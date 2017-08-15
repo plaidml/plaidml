@@ -1,0 +1,83 @@
+// Copyright 2017, Vertex.AI. 
+
+syntax = "proto3";
+
+package vertexai.tile.hal.proto;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
+import "tile/proto/tile.proto";
+import "tile/lang/lang.proto";
+
+option java_package = "ai.vertex.tile.hal";
+option java_outer_classname = "HalProtos";
+
+message HardwareType {
+  enum Value {
+    Unknown = 0;
+    CPU = 1;
+    GPU = 2;
+    Accelerator = 3;
+    Custom = 4;
+  }
+}
+
+// A selector for hardware.
+// N.B. Implementations may impose depth limits on this structure.
+message HardwareSelector {
+  oneof selector {
+    bool value = 1;
+    HardwareSelectorList and = 2;
+    HardwareSelectorList or = 3;
+    HardwareSelector not = 4;
+    HardwareType.Value type = 5;
+    string name_regex = 6;
+    string vendor_regex = 7;
+    uint32 vendor_id = 8;
+  }
+}
+
+message HardwareSelectorList {
+  repeated HardwareSelector sel = 1;
+}
+
+message HardwareSettings {
+  google.protobuf.UInt32Value threads = 1;
+  google.protobuf.UInt32Value vec_size = 2;
+  google.protobuf.BoolValue use_global = 3;
+  google.protobuf.UInt64Value mem_width = 4;
+  google.protobuf.UInt64Value max_mem = 5;
+  google.protobuf.UInt64Value max_regs = 6;
+  google.protobuf.UInt64Value goal_groups = 7;
+  google.protobuf.UInt64Value goal_flops_per_byte = 8;
+  google.protobuf.BoolValue enable_half = 9;
+  repeated uint64 dim_sizes = 10;
+}
+
+message HardwareConfig {
+  hal.proto.HardwareSelector sel = 1;
+  HardwareSettings settings = 2;
+  // Description for human readability
+  string description = 3;
+}
+
+message HardwareInfo {
+  // Driver-specific information about the hardware.
+  google.protobuf.Any info = 1;
+
+  HardwareType.Value type = 2;
+  string name = 3;
+  string vendor = 4;
+  uint32 vendor_id = 5;
+
+  // The shape of the underlying hardware, as determined by the HAL.
+  HardwareSettings settings = 6;
+}
+
+// Metadata about program compilations.
+message CompilationInfo {
+  vertexai.tile.proto.Program program = 1;
+  map<uint64, uint64> tmp_sizes = 2;
+  map<uint64, uint64> alloc_sizes = 3;
+  map<string, vertexai.tile.lang.proto.KernelInfo> kernels = 4;
+}

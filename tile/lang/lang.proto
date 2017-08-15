@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package vertexai.tile.lang.proto;
+
+option java_package = "ai.vertex.tile.lang";
+option java_outer_classname = "LangProtos";
+
+message KernelInfo {
+  oneof kernel_type {
+    ElementInfo element = 1;
+    ContractionInfo contraction = 2;
+    ZeroInfo zero = 3;
+  }
+}
+
+message ElementInfo {
+  repeated string ops = 1;
+}
+
+message ContractionInfo {
+  message Access {
+    string name = 1;
+    int64 range = 2;
+    repeated uint64 strides = 3;
+  }
+
+  message Constraint {
+    repeated int64 lhs = 1;
+    int64 rhs = 2;
+  }
+
+  string op = 1;
+  repeated Access accesses = 2;
+  repeated int64 off = 3;
+  repeated int64 vec = 4;
+  repeated Constraint constraints = 5;
+}
+
+message ZeroInfo {
+}

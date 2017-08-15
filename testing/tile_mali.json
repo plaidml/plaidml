@@ -1,0 +1,32 @@
+{
+  "platform": {
+    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+    "hals": [
+      {
+        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
+        "sel": { "vendor_regex": "ARM" }
+      }
+    ],
+    "hardware_configs": [
+      {
+        "sel": {
+          "and": {
+            "sel": [
+              { "vendor_regex": "ARM" },
+              { "name_regex": "Mali.*" }
+            ]
+          }
+        },
+        "settings": {
+          "threads": { "value": 256 },
+          "vec_size": { "value": 1 },
+          "mem_width": { "value": 16 },
+          "max_mem": { "value": 16000 },
+          "max_regs": { "value": 32000 },
+          "use_global": { "value": true },
+          "enable_half": { "value": false }
+        }
+      }
+    ]
+  }
+}

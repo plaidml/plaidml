@@ -1,0 +1,28 @@
+build --define version=0.0.0.dev0
+build --build_tag_filters=-msvc
+
+test --spawn_strategy=standalone
+test --test_timeout_filters=-eternal
+test --test_tag_filters=-msvc
+
+build:darwin --build_tag_filters=-msvc
+test:darwin --strategy=TestRunner=standalone
+test:darwin --test_tag_filters=-msvc
+
+build:ubuntu-14.04 --cpu k8
+build:ubuntu-14.04 --build_tag_filters=-msvc
+test:ubuntu-14.04 --test_tag_filters=-msvc
+
+build:arm7-ubuntu-14.04 --cpu arm7-linux
+build:arm7-ubuntu-14.04 --crosstool_top=//bzl:toolchain
+build:arm7-ubuntu-14.04 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+build:arm7-ubuntu-14.04 --build_tag_filters=-large,-msvc,-tensorflow
+test:arm7-ubuntu-14.04 --test_tag_filters=-large,-msvc,-tensorflow
+
+build:x64_windows --build_tag_filters=-deb,-keras,-tensorflow
+test:x64_windows --test_tag_filters=-deb,-keras,-tensorflow
+
+build:callgrind -c dbg
+build:callgrind --cxxopt=-O3
+build:callgrind --define=with_callgrind=true
+run:callgrind --run_under='valgrind --quiet --tool=callgrind'

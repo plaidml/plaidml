@@ -1,0 +1,238 @@
+// Copyright 2017, Vertex.AI. 
+
+syntax = "proto3";
+
+package vertexai.tile.hal.opencl.proto;
+
+import "tile/lang/lang.proto";
+import "tile/proto/hal.proto";
+
+message DeviceFPConfig {
+  enum Value {
+    Unknown = 0;
+    Denorm = 1;
+    InfNan = 2;
+    RoundToNearest = 3;
+    RoundToZero = 4;
+    RoundToInf = 5;
+    FusedMultiplyAdd = 6;
+    CorrectlyRoundedDivideSqrt = 7;
+    SoftFloat = 8;
+  }
+}
+
+message MemCacheType {
+  enum Value {
+    Unknown = 0;
+    None = 1;
+    ReadOnly = 2;
+    ReadWrite = 3;
+  }
+}
+
+message LocalMemType {
+  enum Value {
+    Unknown = 0;
+    None = 1;
+    Local = 2;
+    Global = 3;
+  }
+}
+
+message DeviceExecutionCapability {
+  enum Value {
+    Unknown = 0;
+    Kernel = 1;
+    NativeKernel = 2;
+  }
+}
+
+message CommandQueueProperty {
+  enum Value {
+    Unknown = 0;
+    OutOfOrderExecModeEnable = 1;
+    ProfilingEnable = 2;
+  }
+}
+
+message DevicePartitionProperty {
+  enum Value {
+    Unknown = 0;
+    Equally = 1;
+    ByCounts = 2;
+    ByAffinityDomain = 3;
+  }
+}
+
+message DevicePartitionType {
+  enum Value {
+    Unknown = 0;
+    NUMA = 1;
+    L4Cache = 2;
+    L3Cache = 3;
+    L2Cache = 4;
+    L1Cache = 5;
+    NextPartitionable = 6;
+  }
+}
+
+message SvmCapability {
+  enum Value {
+    Unknown = 0;
+    CoarseGrainBuffer = 1;
+    FineGrainBuffer = 2;
+    FineGrainSystem = 3;
+    Atomics = 4;
+  }
+}
+
+// Configuration of the TILE OpenCL driver.
+message Driver {
+  // The OpenCL device selector, used to determine which OpenCL devices
+  // are exposed as child devices of this TILE device.  If this it not
+  // set, the TILE device will default to exposing all GPU and Accelerator
+  // OpenCL devices that it is able to schedule work on.
+  hal.proto.HardwareSelector sel = 1;
+
+  // If true, nan's will be detected at WARNING and summaries will be printed at VLOG(1).
+  bool debug_summaries = 2;
+}
+
+// Metadata about OpenCL platforms discovered during enumeration.
+// Fields are ordered according to the table in the clGetPlatformInfo description in the OpenCL 2.2 specification.
+message PlatformInfo {
+  string profile = 1;
+  string version = 2;
+  string name = 3;
+  string vendor = 4;
+  repeated string extension = 5;
+  uint64 host_timer_resolution_ns = 6;
+};
+
+// Metadata about OpenCL devices discovered during enumeration.
+// Fields are ordered according to the table in the clGetDeviceInfo description in the OpenCL 2.2 specification.
+message DeviceInfo {
+  hal.proto.HardwareType.Value type = 1;
+  uint32 vendor_id = 2;
+  uint32 max_compute_units = 3;
+  repeated uint64 work_item_dimension_size = 4;
+  uint64 max_work_group_size = 5;
+  uint32 preferred_vector_width_char = 6;
+  uint32 preferred_vector_width_short = 7;
+  uint32 preferred_vector_width_int = 8;
+  uint32 preferred_vector_width_long = 9;
+  uint32 preferred_vector_width_float = 10;
+  uint32 preferred_vector_width_double = 11;
+  uint32 preferred_vector_width_half = 12;
+  uint32 native_vector_width_char = 13;
+  uint32 native_vector_width_short = 14;
+  uint32 native_vector_width_int = 15;
+  uint32 native_vector_width_long = 16;
+  uint32 native_vector_width_float = 17;
+  uint32 native_vector_width_double = 18;
+  uint32 native_vector_width_half = 19;
+  uint32 max_clock_frequency_mhz = 20;
+  uint32 address_bits = 21;
+  uint64 max_mem_alloc_size = 22;
+  bool image_support = 23;
+  uint32 max_read_image_args = 24;
+  uint32 max_write_image_args = 25;
+  uint32 max_read_write_image_args = 26;
+  repeated string il_version = 27;
+  uint64 image2d_max_width = 28;
+  uint64 image2d_max_height = 29;
+  uint64 image3d_max_width = 30;
+  uint64 image3d_max_height = 31;
+  uint64 image3d_max_depth = 32;
+  uint64 image_max_buffer_size = 33;
+  uint64 image_max_array_size = 34;
+  uint32 max_samplers = 35;
+  uint32 image_pitch_alignment = 36;
+  uint32 image_base_address_alignment = 37;
+  uint32 max_pipe_args = 38;
+  uint32 pipe_max_active_reservations = 39;
+  uint64 max_parameter_size = 40;
+  uint32 mem_base_addr_align = 41;
+  repeated DeviceFPConfig.Value single_fp_config = 42;
+  repeated DeviceFPConfig.Value double_fp_config = 43;
+  MemCacheType.Value global_mem_cache_type = 44;
+  uint32 global_mem_cacheline_size = 45;
+  uint64 global_mem_cache_size = 46;
+  uint64 max_constant_buffer_size = 47;
+  uint32 max_constant_args = 48;
+  uint64 max_global_variable_size = 49;
+  uint64 global_variable_preferred_total_size = 50;
+  LocalMemType.Value local_mem_type = 51;
+  uint64 local_mem_size = 52;
+  bool error_correction_support = 53;
+  uint64 profiling_timer_resolution_ns = 54;
+  bool endian_little = 55;
+  bool available = 56;
+  bool compiler_available = 57;
+  bool linker_available = 58;
+  repeated DeviceExecutionCapability.Value execution_capability = 59;
+  repeated CommandQueueProperty.Value queue_on_host_property = 60;
+  repeated CommandQueueProperty.Value queue_on_device_property = 61;
+  uint32 queue_on_device_preferred_size = 62;
+  uint32 queue_on_device_max_size = 63;
+  uint32 max_on_device_queues = 64;
+  uint32 max_on_device_events = 65;
+  repeated string built_in_kernel = 66;
+  uint32 platform_index = 67;  // Index of the associated PlatformInfo
+  string name = 68;
+  string vendor = 69;
+  string driver_version = 70;
+  string profile = 71;
+  string version = 72;
+  string opencl_c_version = 73;
+  repeated string extension = 74;
+  uint64 printf_buffer_size = 75;
+  bool preferred_interop_user_sync = 76;
+  uint32 partition_max_sub_devices = 78;
+  repeated DevicePartitionProperty.Value device_partition_property = 79;
+  uint32 partition_affinity_domain = 80;
+  repeated DevicePartitionType.Value device_partition_type = 81;
+  repeated SvmCapability.Value svm_capability = 82;
+  uint32 preferred_platform_atomic_alignment = 83;
+  uint32 preferred_global_atomic_alignment = 84;
+  uint32 preferred_local_atomic_alignment = 85;
+  uint32 max_num_sub_groups = 86;
+  bool sub_group_independent_forward_progress = 87;
+
+  int32 nv_cuda_major_rev = 1001;
+  int32 nv_cuda_minor_rev = 1002;
+  int32 nv_registers_per_block = 1003;
+  int32 nv_warp_size = 1004;
+  bool nv_gpu_overlap = 1005;
+  bool nv_kernel_exec_timeout = 1006;
+  bool nv_integrated_memory = 1007;
+
+  string amd_board_name = 2001;
+  int32 amd_simd_per_compute_unit = 2002;
+  int32 amd_simd_instruction_width = 2003;
+  int32 amd_wavefront_width = 2004;
+  int32 amd_global_mem_channels = 2005;
+  int32 amd_global_mem_channel_banks = 2006;
+  int32 amd_global_mem_channel_bank_width = 2007;
+  int32 amd_local_mem_size_per_compute_unit = 2008;
+  int32 amd_local_mem_banks = 2009;
+
+  bytes platform_uuid = 10000;
+}
+
+message BuildInfo {
+  bytes device_uuid = 1;
+  string src = 2;
+  int32 cl_build_status = 3;
+  string log = 4;
+}
+
+message KernelInfo {
+  string kname = 1;
+  string src = 2;
+  vertexai.tile.lang.proto.KernelInfo kinfo = 3;
+}
+
+message RunInfo {
+  bytes kernel_uuid = 1;
+}

@@ -1,0 +1,24 @@
+# Fill a tensor with a constant
+C[&] = +(A * 1) # Creates one index for each dimension of C and assigns them to the output expression
+
+# Sum a tensor and produce a constant
+C = +(A[&] * 1) # Creates one index for each dimension in A and assigns them to the output expression
+
+# Piecewise Multiplication
+C[&] = +(A[&C] * B[&C]) # Uses the generated C indices to iterate over A and B
+
+# Matrix Multiplication
+C[y,x] = +(A[y,i] * B[i,x]) # Three indices x,y,i, sizes inferred from bound matrices.
+C[y,x] = +(A[i,y] * B[x,i]) # Transposed matmul
+
+# Image Convolution (2D)
+O[co,ci,y,x] = +(I[ci,y+j,x+i] * K[co,ci,j,i])
+
+# Max Pooling
+C[&] = >(A[2&])       # 2x downsampling, using MAX for aggregation, arbitrary dimensionality
+C[y,x] = >(A[2y,4x]) # 2x4 downsampling in two dimensions
+
+# Softmax
+NUM[y,x] = EXP +(A[y,i] * B[i,x])
+DENOM = +(NUM[&])
+SFTMX[NUM&] = +(NUM[&] / DENOM)

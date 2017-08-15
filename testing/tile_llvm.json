@@ -1,0 +1,17 @@
+{
+  "platform": {
+    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+    "hals": [
+      {
+        "@type": "type.vertex.ai/vertexai.tile.hal.cpu.proto.Driver"
+      }
+    ],
+    "hardware_configs": [
+      {
+        "sel": {
+          "value": true
+        }
+      }
+    ]
+  }
+}

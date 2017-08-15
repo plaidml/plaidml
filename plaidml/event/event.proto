@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package vertexai.event.proto;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+
+option java_package = "ai.vertex.event";
+option java_outer_classname = "EventProtos";
+
+// Represents a single event.
+message Event {
+  // The parent of this event (what was going on when this activity started).
+  bytes parent_instance_uuid = 1;
+
+  // The instance of this activity (e.g. a particular run of some RPC).
+  bytes instance_uuid = 2;
+
+  // The verb of this activity (e.g. the RPC being run).
+  string verb = 3;
+
+  // Identifies the particular clock instance used to measure this activity.
+  bytes clock_uuid = 4;
+
+  // The activity's start and end times, as offsets from the clock's epoch.
+  //
+  // Note that activity events may be split, with the initial start event
+  // (missing the end time) followed later by a completion event (containing
+  // only the instance UUID and the end time).
+  google.protobuf.Duration start_time = 5;
+  google.protobuf.Duration end_time = 6;
+
+  // Activity metadata.
+  repeated google.protobuf.Any metadata = 7;
+
+  // Identifies the domain of this event -- i.e. the process in which the event takes place.
+  // This will be equal to another event's instance_uuid.
+  bytes domain_uuid = 8;
+}
+
+// Domain metadata, identifying the source of a stream of events.
+// This is typically attached to a top-level event (one with no parent),
+// in order to provide a scope for a tree of events.
+message Domain {
+  // The creator of the domain.  This is unique to the point in the codebase
+  // where the domain is created.  Example: "vertex.ai/plaidml/keras_backend"
+  string creator = 1;
+
+  // TODO: Additional domain details should be added here, such as the release
+  // or commit the code is built from, the user identity, machine identity, &c.
+}
+
+// A magic value, used in the first record in an event file.
+message FileMagic {
+  enum Value {
+    Unknown = 0;
+    Eventlog = 0x4C747645;  // 'EvtL', little-endian
+  }
+
+  Value value = 1;
+}
+
+// An event log file consists of a sequence of Record messages, each prefixed with a varint byte length.
+message FileRecord {
+  // If present, the value must be equal to FileMagic.Eventlog.
+  FileMagic magic = 1;
+
+  // Some number of events.
+  repeated Event event = 2;
+}
+
+// A buffer of data, attached to an event as metadata.
+message Buffer {
+  string comment = 1;
+  string dtype = 2;
+  repeated int32 shape = 3;
+  bytes data = 4;
+}
+

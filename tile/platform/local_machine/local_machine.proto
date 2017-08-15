@@ -1,0 +1,17 @@
+// Copyright 2017, Vertex.AI. 
+
+syntax = "proto3";
+
+package vertexai.tile.local_machine.proto;
+
+import "google/protobuf/any.proto";
+import "tile/proto/hal.proto";
+
+message Platform {
+  // The low-level HALs to load.
+  repeated google.protobuf.Any hals = 1;
+
+  // Device settings overrides.
+  // Later entries override earlier entries.
+  repeated vertexai.tile.hal.proto.HardwareConfig hardware_configs = 2;
+}
