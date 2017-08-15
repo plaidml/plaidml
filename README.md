@@ -1,5 +1,5 @@
 # PlaidML
-*A framwork for making machine learning work everywhere.*
+*A framework for making machine learning work everywhere.*
 ![The PlaidML Platypus](https://github.com/vertexai/plaidml/raw/master/images/plaid-final.png)
 
 PlaidML is a framework that uses the *Tile* language to enable machine learning to work on any device, 
