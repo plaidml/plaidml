@@ -89,6 +89,14 @@ model.compile(optimizer='sgd', loss='categorical_crossentropy',
 
 print("Running initial batch (compiling tile program)")
 y = model.predict(x=x_train, batch_size=batch_size)
+
+# Now start the clock and run 10 batches
+print("Timing inference...")
+start = time.time()
+for i in range(10):
+    y = model.predict(x=x_train, batch_size=batch_size)
+    print("Ran in {} seconds".format(time.time() - start))
+
 ```
 
 ## Reporting Issues
