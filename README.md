@@ -58,7 +58,7 @@ Currently we support:
 ## Installation Instructions
 Just install the pip and you're ready to go.
 
-The Pre-release bundles the wheels inside the `whl` directory, so you'll install them from there:
+**PRE-RELEASE USERs: the wheels are bundled inside the `whl` directory, so you'll install them from there:**
 
 `sudo pip install whl/*`
 
