@@ -66,6 +66,8 @@ Just install the pip and you're ready to go.
 
 You can adapt any Keras code to use PlaidML simply by using the PlaidML backend instead
 of the TensorFlow, CTNK, or Theano backend that you normally use.
+
+Simply insert this code **BEFORE you `import keras`**:
 ```
 # Install the plaidml backend
 import plaidml.keras
