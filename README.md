@@ -7,7 +7,8 @@ from any framework. We'll be releasing more details about how *Tile* works and w
 
 ## Supported Hardware, Networks, and Operations
 We're constantly working on expanding the set of qualifies platforms for running PlaidML. 
-To ensure our users have a positive experience with performance, we only support a subset of commonly available hardware, though dedicated hackers can enable support for any devices that supports OpenCL 1.1 or higher.
+To ensure our users have a positive experience with performance, we only support a subset of commonly available hardware,
+though dedicated hackers can enable support for any devices that supports OpenCL 1.1 or higher.
 
 ### Currently Supported Hardware
 *These cards are tested for correctness and performance on every commit*
@@ -33,16 +34,20 @@ If you have multiple supported devices, you'll need to choose between them by se
 instructions will be printed.
 
 ### Networks
-We support most the convolutional Keras application networks. RNNs are coming soon. Support in this context means they are tested (for performance and correctness) as part of our continuous integration system on our supported hardware. Other networks may work.
+We support most of the convolutional Keras application networks. Supported networks are
+tested for performance and correctness as part of our continuous integration system on
+our supported hardware. Other networks may work.
 
  * CNNs
    * inception_v3
    * resnet50
    * vgg19
    * xception
+ * RNNs
+   * `<coming soon>`
 
 ### Operations & Data Formats
-We support many but not all of the keras backend operations. We welcome community contributions. Once you get the hang of writing *Tile* code, you'll be hooked.
+We support many but not all of the keras backend operations. We welcome community contributions to cover more operations.
 
 We currently only officially support single precision floating point. *Tile* itself is data type agnostic and we expect to support every meaningful data type in the near future.
 
@@ -65,6 +70,16 @@ of the TensorFlow, CTNK, or Theano backend that you normally use.
 import plaidml.keras
 plaidml.keras.install_backend()
 ```
+
+### Plaidvision and Plaidmark
+
+We've developed two open source projects: 
+  **PRE-RELEASE USERS: plaidvision and plaidbench are included in the release tarball.**
+
+  * [Plaidvision](https://github.com/vertexai/plaidvision) provides a simple shell for developing vision applications using your webcam
+  * [Plaidbench](https://github.com/vertexai/plaidbench) is a performance testing suite designed to help users compare the performance
+  of different cards and different frameworks
+  
 
 ### Hello VGG
 One of the great things about keras is how easy it is to play with state-of-the-art networks. Here's all the code you
