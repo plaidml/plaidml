@@ -59,6 +59,7 @@ Currently we support:
 Just install the pip and you're ready to go.
 
 The Pre-release bundles the wheels inside the `whl` directory, so you'll install them from there:
+
 `sudo pip install whl/*`
 
 ~~`sudo pip install plaidml-keras`~~
@@ -73,8 +74,9 @@ plaidml.keras.install_backend()
 
 ### Plaidvision and Plaidmark
 
+**PRE-RELEASE USERS: plaidvision and plaidbench are included in the release tarball.**
+
 We've developed two open source projects: 
-  **PRE-RELEASE USERS: plaidvision and plaidbench are included in the release tarball.**
 
   * [Plaidvision](https://github.com/vertexai/plaidvision) provides a simple shell for developing vision applications using your webcam
   * [Plaidbench](https://github.com/vertexai/plaidbench) is a performance testing suite designed to help users compare the performance
