@@ -53,7 +53,10 @@ Currently we support:
 ## Installation Instructions
 Just install the pip and you're ready to go.
 
-`sudo pip install plaidml-keras`
+The Pre-release bundles the wheels inside the `whl` directory, so you'll install them from there:
+`sudo pip install whl/*`
+
+~~`sudo pip install plaidml-keras`~~
 
 You can adapt any Keras code to use PlaidML simply by using the PlaidML backend instead
 of the TensorFlow, CTNK, or Theano backend that you normally use.
