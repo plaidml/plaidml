@@ -56,13 +56,11 @@ Currently we support:
  * 1d, 3d, and separable convolutions
 
 ## Installation Instructions
-Just install the pip and you're ready to go.
 
-**PRE-RELEASE USERs: the wheels are bundled inside the `whl` directory, so you'll install them from there:**
-
-`sudo pip install whl/*`
-
-~~`sudo pip install plaidml-keras`~~
+ * Linux/OS-X 
+   * System-wide `sudo ./install.sh`
+   * Inside a virtualenv `./install.sh`
+ * ~~Windows `install.bat`~~
 
 You can adapt any Keras code to use PlaidML simply by using the PlaidML backend instead
 of the TensorFlow, CTNK, or Theano backend that you normally use.
