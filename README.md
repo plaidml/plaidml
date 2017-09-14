@@ -57,10 +57,49 @@ Currently we support:
 
 ## Installation Instructions
 
- * Linux/OS-X 
-   * System-wide `sudo ./install.sh`
-   * Inside a virtualenv `./install.sh`
- * ~~Windows `install.bat`~~
+### Linux
+If necessary, install python's 'pip' tool.
+```
+sudo add-apt-repository universe && sudo apt update
+sudo apt install python-pip
+```
+Make sure your system has OpenCL.
+```
+sudo apt install clinfo
+clinfo
+```
+If clinfo reports "Number of platforms" == 0, you must install a driver.
+
+If you have an Nvidia graphics card:
+```
+sudo add-apt-repository ppa:graphics-drivers/ppa && sudo apt update
+sudo apt install nvidia-modprobe nvidia-384 nvidia-opencl-icd-384 libcuda1-384
+```
+If you have an AMD card, [download the AMDGPU PRO driver and install](http://support.amd.com/en-us/kb-articles/Pages/AMD-Radeon-GPU-PRO-Linux-Beta-Driver%e2%80%93Release-Notes.aspx) according to AMD's instructions. 
+
+Install plaidml system-wide:
+```
+sudo ./install.sh
+```
+
+Install plaidml inside a virtualenv:
+```
+./install.sh
+```
+
+### Mac OS
+Install plaidml system-wide:
+```
+sudo ./install.sh
+```
+
+Install plaidml inside a virtualenv:
+```
+./install.sh
+```
+
+### ~~Windows~~
+~~`install.bat`~~
 
 You can adapt any Keras code to use PlaidML simply by using the PlaidML backend instead
 of the TensorFlow, CTNK, or Theano backend that you normally use.
@@ -72,7 +111,7 @@ import plaidml.keras
 plaidml.keras.install_backend()
 ```
 
-### Plaidvision and Plaidmark
+### Plaidvision and Plaidbench
 
 **PRE-RELEASE USERS: plaidvision and plaidbench are included in the release tarball.**
 
