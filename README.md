@@ -57,7 +57,7 @@ Currently we support:
 
 ## Installation Instructions
 
-### Linux
+### Ubuntu Linux (16.04 or later)
 If necessary, install python's 'pip' tool.
 ```
 sudo add-apt-repository universe && sudo apt update
@@ -75,7 +75,7 @@ If you have an Nvidia graphics card:
 sudo add-apt-repository ppa:graphics-drivers/ppa && sudo apt update
 sudo apt install nvidia-modprobe nvidia-384 nvidia-opencl-icd-384 libcuda1-384
 ```
-If you have an AMD card, [download the AMDGPU PRO driver and install](http://support.amd.com/en-us/kb-articles/Pages/AMD-Radeon-GPU-PRO-Linux-Beta-Driver%e2%80%93Release-Notes.aspx) according to AMD's instructions. 
+If you have an AMD card, [download the AMDGPU PRO driver and install](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Driver-for-Linux-Release-Notes.aspx) according to AMD's instructions.
 
 Install plaidml system-wide:
 ```
