@@ -30,7 +30,7 @@ We also provide experimental configurations for all Fiji, Ellsemere, Kepler, and
 We can't promise they'll work well though. If your card isn't currently supported, helpful instructions will be printed;
 you can enable experimental cards by running with the environment variable `PLAIDML_EXPERIMENTAL=1`
 
-If you have multiple supported devices, you'll need to choose between them by setting `PLAIDML_DEVICE_IDX=<id>`. Again,
+If you have multiple supported devices, you'll need to choose between them by setting `PLAIDML_DEVICE_IDS=<id>`. Again,
 instructions will be printed.
 
 ### Networks
