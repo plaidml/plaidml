@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package vertexai.tile.proto;
+
+import "tile/proto/tile.proto";
+
+import "google/protobuf/empty.proto";
+
+option java_package = "ai.vertex.tile";
+option java_outer_classname = "TensorProtos";
+
+// The Tile backend service API.
+// This API is used by Tile clients to manage remote Tile operations
+// in deployments where the Tile backends have access to compute resources
+// not directly available to clients.
+service Backend {
+  // List the sub-devices (if any) managed by this backend.
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+
+  // Create a new session.
+  rpc CreateSession(CreateSessionRequest) returns (Session);
+
+  // Updates a session's expiration time.
+  rpc UpdateSessionExpiration(UpdateSessionExpirationRequest)
+      returns (UpdateSessionExpirationResponse);
+
+  // Delete a session, also deleting all session sub-resources.
+  rpc DeleteSession(DeleteSessionRequest) returns (google.protobuf.Empty);
+
+  // List the server's current sessions.
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+
+  // Get a particular session.
+  rpc GetSession(GetSessionRequest) returns (Session);
+
+  // Deletes a buffer (sets it to zero length).
+  rpc DeleteBuffer(DeleteBufferRequest) returns (google.protobuf.Empty);
+
+  // Lists a session's non-zero-length buffers.
+  rpc ListBuffers(ListBuffersRequest) returns (ListBuffersResponse);
+
+  // Gets the state of a particular buffer.
+  rpc GetBuffer(GetBufferRequest) returns (Buffer);
+
+  // Write to a buffer's memory, optionally creating the buffer and/or
+  // marking it as complete (making it available to readers).
+  rpc WriteBuffer(stream WriteBufferRequest) returns (stream WriteBufferResponse);
+
+  // Read from a buffer's memory.  The read will fail if the buffer is
+  // being written by any process or API client.
+  rpc ReadBuffer(stream ReadBufferRequest) returns (stream ReadBufferResponse);
+
+  // Updates a process -- possibly creating it, but also to adjust
+  // the process's state.
+  rpc UpdateProcess(UpdateProcessRequest) returns (Process);
+
+  // Deletes a process.
+  rpc DeleteProcess(DeleteProcessRequest) returns (google.protobuf.Empty);
+
+  // Lists a session's processes.
+  rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+
+  // Gets the state of a particular process.
+  rpc GetProcess(GetProcessRequest) returns (Process);
+}

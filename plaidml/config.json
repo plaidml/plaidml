@@ -1,0 +1,77 @@
+{
+  "platform": {
+    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+    "hals": [
+      {
+        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
+        "sel": {
+          "or": {
+            "sel": [
+              { "vendor_regex": "Advanced Micro Devices.*" },
+              { "vendor_regex": "NVIDIA.*" }
+            ]
+          }
+        }
+      }
+    ],
+    "hardware_configs": [
+      {
+        "description": "AMD settings",
+        "sel": {
+          "and": {
+            "sel": [
+              { "vendor_regex": "Advanced Micro Devices.*" },
+              { "or": {
+                  "sel": [
+                    { "name_regex": "Fiji" },
+                    { "name_regex": "Ellesmere" }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "settings": {
+          "threads": {"value": 256},
+          "vec_size": {"value": 1},
+          "mem_width": {"value": 128},
+          "max_mem": {"value": 32768},
+          "max_regs": {"value": 16384},
+          "goal_groups": {"value": 1},
+          "goal_flops_per_byte": {"value": 50},
+          "enable_half": {"value": false}
+        }
+      },
+      {
+        "description": "nvidia settings",
+        "sel": {
+          "and": {
+            "sel": [
+              { "vendor_regex": "NVIDIA.*" },
+              { "or": {
+                  "sel": [
+                    { "name_regex": ".*GTX.*" },
+                    { "name_regex": ".*Tesla K.*" },
+                    { "name_regex": ".*TITAN.*" },
+                    { "name_regex": ".*Pascal.*" },
+                    { "name_regex": ".*Kepler.*" }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "settings": {
+          "threads": {"value": 256},
+          "vec_size": {"value": 1},
+          "mem_width": {"value": 64},
+          "max_mem": {"value": 15360},
+          "max_regs": {"value": 32768},
+          "goal_groups": {"value": 7},
+          "goal_flops_per_byte": {"value": 46},
+          "enable_half": {"value": false}
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "platform": {
+    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+    "hals": [
+      {
+        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
+        "sel": { "name_regex": "Ellesmere.*" }
+      }
+    ],
+    "hardware_configs": [
+      {
+        "sel": { "value": true },
+        "settings": {
+          "threads": {"value": 256},
+          "vec_size": {"value": 1},
+          "mem_width": {"value": 128},
+          "max_mem": {"value": 32000},
+          "max_regs": {"value": 32000},
+          "enable_half": {"value": false}
+        }
+      }
+    ]
+  }
+}

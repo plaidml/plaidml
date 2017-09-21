@@ -1,0 +1,11 @@
+// Copyright 2017 Vertex.AI.
+syntax = "proto3";
+
+package vertexai.plaidml.proto;
+
+import "google/protobuf/any.proto";
+
+message Config {
+  // The platform-specific configuration for the backend.
+  google.protobuf.Any platform = 1;
+}

@@ -1,0 +1,461 @@
+\documentclass[11pt]{article}
+\usepackage{geometry}
+\geometry{letterpaper}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+
+\newcommand{\matr}[1]{\mathbf{#1}}
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newenvironment{code}{\verbatim}{\endverbatim}
+
+\newcommand{\abs}[1]{{\left\vert{#1}\right\vert}}
+\newcommand{\floor}[1]{{\left\lfloor{#1}\right\rfloor}}
+\newcommand{\ceil}[1]{{\left\lceil{#1}\right\rceil}}
+\newcommand{\cc}{::\allowbreak }
+\newtheorem*{theorem*}{Theorem}
+\newtheorem{theorem}{Theorem}
+\newtheorem*{lemma*}{Lemma}
+\newtheorem{lemma}{Lemma}
+
+\title{Algorithm for Merging Parallel Constraints}
+\author{Tim Zerrell}
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Abstract}
+
+This document describes the intent of \texttt{tile\cc lang\cc MergeParallelConstraints} and justifies why its code produces the desired results.
+
+\section{Purpose}
+
+The \texttt{tile\cc lang\cc MergeParallelConstraints} function is intended to reduce a list of constraints by combining those constraints that are satisfied by hyperplanes which are parallel to each other. After running this function on a vector of constraints, the vector will contain no pair of parallel constraints --- that is, for any pair of constraints $C_1$ and $C_2$, the polynomials $\vect{c_1}$ and $\vect{c_2}$ describing these constraints (without constant term) will not divide each other: $\vect{c_1} \neq \alpha \vect{c_2}$ for any real number $\alpha\in\mathbb{R}$ --- but the set of integer vectors satisfying the constraints will remain unchanged.
+
+The core part of \texttt{tile\cc lang\cc MergeParallelConstraints} is another function called \texttt{tile\cc lang\cc IntersectParallelConstraintPair} which, given two constraints known to be parallel \texttt{constraint1} and \texttt{constraint2}, will return a single constraint satisfied by exactly those integer vectors which satisfy both \texttt{constraint1} and \texttt{constraint2}.
+
+\section{Requirements}
+
+Given two constraints
+\begin{align}
+\vect{c_1} \vect{u} + o_1 &\in \mathbb{Z} \cap [0, r_1)\text{, and} \label{C1} \\
+\vect{c_2} \vect{u} + o_2 &\in \mathbb{Z} \cap [0, r_2) \label{C2}
+\end{align}
+we want to construct a single constraint
+\begin{align}
+\vect{\widetilde{c}} \vect{u} + \widetilde{o} &\in \mathbb{Z} \cap [0, \widetilde{r}) \label{Cmerged}
+\end{align}
+such that $\vect{u}$ satisfies \eqref{Cmerged} if and only if $\vect{u}$ satisfies both \eqref{C1} and \eqref{C2}. Here $o_1$ and $o_2$ are rational numbers, $\vect{c_1}$ and $\vect{c_2}$ are row vectors in $\mathbb{Q}^n$, and $\vect{u}$ is a column vector in $\mathbb{Q}^n$ (later in the constraint optimisation process $\vect{u}$ will be in $\mathbb{Z}^n$, but we do not need to assume that for this algorithm).
+
+This algorithm assumes that $\vect{c_1}$ and $\vect{c_2}$ are parallel. The function \texttt{tile\cc lang\cc IntersectParallelConstraintPair} tests this assertion when called and fails throwing a \texttt{std\cc invalid\_argument} exception if they are not parallel.
+
+The algorithm also assumes that $\vect{c_1}$ and $\vect{c_2}$ are both nonzero. Constraints with a constant polynomial $\vect{c}\vect{u} + o$ (i.e., those with $\vect{c} = 0$) are eliminated by \texttt{tile\cc lang\cc MergeParallelConstraints} before running the main algorithm.
+
+\section{Justification of the Algorithm}
+
+\subsection{Computation of $\widetilde{\vect{c}}$ (the nonconstant part of \texttt{PartialConstraint})}
+
+We first concern ourselves with the integrality condition. That is, we want to construct $\widetilde{\vect{c}}\in\mathbb{Q}^n$ and  $\widehat{o}\in\mathbb{Q}$ such that
+\begin{align}
+\widetilde{\vect{c}} \vect{u} + \widehat{o} &\in \mathbb{Z} \label{cmerged}
+\end{align}
+if and only if
+\begin{align}
+\vect{c_1}\vect{u} + o_1 &\in\mathbb{Z}\text{, and} \label{c1}\\
+\vect{c_2}\vect{u} + o_2 &\in\mathbb{Z}. \label{c2}
+\end{align}
+We initially ignore the offsets $o_1$, $o_2$, and $\widehat{o}$, for if $\vect{u_1}$ and $\vect{u_2}$ satisfy \eqref{c1} and \eqref{c2} then $\vect{c_1}(\vect{u_1} - \vect{u_2})\in\mathbb{Z}$ and $\vect{c_2}(\vect{u_1} - \vect{u_2}) \in \mathbb{Z}$, but also \eqref{cmerged} must be satisfied so we must have $\widehat{\vect{c}} (\vect{u_1} - \vect{u_2}) \in \mathbb{Z}$ as well; and also conversely.
+
+Now let $d_1$ (called \texttt{coeff1} in the code) be a nonzero coefficient of $\vect{c_1}$, and let $d_2$ be the corresponding coefficient of $\vect{c_2}$. Let $\gcd(x,y)$ denote the \emph{rational} greatest common divisor of $x$ and $y$ (that is, the largest $q\in\mathbb{Q}$ for which there exist integers $k_1$ and $k_2$ such that $k_1 q = x$ and $k_2 q = y$). We will show that $\widetilde{\vect{c}} = \frac{\gcd(d_1, d_2)}{d_1} \vect{c_1}$ has the properties we are looking for.
+
+\begin{lemma*}
+Let $k_1$ and $k_2$ be the integers such that $d_1 = k_1\gcd(d_1, d_2)$ and $d_2 = k_2\gcd(d_1,d_2)$. Then $\gcd(k_1,k_2) = 1$.
+\end{lemma*}
+
+\begin{proof}
+This is a basic number theory result. Let $\ell_1 = \frac{k_1}{\gcd(k_1,k_2)}$ and $\ell_2 = \frac{k_2}{\gcd(k_1,k_2)}$. By the definition of $\gcd$, $\ell_1$ and $\ell_2$ are both integers. Moreover, \begin{align*}d_1 = \ell_1 \gcd(k_1,k_2) \gcd(d_1, d_2)\quad&\text{and}\quad d_2 = \ell_2 \gcd(k_1, k_2) \gcd(d_1, d_2).\end{align*} Therefore, $\gcd(k_1, k_2) \gcd(d_1, d_2)$ divides both $d_1$ and $d_2$ and so by the definition of $\gcd$
+\begin{align*}
+\gcd(k_1, k_2) \gcd(d_1, d_2) &\leq \gcd(d_1, d_2) \\
+\gcd(k_1, k_2) &\leq 1.
+\end{align*}
+But as $k_1$ and $k_2$ are nonzero integers, $\gcd(k_1,k_2)$ must be a positive integer, and thus $\gcd(k_1,k_2) \geq 1$. Combining these inequalities,
+\begin{align*}
+\gcd(k_1, k_2) &= 1.
+\end{align*}
+\end{proof}
+
+\begin{theorem*}
+Let $\vect{c_1}$, $\vect{c_2}$, $d_1$, and $d_2$ be defined as above. Then
+\begin{align*}
+\frac{\gcd(d_1, d_2)}{d_1} \vect{c_1} &= \frac{\gcd(d_1, d_2)}{d_2} \vect{c_2}.
+\end{align*}
+Moreover, if we define 
+\begin{align}
+\widetilde{\vect{c}} &= \frac{\gcd(d_1, d_2)}{d_1} \vect{c_1} \label{ctilde-def}
+\end{align}
+then using $o_1 = o_2 = \widehat{o} = 0$ we have that any vector $\vect{u}$ satisfies \eqref{cmerged} for this $\widetilde{\vect{c}}$ if and only if it satisfies both \eqref{c1} and \eqref{c2}.
+\end{theorem*}
+
+\begin{proof}
+Since we have by assumption that $\vect{c_1}$ and $\vect{c_2}$ are parallel and $d_1$ is a nonzero coefficient of $\vect{c_1}$ corresponding to the coefficient $d_2$ of $\vect{c_2}$, we know that for any $\alpha, \beta\in\mathbb{R}$, $\alpha \vect{c_1} = \beta \vect{c_2}$ if and only if $\alpha d_1 = \beta d_2$. But
+\begin{align*}
+\frac{\gcd(d_1, d_2)}{d_1} d_1 &= \gcd(d_1, d_2) = \frac{\gcd(d_1, d_2)}{d_2} d_2,
+\end{align*}
+proving the first equation of this theorem.
+
+Now define $\widetilde{\vect{c}}$ as in \eqref{ctilde-def}. Suppose $\vect{u}$ satisfies \eqref{cmerged} with $\widehat{o} = 0$. Then
+\begin{align*}
+\widetilde{\vect{c}} \vect{u} &\in \mathbb{Z}, \\
+\frac{\gcd(d_1, d_2)}{d_1} \vect{c_1} \vect{u} &\in \mathbb{Z}.
+\end{align*}
+But by definition of the $\gcd$, there exists some $k_1\in \mathbb{Z}$ such that $d_1 = k_1 \gcd(d_1, d_2)$. Thus we have $\frac{1}{k_1}\vect{c_1} \vect{u} \in \mathbb{Z}$, and since $k_1$ is an integer $k_1 \frac{1}{k_1}\vect{c_1}\vect{u}\in\mathbb{Z}$ and hence $\vect{c_1}\vect{u}\in\mathbb{Z}$.
+
+We can use the first part of the theorem to get that $\widetilde{\vect{c}} = \frac{\gcd(d_1, d_2)}{d_2}\vect{c_2}$. Thus, we can similarly reason that
+\begin{align*}
+\frac{\gcd(d_1, d_2)}{d_2}\vect{c_2}\vect{u} \in \mathbb{Z},
+\end{align*}
+and with $k_2\in\mathbb{Z}$ such that $d_2 = k_2 \gcd(d_1, d_2)$ we have $\frac{1}{k_2}\vect{c_2}\vect{u}\in\mathbb{Z}$ and hence $\vect{c_2}\vect{u}\in\mathbb{Z}$.
+
+Conversely, suppose $\vect{u}$ satisfies both \eqref{c1} and \eqref{c2} with $o_1 = o_2 = 0$. With $k_1$ and $k_2$ defined as above, we have $k_1 = \frac{d_1}{\gcd(d_1, d_2)}$ and $k_2 = \frac{d_2}{\gcd(d_1,d_2)}$. Thus,
+\begin{align*}
+\widetilde{\vect{c}} &= \frac{1}{k_1} \vect{c_1} = \frac{1}{k_2}\vect{c_2},
+\end{align*}
+or equivalently
+\begin{align*}
+\vect{c_1} = k_1\widetilde{\vect{c}} \quad&\text{ and }\quad \vect{c_2} = k_2 \widetilde{\vect{c}}.
+\end{align*}
+Thus from \eqref{c1} and \eqref{c2} we have
+\begin{align*}
+k_1\widetilde{\vect{c}}\vect{u}\in\mathbb{Z} \quad&\text{ and }\quad k_2\widetilde{\vect{c}}\vect{u}\in\mathbb{Z} 
+\end{align*}
+which means that 
+\begin{align*}
+\gcd(k_1, k_2) \widetilde{\vect{c}}\vect{u} \in \mathbb{Z}.
+\end{align*}
+But by the Lemma, $\gcd(k_1, k_2) = 1$, and hence we have $\widetilde{\vect{c}}\vect{u}\in\mathbb{Z}$ as desired.
+\end{proof}
+
+Note that $k_1$ is named \texttt{c1IntegerFactor} in the code and $k_2$ is named \texttt{c2IntegerFactor} in the code. For ease of further computation we will also name $k_1^{-1}$ as \texttt{c1ratio} and $k_2^{-1}$ as \texttt{c2ratio} in the code. Note that these can be computed directly by the formulas
+\begin{align*}
+\frac{1}{k_1} &= \frac{\gcd(d_1,d_2)}{d_1}\text{, and} \\
+\frac{1}{k_2} &= \frac{\gcd(d_1,d_2)}{d_2}.
+\end{align*}
+Indeed, in the code these are the quantities we initially compute, then we find $k_1$ and $k_2$ by taking the reciprocal of these quantities. (There are some additional checks to confirm these are integers and to ensure they get the proper sign; this is performed in the \texttt{static} function \texttt{getIntegerFactorFromRatio} defined at the beginning of \texttt{bound.cc}.)
+Note the following properties:
+\begin{align}
+\vect{c_1} &= k_1 \widetilde{\vect{c}}, & \vect{c_2} &= k_2\widetilde{\vect{c}}, & & \text{and} & \widetilde{\vect{c}} &= k_1^{-1} \vect{c_1} = k_2^{-1} \vect{c_2}. \label{k-props}
+\end{align}
+
+\subsection{Computation of $\widehat{o}$ (called \texttt{FractionalOffset} in the code)}
+
+We next compute the offset $\widehat{o}\in\mathbb{Q}$ for which the integrality condition given in \eqref{cmerged} holds if and only if the integrality conditions in \eqref{c1} and \eqref{c2} hold. Thus, we want $\widehat{o}$ to satisfy both of the implications
+\begin{align*}
+k_1^{-1}\vect{c_1}\vect{u} + \widehat{o} \in \mathbb{Z} &\Rightarrow \vect{c_1}\vect{u} + o_1 \in \mathbb{Z}\text{, and} \\
+k_2^{-1}\vect{c_2}\vect{u} + \widehat{o} \in \mathbb{Z} &\Rightarrow \vect{c_2}\vect{u} + o_2 \in \mathbb{Z}.
+\end{align*}
+These are the $\widehat{o}$ such that
+\begin{align}
+\begin{cases}
+\widehat{o} = o_1 + ik_1^{-1}, & \text{ for some $i\in\mathbb{Z}$, and} \\
+\widehat{o} = o_2 + jk_2^{-1}, & \text{ for some $j\in\mathbb{Z}$.}
+\end{cases} \label{o-hat-criteria}
+\end{align}
+We will also show that for such $\widehat{o}$, if $\vect{c_1}\vect{u} + o_1 \in \mathbb{Z}$ and $\vect{c_2}\vect{u} + o_2\in\mathbb{Z}$ then $\widetilde{\vect{c}}\vect{u} + \widehat{o} \in\mathbb{Z}$.
+
+To solve the system in \eqref{o-hat-criteria} it is sufficient to solve for any of $i$, $j$, or $\widehat{o}$. Therefore we will eliminate $\widehat{o}$ and write
+\begin{align*}
+o_2 + j k_2^{-1} &= o_1 + i k_1^{-1} \\
+k_2 o_2 + j &= k_2 o_1 + k_2 i k_1^{-1} \\
+k_1 k_2 o_2 + k_1 j &= k_1 k_2 o_1 + k_2 i \\
+k_2 i - k_1 j &= k_1 k_2 o_2 - k_1 k_2 o_1.
+\end{align*}
+
+Now note that $k_1 k_2 o_2 - k_1 k_2 o_1$ is a rational number, and so let $\ell$ be the denominator of this rational number as expressed in reduced form. Thus $\ell$ is a nonzero integer, and $\ell(k_1 k_2 o_2 - k_1 k_2 o_1)$ is an integer. Therefore
+\begin{align*}
+\ell k_2 i - \ell k j &= \ell(k_1 k_2 o_2 - k_1 k_2 o_1)
+\end{align*}
+is a linear Diophantine equation (with all coefficients integers), and its solutions are precisely those $i$ and $j$ which define an $\widehat{o}$ that satisfies \eqref{o-hat-criteria}.
+
+But by B\'{e}zout's identity, this has a solution if and only if
+\begin{align*}
+\gcd(\ell k_2, \ell k_1) \vert \ell(k_1 k_2 o_2 - k_1 k_2 o_1) \\
+\ell\gcd(k_2, k_1) \vert \ell(k_1 k_2 o_2 - k_1 k_2 o_1) \\
+\ell \vert \ell(k_1 k_2 o_2 - k_1 k_2 o_1).
+\end{align*}
+But that in turn is true if and only if $k_1 k_2 o_2 - k_1 k_2 o_1$ is an integer. We will need this quantity throughout the following algorithm, so set
+\begin{align}
+b &= k_1 k_2 o_2 - k_1 k_2 o_1 \label{b-def}
+\end{align}
+
+Thus, we check whether $b \in \mathbb{Z}$. If not, we abort the algorithm, reporting that there are no $\vect{u}$ that satisfy both constraints and so the constraints as a whole are inconsistent.
+
+Otherwise, we may proceed with the algorithm knowing $b \in \mathbb{Z}$. We can therefore solve the simpler linear Diophantine equation
+\begin{align*}
+k_2 i + - k_1 j &= b.
+\end{align*}
+
+This involves using the \emph{extended Euclidean algorithm}, which in our code is the function \texttt{tile\cc lang\cc XGCD}. This yields integers $\hat{\imath}$ and $\hat{\jmath}$ such that
+\begin{align*}
+k_2 \hat{\imath} + -k_1 \hat{\jmath} &= \gcd(k_2, -k_1) = 1.
+\end{align*}
+Therefore, setting
+\begin{align*}
+i &= b\hat{\imath}, \\
+j &= b\hat{\jmath},
+\end{align*}
+we get the desired solution
+\begin{align*}
+k_2 i - k_1 j = b.
+\end{align*}
+From here, we can solve for $\widehat{o}$:
+\begin{align*}
+\widehat{o} = o_1 + ik_1^{-1}.
+\end{align*}
+
+All that remains to confirm that $\widehat{o}$ causes $\vect{u}$ to satisfy \eqref{cmerged} if and only if $\vect{u}$ satisfies \eqref{c1} and \eqref{c2} is the following theorem:
+\begin{theorem*}
+Suppose $\widehat{o}$ satisfies the conditions in \eqref{o-hat-criteria}. If $\vect{c_1}\vect{u} + o_1 \in \mathbb{Z}$ and $\vect{c_2}\vect{u} + o_2\in\mathbb{Z}$ then $\widetilde{\vect{c}}\vect{u} + \widehat{o} \in\mathbb{Z}$.
+\end{theorem*}
+
+\begin{proof}
+TODO %Tim: My intuition says this works but involves a fair amount of messy algebra where you have to divine the appropriate constant to add. I think multiplying both equations by $k_1k_2$ and then taking their difference might work (it would get rid of the weird terms on the end by turning them into $b$, which we know is an integer). This does leave us with a weird linear combination of the things we're actually looking to get, but probably you can make it work; I just don't want to have to do it, so I'm leaving this.
+\end{proof}
+
+\subsection{Computation of $\widetilde{o}$ (called \texttt{NetOffset} in the code)}
+
+We now have computed $\widetilde{\vect{c}}$ and $\widehat{o}$ such that \eqref{cmerged} is satisfied for exactly those $\vect{u}$ for which \eqref{c1} and \eqref{c2} are satisfied. This means these choices of $\widetilde{\vect{c}}$ and $\widehat{o}$ ensure the integrality portion of the constraint \eqref{Cmerged} is satisfied exactly when the integrality portions of the constraints \eqref{C1} and \eqref{C2} are satisfied. What remains is to compute $\widetilde{o}$ and $\widetilde{r}$ such that the bound portions of the constraints are satisfied (without losing the integrality portion).
+
+Note that $\widehat{o} + s \in \mathbb{Z}$ if and only if $\widehat{o} \in \mathbb{Z}$ precisely when $s$ is an integer. Therefore, we are looking for an integer $s\in \mathbb{Z}$ and a bound $\widetilde{r}\in \mathbb{Z}$ such that for $\widetilde{o} = \widehat{o} + s$ constraint \eqref{Cmerged} is equivalent to \eqref{C1} and \eqref{C2}. We will first compute $s$ (and thus $\widetilde{o}$) before moving on to $\widetilde{r}$.
+
+We must choose either $s$ or $\widetilde{r}$ to ensure that if
+\begin{align}
+0 &\leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + s < \widetilde{r} \label{s-and-r}
+\end{align}
+then
+\begin{align*}
+0 &\leq \vect{c_1}\vect{u} + o_1 < r_1\text{, and} \\
+0 &\leq \vect{c_2}\vect{u} + o_2 < r_2.
+\end{align*}
+Notice that the manner in which \eqref{s-and-r} bounds $\vect{c_1}\vect{u}$ depends on the sign of $k_1$, as it can be written in terms of $\vect{c_1}$ and $k_1$ by using \eqref{k-props} as
+\begin{align*}
+-\widehat{o} - s &\leq k_1^{-1}\vect{c_1}\vect{u} < \widetilde{r} - \widehat{o} - s.
+\end{align*}
+When $k_1 > 0$, this can be rewritten as
+\begin{align*}
+-k_1(\widehat{o} + s) &\leq \vect{c_1}\vect{u} < k_1(\widetilde{r} - \widehat{o} - s),
+\end{align*}
+but when $k_1 < 0$ we instead get
+\begin{align*}
+-k_1(\widehat{o} + s) &\geq \vect{c_1}\vect{u} > k_1(\widetilde{r} - \widehat{o} - s).
+\end{align*}
+Thus for $k_1 > 0$ we use $s$ to define the lower bound of $\vect{c_1}\vect{u}$ (and later $\widetilde{r}$ to define the upper bound once $s$ has been chosen), whereas when $k_1 < 0$ we use $s$ to define the upper bound of $\vect{c_1}\vect{u}$.
+
+Similarly, when $k_2 > 0$ we use $s$ to define the lower bound of $\vect{c_2}\vect{u}$, and when $k_2 < 0$ we use $s$ to define its upper bound.
+
+\subsubsection{Case $k > 0$ ($k$ is \texttt{c1IntegerFactor} or \texttt{c2IntegerFactor} in the code)}
+
+Let us first suppose $k_1 > 0$. Assume for the moment that we may enforce
+\begin{align*}
+0 &\leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1 \\
+-\widehat{o} - \widehat{s}_1 &\leq \widetilde{\vect{c}}\vect{u}
+\end{align*}
+for our choice of $\widehat{s}_1 \in \mathbb{Q}$ (rather than using $s\in \mathbb{Z}$ as we will eventually require). The inequality we wish to achieve (looking for now at just the $\vect{c_1}$ inequality) is
+\begin{align*}
+0 &\leq \vect{c_1}\vect{u} + o_1 \\
+-o_1 &\leq \vect{c_1}\vect{u} \\
+-o_1 &\leq k_1\widetilde{\vect{c}}\vect{u} \\
+-k_1^{-1}o_1 &\leq \widetilde{\vect{c}}\vect{u}.
+\end{align*}
+Therefore, we want
+\begin{align*}
+-\widehat{o} - \widehat{s}_1 &= -k_1^{-1}o_1 \\
+\widehat{s}_1 &= k_1^{-1}o_1 - \widehat{o}.
+\end{align*}
+
+For this $\widehat{s}_1$, we have that
+\begin{align*}
+0 &\leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1.
+\end{align*}
+However, the integrality condition says that this constraint also only permits vectors $\vect{u}$ for which $\widetilde{\vect{c}}\vect{u} + \widehat{o}\in\mathbb{Z}$ (note the absence of a $+\widehat{s}_1$ at the end of that expression). Now let $s^*_1$ be the unique real number in $[0, 1)$ such that $\widehat{s}_1 + s^*_1 \in \mathbb{Z}$ (thus $\ceil{\widehat{s}_1} = \widehat{s}_1 + s^*_1$). Then $\widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1 + s^*_1$ is an integer whenever $\widetilde{\vect{c}}\vect{u} + \widehat{o}$ is an integer. Moreover, by our choice of $s^*_1$ we have that for any choice of $\vect{u}$ for which $\widetilde{\vect{c}}\vect{u} + \widehat{o}$ is an integer, we have both
+\begin{align*}
+0&\leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1 & & \text{whenever} & 0&\leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1 + s^*_1
+\end{align*}
+(since there are no integer values of $\widetilde{\vect{c}}\vect{u} + \widehat{o}$ satisfying the left constraint but not the right) and also
+\begin{align*}
+0&> \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1 & & \text{whenever} & 0&> \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1 + s^*_1.
+\end{align*}
+Thus, these are equivalent constraints, and so combining $\widehat{s}_1$ with $s^*_1$ by the formula $\ceil{\widehat{s}_1} = \widehat{s}_1 + s^*_1$ we get that enforcing both integrality and the bound $0 \leq \vect{c_1}\vect{u} + o_1$ is equivalent to enforcing both integrality and the bound
+\begin{align*}
+0&\leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + s_1
+\end{align*}
+where $s_1$ is the integer
+\begin{align}
+s_1 = \ceil{\widehat{s}_1} &= \ceil{k_1^{-1}o_1 - \widehat{o}}. \label{s1k+}
+\end{align}
+
+By a similar process, we get that in the case $k_2 > 0$, enforcing both integrality and the bound $0\leq \vect{c_2}\vect{u} + o_2$ is equivalent to enforcing both integrality and the bound
+\begin{align*}
+0&\leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + s_2
+\end{align*}
+where $s_2$ is the integer
+\begin{align}
+s_2 = \ceil{\widehat{s}_2} &= \ceil{k_2^{-1}o_2 - \widehat{o}}. \label{s2k+}
+\end{align}
+
+\subsubsection{Case $k < 0$}
+
+Suppose $k_1 < 0$ and assume for the moment that we may enforce
+\begin{align*}
+0 &\leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1 \\
+-\widehat{o} - \widehat{s}_1 &\leq \widetilde{\vect{c}}\vect{u}
+\end{align*}
+for our choice of $\widehat{s}_1\in\mathbb{Q}$ (rather than $\mathbb{Z}$). The inequality we wish to achieve for $\vect{c_1}$ is
+\begin{align*}
+\vect{c_1}\vect{u} + o_1 &< r_1 \\
+\vect{c_1}\vect{u} &< r_1 - o_1 \\
+k_1\widetilde{\vect{c}}\vect{u} &< r_1 - o_1 \\
+\widetilde{\vect{c}}\vect{u} &> k_1^{-1}(r_1 - o_1).
+\end{align*}
+Ignoring for the moment the difference in whether the inequality is strict, we want
+\begin{align*}
+-\widehat{o}-\widehat{s}_1 &= k_1^{-1}(r_1 - o_1) \\
+\widehat{s}_1 &= k_1^{-1}(o_1 - r_1) - \widehat{o}
+\end{align*}
+Then the inequality we are enforcing is $0 \leq \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1$ which gives us $\vect{c_1}\vect{u} + o_1 \leq r_1$, which is correct in every case except exact equality.
+
+Combining this with the integrality restriction gives us that we want to include exactly those $\vect{u}$ for which $\widetilde{\vect{c}}\vect{u} + \widehat{o}$ that is an integer and also
+\begin{align*}
+0 \lneqq \widetilde{\vect{c}}\vect{u} + \widehat{o} + \widehat{s}_1.
+\end{align*}
+If $\widehat{s}_1 \neq \ceil{\widehat{s}}_1$ then this is acheived by taking $s = \ceil{\widehat{s}_1}$; but if $\widehat{s}_1 = \ceil{\widehat{s}_1}$ then we instead want to take $s = \widehat{s}_1 + 1$. Note that $\floor{\widehat{s}_1 + 1}$ handles both of these cases correctly; thus, the appropriate bound to select is
+\begin{align*}
+0 \leq \widehat{\vect{c}}\vect{u} + \widehat{o} + s_1
+\end{align*}
+where
+\begin{align}
+s_1 = \floor{\widehat{s}_1 + 1} &= \floor{k_1^{-1}(o_1 - r_1) - \widehat{o} + 1}. \label{s1k-}
+\end{align}
+
+Similarly, when $k_2 < 0$, we need to impose
+\begin{align*}
+0 \leq \widehat{\vect{c}}\vect{u} + \widehat{o} + s_2
+\end{align*}
+where
+\begin{align}
+s_2 = \floor{\widehat{s}_2 + 1} &= \floor{k_2^{-1}(o_2 - r_2) - \widehat{o} + 1}. \label{s2k-}
+\end{align}
+
+\subsubsection{Combining $s_1$ and $s_2$ (\texttt{IntegralOffset1} and \texttt{2} in the code)}
+
+We need to satisfy both the $\vect{c_1}$- and $\vect{c_2}$-based constraints; since we do not want to include values of $\vect{u}$ for which only one of these constraints is satisfied, we want to take the stricter of $s_1$ and $s_2$. Thus, we choose
+\begin{align}
+s = \min(s_1, s_2)
+\end{align}
+where $s_1$ is given by whichever of \eqref{s1k+} or \eqref{s1k-} is appropriate and $s_2$ is given by whichever of \eqref{s2k+} or \eqref{s2k-} is appropriate.
+
+\subsubsection{Computing $\widetilde{o}$}
+
+We can now compute $\widetilde{o}$ as
+\begin{align}
+\widetilde{o} &= \widehat{o} + s.
+\end{align}
+
+\subsection{Computation of $\widetilde{r}$ (called \texttt{Range} in the code)}
+
+The constraint we are setting is
+\begin{align*}
+\widetilde{\vect{c}}\vect{u} + \widetilde{o} + s < \widetilde{r}
+\end{align*}
+for our choice of $\widetilde{r} \in \mathbb{Z}$. The constraints we must satisfy are
+\begin{align*}
+0 &\leq \vect{c_1}\vect{u} + o_1 < r_1, \\
+0 &\leq \vect{c_2}\vect{u} + o_2 < r_2.
+\end{align*}
+
+As with the calculation of $\widetilde{o}$, we split these up into the two cases $k > 0$ and $k < 0$.
+
+\subsubsection{Case $k > 0$}
+
+When $k_1 > 0$, we need to ensure
+\begin{align*}
+\vect{c_1}\vect{u} + o_1 &< r_1, \\
+k_1 \widetilde{\vect{c}}\vect{u} &< r_1 - o_1, \\
+\widetilde{\vect{c}}\vect{u} &< k_1^{-1}(r_1 - o_1).
+\end{align*}
+We can enforce $\widetilde{\vect{c}}\vect{u} + \widetilde{o} < \widetilde{r}_1$ for our choice of $\widetilde{r}_1 \in \mathbb{Z}$, but suppose for now we can instead enforce (for our choice of $\widehat{r}_1\in\mathbb{Q}$)
+\begin{align*}
+\widetilde{\vect{c}}\vect{u} + \widetilde{o} &< \widehat{r}_1, \\
+\widetilde{\vect{c}}\vect{u} &< \widehat{r}_1 - \widetilde{o}.
+\end{align*}
+So to get the desired bound we want
+\begin{align*}
+\widehat{r}_1 &= k_1^{-1}(r_1 - o_1) + \widetilde{o}
+\end{align*}
+
+Since $\widetilde{\vect{c}}\vect{u} + \widetilde{o}$ must be an integer, this is equivalent to setting $\widetilde{r}_1 = \ceil{\widehat{r}_1}\in\mathbb{Z}$ and requiring the bound
+\begin{align*}
+\widetilde{\vect{c}}\vect{u} + \widetilde{o} < \widetilde{r}_1.
+\end{align*}
+We can write this $\widetilde{r}_1$ more explicitly as
+\begin{align}
+\widetilde{r}_1 &= \ceil{k_1^{-1}(r_1 - o_1) + \widetilde{o}}. \label{r1k+}
+\end{align}
+
+By similar reasoning for the $\vect{c}_2$-based bound, in the $k_2 > 0$ case we require the bound
+\begin{align*}
+\widetilde{\vect{c}}\vect{u} + \widetilde{o} < \widetilde{r}_2
+\end{align*}
+where
+\begin{align}
+\widetilde{r}_2 &= \ceil{k_2^{-1}(r_2 - o_2) + \widetilde{o}}. \label{r2k+}
+\end{align}
+
+\subsubsection{Case $k < 0$}
+
+When $k_2 < 0$, we need to ensure
+\begin{align*}
+0 &\leq \vect{c_1}\vect{u} + o_1 \\
+-o_1 &\leq k_1\widetilde{\vect{c}}\vect{u} \\
+-k_1^{-1}o_1 &\geq \widetilde{\vect{c}}\vect{u}
+\end{align*}
+We can enforce $\widetilde{\vect{c}}\vect{u} + \widetilde{o} < \widetilde{r}_1$ for our choice of $\widetilde{r}_1\in\mathbb{Z}$, but suppose for nw we can instead enforce (for our choice of $\widehat{r}_1\in\mathbb{Q}$)
+\begin{align*}
+\widetilde{\vect{c}}\vect{u} + \widetilde{o} &< \widehat{r}_1, \\
+\widetilde{\vect{c}}\vect{u} &< \widehat{r}_1 - \widetilde{o}.
+\end{align*}
+So to get the desired bound (except in the case of exact equality) we want
+\begin{align*}
+\widehat{r}_1 &= \widetilde{o} - k_1^{-1}o_1
+\end{align*}
+Since $\widetilde{\vect{c}}\vect{u} + \widetilde{o}$ must be an integer, this is equivalent to setting $\widetilde{r}_1 = \ceil{\widehat{r}_1} \in \mathbb{Z}$ and requiring
+\begin{align*}
+\widetilde{\vect{c}}\vect{u} + \widetilde{o} &< \widetilde{r}_1.
+\end{align*}
+But as this is exactly equivalent, it does not work as desired when $\widehat{r}_1 = \ceil{\widehat{r}_1}$. In that case, we instead want to choose $\widetilde{r}_1 = \widehat{r} + 1$. We can accomplish both cases simultaneously by instead setting $\widetilde{r}_1 = \floor{\widehat{r}_1 + 1}$, or more explicitly
+\begin{align}
+\widetilde{r}_1 &= \floor{\widetilde{o} - k_1^{-1}o_1 + 1}. \label{r1k-}
+\end{align}
+
+By similar reasoning, in the $k_2 > 0$ we require
+\begin{align*}
+\widetilde{\vect{c}}\vect{u} + \widetilde{o} &< \widetilde{r}_2
+\end{align*}
+where
+\begin{align}
+\widetilde{r}_2 &= \floor{\widetilde{o} - k_2^{-1}o_2 + 1}. \label{r2k-}
+\end{align}
+
+\subsubsection{Computing $\widetilde{r}$}
+
+As with $s$, we want to choose $\widetilde{r}$ to be the stricter of $\widetilde{r}_1$ and $\widetilde{r}_2$, so set
+\begin{align}
+\widetilde{r} &= \min(\widetilde{r}_1, \widetilde{r}_2)
+\end{align}
+where $\widetilde{r}_1$ is given by whichever of \eqref{r1k+} or \eqref{r1k-} is appropriate and $\widetilde{r}_2$ is given by whichever of \eqref{r2k+} or \eqref{r2k-} is appropriate.
+
+
+
+
+\end{document}
