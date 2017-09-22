@@ -43,6 +43,7 @@ our supported hardware. Other networks may work.
    * resnet50
    * vgg19
    * xception
+   * mobilenet
  * RNNs
    * `<coming soon>`
 
