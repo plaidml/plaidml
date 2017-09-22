@@ -44,13 +44,10 @@ plaidml_py_library(
 
 filegroup(
     name = "configs",
-    data = select({
-        "//conditions:default": glob(["*.json"]),
-        "//bzl:x64_windows": glob(
-            ["*.json"],
-            exclude = ["plaidml_llvm.json"],
-        ),
-    }),
+    data = glob(
+        ["*.json"],
+        exclude = ["tile_llvm.json"],
+    ),
 )
 
 pkg_tar(

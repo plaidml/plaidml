@@ -1,12 +1,11 @@
 # -*- mode: python; -*- PYTHON-PREPROCESSING-REQUIRED
 
-
-def with_protobuf():
+def with_protobuf(root=""):
   native.new_git_repository(
     name="protobuf", # named thusly to appease tensorflow
     remote="https://github.com/google/protobuf",
     tag="v3.2.0",
-    build_file="bzl/protobuf.BUILD")
+    build_file = root + "//bzl:protobuf.BUILD")
 
   native.bind(name="protoc", actual="@protobuf//:protoc")
   native.bind(name="protobuf_clib", actual="@protobuf//:protoc_lib",)
@@ -23,13 +22,11 @@ def with_protobuf():
 # Cribbed from protobuf to provide py gRPC support
 #/
 
-
 def _GetPath(ctx, path):
   if ctx.label.workspace_root:
     return ctx.label.workspace_root + '/' + path
   else:
     return path
-
 
 def _GenDir(ctx):
   if not ctx.attr.includes:
@@ -39,7 +36,6 @@ def _GenDir(ctx):
   if not ctx.label.package:
     return _GetPath(ctx, ctx.attr.includes[0])
   return _GetPath(ctx, ctx.label.package + '/' + ctx.attr.includes[0])
-
 
 def _CcHdrs(srcs, use_grpc_plugin=False):
   ret = [s[:-len(".proto")] + ".pb.h" for s in srcs]
@@ -55,7 +51,6 @@ def _CcSrcs(srcs, use_grpc_plugin=False):
 
 def _PyOuts(srcs):
   return [s[:-len(".proto")] + "_pb2.py" for s in srcs]
-
 
 def _RelativeOutputPath(path, include):
   if include == None:
@@ -76,7 +71,6 @@ def _RelativeOutputPath(path, include):
     return path
 
   return path[len(PACKAGE_NAME) + 1:]
-
 
 def _proto_gen_impl(ctx):
   """General implementation for generating protos"""
@@ -115,28 +109,34 @@ def _proto_gen_impl(ctx):
 
   return struct(proto=struct(srcs=srcs, import_flags=import_flags, deps=deps,),)
 
-
-_proto_gen = rule(attrs={
-    "srcs": attr.label_list(allow_files=True),
-    "deps": attr.label_list(providers=["proto"]),
-    "includes": attr.string_list(),
-    "protoc": attr.label(cfg="host",
-                         executable=True,
-                         single_file=True,
-                         mandatory=True,),
-    "grpc_plugin": attr.label(cfg="host",
-                              executable=True,
-                              single_file=True,),
-    "cc11_plugin": attr.label(cfg="host",
-                              executable=True,
-                              single_file=True,),
-    "gen_cc": attr.bool(),
-    "gen_py": attr.bool(),
-    "outs": attr.output_list(),
-},
-                  output_to_genfiles=True,
-                  implementation=_proto_gen_impl,)
-
+_proto_gen = rule(
+    attrs = {
+        "srcs": attr.label_list(allow_files = True),
+        "deps": attr.label_list(providers = ["proto"]),
+        "includes": attr.string_list(),
+        "protoc": attr.label(
+            cfg = "host",
+            executable = True,
+            single_file = True,
+            mandatory = True,
+        ),
+        "grpc_plugin": attr.label(
+            cfg = "host",
+            executable = True,
+            single_file = True,
+        ),
+        "cc11_plugin": attr.label(
+            cfg = "host",
+            executable = True,
+            single_file = True,
+        ),
+        "gen_cc": attr.bool(),
+        "gen_py": attr.bool(),
+        "outs": attr.output_list(),
+    },
+    output_to_genfiles = True,
+    implementation = _proto_gen_impl,
+)
 
 def cc_proto_library(name,
                      srcs=[],
@@ -192,7 +192,6 @@ def cc_proto_library(name,
   if default_runtime and not default_runtime in cc_libs:
     cc_libs += [default_runtime]
   if has_services:
-    cc_libs += ["//base/context"]
     cc_libs += ["//external:grpc++_lib"]
     cc_libs += ["//external:zlib"]
 
@@ -203,7 +202,6 @@ def cc_proto_library(name,
                     includes=includes,
                     copts=copts,
                     **kargs)
-
 
 def py_proto_library(name,
                      srcs=[],
@@ -257,4 +255,3 @@ def py_proto_library(name,
                     deps=py_libs + deps,
                     srcs_version=srcs_version,
                     **kargs)
-

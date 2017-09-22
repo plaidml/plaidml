@@ -11,16 +11,6 @@ plaidml_proto_library(
 )
 
 plaidml_proto_library(
-    name = "service",
-    srcs = [
-        "service.proto",
-    ],
-    has_services = True,
-    visibility = ["//visibility:public"],
-    deps = [":proto"],
-)
-
-plaidml_proto_library(
     name = "hal",
     srcs = [
         "hal.proto",
