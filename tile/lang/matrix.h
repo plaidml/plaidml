@@ -1,7 +1,9 @@
+#pragma once
 
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/vector.hpp>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -32,14 +34,19 @@ class Matrix : public boost::numeric::ublas::matrix<Rational> {
   // Row ops
   void swapRows(size_t r, size_t s);
   void multRow(size_t r, Rational multiplier);
-  void addRowMultToRow(size_t dest_row, size_t src_row, Rational multiplier);
+  void addRowMultToRow(size_t dest_row, size_t src_row, const Rational& multiplier);
   void makePivotAt(size_t row, size_t col);
 
   // Performs a rational matrix inversion, return false if singular
   bool invert();
 
+  std::string toString() const;  // Pretty-print to string
+
   bool operator==(const Matrix& m);
 };
+
+// Play nice with std::to_string
+inline std::string to_string(const Matrix& m) { return m.toString(); }
 
 typedef boost::numeric::ublas::vector<Rational> Vector;
 typedef boost::numeric::ublas::identity_matrix<Rational> IdentityMatrix;

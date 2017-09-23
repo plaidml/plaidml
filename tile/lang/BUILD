@@ -94,7 +94,7 @@ plaidml_cc_library(
         ":proto_cc",
         "//base/util:util_cc",
         "//external:boost",
-        "//external:coinlp",
+        "//tile/lang/milp",
     ],
 )
 
@@ -127,6 +127,7 @@ plaidml_cc_library(
         "polynomial.h",
     ],
     copts = ["-Wno-error"],
+    visibility = ["//tile/lang/milp:__pkg__"],
     deps = [
         "//base/util:util_cc",
         "//external:boost",

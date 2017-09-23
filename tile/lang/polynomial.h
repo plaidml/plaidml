@@ -47,6 +47,8 @@ class Polynomial : boost::additive<Polynomial>,
   // If this/p has no remainder, return this/p, otherwise return 0
   // This works even if p == 0
   Rational tryDivide(const Polynomial& p, bool ignoreConst = false) const;
+  // Substitute replacement in for var in this polynomial
+  void substitute(const std::string& var, const Polynomial& replacement);
   // If the string has a nonzero coefficient for at least one of its nonconstant
   // indices, it will return the index name of one such index. No promises about
   // which index you'll get. Returns empty string if no index w/ nonconst coeff

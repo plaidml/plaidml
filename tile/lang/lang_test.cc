@@ -24,10 +24,6 @@
 #include "base/util/catch.h"
 #include "base/util/logging.h"
 
-#include "CoinPackedVector.hpp"
-#include "CoinPragma.hpp"
-#include "OsiClp/OsiClpSolverInterface.hpp"
-
 namespace vertexai {
 namespace tile {
 namespace lang {
@@ -157,7 +153,7 @@ TEST_CASE("Optimization of Matrix Multiply", "[mat_opt][opt]") {
   REQUIRE(it->first == best_score);
 }
 
-TEST_CASE("Subdivision (1D, input width 2^n)", "[subdivision]") {
+TEST_CASE("Subdivision 1D input width 2**n", "[subdivision]") {
   const std::size_t kernelSize = 5;
 
   for (std::size_t inputSize = 35; inputSize < 100; inputSize += 2) {
@@ -304,7 +300,7 @@ TEST_CASE("Compile strided convolution derivate", "[compile][conv_d]") {
       SimpleShape(DataType::FLOAT32, {2, 2, 1, 1}),
   };
   FlatContraction r = Compile(c, shapes);
-  // TODO: Validate something.
+  // TODO(T1146): Validate something.
 }
 
 TEST_CASE("Flatten wacky matrix multiply type thing", "[flatten]") {
@@ -629,51 +625,6 @@ TEST_CASE("ProgGrad", "[deriv]") {
   Program p = ProgGrad(bf.prog());
 }
 
-TEST_CASE("Test coinlp", "[coin]") {
-  IVLOG(4, "Hello coin");
-  double obj_out[] = {-99, -99, -99, -99};
-
-  for (int i = 0; i < 4; ++i) {
-    OsiClpSolverInterface model;
-    model.setLogLevel(0);
-    model.messageHandler()->setLogLevel(0);
-    // (this is the defract'd version of Doc Examples
-    int start[] = {0, 6, 12, 15, 17};
-    int index[] = {0, 2, 3, 4, 7, 8, 1, 3, 4, 5, 6, 8, 1, 5, 7, 2, 6};
-    double values[] = {1, 1, 1, 2, 1, 3, -1, 2, 4, -5, -3, 6, 1, 5, 2, 2, 3};
-    double collb[] = {-1e9, -1e9, -1e9, -1e9};
-    double colub[] = {1e9, 1e9, 1e9, 1e9};
-    double obj[] = {0, 0, 0, 0};
-    obj[i] = 1;
-    double rowlb[] = {0, 0, 0, 0, -5, 2, 0, 0, 0};
-    double rowub[] = {1, 4, 5, 6, 4, 11, 9, 9, 9};
-    model.loadProblem(4, 9, start, index, values, collb, colub, obj, rowlb, rowub);
-    model.setInteger(0);
-    model.setInteger(1);
-    model.setInteger(2);
-    model.setInteger(3);
-    model.setObjSense(1.0);
-
-    double saveLower[4];
-    double saveUpper[4];
-    int numberColumns = model.getNumCols();
-    CoinCopyN(model.getColLower(), numberColumns, saveLower);
-    CoinCopyN(model.getColUpper(), numberColumns, saveUpper);
-    double objLimit;
-    model.getDblParam(OsiDualObjectiveLimit, objLimit);
-    model.branchAndBound();
-    // optimal = model.isProvenOptimal();
-    const double *val = model.getColSolution();
-
-    obj_out[i] = val[i];
-    IVLOG(4, "COIN Solution " << val[0] << " " << val[1] << " " << val[2] << " " << val[3]);
-  }
-  REQUIRE(obj_out[0] == 0);
-  REQUIRE(obj_out[1] == 0);
-  REQUIRE(obj_out[2] == 1);
-  REQUIRE(obj_out[0] == 0);
-}
-
 TEST_CASE("Basic Infeasible Constraints", "[infeasible]") {
   IVLOG(1, "We expect the infeasibility test to throw a warning.");
   Parser p;
@@ -752,9 +703,10 @@ TEST_CASE("Parallel constraints with some overlaps that hit nothing", "[parallel
   FlatContraction f = Compile(c, {SimpleShape(DataType::FLOAT32, {size}), SimpleShape(DataType::FLOAT32, {size, size}),
                                   SimpleShape(DataType::FLOAT32, {size})});
 
-  // Note currently produces five constraints but later optimization might be able
-  // to reduce this further
-  REQUIRE(f.constraints.size() == 5);
+  REQUIRE(f.constraints.size() == 4);
+  REQUIRE(f.ranges[0] == 12);
+  REQUIRE(f.ranges[1] == 13);
+  REQUIRE(f.ranges[2] == 13);
 }
 
 TEST_CASE("Parallel constraints 3D", "[parallel]") {
@@ -765,8 +717,11 @@ TEST_CASE("Parallel constraints 3D", "[parallel]") {
   FlatContraction f =
       Compile(c, {SimpleShape(DataType::FLOAT32, {size}), SimpleShape(DataType::FLOAT32, {size, size, size})});
 
-  // TODO: Require something
   REQUIRE(f.constraints.size() == 4);
+  REQUIRE(f.ranges[0] == 12);
+  REQUIRE(f.ranges[1] == 13);
+  REQUIRE(f.ranges[2] == 13);
+  REQUIRE(f.ranges[3] == 150);
 }
 
 TEST_CASE("Non-Parallel constraints 3D", "[parallel]") {
@@ -777,8 +732,11 @@ TEST_CASE("Non-Parallel constraints 3D", "[parallel]") {
   FlatContraction f =
       Compile(c, {SimpleShape(DataType::FLOAT32, {size}), SimpleShape(DataType::FLOAT32, {size, size, size})});
 
-  // TODO: Require something
   REQUIRE(f.constraints.size() == 4);
+  REQUIRE(f.ranges[0] == 12);
+  REQUIRE(f.ranges[1] == 13);
+  REQUIRE(f.ranges[2] == 13);
+  REQUIRE(f.ranges[3] == 150);
 }
 
 TEST_CASE("Condense size 1 dimensions", "[reshape]") {

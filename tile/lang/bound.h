@@ -1,9 +1,9 @@
 #pragma once
 
-#include "OsiClp/OsiClpSolverInterface.hpp"
 #include <tuple>
 #include <vector>
 
+#include "tile/lang/milp/ilp_solver.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/shape.h"
 

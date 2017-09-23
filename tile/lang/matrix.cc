@@ -93,9 +93,11 @@ void Matrix::multRow(size_t r, Rational multiplier) {
   }
 }
 
-void Matrix::addRowMultToRow(size_t dest_row, size_t src_row, Rational multiplier) {
-  for (size_t i = 0; i < size2(); i++) {
-    (*this)(dest_row, i) += multiplier * (*this)(src_row, i);
+void Matrix::addRowMultToRow(size_t dest_row, size_t src_row, const Rational& multiplier) {
+  if (multiplier != 0) {
+    for (size_t i = 0; i < size2(); i++) {
+      (*this)(dest_row, i) += multiplier * (*this)(src_row, i);
+    }
   }
 }
 
@@ -122,6 +124,19 @@ bool Matrix::invert() {
   }
   *this = dm.lhs_;
   return true;
+}
+
+std::string Matrix::toString() const {
+  std::string ret;
+  ret += "\n";
+  for (size_t i = 0; i < size1(); ++i) {
+    ret += "[ ";
+    for (size_t j = 0; j < size2(); ++j) {
+      ret += ((*this)(i, j)).str() + "\t";
+    }
+    ret += "]\n";
+  }
+  return ret;
 }
 
 bool Matrix::operator==(const Matrix& m) {
