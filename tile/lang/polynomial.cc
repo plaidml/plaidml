@@ -102,6 +102,16 @@ Rational Polynomial::tryDivide(const Polynomial& p, bool ignoreConst) const {
   return val;
 }
 
+void Polynomial::substitute(const std::string& var, const Polynomial& replacement) {
+  if (map_.count(var) == 0) {
+    // If var isn't in this polynomial, nothing needs to be done
+    return;
+  }
+  Rational coeff = map_.at(var);
+  map_.erase(var);
+  (*this) += coeff * replacement;
+}
+
 std::string Polynomial::GetNonzeroIndex() const {
   // Returns a nonconstant nonzero index, if one exists; otherwise returns empty string
   for (const auto& kvp : map_) {

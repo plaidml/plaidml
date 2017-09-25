@@ -10,11 +10,6 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-class CoinSilencer : public CoinMessageHandler {
-  // The whole point of this class is to NOT print, so just return on print()
-  virtual int print() { return 0; }
-};
-
 Contraction ConstrainIndexVarsToInts(const Contraction& c) {
   Contraction c_new = c;
 
@@ -228,211 +223,48 @@ RangeConstraint IntersectParallelConstraintPair(const RangeConstraint& constrain
   return RangeConstraint(PartialConstraint, Range);
 }
 
-// TODO(T133): Check size of LP-Solve problem to prevent exponential slowdown
-static std::pair<CoinPackedMatrix, std::vector<std::string>> ConstraintsToSparseMatrix(
-    const std::vector<RangeConstraint>& constraints) {
-  // Transforms constraints into a sparse matrix in a format Coin can comprehend.
-  // Also reports which variable indices go with which variable names
+static std::set<std::string> variablesUsed(const std::vector<RangeConstraint>& constraints) {
+  // Returns all the variables appearing in the constraints
+  std::set<std::string> ret;
 
-  // Each variable is associated with a column in the output matrix. colNumberMap
-  // lets us get this column's index from the variable name.
-  std::map<std::string, int> colNumberMap;
-  int variables_in_model = 0;  // Total # variables among all constraints
-
-  // Matrix is encoded by triples (rowIdx, colIdx, coeff) -- so that
-  // <Matrix>[rowIdx, colIdx] = coeff
-  // entries stores these in the order (rowIdx, colIdx, coeff)
-  std::vector<std::tuple<int, int, Rational>> entries;
-
-  for (int rowNumber = 0; rowNumber < constraints.size(); ++rowNumber) {
-    const auto& c = constraints[rowNumber];
+  for (const RangeConstraint& c : constraints) {
     for (const auto& kvp : c.poly.getMap()) {
-      if (kvp.first != "") {  // Constant terms don't go into this matrix
-        // Get the int index of this variable, or give it one if we haven't seen it before
-        auto it = colNumberMap.find(kvp.first);
-        if (it == colNumberMap.end()) {
-          it = colNumberMap.insert(std::map<std::string, int>::value_type(kvp.first, variables_in_model)).first;
-          variables_in_model++;
-        }
-        entries.push_back(std::tuple<int, int, double>(rowNumber, it->second, static_cast<double>(kvp.second)));
+      const std::string& key = kvp.first;
+      if (key != "") {  // Do nothing for constant term
+        ret.emplace(key);
       }
     }
   }
 
-  // Read out entries into three vectors for Coin to read
-  std::vector<int> rowIndices;
-  std::vector<int> colIndices;
-  std::vector<double> coefficients;
-  for (const auto& entry : entries) {
-    rowIndices.push_back(std::get<0>(entry));
-    colIndices.push_back(std::get<1>(entry));
-    coefficients.push_back(static_cast<double>(std::get<2>(entry)));
-  }
-  if (VLOG_IS_ON(5)) {
-    std::ostringstream msg;
-    msg << "Handing to COIN:";
-    msg << "\nrowIndices:";
-    for (const auto& index : rowIndices) {
-      msg << " " << std::to_string(index);
-    }
-    msg << "\ncolIndices:";
-    for (const auto& index : colIndices) {
-      msg << " " << std::to_string(index);
-    }
-    msg << "\ncoefficients:";
-    for (const auto& coeff : coefficients) {
-      msg << " " << std::to_string(coeff);
-    }
-    IVLOG(5, msg.str());
-  }
-
-  std::vector<std::string> varNames(entries.size());
-  for (const auto& kvp : colNumberMap) {
-    varNames[kvp.second] = kvp.first;
-  }
-  if (VLOG_IS_ON(5)) {
-    std::ostringstream msg;
-    msg << "Var names:";
-    for (const auto& name : varNames) {
-      msg << " " << name;
-    }
-    IVLOG(5, msg.str());
-  }
-
-  return std::pair<CoinPackedMatrix, std::vector<std::string>>(
-      CoinPackedMatrix(false, &rowIndices[0], &colIndices[0], &coefficients[0], entries.size()), varNames);
+  return ret;
 }
 
-// TODO(T133): Check size of integer programming problem to prevent exponential slowdown
+// TODO(T133): Check size of integer programming problem to prevent slowdown
 std::tuple<IndexBounds, std::vector<SimpleConstraint>> ComputeBounds(const std::vector<RangeConstraint>& constraints) {
-  Integer lcm = 1;
-  for (int rowNumber = 0; rowNumber < constraints.size(); ++rowNumber) {
-    const auto& c = constraints[rowNumber];
-    for (const auto& kvp : c.poly.getMap()) {
-      lcm = LCM(lcm, denominator(kvp.second));
-    }
-  }
-
-  // Create the constraint matrix to pass to the model (also LCM for later use
-  // is computed now to reduce iterations over constraints)
-  auto sparseMatAndVarNames = ConstraintsToSparseMatrix(constraints);
-  CoinPackedMatrix constraintMatrix = sparseMatAndVarNames.first;
-  std::vector<std::string> variableNames = sparseMatAndVarNames.second;
-
-  if (VLOG_IS_ON(5)) {
-    size_t num_elems = constraintMatrix.getNumElements();
-    const double* elems = constraintMatrix.getElements();
-    const int* idxs = constraintMatrix.getIndices();
-    std::ostringstream msg;
-    msg << "Elements:";
-    for (size_t i = 0; i < num_elems; ++i) {
-      msg << " " << elems[i];
-    }
-    msg << '\n';
-    msg << "Indices:";
-    for (size_t i = 0; i < num_elems; ++i) {
-      msg << " " << idxs[i];
-    }
-    IVLOG(5, msg.str());
-  }
-
-  // Write the bounds for the constraints and the variables
-  std::vector<double> constraintLowerBounds;
-  std::vector<double> constraintUpperBounds;
-  std::vector<double> variableLowerBounds;
-  std::vector<double> variableUpperBounds;
-  for (const auto& c : constraints) {
-    constraintLowerBounds.push_back(static_cast<double>(-c.poly.constant()));
-    constraintUpperBounds.push_back(static_cast<double>(c.range - 1 - c.poly.constant()));
-  }
-  for (int i = 0; i < constraintMatrix.getNumCols(); ++i) {
-    variableLowerBounds.push_back(-10e9);
-    variableUpperBounds.push_back(10e9);
-  }
-  if (VLOG_IS_ON(5)) {
-    std::ostringstream msg;
-    msg << "Constraint Bounds: ";
-    for (int i = 0; i < constraints.size(); ++i) {
-      msg << constraintLowerBounds[i] << " <= (" << i << ") <= " << constraintUpperBounds[i];
-      if (i != constraints.size() - 1) msg << ", ";
-    }
-    IVLOG(5, msg.str());
-  }
+  std::set<std::string> variableNames = variablesUsed(constraints);
 
   // Run the solver for each variable min + max
+  milp::ILPSolver solver;
   IndexBounds out;
-  for (size_t i = 0; i < constraintMatrix.getNumCols(); ++i) {
-    Bound result;
-    std::vector<double> objective(constraintMatrix.getNumCols(), 0);
-
-    std::vector<int> MinOrMax = {-1, 1};  // -1 encodes maximize, 1 encodes minimize
-    for (const auto& objective_type : MinOrMax) {
-      // Make a Clp model
-      OsiClpSolverInterface model;
-
-      // Set CLP log verbosity
-      CoinSilencer silentHandler;
-      if (VLOG_IS_ON(4)) {
-        model.setLogLevel(2);
-        model.messageHandler()->setLogLevel(2);
-      } else if (VLOG_IS_ON(5)) {
-        model.setLogLevel(4);
-        model.messageHandler()->setLogLevel(4);
-      } else {
-        model.passInMessageHandler(&silentHandler);
-      }
-
-      objective[i] = objective_type;
-      model.loadProblem(constraintMatrix, &variableLowerBounds[0], &variableUpperBounds[0], &objective[0],
-                        &constraintLowerBounds[0], &constraintUpperBounds[0]);
-      if (i == 0) {
-        for (int j = 0; j < constraintMatrix.getNumCols(); ++j) {
-          model.setInteger(j);
-        }
-      }
-      model.branchAndBound();
-
-      if (VLOG_IS_ON(5)) {
-        std::ostringstream solnTerminationInfo;
-        solnTerminationInfo << "Integer Program Model (i=" << std::to_string(i) << ") "
-                            << "... isAbandoned: " << model.isAbandoned() << "\n"
-                            << "... isProvenOptimal: " << model.isProvenOptimal() << "\n"
-                            << "... isProvenPrimalInfeasible: " << model.isProvenPrimalInfeasible() << "\n"
-                            << "... isProvenDualInfeasible: " << model.isProvenDualInfeasible() << "\n"
-                            << "... isPrimalObjectiveLimitReached: " << model.isPrimalObjectiveLimitReached() << "\n"
-                            << "... isDualObjectiveLimitReached: " << model.isDualObjectiveLimitReached() << "\n"
-                            << "... isIterationLimitReached: " << model.isIterationLimitReached();
-        IVLOG(5, solnTerminationInfo.str());
-      }
-      if (model.isProvenPrimalInfeasible()) {
-        std::string msg = "vertexai::tile::lang::ComputeBounds: Constraints are infeasible; nothing to compute";
-        throw std::runtime_error(msg);
-      } else if (model.isProvenDualInfeasible()) {
-        std::string msg = "vertexai::tile::lang::ComputeBounds: Constraints unbounded or infeasible; aborting";
-        throw std::runtime_error(msg);
-      } else if (model.isAbandoned()) {
-        std::string msg = "vertexai::tile::lang::ComputeBounds: Model numerically ill-behaved; aborting";
-        throw std::runtime_error(msg);
-      }
-      if (!model.isProvenOptimal()) {
-        throw std::runtime_error(
-            "vertexai::tile::lang::ComputeBounds: Unable to prove bounds from linear program are optimal.");
-      }
-      double solution_buffer = model.getObjValue();
-      Rational rationalized_solution;
-      if (solution_buffer > 0) {
-        rationalized_solution = Rational(Integer(int64_t(solution_buffer + 0.01)), lcm);
-      } else {
-        rationalized_solution = Rational(Integer(int64_t(solution_buffer - 0.01)), lcm);
-      }
-      int64_t final_result_buffer = static_cast<int64_t>(Floor(rationalized_solution));
-      if (objective_type == -1) {
-        result.max = -final_result_buffer;
-      } else {
-        result.min = final_result_buffer;
-      }
+  std::vector<Polynomial> objectives;
+  for (const std::string& var : variableNames) {
+    objectives.emplace_back(var);
+    objectives.emplace_back(var, -1);
+  }
+  std::vector<milp::ILPResult> result = solver.batch_solve(constraints, objectives);
+  for (const milp::ILPResult& res : result) {
+    // ILPResult lists the objective for each requested optimization. Since we
+    // used a monomial for each objective, GetNonzeroIndex returns the name of
+    // the variable. Then we grab its coefficient to see if we were requesting
+    // minimization or maximization
+    std::string var = res.obj.GetNonzeroIndex();
+    if (res.obj[var] == 1) {
+      out[var].min = static_cast<int64_t>(res.obj_val);
+    } else if (res.obj[var] == -1) {
+      out[var].max = static_cast<int64_t>(-res.obj_val);
+    } else {
+      throw std::runtime_error("Internal error: unexpected ILP objective type");
     }
-    out[variableNames[i]] = result;
   }
 
   // Remove constraints which are implied

@@ -91,6 +91,9 @@ FlatContraction Flatten(const Contraction& c, const std::vector<TensorShape>& sh
   // Gather the constraints from index bounds
   auto constraints = GatherConstraints(c, shapes);
 
+  // New parallel constraints might have been introduced by defract; re-merge them
+  MergeParallelConstraints(&constraints);
+
   // Compute bounds
   IndexBounds bounds;
   std::vector<SimpleConstraint> new_cons;
