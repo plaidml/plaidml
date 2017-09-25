@@ -4,13 +4,13 @@ import os
 
 
 def config():
-  filename = os.getenv('PLAIDML_CONFIG', '../vertexai_plaidml/testing/tile_generic_cpu.json')
-  with open(filename) as file_:
-    return file_.read()
+    filename = os.getenv('PLAIDML_CONFIG', '../vertexai_plaidml/testing/tile_generic_cpu.json')
+    with open(filename) as file_:
+        return file_.read()
 
 
 def very_large_values_config():
-  return """
+    return """
 {
   "platform": {
     "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
