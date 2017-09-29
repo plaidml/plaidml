@@ -3,6 +3,7 @@
 *A framework for making machine learning work everywhere.*
 
 PlaidML is a multi-language acceleration framework that: 
+  
   * Enables practioners to deploy high-performance neural nets on any device
   * Allows hardware developers to quickly integrate with high-level frameworks
   * Allows framework developers to easily add support for many kinds of hardware
@@ -14,6 +15,8 @@ PlaidML is under active development and should be thought of as early-beta quali
   - [Validated Hardware](#validated-hardware)
   - [Experimental Config](#experimental-config)
 - [Validated Networks](#validated-networks)
+- [Installation Instructions](#installation-instructions)
+- [Reporting Issues](#reporting-issues)
 
 ## Current Limitations
 
@@ -74,7 +77,7 @@ correctness as part of our continuous integration system.
 
 ## Installation Instructions
 
-### Ubuntu Linux (16.04 or later)
+### Ubuntu Linux
 If necessary, install python's 'pip' tool.
 ```
 sudo add-apt-repository universe && sudo apt update
@@ -168,4 +171,4 @@ print("Ran in {} seconds".format(time.time() - start))
 ```
 
 ## Reporting Issues
-Please use GitHub to report any issues you encounter. Please search for duplicates before posting.
+Contact [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev) 
