@@ -41,7 +41,7 @@ our supported hardware. Other networks may work.
  * CNNs
    * inception_v3
    * resnet50
-   * vgg19
+   * vggg*
    * xception
    * mobilenet
  * RNNs
