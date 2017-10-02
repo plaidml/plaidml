@@ -2,6 +2,8 @@
 ![The PlaidML Platypus](https://github.com/vertexai/plaidml/raw/master/images/plaid-final.png)
 *A framework for making machine learning work everywhere.*
 
+PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt).
+
 PlaidML is a multi-language acceleration framework that: 
   
   * Enables practioners to deploy high-performance neural nets on any device
