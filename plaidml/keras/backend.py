@@ -96,7 +96,7 @@ def _device():
         if not _dev:
             devices = [c for c in plaidml.devices(_ctx, _config)]
             if len(devices) == 0:
-                print("ERROR: No devices found, set PLAIDML_EXPERIMENTAL=1 or to the path of a config file")
+                print("ERROR: No devices found, set PLAIDML_EXPERIMENTAL=1 to enable broader device support.")
             if len(devices) > 1:
                 print("ERROR: Multiple Devices found, set PLAIDML_DEVICE_IDS=<devid> to one of:")
                 for i, conf in enumerate(devices):
