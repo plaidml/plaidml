@@ -34,13 +34,13 @@ configuration files and parameters only for devices that we've verified or are c
 performance.
 
 ### Validated Hardware
-*These cards are tested for correctness and performance on every commit*
+Vertex.AI runs a comprehensive set of tests for each release against these hardware targets:
   * AMD
     * R9 Nano
-    * RX480
-  * NVidia
-    * K80, GTX780
-    * GTX1070
+    * RX 480
+  * NVIDIA
+    * K80, GTX 780
+    * GTX 1070
 
 ### Experimental Config
 If the device you're testing against isn't supported by the default configuration, you can enable the experimental
@@ -71,7 +71,7 @@ correctness as part of our continuous integration system.
  * CNNs
    * inception_v3
    * resnet50
-   * vggg*
+   * vgg16, vgg19
    * xception
    * mobilenet
 
@@ -97,23 +97,18 @@ sudo apt install nvidia-modprobe nvidia-384 nvidia-opencl-icd-384 libcuda1-384
 ```
 If you have an AMD card, [download the AMDGPU PRO driver and install](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Driver-for-Linux-Release-Notes.aspx) according to AMD's instructions.
 
-Install plaidml system-wide:
+Install the plaidml wheels system-wide:
 ```
 sudo ./install.sh
 ```
 
-Install plaidml inside a virtualenv:
-```
-./install.sh
-```
-
-You can test your installation by running mobilenet in plaidbench:
+You can test your installation by running MobileNet in plaidbench:
 ```
 cd plaidbench
 python plaidbench.py mobilenet
 ```
 
-You can adapt any Keras code by using the PlaidML backend instead of the TensorFlow, CTNK, or Theano backend that you 
+You can adapt any Keras code by using the PlaidML backend instead of the TensorFlow, CNTK, or Theano backend that you 
 normally use.
 
 Simply insert this code **BEFORE you `import keras`**:
