@@ -50,13 +50,6 @@ filegroup(
     ),
 )
 
-pkg_tar(
-    name = "pkg",
-    files = glob(["*.json"]),
-    package_dir = "testing",
-    strip_prefix = ".",
-)
-
 plaidml_py_test(
     name = "configs_test",
     srcs = ["configs_test.py"],

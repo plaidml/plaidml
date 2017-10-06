@@ -47,6 +47,13 @@ struct HardwareSettings : public DirectSettings {
 
 typedef std::array<size_t, 3> GridSize;
 
+// Describes a potentially-builtin kernel type, in case the hardware
+// abstraction layer has an optimized implementation.
+enum class KernelType {
+  kFunction,  // A normal function kernel.
+  kZero       // A zeroing kernel.
+};
+
 struct KernelInfo {
   std::string kname;
   std::string comments;
@@ -62,6 +69,7 @@ struct KernelInfo {
   size_t tot_flops;
   std::vector<KernelInfo> candidates;
   proto::KernelInfo info;
+  KernelType ktype = KernelType::kFunction;
 };
 
 struct KernelList {

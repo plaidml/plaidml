@@ -68,8 +68,8 @@ std::vector<RangeConstraint> GatherConstraints(const Contraction& c, const std::
       out.push_back(RangeConstraint(spec[j], shapes[i].dims[j].size));
     }
   }
-  std::sort(out.begin(), out.end(),
-            [](const RangeConstraint& c1, const RangeConstraint& c2) { return (c1.range < c2.range); });
+  std::stable_sort(out.begin(), out.end(),
+                   [](const RangeConstraint& c1, const RangeConstraint& c2) { return (c1.range < c2.range); });
   // Return the output
   return out;
 }
@@ -244,24 +244,24 @@ std::tuple<IndexBounds, std::vector<SimpleConstraint>> ComputeBounds(const std::
   std::set<std::string> variableNames = variablesUsed(constraints);
 
   // Run the solver for each variable min + max
-  milp::ILPSolver solver;
+  bilp::ILPSolver solver;
   IndexBounds out;
   std::vector<Polynomial> objectives;
   for (const std::string& var : variableNames) {
     objectives.emplace_back(var);
     objectives.emplace_back(var, -1);
   }
-  std::vector<milp::ILPResult> result = solver.batch_solve(constraints, objectives);
-  for (const milp::ILPResult& res : result) {
+  std::map<Polynomial, bilp::ILPResult> result = solver.batch_solve(constraints, objectives);
+  for (const auto& kvp : result) {
     // ILPResult lists the objective for each requested optimization. Since we
     // used a monomial for each objective, GetNonzeroIndex returns the name of
     // the variable. Then we grab its coefficient to see if we were requesting
     // minimization or maximization
-    std::string var = res.obj.GetNonzeroIndex();
-    if (res.obj[var] == 1) {
-      out[var].min = static_cast<int64_t>(res.obj_val);
-    } else if (res.obj[var] == -1) {
-      out[var].max = static_cast<int64_t>(-res.obj_val);
+    std::string var = kvp.first.GetNonzeroIndex();
+    if (kvp.first[var] == 1) {
+      out[var].min = static_cast<int64_t>(kvp.second.obj_val);
+    } else if (kvp.first[var] == -1) {
+      out[var].max = static_cast<int64_t>(-kvp.second.obj_val);
     } else {
       throw std::runtime_error("Internal error: unexpected ILP objective type");
     }

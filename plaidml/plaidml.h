@@ -347,8 +347,9 @@ PLAIDML_API plaidml_var* plaidml_alloc_real(double value);
 PLAIDML_API plaidml_var* plaidml_alloc_tensor(vai_ctx* ctx, plaidml_buffer* buffer, plaidml_shape* shape);
 
 // Builds a function from the supplied code written in the PlaidML operation
-// description language.
-PLAIDML_API plaidml_function* plaidml_build_coded_function(const char* code);
+// description language.  If 'id' is not NULL, attach the id to the function
+// for tracking purposes.
+PLAIDML_API plaidml_function* plaidml_build_coded_function(const char* code, const char* id);
 
 // TODO: Make more general method to serialize things.
 

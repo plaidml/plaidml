@@ -23,16 +23,6 @@ def plaidml_deps(root=""):
     actual="@easylogging_repo//:easylogging"
   )
 
-  native.new_http_archive(
-    name = "coinlp_archive",
-    url = "https://storage.googleapis.com/external_build_repo/Clp-1.16.10-tz.tgz",
-    sha256 = "897a97b8829f465d1282da4e5fa61ba3ff506e1b0051733e5dde5e2451dcaebe",
-    strip_prefix = "Clp-1.16.10",
-    build_file = root + "//bzl:coinlp.BUILD",
-  )
-  native.bind(name="coinlp", actual="@coinlp_archive//:coinlp")
-  native.bind(name="clp", actual="@coinlp_archive//:clp")
-
   native.new_git_repository(
     name="gflags_repo",
     commit="ac1a925c2bdec48e010020df93732badf75970e9",

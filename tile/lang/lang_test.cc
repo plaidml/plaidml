@@ -300,7 +300,17 @@ TEST_CASE("Compile strided convolution derivate", "[compile][conv_d]") {
       SimpleShape(DataType::FLOAT32, {2, 2, 1, 1}),
   };
   FlatContraction r = Compile(c, shapes);
-  // TODO(T1146): Validate something.
+  // This is testing against regression, none of these were worked out from first principles
+  REQUIRE(r.names == (std::vector<std::string>{"v1_0", "v2_0", "v2_1", "v5_0"}));
+  REQUIRE(r.constraints.size() == 2);
+  REQUIRE(r.constraints[0].lhs == (std::vector<int64_t>{-1, 0, 0, 1}));
+  REQUIRE(r.constraints[0].rhs == 0);
+  REQUIRE(r.constraints[1].lhs == (std::vector<int64_t>{1, 0, 0, -1}));
+  REQUIRE(r.constraints[1].rhs == 1);
+  REQUIRE(r.ranges == (std::vector<uint64_t>{3, 2, 3, 2}));
+  REQUIRE(r.access[0].strides == (std::vector<int64_t>{6, 1, 2, 0}));
+  REQUIRE(r.access[1].strides == (std::vector<int64_t>{0, 0, 1, 3}));
+  REQUIRE(r.access[2].strides == (std::vector<int64_t>{2, 1, 0, -2}));
 }
 
 TEST_CASE("Flatten wacky matrix multiply type thing", "[flatten]") {

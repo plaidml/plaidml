@@ -155,10 +155,65 @@ static void GenShape(KernelList& r, const Op& op, const Bindings& bindings,  // 
   r.kernels.push_back(ki);
 }
 
+static void GenReshape(KernelList& r, const Op& op, const Bindings& bindings,  // NOLINT(runtime/references)
+                       const std::string& kname, const HardwareSettings& setting) {
+  using namespace vertexai::tile::sem::builder;  // NOLINT
+  IVLOG(3, "Making Reshape");
+
+  if (op.inputs.size() < 1) {
+    throw std::runtime_error("prng must have at least one parameter");
+  }
+
+  // Get input shape
+  const TensorShape in_shape = bindings.at(op.inputs[0]).shape;
+
+  // Get output shape
+  const TensorShape out_shape = bindings.at(op.output).shape;
+
+  // Get total size
+  uint64_t buffer_size = in_shape.buffer_size();
+
+  // Verify it matches output size
+  if (out_shape.buffer_size() != buffer_size) {
+    throw std::runtime_error("Invalid reshape");
+  }
+
+  // Predeclare types for nice syntax
+  auto idx_type = sem::Type(sem::Type::INDEX);
+
+  // Make function body
+  auto body = _Block({});
+  body->append(_Declare(idx_type, "i", _Index(sem::IndexExpr::GLOBAL, 0)));
+  sem::ExprPtr cond = (_("i") < buffer_size);
+  auto inner = _Block({});
+  inner->append(_("out")[_("i")] = _("in")[_("i")]);
+  body->append(_If(cond, inner));
+
+  sem::Function::params_t params;
+  params.push_back(std::make_pair(sem::Type(sem::Type::POINTER_MUT, out_shape.type, 1, 0, sem::Type::GLOBAL), "out"));
+  params.push_back(std::make_pair(sem::Type(sem::Type::POINTER_CONST, in_shape.type, 1, 0, sem::Type::GLOBAL), "in"));
+
+  KernelInfo ki;
+  ki.kname = kname;
+  ki.outputs.push_back(op.output);
+  ki.inputs.push_back(op.inputs[0]);
+  ki.kfunc = std::make_shared<sem::Function>(kname, sem::Type(sem::Type::TVOID), params, body);
+  ki.gwork = {size_t(((buffer_size + setting.threads - 1) / setting.threads) * setting.threads), 1, 1};
+  ki.lwork = {size_t(setting.threads), 1, 1};
+  ki.tot_bytes = buffer_size * ((bit_width(out_shape.type) + 7) / 8);
+  ki.tot_flops = buffer_size;
+
+  // Dump the code
+  sem::Print dump(*ki.kfunc);
+  IVLOG(3, "CODE:\n" << dump.str());
+  // Add to kernel list
+  r.kernels.push_back(ki);
+}
+
 static void GenPRNG(KernelList& r, const Op& op, const Bindings& bindings,  // NOLINT(runtime/references)
                     const std::string& kname, const HardwareSettings& setting) {
   using namespace vertexai::tile::sem::builder;  // NOLINT
-  IVLOG(1, "Making PRNG");
+  IVLOG(3, "Making PRNG");
 
   if (op.inputs.size() < 1) {
     throw std::runtime_error("prng must have at least one parameter");
@@ -218,7 +273,7 @@ static void GenPRNG(KernelList& r, const Op& op, const Bindings& bindings,  // N
 
   // Dump the code
   sem::Print dump(*ki.kfunc);
-  IVLOG(1, "CODE:\n" << dump.str());
+  IVLOG(3, "CODE:\n" << dump.str());
   // Add to kernel list
   r.kernels.push_back(ki);
 }
@@ -232,6 +287,8 @@ void GenSpecial(KernelList& r, const Op& op, const Bindings& bindings,  // NOLIN
     GenScatter(r, op, bindings, kname, settings);
   } else if (op.f.fn == "shape") {
     GenShape(r, op, bindings, kname, settings);
+  } else if (op.f.fn == "reshape") {
+    GenReshape(r, op, bindings, kname, settings);
   } else if (op.f.fn == "prng_step") {
     GenPRNG(r, op, bindings, kname, settings);
   } else {

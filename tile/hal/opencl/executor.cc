@@ -14,6 +14,7 @@
 #include "tile/hal/opencl/kernel.h"
 #include "tile/hal/opencl/library.h"
 #include "tile/hal/opencl/local_memory.h"
+#include "tile/hal/opencl/zero_kernel.h"
 #include "tile/hal/util/selector.h"
 
 namespace vertexai {
@@ -141,16 +142,23 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
 boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* library, std::size_t kernel_index) {
   Library* exe = Library::Upcast(library, device_state_);
 
+  const lang::KernelInfo& kinfo = exe->kernel_info()[kernel_index];
+  boost::uuids::uuid kuuid = exe->kernel_uuids()[kernel_index];
+
+  if (kinfo.ktype == lang::KernelType::kZero) {
+    return boost::make_ready_future(
+        std::unique_ptr<hal::Kernel>(compat::make_unique<ZeroKernel>(device_state_, kinfo, kuuid)));
+  }
+
   Err err;
-  std::string kname = exe->kernel_info()[kernel_index].kname;
+  std::string kname = kinfo.kname;
   CLObj<cl_kernel> kernel = clCreateKernel(exe->program().get(), kname.c_str(), err.ptr());
   if (!kernel) {
     throw std::runtime_error(std::string("Unable to initialize OpenCL kernel: ") + err.str());
   }
 
-  boost::uuids::uuid kernel_uuid = exe->kernel_uuids()[kernel_index];
   return boost::make_ready_future(std::unique_ptr<hal::Kernel>(
-      compat::make_unique<Kernel>(device_state_, std::move(kernel), exe->kernel_info()[kernel_index], kernel_uuid)));
+      compat::make_unique<Kernel>(device_state_, std::move(kernel), exe->kernel_info()[kernel_index], kuuid)));
 }
 
 void Executor::Flush() { device_state_->FlushCommandQueue(); }

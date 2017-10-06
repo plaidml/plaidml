@@ -1,7 +1,7 @@
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 plaidml_cc_library(
-    name = "milp",
+    name = "bilp",
     srcs = [
         "ilp_solver.cc",
         "ilp_solver.h",
@@ -22,7 +22,7 @@ plaidml_cc_test(
         "test.cc",
     ],
     deps = [
-        ":milp",
+        ":bilp",
         "//external:gtest",
     ],
 )

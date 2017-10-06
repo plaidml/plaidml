@@ -497,7 +497,8 @@ class function {
   function() {}
 
   // Make a function from code
-  explicit function(const std::string& str) : ptr_(plaidml_build_coded_function(str.c_str()), plaidml_free_function) {
+  explicit function(const std::string& str, const std::string& id = "")
+      : ptr_(plaidml_build_coded_function(str.c_str(), id.c_str()), plaidml_free_function) {
     vai_exception::check_and_throw(ptr_);
   }
 

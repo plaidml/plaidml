@@ -297,7 +297,7 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(3, 3), m(3, 3)],
              [m(2, 1, 1), m(1)],
              [m(2), m(1)]
-    ], skip_theano=True, verbose=True)
+    ], skip_theano=True)
     def testDivElements(self, b, x, y):
         return [x / y]
 
@@ -383,6 +383,22 @@ class TestBackendOps(unittest.TestCase):
     def testNotEqual(self, b):
         return b.not_equal(b.variable(m(3, 3)), b.variable(m(3, 3)))
 
+    @compareForwardExact()
+    def testLess(self, b):
+        return b.less(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testLessEqual(self, b):
+        return b.less_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testGreater(self, b):
+        return b.greater(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testGreaterEqual(self, b):
+        return b.greater_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
+
     @opTest([[m(3, 3)]])
     def testSquare(self, b, x):
         return [b.square(x)]
@@ -410,6 +426,10 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[np.array([[0,0,0], [0,1,0], [0,0,0]]), (m(3, 3) + 3) / 15.0]])
     def testCategoricalCrossentropy(self, b, x, y):
         return [b.categorical_crossentropy(x, y)]
+
+    @opTest([[np.array([[0,0,0], [0,0,1], [1,1,0]]), (m(3, 3) + 3)]])
+    def testSoftCat(self, b, x, y):
+        return [b.categorical_crossentropy(x, b.softmax(y))]
 
     @unittest.skip("Doesn't need to agree b/c what we do with garbage input is implementation detail")
     @opTest([[(m(2, 2) + 3) / 10.0, np.array([[0., 0.], [1., 2.]])]])
@@ -661,20 +681,16 @@ class TestBackendOps(unittest.TestCase):
         f([])
         return moving_var
 
-    # TODO(T1038): The various normalize derivatives were wrong while
-    # T1033 was outstanding. Now that that's fixed, these should be
-    # switched to opTest.
-
     @opTest([[m(2, 3, 5),
               m(2, 3, 1) + 3,
               m(2, 3, 1) + 4,
     ]],
-            atol=1e-7) #verbose=True, skip_theano=True)
+            atol=1e-7)
     def testNormalizeBatchInTrainingSimple(self, b, x, mov_avg, mov_var):
         return [(b.normalize_batch_in_training(x, mov_avg, mov_var, [2]))[0]]
 
     @opTest([[n(2,3), np.array([3., 4.,.7]), np.array([1.44, .99, .98])]],
-            verbose=True, skip_theano=True, skip_tensorflow=True)
+            skip_theano=True, skip_tensorflow=True)
     def testNormalizeBatchInTraining(self, b, x, beta, gamma):
         return [b.normalize_batch_in_training(x, gamma, beta, [1])[0]]
 
@@ -687,12 +703,11 @@ class TestBackendOps(unittest.TestCase):
         return b.normalize_batch_in_training(b.variable(n(2,3,5,7,11)), b.constant(11, shape=(1,3,1,1,11)), b.constant(0, shape=(1,3,1,1,11)), [0,2,3])[2]
 
     @opTest([[n(4,3), np.array([0.0, 0.1, 0.1]), np.array([100., 101., 50.]),
-              np.array([3., 4.,.7]), np.array([1.44, .99, .98])]],
-            verbose=True)
+              np.array([3., 4.,.7]), np.array([1.44, .99, .98])]])
     def testBatchNormalization(self, b, x, mean, var, beta, gamma):
         return [b.batch_normalization(x, mean, var, beta, gamma)]
 
-    @opTest([[np.array([100])]], skip_theano=True, verbose=True)
+    @opTest([[np.array([100])]], skip_theano=True)
     def testBatchNormalizationVar(self, b, var):
         return [b.batch_normalization(b.variable(n(1, 1, 2)), b.variable(np.array([15])), var, None, None),
                 b.batch_normalization(b.variable(n(2, 1, 1)), b.variable(np.array([15])), var, None, None)]
@@ -789,7 +804,7 @@ class TestBackendOps(unittest.TestCase):
 
     @opTest([[m(34)]])
     def testSliceBasic(self, b, x):
-        return [b.exp(x[2:30]), b.log(x[:5]), b.tanh(x[-4:])]
+        return [b.exp(x[2:30]), b.log(x[:5]), b.tanh(x[-4:]), b.sqrt(x[-1])]
 
     @opTest([[m(4, 3, 3, 2, 5)]])
     def testSliceMessy(self, b, x):

@@ -1,9 +1,9 @@
-#include "tile/lang/milp/tableau.h"
+#include "tile/lang/bilp/tableau.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
-namespace milp {
+namespace bilp {
 
 Tableau::Tableau(const Matrix& m, const std::vector<std::string>& var_names, const std::vector<size_t>* opposites)
     : matrix_(m), var_names_(var_names), opposites_(var_names.size(), 0) {
@@ -30,7 +30,7 @@ std::vector<std::string> Tableau::varNames() const { return var_names_; }
 
 void Tableau::buildOppositesFromNames() {
   for (size_t i = 0; i < var_names_.size(); ++i) {
-    if (var_names_[i].substr(var_names_[i].length() - 4, 4) == "_pos") {
+    if (var_names_[i].substr(var_names_[i].length() - 4, 4) == "_pos" && var_names_[i][0] == '_') {
       for (size_t j = i + 1; j < var_names_.size(); ++j) {
         if (var_names_[j] == var_names_[i].substr(0, var_names_[i].length() - 4) + "_neg") {
           opposites_[i] = j;
@@ -38,7 +38,7 @@ void Tableau::buildOppositesFromNames() {
           break;
         }
       }
-    } else if (var_names_[i].substr(var_names_[i].length() - 4, 4) == "_neg") {
+    } else if (var_names_[i].substr(var_names_[i].length() - 4, 4) == "_neg" && var_names_[i][0] == '_') {
       for (size_t j = i + 1; j < var_names_.size(); ++j) {
         if (var_names_[j] == var_names_[i].substr(0, var_names_[i].length() - 4) + "_pos") {
           opposites_[i] = j;
@@ -66,7 +66,7 @@ bool Tableau::convertToCanonicalForm() {
 
   phase1.selectBasicVars();
   phase1.priceOut();
-  if (!phase1.makeCanonicalFormOptimal()) {
+  if (!phase1.makeOptimal(true)) {
     throw std::runtime_error(
         "Unable to convert LP tableau to canonical form, likely due to unbounded feasible region.");
   }
@@ -115,17 +115,14 @@ bool Tableau::convertToCanonicalForm() {
 }
 
 bool Tableau::makeOptimal(bool already_canonical) {
-  // Convert to an equivalent tableau giving optimal solution
+  // Convert to an equivalent tableau giving optimal real solution
   if (!already_canonical) {
     if (!convertToCanonicalForm()) {
       // Feasible region is empty
       return false;
     }
   }
-  return makeCanonicalFormOptimal();
-}
 
-bool Tableau::makeCanonicalFormOptimal() {
   // Select pivot col
   Rational max_obj_coeff = 0;  // If the max is <= 0, we're done, so feel free to start there
   size_t max_obj_col = 0;      // 0 is not a valid column, so ok to start at this
@@ -177,12 +174,16 @@ bool Tableau::makeCanonicalFormOptimal() {
   basic_vars_[min_pivot_row] = max_obj_col;
   mat().makePivotAt(min_pivot_row, max_obj_col);
   // iterate
-  return makeCanonicalFormOptimal();
+  return makeOptimal(true);
 }
 
 void Tableau::selectBasicVars() {
   // Makes basic_vars_ a map pointing from each row (other than 1st) to the basic var column for it
   basic_vars_ = RowToColLookup();  // Start from scratch
+  if (mat().size1() - 1 == 0) {
+    // No basic variables to find!
+    return;
+  }
   for (size_t j = 1; j < mat().size2() - 1; ++j) {
     // Skipping the first and last columns which can't be basic vars
     // Otherwise, search each column; if it contains all 0s and one 1, it's basic
@@ -245,17 +246,8 @@ std::vector<Rational> Tableau::getSymbolicSolution() const {
   return soln;
 }
 
-std::map<std::string, Rational> Tableau::reportSolution() const {
-  std::vector<Rational> sym_soln = getSymbolicSolution();
-  std::map<std::string, Rational> soln;
-  for (size_t i = 0; i < sym_soln.size(); ++i) {
-    soln[var_names_[i]] = sym_soln[i];
-  }
-  return soln;
-}
-
 Rational Tableau::reportObjectiveValue() const { return mat()(0, mat().size2() - 1); }
-}  // namespace milp
+}  // namespace bilp
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

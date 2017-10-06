@@ -73,7 +73,7 @@ if PLAIDML_EVENTLOG_FILENAME:
 
     @atexit.register
     def close_eventlog():
-        _ctx.close_eventlog()
+        _ctx.shutdown()
 
 
 _device_lock = threading.Lock()
@@ -254,7 +254,7 @@ class _Var(object):
 
         def __parse_slice(idx):
             if isinstance(key[idx], int):
-                return 1, None, str(key[idx])
+                return 1, None, key[idx]
             if ((not isinstance(key[idx].start, int) and not isinstance(key[idx].start, type(None))) or
                 (not isinstance(key[idx].stop, int) and not isinstance(key[idx].stop, type(None))) or
                 (not isinstance(key[idx].step, int) and not isinstance(key[idx].step, type(None)))):
@@ -328,7 +328,12 @@ class _Var(object):
         for idx in range(len(key)):
             length_numerator, step, offset = __parse_slice(idx)
             if step == None:
-                formula_list.append('{}'.format(offset))
+                # In this case offset is an int
+                if offset >= 0:
+                    formula_list.append('{}'.format(offset))
+                else:
+                    offset_list.append('Offset{} = N{}+{};'.format(idx, idx, offset))
+                    formula_list.append('{}'.format('Offset{}'.format(idx)))
             else:
                 var_list.append('i{}'.format(inner_idx))
                 dim_subs = {'numer': length_numerator, 'step': step}
@@ -337,7 +342,7 @@ class _Var(object):
                 else:
                     dim_list.append('({numer} + {step} + 1)/{step}'.format(**dim_subs))
                 if isinstance(length_numerator, str):
-                    shape.append('None')
+                    shape.append(None)
                     offset_list.append('Offset{} = {};'.format(idx, offset))
                     formula_list.append('{}*i{}+{}'.format(step, inner_idx, 'Offset{}'.format(idx)))
                 else:
@@ -348,7 +353,7 @@ class _Var(object):
         for idx in range(len(key), len(self.shape)):
             var_list.append('i{}'.format(inner_idx))
             dim_list.append('N{}'.format(idx))
-            shape.append('None')
+            shape.append(None)
             formula_list.append('i{}'.format(inner_idx))
             inner_idx += 1
         shape = tuple(shape)
@@ -482,6 +487,30 @@ class _Var(object):
                    OrderedDict([('B', other), ('C', self)]),
                    ['A'])
 
+    def __lt__(self, other):
+        return _Op('<', self.dtype, _broadcast_shape(self, other),
+                   'function (B, C) -> (A) { A = cmp_lt(B, C); }',
+                   OrderedDict([('B', self), ('C', other)]),
+                   ['A'])
+
+    def __le__(self, other):
+        return _Op('<=', self.dtype, _broadcast_shape(self, other),
+                   'function (B, C) -> (A) { A = cmp_le(B, C); }',
+                   OrderedDict([('B', self), ('C', other)]),
+                   ['A'])
+
+    def __gt__(self, other):
+        return _Op('>', self.dtype, _broadcast_shape(self, other),
+                   'function (B, C) -> (A) { A = cmp_gt(B, C); }',
+                   OrderedDict([('B', self), ('C', other)]),
+                   ['A'])
+
+    def __ge__(self, other):
+        return _Op('>=', self.dtype, _broadcast_shape(self, other),
+                   'function (B, C) -> (A) { A = cmp_ge(B, C); }',
+                   OrderedDict([('B', self), ('C', other)]),
+                   ['A'])
+
     def batch_flatten(self):
         # Flatten all but first dimension to a single dimension; leave 1st dimension unchanged
         # Note this is a specific kind of reshape that serves a special role in Keras (for Flatten layers)
@@ -490,8 +519,6 @@ class _Var(object):
 
     def reshape(self, shape):
         in_dim_list = ["N{}".format(i) for i in range(self.ndim)]
-        in_idx_list = ["n{}".format(i) for i in range(self.ndim)]
-        out_idx_list = ["i{}".format(j) for j in range(len(shape))]
 
         # Fill in Nones in target shape
         o_shape = [self.shape[i] if shape[i] is None else shape[i] for i in range(len(shape))]
@@ -519,26 +546,10 @@ class _Var(object):
         py_shape = tuple(x if isinstance(x, int) else None for x in o_shape)
         o_shape = [str(x) for x in o_shape]
 
-        # Write index polynomials to flatten and unflatten
-        flatten_terms = ["*".join([in_dim_list[j] for j in range(i+1, self.ndim)] + [in_idx_list[i]])
-                                                                                            for i in range(self.ndim)]
-        flatten_idx_poly = " + ".join(flatten_terms)
-        unflatten_terms = ["*".join([o_shape[j] for j in range(i+1, len(o_shape))] + [out_idx_list[i]])
-                                                                                        for i in range(len(o_shape))]
-        unflatten_idx_poly = " + ".join(unflatten_terms)
-
         code = ('function (I[{idims}]) -> (O) {{\n' +
-                '  Assert = assert_reshape_compatible(mod({idim_prod}, {o_shape_sz}) == 0);\n' +
-                '  Flat[{flat_idx} : {idim_prod}] = +(I[{iidxs}]) no_defract;\n' +
-                '  O[{oidxs} : {odims}] = +(Flat[{uf_idx_poly}]) no_defract;\n' +
+                '  O = reshape(I, {odims});\n'
                 '}}').format(idims=", ".join(in_dim_list),
-                             flat_idx=flatten_idx_poly,
-                             idim_prod="*".join(in_dim_list),
-                             o_shape_sz=o_shape_sz,
-                             iidxs=", ".join(in_idx_list),
-                             oidxs=", ".join(out_idx_list),
-                             odims=", ".join(o_shape),
-                             uf_idx_poly=unflatten_idx_poly)
+                             odims=", ".join(o_shape))
 
         return _Op('reshape', self.dtype, py_shape, code, {'I': self}, ['O'])
 
@@ -776,6 +787,7 @@ class _Op(_Var):
         self._dtype = dtype
         self._self_side_effects = side_effects
         self._cached_side_effects = None
+        self._backtrace = "".join(traceback.format_stack()[:-1])
         if not self._code:
             self._trace = traceback.extract_stack()[:-2]
 
@@ -807,7 +819,7 @@ class _Op(_Var):
                 if not self._code:
                     exn = PlaidMLKerasException('unable to construct value for operation \'%s\' at:\n%s' % (self.ident, ''.join(traceback.format_list(self._trace))))
                     raise exn
-                a = plaidml.Applier(_ctx, plaidml.Function(self._code))
+                a = plaidml.Applier(_ctx, plaidml.Function(self._code, self._backtrace))
                 for k, v in self._inputs.iteritems():
                     a.add_input(k, _plaidml_val(v, indent + 1))
                 self._value = a.add_output(self._outputs[0])
@@ -822,7 +834,7 @@ class _Op(_Var):
         if self._self_side_effects is not None:
             self._cached_side_effects = self._self_side_effects
         for ki, vi in self._inputs.iteritems():
-            if isinstance(vi, float) or isinstance(vi, int) or isinstance(vi, bool):
+            if not isinstance(vi, _Var):
                 continue
             inner_effects = vi._side_effects()
             for k, v in inner_effects.iteritems():
@@ -1098,7 +1110,7 @@ def cast(x, dtype):
 def categorical_crossentropy(target, output, from_logits=False):
     if from_logits:
         output = softmax(output)
-    else:
+    elif not isinstance(output, _Op) or output._ident != "softmax":
         output /= output.sum(axis=-1, keepdims=True)
         output = output.clip(epsilon(), 1.0 - epsilon())
     fixed_dims = ",".join("X{}".format(i) for i in range(len(output.shape)-1))
@@ -1644,6 +1656,14 @@ def gradients(loss, variables):
                                                            [_plaidml_val(var) for var in variables]))]
 
 
+def greater(x, y):
+    return x > y
+
+
+def greater_equal(x, y):
+    return x >= y
+
+
 def identity(x):
     # Return a tensor with the same content as the input tensor.
     f = """function (I) -> (O) { O = I; }"""
@@ -1708,6 +1728,14 @@ def learning_phase():
     if _in_train_phase is None:
         _in_train_phase = placeholder(ndim=0)
     return _in_train_phase
+
+
+def less(x, y):
+    return x < y
+
+
+def less_equal(x, y):
+    return x <= y
 
 
 def log(x):

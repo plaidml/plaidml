@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import contextlib
 import ctypes
+import hashlib
 import logging
 import numpy as np
 import os
@@ -13,14 +14,19 @@ import plaidml.exceptions
 import plaidml.library
 import platform
 import threading
+import traceback
 import weakref
 
 from collections import namedtuple
 from itertools import islice
 
 
-os.environ["PLAIDML_EXPERIMENTAL_CONFIG"] = os.path.join(pkg_resources.resource_filename('plaidml',  'experimental.json'))
-os.environ["PLAIDML_DEFAULT_CONFIG"] = os.path.join(pkg_resources.resource_filename('plaidml',  'config.json'))
+if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
+    os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(pkg_resources.resource_filename('plaidml',  'experimental.json'))
+
+if 'PLAIDML_DEFAULT_CONFIG' not in os.environ:
+    os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(pkg_resources.resource_filename('plaidml',  'config.json'))
+
 
 # Create types for all PlaidML structures, so that we can get some type checking.
 class _C_Devconf(ctypes.Structure):
@@ -409,7 +415,8 @@ class _Library(plaidml.library.Library):
         # PLAIDML_API plaidml_function* plaidml_build_coded_function(const char* code);
         self.plaidml_build_coded_function = lib.plaidml_build_coded_function
         self.plaidml_build_coded_function.argtypes = [
-            ctypes.c_char_p  # const char* code
+            ctypes.c_char_p,  # const char* code
+            ctypes.c_char_p   # const char* id
         ]
         self.plaidml_build_coded_function.restype = ctypes.POINTER(_C_Function)
         self.plaidml_build_coded_function.errcheck = self._check_err
@@ -688,6 +695,17 @@ def set_perf_counter(name, value):
     return _lib().set_perf_counter(name, value)
 
 
+_backtraces = None
+
+
+def set_backtrace(enable):
+    global _backtraces
+    if enable:
+        _backtraces = {}
+    else:
+        _backtraces = None
+
+
 def Context():
     return plaidml.context.Context(_lib())
 
@@ -705,8 +723,20 @@ class _Function(object):
 
 class Function(_Function):
 
-    def __init__(self, code):
-        super(Function, self).__init__(_lib().plaidml_build_coded_function(code))
+    def __init__(self, code, backtrace=None):
+        global _backtraces
+        fid = ""
+        if _backtraces is not None:
+            if backtrace == None:
+                backtrace = "".join(traceback.format_stack()[:-1])
+            fid = "id_" + hashlib.md5(backtrace + code).hexdigest()[0:12]
+            if fid not in _backtraces:
+                _backtraces[fid] = backtrace 
+                logging.getLogger(__name__).info("Adding function ID: " + fid)
+                logging.getLogger(__name__).info(code)
+                logging.getLogger(__name__).info(backtrace)
+
+        super(Function, self).__init__(_lib().plaidml_build_coded_function(code, fid))
 
 
 class _DeviceConfig(object):

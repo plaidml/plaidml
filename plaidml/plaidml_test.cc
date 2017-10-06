@@ -25,7 +25,7 @@ namespace plaidml = vertexai::plaidml;
 TEST(PlaidML_C_API, BroadcastFailure) {
   vai_clear_status();
 
-  std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }")};
+  std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }", nullptr)};
   EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
@@ -74,7 +74,7 @@ TEST(PlaidML_C_API, BroadcastFailure) {
 TEST(PlaidML_C_API, BroadcastOne) {
   vai_clear_status();
 
-  std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }")};
+  std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }", nullptr)};
   EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
@@ -170,7 +170,7 @@ TEST(PlaidML_C_API, BroadcastOne) {
 TEST(PlaidML_C_API, BroadcastBoth) {
   vai_clear_status();
 
-  std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }")};
+  std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }", nullptr)};
   EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
@@ -277,7 +277,7 @@ TEST(PlaidML_C_API, MatMul) {
   vai_clear_status();
 
   std::unique_ptr<plaidml_function> matmul{
-      plaidml_build_coded_function("function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")};
+      plaidml_build_coded_function("function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }", nullptr)};
   EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};

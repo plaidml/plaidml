@@ -7,6 +7,7 @@
 #include "tile/lang/gen_special.h"
 #include "tile/lang/replace.h"
 #include "tile/lang/sym_poly.h"
+#include "tile/lang/symbolic.h"
 #include "tile/lang/type.h"
 
 namespace vertexai {
@@ -21,6 +22,8 @@ std::shared_ptr<IConstValue> IConstValue::make(const int64_t& val) {
   IVLOG(4, "Making IConstValue " << result.get() << " from constant " << val);
   return result;
 }
+
+std::map<std::shared_ptr<Value>, std::set<std::string>> g_ids;
 
 std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shared_ptr<Value>> inputs) {
   static std::shared_ptr<Value> zeroi = IConstValue::make(0);
@@ -164,6 +167,12 @@ std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shar
       return inputs[0];
     }
   }
+  if (fn == "log" && inputs.size() == 1) {
+    auto inner = std::dynamic_pointer_cast<FunctionValue>(inputs[0]);
+    if (inner && inner->fn() == "builtin_softmax") {
+      return FunctionValue::make("builtin_logsoftmax", inner->inputs());
+    }
+  }
 
   auto result = Interned<FunctionValue>::make(fn, inputs);
   IVLOG(4, "Making FunctionValue " << *result << " from fn " << fn);
@@ -179,13 +188,13 @@ std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shar
 FunctionValue::FunctionValue(std::string fn, std::vector<std::shared_ptr<Value>> inputs)
     : fn_{std::move(fn)}, inputs_{std::move(inputs)} {
   IVLOG(4, "Building function value \"" << fn_ << "\" over " << inputs_.size() << " inputs");
-  if (fn_ == "prng_step") {
+  if (fn_ == "prng_step" || fn_ == "reshape") {
     if (inputs_.size() < 1) {
-      throw std::runtime_error("prng_step must have at least one input");
+      throw std::runtime_error("prng_step/reshape must have at least one input");
     }
     for (size_t i = 1; i < inputs_.size(); i++) {
       if (inputs_[i]->num_dims() != 0) {
-        throw std::runtime_error("prng_step sizes must be scalars");
+        throw std::runtime_error("prng_step/reshape sizes must be scalars");
       }
       dims_.push_back(inputs_[i]);
     }
@@ -256,9 +265,9 @@ std::shared_ptr<Value> ContractionValue::make(CombinationOp comb_op, Aggregation
   return result;
 }
 
-BoundFunction::BoundFunction(const std::string& code) {
+BoundFunction::BoundFunction(const std::string& code, const std::string& id) {
   Parser p;
-  prog_ = p.Parse(code);
+  prog_ = p.Parse(code, id);
   for (size_t i = 0; i < prog_.inputs.size(); i++) {
     in_pos_[prog_.inputs[i].name] = i;
   }
@@ -490,6 +499,29 @@ std::string BoundFunction::Apply(const std::shared_ptr<Value>& val) {
     return it->second;
   }
   std::string name = ValueVisitor<std::string>::Apply(val);
+  auto it2 = g_ids.find(val);
+  if (it2 != g_ids.end()) {
+    Attribute attr = {"pid", {}};
+    for (const auto& s : it2->second) {
+      attr.params.push_back(s);
+    }
+    prog_.ops.back().attributes.emplace_back(attr);
+  }
+  /*
+  auto it2 = g_deriv_source.find(val);
+  if (it2 != g_deriv_source.end()) {
+    Attribute d_of = { "d_of", {} };
+    for(const auto& s : it2->second) {
+      auto it3 = bindings_.find(s);
+      if (it3 == bindings_.end()) {
+        d_of.params.push_back("unknown");
+      } else {
+        d_of.params.push_back(it3->second);
+      }
+    }
+    prog_.ops.back().attributes.push_back(d_of);
+  }
+  */
   bindings_[val] = name;
   return name;
 }
@@ -719,6 +751,13 @@ void FunctionApplication::SetDone() {
       bool no_defract = c.no_defract;
       bindings_[o.output] = ContractionValue::make(c.comb_op, c.agg_op, specs, cons, inputs, dims, no_defract);
       IVLOG(4, "FunApp::SetDone " << this << " binding " << o.output << " ->(contraction) " << *bindings_[o.output]);
+    }
+    for (const auto& attr : o.attributes) {
+      if (attr.name == "pid") {
+        for (const auto& s : attr.params) {
+          g_ids[bindings_[o.output]].emplace(s);
+        }
+      }
     }
   }
   // Run the 'updates'

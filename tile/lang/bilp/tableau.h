@@ -13,13 +13,11 @@
 namespace vertexai {
 namespace tile {
 namespace lang {
-namespace milp {
+namespace bilp {
 
 using boost::numeric::ublas::range;
 
 typedef std::map<size_t, size_t> RowToColLookup;
-
-// TODO(T1146): Disable resize and swap from UBLAS, as they will break Tableaus?
 
 class Tableau {
  public:
@@ -29,6 +27,7 @@ class Tableau {
   Tableau(Matrix::size_type size1, Matrix::size_type size2, const std::vector<std::string>& var_names,
           const std::vector<size_t>* opposites = nullptr);
   // Accessors
+  // Don't use resize or swap on mat(); the other parts of Tableau won't recognize this and will fail
   const Matrix& mat() const { return matrix_; }
   Matrix& mat() { return matrix_; }
   RowToColLookup basicVars() const;
@@ -42,8 +41,6 @@ class Tableau {
   // Put Tableau in Canonical Form
   // (i.e. contains permuted identity submatrix, last column nonnegative except possibly objective)
   bool convertToCanonicalForm();
-  // TODO(T1146): merge into makeOptimal
-  bool makeCanonicalFormOptimal();
   // Find the columns that are basic variables in the current matrix
   void selectBasicVars();
   // Make objective == 0 at each basic variable via row ops
@@ -53,8 +50,6 @@ class Tableau {
   // tableau, so if it hasn't been solved they are likely meaningless
   // Returns the coefficients of the solution in the order of varNames()
   std::vector<Rational> getSymbolicSolution() const;
-  // Returns a map from variable names to that var's coeff in the solution
-  std::map<std::string, Rational> reportSolution() const;
   // Returns the minimal value the objective can take in the feasible region
   Rational reportObjectiveValue() const;
 
@@ -62,15 +57,13 @@ class Tableau {
   Matrix matrix_;
 
  private:
-  // TODO(T1146): UI quirk: named variables must be ints, unnamed variables can be arbitrary
-  // rationals. It would be nice to make this interface clearer.
   std::vector<std::string> var_names_;
   RowToColLookup basic_vars_;
   std::vector<size_t> opposites_;
 
   void buildOppositesFromNames();
 };
-}  // namespace milp
+}  // namespace bilp
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

@@ -7,7 +7,7 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-typedef boost::multiprecision::cpp_int_backend<> IntegerBackend;  // TODO(T1146): Consider setting min to 128
+typedef boost::multiprecision::cpp_int_backend<> IntegerBackend;
 typedef boost::multiprecision::rational_adaptor<IntegerBackend> RationalBackend;
 typedef boost::multiprecision::number<IntegerBackend, boost::multiprecision::et_off> Integer;
 typedef boost::multiprecision::number<RationalBackend, boost::multiprecision::et_off> Rational;

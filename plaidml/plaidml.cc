@@ -735,9 +735,13 @@ struct plaidml_function {
   std::shared_ptr<tile::Program> prog;
 };
 
-extern "C" plaidml_function* plaidml_build_coded_function(const char* code) {
+extern "C" plaidml_function* plaidml_build_coded_function(const char* code, const char* id) {
   try {
-    return new plaidml_function{std::make_shared<BoundFunction>(code)};
+    std::string sid;
+    if (id != NULL) {
+      sid = std::string(id);
+    }
+    return new plaidml_function{std::make_shared<BoundFunction>(code, sid)};
   } catch (...) {
     vertexai::SetLastOOM();
     return nullptr;
