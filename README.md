@@ -1,64 +1,85 @@
 # PlaidML
-*A framework for making machine learning work everywhere.*
 ![The PlaidML Platypus](https://github.com/vertexai/plaidml/raw/master/images/plaid-final.png)
+*A framework for making machine learning work everywhere.*
 
-PlaidML is a framework that uses the *Tile* language to enable machine learning to work on any device, 
-from any framework. We'll be releasing more details about how *Tile* works and why it's so amazing in the near future.
+PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt).
 
-## Supported Hardware, Networks, and Operations
-We're constantly working on expanding the set of qualifies platforms for running PlaidML. 
-To ensure our users have a positive experience with performance, we only support a subset of commonly available hardware,
-though dedicated hackers can enable support for any devices that supports OpenCL 1.1 or higher.
+PlaidML is a multi-language acceleration framework that: 
+  
+  * Enables practioners to deploy high-performance neural nets on any device
+  * Allows hardware developers to quickly integrate with high-level frameworks
+  * Allows framework developers to easily add support for many kinds of hardware
 
-### Currently Supported Hardware
-*These cards are tested for correctness and performance on every commit*
+PlaidML is under active development and should be thought of as early-beta quality.
+
+- [Current Limitations](#current-limitation)
+- [Supported Hardware](#supported-hardware)
+  - [Validated Hardware](#validated-hardware)
+  - [Experimental Config](#experimental-config)
+- [Validated Networks](#validated-networks)
+- [Installation Instructions](#installation-instructions)
+- [Reporting Issues](#reporting-issues)
+
+## Current Limitations
+
+This version of PlaidML has some notable limitations which will be addressed soon in upcoming releases:
+
+  * Initial compile times are long, especially for training
+  * AMD training performance is unacceptable
+  * RNN support is not implemented
+  * The Keras backend is not complete
+
+## Supported Hardware
+
+PlaidML currently supports any devices that provides the full profile of OpenCL 1.1 or higher. PlaidML ships with
+configuration files and parameters only for devices that we've verified or are confident have an acceptable level of 
+performance.
+
+### Validated Hardware
+Vertex.AI runs a comprehensive set of tests for each release against these hardware targets:
   * AMD
-    * Fiji
-      * R9 Nano
-    * Ellsemere
-      * RX480
-  * NVidia
-    * Kepler
-      * K80
-      * GTX780
-    * Pascal
-      * GTX1070
+    * R9 Nano
+    * RX 480
+  * NVIDIA
+    * K80, GTX 780
+    * GTX 1070
 
-The default configs we ship with should work with a slightly broader range of AMD and NVidia hardware.
+### Experimental Config
+If the device you're testing against isn't supported by the default configuration, you can enable the experimental
+configuration.
 
-We also provide experimental configurations for all Fiji, Ellsemere, Kepler, and Pascal devices. 
-We can't promise they'll work well though. If your card isn't currently supported, helpful instructions will be printed;
-you can enable experimental cards by running with the environment variable `PLAIDML_EXPERIMENTAL=1`
+If your device isn't supported, PlaidML will error with this message:
+```
+ERROR: No devices found, set PLAIDML_EXPERIMENTAL=1 to enable broader device support
+```
+As noted, set the `PLAIDML_EXPERIMENTAL=1`. This will use a the experimental config from the python package. If your
+device still isn't supported, contact [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev) with the output
+of `clinfo`. Alternatively, users can attempt to add support themselves by editing the configuration file listed when
+PlaidML starts.
 
-If you have multiple supported devices, you'll need to choose between them by setting `PLAIDML_DEVICE_IDS=<id>`. Again,
-instructions will be printed.
+If you have multiple supported devices, you'll need to choose between them by setting `PLAIDML_DEVICE_IDS=<id>`. PlaidML
+will emit a helpful error message in this case, like:
+```
+ERROR: Multiple Devices found, set PLAIDML_DEVICE_IDS=<devid> to one of:
+  fiji.0
+  intel(r)_xeon(r)_cpu_e5-2670_0_@_2.60ghz.0
+```
 
-### Networks
-We support most of the convolutional Keras application networks. Supported networks are
-tested for performance and correctness as part of our continuous integration system on
-our supported hardware. Other networks may work.
+### Validated Networks
+
+We support most of the convolutional Keras application networks. Validated networks are tested for performance and 
+correctness as part of our continuous integration system.
 
  * CNNs
    * inception_v3
    * resnet50
-   * vggg*
+   * vgg16, vgg19
    * xception
    * mobilenet
- * RNNs
-   * `<coming soon>`
-
-### Operations & Data Formats
-We support many but not all of the keras backend operations. We welcome community contributions to cover more operations.
-
-We currently only officially support single precision floating point. *Tile* itself is data type agnostic and we expect to support every meaningful data type in the near future.
-
-Currently we support:
- * Most CNN related operations
- * 1d, 3d, and separable convolutions
 
 ## Installation Instructions
 
-### Ubuntu Linux (16.04 or later)
+### Ubuntu Linux
 If necessary, install python's 'pip' tool.
 ```
 sudo add-apt-repository universe && sudo apt update
@@ -78,32 +99,19 @@ sudo apt install nvidia-modprobe nvidia-384 nvidia-opencl-icd-384 libcuda1-384
 ```
 If you have an AMD card, [download the AMDGPU PRO driver and install](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Driver-for-Linux-Release-Notes.aspx) according to AMD's instructions.
 
-Install plaidml system-wide:
+Install the plaidml wheels system-wide:
 ```
 sudo ./install.sh
 ```
 
-Install plaidml inside a virtualenv:
+You can test your installation by running MobileNet in plaidbench:
 ```
-./install.sh
-```
-
-### Mac OS
-Install plaidml system-wide:
-```
-sudo ./install.sh
+cd plaidbench
+python plaidbench.py mobilenet
 ```
 
-Install plaidml inside a virtualenv:
-```
-./install.sh
-```
-
-### ~~Windows~~
-~~`install.bat`~~
-
-You can adapt any Keras code to use PlaidML simply by using the PlaidML backend instead
-of the TensorFlow, CTNK, or Theano backend that you normally use.
+You can adapt any Keras code by using the PlaidML backend instead of the TensorFlow, CNTK, or Theano backend that you 
+normally use.
 
 Simply insert this code **BEFORE you `import keras`**:
 ```
@@ -114,14 +122,14 @@ plaidml.keras.install_backend()
 
 ### Plaidvision and Plaidbench
 
-**PRE-RELEASE USERS: plaidvision and plaidbench are included in the release tarball.**
-
 We've developed two open source projects: 
 
-  * [Plaidvision](https://github.com/vertexai/plaidvision) provides a simple shell for developing vision applications using your webcam
-  * [Plaidbench](https://github.com/vertexai/plaidbench) is a performance testing suite designed to help users compare the performance
+  * [plaidvision](https://github.com/vertexai/plaidvision) provides a simple shell for developing vision applications using your webcam
+  * [plaidbench](https://github.com/vertexai/plaidbench) is a performance testing suite designed to help users compare the performance
   of different cards and different frameworks
   
+**PRE-RELEASE USERS: plaidvision and plaidbench are included in the release tarball.**
+
 
 ### Hello VGG
 One of the great things about keras is how easy it is to play with state-of-the-art networks. Here's all the code you
@@ -160,4 +168,4 @@ print("Ran in {} seconds".format(time.time() - start))
 ```
 
 ## Reporting Issues
-Please use GitHub to report any issues you encounter. Please search for duplicates before posting.
+Contact [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev) 
