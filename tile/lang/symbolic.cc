@@ -11,6 +11,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+std::map<ValuePtr, std::set<ValuePtr>> g_deriv_source;
+
 void ComputeUses::Apply(const ValuePtr& val) {
   if (done_.count(val)) {
     return;
@@ -71,6 +73,8 @@ ValuePtr Gradiant::operator()(const ValuePtr& val) {
       inputs.push_back(val->dim_value(i));
     }
     tot = FunctionValue::make("simple_reduce", inputs);
+    // g_deriv_source[tot].emplace(val);
+    // IVLOG(1, "Saving grad of " << val << " as " << tot);
   }
   IVLOG(4, "  Gradiant::operator(), final result -> " << tot);
   done_.emplace(val, tot);
@@ -98,6 +102,14 @@ ValuePtr Gradiant::OpGrad(const ValuePtr& dout, const ValuePtr& op, size_t idx) 
 
 ValuePtr Gradiant::FuncOp(const ValuePtr& dout, const std::shared_ptr<FunctionValue>& op, size_t idx) {
   IVLOG(4, "  Gradiant::FuncOp(), dout=" << dout << ", op=" << op << ", fn=" << op->fn() << ", idx=" << idx);
+  if (op->fn() == "reshape") {
+    std::vector<ValuePtr> inputs = {dout};
+    ValuePtr in = op->inputs()[0];
+    for (size_t i = 0; i < in->num_dims(); i++) {
+      inputs.push_back(in->dim_value(i));
+    }
+    return FunctionValue::make("reshape", inputs);
+  }
   auto it = DerivDefines.find(op->fn());
   if (it == DerivDefines.end()) {
     throw std::runtime_error("Invalid derivative: unknown function " + op->fn());

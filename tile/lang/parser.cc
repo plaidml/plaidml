@@ -10,10 +10,11 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-Context parse_helper(const std::string& code, int64_t start_tmp) {
+Context parse_helper(const std::string& code, int64_t start_tmp, const std::string& id = "") {
   try {
     Context ctx;
     ctx.program.next_tmp = start_tmp;
+    ctx.id = id;
     yyscan_t scanner;
     yylex_init(&scanner);
     YY_BUFFER_STATE state = yy_scan_string(code.c_str(), scanner);
@@ -28,7 +29,9 @@ Context parse_helper(const std::string& code, int64_t start_tmp) {
   }
 }
 
-Program Parser::Parse(const std::string& code) const { return parse_helper(code, 0).program; }
+Program Parser::Parse(const std::string& code, const std::string& id) const {
+  return parse_helper(code, 0, id).program;
+}
 
 Program Parser::ParseExpr(const std::string& code, int64_t start_tmp) const {
   return parse_helper("expression " + code + ";", start_tmp).program;

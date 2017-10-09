@@ -59,13 +59,11 @@ plaidml_cc_library(
         "opencl.cc",
         "result.cc",
         "result.h",
+        "zero_kernel.cc",
+        "zero_kernel.h",
     ] + select({
-        "//bzl:arm7-ubuntu-14.04": OPENCL_1_0_IMPL,
         "//bzl:darwin": OPENCL_1_0_IMPL,
-        "//bzl:x64-linux": OPENCL_1_0_IMPL,
-        "//bzl:android": OPENCL_1_0_IMPL,
-        "//bzl:x64win": OPENCL_2_0_IMPL,
-        "//bzl:x64_windows": OPENCL_2_0_IMPL,
+        "//conditions:default": OPENCL_2_0_IMPL,
     }),
     hdrs = [
         "emitocl.h",

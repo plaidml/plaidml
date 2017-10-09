@@ -14,8 +14,7 @@ class Context(object):
         self._set_eventlog = lib.vai_set_eventlog
 
     def __del__(self):
-        if hasattr(self, '_free'):
-            self._free(self)
+        self.shutdown()
 
     def cancel(self):
         self._cancel(self)
@@ -27,5 +26,7 @@ class Context(object):
         }
         self._set_eventlog(self, json.dumps(config))
 
-    def close_eventlog(self):
-        self._set_eventlog(self, None)
+    def shutdown(self):
+        if hasattr(self, '_free') and self._as_parameter_:
+            self._free(self)
+        self._as_parameter_ = None

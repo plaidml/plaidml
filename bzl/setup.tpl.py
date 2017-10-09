@@ -8,14 +8,17 @@ from __future__ import print_function
 import os
 import os.path
 import shutil
+import subprocess
+
 from setuptools import setup
+
 
 def main():
     """Builds the Python wheel."""
     os.chdir(os.path.dirname(__file__) or '.')
 
     if 'bzl_target_cpu' == 'x64_windows':
-        os.system('attrib -R .\\* /S')
+        subprocess.call('attrib -R /S')
 
     shutil.rmtree('build', ignore_errors=True)
     shutil.rmtree(os.path.join('pkg', 'bzl_package_name.egg-info'), ignore_errors=True)
@@ -30,7 +33,7 @@ def main():
     )
 
     if 'bzl_target_cpu' == 'x64_windows':
-        os.system('attrib -R pkg\\bzl_package_name.egg-info\\*')
+        subprocess.call('attrib -R /S pkg\\bzl_package_name.egg-info')
 
     shutil.rmtree('build', ignore_errors=True)
     shutil.rmtree(os.path.join('pkg', 'bzl_package_name.egg-info'), ignore_errors=True)

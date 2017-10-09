@@ -454,7 +454,8 @@ def _plaidml_py_wheel_impl(ctx):
     outputs = [wheel],
     inputs = pkg_inputs.to_list(),
     command = bdist_wheel_cmd,
-    mnemonic = "BuildWheel"
+    mnemonic = "BuildWheel",
+    use_default_shell_env = True,
   )
   output = ctx.new_file(ctx.bin_dir, wheel.basename)
   ctx.action(

@@ -12,7 +12,6 @@ from google.protobuf import symbol_database
 import base.context.analysis.util as util
 
 import tile.hal.opencl.opencl_pb2
-import tile.hal.cpu.cpu_pb2
 import tile.platform.local_machine.local_machine_pb2
 import tile.proto.hal_pb2
 

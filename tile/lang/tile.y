@@ -16,6 +16,7 @@ using vertexai::tile::lang::Integer;
 using vertexai::tile::lang::Rational;
 
 struct Context {
+  std::string id;
   vertexai::tile::lang::Program program;
   vertexai::tile::lang::SymbolicPolynomialPtr polynomial;
   std::vector<vertexai::tile::lang::SymbolicConstraint> constraints;
@@ -30,6 +31,14 @@ struct Context {
     op.inputs = inputs;
     program.ops.emplace_back(op);
     return op.output;
+  }
+  void finish_stmt() {
+    if (id != "") {
+      vertexai::tile::lang::Attribute attr;
+      attr.name = "pid";
+      attr.params.push_back(id);
+      program.ops.back().attributes.emplace_back(attr);
+    }
   }
 };
 
@@ -155,8 +164,8 @@ attribute_parameter:
 ;
 
 body
-  : attributed_stmt ";"
-  | body attributed_stmt ";"
+  : attributed_stmt ";" { context.finish_stmt(); }
+  | body attributed_stmt ";" {  context.finish_stmt(); }
 ;
 
 name_list

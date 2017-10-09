@@ -40,6 +40,7 @@ KernelInfo GenZero(const TensorShape& shape, const std::string& bname, const std
   ki.tot_bytes = size * ((bit_width(shape.type) + 7) / 8);
   ki.tot_flops = size;
   ki.info.mutable_zero();
+  ki.ktype = KernelType::kZero;
   return ki;
 }
 

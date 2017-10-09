@@ -425,6 +425,24 @@ void TypeCheck(Program* prog, Bindings* vars) {
         vars->emplace(op.output, Binding(SimpleShape(out_type, out_shape)));
         continue;
       }
+      if (op.f.fn == "reshape") {
+        if (op.inputs.size() < 1) {
+          throw new std::runtime_error("Reshape requires at least one input.");
+        }
+        const Binding& it = vars->at(op.inputs[0]);
+        if (it.tag != Binding::TENSOR) {
+          throw new std::runtime_error("Reshape requires one input that is a tensor");
+        }
+        std::vector<size_t> sizes;
+        for (size_t i = 1; i < op.inputs.size(); i++) {
+          if (vars->at(op.inputs[i]).tag != Binding::ICONST) {
+            throw std::runtime_error("Additional parameters to reshape call must be constant integers");
+          }
+          sizes.push_back(vars->at(op.inputs[i]).iconst);
+        }
+        vars->emplace(op.output, Binding(SimpleShape(it.shape.type, sizes)));
+        continue;
+      }
       if (op.f.fn == "prng_step") {
         if (op.inputs.size() < 1) {
           throw std::runtime_error("prng_step must have at least one parameter");
@@ -582,11 +600,21 @@ void TypeCheck(Program* prog, Bindings* vars) {
 }
 
 void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std::set<std::string>& outputs) {
-  // Figure out where variables are defined
+  // Figure out where variables are defined, and also setup identity mappings
+  // IVLOG(1, "Pre optimize:\n"  << to_string(*p));
   std::map<std::string, size_t> defs;
+  std::map<std::string, std::string> first_def;
   for (size_t i = 0; i < p->ops.size(); i++) {
     defs[p->ops[i].output] = i;
+    if (p->ops[i].tag == Op::FUNCTION && p->ops[i].f.fn == "ident" && !outputs.count(p->ops[i].output)) {
+      std::string first = p->ops[i].inputs[0];
+      if (first_def.count(first)) {
+        first = first_def.at(first);
+      }
+      first_def[p->ops[i].output] = first;
+    }
   }
+  // IVLOG(1, "Identity backrefs" << first_def);
   // Backtrack from outputs till we hit inputs or constants
   std::queue<std::string> to_proc;
   std::set<std::string> keep;
@@ -594,21 +622,37 @@ void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std:
     keep.insert(s);
     to_proc.push(s);
   }
+  auto deident = [&first_def](std::string& s) {
+    if (first_def.count(s)) {
+      s = first_def.at(s);
+    }
+  };
   while (!to_proc.empty()) {
     std::string s = to_proc.front();
     to_proc.pop();
-    const Op& op = p->ops[defs[s]];
+    Op& op = p->ops[defs[s]];
     if (op.tag == Op::CONSTANT) {
       continue;
     }
-    for (const std::string& s2 : op.inputs) {
-      if (keep.count(s2) || inputs.count(s2)) {
+    for (std::string& i : op.inputs) {
+      deident(i);
+      if (keep.count(i) || inputs.count(i)) {
         continue;
       }
-      keep.insert(s2);
-      to_proc.push(s2);
+      keep.insert(i);
+      to_proc.push(i);
+    }
+    if (op.tag != Op::CONTRACTION) {
+      continue;
+    }
+    for (auto& s : op.c.output_size) {
+      deident(s);
+    }
+    for (auto& s : op.c.specs) {
+      deident(s.id);
     }
   }
+  // IVLOG(1, "Replaced program:\n" << first_def);
   // Remove needless ops (TODO: do common subexpr elimination)
   std::vector<Op> new_ops;
   for (const Op& op : p->ops) {

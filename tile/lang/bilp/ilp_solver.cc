@@ -1,21 +1,26 @@
-#include "tile/lang/milp/ilp_solver.h"
+#include "tile/lang/bilp/ilp_solver.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
-namespace milp {
+namespace bilp {
 
 std::map<std::string, Rational> ILPSolver::reportSolution() const {
   std::vector<Rational> sym_soln = getSymbolicSolution();
   std::map<std::string, Rational> soln;
   for (size_t i = 0; i < sym_soln.size(); ++i) {
-    soln[var_names_[i]] = sym_soln[i];
+    std::string var = var_names_[i];
+    if (var.substr(var.length() - 4, 4) == "_pos") {
+      soln[var.substr(1, var.length() - 5)] += sym_soln[i];
+    } else if (var.substr(var.length() - 4, 4) == "_neg") {
+      soln[var.substr(1, var.length() - 5)] -= sym_soln[i];
+    }
   }
   return soln;
 }
 
-std::vector<ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>& constraints,
-                                              const std::vector<Polynomial>& objectives) {
+std::map<Polynomial, ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>& constraints,
+                                                       const std::vector<Polynomial>& objectives) {
   // Solve a batch of ILP problems, all with the same constraints but different objectives
   Tableau t = makeStandardFormTableau(constraints);
   if (!t.convertToCanonicalForm()) {
@@ -24,7 +29,7 @@ std::vector<ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>
   var_names_ = t.varNames();
   t.convertToCanonicalForm();
 
-  std::vector<ILPResult> ret;
+  std::map<Polynomial, ILPResult> ret;
   for (const Polynomial& obj : objectives) {
     clean();
     var_names_ = t.varNames();
@@ -37,9 +42,9 @@ std::vector<ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>
     for (size_t i = 0; i < t.varNames().size(); ++i) {
       std::string var = t.varNames()[i];
       if (var.substr(var.size() - 4, 4) == "_pos") {
-        specific_t.mat()(0, i + 1) = -obj[var.substr(0, var.size() - 4)];
+        specific_t.mat()(0, i + 1) = -obj[var.substr(1, var.size() - 5)];
       } else if (var.substr(var.size() - 4, 4) == "_neg") {
-        specific_t.mat()(0, i + 1) = obj[var.substr(0, var.size() - 4)];
+        specific_t.mat()(0, i + 1) = obj[var.substr(1, var.size() - 5)];
       } else {
         // Do nothing: We're on a slack variable or other artificially added variable
       }
@@ -47,15 +52,12 @@ std::vector<ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>
 
     // Since objective was reset, need to price out to make canonical
     specific_t.priceOut();
-    if (!solve(specific_t, true)) {
-      throw std::runtime_error("Feasible region has empty intersection with integers.");
-    }
-    ret.emplace_back(obj, reportObjective(), reportSolution());
+    ret.emplace(std::piecewise_construct, std::make_tuple(obj), std::make_tuple(solve(specific_t, true)));
   }
   return ret;
 }
 
-bool ILPSolver::solve(const std::vector<RangeConstraint>& constraints, const Polynomial objective) {
+ILPResult ILPSolver::solve(const std::vector<RangeConstraint>& constraints, const Polynomial objective) {
   if (VLOG_IS_ON(1)) {
     std::ostringstream msg;
     msg << "Starting ILPSolver with constraints\n";
@@ -69,12 +71,15 @@ bool ILPSolver::solve(const std::vector<RangeConstraint>& constraints, const Pol
   return solve(t);
 }
 
-bool ILPSolver::solve(Tableau& tableau, bool already_canonical) {
+ILPResult ILPSolver::solve(Tableau& tableau, bool already_canonical) {
   clean();
   var_names_ = tableau.varNames();
   IVLOG(4, "Starting ILPSolver with tableau " << tableau.mat().toString());
   solve_step(tableau, already_canonical);
-  return feasible_found;
+  if (!feasible_found) {
+    throw std::runtime_error("No feasible solution");
+  }
+  return ILPResult(reportObjective(), reportSolution());
 }
 
 void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
@@ -85,34 +90,25 @@ void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
     return;
   }
 
-  // Check if LP relaxation objective is better than current best found ILP objective
+  // Check the LP Relaxation objective value
   Rational obj_val = tableau.reportObjectiveValue();
-  if (obj_val >= best_objective && feasible_found) {
-    // Best real solution of this subproblem is worse than best overall int solution
-    // found so far, so prune this branch
-    IVLOG(4, "Objective value " << obj_val << " proven suboptimal; pruning branch");
-    return;
-  }
 
   // Check if this solution is integral
   std::vector<Rational> soln = tableau.getSymbolicSolution();
-  // Infeasibleness is in [0, 1/2] (frac part dist from 1/2), with less being more infeasible
-  Rational most_infeasible_infeas_value = 1;
-  Rational most_infeasible_full_value = 0;
-  size_t most_infeasible_variable = 0;  // 0 is not a valid variable, so can use as "none"
-  for (size_t i = 0; i < soln.size(); ++i) {
-    Rational frac_part = soln[i] - Floor(soln[i]);
-    if (frac_part != 0) {
-      Rational infeasibleness = Abs(frac_part - Rational(1, 2));
-      if (infeasibleness < most_infeasible_infeas_value) {
-        most_infeasible_infeas_value = infeasibleness;
-        most_infeasible_variable = i + 1;  // TODO(T1146): Keep eye on possible off-by-one error
-        most_infeasible_full_value = soln[i];
-      }
+
+  // Find the greatest fractional part
+  Rational greatest_fractional = 0;
+  size_t greatest_fractional_row = 0;
+  for (size_t i = 1; i < tableau.mat().size1(); ++i) {
+    Rational frac = tableau.mat()(i, tableau.mat().size2() - 1) - Floor(tableau.mat()(i, tableau.mat().size2() - 1));
+    if (frac > greatest_fractional) {
+      greatest_fractional = frac;
+      greatest_fractional_row = i;
     }
   }
-  if (most_infeasible_variable == 0) {
-    // This is an integer solution better than any previous!
+
+  if (greatest_fractional == 0) {
+    // This is an integer solution!
     if (VLOG_IS_ON(3)) {
       std::ostringstream msg;
       msg << "Found new best integer solution!"
@@ -127,9 +123,8 @@ void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
     feasible_found = true;
     best_objective = obj_val;
     best_solution = soln;
-    return;
   } else {
-    // This is a non-integer solution; branch
+    // This is a non-integer solution; cut
     if (VLOG_IS_ON(5)) {
       std::ostringstream msg;
       msg << "Found non-integer solution;"
@@ -140,17 +135,6 @@ void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
       }
       IVLOG(5, msg.str());
       IVLOG(6, "  from tableau:" << tableau.mat().toString());
-    }
-
-    // TODO(T1146): The following *should* be redundant w/ "most_infeasible_variable", but apparently isn't?
-    Rational greatest_fractional = 0;
-    size_t greatest_fractional_row = 0;
-    for (size_t i = 1; i < tableau.mat().size1(); ++i) {
-      Rational frac = tableau.mat()(i, tableau.mat().size2() - 1) - Floor(tableau.mat()(i, tableau.mat().size2() - 1));
-      if (frac > greatest_fractional) {
-        greatest_fractional = frac;
-        greatest_fractional_row = i;
-      }
     }
 
     IVLOG(3, "Requesting Gomory cut at row " << greatest_fractional_row << " with value " << greatest_fractional);
@@ -182,11 +166,6 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& c
                                            const Polynomial objective) {
   // Create the standard form linear program for minimizing objective subject to the given constraints
 
-  // TODO(T1146): Choose names for the slack variables in a way that guarantees no
-  // conflict with any already existing variable names.
-  // TODO(T1146): Also choose names for the positive and negative part variables
-  // to also ensure no variable name conflicts.
-
   std::vector<Polynomial> lp_constraints;  // The represented constraint is poly == 0
   unsigned int slack_count = 0;
 
@@ -213,26 +192,26 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& c
     for (const std::string& var : local_vars) {
       std::map<std::string, size_t>::iterator unused;
       bool added_new_var;
-      poly.substitute(var, Polynomial(var + "_pos") - Polynomial(var + "_neg"));
-      std::tie(unused, added_new_var) = var_index.emplace(var + "_pos", var_index.size() + 1);
+      poly.substitute(var, Polynomial("_" + var + "_pos") - Polynomial("_" + var + "_neg"));
+      std::tie(unused, added_new_var) = var_index.emplace("_" + var + "_pos", var_index.size() + 1);
       if (added_new_var) {
-        var_names.emplace_back(var + "_pos");
+        var_names.emplace_back("_" + var + "_pos");
       }
-      std::tie(unused, added_new_var) = var_index.emplace(var + "_neg", var_index.size() + 1);
+      std::tie(unused, added_new_var) = var_index.emplace("_" + var + "_neg", var_index.size() + 1);
       if (added_new_var) {
-        var_names.emplace_back(var + "_neg");
+        var_names.emplace_back("_" + var + "_neg");
       }
     }
 
     // Make LP constraint from lower bound
-    std::string slack_var = "slack" + std::to_string(slack_count);
+    std::string slack_var = "_slack" + std::to_string(slack_count);
     lp_constraints.emplace_back(poly - Polynomial(slack_var));
     var_names.emplace_back(slack_var);
     var_index.emplace(slack_var, var_index.size() + 1);
     ++slack_count;
 
     // Make LP constraint from upper bound
-    slack_var = "slack" + std::to_string(slack_count);
+    slack_var = "_slack" + std::to_string(slack_count);
     lp_constraints.emplace_back(poly + Polynomial(slack_var) - c.range + 1);
     var_names.emplace_back(slack_var);
     var_index.emplace(slack_var, var_index.size() + 1);
@@ -251,8 +230,8 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& c
       // The positive and negative parts have reversed sign because the algorithm
       // needs to use -objective for the coeffs of the first row
       try {
-        tableau.mat()(0, var_index.at(kvp.first + "_pos")) = -kvp.second;
-        tableau.mat()(0, var_index.at(kvp.first + "_neg")) = kvp.second;
+        tableau.mat()(0, var_index.at("_" + kvp.first + "_pos")) = -kvp.second;
+        tableau.mat()(0, var_index.at("_" + kvp.first + "_neg")) = kvp.second;
       } catch (const std::out_of_range& e) {
         throw std::out_of_range("Bad index given to Tableau objective: " + kvp.first);
       }
@@ -286,7 +265,7 @@ void ILPSolver::clean() {
   best_solution.clear();
   var_names_.clear();
 }
-}  // namespace milp
+}  // namespace bilp
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

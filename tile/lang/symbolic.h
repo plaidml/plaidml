@@ -17,6 +17,8 @@ struct UseInfo {
   size_t idx;
 };
 
+extern std::map<ValuePtr, std::set<ValuePtr>> g_deriv_source;
+
 class ComputeUses final : public ValueVisitor<void> {
  public:
   ComputeUses() {}                                           // Initial empty top

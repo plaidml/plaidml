@@ -16,7 +16,7 @@ namespace {
 
 TEST(PlaidMLTest, Uints) {
   std::unique_ptr<plaidml_function> dotprod{
-      plaidml_build_coded_function("function (A[N], B[N]) -> (C) { C[n : N] = +(A[n] * B[n]); }")};
+      plaidml_build_coded_function("function (A[N], B[N]) -> (C) { C[n : N] = +(A[n] * B[n]); }", NULL)};
 
   std::unique_ptr<vai_ctx> ctx(vai_alloc_ctx());
   std::unique_ptr<plaidml_device_enumerator> dev_enum{

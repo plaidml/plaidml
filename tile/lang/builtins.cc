@@ -40,13 +40,17 @@ std::map<std::string, Program> InlineDefines = {
     {"sigmoid", idef("function (X1) -> (Y) { Y = (1.0 / (1.0 + exp(-X1))); }")},
     {"builtin_softmax", idef(R"***(
       function (X1, X2, X3) -> (Y) {
-        M[i : X2] = >(X1[i, j]);
-        NM = -M;
-        S[i, j : X2, X3] = +(X1[i, j] + NM[i]);
-        E = exp(S);
-        N[i : X2] = +(E[i, j]);
-        IN = 1.0 / N;
-        Y[i, j : X2, X3] = +(E[i, j] * IN[i]);
+        M[i, 0 : X2, 1] = >(X1[i, j]);
+        E = exp(X1 - M);
+        N[i, 0 : X2, 1] = +(E[i, j]);
+        Y = E / N;
+      } )***")},
+    {"builtin_logsoftmax", idef(R"***(
+      function (X1, X2, X3) -> (Y) {
+        M[i, 0 : X2, 1] = >(X1[i, j]);
+        E = exp(X1 - M);
+        N[i, 0 : X2, 1] = +(E[i, j]);
+        Y = X1 - (M + log(N));
       } )***")},
     // In binary crossentropy, X3 is a scaling factor used only in the derivative
     {"builtin_binary_crossentropy", idef(R"***(
@@ -93,7 +97,7 @@ std::map<std::string, std::shared_ptr<BoundFunction>> DerivDefines = {
     {"gather", std::make_shared<BoundFunction>(R"***(
       function (X1, X2, Y, DY) -> (DX1, DX2) {
         DX1 = scatter(DY, X2);
-	DX2 = 0;
+        DX2 = 0;
       } )***")},
     {"builtin_softmax", std::make_shared<BoundFunction>(R"***(
       function (X1, X2, X3, Y, DY) -> (DX1, DX2, DX3) {
@@ -101,6 +105,14 @@ std::map<std::string, std::shared_ptr<BoundFunction>> DerivDefines = {
         T[i : X2] = +(DYY[i, j]);
         TB[i, j : X2, X3] = +(T[i]);
         DX1 = DYY - TB * Y; 
+        DX2 = 0;
+        DX3 = 0;
+      } )***")},
+    {"builtin_logsoftmax", std::make_shared<BoundFunction>(R"***(
+      function (X1, X2, X3, Y, DY) -> (DX1, DX2, DX3) {
+        SM = builtin_softmax(X1, X2, X3);
+        TDY[i, 0 : X2, 1] = +(DY[i, j]);
+        DX1 = DY - SM * TDY;
         DX2 = 0;
         DX3 = 0;
       } )***")},

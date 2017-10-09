@@ -3,7 +3,7 @@
 #include <tuple>
 #include <vector>
 
-#include "tile/lang/milp/ilp_solver.h"
+#include "tile/lang/bilp/ilp_solver.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/shape.h"
 

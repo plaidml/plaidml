@@ -138,6 +138,10 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   for (const auto& ki : kernel_info) {
     context::Activity kbuild{activity.ctx(), "tile::hal::opencl::BuildKernel"};
 
+    if (ki.ktype == lang::KernelType::kZero) {
+      continue;
+    }
+
     code << ki.comments;
     Emit ocl;
     ocl.Visit(*ki.kfunc);

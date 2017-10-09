@@ -228,7 +228,7 @@ class BoundFunction final : public ValueVisitor<std::string> {
 
  public:
   // Make a bound function from a snip
-  explicit BoundFunction(const std::string& code);
+  explicit BoundFunction(const std::string& code, const std::string& id = "");
 
   // Make a function as a composite
   // Each method below must be called (if needed) in order as many times as needed.
