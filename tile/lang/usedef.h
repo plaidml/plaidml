@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "tile/lang/ops.h"
+#include "tile/lang/type.h"
 
 namespace vertexai {
 namespace tile {
@@ -15,9 +16,6 @@ class UseDef {
  public:
   // Construct use-definition chains for a program
   explicit UseDef(const Program& prog);
-
-  // Given a program op #, compute all ops connected by simple functions
-  std::set<size_t> ConnectedComponents(const Program& prog, size_t start, const std::set<size_t>& previously_computed);
 
   const std::map<std::string, size_t>& op_defs() const { return op_defs_; }
   const std::map<std::string, std::vector<size_t>>& uses() const { return uses_; }

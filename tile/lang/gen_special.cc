@@ -143,8 +143,8 @@ static void GenShape(KernelList& r, const Op& op, const Bindings& bindings,  // 
   ki.kfunc = std::make_shared<sem::Function>(kname, sem::Type(sem::Type::TVOID), params, body);
   uint64_t out_size = out_shape.buffer_size();
   IVLOG(4, "OUT_SIZE:\n" << out_size);
-  ki.gwork = {1, 1, 1};
-  ki.lwork = {1, 1, 1};
+  ki.gwork = {{1, 1, 1}};
+  ki.lwork = {{1, 1, 1}};
   ki.tot_bytes = out_size * ((bit_width(out_shape.type) + 7) / 8);
   ki.tot_flops = out_size;
 
@@ -161,7 +161,7 @@ static void GenReshape(KernelList& r, const Op& op, const Bindings& bindings,  /
   IVLOG(3, "Making Reshape");
 
   if (op.inputs.size() < 1) {
-    throw std::runtime_error("prng must have at least one parameter");
+    throw std::runtime_error("reshape must have at least one parameter");
   }
 
   // Get input shape
@@ -198,8 +198,8 @@ static void GenReshape(KernelList& r, const Op& op, const Bindings& bindings,  /
   ki.outputs.push_back(op.output);
   ki.inputs.push_back(op.inputs[0]);
   ki.kfunc = std::make_shared<sem::Function>(kname, sem::Type(sem::Type::TVOID), params, body);
-  ki.gwork = {size_t(((buffer_size + setting.threads - 1) / setting.threads) * setting.threads), 1, 1};
-  ki.lwork = {size_t(setting.threads), 1, 1};
+  ki.gwork = {{size_t(((buffer_size + setting.threads - 1) / setting.threads) * setting.threads), 1, 1}};
+  ki.lwork = {{size_t(setting.threads), 1, 1}};
   ki.tot_bytes = buffer_size * ((bit_width(out_shape.type) + 7) / 8);
   ki.tot_flops = buffer_size;
 
@@ -266,8 +266,8 @@ static void GenPRNG(KernelList& r, const Op& op, const Bindings& bindings,  // N
   ki.inputs.push_back(op.inputs[0]);
   ki.kfunc = std::make_shared<sem::Function>(kname, sem::Type(sem::Type::TVOID), params, body);
   uint64_t out_size = out_shape.buffer_size();
-  ki.gwork = {k_rng_size, 1, 1};
-  ki.lwork = {size_t(setting.threads), 1, 1};
+  ki.gwork = {{k_rng_size, 1, 1}};
+  ki.lwork = {{size_t(setting.threads), 1, 1}};
   ki.tot_bytes = out_size * ((bit_width(out_shape.type) + 7) / 8);
   ki.tot_flops = out_size;
 

@@ -133,6 +133,8 @@ struct Program {
 
 std::string to_string(const Program& prog);
 
+const std::map<std::string, std::string>& BinaryOpMap();
+
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

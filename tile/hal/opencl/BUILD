@@ -15,10 +15,12 @@ plaidml_proto_library(
 
 OPENCL_1_0_IMPL = [
     "shared_memory_disabled.cc",
+    "zero_kernel_svm_disabled.cc",
 ]
 
 OPENCL_2_0_IMPL = [
     "shared_memory.cc",
+    "zero_kernel_svm.cc",
 ]
 
 plaidml_cc_library(

@@ -1,4 +1,11 @@
 # Copyright Vertex.AI
+#
+# Licensed under the GNU Affero General Public License V3 (the License) ;
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    https://www.gnu.org/licenses/agpl-3.0.en.html 
+
 
 from __future__ import print_function
 
@@ -20,12 +27,13 @@ import weakref
 from collections import namedtuple
 from itertools import islice
 
-
 if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
-    os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(pkg_resources.resource_filename('plaidml',  'experimental.json'))
+    os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(
+        pkg_resources.resource_filename('plaidml', 'experimental.json'))
 
 if 'PLAIDML_DEFAULT_CONFIG' not in os.environ:
-    os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(pkg_resources.resource_filename('plaidml',  'config.json'))
+    os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(
+        pkg_resources.resource_filename('plaidml', 'config.json'))
 
 
 # Create types for all PlaidML structures, so that we can get some type checking.
@@ -175,7 +183,8 @@ class _Library(plaidml.library.Library):
             _ENUM_DEVICES_FUNCTYPE,  # void (*callback)(void* arg, plaidml_device_enumerator* enumerator)
             ctypes.c_void_p  # void* arg
         ]
-        self.plaidml_alloc_device_enumerator_with_config.restype = ctypes.POINTER(_C_DeviceEnumerator)
+        self.plaidml_alloc_device_enumerator_with_config.restype = ctypes.POINTER(
+            _C_DeviceEnumerator)
         self.plaidml_alloc_device_enumerator_with_config.errcheck = self._check_err
 
         # PLAIDML_API void plaidml_free_device_enumerator(plaidml_device_enumerator* enumerator);
@@ -833,10 +842,10 @@ class _Enumerator(object):
         self._ctx = ctx
         if config:
             self._as_parameter_ = _lib().plaidml_alloc_device_enumerator_with_config(
-                ctx, config, ctypes.cast( None, _ENUM_DEVICES_FUNCTYPE), None)
+                ctx, config, ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
         else:
             self._as_parameter_ = _lib().plaidml_alloc_device_enumerator(
-                ctx, ctypes.cast( None, _ENUM_DEVICES_FUNCTYPE), None)
+                ctx, ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
         self._free = _lib().plaidml_free_device_enumerator
 
     def __del__(self):
@@ -850,18 +859,17 @@ class _Enumerator(object):
             raise IndexError
 
 
-def devices(ctx, config = None):
+def devices(ctx, config=None):
     enumerator = _Enumerator(ctx, config)
     for conf in enumerator:
         yield conf
 
 
-
 class _Buffer(object):
 
     def __init__(self, ctx, dev, shape):
-        self._as_parameter_ = _lib().plaidml_alloc_buffer(ctx, dev,
-                                                          _lib().plaidml_get_shape_buffer_size(shape))
+        self._as_parameter_ = _lib().plaidml_alloc_buffer(
+            ctx, dev, _lib().plaidml_get_shape_buffer_size(shape))
         self._ctx = ctx
         dev._register_buffer(self)
 
@@ -998,7 +1006,8 @@ class Tensor(_Var):
             self._buffer = copy_buffer
         else:
             self._buffer = _Buffer(dev.get_context(), dev, shape)
-        super(Tensor, self).__init__(_lib().plaidml_alloc_tensor(dev.get_context(), self.buffer, shape))
+        super(Tensor,
+              self).__init__(_lib().plaidml_alloc_tensor(dev.get_context(), self.buffer, shape))
 
     @property
     def buffer(self):
@@ -1121,11 +1130,13 @@ def _as_plaidml_var(value):
         if value.dtype.name == 'float_' or value.dtype.name == 'float32':
             return _Var(_lib().plaidml_alloc_real(value))
         else:
-            raise plaidml.exceptions.InvalidArguments('Unexpected type in array: ' + value.dtype.name)
+            raise plaidml.exceptions.InvalidArguments('Unexpected type in array: ' +
+                                                      value.dtype.name)
     else:
         raise plaidml.exceptions.InvalidArguments(
             'unable to convert high dim array to PlaidML value: shape = ' + str(value.shape))
-    raise plaidml.exceptions.InvalidArguments('unable to convert \'%s\' to a PlaidML value' % value)
+    raise plaidml.exceptions.InvalidArguments(
+        'unable to convert \'%s\' to a PlaidML value' % value)
 
 
 class Applier(object):

@@ -37,7 +37,7 @@
           "mem_width": {"value": 128},
           "max_mem": {"value": 32768},
           "max_regs": {"value": 16384},
-          "goal_groups": {"value": 1},
+          "goal_groups": {"value": 16},
           "goal_flops_per_byte": {"value": 50},
           "enable_half": {"value": false}
         }
@@ -50,8 +50,9 @@
               { "vendor_regex": "NVIDIA.*" },
               { "or": {
                   "sel": [
+                    { "name_regex": ".*GeForce.*" },
                     { "name_regex": ".*GTX.*" },
-                    { "name_regex": ".*Tesla K.*" },
+                    { "name_regex": ".*Tesla.*" },
                     { "name_regex": ".*TITAN.*" },
                     { "name_regex": ".*Pascal.*" },
                     { "name_regex": ".*Kepler.*" }
@@ -67,7 +68,7 @@
           "mem_width": {"value": 64},
           "max_mem": {"value": 15360},
           "max_regs": {"value": 32768},
-          "goal_groups": {"value": 7},
+          "goal_groups": {"value": 16},
           "goal_flops_per_byte": {"value": 46},
           "enable_half": {"value": false}
         }

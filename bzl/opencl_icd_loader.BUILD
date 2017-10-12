@@ -22,6 +22,7 @@ cc_library(
     }),
     deps = [
         "//external:opencl_headers",
+        "//external:opengl_headers",
     ],
     visibility = ["//visibility:public"],
     nocopts = select({

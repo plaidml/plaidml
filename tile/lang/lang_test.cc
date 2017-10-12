@@ -138,7 +138,7 @@ TEST_CASE("Optimization of Matrix Multiply", "[mat_opt][opt]") {
     for (size_t j = 0; j < 10; j++) {
       for (size_t k = 0; k < 10; k++) {
         std::vector<uint64_t> tile = {one << i, one << j, one << k};
-        double score = ComputeScore(TestGPU(), ComputeTileStats(TestGPU(), f, tile));
+        double score = ComputeScore(TestGPU(), ComputeTileStats(TestGPU(), f, tile, Bindings()));
         if (score > best_score) {
           best_tile = tile;
           best_score = score;
@@ -147,7 +147,7 @@ TEST_CASE("Optimization of Matrix Multiply", "[mat_opt][opt]") {
     }
   }
   IVLOG(1, "Best Score = " << best_score << " " << best_tile);
-  std::multimap<double, std::vector<uint64_t>> out = TileOptimize(TestGPU(), f, false);
+  std::multimap<double, std::vector<uint64_t>> out = TileOptimize(TestGPU(), f, false, Bindings());
   auto it = out.rbegin();
   IVLOG(1, "Opt Score = " << it->first << " " << it->second);
   REQUIRE(it->first == best_score);
@@ -190,10 +190,10 @@ TEST_CASE("Optimization of Convolution", "[conv_opt][opt]") {
              SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
          });
   IVLOG(1, "Flat:\n" << f.toString());
-  std::vector<uint64_t> r = TileVecOptimize(TestGPU(), f);
-  double score2 = ComputeScore(TestGPU(), ComputeTileStats(TestGPU(), f, r));
+  std::vector<uint64_t> r = TileVecOptimize(TestGPU(), f, Bindings());
+  double score2 = ComputeScore(TestGPU(), ComputeTileStats(TestGPU(), f, r, Bindings()));
   IVLOG(1, "Opt Score = " << score2 << " " << r);
-  REQUIRE(score2 > .5);
+  REQUIRE(score2 > .4);
 }
 
 TEST_CASE("Vectorized Flop Computation", "[conv_opt][opt]") {
@@ -207,9 +207,9 @@ TEST_CASE("Vectorized Flop Computation", "[conv_opt][opt]") {
   uint64_t ops = 128ll * 3 * 3 * 25 * 25 * 384 * 256 * 2;
   HardwareSettings vectorized_gpu = TestGPU();
   vectorized_gpu.vec_size = 4;
-  std::vector<uint64_t> r = TileVecOptimize(TestGPU(), f);
-  PerfStats psn = ComputeTileStats(TestGPU(), f, r);
-  PerfStats psv = ComputeTileStats(vectorized_gpu, f, r);
+  std::vector<uint64_t> r = TileVecOptimize(TestGPU(), f, Bindings());
+  PerfStats psn = ComputeTileStats(TestGPU(), f, r, Bindings());
+  PerfStats psv = ComputeTileStats(vectorized_gpu, f, r, Bindings());
   REQUIRE(psn.true_ops == psv.true_ops);
   REQUIRE(psn.true_ops == ops);
 }
@@ -809,6 +809,30 @@ TEST_CASE("Check attribute parsing", "[attr]") {
   REQUIRE(to_string(attr) == "hello(world)");
   auto opstr = to_string(op);
   REQUIRE(opstr.find("[[hello(world)]] O[") == 0);
+}
+
+TEST_CASE("CombineConvolutionAndRelu", "[emit]") {
+  Parser parser;
+  Program prog = parser.Parse(
+      "function (B[X,Y], C[Y,Z]) -> (A) { "
+      "  T[x,z:X,Z] = +(B[x,y] * C[y,z]); "
+      "  M = (T < 0 ? 0.3 * T : T); "
+      "  A = (M < 0.9 ? M : 0.9); "
+      "}");
+  ShapeMap inputs;
+  inputs.emplace("B", SimpleShape(DataType::FLOAT32, {10, 10}));
+  inputs.emplace("C", SimpleShape(DataType::FLOAT32, {10, 10}));
+  ShapeMap outputs;
+  outputs.emplace("A", SimpleShape(DataType::FLOAT32, {10, 10}));
+  auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), "ID");
+  if (VLOG_IS_ON(1)) {
+    for (const auto &kinfo : klist.kernels) {
+      Emit emit;
+      emit.Visit(*kinfo.kfunc);
+      VLOG(1) << "Got kernel: " << emit.str();
+    }
+  }
+  REQUIRE(klist.kernels.size() == 1);
 }
 
 }  // namespace

@@ -42,7 +42,7 @@ inline bool is_float(const DataType& dt) {
 inline size_t bit_width(const DataType& dt) {
   switch (dt) {
     case DataType::BOOLEAN:
-      return 1;
+      return 8;
     case DataType::INT8:
       return 8;
     case DataType::INT16:
@@ -96,6 +96,8 @@ inline std::string to_string(const DataType& dt) {
       return "float32";
     case DataType::FLOAT64:
       return "float64";
+    case DataType::PRNG:
+      return "prng";
     default:
       return "!!invalid data type";
   }

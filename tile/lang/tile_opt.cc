@@ -86,18 +86,18 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
   return op;
 }
 
-PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction& op,
-                           const std::vector<uint64_t>& tile) {
+PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction& op, const std::vector<uint64_t>& tile,
+                           const Bindings& vars) {
   PerfStats r;
   IVLOG(4, "Computing cost for tile size: " << tile);
   uint64_t sz = op.ranges.size();
 
   OutPlan pout(op, tile, settings.threads, settings.mem_width / op.access[0].elem_size());
   r.out_regs = pout.localSize() * op.access[0].elem_size();
-  r.mem_write = pout.outputs() * settings.mem_width;
+  r.mem_write = pout.outputs() * settings.mem_width * op.kernel_outputs.size();
   r.shared_mem = 0;
   r.mem_read = 0;
-  r.true_ops = 2;
+  r.true_ops = 1;
   for (size_t i = 1; i < op.access.size(); i++) {
     const auto& a = op.access[i];
     uint64_t mem_width = settings.mem_width / a.elem_size();
@@ -109,6 +109,10 @@ PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction
     if (!settings.use_global) {
       r.shared_mem += mi.localSize() * a.elem_size();
     }
+  }
+  for (const auto& input : op.post_op_inputs) {
+    // We read the post-op inputs during the output phase.
+    r.mem_read += pout.outputs() * byte_width(vars.at(input).shape.type);
   }
 
   uint64_t out_tiles = 1;
@@ -124,28 +128,34 @@ PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction
       out_tiles *= RoundUp(op.ranges[i], tile[i]);
     }
   }
+  r.true_ops *= (op.post_ops.size() + (op.generate_contraction ? 2 : 0));
 
   r.work_groups = out_tiles;
   r.inner_loops = all_tiles / out_tiles;
-  r.operations = all_max_threads;
+  r.operations = std::min(settings.threads, all_max_threads);
   r.true_ops *= op.agg_vec;
   r.rollups = 0;
-  uint64_t comp_threads = std::min(settings.threads, all_max_threads);
-  if (out_max_threads < comp_threads) {
+  if (out_max_threads < r.operations) {
     r.shared_mem += settings.threads * op.access[0].elem_size();
   }
-  while (out_max_threads < comp_threads) {
+  while (out_max_threads < r.operations) {
     r.rollups++;
     out_max_threads *= 2;
   }
+  std::uint64_t output_threads = 1;
+  for (const auto& idx : pout.indexes()) {
+    output_threads *= idx.threads;
+  }
+  r.threads_used = std::max(r.operations, output_threads);
   return r;
 }
 
 // Compute score from PerfStats
 double ComputeScore(const HardwareSettings& settings, const PerfStats& perf) {
   IVLOG(4, "Compute score:"
-               << " wg=" << perf.work_groups << " sm=" << perf.shared_mem << " or=" << perf.out_regs
-               << " mr=" << perf.mem_read << " mw=" << perf.mem_write << " op=" << perf.operations);
+               << " to=" << perf.true_ops << " wg=" << perf.work_groups << " il=" << perf.inner_loops << " sm="
+               << perf.shared_mem << " or=" << perf.out_regs << " mr=" << perf.mem_read << " mw=" << perf.mem_write
+               << " op=" << perf.operations << " rp=" << perf.rollups << " tu=" << perf.threads_used);
   if (perf.shared_mem > settings.max_mem) {
     IVLOG(4, "  over memory");
     return -1;
@@ -159,16 +169,18 @@ double ComputeScore(const HardwareSettings& settings, const PerfStats& perf) {
   double flops_per_byte = perf.true_ops / bytes;
   double roof = std::min(flops_per_byte, static_cast<double>(settings.goal_flops_per_byte));
   double occupancy = std::min(perf.work_groups, settings.goal_groups);
+  double thread_ratio = perf.threads_used / static_cast<double>(settings.threads);
   double roof_ratio = roof / static_cast<double>(settings.goal_flops_per_byte);
   double occ_ratio = occupancy / static_cast<double>(settings.goal_groups);
-  double score = roof_ratio * occ_ratio;
+  double score = roof_ratio * occ_ratio * thread_ratio;
   IVLOG(4, "  flops_per_byte=" << flops_per_byte << " occupancy=" << occupancy);
-  IVLOG(4, "  roof_ratio=" << roof_ratio << " occ_ration=" << occ_ratio << " score=" << score);
+  IVLOG(4, "  roof_ratio=" << roof_ratio << " occ_ratio=" << occ_ratio << " thread_ratio=" << thread_ratio
+                           << " score=" << score);
   return score;
 }
 
 std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings& settings, const FlatContraction& op,
-                                                          bool fast) {
+                                                          bool fast, const Bindings& vars) {
   std::multimap<double, std::vector<uint64_t>> by_score;
   size_t sz = op.ranges.size();
 
@@ -176,7 +188,7 @@ std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings
   std::set<std::pair<double, std::vector<uint64_t>>> to_do;
   IVLOG(3, "Computing optimal tile cost");
   std::vector<uint64_t> tile(sz, 1);
-  double score = ComputeScore(settings, ComputeTileStats(settings, op, tile));
+  double score = ComputeScore(settings, ComputeTileStats(settings, op, tile, vars));
   by_tile.emplace(tile, score);
   by_score.emplace(score, tile);
   to_do.emplace(score, tile);
@@ -192,7 +204,7 @@ std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings
       uint64_t prev = tile[i];
       tile[i] = std::min(2 * tile[i], op.ranges[i]);
       if (!by_tile.count(tile)) {
-        score = ComputeScore(settings, ComputeTileStats(settings, op, tile));
+        score = ComputeScore(settings, ComputeTileStats(settings, op, tile, vars));
         by_tile.emplace(tile, score);
         by_score.emplace(score, tile);
         if (score > 0) {
@@ -209,11 +221,12 @@ std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings
 
 // Performs vectorization + tile size optimization
 std::vector<uint64_t> TileVecOptimize(const HardwareSettings& settings,
-                                      FlatContraction& op) {  // NOLINT(runtime/references)
+                                      FlatContraction& op,  // NOLINT(runtime/references)
+                                      const Bindings& vars) {
   if (settings.vec_size > 1) {
     op = Vectorize(op, settings.vec_size);
   }
-  std::multimap<double, std::vector<uint64_t>> by_score = TileOptimize(settings, op, true);
+  std::multimap<double, std::vector<uint64_t>> by_score = TileOptimize(settings, op, true, vars);
   return by_score.rbegin()->second;
 }
 

@@ -8,7 +8,10 @@ plaidml_cc_library(
     name = "selector",
     srcs = ["selector.cc"],
     hdrs = ["selector.h"],
-    deps = ["//tile/proto:hal_cc"],
+    deps = [
+        "//external:boost_regex",
+        "//tile/proto:hal_cc",
+    ],
 )
 
 plaidml_cc_library(

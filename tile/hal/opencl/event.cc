@@ -12,6 +12,57 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
+#define COMMAND_TYPE_STR(__code__) \
+  case __code__:                   \
+    return #__code__;
+
+const char* EventCommandTypeStr(cl_command_type code) {
+  switch (code) {
+    COMMAND_TYPE_STR(CL_COMMAND_NDRANGE_KERNEL)
+    COMMAND_TYPE_STR(CL_COMMAND_TASK)
+    COMMAND_TYPE_STR(CL_COMMAND_NATIVE_KERNEL)
+    COMMAND_TYPE_STR(CL_COMMAND_READ_BUFFER)
+    COMMAND_TYPE_STR(CL_COMMAND_WRITE_BUFFER)
+    COMMAND_TYPE_STR(CL_COMMAND_COPY_BUFFER)
+    COMMAND_TYPE_STR(CL_COMMAND_READ_IMAGE)
+    COMMAND_TYPE_STR(CL_COMMAND_WRITE_IMAGE)
+    COMMAND_TYPE_STR(CL_COMMAND_COPY_IMAGE)
+    COMMAND_TYPE_STR(CL_COMMAND_COPY_IMAGE_TO_BUFFER)
+    COMMAND_TYPE_STR(CL_COMMAND_COPY_BUFFER_TO_IMAGE)
+    COMMAND_TYPE_STR(CL_COMMAND_MAP_BUFFER)
+    COMMAND_TYPE_STR(CL_COMMAND_MAP_IMAGE)
+    COMMAND_TYPE_STR(CL_COMMAND_UNMAP_MEM_OBJECT)
+    COMMAND_TYPE_STR(CL_COMMAND_MARKER)
+    COMMAND_TYPE_STR(CL_COMMAND_ACQUIRE_GL_OBJECTS)
+    COMMAND_TYPE_STR(CL_COMMAND_RELEASE_GL_OBJECTS)
+    COMMAND_TYPE_STR(CL_COMMAND_READ_BUFFER_RECT)
+    COMMAND_TYPE_STR(CL_COMMAND_WRITE_BUFFER_RECT)
+    COMMAND_TYPE_STR(CL_COMMAND_COPY_BUFFER_RECT)
+    COMMAND_TYPE_STR(CL_COMMAND_USER)
+    COMMAND_TYPE_STR(CL_COMMAND_BARRIER)
+    COMMAND_TYPE_STR(CL_COMMAND_MIGRATE_MEM_OBJECTS)
+    COMMAND_TYPE_STR(CL_COMMAND_FILL_BUFFER)
+    COMMAND_TYPE_STR(CL_COMMAND_FILL_IMAGE)
+#if defined(CL_COMMAND_SVM_FREE)
+    COMMAND_TYPE_STR(CL_COMMAND_SVM_FREE)
+#endif
+#if defined(CL_COMMAND_SVM_MEMCPY)
+    COMMAND_TYPE_STR(CL_COMMAND_SVM_MEMCPY)
+#endif
+#if defined(CL_COMMAND_SVM_MEMFILL)
+    COMMAND_TYPE_STR(CL_COMMAND_SVM_MEMFILL)
+#endif
+#if defined(CL_COMMAND_SVM_MAP)
+    COMMAND_TYPE_STR(CL_COMMAND_SVM_MAP)
+#endif
+#if defined(CL_COMMAND_SVM_UNMAP)
+    COMMAND_TYPE_STR(CL_COMMAND_SVM_UNMAP)
+#endif
+    default:
+      return "Unknown cl_command_type";
+  }
+}
+
 std::shared_ptr<Event> Event::Upcast(const std::shared_ptr<hal::Event>& event, const CLObj<cl_context>& cl_ctx) {
   std::shared_ptr<Event> evt = std::dynamic_pointer_cast<Event>(event);
   if (!evt || evt->cl_ctx_ != cl_ctx) {
@@ -125,7 +176,18 @@ void Event::EventComplete(cl_event evt, cl_int status, void* data) {
     self_ref = std::move(state->self);
   }
 
-  state->prom.set_value(std::move(state->result));
+  try {
+    if (status < 0) {
+      Err err(status);
+      cl_command_type type = 0;
+      clGetEventInfo(evt, CL_EVENT_COMMAND_TYPE, sizeof(type), &type, nullptr);
+      LOG(ERROR) << "Event " << EventCommandTypeStr(type) << " failed with: " << err.str();
+      Err::Check(err, "Event completed with failure");
+    }
+    state->prom.set_value(std::move(state->result));
+  } catch (...) {
+    state->prom.set_exception(boost::current_exception());
+  }
 
   // N.B. state may be deleted as we leave this context.
 }

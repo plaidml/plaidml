@@ -24,6 +24,25 @@ namespace vertexai {
 // program.  This should be only be used after command line flag parsing is
 // complete.
 el::Configurations LogConfigurationFromFlags(const std::string& app_name);
+
+// ScopedVerbosity is an RAII holder to adjust the verbosity in a
+// chunk of code.  It's not currently designed to work with
+// multithreaded code -- a more general implementation would pin the
+// verbosity level and drop the pin on exit.  It's useful for
+// debugging, though; just allocate an instance on the stack.
+class ScopedVerbosity {
+ public:
+  explicit ScopedVerbosity(int level) : previous_level_{el::Loggers::verboseLevel()} {
+    el::Loggers::setVerboseLevel(level);
+  }
+  ~ScopedVerbosity() { el::Loggers::setVerboseLevel(previous_level_); }
+  ScopedVerbosity(const ScopedVerbosity&) = delete;
+  ScopedVerbosity& operator=(const ScopedVerbosity&) = delete;
+
+ private:
+  int previous_level_;
+};
+
 }  // namespace vertexai
 
 #define IVLOG(N, rest)   \

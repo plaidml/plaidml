@@ -6,7 +6,9 @@
 #include <stdexcept>
 #include <vector>
 
+#include "base/util/error.h"
 #include "tile/lang/builtins.h"
+#include "tile/lang/fpconv.h"
 #include "tile/lang/gen_special.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/replace.h"
@@ -15,6 +17,24 @@
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+bool Binding::operator==(const Binding& rhs) {
+  if (tag != rhs.tag) {
+    return false;
+  }
+  switch (tag) {
+    case Binding::TENSOR:
+      return shape == rhs.shape;
+    case Binding::ICONST:
+      return iconst == rhs.iconst;
+    case Binding::FCONST:
+      return fconst == rhs.fconst;
+    default:
+      throw std::logic_error{"Invalid binding"};
+  }
+}
+
+bool Binding::operator!=(const Binding& rhs) { return !(*this == rhs); }
 
 static double ConstantPropagate(const std::string& op, const std::vector<double>& x) {
   if (op == "ident") {
@@ -311,27 +331,40 @@ void TypeCheck(Program* prog, Bindings* vars) {
     }
 
     // Compute result type by 'upcasting' to the highest type in the hierarchy
-    DataType out_type = DataType::BOOLEAN;
-    for (size_t i = 0; i < op.inputs.size(); i++) {
-      const auto& s = op.inputs[i];
-      // Skip condition booleans
-      if (op.tag == Op::FUNCTION && op.f.fn == "cond" && i == 0) {
-        continue;
-      }
-      // Move types up the hierarchy
-      DataType cur = vars->at(s).shape.type;
-      IVLOG(4, "  Adding type " << to_string(cur));
-      if (is_float(cur) != is_float(out_type)) {
-        if (is_float(cur)) {
-          out_type = cur;
+    DataType out_type = DataType::INVALID;
+    if (op.tag == Op::FUNCTION && op.f.fn == "prng_step") {
+      out_type = DataType::PRNG;
+    } else if (op.tag == Op::FUNCTION && op.f.fn == "prng_state") {
+      out_type = DataType::UINT32;
+    } else if (op.tag == Op::FUNCTION && op.f.fn == "prng_value") {
+      out_type = DataType::FLOAT32;
+    } else {
+      for (size_t i = 0; i < op.inputs.size(); i++) {
+        const auto& s = op.inputs[i];
+        // Skip condition booleans
+        if (op.tag == Op::FUNCTION && op.f.fn == "cond" && i == 0) {
+          continue;
         }
-      } else {
-        if (bit_width(cur) > bit_width(out_type)) {
-          out_type = cur;
+        // Move types up the hierarchy
+        DataType cur = vars->at(s).shape.type;
+        IVLOG(4, "  Adding type " << to_string(cur));
+        if (is_float(cur) != is_float(out_type)) {
+          if (is_float(cur)) {
+            out_type = cur;
+          }
+        } else {
+          // TODO: This is a bit primitive; for example, it will pick
+          // the first of "int32" or "float32".  We may want to make it
+          // a bit more sophisticated.
+          if (bit_width(cur) > bit_width(out_type)) {
+            out_type = cur;
+          }
         }
       }
     }
-
+    if (out_type == DataType::INVALID) {
+      throw error::FailedPrecondition("Output result type is ill-defined");
+    }
     // Set output type
     IVLOG(4, "Derived type " << to_string(out_type));
     if (op.tag == Op::CONTRACTION) {
@@ -566,11 +599,17 @@ void TypeCheck(Program* prog, Bindings* vars) {
       // If it's a constant, do the propagation
       if (all_const) {
         double r = ConstantPropagate(op.f.fn, dins);
+        op.inputs.resize(1);
         if (is_float(out_type)) {
           vars->emplace(op.output, Binding(r));
+          op.f.fn = "fconst";
+          op.inputs[0] = DoubleToString(r);
         } else {
           vars->emplace(op.output, Binding(static_cast<int64_t>(r)));
+          op.f.fn = "iconst";
+          op.inputs[0] = std::to_string(static_cast<int64_t>(r));
         }
+        op.tag = Op::CONSTANT;
         continue;
       }
       if (!all_const && op.f.fn == "mod") {

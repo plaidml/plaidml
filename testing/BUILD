@@ -68,24 +68,3 @@ plaidml_cc_library(
         "//external:gtest",
     ],
 )
-
-test_suite(
-    name = "plaidml_tests",
-    tests = [
-        "//base/context:context_test",
-        "//base/context:gate_test",
-        "//base/util/astgen:ast_test",
-        "//plaidml:cpp_test",
-        "//plaidml:plaidml_test",
-        "//plaidml:py_plaidml_test",
-        "//plaidml:uint8_test",
-        "//plaidml/base:feature_test",
-        "//plaidml/base:status_test",
-        "//plaidml/keras:backend_test",
-        "//plaidml/keras:mnist_mlp_test",
-        "//plaidml/keras:trivial_model_test",
-        "//tile/lang:gid_test",
-        "//tile/lang:test",
-        "//tile/platform/local_machine:platform_test",
-    ],
-)

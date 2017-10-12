@@ -71,11 +71,12 @@
           }
         },
         "settings": {
-          "threads": { "value": 8 },
+          "threads": { "value": 256 },
           "vec_size": { "value": 1 },
-          "mem_width": { "value": 64 },
+          "mem_width": { "value": 16 },
           "max_mem": { "value": 16000 },
-          "max_regs": { "value": 16000 },
+          "max_regs": { "value": 32000 },
+          "use_global": { "value": true },
           "enable_half": { "value": false }
         }
       }

@@ -145,8 +145,7 @@ class TestPlaidML(unittest.TestCase):
     def testLargeConfigValuesNoCrash(self):
         ctx = plaidml.Context()
         with plaidml.open_device(ctx, testing.plaidml_config.very_large_values_config()) as dev:
-            with self.assertRaises(plaidml.exceptions.PlaidMLError):
-                self.runMatrixMultiply(ctx, dev)
+            self.runMatrixMultiply(ctx, dev)
 
     def testTransferLargeNDArray(self):
         size = 30000000

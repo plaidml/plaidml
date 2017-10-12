@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "tile/base/hal.h"
+#include "tile/hal/opencl/buffer.h"
 #include "tile/hal/opencl/device_state.h"
 
 namespace vertexai {
@@ -27,6 +28,9 @@ class ZeroKernel final : public hal::Kernel {
   std::shared_ptr<DeviceState> device_state_;
   lang::KernelInfo kinfo_;
   boost::uuids::uuid kuuid_;
+
+  CLObj<cl_event> FillBufferImpl(const DeviceState::Queue& queue, Buffer* buf, void* pattern, size_t pattern_size,
+                                 const std::vector<cl_event>& deps);
 };
 
 }  // namespace opencl

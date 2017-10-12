@@ -231,14 +231,14 @@ TEST_CASE("Example function used in conv2d", "[conv2d][keras]") {
                                        {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}};
   Tensor<float, 4> ExpectedO(boost::extents[5][4][4][4]);
   Tensor<float, 4> O2(boost::extents[5][4][4][4]);
-  for (size_t n = 0; n < 5; n++) {
-    for (size_t x = 0; x < 4; x++) {
-      for (size_t y = 0; y < 4; y++) {
-        for (size_t c = 0; c < 4; c++) {
+  for (int n = 0; n < 5; n++) {
+    for (int x = 0; x < 4; x++) {
+      for (int y = 0; y < 4; y++) {
+        for (int c = 0; c < 4; c++) {
           O2[n][x][y][c] = 0;
-          for (size_t i = 0; i < 3; i++) {
-            for (size_t j = 0; j < 3; j++) {
-              for (size_t ci = 0; ci < 3; ci++) {
+          for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+              for (int ci = 0; ci < 3; ci++) {
                 if (0 <= x + i - 1 && x + i - 1 < 4 && 0 <= y + j - 1 && y + j - 1 < 4) {
                   O2[n][x][y][c] += I[n][x + i - 1][y + j - 1][ci] * K[i][j][ci][c];
                 }

@@ -1,6 +1,7 @@
 // Copyright 2017, Vertex.AI. CONFIDENTIAL
 
 #include "tile/hal/opencl/executor.h"
+#include "tile/hal/opencl/zero_kernel.h"
 
 namespace vertexai {
 namespace tile {
