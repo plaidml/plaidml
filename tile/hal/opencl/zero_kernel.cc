@@ -3,7 +3,6 @@
 #include "tile/hal/opencl/zero_kernel.h"
 
 #include "base/util/error.h"
-#include "tile/hal/opencl/buffer.h"
 #include "tile/hal/opencl/event.h"
 
 namespace vertexai {
@@ -42,9 +41,6 @@ std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
   rinfo.set_kernel_uuid(ToByteString(kuuid_));
   activity.AddMetadata(rinfo);
 
-  CLObj<cl_event> done;
-  auto event_wait_list = deps.size() ? deps.data() : nullptr;
-
   cl_uchar char_pattern = 0;
   cl_ulong long_pattern = 0;
   void* pattern = &long_pattern;
@@ -54,17 +50,7 @@ std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
     pattern_size = sizeof(char_pattern);
   }
 
-  Err err;
-  if (buf->mem()) {
-    // OpenCL cl_mem
-    err = clEnqueueFillBuffer(queue.cl_queue.get(), buf->mem(), pattern, pattern_size, 0, buf->size(), deps.size(),
-                              event_wait_list, done.LvaluePtr());
-  } else {
-    // OpenCL SVM
-    err = clEnqueueSVMMemFill(queue.cl_queue.get(), buf->base(), pattern, pattern_size, buf->size(), deps.size(),
-                              event_wait_list, done.LvaluePtr());
-  }
-  Err::Check(err, "unable to fill buffer");
+  CLObj<cl_event> done = FillBufferImpl(queue, buf, pattern, pattern_size, deps);
 
   IVLOG(4, "  Produced dep: " << done.get());
 

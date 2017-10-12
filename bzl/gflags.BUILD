@@ -27,7 +27,7 @@ COPTS_ALL = [
     # GENDIR, and we don't want to put it into the includes
     # otherwise the dependent may pull it in by accident.
     "-I$(GENDIR)/" + PACKAGE_NAME,
-    "-Wno-sign-compare",
+    "-w",
     "-DHAVE_STDINT_H",
     "-DHAVE_SYS_TYPES_H",
     "-DHAVE_INTTYPES_H",

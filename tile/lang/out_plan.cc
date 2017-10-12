@@ -19,7 +19,7 @@ namespace tile {
 namespace lang {
 
 OutPlan::OutPlan(const FlatContraction& op, const std::vector<uint64_t>& tile, uint64_t threads, uint64_t mem_elems)
-    : op_(op), threads_(threads), local_size_(1), outputs_(1), group_dims_({1, 1, 1}) {
+    : op_(op), threads_(threads), local_size_(1), outputs_(1), group_dims_({{1, 1, 1}}) {
   using namespace sem::builder;  // NOLINT
   if (mem_elems < 1) {
     mem_elems = 1;
@@ -30,12 +30,18 @@ OutPlan::OutPlan(const FlatContraction& op, const std::vector<uint64_t>& tile, u
   for (size_t i = 0; i < sz; i++) {
     const std::vector<int64_t>& out_stride = op.access[0].strides;
     if (out_stride[i] != 0) {  // Only keep 'output' indexes
-      indexes_.emplace_back(op.names[i], op.ranges[i], tile[i], out_stride[i]);
+      indexes_.emplace_back(op.names[i], i, op.ranges[i], tile[i], out_stride[i]);
     }
   }
-  // Sort by stride
-  std::sort(indexes_.begin(), indexes_.end(),
-            [](const IdxInfo& a, const IdxInfo& b) { return std::abs(a.stride) < std::abs(b.stride); });
+  // Sort by stride, then by reverse index.
+  std::sort(indexes_.begin(), indexes_.end(), [](const IdxInfo& a, const IdxInfo& b) {
+    auto as = std::abs(a.stride);
+    auto bs = std::abs(b.stride);
+    if (as != bs) {
+      return as < bs;
+    }
+    return b.stride_idx < a.stride_idx;
+  });
 
   // Assign threads
   if (indexes_.size() > 0) {

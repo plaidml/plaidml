@@ -15,12 +15,15 @@ struct Binding {
   explicit Binding(const TensorShape& _shape) : tag(TENSOR), shape(_shape) {}
   explicit Binding(int64_t _iconst) : tag(ICONST), iconst(_iconst) { shape.type = DataType::INT32; }
   // TODO(): This can't be enabled if the device doesn't support FP16
-  //explicit Binding(double _fconst) : tag(FCONST), fconst(_fconst) { shape.type = DataType::FLOAT16; }
+  // explicit Binding(double _fconst) : tag(FCONST), fconst(_fconst) { shape.type = DataType::FLOAT16; }
   explicit Binding(double _fconst) : tag(FCONST), fconst(_fconst) { shape.type = DataType::FLOAT32; }
   enum { TENSOR, ICONST, FCONST } tag;
   TensorShape shape;
   int64_t iconst;
   double fconst;
+
+  bool operator==(const Binding& rhs);
+  bool operator!=(const Binding& rhs);
 };
 
 inline MAKE_LOGGABLE(Binding, t, os) {

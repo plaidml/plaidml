@@ -12,9 +12,8 @@ PLAIDML_COPTS = select({
         "-Werror",
     ],
     "//bzl:darwin": [
-        "-std=c++14",
-        "-Wno-missing-braces",
-        "-Wno-unreachable-code",
+        "-std=c++1y",
+        "-Werror",
     ],
     "//bzl:x64_windows": [
         "/std:c++14",

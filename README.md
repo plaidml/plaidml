@@ -24,18 +24,12 @@ PlaidML is under active development and should be thought of as early-beta quali
 
 This version of PlaidML has some notable limitations which will be addressed soon in upcoming releases:
 
-  * Initial compile times are long, especially for training
-  * AMD training performance is unacceptable
+  * Initial compile times can be quite long
+  * AMD training performance needs improvement
   * RNN support is not implemented
-  * The Keras backend is not complete
-
-## Supported Hardware
-
-PlaidML currently supports any devices that provides the full profile of OpenCL 1.1 or higher. PlaidML ships with
-configuration files and parameters only for devices that we've verified or are confident have an acceptable level of 
-performance.
 
 ### Validated Hardware
+
 Vertex.AI runs a comprehensive set of tests for each release against these hardware targets:
   * AMD
     * R9 Nano
@@ -52,7 +46,7 @@ If your device isn't supported, PlaidML will error with this message:
 ```
 ERROR: No devices found, set PLAIDML_EXPERIMENTAL=1 to enable broader device support
 ```
-As noted, set the `PLAIDML_EXPERIMENTAL=1`. This will use a the experimental config from the python package. If your
+As noted, set the environment variable `PLAIDML_EXPERIMENTAL=1`. This will use a the experimental config from the python package. If your
 device still isn't supported, contact [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev) with the output
 of `clinfo`. Alternatively, users can attempt to add support themselves by editing the configuration file listed when
 PlaidML starts.
@@ -101,11 +95,12 @@ If you have an AMD card, [download the AMDGPU PRO driver and install](http://sup
 
 Install the plaidml wheels system-wide:
 ```
-sudo ./install.sh
+sudo pip install -U plaidml-keras
 ```
 
-You can test your installation by running MobileNet in plaidbench:
+You can test your installation by running MobileNet in [plaidbench](https://github.com/vertexai/plaidbench):
 ```
+git clone https://github.com/vertexai/plaidbench.git
 cd plaidbench
 python plaidbench.py mobilenet
 ```
@@ -128,8 +123,6 @@ We've developed two open source projects:
   * [plaidbench](https://github.com/vertexai/plaidbench) is a performance testing suite designed to help users compare the performance
   of different cards and different frameworks
   
-**PRE-RELEASE USERS: plaidvision and plaidbench are included in the release tarball.**
-
 
 ### Hello VGG
 One of the great things about keras is how easy it is to play with state-of-the-art networks. Here's all the code you

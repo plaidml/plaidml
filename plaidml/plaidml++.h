@@ -100,7 +100,7 @@ struct dimension {
 };
 
 inline std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx);
-inline std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx, const std::string& config = "");
+inline std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx, const std::string& config);
 
 class base_shape {
   friend class base_tensor;

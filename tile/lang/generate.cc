@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <memory>
 #include <set>
 #include <string>
@@ -12,9 +13,8 @@
 #include "tile/lang/flat.h"
 #include "tile/lang/fpconv.h"
 #include "tile/lang/gen_contract.h"
-#include "tile/lang/gen_elemwise.h"
 #include "tile/lang/gen_special.h"
-#include "tile/lang/gid.h"
+#include "tile/lang/gen_zero.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/tile_opt.h"
@@ -63,11 +63,11 @@ static bool NeedsZero(const FlatContraction& flat, const TensorShape& ts) {
 }
 
 static KernelInfo GenerateContractionKernel(const std::string& kname, const HardwareSettings& settings,
-                                            const Contraction& c, const FlatContraction& flat,
+                                            const Contraction* c, const FlatContraction& flat,
                                             const std::vector<uint64_t>& tile, const std::vector<std::string>& inputs,
-                                            const std::vector<std::string>& outputs, const Bindings& vars) {
+                                            const Bindings& vars) {
   KernelInfo ki = GenContract(kname, settings, flat, tile, vars, inputs);
-  ki.outputs = outputs;
+  ki.outputs = flat.kernel_outputs;
   ki.key = flat.KeyString();
   ki.settings = settings;
   ki.tile_size = tile;
@@ -76,7 +76,10 @@ static KernelInfo GenerateContractionKernel(const std::string& kname, const Hard
       ki.inputs.emplace_back(input);
     }
   }
-  PerfStats perf = ComputeTileStats(settings, flat, tile);
+  for (const auto& input : flat.post_op_inputs) {
+    ki.inputs.emplace_back(input);
+  }
+  PerfStats perf = ComputeTileStats(settings, flat, tile, vars);
   ki.tot_bytes = perf.work_groups * ((perf.inner_loops * perf.mem_read) + perf.mem_write);
   ki.tot_flops = perf.true_ops;
   if (VLOG_IS_ON(1)) {
@@ -85,75 +88,90 @@ static KernelInfo GenerateContractionKernel(const std::string& kname, const Hard
       tsize += std::to_string(size) + ", ";
     }
     VLOG(1) << "Contraction " << kname << ":\n"
-            << to_string(c) << "\n"
+            << (c ? to_string(*c) : "<empty>") << "\n"
             << to_string(flat) << "\n"
-            << tsize << "\n"
-            << "tot_flops = " << ki.tot_flops << ", tot_bytes = " << ki.tot_bytes << "\n\n";
+            << tsize << "\n";
+    if (flat.post_ops.size()) {
+      VLOG(1) << "Output operations:";
+      for (const auto& op : flat.post_ops) {
+        VLOG(1) << "  " << op;
+      }
+    }
+    VLOG(1) << "tot_flops = " << ki.tot_flops << ", tot_bytes = " << ki.tot_bytes << "\n\n";
   }
-  auto pb = ki.info.mutable_contraction();
-  pb->set_op(to_string(c));
-  for (std::size_t idx = 0; idx < flat.names.size(); ++idx) {
-    auto access = pb->add_accesses();
-    access->set_name(flat.names[idx]);
-    access->set_range(flat.ranges[idx]);
+  if (c) {
+    auto pb = ki.info.mutable_contraction();
+    pb->set_op(to_string(*c));
+    for (std::size_t idx = 0; idx < flat.names.size(); ++idx) {
+      auto access = pb->add_accesses();
+      access->set_name(flat.names[idx]);
+      access->set_range(flat.ranges[idx]);
+      for (auto a : flat.access) {
+        access->add_strides(a.strides[idx]);
+      }
+    }
     for (auto a : flat.access) {
-      access->add_strides(a.strides[idx]);
+      pb->add_off(a.offset);
+      pb->add_vec(a.vector);
     }
-  }
-  for (auto a : flat.access) {
-    pb->add_off(a.offset);
-    pb->add_vec(a.vector);
-  }
-  for (auto c : flat.constraints) {
-    auto constraint = pb->add_constraints();
-    for (auto lhs : c.lhs) {
-      constraint->add_lhs(lhs);
+    for (auto cons : flat.constraints) {
+      auto constraint = pb->add_constraints();
+      for (auto lhs : cons.lhs) {
+        constraint->add_lhs(lhs);
+      }
+      constraint->set_rhs(cons.rhs);
     }
-    constraint->set_rhs(c.rhs);
   }
 
   return ki;
 }
 
-static void ContractionWrap(KernelList& r, const Contraction& c, const ShapeMap& shapes,  // NOLINT(runtime/references)
-                            const std::string& kname, const HardwareSettings& settings, const Bindings& vars,
-                            size_t tile_trials) {
-  if (c.specs.size() != 2 && c.specs.size() != 3 && c.specs.size() != 4) {
-    throw std::runtime_error("Currently, we only support 1, 2, and 3 element Contractions");
-  }
+static std::vector<TensorShape> MakeTShapes(const Contraction& c, const Bindings& vars) {
   std::vector<TensorShape> tshapes;
-  std::vector<std::string> outputs;
-  std::vector<std::string> inputs;
-  bool first = true;
   for (const TensorSpec& spec : c.specs) {
-    auto it = shapes.find(spec.id);
-    if (it == shapes.end()) {
-      IVLOG(1, "About to barf: " << shapes);
+    auto it = vars.find(spec.id);
+    if (it == vars.end()) {
+      IVLOG(1, "About to barf: " << vars);
       throw std::runtime_error(printstring("Unable to find tensor shape for id %s, ug", spec.id.c_str()));
     }
-    tshapes.push_back(it->second);
-    if (first) {
-      outputs.push_back(it->first);
-    } else {
-      inputs.push_back(it->first);
-    }
-    first = false;
+    tshapes.push_back(it->second.shape);
   }
-  FlatContraction flat = Compile(c, tshapes);
-  if (NeedsZero(flat, tshapes[0])) {
-    r.kernels.push_back(GenZero(tshapes[0], outputs[0], "zero_" + kname));
+  return tshapes;
+}
+
+static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction flat,  // NOLINT(runtime/references)
+                            const std::string& kname, const HardwareSettings& settings, const Bindings& vars,
+                            size_t tile_trials) {
+  std::vector<std::string> inputs;
+  if (c) {
+    if (c->specs.size() != 2 && c->specs.size() != 3 && c->specs.size() != 4) {
+      throw std::runtime_error("Currently, we only support 1, 2, and 3 element Contractions");
+    }
+    bool first = true;
+    for (const TensorSpec& spec : c->specs) {
+      auto it = vars.find(spec.id);
+      if (it == vars.end()) {
+        IVLOG(1, "About to barf: " << vars);
+        throw std::runtime_error(printstring("Unable to find tensor shape for id %s, ug", spec.id.c_str()));
+      }
+      if (!first) {
+        inputs.push_back(it->first);
+      }
+      first = false;
+    }
   }
   // Do memory based tile optimization
   if (settings.vec_size > 1) {
     flat = Vectorize(flat, settings.vec_size);
   }
-  auto by_score = TileOptimize(settings, flat, tile_trials == 1);
+  IVLOG(4, "Optimizing " << kname);
+  auto by_score = TileOptimize(settings, flat, tile_trials == 1, vars);
 
   KernelInfo primary;
   size_t trial_count = 0;
   for (auto it = by_score.rbegin(); it != by_score.rend() && trial_count < tile_trials; it++, trial_count++) {
     auto tile = it->second;
-    KernelInfo ki = GenerateContractionKernel(kname, settings, c, flat, tile, inputs, outputs, vars);
+    KernelInfo ki = GenerateContractionKernel(kname, settings, c, flat, tile, inputs, vars);
     if (trial_count == 0) {
       primary = ki;
     } else {
@@ -161,6 +179,182 @@ static void ContractionWrap(KernelList& r, const Contraction& c, const ShapeMap&
     }
   }
   r.kernels.push_back(primary);
+}
+
+static bool DifferentDims(const Binding& a, const Binding& b) {
+  if (a.tag != Binding::TENSOR || b.tag != Binding::TENSOR) {
+    return true;
+  }
+  return a.shape.dims != b.shape.dims;
+}
+
+static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed, const Program& prog,
+                          std::size_t opidx, const UseDef& ud, const Bindings& vars, const ShapeMap& inputs,
+                          const ShapeMap& outputs) {
+  // Unify the contraction with downstream elementwise operations.
+  //
+  // Here's the idea: during the contraction's output phase, we
+  // have some set of outputs available, starting with the
+  // actual output of the contraction.  So we scan the uses of
+  // those outputs: any downstream elementwise operation that's
+  // only dependent on the outputs we have so far, program
+  // inputs, or constants, can be unified into the current
+  // contraction.  Elementwise operations that are added to a
+  // contraction add their own outputs to the set of outputs
+  // available, thus allowing further elementwise operations to
+  // be added.
+
+  const Op& op = prog.ops[opidx];
+
+  // Additional inputs required for the unified kernel.
+  std::set<std::string> post_contraction_inputs;
+
+  // The set of outputs that are known to be available within the kernel.
+  std::set<std::string> available_outputs;
+
+  // The set of elementwise operations that have been unified with the kernel.
+  std::set<std::size_t> unified_opidxs;
+
+  // The set of operations that have been unified with the kernel
+  // (starting with the initiating contraction or elementwise
+  // operation) whose outputs need to checked for downstream
+  // elementwise operations that might be unified.
+  //
+  // We always check these lowest-numbered-op-first, since the
+  // operation list is in single-assignment form, and consumers
+  // are always after producers in the list.
+  std::set<std::size_t> ops_to_check;
+
+  // Initialize the set of outputs available.
+  available_outputs.insert(op.output);
+  unified_opidxs.insert(opidx);
+
+  if (!flat->generate_contraction) {
+    // If there's no actual contraction, the initiating operation has
+    // already been added to the FlatContraction's post-ops list.
+    // Initialize the post_contraction_inputs to take this into
+    // account -- the operation's inputs are required to come from
+    // kernel parameters.
+    for (const auto& input : op.inputs) {
+      if (vars.at(input).tag == Binding::TENSOR) {
+        post_contraction_inputs.emplace(input);
+      }
+    }
+  }
+
+  // Add the initial operation's output's consumers as the ops to check.
+  {
+    auto use_it = ud.uses().find(op.output);
+    if (use_it != ud.uses().end()) {
+      ops_to_check.insert(use_it->second.begin(), use_it->second.end());
+    }
+  }
+
+  IVLOG(4, "Looking for ops to unify with op " << op);
+
+  while (ops_to_check.size()) {
+    // Pop an operation to be checked for possible unification.
+    auto check_it = ops_to_check.begin();
+    auto check_opidx = *check_it;
+    ops_to_check.erase(check_it);
+
+    auto& check_op = prog.ops[check_opidx];
+    IVLOG(4, "  Checking op " << check_op);
+
+    if (check_opidx != opidx) {  // The initial operation is automatically unified.
+      if (check_op.tag != Op::FUNCTION || check_op.f.is_special()) {
+        IVLOG(4, "  Consumer tag=" << check_op.tag << " inputs.size=" << check_op.inputs.size()
+                                   << " is_special=" << check_op.f.is_special() << "; skipping unification");
+        continue;
+      }
+      if (DifferentDims(vars.at(op.output), vars.at(check_op.output))) {
+        IVLOG(4, "  Var " << op.output << " differs in dimensions from " << check_op.output
+                          << "; skipping unification");
+        continue;
+      }
+
+      bool all_inputs_available = true;
+      std::vector<std::string> check_op_added_inputs;
+      for (const auto& input : check_op.inputs) {
+        if (vars.at(input).tag != Binding::TENSOR) {
+          continue;
+        }
+        if (available_outputs.count(input)) {
+          // We've merged this input's creator into this op.
+          continue;
+        }
+        if (inputs.count(input)) {
+          // This is a program input.
+          check_op_added_inputs.push_back(input);
+          continue;
+        }
+        // Tensor inputs that aren't in the program inputs should be in the usedef map.
+        assert(ud.op_defs().count(input));
+
+        // If the input was generated by an earlier operation, we
+        // can add it as an input to the current kernel, enabling
+        // merging of the operation we're checking.
+        //
+        // It's not clear that this is always a good idea,
+        // since it prevents the earlier operation and the
+        // current operation from running in parallel.
+        if (ud.op_defs().at(input) <= opidx) {
+          check_op_added_inputs.push_back(input);
+          continue;
+        }
+
+        all_inputs_available = false;
+        break;
+      }
+      if (!all_inputs_available) {
+        IVLOG(4, "  Op " << check_op << " cannot be computed in this contraction; skipping unification");
+        continue;
+      }
+
+      IVLOG(4, "  Scheduling unification of op " << check_op);
+      // Looks like this elementwise op can be unified with the current contraction.
+      flat->post_ops.emplace_back(check_op);
+      unified_opidxs.insert(check_opidx);
+      available_outputs.insert(check_op.output);
+      post_contraction_inputs.insert(std::make_move_iterator(check_op_added_inputs.begin()),
+                                     std::make_move_iterator(check_op_added_inputs.end()));
+    }
+
+    // Add the uses of the op's outputs for consideration.
+    auto use_it = ud.uses().find(check_op.output);
+    if (use_it != ud.uses().end()) {
+      ops_to_check.insert(use_it->second.begin(), use_it->second.end());
+    }
+  }
+
+  // For all available outputs: if the usedefs or program
+  // outputs require it, add it to the kernel outputs.
+  for (auto unified_opidx : unified_opidxs) {
+    auto& unified_op = prog.ops[unified_opidx];
+    bool needed_as_output = false;
+    if (outputs.count(unified_op.output)) {
+      // It's a program output; we need to write it.
+      needed_as_output = true;
+    } else {
+      auto use_it = ud.uses().find(unified_op.output);
+      if (use_it != ud.uses().end()) {
+        for (auto use_opidx : use_it->second) {
+          if (!unified_opidxs.count(use_opidx)) {
+            needed_as_output = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (needed_as_output) {
+      flat->kernel_outputs.push_back(unified_op.output);
+    }
+  }
+
+  computed->insert(unified_opidxs.begin(), unified_opidxs.end());
+  flat->post_op_inputs.insert(flat->post_op_inputs.end(), post_contraction_inputs.begin(),
+                              post_contraction_inputs.end());
 }
 
 static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, const ShapeMap& outputs,
@@ -175,21 +369,36 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
     types.emplace(kvp.first, kvp.second.shape);
   }
 
-  // Make a convolution kernel for each convolution, and a function kernel for
-  // each group of connected functions.
-
   // First, compute use/defs for later use
   UseDef ud(prog);
 
-  // Now, go over all of the program operations
+  // Remember the set of operations that have already been covered by kernels
+  // (necessary since a given kernel may encompass multiple ops).
   std::set<size_t> computed;
+
+  // Now, go over all of the program operations; make a convolution kernel for each convolution, and a function kernel
+  // for each group of connected functions.
   size_t knum = 0;
+  auto next_kname = [&knum, kid] { return printstring("%s_%zu", kid.c_str(), knum++); };
   for (size_t i = 0; i < prog.ops.size(); i++) {
     const Op& op = prog.ops[i];
+
     if (op.tag == Op::CONTRACTION) {
-      // If it's a contraction, do the easy thing
-      IVLOG(3, "Running contraction " << op << " types = " << types);
-      ContractionWrap(r, op.c, types, printstring("%s_%zu", kid.c_str(), knum++), settings, vars, tile_trials);
+      IVLOG(3, "Running contraction " << op << " vars = " << vars);
+      std::vector<TensorShape> tshapes = MakeTShapes(op.c, vars);
+      FlatContraction flat = Compile(op.c, tshapes);
+      flat.output = op.output;
+
+      auto kname = next_kname();
+      if (NeedsZero(flat, tshapes[0])) {
+        // N.B. We currently don't unify kernels with subsequent
+        // operations unless they cover the entire output space.
+        r.kernels.push_back(GenZero(tshapes[0], op.output, "zero_" + kname));
+        flat.kernel_outputs.push_back(op.output);
+      } else {
+        DoUnification(&flat, &computed, prog, i, ud, vars, inputs, outputs);
+      }
+      ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials);
       continue;
     }
     // Ignore constants
@@ -240,18 +449,49 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
         dop.f.params.push_back(sout);
         dop.f.params.push_back(vout);
       }
-      GenSpecial(r, dop, vars, printstring("%s_%zu", kid.c_str(), knum++), settings);
+      GenSpecial(r, dop, vars, next_kname(), settings);
       continue;
     }
-    // Otherwise, find the connected components
-    std::set<size_t> comps = ud.ConnectedComponents(prog, i, computed);
-    IVLOG(3, "CC = " << comps);
-    // Add to list of computed parts
-    computed.insert(comps.begin(), comps.end());
-    // Compile function (TODO: do something with the output)
-    KernelInfo ki =
-        GenFunction(prog, outputs, types, vars, comps, printstring("%s_%zu", kid.c_str(), knum++), ud, settings);
-    r.kernels.push_back(std::move(ki));
+
+    // Otherwise, it's an elementwise operation that hasn't been
+    // unified with an earlier contraction.  Initialize a
+    // FlatContraction object to represent the computation to the rest
+    // of the tile shaping logic; we'll omit generating the
+    // contraction itself later.
+
+    FlatContraction flat;
+    {
+      // The initial elementwise operation's output is used to
+      // determine the shape of the overall kernel -- which is
+      // reasonable, because every subsequent elementwise operation is
+      // required to have an output that's same shape as that initial
+      // operation.
+      flat.generate_contraction = false;
+
+      const auto& access_op = prog.ops[i];
+      flat.post_ops.emplace_back(access_op);
+
+      flat.output = access_op.output;
+      const TensorShape& shape = vars.at(access_op.output).shape;
+      for (std::size_t idx = 0; idx < shape.dims.size(); ++idx) {
+        flat.names.push_back(std::string("i") + std::to_string(idx + 1));
+        flat.ranges.push_back(shape.dims[idx].size);
+      }
+
+      FlatTensorAccess access;
+      access.type = shape.type;
+      access.vector = 1;
+      access.offset = 0;
+      access.global_index_limit = shape.buffer_size();
+      for (const auto& dim : shape.dims) {
+        access.strides.emplace_back(dim.stride);
+      }
+      flat.access.emplace_back(std::move(access));
+    }
+
+    DoUnification(&flat, &computed, prog, i, ud, vars, inputs, outputs);
+
+    ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials);
   }
 
   // Copy only the relevant typing info across

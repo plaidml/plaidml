@@ -148,35 +148,6 @@ const uint8_t Expected[] = {
 
 }  // namespace multiply
 
-namespace dot_product {
-
-const char* Code = "function (A[X, Y], B[X, Y]) -> (C) { C[] = +(A[x, y] * B[x, y]); }";
-const char* Shape = R"(type: INT16 dimensions: { size: 3 stride: 3 } dimensions: { size: 3 stride: 1 })";
-const uint8_t A[] = {
-    0x01, 0x00,  // 1
-    0x02, 0x00,  // 2
-    0x03, 0x00,  // 3
-    0x01, 0x00,  // 1
-    0x02, 0x00,  // 2
-    0x03, 0x00,  // 3
-};
-const uint8_t B[] = {
-    0x05, 0x00,  // 5
-    0x06, 0x00,  // 6
-    0x07, 0x00,  // 7
-    0x05, 0x00,  // 5
-    0x06, 0x00,  // 6
-    0x07, 0x00,  // 7
-};
-const uint8_t Output[] = {
-    0x00, 0x00,  // 0
-};
-const uint8_t Expected[] = {
-    0x4C, 0x00,  // ((1*5) + (2*6) + (3*7)) * 2 = (5 + 12 + 21) * 2 = 38 * 2 = 76
-};
-
-}  // namespace dot_product
-
 namespace vector_add {
 
 const char* Code = "function (A, B) -> (C) { C = A + B; }";
@@ -270,17 +241,6 @@ TEST_P(PlatformTest, VectorAddWorks) {
   program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}});
   CheckExpected(ctx, c, MakeBuffer(vector_add::Expected, sizeof(vector_add::Expected)));
 }
-
-// TEST_P(PlatformTest, DotProductWorks) {
-//   context::Context ctx;
-//   auto device = MakePlatform();
-//   auto program = MakeProgram(ctx, device, nullptr, dot_product::Code, dot_product::Shape);
-//   auto a = MakeInput(ctx, device, MakeBuffer(dot_product::A, sizeof(dot_product::A)));
-//   auto b = MakeInput(ctx, device, MakeBuffer(dot_product::B, sizeof(dot_product::B)));
-//   auto c = MakeOutput(ctx, device, MakeBuffer(dot_product::Output, sizeof(dot_product::Output)));
-//   program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}});
-//   CheckExpected(ctx, c, MakeBuffer(dot_product::Expected, sizeof(dot_product::Expected)));
-// }
 
 TEST_P(PlatformTest, PiecewiseMultiplyWorks) {
   context::Context ctx;

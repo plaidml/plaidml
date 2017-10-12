@@ -2,7 +2,7 @@
 
 #include "tile/hal/util/selector.h"
 
-#include <regex>
+#include <boost/regex.hpp>
 
 namespace vertexai {
 namespace tile {
@@ -46,10 +46,10 @@ bool Match(const proto::HardwareSelector& sel, const proto::HardwareInfo& info, 
       return sel.type() == info.type();
 
     case proto::HardwareSelector::kNameRegex:
-      return std::regex_match(info.name(), std::regex(sel.name_regex()));
+      return boost::regex_match(info.name(), boost::regex(sel.name_regex()));
 
     case proto::HardwareSelector::kVendorRegex:
-      return std::regex_match(info.vendor(), std::regex(sel.vendor_regex()));
+      return boost::regex_match(info.vendor(), boost::regex(sel.vendor_regex()));
 
     case proto::HardwareSelector::kVendorId:
       return sel.vendor_id() == info.vendor_id();

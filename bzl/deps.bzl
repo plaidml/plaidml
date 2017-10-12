@@ -50,7 +50,7 @@ def plaidml_deps(root=""):
     build_file = root + "//bzl:half.BUILD",
   )
 
-  native.bind( name="half", actual="@half_repo//:half")
+  native.bind(name="half", actual="@half_repo//:half")
 
   native.new_git_repository(
     name = "jsoncpp_git",
@@ -73,21 +73,26 @@ def plaidml_deps(root=""):
   native.bind(name="minizip", actual="@minizip_repo//:minizip")
 
   native.new_git_repository(
-    name="opencl_headers_repo",
-    commit="f039db6764d52388658ef15c30b2237bbda49803",
-    remote="https://github.com/KhronosGroup/OpenCL-Headers.git",
+    name = "opencl_headers_repo",
+    commit = "f039db6764d52388658ef15c30b2237bbda49803",
+    remote = "https://github.com/KhronosGroup/OpenCL-Headers.git",
     build_file = root + "//bzl:opencl_headers.BUILD"
   )
 
   native.bind(
-    name="opencl_headers",
-    actual="@opencl_headers_repo//:inc"
+    name = "opencl_headers",
+    actual = "@opencl_headers_repo//:inc"
+  )
+
+  native.bind(
+    name = "opengl_headers",
+    actual = "@opengl_repo//:inc"
   )
 
   native.new_git_repository(
-    name="opencl_icd_loader_repo",
-    commit="6849f617e991e8a46eebf746df43032175f263b3",
-    remote="https://github.com/KhronosGroup/OpenCL-ICD-Loader.git",
+    name = "opencl_icd_loader_repo",
+    commit = "6849f617e991e8a46eebf746df43032175f263b3",
+    remote = "https://github.com/KhronosGroup/OpenCL-ICD-Loader.git",
     build_file = root + "//bzl:opencl_icd_loader.BUILD"
   )
 

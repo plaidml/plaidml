@@ -83,14 +83,16 @@ inline std::shared_ptr<Function> _Function(const std::string& name, const Type& 
                                     std::make_shared<Block>(std::vector<StmtPtr>(body)));
 }
 
-inline std::shared_ptr<IntConst> _Const(int x) { return std::make_shared<IntConst>(x); }
-inline std::shared_ptr<IntConst> _Const(int64_t x) { return std::make_shared<IntConst>(x); }
-inline std::shared_ptr<IntConst> _Const(uint64_t x) { return std::make_shared<IntConst>(x); }
+template <typename T>
+inline std::shared_ptr<IntConst> _Const(T x) {
+  return std::make_shared<IntConst>(x);
+}
 inline std::shared_ptr<FloatConst> _Const(double x) { return std::make_shared<FloatConst>(x); }
 inline std::shared_ptr<DeclareStmt> _Declare(const Type& type, const std::string& name, ExprPtr init) {
   return std::make_shared<DeclareStmt>(type, name, init);
 }
-inline std::shared_ptr<DeclareStmt> _DeclareConst(const Type& type, const std::string& name, int init) {
+template <typename T>
+inline std::shared_ptr<DeclareStmt> _DeclareConst(const Type& type, const std::string& name, T init) {
   return _Declare(type, name, _Const(init));
 }
 inline std::shared_ptr<CastExpr> _Cast(const Type& type, ExprPtr init) {
@@ -121,16 +123,28 @@ inline std::shared_ptr<ClampExpr> _Clamp(ExprPtr val, ExprPtr min, ExprPtr max) 
   }
 
 // Define some binary ops
-#define DEF_BINARY_OP(op)                                                                                          \
-  inline std::shared_ptr<vertexai::tile::sem::BinaryExpr> operator op(vertexai::tile::sem::ExprPtr lhs,            \
-                                                                      vertexai::tile::sem::ExprPtr rhs) {          \
-    return std::make_shared<vertexai::tile::sem::BinaryExpr>(#op, lhs, rhs);                                       \
-  }                                                                                                                \
-  inline std::shared_ptr<vertexai::tile::sem::BinaryExpr> operator op(vertexai::tile::sem::ExprPtr lhs, int rhs) { \
-    return std::make_shared<vertexai::tile::sem::BinaryExpr>(#op, lhs, vertexai::tile::sem::builder::_Const(rhs)); \
-  }                                                                                                                \
-  inline std::shared_ptr<vertexai::tile::sem::BinaryExpr> operator op(int lhs, vertexai::tile::sem::ExprPtr rhs) { \
-    return std::make_shared<vertexai::tile::sem::BinaryExpr>(#op, vertexai::tile::sem::builder::_Const(lhs), rhs); \
+#define DEF_BINARY_OP(op)                                                                                             \
+  inline std::shared_ptr<vertexai::tile::sem::BinaryExpr> operator op(vertexai::tile::sem::ExprPtr lhs,               \
+                                                                      vertexai::tile::sem::ExprPtr rhs) {             \
+    return std::make_shared<vertexai::tile::sem::BinaryExpr>(#op, lhs, rhs);                                          \
+  }                                                                                                                   \
+  template <class T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>                            \
+  inline std::shared_ptr<vertexai::tile::sem::BinaryExpr> operator op(vertexai::tile::sem::ExprPtr lhs, T rhs) {      \
+    auto rhs_const = vertexai::tile::sem::builder::_Const(rhs);                                                       \
+    return std::make_shared<vertexai::tile::sem::BinaryExpr>(#op, lhs, rhs_const);                                    \
+  }                                                                                                                   \
+  template <class T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>                            \
+  inline std::shared_ptr<vertexai::tile::sem::BinaryExpr> operator op(T lhs, vertexai::tile::sem::ExprPtr rhs) {      \
+    auto lhs_const = vertexai::tile::sem::builder::_Const(lhs);                                                       \
+    return std::make_shared<vertexai::tile::sem::BinaryExpr>(#op, lhs_const, rhs);                                    \
+  }                                                                                                                   \
+  inline std::shared_ptr<vertexai::tile::sem::BinaryExpr> operator op(vertexai::tile::sem::ExprPtr lhs, double rhs) { \
+    auto rhs_const = vertexai::tile::sem::builder::_Const(rhs);                                                       \
+    return std::make_shared<vertexai::tile::sem::BinaryExpr>(#op, lhs, rhs_const);                                    \
+  }                                                                                                                   \
+  inline std::shared_ptr<vertexai::tile::sem::BinaryExpr> operator op(double lhs, vertexai::tile::sem::ExprPtr rhs) { \
+    auto lhs_const = vertexai::tile::sem::builder::_Const(lhs);                                                       \
+    return std::make_shared<vertexai::tile::sem::BinaryExpr>(#op, lhs_const, rhs);                                    \
   }
 
 namespace std {

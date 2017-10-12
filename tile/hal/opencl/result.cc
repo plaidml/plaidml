@@ -28,10 +28,10 @@ std::chrono::high_resolution_clock::duration Result::GetDuration() const {
   }
 
   err = clGetEventProfilingInfo(event_.get(), CL_PROFILING_COMMAND_START, sizeof(start_time), &start_time, nullptr);
-  Err::Check(err, "Unable to read profiling info");
+  Err::Check(err, "Unable to read profiling info for CL_PROFILING_COMMAND_START");
 
   err = clGetEventProfilingInfo(event_.get(), CL_PROFILING_COMMAND_END, sizeof(end_time), &end_time, nullptr);
-  Err::Check(err, "Unable to read profiling info");
+  Err::Check(err, "Unable to read profiling info for CL_PROFILING_COMMAND_END");
 
   return std::chrono::nanoseconds(end_time - start_time);
 }

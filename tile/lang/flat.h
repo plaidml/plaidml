@@ -41,8 +41,14 @@ struct FlatContraction {
   std::string KeyString() const;
 
   // non-primary key members
+  bool generate_contraction = true;
   std::vector<std::string> names;
   std::string comments;
+  std::string output;  // The contraction output -- not necessarily written.
+  std::vector<Op> post_ops;
+  std::vector<std::string> post_op_inputs;  // Additional inputs for the post_ops
+  std::vector<std::string> kernel_outputs;  // Outputs written by the kernel.
+
   std::string toString() const;
 };
 

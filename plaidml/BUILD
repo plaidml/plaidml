@@ -154,6 +154,14 @@ plaidml_objc_library(
     ],
 )
 
+filegroup(
+    name = "configs",
+    srcs = [
+        "config.json",
+        "experimental.json",
+    ],
+)
+
 plaidml_py_library(
     name = "py",
     srcs = [
@@ -162,7 +170,7 @@ plaidml_py_library(
         "exceptions.py",
         "library.py",
     ],
-    data = ["config.json"] + select({
+    data = [":configs"] + select({
         "//bzl:x64_windows": [":plaidml.dll"],
         "//conditions:default": [":libplaidml.so"],
     }),
@@ -181,7 +189,7 @@ plaidml_py_test(
 
 pkg_tar(
     name = "py_deb_data",
-    files = [":py"],
+    srcs = [":py"],
     package_dir = "/usr/lib/python2.7/dist-packages/plaidml",
 )
 
@@ -205,8 +213,7 @@ plaidml_py_wheel(
     name = "wheel",
     srcs = [
         ":py",
-        "config.json",
-        "experimental.json",
+        ":configs",
     ] + select({
         "//bzl:x64_windows": ["//plaidml:plaidml.dll"],
         "//conditions:default": ["//plaidml:libplaidml.so"],
@@ -217,7 +224,7 @@ plaidml_py_wheel(
         "//bzl:arm7-ubuntu-14.04": "linux_armv7l",
         "//bzl:darwin": "macosx_10_10_x86_64",
         "//bzl:x64_windows": "win_amd64",
-        "//conditions:default": "linux_x86_64",
+        "//conditions:default": "manylinux1_x86_64",
     }),
     python = "py2",
 )

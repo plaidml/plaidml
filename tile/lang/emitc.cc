@@ -190,31 +190,19 @@ void EmitC::Visit(const sem::CallExpr &n) {
 }
 
 static std::map<std::pair<DataType, sem::LimitConst::Which>, std::string> LimitConstLookup = {
-    {{DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},
-    {{DataType::INT8, sem::LimitConst::MIN}, "SCHAR_MIN"},
-    {{DataType::INT16, sem::LimitConst::MIN}, "SHRT_MIN"},
-    {{DataType::INT32, sem::LimitConst::MIN}, "INT_MIN"},
-    {{DataType::INT64, sem::LimitConst::MIN}, "LONG_MIN"},
-    {{DataType::UINT8, sem::LimitConst::MIN}, "0"},
-    {{DataType::UINT16, sem::LimitConst::MIN}, "0"},
-    {{DataType::UINT32, sem::LimitConst::MIN}, "0"},
-    {{DataType::UINT64, sem::LimitConst::MIN}, "0"},
-    {{DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
-    {{DataType::FLOAT32, sem::LimitConst::MIN}, "-FLT_MAX"},
-    {{DataType::FLOAT64, sem::LimitConst::MIN}, "-DBL_MAX"},
+    {{DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},        {{DataType::INT8, sem::LimitConst::MIN}, "SCHAR_MIN"},
+    {{DataType::INT16, sem::LimitConst::MIN}, "SHRT_MIN"},   {{DataType::INT32, sem::LimitConst::MIN}, "INT_MIN"},
+    {{DataType::INT64, sem::LimitConst::MIN}, "LONG_MIN"},   {{DataType::UINT8, sem::LimitConst::MIN}, "0"},
+    {{DataType::UINT16, sem::LimitConst::MIN}, "0"},         {{DataType::UINT32, sem::LimitConst::MIN}, "0"},
+    {{DataType::UINT64, sem::LimitConst::MIN}, "0"},         {{DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
+    {{DataType::FLOAT32, sem::LimitConst::MIN}, "-FLT_MAX"}, {{DataType::FLOAT64, sem::LimitConst::MIN}, "-DBL_MAX"},
 
-    {{DataType::BOOLEAN, sem::LimitConst::MAX}, "0"},
-    {{DataType::INT8, sem::LimitConst::MAX}, "SCHAR_MAX"},
-    {{DataType::INT16, sem::LimitConst::MAX}, "SHRT_MAX"},
-    {{DataType::INT32, sem::LimitConst::MAX}, "INT_MAX"},
-    {{DataType::INT64, sem::LimitConst::MAX}, "LONG_MAX"},
-    {{DataType::UINT8, sem::LimitConst::MAX}, "UCHAR_MAX"},
-    {{DataType::UINT16, sem::LimitConst::MAX}, "USHRT_MAX"},
-    {{DataType::UINT32, sem::LimitConst::MAX}, "UINT_MAX"},
-    {{DataType::UINT64, sem::LimitConst::MAX}, "ULONG_MAX"},
-    {{DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
-    {{DataType::FLOAT32, sem::LimitConst::MAX}, "FLT_MAX"},
-    {{DataType::FLOAT64, sem::LimitConst::MAX}, "DBL_MAX"},
+    {{DataType::BOOLEAN, sem::LimitConst::MAX}, "0"},        {{DataType::INT8, sem::LimitConst::MAX}, "SCHAR_MAX"},
+    {{DataType::INT16, sem::LimitConst::MAX}, "SHRT_MAX"},   {{DataType::INT32, sem::LimitConst::MAX}, "INT_MAX"},
+    {{DataType::INT64, sem::LimitConst::MAX}, "LONG_MAX"},   {{DataType::UINT8, sem::LimitConst::MAX}, "UCHAR_MAX"},
+    {{DataType::UINT16, sem::LimitConst::MAX}, "USHRT_MAX"}, {{DataType::UINT32, sem::LimitConst::MAX}, "UINT_MAX"},
+    {{DataType::UINT64, sem::LimitConst::MAX}, "ULONG_MAX"}, {{DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
+    {{DataType::FLOAT32, sem::LimitConst::MAX}, "FLT_MAX"},  {{DataType::FLOAT64, sem::LimitConst::MAX}, "DBL_MAX"},
 };
 
 void EmitC::Visit(const sem::LimitConst &n) {

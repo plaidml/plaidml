@@ -39,6 +39,7 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
   // Check in cache, and early return if found
   int64_t cached_time = lang::TileCache::Instance()->GetDuration(ki.key, ki.settings, ki.tile_size);
   if (cached_time >= 0) {
+    LOG(DEBUG) << "Cached kernel: " << ki.key;
     return cached_time;
   }
 
@@ -50,6 +51,7 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
 
   // Run trial_runs number of times, picking minimum time
   for (size_t i = 0; i < trial_runs; i++) {
+    LOG(DEBUG) << "Trying kernel: " << ki.kname << ", key: " << ki.key << ", tile_size: " << ki.tile_size;
     auto evt = kernel->Run(ctx, buffers, {}, true);
     device.executor()->Flush();
     auto result = evt->GetFuture().get();
@@ -107,7 +109,6 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
     std::vector<lang::KernelInfo> candidates;
     std::swap(candidates, ki.candidates);
 
-    IVLOG(1, "Trying kernel: " << ki.kname << ", key = " << ki.key);
     size_t cur_num = 0;
     size_t best_num = 0;
     uint64_t best_time = TryKernel(ctx, ki, buffers, devinfo, trial_runs);

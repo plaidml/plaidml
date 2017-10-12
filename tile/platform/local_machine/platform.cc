@@ -78,8 +78,8 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
           }
           if (!found_hardware_config) {
             skip_device = true;
-            LOG(ERROR) << "No settings found for hardware device \"" << info.name() << "\", vendor \"" << info.vendor()
-                       << "\"";
+            LOG(WARNING) << "No settings found for hardware device \"" << info.name() << "\", vendor \""
+                         << info.vendor() << "\"";
           }
           auto devinfo = std::make_shared<DevInfo>(DevInfo{devset, dev, settings});
           PlatformDev pd{devinfo};
