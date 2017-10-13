@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017, Vertex.AI.
 
 #include "tile/platform/local_machine/copy_mem_strategy.h"
 

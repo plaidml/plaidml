@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017, Vertex.AI.
 
 // This is an overly-simplistic utility for doing some simple printf
 // timing debugging.  It's not useful for extremely short time periods

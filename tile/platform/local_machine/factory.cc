@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017, Vertex.AI.
 
 #include "base/util/any_factory_map.h"
 #include "base/util/compat.h"

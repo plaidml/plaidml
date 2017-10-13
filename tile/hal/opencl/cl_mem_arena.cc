@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017, Vertex.AI.
 
 #include "tile/hal/opencl/cl_mem_arena.h"
 
