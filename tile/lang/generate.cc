@@ -470,7 +470,12 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
   // for each group of connected functions.
   size_t knum = 0;
   auto next_kname = [&knum, kid] { return printstring("%s_%zu", kid.c_str(), knum++); };
+  time_t last_update = time(nullptr);
   for (size_t i = 0; i < prog.ops.size(); i++) {
+    if (time(nullptr) - last_update >= 2) {
+      LOG(INFO) << "Analysing Ops: " << i << " of " << prog.ops.size() << " operations complete";
+      last_update = time(nullptr);
+    }
     const Op& op = prog.ops[i];
 
     if (op.tag == Op::CONTRACTION) {
