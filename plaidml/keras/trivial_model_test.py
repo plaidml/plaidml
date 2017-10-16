@@ -17,8 +17,7 @@ def run():
 
     img_input = Input(shape=(3,))
     model = Model(img_input, img_input, name='trivial')
-    model.compile(loss='mean_squared_error',
-                  optimizer='sgd')
+    model.compile(loss='mean_squared_error', optimizer='sgd')
 
     score = model.evaluate(X_test, Y_test)
     return score

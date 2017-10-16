@@ -28,7 +28,7 @@ hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
   hal::proto::HardwareSettings* settings = result.mutable_settings();
 
   // Threads to use per work group.
-  settings->mutable_threads()->set_value(256);
+  settings->mutable_threads()->set_value(1);
 
   // Vector size.
   settings->mutable_vec_size()->set_value(

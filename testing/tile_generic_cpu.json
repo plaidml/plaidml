@@ -1,20 +1,25 @@
 {
-  "platform": {
-    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
-    "hals": [
-      {
-        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
-        "sel": {
-          "type": "CPU"
-        }
-      }
-    ],
-    "hardware_configs": [
-      {
-        "sel": {
-          "value": true
-        }
-      }
-    ]
-  }
+    "platform": {
+        "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+        "hals": [
+            {
+                "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
+                "sel": {
+                    "type": "CPU"
+                }
+            }
+        ],
+        "hardware_configs": [
+            {
+                "sel": {
+                    "value": true
+                },
+                "settings": {
+                    "threads": {
+                        "value": 1
+                    }
+                }
+            }
+        ]
+    }
 }
