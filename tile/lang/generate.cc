@@ -76,8 +76,8 @@ static KernelInfo GenerateContractionKernel(const std::string& kname, const Hard
       ki.inputs.emplace_back(input);
     }
   }
-  for (const auto& input : flat.post_op_inputs) {
-    ki.inputs.emplace_back(input);
+  for (const auto& kvp : flat.post_op_inputs) {
+    ki.inputs.emplace_back(kvp.first);
   }
   PerfStats perf = ComputeTileStats(settings, flat, tile, vars);
   ki.tot_bytes = perf.work_groups * ((perf.inner_loops * perf.mem_read) + perf.mem_write);
@@ -139,6 +139,73 @@ static std::vector<TensorShape> MakeTShapes(const Contraction& c, const Bindings
   return tshapes;
 }
 
+// Simplify a flat contraction by combining indexes if possible
+static bool SimplifyFlat(FlatContraction* flat) {
+  // Skip if we have any constraints, cuz it's tricky
+  if (flat->constraints.size() > 0) {
+    return false;
+  }
+  // This algorithm is n^3 at worst (n calls to flatten, each doing n^2 work)
+  // Hopefully n is pretty small.
+  size_t sz = flat->ranges.size();
+  for (size_t i = 0; i < sz; i++) {
+    size_t i_stride = flat->access[0].strides[i];
+    if (i_stride == 0) {
+      continue;
+    }
+    for (size_t j = 0; j < sz; j++) {
+      size_t j_stride = flat->access[0].strides[j];
+      if (j_stride == 0) {
+        continue;
+      }
+      if (i_stride != flat->ranges[j] * j_stride) {
+        continue;
+      }
+      auto is_safe = [&](const FlatTensorAccess& a) -> bool {
+        bool perfect_match = (a.strides[i] == i_stride && a.strides[j] == j_stride);
+        bool both_zeros = (a.strides[i] == 0 && a.strides[j] == 0);
+        return perfect_match || perfect_match;
+      };
+      bool all_good = true;
+      for (size_t k = 1; k < flat->access.size(); k++) {
+        if (!is_safe(flat->access[k])) {
+          all_good = false;
+          break;
+        }
+      }
+      for (const auto& kvp : flat->post_op_inputs) {
+        if (!is_safe(kvp.second)) {
+          all_good = false;
+          break;
+        }
+      }
+      if (!all_good) {
+        continue;
+      }
+      IVLOG(3, "SimplifyFlat: Combining " << flat->names[i] << " and " << flat->names[j]);
+      IVLOG(3, "Pre=\n" << to_string(*flat));
+      // Found a valid indexes to combine!
+      flat->names[j] = flat->names[i] + "_" + flat->names[j];
+      flat->names.erase(flat->names.begin() + i);
+      flat->ranges[j] *= flat->ranges[i];
+      flat->ranges.erase(flat->ranges.begin() + i);
+      auto fixup = [&](FlatTensorAccess& a) { a.strides.erase(a.strides.begin() + i); };
+      for (size_t k = 0; k < flat->access.size(); k++) {
+        fixup(flat->access[k]);
+      }
+      for (auto& kvp : flat->post_op_inputs) {
+        fixup(kvp.second);
+      }
+      IVLOG(3, "Out=\n" << to_string(*flat));
+      // We bail and let the outer caller rerun the main loop
+      // This is mostly because the indexes we are iterating over changed
+      // and thinking is hard.
+      return true;
+    }
+  }
+  return false;
+}
+
 static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction flat,  // NOLINT(runtime/references)
                             const std::string& kname, const HardwareSettings& settings, const Bindings& vars,
                             size_t tile_trials) {
@@ -159,6 +226,9 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
       }
       first = false;
     }
+  }
+  // Flatten out needless dimensions
+  while (SimplifyFlat(&flat)) {
   }
   // Do memory based tile optimization
   if (settings.vec_size > 1) {
@@ -190,7 +260,7 @@ static bool DifferentDims(const Binding& a, const Binding& b) {
 
 static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed, const Program& prog,
                           std::size_t opidx, const UseDef& ud, const Bindings& vars, const ShapeMap& inputs,
-                          const ShapeMap& outputs) {
+                          const ShapeMap& outputs, const std::vector<Polynomial>& out_poly) {
   // Unify the contraction with downstream elementwise operations.
   //
   // Here's the idea: during the contraction's output phase, we
@@ -250,6 +320,7 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
     }
   }
 
+  IVLOG(3, "In unification, out polys = " << out_poly);
   IVLOG(4, "Looking for ops to unify with op " << op);
 
   while (ops_to_check.size()) {
@@ -298,7 +369,8 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
         // It's not clear that this is always a good idea,
         // since it prevents the earlier operation and the
         // current operation from running in parallel.
-        if (ud.op_defs().at(input) <= opidx) {
+        size_t src_num = ud.op_defs().at(input);
+        if (src_num <= opidx || computed->count(src_num)) {
           check_op_added_inputs.push_back(input);
           continue;
         }
@@ -352,9 +424,27 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
     }
   }
 
+  // Copy over post contraction inputs and compute strides
   computed->insert(unified_opidxs.begin(), unified_opidxs.end());
-  flat->post_op_inputs.insert(flat->post_op_inputs.end(), post_contraction_inputs.begin(),
-                              post_contraction_inputs.end());
+  const TensorShape& out_shape = vars.at(flat->output).shape;
+  for (const auto& name : post_contraction_inputs) {
+    const TensorShape& shape = vars.at(name).shape;
+    FlatTensorAccess a;
+    a.global_index_limit = shape.buffer_size();
+    Polynomial p;
+    size_t off = out_poly.size() - shape.dims.size();
+    for (size_t i = 0; i < shape.dims.size(); i++, off++) {
+      // We add things if they are not broadcast, we treat 1, 1 as non broadcast in this case
+      if (shape.dims[i].size != 1 || out_shape.dims[off].size == 1) {
+        p += out_poly[off] * shape.dims[i].stride;
+      }
+    }
+    for (const auto& idx : flat->names) {
+      a.strides.push_back(static_cast<int64_t>(Floor(p[idx])));
+    }
+    IVLOG(3, "For shape: " << shape << " poly = " << p << " strides = " << a.strides);
+    flat->post_op_inputs.emplace(name, a);
+  }
 }
 
 static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, const ShapeMap& outputs,
@@ -386,7 +476,8 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
     if (op.tag == Op::CONTRACTION) {
       IVLOG(3, "Running contraction " << op << " vars = " << vars);
       std::vector<TensorShape> tshapes = MakeTShapes(op.c, vars);
-      FlatContraction flat = Compile(op.c, tshapes);
+      std::vector<Polynomial> out_poly;
+      FlatContraction flat = Compile(op.c, tshapes, &out_poly);
       flat.output = op.output;
 
       auto kname = next_kname();
@@ -396,7 +487,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
         r.kernels.push_back(GenZero(tshapes[0], op.output, "zero_" + kname));
         flat.kernel_outputs.push_back(op.output);
       } else {
-        DoUnification(&flat, &computed, prog, i, ud, vars, inputs, outputs);
+        DoUnification(&flat, &computed, prog, i, ud, vars, inputs, outputs, out_poly);
       }
       ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials);
       continue;
@@ -460,6 +551,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
     // contraction itself later.
 
     FlatContraction flat;
+    std::vector<Polynomial> out_poly;
     {
       // The initial elementwise operation's output is used to
       // determine the shape of the overall kernel -- which is
@@ -474,7 +566,9 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       flat.output = access_op.output;
       const TensorShape& shape = vars.at(access_op.output).shape;
       for (std::size_t idx = 0; idx < shape.dims.size(); ++idx) {
-        flat.names.push_back(std::string("i") + std::to_string(idx + 1));
+        std::string idx_name = std::string("i") + std::to_string(idx + 1);
+        flat.names.push_back(idx_name);
+        out_poly.push_back(Polynomial(idx_name));
         flat.ranges.push_back(shape.dims[idx].size);
       }
 
@@ -489,7 +583,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       flat.access.emplace_back(std::move(access));
     }
 
-    DoUnification(&flat, &computed, prog, i, ud, vars, inputs, outputs);
+    DoUnification(&flat, &computed, prog, i, ud, vars, inputs, outputs, out_poly);
 
     ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials);
   }

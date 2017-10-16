@@ -20,7 +20,7 @@ namespace local_machine {
 
 class Program final : public tile::Program {
  public:
-  enum class KernelParamType { kInput, kOutput, kTmpInput, kTmpOutput };
+  enum class KernelParamType { kInput, kOutput, kTmpInput, kTmpOutput, kSynthetic };
 
   struct KernelParam {
     KernelParam(KernelParamType _ty, std::string _name, std::size_t _tidx = 0) : ty{_ty}, name{_name}, tidx{_tidx} {}
@@ -75,6 +75,12 @@ class Program final : public tile::Program {
   // the implementation needs to allocate a new HAL buffer for the
   // output memory and remap the output buffer to that HAL buffer.)
   std::vector<TmpInfo> AllocTemporaries(const tile::proto::Program& program, const lang::ShapeMap& shape_map);
+
+  // Adds synthetic dependencies between all kernels.  This is useful
+  // when the underlying device queue is synchronous, as it maximizes
+  // device memory reuse and removes explicit inter-kernel
+  // synchronization (which has some overhead).
+  void AddInterKernelDeps(size_t max_in_flight);
 
   // Schedules the temporary buffers used by the program: i.e. which
   // allocations need to be made in order to run the program, the size

@@ -46,8 +46,8 @@ struct FlatContraction {
   std::string comments;
   std::string output;  // The contraction output -- not necessarily written.
   std::vector<Op> post_ops;
-  std::vector<std::string> post_op_inputs;  // Additional inputs for the post_ops
-  std::vector<std::string> kernel_outputs;  // Outputs written by the kernel.
+  std::map<std::string, FlatTensorAccess> post_op_inputs;  // Additional inputs for the post_ops
+  std::vector<std::string> kernel_outputs;                 // Outputs written by the kernel.
 
   std::string toString() const;
 };

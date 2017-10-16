@@ -110,9 +110,9 @@ PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction
       r.shared_mem += mi.localSize() * a.elem_size();
     }
   }
-  for (const auto& input : op.post_op_inputs) {
+  for (const auto& kvp : op.post_op_inputs) {
     // We read the post-op inputs during the output phase.
-    r.mem_read += pout.outputs() * byte_width(vars.at(input).shape.type);
+    r.mem_read += pout.outputs() * byte_width(vars.at(kvp.first).shape.type);
   }
 
   uint64_t out_tiles = 1;

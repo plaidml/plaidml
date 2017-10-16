@@ -161,6 +161,9 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   }
   LoadKernels(activity.ctx(), std::move(kernel_list.kernels));
   auto tmps = AllocTemporaries(program, kernel_list.types);
+
+  AddInterKernelDeps(16);
+
   ScheduleTemporaries(std::move(tmps));
   LogTemporaries(&cinfo);
   ValidateTemporaries();
@@ -214,7 +217,7 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
 
   for (std::size_t kidx_current = 0; kidx_current < kernels_.size(); ++kidx_current) {
     BoundKernel& bk = kernels_[kidx_current];
-    IVLOG(4, "Setting up parameters for kernel " << kidx_current << ": " << to_string(bk.info));
+    IVLOG(4, "Setting up parameters for kidx=" << kidx_current << ": " << to_string(bk.info));
 
     // Set up output parameters (N.B. outputs come before inputs).
     for (auto bname : bk.info.outputs) {
@@ -257,6 +260,18 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
   return tmps;
 }
 
+void Program::AddInterKernelDeps(size_t max_in_flight) {
+  IVLOG(4, "Adding synthetic dependencies between all kernels");
+  for (std::size_t kidx = max_in_flight; kidx < kernels_.size(); ++kidx) {
+    for (const auto& param : kernels_[kidx - max_in_flight].params) {
+      if (param.ty == KernelParamType::kTmpOutput) {
+        kernels_[kidx].params.push_back(KernelParam{KernelParamType::kSynthetic, "<synthetic>", param.tidx});
+        break;
+      }
+    }
+  }
+}
+
 void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
   // Assumptions:
   //   * The kernel issue ordering is fixed
@@ -281,7 +296,8 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
   for (std::size_t kidx = 0; kidx < kernels_.size(); ++kidx) {
     auto dest = std::inserter(kernel_deps[kidx], kernel_deps[kidx].end());
     for (const auto& param : kernels_[kidx].params) {
-      if (param.ty != KernelParamType::kTmpInput && param.ty != KernelParamType::kTmpOutput) {
+      if (param.ty != KernelParamType::kTmpInput && param.ty != KernelParamType::kTmpOutput &&
+          param.ty != KernelParamType::kSynthetic) {
         continue;
       }
       tmp_accessors[param.tidx].insert(kidx);
@@ -473,7 +489,8 @@ void Program::ValidateTemporaries() {
       IVLOG(4, "    Considering kidx=" << kidx_current);
       const auto& bk = kernels_[kidx_current];
       for (const auto& param : bk.params) {
-        if (param.ty == KernelParamType::kTmpInput || param.ty == KernelParamType::kTmpOutput) {
+        if (param.ty == KernelParamType::kTmpInput || param.ty == KernelParamType::kTmpOutput ||
+            param.ty == KernelParamType::kSynthetic) {
           IVLOG(4, "      Considering param tidx=" << param.tidx);
           tidx_to_accessor_kidxs[param.tidx].insert(kidx_current);
 
@@ -647,6 +664,9 @@ void RunRequest::Log() {
           case Program::KernelParamType::kTmpOutput:
             VLOG(4) << " -> " << param.name << " tidx=" << param.tidx;
             break;
+          case Program::KernelParamType::kSynthetic:
+            VLOG(4) << " ** " << param.name << " tidx=" << param.tidx;
+            break;
         }
       }
     }
@@ -751,6 +771,11 @@ void RunRequest::LaunchKernels(const context::Context& ctx) {
               IVLOG(2, "    Adding tmp output dep");
               deps.emplace_back(tmp_events[param.tidx]);
             }
+            break;
+
+          case Program::KernelParamType::kSynthetic:
+            IVLOG(2, "  Synthetic tidx=" << param.tidx);
+            deps.emplace_back(tmp_events[param.tidx]);
             break;
         }
       }

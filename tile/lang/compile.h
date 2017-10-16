@@ -13,7 +13,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& shapes);
+FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& shapes,
+                        std::vector<Polynomial>* out_poly = nullptr);
 
 }  // namespace lang
 }  // namespace tile
