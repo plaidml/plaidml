@@ -126,7 +126,10 @@ plaidml_cc_library(
         "matrix.h",
         "polynomial.h",
     ],
-    copts = ["-Wno-error"],
+    copts = select({
+        "//bzl:x64_windows": [],
+        "//conditions:default": ["-Wno-error"],
+    }),
     visibility = ["//tile/lang/bilp:__pkg__"],
     deps = [
         "//base/util:util_cc",
