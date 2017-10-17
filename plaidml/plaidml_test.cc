@@ -13,6 +13,7 @@
 using ::testing::Eq;
 using ::testing::IsNull;
 using ::testing::Ne;
+using ::testing::Gt;
 using ::testing::NotNull;
 using ::testing::StrEq;
 
@@ -21,6 +22,11 @@ extern "C" void vai_internal_set_vlog(size_t);
 namespace {
 
 namespace plaidml = vertexai::plaidml;
+
+TEST(PlaidML_C_API, VersionDefined) {
+  EXPECT_THAT(plaidml_get_version(), NotNull());
+  EXPECT_THAT(strlen(plaidml_get_version()), Gt(4));
+}
 
 TEST(PlaidML_C_API, BroadcastFailure) {
   vai_clear_status();

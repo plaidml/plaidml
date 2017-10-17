@@ -13,6 +13,7 @@ load(
     "plaidml_py_library",
     "plaidml_py_test",
     "plaidml_py_wheel",
+    "plaidml_cc_version",
 )
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
 
@@ -22,9 +23,17 @@ plaidml_proto_library(
     visibility = ["//visibility:public"],
 )
 
+plaidml_cc_version(
+    name = "version",
+    prefix = "PLAIDML",
+)
+
 plaidml_cc_library(
     name = "api",
-    srcs = ["plaidml.cc"],
+    srcs = [
+        "plaidml.cc",
+        ":version",
+    ],
     hdrs = [
         "plaidml.h",
         "plaidml++.h",

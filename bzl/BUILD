@@ -5,7 +5,10 @@ filegroup(
     srcs = [],
 )
 
-exports_files(["setup.tpl.py"])
+exports_files([
+    "setup.tpl.py",
+    "version.cc.tpl",
+])
 
 cc_toolchain_suite(
     name = "toolchain",

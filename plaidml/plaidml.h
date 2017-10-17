@@ -40,6 +40,9 @@ typedef enum {
   PLAIDML_DEVICE_DESCRIPTION = 2,
 } plaidml_device_property;
 
+// Returns the version of plaidml
+PLAIDML_API const char* plaidml_get_version();
+
 // Queries the supplied device configuration property.
 //
 // The supplied output buffer pointer should point to a property-specific value

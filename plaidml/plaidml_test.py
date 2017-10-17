@@ -10,6 +10,12 @@ import unittest
 
 class TestPlaidML(unittest.TestCase):
 
+    def testVersion(self):
+        # From https://www.python.org/dev/peps/pep-0440/
+        self.assertRegexpMatches(
+            plaidml.__version__, 
+            r'^([1-9]\d*!)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)(0|[1-9]\d*))?(\.post(0|[1-9]\d*))?(\.dev(0|[1-9]\d*))?$')
+
     def testDeviceEnumerator(self):
         ctx = plaidml.Context()
         for conf in plaidml.devices(ctx, testing.plaidml_config.config()):

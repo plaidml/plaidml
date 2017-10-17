@@ -20,6 +20,7 @@ import plaidml.context
 import plaidml.exceptions
 import plaidml.library
 import platform
+import sys
 import threading
 import traceback
 import weakref
@@ -119,6 +120,10 @@ class _Library(plaidml.library.Library):
         lib = ctypes.cdll.LoadLibrary(libpath)
 
         super(_Library, self).__init__(lib, logger=logger)
+
+        # PLAIDML_API const char* plaidml_get_version();
+        self.plaidml_get_version = lib.plaidml_get_version
+        self.plaidml_get_version.restype = ctypes.c_char_p
 
         # PLAIDML_API bool plaidml_query_devconf(
         #   vai_ctx* ctx,
@@ -1241,3 +1246,22 @@ def gradients(loss, variables):
 
 def run(ctx, f, inputs={}, outputs={}):
     Invoker(ctx, f, inputs, outputs).invoke()
+
+@property
+def __version__(self):
+    return _lib().plaidml_get_version()
+
+class Module(object):
+    pass
+
+module = Module()
+module.__dict__ = globals()
+
+for k, v in list(module.__dict__.items()):
+    if isinstance(v, property):
+        setattr(Module, k, v)
+        del module.__dict__[k]
+
+module._module = sys.modules[module.__name__]
+module._pmodule = module
+sys.modules[module.__name__] = module

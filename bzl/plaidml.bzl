@@ -484,3 +484,26 @@ plaidml_py_wheel = rule(
     },
     implementation = _plaidml_py_wheel_impl,
 )
+
+def _plaidml_version_impl(ctx):
+  ctx.actions.expand_template(
+    template=ctx.file._version_cc_tpl,
+    output=ctx.outputs.version_file,
+    substitutions={
+      "{PREFIX}": ctx.attr.prefix,
+      "{VERSION}": ctx.var.get('version', default='unknown'),
+    })
+
+plaidml_cc_version = rule(
+  attrs = {
+    "prefix": attr.string(mandatory = True),
+    "_version_cc_tpl": attr.label(
+        default = Label("//bzl:version.cc.tpl"), 
+        allow_files = True, 
+        single_file = True
+    )
+  },
+  outputs = {"version_file": "_version.cc"},
+  implementation = _plaidml_version_impl,
+  output_to_genfiles = True
+)

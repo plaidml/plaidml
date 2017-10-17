@@ -100,6 +100,9 @@ void FillPropString(const std::string& str, void* output_buffer, size_t output_b
 
 }  // namespace
 
+extern const char* PLAIDML_VERSION;
+extern "C" const char* plaidml_get_version() { return PLAIDML_VERSION; }
+
 extern "C" bool plaidml_query_devconf(vai_ctx* ctx, plaidml_devconf* devconf, plaidml_device_property property,
                                       void* output_buffer, size_t output_buffer_size,
                                       size_t* output_buffer_size_required) {
