@@ -1,5 +1,5 @@
 # Copyright 2017, Vertex.AI.
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
     name = "config",

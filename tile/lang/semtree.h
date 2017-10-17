@@ -1,5 +1,3 @@
-
-
 #pragma once
 
 // Semantic tree representing Tile operations: an intermediate representation
@@ -19,7 +17,7 @@ namespace sem {
 
 // Simple typing.  Every type is either a TILE value type, a TILE pointer type, or an index
 // TILE value types consist of the underlying type and a vector width
-struct Type {
+struct Type : public el::Loggable {
   enum BaseType { TVOID, INDEX, VALUE, POINTER_MUT, POINTER_CONST };
   enum MemoryRegion { NORMAL, LOCAL, GLOBAL };
 
@@ -27,12 +25,18 @@ struct Type {
        uint64_t array_in = 0, MemoryRegion region_in = NORMAL)
       : base{base_in}, dtype{dtype_in}, vec_width{vec_width_in}, array{array_in}, region{region_in} {}
 
+  void log(el::base::type::ostream_t &os) const final;  // NOLINT(runtime/references)
+
   BaseType base;
   lang::DataType dtype;
   uint64_t vec_width;  // 1 is non-vector
   uint64_t array;      // 0 is non-array, otherwise, array size
   MemoryRegion region;
 };
+
+std::string to_string(const Type &ty);
+
+inline std::ostream &operator<<(::std::ostream &os, const Type &ty) { return os << to_string(ty); }
 
 class Visitor;
 

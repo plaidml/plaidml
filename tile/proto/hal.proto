@@ -5,7 +5,6 @@ syntax = "proto3";
 package vertexai.tile.hal.proto;
 
 import "google/protobuf/any.proto";
-import "google/protobuf/wrappers.proto";
 import "tile/proto/tile.proto";
 import "tile/lang/lang.proto";
 
@@ -42,15 +41,14 @@ message HardwareSelectorList {
 }
 
 message HardwareSettings {
-  google.protobuf.UInt32Value threads = 1;
-  google.protobuf.UInt32Value vec_size = 2;
-  google.protobuf.BoolValue use_global = 3;
-  google.protobuf.UInt64Value mem_width = 4;
-  google.protobuf.UInt64Value max_mem = 5;
-  google.protobuf.UInt64Value max_regs = 6;
-  google.protobuf.UInt64Value goal_groups = 7;
-  google.protobuf.UInt64Value goal_flops_per_byte = 8;
-  google.protobuf.BoolValue enable_half = 9;
+  uint32 threads = 1;
+  uint32 vec_size = 2;
+  bool use_global = 3;
+  uint64 mem_width = 4;
+  uint64 max_mem = 5;
+  uint64 max_regs = 6;
+  uint64 goal_groups = 7;
+  uint64 goal_flops_per_byte = 8;
   repeated uint64 dim_sizes = 10;
 }
 

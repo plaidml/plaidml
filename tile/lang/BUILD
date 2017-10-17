@@ -48,6 +48,7 @@ plaidml_cc_library(
         "reduce.h",
         "replace.cc",
         "replace.h",
+        "scope.h",
         "semprinter.cc",
         "semtree.cc",
         "sym_poly.cc",

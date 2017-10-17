@@ -42,7 +42,6 @@ struct HardwareSettings : public DirectSettings {
   uint64_t goal_groups;                           // How many workgroups till we hit full occupancy
   uint64_t goal_flops_per_byte;                   // Where do we hit the ceiling on flops/byte
   std::vector<std::size_t> goal_dimension_sizes;  // How big to make each dimension in a work group
-  bool enable_half;                               // Enables half precision
 };
 
 typedef std::array<size_t, 3> GridSize;

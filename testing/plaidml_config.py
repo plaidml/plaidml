@@ -28,12 +28,11 @@ def very_large_values_config():
           "value": "true"
         },
         "settings": {
-          "max_mem": {"value": 1000000},
-          "max_regs": {"value": 1000000},
-          "mem_width": {"value": 1000000},
-          "threads": {"value": 1000000},
-          "vec_size": {"value": 1000000},
-          "enable_half": {"value": "false"}
+          "max_mem": 1000000,
+          "max_regs": 1000000,
+          "mem_width": 1000000,
+          "threads": 1000000,
+          "vec_size": 1000000
         }
       }
     ]

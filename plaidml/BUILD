@@ -104,7 +104,22 @@ plaidml_cc_test(
     srcs = ["plaidml_test.cc"],
     deps = [
         ":api",
+        "//testing:matchers",
         "//testing:plaidml_config",
+    ],
+)
+
+plaidml_cc_test(
+    name = "dtype_vec_test",
+    srcs = ["dtype_vec_test.cc"],
+    deps = [
+        ":api",
+        "//external:half",
+        "//plaidml:proto_cc",
+        "//testing:matchers",
+        "//testing:plaidml_config",
+        "//tile/hal/opencl:proto_cc",
+        "//tile/platform/local_machine:proto_cc",
     ],
 )
 
@@ -123,6 +138,7 @@ plaidml_cc_test(
     srcs = ["uint8_test.cc"],
     deps = [
         ":api",
+        "//testing:matchers",
         "//testing:plaidml_config",
     ],
 )

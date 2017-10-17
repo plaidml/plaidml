@@ -28,32 +28,32 @@ hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
   hal::proto::HardwareSettings* settings = result.mutable_settings();
 
   // Threads to use per work group.
-  settings->mutable_threads()->set_value(1);
+  settings->set_threads(1);
 
   // Vector size.
-  settings->mutable_vec_size()->set_value(
-      1);  // TODO(T404) re-enable when possible - info.preferred_vector_width_float())
+  // TODO(T404) re-enable when possible - info.preferred_vector_width_float())
+  settings->set_vec_size(1);
 
-  settings->mutable_use_global()->set_value(false);  // Use shared memory on most platforms.
+  settings->set_use_global(false);  // Use shared memory on most platforms.
 
 // Memory width
 #ifdef __APPLE__
-  settings->mutable_mem_width()->set_value(32);
+  settings->set_mem_width(32);
 #else
-  settings->mutable_mem_width()->set_value(info.global_mem_cacheline_size());
+  settings->set_mem_width(info.global_mem_cacheline_size());
 #endif
 
   // Maximum local memory
-  settings->mutable_max_mem()->set_value(info.local_mem_size());
+  settings->set_max_mem(info.local_mem_size());
 
   // Maximum register size
-  settings->mutable_max_regs()->set_value(16 * 1024);
+  settings->set_max_regs(16 * 1024);
 
   // Minimum number of work groups to get full utilization, 4 * CU's is an estimate
-  settings->mutable_goal_groups()->set_value(info.max_compute_units() * 4);
+  settings->set_goal_groups(info.max_compute_units() * 4);
 
   // Minimum roof, this is a total guess
-  settings->mutable_goal_flops_per_byte()->set_value(50);
+  settings->set_goal_flops_per_byte(50);
 
   // Workgroup dimension sizes
   for (auto size : info.work_item_dimension_size()) {

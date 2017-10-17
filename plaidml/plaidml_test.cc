@@ -3,19 +3,17 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "base/util/logging.h"
 #include "plaidml/base/base.h"
 #include "plaidml/base/context.h"
 #include "plaidml/plaidml++.h"
 #include "plaidml/plaidml.h"
+#include "testing/matchers.h"
 #include "testing/plaidml_config.h"
 
-using ::testing::Eq;
-using ::testing::IsNull;
-using ::testing::Ne;
 using ::testing::Gt;
+using ::testing::IsVaiStatus;
+using ::testing::Not;
 using ::testing::NotNull;
-using ::testing::StrEq;
 
 extern "C" void vai_internal_set_vlog(size_t);
 
@@ -32,23 +30,23 @@ TEST(PlaidML_C_API, BroadcastFailure) {
   vai_clear_status();
 
   std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }", nullptr)};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
   std::unique_ptr<plaidml_device_enumerator> dev_enum{
       plaidml_alloc_device_enumerator_with_config(ctx.get(), vertexai::testing::PlaidMLConfig(), nullptr, nullptr)};
   std::unique_ptr<plaidml_device> dev{
       plaidml_open_device(ctx.get(), plaidml_get_devconf(ctx.get(), dev_enum.get(), 0))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> a_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 2 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> b_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 9 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> c_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 18 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_shape> a_shape{plaidml_alloc_shape(ctx.get(), PLAIDML_DATA_FLOAT32)};
   plaidml_add_dimension(ctx.get(), a_shape.get(), 1, 0);
@@ -74,34 +72,34 @@ TEST(PlaidML_C_API, BroadcastFailure) {
   plaidml_set_invoker_output(invoker.get(), "C", c.get());
   std::unique_ptr<plaidml_invocation> invocation{plaidml_schedule_invocation(ctx.get(), invoker.get())};
 
-  EXPECT_THAT(vai_last_status(), Ne(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), Not(IsVaiStatus(VAI_STATUS_OK)));
 }
 
 TEST(PlaidML_C_API, BroadcastOne) {
   vai_clear_status();
 
   std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }", nullptr)};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
   std::unique_ptr<plaidml_device_enumerator> dev_enum{
       plaidml_alloc_device_enumerator_with_config(ctx.get(), vertexai::testing::PlaidMLConfig(), nullptr, nullptr)};
   std::unique_ptr<plaidml_device> dev{
       plaidml_open_device(ctx.get(), plaidml_get_devconf(ctx.get(), dev_enum.get(), 0))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> a_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 3 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> b_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 9 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> c_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 9 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   {
     std::unique_ptr<plaidml_mapping> a_map{plaidml_map_buffer_discard(ctx.get(), a_buf.get())};
-    EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+    EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
     float* base = reinterpret_cast<float*>(plaidml_get_mapping_base(ctx.get(), a_map.get()));
     ASSERT_THAT(base, NotNull());
 
@@ -114,7 +112,7 @@ TEST(PlaidML_C_API, BroadcastOne) {
 
   {
     std::unique_ptr<plaidml_mapping> b_map{plaidml_map_buffer_discard(ctx.get(), b_buf.get())};
-    EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+    EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
     float* base = reinterpret_cast<float*>(plaidml_get_mapping_base(ctx.get(), b_map.get()));
     ASSERT_THAT(base, NotNull());
 
@@ -153,11 +151,11 @@ TEST(PlaidML_C_API, BroadcastOne) {
   plaidml_set_invoker_output(invoker.get(), "C", c.get());
   std::unique_ptr<plaidml_invocation> invocation{plaidml_schedule_invocation(ctx.get(), invoker.get())};
 
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   {
     std::unique_ptr<plaidml_mapping> c_map{plaidml_map_buffer_current(c_buf.get(), nullptr, nullptr)};
-    EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+    EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
     float* base = reinterpret_cast<float*>(plaidml_get_mapping_base(ctx.get(), c_map.get()));
     ASSERT_THAT(base, NotNull());
 
@@ -177,27 +175,27 @@ TEST(PlaidML_C_API, BroadcastBoth) {
   vai_clear_status();
 
   std::unique_ptr<plaidml_function> add{plaidml_build_coded_function("function (A, B) -> (C) { C = A + B; }", nullptr)};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
   std::unique_ptr<plaidml_device_enumerator> dev_enum{
       plaidml_alloc_device_enumerator_with_config(ctx.get(), vertexai::testing::PlaidMLConfig(), nullptr, nullptr)};
   std::unique_ptr<plaidml_device> dev{
       plaidml_open_device(ctx.get(), plaidml_get_devconf(ctx.get(), dev_enum.get(), 0))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> a_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 2 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> b_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 9 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> c_buf{plaidml_alloc_buffer(ctx.get(), dev.get(), 18 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   {
     std::unique_ptr<plaidml_mapping> a_map{plaidml_map_buffer_discard(ctx.get(), a_buf.get())};
-    EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+    EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
     float* base = reinterpret_cast<float*>(plaidml_get_mapping_base(ctx.get(), a_map.get()));
     ASSERT_THAT(base, NotNull());
 
@@ -209,7 +207,7 @@ TEST(PlaidML_C_API, BroadcastBoth) {
 
   {
     std::unique_ptr<plaidml_mapping> b_map{plaidml_map_buffer_discard(ctx.get(), b_buf.get())};
-    EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+    EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
     float* base = reinterpret_cast<float*>(plaidml_get_mapping_base(ctx.get(), b_map.get()));
     ASSERT_THAT(base, NotNull());
 
@@ -250,11 +248,11 @@ TEST(PlaidML_C_API, BroadcastBoth) {
   plaidml_set_invoker_output(invoker.get(), "C", c.get());
   std::unique_ptr<plaidml_invocation> invocation{plaidml_schedule_invocation(ctx.get(), invoker.get())};
 
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   {
     std::unique_ptr<plaidml_mapping> c_map{plaidml_map_buffer_current(c_buf.get(), nullptr, nullptr)};
-    EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+    EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
     float* base = reinterpret_cast<float*>(plaidml_get_mapping_base(ctx.get(), c_map.get()));
     ASSERT_THAT(base, NotNull());
 
@@ -284,24 +282,24 @@ TEST(PlaidML_C_API, MatMul) {
 
   std::unique_ptr<plaidml_function> matmul{
       plaidml_build_coded_function("function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }", nullptr)};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
   std::unique_ptr<plaidml_device_enumerator> dev_enum{
       plaidml_alloc_device_enumerator_with_config(ctx.get(), vertexai::testing::PlaidMLConfig(), nullptr, nullptr)};
   std::unique_ptr<plaidml_device> dev{
       plaidml_open_device(ctx.get(), plaidml_get_devconf(ctx.get(), dev_enum.get(), 0))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> inbuf{plaidml_alloc_buffer(ctx.get(), dev.get(), 9 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   std::unique_ptr<plaidml_buffer> outbuf{plaidml_alloc_buffer(ctx.get(), dev.get(), 9 * sizeof(float))};
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   {
     std::unique_ptr<plaidml_mapping> inmap{plaidml_map_buffer_discard(ctx.get(), inbuf.get())};
-    EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+    EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
     float* base = reinterpret_cast<float*>(plaidml_get_mapping_base(ctx.get(), inmap.get()));
     ASSERT_THAT(base, NotNull());
 
@@ -332,11 +330,11 @@ TEST(PlaidML_C_API, MatMul) {
   plaidml_set_invoker_output(invoker.get(), "A", a.get());
   std::unique_ptr<plaidml_invocation> invocation{plaidml_schedule_invocation(ctx.get(), invoker.get())};
 
-  EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+  EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
   {
     std::unique_ptr<plaidml_mapping> outmap{plaidml_map_buffer_current(outbuf.get(), nullptr, nullptr)};
-    EXPECT_THAT(vai_last_status(), Eq(VAI_STATUS_OK));
+    EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
     float* base = reinterpret_cast<float*>(plaidml_get_mapping_base(ctx.get(), outmap.get()));
     ASSERT_THAT(base, NotNull());
 

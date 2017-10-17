@@ -89,17 +89,15 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
           }
           LOG(INFO) << "Initializing device " << id << ": \"" << info.name() << "\", vendor \"" << info.vendor()
                     << "\"";
-          LOG(INFO) << "  " << id << " Threads:" << settings.threads().value();
-          LOG(INFO) << "  " << id << " Vector size:" << settings.vec_size().value();
-          LOG(INFO) << "  " << id << " Memory width:" << settings.mem_width().value();
-          LOG(INFO) << "  " << id << " Memory Max:" << settings.max_mem().value();
-          LOG(INFO) << "  " << id << " Register Max:" << settings.max_regs().value();
-          LOG(INFO) << "  " << id << " Goal Groups:" << settings.goal_groups().value();
-          LOG(INFO) << "  " << id << " Goal Flops/byte:" << settings.goal_flops_per_byte().value();
+          LOG(INFO) << "  " << id << " Threads:" << settings.threads();
+          LOG(INFO) << "  " << id << " Vector size:" << settings.vec_size();
+          LOG(INFO) << "  " << id << " Memory width:" << settings.mem_width();
+          LOG(INFO) << "  " << id << " Memory Max:" << settings.max_mem();
+          LOG(INFO) << "  " << id << " Register Max:" << settings.max_regs();
+          LOG(INFO) << "  " << id << " Goal Groups:" << settings.goal_groups();
+          LOG(INFO) << "  " << id << " Goal Flops/byte:" << settings.goal_flops_per_byte();
           LOG(INFO) << "  " << id
-                    << (settings.use_global().value() ? " Running from system memory" : " Running from device memory");
-          LOG(INFO) << "  " << id
-                    << (settings.enable_half().value() ? " Using half-width floats" : " Using full-width floats");
+                    << (settings.use_global() ? " Running from system memory" : " Running from device memory");
           GetMemStrategy(devinfo, &pd);
           devs_[id] = std::move(pd);
         }

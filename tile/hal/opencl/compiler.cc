@@ -131,7 +131,8 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
 
   context::Activity activity{ctx, "tile::hal::opencl::Build"};
 
-  if (settings.enable_half().value()) {
+  bool cl_khr_fp16 = device_state_->HasDeviceExtension("cl_khr_fp16");
+  if (cl_khr_fp16) {
     code << "#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n";
   }
 
@@ -143,7 +144,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     }
 
     code << ki.comments;
-    Emit ocl;
+    Emit ocl{cl_khr_fp16};
     ocl.Visit(*ki.kfunc);
     code << ocl.str();
     code << "\n\n";

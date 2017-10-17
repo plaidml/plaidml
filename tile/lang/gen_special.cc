@@ -73,7 +73,7 @@ static void GenGather(KernelList& r, const Op& op, const Bindings& bindings,  //
   }
 
   // Generate the data offset
-  sem::ExprPtr data_offset = _("clamp")(_("idx")[idx_offset], _Const(0), _Const(data_shape.dims[0].size));
+  sem::ExprPtr data_offset = _Clamp(_("idx")[idx_offset], _Const(0), _Const(data_shape.dims[0].size));
   data_offset = data_offset * data_shape.dims[0].stride;
   for (size_t i = 1; i < data_shape.dims.size(); i++) {
     data_offset = data_offset + lid_vars[idx_shape.dims.size() + i] * data_shape.dims[i].stride;

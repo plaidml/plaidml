@@ -15,9 +15,7 @@
                     "value": true
                 },
                 "settings": {
-                    "threads": {
-                        "value": 1
-                    }
+                    "threads": 1
                 }
             }
         ]

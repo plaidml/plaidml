@@ -50,6 +50,10 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
         }
       }
       valid = false;
+      break;
+    }
+    if (!valid) {
+      break;
     }
   }
   // Nope?  Forget it
