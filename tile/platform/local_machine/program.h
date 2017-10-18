@@ -4,6 +4,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -20,7 +21,7 @@ namespace local_machine {
 
 class Program final : public tile::Program {
  public:
-  enum class KernelParamType { kInput, kOutput, kTmpInput, kTmpOutput, kSynthetic };
+  enum class KernelParamType { kInput, kOutput, kTmpInput, kTmpOutput };
 
   struct KernelParam {
     KernelParam(KernelParamType _ty, std::string _name, std::size_t _tidx = 0) : ty{_ty}, name{_name}, tidx{_tidx} {}
@@ -33,6 +34,7 @@ class Program final : public tile::Program {
   struct BoundKernel {
     std::unique_ptr<hal::Kernel> kernel;
     std::vector<KernelParam> params;
+    std::set<std::size_t> dep_kidxs;
     lang::KernelInfo info;
   };
 

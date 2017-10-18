@@ -263,12 +263,7 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
 void Program::AddInterKernelDeps(size_t max_in_flight) {
   IVLOG(4, "Adding synthetic dependencies between all kernels");
   for (std::size_t kidx = max_in_flight; kidx < kernels_.size(); ++kidx) {
-    for (const auto& param : kernels_[kidx - max_in_flight].params) {
-      if (param.ty == KernelParamType::kTmpOutput) {
-        kernels_[kidx].params.push_back(KernelParam{KernelParamType::kSynthetic, "<synthetic>", param.tidx});
-        break;
-      }
-    }
+    kernels_[kidx].dep_kidxs.insert(kidx - max_in_flight);
   }
 }
 
@@ -294,10 +289,10 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
   tmp_accessors.resize(tmps.size());
 
   for (std::size_t kidx = 0; kidx < kernels_.size(); ++kidx) {
+    auto& bk = kernels_[kidx];
     auto dest = std::inserter(kernel_deps[kidx], kernel_deps[kidx].end());
-    for (const auto& param : kernels_[kidx].params) {
-      if (param.ty != KernelParamType::kTmpInput && param.ty != KernelParamType::kTmpOutput &&
-          param.ty != KernelParamType::kSynthetic) {
+    for (const auto& param : bk.params) {
+      if (param.ty != KernelParamType::kTmpInput && param.ty != KernelParamType::kTmpOutput) {
         continue;
       }
       tmp_accessors[param.tidx].insert(kidx);
@@ -309,6 +304,7 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
       }
       std::size_t last_writer_kidx = tmps[param.tidx].last_writer_kidx;
       dest = last_writer_kidx;
+      bk.dep_kidxs.insert(last_writer_kidx);
       const auto& writer_deps = kernel_deps[last_writer_kidx];
       std::copy(writer_deps.begin(), writer_deps.end(), dest);
       if (param.ty == KernelParamType::kTmpOutput) {
@@ -456,58 +452,37 @@ void Program::ValidateTemporaries() {
   // recursively depend on every one of the earlier temporary's
   // kernels.
   //
-  // We start by scanning the kernels.  As we go, we construct three
+  // We start by scanning the kernels.  As we go, we construct two
   // vectors:
   //
   // * A mapping from each temporary to the set of kernels that access
   //   the temporary.
-  //
-  // * A mapping from each temporary to the kernel that last wrote
-  //   that temporary.
   //
   // * A mapping from each kernel to the dependencies of that kernel
   //   (aka the "known to have finished" set), which we build by
   //   knowing the temporaries that the kernel accesses, the last
   //   writer of each temporary, and the set of dependencies for each
   //   of those writers.
-  //
-  // The last-writer mapping is only used to construct the
-  // dependencies, so we discard it after the loop.
   std::vector<std::set<std::size_t>> tidx_to_accessor_kidxs(tmp_locs_.size());
   std::vector<std::set<std::size_t>> kidx_to_dep_kidxs(kernels_.size());
 
   IVLOG(4, "  Building dependency lists for placement verification");
 
   {
-    struct WriterInfo {
-      bool written = false;
-      std::size_t last_writer_kidx = 0;
-    };
-    std::vector<WriterInfo> tidx_to_last_writer(tmp_locs_.size());
-
     for (std::size_t kidx_current = 0; kidx_current < kernels_.size(); ++kidx_current) {
       IVLOG(4, "    Considering kidx=" << kidx_current);
       const auto& bk = kernels_[kidx_current];
+      for (auto dep_kidx : bk.dep_kidxs) {
+        const std::set<std::size_t>& dep_kidxs = kidx_to_dep_kidxs[dep_kidx];
+        IVLOG(4, "      Adding direct dep kidx=" << dep_kidx);
+        kidx_to_dep_kidxs[kidx_current].insert(dep_kidx);
+        IVLOG(4, "      Adding transitive deps kidx=" << dep_kidxs);
+        kidx_to_dep_kidxs[kidx_current].insert(dep_kidxs.begin(), dep_kidxs.end());
+      }
       for (const auto& param : bk.params) {
-        if (param.ty == KernelParamType::kTmpInput || param.ty == KernelParamType::kTmpOutput ||
-            param.ty == KernelParamType::kSynthetic) {
+        if (param.ty == KernelParamType::kTmpInput || param.ty == KernelParamType::kTmpOutput) {
           IVLOG(4, "      Considering param tidx=" << param.tidx);
           tidx_to_accessor_kidxs[param.tidx].insert(kidx_current);
-
-          auto& writer_info = tidx_to_last_writer[param.tidx];
-
-          if (writer_info.written) {
-            IVLOG(4, "        Param has been written; adding known deps of writer " << writer_info.last_writer_kidx);
-            const std::set<std::size_t>& dep_kidxs = kidx_to_dep_kidxs[writer_info.last_writer_kidx];
-            kidx_to_dep_kidxs[kidx_current].insert(writer_info.last_writer_kidx);
-            kidx_to_dep_kidxs[kidx_current].insert(dep_kidxs.begin(), dep_kidxs.end());
-          }
-
-          if (!writer_info.written || param.ty == KernelParamType::kTmpOutput) {
-            IVLOG(4, "        Param is written by current kidx=" << kidx_current);
-            writer_info.written = true;
-            writer_info.last_writer_kidx = kidx_current;
-          }
         }
       }
     }
@@ -664,9 +639,6 @@ void RunRequest::Log() {
           case Program::KernelParamType::kTmpOutput:
             VLOG(4) << " -> " << param.name << " tidx=" << param.tidx;
             break;
-          case Program::KernelParamType::kSynthetic:
-            VLOG(4) << " ** " << param.name << " tidx=" << param.tidx;
-            break;
         }
       }
     }
@@ -696,8 +668,8 @@ void RunRequest::AllocTemporaries(const context::Context& ctx) {
 void RunRequest::LaunchKernels(const context::Context& ctx) {
   kernel_log_info_.reserve(program_->kernels().size());
   output_ready_futures_.reserve(program_->kernels().size());
-  std::vector<std::shared_ptr<hal::Event>> tmp_events;
-  tmp_events.resize(program_->tmp_locs().size());
+  std::vector<std::shared_ptr<hal::Event>> kernel_events;
+  kernel_events.resize(program_->kernels().size());
 
   try {
     for (std::size_t kidx = 0; kidx < program_->kernels().size(); ++kidx) {
@@ -711,7 +683,11 @@ void RunRequest::LaunchKernels(const context::Context& ctx) {
       params.reserve(bk.params.size());
 
       std::vector<std::shared_ptr<hal::Event>> deps;
-      deps.reserve(bk.params.size());  // Just a guess, but usually correct.
+      deps.reserve(bk.dep_kidxs.size());
+      for (auto dep_kidx : bk.dep_kidxs) {
+        assert(dep_kidx < kidx);
+        deps.emplace_back(kernel_events[dep_kidx]);
+      }
 
       // Set up the output buffers, and add them to the kernel
       // dependencies in case some earlier kernel (like a zeroing
@@ -757,25 +733,11 @@ void RunRequest::LaunchKernels(const context::Context& ctx) {
           case Program::KernelParamType::kTmpInput:
             IVLOG(2, "  TmpInput tidx=" << param.tidx);
             params.emplace_back(tmps_[param.tidx]->hal_buffer());
-            if (tmp_events[param.tidx]) {
-              // This can happen if the input is uninitialized, which can happen if the input is actually a constant.
-              IVLOG(2, "    Adding tmp input dep");
-              deps.emplace_back(tmp_events[param.tidx]);
-            }
             break;
 
           case Program::KernelParamType::kTmpOutput:
             IVLOG(2, "  TmpOutput tidx=" << param.tidx);
             params.emplace_back(tmps_[param.tidx]->hal_buffer());
-            if (tmp_events[param.tidx]) {
-              IVLOG(2, "    Adding tmp output dep");
-              deps.emplace_back(tmp_events[param.tidx]);
-            }
-            break;
-
-          case Program::KernelParamType::kSynthetic:
-            IVLOG(2, "  Synthetic tidx=" << param.tidx);
-            deps.emplace_back(tmp_events[param.tidx]);
             break;
         }
       }
@@ -786,24 +748,18 @@ void RunRequest::LaunchKernels(const context::Context& ctx) {
 
       bool added_kernel_as_output = false;
       for (const auto& param : bk.params) {
-        switch (param.ty) {
-          case Program::KernelParamType::kOutput:
-            output_chunk_map_.at(param.name)->deps()->AddReadDependency(done);
-            if (!added_kernel_as_output) {
-              output_ready_futures_.emplace_back(
-                  done->GetFuture().then([](boost::shared_future<std::shared_ptr<hal::Result>> fut) { fut.get(); }));
-              added_kernel_as_output = true;
-            }
-            break;
-
-          case Program::KernelParamType::kTmpOutput:
-            tmp_events[param.tidx] = done;
-            break;
-
-          default:
-            break;
+        if (param.ty != Program::KernelParamType::kOutput) {
+          continue;
+        }
+        output_chunk_map_.at(param.name)->deps()->AddReadDependency(done);
+        if (!added_kernel_as_output) {
+          output_ready_futures_.emplace_back(
+              done->GetFuture().then([](boost::shared_future<std::shared_ptr<hal::Result>> fut) { fut.get(); }));
+          added_kernel_as_output = true;
         }
       }
+
+      kernel_events[kidx] = done;
     }
   } catch (...) {
     // Any error in the launch poisons all output buffers.
