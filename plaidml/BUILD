@@ -193,6 +193,8 @@ plaidml_py_library(
         "__init__.py",
         "context.py",
         "exceptions.py",
+        "plaidml_setup.py",
+        "settings.py",
         "library.py",
     ],
     data = [":configs"] + select({
@@ -200,6 +202,14 @@ plaidml_py_library(
         "//conditions:default": [":libplaidml.so"],
     }),
     visibility = ["//visibility:public"],
+)
+
+plaidml_py_test(
+    name = "settings_test",
+    srcs = ["settings_test.py"],
+    deps = [
+        ":py",
+    ],
 )
 
 plaidml_py_test(
@@ -211,6 +221,7 @@ plaidml_py_test(
         "//testing:plaidml_py",
     ],
 )
+
 
 pkg_tar(
     name = "py_deb_data",
@@ -251,5 +262,8 @@ plaidml_py_wheel(
         "//bzl:x64_windows": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
     }),
+    console_scripts = [
+       "'plaidml-setup = plaidml.plaidml_setup:main'",
+    ],
     python = "py2",
 )

@@ -435,6 +435,7 @@ def _plaidml_py_wheel_impl(ctx):
       'bzl_package_name': pkg_name,
       'bzl_version': version,
       'bzl_target_cpu': ctx.var['TARGET_CPU'],
+      '{CONSOLE_SCRIPTS}': ",\n".join(ctx.attr.console_scripts)
     }
   )
   wheel_filename = "dist/%s-%s-%s-%s-%s.whl" % (
@@ -477,6 +478,7 @@ plaidml_py_wheel = rule(
         "python": attr.string(mandatory = True),
         "abi": attr.string(default = "none"),
         "platform": attr.string(default = "any"),
+        "console_scripts": attr.string_list(),
         "_setup_py_tpl": attr.label(
             default = Label("//bzl:setup.tpl.py"),
             allow_single_file = True,

@@ -24,6 +24,7 @@ import tensorflow
 import theano
 theano.config.optimizer = "None"
 
+
 def m(*args, **kwargs):
     dtype = kwargs.get('dtype', 'float32')
     """Makes a test matrix whose dimensions are the supplied arguments."""
@@ -857,5 +858,5 @@ class TestBackendOps(unittest.TestCase):
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.nan)
     #plaidml._internal_set_vlog(4)
-    pkb.set_config(testing.plaidml_config.config())
+    testing.plaidml_config.default_config()
     unittest.main()

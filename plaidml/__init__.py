@@ -14,28 +14,23 @@ import ctypes
 import hashlib
 import logging
 import numpy as np
+import json
 import os
-import pkg_resources
 import plaidml.context
 import plaidml.exceptions
 import plaidml.library
+import plaidml.settings
 import platform
+import pkg_resources
+import requests
 import sys
 import threading
 import traceback
+import uuid
 import weakref
 
 from collections import namedtuple
 from itertools import islice
-
-if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
-    os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(
-        pkg_resources.resource_filename('plaidml', 'experimental.json'))
-
-if 'PLAIDML_DEFAULT_CONFIG' not in os.environ:
-    os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(
-        pkg_resources.resource_filename('plaidml', 'config.json'))
-
 
 # Create types for all PlaidML structures, so that we can get some type checking.
 class _C_Devconf(ctypes.Structure):
@@ -101,6 +96,9 @@ DEFAULT_LOG_HANDLER = logging.StreamHandler()
 DEFAULT_LOG_HANDLER.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
 DEFAULT_LOG_HANDLER.setLevel(logging.INFO)
 
+@property
+def __version__(self):
+    return _lib().plaidml_get_version()
 
 class _Library(plaidml.library.Library):
 
@@ -198,15 +196,39 @@ class _Library(plaidml.library.Library):
             ctypes.POINTER(_C_DeviceEnumerator)  # plaidml_device_enumerator* enumerator
         ]
 
-        # PLAIDML_API plaidml_devconf* plaidml_get_devconf(vai_ctx* ctx, plaidml_device_enumerator* enumerator, size_t index);
+        # PLAIDML_API const char* plaidml_get_enumerator_config_source(plaidml_device_enumerator* enumerator);
+        self.plaidml_get_enumerator_config_source = lib.plaidml_get_enumerator_config_source
+        self.plaidml_get_enumerator_config_source.argtypes = [
+            ctypes.POINTER(_C_DeviceEnumerator)  # plaidml_device_enumerator* enumerator
+        ]
+        self.plaidml_get_enumerator_config_source.restype = ctypes.c_char_p
+
+        # PLAIDML_API plaidml_devconf* plaidml_get_devconf(vai_ctx* ctx, plaidml_device_enumerator* enumerator);
         self.plaidml_get_devconf = lib.plaidml_get_devconf
         self.plaidml_get_devconf.argtypes = [
             ctypes.POINTER(plaidml.library._C_Context),  # vai_ctx* ctx
             ctypes.POINTER(_C_DeviceEnumerator),  # plaidml_device_enumerator* enumerator
-            ctypes.c_size_t  # size_t index
         ]
         self.plaidml_get_devconf.restype = ctypes.POINTER(_C_Devconf)
         self.plaidml_get_devconf.errcheck = self._check_err
+
+        # PLAIDML_API plaidml_devconf* plaidml_get_invalid_devconf(vai_ctx* ctx, plaidml_device_enumerator* enumerator);
+        self.plaidml_get_invalid_devconf = lib.plaidml_get_invalid_devconf
+        self.plaidml_get_invalid_devconf.argtypes = [
+            ctypes.POINTER(plaidml.library._C_Context),  # vai_ctx* ctx
+            ctypes.POINTER(_C_DeviceEnumerator),  # plaidml_device_enumerator* enumerator
+        ]
+        self.plaidml_get_invalid_devconf.restype = ctypes.POINTER(_C_Devconf)
+        self.plaidml_get_invalid_devconf.errcheck = self._check_err
+
+        # PLAIDML_API size_t plaidml_get_devconf_count(vai_ctx* ctx, plaidml_device_enumerator* enumerator, bool valid);
+        self.plaidml_get_devconf_count = lib.plaidml_get_devconf_count
+        self.plaidml_get_devconf_count.argtypes = [
+            ctypes.POINTER(plaidml.library._C_Context),  # vai_ctx* ctx
+            ctypes.POINTER(_C_DeviceEnumerator),  # plaidml_device_enumerator* enumerator
+            ctypes.c_bool, # valid devices
+        ]
+        self.plaidml_get_devconf_count.restype = ctypes.c_size_t
 
         # PLAIDML_API plaidml_buffer* plaidml_alloc_buffer(vai_ctx* ctx, plaidml_device* device, uint64_t size);
         self.plaidml_alloc_buffer = lib.plaidml_alloc_buffer
@@ -659,9 +681,10 @@ def _lib():
 
 
 # Enums
-_DEVICE_NAME = 1
-_DEVICE_DESCRIPTION = 2
-_CONFIG_ID = 3
+_DEVICE_ID = 1
+_DEVICE_CONFIG = 2
+_DEVICE_DESCRIPTION = 3
+_DEVICE_DETAILS = 4
 
 _PROVIDER_DEVICES = 1
 
@@ -699,6 +722,11 @@ def _internal_set_vlog(l):
     _lib()._internal_set_vlog(l)
     logging.getLogger(__name__).setLevel(logging.DEBUG)
     plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.NOTSET)
+
+def quiet():
+    logging.getLogger(__name__).setLevel(logging.WARNING)
+    plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.NOTSET)
+
 
 
 def get_perf_counter(name):
@@ -764,16 +792,20 @@ class _DeviceConfig(object):
         self._enumerator = enumerator
 
     @property
-    def name(self):
-        return self._query_str(_DEVICE_NAME)
+    def id(self):
+        return self._query_str(_DEVICE_ID)
 
     @property
-    def config_id(self):
-        return self._query_str(_CONFIG_ID)
+    def config(self):
+        return self._query_str(_DEVICE_CONFIG)
 
     @property
     def description(self):
         return self._query_str(_DEVICE_DESCRIPTION)
+
+    @property
+    def details(self):
+        return self._query_str(_DEVICE_DETAILS)
 
     def _query_str(self, propid):
         blen = ctypes.c_size_t(0)
@@ -785,17 +817,13 @@ class _DeviceConfig(object):
         return buf.value
 
     def __str__(self):
-        return self.name
+        return self.id
 
 
 class Device(object):
 
-    def __init__(self, ctx, device=None):
+    def __init__(self, ctx, device):
         self._bufs = set()
-        if device and not isinstance(device, _DeviceConfig):
-            for d in devices(ctx, device):
-                device = d
-                break
         self._as_parameter_ = _lib().plaidml_open_device(ctx, device if device else None)
         self._free_buffer = _lib().plaidml_free_buffer
         self._close = _lib().plaidml_close_device
@@ -834,40 +862,104 @@ class Device(object):
 
 
 @contextlib.contextmanager
-def open_device(ctx, config=None):
-    dev = Device(ctx, config)
+def open_first_device(ctx):
+    device = devices(ctx, limit=10)[0]
+    dev = Device(ctx, device)
     yield dev
     dev.close()
 
 
-# TODO(T1104): make this just return lists
-class _Enumerator(object):
+def _record_usage(device_id, config_source, valid_devices, invalid_devices, status, sync=False):
+    # Collects basic information about the GPUs being used.
+    if not plaidml.settings.telemetry:
+        return
+    table = 'usage_v1'
+    version = _lib().plaidml_get_version()
+    if version == '0.0.0' or 'dev' in version:
+        table = 'usage_v1_test'
+    record = {
+        'version': version,
+        'session': plaidml.settings.session,
+        'machine': str(uuid.uuid1())[14:],
+        'device_id': device_id,
+        'status': status,
+        'hal': 'OpenCL', # TODO(T1191): plumb from hal
+        'platform': "|".join([platform.system(), platform.release(), platform.machine()]),
+        'config_source': os.path.basename(config_source), # ensure only the filename is included
+        'devices': 
+           [{ 'id': d.id, 'config': d.config, 'details': d.details, 'valid': True} for d in valid_devices] +
+           [{ 'id': d.id, 'config': d.config, 'details': d.details, 'valid': False} for d in invalid_devices],
+    }
+    body = {
+        'table': table,
+        'data': record
+    }
+    ex = lambda: requests.post("https://us-central1-vertexai-release.cloudfunctions.net/record_usage",
+        data=json.dumps(body),
+        headers={'content-type': 'application/json'})
+    thread = threading.Thread(target=ex)
+    thread.daemon = True
+    if sync:
+        thread.run()
+    else:
+        thread.start()
 
-    def __init__(self, ctx, config=None):
+
+class _Enumerator(object):
+    def __init__(self, ctx):
         self._ctx = ctx
-        if config:
+        if settings.config:
+            self._as_parameter_ = _lib().plaidml_alloc_device_enumerator_with_config(
+                ctx, settings.config, ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
+        elif settings.config_file and os.path.exists(settings.config_file):
+            with file(settings.config_file) as cf:
+                config = cf.read()
             self._as_parameter_ = _lib().plaidml_alloc_device_enumerator_with_config(
                 ctx, config, ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
         else:
             self._as_parameter_ = _lib().plaidml_alloc_device_enumerator(
                 ctx, ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
         self._free = _lib().plaidml_free_device_enumerator
+        self._valid_devs = None
+        self._invalid_devs = None
+
+    @property
+    def valid_devs(self):
+        if not self._valid_devs:
+            self._valid_devs = []
+            for i in range(0, _lib().plaidml_get_devconf_count(self._ctx, self, True)):
+                self._valid_devs += [_DeviceConfig(self._ctx, self, _lib().plaidml_get_devconf(self._ctx, self, i))]
+        return self._valid_devs
+        
+    @property
+    def invalid_devs(self):
+        if not self._invalid_devs:
+            self._invalid_devs = []
+            for i in range(0, _lib().plaidml_get_devconf_count(self._ctx, self, False)):
+                self._invalid_devs += [_DeviceConfig(self._ctx, self, _lib().plaidml_get_invalid_devconf(self._ctx, self, i))]
+        return self._invalid_devs
 
     def __del__(self):
         if hasattr(self, '_free'):
             self._free(self)
 
-    def __getitem__(self, key):
-        try:
-            return _DeviceConfig(self._ctx, self, _lib().plaidml_get_devconf(self._ctx, self, key))
-        except plaidml.exceptions.OutOfRange:
-            raise IndexError
 
+def devices(ctx, limit=1):
+    plaidml.settings.start_session()
 
-def devices(ctx, config=None):
-    enumerator = _Enumerator(ctx, config)
-    for conf in enumerator:
-        yield conf
+    """Returns a tuple of lists valid devices or aborts the program."""
+    enumerator = _Enumerator(ctx)
+    config_source = _lib().plaidml_get_enumerator_config_source(enumerator)
+    if len(enumerator.valid_devs) == 0:
+        _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs, "ERR_NO_DEVICES", True)
+        raise exceptions.PlaidMLError("No devices found. Please run plaidml-setup.")
+    if len(enumerator.valid_devs) > limit:
+        _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs, "ERR_TOO_MANY_DEVICES", True)
+        raise exceptions.PlaidMLError("Too many devices configured. Please run plaidml-setup.")
+    _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs, enumerator.invalid_devs, "OK")
+
+    return enumerator.valid_devs
+
 
 
 class _Buffer(object):
@@ -1246,10 +1338,6 @@ def gradients(loss, variables):
 
 def run(ctx, f, inputs={}, outputs={}):
     Invoker(ctx, f, inputs, outputs).invoke()
-
-@property
-def __version__(self):
-    return _lib().plaidml_get_version()
 
 class Module(object):
     pass

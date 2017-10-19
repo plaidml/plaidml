@@ -25,6 +25,7 @@ class Platform : public tile::Platform {
  public:
   // Contains the platform API handlers for a particular device.
   struct PlatformDev {
+    std::string id;
     std::shared_ptr<DevInfo> devinfo;
     std::shared_ptr<MemStrategy> mem_strategy;
     hal::Memory* tmp_mem_source;

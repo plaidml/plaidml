@@ -24,7 +24,7 @@ def run():
 
 
 if __name__ == '__main__':
-    plaidml.keras.backend.set_config(testing.plaidml_config.config())
+    testing.plaidml_config.default_config()
     score = run()
     expected = 1.66666666666666666666
     if (-0.0001 < score - expected and score - expected < 0.0001):

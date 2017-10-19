@@ -2,13 +2,20 @@ from __future__ import print_function
 
 import cProfile
 import numpy as np
+import os
 import plaidml.context
 import plaidml.exceptions
 import plaidml
 import testing.plaidml_config
 import unittest
 
+
 class TestPlaidML(unittest.TestCase):
+
+    def setUp(self):
+        plaidml.settings.config = None
+        testing.plaidml_config.default_config()
+    
 
     def testVersion(self):
         # From https://www.python.org/dev/peps/pep-0440/
@@ -18,13 +25,13 @@ class TestPlaidML(unittest.TestCase):
 
     def testDeviceEnumerator(self):
         ctx = plaidml.Context()
-        for conf in plaidml.devices(ctx, testing.plaidml_config.config()):
+        for conf in plaidml.devices(ctx):
             pass
 
     def testDeviceEnumeratorWithNoDevices(self):
         ctx = plaidml.Context()
-        with self.assertRaises(plaidml.exceptions.NotFound):
-            for conf in plaidml.devices(ctx, """{
+        with self.assertRaises(plaidml.exceptions.PlaidMLError):
+            plaidml.settings.config = """{
                   "platform": {
                     "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
                     "hals": [
@@ -36,18 +43,20 @@ class TestPlaidML(unittest.TestCase):
                       }
                     ]
                   }
-                }"""):
+                }"""
+            for conf in plaidml.devices(ctx):
                 pass
 
     def testDeviceEnumeratorInvalidConfig(self):
         ctx = plaidml.Context()
         with self.assertRaises(plaidml.exceptions.InvalidArgument):
-            for conf in plaidml.devices(ctx, 'An invalid configuration'):
+            plaidml.settings.config = 'An invalid configuration'
+            for conf in plaidml.devices(ctx):
                 pass
 
     def testBufferRanges(self):
         ctx = plaidml.Context()
-        with plaidml.open_device(ctx, testing.plaidml_config.config()) as dev:
+        with plaidml.open_first_device(ctx) as dev:
             buf = plaidml.Tensor(dev, plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 10))
             with buf.mmap_current() as view:
                 self.assertEqual(len(view), 10)
@@ -66,7 +75,7 @@ class TestPlaidML(unittest.TestCase):
         reshape = plaidml.Function("function (I) -> (O) { F[3*j + k: 4 * 3] = >(I[j,k]); O[p,q : 6,2] = >(F[2*p + q]);}")
         iShape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 4, 3)
         oShape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 6, 2)
-        with plaidml.open_device(ctx, testing.plaidml_config.config()) as dev:
+        with plaidml.open_first_device(ctx) as dev:
             I = plaidml.Tensor(dev, iShape)
             with I.mmap_discard(ctx) as view:
                 view[0] = 1.0
@@ -145,21 +154,23 @@ class TestPlaidML(unittest.TestCase):
 
     def testMatrixMultiply(self):
         ctx = plaidml.Context()
-        with plaidml.open_device(ctx, testing.plaidml_config.config()) as dev:
+        with plaidml.open_first_device(ctx) as dev:
             self.runMatrixMultiply(ctx, dev)
 
+    @unittest.skip("T1193: Skip until there is a fake HAL or use single device is implmemented.")
     def testLargeConfigValuesNoCrash(self):
         ctx = plaidml.Context()
-        with plaidml.open_device(ctx, testing.plaidml_config.very_large_values_config()) as dev:
+        plaidml.settings.config = testing.plaidml_config.very_large_values_config()
+        with plaidml.open_first_device(ctx) as dev:
             self.runMatrixMultiply(ctx, dev)
 
     def testTransferLargeNDArray(self):
-        size = 30000000
+        size = 3000000
         shape = (size,)
         dtype = plaidml.DATA_FLOAT32
 
         ctx = plaidml.Context()
-        with plaidml.open_device(ctx, testing.plaidml_config.config()) as dev:
+        with plaidml.open_first_device(ctx) as dev:
             expected = np.random.uniform(low=0, high=100, size=size)
             tensor = plaidml.Tensor(dev, plaidml.Shape(ctx, dtype, *shape))
             actual = np.ndarray(shape, dtype='f4')
