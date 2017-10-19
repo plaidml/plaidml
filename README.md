@@ -86,6 +86,7 @@ You can test your installation by running MobileNet in [plaidbench](https://gith
 ```
 git clone https://github.com/plaidml/plaidbench.git
 cd plaidbench
+sudo pip install -r requirements.txt
 python plaidbench.py mobilenet
 ```
 
