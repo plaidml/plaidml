@@ -206,13 +206,15 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
 
       // Compute the temporary's size.
       const auto& ty = shape_map.at(bname);
-      std::uint64_t size = ty.byte_size();
+      std::uint64_t elem_size = ty.elem_size();
+      std::uint64_t byte_size = ty.byte_size();
 
-      IVLOG(4, "  Temp " << bname << " tidx=" << tidx << " size=" << size);
+      IVLOG(4, "  Temp " << bname << " tidx=" << tidx << " elem_size=" << elem_size << " byte_size=" << byte_size);
 
       // Save the computed size and creator.
       tmps[tidx].first_writer_kidx = kidx;
-      tmps[tidx].size = size;
+      tmps[tidx].elem_size = elem_size;
+      tmps[tidx].byte_size = byte_size;
     } else {
       IVLOG(4, "Temp " << bname << " already had tidx=" << tiv.first->second);
     }
@@ -263,7 +265,11 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
       }
 
       auto tidx = get_tidx(kidx_current, bname);
-      bk.params.push_back(KernelParam{KernelParamType::kTmpInput, bname, tidx});
+      bool war_safe_reader = false;
+      if (bk.info.war_safe_reads.count(bname)) {
+        war_safe_reader = true;
+      }
+      bk.params.push_back(KernelParam{KernelParamType::kTmpInput, bname, tidx, war_safe_reader});
     }
   }
 
@@ -298,6 +304,9 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
   std::vector<std::set<std::size_t>> tmp_accessors;
   tmp_accessors.resize(tmps.size());
 
+  std::vector<std::set<std::size_t>> war_safe_readers;
+  war_safe_readers.resize(tmps.size());
+
   for (std::size_t kidx = 0; kidx < kernels_.size(); ++kidx) {
     auto& bk = kernels_[kidx];
     auto dest = std::inserter(kernel_deps[kidx], kernel_deps[kidx].end());
@@ -307,10 +316,14 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
       }
       tmp_accessors[param.tidx].insert(kidx);
       if (tmps[param.tidx].first_writer_kidx == kidx) {
-        // This is where the temporary is created; the current kernel
-        // is considered to be in its own transitive dependency set.
+        // This is where the temporary is created.  The current kernel
+        // is not considered to be in its own transitive dependency
+        // set.
         tmps[param.tidx].last_writer_kidx = kidx;
         continue;
+      }
+      if (param.war_safe_reader) {
+        war_safe_readers[param.tidx].insert(kidx);
       }
       std::size_t last_writer_kidx = tmps[param.tidx].last_writer_kidx;
       dest = last_writer_kidx;
@@ -330,14 +343,25 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
   // in the set of indirect dependencies of the creator of the other
   // temporary (and thus in the indirect dependencies of every
   // accessor of the other temporary).
-
+  //
+  // One special case: if the creator of the second temporary is also
+  // an accessor of the first, and the creator of the second temporary
+  // guarantees that all writes to the second temporary's buffer
+  // strictly follow all reads from the same memory locations of the
+  // first temporary's buffer (which is a property of the way the
+  // kernel accesses the first temporary), the creator doesn't count
+  // as an accessor of the first temporary -- if this is the only
+  // dependency keeping them from being temporally distinct, they're
+  // temporally distinct.
   auto is_distinct = [&](std::size_t tidx_a, std::size_t tidx_b) {
     if (tmps[tidx_b].first_writer_kidx < tmps[tidx_a].first_writer_kidx) {
       std::swap(tidx_a, tidx_b);
     }
     const auto& b_deps = kernel_deps[tmps[tidx_b].first_writer_kidx];
     for (auto kidx_a : tmp_accessors[tidx_a]) {
-      if (!b_deps.count(kidx_a)) {
+      if (!b_deps.count(kidx_a) &&
+          (kidx_a != tmps[tidx_b].first_writer_kidx || !war_safe_readers[tidx_a].count(kidx_a) ||
+           tmps[tidx_a].elem_size != tmps[tidx_b].elem_size || tmps[tidx_a].byte_size != tmps[tidx_b].byte_size)) {
         return false;
       }
     }
@@ -348,8 +372,9 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
   std::vector<std::size_t> tidx_by_size;
   tidx_by_size.resize(tmps.size());
   std::iota(tidx_by_size.begin(), tidx_by_size.end(), 0);
-  std::sort(tidx_by_size.begin(), tidx_by_size.end(),
-            [&](std::size_t lhs_tidx, std::size_t rhs_tidx) { return tmps[lhs_tidx].size > tmps[rhs_tidx].size; });
+  std::sort(tidx_by_size.begin(), tidx_by_size.end(), [&](std::size_t lhs_tidx, std::size_t rhs_tidx) {
+    return tmps[lhs_tidx].byte_size > tmps[rhs_tidx].byte_size;
+  });
 
   IVLOG(4, "Built tidx_by_size vector: " << tidx_by_size);
 
@@ -402,7 +427,7 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
       alloc_tmps.resize(aidx + 1);
       alloc_tmps[aidx].insert(tidx);
       alloc_sizes_.resize(aidx + 1);
-      alloc_sizes_[aidx] = tmps[tidx].size;
+      alloc_sizes_[aidx] = tmps[tidx].byte_size;
       tmp_locs_[tidx] = aidx;
     }
   }
@@ -466,14 +491,15 @@ void Program::ValidateTemporaries() {
   // vectors:
   //
   // * A mapping from each temporary to the set of kernels that access
-  //   the temporary.
+  //   the temporary (with a flag to indicate whether the accessor is
+  //   a war-safe reader).
   //
   // * A mapping from each kernel to the dependencies of that kernel
   //   (aka the "known to have finished" set), which we build by
   //   knowing the temporaries that the kernel accesses, the last
   //   writer of each temporary, and the set of dependencies for each
   //   of those writers.
-  std::vector<std::set<std::size_t>> tidx_to_accessor_kidxs(tmp_locs_.size());
+  std::vector<std::map<std::size_t, bool>> tidx_to_accessor_kidxs(tmp_locs_.size());
   std::vector<std::set<std::size_t>> kidx_to_dep_kidxs(kernels_.size());
 
   IVLOG(4, "  Building dependency lists for placement verification");
@@ -492,7 +518,7 @@ void Program::ValidateTemporaries() {
       for (const auto& param : bk.params) {
         if (param.ty == KernelParamType::kTmpInput || param.ty == KernelParamType::kTmpOutput) {
           IVLOG(4, "      Considering param tidx=" << param.tidx);
-          tidx_to_accessor_kidxs[param.tidx].insert(kidx_current);
+          tidx_to_accessor_kidxs[param.tidx].emplace(kidx_current, param.war_safe_reader);
         }
       }
     }
@@ -534,10 +560,18 @@ void Program::ValidateTemporaries() {
         tidx_high = it->tidx;
       }
 
-      for (auto kidx_high : tidx_to_accessor_kidxs[tidx_high]) {
+      for (auto kidx_war_high : tidx_to_accessor_kidxs[tidx_high]) {
+        auto kidx_high = kidx_war_high.first;
         const auto& deps = kidx_to_dep_kidxs[kidx_high];
-        for (auto kidx_low : tidx_to_accessor_kidxs[tidx_low]) {
-          if (!deps.count(kidx_low)) {
+        for (auto kidx_war_low : tidx_to_accessor_kidxs[tidx_low]) {
+          auto kidx_low = kidx_war_low.first;
+          if (!deps.count(kidx_low) && (kidx_high != kidx_low || !kidx_war_low.second)) {
+            // N.B. If we're using the write-after-read check, we might
+            // want to validate that the temporaries have the same
+            // buffer and element sizes.  We currently don't, because by
+            // the time this code is run, we've dropped the temporary
+            // size information, and we're careful to validate this in
+            // the call to is_distinct().
             LOG(FATAL) << "Internal logic error: kidx=" << kidx_high << " accesses tidx=" << tidx_high
                        << " aidx=" << tmp_locs_[tidx_high] << " while kidx=" << kidx_low
                        << " accesses tidx=" << tidx_low << " aidx=" << tmp_locs_[tidx_low];

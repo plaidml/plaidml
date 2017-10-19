@@ -208,7 +208,8 @@ static bool SimplifyFlat(FlatContraction* flat) {
 
 static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction flat,  // NOLINT(runtime/references)
                             const std::string& kname, const HardwareSettings& settings, const Bindings& vars,
-                            size_t tile_trials, const VarRewrites& var_rewrites) {
+                            size_t tile_trials, const VarRewrites& var_rewrites,
+                            std::unordered_set<std::string> war_safe_reads) {
   if (!flat.generate_contraction && !flat.post_ops.size()) {
     // The kernel consists entirely of elided elementwise operations; nothing to do.
     return;
@@ -252,7 +253,8 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
       primary.candidates.push_back(ki);
     }
   }
-  r.kernels.push_back(primary);
+  primary.war_safe_reads = std::move(war_safe_reads);
+  r.kernels.emplace_back(std::move(primary));
 }
 
 static bool DifferentSize(const Binding& a, const Binding& b) {
@@ -279,8 +281,9 @@ static bool SameSizeOrBroadcastCompatible(const Binding& input, const Binding& o
 }
 
 static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed, VarRewrites* var_rewrites,
-                          const Program& prog, std::size_t opidx, const UseDef& ud, const Bindings& vars,
-                          const ShapeMap& inputs, const ShapeMap& outputs, const std::vector<Polynomial>& out_poly) {
+                          std::unordered_set<std::string>* war_safe_reads, const Program& prog, std::size_t opidx,
+                          const UseDef& ud, const Bindings& vars, const ShapeMap& inputs, const ShapeMap& outputs,
+                          const std::vector<Polynomial>& out_poly) {
   // Unify the contraction with downstream elementwise operations.
   //
   // Here's the idea: during the contraction's output phase, we
@@ -352,6 +355,7 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
     for (const auto& input : op.inputs) {
       if (vars.at(input).tag == Binding::TENSOR) {
         post_contraction_inputs.emplace(input);
+        war_safe_reads->emplace(input);
       }
     }
     ops_to_check.insert(opidx);
@@ -439,6 +443,9 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
       IVLOG(4, "  Scheduling unification of op " << check_op);
       unified_opidxs.insert(check_opidx);
       available_postop_inputs.insert(check_op.output);
+      for (const auto& input : check_op_added_inputs) {
+        war_safe_reads->emplace(input);
+      }
       post_contraction_inputs.insert(std::make_move_iterator(check_op_added_inputs.begin()),
                                      std::make_move_iterator(check_op_added_inputs.end()));
 
@@ -613,6 +620,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       last_update = time(nullptr);
     }
     const Op& op = prog.ops[i];
+    std::unordered_set<std::string> war_safe_reads;
 
     if (op.tag == Op::CONTRACTION) {
       IVLOG(3, "Running contraction " << op << " vars = " << vars);
@@ -628,9 +636,10 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
         r.kernels.push_back(GenZero(tshapes[0], op.output, "zero_" + kname));
         flat.kernel_outputs.push_back(op.output);
       } else {
-        DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly);
+        DoUnification(&flat, &computed, &r.var_rewrites, &war_safe_reads, prog, i, ud, vars, inputs, outputs, out_poly);
       }
-      ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials, r.var_rewrites);
+      ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials, r.var_rewrites,
+                      std::move(war_safe_reads));
       continue;
     }
     // Ignore constants
@@ -724,9 +733,10 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       flat.access.emplace_back(std::move(access));
     }
 
-    DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly);
+    DoUnification(&flat, &computed, &r.var_rewrites, &war_safe_reads, prog, i, ud, vars, inputs, outputs, out_poly);
 
-    ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials, r.var_rewrites);
+    ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials, r.var_rewrites,
+                    std::move(war_safe_reads));
   }
 
   // Copy only the relevant typing info across
