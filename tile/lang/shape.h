@@ -128,7 +128,8 @@ struct TensorShape {
   bool operator<(const TensorShape& rhs) const {
     return std::make_pair(type, dims) < std::make_pair(rhs.type, rhs.dims);
   }
-  uint64_t buffer_size() const {
+  uint64_t byte_size() const { return elem_size() * byte_width(type); }
+  uint64_t elem_size() const {
     uint64_t max_elem = 0;
     for (const auto& dim : dims) {
       if (dim.stride > 0) {

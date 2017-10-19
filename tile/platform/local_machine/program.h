@@ -108,6 +108,7 @@ class Program final : public tile::Program {
   std::unordered_map<std::string, std::size_t> last_input_use_;
   std::vector<std::size_t> tmp_locs_;
   std::vector<std::size_t> alloc_sizes_;
+  lang::VarRewrites var_rewrites_;
 };
 
 }  // namespace local_machine

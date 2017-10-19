@@ -611,9 +611,16 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(1, 1, 60), (60,)],
              [m(4, 3, 70, 2), (14, 10, 6, 2)],
              [m(7, 3, 2, 4), (-1,)],
-             [m(4, 4), (-1,)],])
+             [m(4, 4), (-1,)]])
     def testReshape(self, b, x, s):
         return [b.reshape(x, s)]
+
+    @opTest([[m(1, 1, 60), (60,)],
+             [m(4, 3, 70, 2), (14, 10, 6, 2)],
+             [m(7, 3, 2, 4), (-1,)],
+             [m(4, 4), (-1,)],])
+    def testTransposeReshape(self, b, x, s):
+        return [b.reshape(b.transpose(x), s)]
 
     @opTest([[m(4, 2, 1, 3, 2), 2],
              [m(5, 3, 2, 1), -1]])

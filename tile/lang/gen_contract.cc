@@ -460,14 +460,20 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
   auto checked_output_block = _Block({});
 
   // Load each input into a register.
+  auto output_elem_size = vars.at(op.output).shape.elem_size();
   for (const auto& kvp : op.post_op_inputs) {
     std::string input = kvp.first;
     std::string declname = std::string("L") + input;
     sem::Type declatype{sem::Type::VALUE, vars.at(input).shape.type, op.agg_vec};
-    sem::ExprPtr idx = _Const(0);
-    for (size_t i = 0; i < sz; i++) {
-      if (kvp.second.strides[i] != 0) {
-        idx = idx + _Const(kvp.second.strides[i]) * (_(op.names[i] + "_gid") + _(op.names[i]));
+    sem::ExprPtr idx;
+    if (vars.at(input).shape.elem_size() == output_elem_size) {
+      idx = _("gout_idx");
+    } else {
+      idx = _Const(0);
+      for (size_t i = 0; i < sz; i++) {
+        if (kvp.second.strides[i] != 0) {
+          idx = idx + _Const(kvp.second.strides[i]) * (_(op.names[i] + "_gid") + _(op.names[i]));
+        }
       }
     }
     sem::ExprPtr opexpr = _(input)[idx];
@@ -536,7 +542,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       opexpr = std::make_shared<sem::UnaryExpr>("-", inexprs[0]);
     } else if (post_op.f.fn == "bit_not") {
       opexpr = std::make_shared<sem::UnaryExpr>("~", inexprs[0]);
-    } else if (post_op.f.fn == "ident") {
+    } else if (post_op.f.fn == "ident" || post_op.f.fn == "reshape") {
       opexpr = inexprs[0];
     } else if (post_op.f.fn == "as_float" || post_op.f.fn == "as_int" || post_op.f.fn == "as_uint") {
       sem::Type declatype{sem::Type::VALUE, vars.at(post_op.output).shape.type, op.agg_vec};

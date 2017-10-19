@@ -5,6 +5,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "base/util/transfer_object.h"
@@ -71,9 +72,26 @@ struct KernelInfo {
   KernelType ktype = KernelType::kFunction;
 };
 
+class VarRewrites {
+ public:
+  const std::string& Lookup(const std::string& var_name) const {
+    auto it = rewrites_.find(var_name);
+    if (it == rewrites_.end()) {
+      return var_name;
+    }
+    return it->second;
+  }
+
+  void Insert(const std::string& from, const std::string& to) { rewrites_.emplace(from, to); }
+
+ private:
+  std::unordered_map<std::string, std::string> rewrites_;
+};
+
 struct KernelList {
   std::vector<KernelInfo> kernels;
   ShapeMap types;
+  VarRewrites var_rewrites;
 };
 
 KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const ShapeMap& outputs,

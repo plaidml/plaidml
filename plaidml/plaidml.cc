@@ -753,7 +753,7 @@ uint64_t plaidml_get_shape_buffer_size(plaidml_shape* shape) {
     vertexai::SetLastOOM();
     return 0;
   }
-  return shape->shape.buffer_size() * byte_width(shape->shape.type);
+  return shape->shape.byte_size();
 }
 
 uint64_t plaidml_get_shape_element_count(plaidml_shape* shape) {
@@ -761,7 +761,7 @@ uint64_t plaidml_get_shape_element_count(plaidml_shape* shape) {
     vertexai::SetLastOOM();
     return 0;
   }
-  return shape->shape.buffer_size();
+  return shape->shape.elem_size();
 }
 
 // plaidml_function
@@ -866,9 +866,8 @@ static std::shared_ptr<TensorValue> read_tensor(vai_ctx* ctx, unzFile f, const s
   tile::proto::TensorShape ts_proto;
   ts_proto.ParseFromString(proto_buf);
   tile::lang::TensorShape ts = tile::proto::to_poco(ts_proto);
-  size_t size = ts.buffer_size() * ((bit_width(ts.type) + 7) / 8);
   std::shared_ptr<BufferState> bs = std::make_shared<BufferState>(
-      evaluator->get_platform()->MakeBuffer(ctx->activity.ctx(), evaluator->get_id(), size), evaluator);
+      evaluator->get_platform()->MakeBuffer(ctx->activity.ctx(), evaluator->get_id(), ts.byte_size()), evaluator);
   plaidml_buffer tb{std::move(activity), bs};
   std::unique_ptr<plaidml_mapping> tm{plaidml_map_buffer_discard(ctx, &tb)};
   if (!tm) {

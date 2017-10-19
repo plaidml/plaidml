@@ -6,6 +6,7 @@
 #include <forward_list>
 #include <numeric>
 #include <set>
+#include <unordered_set>
 #include <utility>
 
 #include "base/util/error.h"
@@ -29,8 +30,7 @@ void AllocateBuffers(const std::vector<std::string>& names, const lang::ShapeMap
                      std::vector<std::shared_ptr<hal::Buffer>>* buffers) {
   for (const auto& name : names) {
     const auto& shape = types.find(name)->second;
-    std::uint64_t buf_size = shape.buffer_size() * lang::byte_width(shape.type);
-    buffers->push_back(memory->MakeBuffer(buf_size, hal::BufferAccessMask::ALL));
+    buffers->push_back(memory->MakeBuffer(shape.byte_size(), hal::BufferAccessMask::ALL));
   }
 }
 
@@ -153,12 +153,14 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   context::Activity activity{ctx, "tile::local_machine::Compile"};
 
   hal::proto::CompilationInfo cinfo;
-  *(cinfo.mutable_program()) = program;
 
   lang::KernelList kernel_list = CompileProgram(program, *devinfo_.get());
   for (auto kernel : kernel_list.kernels) {
     (*cinfo.mutable_kernels())[kernel.kname] = kernel.info;
   }
+
+  var_rewrites_ = std::move(kernel_list.var_rewrites);
+
   LoadKernels(activity.ctx(), std::move(kernel_list.kernels));
   auto tmps = AllocTemporaries(program, kernel_list.types);
 
@@ -167,6 +169,8 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   ScheduleTemporaries(std::move(tmps));
   LogTemporaries(&cinfo);
   ValidateTemporaries();
+
+  *(cinfo.mutable_program()) = std::move(program);
   activity.AddMetadata(cinfo);
 }
 
@@ -202,7 +206,7 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
 
       // Compute the temporary's size.
       const auto& ty = shape_map.at(bname);
-      std::uint64_t size = ty.buffer_size() * lang::byte_width(ty.type);
+      std::uint64_t size = ty.byte_size();
 
       IVLOG(4, "  Temp " << bname << " tidx=" << tidx << " size=" << size);
 
@@ -215,14 +219,19 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
     return tiv.first->second;
   };
 
+  // Translate the program output names, so that we can look up kernel output names in it.
+  std::unordered_set<std::string> rewrite_program_outputs;
+  for (const auto& kvp : program.outputs()) {
+    rewrite_program_outputs.insert(var_rewrites_.Lookup(kvp.first));
+  }
+
   for (std::size_t kidx_current = 0; kidx_current < kernels_.size(); ++kidx_current) {
     BoundKernel& bk = kernels_[kidx_current];
     IVLOG(4, "Setting up parameters for kidx=" << kidx_current << ": " << to_string(bk.info));
 
     // Set up output parameters (N.B. outputs come before inputs).
     for (auto bname : bk.info.outputs) {
-      auto it = program.outputs().find(bname);
-      if (it != program.outputs().end()) {
+      if (rewrite_program_outputs.count(bname)) {
         bk.params.push_back(KernelParam{KernelParamType::kOutput, bname});
         continue;
       }
@@ -246,9 +255,10 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
       }
 
       // A kernel input might also be a program output produced by an earlier kernel.
-      it = program.outputs().find(bname);
+      const std::string& rewrite_bname = var_rewrites_.Lookup(bname);
+      it = program.outputs().find(rewrite_bname);
       if (it != program.outputs().end()) {
-        bk.params.push_back(KernelParam{KernelParamType::kInput, bname});
+        bk.params.push_back(KernelParam{KernelParamType::kInput, rewrite_bname});
         continue;
       }
 
@@ -878,7 +888,15 @@ boost::future<void> RunRequest::LogResults(const context::Context& ctx) {
 boost::future<void> Program::Run(const context::Context& ctx,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
-  return RunRequest::BuildAndIssue(ctx, this, std::move(inputs), std::move(outputs));
+  for (const auto& it : outputs) {
+    VLOG(4) << "Original output " << it.first << " -> Buffer " << it.second.get() << " -> HAL Buffer "
+            << Buffer::Upcast(it.second, devinfo())->chunk()->hal_buffer().get();
+  }
+  std::map<std::string, std::shared_ptr<tile::Buffer>> rewrite_outputs;
+  for (auto kvp : outputs) {
+    rewrite_outputs.emplace(var_rewrites_.Lookup(kvp.first), std::move(kvp.second));
+  }
+  return RunRequest::BuildAndIssue(ctx, this, std::move(inputs), std::move(rewrite_outputs));
 }
 
 }  // namespace local_machine
