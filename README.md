@@ -82,10 +82,11 @@ Next, setup PlaidML to use your preferred computing device:
 plaidml-setup
 ```
 
-You can test your installation by running MobileNet in [plaidbench](https://github.com/vertexai/plaidbench):
+You can test your installation by running MobileNet in [plaidbench](https://github.com/plaidml/plaidbench):
 ```
-git clone https://github.com/vertexai/plaidbench.git
+git clone https://github.com/plaidml/plaidbench.git
 cd plaidbench
+sudo pip install -r requirements.txt
 python plaidbench.py mobilenet
 ```
 
@@ -103,8 +104,8 @@ plaidml.keras.install_backend()
 
 We've developed two open source projects: 
 
-  * [plaidvision](https://github.com/vertexai/plaidvision) provides a simple shell for developing vision applications using your webcam
-  * [plaidbench](https://github.com/vertexai/plaidbench) is a performance testing suite designed to help users compare the performance
+  * [plaidvision](https://github.com/plaidml/plaidvision) provides a simple shell for developing vision applications using your webcam
+  * [plaidbench](https://github.com/plaidml/plaidbench) is a performance testing suite designed to help users compare the performance
   of different cards and different frameworks
   
 
