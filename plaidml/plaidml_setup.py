@@ -36,22 +36,23 @@ Some Notes:
     # Operate as if nothing is set
     plaidml.settings._setup_for_test(plaidml.settings.user_settings)
 
-    try:
-        plaidml.settings.experimental = False
-        devices = plaidml.devices(ctx, limit=100)
-    except plaidml.exceptions.PlaidMLError:
-        devices = []
-    try:
-        plaidml.settings.experimental = True
-        exp_devices = plaidml.devices(ctx, limit=100)
-    except plaidml.exceptions.PlaidMLError:
-        exp_devices = []
+    plaidml.settings.experimental = False
+    devices, _ = plaidml.devices(ctx, limit=100, return_all=True)
+    plaidml.settings.experimental = True
+    exp_devices, unmatched = plaidml.devices(ctx, limit=100, return_all=True)
 
     if len(devices) == 0 and len(exp_devices) == 0:
-        print(
+        if len(unmatched) == 0:
+            print(
 """
-No devices found. Please run 'clinfo' to ensure an OpenCL device is present.
-If a device is present, open an issue and include the full output of clinfo.
+No OpenCL devices found. Check driver installation.
+Read the helpful, easy driver installation instructions from our README:
+http://github.com/plaidml/plaidml
+""")
+        else:
+            print(
+"""
+No supported devices found. Run 'clinfo' and file an issue containing the full output.
 """)
         sys.exit(-1)
 
@@ -62,8 +63,9 @@ If a device is present, open an issue and include the full output of clinfo.
     print("\nExperimental Config Devices:")
     for dev in exp_devices:
         print("   {0} : {1}".format(dev.id, dev.description))
-
-    exp = choice_prompt("\nEnable experimental device support", ["y","n"], "n")
+    
+    print("\nUsing experimental devices can cause poor performance, crashes, and other nastiness.")
+    exp = choice_prompt("Enable experimental device support", ["y","n"], "n")
     plaidml.settings.experimental = exp == "y"
     devices = plaidml.devices(ctx, limit=100)
 

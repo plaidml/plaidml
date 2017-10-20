@@ -42,7 +42,7 @@ void Result::LogStatistics() const {
   cl_ulong start_time = 0;
   cl_ulong end_time = 0;
   Err err;
-
+  std::cout << "WOOF";
   if (!event_) {
     throw error::NotFound("No associated event information");
   }

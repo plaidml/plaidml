@@ -944,22 +944,22 @@ class _Enumerator(object):
             self._free(self)
 
 
-def devices(ctx, limit=1):
-    plaidml.settings.start_session()
-
+def devices(ctx, limit=1, return_all=False):
     """Returns a tuple of lists valid devices or aborts the program."""
+    plaidml.settings.start_session()
     enumerator = _Enumerator(ctx)
     config_source = _lib().plaidml_get_enumerator_config_source(enumerator)
-    if len(enumerator.valid_devs) == 0:
-        _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs, "ERR_NO_DEVICES", True)
-        raise exceptions.PlaidMLError("No devices found. Please run plaidml-setup.")
-    if len(enumerator.valid_devs) > limit:
-        _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs, "ERR_TOO_MANY_DEVICES", True)
-        raise exceptions.PlaidMLError("Too many devices configured. Please run plaidml-setup.")
-    _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs, enumerator.invalid_devs, "OK")
-
-    return enumerator.valid_devs
-
+    if return_all:
+        return enumerator.valid_devs, enumerator.invalid_devs
+    else:
+        if len(enumerator.valid_devs) == 0:
+            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs, "ERR_NO_DEVICES", True)
+            raise exceptions.PlaidMLError("No devices found. Please run plaidml-setup.")
+        if len(enumerator.valid_devs) > limit:
+            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs, "ERR_TOO_MANY_DEVICES", True)
+            raise exceptions.PlaidMLError("Too many devices configured. Please run plaidml-setup.")
+        _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs, enumerator.invalid_devs, "OK")
+        return enumerator.valid_devs
 
 
 class _Buffer(object):

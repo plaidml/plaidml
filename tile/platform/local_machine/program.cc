@@ -877,7 +877,9 @@ boost::future<void> RunRequest::LogResults(const context::Context& ctx) {
                     << " GFL/s=" << kinfo.tot_flops / duration.count()
                     << " GBP/s= " << kinfo.tot_bytes / duration.count();
           }
-          result->LogStatistics();
+          if (ctx.is_logging_events()) {
+            result->LogStatistics();
+          }
         }
       });
   return result;
