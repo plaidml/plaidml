@@ -29,7 +29,7 @@ class Program final : public tile::Program {
 
     KernelParamType ty;
     std::string name;      // Used for inputs and outputs
-    std::size_t tidx = 0;  // Used for temporaries.
+    std::size_t tidx = 0;  // Used for temporaries and outputs
     bool war_safe_reader = false;
   };
 
@@ -38,6 +38,11 @@ class Program final : public tile::Program {
     std::vector<KernelParam> params;
     std::set<std::size_t> dep_kidxs;
     lang::KernelInfo info;
+  };
+
+  struct AllocInfo {
+    std::size_t byte_size = 0;
+    std::string program_output;
   };
 
   Program(const context::Context& ctx, const tile::proto::Program& program, const std::shared_ptr<DevInfo>& devinfo,
@@ -52,7 +57,7 @@ class Program final : public tile::Program {
   const std::shared_ptr<MemStrategy>& tmp_mem_strategy() const { return tmp_mem_strategy_; }
   const std::vector<BoundKernel>& kernels() const { return kernels_; }
   const std::vector<std::size_t>& tmp_locs() const { return tmp_locs_; }
-  const std::vector<std::size_t>& alloc_sizes() const { return alloc_sizes_; }
+  const std::vector<AllocInfo>& alloc_infos() const { return alloc_infos_; }
 
  private:
   struct TmpInfo {
@@ -60,12 +65,21 @@ class Program final : public tile::Program {
     std::size_t last_writer_kidx = 0;
     std::size_t elem_size = 0;
     std::size_t byte_size = 0;
+    std::string program_output;
   };
 
   // Compiles kernel semantic trees down to executable code, and loads
   // the code onto the underlying hardware, initializing the kernels_
   // vector.
   void LoadKernels(const context::Context& ctx, std::vector<lang::KernelInfo> kernel_infos);
+
+  // Adds an output-consumer kernel to the end of the kernel list, in
+  // order to keep output buffers from being reused once their outputs
+  // have been written to them.
+  void PushOutputConsumer(const tile::proto::Program& program);
+
+  // Removes the output-consumer kernel.
+  void PopOutputConsumer();
 
   // Fills in the params fields of the kernels in the kernels_ vector
   // (i.e. translating the string temporary names to unique integers),
@@ -101,7 +115,7 @@ class Program final : public tile::Program {
   std::shared_ptr<MemStrategy> tmp_mem_strategy_;
   std::vector<BoundKernel> kernels_;
   std::vector<std::size_t> tmp_locs_;
-  std::vector<std::size_t> alloc_sizes_;
+  std::vector<AllocInfo> alloc_infos_;
   lang::VarRewrites var_rewrites_;
 };
 
