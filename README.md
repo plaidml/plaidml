@@ -38,27 +38,6 @@ Vertex.AI runs a comprehensive set of tests for each release against these hardw
     * K80, GTX 780
     * GTX 1070
 
-### Experimental Config
-If the device you're testing against isn't supported by the default configuration, you can enable the experimental
-configuration.
-
-If your device isn't supported, PlaidML will error with this message:
-```
-ERROR: No devices found, set PLAIDML_EXPERIMENTAL=1 to enable broader device support
-```
-As noted, set the environment variable `PLAIDML_EXPERIMENTAL=1`. This will use a the experimental config from the python package. If your
-device still isn't supported, contact [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev) with the output
-of `clinfo`. Alternatively, users can attempt to add support themselves by editing the configuration file listed when
-PlaidML starts.
-
-If you have multiple supported devices, you'll need to choose between them by setting `PLAIDML_DEVICE_IDS=<id>`. PlaidML
-will emit a helpful error message in this case, like:
-```
-ERROR: Multiple Devices found, set PLAIDML_DEVICE_IDS=<devid> to one of:
-  fiji.0
-  intel(r)_xeon(r)_cpu_e5-2670_0_@_2.60ghz.0
-```
-
 ### Validated Networks
 
 We support most of the convolutional Keras application networks. Validated networks are tested for performance and 
@@ -98,10 +77,16 @@ Install the plaidml wheels system-wide:
 sudo pip install -U plaidml-keras
 ```
 
-You can test your installation by running MobileNet in [plaidbench](https://github.com/vertexai/plaidbench):
+Next, setup PlaidML to use your preferred computing device:
 ```
-git clone https://github.com/vertexai/plaidbench.git
+plaidml-setup
+```
+
+You can test your installation by running MobileNet in [plaidbench](https://github.com/plaidml/plaidbench):
+```
+git clone https://github.com/plaidml/plaidbench.git
 cd plaidbench
+sudo pip install -r requirements.txt
 python plaidbench.py mobilenet
 ```
 
@@ -119,8 +104,8 @@ plaidml.keras.install_backend()
 
 We've developed two open source projects: 
 
-  * [plaidvision](https://github.com/vertexai/plaidvision) provides a simple shell for developing vision applications using your webcam
-  * [plaidbench](https://github.com/vertexai/plaidbench) is a performance testing suite designed to help users compare the performance
+  * [plaidvision](https://github.com/plaidml/plaidvision) provides a simple shell for developing vision applications using your webcam
+  * [plaidbench](https://github.com/plaidml/plaidbench) is a performance testing suite designed to help users compare the performance
   of different cards and different frameworks
   
 
