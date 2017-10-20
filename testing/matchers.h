@@ -13,6 +13,7 @@
 #include <type_traits>
 
 #include "base/util/compat.h"
+#include "plaidml/base/base.h"
 
 namespace testing {
 
@@ -46,6 +47,14 @@ MATCHER_P(EqualsProto, val, "") {
     return false;
   }
   return true;
+}
+
+MATCHER_P(IsVaiStatus, st, "is vai_status=" + PrintToString(st)) {
+  if (arg == st) {
+    return true;
+  }
+  *result_listener << "Last status message: \"" << vai_last_status_str() << "\"";
+  return false;
 }
 
 }  // namespace testing

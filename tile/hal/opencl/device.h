@@ -24,7 +24,7 @@ class Device final : public hal::Device {
   Device(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did,
          const std::shared_ptr<proto::Driver>& config, proto::DeviceInfo info);
 
-  std::string description() final { return device_state()->info().name(); }
+  std::string description() final { return device_state()->info().vendor() + " " + device_state()->info().name(); }
 
   hal::Compiler* compiler() final { return compiler_.get(); }
 

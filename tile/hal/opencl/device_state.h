@@ -46,6 +46,8 @@ class DeviceState {
 
   void FlushCommandQueue();
 
+  bool HasDeviceExtension(const char* extension);
+
  private:
   const cl_device_id did_;
   const std::shared_ptr<proto::Driver> config_;

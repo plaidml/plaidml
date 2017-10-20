@@ -56,6 +56,15 @@ void DeviceState::FlushCommandQueue() {
   cl_profiling_queue_.Flush();
 }
 
+bool DeviceState::HasDeviceExtension(const char* extension) {
+  for (auto ext : info_.extension()) {
+    if (ext == extension) {
+      return true;
+    }
+  }
+  return false;
+}
+
 cl_map_flags DeviceState::map_discard_flags() const {
   // TODO: parse this string out into different parts and then check major/minor directly
   if (info_.version() == "OpenCL 1.1 ") {

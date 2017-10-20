@@ -99,6 +99,8 @@ struct dimension {
   int64_t stride;
 };
 
+inline std::vector<device_config> _enumerate_devices(const std::shared_ptr<ctx>& ctx,
+                                                     std::shared_ptr<plaidml_device_enumerator> dev_enum);
 inline std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx);
 inline std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx, const std::string& config);
 
@@ -697,8 +699,8 @@ class device {
 };
 
 class device_config {
-  friend std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx);
-  friend std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx, const std::string& config);
+  friend std::vector<device_config> _enumerate_devices(const std::shared_ptr<ctx>& ctx,
+                                                       std::shared_ptr<plaidml_device_enumerator> dev_enum);
 
  public:
   // Get any string based property
@@ -714,8 +716,10 @@ class device_config {
   }
 
   // Convenience functions for current properties
-  std::string name() const { return get_string_prop(PLAIDML_DEVICE_NAME); }
+  std::string id() const { return get_string_prop(PLAIDML_DEVICE_ID); }
+  std::string config() const { return get_string_prop(PLAIDML_DEVICE_CONFIG); }
   std::string description() const { return get_string_prop(PLAIDML_DEVICE_DESCRIPTION); }
+  std::string details() const { return get_string_prop(PLAIDML_DEVICE_DETAILS); }
 
   // Open the device
   device open() const {
@@ -734,11 +738,9 @@ class device_config {
   plaidml_devconf* config_;
 };
 
-std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx) {
+std::vector<device_config> _enumerate_devices(const std::shared_ptr<ctx>& ctx,
+                                              std::shared_ptr<plaidml_device_enumerator> dev_enum) {
   std::vector<device_config> out;
-  std::shared_ptr<plaidml_device_enumerator> dev_enum(plaidml_alloc_device_enumerator(ctx->get_ctx(), NULL, NULL),
-                                                      plaidml_free_device_enumerator);
-  vai_exception::check_and_throw(dev_enum);
   size_t i = 0;
   while (true) {
     plaidml_devconf* conf = plaidml_get_devconf(ctx->get_ctx(), dev_enum.get(), i);
@@ -750,21 +752,20 @@ std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx) {
   return out;
 }
 
+std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx) {
+  std::shared_ptr<plaidml_device_enumerator> dev_enum(plaidml_alloc_device_enumerator(ctx->get_ctx(), NULL, NULL),
+                                                      plaidml_free_device_enumerator);
+  vai_exception::check_and_throw(dev_enum);
+  return _enumerate_devices(ctx, dev_enum);
+}
+
 std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& ctx, const std::string& config) {
   std::vector<device_config> out;
   std::shared_ptr<plaidml_device_enumerator> dev_enum(
       plaidml_alloc_device_enumerator_with_config(ctx->get_ctx(), config.c_str(), NULL, NULL),
       plaidml_free_device_enumerator);
   vai_exception::check_and_throw(dev_enum);
-  size_t i = 0;
-  while (true) {
-    plaidml_devconf* conf = plaidml_get_devconf(ctx->get_ctx(), dev_enum.get(), i);
-    if (conf == NULL) break;
-    i++;
-    out.push_back(device_config(ctx, dev_enum, conf));
-  }
-  vai_clear_status();  // Since we always walk off the list, clear errors
-  return out;
+  return _enumerate_devices(ctx, dev_enum);
 }
 
 // Actually needs definitions of both classes

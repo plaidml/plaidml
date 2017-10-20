@@ -78,32 +78,12 @@ if PLAIDML_EVENTLOG_FILENAME:
 
 _device_lock = threading.Lock()
 _dev = None
-_config = None
-
-
-def set_config(config):
-    """Sets the configuration used by the PlaidML Keras backend."""
-    global _config, _dev
-    _config = config
-    if _dev:
-        _dev.close()
-        _dev = None
-
 
 def _device():
-    global _ctx, _dev, _device_lock, _config
+    global _ctx, _dev, _device_lock
     with _device_lock:
         if not _dev:
-            try:
-                devices = [c for c in plaidml.devices(_ctx, _config)]
-            except:    
-                print("ERROR: No devices found, set PLAIDML_EXPERIMENTAL=1 to enable broader device support.")
-                sys.exit(-1)
-            if len(devices) > 1:
-                print("ERROR: Multiple Devices found, set PLAIDML_DEVICE_IDS=<devid> to one of:")
-                for i, conf in enumerate(devices):
-                    print("  {}".format(conf))
-                sys.exit(-1)
+            devices = plaidml.devices(_ctx)
             _dev = plaidml.Device(_ctx, devices[0])
     return _dev
 

@@ -10,6 +10,7 @@ plaidml_cc_library(
     deps = [
         "//base/util:util_cc",
         "//external:gtest",
+        "//plaidml/base",
     ],
 )
 

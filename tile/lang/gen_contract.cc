@@ -103,8 +103,8 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     SVLOG(cs, 3, "Input " << i << " offset: " << op.access[i].offset);
     SVLOG(cs, 3, "Input " << i << " stride: " << to_string(op.access[i].strides));
   }
-  for (const auto& post_input : op.post_op_inputs) {
-    SVLOG(cs, 3, "Elementwise input " << post_input << " shape: " << vars.at(post_input).shape);
+  for (const auto& kvp : op.post_op_inputs) {
+    SVLOG(cs, 3, "Elementwise input " << kvp.first << " shape: " << vars.at(kvp.first).shape);
   }
   for (const auto& post_op : op.post_ops) {
     SVLOG(cs, 3, "Elementwise op: " << to_string(post_op));
@@ -459,65 +459,24 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
 
   auto checked_output_block = _Block({});
 
-  // Define a function for computing the index into a post-contraction
-  // elementwise operation's input.
-  auto shape_to_offset = [&](const TensorShape& shape) -> sem::ExprPtr {
-    // Invariant: the elementwise operation input has the same size
-    // (modulo broadcast) as the contraction's output.  (Otherwise, we
-    // wouldn't be performing an elementwise operation involving it.)
-
-    // If this input strides are exactly the same as the contraction's
-    // output strides, we can use gout_idx to dereference it.  We also
-    // check the size, to handle the interesting edge case where we're
-    // broadcasting a zero-dimensional value across a one-dimensional
-    // operation.
-    //
-    // TODO: This doesn't take the offset of the contraction's
-    //       output or the input into account.  For correctness,
-    //       this calculation should, but TensorShape doesn't have
-    //       the right information, and it's not immediately obvious
-    //       how we should go about getting it.
-
-    const auto& out_dims = vars.at(op.output).shape.dims;
-
-    bool gout_idx_compatible = (shape.dims.size() == out_dims.size());
-    for (std::size_t idx = 0; gout_idx_compatible && idx < shape.dims.size(); ++idx) {
-      gout_idx_compatible =
-          ((shape.dims[idx].stride == out_dims[idx].stride) && (shape.dims[idx].size == out_dims[idx].size));
-    }
-    if (gout_idx_compatible) {
-      return _("gout_idx");
-    }
-
-    // Otherwise, we need to compute the index for this particular input.
-    sem::ExprPtr expr = _Const(0);
-
-    auto offset = out_dims.size() - shape.dims.size();
-
-    for (std::size_t nidx = 0; nidx < shape.dims.size(); ++nidx) {
-      std::size_t idx = shape.dims.size() - 1 - nidx;
-      if (shape.dims[idx].size == 1) {
-        continue;
-      }
-      const auto& idx_info = pout.indexes()[nidx];
-      sem::ExprPtr d_offset = _(idx_info.name + "_gid") + _(idx_info.name);
-      if (shape.dims[idx].stride != 1) {
-        d_offset = d_offset * shape.dims[idx].stride;
-      }
-      if (nidx) {
-        expr = expr + d_offset;
-      } else {
-        expr = d_offset;
-      }
-    }
-    return expr;
-  };
-
   // Load each input into a register.
-  for (const auto& input : op.post_op_inputs) {
+  auto output_elem_size = vars.at(op.output).shape.elem_size();
+  for (const auto& kvp : op.post_op_inputs) {
+    std::string input = kvp.first;
     std::string declname = std::string("L") + input;
     sem::Type declatype{sem::Type::VALUE, vars.at(input).shape.type, op.agg_vec};
-    sem::ExprPtr opexpr = _(input)[shape_to_offset(vars.at(input).shape)];
+    sem::ExprPtr idx;
+    if (vars.at(input).shape.elem_size() == output_elem_size) {
+      idx = _("gout_idx");
+    } else {
+      idx = _Const(0);
+      for (size_t i = 0; i < sz; i++) {
+        if (kvp.second.strides[i] != 0) {
+          idx = idx + _Const(kvp.second.strides[i]) * (_(op.names[i] + "_gid") + _(op.names[i]));
+        }
+      }
+    }
+    sem::ExprPtr opexpr = _(input)[idx];
     sem::StmtPtr declstmt = _Declare(declatype, declname, opexpr);
     checked_output_block->append(declstmt);
   }
@@ -565,12 +524,6 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     if (bin_ops.count(post_op.f.fn)) {
       std::string opname = bin_ops.at(post_op.f.fn);
       opexpr = std::make_shared<sem::BinaryExpr>(opname, inexprs[0], inexprs[1]);
-    } else if (post_op.f.fn == "broadcast") {
-      if (inexprs[0].get() == inexprs[1].get()) {
-        opexpr = inexprs[0];
-      } else {
-        opexpr = _Cond(inexprs[0] == sem::ExprPtr{_Const(1)}, inexprs[1], inexprs[0]);
-      }
     } else if (post_op.f.fn == "cond") {
       switch (vars.at(post_op.inputs[0]).shape.type) {
         case DataType::FLOAT16:
@@ -589,7 +542,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       opexpr = std::make_shared<sem::UnaryExpr>("-", inexprs[0]);
     } else if (post_op.f.fn == "bit_not") {
       opexpr = std::make_shared<sem::UnaryExpr>("~", inexprs[0]);
-    } else if (post_op.f.fn == "ident") {
+    } else if (post_op.f.fn == "ident" || post_op.f.fn == "reshape") {
       opexpr = inexprs[0];
     } else if (post_op.f.fn == "as_float" || post_op.f.fn == "as_int" || post_op.f.fn == "as_uint") {
       sem::Type declatype{sem::Type::VALUE, vars.at(post_op.output).shape.type, op.agg_vec};
@@ -640,7 +593,12 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       check = std::make_shared<sem::BinaryExpr>("&&", check, (sum <= fc.rhs));
     }
   }
-  wblock->append(_If(check, checked_output_block));
+  // Skip the check if there are no contraints at all
+  if (op.constraints.size() == 0) {
+    wblock->append(checked_output_block);
+  } else {
+    wblock->append(_If(check, checked_output_block));
+  }
 
   kblock->append(ci2.generate(threads, 1, false, false));
 
@@ -658,9 +616,9 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       func->params.emplace_back(in_type, "in" + std::to_string(i));
     }
   }
-  for (const auto& input : op.post_op_inputs) {
-    sem::Type in_type = {sem::Type::POINTER_CONST, vars.at(input).shape.type, op.agg_vec, 0, sem::Type::GLOBAL};
-    func->params.emplace_back(in_type, input);
+  for (const auto& kvp : op.post_op_inputs) {
+    sem::Type in_type = {sem::Type::POINTER_CONST, vars.at(kvp.first).shape.type, op.agg_vec, 0, sem::Type::GLOBAL};
+    func->params.emplace_back(in_type, kvp.first);
   }
   func->body = kblock;
 

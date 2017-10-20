@@ -5,6 +5,37 @@ namespace vertexai {
 namespace tile {
 namespace sem {
 
+void Type::log(el::base::type::ostream_t &os) const { os << to_string(*this); }
+
+std::string to_string(const Type &ty) {
+  std::ostringstream os;
+  if (ty.region == Type::LOCAL) {
+    os << "local ";
+  } else if (ty.region == Type::GLOBAL) {
+    os << "global ";
+  }
+  if (ty.base == Type::POINTER_CONST) {
+    os << "const ";
+  }
+  if (ty.base == Type::TVOID) {
+    os << "void ";
+  }
+  if (ty.base == Type::INDEX) {
+    os << "index ";
+  }
+  os << to_string(ty.dtype);
+  if (ty.vec_width > 1) {
+    os << 'x' << std::to_string(ty.vec_width);
+  }
+  if (ty.base == Type::POINTER_MUT || ty.base == Type::POINTER_CONST) {
+    os << '*';
+  }
+  if (ty.array) {
+    os << '[' << std::to_string(ty.array) << ']';
+  }
+  return os.str();
+}
+
 void IntConst::Accept(Visitor &v) const { v.Visit(*this); }
 
 void FloatConst::Accept(Visitor &v) const { v.Visit(*this); }

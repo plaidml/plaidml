@@ -34,11 +34,20 @@ typedef struct plaidml_devconf plaidml_devconf;
 // Platform configuration properties.  This set may be extended in the future.
 typedef enum {
   // Platform names are NUL-terminated strings.
-  PLAIDML_DEVICE_NAME = 1,
+  PLAIDML_DEVICE_ID = 1,
 
-  // Platform descriptions are NUL-terminated strings.
-  PLAIDML_DEVICE_DESCRIPTION = 2,
+  // Platform configs are NUL-terminated prototxt.
+  PLAIDML_DEVICE_CONFIG = 2,
+
+  // Platform descriptions are NUL-terminated prototxt.
+  PLAIDML_DEVICE_DESCRIPTION = 3,
+
+  // Platform descriptions are NUL-terminated prototxt.
+  PLAIDML_DEVICE_DETAILS = 4
 } plaidml_device_property;
+
+// Returns the version of plaidml
+PLAIDML_API const char* plaidml_get_version();
 
 // Queries the supplied device configuration property.
 //
@@ -54,8 +63,6 @@ typedef enum {
 // with queries that return string values or arrays of values; a common pattern
 // is to make a call with a NULL output buffer and zero size, allocate a buffer
 // of the indicated output size required, and then to re-issue the query.
-//
-// Passing a buffer that's too small is explicitly not an error.
 PLAIDML_API bool plaidml_query_devconf(vai_ctx* ctx, plaidml_devconf* devconf, plaidml_device_property property,
                                        void* output_buffer, size_t output_buffer_size,
                                        size_t* output_buffer_size_required);
@@ -91,10 +98,6 @@ typedef struct plaidml_device_enumerator plaidml_device_enumerator;
 
 // Allocates a device enumerator and initializes it using automatic configuration.
 //
-// Environment variables control how configurations are managed:
-//   PLAIDML_CONFIG=DEFAULT, EXPERIMENTAL,
-//
-//
 // If the supplied callback is NULL, the call will block until the enumerator
 // is fully initialized, and then will return a pointer to the enumerator
 // (unless an error occurs).
@@ -127,11 +130,21 @@ PLAIDML_API plaidml_device_enumerator* plaidml_alloc_device_enumerator_with_conf
 // Freeing a NULL enumerator is a no-op.
 PLAIDML_API void plaidml_free_device_enumerator(plaidml_device_enumerator* enumerator);
 
+// Gets the configuration file that was used to initialize devices.
+PLAIDML_API const char* plaidml_get_enumerator_config_source(plaidml_device_enumerator* enumerator);
+
+// Gets the number of device valid or invalid configurations available.
+PLAIDML_API size_t plaidml_get_devconf_count(vai_ctx* ctx, plaidml_device_enumerator* enumerator, bool valid_devices);
+
 // Gets one device configuration from a device enumerator.  The lifetime of the
 // device configuration is bounded by the device enumerator; there's no need to
 // separately free the configuration.  If the requested configuration index is
 // out of range, or if the enumerator is NULL, this call will return NULL.
 PLAIDML_API plaidml_devconf* plaidml_get_devconf(vai_ctx* ctx, plaidml_device_enumerator* enumerator, size_t index);
+
+// Same as above, only returns invalid devices
+PLAIDML_API plaidml_devconf* plaidml_get_invalid_devconf(vai_ctx* ctx, plaidml_device_enumerator* enumerator,
+                                                         size_t index);
 
 // PlaidML buffers are used to create bindings between actual data and the data
 // elements in PlaidML programs.

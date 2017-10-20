@@ -55,8 +55,15 @@ message TensorShape {
 // A device capable of performing tensor operations.
 message Device {
   string dev_id = 1;
+  
+  // A short description of the device
   string description = 2;
-  string config_id = 3;
+  
+  // Very detailed device information
+  string details = 3;
+
+  // Configuration parameters used for the configured device
+  string config = 4;
 }
 
 // A Tile backend session resource.

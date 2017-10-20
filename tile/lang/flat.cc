@@ -165,7 +165,7 @@ FlatContraction Flatten(const Contraction& c, const std::vector<TensorShape>& sh
 
   // Calculate global offset limits
   for (size_t i = 0; i < shapes.size(); i++) {
-    out.access[i].global_index_limit = shapes[i].buffer_size();
+    out.access[i].global_index_limit = shapes[i].elem_size();
   }
 
   names.push_back(std::string{});

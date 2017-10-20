@@ -67,6 +67,7 @@ inline std::shared_ptr<IfStmt> _If(ExprPtr cond, StmtPtr iftrue, StmtPtr iffalse
 inline std::shared_ptr<WhileStmt> _While(ExprPtr cond, StmtPtr inner) {
   return std::make_shared<WhileStmt>(cond, inner);
 }
+
 inline std::shared_ptr<ForStmt> _For(const std::string& var, uint64_t n, uint64_t s, StmtPtr inner) {
   return std::make_shared<ForStmt>(var, n, s, inner);
 }

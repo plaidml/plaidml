@@ -1,9 +1,9 @@
-
 #pragma once
 
-#include "tile/lang/semtree.h"
 #include <sstream>
 #include <string>
+
+#include "tile/lang/semtree.h"
 
 namespace vertexai {
 namespace tile {

@@ -4,6 +4,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -33,6 +34,7 @@ class Program final : public tile::Program {
   struct BoundKernel {
     std::unique_ptr<hal::Kernel> kernel;
     std::vector<KernelParam> params;
+    std::set<std::size_t> dep_kidxs;
     lang::KernelInfo info;
   };
 
@@ -76,6 +78,12 @@ class Program final : public tile::Program {
   // output memory and remap the output buffer to that HAL buffer.)
   std::vector<TmpInfo> AllocTemporaries(const tile::proto::Program& program, const lang::ShapeMap& shape_map);
 
+  // Adds synthetic dependencies between all kernels.  This is useful
+  // when the underlying device queue is synchronous, as it maximizes
+  // device memory reuse and removes explicit inter-kernel
+  // synchronization (which has some overhead).
+  void AddInterKernelDeps(size_t max_in_flight);
+
   // Schedules the temporary buffers used by the program: i.e. which
   // allocations need to be made in order to run the program, the size
   // of each allocation, and the assignment from each temporary to its
@@ -100,6 +108,7 @@ class Program final : public tile::Program {
   std::unordered_map<std::string, std::size_t> last_input_use_;
   std::vector<std::size_t> tmp_locs_;
   std::vector<std::size_t> alloc_sizes_;
+  lang::VarRewrites var_rewrites_;
 };
 
 }  // namespace local_machine

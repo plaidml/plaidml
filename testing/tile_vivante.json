@@ -11,13 +11,12 @@
       {
         "sel": { "vendor_regex": "Vivante.*" },
         "settings": {
-          "threads": {"value": 4},
-          "vec_size": {"value": 1},
-          "mem_width": {"value": 4},
-          "max_mem": {"value": 1024},
-          "max_regs": {"value": 1024},
-          "use_global": {"value": true},
-          "enable_half": {"value": false}
+          "threads": 4,
+          "vec_size": 1,
+          "mem_width": 4,
+          "max_mem": 1024,
+          "max_regs": 1024,
+          "use_global": true
         }
       }
     ]
