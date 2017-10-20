@@ -88,8 +88,7 @@ struct Function {
   std::string fn;
   std::vector<std::string> params;
   bool is_special() const {
-    return fn == "gather" || fn == "scatter" || fn == "shape" || fn == "reshape" ||
-           (fn.size() > 5 && fn.substr(0, 5) == "prng_");
+    return fn == "gather" || fn == "scatter" || fn == "shape" || (fn.size() > 5 && fn.substr(0, 5) == "prng_");
   }
 };
 

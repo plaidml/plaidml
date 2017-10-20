@@ -20,7 +20,7 @@ TEST(PlaidML_CPP_API, Composition) {
   std::vector<device_config> configs = enumerate_devices(ctx, vertexai::testing::PlaidMLConfig());
 
   for (size_t i = 0; i < configs.size(); i++) {
-    std::cout << i << ": " << configs[i].name() << "->" << configs[i].description() << std::endl;
+    std::cout << i << ": " << configs[i].id() << "->" << configs[i].description() << std::endl;
   }
 
   ASSERT_THAT(configs.size(), Ne(0));

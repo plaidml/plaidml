@@ -86,7 +86,6 @@ const HardwareSettings &TestGPU() {
     settings.goal_dimension_sizes.push_back(1024);
     settings.goal_dimension_sizes.push_back(1024);
     settings.goal_dimension_sizes.push_back(1024);
-    settings.enable_half = false;
   });
 
   return settings;

@@ -17,15 +17,14 @@ def run():
 
     img_input = Input(shape=(3,))
     model = Model(img_input, img_input, name='trivial')
-    model.compile(loss='mean_squared_error',
-                  optimizer='sgd')
+    model.compile(loss='mean_squared_error', optimizer='sgd')
 
     score = model.evaluate(X_test, Y_test)
     return score
 
 
 if __name__ == '__main__':
-    plaidml.keras.backend.set_config(testing.plaidml_config.config())
+    testing.plaidml_config.default_config()
     score = run()
     expected = 1.66666666666666666666
     if (-0.0001 < score - expected and score - expected < 0.0001):

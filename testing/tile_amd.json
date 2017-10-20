@@ -11,14 +11,13 @@
       {
         "sel": { "value": true },
         "settings": {
-          "threads": {"value": 256},
-          "vec_size": {"value": 1},
-          "mem_width": {"value": 128},
-          "max_mem": {"value": 32768},
-          "max_regs": {"value": 16384},
-          "goal_groups": {"value": 1},
-          "goal_flops_per_byte": {"value": 50},
-          "enable_half": {"value": false}
+          "threads": 256,
+          "vec_size": 1,
+          "mem_width": 128,
+          "max_mem": 32768,
+          "max_regs": 16384,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50
         }
       }
     ]

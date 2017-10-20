@@ -14,7 +14,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& shapes) {
+FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& shapes,
+                        std::vector<Polynomial>* out_poly) {
   if (c.specs.size() != 2 && c.specs.size() != 3 && c.specs.size() != 4) {
     throw std::runtime_error("Currently, we only support 1, 2, or 3 element Contractions");
   }
@@ -47,6 +48,9 @@ FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& sh
   Contraction defracted = Defract(reduced, cons);
   SVLOG(cs, 3, "Defracted:\n" << to_string(defracted));
   // Flatten
+  if (out_poly) {
+    *out_poly = defracted.specs[0].spec;
+  }
   FlatContraction flat = Flatten(defracted, shapes);
   SVLOG(cs, 3, "Flattened:\n" << to_string(flat).c_str());
   flat.comments = cs.str();

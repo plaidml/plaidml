@@ -142,7 +142,7 @@ void EmitC::Visit(const sem::BinaryExpr &n) {
 void EmitC::Visit(const sem::CondExpr &n) {
   emit("(");
   n.cond->Accept(*this);
-  emit("?");
+  emit(" ? ");
   n.tcase->Accept(*this);
   emit(" : ");
   n.fcase->Accept(*this);
@@ -152,9 +152,9 @@ void EmitC::Visit(const sem::CondExpr &n) {
 void EmitC::Visit(const sem::SelectExpr &n) {
   emit("select(");
   n.fcase->Accept(*this);
-  emit(",");
+  emit(", ");
   n.tcase->Accept(*this);
-  emit(",");
+  emit(", ");
   n.cond->Accept(*this);
   emit(")");
 }
@@ -162,9 +162,9 @@ void EmitC::Visit(const sem::SelectExpr &n) {
 void EmitC::Visit(const sem::ClampExpr &n) {
   emit("clamp(");
   n.val->Accept(*this);
-  emit(",");
+  emit(", ");
   n.min->Accept(*this);
-  emit(",");
+  emit(", ");
   n.max->Accept(*this);
   emit(")");
 }
@@ -249,7 +249,7 @@ void EmitC::Visit(const sem::IfStmt &n) {
 
 void EmitC::Visit(const sem::ForStmt &n) {
   emitTab();
-  emit("for(int ");
+  emit("for (int ");
   emit(n.var);
   emit(" = 0; ");
   emit(n.var);

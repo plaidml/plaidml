@@ -204,6 +204,10 @@ class Executor {
   // nullptr.
   virtual Memory* shared_memory() = 0;
 
+  // Indicates whether the executor is synchronous.  Synchronous executors guarantee that operations (e.g. kernel
+  // evaluations) will always run to completion before subsequent operations.
+  virtual bool is_synchronous() const = 0;
+
   // Instructs the device to copy memory between buffers.
   // The 'from' buffer must have been created with DEVICE_READABLE access; the 'to' buffer must have been created with
   // DEVICE_WRITEABLE access.

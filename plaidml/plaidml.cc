@@ -100,6 +100,9 @@ void FillPropString(const std::string& str, void* output_buffer, size_t output_b
 
 }  // namespace
 
+extern const char* PLAIDML_VERSION;
+extern "C" const char* plaidml_get_version() { return PLAIDML_VERSION; }
+
 extern "C" bool plaidml_query_devconf(vai_ctx* ctx, plaidml_devconf* devconf, plaidml_device_property property,
                                       void* output_buffer, size_t output_buffer_size,
                                       size_t* output_buffer_size_required) {
@@ -116,11 +119,17 @@ extern "C" bool plaidml_query_devconf(vai_ctx* ctx, plaidml_devconf* devconf, pl
       return false;
     }
     switch (property) {
-      case PLAIDML_DEVICE_NAME:
+      case PLAIDML_DEVICE_ID:
         FillPropString(devconf->device.dev_id(), output_buffer, output_buffer_size, output_buffer_size_required);
         return true;
       case PLAIDML_DEVICE_DESCRIPTION:
         FillPropString(devconf->device.description(), output_buffer, output_buffer_size, output_buffer_size_required);
+        return true;
+      case PLAIDML_DEVICE_DETAILS:
+        FillPropString(devconf->device.details(), output_buffer, output_buffer_size, output_buffer_size_required);
+        return true;
+      case PLAIDML_DEVICE_CONFIG:
+        FillPropString(devconf->device.config(), output_buffer, output_buffer_size, output_buffer_size_required);
         return true;
       default:
         FillPropString("", output_buffer, output_buffer_size, output_buffer_size_required);
@@ -196,6 +205,7 @@ extern "C" void plaidml_close_device(plaidml_device* device) { delete device; }
 // plaidml_device_enumerator
 
 struct plaidml_device_enumerator {
+  std::string config_source;
   std::shared_ptr<tile::Platform> platform;
   std::vector<plaidml_devconf> devices;
   std::vector<plaidml_devconf> unmatched_devices;
@@ -209,11 +219,11 @@ std::string getEnvVar(std::string const& key) {
 }
 
 plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
-    vai_ctx* ctx, const char* configuration, void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator),
-    void* arg) {
+    vai_ctx* ctx, const char* configuration, const std::string& config_source,
+    void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
   if (!callback) {
     vertexai::Sync<plaidml_device_enumerator*> sync;
-    _plaidml_alloc_device_enumerator(ctx, configuration, sync.callback(), sync.arg());
+    _plaidml_alloc_device_enumerator(ctx, configuration, config_source, sync.callback(), sync.arg());
     return sync.WaitForResult();
   }
 
@@ -233,6 +243,7 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
   try {
     context::Activity activity{ctx->activity.ctx(), "vertexai::EnumerateDevices"};
     auto enumerator = vertexai::compat::make_unique<plaidml_device_enumerator>();
+    enumerator->config_source = config_source;
 #if TARGET_OS_IPHONE == 1
     enumerator->platform = std::make_shared<tile::metal::MetalPlatform>();
 #else   // TARGET_OS_IPHONE == 1
@@ -248,19 +259,19 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
         vertexai::AnyFactoryMap<tile::Platform>::Instance()->MakeInstance(activity.ctx(), config.platform());
 #endif  // TARGET_OS_IPHONE == 1 ... else
     tile::proto::ListDevicesRequest req;
-    tile::proto::ListDevicesResponse subdevs;
-    enumerator->platform->ListDevices(activity.ctx(), req, &subdevs);
-    for (const auto& subdev : subdevs.devices()) {
-      plaidml_devconf devconf = {enumerator->platform, subdev};
+    tile::proto::ListDevicesResponse resp;
+    enumerator->platform->ListDevices(activity.ctx(), req, &resp);
+    for (const auto& dev : resp.devices()) {
+      plaidml_devconf devconf = {enumerator->platform, dev};
       if (!device_ids.empty() && device_ids.find(devconf.device.dev_id()) == device_ids.end()) {
+        enumerator->unmatched_devices.emplace_back(devconf);
         continue;
       }
       enumerator->devices.emplace_back(devconf);
     }
-    if (!enumerator->devices.size()) {
-      vertexai::SetLastStatus(VAI_STATUS_NOT_FOUND, vertexai::status_strings::kNoDevices);
-      callback(arg, nullptr);
-      return nullptr;
+    for (const auto& dev : resp.unmatched_devices()) {
+      plaidml_devconf devconf = {enumerator->platform, dev};
+      enumerator->unmatched_devices.emplace_back(devconf);
     }
     result = enumerator.release();
   } catch (...) {
@@ -276,29 +287,43 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
 extern "C" plaidml_device_enumerator* plaidml_alloc_device_enumerator(
     vai_ctx* ctx, void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
   std::string config_file;
-
-  if (!getEnvVar(PLAIDML_EXPERIMENTAL).empty()) {
+  std::string exp = getEnvVar(PLAIDML_EXPERIMENTAL);
+  if (!exp.empty() && exp!="0") {
     config_file = getEnvVar(PLAIDML_EXPERIMENTAL_CONFIG);
   } else {
     config_file = getEnvVar(PLAIDML_DEFAULT_CONFIG);
   }
-
-  LOG(INFO) << "Loading configs from: " << config_file;
   std::ifstream cfs(config_file);
   std::string config;
   config.assign(std::istreambuf_iterator<char>(cfs), std::istreambuf_iterator<char>());
-
-  return _plaidml_alloc_device_enumerator(ctx, config.c_str(), callback, arg);
+  return _plaidml_alloc_device_enumerator(ctx, config.c_str(), config_file, callback, arg);
 }
 
 extern "C" plaidml_device_enumerator* plaidml_alloc_device_enumerator_with_config(
     vai_ctx* ctx, const char* configuration, void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator),
     void* arg) {
-  return _plaidml_alloc_device_enumerator(ctx, configuration, callback, arg);
+  return _plaidml_alloc_device_enumerator(ctx, configuration, "CUSTOM", callback, arg);
 }
 
 extern "C" void plaidml_free_device_enumerator(plaidml_device_enumerator* device_enumerator) {
   delete device_enumerator;
+}
+
+// Gets the configuration file that was used to initialize devices
+PLAIDML_API const char* plaidml_get_enumerator_config_source(plaidml_device_enumerator* enumerator) {
+  return enumerator->config_source.c_str();
+}
+
+extern "C" size_t plaidml_get_devconf_count(vai_ctx* ctx, plaidml_device_enumerator* enumerator, bool valid_devices) {
+  if (!enumerator) {
+    vertexai::SetLastOOM();
+    return 0;
+  }
+  if (valid_devices) {
+    return enumerator->devices.size();
+  } else {
+    return enumerator->unmatched_devices.size();
+  }
 }
 
 extern "C" plaidml_devconf* plaidml_get_devconf(vai_ctx* ctx, plaidml_device_enumerator* enumerator, size_t index) {
@@ -313,6 +338,18 @@ extern "C" plaidml_devconf* plaidml_get_devconf(vai_ctx* ctx, plaidml_device_enu
   return &enumerator->devices.at(index);
 }
 
+extern "C" plaidml_devconf* plaidml_get_invalid_devconf(vai_ctx* ctx, plaidml_device_enumerator* enumerator,
+                                                        size_t index) {
+  if (!enumerator) {
+    vertexai::SetLastOOM();
+    return nullptr;
+  }
+  if (enumerator->unmatched_devices.size() <= index) {
+    vertexai::SetLastStatus(VAI_STATUS_OUT_OF_RANGE, "Requested valdevice index is out of range");
+    return nullptr;
+  }
+  return &enumerator->unmatched_devices.at(index);
+}
 // plaidml_buffer and plaidml_mapping
 namespace {
 
@@ -388,7 +425,7 @@ class MapCompletion final {
   std::mutex mu_;
   bool invoked_callback_ = false;
 
-  // N.B. This rundown should be the last member, so that it's the first destroyed; that way, if a cancellation callback
+  // N.B. This rundown should be the last member, so that it's the first destrsoyed; that way, if a cancellation callback
   // arrives during destruction, the rest of the MapCompletion will still be in a valid state to handle it.  Also note
   // that once the rundown is destroyed, subsequent callbacks cannot occur.
   context::Rundown rundown_{[this]() { OnCancel(); }};
@@ -716,7 +753,7 @@ uint64_t plaidml_get_shape_buffer_size(plaidml_shape* shape) {
     vertexai::SetLastOOM();
     return 0;
   }
-  return shape->shape.buffer_size() * byte_width(shape->shape.type);
+  return shape->shape.byte_size();
 }
 
 uint64_t plaidml_get_shape_element_count(plaidml_shape* shape) {
@@ -724,7 +761,7 @@ uint64_t plaidml_get_shape_element_count(plaidml_shape* shape) {
     vertexai::SetLastOOM();
     return 0;
   }
-  return shape->shape.buffer_size();
+  return shape->shape.elem_size();
 }
 
 // plaidml_function
@@ -829,9 +866,8 @@ static std::shared_ptr<TensorValue> read_tensor(vai_ctx* ctx, unzFile f, const s
   tile::proto::TensorShape ts_proto;
   ts_proto.ParseFromString(proto_buf);
   tile::lang::TensorShape ts = tile::proto::to_poco(ts_proto);
-  size_t size = ts.buffer_size() * ((bit_width(ts.type) + 7) / 8);
   std::shared_ptr<BufferState> bs = std::make_shared<BufferState>(
-      evaluator->get_platform()->MakeBuffer(ctx->activity.ctx(), evaluator->get_id(), size), evaluator);
+      evaluator->get_platform()->MakeBuffer(ctx->activity.ctx(), evaluator->get_id(), ts.byte_size()), evaluator);
   plaidml_buffer tb{std::move(activity), bs};
   std::unique_ptr<plaidml_mapping> tm{plaidml_map_buffer_discard(ctx, &tb)};
   if (!tm) {

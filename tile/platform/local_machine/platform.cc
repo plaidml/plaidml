@@ -6,6 +6,8 @@
 #include <memory>
 #include <utility>
 
+#include <google/protobuf/util/json_util.h>
+
 #include "base/util/any_factory_map.h"
 #include "base/util/compat.h"
 #include "base/util/error.h"
@@ -78,28 +80,16 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
           }
           if (!found_hardware_config) {
             skip_device = true;
-            LOG(WARNING) << "No settings found for hardware device \"" << info.name() << "\", vendor \""
-                         << info.vendor() << "\"";
           }
           auto devinfo = std::make_shared<DevInfo>(DevInfo{devset, dev, settings});
-          PlatformDev pd{devinfo};
+          PlatformDev pd{id, devinfo};
           if (skip_device) {
             unmatched_devs_[id] = std::move(pd);
             continue;
           }
           LOG(INFO) << "Initializing device " << id << ": \"" << info.name() << "\", vendor \"" << info.vendor()
                     << "\"";
-          LOG(INFO) << "  " << id << " Threads:" << settings.threads().value();
-          LOG(INFO) << "  " << id << " Vector size:" << settings.vec_size().value();
-          LOG(INFO) << "  " << id << " Memory width:" << settings.mem_width().value();
-          LOG(INFO) << "  " << id << " Memory Max:" << settings.max_mem().value();
-          LOG(INFO) << "  " << id << " Register Max:" << settings.max_regs().value();
-          LOG(INFO) << "  " << id << " Goal Groups:" << settings.goal_groups().value();
-          LOG(INFO) << "  " << id << " Goal Flops/byte:" << settings.goal_flops_per_byte().value();
-          LOG(INFO) << "  " << id
-                    << (settings.use_global().value() ? " Running from system memory" : " Running from device memory");
-          LOG(INFO) << "  " << id
-                    << (settings.enable_half().value() ? " Using half-width floats" : " Using full-width floats");
+          VLOG(1) << settings.DebugString();
           GetMemStrategy(devinfo, &pd);
           devs_[id] = std::move(pd);
         }
@@ -121,17 +111,27 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx
       std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source), platform_dev.tmp_mem_source);
 }
 
+void _fill_device(const Platform::PlatformDev& pdev, tile::proto::Device* dev) {
+  google::protobuf::util::JsonPrintOptions options;
+  options.add_whitespace = true;
+  // options.preserve_proto_field_names = true;
+  dev->set_dev_id(pdev.id);
+  dev->set_description(pdev.devinfo->dev->description());
+  std::string buf;
+  google::protobuf::util::MessageToJsonString(pdev.devinfo->dev->executor()->info().info(), &buf, options);
+  dev->set_details(buf);
+  buf.clear();
+  google::protobuf::util::MessageToJsonString(pdev.devinfo->settings, &buf, options);
+  dev->set_config(buf);
+}
+
 void Platform::ListDevices(const context::Context& ctx, const tile::proto::ListDevicesRequest& request,
                            tile::proto::ListDevicesResponse* response) {
   for (const auto& dev : devs_) {
-    auto desc = response->add_devices();
-    desc->set_dev_id(dev.first);
-    desc->set_description(dev.second.devinfo->dev->description());
+    _fill_device(dev.second, response->add_devices());
   }
   for (const auto& dev : unmatched_devs_) {
-    auto desc = response->add_unmatched_devices();
-    desc->set_dev_id(dev.first);
-    desc->set_description(dev.second.devinfo->dev->description());
+    _fill_device(dev.second, response->add_unmatched_devices());
   }
 }
 

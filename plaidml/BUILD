@@ -13,6 +13,7 @@ load(
     "plaidml_py_library",
     "plaidml_py_test",
     "plaidml_py_wheel",
+    "plaidml_cc_version",
 )
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
 
@@ -22,9 +23,17 @@ plaidml_proto_library(
     visibility = ["//visibility:public"],
 )
 
+plaidml_cc_version(
+    name = "version",
+    prefix = "PLAIDML",
+)
+
 plaidml_cc_library(
     name = "api",
-    srcs = ["plaidml.cc"],
+    srcs = [
+        "plaidml.cc",
+        ":version",
+    ],
     hdrs = [
         "plaidml.h",
         "plaidml++.h",
@@ -95,7 +104,22 @@ plaidml_cc_test(
     srcs = ["plaidml_test.cc"],
     deps = [
         ":api",
+        "//testing:matchers",
         "//testing:plaidml_config",
+    ],
+)
+
+plaidml_cc_test(
+    name = "dtype_vec_test",
+    srcs = ["dtype_vec_test.cc"],
+    deps = [
+        ":api",
+        "//external:half",
+        "//plaidml:proto_cc",
+        "//testing:matchers",
+        "//testing:plaidml_config",
+        "//tile/hal/opencl:proto_cc",
+        "//tile/platform/local_machine:proto_cc",
     ],
 )
 
@@ -114,6 +138,7 @@ plaidml_cc_test(
     srcs = ["uint8_test.cc"],
     deps = [
         ":api",
+        "//testing:matchers",
         "//testing:plaidml_config",
     ],
 )
@@ -168,6 +193,8 @@ plaidml_py_library(
         "__init__.py",
         "context.py",
         "exceptions.py",
+        "plaidml_setup.py",
+        "settings.py",
         "library.py",
     ],
     data = [":configs"] + select({
@@ -175,6 +202,14 @@ plaidml_py_library(
         "//conditions:default": [":libplaidml.so"],
     }),
     visibility = ["//visibility:public"],
+)
+
+plaidml_py_test(
+    name = "settings_test",
+    srcs = ["settings_test.py"],
+    deps = [
+        ":py",
+    ],
 )
 
 plaidml_py_test(
@@ -186,6 +221,7 @@ plaidml_py_test(
         "//testing:plaidml_py",
     ],
 )
+
 
 pkg_tar(
     name = "py_deb_data",
@@ -226,5 +262,8 @@ plaidml_py_wheel(
         "//bzl:x64_windows": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
     }),
+    console_scripts = [
+       "'plaidml-setup = plaidml.plaidml_setup:main'",
+    ],
     python = "py2",
 )

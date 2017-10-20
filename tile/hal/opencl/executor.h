@@ -23,6 +23,10 @@ class Executor : public hal::Executor {
 
   Memory* shared_memory() final { return shared_memory_.get(); }
 
+  bool is_synchronous() const final {
+    return !(device_state_->cl_normal_queue().props & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE);
+  }
+
   std::shared_ptr<hal::Event> Copy(const context::Context& ctx, const std::shared_ptr<hal::Buffer>& from,
                                    std::size_t from_offset, const std::shared_ptr<hal::Buffer>& to,
                                    std::size_t to_offset, std::size_t length,

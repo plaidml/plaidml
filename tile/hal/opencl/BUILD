@@ -47,6 +47,8 @@ plaidml_cc_library(
         "event.h",
         "executor.cc",
         "executor.h",
+        "exprtype.cc",
+        "exprtype.h",
         "global_memory.cc",
         "global_memory.h",
         "info.cc",
@@ -101,4 +103,15 @@ plaidml_cc_library(
         ],
     }),
     alwayslink = 1,
+)
+
+plaidml_cc_test(
+    name = "exprtype_test",
+    srcs = [
+        "exprtype_test.cc",
+    ],
+    deps = [
+        ":opencl",
+        "//external:gtest",
+    ],
 )

@@ -12,7 +12,7 @@ namespace lang {
 
 KernelInfo GenZero(const TensorShape& shape, const std::string& bname, const std::string& kname) {
   using namespace sem::builder;  // NOLINT
-  uint64_t size = shape.buffer_size();
+  uint64_t size = shape.elem_size();
   IVLOG(2, "Making a zero for " << bname.c_str() << ", of size " << size);
   sem::Function::params_t params;
   sem::Type paramtype{sem::Type::POINTER_MUT, shape.type};

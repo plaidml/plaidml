@@ -24,6 +24,7 @@ import tensorflow
 import theano
 theano.config.optimizer = "None"
 
+
 def m(*args, **kwargs):
     dtype = kwargs.get('dtype', 'float32')
     """Makes a test matrix whose dimensions are the supplied arguments."""
@@ -610,9 +611,16 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(1, 1, 60), (60,)],
              [m(4, 3, 70, 2), (14, 10, 6, 2)],
              [m(7, 3, 2, 4), (-1,)],
-             [m(4, 4), (-1,)],])
+             [m(4, 4), (-1,)]])
     def testReshape(self, b, x, s):
         return [b.reshape(x, s)]
+
+    @opTest([[m(1, 1, 60), (60,)],
+             [m(4, 3, 70, 2), (14, 10, 6, 2)],
+             [m(7, 3, 2, 4), (-1,)],
+             [m(4, 4), (-1,)],])
+    def testTransposeReshape(self, b, x, s):
+        return [b.reshape(b.transpose(x), s)]
 
     @opTest([[m(4, 2, 1, 3, 2), 2],
              [m(5, 3, 2, 1), -1]])
@@ -857,5 +865,5 @@ class TestBackendOps(unittest.TestCase):
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.nan)
     #plaidml._internal_set_vlog(4)
-    pkb.set_config(testing.plaidml_config.config())
+    testing.plaidml_config.default_config()
     unittest.main()

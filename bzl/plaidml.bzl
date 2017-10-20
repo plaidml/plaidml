@@ -435,6 +435,7 @@ def _plaidml_py_wheel_impl(ctx):
       'bzl_package_name': pkg_name,
       'bzl_version': version,
       'bzl_target_cpu': ctx.var['TARGET_CPU'],
+      '{CONSOLE_SCRIPTS}': ",\n".join(ctx.attr.console_scripts)
     }
   )
   wheel_filename = "dist/%s-%s-%s-%s-%s.whl" % (
@@ -477,10 +478,34 @@ plaidml_py_wheel = rule(
         "python": attr.string(mandatory = True),
         "abi": attr.string(default = "none"),
         "platform": attr.string(default = "any"),
+        "console_scripts": attr.string_list(),
         "_setup_py_tpl": attr.label(
             default = Label("//bzl:setup.tpl.py"),
             allow_single_file = True,
         ),
     },
     implementation = _plaidml_py_wheel_impl,
+)
+
+def _plaidml_version_impl(ctx):
+  ctx.actions.expand_template(
+    template=ctx.file._version_cc_tpl,
+    output=ctx.outputs.version_file,
+    substitutions={
+      "{PREFIX}": ctx.attr.prefix,
+      "{VERSION}": ctx.var.get('version', default='unknown'),
+    })
+
+plaidml_cc_version = rule(
+  attrs = {
+    "prefix": attr.string(mandatory = True),
+    "_version_cc_tpl": attr.label(
+        default = Label("//bzl:version.cc.tpl"), 
+        allow_files = True, 
+        single_file = True
+    )
+  },
+  outputs = {"version_file": "_version.cc"},
+  implementation = _plaidml_version_impl,
+  output_to_genfiles = True
 )

@@ -25,6 +25,7 @@ plaidml_py_test(
         "backend_test.py",
     ],
     tags = [
+        "darwin_fail",
         "keras",
         "tensorflow",
     ],
