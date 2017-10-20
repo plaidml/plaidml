@@ -40,7 +40,7 @@ Vertex.AI runs a comprehensive set of tests for each release against these hardw
 
 ### Validated Networks
 
-We support most of the convolutional Keras application networks. Validated networks are tested for performance and 
+We support all of the Keras application networks from the current version (2.0.8). Validated networks are tested for performance and 
 correctness as part of our continuous integration system.
 
  * CNNs
