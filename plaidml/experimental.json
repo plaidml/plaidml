@@ -13,7 +13,12 @@
       {
         "description": "AMD config",
         "sel": {
-          "vendor_regex": "Advanced Micro Devices.*"
+          "or": {
+            "sel": [
+              { "vendor_regex": "Advanced Micro Devices.*" },
+              { "vendor_regex": "AMD" }
+            ]
+          }
         },
         "settings": {
           "threads": 256,
@@ -21,6 +26,26 @@
           "mem_width": 128,
           "max_mem": 32768,
           "max_regs": 16384,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50
+        }
+      },
+      {
+        "description": "Intel GPU config",
+        "sel": {
+          "or": {
+            "sel": [
+              { "name_regex": "Iris.*" },
+              { "name_regex": "HD Graphics.*" }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 64,
+          "vec_size": 8,
+          "mem_width": 256,
+          "max_mem": 7300,
+          "max_regs": 4000,
           "goal_groups": 1,
           "goal_flops_per_byte": 50
         }
@@ -41,7 +66,7 @@
         }
       },
       {
-        "description": "Intel config",
+        "description": "Intel CPU config",
         "sel": {
           "and": {
             "sel": [
