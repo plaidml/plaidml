@@ -57,17 +57,25 @@ No supported devices found. Run 'clinfo' and file an issue containing the full o
         sys.exit(-1)
 
     print("Default Config Devices:")
+    if len(devices) == 0:
+        print("   No devices.")
     for dev in devices:
         print("   {0} : {1}".format(dev.id, dev.description))
 
     print("\nExperimental Config Devices:")
+    if len(exp_devices) == 0:
+        print("   No devices.")
     for dev in exp_devices:
         print("   {0} : {1}".format(dev.id, dev.description))
     
     print("\nUsing experimental devices can cause poor performance, crashes, and other nastiness.")
     exp = choice_prompt("Enable experimental device support", ["y","n"], "n")
     plaidml.settings.experimental = exp == "y"
-    devices = plaidml.devices(ctx, limit=100)
+    try:
+        devices = plaidml.devices(ctx, limit=100)
+    except plaidml.exceptions.PlaidMLError:
+        print("\nNo devices available in chosen config. Rerun plaidml-setup.")
+        sys.exit(-1)
 
     if len(devices) > 1:
         print(
