@@ -8,7 +8,7 @@ PlaidML is a multi-language acceleration framework that:
   * Allows hardware developers to quickly integrate with high-level frameworks
   * Allows framework developers to easily add support for many kinds of hardware
 
-PlaidML is under active development and should be thought of as early-beta quality.
+For background and early benchmarks see our [blog post](http://vertex.ai/blog/announcing-plaidml) announcing the release. PlaidML is under active development and should be thought of as early-beta quality.
 
 - [Current Limitations](#current-limitation)
 - [Supported Hardware](#supported-hardware)
