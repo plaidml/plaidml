@@ -145,7 +145,7 @@ print("Ran in {} seconds".format(time.time() - start))
 
 ## Building PlaidML
 
-PlaidML depends on [Bazel](http://bazel.build) v0.6.0 and higher.
+PlaidML depends on [Bazel](http://bazel.build) v0.6.0 or higher.
 ```
 bazel build -c opt plaidml:wheel plaidml/keras:wheel
 sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
