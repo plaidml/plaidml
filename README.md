@@ -16,6 +16,7 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
   - [Experimental Config](#experimental-config)
 - [Validated Networks](#validated-networks)
 - [Installation Instructions](#installation-instructions)
+- [Building PlaidML](#building-plaidml)
 - [Reporting Issues](#reporting-issues)
 
 ## Current Limitations
@@ -142,9 +143,17 @@ print("Ran in {} seconds".format(time.time() - start))
 
 ```
 
+## Building PlaidML
+
+PlaidML depends on [Bazel](http://bazel.build) v0.6.0 or higher.
+```
+bazel build -c opt plaidml:wheel plaidml/keras:wheel
+sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
+```
+
 ## License
 
-PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt).
+PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt). For alternative licensing contact [solutions@vertex.ai](mailto:solutions@vertex.ai).
 
 ## Reporting Issues
 Either open a ticket on [GitHub](https://github.com/plaidml/plaidml/issues) or post to [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev).
