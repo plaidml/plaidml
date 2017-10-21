@@ -20,6 +20,7 @@ UseDef::UseDef(const Program& prog) {
       throw std::runtime_error("Variable " + prog.ops[i].output + " redeclared");
     }
     op_defs_[prog.ops[i].output] = i;
+    uses_[prog.ops[i].output];  // Initialize an empty set for the output
     if (prog.ops[i].tag == Op::CONSTANT) {
       continue;
     }

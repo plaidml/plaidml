@@ -29,47 +29,6 @@ namespace tile {
 namespace lang {
 namespace {
 
-class Emit : public EmitC {
- public:
-  void Visit(const sem::CallExpr &n) final {
-    n.func->Accept(*this);
-    emit("(");
-    for (size_t i = 0; i < n.vals.size(); i++) {
-      n.vals[i]->Accept(*this);
-      if (i != n.vals.size() - 1) {
-        emit(", ");
-      }
-    }
-    emit(")");
-  }
-
-  void Visit(const sem::IndexExpr &n) final {
-    switch (n.type) {
-      case sem::IndexExpr::GLOBAL:
-        emit("get_global_id(" + std::to_string(n.dim) + ")");
-        break;
-      case sem::IndexExpr::GROUP:
-        emit("get_group_id(" + std::to_string(n.dim) + ")");
-        break;
-      case sem::IndexExpr::LOCAL:
-        emit("get_local_id(" + std::to_string(n.dim) + ")");
-        break;
-      default:
-        throw std::runtime_error("Invalid IndexExpr type");
-    }
-  }
-
-  void Visit(const sem::BarrierStmt &n) {
-    emitTab();
-    emit("barrier();\n");
-  }
-
-  void Visit(const sem::Function &n) final {
-    emit("kernel ");
-    EmitC::Visit(n);
-  }
-};
-
 const HardwareSettings &TestGPU() {
   static HardwareSettings settings;
   static std::once_flag init;
@@ -425,7 +384,7 @@ TEST_CASE("Functions", "[compile]") {
   inputs.emplace("x", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
   outputs.emplace("y", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
   KernelList result = GenerateProgram(p, inputs, outputs, TestGPU());
-  Emit emit;
+  EmitDebug emit;
   emit.Visit(*result.kernels[0].kfunc);
   std::string code = emit.str();
   REQUIRE(code.find("exp") != std::string::npos);
@@ -552,7 +511,7 @@ TEST_CASE("Ast", "[ast]") {
                       }),
                       _Return(r)});
 
-  Emit emit;
+  EmitDebug emit;
   emit.Visit(*f);
   IVLOG(1, "Code:\n" << emit.str());
 }
@@ -826,7 +785,7 @@ TEST_CASE("CombineConvolutionAndRelu", "[emit]") {
   auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), "ID");
   if (VLOG_IS_ON(1)) {
     for (const auto &kinfo : klist.kernels) {
-      Emit emit;
+      EmitDebug emit;
       emit.Visit(*kinfo.kfunc);
       VLOG(1) << "Got kernel: " << emit.str();
     }
