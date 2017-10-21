@@ -87,8 +87,6 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
             unmatched_devs_[id] = std::move(pd);
             continue;
           }
-          LOG(INFO) << "Initializing device " << id << ": \"" << info.name() << "\", vendor \"" << info.vendor()
-                    << "\"";
           VLOG(1) << settings.DebugString();
           GetMemStrategy(devinfo, &pd);
           devs_[id] = std::move(pd);

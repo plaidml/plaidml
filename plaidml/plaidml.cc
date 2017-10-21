@@ -191,8 +191,7 @@ extern "C" plaidml_device* plaidml_open_device(vai_ctx* ctx, plaidml_devconf* de
         return nullptr;
       }
     }
-    LOG(INFO) << "Opening device \"" << devconf->device.dev_id() << "\": \"" << devconf->device.description() << "\"";
-
+    LOG(INFO) << "Opening device \"" << devconf->device.dev_id();
     return new plaidml_device{std::make_shared<Evaluator>(devconf)};
   } catch (...) {
     vertexai::SetLastException(std::current_exception());
@@ -288,7 +287,7 @@ extern "C" plaidml_device_enumerator* plaidml_alloc_device_enumerator(
     vai_ctx* ctx, void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
   std::string config_file;
   std::string exp = getEnvVar(PLAIDML_EXPERIMENTAL);
-  if (!exp.empty() && exp!="0") {
+  if (!exp.empty() && exp != "0") {
     config_file = getEnvVar(PLAIDML_EXPERIMENTAL_CONFIG);
   } else {
     config_file = getEnvVar(PLAIDML_DEFAULT_CONFIG);
@@ -425,7 +424,8 @@ class MapCompletion final {
   std::mutex mu_;
   bool invoked_callback_ = false;
 
-  // N.B. This rundown should be the last member, so that it's the first destrsoyed; that way, if a cancellation callback
+  // N.B. This rundown should be the last member, so that it's the first destroyed; that way, if a cancellation
+  // callback
   // arrives during destruction, the rest of the MapCompletion will still be in a valid state to handle it.  Also note
   // that once the rundown is destroyed, subsequent callbacks cannot occur.
   context::Rundown rundown_{[this]() { OnCancel(); }};
