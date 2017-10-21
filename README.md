@@ -153,7 +153,7 @@ sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 ## License
 
-PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt). Commercial licenses and support for PlaidML are available from [Vertex.AI](mailto:info@vertex.ai).
+PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt). For alternative licensing contact [solutions@vertex.ai](mailto:solutions@vertex.ai)
 
 ## Reporting Issues
 Either open a ticket on [GitHub](https://github.com/plaidml/plaidml/issues) or post to [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev).
