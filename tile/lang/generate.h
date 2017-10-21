@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "base/util/transfer_object.h"
@@ -63,6 +64,7 @@ struct KernelInfo {
   std::shared_ptr<sem::Function> kfunc;
   std::vector<std::string> outputs;
   std::vector<std::string> inputs;
+  std::unordered_set<std::string> war_safe_reads;
   GridSize gwork;
   GridSize lwork;
   size_t tot_bytes;

@@ -68,7 +68,7 @@ No supported devices found. Run 'clinfo' and file an issue containing the full o
     for dev in exp_devices:
         print("   {0} : {1}".format(dev.id, dev.description))
     
-    print("\nUsing experimental devices can cause poor performance, crashes, and other nastiness.")
+    print("\nUsing experimental devices can cause poor performance, crashes, and other nastiness.\n")
     exp = choice_prompt("Enable experimental device support", ["y","n"], "n")
     plaidml.settings.experimental = exp == "y"
     try:
@@ -89,6 +89,7 @@ Please choose a default device:
         dev = choice_prompt("\nDefault device", [str(i) for i in devrange], "1")
         plaidml.settings.device_ids = [devices[int(dev) - 1].id]
 
+    print("\nSelected device:\n    {0}".format(plaidml.devices(ctx)[0]))
     print(
 """
 PlaidML sends anonymous usage statistics to help guide improvements.

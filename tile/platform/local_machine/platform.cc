@@ -51,13 +51,13 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
     drivers_.emplace_back(AnyFactoryMap<hal::Driver>::Instance()->MakeInstance(ctx, hal_config));
   }
 
-  bool skip_device = false;
   for (const auto& driver : drivers_) {
     for (const auto& devset : driver->device_sets()) {
       for (const auto& dev : devset->devices()) {
         if (dev->executor()) {
           const hal::proto::HardwareInfo& info = dev->executor()->info();
           hal::proto::HardwareSettings settings = info.settings();
+          bool skip_device = false;
           bool found_hardware_config = false;
           // TODO(T1101): Move ids into the hal
 
@@ -87,8 +87,6 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
             unmatched_devs_[id] = std::move(pd);
             continue;
           }
-          LOG(INFO) << "Initializing device " << id << ": \"" << info.name() << "\", vendor \"" << info.vendor()
-                    << "\"";
           VLOG(1) << settings.DebugString();
           GetMemStrategy(devinfo, &pd);
           devs_[id] = std::move(pd);

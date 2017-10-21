@@ -24,11 +24,13 @@ class Program final : public tile::Program {
   enum class KernelParamType { kInput, kOutput, kTmpInput, kTmpOutput };
 
   struct KernelParam {
-    KernelParam(KernelParamType _ty, std::string _name, std::size_t _tidx = 0) : ty{_ty}, name{_name}, tidx{_tidx} {}
+    KernelParam(KernelParamType _ty, std::string _name, std::size_t _tidx = 0, bool _war_safe_reader = false)
+        : ty{_ty}, name{_name}, tidx{_tidx}, war_safe_reader{_war_safe_reader} {}
 
     KernelParamType ty;
     std::string name;      // Used for inputs and outputs
     std::size_t tidx = 0;  // Used for temporaries.
+    bool war_safe_reader = false;
   };
 
   struct BoundKernel {
@@ -57,7 +59,8 @@ class Program final : public tile::Program {
   struct TmpInfo {
     std::size_t first_writer_kidx = 0;
     std::size_t last_writer_kidx = 0;
-    std::size_t size = 0;
+    std::size_t elem_size = 0;
+    std::size_t byte_size = 0;
   };
 
   // Compiles kernel semantic trees down to executable code, and loads
