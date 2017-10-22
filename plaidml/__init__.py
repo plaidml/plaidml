@@ -1221,7 +1221,7 @@ class Placeholder(_Var):
 def _as_plaidml_var(value):
     if isinstance(value, _Var):
         return value
-    if isinstance(value, long):
+    if sys.version_info.major < 3 and isinstance(value, long):
         return _Var(_lib().plaidml_alloc_int64(value))
     if isinstance(value, int):
         return _Var(_lib().plaidml_alloc_int64(value))
