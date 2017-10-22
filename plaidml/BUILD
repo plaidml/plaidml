@@ -265,5 +265,5 @@ plaidml_py_wheel(
     console_scripts = [
        "'plaidml-setup = plaidml.plaidml_setup:main'",
     ],
-    python = "py2",
+    python = "py3",
 )
