@@ -245,13 +245,6 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
     for (auto bname : bk.info.inputs) {
       auto it = program.inputs().find(bname);
       if (it != program.inputs().end()) {
-        // Remember the last use of each program input, to support
-        // dealiasing at program execution time (i.e. in order to
-        // detect the case when the same buffer is used as an input
-        // and as an output, where the input is still needed as the
-        // output is being produced).
-        last_input_use_[bname] = kidx_current;
-
         bk.params.push_back(KernelParam{KernelParamType::kInput, bname});
         continue;
       }
@@ -831,13 +824,10 @@ std::forward_list<RunRequest::PendingUpdate> RunRequest::DealiasIO(const context
   // The list of input buffers to be updated to output buffers after all kernels have been issued.
   std::forward_list<PendingUpdate> io_updates;
 
-  // Build a map from each input buffer to the index of the last kernel that uses that buffer.
-  std::unordered_map<std::shared_ptr<tile::Buffer>, size_t> last_buffer_use_as_input;
+  // Build a set of all input buffers.
+  std::unordered_set<std::shared_ptr<tile::Buffer>> input_buffers;
   for (auto in : inputs_) {
-    auto it = program_->last_input_use().find(in.first);
-    if (it != program_->last_input_use().end()) {
-      last_buffer_use_as_input[in.second] = it->second;
-    }
+    input_buffers.emplace(in.second);
   }
 
   // Examine kernels; de-alias if an input is used after an output is produced in the same buffer.
@@ -855,21 +845,17 @@ std::forward_list<RunRequest::PendingUpdate> RunRequest::DealiasIO(const context
         VLOG(4) << "    " << param.name << " is not a program output";
         continue;
       }
-      auto iit = last_buffer_use_as_input.find(oit->second);
-      if (iit == last_buffer_use_as_input.end()) {
+      auto iit = input_buffers.find(oit->second);
+      if (iit == input_buffers.end()) {
         // This output buffer wasn't used as an input; nothing to do.
         VLOG(4) << "    " << param.name << " is not used as an input";
         continue;
       }
-      if (iit->second < kidx) {
-        // This output buffer is written after the last read of the input's
-        // contents.  TODO: It would be useful to have a flag in KernelInfo to
-        // indicate whether a given kernel can safely use the same buffer as an
-        // input and an output; if we had that, we could also continue the loop
-        // if the indices were equal and the flag were set.
-        VLOG(4) << "    " << param.name << " is written after its last use as an input";
-        continue;
-      }
+
+      // TODO: Add the operation dependency graph to the program,
+      // making it available for computing dealiasing, so that we
+      // don't have to de-duplicate every time a buffer is used as
+      // both an input and an output.
 
       // This output aliases an input; use a new chunk for the output.
       auto buf = std::make_shared<Buffer>(program_->devinfo(),
@@ -884,7 +870,7 @@ std::forward_list<RunRequest::PendingUpdate> RunRequest::DealiasIO(const context
       oit->second = buf;
 
       // Remember to update the input later.
-      io_updates.emplace_front(PendingUpdate{iit->first, buf->chunk()});
+      io_updates.emplace_front(PendingUpdate{*iit, buf->chunk()});
     }
   }
 

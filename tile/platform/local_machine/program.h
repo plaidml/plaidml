@@ -51,7 +51,6 @@ class Program final : public tile::Program {
   const std::shared_ptr<MemStrategy>& output_mem_strategy() const { return output_mem_strategy_; }
   const std::shared_ptr<MemStrategy>& tmp_mem_strategy() const { return tmp_mem_strategy_; }
   const std::vector<BoundKernel>& kernels() const { return kernels_; }
-  const std::unordered_map<std::string, std::size_t>& last_input_use() const { return last_input_use_; }
   const std::vector<std::size_t>& tmp_locs() const { return tmp_locs_; }
   const std::vector<std::size_t>& alloc_sizes() const { return alloc_sizes_; }
 
@@ -72,13 +71,6 @@ class Program final : public tile::Program {
   // (i.e. translating the string temporary names to unique integers),
   // and returns a vector containing information about each temporary
   // allocation.
-  //
-  // Additionally, this fills in the last_input_use_ map, which is
-  // used at runtime to dealias buffers that are used as both inputs
-  // and outputs.  (It's legal to use a single buffer as both an input
-  // and an output to a program, but if this creates a RAW dependency,
-  // the implementation needs to allocate a new HAL buffer for the
-  // output memory and remap the output buffer to that HAL buffer.)
   std::vector<TmpInfo> AllocTemporaries(const tile::proto::Program& program, const lang::ShapeMap& shape_map);
 
   // Adds synthetic dependencies between all kernels.  This is useful
@@ -108,7 +100,6 @@ class Program final : public tile::Program {
   std::shared_ptr<MemStrategy> output_mem_strategy_;
   std::shared_ptr<MemStrategy> tmp_mem_strategy_;
   std::vector<BoundKernel> kernels_;
-  std::unordered_map<std::string, std::size_t> last_input_use_;
   std::vector<std::size_t> tmp_locs_;
   std::vector<std::size_t> alloc_sizes_;
   lang::VarRewrites var_rewrites_;
