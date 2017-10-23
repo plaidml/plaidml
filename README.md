@@ -23,7 +23,7 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
 
 This version of PlaidML has some notable limitations which will be addressed soon in upcoming releases:
 
-  * **OS-X builds, but has correctness issues. We're addressing this in [Issue #26](https://github.com/plaidml/plaidml/issues/26).**
+  * **macOS builds, but has correctness issues. We're addressing this in [Issue #26](https://github.com/plaidml/plaidml/issues/26).**
   * Start-up times can be quite long
   * Training throughput much lower than we'd like
   * RNN support is not implemented
