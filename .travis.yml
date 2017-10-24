@@ -21,12 +21,13 @@ before_install:
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
   # Before_install results seem to generally get cached.
-  - bazel build plaidml:wheel plaidml/keras:wheel
+  - pip install tensorflow theano
+  - git clone http://github.com/plaidml/plaidbench
+  - bazel build -c opt plaidml:wheel plaidml/keras:wheel
 
 install:
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
-  - git clone http://github.com/plaidml/plaidbench
 
 script:
-  - bazel test --force_python=$BZL_PY_VER //plaidml/keras:backend_test
+  - bazel test -c opt --force_python=$BZL_PY_VER //plaidml/keras:backend_test
   - python plaidbench/plaidbench.py mobilenet
