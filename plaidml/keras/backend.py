@@ -1119,17 +1119,21 @@ def categorical_crossentropy(target, output, from_logits=False):
     elif not isinstance(output, _Op) or output._ident != "softmax":
         output /= output.sum(axis=-1, keepdims=True)
         output = output.clip(epsilon(), 1.0 - epsilon())
-    fixed_dims = ",".join("X{}".format(i) for i in range(len(output.shape)-1))
-    fixed_idxs = ",".join("x{}".format(i) for i in range(len(output.shape)-1))
-    f = """function (O[{fixed_dims},Y], T[{fixed_dims},Y]) -> (R) {{
-               LO = log(O);
-               TR[{fixed_idxs}:{fixed_dims}] = +(T[{fixed_idxs},y] * LO[{fixed_idxs},y]);
-               R = -TR;
-           }}""".format(fixed_dims=fixed_dims, fixed_idxs=fixed_idxs)
-    shape = list(output.shape)
-    shape.pop()
-    shape = tuple(shape)
-    return _Op('categorical_crossentropy', output.dtype, shape, f,
+    if output.ndim == 1:
+        f = """function (O[Y], T[Y]) -> (R) {
+                   LO = log(O);
+                   TR[] = +(T[y] * LO[y]);
+                   R = -TR;
+               }"""
+    else:
+        fixed_dims = ",".join("X{}".format(i) for i in range(output.ndim-1))
+        fixed_idxs = ",".join("x{}".format(i) for i in range(output.ndim-1))
+        f = """function (O[{fixed_dims},Y], T[{fixed_dims},Y]) -> (R) {{
+                   LO = log(O);
+                   TR[{fixed_idxs}:{fixed_dims}] = +(T[{fixed_idxs},y] * LO[{fixed_idxs},y]);
+                   R = -TR;
+               }}""".format(fixed_dims=fixed_dims, fixed_idxs=fixed_idxs)
+    return _Op('categorical_crossentropy', output.dtype, output.shape[:-1], f,
                OrderedDict([('O', output), ('T', target)]), ['R'])
 
 
