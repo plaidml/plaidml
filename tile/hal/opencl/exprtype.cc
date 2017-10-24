@@ -260,8 +260,8 @@ sem::Type ExprType::TypeOf(const sem::ExprPtr &expr) {
 }
 
 void ExprType::AdjustLogicOpResult() {
+  ty_.base = sem::Type::VALUE;
   if (ty_.vec_width == 1) {
-    ty_.base = sem::Type::VALUE;
     ty_.dtype = lang::DataType::INT32;
   } else {
     switch (ty_.dtype) {

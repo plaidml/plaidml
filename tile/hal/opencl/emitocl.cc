@@ -65,24 +65,42 @@ void Emit::Visit(const sem::StoreStmt &n) {
 }
 
 void Emit::Visit(const sem::DeclareStmt &n) {
-  sem::DeclareStmt decl(n);
-  if (decl.type.base == sem::Type::VALUE && ((decl.type.dtype == lang::DataType::FLOAT16 && !cl_khr_fp16_) ||
-                                             (decl.type.dtype == lang::DataType::BOOLEAN && 1 < decl.type.vec_width))) {
-    sem::Type ty = decl.type;
-    if (decl.init) {
-      IVLOG(5, "Determining type of initializer for " << decl.name);
-      ty = Promote({ty, TypeOf(decl.init)});
-    }
+  sem::Type ty = n.type;
+  sem::Type init_type;
+  if (n.init) {
+    init_type = TypeOf(n.init);
+  }
+
+  if (ty.base == sem::Type::VALUE) {
     if (ty.dtype == lang::DataType::FLOAT16 && !cl_khr_fp16_) {
       ty.dtype = lang::DataType::FLOAT32;
-    } else if (ty.dtype == lang::DataType::BOOLEAN && 1 < decl.type.vec_width) {
-      ty.dtype = lang::DataType::INT8;
+    } else if (ty.dtype == lang::DataType::BOOLEAN && 1 < ty.vec_width) {
+      ty.dtype = Promote({init_type}).dtype;
     }
-    decl.type.dtype = ty.dtype;
-    IVLOG(5, "... type is: " << decl.type);
   }
-  EmitC::Visit(decl);
-  scope_->Bind(decl.name, decl.type);
+
+  emitTab();
+  emitType(ty);
+  emit(" ");
+  emit(n.name);
+  if (n.type.array) {
+    emit("[" + std::to_string(n.type.array) + "]");
+  }
+  if (n.init) {
+    emit(" = ");
+    if (n.type.array) {
+      emit("{");
+      for (size_t i = 0; i < n.type.array; i++) {
+        n.init->Accept(*this);
+        emit(", ");
+      }
+      emit("}");
+    } else {
+      EmitWithTypeConversion(init_type, ty, n.init);
+    }
+  }
+  emit(";\n");
+  scope_->Bind(n.name, ty);
 }
 
 void Emit::Visit(const sem::BinaryExpr &n) {
@@ -93,6 +111,19 @@ void Emit::Visit(const sem::BinaryExpr &n) {
   EmitWithTypeConversion(ty_lhs, ty, n.lhs);
   emit(n.op);
   EmitWithTypeConversion(ty_rhs, ty, n.rhs);
+  emit(")");
+}
+
+void Emit::Visit(const sem::CondExpr &n) {
+  auto ty_tcase = TypeOf(n.tcase);
+  auto ty_fcase = TypeOf(n.fcase);
+  auto ty = Promote({ty_tcase, ty_fcase});
+  emit("select(");
+  EmitWithTypeConversion(ty_fcase, ty, n.fcase);
+  emit(", ");
+  EmitWithTypeConversion(ty_tcase, ty, n.tcase);
+  emit(", ");
+  EmitWithWidthConversion(TypeOf(n.cond), ty, n.cond);
   emit(")");
 }
 
@@ -290,28 +321,36 @@ void Emit::EmitWithWidthConversion(const sem::Type &from, const sem::Type &to, c
     expr->Accept(*this);
     return;
   }
-  if (from.base == sem::Type::VALUE && from.vec_width == to.vec_width) {
-    expr->Accept(*this);
-    return;
+
+  // Based on the target type, convert to the appropriate condition type.
+  sem::Type condition_type = to;
+  switch (condition_type.dtype) {
+    case lang::DataType::BOOLEAN:
+    case lang::DataType::INT8:
+    case lang::DataType::UINT8:
+      condition_type.dtype = lang::DataType::INT8;
+      break;
+    case lang::DataType::INT16:
+    case lang::DataType::UINT16:
+    case lang::DataType::FLOAT16:
+      condition_type.dtype = lang::DataType::INT16;
+      break;
+    case lang::DataType::INT32:
+    case lang::DataType::UINT32:
+    case lang::DataType::FLOAT32:
+      condition_type.dtype = lang::DataType::INT32;
+      break;
+    case lang::DataType::INT64:
+    case lang::DataType::UINT64:
+    case lang::DataType::FLOAT64:
+      condition_type.dtype = lang::DataType::INT64;
+      break;
+    default:
+      break;
   }
-  sem::Type etype = from;
-  etype.base = sem::Type::VALUE;
-  etype.vec_width = to.vec_width;
-  if (from.vec_width == 1) {
-    // We can (and should) convert it with a simple cast.
-    emit("(");
-    EmitC::emitType(etype);
-    emit(")");
-    expr->Accept(*this);
-    return;
-  }
-  emit("convert_");
-  EmitC::emitType(etype);
-  emit("((");
-  EmitC::emitType(from);
-  emit(")");
-  expr->Accept(*this);
-  emit(")");
+
+  // Let the regular emit logic handle the rest of the work.
+  EmitWithTypeConversion(from, condition_type, expr);
 }
 
 void Emit::emitType(const sem::Type &t) {
