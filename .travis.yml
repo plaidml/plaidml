@@ -20,9 +20,10 @@ before_install:
   - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
+  # Before_install results seem to generally get cached.
+  - bazel build plaidml:wheel plaidml/keras:wheel
 
 install:
-  - bazel build plaidml:wheel plaidml/keras:wheel
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
   - git clone http://github.com/plaidml/plaidbench
 
