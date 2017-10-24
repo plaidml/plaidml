@@ -74,8 +74,18 @@ void Emit::Visit(const sem::DeclareStmt &n) {
   if (ty.base == sem::Type::VALUE) {
     if (ty.dtype == lang::DataType::FLOAT16 && !cl_khr_fp16_) {
       ty.dtype = lang::DataType::FLOAT32;
-    } else if (ty.dtype == lang::DataType::BOOLEAN && 1 < ty.vec_width) {
-      ty.dtype = Promote({init_type}).dtype;
+    } else if (ty.dtype == lang::DataType::BOOLEAN) {
+      if (n.init) {
+        ty.dtype = Promote({init_type}).dtype;
+        if (ty.dtype == lang::DataType::BOOLEAN) {
+          // If the initializer was booleans, make it INT8.
+          ty.dtype = lang::DataType::INT8;
+        }
+      } else {
+        // Assume that this is being initialized from an inter-kernel
+        // boolean tensor -- which, in OpenCL, we represent as INT8.
+        ty.dtype = lang::DataType::INT8;
+      }
     }
   }
 
@@ -119,11 +129,11 @@ void Emit::Visit(const sem::CondExpr &n) {
   auto ty_fcase = TypeOf(n.fcase);
   auto ty = Promote({ty_tcase, ty_fcase});
   emit("select(");
-  EmitWithTypeConversion(ty_fcase, ty, n.fcase);
+  EmitWithTypeConversion(ty_fcase, ty, n.fcase, true);
   emit(", ");
-  EmitWithTypeConversion(ty_tcase, ty, n.tcase);
+  EmitWithTypeConversion(ty_tcase, ty, n.tcase, true);
   emit(", ");
-  EmitWithWidthConversion(TypeOf(n.cond), ty, n.cond);
+  EmitWithWidthConversion(TypeOf(n.cond), ty, n.cond, true);
   emit(")");
 }
 
@@ -132,11 +142,11 @@ void Emit::Visit(const sem::SelectExpr &n) {
   auto ty_fcase = TypeOf(n.fcase);
   auto ty = Promote({ty_tcase, ty_fcase});
   emit("select(");
-  EmitWithTypeConversion(ty_fcase, ty, n.fcase);
+  EmitWithTypeConversion(ty_fcase, ty, n.fcase, true);
   emit(", ");
-  EmitWithTypeConversion(ty_tcase, ty, n.tcase);
+  EmitWithTypeConversion(ty_tcase, ty, n.tcase, true);
   emit(", ");
-  EmitWithWidthConversion(TypeOf(n.cond), ty, n.cond);
+  EmitWithWidthConversion(TypeOf(n.cond), ty, n.cond, true);
   emit(")");
 }
 
@@ -161,9 +171,9 @@ void Emit::Visit(const sem::ClampExpr &n) {
   emit("clamp(");
   n.val->Accept(*this);
   emit(", ");
-  EmitWithTypeConversion(ty_min, ty_clamp, n.min);
+  EmitWithTypeConversion(ty_min, ty_clamp, n.min, true);
   emit(", ");
-  EmitWithTypeConversion(ty_max, ty_clamp, n.max);
+  EmitWithTypeConversion(ty_max, ty_clamp, n.max, true);
   emit(")");
 }
 
@@ -288,15 +298,17 @@ sem::Type Emit::TypeOf(const sem::ExprPtr &expr) { return ExprType::TypeOf(scope
 
 sem::Type Emit::TypeOf(const sem::LValPtr &lvalue) { return ExprType::TypeOf(scope_, cl_khr_fp16_, lvalue); }
 
-void Emit::EmitWithTypeConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr) {
+void Emit::EmitWithTypeConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr,
+                                  bool force_conversion) {
   if (to.base == sem::Type::POINTER_MUT || to.base == sem::Type::POINTER_CONST ||
-      (from.vec_width == 1 && from.base == sem::Type::VALUE &&
-       (from.dtype == lang::DataType::INT32 || from.dtype == lang::DataType::INT16 ||
-        from.dtype == lang::DataType::INT8) &&
-       (to.base == sem::Type::INDEX ||
-        (to.base == sem::Type::VALUE && (to.dtype == lang::DataType::INT32 || to.dtype == lang::DataType::INT16 ||
-                                         to.dtype == lang::DataType::INT8)))) ||
-      (from.base == to.base && from.dtype == to.dtype && from.vec_width == to.vec_width)) {
+      (!force_conversion &&
+       ((from.vec_width == 1 && from.base == sem::Type::VALUE &&
+         (from.dtype == lang::DataType::INT32 || from.dtype == lang::DataType::INT16 ||
+          from.dtype == lang::DataType::INT8) &&
+         (to.base == sem::Type::INDEX ||
+          (to.base == sem::Type::VALUE && (to.dtype == lang::DataType::INT32 || to.dtype == lang::DataType::INT16 ||
+                                           to.dtype == lang::DataType::INT8)))) ||
+        (from.base == to.base && from.dtype == to.dtype && from.vec_width == to.vec_width)))) {
     // No conversion required.
     expr->Accept(*this);
     return;
@@ -315,7 +327,8 @@ void Emit::EmitWithTypeConversion(const sem::Type &from, const sem::Type &to, co
   emit(")");
 }
 
-void Emit::EmitWithWidthConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr) {
+void Emit::EmitWithWidthConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr,
+                                   bool force_conversion) {
   if (to.base == sem::Type::POINTER_MUT || to.base == sem::Type::POINTER_CONST) {
     // No conversion required.
     expr->Accept(*this);
@@ -350,7 +363,7 @@ void Emit::EmitWithWidthConversion(const sem::Type &from, const sem::Type &to, c
   }
 
   // Let the regular emit logic handle the rest of the work.
-  EmitWithTypeConversion(from, condition_type, expr);
+  EmitWithTypeConversion(from, condition_type, expr, force_conversion);
 }
 
 void Emit::emitType(const sem::Type &t) {
