@@ -89,7 +89,26 @@
           "and": {
             "sel": [
               { "vendor_regex": "ARM" },
-              { "name_regex": "Mali.*" }
+              { "name_regex": "Mali-T760" }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 128,
+          "vec_size": 2,
+          "mem_width": 16,
+          "max_mem": 16000,
+          "max_regs": 16000,
+          "use_global": true
+        }
+      },
+      {
+        "description": "ARM Mali config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "vendor_regex": "ARM" },
+              { "name_regex": "Mali-T628" }
             ]
           }
         },
