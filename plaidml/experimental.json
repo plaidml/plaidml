@@ -35,8 +35,8 @@
         "sel": {
           "or": {
             "sel": [
-              { "name_regex": "Iris.*" },
-              { "name_regex": "HD Graphics.*" }
+              { "name_regex": ".*Iris.*" },
+              { "name_regex": ".*HD Graphics.*" }
             ]
           }
         },
