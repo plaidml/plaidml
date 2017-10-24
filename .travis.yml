@@ -7,9 +7,6 @@ matrix:
   - python: "2.7"
     env: BZL_PY_VER=PY2
 
-env:
-  PLAIDML_EXPERIMENTAL=1
-
 before_install:
   - echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
   - curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
@@ -29,5 +26,5 @@ install:
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
-  - python plaidbench/plaidbench.py mobilenet
+  - PLAIDML_EXPERIMENTAL=1 python plaidbench/plaidbench.py mobilenet
   - bazel test -c opt --force_python=$BZL_PY_VER //plaidml/keras:backend_test
