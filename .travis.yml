@@ -18,7 +18,7 @@ before_install:
   - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - tar xzvf opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - cd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
-  - ./install.sh --cli-mode --silent tools/intel-ocl-silent
+  - ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
 
 install:
   - bazel build plaidml:wheel plaidml/keras:wheel
