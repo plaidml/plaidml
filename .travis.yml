@@ -23,7 +23,7 @@ before_install:
 
 install:
   - bazel build plaidml:wheel plaidml/keras:wheel
-  - pip install bazel-bin/plaidml/whl* bazel-bin/plaidml/keras/whl*
+  - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
   - git clone http://github.com/plaidml/plaidbench
 
 script:
