@@ -20,6 +20,7 @@ before_install:
   # Before_install results seem to generally get cached.
   - pip install tensorflow theano
   - git clone http://github.com/plaidml/plaidbench
+  - pip install -r plaidbench/requirements.txt
   - bazel build -c opt plaidml:wheel plaidml/keras:wheel
 
 install:
