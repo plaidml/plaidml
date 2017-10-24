@@ -1,0 +1,30 @@
+language: python
+python:
+  - "2.7"
+
+matrix:
+  include:
+  - python: "2.7"
+    env: BZL_PY_VER=PY2
+
+env:
+  PLAIDML_EXPERIMENTAL=1
+
+before_install:
+  - echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+  - curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
+  - sudo apt-get update -q   
+  - sudo apt-get install openjdk-8-jdk bazel bison g++ wget -y
+  - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
+  - tar xzvf opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
+  - cd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
+  - ./install.sh --cli-mode --silent tools/intel-ocl-silent
+
+install:
+  - bazel build plaidml:wheel plaidml/keras:wheel
+  - pip install bazel-bin/plaidml/whl* bazel-bin/plaidml/keras/whl*
+  - git clone http://github.com/plaidml/plaidbench
+
+script:
+  - bazel test --force_python=$BZL_PY_VER //plaidml/keras:backend_test
+  - python plaidbench/plaidbench.py mobilenet
