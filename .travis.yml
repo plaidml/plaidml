@@ -17,8 +17,9 @@ before_install:
   - sudo apt-get install openjdk-8-jdk bazel bison g++ wget -y
   - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - tar xzvf opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
-  - cd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
+  - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
+  - popd
 
 install:
   - bazel build plaidml:wheel plaidml/keras:wheel
