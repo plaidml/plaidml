@@ -7,7 +7,7 @@ matrix:
       - BZL_PY_VER=PY2
     install:
       - bazel build -c opt plaidml:wheel plaidml/keras:wheel
-      - pip2 install bazel-bin/plaidml/*py2*whl bazel-bin/plaidml/keras/*py2*whl
+      - pip install bazel-bin/plaidml/*py2*whl bazel-bin/plaidml/keras/*py2*whl
 
   allow_failures:
   - python: "3.6"
@@ -15,7 +15,7 @@ matrix:
       - BZL_PY_VER=PY3
     install:
       - bazel build -c opt plaidml:wheel_v3 plaidml/keras:wheel_v3
-      - pip3 install bazel-bin/plaidml/*py3*whl bazel-bin/plaidml/keras/*py3*whl
+      - pip install bazel-bin/plaidml/*py3*whl bazel-bin/plaidml/keras/*py3*whl
 
 before_install:
   - echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
