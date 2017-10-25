@@ -1638,12 +1638,12 @@ def pow(x, p):
 
 def expand_dims(x, axis=-1):
     if axis < 0:
-        axis = x.ndim + axis
+        axis = x.ndim + 1 + axis
     slist_in = ["S" + str(i) for i in range(x.ndim)]
     ilist_in = ["i" + str(i) for i in range(x.ndim)]
     slist_out = slist_in[0:axis] + ["1"] + slist_in[axis:]
     ilist_out = ilist_in[0:axis] + ["0"] + ilist_in[axis:]
-    newshape = x.shape[0:axis] + (1,) + x.shape[axis:]
+    newshape = list(x.shape[0:axis]) + [1,] + list(x.shape[axis:])
     f = """function (IN[{slist_in}]) -> (OUT) {{
                OUT[{ilist_out} : {slist_out}] = +(IN[{ilist_in}]);
            }}""".format(

@@ -804,7 +804,7 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(3, 2, 4), 1],
              [m(2, 5, 3)],])
     def testExpandDims(self, b, x, ax=-1):
-        return [b.expand_dims(x, 1)]
+        return [b.expand_dims(x, ax)]
 
     @opTest([[m(3, 2, 4), [1, 7, 3]],
              [m(2, 3, 1), [2, 1, 4]]])

@@ -1228,12 +1228,12 @@ def _as_plaidml_var(value):
         if value.dtype.name == 'float_' or value.dtype.name == 'float32':
             return _Var(_lib().plaidml_alloc_real(value))
         else:
-            raise plaidml.exceptions.InvalidArguments('Unexpected type in array: ' +
+            raise plaidml.exceptions.InvalidArgument('Unexpected type in array: ' +
                                                       value.dtype.name)
     else:
-        raise plaidml.exceptions.InvalidArguments(
+        raise plaidml.exceptions.InvalidArgument(
             'unable to convert high dim array to PlaidML value: shape = ' + str(value.shape))
-    raise plaidml.exceptions.InvalidArguments(
+    raise plaidml.exceptions.InvalidArgument(
         'unable to convert \'%s\' to a PlaidML value' % value)
 
 
