@@ -827,7 +827,7 @@ void RunRequest::LaunchKernels(const context::Context& ctx) {
         }
       }
 
-      done = bk.kernel->Run(ctx, params, deps, ctx.is_logging_events() || VLOG_IS_ON(1));
+      done = bk.kernel->Run(ctx, params, deps, ctx.is_logging_events());
 
       kernel_log_info_.emplace_back(KernelLogInfo{done, bk.info.kname, bk.info.tot_bytes, bk.info.tot_flops});
 
