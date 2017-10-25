@@ -454,8 +454,13 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
       IVLOG(4, "  Failed to find an existing alloc; allocating aidx=" << aidx << " for tidx=" << tidx);
       alloc_tmps.resize(aidx + 1);
       alloc_tmps[aidx].insert(tidx);
+<<<<<<< HEAD
       alloc_infos_.resize(aidx + 1);
       alloc_infos_[aidx].byte_size = tmps[tidx].byte_size;
+=======
+      alloc_sizes_.resize(aidx + 1);
+      alloc_sizes_[aidx] = tmps[tidx].byte_size;
+>>>>>>> f0ea976ab6705457cf56f2a183d85db17e804138
       tmp_locs_[tidx] = aidx;
     }
   }
