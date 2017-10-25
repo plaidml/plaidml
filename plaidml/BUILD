@@ -272,28 +272,5 @@ plaidml_py_wheel(
         "//bzl:x64_windows": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
     }),
-    python = "py2",
-)
-
-plaidml_py_wheel(
-    name = "wheel_v3",
-    srcs = [
-        ":py",
-        ":configs",
-    ] + select({
-        "//bzl:x64_windows": ["//plaidml:plaidml.dll"],
-        "//conditions:default": ["//plaidml:libplaidml.so"],
-    }),
-    config = ":setup.cfg",
-    console_scripts = [
-        "'plaidml-setup = plaidml.plaidml_setup:main'",
-    ],
-    package = "plaidml",
-    platform = select({
-        "//bzl:arm7-ubuntu-14.04": "linux_armv7l",
-        "//bzl:darwin": "macosx_10_10_x86_64",
-        "//bzl:x64_windows": "win_amd64",
-        "//conditions:default": "manylinux1_x86_64",
-    }),
-    python = "py3",
-)
+    python = "py2.py3",
+-
