@@ -72,5 +72,16 @@ plaidml_py_wheel(
     ],
     config = ":setup.cfg",
     package = "plaidml/keras",
+    python = "py2",
+)
+
+plaidml_py_wheel(
+    name = "wheel_v3",
+    srcs = [
+        "__init__.py",
+        "backend.py",
+    ],
+    config = ":setup.cfg",
+    package = "plaidml/keras",
     python = "py3",
 )
