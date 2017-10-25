@@ -23,6 +23,7 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
 
 This version of PlaidML has some notable limitations which will be addressed soon in upcoming releases:
 
+  * **macOS builds, but has correctness issues. We're addressing this in [Issue #26](https://github.com/plaidml/plaidml/issues/26).**
   * Start-up times can be quite long
   * Training throughput much lower than we'd like
   * RNN support is not implemented
@@ -153,7 +154,9 @@ sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 ## License
 
-PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt). For alternative licensing contact [solutions@vertex.ai](mailto:solutions@vertex.ai).
+PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt). 
+
+Our open source goals include 1) helping students get started with deep learning as easily as possible and 2) helping researchers develop new methods more quickly than is possible with other tools. PlaidML is unique in being fully open source and free of dependence on libraries like cuDNN that carry revocable and redistribution-prohibiting licenses. For situations where an alternate license is preferable please contact [solutions@vertex.ai](mailto:solutions@vertex.ai).
 
 ## Reporting Issues
 Either open a ticket on [GitHub](https://github.com/plaidml/plaidml/issues) or post to [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev).

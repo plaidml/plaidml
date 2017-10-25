@@ -1,0 +1,31 @@
+language: python
+python:
+  - "2.7"
+
+matrix:
+  include:
+  - python: "2.7"
+    env: BZL_PY_VER=PY2
+
+before_install:
+  - echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+  - curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
+  - sudo apt-get update -q   
+  - sudo apt-get install openjdk-8-jdk bazel bison g++ wget -y
+  - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
+  - tar xzvf opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
+  - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
+  - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
+  - popd
+  # Before_install results seem to generally get cached.
+  - pip install tensorflow theano
+  - git clone http://github.com/plaidml/plaidbench
+  - pip install -r plaidbench/requirements.txt
+  - bazel build -c opt plaidml:wheel plaidml/keras:wheel
+
+install:
+  - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
+
+script:
+  - PLAIDML_EXPERIMENTAL=1 python plaidbench/plaidbench.py mobilenet
+  - bazel test -c opt --force_python=$BZL_PY_VER //plaidml/keras:backend_test
