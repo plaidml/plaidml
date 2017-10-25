@@ -1,11 +1,21 @@
 language: python
-python:
-  - "2.7"
 
 matrix:
   include:
   - python: "2.7"
-    env: BZL_PY_VER=PY2
+    env:
+      - BZL_PY_VER=PY2
+    install:
+      - bazel build -c opt plaidml:wheel plaidml/keras:wheel
+      - pip install bazel-bin/plaidml/*py2*whl bazel-bin/plaidml/keras/*py2*whl
+
+  allow_failures:
+  - python: "3.6"
+    env: 
+      - BZL_PY_VER=PY3
+    install:
+      - bazel build -c opt plaidml:wheel_v3 plaidml/keras:wheel_v3
+      - pip install bazel-bin/plaidml/*py3*whl bazel-bin/plaidml/keras/*py3*whl
 
 before_install:
   - echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
@@ -17,15 +27,13 @@ before_install:
   - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
-  # Before_install results seem to generally get cached.
-  - pip install tensorflow theano
+  - pip install tensorflow theano setuptools
   - git clone http://github.com/plaidml/plaidbench
-  - pip install -r plaidbench/requirements.txt
-  - bazel build -c opt plaidml:wheel plaidml/keras:wheel
+  # TODO(https://github.com/plaidml/plaidml/issues/20): Reenable once python3 wheel is avilable
+  # - pip install -r plaidbench/requirements.txt
 
-install:
-  - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
-  - PLAIDML_EXPERIMENTAL=1 python plaidbench/plaidbench.py mobilenet
-  - bazel test -c opt --force_python=$BZL_PY_VER //plaidml/keras:backend_test
+  # TODO(https://github.com/plaidml/plaidml/issues/20): Reenable once python3 wheel is avilable
+  # - PLAIDML_EXPERIMENTAL=1 python plaidbench/plaidbench.py mobilenet
+  - bazel test -c opt --force_python=$BZL_PY_VER plaidml/keras:backend_test

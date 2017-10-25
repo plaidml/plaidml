@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 """Creates a plaidml user configuration file."""
+from __future__ import print_function
 
+from builtins import input
+from builtins import str
+from builtins import range
 import sys
 
 import plaidml
@@ -15,7 +19,7 @@ def main():
     def choice_prompt(question, choices, default):
         input = ""
         while not input in choices:
-            input = raw_input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
+            input = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
             if not input:
                 input = default
             elif input not in choices:

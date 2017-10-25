@@ -9,6 +9,12 @@
 
 from __future__ import print_function
 
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import next
+from builtins import range
+from builtins import object
 import contextlib
 import ctypes
 import hashlib
@@ -1022,7 +1028,7 @@ class _View(object):
 
     def __getitem__(self, key):
         if isinstance(key, slice):
-            return [self._base[idx] for idx in xrange(*key.indices(self._length))]
+            return [self._base[idx] for idx in range(*key.indices(self._length))]
 
         try:
             idx = self.__get_dim_idx(key)
@@ -1040,8 +1046,8 @@ class _View(object):
     def __setitem__(self, key, value):
         if isinstance(key, slice):
             e = enumerate(value)
-            for idx in xrange(*key.indices(self._length)):
-                _, v = e.next()
+            for idx in range(*key.indices(self._length)):
+                _, v = next(e)
                 self._base[idx] = v
             return
 
@@ -1091,7 +1097,7 @@ class _View(object):
         return self._length
 
     def __iter__(self):
-        for idx in xrange(self._length):
+        for idx in range(self._length):
             yield self[idx]
 
 
@@ -1190,7 +1196,7 @@ class _Shape(object):
         return [
             Dimension(_lib().plaidml_get_shape_dimension_size(self, dix),
                       _lib().plaidml_get_shape_dimension_stride(self, dix))
-            for dix in xrange(self.dimension_count)
+            for dix in range(self.dimension_count)
         ]
 
 
@@ -1215,7 +1221,7 @@ class Placeholder(_Var):
 def _as_plaidml_var(value):
     if isinstance(value, _Var):
         return value
-    if isinstance(value, long):
+    if sys.version_info.major < 3 and isinstance(value, long):
         return _Var(_lib().plaidml_alloc_int64(value))
     if isinstance(value, int):
         return _Var(_lib().plaidml_alloc_int64(value))
@@ -1300,7 +1306,7 @@ class Invoker(object):
         _lib().plaidml_set_invoker_input(self, name, _as_plaidml_var(value))
 
     def set_inputs(self, inputs):
-        for (name, value) in inputs.iteritems():
+        for (name, value) in inputs.items():
             self.set_input(name, value)
 
     def get_output_shape(self, name):
@@ -1310,7 +1316,7 @@ class Invoker(object):
         _lib().plaidml_set_invoker_output(self, name, _as_plaidml_var(value))
 
     def set_outputs(self, outputs):
-        for (name, value) in outputs.iteritems():
+        for (name, value) in outputs.items():
             self.set_output(name, value)
 
     def invoke(self):
