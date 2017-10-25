@@ -272,5 +272,5 @@ plaidml_py_wheel(
         "//bzl:x64_windows": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
     }),
-    python = "py2",
+    python = "py2.py3",
 )

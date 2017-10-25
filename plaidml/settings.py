@@ -66,7 +66,7 @@ class _Settings(object):
         if not os.path.exists(settings_file):
             settings_file = SYSTEM_SETTINGS
         if os.path.exists(settings_file):
-            for k, val in json.load(file(settings_file)).items():
+            for k, val in json.load(open(settings_file)).items():
                 if k not in ENV_SETTINGS:
                     raise plaidml.exceptions.OutOfRange('Invalid key "{0}" in config {1}'.format(k, settings_file))
                 settings[k] = val
@@ -79,7 +79,7 @@ class _Settings(object):
         for k in ENV_SETTINGS:
             if k in os.environ and k is not "PLAIDML_SESSION":
                 settings[k] = getattr(self, k.replace("PLAIDML_","").lower())
-        with file(filename, "w") as out:
+        with open(filename, "w") as out:
             json.dump(settings, out, sort_keys=True, indent=4, separators=(',',':'))
 
     @property
