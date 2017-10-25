@@ -446,7 +446,10 @@ def _plaidml_py_wheel_impl(ctx):
     ctx.attr.platform
   )
   wheel = ctx.new_file(setup_py, wheel_filename)
-  bdist_wheel_cmd = ["python", setup_py.path, "--no-user-cfg", "bdist_wheel"]
+  if ctx.attr.python == "py3":
+    bdist_wheel_cmd = ["python3", setup_py.path, "bdist_wheel"]
+  else:
+    bdist_wheel_cmd = ["python", setup_py.path, "--no-user-cfg", "bdist_wheel"]
   if ctx.attr.platform != 'any':
     bdist_wheel_cmd.append("--plat-name")
     bdist_wheel_cmd.append(ctx.attr.platform)
