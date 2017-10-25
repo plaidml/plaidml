@@ -28,7 +28,8 @@ before_install:
   # Before_install results seem to generally get cached.
   - pip install tensorflow theano
   - git clone http://github.com/plaidml/plaidbench
-  - pip install -r plaidbench/requirements.txt
+  # TODO(https://github.com/plaidml/plaidml/issues/20): Reenable once python3 wheel is avilable
+  # - pip install -r plaidbench/requirements.txt
   - bazel build -c opt plaidml:wheel plaidml:wheel_v3 plaidml/keras:wheel plaidml/keras:wheel_v3
 
 install:
@@ -36,5 +37,6 @@ install:
   - pip3 install bazel-bin/plaidml/*py3*whl bazel-bin/plaidml/keras/*py3*whl
 
 script:
-  - PLAIDML_EXPERIMENTAL=1 python plaidbench/plaidbench.py mobilenet
+  # TODO(https://github.com/plaidml/plaidml/issues/20): Reenable once python3 wheel is avilable
+  # - PLAIDML_EXPERIMENTAL=1 python plaidbench/plaidbench.py mobilenet
   - bazel test -c opt --force_python=$BZL_PY_VER //plaidml/keras:backend_test
