@@ -424,7 +424,8 @@ class TestBackendOps(unittest.TestCase):
             b.binary_crossentropy(b.variable(np.array([[0,0.7],[1,.3]])), b.sigmoid(x))
         ]
 
-    @opTest([[np.array([[0,0,0], [0,1,0], [0,0,0]]), (m(3, 3) + 3) / 15.0]])
+    @opTest([[np.array([[0,0,0], [0,1,0], [0,0,0]]), (m(3, 3) + 3) / 15.0],
+             [np.array([0, 0, 1, 0, 0, 0]), (m(6) + 7) / 11.0]])
     def testCategoricalCrossentropy(self, b, x, y):
         return [b.categorical_crossentropy(x, y)]
 

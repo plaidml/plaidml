@@ -253,7 +253,7 @@ TEST_P(PlatformTest, PiecewiseMultiplyWorks) {
   CheckExpected(ctx, c, MakeBuffer(multiply::Expected, sizeof(multiply::Expected)));
 }
 
-TEST_P(PlatformTest, RuntimeTileScannerWorks) {
+TEST_P(PlatformTest, DISABLED_RuntimeTileScannerWorks) {
   context::Context ctx;
   tile::proto::TileScanningParameters params;
   params.set_max_trials(2);

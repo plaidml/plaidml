@@ -21,6 +21,7 @@ class Emit : public lang::EmitC {
   void Visit(const sem::StoreStmt &) final;
   void Visit(const sem::DeclareStmt &) final;
   void Visit(const sem::BinaryExpr &) final;
+  void Visit(const sem::CondExpr &n) final;
   void Visit(const sem::SelectExpr &n) final;
   void Visit(const sem::ClampExpr &n) final;
   void Visit(const sem::CastExpr &) final;
@@ -34,8 +35,10 @@ class Emit : public lang::EmitC {
  private:
   sem::Type TypeOf(const sem::ExprPtr &expr);
   sem::Type TypeOf(const sem::LValPtr &lvalue);
-  void EmitWithTypeConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr);
-  void EmitWithWidthConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr);
+  void EmitWithTypeConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr,
+                              bool force_conversion = false);
+  void EmitWithWidthConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr,
+                               bool force_conversion = false);
   void emitType(const sem::Type &t) final;
 
   bool cl_khr_fp16_;

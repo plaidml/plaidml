@@ -23,7 +23,9 @@ std::string to_string(const Type &ty) {
   if (ty.base == Type::INDEX) {
     os << "index ";
   }
-  os << to_string(ty.dtype);
+  if (ty.base != Type::TVOID && ty.base != Type::INDEX) {
+    os << to_string(ty.dtype);
+  }
   if (ty.vec_width > 1) {
     os << 'x' << std::to_string(ty.vec_width);
   }
