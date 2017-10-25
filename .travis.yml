@@ -22,6 +22,7 @@ before_install:
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
   - pip install tensorflow theano setuptools
+  - pip3 install setuptools
   - git clone http://github.com/plaidml/plaidbench
   # TODO(https://github.com/plaidml/plaidml/issues/20): Reenable once python3 wheel is avilable
   # - pip install -r plaidbench/requirements.txt
