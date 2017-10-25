@@ -65,10 +65,7 @@ class Program final : public tile::Program {
     std::size_t last_writer_kidx = 0;
     std::size_t elem_size = 0;
     std::size_t byte_size = 0;
-<<<<<<< HEAD
     std::string program_output;
-=======
->>>>>>> f0ea976ab6705457cf56f2a183d85db17e804138
   };
 
   // Compiles kernel semantic trees down to executable code, and loads
