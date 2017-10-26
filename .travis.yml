@@ -22,15 +22,13 @@ before_install:
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
   - pip install tensorflow theano setuptools
-  - git clone http://github.com/plaidml/plaidbench
-  # TODO(https://github.com/plaidml/plaidml/issues/20): Reenable once python3 wheel is avilable
-  # - pip install -r plaidbench/requirements.txt
+  - git clone http://github.com/plaidml/plaidbench  
+  - pip install -r plaidbench/requirements.txt
 
 install:
   - bazel build -c opt plaidml:wheel plaidml/keras:wheel
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
-  # TODO(https://github.com/plaidml/plaidml/issues/20): Reenable once python3 wheel is avilable
-  # - PLAIDML_EXPERIMENTAL=1 python plaidbench/plaidbench.py mobilenet
+  - PLAIDML_EXPERIMENTAL=1 python plaidbench/plaidbench.py mobilenet
   - bazel test -c opt --force_python=$BZL_PY_VER plaidml/keras:backend_test
