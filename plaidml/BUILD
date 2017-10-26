@@ -10,6 +10,7 @@ load(
     "plaidml_objc_library",
     "plaidml_objc_cc_library",
     "plaidml_proto_library",
+    "plaidml_py_binary",
     "plaidml_py_library",
     "plaidml_py_test",
     "plaidml_py_wheel",
@@ -187,15 +188,22 @@ filegroup(
     ],
 )
 
+plaidml_py_binary(
+    name = "setup",
+    srcs = ["plaidml_setup.py"],
+    main = "plaidml_setup.py",
+    deps = [":py"],
+)
+
 plaidml_py_library(
     name = "py",
     srcs = [
         "__init__.py",
         "context.py",
         "exceptions.py",
+        "library.py",
         "plaidml_setup.py",
         "settings.py",
-        "library.py",
     ],
     data = [":configs"] + select({
         "//bzl:x64_windows": [":plaidml.dll"],
@@ -221,7 +229,6 @@ plaidml_py_test(
         "//testing:plaidml_py",
     ],
 )
-
 
 pkg_tar(
     name = "py_deb_data",
@@ -255,6 +262,9 @@ plaidml_py_wheel(
         "//conditions:default": ["//plaidml:libplaidml.so"],
     }),
     config = ":setup.cfg",
+    console_scripts = [
+        "'plaidml-setup = plaidml.plaidml_setup:main'",
+    ],
     package = "plaidml",
     platform = select({
         "//bzl:arm7-ubuntu-14.04": "linux_armv7l",
@@ -262,31 +272,5 @@ plaidml_py_wheel(
         "//bzl:x64_windows": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
     }),
-    console_scripts = [
-       "'plaidml-setup = plaidml.plaidml_setup:main'",
-    ],
-    python = "py2",
-)
-
-plaidml_py_wheel(
-    name = "wheel_v3",
-    srcs = [
-        ":py",
-        ":configs",
-    ] + select({
-        "//bzl:x64_windows": ["//plaidml:plaidml.dll"],
-        "//conditions:default": ["//plaidml:libplaidml.so"],
-    }),
-    config = ":setup.cfg",
-    package = "plaidml",
-    platform = select({
-        "//bzl:arm7-ubuntu-14.04": "linux_armv7l",
-        "//bzl:darwin": "macosx_10_10_x86_64",
-        "//bzl:x64_windows": "win_amd64",
-        "//conditions:default": "manylinux1_x86_64",
-    }),
-    console_scripts = [
-       "'plaidml-setup = plaidml.plaidml_setup:main'",
-    ],
-    python = "py3",
+    python = "py2.py3",
 )

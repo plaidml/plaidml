@@ -177,6 +177,14 @@ def _plaidml_val(x, indent=0):
     return x._plaidml_val(indent)
 
 
+def _report_unimplemented(name):
+    report = ("The Keras backend function '{}' is not yet implemented in "
+            + "Plaid. You can help us prioritize by letting us know if this "
+            + "function is important to you, and as always, contributions are "
+            + "welcome!").format(name)
+    raise NotImplementedError(report)
+
+
 class _Var(object):
     """A PlaidML variable.
 
@@ -933,8 +941,24 @@ def abs(x):
     return _Op('abs', x.dtype, x.shape, f, {'I': x}, ['O'])
 
 
+def all(x, axis=None, keepdims=False):
+    _report_unimplemented('all')
+
+
+def any(x, axis=None, keepdims=False):
+    _report_unimplemented('any')
+
+
+def arange(start, stop=None, step=1, dtype='int32'):
+    _report_unimplemented('arange')
+
+
 def argmax(x, axis=-1):
     return _Op('argmax', x.dtype, x.shape, None, OrderedDict([('I', x), ('axis', axis)]), ['O'])
+
+
+def argmin(x, axis=-1):
+    _report_unimplemented('argmin')
 
 
 def backend():
@@ -1095,23 +1119,31 @@ def categorical_crossentropy(target, output, from_logits=False):
     elif not isinstance(output, _Op) or output._ident != "softmax":
         output /= output.sum(axis=-1, keepdims=True)
         output = output.clip(epsilon(), 1.0 - epsilon())
-    fixed_dims = ",".join("X{}".format(i) for i in range(len(output.shape)-1))
-    fixed_idxs = ",".join("x{}".format(i) for i in range(len(output.shape)-1))
-    f = """function (O[{fixed_dims},Y], T[{fixed_dims},Y]) -> (R) {{
-               LO = log(O);
-               TR[{fixed_idxs}:{fixed_dims}] = +(T[{fixed_idxs},y] * LO[{fixed_idxs},y]);
-               R = -TR;
-           }}""".format(fixed_dims=fixed_dims, fixed_idxs=fixed_idxs)
-    shape = list(output.shape)
-    shape.pop()
-    shape = tuple(shape)
-    return _Op('categorical_crossentropy', output.dtype, shape, f,
+    if output.ndim == 1:
+        f = """function (O[Y], T[Y]) -> (R) {
+                   LO = log(O);
+                   TR[] = +(T[y] * LO[y]);
+                   R = -TR;
+               }"""
+    else:
+        fixed_dims = ",".join("X{}".format(i) for i in range(output.ndim-1))
+        fixed_idxs = ",".join("x{}".format(i) for i in range(output.ndim-1))
+        f = """function (O[{fixed_dims},Y], T[{fixed_dims},Y]) -> (R) {{
+                   LO = log(O);
+                   TR[{fixed_idxs}:{fixed_dims}] = +(T[{fixed_idxs},y] * LO[{fixed_idxs},y]);
+                   R = -TR;
+               }}""".format(fixed_dims=fixed_dims, fixed_idxs=fixed_idxs)
+    return _Op('categorical_crossentropy', output.dtype, output.shape[:-1], f,
                OrderedDict([('O', output), ('T', target)]), ['R'])
 
 
 def ceil(x):
     f = """function (I) -> (O) { O = ceil(I); }"""
     return _Op('ceil', x.dtype, x.shape, f, {'I': x}, ['O'])
+
+
+def clear_session():
+    _report_unimplemented('clear_session')
 
 
 def clip(x, min_value, max_value):
@@ -1476,8 +1508,16 @@ def conv2d(x, kernel, strides=(1, 1), padding='valid', dilation_rate=(1, 1), dat
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
+def conv2d_transpose(x, kernel, output_shape, strides=(1, 1), padding='valid', data_format=None):
+    _report_unimplemented('conv2d_transpose')
+
+
 def conv3d(x, kernel, strides=(1, 1, 1), padding='valid', dilation_rate=(1, 1, 1), data_format = None):
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
+
+
+def conv3d_transpose(x, kernel, output_shape, strides=(1, 1, 1), padding='valid', data_format=None):
+    _report_unimplemented('conv3d_transpose')
 
 
 def count_params(x):
@@ -1485,6 +1525,26 @@ def count_params(x):
     for dim in x.shape:
         result *= dim
     return result
+
+
+def ctc_batch_cost(y_true, y_pred, input_length, label_length):
+    _report_unimplemented('ctc_batch_cost')
+
+
+def ctc_decode(y_pred, input_length, greedy=True, beam_width=100, top_paths=1):
+    _report_unimplemented('ctc_decode')
+
+
+def ctc_label_dense_to_sparse(labels, label_lengths):
+    _report_unimplemented('ctc_label_dense_to_sparse')
+
+
+def cumprod(x, axis=0):
+    _report_unimplemented('cumprod')
+
+
+def cumsum(x, axis=0):
+    _report_unimplemented('cumsum')
 
 
 def depthwise_conv2d(x, kernel, strides=(1, 1), padding='valid', data_format = None, dilation_rate=(1, 1)):
@@ -1548,6 +1608,10 @@ def dtype(x):
     return x.dtype
 
 
+def elu(x, alpha=1.0):
+    _report_unimplemented('elu')
+
+
 def eval(x):
     return x.eval()
 
@@ -1561,6 +1625,10 @@ def equal(x, y):
 def exp(x):
     f = """function (I) -> (O) { O = exp(I); }"""
     return _Op('exp', x.dtype, x.shape, f, {'I': x}, ['O'])
+
+
+def eye(size, dtype=None, name=None):
+    _report_unimplemented('eye')
 
 
 def pow(x, p):
@@ -1586,9 +1654,21 @@ def expand_dims(x, axis=-1):
     return _Op('expand_dims', x.dtype, newshape, f, {'IN': x }, ['OUT'])
 
 
+def flatten(x):
+    _report_unimplemented('flatten')
+
+
 def floor(x):
     f = """function (I) -> (O) { O = floor(I); }"""
     return _Op('floor', x.dtype, x.shape, f, {'I': x}, ['O'])
+
+
+def foldl(fn, elems, initializer=None, name=None):
+    _report_unimplemented('foldl')
+
+
+def foldr(fn, elems, initializer=None, name=None):
+    _report_unimplemented('foldr')
 
 
 def function(inputs, outputs, updates=None, name=None):
@@ -1646,6 +1726,10 @@ def greater_equal(x, y):
     return x >= y
 
 
+def hard_sigmoid(x):
+    _report_unimplemented('hard_sigmoid')
+
+
 def identity(x):
     # Return a tensor with the same content as the input tensor.
     f = """function (I) -> (O) { O = I; }"""
@@ -1655,6 +1739,10 @@ def identity(x):
 def in_test_phase(x, alt, training=None):
     # Note that this flips 'alt' and 'x'
     return in_train_phase(alt, x, training=training)
+
+
+def in_top_k(predictions, targets, k):
+    _report_unimplemented('in_top_k')
 
 
 def in_train_phase(x, alt, training=None):
@@ -1695,6 +1783,10 @@ def is_keras_tensor(x):
     return isinstance(x, _Var) and x.is_keras_tensor
 
 
+def is_placeholder(x):
+    _report_unimplemented('is_placeholder')
+
+
 def is_sparse(x):
     return False
 
@@ -1720,9 +1812,29 @@ def less_equal(x, y):
     return x <= y
 
 
+def local_conv1d(inputs, kernel, kernel_size, strides, data_format=None):
+    _report_unimplemented('local_conv1d')
+
+
+def local_conv2d(inputs, kernel, kernel_size, strides, output_shape, data_format=None):
+    _report_unimplemented('local_conv2d')
+
+
 def log(x):
     f = """function (I) -> (O) { O = log(I); }"""
     return _Op('log', x.dtype, x.shape, f, {'I': x}, ['O'])
+
+
+def logsumexp(x, axis=None, keepdims=False):
+    _report_unimplemented('logsumexp')
+
+
+def manual_variable_initialization(value):
+    _report_unimplemented('manual_variable_initialization')
+
+
+def map_fn(fn, elems, name=None, dtype=None):
+    _report_unimplemented('map_fn')
 
 
 # WARNING: You can't use python's builtin function 'max()' directly in this
@@ -2006,8 +2118,21 @@ def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool
     return pool(x, pool_size, strides=strides, padding=padding,
                 data_format=data_format, pool_mode=pool_mode)
 
+
+def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, pool_mode='max'):
+    _report_unimplemented('pool3d')
+
+
+def print_tensor(x, message=''):
+    _report_unimplemented('print_tensor')
+
+
 def prod(x, axis=None, keepdims=False):
     return x.prod(axis=axis, keepdims=keepdims)
+
+
+def random_binomial(shape, p=0.0, dtype=None, see=None):
+    _report_unimplemented('random_binomial')
 
 
 def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
@@ -2026,6 +2151,10 @@ def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
     if dtype != 'float32':
         z0 = cast(z0, dtype)
     return z0
+
+
+def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None):
+    _report_unimplemented('random_normal_variable')
 
 
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
@@ -2125,6 +2254,14 @@ def resize_images(x, height_factor, width_factor, data_format):
     return ret
 
 
+def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
+    _report_unimplemented('resize_volumes')
+
+
+def reverse(x, axes):
+    _report_unimplemented('reverse')
+
+
 def reverse_gradient(x, coeff = 1.0):
     f = """function (I, C) -> (O) { O = reverse_grad(I, C); }"""
     return _Op('reverse_grad', x.dtype, x.shape, f, {'I': x, 'C': coeff}, ['O'])
@@ -2133,15 +2270,7 @@ def reverse_gradient(x, coeff = 1.0):
 def rnn(step_function, inputs, initial_states,
         go_backwards=False, mask=None, constants=None,
         unroll=False, input_length=None):
-    # TODO: This is just a stub and does not implement needed functionality
-
-    f = """function (A) -> (B) { B = assert_rnn_not_implemented(A == exp(A)); }"""
-    return (_Op('rnn_lo', inputs.dtype, inputs.shape[:1] + inputs.shape[2:],
-                f, {'A': inputs}, ['B']),
-            _Op('rnn_o', inputs.dtype, inputs.shape,
-                f, {'A': inputs}, ['B']),
-            initial_states
-    )
+    _report_unimplemented('rnn')
 
 
 def round(x):
@@ -2197,6 +2326,10 @@ def sigmoid(x):
     return _Op('sigmoid', x.dtype, x.shape, f, {'I': x}, ['O'])
 
 
+def sign(x):
+    _report_unimplemented('sign')
+
+
 def sin(x):
     f = "function (I) -> (O) { O = sin(I); }"
     return _Op('sin', x.dtype, x.shape, f, {'I': x}, ['O'])
@@ -2216,8 +2349,20 @@ def softmax(x):
         return reshape(softmaxed, full_shape)
 
 
+def softplus(x):
+    _report_unimplemented('softplus')
+
+
+def softsign(x):
+    _report_unimplemented('softsign')
+
+
 def sparse_categorical_crossentropy(target, output, from_logits=False):
     return categorical_crossentropy(one_hot(target, output.shape[-1]), output, from_logits)
+
+
+def spatial_3d_padding(x, padding=((1, 1), (1, 1), (1, 1)), data_format=None):
+    _report_unimplemented('spatial_3d_padding')
 
 
 def square(x):
@@ -2242,6 +2387,18 @@ def sqrt(x):
     return _Op('sqrt', x.dtype, x.shape, f, {'I': x}, ['O'])
 
 
+def stack(x, axis=0):
+    _report_unimplemented('stack')
+
+
+def std(x, axis=None, keepdims=False):
+    _report_unimplemented('std')
+
+
+def stop_gradient(variables):
+    _report_unimplemented('stop_gradient')
+
+
 def sum(x, axis=None, keepdims=False):
     return x.sum(axis=axis, keepdims=keepdims)
 
@@ -2256,6 +2413,15 @@ def switch(condition, then_expression, else_expression):
                             ('T', then_expression),
                             ('E', else_expression)]),
                ['O'])
+
+
+def tanh(x):
+    f = """function (I) -> (O) { O = tanh(I); }"""
+    return _Op('tanh', x.dtype, x.shape, f, {'I': x}, ['O'])
+
+
+def temporal_padding(x, padding=(1, 1)):
+    _report_unimplemented('temporal_padding')
 
 
 def tile(x, n):
@@ -2273,9 +2439,8 @@ def tile(x, n):
     return _Op('tile', x.dtype, out_shape, f, {'I': x}, ['O'])
 
 
-def tanh(x):
-    f = """function (I) -> (O) { O = tanh(I); }"""
-    return _Op('tanh', x.dtype, x.shape, f, {'I': x}, ['O'])
+def to_dense(tensor):
+    _report_unimplemented('to_dense')
 
 
 def transpose(x):

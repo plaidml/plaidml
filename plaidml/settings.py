@@ -1,7 +1,5 @@
 """Manages loading and saving settings into the environment."""
 
-from builtins import str
-from builtins import object
 import json
 import os
 import pkg_resources

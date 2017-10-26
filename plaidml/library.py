@@ -1,6 +1,5 @@
 # Copyright Vertex.AI
 
-from builtins import object
 import ctypes
 import logging
 import plaidml.exceptions

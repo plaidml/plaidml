@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 """Creates a plaidml user configuration file."""
-from __future__ import print_function
+from six.moves import *
 
-from builtins import input
-from builtins import str
-from builtins import range
 import sys
 
 import plaidml
@@ -17,14 +14,14 @@ def main():
     plaidml.quiet()
 
     def choice_prompt(question, choices, default):
-        input = ""
-        while not input in choices:
-            input = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
-            if not input:
-                input = default
-            elif input not in choices:
-                print("Invalid choice: {}".format(input))
-        return input
+        inp = ""
+        while not inp in choices:
+            inp = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
+            if not inp:
+                inp = default
+            elif inp not in choices:
+                print("Invalid choice: {}".format(inp))
+        return inp
     print("""
 PlaidML Setup ({0})
 

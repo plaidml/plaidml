@@ -280,6 +280,133 @@ static bool SameSizeOrBroadcastCompatible(const Binding& input, const Binding& o
   return true;
 }
 
+static bool OpCanBeUnified(const Program& prog, const Bindings& vars, std::size_t root_opidx, std::size_t test_opidx) {
+  const Op& root_op = prog.ops[root_opidx];
+  const Op& test_op = prog.ops[test_opidx];
+  IVLOG(4, "Testing for unification: " << root_op << " with " << test_op);
+  if (test_op.tag != Op::FUNCTION || test_op.f.is_special()) {
+    IVLOG(4, "  Downstream is not a simple elementwise operation");
+    return false;
+  }
+
+  if (DifferentSize(vars.at(root_op.output), vars.at(test_op.output))) {
+    IVLOG(4, "  Var " << root_op.output << " differs in size from " << test_op.output);
+    return false;
+  }
+
+  for (const auto& input : test_op.inputs) {
+    if (vars.at(input).tag != Binding::TENSOR) {
+      continue;
+    }
+    if (!SameSizeOrBroadcastCompatible(vars.at(input), vars.at(root_op.output))) {
+      // This input requires broadcasting, but it's not
+      // dimensionally compatible with the kernel output shape;
+      // there's a reshape involved, making it tricky to read from
+      // within a kernel output loop.  So we can't use this
+      // operation.
+      IVLOG(4, "  Input " << input << " is incompatible with the output shape");
+      return false;
+    }
+  }
+
+  IVLOG(4, "  LGTM");
+  return true;
+}
+
+static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings& vars, std::size_t root_opidx,
+                                            const std::set<size_t>& previously_computed, const UseDef& ud) {
+  // This method computes the set of function operations that can be unified with the indicated initial operation,
+  // 'start'.
+  //
+  // The algorithm is relatively simplistic.  You could imagine unifying function ops with contractions, pushing the
+  // starting op forward (so that more subsequent ops can unify with it), or even evaluating function ops multiple times
+  // instead of exactly once, which may in some cases allow us to save some intermediate memory -- and perhaps at some
+  // point we will implement optimizations like that, but not today.
+  //
+  // The current implementation starts with the constraint that the starting op will be issued in its existing sequence
+  // with all other contraction ops.  The goal of the unification algorithm is simply to determine the set of future
+  // function ops that can be unified with the initial function op.
+  //
+  // Unification is performed iff:
+  //
+  //   1) Either:
+  //      A - The downstream op takes as an input one of the products of the current set's outputs
+  //      B - The downstream op produces an output that enables another op to become part of the current set
+  //
+  //   2) The downstream op's inputs are available at the point where the starting op is issued
+  //
+  // The algorithm tracks a frontier of function ops to process; this is always a subset of the final op set.  For the
+  // current frontier op being processed, each consumer of the current op's output is considered as a candidate for
+  // inclusion (automatically
+  // satisfying condition 1.A).  If the candidate's inputs are available (either coming from operations issued before
+  // start, or coming from operations that're already part of the set), condition 2 is satisfied, and the candidate is
+  // added to the set of ops to be unified, as well as to the frontier.
+  //
+  // To satisfy 1.B, when the candidate might be unifiable if a unifiable parent were included, we consider each
+  // candidate as a set of candidates, built by tracing the inputs of each op in the candidate set.  The candidate set
+  // is either added as a whole or discarded.
+  //
+  // We process each frontier depth-first in order to slightly increase memory locality, although at this scale, it
+  // doesn't matter much.
+  std::set<size_t> unified;
+  std::stack<size_t> unified_frontier;
+
+  unified.insert(root_opidx);
+  unified_frontier.push(root_opidx);
+
+  while (!unified_frontier.empty()) {
+    std::size_t u = unified_frontier.top();
+    unified_frontier.pop();
+
+    // Loop over the current frontier node's output consumers.
+    for (std::size_t c_start : ud.uses().at(prog.ops[u].output)) {
+      if (unified.count(c_start) || !OpCanBeUnified(prog, vars, root_opidx, c_start) ||
+          previously_computed.count(c_start)) {
+        continue;
+      }
+
+      std::set<std::size_t> candidates;
+      std::stack<std::size_t> candidate_frontier;
+
+      candidates.insert(c_start);
+      candidate_frontier.push(c_start);
+
+      while (!candidate_frontier.empty()) {
+        size_t c = candidate_frontier.top();
+        candidate_frontier.pop();
+
+        for (const std::string& input : prog.ops[c].inputs) {
+          auto it = ud.op_defs().find(input);
+          if (it == ud.op_defs().end()) {
+            continue;
+          }
+          size_t i = it->second;
+          if (i < root_opidx || unified.count(i) || candidates.count(i) || previously_computed.count(i)) {
+            continue;
+          }
+          auto tag = prog.ops[i].tag;
+          if (tag == Op::CONSTANT) {
+            continue;
+          }
+          if (!OpCanBeUnified(prog, vars, root_opidx, i)) {
+            goto discard_candidate_set;
+          }
+          candidates.insert(i);
+          candidate_frontier.push(i);
+        }
+      }
+
+      unified.insert(candidates.begin(), candidates.end());
+      for (auto c : candidates) {
+        unified_frontier.push(c);
+      }
+
+    discard_candidate_set : {}
+    }
+  }
+  return unified;
+}
+
 static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed, VarRewrites* var_rewrites,
                           std::unordered_set<std::string>* war_safe_reads, const Program& prog, std::size_t opidx,
                           const UseDef& ud, const Bindings& vars, const ShapeMap& inputs, const ShapeMap& outputs,
@@ -302,12 +429,6 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   // Additional inputs required for the unified kernel.
   std::set<std::string> post_contraction_inputs;
 
-  // The set of inputs that are known to be available within the kernel.
-  std::set<std::string> available_postop_inputs;
-
-  // The set of elementwise operations that have been unified with the kernel.
-  std::set<std::size_t> unified_opidxs;
-
   // The variable remappings that have been made in the current
   // kernel.  When talking about a kernel's input parameters, we use
   // original variable names, so that shape lookups are correct.  For
@@ -321,16 +442,6 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   // them later iff unused (again, trickier).
   std::unordered_map<std::string, std::string> local_var_rewrites;
 
-  // The set of operations that have been unified with the kernel
-  // (starting with the initiating contraction or elementwise
-  // operation) whose outputs need to checked for downstream
-  // elementwise operations that might be unified.
-  //
-  // We always check these lowest-numbered-op-first, since the
-  // operation list is in single-assignment form, and consumers
-  // are always after producers in the list.
-  std::set<std::size_t> ops_to_check;
-
   // The initial set of inputs supplied to the kernel.  Reshape/Ident
   // operations might produce variables that are needed downstream; if
   // their input variables are created within the kernel, they need to
@@ -338,129 +449,19 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   // don't.
   std::set<std::string> kernel_inputs;
 
-  // Initialize the set of inputs available for post-contraction (unified) ops.
-  available_postop_inputs.insert(op.output);
-  for (const auto& input : op.inputs) {
-    kernel_inputs.insert(input);
-    available_postop_inputs.insert(input);
-  }
-  unified_opidxs.insert(opidx);
-
-  if (!flat->generate_contraction) {
-    // If there's no actual contraction, the initiating operation has
-    // already been added to the FlatContraction's post-ops list.
-    // Initialize the post_contraction_inputs to take this into
-    // account -- the operation's inputs are required to come from
-    // kernel parameters.
-    for (const auto& input : op.inputs) {
-      if (vars.at(input).tag == Binding::TENSOR) {
-        post_contraction_inputs.emplace(input);
-        war_safe_reads->emplace(input);
-      }
-    }
-    ops_to_check.insert(opidx);
-  } else {
-    // Add the initial contraction's output's consumers as the ops to check.
-    auto use_it = ud.uses().find(op.output);
-    if (use_it != ud.uses().end()) {
-      ops_to_check.insert(use_it->second.begin(), use_it->second.end());
-    }
-  }
-
   IVLOG(3, "In unification, out polys = " << out_poly);
-  IVLOG(4, "Looking for ops to unify with op " << op);
 
-  while (ops_to_check.size()) {
-    // Pop an operation to be checked for possible unification.
-    auto check_it = ops_to_check.begin();
-    auto check_opidx = *check_it;
-    ops_to_check.erase(check_it);
+  // The set of elementwise operations that have been unified with the kernel.
+  std::set<std::size_t> unified_opidxs = ConnectedComponents(prog, vars, opidx, *computed, ud);
 
-    auto& check_op = prog.ops[check_opidx];
-    IVLOG(4, "  Checking op " << check_op);
+  for (auto unified_opidx : unified_opidxs) {
+    auto& unified_op = prog.ops[unified_opidx];
 
-    if (check_opidx != opidx) {  // The initial operation is automatically unified.
-      if (check_op.tag != Op::FUNCTION || check_op.f.is_special()) {
-        IVLOG(4, "  Consumer tag=" << check_op.tag << " inputs.size=" << check_op.inputs.size()
-                                   << " is_special=" << check_op.f.is_special() << "; skipping unification");
-        continue;
-      }
-      if (DifferentSize(vars.at(op.output), vars.at(check_op.output))) {
-        IVLOG(4, "  Var " << op.output << " differs in size from " << check_op.output << "; skipping unification");
-        continue;
-      }
-
-      bool all_inputs_available = true;
-      std::vector<std::string> check_op_added_inputs;
-      for (const auto& input : check_op.inputs) {
-        if (vars.at(input).tag != Binding::TENSOR) {
-          continue;
-        }
-        if (!SameSizeOrBroadcastCompatible(vars.at(input), vars.at(op.output))) {
-          // This input requires broadcasting, but it's not
-          // dimensionally compatible with the kernel output shape;
-          // there's a reshape involved, making it tricky to read from
-          // within a kernel output loop.  So we can't use this
-          // operation.
-          all_inputs_available = false;
-          break;
-        }
-
-        if (available_postop_inputs.count(input)) {
-          // We've merged this input's creator into this op, or it was already available.
-          continue;
-        }
-        if (inputs.count(input)) {
-          // This is a program input.
-          check_op_added_inputs.push_back(input);
-          continue;
-        }
-        // Tensor inputs that aren't in the program inputs should be in the usedef map.
-        assert(ud.op_defs().count(input));
-
-        // If the input was generated by an earlier operation, we
-        // can add it as an input to the current kernel, enabling
-        // merging of the operation we're checking.
-        //
-        // It's not clear that this is always a good idea,
-        // since it prevents the earlier operation and the
-        // current operation from running in parallel.
-        size_t src_num = ud.op_defs().at(input);
-        if (src_num <= opidx || computed->count(src_num)) {
-          check_op_added_inputs.push_back(input);
-          continue;
-        }
-
-        all_inputs_available = false;
-        break;
-      }
-      if (!all_inputs_available) {
-        IVLOG(4, "  Op " << check_op << " cannot be computed in this contraction; skipping unification");
-        continue;
-      }
-
-      // Looks like this elementwise op can be unified with the current contraction.
-      IVLOG(4, "  Scheduling unification of op " << check_op);
-      unified_opidxs.insert(check_opidx);
-      available_postop_inputs.insert(check_op.output);
-      for (const auto& input : check_op_added_inputs) {
-        war_safe_reads->emplace(input);
-      }
-      post_contraction_inputs.insert(std::make_move_iterator(check_op_added_inputs.begin()),
-                                     std::make_move_iterator(check_op_added_inputs.end()));
-
-      // Adjust inputs to account for local variable rewrites.
-      Op copied_op = check_op;
-      for (std::string& input : copied_op.inputs) {
-        auto it = local_var_rewrites.find(input);
-        if (it != local_var_rewrites.end()) {
-          input = it->second;
-        }
-      }
-      flat->post_ops.emplace_back(std::move(copied_op));
+    if (unified_op.tag != Op::FUNCTION) {
+      continue;
     }
 
-    // Determine the variable rewrite to use, if any.
+    // Attempt to elide reshape and ident operations.
     //
     // Note that there are several interesting cases here:
     //
@@ -474,12 +475,12 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
     // pre-variable name, map the post-name to the pre-name in subsequent kernels and in the program output bindings,
     // and elide writing the post-variable (although if the post-variable is used downstream, we need to be sure this
     // causes the pre-variable to be written): this may allow subsequent kernels to get started slightly sooner.
-    if (check_op.f.fn == "reshape" || check_op.f.fn == "ident") {
-      if (check_op.inputs.size() < 1) {
+    if (unified_op.f.fn == "reshape" || unified_op.f.fn == "ident") {
+      if (unified_op.inputs.size() < 1) {
         throw std::runtime_error("reshape must have at least one parameter");
       }
-      const auto& in_binding = vars.at(check_op.inputs[0]);
-      const auto& out_binding = vars.at(check_op.output);
+      const auto& in_binding = vars.at(unified_op.inputs[0]);
+      const auto& out_binding = vars.at(unified_op.output);
       if (in_binding.tag != Binding::TENSOR) {
         throw std::runtime_error("reshape only works on tensors");
       }
@@ -491,19 +492,37 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
       }
 
       std::string input;
-      input = var_rewrites->Lookup(check_op.inputs[0]);
-      if (!outputs.count(check_op.output) || (!outputs.count(input) && !inputs.count(input))) {
-        var_rewrites->Insert(check_op.output, input);
-        local_var_rewrites.emplace(check_op.output, std::move(input));
-        flat->post_ops.pop_back();
+      input = var_rewrites->Lookup(unified_op.inputs[0]);
+      if (!outputs.count(unified_op.output) || (!outputs.count(input) && !inputs.count(input))) {
+        IVLOG(4, "  Eliding op:" << unified_op << "; replacing " << unified_op.output << " with " << input);
+        var_rewrites->Insert(unified_op.output, input);
+        local_var_rewrites.emplace(unified_op.output, std::move(input));
+        continue;
+      } else {
+        IVLOG(4, "  Keeping reshape/ident op:" << unified_op);
       }
     }
 
-    // Add the uses of the op's outputs for consideration.
-    auto use_it = ud.uses().find(check_op.output);
-    if (use_it != ud.uses().end()) {
-      ops_to_check.insert(use_it->second.begin(), use_it->second.end());
+    IVLOG(4, "  Unifying op " << unified_op);
+
+    // Adjust inputs to account for local variable rewrites, and add
+    // them to the the post-contraction inputs if needed.
+    Op copied_op = unified_op;
+    for (std::string& input : copied_op.inputs) {
+      auto rit = local_var_rewrites.find(input);
+      if (rit != local_var_rewrites.end()) {
+        input = rit->second;
+      }
+
+      auto uit = ud.op_defs().find(input);
+      if (vars.at(input).tag == Binding::TENSOR &&
+          (uit == ud.op_defs().end() || (!unified_opidxs.count(uit->second)))) {
+        war_safe_reads->emplace(input);
+        post_contraction_inputs.insert(input);
+      }
     }
+
+    flat->post_ops.emplace_back(std::move(copied_op));
   }
 
   // For all available outputs: if the usedefs or program outputs
@@ -711,7 +730,6 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       flat.generate_contraction = false;
 
       const auto& access_op = prog.ops[i];
-      flat.post_ops.emplace_back(access_op);
 
       flat.output = access_op.output;
       const TensorShape& shape = vars.at(access_op.output).shape;

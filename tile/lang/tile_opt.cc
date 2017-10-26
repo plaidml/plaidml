@@ -25,16 +25,14 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
       to_vec.insert(i);
     }
   }
+
   // Given that, see if we are valid for all accesses
-  bool valid = true;
-  for (auto& a : op.access) {
+  auto is_vectorizable = [&](const FlatTensorAccess& a) {
     if (a.offset % vec_size != 0) {
-      valid = false;
-      break;
+      return false;
     }
     if (a.global_index_limit % vec_size != 0) {
-      valid = false;
-      break;
+      return false;
     }
     for (size_t i = 0; i < sz; i++) {
       if (to_vec.find(i) != to_vec.end()) {
@@ -49,11 +47,24 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
           continue;
         }
       }
-      valid = false;
-      break;
+      return false;
     }
+    return true;
+  };
+
+  bool valid = true;
+  for (auto& a : op.access) {
+    valid = is_vectorizable(a);
     if (!valid) {
       break;
+    }
+  }
+  if (valid) {
+    for (auto& a : op.post_op_inputs) {
+      valid = is_vectorizable(a.second);
+      if (!valid) {
+        break;
+      }
     }
   }
   // Nope?  Forget it
@@ -61,29 +72,37 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
     IVLOG(1, "Unable to vectorize");
     return op;
   }
+
   // Adjust ranges
   for (size_t i : to_vec) {
     op.ranges[i] /= vec_size;
   }
+
   // Adjust access
-  for (auto& a : op.access) {
+  auto adjust_access = [&](FlatTensorAccess* a) {
     bool do_vec = false;
     for (size_t i : to_vec) {
-      if (a.strides[i] == 1) {
+      if (a->strides[i] == 1) {
         do_vec = true;
       }
     }
     if (!do_vec) {
-      continue;
+      return;
     }
-    a.vector = vec_size;
-    a.offset /= vec_size;
-    a.global_index_limit /= vec_size;
-    for (size_t i = 0; i < a.strides.size(); i++) {
+    a->vector = vec_size;
+    a->offset /= vec_size;
+    a->global_index_limit /= vec_size;
+    for (size_t i = 0; i < a->strides.size(); i++) {
       if (!to_vec.count(i)) {
-        a.strides[i] /= vec_size;
+        a->strides[i] /= vec_size;
       }
     }
+  };
+  for (auto& a : op.access) {
+    adjust_access(&a);
+  }
+  for (auto& a : op.post_op_inputs) {
+    adjust_access(&a.second);
   }
   op.agg_vec = op.access[0].vector;
   IVLOG(2, "Vectorized: \n" << op.toString());

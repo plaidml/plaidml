@@ -162,11 +162,11 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   var_rewrites_ = std::move(kernel_list.var_rewrites);
 
   LoadKernels(activity.ctx(), std::move(kernel_list.kernels));
+  PushOutputConsumer(program);
   auto tmps = AllocTemporaries(program, kernel_list.types);
-
   AddInterKernelDeps(16);
-
   ScheduleTemporaries(std::move(tmps));
+  PopOutputConsumer();
   LogTemporaries(&cinfo);
   ValidateTemporaries();
 
@@ -177,7 +177,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
 void Program::LoadKernels(const context::Context& ctx, std::vector<lang::KernelInfo> kernel_infos) {
   auto lib = devinfo_->dev->compiler()->Build(ctx, kernel_infos, devinfo_->settings).get();
 
-  kernels_.reserve(kernel_infos.size());
+  kernels_.reserve(kernel_infos.size() + 1);
   for (std::size_t kidx = 0; kidx < kernel_infos.size(); ++kidx) {
     BoundKernel bk;
     bk.info = std::move(kernel_infos[kidx]);
@@ -186,6 +186,23 @@ void Program::LoadKernels(const context::Context& ctx, std::vector<lang::KernelI
     kernels_.emplace_back(std::move(bk));
   }
 }
+
+void Program::PushOutputConsumer(const tile::proto::Program& program) {
+  // We push an extra nop kernel onto the end of the bound kernels
+  // list, with an input dependency on every program output.  To the
+  // scheduler logic, this looks like something requiring every
+  // program output to be live simultaneously, preventing it from
+  // reusing output buffers for intra-program temporaries once those
+  // buffers' final outputs have been written.
+  BoundKernel bk;
+  for (const auto& output : program.outputs()) {
+    bk.info.inputs.emplace_back(var_rewrites_.Lookup(output.first));
+  }
+  bk.info.kname = "<synthetic output collector>";
+  kernels_.emplace_back(std::move(bk));
+}
+
+void Program::PopOutputConsumer() { kernels_.pop_back(); }
 
 std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Program& program,
                                                         const lang::ShapeMap& shape_map) {
@@ -229,12 +246,14 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
 
   for (std::size_t kidx_current = 0; kidx_current < kernels_.size(); ++kidx_current) {
     BoundKernel& bk = kernels_[kidx_current];
-    IVLOG(4, "Setting up parameters for kidx=" << kidx_current << ": " << to_string(bk.info));
+    IVLOG(4, "Binding parameters for kidx=" << kidx_current << ": " << to_string(bk.info));
 
     // Set up output parameters (N.B. outputs come before inputs).
     for (auto bname : bk.info.outputs) {
       if (rewrite_program_outputs.count(bname)) {
-        bk.params.push_back(KernelParam{KernelParamType::kOutput, bname});
+        auto tidx = get_tidx(kidx_current, bname);
+        bk.params.push_back(KernelParam{KernelParamType::kOutput, bname, tidx});
+        tmps[tidx].program_output = bname;
         continue;
       }
 
@@ -245,22 +264,13 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
     for (auto bname : bk.info.inputs) {
       auto it = program.inputs().find(bname);
       if (it != program.inputs().end()) {
-        // Remember the last use of each program input, to support
-        // dealiasing at program execution time (i.e. in order to
-        // detect the case when the same buffer is used as an input
-        // and as an output, where the input is still needed as the
-        // output is being produced).
-        last_input_use_[bname] = kidx_current;
-
         bk.params.push_back(KernelParam{KernelParamType::kInput, bname});
         continue;
       }
 
       // A kernel input might also be a program output produced by an earlier kernel.
-      const std::string& rewrite_bname = var_rewrites_.Lookup(bname);
-      it = program.outputs().find(rewrite_bname);
-      if (it != program.outputs().end()) {
-        bk.params.push_back(KernelParam{KernelParamType::kInput, rewrite_bname});
+      if (rewrite_program_outputs.count(bname)) {
+        bk.params.push_back(KernelParam{KernelParamType::kTmpInput, bname, get_tidx(kidx_current, bname)});
         continue;
       }
 
@@ -277,7 +287,7 @@ std::vector<Program::TmpInfo> Program::AllocTemporaries(const tile::proto::Progr
 }
 
 void Program::AddInterKernelDeps(size_t max_in_flight) {
-  IVLOG(4, "Adding synthetic dependencies between all kernels");
+  IVLOG(4, "Adding inter-kernel synthetic dependencies");
   for (std::size_t kidx = max_in_flight; kidx < kernels_.size(); ++kidx) {
     kernels_[kidx].dep_kidxs.insert(kidx - max_in_flight);
   }
@@ -368,10 +378,32 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
     return true;
   };
 
-  // Next, we consider the temporaries, from largest to smallest.
+  // Allocate alloc tracking structures, and initialize tmp_locs_
+  std::vector<std::set<std::size_t>> alloc_tmps;
+  alloc_tmps.reserve(tmps.size());
+  tmp_locs_.resize(tmps.size());
+
+  // Sort the temporaries, from largest to smallest.  Along the way,
+  // we'll filter out the temporaries that are actually program
+  // outputs, creating named allocs for them (since their assignments
+  // can't be changed).
   std::vector<std::size_t> tidx_by_size;
-  tidx_by_size.resize(tmps.size());
-  std::iota(tidx_by_size.begin(), tidx_by_size.end(), 0);
+  tidx_by_size.reserve(tmps.size());
+  for (std::size_t tidx = 0; tidx < tmps.size(); ++tidx) {
+    if (tmps[tidx].program_output.length()) {
+      auto aidx = alloc_tmps.size();
+      IVLOG(4, "  Allocating output aidx=" << aidx << " for tidx=" << tidx
+                                           << " program_output=" << tmps[tidx].program_output);
+      alloc_tmps.resize(aidx + 1);
+      alloc_tmps[aidx].insert(tidx);
+      alloc_infos_.resize(aidx + 1);
+      alloc_infos_[aidx].byte_size = tmps[tidx].byte_size;
+      alloc_infos_[aidx].program_output = tmps[tidx].program_output;
+      tmp_locs_[tidx] = aidx;
+    } else {
+      tidx_by_size.push_back(tidx);
+    }
+  }
   std::sort(tidx_by_size.begin(), tidx_by_size.end(), [&](std::size_t lhs_tidx, std::size_t rhs_tidx) {
     return tmps[lhs_tidx].byte_size > tmps[rhs_tidx].byte_size;
   });
@@ -383,9 +415,6 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
   // temporary under consideration.  If we can't find a workable
   // alloc, we create one.
   //
-  // Note that any existing alloc will be big enough, since we're
-  // considering the temporaries from largest to smallest.
-  //
   // It does matter which alloc we choose -- if there are two allocs
   // available, a subsequent temporary that temporally overlaps the
   // current temporary might only not-overlap with a subset of the
@@ -393,16 +422,15 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
   // we're arbitrarily picking the first matching alloc, but
   // long-term, it might be interesting to do a complete search.
 
-  std::vector<std::set<std::size_t>> alloc_tmps;
-  alloc_tmps.reserve(tmps.size());
-
-  tmp_locs_.resize(tmps.size());
-
   for (std::size_t tidx : tidx_by_size) {
     IVLOG(4, "Considering tidx=" << tidx);
     bool used_existing_alloc = false;
     for (std::size_t aidx = 0; aidx < alloc_tmps.size(); ++aidx) {
       IVLOG(4, "  Considering alloc aidx=" << aidx);
+      if (alloc_infos_[aidx].byte_size < tmps[tidx].byte_size) {
+        IVLOG(4, "    Alloc is too small");
+        continue;
+      }
       auto& alloc = alloc_tmps[aidx];
       bool alloc_usable = true;
       for (std::size_t alloc_tidx : alloc) {
@@ -426,8 +454,8 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
       IVLOG(4, "  Failed to find an existing alloc; allocating aidx=" << aidx << " for tidx=" << tidx);
       alloc_tmps.resize(aidx + 1);
       alloc_tmps[aidx].insert(tidx);
-      alloc_sizes_.resize(aidx + 1);
-      alloc_sizes_[aidx] = tmps[tidx].byte_size;
+      alloc_infos_.resize(aidx + 1);
+      alloc_infos_[aidx].byte_size = tmps[tidx].byte_size;
       tmp_locs_[tidx] = aidx;
     }
   }
@@ -439,17 +467,25 @@ void Program::LogTemporaries(hal::proto::CompilationInfo* cinfo) {
   std::map<std::size_t, std::size_t> tmp_size_counts;
   std::map<std::size_t, std::size_t> alloc_size_counts;
   for (const auto& tl : tmp_locs_) {
-    auto res = tmp_size_counts.emplace(alloc_sizes_[tl], 1);
+    if (alloc_infos_[tl].program_output.length()) {
+      continue;
+    }
+    auto res = tmp_size_counts.emplace(alloc_infos_[tl].byte_size, 1);
     if (!res.second) {
       res.first->second += 1;
     }
   }
 
   std::size_t total_alloced = 0;
+  std::size_t total_allocs = 0;
 
-  for (const auto& al : alloc_sizes_) {
-    total_alloced += al;
-    auto res = alloc_size_counts.emplace(al, 1);
+  for (const auto& al : alloc_infos_) {
+    if (al.program_output.length()) {
+      continue;
+    }
+    total_allocs++;
+    total_alloced += al.byte_size;
+    auto res = alloc_size_counts.emplace(al.byte_size, 1);
     if (!res.second) {
       res.first->second += 1;
     }
@@ -461,7 +497,7 @@ void Program::LogTemporaries(hal::proto::CompilationInfo* cinfo) {
     IVLOG(4, "  " << it.first << ": " << it.second);
     (*cinfo->mutable_tmp_sizes())[it.first] = it.second;
   }
-  IVLOG(4, "Alloc count: " << alloc_sizes_.size());
+  IVLOG(4, "Alloc count: " << total_allocs);
   IVLOG(4, "Alloc sizes: ");
   for (auto it : alloc_size_counts) {
     IVLOG(4, "  " << it.first << ": " << it.second);
@@ -636,9 +672,9 @@ boost::future<void> RunRequest::BuildAndIssue(const context::Context& ctx, Progr
   {
     context::Activity queueing{running.ctx(), "tile::local_machine::Program::Enqueue"};
 
-    req.AllocTemporaries(queueing.ctx());
     req.BuildChunkMap(queueing.ctx());
     auto io_updates = req.DealiasIO(queueing.ctx());
+    req.AllocTemporaries(queueing.ctx());
 
     req.LaunchKernels(queueing.ctx());
 
@@ -688,8 +724,9 @@ void RunRequest::Log() {
     }
     for (std::size_t tidx = 0; tidx < program_->tmp_locs().size(); ++tidx) {
       const auto& aidx = program_->tmp_locs()[tidx];
-      const auto& size = program_->alloc_sizes()[aidx];
-      VLOG(4) << "tidx=" << tidx << ": aidx=" << aidx << " size=" << size;
+      const auto& info = program_->alloc_infos()[aidx];
+      VLOG(4) << "tidx=" << tidx << ": aidx=" << aidx << " size=" << info.byte_size << " output=\""
+              << info.program_output << "\"";
     }
   }
 }
@@ -697,9 +734,13 @@ void RunRequest::Log() {
 void RunRequest::AllocTemporaries(const context::Context& ctx) {
   if (program_->tmp_locs().size()) {
     std::vector<std::shared_ptr<MemChunk>> allocs;
-    allocs.reserve(program_->alloc_sizes().size());
-    for (const auto& size : program_->alloc_sizes()) {
-      allocs.emplace_back(program_->tmp_mem_strategy()->MakeChunk(ctx, size));
+    allocs.reserve(program_->alloc_infos().size());
+    for (const auto& info : program_->alloc_infos()) {
+      if (info.program_output.length() == 0) {
+        allocs.emplace_back(program_->tmp_mem_strategy()->MakeChunk(ctx, info.byte_size));
+      } else {
+        allocs.emplace_back(output_chunk_map_[info.program_output]);
+      }
     }
 
     tmps_.reserve(program_->tmp_locs().size());
@@ -786,7 +827,7 @@ void RunRequest::LaunchKernels(const context::Context& ctx) {
         }
       }
 
-      done = bk.kernel->Run(ctx, params, deps, ctx.is_logging_events() || VLOG_IS_ON(1));
+      done = bk.kernel->Run(ctx, params, deps, ctx.is_logging_events());
 
       kernel_log_info_.emplace_back(KernelLogInfo{done, bk.info.kname, bk.info.tot_bytes, bk.info.tot_flops});
 
@@ -831,13 +872,10 @@ std::forward_list<RunRequest::PendingUpdate> RunRequest::DealiasIO(const context
   // The list of input buffers to be updated to output buffers after all kernels have been issued.
   std::forward_list<PendingUpdate> io_updates;
 
-  // Build a map from each input buffer to the index of the last kernel that uses that buffer.
-  std::unordered_map<std::shared_ptr<tile::Buffer>, size_t> last_buffer_use_as_input;
+  // Build a set of all input buffers.
+  std::unordered_set<std::shared_ptr<tile::Buffer>> input_buffers;
   for (auto in : inputs_) {
-    auto it = program_->last_input_use().find(in.first);
-    if (it != program_->last_input_use().end()) {
-      last_buffer_use_as_input[in.second] = it->second;
-    }
+    input_buffers.emplace(in.second);
   }
 
   // Examine kernels; de-alias if an input is used after an output is produced in the same buffer.
@@ -855,21 +893,17 @@ std::forward_list<RunRequest::PendingUpdate> RunRequest::DealiasIO(const context
         VLOG(4) << "    " << param.name << " is not a program output";
         continue;
       }
-      auto iit = last_buffer_use_as_input.find(oit->second);
-      if (iit == last_buffer_use_as_input.end()) {
+      auto iit = input_buffers.find(oit->second);
+      if (iit == input_buffers.end()) {
         // This output buffer wasn't used as an input; nothing to do.
         VLOG(4) << "    " << param.name << " is not used as an input";
         continue;
       }
-      if (iit->second < kidx) {
-        // This output buffer is written after the last read of the input's
-        // contents.  TODO: It would be useful to have a flag in KernelInfo to
-        // indicate whether a given kernel can safely use the same buffer as an
-        // input and an output; if we had that, we could also continue the loop
-        // if the indices were equal and the flag were set.
-        VLOG(4) << "    " << param.name << " is written after its last use as an input";
-        continue;
-      }
+
+      // TODO: Add the operation dependency graph to the program,
+      // making it available for computing dealiasing, so that we
+      // don't have to de-duplicate every time a buffer is used as
+      // both an input and an output.
 
       // This output aliases an input; use a new chunk for the output.
       auto buf = std::make_shared<Buffer>(program_->devinfo(),
@@ -884,7 +918,7 @@ std::forward_list<RunRequest::PendingUpdate> RunRequest::DealiasIO(const context
       oit->second = buf;
 
       // Remember to update the input later.
-      io_updates.emplace_front(PendingUpdate{iit->first, buf->chunk()});
+      io_updates.emplace_front(PendingUpdate{*iit, buf->chunk()});
     }
   }
 
