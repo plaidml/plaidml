@@ -6,7 +6,7 @@ matrix:
     env:
       - BZL_PY_VER=PY2
 
-  allow_failures:
+  include:
   - python: "3.6"
     env: 
       - BZL_PY_VER=PY3
