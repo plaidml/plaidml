@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Creates a plaidml user configuration file."""
-from six.moves import *
+from six.moves import input
 
 import sys
 
