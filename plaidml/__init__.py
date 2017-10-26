@@ -875,12 +875,22 @@ def _record_usage(device_id, config_source, valid_devices, invalid_devices, stat
     if not plaidml.settings.telemetry:
         return
     table = 'usage_v1'
+<<<<<<< HEAD
     version = _lib().plaidml_get_version().decode()
+=======
+    version = _lib().plaidml_get_version()
+    if version == b'0.0.0' or b'dev' in version:
+        table = 'usage_v1_test'
+>>>>>>> 61afbca8819d0908d2164fa4abf376b1566c2191
     record = {
-        'version': version,
+        'version': version.decode(),
         'session': plaidml.settings.session,
         'machine': str(uuid.uuid1())[14:],
+<<<<<<< HEAD
         'device_id': str(device_id),
+=======
+        'device_id': device_id.decode(),
+>>>>>>> 61afbca8819d0908d2164fa4abf376b1566c2191
         'status': status,
         'hal': 'OpenCL', # TODO(T1191): plumb from hal
         'platform': "|".join([platform.system(), platform.release(), platform.machine()]),

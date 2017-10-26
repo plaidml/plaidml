@@ -105,7 +105,7 @@ We'd love your help making it better.
     print("Tile code:")
     print("  function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
     with plaidml.open_first_device(ctx) as dev:
-        matmul = plaidml.Function("function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
+        matmul = plaidml.Function(b"function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
         shape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 3, 3)
         a = plaidml.Tensor(dev, shape)
         b = plaidml.Tensor(dev, shape)
