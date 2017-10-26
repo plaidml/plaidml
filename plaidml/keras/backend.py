@@ -20,7 +20,7 @@ subsequently loaded Keras modules to use PlaidML.
 
 from __future__ import print_function, division
 
-import __builtin__
+
 import atexit
 import math
 import numpy as np
@@ -29,6 +29,7 @@ import os
 import pkg_resources
 import plaidml
 import scipy.stats
+import six
 import sys
 import threading
 import traceback
@@ -36,7 +37,8 @@ import types
 
 from collections import OrderedDict
 from contextlib import contextmanager
-
+from six import iteritems
+from six.moves import builtins
 
 from keras.backend.common import epsilon
 from keras.backend.common import floatx
@@ -126,7 +128,7 @@ def _dump_val(x, indent=2):
         return '[val=%s, type=%s]' % (str(x), type(x).__name__)
     result = str(x)
     if isinstance(x, _Op):
-        for (name, val) in x._inputs.iteritems():
+        for (name, val) in iteritems(x._inputs):
             result = result + '\n' + (' ' * indent) + 'where ' + name + ' = ' + _dump_val(val, indent+2)
     elif isinstance(x, _Var) and x._src:
         result = result + '\n' + (' ' * indent) + 'from ' + _dump_val(x._src, indent+2)
@@ -268,12 +270,12 @@ class _Var(object):
                 if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
                     start = 'max({}, 0)'.format(start)
                 else:
-                    start = getattr(__builtin__, "max")(start, 0)
+                    start = getattr(builtins, "max")(start, 0)
             else:
                 if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
                     start = 'min({}, N{} - 1)'.format(start, idx)
                 else:
-                    start = getattr(__builtin__, "min")(start, self.shape[idx] - 1)
+                    start = getattr(builtins, "min")(start, self.shape[idx] - 1)
 
             stop = key[idx].stop
             if stop == None:
@@ -297,12 +299,12 @@ class _Var(object):
                 if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
                     stop = 'min({}, N{})'.format(stop, idx)
                 else:
-                    stop = getattr(__builtin__, "min")(stop, self.shape[idx])
+                    stop = getattr(builtins, "min")(stop, self.shape[idx])
             else:
                 if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
                     stop = 'max({}, -1)'.format(stop)
                 else:
-                    stop = getattr(__builtin__, "max")(stop, -1)
+                    stop = getattr(builtins, "max")(stop, -1)
             if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
                 length_numerator = '({} - ({}))'.format(stop, start)
             else:
@@ -621,7 +623,7 @@ class _Var(object):
             return self
 
         if axis == None:
-            axis = range(self.ndim)
+            axis = list(range(self.ndim))
 
         if isinstance(axis, list) and not len(axis):
             # We're taking the mean across an empty axis list.
@@ -810,7 +812,7 @@ class _Op(_Var):
                     exn = PlaidMLKerasException('unable to construct value for operation \'%s\' at:\n%s' % (self.ident, ''.join(traceback.format_list(self._trace))))
                     raise exn
                 a = plaidml.Applier(_ctx, plaidml.Function(self._code, self._backtrace))
-                for k, v in self._inputs.iteritems():
+                for k, v in iteritems(self._inputs):
                     a.add_input(k, _plaidml_val(v, indent + 1))
                 self._value = a.add_output(self._outputs[0])
             except plaidml.exceptions.PlaidMLError as e:
@@ -823,11 +825,11 @@ class _Op(_Var):
         self._cached_side_effects = {}
         if self._self_side_effects is not None:
             self._cached_side_effects = self._self_side_effects
-        for ki, vi in self._inputs.iteritems():
+        for ki, vi in iteritems(self._inputs):
             if not isinstance(vi, _Var):
                 continue
             inner_effects = vi._side_effects()
-            for k, v in inner_effects.iteritems():
+            for k, v in iteritems(inner_effects):
                 self._cached_side_effects[k] = v
         return self._cached_side_effects
 
@@ -839,7 +841,7 @@ class _Op(_Var):
         c.add_output("eval_out", sv)
         func = c.build()
         # Add any side effects
-        for (var, newval) in self._side_effects().iteritems():
+        for (var, newval) in iteritems(self._side_effects()):
             c.add_update(var, newval)
 
         # Now build an invoker for that function
@@ -894,9 +896,9 @@ class _Function(object):
         side_effects = {}
         for o in outputs:
             inner_effects = o._side_effects()
-            for k, v in inner_effects.iteritems():
+            for k, v in iteritems(inner_effects):
                 side_effects[k] = v
-        for (var, newval) in side_effects.iteritems():
+        for (var, newval) in iteritems(side_effects):
             c.add_update(var, newval)
 
         self._invoker = plaidml.Invoker(_ctx, c.build())
@@ -905,7 +907,7 @@ class _Function(object):
         # Inputs: a list of bindings for the placeholders.
 
         for (name, val) in zip(self._input_names, inputs):
-            if isinstance(val, long) or isinstance(val, int):
+            if isinstance(val, six.integer_types):
                 val = plaidml.Integer(val)
             elif isinstance(val, float):
                 val = plaidml.Real(val)
@@ -1838,7 +1840,7 @@ def map_fn(fn, elems, name=None, dtype=None):
 
 
 # WARNING: You can't use python's builtin function 'max()' directly in this
-# file. Use getattr(__builtin__, "max")() instead.
+# file. Use builtins("max")() instead.
 # Unfortunately, this name is required by Keras.
 def max(x, axis=None, keepdims=False):
     return x.max(axis, keepdims)
@@ -2475,7 +2477,7 @@ def variable(value, dtype=None, name=None, constraint=None):
     dtype = dtype or floatx()
     if constraint:
         raise PlaidMLKerasException('Unsupported variable constraint')
-    if isinstance(value, long) or isinstance(value, int):
+    if isinstance(value, six.integer_types):
         tensor = plaidml.Tensor(_device(), plaidml.Shape(_ctx, _dtypes[dtype]))
         with tensor.mmap_discard(_ctx) as view:
             view.copy_from_ndarray(np.array(value))

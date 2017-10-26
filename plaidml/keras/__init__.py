@@ -43,6 +43,8 @@ to that mechanism.)
 
 from __future__ import print_function
 
+from six import iteritems
+
 import functools
 import importlib
 import numpy as np
@@ -69,7 +71,7 @@ def install_backend(import_path='keras.backend',
                     name of a file, which will be opened with mode 'w' (clobbering
                     the existing file, if any).
     """
-    sys.meta_path.append(_PlaidMLBackendFinder(import_path, backend, trace_file))
+    sys.meta_path = [_PlaidMLBackendFinder(import_path, backend, trace_file)] + sys.meta_path
 
     # Hack around Keras expecting everything not Tensorflow to be Theano.
     from keras.utils import conv_utils
@@ -109,7 +111,7 @@ class _PlaidMLBackendFinder(object):
 
     def _add_imports(self, mod, import_modname):
         impl = importlib.import_module(import_modname, __name__)
-        for (k, v) in impl.__dict__.iteritems():
+        for (k, v) in iteritems(impl.__dict__):
             setattr(mod, k, v)
         return mod
 
