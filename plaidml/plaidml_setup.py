@@ -32,7 +32,7 @@ Some Notes:
   * Questions: https://stackoverflow.com/questions/tagged/plaidml
   * Say hello: https://groups.google.com/forum/#!forum/plaidml-dev
   * PlaidML is licensed under the GNU AGPLv3
- """).format(plaidml.__version__)
+ """.format(plaidml.__version__))
 
     # Operate as if nothing is set
     plaidml.settings._setup_for_test(plaidml.settings.user_settings)
@@ -61,13 +61,13 @@ No supported devices found. Run 'clinfo' and file an issue containing the full o
     if len(devices) == 0:
         print("   No devices.")
     for dev in devices:
-        print("   {0} : {1}".format(dev.id, dev.description))
+        print("   {0} : {1}".format(dev.id.decode(), dev.description.decode()))
 
     print("\nExperimental Config Devices:")
     if len(exp_devices) == 0:
         print("   No devices.")
     for dev in exp_devices:
-        print("   {0} : {1}".format(dev.id, dev.description))
+        print("   {0} : {1}".format(dev.id.decode(), dev.description.decode()))
     
     print("\nUsing experimental devices can cause poor performance, crashes, and other nastiness.\n")
     exp = choice_prompt("Enable experimental device support", ["y","n"], "n")
@@ -86,9 +86,9 @@ Please choose a default device:
 """)
         devrange = range(1, len(devices) + 1)
         for i in devrange:
-            print("   {0} : {1}".format(i, devices[i - 1].id))
+            print("   {0} : {1}".format(i, devices[i - 1].id.decode()))
         dev = choice_prompt("\nDefault device", [str(i) for i in devrange], "1")
-        plaidml.settings.device_ids = [devices[int(dev) - 1].id]
+        plaidml.settings.device_ids = [devices[int(dev) - 1].id.decode()]
 
     print("\nSelected device:\n    {0}".format(plaidml.devices(ctx)[0]))
     print(
@@ -105,7 +105,7 @@ We'd love your help making it better.
     print("Tile code:")
     print("  function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
     with plaidml.open_first_device(ctx) as dev:
-        matmul = plaidml.Function("function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
+        matmul = plaidml.Function(b"function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
         shape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 3, 3)
         a = plaidml.Tensor(dev, shape)
         b = plaidml.Tensor(dev, shape)

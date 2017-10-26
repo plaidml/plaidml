@@ -779,7 +779,7 @@ class Function(_Function):
                 logging.getLogger(__name__).info(code)
                 logging.getLogger(__name__).info(backtrace)
 
-        super(Function, self).__init__(_lib().plaidml_build_coded_function(code, fid))
+        super(Function, self).__init__(_lib().plaidml_build_coded_function(code, fid.encode()))
 
 
 class _DeviceConfig(object):
@@ -818,7 +818,7 @@ class _DeviceConfig(object):
         return buf.value
 
     def __str__(self):
-        return self.id
+        return self.id.decode()
 
 
 class Device(object):
@@ -876,20 +876,20 @@ def _record_usage(device_id, config_source, valid_devices, invalid_devices, stat
         return
     table = 'usage_v1'
     version = _lib().plaidml_get_version()
-    if version == '0.0.0' or 'dev' in version:
+    if version == b'0.0.0' or b'dev' in version:
         table = 'usage_v1_test'
     record = {
-        'version': version,
+        'version': version.decode(),
         'session': plaidml.settings.session,
         'machine': str(uuid.uuid1())[14:],
-        'device_id': device_id,
+        'device_id': device_id.decode(),
         'status': status,
         'hal': 'OpenCL', # TODO(T1191): plumb from hal
         'platform': "|".join([platform.system(), platform.release(), platform.machine()]),
-        'config_source': os.path.basename(config_source), # ensure only the filename is included
+        'config_source': os.path.basename(config_source).decode(), # ensure only the filename is included
         'devices': 
-           [{ 'id': d.id, 'config': d.config, 'details': d.details, 'valid': True} for d in valid_devices] +
-           [{ 'id': d.id, 'config': d.config, 'details': d.details, 'valid': False} for d in invalid_devices],
+           [{ 'id': d.id.decode(), 'config': d.config.decode(), 'details': d.details.decode(), 'valid': True} for d in valid_devices] +
+           [{ 'id': d.id.decode(), 'config': d.config.decode(), 'details': d.details.decode(), 'valid': False} for d in invalid_devices],
     }
     body = {
         'table': table,
@@ -1204,7 +1204,7 @@ class Shape(_Shape):
             stride *= arg
         for arg in args:
             stride /= arg
-            _lib().plaidml_add_dimension(ctx, self, arg, stride)
+            _lib().plaidml_add_dimension(ctx, self, arg, int(stride))
 
 
 class Placeholder(_Var):
