@@ -877,7 +877,7 @@ def _record_usage(device_id, config_source, valid_devices, invalid_devices, stat
     table = 'usage_v1'
     version = _lib().plaidml_get_version().decode()
     record = {
-        'version': version.decode(),
+        'version': version,
         'session': plaidml.settings.session,
         'machine': str(uuid.uuid1())[14:],
         'device_id': str(device_id),
