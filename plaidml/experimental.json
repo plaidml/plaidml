@@ -42,7 +42,7 @@
         },
         "settings": {
           "threads": 64,
-          "vec_size": 8,
+          "vec_size": 1,
           "mem_width": 256,
           "max_mem": 7300,
           "max_regs": 4000,
