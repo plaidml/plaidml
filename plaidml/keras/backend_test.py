@@ -842,12 +842,13 @@ class TestBackendOps(unittest.TestCase):
     @compareForwardExact()
     def testCastToFloat(self, b):
         A = b.variable(m(3,2,4))
-        return b.cast(A, dtype='float64')
+        A2 = b.cast(A, dtype='int32')
+        return b.cast(A, dtype='float32')
 
     @compareForwardExact()
     def testCastToUInt(self, b):
         A = b.variable(m(3,2,4))
-        return b.cast(A, dtype='uint8')
+        return b.cast(A + 2, dtype='uint8')
 
     # Th/TF disagree w/ us about negative zeros and I think the even/odd rounding
     # direction for numbers ending in *.5, so we'll settle for a close match.
