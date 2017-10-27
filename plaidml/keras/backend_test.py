@@ -1,5 +1,6 @@
 # Copyright Vertex.AI.
 
+import functools
 import numpy as np
 import numpy.testing as npt
 import operator
@@ -7,7 +8,7 @@ import os
 import unittest
 import sys
 import plaidml
-import testing.plaidml_config
+#import testing.plaidml_config
 #import plaidml  #only needed if adjusting vlog
 
 from keras.backend.common import set_floatx, floatx
@@ -28,7 +29,7 @@ theano.config.optimizer = "None"
 def m(*args, **kwargs):
     dtype = kwargs.get('dtype', 'float32')
     """Makes a test matrix whose dimensions are the supplied arguments."""
-    total = reduce(operator.mul, args, 1)
+    total = functools.reduce(operator.mul, args, 1)
     arr = np.array(range(-2, total-2), dtype=dtype)
     arr = np.reshape(arr, args)
     return arr
@@ -38,7 +39,7 @@ def n(*args):
     """Makes a test matrix whose dimensions are the supplied arguments.
 
     Differs from m only in what values it has."""
-    total = reduce(operator.mul, args, 1)
+    total = functools.reduce(operator.mul, args, 1)
     arr = np.array(range(-11, total-11), dtype='float32')
     arr = np.reshape(arr, args)
     for i in range(5):
@@ -867,5 +868,5 @@ class TestBackendOps(unittest.TestCase):
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.nan)
     #plaidml._internal_set_vlog(4)
-    testing.plaidml_config.default_config()
+    #testing.plaidml_config.default_config()
     unittest.main()
