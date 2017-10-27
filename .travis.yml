@@ -8,15 +8,15 @@ env:
   - BZL_PY_VER=PY3
 
 matrix:
-  include:
+  exclude:
   - python: "2.7"
     env:
-      - BZL_PY_VER=PY2
+      - BZL_PY_VER=PY3
 
-  include:
+  exclude:
   - python: "3.6"
     env: 
-      - BZL_PY_VER=PY3
+      - BZL_PY_VER=PY2
 
 before_install:
   - echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
