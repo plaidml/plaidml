@@ -1646,7 +1646,7 @@ def expand_dims(x, axis=-1):
     ilist_in = ["i" + str(i) for i in range(x.ndim)]
     slist_out = slist_in[0:axis] + ["1"] + slist_in[axis:]
     ilist_out = ilist_in[0:axis] + ["0"] + ilist_in[axis:]
-    newshape = list(x.shape[0:axis]) + [1,] + list(x.shape[axis:])
+    newshape = tuple(list(x.shape[0:axis]) + [1,] + list(x.shape[axis:]))
     f = """function (IN[{slist_in}]) -> (OUT) {{
                OUT[{ilist_out} : {slist_out}] = +(IN[{ilist_in}]);
            }}""".format(

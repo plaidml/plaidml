@@ -60,7 +60,7 @@ std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shar
       }
       // Rewrite into an add with the constant on the lhs, slightly simplifying subsequent merge logic.
       fn = "add";
-      inputs[1] = IConstValue::make(0 - dynamic_cast<const FConstValue*>(inputs[1].get())->value());
+      inputs[1] = FConstValue::make(0.0 - dynamic_cast<const FConstValue*>(inputs[1].get())->value());
       std::swap(inputs[0], inputs[1]);
     }
   }
@@ -114,7 +114,7 @@ std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shar
         if (lhs->inputs_[0]->type() == FCONST) {
           if (inputs[0]->type() == ICONST) {
             return FunctionValue::make(
-                lhs->fn(), {IConstValue::make(dynamic_cast<const FConstValue*>(lhs->inputs_[0].get())->value() +
+                lhs->fn(), {FConstValue::make(dynamic_cast<const FConstValue*>(lhs->inputs_[0].get())->value() +
                                               dynamic_cast<const IConstValue*>(inputs[0].get())->value()),
                             lhs->inputs_[1]});
           }
