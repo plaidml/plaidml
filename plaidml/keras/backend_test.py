@@ -8,7 +8,7 @@ import os
 import unittest
 import sys
 import plaidml
-#import testing.plaidml_config
+import testing.plaidml_config
 #import plaidml  #only needed if adjusting vlog
 
 from keras.backend.common import set_floatx, floatx
@@ -868,5 +868,5 @@ class TestBackendOps(unittest.TestCase):
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.nan)
     #plaidml._internal_set_vlog(4)
-    #testing.plaidml_config.default_config()
+    testing.plaidml_config.default_config()
     unittest.main()

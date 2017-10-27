@@ -583,7 +583,7 @@ class _Var(object):
             axis = list(axis)
 
         if axis == None:
-            axis = range(self.ndim)
+            axis = list(range(self.ndim))
 
         if isinstance(axis, list) and not len(axis):
             # We're taking the sum across an empty axis list.
