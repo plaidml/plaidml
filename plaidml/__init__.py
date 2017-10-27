@@ -9,7 +9,6 @@
 
 from __future__ import print_function
 
-from six.moves import *
 import contextlib
 import ctypes
 import hashlib
@@ -32,6 +31,7 @@ import weakref
 
 from collections import namedtuple
 from itertools import islice
+from six import u
 
 # Create types for all PlaidML structures, so that we can get some type checking.
 class _C_Devconf(ctypes.Structure):
@@ -99,7 +99,7 @@ DEFAULT_LOG_HANDLER.setLevel(logging.INFO)
 
 @property
 def __version__(self):
-    return _lib().plaidml_get_version()
+    return _lib().plaidml_get_version().decode()
 
 class _Library(plaidml.library.Library):
 
@@ -779,7 +779,7 @@ class Function(_Function):
                 logging.getLogger(__name__).info(code)
                 logging.getLogger(__name__).info(backtrace)
 
-        super(Function, self).__init__(_lib().plaidml_build_coded_function(code, fid.encode()))
+        super(Function, self).__init__(_lib().plaidml_build_coded_function(code.encode(), fid.encode()))
 
 
 class _DeviceConfig(object):
@@ -875,14 +875,12 @@ def _record_usage(device_id, config_source, valid_devices, invalid_devices, stat
     if not plaidml.settings.telemetry:
         return
     table = 'usage_v1'
-    version = _lib().plaidml_get_version()
-    if version == b'0.0.0' or b'dev' in version:
-        table = 'usage_v1_test'
+    version = _lib().plaidml_get_version().decode()
     record = {
-        'version': version.decode(),
+        'version': version,
         'session': plaidml.settings.session,
         'machine': str(uuid.uuid1())[14:],
-        'device_id': device_id.decode(),
+        'device_id': str(device_id),
         'status': status,
         'hal': 'OpenCL', # TODO(T1191): plumb from hal
         'platform': "|".join([platform.system(), platform.release(), platform.machine()]),
@@ -1228,12 +1226,12 @@ def _as_plaidml_var(value):
         if value.dtype.name == 'float_' or value.dtype.name == 'float32':
             return _Var(_lib().plaidml_alloc_real(value))
         else:
-            raise plaidml.exceptions.InvalidArguments('Unexpected type in array: ' +
+            raise plaidml.exceptions.InvalidArgument('Unexpected type in array: ' +
                                                       value.dtype.name)
     else:
-        raise plaidml.exceptions.InvalidArguments(
+        raise plaidml.exceptions.InvalidArgument(
             'unable to convert high dim array to PlaidML value: shape = ' + str(value.shape))
-    raise plaidml.exceptions.InvalidArguments(
+    raise plaidml.exceptions.InvalidArgument(
         'unable to convert \'%s\' to a PlaidML value' % value)
 
 
@@ -1249,13 +1247,13 @@ class Applier(object):
             self._free(self)
 
     def add_input(self, name, value):
-        _lib().plaidml_apply_add_input(self, name, _as_plaidml_var(value))
+        _lib().plaidml_apply_add_input(self, name.encode(), _as_plaidml_var(value))
 
     def get_output_shape(self, name):
-        return _Shape(self._ctx, _lib().plaidml_apply_alloc_output_shape(self, name))
+        return _Shape(self._ctx, _lib().plaidml_apply_alloc_output_shape(self, name.encode()))
 
     def add_output(self, name):
-        return _Var(_lib().plaidml_apply_alloc_output(self, name))
+        return _Var(_lib().plaidml_apply_alloc_output(self, name.encode()))
 
 
 class Composer(object):
@@ -1269,10 +1267,10 @@ class Composer(object):
             self._free(self)
 
     def add_input(self, name, val):
-        _lib().plaidml_add_composer_input(self, name, val)
+        _lib().plaidml_add_composer_input(self, name.encode(), val)
 
     def add_output(self, name, val):
-        _lib().plaidml_add_composer_output(self, name, val)
+        _lib().plaidml_add_composer_output(self, name.encode(), val)
 
     def add_dependency(self, applier):
         _lib().plaidml_add_composer_dependency(self, applier)
@@ -1298,17 +1296,17 @@ class Invoker(object):
             self._free(self)
 
     def set_input(self, name, value):
-        _lib().plaidml_set_invoker_input(self, name, _as_plaidml_var(value))
+        _lib().plaidml_set_invoker_input(self, name.encode(), _as_plaidml_var(value))
 
     def set_inputs(self, inputs):
         for (name, value) in inputs.items():
             self.set_input(name, value)
 
     def get_output_shape(self, name):
-        return _Shape(self._ctx, _lib().plaidml_alloc_invoker_output_shape(self, name))
+        return _Shape(self._ctx, _lib().plaidml_alloc_invoker_output_shape(self, name.encode()))
 
     def set_output(self, name, value):
-        _lib().plaidml_set_invoker_output(self, name, _as_plaidml_var(value))
+        _lib().plaidml_set_invoker_output(self, name.encode(), _as_plaidml_var(value))
 
     def set_outputs(self, outputs):
         for (name, value) in outputs.items():

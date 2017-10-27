@@ -804,7 +804,7 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(3, 2, 4), 1],
              [m(2, 5, 3)],])
     def testExpandDims(self, b, x, ax=-1):
-        return [b.expand_dims(x, 1)]
+        return [b.expand_dims(x, ax)]
 
     @opTest([[m(3, 2, 4), [1, 7, 3]],
              [m(2, 3, 1), [2, 1, 4]]])
@@ -842,12 +842,13 @@ class TestBackendOps(unittest.TestCase):
     @compareForwardExact()
     def testCastToFloat(self, b):
         A = b.variable(m(3,2,4))
-        return b.cast(A, dtype='float64')
+        A2 = b.cast(A, dtype='int32')
+        return b.cast(A, dtype='float32')
 
     @compareForwardExact()
     def testCastToUInt(self, b):
         A = b.variable(m(3,2,4))
-        return b.cast(A, dtype='uint8')
+        return b.cast(A + 2, dtype='uint8')
 
     # Th/TF disagree w/ us about negative zeros and I think the even/odd rounding
     # direction for numbers ending in *.5, so we'll settle for a close match.

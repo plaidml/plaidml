@@ -369,9 +369,7 @@ void Program::ScheduleTemporaries(std::vector<TmpInfo> tmps) {
     }
     const auto& b_deps = kernel_deps[tmps[tidx_b].first_writer_kidx];
     for (auto kidx_a : tmp_accessors[tidx_a]) {
-      if (!b_deps.count(kidx_a) &&
-          (kidx_a != tmps[tidx_b].first_writer_kidx || !war_safe_readers[tidx_a].count(kidx_a) ||
-           tmps[tidx_a].elem_size != tmps[tidx_b].elem_size || tmps[tidx_a].byte_size != tmps[tidx_b].byte_size)) {
+      if (!b_deps.count(kidx_a)) {
         return false;
       }
     }

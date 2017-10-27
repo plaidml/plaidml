@@ -5,8 +5,6 @@ matrix:
   - python: "2.7"
     env:
       - BZL_PY_VER=PY2
-
-  allow_failures:
   - python: "3.6"
     env: 
       - BZL_PY_VER=PY3
@@ -21,9 +19,8 @@ before_install:
   - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
-  - pip install tensorflow theano setuptools
+  - pip install tensorflow theano setuptools h5py
   - git clone http://github.com/plaidml/plaidbench  
-  - pip install -r plaidbench/requirements.txt
 
 install:
   - bazel build -c opt plaidml:wheel plaidml/keras:wheel

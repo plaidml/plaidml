@@ -19,11 +19,7 @@ namespace {
 
 void OnErr(const char* errinfo, const void* priv_info, size_t cb, void* user_data) {
   std::string err{errinfo};
-  auto nl = err.find('\n');
-  if (nl != std::string::npos) {
-    err.resize(nl);
-  }
-  LOG(ERROR) << "OpenCL: " << err << " (cb=" << cb << ")";
+  IVLOG(1, "OpenCL: " << err << " (cb=" << cb << ")");
 }
 
 proto::PlatformInfo GetPlatformInfo(cl_platform_id pid) {
