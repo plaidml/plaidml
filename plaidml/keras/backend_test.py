@@ -271,7 +271,8 @@ class TestBackendOps(unittest.TestCase):
     def testAddElements(self, b, x, y):
         return [x + y]
 
-    @opTest([[m(3, 3), 1.0]])
+    @opTest([[m(3, 3), 1.0],
+             [m(3, 3), -3.4]])
     def testAddConstant(self, b, x, c):
         return [x + c,
                 c + x]
@@ -280,7 +281,8 @@ class TestBackendOps(unittest.TestCase):
     def testSubElements(self, b, x, y):
         return [x - y]
 
-    @opTest([[m(3, 3), 1.0]])
+    @opTest([[m(3, 3), 1.0],
+             [m(3, 3), -3.4]])
     def testSubConstant(self, b, x, c):
         return [x - c,
                 c - x]
@@ -290,7 +292,8 @@ class TestBackendOps(unittest.TestCase):
     def testMulElements(self, b, x, y):
         return [x * y]
 
-    @opTest([[m(3, 3), 2.0]])
+    @opTest([[m(3, 3), 2.0],
+             [m(3, 3), -3.4]])
     def testMulConstant(self, b, x, c):
         return [x * c,
                 c * x]
@@ -302,7 +305,8 @@ class TestBackendOps(unittest.TestCase):
     def testDivElements(self, b, x, y):
         return [x / y]
 
-    @opTest([[m(3, 3), 2.0]])
+    @opTest([[m(3, 3), 2.0],
+             [m(3, 3), -3.4]])
     def testDivConstant(self, b, x, c):
         return [x / c,
                 c / x]
