@@ -914,7 +914,7 @@ class _Enumerator(object):
             with open(settings.config_file) as cf:
                 config = cf.read()
             self._as_parameter_ = _lib().plaidml_alloc_device_enumerator_with_config(
-                ctx, config, ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
+                ctx, config.encode(), ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
         else:
             self._as_parameter_ = _lib().plaidml_alloc_device_enumerator(
                 ctx, ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
