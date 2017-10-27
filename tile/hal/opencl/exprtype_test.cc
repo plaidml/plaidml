@@ -47,16 +47,16 @@ TEST_F(ExprTypeTest, Constants) {
   EXPECT_THAT(TypeOf(_Const(-129)), IsValueType(lang::DataType::INT16));
   EXPECT_THAT(TypeOf(_Const(-32768)), IsValueType(lang::DataType::INT16));
   EXPECT_THAT(TypeOf(_Const(-32769)), IsValueType(lang::DataType::INT32));
-  EXPECT_THAT(TypeOf(_Const(-2147483648)), IsValueType(lang::DataType::INT32));
-  EXPECT_THAT(TypeOf(_Const(-2147483649)), IsValueType(lang::DataType::INT64));
+  EXPECT_THAT(TypeOf(_Const(-2147483648LL)), IsValueType(lang::DataType::INT32));
+  EXPECT_THAT(TypeOf(_Const(-2147483649LL)), IsValueType(lang::DataType::INT64));
 
   EXPECT_THAT(TypeOf(_Const(1)), IsValueType(lang::DataType::INT8));
   EXPECT_THAT(TypeOf(_Const(127)), IsValueType(lang::DataType::INT8));
   EXPECT_THAT(TypeOf(_Const(128)), IsValueType(lang::DataType::INT16));
   EXPECT_THAT(TypeOf(_Const(32767)), IsValueType(lang::DataType::INT16));
   EXPECT_THAT(TypeOf(_Const(32768)), IsValueType(lang::DataType::INT32));
-  EXPECT_THAT(TypeOf(_Const(2147483647)), IsValueType(lang::DataType::INT32));
-  EXPECT_THAT(TypeOf(_Const(2147483648)), IsValueType(lang::DataType::INT64));
+  EXPECT_THAT(TypeOf(_Const(2147483647LL)), IsValueType(lang::DataType::INT32));
+  EXPECT_THAT(TypeOf(_Const(2147483648LL)), IsValueType(lang::DataType::INT64));
 }
 
 TEST_F(ExprTypeTest, AddIndexes) { EXPECT_THAT(TypeOf(_("idx") + _("idx")), IsType(sem::Type{sem::Type::INDEX})); }

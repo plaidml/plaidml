@@ -212,8 +212,17 @@ struct plaidml_device_enumerator {
 
 namespace {
 std::string getEnvVar(std::string const& key) {
+#ifdef _MSC_VER
+  char var[1024];
+  auto rv = GetEnvironmentVariable(key.c_str(), var, sizeof(var));
+  if (!rv || sizeof(var) <= rv) {
+    return "";
+  }
+  return std::string(var);
+#else
   char const* val = std::getenv(key.c_str());
   return val == nullptr ? "" : val;
+#endif
 }
 }
 
