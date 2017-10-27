@@ -557,7 +557,7 @@ class _Var(object):
             axis = list(axis)
 
         if axis == None:
-            axis = range(self.ndim)
+            axis = list(range(self.ndim))
 
         if isinstance(axis, list) and not len(axis):
             # We're taking the product across an empty axis list.
@@ -583,7 +583,7 @@ class _Var(object):
             axis = list(axis)
 
         if axis == None:
-            axis = range(self.ndim)
+            axis = list(range(self.ndim))
 
         if isinstance(axis, list) and not len(axis):
             # We're taking the sum across an empty axis list.
@@ -602,7 +602,7 @@ class _Var(object):
             return self
 
         if axis == None:
-            axis = range(self.ndim)
+            axis = list(range(self.ndim))
 
         if isinstance(axis, list) and not len(axis):
             # Do nothing if max'ing over empty axis list
@@ -648,7 +648,7 @@ class _Var(object):
             return self
 
         if axis == None:
-            axis = range(self.ndim)
+            axis = list(range(self.ndim))
 
         if isinstance(axis, list) and not len(axis):
             # Do nothing if min'ing over empty axis list
@@ -675,7 +675,7 @@ class _Var(object):
             return self
 
         if axis == None:
-            axis = range(self.ndim)
+            axis = list(range(self.ndim))
 
         shape, axis, subs = self._compute_agg_axes(axis, keepdims)
 
@@ -1570,9 +1570,9 @@ def dot(x, y):
                    'x_ranges': ', '.join(['X{}'.format(i) for i in range(x.ndim)]),
                    'y_ranges': ', '.join(['Y{}'.format(i) for i in range(y.ndim)]),
                    'dest_indices': ', '.join(['x{}'.format(i) for i in range(x.ndim-1)] +
-                                             ['y{}'.format(i) for i in range(y.ndim-2)+[y.ndim-1]]),
+                                             ['y{}'.format(i) for i in list(range(y.ndim-2))+[y.ndim-1]]),
                    'dest_ranges': ', '.join(['X{}'.format(i) for i in range(x.ndim-1)] +
-                                            ['Y{}'.format(i) for i in range(y.ndim-2)+[y.ndim-1]]),
+                                            ['Y{}'.format(i) for i in list(range(y.ndim-2))+[y.ndim-1]]),
                    'x_indices': ', '.join(['x{}'.format(i) for i in range(x.ndim-1)]+['z']),
                    'y_indices': ', '.join(['y{}'.format(i) for i in range(y.ndim-2)]+['z']+['y{}'.format(y.ndim-1)]),
                }
