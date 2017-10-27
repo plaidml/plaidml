@@ -22,6 +22,7 @@ from __future__ import print_function, division
 
 
 import atexit
+import functools
 import math
 import numpy as np
 import operator
@@ -506,7 +507,7 @@ class _Var(object):
     def batch_flatten(self):
         # Flatten all but first dimension to a single dimension; leave 1st dimension unchanged
         # Note this is a specific kind of reshape that serves a special role in Keras (for Flatten layers)
-        new_shape = (self.shape[0], reduce(operator.mul, self.shape[1:]))
+        new_shape = (self.shape[0], functools.reduce(operator.mul, self.shape[1:]))
         return self.reshape(new_shape)
 
     def reshape(self, shape):
