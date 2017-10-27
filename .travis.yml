@@ -1,22 +1,13 @@
 language: python
 
-python:
-  - "2.7"
-  - "3.6"
-env:
-  - BZL_PY_VER=PY2
-  - BZL_PY_VER=PY3
-
 matrix:
-  exclude:
+  include:
   - python: "2.7"
     env:
-      - BZL_PY_VER=PY3
-
-  exclude:
+      - BZL_PY_VER=PY2
   - python: "3.6"
     env: 
-      - BZL_PY_VER=PY2
+      - BZL_PY_VER=PY3
 
 before_install:
   - echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
