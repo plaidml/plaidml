@@ -18,6 +18,12 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+namespace {
+DataType g_floatx = DataType::FLOAT32;
+}  // namespace
+
+void SetFloatX(DataType dtype) { g_floatx = dtype; }
+
 bool Binding::operator==(const Binding& rhs) {
   if (tag != rhs.tag) {
     return false;
@@ -251,7 +257,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
     // Handle constants
     if (op.tag == Op::CONSTANT && op.f.fn == "fconst") {
       IVLOG(4, "Found fconst op " << to_string(op));
-      vars->emplace(op.output, Binding(std::stof(op.inputs[0].c_str())));
+      vars->emplace(op.output, Binding(std::stof(op.inputs[0].c_str()), g_floatx));
       continue;
     }
     if (op.tag == Op::CONSTANT && op.f.fn == "iconst") {
@@ -601,7 +607,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
         double r = ConstantPropagate(op.f.fn, dins);
         op.inputs.resize(1);
         if (is_float(out_type)) {
-          vars->emplace(op.output, Binding(r));
+          vars->emplace(op.output, Binding(r, g_floatx));
           op.f.fn = "fconst";
           op.inputs[0] = DoubleToString(r);
         } else {
@@ -750,6 +756,7 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
   std::set<std::string> input_vars;
   std::set<std::string> output_vars;
   for (const auto& kvp : inputs) {
+    // TODO: do we need to check for float and use floatx here?
     vars.emplace(kvp.first, Binding(kvp.second));
     input_vars.insert(kvp.first);
   }

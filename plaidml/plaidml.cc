@@ -579,6 +579,50 @@ extern "C" bool plaidml_writeback_mapping(vai_ctx* ctx, plaidml_mapping* mapping
 
 extern "C" void plaidml_free_mapping(plaidml_mapping* mapping) { delete mapping; }
 
+namespace {
+
+tile::lang::DataType MakeTileDataType(plaidml_datatype datatype) {
+  switch (datatype) {
+    case PLAIDML_DATA_BOOLEAN:
+      return tile::lang::DataType::BOOLEAN;
+    case PLAIDML_DATA_INT8:
+      return tile::lang::DataType::INT8;
+    case PLAIDML_DATA_INT16:
+      return tile::lang::DataType::INT16;
+    case PLAIDML_DATA_INT32:
+      return tile::lang::DataType::INT32;
+    case PLAIDML_DATA_INT64:
+      return tile::lang::DataType::INT64;
+    case PLAIDML_DATA_UINT8:
+      return tile::lang::DataType::UINT8;
+    case PLAIDML_DATA_UINT16:
+      return tile::lang::DataType::UINT16;
+    case PLAIDML_DATA_UINT32:
+      return tile::lang::DataType::UINT32;
+    case PLAIDML_DATA_UINT64:
+      return tile::lang::DataType::UINT64;
+    case PLAIDML_DATA_FLOAT16:
+      return tile::lang::DataType::FLOAT16;
+    case PLAIDML_DATA_FLOAT32:
+      return tile::lang::DataType::FLOAT32;
+    case PLAIDML_DATA_FLOAT64:
+      return tile::lang::DataType::FLOAT64;
+    default:
+      return tile::lang::DataType::INVALID;
+  }
+}
+
+}  // namespace
+
+extern "C" void plaidml_set_floatx(plaidml_datatype datatype) {
+  tile::lang::DataType dt = MakeTileDataType(datatype);
+  if (dt == tile::lang::DataType::INVALID) {
+    vertexai::SetLastStatus(VAI_STATUS_INVALID_ARGUMENT, status_strings::kInvalidArgument);
+    return;
+  }
+  tile::lang::SetFloatX(dt);
+}
+
 // plaidml_shape
 
 struct plaidml_shape {
@@ -588,53 +632,17 @@ struct plaidml_shape {
 };
 
 extern "C" plaidml_shape* plaidml_alloc_shape(vai_ctx* ctx, plaidml_datatype datatype) {
-  tile::lang::DataType dt;
-
   if (!ctx) {
     vertexai::SetLastStatus(VAI_STATUS_CANCELLED, status_strings::kCancelled);
     return nullptr;
   }
 
-  switch (datatype) {
-    case PLAIDML_DATA_BOOLEAN:
-      dt = tile::lang::DataType::BOOLEAN;
-      break;
-    case PLAIDML_DATA_INT8:
-      dt = tile::lang::DataType::INT8;
-      break;
-    case PLAIDML_DATA_INT16:
-      dt = tile::lang::DataType::INT16;
-      break;
-    case PLAIDML_DATA_INT32:
-      dt = tile::lang::DataType::INT32;
-      break;
-    case PLAIDML_DATA_INT64:
-      dt = tile::lang::DataType::INT64;
-      break;
-    case PLAIDML_DATA_UINT8:
-      dt = tile::lang::DataType::UINT8;
-      break;
-    case PLAIDML_DATA_UINT16:
-      dt = tile::lang::DataType::UINT16;
-      break;
-    case PLAIDML_DATA_UINT32:
-      dt = tile::lang::DataType::UINT32;
-      break;
-    case PLAIDML_DATA_UINT64:
-      dt = tile::lang::DataType::UINT64;
-      break;
-    case PLAIDML_DATA_FLOAT16:
-      dt = tile::lang::DataType::FLOAT16;
-      break;
-    case PLAIDML_DATA_FLOAT32:
-      dt = tile::lang::DataType::FLOAT32;
-      break;
-    case PLAIDML_DATA_FLOAT64:
-      dt = tile::lang::DataType::FLOAT64;
-      break;
-    default:
-      return nullptr;
+  tile::lang::DataType dt = MakeTileDataType(datatype);
+  if (dt == tile::lang::DataType::INVALID) {
+    vertexai::SetLastStatus(VAI_STATUS_INVALID_ARGUMENT, status_strings::kInvalidArgument);
+    return nullptr;
   }
+
   try {
     context::Activity activity(ctx->activity.ctx(), "vertexai::AllocShape");
     auto shp = vertexai::compat::make_unique<plaidml_shape>();

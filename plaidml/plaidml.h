@@ -261,6 +261,9 @@ typedef enum {
   PLAIDML_DATA_FLOAT64 = 0x33,
 } plaidml_datatype;
 
+// Set the default datatype for floating-point computations.
+PLAIDML_API void plaidml_set_floatx(plaidml_datatype datatype);
+
 // Allocates a shape, or returns NULL if the library cannot allocate sufficient
 // memory.  Note that shapes must have dimensions added before use.
 PLAIDML_API plaidml_shape* plaidml_alloc_shape(vai_ctx* ctx, plaidml_datatype datatype);
