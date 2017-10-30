@@ -23,5 +23,8 @@ extern const char kCancelled[];
 // The string used for "no-devices" status messages.
 extern const char kNoDevices[];
 
+// The string used for invalid argument status messages.
+extern const char kInvalidArgument[];
+
 }  // namespace status_strings
 }  // namespace vertexai

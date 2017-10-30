@@ -3,31 +3,53 @@
 import functools
 import numpy as np
 import numpy.testing as npt
+import argparse
 import operator
 import os
-import unittest
 import sys
-import plaidml
-import testing.plaidml_config
-#import plaidml  #only needed if adjusting vlog
+import unittest
 
-from keras.backend.common import set_floatx, floatx
-set_floatx('float32')
-
-from keras.backend import theano_backend as th
-from plaidml.keras import backend as pkb
-from keras.backend import tensorflow_backend as tf
-
+import numpy as np
+import numpy.testing as npt
 # Tensorflow needs some code called directly
 import tensorflow
-
 # Theano breaks on convolution if given a default optimizer
 import theano
+from keras.backend import tensorflow_backend as tf
+from keras.backend import theano_backend as th
+from keras.backend.common import floatx
+
+import plaidml
+import testing.plaidml_config
+from plaidml.keras import backend as pkb
+from plaidml.keras.backend import set_floatx
+
 theano.config.optimizer = "None"
+
+# We have to set_floatx before the interpreter encounters any of the test
+# functions, because it will execute the 'opTest' decorator as it processes
+# each test function, which will execute the value-generation functions, which
+# will use the value of floatx() to create test data. Changing floatx later
+# will have inconsistent effects.
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--fp16', action='store_true')
+    parser.add_argument('-v', '--verbose', action='count', default=0)
+    args, remainder = parser.parse_known_args()
+
+    plaidml._internal_set_vlog(args.verbose)
+    if args.fp16:
+        set_floatx('float16')
+        DEFAULT_TOL = 1e-2
+        DEFAULT_ATOL = 1e-5
+    else:
+        set_floatx('float32')
+        DEFAULT_TOL = 1e-3
+        DEFAULT_ATOL = 1e-8
 
 
 def m(*args, **kwargs):
-    dtype = kwargs.get('dtype', 'float32')
+    dtype = kwargs.get('dtype', floatx())
     """Makes a test matrix whose dimensions are the supplied arguments."""
     total = functools.reduce(operator.mul, args, 1)
     arr = np.array(range(-2, total-2), dtype=dtype)
@@ -40,7 +62,7 @@ def n(*args):
 
     Differs from m only in what values it has."""
     total = functools.reduce(operator.mul, args, 1)
-    arr = np.array(range(-11, total-11), dtype='float32')
+    arr = np.array(range(-11, total-11), dtype=floatx())
     arr = np.reshape(arr, args)
     for i in range(5):
         if len(args) > i + 1:
@@ -75,7 +97,7 @@ def _separable_conv_inp(IN, IC, OC, CM, IS, KS, data_format=None):
     return [input_mat, depth_kernel_mat, point_kernel_mat, data_format]
 
 
-def compareForwardExact(skip_theano=False, skip_tensorflow=False):
+def compareForwardExact(skip_theano=True, skip_tensorflow=False):
     """Decorates test methods, checking equality under multiple backends."""
     def decorator(test_func):
         def compare(self, *args):
@@ -98,7 +120,7 @@ def compareForwardExact(skip_theano=False, skip_tensorflow=False):
     return decorator
 
 
-def compareForwardClose(epsilon=1e-03, atol=1e-8, skip_theano=False, skip_tensorflow=False):
+def compareForwardClose(epsilon=DEFAULT_TOL, atol=DEFAULT_ATOL, skip_theano=True, skip_tensorflow=False):
     """Decorates test methods, checking near-equality under multiple backends."""
     def decorator(test_func):
         def compare(self, *args):
@@ -122,7 +144,7 @@ def compareForwardClose(epsilon=1e-03, atol=1e-8, skip_theano=False, skip_tensor
     return decorator
 
 
-def opTest(in_data, tol=1e-3, atol=1e-8, skip_theano=False, skip_tensorflow=False, verbose=False):
+def opTest(in_data, tol=DEFAULT_TOL, atol=DEFAULT_ATOL, skip_theano=True, skip_tensorflow=False, verbose=False):
     # If using with non-tensor parameters, all tensor params must appear before
     # all non-tensor params
     def run_one_backend(self, data, test_func, b, *args):
@@ -131,7 +153,7 @@ def opTest(in_data, tol=1e-3, atol=1e-8, skip_theano=False, skip_tensorflow=Fals
         results = []
         with tf_session.as_default():
             x = [b.placeholder(shape = t.shape) for t in data if hasattr(t, 'shape')]
-            xv = [b.variable(t, dtype='float32') for t in data if hasattr(t, 'shape')]
+            xv = [b.variable(t, dtype=floatx()) for t in data if hasattr(t, 'shape')]
             ps = [t for t in data if not hasattr(t, 'shape')]
             grad_funcs = test_func(self, b, *(x + ps +  list(args)))
             funcs = test_func(self, b, *(xv + ps + list(args)))
@@ -194,11 +216,6 @@ class TestBackendOps(unittest.TestCase):
     def testPassthrough(self, b):
         return b.variable(m(3,3))
 
-    #@compareExact()
-    #def testFp16(self, b):
-    #  set_floatx('float16')
-    #  return b.dot(b.variable(m(4, 4, dtype='float16')), b.variable(m(4, 4, dtype='float16')))
-
     @opTest([[m(3, 3), m(3, 3)], [m(2, 3, 4, 5), m(2, 3, 5, 2)]])
     def testDot(self, b, x, y):
         return [b.dot(x, y)]
@@ -237,7 +254,7 @@ class TestBackendOps(unittest.TestCase):
         args = list()
         ###############
         x = [pkb.placeholder(shape = t.shape) for t in data if isinstance(t, np.ndarray)]
-        xv = [pkb.variable(t, dtype='float32') for t in data if isinstance(t, np.ndarray)]
+        xv = [pkb.variable(t, dtype=floatx()) for t in data if isinstance(t, np.ndarray)]
         par = [t for t in data if not isinstance(t, np.ndarray)]
         grad_funcs = test_func(pkb, *(x + par + list(args)))
         funcs = test_func(pkb, *(xv + par + list(args)))
@@ -510,9 +527,9 @@ class TestBackendOps(unittest.TestCase):
             input_mat_np = m(IN, IC, IH, IW)
         else:
             input_mat_np = m(IN, IH, IW, IC)
-        inputMat = b.variable(input_mat_np, dtype='float32')
-        depthKernelMat = b.variable(depth_kernel_mat_np, dtype='float32')
-        pointKernelMat = b.variable(point_kernel_mat_np, dtype='float32')
+        inputMat = b.variable(input_mat_np, dtype=floatx())
+        depthKernelMat = b.variable(depth_kernel_mat_np, dtype=floatx())
+        pointKernelMat = b.variable(point_kernel_mat_np, dtype=floatx())
         return b.separable_conv2d(inputMat, depthKernelMat, pointKernelMat, padding=padding,
                                   strides=strides, data_format=data_format)
 
@@ -868,9 +885,7 @@ class TestBackendOps(unittest.TestCase):
         c_tensor = b.variable(c)
         return [b.switch(c_tensor, e, t),]
 
-
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.nan)
-    #plaidml._internal_set_vlog(4)
     testing.plaidml_config.default_config()
-    unittest.main()
+    unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

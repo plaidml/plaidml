@@ -100,21 +100,21 @@ void ExprType::Visit(const sem::IntConst &n) {
   // hand, this works pretty well in most cases, and it has the
   // advantage of being simple.
   if (n.value < 0) {
-    if (std::numeric_limits<std::int8_t>::min() <= n.value) {
+    if ((-127 - 1) /* OpenCL SCHAR_MIN */ <= n.value) {
       dtype = lang::DataType::INT8;
-    } else if (std::numeric_limits<std::int16_t>::min() <= n.value) {
+    } else if ((-32767 - 1) /* OpenCL SHRT_MIN */ <= n.value) {
       dtype = lang::DataType::INT16;
-    } else if (std::numeric_limits<std::int32_t>::min() <= n.value) {
+    } else if ((-2147483647 - 1) /* OpenCL INT_MIN */ <= n.value) {
       dtype = lang::DataType::INT32;
     } else {
       dtype = lang::DataType::INT64;
     }
   } else {
-    if (n.value <= std::numeric_limits<std::int8_t>::max()) {
+    if (n.value <= 127 /* OpenCL SCHAR_MAX */) {
       dtype = lang::DataType::INT8;
-    } else if (n.value <= std::numeric_limits<std::int16_t>::max()) {
+    } else if (n.value <= 32767 /* OpenCL SHRT_MAX */) {
       dtype = lang::DataType::INT16;
-    } else if (n.value <= std::numeric_limits<std::int32_t>::max()) {
+    } else if (n.value <= 2147483647 /* OpenCL INT_MAX */) {
       dtype = lang::DataType::INT32;
     } else {
       dtype = lang::DataType::INT64;

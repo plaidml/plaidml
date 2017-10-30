@@ -27,7 +27,6 @@ import math
 import numpy as np
 import operator
 import os
-import pkg_resources
 import plaidml
 import scipy.stats
 import six
@@ -41,11 +40,11 @@ from contextlib import contextmanager
 from six import iteritems
 from six.moves import builtins
 
+from keras.backend.common import cast_to_floatx
 from keras.backend.common import epsilon
 from keras.backend.common import floatx
-from keras.backend.common import set_floatx
-from keras.backend.common import cast_to_floatx
 from keras.backend.common import image_data_format
+from keras.backend.common import set_floatx as keras_set_floatx
 from keras.backend.common import set_image_data_format
 
 
@@ -765,8 +764,8 @@ class _Op(_Var):
     _Op objects have an identifier, dtype, shape, a dict of inputs, and a list
     of output identifiers (typically only one).
 
-    Since most operations translate directly to PlaidMLScript, _Op objects also
-    typically include the PlaidMLScript code for their particular operations.  This
+    Since most operations translate directly to Tile code, _Op objects also
+    typically include the Tile code for their particular operations.  This
     is done to keep per-operation logic together when possible; the only bits that
     are handled seperately are the multiple-operation-coalescing optimizations.
     """
@@ -2307,6 +2306,11 @@ def separable_conv2d(x, depthwise_kernel, pointwise_kernel, strides=(1,1),
                      padding='valid', data_format=None, dilation_rate=(1,1)):
     return separable_conv(x, depthwise_kernel, pointwise_kernel, strides,
                           padding, data_format, dilation_rate)
+
+
+def set_floatx(dtype):
+    keras_set_floatx(dtype)
+    plaidml.set_floatx(_dtypes[dtype])
 
 
 def set_learning_phase(value):

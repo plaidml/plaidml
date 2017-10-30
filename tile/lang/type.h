@@ -14,9 +14,7 @@ namespace lang {
 struct Binding {
   explicit Binding(const TensorShape& _shape) : tag(TENSOR), shape(_shape) {}
   explicit Binding(int64_t _iconst) : tag(ICONST), iconst(_iconst) { shape.type = DataType::INT32; }
-  // TODO(): This can't be enabled if the device doesn't support FP16
-  // explicit Binding(double _fconst) : tag(FCONST), fconst(_fconst) { shape.type = DataType::FLOAT16; }
-  explicit Binding(double _fconst) : tag(FCONST), fconst(_fconst) { shape.type = DataType::FLOAT32; }
+  explicit Binding(double _fconst, DataType dtype) : tag(FCONST), fconst(_fconst) { shape.type = dtype; }
   enum { TENSOR, ICONST, FCONST } tag;
   TensorShape shape;
   int64_t iconst;
@@ -52,6 +50,9 @@ void TypeCheck(Program* prog, Bindings* vars);
 
 // Do the whole ball of wax
 Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs);
+
+// Set the default data type for floating-point computations
+void SetFloatX(DataType dtype);
 
 }  // namespace lang
 }  // namespace tile
