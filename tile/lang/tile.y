@@ -334,6 +334,8 @@ agg_op
   : "+" { $$ = AggregationOp::SUM; }
   | "*" { $$ = AggregationOp::PROD; }
   | ">" { $$ = AggregationOp::MAX; }
+  | "<" { $$ = AggregationOp::MIN; }
+  | "=" { $$ = AggregationOp::ASSIGN; }
 ;
 
 comb_op

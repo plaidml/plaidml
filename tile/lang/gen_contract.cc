@@ -32,6 +32,8 @@ namespace tile {
 namespace lang {
 
 static std::map<AggregationOp, sem::LimitConst::Which> INITIAL_VALUES = {{AggregationOp::MAX, sem::LimitConst::MIN},
+                                                                         {AggregationOp::MIN, sem::LimitConst::MAX},
+                                                                         {AggregationOp::ASSIGN, sem::LimitConst::ZERO},
                                                                          {AggregationOp::PROD, sem::LimitConst::ONE},
                                                                          {AggregationOp::SUM, sem::LimitConst::ZERO}};
 
@@ -69,11 +71,20 @@ static sem::StmtPtr aggregate(const AggregationOp& ag, const sem::builder::LValu
     case AggregationOp::MAX:
       r = (lhs = _Cond(rhs > lhs, rhs, lhs));
       break;
+    case AggregationOp::MIN:
+      r = (lhs = _Cond(rhs < lhs, rhs, lhs));
+      break;
     case AggregationOp::PROD:
       r = (lhs = lhs * rhs);
       break;
+    case AggregationOp::ASSIGN:
+      r = (lhs = rhs);
+      break;
     default:
-      throw std::runtime_error("Invalid Aggregation op");
+      std::string msg("Invalid Aggregation op '");
+      msg += static_cast<char>(ag);
+      msg += "'";
+      throw std::runtime_error(msg);
   }
   return r;
 }
@@ -84,6 +95,14 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
   using namespace sem::builder;  // NOLINT
   // Get size
   size_t sz = op.names.size();
+
+  if (op.agg_op == AggregationOp::ASSIGN) {
+    for (size_t i = 0; i < sz; i++) {
+      if (op.access[0].strides[i] == 0) {
+        throw std::runtime_error("Multiple assignment in Aggregation op '='");
+      }
+    }
+  }
 
   // Determine the useful thread count
   std::uint64_t threads = 1;

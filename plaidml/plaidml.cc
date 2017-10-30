@@ -77,7 +77,7 @@ using tile::lang::PlaceholderValue;
 using tile::lang::RunInfo;
 using tile::lang::TensorValue;
 using tile::lang::Value;
-using tile::lang::Gradiant;
+using tile::lang::Gradient;
 
 struct plaidml_devconf {
   std::shared_ptr<tile::Platform> platform;
@@ -1515,7 +1515,7 @@ extern "C" void plaidml_free_invocation(plaidml_invocation* invocation) { delete
 // plaidml_gradient
 
 struct plaidml_gradient {
-  std::shared_ptr<Gradiant> grad;
+  std::shared_ptr<Gradient> grad;
 };
 
 extern "C" plaidml_gradient* plaidml_alloc_gradient(plaidml_var* var) {
@@ -1524,7 +1524,7 @@ extern "C" plaidml_gradient* plaidml_alloc_gradient(plaidml_var* var) {
     return nullptr;
   }
   try {
-    auto ptr = std::make_shared<Gradiant>(var->value);
+    auto ptr = std::make_shared<Gradient>(var->value);
     return new plaidml_gradient{ptr};
   } catch (...) {
     vertexai::SetLastException(std::current_exception());

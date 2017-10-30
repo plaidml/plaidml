@@ -4,6 +4,7 @@ import functools
 import numpy as np
 import numpy.testing as npt
 import argparse
+from collections import OrderedDict
 import operator
 import os
 import sys
@@ -23,6 +24,7 @@ import plaidml
 import testing.plaidml_config
 from plaidml.keras import backend as pkb
 from plaidml.keras.backend import set_floatx
+import plaidml.exceptions
 
 theano.config.optimizer = "None"
 
@@ -855,6 +857,24 @@ class TestBackendOps(unittest.TestCase):
             pkb.conv(A, B, strides=(2,3))
         with self.assertRaises(ValueError):
             pkb.conv(A, B, dilation_rate=(1,1))
+
+    def testAssignmentExceptions(self):
+        A = pkb.variable(m(5, 1))
+        B = pkb.variable(m(1, 5))
+        f = """function (A[L, M], B[M, N]) -> (O) {
+                   O[i, k: L, N] = =(A[i, j] * B[j, k]);
+               }"""
+        # A * B has each entry a "sum" of exactly one product, and so assignment
+        # is valid and should be the same as + aggregation.
+        O = pkb._Op('assign_mul', A.dtype, (A.shape[0], B.shape[1]), f,
+                    OrderedDict([('A', A), ('B', B)]), ['O']).eval()
+        npt.assert_allclose(O, np.dot(m(5, 1), m(1, 5)))
+        # B * A sums multiple products into one output entry, and so assignment
+        # is not valid and should raise a multiple assignment error.
+        with self.assertRaises(plaidml.exceptions.Unknown) as cm:
+            pkb._Op('assign_mul', A.dtype, (A.shape[0], B.shape[1]), f,
+                    OrderedDict([('A', B), ('B', A)]), ['O']).eval()
+        self.assertEqual(cm.exception.message, "Multiple assignment in Aggregation op '='")
 
     @compareForwardExact()
     def testCastToInt(self, b):

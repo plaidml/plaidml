@@ -19,7 +19,7 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-enum class AggregationOp : char { SUM = '+', MAX = '>', PROD = '*' };
+enum class AggregationOp : char { SUM = '+', MAX = '>', MIN = '<', PROD = '*', ASSIGN = '=' };
 
 enum class CombinationOp : char { MULTIPLY = '*', PLUS = '+', EQ = '=', COND = '?' };
 

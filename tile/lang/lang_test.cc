@@ -541,7 +541,7 @@ TEST_CASE("Softmax Deriv", "[deriv]") {
   ce.SetInput("TY", y);
   auto e = ce.GetOutput("E");
 
-  Gradiant grad(e);
+  Gradient grad(e);
   auto dx = grad(x);
 
   auto ofunc = std::make_shared<BoundFunction>();
@@ -577,7 +577,7 @@ TEST_CASE("Function Deriv", "[deriv]") {
   app.SetInput("X", x);
   auto y = app.GetOutput("Y");
 
-  Gradiant grad(y);
+  Gradient grad(y);
   auto dx = grad(x);
 
   BoundFunction ofunc;
