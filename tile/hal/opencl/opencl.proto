@@ -88,12 +88,6 @@ message SvmCapability {
 
 // Configuration of the TILE OpenCL driver.
 message Driver {
-  // The OpenCL device selector, used to determine which OpenCL devices
-  // are exposed as child devices of this TILE device.  If this it not
-  // set, the TILE device will default to exposing all GPU and Accelerator
-  // OpenCL devices that it is able to schedule work on.
-  hal.proto.HardwareSelector sel = 1;
-
   // If true, nan's will be detected at WARNING and summaries will be printed at VLOG(1).
   bool debug_summaries = 2;
 }

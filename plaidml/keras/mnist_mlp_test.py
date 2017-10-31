@@ -29,8 +29,6 @@ from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.utils import np_utils
 
-import testing.plaidml_config
-
 
 def load_data():
     integration_test_limit = 20000
@@ -101,8 +99,6 @@ def run(use_batch_normalization=False, use_dropout=False):
 
 
 if __name__ == '__main__':
-    plaidml.keras.backend.set_config(testing.plaidml_config.config())
-
     score = run()
 
     print('Test score:', score[0])

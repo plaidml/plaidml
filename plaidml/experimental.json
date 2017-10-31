@@ -3,10 +3,7 @@
     "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
     "hals": [
       {
-        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
-        "sel": {
-          "value": true
-        }
+        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver"
       }
     ],
     "hardware_configs": [
@@ -66,11 +63,10 @@
         }
       },
       {
-        "description": "Intel CPU config",
+        "description": "CPU config",
         "sel": {
           "and": {
             "sel": [
-              { "vendor_regex": "Intel.*" },
               { "name_regex": ".*CPU.*" }
             ]
           }

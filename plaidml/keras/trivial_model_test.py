@@ -5,8 +5,6 @@ import plaidml.keras
 plaidml.keras.install_backend()
 import plaidml.keras.backend
 
-import testing.plaidml_config
-
 from keras.layers import Input
 from keras.models import Model
 
@@ -24,7 +22,6 @@ def run():
 
 
 if __name__ == '__main__':
-    testing.plaidml_config.default_config()
     score = run()
     expected = 1.66666666666666666666
     if (-0.0001 < score - expected and score - expected < 0.0001):

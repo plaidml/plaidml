@@ -54,7 +54,6 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "platform_test",
     srcs = ["platform_test.cc"],
-    data = ["//testing:configs"],
     deps = [
         ":local_machine",
         "//base/config",

@@ -42,18 +42,20 @@ class _Settings(object):
 
     def __init__(self):
         self._load()
+        self._setup = False
 
     def start_session(self):
         """If there are any settings, start the session, otherwise fail."""
         if self.session:
             return
-        settings_count = sum([1 if k in os.environ else 0 for k in ENV_SETTINGS])
-        if settings_count == 0:
+        elif not self.setup:
             raise plaidml.exceptions.PlaidMLError('PlaidML is not configured. Run plaidml-setup.')
         self.session = str(uuid.uuid4()) # Random session id
 
     def _setup_for_test(self, user_settings='', system_settings=''):
         """Sets environment for tests."""
+        self._setup = False
+        self.session = None
         global USER_SETTINGS, SYSTEM_SETTINGS
         USER_SETTINGS = user_settings
         SYSTEM_SETTINGS = system_settings
@@ -84,6 +86,15 @@ class _Settings(object):
                 settings[k] = getattr(self, k.replace("PLAIDML_", "").lower())
         with open(filename, "w") as out:
             json.dump(settings, out, sort_keys=True, indent=4, separators=(',', ':'))
+
+    @property
+    def setup(self):
+        settings_count = sum([1 if k in os.environ else 0 for k in ENV_SETTINGS])
+        return settings_count != 0 or self._setup
+
+    @setup.setter
+    def setup(self, val):
+      self._setup = val
 
     @property
     def user_settings(self):
@@ -137,7 +148,11 @@ class _Settings(object):
 
     @session.setter
     def session(self, val):
-        os.environ[SESSION] = val
+        if val is None:
+            if SESSION in os.environ:
+                del os.environ[SESSION]
+        else:
+          os.environ[SESSION] = val
 
     @property
     def telemetry(self):

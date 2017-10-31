@@ -9,7 +9,6 @@
 #include "base/util/compat.h"
 #include "base/util/error.h"
 #include "tile/hal/opencl/info.h"
-#include "tile/hal/util/selector.h"
 
 namespace vertexai {
 namespace tile {
@@ -362,9 +361,6 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
     auto did = devices[didx];
     auto dinfo = GetDeviceInfo(did, pidx);
     dinfo.set_platform_uuid(ToByteString(platform_activity.ctx().activity_uuid()));
-    if (!selector::Match(config_->sel(), GetHardwareInfo(dinfo))) {
-      continue;
-    }
     LogInfo(std::string("Platform[") + std::to_string(pidx) + "].Device[" + std::to_string(didx) + "]", dinfo);
     device_activity.AddMetadata(dinfo);
     auto dev = std::make_shared<Device>(device_activity.ctx(), cl_ctx, did, config_, std::move(dinfo));

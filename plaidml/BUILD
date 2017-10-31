@@ -231,6 +231,15 @@ plaidml_py_test(
 )
 
 pkg_tar(
+    name = "pkg",
+    srcs = glob([
+        "**/*",
+    ]),
+    package_dir = "plaidml",
+    strip_prefix = ".",
+)
+
+pkg_tar(
     name = "py_deb_data",
     srcs = [":py"],
     package_dir = "/usr/lib/python2.7/dist-packages/plaidml",

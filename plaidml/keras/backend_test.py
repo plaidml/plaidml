@@ -21,7 +21,6 @@ from keras.backend import theano_backend as th
 from keras.backend.common import floatx
 
 import plaidml
-import testing.plaidml_config
 from plaidml.keras import backend as pkb
 from plaidml.keras.backend import set_floatx
 import plaidml.exceptions
@@ -907,5 +906,5 @@ class TestBackendOps(unittest.TestCase):
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.nan)
-    testing.plaidml_config.default_config()
+    #plaidml._internal_set_vlog(5)
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
