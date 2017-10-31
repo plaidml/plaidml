@@ -23,6 +23,10 @@ PLAIDML_COPTS = select({
         "--std=c++1y",
         "-Werror",
     ],
+    "//conditions:default": [
+        "--std=c++1y",
+        "-Werror",
+    ],
 })
 
 PY_SRCS_VER = "PY2AND3"
