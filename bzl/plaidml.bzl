@@ -2,24 +2,12 @@
 
 load("//bzl:protobuf.bzl", "py_proto_library", "cc_proto_library")
 
-def with_plaidml():
-  native.bind(name="xcrunwrapper", actual="@bazel_tools//tools/objc:xcrunwrapper")
-  native.bind(name="protoc-gen-cc11", actual="//base/util/protoc-gen-cc11")
-
 PLAIDML_COPTS = select({
-    "//bzl:arm7-ubuntu-14.04": [
-        "--std=c++1y",
-        "-Werror",
-    ],
-    "//bzl:darwin": [
-        "-std=c++1y",
-        "-Werror",
-    ],
     "//bzl:x64_windows": [
         "/std:c++14",
         "/DWIN32_LEAN_AND_MEAN",
     ],
-    "//bzl:x64-linux": [
+    "//conditions:default": [
         "--std=c++1y",
         "-Werror",
     ],
@@ -32,15 +20,12 @@ PLAIDML_BASE_LINKOPTS = select({
         "-Lexternal/androidndk/ndk/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/",
         "-pie",
     ],
-    "//bzl:x64-linux": [
+    "//bzl:x64_windows": [],
+    "//bzl:darwin": [],
+    "//conditions:default": [
         "-pthread",
         "-lm",
     ],
-    "//bzl:arm7-ubuntu-14.04": [
-        "-pthread",
-        "-lm",
-    ],
-    "//conditions:default": [],
 })
 
 def plaidml_cc_library(copts=[], linkopts=[], **kwargs):
@@ -497,15 +482,15 @@ def _plaidml_version_impl(ctx):
     })
 
 plaidml_cc_version = rule(
-  attrs = {
-    "prefix": attr.string(mandatory = True),
-    "_version_cc_tpl": attr.label(
-        default = Label("//bzl:version.cc.tpl"), 
-        allow_files = True, 
-        single_file = True
-    )
-  },
-  outputs = {"version_file": "_version.cc"},
-  implementation = _plaidml_version_impl,
-  output_to_genfiles = True
+    attrs = {
+        "prefix": attr.string(mandatory = True),
+        "_version_cc_tpl": attr.label(
+            default = Label("//bzl:version.cc.tpl"),
+            allow_files = True,
+            single_file = True,
+        ),
+    },
+    output_to_genfiles = True,
+    outputs = {"version_file": "_version.cc"},
+    implementation = _plaidml_version_impl,
 )

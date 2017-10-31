@@ -191,7 +191,7 @@ extern "C" plaidml_device* plaidml_open_device(vai_ctx* ctx, plaidml_devconf* de
         return nullptr;
       }
     }
-    LOG(INFO) << "Opening device \"" << devconf->device.dev_id();
+    LOG(INFO) << "Opening device \"" << devconf->device.dev_id() << "\"";
     return new plaidml_device{std::make_shared<Evaluator>(devconf)};
   } catch (...) {
     vertexai::SetLastException(std::current_exception());
