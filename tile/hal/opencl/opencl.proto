@@ -193,6 +193,8 @@ message DeviceInfo {
   uint32 max_num_sub_groups = 86;
   bool sub_group_independent_forward_progress = 87;
 
+  string platform_name = 100;
+
   int32 nv_cuda_major_rev = 1001;
   int32 nv_cuda_minor_rev = 1002;
   int32 nv_registers_per_block = 1003;
