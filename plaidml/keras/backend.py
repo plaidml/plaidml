@@ -2031,8 +2031,8 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None,
 
     if len(pool_size) != rank:
         raise ValueError("Pool size inconsistent with input shape: " +
-                         "{} (rank {}) v {} (rank {})".format(pool_size.shape,
-                                                              pool_size.ndim,
+                         "{} (rank {}) v {} (rank {})".format(pool_size,
+                                                              len(pool_size),
                                                               x.shape,
                                                               x.ndim - 2))
     if len(strides) != rank:
