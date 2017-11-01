@@ -381,7 +381,7 @@ class _Var(object):
         return self.name + '[' + ', '.join([str(dim) for dim in self.shape]) + ']'
 
     def _compute_agg_axes(self, axis=None, keepdims=False):
-        if not axis:
+        if axis is None:
             axis = self.ndim - 1
         if isinstance(axis, list):
             axis = [(self.ndim + i if i < 0 else i) for i in axis]

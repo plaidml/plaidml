@@ -337,7 +337,8 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(3, 3)],
              [m(3, 3), None, True],
              [m(2, 3, 4, 5), [1, 3]],
-             [m(3, 4, 5), -1],])
+             [m(3, 4, 5), -1],
+             [m(2, 3, 4), 0],])
     def testSum(self, b, x, ax=None, kd=False):
         return [b.sum(x, axis=ax, keepdims=kd)]
 
