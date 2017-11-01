@@ -59,14 +59,22 @@ plaidml_cc_library(
 plaidml_cc_binary(
     name = "libplaidml.so",
     linkshared = 1,
+    srcs = select({
+        "//bzl:x64_windows": ["dummy.cc"], # Work around for https://github.com/bazelbuild/bazel/issues/4003
+        "//conditions:default": [],
+    }),
     deps = [
         ":api",
     ],
 )
 
-plaidml_cc_binary(
+cc_binary(
     name = "plaidml.dll",
     linkshared = 1,
+    srcs = select({
+        "//bzl:x64_windows": ["dummy.cc"], # Work around for https://github.com/bazelbuild/bazel/issues/4003
+        "//conditions:default": [],
+    }),
     deps = [
         ":api",
     ],
