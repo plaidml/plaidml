@@ -68,7 +68,7 @@ plaidml_cc_binary(
     ],
 )
 
-cc_binary(
+plaidml_cc_binary(
     name = "plaidml.dll",
     srcs = select({
         "//bzl:x64_windows": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
