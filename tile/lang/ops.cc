@@ -83,6 +83,9 @@ std::string to_string(const Contraction& cnt) {
   if (cnt.no_defract) {
     r += " no_defract";
   }
+  if (cnt.use_default != "") {
+    r += " default " + cnt.use_default;
+  }
   return r;
 }
 

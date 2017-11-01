@@ -247,6 +247,10 @@ class TestBackendOps(unittest.TestCase):
     def testBatchDot4(self, b, x):
         return [b.batch_dot(x, b.variable(m(2, 5, 2)))]
 
+    @opTest([[m(2, 4, 5)]])
+    def testBatchFlatten(self, b, x):
+        return [b.batch_flatten(x)]
+
     #TODO: Does not need to exist longterm
     @unittest.skip("Helper test for debugging testAddElements, not standalone")
     def testMicroAddElementsFail(self):
