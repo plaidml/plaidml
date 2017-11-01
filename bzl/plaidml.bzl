@@ -395,25 +395,27 @@ def _plaidml_py_wheel_impl(ctx):
   version = ctx.var.get('version', default='unknown')
   if ctx.file.config:
     cfg = ctx.new_file(setup_py, 'setup.cfg')
-    ctx.action(
+    ctx.actions.run_shell(
       outputs = [cfg],
       inputs = [ctx.file.config],
-      command = ["cp", ctx.file.config.path, cfg.path],
+      command = "cp $0 $1",
+      arguments = [ctx.file.config.path, cfg.path],
       mnemonic = "CopySetupCfg"
     )
     pkg_inputs += [cfg]
   for tgt in ctx.attr.srcs:
     for src in tgt.files:
       dest = ctx.new_file(setup_py, 'pkg/'+ctx.attr.package+'/'+src.basename)
-      ctx.action(
+      ctx.actions.run_shell(
         outputs = [dest],
         inputs = [src],
-        command = ["cp", src.path, dest.path],
+        command = "cp $0 $1",
+        arguments = [src.path, dest.path],
         mnemonic = "CopyPackageFile"
       )
       pkg_inputs += [dest]
   pkg_name = ctx.attr.package.replace('/', '_')
-  ctx.template_action(
+  ctx.actions.expand_template(
     template = tpl,
     output = setup_py,
     substitutions = {
@@ -431,22 +433,24 @@ def _plaidml_py_wheel_impl(ctx):
     ctx.attr.platform
   )
   wheel = ctx.new_file(setup_py, wheel_filename)
-  bdist_wheel_cmd = ["python", setup_py.path, "--no-user-cfg", "bdist_wheel"]
+  bdist_wheel_args = [setup_py.path, "--no-user-cfg", "bdist_wheel"]
   if ctx.attr.platform != 'any':
-    bdist_wheel_cmd.append("--plat-name")
-    bdist_wheel_cmd.append(ctx.attr.platform)
-  ctx.action(
+    bdist_wheel_args.append("--plat-name")
+    bdist_wheel_args.append(ctx.attr.platform)
+  ctx.actions.run(
     outputs = [wheel],
     inputs = pkg_inputs.to_list(),
-    command = bdist_wheel_cmd,
+    executable = "python",
+    arguments = bdist_wheel_args,
     mnemonic = "BuildWheel",
     use_default_shell_env = True,
   )
   output = ctx.new_file(ctx.bin_dir, wheel.basename)
-  ctx.action(
+  ctx.actions.run_shell(
     outputs = [output],
     inputs = [wheel],
-    command = ["cp", wheel.path, output.path],
+    command = "cp $0 $1", 
+    arguments = [wheel.path, output.path],
     mnemonic = "CopyWheel"
   )
   return DefaultInfo(files=depset([output]))

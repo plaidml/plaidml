@@ -14,15 +14,7 @@ cc_toolchain_suite(
     name = "toolchain",
     toolchains = {
         "arm7-linux|gcc": ":cc-gcc-arm7linux",
-        "x64win|gcc": ":cc-gcc-x64win",
     },
-)
-
-config_setting(
-    # Cross-compilation for Windows from Linux
-    name = "x64win",
-    values = {"cpu": "x64win"},
-    visibility = ["//visibility:public"],
 )
 
 config_setting(
@@ -76,21 +68,6 @@ config_setting(
 config_setting(
     name = "with_callgrind",
     define_values = {"with_callgrind": "true"},
-    visibility = ["//visibility:public"],
-)
-
-cc_toolchain(
-    name = "cc-gcc-x64win",
-    all_files = ":empty",
-    compiler_files = ":empty",
-    cpu = "x64win",
-    dwp_files = ":empty",
-    dynamic_runtime_libs = [":empty"],
-    linker_files = ":empty",
-    objcopy_files = ":empty",
-    static_runtime_libs = [":empty"],
-    strip_files = ":empty",
-    supports_param_files = 1,
     visibility = ["//visibility:public"],
 )
 
