@@ -33,6 +33,7 @@ message HardwareSelector {
     string name_regex = 6;
     string vendor_regex = 7;
     uint32 vendor_id = 8;
+    string platform_regex = 9;
   }
 }
 
@@ -70,6 +71,8 @@ message HardwareInfo {
 
   // The shape of the underlying hardware, as determined by the HAL.
   HardwareSettings settings = 6;
+
+  string platform = 7;
 }
 
 // Metadata about program compilations.

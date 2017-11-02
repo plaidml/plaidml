@@ -24,6 +24,7 @@ hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
   result.set_name(info.name());
   result.set_vendor(info.vendor());
   result.set_vendor_id(info.vendor_id());
+  result.set_platform(info.platform_name());
   result.mutable_info()->PackFrom(info);
 
   hal::proto::HardwareSettings* settings = result.mutable_settings();

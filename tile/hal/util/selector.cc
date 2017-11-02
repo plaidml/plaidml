@@ -51,6 +51,9 @@ bool Match(const proto::HardwareSelector& sel, const proto::HardwareInfo& info, 
     case proto::HardwareSelector::kVendorRegex:
       return boost::regex_match(info.vendor(), boost::regex(sel.vendor_regex()));
 
+    case proto::HardwareSelector::kPlatformRegex:
+      return boost::regex_match(info.platform(), boost::regex(sel.platform_regex()));
+
     case proto::HardwareSelector::kVendorId:
       return sel.vendor_id() == info.vendor_id();
 

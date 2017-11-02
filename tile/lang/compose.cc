@@ -401,6 +401,9 @@ Program Xify(const Program& orig) {
     for (auto& c : op.c.constraints) {
       c.range = "X" + c.range;
     }
+    if (op.c.use_default != "") {
+      op.c.use_default = "X" + op.c.use_default;
+    }
   }
   return r;
 }
@@ -445,6 +448,9 @@ Program DeXify(const Program& orig) {
     }
     for (auto& c : op.c.constraints) {
       c.range = DeX(c.range);
+    }
+    if (op.c.use_default != "") {
+      op.c.use_default = DeX(op.c.use_default);
     }
   }
   return r;
@@ -651,8 +657,8 @@ void FunctionApplication::SetInput(const std::string& name, const std::shared_pt
   const Input& pi = p.inputs[func_->in_pos().at(name)];
   if (pi.tag == Input::FIXED) {
     if (val->num_dims() != pi.dims.size()) {
-      throw std::runtime_error("Applying function, tensor with mismatching dimensionality: " + name + ", expected=" +
-                               to_string(pi.dims.size()) + ", got=" + to_string(val->num_dims()));
+      throw std::runtime_error("Applying function, tensor with mismatching dimensionality: " + name +
+                               ", expected=" + to_string(pi.dims.size()) + ", got=" + to_string(val->num_dims()));
     }
     for (size_t d = 0; d < pi.dims.size(); d++) {
       bindings_[pi.dims[d]] = val->dim_value(d);

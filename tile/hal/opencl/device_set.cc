@@ -36,7 +36,7 @@ proto::PlatformInfo GetPlatformInfo(cl_platform_id pid) {
   return info;
 }
 
-proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx) {
+proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx, const proto::PlatformInfo& pinfo) {
   proto::DeviceInfo info;
 
   switch (CLInfo<CL_DEVICE_TYPE>(did)) {
@@ -303,6 +303,8 @@ proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx) {
   info.set_sub_group_independent_forward_progress(CLInfo<CL_DEVICE_SUB_GROUP_INDEPENDENT_FORWARD_PROGRESS>(did));
 #endif
 
+  info.set_platform_name(pinfo.name());
+
 #ifdef CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV
   if (exts.find("cl_nv_device_attribute_query") != exts.end()) {
     info.set_nv_cuda_major_rev(CLInfo<CL_DEVICE_COMPUTE_CAPABILITY_MAJOR_NV>(did));
@@ -359,7 +361,7 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
   for (std::uint32_t didx = 0; didx < devices.size(); ++didx) {
     context::Activity device_activity{platform_activity.ctx(), "tile::hal::opencl::Device"};
     auto did = devices[didx];
-    auto dinfo = GetDeviceInfo(did, pidx);
+    auto dinfo = GetDeviceInfo(did, pidx, pinfo);
     dinfo.set_platform_uuid(ToByteString(platform_activity.ctx().activity_uuid()));
     LogInfo(std::string("Platform[") + std::to_string(pidx) + "].Device[" + std::to_string(didx) + "]", dinfo);
     device_activity.AddMetadata(dinfo);

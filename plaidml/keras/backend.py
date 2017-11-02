@@ -238,78 +238,78 @@ class _Var(object):
         exn = PlaidMLKerasException('unable to evaluate \'%s\' (%s)' % (self.name, self.ident))
         raise exn
 
-    def __getitem__(self, key):
+    def _parse_slice(self, key, idx):
+        if isinstance(key[idx], int):
+            return 1, None, key[idx]
+        if ((not isinstance(key[idx].start, int) and not isinstance(key[idx].start, type(None))) or
+            (not isinstance(key[idx].stop, int) and not isinstance(key[idx].stop, type(None))) or
+            (not isinstance(key[idx].step, int) and not isinstance(key[idx].step, type(None)))):
+            raise ValueError("Must use ints when slicing _Op; received {}".format(key[idx]))
+        step = key[idx].step or 1
+        if step == 0:
+            raise ValueError("Cannot slice with step size 0")
+
+        start = key[idx].start
+        if start == None:
+            if step > 0:
+                start = 0
+            else:
+                start = -1
+        if start < 0:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                start = 'N{} + {}'.format(idx, start)
+            else:
+                start = self.shape[idx] + start
+        if step > 0:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                start = 'max({}, 0)'.format(start)
+            else:
+                start = getattr(builtins, "max")(start, 0)
+        else:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                start = 'min({}, N{} - 1)'.format(start, idx)
+            else:
+                start = getattr(builtins, "min")(start, self.shape[idx] - 1)
+
+        stop = key[idx].stop
+        if stop == None:
+            if step > 0:
+                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                    stop = 'N{}'.format(idx)
+                else:
+                    stop = self.shape[idx]
+            else:
+                stop = -1
+            # Can return now and skip unneeded max/min
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                return '({} - ({}))'.format(stop, start), step, start
+            return stop - start, step, start
+        elif stop < 0:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                stop = 'N{} + {}'.format(idx, stop)
+            else:
+                stop = self.shape[idx] + stop
+        if step > 0:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                stop = 'min({}, N{})'.format(stop, idx)
+            else:
+                stop = getattr(builtins, "min")(stop, self.shape[idx])
+        else:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                stop = 'max({}, -1)'.format(stop)
+            else:
+                stop = getattr(builtins, "max")(stop, -1)
+        if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+            length_numerator = '({} - ({}))'.format(stop, start)
+        else:
+            length_numerator = stop - start
+        return length_numerator, step, start
+
+    def _gen_slice(self, key):
         if isinstance(key, slice) or isinstance(key, int):
             key = (key,)
         if not isinstance(key, tuple):
             raise ValueError("Cannot index _Var using type {}".format(type(key)))
-
-        def __parse_slice(idx):
-            if isinstance(key[idx], int):
-                return 1, None, key[idx]
-            if ((not isinstance(key[idx].start, int) and not isinstance(key[idx].start, type(None))) or
-                (not isinstance(key[idx].stop, int) and not isinstance(key[idx].stop, type(None))) or
-                (not isinstance(key[idx].step, int) and not isinstance(key[idx].step, type(None)))):
-                raise ValueError("Must use ints when slicing _Op; received {}".format(key[idx]))
-            step = key[idx].step or 1
-            if step == 0:
-                raise ValueError("Cannot slice with step size 0")
-
-            start = key[idx].start
-            if start == None:
-                if step > 0:
-                    start = 0
-                else:
-                    start = -1
-            if start < 0:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    start = 'N{} + {}'.format(idx, start)
-                else:
-                    start = self.shape[idx] + start
-            if step > 0:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    start = 'max({}, 0)'.format(start)
-                else:
-                    start = getattr(builtins, "max")(start, 0)
-            else:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    start = 'min({}, N{} - 1)'.format(start, idx)
-                else:
-                    start = getattr(builtins, "min")(start, self.shape[idx] - 1)
-
-            stop = key[idx].stop
-            if stop == None:
-                if step > 0:
-                    if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                        stop = 'N{}'.format(idx)
-                    else:
-                        stop = self.shape[idx]
-                else:
-                    stop = -1
-                # Can return now and skip unneeded max/min
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    return '({} - ({}))'.format(stop, start), step, start
-                return stop - start, step, start
-            elif stop < 0:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    stop = 'N{} + {}'.format(idx, stop)
-                else:
-                    stop = self.shape[idx] + stop
-            if step > 0:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    stop = 'min({}, N{})'.format(stop, idx)
-                else:
-                    stop = getattr(builtins, "min")(stop, self.shape[idx])
-            else:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    stop = 'max({}, -1)'.format(stop)
-                else:
-                    stop = getattr(builtins, "max")(stop, -1)
-            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                length_numerator = '({} - ({}))'.format(stop, start)
-            else:
-                length_numerator = stop - start
-            return length_numerator, step, start
 
         var_list = list()
         dim_list = list()
@@ -318,7 +318,7 @@ class _Var(object):
         shape = list()
         inner_idx = 0
         for idx in range(len(key)):
-            length_numerator, step, offset = __parse_slice(idx)
+            length_numerator, step, offset = self._parse_slice(key, idx)
             if step == None:
                 # In this case offset is an int
                 if offset >= 0:
@@ -349,6 +349,12 @@ class _Var(object):
             formula_list.append('i{}'.format(inner_idx))
             inner_idx += 1
         shape = tuple(shape)
+        return (var_list, dim_list, formula_list, offset_list, shape)
+
+
+    def __getitem__(self, key):
+        (var_list, dim_list, formula_list, offset_list, shape) = self._gen_slice(key)
+
         if len(shape) == 0:
             body = "  O[] = =(I[" + ', '.join(formula_list) + "]);"
         else:
@@ -375,7 +381,7 @@ class _Var(object):
         return self.name + '[' + ', '.join([str(dim) for dim in self.shape]) + ']'
 
     def _compute_agg_axes(self, axis=None, keepdims=False):
-        if not axis:
+        if axis is None:
             axis = self.ndim - 1
         if isinstance(axis, list):
             axis = [(self.ndim + i if i < 0 else i) for i in axis]
@@ -506,8 +512,26 @@ class _Var(object):
     def batch_flatten(self):
         # Flatten all but first dimension to a single dimension; leave 1st dimension unchanged
         # Note this is a specific kind of reshape that serves a special role in Keras (for Flatten layers)
-        new_shape = (self.shape[0], functools.reduce(operator.mul, self.shape[1:]))
-        return self.reshape(new_shape)
+        if self.ndim < 2:
+            raise Exception("batch_flatten called on tensor with ndim < 2")
+
+        in_dim_list = ["N{}".format(i) for i in range(self.ndim)]
+        out_dim_list = ["N0", "*".join(["N{}".format(i) for i in range(1, self.ndim)])]
+        rest_shape = 1
+        for i in range(1, self.ndim):
+            if rest_shape is not None:
+                if self.shape[i] is not None:
+                    rest_shape *= self.shape[i]
+                else:
+                    rest_shape = None
+
+        py_shape = [self.shape[0], rest_shape]
+
+        code = ('function (I[{idims}]) -> (O) {{\n' +
+                '  O = reshape(I, {odims});\n'
+                '}}').format(idims=", ".join(in_dim_list),
+                             odims=", ".join(out_dim_list))
+        return _Op('batch_flatten', self.dtype, py_shape, code, {'I': self}, ['O'])
 
     def reshape(self, shape):
         in_dim_list = ["N{}".format(i) for i in range(self.ndim)]
@@ -542,7 +566,6 @@ class _Var(object):
                 '  O = reshape(I, {odims});\n'
                 '}}').format(idims=", ".join(in_dim_list),
                              odims=", ".join(o_shape))
-
         return _Op('reshape', self.dtype, py_shape, code, {'I': self}, ['O'])
 
     def prod(self, axis=None, dtype=None, keepdims=False, acc_dtype=None):
@@ -1969,7 +1992,7 @@ def ones_like(x, dtype=None, name=None):
 
 
 def permute_dimensions(x, pattern):
-    return _Op('permute', x.dtype, [pattern[idx] for idx in range(x.ndim)],
+    return _Op('permute', x.dtype, tuple([x.shape[idx] for idx in range(x.ndim)]),
                """function (X[%(src_ranges)s]) -> (R) {
                       R[%(dest_indices)s : %(dest_ranges)s] = =(X[%(src_indices)s]);
                   }""" % {
@@ -2008,8 +2031,8 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None,
 
     if len(pool_size) != rank:
         raise ValueError("Pool size inconsistent with input shape: " +
-                         "{} (rank {}) v {} (rank {})".format(pool_size.shape,
-                                                              pool_size.ndim,
+                         "{} (rank {}) v {} (rank {})".format(pool_size,
+                                                              len(pool_size),
                                                               x.shape,
                                                               x.ndim - 2))
     if len(strides) != rank:
