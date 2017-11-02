@@ -525,20 +525,6 @@ class TestBackendOps(unittest.TestCase):
         diffs = X - mean
         return b.mean(b.square(diffs))
 
-    def _separable_conv2d(self, b, IN, IH, IW, IC, OC, CM, KH, KW,
-                          strides=(1,1), padding='same', data_format=None):
-        depth_kernel_mat_np = m(KH, KW, IC, CM)
-        point_kernel_mat_np = m(1, 1, CM*IC, OC)
-        if data_format == 'channels_first':
-            input_mat_np = m(IN, IC, IH, IW)
-        else:
-            input_mat_np = m(IN, IH, IW, IC)
-        inputMat = b.variable(input_mat_np, dtype=floatx())
-        depthKernelMat = b.variable(depth_kernel_mat_np, dtype=floatx())
-        pointKernelMat = b.variable(point_kernel_mat_np, dtype=floatx())
-        return b.separable_conv2d(inputMat, depthKernelMat, pointKernelMat, padding=padding,
-                                  strides=strides, data_format=data_format)
-
     @opTest([_conv_inp(IN=1, IC=16, OC=16, IS=[4, 5], KS=[3, 3]),],
             1e-04, skip_theano=True)
     def testWinograd(self, b, im, km, df):
@@ -563,11 +549,12 @@ class TestBackendOps(unittest.TestCase):
             b.separable_conv2d(im, dkm, pkm, padding='valid', strides=(2, 2), data_format=df),
             b.separable_conv2d(im, dkm, pkm, padding='valid', strides=(1, 1), data_format=df),
             b.separable_conv2d(im, dkm, pkm, padding='same', strides=(3, 3), data_format=df),
+            b.separable_conv2d(im, dkm, pkm, padding='valid', dilation_rate=(2, 1), data_format=df),
         ]
 
     @opTest(
-        [_conv_inp(IN=1, IC=3, OC=1, IS=[5], KS=[2], data_format='channels_last'),
-         _conv_inp(IN=2, IC=1, OC=4, IS=[5], KS=[3], data_format='channels_last')],
+        [_conv_inp(IN=1, IC=3, OC=1, IS=[8], KS=[2], data_format='channels_last'),
+         _conv_inp(IN=2, IC=1, OC=4, IS=[8], KS=[3], data_format='channels_last')],
         # Tensorflow doesn't support 1d convos in this order yet
         #_conv_inp(IN=4, IC=1, OC=5, IS=[9], KS=[4], data_format='channels_first')],
             1e-04, skip_theano=True)
@@ -576,6 +563,8 @@ class TestBackendOps(unittest.TestCase):
             b.conv1d(im, km, padding='same', data_format=df),
             b.conv1d(im, km, padding='valid', data_format=df),
             b.conv1d(im, km, padding='valid', strides=(2), data_format=df),
+            b.conv1d(im, km, padding='valid', dilation_rate=3, data_format=df),
+            b.conv1d(im, km, padding='same', dilation_rate=2, data_format=df),
         ]
 
     @opTest([
@@ -591,6 +580,7 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='valid', data_format=df),
             b.conv2d(im, km, padding='same', strides=(2,2), data_format=df),
             b.conv2d(im, km, padding='valid', strides=(3,1), data_format=df),
+            b.conv2d(im, km, padding='same', dilation_rate=(2, 2), data_format=df),
         ]
 
     @unittest.skip("TODO(T1046): This case is bugged in Keras 2.0.8 TF")
@@ -604,7 +594,7 @@ class TestBackendOps(unittest.TestCase):
         return [b.conv2d(im, km, padding='same', strides=(2,3), data_format=df)]
 
     @opTest(
-        [_conv_inp(IN=3, IC=1, OC=3, IS=[4, 7, 4], KS=[3, 3, 3]),
+        [_conv_inp(IN=3, IC=1, OC=3, IS=[4, 7, 5], KS=[3, 3, 3]),
          _conv_inp(IN=3, IC=4, OC=2, IS=[3, 6, 3], KS=[2, 1, 2], data_format='channels_last'),
          _conv_inp(IN=2, IC=3, OC=1, IS=[5, 5, 3], KS=[3, 2, 2], data_format='channels_first'),
         ],
@@ -615,6 +605,7 @@ class TestBackendOps(unittest.TestCase):
             # TODO(T1046): TF broken in Keras 2.0.8 on this; see testConv2dSpecial
             #b.conv3d(im, km, padding='same', strides=(2,3,3), data_format=df),
             b.conv3d(im, km, padding='valid', strides=(2,1,2), data_format=df),
+            b.conv3d(im, km, padding='valid', dilation_rate=(1, 3, 2), data_format=df),
         ]
 
     @opTest([[m(1, 4, 4, 1)], [m(1, 7, 5, 1)], [m(2, 11, 13, 3)]], skip_theano=True)
@@ -908,6 +899,13 @@ class TestBackendOps(unittest.TestCase):
     def testSwitch(self, b, e, t, c):
         c_tensor = b.variable(c)
         return [b.switch(c_tensor, e, t),]
+
+    @opTest([[m(1, 2, 4), 0],
+             [m(2, 3), 1],
+             [m(2, 3), 0],
+             [m(2, 4, 5), 2]])
+    def testCumSum(self, b, t, a):
+        return [b.cumsum(t, a)]
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.nan)
