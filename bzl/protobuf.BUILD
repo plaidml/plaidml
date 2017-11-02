@@ -19,9 +19,16 @@ config_setting(
     },
 )
 
+config_setting(
+   name = "x64_windows",
+   values = {"cpu": "x64_windows"},
+   visibility = ["//visibility:public"],
+)
+
 # Android builds do not need to link in a separate pthread library.
 LINK_OPTS = select({
     ":android": [],
+    ":x64_windows": [],
     "//conditions:default": ["-lpthread"],
 })
 

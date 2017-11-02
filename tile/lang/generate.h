@@ -52,7 +52,8 @@ typedef std::array<size_t, 3> GridSize;
 // abstraction layer has an optimized implementation.
 enum class KernelType {
   kFunction,  // A normal function kernel.
-  kZero       // A zeroing kernel.
+  kZero,      // A zeroing kernel.
+  kCopy,      // A direct memcpy kernel.
 };
 
 struct KernelInfo {

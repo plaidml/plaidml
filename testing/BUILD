@@ -26,7 +26,7 @@ plaidml_cc_library(
     testonly = True,
     srcs = ["plaidml_config.cc"],
     hdrs = ["plaidml_config.h"],
-    data = [":configs"],
+    data = ["//plaidml:configs"],
     deps = [
         ":runfiles_db",
         "//base/util:util_cc",
@@ -40,21 +40,13 @@ plaidml_py_library(
         "__init__.py",
         "plaidml_config.py",
     ],
-    data = [":configs"],
-)
-
-filegroup(
-    name = "configs",
-    data = glob(
-        ["*.json"],
-        exclude = ["tile_llvm.json"],
-    ),
+    data = ["//plaidml:configs"],
 )
 
 plaidml_py_test(
     name = "configs_test",
     srcs = ["configs_test.py"],
-    data = [":configs"],
+    data = ["//plaidml:configs"],
     deps = ["//plaidml:py"],
 )
 

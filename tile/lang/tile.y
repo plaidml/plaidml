@@ -76,6 +76,7 @@ int yyerror(yyscan_t s, Context& context, const char* message) {
 
 %token FUNCTION "function"
 %token POLYNOMIAL "polynomial" EXPRESSION "expression" CONTRACTION "contraction"
+%token DEFAULT "default"
 %token NO_DEFRACT "no_defract"
 %token QUESTION "?" COLON ":"
 %left QUESTION COLON
@@ -126,7 +127,6 @@ input
 
 stmt
   : contract { context.constraints.clear(); }
-  | contract "no_defract" { context.program.ops.back().c.no_defract = true; context.constraints.clear(); }
   | assign
 ;
 
@@ -192,8 +192,13 @@ outputs
 output
   : ID { context.program.outputs.push_back($1); }
 ;
-  
-contract
+
+contract:
+  | base_contract { context.constraints.clear(); }
+  | contract "no_defract" { context.program.ops.back().c.no_defract = true; }
+  | contract "default" ID { context.program.ops.back().c.use_default = $3; }
+
+base_contract
   : unary_con { context.program.ops.push_back($1); }
   | unary_con constraints { context.program.ops.push_back($1); context.program.ops.back().c.constraints = context.constraints; }
   | binary_con { context.program.ops.push_back($1); }
@@ -334,6 +339,8 @@ agg_op
   : "+" { $$ = AggregationOp::SUM; }
   | "*" { $$ = AggregationOp::PROD; }
   | ">" { $$ = AggregationOp::MAX; }
+  | "<" { $$ = AggregationOp::MIN; }
+  | "=" { $$ = AggregationOp::ASSIGN; }
 ;
 
 comb_op

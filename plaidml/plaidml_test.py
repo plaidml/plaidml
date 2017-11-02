@@ -14,8 +14,8 @@ class TestPlaidML(unittest.TestCase):
 
     def setUp(self):
         plaidml.settings.config = None
-        testing.plaidml_config.default_config()
-    
+        plaidml.settings.setup = True 
+        plaidml.settings.experimental = True 
 
     def testVersion(self):
         # From https://www.python.org/dev/peps/pep-0440/
@@ -25,7 +25,7 @@ class TestPlaidML(unittest.TestCase):
 
     def testDeviceEnumerator(self):
         ctx = plaidml.Context()
-        for conf in plaidml.devices(ctx):
+        for conf in plaidml.devices(ctx, limit=100):
             pass
 
     def testDeviceEnumeratorWithNoDevices(self):
@@ -37,9 +37,6 @@ class TestPlaidML(unittest.TestCase):
                     "hals": [
                       {
                         "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
-                        "sel": {
-                            "value": "false"
-                        }
                       }
                     ]
                   }

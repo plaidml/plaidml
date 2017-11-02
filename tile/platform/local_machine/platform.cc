@@ -57,7 +57,6 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
         if (dev->executor()) {
           const hal::proto::HardwareInfo& info = dev->executor()->info();
           hal::proto::HardwareSettings settings = info.settings();
-          bool skip_device = false;
           bool found_hardware_config = false;
           // TODO(T1101): Move ids into the hal
 
@@ -78,12 +77,9 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
               found_hardware_config = true;
             }
           }
-          if (!found_hardware_config) {
-            skip_device = true;
-          }
           auto devinfo = std::make_shared<DevInfo>(DevInfo{devset, dev, settings});
           PlatformDev pd{id, devinfo};
-          if (skip_device) {
+          if (!found_hardware_config) {
             unmatched_devs_[id] = std::move(pd);
             continue;
           }

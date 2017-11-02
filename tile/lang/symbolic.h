@@ -39,18 +39,18 @@ class ComputeUses final : public ValueVisitor<void> {
   std::set<ValuePtr> done_;
 };
 
-class Gradiant {
+class Gradient {
  public:
-  Gradiant();                                                // No initial source, must be added
-  explicit Gradiant(const ValuePtr& err);                    // Default initial scalar source
+  Gradient();                                                // No initial source, must be added
+  explicit Gradient(const ValuePtr& err);                    // Default initial scalar source
   void AddSource(const ValuePtr& wrt, const ValuePtr& val);  // Add a source
-  ValuePtr operator()(const ValuePtr& val);                  // Compute gradiants
+  ValuePtr operator()(const ValuePtr& val);                  // Compute gradients
 
  private:
   ValuePtr OpGrad(const ValuePtr& dout, const ValuePtr& op, size_t idx);
   ValuePtr FuncOp(const ValuePtr& dout, const std::shared_ptr<FunctionValue>& op, size_t idx);
   ValuePtr SumOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx);
-  ValuePtr MaxOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx);
+  ValuePtr ExtremeOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx);
   ComputeUses uses_;
   std::map<ValuePtr, ValuePtr> done_;
 };

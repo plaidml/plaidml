@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 """Creates a plaidml user configuration file."""
-from six.moves import input
+from __future__ import print_function
 
 import sys
+
+from six.moves import input
 
 import plaidml
 import plaidml.exceptions
 import plaidml.settings
 
-def main():
 
+def main():
     ctx = plaidml.Context()
     plaidml.quiet()
 
@@ -42,35 +44,33 @@ Some Notes:
     plaidml.settings.experimental = True
     exp_devices, unmatched = plaidml.devices(ctx, limit=100, return_all=True)
 
-    if len(devices) == 0 and len(exp_devices) == 0:
-        if len(unmatched) == 0:
-            print(
-"""
+    if not (devices or exp_devices):
+        if not unmatched:
+            print("""
 No OpenCL devices found. Check driver installation.
 Read the helpful, easy driver installation instructions from our README:
 http://github.com/plaidml/plaidml
 """)
         else:
-            print(
-"""
+            print("""
 No supported devices found. Run 'clinfo' and file an issue containing the full output.
 """)
         sys.exit(-1)
 
     print("Default Config Devices:")
-    if len(devices) == 0:
+    if not devices:
         print("   No devices.")
     for dev in devices:
         print("   {0} : {1}".format(dev.id.decode(), dev.description.decode()))
 
     print("\nExperimental Config Devices:")
-    if len(exp_devices) == 0:
+    if not exp_devices:
         print("   No devices.")
     for dev in exp_devices:
         print("   {0} : {1}".format(dev.id.decode(), dev.description.decode()))
-    
+
     print("\nUsing experimental devices can cause poor performance, crashes, and other nastiness.\n")
-    exp = choice_prompt("Enable experimental device support", ["y","n"], "n")
+    exp = choice_prompt("Enable experimental device support", ["y", "n"], "n")
     plaidml.settings.experimental = exp == "y"
     try:
         devices = plaidml.devices(ctx, limit=100)
@@ -79,8 +79,7 @@ No supported devices found. Run 'clinfo' and file an issue containing the full o
         sys.exit(-1)
 
     if len(devices) > 1:
-        print(
-"""
+        print("""
 Multiple devices detected (You can override by setting PLAIDML_DEVICE_IDS).
 Please choose a default device:
 """)
@@ -91,13 +90,12 @@ Please choose a default device:
         plaidml.settings.device_ids = [devices[int(dev) - 1].id.decode()]
 
     print("\nSelected device:\n    {0}".format(plaidml.devices(ctx)[0]))
-    print(
-"""
+    print("""
 PlaidML sends anonymous usage statistics to help guide improvements.
 We'd love your help making it better.
 """)
 
-    tel = choice_prompt("Enable telemetry reporting", ["y","n"], "y")
+    tel = choice_prompt("Enable telemetry reporting", ["y", "n"], "y")
     plaidml.settings.telemetry = tel == "y"
 
     print("\nAlmost done. Multiplying some matrices...")
@@ -113,10 +111,12 @@ We'd love your help making it better.
         plaidml.run(ctx, matmul, inputs={"B": b, "C": c}, outputs={"A": a})
     print("Whew. That worked.\n")
 
-    sav = choice_prompt("Save settings to {0}".format(plaidml.settings.user_settings), ["y","n"], "y")
+    sav = choice_prompt("Save settings to {0}".format(plaidml.settings.user_settings),
+                        ["y", "n"], "y")
     if sav == "y":
         plaidml.settings.save(plaidml.settings.user_settings)
     print("Success!\n")
+
 
 if __name__ == "__main__":
     main()

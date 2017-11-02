@@ -2,11 +2,13 @@
 
 import json
 import os
-import pkg_resources
 import sys
 import uuid
 
+import pkg_resources
+
 import plaidml.exceptions
+
 
 if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
     os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(
@@ -15,6 +17,7 @@ if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
 if 'PLAIDML_DEFAULT_CONFIG' not in os.environ:
     os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(
         pkg_resources.resource_filename('plaidml', 'config.json'))
+
 
 CONFIG = 'PLAIDML_CONFIG'
 CONFIG_FILE = 'PLAIDML_CONFIG_FILE'
@@ -26,8 +29,9 @@ TELEMETRY = 'PLAIDML_TELEMETRY'
 
 ENV_SETTINGS = [CONFIG, CONFIG_FILE, DEVICE_IDS, EXPERIMENTAL, SESSION, TELEMETRY]
 
-USER_SETTINGS = os.path.expanduser('~/.plaidml')
+USER_SETTINGS = os.path.expanduser(os.path.join('~', '.plaidml'))
 SYSTEM_SETTINGS = os.path.normpath('/etc/plaidml')
+
 
 #TODO(T1192): Push into plaidml.cc once stabilized
 class _Settings(object):
@@ -35,28 +39,29 @@ class _Settings(object):
     Manual settings take precedence over the environment.
     Environment settings take precedence over those in files.
     """
-    
+
     def __init__(self):
         self._load()
+        self._setup = False
 
     def start_session(self):
         """If there are any settings, start the session, otherwise fail."""
         if self.session:
             return
-        settings_count = sum([1 if k in os.environ else 0 for k in ENV_SETTINGS])
-        if settings_count == 0:
+        elif not self.setup:
             raise plaidml.exceptions.PlaidMLError('PlaidML is not configured. Run plaidml-setup.')
         self.session = str(uuid.uuid4()) # Random session id
 
     def _setup_for_test(self, user_settings='', system_settings=''):
         """Sets environment for tests."""
+        self._setup = False
+        self.session = None
         global USER_SETTINGS, SYSTEM_SETTINGS
         USER_SETTINGS = user_settings
         SYSTEM_SETTINGS = system_settings
-        for k in ENV_SETTINGS + [SETTINGS] :
+        for k in ENV_SETTINGS + [SETTINGS]:
             if k in os.environ:
                 del os.environ[k]
-
 
     def _load(self):
         settings = {}
@@ -72,15 +77,24 @@ class _Settings(object):
                 settings[k] = val
         for k, val in settings.items():
             if k not in os.environ:
-                setattr(self, k.replace("PLAIDML_","").lower(), val)
-    
+                setattr(self, k.replace("PLAIDML_", "").lower(), val)
+
     def save(self, filename):
         settings = {}
         for k in ENV_SETTINGS:
             if k in os.environ and k is not "PLAIDML_SESSION":
-                settings[k] = getattr(self, k.replace("PLAIDML_","").lower())
+                settings[k] = getattr(self, k.replace("PLAIDML_", "").lower())
         with open(filename, "w") as out:
-            json.dump(settings, out, sort_keys=True, indent=4, separators=(',',':'))
+            json.dump(settings, out, sort_keys=True, indent=4, separators=(',', ':'))
+
+    @property
+    def setup(self):
+        settings_count = sum([1 if k in os.environ else 0 for k in ENV_SETTINGS])
+        return settings_count != 0 or self._setup
+
+    @setup.setter
+    def setup(self, val):
+      self._setup = val
 
     @property
     def user_settings(self):
@@ -109,7 +123,7 @@ class _Settings(object):
                 del os.environ[CONFIG]
         else:
             os.environ[CONFIG] = val
-    
+
     @property
     def device_ids(self):
         ids = os.environ.get(DEVICE_IDS)
@@ -126,7 +140,7 @@ class _Settings(object):
     @experimental.setter
     def experimental(self, val):
         os.environ[EXPERIMENTAL] = '1' if val else '0'
-    
+
     @property
     def session(self):
         """Returns a session id if a session is running."""
@@ -134,15 +148,20 @@ class _Settings(object):
 
     @session.setter
     def session(self, val):
-        os.environ[SESSION] = val
-    
+        if val is None:
+            if SESSION in os.environ:
+                del os.environ[SESSION]
+        else:
+          os.environ[SESSION] = val
+
     @property
     def telemetry(self):
         return os.environ.get(TELEMETRY, '0') is not '0'
-    
+
     @telemetry.setter
     def telemetry(self, val):
         os.environ[TELEMETRY] = '1' if val else '0'
+
 
 module = _Settings()
 module.__name__ = __name__

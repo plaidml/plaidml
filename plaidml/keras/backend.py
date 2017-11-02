@@ -27,7 +27,6 @@ import math
 import numpy as np
 import operator
 import os
-import pkg_resources
 import plaidml
 import scipy.stats
 import six
@@ -41,11 +40,11 @@ from contextlib import contextmanager
 from six import iteritems
 from six.moves import builtins
 
+from keras.backend.common import cast_to_floatx
 from keras.backend.common import epsilon
 from keras.backend.common import floatx
-from keras.backend.common import set_floatx
-from keras.backend.common import cast_to_floatx
 from keras.backend.common import image_data_format
+from keras.backend.common import set_floatx as keras_set_floatx
 from keras.backend.common import set_image_data_format
 
 
@@ -239,78 +238,78 @@ class _Var(object):
         exn = PlaidMLKerasException('unable to evaluate \'%s\' (%s)' % (self.name, self.ident))
         raise exn
 
-    def __getitem__(self, key):
+    def _parse_slice(self, key, idx):
+        if isinstance(key[idx], int):
+            return 1, None, key[idx]
+        if ((not isinstance(key[idx].start, int) and not isinstance(key[idx].start, type(None))) or
+            (not isinstance(key[idx].stop, int) and not isinstance(key[idx].stop, type(None))) or
+            (not isinstance(key[idx].step, int) and not isinstance(key[idx].step, type(None)))):
+            raise ValueError("Must use ints when slicing _Op; received {}".format(key[idx]))
+        step = key[idx].step or 1
+        if step == 0:
+            raise ValueError("Cannot slice with step size 0")
+
+        start = key[idx].start
+        if start == None:
+            if step > 0:
+                start = 0
+            else:
+                start = -1
+        if start < 0:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                start = 'N{} + {}'.format(idx, start)
+            else:
+                start = self.shape[idx] + start
+        if step > 0:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                start = 'max({}, 0)'.format(start)
+            else:
+                start = getattr(builtins, "max")(start, 0)
+        else:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                start = 'min({}, N{} - 1)'.format(start, idx)
+            else:
+                start = getattr(builtins, "min")(start, self.shape[idx] - 1)
+
+        stop = key[idx].stop
+        if stop == None:
+            if step > 0:
+                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                    stop = 'N{}'.format(idx)
+                else:
+                    stop = self.shape[idx]
+            else:
+                stop = -1
+            # Can return now and skip unneeded max/min
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                return '({} - ({}))'.format(stop, start), step, start
+            return stop - start, step, start
+        elif stop < 0:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                stop = 'N{} + {}'.format(idx, stop)
+            else:
+                stop = self.shape[idx] + stop
+        if step > 0:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                stop = 'min({}, N{})'.format(stop, idx)
+            else:
+                stop = getattr(builtins, "min")(stop, self.shape[idx])
+        else:
+            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+                stop = 'max({}, -1)'.format(stop)
+            else:
+                stop = getattr(builtins, "max")(stop, -1)
+        if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
+            length_numerator = '({} - ({}))'.format(stop, start)
+        else:
+            length_numerator = stop - start
+        return length_numerator, step, start
+
+    def _gen_slice(self, key):
         if isinstance(key, slice) or isinstance(key, int):
             key = (key,)
         if not isinstance(key, tuple):
             raise ValueError("Cannot index _Var using type {}".format(type(key)))
-
-        def __parse_slice(idx):
-            if isinstance(key[idx], int):
-                return 1, None, key[idx]
-            if ((not isinstance(key[idx].start, int) and not isinstance(key[idx].start, type(None))) or
-                (not isinstance(key[idx].stop, int) and not isinstance(key[idx].stop, type(None))) or
-                (not isinstance(key[idx].step, int) and not isinstance(key[idx].step, type(None)))):
-                raise ValueError("Must use ints when slicing _Op; received {}".format(key[idx]))
-            step = key[idx].step or 1
-            if step == 0:
-                raise ValueError("Cannot slice with step size 0")
-
-            start = key[idx].start
-            if start == None:
-                if step > 0:
-                    start = 0
-                else:
-                    start = -1
-            if start < 0:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    start = 'N{} + {}'.format(idx, start)
-                else:
-                    start = self.shape[idx] + start
-            if step > 0:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    start = 'max({}, 0)'.format(start)
-                else:
-                    start = getattr(builtins, "max")(start, 0)
-            else:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    start = 'min({}, N{} - 1)'.format(start, idx)
-                else:
-                    start = getattr(builtins, "min")(start, self.shape[idx] - 1)
-
-            stop = key[idx].stop
-            if stop == None:
-                if step > 0:
-                    if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                        stop = 'N{}'.format(idx)
-                    else:
-                        stop = self.shape[idx]
-                else:
-                    stop = -1
-                # Can return now and skip unneeded max/min
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    return '({} - ({}))'.format(stop, start), step, start
-                return stop - start, step, start
-            elif stop < 0:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    stop = 'N{} + {}'.format(idx, stop)
-                else:
-                    stop = self.shape[idx] + stop
-            if step > 0:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    stop = 'min({}, N{})'.format(stop, idx)
-                else:
-                    stop = getattr(builtins, "min")(stop, self.shape[idx])
-            else:
-                if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                    stop = 'max({}, -1)'.format(stop)
-                else:
-                    stop = getattr(builtins, "max")(stop, -1)
-            if self.shape[idx] == None:  #Replace condition w/ 'True' for some tests
-                length_numerator = '({} - ({}))'.format(stop, start)
-            else:
-                length_numerator = stop - start
-            return length_numerator, step, start
 
         var_list = list()
         dim_list = list()
@@ -319,7 +318,7 @@ class _Var(object):
         shape = list()
         inner_idx = 0
         for idx in range(len(key)):
-            length_numerator, step, offset = __parse_slice(idx)
+            length_numerator, step, offset = self._parse_slice(key, idx)
             if step == None:
                 # In this case offset is an int
                 if offset >= 0:
@@ -350,10 +349,16 @@ class _Var(object):
             formula_list.append('i{}'.format(inner_idx))
             inner_idx += 1
         shape = tuple(shape)
+        return (var_list, dim_list, formula_list, offset_list, shape)
+
+
+    def __getitem__(self, key):
+        (var_list, dim_list, formula_list, offset_list, shape) = self._gen_slice(key)
+
         if len(shape) == 0:
-            body = "  O[] = +(I[" + ', '.join(formula_list) + "]);"
+            body = "  O[] = =(I[" + ', '.join(formula_list) + "]);"
         else:
-            body = "  O[{}: {}] = +(I[{}]);".format(', '.join(var_list),
+            body = "  O[{}: {}] = =(I[{}]);".format(', '.join(var_list),
                                                     ', '.join(dim_list),
                                                     ', '.join(formula_list))
 
@@ -376,7 +381,7 @@ class _Var(object):
         return self.name + '[' + ', '.join([str(dim) for dim in self.shape]) + ']'
 
     def _compute_agg_axes(self, axis=None, keepdims=False):
-        if not axis:
+        if axis is None:
             axis = self.ndim - 1
         if isinstance(axis, list):
             axis = [(self.ndim + i if i < 0 else i) for i in axis]
@@ -507,8 +512,26 @@ class _Var(object):
     def batch_flatten(self):
         # Flatten all but first dimension to a single dimension; leave 1st dimension unchanged
         # Note this is a specific kind of reshape that serves a special role in Keras (for Flatten layers)
-        new_shape = (self.shape[0], functools.reduce(operator.mul, self.shape[1:]))
-        return self.reshape(new_shape)
+        if self.ndim < 2:
+            raise Exception("batch_flatten called on tensor with ndim < 2")
+
+        in_dim_list = ["N{}".format(i) for i in range(self.ndim)]
+        out_dim_list = ["N0", "*".join(["N{}".format(i) for i in range(1, self.ndim)])]
+        rest_shape = 1
+        for i in range(1, self.ndim):
+            if rest_shape is not None:
+                if self.shape[i] is not None:
+                    rest_shape *= self.shape[i]
+                else:
+                    rest_shape = None
+
+        py_shape = [self.shape[0], rest_shape]
+
+        code = ('function (I[{idims}]) -> (O) {{\n' +
+                '  O = reshape(I, {odims});\n'
+                '}}').format(idims=", ".join(in_dim_list),
+                             odims=", ".join(out_dim_list))
+        return _Op('batch_flatten', self.dtype, py_shape, code, {'I': self}, ['O'])
 
     def reshape(self, shape):
         in_dim_list = ["N{}".format(i) for i in range(self.ndim)]
@@ -543,7 +566,6 @@ class _Var(object):
                 '  O = reshape(I, {odims});\n'
                 '}}').format(idims=", ".join(in_dim_list),
                              odims=", ".join(o_shape))
-
         return _Op('reshape', self.dtype, py_shape, code, {'I': self}, ['O'])
 
     def prod(self, axis=None, dtype=None, keepdims=False, acc_dtype=None):
@@ -657,9 +679,7 @@ class _Var(object):
         shape, axis, subs = self._compute_agg_axes(axis, keepdims)
 
         f = """function (I[{src_ranges}]) -> (O) {{
-                   NEG = -I;
-                   O_NEG[{dest_indices}{dest_sep}{dest_ranges}] = >(NEG[{src_indices}]);
-                   O = -O_NEG;
+                   O[{dest_indices}{dest_sep}{dest_ranges}] = <(I[{src_indices}]);
                }}""".format(**subs)
 
         return _Op('min', self.dtype, shape, f, {'I': self}, ['O'])
@@ -765,8 +785,8 @@ class _Op(_Var):
     _Op objects have an identifier, dtype, shape, a dict of inputs, and a list
     of output identifiers (typically only one).
 
-    Since most operations translate directly to PlaidMLScript, _Op objects also
-    typically include the PlaidMLScript code for their particular operations.  This
+    Since most operations translate directly to Tile code, _Op objects also
+    typically include the Tile code for their particular operations.  This
     is done to keep per-operation logic together when possible; the only bits that
     are handled seperately are the multiple-operation-coalescing optimizations.
     """
@@ -817,7 +837,7 @@ class _Op(_Var):
                     a.add_input(k, _plaidml_val(v, indent + 1))
                 self._value = a.add_output(self._outputs[0])
             except plaidml.exceptions.PlaidMLError as e:
-                raise PlaidMLKerasException("{}\nTraceback:\n{}\n{}".format(e.message, self, self.traceback()))
+                raise PlaidMLKerasException("{}\nTraceback:\n{}\n{}".format(str(e), self, self.traceback()))
         return self._value
 
     def _side_effects(self):
@@ -1201,7 +1221,7 @@ def concatenate(tensors, axis=-1):
     for i in range(len(tensors)):
         line_subs['off'] = "+{}".format(offsets[i])
         line_subs['i'] = i
-        curr_line = "  T{i}[{beg}{off}{end}: {odims}] = +(I{i}[{beg}{end}]);\n".format(**line_subs)
+        curr_line = "  T{i}[{beg}{off}{end}: {odims}] = =(I{i}[{beg}{end}]);\n".format(**line_subs)
         body_str += curr_line
     body_str += "O = "
     body_str += " + ".join(["T{}".format(i) for i in range(len(tensors))])
@@ -1209,9 +1229,9 @@ def concatenate(tensors, axis=-1):
 
     # Example 'code' (concatenating (4,3,2), (4,5,2), (4,1,2)):
     #   function (I0[N0, A0, N2], I1[N0, A1, N2], I2[N0, A2, N2]) -> (O) {
-    #     T0[n0, a, n2: N0, 9, N2] = +(I0[n0, a, n2]);
-    #     T1[n0, a+3, n2: N0, 9, N2] = +(I1[n0, a, n2]);
-    #     T2[n0, a+8, n2: N0, 9, N2] = +(I2[n0, a, n2]);
+    #     T0[n0, a, n2: N0, 9, N2] = =(I0[n0, a, n2]);
+    #     T1[n0, a+3, n2: N0, 9, N2] = =(I1[n0, a, n2]);
+    #     T2[n0, a+8, n2: N0, 9, N2] = =(I2[n0, a, n2]);
     #     O = T0 + T1 + T2;
     #   }
     code = ('function ({inputs}) -> (O) {{\n' +
@@ -1273,7 +1293,7 @@ def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
     xTotal = padding[1][0] + padding[1][1]
     f = ("""
         function (I[N, H, W, C]) -> (O) {{
-            O[n, y, x, c : N, H + {yTotal}, W + {xTotal}, C] = +(I[n, y - {yFront}, x - {xFront}, c]);
+            O[n, y, x, c : N, H + {yTotal}, W + {xTotal}, C] = =(I[n, y - {yFront}, x - {xFront}, c]);
         }}
     """).format(yFront=yFront, yTotal=yTotal, xFront=xFront, xTotal=xTotal)
 
@@ -1646,9 +1666,9 @@ def expand_dims(x, axis=-1):
     ilist_in = ["i" + str(i) for i in range(x.ndim)]
     slist_out = slist_in[0:axis] + ["1"] + slist_in[axis:]
     ilist_out = ilist_in[0:axis] + ["0"] + ilist_in[axis:]
-    newshape = list(x.shape[0:axis]) + [1,] + list(x.shape[axis:])
+    newshape = tuple(list(x.shape[0:axis]) + [1,] + list(x.shape[axis:]))
     f = """function (IN[{slist_in}]) -> (OUT) {{
-               OUT[{ilist_out} : {slist_out}] = +(IN[{ilist_in}]);
+               OUT[{ilist_out} : {slist_out}] = =(IN[{ilist_in}]);
            }}""".format(
                slist_in=", ".join(slist_in),
                slist_out=", ".join(slist_out),
@@ -1947,7 +1967,7 @@ def one_hot(indices, num_classes):
 
     count = variable(np.array(range(num_classes)), dtype='int32')
     f = ('function (Idx[{idim}], Count[C]) -> (O) {{\n' +
-         '  O[{iidx}, c : {idim}, C] = +(Idx[{iidx}] == Count[c]);\n' +
+         '  O[{iidx}, c : {idim}, C] = =(Idx[{iidx}] == Count[c]);\n' +
          '}}').format(idim=", ".join(["I{}".format(k) for k in range(indices.ndim)]),
                       iidx=", ".join(["i{}".format(k) for k in range(indices.ndim)]))
     return _Op('one_hot', 'bool', indices.shape + (num_classes,), f,
@@ -1966,15 +1986,15 @@ def ones_like(x, dtype=None, name=None):
     sizes= ", ".join(["S" + str(i) for i in range(ndims)])
     dims = ", ".join(["i" + str(i) for i in range(ndims)])
     f = """function (IN[{sizes}], ONE[SZ]) -> (OUT) {{
-               OUT[{dims} : {sizes}] = +(ONE[0]);
+               OUT[{dims} : {sizes}] = =(ONE[0]);
            }}""".format(sizes=sizes, dims=dims)
     return _Op('ones_like', dtype, x.shape, f, {'IN': x, 'ONE': a_one}, ['OUT'])
 
 
 def permute_dimensions(x, pattern):
-    return _Op('permute', x.dtype, [pattern[idx] for idx in range(x.ndim)],
+    return _Op('permute', x.dtype, tuple([x.shape[idx] for idx in range(x.ndim)]),
                """function (X[%(src_ranges)s]) -> (R) {
-                      R[%(dest_indices)s : %(dest_ranges)s] = +(X[%(src_indices)s]);
+                      R[%(dest_indices)s : %(dest_ranges)s] = =(X[%(src_indices)s]);
                   }""" % {
                       'src_ranges': ', '.join(['X{}'.format(i) for i in range(x.ndim)]),
                       'src_indices': ', '.join(['x{}'.format(i) for i in range(x.ndim)]),
@@ -2206,7 +2226,7 @@ def relu(x, alpha=0.0, max_value=None):
 def repeat(x, n):
     assert x.ndim == 2
     f = ("function (I[N0, N1]) -> (O) {{" +
-         "  O[i0, r, i1: N0, {reps}, N1] = +(I[i0, i1]);" +
+         "  O[i0, r, i1: N0, {reps}, N1] = =(I[i0, i1]);" +
          "}}").format(reps=n)
     return _Op('repeat', x.dtype, (x.shape[0], n, x.shape[1]), f, {'I': x}, ['O'])
 
@@ -2224,10 +2244,10 @@ def repeat_elements(x, rep, axis):
 
     # Example
     # function(I[N0, N1, N2]) -> (O) {
-    #   O[n0, 3*n1 + k, n2 : N0, 3*N1, N2] = +(I[n0, n1, n2]), k < 3 no_defract;
+    #   O[n0, 3*n1 + k, n2 : N0, 3*N1, N2] = =(I[n0, n1, n2]), k < 3 no_defract;
     # }
     f = ("function (I[{idims}]) -> (O) {{\n" +
-         "  O[{oidxs} : {odims}] = +(I[{iidxs}]), k < {rep} no_defract;\n" + #;\n" + #
+         "  O[{oidxs} : {odims}] = =(I[{iidxs}]), k < {rep} no_defract;\n" + #;\n" + #
          "}}").format(idims=", ".join(idim_list),
                       iidxs=", ".join(iidx_list),
                       odims=", ".join(odim_list),
@@ -2307,6 +2327,11 @@ def separable_conv2d(x, depthwise_kernel, pointwise_kernel, strides=(1,1),
                      padding='valid', data_format=None, dilation_rate=(1,1)):
     return separable_conv(x, depthwise_kernel, pointwise_kernel, strides,
                           padding, data_format, dilation_rate)
+
+
+def set_floatx(dtype):
+    keras_set_floatx(dtype)
+    plaidml.set_floatx(_dtypes[dtype])
 
 
 def set_learning_phase(value):
@@ -2436,7 +2461,7 @@ def tile(x, n):
     in_idx = ", ".join(["i" + str(i) for i in range(x.ndim)])
     cons = ", ".join(["t" + str(i) + " < " + str(n[i]) for i in range(x.ndim)])
     f = """function (I[{sizes}]) -> (O) {{
-               O[{out_idx} : {out_sizes}] = +(I[{in_idx}]), {cons};
+               O[{out_idx} : {out_sizes}] = =(I[{in_idx}]), {cons} no_defract;
            }}""".format(sizes=sizes, out_idx=out_idx, out_sizes=out_sizes, in_idx=in_idx, cons=cons)
     out_shape = tuple([None if x.shape[i] is None else x.shape[i] * n[i] for i in range(x.ndim)])
     return _Op('tile', x.dtype, out_shape, f, {'I': x}, ['O'])
@@ -2515,7 +2540,7 @@ def zeros_like(x, dtype=floatx(), name=None):
     sizes= ", ".join(["S" + str(i) for i in range(ndims)])
     dims = ", ".join(["i" + str(i) for i in range(ndims)])
     f = """function (IN[{sizes}], ZERO[SZ]) -> (OUT) {{
-               OUT[{dims} : {sizes}] = +(ZERO[0]);
+               OUT[{dims} : {sizes}] = =(ZERO[0]);
            }}""".format(sizes=sizes, dims=dims)
     return _Op('zeros_like', dtype, x.shape, f, {'IN': x, 'ZERO': a_zero}, ['OUT'])
 
