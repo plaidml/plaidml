@@ -837,7 +837,7 @@ class _Op(_Var):
                     a.add_input(k, _plaidml_val(v, indent + 1))
                 self._value = a.add_output(self._outputs[0])
             except plaidml.exceptions.PlaidMLError as e:
-                raise PlaidMLKerasException("{}\nTraceback:\n{}\n{}".format(e.message, self, self.traceback()))
+                raise PlaidMLKerasException("{}\nTraceback:\n{}\n{}".format(str(e), self, self.traceback()))
         return self._value
 
     def _side_effects(self):
