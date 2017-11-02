@@ -619,6 +619,21 @@ class _Var(object):
 
         return _Op('sum', self.dtype, shape, f, {'I': self}, ['O'])
 
+    def cumsum(self, axis=0):
+        ranges = ", ".join(["N{}".format(n) for n in range(self.ndim)])
+        dest_idxs = ", ".join(["i{}".format(n) for n in range(self.ndim)])
+        src_idxs = ["i{}".format(n) for n in range(self.ndim)]
+        src_idxs[axis] += " - k"
+        src_idxs = ", ".join(src_idxs)
+        f = ("""function (I[{src_ranges}]) -> (O) {{
+                    O[{dest_idxs}: {dest_ranges}] = +(I[{src_idxs}]), k < N{ax};
+                }}""").format(src_ranges=ranges,
+                              dest_idxs=dest_idxs,
+                              dest_ranges=ranges,
+                              src_idxs=src_idxs,
+                              ax=axis)
+        return _Op('cumsum', self.dtype, self.shape, f, {'I': self}, ['O'])
+
     def max(self, axis=None, keepdims=False):
         if not len(self.shape):
             return self
@@ -1314,8 +1329,8 @@ def conv(x, kernel, strides=None, padding='valid',
         dilation_rate = tuple(1 for _ in range(rank))
 
     for entry in dilation_rate:
-        if entry != 1:
-            raise ValueError("Dilated convolutions not yet supported")
+        if not isinstance(entry, int) or entry <= 0:
+            raise ValueError("Invalid dilation_rate: {}".format(dilation_rate))
     if kernel.ndim != rank + 2:
         raise ValueError("Convolution kernel shape inconsistent with input shape: " +
                          "{} (rank {}) v {} (rank {})".format(kernel.shape,
@@ -1373,7 +1388,7 @@ def conv(x, kernel, strides=None, padding='valid',
     for i in range(rank):
         sym_out, sym_pad, num_out = pad_compute("L{}".format(i),
                                                 x.shape[l[i]],
-                                                kernel.shape[i],
+                                                dilation_rate[i] * (kernel.shape[i] - 1) + 1,
                                                 strides[i],
                                                 padding)
         out_size.append(sym_out)
@@ -1382,10 +1397,11 @@ def conv(x, kernel, strides=None, padding='valid',
 
     padding_list = ["  Pad{} = {};".format(i, pad_amount[i]) for i in range(rank)]
     padding_str = "\n".join(padding_list)
-    input_idx_list = ["{}*{} + {} - {}".format(strides[i],
-                                               "x{}".format(i),
-                                               "k{}".format(i),
-                                               "Pad{}".format(i))
+    input_idx_list = ["{s}*{x} + {d}*{k} - {p}".format(s=strides[i],
+                                                       x="x{}".format(i),
+                                                       d="{}".format(dilation_rate[i]),
+                                                       k="k{}".format(i),
+                                                       p="Pad{}".format(i))
                       for i in range(rank)]
     if data_format == 'channels_first' and not channelwise:
         input_dims_str = "N, CI, " + ", ".join(["L{}".format(i) for i in range(rank)])
@@ -1567,7 +1583,7 @@ def cumprod(x, axis=0):
 
 
 def cumsum(x, axis=0):
-    _report_unimplemented('cumsum')
+    return x.cumsum(axis=axis)
 
 
 def depthwise_conv2d(x, kernel, strides=(1, 1), padding='valid', data_format = None, dilation_rate=(1, 1)):
@@ -2031,8 +2047,8 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None,
 
     if len(pool_size) != rank:
         raise ValueError("Pool size inconsistent with input shape: " +
-                         "{} (rank {}) v {} (rank {})".format(pool_size.shape,
-                                                              pool_size.ndim,
+                         "{} (rank {}) v {} (rank {})".format(pool_size,
+                                                              len(pool_size),
                                                               x.shape,
                                                               x.ndim - 2))
     if len(strides) != rank:
