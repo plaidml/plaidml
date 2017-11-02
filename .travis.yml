@@ -29,5 +29,5 @@ install:
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
+  - bazel test -c opt --force_python=$BZL_PY_VER --test_env=PLAIDML_EXPERIMENTAL plaidml/keras:backend_test
   - python plaidbench/plaidbench.py mobilenet
-  - bazel test -c opt --force_python=$BZL_PY_VER plaidml/keras:backend_test
