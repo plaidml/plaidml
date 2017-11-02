@@ -869,7 +869,7 @@ class TestBackendOps(unittest.TestCase):
         with self.assertRaises(plaidml.exceptions.Unknown) as cm:
             pkb._Op('assign_mul', A.dtype, (A.shape[0], B.shape[1]), f,
                     OrderedDict([('A', B), ('B', A)]), ['O']).eval()
-        self.assertEqual(cm.exception.message, "Multiple assignment in Aggregation op '='")
+        self.assertTrue("Multiple assignment" in str(cm.exception))
 
     @compareForwardExact()
     def testCastToInt(self, b):
