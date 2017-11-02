@@ -37,21 +37,21 @@ void ComputeUses::Visit(const std::shared_ptr<ContractionValue>& val) {
   }
 }
 
-Gradiant::Gradiant() {}
+Gradient::Gradient() {}
 
-Gradiant::Gradiant(const ValuePtr& err) : uses_(err) { done_[err] = FConstValue::make(1.0); }
+Gradient::Gradient(const ValuePtr& err) : uses_(err) { done_[err] = FConstValue::make(1.0); }
 
-void Gradiant::AddSource(const ValuePtr& wrt, const ValuePtr& val) {
-  IVLOG(4, "Gradiant::AddSource, source: " << wrt);
+void Gradient::AddSource(const ValuePtr& wrt, const ValuePtr& val) {
+  IVLOG(4, "Gradient::AddSource, source: " << wrt);
   uses_.AddTop(wrt);
   done_[wrt] = val;
 }
 
-ValuePtr Gradiant::operator()(const ValuePtr& val) {
-  IVLOG(4, "Gradiant::operator(), val: " << val);
+ValuePtr Gradient::operator()(const ValuePtr& val) {
+  IVLOG(4, "Gradient::operator(), val: " << val);
   auto it = done_.find(val);
   if (it != done_.end()) {
-    IVLOG(4, "  Gradiant::operator(), already found -> " << it->second);
+    IVLOG(4, "  Gradient::operator(), already found -> " << it->second);
     return it->second;
   }
   ValuePtr tot;
@@ -76,32 +76,32 @@ ValuePtr Gradiant::operator()(const ValuePtr& val) {
     // g_deriv_source[tot].emplace(val);
     // IVLOG(1, "Saving grad of " << val << " as " << tot);
   }
-  IVLOG(4, "  Gradiant::operator(), final result -> " << tot);
+  IVLOG(4, "  Gradient::operator(), final result -> " << tot);
   done_.emplace(val, tot);
   return tot;
 }
 
-ValuePtr Gradiant::OpGrad(const ValuePtr& dout, const ValuePtr& op, size_t idx) {
+ValuePtr Gradient::OpGrad(const ValuePtr& dout, const ValuePtr& op, size_t idx) {
   if (op->type() == Value::Type::FUNCTION) {
     return FuncOp(dout, std::static_pointer_cast<FunctionValue>(op), idx);
   } else if (op->type() == Value::Type::CONTRACTION) {
     auto c = std::static_pointer_cast<ContractionValue>(op);
     if (c->comb_op() == CombinationOp::EQ) {
       return IConstValue::make(0);
-    } else if (c->agg_op() == AggregationOp::SUM) {
+    } else if (c->agg_op() == AggregationOp::SUM || c->agg_op() == AggregationOp::ASSIGN) {
       return SumOp(dout, c, idx);
-    } else if (c->agg_op() == AggregationOp::MAX && c->inputs().size() == 1) {
-      return MaxOp(dout, c, idx);
+    } else if ((c->agg_op() == AggregationOp::MAX || c->agg_op() == AggregationOp::MIN) && c->inputs().size() == 1) {
+      return ExtremeOp(dout, c, idx);
     } else if (c->agg_op() == AggregationOp::PROD) {
       throw std::runtime_error("PROD AggregationOp does not support derivatives yet");
     }
-    throw std::runtime_error("Cannot compute derivative max contraction op with more than one input");
+    throw std::runtime_error("Cannot compute derivative max/min contraction op with more than one input");
   }
   throw std::runtime_error("Invalid operation type in OpGrad");
 }
 
-ValuePtr Gradiant::FuncOp(const ValuePtr& dout, const std::shared_ptr<FunctionValue>& op, size_t idx) {
-  IVLOG(4, "  Gradiant::FuncOp(), dout=" << dout << ", op=" << op << ", fn=" << op->fn() << ", idx=" << idx);
+ValuePtr Gradient::FuncOp(const ValuePtr& dout, const std::shared_ptr<FunctionValue>& op, size_t idx) {
+  IVLOG(4, "  Gradient::FuncOp(), dout=" << dout << ", op=" << op << ", fn=" << op->fn() << ", idx=" << idx);
   if (op->fn() == "reshape") {
     std::vector<ValuePtr> inputs = {dout};
     ValuePtr in = op->inputs()[0];
@@ -123,8 +123,8 @@ ValuePtr Gradiant::FuncOp(const ValuePtr& dout, const std::shared_ptr<FunctionVa
   return app.GetOutput("DX" + std::to_string(1 + idx));
 }
 
-ValuePtr Gradiant::SumOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx) {
-  IVLOG(4, "  Gradiant::SumOp(), dout=" << dout << ", op=" << op << ", idx=" << idx);
+ValuePtr Gradient::SumOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx) {
+  IVLOG(4, "  Gradient::SumOp(), dout=" << dout << ", op=" << op << ", idx=" << idx);
   std::vector<SymbolicSpec> specs;
   std::vector<std::shared_ptr<Value>> inputs;
   std::vector<std::shared_ptr<Value>> dims;
@@ -151,8 +151,8 @@ ValuePtr Gradiant::SumOp(const ValuePtr& dout, const std::shared_ptr<Contraction
                                 op->no_defract());
 }
 
-ValuePtr Gradiant::MaxOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx) {
-  IVLOG(4, "  Gradiant::MaxOp(), dout=" << dout << ", op=" << op << ", idx=" << idx);
+ValuePtr Gradient::ExtremeOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx) {
+  IVLOG(4, "  Gradient::ExtremeOp(), dout=" << dout << ", op=" << op << ", idx=" << idx);
   std::vector<SymbolicSpec> specs = {op->specs()[1], op->specs()[1], op->specs()[0], op->specs()[0]};
   // Get the size of the input (which will be the output for gradient)
   std::vector<std::shared_ptr<Value>> dims;
@@ -180,15 +180,15 @@ Program ProgGrad(const Program& p) {
     fa.SetInput(in.name, pv);
     newbf.AddInput(in.name, pv);
   }
-  // Make a gradiant thingy and add gradiant input values to the new function
-  Gradiant g;
+  // Make a gradient thingy and add gradient input values to the new function
+  Gradient g;
   for (const auto& out : p.outputs) {
     ValuePtr ov = fa.GetOutput(out);
     auto pv = std::make_shared<PlaceholderValue>(ov->num_dims());
     g.AddSource(ov, pv);
     newbf.AddInput("_d_" + out, pv);
   }
-  // Add the gradiant outputs
+  // Add the gradient outputs
   for (const auto& in : p.inputs) {
     newbf.AddOutput("_d_" + in.name, g(new_ins[in.name]));
   }

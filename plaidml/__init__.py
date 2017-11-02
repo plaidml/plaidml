@@ -303,6 +303,12 @@ class _Library(plaidml.library.Library):
             ctypes.POINTER(_C_Mapping)  # plaidml_mapping* mapping
         ]
 
+        # PLAIDML_API void plaidml_set_floatx(plaidml_datatype datatype);
+        self.plaidml_set_floatx = lib.plaidml_set_floatx
+        self.plaidml_set_floatx.argtypes = [
+            ctypes.c_int  # plaidml_datatype datatype
+        ]
+
         # PLAIDML_API plaidml_shape* plaidml_alloc_shape(vai_ctx* ctx, plaidml_datatype datatype);
         self.plaidml_alloc_shape = lib.plaidml_alloc_shape
         self.plaidml_alloc_shape.argtypes = [
@@ -738,6 +744,10 @@ def set_perf_counter(name, value):
     return _lib().set_perf_counter(name, value)
 
 
+def set_floatx(dtype):
+    _lib().plaidml_set_floatx(dtype)
+
+
 _backtraces = None
 
 
@@ -1069,7 +1079,7 @@ class _View(object):
     def as_ndarray(self):
         ar = np.ctypeslib.as_array(self, shape=tuple(dim.size for dim in self._shape.dimensions))
         if self._dtype == DATA_FLOAT16:
-            ar = src.view(dtype='float16')
+            ar = ar.view(dtype='float16')
         return ar
 
     def copy_from_ndarray(self, src):

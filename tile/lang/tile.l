@@ -23,7 +23,8 @@ newline   [\n]
 "function"    { return FUNCTION; }
 "polynomial"  { return POLYNOMIAL; }
 "expression"  { return EXPRESSION; }
-"contraction"  { return CONTRACTION; }
+"contraction" { return CONTRACTION; }
+"default"     { return DEFAULT; }
 "no_defract"  { return NO_DEFRACT; }
 
 {float} { yylval->s = yytext; return FLOAT_LITERAL; }

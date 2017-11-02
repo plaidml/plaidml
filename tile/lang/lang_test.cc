@@ -450,7 +450,7 @@ TEST_CASE("Type checking", "[type]") {
   types.emplace("Input", Binding(SimpleShape(DataType::FLOAT32, {64, 77})));
   types.emplace("Weights", Binding(SimpleShape(DataType::FLOAT32, {55, 77})));
   types.emplace("Biases", Binding(SimpleShape(DataType::INT32, {55})));
-  types.emplace("ReluLeak", Binding(.05));
+  types.emplace("ReluLeak", Binding(.05, DataType::FLOAT32));
   TypeCheck(&prog, &types);
   IVLOG(1, "Types " << types);
   REQUIRE(types.at("Output").shape == SimpleShape(DataType::FLOAT32, {64, 55}));
@@ -541,7 +541,7 @@ TEST_CASE("Softmax Deriv", "[deriv]") {
   ce.SetInput("TY", y);
   auto e = ce.GetOutput("E");
 
-  Gradiant grad(e);
+  Gradient grad(e);
   auto dx = grad(x);
 
   auto ofunc = std::make_shared<BoundFunction>();
@@ -577,7 +577,7 @@ TEST_CASE("Function Deriv", "[deriv]") {
   app.SetInput("X", x);
   auto y = app.GetOutput("Y");
 
-  Gradiant grad(y);
+  Gradient grad(y);
   auto dx = grad(x);
 
   BoundFunction ofunc;

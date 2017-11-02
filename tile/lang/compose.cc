@@ -60,7 +60,7 @@ std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shar
       }
       // Rewrite into an add with the constant on the lhs, slightly simplifying subsequent merge logic.
       fn = "add";
-      inputs[1] = IConstValue::make(0 - dynamic_cast<const FConstValue*>(inputs[1].get())->value());
+      inputs[1] = FConstValue::make(0.0 - dynamic_cast<const FConstValue*>(inputs[1].get())->value());
       std::swap(inputs[0], inputs[1]);
     }
   }
@@ -114,7 +114,7 @@ std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shar
         if (lhs->inputs_[0]->type() == FCONST) {
           if (inputs[0]->type() == ICONST) {
             return FunctionValue::make(
-                lhs->fn(), {IConstValue::make(dynamic_cast<const FConstValue*>(lhs->inputs_[0].get())->value() +
+                lhs->fn(), {FConstValue::make(dynamic_cast<const FConstValue*>(lhs->inputs_[0].get())->value() +
                                               dynamic_cast<const IConstValue*>(inputs[0].get())->value()),
                             lhs->inputs_[1]});
           }
@@ -401,6 +401,9 @@ Program Xify(const Program& orig) {
     for (auto& c : op.c.constraints) {
       c.range = "X" + c.range;
     }
+    if (op.c.use_default != "") {
+      op.c.use_default = "X" + op.c.use_default;
+    }
   }
   return r;
 }
@@ -445,6 +448,9 @@ Program DeXify(const Program& orig) {
     }
     for (auto& c : op.c.constraints) {
       c.range = DeX(c.range);
+    }
+    if (op.c.use_default != "") {
+      op.c.use_default = DeX(op.c.use_default);
     }
   }
   return r;
@@ -651,8 +657,8 @@ void FunctionApplication::SetInput(const std::string& name, const std::shared_pt
   const Input& pi = p.inputs[func_->in_pos().at(name)];
   if (pi.tag == Input::FIXED) {
     if (val->num_dims() != pi.dims.size()) {
-      throw std::runtime_error("Applying function, tensor with mismatching dimensionality: " + name + ", expected=" +
-                               to_string(pi.dims.size()) + ", got=" + to_string(val->num_dims()));
+      throw std::runtime_error("Applying function, tensor with mismatching dimensionality: " + name +
+                               ", expected=" + to_string(pi.dims.size()) + ", got=" + to_string(val->num_dims()));
     }
     for (size_t d = 0; d < pi.dims.size(); d++) {
       bindings_[pi.dims[d]] = val->dim_value(d);

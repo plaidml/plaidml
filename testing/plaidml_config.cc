@@ -15,7 +15,7 @@ std::string GetConfigFile() {
   RunfilesDB rdb("vertexai_plaidml", nullptr);
   const char* filename = std::getenv("PLAIDML_CONFIG_FILE");
   if (!filename) {
-    filename = "testing/tile_generic_cpu.json";
+    filename = "plaidml/experimental.json";
   }
   return rdb[filename];
 }

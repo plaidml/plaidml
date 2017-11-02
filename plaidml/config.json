@@ -3,15 +3,7 @@
     "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
     "hals": [
       {
-        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
-        "sel": {
-          "or": {
-            "sel": [
-              { "vendor_regex": "Advanced Micro Devices.*" },
-              { "vendor_regex": "NVIDIA.*" }
-            ]
-          }
-        }
+        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver"
       }
     ],
     "hardware_configs": [

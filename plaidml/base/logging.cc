@@ -5,9 +5,6 @@
 #include "base/util/logging.h"
 #include "plaidml/base/base.h"
 
-// Logging
-// TODO: We need a better mechanism for managing logging.
-
 namespace vertexai {
 
 class ExternalLogger final : public el::LogDispatchCallback {
@@ -38,7 +35,6 @@ void ExternalLogger::SetLoggerCallback(Callback logger, void* arg) {
     auto el_logger = el::Loggers::getLogger("default");
     config = *el_logger->configurations();
     g_previous_config = config;
-    config.setGlobally(el::ConfigurationType::ToFile, "false");
     config.setGlobally(el::ConfigurationType::ToStandardOutput, "false");
     el_logger->configure(config);
   } else if (!logger && g_logger) {

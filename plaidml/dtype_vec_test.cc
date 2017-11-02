@@ -74,7 +74,6 @@ void ExpectOutput(char* buffer) {
 }
 
 std::string ConfigWithVectorWidth(std::size_t vec_width) {
-  // return vertexai::testing::PlaidMLConfig();
   auto confstr = vertexai::testing::PlaidMLConfig();
   auto config = vertexai::ParseConfig<vertexai::plaidml::proto::Config>(confstr);
 

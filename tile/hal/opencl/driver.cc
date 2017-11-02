@@ -16,12 +16,6 @@ Driver::Driver(const context::Context& ctx, const proto::Driver& config)
     : config_{std::make_shared<proto::Driver>(config)} {
   context::Activity enumerating{ctx, "tile::hal::opencl::Enumerating"};
 
-  if (!config_->has_sel()) {
-    auto* sel_list = config_->mutable_sel()->mutable_or_();
-    sel_list->add_sel()->set_type(hal::proto::HardwareType::GPU);
-    sel_list->add_sel()->set_type(hal::proto::HardwareType::Accelerator);
-  }
-
   cl_uint platform_count;
   clGetPlatformIDs(0, nullptr, &platform_count);
   std::vector<cl_platform_id> platforms(platform_count);

@@ -45,6 +45,13 @@ class TestSettings(unittest.TestCase):
     def testStartSession(self):
         with self.assertRaises(plaidml.exceptions.PlaidMLError):
             s.start_session()
+        s.setup = True
+        s.start_session()
+        s._setup_for_test()
+        s.setup = False
+        with self.assertRaises(plaidml.exceptions.PlaidMLError):
+            s.start_session()
+        s._setup_for_test()
         s.experimental = True
         s.start_session()
         u = uuid.UUID(s.session)

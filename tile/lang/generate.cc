@@ -14,7 +14,7 @@
 #include "tile/lang/fpconv.h"
 #include "tile/lang/gen_contract.h"
 #include "tile/lang/gen_special.h"
-#include "tile/lang/gen_zero.h"
+#include "tile/lang/gen_trivial.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/tile_opt.h"
@@ -652,7 +652,11 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       if (NeedsZero(flat, tshapes[0])) {
         // N.B. We currently don't unify kernels with subsequent
         // operations unless they cover the entire output space.
-        r.kernels.push_back(GenZero(tshapes[0], op.output, "zero_" + kname));
+        if (op.c.use_default != "") {
+          r.kernels.push_back(GenCopy(tshapes[0], op.output, op.c.use_default, "copy_" + kname));
+        } else {
+          r.kernels.push_back(GenZero(tshapes[0], op.output, "zero_" + kname));
+        }
         flat.kernel_outputs.push_back(op.output);
       } else {
         DoUnification(&flat, &computed, &r.var_rewrites, &war_safe_reads, prog, i, ud, vars, inputs, outputs, out_poly);

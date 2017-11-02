@@ -3,6 +3,7 @@
 licenses(["by_exception_only"])
 
 load("//bzl:plaidml.bzl", "plaidml_py_library", "plaidml_py_test", "plaidml_py_wheel")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_deb", "pkg_tar")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -18,6 +19,15 @@ plaidml_py_library(
     ],
 )
 
+pkg_tar(
+    name = "pkg",
+    srcs = glob([
+        "**/*",
+    ]),
+    package_dir = "plaidml/keras",
+    strip_prefix = ".",
+)
+
 plaidml_py_test(
     name = "backend_test",
     timeout = "long",
@@ -25,8 +35,8 @@ plaidml_py_test(
         "backend_test.py",
     ],
     tags = [
-        "darwin_fail",
         "keras",
+        "manual",
         "tensorflow",
     ],
     deps = [
@@ -57,6 +67,7 @@ plaidml_py_test(
     ],
     tags = [
         "keras",
+        "manual",
     ],
     deps = [
         ":keras",

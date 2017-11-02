@@ -3,20 +3,51 @@
     "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
     "hals": [
       {
-        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver",
-        "sel": {
-          "value": true
-        }
+        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver"
       }
     ],
     "hardware_configs": [
       {
-        "description": "AMD config",
+        "description": "Apple AMD config",
         "sel": {
-          "or": {
+          "and": {
             "sel": [
-              { "vendor_regex": "Advanced Micro Devices.*" },
-              { "vendor_regex": "AMD" }
+              { "platform_regex": "Apple" },
+              { "or": {
+                  "sel": [
+                    { "vendor_regex": "AMD" },
+                    { "vendor_regex": "Advanced Micro Devices.*" }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 256,
+          "vec_size": 1,
+          "mem_width": 128,
+          "max_mem": 32768,
+          "max_regs": 2048,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50
+        }
+      },
+      {
+        "description": "Non-Apple AMD config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "not" :
+                { "platform_regex": "Apple" }
+              },
+              { "or": {
+                  "sel": [
+                    { "vendor_regex": "AMD" },
+                    { "vendor_regex": "Advanced Micro Devices.*" }
+                  ]
+                }
+              }
             ]
           }
         },
@@ -66,10 +97,13 @@
         }
       },
       {
-        "description": "Intel CPU config",
+        "description": "Non-Apple Intel CPU config",
         "sel": {
           "and": {
             "sel": [
+              { "not" :
+                { "platform_regex": "Apple" }
+              },
               { "vendor_regex": "Intel.*" },
               { "name_regex": ".*CPU.*" }
             ]
@@ -77,6 +111,25 @@
         },
         "settings": {
           "threads": 32,
+          "vec_size": 1,
+          "mem_width": 64,
+          "max_mem": 32768,
+          "max_regs": 32768
+        }
+      },
+      {
+        "description": "Apple Intel CPU config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "platform_regex": "Apple" },
+              { "vendor_regex": "Intel.*" },
+              { "name_regex": ".*CPU.*" }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 1,
           "vec_size": 1,
           "mem_width": 64,
           "max_mem": 32768,

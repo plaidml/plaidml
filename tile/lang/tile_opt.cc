@@ -26,27 +26,50 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
     }
   }
 
+  // Give up early if we have nothing to vectorize on
+  if (to_vec.size() == 0) {
+    IVLOG(1, "Unable to vectorize: no stride 1 outputs");
+    return op;
+  }
+
+  // Give up early if we have any constraints since we don't currently handle them properly
+  if (iop.constraints.size()) {
+    IVLOG(1, "Unable to vectorize do due constraints");
+    return op;
+  }
+
   // Given that, see if we are valid for all accesses
   auto is_vectorizable = [&](const FlatTensorAccess& a) {
     if (a.offset % vec_size != 0) {
+      IVLOG(1, "Unable to vectorize: Offset not valid, " << a.offset);
       return false;
     }
     if (a.global_index_limit % vec_size != 0) {
+      IVLOG(1, "Unable to vectorize: Size not not valid, " << a.global_index_limit);
       return false;
     }
+    bool has_stride_1 = false;
+    bool has_uneven = false;
     for (size_t i = 0; i < sz; i++) {
       if (to_vec.find(i) != to_vec.end()) {
         if (a.strides[i] == 0) {
           continue;
         }
         if (a.strides[i] == 1 && op.ranges[i] % vec_size == 0) {
+          has_stride_1 = true;
           continue;
         }
       } else {
-        if (a.strides[i] % vec_size == 0) {
-          continue;
+        if (a.strides[i] % vec_size != 0) {
+          has_uneven = true;
         }
+        continue;
       }
+      IVLOG(1, "Unable to vectorize: Strides not valid, " << a.strides << ", case " << i);
+      return false;
+    }
+    if (has_stride_1 && has_uneven) {
+      IVLOG(1, "Unable to vectorize: Vector stride uneven, " << a.strides);
       return false;
     }
     return true;
@@ -69,9 +92,10 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
   }
   // Nope?  Forget it
   if (!valid) {
-    IVLOG(1, "Unable to vectorize");
     return op;
   }
+
+  IVLOG(1, "Vectorizing on " << to_vec);
 
   // Adjust ranges
   for (size_t i : to_vec) {
