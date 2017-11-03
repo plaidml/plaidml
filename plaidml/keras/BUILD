@@ -61,6 +61,21 @@ plaidml_py_test(
 )
 
 plaidml_py_test(
+    name = "tile_sandbox",
+    srcs = [
+        "tile_sandbox.py",
+    ],
+    tags = [
+        "keras",
+        "manual",
+    ],
+    deps = [
+        ":keras",
+        "//testing:plaidml_py",
+    ],
+)
+
+plaidml_py_test(
     name = "trivial_model_test",
     srcs = [
         "trivial_model_test.py",
@@ -68,6 +83,21 @@ plaidml_py_test(
     tags = [
         "keras",
         "manual",
+    ],
+    deps = [
+        ":keras",
+        "//testing:plaidml_py",
+    ],
+)
+
+plaidml_py_test(
+    name = "tutorial_test",
+    srcs = [
+        "tutorial_test.py",
+    ],
+    tags = [
+        "keras",
+        "trusty",
     ],
     deps = [
         ":keras",
