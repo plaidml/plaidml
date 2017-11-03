@@ -13,7 +13,7 @@ import unittest
 class TestPlaidML(unittest.TestCase):
 
     def setUp(self):
-      testing.plaidml_config.unittest_config()
+        testing.plaidml_config.unittest_config()
 
     def testVersion(self):
         # From https://www.python.org/dev/peps/pep-0440/
