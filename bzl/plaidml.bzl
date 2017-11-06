@@ -2,6 +2,10 @@
 
 load("//bzl:protobuf.bzl", "py_proto_library", "cc_proto_library")
 
+def with_plaidml():
+   native.bind(name="xcrunwrapper", actual="@bazel_tools//tools/objc:xcrunwrapper")
+   native.bind(name="protoc-gen-cc11", actual="//base/util/protoc-gen-cc11")
+    
 PLAIDML_COPTS = select({
     "//bzl:x64_windows": [
         "/std:c++14",
