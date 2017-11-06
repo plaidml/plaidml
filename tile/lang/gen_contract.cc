@@ -296,14 +296,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       switch (bindings[i] ? bindings[i]->tag : Binding::TENSOR) {
         case Binding::TENSOR:
           if (settings.use_global) {
-            sem::ExprPtr off = pin.globalOffset();
-            auto index_type = sem::Type{sem::Type::INDEX};
-            if (cond_is_always_true) {
-              off = _Cast(index_type, off);
-            } else {
-              off = _Select(_Cast(index_type, cond), _Cast(index_type, off), _Cast(index_type, _Const(0)));
-            }
-            input = _("in" + num)[off];
+            input = _("in" + num)[pin.globalOffset()];
           } else {
             input = _("in" + num + "_shared")[pin.sharedOffset()];
           }
@@ -368,10 +361,15 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     }
 
     // Make slow and non-slow version
-    slow_inner_block->append(inner_block);
-    slow_inner_block->append(_Declare(type, "guarded_pre_agg", guarded_pre_agg));
-    inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("pre_agg")));
-    slow_inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("guarded_pre_agg")));
+    if (settings.use_global) {
+      inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("pre_agg")));
+      slow_inner_block->append(_If(cond, inner_block));
+    } else {
+      slow_inner_block->append(inner_block);
+      slow_inner_block->append(_Declare(type, "guarded_pre_agg", guarded_pre_agg));
+      inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("pre_agg")));
+      slow_inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("guarded_pre_agg")));
+    }
 
     // Copy loops to allow two generations (slow + fast)
     auto dup_ci_o = ci_o;
