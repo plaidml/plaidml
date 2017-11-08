@@ -8,6 +8,7 @@
 #include "base/util/uuid.h"
 #include "tile/hal/opencl/buffer.h"
 #include "tile/hal/opencl/event.h"
+#include "tile/hal/opencl/result.h"
 
 namespace vertexai {
 namespace tile {
@@ -57,12 +58,12 @@ std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
                                         const std::vector<std::shared_ptr<hal::Event>>& dependencies,
                                         bool enable_profiling) {
   const auto& queue = device_state_->cl_queue(enable_profiling);
-  auto deps = Event::Upcast(dependencies, device_state_->cl_ctx(), queue);
+  auto deps = Event::Downcast(dependencies, device_state_->cl_ctx(), queue);
   VLOG(4) << "Running kernel " << ki_.kname;
 
   std::lock_guard<std::mutex> lock{mu_};
   for (std::size_t i = 0; i < params.size(); ++i) {
-    Buffer* buf = Buffer::Upcast(params[i].get(), device_state_->cl_ctx());
+    Buffer* buf = Buffer::Downcast(params[i].get(), device_state_->cl_ctx());
     VLOG(4) << "  Param: " << buf;
     buf->SetKernelArg(kernel_, i);
   }
@@ -95,7 +96,8 @@ std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
 
   VLOG(4) << "  Produced dep: " << done.get();
 
-  return std::make_shared<Event>(activity.ctx(), device_state_, done, queue);
+  auto result = std::make_shared<KernelResult>(activity.ctx(), device_state_, done, ki_);
+  return std::make_shared<Event>(activity.ctx(), device_state_, std::move(done), queue, std::move(result));
 }
 
 }  // namespace opencl

@@ -51,6 +51,7 @@ message HardwareSettings {
   uint64 goal_groups = 7;
   uint64 goal_flops_per_byte = 8;
   repeated uint64 dim_sizes = 10;
+  bool is_synchronous = 11;
 }
 
 message HardwareConfig {

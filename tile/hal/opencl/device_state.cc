@@ -17,15 +17,19 @@ namespace opencl {
 namespace {
 
 DeviceState::Queue MakeQueue(cl_device_id did, const CLObj<cl_context>& cl_ctx,
+                             const hal::proto::HardwareSettings& settings,
                              cl_command_queue_properties extra_properties = 0) {
   Err err;
 
-  // Probe the device for supported queue properties.
-  auto props = CLInfoType<CL_DEVICE_QUEUE_PROPERTIES>::Read(did);
+  cl_command_queue_properties mask = 0;
+  if (!settings.is_synchronous()) {
+    // Enable out of order execution if supported.
+    mask = CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
+  }
 
-  // Enable out of order execution if supported.
+  // Probe the device for supported queue properties.
   // Clear any properties we don't understand (aka everything else).
-  props &= CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE;
+  auto props = CLInfoType<CL_DEVICE_QUEUE_PROPERTIES>::Read(did) & mask;
 
   DeviceState::Queue result;
   result.props = props | extra_properties;
@@ -43,17 +47,16 @@ void DeviceState::Queue::Flush() const { Err::Check(clFlush(cl_queue.get()), "Un
 
 DeviceState::DeviceState(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did,
                          const std::shared_ptr<proto::Driver>& config, proto::DeviceInfo info)
-    : did_{did},
-      config_{config},
-      info_{std::move(info)},
-      cl_ctx_{cl_ctx},
-      cl_normal_queue_(MakeQueue(did_, cl_ctx_)),
-      cl_profiling_queue_(MakeQueue(did_, cl_ctx_, CL_QUEUE_PROFILING_ENABLE)),
-      uuid_(ctx.activity_uuid()) {}
+    : did_{did}, config_{config}, info_{std::move(info)}, cl_ctx_{cl_ctx}, uuid_(ctx.activity_uuid()) {}
+
+void DeviceState::Initialize(const hal::proto::HardwareSettings& settings) {
+  cl_normal_queue_ = compat::make_unique<Queue>(MakeQueue(did_, cl_ctx_, settings));
+  cl_profiling_queue_ = compat::make_unique<Queue>(MakeQueue(did_, cl_ctx_, settings, CL_QUEUE_PROFILING_ENABLE));
+}
 
 void DeviceState::FlushCommandQueue() {
-  cl_normal_queue_.Flush();
-  cl_profiling_queue_.Flush();
+  cl_normal_queue_->Flush();
+  cl_profiling_queue_->Flush();
 }
 
 bool DeviceState::HasDeviceExtension(const char* extension) {

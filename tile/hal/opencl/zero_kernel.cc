@@ -19,14 +19,14 @@ std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
                                             const std::vector<std::shared_ptr<hal::Event>>& dependencies,
                                             bool enable_profiling) {
   const auto& queue = device_state_->cl_queue(enable_profiling);
-  auto deps = Event::Upcast(dependencies, device_state_->cl_ctx(), queue);
+  auto deps = Event::Downcast(dependencies, device_state_->cl_ctx(), queue);
   IVLOG(4, "Running zero-fill memory " << kinfo_.kname);
 
   if (params.size() != 1) {
     throw error::Internal("Zero-memory operation invoked with a memory region count != 1");
   }
 
-  Buffer* buf = Buffer::Upcast(params[0].get(), device_state_->cl_ctx());
+  Buffer* buf = Buffer::Downcast(params[0].get(), device_state_->cl_ctx());
   IVLOG(4, "  Buffer: " << buf);
 
   if (VLOG_IS_ON(4)) {

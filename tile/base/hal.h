@@ -33,7 +33,7 @@ class Result {
   // Adds the operation's statistics to the event log of the context with which the operation was started.  This may
   // involve logging multiple sub-events.
   //
-  // To log statistics, the operation must have been created via a context that was logging events; otherwise, the this
+  // To log statistics, the operation must have been created via a context that was logging events; otherwise, this
   // call is a no-op.
   //
   // (This is done on-demand because on some HALs it's expensive to synchronize with an incomplete operation; the HAL
@@ -231,6 +231,13 @@ class Executor {
   // Prepares a kernel to run on the device.
   virtual boost::future<std::unique_ptr<Kernel>> Prepare(Library* library, std::size_t kernel_index) = 0;
 
+  // Returns a future that waits for all of the supplied events to complete, allowing users to obtain the corresponding
+  // results.
+  //
+  // TODO: consider moving this to DeviceSet
+  virtual boost::future<std::vector<std::shared_ptr<Result>>> WaitFor(
+      const std::vector<std::shared_ptr<Event>>& events) = 0;
+
   // Flush any pending kernels to begin execution.
   virtual void Flush() = 0;
 };
@@ -240,6 +247,12 @@ class Executor {
 class Device {
  public:
   virtual ~Device() noexcept {}
+
+  // Initialize a device. This *must* be called before using the device.
+  // The supplied settings allow the device to be configured by users.
+  //
+  // TODO(rob): Fix our configuration story
+  virtual void Initialize(const proto::HardwareSettings& settings) = 0;
 
   // Retrieves the device's description string, making it a little easier for humans to figure out which device is
   // which.

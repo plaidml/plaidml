@@ -34,6 +34,9 @@ class Executor : public hal::Executor {
 
   boost::future<std::unique_ptr<Kernel>> Prepare(Library* library, std::size_t kernel_index) final;
 
+  boost::future<std::vector<std::shared_ptr<hal::Result>>> WaitFor(
+      const std::vector<std::shared_ptr<hal::Event>>& events) final;
+
   void Flush() final;
 
  private:

@@ -12,7 +12,7 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-Library* Library::Upcast(hal::Library* library, const std::shared_ptr<DeviceState>& device_state) {
+Library* Library::Downcast(hal::Library* library, const std::shared_ptr<DeviceState>& device_state) {
   Library* exe = dynamic_cast<Library*>(library);
   if (!exe || exe->device_state() != device_state) {
     throw error::InvalidArgument{"Incompatible library for Tile device"};
