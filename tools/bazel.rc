@@ -1,4 +1,4 @@
-bbuild -c opt
+build -c opt
 test -c opt
 run -c opt
 
