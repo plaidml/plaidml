@@ -1,5 +1,6 @@
 # Copyright Vertex.AI
 
+
 class PlaidMLError(Exception):
     """The base class of exceptions raised by VertexAI library operations."""
 

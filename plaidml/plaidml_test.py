@@ -13,13 +13,14 @@ import unittest
 class TestPlaidML(unittest.TestCase):
 
     def setUp(self):
-      testing.plaidml_config.unittest_config()
+        testing.plaidml_config.unittest_config()
 
     def testVersion(self):
         # From https://www.python.org/dev/peps/pep-0440/
         self.assertRegexpMatches(
-            plaidml.__version__, 
-            r'^([1-9]\d*!)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)(0|[1-9]\d*))?(\.post(0|[1-9]\d*))?(\.dev(0|[1-9]\d*))?$')
+            plaidml.__version__,
+            r'^([1-9]\d*!)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)(0|[1-9]\d*))?(\.post(0|[1-9]\d*))?(\.dev(0|[1-9]\d*))?$'
+        )
 
     def testDeviceEnumerator(self):
         ctx = plaidml.Context()
@@ -61,13 +62,14 @@ class TestPlaidML(unittest.TestCase):
                 view[9] = 2
                 view[-1] = 4
                 self.assertEqual(view[9], 4)
-                view[0:10:3] = (1,2,3,4)
+                view[0:10:3] = (1, 2, 3, 4)
                 self.assertEqual(view[3], 2)
-                self.assertSequenceEqual(view[0:10:3], (1,2,3,4))
+                self.assertSequenceEqual(view[0:10:3], (1, 2, 3, 4))
 
     def testManualReshape(self):
         ctx = plaidml.Context()
-        reshape = plaidml.Function("function (I) -> (O) { F[3*j + k: 4 * 3] = >(I[j,k]); O[p,q : 6,2] = >(F[2*p + q]);}")
+        reshape = plaidml.Function(
+            "function (I) -> (O) { F[3*j + k: 4 * 3] = >(I[j,k]); O[p,q : 6,2] = >(F[2*p + q]);}")
         iShape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 4, 3)
         oShape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 6, 2)
         with plaidml.open_first_device(ctx) as dev:
@@ -88,7 +90,7 @@ class TestPlaidML(unittest.TestCase):
                 view.writeback()
 
             O = plaidml.Tensor(dev, oShape)
-            plaidml.run(ctx, reshape, inputs={"I": I}, outputs={"O":O})
+            plaidml.run(ctx, reshape, inputs={"I": I}, outputs={"O": O})
             with O.mmap_current() as view:
                 self.assertEqual(view[0], 1.0)
                 self.assertEqual(view[1], 2.0)
@@ -104,7 +106,8 @@ class TestPlaidML(unittest.TestCase):
                 self.assertEqual(view[11], 12.0)
 
     def runMatrixMultiply(self, ctx, dev):
-        matmul = plaidml.Function("function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
+        matmul = plaidml.Function(
+            "function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
         shape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 3, 3)
         b = plaidml.Tensor(dev, shape)
         with b.mmap_discard(ctx) as view:
@@ -121,15 +124,15 @@ class TestPlaidML(unittest.TestCase):
 
         c = plaidml.Tensor(dev, shape)
         with c.mmap_discard(ctx) as view:
-            view[(0,0)] = 1.0
-            view[(0,1)] = 2.0
-            view[(0,2)] = 3.0
-            view[(1,0)] = 4.0
-            view[(1,1)] = 5.0
-            view[(1,2)] = 6.0
-            view[(2,0)] = 7.0
-            view[(2,1)] = 8.0
-            view[(2,2)] = 9.0
+            view[(0, 0)] = 1.0
+            view[(0, 1)] = 2.0
+            view[(0, 2)] = 3.0
+            view[(1, 0)] = 4.0
+            view[(1, 1)] = 5.0
+            view[(1, 2)] = 6.0
+            view[(2, 0)] = 7.0
+            view[(2, 1)] = 8.0
+            view[(2, 2)] = 9.0
             view.writeback()
 
         a = plaidml.Tensor(dev, shape)
@@ -137,15 +140,15 @@ class TestPlaidML(unittest.TestCase):
         plaidml.run(ctx, matmul, inputs={"B": b, "C": c}, outputs={"A": a})
 
         with a.mmap_current() as view:
-            self.assertEqual(view[0], 1.0+8.0+21.0)
-            self.assertEqual(view[1], 2.0+10.0+24.0)
-            self.assertEqual(view[2], 3.0+12.0+27.0)
-            self.assertEqual(view[(1,0)], 4.0+20.0+42.0)
-            self.assertEqual(view[(1,1)], 8.0+25.0+48.0)
-            self.assertEqual(view[(1,2)], 12.0+30.0+54.0)
-            self.assertEqual(view[6], 7.0+32.0+63.0)
-            self.assertEqual(view[7], 14.0+40.0+72.0)
-            self.assertEqual(view[8], 21.0+48.0+81.0)
+            self.assertEqual(view[0], 1.0 + 8.0 + 21.0)
+            self.assertEqual(view[1], 2.0 + 10.0 + 24.0)
+            self.assertEqual(view[2], 3.0 + 12.0 + 27.0)
+            self.assertEqual(view[(1, 0)], 4.0 + 20.0 + 42.0)
+            self.assertEqual(view[(1, 1)], 8.0 + 25.0 + 48.0)
+            self.assertEqual(view[(1, 2)], 12.0 + 30.0 + 54.0)
+            self.assertEqual(view[6], 7.0 + 32.0 + 63.0)
+            self.assertEqual(view[7], 14.0 + 40.0 + 72.0)
+            self.assertEqual(view[8], 21.0 + 48.0 + 81.0)
 
     def testMatrixMultiply(self):
         ctx = plaidml.Context()

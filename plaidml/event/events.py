@@ -1,5 +1,4 @@
 # Copyright Vertex.AI.
-
 """Provides common event handling functionality."""
 
 from __future__ import absolute_import, print_function
@@ -18,6 +17,7 @@ def _Now():
 
 class Context(object):
     """An execution context for eventing."""
+
     def __init__(self, parent=None):
         self.id = uuid.uuid4()
         self.eventlog = parent.eventlog if parent else None

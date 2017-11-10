@@ -20,9 +20,9 @@ config_setting(
 )
 
 config_setting(
-   name = "x64_windows",
-   values = {"cpu": "x64_windows"},
-   visibility = ["//visibility:public"],
+    name = "x64_windows",
+    values = {"cpu": "x64_windows"},
+    visibility = ["//visibility:public"],
 )
 
 # Android builds do not need to link in a separate pthread library.
@@ -62,13 +62,13 @@ config_setting(
 )
 
 IOS_ARM_COPTS = COPTS + [
-#    "-DOS_IOS",
-#    "-miphoneos-version-min=7.0",
-#    "-arch armv7",
-#    "-arch armv7s",
-#    "-arch arm64",
-#    "-D__thread=",
-#    "-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS9.2.sdk/",
+    #    "-DOS_IOS",
+    #    "-miphoneos-version-min=7.0",
+    #    "-arch armv7",
+    #    "-arch armv7s",
+    #    "-arch arm64",
+    #    "-D__thread=",
+    #    "-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS9.2.sdk/",
 ]
 
 cc_library(
@@ -220,8 +220,8 @@ cc_library(
     linkopts = LINK_OPTS,
     visibility = ["//visibility:public"],
     deps = [
-      ":protobuf_lite",
-      "//external:zlib",
+        ":protobuf_lite",
+        "//external:zlib",
     ],
 )
 
@@ -294,8 +294,8 @@ objc_library(
     #linkopts = LINK_OPTS,
     visibility = ["//visibility:public"],
     deps = [
-      ":protobuf_lite_ios",
-      "//external:zlib",
+        ":protobuf_lite_ios",
+        "//external:zlib",
     ],
 )
 
@@ -647,8 +647,8 @@ cc_test(
     ],
     copts = COPTS,
     data = [
-               ":test_plugin",
-           ] + glob([
+        ":test_plugin",
+    ] + glob([
         "src/google/protobuf/**/*",
     ]),
     includes = [
@@ -675,8 +675,8 @@ java_library(
     srcs = glob([
         "java/core/src/main/java/com/google/protobuf/*.java",
     ]) + [
-               ":gen_well_known_protos_java",
-           ],
+        ":gen_well_known_protos_java",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -685,12 +685,12 @@ java_library(
     srcs = glob([
         "java/util/src/main/java/com/google/protobuf/util/*.java",
     ]),
+    visibility = ["//visibility:public"],
     deps = [
         "protobuf_java",
         "//external:gson",
         "//external:guava",
     ],
-    visibility = ["//visibility:public"],
 )
 
 ################################################################################
@@ -709,8 +709,8 @@ py_library(
             "python/google/protobuf/internal/test_util.py",
         ],
     ),
-    srcs_version = "PY2AND3",
     imports = ["python"],
+    srcs_version = "PY2AND3",
 )
 
 cc_binary(
@@ -746,8 +746,8 @@ cc_binary(
     linkshared = 1,
     linkstatic = 1,
     deps = [
-               ":protobuf",
-           ] + select({
+        ":protobuf",
+    ] + select({
         "//conditions:default": [],
         ":use_fast_cpp_protos": ["//external:python_headers"],
     }),
@@ -782,7 +782,7 @@ py_proto_library(
     protoc = ":protoc",
     py_libs = [
         ":python_srcs",
-        "//external:six"
+        "//external:six",
     ],
     srcs_version = "PY2AND3",
     visibility = ["//visibility:public"],

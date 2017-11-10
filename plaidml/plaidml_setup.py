@@ -24,6 +24,7 @@ def main():
             elif inp not in choices:
                 print("Invalid choice: {}".format(inp))
         return inp
+
     print("""
 PlaidML Setup ({0})
 
@@ -69,7 +70,8 @@ No supported devices found. Run 'clinfo' and file an issue containing the full o
     for dev in exp_devices:
         print("   {0} : {1}".format(dev.id.decode(), dev.description.decode()))
 
-    print("\nUsing experimental devices can cause poor performance, crashes, and other nastiness.\n")
+    print(
+        "\nUsing experimental devices can cause poor performance, crashes, and other nastiness.\n")
     exp = choice_prompt("Enable experimental device support", ["y", "n"], "n")
     plaidml.settings.experimental = exp == "y"
     try:
@@ -103,7 +105,8 @@ We'd love your help making it better.
     print("Tile code:")
     print("  function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
     with plaidml.open_first_device(ctx) as dev:
-        matmul = plaidml.Function("function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
+        matmul = plaidml.Function(
+            "function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
         shape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 3, 3)
         a = plaidml.Tensor(dev, shape)
         b = plaidml.Tensor(dev, shape)
@@ -111,8 +114,8 @@ We'd love your help making it better.
         plaidml.run(ctx, matmul, inputs={"B": b, "C": c}, outputs={"A": a})
     print("Whew. That worked.\n")
 
-    sav = choice_prompt("Save settings to {0}".format(plaidml.settings.user_settings),
-                        ["y", "n"], "y")
+    sav = choice_prompt("Save settings to {0}".format(plaidml.settings.user_settings), ["y", "n"],
+                        "y")
     if sav == "y":
         plaidml.settings.save(plaidml.settings.user_settings)
     print("Success!\n")

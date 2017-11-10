@@ -8,6 +8,6 @@ cc_library(
     name = "zlib",
     srcs = glob([prefix_dir + "/*.c"]),
     hdrs = glob([prefix_dir + "/*.h"]),
+    copts = ["-w"],
     includes = [prefix_dir],
-    copts=[ "-w" ]
 )

@@ -4,7 +4,6 @@
 # ) It uses PlaidML as a backend (by invoking plaidml.keras.install_backend()).
 # ) It removes Dropout.
 # ) It's been reworked slightly to act as a functional integration test.
-
 '''Trains a simple deep NN on the MNIST dataset.
 
 Gets to 98.40% test accuracy after 20 epochs
@@ -85,13 +84,9 @@ def run(use_batch_normalization=False, use_dropout=False):
 
     model.summary()
 
-    model.compile(loss='categorical_crossentropy',
-                  optimizer=RMSprop(),
-                  metrics=['accuracy'])
+    model.compile(loss='categorical_crossentropy', optimizer=RMSprop(), metrics=['accuracy'])
 
-    history = model.fit(X_train, Y_train,
-                        batch_size=batch_size, epochs=epochs,
-                        verbose=1)
+    history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=epochs, verbose=1)
 
     score = model.evaluate(X_test, Y_test, verbose=1)
 
