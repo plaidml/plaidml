@@ -8,6 +8,7 @@ We welcome contributions to PlaidML from anyone. This document:
 
 Before starting any work please ensure you are able to [build and test PlaidML](BUIDLING.md)
 
+
 ## Guidelines
 
   * Create unit tests for new features and bug fixes. Integration tests are required for larger features.
@@ -38,7 +39,7 @@ Before starting any work please ensure you are able to [build and test PlaidML](
 
   * ML Framework Frontends (e.g., Keras, Pytorch, etc)
     * PlaidML welcomes integrations with any established ML framework or interop (NNVM, ONNX, etc)
-    * Currently this involves duplicating tile operations. We want to abstrace common NN tile operations
+    * Currently this involves duplicating tile operations. We will eventually abstract common NN tile operations
       into a separate C++ library to ease backend development.
   * Ops for Frontends
     * PlaidML welcomes implementations for currently unimplemented operations as well as Tile code
