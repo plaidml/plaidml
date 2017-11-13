@@ -12,14 +12,10 @@ PlaidML is a multi-language acceleration framework that:
 
 For background and early benchmarks see our [blog post](http://vertex.ai/blog/announcing-plaidml) announcing the release. PlaidML is under active development and should be thought of as early alpha quality.
 
-- [Current Limitations](#current-limitation)
-- [Supported Hardware](#supported-hardware)
-  - [Validated Hardware](#validated-hardware)
-  - [Experimental Config](#experimental-config)
-- [Validated Networks](#validated-networks)
+- [Current Limitations](#current-limitations)
 - [Installation Instructions](#installation-instructions)
-- [Building PlaidML](#building-plaidml)
-- [Contributing](#contributing)
+- [Building PlaidML](BUILDING.md)
+- [Contributing](CONTRIBUTING.md)
 - [Reporting Issues](#reporting-issues)
 
 ## Current Limitations
@@ -146,20 +142,6 @@ for i in range(10):
 print("Ran in {} seconds".format(time.time() - start))
 
 ```
-
-## Building PlaidML
-
-PlaidML depends on [Bazel](http://bazel.build) v0.6.0 or higher.
-```
-bazel build -c opt plaidml:wheel plaidml/keras:wheel
-sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
-```
-
-See [BUILDING](BUILDING.md) for more details.
-
-## Contributing
-
-We welcome community contributions to PlaidML. Please review our [contribution guidelines](CONTRIBUTING.md) for more details.
 
 ## License
 
