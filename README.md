@@ -1,4 +1,6 @@
 # PlaidML
+[![Build Status](https://travis-ci.org/plaidml/plaidml.svg?branch=master)]()
+
 ![The PlaidML Platypus](resources/plaid-final.png)
 *A framework for making deep learning work everywhere.*
 
