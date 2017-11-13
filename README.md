@@ -17,6 +17,7 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
 - [Validated Networks](#validated-networks)
 - [Installation Instructions](#installation-instructions)
 - [Building PlaidML](#building-plaidml)
+- [Contributing](#contributing)
 - [Reporting Issues](#reporting-issues)
 
 ## Current Limitations
@@ -153,6 +154,10 @@ sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 ```
 
 See [BUILDING](BUILDING.md) for more details.
+
+## Contributing
+
+We welcome community contributions to PlaidML. Please review our [contribution guidelines](CONTRIBUTING.md) for more details.
 
 ## License
 
