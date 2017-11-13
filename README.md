@@ -1,5 +1,5 @@
 # PlaidML
-![The PlaidML Platypus](https://github.com/vertexai/plaidml/raw/master/images/plaid-final.png)
+![The PlaidML Platypus](resources/plaid-final.png)
 *A framework for making deep learning work everywhere.*
 
 PlaidML is a multi-language acceleration framework that: 
@@ -151,6 +151,8 @@ PlaidML depends on [Bazel](http://bazel.build) v0.6.0 or higher.
 bazel build -c opt plaidml:wheel plaidml/keras:wheel
 sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 ```
+
+See [BUILDING](BUILDING.md) for more details.
 
 ## License
 
