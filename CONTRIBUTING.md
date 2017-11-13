@@ -1,6 +1,6 @@
 # Contributing to PlaidML
 
-We welcome contributions to PlaidML from anyone. This document:
+We welcome contributions to PlaidML from anyone. This document contains:
   * Guidelines for creating successful PRs
   * Outlines the contribution process
   * Lists general areas for contribution
@@ -22,8 +22,7 @@ Before starting any work please ensure you are able to [build and test PlaidML](
     * If you're tackling an open issue that isn't assigned, please assign it to yourself.
     * If you'd like to solve an issue that is already assigned, please comment on the issue
       to ensure you're not duplicating effort.
-    * If you'd like to provide a new feature, please open an issue and leave it unassigned.
-      We'll handle communication on your proposal through the issue. Please provide a
+    * If you'd like to provide a new feature, open a new issue. Please provide a
       reasonably detailed description of what you'd like to do, and clearly indicate that 
       you're willing to do the work.
   2. Work on a fork as usual in Github. Please ensure the same tests travis runs will pass
@@ -36,15 +35,14 @@ Before starting any work please ensure you are able to [build and test PlaidML](
   5. Once the performance regression suite has passed, we will accept and merge the PR.
 
 ## Areas for Contribution
-
-  * ML Framework Frontends (e.g., Keras, Pytorch, etc)
-    * PlaidML welcomes integrations with any established ML framework or interop (NNVM, ONNX, etc)
-    * Currently this involves duplicating tile operations. We will eventually abstract common NN tile operations
-      into a separate C++ library to ease backend development.
   * Ops for Frontends
     * PlaidML welcomes implementations for currently unimplemented operations as well as Tile code
       for novel operations supported by research.
     * Please read the [Tile Tutorial](https://github.com/plaidml/plaidml/wiki/Tile-Tutorial) and the [PlaidML Op Tutorial](https://github.com/plaidml/plaidml/wiki/PlaidML-Op-Tutorial) 
+  * ML Framework Frontends (e.g., Keras, Pytorch, etc)
+    * PlaidML welcomes integrations with any established ML framework or interop (NNVM, ONNX, etc)
+    * Currently this involves duplicating tile operations. We will eventually abstract common NN tile operations
+      into a separate C++ library to ease backend development.
   * HALs for Backend Targets (OpenCL, Vulkan, SPIR-V, HVX, etc)
     * There is no documentation for the HAL currently. The interface is fairly straightforward and the [OpenCL HAL](tile/hal/opencl) 
       provides a good example of a complete HAL.
