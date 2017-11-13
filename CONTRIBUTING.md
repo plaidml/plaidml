@@ -6,15 +6,15 @@ We welcome contributions to PlaidML from anyone. This document:
   * Lists general areas for contribution
   * Provides resources and context to ease development, where relevant and available
 
-Before starting any work please ensure you are able to [build and test PlaidML](BUIDLING.md)
+Before starting any work please ensure you are able to [build and test PlaidML](BUILDING.md)
 
 
 ## Guidelines
 
   * Create unit tests for new features and bug fixes. Integration tests are required for larger features.
   * Pre-commit linters will be available soon. 
-    * C++ code conforms to the (Google C++ Style Guide)[https://google.github.io/styleguide/cppguide.html]
-    * Python code conforms to the (Google Python Style Guide)[https://google.github.io/styleguide/pyguide.html]
+    * C++ code conforms to the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
+    * Python code conforms to the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)
 
 ## Process
 
@@ -44,7 +44,7 @@ Before starting any work please ensure you are able to [build and test PlaidML](
   * Ops for Frontends
     * PlaidML welcomes implementations for currently unimplemented operations as well as Tile code
       for novel operations supported by research.
-    * Please read the [Tile Tutorial](wiki/Tile-Tutorial) and the [PlaidML Op Tutorial](wiki/PlaidML-Op-Tutorial) 
+    * Please read the [Tile Tutorial](https://github.com/plaidml/plaidml/wiki/Tile-Tutorial) and the [PlaidML Op Tutorial](https://github.com/plaidml/plaidml/wiki/PlaidML-Op-Tutorial) 
   * HALs for Backend Targets (OpenCL, Vulkan, SPIR-V, HVX, etc)
     * There is no documentation for the HAL currently. The interface is fairly straightforward and the [OpenCL HAL](tile/hal/opencl) 
       provides a good example of a complete HAL.
