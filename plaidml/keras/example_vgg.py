@@ -15,8 +15,7 @@ batch_size = 8
 x_train = x_train[:batch_size]
 x_train = np.repeat(np.repeat(x_train, 7, axis=1), 7, axis=2)
 model = kapp.VGG19()
-model.compile(optimizer='sgd', loss='categorical_crossentropy',
-              metrics=['accuracy'])
+model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['accuracy'])
 
 print("Running initial batch (compiling tile program)")
 y = model.predict(x=x_train, batch_size=batch_size)

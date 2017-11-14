@@ -11,8 +11,8 @@ namespace vertexai {
 namespace tile {
 namespace local_machine {
 
-std::shared_ptr<Buffer> Buffer::Upcast(const std::shared_ptr<tile::Buffer>& buffer,
-                                       const std::shared_ptr<DevInfo>& devinfo) {
+std::shared_ptr<Buffer> Buffer::Downcast(const std::shared_ptr<tile::Buffer>& buffer,
+                                         const std::shared_ptr<DevInfo>& devinfo) {
   auto result = std::dynamic_pointer_cast<Buffer>(buffer);
   if (!result) {
     throw error::InvalidArgument("incompatible buffer type");

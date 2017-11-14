@@ -29,8 +29,8 @@ build:arm7-ubuntu-14.04 --cpu=arm7-linux
 build:arm7-ubuntu-14.04 --define=VARIANT=arm7-ubuntu-14.04
 build:arm7-ubuntu-14.04 --crosstool_top=//bzl:toolchain
 build:arm7-ubuntu-14.04 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
-build:arm7-ubuntu-14.04 --build_tag_filters=-large,-llvm,-msvc,-tensorflow,-trusty
-test:arm7-ubuntu-14.04 --test_tag_filters=-large,-llvm,-msvc,-tensorflow,-trusty
+build:arm7-ubuntu-14.04 --build_tag_filters=-large,-msvc,-rtest_fail,-tensorflow
+test:arm7-ubuntu-14.04 --test_tag_filters=-large,-msvc,-rtest_fail,-tensorflow
 
 build:macos-10.12 --cpu=darwin
 build:macos-10.12 --build_tag_filters=-large,-llvm,-darwin_fail,-msvc

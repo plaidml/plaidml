@@ -1,4 +1,3 @@
-
 # Description:
 #   The Boost library collection (http://www.boost.org)
 #
@@ -31,83 +30,87 @@ config_setting(
 )
 
 cc_library(
-  name = "boost",
-  hdrs = glob([
-    prefix_dir + "/boost/**/*.hpp",
-    prefix_dir + "/boost/**/*.h",
-    prefix_dir + "/boost/**/*.ipp",
+    name = "boost",
+    hdrs = glob([
+        prefix_dir + "/boost/**/*.hpp",
+        prefix_dir + "/boost/**/*.h",
+        prefix_dir + "/boost/**/*.ipp",
     ]),
-  includes = [prefix_dir],
-  defines = [
-    "BOOST_ERROR_CODE_HEADER_ONLY",
-    "BOOST_SYSTEM_NO_DEPRECATED",
-    "BOOST_THREAD_BUILD_LIB",
-    "BOOST_THREAD_VERSION=4",
-    "BOOST_ALL_NO_LIB",
-  ],
+    defines = [
+        "BOOST_ERROR_CODE_HEADER_ONLY",
+        "BOOST_SYSTEM_NO_DEPRECATED",
+        "BOOST_THREAD_BUILD_LIB",
+        "BOOST_THREAD_VERSION=4",
+        "BOOST_ALL_NO_LIB",
+    ],
+    includes = [prefix_dir],
 )
 
 cc_library(
-  name = "filesystem",
-  srcs = glob([prefix_dir + "/libs/filesystem/src/*.cpp"]),
-  deps = [
-    ":boost",
-    ":system",
-  ],
+    name = "filesystem",
+    srcs = glob([prefix_dir + "/libs/filesystem/src/*.cpp"]),
+    deps = [
+        ":boost",
+        ":system",
+    ],
 )
 
 cc_library(
-  name = "iostreams",
-  srcs = glob([prefix_dir + "/libs/iostreams/src/*.cpp"]),
-  deps = [
-    ":boost",
-    "@bzip2_archive//:bz2lib",
-    "@zlib_archive//:zlib",
-  ],
+    name = "iostreams",
+    srcs = glob([prefix_dir + "/libs/iostreams/src/*.cpp"]),
+    deps = [
+        ":boost",
+        "@bzip2_archive//:bz2lib",
+        "@zlib_archive//:zlib",
+    ],
 )
 
 cc_library(
-  name = "program_options",
-  srcs = glob([prefix_dir + "/libs/program_options/src/*.cpp"]),
-  deps = [
-    ":boost",
-  ],
+    name = "program_options",
+    srcs = glob([prefix_dir + "/libs/program_options/src/*.cpp"]),
+    deps = [
+        ":boost",
+    ],
 )
 
 cc_library(
-  name = "regex",
-  srcs = glob([prefix_dir + "/libs/regex/src/*.cpp", prefix_dir + "/libs/regex/src/*.hpp"]),
-  deps = [
-    ":boost",
-  ],
+    name = "regex",
+    srcs = glob([
+        prefix_dir + "/libs/regex/src/*.cpp",
+        prefix_dir + "/libs/regex/src/*.hpp",
+    ]),
+    deps = [
+        ":boost",
+    ],
 )
 
 cc_library(
-  name = "system",
-  srcs = glob([prefix_dir + "/libs/system/src/*.cpp"]),
-  deps = [
-    ":boost",
-  ],
+    name = "system",
+    srcs = glob([prefix_dir + "/libs/system/src/*.cpp"]),
+    deps = [
+        ":boost",
+    ],
 )
 
 cc_library(
-  name = "thread",
-  srcs = glob([prefix_dir + "/libs/thread/src/*.cpp"]) +
-         select({
-           "//:x64win": glob([prefix_dir + "/libs/thread/src/win32/*.cpp"]),
-           "//:x64_windows": glob([prefix_dir + "/libs/thread/src/win32/*.cpp"]),
-           "//conditions:default":
-              glob([prefix_dir + "/libs/thread/src/pthread/*.cpp"],
-                   exclude=[prefix_dir + "/libs/thread/src/pthread/once.cpp"]),
-         }),
-  deps = [
-    ":boost",
-    ":system",
-  ],
-  linkopts = select({
-    "//:darwin": [],
-    "//:x64win": [],
-    "//:x64_windows": [],
-    "//conditions:default": ["-pthread"],
-  }),
+    name = "thread",
+    srcs = glob([prefix_dir + "/libs/thread/src/*.cpp"]) +
+           select({
+               "//:x64win": glob([prefix_dir + "/libs/thread/src/win32/*.cpp"]),
+               "//:x64_windows": glob([prefix_dir + "/libs/thread/src/win32/*.cpp"]),
+               "//conditions:default": glob(
+                   [prefix_dir + "/libs/thread/src/pthread/*.cpp"],
+                   exclude = [prefix_dir + "/libs/thread/src/pthread/once.cpp"],
+               ),
+           }),
+    linkopts = select({
+        "//:darwin": [],
+        "//:x64win": [],
+        "//:x64_windows": [],
+        "//conditions:default": ["-pthread"],
+    }),
+    deps = [
+        ":boost",
+        ":system",
+    ],
 )

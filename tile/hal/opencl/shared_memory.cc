@@ -114,7 +114,9 @@ void SharedBuffer::SetKernelArg(const CLObj<cl_kernel>& kernel, std::size_t inde
 
 boost::future<void*> SharedBuffer::MapCurrent(const std::vector<std::shared_ptr<hal::Event>>& deps) {
   VLOG(4) << "OCL SharedBuffer MapCurrent: waiting this: " << this;
-  return Event::WaitFor(deps, arena_->device_state()).then([ this, base = base_ ](boost::future<void> f) {
+  return Event::WaitFor(deps, arena_->device_state()).then([
+    this, base = base_
+  ](boost::shared_future<std::vector<std::shared_ptr<hal::Result>>> f) {
     VLOG(4) << "OCL SharedBuffer MapCurrent: complete this: " << this;
     f.get();
     return base;

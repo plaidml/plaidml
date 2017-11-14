@@ -1,11 +1,11 @@
 # Copyright Vertex.AI
 
-
 import ctypes
 import json
 
 
 class Context(object):
+
     def __init__(self, lib):
         self._as_parameter_ = lib.vai_alloc_ctx()
         if not self._as_parameter_:

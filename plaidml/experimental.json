@@ -152,7 +152,8 @@
           "mem_width": 16,
           "max_mem": 16000,
           "max_regs": 16000,
-          "use_global": true
+          "use_global": true,
+          "is_synchronous": true
         }
       },
       {
@@ -166,12 +167,13 @@
           }
         },
         "settings": {
-          "threads": 256,
-          "vec_size": 1,
-          "mem_width": 16,
-          "max_mem": 16000,
-          "max_regs": 32000,
-          "use_global": true
+          "threads": 128,
+          "vec_size": 8,
+          "mem_width": 64,
+          "max_mem": 8000,
+          "max_regs": 8000,
+          "use_global": true,
+          "is_synchronous": true
         }
       }
     ]

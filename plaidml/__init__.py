@@ -4,8 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    https://www.gnu.org/licenses/agpl-3.0.en.html 
-
+#    https://www.gnu.org/licenses/agpl-3.0.en.html
 
 from __future__ import print_function
 
@@ -32,6 +31,7 @@ import weakref
 from collections import namedtuple
 from itertools import islice
 from six import u
+
 
 # Create types for all PlaidML structures, so that we can get some type checking.
 class _C_Devconf(ctypes.Structure):
@@ -97,9 +97,11 @@ DEFAULT_LOG_HANDLER = logging.StreamHandler()
 DEFAULT_LOG_HANDLER.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
 DEFAULT_LOG_HANDLER.setLevel(logging.INFO)
 
+
 @property
 def __version__(self):
     return _lib().plaidml_get_version().decode()
+
 
 class _Library(plaidml.library.Library):
 
@@ -227,7 +229,7 @@ class _Library(plaidml.library.Library):
         self.plaidml_get_devconf_count.argtypes = [
             ctypes.POINTER(plaidml.library._C_Context),  # vai_ctx* ctx
             ctypes.POINTER(_C_DeviceEnumerator),  # plaidml_device_enumerator* enumerator
-            ctypes.c_bool, # valid devices
+            ctypes.c_bool,  # valid devices
         ]
         self.plaidml_get_devconf_count.restype = ctypes.c_size_t
 
@@ -459,7 +461,7 @@ class _Library(plaidml.library.Library):
         self.plaidml_build_coded_function = lib.plaidml_build_coded_function
         self.plaidml_build_coded_function.argtypes = [
             ctypes.c_char_p,  # const char* code
-            ctypes.c_char_p   # const char* id
+            ctypes.c_char_p  # const char* id
         ]
         self.plaidml_build_coded_function.restype = ctypes.POINTER(_C_Function)
         self.plaidml_build_coded_function.errcheck = self._check_err
@@ -730,10 +732,10 @@ def _internal_set_vlog(l):
     logging.getLogger(__name__).setLevel(logging.DEBUG)
     plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.NOTSET)
 
+
 def quiet():
     logging.getLogger(__name__).setLevel(logging.WARNING)
     plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.NOTSET)
-
 
 
 def get_perf_counter(name):
@@ -784,12 +786,13 @@ class Function(_Function):
                 backtrace = "".join(traceback.format_stack()[:-1])
             fid = "id_" + hashlib.md5(backtrace + code).hexdigest()[0:12]
             if fid not in _backtraces:
-                _backtraces[fid] = backtrace 
+                _backtraces[fid] = backtrace
                 logging.getLogger(__name__).info("Adding function ID: " + fid)
                 logging.getLogger(__name__).info(code)
                 logging.getLogger(__name__).info(backtrace)
 
-        super(Function, self).__init__(_lib().plaidml_build_coded_function(code.encode(), fid.encode()))
+        super(Function, self).__init__(_lib().plaidml_build_coded_function(
+            code.encode(), fid.encode()))
 
 
 class _DeviceConfig(object):
@@ -887,22 +890,36 @@ def _record_usage(device_id, config_source, valid_devices, invalid_devices, stat
     table = 'usage_v1'
     version = _lib().plaidml_get_version().decode()
     record = {
-        'version': version,
-        'session': plaidml.settings.session,
-        'machine': str(uuid.uuid1())[14:],
-        'device_id': str(device_id),
-        'status': status,
-        'hal': 'OpenCL', # TODO(T1191): plumb from hal
-        'platform': "|".join([platform.system(), platform.release(), platform.machine()]),
-        'config_source': os.path.basename(config_source).decode(), # ensure only the filename is included
-        'devices': 
-           [{ 'id': d.id.decode(), 'config': d.config.decode(), 'details': d.details.decode(), 'valid': True} for d in valid_devices] +
-           [{ 'id': d.id.decode(), 'config': d.config.decode(), 'details': d.details.decode(), 'valid': False} for d in invalid_devices],
+        'version':
+            version,
+        'session':
+            plaidml.settings.session,
+        'machine':
+            str(uuid.uuid1())[14:],
+        'device_id':
+            str(device_id),
+        'status':
+            status,
+        'hal':
+            'OpenCL',  # TODO(T1191): plumb from hal
+        'platform':
+            "|".join([platform.system(), platform.release(),
+                      platform.machine()]),
+        'config_source':
+            os.path.basename(config_source).decode(),  # ensure only the filename is included
+        'devices': [{
+            'id': d.id.decode(),
+            'config': d.config.decode(),
+            'details': d.details.decode(),
+            'valid': True
+        } for d in valid_devices] + [{
+            'id': d.id.decode(),
+            'config': d.config.decode(),
+            'details': d.details.decode(),
+            'valid': False
+        } for d in invalid_devices],
     }
-    body = {
-        'table': table,
-        'data': record
-    }
+    body = {'table': table, 'data': record}
     ex = lambda: requests.post("https://us-central1-vertexai-release.cloudfunctions.net/record_usage",
         data=json.dumps(body),
         headers={'content-type': 'application/json'})
@@ -915,6 +932,7 @@ def _record_usage(device_id, config_source, valid_devices, invalid_devices, stat
 
 
 class _Enumerator(object):
+
     def __init__(self, ctx):
         self._ctx = ctx
         if settings.config:
@@ -937,15 +955,20 @@ class _Enumerator(object):
         if not self._valid_devs:
             self._valid_devs = []
             for i in range(0, _lib().plaidml_get_devconf_count(self._ctx, self, True)):
-                self._valid_devs += [_DeviceConfig(self._ctx, self, _lib().plaidml_get_devconf(self._ctx, self, i))]
+                self._valid_devs += [
+                    _DeviceConfig(self._ctx, self, _lib().plaidml_get_devconf(self._ctx, self, i))
+                ]
         return self._valid_devs
-        
+
     @property
     def invalid_devs(self):
         if not self._invalid_devs:
             self._invalid_devs = []
             for i in range(0, _lib().plaidml_get_devconf_count(self._ctx, self, False)):
-                self._invalid_devs += [_DeviceConfig(self._ctx, self, _lib().plaidml_get_invalid_devconf(self._ctx, self, i))]
+                self._invalid_devs += [
+                    _DeviceConfig(self._ctx, self,
+                                  _lib().plaidml_get_invalid_devconf(self._ctx, self, i))
+                ]
         return self._invalid_devs
 
     def __del__(self):
@@ -962,12 +985,15 @@ def devices(ctx, limit=1, return_all=False):
         return enumerator.valid_devs, enumerator.invalid_devs
     else:
         if len(enumerator.valid_devs) == 0:
-            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs, "ERR_NO_DEVICES", True)
+            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
+                          "ERR_NO_DEVICES", True)
             raise exceptions.PlaidMLError("No devices found. Please run plaidml-setup.")
         if len(enumerator.valid_devs) > limit:
-            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs, "ERR_TOO_MANY_DEVICES", True)
+            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
+                          "ERR_TOO_MANY_DEVICES", True)
             raise exceptions.PlaidMLError("Too many devices configured. Please run plaidml-setup.")
-        _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs, enumerator.invalid_devs, "OK")
+        _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs,
+                      enumerator.invalid_devs, "OK")
         return enumerator.valid_devs
 
 
@@ -1112,8 +1138,8 @@ class Tensor(_Var):
             self._buffer = copy_buffer
         else:
             self._buffer = _Buffer(dev.get_context(), dev, shape)
-        super(Tensor,
-              self).__init__(_lib().plaidml_alloc_tensor(dev.get_context(), self.buffer, shape))
+        super(Tensor, self).__init__(_lib().plaidml_alloc_tensor(dev.get_context(), self.buffer,
+                                                                 shape))
 
     @property
     def buffer(self):
@@ -1237,12 +1263,11 @@ def _as_plaidml_var(value):
             return _Var(_lib().plaidml_alloc_real(value))
         else:
             raise plaidml.exceptions.InvalidArgument('Unexpected type in array: ' +
-                                                      value.dtype.name)
+                                                     value.dtype.name)
     else:
         raise plaidml.exceptions.InvalidArgument(
             'unable to convert high dim array to PlaidML value: shape = ' + str(value.shape))
-    raise plaidml.exceptions.InvalidArgument(
-        'unable to convert \'%s\' to a PlaidML value' % value)
+    raise plaidml.exceptions.InvalidArgument('unable to convert \'%s\' to a PlaidML value' % value)
 
 
 class Applier(object):
@@ -1348,8 +1373,10 @@ def gradients(loss, variables):
 def run(ctx, f, inputs={}, outputs={}):
     Invoker(ctx, f, inputs, outputs).invoke()
 
+
 class Module(object):
     pass
+
 
 module = Module()
 module.__dict__ = globals()

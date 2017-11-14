@@ -19,8 +19,8 @@ class Buffer : public tile::Buffer, public std::enable_shared_from_this<Buffer> 
   // Casts a tile::Buffer to a Buffer for the indicated device, throwing an
   // exception if the supplied buffer is not a Buffer or if it was allocated on a
   // different device.
-  static std::shared_ptr<Buffer> Upcast(const std::shared_ptr<tile::Buffer>& buffer,
-                                        const std::shared_ptr<DevInfo>& devinfo);
+  static std::shared_ptr<Buffer> Downcast(const std::shared_ptr<tile::Buffer>& buffer,
+                                          const std::shared_ptr<DevInfo>& devinfo);
 
   Buffer(const std::shared_ptr<DevInfo>& devinfo, std::shared_ptr<MemChunk> chunk);
 

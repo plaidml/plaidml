@@ -1,5 +1,4 @@
 # Copyright Vertex.AI.
-
 """Implements a Keras backend using PlaidML.
 
 This module implements the Keras backend interface, using PlaidML for computation.
@@ -19,7 +18,6 @@ subsequently loaded Keras modules to use PlaidML.
 """
 
 from __future__ import print_function, division
-
 
 import atexit
 import functools
@@ -81,6 +79,7 @@ if PLAIDML_EVENTLOG_FILENAME:
 _device_lock = threading.Lock()
 _dev = None
 
+
 def _device():
     global _ctx, _dev, _device_lock
     with _device_lock:
@@ -93,6 +92,7 @@ def _device():
 # Keras needs us to keep track of unique IDs for prefix strings
 # (for use with get_uid and reset_uids)
 _UID_PREFIX_DICT = dict()
+
 
 def _broadcast_shape(x, y):
     """Returns the shape of the result of a broadcasted element-wise operation.
@@ -115,9 +115,9 @@ def _broadcast_shape(x, y):
             return xd
         if xd == yd:
             return xd
-        e = PlaidMLKerasException('Broadcast failure: (%s) and (%s) cannot be unified'
-                                  % (', '.join([str(d) for d in x_shape]),
-                                     ', '.join([str(d) for d in y_shape])))
+        e = PlaidMLKerasException('Broadcast failure: (%s) and (%s) cannot be unified' %
+                                  (', '.join([str(d) for d in x_shape]),
+                                   ', '.join([str(d) for d in y_shape])))
         raise e  # Incompatible shapes
 
     return tuple([broad_dim(x, y) for (x, y) in zip(x_shape, y_shape)])
@@ -129,9 +129,10 @@ def _dump_val(x, indent=2):
     result = str(x)
     if isinstance(x, _Op):
         for (name, val) in iteritems(x._inputs):
-            result = result + '\n' + (' ' * indent) + 'where ' + name + ' = ' + _dump_val(val, indent+2)
+            result = result + '\n' + (' ' * indent) + 'where ' + name + ' = ' + _dump_val(
+                val, indent + 2)
     elif isinstance(x, _Var) and x._src:
-        result = result + '\n' + (' ' * indent) + 'from ' + _dump_val(x._src, indent+2)
+        result = result + '\n' + (' ' * indent) + 'from ' + _dump_val(x._src, indent + 2)
     return result
 
 
@@ -146,8 +147,8 @@ def _plaidml_val(x, indent=0):
         return x
 
     try:
-        if (x.ident == 'equal' and x._inputs['X'].ident == 'argmax'
-            and x._inputs['Y'].ident == 'argmax') :
+        if (x.ident == 'equal' and x._inputs['X'].ident == 'argmax' and
+                x._inputs['Y'].ident == 'argmax'):
             # Basically: we want a bool tensor that's true iff the index of
             # the maximum element along some axis for both tensors is the same.
             # Since we don't have argmax itself, what we do is, for each tensor,
@@ -166,7 +167,8 @@ def _plaidml_val(x, indent=0):
             and_f = """function (B, C) -> (A) {
                            A = B ? (C ? 1 : 0) : 0;
                        }"""
-            and_op = _Op('max_arg_match', 'int32', b.shape, and_f, OrderedDict([('B', b), ('C', c)]), ['A'])
+            and_op = _Op('max_arg_match', 'int32', b.shape, and_f,
+                         OrderedDict([('B', b), ('C', c)]), ['A'])
             sum_op = and_op.sum(axis=x._inputs['X']._inputs['axis'], keepdims=True)
             eq_f = """function (I) -> (O) {
                           O = 0 < I;
@@ -180,10 +182,10 @@ def _plaidml_val(x, indent=0):
 
 
 def _report_unimplemented(name):
-    report = ("The Keras backend function '{}' is not yet implemented in "
-            + "Plaid. You can help us prioritize by letting us know if this "
-            + "function is important to you, and as always, contributions are "
-            + "welcome!").format(name)
+    report = ("The Keras backend function '{}' is not yet implemented in " +
+              "Plaid. You can help us prioritize by letting us know if this " +
+              "function is important to you, and as always, contributions are " +
+              "welcome!").format(name)
     raise NotImplementedError(report)
 
 
@@ -193,7 +195,14 @@ class _Var(object):
     Variables may be directly allocated by the caller, or returned to Keras by
     the PlaidML backend."""
 
-    def __init__(self, ident, dtype, shape, name=None, plaidml_val=None, src=None, is_keras_tensor=False):
+    def __init__(self,
+                 ident,
+                 dtype,
+                 shape,
+                 name=None,
+                 plaidml_val=None,
+                 src=None,
+                 is_keras_tensor=False):
         self._ident = ident
         self._keras_dtype = dtype
         self._keras_shape = shape
@@ -336,9 +345,10 @@ class _Var(object):
                 if isinstance(length_numerator, str):
                     shape.append(None)
                     offset_list.append('Offset{} = {};'.format(idx, offset))
-                    formula_list.append('{}*i{}+{}'.format(step, inner_idx, 'Offset{}'.format(idx)))
+                    formula_list.append('{}*i{}+{}'.format(step, inner_idx,
+                                                           'Offset{}'.format(idx)))
                 else:
-                    shape.append(int(math.ceil(float(length_numerator)/step)))
+                    shape.append(int(math.ceil(float(length_numerator) / step)))
                     formula_list.append('{}*i{}+{}'.format(step, inner_idx, offset))
                 inner_idx += 1
         # Separately handle extra indices not sliced over
@@ -351,15 +361,13 @@ class _Var(object):
         shape = tuple(shape)
         return (var_list, dim_list, formula_list, offset_list, shape)
 
-
     def __getitem__(self, key):
         (var_list, dim_list, formula_list, offset_list, shape) = self._gen_slice(key)
 
         if len(shape) == 0:
             body = "  O[] = =(I[" + ', '.join(formula_list) + "]);"
         else:
-            body = "  O[{}: {}] = =(I[{}]);".format(', '.join(var_list),
-                                                    ', '.join(dim_list),
+            body = "  O[{}: {}] = =(I[{}]);".format(', '.join(var_list), ', '.join(dim_list),
                                                     ', '.join(formula_list))
 
         # TODO: Example below is out of date, although it shows the spirit of the op
@@ -367,9 +375,11 @@ class _Var(object):
         #   function (I[N0, N1, N2, N3]) -> (O) {
         #     O[i0, i1, i2: 5, N2, 2] = +(I[i0+5, 3, i1, 2*i2+2]);
         #   }
-        subs = {'indims': ', '.join(['N{}'.format(i) for i in range(len(self.shape))]),
-                'offsets': '  \n' + '  \n'.join(offset_list),
-                'body': body}
+        subs = {
+            'indims': ', '.join(['N{}'.format(i) for i in range(len(self.shape))]),
+            'offsets': '  \n' + '  \n'.join(offset_list),
+            'body': body
+        }
         code = ('function (I[{indims}]) -> (O) {{{offsets}\n{body}\n}}').format(**subs)
 
         return _Op('slice', self.dtype, shape, code, {'I': self}, ['O'])
@@ -418,96 +428,80 @@ class _Var(object):
         }
 
     def __add__(self, other):
-        return _Op('+', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B + C; }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('+', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B + C; }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def __radd__(self, other):
-        return _Op('+', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B + C; }',
-                   OrderedDict([('B', other), ('C', self)]),
-                   ['A'])
+        return _Op('+', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B + C; }',
+                   OrderedDict([('B', other), ('C', self)]), ['A'])
 
     def __sub__(self, other):
-        return _Op('-', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B - C; }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('-', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B - C; }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def __rsub__(self, other):
-        return _Op('-', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B - C; }',
-                   OrderedDict([('B', other), ('C', self)]),
-                   ['A'])
+        return _Op('-', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B - C; }',
+                   OrderedDict([('B', other), ('C', self)]), ['A'])
 
     def __neg__(self):
-        return _Op('neg', self.dtype, self.shape,
-                   'function (B) -> (A) { A = -B; }',
-                   OrderedDict([('B', self)]),
-                   ['A'])
+        return _Op('neg', self.dtype, self.shape, 'function (B) -> (A) { A = -B; }',
+                   OrderedDict([('B', self)]), ['A'])
 
     def __mul__(self, other):
-        return _Op('*', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B * C; }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('*', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B * C; }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def __rmul__(self, other):
-        return _Op('*', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B * C; }',
-                   OrderedDict([('B', other), ('C', self)]),
-                   ['A'])
+        return _Op('*', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B * C; }',
+                   OrderedDict([('B', other), ('C', self)]), ['A'])
 
     def __div__(self, other):
         # TODO: Consider implementing truncating div, instead of truediv.
-        return _Op('/', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B / C; }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('/', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B / C; }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def __rdiv__(self, other):
         # TODO: Consider implementing truncating div, instead of truediv.
-        return _Op('/', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B / C; }',
-                   OrderedDict([('B', other), ('C', self)]),
-                   ['A'])
+        return _Op('/', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B / C; }',
+                   OrderedDict([('B', other), ('C', self)]), ['A'])
 
     def __truediv__(self, other):
-        return _Op('/', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B / C; }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('/', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B / C; }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def __rtruediv__(self, other):
-        return _Op('/', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = B / C; }',
-                   OrderedDict([('B', other), ('C', self)]),
-                   ['A'])
+        return _Op('/', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = B / C; }',
+                   OrderedDict([('B', other), ('C', self)]), ['A'])
 
     def __lt__(self, other):
-        return _Op('<', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = cmp_lt(B, C); }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('<', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = cmp_lt(B, C); }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def __le__(self, other):
-        return _Op('<=', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = cmp_le(B, C); }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('<=', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = cmp_le(B, C); }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def __gt__(self, other):
-        return _Op('>', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = cmp_gt(B, C); }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('>', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = cmp_gt(B, C); }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def __ge__(self, other):
-        return _Op('>=', self.dtype, _broadcast_shape(self, other),
-                   'function (B, C) -> (A) { A = cmp_ge(B, C); }',
-                   OrderedDict([('B', self), ('C', other)]),
-                   ['A'])
+        return _Op('>=', self.dtype,
+                   _broadcast_shape(self, other), 'function (B, C) -> (A) { A = cmp_ge(B, C); }',
+                   OrderedDict([('B', self), ('C', other)]), ['A'])
 
     def batch_flatten(self):
         # Flatten all but first dimension to a single dimension; leave 1st dimension unchanged
@@ -527,10 +521,9 @@ class _Var(object):
 
         py_shape = [self.shape[0], rest_shape]
 
-        code = ('function (I[{idims}]) -> (O) {{\n' +
-                '  O = reshape(I, {odims});\n'
-                '}}').format(idims=", ".join(in_dim_list),
-                             odims=", ".join(out_dim_list))
+        code = ('function (I[{idims}]) -> (O) {{\n' + '  O = reshape(I, {odims});\n'
+                '}}').format(
+                    idims=", ".join(in_dim_list), odims=", ".join(out_dim_list))
         return _Op('batch_flatten', self.dtype, py_shape, code, {'I': self}, ['O'])
 
     def reshape(self, shape):
@@ -552,20 +545,19 @@ class _Var(object):
         if Neg1Idx is None:
             o_shape_sz = "*".join([str(x) for x in o_shape])
         else:
-            o_shape_sz = "*".join([str(x) for x in o_shape[:Neg1Idx] + o_shape[Neg1Idx+1:]])
-            if o_shape_sz == '':    #Handle case shape == (-1,)
+            o_shape_sz = "*".join([str(x) for x in o_shape[:Neg1Idx] + o_shape[Neg1Idx + 1:]])
+            if o_shape_sz == '':  #Handle case shape == (-1,)
                 o_shape_sz = '1'
-            o_shape[Neg1Idx] = "{ishsz}/({oshsz})".format(ishsz="*".join(in_dim_list),
-                                                          oshsz=o_shape_sz)
+            o_shape[Neg1Idx] = "{ishsz}/({oshsz})".format(
+                ishsz="*".join(in_dim_list), oshsz=o_shape_sz)
 
         # Write python shape with dims computed at bind time replaced with 'None'
         py_shape = tuple(x if isinstance(x, int) else None for x in o_shape)
         o_shape = [str(x) for x in o_shape]
 
-        code = ('function (I[{idims}]) -> (O) {{\n' +
-                '  O = reshape(I, {odims});\n'
-                '}}').format(idims=", ".join(in_dim_list),
-                             odims=", ".join(o_shape))
+        code = ('function (I[{idims}]) -> (O) {{\n' + '  O = reshape(I, {odims});\n'
+                '}}').format(
+                    idims=", ".join(in_dim_list), odims=", ".join(o_shape))
         return _Op('reshape', self.dtype, py_shape, code, {'I': self}, ['O'])
 
     def prod(self, axis=None, dtype=None, keepdims=False, acc_dtype=None):
@@ -593,7 +585,6 @@ class _Var(object):
 
         return _Op('prod', self.dtype, shape, f, {'I': self}, ['O'])
 
-
     def sum(self, axis=None, dtype=None, keepdims=False, acc_dtype=None):
         if self.dtype == 'bool':
             self = cast(self, floatx())
@@ -618,6 +609,18 @@ class _Var(object):
                }""" % subs
 
         return _Op('sum', self.dtype, shape, f, {'I': self}, ['O'])
+
+    def cumsum(self, axis=0):
+        ranges = ", ".join(["N{}".format(n) for n in range(self.ndim)])
+        dest_idxs = ", ".join(["i{}".format(n) for n in range(self.ndim)])
+        src_idxs = ["i{}".format(n) for n in range(self.ndim)]
+        src_idxs[axis] += " - k"
+        src_idxs = ", ".join(src_idxs)
+        f = ("""function (I[{src_ranges}]) -> (O) {{
+                    O[{dest_idxs}: {dest_ranges}] = +(I[{src_idxs}]), k < N{ax};
+                }}""").format(
+            src_ranges=ranges, dest_idxs=dest_idxs, dest_ranges=ranges, src_idxs=src_idxs, ax=axis)
+        return _Op('cumsum', self.dtype, self.shape, f, {'I': self}, ['O'])
 
     def max(self, axis=None, keepdims=False):
         if not len(self.shape):
@@ -741,16 +744,24 @@ class _Var(object):
 
 
 class _Tensor(_Var):
+
     def __init__(self, ident, dtype, shape, name, value, src=None):
-        super(_Tensor, self).__init__(ident, dtype, shape, name, value, src=src, is_keras_tensor=True)
+        super(_Tensor, self).__init__(
+            ident, dtype, shape, name, value, src=src, is_keras_tensor=True)
 
     def set_value(self, value):
         try:
             if tuple(self.shape) != value.shape:
-                raise NotImplementedError("The PlaidML backend for Keras does not support changing tensor shapes with set_value.\n" + "existing.shape = " + str(self.shape) + ", value.shape = " + str(value.shape))
+                raise NotImplementedError(
+                    "The PlaidML backend for Keras does not support changing tensor shapes with set_value.\n"
+                    + "existing.shape = " + str(self.shape) + ", value.shape = " + str(
+                        value.shape))
         except AttributeError:
             if tuple(self.shape) != () and tuple(self.shape) != (1,):
-                raise NotImplementedError("The PlaidML backend for Keras does not support changing tensor shapes with set_value.\n" + "existing.shape = " + str(self.shape) + ", value is a non-array object of type: " + str(type(value)))
+                raise NotImplementedError(
+                    "The PlaidML backend for Keras does not support changing tensor shapes with set_value.\n"
+                    + "existing.shape = " + str(
+                        self.shape) + ", value is a non-array object of type: " + str(type(value)))
         with self._value.mmap_discard(_ctx) as view:
             view.copy_from_ndarray(np.asarray(value))
             view.writeback()
@@ -806,38 +817,41 @@ class _Op(_Var):
 
     def traceback(self, indent=0, depth=5):
         ret = ""
-        ret += "{}{}\n".format('  '*indent, 'outputs: {}'.format(','.join(self._outputs)))
-        ret += "{}{}\n".format('  '*indent, 'inputs:')
+        ret += "{}{}\n".format('  ' * indent, 'outputs: {}'.format(','.join(self._outputs)))
+        ret += "{}{}\n".format('  ' * indent, 'inputs:')
         indent += 1
         if indent < depth:
             for n, inp in self._inputs.items():
-                ret += "{}{}\n".format('  '*indent, "{}: {}".format(n,inp))
+                ret += "{}{}\n".format('  ' * indent, "{}: {}".format(n, inp))
                 if isinstance(inp, _Op):
                     ret += inp.traceback(indent, depth)
                 else:
-                    ret += "{}{}\n".format('  '*indent, inp)
+                    ret += "{}{}\n".format('  ' * indent, inp)
         else:
-            ret += "{}{}\n".format('  '*indent, '...truncated...')
+            ret += "{}{}\n".format('  ' * indent, '...truncated...')
         return ret
 
     def __repr__(self):
-        return  "_Op({})".format(self._ident)
+        return "_Op({})".format(self._ident)
 
     def __str__(self):
-        return  "_Op({})".format(self._ident)
+        return "_Op({})".format(self._ident)
 
     def _plaidml_val(self, indent=0, path=''):
         if self._value is None:
             try:
                 if not self._code:
-                    exn = PlaidMLKerasException('unable to construct value for operation \'%s\' at:\n%s' % (self.ident, ''.join(traceback.format_list(self._trace))))
+                    exn = PlaidMLKerasException(
+                        'unable to construct value for operation \'%s\' at:\n%s' %
+                        (self.ident, ''.join(traceback.format_list(self._trace))))
                     raise exn
                 a = plaidml.Applier(_ctx, plaidml.Function(self._code, self._backtrace))
                 for k, v in iteritems(self._inputs):
                     a.add_input(k, _plaidml_val(v, indent + 1))
                 self._value = a.add_output(self._outputs[0])
             except plaidml.exceptions.PlaidMLError as e:
-                raise PlaidMLKerasException("{}\nTraceback:\n{}\n{}".format(e.message, self, self.traceback()))
+                raise PlaidMLKerasException("{}\nTraceback:\n{}\n{}".format(
+                    str(e), self, self.traceback()))
         return self._value
 
     def _side_effects(self):
@@ -892,6 +906,7 @@ class _Op(_Var):
 
 
 class _Function(object):
+
     def __init__(self, inputs, outputs, updates, name):
         # Inputs: a list of placeholders
         # Outputs: a list of ops
@@ -907,7 +922,8 @@ class _Function(object):
                 if isinstance(_plaidml_val(val), plaidml.Placeholder):
                     c.add_input(name, _plaidml_val(val))
                 else:
-                    raise RuntimeError("_Function given unexpected input type {}".format(type(val)))
+                    raise RuntimeError("_Function given unexpected input type {}".format(
+                        type(val)))
             else:
                 raise RuntimeError("_Function given unexpected input type {}".format(type(val)))
         for (name, val) in zip(self._output_names, outputs):
@@ -936,7 +952,10 @@ class _Function(object):
                 val = variable(val)._plaidml_val()
             self._invoker.set_input(name, val)
 
-        tensors = [plaidml.Tensor(_device(), self._invoker.get_output_shape(name)) for name in self._output_names]
+        tensors = [
+            plaidml.Tensor(_device(), self._invoker.get_output_shape(name))
+            for name in self._output_names
+        ]
 
         for (name, t) in zip(self._output_names, tensors):
             self._invoker.set_output(name, t)
@@ -945,19 +964,22 @@ class _Function(object):
 
         return [t.as_ndarray(_ctx) for t in tensors]
 
+
 _k_rng_size = 2048
+
 
 def _make_rng_state(seed=None):
     if seed:
         np.random.seed(seed)
 
-    rng_init= np.empty((3, _k_rng_size), dtype=np.uint32)
+    rng_init = np.empty((3, _k_rng_size), dtype=np.uint32)
     rng_init[0] = np.random.randint(1, 2**32, (_k_rng_size,), dtype=np.uint32)
     rng_init[1] = np.random.randint(7, 2**32, (_k_rng_size,), dtype=np.uint32)
     rng_init[2] = np.random.randint(15, 2**32, (_k_rng_size,), dtype=np.uint32)
     rng_state = variable(rng_init, dtype='uint32')
 
     return rng_state
+
 
 def abs(x):
     f = """function (I) -> (O) { O = abs(I); }"""
@@ -993,7 +1015,8 @@ def batch_dot(x, y, axes=None):
         axes = (axes, axes)
     if axes is None:
         axes = (x.ndim - 1, y.ndim - 2)
-    out_shape = x.shape[:axes[0]] + x.shape[axes[0]+1:] + y.shape[1:axes[1]] + y.shape[axes[1]+1:]
+    out_shape = x.shape[:axes[0]] + x.shape[axes[0] + 1:] + y.shape[1:axes[1]] + y.shape[axes[1] +
+                                                                                         1:]
     if out_shape[0] is None:  # can infer batch size from either x or y
         out_shape = (y.shape[0],) + out_shape[1:]
 
@@ -1012,18 +1035,18 @@ def batch_dot(x, y, axes=None):
     #   O[b, m1, m2, m3, n1, n3: B, M1, M2, M3, N1, N3] = +(X[b, m1, m2, m3, d] * Y[b, n1, d, n3]);
     # }
     f = ("function (X[{xdims}], Y[{ydims}]) -> (O) {{\n" +
-         "  O[{oidxs}: {odims}] = +(X[{xidxs}] * Y[{yidxs}]);\n" +
-         "}}").format(xdims=", ".join(xdim_list),
-                      ydims=", ".join(ydim_list),
-                      odims=", ".join(odim_list),
-                      xidxs=", ".join(xidx_list),
-                      yidxs=", ".join(yidx_list),
-                      oidxs=", ".join(oidx_list))
-    ret = _Op('batch_dot', x.dtype, out_shape, f,
-              OrderedDict([('X', x), ('Y', y)]), ['O'])
+         "  O[{oidxs}: {odims}] = +(X[{xidxs}] * Y[{yidxs}]);\n" + "}}").format(
+             xdims=", ".join(xdim_list),
+             ydims=", ".join(ydim_list),
+             odims=", ".join(odim_list),
+             xidxs=", ".join(xidx_list),
+             yidxs=", ".join(yidx_list),
+             oidxs=", ".join(oidx_list))
+    ret = _Op('batch_dot', x.dtype, out_shape, f, OrderedDict([('X', x), ('Y', y)]), ['O'])
     if len(out_shape) == 1:
         ret = expand_dims(ret, 1)
     return ret
+
 
 def batch_flatten(x):
     return x.batch_flatten()
@@ -1043,20 +1066,21 @@ def batch_normalization(x, mean, var, beta, gamma, epsilon=1e-3):
     # beta == offset
     denom = sqrt(var + epsilon)
     if gamma is not None and beta is not None:
-            return ((x - mean) * gamma / denom) + beta
+        return ((x - mean) * gamma / denom) + beta
     elif gamma is not None:
-            return ((x - mean) * gamma / denom)
+        return ((x - mean) * gamma / denom)
     elif beta is not None:
-            return ((x - mean) / denom) + beta
+        return ((x - mean) / denom) + beta
     else:
-            return ((x - mean) / denom)
+        return ((x - mean) / denom)
 
 
 def bias_add(x, bias, data_format=None):
     if data_format is None:
         data_format = image_data_format()
     if data_format not in {'channels_first', 'channels_last'}:
-        raise PlaidMLKerasException("Unrecognized data_format given to bias_add: '" + str(data_format) + "'; only 'channels_first' and 'channels_last' recognized.")
+        raise PlaidMLKerasException("Unrecognized data_format given to bias_add: '" + str(
+            data_format) + "'; only 'channels_first' and 'channels_last' recognized.")
     if ndim(x) > 2:
         if data_format == 'channels_first':
             x += reshape(bias, (1, bias.shape[0]) + (1,) * (ndim(x) - 2))
@@ -1075,7 +1099,8 @@ def binary_crossentropy(target, output, from_logits=False):
     input_sizes_prod = "*".join(["I" + str(i) for i in range(ndim(output))])
     f = """function (O[{dims}], T[{dims}]) -> (R) {{
                R = builtin_binary_crossentropy(O,T,{prod});
-           }}""".format(dims=input_sizes, prod=input_sizes_prod)
+           }}""".format(
+        dims=input_sizes, prod=input_sizes_prod)
     return _Op('binary_crossentropy', output.dtype, output.shape, f,
                OrderedDict([('O', output), ('T', target)]), ['R'])
 
@@ -1131,8 +1156,8 @@ def cast(x, dtype):
     else:
         raise PlaidMLKerasException('Unsupported cast (%s -> %s)' % (x.dtype, dtype))
 
-    return _Op('cast_as_' + dtype, dtype, x.shape, 'function (I) -> (O) { O = as_' + basetype + '(I, ' + bitwidth + '); }',
-               {'I': x},
+    return _Op('cast_as_' + dtype, dtype, x.shape,
+               'function (I) -> (O) { O = as_' + basetype + '(I, ' + bitwidth + '); }', {'I': x},
                ['O'])
 
 
@@ -1149,13 +1174,14 @@ def categorical_crossentropy(target, output, from_logits=False):
                    R = -TR;
                }"""
     else:
-        fixed_dims = ",".join("X{}".format(i) for i in range(output.ndim-1))
-        fixed_idxs = ",".join("x{}".format(i) for i in range(output.ndim-1))
+        fixed_dims = ",".join("X{}".format(i) for i in range(output.ndim - 1))
+        fixed_idxs = ",".join("x{}".format(i) for i in range(output.ndim - 1))
         f = """function (O[{fixed_dims},Y], T[{fixed_dims},Y]) -> (R) {{
                    LO = log(O);
                    TR[{fixed_idxs}:{fixed_dims}] = +(T[{fixed_idxs},y] * LO[{fixed_idxs},y]);
                    R = -TR;
-               }}""".format(fixed_dims=fixed_dims, fixed_idxs=fixed_idxs)
+               }}""".format(
+            fixed_dims=fixed_dims, fixed_idxs=fixed_idxs)
     return _Op('categorical_crossentropy', output.dtype, output.shape[:-1], f,
                OrderedDict([('O', output), ('T', target)]), ['R'])
 
@@ -1176,20 +1202,26 @@ def clip(x, min_value, max_value):
 def concatenate(tensors, axis=-1):
     rank = ndim(tensors[0])
     if axis >= rank or axis < -rank:
-        raise ValueError("Cannot concatenate tensors with {} dimensions along axis {}".format(rank, axis))
+        raise ValueError("Cannot concatenate tensors with {} dimensions along axis {}".format(
+            rank, axis))
     elif axis < 0:
         axis = axis % rank
+
     def __clear_axis(shape):
         return [shape[i] for i in range(len(shape)) if i != axis]
+
     shape_template = __clear_axis(tensors[0].shape)
     for t in tensors:
         if __clear_axis(t.shape) != shape_template:
-            raise ValueError("Incompatible shapes: cannot concatenate along axis {}\n{} v {}".format(axis, tensors[0].shape, t.shape))
+            raise ValueError(
+                "Incompatible shapes: cannot concatenate along axis {}\n{} v {}".format(
+                    axis, tensors[0].shape, t.shape))
 
     offsets = [0]
     for i in range(len(tensors)):
         offsets.append(offsets[i] + tensors[i].shape[axis])
-    out_shape = tuple(tensors[0].shape[i] if i != axis else offsets[len(tensors)] for i in range(rank))
+    out_shape = tuple(
+        tensors[0].shape[i] if i != axis else offsets[len(tensors)] for i in range(rank))
 
     output_dims_list = ["N{}".format(i) for i in range(rank)]
     output_dims_list[axis] = offsets[len(tensors)]
@@ -1198,7 +1230,7 @@ def concatenate(tensors, axis=-1):
     # with `axis` index to be overwritten by "Ai" (i = input index)
     inputs_list = list()
     for i in range(len(tensors)):
-        curr_input_dims = list(output_dims_list) # using 'list' here to make a copy
+        curr_input_dims = list(output_dims_list)  # using 'list' here to make a copy
         curr_input_dims[axis] = "A{}".format(i)
         inputs_list.append("I{}[{}]".format(i, ', '.join(curr_input_dims)))
     inputs_str = ', '.join(inputs_list)
@@ -1213,11 +1245,7 @@ def concatenate(tensors, axis=-1):
         indices_end = ", " + ', '.join(["n{}".format(i) for i in range(axis + 1, rank)])
 
     body_str = ""
-    line_subs = {
-        'beg': indices_begin,
-        'end': indices_end,
-        'odims': output_dims_str
-    }
+    line_subs = {'beg': indices_begin, 'end': indices_end, 'odims': output_dims_str}
     for i in range(len(tensors)):
         line_subs['off'] = "+{}".format(offsets[i])
         line_subs['i'] = i
@@ -1234,9 +1262,11 @@ def concatenate(tensors, axis=-1):
     #     T2[n0, a+8, n2: N0, 9, N2] = =(I2[n0, a, n2]);
     #     O = T0 + T1 + T2;
     #   }
-    code = ('function ({inputs}) -> (O) {{\n' +
-            '{body}\n' +
-            '}}').format(**{'inputs': inputs_str, 'body': body_str})
+    code = ('function ({inputs}) -> (O) {{\n' + '{body}\n' +
+            '}}').format(**{
+                'inputs': inputs_str,
+                'body': body_str
+            })
     inputs_dict = dict()
     for i in range(len(tensors)):
         inputs_dict['I{}'.format(i)] = tensors[i]
@@ -1262,7 +1292,7 @@ def pad_compute(sym, input_size, filter_size, stride, padding):
         if input_size is None:
             num_out_size = None
         else:
-            num_out_size = (input_size - filter_size + stride) // stride;
+            num_out_size = (input_size - filter_size + stride) // stride
         sym_output_size = "({sym} - {fs} + {s}) / {s}".format(sym=sym, fs=filter_size, s=stride)
         sym_padding_before = 0
     elif padding == 'same':
@@ -1271,15 +1301,15 @@ def pad_compute(sym, input_size, filter_size, stride, padding):
         else:
             num_out_size = (input_size + stride - 1) // stride
         sym_output_size = "({sym} + {s} - 1) / {s}".format(sym=sym, s=stride)
-        sym_padding_before = "(max(0, ({symout} - 1) * {s} + {fs} - {syminp})) / 2".format(symout=sym_output_size,
-                                                                                           s=stride,
-                                                                                           fs=filter_size,
-                                                                                           syminp=sym)
+        sym_padding_before = "(max(0, ({symout} - 1) * {s} + {fs} - {syminp})) / 2".format(
+            symout=sym_output_size, s=stride, fs=filter_size, syminp=sym)
     else:
         raise Exception("Invalid padding")
     if num_out_size != None and num_out_size < 0:
-            raise Exception("Invalid output size computed for convolution: num_out_size={}".format(num_out_size))
+        raise Exception(
+            "Invalid output size computed for convolution: num_out_size={}".format(num_out_size))
     return (sym_output_size, sym_padding_before, num_out_size)
+
 
 def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
     if data_format is None:
@@ -1295,7 +1325,8 @@ def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
         function (I[N, H, W, C]) -> (O) {{
             O[n, y, x, c : N, H + {yTotal}, W + {xTotal}, C] = =(I[n, y - {yFront}, x - {xFront}, c]);
         }}
-    """).format(yFront=yFront, yTotal=yTotal, xFront=xFront, xTotal=xTotal)
+    """).format(
+        yFront=yFront, yTotal=yTotal, xFront=xFront, xTotal=xTotal)
 
     # TODO: reorder output dimensions in theano ordering case
     outshape = (x.shape[0], x.shape[1] + yTotal, x.shape[2] + xTotal, x.shape[3])
@@ -1303,8 +1334,13 @@ def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
     return _Op('spatial_2d_padding', x.dtype, outshape, f, OrderedDict([('I', x)]), ['O'])
 
 
-def conv(x, kernel, strides=None, padding='valid',
-         data_format=None, dilation_rate=None, channelwise=False):
+def conv(x,
+         kernel,
+         strides=None,
+         padding='valid',
+         data_format=None,
+         dilation_rate=None,
+         channelwise=False):
     rank = len(x.shape) - 2
     if strides is None:
         strides = tuple(1 for _ in range(rank))
@@ -1314,41 +1350,36 @@ def conv(x, kernel, strides=None, padding='valid',
         dilation_rate = tuple(1 for _ in range(rank))
 
     for entry in dilation_rate:
-        if entry != 1:
-            raise ValueError("Dilated convolutions not yet supported")
+        if not isinstance(entry, int) or entry <= 0:
+            raise ValueError("Invalid dilation_rate: {}".format(dilation_rate))
     if kernel.ndim != rank + 2:
         raise ValueError("Convolution kernel shape inconsistent with input shape: " +
-                         "{} (rank {}) v {} (rank {})".format(kernel.shape,
-                                                              kernel.ndim - 2,
-                                                              x.shape,
-                                                              x.ndim - 2))
+                         "{} (rank {}) v {} (rank {})".format(kernel.shape, kernel.ndim - 2,
+                                                              x.shape, x.ndim - 2))
     if len(strides) != rank:
         raise ValueError("Convolution strides length inconsistent with input shape: " +
                          "{} (rank {}) v {} (rank {})".format(strides,
-                                                              len(strides),
-                                                              x.shape,
-                                                              x.ndim - 2))
+                                                              len(strides), x.shape, x.ndim - 2))
     if len(dilation_rate) != rank:
         raise ValueError("Convolution dilation_rate length inconsistent with input shape: " +
-                         "{} (rank {}) v {} (rank {})".format(dilation_rate,
-                                                              len(dilation_rate),
-                                                              x.shape,
-                                                              x.ndim - 2))
+                         "{} (rank {}) v {} (rank {})".format(
+                             dilation_rate, len(dilation_rate), x.shape, x.ndim - 2))
 
     if data_format == 'channels_first':
         n = 0
         c = 1
-        l = [i+2 for i in range(rank)]
+        l = [i + 2 for i in range(rank)]
     elif data_format == 'channels_last':
         n = 0
-        l = [i+1 for i in range(rank)]
+        l = [i + 1 for i in range(rank)]
         c = rank + 1
     else:
         raise ValueError("Unrecognized data format '{}'".format(data_format))
     if channelwise == True and x.shape[c] != kernel.shape[-2]:
-        raise ValueError("Channelwise convolution must have same number of channels in both input and kernel:\n" +
-                         "{} (from shape {}) v {} (from shape {})".format(x.shape[c], x.shape,
-                                                                          kernel.shape[-2], kernel.shape))
+        raise ValueError(
+            "Channelwise convolution must have same number of channels in both input and kernel:\n"
+            + "{} (from shape {}) v {} (from shape {})".format(x.shape[c], x.shape,
+                                                               kernel.shape[-2], kernel.shape))
 
     # Variable meanings:
     # N: Number of items in the batch
@@ -1371,22 +1402,22 @@ def conv(x, kernel, strides=None, padding='valid',
     pad_amount = list()
     num_out_size = list()
     for i in range(rank):
-        sym_out, sym_pad, num_out = pad_compute("L{}".format(i),
-                                                x.shape[l[i]],
-                                                kernel.shape[i],
-                                                strides[i],
-                                                padding)
+        sym_out, sym_pad, num_out = pad_compute("L{}".format(i), x.shape[l[i]], dilation_rate[i] *
+                                                (kernel.shape[i] - 1) + 1, strides[i], padding)
         out_size.append(sym_out)
         pad_amount.append(sym_pad)
         num_out_size.append(num_out)
 
     padding_list = ["  Pad{} = {};".format(i, pad_amount[i]) for i in range(rank)]
     padding_str = "\n".join(padding_list)
-    input_idx_list = ["{}*{} + {} - {}".format(strides[i],
-                                               "x{}".format(i),
-                                               "k{}".format(i),
-                                               "Pad{}".format(i))
-                      for i in range(rank)]
+    input_idx_list = [
+        "{s}*{x} + {d}*{k} - {p}".format(
+            s=strides[i],
+            x="x{}".format(i),
+            d="{}".format(dilation_rate[i]),
+            k="k{}".format(i),
+            p="Pad{}".format(i)) for i in range(rank)
+    ]
     if data_format == 'channels_first' and not channelwise:
         input_dims_str = "N, CI, " + ", ".join(["L{}".format(i) for i in range(rank)])
         out_idx_str = "n, co, " + ", ".join(["x{}".format(i) for i in range(rank)])
@@ -1420,30 +1451,33 @@ def conv(x, kernel, strides=None, padding='valid',
         ker_dims_str = ", ".join(["LK{}".format(i) for i in range(rank)]) + ", CI, CO"
         ker_idx_str = ", ".join(["k{}".format(i) for i in range(rank)]) + ", ci, co"
 
-    f = ('function (I[{input_dims_str}], K[{ker_dims_str}]) ' +
-         '-> (O) {{\n{padding_str}\n' +
+    f = ('function (I[{input_dims_str}], K[{ker_dims_str}]) ' + '-> (O) {{\n{padding_str}\n' +
          '  O[{out_idx_str} : {out_dims_str}]' +
-         '= +(I[{input_idx_str}]*K[{ker_idx_str}]);\n}}'
-    ).format(**{'input_dims_str': input_dims_str,
-                'ker_dims_str': ker_dims_str,
-                'out_idx_str': out_idx_str,
-                'out_dims_str': out_dims_str,
-                'input_idx_str': input_idx_str,
-                'ker_idx_str': ker_idx_str,
-                'padding_str': padding_str})
+         '= +(I[{input_idx_str}]*K[{ker_idx_str}]);\n}}').format(**{
+             'input_dims_str': input_dims_str,
+             'ker_dims_str': ker_dims_str,
+             'out_idx_str': out_idx_str,
+             'out_dims_str': out_dims_str,
+             'input_idx_str': input_idx_str,
+             'ker_idx_str': ker_idx_str,
+             'padding_str': padding_str
+         })
     name = "conv{}d".format(rank)
     return _Op(name, x.dtype, outshape, f, OrderedDict([('I', x), ('K', kernel)]), ['O'])
 
 
 def _func_once(func):
     "A decorator that runs a function only once."
+
     def decorated(*args, **kwargs):
         try:
             return decorated._once_result
         except AttributeError:
             decorated._once_result = func(*args, **kwargs)
             return decorated._once_result
+
     return decorated
+
 
 @_func_once
 def _compute_transforms(block, conv):
@@ -1463,6 +1497,7 @@ def _compute_transforms(block, conv):
         #G = constant([[1., 0., 0.], [-2./3., -s2/3., -1./3.], [-2./3., s2/3., -1./3.],
         #              [1./6., s2/6., 1./3.], [1./6., -s2/6., 1./3.], [0., 0., 1.]])
         #return (A, B, G)
+        # yapf: disable
         A = np.array([
             [ 1.13777777777778,   0,                  0,                 0,                ],
             [-0.688403361344538, -0.430252100840336, -0.26890756302521, -0.168067226890756 ],
@@ -1481,10 +1516,12 @@ def _compute_transforms(block, conv):
             [ 1, 1,         1 ,       1,     1,     0 ],
             [ 0, 0.625,    -0.625,    1.5,  -1.5,   0 ],
             [ 0, 0.390625,  0.390625, 2.25,  2.25,  1 ]]).T
+        # yapf: enable
 
         return (constant(A), constant(B), constant(G))
 
     raise Exception("Only support L(2, 3) and L(4, 3) right now")
+
 
 def _winograd(x, kernel, padding='valid', block=6):
     (A, B, G) = _compute_transforms(block, kernel.shape[0])
@@ -1508,25 +1545,29 @@ def _winograd(x, kernel, padding='valid', block=6):
             M[n, i, j, x, y, co : N, BI, BI, XB, YB, CO] = +(V[n, i, j, x, y, ci] * U[i, j, ci, co]);
             O1[n, i, j, x, y, co : N, BO, BI, XB, YB, CO] = +(A[k, i] * M[n, k, j, x, y, co]);
             O[n, BO*x + i, BO*y + j, co : N, XO, YO, CO] = +(O1[n, i, k, x, y, co] * A[k, j]) no_defract;
-        }}""".format(XO=XO, YO=YO, XP=XP, YP=YP);
-    return _Op("winograd", x.dtype, outshape, f, OrderedDict(
-        [('I', x), ('K', kernel), ('A', A), ('B', B), ('G', G)]), ['O'])
+        }}""".format(
+        XO=XO, YO=YO, XP=XP, YP=YP)
+    return _Op("winograd", x.dtype, outshape, f,
+               OrderedDict([('I', x), ('K', kernel), ('A', A), ('B', B), ('G', G)]), ['O'])
 
 
 def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rate=1):
     return conv(x, kernel, (strides,), padding, data_format, (dilation_rate,))
 
 
-def conv2d(x, kernel, strides=(1, 1), padding='valid', dilation_rate=(1, 1), data_format = None, force_winograd = False):
+def conv2d(x,
+           kernel,
+           strides=(1, 1),
+           padding='valid',
+           dilation_rate=(1, 1),
+           data_format=None,
+           force_winograd=False):
     if data_format is None:
         data_format = image_data_format()
-    if (force_winograd or (data_format == 'channels_last' and
-                           kernel.shape[0] == 3 and
-                           kernel.shape[1] == 3 and
-                           strides == (1, 1) and
-                           dilation_rate == (1,1) and
-                           kernel.shape[2] > 4 and
-                           kernel.shape[3] > 4)):
+    if (force_winograd or
+        (data_format == 'channels_last' and kernel.shape[0] == 3 and kernel.shape[1] == 3 and
+         strides == (1, 1) and dilation_rate == (1, 1) and kernel.shape[2] > 4 and
+         kernel.shape[3] > 4)):
         return _winograd(x, kernel, padding=padding)
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
@@ -1535,11 +1576,17 @@ def conv2d_transpose(x, kernel, output_shape, strides=(1, 1), padding='valid', d
     _report_unimplemented('conv2d_transpose')
 
 
-def conv3d(x, kernel, strides=(1, 1, 1), padding='valid', dilation_rate=(1, 1, 1), data_format = None):
+def conv3d(x,
+           kernel,
+           strides=(1, 1, 1),
+           padding='valid',
+           dilation_rate=(1, 1, 1),
+           data_format=None):
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
-def conv3d_transpose(x, kernel, output_shape, strides=(1, 1, 1), padding='valid', data_format=None):
+def conv3d_transpose(x, kernel, output_shape, strides=(1, 1, 1), padding='valid',
+                     data_format=None):
     _report_unimplemented('conv3d_transpose')
 
 
@@ -1567,10 +1614,15 @@ def cumprod(x, axis=0):
 
 
 def cumsum(x, axis=0):
-    _report_unimplemented('cumsum')
+    return x.cumsum(axis=axis)
 
 
-def depthwise_conv2d(x, kernel, strides=(1, 1), padding='valid', data_format = None, dilation_rate=(1, 1)):
+def depthwise_conv2d(x,
+                     kernel,
+                     strides=(1, 1),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1, 1)):
     if data_format is None:
         data_format = image_data_format()
     return conv(x, kernel, strides, padding, data_format, dilation_rate, channelwise=True)
@@ -1578,7 +1630,8 @@ def depthwise_conv2d(x, kernel, strides=(1, 1), padding='valid', data_format = N
 
 def dot(x, y):
     if x.dtype != y.dtype:
-        raise PlaidMLKerasException('Invalid dtype in multiplication: x.dtype=\'%s\', y.dtype=\'%s\'' % (x.dtype, y.dtype))
+        raise PlaidMLKerasException(
+            'Invalid dtype in multiplication: x.dtype=\'%s\', y.dtype=\'%s\'' % (x.dtype, y.dtype))
 
     if x.ndim == 1 and y.ndim == 1:
         f = 'function (X[I], Y[I]) -> (R) { R[i:I] = +(X[i] * Y[i]); }'
@@ -1587,19 +1640,27 @@ def dot(x, y):
         f = """function(X[%(x_ranges)s], Y[%(y_ranges)s]) -> (R) {
                    R[%(dest_indices)s : %(dest_ranges)s] = +(X[%(x_indices)s] * Y[%(y_indices)s]);
                }""" % {
-                   'x_ranges': ', '.join(['X{}'.format(i) for i in range(x.ndim)]),
-                   'y_ranges': ', '.join(['Y{}'.format(i) for i in range(y.ndim)]),
-                   'dest_indices': ', '.join(['x{}'.format(i) for i in range(x.ndim-1)] +
-                                             ['y{}'.format(i) for i in list(range(y.ndim-2))+[y.ndim-1]]),
-                   'dest_ranges': ', '.join(['X{}'.format(i) for i in range(x.ndim-1)] +
-                                            ['Y{}'.format(i) for i in list(range(y.ndim-2))+[y.ndim-1]]),
-                   'x_indices': ', '.join(['x{}'.format(i) for i in range(x.ndim-1)]+['z']),
-                   'y_indices': ', '.join(['y{}'.format(i) for i in range(y.ndim-2)]+['z']+['y{}'.format(y.ndim-1)]),
-               }
+            'x_ranges':
+                ', '.join(['X{}'.format(i) for i in range(x.ndim)]),
+            'y_ranges':
+                ', '.join(['Y{}'.format(i) for i in range(y.ndim)]),
+            'dest_indices':
+                ', '.join(['x{}'.format(i) for i in range(x.ndim - 1)] +
+                          ['y{}'.format(i) for i in list(range(y.ndim - 2)) + [y.ndim - 1]]),
+            'dest_ranges':
+                ', '.join(['X{}'.format(i) for i in range(x.ndim - 1)] +
+                          ['Y{}'.format(i) for i in list(range(y.ndim - 2)) + [y.ndim - 1]]),
+            'x_indices':
+                ', '.join(['x{}'.format(i) for i in range(x.ndim - 1)] + ['z']),
+            'y_indices':
+                ', '.join(['y{}'.format(i)
+                           for i in range(y.ndim - 2)] + ['z'] + ['y{}'.format(y.ndim - 1)]),
+        }
         shape = list(x.shape[:-1]) + list(y.shape[:-2]) + [y.shape[-1]]
 
     else:
-        raise PlaidMLKerasException('TODO: Implement dot when x.dim='+str(x.dim)+' and y.dim='+str(y.dim))
+        raise PlaidMLKerasException('TODO: Implement dot when x.dim=' + str(x.dim) + ' and y.dim='
+                                    + str(y.dim))
 
     return _Op('dot', x.dtype, shape, f, OrderedDict([('X', x), ('Y', y)]), ['R'])
 
@@ -1612,18 +1673,26 @@ def dropout(x, level, noise_shape=None, seed=None):
 
     szs = ", ".join(['S' + str(i) for i in range(x.ndim)])
     args = ", ".join(['I'] + ['S' + str(i) for i in range(x.ndim)])
-    rng_step = "function (I, X[{szs}]) -> (O) {{ O = prng_step({args}); }}".format(szs=szs, args=args)
+    rng_step = "function (I, X[{szs}]) -> (O) {{ O = prng_step({args}); }}".format(
+        szs=szs, args=args)
     rng_update = "function (I) -> (O) { O = prng_state(I); }"
     rng_value = """function (I, X, L) -> (O) {
         R = 1.0 - L;
         M = 1.0 / R;
         O = (prng_value(I) < R ? X * M : 0.0);
     }"""
-    t = _Op('random_uniform_step', 'uint32', (), rng_step, OrderedDict([('I', rng_state), ('X', x)]), ['O'])
-    n = _Op('random_uniform_state', 'uint32', (3, _k_rng_size), rng_update, OrderedDict([('I', t)]), ['O'])
-    side_effects = { _plaidml_val(rng_state) :  _plaidml_val(n) }
-    o = _Op('random_uniform_value', 'float32', shape, rng_value,
-            OrderedDict([('I', t), ('X', x), ('L', level)]), ['O'], side_effects=side_effects)
+    t = _Op('random_uniform_step', 'uint32', (), rng_step,
+            OrderedDict([('I', rng_state), ('X', x)]), ['O'])
+    n = _Op('random_uniform_state', 'uint32', (3, _k_rng_size), rng_update,
+            OrderedDict([('I', t)]), ['O'])
+    side_effects = {_plaidml_val(rng_state): _plaidml_val(n)}
+    o = _Op(
+        'random_uniform_value',
+        'float32',
+        shape,
+        rng_value,
+        OrderedDict([('I', t), ('X', x), ('L', level)]), ['O'],
+        side_effects=side_effects)
     return o
 
 
@@ -1640,8 +1709,8 @@ def eval(x):
 
 
 def equal(x, y):
-    return _Op('equal', 'bool', _broadcast_shape(x, y),
-               'function (X, Y) -> (R) { R = (X == Y); }',
+    return _Op('equal', 'bool',
+               _broadcast_shape(x, y), 'function (X, Y) -> (R) { R = (X == Y); }',
                OrderedDict([('X', x), ('Y', y)]), ['R'])
 
 
@@ -1666,15 +1735,17 @@ def expand_dims(x, axis=-1):
     ilist_in = ["i" + str(i) for i in range(x.ndim)]
     slist_out = slist_in[0:axis] + ["1"] + slist_in[axis:]
     ilist_out = ilist_in[0:axis] + ["0"] + ilist_in[axis:]
-    newshape = tuple(list(x.shape[0:axis]) + [1,] + list(x.shape[axis:]))
+    newshape = tuple(list(x.shape[0:axis]) + [
+        1,
+    ] + list(x.shape[axis:]))
     f = """function (IN[{slist_in}]) -> (OUT) {{
                OUT[{ilist_out} : {slist_out}] = =(IN[{ilist_in}]);
            }}""".format(
-               slist_in=", ".join(slist_in),
-               slist_out=", ".join(slist_out),
-               ilist_in=", ".join(ilist_in),
-               ilist_out=", ".join(ilist_out))
-    return _Op('expand_dims', x.dtype, newshape, f, {'IN': x }, ['OUT'])
+        slist_in=", ".join(slist_in),
+        slist_out=", ".join(slist_out),
+        ilist_in=", ".join(ilist_in),
+        ilist_out=", ".join(ilist_out))
+    return _Op('expand_dims', x.dtype, newshape, f, {'IN': x}, ['OUT'])
 
 
 def flatten(x):
@@ -1735,10 +1806,12 @@ def get_variable_shape(x):
 def gradients(loss, variables):
     if isinstance(variables, _Var):
         variables = [variables]
-    return [_Var('grad', var.dtype, var.shape, plaidml_val=grad, src=loss)
-                    for var, grad in zip(variables,
-                                         plaidml.gradients(_plaidml_val(loss),
-                                                           [_plaidml_val(var) for var in variables]))]
+    return [
+        _Var('grad', var.dtype, var.shape, plaidml_val=grad, src=loss)
+        for var, grad in zip(variables,
+                             plaidml.gradients(
+                                 _plaidml_val(loss), [_plaidml_val(var) for var in variables]))
+    ]
 
 
 def greater(x, y):
@@ -1868,8 +1941,8 @@ def max(x, axis=None, keepdims=False):
 
 
 def maximum(x, y):
-    return _Op('maximum', x.dtype, _broadcast_shape(x, y),
-               'function (X, Y) -> (R) { R = (X < Y ? Y : X); }',
+    return _Op('maximum', x.dtype,
+               _broadcast_shape(x, y), 'function (X, Y) -> (R) { R = (X < Y ? Y : X); }',
                OrderedDict([('X', x), ('Y', y)]), ['R'])
 
 
@@ -1885,8 +1958,8 @@ def min(x, axis=None, keepdims=False):
 
 
 def minimum(x, y):
-    return _Op('minimum', x.dtype, _broadcast_shape(x, y),
-               'function (X, Y) -> (R) { R = (X < Y ? X : Y); }',
+    return _Op('minimum', x.dtype,
+               _broadcast_shape(x, y), 'function (X, Y) -> (R) { R = (X < Y ? X : Y); }',
                OrderedDict([('X', x), ('Y', y)]), ['R'])
 
 
@@ -1906,6 +1979,7 @@ def _prepend_name_scope(name, default):
         r = "/".join(_NAME_SCOPE_STACK + [name])
     return r
 
+
 @contextmanager
 def name_scope(name):
     global _NAME_SCOPE_STACK
@@ -1919,8 +1993,8 @@ def ndim(x):
 
 
 def not_equal(x, y):
-    return _Op('not_equal', 'bool', _broadcast_shape(x, y),
-               'function (X, Y) -> (R) { R = (X != Y); }',
+    return _Op('not_equal', 'bool',
+               _broadcast_shape(x, y), 'function (X, Y) -> (R) { R = (X != Y); }',
                OrderedDict([('X', x), ('Y', y)]), ['R'])
 
 
@@ -1935,11 +2009,13 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     axes = [i + rank if i < 0 else i for i in axes]
     for i in axes:
         if i < 0:
-            raise ValueError(("Unexpected axis '{}' in normalize_batch_in training " +
-                              "(tensor dim {})").format(i - rank, rank))
+            raise ValueError((
+                "Unexpected axis '{}' in normalize_batch_in training " + "(tensor dim {})").format(
+                    i - rank, rank))
         if i >= rank:
-            raise ValueError(("Unexpected axis '{}' in normalize_batch_in training " +
-                              "(tensor dim {})").format(i, rank))
+            raise ValueError((
+                "Unexpected axis '{}' in normalize_batch_in training " + "(tensor dim {})").format(
+                    i, rank))
     axes.sort()
 
     # Mean and var need to keepdims for computing normalized_tensor, but their
@@ -1951,7 +2027,8 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     # final axis as the sole element of axis requires broadcasting,
     # but I don't see it ...
     # Indeed, this passes unit tests with a non-final axis selected
-    normalized_tensor = batch_normalization(x=x, mean=mean, var=var, beta=beta, gamma=gamma, epsilon=epsilon)
+    normalized_tensor = batch_normalization(
+        x=x, mean=mean, var=var, beta=beta, gamma=gamma, epsilon=epsilon)
 
     # Tensorflow and Theano disagree on whether mean and var should be squeezed
     # here. For now, going with Theano for simplicity.
@@ -1967,9 +2044,9 @@ def one_hot(indices, num_classes):
 
     count = variable(np.array(range(num_classes)), dtype='int32')
     f = ('function (Idx[{idim}], Count[C]) -> (O) {{\n' +
-         '  O[{iidx}, c : {idim}, C] = =(Idx[{iidx}] == Count[c]);\n' +
-         '}}').format(idim=", ".join(["I{}".format(k) for k in range(indices.ndim)]),
-                      iidx=", ".join(["i{}".format(k) for k in range(indices.ndim)]))
+         '  O[{iidx}, c : {idim}, C] = =(Idx[{iidx}] == Count[c]);\n' + '}}').format(
+             idim=", ".join(["I{}".format(k) for k in range(indices.ndim)]),
+             iidx=", ".join(["i{}".format(k) for k in range(indices.ndim)]))
     return _Op('one_hot', 'bool', indices.shape + (num_classes,), f,
                OrderedDict([('Idx', indices), ('Count', count)]), ['O'])
 
@@ -1983,25 +2060,26 @@ def ones_like(x, dtype=None, name=None):
     dtype = dtype or floatx()
     a_one = constant(1.0, shape=(1), dtype=dtype, name=_prepend_name_scope(name, "a_one"))
     ndims = len(x.shape)
-    sizes= ", ".join(["S" + str(i) for i in range(ndims)])
+    sizes = ", ".join(["S" + str(i) for i in range(ndims)])
     dims = ", ".join(["i" + str(i) for i in range(ndims)])
     f = """function (IN[{sizes}], ONE[SZ]) -> (OUT) {{
                OUT[{dims} : {sizes}] = =(ONE[0]);
-           }}""".format(sizes=sizes, dims=dims)
+           }}""".format(
+        sizes=sizes, dims=dims)
     return _Op('ones_like', dtype, x.shape, f, {'IN': x, 'ONE': a_one}, ['OUT'])
 
 
 def permute_dimensions(x, pattern):
-    return _Op('permute', x.dtype, tuple([x.shape[idx] for idx in range(x.ndim)]),
+    return _Op('permute', x.dtype,
+               tuple([x.shape[idx] for idx in range(x.ndim)]),
                """function (X[%(src_ranges)s]) -> (R) {
                       R[%(dest_indices)s : %(dest_ranges)s] = =(X[%(src_indices)s]);
                   }""" % {
-                      'src_ranges': ', '.join(['X{}'.format(i) for i in range(x.ndim)]),
-                      'src_indices': ', '.join(['x{}'.format(i) for i in range(x.ndim)]),
-                      'dest_ranges': ', '.join(['X{}'.format(pattern[i]) for i in range(x.ndim)]),
-                      'dest_indices': ', '.join(['x{}'.format(pattern[i]) for i in range(x.ndim)]),
-                  },
-               OrderedDict([('X', x)]), ['R'])
+                   'src_ranges': ', '.join(['X{}'.format(i) for i in range(x.ndim)]),
+                   'src_indices': ', '.join(['x{}'.format(i) for i in range(x.ndim)]),
+                   'dest_ranges': ', '.join(['X{}'.format(pattern[i]) for i in range(x.ndim)]),
+                   'dest_indices': ', '.join(['x{}'.format(pattern[i]) for i in range(x.ndim)]),
+               }, OrderedDict([('X', x)]), ['R'])
 
 
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
@@ -2014,13 +2092,18 @@ def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     else:
         shape = tuple([None for _ in range(ndim)])
 
-    ret = _Var('placeholder', dtype, shape, _prepend_name_scope(name, "placeholder"), plaidml.Placeholder(len(shape)), is_keras_tensor=True)
+    ret = _Var(
+        'placeholder',
+        dtype,
+        shape,
+        _prepend_name_scope(name, "placeholder"),
+        plaidml.Placeholder(len(shape)),
+        is_keras_tensor=True)
     ret._uses_learning_phase = False
     return ret
 
 
-def pool(x, pool_size, strides=None, padding='valid', data_format=None,
-         pool_mode='max'):
+def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mode='max'):
     # TODO: There are major similarities between pool and conv. I think keeping
     # them separate makes sense, but we could consider merging them.
     rank = len(x.shape) - 2
@@ -2032,23 +2115,19 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None,
     if len(pool_size) != rank:
         raise ValueError("Pool size inconsistent with input shape: " +
                          "{} (rank {}) v {} (rank {})".format(pool_size,
-                                                              len(pool_size),
-                                                              x.shape,
-                                                              x.ndim - 2))
+                                                              len(pool_size), x.shape, x.ndim - 2))
     if len(strides) != rank:
         raise ValueError("Pool strides length inconsistent with input shape: " +
                          "{} (rank {}) v {} (rank {})".format(strides,
-                                                              len(strides),
-                                                              x.shape,
-                                                              x.ndim - 2))
+                                                              len(strides), x.shape, x.ndim - 2))
 
     if data_format == 'channels_first':
         n = 0
         c = 1
-        l = [i+2 for i in range(rank)]
+        l = [i + 2 for i in range(rank)]
     elif data_format == 'channels_last':
         n = 0
-        l = [i+1 for i in range(rank)]
+        l = [i + 1 for i in range(rank)]
         c = rank + 1
     else:
         raise ValueError("Unrecognized data format '{}'".format(data_format))
@@ -2057,21 +2136,17 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None,
     pad_amount = list()
     num_out_size = list()
     for i in range(rank):
-        sym_out, sym_pad, num_out = pad_compute("L{}".format(i),
-                                                x.shape[l[i]],
-                                                pool_size[i],
-                                                strides[i],
-                                                padding)
+        sym_out, sym_pad, num_out = pad_compute("L{}".format(i), x.shape[l[i]], pool_size[i],
+                                                strides[i], padding)
         out_size.append(sym_out)
         pad_amount.append(sym_pad)
         num_out_size.append(num_out)
     padding_list = ["  Pad{} = {};".format(i, pad_amount[i]) for i in range(rank)]
     padding_str = "\n".join(padding_list)
-    input_idx_list = ["{}*{} + {} - {}".format(strides[i],
-                                               "x{}".format(i),
-                                               "k{}".format(i),
-                                               "Pad{}".format(i))
-                      for i in range(rank)]
+    input_idx_list = [
+        "{}*{} + {} - {}".format(strides[i], "x{}".format(i), "k{}".format(i), "Pad{}".format(i))
+        for i in range(rank)
+    ]
     pool_bounds = ", " + ", ".join(["k{} < {}".format(i, pool_size[i]) for i in range(rank)])
     if data_format == 'channels_first':
         input_dims_str = "N, C, " + ", ".join(["L{}".format(i) for i in range(rank)])
@@ -2101,31 +2176,33 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None,
         # tensor is defined, and we sum that tensor over the pool area to find the
         # number of elements in the pool for the corresponding output entry.
         ones = ones_like(x)
-        scale_expr = ('  C[{out_idx_str}: {out_dims_str}]'+
-                      '= +(Ones[{input_idx_str}]){pool_bounds};\n' +
-                      '  O = OT / C;').format(**{'out_idx_str': out_idx_str,
-                                                 'out_dims_str': out_dims_str,
-                                                 'input_idx_str': input_idx_str,
-                                                 'pool_bounds': pool_bounds})
+        scale_expr = (
+            '  C[{out_idx_str}: {out_dims_str}] = +(Ones[{input_idx_str}]){pool_bounds};\n' +
+            '  O = OT / C;').format(**{
+                'out_idx_str': out_idx_str,
+                'out_dims_str': out_dims_str,
+                'input_idx_str': input_idx_str,
+                'pool_bounds': pool_bounds
+            })
         extra_input = ', Ones[{}]'.format(input_dims_str)
     else:
         raise ValueError("Unrecognized pool mode '{}'".format(pool_mode))
 
-    f = ('function (I[{input_dims_str}]{extra_input}) -> (O) {{\n' +
-         '{padding_str}\n' +
+    f = ('function (I[{input_dims_str}]{extra_input}) -> (O) {{\n' + '{padding_str}\n' +
          '  {internal_name}[{out_idx_str}: {out_dims_str}]' +
          '= {pool_sym}(I[{input_idx_str}]){pool_bounds};\n'
-         '{scale_expr}\n}}'
-    ).format(**{'input_dims_str': input_dims_str,
-                'out_idx_str': out_idx_str,
-                'out_dims_str': out_dims_str,
-                'pool_sym': pool_sym,
-                'input_idx_str': input_idx_str,
-                'pool_bounds': pool_bounds,
-                'scale_expr': scale_expr,
-                'internal_name': internal_name,
-                'padding_str': padding_str,
-                'extra_input': extra_input})
+         '{scale_expr}\n}}').format(**{
+             'input_dims_str': input_dims_str,
+             'out_idx_str': out_idx_str,
+             'out_dims_str': out_dims_str,
+             'pool_sym': pool_sym,
+             'input_idx_str': input_idx_str,
+             'pool_bounds': pool_bounds,
+             'scale_expr': scale_expr,
+             'internal_name': internal_name,
+             'padding_str': padding_str,
+             'extra_input': extra_input
+         })
 
     name = "pool{}d".format(rank)
     if pool_mode == 'max':
@@ -2138,8 +2215,13 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None,
 
 
 def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool_mode='max'):
-    return pool(x, pool_size, strides=strides, padding=padding,
-                data_format=data_format, pool_mode=pool_mode)
+    return pool(
+        x,
+        pool_size,
+        strides=strides,
+        padding=padding,
+        data_format=data_format,
+        pool_mode=pool_mode)
 
 
 def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, pool_mode='max'):
@@ -2166,7 +2248,7 @@ def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
     # TODO: We only use half of the Box-Muller here
     u1 = random_uniform(shape, dtype='float32')
     u2 = random_uniform(shape, dtype='float32')
-    z0 = sqrt(-2.0 * log(u1 + (1.0/(2**33)))) * cos(2.0 * math.pi * u2);
+    z0 = sqrt(-2.0 * log(u1 + (1.0 / (2**33)))) * cos(2.0 * math.pi * u2)
     if stddev != 1.0:
         z0 = stddev * z0
     if mean != 0.0:
@@ -2189,9 +2271,16 @@ def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
     func_state = "function (I) -> (O) { O = prng_state(I); }"
     func_value = "function (I) -> (O) { O = prng_value(I); }"
     t = _Op('random_uniform_step', 'uint32', (), func_step, OrderedDict([('I', rng_state)]), ['O'])
-    n = _Op('random_uniform_state', 'uint32', (3, _k_rng_size), func_state, OrderedDict([('I', t)]), ['O'])
-    side_effects = { _plaidml_val(rng_state) :  _plaidml_val(n) }
-    o = _Op('random_uniform_value', 'float32', shape, func_value, OrderedDict([('I', t)]), ['O'], side_effects=side_effects)
+    n = _Op('random_uniform_state', 'uint32', (3, _k_rng_size), func_state,
+            OrderedDict([('I', t)]), ['O'])
+    side_effects = {_plaidml_val(rng_state): _plaidml_val(n)}
+    o = _Op(
+        'random_uniform_value',
+        'float32',
+        shape,
+        func_value,
+        OrderedDict([('I', t)]), ['O'],
+        side_effects=side_effects)
 
     if dtype != 'float32':
         o = cast(o, dtype)
@@ -2225,8 +2314,7 @@ def relu(x, alpha=0.0, max_value=None):
 
 def repeat(x, n):
     assert x.ndim == 2
-    f = ("function (I[N0, N1]) -> (O) {{" +
-         "  O[i0, r, i1: N0, {reps}, N1] = =(I[i0, i1]);" +
+    f = ("function (I[N0, N1]) -> (O) {{" + "  O[i0, r, i1: N0, {reps}, N1] = =(I[i0, i1]);" +
          "}}").format(reps=n)
     return _Op('repeat', x.dtype, (x.shape[0], n, x.shape[1]), f, {'I': x}, ['O'])
 
@@ -2234,25 +2322,29 @@ def repeat(x, n):
 def repeat_elements(x, rep, axis):
     if x.shape[axis] is None:
         # Note: other backends just raise exception in this case
-        out_shape = x.shape[:axis] + (None,) + x.shape[axis+1:]
+        out_shape = x.shape[:axis] + (None,) + x.shape[axis + 1:]
     else:
-        out_shape = x.shape[:axis] + (rep*x.shape[axis],) + x.shape[axis+1:]
+        out_shape = x.shape[:axis] + (rep * x.shape[axis],) + x.shape[axis + 1:]
     idim_list = ["N{}".format(i) for i in range(x.ndim)]
     iidx_list = [N.lower() for N in idim_list]
     odim_list = ["{}*N{}".format(rep, i) if i == axis else "N{}".format(i) for i in range(x.ndim)]
-    oidx_list = ["{}*n{} + k".format(rep, i) if i == axis else "n{}".format(i) for i in range(x.ndim)]
+    oidx_list = [
+        "{}*n{} + k".format(rep, i) if i == axis else "n{}".format(i) for i in range(x.ndim)
+    ]
 
     # Example
     # function(I[N0, N1, N2]) -> (O) {
     #   O[n0, 3*n1 + k, n2 : N0, 3*N1, N2] = =(I[n0, n1, n2]), k < 3 no_defract;
     # }
-    f = ("function (I[{idims}]) -> (O) {{\n" +
-         "  O[{oidxs} : {odims}] = =(I[{iidxs}]), k < {rep} no_defract;\n" + #;\n" + #
-         "}}").format(idims=", ".join(idim_list),
-                      iidxs=", ".join(iidx_list),
-                      odims=", ".join(odim_list),
-                      oidxs=", ".join(oidx_list),
-                      rep=str(rep))
+    f = (
+        "function (I[{idims}]) -> (O) {{\n" +
+        "  O[{oidxs} : {odims}] = =(I[{iidxs}]), k < {rep} no_defract;\n" +  #;\n" + #
+        "}}").format(
+            idims=", ".join(idim_list),
+            iidxs=", ".join(iidx_list),
+            odims=", ".join(odim_list),
+            oidxs=", ".join(oidx_list),
+            rep=str(rep))
     return _Op('repeat_elements', x.dtype, out_shape, f, {'I': x}, ['O'])
 
 
@@ -2285,14 +2377,19 @@ def reverse(x, axes):
     _report_unimplemented('reverse')
 
 
-def reverse_gradient(x, coeff = 1.0):
+def reverse_gradient(x, coeff=1.0):
     f = """function (I, C) -> (O) { O = reverse_grad(I, C); }"""
     return _Op('reverse_grad', x.dtype, x.shape, f, {'I': x, 'C': coeff}, ['O'])
 
 
-def rnn(step_function, inputs, initial_states,
-        go_backwards=False, mask=None, constants=None,
-        unroll=False, input_length=None):
+def rnn(step_function,
+        inputs,
+        initial_states,
+        go_backwards=False,
+        mask=None,
+        constants=None,
+        unroll=False,
+        input_length=None):
     _report_unimplemented('rnn')
 
 
@@ -2301,32 +2398,50 @@ def round(x):
     return _Op('round', x.dtype, x.shape, f, {'I': x}, ['O'])
 
 
-def separable_conv(x, depthwise_kernel, pointwise_kernel, strides=None,
-                   padding='valid', data_format=None, dilation_rate=None):
+def separable_conv(x,
+                   depthwise_kernel,
+                   pointwise_kernel,
+                   strides=None,
+                   padding='valid',
+                   data_format=None,
+                   dilation_rate=None):
     if data_format is None:
         data_format = image_data_format()
     if pointwise_kernel.shape[-2] != depthwise_kernel.shape[-1] * depthwise_kernel.shape[-2]:
-        raise ValueError(("Shape mismatch in separable convolution. Depthwise kernel input " +
-                          "channel count must match pointwise kernel channel count times channel " +
-                          "multiplier.\nReceived {} v {} * {} (from full shapes {} and " +
-                          "{})").format(pointwise_kernel.shape[-2],
-                                        depthwise_kernel.shape[-2],
-                                        depthwise_kernel.shape[-1],
-                                        pointwise_kernel.shape,
-                                        depthwise_kernel.shape))
-    intermediate = conv(x, depthwise_kernel, strides=strides, padding=padding,
-                        data_format=data_format, dilation_rate=dilation_rate,
-                        channelwise=True)
+        raise ValueError(
+            ("Shape mismatch in separable convolution. Depthwise kernel input " +
+             "channel count must match pointwise kernel channel count times channel " +
+             "multiplier.\nReceived {} v {} * {} (from full shapes {} and " + "{})").format(
+                 pointwise_kernel.shape[-2], depthwise_kernel.shape[-2],
+                 depthwise_kernel.shape[-1], pointwise_kernel.shape, depthwise_kernel.shape))
+    intermediate = conv(
+        x,
+        depthwise_kernel,
+        strides=strides,
+        padding=padding,
+        data_format=data_format,
+        dilation_rate=dilation_rate,
+        channelwise=True)
     rank = x.ndim - 2
     ones = tuple(1 for _ in range(rank))
-    return conv(intermediate, pointwise_kernel, strides=ones, padding='valid',
-                data_format=data_format, dilation_rate=ones)
+    return conv(
+        intermediate,
+        pointwise_kernel,
+        strides=ones,
+        padding='valid',
+        data_format=data_format,
+        dilation_rate=ones)
 
 
-def separable_conv2d(x, depthwise_kernel, pointwise_kernel, strides=(1,1),
-                     padding='valid', data_format=None, dilation_rate=(1,1)):
-    return separable_conv(x, depthwise_kernel, pointwise_kernel, strides,
-                          padding, data_format, dilation_rate)
+def separable_conv2d(x,
+                     depthwise_kernel,
+                     pointwise_kernel,
+                     strides=(1, 1),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1, 1)):
+    return separable_conv(x, depthwise_kernel, pointwise_kernel, strides, padding, data_format,
+                          dilation_rate)
 
 
 def set_floatx(dtype):
@@ -2403,7 +2518,7 @@ def squeeze(x, axis):
     if axis == -1:
         result = x.reshape(x.shape[:axis])
     else:
-        result = x.reshape(x.shape[:axis] + x.shape[axis+1:])
+        result = x.reshape(x.shape[:axis] + x.shape[axis + 1:])
     return result
 
 
@@ -2433,14 +2548,12 @@ def sum(x, axis=None, keepdims=False):
 
 def switch(condition, then_expression, else_expression):
     f = """function (C, T, E) -> (O) { O = (C ? T : E); }"""
-    return _Op('switch',
-               then_expression.dtype,
-               then_expression.shape,
-               f,
-               OrderedDict([('C', condition),
-                            ('T', then_expression),
-                            ('E', else_expression)]),
-               ['O'])
+    return _Op('switch', then_expression.dtype, then_expression.shape, f,
+               OrderedDict([
+                   ('C', condition),
+                   ('T', then_expression),
+                   ('E', else_expression),
+               ]), ['O'])
 
 
 def tanh(x):
@@ -2462,7 +2575,8 @@ def tile(x, n):
     cons = ", ".join(["t" + str(i) + " < " + str(n[i]) for i in range(x.ndim)])
     f = """function (I[{sizes}]) -> (O) {{
                O[{out_idx} : {out_sizes}] = =(I[{in_idx}]), {cons} no_defract;
-           }}""".format(sizes=sizes, out_idx=out_idx, out_sizes=out_sizes, in_idx=in_idx, cons=cons)
+           }}""".format(
+        sizes=sizes, out_idx=out_idx, out_sizes=out_sizes, in_idx=in_idx, cons=cons)
     out_shape = tuple([None if x.shape[i] is None else x.shape[i] * n[i] for i in range(x.ndim)])
     return _Op('tile', x.dtype, out_shape, f, {'I': x}, ['O'])
 
@@ -2472,7 +2586,7 @@ def to_dense(tensor):
 
 
 def transpose(x):
-    return permute_dimensions(x, range(x.ndim-1, -1, -1))
+    return permute_dimensions(x, range(x.ndim - 1, -1, -1))
 
 
 def truncated_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
@@ -2480,7 +2594,7 @@ def truncated_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
         dtype = floatx()
     if seed:
         np.random.seed(seed)
-    return stddev * scipy.stats.truncnorm.rvs(-2.0, 2.0, size = shape) + mean
+    return stddev * scipy.stats.truncnorm.rvs(-2.0, 2.0, size=shape) + mean
 
 
 def update(x, new_x):
@@ -2508,7 +2622,7 @@ def variable(value, dtype=None, name=None, constraint=None):
         with tensor.mmap_discard(_ctx) as view:
             view.copy_from_ndarray(np.array(value))
             view.writeback()
-        ret =  _Tensor('integer', dtype, (), _prepend_name_scope(name, "int_variable"), tensor)
+        ret = _Tensor('integer', dtype, (), _prepend_name_scope(name, "int_variable"), tensor)
     elif isinstance(value, float):
         tensor = plaidml.Tensor(_device(), plaidml.Shape(_ctx, _dtypes[dtype]))
         with tensor.mmap_discard(_ctx) as view:
@@ -2534,13 +2648,14 @@ def variable(value, dtype=None, name=None, constraint=None):
 def zeros(shape, dtype=floatx(), name=None):
     return constant(0.0, shape=shape, dtype=dtype, name=_prepend_name_scope(name, "zeros"))
 
+
 def zeros_like(x, dtype=floatx(), name=None):
     a_zero = constant(0.0, shape=(1), dtype=dtype, name=_prepend_name_scope(name, "a_zero"))
     ndims = len(x.shape)
-    sizes= ", ".join(["S" + str(i) for i in range(ndims)])
+    sizes = ", ".join(["S" + str(i) for i in range(ndims)])
     dims = ", ".join(["i" + str(i) for i in range(ndims)])
     f = """function (IN[{sizes}], ZERO[SZ]) -> (OUT) {{
                OUT[{dims} : {sizes}] = =(ZERO[0]);
-           }}""".format(sizes=sizes, dims=dims)
+           }}""".format(
+        sizes=sizes, dims=dims)
     return _Op('zeros_like', dtype, x.shape, f, {'IN': x, 'ZERO': a_zero}, ['OUT'])
-

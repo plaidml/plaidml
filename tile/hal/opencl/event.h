@@ -22,21 +22,24 @@ class Event final : public hal::Event {
  public:
   // Casts a hal::Event to an Event, throwing an exception if the supplied hal::Event isn't an
   // OpenCL event, or if it's an event for a different context.
-  static std::shared_ptr<Event> Upcast(const std::shared_ptr<hal::Event>& event, const CLObj<cl_context>& cl_ctx);
+  static std::shared_ptr<Event> Downcast(const std::shared_ptr<hal::Event>& event, const CLObj<cl_context>& cl_ctx);
 
   // Casts a vector of hal::Event to a vector of cl_event, throwing an exception if the supplied
   // hal::Event objects aren't OpenCL events, or if any are events for a different context. This
   // method does not retain the returned events; callers must hold onto the input vector to keep the
   // events alive.
-  static std::vector<cl_event> Upcast(const std::vector<std::shared_ptr<hal::Event>>& events,
-                                      const CLObj<cl_context>& cl_ctx, const DeviceState::Queue& queue);
+  static std::vector<cl_event> Downcast(const std::vector<std::shared_ptr<hal::Event>>& events,
+                                        const CLObj<cl_context>& cl_ctx, const DeviceState::Queue& queue);
 
   // Returns a future that waits for all of the supplied events to complete.
-  static boost::future<void> WaitFor(const std::vector<std::shared_ptr<hal::Event>>& events,
-                                     const std::shared_ptr<DeviceState>& device_state);
+  static boost::future<std::vector<std::shared_ptr<hal::Result>>> WaitFor(
+      const std::vector<std::shared_ptr<hal::Event>>& events, const std::shared_ptr<DeviceState>& device_state);
 
   Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& device_state, CLObj<cl_event> cl_event,
         const DeviceState::Queue& queue);
+
+  Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& device_state, CLObj<cl_event> cl_event,
+        const DeviceState::Queue& queue, const std::shared_ptr<hal::Result>& result);
 
   boost::shared_future<std::shared_ptr<hal::Result>> GetFuture() final;
 
@@ -45,7 +48,7 @@ class Event final : public hal::Event {
     std::mutex mu;
     bool completed = false;
     std::shared_ptr<FutureState> self;  // Set iff clSetEventCallback is in flight
-    std::shared_ptr<Result> result;
+    std::shared_ptr<hal::Result> result;
     boost::promise<std::shared_ptr<hal::Result>> prom;
   };
 

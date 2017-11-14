@@ -19,6 +19,8 @@ Device::Device(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_
       compiler_{compat::make_unique<Compiler>(device_state_)},
       executor_{compat::make_unique<Executor>(device_state_)} {}
 
+void Device::Initialize(const hal::proto::HardwareSettings& settings) { device_state_->Initialize(settings); }
+
 }  // namespace opencl
 }  // namespace hal
 }  // namespace tile

@@ -224,7 +224,7 @@ std::string getEnvVar(std::string const& key) {
   return val == nullptr ? "" : val;
 #endif
 }
-}
+}  // namespace
 
 plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
     vai_ctx* ctx, const char* configuration, const std::string& config_source,
@@ -1501,7 +1501,15 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
 
     // Run the program
     auto result = program->Run(activity.ctx(), in_buffers, out_buffers);
-    result.then(boost::launch::async, [rundown = std::move(rundown)](decltype(result) result){});
+    result.then(boost::launch::async, [rundown = std::move(rundown)](decltype(result) fut) {
+      try {
+        fut.get();
+      } catch (const std::exception& ex) {
+        // TODO: We need a better way to notify users if the asynchronous results
+        // of an invocation are valid, perhaps by allowing a callback to be specified.
+        LOG(ERROR) << ex.what();
+      }
+    });
 
     return invocation.release();
   } catch (...) {

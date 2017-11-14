@@ -3,10 +3,12 @@
 import os
 import plaidml.settings
 
+
 def unittest_config():
     plaidml.settings.config = None
-    plaidml.settings.setup = True 
-    plaidml.settings.experimental = True 
+    plaidml.settings.setup = True
+    plaidml.settings.experimental = True
+
 
 def config():
     filename = os.getenv('PLAIDML_CONFIG_FILE', '../vertexai_plaidml/plaidml/experimental.json')

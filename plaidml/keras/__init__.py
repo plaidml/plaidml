@@ -4,8 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    https://www.gnu.org/licenses/agpl-3.0.en.html 
-
+#    https://www.gnu.org/licenses/agpl-3.0.en.html
 """Patches in a PlaidML backend for Keras.
 
 This module hooks the system meta module path to add a backend for Keras
@@ -52,11 +51,7 @@ import os
 import sys
 import types
 
-
-_BACKENDS = {
-    'plaidml': '.backend',
-    'theano': 'keras.backend.theano_backend'
-}
+_BACKENDS = {'plaidml': '.backend', 'theano': 'keras.backend.theano_backend'}
 
 
 def install_backend(import_path='keras.backend',
@@ -75,10 +70,11 @@ def install_backend(import_path='keras.backend',
 
     # Hack around Keras expecting everything not Tensorflow to be Theano.
     from keras.utils import conv_utils
-    conv_utils.convert_kernel = lambda x :  x
+    conv_utils.convert_kernel = lambda x: x
 
 
 class _PlaidMLBackendFinder(object):
+
     def __init__(self, repname, backend_name, trace_file):
         self._repname = repname
         self._backend_name = backend_name
@@ -114,69 +110,3 @@ class _PlaidMLBackendFinder(object):
         for (k, v) in iteritems(impl.__dict__):
             setattr(mod, k, v)
         return mod
-
-    # NOTE: This code depends on OpenCL 2.x functionality.
-    #       Apple platforms only supports OpenCL 1.x.
-    #       This code is meant to be used for comparing PlaidML vs Theano output.
-    # def _add_intercepts(self, mod):
-    #     if not self._trace_file:
-    #       return
-
-    #     ctx = events.Context()
-    #     ctx.eventlog = filelog.Writer(self._trace_file)
-    #     ctx.domain = events.LogDomain(ctx, 'vertex.ai/plaidml/keras/' + self._backend_name)
-
-    #     def backend_function_wrapper(f, args, ops, updates):
-    #         @functools.wraps(f, assigned=(), updated=())
-    #         def wrapper(inputs):
-    #             """A wrapper around a function built by keras.backend.function().
-
-    #             As a side-effect, when the wrapped function is invoked, updates described
-    #             when the wrapped function was created will be performed.
-
-    #             Args:
-    #               inputs: A list of parameters to bind to the wrapped function inputs.
-
-    #             Returns:
-    #               The wrapped function's outputs.
-    #             """
-    #             with ctx.Activity('vertexai::keras::Step') as actx:
-    #                 for i in inputs:
-    #                     events.LogBufferInfo(actx, i, 'Input')
-    #                 for (v, _) in updates:
-    #                     events.LogBufferInfo(actx, v.eval(), 'PreUpdate')
-
-    #                 outputs = f(inputs)
-
-    #                 for (o, op) in zip(outputs, ops):
-    #                     comment = 'Output'
-    #                     if self._backend_name == 'plaidml':
-    #                         comment = comment + ': ' + mod._dump_val(op)
-    #                     events.LogBufferInfo(actx, o, comment)
-    #                 for (v, vp) in updates:
-    #                     comment = 'PostUpdate'
-    #                     if self._backend_name == 'plaidml':
-    #                         comment = comment + ': ' + mod._dump_val(vp)
-    #                     events.LogBufferInfo(actx, v.eval(), comment)
-
-    #                 return outputs
-
-    #         return wrapper
-
-        def function_builder_wrapper(f):
-            @functools.wraps(f)
-            def wrapper(args, ops, updates, **kwargs):
-                """A wrapper around a Keras backend.function().
-
-                Args:
-                    args: A list of placeholders for the constructed function's inputs.
-                    ops: A list of operations whose results are to be returned as the function's outputs.
-                    updates: A list of (variable, op) assignments to perform when the function is called.
-
-                Returns:
-                    A callable object that performs the requested computation.
-                """
-                return backend_function_wrapper(f(args, ops, updates, **kwargs), args, ops, updates)
-            return wrapper
-
-        mod.function = function_builder_wrapper(mod.function)
