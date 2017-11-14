@@ -136,6 +136,11 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     code << "#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n";
   }
 
+  bool cl_khr_fp64 = device_state_->HasDeviceExtension("cl_khr_fp64");
+  if (cl_khr_fp64) {
+    code << "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n";
+  }
+
   for (const auto& ki : kernel_info) {
     context::Activity kbuild{activity.ctx(), "tile::hal::opencl::BuildKernel"};
 
@@ -152,7 +157,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     }
 
     code << ki.comments;
-    Emit ocl{cl_khr_fp16};
+    Emit ocl{cl_khr_fp16, cl_khr_fp64};
     ocl.Visit(*ki.kfunc);
     code << ocl.str();
     code << "\n\n";

@@ -6,6 +6,7 @@
 #include <map>
 #include <utility>
 
+#include "base/util/error.h"
 #include "tile/hal/opencl/exprtype.h"
 #include "tile/lang/fpconv.h"
 
@@ -110,6 +111,7 @@ void Emit::Visit(const sem::DeclareStmt &n) {
     }
   }
   emit(";\n");
+  CheckValidType(ty);
   scope_->Bind(n.name, ty);
 }
 
@@ -258,6 +260,7 @@ void Emit::Visit(const sem::Function &n) {
       // Global booleans are stored as INT8.
       ty.dtype = lang::DataType::INT8;
     }
+    CheckValidType(ty);
     scope.Bind(p.second, ty);
   }
 
@@ -292,6 +295,18 @@ void Emit::Visit(const sem::Function &n) {
   n.body->Accept(*this);
 
   scope_ = nullptr;
+}
+
+void Emit::CheckValidType(const sem::Type &ty) {
+  if (cl_khr_fp64_) {
+    return;
+  }
+  if (ty.base == sem::Type::TVOID || ty.base == sem::Type::INDEX) {
+    return;
+  }
+  if (ty.dtype == lang::DataType::FLOAT64) {
+    throw error::Unimplemented{"The device does not support 64-bit floating-point types"};
+  }
 }
 
 sem::Type Emit::TypeOf(const sem::ExprPtr &expr) { return ExprType::TypeOf(scope_, cl_khr_fp16_, expr); }

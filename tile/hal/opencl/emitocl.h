@@ -15,7 +15,8 @@ namespace opencl {
 
 class Emit : public lang::EmitC {
  public:
-  explicit Emit(bool cl_khr_fp16) : cl_khr_fp16_{cl_khr_fp16}, scope_{nullptr} {}
+  explicit Emit(bool cl_khr_fp16, bool cl_khr_fp64)
+      : cl_khr_fp16_{cl_khr_fp16}, cl_khr_fp64_{cl_khr_fp64}, scope_{nullptr} {}
 
   void Visit(const sem::LoadExpr &) final;
   void Visit(const sem::StoreStmt &) final;
@@ -33,6 +34,7 @@ class Emit : public lang::EmitC {
   void Visit(const sem::Function &) final;
 
  private:
+  void CheckValidType(const sem::Type &ty);
   sem::Type TypeOf(const sem::ExprPtr &expr);
   sem::Type TypeOf(const sem::LValPtr &lvalue);
   void EmitWithTypeConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr,
@@ -42,6 +44,7 @@ class Emit : public lang::EmitC {
   void emitType(const sem::Type &t) final;
 
   bool cl_khr_fp16_;
+  bool cl_khr_fp64_;
   lang::Scope<sem::Type> *scope_;
 };
 
