@@ -92,6 +92,9 @@ Event::Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& de
       state_{std::make_shared<FutureState>()},
       fut_{state_->prom.get_future().share()} {
   state_->result = result;
+  if (!cl_event_) {
+    state_->prom.set_value(std::shared_ptr<hal::Result>(state_->result));
+  }
 }
 
 boost::shared_future<std::shared_ptr<hal::Result>> Event::GetFuture() {
