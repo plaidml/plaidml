@@ -466,7 +466,15 @@ class _Library(plaidml.library.Library):
         self.plaidml_build_coded_function.restype = ctypes.POINTER(_C_Function)
         self.plaidml_build_coded_function.errcheck = self._check_err
 
-        # TODO: PLAIDML_API plaidml_function* plaidml_load_function(plaidml_device* dev, const char* file);
+        # PLAIDML_API plaidml_function* plaidml_load_function(vai_ctx* ctx, plaidml_device* dev, const char* file);
+        self.plaidml_load_function = lib.plaidml_load_function
+        self.plaidml_load_function.argtypes = [
+            ctypes.POINTER(plaidml.library._C_Context),  # plaidml_device* ctx
+            ctypes.POINTER(_C_Device),  # plaidml_device* dev
+            ctypes.c_char_p,  # const char* file
+        ]
+        self.plaidml_load_function.restype = ctypes.POINTER(_C_Function)
+        self.plaidml_load_function.errcheck = self._check_err
 
         # PLAIDML_API bool plaidml_save_function(plaidml_function* func, const char* file);
         self.plaidml_save_function = lib.plaidml_save_function
@@ -775,6 +783,9 @@ class _Function(object):
         if hasattr(self, '_free'):
             self._free(self)
 
+    def save(self, filename):
+        _lib().plaidml_save_function(self._as_parameter_, filename)
+
 
 class Function(_Function):
 
@@ -793,6 +804,10 @@ class Function(_Function):
 
         super(Function, self).__init__(_lib().plaidml_build_coded_function(
             code.encode(), fid.encode()))
+
+
+def load_function(ctx, device, filename):
+    return _Function(_lib().plaidml_load_function(ctx, device._as_parameter_, filename))
 
 
 class _DeviceConfig(object):
@@ -1237,7 +1252,8 @@ class Shape(_Shape):
         for arg in args:
             stride *= arg
         for arg in args:
-            stride /= arg
+            if arg != 0:
+                stride /= arg
             _lib().plaidml_add_dimension(ctx, self, arg, int(stride))
 
 

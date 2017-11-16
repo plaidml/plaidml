@@ -205,7 +205,9 @@ class _Var(object):
                  is_keras_tensor=False):
         self._ident = ident
         self._keras_dtype = dtype
-        self._keras_shape = shape
+        if isinstance(shape, int):
+            shape = (shape,)
+        self._keras_shape = tuple(shape)
         self._name = name
         self._value = plaidml_val
         self._src = src
@@ -912,8 +914,8 @@ class _Function(object):
         # Outputs: a list of ops
         # Updates: a list of (var, newval) tuples
         # Name: a string, which we ignore
-        self._input_names = ['i' + str(n) for n in range(len(inputs))]
-        self._output_names = ['o' + str(n) for n in range(len(outputs))]
+        self._input_names = ['I' + str(n) for n in range(len(inputs))]
+        self._output_names = ['O' + str(n) for n in range(len(outputs))]
         self._name = name
 
         c = plaidml.Composer()
@@ -938,7 +940,8 @@ class _Function(object):
         for (var, newval) in iteritems(side_effects):
             c.add_update(var, newval)
 
-        self._invoker = plaidml.Invoker(_ctx, c.build())
+        self._func = c.build()
+        self._invoker = plaidml.Invoker(_ctx, self._func)
 
     def __call__(self, inputs):
         # Inputs: a list of bindings for the placeholders.
@@ -1262,11 +1265,11 @@ def concatenate(tensors, axis=-1):
     #     T2[n0, a+8, n2: N0, 9, N2] = =(I2[n0, a, n2]);
     #     O = T0 + T1 + T2;
     #   }
-    code = ('function ({inputs}) -> (O) {{\n' + '{body}\n' +
-            '}}').format(**{
-                'inputs': inputs_str,
-                'body': body_str
-            })
+    code = ('function ({inputs}) -> (O) {{\n' + '{body}\n' + '}}').format(
+        **{
+            'inputs': inputs_str,
+            'body': body_str
+        })
     inputs_dict = dict()
     for i in range(len(tensors)):
         inputs_dict['I{}'.format(i)] = tensors[i]
@@ -1292,14 +1295,14 @@ def pad_compute(sym, input_size, filter_size, stride, padding):
         if input_size is None:
             num_out_size = None
         else:
-            num_out_size = (input_size - filter_size + stride) // stride
+            num_out_size = int((input_size - filter_size + stride) // stride)
         sym_output_size = "({sym} - {fs} + {s}) / {s}".format(sym=sym, fs=filter_size, s=stride)
         sym_padding_before = 0
     elif padding == 'same':
         if input_size is None:
             num_out_size = None
         else:
-            num_out_size = (input_size + stride - 1) // stride
+            num_out_size = int((input_size + stride - 1) // stride)
         sym_output_size = "({sym} + {s} - 1) / {s}".format(sym=sym, s=stride)
         sym_padding_before = "(max(0, ({symout} - 1) * {s} + {fs} - {syminp})) / 2".format(
             symout=sym_output_size, s=stride, fs=filter_size, syminp=sym)
@@ -1463,7 +1466,7 @@ def conv(x,
              'padding_str': padding_str
          })
     name = "conv{}d".format(rank)
-    return _Op(name, x.dtype, outshape, f, OrderedDict([('I', x), ('K', kernel)]), ['O'])
+    return _Op(name, x.dtype, tuple(outshape), f, OrderedDict([('I', x), ('K', kernel)]), ['O'])
 
 
 def _func_once(func):
@@ -1689,7 +1692,7 @@ def dropout(x, level, noise_shape=None, seed=None):
     o = _Op(
         'random_uniform_value',
         'float32',
-        shape,
+        x.shape,
         rng_value,
         OrderedDict([('I', t), ('X', x), ('L', level)]), ['O'],
         side_effects=side_effects)
