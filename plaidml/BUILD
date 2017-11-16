@@ -58,6 +58,10 @@ plaidml_cc_library(
 # This allows the library to be used as a data dependency in Bazel rules.
 plaidml_cc_binary(
     name = "libplaidml.so",
+    srcs = select({
+        "//bzl:x64_windows": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
+        "//conditions:default": [],
+    }),
     linkshared = 1,
     deps = [
         ":api",
@@ -66,6 +70,10 @@ plaidml_cc_binary(
 
 plaidml_cc_binary(
     name = "plaidml.dll",
+    srcs = select({
+        "//bzl:x64_windows": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
+        "//conditions:default": [],
+    }),
     linkshared = 1,
     deps = [
         ":api",
