@@ -2156,7 +2156,7 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mod
         out_idx_str = "n, c, " + ", ".join(["x{}".format(i) for i in range(rank)])
         out_dims_str = "N, C, " + ", ".join(["{}".format(out_size[i]) for i in range(rank)])
         input_idx_str = "n, c, " + ", ".join(input_idx_list)
-        outshape = x.shape[:2] + num_out_size
+        outshape = list(x.shape[:2]) + num_out_size
     elif data_format == 'channels_last':
         input_dims_str = "N, " + ", ".join(["L{}".format(i) for i in range(rank)]) + ", C"
         out_idx_str = "n, " + ", ".join(["x{}".format(i) for i in range(rank)]) + ", c"
