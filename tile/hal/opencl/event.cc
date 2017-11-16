@@ -17,6 +17,7 @@ const char* EventCommandTypeStr(cl_command_type code);
 std::shared_ptr<Event> Event::Downcast(const std::shared_ptr<hal::Event>& event, const CLObj<cl_context>& cl_ctx) {
   std::shared_ptr<Event> evt = std::dynamic_pointer_cast<Event>(event);
   if (!evt || evt->cl_ctx_ != cl_ctx) {
+    LOG(ERROR) << "Incompatible event for Tile device. event: " << evt;
     throw error::InvalidArgument{"Incompatible event for Tile device"};
   }
   return evt;
@@ -40,10 +41,12 @@ std::vector<cl_event> Event::Downcast(const std::vector<std::shared_ptr<hal::Eve
 boost::future<std::vector<std::shared_ptr<hal::Result>>> Event::WaitFor(
     const std::vector<std::shared_ptr<hal::Event>>& events, const std::shared_ptr<DeviceState>& device_state) {
   std::vector<cl_event> mdeps;
+  std::vector<std::shared_ptr<Event>> hal_events;
   for (const auto& event : events) {
     auto evt = Downcast(event, device_state->cl_ctx());
     if (evt->cl_event_) {
       mdeps.emplace_back(evt->cl_event_.get());
+      hal_events.emplace_back(std::move(evt));
     }
   }
   if (!mdeps.size()) {
@@ -60,18 +63,17 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> Event::WaitFor(
   context::Context ctx{};
   Event event{ctx, device_state, std::move(evt), queue};
   auto future = event.GetFuture();
-  auto results = future.then([events, device_state](decltype(future) fut) {
+  auto results = future.then([ hal_events = std::move(hal_events), device_state ](decltype(future) fut) {
     std::vector<std::shared_ptr<hal::Result>> results;
-    results.reserve(events.size());
+    results.reserve(hal_events.size());
     try {
       fut.get();
     } catch (...) {
       LOG(ERROR) << boost::current_exception();
     }
-    for (const auto& event : events) {
-      auto evt = Downcast(event, device_state->cl_ctx());
-      if (evt->state_->result) {
-        results.emplace_back(evt->state_->result);
+    for (const auto& event : hal_events) {
+      if (event->state_->result) {
+        results.emplace_back(event->state_->result);
       }
     }
     return results;

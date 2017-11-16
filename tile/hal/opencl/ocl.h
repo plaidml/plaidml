@@ -55,7 +55,9 @@ class Err final {
     if (code_ == CL_SUCCESS) {
       return std::exception_ptr();
     }
-    return std::make_exception_ptr(std::runtime_error(msg + ": " + str()));
+    std::string err_msg = msg + ": " + str();
+    LOG(ERROR) << err_msg;
+    return std::make_exception_ptr(std::runtime_error(err_msg));
   }
 
  private:
