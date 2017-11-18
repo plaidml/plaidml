@@ -1,5 +1,4 @@
 # Copyright Vertex.AI.
-
 """Intelligently displays buffer differences between two trace logs."""
 
 from __future__ import absolute_import, print_function
@@ -14,6 +13,7 @@ from tile.sdk.src.event import filelog
 
 
 class Differ(object):
+
     def __init__(self):
         self._step_index = 0
         self._step_max = 0
@@ -56,7 +56,9 @@ class Differ(object):
         return out
 
     def _print_buffer(self, buf, comment):
-        print(' Batch %d dtype=%s shape=(%s) len=%d %s' % (self._step_index, buf.dtype, ', '.join([str(i) for i in buf.shape]), len(buf.data), comment))
+        print(' Batch %d dtype=%s shape=(%s) len=%d %s' %
+              (self._step_index, buf.dtype, ', '.join([str(i) for i in buf.shape]), len(buf.data),
+               comment))
 
 
 if __name__ == '__main__':

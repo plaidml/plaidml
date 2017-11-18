@@ -61,6 +61,21 @@ plaidml_py_test(
 )
 
 plaidml_py_test(
+    name = "regression_test",
+    srcs = [
+        "regression_test.py",
+    ],
+    tags = [
+        "keras",
+        "manual",
+    ],
+    deps = [
+        ":keras",
+        "//testing:plaidml_py",
+    ],
+)
+
+plaidml_py_test(
     name = "tile_sandbox",
     srcs = [
         "tile_sandbox.py",

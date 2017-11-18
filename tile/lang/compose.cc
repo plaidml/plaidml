@@ -410,7 +410,7 @@ Program Xify(const Program& orig) {
 
 static std::string DeX(const std::string& s) {
   if (!s.size() || s[0] != 'X') {
-    throw std::runtime_error("Not an X in DeX");
+    throw std::runtime_error("Not an X in DeX: " + s);
   }
   return s.substr(1, s.size() - 1);
 }

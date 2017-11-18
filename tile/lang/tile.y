@@ -24,6 +24,13 @@ struct Context {
   std::vector<std::string> out_spec;
 
   inline std::string apply(const std::string& func, const std::vector<std::string>& inputs) {
+    // Special case negative constants to avoid an extra 'neg' op which breaks the
+    // exact roundtriping of the printer -> parser case
+    if (func == "neg" && program.ops.size() && program.ops.back().output == inputs[0] && 
+         program.ops.back().tag == vertexai::tile::lang::Op::CONSTANT) {
+      program.ops.back().inputs[0] = "-" + program.ops.back().inputs[0];
+      return program.ops.back().output;
+    }
     vertexai::tile::lang::Op op;
     op.tag = vertexai::tile::lang::Op::FUNCTION;
     op.f.fn = func;

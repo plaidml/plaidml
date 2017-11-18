@@ -18,6 +18,7 @@ VALID_CONF = r'''{
 '''
 INVALID_CONF = '{"PLAIDML_INVALID":"1"}'
 
+
 class TestSettings(unittest.TestCase):
 
     def setUp(self):
@@ -26,19 +27,19 @@ class TestSettings(unittest.TestCase):
     def testDefaults(self):
         self.assertEquals(s.config, None)
         self.assertEquals(s.device_ids, [])
-        self.assertEquals(s.experimental, False) 
+        self.assertEquals(s.experimental, False)
         self.assertEquals(s.session, None)
         self.assertEquals(s.telemetry, False)
 
     def testSetting(self):
         s.config = 'test'
-        s.device_ids = ['1','2']
+        s.device_ids = ['1', '2']
         s.experimental = True
         s.telemetry = True
         s.session = "123"
         self.assertEquals(s.config, 'test')
         self.assertEquals(s.device_ids, ['1', '2'])
-        self.assertEquals(s.experimental, True) 
+        self.assertEquals(s.experimental, True)
         self.assertEquals(s.session, "123")
         self.assertEquals(s.telemetry, True)
 
@@ -69,7 +70,7 @@ class TestSettings(unittest.TestCase):
         self.assertEquals(s.experimental, True)
         self.assertEquals(s.device_ids, ['1', '3', '5'])
         self.assertEquals(s.telemetry, True)
- 
+
         # User config should shadow system config
         s._setup_for_test(val.name, inv.name)
         s._load()
@@ -79,7 +80,7 @@ class TestSettings(unittest.TestCase):
             s._load()
         os.remove(val.name)
         os.remove(inv.name)
-  
+
     def testSettingsOverridesLoading(self):
         with tempfile.NamedTemporaryFile(delete=False) as tf:
             tf.write(VALID_CONF)
@@ -90,6 +91,7 @@ class TestSettings(unittest.TestCase):
         self.assertEquals(s.config, 'other')
         self.assertEquals(s.telemetry, False)
         os.remove(tf.name)
-    
+
+
 if __name__ == '__main__':
     unittest.main()

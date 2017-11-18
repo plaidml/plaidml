@@ -1,4 +1,4 @@
-# Copyright 2017, Vertex.AI. 
+# Copyright 2017, Vertex.AI.
 
 import argparse
 import os
@@ -106,11 +106,11 @@ class Group(object):
                 self.subtypes[subtype] = Group(name, subtype, submap)
 
     def get_node_names(self):
-        return set.union(* [subtype.get_node_names() for subtype in self.subtypes.values()])
+        return set.union(*[subtype.get_node_names() for subtype in self.subtypes.values()])
 
     def get_group_names(self):
         return set.union(
-            set([self.name]), * [subtype.get_group_names() for subtype in self.subtypes.values()])
+            set([self.name]), *[subtype.get_group_names() for subtype in self.subtypes.values()])
 
     def get_nodes(self, node_names, group_names):
         return sum(
@@ -121,7 +121,7 @@ class Group(object):
         return out_group + sum([subtype.get_groups() for subtype in self.subtypes.values()], [])
 
     def get_primitives(self, node_names, group_names):
-        return set.union(* [
+        return set.union(*[
             subtype.get_primitives(node_names, group_names) for subtype in self.subtypes.values()
         ])
 

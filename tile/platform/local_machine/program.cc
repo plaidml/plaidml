@@ -644,9 +644,9 @@ class RunRequest {
   void AllocTemporaries(const context::Context& ctx);
   void BuildChunkMap(const context::Context& ctx);
   std::forward_list<PendingUpdate> DealiasIO(const context::Context& ctx);
-  void LaunchKernels(const context::Context& ctx);
+  boost::future<std::vector<std::shared_ptr<hal::Result>>> LaunchKernels(const context::Context& ctx);
   void ApplyIOUpdates(std::forward_list<PendingUpdate> io_updates);
-  boost::future<void> LogResults(const context::Context& ctx);
+  boost::future<void> LogResults(const context::Context& ctx, boost::future<std::vector<std::shared_ptr<hal::Result>>>);
 
   Program* program_;
   std::vector<std::shared_ptr<MemChunk>> tmps_;
@@ -654,8 +654,6 @@ class RunRequest {
   std::map<std::string, std::shared_ptr<tile::Buffer>> outputs_;
   std::map<std::string, std::shared_ptr<MemChunk>> input_chunk_map_;
   std::map<std::string, std::shared_ptr<MemChunk>> output_chunk_map_;
-  std::vector<KernelLogInfo> kernel_log_info_;
-  std::vector<boost::future<void>> output_ready_futures_;
 };
 
 boost::future<void> RunRequest::BuildAndIssue(const context::Context& ctx, Program* program,
@@ -674,15 +672,15 @@ boost::future<void> RunRequest::BuildAndIssue(const context::Context& ctx, Progr
     auto io_updates = req.DealiasIO(queueing.ctx());
     req.AllocTemporaries(queueing.ctx());
 
-    req.LaunchKernels(queueing.ctx());
+    auto results = req.LaunchKernels(queueing.ctx());
 
     req.ApplyIOUpdates(std::move(io_updates));
 
-    complete = req.LogResults(queueing.ctx());
+    complete = req.LogResults(queueing.ctx(), std::move(results));
   }
 
   // Keep the request and activity referenced until the program is complete.
-  return complete.then([ req = std::move(req), running = std::move(running) ](decltype(complete)){});
+  return complete.then([ req = std::move(req), running = std::move(running) ](decltype(complete) fut) { fut.get(); });
 }
 
 RunRequest::RunRequest(Program* program, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
@@ -694,11 +692,11 @@ void RunRequest::Log() {
     VLOG(4) << "Running program " << program_;
     for (const auto& it : inputs_) {
       VLOG(4) << "Input  " << it.first << " -> Buffer " << it.second.get() << " -> HAL Buffer "
-              << Buffer::Upcast(it.second, program_->devinfo())->chunk()->hal_buffer().get();
+              << Buffer::Downcast(it.second, program_->devinfo())->chunk()->hal_buffer().get();
     }
     for (const auto& it : outputs_) {
       VLOG(4) << "Output " << it.first << " -> Buffer " << it.second.get() << " -> HAL Buffer "
-              << Buffer::Upcast(it.second, program_->devinfo())->chunk()->hal_buffer().get();
+              << Buffer::Downcast(it.second, program_->devinfo())->chunk()->hal_buffer().get();
     }
     for (std::size_t kidx = 0; kidx < program_->kernels().size(); ++kidx) {
       const auto& bk = program_->kernels()[kidx];
@@ -748,9 +746,7 @@ void RunRequest::AllocTemporaries(const context::Context& ctx) {
   }
 }
 
-void RunRequest::LaunchKernels(const context::Context& ctx) {
-  kernel_log_info_.reserve(program_->kernels().size());
-  output_ready_futures_.reserve(program_->kernels().size());
+boost::future<std::vector<std::shared_ptr<hal::Result>>> RunRequest::LaunchKernels(const context::Context& ctx) {
   std::vector<std::shared_ptr<hal::Event>> kernel_events;
   kernel_events.resize(program_->kernels().size());
 
@@ -825,21 +821,15 @@ void RunRequest::LaunchKernels(const context::Context& ctx) {
         }
       }
 
-      done = bk.kernel->Run(ctx, params, deps, ctx.is_logging_events());
+      // NOTE: VLOG_IS_ON(1) is needed here because LogResults depends on profiling
+      // being enabled in order to print durations.
+      done = bk.kernel->Run(ctx, params, deps, ctx.is_logging_events() || VLOG_IS_ON(1));
 
-      kernel_log_info_.emplace_back(KernelLogInfo{done, bk.info.kname, bk.info.tot_bytes, bk.info.tot_flops});
-
-      bool added_kernel_as_output = false;
       for (const auto& param : bk.params) {
         if (param.ty != Program::KernelParamType::kOutput) {
           continue;
         }
         output_chunk_map_.at(param.name)->deps()->AddReadDependency(done);
-        if (!added_kernel_as_output) {
-          output_ready_futures_.emplace_back(
-              done->GetFuture().then([](boost::shared_future<std::shared_ptr<hal::Result>> fut) { fut.get(); }));
-          added_kernel_as_output = true;
-        }
       }
 
       kernel_events[kidx] = done;
@@ -851,18 +841,16 @@ void RunRequest::LaunchKernels(const context::Context& ctx) {
     }
   }
 
-  // Note: This is not required on desktop GPUs,
-  // but embedded devices like the Mali T-628 will hang until a flush is issued.
-  program_->devinfo()->dev->executor()->Flush();
+  return program_->devinfo()->dev->executor()->WaitFor(kernel_events);
 }
 
 void RunRequest::BuildChunkMap(const context::Context& ctx) {
   // Prepare the buffers for attaching to kernels
   for (const auto& kvp : inputs_) {
-    input_chunk_map_.emplace(kvp.first, Buffer::Upcast(kvp.second, program_->devinfo())->chunk());
+    input_chunk_map_.emplace(kvp.first, Buffer::Downcast(kvp.second, program_->devinfo())->chunk());
   }
   for (const auto& kvp : outputs_) {
-    output_chunk_map_.emplace(kvp.first, Buffer::Upcast(kvp.second, program_->devinfo())->chunk());
+    output_chunk_map_.emplace(kvp.first, Buffer::Downcast(kvp.second, program_->devinfo())->chunk());
   }
 }
 
@@ -925,30 +913,24 @@ std::forward_list<RunRequest::PendingUpdate> RunRequest::DealiasIO(const context
 
 void RunRequest::ApplyIOUpdates(std::forward_list<PendingUpdate> io_updates) {
   for (auto update : io_updates) {
-    Buffer::Upcast(update.input_to_reassign, program_->devinfo())->RemapTo(update.new_input_value);
+    Buffer::Downcast(update.input_to_reassign, program_->devinfo())->RemapTo(update.new_input_value);
   }
 }
 
-boost::future<void> RunRequest::LogResults(const context::Context& ctx) {
+boost::future<void> RunRequest::LogResults(const context::Context& ctx,
+                                           boost::future<std::vector<std::shared_ptr<hal::Result>>> results) {
   context::Context ctx_copy{ctx};
-  auto when_future = boost::when_all(output_ready_futures_.begin(), output_ready_futures_.end());
-  auto result = when_future.then(
-      [ ctx = std::move(ctx_copy), kinfos = std::move(kernel_log_info_) ](decltype(when_future) outputs)->void {
-        outputs.get();
-        for (const auto& kinfo : kinfos) {
-          auto result = kinfo.done->GetFuture().get();
-          if (VLOG_IS_ON(1)) {
-            std::chrono::duration<double> duration = result->GetDuration();
-            VLOG(1) << "Ran " << kinfo.kname << ": dur=" << duration.count()
-                    << " GFL/s=" << kinfo.tot_flops / duration.count()
-                    << " GBP/s= " << kinfo.tot_bytes / duration.count();
-          }
-          if (ctx.is_logging_events()) {
-            result->LogStatistics();
-          }
-        }
-      });
-  return result;
+  return results.then([ctx = std::move(ctx_copy)](decltype(results) future) {
+    auto results = future.get();
+    if (VLOG_IS_ON(1) || ctx.is_logging_events()) {
+      std::chrono::high_resolution_clock::duration total{std::chrono::high_resolution_clock::duration::zero()};
+      for (const auto& result : results) {
+        total += result->GetDuration();
+        result->LogStatistics();
+      }
+      VLOG(1) << "Total program execution duration: " << total.count();
+    }
+  });
 }
 
 }  // namespace
@@ -958,7 +940,7 @@ boost::future<void> Program::Run(const context::Context& ctx,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
   for (const auto& it : outputs) {
     VLOG(4) << "Original output " << it.first << " -> Buffer " << it.second.get() << " -> HAL Buffer "
-            << Buffer::Upcast(it.second, devinfo())->chunk()->hal_buffer().get();
+            << Buffer::Downcast(it.second, devinfo())->chunk()->hal_buffer().get();
   }
   std::map<std::string, std::shared_ptr<tile::Buffer>> rewrite_outputs;
   for (auto kvp : outputs) {

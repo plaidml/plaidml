@@ -17,21 +17,27 @@ test --test_timeout_filters=-eternal
 test --test_output=streamed
 test --test_env=PATH
 
-build:darwin --build_tag_filters=-darwin_fail,-msvc
-test:darwin --test_tag_filters=-darwin_fail,-msvc
+build:ubuntu-17.04 --cpu=k8
+build:ubuntu-17.04 --define=VARIANT=ubuntu-17.04
 
-build:ubuntu-14.04 --cpu k8
-build:ubuntu-14.04 --build_tag_filters=-msvc
-test:ubuntu-14.04 --test_tag_filters=-msvc
+build:ubuntu-14.04 --cpu=k8
+build:ubuntu-14.04 --define=VARIANT=ubuntu-14.04
+build:ubuntu-14.04 --build_tag_filters=-msvc,-trusty
+test:ubuntu-14.04 --test_tag_filters=-msvc,-trusty
 
-build:arm7-ubuntu-14.04 --cpu arm7-linux
+build:arm7-ubuntu-14.04 --cpu=arm7-linux
+build:arm7-ubuntu-14.04 --define=VARIANT=arm7-ubuntu-14.04
 build:arm7-ubuntu-14.04 --crosstool_top=//bzl:toolchain
 build:arm7-ubuntu-14.04 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
-build:arm7-ubuntu-14.04 --build_tag_filters=-large,-msvc,-tensorflow
-test:arm7-ubuntu-14.04 --test_tag_filters=-large,-msvc,-tensorflow
+build:arm7-ubuntu-14.04 --build_tag_filters=-large,-msvc,-rtest_fail,-tensorflow
+test:arm7-ubuntu-14.04 --test_tag_filters=-large,-msvc,-rtest_fail,-tensorflow
 
-build:x64_windows --build_tag_filters=-deb,-keras,-tensorflow
-test:x64_windows --test_tag_filters=-deb,-keras,-tensorflow
+build:macos-10.12 --cpu=darwin
+build:macos-10.12 --build_tag_filters=-large,-llvm,-darwin_fail,-msvc
+test:macos-10.12 --test_tag_filters=-large,-llvm,-darwin_fail,-msvc
+
+build:windows-10 --build_tag_filters=-deb,-keras,-llvm,-shell,-tensorflow,-uvc
+test:windows-10 --test_tag_filters=-deb,-keras,-llvm,-shell,-tensorflow,-uvc --test_env=NUMBER_OF_PROCESSORS
 
 build:callgrind -c dbg
 build:callgrind --cxxopt=-O3
