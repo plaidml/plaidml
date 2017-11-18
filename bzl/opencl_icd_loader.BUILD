@@ -18,15 +18,18 @@ cc_library(
     ],
     linkopts = select({
         ":x64_windows": [],
-        "//conditions:default": ["-pthread", "-ldl"],
+        "//conditions:default": [
+            "-pthread",
+            "-ldl",
+        ],
     }),
+    nocopts = select({
+        "//:x64_windows": "/DNOGDI",
+        "//conditions:default": "",
+    }),
+    visibility = ["//visibility:public"],
     deps = [
         "//external:opencl_headers",
         "//external:opengl_headers",
     ],
-    visibility = ["//visibility:public"],
-    nocopts = select({
-        "//:x64_windows": "/DNOGDI",
-        "//conditions:default": "",
-    })
 )

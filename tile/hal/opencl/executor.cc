@@ -36,8 +36,8 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
                                            std::size_t from_offset, const std::shared_ptr<hal::Buffer>& to,
                                            std::size_t to_offset, std::size_t length,
                                            const std::vector<std::shared_ptr<hal::Event>>& dependencies) {
-  auto from_buf = Buffer::Upcast(from, device_state_->cl_ctx());
-  auto to_buf = Buffer::Upcast(to, device_state_->cl_ctx());
+  auto from_buf = Buffer::Downcast(from, device_state_->cl_ctx());
+  auto to_buf = Buffer::Downcast(to, device_state_->cl_ctx());
 
   if (from_buf->size() <= from_offset || from_buf->size() < length || from_buf->size() < from_offset + length ||
       to_buf->size() <= to_offset || to_buf->size() < length || to_buf->size() < to_offset + length) {
@@ -52,7 +52,7 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
   auto to_ptr = to_buf->mem();
 
   const auto& queue = device_state_->cl_queue(activity.ctx().is_logging_events());
-  auto mdeps = Event::Upcast(dependencies, device_state_->cl_ctx(), queue);
+  auto mdeps = Event::Downcast(dependencies, device_state_->cl_ctx(), queue);
 
   if (from_base && to_base) {
     // Memory-to-memory copy.
@@ -66,7 +66,8 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
     Err::Check(err, "Unable to allocate a synchronization event");
 
     Event::WaitFor(dependencies, device_state_)
-        .then([event, to_base, to_offset, from_base, from_offset, length](boost::future<void> result) {
+        .then([event, to_base, to_offset, from_base, from_offset,
+               length](boost::shared_future<std::vector<std::shared_ptr<hal::Result>>> result) {
           try {
             result.get();
             memcpy(static_cast<char*>(to_base) + to_offset, static_cast<char*>(from_base) + from_offset, length);
@@ -140,7 +141,7 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
 }
 
 boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* library, std::size_t kernel_index) {
-  Library* exe = Library::Upcast(library, device_state_);
+  Library* exe = Library::Downcast(library, device_state_);
 
   const lang::KernelInfo& kinfo = exe->kernel_info()[kernel_index];
   boost::uuids::uuid kuuid = exe->kernel_uuids()[kernel_index];
@@ -162,6 +163,11 @@ boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* libr
 }
 
 void Executor::Flush() { device_state_->FlushCommandQueue(); }
+
+boost::future<std::vector<std::shared_ptr<hal::Result>>> Executor::WaitFor(
+    const std::vector<std::shared_ptr<hal::Event>>& events) {
+  return Event::WaitFor(events, device_state_);
+}
 
 }  // namespace opencl
 }  // namespace hal

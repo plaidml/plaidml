@@ -11,7 +11,7 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-std::shared_ptr<Buffer> Buffer::Upcast(const std::shared_ptr<hal::Buffer>& buffer, const CLObj<cl_context>& cl_ctx) {
+std::shared_ptr<Buffer> Buffer::Downcast(const std::shared_ptr<hal::Buffer>& buffer, const CLObj<cl_context>& cl_ctx) {
   std::shared_ptr<Buffer> buf = std::dynamic_pointer_cast<Buffer>(buffer);
   if (!buf || buf->cl_ctx_ != cl_ctx) {
     throw error::InvalidArgument{"Incompatible buffer for Tile device"};
@@ -19,7 +19,7 @@ std::shared_ptr<Buffer> Buffer::Upcast(const std::shared_ptr<hal::Buffer>& buffe
   return buf;
 }
 
-Buffer* Buffer::Upcast(hal::Buffer* buffer, const CLObj<cl_context>& cl_ctx) {
+Buffer* Buffer::Downcast(hal::Buffer* buffer, const CLObj<cl_context>& cl_ctx) {
   Buffer* buf = dynamic_cast<Buffer*>(buffer);
   if (!buf || buf->cl_ctx_ != cl_ctx) {
     throw error::InvalidArgument{"Incompatible buffer for Tile device"};

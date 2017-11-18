@@ -6,7 +6,6 @@ import plaidml.exceptions
 
 _LOGGER_FUNCTYPE = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_int, ctypes.c_char_p)
 
-
 _LOG_SEVERITY_VERBOSE = 64
 _LOG_SEVERITY_TRACE = 2
 _LOG_SEVERITY_DEBUG = 4
@@ -14,7 +13,6 @@ _LOG_SEVERITY_INFO = 128
 _LOG_SEVERITY_WARNING = 32
 _LOG_SEVERITY_ERROR = 16
 _LOG_SEVERITY_FATAL = 8
-
 
 _LOG_SEVERITY_MAP = {
     _LOG_SEVERITY_VERBOSE: logging.DEBUG,
@@ -25,7 +23,6 @@ _LOG_SEVERITY_MAP = {
     _LOG_SEVERITY_ERROR: logging.ERROR,
     _LOG_SEVERITY_FATAL: logging.CRITICAL
 }
-
 
 _PLAIDML_STATUS_CANCELLED = 1
 _PLAIDML_STATUS_UNKNOWN = 2
@@ -44,24 +41,23 @@ _PLAIDML_STATUS_UNAVAILABLE = 14
 _PLAIDML_STATUS_DATA_LOSS = 15
 _PLAIDML_STATUS_UNAUTHENTICATED = 16
 
-
 _PLAIDML_ERRMAP = {
-    _PLAIDML_STATUS_CANCELLED : plaidml.exceptions.Cancelled,
-    _PLAIDML_STATUS_UNKNOWN : plaidml.exceptions.Unknown,
-    _PLAIDML_STATUS_INVALID_ARGUMENT : plaidml.exceptions.InvalidArgument,
-    _PLAIDML_STATUS_DEADLINE_EXCEEDED : plaidml.exceptions.DeadlineExceeded,
-    _PLAIDML_STATUS_NOT_FOUND : plaidml.exceptions.NotFound,
-    _PLAIDML_STATUS_ALREADY_EXISTS : plaidml.exceptions.AlreadyExists,
-    _PLAIDML_STATUS_PERMISSION_DENIED : plaidml.exceptions.PermissionDenied,
-    _PLAIDML_STATUS_RESOURCE_EXHAUSTED : plaidml.exceptions.ResourceExhausted,
-    _PLAIDML_STATUS_FAILED_PRECONDITION : plaidml.exceptions.FailedPrecondition,
-    _PLAIDML_STATUS_ABORTED : plaidml.exceptions.Aborted,
-    _PLAIDML_STATUS_OUT_OF_RANGE : plaidml.exceptions.OutOfRange,
-    _PLAIDML_STATUS_UNIMPLEMENTED : plaidml.exceptions.Unimplemented,
-    _PLAIDML_STATUS_INTERNAL : plaidml.exceptions.Internal,
-    _PLAIDML_STATUS_UNAVAILABLE : plaidml.exceptions.Unavailable,
-    _PLAIDML_STATUS_DATA_LOSS : plaidml.exceptions.DataLoss,
-    _PLAIDML_STATUS_UNAUTHENTICATED : plaidml.exceptions.Unauthenticated
+    _PLAIDML_STATUS_CANCELLED: plaidml.exceptions.Cancelled,
+    _PLAIDML_STATUS_UNKNOWN: plaidml.exceptions.Unknown,
+    _PLAIDML_STATUS_INVALID_ARGUMENT: plaidml.exceptions.InvalidArgument,
+    _PLAIDML_STATUS_DEADLINE_EXCEEDED: plaidml.exceptions.DeadlineExceeded,
+    _PLAIDML_STATUS_NOT_FOUND: plaidml.exceptions.NotFound,
+    _PLAIDML_STATUS_ALREADY_EXISTS: plaidml.exceptions.AlreadyExists,
+    _PLAIDML_STATUS_PERMISSION_DENIED: plaidml.exceptions.PermissionDenied,
+    _PLAIDML_STATUS_RESOURCE_EXHAUSTED: plaidml.exceptions.ResourceExhausted,
+    _PLAIDML_STATUS_FAILED_PRECONDITION: plaidml.exceptions.FailedPrecondition,
+    _PLAIDML_STATUS_ABORTED: plaidml.exceptions.Aborted,
+    _PLAIDML_STATUS_OUT_OF_RANGE: plaidml.exceptions.OutOfRange,
+    _PLAIDML_STATUS_UNIMPLEMENTED: plaidml.exceptions.Unimplemented,
+    _PLAIDML_STATUS_INTERNAL: plaidml.exceptions.Internal,
+    _PLAIDML_STATUS_UNAVAILABLE: plaidml.exceptions.Unavailable,
+    _PLAIDML_STATUS_DATA_LOSS: plaidml.exceptions.DataLoss,
+    _PLAIDML_STATUS_UNAUTHENTICATED: plaidml.exceptions.Unauthenticated
 }
 
 

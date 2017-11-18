@@ -224,7 +224,7 @@ std::string getEnvVar(std::string const& key) {
   return val == nullptr ? "" : val;
 #endif
 }
-}
+}  // namespace
 
 plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
     vai_ctx* ctx, const char* configuration, const std::string& config_source,
@@ -904,7 +904,7 @@ static std::string read_string(unzFile f, const std::string& name) {
   unzOpenCurrentFile(f);
   unzGetCurrentFileInfo64(f, &fi, NULL, 0, NULL, 0, NULL, 0);
   std::string r(fi.uncompressed_size, '\0');
-  unzReadCurrentFile(f, &r[0], r.size());
+  readBufferFromZipFile(f, &r[0], r.size());
   unzCloseCurrentFile(f);
   return r;
 }
@@ -940,6 +940,14 @@ extern "C" plaidml_function* plaidml_load_function(vai_ctx* ctx, plaidml_device*
     std::string xo = read_string(in_file, "code");
     tile::lang::Parser parser;
     tile::lang::Program p = DeXify(parser.Parse(xo));
+    // Unfortunately, we don't serialize the number of temps (which is needed to do inlining)
+    // So we recompute that here, based on the fact that all temps start with _T (otherwise reserved)
+    for (const tile::lang::Op& op : p.ops) {
+      if (op.output.size() >= 2 && op.output[0] == '_' && op.output[1] == 'T') {
+        p.next_tmp = std::max(p.next_tmp,
+                              static_cast<uint64_t>(std::atoi(op.output.substr(2, op.output.size() - 2).c_str()) + 1));
+      }
+    }
     std::vector<std::shared_ptr<TensorValue>> inputs;
     for (const auto& in : p.inputs) {
       if (in.name[0] == '_') {
@@ -1429,8 +1437,8 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
   context::Activity activity{ctx->activity.ctx(), "plaidml::invoker::ScheduleInvocation"};
   try {
     auto invocation = vertexai::compat::make_unique<plaidml_invocation>();
-    context::Rundown rundown;
-    rundown.TryEnterGate(activity.ctx().gate());
+    auto rundown = std::make_shared<context::Rundown>();
+    rundown->TryEnterGate(activity.ctx().gate());
     if (!invoker->runinfo) {
       invoker->runinfo = invoker->runinfo_cache.Lookup(
           std::make_pair(ToApplierParameterShapes(invoker->inputs), ToApplierParameterShapes(invoker->outputs)),
@@ -1501,7 +1509,15 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
 
     // Run the program
     auto result = program->Run(activity.ctx(), in_buffers, out_buffers);
-    result.then(boost::launch::async, [rundown = std::move(rundown)](decltype(result) result){});
+    result.then(boost::launch::async, [rundown = std::move(rundown)](decltype(result) fut) {
+      try {
+        fut.get();
+      } catch (const std::exception& ex) {
+        // TODO: We need a better way to notify users if the asynchronous results
+        // of an invocation are valid, perhaps by allowing a callback to be specified.
+        LOG(ERROR) << ex.what();
+      }
+    });
 
     return invocation.release();
   } catch (...) {

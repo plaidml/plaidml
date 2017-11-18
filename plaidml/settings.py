@@ -9,7 +9,6 @@ import pkg_resources
 
 import plaidml.exceptions
 
-
 if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
     os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(
         pkg_resources.resource_filename('plaidml', 'experimental.json'))
@@ -17,7 +16,6 @@ if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
 if 'PLAIDML_DEFAULT_CONFIG' not in os.environ:
     os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(
         pkg_resources.resource_filename('plaidml', 'config.json'))
-
 
 CONFIG = 'PLAIDML_CONFIG'
 CONFIG_FILE = 'PLAIDML_CONFIG_FILE'
@@ -50,7 +48,7 @@ class _Settings(object):
             return
         elif not self.setup:
             raise plaidml.exceptions.PlaidMLError('PlaidML is not configured. Run plaidml-setup.')
-        self.session = str(uuid.uuid4()) # Random session id
+        self.session = str(uuid.uuid4())  # Random session id
 
     def _setup_for_test(self, user_settings='', system_settings=''):
         """Sets environment for tests."""
@@ -73,7 +71,8 @@ class _Settings(object):
         if os.path.exists(settings_file):
             for k, val in json.load(open(settings_file)).items():
                 if k not in ENV_SETTINGS:
-                    raise plaidml.exceptions.OutOfRange('Invalid key "{0}" in config {1}'.format(k, settings_file))
+                    raise plaidml.exceptions.OutOfRange('Invalid key "{0}" in config {1}'.format(
+                        k, settings_file))
                 settings[k] = val
         for k, val in settings.items():
             if k not in os.environ:
@@ -94,7 +93,7 @@ class _Settings(object):
 
     @setup.setter
     def setup(self, val):
-      self._setup = val
+        self._setup = val
 
     @property
     def user_settings(self):
@@ -152,7 +151,7 @@ class _Settings(object):
             if SESSION in os.environ:
                 del os.environ[SESSION]
         else:
-          os.environ[SESSION] = val
+            os.environ[SESSION] = val
 
     @property
     def telemetry(self):

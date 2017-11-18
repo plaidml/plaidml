@@ -5,16 +5,16 @@ config_setting(
 )
 
 config_setting(
-  name = "x64_windows",
-  values = {"cpu": "x64_windows"},
-  visibility = ["//visibility:public"],
+    name = "x64_windows",
+    values = {"cpu": "x64_windows"},
+    visibility = ["//visibility:public"],
 )
 
 cc_library(
     name = "gtest",
     srcs = [
-        "googletest/src/gtest-all.cc",
         "googlemock/src/gmock-all.cc",
+        "googletest/src/gtest-all.cc",
     ],
     hdrs = glob([
         "**/*.h",
@@ -23,14 +23,14 @@ cc_library(
     ]),
     includes = [
         "googlemock",
+        "googlemock/include",
         "googletest",
         "googletest/include",
-        "googlemock/include",
     ],
     linkopts = select({
-      "//:darwin": [],
-      "//:x64_windows": [],
-      "//conditions:default": ["-pthread"],
+        "//:darwin": [],
+        "//:x64_windows": [],
+        "//conditions:default": ["-pthread"],
     }),
     visibility = ["//visibility:public"],
 )
@@ -39,9 +39,9 @@ cc_library(
     name = "gtest_main",
     srcs = ["googlemock/src/gmock_main.cc"],
     linkopts = select({
-      "//:darwin": [],
-      "//:x64_windows": [],
-      "//conditions:default": ["-pthread"],
+        "//:darwin": [],
+        "//:x64_windows": [],
+        "//conditions:default": ["-pthread"],
     }),
     visibility = ["//visibility:public"],
     deps = [":gtest"],

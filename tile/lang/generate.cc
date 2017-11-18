@@ -442,12 +442,8 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   // them later iff unused (again, trickier).
   std::unordered_map<std::string, std::string> local_var_rewrites;
 
-  // The initial set of inputs supplied to the kernel.  Reshape/Ident
-  // operations might produce variables that are needed downstream; if
-  // their input variables are created within the kernel, they need to
-  // be kernel outputs, but if their inputs are kernel inputs, they
-  // don't.
-  std::set<std::string> kernel_inputs;
+  // The initial set of inputs supplied to the kernel.
+  std::set<std::string> kernel_inputs{op.inputs.begin(), op.inputs.end()};
 
   IVLOG(3, "In unification, out polys = " << out_poly);
 

@@ -22,8 +22,7 @@ class MemDeps final : public std::enable_shared_from_this<MemDeps> {
   std::vector<std::shared_ptr<hal::Event>> GetReadDependencies();
 
   // Adds to this memory chunk's read dependency, blocking read operations from taking place until the supplied event
-  // has
-  // reached a final state.  This also clears the poison state of the MemDeps.
+  // has reached a final state.  This also clears the poison state of the MemDeps.
   void AddReadDependency(std::shared_ptr<hal::Event> event);
 
   // Poisons the memory chunk, if not already poisoned.  This causes the indicated exception to be thrown from

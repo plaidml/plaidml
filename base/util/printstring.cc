@@ -1,10 +1,10 @@
+#include "base/util/printstring.h"
 
 #include <stdarg.h>
-#include <stdexcept>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "printstring.h"
+#include <stdexcept>
 
 std::string printstring(const char* format, ...) {
   va_list vl;
@@ -21,7 +21,7 @@ std::string printstring(const char* format, ...) {
     throw std::runtime_error("vasprintf failure.");
   }
   /* +1 for \0 terminator. */
-  char *buf = (char *) malloc(len + 1);
+  char* buf = reinterpret_cast<char*>(malloc(len + 1));
   len = vsnprintf(buf, len + 1, format, vl2);
   if (len < 0) {
     va_end(vl);

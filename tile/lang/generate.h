@@ -107,13 +107,15 @@ inline std::string to_string(const KernelInfo& ki) {
   out << "outputs(";
   for (size_t i = 0; i < ki.outputs.size(); i++) {
     out << ki.outputs[i];
-    i < ki.outputs.size() - 1 ? out << ", " : out << ")";
+    if (i < ki.outputs.size() - 1) out << ", ";
   }
+  out << ") ";
   out << "inputs(";
   for (size_t i = 0; i < ki.inputs.size(); i++) {
     out << ki.inputs[i];
-    i < ki.inputs.size() - 1 ? out << ", " : out << ")";
+    if (i < ki.inputs.size() - 1) out << ", ";
   }
+  out << ")";
   return out.str();
 }
 

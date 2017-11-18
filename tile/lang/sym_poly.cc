@@ -25,7 +25,7 @@ class LiteralPolynomial : public SymbolicPolynomial {
   std::string ToString() const override { return std::to_string(value_); }
 
  private:
-  uint64_t value_;
+  int64_t value_;
 };
 
 class LookupPolynomial : public SymbolicPolynomial {

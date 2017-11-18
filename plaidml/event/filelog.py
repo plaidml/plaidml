@@ -1,5 +1,4 @@
 # Copyright Vertex.AI.
-
 """Implements access to Vertex.AI's event log file format."""
 
 from __future__ import absolute_import, print_function

@@ -18,7 +18,7 @@ namespace opencl {
 
 class Library final : public hal::Library {
  public:
-  static Library* Upcast(hal::Library* library, const std::shared_ptr<DeviceState>& device_state);
+  static Library* Downcast(hal::Library* library, const std::shared_ptr<DeviceState>& device_state);
 
   Library(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_program> program,
           const std::vector<lang::KernelInfo>& kernel_info, std::vector<boost::uuids::uuid> kernel_uuids);

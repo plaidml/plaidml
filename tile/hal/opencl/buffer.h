@@ -18,8 +18,8 @@ class Buffer : public hal::Buffer {
  public:
   // Casts a hal::Buffer to a Buffer, throwing an exception if the supplied hal::Buffer isn't an OpenCL buffer, or if
   // it's a buffer for a different context.
-  static std::shared_ptr<Buffer> Upcast(const std::shared_ptr<hal::Buffer>& buffer, const CLObj<cl_context>& cl_ctx);
-  static Buffer* Upcast(hal::Buffer* buffer, const CLObj<cl_context>& cl_ctx);
+  static std::shared_ptr<Buffer> Downcast(const std::shared_ptr<hal::Buffer>& buffer, const CLObj<cl_context>& cl_ctx);
+  static Buffer* Downcast(hal::Buffer* buffer, const CLObj<cl_context>& cl_ctx);
 
   virtual void SetKernelArg(const CLObj<cl_kernel>& kernel, std::size_t index) = 0;
 
