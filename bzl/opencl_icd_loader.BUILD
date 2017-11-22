@@ -29,7 +29,7 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        "//external:opencl_headers",
-        "//external:opengl_headers",
+        "@opencl_headers_repo//:inc",
+        "@opengl_repo//:inc",
     ],
 )

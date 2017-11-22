@@ -1,10 +1,11 @@
 # -*- mode: python; -*- PYTHON-PREPROCESSING-REQUIRED
 
 def with_protobuf(root=""):
-  native.new_git_repository(
-    name="protobuf", # named thusly to appease tensorflow
-    remote="https://github.com/google/protobuf",
-    tag="v3.2.0",
+  native.new_http_archive(
+    name="protobuf",
+    url="https://github.com/google/protobuf/archive/v3.2.0.zip",
+    sha256="5bb18de928e3c6f11da077452f934414f2912df01a3adf7d2d82aba9e47d34bf",
+    strip_prefix="protobuf-3.2.0",
     build_file = root + "//bzl:protobuf.BUILD")
 
   native.bind(name="protoc", actual="@protobuf//:protoc")
@@ -192,7 +193,7 @@ def cc_proto_library(name,
   if default_runtime and not default_runtime in cc_libs:
     cc_libs += [default_runtime]
   if has_services:
-    cc_libs += ["//external:grpc++_lib"]
+    cc_libs += ["@grpc//:grpc++_unsecure"]
     cc_libs += ["//external:zlib"]
 
   native.cc_library(name=name,

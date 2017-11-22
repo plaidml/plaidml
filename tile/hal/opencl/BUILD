@@ -89,7 +89,7 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util:util_cc",
-        "//external:boost_regex",
+        "@boost_archive//:regex",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
@@ -99,7 +99,7 @@ plaidml_cc_library(
     ] + select({
         "//bzl:darwin": [],
         "//conditions:default": [
-            "//external:opencl_icd_loader",
+            "@opencl_icd_loader_repo//:lib",
         ],
     }),
     alwayslink = 1,
@@ -112,6 +112,5 @@ plaidml_cc_test(
     ],
     deps = [
         ":opencl",
-        "//external:gtest",
     ],
 )

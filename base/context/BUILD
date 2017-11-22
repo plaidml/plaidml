@@ -17,9 +17,8 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util:util_cc",
-        "//external:boost",
-        "//external:boost_thread",
-        "//external:protobuf_clib",
+        "@boost_archive//:boost",
+        "@boost_archive//:thread",
     ],
 )
 
