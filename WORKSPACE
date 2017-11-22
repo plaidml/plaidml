@@ -3,7 +3,7 @@ workspace(name = "vertexai_plaidml")
 
 local_repository(
     name = "opengl_repo",
-    path = "external/opengl",
+    path = "vendor/opengl",
 )
 
 load("//bzl:deps.bzl", "plaidml_deps")

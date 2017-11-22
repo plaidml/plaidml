@@ -4,5 +4,5 @@ cc_binary(
     name = "protoc-gen-cc11",
     srcs = ["protoc-gen-cc11.cc"],
     copts = ["-std=c++11"],
-    deps = ["//external:protobuf_compiler"],
+    deps = ["@protobuf//:protoc_lib"],
 )

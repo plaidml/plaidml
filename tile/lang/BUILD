@@ -94,7 +94,7 @@ plaidml_cc_library(
         ":math",
         ":proto_cc",
         "//base/util:util_cc",
-        "//external:boost",
+        "@boost_archive//:boost",
         "//tile/lang/bilp",
     ],
 )
@@ -134,7 +134,7 @@ plaidml_cc_library(
     visibility = ["//tile/lang/bilp:__pkg__"],
     deps = [
         "//base/util:util_cc",
-        "//external:boost",
+        "@boost_archive//:boost",
     ],
 )
 
@@ -158,6 +158,5 @@ plaidml_cc_test(
     deps = [
         ":lang",
         "//base/util:util_cc",
-        "//external:gtest",
     ],
 )

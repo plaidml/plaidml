@@ -11,7 +11,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/util:util_cc",
-        "//external:gtest",
+        "@gmock_archive//:gtest",
         "//tile/lang:math",
     ],
 )
@@ -24,6 +24,5 @@ plaidml_cc_test(
     tags = ["large"],
     deps = [
         ":bilp",
-        "//external:gtest",
     ],
 )
