@@ -19,10 +19,10 @@ plaidml_cc_library(
     deps = [
         "//base/context",
         "//base/util:util_cc",
-        "//external:boost",
-        "//external:boost_thread",
-        "//external:easylogging",
-        "//external:gflags",
+        "@boost_archive//:boost",
+        "@boost_archive//:thread",
+        "@easylogging_repo//:easylogging",
+        "@gflags_repo//:gflags",
         "//tile/proto:proto_cc",
     ],
 )
@@ -35,7 +35,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/context",
-        "//external:boost_thread",
+        "@boost_archive//:thread",
         "//tile/lang",
         "//tile/proto:hal_cc",
     ],
@@ -60,7 +60,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":base",
-        "//external:gtest",
+        "@gmock_archive//:gtest",
         "//testing:matchers",
     ],
     alwayslink = True,
