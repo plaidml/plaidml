@@ -51,6 +51,7 @@ plaidml_cc_library(
         "scope.h",
         "semprinter.cc",
         "semtree.cc",
+        "simplifier.cc",
         "sym_poly.cc",
         "sym_poly.h",
         "symbolic.cc",
@@ -75,6 +76,7 @@ plaidml_cc_library(
         "semprinter.h",
         "semtree.h",
         "shape.h",
+        "simplifier.h",
         "symbolic.h",
         "type.h",
     ],
@@ -94,8 +96,8 @@ plaidml_cc_library(
         ":math",
         ":proto_cc",
         "//base/util:util_cc",
-        "@boost_archive//:boost",
         "//tile/lang/bilp",
+        "@boost_archive//:boost",
     ],
 )
 

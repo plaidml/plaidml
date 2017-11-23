@@ -95,14 +95,14 @@ Event::Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& de
       fut_{state_->prom.get_future().share()} {
   state_->result = result;
   if (!cl_event_) {
-    state_->prom.set_value(std::shared_ptr<hal::Result>(state_->result));
+    state_->prom.set_value(state_->result);
   }
 }
 
 boost::shared_future<std::shared_ptr<hal::Result>> Event::GetFuture() {
   std::lock_guard<std::mutex> lock{mu_};
   if (!cl_event_) {
-    return boost::make_ready_future<std::shared_ptr<hal::Result>>(state_->result);
+    return boost::make_ready_future(state_->result);
   }
 
   if (!started_) {
@@ -149,7 +149,7 @@ void Event::EventComplete(cl_event evt, cl_int status, void* data) {
       LOG(ERROR) << "Event " << EventCommandTypeStr(type) << " failed with: " << err.str();
       Err::Check(err, "Event completed with failure");
     }
-    state->prom.set_value(std::move(state->result));
+    state->prom.set_value(state->result);
   } catch (...) {
     state->prom.set_exception(boost::current_exception());
   }

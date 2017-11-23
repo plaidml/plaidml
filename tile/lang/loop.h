@@ -36,7 +36,6 @@ struct CodeInfo {
   sem::StmtPtr generate(uint64_t numThreads, uint64_t div = 1, bool skip_edge = false, bool order = true);
 
  private:
-  std::shared_ptr<sem::Block> continueClause(int i, ssize_t mul = 1) const;
   std::shared_ptr<sem::Block> increments(int i, ssize_t mul = 1) const;
 };
 
