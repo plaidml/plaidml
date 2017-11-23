@@ -109,7 +109,14 @@ void Build::OnError() noexcept {
         LOG(ERROR) << "Failed to retrieve build log: " << bi_err;
       } else {
         LOG(WARNING) << "Failed build log: " << buffer;
-        LOG(WARNING) << "Code was: " << binfo_.src();
+        std::stringstream ss_in(binfo_.src());
+        std::stringstream ss_out;
+        size_t line_num = 1;
+        std::string line;
+        while (std::getline(ss_in, line, '\n')) {
+          ss_out << std::setw(5) << line_num++ << ": " << line << "\n";
+        }
+        LOG(WARNING) << "Code was: \n" << ss_out.str();
         binfo_.set_log(buffer);
       }
     }
