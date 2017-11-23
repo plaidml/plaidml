@@ -17,6 +17,7 @@
 #include "tile/lang/gen_trivial.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
+#include "tile/lang/simplifier.h"
 #include "tile/lang/tile_opt.h"
 #include "tile/lang/type.h"
 #include "tile/lang/usedef.h"
@@ -786,7 +787,7 @@ KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const Sh
   // Do the primary compilations
   KernelList r;
   r = Compile(prog, inputs, outputs, settings, kid, tile_trials);
-
+  Simplify(r.kernels);
   return r;
 }
 
