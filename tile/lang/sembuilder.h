@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "tile/lang/semtree.h"
 
@@ -72,8 +73,6 @@ inline std::shared_ptr<ForStmt> _For(const std::string& var, uint64_t n, uint64_
   return std::make_shared<ForStmt>(var, n, s, inner);
 }
 
-inline std::shared_ptr<BreakStmt> _Break() { return std::make_shared<BreakStmt>(); }
-inline std::shared_ptr<ContinueStmt> _Continue() { return std::make_shared<ContinueStmt>(); }
 inline std::shared_ptr<BarrierStmt> _Barrier() { return std::make_shared<BarrierStmt>(); }
 inline std::shared_ptr<ReturnStmt> _Return(ExprPtr value = ExprPtr()) { return std::make_shared<ReturnStmt>(value); }
 
