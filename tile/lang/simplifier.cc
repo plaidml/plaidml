@@ -1,6 +1,7 @@
 #include "tile/lang/simplifier.h"
 
 #include "tile/lang/emitc.h"
+#include "tile/lang/scope.h"
 #include "tile/lang/semtree.h"
 
 namespace vertexai {
@@ -8,31 +9,92 @@ namespace tile {
 
 namespace sem {
 
+// This struct holds two totally disparate things, but it's easier
+// to use a single scope object throughout the recursive Simplifier
+// rather than having to pass multiple scope objects down.
+struct Symbol {
+  // This member is set if the symbol can be resolved to an IntConst value.
+  // If such a value exists, substitute in an IntConst over a LoadExpr.
+  boost::optional<int64_t> const_value;
+
+  // This member is set if the symbol can be resolved to another symbol.
+  // That is, if the code looks like:
+  //   int x = y;
+  // Then symbol 'x' is an alias to 'y'.
+  // If such an alias exists, substitute every use for 'x' with a LoadExpr of 'y'.
+  // It's also safe to elide this declaration since every use of 'x' will be replaced with 'y'.
+  boost::optional<std::string> alias;
+};
+
 class Simplifier : public Visitor {
  public:
-  Simplifier() {}
+  explicit Simplifier(lang::Scope<Symbol>* scope) : scope_{scope} {}
 
   void Visit(const IntConst& node) override {}
 
   void Visit(const FloatConst& node) override {}
 
-  void Visit(const LookupLVal& node) override {}
+  void Visit(const LookupLVal& node) override {
+    auto symbol = scope_->Lookup(node.name);
+    // Check if a symbol exists that is an alias for another symbol.
+    if (symbol && (*symbol).alias) {
+      // If such a symbol exists, substitute it in.
+      ref_ = *(*symbol).alias;
+      const_cast<LookupLVal&>(node).name = ref_;
+    } else {
+      ref_ = node.name;
+    }
+  }
 
-  void Visit(const LoadExpr& node) override { node.inner->Accept(*this); }
+  void Visit(const LoadExpr& node) override {
+    auto ref = Resolve(node.inner);
+    auto symbol = scope_->Lookup(ref);
+    // Check if a symbol exists that refers to an IntConst value.
+    if (symbol && (*symbol).const_value) {
+      // If such a symbol exists, substitute the IntConst expr in directly.
+      new_expr_ = std::make_shared<IntConst>(*(*symbol).const_value);
+    }
+  }
 
   void Visit(const StoreStmt& node) override {
-    node.lhs->Accept(*this);
+    Resolve(node.lhs);
     const_cast<StoreStmt&>(node).rhs = EvalExpr(node.rhs);
   }
 
   void Visit(const SubscriptLVal& node) override {
-    node.ptr->Accept(*this);
+    ref_ = Resolve(node.ptr);
     const_cast<SubscriptLVal&>(node).offset = EvalExpr(node.offset);
   }
 
   void Visit(const DeclareStmt& node) override {
     if (node.init) {
-      const_cast<DeclareStmt&>(node).init = EvalExpr(node.init);
+      auto init = EvalExpr(node.init);
+
+      auto int_const = std::dynamic_pointer_cast<IntConst>(init);
+      if (int_const) {
+        Symbol symbol;
+        symbol.const_value = int_const->value;
+        scope_->Bind(node.name, symbol);
+        // Mark this statement as elided.
+        new_stmt_ = std::make_shared<Block>();
+        return;
+      }
+
+      auto load_expr = std::dynamic_pointer_cast<LoadExpr>(init);
+      if (load_expr) {
+        auto lookup = std::dynamic_pointer_cast<LookupLVal>(load_expr->inner);
+        if (lookup) {
+          auto ref = Resolve(load_expr->inner);
+          Symbol symbol;
+          symbol.alias = ref;
+          scope_->Bind(node.name, symbol);
+          // Mark this statement as elided.
+          new_stmt_ = std::make_shared<Block>();
+          return;
+        }
+      }
+
+      const_cast<DeclareStmt&>(node).init = init;
     }
   }
 
@@ -112,9 +174,17 @@ class Simplifier : public Visitor {
   void Visit(const IndexExpr& node) override {}
 
   void Visit(const Block& node) override {
-    for (size_t i = 0; i < node.statements.size(); i++) {
-      const_cast<Block&>(node).statements[i] = EvalStmt(node.statements[i]);
+    lang::Scope<Symbol> scope{scope_};
+    auto new_block = std::make_shared<Block>();
+    for (const auto& stmt : node.statements) {
+      auto new_stmt = EvalStmt(stmt, &scope);
+      auto block = std::dynamic_pointer_cast<Block>(new_stmt);
+      if (!block || !block->statements.empty()) {
+        // Only emit statements that haven't been elided.
+        new_block->push_back(new_stmt);
+      }
     }
+    new_stmt_ = new_block;
   }
 
   void Visit(const IfStmt& node) override {
@@ -151,7 +221,7 @@ class Simplifier : public Visitor {
   }
 
   ExprPtr EvalExpr(const ExprPtr& expr) {
-    Simplifier eval;
+    Simplifier eval(scope_);
     expr->Accept(eval);
     if (eval.new_expr_) {
       return eval.new_expr_;
@@ -159,8 +229,10 @@ class Simplifier : public Visitor {
     return expr;
   }
 
-  StmtPtr EvalStmt(const StmtPtr& stmt) {
-    Simplifier eval;
+  StmtPtr EvalStmt(const StmtPtr& stmt) { return EvalStmt(stmt, scope_); }
+
+  StmtPtr EvalStmt(const StmtPtr& stmt, lang::Scope<Symbol>* scope) {
+    Simplifier eval(scope);
     stmt->Accept(eval);
     if (eval.new_stmt_) {
       return eval.new_stmt_;
@@ -168,8 +240,18 @@ class Simplifier : public Visitor {
     return stmt;
   }
 
+  std::string Resolve(const LValPtr& ptr) {
+    Simplifier eval(scope_);
+    ptr->Accept(eval);
+    return eval.ref_;
+  }
+
+ private:
   ExprPtr new_expr_;
   StmtPtr new_stmt_;
+  std::string ref_;
+
+  lang::Scope<Symbol>* scope_;
 };
 
 }  // namespace sem
@@ -185,7 +267,8 @@ void Simplify(const std::vector<KernelInfo>& kernels) {
       VLOG(4) << ki.comments;
       VLOG(4) << emit_debug.str();
     }
-    sem::Simplifier simplifier;
+    lang::Scope<sem::Symbol> scope;
+    sem::Simplifier simplifier{&scope};
     ki.kfunc->Accept(simplifier);
   }
 }
