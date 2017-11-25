@@ -134,7 +134,11 @@ void ExprType::Visit(const sem::FloatConst& n) {
 }
 
 void ExprType::Visit(const sem::LookupLVal& n) {
-  ty_ = scope_->Lookup(n.name);
+  auto result = scope_->Lookup(n.name);
+  if (!result) {
+    throw std::out_of_range{"Undeclared reference: " + n.name};
+  }
+  ty_ = *result;
   IVLOG(5, "ExprType(LookupLVal[" << n.name << "]): " << ty_);
 }
 

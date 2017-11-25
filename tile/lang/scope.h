@@ -6,6 +6,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <boost/optional.hpp>
+
 namespace vertexai {
 namespace tile {
 namespace lang {
@@ -16,35 +18,23 @@ template <class V>
 class Scope {
  public:
   Scope() {}
-  explicit Scope(Scope<V>* parent) : parent_{parent} {}
+  explicit Scope(const Scope<V>* parent) : parent_{parent} {}
 
   // Lookup the key in this scope or a parent scope.
-  // Throws std::out_of_range if the key cannot be found.
-  V& Lookup(const std::string& key) {
-    auto it = info_.find(key);
-    if (it != info_.end()) {
+  boost::optional<V> Lookup(const std::string& key) const {
+    auto it = items_.find(key);
+    if (it != items_.end()) {
       return it->second;
     }
     if (parent_) {
       return parent_->Lookup(key);
     }
-    throw std::out_of_range{"Undeclared reference: " + key};
-  }
-
-  const V& Lookup(const std::string& key) const {
-    auto it = info_.find(key);
-    if (it != info_.end()) {
-      return it->second;
-    }
-    if (parent_) {
-      return parent_->Lookup(key);
-    }
-    throw std::out_of_range{"Undeclared reference: " + key};
+    return boost::none;
   }
 
   bool Defines(const std::string& key) const {
-    auto it = info_.find(key);
-    if (it != info_.end()) {
+    auto it = items_.find(key);
+    if (it != items_.end()) {
       return true;
     }
     return false;
@@ -53,15 +43,15 @@ class Scope {
   // Bind the key in the current scope (regardless of whether it's bound in a parent scope).
   // Throws std::logic_error if the key is already bound in the current scope.
   void Bind(const std::string& key, const V& value) {
-    auto result = info_.emplace(key, value);
+    auto result = items_.emplace(key, value);
     if (!result.second) {
       throw std::logic_error{"Duplicate binding discovered: " + key};
     }
   }
 
  private:
-  Scope<V>* parent_ = nullptr;
-  std::unordered_map<std::string, V> info_;
+  const Scope<V>* parent_ = nullptr;
+  std::unordered_map<std::string, V> items_;
 };
 
 }  // namespace lang

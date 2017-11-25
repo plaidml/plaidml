@@ -132,7 +132,9 @@ void EmitC::Visit(const sem::UnaryExpr& n) {
 void EmitC::Visit(const sem::BinaryExpr& n) {
   emit("(");
   n.lhs->Accept(*this);
+  emit(" ");
   emit(n.op);
+  emit(" ");
   n.rhs->Accept(*this);
   emit(")");
 }
