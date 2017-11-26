@@ -18,9 +18,9 @@ namespace opencl {
 static std::map<std::string, std::string> FuncNameMap = {
     {"recip", "native_recip"}, {"exp", "native_exp"}, {"log", "native_log"}, {"sqrt", "native_sqrt"}};
 
-void Emit::operator()(const sem::LoadExpr& n) {
+void Emit::Visit(const sem::LoadExpr& n) {
   auto ty = TypeOf(n.inner);
-  auto inner = boost::get<sem::SubscriptLVal>(n.inner.get());
+  auto inner = std::dynamic_pointer_cast<sem::SubscriptLVal>(n.inner);
   if (!cl_khr_fp16_ && inner && ty.dtype == lang::DataType::FLOAT16) {
     // Half-width floats can't be loaded directly on this device.
     std::string fname = "vloada_half";
@@ -29,18 +29,18 @@ void Emit::operator()(const sem::LoadExpr& n) {
     }
     emit(fname);
     emit("(");
-    boost::apply_visitor(*this, *inner->offset);
+    inner->offset->Accept(*this);
     emit(", ");
-    boost::apply_visitor(*this, *inner->ptr);
+    inner->ptr->Accept(*this);
     emit(")");
   } else {
-    EmitC::operator()(n);
+    EmitC::Visit(n);
   }
 }
 
-void Emit::operator()(const sem::StoreStmt& n) {
+void Emit::Visit(const sem::StoreStmt& n) {
   auto ty_lhs = TypeOf(n.lhs);
-  auto lhs = boost::get<sem::SubscriptLVal>(n.lhs.get());
+  auto lhs = std::dynamic_pointer_cast<sem::SubscriptLVal>(n.lhs);
   if (!cl_khr_fp16_ && lhs && ty_lhs.dtype == lang::DataType::FLOAT16) {
     // Half-width floats can't be stored directly on this device.
     std::string fname = "vstorea_half";
@@ -50,22 +50,22 @@ void Emit::operator()(const sem::StoreStmt& n) {
     emitTab();
     emit(fname);
     emit("(");
-    boost::apply_visitor(*this, *n.rhs);
+    n.rhs->Accept(*this);
     emit(", ");
-    boost::apply_visitor(*this, *lhs->offset);
+    lhs->offset->Accept(*this);
     emit(", ");
-    boost::apply_visitor(*this, *lhs->ptr);
+    lhs->ptr->Accept(*this);
     emit(");\n");
   } else {
     emitTab();
-    boost::apply_visitor(*this, *n.lhs);
+    n.lhs->Accept(*this);
     emit(" = ");
     EmitWithTypeConversion(TypeOf(n.rhs), ty_lhs, n.rhs);
     emit(";\n");
   }
 }
 
-void Emit::operator()(const sem::DeclareStmt& n) {
+void Emit::Visit(const sem::DeclareStmt& n) {
   sem::Type ty = n.type;
   sem::Type init_type;
   if (n.init) {
@@ -102,7 +102,7 @@ void Emit::operator()(const sem::DeclareStmt& n) {
     if (n.type.array) {
       emit("{");
       for (size_t i = 0; i < n.type.array; i++) {
-        boost::apply_visitor(*this, *n.init);
+        n.init->Accept(*this);
         emit(", ");
       }
       emit("}");
@@ -115,7 +115,7 @@ void Emit::operator()(const sem::DeclareStmt& n) {
   scope_->Bind(n.name, ty);
 }
 
-void Emit::operator()(const sem::BinaryExpr& n) {
+void Emit::Visit(const sem::BinaryExpr& n) {
   auto ty_lhs = TypeOf(n.lhs);
   auto ty_rhs = TypeOf(n.rhs);
   auto ty = Promote({ty_lhs, ty_rhs});
@@ -128,7 +128,7 @@ void Emit::operator()(const sem::BinaryExpr& n) {
   emit(")");
 }
 
-void Emit::operator()(const sem::CondExpr& n) {
+void Emit::Visit(const sem::CondExpr& n) {
   auto ty_tcase = TypeOf(n.tcase);
   auto ty_fcase = TypeOf(n.fcase);
   auto ty = Promote({ty_tcase, ty_fcase});
@@ -141,7 +141,7 @@ void Emit::operator()(const sem::CondExpr& n) {
   emit(")");
 }
 
-void Emit::operator()(const sem::SelectExpr& n) {
+void Emit::Visit(const sem::SelectExpr& n) {
   auto ty_tcase = TypeOf(n.tcase);
   auto ty_fcase = TypeOf(n.fcase);
   auto ty = Promote({ty_tcase, ty_fcase});
@@ -154,7 +154,7 @@ void Emit::operator()(const sem::SelectExpr& n) {
   emit(")");
 }
 
-void Emit::operator()(const sem::ClampExpr& n) {
+void Emit::Visit(const sem::ClampExpr& n) {
   auto ty_val = TypeOf(n.val);
   auto ty_min = TypeOf(n.min);
   auto ty_max = TypeOf(n.max);
@@ -181,13 +181,13 @@ void Emit::operator()(const sem::ClampExpr& n) {
   emit(")");
 }
 
-void Emit::operator()(const sem::CastExpr& n) { boost::apply_visitor(*this, *n.val); }
+void Emit::Visit(const sem::CastExpr& n) { n.val->Accept(*this); }
 
-void Emit::operator()(const sem::CallExpr& n) {
+void Emit::Visit(const sem::CallExpr& n) {
   bool did_override = false;
-  auto load = boost::get<sem::LoadExpr>(n.func.get());
+  auto load = std::dynamic_pointer_cast<sem::LoadExpr>(n.func);
   if (load) {
-    auto lookup = boost::get<sem::LookupLVal>(load->inner.get());
+    auto lookup = std::dynamic_pointer_cast<sem::LookupLVal>(load->inner);
     if (lookup) {
       auto it = FuncNameMap.find(lookup->name);
       if (it != FuncNameMap.end()) {
@@ -201,11 +201,11 @@ void Emit::operator()(const sem::CallExpr& n) {
     }
   }
   if (!did_override) {
-    boost::apply_visitor(*this, *n.func);
+    n.func->Accept(*this);
   }
   emit("(");
   for (size_t i = 0; i < n.vals.size(); i++) {
-    boost::apply_visitor(*this, *n.vals[i]);
+    n.vals[i]->Accept(*this);
     if (i != n.vals.size() - 1) {
       emit(", ");
     }
@@ -213,7 +213,7 @@ void Emit::operator()(const sem::CallExpr& n) {
   emit(")");
 }
 
-void Emit::operator()(const sem::IndexExpr& n) {
+void Emit::Visit(const sem::IndexExpr& n) {
   switch (n.type) {
     case sem::IndexExpr::GLOBAL:
       emit("get_global_id(" + std::to_string(n.dim) + ")");
@@ -229,29 +229,29 @@ void Emit::operator()(const sem::IndexExpr& n) {
   }
 }
 
-void Emit::operator()(const sem::Block& n) {
+void Emit::Visit(const sem::Block& n) {
   auto previous_scope = scope_;
   lang::Scope<sem::Type> scope{scope_};
   scope_ = &scope;
-  EmitC::operator()(n);
+  EmitC::Visit(n);
   scope_ = previous_scope;
 }
 
-void Emit::operator()(const sem::ForStmt& n) {
+void Emit::Visit(const sem::ForStmt& n) {
   auto previous_scope = scope_;
   lang::Scope<sem::Type> scope{scope_};
   scope_ = &scope;
   scope.Bind(n.var, sem::Type{sem::Type::INDEX});
-  EmitC::operator()(n);
+  EmitC::Visit(n);
   scope_ = previous_scope;
 }
 
-void Emit::operator()(const sem::BarrierStmt& n) {
+void Emit::Visit(const sem::BarrierStmt& n) {
   emitTab();
   emit("barrier(CLK_LOCAL_MEM_FENCE);\n");
 }
 
-void Emit::operator()(const sem::Function& n) {
+void Emit::Visit(const sem::Function& n) {
   emit("__kernel ");
   lang::Scope<sem::Type> scope;
   scope_ = &scope;
@@ -294,7 +294,7 @@ void Emit::operator()(const sem::Function& n) {
     emit(p.second);
   }
   emit(")\n");
-  (*this)(*n.body);
+  n.body->Accept(*this);
 
   scope_ = nullptr;
 }
@@ -327,20 +327,20 @@ void Emit::EmitWithTypeConversion(const sem::Type& from, const sem::Type& to, co
                                            to.dtype == lang::DataType::INT8)))) ||
         (from.base == to.base && from.dtype == to.dtype && from.vec_width == to.vec_width)))) {
     // No conversion required.
-    boost::apply_visitor(*this, *expr);
+    expr->Accept(*this);
     return;
   }
   if (from.base == sem::Type::INDEX || (from.base == sem::Type::VALUE && from.vec_width == 1)) {
     emit("(");
     EmitC::emitType(to);
     emit(")");
-    boost::apply_visitor(*this, *expr);
+    expr->Accept(*this);
     return;
   }
   emit("convert_");
   EmitC::emitType(to);
   emit("(");
-  boost::apply_visitor(*this, *expr);
+  expr->Accept(*this);
   emit(")");
 }
 
@@ -348,7 +348,7 @@ void Emit::EmitWithWidthConversion(const sem::Type& from, const sem::Type& to, c
                                    bool force_conversion) {
   if (to.base == sem::Type::POINTER_MUT || to.base == sem::Type::POINTER_CONST) {
     // No conversion required.
-    boost::apply_visitor(*this, *expr);
+    expr->Accept(*this);
     return;
   }
 

@@ -21,7 +21,8 @@ class ZeroKernel final : public hal::Kernel {
   ZeroKernel(const std::shared_ptr<DeviceState>& device_state, const lang::KernelInfo& kinfo, boost::uuids::uuid kuuid);
 
   std::shared_ptr<hal::Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<hal::Buffer>>& params,
-                                  const std::vector<std::shared_ptr<hal::Event>>& dependencies) final;
+                                  const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                  bool enable_profiling) final;
 
  private:
   std::shared_ptr<DeviceState> device_state_;

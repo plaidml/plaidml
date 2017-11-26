@@ -16,8 +16,9 @@ ZeroKernel::ZeroKernel(const std::shared_ptr<DeviceState>& device_state, const l
 
 std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
                                             const std::vector<std::shared_ptr<hal::Buffer>>& params,
-                                            const std::vector<std::shared_ptr<hal::Event>>& dependencies) {
-  const auto& queue = device_state_->cl_queue();
+                                            const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                            bool enable_profiling) {
+  const auto& queue = device_state_->cl_queue(enable_profiling);
   auto deps = Event::Downcast(dependencies, device_state_->cl_ctx(), queue);
   IVLOG(4, "Running zero-fill memory " << kinfo_.kname);
 

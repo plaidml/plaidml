@@ -202,8 +202,7 @@ sem::StmtPtr ReadPlan::generate(const std::string& to, const std::string& from, 
   b2->append(_Declare({sem::Type::INDEX}, "gidx", gidx));
   sem::StmtPtr assign = (_(to)[_("lidx")] = _(from)[_Clamp(_("gidx"), _Const(-offset), _Const(limit - offset - 1))]);
   b2->append(assign);
-  ci.inner = std::move(b2);
-
+  ci.inner = b2;
   ci.thread(threads);
   auto b = _Block({});
   sem::ExprPtr gbase = _Const(-global_zero_);
@@ -211,8 +210,8 @@ sem::StmtPtr ReadPlan::generate(const std::string& to, const std::string& from, 
     gbase = gbase + (_(oi.name + "_gid") * oi.stride);
   }
   b->append(_Declare({sem::Type::INDEX}, "gbase", gbase));
-  b->merge(ci.generate(threads));
-  return _Stmt(std::move(b));
+  b->append(ci.generate(threads));
+  return b;
 }
 
 }  // namespace lang
