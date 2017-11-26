@@ -150,7 +150,8 @@ class Kernel {
   // a callback to the event returned by this call, or by attaching a callback to the returned event of a subsequent
   // operation whose dependencies include the event returned by this call.
   virtual std::shared_ptr<Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<Buffer>>& params,
-                                     const std::vector<std::shared_ptr<Event>>& dependencies) = 0;
+                                     const std::vector<std::shared_ptr<Event>>& dependencies,
+                                     bool enable_profiling = false) = 0;
 };
 
 // A Library is an opaque object representing device-specific executable code.
@@ -251,7 +252,7 @@ class Device {
   // The supplied settings allow the device to be configured by users.
   //
   // TODO(rob): Fix our configuration story
-  virtual void Initialize(const context::Context& ctx, const proto::HardwareSettings& settings) = 0;
+  virtual void Initialize(const proto::HardwareSettings& settings) = 0;
 
   // Retrieves the device's description string, making it a little easier for humans to figure out which device is
   // which.

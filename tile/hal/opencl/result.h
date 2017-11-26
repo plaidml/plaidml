@@ -14,19 +14,18 @@ namespace hal {
 namespace opencl {
 
 struct ResultInfo {
-  cl_ulong queued_time = 0;
-  cl_ulong submit_time = 0;
-  cl_ulong start_time = 0;
-  cl_ulong end_time = 0;
-  cl_int status = 0;
-  std::chrono::high_resolution_clock::duration execution_duration{std::chrono::high_resolution_clock::duration::zero()};
+  cl_ulong queued_time;
+  cl_ulong submit_time;
+  cl_ulong start_time;
+  cl_ulong end_time;
+  cl_int status;
+  std::chrono::high_resolution_clock::duration execution_duration;
 };
 
 // Implements hal::Result in terms of OpenCL events.
 class Result final : public hal::Result {
  public:
-  Result(const context::Context& ctx, std::shared_ptr<DeviceState> device_state, CLObj<cl_event> event,
-         const DeviceState::Queue& queue);
+  Result(const context::Context& ctx, std::shared_ptr<DeviceState> device_state, CLObj<cl_event> event);
 
   std::chrono::high_resolution_clock::duration GetDuration() const final;
   void LogStatistics() const final;
@@ -35,7 +34,6 @@ class Result final : public hal::Result {
   context::Context ctx_;
   std::shared_ptr<DeviceState> device_state_;
   CLObj<cl_event> event_;
-  bool profiling_enabled_;
   mutable std::unique_ptr<ResultInfo> info_;
   mutable std::once_flag once_;
 };
@@ -43,7 +41,7 @@ class Result final : public hal::Result {
 class KernelResult final : public hal::Result {
  public:
   KernelResult(const context::Context& ctx, std::shared_ptr<DeviceState> device_state, CLObj<cl_event> event,
-               const lang::KernelInfo& ki, const DeviceState::Queue& queue);
+               const lang::KernelInfo& ki);
 
   std::chrono::high_resolution_clock::duration GetDuration() const final;
   void LogStatistics() const final;
@@ -52,7 +50,6 @@ class KernelResult final : public hal::Result {
   context::Context ctx_;
   std::shared_ptr<DeviceState> device_state_;
   CLObj<cl_event> event_;
-  bool profiling_enabled_;
   mutable std::unique_ptr<ResultInfo> info_;
   mutable std::once_flag once_;
 
