@@ -7,33 +7,33 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace sem {
 
-class EmitC : public sem::Visitor {
+class EmitC : public boost::static_visitor<> {
  public:
-  void Visit(const sem::IntConst&) override;
-  void Visit(const sem::FloatConst&) override;
-  void Visit(const sem::LookupLVal&) override;
-  void Visit(const sem::LoadExpr&) override;
-  void Visit(const sem::StoreStmt&) override;
-  void Visit(const sem::SubscriptLVal&) override;
-  void Visit(const sem::DeclareStmt&) override;
-  void Visit(const sem::UnaryExpr&) override;
-  void Visit(const sem::BinaryExpr&) override;
-  void Visit(const sem::CondExpr&) override;
-  void Visit(const sem::SelectExpr&) override;
-  void Visit(const sem::ClampExpr&) override;
-  void Visit(const sem::CastExpr&) override;
-  void Visit(const sem::CallExpr&) override;
-  void Visit(const sem::LimitConst&) override;
-  void Visit(const sem::IndexExpr&) override;
-  void Visit(const sem::Block&) override;
-  void Visit(const sem::IfStmt&) override;
-  void Visit(const sem::ForStmt&) override;
-  void Visit(const sem::WhileStmt&) override;
-  void Visit(const sem::BarrierStmt&) override;
-  void Visit(const sem::ReturnStmt&) override;
-  void Visit(const sem::Function&) override;
+  virtual void operator()(const sem::IntConst&);
+  virtual void operator()(const sem::FloatConst&);
+  virtual void operator()(const sem::LookupLVal&);
+  virtual void operator()(const sem::LoadExpr&);
+  virtual void operator()(const sem::StoreStmt&);
+  virtual void operator()(const sem::SubscriptLVal&);
+  virtual void operator()(const sem::DeclareStmt&);
+  virtual void operator()(const sem::UnaryExpr&);
+  virtual void operator()(const sem::BinaryExpr&);
+  virtual void operator()(const sem::CondExpr&);
+  virtual void operator()(const sem::SelectExpr&);
+  virtual void operator()(const sem::ClampExpr&);
+  virtual void operator()(const sem::CastExpr&);
+  virtual void operator()(const sem::CallExpr&);
+  virtual void operator()(const sem::LimitConst&);
+  virtual void operator()(const sem::IndexExpr&);
+  virtual void operator()(const sem::Block&);
+  virtual void operator()(const sem::IfStmt&);
+  virtual void operator()(const sem::ForStmt&);
+  virtual void operator()(const sem::WhileStmt&);
+  virtual void operator()(const sem::BarrierStmt&);
+  virtual void operator()(const sem::ReturnStmt&);
+  virtual void operator()(const sem::Function&);
   std::string str() const { return result_.str(); }
 
  protected:
@@ -44,47 +44,20 @@ class EmitC : public sem::Visitor {
   size_t indent_ = 0;
 };
 
-class EmitDebug : public EmitC {
+class Print final : public EmitC {
  public:
-  void Visit(const sem::CallExpr& n) final {
-    n.func->Accept(*this);
-    emit("(");
-    for (size_t i = 0; i < n.vals.size(); i++) {
-      n.vals[i]->Accept(*this);
-      if (i != n.vals.size() - 1) {
-        emit(", ");
-      }
-    }
-    emit(")");
-  }
-
-  void Visit(const sem::IndexExpr& n) final {
-    switch (n.type) {
-      case sem::IndexExpr::GLOBAL:
-        emit("get_global_id(" + std::to_string(n.dim) + ")");
-        break;
-      case sem::IndexExpr::GROUP:
-        emit("get_group_id(" + std::to_string(n.dim) + ")");
-        break;
-      case sem::IndexExpr::LOCAL:
-        emit("get_local_id(" + std::to_string(n.dim) + ")");
-        break;
-      default:
-        throw std::runtime_error("Invalid IndexExpr type");
-    }
-  }
-
-  void Visit(const sem::BarrierStmt& n) {
-    emitTab();
-    emit("barrier();\n");
-  }
-
-  void Visit(const sem::Function& n) final {
-    emit("kernel ");
-    EmitC::Visit(n);
-  }
+  void operator()(const sem::CallExpr& n) final;
+  void operator()(const sem::IndexExpr& n) final;
+  void operator()(const sem::BarrierStmt& n) final;
+  void operator()(const sem::Function& f) final;
 };
 
-}  // namespace lang
+inline std::string to_string(const sem::Function& f) {
+  Print p{};
+  p(f);
+  return p.str();
+}
+
+}  // namespace sem
 }  // namespace tile
 }  // namespace vertexai

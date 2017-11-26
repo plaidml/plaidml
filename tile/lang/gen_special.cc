@@ -7,10 +7,10 @@
 #include <utility>
 
 #include "base/util/logging.h"
+#include "tile/lang/emitc.h"
 #include "tile/lang/gid.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/sembuilder.h"
-#include "tile/lang/semprinter.h"
 
 namespace vertexai {
 namespace tile {
@@ -104,9 +104,9 @@ static void GenGather(KernelList& r, const Op& op, const Bindings& bindings,  //
   ki.tot_flops = out_size;
 
   // Dump the code
-  sem::Print dump(*ki.kfunc);
-  IVLOG(4, "CODE:\n" << dump.str());
+  IVLOG(4, "CODE:\n" << to_string(*ki.kfunc));
   IVLOG(4, "gwork: " << ki.gwork << ", lwork: " << ki.lwork);
+
   // Add to kernel list
   r.kernels.push_back(ki);
 }
@@ -149,8 +149,8 @@ static void GenShape(KernelList& r, const Op& op, const Bindings& bindings,  // 
   ki.tot_flops = out_size;
 
   // Dump the code
-  sem::Print dump(*ki.kfunc);
-  IVLOG(4, "CODE:\n" << dump.str());
+  IVLOG(4, "CODE:\n" << to_string(*ki.kfunc));
+
   // Add to kernel list
   r.kernels.push_back(ki);
 }
@@ -217,8 +217,8 @@ static void GenPRNG(KernelList& r, const Op& op, const Bindings& bindings,  // N
   ki.tot_flops = out_size;
 
   // Dump the code
-  sem::Print dump(*ki.kfunc);
-  IVLOG(3, "CODE:\n" << dump.str());
+  IVLOG(3, "CODE:\n" << to_string(*ki.kfunc));
+
   // Add to kernel list
   r.kernels.push_back(ki);
 }

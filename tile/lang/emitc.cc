@@ -5,45 +5,45 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace sem {
 
-inline std::string c_dtype(const DataType& dt) {
+inline std::string c_dtype(const lang::DataType& dt) {
   std::string base;
   switch (dt) {
-    case DataType::BOOLEAN:
+    case lang::DataType::BOOLEAN:
       base = "bool";
       break;
-    case DataType::INT8:
+    case lang::DataType::INT8:
       base = "char";
       break;
-    case DataType::INT16:
+    case lang::DataType::INT16:
       base = "short";
       break;
-    case DataType::INT32:
+    case lang::DataType::INT32:
       base = "int";
       break;
-    case DataType::INT64:
+    case lang::DataType::INT64:
       base = "long";
       break;
-    case DataType::UINT8:
+    case lang::DataType::UINT8:
       base = "uchar";
       break;
-    case DataType::UINT16:
+    case lang::DataType::UINT16:
       base = "ushort";
       break;
-    case DataType::UINT32:
+    case lang::DataType::UINT32:
       base = "uint";
       break;
-    case DataType::UINT64:
+    case lang::DataType::UINT64:
       base = "ulong";
       break;
-    case DataType::FLOAT16:
+    case lang::DataType::FLOAT16:
       base = "half";
       break;
-    case DataType::FLOAT32:
+    case lang::DataType::FLOAT32:
       base = "float";
       break;
-    case DataType::FLOAT64:
+    case lang::DataType::FLOAT64:
       base = "double";
       break;
     default:
@@ -69,36 +69,36 @@ void EmitC::emitType(const sem::Type& t) {
   }
 }
 
-void EmitC::Visit(const sem::IntConst& n) { emit(std::to_string(n.value)); }
+void EmitC::operator()(const sem::IntConst& n) { emit(std::to_string(n.value)); }
 
-void EmitC::Visit(const sem::FloatConst& n) {
-  std::string c = DoubleToString(n.value);
+void EmitC::operator()(const sem::FloatConst& n) {
+  std::string c = lang::DoubleToString(n.value);
   if (c.find_first_of(".e") == std::string::npos) {
     c += ".0";
   }
   emit(c + "f");
 }
 
-void EmitC::Visit(const sem::LookupLVal& n) { emit(n.name); }
+void EmitC::operator()(const sem::LookupLVal& n) { emit(n.name); }
 
-void EmitC::Visit(const sem::LoadExpr& n) { n.inner->Accept(*this); }
+void EmitC::operator()(const sem::LoadExpr& n) { boost::apply_visitor(*this, *n.inner); }
 
-void EmitC::Visit(const sem::StoreStmt& n) {
+void EmitC::operator()(const sem::StoreStmt& n) {
   emitTab();
-  n.lhs->Accept(*this);
+  boost::apply_visitor(*this, *n.lhs);
   emit(" = ");
-  n.rhs->Accept(*this);
+  boost::apply_visitor(*this, *n.rhs);
   emit(";\n");
 }
 
-void EmitC::Visit(const sem::SubscriptLVal& n) {
-  n.ptr->Accept(*this);
+void EmitC::operator()(const sem::SubscriptLVal& n) {
+  boost::apply_visitor(*this, *n.ptr);
   emit("[");
-  n.offset->Accept(*this);
+  boost::apply_visitor(*this, *n.offset);
   emit("]");
 }
 
-void EmitC::Visit(const sem::DeclareStmt& n) {
+void EmitC::operator()(const sem::DeclareStmt& n) {
   emitTab();
   emitType(n.type);
   emit(" ");
@@ -111,101 +111,113 @@ void EmitC::Visit(const sem::DeclareStmt& n) {
     if (n.type.array) {
       emit("{");
       for (size_t i = 0; i < n.type.array; i++) {
-        n.init->Accept(*this);
+        boost::apply_visitor(*this, *n.init);
         emit(", ");
       }
       emit("}");
     } else {
-      n.init->Accept(*this);
+      boost::apply_visitor(*this, *n.init);
     }
   }
   emit(";\n");
 }
 
-void EmitC::Visit(const sem::UnaryExpr& n) {
+void EmitC::operator()(const sem::UnaryExpr& n) {
   emit("(");
   emit(n.op);
-  n.inner->Accept(*this);
+  boost::apply_visitor(*this, *n.inner);
   emit(")");
 }
 
-void EmitC::Visit(const sem::BinaryExpr& n) {
+void EmitC::operator()(const sem::BinaryExpr& n) {
   emit("(");
-  n.lhs->Accept(*this);
+  boost::apply_visitor(*this, *n.lhs);
   emit(" ");
   emit(n.op);
   emit(" ");
-  n.rhs->Accept(*this);
+  boost::apply_visitor(*this, *n.rhs);
   emit(")");
 }
 
-void EmitC::Visit(const sem::CondExpr& n) {
+void EmitC::operator()(const sem::CondExpr& n) {
   emit("(");
-  n.cond->Accept(*this);
+  boost::apply_visitor(*this, *n.cond);
   emit(" ? ");
-  n.tcase->Accept(*this);
+  boost::apply_visitor(*this, *n.tcase);
   emit(" : ");
-  n.fcase->Accept(*this);
+  boost::apply_visitor(*this, *n.fcase);
   emit(")");
 }
 
-void EmitC::Visit(const sem::SelectExpr& n) {
+void EmitC::operator()(const sem::SelectExpr& n) {
   emit("select(");
-  n.fcase->Accept(*this);
+  boost::apply_visitor(*this, *n.fcase);
   emit(", ");
-  n.tcase->Accept(*this);
+  boost::apply_visitor(*this, *n.tcase);
   emit(", ");
-  n.cond->Accept(*this);
+  boost::apply_visitor(*this, *n.cond);
   emit(")");
 }
 
-void EmitC::Visit(const sem::ClampExpr& n) {
+void EmitC::operator()(const sem::ClampExpr& n) {
   emit("clamp(");
-  n.val->Accept(*this);
+  boost::apply_visitor(*this, *n.val);
   emit(", ");
-  n.min->Accept(*this);
+  boost::apply_visitor(*this, *n.min);
   emit(", ");
-  n.max->Accept(*this);
+  boost::apply_visitor(*this, *n.max);
   emit(")");
 }
 
-void EmitC::Visit(const sem::CastExpr& n) {
+void EmitC::operator()(const sem::CastExpr& n) {
   emit("((");
   emitType(n.type);
   emit(")");
-  n.val->Accept(*this);
+  boost::apply_visitor(*this, *n.val);
   emit(")");
 }
 
-void EmitC::Visit(const sem::CallExpr& n) {
-  n.func->Accept(*this);
+void EmitC::operator()(const sem::CallExpr& n) {
+  boost::apply_visitor(*this, *n.func);
   emit("(");
   for (size_t i = 0; i < n.vals.size(); i++) {
     if (i) {
       emit(", ");
     }
-    n.vals[i]->Accept(*this);
+    boost::apply_visitor(*this, *n.vals[i]);
   }
   emit(")");
 }
 
-static std::map<std::pair<DataType, sem::LimitConst::Which>, std::string> LimitConstLookup = {
-    {{DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},        {{DataType::INT8, sem::LimitConst::MIN}, "SCHAR_MIN"},
-    {{DataType::INT16, sem::LimitConst::MIN}, "SHRT_MIN"},   {{DataType::INT32, sem::LimitConst::MIN}, "INT_MIN"},
-    {{DataType::INT64, sem::LimitConst::MIN}, "LONG_MIN"},   {{DataType::UINT8, sem::LimitConst::MIN}, "0"},
-    {{DataType::UINT16, sem::LimitConst::MIN}, "0"},         {{DataType::UINT32, sem::LimitConst::MIN}, "0"},
-    {{DataType::UINT64, sem::LimitConst::MIN}, "0"},         {{DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
-    {{DataType::FLOAT32, sem::LimitConst::MIN}, "-FLT_MAX"}, {{DataType::FLOAT64, sem::LimitConst::MIN}, "-DBL_MAX"},
+static std::map<std::pair<lang::DataType, sem::LimitConst::Which>, std::string> LimitConstLookup = {
+    {{lang::DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::INT8, sem::LimitConst::MIN}, "SCHAR_MIN"},
+    {{lang::DataType::INT16, sem::LimitConst::MIN}, "SHRT_MIN"},
+    {{lang::DataType::INT32, sem::LimitConst::MIN}, "INT_MIN"},
+    {{lang::DataType::INT64, sem::LimitConst::MIN}, "LONG_MIN"},
+    {{lang::DataType::UINT8, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::UINT16, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::UINT32, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::UINT64, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
+    {{lang::DataType::FLOAT32, sem::LimitConst::MIN}, "-FLT_MAX"},
+    {{lang::DataType::FLOAT64, sem::LimitConst::MIN}, "-DBL_MAX"},
 
-    {{DataType::BOOLEAN, sem::LimitConst::MAX}, "0"},        {{DataType::INT8, sem::LimitConst::MAX}, "SCHAR_MAX"},
-    {{DataType::INT16, sem::LimitConst::MAX}, "SHRT_MAX"},   {{DataType::INT32, sem::LimitConst::MAX}, "INT_MAX"},
-    {{DataType::INT64, sem::LimitConst::MAX}, "LONG_MAX"},   {{DataType::UINT8, sem::LimitConst::MAX}, "UCHAR_MAX"},
-    {{DataType::UINT16, sem::LimitConst::MAX}, "USHRT_MAX"}, {{DataType::UINT32, sem::LimitConst::MAX}, "UINT_MAX"},
-    {{DataType::UINT64, sem::LimitConst::MAX}, "ULONG_MAX"}, {{DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
-    {{DataType::FLOAT32, sem::LimitConst::MAX}, "FLT_MAX"},  {{DataType::FLOAT64, sem::LimitConst::MAX}, "DBL_MAX"},
+    {{lang::DataType::BOOLEAN, sem::LimitConst::MAX}, "0"},
+    {{lang::DataType::INT8, sem::LimitConst::MAX}, "SCHAR_MAX"},
+    {{lang::DataType::INT16, sem::LimitConst::MAX}, "SHRT_MAX"},
+    {{lang::DataType::INT32, sem::LimitConst::MAX}, "INT_MAX"},
+    {{lang::DataType::INT64, sem::LimitConst::MAX}, "LONG_MAX"},
+    {{lang::DataType::UINT8, sem::LimitConst::MAX}, "UCHAR_MAX"},
+    {{lang::DataType::UINT16, sem::LimitConst::MAX}, "USHRT_MAX"},
+    {{lang::DataType::UINT32, sem::LimitConst::MAX}, "UINT_MAX"},
+    {{lang::DataType::UINT64, sem::LimitConst::MAX}, "ULONG_MAX"},
+    {{lang::DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
+    {{lang::DataType::FLOAT32, sem::LimitConst::MAX}, "FLT_MAX"},
+    {{lang::DataType::FLOAT64, sem::LimitConst::MAX}, "DBL_MAX"},
 };
 
-void EmitC::Visit(const sem::LimitConst& n) {
+void EmitC::operator()(const sem::LimitConst& n) {
   if (n.which == sem::LimitConst::ZERO) {
     emit("0");
     return;
@@ -220,44 +232,45 @@ void EmitC::Visit(const sem::LimitConst& n) {
   emit(it->second);
 }
 
-void EmitC::Visit(const sem::IndexExpr& n) { throw std::runtime_error("IndexExpr unimplemented in EmitC"); }
+void EmitC::operator()(const sem::IndexExpr& n) { throw std::runtime_error("IndexExpr unimplemented in EmitC"); }
 
-void EmitC::Visit(const sem::Block& n) {
+void EmitC::operator()(const sem::Block& n) {
   emitTab();
   emit("{\n");
   ++indent_;
-  for (const sem::StmtPtr& ptr : n.statements) {
-    ptr->Accept(*this);
+  for (const sem::StmtPtr& ptr : *n.statements) {
+    boost::apply_visitor(*this, *ptr);
   }
   --indent_;
   emitTab();
   emit("}\n");
 }
 
-void EmitC::Visit(const sem::IfStmt& n) {
+void EmitC::operator()(const sem::IfStmt& n) {
   emitTab();
+  // TODO: Re-combine these print cases; handle the only-iffalse case in simplification.
   if (n.iftrue && n.iffalse) {
     emit("if (");
-    n.cond->Accept(*this);
+    boost::apply_visitor(*this, *n.cond);
     emit(")\n");
-    n.iftrue->Accept(*this);
+    (*this)(*n.iftrue);
     emitTab();
     emit("else\n");
-    n.iffalse->Accept(*this);
+    (*this)(*n.iffalse);
   } else if (n.iftrue) {
     emit("if (");
-    n.cond->Accept(*this);
+    boost::apply_visitor(*this, *n.cond);
     emit(")\n");
-    n.iftrue->Accept(*this);
+    (*this)(*n.iftrue);
   } else if (n.iffalse) {
     emit("if (!");
-    n.cond->Accept(*this);
+    boost::apply_visitor(*this, *n.cond);
     emit(")\n");
-    n.iffalse->Accept(*this);
+    (*this)(*n.iffalse);
   }
 }
 
-void EmitC::Visit(const sem::ForStmt& n) {
+void EmitC::operator()(const sem::ForStmt& n) {
   emitTab();
   emit("for (int ");
   emit(n.var);
@@ -270,31 +283,31 @@ void EmitC::Visit(const sem::ForStmt& n) {
   emit(" += ");
   emit(std::to_string(n.step));
   emit(")\n");
-  n.inner->Accept(*this);
+  (*this)(*n.inner);
 }
 
-void EmitC::Visit(const sem::WhileStmt& n) {
+void EmitC::operator()(const sem::WhileStmt& n) {
   emitTab();
   emit("while (");
-  n.cond->Accept(*this);
+  boost::apply_visitor(*this, *n.cond);
   emit(")\n");
-  n.inner->Accept(*this);
+  (*this)(*n.inner);
 }
 
-void EmitC::Visit(const sem::BarrierStmt& n) { throw std::runtime_error("Barrier unimplemented in EmitC"); }
+void EmitC::operator()(const sem::BarrierStmt& n) { throw std::runtime_error("Barrier unimplemented in EmitC"); }
 
-void EmitC::Visit(const sem::ReturnStmt& n) {
+void EmitC::operator()(const sem::ReturnStmt& n) {
   emitTab();
   emit("return");
   if (n.value) {
     emit(" (");
-    n.value->Accept(*this);
+    boost::apply_visitor(*this, *n.value);
     emit(")");
   }
   emit(";\n");
 }
 
-void EmitC::Visit(const sem::Function& n) {
+void EmitC::operator()(const sem::Function& n) {
   emitType(n.ret);
   emit(" ");
   emit(n.name);
@@ -311,9 +324,47 @@ void EmitC::Visit(const sem::Function& n) {
     emit(p.second);
   }
   emit(")\n");
-  n.body->Accept(*this);
+  (*this)(*n.body);
 }
 
-}  // namespace lang
+void Print::operator()(const sem::CallExpr& n) {
+  boost::apply_visitor(*static_cast<EmitC*>(this), *n.func);
+  emit("(");
+  for (size_t i = 0; i < n.vals.size(); i++) {
+    boost::apply_visitor(*static_cast<EmitC*>(this), *n.vals[i]);
+    if (i != n.vals.size() - 1) {
+      emit(", ");
+    }
+  }
+  emit(")");
+}
+
+void Print::operator()(const sem::IndexExpr& n) {
+  switch (n.type) {
+    case sem::IndexExpr::GLOBAL:
+      emit("get_global_id(" + std::to_string(n.dim) + ")");
+      break;
+    case sem::IndexExpr::GROUP:
+      emit("get_group_id(" + std::to_string(n.dim) + ")");
+      break;
+    case sem::IndexExpr::LOCAL:
+      emit("get_local_id(" + std::to_string(n.dim) + ")");
+      break;
+    default:
+      throw std::runtime_error("Invalid IndexExpr type");
+  }
+}
+
+void Print::operator()(const sem::BarrierStmt& n) {
+  emitTab();
+  emit("barrier();\n");
+}
+
+void Print::operator()(const sem::Function& f) {
+  emit("kernel ");
+  EmitC::operator()(f);
+}
+
+}  // namespace sem
 }  // namespace tile
 }  // namespace vertexai

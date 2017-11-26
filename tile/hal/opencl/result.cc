@@ -108,12 +108,9 @@ void KernelResult::LogStatistics() const {
   if (info_->status < 0) {
     Err err(info_->status);
     LOG(ERROR) << "Kernel " << ki_.kname << " failed with: " << err.str();
-
-    lang::EmitDebug emit_debug;
-    emit_debug.Visit(*ki_.kfunc);
     LOG(ERROR) << "Generic debug kernel:";
     LOG(ERROR) << ki_.comments;
-    LOG(ERROR) << emit_debug.str();
+    LOG(ERROR) << to_string(*ki_.kfunc);
 
     Err::Check(err, "Kernel execution failure");
   } else if (profiling_enabled_) {

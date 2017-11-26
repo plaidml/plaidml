@@ -29,7 +29,7 @@ namespace tile {
 namespace lang {
 namespace {
 
-const HardwareSettings &TestGPU() {
+const HardwareSettings& TestGPU() {
   static HardwareSettings settings;
   static std::once_flag init;
 
@@ -384,9 +384,7 @@ TEST_CASE("Functions", "[compile]") {
   inputs.emplace("x", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
   outputs.emplace("y", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
   KernelList result = GenerateProgram(p, inputs, outputs, TestGPU());
-  EmitDebug emit;
-  emit.Visit(*result.kernels[0].kfunc);
-  std::string code = emit.str();
+  std::string code = to_string(*result.kernels[0].kfunc);
   REQUIRE(code.find("exp") != std::string::npos);
 }
 
@@ -506,14 +504,12 @@ TEST_CASE("Ast", "[ast]") {
   auto r = _("r");
   auto f = _Function("factorial", idxType, {{idxType, "n"}},
                      {_DeclareConst(idxType, "r", 1),
-                      _Block({
+                      _Stmt(_Block({
                           _DeclareConst(idxType, "i", 1), _While(i <= n, _Block({r = r * i, i = i + 1})),
-                      }),
+                      })),
                       _Return(r)});
 
-  EmitDebug emit;
-  emit.Visit(*f);
-  IVLOG(1, "Code:\n" << emit.str());
+  IVLOG(1, "Code:\n" << to_string(*f));
 }
 
 TEST_CASE("Softmax Deriv", "[deriv]") {
@@ -758,9 +754,9 @@ TEST_CASE("Check attribute parsing", "[attr]") {
   Parser p;
   Program prog = p.Parse("function (A[I,K], B[K,J]) -> (O) { [[hello(world)]] O[i,j : I,J] = +(A[i,k] * B[k,j]); }");
   REQUIRE(prog.ops.size() == 1);
-  const auto &op = prog.ops[0];
+  const auto& op = prog.ops[0];
   REQUIRE(op.attributes.size() == 1);
-  const auto &attr = op.attributes[0];
+  const auto& attr = op.attributes[0];
   REQUIRE(attr.name == "hello");
   REQUIRE(attr.params.size() == 1);
   REQUIRE(attr.params[0] == "world");
@@ -784,10 +780,8 @@ TEST_CASE("CombineConvolutionAndRelu", "[emit]") {
   outputs.emplace("A", SimpleShape(DataType::FLOAT32, {10, 10}));
   auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), "ID");
   if (VLOG_IS_ON(1)) {
-    for (const auto &kinfo : klist.kernels) {
-      EmitDebug emit;
-      emit.Visit(*kinfo.kfunc);
-      VLOG(1) << "Got kernel: " << emit.str();
+    for (const auto& kinfo : klist.kernels) {
+      VLOG(1) << "Got kernel: " << to_string(*kinfo.kfunc);
     }
   }
   REQUIRE(klist.kernels.size() == 1);
