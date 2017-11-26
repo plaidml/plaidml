@@ -156,16 +156,14 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     }
 
     if (VLOG_IS_ON(4)) {
-      lang::EmitDebug emit_debug;
-      emit_debug.Visit(*ki.kfunc);
       VLOG(4) << "Generic debug kernel:";
       VLOG(4) << ki.comments;
-      VLOG(4) << emit_debug.str();
+      VLOG(4) << to_string(*ki.kfunc);
     }
 
     code << ki.comments;
     Emit ocl{cl_khr_fp16, cl_khr_fp64};
-    ocl.Visit(*ki.kfunc);
+    ocl(*ki.kfunc);
     code << ocl.str();
     code << "\n\n";
 

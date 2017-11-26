@@ -202,7 +202,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     if (type.vec_width > 1) {
       agg_base = _Cast(type, agg_base);
     }
-    kblock->append(pout.initOutput(type, agg_base));
+    kblock->merge(pout.initOutput(type, agg_base));
 
     if (!settings.use_global) {
       // Allocate shared memory
@@ -216,7 +216,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     }
 
     // Emit base sets
-    kblock->append(pout.initBases());
+    kblock->merge(pout.initBases());
 
     // Emit the loops over the input scan loops
     auto iblock = kblock;
@@ -232,7 +232,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     // Make an empty block if no inner loops to prevent variable shadowing
     if (!any_loops) {
       auto inner = _Block({});
-      iblock->push_back(inner);
+      iblock->append(_Stmt(inner));
       iblock = inner;
     }
     if (!settings.use_global) {
@@ -241,8 +241,8 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       for (size_t i = 1; i < op.access.size(); i++) {
         if (bindings[i] && bindings[i]->tag == Binding::TENSOR) {
           string sname = "in" + std::to_string(i);
-          iblock->push_back(pins[i - 1].generate(sname + "_shared", sname, threads, op.access[i].global_index_limit,
-                                                 op.access[i].offset));
+          iblock->append(pins[i - 1].generate(sname + "_shared", sname, threads, op.access[i].global_index_limit,
+                                              op.access[i].offset));
           loaded_input = true;
         }
       }
@@ -281,7 +281,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
           sum = sum + fc.lhs[i] * (_(op.names[i] + "_gid") + _(op.names[i]));
         }
       }
-      cond = std::make_shared<sem::BinaryExpr>("&&", cond, (sum <= fc.rhs));
+      cond = std::make_shared<sem::Expression>(sem::BinaryExpr("&&", cond, (sum <= fc.rhs)));
       cond_is_always_true = false;
     }
 
@@ -302,10 +302,10 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
           }
           break;
         case Binding::ICONST:
-          input = std::make_shared<sem::IntConst>(bindings[i]->iconst);
+          input = std::make_shared<sem::Expression>(sem::IntConst(bindings[i]->iconst));
           break;
         case Binding::FCONST:
-          input = std::make_shared<sem::FloatConst>(bindings[i]->fconst);
+          input = std::make_shared<sem::Expression>(sem::FloatConst(bindings[i]->fconst));
           break;
       }
       if (op.comb_op == CombinationOp::EQ) {
@@ -365,7 +365,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("pre_agg")));
       slow_inner_block->append(_If(cond, inner_block));
     } else {
-      slow_inner_block->append(inner_block);
+      slow_inner_block->merge(inner_block);
       slow_inner_block->append(_Declare(type, "guarded_pre_agg", guarded_pre_agg));
       inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("pre_agg")));
       slow_inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("guarded_pre_agg")));
@@ -387,9 +387,9 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     dup_ci_i.inner = dup_ci_o.generate(out_threads, 1, true, false);
     auto slow_looped_inner = dup_ci_i.generate(threads, out_threads);
 
-    sem::StmtPtr both;
+    // Append the whole thing to out inner block
     if (!op.constraints.size()) {
-      both = looped_inner;
+      iblock->merge(looped_inner);
     } else {
       // Make if condition which is true if *any* contraint is unsafe
       sem::ExprPtr safe = _Const(1);
@@ -403,15 +403,12 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
             sum = sum + fc.lhs[i] * (_(op.names[i] + "_gid"));
           }
         }
-        safe = std::make_shared<sem::BinaryExpr>("&&", safe, (sum <= fc.rhs));
+        safe = std::make_shared<sem::Expression>(sem::BinaryExpr("&&", safe, (sum <= fc.rhs)));
       }
 
       // Make a master if to switch on fast path
-      both = _If(safe, looped_inner, slow_looped_inner);
+      iblock->append(_If(safe, looped_inner, slow_looped_inner));
     }
-
-    // Append the whole thing to out inner block
-    iblock->append(both);
 
     // Add another barrier to prevent other threads from overwriting current shared memory
     if (!settings.use_global) {
@@ -438,11 +435,11 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       }
       mblock->append(_Barrier());
       mblock->append(_If(_("tid") < out_threads, _("agg")[_Const(0)] = _("merge_shared")[_("tid")]));
-      kblock->push_back(mblock);
+      kblock->merge(mblock);
     }
   } else {
     // There's no contraction.  Just initialize _gid variables.
-    kblock->append(pout.initBases());
+    kblock->merge(pout.initBases());
   }
 
   // Write the final output
@@ -513,7 +510,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
           break;
         }
         case Binding::ICONST: {
-          sem::ExprPtr val = std::make_shared<sem::IntConst>(tin.iconst);
+          sem::ExprPtr val = std::make_shared<sem::Expression>(sem::IntConst(tin.iconst));
           if (op.agg_vec > 1) {
             // TODO: This is hacky.  It works (unlike using an
             // integer type -- int4 and float4 don't interoperate
@@ -526,7 +523,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
           break;
         }
         case Binding::FCONST: {
-          sem::ExprPtr val = std::make_shared<sem::FloatConst>(tin.fconst);
+          sem::ExprPtr val = std::make_shared<sem::Expression>(sem::FloatConst(tin.fconst));
           if (op.agg_vec > 1) {
             sem::Type type = {sem::Type::VALUE, DataType::FLOAT32, op.agg_vec};
             val = _Cast(type, val);
@@ -540,7 +537,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     sem::ExprPtr opexpr = nullptr;
     if (bin_ops.count(post_op.f.fn)) {
       std::string opname = bin_ops.at(post_op.f.fn);
-      opexpr = std::make_shared<sem::BinaryExpr>(opname, inexprs[0], inexprs[1]);
+      opexpr = std::make_shared<sem::Expression>(sem::BinaryExpr(opname, inexprs[0], inexprs[1]));
     } else if (post_op.f.fn == "cond") {
       switch (vars.at(post_op.inputs[0]).shape.type) {
         case DataType::FLOAT16:
@@ -556,16 +553,16 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       }
       opexpr = _Cond(inexprs[0], inexprs[1], inexprs[2]);
     } else if (post_op.f.fn == "neg") {
-      opexpr = std::make_shared<sem::UnaryExpr>("-", inexprs[0]);
+      opexpr = std::make_shared<sem::Expression>(sem::UnaryExpr("-", inexprs[0]));
     } else if (post_op.f.fn == "bit_not") {
-      opexpr = std::make_shared<sem::UnaryExpr>("~", inexprs[0]);
+      opexpr = std::make_shared<sem::Expression>(sem::UnaryExpr("~", inexprs[0]));
     } else if (post_op.f.fn == "ident" || post_op.f.fn == "reshape") {
       opexpr = inexprs[0];
     } else if (post_op.f.fn == "as_float" || post_op.f.fn == "as_int" || post_op.f.fn == "as_uint") {
       sem::Type declatype{sem::Type::VALUE, vars.at(post_op.output).shape.type, op.agg_vec};
       opexpr = _Cast(declatype, inexprs[0]);
     } else {
-      opexpr = std::make_shared<sem::CallExpr>(_(post_op.f.fn), inexprs);
+      opexpr = std::make_shared<sem::Expression>(sem::CallExpr(_(post_op.f.fn), inexprs));
     }
     assert(static_cast<bool>(opexpr));
 
@@ -590,9 +587,9 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
   }
   wblock->append(_Declare({sem::Type::INDEX}, "gout_idx", gout));
   // Make a basic out of bounds check
-  sem::ExprPtr check =
-      std::make_shared<sem::BinaryExpr>("&&", _("gout_idx") >= -op.access[0].offset,
-                                        _("gout_idx") < op.access[0].global_index_limit - op.access[0].offset);
+  sem::ExprPtr check = std::make_shared<sem::Expression>(
+      sem::BinaryExpr("&&", _("gout_idx") >= -op.access[0].offset,
+                      _("gout_idx") < op.access[0].global_index_limit - op.access[0].offset));
   // Add any constraints that only appear on output variables
   for (const FlatConstraint& fc : op.constraints) {
     sem::ExprPtr sum = _Const(0);
@@ -607,17 +604,17 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       }
     }
     if (only_output) {
-      check = std::make_shared<sem::BinaryExpr>("&&", check, (sum <= fc.rhs));
+      check = std::make_shared<sem::Expression>(sem::BinaryExpr("&&", check, (sum <= fc.rhs)));
     }
   }
   // Skip the check if there are no contraints at all
   if (op.constraints.size() == 0) {
-    wblock->append(checked_output_block);
+    wblock->merge(checked_output_block);
   } else {
     wblock->append(_If(check, checked_output_block));
   }
 
-  kblock->append(ci2.generate(threads, 1, false, false));
+  kblock->merge(ci2.generate(threads, 1, false, false));
 
   // Wrap entire function
   auto func = std::make_shared<sem::Function>();
