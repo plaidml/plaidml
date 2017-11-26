@@ -27,17 +27,17 @@ void CodeInfo::thread(uint64_t threads) {
   }
 }
 
-sem::StmtPtr CodeInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, bool order) {
+sem::BlockPtr CodeInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, bool order) {
   using namespace sem::builder;  // NOLINT
   // Start with the inner-most block
-  sem::StmtPtr cur = inner;
+  sem::BlockPtr cur = inner;
   // Check for thread underrun and correct
   size_t tot_threads = div;
   for (const auto& idx : indexes) {
     tot_threads *= idx.thread;
   }
   if (tot_threads < threads) {
-    cur = _If(_("tid") < tot_threads, cur);
+    cur = _Block({_If(_("tid") < tot_threads, cur)});
   }
   auto r = _Block({});
   // Convert a single thread id to per index thread id, innermost first
@@ -78,19 +78,19 @@ sem::StmtPtr CodeInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, 
     auto idx_tid = _(idx_name + "_tid");
 
     auto block = _Block({});  // Interior of for loop
-    sem::StmtPtr ptr = block;
+    auto ptr = block;
 
     // Now add inner code
     block->append(_Declare({sem::Type::INDEX}, idx_name, thread * idx_lid + idx_tid));
-    block->append(cur);
+    block->merge(cur);
     // Step forward
-    block->append(increments(i));
+    block->merge(increments(i));
 
     // Add in any breaks we need
     if (indexes[i].tile % thread != 0) {
       // This only happens if tile == total, thread only break
       auto cond = (idx_lid >= (max_loops - 1)) & (idx_tid >= (indexes[i].tile % thread));
-      ptr = _If(cond, increments(i), ptr);
+      ptr = _Block({_If(cond, increments(i), ptr)});
     }
 
     if (edge != 0 && !skip_edge) {       // If we have an edge
@@ -101,35 +101,34 @@ sem::StmtPtr CodeInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, 
         // Case for uneven thread break, add up to two breaks
         if (high_edge != max_loops) {
           auto cond = (idx_lid >= high_edge) & (idx_gid == max_gid);
-          ptr = _If(cond, increments(i, max_loops - high_edge), ptr);
+          ptr = _Block({_If(cond, increments(i, max_loops - high_edge), ptr)});
         }
 
         auto cond = (idx_lid >= low_edge) & (idx_gid == max_gid) & (idx_tid >= slop);
-        ptr = _If(cond, increments(i, max_loops - low_edge), ptr);
+        ptr = _Block({_If(cond, increments(i, max_loops - low_edge), ptr)});
       } else {
         // Even thread break
         auto cond = (idx_lid >= low_edge) & (idx_gid == max_gid);
-        ptr = _If(cond, increments(i, max_loops - low_edge), ptr);
+        ptr = _Block({_If(cond, increments(i, max_loops - low_edge), ptr)});
       }
     }
-
     // Build outer block
     auto bo = _Block({});
     if (max_loops == 1) {
       bo->append(_DeclareConst({sem::Type::INDEX}, idx_name + "_lid", 0));
-      bo->append(ptr);
+      bo->merge(ptr);
     } else {
       bo->append(_For(idx_name + "_lid", max_loops, 1, ptr));
     }
     // Unwind the changes
-    bo->append(increments(i, -max_loops));
+    bo->merge(increments(i, -max_loops));
     cur = bo;
   }
-  r->append(cur);
+  r->merge(cur);
   return r;
 }
 
-std::shared_ptr<sem::Block> CodeInfo::increments(int i, ssize_t mul) const {
+sem::BlockPtr CodeInfo::increments(int i, ssize_t mul) const {
   using namespace sem::builder;  // NOLINT
   if (mul == 0) {
     return nullptr;
@@ -142,7 +141,6 @@ std::shared_ptr<sem::Block> CodeInfo::increments(int i, ssize_t mul) const {
       block->append(v = v + hop);
     }
   }
-  if (block->statements.empty()) return nullptr;
   return block;
 }
 
