@@ -51,7 +51,7 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
   auto to_base = to_buf->base();
   auto to_ptr = to_buf->mem();
 
-  const auto& queue = device_state_->cl_queue(activity.ctx().is_logging_events());
+  const auto& queue = device_state_->cl_queue();
   auto mdeps = Event::Downcast(dependencies, device_state_->cl_ctx(), queue);
 
   if (from_base && to_base) {

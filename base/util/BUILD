@@ -4,6 +4,7 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 plaidml_cc_library(
     name = "util_cc",
     srcs = [
+        "env.cc",
         "error.cc",
         "json_transfer.cc",
         "logging.cc",
@@ -16,6 +17,7 @@ plaidml_cc_library(
         "any_factory_map.h",
         "catch.h",
         "compat.h",
+        "env.h",
         "error.h",
         "intern.h",
         "iterator_util.h",
