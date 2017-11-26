@@ -40,9 +40,9 @@ class OutPlan {
   // Construct a new output plan for a given tiling
   OutPlan(const FlatContraction& op, const std::vector<uint64_t>& tile, uint64_t threads, uint64_t mem_elems);
   // Generate code to initialize output locals
-  sem::BlockPtr initOutput(sem::Type type, sem::ExprPtr value) const;
+  std::shared_ptr<sem::Block> initOutput(sem::Type type, sem::ExprPtr value) const;
   // Generate code to set base offsets from global id
-  sem::BlockPtr initBases() const;
+  std::shared_ptr<sem::Block> initBases() const;
   // Generate inner (per tile) loops for each output
   uint64_t addOutLoops(CodeInfo& ci) const;  // NOLINT(runtime/references)
   // Compute the position of the output in the register variable

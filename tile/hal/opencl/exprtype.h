@@ -21,34 +21,46 @@ namespace opencl {
 sem::Type Promote(const std::vector<sem::Type>& types);
 
 // Analyzes expression types.
-class ExprType final : public boost::static_visitor<sem::Type> {
+class ExprType final : public sem::Visitor {
  public:
   static sem::Type TypeOf(const lang::Scope<sem::Type>* scope, bool cl_khr_fp16, const sem::ExprPtr& expr);
 
   static sem::Type TypeOf(const lang::Scope<sem::Type>* scope, bool cl_khr_fp16, const sem::LValPtr& lvalue);
 
-  static sem::Type AdjustLogicOpResult(sem::Type ty);
-
-  ExprType(const lang::Scope<sem::Type>* scope, bool cl_khr_fp16) : scope_{scope}, cl_khr_fp16_{cl_khr_fp16} {}
-
-  sem::Type operator()(const sem::IntConst&);
-  sem::Type operator()(const sem::FloatConst&);
-  sem::Type operator()(const sem::LookupLVal&);
-  sem::Type operator()(const sem::LoadExpr&);
-  sem::Type operator()(const sem::SubscriptLVal&);
-  sem::Type operator()(const sem::UnaryExpr&);
-  sem::Type operator()(const sem::BinaryExpr&);
-  sem::Type operator()(const sem::CondExpr&);
-  sem::Type operator()(const sem::SelectExpr&);
-  sem::Type operator()(const sem::ClampExpr&);
-  sem::Type operator()(const sem::CastExpr&);
-  sem::Type operator()(const sem::CallExpr&);
-  sem::Type operator()(const sem::LimitConst&);
-  sem::Type operator()(const sem::IndexExpr&);
+  void Visit(const sem::IntConst&) final;
+  void Visit(const sem::FloatConst&) final;
+  void Visit(const sem::LookupLVal&) final;
+  void Visit(const sem::LoadExpr&) final;
+  void Visit(const sem::StoreStmt&) final;
+  void Visit(const sem::SubscriptLVal&) final;
+  void Visit(const sem::DeclareStmt&) final;
+  void Visit(const sem::UnaryExpr&) final;
+  void Visit(const sem::BinaryExpr&) final;
+  void Visit(const sem::CondExpr&) final;
+  void Visit(const sem::SelectExpr&) final;
+  void Visit(const sem::ClampExpr&) final;
+  void Visit(const sem::CastExpr&) final;
+  void Visit(const sem::CallExpr&) final;
+  void Visit(const sem::LimitConst&) final;
+  void Visit(const sem::IndexExpr&) final;
+  void Visit(const sem::Block&) final;
+  void Visit(const sem::IfStmt&) final;
+  void Visit(const sem::ForStmt&) final;
+  void Visit(const sem::WhileStmt&) final;
+  void Visit(const sem::BarrierStmt&) final;
+  void Visit(const sem::ReturnStmt&) final;
+  void Visit(const sem::Function&) final;
 
  private:
+  ExprType(const lang::Scope<sem::Type>* scope, bool cl_khr_fp16);
+
+  sem::Type TypeOf(const sem::ExprPtr& expr);
+
+  void AdjustLogicOpResult();
+
   const lang::Scope<sem::Type>* scope_;
-  const bool cl_khr_fp16_;
+  bool cl_khr_fp16_;
+  sem::Type ty_;
 };
 
 }  // namespace opencl

@@ -30,13 +30,13 @@ struct TRef {
 struct CodeInfo {
   std::vector<IndexInfo> indexes;  // Index names, order, sizes
   std::vector<TRef> refs;          // Output, input1 [, input2]
-  sem::BlockPtr inner;
+  sem::StmtPtr inner;
 
   void thread(uint64_t numThreads);
-  sem::BlockPtr generate(uint64_t numThreads, uint64_t div = 1, bool skip_edge = false, bool order = true);
+  sem::StmtPtr generate(uint64_t numThreads, uint64_t div = 1, bool skip_edge = false, bool order = true);
 
  private:
-  sem::BlockPtr increments(int i, ssize_t mul = 1) const;
+  std::shared_ptr<sem::Block> increments(int i, ssize_t mul = 1) const;
 };
 
 }  // namespace lang

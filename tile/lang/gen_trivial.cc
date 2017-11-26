@@ -23,8 +23,9 @@ KernelInfo GenCopy(const TensorShape& shape, const std::string& oname, const std
   params.push_back(std::make_pair(oparamtype, "out"));
   params.push_back(std::make_pair(iparamtype, "in"));
   sem::Type voidret{sem::Type::TVOID};
-  auto body = _Block({_("out")[_Index(sem::IndexExpr::GLOBAL, 0)] = _("in")[_Index(sem::IndexExpr::GLOBAL, 0)]});
-  auto func = std::make_shared<sem::Function>(kname, voidret, params, std::move(body));
+  sem::StmtPtr body =
+      _Block({_("out")[_Index(sem::IndexExpr::GLOBAL, 0)] = _("in")[_Index(sem::IndexExpr::GLOBAL, 0)]});
+  auto func = std::make_shared<sem::Function>(kname, voidret, params, body);
 
   KernelInfo ki;
   ki.kname = kname;
@@ -51,8 +52,8 @@ KernelInfo GenZero(const TensorShape& shape, const std::string& bname, const std
   paramtype.region = sem::Type::GLOBAL;
   params.push_back(std::make_pair(paramtype, "out"));
   sem::Type voidret{sem::Type::TVOID};
-  auto body = _Block({_("out")[_Index(sem::IndexExpr::GLOBAL, 0)] = _Const(0)});
-  auto func = std::make_shared<sem::Function>(kname, voidret, params, std::move(body));
+  sem::StmtPtr body = _Block({_("out")[_Index(sem::IndexExpr::GLOBAL, 0)] = _Const(0)});
+  auto func = std::make_shared<sem::Function>(kname, voidret, params, body);
 
   KernelInfo ki;
   ki.kname = kname;

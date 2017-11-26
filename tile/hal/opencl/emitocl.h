@@ -13,48 +13,39 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-class Emit final : public sem::EmitC {
+class Emit : public lang::EmitC {
  public:
-  Emit(bool cl_khr_fp16, bool cl_khr_fp64) : cl_khr_fp16_{cl_khr_fp16}, cl_khr_fp64_{cl_khr_fp64}, scope_{nullptr} {}
+  explicit Emit(bool cl_khr_fp16, bool cl_khr_fp64)
+      : cl_khr_fp16_{cl_khr_fp16}, cl_khr_fp64_{cl_khr_fp64}, scope_{nullptr} {}
 
-  void operator()(const sem::IntConst& v) final { EmitC::operator()(v); }
-  void operator()(const sem::FloatConst& v) final { EmitC::operator()(v); }
-  void operator()(const sem::LookupLVal& v) final { EmitC::operator()(v); }
-  void operator()(const sem::SubscriptLVal& v) final { EmitC::operator()(v); }
-  void operator()(const sem::UnaryExpr& v) final { EmitC::operator()(v); }
-  void operator()(const sem::LimitConst& v) final { EmitC::operator()(v); }
-  void operator()(const sem::IfStmt& v) final { EmitC::operator()(v); }
-  void operator()(const sem::WhileStmt& v) final { EmitC::operator()(v); }
-  void operator()(const sem::ReturnStmt& v) final { EmitC::operator()(v); }
-
-  void operator()(const sem::LoadExpr&) final;
-  void operator()(const sem::StoreStmt&) final;
-  void operator()(const sem::DeclareStmt&) final;
-  void operator()(const sem::BinaryExpr&) final;
-  void operator()(const sem::CondExpr& n) final;
-  void operator()(const sem::SelectExpr& n) final;
-  void operator()(const sem::ClampExpr& n) final;
-  void operator()(const sem::CastExpr&) final;
-  void operator()(const sem::CallExpr&) final;
-  void operator()(const sem::IndexExpr&) final;
-  void operator()(const sem::Block&) final;
-  void operator()(const sem::ForStmt&) final;
-  void operator()(const sem::BarrierStmt&) final;
-  void operator()(const sem::Function&) final;
+  void Visit(const sem::LoadExpr &) final;
+  void Visit(const sem::StoreStmt &) final;
+  void Visit(const sem::DeclareStmt &) final;
+  void Visit(const sem::BinaryExpr &) final;
+  void Visit(const sem::CondExpr &n) final;
+  void Visit(const sem::SelectExpr &n) final;
+  void Visit(const sem::ClampExpr &n) final;
+  void Visit(const sem::CastExpr &) final;
+  void Visit(const sem::CallExpr &) final;
+  void Visit(const sem::IndexExpr &) final;
+  void Visit(const sem::Block &) final;
+  void Visit(const sem::ForStmt &) final;
+  void Visit(const sem::BarrierStmt &) final;
+  void Visit(const sem::Function &) final;
 
  private:
-  void CheckValidType(const sem::Type& ty);
-  sem::Type TypeOf(const sem::ExprPtr& expr);
-  sem::Type TypeOf(const sem::LValPtr& lvalue);
-  void EmitWithTypeConversion(const sem::Type& from, const sem::Type& to, const sem::ExprPtr& expr,
+  void CheckValidType(const sem::Type &ty);
+  sem::Type TypeOf(const sem::ExprPtr &expr);
+  sem::Type TypeOf(const sem::LValPtr &lvalue);
+  void EmitWithTypeConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr,
                               bool force_conversion = false);
-  void EmitWithWidthConversion(const sem::Type& from, const sem::Type& to, const sem::ExprPtr& expr,
+  void EmitWithWidthConversion(const sem::Type &from, const sem::Type &to, const sem::ExprPtr &expr,
                                bool force_conversion = false);
-  void emitType(const sem::Type& t) final;
+  void emitType(const sem::Type &t) final;
 
   bool cl_khr_fp16_;
   bool cl_khr_fp64_;
-  lang::Scope<sem::Type>* scope_;
+  lang::Scope<sem::Type> *scope_;
 };
 
 }  // namespace opencl

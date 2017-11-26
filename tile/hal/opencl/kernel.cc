@@ -55,8 +55,9 @@ Kernel::Kernel(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_kernel
 
 std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
                                         const std::vector<std::shared_ptr<hal::Buffer>>& params,
-                                        const std::vector<std::shared_ptr<hal::Event>>& dependencies) {
-  const auto& queue = device_state_->cl_queue();
+                                        const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                        bool enable_profiling) {
+  const auto& queue = device_state_->cl_queue(enable_profiling);
   auto deps = Event::Downcast(dependencies, device_state_->cl_ctx(), queue);
   VLOG(4) << "Running kernel " << ki_.kname;
 
@@ -95,7 +96,7 @@ std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
 
   VLOG(4) << "  Produced dep: " << done.get();
 
-  auto result = std::make_shared<KernelResult>(activity.ctx(), device_state_, done, ki_, queue);
+  auto result = std::make_shared<KernelResult>(activity.ctx(), device_state_, done, ki_);
   return std::make_shared<Event>(activity.ctx(), device_state_, std::move(done), queue, std::move(result));
 }
 
