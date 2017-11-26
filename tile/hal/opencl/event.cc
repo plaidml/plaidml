@@ -54,7 +54,7 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> Event::WaitFor(
     return boost::make_ready_future(std::move(results));
   }
   CLObj<cl_event> evt;
-  const auto& queue = device_state->cl_queue();
+  const auto& queue = device_state->cl_normal_queue();
   Err err = clEnqueueMarkerWithWaitList(queue.cl_queue.get(),  // command_queue
                                         mdeps.size(),          // num_events_in_wait_list
                                         mdeps.data(),          // event_wait_list
@@ -84,7 +84,7 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> Event::WaitFor(
 
 Event::Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& device_state, CLObj<cl_event> cl_event,
              const DeviceState::Queue& queue)
-    : Event(ctx, device_state, cl_event, queue, std::make_shared<Result>(ctx, device_state, cl_event, queue)) {}
+    : Event(ctx, device_state, cl_event, queue, std::make_shared<Result>(ctx, device_state, cl_event)) {}
 
 Event::Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& device_state, CLObj<cl_event> cl_event,
              const DeviceState::Queue& queue, const std::shared_ptr<hal::Result>& result)

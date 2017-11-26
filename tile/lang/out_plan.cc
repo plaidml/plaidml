@@ -130,13 +130,13 @@ OutPlan::OutPlan(const FlatContraction& op, const std::vector<uint64_t>& tile, u
   }
 }
 
-sem::BlockPtr OutPlan::initOutput(sem::Type type, sem::ExprPtr value) const {
+std::shared_ptr<sem::Block> OutPlan::initOutput(sem::Type type, sem::ExprPtr value) const {
   using namespace sem::builder;  // NOLINT
   type.array = local_size_ / threads_;
   return _Block({_Declare(type, "agg", value)});
 }
 
-sem::BlockPtr OutPlan::initBases() const {
+std::shared_ptr<sem::Block> OutPlan::initBases() const {
   using namespace sem::builder;  // NOLINT
   auto out = _Block({});
   // For each index, set a _gid variable

@@ -34,7 +34,6 @@
 
 #include "base/config/config.h"
 #include "base/util/compat.h"
-#include "base/util/env.h"
 #include "base/util/error.h"
 #include "base/util/sync.h"
 #include "plaidml/base/base_cpp.h"
@@ -71,14 +70,14 @@ namespace status_strings = vertexai::status_strings;
 namespace tile = vertexai::tile;
 
 using tile::lang::BoundFunction;
-using tile::lang::FConstValue;
 using tile::lang::FunctionApplication;
-using tile::lang::Gradient;
 using tile::lang::IConstValue;
+using tile::lang::FConstValue;
 using tile::lang::PlaceholderValue;
 using tile::lang::RunInfo;
 using tile::lang::TensorValue;
 using tile::lang::Value;
+using tile::lang::Gradient;
 
 struct plaidml_devconf {
   std::shared_ptr<tile::Platform> platform;
@@ -211,6 +210,22 @@ struct plaidml_device_enumerator {
   std::vector<plaidml_devconf> unmatched_devices;
 };
 
+namespace {
+std::string getEnvVar(std::string const& key) {
+#ifdef _MSC_VER
+  char var[1024];
+  auto rv = GetEnvironmentVariable(key.c_str(), var, sizeof(var));
+  if (!rv || sizeof(var) <= rv) {
+    return "";
+  }
+  return std::string(var);
+#else
+  char const* val = std::getenv(key.c_str());
+  return val == nullptr ? "" : val;
+#endif
+}
+}  // namespace
+
 plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
     vai_ctx* ctx, const char* configuration, const std::string& config_source,
     void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
@@ -229,7 +244,7 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
   plaidml_device_enumerator* result = nullptr;
 
   std::set<std::string> device_ids;
-  std::stringstream devids(vertexai::env::GetVar(PLAIDML_DEVICE_IDS));
+  std::stringstream devids(getEnvVar(PLAIDML_DEVICE_IDS));
   std::copy(std::istream_iterator<std::string>(devids), std::istream_iterator<std::string>(),
             std::inserter(device_ids, device_ids.end()));
 
@@ -280,11 +295,11 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
 extern "C" plaidml_device_enumerator* plaidml_alloc_device_enumerator(
     vai_ctx* ctx, void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
   std::string config_file;
-  std::string exp = vertexai::env::GetVar(PLAIDML_EXPERIMENTAL);
+  std::string exp = getEnvVar(PLAIDML_EXPERIMENTAL);
   if (!exp.empty() && exp != "0") {
-    config_file = vertexai::env::GetVar(PLAIDML_EXPERIMENTAL_CONFIG);
+    config_file = getEnvVar(PLAIDML_EXPERIMENTAL_CONFIG);
   } else {
-    config_file = vertexai::env::GetVar(PLAIDML_DEFAULT_CONFIG);
+    config_file = getEnvVar(PLAIDML_DEFAULT_CONFIG);
   }
   std::ifstream cfs(config_file);
   std::string config;

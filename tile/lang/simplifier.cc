@@ -6,6 +6,7 @@
 
 namespace vertexai {
 namespace tile {
+
 namespace sem {
 
 // This struct holds two totally disparate things, but it's easier
@@ -25,15 +26,15 @@ struct Symbol {
   boost::optional<std::string> alias;
 };
 
-class Simplifier : public boost::static_visitor<> {
+class Simplifier : public Visitor {
  public:
   explicit Simplifier(lang::Scope<Symbol>* scope) : scope_{scope} {}
 
-  void operator()(IntConst& node) {}  // NOLINT
+  void Visit(const IntConst& node) override {}
 
-  void operator()(FloatConst& node) {}  // NOLINT
+  void Visit(const FloatConst& node) override {}
 
-  void operator()(LookupLVal& node) {  // NOLINT
+  void Visit(const LookupLVal& node) override {
     auto symbol = scope_->Lookup(node.name);
     // Check if a symbol exists that is an alias for another symbol.
     if (symbol && (*symbol).alias) {
@@ -45,63 +46,63 @@ class Simplifier : public boost::static_visitor<> {
     }
   }
 
-  void operator()(LoadExpr& node) {  // NOLINT
+  void Visit(const LoadExpr& node) override {
     auto ref = Resolve(node.inner);
     auto symbol = scope_->Lookup(ref);
     // Check if a symbol exists that refers to an IntConst value.
     if (symbol && (*symbol).const_value) {
       // If such a symbol exists, substitute the IntConst expr in directly.
-      new_expr_ = std::make_shared<Expression>(IntConst(*(*symbol).const_value));
+      new_expr_ = std::make_shared<IntConst>(*(*symbol).const_value);
     }
   }
 
-  void operator()(StoreStmt& node) {  // NOLINT
+  void Visit(const StoreStmt& node) override {
     Resolve(node.lhs);
-    node.rhs = EvalExpr(node.rhs);
+    const_cast<StoreStmt&>(node).rhs = EvalExpr(node.rhs);
   }
 
-  void operator()(SubscriptLVal& node) {  // NOLINT
+  void Visit(const SubscriptLVal& node) override {
     ref_ = Resolve(node.ptr);
-    node.offset = EvalExpr(node.offset);
+    const_cast<SubscriptLVal&>(node).offset = EvalExpr(node.offset);
   }
 
-  void operator()(DeclareStmt& node) {  // NOLINT
+  void Visit(const DeclareStmt& node) override {
     if (node.init) {
       auto init = EvalExpr(node.init);
 
-      auto int_const = boost::get<IntConst>(init.get());
+      auto int_const = std::dynamic_pointer_cast<IntConst>(init);
       if (int_const) {
         Symbol symbol;
         symbol.const_value = int_const->value;
         scope_->Bind(node.name, symbol);
         // Mark this statement as elided.
-        new_stmt_ = std::make_shared<Statement>(Block());
+        new_stmt_ = std::make_shared<Block>();
         return;
       }
 
-      auto load_expr = boost::get<LoadExpr>(init.get());
+      auto load_expr = std::dynamic_pointer_cast<LoadExpr>(init);
       if (load_expr) {
-        auto lookup = boost::get<LookupLVal>(load_expr->inner.get());
+        auto lookup = std::dynamic_pointer_cast<LookupLVal>(load_expr->inner);
         if (lookup) {
           auto ref = Resolve(load_expr->inner);
           Symbol symbol;
           symbol.alias = ref;
           scope_->Bind(node.name, symbol);
           // Mark this statement as elided.
-          new_stmt_ = std::make_shared<Statement>(Block());
+          new_stmt_ = std::make_shared<Block>();
           return;
         }
       }
 
-      node.init = init;
+      const_cast<DeclareStmt&>(node).init = init;
     }
   }
 
-  void operator()(UnaryExpr& node) { node.inner = EvalExpr(node.inner); }  // NOLINT
+  void Visit(const UnaryExpr& node) override { const_cast<UnaryExpr&>(node).inner = EvalExpr(node.inner); }
 
-  void operator()(BinaryExpr& node) {  // NOLINT
-    node.lhs = EvalExpr(node.lhs);
-    node.rhs = EvalExpr(node.rhs);
+  void Visit(const BinaryExpr& node) override {
+    const_cast<BinaryExpr&>(node).lhs = EvalExpr(node.lhs);
+    const_cast<BinaryExpr&>(node).rhs = EvalExpr(node.rhs);
 
     if (node.op == "*") {
       if (CheckIntConstValue(node.rhs, 1)) {
@@ -141,87 +142,87 @@ class Simplifier : public boost::static_visitor<> {
     }
   }
 
-  void operator()(CondExpr& node) {  // NOLINT
-    node.cond = EvalExpr(node.cond);
-    node.tcase = EvalExpr(node.tcase);
-    node.fcase = EvalExpr(node.fcase);
+  void Visit(const CondExpr& node) override {
+    const_cast<CondExpr&>(node).cond = EvalExpr(node.cond);
+    const_cast<CondExpr&>(node).tcase = EvalExpr(node.tcase);
+    const_cast<CondExpr&>(node).fcase = EvalExpr(node.fcase);
   }
 
-  void operator()(SelectExpr& node) {  // NOLINT
-    node.cond = EvalExpr(node.cond);
-    node.tcase = EvalExpr(node.tcase);
-    node.fcase = EvalExpr(node.fcase);
+  void Visit(const SelectExpr& node) override {
+    const_cast<SelectExpr&>(node).cond = EvalExpr(node.cond);
+    const_cast<SelectExpr&>(node).tcase = EvalExpr(node.tcase);
+    const_cast<SelectExpr&>(node).fcase = EvalExpr(node.fcase);
   }
 
-  void operator()(ClampExpr& node) {  // NOLINT
-    node.val = EvalExpr(node.val);
-    node.min = EvalExpr(node.min);
-    node.max = EvalExpr(node.max);
+  void Visit(const ClampExpr& node) override {
+    const_cast<ClampExpr&>(node).val = EvalExpr(node.val);
+    const_cast<ClampExpr&>(node).min = EvalExpr(node.min);
+    const_cast<ClampExpr&>(node).max = EvalExpr(node.max);
   }
 
-  void operator()(CastExpr& node) { node.val = EvalExpr(node.val); }  // NOLINT
+  void Visit(const CastExpr& node) override { const_cast<CastExpr&>(node).val = EvalExpr(node.val); }
 
-  void operator()(CallExpr& node) {  // NOLINT
-    node.func = EvalExpr(node.func);
+  void Visit(const CallExpr& node) override {
+    const_cast<CallExpr&>(node).func = EvalExpr(node.func);
     for (size_t i = 0; i < node.vals.size(); i++) {
-      node.vals[i] = EvalExpr(node.vals[i]);
+      const_cast<CallExpr&>(node).vals[i] = EvalExpr(node.vals[i]);
     }
   }
 
-  void operator()(LimitConst& node) {}  // NOLINT
+  void Visit(const LimitConst& node) override {}
 
-  void operator()(IndexExpr& node) {}  // NOLINT
+  void Visit(const IndexExpr& node) override {}
 
-  void operator()(Block& node) {  // NOLINT
+  void Visit(const Block& node) override {
     lang::Scope<Symbol> scope{scope_};
-    Block new_block;
-    for (const auto& stmt : *node.statements) {
+    auto new_block = std::make_shared<Block>();
+    for (const auto& stmt : node.statements) {
       auto new_stmt = EvalStmt(stmt, &scope);
-      auto block = boost::get<Block>(new_stmt.get());
-      if (!block || !block->statements->empty()) {
+      auto block = std::dynamic_pointer_cast<Block>(new_stmt);
+      if (!block || !block->statements.empty()) {
         // Only emit statements that haven't been elided.
-        new_block.append(new_stmt);
+        new_block->push_back(new_stmt);
       }
     }
-    new_stmt_ = std::make_shared<Statement>(std::move(new_block));
+    new_stmt_ = new_block;
   }
 
-  void operator()(IfStmt& node) {  // NOLINT
-    node.cond = EvalExpr(node.cond);
+  void Visit(const IfStmt& node) override {
+    const_cast<IfStmt&>(node).cond = EvalExpr(node.cond);
     if (node.iftrue) {
-      (*this)(*node.iftrue);
+      const_cast<IfStmt&>(node).iftrue = EvalStmt(node.iftrue);
     }
     if (node.iffalse) {
-      (*this)(*node.iffalse);
+      const_cast<IfStmt&>(node).iffalse = EvalStmt(node.iffalse);
     }
   }
 
-  void operator()(ForStmt& node) { (*this)(*node.inner); }  // NOLINT
+  void Visit(const ForStmt& node) override { const_cast<ForStmt&>(node).inner = EvalStmt(node.inner); }
 
-  void operator()(WhileStmt& node) {  // NOLINT
-    node.cond = EvalExpr(node.cond);
-    (*this)(*node.inner);
+  void Visit(const WhileStmt& node) override {
+    const_cast<WhileStmt&>(node).cond = EvalExpr(node.cond);
+    const_cast<WhileStmt&>(node).inner = EvalStmt(node.inner);
   }
 
-  void operator()(BarrierStmt& node) {}  // NOLINT
+  void Visit(const BarrierStmt& node) override {}
 
-  void operator()(ReturnStmt& node) {  // NOLINT
+  void Visit(const ReturnStmt& node) override {
     if (node.value) {
-      node.value = EvalExpr(node.value);
+      const_cast<ReturnStmt&>(node).value = EvalExpr(node.value);
     }
   }
 
-  void operator()(Function& node) { (*this)(*node.body); }  // NOLINT
+  void Visit(const Function& node) override { const_cast<Function&>(node).body = EvalStmt(node.body); }
 
  private:
   bool CheckIntConstValue(const ExprPtr& expr, int64_t value) {
-    auto int_const = boost::get<IntConst>(expr.get());
+    auto int_const = std::dynamic_pointer_cast<IntConst>(expr);
     return (int_const && int_const->value == value);
   }
 
   ExprPtr EvalExpr(const ExprPtr& expr) {
-    Simplifier eval{scope_};
-    boost::apply_visitor(eval, *expr);
+    Simplifier eval(scope_);
+    expr->Accept(eval);
     if (eval.new_expr_) {
       return eval.new_expr_;
     }
@@ -231,8 +232,8 @@ class Simplifier : public boost::static_visitor<> {
   StmtPtr EvalStmt(const StmtPtr& stmt) { return EvalStmt(stmt, scope_); }
 
   StmtPtr EvalStmt(const StmtPtr& stmt, lang::Scope<Symbol>* scope) {
-    Simplifier eval{scope};
-    boost::apply_visitor(eval, *stmt);
+    Simplifier eval(scope);
+    stmt->Accept(eval);
     if (eval.new_stmt_) {
       return eval.new_stmt_;
     }
@@ -241,7 +242,7 @@ class Simplifier : public boost::static_visitor<> {
 
   std::string Resolve(const LValPtr& ptr) {
     Simplifier eval(scope_);
-    boost::apply_visitor(eval, *ptr);
+    ptr->Accept(eval);
     return eval.ref_;
   }
 
@@ -260,13 +261,15 @@ namespace lang {
 void Simplify(const std::vector<KernelInfo>& kernels) {
   for (const auto& ki : kernels) {
     if (VLOG_IS_ON(4)) {
+      lang::EmitDebug emit_debug;
+      emit_debug.Visit(*ki.kfunc);
       VLOG(4) << "Generic debug kernel before simplification:";
       VLOG(4) << ki.comments;
-      VLOG(4) << to_string(*ki.kfunc);
+      VLOG(4) << emit_debug.str();
     }
     lang::Scope<sem::Symbol> scope;
     sem::Simplifier simplifier{&scope};
-    simplifier(*ki.kfunc);
+    ki.kfunc->Accept(simplifier);
   }
 }
 
