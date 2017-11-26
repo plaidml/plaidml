@@ -1,3 +1,4 @@
+// Copyright 2017, Vertex.AI.
 
 #include "tile/lang/semtree.h"
 
@@ -38,93 +39,19 @@ std::string to_string(const Type& ty) {
   return os.str();
 }
 
-void IntConst::Accept(Visitor& v) const { v.Visit(*this); }
+Block::Block() : statements{std::make_shared<std::vector<StmtPtr>>()} {}
 
-void FloatConst::Accept(Visitor& v) const { v.Visit(*this); }
-
-void LookupLVal::Accept(Visitor& v) const { v.Visit(*this); }
-
-void LoadExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void StoreStmt::Accept(Visitor& v) const { v.Visit(*this); }
-
-void SubscriptLVal::Accept(Visitor& v) const { v.Visit(*this); }
-
-void DeclareStmt::Accept(Visitor& v) const { v.Visit(*this); }
-
-void UnaryExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void BinaryExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void CondExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void SelectExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void ClampExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void CastExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void CallExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void LimitConst::Accept(Visitor& v) const { v.Visit(*this); }
-
-void IndexExpr::Accept(Visitor& v) const { v.Visit(*this); }
-
-void Block::merge(std::shared_ptr<Block> other) {
-  statements.insert(statements.end(), other->statements.begin(), other->statements.end());
+Block::Block(std::vector<StmtPtr> s) : Block() {
+  statements->insert(statements->end(), std::make_move_iterator(s.begin()), std::make_move_iterator(s.end()));
 }
 
-void Block::append(StmtPtr p) {
-  if (p) {
-    if (p->isBlock()) {
-      merge(std::static_pointer_cast<Block>(p));
-    } else {
-      push_back(p);
-    }
-  }
+Block::Block(StmtPtr s) : Block() { append(std::move(s)); }
+
+void Block::merge(BlockPtr other) {
+  statements->insert(statements->end(), other->statements->begin(), other->statements->end());
 }
 
-void Block::Accept(Visitor& v) const { v.Visit(*this); }
-
-IfStmt::IfStmt(ExprPtr c, StmtPtr t, StmtPtr f) : cond(c), iftrue(t), iffalse(f) {
-  if (iftrue && !iftrue->isBlock()) {
-    iftrue = std::make_shared<Block>(std::vector<StmtPtr>{iftrue});
-  }
-  if (iffalse && !iffalse->isBlock()) {
-    iffalse = std::make_shared<Block>(std::vector<StmtPtr>{iffalse});
-  }
-}
-
-void IfStmt::Accept(Visitor& v) const { v.Visit(*this); }
-
-ForStmt::ForStmt(const std::string v, uint64_t n, uint64_t s, StmtPtr i) : var(v), num(n), step(s), inner(i) {
-  if (!inner->isBlock()) {
-    inner = std::make_shared<Block>(std::vector<StmtPtr>{i});
-  }
-}
-
-void ForStmt::Accept(Visitor& v) const { v.Visit(*this); }
-
-WhileStmt::WhileStmt(ExprPtr c, StmtPtr i) : cond(c), inner(i) {
-  if (!inner->isBlock()) {
-    inner = std::make_shared<Block>(std::vector<StmtPtr>{i});
-  }
-}
-
-void WhileStmt::Accept(Visitor& v) const { v.Visit(*this); }
-
-void BarrierStmt::Accept(Visitor& v) const { v.Visit(*this); }
-
-void ReturnStmt::Accept(Visitor& v) const { v.Visit(*this); }
-
-Function::Function(const std::string n, const Type& r, const params_t& p, StmtPtr b)
-    : name(n), ret(r), params(p), body(b) {
-  if (!body->isBlock()) {
-    body = std::make_shared<Block>(std::vector<StmtPtr>{body});
-  }
-}
-
-void Function::Accept(Visitor& v) const { v.Visit(*this); }
+void Block::append(StmtPtr p) { statements->emplace_back(std::move(p)); }
 
 }  // namespace sem
 }  // namespace tile
