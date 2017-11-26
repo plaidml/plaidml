@@ -90,6 +90,9 @@ message SvmCapability {
 message Driver {
   // If true, nan's will be detected at WARNING and summaries will be printed at VLOG(1).
   bool debug_summaries = 2;
+
+  // If true, profiling will be enabled.
+  bool enable_profiling = 3;
 }
 
 // Metadata about OpenCL platforms discovered during enumeration.

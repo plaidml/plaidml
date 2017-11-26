@@ -52,7 +52,7 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
   // Run trial_runs number of times, picking minimum time
   for (size_t i = 0; i < trial_runs; i++) {
     LOG(DEBUG) << "Trying kernel: " << ki.kname << ", key: " << ki.key << ", tile_size: " << ki.tile_size;
-    auto evt = kernel->Run(ctx, buffers, {}, true);
+    auto evt = kernel->Run(ctx, buffers, {});
     device.executor()->Flush();
     auto result = evt->GetFuture().get();
     int64_t time = result->GetDuration().count();
@@ -821,9 +821,7 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> RunRequest::LaunchKerne
         }
       }
 
-      // NOTE: VLOG_IS_ON(1) is needed here because LogResults depends on profiling
-      // being enabled in order to print durations.
-      done = bk.kernel->Run(ctx, params, deps, ctx.is_logging_events() || VLOG_IS_ON(1));
+      done = bk.kernel->Run(ctx, params, deps);
 
       for (const auto& param : bk.params) {
         if (param.ty != Program::KernelParamType::kOutput) {
@@ -922,7 +920,7 @@ boost::future<void> RunRequest::LogResults(const context::Context& ctx,
   context::Context ctx_copy{ctx};
   return results.then([ctx = std::move(ctx_copy)](decltype(results) future) {
     auto results = future.get();
-    if (VLOG_IS_ON(1) || ctx.is_logging_events()) {
+    if (VLOG_IS_ON(1)) {
       std::chrono::high_resolution_clock::duration total{std::chrono::high_resolution_clock::duration::zero()};
       for (const auto& result : results) {
         total += result->GetDuration();

@@ -25,7 +25,7 @@ void CLMemBuffer::SetKernelArg(const CLObj<cl_kernel>& kernel, std::size_t index
 }
 
 boost::future<void*> CLMemBuffer::MapCurrent(const std::vector<std::shared_ptr<hal::Event>>& deps) {
-  const auto& queue = device_state_->cl_normal_queue();
+  const auto& queue = device_state_->cl_queue();
   auto mdeps = Event::Downcast(deps, device_state_->cl_ctx(), queue);
   Err err;
   // TODO: Create a way for MapCurrent to specify read, write, or both, so that when we're reading (the usual case for
@@ -46,7 +46,7 @@ boost::future<void*> CLMemBuffer::MapCurrent(const std::vector<std::shared_ptr<h
 }
 
 boost::future<void*> CLMemBuffer::MapDiscard(const std::vector<std::shared_ptr<hal::Event>>& deps) {
-  const auto& queue = device_state_->cl_normal_queue();
+  const auto& queue = device_state_->cl_queue();
   auto mdeps = Event::Downcast(deps, device_state_->cl_ctx(), queue);
   Err err;
   base_ = clEnqueueMapBuffer(queue.cl_queue.get(),                   // command_queue
@@ -64,7 +64,7 @@ boost::future<void*> CLMemBuffer::MapDiscard(const std::vector<std::shared_ptr<h
 }
 
 std::shared_ptr<hal::Event> CLMemBuffer::Unmap(const context::Context& ctx) {
-  const auto& queue = device_state_->cl_normal_queue();
+  const auto& queue = device_state_->cl_queue();
   context::Activity activity{ctx, "tile::hal::opencl::Buffer::Unmap"};
   CLObj<cl_event> evt;
   Err err = clEnqueueUnmapMemObject(queue.cl_queue.get(),  // command_queue
