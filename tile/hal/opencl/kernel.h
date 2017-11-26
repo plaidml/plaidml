@@ -21,8 +21,7 @@ class Kernel final : public hal::Kernel {
          boost::uuids::uuid kernel_uuid);
 
   std::shared_ptr<hal::Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<hal::Buffer>>& params,
-                                  const std::vector<std::shared_ptr<hal::Event>>& dependencies,
-                                  bool enable_profiling) final;
+                                  const std::vector<std::shared_ptr<hal::Event>>& dependencies) final;
 
  private:
   std::mutex mu_;
