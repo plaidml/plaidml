@@ -77,7 +77,7 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
               found_hardware_config = true;
             }
           }
-          dev->Initialize(settings);
+          dev->Initialize(ctx, settings);
           auto devinfo = std::make_shared<DevInfo>(DevInfo{devset, dev, settings});
           PlatformDev pd{id, devinfo};
           if (!found_hardware_config) {
