@@ -162,3 +162,13 @@ plaidml_cc_test(
         "//base/util:util_cc",
     ],
 )
+
+plaidml_cc_test(
+    name = "simplifier_test",
+    srcs = [
+        "simplifier_test.cc",
+    ],
+    deps = [
+        ":lang",
+    ],
+)
