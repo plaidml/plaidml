@@ -66,7 +66,7 @@ _app_stack = []
 
 _ctx = plaidml.Context()
 
-PLAIDML_EVENTLOG_FILENAME = os.environ.get('PLAIDML_EVENTLOG_FILENAME')
+PLAIDML_EVENTLOG_FILENAME = os.getenv('PLAIDML_EVENTLOG_FILENAME')
 if PLAIDML_EVENTLOG_FILENAME:
     print("Logging events to", PLAIDML_EVENTLOG_FILENAME)
     _ctx.set_eventlog_filename(PLAIDML_EVENTLOG_FILENAME)
@@ -1265,11 +1265,10 @@ def concatenate(tensors, axis=-1):
     #     T2[n0, a+8, n2: N0, 9, N2] = =(I2[n0, a, n2]);
     #     O = T0 + T1 + T2;
     #   }
-    code = ('function ({inputs}) -> (O) {{\n' + '{body}\n' + '}}').format(
-        **{
-            'inputs': inputs_str,
-            'body': body_str
-        })
+    code = ('function ({inputs}) -> (O) {{\n{body}\n}}').format(
+        inputs=inputs_str,
+        body=body_str,
+    )
     inputs_dict = dict()
     for i in range(len(tensors)):
         inputs_dict['I{}'.format(i)] = tensors[i]
