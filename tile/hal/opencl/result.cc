@@ -108,6 +108,10 @@ void KernelResult::LogStatistics() const {
     Err::Check(err, "Kernel execution failure");
   } else {
     auto duration = info_->execution_duration.count();
+    if (duration == 0) {
+      // Prevent division by 0
+      duration = 1;
+    }
     VLOG(1) << "Ran " << ki_.kname << ": dur=" << duration << " GFL/s=" << ki_.tot_flops / duration
             << " GBP/s=" << ki_.tot_bytes / duration;
     LogActivity(ctx_, device_state_, *info_);
