@@ -30,6 +30,7 @@ TileCache::TileCache(const std::string& filename, bool use_env) {
   file_.clear();
   file_.exceptions(std::fstream::failbit | std::fstream::badbit);
 }
+
 TileCache* TileCache::Instance() {
   static TileCache instance("", true);
   return &instance;
