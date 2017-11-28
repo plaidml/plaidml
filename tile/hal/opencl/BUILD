@@ -89,8 +89,8 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util:util_cc",
-        "@boost_archive//:regex",
         "@boost_archive//:filesystem",
+        "@boost_archive//:regex",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
