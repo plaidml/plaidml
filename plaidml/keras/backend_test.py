@@ -16,7 +16,7 @@ import tensorflow
 import theano
 from keras.backend import tensorflow_backend as tf
 from keras.backend import theano_backend as th
-from keras.backend.common import floatx
+from keras.backend import floatx
 
 import plaidml
 import plaidml.exceptions
