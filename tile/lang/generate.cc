@@ -100,28 +100,35 @@ static KernelInfo GenerateContractionKernel(const std::string& kname, const Hard
     }
     VLOG(1) << "tot_flops = " << ki.tot_flops << ", tot_bytes = " << ki.tot_bytes << "\n\n";
   }
+
+  proto::ContractionInfo* pb;
   if (c) {
-    auto pb = ki.info.mutable_contraction();
-    pb->set_op(to_string(*c));
-    for (std::size_t idx = 0; idx < flat.names.size(); ++idx) {
-      auto access = pb->add_accesses();
-      access->set_name(flat.names[idx]);
-      access->set_range(flat.ranges[idx]);
-      for (auto a : flat.access) {
-        access->add_strides(a.strides[idx]);
-      }
-    }
+    pb = ki.info.mutable_contraction();
+    pb->add_ops(to_string(*c));
+  } else {
+    pb = ki.info.mutable_element();
+  }
+  for (const auto& op : flat.post_ops) {
+    pb->add_ops(to_string(op));
+  }
+  for (std::size_t idx = 0; idx < flat.names.size(); ++idx) {
+    auto access = pb->add_accesses();
+    access->set_name(flat.names[idx]);
+    access->set_range(flat.ranges[idx]);
     for (auto a : flat.access) {
-      pb->add_off(a.offset);
-      pb->add_vec(a.vector);
+      access->add_strides(a.strides[idx]);
     }
-    for (auto cons : flat.constraints) {
-      auto constraint = pb->add_constraints();
-      for (auto lhs : cons.lhs) {
-        constraint->add_lhs(lhs);
-      }
-      constraint->set_rhs(cons.rhs);
+  }
+  for (auto a : flat.access) {
+    pb->add_off(a.offset);
+    pb->add_vec(a.vector);
+  }
+  for (auto cons : flat.constraints) {
+    auto constraint = pb->add_constraints();
+    for (auto lhs : cons.lhs) {
+      constraint->add_lhs(lhs);
     }
+    constraint->set_rhs(cons.rhs);
   }
 
   return ki;

@@ -7,14 +7,11 @@ option java_outer_classname = "LangProtos";
 
 message KernelInfo {
   oneof kernel_type {
-    ElementInfo element = 1;
+    ContractionInfo element = 1;
     ContractionInfo contraction = 2;
     ZeroInfo zero = 3;
+    SpecialInfo special = 4;
   }
-}
-
-message ElementInfo {
-  repeated string ops = 1;
 }
 
 message ContractionInfo {
@@ -29,7 +26,7 @@ message ContractionInfo {
     int64 rhs = 2;
   }
 
-  string op = 1;
+  repeated string ops = 1;
   repeated Access accesses = 2;
   repeated int64 off = 3;
   repeated int64 vec = 4;
@@ -37,4 +34,9 @@ message ContractionInfo {
 }
 
 message ZeroInfo {
+  bool copy = 1;
+}
+
+message SpecialInfo {
+  string fn = 1;
 }
