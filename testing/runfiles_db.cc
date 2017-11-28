@@ -16,6 +16,7 @@ RunfilesDB::RunfilesDB(const char* prefix, const char* environ_override_var) {
     if (prefix_[prefix_.size()] != '/') {
       prefix_ += '/';
     }
+    relative_prefix_ = prefix_.substr(prefix_.find('/') + 1);
   }
 
   if (environ_override_var) {
@@ -51,8 +52,9 @@ std::string RunfilesDB::operator[](const char* logical_filename) {
     return env_override_ + logical_filename;
   }
   std::string logical = prefix_ + logical_filename;
+  std::string relative_filename = relative_prefix_ + logical_filename;
   std::lock_guard<std::mutex> lock{mu_};
-  auto r = logical_to_physical_.emplace(logical, logical_filename);
+  auto r = logical_to_physical_.emplace(logical, relative_filename);
   return r.first->second;
 }
 

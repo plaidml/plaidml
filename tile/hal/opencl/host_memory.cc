@@ -1,6 +1,6 @@
 // Copyright 2017, Vertex.AI.
 
-#include "tile/hal/opencl/global_memory.h"
+#include "tile/hal/opencl/host_memory.h"
 
 #include <utility>
 
@@ -12,9 +12,9 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-GlobalMemory::GlobalMemory(const std::shared_ptr<DeviceState>& device_state) : device_state_{device_state} {}
+HostMemory::HostMemory(const std::shared_ptr<DeviceState>& device_state) : device_state_{device_state} {}
 
-std::shared_ptr<hal::Buffer> GlobalMemory::MakeBuffer(std::uint64_t size, BufferAccessMask /* access */) {
+std::shared_ptr<hal::Buffer> HostMemory::MakeBuffer(std::uint64_t size, BufferAccessMask /* access */) {
   Err err;
   CLObj<cl_mem> mem = clCreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, size,
                                      nullptr, err.ptr());
@@ -22,7 +22,7 @@ std::shared_ptr<hal::Buffer> GlobalMemory::MakeBuffer(std::uint64_t size, Buffer
   return std::make_shared<CLMemBuffer>(device_state_, size, std::move(mem));
 }
 
-std::shared_ptr<hal::Arena> GlobalMemory::MakeArena(std::uint64_t size, BufferAccessMask /* access */) {
+std::shared_ptr<hal::Arena> HostMemory::MakeArena(std::uint64_t size, BufferAccessMask /* access */) {
   Err err;
   CLObj<cl_mem> mem = clCreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, size,
                                      nullptr, err.ptr());

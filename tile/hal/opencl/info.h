@@ -230,6 +230,8 @@ struct CLInfoType<CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE> : CLDeviceInfo<CL_DEVICE_
 template <>
 struct CLInfoType<CL_DEVICE_GLOBAL_MEM_CACHE_SIZE> : CLDeviceInfo<CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, cl_ulong> {};
 template <>
+struct CLInfoType<CL_DEVICE_GLOBAL_MEM_SIZE> : CLDeviceInfo<CL_DEVICE_GLOBAL_MEM_SIZE, cl_ulong> {};
+template <>
 struct CLInfoType<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE> : CLDeviceInfo<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, cl_ulong> {};
 template <>
 struct CLInfoType<CL_DEVICE_MAX_CONSTANT_ARGS> : CLDeviceInfo<CL_DEVICE_MAX_CONSTANT_ARGS, cl_uint> {};

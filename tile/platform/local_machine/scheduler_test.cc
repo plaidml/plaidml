@@ -1,0 +1,78 @@
+// Copyright 2017, Vertex.AI.
+
+#include "tile/platform/local_machine/scheduler_test.h"
+
+#include <boost/core/demangle.hpp>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/text_format.h>
+
+#include "base/util/logging.h"
+#include "testing/runfiles_db.h"
+#include "tile/lang/generate.h"
+#include "tile/lang/parser.h"
+#include "tile/proto/support.h"
+
+namespace gp = ::google::protobuf;
+
+namespace vertexai {
+namespace tile {
+namespace local_machine {
+namespace {
+
+tile::proto::Program MakeProgram(const std::string& filename) {
+  tile::proto::Program result;
+  std::ifstream in{filename};
+  if (!in) {
+    LOG(FATAL) << "Unable to read program proto from " << filename;
+  }
+  gp::io::IstreamInputStream zcis{&in};
+  if (!gp::TextFormat::Parse(&zcis, &result)) {
+    LOG(FATAL) << "Failed to parse program proto from " << filename;
+  }
+  return result;
+}
+
+}  // namespace
+
+std::vector<tile::proto::Program> SchedulerTest::GetTestPrograms() {
+  testing::RunfilesDB rdb{"vertexai_plaidml/tile/platform/local_machine/testdata"};
+  return std::vector<tile::proto::Program>{MakeProgram(rdb["prng.tpb"]), MakeProgram(rdb["resnet50_train.tpb"]),
+                                           MakeProgram(rdb["xception.tpb"])};
+}
+
+void PrintTo(const SchedulerTestParam& param, ::std::ostream* os) {
+  *os << std::get<0>(param)->name() << "/" << std::get<1>(param).id();
+}
+
+tile::lang::HardwareSettings SchedulerTest::GetSettings() {
+  tile::lang::HardwareSettings settings;
+  settings.threads = 256;
+  settings.use_global = false;
+  settings.mem_width = 128;
+  settings.vec_size = 4;
+  settings.max_mem = 32768;
+  settings.max_regs = 16384;
+  settings.goal_groups = 16;
+  settings.goal_flops_per_byte = 50;
+  return settings;
+}
+
+namespace {
+
+TEST_P(SchedulerTest, Schedule) {
+  const auto& program = GetProgram();
+  lang::Parser parser;
+  auto parsed = parser.Parse(program.code());
+  auto inputs = to_poco(program.inputs());
+  auto outputs = to_poco(program.outputs());
+  auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, GetSettings(), program.id(), 1);
+
+  auto schedule = GetScheduler()->BuildSchedule(program, kernel_list);
+  SummarizeSchedule(nullptr, program, kernel_list, schedule);
+  ValidateSchedule(program, kernel_list, schedule);
+}
+
+}  // namespace
+}  // namespace local_machine
+}  // namespace tile
+}  // namespace vertexai
