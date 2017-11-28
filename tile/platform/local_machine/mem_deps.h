@@ -27,7 +27,7 @@ class MemDeps final : public std::enable_shared_from_this<MemDeps> {
 
   // Poisons the memory chunk, if not already poisoned.  This causes the indicated exception to be thrown from
   // subsequent calls to Capture.
-  void Poison(std::exception_ptr ep);
+  void Poison(std::exception_ptr ep) noexcept;
 
  private:
   std::mutex mu_;

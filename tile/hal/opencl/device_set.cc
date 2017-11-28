@@ -166,6 +166,7 @@ proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx, const prot
   }
   info.set_global_mem_cacheline_size(CLInfo<CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE>(did));
   info.set_global_mem_cache_size(CLInfo<CL_DEVICE_GLOBAL_MEM_CACHE_SIZE>(did));
+  info.set_global_mem_size(CLInfo<CL_DEVICE_GLOBAL_MEM_SIZE>(did));
   info.set_max_constant_buffer_size(CLInfo<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE>(did));
   info.set_max_constant_args(CLInfo<CL_DEVICE_MAX_CONSTANT_ARGS>(did));
 #ifndef __APPLE__
@@ -373,7 +374,7 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
   }
 
   if (first_dev) {
-    host_memory_ = compat::make_unique<GlobalMemory>(first_dev->device_state());
+    host_memory_ = compat::make_unique<HostMemory>(first_dev->device_state());
   }
 }
 

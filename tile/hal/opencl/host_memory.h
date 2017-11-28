@@ -14,9 +14,14 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-class GlobalMemory final : public Memory {
+class HostMemory final : public Memory {
  public:
-  explicit GlobalMemory(const std::shared_ptr<DeviceState>& device_state);
+  explicit HostMemory(const std::shared_ptr<DeviceState>& device_state);
+
+  std::uint64_t size_goal() const final {
+    // TODO: Actually query the system physical memory size.
+    return 16 * std::giga::num;
+  }
 
   BufferAccessMask AllowedAccesses() const final { return BufferAccessMask::ALL; }
 

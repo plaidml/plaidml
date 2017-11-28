@@ -14,9 +14,11 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-class LocalMemory final : public Memory {
+class DeviceMemory final : public Memory {
  public:
-  explicit LocalMemory(const std::shared_ptr<DeviceState>& device_state);
+  explicit DeviceMemory(const std::shared_ptr<DeviceState>& device_state);
+
+  std::uint64_t size_goal() const final { return device_state_->info().global_mem_size(); }
 
   BufferAccessMask AllowedAccesses() const final { return BufferAccessMask::ALL; }
 

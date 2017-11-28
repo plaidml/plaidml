@@ -36,7 +36,7 @@ class Buffer : public tile::Buffer, public std::enable_shared_from_this<Buffer> 
   std::unique_ptr<View> MapDiscard(const context::Context& ctx) final;
   std::uint64_t size() const final;
 
-  void RemapTo(const std::shared_ptr<MemChunk>& chunk);
+  void RemapTo(std::shared_ptr<MemChunk> chunk);
 
  private:
   const std::shared_ptr<DevInfo> devinfo_;

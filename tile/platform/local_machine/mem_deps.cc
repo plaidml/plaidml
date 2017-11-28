@@ -37,7 +37,7 @@ void MemDeps::AddReadDependency(std::shared_ptr<hal::Event> event) {
   });
 }
 
-void MemDeps::Poison(std::exception_ptr ep) {
+void MemDeps::Poison(std::exception_ptr ep) noexcept {
   std::lock_guard<std::mutex> lock{mu_};
   ep_ = ep;
 }

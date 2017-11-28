@@ -63,6 +63,11 @@ class SharedMemory final : public Memory {
  public:
   explicit SharedMemory(const std::shared_ptr<DeviceState>& device_state);
 
+  std::uint64_t size_goal() const final {
+    // TODO: Actually query the system physical memory size.
+    return 16 * std::giga::num;
+  }
+
   BufferAccessMask AllowedAccesses() const final { return BufferAccessMask::ALL; }
 
   std::size_t ArenaBufferAlignment() const final { return device_state_->info().mem_base_addr_align(); }

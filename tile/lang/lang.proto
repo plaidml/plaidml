@@ -12,6 +12,7 @@ message KernelInfo {
     ZeroInfo zero = 3;
     SpecialInfo special = 4;
   }
+  string name = 5;
 }
 
 message ContractionInfo {

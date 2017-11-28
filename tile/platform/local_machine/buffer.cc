@@ -34,12 +34,12 @@ std::unique_ptr<View> Buffer::MapDiscard(const context::Context& ctx) { return c
 
 std::uint64_t Buffer::size() const { return chunk()->size(); }
 
-void Buffer::RemapTo(const std::shared_ptr<MemChunk>& chunk) {
+void Buffer::RemapTo(std::shared_ptr<MemChunk> chunk) {
   if (size() != chunk->size()) {
     throw std::runtime_error("The requested buffer remapping required a change in buffer size");
   }
   std::lock_guard<std::mutex> lock{mu_};
-  chunk_ = chunk;
+  chunk_ = std::move(chunk);
 }
 
 }  // namespace local_machine
