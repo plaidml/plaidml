@@ -90,6 +90,7 @@ plaidml_cc_library(
         ":proto_cc",
         "//base/util:util_cc",
         "@boost_archive//:regex",
+        "@boost_archive//:filesystem",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
