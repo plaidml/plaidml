@@ -139,6 +139,11 @@ class Simplifier : public Visitor {
         // Check for (L - 0), return (L)
         new_expr_ = node.lhs;
       }
+    } else if (node.op == "%") {
+      if (CheckIntConstValue(node.rhs, 1)) {
+        // Check for (L % 1), return (0)
+        new_expr_ = std::make_shared<IntConst>(0);
+      }
     }
   }
 
