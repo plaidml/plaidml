@@ -9,11 +9,15 @@
 #include <utility>
 #include <vector>
 
+#include <boost/filesystem.hpp>
+
 #include "base/util/compat.h"
 #include "base/util/logging.h"
 #include "base/util/uuid.h"
 #include "tile/hal/opencl/emitocl.h"
 #include "tile/hal/opencl/library.h"
+
+namespace fs = boost::filesystem;
 
 namespace vertexai {
 namespace tile {
@@ -36,7 +40,7 @@ class Build {
         std::vector<boost::uuids::uuid> kernel_uuids);
 
  private:
-  static void OnBuildComplete(cl_program /* program */, void* raw_build) noexcept;
+  static void OnBuildComplete(cl_program program, void* raw_build) noexcept;
 
   void OnError() noexcept;
 
@@ -77,7 +81,7 @@ Build::Build(context::Activity activity, const std::shared_ptr<DeviceState>& dev
       library_{compat::make_unique<Library>(device_state, std::move(program), kernel_info, std::move(kernel_uuids))},
       binfo_{std::move(binfo)} {}
 
-void Build::OnBuildComplete(cl_program /* program */, void* raw_build) noexcept {
+void Build::OnBuildComplete(cl_program program, void* raw_build) noexcept {
   std::unique_ptr<Build> build{static_cast<Build*>(raw_build)};
 
   cl_build_status status;
@@ -126,6 +130,23 @@ void Build::OnError() noexcept {
   }
 }
 
+std::string ReadFile(const fs::path& path) {
+  fs::ifstream ifs;
+  ifs.open(path);
+  auto it = std::istreambuf_iterator<char>(ifs);
+  auto it_end = std::istreambuf_iterator<char>();
+  std::string contents(it, it_end);
+  if (ifs.bad()) {
+    throw std::runtime_error("Unable to fully read file: " + path.string());
+  }
+  return contents;
+}
+
+void WriteFile(const fs::path& path, const std::string& contents) {
+  fs::ofstream ofs(path);
+  ofs << contents;
+}
+
 }  // namespace
 
 Compiler::Compiler(const std::shared_ptr<DeviceState>& device_state) : device_state_{device_state} {}
@@ -148,6 +169,13 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     code << "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n";
   }
 
+  auto env_cache = std::getenv("PLAIDML_OPENCL_CACHE");
+  fs::path cache_dir;
+  if (env_cache) {
+    VLOG(1) << "Using OpenCL cache directory: " << env_cache;
+    cache_dir = env_cache;
+  }
+
   for (const auto& ki : kernel_info) {
     context::Activity kbuild{activity.ctx(), "tile::hal::opencl::BuildKernel"};
 
@@ -155,23 +183,35 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
       continue;
     }
 
-    if (VLOG_IS_ON(4)) {
-      lang::EmitDebug emit_debug;
-      emit_debug.Visit(*ki.kfunc);
-      VLOG(4) << "Generic debug kernel:";
-      VLOG(4) << ki.comments;
-      VLOG(4) << emit_debug.str();
-    }
-
-    code << ki.comments;
     Emit ocl{cl_khr_fp16, cl_khr_fp64};
     ocl.Visit(*ki.kfunc);
-    code << ocl.str();
+    std::string src = ki.comments + ocl.str();
+
+    if (is_directory(cache_dir)) {
+      fs::path src_path = (cache_dir / ki.kname).replace_extension("cl");
+      if (fs::is_regular_file(src_path)) {
+        VLOG(1) << "Reading OpenCL code from cache: " << src_path;
+        src = ReadFile(src_path);
+      } else {
+        VLOG(1) << "Writing OpenCL code to cache: " << src_path;
+        WriteFile(src_path, src);
+      }
+    } else {
+      if (VLOG_IS_ON(4)) {
+        lang::EmitDebug emit_debug;
+        emit_debug.Visit(*ki.kfunc);
+        VLOG(4) << "Generic debug kernel:";
+        VLOG(4) << ki.comments;
+        VLOG(4) << emit_debug.str();
+      }
+    }
+
+    code << src;
     code << "\n\n";
 
     proto::KernelInfo kinfo;
     kinfo.set_kname(ki.kname);
-    kinfo.set_src(ki.comments + ocl.str());
+    kinfo.set_src(src);
     *(kinfo.mutable_kinfo()) = ki.info;
     kbuild.AddMetadata(kinfo);
 
