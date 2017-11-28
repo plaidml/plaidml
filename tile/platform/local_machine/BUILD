@@ -28,10 +28,15 @@ plaidml_cc_library(
         "mem_deps.cc",
         "mem_deps.h",
         "mem_strategy.h",
+        "placer.h",
         "platform.cc",
         "platform.h",
         "program.cc",
         "program.h",
+        "run_request.cc",
+        "run_request.h",
+        "shim.cc",
+        "shim.h",
         "tmp_mem_strategy.cc",
         "tmp_mem_strategy.h",
     ],
@@ -40,7 +45,10 @@ plaidml_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":block_placer",
+        ":loose_scheduler",
         ":proto_cc",
+        ":tdep_scheduler",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
@@ -62,4 +70,138 @@ plaidml_cc_test(
         "//tile/base:platform_test",
         "//tile/hal/opencl",
     ],
+)
+
+plaidml_cc_library(
+    name = "placer",
+    hdrs = ["placer.h"],
+    visibility = ["//visibility:private"],
+    deps = [":scheduler"],
+)
+
+plaidml_cc_library(
+    name = "block_placer",
+    srcs = ["block_placer.cc"],
+    hdrs = ["block_placer.h"],
+    visibility = ["//visibility:private"],
+    deps = [":placer"],
+)
+
+plaidml_cc_library(
+    name = "naive_placer",
+    srcs = ["naive_placer.cc"],
+    hdrs = ["naive_placer.h"],
+    visibility = ["//visibility:private"],
+    deps = [":placer"],
+)
+
+plaidml_cc_library(
+    name = "scheduler",
+    srcs = [
+        "schedule.cc",
+        "scheduler.cc",
+    ],
+    hdrs = [
+        "schedule.h",
+        "scheduler.h",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":proto_cc",
+        "//tile/lang",
+    ],
+)
+
+plaidml_cc_library(
+    name = "scheduler_test",
+    testonly = True,
+    srcs = [
+        "scheduler_test.cc",
+    ],
+    hdrs = ["scheduler_test.h"],
+    data = [
+        "testdata/prng.tpb",
+        "testdata/resnet50_train.tpb",
+        "testdata/xception.tpb",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":block_placer",
+        ":naive_placer",
+        ":scheduler",
+        "//testing:gtest_main",
+        "//testing:matchers",
+        "//testing:runfiles_db",
+        "//tile/proto:support",
+    ],
+    alwayslink = True,
+)
+
+plaidml_cc_library(
+    name = "loose_scheduler",
+    srcs = [
+        "loose_scheduler.cc",
+        "loose_scheduler.h",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":placer",
+        ":scheduler",
+    ],
+)
+
+plaidml_cc_test(
+    name = "loose_scheduler_test",
+    srcs = ["loose_scheduler_test.cc"],
+    deps = [
+        ":loose_scheduler",
+        ":scheduler_test",
+    ],
+    tags = ["rtest_fail"],
+)
+
+plaidml_cc_library(
+    name = "linear_scheduler",
+    srcs = [
+        "linear_scheduler.cc",
+        "linear_scheduler.h",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":placer",
+        ":scheduler",
+    ],
+)
+
+plaidml_cc_test(
+    name = "linear_scheduler_test",
+    srcs = ["linear_scheduler_test.cc"],
+    deps = [
+        ":linear_scheduler",
+        ":scheduler_test",
+    ],
+    tags = ["rtest_fail"],
+)
+
+plaidml_cc_library(
+    name = "tdep_scheduler",
+    srcs = [
+        "tdep_scheduler.cc",
+        "tdep_scheduler.h",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":placer",
+        ":scheduler",
+    ],
+)
+
+plaidml_cc_test(
+    name = "tdep_scheduler_test",
+    srcs = ["tdep_scheduler_test.cc"],
+    deps = [
+        ":scheduler_test",
+        ":tdep_scheduler",
+    ],
+    tags = ["rtest_fail"],
 )

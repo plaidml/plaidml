@@ -8,12 +8,11 @@
 #include "base/util/compat.h"
 #include "base/util/error.h"
 #include "tile/hal/opencl/buffer.h"
+#include "tile/hal/opencl/device_memory.h"
 #include "tile/hal/opencl/event.h"
-#include "tile/hal/opencl/global_memory.h"
 #include "tile/hal/opencl/info.h"
 #include "tile/hal/opencl/kernel.h"
 #include "tile/hal/opencl/library.h"
-#include "tile/hal/opencl/local_memory.h"
 #include "tile/hal/opencl/zero_kernel.h"
 #include "tile/hal/util/selector.h"
 
@@ -28,7 +27,7 @@ Executor::Executor(const std::shared_ptr<DeviceState>& device_state)
 
   if (device_state_->info().local_mem_type() == proto::LocalMemType::Local) {
     VLOG(3) << "Enabling OpenCL device-local memory";
-    device_memory_ = compat::make_unique<LocalMemory>(device_state_);
+    device_memory_ = compat::make_unique<DeviceMemory>(device_state_);
   }
 }
 
@@ -41,7 +40,10 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
 
   if (from_buf->size() <= from_offset || from_buf->size() < length || from_buf->size() < from_offset + length ||
       to_buf->size() <= to_offset || to_buf->size() < length || to_buf->size() < to_offset + length) {
-    throw error::InvalidArgument{"Invalid copy request"};
+    throw error::InvalidArgument{"Invalid copy request: from=" + std::to_string(from_buf->size()) +
+                                 " bytes, from_offset=" + std::to_string(from_offset) + ", to=" +
+                                 std::to_string(to_buf->size()) + " bytes, to_offset=" + std::to_string(to_offset) +
+                                 ", length=" + std::to_string(length)};
   }
 
   context::Activity activity{ctx, "tile::hal::opencl::Copy"};

@@ -5,8 +5,8 @@ syntax = "proto3";
 package vertexai.tile.hal.proto;
 
 import "google/protobuf/any.proto";
-import "tile/proto/tile.proto";
 import "tile/lang/lang.proto";
+import "tile/proto/tile.proto";
 
 option java_package = "ai.vertex.tile.hal";
 option java_outer_classname = "HalProtos";

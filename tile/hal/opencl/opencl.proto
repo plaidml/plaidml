@@ -192,6 +192,7 @@ message DeviceInfo {
   uint32 preferred_local_atomic_alignment = 85;
   uint32 max_num_sub_groups = 86;
   bool sub_group_independent_forward_progress = 87;
+  uint64 global_mem_size = 88;
 
   string platform_name = 100;
 
