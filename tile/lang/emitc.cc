@@ -236,23 +236,13 @@ void EmitC::Visit(const sem::Block& n) {
 
 void EmitC::Visit(const sem::IfStmt& n) {
   emitTab();
-  if (n.iftrue && n.iffalse) {
-    emit("if (");
-    n.cond->Accept(*this);
-    emit(")\n");
-    n.iftrue->Accept(*this);
+  emit("if (");
+  n.cond->Accept(*this);
+  emit(")\n");
+  n.iftrue->Accept(*this);
+  if (n.iffalse) {
     emitTab();
     emit("else\n");
-    n.iffalse->Accept(*this);
-  } else if (n.iftrue) {
-    emit("if (");
-    n.cond->Accept(*this);
-    emit(")\n");
-    n.iftrue->Accept(*this);
-  } else if (n.iffalse) {
-    emit("if (!");
-    n.cond->Accept(*this);
-    emit(")\n");
     n.iffalse->Accept(*this);
   }
 }
