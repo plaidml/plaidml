@@ -15,8 +15,8 @@
 #include "testing/plaidml_config.h"
 #include "tile/platform/local_machine/local_machine.pb.h"
 
-using ::testing::NotNull;
 using ::testing::IsVaiStatus;
+using ::testing::NotNull;
 
 extern "C" void vai_internal_set_vlog(size_t);
 
@@ -223,6 +223,11 @@ TEST_P(DTypeTest, MulSum) {
   plaidml_set_invoker_input(invoker.get(), "C", c.get());
   plaidml_set_invoker_output(invoker.get(), "A", a.get());
   std::unique_ptr<plaidml_invocation> invocation{plaidml_schedule_invocation(ctx.get(), invoker.get())};
+
+  if (dtype == PLAIDML_DATA_FLOAT64 && vai_last_status() == VAI_STATUS_UNIMPLEMENTED) {
+    SUCCEED() << "Devices are allowed to return VAI_STATUS_UNIMPLEMENTED for 64-bit float operations";
+    return;
+  }
 
   EXPECT_THAT(vai_last_status(), IsVaiStatus(VAI_STATUS_OK));
 
