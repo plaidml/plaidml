@@ -244,8 +244,8 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
   while (SimplifyFlat(&flat)) {
   }
   // Do memory based tile optimization
-  if (settings.vec_size > 1) {
-    flat = Vectorize(flat, settings.vec_size);
+  for (auto vec_size = settings.vec_size; flat.agg_vec == 1 && 1 < vec_size; vec_size /= 2) {
+    flat = Vectorize(flat, vec_size);
   }
   IVLOG(4, "Optimizing " << kname);
   auto by_score = TileOptimize(settings, flat, tile_trials == 1, vars);
