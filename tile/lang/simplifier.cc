@@ -193,13 +193,25 @@ class Simplifier : public Visitor {
   }
 
   void Visit(const IfStmt& node) override {
-    const_cast<IfStmt&>(node).cond = EvalExpr(node.cond);
-    if (node.iftrue) {
-      const_cast<IfStmt&>(node).iftrue = EvalStmt(node.iftrue);
-    }
     if (node.iffalse) {
       const_cast<IfStmt&>(node).iffalse = EvalStmt(node.iffalse);
     }
+    bool invert_test = false;
+    if (node.iftrue) {
+      const_cast<IfStmt&>(node).iftrue = EvalStmt(node.iftrue);
+      auto block = std::dynamic_pointer_cast<Block>(node.iffalse);
+      if (block && block->statements.empty()) {
+        invert_test = true;
+      }
+    } else {
+      invert_test = true;
+    }
+    if (invert_test) {
+      const_cast<IfStmt&>(node).iftrue = node.iffalse;
+      const_cast<IfStmt&>(node).iffalse = StmtPtr();
+      const_cast<IfStmt&>(node).cond = std::make_shared<UnaryExpr>("!", node.cond);
+    }
+    const_cast<IfStmt&>(node).cond = EvalExpr(node.cond);
   }
 
   void Visit(const ForStmt& node) override { const_cast<ForStmt&>(node).inner = EvalStmt(node.inner); }
@@ -240,6 +252,10 @@ class Simplifier : public Visitor {
     Simplifier eval(scope);
     stmt->Accept(eval);
     if (eval.new_stmt_) {
+      auto ifstmt = std::dynamic_pointer_cast<IfStmt>(eval.new_stmt_);
+      if (ifstmt && !ifstmt->iftrue) {
+        return std::make_shared<Block>();
+      }
       return eval.new_stmt_;
     }
     return stmt;
