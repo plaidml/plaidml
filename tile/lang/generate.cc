@@ -130,6 +130,8 @@ static KernelInfo GenerateContractionKernel(const std::string& kname, const Hard
     }
     constraint->set_rhs(cons.rhs);
   }
+  ki.info.set_flops(ki.tot_flops);
+  ki.info.set_bytes(ki.tot_bytes);
 
   return ki;
 }
