@@ -13,6 +13,9 @@ message KernelInfo {
     SpecialInfo special = 4;
   }
   string name = 5;
+
+  int64 flops = 101;
+  int64 bytes = 102;
 }
 
 message ContractionInfo {
