@@ -40,6 +40,8 @@ KernelInfo GenCopy(const TensorShape& shape, const std::string& oname, const std
   ki.tot_flops = size;
   auto pb = ki.info.mutable_zero();
   pb->set_copy(true);
+  ki.info.set_flops(ki.tot_flops);
+  ki.info.set_bytes(ki.tot_bytes);
   ki.ktype = KernelType::kCopy;
   return ki;
 }
@@ -68,6 +70,8 @@ KernelInfo GenZero(const TensorShape& shape, const std::string& bname, const std
   ki.tot_flops = size;
   auto pb = ki.info.mutable_zero();
   pb->set_copy(false);
+  ki.info.set_flops(ki.tot_flops);
+  ki.info.set_bytes(ki.tot_bytes);
   ki.ktype = KernelType::kZero;
   return ki;
 }
