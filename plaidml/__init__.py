@@ -5,6 +5,36 @@
 # You may obtain a copy of the License at
 #
 #    https://www.gnu.org/licenses/agpl-3.0.en.html
+"""
+PlaidML
+=======
+A framework for making deep learning work everywhere.
+
+PlaidML is a multi-language acceleration framework that:
+* Enables practitioners to deploy high-performance neural nets on any device
+* Allows hardware developers to quickly integrate with high-level frameworks
+* Allows framework developers to easily add support for many kinds of hardware
+
+For more information, see the
+[PlaidML Announcement](http://vertex.ai/blog/announcing-plaidml),
+and the [PlaidML GitHub Repository](https://github.com/plaidml/plaidml).
+
+About this module
+-----------------
+This module provides the low-level PlaidML Python API.
+
+Using this API directly requires either knowledge of the
+[Tile](https://github.com/plaidml/plaidml/wiki/Tile-Tutorial)
+language (used to describe the computations that make up a neural network), or
+a pre-built serialized network (which encapsulates the Tile operations that define
+the shape of the network, and the intra-network connection weights found by
+training the network).
+
+Higher-level APIs
+-----------------
+plaidml.keras - Integration with the [Keras](https://keras.io/) machine learning framework.
+This is useful for easily describing and training neural networks.
+"""
 
 from __future__ import print_function
 
