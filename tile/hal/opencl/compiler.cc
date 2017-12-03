@@ -179,39 +179,41 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   for (const auto& ki : kernel_info) {
     context::Activity kbuild{activity.ctx(), "tile::hal::opencl::BuildKernel"};
 
-    if (ki.ktype == lang::KernelType::kZero) {
-      continue;
-    }
-
-    Emit ocl{cl_khr_fp16, cl_khr_fp64};
-    ocl.Visit(*ki.kfunc);
-    std::string src = ki.comments + ocl.str();
-
-    if (is_directory(cache_dir)) {
-      fs::path src_path = (cache_dir / ki.kname).replace_extension("cl");
-      if (fs::is_regular_file(src_path)) {
-        VLOG(1) << "Reading OpenCL code from cache: " << src_path;
-        src = ReadFile(src_path);
-      } else {
-        VLOG(1) << "Writing OpenCL code to cache: " << src_path;
-        WriteFile(src_path, src);
-      }
-    } else {
-      if (VLOG_IS_ON(4)) {
-        lang::EmitDebug emit_debug;
-        emit_debug.Visit(*ki.kfunc);
-        VLOG(4) << "Generic debug kernel:";
-        VLOG(4) << ki.comments;
-        VLOG(4) << emit_debug.str();
-      }
-    }
-
-    code << src;
-    code << "\n\n";
-
     proto::KernelInfo kinfo;
     kinfo.set_kname(ki.kname);
-    kinfo.set_src(src);
+
+    if (ki.ktype == lang::KernelType::kZero) {
+      kinfo.set_src("// Builtin zero kernel");
+    } else {
+      Emit ocl{cl_khr_fp16, cl_khr_fp64};
+      ocl.Visit(*ki.kfunc);
+      std::string src = ki.comments + ocl.str();
+
+      if (is_directory(cache_dir)) {
+        fs::path src_path = (cache_dir / ki.kname).replace_extension("cl");
+        if (fs::is_regular_file(src_path)) {
+          VLOG(1) << "Reading OpenCL code from cache: " << src_path;
+          src = ReadFile(src_path);
+        } else {
+          VLOG(1) << "Writing OpenCL code to cache: " << src_path;
+          WriteFile(src_path, src);
+        }
+      } else {
+        if (VLOG_IS_ON(4)) {
+          lang::EmitDebug emit_debug;
+          emit_debug.Visit(*ki.kfunc);
+          VLOG(4) << "Generic debug kernel:";
+          VLOG(4) << ki.comments;
+          VLOG(4) << emit_debug.str();
+        }
+      }
+
+      code << src;
+      code << "\n\n";
+
+      kinfo.set_src(src);
+    }
+
     *(kinfo.mutable_kinfo()) = ki.info;
     kbuild.AddMetadata(kinfo);
 
