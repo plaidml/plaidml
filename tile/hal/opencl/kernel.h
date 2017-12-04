@@ -18,7 +18,7 @@ namespace opencl {
 class Kernel final : public hal::Kernel {
  public:
   Kernel(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_kernel> kernel, const lang::KernelInfo& info,
-         boost::uuids::uuid kernel_uuid);
+         context::proto::ActivityID kernel_id);
 
   std::shared_ptr<hal::Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<hal::Buffer>>& params,
                                   const std::vector<std::shared_ptr<hal::Event>>& dependencies,
@@ -29,7 +29,7 @@ class Kernel final : public hal::Kernel {
   std::shared_ptr<DeviceState> device_state_;
   CLObj<cl_kernel> kernel_;
   lang::KernelInfo ki_;
-  boost::uuids::uuid kernel_uuid_;
+  context::proto::ActivityID kernel_id_;
 };
 
 }  // namespace opencl

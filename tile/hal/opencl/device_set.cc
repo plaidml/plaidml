@@ -363,7 +363,7 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
     context::Activity device_activity{platform_activity.ctx(), "tile::hal::opencl::Device"};
     auto did = devices[didx];
     auto dinfo = GetDeviceInfo(did, pidx, pinfo);
-    dinfo.set_platform_uuid(ToByteString(platform_activity.ctx().activity_uuid()));
+    *dinfo.mutable_platform_id() = platform_activity.ctx().activity_id();
     LogInfo(std::string("Platform[") + std::to_string(pidx) + "].Device[" + std::to_string(didx) + "]", dinfo);
     device_activity.AddMetadata(dinfo);
     auto dev = std::make_shared<Device>(device_activity.ctx(), cl_ctx, did, config_, std::move(dinfo));

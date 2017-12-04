@@ -78,12 +78,6 @@ def plaidml_py_init(name, **kwargs):
         **kwargs
     )
 
-def plaidml_py_test(**kwargs):
-    native.py_test(srcs_version=PY_SRCS_VER, **kwargs)
-
-def plaidml_py_binary(**kwargs):
-    native.py_binary(srcs_version=PY_SRCS_VER, **kwargs)
-
 def plaidml_proto_library(name, srcs=[], has_services=False, deps=(), visibility=(),
                        testonly=0, cc_libs=[], **kwargs):
     plaidml_cc_proto_library(name=name,
@@ -136,7 +130,7 @@ def plaidml_ast(name, ast, output, template = "base", visibility = None):
         name = name,
         outs = [output],
         srcs = [ast],
-        tools = ["@vertexai_plaidml//base/util/astgen:astgen"],
+        tools = ["@vertexai_plaidml//base/util/astgen"],
         cmd = '$(location @vertexai_plaidml//base/util/astgen) -i $(SRCS) -t ' + template + ' -o $(OUTS)',
     )
 
@@ -491,7 +485,7 @@ plaidml_py_wheel = rule(
 
 def _plaidml_version_impl(ctx):
   ctx.actions.expand_template(
-    template=ctx.file._version_cc_tpl,
+    template=ctx.file._template,
     output=ctx.outputs.version_file,
     substitutions={
       "{PREFIX}": ctx.attr.prefix,
@@ -501,8 +495,8 @@ def _plaidml_version_impl(ctx):
 plaidml_cc_version = rule(
     attrs = {
         "prefix": attr.string(mandatory = True),
-        "_version_cc_tpl": attr.label(
-            default = Label("@vertexai_plaidml//bzl:version.cc.tpl"),
+        "_template": attr.label(
+            default = Label("@vertexai_plaidml//bzl:version.tpl.cc"),
             allow_files = True,
             single_file = True,
         ),
@@ -520,8 +514,8 @@ def _fresh_http_archive_impl(ctx):
     ]
     result = ctx.execute(args)
     if result.return_code:
-        fail("fresh.py failed: %s (%s)" % (result.stdout, result.stderr))
-    ctx.symlink(ctx.path(ctx.attr.build_file), 'BUILD')
+        fail("clean.py failed: %s (%s)" % (result.stdout, result.stderr))
+    ctx.symlink(ctx.path(ctx.attr.build_file), "BUILD")
 
 fresh_http_archive = repository_rule(
     attrs = {
@@ -541,3 +535,80 @@ fresh_http_archive = repository_rule(
     },
     implementation = _fresh_http_archive_impl,
 )
+
+def _venv_wrapper_impl(ctx):
+    main = ctx.expand_location("$(location {})".format(ctx.attr.main.label), [ctx.attr.main])
+    requirements = ctx.expand_location("$(location {})".format(ctx.attr.requirements.label), [ctx.attr.requirements])
+    venv_args = str(ctx.attr.venv_args)
+    ctx.actions.expand_template(
+        template=ctx.file._template,
+        output=ctx.outputs.executable,
+        substitutions={
+            "__BZL_MAIN__": main,
+            "__BZL_REQUIREMENTS__": requirements,
+            "__BZL_VENV_ARGS__": venv_args,
+        }
+    )
+
+venv_wrapper = rule(
+    attrs = {
+        "main": attr.label(
+            allow_files = True,
+            mandatory = True,
+            single_file = True,
+        ),
+        "requirements": attr.label(
+            allow_files = True,
+            mandatory = True,
+            single_file = True,
+        ),
+        "venv_args": attr.string_list(
+            default = [],
+        ),
+        "_template": attr.label(
+            default = Label("@vertexai_plaidml//bzl:venv.tpl.py"),
+            allow_files = True,
+            single_file = True,
+        ),
+    },
+    executable = True,
+    implementation = _venv_wrapper_impl,
+)
+
+def plaidml_py_binary(name, main=None, srcs=[], requirements="requirements.txt", data=[], venv_args=[], **kwargs):
+    if main == None:
+        main = name + ".py"
+    venv = name + "__venv__.py"
+    venv_wrapper(
+        name=venv,
+        main=main,
+        requirements=requirements,
+        venv_args=venv_args,
+    )
+    native.py_binary(
+        name=name,
+        main=venv,
+        srcs=srcs + [venv],
+        srcs_version=PY_SRCS_VER,
+        data=data + [requirements],
+        **kwargs
+    )
+
+def plaidml_py_test(name, main=None, srcs=[], requirements="requirements.txt", data=[], venv_args=[], **kwargs):
+    if main == None:
+        main = name + ".py"
+    venv = name + "__venv__.py"
+    venv_wrapper(
+        name=venv,
+        main=main,
+        requirements=requirements,
+        venv_args=venv_args,
+    )
+    native.py_test(
+        name=name,
+        main=venv,
+        srcs=srcs + [venv],
+        srcs_version=PY_SRCS_VER,
+        data=data + [requirements],
+        **kwargs
+    )

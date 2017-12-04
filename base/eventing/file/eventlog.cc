@@ -6,6 +6,7 @@
 
 #include "base/util/compat.h"
 #include "base/util/logging.h"
+#include "base/util/uuid.h"
 
 namespace gpi = google::protobuf::io;
 
@@ -34,6 +35,10 @@ void EventLog::LogEvent(context::proto::Event event) {
   std::lock_guard<std::mutex> lock{mu_};
   if (closed_) {
     return;
+  }
+  if (!wrote_uuid_) {
+    event.mutable_activity_id()->set_stream_uuid(ToByteString(stream_uuid()));
+    wrote_uuid_ = true;
   }
   proto::Record record;
   *record.add_event() = std::move(event);

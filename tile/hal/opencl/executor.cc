@@ -40,10 +40,10 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
 
   if (from_buf->size() <= from_offset || from_buf->size() < length || from_buf->size() < from_offset + length ||
       to_buf->size() <= to_offset || to_buf->size() < length || to_buf->size() < to_offset + length) {
-    throw error::InvalidArgument{"Invalid copy request: from=" + std::to_string(from_buf->size()) +
-                                 " bytes, from_offset=" + std::to_string(from_offset) + ", to=" +
-                                 std::to_string(to_buf->size()) + " bytes, to_offset=" + std::to_string(to_offset) +
-                                 ", length=" + std::to_string(length)};
+    throw error::InvalidArgument{
+        "Invalid copy request: from=" + std::to_string(from_buf->size()) +
+        " bytes, from_offset=" + std::to_string(from_offset) + ", to=" + std::to_string(to_buf->size()) +
+        " bytes, to_offset=" + std::to_string(to_offset) + ", length=" + std::to_string(length)};
   }
 
   context::Activity activity{ctx, "tile::hal::opencl::Copy"};
@@ -146,11 +146,11 @@ boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* libr
   Library* exe = Library::Downcast(library, device_state_);
 
   const lang::KernelInfo& kinfo = exe->kernel_info()[kernel_index];
-  boost::uuids::uuid kuuid = exe->kernel_uuids()[kernel_index];
+  auto kid = exe->kernel_ids()[kernel_index];
 
   if (kinfo.ktype == lang::KernelType::kZero) {
     return boost::make_ready_future(
-        std::unique_ptr<hal::Kernel>(compat::make_unique<ZeroKernel>(device_state_, kinfo, kuuid)));
+        std::unique_ptr<hal::Kernel>(compat::make_unique<ZeroKernel>(device_state_, kinfo, kid)));
   }
 
   Err err;
@@ -161,7 +161,7 @@ boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* libr
   }
 
   return boost::make_ready_future(std::unique_ptr<hal::Kernel>(
-      compat::make_unique<Kernel>(device_state_, std::move(kernel), exe->kernel_info()[kernel_index], kuuid)));
+      compat::make_unique<Kernel>(device_state_, std::move(kernel), exe->kernel_info()[kernel_index], kid)));
 }
 
 void Executor::Flush() { device_state_->FlushCommandQueue(); }

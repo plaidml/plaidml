@@ -33,11 +33,11 @@ class Build {
                                                             CLObj<cl_program> program,
                                                             const std::vector<lang::KernelInfo>& kernel_info,
                                                             proto::BuildInfo binfo,
-                                                            std::vector<boost::uuids::uuid> kernel_uuids);
+                                                            std::vector<context::proto::ActivityID> kernel_ids);
 
   Build(context::Activity activity, const std::shared_ptr<DeviceState>& device_state, CLObj<cl_program> program,
         const std::vector<lang::KernelInfo>& kernel_info, proto::BuildInfo binfo,
-        std::vector<boost::uuids::uuid> kernel_uuids);
+        std::vector<context::proto::ActivityID> kernel_ids);
 
  private:
   static void OnBuildComplete(cl_program program, void* raw_build) noexcept;
@@ -56,9 +56,9 @@ boost::future<std::unique_ptr<hal::Library>> Build::Start(context::Activity acti
                                                           CLObj<cl_program> program,
                                                           const std::vector<lang::KernelInfo>& kernel_info,
                                                           proto::BuildInfo binfo,
-                                                          std::vector<boost::uuids::uuid> kernel_uuids) {
+                                                          std::vector<context::proto::ActivityID> kernel_ids) {
   auto build = compat::make_unique<Build>(std::move(activity), device_state, std::move(program), kernel_info,
-                                          std::move(binfo), std::move(kernel_uuids));
+                                          std::move(binfo), std::move(kernel_ids));
   auto result = build->prom_.get_future();
 
   cl_device_id device_id = device_state->did();
@@ -75,10 +75,10 @@ boost::future<std::unique_ptr<hal::Library>> Build::Start(context::Activity acti
 
 Build::Build(context::Activity activity, const std::shared_ptr<DeviceState>& device_state, CLObj<cl_program> program,
              const std::vector<lang::KernelInfo>& kernel_info, proto::BuildInfo binfo,
-             std::vector<boost::uuids::uuid> kernel_uuids)
+             std::vector<context::proto::ActivityID> kernel_ids)
     : activity_{std::move(activity)},
       device_state_{device_state},
-      library_{compat::make_unique<Library>(device_state, std::move(program), kernel_info, std::move(kernel_uuids))},
+      library_{compat::make_unique<Library>(device_state, std::move(program), kernel_info, std::move(kernel_ids))},
       binfo_{std::move(binfo)} {}
 
 void Build::OnBuildComplete(cl_program program, void* raw_build) noexcept {
@@ -154,7 +154,7 @@ Compiler::Compiler(const std::shared_ptr<DeviceState>& device_state) : device_st
 boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Context& ctx,
                                                              const std::vector<lang::KernelInfo>& kernel_info,
                                                              const hal::proto::HardwareSettings& settings) {
-  std::vector<boost::uuids::uuid> kernel_uuids;
+  std::vector<context::proto::ActivityID> kernel_ids;
   std::ostringstream code;
 
   context::Activity activity{ctx, "tile::hal::opencl::Build"};
@@ -217,11 +217,11 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     *(kinfo.mutable_kinfo()) = ki.info;
     kbuild.AddMetadata(kinfo);
 
-    kernel_uuids.emplace_back(kbuild.ctx().activity_uuid());
+    kernel_ids.emplace_back(kbuild.ctx().activity_id());
   }
 
   proto::BuildInfo binfo;
-  binfo.set_device_uuid(ToByteString(device_state_->uuid()));
+  *binfo.mutable_device_id() = device_state_->id();
   binfo.set_src(code.str());
   const char* src = binfo.src().c_str();
   Err err;
@@ -233,7 +233,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   }
 
   return Build::Start(std::move(activity), device_state_, std::move(program), kernel_info, std::move(binfo),
-                      std::move(kernel_uuids));
+                      std::move(kernel_ids));
 }
 
 }  // namespace opencl

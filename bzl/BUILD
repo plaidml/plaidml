@@ -7,7 +7,8 @@ filegroup(
 
 exports_files([
     "setup.tpl.py",
-    "version.cc.tpl",
+    "venv.tpl.py",
+    "version.tpl.cc",
 ])
 
 cc_toolchain_suite(
