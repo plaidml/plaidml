@@ -42,6 +42,8 @@ TEST_F(EventLogTest, CanReport) {
     Reader reader{kTestFilename};
     context::proto::Event event;
     EXPECT_THAT(reader.Read(&event), Eq(true));
+    EXPECT_THAT(event.activity_id().stream_uuid().length(), Eq(16));
+    event.clear_activity_id();
     EXPECT_THAT(event, EqualsProto(R"(verb: "Hello, World!")"));
     EXPECT_THAT(reader.Read(&event), Eq(false));
   }

@@ -48,6 +48,7 @@ plaidml_py_test(
     srcs = ["configs_test.py"],
     data = ["//plaidml:configs"],
     deps = ["//plaidml:py"],
+    requirements = "//plaidml:requirements.txt",
 )
 
 plaidml_cc_library(

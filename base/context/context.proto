@@ -43,20 +43,38 @@ message RpcResponse {
   Status status = 1;
   google.protobuf.Any response = 2;
 }
- 
+
+// Identifies an ongoing activity.
+message ActivityID {
+  // The index of the activity within its stream.
+  uint64 index = 1;
+
+  // The ID of the event stream.
+  // This may be absent, indicating "the current stream".
+  bytes stream_uuid = 2;
+}
+
+// Identifies a clock.
+message ClockID {
+  // The index of the clock within the stream.
+  uint64 index = 1;
+}
+
 // Represents a single event.
+// An activity is typically described by multiple events that
+// have the same activity ID.
 message Event {
-  // The parent of this event (what was going on when this activity started).
-  bytes parent_instance_uuid = 1;
+  // The parent of this event's activity (what was going on when this activity started).
+  ActivityID parent_id = 1;
 
   // The instance of this activity (e.g. a particular run of some RPC).
-  bytes instance_uuid = 2;
+  ActivityID activity_id = 2;
 
   // The verb of this activity (e.g. the RPC being run).
   string verb = 3;
 
   // Identifies the particular clock instance used to measure this activity.
-  bytes clock_uuid = 4;
+  ClockID clock_id = 4;
 
   // The activity's start and end times, as offsets from the clock's epoch.
   //
@@ -70,6 +88,5 @@ message Event {
   repeated google.protobuf.Any metadata = 7;
 
   // Identifies the domain of this event -- i.e. the process in which the event takes place.
-  // This will be equal to another event's instance_uuid.
-  bytes domain_uuid = 8;
+  ActivityID domain_id = 8;
 }

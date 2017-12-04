@@ -32,26 +32,29 @@ pb::Duration Activity::Now() noexcept {
   return result;
 }
 
-Activity::Activity(const Context& parent, const std::string& verb, bool set_domain_uuid) : ctx_{parent} {
-  auto instance_uuid = GetRandomUUID();
-  if (set_domain_uuid) {
-    ctx_.set_domain_uuid(instance_uuid);
-  }
+Activity::Activity(const Context& parent, const std::string& verb, bool set_domain_id) : ctx_{parent} {
   if (ctx_.is_logging_events()) {
-    auto instance_uuid_str = ToByteString(instance_uuid);
+    auto idx = ctx_.eventlog()->AllocActivityIndex();
+    if (set_domain_id) {
+      proto::ActivityID did;
+      did.set_index(idx);
+      ctx_.set_domain_id(did);
+    }
 
     proto::Event event;
-    *event.mutable_parent_instance_uuid() = ToByteString(ctx_.activity_uuid());
+    *event.mutable_parent_id() = ctx_.activity_id();
     event.set_verb(verb);
-    *event.mutable_instance_uuid() = instance_uuid_str;
-    *event.mutable_clock_uuid() = ToByteString(HighResolutionClock().uuid());
+
+    proto::ActivityID aid;
+    aid.set_index(idx);
+    ctx_.set_activity_id(aid);
+
+    *event.mutable_activity_id() = aid;
     *event.mutable_start_time() = Now();
-    *event.mutable_domain_uuid() = ToByteString(ctx_.domain_uuid());
+    *event.mutable_domain_id() = ctx_.domain_id();
     ctx_.eventlog()->LogEvent(std::move(event));
 
-    ctx_.set_activity_uuid(instance_uuid);
-
-    *final_event_.mutable_instance_uuid() = std::move(instance_uuid_str);
+    *final_event_.mutable_activity_id() = aid;
   }
 }
 

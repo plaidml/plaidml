@@ -7,6 +7,8 @@ load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_deb", "pkg_tar")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(["requirements.txt"])
+
 plaidml_py_library(
     name = "keras",
     srcs = [
@@ -15,7 +17,6 @@ plaidml_py_library(
     ],
     deps = [
         "//plaidml:py",
-        "//plaidml/event:filelog_py",
     ],
 )
 
@@ -34,6 +35,7 @@ plaidml_py_test(
     srcs = [
         "backend_test.py",
     ],
+    requirements = "backend_test.txt",
     tags = [
         "keras",
         "manual",

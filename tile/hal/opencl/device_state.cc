@@ -47,7 +47,7 @@ void DeviceState::Queue::Flush() const { Err::Check(clFlush(cl_queue.get()), "Un
 
 DeviceState::DeviceState(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did,
                          const std::shared_ptr<proto::Driver>& config, proto::DeviceInfo info)
-    : did_{did}, config_{config}, info_{std::move(info)}, cl_ctx_{cl_ctx}, uuid_(ctx.activity_uuid()) {}
+    : did_{did}, config_{config}, info_{std::move(info)}, cl_ctx_{cl_ctx}, clock_{}, id_{ctx.activity_id()} {}
 
 void DeviceState::Initialize(const hal::proto::HardwareSettings& settings) {
   cl_normal_queue_ = compat::make_unique<Queue>(MakeQueue(did_, cl_ctx_, settings));

@@ -52,12 +52,12 @@ class Context {
     is_logging_events_ = is_logging_events;
     return *this;
   }
-  Context& set_activity_uuid(boost::uuids::uuid activity_uuid) {
-    activity_uuid_ = activity_uuid;
+  Context& set_activity_id(proto::ActivityID activity_id) {
+    activity_id_ = activity_id;
     return *this;
   }
-  Context& set_domain_uuid(boost::uuids::uuid domain_uuid) {
-    domain_uuid_ = domain_uuid;
+  Context& set_domain_id(proto::ActivityID domain_id) {
+    domain_id_ = domain_id;
     return *this;
   }
 
@@ -79,11 +79,18 @@ class Context {
   // Gets whether event logging is enabled or not.
   bool is_logging_events() const { return is_logging_events_ && eventlog_; }
 
-  // Gets the current activity's instance uuid.
-  boost::uuids::uuid activity_uuid() const { return activity_uuid_; }
+  // Gets the current activity's instance id.
+  proto::ActivityID activity_id() const { return activity_id_; }
 
-  // Gets the current activity's domain uuid.
-  boost::uuids::uuid domain_uuid() const { return domain_uuid_; }
+  // Gets the current activity's domain id.
+  proto::ActivityID domain_id() const { return domain_id_; }
+
+  // Gets the full activity id, including the stream uuid.  This should be used for cross-stream references.
+  proto::ActivityID full_activity_id() const {
+    context::proto::ActivityID aid = activity_id();
+    aid.set_stream_uuid(ToByteString(eventlog()->stream_uuid()));
+    return aid;
+  }
 
  private:
   static boost::uuids::nil_generator nil_uuid_gen;
@@ -92,8 +99,8 @@ class Context {
   std::shared_ptr<EventLog> eventlog_;
   bool is_logging_events_ = false;
   std::shared_ptr<Gate> gate_;
-  boost::uuids::uuid activity_uuid_ = nil_uuid_gen();
-  boost::uuids::uuid domain_uuid_ = nil_uuid_gen();
+  proto::ActivityID activity_id_;
+  proto::ActivityID domain_id_;
 };
 
 // Activity works with the current context's eventlog to automatically track the beginning and end of an event, using
@@ -104,7 +111,7 @@ class Activity {
   // Construct an activity.  The verb can be an arbitrary string, but it should be localized to the
   // namespace of the creating component.  For example, "context::Test" makes a fine verb.
   Activity() {}
-  Activity(const Context& parent, const std::string& verb, bool set_domain_uuid = false);
+  Activity(const Context& parent, const std::string& verb, bool set_domain_id = false);
   ~Activity();
 
   Activity(const Activity& activity) = delete;
