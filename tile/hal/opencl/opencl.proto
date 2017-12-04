@@ -4,6 +4,7 @@ syntax = "proto3";
 
 package vertexai.tile.hal.opencl.proto;
 
+import "base/context/context.proto";
 import "tile/lang/lang.proto";
 import "tile/proto/hal.proto";
 
@@ -214,11 +215,11 @@ message DeviceInfo {
   int32 amd_local_mem_size_per_compute_unit = 2008;
   int32 amd_local_mem_banks = 2009;
 
-  bytes platform_uuid = 10000;
+  context.proto.ActivityID platform_id = 10000;
 }
 
 message BuildInfo {
-  bytes device_uuid = 1;
+  context.proto.ActivityID device_id = 1;
   string src = 2;
   int32 cl_build_status = 3;
   string log = 4;
@@ -231,5 +232,5 @@ message KernelInfo {
 }
 
 message RunInfo {
-  bytes kernel_uuid = 1;
+  context.proto.ActivityID kernel_id = 1;
 }

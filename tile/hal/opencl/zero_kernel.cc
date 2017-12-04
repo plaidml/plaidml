@@ -11,8 +11,8 @@ namespace hal {
 namespace opencl {
 
 ZeroKernel::ZeroKernel(const std::shared_ptr<DeviceState>& device_state, const lang::KernelInfo& kinfo,
-                       boost::uuids::uuid kuuid)
-    : device_state_{device_state}, kinfo_{kinfo}, kuuid_(kuuid) {}
+                       context::proto::ActivityID kid)
+    : device_state_{device_state}, kinfo_{kinfo}, kid_(kid) {}
 
 std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
                                             const std::vector<std::shared_ptr<hal::Buffer>>& params,
@@ -38,7 +38,7 @@ std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
 
   context::Activity activity{ctx, "tile::hal::opencl::Buffer::Fill"};
   proto::RunInfo rinfo;
-  rinfo.set_kernel_uuid(ToByteString(kuuid_));
+  *rinfo.mutable_kernel_id() = kid_;
   activity.AddMetadata(rinfo);
 
   cl_uchar char_pattern = 0;

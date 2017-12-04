@@ -21,20 +21,20 @@ class Library final : public hal::Library {
   static Library* Downcast(hal::Library* library, const std::shared_ptr<DeviceState>& device_state);
 
   Library(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_program> program,
-          const std::vector<lang::KernelInfo>& kernel_info, std::vector<boost::uuids::uuid> kernel_uuids);
+          const std::vector<lang::KernelInfo>& kernel_info, std::vector<context::proto::ActivityID> kernel_ids);
 
   std::string Serialize() final;
 
   const std::shared_ptr<DeviceState>& device_state() const { return device_state_; }
   const CLObj<cl_program>& program() const { return program_; }
   const std::vector<lang::KernelInfo>& kernel_info() const { return kernel_info_; }
-  const std::vector<boost::uuids::uuid>& kernel_uuids() const { return kernel_uuids_; }
+  const std::vector<context::proto::ActivityID>& kernel_ids() const { return kernel_ids_; }
 
  private:
   std::shared_ptr<DeviceState> device_state_;
   CLObj<cl_program> program_;
   std::vector<lang::KernelInfo> kernel_info_;
-  std::vector<boost::uuids::uuid> kernel_uuids_;
+  std::vector<context::proto::ActivityID> kernel_ids_;
 };
 
 }  // namespace opencl
