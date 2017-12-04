@@ -9,6 +9,7 @@ plaidml_proto_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//base/context:proto",
         "//tile/proto:hal",
     ],
 )

@@ -16,8 +16,8 @@ namespace hal {
 namespace opencl {
 
 Kernel::Kernel(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_kernel> kernel, const lang::KernelInfo& info,
-               boost::uuids::uuid kernel_uuid)
-    : device_state_{device_state}, kernel_{std::move(kernel)}, ki_(info), kernel_uuid_(kernel_uuid) {
+               context::proto::ActivityID kernel_id)
+    : device_state_{device_state}, kernel_{std::move(kernel)}, ki_(info), kernel_id_(kernel_id) {
   if (VLOG_IS_ON(3)) {
     size_t work_group_size;
     Err::Check(clGetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_WORK_GROUP_SIZE,
@@ -77,7 +77,7 @@ std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
 
   context::Activity activity{ctx, "tile::hal::opencl::Kernel::Run"};
   proto::RunInfo rinfo;
-  rinfo.set_kernel_uuid(ToByteString(kernel_uuid_));
+  *rinfo.mutable_kernel_id() = kernel_id_;
   activity.AddMetadata(rinfo);
 
   CLObj<cl_event> done;

@@ -42,6 +42,9 @@ class EventLog final : public context::EventLog {
 
   // Whether the log's been closed.
   bool closed_ = false;
+
+  // Whether the UUID's been written.
+  bool wrote_uuid_ = false;
 };
 
 class Reader final {
