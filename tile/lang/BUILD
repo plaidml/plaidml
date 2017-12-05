@@ -154,9 +154,7 @@ plaidml_grammar(
 
 plaidml_cc_test(
     name = "gid_test",
-    srcs = [
-        "gid_test.cc",
-    ],
+    srcs = ["gid_test.cc"],
     deps = [
         ":lang",
         "//base/util:util_cc",
@@ -165,10 +163,13 @@ plaidml_cc_test(
 
 plaidml_cc_test(
     name = "simplifier_test",
-    srcs = [
-        "simplifier_test.cc",
-    ],
-    deps = [
-        ":lang",
-    ],
+    srcs = ["simplifier_test.cc"],
+    deps = [":lang"],
+)
+
+plaidml_cc_test(
+    name = "gen_test",
+    srcs = ["gen_test.cc"],
+    tags = ["manual"],
+    deps = [":lang"],
 )

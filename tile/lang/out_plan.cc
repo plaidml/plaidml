@@ -1,10 +1,11 @@
 #include "tile/lang/out_plan.h"
 
 #include <assert.h>
-#include <boost/range/adaptor/reversed.hpp>
 
 #include <cinttypes>
 #include <utility>
+
+#include <boost/range/adaptor/reversed.hpp>
 
 #include "base/util/logging.h"
 #include "tile/lang/mutil.h"
@@ -146,11 +147,11 @@ std::shared_ptr<sem::Block> OutPlan::initBases() const {
   return out;
 }
 
-uint64_t OutPlan::addOutLoops(CodeInfo& ci) const {
+uint64_t OutPlan::addOutLoops(LoopInfo& loop) const {
   // Add the loops for all output variables
   uint64_t threads = threads_;
   for (const auto& idx : indexes_) {
-    ci.indexes.emplace_back(IndexInfo{idx.name, idx.range, idx.tile, idx.threads});
+    loop.indexes.emplace_back(IndexInfo{idx.name, idx.range, idx.tile, idx.threads});
     threads /= idx.threads;
   }
   return threads;
