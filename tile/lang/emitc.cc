@@ -236,13 +236,26 @@ void EmitC::Visit(const sem::Block& n) {
 
 void EmitC::Visit(const sem::IfStmt& n) {
   emitTab();
-  emit("if (");
-  n.cond->Accept(*this);
-  emit(")\n");
-  n.iftrue->Accept(*this);
-  if (n.iffalse) {
+  if (n.iftrue && n.iffalse) {
+    emit("if (");
+    n.cond->Accept(*this);
+    emit(")\n");
+    n.iftrue->Accept(*this);
     emitTab();
     emit("else\n");
+    n.iffalse->Accept(*this);
+  } else if (n.iftrue) {
+    emit("if (");
+    n.cond->Accept(*this);
+    emit(")\n");
+    n.iftrue->Accept(*this);
+  } else if (n.iffalse) {
+    // This code is required since it is possible for n.iftrue to be a nullptr.
+    // It needs to stay in place because its possible for verbose logging to print
+    // pre-simplified code; this would cause a null pointer to be dereferencd and hence a crash.
+    emit("if !(");
+    n.cond->Accept(*this);
+    emit(")\n");
     n.iffalse->Accept(*this);
   }
 }

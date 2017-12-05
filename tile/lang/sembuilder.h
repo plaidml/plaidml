@@ -109,6 +109,13 @@ inline std::shared_ptr<ClampExpr> _Clamp(ExprPtr val, ExprPtr min, ExprPtr max) 
   return std::make_shared<ClampExpr>(val, min, max);
 }
 
+inline std::shared_ptr<BinaryExpr> _LogicalAnd(ExprPtr lhs, ExprPtr rhs) {
+  return std::make_shared<BinaryExpr>("&&", lhs, rhs);
+}
+inline std::shared_ptr<BinaryExpr> _LogicalOr(ExprPtr lhs, ExprPtr rhs) {
+  return std::make_shared<BinaryExpr>("||", lhs, rhs);
+}
+
 }  // namespace builder
 }  // namespace sem
 }  // namespace tile

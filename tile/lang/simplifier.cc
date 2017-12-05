@@ -2,6 +2,7 @@
 
 #include "tile/lang/emitc.h"
 #include "tile/lang/scope.h"
+#include "tile/lang/sembuilder.h"
 #include "tile/lang/semtree.h"
 
 namespace vertexai {
@@ -98,51 +99,134 @@ class Simplifier : public Visitor {
     }
   }
 
-  void Visit(const UnaryExpr& node) override { const_cast<UnaryExpr&>(node).inner = EvalExpr(node.inner); }
+  void Visit(const UnaryExpr& node) override {
+    const_cast<UnaryExpr&>(node).inner = EvalExpr(node.inner);
+    auto int_const = std::dynamic_pointer_cast<IntConst>(node.inner);
+    if (node.op == "!") {
+      if (int_const) {
+        new_expr_ = std::make_shared<IntConst>(!int_const->value);
+      }
+    }
+  }
 
   void Visit(const BinaryExpr& node) override {
     const_cast<BinaryExpr&>(node).lhs = EvalExpr(node.lhs);
     const_cast<BinaryExpr&>(node).rhs = EvalExpr(node.rhs);
 
+    auto lhs_int_const = std::dynamic_pointer_cast<IntConst>(node.lhs);
+    auto rhs_int_const = std::dynamic_pointer_cast<IntConst>(node.rhs);
+
     if (node.op == "*") {
-      if (CheckIntConstValue(node.rhs, 1)) {
-        // Check for (L * 1), return (L)
-        new_expr_ = node.lhs;
-      } else if (CheckIntConstValue(node.lhs, 1)) {
-        // Check for (1 * R), return (R)
-        new_expr_ = node.rhs;
-      } else if (CheckIntConstValue(node.lhs, 0)) {
-        // Check for (0 * R), return (0)
-        new_expr_ = node.lhs;
-      } else if (CheckIntConstValue(node.rhs, 0)) {
-        // Check for (L * 0), return (0)
-        new_expr_ = node.rhs;
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value * rhs_int_const->value);
+      } else {
+        if (CheckIntConstValue(rhs_int_const, 1)) {
+          // Check for (L * 1), return (L)
+          new_expr_ = node.lhs;
+        } else if (CheckIntConstValue(lhs_int_const, 1)) {
+          // Check for (1 * R), return (R)
+          new_expr_ = node.rhs;
+        } else if (CheckIntConstValue(lhs_int_const, 0)) {
+          // Check for (0 * R), return (0)
+          new_expr_ = node.lhs;
+        } else if (CheckIntConstValue(rhs_int_const, 0)) {
+          // Check for (L * 0), return (0)
+          new_expr_ = node.rhs;
+        }
       }
     } else if (node.op == "/") {
-      if (CheckIntConstValue(node.rhs, 1)) {
-        // Check for (L / 1), return (L)
-        new_expr_ = node.lhs;
-      } else if (CheckIntConstValue(node.lhs, 0)) {
-        // Check for (0 / R), return (0)
-        new_expr_ = node.lhs;
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value / rhs_int_const->value);
+      } else {
+        if (CheckIntConstValue(rhs_int_const, 1)) {
+          // Check for (L / 1), return (L)
+          new_expr_ = node.lhs;
+        } else if (CheckIntConstValue(lhs_int_const, 0)) {
+          // Check for (0 / R), return (0)
+          new_expr_ = node.lhs;
+        }
       }
     } else if (node.op == "+") {
-      if (CheckIntConstValue(node.rhs, 0)) {
-        // Check for (L + 0), return (L)
-        new_expr_ = node.lhs;
-      } else if (CheckIntConstValue(node.lhs, 0)) {
-        // Check for (0 + R), return (R)
-        new_expr_ = node.rhs;
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value + rhs_int_const->value);
+      } else {
+        if (CheckIntConstValue(rhs_int_const, 0)) {
+          // Check for (L + 0), return (L)
+          new_expr_ = node.lhs;
+        } else if (CheckIntConstValue(lhs_int_const, 0)) {
+          // Check for (0 + R), return (R)
+          new_expr_ = node.rhs;
+        }
       }
     } else if (node.op == "-") {
-      if (CheckIntConstValue(node.rhs, 0)) {
-        // Check for (L - 0), return (L)
-        new_expr_ = node.lhs;
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value - rhs_int_const->value);
+      } else {
+        if (CheckIntConstValue(rhs_int_const, 0)) {
+          // Check for (L - 0), return (L)
+          new_expr_ = node.lhs;
+        }
       }
     } else if (node.op == "%") {
-      if (CheckIntConstValue(node.rhs, 1)) {
+      if (CheckIntConstValue(rhs_int_const, 1)) {
         // Check for (L % 1), return (0)
         new_expr_ = std::make_shared<IntConst>(0);
+      }
+    } else if (node.op == "<") {
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value < rhs_int_const->value);
+      }
+    } else if (node.op == ">") {
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value > rhs_int_const->value);
+      }
+    } else if (node.op == "<=") {
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value <= rhs_int_const->value);
+      }
+    } else if (node.op == ">=") {
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value >= rhs_int_const->value);
+      }
+    } else if (node.op == "==") {
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value == rhs_int_const->value);
+      }
+    } else if (node.op == "&&") {
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value && rhs_int_const->value);
+      } else {
+        if (CheckIntConstValue(lhs_int_const, 1)) {
+          // Check for (1 && R), return (R)
+          new_expr_ = node.rhs;
+        } else if (CheckIntConstValue(lhs_int_const, 0)) {
+          // Check for (0 && R), return (0)
+          new_expr_ = node.lhs;
+        } else if (CheckIntConstValue(rhs_int_const, 1)) {
+          // Check for (L && 1), return (L)
+          new_expr_ = node.lhs;
+        } else if (CheckIntConstValue(rhs_int_const, 0)) {
+          // Check for (L && 0), return (0)
+          new_expr_ = node.rhs;
+        }
+      }
+    } else if (node.op == "||") {
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value && rhs_int_const->value);
+      } else {
+        if (CheckIntConstValue(lhs_int_const, 1)) {
+          // Check for (1 || R), return (1)
+          new_expr_ = node.lhs;
+        } else if (CheckIntConstValue(lhs_int_const, 0)) {
+          // Check for (0 || R), return (R)
+          new_expr_ = node.rhs;
+        } else if (CheckIntConstValue(rhs_int_const, 1)) {
+          // Check for (L || 1), return (1)
+          new_expr_ = node.rhs;
+        } else if (CheckIntConstValue(rhs_int_const, 0)) {
+          // Check for (L || 0), return (L)
+          new_expr_ = node.lhs;
+        }
       }
     }
   }
@@ -193,25 +277,26 @@ class Simplifier : public Visitor {
   }
 
   void Visit(const IfStmt& node) override {
-    if (node.iffalse) {
-      const_cast<IfStmt&>(node).iffalse = EvalStmt(node.iffalse);
-    }
-    bool invert_test = false;
-    if (node.iftrue) {
+    // Note: care must be taken here.
+    // Inversions need to occur before EvalExpr.
+    // If the EvalExpr happens 1st, there's a chance that a reference to an elided
+    // identifier will be emitted.
+    if (node.iftrue && node.iffalse) {
+      const_cast<IfStmt&>(node).cond = EvalExpr(node.cond);
       const_cast<IfStmt&>(node).iftrue = EvalStmt(node.iftrue);
-      auto block = std::dynamic_pointer_cast<Block>(node.iffalse);
-      if (block && block->statements.empty()) {
-        invert_test = true;
+      const_cast<IfStmt&>(node).iffalse = EvalStmt(node.iffalse);
+    } else if (node.iftrue) {
+      auto unary_expr = std::dynamic_pointer_cast<UnaryExpr>(node.cond);
+      if (unary_expr && unary_expr->op == "!") {
+        const_cast<IfStmt&>(node).cond = EvalExpr(Invert(unary_expr));
+      } else {
+        const_cast<IfStmt&>(node).cond = EvalExpr(node.cond);
       }
-    } else {
-      invert_test = true;
+      const_cast<IfStmt&>(node).iftrue = EvalStmt(node.iftrue);
+    } else if (node.iffalse) {
+      const_cast<IfStmt&>(node).cond = EvalExpr(Invert(node.cond));
+      const_cast<IfStmt&>(node).iftrue = EvalStmt(node.iffalse);
     }
-    if (invert_test) {
-      const_cast<IfStmt&>(node).iftrue = node.iffalse;
-      const_cast<IfStmt&>(node).iffalse = StmtPtr();
-      const_cast<IfStmt&>(node).cond = std::make_shared<UnaryExpr>("!", node.cond);
-    }
-    const_cast<IfStmt&>(node).cond = EvalExpr(node.cond);
   }
 
   void Visit(const ForStmt& node) override { const_cast<ForStmt&>(node).inner = EvalStmt(node.inner); }
@@ -232,9 +317,49 @@ class Simplifier : public Visitor {
   void Visit(const Function& node) override { const_cast<Function&>(node).body = EvalStmt(node.body); }
 
  private:
-  bool CheckIntConstValue(const ExprPtr& expr, int64_t value) {
-    auto int_const = std::dynamic_pointer_cast<IntConst>(expr);
+  bool CheckIntConstValue(const std::shared_ptr<IntConst> int_const, int64_t value) {
     return (int_const && int_const->value == value);
+  }
+
+  ExprPtr Invert(const std::shared_ptr<UnaryExpr>& expr) {
+    if (expr->op == "!") {
+      return Invert(expr->inner);
+    }
+    return std::make_shared<UnaryExpr>("!", Invert(expr->inner));
+  }
+
+  ExprPtr Invert(const std::shared_ptr<BinaryExpr>& expr) {
+    using namespace sem::builder;  // NOLINT
+    if (expr->op == "<") {
+      return expr->lhs >= expr->rhs;
+    } else if (expr->op == ">") {
+      return expr->lhs <= expr->rhs;
+    } else if (expr->op == "<=") {
+      return expr->lhs > expr->rhs;
+    } else if (expr->op == ">=") {
+      return expr->lhs < expr->rhs;
+    } else if (expr->op == "==") {
+      return expr->lhs != expr->rhs;
+    } else if (expr->op == "!=") {
+      return expr->lhs == expr->rhs;
+    } else if (expr->op == "&&") {
+      return _LogicalOr(Invert(expr->lhs), Invert(expr->rhs));
+    } else if (expr->op == "||") {
+      return _LogicalAnd(Invert(expr->lhs), Invert(expr->rhs));
+    }
+    return std::make_shared<UnaryExpr>("!", expr);
+  }
+
+  ExprPtr Invert(const ExprPtr& expr) {
+    auto unary_expr = std::dynamic_pointer_cast<UnaryExpr>(expr);
+    if (unary_expr) {
+      return Invert(unary_expr);
+    }
+    auto binary_expr = std::dynamic_pointer_cast<BinaryExpr>(expr);
+    if (binary_expr) {
+      return Invert(binary_expr);
+    }
+    return expr;
   }
 
   ExprPtr EvalExpr(const ExprPtr& expr) {
@@ -278,7 +403,6 @@ class Simplifier : public Visitor {
 }  // namespace sem
 
 namespace lang {
-
 void Simplify(const std::vector<KernelInfo>& kernels) {
   for (const auto& ki : kernels) {
     if (VLOG_IS_ON(4)) {

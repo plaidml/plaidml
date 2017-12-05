@@ -11,6 +11,7 @@
 
 #include <boost/filesystem.hpp>
 
+#include "base/util/callback_map.h"
 #include "base/util/compat.h"
 #include "base/util/logging.h"
 #include "base/util/uuid.h"
@@ -40,16 +41,20 @@ class Build {
         std::vector<context::proto::ActivityID> kernel_ids);
 
  private:
-  static void OnBuildComplete(cl_program program, void* raw_build) noexcept;
+  static void OnBuildComplete(cl_program program, void* handle) noexcept;
 
-  void OnError() noexcept;
+  void OnError();
 
   context::Activity activity_;
   std::shared_ptr<DeviceState> device_state_;
   std::unique_ptr<Library> library_;
   boost::promise<std::unique_ptr<hal::Library>> prom_;
   proto::BuildInfo binfo_;
+
+  static PendingCallbackMap<Build> pending_;
 };
+
+PendingCallbackMap<Build> Build::pending_;
 
 boost::future<std::unique_ptr<hal::Library>> Build::Start(context::Activity activity,
                                                           const std::shared_ptr<DeviceState>& device_state,
@@ -60,14 +65,14 @@ boost::future<std::unique_ptr<hal::Library>> Build::Start(context::Activity acti
   auto build = compat::make_unique<Build>(std::move(activity), device_state, std::move(program), kernel_info,
                                           std::move(binfo), std::move(kernel_ids));
   auto result = build->prom_.get_future();
-
   cl_device_id device_id = device_state->did();
   cl_program prog = build->library_->program().get();
-  Err err = clBuildProgram(prog, 1, &device_id, "-w -cl-fast-relaxed-math -cl-mad-enable -cl-unsafe-math-optimizations",
-                           &OnBuildComplete, build.release());
+  auto handle = Build::pending_.Acquire(std::move(build));
+  Err err = clBuildProgram(prog, 1, &device_id, "-cl-fast-relaxed-math -cl-mad-enable -cl-unsafe-math-optimizations",
+                           &OnBuildComplete, handle);
   if (err) {
     LOG(WARNING) << "Failed to build program: " << err;
-    // N.B. OnBuildComplete will be called by OpenCL at some point, even for failed builds.
+    OnBuildComplete(prog, handle);
   }
 
   return result;
@@ -81,53 +86,61 @@ Build::Build(context::Activity activity, const std::shared_ptr<DeviceState>& dev
       library_{compat::make_unique<Library>(device_state, std::move(program), kernel_info, std::move(kernel_ids))},
       binfo_{std::move(binfo)} {}
 
-void Build::OnBuildComplete(cl_program program, void* raw_build) noexcept {
-  std::unique_ptr<Build> build{static_cast<Build*>(raw_build)};
-
-  cl_build_status status;
-  Err::Check(clGetProgramBuildInfo(build->library_->program().get(), build->device_state_->did(),
-                                   CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr),
-             "Unable to construct program build status");
-  if (status == CL_BUILD_SUCCESS) {
-    build->prom_.set_value(std::move(build->library_));
-  } else {
-    LOG(WARNING) << "Failed to build program";
-    build->binfo_.set_cl_build_status(status);
-    build->OnError();
+void Build::OnBuildComplete(cl_program program, void* handle) noexcept {
+  auto build = Build::pending_.Release(handle);
+  if (!build) {
+    // no-op, this handle has already been processed.
+    return;
   }
-  build->activity_.AddMetadata(build->binfo_);
+
+  try {
+    cl_build_status status;
+    Err::Check(clGetProgramBuildInfo(build->library_->program().get(), build->device_state_->did(),
+                                     CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr),
+               "Unable to construct program build status");
+    if (status == CL_BUILD_SUCCESS) {
+      build->prom_.set_value(std::move(build->library_));
+    } else {
+      LOG(WARNING) << "Failed to build program";
+      build->binfo_.set_cl_build_status(status);
+      build->OnError();
+    }
+    build->activity_.AddMetadata(build->binfo_);
+  } catch (...) {
+    build->prom_.set_exception(boost::current_exception());
+  }
 }
 
-void Build::OnError() noexcept {
-  try {
-    size_t len = 0;
-    Err bi_err =
-        clGetProgramBuildInfo(library_->program().get(), device_state_->did(), CL_PROGRAM_BUILD_LOG, 0, nullptr, &len);
-    if (bi_err != CL_SUCCESS) {
-      LOG(ERROR) << "Failed to retrieve build log size: " << bi_err;
-    } else {
-      std::string buffer(len, '\0');
-      bi_err = clGetProgramBuildInfo(library_->program().get(), device_state_->did(), CL_PROGRAM_BUILD_LOG, len,
-                                     const_cast<char*>(buffer.c_str()), nullptr);
-      if (bi_err) {
-        LOG(ERROR) << "Failed to retrieve build log: " << bi_err;
-      } else {
-        LOG(WARNING) << "Failed build log: " << buffer;
-        std::stringstream ss_in(binfo_.src());
-        std::stringstream ss_out;
-        size_t line_num = 1;
-        std::string line;
-        while (std::getline(ss_in, line, '\n')) {
-          ss_out << std::setw(5) << line_num++ << ": " << line << "\n";
-        }
-        LOG(WARNING) << "Code was: \n" << ss_out.str();
-        binfo_.set_log(buffer);
-      }
-    }
-    throw std::runtime_error{"Unable to compile Tile program"};
-  } catch (...) {
-    prom_.set_exception(boost::current_exception());
+std::string WithLineNumbers(const std::string& src) {
+  std::stringstream ss_in(src);
+  std::stringstream ss_out;
+  size_t line_num = 1;
+  std::string line;
+  while (std::getline(ss_in, line, '\n')) {
+    ss_out << std::setw(5) << line_num++ << ": " << line << "\n";
   }
+  return ss_out.str();
+}
+
+void Build::OnError() {
+  size_t len = 0;
+  Err bi_err =
+      clGetProgramBuildInfo(library_->program().get(), device_state_->did(), CL_PROGRAM_BUILD_LOG, 0, nullptr, &len);
+  if (bi_err != CL_SUCCESS) {
+    LOG(ERROR) << "Failed to retrieve build log size: " << bi_err;
+  } else {
+    std::string buffer(len, '\0');
+    bi_err = clGetProgramBuildInfo(library_->program().get(), device_state_->did(), CL_PROGRAM_BUILD_LOG, len,
+                                   const_cast<char*>(buffer.c_str()), nullptr);
+    if (bi_err) {
+      LOG(ERROR) << "Failed to retrieve build log: " << bi_err;
+    } else {
+      LOG(WARNING) << "Failed build log: " << buffer;
+      LOG(WARNING) << "Code was: \n" << WithLineNumbers(binfo_.src());
+      binfo_.set_log(buffer);
+    }
+  }
+  throw std::runtime_error{"Unable to compile Tile program"};
 }
 
 std::string ReadFile(const fs::path& path) {
@@ -226,7 +239,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   const char* src = binfo.src().c_str();
   Err err;
 
-  VLOG(4) << "Compiling OpenCL:\n" << binfo.src();
+  VLOG(4) << "Compiling OpenCL:\n" << WithLineNumbers(binfo.src());
   CLObj<cl_program> program = clCreateProgramWithSource(device_state_->cl_ctx().get(), 1, &src, nullptr, err.ptr());
   if (!program) {
     throw std::runtime_error(std::string("creating an OpenCL program object: ") + err.str());
