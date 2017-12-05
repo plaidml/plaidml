@@ -1,16 +1,8 @@
 #include "tile/lang/gen_contract.h"
 
 #include <assert.h>
-#include <boost/algorithm/string/replace.hpp>
 
-#include <cinttypes>
-#include <cmath>
-#include <map>
-#include <memory>
-#include <sstream>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#include <boost/algorithm/string/replace.hpp>
 
 #include "base/util/logging.h"
 #include "tile/lang/compile.h"
@@ -30,6 +22,10 @@ using std::vector;
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+namespace {
+const size_t SELECT_THRESHOLD = 32;
+}  // namespace
 
 static std::map<AggregationOp, sem::LimitConst::Which> INITIAL_VALUES = {{AggregationOp::MAX, sem::LimitConst::MIN},
                                                                          {AggregationOp::MIN, sem::LimitConst::MAX},
@@ -149,7 +145,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
   }
 
   // Setup output plan and read plans
-  OutPlan pout(op, tile, threads, settings.mem_width / op.access[0].elem_size());
+  OutPlan out_plan(op, tile, threads, settings.mem_width / op.access[0].elem_size());
   std::vector<ReadPlan> pins;
   for (size_t i = 1; i < op.access.size(); i++) {
     const auto& a = op.access[i];
@@ -161,7 +157,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
   ki.kname = kname;
   for (size_t i = 0; i < 3; i++) {
     ki.lwork[i] = (i == 0 ? threads : 1);
-    ki.gwork[i] = pout.group_dims()[i] * ki.lwork[i];
+    ki.gwork[i] = out_plan.group_dims()[i] * ki.lwork[i];
   }
   SVLOG(cs, 3, "lwork = " << ki.lwork[0] << ", " << ki.lwork[1] << ", " << ki.lwork[2]);
   SVLOG(cs, 3, "gwork = " << ki.gwork[0] << ", " << ki.gwork[1] << ", " << ki.gwork[2]);
@@ -188,6 +184,8 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     }
   }
   kblock->append(_Declare({sem::Type::INDEX}, "tid", _Index(sem::IndexExpr::LOCAL, 0)));
+  auto tid = _("tid");
+  auto agg = _("agg");
 
   if (op.generate_contraction) {
     // There's a contraction, so initialize the aggregation output and
@@ -202,7 +200,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     if (type.vec_width > 1) {
       agg_base = _Cast(type, agg_base);
     }
-    kblock->append(pout.initOutput(type, agg_base));
+    kblock->append(out_plan.initOutput(type, agg_base));
 
     if (!settings.use_global) {
       // Allocate shared memory
@@ -216,7 +214,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     }
 
     // Emit base sets
-    kblock->append(pout.initBases());
+    kblock->append(out_plan.initBases());
 
     // Emit the loops over the input scan loops
     auto iblock = kblock;
@@ -255,9 +253,9 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
 
     // Do the actual main work
     // First, take into account threads assigned to outputs
-    CodeInfo ci_o;
-    CodeInfo ci_i;
-    uint64_t rthreads = pout.addOutLoops(ci_o);
+    LoopInfo main_loop_inner;
+    LoopInfo main_loop_outer;
+    uint64_t rthreads = out_plan.addOutLoops(main_loop_inner);
     uint64_t out_threads = threads / rthreads;
 
     // Push input specific loops
@@ -267,7 +265,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       }
       uint64_t po2 = NearestPo2(tile[i]);
       uint64_t thread = std::min(rthreads, po2);
-      ci_i.indexes.emplace_back(IndexInfo{op.names[i], op.ranges[i], tile[i], thread});
+      main_loop_outer.indexes.emplace_back(IndexInfo{op.names[i], op.ranges[i], tile[i], thread});
       rthreads /= thread;
     }
 
@@ -281,7 +279,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
           sum = sum + fc.lhs[i] * (_(op.names[i] + "_gid") + _(op.names[i]));
         }
       }
-      cond = std::make_shared<sem::BinaryExpr>("&&", cond, (sum <= fc.rhs));
+      cond = _LogicalAnd(cond, sum <= fc.rhs);
       cond_is_always_true = false;
     }
 
@@ -316,18 +314,6 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       }
     }
 
-    // Combine (if needed)
-    if (op.access.size() == 2) {
-      inner_block->append(_Declare(type, "pre_agg", _("val1")));
-    } else if (op.access.size() == 3) {
-      inner_block->append(_Declare(type, "pre_agg", _Cast(type, combine(op.comb_op, _("val1"), _("val2")))));
-    } else {
-      if (op.comb_op != CombinationOp::COND) {
-        throw std::runtime_error("Invalid three input combination op");
-      }
-      inner_block->append(_Declare(type, "pre_agg", _Cast(type, combine_cond(_("val1"), _("val2"), _("val3")))));
-    }
-
     // If the aggregate type is a vector, OpenCL requires that we expand the
     // condition to match its width.
     sem::Type condType = {type.base, type.dtype, type.vec_width};
@@ -351,41 +337,62 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
         break;
     }
 
-    // Aggregate
-    sem::ExprPtr guarded_pre_agg = nullptr;
-
-    if (cond_is_always_true) {
-      guarded_pre_agg = _Cast(type, _("pre_agg"));
+    // Combine (if needed)
+    sem::ExprPtr pre_agg_init;
+    if (op.access.size() == 2) {
+      pre_agg_init = _("val1");
+    } else if (op.access.size() == 3) {
+      pre_agg_init = _Cast(type, combine(op.comb_op, _("val1"), _("val2")));
     } else {
-      guarded_pre_agg = _Select(_Cast(condType, cond), _Cast(type, _("pre_agg")), _Cast(type, agg_base));
+      if (op.comb_op != CombinationOp::COND) {
+        throw std::runtime_error("Invalid three input combination op");
+      }
+      pre_agg_init = _Cast(type, combine_cond(_("val1"), _("val2"), _("val3")));
     }
+    auto pre_agg_decl = _Declare(type, "pre_agg", pre_agg_init);
+    inner_block->append(pre_agg_decl);
+    auto pre_agg = _("pre_agg");
+    inner_block->append(_Declare({sem::Type::INDEX}, "agg_idx", out_plan.regIndex()));
+    auto agg_idx = _("agg_idx");
 
+    // Aggregate
     // Make slow and non-slow version
     if (settings.use_global) {
-      inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("pre_agg")));
+      inner_block->append(aggregate(op.agg_op, agg[agg_idx], pre_agg));
       slow_inner_block->append(_If(cond, inner_block));
     } else {
+      sem::ExprPtr guarded_pre_agg = nullptr;
+      if (cond_is_always_true) {
+        guarded_pre_agg = _Cast(type, pre_agg);
+      } else {
+        guarded_pre_agg = _Select(_Cast(condType, cond), _Cast(type, pre_agg), _Cast(type, agg_base));
+      }
       slow_inner_block->append(inner_block);
       slow_inner_block->append(_Declare(type, "guarded_pre_agg", guarded_pre_agg));
-      inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("pre_agg")));
-      slow_inner_block->append(aggregate(op.agg_op, _("agg")[pout.regIndex()], _("guarded_pre_agg")));
+      inner_block->append(aggregate(op.agg_op, agg[agg_idx], pre_agg));
+      slow_inner_block->append(aggregate(op.agg_op, agg[agg_idx], _("guarded_pre_agg")));
     }
 
     // Copy loops to allow two generations (slow + fast)
-    auto dup_ci_o = ci_o;
-    auto dup_ci_i = ci_i;
+    auto dup_main_loop_inner = main_loop_inner;
+    auto dup_main_loop_outer = main_loop_outer;
 
     // Add all the loops into their place
-    ci_o.inner = inner_block;
+    main_loop_inner.inner = inner_block;
     // Generate 'output' loops on the inside, skip edge handling
-    ci_i.inner = ci_o.generate(out_threads, 1, true, false);
+    main_loop_outer.inner = main_loop_inner.generate(out_threads, 1, true, false, SELECT_THRESHOLD);
+    if (main_loop_inner.inner_cond) {
+      // If LoopInfo has determined that we should replace range checks with a select,
+      // then wrap the pre_agg in a select, using the agg_base for the false case.
+      pre_agg_decl->init = _Select(main_loop_inner.inner_cond, pre_agg_decl->init, agg_base);
+    }
     // Generate input loops on the outside, account for out threads
-    auto looped_inner = ci_i.generate(threads, out_threads);
+    auto looped_inner = main_loop_outer.generate(threads, out_threads, false, true, 0);
 
     // Now do the same for the 'slow' case
-    dup_ci_o.inner = slow_inner_block;
-    dup_ci_i.inner = dup_ci_o.generate(out_threads, 1, true, false);
-    auto slow_looped_inner = dup_ci_i.generate(threads, out_threads);
+    dup_main_loop_inner.inner = slow_inner_block;
+    dup_main_loop_outer.inner = dup_main_loop_inner.generate(out_threads, 1, true, false, SELECT_THRESHOLD);
+    auto slow_looped_inner = dup_main_loop_outer.generate(threads, out_threads, false, true, 0);
 
     sem::StmtPtr both;
     if (!op.constraints.size()) {
@@ -403,7 +410,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
             sum = sum + fc.lhs[i] * (_(op.names[i] + "_gid"));
           }
         }
-        safe = std::make_shared<sem::BinaryExpr>("&&", safe, (sum <= fc.rhs));
+        safe = _LogicalAnd(safe, sum <= fc.rhs);
       }
 
       // Make a master if to switch on fast path
@@ -423,37 +430,36 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     if (out_threads < comp_threads) {
       auto mblock = _Block({});
       sem::Type ltype = {sem::Type::VALUE, op.access[0].type, op.access[0].vector, threads, sem::Type::LOCAL};
-      // mblock->append(_Barrier());
 
       // OpenCL requires that __local variables be defined at kernel function scope.
       kblock->append(_Declare(ltype, "merge_shared", sem::ExprPtr()));
+      auto merge_shared = _("merge_shared");
 
-      mblock->append(_("merge_shared")[_("tid")] = _("agg")[_Const(0)]);
+      mblock->append(merge_shared[tid] = agg[_Const(0)]);
       uint64_t x = comp_threads;
       while (x > out_threads) {
         mblock->append(_Barrier());
         x /= 2;
-        mblock->append(
-            _If(_("tid") < x, aggregate(op.agg_op, _("merge_shared")[_("tid")], _("merge_shared")[_("tid") + x])));
+        mblock->append(_If(tid < x, aggregate(op.agg_op, merge_shared[tid], merge_shared[tid + x])));
       }
       mblock->append(_Barrier());
-      mblock->append(_If(_("tid") < out_threads, _("agg")[_Const(0)] = _("merge_shared")[_("tid")]));
+      mblock->append(_If(tid < out_threads, agg[_Const(0)] = merge_shared[tid]));
       kblock->push_back(mblock);
     }
   } else {
     // There's no contraction.  Just initialize _gid variables.
-    kblock->append(pout.initBases());
+    kblock->append(out_plan.initBases());
   }
 
   // Write the final output
-  CodeInfo ci2;
-  pout.addOutLoops(ci2);
+  LoopInfo out_loop;
+  out_plan.addOutLoops(out_loop);
   auto wblock = _Block({});
-  ci2.inner = wblock;
+  out_loop.inner = wblock;
 
   if (op.generate_contraction) {
     // There was a contraction; this value comes from aggregation.
-    LValueHolder o = _("agg")[pout.regIndex()];
+    LValueHolder agg_out = agg[out_plan.regIndex()];
     sem::ExprPtr agg_min = _LimitConst(sem::LimitConst::MIN, op.agg_type);
     sem::ExprPtr agg_zero = _LimitConst(sem::LimitConst::ZERO, op.agg_type);
     if (op.agg_vec > 1) {
@@ -465,7 +471,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     std::string declname = std::string("L") + op.output;
     sem::Type declatype{sem::Type::VALUE, vars.at(op.output).shape.type, op.agg_vec};
 
-    wblock->append(_Declare(declatype, declname, o));
+    wblock->append(_Declare(declatype, declname, agg_out));
 
     if (op.agg_op == AggregationOp::MAX) {
       sem::ExprPtr val = _(declname);
@@ -590,9 +596,8 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
   }
   wblock->append(_Declare({sem::Type::INDEX}, "gout_idx", gout));
   // Make a basic out of bounds check
-  sem::ExprPtr check =
-      std::make_shared<sem::BinaryExpr>("&&", _("gout_idx") >= -op.access[0].offset,
-                                        _("gout_idx") < op.access[0].global_index_limit - op.access[0].offset);
+  sem::ExprPtr check = _LogicalAnd(_("gout_idx") >= -op.access[0].offset,
+                                   _("gout_idx") < op.access[0].global_index_limit - op.access[0].offset);
   // Add any constraints that only appear on output variables
   for (const FlatConstraint& fc : op.constraints) {
     sem::ExprPtr sum = _Const(0);
@@ -607,7 +612,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       }
     }
     if (only_output) {
-      check = std::make_shared<sem::BinaryExpr>("&&", check, (sum <= fc.rhs));
+      check = _LogicalAnd(check, sum <= fc.rhs);
     }
   }
   // Skip the check if there are no contraints at all
@@ -617,7 +622,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     wblock->append(_If(check, checked_output_block));
   }
 
-  kblock->append(ci2.generate(threads, 1, false, false));
+  kblock->append(out_loop.generate(threads, 1, false, false, 0));
 
   // Wrap entire function
   auto func = std::make_shared<sem::Function>();

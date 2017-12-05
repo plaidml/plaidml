@@ -14,6 +14,7 @@ plaidml_cc_library(
     hdrs = [
         "any_factory.h",
         "any_factory_map.h",
+        "callback_map.h",
         "catch.h",
         "compat.h",
         "error.h",

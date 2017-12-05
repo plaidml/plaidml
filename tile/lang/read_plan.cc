@@ -1,16 +1,6 @@
 #include "tile/lang/read_plan.h"
 
 #include <assert.h>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/range/adaptor/reversed.hpp>
-#include <cinttypes>
-#include <cmath>
-#include <cstdlib>
-#include <map>
-#include <sstream>
-#include <type_traits>
-#include <utility>
-#include <vector>
 
 #include "base/util/logging.h"
 #include "tile/lang/flat.h"
@@ -188,29 +178,29 @@ sem::ExprPtr ReadPlan::globalOffset() const {
 sem::StmtPtr ReadPlan::generate(const std::string& to, const std::string& from, uint64_t threads, uint64_t limit,
                                 uint64_t offset) const {
   using namespace sem::builder;  // NOLINT
-  CodeInfo ci;
+  LoopInfo loop;
   sem::ExprPtr lidx = _Const(0);
   sem::ExprPtr gidx = _("gbase");
   for (size_t i = 0; i < merged_.size(); i++) {
     const auto& m = merged_[order_[i]];
     lidx = lidx + int64_t(m.local_stride) * _(m.name);
     gidx = gidx + int64_t(m.stride) * _(m.name);
-    ci.indexes.push_back(IndexInfo{m.name, m.range, m.range, 1});
+    loop.indexes.push_back(IndexInfo{m.name, m.range, m.range, 1});
   }
   auto b2 = _Block({});
   b2->append(_Declare({sem::Type::INDEX}, "lidx", lidx));
   b2->append(_Declare({sem::Type::INDEX}, "gidx", gidx));
   sem::StmtPtr assign = (_(to)[_("lidx")] = _(from)[_Clamp(_("gidx"), _Const(-offset), _Const(limit - offset - 1))]);
   b2->append(assign);
-  ci.inner = b2;
-  ci.thread(threads);
+  loop.inner = b2;
+  loop.thread(threads);
   auto b = _Block({});
   sem::ExprPtr gbase = _Const(-global_zero_);
   for (const auto& oi : orig_) {
     gbase = gbase + (_(oi.name + "_gid") * oi.stride);
   }
   b->append(_Declare({sem::Type::INDEX}, "gbase", gbase));
-  b->append(ci.generate(threads));
+  b->append(loop.generate(threads, 1, false, true, false));
   return b;
 }
 

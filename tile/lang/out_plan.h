@@ -44,7 +44,7 @@ class OutPlan {
   // Generate code to set base offsets from global id
   std::shared_ptr<sem::Block> initBases() const;
   // Generate inner (per tile) loops for each output
-  uint64_t addOutLoops(CodeInfo& ci) const;  // NOLINT(runtime/references)
+  uint64_t addOutLoops(LoopInfo& loop) const;  // NOLINT(runtime/references)
   // Compute the position of the output in the register variable
   sem::ExprPtr regIndex() const;
   // Return number of local elements for this tile size

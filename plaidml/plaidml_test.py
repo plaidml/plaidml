@@ -1,13 +1,16 @@
 from __future__ import print_function
 
+import argparse
 import cProfile
-import numpy as np
 import os
+import sys
+import unittest
+
+import numpy as np
+import plaidml
 import plaidml.context
 import plaidml.exceptions
-import plaidml
 import testing.plaidml_config
-import unittest
 
 
 class TestPlaidML(unittest.TestCase):
@@ -190,4 +193,8 @@ class TestPlaidML(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-v', '--verbose', action='count', default=0)
+    args, remainder = parser.parse_known_args()
+    plaidml._internal_set_vlog(args.verbose)
+    unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

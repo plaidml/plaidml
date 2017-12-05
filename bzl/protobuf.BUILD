@@ -723,7 +723,6 @@ cc_binary(
     linkstatic = 1,
     deps = select({
         "//conditions:default": [],
-        # ":use_fast_cpp_protos": ["//external:python_headers"],
     }),
 )
 
@@ -749,16 +748,8 @@ cc_binary(
         ":protobuf",
     ] + select({
         "//conditions:default": [],
-        # ":use_fast_cpp_protos": ["//external:python_headers"],
     }),
 )
-
-# config_setting(
-#     name = "use_fast_cpp_protos",
-#     values = {
-#         "define": "use_fast_cpp_protos=true",
-#     },
-# )
 
 config_setting(
     name = "allow_oversize_protos",
@@ -773,10 +764,6 @@ py_proto_library(
     include = "src",
     data = select({
         "//conditions:default": [],
-        # ":use_fast_cpp_protos": [
-        #     ":internal/_api_implementation.so",
-        #     ":pyext/_message.so",
-        # ],
     }),
     default_runtime = "",
     protoc = ":protoc",

@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2018, Vertex.AI.
 
 #include "tile/hal/opencl/executor.h"
 
