@@ -7,7 +7,7 @@ import os
 import platform
 import shutil
 import sys
-from subprocess import check_call
+from subprocess import call, check_call
 
 MAIN = "__BZL_MAIN__"
 REQUIREMENTS = ["__BZL_REQUIREMENTS__"]
@@ -23,8 +23,7 @@ def _find_in_runfiles(logical_name):
     except AttributeError:
         _find_in_runfiles.manifest = {}
         if 'RUNFILES_DIR' in os.environ:
-            manifest_filename = os.path.join(os.environ['RUNFILES_DIR'],
-                                             'MANIFEST')
+            manifest_filename = os.path.join(os.environ['RUNFILES_DIR'], 'MANIFEST')
             if os.path.exists(manifest_filename):
                 with open(manifest_filename) as manifest:
                     for line in manifest:
@@ -34,6 +33,7 @@ def _find_in_runfiles(logical_name):
 
 
 class VirtualEnv(object):
+
     def __init__(self, requirements):
         self._requirements = requirements
         hasher = hashlib.md5()
@@ -42,8 +42,7 @@ class VirtualEnv(object):
         for requirement in requirements:
             with open(_find_in_runfiles(requirement)) as file_:
                 hasher.update(file_.read())
-        self._path = os.path.join(
-            os.path.expanduser('~'), '.t2', 'venv', hasher.hexdigest())
+        self._path = os.path.join(os.path.expanduser('~'), '.t2', 'venv', hasher.hexdigest())
 
         if platform.system() == 'Windows':
             self._venv_bin = os.path.join(self._path, 'Scripts')
@@ -61,10 +60,9 @@ class VirtualEnv(object):
                     vpython = ['-p', 'python2']
                 check_call(['virtualenv'] + vpython + VENV_ARGS + [self._path])
                 for requirement in self._requirements:
-                    check_call([
-                        self.python, self._pip, 'install', '-r',
-                        _find_in_runfiles(requirement)
-                    ])
+                    check_call(
+                        [self.python, self._pip, 'install', '-r',
+                         _find_in_runfiles(requirement)])
         except:
             if os.path.exists(self._path):
                 shutil.rmtree(self._path)
@@ -83,7 +81,7 @@ def main():
     args = [venv.python, MAIN] + sys.argv[1:]
     args[1:] = [_find_in_runfiles(arg) for arg in args[1:]]
     print('Running in venv: {}'.format(venv._path))
-    check_call(args, env=env)
+    sys.exit(call(args, env=env))
 
 
 if __name__ == '__main__':
