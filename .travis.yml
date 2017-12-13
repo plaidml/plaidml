@@ -12,10 +12,10 @@ matrix:
       - PLAIDML_EXPERIMENTAL=1 
 
 before_install:
-  - echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
-  - curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
-  - sudo apt-get update -q   
-  - sudo apt-get install openjdk-8-jdk bazel bison g++ wget -y
+  - sudo apt-get install openjdk-8-jdk bison g++ wget -y
+  - culr -o bazel-installer.sh https://github.com/bazelbuild/bazel/releases/download/0.7.0/bazel-0.7.0-without-jdk-installer-linux-x86_64.sh
+  - chmod +x ./bazel-installer.sh
+  - sudo ./bazel-installer.sh
   - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - tar xzvf opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
