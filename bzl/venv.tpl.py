@@ -22,13 +22,16 @@ def _find_in_runfiles(logical_name):
         return _find_in_runfiles.manifest.get(key, logical_name)
     except AttributeError:
         _find_in_runfiles.manifest = {}
-        if 'RUNFILES_DIR' in os.environ:
+        manifest_filename = None
+        if 'RUNFILES_MANIFEST_FILE' in os.environ:
+            manifest_filename = os.environ['RUNFILES_MANIFEST_FILE']
+        elif 'RUNFILES_DIR' in os.environ:
             manifest_filename = os.path.join(os.environ['RUNFILES_DIR'], 'MANIFEST')
-            if os.path.exists(manifest_filename):
-                with open(manifest_filename) as manifest:
-                    for line in manifest:
-                        (logical, physical) = line.split(' ', 2)
-                        _find_in_runfiles.manifest[logical] = physical.strip()
+        if manifest_filename and os.path.exists(manifest_filename):
+            with open(manifest_filename) as manifest:
+                for line in manifest:
+                    (logical, physical) = line.split(' ', 2)
+                    _find_in_runfiles.manifest[logical] = physical.strip()
         return _find_in_runfiles.manifest.get(key, logical_name)
 
 
@@ -61,7 +64,7 @@ class VirtualEnv(object):
                 check_call(['virtualenv'] + vpython + VENV_ARGS + [self._path])
                 for requirement in self._requirements:
                     check_call(
-                        [self.python, self._pip, 'install', '-r',
+                        [self._pip, 'install', '-r',
                          _find_in_runfiles(requirement)])
         except:
             if os.path.exists(self._path):
