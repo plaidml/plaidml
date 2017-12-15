@@ -67,7 +67,14 @@
           "or": {
             "sel": [
               { "name_regex": ".*Iris.*" },
-              { "name_regex": ".*HD Graphics.*" }
+              { 
+                "and" : {
+                  "sel": [
+                    { "name_regex": ".*HD Graphics.*" },
+                    { "not": { "name_regex": ".*Broxton.*" } }
+                  ]
+                }
+              }
             ]
           }
         },
@@ -79,6 +86,22 @@
           "max_regs": 4000,
           "goal_groups": 1,
           "goal_flops_per_byte": 50
+        }
+      },
+      {
+        "description": "Intel GPU config (Broxton)",
+        "sel": {
+            "name_regex": ".*HD Graphics Broxton.*"
+        },
+        "settings": {
+          "threads": 64,
+          "vec_size": 4,
+          "mem_width": 256,
+          "max_mem": 7300,
+          "max_regs": 4000,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50,
+          "use_global": true
         }
       },
       {

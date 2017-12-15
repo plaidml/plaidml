@@ -377,10 +377,12 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     auto dup_main_loop_inner = main_loop_inner;
     auto dup_main_loop_outer = main_loop_outer;
 
+    auto select_threshold = settings.use_global ? 0 : SELECT_THRESHOLD;
+
     // Add all the loops into their place
     main_loop_inner.inner = inner_block;
     // Generate 'output' loops on the inside, skip edge handling
-    main_loop_outer.inner = main_loop_inner.generate(out_threads, 1, true, false, SELECT_THRESHOLD);
+    main_loop_outer.inner = main_loop_inner.generate(out_threads, 1, true, false, select_threshold);
     if (main_loop_inner.inner_cond) {
       // If LoopInfo has determined that we should replace range checks with a select,
       // then wrap the pre_agg in a select, using the agg_base for the false case.
@@ -391,7 +393,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
 
     // Now do the same for the 'slow' case
     dup_main_loop_inner.inner = slow_inner_block;
-    dup_main_loop_outer.inner = dup_main_loop_inner.generate(out_threads, 1, true, false, SELECT_THRESHOLD);
+    dup_main_loop_outer.inner = dup_main_loop_inner.generate(out_threads, 1, true, false, select_threshold);
     auto slow_looped_inner = dup_main_loop_outer.generate(threads, out_threads, false, true, 0);
 
     sem::StmtPtr both;

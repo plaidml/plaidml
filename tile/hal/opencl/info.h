@@ -243,6 +243,8 @@ struct CLInfoType<CL_DEVICE_GLOBAL_VARIABLE_PREFERRED_TOTAL_SIZE>
     : CLDeviceInfo<CL_DEVICE_GLOBAL_VARIABLE_PREFERRED_TOTAL_SIZE, size_t> {};
 #endif
 template <>
+struct CLInfoType<CL_DEVICE_HOST_UNIFIED_MEMORY> : CLDeviceInfo<CL_DEVICE_HOST_UNIFIED_MEMORY, cl_bool> {};
+template <>
 struct CLInfoType<CL_DEVICE_LOCAL_MEM_TYPE> : CLDeviceInfo<CL_DEVICE_LOCAL_MEM_TYPE, cl_device_local_mem_type> {};
 template <>
 struct CLInfoType<CL_DEVICE_LOCAL_MEM_SIZE> : CLDeviceInfo<CL_DEVICE_LOCAL_MEM_SIZE, cl_ulong> {};

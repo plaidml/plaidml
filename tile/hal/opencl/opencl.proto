@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. 
+// Copyright 2017, Vertex.AI.
 
 syntax = "proto3";
 
@@ -89,12 +89,14 @@ message SvmCapability {
 
 // Configuration of the TILE OpenCL driver.
 message Driver {
-  // If true, nan's will be detected at WARNING and summaries will be printed at VLOG(1).
+  // If true, nan's will be detected at WARNING and summaries will be printed at
+  // VLOG(1).
   bool debug_summaries = 2;
 }
 
 // Metadata about OpenCL platforms discovered during enumeration.
-// Fields are ordered according to the table in the clGetPlatformInfo description in the OpenCL 2.2 specification.
+// Fields are ordered according to the table in the clGetPlatformInfo
+// description in the OpenCL 2.2 specification.
 message PlatformInfo {
   string profile = 1;
   string version = 2;
@@ -105,7 +107,8 @@ message PlatformInfo {
 };
 
 // Metadata about OpenCL devices discovered during enumeration.
-// Fields are ordered according to the table in the clGetDeviceInfo description in the OpenCL 2.2 specification.
+// Fields are ordered according to the table in the clGetDeviceInfo description
+// in the OpenCL 2.2 specification.
 message DeviceInfo {
   hal.proto.HardwareType.Value type = 1;
   uint32 vendor_id = 2;
@@ -194,6 +197,7 @@ message DeviceInfo {
   uint32 max_num_sub_groups = 86;
   bool sub_group_independent_forward_progress = 87;
   uint64 global_mem_size = 88;
+  bool host_unified_memory = 89;
 
   string platform_name = 100;
 
