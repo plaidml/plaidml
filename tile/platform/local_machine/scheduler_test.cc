@@ -3,6 +3,7 @@
 #include "tile/platform/local_machine/scheduler_test.h"
 
 #include <boost/core/demangle.hpp>
+#include <gflags/gflags.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/text_format.h>
 
@@ -11,6 +12,8 @@
 #include "tile/lang/generate.h"
 #include "tile/lang/parser.h"
 #include "tile/proto/support.h"
+
+DEFINE_bool(test_long_schedules, false, "Include long schedules in tests");
 
 namespace gp = ::google::protobuf;
 
@@ -36,8 +39,12 @@ tile::proto::Program MakeProgram(const std::string& filename) {
 
 std::vector<tile::proto::Program> SchedulerTest::GetTestPrograms() {
   testing::RunfilesDB rdb{"vertexai_plaidml/tile/platform/local_machine/testdata"};
-  return std::vector<tile::proto::Program>{MakeProgram(rdb["prng.tpb"]), MakeProgram(rdb["resnet50_train.tpb"]),
-                                           MakeProgram(rdb["xception.tpb"])};
+  std::vector<tile::proto::Program> result{MakeProgram(rdb["prng.tpb"])};
+  result.emplace_back(MakeProgram(rdb["xception.tpb"]));
+  if (FLAGS_test_long_schedules) {
+    result.emplace_back(MakeProgram(rdb["resnet50_train.tpb"]));
+  }
+  return result;
 }
 
 void PrintTo(const SchedulerTestParam& param, ::std::ostream* os) {

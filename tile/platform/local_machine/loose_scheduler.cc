@@ -11,7 +11,7 @@ namespace tile {
 namespace local_machine {
 namespace {
 
-constexpr auto kSchedulerTimeout = std::chrono::milliseconds(250);
+constexpr auto kSchedulerTimeout = std::chrono::seconds(3);
 
 }  // namespace
 
@@ -91,7 +91,13 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
   std::unique_ptr<Placement> placement;
 
   // Execute the broad rescheduling loop.
-  while (candidates.size() && std::chrono::steady_clock::now() < end_time) {
+  bool reached_timeout = false;
+  while (!placement || candidates.size()) {
+    if (end_time < std::chrono::steady_clock::now()) {
+      LOG(WARNING) << "Reached scheduler optimization timeout";
+      reached_timeout = true;
+      break;
+    }
     ++broad_loop_count;
     std::list<StepInfo> new_candidates;
 
@@ -157,7 +163,12 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
   IVLOG(3, "Loose scheduler: broad schedule is:\n" << schedule);
 
   // Execute the narrow scheduling loop.
-  while (candidates.size() && std::chrono::steady_clock::now() < end_time) {
+  while (candidates.size() && !reached_timeout) {
+    if (end_time < std::chrono::steady_clock::now()) {
+      LOG(WARNING) << "Reached scheduler optimization timeout";
+      reached_timeout = true;
+      break;
+    }
     ++narrow_loop_count;
     auto current = candidates.begin();
     while (current != candidates.end() && std::chrono::steady_clock::now() < end_time) {
