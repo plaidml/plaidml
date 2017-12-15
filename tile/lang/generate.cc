@@ -17,6 +17,7 @@
 #include "tile/lang/gen_trivial.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
+#include "tile/lang/simplifier.h"
 #include "tile/lang/tile_opt.h"
 #include "tile/lang/type.h"
 #include "tile/lang/usedef.h"
@@ -99,29 +100,38 @@ static KernelInfo GenerateContractionKernel(const std::string& kname, const Hard
     }
     VLOG(1) << "tot_flops = " << ki.tot_flops << ", tot_bytes = " << ki.tot_bytes << "\n\n";
   }
+
+  proto::ContractionInfo* pb;
   if (c) {
-    auto pb = ki.info.mutable_contraction();
-    pb->set_op(to_string(*c));
-    for (std::size_t idx = 0; idx < flat.names.size(); ++idx) {
-      auto access = pb->add_accesses();
-      access->set_name(flat.names[idx]);
-      access->set_range(flat.ranges[idx]);
-      for (auto a : flat.access) {
-        access->add_strides(a.strides[idx]);
-      }
-    }
+    pb = ki.info.mutable_contraction();
+    pb->add_ops(to_string(*c));
+  } else {
+    pb = ki.info.mutable_element();
+  }
+  for (const auto& op : flat.post_ops) {
+    pb->add_ops(to_string(op));
+  }
+  for (std::size_t idx = 0; idx < flat.names.size(); ++idx) {
+    auto access = pb->add_accesses();
+    access->set_name(flat.names[idx]);
+    access->set_range(flat.ranges[idx]);
     for (auto a : flat.access) {
-      pb->add_off(a.offset);
-      pb->add_vec(a.vector);
-    }
-    for (auto cons : flat.constraints) {
-      auto constraint = pb->add_constraints();
-      for (auto lhs : cons.lhs) {
-        constraint->add_lhs(lhs);
-      }
-      constraint->set_rhs(cons.rhs);
+      access->add_strides(a.strides[idx]);
     }
   }
+  for (auto a : flat.access) {
+    pb->add_off(a.offset);
+    pb->add_vec(a.vector);
+  }
+  for (auto cons : flat.constraints) {
+    auto constraint = pb->add_constraints();
+    for (auto lhs : cons.lhs) {
+      constraint->add_lhs(lhs);
+    }
+    constraint->set_rhs(cons.rhs);
+  }
+  ki.info.set_flops(ki.tot_flops);
+  ki.info.set_bytes(ki.tot_bytes);
 
   return ki;
 }
@@ -236,8 +246,8 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
   while (SimplifyFlat(&flat)) {
   }
   // Do memory based tile optimization
-  if (settings.vec_size > 1) {
-    flat = Vectorize(flat, settings.vec_size);
+  for (auto vec_size = settings.vec_size; flat.agg_vec == 1 && 1 < vec_size; vec_size /= 2) {
+    flat = Vectorize(flat, vec_size);
   }
   IVLOG(4, "Optimizing " << kname);
   auto by_score = TileOptimize(settings, flat, tile_trials == 1, vars);
@@ -786,7 +796,7 @@ KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const Sh
   // Do the primary compilations
   KernelList r;
   r = Compile(prog, inputs, outputs, settings, kid, tile_trials);
-
+  Simplify(r.kernels);
   return r;
 }
 

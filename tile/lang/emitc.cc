@@ -1,15 +1,13 @@
 
 #include "tile/lang/emitc.h"
-#include "tile/lang/fpconv.h"
 
-#include <map>
-#include <utility>
+#include "tile/lang/fpconv.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
 
-inline std::string c_dtype(const DataType &dt) {
+inline std::string c_dtype(const DataType& dt) {
   std::string base;
   switch (dt) {
     case DataType::BOOLEAN:
@@ -54,7 +52,7 @@ inline std::string c_dtype(const DataType &dt) {
   return base;
 }
 
-void EmitC::emitType(const sem::Type &t) {
+void EmitC::emitType(const sem::Type& t) {
   if (t.base == sem::Type::TVOID) {
     emit("void");
     return;
@@ -71,9 +69,9 @@ void EmitC::emitType(const sem::Type &t) {
   }
 }
 
-void EmitC::Visit(const sem::IntConst &n) { emit(std::to_string(n.value)); }
+void EmitC::Visit(const sem::IntConst& n) { emit(std::to_string(n.value)); }
 
-void EmitC::Visit(const sem::FloatConst &n) {
+void EmitC::Visit(const sem::FloatConst& n) {
   std::string c = DoubleToString(n.value);
   if (c.find_first_of(".e") == std::string::npos) {
     c += ".0";
@@ -81,11 +79,11 @@ void EmitC::Visit(const sem::FloatConst &n) {
   emit(c + "f");
 }
 
-void EmitC::Visit(const sem::LookupLVal &n) { emit(n.name); }
+void EmitC::Visit(const sem::LookupLVal& n) { emit(n.name); }
 
-void EmitC::Visit(const sem::LoadExpr &n) { n.inner->Accept(*this); }
+void EmitC::Visit(const sem::LoadExpr& n) { n.inner->Accept(*this); }
 
-void EmitC::Visit(const sem::StoreStmt &n) {
+void EmitC::Visit(const sem::StoreStmt& n) {
   emitTab();
   n.lhs->Accept(*this);
   emit(" = ");
@@ -93,14 +91,14 @@ void EmitC::Visit(const sem::StoreStmt &n) {
   emit(";\n");
 }
 
-void EmitC::Visit(const sem::SubscriptLVal &n) {
+void EmitC::Visit(const sem::SubscriptLVal& n) {
   n.ptr->Accept(*this);
   emit("[");
   n.offset->Accept(*this);
   emit("]");
 }
 
-void EmitC::Visit(const sem::DeclareStmt &n) {
+void EmitC::Visit(const sem::DeclareStmt& n) {
   emitTab();
   emitType(n.type);
   emit(" ");
@@ -124,22 +122,24 @@ void EmitC::Visit(const sem::DeclareStmt &n) {
   emit(";\n");
 }
 
-void EmitC::Visit(const sem::UnaryExpr &n) {
+void EmitC::Visit(const sem::UnaryExpr& n) {
   emit("(");
   emit(n.op);
   n.inner->Accept(*this);
   emit(")");
 }
 
-void EmitC::Visit(const sem::BinaryExpr &n) {
+void EmitC::Visit(const sem::BinaryExpr& n) {
   emit("(");
   n.lhs->Accept(*this);
+  emit(" ");
   emit(n.op);
+  emit(" ");
   n.rhs->Accept(*this);
   emit(")");
 }
 
-void EmitC::Visit(const sem::CondExpr &n) {
+void EmitC::Visit(const sem::CondExpr& n) {
   emit("(");
   n.cond->Accept(*this);
   emit(" ? ");
@@ -149,7 +149,7 @@ void EmitC::Visit(const sem::CondExpr &n) {
   emit(")");
 }
 
-void EmitC::Visit(const sem::SelectExpr &n) {
+void EmitC::Visit(const sem::SelectExpr& n) {
   emit("select(");
   n.fcase->Accept(*this);
   emit(", ");
@@ -159,7 +159,7 @@ void EmitC::Visit(const sem::SelectExpr &n) {
   emit(")");
 }
 
-void EmitC::Visit(const sem::ClampExpr &n) {
+void EmitC::Visit(const sem::ClampExpr& n) {
   emit("clamp(");
   n.val->Accept(*this);
   emit(", ");
@@ -169,7 +169,7 @@ void EmitC::Visit(const sem::ClampExpr &n) {
   emit(")");
 }
 
-void EmitC::Visit(const sem::CastExpr &n) {
+void EmitC::Visit(const sem::CastExpr& n) {
   emit("((");
   emitType(n.type);
   emit(")");
@@ -177,7 +177,7 @@ void EmitC::Visit(const sem::CastExpr &n) {
   emit(")");
 }
 
-void EmitC::Visit(const sem::CallExpr &n) {
+void EmitC::Visit(const sem::CallExpr& n) {
   n.func->Accept(*this);
   emit("(");
   for (size_t i = 0; i < n.vals.size(); i++) {
@@ -205,7 +205,7 @@ static std::map<std::pair<DataType, sem::LimitConst::Which>, std::string> LimitC
     {{DataType::FLOAT32, sem::LimitConst::MAX}, "FLT_MAX"},  {{DataType::FLOAT64, sem::LimitConst::MAX}, "DBL_MAX"},
 };
 
-void EmitC::Visit(const sem::LimitConst &n) {
+void EmitC::Visit(const sem::LimitConst& n) {
   if (n.which == sem::LimitConst::ZERO) {
     emit("0");
     return;
@@ -220,13 +220,13 @@ void EmitC::Visit(const sem::LimitConst &n) {
   emit(it->second);
 }
 
-void EmitC::Visit(const sem::IndexExpr &n) { throw std::runtime_error("IndexExpr unimplemented in EmitC"); }
+void EmitC::Visit(const sem::IndexExpr& n) { throw std::runtime_error("IndexExpr unimplemented in EmitC"); }
 
-void EmitC::Visit(const sem::Block &n) {
+void EmitC::Visit(const sem::Block& n) {
   emitTab();
   emit("{\n");
   ++indent_;
-  for (const sem::StmtPtr &ptr : n.statements) {
+  for (const sem::StmtPtr& ptr : n.statements) {
     ptr->Accept(*this);
   }
   --indent_;
@@ -234,20 +234,33 @@ void EmitC::Visit(const sem::Block &n) {
   emit("}\n");
 }
 
-void EmitC::Visit(const sem::IfStmt &n) {
+void EmitC::Visit(const sem::IfStmt& n) {
   emitTab();
-  emit("if (");
-  n.cond->Accept(*this);
-  emit(")\n");
-  n.iftrue->Accept(*this);
-  if (n.iffalse) {
+  if (n.iftrue && n.iffalse) {
+    emit("if (");
+    n.cond->Accept(*this);
+    emit(")\n");
+    n.iftrue->Accept(*this);
     emitTab();
     emit("else\n");
+    n.iffalse->Accept(*this);
+  } else if (n.iftrue) {
+    emit("if (");
+    n.cond->Accept(*this);
+    emit(")\n");
+    n.iftrue->Accept(*this);
+  } else if (n.iffalse) {
+    // This code is required since it is possible for n.iftrue to be a nullptr.
+    // It needs to stay in place because its possible for verbose logging to print
+    // pre-simplified code; this would cause a null pointer to be dereferencd and hence a crash.
+    emit("if !(");
+    n.cond->Accept(*this);
+    emit(")\n");
     n.iffalse->Accept(*this);
   }
 }
 
-void EmitC::Visit(const sem::ForStmt &n) {
+void EmitC::Visit(const sem::ForStmt& n) {
   emitTab();
   emit("for (int ");
   emit(n.var);
@@ -263,7 +276,7 @@ void EmitC::Visit(const sem::ForStmt &n) {
   n.inner->Accept(*this);
 }
 
-void EmitC::Visit(const sem::WhileStmt &n) {
+void EmitC::Visit(const sem::WhileStmt& n) {
   emitTab();
   emit("while (");
   n.cond->Accept(*this);
@@ -271,19 +284,9 @@ void EmitC::Visit(const sem::WhileStmt &n) {
   n.inner->Accept(*this);
 }
 
-void EmitC::Visit(const sem::BreakStmt &n) {
-  emitTab();
-  emit("break;\n");
-}
+void EmitC::Visit(const sem::BarrierStmt& n) { throw std::runtime_error("Barrier unimplemented in EmitC"); }
 
-void EmitC::Visit(const sem::ContinueStmt &n) {
-  emitTab();
-  emit("continue;\n");
-}
-
-void EmitC::Visit(const sem::BarrierStmt &n) { throw std::runtime_error("Barrier unimplemented in EmitC"); }
-
-void EmitC::Visit(const sem::ReturnStmt &n) {
+void EmitC::Visit(const sem::ReturnStmt& n) {
   emitTab();
   emit("return");
   if (n.value) {
@@ -294,13 +297,13 @@ void EmitC::Visit(const sem::ReturnStmt &n) {
   emit(";\n");
 }
 
-void EmitC::Visit(const sem::Function &n) {
+void EmitC::Visit(const sem::Function& n) {
   emitType(n.ret);
   emit(" ");
   emit(n.name);
   emit("(");
   bool first_param = true;
-  for (const auto &p : n.params) {
+  for (const auto& p : n.params) {
     if (first_param) {
       first_param = false;
     } else {

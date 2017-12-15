@@ -21,11 +21,11 @@ Library* Library::Downcast(hal::Library* library, const std::shared_ptr<DeviceSt
 }
 
 Library::Library(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_program> program,
-                 const std::vector<lang::KernelInfo>& kernel_info, std::vector<boost::uuids::uuid> kernel_uuids)
+                 const std::vector<lang::KernelInfo>& kernel_info, std::vector<context::proto::ActivityID> kernel_ids)
     : device_state_{device_state},
       program_{std::move(program)},
       kernel_info_{kernel_info},
-      kernel_uuids_{std::move(kernel_uuids)} {}
+      kernel_ids_{std::move(kernel_ids)} {}
 
 std::string Library::Serialize() {
   std::size_t size;

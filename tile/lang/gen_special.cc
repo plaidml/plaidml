@@ -102,6 +102,10 @@ static void GenGather(KernelList& r, const Op& op, const Bindings& bindings,  //
   ki.lwork = grids.second;
   ki.tot_bytes = out_size * ((bit_width(out_shape.type) + 7) / 8);
   ki.tot_flops = out_size;
+  auto pb = ki.info.mutable_special();
+  pb->set_fn(op.f.fn);
+  ki.info.set_flops(ki.tot_flops);
+  ki.info.set_bytes(ki.tot_bytes);
 
   // Dump the code
   sem::Print dump(*ki.kfunc);
@@ -147,6 +151,10 @@ static void GenShape(KernelList& r, const Op& op, const Bindings& bindings,  // 
   ki.lwork = {{1, 1, 1}};
   ki.tot_bytes = out_size * ((bit_width(out_shape.type) + 7) / 8);
   ki.tot_flops = out_size;
+  auto pb = ki.info.mutable_special();
+  pb->set_fn(op.f.fn);
+  ki.info.set_flops(ki.tot_flops);
+  ki.info.set_bytes(ki.tot_bytes);
 
   // Dump the code
   sem::Print dump(*ki.kfunc);
@@ -215,6 +223,10 @@ static void GenPRNG(KernelList& r, const Op& op, const Bindings& bindings,  // N
   ki.lwork = {{size_t(setting.threads), 1, 1}};
   ki.tot_bytes = out_size * ((bit_width(out_shape.type) + 7) / 8);
   ki.tot_flops = out_size;
+  auto pb = ki.info.mutable_special();
+  pb->set_fn(op.f.fn);
+  ki.info.set_flops(ki.tot_flops);
+  ki.info.set_bytes(ki.tot_bytes);
 
   // Dump the code
   sem::Print dump(*ki.kfunc);

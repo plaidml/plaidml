@@ -1,0 +1,2 @@
+pystache==0.5.4
+pyyaml==3.12

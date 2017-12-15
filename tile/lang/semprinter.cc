@@ -1,9 +1,10 @@
 
 #include "tile/lang/semprinter.h"
-#include "tile/lang/fpconv.h"
 
 #include <map>
 #include <utility>
+
+#include "tile/lang/fpconv.h"
 
 namespace vertexai {
 namespace tile {
@@ -11,7 +12,7 @@ namespace sem {
 
 using lang::DataType;
 
-inline std::string c_dtype(const DataType &dt) {
+inline std::string c_dtype(const DataType& dt) {
   std::string base;
   switch (dt) {
     case DataType::BOOLEAN:
@@ -56,7 +57,7 @@ inline std::string c_dtype(const DataType &dt) {
   return base;
 }
 
-void Print::emitType(const Type &t) {
+void Print::emitType(const Type& t) {
   if (t.base == Type::TVOID) {
     emit("void");
     return;
@@ -73,9 +74,9 @@ void Print::emitType(const Type &t) {
   }
 }
 
-void Print::Visit(const IntConst &n) { emit(std::to_string(n.value)); }
+void Print::Visit(const IntConst& n) { emit(std::to_string(n.value)); }
 
-void Print::Visit(const FloatConst &n) {
+void Print::Visit(const FloatConst& n) {
   std::string c = lang::DoubleToString(n.value);
   if (c.find_first_of(".e") == std::string::npos) {
     c += ".0";
@@ -83,11 +84,11 @@ void Print::Visit(const FloatConst &n) {
   emit(c + "f");
 }
 
-void Print::Visit(const LookupLVal &n) { emit(n.name); }
+void Print::Visit(const LookupLVal& n) { emit(n.name); }
 
-void Print::Visit(const LoadExpr &n) { n.inner->Accept(*this); }
+void Print::Visit(const LoadExpr& n) { n.inner->Accept(*this); }
 
-void Print::Visit(const StoreStmt &n) {
+void Print::Visit(const StoreStmt& n) {
   emitTab();
   n.lhs->Accept(*this);
   emit(" = ");
@@ -95,14 +96,14 @@ void Print::Visit(const StoreStmt &n) {
   emit(";\n");
 }
 
-void Print::Visit(const SubscriptLVal &n) {
+void Print::Visit(const SubscriptLVal& n) {
   n.ptr->Accept(*this);
   emit("[");
   n.offset->Accept(*this);
   emit("]");
 }
 
-void Print::Visit(const DeclareStmt &n) {
+void Print::Visit(const DeclareStmt& n) {
   emitTab();
   emitType(n.type);
   emit(" ");
@@ -128,14 +129,14 @@ void Print::Visit(const DeclareStmt &n) {
   emit(";\n");
 }
 
-void Print::Visit(const UnaryExpr &n) {
+void Print::Visit(const UnaryExpr& n) {
   emit("(");
   emit(n.op);
   n.inner->Accept(*this);
   emit(")");
 }
 
-void Print::Visit(const BinaryExpr &n) {
+void Print::Visit(const BinaryExpr& n) {
   emit("(");
   n.lhs->Accept(*this);
   emit(" " + n.op + " ");
@@ -143,7 +144,7 @@ void Print::Visit(const BinaryExpr &n) {
   emit(")");
 }
 
-void Print::Visit(const CondExpr &n) {
+void Print::Visit(const CondExpr& n) {
   emit("(");
   n.cond->Accept(*this);
   emit("? ");
@@ -153,7 +154,7 @@ void Print::Visit(const CondExpr &n) {
   emit(")");
 }
 
-void Print::Visit(const SelectExpr &n) {
+void Print::Visit(const SelectExpr& n) {
   emit("(");
   n.cond->Accept(*this);
   emit("?? ");
@@ -163,7 +164,7 @@ void Print::Visit(const SelectExpr &n) {
   emit(")");
 }
 
-void Print::Visit(const ClampExpr &n) {
+void Print::Visit(const ClampExpr& n) {
   emit("clamp(");
   n.val->Accept(*this);
   emit(", ");
@@ -173,7 +174,7 @@ void Print::Visit(const ClampExpr &n) {
   emit(")");
 }
 
-void Print::Visit(const CastExpr &n) {
+void Print::Visit(const CastExpr& n) {
   emit("((");
   emitType(n.type);
   emit(") ");
@@ -181,7 +182,7 @@ void Print::Visit(const CastExpr &n) {
   emit(")");
 }
 
-void Print::Visit(const CallExpr &n) {
+void Print::Visit(const CallExpr& n) {
   n.func->Accept(*this);
   emit("(");
   for (size_t i = 0; i < n.vals.size(); i++) {
@@ -209,7 +210,7 @@ static std::map<std::pair<DataType, LimitConst::Which>, std::string> LimitConstL
     {{DataType::FLOAT32, LimitConst::MAX}, "FLT_MAX"},  {{DataType::FLOAT64, LimitConst::MAX}, "DBL_MAX"},
 };
 
-void Print::Visit(const LimitConst &n) {
+void Print::Visit(const LimitConst& n) {
   if (n.which == LimitConst::ZERO) {
     emit("0");
     return;
@@ -221,7 +222,7 @@ void Print::Visit(const LimitConst &n) {
   emit(it->second);
 }
 
-void Print::Visit(const IndexExpr &n) {
+void Print::Visit(const IndexExpr& n) {
   switch (n.type) {
     case sem::IndexExpr::GLOBAL:
       emit("get_global_id(" + std::to_string(n.dim) + ")");
@@ -237,11 +238,11 @@ void Print::Visit(const IndexExpr &n) {
   }
 }
 
-void Print::Visit(const Block &n) {
+void Print::Visit(const Block& n) {
   emitTab();
   emit("{\n");
   ++indent_;
-  for (const StmtPtr &ptr : n.statements) {
+  for (const StmtPtr& ptr : n.statements) {
     ptr->Accept(*this);
   }
   --indent_;
@@ -249,20 +250,30 @@ void Print::Visit(const Block &n) {
   emit("}\n");
 }
 
-void Print::Visit(const IfStmt &n) {
+void Print::Visit(const IfStmt& n) {
   emitTab();
-  emit("if (");
-  n.cond->Accept(*this);
-  emit(")\n");
-  n.iftrue->Accept(*this);
-  if (n.iffalse) {
+  if (n.iftrue && n.iffalse) {
+    emit("if (");
+    n.cond->Accept(*this);
+    emit(")\n");
+    n.iftrue->Accept(*this);
     emitTab();
     emit("else\n");
+    n.iffalse->Accept(*this);
+  } else if (n.iftrue) {
+    emit("if (");
+    n.cond->Accept(*this);
+    emit(")\n");
+    n.iftrue->Accept(*this);
+  } else if (n.iffalse) {
+    emit("if (!");
+    n.cond->Accept(*this);
+    emit(")\n");
     n.iffalse->Accept(*this);
   }
 }
 
-void Print::Visit(const ForStmt &n) {
+void Print::Visit(const ForStmt& n) {
   emitTab();
   emit("for(int ");
   emit(n.var);
@@ -278,7 +289,7 @@ void Print::Visit(const ForStmt &n) {
   n.inner->Accept(*this);
 }
 
-void Print::Visit(const WhileStmt &n) {
+void Print::Visit(const WhileStmt& n) {
   emitTab();
   emit("while (");
   n.cond->Accept(*this);
@@ -286,22 +297,12 @@ void Print::Visit(const WhileStmt &n) {
   n.inner->Accept(*this);
 }
 
-void Print::Visit(const BreakStmt &n) {
-  emitTab();
-  emit("break;\n");
-}
-
-void Print::Visit(const ContinueStmt &n) {
-  emitTab();
-  emit("continue;\n");
-}
-
-void Print::Visit(const BarrierStmt &n) {
+void Print::Visit(const BarrierStmt& n) {
   emitTab();
   emit("barrier();\n");
 }
 
-void Print::Visit(const ReturnStmt &n) {
+void Print::Visit(const ReturnStmt& n) {
   emitTab();
   emit("return");
   if (n.value) {
@@ -312,13 +313,13 @@ void Print::Visit(const ReturnStmt &n) {
   emit(";\n");
 }
 
-void Print::Visit(const Function &n) {
+void Print::Visit(const Function& n) {
   emitType(n.ret);
   emit(" ");
   emit(n.name);
   emit("(");
   bool first_param = true;
-  for (const auto &p : n.params) {
+  for (const auto& p : n.params) {
     if (first_param) {
       first_param = false;
     } else {

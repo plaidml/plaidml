@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "tile/lang/semtree.h"
 
@@ -72,8 +73,6 @@ inline std::shared_ptr<ForStmt> _For(const std::string& var, uint64_t n, uint64_
   return std::make_shared<ForStmt>(var, n, s, inner);
 }
 
-inline std::shared_ptr<BreakStmt> _Break() { return std::make_shared<BreakStmt>(); }
-inline std::shared_ptr<ContinueStmt> _Continue() { return std::make_shared<ContinueStmt>(); }
 inline std::shared_ptr<BarrierStmt> _Barrier() { return std::make_shared<BarrierStmt>(); }
 inline std::shared_ptr<ReturnStmt> _Return(ExprPtr value = ExprPtr()) { return std::make_shared<ReturnStmt>(value); }
 
@@ -108,6 +107,13 @@ inline std::shared_ptr<SelectExpr> _Select(ExprPtr cond, ExprPtr tcase, ExprPtr 
 }
 inline std::shared_ptr<ClampExpr> _Clamp(ExprPtr val, ExprPtr min, ExprPtr max) {
   return std::make_shared<ClampExpr>(val, min, max);
+}
+
+inline std::shared_ptr<BinaryExpr> _LogicalAnd(ExprPtr lhs, ExprPtr rhs) {
+  return std::make_shared<BinaryExpr>("&&", lhs, rhs);
+}
+inline std::shared_ptr<BinaryExpr> _LogicalOr(ExprPtr lhs, ExprPtr rhs) {
+  return std::make_shared<BinaryExpr>("||", lhs, rhs);
 }
 
 }  // namespace builder

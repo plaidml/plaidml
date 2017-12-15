@@ -34,7 +34,6 @@ plaidml_cc_test(
     srcs = ["eventlog_test.cc"],
     deps = [
         ":file",
-        "//external:gtest",
         "//testing:matchers",
     ],
 )

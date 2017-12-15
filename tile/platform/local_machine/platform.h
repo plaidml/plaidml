@@ -13,6 +13,7 @@
 #include "tile/platform/local_machine/devinfo.h"
 #include "tile/platform/local_machine/local_machine.pb.h"
 #include "tile/platform/local_machine/mem_strategy.h"
+#include "tile/platform/local_machine/scheduler.h"
 
 namespace vertexai {
 namespace tile {
@@ -29,11 +30,10 @@ class Platform : public tile::Platform {
     std::shared_ptr<DevInfo> devinfo;
     std::shared_ptr<MemStrategy> mem_strategy;
     hal::Memory* tmp_mem_source;
+    std::shared_ptr<Scheduler> scheduler;
   };
 
   Platform(const context::Context& ctx, const proto::Platform& config);
-  Platform(const context::Context& ctx, const proto::Platform& config, const std::set<std::string>& config_ids,
-           const std::set<std::string>& device_ids);
 
   std::shared_ptr<tile::Buffer> MakeBuffer(const context::Context& ctx, const std::string& device_id,
                                            std::uint64_t size) final;
@@ -49,8 +49,7 @@ class Platform : public tile::Platform {
   std::vector<std::unique_ptr<hal::Driver>> drivers_;
   std::unordered_map<std::string, PlatformDev> devs_;
   std::unordered_map<std::string, PlatformDev> unmatched_devs_;
-  std::set<std::string> config_ids;
-  std::set<std::string> device_ids;
+  std::shared_ptr<Scheduler> scheduler_;
 };
 
 }  // namespace local_machine

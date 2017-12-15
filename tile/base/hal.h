@@ -123,6 +123,10 @@ class Memory {
  public:
   virtual ~Memory() noexcept {}
 
+  // The number of bytes that upper layers should aim to use within this memory region
+  // in order to maximize performance.
+  virtual std::uint64_t size_goal() const = 0;
+
   // Indicates the access rights that can be used with buffers created via this memory object.
   virtual BufferAccessMask AllowedAccesses() const = 0;
 

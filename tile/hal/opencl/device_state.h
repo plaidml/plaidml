@@ -42,7 +42,7 @@ class DeviceState {
     return cl_normal_queue();
   }
   const context::Clock& clock() const { return clock_; }
-  const boost::uuids::uuid& uuid() const { return uuid_; }
+  const context::proto::ActivityID& id() const { return id_; }
 
   cl_map_flags map_discard_flags() const;
 
@@ -58,7 +58,7 @@ class DeviceState {
   std::unique_ptr<const Queue> cl_normal_queue_;
   std::unique_ptr<const Queue> cl_profiling_queue_;
   const context::Clock clock_;
-  const boost::uuids::uuid uuid_;
+  const context::proto::ActivityID id_;
 };
 
 }  // namespace opencl

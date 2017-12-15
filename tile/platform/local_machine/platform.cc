@@ -15,16 +15,24 @@
 #include "base/util/type_url.h"
 #include "tile/hal/util/selector.h"
 #include "tile/hal/util/settings.h"
+#include "tile/platform/local_machine/block_placer.h"
 #include "tile/platform/local_machine/buffer.h"
 #include "tile/platform/local_machine/copy_mem_strategy.h"
 #include "tile/platform/local_machine/direct_mem_strategy.h"
+#include "tile/platform/local_machine/loose_scheduler.h"
 #include "tile/platform/local_machine/program.h"
+#include "tile/platform/local_machine/tdep_scheduler.h"
 #include "tile/platform/local_machine/tmp_mem_strategy.h"
 
 namespace vertexai {
 namespace tile {
 namespace local_machine {
 namespace {
+
+// The percentage of the device's memory that programs will try to use.
+// This value seems to work pretty well on most devices.
+// TODO: Either autotune this, or move it to the per-device configuration.
+constexpr float kGoalMemPercentage = .85;
 
 void GetMemStrategy(const std::shared_ptr<DevInfo>& devinfo, Platform::PlatformDev* pd) {
   if (devinfo->dev->executor()->shared_memory()) {
@@ -86,6 +94,18 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
           }
           VLOG(1) << settings.DebugString();
           GetMemStrategy(devinfo, &pd);
+
+          auto memory = (dev->executor() && dev->executor()->device_memory() ? dev->executor()->device_memory()
+                                                                             : devset->host_memory());
+          auto placer = std::make_shared<BlockPlacer>(memory->ArenaBufferAlignment());
+          if (dev->executor() && dev->executor()->is_synchronous()) {
+            IVLOG(1, "Using transitive dep scheduler");
+            pd.scheduler = std::make_shared<TransitiveDepScheduler>(std::move(placer), 0);
+          } else {
+            auto size_goal = memory->size_goal() * kGoalMemPercentage;
+            IVLOG(1, "Using loose scheduler; size_goal=" << size_goal);
+            pd.scheduler = std::make_shared<LooseScheduler>(std::move(placer), size_goal);
+          }
           devs_[id] = std::move(pd);
         }
       }
@@ -102,7 +122,7 @@ std::shared_ptr<tile::Buffer> Platform::MakeBuffer(const context::Context& ctx, 
 std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx, const tile::proto::Program& program) {
   auto& platform_dev = LookupDevice(program.dev_id());
   return compat::make_unique<Program>(
-      ctx, program, platform_dev.devinfo, platform_dev.mem_strategy,
+      ctx, program, platform_dev.devinfo, platform_dev.scheduler, platform_dev.mem_strategy,
       std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source), platform_dev.tmp_mem_source);
 }
 

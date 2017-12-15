@@ -39,6 +39,7 @@ class RunfilesDB {
  private:
   std::mutex mu_;
   std::string prefix_;
+  std::string relative_prefix_;
   std::string env_override_;
   std::unordered_map<std::string, std::string> logical_to_physical_;
 };

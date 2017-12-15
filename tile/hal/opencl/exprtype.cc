@@ -49,19 +49,19 @@ unsigned Rank(sem::Type ty) {
 
 }  // namespace
 
-sem::Type ExprType::TypeOf(const lang::Scope<sem::Type> *scope, bool cl_khr_fp16, const sem::ExprPtr &expr) {
+sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool cl_khr_fp16, const sem::ExprPtr& expr) {
   ExprType et{scope, cl_khr_fp16};
   expr->Accept(et);
   return et.ty_;
 }
 
-sem::Type ExprType::TypeOf(const lang::Scope<sem::Type> *scope, bool cl_khr_fp16, const sem::LValPtr &lvalue) {
+sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool cl_khr_fp16, const sem::LValPtr& lvalue) {
   ExprType et{scope, cl_khr_fp16};
   lvalue->Accept(et);
   return et.ty_;
 }
 
-sem::Type Promote(const std::vector<sem::Type> &types) {
+sem::Type Promote(const std::vector<sem::Type>& types) {
   sem::Type result{sem::Type::VALUE};
   unsigned rank_so_far = 0;
   for (auto ty : types) {
@@ -91,7 +91,7 @@ sem::Type Promote(const std::vector<sem::Type> &types) {
   return result;
 }
 
-void ExprType::Visit(const sem::IntConst &n) {
+void ExprType::Visit(const sem::IntConst& n) {
   lang::DataType dtype;
 
   // This isn't quite correct; when we see an integer constant, we
@@ -125,7 +125,7 @@ void ExprType::Visit(const sem::IntConst &n) {
   IVLOG(5, "ExprType(IntConst): " << ty_);
 }
 
-void ExprType::Visit(const sem::FloatConst &n) {
+void ExprType::Visit(const sem::FloatConst& n) {
   // This definitely isn't correct; when we see a float constant, we
   // ought to propagate its type lazily, so that it doesn't impose
   // contraints on expressions that use it (ala Go).
@@ -133,12 +133,16 @@ void ExprType::Visit(const sem::FloatConst &n) {
   IVLOG(5, "ExprType(FloatConst): " << ty_);
 }
 
-void ExprType::Visit(const sem::LookupLVal &n) {
-  ty_ = scope_->Lookup(n.name);
+void ExprType::Visit(const sem::LookupLVal& n) {
+  auto result = scope_->Lookup(n.name);
+  if (!result) {
+    throw std::out_of_range{"Undeclared reference: " + n.name};
+  }
+  ty_ = *result;
   IVLOG(5, "ExprType(LookupLVal[" << n.name << "]): " << ty_);
 }
 
-void ExprType::Visit(const sem::LoadExpr &n) {
+void ExprType::Visit(const sem::LoadExpr& n) {
   n.inner->Accept(*this);
   if (ty_.dtype == lang::DataType::FLOAT16 && !cl_khr_fp16_) {
     // No fp16 support => automatically promote loads to 32-bit.
@@ -147,9 +151,9 @@ void ExprType::Visit(const sem::LoadExpr &n) {
   IVLOG(5, "ExprType(LoadExpr): " << ty_);
 }
 
-void ExprType::Visit(const sem::StoreStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::StoreStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::SubscriptLVal &n) {
+void ExprType::Visit(const sem::SubscriptLVal& n) {
   n.ptr->Accept(*this);
   ty_.base = sem::Type::VALUE;
   ty_.array = 0;
@@ -157,9 +161,9 @@ void ExprType::Visit(const sem::SubscriptLVal &n) {
   IVLOG(5, "ExprType(SubscriptLVal): " << ty_);
 }
 
-void ExprType::Visit(const sem::DeclareStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::DeclareStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::UnaryExpr &n) {
+void ExprType::Visit(const sem::UnaryExpr& n) {
   n.inner->Accept(*this);
   if (n.op == "!") {
     AdjustLogicOpResult();
@@ -179,7 +183,7 @@ void ExprType::Visit(const sem::UnaryExpr &n) {
   IVLOG(5, "ExprType(UnaryExpr[" << n.op << "]): " << ty_);
 }
 
-void ExprType::Visit(const sem::BinaryExpr &n) {
+void ExprType::Visit(const sem::BinaryExpr& n) {
   ty_ = Promote({TypeOf(n.lhs), TypeOf(n.rhs)});
   if (n.op == ">" || n.op == ">=" || n.op == "<" || n.op == "<=" || n.op == "==" || n.op == "!=" || n.op == "&&" ||
       n.op == "||") {
@@ -188,22 +192,22 @@ void ExprType::Visit(const sem::BinaryExpr &n) {
   IVLOG(5, "ExprType(BinaryExpr[" << n.op << "]): " << ty_);
 }
 
-void ExprType::Visit(const sem::CondExpr &n) {
+void ExprType::Visit(const sem::CondExpr& n) {
   ty_ = Promote({TypeOf(n.tcase), TypeOf(n.fcase)});
   IVLOG(5, "ExprType(CondExpr): " << ty_);
 }
 
-void ExprType::Visit(const sem::SelectExpr &n) {
+void ExprType::Visit(const sem::SelectExpr& n) {
   ty_ = Promote({TypeOf(n.tcase), TypeOf(n.fcase)});
   IVLOG(5, "ExprType(SelectExpr): " << ty_);
 }
 
-void ExprType::Visit(const sem::ClampExpr &n) {
+void ExprType::Visit(const sem::ClampExpr& n) {
   n.val->Accept(*this);
   IVLOG(5, "ExprType(ClampExpr): " << ty_);
 }
 
-void ExprType::Visit(const sem::CastExpr &n) {
+void ExprType::Visit(const sem::CastExpr& n) {
   // TODO: Consider using the type of the cast expression.  Currently,
   // the compiler is inserting casts that work but are technically
   // incorrect for OpenCL; those should perhaps be removed so that
@@ -213,7 +217,7 @@ void ExprType::Visit(const sem::CastExpr &n) {
   IVLOG(5, "ExprType(CastExpr): " << ty_);
 }
 
-void ExprType::Visit(const sem::CallExpr &n) {
+void ExprType::Visit(const sem::CallExpr& n) {
   std::vector<sem::Type> types;
   for (auto val : n.vals) {
     types.push_back(TypeOf(val));
@@ -222,38 +226,34 @@ void ExprType::Visit(const sem::CallExpr &n) {
   IVLOG(5, "ExprType(CallExpr): " << ty_);
 }
 
-void ExprType::Visit(const sem::LimitConst &n) {
+void ExprType::Visit(const sem::LimitConst& n) {
   ty_.base = sem::Type::INDEX;
   ty_.dtype = n.type;
   IVLOG(5, "ExprType(LimitConst): " << ty_);
 }
 
-void ExprType::Visit(const sem::IndexExpr &n) {
+void ExprType::Visit(const sem::IndexExpr& n) {
   ty_.base = sem::Type::INDEX;
   IVLOG(5, "ExprType(IndexExpr): " << ty_);
 }
 
-void ExprType::Visit(const sem::Block &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::Block&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::IfStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::IfStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::ForStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::ForStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::WhileStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::WhileStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::BreakStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::BarrierStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::ContinueStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::ReturnStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::BarrierStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+void ExprType::Visit(const sem::Function&) { throw std::logic_error{"Unexpected expression component"}; }
 
-void ExprType::Visit(const sem::ReturnStmt &) { throw std::logic_error{"Unexpected expression component"}; }
+ExprType::ExprType(const lang::Scope<sem::Type>* scope, bool cl_khr_fp16) : scope_{scope}, cl_khr_fp16_{cl_khr_fp16} {}
 
-void ExprType::Visit(const sem::Function &) { throw std::logic_error{"Unexpected expression component"}; }
-
-ExprType::ExprType(const lang::Scope<sem::Type> *scope, bool cl_khr_fp16) : scope_{scope}, cl_khr_fp16_{cl_khr_fp16} {}
-
-sem::Type ExprType::TypeOf(const sem::ExprPtr &expr) {
+sem::Type ExprType::TypeOf(const sem::ExprPtr& expr) {
   ExprType et{scope_, cl_khr_fp16_};
   expr->Accept(et);
   return et.ty_;

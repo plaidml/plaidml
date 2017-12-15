@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include <boost/regex.hpp>
-
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/regex.hpp>
 
 #include "tile/hal/opencl/ocl.h"
 #include "tile/hal/opencl/opencl.pb.h"
@@ -35,7 +35,7 @@ struct CLPlatformInfo {
   static T Read(cl_platform_id pid) {
     T value = 0;
     Err err = clGetPlatformInfo(pid, Param, sizeof(value), reinterpret_cast<char*>(&value), nullptr);
-    if (err && err.code() != CL_INVALID_VALUE) {
+    if (err && err.code() != CL_INVALID_VALUE && err.code() != CL_INVALID_DEVICE) {
       Err::Check(err, "reading OpenCL platform info");
     }
     return value;
@@ -229,6 +229,8 @@ template <>
 struct CLInfoType<CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE> : CLDeviceInfo<CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, cl_uint> {};
 template <>
 struct CLInfoType<CL_DEVICE_GLOBAL_MEM_CACHE_SIZE> : CLDeviceInfo<CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, cl_ulong> {};
+template <>
+struct CLInfoType<CL_DEVICE_GLOBAL_MEM_SIZE> : CLDeviceInfo<CL_DEVICE_GLOBAL_MEM_SIZE, cl_ulong> {};
 template <>
 struct CLInfoType<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE> : CLDeviceInfo<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, cl_ulong> {};
 template <>

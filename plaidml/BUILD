@@ -18,6 +18,8 @@ load(
 )
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
 
+exports_files(["requirements.txt"])
+
 plaidml_proto_library(
     name = "proto",
     srcs = ["plaidml.proto"],
@@ -43,8 +45,8 @@ plaidml_cc_library(
         ":proto_cc",
         "//base/config",
         "//base/eventing/file",
-        "//external:half",
-        "//external:minizip",
+        "@half_repo//:half",
+        "@minizip_repo//:minizip",
         "//plaidml/base",
         "//tile/base",
         "//tile/base:program_cache",
@@ -123,7 +125,7 @@ plaidml_cc_test(
     srcs = ["dtype_vec_test.cc"],
     deps = [
         ":api",
-        "//external:half",
+        "@half_repo//:half",
         "//plaidml:proto_cc",
         "//testing:matchers",
         "//testing:plaidml_config",

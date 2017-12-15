@@ -9,6 +9,7 @@ plaidml_proto_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//base/context:proto",
         "//tile/proto:hal",
     ],
 )
@@ -36,6 +37,8 @@ plaidml_cc_library(
         "compiler.h",
         "device.cc",
         "device.h",
+        "device_memory.cc",
+        "device_memory.h",
         "device_set.cc",
         "device_set.h",
         "device_state.cc",
@@ -49,15 +52,13 @@ plaidml_cc_library(
         "executor.h",
         "exprtype.cc",
         "exprtype.h",
-        "global_memory.cc",
-        "global_memory.h",
+        "host_memory.cc",
+        "host_memory.h",
         "info.cc",
         "kernel.cc",
         "kernel.h",
         "library.cc",
         "library.h",
-        "local_memory.cc",
-        "local_memory.h",
         "ocl.cc",
         "ocl.h",
         "opencl.cc",
@@ -89,7 +90,8 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util:util_cc",
-        "//external:boost_regex",
+        "@boost_archive//:filesystem",
+        "@boost_archive//:regex",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
@@ -99,7 +101,7 @@ plaidml_cc_library(
     ] + select({
         "//bzl:darwin": [],
         "//conditions:default": [
-            "//external:opencl_icd_loader",
+            "@opencl_icd_loader_repo//:lib",
         ],
     }),
     alwayslink = 1,
@@ -112,6 +114,5 @@ plaidml_cc_test(
     ],
     deps = [
         ":opencl",
-        "//external:gtest",
     ],
 )

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,30 +13,22 @@ namespace lang {
 
 // Information about each index in loop
 struct IndexInfo {
-  std::string name;   // Name of the index
-  uint64_t total;     // Full dimension size
-  uint64_t tile;      // Tile size (assert <= total, Po2 or total)
-  uint64_t thread;    // Number of threads (asset <= tile, Po2)
+  std::string name;  // Name of the index
+  uint64_t total;    // Full dimension size
+  uint64_t tile;     // Tile size (assert <= total, Po2 or total)
+  uint64_t thread;   // Number of threads (asset <= tile, Po2)
+  std::vector<sem::ExprPtr> checks;
+  std::vector<sem::ExprPtr> idx_conds;
   int score() const;  // Low score sorts to inside loops
 };
 
-// Information about each tensor in the loop
-struct TRef {
-  std::string name;
-  std::vector<int64_t> strides;
-};
-
-struct CodeInfo {
+struct LoopInfo {
   std::vector<IndexInfo> indexes;  // Index names, order, sizes
-  std::vector<TRef> refs;          // Output, input1 [, input2]
   sem::StmtPtr inner;
+  sem::ExprPtr inner_cond;
 
   void thread(uint64_t numThreads);
-  sem::StmtPtr generate(uint64_t numThreads, uint64_t div = 1, bool skip_edge = false, bool order = true);
-
- private:
-  std::shared_ptr<sem::Block> continueClause(int i, ssize_t mul = 1) const;
-  std::shared_ptr<sem::Block> increments(int i, ssize_t mul = 1) const;
+  sem::StmtPtr generate(uint64_t numThreads, uint64_t div, bool skip_edge, bool order, size_t select_threshold);
 };
 
 }  // namespace lang

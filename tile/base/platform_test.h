@@ -1,3 +1,5 @@
+// Copyright 2017, Vertex.AI.
+
 #pragma once
 
 #include <functional>
@@ -16,15 +18,15 @@ typedef std::function<std::unique_ptr<tile::Platform>()> PlatformFactory;
 
 // Platform implementation conformance tests.
 //
-// To test a device, #include this header (linking with the :device_tests
+// To test a platform, #include this header (linking with the :platform_tests
 // target), and use INSTANTIATE_TEST_CASE_P to instantiate the conformance
 // tests with factories producing Platform instances -- e.g.
 //
 //   INSTANTIATE_TEST_CASE_P(
-//       MyDevice,
+//       MyPlatform,
 //       PlatformTest,
 //       ::testing::Values(std::function<unique_ptr<Platform>()>[](){
-//         return compat::make_unique<MyDevice>();
+//         return compat::make_unique<MyPlatform>();
 //       }));
 //
 class PlatformTest : public ::testing::TestWithParam<PlatformFactory> {

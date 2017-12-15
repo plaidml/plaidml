@@ -1,0 +1,5 @@
+keras==2.0.8
+requests==2.18.4
+six==1.11.0
+tensorflow==1.4.0
+theano==1.0.0

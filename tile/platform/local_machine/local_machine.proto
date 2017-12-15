@@ -7,6 +7,9 @@ package vertexai.tile.local_machine.proto;
 import "google/protobuf/any.proto";
 import "tile/proto/hal.proto";
 
+option java_package = "ai.vertex.tile.platform.local_machine";
+option java_outer_classname = "LocalMachineProtos";
+
 message Platform {
   // The low-level HALs to load.
   repeated google.protobuf.Any hals = 1;

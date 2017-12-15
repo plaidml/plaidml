@@ -1,18 +1,12 @@
 
 #include "tile/lang/loop.h"
 
-#include <boost/format.hpp>
-
-#include <algorithm>
-
 #include "tile/lang/mutil.h"
 #include "tile/lang/sembuilder.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
-
-using boost::format;
 
 int IndexInfo::score() const {
   if (total % tile == 0 && tile % thread == 0) {
@@ -26,119 +20,157 @@ int IndexInfo::score() const {
   }
   return 3;
 }
-void CodeInfo::thread(uint64_t threads) {
+
+void LoopInfo::thread(uint64_t threads) {
   for (auto& idx : indexes) {
     idx.thread = std::min(threads, NearestPo2(idx.tile));
     threads /= idx.thread;
   }
 }
 
-sem::StmtPtr CodeInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, bool order) {
+sem::StmtPtr LoopInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, bool order, size_t select_threshold) {
   using namespace sem::builder;  // NOLINT
   // Start with the inner-most block
   sem::StmtPtr cur = inner;
   // Check for thread underrun and correct
+  auto tid = _("tid");
   size_t tot_threads = div;
   for (const auto& idx : indexes) {
     tot_threads *= idx.thread;
   }
   if (tot_threads < threads) {
-    cur = _If(_("tid") < tot_threads, cur);
+    cur = _If(tid < tot_threads, cur);
   }
   auto r = _Block({});
   // Convert a single thread id to per index thread id, innermost first
   // Also, do per-thread preincrement
-  auto tid = _("tid");
   for (int i = 0; i < indexes.size(); i++) {
-    // if (indexes[i].thread == 1) { continue; }
     r->append(_Declare({sem::Type::INDEX}, indexes[i].name + "_tid", (tid / div) % indexes[i].thread));
-    for (size_t j = 0; j < refs.size(); j++) {
-      if (refs[j].strides[i] == 0) {
-        continue;
-      }
-      auto t = _(indexes[i].name + "_tid");
-      auto v = _(refs[j].name);
-      r->append(v = v + t * refs[j].strides[i]);
-    }
     div *= indexes[i].thread;
-  }
-  // Sort least inefficient loops to the inside
-  if (order) {
-    std::sort(indexes.begin(), indexes.end(),
-              [](const IndexInfo& a, const IndexInfo& b) -> bool { return a.score() > b.score(); });
   }
   // Sort least inefficient loops to the inside
   std::sort(indexes.begin(), indexes.end(),
             [](const IndexInfo& a, const IndexInfo& b) -> bool { return a.score() > b.score(); });
-  // Wrap with each outer
-  for (int i = indexes.size() - 1; i >= 0; i--) {
-    auto b = _Block({});  // Interior of for loop
-    ssize_t thread = indexes[i].thread;
-    ssize_t edge = indexes[i].total % indexes[i].tile;     // Determine if we have an edge tile
-    ssize_t max_loops = RoundUp(indexes[i].tile, thread);  // Compute max loops
-    ssize_t max_gid = (indexes[i].total / indexes[i].tile) * indexes[i].tile;
-    // Make some variables
-    std::string idx_name = indexes[i].name;
+
+  // First compute range checks so that they can be composed as we descend to inner loops
+  std::vector<sem::ExprPtr> idx_conds;
+  for (auto& index : indexes) {
+    ssize_t thread = index.thread;
+    ssize_t edge = index.total % index.tile;          // Determine if we have an edge tile
+    ssize_t max_loops = RoundUp(index.tile, thread);  // Compute max loops
+    ssize_t max_gid = (index.total / index.tile) * index.tile;
+
+    std::string idx_name = index.name;
     auto idx_lid = _(idx_name + "_lid");
     auto idx_gid = _(idx_name + "_gid");
     auto idx_tid = _(idx_name + "_tid");
-    // Add in any breaks we need
+    auto idx_cond = _(idx_name + "_cond");
+
+    if (index.tile % thread != 0) {
+      // This only happens if tile == total, thread only break
+      index.checks.emplace_back(_LogicalOr(idx_lid < (max_loops - 1), idx_tid < (index.tile % thread)));
+    }
+
     if (edge != 0 && !skip_edge) {       // If we have an edge
       ssize_t low_edge = edge / thread;  // Lowest index we need to break on
       ssize_t high_edge = low_edge + 1;  // Highest index we need to break on
       ssize_t slop = edge % thread;      // Do we break evenly (same of all threads)
       if (slop != 0) {
         // Case for uneven thread break, add up to two breaks
-        b->push_back(_If((idx_lid >= low_edge) & (idx_gid == max_gid) & (idx_tid >= slop),
-                         continueClause(i, (max_loops - low_edge))));
+        index.checks.emplace_back(_LogicalOr(idx_lid < low_edge, _LogicalOr(idx_gid != max_gid, idx_tid < slop)));
         if (high_edge != max_loops) {
-          b->push_back(_If((idx_lid >= high_edge) & (idx_gid == max_gid), continueClause(i, (max_loops - high_edge))));
+          index.checks.emplace_back(_LogicalOr(idx_lid < high_edge, idx_gid != max_gid));
         }
       } else {
         // Even thread break
-        b->push_back(_If((idx_lid >= low_edge) & (idx_gid == max_gid), continueClause(i, (max_loops - low_edge))));
+        index.checks.emplace_back(_LogicalOr(idx_lid < low_edge, idx_gid != max_gid));
       }
     }
-    if (indexes[i].tile % thread != 0) {
-      // This only happens if tile == total, thread only break
-      b->push_back(_If((idx_lid >= (max_loops - 1)) & (idx_tid >= (indexes[i].tile % thread)), continueClause(i)));
+
+    if (!index.checks.empty()) {
+      idx_conds.push_back(idx_cond);
     }
-    // Now add inner code
-    b->append(_Declare({sem::Type::INDEX}, idx_name, thread * idx_lid + idx_tid));
-    b->append(cur);
-    // Step forward
-    b->append(increments(i));
+    index.idx_conds = idx_conds;
+  }
+
+  // Wrap with each outer
+  size_t element_count = 1;
+  for (int i = indexes.size() - 1; i >= 0; i--) {
+    ssize_t thread = indexes[i].thread;
+    ssize_t max_loops = RoundUp(indexes[i].tile, thread);  // Compute max loops
+    element_count *= max_loops;
+
+    // Make some variables
+    std::string idx_name = indexes[i].name;
+    auto idx_lid = _(idx_name + "_lid");
+    auto idx_tid = _(idx_name + "_tid");
+
+    // Potentially wrap the inner code with range checks
+    std::shared_ptr<sem::Block> next;
+    if (indexes[i].checks.empty()) {
+      // Now add inner code
+      auto block = _Block({});  // Interior of for loop
+      block->append(_Declare({sem::Type::INDEX}, idx_name, thread * idx_lid + idx_tid));
+      block->append(cur);
+      next = block;
+    } else {
+      bool is_first = true;
+      sem::ExprPtr check;
+      for (const auto& cond : indexes[i].checks) {
+        if (is_first) {
+          is_first = false;
+          check = cond;
+        } else {
+          check = _LogicalAnd(check, cond);
+        }
+      }
+
+      next = _Block({});
+      auto idx_cond = _(idx_name + "_cond");
+      next->append(_Declare({sem::Type::INDEX}, idx_name + "_cond", check));
+
+      // Now add inner code
+      auto block = _Block({});  // Interior of for loop
+      auto idx_init = thread * idx_lid + idx_tid;
+      if (element_count <= select_threshold) {
+        sem::ExprPtr accumulated_cond;
+        bool is_first_cond = true;
+        for (const auto& cond : indexes[i].idx_conds) {
+          if (is_first_cond) {
+            is_first_cond = false;
+            accumulated_cond = cond;
+          } else {
+            accumulated_cond = _LogicalAnd(accumulated_cond, cond);
+          }
+        }
+        // We use a negative sign here so that when the scalar condition
+        // gets converted to a vector condition, the MSB is set.
+        // Note: Use .get() here to ensure we don't accidentally get a sembuilder operator overload.
+        if (!inner_cond.get()) {
+          inner_cond = -(accumulated_cond);
+        }
+        auto select = _Select(accumulated_cond, idx_init, _Const(0));
+        block->append(_Declare({sem::Type::INDEX}, idx_name, select));
+        block->append(cur);
+        next->append(block);
+      } else {
+        block->append(_Declare({sem::Type::INDEX}, idx_name, idx_init));
+        block->append(cur);
+        next->append(_If(idx_cond, block));
+      }
+    }
+
     // Build outer block
     auto bo = _Block({});
-    bo->append(_For(idx_name + "_lid", max_loops, 1, b));
-    // Unwind the changes
-    bo->append(increments(i, -max_loops));
+    if (max_loops == 1) {
+      bo->append(_DeclareConst({sem::Type::INDEX}, idx_name + "_lid", 0));
+      bo->append(next);
+    } else {
+      bo->append(_For(idx_name + "_lid", max_loops, 1, next));
+    }
     cur = bo;
   }
   r->append(cur);
-  return r;
-}
-
-std::shared_ptr<sem::Block> CodeInfo::continueClause(int i, ssize_t mul) const {
-  using namespace sem::builder;  // NOLINT
-  auto r = increments(i, mul);
-  r->append(_Continue());
-  return r;
-}
-
-std::shared_ptr<sem::Block> CodeInfo::increments(int i, ssize_t mul) const {
-  using namespace sem::builder;  // NOLINT
-  auto r = _Block({});
-  if (mul == 0) {
-    return r;
-  }
-  for (size_t j = 0; j < refs.size(); j++) {
-    ssize_t hop = mul * indexes[i].thread * refs[j].strides[i];
-    auto v = _(refs[j].name);
-    if (hop != 0) {
-      r->append(v = v + hop);
-    }
-  }
   return r;
 }
 

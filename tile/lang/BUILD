@@ -51,6 +51,7 @@ plaidml_cc_library(
         "scope.h",
         "semprinter.cc",
         "semtree.cc",
+        "simplifier.cc",
         "sym_poly.cc",
         "sym_poly.h",
         "symbolic.cc",
@@ -75,6 +76,7 @@ plaidml_cc_library(
         "semprinter.h",
         "semtree.h",
         "shape.h",
+        "simplifier.h",
         "symbolic.h",
         "type.h",
     ],
@@ -94,8 +96,8 @@ plaidml_cc_library(
         ":math",
         ":proto_cc",
         "//base/util:util_cc",
-        "//external:boost",
         "//tile/lang/bilp",
+        "@boost_archive//:boost",
     ],
 )
 
@@ -134,7 +136,7 @@ plaidml_cc_library(
     visibility = ["//tile/lang/bilp:__pkg__"],
     deps = [
         "//base/util:util_cc",
-        "//external:boost",
+        "@boost_archive//:boost",
     ],
 )
 
@@ -152,12 +154,22 @@ plaidml_grammar(
 
 plaidml_cc_test(
     name = "gid_test",
-    srcs = [
-        "gid_test.cc",
-    ],
+    srcs = ["gid_test.cc"],
     deps = [
         ":lang",
         "//base/util:util_cc",
-        "//external:gtest",
     ],
+)
+
+plaidml_cc_test(
+    name = "simplifier_test",
+    srcs = ["simplifier_test.cc"],
+    deps = [":lang"],
+)
+
+plaidml_cc_test(
+    name = "gen_test",
+    srcs = ["gen_test.cc"],
+    tags = ["manual"],
+    deps = [":lang"],
 )

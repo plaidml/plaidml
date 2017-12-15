@@ -14,6 +14,7 @@ plaidml_cc_library(
     hdrs = [
         "any_factory.h",
         "any_factory_map.h",
+        "callback_map.h",
         "catch.h",
         "compat.h",
         "error.h",
@@ -32,9 +33,9 @@ plaidml_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//external:boost",
-        "//external:easylogging",
-        "//external:gflags",
-        "//external:jsoncpp",
+        "@boost_archive//:boost",
+        "@easylogging_repo//:easylogging",
+        "@gflags_repo//:gflags",
+        "@jsoncpp_git//:jsoncpp",
     ],
 )

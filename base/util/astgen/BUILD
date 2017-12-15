@@ -1,3 +1,4 @@
+load("@vertexai_plaidml_pip_deps//:requirements.bzl", "requirement")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_ast")
 
 py_binary(
@@ -5,6 +6,10 @@ py_binary(
     srcs = ["astgen.py"],
     data = ["base.template"],
     visibility = ["//visibility:public"],
+    deps = [
+        requirement("pystache"),
+        requirement("pyyaml"),
+    ],
 )
 
 plaidml_ast(

@@ -3,8 +3,8 @@
 load("//bzl:protobuf.bzl", "py_proto_library", "cc_proto_library")
 
 def with_plaidml():
-   native.bind(name="xcrunwrapper", actual="@bazel_tools//tools/objc:xcrunwrapper")
-   native.bind(name="protoc-gen-cc11", actual="//base/util/protoc-gen-cc11")
+    native.bind(name="xcrunwrapper", actual="@bazel_tools//tools/objc:xcrunwrapper")
+    native.bind(name="protoc-gen-cc11", actual="//base/util/protoc-gen-cc11")
 
 PLAIDML_COPTS = select({
     "//bzl:x64_windows": [
@@ -33,48 +33,50 @@ PLAIDML_BASE_LINKOPTS = select({
 })
 
 def plaidml_cc_library(copts=[], linkopts=[], **kwargs):
-  native.cc_library(
-    copts=PLAIDML_COPTS + copts,
-    linkopts=PLAIDML_BASE_LINKOPTS + linkopts,
-    **kwargs)
+    native.cc_library(
+        copts=PLAIDML_COPTS + copts,
+        linkopts=PLAIDML_BASE_LINKOPTS + linkopts,
+        **kwargs
+    )
 
 def plaidml_objc_library(copts=[], linkopts=[], **kwargs):
-  native.objc_library(copts=PLAIDML_COPTS + copts + ["-Wno-shorten-64-to-32"], **kwargs)
+    native.objc_library(
+        copts=PLAIDML_COPTS + copts + ["-Wno-shorten-64-to-32"],
+        **kwargs
+    )
 
 def plaidml_cc_binary(copts=[], **kwargs):
-  native.cc_binary(copts=PLAIDML_COPTS + copts, **kwargs)
+    native.cc_binary(
+        copts=PLAIDML_COPTS + copts,
+        **kwargs
+    )
 
 def plaidml_cc_test(copts=[], deps=[], linkopts=[], **kwargs):
-  native.cc_test(
-    copts=copts + PLAIDML_COPTS,
-    deps=deps + ["//testing:gtest_main"],
-    linkopts=PLAIDML_BASE_LINKOPTS + linkopts,
-    **kwargs)
+    native.cc_test(
+        copts=copts + PLAIDML_COPTS,
+        deps=deps + ["@vertexai_plaidml//testing:gtest_main"],
+        linkopts=PLAIDML_BASE_LINKOPTS + linkopts,
+        **kwargs
+    )
 
 def plaidml_py_library(**kwargs):
   native.py_library(srcs_version=PY_SRCS_VER, **kwargs)
 
 def plaidml_py_init(name, **kwargs):
-  pyinit_name = name + "_init_py"
+    pyinit_name = name + "_init_py"
 
-  native.genrule(
-    name = pyinit_name,
-    visibility = ["//visibility:private"],
-    outs = ["__init__.py"],
-    cmd = "touch $(location __init__.py)"
-  )
+    native.genrule(
+        name = pyinit_name,
+        visibility = ["//visibility:private"],
+        outs = ["__init__.py"],
+        cmd = "touch $(location __init__.py)"
+    )
 
-  plaidml_py_library(
-    name = name,
-    srcs = [":" + pyinit_name],
-    **kwargs
-  )
-
-def plaidml_py_test(**kwargs):
-  native.py_test(srcs_version=PY_SRCS_VER, **kwargs)
-
-def plaidml_py_binary(**kwargs):
-  native.py_binary(srcs_version=PY_SRCS_VER, **kwargs)
+    plaidml_py_library(
+        name = name,
+        srcs = [":" + pyinit_name],
+        **kwargs
+    )
 
 def plaidml_proto_library(name, srcs=[], has_services=False, deps=(), visibility=(),
                        testonly=0, cc_libs=[], **kwargs):
@@ -124,32 +126,32 @@ def plaidml_cc_proto_library(name, srcs=[], has_services=False,
                      **kwargs)
 
 def plaidml_ast(name, ast, output, template = "base", visibility = None):
-  native.genrule(
-    name = name,
-    outs = [output],
-    srcs = [ast],
-    tools = ["//base/util/astgen:astgen"],
-    cmd = '$(location //base/util/astgen) -i $(SRCS) -t ' + template + ' -o $(OUTS)',
-  )
+    native.genrule(
+        name = name,
+        outs = [output],
+        srcs = [ast],
+        tools = ["@vertexai_plaidml//base/util/astgen"],
+        cmd = '$(location @vertexai_plaidml//base/util/astgen) -i $(SRCS) -t ' + template + ' -o $(OUTS)',
+    )
 
 def plaidml_grammar(name, bison_src, flex_src, outs, visibility = None):
-  native.genrule(
-    name = name,
-    outs = outs,
-    srcs = [bison_src, flex_src],
-    visibility = visibility,
-    # The following is known to work when building ios;
-    # we need to unify the ios and non-ios verions here:
-    # cmd = 'ssrcs=($(SRCS)); /usr/local/opt/bison/bin/bison $${ssrcs[0]} ; /usr/local/opt/flex/bin/flex $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
-    cmd = select({
-      "//bzl:darwin":
-         'ssrcs=($(SRCS)); /usr/local/opt/bison/bin/bison --verbose $${ssrcs[0]} ; /usr/local/opt/flex/bin/flex $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
-      "//bzl:x64_windows":
-         'ssrcs=($(SRCS)); bison --verbose $${ssrcs[0]} ; flex --nounistd $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
-      "//conditions:default":
-         'ssrcs=($(SRCS)); bison --verbose $${ssrcs[0]} ; flex $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
-    }),
-  )
+    native.genrule(
+        name = name,
+        outs = outs,
+        srcs = [bison_src, flex_src],
+        visibility = visibility,
+        # The following is known to work when building ios;
+        # we need to unify the ios and non-ios verions here:
+        # cmd = 'ssrcs=($(SRCS)); /usr/local/opt/bison/bin/bison $${ssrcs[0]} ; /usr/local/opt/flex/bin/flex $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
+        cmd = select({
+        "//bzl:darwin":
+            'ssrcs=($(SRCS)); /usr/local/opt/bison/bin/bison --verbose $${ssrcs[0]} ; /usr/local/opt/flex/bin/flex $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
+        "//bzl:x64_windows":
+            'ssrcs=($(SRCS)); bison --verbose $${ssrcs[0]} ; flex --nounistd $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
+        "//conditions:default":
+            'ssrcs=($(SRCS)); bison --verbose $${ssrcs[0]} ; flex $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
+        }),
+    )
 
 load(
     "@bazel_tools//tools/build_defs/apple:shared.bzl",
@@ -474,7 +476,7 @@ plaidml_py_wheel = rule(
         "platform": attr.string(default = "any"),
         "console_scripts": attr.string_list(),
         "_setup_py_tpl": attr.label(
-            default = Label("//bzl:setup.tpl.py"),
+            default = Label("@vertexai_plaidml//bzl:setup.tpl.py"),
             allow_single_file = True,
         ),
     },
@@ -483,7 +485,7 @@ plaidml_py_wheel = rule(
 
 def _plaidml_version_impl(ctx):
   ctx.actions.expand_template(
-    template=ctx.file._version_cc_tpl,
+    template=ctx.file._template,
     output=ctx.outputs.version_file,
     substitutions={
       "{PREFIX}": ctx.attr.prefix,
@@ -493,8 +495,8 @@ def _plaidml_version_impl(ctx):
 plaidml_cc_version = rule(
     attrs = {
         "prefix": attr.string(mandatory = True),
-        "_version_cc_tpl": attr.label(
-            default = Label("//bzl:version.cc.tpl"),
+        "_template": attr.label(
+            default = Label("@vertexai_plaidml//bzl:version.tpl.cc"),
             allow_files = True,
             single_file = True,
         ),
@@ -503,3 +505,110 @@ plaidml_cc_version = rule(
     outputs = {"version_file": "_version.cc"},
     implementation = _plaidml_version_impl,
 )
+
+def _fresh_http_archive_impl(ctx):
+    ctx.download_and_extract(ctx.attr.url, sha256=ctx.attr.sha256, stripPrefix=ctx.attr.strip_prefix)
+    args = [
+        "python",
+        ctx.path(ctx.attr._script),
+    ]
+    result = ctx.execute(args)
+    if result.return_code:
+        fail("clean.py failed: %s (%s)" % (result.stdout, result.stderr))
+    ctx.symlink(ctx.path(ctx.attr.build_file), "BUILD")
+
+fresh_http_archive = repository_rule(
+    attrs = {
+        "url": attr.string(mandatory = True),
+        "sha256": attr.string(),
+        "strip_prefix": attr.string(),
+        "build_file": attr.label(
+            allow_files = True,
+            mandatory = True,
+            single_file = True,
+        ),
+        "_script": attr.label(
+            executable = True,
+            default = Label("@vertexai_plaidml//bzl:clean.py"),
+            cfg = "host",
+        ),
+    },
+    implementation = _fresh_http_archive_impl,
+)
+
+def _venv_wrapper_impl(ctx):
+    main = ctx.expand_location("$(location {})".format(ctx.attr.main.label), [ctx.attr.main])
+    requirements = ctx.expand_location("$(location {})".format(ctx.attr.requirements.label), [ctx.attr.requirements])
+    venv_args = str(ctx.attr.venv_args)
+    ctx.actions.expand_template(
+        template=ctx.file._template,
+        output=ctx.outputs.executable,
+        substitutions={
+            "__BZL_MAIN__": main,
+            "__BZL_REQUIREMENTS__": requirements,
+            "__BZL_VENV_ARGS__": venv_args,
+        }
+    )
+
+venv_wrapper = rule(
+    attrs = {
+        "main": attr.label(
+            allow_files = True,
+            mandatory = True,
+            single_file = True,
+        ),
+        "requirements": attr.label(
+            allow_files = True,
+            mandatory = True,
+            single_file = True,
+        ),
+        "venv_args": attr.string_list(
+            default = [],
+        ),
+        "_template": attr.label(
+            default = Label("@vertexai_plaidml//bzl:venv.tpl.py"),
+            allow_files = True,
+            single_file = True,
+        ),
+    },
+    executable = True,
+    implementation = _venv_wrapper_impl,
+)
+
+def plaidml_py_binary(name, main=None, srcs=[], requirements="requirements.txt", data=[], venv_args=[], **kwargs):
+    if main == None:
+        main = name + ".py"
+    venv = name + "__venv__.py"
+    venv_wrapper(
+        name=venv,
+        main=main,
+        requirements=requirements,
+        venv_args=venv_args,
+    )
+    native.py_binary(
+        name=name,
+        main=venv,
+        srcs=srcs + [venv],
+        srcs_version=PY_SRCS_VER,
+        data=data + [requirements],
+        **kwargs
+    )
+
+def plaidml_py_test(name, main=None, srcs=[], requirements="requirements.txt", data=[], venv_args=[], **kwargs):
+    if main == None:
+        main = name + ".py"
+    venv = name + "__venv__.py"
+    venv_wrapper(
+        name=venv,
+        main=main,
+        requirements=requirements,
+        venv_args=venv_args,
+    )
+    native.py_test(
+        name=name,
+        main=venv,
+        srcs=srcs + [venv],
+        srcs_version=PY_SRCS_VER,
+        data=data + [requirements],
+        **kwargs
+    )
