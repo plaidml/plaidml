@@ -412,9 +412,16 @@ void Simplify(const std::vector<KernelInfo>& kernels) {
       VLOG(4) << ki.comments;
       VLOG(4) << emit_debug.str();
     }
-    lang::Scope<sem::Symbol> scope;
-    sem::Simplifier simplifier{&scope};
-    ki.kfunc->Accept(simplifier);
+    {
+      lang::Scope<sem::Symbol> scope;
+      sem::Simplifier simplifier{&scope};
+      ki.kfunc->Accept(simplifier);
+    }
+    for (auto& candidate : ki.candidates) {
+      lang::Scope<sem::Symbol> scope;
+      sem::Simplifier simplifier{&scope};
+      candidate.kfunc->Accept(simplifier);
+    }
   }
 }
 

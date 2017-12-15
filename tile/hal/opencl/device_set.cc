@@ -2,9 +2,10 @@
 
 #include "tile/hal/opencl/device_set.h"
 
-#include <boost/regex.hpp>
 #include <string>
 #include <utility>
+
+#include <boost/regex.hpp>
 
 #include "base/util/compat.h"
 #include "base/util/error.h"
@@ -185,6 +186,7 @@ proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx, const prot
       break;
   }
   info.set_local_mem_size(CLInfo<CL_DEVICE_LOCAL_MEM_SIZE>(did));
+  info.set_host_unified_memory(CLInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>(did));
   info.set_error_correction_support(CLInfo<CL_DEVICE_ERROR_CORRECTION_SUPPORT>(did));
   info.set_profiling_timer_resolution_ns(CLInfo<CL_DEVICE_PROFILING_TIMER_RESOLUTION>(did));
   info.set_endian_little(CLInfo<CL_DEVICE_ENDIAN_LITTLE>(did));

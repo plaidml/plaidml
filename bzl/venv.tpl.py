@@ -62,6 +62,15 @@ class VirtualEnv(object):
                 else:
                     vpython = ['-p', 'python2']
                 check_call(['virtualenv'] + vpython + VENV_ARGS + [self._path])
+                if platform.system() == 'Darwin':
+                    check_call([
+                        self.python, self._pip, 'install',
+                        'git+https://github.com/gldnspud/virtualenv-pythonw-osx.git'
+                    ])
+                    check_call([
+                        self.python,
+                        os.path.join(self._venv_bin, 'fix-osx-virtualenv'), self._path
+                    ])
                 for requirement in self._requirements:
                     check_call(
                         [self._pip, 'install', '-r',
