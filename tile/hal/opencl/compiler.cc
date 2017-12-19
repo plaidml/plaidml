@@ -199,7 +199,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     if (ki.ktype == lang::KernelType::kZero) {
       kinfo.set_src("// Builtin zero kernel");
     } else {
-      OptimizeKernel(ki, cl_khr_fp16);
+      OptimizeKernel(ki, cl_khr_fp16, settings);
 
       Emit ocl{cl_khr_fp16, cl_khr_fp64};
       ocl.Visit(*ki.kfunc);
