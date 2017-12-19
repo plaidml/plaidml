@@ -195,50 +195,74 @@ class Simplifier : public Visitor {
     } else if (node.op == "&&") {
       if (lhs_int_const && rhs_int_const) {
         new_expr_ = std::make_shared<IntConst>(lhs_int_const->value && rhs_int_const->value);
-      } else {
-        if (CheckIntConstValue(lhs_int_const, 1)) {
-          // Check for (1 && R), return (R)
-          new_expr_ = node.rhs;
-        } else if (CheckIntConstValue(lhs_int_const, 0)) {
+      } else if (lhs_int_const) {
+        if (lhs_int_const->value == 0) {
           // Check for (0 && R), return (0)
           new_expr_ = node.lhs;
-        } else if (CheckIntConstValue(rhs_int_const, 1)) {
-          // Check for (L && 1), return (L)
-          new_expr_ = node.lhs;
-        } else if (CheckIntConstValue(rhs_int_const, 0)) {
+        } else {
+          // Check for (!0 && R), return (R)
+          new_expr_ = node.rhs;
+        }
+      } else if (rhs_int_const) {
+        if (rhs_int_const->value == 0) {
           // Check for (L && 0), return (0)
           new_expr_ = node.rhs;
+        } else {
+          // Check for (L && !0), return (L)
+          new_expr_ = node.lhs;
         }
       }
     } else if (node.op == "||") {
       if (lhs_int_const && rhs_int_const) {
         new_expr_ = std::make_shared<IntConst>(lhs_int_const->value && rhs_int_const->value);
-      } else {
-        if (CheckIntConstValue(lhs_int_const, 1)) {
-          // Check for (1 || R), return (1)
-          new_expr_ = node.lhs;
-        } else if (CheckIntConstValue(lhs_int_const, 0)) {
+      } else if (lhs_int_const) {
+        if (lhs_int_const->value == 0) {
           // Check for (0 || R), return (R)
           new_expr_ = node.rhs;
-        } else if (CheckIntConstValue(rhs_int_const, 1)) {
-          // Check for (L || 1), return (1)
-          new_expr_ = node.rhs;
-        } else if (CheckIntConstValue(rhs_int_const, 0)) {
+        } else {
+          // Check for (!0 || R), return (L)
+          new_expr_ = node.lhs;
+        }
+      } else if (rhs_int_const) {
+        if (rhs_int_const->value == 0) {
           // Check for (L || 0), return (L)
           new_expr_ = node.lhs;
+        } else {
+          // Check for (L || !0), return (R)
+          new_expr_ = node.rhs;
         }
       }
     }
   }
 
   void Visit(const CondExpr& node) override {
-    const_cast<CondExpr&>(node).cond = EvalExpr(node.cond);
+    auto cond = EvalExpr(node.cond);
+    auto int_const = std::dynamic_pointer_cast<IntConst>(cond);
+    if (int_const) {
+      if (int_const->value == 0) {
+        new_expr_ = EvalExpr(node.fcase);
+      } else {
+        new_expr_ = EvalExpr(node.tcase);
+      }
+      return;
+    }
+    const_cast<CondExpr&>(node).cond = cond;
     const_cast<CondExpr&>(node).tcase = EvalExpr(node.tcase);
     const_cast<CondExpr&>(node).fcase = EvalExpr(node.fcase);
   }
 
   void Visit(const SelectExpr& node) override {
-    const_cast<SelectExpr&>(node).cond = EvalExpr(node.cond);
+    auto cond = EvalExpr(node.cond);
+    auto int_const = std::dynamic_pointer_cast<IntConst>(cond);
+    if (int_const) {
+      if (int_const->value == 0) {
+        new_expr_ = EvalExpr(node.fcase);
+      } else {
+        new_expr_ = EvalExpr(node.tcase);
+      }
+      return;
+    }
+    const_cast<SelectExpr&>(node).cond = cond;
     const_cast<SelectExpr&>(node).tcase = EvalExpr(node.tcase);
     const_cast<SelectExpr&>(node).fcase = EvalExpr(node.fcase);
   }

@@ -17,24 +17,33 @@ namespace builder {
 class LValueHolder {
  public:
   explicit LValueHolder(LValPtr v) : v_(v) {}
+
   operator ExprPtr() const { return std::make_shared<LoadExpr>(v_); }
+
   std::shared_ptr<StoreStmt> operator=(const LValueHolder& rhs) const {
     return std::make_shared<StoreStmt>(v_, std::make_shared<LoadExpr>(rhs.v_));
   }
+
   std::shared_ptr<StoreStmt> operator=(int x) const {
     return std::make_shared<StoreStmt>(v_, std::make_shared<IntConst>(x));
   }
+
   std::shared_ptr<StoreStmt> operator=(ExprPtr rhs) const { return std::make_shared<StoreStmt>(v_, rhs); }
+
   LValueHolder operator[](ExprPtr offset) const { return LValueHolder(std::make_shared<SubscriptLVal>(v_, offset)); }
+
   ExprPtr operator()(ExprPtr val) const {
     return std::make_shared<CallExpr>(std::make_shared<LoadExpr>(v_), std::vector<ExprPtr>{val});
   }
+
   ExprPtr operator()(ExprPtr v1, ExprPtr v2) const {
     return std::make_shared<CallExpr>(std::make_shared<LoadExpr>(v_), std::vector<ExprPtr>{v1, v2});
   }
+
   ExprPtr operator()(ExprPtr v1, ExprPtr v2, ExprPtr v3) const {
     return std::make_shared<CallExpr>(std::make_shared<LoadExpr>(v_), std::vector<ExprPtr>{v1, v2, v3});
   }
+
   ExprPtr operator()(int val) const {
     return std::make_shared<CallExpr>(std::make_shared<LoadExpr>(v_),
                                       std::vector<ExprPtr>({std::make_shared<IntConst>(val)}));
@@ -61,6 +70,7 @@ inline std::shared_ptr<Block> _Block(std::initializer_list<StmtPtr> inner) {
 inline std::shared_ptr<IfStmt> _If(ExprPtr cond, StmtPtr iftrue) {
   return std::make_shared<IfStmt>(cond, iftrue, StmtPtr());
 }
+
 inline std::shared_ptr<IfStmt> _If(ExprPtr cond, StmtPtr iftrue, StmtPtr iffalse) {
   return std::make_shared<IfStmt>(cond, iftrue, iffalse);
 }
@@ -74,6 +84,7 @@ inline std::shared_ptr<ForStmt> _For(const std::string& var, uint64_t n, uint64_
 }
 
 inline std::shared_ptr<BarrierStmt> _Barrier() { return std::make_shared<BarrierStmt>(); }
+
 inline std::shared_ptr<ReturnStmt> _Return(ExprPtr value = ExprPtr()) { return std::make_shared<ReturnStmt>(value); }
 
 inline std::shared_ptr<Function> _Function(const std::string& name, const Type& ret,
@@ -87,14 +98,23 @@ template <typename T>
 inline std::shared_ptr<IntConst> _Const(T x) {
   return std::make_shared<IntConst>(x);
 }
+
 inline std::shared_ptr<FloatConst> _Const(double x) { return std::make_shared<FloatConst>(x); }
+
 inline std::shared_ptr<DeclareStmt> _Declare(const Type& type, const std::string& name, ExprPtr init) {
   return std::make_shared<DeclareStmt>(type, name, init);
 }
+
+inline LValueHolder _Declare(std::shared_ptr<Block> block, const Type& type, const std::string& name, ExprPtr init) {
+  block->append(_Declare(type, name, init));
+  return _(name);
+}
+
 template <typename T>
 inline std::shared_ptr<DeclareStmt> _DeclareConst(const Type& type, const std::string& name, T init) {
   return _Declare(type, name, _Const(init));
 }
+
 inline std::shared_ptr<CastExpr> _Cast(const Type& type, ExprPtr init) {
   return std::make_shared<CastExpr>(type, init);
 }
@@ -102,9 +122,11 @@ inline std::shared_ptr<CastExpr> _Cast(const Type& type, ExprPtr init) {
 inline std::shared_ptr<CondExpr> _Cond(ExprPtr cond, ExprPtr tcase, ExprPtr fcase) {
   return std::make_shared<CondExpr>(cond, tcase, fcase);
 }
+
 inline std::shared_ptr<SelectExpr> _Select(ExprPtr cond, ExprPtr tcase, ExprPtr fcase) {
   return std::make_shared<SelectExpr>(cond, tcase, fcase);
 }
+
 inline std::shared_ptr<ClampExpr> _Clamp(ExprPtr val, ExprPtr min, ExprPtr max) {
   return std::make_shared<ClampExpr>(val, min, max);
 }
@@ -112,8 +134,37 @@ inline std::shared_ptr<ClampExpr> _Clamp(ExprPtr val, ExprPtr min, ExprPtr max) 
 inline std::shared_ptr<BinaryExpr> _LogicalAnd(ExprPtr lhs, ExprPtr rhs) {
   return std::make_shared<BinaryExpr>("&&", lhs, rhs);
 }
+
 inline std::shared_ptr<BinaryExpr> _LogicalOr(ExprPtr lhs, ExprPtr rhs) {
   return std::make_shared<BinaryExpr>("||", lhs, rhs);
+}
+
+inline ExprPtr _MaybeSelect(ExprPtr cond, ExprPtr tcase, ExprPtr fcase) {
+  if (cond) {
+    return _Select(cond, tcase, fcase);
+  }
+  return tcase;
+}
+
+inline ExprPtr _MaybeCond(ExprPtr cond, ExprPtr tcase, ExprPtr fcase) {
+  if (cond) {
+    return _Cond(cond, tcase, fcase);
+  }
+  return tcase;
+}
+
+inline ExprPtr _MaybeLogicalAnd(ExprPtr lhs, ExprPtr rhs) {
+  if (lhs.get() && rhs.get()) {
+    return _LogicalAnd(lhs, rhs);
+  }
+  return lhs.get() ? lhs : rhs;
+}
+
+inline ExprPtr _MaybeLogicalOr(ExprPtr lhs, ExprPtr rhs) {
+  if (lhs.get() && rhs.get()) {
+    return _LogicalOr(lhs, rhs);
+  }
+  return lhs.get() ? lhs : rhs;
 }
 
 }  // namespace builder

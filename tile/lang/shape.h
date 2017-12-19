@@ -28,6 +28,18 @@ enum class DataType : int {
   PRNG = 0x40,
 };
 
+inline bool is_int(const DataType& dt) {
+  switch (dt) {
+    case DataType::INT8:
+    case DataType::INT16:
+    case DataType::INT32:
+    case DataType::INT64:
+      return true;
+    default:
+      return false;
+  }
+}
+
 inline bool is_float(const DataType& dt) {
   switch (dt) {
     case DataType::FLOAT16:

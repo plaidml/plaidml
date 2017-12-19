@@ -317,15 +317,14 @@ sem::Type Emit::TypeOf(const sem::LValPtr& lvalue) { return ExprType::TypeOf(sco
 
 void Emit::EmitWithTypeConversion(const sem::Type& from, const sem::Type& to, const sem::ExprPtr& expr,
                                   bool force_conversion) {
-  if (to.base == sem::Type::POINTER_MUT || to.base == sem::Type::POINTER_CONST ||
-      (!force_conversion &&
-       ((from.vec_width == 1 && from.base == sem::Type::VALUE &&
-         (from.dtype == lang::DataType::INT32 || from.dtype == lang::DataType::INT16 ||
-          from.dtype == lang::DataType::INT8) &&
-         (to.base == sem::Type::INDEX ||
-          (to.base == sem::Type::VALUE && (to.dtype == lang::DataType::INT32 || to.dtype == lang::DataType::INT16 ||
-                                           to.dtype == lang::DataType::INT8)))) ||
-        (from.base == to.base && from.dtype == to.dtype && from.vec_width == to.vec_width)))) {
+  if (to.base == sem::Type::POINTER_MUT || to.base == sem::Type::POINTER_CONST) {
+    // No conversion required for pointer types.
+    expr->Accept(*this);
+    return;
+  }
+  if (!force_conversion && ((from.vec_width == 1 && from.base == sem::Type::VALUE && is_int(from.dtype) &&
+                             (to.base == sem::Type::INDEX || (to.base == sem::Type::VALUE && is_int(to.dtype)))) ||
+                            (from.base == to.base && from.dtype == to.dtype && from.vec_width == to.vec_width))) {
     // No conversion required.
     expr->Accept(*this);
     return;
@@ -379,8 +378,16 @@ void Emit::EmitWithWidthConversion(const sem::Type& from, const sem::Type& to, c
       break;
   }
 
-  // Let the regular emit logic handle the rest of the work.
   EmitWithTypeConversion(from, condition_type, expr, force_conversion);
+  if (from.vec_width != to.vec_width) {
+    // We need to convert a scalar into a vector.
+    // See the OpenCL 1.2 spec (pg 219, Section 6.3: Operators, e.)
+    emit(" != ");
+    emit("(");
+    EmitC::emitType(condition_type);
+    emit(")");
+    emit("0");
+  }
 }
 
 void Emit::emitType(const sem::Type& t) {
