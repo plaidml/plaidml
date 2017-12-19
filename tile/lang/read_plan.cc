@@ -200,7 +200,7 @@ sem::StmtPtr ReadPlan::generate(const std::string& to, const std::string& from, 
     gbase = gbase + (_(oi.name + "_gid") * oi.stride);
   }
   b->append(_Declare({sem::Type::INDEX}, "gbase", gbase));
-  b->append(loop.generate(threads, 1, false, true, false));
+  b->append(loop.generate(threads, 1, false, 0));
   return b;
 }
 

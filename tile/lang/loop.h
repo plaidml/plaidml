@@ -28,7 +28,7 @@ struct LoopInfo {
   sem::ExprPtr inner_cond;
 
   void thread(uint64_t numThreads);
-  sem::StmtPtr generate(uint64_t numThreads, uint64_t div, bool skip_edge, bool order, size_t select_threshold);
+  sem::StmtPtr generate(uint64_t numThreads, uint64_t div, bool skip_edge, size_t select_threshold);
 };
 
 }  // namespace lang

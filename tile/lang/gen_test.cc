@@ -35,7 +35,7 @@ void RunTest(const TestParam& param) {
   lang::EmitDebug expected;
   expected.Visit(*param.expected);
 
-  EXPECT_EQ(actual.str(), expected.str());
+  EXPECT_EQ(expected.str(), actual.str());
 }
 
 HardwareSettings TestGPU() {

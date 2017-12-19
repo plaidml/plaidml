@@ -52,37 +52,25 @@ static sem::ExprPtr combine(const CombinationOp& co, sem::ExprPtr rhs, sem::Expr
   return e;
 }
 
-static sem::ExprPtr combine_cond(sem::ExprPtr rhs, sem::ExprPtr lhs, sem::ExprPtr val) {
+static sem::ExprPtr aggregate(const AggregationOp& op, sem::ExprPtr lhs, sem::ExprPtr rhs) {
   using namespace sem::builder;  // NOLINT
-  return _Cond(rhs == lhs, val, _Const(0));
-}
-
-static sem::StmtPtr aggregate(const AggregationOp& ag, const sem::builder::LValueHolder& lhs, sem::ExprPtr rhs) {
-  using namespace sem::builder;  // NOLINT
-  sem::StmtPtr r;
-  switch (ag) {
+  switch (op) {
     case AggregationOp::SUM:
-      r = (lhs = lhs + rhs);
-      break;
+      return (lhs + rhs);
     case AggregationOp::MAX:
-      r = (lhs = _Cond(rhs > lhs, rhs, lhs));
-      break;
+      return (_Cond(rhs > lhs, rhs, lhs));
     case AggregationOp::MIN:
-      r = (lhs = _Cond(rhs < lhs, rhs, lhs));
-      break;
+      return (_Cond(rhs < lhs, rhs, lhs));
     case AggregationOp::PROD:
-      r = (lhs = lhs * rhs);
-      break;
+      return (lhs * rhs);
     case AggregationOp::ASSIGN:
-      r = (lhs = rhs);
-      break;
+      return rhs;
     default:
       std::string msg("Invalid Aggregation op '");
-      msg += static_cast<char>(ag);
+      msg += static_cast<char>(op);
       msg += "'";
       throw std::runtime_error(msg);
   }
-  return r;
 }
 
 KernelInfo GenContract(const string& kname, const DirectSettings& settings, const FlatContraction& op,
@@ -183,8 +171,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       kblock->append(var = var + op.access[i].offset);
     }
   }
-  kblock->append(_Declare({sem::Type::INDEX}, "tid", _Index(sem::IndexExpr::LOCAL, 0)));
-  auto tid = _("tid");
+  auto tid = _Declare(kblock, {sem::Type::INDEX}, "tid", _Index(sem::IndexExpr::LOCAL, 0));
   auto agg = _("agg");
 
   if (op.generate_contraction) {
@@ -269,9 +256,8 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       rthreads /= thread;
     }
 
-    // Make if condition for any constraints
-    sem::ExprPtr cond = _Const(-1);
-    bool cond_is_always_true = true;
+    // Make condition for any constraints
+    sem::ExprPtr agg_cond = _Const(1);
     for (const FlatConstraint& fc : op.constraints) {
       sem::ExprPtr sum = _Const(0);
       for (size_t i = 0; i < sz; i++) {
@@ -279,12 +265,11 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
           sum = sum + fc.lhs[i] * (_(op.names[i] + "_gid") + _(op.names[i]));
         }
       }
-      cond = _LogicalAnd(cond, sum <= fc.rhs);
-      cond_is_always_true = false;
+      agg_cond = _LogicalAnd(agg_cond, sum <= fc.rhs);
     }
 
     // Compute input indexes and get input values
-    auto inner_block = _Block({});
+    auto fast_inner_block = _Block({});
     auto slow_inner_block = _Block({});
 
     for (size_t i = 1; i < op.access.size(); i++) {
@@ -308,100 +293,85 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       }
       if (op.comb_op == CombinationOp::EQ) {
         sem::Type itype = {sem::Type::VALUE, op.access[i].type, op.access[i].vector};
-        inner_block->append(_Declare(itype, "val" + num, input));
+        fast_inner_block->append(_Declare(itype, "val" + num, input));
       } else {
-        inner_block->append(_Declare(type, "val" + num, _Cast(type, input)));
+        fast_inner_block->append(_Declare(type, "val" + num, _Cast(type, input)));
       }
     }
 
-    // If the aggregate type is a vector, OpenCL requires that we expand the
-    // condition to match its width.
-    sem::Type condType = {type.base, type.dtype, type.vec_width};
-
-    // OpenCL requires that the condition expression type must be an integer with
-    // the same width as the true and false values.
-    switch (bit_width(type.dtype)) {
-      case 8:
-        condType.dtype = lang::DataType::INT8;
-        break;
-      case 16:
-        condType.dtype = lang::DataType::INT16;
-        break;
-      case 32:
-        condType.dtype = lang::DataType::INT32;
-        break;
-      case 64:
-        condType.dtype = lang::DataType::INT64;
-        break;
-      default:
-        break;
-    }
-
     // Combine (if needed)
-    sem::ExprPtr pre_agg_init;
+    sem::ExprPtr pre_agg;
     if (op.access.size() == 2) {
-      pre_agg_init = _("val1");
+      pre_agg = _("val1");
     } else if (op.access.size() == 3) {
-      pre_agg_init = _Cast(type, combine(op.comb_op, _("val1"), _("val2")));
+      pre_agg = _Cast(type, combine(op.comb_op, _("val1"), _("val2")));
     } else {
       if (op.comb_op != CombinationOp::COND) {
         throw std::runtime_error("Invalid three input combination op");
       }
-      pre_agg_init = _Cast(type, combine_cond(_("val1"), _("val2"), _("val3")));
+      pre_agg = _Cast(type, _Cond(_("val1") == _("val2"), _("val3"), _Const(0)));
     }
-    auto pre_agg_decl = _Declare(type, "pre_agg", pre_agg_init);
-    inner_block->append(pre_agg_decl);
-    auto pre_agg = _("pre_agg");
-    inner_block->append(_Declare({sem::Type::INDEX}, "agg_idx", out_plan.regIndex()));
-    auto agg_idx = _("agg_idx");
-
     // Aggregate
+    auto agg_idx = _Declare(fast_inner_block, {sem::Type::INDEX}, "agg_idx", out_plan.regIndex());
+    auto agg_rhs = _Declare(fast_inner_block, type, "agg_rhs", aggregate(op.agg_op, agg[agg_idx], pre_agg));
+
+    // Make two versions of the guard.
+    // The fast guard is simply a placeholder for later uneven break checks.
+    // The simplifier should elide this if no uneven break checks are needed.
+    auto fast_guard = _Cond(_Const(1), agg_rhs, agg[agg_idx]);
+    // The slow guard always includes constraint checks.
+    // Uneven break checks can be combined with this later on.
+    auto slow_guard = _Cond(agg_cond, agg_rhs, agg[agg_idx]);
+
     // Make slow and non-slow version
     if (settings.use_global) {
-      inner_block->append(aggregate(op.agg_op, agg[agg_idx], pre_agg));
-      slow_inner_block->append(_If(cond, inner_block));
+      fast_inner_block->append(agg[agg_idx] = fast_guard);
+      slow_inner_block->append(_If(agg_cond, fast_inner_block));
+    } else if (!agg_cond.get()) {
+      fast_inner_block->append(agg[agg_idx] = fast_guard);
     } else {
-      sem::ExprPtr guarded_pre_agg = nullptr;
-      if (cond_is_always_true) {
-        guarded_pre_agg = _Cast(type, pre_agg);
-      } else {
-        guarded_pre_agg = _Select(_Cast(condType, cond), _Cast(type, pre_agg), _Cast(type, agg_base));
-      }
-      slow_inner_block->append(inner_block);
-      slow_inner_block->append(_Declare(type, "guarded_pre_agg", guarded_pre_agg));
-      inner_block->append(aggregate(op.agg_op, agg[agg_idx], pre_agg));
-      slow_inner_block->append(aggregate(op.agg_op, agg[agg_idx], _("guarded_pre_agg")));
+      // The following will actually make a copy of inner_block, allowing the two paths to diverge.
+      slow_inner_block->append(fast_inner_block);
+      // Now that we've made a copy, the fast path can now be modified without the slow path also being modified.
+      fast_inner_block->append(agg[agg_idx] = fast_guard);
+      slow_inner_block->append(agg[agg_idx] = slow_guard);
     }
 
     // Copy loops to allow two generations (slow + fast)
-    auto dup_main_loop_inner = main_loop_inner;
-    auto dup_main_loop_outer = main_loop_outer;
+    auto slow_main_loop_inner = main_loop_inner;
+    auto slow_main_loop_outer = main_loop_outer;
 
     auto select_threshold = settings.use_global ? 0 : SELECT_THRESHOLD;
 
     // Add all the loops into their place
-    main_loop_inner.inner = inner_block;
+    main_loop_inner.inner = fast_inner_block;
     // Generate 'output' loops on the inside, skip edge handling
-    main_loop_outer.inner = main_loop_inner.generate(out_threads, 1, true, false, select_threshold);
+    main_loop_outer.inner = main_loop_inner.generate(out_threads, 1, true, select_threshold);
     if (main_loop_inner.inner_cond) {
-      // If LoopInfo has determined that we should replace range checks with a select,
-      // then wrap the pre_agg in a select, using the agg_base for the false case.
-      pre_agg_decl->init = _Select(main_loop_inner.inner_cond, pre_agg_decl->init, agg_base);
+      // If LoopInfo has determined that we should replace uneven break checks with a select,
+      // then inject the condition into the placeholder.
+      fast_guard->cond = main_loop_inner.inner_cond;
     }
     // Generate input loops on the outside, account for out threads
-    auto looped_inner = main_loop_outer.generate(threads, out_threads, false, true, 0);
+    auto looped_inner = main_loop_outer.generate(threads, out_threads, false, 0);
 
     // Now do the same for the 'slow' case
-    dup_main_loop_inner.inner = slow_inner_block;
-    dup_main_loop_outer.inner = dup_main_loop_inner.generate(out_threads, 1, true, false, select_threshold);
-    auto slow_looped_inner = dup_main_loop_outer.generate(threads, out_threads, false, true, 0);
+    slow_main_loop_inner.inner = slow_inner_block;
+    slow_main_loop_outer.inner = slow_main_loop_inner.generate(out_threads, 1, true, select_threshold);
+    if (slow_main_loop_inner.inner_cond) {
+      // If LoopInfo has determined that we should replace uneven break checks with a select,
+      // then extend the existing checks to include uneven breaks.
+      slow_guard->cond = _LogicalAnd(slow_main_loop_inner.inner_cond, slow_guard->cond);
+    }
+
+    auto slow_looped_inner = slow_main_loop_outer.generate(threads, out_threads, false, 0);
 
     sem::StmtPtr both;
     if (!op.constraints.size()) {
       both = looped_inner;
     } else {
       // Make if condition which is true if *any* contraint is unsafe
-      sem::ExprPtr safe = _Const(1);
+      sem::ExprPtr safe;
       for (const FlatConstraint& fc : op.constraints) {
         sem::ExprPtr sum = _Const(0);
         for (size_t i = 0; i < sz; i++) {
@@ -412,7 +382,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
             sum = sum + fc.lhs[i] * (_(op.names[i] + "_gid"));
           }
         }
-        safe = _LogicalAnd(safe, sum <= fc.rhs);
+        safe = _MaybeLogicalAnd(safe, sum <= fc.rhs);
       }
 
       // Make a master if to switch on fast path
@@ -434,15 +404,15 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       sem::Type ltype = {sem::Type::VALUE, op.access[0].type, op.access[0].vector, threads, sem::Type::LOCAL};
 
       // OpenCL requires that __local variables be defined at kernel function scope.
-      kblock->append(_Declare(ltype, "merge_shared", sem::ExprPtr()));
-      auto merge_shared = _("merge_shared");
+      auto merge_shared = _Declare(kblock, ltype, "merge_shared", sem::ExprPtr());
 
       mblock->append(merge_shared[tid] = agg[_Const(0)]);
       uint64_t x = comp_threads;
       while (x > out_threads) {
         mblock->append(_Barrier());
         x /= 2;
-        mblock->append(_If(tid < x, aggregate(op.agg_op, merge_shared[tid], merge_shared[tid + x])));
+        auto merge_agg = aggregate(op.agg_op, merge_shared[tid], merge_shared[tid + x]);
+        mblock->append(_If(tid < x, merge_shared[tid] = merge_agg));
       }
       mblock->append(_Barrier());
       mblock->append(_If(tid < out_threads, agg[_Const(0)] = merge_shared[tid]));
@@ -624,7 +594,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     wblock->append(_If(check, checked_output_block));
   }
 
-  kblock->append(out_loop.generate(threads, 1, false, false, 0));
+  kblock->append(out_loop.generate(threads, 1, false, 0));
 
   // Wrap entire function
   auto func = std::make_shared<sem::Function>();

@@ -28,7 +28,7 @@ void LoopInfo::thread(uint64_t threads) {
   }
 }
 
-sem::StmtPtr LoopInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, bool order, size_t select_threshold) {
+sem::StmtPtr LoopInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, size_t select_threshold) {
   using namespace sem::builder;  // NOLINT
   // Start with the inner-most block
   sem::StmtPtr cur = inner;
@@ -114,42 +114,27 @@ sem::StmtPtr LoopInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, 
       block->append(cur);
       next = block;
     } else {
-      bool is_first = true;
       sem::ExprPtr check;
       for (const auto& cond : indexes[i].checks) {
-        if (is_first) {
-          is_first = false;
-          check = cond;
-        } else {
-          check = _LogicalAnd(check, cond);
-        }
+        check = _MaybeLogicalAnd(check, cond);
       }
 
       next = _Block({});
-      auto idx_cond = _(idx_name + "_cond");
-      next->append(_Declare({sem::Type::INDEX}, idx_name + "_cond", check));
+      auto idx_cond = _Declare(next, {sem::Type::INDEX}, idx_name + "_cond", check);
 
       // Now add inner code
       auto block = _Block({});  // Interior of for loop
       auto idx_init = thread * idx_lid + idx_tid;
       if (element_count <= select_threshold) {
-        sem::ExprPtr accumulated_cond;
-        bool is_first_cond = true;
+        sem::ExprPtr acc_cond;
         for (const auto& cond : indexes[i].idx_conds) {
-          if (is_first_cond) {
-            is_first_cond = false;
-            accumulated_cond = cond;
-          } else {
-            accumulated_cond = _LogicalAnd(accumulated_cond, cond);
-          }
+          acc_cond = _MaybeLogicalAnd(acc_cond, cond);
         }
-        // We use a negative sign here so that when the scalar condition
-        // gets converted to a vector condition, the MSB is set.
         // Note: Use .get() here to ensure we don't accidentally get a sembuilder operator overload.
-        if (!inner_cond.get()) {
-          inner_cond = -(accumulated_cond);
+        if (!inner_cond.get() && acc_cond.get()) {
+          inner_cond = acc_cond;
         }
-        auto select = _Select(accumulated_cond, idx_init, _Const(0));
+        auto select = _MaybeSelect(acc_cond, idx_init, _Const(0));
         block->append(_Declare({sem::Type::INDEX}, idx_name, select));
         block->append(cur);
         next->append(block);

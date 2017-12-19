@@ -33,6 +33,8 @@ plaidml_cc_library(
         "cl_mem_arena.h",
         "cl_mem_buffer.cc",
         "cl_mem_buffer.h",
+        "cl_opt.cc",
+        "cl_opt.h",
         "compiler.cc",
         "compiler.h",
         "device.cc",
