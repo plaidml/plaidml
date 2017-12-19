@@ -39,29 +39,36 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
   // Check in cache, and early return if found
   int64_t cached_time = lang::TileCache::Instance()->GetDuration(ki.key, ki.settings, ki.tile_size);
   if (cached_time >= 0) {
-    LOG(DEBUG) << "Cached kernel: " << ki.key;
+    LOG(DEBUG) << "Cached kernel: " << ki.kname << ", key: " << ki.key << ", tile_size: " << ki.tile_size;
     return cached_time;
   }
 
-  // Prep to do a real run
-  auto& device = *devinfo.dev;
-  auto library = device.compiler()->Build(ctx, {ki}, devinfo.settings).get();
-  auto kernel = device.executor()->Prepare(library.get(), 0).get();
-  int64_t best_time = std::numeric_limits<int64_t>::max();
+  LOG(DEBUG) << "Trying kernel: " << ki.kname << ", key: " << ki.key << ", tile_size: " << ki.tile_size;
+  try {
+    // Prep to do a real run
+    auto& device = *devinfo.dev;
+    auto library = device.compiler()->Build(ctx, {ki}, devinfo.settings).get();
+    auto kernel = device.executor()->Prepare(library.get(), 0).get();
+    int64_t best_time = std::numeric_limits<int64_t>::max();
 
-  // Run trial_runs number of times, picking minimum time
-  for (size_t i = 0; i < trial_runs; i++) {
-    LOG(DEBUG) << "Trying kernel: " << ki.kname << ", key: " << ki.key << ", tile_size: " << ki.tile_size;
-    auto evt = kernel->Run(ctx, buffers, {}, true);
-    device.executor()->Flush();
-    auto result = evt->GetFuture().get();
-    int64_t time = result->GetDuration().count();
-    best_time = std::min(time, best_time);
+    // Run trial_runs number of times, picking minimum time
+    for (size_t i = 0; i < trial_runs; i++) {
+      auto evt = kernel->Run(ctx, buffers, {}, true);
+      device.executor()->Flush();
+      auto result = evt->GetFuture().get();
+      int64_t time = result->GetDuration().count();
+      best_time = std::min(time, best_time);
+    }
+
+    // Save in cache and return
+    lang::TileCache::Instance()->AddEntry(ki.key, ki.settings, ki.tile_size, best_time);
+    return best_time;
+  } catch (const std::exception& ex) {
+    LOG(ERROR) << "Skipping kernel failure: " << ex.what();
+  } catch (...) {
+    LOG(ERROR) << "Skipping unknown kernel failure";
   }
-
-  // Save in cache and return
-  lang::TileCache::Instance()->AddEntry(ki.key, ki.settings, ki.tile_size, best_time);
-  return best_time;
+  return std::numeric_limits<int64_t>::max();
 }
 
 lang::KernelList CompileProgram(const tile::proto::Program& program, const DevInfo& devinfo) {
