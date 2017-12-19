@@ -23,11 +23,11 @@ void Emit::Visit(const sem::LoadExpr& n) {
   auto inner = std::dynamic_pointer_cast<sem::SubscriptLVal>(n.inner);
   if (!cl_khr_fp16_ && inner && ty.dtype == lang::DataType::FLOAT16) {
     // Half-width floats can't be loaded directly on this device.
-    std::string fname = "vloada_half";
-    if (ty.vec_width != 1) {
-      fname = fname + std::to_string(ty.vec_width);
+    if (ty.vec_width == 1) {
+      emit("vload_half");
+    } else {
+      emit("vloada_half" + std::to_string(ty.vec_width));
     }
-    emit(fname);
     emit("(");
     inner->offset->Accept(*this);
     emit(", ");
@@ -43,12 +43,12 @@ void Emit::Visit(const sem::StoreStmt& n) {
   auto lhs = std::dynamic_pointer_cast<sem::SubscriptLVal>(n.lhs);
   if (!cl_khr_fp16_ && lhs && ty_lhs.dtype == lang::DataType::FLOAT16) {
     // Half-width floats can't be stored directly on this device.
-    std::string fname = "vstorea_half";
-    if (ty_lhs.vec_width != 1) {
-      fname = fname + std::to_string(ty_lhs.vec_width);
-    }
     emitTab();
-    emit(fname);
+    if (ty_lhs.vec_width == 1) {
+      emit("vstore_half");
+    } else {
+      emit("vstorea_half" + std::to_string(ty_lhs.vec_width));
+    }
     emit("(");
     n.rhs->Accept(*this);
     emit(", ");
