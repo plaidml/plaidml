@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. 
+// Copyright 2017, Vertex.AI.
 
 syntax = "proto3";
 
@@ -52,6 +52,7 @@ message HardwareSettings {
   uint64 goal_flops_per_byte = 8;
   repeated uint64 dim_sizes = 10;
   bool is_synchronous = 11;
+  bool disable_mad = 12;
 }
 
 message HardwareConfig {
