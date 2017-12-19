@@ -10,9 +10,12 @@ namespace opencl {
 
 namespace {
 
+// This is an instruction optimizer. It's intended to replace expression patterns with potentially
+// more efficient OpenCL builtin functions.
 class InsnOptimizer : public sem::Visitor {
  public:
-  explicit InsnOptimizer(bool cl_khr_fp16) : cl_khr_fp16_{cl_khr_fp16} {}
+  explicit InsnOptimizer(bool cl_khr_fp16, const hal::proto::HardwareSettings& settings)
+      : cl_khr_fp16_{cl_khr_fp16}, settings_{settings} {}
 
   void Visit(const sem::IntConst& node) override {}
 
@@ -35,7 +38,9 @@ class InsnOptimizer : public sem::Visitor {
         auto mul = FindBinaryExpr("*", add->rhs);
         if (mul) {
           auto mul_ty = TypeOf(mul);
-          if (is_float(add_ty.dtype) && is_float(mul_ty.dtype)) {
+          // Replace mul/add with a mad() call unless hardware settings have disabled it.
+          // Some platforms (i.e. Intel HD Graphics 4000) perform worse with this optimization.
+          if (is_float(add_ty.dtype) && is_float(mul_ty.dtype) && !settings_.disable_mad()) {
             auto mad = _("mad")(mul->lhs, mul->rhs, add->lhs);
             const_cast<sem::DeclareStmt&>(node).init = mad;
           }
@@ -128,13 +133,14 @@ class InsnOptimizer : public sem::Visitor {
 
  private:
   bool cl_khr_fp16_;
+  hal::proto::HardwareSettings settings_;
   lang::Scope<sem::Type>* scope_;
 };
 
 }  // namespace
 
-void OptimizeKernel(const lang::KernelInfo& ki, bool cl_khr_fp16) {
-  InsnOptimizer opt(cl_khr_fp16);
+void OptimizeKernel(const lang::KernelInfo& ki, bool cl_khr_fp16, const hal::proto::HardwareSettings& settings) {
+  InsnOptimizer opt(cl_khr_fp16, settings);
   ki.kfunc->Accept(opt);
 }
 

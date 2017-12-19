@@ -2,10 +2,10 @@
 
 #include "tile/hal/opencl/info.h"
 
-#include <boost/regex.hpp>
 #include <google/protobuf/text_format.h>
 
 #include <algorithm>
+#include <boost/regex.hpp>
 
 #include "base/util/logging.h"
 #include "tile/hal/opencl/opencl.pb.h"
@@ -36,7 +36,8 @@ hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
   // TODO(T404) re-enable when possible - info.preferred_vector_width_float())
   settings->set_vec_size(1);
 
-  settings->set_use_global(false);  // Use shared memory on most platforms.
+  // Use shared memory by default since most platforms support it.
+  settings->set_use_global(false);
 
 // Memory width
 #ifdef __APPLE__
@@ -62,8 +63,11 @@ hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
     settings->add_dim_sizes(size);
   }
 
-  // N.B. We never enable half-width computation by default; the user
-  // can set it as an override if desired.
+  // Enable out-of-order execution if the hardware supports it.
+  settings->set_is_synchronous(false);
+
+  // Enable the use of mad() calls by default. Users may disable this as an override.
+  settings->set_disable_mad(false);
 
   return result;
 }

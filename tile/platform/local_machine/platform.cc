@@ -2,11 +2,11 @@
 
 #include "tile/platform/local_machine/platform.h"
 
+#include <google/protobuf/util/json_util.h>
+
 #include <algorithm>
 #include <memory>
 #include <utility>
-
-#include <google/protobuf/util/json_util.h>
 
 #include "base/util/any_factory_map.h"
 #include "base/util/compat.h"
@@ -52,6 +52,20 @@ void GetMemStrategy(const std::shared_ptr<DevInfo>& devinfo, Platform::PlatformD
   pd->tmp_mem_source = devinfo->devset->host_memory();
 }
 
+bool MatchConfig(const proto::Platform& config, const hal::proto::HardwareInfo& info,
+                 hal::proto::HardwareSettings* settings) {
+  for (const auto& hardware_config : config.hardware_configs()) {
+    if (hal::selector::Match(hardware_config.sel(), info)) {
+      auto overrides = hardware_config.settings();
+      // Note: Booleans can only be overriden from false to true.
+      // This is because protobuf treats an unspecified boolean as a false.
+      settings->MergeFrom(overrides);
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
@@ -65,7 +79,6 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
         if (dev->executor()) {
           const hal::proto::HardwareInfo& info = dev->executor()->info();
           hal::proto::HardwareSettings settings = info.settings();
-          bool found_hardware_config = false;
           // TODO(T1101): Move ids into the hal
 
           // Loop over identical devices and ensure each one gets a unique id
@@ -79,12 +92,7 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
             std::transform(id.begin(), id.end(), id.begin(), ::tolower);
           } while (devs_.find(id) != devs_.end());
 
-          for (const auto& hardware_config : config.hardware_configs()) {
-            if (hal::selector::Match(hardware_config.sel(), info)) {
-              settings.MergeFrom(hardware_config.settings());
-              found_hardware_config = true;
-            }
-          }
+          bool found_hardware_config = MatchConfig(config, info, &settings);
           dev->Initialize(settings);
           auto devinfo = std::make_shared<DevInfo>(DevInfo{devset, dev, settings});
           PlatformDev pd{id, devinfo};
