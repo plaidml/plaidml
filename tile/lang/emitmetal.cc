@@ -8,7 +8,7 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-void EmitMetal::emitType(const sem::Type &t) {
+void EmitMetal::emitType(const sem::Type& t) {
   if (t.region == sem::Type::LOCAL) {
     emit("threadgroup ");
   } else if (t.region == sem::Type::GLOBAL) {
@@ -21,21 +21,12 @@ static std::map<std::string, std::string> FuncNameMap = {
     {"recip", "native_recip"}, {"exp", "native_exp"}, {"log", "native_log"}, {"sqrt", "native_sqrt"},
 };
 
-void EmitMetal::Visit(const sem::CallExpr &n) {
-  bool did_override = false;
-  auto load = std::dynamic_pointer_cast<sem::LoadExpr>(n.func);
-  if (load) {
-    auto lookup = std::dynamic_pointer_cast<sem::LookupLVal>(load->inner);
-    if (lookup) {
-      auto it = FuncNameMap.find(lookup->name);
-      if (it != FuncNameMap.end()) {
-        emit(it->second);
-        did_override = true;
-      }
-    }
-  }
-  if (!did_override) {
-    n.func->Accept(*this);
+void EmitMetal::Visit(const sem::CallExpr& n) {
+  auto it = FuncNameMap.find(n.name);
+  if (it != FuncNameMap.end()) {
+    emit(it->second);
+  } else {
+    emit(n.name);
   }
   emit("(");
   for (size_t i = 0; i < n.vals.size(); i++) {
@@ -47,7 +38,7 @@ void EmitMetal::Visit(const sem::CallExpr &n) {
   emit(")");
 }
 
-void EmitMetal::Visit(const sem::IndexExpr &n) {
+void EmitMetal::Visit(const sem::IndexExpr& n) {
   switch (n.type) {
     case sem::IndexExpr::GLOBAL:
       emit("_globalid[" + std::to_string(n.dim) + "]");
@@ -63,19 +54,19 @@ void EmitMetal::Visit(const sem::IndexExpr &n) {
   }
 }
 
-void EmitMetal::Visit(const sem::BarrierStmt &n) {
+void EmitMetal::Visit(const sem::BarrierStmt& n) {
   emitTab();
   emit("threadgroup_barrier(mem_flags::mem_threadgroup);\n");
 }
 
-void EmitMetal::Visit(const sem::Function &n) {
+void EmitMetal::Visit(const sem::Function& n) {
   emit("kernel ");
   emitType(n.ret);
   emit(" ");
   emit(n.name);
   emit("(\n");
   for (size_t i = 0; i < n.params.size(); i++) {
-    const auto &p = n.params[i];
+    const auto& p = n.params[i];
     emit("    ");
     emitType(p.first);
     emit(" ");

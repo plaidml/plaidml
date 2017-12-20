@@ -1,6 +1,8 @@
 
 #include "tile/lang/semtree.h"
 
+#include <assert.h>
+
 namespace vertexai {
 namespace tile {
 namespace sem {
@@ -63,6 +65,23 @@ void SelectExpr::Accept(Visitor& v) const { v.Visit(*this); }
 void ClampExpr::Accept(Visitor& v) const { v.Visit(*this); }
 
 void CastExpr::Accept(Visitor& v) const { v.Visit(*this); }
+
+CallExpr::CallExpr(ExprPtr f, const std::vector<ExprPtr>& v) : vals(v) {
+  // The historical concept of CallExpr allowed for the concept of a function
+  // pointer, and the semtree builder therefore constructs CallExpr using an
+  // arbitrary expression as the target function. In practice, the only type
+  // of function expresion which has ever actually worked is a simple name
+  // lookup, and that is necessarily the case as the backends would otherwise
+  // have no information about the callee type signature. Instead of making
+  // each backend decompose the target expression individually, we'll do it
+  // here, and perhaps someday we can update all the places we build semtrees
+  // and eliminate the intermediate ExprPtr.
+  auto load = std::dynamic_pointer_cast<sem::LoadExpr>(f);
+  if (!load) throw std::runtime_error("CallExpr only applies to LoadExpr");
+  auto lookup = std::dynamic_pointer_cast<sem::LookupLVal>(load->inner);
+  if (!lookup) throw std::runtime_error("CallExpr only invokes lval");
+  name = lookup->name;
+}
 
 void CallExpr::Accept(Visitor& v) const { v.Visit(*this); }
 

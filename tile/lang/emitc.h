@@ -47,7 +47,7 @@ class EmitC : public sem::Visitor {
 class EmitDebug : public EmitC {
  public:
   void Visit(const sem::CallExpr& n) final {
-    n.func->Accept(*this);
+    emit(n.name);
     emit("(");
     for (size_t i = 0; i < n.vals.size(); i++) {
       n.vals[i]->Accept(*this);
