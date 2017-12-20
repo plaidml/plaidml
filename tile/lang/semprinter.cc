@@ -183,7 +183,7 @@ void Print::Visit(const CastExpr& n) {
 }
 
 void Print::Visit(const CallExpr& n) {
-  n.func->Accept(*this);
+  emit(n.name);
   emit("(");
   for (size_t i = 0; i < n.vals.size(); i++) {
     n.vals[i]->Accept(*this);

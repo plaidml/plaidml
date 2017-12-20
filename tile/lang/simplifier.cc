@@ -276,7 +276,6 @@ class Simplifier : public Visitor {
   void Visit(const CastExpr& node) override { const_cast<CastExpr&>(node).val = EvalExpr(node.val); }
 
   void Visit(const CallExpr& node) override {
-    const_cast<CallExpr&>(node).func = EvalExpr(node.func);
     for (size_t i = 0; i < node.vals.size(); i++) {
       const_cast<CallExpr&>(node).vals[i] = EvalExpr(node.vals[i]);
     }

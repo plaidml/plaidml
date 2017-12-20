@@ -164,9 +164,9 @@ struct CastExpr : public Expression {
 
 // A call of a function
 struct CallExpr : public Expression {
-  ExprPtr func;
+  std::string name;
   std::vector<ExprPtr> vals;
-  CallExpr(ExprPtr f, const std::vector<ExprPtr>& v) : func(f), vals(v) {}
+  CallExpr(ExprPtr f, const std::vector<ExprPtr>& v);
   void Accept(Visitor&) const final;
 };
 
