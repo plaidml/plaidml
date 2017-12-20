@@ -10,9 +10,9 @@ namespace gp = google::protobuf;
 namespace vertexai {
 namespace context {
 
-EventLog::EventLog() : stream_uuid_(GetRandomUUID()) {}
+EventLog::EventLog() : stream_uuid_(GetRandomUUID()), prev_activity_index_(0) {}
 
-EventLog::EventLog(boost::uuids::uuid stream_uuid) : stream_uuid_(stream_uuid) {}
+EventLog::EventLog(boost::uuids::uuid stream_uuid) : stream_uuid_(stream_uuid), prev_activity_index_(0) {}
 
 std::size_t EventLog::GetClockIndex(const Clock* clock) {
   std::lock_guard<std::mutex> lock{mu_};
