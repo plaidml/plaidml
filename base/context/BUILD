@@ -16,7 +16,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":proto_cc",
-        "//base/util:util_cc",
+        "//base/util",
         "@boost_archive//:boost",
         "@boost_archive//:thread",
     ],
@@ -27,7 +27,7 @@ plaidml_cc_test(
     srcs = ["context_test.cc"],
     deps = [
         ":context",
-        "//base/util:util_cc",
+        "//base/util",
     ],
 )
 
@@ -36,7 +36,7 @@ plaidml_cc_test(
     srcs = ["gate_test.cc"],
     deps = [
         ":context",
-        "//base/util:util_cc",
+        "//base/util",
     ],
 )
 

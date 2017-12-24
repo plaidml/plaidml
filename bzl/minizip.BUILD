@@ -44,5 +44,5 @@ cc_library(
         ],
     }),
     includes = [""],
-    deps = ["//external:zlib"],
+    deps = ["@zlib_archive//:zlib"],
 )

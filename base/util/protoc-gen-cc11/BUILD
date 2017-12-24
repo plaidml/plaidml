@@ -4,5 +4,5 @@ cc_binary(
     name = "protoc-gen-cc11",
     srcs = ["protoc-gen-cc11.cc"],
     copts = ["-std=c++11"],
-    deps = ["@protobuf//:protoc_lib"],
+    deps = ["@com_google_protobuf//:protoc_lib"],
 )
