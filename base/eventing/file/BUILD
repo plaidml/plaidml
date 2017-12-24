@@ -14,8 +14,8 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/context",
-        "//base/util:util_cc",
-        "//external:protobuf_",
+        "//base/util",
+        "@com_google_protobuf//:protobuf",
     ],
     alwayslink = 1,
 )

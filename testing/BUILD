@@ -8,7 +8,7 @@ plaidml_cc_library(
     testonly = True,
     hdrs = ["matchers.h"],
     deps = [
-        "//base/util:util_cc",
+        "//base/util",
         "@gmock_archive//:gtest",
         "//plaidml/base",
     ],
@@ -29,7 +29,7 @@ plaidml_cc_library(
     data = ["//plaidml:configs"],
     deps = [
         ":runfiles_db",
-        "//base/util:util_cc",
+        "//base/util",
     ],
 )
 
@@ -56,7 +56,7 @@ plaidml_cc_library(
     testonly = True,
     srcs = ["gtest_main.cc"],
     deps = [
-        "//base/util:util_cc",
+        "//base/util",
         "@easylogging_repo//:easylogging",
         "@gflags_repo//:gflags",
         "@gmock_archive//:gtest",

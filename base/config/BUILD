@@ -3,15 +3,11 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
     name = "config",
-    srcs = [
-        "config.cc",
-    ],
-    hdrs = [
-        "config.h",
-    ],
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "//base/util:util_cc",
-        "//external:protobuf_clib",
+        "//base/util",
+        "@com_google_protobuf//:protobuf",
     ],
 )

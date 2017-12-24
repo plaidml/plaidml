@@ -20,6 +20,6 @@ plaidml_cc_test(
         ":make_test_ast",
     ],
     deps = [
-        "//base/util:util_cc",
+        "//base/util",
     ],
 )

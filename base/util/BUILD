@@ -1,8 +1,8 @@
 # Copyright 2017, Vertex.AI.
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
-    name = "util_cc",
+    name = "util",
     srcs = [
         "error.cc",
         "json_transfer.cc",
