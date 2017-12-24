@@ -10,6 +10,9 @@ build --genrule_strategy=standalone
 test --genrule_strategy=standalone
 run --genrule_strategy=standalone
 
+build --action_env=VIRTUAL_ENV
+build --action_env=PATH
+
 build --define=version=0.0.0.dev0
 build --build_tag_filters=-msvc
 test --test_tag_filters=-msvc

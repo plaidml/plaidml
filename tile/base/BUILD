@@ -18,7 +18,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/context",
-        "//base/util:util_cc",
+        "//base/util",
         "@boost_archive//:boost",
         "@boost_archive//:thread",
         "@easylogging_repo//:easylogging",

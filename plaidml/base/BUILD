@@ -24,7 +24,7 @@ plaidml_cc_library(
     deps = [
         "//base/config",
         "//base/context",
-        "//base/util:util_cc",
+        "//base/util",
     ],
 )
 

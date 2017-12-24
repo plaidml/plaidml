@@ -91,7 +91,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":proto_cc",
-        "//base/util:util_cc",
+        "//base/util",
         "@boost_archive//:filesystem",
         "@boost_archive//:regex",
         "//tile/base",

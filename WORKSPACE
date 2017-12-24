@@ -6,11 +6,5 @@ local_repository(
     path = "vendor/opengl",
 )
 
-load("//bzl:deps.bzl", "plaidml_deps")
-plaidml_deps()
-
-load("//bzl:protobuf.bzl", "with_protobuf")
-with_protobuf()
-
-load("//bzl:plaidml.bzl", "with_plaidml")
-with_plaidml()
+load("//bzl:workspace.bzl", "plaidml_workspace")
+plaidml_workspace()
