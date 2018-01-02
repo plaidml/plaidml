@@ -363,13 +363,12 @@ def _plaidml_py_wheel_impl(ctx):
     setup_py = ctx.new_file(ctx.label.name + '.pkg/setup.py')
     pkg_inputs = depset([setup_py])
     version = ctx.var.get('version', default='unknown')
-    cpsub = "$0 $1" if ctx.var['TARGET_CPU'] == 'x64_windows' else "$1 $2"
     if ctx.file.config:
         cfg = ctx.new_file(setup_py, 'setup.cfg')
         ctx.actions.run_shell(
             outputs=[cfg],
             inputs=[ctx.file.config],
-            command="cp " + cpsub,
+            command="cp $1 $2",
             arguments=[ctx.file.config.path, cfg.path],
             mnemonic="CopySetupCfg")
         pkg_inputs += [cfg]
@@ -379,7 +378,7 @@ def _plaidml_py_wheel_impl(ctx):
             ctx.actions.run_shell(
                 outputs=[dest],
                 inputs=[src],
-                command="cp " + cpsub,
+                command="cp $1 $2",
                 arguments=[src.path, dest.path],
                 mnemonic="CopyPackageFile")
             pkg_inputs += [dest]
@@ -412,7 +411,7 @@ def _plaidml_py_wheel_impl(ctx):
     ctx.actions.run_shell(
         outputs=[output],
         inputs=[wheel],
-        command="cp " + cpsub,
+        command="cp $1 $2",
         arguments=[wheel.path, output.path],
         mnemonic="CopyWheel")
     return DefaultInfo(files=depset([output]))

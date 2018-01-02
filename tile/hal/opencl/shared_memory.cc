@@ -157,8 +157,12 @@ std::shared_ptr<hal::Arena> SharedMemory::MakeArena(std::uint64_t size, BufferAc
 // shared memory OpenCL APIs, by enabling shared memory if the
 // underlying hardware supports it.
 void Executor::InitSharedMemory() {
+  if (!device_state_->info().host_unified_memory()) {
+    return;
+  }
+
   for (auto cap : device_state_->info().svm_capability()) {
-    if (cap != proto::SvmCapability::FineGrainSystem) {
+    if (cap != proto::SvmCapability::FineGrainBuffer) {
       continue;
     }
     VLOG(3) << "Enabling OpenCL fine-grain SVM memory";
