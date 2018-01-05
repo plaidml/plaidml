@@ -9,8 +9,6 @@ package(default_visibility = ["@//visibility:public"])
 
 licenses(["notice"])  # Boost software license
 
-prefix_dir = "boost_1_63_0"
-
 config_setting(
     name = "darwin",
     values = {"cpu": "darwin"},
@@ -32,9 +30,9 @@ config_setting(
 cc_library(
     name = "boost",
     hdrs = glob([
-        prefix_dir + "/boost/**/*.hpp",
-        prefix_dir + "/boost/**/*.h",
-        prefix_dir + "/boost/**/*.ipp",
+        "boost/**/*.hpp",
+        "boost/**/*.h",
+        "boost/**/*.ipp",
     ]),
     defines = [
         "BOOST_ERROR_CODE_HEADER_ONLY",
@@ -43,12 +41,12 @@ cc_library(
         "BOOST_THREAD_VERSION=4",
         "BOOST_ALL_NO_LIB",
     ],
-    includes = [prefix_dir],
+    includes = ["."],
 )
 
 cc_library(
     name = "filesystem",
-    srcs = glob([prefix_dir + "/libs/filesystem/src/*.cpp"]),
+    srcs = glob(["libs/filesystem/src/*.cpp"]),
     deps = [
         ":boost",
         ":system",
@@ -57,7 +55,7 @@ cc_library(
 
 cc_library(
     name = "iostreams",
-    srcs = glob([prefix_dir + "/libs/iostreams/src/*.cpp"]),
+    srcs = glob(["libs/iostreams/src/*.cpp"]),
     deps = [
         ":boost",
         "@bzip2_archive//:bz2lib",
@@ -67,7 +65,7 @@ cc_library(
 
 cc_library(
     name = "program_options",
-    srcs = glob([prefix_dir + "/libs/program_options/src/*.cpp"]),
+    srcs = glob(["libs/program_options/src/*.cpp"]),
     deps = [
         ":boost",
     ],
@@ -76,8 +74,8 @@ cc_library(
 cc_library(
     name = "regex",
     srcs = glob([
-        prefix_dir + "/libs/regex/src/*.cpp",
-        prefix_dir + "/libs/regex/src/*.hpp",
+        "libs/regex/src/*.cpp",
+        "libs/regex/src/*.hpp",
     ]),
     deps = [
         ":boost",
@@ -86,7 +84,7 @@ cc_library(
 
 cc_library(
     name = "system",
-    srcs = glob([prefix_dir + "/libs/system/src/*.cpp"]),
+    srcs = glob(["libs/system/src/*.cpp"]),
     deps = [
         ":boost",
     ],
@@ -94,13 +92,13 @@ cc_library(
 
 cc_library(
     name = "thread",
-    srcs = glob([prefix_dir + "/libs/thread/src/*.cpp"]) +
+    srcs = glob(["libs/thread/src/*.cpp"]) +
            select({
-               "//:x64win": glob([prefix_dir + "/libs/thread/src/win32/*.cpp"]),
-               "//:x64_windows": glob([prefix_dir + "/libs/thread/src/win32/*.cpp"]),
+               "//:x64win": glob(["libs/thread/src/win32/*.cpp"]),
+               "//:x64_windows": glob(["libs/thread/src/win32/*.cpp"]),
                "//conditions:default": glob(
-                   [prefix_dir + "/libs/thread/src/pthread/*.cpp"],
-                   exclude = [prefix_dir + "/libs/thread/src/pthread/once.cpp"],
+                   ["libs/thread/src/pthread/*.cpp"],
+                   exclude = ["libs/thread/src/pthread/once.cpp"],
                ),
            }),
     linkopts = select({

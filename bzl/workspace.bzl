@@ -1,9 +1,10 @@
 def plaidml_workspace():
     native.new_http_archive(
         name="boost_archive",
-        url="https://storage.googleapis.com/external_build_repo/boost_1_63_0.tar.bz2",
-        sha256="beae2529f759f6b3bf3f4969a19c2e9d6f0c503edcb2de4a61d1428519fcb3b0",
+        url="https://dl.bintray.com/boostorg/release/1.66.0/source/boost_1_66_0.tar.gz",
+        sha256="bd0df411efd9a585e5a2212275f8762079fed8842264954675a4fddc46cfcf60",
         build_file=str(Label("//bzl:boost.BUILD")),
+        strip_prefix="boost_1_66_0",
     )
 
     native.new_git_repository(
