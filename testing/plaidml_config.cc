@@ -3,9 +3,10 @@
 #include <fstream>
 #include <string>
 
+#include "base/util/env.h"
 #include "base/util/logging.h"
+#include "base/util/runfiles_db.h"
 #include "testing/plaidml_config.h"
-#include "testing/runfiles_db.h"
 
 namespace vertexai {
 namespace testing {
@@ -13,11 +14,11 @@ namespace {
 
 std::string GetConfigFile() {
   RunfilesDB rdb("vertexai_plaidml", nullptr);
-  const char* filename = std::getenv("PLAIDML_CONFIG_FILE");
-  if (!filename) {
+  auto filename = env::Get("PLAIDML_CONFIG_FILE");
+  if (!filename.length()) {
     filename = "plaidml/experimental.json";
   }
-  return rdb[filename];
+  return rdb[filename.c_str()];
 }
 
 std::string GetConfig() {

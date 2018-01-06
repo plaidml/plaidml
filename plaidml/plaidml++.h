@@ -106,6 +106,7 @@ inline std::vector<device_config> enumerate_devices(const std::shared_ptr<ctx>& 
 
 class base_shape {
   friend class base_tensor;
+  friend class invoker;
 
  public:
   // Construct an empty shape with a specific data type
@@ -169,6 +170,12 @@ template <typename T>
 class shape : public base_shape {
  public:
   explicit shape(const std::shared_ptr<ctx>& ctx) : base_shape(ctx, to_plaidml_datatype<T>::value) {}
+
+  explicit shape(const base_shape& base) : base_shape(base) {
+    if (to_plaidml_datatype<T>::value != base.type()) {
+      throw vai_exception(VAI_STATUS_INVALID_ARGUMENT, "Mismatched shape");
+    }
+  }
 
   shape(const std::shared_ptr<ctx>& ctx, const std::initializer_list<size_t>& il, uint64_t offset = 0)
       : base_shape(ctx, to_plaidml_datatype<T>::value, il, offset) {}
@@ -621,16 +628,22 @@ class invoker {
     vai_exception::check_and_throw(invoker_);
   }
 
-  invoker& set_input(const char* name, const variable& var) {
-    auto r = plaidml_set_invoker_input(invoker_.get(), name, var.ptr_.get());
+  invoker& set_input(const std::string& name, const variable& var) {
+    auto r = plaidml_set_invoker_input(invoker_.get(), name.c_str(), var.ptr_.get());
     vai_exception::check_and_throw(r);
     return *this;
   }
 
-  invoker& set_output(const char* name, const variable& var) {
-    auto r = plaidml_set_invoker_output(invoker_.get(), name, var.ptr_.get());
+  invoker& set_output(const std::string& name, const variable& var) {
+    auto r = plaidml_set_invoker_output(invoker_.get(), name.c_str(), var.ptr_.get());
     vai_exception::check_and_throw(r);
     return *this;
+  }
+
+  base_shape output_shape(const std::string& name) {
+    std::shared_ptr<plaidml_shape> shp{plaidml_alloc_invoker_output_shape(invoker_.get(), name.c_str()), plaidml_free_shape};
+    vai_exception::check_and_throw(shp);
+    return base_shape{ctx_, std::move(shp)};
   }
 
   std::unique_ptr<plaidml_invocation> invoke() {

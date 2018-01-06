@@ -8,7 +8,7 @@
 #include <google/protobuf/text_format.h>
 
 #include "base/util/logging.h"
-#include "testing/runfiles_db.h"
+#include "base/util/runfiles_db.h"
 #include "tile/lang/generate.h"
 #include "tile/lang/parser.h"
 #include "tile/proto/support.h"
@@ -38,7 +38,7 @@ tile::proto::Program MakeProgram(const std::string& filename) {
 }  // namespace
 
 std::vector<tile::proto::Program> SchedulerTest::GetTestPrograms() {
-  testing::RunfilesDB rdb{"vertexai_plaidml/tile/platform/local_machine/testdata"};
+  RunfilesDB rdb{"vertexai_plaidml/tile/platform/local_machine/testdata"};
   std::vector<tile::proto::Program> result{MakeProgram(rdb["prng.tpb"])};
   result.emplace_back(MakeProgram(rdb["xception.tpb"]));
   if (FLAGS_test_long_schedules) {

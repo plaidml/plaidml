@@ -1,6 +1,7 @@
 
 #include "tile/lang/tile_cache.h"
 
+#include "base/util/env.h"
 #include "base/util/json_transfer.h"
 
 namespace vertexai {
@@ -13,11 +14,10 @@ TileCache::TileCache(const std::string& filename, bool use_env) {
     if (!use_env) {
       return;
     }
-    char* name = std::getenv("PLAIDML_TILE_CACHE");
-    if (!name) {
+    openname = env::Get("PLAIDML_TILE_CACHE");
+    if (!openname.length()) {
       return;
     }
-    openname = std::string(name);
   }
   file_.exceptions(std::fstream::failbit | std::fstream::badbit);
   file_.open(openname, std::fstream::in | std::fstream::out | std::fstream::app);

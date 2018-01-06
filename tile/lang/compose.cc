@@ -1,6 +1,7 @@
 #include "tile/lang/compose.h"
 
 #include <algorithm>
+#include <sstream>
 
 #include "tile/lang/builtins.h"
 #include "tile/lang/fpconv.h"
@@ -684,7 +685,20 @@ void FunctionApplication::SetDone() {
   }
   const Program& p = func_->prog();
   if (attached_ != p.inputs.size()) {
-    throw std::runtime_error("Missing inputs in apply");
+    std::ostringstream msg;
+    msg << "Missing inputs in apply:";
+    bool first = true;
+    for (const auto& input : p.inputs) {
+      if (!bindings_.count(input.name)) {
+        if (first) {
+          first = false;
+        } else {
+          msg << ",";
+        }
+        msg << " \"" << input.name << "\"";
+      }
+    }
+    throw std::runtime_error(msg.str());
   }
 
   // Walk over bound inputs

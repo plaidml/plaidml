@@ -9,16 +9,9 @@ plaidml_cc_library(
     hdrs = ["matchers.h"],
     deps = [
         "//base/util",
-        "@gmock_archive//:gtest",
         "//plaidml/base",
+        "@gmock_archive//:gtest",
     ],
-)
-
-plaidml_cc_library(
-    name = "runfiles_db",
-    testonly = True,
-    srcs = ["runfiles_db.cc"],
-    hdrs = ["runfiles_db.h"],
 )
 
 plaidml_cc_library(
@@ -28,8 +21,8 @@ plaidml_cc_library(
     hdrs = ["plaidml_config.h"],
     data = ["//plaidml:configs"],
     deps = [
-        ":runfiles_db",
         "//base/util",
+        "//base/util:runfiles_db",
     ],
 )
 
@@ -47,8 +40,8 @@ plaidml_py_test(
     name = "configs_test",
     srcs = ["configs_test.py"],
     data = ["//plaidml:configs"],
-    deps = ["//plaidml:py"],
     requirements = "//plaidml:requirements.txt",
+    deps = ["//plaidml:py"],
 )
 
 plaidml_cc_library(
@@ -57,8 +50,8 @@ plaidml_cc_library(
     srcs = ["gtest_main.cc"],
     deps = [
         "//base/util",
+        "@com_github_gflags_gflags//:gflags",
         "@easylogging_repo//:easylogging",
-        "@gflags_repo//:gflags",
         "@gmock_archive//:gtest",
     ],
 )

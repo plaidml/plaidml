@@ -45,14 +45,15 @@ plaidml_cc_library(
         ":proto_cc",
         "//base/config",
         "//base/eventing/file",
-        "@half_repo//:half",
-        "@minizip_repo//:minizip",
+        "//base/util:runfiles_db",
         "//plaidml/base",
         "//tile/base",
         "//tile/base:program_cache",
         "//tile/hal/opencl",
         "//tile/platform/local_machine",
         "//tile/proto:proto_cc",
+        "@half_repo//:half",
+        "@minizip_repo//:minizip",
     ],
 )
 
@@ -125,12 +126,12 @@ plaidml_cc_test(
     srcs = ["dtype_vec_test.cc"],
     deps = [
         ":api",
-        "@half_repo//:half",
         "//plaidml:proto_cc",
         "//testing:matchers",
         "//testing:plaidml_config",
         "//tile/hal/opencl:proto_cc",
         "//tile/platform/local_machine:proto_cc",
+        "@half_repo//:half",
     ],
 )
 

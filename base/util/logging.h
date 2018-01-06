@@ -1,3 +1,5 @@
+// Copyright Vertex.AI
+
 #pragma once
 
 #define ELPP_THREAD_SAFE

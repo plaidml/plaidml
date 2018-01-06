@@ -21,8 +21,8 @@ plaidml_cc_library(
         "//base/util",
         "@boost_archive//:boost",
         "@boost_archive//:thread",
+        "@com_github_gflags_gflags//:gflags",
         "@easylogging_repo//:easylogging",
-        "@gflags_repo//:gflags",
         "//tile/proto:proto_cc",
     ],
 )
