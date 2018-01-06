@@ -1,12 +1,13 @@
 // Copyright Vertex.AI
 
-#include "testing/runfiles_db.h"
+#include "base/util/runfiles_db.h"
 
 #include <cstdlib>
 #include <fstream>
 
+#include "base/util/env.h"
+
 namespace vertexai {
-namespace testing {
 
 RunfilesDB::RunfilesDB(const char* prefix, const char* environ_override_var) {
   // TODO: Once we're on C++17, and have the standard library filesystem APIs
@@ -20,9 +21,9 @@ RunfilesDB::RunfilesDB(const char* prefix, const char* environ_override_var) {
   }
 
   if (environ_override_var) {
-    const char* override = std::getenv(environ_override_var);
-    if (override && * override) {
-      env_override_ = override;
+    auto override_value = env::Get(environ_override_var);
+    if (override_value.length()) {
+      env_override_ = override_value;
       if (env_override_[env_override_.size()] != '/') {
         env_override_ += '/';
       }
@@ -30,9 +31,9 @@ RunfilesDB::RunfilesDB(const char* prefix, const char* environ_override_var) {
   }
 
   if (!env_override_.size()) {
-    const char* test_srcdir = std::getenv("TEST_SRCDIR");
-    if (test_srcdir) {
-      std::string manifest_filename = test_srcdir;
+    auto runfiles_dir = env::Get("RUNFILES_DIR");
+    if (runfiles_dir.length()) {
+      std::string manifest_filename = runfiles_dir;
       manifest_filename += "/MANIFEST";
       std::ifstream manifest{manifest_filename};
       while (manifest) {
@@ -58,5 +59,4 @@ std::string RunfilesDB::operator[](const char* logical_filename) {
   return r.first->second;
 }
 
-}  // namespace testing
 }  // namespace vertexai

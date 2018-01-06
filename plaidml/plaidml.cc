@@ -34,6 +34,7 @@
 
 #include "base/config/config.h"
 #include "base/util/compat.h"
+#include "base/util/env.h"
 #include "base/util/error.h"
 #include "base/util/sync.h"
 #include "plaidml/base/base_cpp.h"
@@ -47,6 +48,7 @@
 #endif  // TARGET_OS_IPHONE == 1
 #include "base/util/any_factory_map.h"
 #include "base/util/logging.h"
+#include "base/util/runfiles_db.h"
 #include "plaidml/plaidml.pb.h"
 #include "tile/base/lru_cache.h"
 #include "tile/lang/compose.h"
@@ -210,22 +212,6 @@ struct plaidml_device_enumerator {
   std::vector<plaidml_devconf> unmatched_devices;
 };
 
-namespace {
-std::string getEnvVar(std::string const& key) {
-#ifdef _MSC_VER
-  char var[1024];
-  auto rv = GetEnvironmentVariable(key.c_str(), var, sizeof(var));
-  if (!rv || sizeof(var) <= rv) {
-    return "";
-  }
-  return std::string(var);
-#else
-  char const* val = std::getenv(key.c_str());
-  return val == nullptr ? "" : val;
-#endif
-}
-}  // namespace
-
 plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
     vai_ctx* ctx, const char* configuration, const std::string& config_source,
     void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
@@ -244,7 +230,7 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
   plaidml_device_enumerator* result = nullptr;
 
   std::set<std::string> device_ids;
-  std::stringstream devids(getEnvVar(PLAIDML_DEVICE_IDS));
+  std::stringstream devids(vertexai::env::Get(PLAIDML_DEVICE_IDS));
   std::copy(std::istream_iterator<std::string>(devids), std::istream_iterator<std::string>(),
             std::inserter(device_ids, device_ids.end()));
 
@@ -294,14 +280,17 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
 
 extern "C" plaidml_device_enumerator* plaidml_alloc_device_enumerator(
     vai_ctx* ctx, void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
+  static vertexai::RunfilesDB runfiles_db{"vertexai_plaidml"};
+
   std::string config_file;
-  std::string exp = getEnvVar(PLAIDML_EXPERIMENTAL);
+  std::string exp = vertexai::env::Get(PLAIDML_EXPERIMENTAL);
   if (!exp.empty() && exp != "0") {
-    config_file = getEnvVar(PLAIDML_EXPERIMENTAL_CONFIG);
+    config_file = vertexai::env::Get(PLAIDML_EXPERIMENTAL_CONFIG);
   } else {
-    config_file = getEnvVar(PLAIDML_DEFAULT_CONFIG);
+    config_file = vertexai::env::Get(PLAIDML_DEFAULT_CONFIG);
   }
-  std::ifstream cfs(config_file);
+  std::string translated = runfiles_db[config_file.c_str()];
+  std::ifstream cfs(runfiles_db[config_file.c_str()]);
   std::string config;
   config.assign(std::istreambuf_iterator<char>(cfs), std::istreambuf_iterator<char>());
   return _plaidml_alloc_device_enumerator(ctx, config.c_str(), config_file, callback, arg);
@@ -1484,18 +1473,18 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     *prog.mutable_outputs() = tile::proto::to_proto(invoker->runinfo->output_shapes);
 
     size_t max_trials = 1;
-    auto env_trials = std::getenv("PLAIDML_KERNEL_TRIALS");
-    if (env_trials) {
-      auto env_value = std::atoi(env_trials);
+    auto env_trials = vertexai::env::Get("PLAIDML_KERNEL_TRIALS");
+    if (env_trials.length()) {
+      auto env_value = std::atoi(env_trials.c_str());
       if (env_value) {
         max_trials = env_value;
       }
     }
 
     size_t max_trial_runs = 1;
-    auto env_runs = std::getenv("PLAIDML_KERNEL_TRIAL_RUNS");
-    if (env_runs) {
-      auto env_value = std::atoi(env_runs);
+    auto env_runs = vertexai::env::Get("PLAIDML_KERNEL_TRIAL_RUNS");
+    if (env_runs.length()) {
+      auto env_value = std::atoi(env_runs.c_str());
       if (env_value) {
         max_trial_runs = env_value;
       }

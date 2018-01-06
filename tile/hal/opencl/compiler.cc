@@ -13,6 +13,7 @@
 
 #include "base/util/callback_map.h"
 #include "base/util/compat.h"
+#include "base/util/env.h"
 #include "base/util/logging.h"
 #include "base/util/uuid.h"
 #include "tile/hal/opencl/cl_opt.h"
@@ -183,9 +184,9 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     code << "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n";
   }
 
-  auto env_cache = std::getenv("PLAIDML_OPENCL_CACHE");
+  auto env_cache = env::Get("PLAIDML_OPENCL_CACHE");
   fs::path cache_dir;
-  if (env_cache) {
+  if (env_cache.length()) {
     VLOG(1) << "Using OpenCL cache directory: " << env_cache;
     cache_dir = env_cache;
   }
