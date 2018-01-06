@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 namespace vertexai {
-namespace testing {
 
 // RunfilesDB maps logical runfiles filenames to physical filenames for tests.
 //
@@ -44,5 +43,4 @@ class RunfilesDB {
   std::unordered_map<std::string, std::string> logical_to_physical_;
 };
 
-}  // namespace testing
 }  // namespace vertexai

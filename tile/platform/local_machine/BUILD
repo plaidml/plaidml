@@ -129,9 +129,9 @@ plaidml_cc_library(
         ":block_placer",
         ":naive_placer",
         ":scheduler",
+        "//base/util:runfiles_db",
         "//testing:gtest_main",
         "//testing:matchers",
-        "//testing:runfiles_db",
         "//tile/proto:support",
     ],
     alwayslink = True,
@@ -153,11 +153,11 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "loose_scheduler_test",
     srcs = ["loose_scheduler_test.cc"],
+    tags = ["rtest_fail"],
     deps = [
         ":loose_scheduler",
         ":scheduler_test",
     ],
-    tags = ["rtest_fail"],
 )
 
 plaidml_cc_library(
@@ -176,11 +176,11 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "linear_scheduler_test",
     srcs = ["linear_scheduler_test.cc"],
+    tags = ["rtest_fail"],
     deps = [
         ":linear_scheduler",
         ":scheduler_test",
     ],
-    tags = ["rtest_fail"],
 )
 
 plaidml_cc_library(
@@ -199,9 +199,9 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "tdep_scheduler_test",
     srcs = ["tdep_scheduler_test.cc"],
+    tags = ["rtest_fail"],
     deps = [
         ":scheduler_test",
         ":tdep_scheduler",
     ],
-    tags = ["rtest_fail"],
 )

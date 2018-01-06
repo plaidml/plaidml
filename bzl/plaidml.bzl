@@ -204,7 +204,7 @@ def _plaidml_objc_cc_library_aspect_impl(target, ctx):
     objs = []
 
     #  Note: for a compilation step, objc_library generates a command like this:
-    #    bazel-out/host/bin/external/bazel_tools/tools/objc/xcrunwrapper clang '-stdlib=libc++' '-std=gnu++11' -Wshorten-64-to-32 -Wbool-conversion -Wconstant-conversion -Wduplicate-method-match -Wempty-body -Wenum-conversion -Wint-conversion -Wunreachable-code -Wmismatched-return-types -Wundeclared-selector -Wuninitialized -Wunused-function -Wunused-variable -DOS_IOS '-miphoneos-version-min=7.0' -arch armv7 -isysroot __BAZEL_XCODE_SDKROOT__ -F __BAZEL_XCODE_SDKROOT__/System/Library/Frameworks -F __BAZEL_XCODE_DEVELOPER_DIR__/Platforms/iPhoneOS.platform/Developer/Library/Frameworks -iquote . -iquote bazel-out/local-fastbuild/genfiles -I external/easylogging_repo/src -I bazel-out/local-fastbuild/genfiles/external/easylogging_repo/src -I external/gflags_repo -I bazel-out/local-fastbuild/genfiles/external/gflags_repo -I external/gflags_repo/include -I bazel-out/local-fastbuild/genfiles/external/gflags_repo/include -fobjc-arc '--std=c++1y' -Werror -Wno-ignored-attributes -Wno-missing-braces -Wno-unreachable-code -Wno-shorten-64-to-32 -c util/error.cc -o bazel-out/local-fastbuild/bin/util/_objs/util_objc/util/error.o -MD -MF bazel-out/local-fastbuild/bin/util/_objs/util_objc/util/error.d)
+    #    bazel-out/host/bin/external/bazel_tools/tools/objc/xcrunwrapper clang '-stdlib=libc++' '-std=gnu++11' -Wshorten-64-to-32 -Wbool-conversion -Wconstant-conversion -Wduplicate-method-match -Wempty-body -Wenum-conversion -Wint-conversion -Wunreachable-code -Wmismatched-return-types -Wundeclared-selector -Wuninitialized -Wunused-function -Wunused-variable -DOS_IOS '-miphoneos-version-min=7.0' -arch armv7 -isysroot __BAZEL_XCODE_SDKROOT__ -F __BAZEL_XCODE_SDKROOT__/System/Library/Frameworks -F __BAZEL_XCODE_DEVELOPER_DIR__/Platforms/iPhoneOS.platform/Developer/Library/Frameworks -iquote . -iquote bazel-out/local-fastbuild/genfiles -I external/easylogging_repo/src -I bazel-out/local-fastbuild/genfiles/external/easylogging_repo/src -I external/com_github_gflags_gflags -I bazel-out/local-fastbuild/genfiles/external/com_github_gflags_gflags -I external/com_github_gflags_gflags/include -I bazel-out/local-fastbuild/genfiles/external/com_github_gflags_gflags/include -fobjc-arc '--std=c++1y' -Werror -Wno-ignored-attributes -Wno-missing-braces -Wno-unreachable-code -Wno-shorten-64-to-32 -c util/error.cc -o bazel-out/local-fastbuild/bin/util/_objs/util_objc/util/error.o -MD -MF bazel-out/local-fastbuild/bin/util/_objs/util_objc/util/error.d)
     #
     # For a link step, objc_library generates a command like this:
     #   bazel-out/host/bin/external/bazel_tools/tools/objc/libtool -static -filelist bazel-out/local-fastbuild/bin/util/util_objc-archive.objlist -arch_only armv7 -syslibroot __BAZEL_XCODE_SDKROOT__ -o bazel-out/local-fastbuild/bin/util/libutil_objc.a
@@ -472,6 +472,7 @@ def _venv_wrapper_impl(ctx):
             "__BZL_MAIN__": main,
             "__BZL_REQUIREMENTS__": requirements,
             "__BZL_VENV_ARGS__": venv_args,
+            "__BZL_WORKSPACE__": ctx.workspace_name,
         })
 
 venv_wrapper = rule(

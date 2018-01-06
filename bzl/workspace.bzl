@@ -14,11 +14,11 @@ def plaidml_workspace():
         build_file=str(Label("//bzl:easylogging.BUILD")),
     )
 
-    native.new_git_repository(
-        name="gflags_repo",
-        commit="ac1a925c2bdec48e010020df93732badf75970e9",
-        remote="https://github.com/gflags/gflags",
-        build_file=str(Label("//bzl:gflags.BUILD")))
+    native.git_repository(
+        name="com_github_gflags_gflags",
+        commit="038cfcd1a08ea6638bb7a75c7f632a56e2fbae1e",
+        remote="https://github.com/earhart/gflags",
+    )
 
     native.new_http_archive(
         name="gmock_archive",
