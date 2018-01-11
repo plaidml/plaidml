@@ -16,8 +16,8 @@ def plaidml_workspace():
 
     native.git_repository(
         name="com_github_gflags_gflags",
-        commit="038cfcd1a08ea6638bb7a75c7f632a56e2fbae1e",
-        remote="https://github.com/earhart/gflags",
+        commit="e292e0452fcfd5a8ae055b59052fc041cbab4abf",
+        remote="https://github.com/gflags/gflags",
     )
 
     native.new_http_archive(
