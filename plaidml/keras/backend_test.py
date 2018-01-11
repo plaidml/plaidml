@@ -683,6 +683,24 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='same', dilation_rate=(2, 2), data_format=df),
         ]
 
+    @opTest([
+             [m(1, 1, 3, 1), m(1, 4, 1, 1), (1, 1, 9, 1), (1, 4), 'same', 'channels_last'],
+             [m(1, 3, 3, 1), m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'same', 'channels_last'],
+             [m(1, 2, 2, 1), m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'valid', 'channels_last'],
+             [m(1, 5, 3, 7), m(5, 5, 4, 7), (1, 9, 10, 4), (1, 2), 'valid', 'channels_last'],
+             [m(1, 5, 3, 7), m(5, 5, 4, 7), (1, 9, 9, 4), (1, 2), 'valid', 'channels_last'],
+             [m(4, 8, 5, 5), m(3, 3, 2, 8), (4, 2, 9, 9), (2, 2), 'same', 'channels_first'],
+             [m(4, 3, 5, 8), m(3, 3, 2, 8), (4, 9, 9, 2), (3, 2), 'same', 'channels_last'],
+             [m(1, 1, 6, 1), m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'same', 'channels_first'],
+             [m(1, 1, 4, 1), m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'valid', 'channels_first'],
+            ],
+            verbose=False,
+            skip_theano=True,)
+    def testConv2dTranspose(self, b, x, k, os, st, pd, df):
+        return [
+            b.conv2d_transpose(x, k, os, strides=st, padding=pd, data_format=df)
+        ]
+
     @unittest.skip("TODO(T1046): This case is bugged in Keras 2.0.8 TF")
     @opTest(
         [_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
@@ -710,6 +728,17 @@ class TestBackendOps(unittest.TestCase):
             #b.conv3d(im, km, padding='same', strides=(2,3,3), data_format=df),
             b.conv3d(im, km, padding='valid', strides=(2, 1, 2), data_format=df),
             b.conv3d(im, km, padding='valid', dilation_rate=(1, 3, 2), data_format=df),
+        ]
+
+    @opTest([
+             [m(1, 3, 3, 3, 1), m(3, 3, 4, 2, 1), (1, 5, 7, 9, 2), (2, 3, 4), 'same', 'channels_last'],
+             [m(1, 1, 2, 8, 4), m(4, 1, 2, 1, 1), (1, 1, 7, 8, 14), (3, 1, 4), 'valid', 'channels_first'],
+            ],
+            verbose=False,
+            skip_theano=True,)
+    def testConv3dTranspose(self, b, x, k, os, st, pd, df):
+        return [
+            b.conv3d_transpose(x, k, os, strides=st, padding=pd, data_format=df)
         ]
 
     @opTest([[m(1, 4, 4, 1)], [m(1, 7, 5, 1)], [m(2, 11, 13, 3)]], skip_theano=True)

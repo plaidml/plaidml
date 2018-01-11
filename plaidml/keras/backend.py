@@ -1336,6 +1336,142 @@ def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
     return _Op('spatial_2d_padding', x.dtype, outshape, f, OrderedDict([('I', x)]), ['O'])
 
 
+def _format_conv_strings(rank,
+                         in_shape,
+                         kernel_shape,
+                         strides,
+                         padding,
+                         data_format,
+                         dilation_rate,
+                         channelwise,
+                         forward=True,
+                         expected_output_shape=None,
+                         ):
+    # Variable meanings:
+    # N: Number of items in the batch
+    # L<i>: Spatial dimension i of each (input) item
+    # CI: Number of channels (aka filters) of each input item
+    # LK<i>: Spatial dimension i of kernel
+    # CO: Number of channels (aka filters) of each output item
+    # C: Number of input channels in channelwise convolutions
+    # M: Channel multiplier in channelwise convolutions (each input channel yields
+    #     M output channels for such convolutions)
+    #
+    # n: Which element of the batch we're on
+    # x<i>: The ith coordinate in the output/image
+    # k<i>: The ith coordinate in the kernel
+    # ci: The input channel we're on
+    # co: The output channel we're on
+    # c: The input channel we're on for channelwise convolutions
+    # m: The output channel multiplier we're on for output convolutions
+    if data_format == 'channels_first':
+        n = 0
+        c = 1
+        l = [i + 2 for i in range(rank)]
+    elif data_format == 'channels_last':
+        n = 0
+        l = [i + 1 for i in range(rank)]
+        c = rank + 1
+    else:
+        raise ValueError("Unrecognized data format '{}'".format(data_format))
+    if channelwise == True and in_shape[c] != kernel_shape[-2]:
+        raise ValueError(
+            "Channelwise convolution must have same number of channels in both input and kernel:\n"
+            + "{} (from shape {}) v {} (from shape {})".format(in_shape[c], in_shape,
+                                                               kernel_shape[-2], kernel_shape))
+    sym_out_shape = list()
+    pad_amount = list()
+    num_out_shape = list()
+    for i in range(rank):
+        if forward:
+            sym_out, sym_pad, num_out = pad_compute("L{}".format(i), in_shape[l[i]],
+                                                    dilation_rate[i] * (kernel_shape[i] - 1) + 1,
+                                                    strides[i], padding)
+        else:
+            sym_out, sym_pad, num_out = pad_compute(str(in_shape[l[i]]), in_shape[l[i]],
+                                                    dilation_rate[i] * (kernel_shape[i] - 1) + 1,
+                                                    strides[i], padding)
+        sym_out_shape.append(sym_out)
+        pad_amount.append(sym_pad)
+        num_out_shape.append(num_out)
+    if expected_output_shape is not None:
+        # Confirm that the output shape is consistent with the rest of the convolution
+        computed_output_shape = [0] * (rank + 2)
+        computed_output_shape[n] = in_shape[n]
+        computed_output_shape[c] = kernel_shape[-1]
+        for i in range(rank):
+            computed_output_shape[l[i]] = num_out_shape[i]
+        for i in range(rank + 2):
+            if computed_output_shape[i] is not None and expected_output_shape[i] is not None \
+                    and computed_output_shape[i] != expected_output_shape[i]:
+                raise ValueError("Expected convolution output of shape {}, received {}".format(
+                        expected_output_shape, computed_output_shape))
+    padding_list = ["  Pad{} = {};".format(i, pad_amount[i]) for i in range(rank)]
+    padding_str = "\n".join(padding_list)
+    input_idx_list = [
+        "{s}*{x} + {d}*{k} - {p}".format(
+            s=strides[i],
+            x="x{}".format(i),
+            d="{}".format(dilation_rate[i]),
+            k="k{}".format(i),
+            p="Pad{}".format(i)) for i in range(rank)
+    ]
+    if data_format == 'channels_first' and not channelwise:
+        if forward:
+            input_dims_str = "N, CI, " + ", ".join(["L{}".format(i) for i in range(rank)])
+            out_dims_str = "N, CO, " + ", ".join(["{}".format(sym_out_shape[i]) for i in range(rank)])
+            outshape = [in_shape[0]] + [kernel_shape[-1]] + num_out_shape
+        else:
+            input_dims_str = "N, CI, " + ", ".join(str(in_shape[l[i]]) for i in range(rank))
+            out_dims_str = "N, CO, " + ", ".join(["L{}".format(i) for i in range(rank)])
+        out_idx_str = "n, co, " + ", ".join(["x{}".format(i) for i in range(rank)])
+        input_idx_str = "n, ci, " + ", ".join(input_idx_list)
+    elif data_format == 'channels_last' and not channelwise:
+        if forward:
+            input_dims_str = "N, " + ", ".join(["L{}".format(i) for i in range(rank)]) + ", CI"
+            out_dims_str = "N, " + ", ".join(["{}".format(sym_out_shape[i]) for i in range(rank)]) + ", CO"
+            outshape = [in_shape[0]] + num_out_shape + [kernel_shape[-1]]
+        else:
+            input_dims_str = "N, " + ", ".join(str(in_shape[l[i]]) for i in range(rank)) + ", CI"
+            out_dims_str = "N, " + ", ".join(["L{}".format(i) for i in range(rank)]) + ", CO"
+        out_idx_str = "n, " + ", ".join(["x{}".format(i) for i in range(rank)]) + ", co"
+        input_idx_str = "n, " + ", ".join(input_idx_list) + ", ci"
+    elif data_format == 'channels_first' and channelwise:
+        if not forward:
+            raise NotImplementedError("Channelwise transposed convolutions not implemented.")
+        input_dims_str = "N, C, " + ", ".join(["L{}".format(i) for i in range(rank)])
+        out_idx_str = "n, c*M + m, " + ", ".join(["x{}".format(i) for i in range(rank)])
+        out_dims_str = "N, C*M, " + ", ".join(["{}".format(sym_out_shape[i]) for i in range(rank)])
+        input_idx_str = "n, c, " + ", ".join(input_idx_list)
+        outshape = [in_shape[0]] + [kernel_shape[-2] * kernel_shape[-1]] + num_out_shape
+    elif data_format == 'channels_last' and channelwise:
+        if not forward:
+            raise NotImplementedError("Channelwise transposed convolutions not implemented.")
+        input_dims_str = "N, " + ", ".join(["L{}".format(i) for i in range(rank)]) + ", C"
+        out_idx_str = "n, " + ", ".join(["x{}".format(i) for i in range(rank)]) + ", c*M + m"
+        out_dims_str = "N, " + ", ".join(["{}".format(sym_out_shape[i]) for i in range(rank)]) + ", C*M"
+        input_idx_str = "n, " + ", ".join(input_idx_list) + ", c"
+        outshape = [in_shape[0]] + num_out_shape + [kernel_shape[-2] * kernel_shape[-1]]
+    else:
+        raise ValueError("Unrecognized data format '{}'".format(data_format))
+    if channelwise:
+        ker_dims_str = ", ".join(["LK{}".format(i) for i in range(rank)]) + ", C, M"
+        ker_idx_str = ", ".join(["k{}".format(i) for i in range(rank)]) + ", c, m"
+    else:
+        ker_dims_str = ", ".join(["LK{}".format(i) for i in range(rank)]) + ", CI, CO"
+        ker_idx_str = ", ".join(["k{}".format(i) for i in range(rank)]) + ", ci, co"
+    ret = {'input_dims_str': input_dims_str,
+            'ker_dims_str': ker_dims_str,
+            'out_idx_str': out_idx_str,
+            'out_dims_str': out_dims_str,
+            'input_idx_str': input_idx_str,
+            'ker_idx_str': ker_idx_str,
+            'padding_str': padding_str}
+    if forward:
+        ret['outshape_tuple'] = outshape
+    return ret
+
+
 def conv(x,
          kernel,
          strides=None,
@@ -1367,105 +1503,60 @@ def conv(x,
                          "{} (rank {}) v {} (rank {})".format(
                              dilation_rate, len(dilation_rate), x.shape, x.ndim - 2))
 
-    if data_format == 'channels_first':
-        n = 0
-        c = 1
-        l = [i + 2 for i in range(rank)]
-    elif data_format == 'channels_last':
-        n = 0
-        l = [i + 1 for i in range(rank)]
-        c = rank + 1
-    else:
-        raise ValueError("Unrecognized data format '{}'".format(data_format))
-    if channelwise == True and x.shape[c] != kernel.shape[-2]:
-        raise ValueError(
-            "Channelwise convolution must have same number of channels in both input and kernel:\n"
-            + "{} (from shape {}) v {} (from shape {})".format(x.shape[c], x.shape,
-                                                               kernel.shape[-2], kernel.shape))
-
-    # Variable meanings:
-    # N: Number of items in the batch
-    # L<i>: Spatial dimension i of each (input) item
-    # CI: Number of channels (aka filters) of each input item
-    # LK<i>: Spatial dimension i of kernel
-    # CO: Number of channels (aka filters) of each output item
-    # C: Number of input channels in channelwise convolutions
-    # M: Channel multiplier in channelwise convolutions (each input channel yields
-    #     M output channels for such convolutions)
-    #
-    # n: Which element of the batch we're on
-    # x<i>: The ith coordinate in the output/image
-    # k<i>: The ith coordinate in the kernel
-    # ci: The input channel we're on
-    # co: The output channel we're on
-    # c: The input channel we're on for channelwise convolutions
-    # m: The output channel multiplier we're on for output convolutions
-    out_size = list()
-    pad_amount = list()
-    num_out_size = list()
-    for i in range(rank):
-        sym_out, sym_pad, num_out = pad_compute("L{}".format(i), x.shape[l[i]], dilation_rate[i] *
-                                                (kernel.shape[i] - 1) + 1, strides[i], padding)
-        out_size.append(sym_out)
-        pad_amount.append(sym_pad)
-        num_out_size.append(num_out)
-
-    padding_list = ["  Pad{} = {};".format(i, pad_amount[i]) for i in range(rank)]
-    padding_str = "\n".join(padding_list)
-    input_idx_list = [
-        "{s}*{x} + {d}*{k} - {p}".format(
-            s=strides[i],
-            x="x{}".format(i),
-            d="{}".format(dilation_rate[i]),
-            k="k{}".format(i),
-            p="Pad{}".format(i)) for i in range(rank)
-    ]
-    if data_format == 'channels_first' and not channelwise:
-        input_dims_str = "N, CI, " + ", ".join(["L{}".format(i) for i in range(rank)])
-        out_idx_str = "n, co, " + ", ".join(["x{}".format(i) for i in range(rank)])
-        out_dims_str = "N, CO, " + ", ".join(["{}".format(out_size[i]) for i in range(rank)])
-        input_idx_str = "n, ci, " + ", ".join(input_idx_list)
-        outshape = [x.shape[0]] + [kernel.shape[-1]] + num_out_size
-    elif data_format == 'channels_last' and not channelwise:
-        input_dims_str = "N, " + ", ".join(["L{}".format(i) for i in range(rank)]) + ", CI"
-        out_idx_str = "n, " + ", ".join(["x{}".format(i) for i in range(rank)]) + ", co"
-        out_dims_str = "N, " + ", ".join(["{}".format(out_size[i]) for i in range(rank)]) + ", CO"
-        input_idx_str = "n, " + ", ".join(input_idx_list) + ", ci"
-        outshape = [x.shape[0]] + num_out_size + [kernel.shape[-1]]
-    elif data_format == 'channels_first' and channelwise:
-        input_dims_str = "N, C, " + ", ".join(["L{}".format(i) for i in range(rank)])
-        out_idx_str = "n, c*M + m, " + ", ".join(["x{}".format(i) for i in range(rank)])
-        out_dims_str = "N, C*M, " + ", ".join(["{}".format(out_size[i]) for i in range(rank)])
-        input_idx_str = "n, c, " + ", ".join(input_idx_list)
-        outshape = [x.shape[0]] + [kernel.shape[-2] * kernel.shape[-1]] + num_out_size
-    elif data_format == 'channels_last' and channelwise:
-        input_dims_str = "N, " + ", ".join(["L{}".format(i) for i in range(rank)]) + ", C"
-        out_idx_str = "n, " + ", ".join(["x{}".format(i) for i in range(rank)]) + ", c*M + m"
-        out_dims_str = "N, " + ", ".join(["{}".format(out_size[i]) for i in range(rank)]) + ", C*M"
-        input_idx_str = "n, " + ", ".join(input_idx_list) + ", c"
-        outshape = [x.shape[0]] + num_out_size + [kernel.shape[-2] * kernel.shape[-1]]
-    else:
-        raise ValueError("Unrecognized data format '{}'".format(data_format))
-    if channelwise:
-        ker_dims_str = ", ".join(["LK{}".format(i) for i in range(rank)]) + ", C, M"
-        ker_idx_str = ", ".join(["k{}".format(i) for i in range(rank)]) + ", c, m"
-    else:
-        ker_dims_str = ", ".join(["LK{}".format(i) for i in range(rank)]) + ", CI, CO"
-        ker_idx_str = ", ".join(["k{}".format(i) for i in range(rank)]) + ", ci, co"
+    conv_strs = _format_conv_strings(rank,
+                                     x.shape,
+                                     kernel.shape,
+                                     strides,
+                                     padding,
+                                     data_format,
+                                     dilation_rate,
+                                     channelwise)
+    outshape = conv_strs['outshape_tuple']
 
     f = ('function (I[{input_dims_str}], K[{ker_dims_str}]) ' + '-> (O) {{\n{padding_str}\n' +
          '  O[{out_idx_str} : {out_dims_str}]' +
-         '= +(I[{input_idx_str}]*K[{ker_idx_str}]);\n}}').format(**{
-             'input_dims_str': input_dims_str,
-             'ker_dims_str': ker_dims_str,
-             'out_idx_str': out_idx_str,
-             'out_dims_str': out_dims_str,
-             'input_idx_str': input_idx_str,
-             'ker_idx_str': ker_idx_str,
-             'padding_str': padding_str
-         })
+         '= +(I[{input_idx_str}]*K[{ker_idx_str}]);\n}}').format(**conv_strs)
     name = "conv{}d".format(rank)
     return _Op(name, x.dtype, tuple(outshape), f, OrderedDict([('I', x), ('K', kernel)]), ['O'])
+
+
+def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
+    rank = x.ndim - 2
+    if data_format is None:
+        data_format = image_data_format()
+    if kernel.ndim != rank + 2:
+        raise ValueError("Transpose convolution kernel shape inconsistent with input shape: " +
+                         "{} (rank {}) v {} (rank {})".format(kernel.shape, kernel.ndim - 2,
+                                                              x.shape, x.ndim - 2))
+    if len(output_shape) != rank + 2:
+        raise ValueError("Transpose convolution output_shape inconsistent with input shape: " +
+                         "{} (rank {}) v {} (rank {})".format(output_shape, len(output_shape) - 2,
+                                                              x.shape, x.ndim - 2))
+    if len(strides) != rank:
+        raise ValueError("Transpose convolution strides inconsistent with input shape: " +
+                         "{} (rank {}) v {} (rank {})".format(strides, len(strides),
+                                                              x.shape, x.ndim - 2))
+    if x.shape[0] != output_shape[0] and x.shape[0] is not None and output_shape[0] is not None:
+        raise ValueError("Transpose convolution batch size inconsistent between input " +
+                         "and output: {} v {}".format(x.shape[0], output_shape[0]))
+
+    conv_strs = _format_conv_strings(rank,
+                                     output_shape,
+                                     kernel.shape,
+                                     strides,
+                                     padding,
+                                     data_format,
+                                     (1,) * rank,
+                                     False,
+                                     False,
+                                     x.shape)
+
+    f = ('function (O[{out_dims_str}], K[{ker_dims_str}]) ' + '-> (I) {{\n{padding_str}\n' +
+         '  I[{input_idx_str} : {input_dims_str}]' +
+         '= +(O[{out_idx_str}]*K[{ker_idx_str}]);\n}}').format(**conv_strs)
+    # TODO print("Requesting function:\n{}\nBased on conv_strs:\n{}".format(f, conv_strs))
+    name = "conv{}d".format(rank)
+    return _Op(name, x.dtype, tuple(output_shape), f, OrderedDict([('O', x), ('K', kernel)]), ['I'])
 
 
 def _func_once(func):
@@ -1575,7 +1666,7 @@ def conv2d(x,
 
 
 def conv2d_transpose(x, kernel, output_shape, strides=(1, 1), padding='valid', data_format=None):
-    _report_unimplemented('conv2d_transpose')
+    return conv_transpose(x, kernel, output_shape, strides, padding, data_format)
 
 
 def conv3d(x,
@@ -1589,7 +1680,7 @@ def conv3d(x,
 
 def conv3d_transpose(x, kernel, output_shape, strides=(1, 1, 1), padding='valid',
                      data_format=None):
-    _report_unimplemented('conv3d_transpose')
+    return conv_transpose(x, kernel, output_shape, strides, padding, data_format)
 
 
 def count_params(x):
