@@ -1,6 +1,6 @@
 # Building and Testing PlaidML
 
-PlaidML depends on [Bazel](http://bazel.build) v0.6.0 or higher.
+PlaidML depends on [Bazel](http://bazel.build) v0.9.0 or higher.
 
 ## Building PlaidML
 
