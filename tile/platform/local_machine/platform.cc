@@ -112,7 +112,7 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
           } else {
             auto size_goal = memory->size_goal() * kGoalMemPercentage;
             IVLOG(1, "Using loose scheduler; size_goal=" << size_goal);
-            pd.scheduler = std::make_shared<LooseScheduler>(std::move(placer), size_goal);
+            pd.scheduler = std::make_shared<LooseScheduler>(std::move(placer), std::lround(std::floor(size_goal)));
           }
           devs_[id] = std::move(pd);
         }

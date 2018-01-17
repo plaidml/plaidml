@@ -39,7 +39,7 @@ build:macos-10.12 --build_tag_filters=-large,-llvm,-darwin_fail,-msvc
 test:macos-10.12 --test_tag_filters=-large,-llvm,-darwin_fail,-msvc
 
 build:windows-10 --build_tag_filters=-deb,-keras,-llvm,-shell,-tensorflow,-uvc
-test:windows-10 --test_tag_filters=-deb,-keras,-llvm,-shell,-tensorflow,-uvc --test_env=NUMBER_OF_PROCESSORS
+test:windows-10 --test_tag_filters=-deb,-keras,-llvm,-shell,-tensorflow,-uvc,-windows_path_fail --test_env=NUMBER_OF_PROCESSORS
 
 build:callgrind -c dbg
 build:callgrind --cxxopt=-O3
