@@ -688,6 +688,10 @@ class device {
  public:
   device() = default;
 
+  bool operator!() const {
+    return !ptr_;
+  }
+
   buffer allocate(uint64_t size) const {
     buffer r;
 

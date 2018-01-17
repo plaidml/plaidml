@@ -24,7 +24,7 @@ class InputDepUpdater final : public AllocVisitor {
 
   void Visit(const TmpAlloc& tmp_alloc) final;
   void Visit(const ProgramInputAlloc& input_alloc) final {}
-  void Visit(const ProgramOutputAlloc& output_alloc) final {}
+  void Visit(const ProgramOutputAlloc& output_alloc) final;
 
  private:
   AllocPtr allocp_;
@@ -38,6 +38,11 @@ InputDepUpdater::InputDepUpdater(AllocPtr allocp, StepPtr stepp,
 
 void InputDepUpdater::Visit(const TmpAlloc& tmp_alloc) {
   IVLOG(5, "  Adding input dep for a" << (*allocp_)->idx << " on last writer s" << (*stepp_)->idx);
+  (*stepp_)->deps.insert(latest_tmp_writer_->at(allocp_));
+}
+
+void InputDepUpdater::Visit(const ProgramOutputAlloc& out_alloc) {
+  IVLOG(5, "  Adding output dep for a" << (*allocp_)->idx << " on last writer s" << (*stepp_)->idx);
   (*stepp_)->deps.insert(latest_tmp_writer_->at(allocp_));
 }
 
