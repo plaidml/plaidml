@@ -131,26 +131,30 @@ void Emit::Visit(const sem::BinaryExpr& n) {
 void Emit::Visit(const sem::CondExpr& n) {
   auto ty_tcase = TypeOf(n.tcase);
   auto ty_fcase = TypeOf(n.fcase);
+  auto ty_cond = TypeOf(n.cond);
   auto ty = Promote({ty_tcase, ty_fcase});
+  ty.vec_width = std::max(ty.vec_width, ty_cond.vec_width);
   emit("select(");
   EmitWithTypeConversion(ty_fcase, ty, n.fcase, true);
   emit(", ");
   EmitWithTypeConversion(ty_tcase, ty, n.tcase, true);
   emit(", ");
-  EmitWithWidthConversion(TypeOf(n.cond), ty, n.cond, true);
+  EmitWithWidthConversion(ty_cond, ty, n.cond, true);
   emit(")");
 }
 
 void Emit::Visit(const sem::SelectExpr& n) {
   auto ty_tcase = TypeOf(n.tcase);
   auto ty_fcase = TypeOf(n.fcase);
+  auto ty_cond = TypeOf(n.cond);
   auto ty = Promote({ty_tcase, ty_fcase});
+  ty.vec_width = std::max(ty.vec_width, ty_cond.vec_width);
   emit("select(");
   EmitWithTypeConversion(ty_fcase, ty, n.fcase, true);
   emit(", ");
   EmitWithTypeConversion(ty_tcase, ty, n.tcase, true);
   emit(", ");
-  EmitWithWidthConversion(TypeOf(n.cond), ty, n.cond, true);
+  EmitWithWidthConversion(ty_cond, ty, n.cond, true);
   emit(")");
 }
 

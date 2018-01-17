@@ -924,6 +924,10 @@ extern "C" bool plaidml_save_function(plaidml_function* function, const char* fi
 }
 
 extern "C" plaidml_function* plaidml_load_function(vai_ctx* ctx, plaidml_device* platform, const char* filename) {
+  if (!platform) {
+    vertexai::SetLastOOM();
+    return 0;
+  }
   try {
     unzFile in_file = unzOpen64(filename);
     std::string xo = read_string(in_file, "code");

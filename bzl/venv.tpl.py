@@ -16,10 +16,7 @@ WORKSPACE = "__BZL_WORKSPACE__"
 
 
 def _find_in_runfiles(logical_name):
-    key = logical_name
-    if key.startswith('external/'):
-        key = key[len('external/'):]
-    key = WORKSPACE + '/' + key
+    key = WORKSPACE + '/' + logical_name
     try:
         return _find_in_runfiles.manifest.get(key, logical_name)
     except AttributeError:
@@ -46,7 +43,7 @@ class VirtualEnv(object):
             hasher.update(arg)
         for requirement in requirements:
             with open(_find_in_runfiles(requirement)) as file_:
-                hasher.update(file_.read())
+                hasher.update(file_.read().encode())
         self._path = os.path.join(os.path.expanduser('~'), '.t2', 'venv', hasher.hexdigest())
 
         if platform.system() == 'Windows':

@@ -194,11 +194,13 @@ void ExprType::Visit(const sem::BinaryExpr& n) {
 
 void ExprType::Visit(const sem::CondExpr& n) {
   ty_ = Promote({TypeOf(n.tcase), TypeOf(n.fcase)});
+  ty_.vec_width = std::max(ty_.vec_width, TypeOf(n.cond).vec_width);
   IVLOG(5, "ExprType(CondExpr): " << ty_);
 }
 
 void ExprType::Visit(const sem::SelectExpr& n) {
   ty_ = Promote({TypeOf(n.tcase), TypeOf(n.fcase)});
+  ty_.vec_width = std::max(ty_.vec_width, TypeOf(n.cond).vec_width);
   IVLOG(5, "ExprType(SelectExpr): " << ty_);
 }
 
