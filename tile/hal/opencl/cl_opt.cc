@@ -103,6 +103,14 @@ class InsnOptimizer : public sem::Visitor {
   void Visit(const sem::Function& node) override {
     lang::Scope<sem::Type> scope;
     scope_ = &scope;
+    for (const auto& p : node.params) {
+      auto ty = p.first;
+      if (ty.dtype == lang::DataType::BOOLEAN) {
+        // Global booleans are stored as INT8.
+        ty.dtype = lang::DataType::INT8;
+      }
+      scope.Bind(p.second, ty);
+    }
     EvalStmt(node.body);
   }
 

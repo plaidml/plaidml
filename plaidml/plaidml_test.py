@@ -56,7 +56,7 @@ class TestPlaidML(unittest.TestCase):
     def testBufferRanges(self):
         ctx = plaidml.Context()
         with plaidml.open_first_device(ctx) as dev:
-            buf = plaidml.Tensor(dev, plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 10))
+            buf = plaidml.Tensor(dev, plaidml.Shape(ctx, plaidml.DType.FLOAT32, 10))
             with buf.mmap_current() as view:
                 self.assertEqual(len(view), 10)
                 view[0] = 1
@@ -73,8 +73,8 @@ class TestPlaidML(unittest.TestCase):
         ctx = plaidml.Context()
         reshape = plaidml.Function(
             "function (I) -> (O) { F[3*j + k: 4 * 3] = >(I[j,k]); O[p,q : 6,2] = >(F[2*p + q]);}")
-        iShape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 4, 3)
-        oShape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 6, 2)
+        iShape = plaidml.Shape(ctx, plaidml.DType.FLOAT32, 4, 3)
+        oShape = plaidml.Shape(ctx, plaidml.DType.FLOAT32, 6, 2)
         with plaidml.open_first_device(ctx) as dev:
             I = plaidml.Tensor(dev, iShape)
             with I.mmap_discard(ctx) as view:
@@ -111,7 +111,7 @@ class TestPlaidML(unittest.TestCase):
     def runMatrixMultiply(self, ctx, dev):
         matmul = plaidml.Function(
             "function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
-        shape = plaidml.Shape(ctx, plaidml.DATA_FLOAT32, 3, 3)
+        shape = plaidml.Shape(ctx, plaidml.DType.FLOAT32, 3, 3)
         b = plaidml.Tensor(dev, shape)
         with b.mmap_discard(ctx) as view:
             view[0] = 1.0
@@ -168,7 +168,7 @@ class TestPlaidML(unittest.TestCase):
     def testTransferLargeNDArray(self):
         size = 3000000
         shape = (size,)
-        dtype = plaidml.DATA_FLOAT32
+        dtype = plaidml.DType.FLOAT32
 
         ctx = plaidml.Context()
         with plaidml.open_first_device(ctx) as dev:

@@ -188,6 +188,17 @@ def opTest(in_data,
                 gfn = b.function(x, df, updates=[])
                 fr = f.eval()
                 gr = gfn([t for t in data if hasattr(t, 'shape')])
+                try:
+                    values = gr[0].values
+                    dense_shape = gr[0].dense_shape
+                    indices = gr[0].indices
+                    result = np.zeros(dense_shape)
+                    for i in indices:
+                        result[i] += values[i]
+                    gr[0] = result
+                except AttributeError:
+                    # This wasn't an IndexedSlices object, do nothing
+                    pass
                 if verbose:
                     print(b, fr, gr)
                 results.append((fr, gr))
@@ -264,6 +275,30 @@ class TestBackendOps(unittest.TestCase):
     def testPassthrough(self, b):
         return b.variable(m(3, 3))
 
+    @compareForwardExact(skip_tensorflow=True)
+    def testArgmax(self, b):
+        # We are using Theano style (keepdims), not TF style (not keepdims)
+        return b.equal(b.argmax(b.variable(m(3, 3))), b.argmax(b.variable(m(3, 3))))
+
+    @compareForwardExact(skip_tensorflow=True)
+    def testArgmaxUnequal(self, b):
+        # We are using Theano style (keepdims), not TF style (not keepdims)
+        x = b.variable(m(3, 2))
+        y = b.variable(np.array([[2, 4], [5, -1], [3, 0]]))
+        return b.equal(b.argmax(x, axis=0), b.argmax(y, axis=0))
+
+    @compareForwardExact(skip_tensorflow=True)
+    def testArgmin(self, b):
+        # We are using Theano style (keepdims), not TF style (not keepdims)
+        return b.equal(b.argmax(-b.variable(m(3, 3))), b.argmin(b.variable(m(3, 3))))
+
+    @compareForwardExact(skip_tensorflow=True)
+    def testArgminUnequal(self, b):
+        # We are using Theano style (keepdims), not TF style (not keepdims)
+        x = b.variable(m(3, 2))
+        y = b.variable(np.array([[2, 4], [5, -1], [3, 0]]))
+        return b.equal(b.argmin(x, axis=0), b.argmin(y, axis=0))
+
     @opTest([
         [m(3, 3), m(3, 3)],
         [m(2, 3, 4, 5), m(2, 3, 5, 2)],
@@ -305,6 +340,10 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(2, 4, 5)]])
     def testBatchFlatten(self, b, x):
         return [b.batch_flatten(x)]
+
+    @opTest([[m(2, 4, 7)]])
+    def testFlatten(self, b, x):
+        return [b.flatten(x)]
 
     #TODO: Does not need to exist longterm
     @unittest.skip("Helper test for debugging testAddElements, not standalone")
@@ -520,7 +559,8 @@ class TestBackendOps(unittest.TestCase):
     def testSqrt(self, b, x):
         return [b.sqrt(x)]
 
-    @opTest([[np.sqrt(m(5, 5, 10) + 2) - 3]], 1e-02, skip_theano=True)
+    @opTest([[np.sqrt(m(5, 5, 10) + 2) - 3],
+             [np.sin(m(4, 3, 2, 1, 6))]], 1e-02, skip_theano=True)
     def testSoftmax(self, b, x):
         return [-b.log(b.softmax(x))]
 
@@ -564,6 +604,44 @@ class TestBackendOps(unittest.TestCase):
     def testSparseCategoricalCrossentropy(self, b, x):
         smax = b.softmax(x)
         sbest = b.variable(np.array([[7, 8, 5], [9, 3, 8], [0, 7, 6]]))
+        return [
+            b.sparse_categorical_crossentropy(sbest, smax),
+            b.sparse_categorical_crossentropy(sbest, smax, from_logits=True)
+        ]
+
+    @opTest([[m(1, 3, 10)]], skip_theano=True, tol=0.01)
+    def testSparseCategoricalCrossentropyUnbalanced(self, b, x):
+        smax = b.softmax(x)
+        sbest = b.variable(np.array([[7, 8, 5]]))
+        return [
+            b.sparse_categorical_crossentropy(sbest, smax),
+            b.sparse_categorical_crossentropy(sbest, smax, from_logits=True)
+        ]
+
+    @opTest([[m(3, 10)]], skip_theano=True, tol=0.001)
+    def testSparseCategoricalCrossentropyShort(self, b, x):
+        smax = b.softmax(x)
+        sbest = b.variable(np.array([7, 8, 5]))
+        return [
+            b.sparse_categorical_crossentropy(sbest, smax),
+            b.sparse_categorical_crossentropy(sbest, smax, from_logits=True)
+        ]
+
+    @unittest.skip("TODO: Broken in TF until Keras 2.1.2 or later")
+    @opTest([[m(3, 3, 2, 10)]], skip_theano=True, tol=0.01)
+    def testSparseCategoricalCrossentropyLong(self, b, x):
+        smax = b.softmax(x)
+        sbest = b.variable(np.array([[[1,7], [2,8], [9,5]], [[4, 9], [0,3], [9,8]], [[0,0], [6,7], [6,6]]]))
+        return [
+            b.sparse_categorical_crossentropy(sbest, smax),
+            b.sparse_categorical_crossentropy(sbest, smax, from_logits=True)
+        ]
+
+    @unittest.skip("TODO: Broken in TF until Keras 2.1.2 or later")
+    @opTest([[m(3, 3, 2, 1, 10)]], skip_theano=True, tol=0.01)
+    def testSparseCategoricalCrossentropyXLong(self, b, x):
+        smax = b.softmax(x)
+        sbest = b.variable(np.array([[[[1],[7]], [[2],[8]], [[9],[5]]], [[[4], [9]], [[0],[3]], [[9],[8]]], [[[0],[0]], [[6],[7]], [[6],[6]]]]))
         return [
             b.sparse_categorical_crossentropy(sbest, smax),
             b.sparse_categorical_crossentropy(sbest, smax, from_logits=True)
@@ -765,6 +843,17 @@ class TestBackendOps(unittest.TestCase):
             b.pool2d(x, (3, 3), strides=(2, 2), pool_mode='max', padding='same')
         ]
 
+    @opTest(
+        [
+            [m(3, 3, 4, 5, 2)],
+            [m(1, 5, 4, 7, 1)],
+        ], skip_theano=True)
+    def testPool3D(self, b, x):
+        return [
+            b.pool3d(x, (1, 2, 2), strides=(2, 1, 2), pool_mode='max', padding='valid'),
+            b.pool3d(x, (2, 2, 3), strides=(2, 3, 1), pool_mode='avg', padding='same'),
+        ]
+
     @opTest([
         [m(1, 1, 60), (60,)],
         [m(4, 3, 70, 2), (14, 10, 6, 2)],
@@ -941,15 +1030,37 @@ class TestBackendOps(unittest.TestCase):
     def testVarSimple(self, b, x, ax=None, kd=False):
         return [b.var(x, axis=ax, keepdims=kd)]
 
+    @opTest(
+        [
+            [m(3, 4)],
+            [m(1, 5, 2)],
+            [m(7, 2), None, True],
+            [m(2, 1, 5, 7, 3), 4],
+        ], atol=1e-7)
+    def testStd(self, b, x, ax=None, kd=False):
+        return [b.std(x, axis=ax, keepdims=kd)]
+
     @opTest([[m(3, 3)]])
     def testSelfMult(self, b, x):
         A = x
         return [b.dot(A, A)]
 
-    @unittest.skip("TODO(T1037): This test is not yet working")
-    @opTest([[np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]])]])
+    @opTest(
+        [
+            [m(3, 4), 0],
+            [m(1, 3, 2, 4), [0, 2]],
+            [m(1, 2, 2, 2), 3],
+        ])
+    def testReverse(self, b, x, ax):
+        return [b.reverse(x, ax)]
+
+    @opTest([[np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]])],
+             [np.array([[[3., 2., 4.], [1., 0., -1.], [1.4, 2.5, 3.4], [2.4, 3.6, 4.4]],
+                        [[-3., 1.1, 4.1], [3.2, -0.4, -4.], [-1.5, 2.2, 3.99], [2.114, -3.2, -4.]],
+                        [[4.1, -1.2, .1234], [4.2, .943, 9.21], [43.4, 47.1, 22.], [0.0, -3434., -2.4]]])]])
     def testGather(self, b, v):
         I = b.variable(np.array([0, 2, 1, 0], dtype='int32'), dtype='int32')
+        I2 = b.variable(np.array([[2, 1], [0, 1], [1, 0], [2, 1], [0, 0]], dtype='int32'), dtype='int32')
         return [b.gather(v, I)]
 
     @compareForwardClose()
@@ -957,6 +1068,13 @@ class TestBackendOps(unittest.TestCase):
         V = b.variable(np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]]))
         I = b.variable(
             np.array([[0, 1, 1, 0], [0, 0, 0, 1], [1, 0, 1, 0]], dtype='int32'), dtype='int32')
+        return b.gather(V, I)
+
+    @compareForwardClose()
+    def testGatherWithA1Dim(self, b):
+        V = b.variable(np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]]))
+        I = b.variable(
+            np.array([[0], [1], [0]], dtype='int32'), dtype='int32')
         return b.gather(V, I)
 
     @compareForwardClose()
