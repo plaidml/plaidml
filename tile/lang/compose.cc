@@ -222,7 +222,22 @@ FunctionValue::FunctionValue(std::string fn, std::vector<std::shared_ptr<Value>>
     dims_.push_back(IConstValue::make(inputs_[0]->num_dims()));
     return;
   }
-  // TODO: "gather" + "scatter"
+  if (fn_ == "gather") {
+      for(size_t i = 0; i < inputs_[1]->num_dims(); i++) {
+          dims_.push_back(inputs_[1]->dim_value(i));
+      }
+      for(size_t i = 1; i < inputs_[0]->num_dims(); i++) {
+          dims_.push_back(inputs_[0]->dim_value(i));
+      }
+      return;
+  }
+  if (fn_ == "scatter") {
+      dims_.push_back(inputs_[2]->dim_value(0));
+      for(size_t i = inputs_[1]->num_dims(); i < inputs_[0]->num_dims(); i++) {
+          dims_.push_back(inputs_[0]->dim_value(i));
+      }
+      return;
+  }
   size_t max_dims = 0;
   for (size_t i = 0; i < inputs_.size(); i++) {
     IVLOG(4, "  input[" << i << "]->num_dims is " << inputs_[i]->num_dims());
