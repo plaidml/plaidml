@@ -491,9 +491,13 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
         throw std::runtime_error("reshape only works on tensors");
       }
       if (in_binding.shape.byte_size() != out_binding.shape.byte_size()) {
+        IVLOG(1, "Input shape = " << in_binding.shape);
+        IVLOG(1, "Output shape = " << out_binding.shape);
         throw std::runtime_error("Invalid reshape");
       }
       if (in_binding.shape.elem_size() != out_binding.shape.elem_size()) {
+        IVLOG(1, "Input shape = " << in_binding.shape);
+        IVLOG(1, "Output shape = " << out_binding.shape);
         throw std::runtime_error("Invalid reshape");
       }
 
@@ -718,6 +722,9 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
         }
         dop.f.params.push_back(sout);
         dop.f.params.push_back(vout);
+      }
+      if (op.f.fn == "scatter") {
+        r.kernels.push_back(GenZero(vars.at(op.output).shape, op.output, "zero_" + next_kname()));
       }
       GenSpecial(r, dop, vars, next_kname(), settings);
       continue;

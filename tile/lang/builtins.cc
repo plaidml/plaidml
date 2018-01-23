@@ -96,7 +96,7 @@ std::map<std::string, std::shared_ptr<BoundFunction>> DerivDefines = {
     {"shape", ddef({"0"})},
     {"gather", std::make_shared<BoundFunction>(R"***(
       function (X1, X2, Y, DY) -> (DX1, DX2) {
-        DX1 = scatter(DY, X2);
+        DX1 = scatter(DY, X2, X1);
         DX2 = 0;
       } )***")},
     {"builtin_softmax", std::make_shared<BoundFunction>(R"***(

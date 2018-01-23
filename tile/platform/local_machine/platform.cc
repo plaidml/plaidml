@@ -107,13 +107,11 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
                                                                              : devset->host_memory());
           auto placer = std::make_shared<BlockPlacer>(memory->ArenaBufferAlignment());
           if (dev->executor() && dev->executor()->is_synchronous()) {
-            IVLOG(1, "Using transitive dep scheduler");
-            pd.scheduler = std::make_shared<TransitiveDepScheduler>(std::move(placer), 0);
-          } else {
-            auto size_goal = memory->size_goal() * kGoalMemPercentage;
-            IVLOG(1, "Using loose scheduler; size_goal=" << size_goal);
-            pd.scheduler = std::make_shared<LooseScheduler>(std::move(placer), std::lround(std::floor(size_goal)));
+            IVLOG(1, "Device is synchronous");
           }
+          auto size_goal = memory->size_goal() * kGoalMemPercentage;
+          IVLOG(1, "Using loose scheduler; size_goal=" << size_goal);
+          pd.scheduler = std::make_shared<LooseScheduler>(std::move(placer), std::lround(std::floor(size_goal)));
           devs_[id] = std::move(pd);
         }
       }

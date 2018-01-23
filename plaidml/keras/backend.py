@@ -51,14 +51,14 @@ class PlaidMLKerasException(Exception):
 
 
 _dtypes = {
-    'float16': plaidml.DATA_FLOAT16,
-    'float32': plaidml.DATA_FLOAT32,
-    'float64': plaidml.DATA_FLOAT64,
-    'bool': plaidml.DATA_BOOLEAN,
-    'int32': plaidml.DATA_INT32,
-    'int64': plaidml.DATA_INT64,
-    'uint32': plaidml.DATA_UINT32,
-    'uint64': plaidml.DATA_UINT64,
+    'float16': plaidml.DType.FLOAT16,
+    'float32': plaidml.DType.FLOAT32,
+    'float64': plaidml.DType.FLOAT64,
+    'bool': plaidml.DType.BOOLEAN,
+    'int32': plaidml.DType.INT32,
+    'int64': plaidml.DType.INT64,
+    'uint32': plaidml.DType.UINT32,
+    'uint64': plaidml.DType.UINT64,
 }
 
 _in_train_phase = None  #Will be initialized on first use
@@ -174,6 +174,20 @@ def _plaidml_val(x, indent=0):
                           O = 0 < I;
                       }"""
             x = _Op('eq_argmax', 'bool', sum_op.shape, eq_f, {'I': sum_op}, ['O'])
+        if x.ident == 'slice' and x._inputs['I'].ident == 'shape' and isinstance(x.original_key, int):
+            in_tensor = x._inputs['I']._inputs['T']
+            key = x.original_key
+            if not isinstance(key, int):
+                raise ValueError("The output of shape can only be sliced using integers; received type '{}'".format(type(key)))
+            if key < -in_tensor.ndim or key >= in_tensor.ndim:
+                raise ValueError("Asked to get dimension {} of a tensor with only {} dimensions".format(key, in_tensor.ndim))
+            if key < 0:
+                key = key % in_tensor.ndim
+            name = 'extract_shape{}'.format(key)
+            f = """ function (I[{dims}]) -> (O) {{
+                        O = N{key};
+                    }}""".format(dims=", ".join("N{}".format(i) for i in range(in_tensor.ndim)), key=key)
+            x = _Op(name, 'int32', tuple(), f, {'I': in_tensor}, ['O'])
 
     except:
         pass
@@ -384,7 +398,9 @@ class _Var(object):
         }
         code = ('function (I[{indims}]) -> (O) {{{offsets}\n{body}\n}}').format(**subs)
 
-        return _Op('slice', self.dtype, shape, code, {'I': self}, ['O'])
+        op = _Op('slice', self.dtype, shape, code, {'I': self}, ['O'])
+        op.original_key = key   # Make key info available for special slice-of-shape parsing
+        return op
 
     def __str__(self):
         return self.name + '[' + ', '.join([str(dim) for dim in self.shape]) + ']'
@@ -527,6 +543,20 @@ class _Var(object):
                 '}}').format(
                     idims=", ".join(in_dim_list), odims=", ".join(out_dim_list))
         return _Op('batch_flatten', self.dtype, py_shape, code, {'I': self}, ['O'])
+
+    def flatten(self):
+        in_dim_list = ["N{}".format(i) for i in range(self.ndim)]
+        out_dim_list = ["*".join(["N{}".format(i) for i in range(self.ndim)])]
+        py_out_dim = 1
+        for i in range(self.ndim):
+            if self.shape[i] is not None:
+                py_out_dim *= self.shape[i]
+            else:
+                py_out_dim = None
+                break
+        code = 'function (I[{idims}]) -> (O) {{\n  O = reshape(I, {odims});\n}}'.format(
+                idims=", ".join(in_dim_list), odims=", ".join(out_dim_list))
+        return _Op('flatten', self.dtype, [py_out_dim], code, {'I': self}, ['O'])
 
     def reshape(self, shape):
         in_dim_list = ["N{}".format(i) for i in range(self.ndim)]
@@ -917,12 +947,14 @@ class _Function(object):
         self._input_names = ['I' + str(n) for n in range(len(inputs))]
         self._output_names = ['O' + str(n) for n in range(len(outputs))]
         self._name = name
+        self._input_types = dict()  # Will be filled with dtype of each input
 
         c = plaidml.Composer()
         for (name, val) in zip(self._input_names, inputs):
             if isinstance(_plaidml_val(val), plaidml._Var):
                 if isinstance(_plaidml_val(val), plaidml.Placeholder):
                     c.add_input(name, _plaidml_val(val))
+                    self._input_types[name] = val.dtype
                 else:
                     raise RuntimeError("_Function given unexpected input type {}".format(
                         type(val)))
@@ -952,7 +984,7 @@ class _Function(object):
             elif isinstance(val, float):
                 val = plaidml.Real(val)
             else:
-                val = variable(val)._plaidml_val()
+                val = variable(val, dtype=self._input_types[name])._plaidml_val()
             self._invoker.set_input(name, val)
 
         tensors = [
@@ -1006,7 +1038,8 @@ def argmax(x, axis=-1):
 
 
 def argmin(x, axis=-1):
-    _report_unimplemented('argmin')
+    # Do argmin(x) by computing argmax(-x)
+    return _Op('argmax', x.dtype, x.shape, None, OrderedDict([('I', -x), ('axis', axis)]), ['O'])
 
 
 def backend():
@@ -1291,14 +1324,14 @@ def cos(x):
 # Logic comes for apeing TF, which I think is a poor choice but good for compatibility
 def pad_compute(sym, input_size, filter_size, stride, padding):
     if padding == 'valid':
-        if input_size is None:
+        if input_size is None or isinstance(input_size, _Op):
             num_out_size = None
         else:
             num_out_size = int((input_size - filter_size + stride) // stride)
         sym_output_size = "({sym} - {fs} + {s}) / {s}".format(sym=sym, fs=filter_size, s=stride)
         sym_padding_before = 0
     elif padding == 'same':
-        if input_size is None:
+        if input_size is None or isinstance(input_size, _Op):
             num_out_size = None
         else:
             num_out_size = int((input_size + stride - 1) // stride)
@@ -1388,7 +1421,7 @@ def _format_conv_strings(rank,
                                                     dilation_rate[i] * (kernel_shape[i] - 1) + 1,
                                                     strides[i], padding)
         else:
-            sym_out, sym_pad, num_out = pad_compute(str(in_shape[l[i]]), in_shape[l[i]],
+            sym_out, sym_pad, num_out = pad_compute("D{}".format(i), in_shape[l[i]],
                                                     dilation_rate[i] * (kernel_shape[i] - 1) + 1,
                                                     strides[i], padding)
         sym_out_shape.append(sym_out)
@@ -1402,8 +1435,8 @@ def _format_conv_strings(rank,
         for i in range(rank):
             computed_output_shape[l[i]] = num_out_shape[i]
         for i in range(rank + 2):
-            if computed_output_shape[i] is not None and expected_output_shape[i] is not None \
-                    and computed_output_shape[i] != expected_output_shape[i]:
+            if computed_output_shape[i] is not None and not isinstance(computed_output_shape[i], _Var) and \
+                    expected_output_shape[i] is not None and computed_output_shape[i] != expected_output_shape[i]:
                 raise ValueError("Expected convolution output of shape {}, received {}".format(
                         expected_output_shape, computed_output_shape))
     padding_list = ["  Pad{} = {};".format(i, pad_amount[i]) for i in range(rank)]
@@ -1422,7 +1455,7 @@ def _format_conv_strings(rank,
             out_dims_str = "N, CO, " + ", ".join(["{}".format(sym_out_shape[i]) for i in range(rank)])
             outshape = [in_shape[0]] + [kernel_shape[-1]] + num_out_shape
         else:
-            input_dims_str = "N, CI, " + ", ".join(str(in_shape[l[i]]) for i in range(rank))
+            input_dims_str = "N, CI, " + ", ".join("D{}".format(i) for i in range(rank))
             out_dims_str = "N, CO, " + ", ".join(["L{}".format(i) for i in range(rank)])
         out_idx_str = "n, co, " + ", ".join(["x{}".format(i) for i in range(rank)])
         input_idx_str = "n, ci, " + ", ".join(input_idx_list)
@@ -1432,7 +1465,7 @@ def _format_conv_strings(rank,
             out_dims_str = "N, " + ", ".join(["{}".format(sym_out_shape[i]) for i in range(rank)]) + ", CO"
             outshape = [in_shape[0]] + num_out_shape + [kernel_shape[-1]]
         else:
-            input_dims_str = "N, " + ", ".join(str(in_shape[l[i]]) for i in range(rank)) + ", CI"
+            input_dims_str = "N, " + ", ".join("D{}".format(i) for i in range(rank)) + ", CI"
             out_dims_str = "N, " + ", ".join(["L{}".format(i) for i in range(rank)]) + ", CO"
         out_idx_str = "n, " + ", ".join(["x{}".format(i) for i in range(rank)]) + ", co"
         input_idx_str = "n, " + ", ".join(input_idx_list) + ", ci"
@@ -1469,6 +1502,8 @@ def _format_conv_strings(rank,
             'padding_str': padding_str}
     if forward:
         ret['outshape_tuple'] = outshape
+    else:
+        ret['dim_input'] = ', ' + ', '.join(['D{}'.format(i) for i in range(rank)])
     return ret
 
 
@@ -1536,7 +1571,8 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
         raise ValueError("Transpose convolution strides inconsistent with input shape: " +
                          "{} (rank {}) v {} (rank {})".format(strides, len(strides),
                                                               x.shape, x.ndim - 2))
-    if x.shape[0] != output_shape[0] and x.shape[0] is not None and output_shape[0] is not None:
+    if x.shape[0] != output_shape[0] and x.shape[0] is not None \
+            and output_shape[0] is not None and not isinstance(output_shape[0], _Var):
         raise ValueError("Transpose convolution batch size inconsistent between input " +
                          "and output: {} v {}".format(x.shape[0], output_shape[0]))
 
@@ -1551,12 +1587,27 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
                                      False,
                                      x.shape)
 
-    f = ('function (O[{out_dims_str}], K[{ker_dims_str}]) ' + '-> (I) {{\n{padding_str}\n' +
+    f = ('function (O[{out_dims_str}], K[{ker_dims_str}]{dim_input}) ' + '-> (I) {{\n{padding_str}\n' +
          '  I[{input_idx_str} : {input_dims_str}]' +
          '= +(O[{out_idx_str}]*K[{ker_idx_str}]);\n}}').format(**conv_strs)
-    # TODO print("Requesting function:\n{}\nBased on conv_strs:\n{}".format(f, conv_strs))
     name = "conv{}d".format(rank)
-    return _Op(name, x.dtype, tuple(output_shape), f, OrderedDict([('O', x), ('K', kernel)]), ['I'])
+    # Output shape may be dynamic, so pass its sizes as inputs to Tile
+    if data_format == 'channels_first':
+        l = [i + 2 for i in range(rank)]
+    elif data_format == 'channels_last':
+        l = [i + 1 for i in range(rank)]
+    else:
+        raise ValueError("Unrecognized data format '{}'".format(data_format))
+    input_tensors = OrderedDict([('O', x), ('K', kernel)])
+    for i in range(rank):
+        input_tensors['D{}'.format(i)] = output_shape[l[i]]
+    # If output shape was dynamically calculated, pass through Keras size as None
+    output_shape = list(output_shape)
+    for i in range(rank + 2):
+        if isinstance(output_shape[i], _Var):
+            output_shape[i] = None
+    output_shape = tuple(output_shape)
+    return _Op(name, x.dtype, tuple(output_shape), f, input_tensors, ['I'])
 
 
 def _func_once(func):
@@ -1842,7 +1893,7 @@ def expand_dims(x, axis=-1):
 
 
 def flatten(x):
-    _report_unimplemented('flatten')
+    return x.flatten()
 
 
 def floor(x):
@@ -1867,6 +1918,7 @@ def function(inputs, outputs, updates=None, name=None):
 
 
 def gather(v, i):
+    i = cast(i, 'int32')
     f = """function (V, I) -> (OUT) {
                OUT = gather(V, I);
            }"""
@@ -2318,7 +2370,13 @@ def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool
 
 
 def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, pool_mode='max'):
-    _report_unimplemented('pool3d')
+    return pool(
+        x,
+        pool_size,
+        strides=strides,
+        padding=padding,
+        data_format=data_format,
+        pool_mode=pool_mode)
 
 
 def print_tensor(x, message=''):
@@ -2467,7 +2525,20 @@ def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
 
 
 def reverse(x, axes):
-    _report_unimplemented('reverse')
+    if isinstance(axes, int):
+        axes = [axes]
+    for axis in axes:
+        if not isinstance(axis, int):
+            raise ValueError("The axes parameter of reverse only accepts an integer or a list of integers, received {}".format(type(axis)))
+        if axis >= x.ndim or axis < -x.ndim:
+            raise ValueError("Invalid axis {} in reverse: target {} too short (ndim={})".format(axis, x, x.ndim))
+    axes = [a % x.ndim for a in axes]
+    dims = ", ".join("N{}".format(j) for j in range(x.ndim))
+    in_idxs = ", ".join("i{}".format(j) for j in range(x.ndim))
+    out_idxs = ", ".join(("N{j} - 1 - i{j}" if j in axes else "i{j}").format(j=j) for j in range(x.ndim))
+    f = """function (I[{dims}]) -> (O) {{\nO[{out_idxs}: {dims}] = =(I[{in_idxs}]);\n}}""".format(
+            dims=dims, out_idxs=out_idxs, in_idxs=in_idxs)
+    return _Op('reverse', x.dtype, x.shape, f, {'I': x}, ['O'])
 
 
 def reverse_gradient(x, coeff=1.0):
@@ -2594,7 +2665,7 @@ def softsign(x):
 
 
 def sparse_categorical_crossentropy(target, output, from_logits=False):
-    return categorical_crossentropy(one_hot(target, output.shape[-1]), output, from_logits)
+    return categorical_crossentropy(reshape(one_hot(target, output.shape[-1]), output.shape), output, from_logits)
 
 
 def spatial_3d_padding(x, padding=((1, 1), (1, 1), (1, 1)), data_format=None):
@@ -2628,7 +2699,7 @@ def stack(x, axis=0):
 
 
 def std(x, axis=None, keepdims=False):
-    _report_unimplemented('std')
+    return sqrt(var(x, axis=axis, keepdims=keepdims))
 
 
 def stop_gradient(variables):

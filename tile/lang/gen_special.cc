@@ -73,7 +73,7 @@ static void GenGather(KernelList& r, const Op& op, const Bindings& bindings,  //
   }
 
   // Generate the data offset
-  sem::ExprPtr data_offset = _Clamp(_("idx")[idx_offset], _Const(0), _Const(data_shape.dims[0].size));
+  sem::ExprPtr data_offset = _Clamp(_("idx")[idx_offset], _Const(0), _Const(data_shape.dims[0].size - 1));
   data_offset = data_offset * data_shape.dims[0].stride;
   for (size_t i = 1; i < data_shape.dims.size(); i++) {
     data_offset = data_offset + lid_vars[idx_shape.dims.size() + i] * data_shape.dims[i].stride;
@@ -93,8 +93,8 @@ static void GenGather(KernelList& r, const Op& op, const Bindings& bindings,  //
   KernelInfo ki;
   ki.kname = kname;
   ki.outputs.push_back(op.output);
-  ki.inputs.push_back(op.inputs[0]);
-  ki.inputs.push_back(op.inputs[1]);
+  ki.inputs.push_back(r.var_rewrites.Lookup(op.inputs[0]));
+  ki.inputs.push_back(r.var_rewrites.Lookup(op.inputs[1]));
   ki.kfunc = std::make_shared<sem::Function>(kname, sem::Type(sem::Type::TVOID), params, body);
   auto grids = gid::ComputeGrids(gids, settings.threads);
   uint64_t out_size = out_shape.elem_size();
@@ -119,7 +119,112 @@ static void GenScatter(KernelList& r, const Op& op, const Bindings& bindings,  /
                        const std::string& kname, const HardwareSettings& settings) {
   using namespace vertexai::tile::sem::builder;  // NOLINT
   IVLOG(3, "Making a scatter");
-  throw std::runtime_error("Scatter unimplemented");
+
+  // Extract shapes to locals
+  const TensorShape out_shape = bindings.at(op.output).shape;
+  const TensorShape expn_shape = bindings.at(op.inputs[0]).shape;
+  const TensorShape idx_shape = bindings.at(op.inputs[1]).shape;
+  const TensorShape val_shape = bindings.at(op.inputs[2]).shape;
+
+  // Make an empty function body
+  auto body = _Block({});
+
+  // Generate expressions for the GIDs.
+  std::vector<size_t> lidx_sizes;
+
+  for (size_t i = idx_shape.dims.size(); i < expn_shape.dims.size(); ++i) {
+    lidx_sizes.push_back(expn_shape.dims[i].size);
+  }
+
+  auto gids = gid::MakeMap(settings.goal_dimension_sizes, lidx_sizes);
+  std::vector<sem::ExprPtr> gid_vars;
+  gid_vars.reserve(gids.gid_sizes.size());
+  for (std::size_t idx = 0; idx < gids.gid_sizes.size(); ++idx) {
+    std::string var = "gidx" + std::to_string(idx);
+    body->append(_Declare({sem::Type::INDEX}, var, _Index(sem::IndexExpr::GLOBAL, idx)));
+    gid_vars.push_back(_(var));
+  }
+
+  // Generate expressions for the logical dimension indicies.
+  std::vector<sem::ExprPtr> lid_vars;
+  lid_vars.reserve(gids.dims.size());
+  for (std::size_t idx = 0; idx < gids.dims.size(); ++idx) {
+    std::string var = "lidx" + std::to_string(idx);
+    auto index = gid::LogicalIndex(gid_vars, gids.dims[idx]);
+    body->append(_Declare({sem::Type::INDEX}, var, index));
+    lid_vars.push_back(_(var));
+  }
+
+  // inner is what will be inside the for loops over the index dimensions
+  auto inner = _Block({});
+  // Generate the expansion offset
+  sem::ExprPtr expn_offset = _Const(0);
+  for (size_t i = 0; i < expn_shape.dims.size(); i++) {
+    if (i < idx_shape.dims.size()) {
+      expn_offset = expn_offset + _("i_" + std::to_string(i)) * expn_shape.dims[i].stride;
+    } else {
+      expn_offset = expn_offset + lid_vars[i - idx_shape.dims.size()] * expn_shape.dims[i].stride;
+    }
+  }
+  inner->append(_Declare({sem::Type::INDEX}, "expn_offset", expn_offset));
+
+  // Generate the index offset
+  sem::ExprPtr idx_offset = _Const(0);
+  for (size_t i = 0; i < idx_shape.dims.size(); i++) {
+    idx_offset = idx_offset + _("i_" + std::to_string(i)) * idx_shape.dims[i].stride;
+  }
+  inner->append(_Declare({sem::Type::INDEX}, "idx_offset", idx_offset));
+
+  // Generate the output offset
+  sem::ExprPtr out_offset = _Clamp(_("idx")[_("idx_offset")], _Const(0), _Const(out_shape.dims[0].size - 1));
+  out_offset = out_offset * out_shape.dims[0].stride;
+  for (size_t i = 1; i < out_shape.dims.size(); i++) {
+    out_offset = out_offset + lid_vars[i - 1] * out_shape.dims[i].stride;
+  }
+  inner->append(_Declare({sem::Type::INDEX}, "out_offset", out_offset));
+
+  // Add in this entry
+  inner->append(_("out")[_("out_offset")] = _("out")[_("out_offset")] + _("expn")[_("expn_offset")]);
+
+  // Loop over the index dimensions
+  for(size_t i = 0; i < idx_shape.dims.size(); ++i) {
+    auto next = _Block({});
+    next->append(_For("i_" + std::to_string(i), idx_shape.dims[i].size, 1, inner));
+    inner = next;
+  }
+  body->append(inner);
+
+  // Build function params
+  sem::Function::params_t params;
+  params.push_back(std::make_pair(sem::Type(sem::Type::POINTER_MUT, out_shape.type, 1, 0, sem::Type::GLOBAL), "out"));
+  params.push_back(
+      std::make_pair(sem::Type(sem::Type::POINTER_CONST, expn_shape.type, 1, 0, sem::Type::GLOBAL), "expn"));
+  params.push_back(std::make_pair(sem::Type(sem::Type::POINTER_CONST, idx_shape.type, 1, 0, sem::Type::GLOBAL), "idx"));
+
+  // Set kernel info
+  KernelInfo ki;
+  ki.kname = kname;
+  ki.outputs.push_back(op.output);
+  ki.inputs.push_back(r.var_rewrites.Lookup(op.inputs[0]));
+  ki.inputs.push_back(r.var_rewrites.Lookup(op.inputs[1]));
+  ki.kfunc = std::make_shared<sem::Function>(kname, sem::Type(sem::Type::TVOID), params, body);
+  auto grids = gid::ComputeGrids(gids, settings.threads);
+  uint64_t out_size = out_shape.elem_size();
+  ki.gwork = grids.first;
+  ki.lwork = grids.second;
+  ki.tot_bytes = out_size * ((bit_width(out_shape.type) + 7) / 8);
+  ki.tot_flops = out_size;
+  auto pb = ki.info.mutable_special();
+  pb->set_fn(op.f.fn);
+  ki.info.set_flops(ki.tot_flops);
+  ki.info.set_bytes(ki.tot_bytes);
+
+  // Dump the code
+  sem::Print dump(*ki.kfunc);
+  IVLOG(4, "CODE:\n" << dump.str());
+  IVLOG(4, "gwork: " << ki.gwork << ", lwork: " << ki.lwork);
+  // Add to kernel list
+  r.kernels.push_back(ki);
 }
 
 static void GenShape(KernelList& r, const Op& op, const Bindings& bindings,  // NOLINT(runtime/references)
@@ -216,7 +321,7 @@ static void GenPRNG(KernelList& r, const Op& op, const Bindings& bindings,  // N
   ki.kname = kname;
   ki.outputs.push_back(vout);
   ki.outputs.push_back(sout);
-  ki.inputs.push_back(op.inputs[0]);
+  ki.inputs.push_back(r.var_rewrites.Lookup(op.inputs[0]));
   ki.kfunc = std::make_shared<sem::Function>(kname, sem::Type(sem::Type::TVOID), params, body);
   uint64_t out_size = out_shape.elem_size();
   ki.gwork = {{k_rng_size, 1, 1}};

@@ -450,6 +450,31 @@ void TypeCheck(Program* prog, Bindings* vars) {
         IVLOG(4, "FunctionOp " << to_string(op) << " produces dims=" << to_string(out_shape));
         continue;
       }
+      if (op.f.fn == "scatter") {
+        Binding es = vars->at(op.inputs[0]);
+        Binding is = vars->at(op.inputs[1]);
+        Binding vs = vars->at(op.inputs[2]);
+        if (es.tag != Binding::TENSOR || is.tag != Binding::TENSOR || vs.tag != Binding::TENSOR) {
+          throw std::runtime_error("All inputs to scatter must be tensors (not constants)");
+        }
+        if (es.shape.dims.size() == 0) {
+          throw std::runtime_error("Data input to scatter must have at least 1 dimension");
+        }
+        if (is.shape.type != DataType::INT32) {
+          // TODO: Handle other integer types?  Floor floats?
+          throw std::runtime_error("Datatype for index input to scatter must be INT32");
+        }
+        out_type = es.shape.type;
+        std::vector<size_t> out_shape;
+        out_shape.push_back(vs.shape.dims[0].size);
+        for (size_t i = is.shape.dims.size(); i < es.shape.dims.size(); i++) {
+          out_shape.push_back(es.shape.dims[i].size);
+        }
+        // Add the output type
+        vars->emplace(op.output, Binding(SimpleShape(out_type, out_shape)));
+        IVLOG(4, "FunctionOp " << to_string(op) << " produces dims=" << to_string(out_shape));
+        continue;
+      }
       if (op.f.fn == "shape") {
         if (op.inputs.size() != 1) {
           throw new std::runtime_error("Shape requires exactly one input.");

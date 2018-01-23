@@ -40,6 +40,7 @@ from __future__ import print_function
 
 import contextlib
 import ctypes
+import enum
 import hashlib
 import logging
 import numpy as np
@@ -735,33 +736,35 @@ _DEVICE_DETAILS = 4
 
 _PROVIDER_DEVICES = 1
 
-DATA_INVALID = 0
-DATA_BOOLEAN = 2
-DATA_INT8 = 0x10
-DATA_INT16 = 0x11
-DATA_INT32 = 0x12
-DATA_INT64 = 0x13
-DATA_UINT8 = 0x20
-DATA_UINT16 = 0x21
-DATA_UINT32 = 0x22
-DATA_UINT64 = 0x23
-DATA_FLOAT16 = 0x31
-DATA_FLOAT32 = 0x32
-DATA_FLOAT64 = 0x33
+class DType(enum.IntEnum):
+    """Describes the type of a tensor element."""
+    INVALID = 0
+    BOOLEAN = 2
+    INT8 = 0x10
+    INT16 = 0x11
+    INT32 = 0x12
+    INT64 = 0x13
+    UINT8 = 0x20
+    UINT16 = 0x21
+    UINT32 = 0x22
+    UINT64 = 0x23
+    FLOAT16 = 0x31
+    FLOAT32 = 0x32
+    FLOAT64 = 0x33
 
 _CTYPES = {
-    DATA_BOOLEAN: ctypes.c_bool,
-    DATA_INT8: ctypes.c_int8,
-    DATA_INT16: ctypes.c_int16,
-    DATA_INT32: ctypes.c_int32,
-    DATA_INT64: ctypes.c_int64,
-    DATA_UINT8: ctypes.c_uint8,
-    DATA_UINT16: ctypes.c_uint16,
-    DATA_UINT32: ctypes.c_uint32,
-    DATA_UINT64: ctypes.c_uint64,
-    DATA_FLOAT16: ctypes.c_uint16,  # TODO: Implement half-width float wrapper
-    DATA_FLOAT32: ctypes.c_float,
-    DATA_FLOAT64: ctypes.c_double
+    DType.BOOLEAN: ctypes.c_bool,
+    DType.INT8: ctypes.c_int8,
+    DType.INT16: ctypes.c_int16,
+    DType.INT32: ctypes.c_int32,
+    DType.INT64: ctypes.c_int64,
+    DType.UINT8: ctypes.c_uint8,
+    DType.UINT16: ctypes.c_uint16,
+    DType.UINT32: ctypes.c_uint32,
+    DType.UINT64: ctypes.c_uint64,
+    DType.FLOAT16: ctypes.c_uint16,  # TODO: Implement half-width float wrapper
+    DType.FLOAT32: ctypes.c_float,
+    DType.FLOAT64: ctypes.c_double
 }
 
 
@@ -1139,7 +1142,7 @@ class _View(object):
         # Special handling since float16 is a placed into a uint16 on the C side
         # (since C has no half type), and yet we want the move the actual bits
         # across (not cast float -> int)
-        if self._dtype == DATA_FLOAT16:
+        if self._dtype == DType.FLOAT16:
             # Do a reinterpet cast... Is there a better way to do this?
             varray = np.array([0], dtype='float16')
             varray[0] = value
@@ -1149,12 +1152,12 @@ class _View(object):
 
     def as_ndarray(self):
         ar = np.ctypeslib.as_array(self, shape=tuple(dim.size for dim in self._shape.dimensions))
-        if self._dtype == DATA_FLOAT16:
+        if self._dtype == DType.FLOAT16:
             ar = ar.view(dtype='float16')
         return ar
 
     def copy_from_ndarray(self, src):
-        if self._dtype == DATA_FLOAT16:
+        if self._dtype == DType.FLOAT16:
             if src.dtype != 'float16':
                 src = src.astype('float16')
             src = src.view(dtype='uint16')
@@ -1163,7 +1166,7 @@ class _View(object):
 
     def copy_to_ndarray(self, dst):
         src = np.ctypeslib.as_array(self, shape=dst.shape)
-        if self._dtype == DATA_FLOAT16:
+        if self._dtype == DType.FLOAT16:
             src = src.view(dtype='float16')
         np.copyto(dst, src)
 
