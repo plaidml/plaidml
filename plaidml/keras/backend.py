@@ -1845,7 +1845,15 @@ def dtype(x):
 
 
 def elu(x, alpha=1.0):
-    _report_unimplemented('elu')
+	if alpha == 1:
+		f = """function (X, Alpha) -> (R) {
+				   A = exp(X)-1;
+				   R = (X < 0 ? A : X); }"""
+	else:
+		f = """function (X, Alpha) -> (R) {
+				   A = Alpha*exp(X)-Alpha;
+				   R = (X < 0 ? A : X); }"""
+	return _Op('elu', x.dtype, x.shape, f, {'X': x, 'Alpha': alpha}, ['R'])
 
 
 def eval(x):
