@@ -513,7 +513,18 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(3, 3), 2.0001, 5.0001]])
     def testClip(self, b, x, lo, hi):
         return [b.clip(x, lo, hi)]
-
+       
+    @opTest([
+        [m(3, 2) + 0.0001, -2, 1],
+        [m(3, 3) - 0.0001, 0.5, 3],
+        [m(3, 4) + 0.0001, 0.1, 5],
+    ])
+    def testElu(self, b, x, a=1.0):
+        return [
+            b.elu(x),
+            b.elu(x, alpha=a)
+        ]
+    
     # T1031: This doesn't match TF/Theano on corner
     @opTest([
         [m(3, 3) - 0.0001, 0.5, 3],
