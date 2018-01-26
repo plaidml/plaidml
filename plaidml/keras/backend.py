@@ -1850,10 +1850,10 @@ def elu(x, alpha=1.0):
 				   A = exp(X)-1;
 				   R = (X < 0 ? A : X); }"""
 	else:
-		f = """function (X, Alpha) -> (R) {
-				   A = Alpha*exp(X)-Alpha;
-				   R = (X < 0 ? A : X); }"""
-	return _Op('elu', x.dtype, x.shape, f, {'X': x, 'Alpha': alpha}, ['R'])
+		f = """function (X) -> (R) {{
+     		 	A = {alpha}*exp(X) - {alpha};
+    			R = X < 0 ? A : X; }}""".format(alpha=alpha)
+	return _Op('elu', x.dtype, x.shape, f, {'X': x, 'Alpha': variable(alpha)}, ['R'])
 
 
 def eval(x):
