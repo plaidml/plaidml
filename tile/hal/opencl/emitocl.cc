@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "base/util/error.h"
-#include "tile/hal/opencl/exprtype.h"
+#include "tile/lang/exprtype.h"
 #include "tile/lang/fpconv.h"
 
 namespace vertexai {
@@ -77,7 +77,7 @@ void Emit::Visit(const sem::DeclareStmt& n) {
       ty.dtype = lang::DataType::FLOAT32;
     } else if (ty.dtype == lang::DataType::BOOLEAN) {
       if (n.init) {
-        ty.dtype = Promote({init_type}).dtype;
+        ty.dtype = lang::Promote({init_type}).dtype;
         if (ty.dtype == lang::DataType::BOOLEAN) {
           // If the initializer was booleans, make it INT8.
           ty.dtype = lang::DataType::INT8;
@@ -118,7 +118,7 @@ void Emit::Visit(const sem::DeclareStmt& n) {
 void Emit::Visit(const sem::BinaryExpr& n) {
   auto ty_lhs = TypeOf(n.lhs);
   auto ty_rhs = TypeOf(n.rhs);
-  auto ty = Promote({ty_lhs, ty_rhs});
+  auto ty = lang::Promote({ty_lhs, ty_rhs});
   emit("(");
   EmitWithTypeConversion(ty_lhs, ty, n.lhs);
   emit(" ");
@@ -132,7 +132,7 @@ void Emit::Visit(const sem::CondExpr& n) {
   auto ty_tcase = TypeOf(n.tcase);
   auto ty_fcase = TypeOf(n.fcase);
   auto ty_cond = TypeOf(n.cond);
-  auto ty = Promote({ty_tcase, ty_fcase});
+  auto ty = lang::Promote({ty_tcase, ty_fcase});
   ty.vec_width = std::max(ty.vec_width, ty_cond.vec_width);
   emit("select(");
   EmitWithTypeConversion(ty_fcase, ty, n.fcase, true);
@@ -147,7 +147,7 @@ void Emit::Visit(const sem::SelectExpr& n) {
   auto ty_tcase = TypeOf(n.tcase);
   auto ty_fcase = TypeOf(n.fcase);
   auto ty_cond = TypeOf(n.cond);
-  auto ty = Promote({ty_tcase, ty_fcase});
+  auto ty = lang::Promote({ty_tcase, ty_fcase});
   ty.vec_width = std::max(ty.vec_width, ty_cond.vec_width);
   emit("select(");
   EmitWithTypeConversion(ty_fcase, ty, n.fcase, true);
@@ -304,9 +304,9 @@ void Emit::CheckValidType(const sem::Type& ty) {
   }
 }
 
-sem::Type Emit::TypeOf(const sem::ExprPtr& expr) { return ExprType::TypeOf(scope_, cl_khr_fp16_, expr); }
+sem::Type Emit::TypeOf(const sem::ExprPtr& expr) { return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, expr); }
 
-sem::Type Emit::TypeOf(const sem::LValPtr& lvalue) { return ExprType::TypeOf(scope_, cl_khr_fp16_, lvalue); }
+sem::Type Emit::TypeOf(const sem::LValPtr& lvalue) { return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, lvalue); }
 
 void Emit::EmitWithTypeConversion(const sem::Type& from, const sem::Type& to, const sem::ExprPtr& expr,
                                   bool force_conversion) {

@@ -10,6 +10,7 @@ PlaidML
 =======
 A framework for making deep learning work everywhere.
 
+
 PlaidML is a multi-language acceleration framework that:
 * Enables practitioners to deploy high-performance neural nets on any device
 * Allows hardware developers to quickly integrate with high-level frameworks
@@ -34,6 +35,9 @@ Higher-level APIs
 -----------------
 plaidml.keras - Integration with the [Keras](https://keras.io/) machine learning framework.
 This is useful for easily describing and training neural networks.
+
+plaidml.tile - Utilities for building up composite TILE functions from
+high-level operation semantics.
 """
 
 from __future__ import print_function
@@ -149,6 +153,7 @@ class _Library(plaidml.library.Library):
         else:
             libname = 'libplaidml.so'
         libpath = pkg_resources.resource_filename(__name__, libname)
+        libpath = os.getenv('PLAIDML_NATIVE_PATH', libpath)
         lib = ctypes.cdll.LoadLibrary(libpath)
 
         super(_Library, self).__init__(lib, logger=logger)
@@ -188,7 +193,7 @@ class _Library(plaidml.library.Library):
 
         # PLAIDML_API void plaidml_close_device(plaidml_device* device);
         self.plaidml_close_device = lib.plaidml_close_device
-        self.plaidml_close_device.argypes = [
+        self.plaidml_close_device.argtypes = [
             ctypes.POINTER(_C_Device)  # plaidml_device* device
         ]
 
@@ -710,8 +715,6 @@ class _Library(plaidml.library.Library):
             return None
         if func == self.plaidml_map_buffer_current and args[2]:
             return None
-        if func == self.plaidml_writeback_mapping and args[2]:
-            return None
         self.raise_last_status()
 
 
@@ -736,6 +739,7 @@ _DEVICE_DETAILS = 4
 
 _PROVIDER_DEVICES = 1
 
+
 class DType(enum.IntEnum):
     """Describes the type of a tensor element."""
     INVALID = 0
@@ -752,6 +756,7 @@ class DType(enum.IntEnum):
     FLOAT32 = 0x32
     FLOAT64 = 0x33
 
+
 _CTYPES = {
     DType.BOOLEAN: ctypes.c_bool,
     DType.INT8: ctypes.c_int8,
@@ -765,6 +770,18 @@ _CTYPES = {
     DType.FLOAT16: ctypes.c_uint16,  # TODO: Implement half-width float wrapper
     DType.FLOAT32: ctypes.c_float,
     DType.FLOAT64: ctypes.c_double
+}
+
+
+_NP_TYPES = {
+    DType.FLOAT16: 'float16',
+    DType.FLOAT32: 'float32',
+    DType.FLOAT64: 'float64',
+    DType.BOOLEAN: 'bool',
+    DType.INT32: 'int32',
+    DType.INT64: 'int64',
+    DType.UINT32: 'uint32',
+    DType.UINT64: 'uint64',
 }
 
 
@@ -817,7 +834,7 @@ class _Function(object):
             self._free(self)
 
     def save(self, filename):
-        _lib().plaidml_save_function(self._as_parameter_, filename)
+        _lib().plaidml_save_function(self._as_parameter_, filename.encode())
 
 
 class Function(_Function):
@@ -840,7 +857,7 @@ class Function(_Function):
 
 
 def load_function(ctx, device, filename):
-    return _Function(_lib().plaidml_load_function(ctx, device._as_parameter_, filename))
+    return _Function(_lib().plaidml_load_function(ctx, device._as_parameter_, filename.encode()))
 
 
 class _DeviceConfig(object):
@@ -1035,8 +1052,11 @@ def devices(ctx, limit=1, return_all=False):
         if len(enumerator.valid_devs) == 0:
             _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
                           "ERR_NO_DEVICES", True)
-            raise exceptions.PlaidMLError("No devices found. Please run plaidml-setup.")
-        if len(enumerator.valid_devs) > limit:
+            available = '\n'.join(['  {}'.format(x.id) for x in enumerator.invalid_devs])
+            raise exceptions.PlaidMLError(
+                "No devices found. Please run plaidml-setup. The following devices are available:\n{}".
+                format(available))
+        if limit and len(enumerator.valid_devs) > limit:
             _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
                           "ERR_TOO_MANY_DEVICES", True)
             raise exceptions.PlaidMLError("Too many devices configured. Please run plaidml-setup.")
@@ -1054,8 +1074,8 @@ class _Buffer(object):
         dev._register_buffer(self)
 
 
-class _Var(object):
-
+class Var(object):
+    """An abstract variable."""
     def __init__(self, v):
         self._as_parameter_ = v
         self._free = _lib().plaidml_free_var
@@ -1178,10 +1198,11 @@ class _View(object):
             yield self[idx]
 
 
-class Tensor(_Var):
+class Tensor(Var):
 
     def __init__(self, dev, shape, copy_buffer=False):
         self._shape = shape
+        self._ndarray = None
         if copy_buffer:
             self._buffer = copy_buffer
         else:
@@ -1213,20 +1234,22 @@ class Tensor(_Var):
         _lib().plaidml_free_mapping(mapping)
 
     def as_ndarray(self, ctx):
-        mapping = _lib().plaidml_map_buffer_current(self.buffer,
-                                                    ctypes.cast(None, _MAP_BUFFER_FUNCTYPE), None)
-        return _View(ctx, mapping, self.shape.dtype, self.shape.ctype,
-                     _lib().plaidml_get_shape_element_count(self.shape), self.shape,
-                     self).as_ndarray()
+        if self._ndarray is None:
+            self._ndarray = np.ndarray(
+                tuple(dim.size for dim in self.shape.dimensions),
+                dtype=_NP_TYPES[self.shape.dtype])
+        with self.mmap_current() as view:
+            view.copy_to_ndarray(self._ndarray)
+        return self._ndarray
 
 
-class Integer(_Var):
+class Integer(Var):
 
     def __init__(self, value):
         super(Integer, self).__init__(_lib().plaidml_alloc_int64(value))
 
 
-class Real(_Var):
+class Real(Var):
 
     def __init__(self, value):
         super(Real, self).__init__(_lib().plaidml_alloc_real(value))
@@ -1254,7 +1277,7 @@ class _Shape(object):
 
     @property
     def dtype(self):
-        return self._dtype
+        return DType(self._dtype)
 
     @property
     def offset(self, off):
@@ -1290,26 +1313,26 @@ class Shape(_Shape):
             _lib().plaidml_add_dimension(ctx, self, arg, int(stride))
 
 
-class Placeholder(_Var):
+class Placeholder(Var):
 
     def __init__(self, dims):
         super(Placeholder, self).__init__(_lib().plaidml_alloc_placeholder(dims))
 
 
 def _as_plaidml_var(value):
-    if isinstance(value, _Var):
+    if isinstance(value, Var):
         return value
     if sys.version_info.major < 3 and isinstance(value, long):
-        return _Var(_lib().plaidml_alloc_int64(value))
+        return Var(_lib().plaidml_alloc_int64(value))
     if isinstance(value, int):
-        return _Var(_lib().plaidml_alloc_int64(value))
+        return Var(_lib().plaidml_alloc_int64(value))
     if isinstance(value, float) or value.dtype.name == 'float32':
-        return _Var(_lib().plaidml_alloc_real(value))
+        return Var(_lib().plaidml_alloc_real(value))
     if value.shape == ():  # This should mean we have a 0-D numpy array
         if value.dtype.name == 'int_':
-            return _Var(_lib().plaidml_alloc_int64(value))
+            return Var(_lib().plaidml_alloc_int64(value))
         if value.dtype.name == 'float_' or value.dtype.name == 'float32':
-            return _Var(_lib().plaidml_alloc_real(value))
+            return Var(_lib().plaidml_alloc_real(value))
         else:
             raise plaidml.exceptions.InvalidArgument('Unexpected type in array: ' +
                                                      value.dtype.name)
@@ -1337,7 +1360,7 @@ class Applier(object):
         return _Shape(self._ctx, _lib().plaidml_apply_alloc_output_shape(self, name.encode()))
 
     def add_output(self, name):
-        return _Var(_lib().plaidml_apply_alloc_output(self, name.encode()))
+        return Var(_lib().plaidml_apply_alloc_output(self, name.encode()))
 
 
 class Composer(object):
@@ -1414,7 +1437,7 @@ class Invocation(object):
 def gradients(loss, variables):
     g = _lib().plaidml_alloc_gradient(loss)
     try:
-        return [_Var(_lib().plaidml_compute_grad_wrt(g, var)) for var in variables]
+        return [Var(_lib().plaidml_compute_grad_wrt(g, var)) for var in variables]
     finally:
         _lib().plaidml_free_gradient(g)
 

@@ -90,60 +90,48 @@ TEST_P(PlatformTest, ListDevicesReturnsAtLeastOneDevice) {
 namespace multiply {
 
 const char* Code = "function (A[X, Y], B[Y, X]) -> (C) { C[x, y : X, Y] = +(A[x, y] * B[y, x]); }";
-const char* Shape = R"(type: INT16 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
-const uint8_t Input[] = {
-    0x00, 0x00,  // [0, 0]
-    0x01, 0x00,  // [0, 1]
-    0x02, 0x00,  // [0, 2]
-    0x03, 0x00,  // [0, 3]
-    0x04, 0x00,  // [1, 0]
-    0x05, 0x00,  // [1, 1]
-    0x06, 0x00,  // [1, 2]
-    0x07, 0x00,  // [1, 3]
-    0x08, 0x00,  // [2, 0]
-    0x09, 0x00,  // [2, 1]
-    0x0A, 0x00,  // [2, 2]
-    0x0B, 0x00,  // [2, 3]
-    0x0C, 0x00,  // [3, 0]
-    0x0D, 0x00,  // [3, 1]
-    0x0E, 0x00,  // [3, 2]
-    0x0F, 0x00,  // [3, 3]
+const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
+const float Input[] = {
+    0,   // [0, 0]
+    1,   // [0, 1]
+    2,   // [0, 2]
+    3,   // [0, 3]
+    4,   // [1, 0]
+    5,   // [1, 1]
+    6,   // [1, 2]
+    7,   // [1, 3]
+    8,   // [2, 0]
+    9,   // [2, 1]
+    10,  // [2, 2]
+    11,  // [2, 3]
+    12,  // [3, 0]
+    13,  // [3, 1]
+    14,  // [3, 2]
+    15,  // [3, 3]
 };
-const uint8_t Output[] = {
-    0x00, 0x00,  // [0, 0]
-    0x00, 0x00,  // [0, 1]
-    0x00, 0x00,  // [0, 2]
-    0x00, 0x00,  // [0, 3]
-    0x00, 0x00,  // [1, 0]
-    0x00, 0x00,  // [1, 1]
-    0x00, 0x00,  // [1, 2]
-    0x00, 0x00,  // [1, 3]
-    0x00, 0x00,  // [2, 0]
-    0x00, 0x00,  // [2, 1]
-    0x00, 0x00,  // [2, 2]
-    0x00, 0x00,  // [2, 3]
-    0x00, 0x00,  // [3, 0]
-    0x00, 0x00,  // [3, 1]
-    0x00, 0x00,  // [3, 2]
-    0x00, 0x00,  // [3, 3]
+const float Output[] = {
+    0, 0, 0, 0,  //
+    0, 0, 0, 0,  //
+    0, 0, 0, 0,  //
+    0, 0, 0, 0,  //
 };
-const uint8_t Expected[] = {
-    0x00, 0x00,  // [0, 0]
-    0x04, 0x00,  // [0, 1]
-    0x10, 0x00,  // [0, 2]
-    0x24, 0x00,  // [0, 3]
-    0x04, 0x00,  // [1, 0]
-    0x19, 0x00,  // [1, 1]
-    0x36, 0x00,  // [1, 2]
-    0x5B, 0x00,  // [1, 3]
-    0x10, 0x00,  // [2, 0]
-    0x36, 0x00,  // [2, 1]
-    0x64, 0x00,  // [2, 2]
-    0x9A, 0x00,  // [2, 3]
-    0x24, 0x00,  // [3, 0]
-    0x5B, 0x00,  // [3, 1]
-    0x9A, 0x00,  // [3, 2]
-    0xE1, 0x00,  // [3, 3]
+const float Expected[] = {
+    0,    // [0, 0]
+    4,    // [0, 1]
+    16,   // [0, 2]
+    36,   // [0, 3]
+    4,    // [1, 0]
+    25,   // [1, 1]
+    54,   // [1, 2]
+    91,   // [1, 3]
+    16,   // [2, 0]
+    54,   // [2, 1]
+    100,  // [2, 2]
+    154,  // [2, 3]
+    36,   // [3, 0]
+    91,   // [3, 1]
+    154,  // [3, 2]
+    225,  // [3, 3]
 };
 
 }  // namespace multiply
@@ -151,85 +139,71 @@ const uint8_t Expected[] = {
 namespace vector_add {
 
 const char* Code = "function (A, B) -> (C) { C = A + B; }";
-const char* Shape = R"(type: INT16 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
-const uint8_t A[] = {
-    0x01, 0x00,  // 1
-    0x02, 0x00,  // 2
-    0x03, 0x00,  // 3
-    0x04, 0x00,  // 4
-    0x01, 0x00,  // 1
-    0x02, 0x00,  // 2
-    0x03, 0x00,  // 3
-    0x04, 0x00,  // 4
-    0x01, 0x00,  // 1
-    0x02, 0x00,  // 2
-    0x03, 0x00,  // 3
-    0x04, 0x00,  // 4
-    0x01, 0x00,  // 1
-    0x02, 0x00,  // 2
-    0x03, 0x00,  // 3
-    0x04, 0x00,  // 4
+const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
+const float A[] = {
+    1,  // 1
+    2,  // 2
+    3,  // 3
+    4,  // 4
+    1,  // 1
+    2,  // 2
+    3,  // 3
+    4,  // 4
+    1,  // 1
+    2,  // 2
+    3,  // 3
+    4,  // 4
+    1,  // 1
+    2,  // 2
+    3,  // 3
+    4,  // 4
 };
-const uint8_t B[] = {
-    0x05, 0x00,  // 5
-    0x06, 0x00,  // 6
-    0x07, 0x00,  // 7
-    0x08, 0x00,  // 8
-    0x05, 0x00,  // 5
-    0x06, 0x00,  // 6
-    0x07, 0x00,  // 7
-    0x08, 0x00,  // 8
-    0x05, 0x00,  // 5
-    0x06, 0x00,  // 6
-    0x07, 0x00,  // 7
-    0x08, 0x00,  // 8
-    0x05, 0x00,  // 5
-    0x06, 0x00,  // 6
-    0x07, 0x00,  // 7
-    0x08, 0x00,  // 8
+const float B[] = {
+    5,  // 5
+    6,  // 6
+    7,  // 7
+    8,  // 8
+    5,  // 5
+    6,  // 6
+    7,  // 7
+    8,  // 8
+    5,  // 5
+    6,  // 6
+    7,  // 7
+    8,  // 8
+    5,  // 5
+    6,  // 6
+    7,  // 7
+    8,  // 8
 };
-const uint8_t Output[] = {
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
-    0x00, 0x00,  // 0
+const float Output[] = {
+    0, 0, 0, 0,  //
+    0, 0, 0, 0,  //
+    0, 0, 0, 0,  //
+    0, 0, 0, 0,  //
 };
-const uint8_t Expected[] = {
-    0x06, 0x00,  // 1 + 5 = 6
-    0x08, 0x00,  // 2 + 6 = 8
-    0x0A, 0x00,  // 3 + 7 = 10
-    0x0C, 0x00,  // 4 + 8 = 12
-    0x06, 0x00,  // 1 + 5 = 6
-    0x08, 0x00,  // 2 + 6 = 8
-    0x0A, 0x00,  // 3 + 7 = 10
-    0x0C, 0x00,  // 4 + 8 = 12
-    0x06, 0x00,  // 1 + 5 = 6
-    0x08, 0x00,  // 2 + 6 = 8
-    0x0A, 0x00,  // 3 + 7 = 10
-    0x0C, 0x00,  // 4 + 8 = 12
-    0x06, 0x00,  // 1 + 5 = 6
-    0x08, 0x00,  // 2 + 6 = 8
-    0x0A, 0x00,  // 3 + 7 = 10
-    0x0C, 0x00,  // 4 + 8 = 12
+const float Expected[] = {
+    6,   // 1 + 5 = 6
+    8,   // 2 + 6 = 8
+    10,  // 3 + 7 = 10
+    12,  // 4 + 8 = 12
+    6,   // 1 + 5 = 6
+    8,   // 2 + 6 = 8
+    10,  // 3 + 7 = 10
+    12,  // 4 + 8 = 12
+    6,   // 1 + 5 = 6
+    8,   // 2 + 6 = 8
+    10,  // 3 + 7 = 10
+    12,  // 4 + 8 = 12
+    6,   // 1 + 5 = 6
+    8,   // 2 + 6 = 8
+    10,  // 3 + 7 = 10
+    12,  // 4 + 8 = 12
 };
 
 }  // namespace vector_add
 
-std::string MakeBuffer(const uint8_t* data, size_t len) {
-  return std::string(reinterpret_cast<const char*>(data), len);
-}
+std::string MakeBuffer(const float* data, size_t len) { return std::string(reinterpret_cast<const char*>(data), len); }
 
 TEST_P(PlatformTest, VectorAddWorks) {
   context::Context ctx;
@@ -238,7 +212,7 @@ TEST_P(PlatformTest, VectorAddWorks) {
   auto a = MakeInput(ctx, device, MakeBuffer(vector_add::A, sizeof(vector_add::A)));
   auto b = MakeInput(ctx, device, MakeBuffer(vector_add::B, sizeof(vector_add::B)));
   auto c = MakeOutput(ctx, device, MakeBuffer(vector_add::Output, sizeof(vector_add::Output)));
-  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}});
+  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}}).get();
   CheckExpected(ctx, c, MakeBuffer(vector_add::Expected, sizeof(vector_add::Expected)));
 }
 
@@ -249,7 +223,7 @@ TEST_P(PlatformTest, PiecewiseMultiplyWorks) {
   auto a = MakeInput(ctx, device, MakeBuffer(multiply::Input, sizeof(multiply::Input)));
   auto b = MakeInput(ctx, device, MakeBuffer(multiply::Input, sizeof(multiply::Input)));
   auto c = MakeOutput(ctx, device, MakeBuffer(multiply::Output, sizeof(multiply::Output)));
-  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}});
+  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}}).get();
   CheckExpected(ctx, c, MakeBuffer(multiply::Expected, sizeof(multiply::Expected)));
 }
 
@@ -263,7 +237,7 @@ TEST_P(PlatformTest, DISABLED_RuntimeTileScannerWorks) {
   auto a = MakeInput(ctx, device, MakeBuffer(multiply::Input, sizeof(multiply::Input)));
   auto b = MakeInput(ctx, device, MakeBuffer(multiply::Input, sizeof(multiply::Input)));
   auto c = MakeOutput(ctx, device, MakeBuffer(multiply::Output, sizeof(multiply::Output)));
-  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}});
+  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}}).get();
   CheckExpected(ctx, c, MakeBuffer(multiply::Expected, sizeof(multiply::Expected)));
 }
 

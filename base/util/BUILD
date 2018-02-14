@@ -12,6 +12,7 @@ plaidml_cc_library(
     srcs = [
         "env.cc",
         "error.cc",
+        "hexdump.cc",
         "json_transfer.cc",
         "logging.cc",
         "perf_counter.cc",
@@ -26,6 +27,7 @@ plaidml_cc_library(
         "compat.h",
         "env.h",
         "error.h",
+        "hexdump.h",
         "intern.h",
         "iterator_util.h",
         "json_transfer.h",

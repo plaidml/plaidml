@@ -24,7 +24,7 @@ DataType g_floatx = DataType::FLOAT32;
 
 void SetFloatX(DataType dtype) { g_floatx = dtype; }
 
-bool Binding::operator==(const Binding& rhs) {
+bool Binding::operator==(const Binding& rhs) const {
   if (tag != rhs.tag) {
     return false;
   }
@@ -35,12 +35,14 @@ bool Binding::operator==(const Binding& rhs) {
       return iconst == rhs.iconst;
     case Binding::FCONST:
       return fconst == rhs.fconst;
+    case Binding::TUPLE:
+      return tuple == rhs.tuple;
     default:
       throw std::logic_error{"Invalid binding"};
   }
 }
 
-bool Binding::operator!=(const Binding& rhs) { return !(*this == rhs); }
+bool Binding::operator!=(const Binding& rhs) const { return !(*this == rhs); }
 
 static double ConstantPropagate(const std::string& op, const std::vector<double>& x) {
   if (op == "ident") {
@@ -48,15 +50,15 @@ static double ConstantPropagate(const std::string& op, const std::vector<double>
   }
   if (op == "broadcast") {
     if (x[0] != x[1] && x[0] != 1 && x[1] != 1) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
-                               std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
+                               " != " + std::to_string(x[1]));
     }
     return x[0] == 1 ? x[1] : x[0];
   }
   if (op == "match") {
     if (x[0] != x[1]) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
-                               std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
+                               " != " + std::to_string(x[1]));
     }
     return x[0];
   }
@@ -475,6 +477,32 @@ void TypeCheck(Program* prog, Bindings* vars) {
         IVLOG(4, "FunctionOp " << to_string(op) << " produces dims=" << to_string(out_shape));
         continue;
       }
+      if (op.f.fn == "tuple") {
+        std::vector<Binding> tuple;
+        for (const auto& i : op.inputs) {
+          tuple.push_back(vars->at(i));
+        }
+        vars->emplace(op.output, Binding(tuple));
+        continue;
+      }
+      if (op.f.fn == "element") {
+        if (op.inputs.size() != 2) {
+          throw new std::runtime_error("Element requires exactly two inputs.");
+        }
+        const Binding& it = vars->at(op.inputs[0]);
+        if (it.tag != Binding::TUPLE) {
+          throw new std::runtime_error("Element requires it's first input to be a tuple");
+        }
+        if (vars->at(op.inputs[1]).tag != Binding::ICONST) {
+          throw new std::runtime_error("Element requires it's second input to be an integer");
+        }
+        int64_t elem = vars->at(op.inputs[1]).iconst;
+        if (elem < 0 || elem >= it.tuple.size()) {
+          throw new std::runtime_error("Element requires it's tuple position to be in bound");
+        }
+        vars->emplace(op.output, it.tuple[elem]);
+        continue;
+      }
       if (op.f.fn == "shape") {
         if (op.inputs.size() != 1) {
           throw new std::runtime_error("Shape requires exactly one input.");
@@ -616,6 +644,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
       for (const auto& s : op.inputs) {
         switch (vars->at(s).tag) {
           case Binding::TENSOR:
+          case Binding::TUPLE:
             all_const = false;
             break;
           case Binding::ICONST:
@@ -669,7 +698,8 @@ void TypeCheck(Program* prog, Bindings* vars) {
   }
 }
 
-void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std::set<std::string>& outputs) {
+void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std::set<std::string>& outputs,
+                     const Bindings& vars) {
   // Figure out where variables are defined, and also setup identity mappings
   // IVLOG(1, "Pre optimize:\n"  << to_string(*p));
   std::map<std::string, size_t> defs;
@@ -682,6 +712,14 @@ void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std:
         first = first_def.at(first);
       }
       first_def[p->ops[i].output] = first;
+    }
+    // Pull 'elements' through from original tuple
+    if (p->ops[i].tag == Op::FUNCTION && p->ops[i].f.fn == "element") {
+      const std::string& tup_name = p->ops[i].inputs[0];
+      const std::string& elem_name = p->ops[i].inputs[1];
+      size_t elem = vars.at(elem_name).iconst;
+      const Op& tup_op = p->ops[defs.at(tup_name)];
+      first_def[p->ops[i].output] = tup_op.inputs[elem];
     }
   }
   // IVLOG(1, "Identity backrefs" << first_def);
@@ -733,48 +771,6 @@ void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std:
   p->ops = new_ops;
 }
 
-void RemoveContractions(Program* prog) {
-  for (Op& op : prog->ops) {
-    if (op.tag == Op::CONTRACTION) {
-      if (op.c.comb_op == CombinationOp::EQ) {
-        continue;
-      }
-      if (op.c.specs.size() > 3) {
-        continue;
-      }
-      IndexSpec is = op.c.specs[0].spec;
-      bool simple = true;
-      std::set<std::string> vars;
-      for (const Polynomial& p : is) {
-        if (p.getMap().size() != 1 || p.getMap().begin()->first == "" || p.getMap().begin()->second != 1) {
-          simple = false;
-          break;
-        }
-        vars.insert(p.getMap().begin()->first);
-      }
-      if (simple == false || vars.size() != is.size()) {
-        continue;
-      }
-      for (size_t i = 1; i < op.c.specs.size(); i++) {
-        if (op.c.specs[i].spec != is) {
-          simple = false;
-          break;
-        }
-      }
-      if (simple == false) {
-        continue;
-      }
-      op.f.fn = (op.c.comb_op == CombinationOp::MULTIPLY ? "mul" : "add");
-      if (op.inputs.size() == 1) {
-        op.f.fn = "ident";
-      }
-      op.c = {};
-      op.tag = Op::FUNCTION;
-      IVLOG(2, "Updated op to " << op);
-    }
-  }
-}
-
 Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs) {
   // Copy input shapes into vars, also track names for OptimizeProgram
   Bindings vars;
@@ -807,32 +803,11 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
     // }
   }
   // Finally, run program 'optimization' pass
-  OptimizeProgram(p, input_vars, output_vars);
+  OptimizeProgram(p, input_vars, output_vars, vars);
   IVLOG(2, "After optimize: " << p->ops);
 
   return vars;
 }
-
-/*
-Bindings ComputeShapes(const std::string& code, const ShapeMap& inputs, const std::set<std::string>& outputs) {
-  Parser parse;
-  Program p = parse.Parse(code);
-
-  // Apply defines
-  ApplyDefines(p, func_defs);
-  IVLOG(2, "After defines: " << p.ops);
-
-  // Do typing
-  RemoveContractions(p);
-  ShapeMap types;
-
-  TypeCheck(p, types, true);
-  IVLOG(2, "After typecheck: " << p.ops);
-  IVLOG(2, "Types:: " << types);
-
-  return types;
-}
-*/
 
 }  // namespace lang
 }  // namespace tile

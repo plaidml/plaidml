@@ -42,6 +42,11 @@ RangeConstraint IntersectParallelConstraintPair(const RangeConstraint& constrain
 // to be minimal presuming the new set of bounds.  Throws on failure (ie Unbounded)
 std::tuple<IndexBounds, std::vector<SimpleConstraint>> ComputeBounds(const std::vector<RangeConstraint>& constraints);
 
+// Given polys n1*q + c1 and n2*q + c2 with gcd(n1, n2) = 1, compute d such that
+// q + d is integral if and only if n1*q + c1 and n2*q + c2 are both integral
+// (or throw if the polys are never both integral).
+Rational UnifiedOffset(const Rational& c1, const Rational& c2, const Integer& n1, const Integer& n2);
+
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

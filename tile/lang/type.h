@@ -3,6 +3,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "tile/lang/ops.h"
 #include "tile/lang/shape.h"
@@ -15,13 +16,15 @@ struct Binding {
   explicit Binding(const TensorShape& _shape) : tag(TENSOR), shape(_shape) {}
   explicit Binding(int64_t _iconst) : tag(ICONST), iconst(_iconst) { shape.type = DataType::INT32; }
   explicit Binding(double _fconst, DataType dtype) : tag(FCONST), fconst(_fconst) { shape.type = dtype; }
-  enum { TENSOR, ICONST, FCONST } tag;
+  explicit Binding(const std::vector<Binding>& _tuple) : tag(TUPLE), tuple(_tuple) {}
+  enum { TENSOR, ICONST, FCONST, TUPLE } tag;
   TensorShape shape;
   int64_t iconst;
   double fconst;
+  std::vector<Binding> tuple;
 
-  bool operator==(const Binding& rhs);
-  bool operator!=(const Binding& rhs);
+  bool operator==(const Binding& rhs) const;
+  bool operator!=(const Binding& rhs) const;
 };
 
 inline MAKE_LOGGABLE(Binding, t, os) {
@@ -35,6 +38,8 @@ inline MAKE_LOGGABLE(Binding, t, os) {
     case Binding::FCONST:
       os << "F:" << t.fconst;
       break;
+    case Binding::TUPLE:
+      os << "T:" << t.tuple.size();
   }
   return os;
 }

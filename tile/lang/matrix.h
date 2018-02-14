@@ -68,7 +68,7 @@ bool operator==(const Matrix& a, const Matrix& b);
 std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial>& polys);
 
 // Convert matrix + vector of offsets to Hermite Normal Form
-bool HermiteNormalForm(Matrix& m, Vector& v);  // NOLINT(runtime/references)
+bool HermiteNormalForm(Matrix& m);  // NOLINT(runtime/references)
 
 }  // namespace lang
 }  // namespace tile
