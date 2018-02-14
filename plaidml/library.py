@@ -2,6 +2,7 @@
 
 import ctypes
 import logging
+import os
 import plaidml.exceptions
 
 _LOGGER_FUNCTYPE = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_int, ctypes.c_char_p)
@@ -111,8 +112,6 @@ class Library(object):
         self.vai_set_eventlog.restype = ctypes.c_bool
         self.vai_set_eventlog.errcheck = self._check_err
 
-        # lib.tile_internal_set_vlog(1)
-
         self._logger_wrapper = _LOGGER_FUNCTYPE(self._logger_callback)
         lib.vai_set_logger(self._logger_wrapper, None)
 
@@ -125,7 +124,7 @@ class Library(object):
         try:
             exclass = _PLAIDML_ERRMAP[self._lib.vai_last_status()]
         except KeyError:
-            return Internal(self._lib.vai_last_status_str())
+            return Exception(self._lib.vai_last_status_str())
         return exclass(self._lib.vai_last_status_str())
 
     def raise_last_status(self):

@@ -19,6 +19,8 @@ inline std::string to_string(const Rational& x) { return x.str(); }
 Integer Floor(const Rational& x);
 // Finds smallest int that is >= x
 Integer Ceil(const Rational& x);
+// Computes the fractional part of x
+Rational FracPart(const Rational& x);
 // Compute the absolute value
 Integer Abs(const Integer& x);
 // Compute the absolute value
@@ -36,8 +38,12 @@ Rational GCD(const Rational& a, const Rational& b);
 Integer GCD(const Integer& a, const Integer& b);
 // Least common multiple for integers
 Integer LCM(const Integer& a, const Integer& b);
-// Least of 2 Integers
+// Least of 2 numbers
 Integer Min(const Integer& a, const Integer& b);
+Rational Min(const Rational& a, const Rational& b);
+// Largest of 2 numbers
+Integer Max(const Integer& a, const Integer& b);
+Rational Max(const Rational& a, const Rational& b);
 // Returns the integer quotient of dividing a by b, w/ rational remainder 0 <= r < b
 Integer RatDiv(const Rational& a, const Rational& b, Rational& r);  // NOLINT(runtime/references)
 

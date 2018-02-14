@@ -21,6 +21,8 @@ plaidml_cc_library(
         "defract.h",
         "emitc.cc",
         "emitmetal.cc",
+        "exprtype.cc",
+        "exprtype.h",
         "flat.cc",
         "flat.h",
         "fnv1a64.h",
@@ -171,5 +173,11 @@ plaidml_cc_test(
     name = "gen_test",
     srcs = ["gen_test.cc"],
     tags = ["manual"],
+    deps = [":lang"],
+)
+
+plaidml_cc_test(
+    name = "exprtype_test",
+    srcs = ["exprtype_test.cc"],
     deps = [":lang"],
 )

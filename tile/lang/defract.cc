@@ -13,10 +13,12 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-static Polynomial ConvertPoly(Polynomial in, const std::map<std::string, Polynomial>& polys) {
+static Polynomial ConvertPoly(Polynomial in, const std::map<std::string, Polynomial>& polys,
+    bool transform_constant = false)
+{
   Polynomial out;
   for (const auto& kvp : in.getMap()) {
-    if (kvp.first == "") {
+    if (kvp.first == "" && !transform_constant) {
       out += kvp.second;
     } else {
       auto it = polys.find(kvp.first);
@@ -52,15 +54,30 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
 
   Matrix m;
   Vector v;
+  bool transform_constant = false;
   std::tie(m, v) = FromPolynomials(polys);
   IVLOG(3, "Original Matrix: " << m);
   IVLOG(3, "Original Vector: " << v);
+  for (auto &v_entry : v) {
+    if (denominator(v_entry) != 1) {
+      // Transform constant -> constant * dummy_var with 1 <= dummy_var < 2
+      transform_constant = true;
+      IVLOG(3, "Non-integer offset vector " << v << " in defractionalization. Transforming constant to variable.");
+      vvars.push_back("");
+      m.resize(m.size1() + 1, m.size2() + 1, true);
+      boost::numeric::ublas::zero_vector<Rational> z(m.size2());
+      boost::numeric::ublas::row(m, m.size1() - 1) = z;
+      v.resize(v.size() + 1, true);
+      boost::numeric::ublas::column(m, m.size2() - 1) = v;
+      m(m.size1() - 1, m.size2() - 1) = 1;
+      break;
+    }
+  }
 
-  if (!HermiteNormalForm(m, v)) {
-    throw std::runtime_error("Unable to peform Hermite Reduction during defractionalization");
+  if (!HermiteNormalForm(m)) {
+    throw std::runtime_error("Unable to perform Hermite Reduction during defractionalization");
   }
   IVLOG(4, "Matrix: " << m);
-  IVLOG(4, "Vector: " << v);
 
   Matrix p = prod(trans(m), m);
   IVLOG(4, "Product Matrix: " << p);
@@ -71,8 +88,8 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
   Matrix d = prod(m, p);
   IVLOG(4, "Dual Matrix: " << d);
   IVLOG(3, "Normalized Dual Matrix: " << d);
-  if (!HermiteNormalForm(d, v)) {
-    throw std::runtime_error("Unable to peform Hermite Reduction on dual during defractionalization");
+  if (!HermiteNormalForm(d)) {
+    throw std::runtime_error("Unable to perform Hermite Reduction on dual during defractionalization");
   }
 
   std::vector<RangeConstraint> new_cons;
@@ -81,7 +98,7 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
     IVLOG(4, "Computing splits for " << vvars[i]);
     std::set<Integer> splits;
     // For each element, compute the 'modulos' I need
-    splits.insert(1);  // Sentinal
+    splits.insert(1);  // Sentinel
     for (size_t j = i + 1; j < d.size2(); j++) {
       Rational r = d(i, j) / d(j, j);
       splits.insert(denominator(r));
@@ -130,14 +147,18 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
   new_op.agg_op = op.agg_op;
   for (size_t i = 0; i < op.specs.size(); i++) {
     for (size_t j = 0; j < op.specs[i].spec.size(); j++) {
-      new_op.specs[i].spec.push_back(ConvertPoly(op.specs[i].spec[j], replacements));
+      new_op.specs[i].spec.push_back(ConvertPoly(op.specs[i].spec[j], replacements, transform_constant));
       new_op.specs[i].id = op.specs[i].id;
     }
   }
 
   for (size_t i = 0; i < op.constraints.size(); i++) {
     const RangeConstraint& oc = op.constraints[i].bound;
-    new_op.constraints.push_back(SymbolicConstraint(RangeConstraint(ConvertPoly(oc.poly, replacements), oc.range)));
+    new_op.constraints.push_back(SymbolicConstraint(RangeConstraint(ConvertPoly(oc.poly, replacements, transform_constant), oc.range)));
+  }
+  if (transform_constant) {
+    // Add constraint for the constant term if it's being transformed
+    new_op.constraints.push_back(SymbolicConstraint(RangeConstraint(ConvertPoly(Polynomial(1), replacements, transform_constant) - 1, 1)));
   }
 
   for (const RangeConstraint& c : new_cons) {

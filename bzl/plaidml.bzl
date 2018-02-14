@@ -182,9 +182,9 @@ def _plaidml_objc_cc_library_aspect_impl(target, ctx):
     # print('apple_common.apple_toolchain().platform_developer_framework_dir:', apple_common.apple_toolchain().platform_developer_framework_dir(apple_fragment))
     # print('apple_common.apple_toolchain().sdk_dir():', apple_common.apple_toolchain().sdk_dir())
 
-    includes = set(ctx.rule.attr.includes)
-    defines = set(ctx.rule.attr.defines)
-    libraries = set()
+    includes = depset(ctx.rule.attr.includes)
+    defines = depset(ctx.rule.attr.defines)
+    libraries = depset()
 
     objc_providers = [x.objc for x in ctx.rule.attr.deps if hasattr(x, 'objc')]
     for o in objc_providers:
@@ -234,7 +234,7 @@ def _plaidml_objc_cc_library_aspect_impl(target, ctx):
 
     arch = ctx.fragments.apple.ios_cpu()
 
-    libs = set()
+    libs = depset()
     for src in _cc_src_filter(ctx.rule.files.srcs):
         # print('Saw cc source:', src)
         obj = ctx.new_file(obj_path + src.basename + '.o')
@@ -289,11 +289,11 @@ def _plaidml_objc_cc_library_aspect_impl(target, ctx):
 
     if target.cc.include_directories:
         # TODO: Maybe add set(target.cc.quote_include_directories)
-        kwargs['include'] = set(target.cc.include_directories)
+        kwargs['include'] = depset(target.cc.include_directories)
     if target.cc.system_include_directories:
-        kwargs['include_system'] = set(target.cc.system_include_directories)
+        kwargs['include_system'] = depset(target.cc.system_include_directories)
     if target.cc.defines:
-        kwargs['define'] = set(target.cc.defines)
+        kwargs['define'] = depset(target.cc.defines)
     if target.cc.transitive_headers:
         kwargs['header'] = target.cc.transitive_headers
     if libraries:

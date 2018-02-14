@@ -114,18 +114,24 @@ FlatContraction Flatten(const Contraction& c, const std::vector<TensorShape>& sh
     const IndexSpec& spec = c.specs[i].spec;
     for (size_t j = 0; j < spec.size(); j++) {
       const Polynomial& p = spec[j];
+      Rational offset_coeff = p.constant();
       for (const auto& kvp : p.getMap()) {
-        // Add a new value if it's not a const and has a real range
-        if (kvp.first != "" && bounds[kvp.first].min != bounds[kvp.first].max) {
-          index_names.insert(kvp.first);
+        if (kvp.first != "") {
+          if (bounds[kvp.first].min == bounds[kvp.first].max) {
+            // A variable that takes a single value gets merged into the offset
+            offset_coeff += bounds[kvp.first].min * kvp.second;
+          } else {
+            // Add a new value if it's not a const and has a real range
+            index_names.insert(kvp.first);
+          }
         }
       }
-      Rational coeff = p.constant();
-      if (denominator(coeff) != 1) {
-        throw std::runtime_error("Non-integral offset value");
+      if (denominator(offset_coeff) != 1) {
+        IVLOG(1, p);
+        throw std::runtime_error("Non-integral offset value after defractionalization");
       }
       int64_t stride = shapes[i].dims[j].stride;
-      out.access[i].offset += static_cast<int64_t>(numerator(coeff) * stride);
+      out.access[i].offset += static_cast<int64_t>(numerator(offset_coeff) * stride);
       flat_polys[i] += stride * p;
     }
     out.access[i].type = shapes[i].type;

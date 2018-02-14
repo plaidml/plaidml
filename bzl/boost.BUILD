@@ -39,6 +39,7 @@ cc_library(
         "BOOST_SYSTEM_NO_DEPRECATED",
         "BOOST_THREAD_BUILD_LIB",
         "BOOST_THREAD_VERSION=4",
+        "BOOST_THREAD_PROVIDES_EXECUTORS",
         "BOOST_ALL_NO_LIB",
     ],
     includes = ["."],

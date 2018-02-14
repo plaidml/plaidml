@@ -29,7 +29,7 @@ namespace tile {
 namespace lang {
 namespace {
 
-const HardwareSettings &TestGPU() {
+const HardwareSettings& TestGPU() {
   static HardwareSettings settings;
   static std::once_flag init;
 
@@ -758,9 +758,9 @@ TEST_CASE("Check attribute parsing", "[attr]") {
   Parser p;
   Program prog = p.Parse("function (A[I,K], B[K,J]) -> (O) { [[hello(world)]] O[i,j : I,J] = +(A[i,k] * B[k,j]); }");
   REQUIRE(prog.ops.size() == 1);
-  const auto &op = prog.ops[0];
+  const auto& op = prog.ops[0];
   REQUIRE(op.attributes.size() == 1);
-  const auto &attr = op.attributes[0];
+  const auto& attr = op.attributes[0];
   REQUIRE(attr.name == "hello");
   REQUIRE(attr.params.size() == 1);
   REQUIRE(attr.params[0] == "world");
@@ -784,7 +784,33 @@ TEST_CASE("CombineConvolutionAndRelu", "[emit]") {
   outputs.emplace("A", SimpleShape(DataType::FLOAT32, {10, 10}));
   auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), "ID");
   if (VLOG_IS_ON(1)) {
-    for (const auto &kinfo : klist.kernels) {
+    for (const auto& kinfo : klist.kernels) {
+      EmitDebug emit;
+      emit.Visit(*kinfo.kfunc);
+      VLOG(1) << "Got kernel: " << emit.str();
+    }
+  }
+  REQUIRE(klist.kernels.size() == 1);
+}
+
+TEST_CASE("Tupleism", "[tuple]") {
+  Parser parser;
+  Program prog = parser.Parse(R"***(
+    function (A[I, K], B[K, J]) -> (O) {
+      T = tuple(A, B);
+      C = element(T, 0);
+      D = element(T, 1);
+      O[i, j : I, J] = +(C[i, k] * D[k, j]);
+    } 
+  )***");
+  ShapeMap inputs;
+  inputs.emplace("A", SimpleShape(DataType::FLOAT32, {10, 17}));
+  inputs.emplace("B", SimpleShape(DataType::FLOAT32, {17, 10}));
+  ShapeMap outputs;
+  outputs.emplace("O", SimpleShape(DataType::FLOAT32, {10, 10}));
+  auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), "ID");
+  if (VLOG_IS_ON(1)) {
+    for (const auto& kinfo : klist.kernels) {
       EmitDebug emit;
       emit.Visit(*kinfo.kfunc);
       VLOG(1) << "Got kernel: " << emit.str();

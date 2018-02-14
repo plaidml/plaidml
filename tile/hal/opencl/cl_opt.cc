@@ -1,6 +1,6 @@
 #include "tile/hal/opencl/cl_opt.h"
 
-#include "tile/hal/opencl/exprtype.h"
+#include "tile/lang/exprtype.h"
 #include "tile/lang/sembuilder.h"
 
 namespace vertexai {
@@ -123,7 +123,7 @@ class InsnOptimizer : public sem::Visitor {
     scope_ = previous_scope;
   }
 
-  sem::Type TypeOf(const sem::ExprPtr& expr) { return ExprType::TypeOf(scope_, cl_khr_fp16_, expr); }
+  sem::Type TypeOf(const sem::ExprPtr& expr) { return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, expr); }
 
   void EvalStmt(const sem::StmtPtr& stmt) { stmt->Accept(*this); }
 
