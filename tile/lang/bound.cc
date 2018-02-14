@@ -138,89 +138,61 @@ void MergeParallelConstraints(std::vector<RangeConstraint>* constraints) {
   }
 }
 
+Rational UnifiedOffset(const Rational& c1, const Rational& c2, const Integer& n1, const Integer& n2) {
+  std::set<Rational> offsets;
+  if (n1 > std::numeric_limits<std::size_t>::max() || n2 > std::numeric_limits<std::size_t>::max()) {
+    throw std::out_of_range("Cannot unify offset when relative quotient exceeds size_t.");
+  }
+  for (size_t i = 0; i < Abs(n1); ++i) {
+    offsets.insert(std::end(offsets), FracPart((c1 + i)/n1));
+  }
+  for (size_t j = 0; j < Abs(n2); ++j) {
+    Rational offset = FracPart((c2 + j)/n2);
+    if (offsets.count(offset)) {
+      return offset;
+    }
+  }
+  IVLOG(1, "Failed to compute UnifiedOffset(" << c1 << ", " << c2 << ", " << n1 << ", " << n2 << ").");
+  throw std::runtime_error("Merging constraints with empty intersection.");
+}
+
 RangeConstraint IntersectParallelConstraintPair(const RangeConstraint& constraint1,
                                                 const RangeConstraint& constraint2) {
   // Combines two parallel constraints into one. See merge-parallel.tex in
   // /tile/lang for more details.
-
-  // ratio is only used to check for invalid input, but if we don't check for
-  // garbage input, then IntersectParallelConstraintPair will in many cases give
-  // us garbage output with no errors or warnings. That seems bad enough to be
-  // worth computing ratio here.
+  IVLOG(5, "Merging the parallel constraints " << constraint1 << ", " << constraint2);
   Rational ratio = constraint1.poly.tryDivide(constraint2.poly, true);
   if (ratio == 0) {
-    throw std::invalid_argument("Error: Parameters of IntersectParallelConstraintPair must be parallel");
+    throw std::invalid_argument("Parameters of IntersectParallelConstraintPair must be parallel");
   }
-
-  std::string NonzeroIndex = constraint1.poly.GetNonzeroIndex();
-  if (NonzeroIndex.empty() || constraint2.poly.GetNonzeroIndex().empty()) {
-    throw std::invalid_argument(std::string("Error: Constant polynomial passed to IntersectParallelConstraintPair.\n") +
-                                "This should have been eliminated in MergeParallelConstraints.");
+  Integer n1 = numerator(ratio);
+  Integer n2 = denominator(ratio);
+  Rational c1 = constraint1.poly.constant();
+  Rational c2 = constraint2.poly.constant();
+  // d is the fractional part of the offset of merged constraint polynomial
+  Rational d = UnifiedOffset(c1, c2, n1, n2);
+  // Range unification requires solving the following equations for q:
+  //    n1*q + c1 = 0           n2*q + c2 = 0
+  //    n1*q + c1 = r1 - 1      n2*q + c2 = r2 - 1
+  Rational q1_low = Min(-c1/n1, (constraint1.range - 1 - c1)/n1);
+  Rational q1_hi = Max(-c1/n1, (constraint1.range - 1 - c1)/n1);
+  Rational q2_low = Min(-c2/n2, (constraint2.range - 1 - c2)/n2);
+  Rational q2_hi = Max(-c2/n2, (constraint2.range - 1 - c2)/n2);
+  Integer lower_bound = Max(Ceil(q1_low + d), Ceil(q2_low + d));
+  Integer upper_bound = Min(Floor(q1_hi + d), Floor(q2_hi + d));
+  Rational merged_offset = -lower_bound + d;
+  Integer range = upper_bound - lower_bound + 1;
+  if (range <= 0) {
+    throw std::runtime_error("Merging constraints with empty intersection: "
+        + to_string(constraint1) + ", " + to_string(constraint2));
   }
-  Rational coeff1 = constraint1.poly[NonzeroIndex];
-  Rational coeff2 = constraint2.poly[NonzeroIndex];
-  Rational c1ratio = GCD(coeff1, coeff2) / coeff1;
-  Rational c2ratio = GCD(coeff1, coeff2) / coeff2;
-  Integer c1IntegerFactor = getIntegerFactorFromRatio(c1ratio);
-  Integer c2IntegerFactor = getIntegerFactorFromRatio(c2ratio);
-
-  Polynomial PartialConstraint(c1ratio * constraint1.poly);
-
-  // We need i, j such that i * c2IntFact - j * c1IntFact = gcd of IntFacts
-  Integer i;
-  Integer j;
-  Integer GCDofIntFactors = XGCD(c1IntegerFactor, c2IntegerFactor, i, j);
-  if (GCDofIntFactors != 1 && GCDofIntFactors != -1) {
-    throw std::logic_error("Error: In IntersectParallelConstraintPair the integer factors must be relatively prime.");
+  if (range > INT64_MAX) {
+    throw std::out_of_range("Bound range in IntersectParallelConstraintPair overflows int64.");
   }
-  Rational offsetMergeConstantRational = c1IntegerFactor * c2IntegerFactor * constraint2.poly.constant() -
-                                         c1IntegerFactor * c2IntegerFactor * constraint1.poly.constant();
-  Integer offsetMergeConstant;
-  if (denominator(offsetMergeConstantRational) == -1) {
-    offsetMergeConstant = -numerator(offsetMergeConstantRational);
-  } else if (denominator(offsetMergeConstantRational) == 1) {
-    offsetMergeConstant = numerator(offsetMergeConstantRational);
-  } else {
-    // Throw indicating the constraints are mutually exclusive
-    std::stringstream ErrorMessage;
-    ErrorMessage << "Error: IntersectParallelConstraintPair does not yet handle mutually exclusive constraints."
-                 << "\nConstraint 1 poly: " << constraint1.poly.toString()
-                 << "\nConstraint 1 range: " << std::to_string(constraint1.range)
-                 << "\nConstraint 2 poly: " << constraint2.poly.toString()
-                 << "\nConstraint 2 range: " << std::to_string(constraint2.range);
-    throw std::invalid_argument(ErrorMessage.str());
-  }
-  // Transform i and j into the actual solutions of the linear Diophantine equation k2 i - k1 j = b
-  i *= GCDofIntFactors * offsetMergeConstant;
-  j *= GCDofIntFactors * offsetMergeConstant;
-
-  Rational FractionalOffset =
-      constraint1.poly.constant() +
-      i * c1ratio;  // Note that this is only correct up to an integer constant (which we compute below)
-  Integer IntegralOffset1 =
-      (c1IntegerFactor > 0)
-          ? Ceil(c1ratio * constraint1.poly.constant() - FractionalOffset)
-          : Floor(c1ratio * constraint1.poly.constant() - c1ratio * constraint1.range - FractionalOffset + 1);
-  Integer IntegralOffset2 =
-      (c2IntegerFactor > 0)
-          ? Ceil(c2ratio * constraint2.poly.constant() - FractionalOffset)
-          : Floor(c2ratio * constraint2.poly.constant() - c2ratio * constraint2.range - FractionalOffset + 1);
-  Rational NetOffset = FractionalOffset + Min(IntegralOffset1, IntegralOffset2);
-  Integer Range1 = (c1IntegerFactor > 0)
-                       ? Ceil(c1ratio * constraint1.range - c1ratio * constraint1.poly.constant() + NetOffset)
-                       : Floor(-c1ratio * constraint1.poly.constant() + NetOffset + 1);
-  Integer Range2 = (c2IntegerFactor > 0)
-                       ? Ceil(c2ratio * constraint2.range - c2ratio * constraint2.poly.constant() + NetOffset)
-                       : Floor(-c2ratio * constraint2.poly.constant() + NetOffset + 1);
-  // I'm not sure but it looks like boost doesn't throw when an explicit narrowing
-  // conversion turns out to be lossy, so we'll check this ourselves
-  if (Range1 > INT64_MAX && Range2 > INT64_MAX)
-    throw std::out_of_range("Error: Bound range in IntersectParallelConstraintPair overflows int64.");
-  int64_t Range = (int64_t)(Min(Range1, Range2));
-
-  PartialConstraint.setConstant(NetOffset);
-
-  return RangeConstraint(PartialConstraint, Range);
+  int64_t r = (int64_t)range;
+  Polynomial p(constraint1.poly / n1);
+  p.setConstant(merged_offset);
+  return RangeConstraint(p, r);
 }
 
 static std::set<std::string> variablesUsed(const std::vector<RangeConstraint>& constraints) {

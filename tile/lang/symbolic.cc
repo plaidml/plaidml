@@ -102,6 +102,25 @@ ValuePtr Gradient::OpGrad(const ValuePtr& dout, const ValuePtr& op, size_t idx) 
 
 ValuePtr Gradient::FuncOp(const ValuePtr& dout, const std::shared_ptr<FunctionValue>& op, size_t idx) {
   IVLOG(4, "  Gradient::FuncOp(), dout=" << dout << ", op=" << op << ", fn=" << op->fn() << ", idx=" << idx);
+  if (op->fn() == "tuple") {
+    return FunctionValue::make("element", {dout, IConstValue::make(idx)});
+  }
+  if (op->fn() == "element") {
+    if (idx == 1) {
+      return IConstValue::make(0);
+    }
+    const FunctionValue* tuple = dynamic_cast<const FunctionValue*>(op->inputs()[0].get());
+    int64_t elem = dynamic_cast<const IConstValue*>(op->inputs()[1].get())->value();
+    std::vector<ValuePtr> inputs;
+    for (size_t i = 0; i < tuple->inputs().size(); i++) {
+      if (i == elem) {
+        inputs.push_back(dout);
+      } else {
+        inputs.push_back(IConstValue::make(0));
+      }
+    }
+    return FunctionValue::make("tuple", inputs);
+  }
   if (op->fn() == "reshape") {
     std::vector<ValuePtr> inputs = {dout};
     ValuePtr in = op->inputs()[0];

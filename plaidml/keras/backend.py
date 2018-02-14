@@ -26,6 +26,7 @@ import numpy as np
 import operator
 import os
 import plaidml
+import plaidml.tile as tile
 import scipy.stats
 import six
 import sys
@@ -951,7 +952,7 @@ class _Function(object):
 
         c = plaidml.Composer()
         for (name, val) in zip(self._input_names, inputs):
-            if isinstance(_plaidml_val(val), plaidml._Var):
+            if isinstance(_plaidml_val(val), plaidml.Var):
                 if isinstance(_plaidml_val(val), plaidml.Placeholder):
                     c.add_input(name, _plaidml_val(val))
                     self._input_types[name] = val.dtype
@@ -1845,15 +1846,15 @@ def dtype(x):
 
 
 def elu(x, alpha=1.0):
-	if alpha == 1:
-		f = """function (X) -> (R) {
-				   A = exp(X)-1;
-				   R = (X < 0 ? A : X); }"""
-	else:
-		f = """function (X) -> (R) {{
-       			  	   A = {alpha}*exp(X) - {alpha};
-       				   R = X < 0 ? A : X; }}""".format(alpha=alpha)
-	return _Op('elu', x.dtype, x.shape, f, {'X': x}, ['R'])
+    if alpha == 1:
+        f = """function (X) -> (R) {
+               A = exp(X)-1;
+               R = (X < 0 ? A : X); }"""
+    else:
+        f = """function (X) -> (R) {{
+               A = {alpha}*exp(X) - {alpha};
+               R = X < 0 ? A : X; }}""".format(alpha=alpha)
+    return _Op('elu', x.dtype, x.shape, f, {'X': x}, ['R'])
 
 
 def eval(x):

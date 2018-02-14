@@ -32,6 +32,31 @@ std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shar
   static std::shared_ptr<Value> zerof = FConstValue::make(0);
   static std::shared_ptr<Value> onef = FConstValue::make(1);
 
+  bool all_tuples = true;
+  int tuple_size = -1;
+  for (const auto& i : inputs) {
+    if (i->type() != FUNCTION || dynamic_cast<const FunctionValue*>(i.get())->fn() != "tuple") {
+      all_tuples = false;
+      break;
+    }
+    int new_size = dynamic_cast<const FunctionValue*>(i.get())->inputs().size();
+    if (tuple_size == -1) {
+      tuple_size = new_size;
+    } else if (tuple_size != new_size) {
+      throw std::runtime_error("Function application on tuples with mismatched sizes");
+    }
+  }
+  if (all_tuples) {
+    std::vector<std::shared_ptr<Value>> tuple_inputs;
+    for (size_t i = 0; i < tuple_size; i++) {
+      std::vector<std::shared_ptr<Value>> func_inputs;
+      for (size_t j = 0; j < inputs.size(); j++) {
+        func_inputs.push_back(dynamic_cast<const FunctionValue*>(inputs[j].get())->inputs()[i]);
+      }
+      tuple_inputs.push_back(FunctionValue::make(fn, func_inputs));
+    }
+    return FunctionValue::make("tuple", tuple_inputs);
+  }
   if (fn == "ident") {
     return inputs[0];
   }
@@ -223,21 +248,41 @@ FunctionValue::FunctionValue(std::string fn, std::vector<std::shared_ptr<Value>>
     return;
   }
   if (fn_ == "gather") {
-      for(size_t i = 0; i < inputs_[1]->num_dims(); i++) {
-          dims_.push_back(inputs_[1]->dim_value(i));
-      }
-      for(size_t i = 1; i < inputs_[0]->num_dims(); i++) {
-          dims_.push_back(inputs_[0]->dim_value(i));
-      }
-      return;
+    for (size_t i = 0; i < inputs_[1]->num_dims(); i++) {
+      dims_.push_back(inputs_[1]->dim_value(i));
+    }
+    for (size_t i = 1; i < inputs_[0]->num_dims(); i++) {
+      dims_.push_back(inputs_[0]->dim_value(i));
+    }
+    return;
   }
   if (fn_ == "scatter") {
-      dims_.push_back(inputs_[2]->dim_value(0));
-      for(size_t i = inputs_[1]->num_dims(); i < inputs_[0]->num_dims(); i++) {
-          dims_.push_back(inputs_[0]->dim_value(i));
-      }
-      return;
+    dims_.push_back(inputs_[2]->dim_value(0));
+    for (size_t i = inputs_[1]->num_dims(); i < inputs_[0]->num_dims(); i++) {
+      dims_.push_back(inputs_[0]->dim_value(i));
+    }
+    return;
   }
+  if (fn_ == "tuple") {
+    return;
+  }
+  if (fn_ == "element") {
+    const FunctionValue* tuple = dynamic_cast<const FunctionValue*>(inputs_[0].get());
+    const IConstValue* elem = dynamic_cast<const IConstValue*>(inputs_[1].get());
+    if (!tuple || !elem) {
+      throw std::runtime_error("Illegal element/tuple");
+    }
+    int64_t elemval = elem->value();
+    if (elemval < 0 || elemval >= tuple->inputs_.size()) {
+      throw std::runtime_error("element index out of range of tuple");
+    }
+    const Value* inner = tuple->inputs_[elemval].get();
+    for (size_t i = 0; i < inner->num_dims(); i++) {
+      dims_.push_back(inner->dim_value(i));
+    }
+    return;
+  }
+
   size_t max_dims = 0;
   for (size_t i = 0; i < inputs_.size(); i++) {
     IVLOG(4, "  input[" << i << "]->num_dims is " << inputs_[i]->num_dims());

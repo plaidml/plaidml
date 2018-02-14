@@ -58,14 +58,14 @@ std::map<Polynomial, ILPResult> ILPSolver::batch_solve(const std::vector<RangeCo
 }
 
 ILPResult ILPSolver::solve(const std::vector<RangeConstraint>& constraints, const Polynomial objective) {
-  if (VLOG_IS_ON(1)) {
+  if (VLOG_IS_ON(2)) {
     std::ostringstream msg;
     msg << "Starting ILPSolver with constraints\n";
     for (const RangeConstraint& c : constraints) {
       msg << "  " << c << "\n";
     }
     msg << "and objective " << objective;
-    IVLOG(1, msg.str());
+    IVLOG(2, msg.str());
   }
   Tableau t = makeStandardFormTableau(constraints, objective);
   return solve(t);
@@ -74,7 +74,7 @@ ILPResult ILPSolver::solve(const std::vector<RangeConstraint>& constraints, cons
 ILPResult ILPSolver::solve(Tableau& tableau, bool already_canonical) {
   clean();
   var_names_ = tableau.varNames();
-  IVLOG(4, "Starting ILPSolver with tableau " << tableau.mat().toString());
+  IVLOG(5, "Starting ILPSolver with tableau " << tableau.mat().toString());
   solve_step(tableau, already_canonical);
   if (!feasible_found) {
     throw std::runtime_error("No feasible solution");
@@ -86,7 +86,7 @@ void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
   // Check feasible region exists for this subproblem
   if (!tableau.makeOptimal(already_canonical)) {
     // Feasible region empty (or unbounded), no solution from this branch
-    IVLOG(4, "Feasible region empty; pruning branch");
+    IVLOG(5, "Feasible region empty; pruning branch");
     return;
   }
 
@@ -117,7 +117,7 @@ void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
       for (size_t i = 0; i < soln.size(); ++i) {
         msg << "\n    " << tableau.varNames()[i] << ": " << soln[i];
       }
-      IVLOG(4, msg.str());
+      IVLOG(5, msg.str());
       IVLOG(6, "  from tableau:" << tableau.mat().toString());
     }
     feasible_found = true;
@@ -137,15 +137,15 @@ void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
       IVLOG(6, "  from tableau:" << tableau.mat().toString());
     }
 
-    IVLOG(3, "Requesting Gomory cut at row " << greatest_fractional_row << " with value " << greatest_fractional);
+    IVLOG(5, "Requesting Gomory cut at row " << greatest_fractional_row << " with value " << greatest_fractional);
     Tableau with_cut = addGomoryCut(tableau, greatest_fractional_row);
-    IVLOG(5, "Adding Gomory cut yielded: " << with_cut.mat().toString());
+    IVLOG(6, "Adding Gomory cut yielded: " << with_cut.mat().toString());
     solve_step(with_cut);
   }
 }
 
 Tableau ILPSolver::addGomoryCut(const Tableau& t, size_t row) {
-  IVLOG(5, "Adding Gomory cut along row " << row);
+  IVLOG(6, "Adding Gomory cut along row " << row);
   Tableau ret(t.mat().size1() + 1, t.mat().size2() + 1, t.varNames(), &t.getOpposites());
   project(ret.mat(), range(0, t.mat().size1()), range(0, t.mat().size2() - 1)) =
       project(t.mat(), range(0, t.mat().size1()), range(0, t.mat().size2() - 1));

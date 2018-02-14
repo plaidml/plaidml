@@ -290,6 +290,8 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
         case Binding::FCONST:
           input = std::make_shared<sem::FloatConst>(bindings[i]->fconst);
           break;
+        case Binding::TUPLE:
+          throw std::runtime_error("Cannot pass tuple to contraction");
       }
       if (op.comb_op == CombinationOp::EQ) {
         sem::Type itype = {sem::Type::VALUE, op.access[i].type, op.access[i].vector};
@@ -511,6 +513,9 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
           }
           inexprs.push_back(val);
           break;
+        }
+        case Binding::TUPLE: {
+          throw std::runtime_error("Cannot use tuple as contraction local");
         }
       }
     }

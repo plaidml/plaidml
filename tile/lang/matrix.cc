@@ -217,11 +217,9 @@ struct HermiteCompute {
   size_t rows_;
   size_t columns_;
   Matrix lhs_;
-  Vector rhs_;
 
   void swap(size_t i, size_t j) {
     lhs_.swapRows(i, j);
-    std::swap(rhs_(i), rhs_(j));
   }
 
   void mult(size_t i, Integer m) {
@@ -229,13 +227,11 @@ struct HermiteCompute {
       throw std::runtime_error("Cannot multiply row by nonunit constant in computing HNF.");
     }
     lhs_.multRow(i, m);
-    rhs_(i) *= m;
   }
 
   void addMult(size_t d, size_t s, Integer m) {
     IVLOG(6, "  Adding " << m << " * row " << s << " to row " << d);
     lhs_.addRowMultToRow(d, s, m);
-    rhs_(d) += m * rhs_(s);
   }
 
   void eliminate(size_t i, size_t j) {
@@ -263,7 +259,6 @@ struct HermiteCompute {
     Rational m = numerator(-lhs_(j, i) / o);
     IVLOG(5, "  m = " << m);
     addMult(j, i, numerator(-lhs_(j, i) / o));
-    rhs_(j) = Reduce(rhs_(j), 1);
   }
 
   void euclidean_reduce(size_t i, size_t j, size_t col) {
@@ -294,7 +289,6 @@ struct HermiteCompute {
     IVLOG(6, "Quotient " << q << ", Remainder " << r);
     while (true) {
       addMult(i, j, -q);
-      rhs_(i) = Reduce(rhs_(i), 1);
       swap(i, j);
       IVLOG(6, "  a = " << a << ", b = " << b << ", state\n" << toString());
       if (r == 0) {
@@ -311,7 +305,6 @@ struct HermiteCompute {
   void normalize(size_t i, size_t j) {
     Integer m = -Floor(lhs_(j, i) / lhs_(i, i));
     addMult(j, i, m);
-    rhs_(j) = Reduce(rhs_(j), 1);
   }
 
   std::string toString() {
@@ -320,23 +313,18 @@ struct HermiteCompute {
       for (size_t j = 0; j < columns_; j++) {
         maxlen = std::max(maxlen, lhs_(i, j).str().size());
       }
-      maxlen = std::max(maxlen, rhs_[i].str().size());
     }
     std::string r;
     for (size_t i = 0; i < rows_; i++) {
       for (size_t j = 0; j < columns_; j++) {
         r += printstring("%*s ", static_cast<int>(maxlen), lhs_(i, j).str().c_str());
       }
-      r += printstring("| %*s\n", static_cast<int>(maxlen), rhs_[i].str().c_str());
     }
     return r;
   }
 
  public:
-  HermiteCompute(const Matrix& m, const Vector& v) : rows_(m.size1()), columns_(m.size2()), lhs_(m), rhs_(v) {
-    if (v.size() != m.size1()) {
-      throw std::runtime_error("Size mismatch in Hermite Normal");
-    }
+  HermiteCompute(const Matrix& m) : rows_(m.size1()), columns_(m.size2()), lhs_(m) {
   }
 
   bool compute() {
@@ -386,11 +374,10 @@ struct HermiteCompute {
   }
 };
 
-bool HermiteNormalForm(Matrix& m, Vector& v) {  // NOLINT(runtime/references)
-  HermiteCompute hc(m, v);
+bool HermiteNormalForm(Matrix& m) {  // NOLINT(runtime/references)
+  HermiteCompute hc(m);
   bool r = hc.compute();
   m = hc.lhs_;
-  v = hc.rhs_;
   return r;
 }
 

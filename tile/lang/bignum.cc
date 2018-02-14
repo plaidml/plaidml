@@ -17,6 +17,8 @@ Integer Floor(const Rational& x) {
 
 Integer Ceil(const Rational& x) { return Floor(Rational(numerator(x) - 1, denominator(x))) + 1; }
 
+Rational FracPart(const Rational& x) { return x - Floor(x); }
+
 Integer Abs(const Integer& x) {
   if (x < 0) {
     return -x;
@@ -81,6 +83,27 @@ Integer Min(const Integer& a, const Integer& b) {
     return a;
   else
     return b;
+}
+
+Rational Min(const Rational& a, const Rational& b) {
+  if (a < b)
+    return a;
+  else
+    return b;
+}
+
+Integer Max(const Integer& a, const Integer& b) {
+  if (a < b)
+    return b;
+  else
+    return a;
+}
+
+Rational Max(const Rational& a, const Rational& b) {
+  if (a < b)
+    return b;
+  else
+    return a;
 }
 
 Integer RatDiv(const Rational& a, const Rational& b, Rational& r) {  // NOLINT(runtime/references)

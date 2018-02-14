@@ -305,9 +305,19 @@ class Simplifier : public Visitor {
     // If the EvalExpr happens 1st, there's a chance that a reference to an elided
     // identifier will be emitted.
     if (node.iftrue && node.iffalse) {
-      const_cast<IfStmt&>(node).cond = EvalExpr(node.cond);
-      const_cast<IfStmt&>(node).iftrue = EvalStmt(node.iftrue);
-      const_cast<IfStmt&>(node).iffalse = EvalStmt(node.iffalse);
+      auto cond = EvalExpr(node.cond);
+      auto int_const = std::dynamic_pointer_cast<IntConst>(cond);
+      if (int_const) {
+        if (int_const->value == 0) {
+          new_stmt_ = EvalStmt(node.iffalse);
+        } else {
+          new_stmt_ = EvalStmt(node.iftrue);
+        }
+      } else {
+        const_cast<IfStmt&>(node).cond = cond;
+        const_cast<IfStmt&>(node).iftrue = EvalStmt(node.iftrue);
+        const_cast<IfStmt&>(node).iffalse = EvalStmt(node.iffalse);
+      }
     } else if (node.iftrue) {
       auto unary_expr = std::dynamic_pointer_cast<UnaryExpr>(node.cond);
       if (unary_expr && unary_expr->op == "!") {
