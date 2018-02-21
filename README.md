@@ -72,7 +72,7 @@ If you have an AMD card, [download the AMDGPU PRO driver and install](http://sup
 
 Install the PlaidML wheels system-wide:
 ```
-sudo pip install -U plaidml-keras
+sudo -H pip install -U plaidml-keras
 ```
 
 Next, setup PlaidML to use your preferred computing device:
@@ -84,7 +84,7 @@ You can test your installation by running MobileNet in [plaidbench](https://gith
 ```
 git clone https://github.com/plaidml/plaidbench.git
 cd plaidbench
-sudo pip install -r requirements.txt
+sudo -H pip install -r requirements.txt
 python plaidbench.py mobilenet
 ```
 
