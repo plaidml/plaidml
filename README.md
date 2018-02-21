@@ -70,9 +70,16 @@ sudo apt install nvidia-modprobe nvidia-384 nvidia-opencl-icd-384 libcuda1-384
 ```
 If you have an AMD card, [download the AMDGPU PRO driver and install](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Driver-for-Linux-Release-Notes.aspx) according to AMD's instructions.
 
-Install the PlaidML wheels system-wide:
+Best practices for python include judicious usage of [Virtualenv](https://virtualenv.pypa.io/en/stable/), and we certainly recommend creating one just for plaidml:
 ```
-sudo pip install -U plaidml-keras
+virtualenv plaidml-venv
+source ./plaidml-venv/bin/activate
+pip install -U plaidml-keras
+```
+
+Alternatively, install the PlaidML wheels system-wide:
+```
+sudo -H pip install -U plaidml-keras
 ```
 
 Next, setup PlaidML to use your preferred computing device:
@@ -81,10 +88,11 @@ plaidml-setup
 ```
 
 You can test your installation by running MobileNet in [plaidbench](https://github.com/plaidml/plaidbench):
+(Remember to use sudo -H if you're not using a Virtualenv)
 ```
 git clone https://github.com/plaidml/plaidbench.git
 cd plaidbench
-sudo pip install -r requirements.txt
+pip install -r requirements.txt
 python plaidbench.py mobilenet
 ```
 
