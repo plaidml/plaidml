@@ -39,7 +39,7 @@ Vertex.AI runs a comprehensive set of tests for each release against these hardw
     * GTX 1070, 1050
 
 ### Validated Networks
-We support all of the Keras application networks from the current version (2.0.8). Validated networks are tested for performance and 
+We support all of the Keras application networks from current versions of 2.x. Validated networks are tested for performance and 
 correctness as part of our continuous integration system.
 
  * CNNs
