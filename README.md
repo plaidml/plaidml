@@ -9,8 +9,9 @@ PlaidML is a multi-language acceleration framework that:
   * Enables practitioners to deploy high-performance neural nets on any device
   * Allows hardware developers to quickly integrate with high-level frameworks
   * Allows framework developers to easily add support for many kinds of hardware
+  * Works on all major platforms - linux, [macOS](http://vertex.ai/blog/plaidml-mac-preview), [Windows](http://vertex.ai/blog/deep-learning-for-everyone-plaidml-for-windows)
 
-For background and early benchmarks see our [blog post](http://vertex.ai/blog/announcing-plaidml) announcing the release. PlaidML is under active development and should be thought of as early alpha quality.
+For background and early benchmarks see our [blog post](http://vertex.ai/blog/announcing-plaidml) announcing the release. PlaidML is under active development and should be thought of as alpha quality.
 
 - [Current Limitations](#current-limitations)
 - [Installation Instructions](#installation-instructions)
@@ -22,7 +23,6 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
 
 This version of PlaidML has some notable limitations which will be addressed soon in upcoming releases:
 
-  * **macOS builds, but has correctness issues. We're addressing this in [Issue #26](https://github.com/plaidml/plaidml/issues/26).**
   * Start-up times can be quite long
   * Training throughput much lower than we'd like
   * RNN support is not implemented
@@ -33,12 +33,13 @@ Vertex.AI runs a comprehensive set of tests for each release against these hardw
   * AMD
     * R9 Nano
     * RX 480
+    * Vega 10
   * NVIDIA
     * K80, GTX 780
-    * GTX 1070
+    * GTX 1070, 1050
 
 ### Validated Networks
-We support all of the Keras application networks from the current version (2.0.8). Validated networks are tested for performance and 
+We support all of the Keras application networks from current versions of 2.x. Validated networks are tested for performance and 
 correctness as part of our continuous integration system.
 
  * CNNs
