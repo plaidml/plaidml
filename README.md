@@ -23,9 +23,8 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
 
 This version of PlaidML has some notable limitations which will be addressed soon in upcoming releases:
 
-  * Start-up times can be quite long
+  * Start-up times are long for training
   * Training throughput much lower than we'd like
-  * RNN support is not implemented
 
 ### Validated Hardware
 
@@ -48,6 +47,9 @@ correctness as part of our continuous integration system.
    * vgg19
    * xception
    * mobilenet
+
+ * LSTM
+   * examples/imdb_lstm.py (from keras)
 
 ## Installation Instructions
 
