@@ -25,9 +25,9 @@ before_install:
   - git clone http://github.com/plaidml/plaidbench  
 
 install:
-  - bazel build -c opt --force_python=$BZL_PY_VER plaidml:wheel plaidml/keras:wheel
+  - bazel build --config=linux_x86_64 --force_python=$BZL_PY_VER plaidml:wheel plaidml/keras:wheel
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
-  - bazel test -c opt --force_python=$BZL_PY_VER --test_env=PLAIDML_EXPERIMENTAL plaidml/keras:backend_test
+  - bazel test --config=linux_x86_64 --force_python=$BZL_PY_VER --test_env=PLAIDML_EXPERIMENTAL plaidml/keras:backend_test
   - python plaidbench/plaidbench.py mobilenet
