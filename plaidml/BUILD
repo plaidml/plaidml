@@ -7,8 +7,6 @@ load(
     "plaidml_cc_binary",
     "plaidml_cc_library",
     "plaidml_cc_test",
-    "plaidml_objc_library",
-    "plaidml_objc_cc_library",
     "plaidml_proto_library",
     "plaidml_py_binary",
     "plaidml_py_library",
@@ -53,7 +51,10 @@ plaidml_cc_library(
         "//tile/proto:proto_cc",
         "@half_repo//:half",
         "@minizip_repo//:minizip",
-    ],
+    ] + select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["//tile/hal/cpu"],
+    }),
 )
 
 # The PLAIDML C library, defined as a Bazel dynamically-loaded library.
@@ -61,7 +62,7 @@ plaidml_cc_library(
 plaidml_cc_binary(
     name = "libplaidml.so",
     srcs = select({
-        "//bzl:x64_windows": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
+        "@toolchain//:windows_x86_64": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
         "//conditions:default": [],
     }),
     linkshared = 1,
@@ -73,30 +74,13 @@ plaidml_cc_binary(
 plaidml_cc_binary(
     name = "plaidml.dll",
     srcs = select({
-        "//bzl:x64_windows": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
+        "@toolchain//:windows_x86_64": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
         "//conditions:default": [],
     }),
     linkshared = 1,
     deps = [
         ":api",
     ],
-)
-
-plaidml_objc_library(
-    name = "api_objc",
-    srcs = ["plaidml.cc"],
-    tags = ["manual"],
-    deps = [
-        ":plaidml_cc_deps_wrap",
-        "//plaidml/dev/metal:metal_objc",
-    ],
-)
-
-plaidml_objc_cc_library(
-    name = "api_cc_deps_wrap",
-    cc_library = ":plaidml_cc_deps",
-    tags = ["manual"],
-    visibility = ["//visibility:private"],
 )
 
 plaidml_cc_library(
@@ -182,20 +166,22 @@ plaidml_cc_test(
     ],
 )
 
-plaidml_objc_library(
-    name = "plaidml_lib_objc",
-    tags = ["manual"],
-    deps = [
-        ":plaidml_objc",
-    ],
-)
-
 filegroup(
     name = "configs",
     srcs = [
         "config.json",
-        "experimental.json",
+        ":experimental.json",
     ],
+)
+
+genrule(
+    name = "experimental_json",
+    srcs = select({
+        "@toolchain//:windows_x86_64": ["experimental.no_llvm.json"],
+        "//conditions:default": ["experimental.llvm.json"],
+    }),
+    outs = ["experimental.json"],
+    cmd = "cp $< $@",
 )
 
 plaidml_py_binary(
@@ -218,7 +204,7 @@ plaidml_py_library(
         "tile.py",
     ],
     data = [":configs"] + select({
-        "//bzl:x64_windows": [":plaidml.dll"],
+        "@toolchain//:windows_x86_64": [":plaidml.dll"],
         "//conditions:default": [":libplaidml.so"],
     }),
 )
@@ -288,7 +274,7 @@ plaidml_py_wheel(
         ":py",
         ":configs",
     ] + select({
-        "//bzl:x64_windows": ["//plaidml:plaidml.dll"],
+        "@toolchain//:windows_x86_64": ["//plaidml:plaidml.dll"],
         "//conditions:default": ["//plaidml:libplaidml.so"],
     }),
     config = ":setup.cfg",
@@ -297,10 +283,27 @@ plaidml_py_wheel(
     ],
     package = "plaidml",
     platform = select({
-        "//bzl:arm7-ubuntu-14.04": "linux_armv7l",
-        "//bzl:darwin": "macosx_10_10_x86_64",
-        "//bzl:x64_windows": "win_amd64",
+        "@toolchain//:linux_arm_32v7": "linux_armv7l",
+        "@toolchain//:macos_x86_64": "macosx_10_10_x86_64",
+        "@toolchain//:windows_x86_64": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
     }),
+    python = "py2.py3",
+)
+
+# HACK: pex doesn't yet support manylinux wheels.
+plaidml_py_wheel(
+    name = "wheel_linux_x86_64",
+    srcs = [
+        ":configs",
+        ":py",
+        "//plaidml:libplaidml.so",
+    ],
+    config = ":setup.cfg",
+    console_scripts = [
+        "'plaidml-setup = plaidml.plaidml_setup:main'",
+    ],
+    package = "plaidml",
+    platform = "linux_x86_64",
     python = "py2.py3",
 )

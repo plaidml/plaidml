@@ -21,6 +21,7 @@ from keras.backend import floatx
 import plaidml
 import plaidml.exceptions
 from plaidml.keras import backend as pkb
+from plaidml import tile
 
 theano.config.optimizer = "None"
 
@@ -263,11 +264,13 @@ class TestBackendOps(unittest.TestCase):
 
     def a_testLearningPhase(self):
         # Test name prefixed with 'a_' because this needs to run before other tests
-        npt.assert_equal(pkb.learning_phase().eval(), 0)
+        assert isinstance(pkb.learning_phase()._plaidml_val(), plaidml.Placeholder)
         pkb.set_learning_phase(1)
-        npt.assert_equal(pkb.learning_phase().eval(), 1)
+        assert isinstance(pkb.learning_phase(), int)
+        npt.assert_equal(pkb.learning_phase(), 1)
         pkb.set_learning_phase(0)
-        npt.assert_equal(pkb.learning_phase().eval(), 0)
+        assert isinstance(pkb.learning_phase(), int)
+        npt.assert_equal(pkb.learning_phase(), 0)
 
     @compareForwardExact()
     def testShape(self, b):
@@ -373,16 +376,17 @@ class TestBackendOps(unittest.TestCase):
 
     def testTileIdentity(self):
         x = pkb.variable(m(3))
-        f = '''function (I[N]) -> (O) { O = I; }'''
-        result = pkb._Op("TileIdent", x.dtype, (3,), f, {'I': x}, ['O'])
-        output = result.eval()
+        op = tile.Operation('function (I[N]) -> (O) { O = I; }', [('I', x)],
+                            [('O', tile.Shape(x.shape.dtype, (3,)))])
+        output = op.sole_output().eval()
         return 0
 
     def testTwoOutputs(self):
         x = pkb.variable(m(3))
-        f = '''function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }'''
-        result = pkb._Op("TwoOut", x.dtype, (None,), f, {'I': x}, ['O1', 'O2'])
-        output = result.eval()
+        op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
+                            [('O1', x.shape), ('O2', x.shape)])
+        output = op.outputs['O1'].eval()
+        output = op.outputs['O2'].eval()
         return 0
 
     @unittest.skip("TODO(T1028): This test is known to fail")
@@ -522,10 +526,7 @@ class TestBackendOps(unittest.TestCase):
         [m(3, 4) + 0.0001, 0.1],
     ])
     def testElu(self, b, x, a=1.0):
-        return [
-            b.elu(x),
-            b.elu(x, alpha=a)
-        ]
+        return [b.elu(x), b.elu(x, alpha=a)]
 
     # T1031: This doesn't match TF/Theano on corner
     @opTest([
@@ -810,19 +811,28 @@ class TestBackendOps(unittest.TestCase):
              '  O[n, x0, x1, co: 1, 5, 5, 1] = +(I[n, (x0 + k0 - 1)/2, (x1 + k1 - 1)/2, ci]' +
              ' * K[2 - k0, 2 - k1, co, ci]);\n}')
         return [
-            b._Op('defract_test', x.dtype, (1, 5, 5, 1), f,
-                  OrderedDict([('I', x), ('K', k)]), ['O'])
+            tile.Operation(
+                f, [('I', x), ('K', k)], [('O', tile.Shape(x.shape.dtype, (1, 5, 5, 1)))],
+                name='DefractTest').sole_output()
         ]
 
     @opTest([[m(3), m(3) + 1]], skip_tensorflow=True, skip_theano=True)
     def testDefract(self, b, x, k):
         f = 'function(I[N], K[M]) -> (O) {\n  O[x: 5] = +(I[(x - k + 1)/2] * K[k]);\n}'
-        return [b._Op('defract_test', x.dtype, (5,), f, OrderedDict([('I', x), ('K', k)]), ['O'])]
+        return [
+            tile.Operation(
+                f, [('I', x), ('K', k)], [('O', tile.Shape(x.shape.dtype, (5,)))],
+                name='DefractTest').sole_output()
+        ]
 
     @opTest([[m(3)]], skip_tensorflow=True, skip_theano=True)
     def testDefractShort(self, b, x):
         f = 'function(I[N]) -> (O) {\n  O[x: 6] = +(I[(x - 1)/2]);\n}'
-        return [b._Op('defract_test', x.dtype, (6,), f, OrderedDict([('I', x)]), ['O'])]
+        return [
+            tile.Operation(
+                f, [('I', x)], [('O', tile.Shape(x.shape.dtype, (6,)))], name='DefractTest')
+            .sole_output()
+        ]
 
     @unittest.skip("TODO(T1046): This case is bugged in Keras 2.0.8 TF")
     @opTest(
@@ -1198,6 +1208,10 @@ class TestBackendOps(unittest.TestCase):
     def testSliceShort(self, b, x):
         return [x[1]]
 
+    @opTest([[m(2, 3, 4, 5)], [m(2, 1, 2)]])
+    def testSliceEllipsis(self, b, x):
+        return [x[..., 1], x[-1, ..., 0, ::-1], x[...]]
+
     def testConvParameterRankExceptions(self):
         A = pkb.variable(m(2, 3, 1))
         B = pkb.variable(m(1, 2, 1))
@@ -1217,14 +1231,18 @@ class TestBackendOps(unittest.TestCase):
                }"""
         # A * B has each entry a "sum" of exactly one product, and so assignment
         # is valid and should be the same as + aggregation.
-        O = pkb._Op('assign_mul', A.dtype, (A.shape[0], B.shape[1]), f,
-                    OrderedDict([('A', A), ('B', B)]), ['O']).eval()
+        O = tile.Operation(f, [('A', A), ('B', B)],
+                           [('O', tile.Shape(A.shape.dtype,
+                                             (A.shape.dims[0], B.shape.dims[1])))]) \
+                .sole_output().eval()
         npt.assert_allclose(O, np.dot(m(5, 1), m(1, 5)))
         # B * A sums multiple products into one output entry, and so assignment
         # is not valid and should raise a multiple assignment error.
         with self.assertRaises(plaidml.exceptions.Unknown) as cm:
-            pkb._Op('assign_mul', A.dtype, (A.shape[0], B.shape[1]), f,
-                    OrderedDict([('A', B), ('B', A)]), ['O']).eval()
+            tile.Operation(f, [('A', B), ('B', A)],
+                           [('O', tile.Shape(A.shape.dtype,
+                                             (A.shape.dims[0], B.shape.dims[1])))]) \
+                .sole_output().eval()
         self.assertTrue("Multiple assignment" in str(cm.exception))
 
     @compareForwardExact()

@@ -4,6 +4,9 @@ PlaidML depends on [Bazel](http://bazel.build) v0.9.0 or higher.
 
 ## Building PlaidML
 
+### Install Requirements
+pip install -r requirements.txt
+
 ### Linux
 
 ```

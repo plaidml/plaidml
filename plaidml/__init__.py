@@ -772,7 +772,6 @@ _CTYPES = {
     DType.FLOAT64: ctypes.c_double
 }
 
-
 _NP_TYPES = {
     DType.FLOAT16: 'float16',
     DType.FLOAT32: 'float32',
@@ -1041,6 +1040,13 @@ class _Enumerator(object):
             self._free(self)
 
 
+def _setup_fail(message, devices):
+    available = '\n'.join(['  {}'.format(x.id) for x in devices])
+    raise exceptions.PlaidMLError(
+        "{} Please run plaidml-setup. The following devices are available:\n{}".format(
+            message, available))
+
+
 def devices(ctx, limit=1, return_all=False):
     """Returns a tuple of lists valid devices or aborts the program."""
     plaidml.settings.start_session()
@@ -1052,16 +1058,14 @@ def devices(ctx, limit=1, return_all=False):
         if len(enumerator.valid_devs) == 0:
             _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
                           "ERR_NO_DEVICES", True)
-            available = '\n'.join(['  {}'.format(x.id) for x in enumerator.invalid_devs])
-            raise exceptions.PlaidMLError(
-                "No devices found. Please run plaidml-setup. The following devices are available:\n{}".
-                format(available))
+            _setup_fail("No devices found.", enumerator.invalid_devs)
         if limit and len(enumerator.valid_devs) > limit:
             _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
                           "ERR_TOO_MANY_DEVICES", True)
-            raise exceptions.PlaidMLError("Too many devices configured. Please run plaidml-setup.")
-        _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs,
-                      enumerator.invalid_devs, "OK")
+            _setup_fail("Too many devices configured (limit={})".format(limit),
+                        enumerator.valid_devs)
+            _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs,
+                          enumerator.invalid_devs, "OK")
         return enumerator.valid_devs
 
 
@@ -1076,6 +1080,7 @@ class _Buffer(object):
 
 class Var(object):
     """An abstract variable."""
+
     def __init__(self, v):
         self._as_parameter_ = v
         self._free = _lib().plaidml_free_var

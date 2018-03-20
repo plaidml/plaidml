@@ -83,7 +83,7 @@ plaidml_cc_library(
         "type.h",
     ],
     copts = select({
-        "//bzl:x64_windows": [],
+        "@toolchain//:windows_x86_64": [],
         "//conditions:default": [
             "-Wno-format",
             "-Wno-sign-compare",
@@ -132,7 +132,7 @@ plaidml_cc_library(
         "polynomial.h",
     ],
     copts = select({
-        "//bzl:x64_windows": [],
+        "@toolchain//:windows_x86_64": [],
         "//conditions:default": ["-Wno-error"],
     }),
     visibility = ["//tile/lang/bilp:__pkg__"],

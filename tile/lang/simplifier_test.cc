@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "tile/lang/emitc.h"
+#include "tile/lang/semprinter.h"
 #include "tile/lang/sembuilder.h"
 
 namespace vertexai {
@@ -25,16 +25,14 @@ TEST_P(SimplifierTest, Compare) {
   std::vector<KernelInfo> kernels{ki};
   Simplify(kernels);
 
-  lang::EmitDebug actual;
-  actual.Visit(*ki.kfunc);
+  sem::Print actual(*ki.kfunc);
 
   if (VLOG_IS_ON(4)) {
     VLOG(4) << "Generic debug kernel after simplification:";
     VLOG(4) << actual.str();
   }
 
-  lang::EmitDebug expected;
-  expected.Visit(*param.after);
+  sem::Print expected(*param.after);
 
   EXPECT_EQ(actual.str(), expected.str());
 }

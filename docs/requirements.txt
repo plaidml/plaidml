@@ -1,0 +1,7 @@
+sphinx==1.7.1
+sphinx-autobuild==0.7.1
+m2r==0.1.13
+recommonmark
+sphinxcontrib-fulltoc
+sphinxcontrib-plantuml
+

@@ -23,6 +23,7 @@ struct Binding {
   double fconst;
   std::vector<Binding> tuple;
 
+  std::string key() const;
   bool operator==(const Binding& rhs) const;
   bool operator!=(const Binding& rhs) const;
 };

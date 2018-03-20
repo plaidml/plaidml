@@ -64,28 +64,29 @@ static bool NeedsZero(const FlatContraction& flat, const TensorShape& ts) {
 }
 
 static KernelInfo GenerateContractionKernel(const std::string& kname, const HardwareSettings& settings,
-                                            const Contraction* c, const FlatContraction& flat,
-                                            const std::vector<uint64_t>& tile, const std::vector<std::string>& inputs,
-                                            const Bindings& vars, const VarRewrites& var_rewrites) {
-  KernelInfo ki = GenContract(kname, settings, flat, tile, vars, inputs);
+                                            const Contraction* c, const FlatContraction& flat, const TileOption& option,
+                                            const std::vector<std::string>& inputs, const Bindings& vars,
+                                            const VarRewrites& var_rewrites) {
+  KernelInfo ki = GenContract(kname, settings, flat, option.shape, vars, inputs);
   ki.outputs = flat.kernel_outputs;
-  ki.key = flat.KeyString();
+  ki.key = flat.TileKeyString();
   ki.settings = settings;
-  ki.tile_size = tile;
+  ki.flat = flat;
+  ki.tile = option;
   for (const auto& input : inputs) {
     if (vars.at(input).tag == Binding::TENSOR) {
       ki.inputs.emplace_back(var_rewrites.Lookup(input));
     }
   }
-  for (const auto& kvp : flat.post_op_inputs) {
-    ki.inputs.emplace_back(var_rewrites.Lookup(kvp.first));
+  for (const auto& op_input : flat.post_op_inputs) {
+    ki.inputs.emplace_back(var_rewrites.Lookup(op_input.name));
   }
-  PerfStats perf = ComputeTileStats(settings, flat, tile, vars);
+  PerfStats perf = ComputeTileStats(settings, flat, option.shape);
   ki.tot_bytes = perf.work_groups * ((perf.inner_loops * perf.mem_read) + perf.mem_write);
   ki.tot_flops = perf.true_ops;
   if (VLOG_IS_ON(1)) {
     std::string tsize = "";
-    for (size_t size : tile) {
+    for (size_t size : option.shape) {
       tsize += std::to_string(size) + ", ";
     }
     VLOG(1) << "Contraction " << kname << ":\n"
@@ -183,8 +184,8 @@ static bool SimplifyFlat(FlatContraction* flat) {
           break;
         }
       }
-      for (const auto& kvp : flat->post_op_inputs) {
-        if (!is_safe(kvp.second)) {
+      for (const auto& op_input : flat->post_op_inputs) {
+        if (!is_safe(op_input.access)) {
           all_good = false;
           break;
         }
@@ -203,8 +204,8 @@ static bool SimplifyFlat(FlatContraction* flat) {
       for (size_t k = 0; k < flat->access.size(); k++) {
         fixup(flat->access[k]);
       }
-      for (auto& kvp : flat->post_op_inputs) {
-        fixup(kvp.second);
+      for (auto& op_input : flat->post_op_inputs) {
+        fixup(op_input.access);
       }
       IVLOG(3, "Out=\n" << to_string(*flat));
       // We bail and let the outer caller rerun the main loop
@@ -218,8 +219,7 @@ static bool SimplifyFlat(FlatContraction* flat) {
 
 static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction flat,  // NOLINT(runtime/references)
                             const std::string& kname, const HardwareSettings& settings, const Bindings& vars,
-                            size_t tile_trials, const VarRewrites& var_rewrites,
-                            std::unordered_set<std::string> war_safe_reads) {
+                            size_t tile_trials, const VarRewrites& var_rewrites, const TileOptimizer& optimizer) {
   if (!flat.generate_contraction && !flat.post_ops.size()) {
     // The kernel consists entirely of elided elementwise operations; nothing to do.
     return;
@@ -249,21 +249,41 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
   for (auto vec_size = settings.vec_size; flat.agg_vec == 1 && 1 < vec_size; vec_size /= 2) {
     flat = Vectorize(flat, vec_size);
   }
+  std::string flat_key = flat.CacheKeyString(vars);
+  static std::map<std::string, KernelInfo> flat_cache;
+  auto it = flat_cache.find(flat_key);
+  if (it != flat_cache.end()) {
+    IVLOG(2, "Cache key: " << flat_key << ", Hit!");
+    r.kernels.emplace_back(it->second);
+    auto& ki = r.kernels.back();
+    ki.outputs = flat.kernel_outputs;
+    ki.inputs.clear();
+    for (const auto& input : inputs) {
+      if (vars.at(input).tag == Binding::TENSOR) {
+        ki.inputs.emplace_back(var_rewrites.Lookup(input));
+      }
+    }
+    for (const auto& op_input : flat.post_op_inputs) {
+      ki.inputs.emplace_back(var_rewrites.Lookup(op_input.name));
+    }
+    return;
+  }
+  IVLOG(2, "Cache key: " << flat_key << ", Miss!");
+
   IVLOG(4, "Optimizing " << kname);
-  auto by_score = TileOptimize(settings, flat, tile_trials == 1, vars);
+  auto options = optimizer.OptionsFor(kname, settings, flat, tile_trials);
 
   KernelInfo primary;
-  size_t trial_count = 0;
-  for (auto it = by_score.rbegin(); it != by_score.rend() && trial_count < tile_trials; it++, trial_count++) {
-    auto tile = it->second;
-    KernelInfo ki = GenerateContractionKernel(kname, settings, c, flat, tile, inputs, vars, var_rewrites);
-    if (trial_count == 0) {
+  for (size_t i = 0; i < options.size(); i++) {
+    const auto& option = options[i];
+    KernelInfo ki = GenerateContractionKernel(kname, settings, c, flat, option, inputs, vars, var_rewrites);
+    if (i == 0) {
       primary = ki;
     } else {
       primary.candidates.push_back(ki);
     }
   }
-  primary.war_safe_reads = std::move(war_safe_reads);
+  flat_cache.emplace(flat_key, primary);
   r.kernels.emplace_back(std::move(primary));
 }
 
@@ -290,7 +310,7 @@ static bool SameSizeOrBroadcastCompatible(const Binding& input, const Binding& o
   return true;
 }
 
-static bool OpCanBeUnified(const Program& prog, const Bindings& vars, std::size_t root_opidx, std::size_t test_opidx) {
+static bool CanUnifyOp(const Program& prog, const Bindings& vars, std::size_t root_opidx, std::size_t test_opidx) {
   const Op& root_op = prog.ops[root_opidx];
   const Op& test_op = prog.ops[test_opidx];
   IVLOG(4, "Testing for unification: " << root_op << " with " << test_op);
@@ -370,7 +390,7 @@ static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings&
 
     // Loop over the current frontier node's output consumers.
     for (std::size_t c_start : ud.uses().at(prog.ops[u].output)) {
-      if (unified.count(c_start) || !OpCanBeUnified(prog, vars, root_opidx, c_start) ||
+      if (unified.count(c_start) || !CanUnifyOp(prog, vars, root_opidx, c_start) ||
           previously_computed.count(c_start)) {
         continue;
       }
@@ -398,7 +418,7 @@ static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings&
           if (tag == Op::CONSTANT) {
             continue;
           }
-          if (!OpCanBeUnified(prog, vars, root_opidx, i)) {
+          if (!CanUnifyOp(prog, vars, root_opidx, i)) {
             goto discard_candidate_set;
           }
           candidates.insert(i);
@@ -418,9 +438,8 @@ static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings&
 }
 
 static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed, VarRewrites* var_rewrites,
-                          std::unordered_set<std::string>* war_safe_reads, const Program& prog, std::size_t opidx,
-                          const UseDef& ud, const Bindings& vars, const ShapeMap& inputs, const ShapeMap& outputs,
-                          const std::vector<Polynomial>& out_poly) {
+                          const Program& prog, std::size_t opidx, const UseDef& ud, const Bindings& vars,
+                          const ShapeMap& inputs, const ShapeMap& outputs, const std::vector<Polynomial>& out_poly) {
   // Unify the contraction with downstream elementwise operations.
   //
   // Here's the idea: during the contraction's output phase, we
@@ -437,7 +456,8 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   const Op& op = prog.ops[opidx];
 
   // Additional inputs required for the unified kernel.
-  std::set<std::string> post_contraction_inputs;
+  std::set<std::string> post_contraction_set;
+  std::vector<std::string> post_contraction_inputs;
 
   // The variable remappings that have been made in the current
   // kernel.  When talking about a kernel's input parameters, we use
@@ -527,8 +547,10 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
       auto uit = ud.op_defs().find(input);
       if (vars.at(input).tag == Binding::TENSOR &&
           (uit == ud.op_defs().end() || (!unified_opidxs.count(uit->second)))) {
-        war_safe_reads->emplace(input);
-        post_contraction_inputs.insert(input);
+        if (!post_contraction_set.count(input)) {
+          post_contraction_set.insert(input);
+          post_contraction_inputs.push_back(input);
+        }
       }
     }
 
@@ -601,8 +623,8 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
       // impossible to do so, though.)
       shape = &out_shape;
     }
-    FlatTensorAccess a;
-    a.global_index_limit = shape->elem_size();
+    FlatTensorAccess access;
+    access.global_index_limit = shape->elem_size();
     Polynomial p;
     size_t off = out_poly.size() - shape->dims.size();
     for (size_t i = 0; i < shape->dims.size(); i++, off++) {
@@ -612,15 +634,19 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
       }
     }
     for (const auto& idx : flat->names) {
-      a.strides.push_back(static_cast<int64_t>(Floor(p[idx])));
+      access.strides.push_back(static_cast<int64_t>(Floor(p[idx])));
     }
-    IVLOG(3, "For shape: " << shape << " poly = " << p << " strides = " << a.strides);
-    flat->post_op_inputs.emplace(name, a);
+    auto binding = vars.at(name);
+    access.type = binding.shape.type;
+    IVLOG(3, "For shape: " << shape << " poly = " << p << " strides = " << access.strides);
+    FlatPostOpInput post_op_input = {name, access, binding};
+    flat->post_op_inputs.emplace_back(post_op_input);
   }
 }
 
 static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, const ShapeMap& outputs,
-                          const HardwareSettings& settings, const std::string& kid, size_t tile_trials) {
+                          const HardwareSettings& settings, const std::string& kid, size_t tile_trials,
+                          const TileOptimizer& optimizer) {
   IVLOG(2, "Compile");
   KernelList r;
   Program prog = orig_prog;
@@ -649,7 +675,6 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       last_update = time(nullptr);
     }
     const Op& op = prog.ops[i];
-    std::unordered_set<std::string> war_safe_reads;
 
     if (op.tag == Op::CONTRACTION) {
       IVLOG(3, "Running contraction " << op << " vars = " << vars);
@@ -669,10 +694,9 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
         }
         flat.kernel_outputs.push_back(op.output);
       } else {
-        DoUnification(&flat, &computed, &r.var_rewrites, &war_safe_reads, prog, i, ud, vars, inputs, outputs, out_poly);
+        DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly);
       }
-      ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials, r.var_rewrites,
-                      std::move(war_safe_reads));
+      ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials, r.var_rewrites, optimizer);
       continue;
     }
     // Ignore constants
@@ -768,10 +792,9 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       flat.access.emplace_back(std::move(access));
     }
 
-    DoUnification(&flat, &computed, &r.var_rewrites, &war_safe_reads, prog, i, ud, vars, inputs, outputs, out_poly);
+    DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly);
 
-    ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials, r.var_rewrites,
-                    std::move(war_safe_reads));
+    ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials, r.var_rewrites, optimizer);
   }
 
   // Copy only the relevant typing info across
@@ -787,7 +810,8 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
 }
 
 KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const ShapeMap& outputs,
-                           const HardwareSettings& settings, const std::string& id, size_t tile_trials) {
+                           const HardwareSettings& settings, const TileOptimizer& optimizer, const std::string& id,
+                           size_t tile_trials) {
   // The caller can pass whatever it likes as the program ID, but for OpenCL, we require a valid C identifier.  We do
   // this by prefixing the supplied identifier with "kernel_" and translating all non-alnum characters to '_'.
   IVLOG(1, "Doing a compilation of:\n" << to_string(prog) << "\n");
@@ -801,10 +825,38 @@ KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const Sh
   }
 
   // Do the primary compilations
-  KernelList r;
-  r = Compile(prog, inputs, outputs, settings, kid, tile_trials);
-  Simplify(r.kernels);
-  return r;
+  KernelList result;
+  result = Compile(prog, inputs, outputs, settings, kid, tile_trials, optimizer);
+  Simplify(result.kernels);
+  return result;
+}
+
+void TileOptimizer::RegisterModel(const TileCostFunction& cost_fn) { models_.push_back(cost_fn); }
+
+TileOptions TileOptimizer::OptionsFor(const std::string& kname, const HardwareSettings& settings,
+                                      const FlatContraction& op, size_t max_options) const {
+  TileOptions options;
+  if (models_.empty()) {
+    auto by_score = TileOptimize(settings, op, max_options == 1);
+    size_t count = 0;
+    for (auto it = by_score.rbegin(); it != by_score.rend() && count < max_options; it++, count++) {
+      options.emplace_back(TileOption{"", it->second, it->first, it->first});
+    }
+  } else {
+    std::multimap<double, TileOption> by_cost;
+    for (const auto& model : models_) {
+      auto model_options = model(kname, settings, op);
+      for (const auto& option : model_options) {
+        by_cost.insert(std::make_pair(option.kernel_cost, option));
+      }
+    }
+    size_t count = 0;
+    for (auto it = by_cost.begin(); it != by_cost.end() && count < max_options; it++, count++) {
+      VLOG(1) << "Option: " << it->second.model;
+      options.push_back(it->second);
+    }
+  }
+  return options;
 }
 
 }  // namespace lang

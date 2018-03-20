@@ -232,4 +232,14 @@ void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj)
 #define IS_HUMAN_READABLE (_ctx.is_human_readable())
 #define GET_VERSION(v) (_ctx.get_version())
 
+#define TRANSFER_ENUM(etype)                                                  \
+  namespace vertexai {                                                        \
+  template <>                                                                 \
+  struct transfer_info<etype> {                                               \
+    typedef vertexai::transfer_type_signed type;                              \
+    static type get(const etype& x) { return static_cast<type>(x); }          \
+    static void put(etype& x, const type& tt) { x = static_cast<etype>(tt); } \
+  };                                                                          \
+  }
+
 }  // namespace vertexai

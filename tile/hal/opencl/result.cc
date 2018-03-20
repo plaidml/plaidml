@@ -8,7 +8,7 @@
 
 #include "base/util/compat.h"
 #include "base/util/error.h"
-#include "tile/hal/opencl/emitocl.h"
+#include "tile/lang/semprinter.h"
 
 namespace vertexai {
 namespace tile {
@@ -99,8 +99,7 @@ void KernelResult::LogStatistics() const {
     Err err(info_->status);
     LOG(ERROR) << "Kernel " << ki_.kname << " failed with: " << err.str();
 
-    lang::EmitDebug emit_debug;
-    emit_debug.Visit(*ki_.kfunc);
+    sem::Print emit_debug(*ki_.kfunc);
     LOG(ERROR) << "Generic debug kernel:";
     LOG(ERROR) << ki_.comments;
     LOG(ERROR) << emit_debug.str();

@@ -85,7 +85,10 @@ bool MatchConfig(const proto::Platform& config, const hal::proto::HardwareInfo& 
 
 Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
   for (auto hal_config : config.hals()) {
-    drivers_.emplace_back(AnyFactoryMap<hal::Driver>::Instance()->MakeInstance(ctx, hal_config));
+    auto driver = AnyFactoryMap<hal::Driver>::Instance()->MakeInstanceIfSupported(ctx, hal_config);
+    if (driver) {
+      drivers_.emplace_back(std::move(driver));
+    }
   }
 
   for (const auto& driver : drivers_) {

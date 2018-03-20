@@ -1,5 +1,6 @@
 #include "tile/lang/type.h"
 
+#include <cmath>
 #include <deque>
 #include <queue>
 #include <set>
@@ -23,6 +24,25 @@ DataType g_floatx = DataType::FLOAT32;
 }  // namespace
 
 void SetFloatX(DataType dtype) { g_floatx = dtype; }
+
+std::string Binding::key() const {
+  switch (tag) {
+    case Binding::TENSOR:
+      return "tensor";
+    case Binding::ICONST:
+      return std::to_string(iconst);
+    case Binding::FCONST: {
+      std::string c = DoubleToString(fconst);
+      if (c.find_first_of(".e") == std::string::npos) {
+        c += ".0";
+      }
+      return c;
+    }
+    case Binding::TUPLE:
+    default:
+      throw std::logic_error{"Invalid binding for key"};
+  }
+}
 
 bool Binding::operator==(const Binding& rhs) const {
   if (tag != rhs.tag) {
@@ -50,15 +70,15 @@ static double ConstantPropagate(const std::string& op, const std::vector<double>
   }
   if (op == "broadcast") {
     if (x[0] != x[1] && x[0] != 1 && x[1] != 1) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
-                               " != " + std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
+                               std::to_string(x[1]));
     }
     return x[0] == 1 ? x[1] : x[0];
   }
   if (op == "match") {
     if (x[0] != x[1]) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
-                               " != " + std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
+                               std::to_string(x[1]));
     }
     return x[0];
   }
@@ -106,6 +126,9 @@ static double ConstantPropagate(const std::string& op, const std::vector<double>
   }
   if (op == "max") {
     return (x[0] < x[1] ? x[1] : x[0]);
+  }
+  if (op == "ceil") {
+    return std::ceil(x[0]);
   }
   throw std::runtime_error("Unknown op " + op + " during constant propagation");
 }

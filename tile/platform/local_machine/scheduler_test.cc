@@ -2,10 +2,11 @@
 
 #include "tile/platform/local_machine/scheduler_test.h"
 
-#include <boost/core/demangle.hpp>
 #include <gflags/gflags.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/text_format.h>
+
+#include <boost/core/demangle.hpp>
 
 #include "base/util/logging.h"
 #include "base/util/runfiles_db.h"
@@ -69,10 +70,11 @@ namespace {
 TEST_P(SchedulerTest, Schedule) {
   const auto& program = GetProgram();
   lang::Parser parser;
+  lang::TileOptimizer optimizer;
   auto parsed = parser.Parse(program.code());
   auto inputs = to_poco(program.inputs());
   auto outputs = to_poco(program.outputs());
-  auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, GetSettings(), program.id(), 1);
+  auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, GetSettings(), optimizer, program.id(), 1);
 
   auto schedule = GetScheduler()->BuildSchedule(program, kernel_list);
   SummarizeSchedule(nullptr, program, kernel_list, schedule);

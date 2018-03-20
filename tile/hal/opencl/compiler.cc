@@ -19,6 +19,7 @@
 #include "tile/hal/opencl/cl_opt.h"
 #include "tile/hal/opencl/emitocl.h"
 #include "tile/hal/opencl/library.h"
+#include "tile/lang/semprinter.h"
 
 namespace fs = boost::filesystem;
 
@@ -190,6 +191,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     VLOG(1) << "Using OpenCL cache directory: " << env_cache;
     cache_dir = env_cache;
   }
+  std::set<std::string> knames;
 
   for (const auto& ki : kernel_info) {
     context::Activity kbuild{activity.ctx(), "tile::hal::opencl::BuildKernel"};
@@ -199,7 +201,8 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
 
     if (ki.ktype == lang::KernelType::kZero) {
       kinfo.set_src("// Builtin zero kernel");
-    } else {
+    } else if (!knames.count(ki.kfunc->name)) {
+      knames.insert(ki.kfunc->name);
       OptimizeKernel(ki, cl_khr_fp16, settings);
 
       Emit ocl{cl_khr_fp16, cl_khr_fp64};
@@ -217,8 +220,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
         }
       } else {
         if (VLOG_IS_ON(4)) {
-          lang::EmitDebug emit_debug;
-          emit_debug.Visit(*ki.kfunc);
+          sem::Print emit_debug(*ki.kfunc);
           VLOG(4) << "Generic debug kernel:";
           VLOG(4) << ki.comments;
           VLOG(4) << emit_debug.str();
@@ -229,6 +231,8 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
       code << "\n\n";
 
       kinfo.set_src(src);
+    } else {
+      kinfo.set_src("// Duplicate");
     }
 
     *(kinfo.mutable_kinfo()) = ki.info;

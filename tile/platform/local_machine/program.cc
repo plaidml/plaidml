@@ -37,13 +37,13 @@ void AllocateBuffers(const std::vector<std::string>& names, const lang::ShapeMap
 int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
                   const std::vector<std::shared_ptr<hal::Buffer>>& buffers, const DevInfo& devinfo, size_t trial_runs) {
   // Check in cache, and early return if found
-  int64_t cached_time = lang::TileCache::Instance()->GetDuration(ki.key, ki.settings, ki.tile_size);
+  int64_t cached_time = lang::TileCache::Instance()->GetDuration(ki.key, ki.settings, ki.tile.shape);
   if (cached_time >= 0) {
-    LOG(DEBUG) << "Cached kernel: " << ki.kname << ", key: " << ki.key << ", tile_size: " << ki.tile_size;
+    LOG(DEBUG) << "Cached kernel: " << ki.kname << ", key: " << ki.key << ", tile: " << ki.tile.shape;
     return cached_time;
   }
 
-  LOG(DEBUG) << "Trying kernel: " << ki.kname << ", key: " << ki.key << ", tile_size: " << ki.tile_size;
+  LOG(DEBUG) << "Trying kernel: " << ki.kname << ", key: " << ki.key << ", tile: " << ki.tile.shape;
   try {
     // Prep to do a real run
     auto& device = *devinfo.dev;
@@ -61,7 +61,7 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
     }
 
     // Save in cache and return
-    lang::TileCache::Instance()->AddEntry(ki.key, ki.settings, ki.tile_size, best_time);
+    lang::TileCache::Instance()->AddEntry(ki.key, ki.settings, ki.tile.shape, best_time);
     return best_time;
   } catch (const std::exception& ex) {
     LOG(ERROR) << "Skipping kernel failure: " << ex.what();
@@ -82,11 +82,12 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
 
   context::Context ctx;
   lang::Parser parser;
+  lang::TileOptimizer optimizer;
   auto parsed = parser.Parse(program.code());
   auto inputs = to_poco(program.inputs());
   auto outputs = to_poco(program.outputs());
   auto settings = hal::settings::ToHardwareSettings(devinfo.settings);
-  auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, program.id(), tile_trials);
+  auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, optimizer, program.id(), tile_trials);
 
   if (tile_trials == 1) {
     return kernel_list;

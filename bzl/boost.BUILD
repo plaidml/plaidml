@@ -9,24 +9,6 @@ package(default_visibility = ["@//visibility:public"])
 
 licenses(["notice"])  # Boost software license
 
-config_setting(
-    name = "darwin",
-    values = {"cpu": "darwin"},
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
-    name = "x64win",
-    values = {"cpu": "x64win"},
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
-    name = "x64_windows",
-    values = {"cpu": "x64_windows"},
-    visibility = ["//visibility:public"],
-)
-
 cc_library(
     name = "boost",
     hdrs = glob([
@@ -95,17 +77,15 @@ cc_library(
     name = "thread",
     srcs = glob(["libs/thread/src/*.cpp"]) +
            select({
-               "//:x64win": glob(["libs/thread/src/win32/*.cpp"]),
-               "//:x64_windows": glob(["libs/thread/src/win32/*.cpp"]),
+               "@toolchain//:windows_x86_64": glob(["libs/thread/src/win32/*.cpp"]),
                "//conditions:default": glob(
                    ["libs/thread/src/pthread/*.cpp"],
                    exclude = ["libs/thread/src/pthread/once.cpp"],
                ),
            }),
     linkopts = select({
-        "//:darwin": [],
-        "//:x64win": [],
-        "//:x64_windows": [],
+        "@toolchain//:macos_x86_64": [],
+        "@toolchain//:windows_x86_64": [],
         "//conditions:default": ["-pthread"],
     }),
     deps = [

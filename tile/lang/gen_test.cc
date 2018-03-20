@@ -3,9 +3,9 @@
 #include <gtest/gtest.h>
 
 #include "tile/lang/compile.h"
-#include "tile/lang/emitc.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/lang/semprinter.h"
 
 namespace vertexai {
 namespace tile {
@@ -21,19 +21,18 @@ struct TestParam {
 
 void RunTest(const TestParam& param) {
   Parser parser;
+  TileOptimizer optimizer;
   auto program = parser.Parse(param.program);
-  auto result = GenerateProgram(program, param.inputs, param.outputs, param.settings, "test");
+  auto result = GenerateProgram(program, param.inputs, param.outputs, param.settings, optimizer, "test");
 
-  lang::EmitDebug actual;
-  actual.Visit(*result.kernels[0].kfunc);
+  sem::Print actual(*result.kernels[0].kfunc);
 
   if (VLOG_IS_ON(4)) {
     VLOG(4) << "Generic debug kernel:";
     VLOG(4) << actual.str();
   }
 
-  lang::EmitDebug expected;
-  expected.Visit(*param.expected);
+  sem::Print expected(*param.expected);
 
   EXPECT_EQ(expected.str(), actual.str());
 }

@@ -36,6 +36,12 @@ class AnyFactoryMap final {
   // construction.
   std::unique_ptr<Product> MakeInstance(const context::Context& ctx, const google::protobuf::Any& config) const;
 
+  // Identical to MakeInstance, but returns an empty pointer if the config
+  // is not supported by the factory.  Exceptions raised by the product-specific
+  // construction may still be thrown.
+  std::unique_ptr<Product> MakeInstanceIfSupported(const context::Context& ctx,
+                                                   const google::protobuf::Any& config) const;
+
  private:
   std::string type_url_prefix_;
   std::unordered_map<std::string, std::unique_ptr<AnyFactory<Product>>> factories_;
@@ -67,9 +73,19 @@ void AnyFactoryMap<Product>::Register(std::unique_ptr<AnyFactory<Product>> facto
 template <typename Product>
 std::unique_ptr<Product> AnyFactoryMap<Product>::MakeInstance(const context::Context& ctx,
                                                               const google::protobuf::Any& config) const {
+  auto result = MakeInstanceIfSupported(ctx, config);
+  if (!result) {
+    throw std::out_of_range(std::string("unable to resolve type: ") + config.type_url());
+  }
+  return result;
+}
+
+template <typename Product>
+std::unique_ptr<Product> AnyFactoryMap<Product>::MakeInstanceIfSupported(const context::Context& ctx,
+                                                                         const google::protobuf::Any& config) const {
   auto it = factories_.find(config.type_url());
   if (it == factories_.end()) {
-    throw std::runtime_error(std::string("unable to resolve type: ") + config.type_url());
+    return std::unique_ptr<Product>();
   }
   return it->second->MakeInstance(ctx, config);
 }

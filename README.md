@@ -1,7 +1,7 @@
 # PlaidML
 [![Build Status](https://travis-ci.org/plaidml/plaidml.svg?branch=master)]()
 
-![The PlaidML Platypus](resources/plaid-final.png)
+![The PlaidML Platypus](docs/plaid-final.png)
 *A framework for making deep learning work everywhere.*
 
 PlaidML is a multi-language acceleration framework that: 

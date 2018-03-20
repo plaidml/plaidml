@@ -1,0 +1,225 @@
+{
+  "platform": {
+    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+    "hals": [
+      {
+        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver"
+      },
+      {
+        "@type": "type.vertex.ai/vertexai.tile.hal.cpu.proto.Driver"
+      }
+    ],
+    "hardware_configs": [
+      {
+        "description": "CPU (via LLVM) settings",
+        "sel": {
+          "and": {
+            "sel": [
+              { "name_regex": "LLVM_preview_CPU" },
+              { "vendor_regex": "LLVM" }
+            ]
+          }
+        },
+        "settings": {
+          "vec_size": 16,
+          "mem_width": 64,
+          "use_global": false,
+          "max_regs": 8192
+        }
+      },
+      {
+        "description": "Apple AMD config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "platform_regex": "Apple" },
+              { "or": {
+                  "sel": [
+                    { "vendor_regex": "AMD" },
+                    { "vendor_regex": "Advanced Micro Devices.*" }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 256,
+          "vec_size": 1,
+          "mem_width": 128,
+          "max_mem": 32768,
+          "max_regs": 2048,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50
+        }
+      },
+      {
+        "description": "Non-Apple AMD config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "not" :
+                { "platform_regex": "Apple" }
+              },
+              { "or": {
+                  "sel": [
+                    { "vendor_regex": "AMD" },
+                    { "vendor_regex": "Advanced Micro Devices.*" }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 256,
+          "vec_size": 1,
+          "mem_width": 128,
+          "max_mem": 32768,
+          "max_regs": 16384,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50
+        }
+      },
+      {
+        "description": "Intel GPU config",
+        "sel": {
+          "or": {
+            "sel": [
+              { "name_regex": ".*Iris.*" },
+              { 
+                "and" : {
+                  "sel": [
+                    { "name_regex": ".*HD Graphics.*" },
+                    { "not": { "name_regex": ".*Broxton.*" } }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 64,
+          "vec_size": 1,
+          "mem_width": 256,
+          "max_mem": 7300,
+          "max_regs": 4000,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50,
+          "disable_mad": true
+        }
+      },
+      {
+        "description": "Intel GPU config (Broxton)",
+        "sel": {
+            "name_regex": ".*HD Graphics Broxton.*"
+        },
+        "settings": {
+          "threads": 64,
+          "vec_size": 8,
+          "mem_width": 256,
+          "max_mem": 7300,
+          "max_regs": 4000,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50,
+          "use_global": true
+        }
+      },
+      {
+        "description": "NVIDIA config",
+        "sel": {
+          "vendor_regex": "NVIDIA.*"
+        },
+        "settings": {
+          "threads": 256,
+          "vec_size": 1,
+          "mem_width": 64,
+          "max_mem": 15360,
+          "max_regs": 32768,
+          "goal_groups": 7,
+          "goal_flops_per_byte": 46
+        }
+      },
+      {
+        "description": "Non-Apple Intel CPU config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "not" :
+                { "platform_regex": "Apple" }
+              },
+              { "vendor_regex": "Intel.*" },
+              { "name_regex": ".*CPU.*" }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 32,
+          "vec_size": 1,
+          "mem_width": 64,
+          "max_mem": 32768,
+          "max_regs": 32768
+        }
+      },
+      {
+        "description": "Apple Intel CPU config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "platform_regex": "Apple" },
+              { "vendor_regex": "Intel.*" },
+              { "name_regex": ".*CPU.*" }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 1,
+          "vec_size": 1,
+          "mem_width": 64,
+          "max_mem": 32768,
+          "max_regs": 32768
+        }
+      },
+      {
+        "description": "ARM Mali config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "vendor_regex": "ARM" },
+              { "name_regex": "Mali-T760" }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 128,
+          "vec_size": 2,
+          "mem_width": 16,
+          "max_mem": 16000,
+          "max_regs": 16000,
+          "use_global": true,
+          "is_synchronous": true
+        }
+      },
+      {
+        "description": "ARM Mali config",
+        "sel": {
+          "and": {
+            "sel": [
+              { "vendor_regex": "ARM" },
+              { "name_regex": "Mali-T628" }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 128,
+          "vec_size": 8,
+          "mem_width": 64,
+          "max_mem": 8000,
+          "max_regs": 8000,
+          "use_global": true,
+          "is_synchronous": true
+        }
+      }
+    ]
+  }
+}

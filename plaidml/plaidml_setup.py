@@ -80,15 +80,17 @@ No supported devices found. Run 'clinfo' and file an issue containing the full o
         print("\nNo devices available in chosen config. Rerun plaidml-setup.")
         sys.exit(-1)
 
-    if len(devices) > 1:
-        print("""
+    if devices:
+        dev = 1
+        if len(devices) > 1:
+            print("""
 Multiple devices detected (You can override by setting PLAIDML_DEVICE_IDS).
 Please choose a default device:
 """)
-        devrange = range(1, len(devices) + 1)
-        for i in devrange:
-            print("   {0} : {1}".format(i, devices[i - 1].id.decode()))
-        dev = choice_prompt("\nDefault device", [str(i) for i in devrange], "1")
+            devrange = range(1, len(devices) + 1)
+            for i in devrange:
+                print("   {0} : {1}".format(i, devices[i - 1].id.decode()))
+            dev = choice_prompt("\nDefault device", [str(i) for i in devrange], "1")
         plaidml.settings.device_ids = [devices[int(dev) - 1].id.decode()]
 
     print("\nSelected device:\n    {0}".format(plaidml.devices(ctx)[0]))
