@@ -13,9 +13,9 @@ matrix:
 
 before_install:
   - sudo apt-get install openjdk-8-jdk bison g++ wget -y
-  - wget https://github.com/bazelbuild/bazel/releases/download/0.9.0/bazel-0.9.0-without-jdk-installer-linux-x86_64.sh
-  - chmod +x ./bazel-0.9.0-without-jdk-installer-linux-x86_64.sh
-  - sudo ./bazel-0.9.0-without-jdk-installer-linux-x86_64.sh
+  - wget https://github.com/bazelbuild/bazel/releases/download/0.11.0/bazel-0.11.0-without-jdk-installer-linux-x86_64.sh
+  - chmod +x ./bazel-0.11.0-without-jdk-installer-linux-x86_64.sh
+  - sudo ./bazel-0.11.0-without-jdk-installer-linux-x86_64.sh
   - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - tar xzvf opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
