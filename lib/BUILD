@@ -39,6 +39,12 @@ cc_library(
             ":llvm_targets",
             "@llvm_archive//:llvm_inc",
         ],
+        "@toolchain//:linux_x86_64": [
+            ":llvm_base",
+            ":llvm_lib",
+            ":llvm_targets",
+            "@llvm_archive//:llvm_inc",
+        ],
         "//conditions:default": ["@llvm_archive//:llvm"],
     }),
 )
