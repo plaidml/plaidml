@@ -1,7 +1,7 @@
 # PlaidML
-[![Build Status](https://travis-ci.org/plaidml/plaidml.svg?branch=master)]()
+[![Build Status](https://travis-ci.org/plaidml/plaidml.svg?branch=master)](https://travis-ci.org/plaidml/plaidml)
 
-![The PlaidML Platypus](resources/plaid-final.png)
+![The PlaidML Platypus](docs/plaid-final.png)
 *A framework for making deep learning work everywhere.*
 
 PlaidML is a multi-language acceleration framework that: 
@@ -23,9 +23,8 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
 
 This version of PlaidML has some notable limitations which will be addressed soon in upcoming releases:
 
-  * Start-up times can be quite long
+  * Start-up times are long for training
   * Training throughput much lower than we'd like
-  * RNN support is not implemented
 
 ### Validated Hardware
 
@@ -48,6 +47,9 @@ correctness as part of our continuous integration system.
    * vgg19
    * xception
    * mobilenet
+
+ * LSTM
+   * examples/imdb_lstm.py (from keras)
 
 ## Installation Instructions
 

@@ -29,20 +29,15 @@ struct PerfStats {
 FlatContraction Vectorize(const FlatContraction& op, uint64_t vector_size);
 
 // Compute the stats for a given tile size
-PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction& op, const std::vector<uint64_t>& tile,
-                           const Bindings& vars);
+PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction& op,
+                           const std::vector<uint64_t>& tile);
 
 // Compute score from PerfStats
 double ComputeScore(const HardwareSettings& settings, const PerfStats& perf);
 
 // Performs tile size optimization
 std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings& settings, const FlatContraction& op,
-                                                          bool fast, const Bindings& vars);
-
-// Performs vectorization + tile size optimization
-std::vector<uint64_t> TileVecOptimize(const HardwareSettings& settings,
-                                      FlatContraction& op,  // NOLINT(runtime/references)
-                                      const Bindings& vars);
+                                                          bool fast);
 
 }  // namespace lang
 }  // namespace tile

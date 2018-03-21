@@ -3,7 +3,6 @@
 #include "tile/lang/bound.h"
 #include "tile/lang/compile.h"
 #include "tile/lang/defract.h"
-#include "tile/lang/emitc.h"
 #include "tile/lang/flat.h"
 #include "tile/lang/gen_contract.h"
 #include "tile/lang/generate.h"
@@ -14,6 +13,7 @@
 #include "tile/lang/reduce.h"
 #include "tile/lang/replace.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/lang/semprinter.h"
 #include "tile/lang/semtree.h"
 #include "tile/lang/shape.h"
 #include "tile/lang/sym_poly.h"
@@ -96,7 +96,7 @@ TEST_CASE("Optimization of Matrix Multiply", "[mat_opt][opt]") {
     for (size_t j = 0; j < 10; j++) {
       for (size_t k = 0; k < 10; k++) {
         std::vector<uint64_t> tile = {one << i, one << j, one << k};
-        double score = ComputeScore(TestGPU(), ComputeTileStats(TestGPU(), f, tile, Bindings()));
+        double score = ComputeScore(TestGPU(), ComputeTileStats(TestGPU(), f, tile));
         if (score > best_score) {
           best_tile = tile;
           best_score = score;
@@ -105,7 +105,7 @@ TEST_CASE("Optimization of Matrix Multiply", "[mat_opt][opt]") {
     }
   }
   IVLOG(1, "Best Score = " << best_score << " " << best_tile);
-  std::multimap<double, std::vector<uint64_t>> out = TileOptimize(TestGPU(), f, false, Bindings());
+  std::multimap<double, std::vector<uint64_t>> out = TileOptimize(TestGPU(), f, false);
   auto it = out.rbegin();
   IVLOG(1, "Opt Score = " << it->first << " " << it->second);
   REQUIRE(it->first == best_score);
@@ -142,32 +142,38 @@ TEST_CASE("Awkward Flatten") {
 TEST_CASE("Optimization of Convolution", "[conv_opt][opt]") {
   Parser p;
   auto c = p.ParseContraction("O[n, x, y, co] = +(K[i, j, co, ci] * I[n, x+i, y+j, ci])");
-  FlatContraction f = Flatten(
+  FlatContraction op = Flatten(
       c, {
              SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}), SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
              SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
          });
-  IVLOG(1, "Flat:\n" << f.toString());
-  std::vector<uint64_t> r = TileVecOptimize(TestGPU(), f, Bindings());
-  double score2 = ComputeScore(TestGPU(), ComputeTileStats(TestGPU(), f, r, Bindings()));
-  IVLOG(1, "Opt Score = " << score2 << " " << r);
+  IVLOG(1, "Flat:\n" << op.toString());
+  auto settings = TestGPU();
+  auto vectorized_op = Vectorize(op, settings.vec_size);
+  auto by_score = TileOptimize(settings, vectorized_op, true);
+  auto tile = by_score.rbegin()->second;
+  double score2 = ComputeScore(settings, ComputeTileStats(TestGPU(), op, tile));
+  IVLOG(1, "Opt Score = " << score2 << " " << tile);
   REQUIRE(score2 > .4);
 }
 
 TEST_CASE("Vectorized Flop Computation", "[conv_opt][opt]") {
   Parser p;
   auto c = p.ParseContraction("O[n, x, y, co] = +(K[i, j, co, ci] * I[n, x+i, y+j, ci])");
-  FlatContraction f = Flatten(
+  FlatContraction op = Flatten(
       c, {
              SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}), SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
              SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
          });
   uint64_t ops = 128ll * 3 * 3 * 25 * 25 * 384 * 256 * 2;
-  HardwareSettings vectorized_gpu = TestGPU();
+  auto settings = TestGPU();
+  auto vectorized_gpu = TestGPU();
   vectorized_gpu.vec_size = 4;
-  std::vector<uint64_t> r = TileVecOptimize(TestGPU(), f, Bindings());
-  PerfStats psn = ComputeTileStats(TestGPU(), f, r, Bindings());
-  PerfStats psv = ComputeTileStats(vectorized_gpu, f, r, Bindings());
+  auto vectorized_op = Vectorize(op, settings.vec_size);
+  auto by_score = TileOptimize(settings, vectorized_op, true);
+  auto tile = by_score.rbegin()->second;
+  PerfStats psn = ComputeTileStats(settings, op, tile);
+  PerfStats psv = ComputeTileStats(vectorized_gpu, op, tile);
   REQUIRE(psn.true_ops == psv.true_ops);
   REQUIRE(psn.true_ops == ops);
 }
@@ -314,7 +320,8 @@ TEST_CASE("Whole ball of wax", "[emit]") {
   outputs.emplace("O", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
   inputs.emplace("A", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
   inputs.emplace("B", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
-  KernelList r = GenerateProgram(prog, inputs, outputs, TestGPU());
+  TileOptimizer optimizer;
+  KernelList r = GenerateProgram(prog, inputs, outputs, TestGPU(), optimizer);
 }
 
 TEST_CASE("Two outputs", "[multiout]") {
@@ -325,7 +332,8 @@ TEST_CASE("Two outputs", "[multiout]") {
   outputs.emplace("O1", SimpleShape(DataType::FLOAT32, {3}));
   outputs.emplace("O2", SimpleShape(DataType::FLOAT32, {3}));
   inputs.emplace("I", SimpleShape(DataType::FLOAT32, {3}));
-  KernelList r = GenerateProgram(prog, inputs, outputs, TestGPU());
+  TileOptimizer optimizer;
+  KernelList r = GenerateProgram(prog, inputs, outputs, TestGPU(), optimizer);
 }
 
 TEST_CASE("Gausian Elimination 1", "[reduce]") {
@@ -383,9 +391,9 @@ TEST_CASE("Functions", "[compile]") {
   std::map<std::string, TensorShape> outputs;
   inputs.emplace("x", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
   outputs.emplace("y", TensorShape{DataType::FLOAT32, {{128L, 100UL}, {1L, 100UL}}});
-  KernelList result = GenerateProgram(p, inputs, outputs, TestGPU());
-  EmitDebug emit;
-  emit.Visit(*result.kernels[0].kfunc);
+  TileOptimizer optimizer;
+  KernelList result = GenerateProgram(p, inputs, outputs, TestGPU(), optimizer);
+  sem::Print emit(*result.kernels[0].kfunc);
   std::string code = emit.str();
   REQUIRE(code.find("exp") != std::string::npos);
 }
@@ -484,7 +492,8 @@ TEST_CASE("JustRelu", "[emit]") {
   ShapeMap outputs;
   inputs.emplace("X", SimpleShape(DataType::FLOAT32, {100}));
   outputs.emplace("Y", SimpleShape(DataType::FLOAT32, {100}));
-  KernelList r = GenerateProgram(prog, inputs, outputs, TestGPU(), "ID");
+  TileOptimizer optimizer;
+  KernelList r = GenerateProgram(prog, inputs, outputs, TestGPU(), optimizer, "ID");
   REQUIRE(r.kernels.size() == 1);
   REQUIRE(r.kernels[0].inputs == std::vector<std::string>({"X"}));
   REQUIRE(r.kernels[0].outputs == std::vector<std::string>({"Y"}));
@@ -495,7 +504,8 @@ TEST_CASE("NoRedeclare", "[emit]") {
   Program prog = parser.Parse("function (X[N]) -> (X) { X = 2*X; }");
   ShapeMap stuff;
   stuff.emplace("x", SimpleShape(DataType::FLOAT32, {100}));
-  REQUIRE_THROWS(GenerateProgram(prog, stuff, stuff, TestGPU(), "ID"));
+  TileOptimizer optimizer;
+  REQUIRE_THROWS(GenerateProgram(prog, stuff, stuff, TestGPU(), optimizer, "ID"));
 }
 
 TEST_CASE("Ast", "[ast]") {
@@ -511,8 +521,7 @@ TEST_CASE("Ast", "[ast]") {
                       }),
                       _Return(r)});
 
-  EmitDebug emit;
-  emit.Visit(*f);
+  sem::Print emit(*f);
   IVLOG(1, "Code:\n" << emit.str());
 }
 
@@ -563,7 +572,8 @@ TEST_CASE("Softmax Deriv", "[deriv]") {
 
   Parser parse;
   Program prog = parse.Parse(ri.code);
-  auto cr = GenerateProgram(prog, ri.input_shapes, ri.output_shapes, TestGPU(), "test");
+  TileOptimizer optimizer;
+  auto cr = GenerateProgram(prog, ri.input_shapes, ri.output_shapes, TestGPU(), optimizer, "test");
 }
 
 TEST_CASE("Function Deriv", "[deriv]") {
@@ -749,7 +759,8 @@ TEST_CASE("Check for switch optimization", "[switch]") {
   IVLOG(1, "New Code:\n" << r.code);
   Parser parser;
   Program prog = parser.Parse(r.code);
-  KernelList kl = GenerateProgram(prog, r.input_shapes, r.output_shapes, TestGPU());
+  TileOptimizer optimizer;
+  KernelList kl = GenerateProgram(prog, r.input_shapes, r.output_shapes, TestGPU(), optimizer);
 
   assert(kl.kernels.size() == 1);
 }
@@ -782,11 +793,11 @@ TEST_CASE("CombineConvolutionAndRelu", "[emit]") {
   inputs.emplace("C", SimpleShape(DataType::FLOAT32, {10, 10}));
   ShapeMap outputs;
   outputs.emplace("A", SimpleShape(DataType::FLOAT32, {10, 10}));
-  auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), "ID");
+  TileOptimizer optimizer;
+  auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), optimizer, "ID");
   if (VLOG_IS_ON(1)) {
     for (const auto& kinfo : klist.kernels) {
-      EmitDebug emit;
-      emit.Visit(*kinfo.kfunc);
+      sem::Print emit(*kinfo.kfunc);
       VLOG(1) << "Got kernel: " << emit.str();
     }
   }
@@ -808,11 +819,11 @@ TEST_CASE("Tupleism", "[tuple]") {
   inputs.emplace("B", SimpleShape(DataType::FLOAT32, {17, 10}));
   ShapeMap outputs;
   outputs.emplace("O", SimpleShape(DataType::FLOAT32, {10, 10}));
-  auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), "ID");
+  TileOptimizer optimizer;
+  auto klist = GenerateProgram(prog, inputs, outputs, TestGPU(), optimizer, "ID");
   if (VLOG_IS_ON(1)) {
     for (const auto& kinfo : klist.kernels) {
-      EmitDebug emit;
-      emit.Visit(*kinfo.kfunc);
+      sem::Print emit(*kinfo.kfunc);
       VLOG(1) << "Got kernel: " << emit.str();
     }
   }

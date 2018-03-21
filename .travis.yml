@@ -6,16 +6,18 @@ matrix:
     env:
       - BZL_PY_VER=PY2
       - PLAIDML_EXPERIMENTAL=1 
+      - PLAIDML_DEVICE_IDS=opencl_cpu.0
   - python: "3.6"
     env: 
       - BZL_PY_VER=PY3
       - PLAIDML_EXPERIMENTAL=1 
+      - PLAIDML_DEVICE_IDS=opencl_cpu.0
 
 before_install:
   - sudo apt-get install openjdk-8-jdk bison g++ wget -y
-  - wget https://github.com/bazelbuild/bazel/releases/download/0.9.0/bazel-0.9.0-without-jdk-installer-linux-x86_64.sh
-  - chmod +x ./bazel-0.9.0-without-jdk-installer-linux-x86_64.sh
-  - sudo ./bazel-0.9.0-without-jdk-installer-linux-x86_64.sh
+  - wget https://github.com/bazelbuild/bazel/releases/download/0.11.0/bazel-0.11.0-without-jdk-installer-linux-x86_64.sh
+  - chmod +x ./bazel-0.11.0-without-jdk-installer-linux-x86_64.sh
+  - sudo ./bazel-0.11.0-without-jdk-installer-linux-x86_64.sh
   - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - tar xzvf opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
   - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
@@ -25,9 +27,9 @@ before_install:
   - git clone http://github.com/plaidml/plaidbench  
 
 install:
-  - bazel build -c opt --force_python=$BZL_PY_VER plaidml:wheel plaidml/keras:wheel
+  - bazel build --config=linux_x86_64 --force_python=$BZL_PY_VER plaidml:wheel plaidml/keras:wheel
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
-  - bazel test -c opt --force_python=$BZL_PY_VER --test_env=PLAIDML_EXPERIMENTAL plaidml/keras:backend_test
+  - bazel test --config=linux_x86_64 --force_python=$BZL_PY_VER --test_env=PLAIDML_EXPERIMENTAL=1 --test_env=PLAIDML_DEVICE_IDS=opencl_cpu.0 plaidml/keras:backend_test
   - python plaidbench/plaidbench.py mobilenet

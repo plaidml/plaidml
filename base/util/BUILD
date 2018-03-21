@@ -18,6 +18,7 @@ plaidml_cc_library(
         "perf_counter.cc",
         "printstring.cc",
         "uuid.cc",
+        "zipfile.cc",
     ],
     hdrs = [
         "any_factory.h",
@@ -38,8 +39,8 @@ plaidml_cc_library(
         "sync.h",
         "transfer_object.h",
         "type_url.h",
-        "uuid.cc",
         "uuid.h",
+        "zipfile.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -47,6 +48,7 @@ plaidml_cc_library(
         "@com_github_gflags_gflags//:gflags",
         "@easylogging_repo//:easylogging",
         "@jsoncpp_git//:jsoncpp",
+        "@minizip_repo//:minizip",
     ],
 )
 

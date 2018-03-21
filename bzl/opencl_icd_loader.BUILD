@@ -1,15 +1,10 @@
-config_setting(
-    name = "x64_windows",
-    values = {"cpu": "x64_windows"},
-)
-
 cc_library(
     name = "lib",
     srcs = [
         "icd.c",
         "icd_dispatch.c",
     ] + select({
-        "//:x64_windows": ["icd_windows.c"],
+        "@toolchain//:windows_x86_64": ["icd_windows.c"],
         "//conditions:default": ["icd_linux.c"],
     }),
     hdrs = [
@@ -17,14 +12,14 @@ cc_library(
         "icd_dispatch.h",
     ],
     linkopts = select({
-        ":x64_windows": [],
+        "@toolchain//:windows_x86_64": [],
         "//conditions:default": [
             "-pthread",
             "-ldl",
         ],
     }),
     nocopts = select({
-        "//:x64_windows": "/DNOGDI",
+        "@toolchain//:windows_x86_64": "/DNOGDI",
         "//conditions:default": "",
     }),
     visibility = ["//visibility:public"],

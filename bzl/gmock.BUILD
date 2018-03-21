@@ -1,15 +1,3 @@
-config_setting(
-    name = "darwin",
-    values = {"cpu": "darwin"},
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
-    name = "x64_windows",
-    values = {"cpu": "x64_windows"},
-    visibility = ["//visibility:public"],
-)
-
 cc_library(
     name = "gtest",
     srcs = [
@@ -28,8 +16,8 @@ cc_library(
         "googletest/include",
     ],
     linkopts = select({
-        "//:darwin": [],
-        "//:x64_windows": [],
+        "@toolchain//:macos_x86_64": [],
+        "@toolchain//:windows_x86_64": [],
         "//conditions:default": ["-pthread"],
     }),
     visibility = ["//visibility:public"],
@@ -39,8 +27,8 @@ cc_library(
     name = "gtest_main",
     srcs = ["googlemock/src/gmock_main.cc"],
     linkopts = select({
-        "//:darwin": [],
-        "//:x64_windows": [],
+        "@toolchain//:macos_x86_64": [],
+        "@toolchain//:windows_x86_64": [],
         "//conditions:default": ["-pthread"],
     }),
     visibility = ["//visibility:public"],

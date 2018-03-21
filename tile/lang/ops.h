@@ -13,6 +13,7 @@
 
 #include "base/util/logging.h"
 #include "base/util/printstring.h"
+#include "base/util/transfer_object.h"
 #include "tile/lang/polynomial.h"
 
 namespace vertexai {
@@ -138,3 +139,6 @@ const std::map<std::string, std::string>& BinaryOpMap();
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai
+
+TRANSFER_ENUM(vertexai::tile::lang::AggregationOp);
+TRANSFER_ENUM(vertexai::tile::lang::CombinationOp);
