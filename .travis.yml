@@ -6,10 +6,12 @@ matrix:
     env:
       - BZL_PY_VER=PY2
       - PLAIDML_EXPERIMENTAL=1 
+      -	PLAIDML_DEVICE_IDS=intel(r)_xeon(r)_cpu_@_2.30ghz.0 
   - python: "3.6"
     env: 
       - BZL_PY_VER=PY3
       - PLAIDML_EXPERIMENTAL=1 
+      -	PLAIDML_DEVICE_IDS=intel(r)_xeon(r)_cpu_@_2.30ghz.0 
 
 before_install:
   - sudo apt-get install openjdk-8-jdk bison g++ wget -y
@@ -29,5 +31,5 @@ install:
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
-  - bazel test --config=linux_x86_64 --force_python=$BZL_PY_VER --test_env=PLAIDML_EXPERIMENTAL=1 --test_env=PLAIDML_DEVICE_IDS=llvm_preview_cpu.0 plaidml/keras:backend_test
+  - bazel test --config=linux_x86_64 --force_python=$BZL_PY_VER --test_env=PLAIDML_EXPERIMENTAL=1 --test_env=PLAIDML_DEVICE_IDS=intel(r)_xeon(r)_cpu_@_2.30ghz.0 plaidml/keras:backend_test
   - python plaidbench/plaidbench.py mobilenet
