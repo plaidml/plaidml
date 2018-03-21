@@ -1,8 +1,6 @@
-
 #pragma once
 
 #include <vector>
-#include <boost/numeric/ublas/matrix_proxy.hpp>
 
 #include "tile/lang/ops.h"
 

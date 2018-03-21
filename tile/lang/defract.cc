@@ -1,4 +1,3 @@
-
 #include "tile/lang/defract.h"
 
 #include <map>
@@ -14,8 +13,7 @@ namespace tile {
 namespace lang {
 
 static Polynomial ConvertPoly(Polynomial in, const std::map<std::string, Polynomial>& polys,
-    bool transform_constant = false)
-{
+                              bool transform_constant = false) {
   Polynomial out;
   for (const auto& kvp : in.getMap()) {
     if (kvp.first == "" && !transform_constant) {
@@ -52,40 +50,47 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
   }
   std::vector<std::string> vvars(vars.begin(), vars.end());
 
-  Matrix m;
-  Vector v;
+  Matrix mat;
+  Vector vec;
   bool transform_constant = false;
-  std::tie(m, v) = FromPolynomials(polys);
-  IVLOG(3, "Original Matrix: " << m);
-  IVLOG(3, "Original Vector: " << v);
-  for (auto &v_entry : v) {
+  std::tie(mat, vec) = FromPolynomials(polys);
+  IVLOG(3, "Original Matrix: " << mat);
+  IVLOG(3, "Original Vector: " << vec);
+  for (auto& v_entry : vec) {
     if (denominator(v_entry) != 1) {
       // Transform constant -> constant * dummy_var with 1 <= dummy_var < 2
       transform_constant = true;
-      IVLOG(3, "Non-integer offset vector " << v << " in defractionalization. Transforming constant to variable.");
+      IVLOG(3, "Non-integer offset vector " << vec << " in defractionalization. Transforming constant to variable.");
       vvars.push_back("");
-      m.resize(m.size1() + 1, m.size2() + 1, true);
-      boost::numeric::ublas::zero_vector<Rational> z(m.size2());
-      boost::numeric::ublas::row(m, m.size1() - 1) = z;
-      v.resize(v.size() + 1, true);
-      boost::numeric::ublas::column(m, m.size2() - 1) = v;
-      m(m.size1() - 1, m.size2() - 1) = 1;
+      mat.resize(mat.size1() + 1, mat.size2() + 1, true);
+      // NOTE: For some reason, using boost::numeric::ublas::row() breaks debug builds.
+      // So instead we write the equivalent code manually.
+      for (size_t c = 0; c < mat.size2(); c++) {
+        mat(mat.size1() - 1, c) = 0;
+      }
+      vec.resize(vec.size() + 1, true);
+      // NOTE: For some reason, using boost::numeric::ublas::column() breaks debug builds.
+      // So instead we write the equivalent code manually.
+      for (size_t r = 0; r < mat.size1(); r++) {
+        mat(r, mat.size2() - 1) = vec[r];
+      }
+      mat(mat.size1() - 1, mat.size2() - 1) = 1;
       break;
     }
   }
 
-  if (!HermiteNormalForm(m)) {
+  if (!HermiteNormalForm(mat)) {
     throw std::runtime_error("Unable to perform Hermite Reduction during defractionalization");
   }
-  IVLOG(4, "Matrix: " << m);
+  IVLOG(4, "Matrix: " << mat);
 
-  Matrix p = prod(trans(m), m);
+  Matrix p = prod(trans(mat), mat);
   IVLOG(4, "Product Matrix: " << p);
   if (!p.invert()) {
     throw std::runtime_error("Unable to invert Hermite Matrix");
   }
   IVLOG(4, "Inverse Product Matrix: " << p);
-  Matrix d = prod(m, p);
+  Matrix d = prod(mat, p);
   IVLOG(4, "Dual Matrix: " << d);
   IVLOG(3, "Normalized Dual Matrix: " << d);
   if (!HermiteNormalForm(d)) {
@@ -154,11 +159,13 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
 
   for (size_t i = 0; i < op.constraints.size(); i++) {
     const RangeConstraint& oc = op.constraints[i].bound;
-    new_op.constraints.push_back(SymbolicConstraint(RangeConstraint(ConvertPoly(oc.poly, replacements, transform_constant), oc.range)));
+    new_op.constraints.push_back(
+        SymbolicConstraint(RangeConstraint(ConvertPoly(oc.poly, replacements, transform_constant), oc.range)));
   }
   if (transform_constant) {
     // Add constraint for the constant term if it's being transformed
-    new_op.constraints.push_back(SymbolicConstraint(RangeConstraint(ConvertPoly(Polynomial(1), replacements, transform_constant) - 1, 1)));
+    new_op.constraints.push_back(
+        SymbolicConstraint(RangeConstraint(ConvertPoly(Polynomial(1), replacements, transform_constant) - 1, 1)));
   }
 
   for (const RangeConstraint& c : new_cons) {

@@ -11,6 +11,15 @@ plaidml_proto_library(
 )
 
 plaidml_proto_library(
+    name = "metadata",
+    srcs = [
+        "metadata.proto",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [":proto"],
+)
+
+plaidml_proto_library(
     name = "hal",
     srcs = [
         "hal.proto",

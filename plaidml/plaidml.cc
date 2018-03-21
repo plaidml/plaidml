@@ -13,7 +13,6 @@
 
 #include "plaidml/plaidml.h"
 
-#include <unzip.h>
 #include <zip.h>
 
 #include <algorithm>
@@ -49,6 +48,7 @@
 #include "base/util/any_factory_map.h"
 #include "base/util/logging.h"
 #include "base/util/runfiles_db.h"
+#include "base/util/zipfile.h"
 #include "plaidml/plaidml.pb.h"
 #include "tile/base/lru_cache.h"
 #include "tile/lang/compose.h"
@@ -842,33 +842,17 @@ static void write_string(zipFile f, const std::string& name, const std::string& 
   zipCloseFileInZip(f);
 }
 
-static void readBufferFromZipFile(unzFile f, char* dest, std::size_t len) {
-  std::size_t bytes_remaining = len;
-  while (bytes_remaining) {
-    std::size_t bytesToRead = std::min(static_cast<std::size_t>(8192ul), bytes_remaining);
-    int err = unzReadCurrentFile(f, dest, bytesToRead);
-    dest += bytesToRead;
-    bytes_remaining -= bytesToRead;
-    if (err < 0) {
-      LOG(ERROR) << "Reading Tensor failed" << err;
-      throw std::runtime_error("Couldn't read tensor");
-    }
-  }
-}
-
-static std::shared_ptr<TensorValue> read_tensor(vai_ctx* ctx, unzFile f, const std::shared_ptr<Evaluator>& evaluator,
-                                                const std::string& name) {
-  if (unzLocateFile(f, name.c_str(), NULL) != UNZ_OK) {
-    throw std::runtime_error(std::string("Tensor '") + name + "' not found in input.");
-  }
+static std::shared_ptr<TensorValue> ReadTensor(vai_ctx* ctx, vertexai::UnZipArchive* zip_file,
+                                               const std::shared_ptr<Evaluator>& evaluator, const std::string& name) {
+  auto tensor_file = zip_file->OpenFile(name);
   context::Activity activity(ctx->activity.ctx(), "vertexai::ReadTensor");
-  unz_file_info64 fi;
-  unzOpenCurrentFile(f);
-  unzGetCurrentFileInfo64(f, &fi, NULL, 0, NULL, 0, NULL, 0);
-  uint64_t shape_sz;
-  unzReadCurrentFile(f, &shape_sz, sizeof(shape_sz));
-  std::string proto_buf(shape_sz, '\0');
-  unzReadCurrentFile(f, &proto_buf[0], shape_sz);
+
+  uint64_t shape_size;
+  tensor_file.ReadInto(&shape_size, sizeof(shape_size));
+
+  std::string proto_buf(shape_size, '\0');
+  tensor_file.ReadInto(&proto_buf[0], proto_buf.size());
+
   tile::proto::TensorShape ts_proto;
   ts_proto.ParseFromString(proto_buf);
   tile::lang::TensorShape ts = tile::proto::to_poco(ts_proto);
@@ -879,23 +863,10 @@ static std::shared_ptr<TensorValue> read_tensor(vai_ctx* ctx, unzFile f, const s
   if (!tm) {
     throw std::runtime_error("Unable to map tensor in read_tensor");
   }
-  readBufferFromZipFile(f, plaidml_get_mapping_base(ctx, tm.get()), plaidml_get_mapping_size(ctx, tm.get()));
-  plaidml_writeback_mapping(ctx, tm.get());
-  unzCloseCurrentFile(f);
-  return tile::lang::TensorValue::make(bs, ts);
-}
 
-static std::string read_string(unzFile f, const std::string& name) {
-  if (unzLocateFile(f, name.c_str(), NULL) != UNZ_OK) {
-    throw std::runtime_error(std::string("String '") + name + "' not found in input.");
-  }
-  unz_file_info64 fi;
-  unzOpenCurrentFile(f);
-  unzGetCurrentFileInfo64(f, &fi, NULL, 0, NULL, 0, NULL, 0);
-  std::string r(fi.uncompressed_size, '\0');
-  readBufferFromZipFile(f, &r[0], r.size());
-  unzCloseCurrentFile(f);
-  return r;
+  tensor_file.ReadInto(plaidml_get_mapping_base(ctx, tm.get()), plaidml_get_mapping_size(ctx, tm.get()));
+  plaidml_writeback_mapping(ctx, tm.get());
+  return tile::lang::TensorValue::make(bs, ts);
 }
 
 extern "C" bool plaidml_save_function(plaidml_function* function, const char* filename) {
@@ -929,10 +900,10 @@ extern "C" plaidml_function* plaidml_load_function(vai_ctx* ctx, plaidml_device*
     return 0;
   }
   try {
-    unzFile in_file = unzOpen64(filename);
-    std::string xo = read_string(in_file, "code");
+    vertexai::UnZipArchive zip_file(filename);
+    auto code = zip_file.OpenFile("code").ReadString();
     tile::lang::Parser parser;
-    tile::lang::Program p = DeXify(parser.Parse(xo));
+    tile::lang::Program p = DeXify(parser.Parse(code));
     // Unfortunately, we don't serialize the number of temps (which is needed to do inlining)
     // So we recompute that here, based on the fact that all temps start with _T (otherwise reserved)
     for (const tile::lang::Op& op : p.ops) {
@@ -944,10 +915,9 @@ extern "C" plaidml_function* plaidml_load_function(vai_ctx* ctx, plaidml_device*
     std::vector<std::shared_ptr<TensorValue>> inputs;
     for (const auto& in : p.inputs) {
       if (in.name[0] == '_') {
-        inputs.push_back(read_tensor(ctx, in_file, platform->evaluator, "data_" + in.name));
+        inputs.push_back(ReadTensor(ctx, &zip_file, platform->evaluator, "data_" + in.name));
       }
     }
-    unzClose(in_file);
     return new plaidml_function{std::make_shared<BoundFunction>(p, inputs)};
   } catch (...) {
     vertexai::SetLastException(std::current_exception());

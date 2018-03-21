@@ -18,28 +18,36 @@ build --build_tag_filters=-msvc
 test --test_tag_filters=-msvc
 test --test_timeout_filters=-eternal
 test --test_output=streamed
+test --test_env=PLAIDML_EXPERIMENTAL
+test --test_env=PLAIDML_DEVICE_IDS
 
-build:ubuntu-17.04 --cpu=k8
-build:ubuntu-17.04 --define=VARIANT=ubuntu-17.04
+build:linux_x86_64 --cpu=linux_x86_64
+build:linux_x86_64 --host_cpu=linux_x86_64
+build:linux_x86_64 --crosstool_top=@toolchain//:toolchain
+build:linux_x86_64 --host_crosstool_top=@toolchain//:toolchain
+build:linux_x86_64 --build_tag_filters=-msvc,-trusty
+test:linux_x86_64 --test_tag_filters=-msvc,-trusty
 
-build:ubuntu-14.04 --cpu=k8
-build:ubuntu-14.04 --define=VARIANT=ubuntu-14.04
-build:ubuntu-14.04 --build_tag_filters=-msvc,-trusty
-test:ubuntu-14.04 --test_tag_filters=-msvc,-trusty
+build:linux_arm_32v7 --cpu=linux_arm_32v7
+build:linux_arm_32v7 --host_cpu=linux_x86_64
+build:linux_arm_32v7 --crosstool_top=@toolchain//:toolchain
+build:linux_arm_32v7 --host_crosstool_top=@toolchain//:toolchain
+build:linux_arm_32v7 --build_tag_filters=-jupyter,-large,-llvm,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
+test:linux_arm_32v7 --test_tag_filters=-jupyter,-large,-llvm,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
 
-build:arm7-ubuntu-14.04 --cpu=arm7-linux
-build:arm7-ubuntu-14.04 --define=VARIANT=arm7-ubuntu-14.04
-build:arm7-ubuntu-14.04 --crosstool_top=//bzl:toolchain
-build:arm7-ubuntu-14.04 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
-build:arm7-ubuntu-14.04 --build_tag_filters=-large,-msvc,-rtest_fail,-tensorflow
-test:arm7-ubuntu-14.04 --test_tag_filters=-large,-msvc,-rtest_fail,-tensorflow
+build:linux_arm_64v8 --cpu=linux_arm_64v8
+build:linux_arm_64v8 --host_cpu=linux_x86_64
+build:linux_arm_64v8 --crosstool_top=@toolchain//:toolchain
+build:linux_arm_64v8 --host_crosstool_top=@toolchain//:toolchain
+build:linux_arm_64v8 --build_tag_filters=-jupyter,-large,-llvm,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
+test:linux_arm_64v8 --test_tag_filters=-jupyter,-large,-llvm,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
 
-build:macos-10.12 --cpu=darwin
-build:macos-10.12 --build_tag_filters=-large,-llvm,-darwin_fail,-msvc
-test:macos-10.12 --test_tag_filters=-large,-llvm,-darwin_fail,-msvc
+build:macos_x86_64 --cpu=darwin
+build:macos_x86_64 --build_tag_filters=-large,-darwin_fail,-msvc,-opengl
+test:macos_x86_64 --test_tag_filters=-large,-darwin_fail,-msvc,-opengl
 
-build:windows-10 --build_tag_filters=-deb,-keras,-llvm,-shell,-tensorflow,-uvc
-test:windows-10 --test_tag_filters=-deb,-keras,-llvm,-shell,-tensorflow,-uvc,-windows_path_fail --test_env=NUMBER_OF_PROCESSORS
+build:windows-10 --build_tag_filters=-deb,-git_big,-keras,-llvm,-omnetpp,-opengl,-shell,-tensorflow,-uvc
+test:windows-10 --test_tag_filters=-deb,-git_big,-keras,-llvm,-omnetpp,-opengl,-shell,-tensorflow,-uvc,-windows_path_fail --test_env=NUMBER_OF_PROCESSORS
 
 build:callgrind -c dbg
 build:callgrind --cxxopt=-O3

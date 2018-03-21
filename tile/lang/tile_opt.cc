@@ -83,8 +83,8 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
     }
   }
   if (valid) {
-    for (auto& a : op.post_op_inputs) {
-      valid = is_vectorizable(a.second);
+    for (auto& op_input : op.post_op_inputs) {
+      valid = is_vectorizable(op_input.access);
       if (!valid) {
         break;
       }
@@ -125,16 +125,16 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
   for (auto& a : op.access) {
     adjust_access(&a);
   }
-  for (auto& a : op.post_op_inputs) {
-    adjust_access(&a.second);
+  for (auto& op_input : op.post_op_inputs) {
+    adjust_access(&op_input.access);
   }
   op.agg_vec = op.access[0].vector;
   IVLOG(2, "Vectorized: \n" << op.toString());
   return op;
 }
 
-PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction& op, const std::vector<uint64_t>& tile,
-                           const Bindings& vars) {
+PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction& op,
+                           const std::vector<uint64_t>& tile) {
   PerfStats r;
   IVLOG(4, "Computing cost for tile size: " << tile);
   uint64_t sz = op.ranges.size();
@@ -157,9 +157,9 @@ PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction
       r.shared_mem += mi.localSize() * a.elem_size();
     }
   }
-  for (const auto& kvp : op.post_op_inputs) {
+  for (const auto& op_input : op.post_op_inputs) {
     // We read the post-op inputs during the output phase.
-    r.mem_read += pout.outputs() * byte_width(vars.at(kvp.first).shape.type);
+    r.mem_read += pout.outputs() * byte_width(op_input.binding.shape.type);
   }
 
   uint64_t out_tiles = 1;
@@ -227,7 +227,7 @@ double ComputeScore(const HardwareSettings& settings, const PerfStats& perf) {
 }
 
 std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings& settings, const FlatContraction& op,
-                                                          bool fast, const Bindings& vars) {
+                                                          bool fast) {
   std::multimap<double, std::vector<uint64_t>> by_score;
   size_t sz = op.ranges.size();
 
@@ -235,7 +235,7 @@ std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings
   std::set<std::pair<double, std::vector<uint64_t>>> to_do;
   IVLOG(3, "Computing optimal tile cost");
   std::vector<uint64_t> tile(sz, 1);
-  double score = ComputeScore(settings, ComputeTileStats(settings, op, tile, vars));
+  double score = ComputeScore(settings, ComputeTileStats(settings, op, tile));
   by_tile.emplace(tile, score);
   by_score.emplace(score, tile);
   to_do.emplace(score, tile);
@@ -251,7 +251,7 @@ std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings
       uint64_t prev = tile[i];
       tile[i] = std::min(2 * tile[i], op.ranges[i]);
       if (!by_tile.count(tile)) {
-        score = ComputeScore(settings, ComputeTileStats(settings, op, tile, vars));
+        score = ComputeScore(settings, ComputeTileStats(settings, op, tile));
         by_tile.emplace(tile, score);
         by_score.emplace(score, tile);
         if (score > 0) {
@@ -264,17 +264,6 @@ std::multimap<double, std::vector<uint64_t>> TileOptimize(const HardwareSettings
   IVLOG(3, "  Final Tile: " << by_score.rbegin()->second);
   IVLOG(3, "  Final Score: " << by_score.rbegin()->first);
   return by_score;
-}
-
-// Performs vectorization + tile size optimization
-std::vector<uint64_t> TileVecOptimize(const HardwareSettings& settings,
-                                      FlatContraction& op,  // NOLINT(runtime/references)
-                                      const Bindings& vars) {
-  if (settings.vec_size > 1) {
-    op = Vectorize(op, settings.vec_size);
-  }
-  std::multimap<double, std::vector<uint64_t>> by_score = TileOptimize(settings, op, true, vars);
-  return by_score.rbegin()->second;
 }
 
 }  // namespace lang

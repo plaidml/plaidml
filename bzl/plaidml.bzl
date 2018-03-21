@@ -5,12 +5,15 @@ load("@com_google_protobuf//:protobuf.bzl", "py_proto_library", "cc_proto_librar
 PY_SRCS_VER = "PY2AND3"
 
 PLAIDML_COPTS = select({
-    "//bzl:x64_windows": [
+    "@toolchain//:macos_x86_64": [
+        "-std=c++14",
+        "-Werror",
+    ],
+    "@toolchain//:windows_x86_64": [
         "/std:c++14",
         "/DWIN32_LEAN_AND_MEAN",
     ],
     "//conditions:default": [
-        "--std=c++1y",
         "-Werror",
     ],
 })
@@ -20,8 +23,8 @@ PLAIDML_LINKOPTS = select({
         "-Lexternal/androidndk/ndk/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/",
         "-pie",
     ],
-    "//bzl:x64_windows": [],
-    "//bzl:darwin": [],
+    "@toolchain//:windows_x86_64": [],
+    "@toolchain//:macos_x86_64": [],
     "//conditions:default": [
         "-pthread",
         "-lm",
@@ -101,10 +104,10 @@ def plaidml_grammar(name, bison_src, flex_src, outs, visibility=None):
         # we need to unify the ios and non-ios verions here:
         # cmd = 'ssrcs=($(SRCS)); /usr/local/opt/bison/bin/bison $${ssrcs[0]} ; /usr/local/opt/flex/bin/flex $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
         cmd=select({
-            "//bzl:darwin":
+            "@toolchain//:macos_x86_64":
                 'ssrcs=($(SRCS)); /usr/local/opt/bison/bin/bison --verbose $${ssrcs[0]} ; /usr/local/opt/flex/bin/flex $${ssrcs[1]} ; cp %s $(@D)'
                 % (" ".join(outs)),
-            "//bzl:x64_windows":
+            "@toolchain//:windows_x86_64":
                 'ssrcs=($(SRCS)); bison --verbose $${ssrcs[0]} ; flex --nounistd $${ssrcs[1]} ; cp %s $(@D)'
                 % (" ".join(outs)),
             "//conditions:default":

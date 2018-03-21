@@ -1,8 +1,8 @@
 #include "tile/lang/simplifier.h"
 
-#include "tile/lang/emitc.h"
 #include "tile/lang/scope.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/lang/semprinter.h"
 #include "tile/lang/semtree.h"
 
 namespace vertexai {
@@ -439,8 +439,7 @@ namespace lang {
 void Simplify(const std::vector<KernelInfo>& kernels) {
   for (const auto& ki : kernels) {
     if (VLOG_IS_ON(4)) {
-      lang::EmitDebug emit_debug;
-      emit_debug.Visit(*ki.kfunc);
+      sem::Print emit_debug(*ki.kfunc);
       VLOG(4) << "Generic debug kernel before simplification:";
       VLOG(4) << ki.comments;
       VLOG(4) << emit_debug.str();

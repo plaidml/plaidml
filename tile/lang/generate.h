@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <limits>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -9,7 +10,10 @@
 #include <unordered_set>
 #include <vector>
 
+#include <boost/optional.hpp>
+
 #include "base/util/transfer_object.h"
+#include "tile/lang/flat.h"
 #include "tile/lang/lang.pb.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/semtree.h"
@@ -56,16 +60,32 @@ enum class KernelType {
   kCopy,      // A direct memcpy kernel.
 };
 
+typedef std::vector<uint64_t> TileShape;
+
+struct TileOption {
+  TileOption()
+      : tile_cost(std::numeric_limits<double>::infinity()), kernel_cost(std::numeric_limits<double>::infinity()) {}
+  TileOption(const std::string& model, const TileShape& shape, const double& tile_cost, const double& kernel_cost) {
+    this->model = model;
+    this->shape = shape;
+    this->tile_cost = tile_cost;
+    this->kernel_cost = kernel_cost;
+  }
+  std::string model;
+  TileShape shape;
+  double tile_cost;
+  double kernel_cost;
+};
+
 struct KernelInfo {
   std::string kname;
   std::string comments;
   std::string key;
   DirectSettings settings;
-  std::vector<uint64_t> tile_size;
+  TileOption tile;
   std::shared_ptr<sem::Function> kfunc;
   std::vector<std::string> outputs;
   std::vector<std::string> inputs;
-  std::unordered_set<std::string> war_safe_reads;
   GridSize gwork;
   GridSize lwork;
   size_t tot_bytes;
@@ -73,6 +93,7 @@ struct KernelInfo {
   std::vector<KernelInfo> candidates;
   proto::KernelInfo info;
   KernelType ktype = KernelType::kFunction;
+  boost::optional<FlatContraction> flat;
 };
 
 class VarRewrites {
@@ -97,8 +118,25 @@ struct KernelList {
   VarRewrites var_rewrites;
 };
 
+typedef std::vector<TileOption> TileOptions;
+
+typedef std::function<TileOptions(const std::string& kname, const HardwareSettings& settings,
+                                  const FlatContraction& op)>
+    TileCostFunction;
+
+class TileOptimizer {
+ public:
+  void RegisterModel(const TileCostFunction& cost_fn);
+  TileOptions OptionsFor(const std::string& kname, const HardwareSettings& settings, const FlatContraction& op,
+                         size_t max_options) const;
+
+ private:
+  std::vector<TileCostFunction> models_;
+};
+
 KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const ShapeMap& outputs,
-                           const HardwareSettings& settings, const std::string& id = "no_id", size_t tile_trials = 1);
+                           const HardwareSettings& settings, const TileOptimizer& optimizer,
+                           const std::string& id = "no_id", size_t tile_trials = 1);
 
 inline std::string to_string(const KernelInfo& ki) {
   std::ostringstream out;

@@ -12,14 +12,10 @@
 #define ELPP_DISABLE_DEFAULT_CRASH_HANDLING
 #define ELPP_WINSOCK2
 
-#if !defined(_MSC_VER)
-#define ELPP_FEATURE_CRASH_LOG
-#endif  // !defined(_MSC_VER)
+#include <easylogging++.h>
 
 #include <string>
 #include <vector>
-
-#include <easylogging++.h>
 
 namespace vertexai {
 
@@ -83,7 +79,7 @@ std::string stringify_collection(IT begin, IT end) {
       r += ", ";
     }
   }
-  r += "}";
+  r += " }";
   return r;
 }
 

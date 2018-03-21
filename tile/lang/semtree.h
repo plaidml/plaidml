@@ -164,8 +164,13 @@ struct CastExpr : public Expression {
 
 // A call of a function
 struct CallExpr : public Expression {
+  enum class Function { CEIL, COS, EXP, FLOOR, LOG, MAD, POW, ROUND, SQRT, TANH };
+  Function function;
   std::string name;
   std::vector<ExprPtr> vals;
+  // New, desirable constructor.
+  CallExpr(Function f, const std::vector<ExprPtr>& v);
+  // Old, deprecated constructor; see comment in the implementation.
   CallExpr(ExprPtr f, const std::vector<ExprPtr>& v);
   void Accept(Visitor&) const final;
 };

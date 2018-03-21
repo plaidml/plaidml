@@ -216,7 +216,9 @@ base_contract
 
 assign
   : ID "=" expr {
-      if (context.program.ops.size() == 0 || context.program.ops.back().output != $3) {
+      if (context.program.ops.size() == 0 ||
+          context.program.ops.back().output != $3 ||
+          context.program.ops.back().output[0] != '_') {
         context.apply("ident", {$3});
       }
       context.program.ops.back().output = $1; 

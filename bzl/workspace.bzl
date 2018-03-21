@@ -69,6 +69,18 @@ def plaidml_workspace():
         build_file=str(Label("//bzl:zlib.BUILD")),
     )
 
+    native.new_http_archive(
+        name="llvm_archive",
+        url="https://storage.googleapis.com/external_build_repo/llvm-3.8.1.src.tar.gz",
+        sha256="ad4b83105ce7540c79c36d92ac903c990a665aca54c878a243e1200aab6c756a",
+        build_file=str(Label("//bzl:llvm.BUILD")),
+        strip_prefix="llvm-3.8.1.src")
+
+    native.http_file(
+        name="plantuml_jar",
+        url="http://sourceforge.net/projects/plantuml/files/plantuml.jar/download",
+    )
+
     configure_protobuf()
 
 def configure_protobuf():

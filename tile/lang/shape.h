@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "base/util/logging.h"
+#include "base/util/transfer_object.h"
 
 namespace vertexai {
 namespace tile {
@@ -180,3 +181,5 @@ typedef std::map<std::string, TensorShape> ShapeMap;
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai
+
+TRANSFER_ENUM(vertexai::tile::lang::DataType);
