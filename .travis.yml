@@ -6,12 +6,12 @@ matrix:
     env:
       - BZL_PY_VER=PY2
       - PLAIDML_EXPERIMENTAL=1 
-      -	PLAIDML_DEVICE_IDS="intel(r)_xeon(r)_cpu_@_2.30ghz.0"
+      -	"PLAIDML_DEVICE_IDS=intel(r)_xeon(r)_cpu_@_2.30ghz.0"
   - python: "3.6"
     env: 
       - BZL_PY_VER=PY3
       - PLAIDML_EXPERIMENTAL=1 
-      -	PLAIDML_DEVICE_IDS="intel(r)_xeon(r)_cpu_@_2.30ghz.0"
+      -	"PLAIDML_DEVICE_IDS=intel(r)_xeon(r)_cpu_@_2.30ghz.0"
 
 before_install:
   - sudo apt-get install openjdk-8-jdk bison g++ wget -y
