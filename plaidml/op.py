@@ -5,12 +5,15 @@ The TILE standard operation library.
 These operations have been shown to be useful across a variety of frameworks.
 (Frameworks are of course free to define their own operations in addition to
 these, although it'll be easier to use them with these if a framework's own
-operations are defined using the standard `plaidml.tile` base classes.)
+operations are defined using the standard :doc:`plaidml.tile` base classes.)
 
-Each operation is defined as a tile.Operation subclass, allowing it to be
+Each operation is defined as a ``tile.Operation`` subclass, allowing it to be
 used in pattern matching.  Additionally, each operation is provided via a
 top-level function that wraps the class, allowing composite operations to
 be built up using a functional programming style.
+
+See the `PlaidML Op Tutorial <https://github.com/plaidml/plaidml/wiki/PlaidML-Op-Tutorial>`_
+for information about writing your own custom operations.
 """
 
 # pylint: disable=invalid-name
@@ -95,8 +98,8 @@ def pad_compute(sym, input_size, filter_size, stride, padding, pads=None):
     else:
         raise Exception('Invalid padding: ' + str(padding))
     if not isinstance(num_out_size, tile.Value) and num_out_size < 0:
-        raise Exception('Invalid output size computed for convolution: num_out_size={}'.format(
-            num_out_size))
+        raise Exception(
+            'Invalid output size computed for convolution: num_out_size={}'.format(num_out_size))
     return (sym_output_size, sym_padding_before, num_out_size)
 
 
@@ -110,7 +113,8 @@ def _format_conv_strings(
         dilation_rate,
         channelwise,
         forward=True,
-        expected_output_shape=None,):
+        expected_output_shape=None,
+):
     # Variable meanings:
     # N: Number of items in the batch
     # L<i>: Spatial dimension i of each (input) item
@@ -141,8 +145,8 @@ def _format_conv_strings(
     if channelwise == True and in_shape[c] != kernel_shape[-2]:
         raise ValueError(
             'Channelwise convolution must have same number of channels in both input and kernel:\n'
-            + '{} (from shape {}) v {} (from shape {})'.format(in_shape[c], in_shape, kernel_shape[
-                -2], kernel_shape))
+            + '{} (from shape {}) v {} (from shape {})'.format(in_shape[c], in_shape,
+                                                               kernel_shape[-2], kernel_shape))
     sym_out_shape = list()
     pad_amount = list()
     num_out_shape = list()
@@ -195,8 +199,8 @@ def _format_conv_strings(
     elif data_format == ConvolutionDataFormat.CHANNELS_LAST and not channelwise:
         if forward:
             input_dims_str = 'N, ' + ', '.join(['L{}'.format(i) for i in range(rank)]) + ', CI'
-            out_dims_str = 'N, ' + ', '.join(
-                ['{}'.format(sym_out_shape[i]) for i in range(rank)]) + ', CO'
+            out_dims_str = 'N, ' + ', '.join(['{}'.format(sym_out_shape[i])
+                                              for i in range(rank)]) + ', CO'
             outshape = [in_shape[0]] + num_out_shape + [kernel_shape[-1]]
         else:
             input_dims_str = 'N, ' + ', '.join('D{}'.format(i) for i in range(rank)) + ', CI'
@@ -216,8 +220,8 @@ def _format_conv_strings(
             raise NotImplementedError('Channelwise transposed convolutions not implemented.')
         input_dims_str = 'N, ' + ', '.join(['L{}'.format(i) for i in range(rank)]) + ', C'
         out_idx_str = 'n, ' + ', '.join(['x{}'.format(i) for i in range(rank)]) + ', c*M + m'
-        out_dims_str = 'N, ' + ', '.join(
-            ['{}'.format(sym_out_shape[i]) for i in range(rank)]) + ', C*M'
+        out_dims_str = 'N, ' + ', '.join(['{}'.format(sym_out_shape[i])
+                                          for i in range(rank)]) + ', C*M'
         input_idx_str = 'n, ' + ', '.join(input_idx_list) + ', c'
         outshape = [in_shape[0]] + num_out_shape + [kernel_shape[-2] * kernel_shape[-1]]
     else:
@@ -341,9 +345,8 @@ class Cast(tile.Operation):
 
     def __init__(self, x, dtype):
         info = tile.DTYPE_INFOS[dtype]
-        super(Cast, self).__init__(
-            'function (I) -> (O) {{ O = as_{}(I, {}); }}'.format(info.base, info.bitwidth),
-            [('I', x)], [('O', tile.Shape(dtype, x.shape.dims))])
+        super(Cast, self).__init__('function (I) -> (O) {{ O = as_{}(I, {}); }}'.format(
+            info.base, info.bitwidth), [('I', x)], [('O', tile.Shape(dtype, x.shape.dims))])
 
 
 cast = Cast.function
@@ -354,24 +357,36 @@ def ceiling(data):
     return tile.unary_op(data, 'ceil(I)', 'Ceiling')
 
 
-class Clip(tile.Operation):
-    """Clips a Value to the specified bounds."""
+class ClipMin(tile.Operation):
+    """Clips a Value to a minimum bound."""
 
-    def __init__(self, value, min_val, max_val):
-        if min_val is None:
-            raise tile.LogicError('Clip requires a minimum clip value; got None')
-        if max_val is None:
-            raise tile.LogicError('Clip requires a maximum clip value; got None')
+    def __init__(self, value, min_val):
         code = """
-               function (I, MIN_VAL, MAX_VAL) -> (O) {
-                   M = (I < MAX_VAL ? I : MAX_VAL);
-                   O = (MIN_VAL < M ? M : MIN_VAL);
+               function (I, MIN_VAL) -> (O) {
+                   O = (MIN_VAL < I ? I : MIN_VAL);
                }"""
-        super(Clip, self).__init__(
-            code, [('I', value), ('MIN_VAL', min_val), ('MAX_VAL', max_val)], [('O', value.shape)])
+        super(ClipMin, self).__init__(code, [('I', value), ('MIN_VAL', min_val)],
+                                      [('O', value.shape)])
 
 
-clip = Clip.function
+class ClipMax(tile.Operation):
+    """Clips a Value to a maximum bound."""
+
+    def __init__(self, value, max_val):
+        code = """
+               function (I, MAX_VAL) -> (O) {
+                   O = (I < MAX_VAL ? I : MAX_VAL);
+               }"""
+        super(ClipMax, self).__init__(code, [('I', value), ('MAX_VAL', max_val)],
+                                      [('O', value.shape)])
+
+
+def clip(value, min_val, max_val):
+    if min_val is not None:
+        value = ClipMin.function(value, min_val)
+    if max_val is not None:
+        value = ClipMax.function(value, max_val)
+    return value
 
 
 class Concatenate(tile.Operation):
@@ -394,14 +409,15 @@ class Concatenate(tile.Operation):
         shape_template = __clear_axis(tensors[0].shape.dims)
         for t in tensors:
             if __clear_axis(t.shape.dims) != shape_template:
-                raise ValueError('Incompatible shapes: cannot concatenate along axis {}\n{} v {}'.
-                                 format(axis, tensors[0].shape, t.shape))
+                raise ValueError(
+                    'Incompatible shapes: cannot concatenate along axis {}\n{} v {}'.format(
+                        axis, tensors[0].shape, t.shape))
 
         offsets = [0]
         for i in range(len(tensors)):
             offsets.append(offsets[i] + tensors[i].shape.dims[axis])
-        out_dims = tuple(tensors[0].shape.dims[i] if i != axis else offsets[len(tensors)]
-                         for i in range(rank))
+        out_dims = tuple(
+            tensors[0].shape.dims[i] if i != axis else offsets[len(tensors)] for i in range(rank))
 
         output_dims_list = ['N{}'.format(i) for i in range(rank)]
         output_dims_list[axis] = offsets[len(tensors)]
@@ -447,7 +463,8 @@ class Concatenate(tile.Operation):
         #   }
         code = ('function ({inputs}) -> (O) {{\n{body}\n}}').format(
             inputs=inputs_str,
-            body=body_str,)
+            body=body_str,
+        )
         inputs_list = []
         inputs_list.extend([('I{}'.format(i), tensors[i]) for i in range(len(tensors))])
 
@@ -531,8 +548,8 @@ class ConvolutionTranspose(tile.Operation):
 
         if kernel.shape.ndims != rank + 2:
             raise ValueError('Transpose convolution kernel shape inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(kernel.shape, kernel.shape.ndims
-                                                                  - 2, x.shape, x.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(
+                                 kernel.shape, kernel.shape.ndims - 2, x.shape, x.shape.ndims - 2))
         if len(output_shape) != rank + 2:
             raise ValueError('Transpose convolution output_shape inconsistent with input shape: ' +
                              '{} (rank {}) v {} (rank {})'.format(
@@ -620,21 +637,20 @@ class Dot(tile.Operation):
                 x_ranges=', '.join(['X{}'.format(i) for i in range(x.shape.ndims)]),
                 y_ranges=', '.join(['Y{}'.format(i) for i in range(y.shape.ndims)]),
                 dest_indices=', '.join(['x{}'.format(i) for i in range(x.shape.ndims - 1)] + [
-                    'y{}'.format(i)
-                    for i in (list(range(y.shape.ndims - 2)) + [y.shape.ndims - 1])
+                    'y{}'.format(i) for i in (list(range(y.shape.ndims - 2)) + [y.shape.ndims - 1])
                 ]),
                 dest_ranges=', '.join(['X{}'.format(i) for i in range(x.shape.ndims - 1)] + [
-                    'Y{}'.format(i)
-                    for i in (list(range(y.shape.ndims - 2)) + [y.shape.ndims - 1])
+                    'Y{}'.format(i) for i in (list(range(y.shape.ndims - 2)) + [y.shape.ndims - 1])
                 ]),
                 x_indices=', '.join(['x{}'.format(i) for i in range(x.shape.ndims - 1)] + ['z']),
                 y_indices=', '.join(['y{}'.format(i) for i in range(y.shape.ndims - 2)] + ['z'] +
                                     ['y{}'.format(y.shape.ndims - 1)]))
-            shape = tile.Shape(x.shape.dtype, (
-                list(x.shape.dims[:-1]) + list(y.shape.dims[:-2]) + [y.shape.dims[-1]]))
+            shape = tile.Shape(
+                x.shape.dtype,
+                (list(x.shape.dims[:-1]) + list(y.shape.dims[:-2]) + [y.shape.dims[-1]]))
         else:
-            raise NotImplementedError('Implement dot when x.dims={} and y.dims={}'
-                                      .format(x.shape.dims, y.shape.dims))
+            raise NotImplementedError('Implement dot when x.dims={} and y.dims={}'.format(
+                x.shape.dims, y.shape.dims))
 
         super(Dot, self).__init__(f, [('X', x), ('Y', y)], [('R', shape)])
 
@@ -795,8 +811,8 @@ class Gemm(tile.Operation):
                     'Invalid Gemm input; two-dimensions required, got: {}'.format(value.shape))
             if value.shape.ndims == 2:
                 return value
-            newdims = (value.shape.dims[0],
-                       functools.reduce(lambda x, y: x * y, value.shape.dims[1:]))
+            newdims = (value.shape.dims[0], functools.reduce(lambda x, y: x * y,
+                                                             value.shape.dims[1:]))
             return reshape(value, newdims)
 
         a = gemm_reshape(a)
@@ -815,13 +831,15 @@ class Gemm(tile.Operation):
             a_idxs='mid, row' if transA else 'row, mid',
             b_idxs='col, mid' if transB else 'col, mid',
             alpha_expr='OM * {}'.format(alpha) if alpha else 'OM',
-            beta_expr='C * {}'.format(beta) if beta else 'C',)
+            beta_expr='C * {}'.format(beta) if beta else 'C',
+        )
 
         outshape = tile.Shape(
             tile.common_dtype(a.shape.dtype, b.shape.dtype, c.shape.dtype),
             tile.broadcast_dims((
                 a.shape.dims[1] if transA else a.shape.dims[0],
-                b.shape.dims[0] if transB else a.shape.dims[1],), c.shape.dims))
+                b.shape.dims[0] if transB else a.shape.dims[1],
+            ), c.shape.dims))
 
         super(Gemm, self).__init__(code, [('A', a), ('B', b), ('C', c)], [('O', outshape)])
 
@@ -835,9 +853,10 @@ class Gradients(tile.Operation):
     """
 
     def __init__(self, loss, variables):
-        super(Gradients, self).__init__(
-            None, [('Loss', loss)] + [('I' + str(i), variables[i]) for i in range(len(variables))],
-            [('O' + str(i), variables[i].shape) for i in range(len(variables))])
+        super(Gradients, self).__init__(None, [('Loss', loss)] + [('I' + str(i), variables[i])
+                                                                  for i in range(len(variables))],
+                                        [('O' + str(i), variables[i].shape)
+                                         for i in range(len(variables))])
         self.num_vars = len(variables)
 
     def bind(self, bindings):
@@ -858,6 +877,45 @@ def gradients(loss, variables):
     for i in range(len(op.outputs)):
         outs.append(op.outputs['O' + str(i)])
     return outs
+
+
+class Hardmax(tile.Operation):
+    """
+    Implements a standard ML hardmax.
+    """
+
+    def __init__(self, data):
+        if data.shape.ndims != 2:
+            raise NotImplementedError(
+                'Hardmax with a non-two-dimensional tensor is not currently implemented')
+
+        code = """
+        function (I[X, Y]) -> (O) {
+            MAXX[x : X] = >(I[x, y]);
+            MAX[x, y : X, Y] = =(MAXX[x]);
+            O = (MAX == I ? 1.0 : 0.0);
+        }"""
+
+        super(Hardmax, self).__init__(code, [('I', data)], [('O', data.shape)])
+
+
+def hardmax(x, axis=None):
+    if x.shape.ndims == 2:
+        return Hardmax.function(x)
+    if axis is None:
+        axis = 1
+    full_dims = x.shape.dims
+    if axis == 0:
+        group = 1
+    else:
+        group = functools.reduce(lambda x, y: x * y, x.shape.dims[:axis])
+    if axis == len(x.shape.dims):
+        values = 1
+    else:
+        values = functools.reduce(lambda x, y: x * y, x.shape.dims[axis:])
+    flat_x = reshape(x, (group, values))
+    result = Hardmax.function(flat_x)
+    return reshape(result, full_dims)
 
 
 class Identity(tile.Operation):
@@ -894,6 +952,43 @@ ismax = IsMax.function
 def log(data):
     """Elementwise logarithm."""
     return tile.unary_op(data, 'log(I)', 'Log')
+
+
+class LogSoftmax(tile.Operation):
+    """
+    Implements the log() of a standard ML softmax.
+    """
+
+    def __init__(self, data):
+        if data.shape.ndims != 2:
+            raise NotImplementedError(
+                'LogSoftmax with a non-two-dimensional tensor is not currently implemented')
+
+        code = """
+        function (I[X, Y]) -> (O) {
+            O = builtin_logsoftmax(I, X, Y);
+        }"""
+
+        super(LogSoftmax, self).__init__(code, [('I', data)], [('O', data.shape)])
+
+
+def log_softmax(x, axis=None):
+    if x.shape.ndims == 2:
+        return LogSoftmax.function(x)
+    if axis is None:
+        axis = 1
+    full_dims = x.shape.dims
+    if axis == 0:
+        group = 1
+    else:
+        group = functools.reduce(lambda x, y: x * y, x.shape.dims[:axis])
+    if axis == len(x.shape.dims):
+        values = 1
+    else:
+        values = functools.reduce(lambda x, y: x * y, x.shape.dims[axis:])
+    flat_x = reshape(x, (group, values))
+    result = LogSoftmax.function(flat_x)
+    return reshape(result, full_dims)
 
 
 class MatMul(tile.Operation):
@@ -942,10 +1037,10 @@ class MatMul(tile.Operation):
                 c_shape = tuple(b.dims[:-2] + b.dims[-1])
                 a_ranges = ['S']
                 a_indicies = ['s']
-                b_ranges = (['I{}'.format(n) for n in range(b_ndims - 2)] +
-                            ['S', 'I{}'.format(b_ndims - 1)])
-                b_indicies = (['i{}'.format(n) for n in range(b_ndims - 2)] +
-                              ['s', 'i{}'.format(b_ndims - 1)])
+                b_ranges = (['I{}'.format(n)
+                             for n in range(b_ndims - 2)] + ['S', 'I{}'.format(b_ndims - 1)])
+                b_indicies = (['i{}'.format(n)
+                               for n in range(b_ndims - 2)] + ['s', 'i{}'.format(b_ndims - 1)])
                 c_ranges = ['I{}'.format(n) for n in range(b_ndims - 2) + [b_ndims - 1]]
                 c_indicies = ['i{}'.format(n) for n in range(b_ndims - 2) + [b_ndims - 1]]
         else:
@@ -971,10 +1066,10 @@ class MatMul(tile.Operation):
                     [a.shape.dims[-2], b.shape.dims[-1]])
                 a_ranges = ['I{}'.format(n) for n in range(a_ndims - 1)] + ['S']
                 a_indicies = ['i{}'.format(n) for n in range(a_ndims - 1)] + ['s']
-                b_ranges = (['I{}'.format(n) for n in range(b_ndims - 2)] +
-                            ['S', 'I{}'.format(b_ndims - 1)])
-                b_indicies = (['i{}'.format(n) for n in range(b_ndims - 2)] +
-                              ['s', 'i{}'.format(b_ndims - 1)])
+                b_ranges = (['I{}'.format(n)
+                             for n in range(b_ndims - 2)] + ['S', 'I{}'.format(b_ndims - 1)])
+                b_indicies = (['i{}'.format(n)
+                               for n in range(b_ndims - 2)] + ['s', 'i{}'.format(b_ndims - 1)])
                 c_ranges = ['I{}'.format(n) for n in range(len(c_dims))]
                 c_indicies = ['i{}'.format(n) for n in range(len(c_dims))]
 
@@ -1310,7 +1405,7 @@ class Reshape(tile.Operation):
             for sym, count in syms.items():
                 for _ in range(count):
                     num *= sym
-            dims[neg_idx] = num / den
+            dims[neg_idx] = num // den
 
         inputs = [('I', x)]
         dstrs = list(dims)
@@ -1362,14 +1457,30 @@ class SliceTensor(tile.Operation):
         shape_dims = list(data.shape.dims)
 
         for axis, start, end in zip(axes, starts, ends):
+            clamped_end = tile.minimum(end, data.shape.dims[axis])
+            clamped_start = tile.minimum(start, data.shape.dims[axis])
+            if isinstance(clamped_start, tile.Value):
+                clamped_start_str = 'min({}, D{})'.format(start, axis)
+            else:
+                clamped_start_str = str(clamped_start)
+            if isinstance(clamped_end, tile.Value):
+                clamped_end_str = 'min({}, D{})'.format(end, axis)
+            else:
+                clamped_end_str = str(clamped_end)
+            delta = clamped_end - clamped_start
+            if isinstance(clamped_end, tile.Value) or isinstance(clamped_start, tile.Value):
+                delta_str = '{}-{}'.format(clamped_end_str, clamped_start_str)
+            else:
+                delta_str = str(clamped_end - clamped_start)
+
             if end > 0:
-                out_dims[axis] = str(end - start)
-                shape_dims[axis] = end - start
+                out_dims[axis] = delta_str
+                shape_dims[axis] = delta
             elif start - end > 0:
-                out_dims[axis] = 'D{}-{}'.format(axis, start - end)
-                shape_dims[axis] -= (start - end)
+                out_dims[axis] = 'D{}+({})'.format(axis, delta_str)
+                shape_dims[axis] += delta
             if start:
-                in_idxs[axis] = 'd{}+{}'.format(axis, start)
+                in_idxs[axis] = 'd{}+{}'.format(axis, clamped_start_str)
 
         code = """
         function (I[{in_dims}]) -> (O) {{
@@ -1412,8 +1523,14 @@ def softmax(x, axis=None):
     if axis is None:
         axis = 1
     full_dims = x.shape.dims
-    group = functools.reduce(lambda x, y: x * y, x.shape.dims[:axis])
-    values = functools.reduce(lambda x, y: x * y, x.shape.dims[axis:])
+    if axis == 0:
+        group = 1
+    else:
+        group = functools.reduce(lambda x, y: x * y, x.shape.dims[:axis])
+    if axis == len(x.shape.dims):
+        values = 1
+    else:
+        values = functools.reduce(lambda x, y: x * y, x.shape.dims[axis:])
     flat_x = reshape(x, (group, values))
     result = Softmax.function(flat_x)
     return reshape(result, full_dims)
@@ -1433,6 +1550,11 @@ class Sqrt(tile.Operation):
 
 
 sqrt = Sqrt.function
+
+
+def squeeze(x, axes):
+    dims = [x.shape.dims[axis] for axis in range(x.shape.ndims) if axis not in axes]
+    return reshape(x, dims)
 
 
 class Summation(tile.Operation):
@@ -1470,6 +1592,18 @@ def summation(value, axes=None, keepdims=False, floatx=plaidml.DType.FLOAT32):
 def tanh(data):
     """Elementwise hyperbolic tangent."""
     return tile.unary_op(data, 'tanh(I)', 'Tanh')
+
+
+def unsqueeze(x, axes):
+    src_idx = 0
+    dims = []
+    for axis in range(len(x.shape.dims) + len(axes)):
+        if axis in axes:
+            dims.append(1)
+        else:
+            dims.append(x.shape.dims[src_idx])
+            src_idx += 1
+    return reshape(x, dims)
 
 
 class Variance(tile.Operation):

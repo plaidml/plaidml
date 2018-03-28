@@ -124,11 +124,12 @@ plaidml_py_test(
 
 plaidml_py_wheel(
     name = "wheel",
+    package_name = "plaidml_keras",
     srcs = [
         "__init__.py",
         "backend.py",
     ],
     config = ":setup.cfg",
-    package = "plaidml/keras",
+    package_prefix = "plaidml/keras",
     python = "py2.py3",
 )

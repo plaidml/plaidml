@@ -1,0 +1,25 @@
+.sphinxsidebar {
+    border-right: solid 3px #eff0f1;
+}
+
+.section > dl:not(.docutils) > dt {
+    display: inline-block;
+    margin: 1rem 0 1rem;
+    background: #e7f2fa;
+    color: #2980B9;
+    border-top: solid 3px #6ab0de;
+    padding: 0.5rem;
+    padding-left: 1rem;
+    width:100%;
+    position: relative;
+}
+
+.class > dd > dl:not(.docutils) > dt {
+    display: inline-block;
+    background: #e7f2fa;
+    color: #2980B9;
+    padding: 0.5rem;
+    padding-left: 1rem;
+    position: relative;
+}
+

@@ -43,6 +43,8 @@ class Platform : public tile::Platform {
   void ListDevices(const context::Context& ctx, const tile::proto::ListDevicesRequest& request,
                    tile::proto::ListDevicesResponse* response) final;
 
+  void RegisterCostModel(const lang::TileCostFunction& cost_fn) final;
+
  private:
   const PlatformDev& LookupDevice(const std::string& id);
 
@@ -50,6 +52,7 @@ class Platform : public tile::Platform {
   std::unordered_map<std::string, PlatformDev> devs_;
   std::unordered_map<std::string, PlatformDev> unmatched_devs_;
   std::shared_ptr<Scheduler> scheduler_;
+  lang::TileOptimizer tile_optimizer_;
 };
 
 }  // namespace local_machine

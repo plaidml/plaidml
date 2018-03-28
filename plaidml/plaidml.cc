@@ -442,6 +442,9 @@ extern "C" plaidml_buffer* plaidml_alloc_buffer(vai_ctx* ctx, plaidml_device* de
     vertexai::SetLastStatus(VAI_STATUS_CANCELLED, status_strings::kCancelled);
     return nullptr;
   }
+
+  size = std::max(size, uint64_t(1));
+
   try {
     context::Activity activity{ctx->activity.ctx(), "vertexai::AllocBuffer"};
     return new plaidml_buffer{std::move(activity),

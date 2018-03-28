@@ -270,6 +270,7 @@ pkg_deb(
 
 plaidml_py_wheel(
     name = "wheel",
+    package_name = "plaidml",
     srcs = [
         ":py",
         ":configs",
@@ -278,10 +279,7 @@ plaidml_py_wheel(
         "//conditions:default": ["//plaidml:libplaidml.so"],
     }),
     config = ":setup.cfg",
-    console_scripts = [
-        "'plaidml-setup = plaidml.plaidml_setup:main'",
-    ],
-    package = "plaidml",
+    package_prefix = "plaidml",
     platform = select({
         "@toolchain//:linux_arm_32v7": "linux_armv7l",
         "@toolchain//:macos_x86_64": "macosx_10_10_x86_64",
@@ -294,16 +292,14 @@ plaidml_py_wheel(
 # HACK: pex doesn't yet support manylinux wheels.
 plaidml_py_wheel(
     name = "wheel_linux_x86_64",
+    package_name = "plaidml",
     srcs = [
         ":configs",
         ":py",
         "//plaidml:libplaidml.so",
     ],
     config = ":setup.cfg",
-    console_scripts = [
-        "'plaidml-setup = plaidml.plaidml_setup:main'",
-    ],
-    package = "plaidml",
+    package_prefix = "plaidml",
     platform = "linux_x86_64",
     python = "py2.py3",
 )

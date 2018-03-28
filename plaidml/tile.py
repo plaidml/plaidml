@@ -30,7 +30,7 @@ Numpy.  So PlaidML provides:
     (this module)
 
   * A suite of operations that we've found to be useful across a variety of
-    frameworks (the `plaidml.tile.op` module).
+    frameworks (the :doc:`plaidml.op` module).
 
 This library uses two passes for building up composite functions.  The first
 pass constructs Python objects representing the operation graph; the second
@@ -40,17 +40,18 @@ translating particular subtrees to more efficient TILE operations) and for
 expressing operations that cannot be efficiently implemented in the current
 version of TILE (e.g. it's very expensive to implement ArgMax in the initial
 released version of TILE, but ArgMax is typically used in composite
-expressions like Equal(ArgMax(X), ArgMax(Y)), which is trivial to efficiently
-implement in TILE).
+expressions like ``Equal(ArgMax(X), ArgMax(Y))``, which is trivial to
+efficiently implement in TILE).
 
 More precisely, this library builds up a bipartite directed acyclic graph of
-`Operation` and `Value` objects.  `Operation` is the base class of each
-operation; `Value` represents an operation input or output.  `compose`
-translates an operation graph into a `plaidml.Function`.
+``Operation`` and ``Value`` objects.  ``Operation`` is the base class of each
+operation; ``Value`` represents an operation input or output.  ``compose``
+translates an operation graph into a ``plaidml.Function``.
 
-See [The Tile Tutorial](https://github.com/plaidml/plaidml/wiki/Tile-Tutorial)
-for more information about how the TILE language works and details for writing
-your own operations.
+See the `Tile Tutorial <https://github.com/plaidml/plaidml/wiki/Tile-Tutorial>`_
+for more information about how the TILE language works, or check out the
+`PlaidML Op Tutorial <https://github.com/plaidml/plaidml/wiki/PlaidML-Op-Tutorial>`_
+for the details of writing your own operations.
 """
 from collections import namedtuple
 import functools
@@ -551,7 +552,8 @@ class _NDArray(Operation):
 
     def bind(self, bindings):
         tensor = plaidml.Tensor(bindings.dev,
-                                plaidml.Shape(bindings.ctx, NUMPY_DTYPE_TO_PLAIDML[self._value.dtype.name],
+                                plaidml.Shape(bindings.ctx,
+                                              NUMPY_DTYPE_TO_PLAIDML[self._value.dtype.name],
                                               *self._value.shape))
         with tensor.mmap_discard(bindings.ctx) as view:
             view.copy_from_ndarray(self._value)

@@ -12,20 +12,20 @@ A framework for making deep learning work everywhere.
 
 
 PlaidML is a multi-language acceleration framework that:
-* Enables practitioners to deploy high-performance neural nets on any device
-* Allows hardware developers to quickly integrate with high-level frameworks
-* Allows framework developers to easily add support for many kinds of hardware
+  * Enables practitioners to deploy high-performance neural nets on any device
+  * Allows hardware developers to quickly integrate with high-level frameworks
+  * Allows framework developers to easily add support for many kinds of hardware
 
 For more information, see the
-[PlaidML Announcement](http://vertex.ai/blog/announcing-plaidml),
-and the [PlaidML GitHub Repository](https://github.com/plaidml/plaidml).
+`PlaidML Announcement <http://vertex.ai/blog/announcing-plaidml>`_,
+and the `PlaidML GitHub Repository <https://github.com/plaidml/plaidml>`_.
 
 About this module
 -----------------
 This module provides the low-level PlaidML Python API.
 
 Using this API directly requires either knowledge of the
-[Tile](https://github.com/plaidml/plaidml/wiki/Tile-Tutorial)
+`Tile <https://github.com/plaidml/plaidml/wiki/Tile-Tutorial>`_
 language (used to describe the computations that make up a neural network), or
 a pre-built serialized network (which encapsulates the Tile operations that define
 the shape of the network, and the intra-network connection weights found by
@@ -33,10 +33,10 @@ training the network).
 
 Higher-level APIs
 -----------------
-plaidml.keras - Integration with the [Keras](https://keras.io/) machine learning framework.
+:doc:`api/plaidml.keras` - Integration with the `Keras <https://keras.io/>`_ machine learning framework.
 This is useful for easily describing and training neural networks.
 
-plaidml.tile - Utilities for building up composite TILE functions from
+:doc:`api/plaidml.tile` - Utilities for building up composite TILE functions from
 high-level operation semantics.
 """
 
@@ -417,7 +417,6 @@ class _Library(plaidml.library.Library):
             ctypes.c_size_t  # size_t dim
         ]
         self.plaidml_get_shape_dimension_size.restype = ctypes.c_uint64
-        self.plaidml_get_shape_dimension_size.errcheck = self._check_err
 
         # PLAIDML_API int64_t plaidml_get_shape_dimension_stride(plaidml_shape* shape, size_t dim);
         self.plaidml_get_shape_dimension_stride = lib.plaidml_get_shape_dimension_stride
@@ -426,7 +425,6 @@ class _Library(plaidml.library.Library):
             ctypes.c_size_t  # size_t dim
         ]
         self.plaidml_get_shape_dimension_stride.restype = ctypes.c_int64
-        self.plaidml_get_shape_dimension_stride.errcheck = self._check_err
 
         # PLAIDML_API uint64_t plaidml_get_shape_buffer_size(plaidml_shape* shape);
         self.plaidml_get_shape_buffer_size = lib.plaidml_get_shape_buffer_size
