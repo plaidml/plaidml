@@ -100,250 +100,27 @@ def plaidml_grammar(name, bison_src, flex_src, outs, visibility=None):
         outs=outs,
         srcs=[bison_src, flex_src],
         visibility=visibility,
-        # The following is known to work when building ios;
-        # we need to unify the ios and non-ios verions here:
-        # cmd = 'ssrcs=($(SRCS)); /usr/local/opt/bison/bin/bison $${ssrcs[0]} ; /usr/local/opt/flex/bin/flex $${ssrcs[1]} ; cp %s $(@D)' % (" ".join(outs)),
         cmd=select({
-            "@toolchain//:macos_x86_64":
-                'ssrcs=($(SRCS)); /usr/local/opt/bison/bin/bison --verbose $${ssrcs[0]} ; /usr/local/opt/flex/bin/flex $${ssrcs[1]} ; cp %s $(@D)'
-                % (" ".join(outs)),
-            "@toolchain//:windows_x86_64":
-                'ssrcs=($(SRCS)); bison --verbose $${ssrcs[0]} ; flex --nounistd $${ssrcs[1]} ; cp %s $(@D)'
-                % (" ".join(outs)),
-            "//conditions:default":
-                'ssrcs=($(SRCS)); bison --verbose $${ssrcs[0]} ; flex $${ssrcs[1]} ; cp %s $(@D)' %
-                (" ".join(outs)),
+            "@toolchain//:macos_x86_64": """
+ssrcs=($(SRCS))
+/usr/local/opt/bison/bin/bison --verbose $${ssrcs[0]}
+/usr/local/opt/flex/bin/flex $${ssrcs[1]}
+cp %s $(@D)
+""" % (" ".join(outs)),
+            "@toolchain//:windows_x86_64": """
+ssrcs=($(SRCS))
+bison --verbose $${ssrcs[0]}
+flex --nounistd $${ssrcs[1]}
+cp %s $(@D)
+""" % (" ".join(outs)),
+            "//conditions:default": """
+ssrcs=($(SRCS))
+bison --verbose $${ssrcs[0]}
+flex $${ssrcs[1]}
+cp %s $(@D)
+""" % (" ".join(outs)),
         }),
     )
-
-load(
-    "@bazel_tools//tools/build_defs/apple:shared.bzl",
-    "label_scoped_path",
-    "xcrun_action",
-    "XCRUNWRAPPER_LABEL",
-)
-
-def _xcrun_args(ctx):
-    if ctx.fragments.apple.xcode_toolchain:
-        return ['--toolchain', ctx.fragments.apple.xcode_toolchain]
-    return []
-
-def _cc_src_filter(files):
-    result = []
-    for f in files:
-        if f.extension == 'cc':
-            result.append(f)
-        elif f.extension == 'cpp':
-            result.append(f)
-        elif f.extension == 'c':
-            result.append(f)
-    return result
-
-def _plaidml_objc_cc_library_aspect_impl(target, ctx):
-    apple_fragment = ctx.fragments.apple
-
-    # print('target:', target)
-    # print('dir(target):', dir(target))
-    # print('target.label.name:', target.label.name)
-    # if hasattr(target, 'objc'):
-    #   print('target.objc:', target.objc)
-    #   print('dir(target.objc):', dir(target.objc))
-    # if hasattr(target, 'cc'):
-    #   print('target.cc:', target.cc)
-    #   print('dir(target.cc):', dir(target.cc))
-    #   print('target.cc.compile_flags:', target.cc.compile_flags)
-    #   print('target.cc.defines:', target.cc.defines)
-    #   print('target.cc.include_directories:', target.cc.include_directories)
-    #   print('target.cc.libs:', target.cc.libs)
-    #   print('target.cc.link_flags:', target.cc.link_flags)
-    #   print('target.cc.quote_include_directories:', target.cc.quote_include_directories)
-    #   print('target.cc.system_include_directories:', target.cc.system_include_directories)
-    #   print('target.cc.transitive_headers:', target.cc.transitive_headers)
-    # print('ctx:', ctx)
-    # print('dir(ctx):', dir(ctx))
-    # print('ctx.attr:', ctx.attr)
-    # print('ctx.executable:', ctx.executable)
-    # print('ctx.rule:', ctx.rule)
-    # print('ctx.rule.attr:', ctx.rule.attr)
-    # print('ctx.rule.attr.deps:', ctx.rule.attr.deps)
-    # for dep in ctx.rule.attr.deps:
-    #   print('dir(', str(dep), '):', dir(dep))
-    # print('ctx.rule.files:', ctx.rule.files)
-    # print('ctx.fragments:', ctx.fragments)
-    # print('ctx.fragments.apple:', ctx.fragments.apple)
-    # print('dir(ctx.fragments.apple):', dir(ctx.fragments.apple))
-    # print('ctx.fragments.apple.apple_host_system_env:', ctx.fragments.apple.apple_host_system_env())
-    # print('ctx.fragments.apple.bitcode_mode:', ctx.fragments.apple.bitcode_mode)
-    # print('ctx.fragments.apple.ios_cpu:', ctx.fragments.apple.ios_cpu())
-    # print('ctx.fragments.apple.ios_cpu_platform:', ctx.fragments.apple.ios_cpu_platform())
-    # print('ctx.fragments.apple.xcode_toolchain:', ctx.fragments.apple.xcode_toolchain)
-    # print('ctx.fragments.objc:', ctx.fragments.objc)
-    # print('dir(ctx.fragments.objc):', dir(ctx.fragments.objc))
-    # print('ctx.fragments.objc.copts:', ctx.fragments.objc.copts)
-    # print('dir(apple_common):', dir(apple_common))
-    # print('dir(apple_common.apple_toolchain()):', dir(apple_common.apple_toolchain()))
-    # print('apple_common.apple_toolchain().platform_developer_framework_dir:', apple_common.apple_toolchain().platform_developer_framework_dir(apple_fragment))
-    # print('apple_common.apple_toolchain().sdk_dir():', apple_common.apple_toolchain().sdk_dir())
-
-    includes = depset(ctx.rule.attr.includes)
-    defines = depset(ctx.rule.attr.defines)
-    libraries = depset()
-
-    objc_providers = [x.objc for x in ctx.rule.attr.deps if hasattr(x, 'objc')]
-    for o in objc_providers:
-        # print(target.label.name, 'dep:', o)
-        if includes:
-            includes = includes | o.include
-        else:
-            includes = o.include
-        if defines:
-            defines = defines | o.define
-        else:
-            defines = o.define
-        libraries = libraries | o.library
-
-    obj_path = label_scoped_path(ctx, '_objc_objs/')
-
-    objs = []
-
-    #  Note: for a compilation step, objc_library generates a command like this:
-    #    bazel-out/host/bin/external/bazel_tools/tools/objc/xcrunwrapper clang '-stdlib=libc++' '-std=gnu++11' -Wshorten-64-to-32 -Wbool-conversion -Wconstant-conversion -Wduplicate-method-match -Wempty-body -Wenum-conversion -Wint-conversion -Wunreachable-code -Wmismatched-return-types -Wundeclared-selector -Wuninitialized -Wunused-function -Wunused-variable -DOS_IOS '-miphoneos-version-min=7.0' -arch armv7 -isysroot __BAZEL_XCODE_SDKROOT__ -F __BAZEL_XCODE_SDKROOT__/System/Library/Frameworks -F __BAZEL_XCODE_DEVELOPER_DIR__/Platforms/iPhoneOS.platform/Developer/Library/Frameworks -iquote . -iquote bazel-out/local-fastbuild/genfiles -I external/easylogging_repo/src -I bazel-out/local-fastbuild/genfiles/external/easylogging_repo/src -I external/com_github_gflags_gflags -I bazel-out/local-fastbuild/genfiles/external/com_github_gflags_gflags -I external/com_github_gflags_gflags/include -I bazel-out/local-fastbuild/genfiles/external/com_github_gflags_gflags/include -fobjc-arc '--std=c++1y' -Werror -Wno-ignored-attributes -Wno-missing-braces -Wno-unreachable-code -Wno-shorten-64-to-32 -c util/error.cc -o bazel-out/local-fastbuild/bin/util/_objs/util_objc/util/error.o -MD -MF bazel-out/local-fastbuild/bin/util/_objs/util_objc/util/error.d)
-    #
-    # For a link step, objc_library generates a command like this:
-    #   bazel-out/host/bin/external/bazel_tools/tools/objc/libtool -static -filelist bazel-out/local-fastbuild/bin/util/util_objc-archive.objlist -arch_only armv7 -syslibroot __BAZEL_XCODE_SDKROOT__ -o bazel-out/local-fastbuild/bin/util/libutil_objc.a
-
-    # if includes:
-    #   includes_args = ['-I%s' % d for d in includes]
-    # else:
-    #   includes_args = []
-    # if defines:
-    #   defines_args = ['-D%s' % d for d in defines]
-    # else:
-    #   defines_args = []
-    quote_includes_args = []
-    for inc in target.cc.quote_include_directories:
-        # TODO: For now, we're not including these in the actual command line,
-        # since objc_library doesn't include them.  Reconsider whether that's in fact the
-        # correct behavior.
-        quote_includes_args += ['-iquote', inc]
-
-    system_includes_args = []
-    for inc in target.cc.system_include_directories:
-        system_includes_args += ['-I', inc]
-
-    defines_args = []
-    for d in target.cc.defines:
-        defines_args.append('-D%s' % d)
-
-    arch = ctx.fragments.apple.ios_cpu()
-
-    libs = depset()
-    for src in _cc_src_filter(ctx.rule.files.srcs):
-        # print('Saw cc source:', src)
-        obj = ctx.new_file(obj_path + src.basename + '.o')
-        objs.append(obj)
-        args = _xcrun_args(ctx) + [
-            'clang',
-            '-stdlib=libc++',
-            '-arch',
-            arch,
-            '-isysroot',
-            apple_common.apple_toolchain().sdk_dir(),
-            '-miphoneos-version-min=7.0',  # TODO: Find a place to get this flag
-            '-F',
-            apple_common.apple_toolchain().platform_developer_framework_dir(apple_fragment),
-            '-iquote',
-            '.',
-            '-iquote',
-            ctx.genfiles_dir.path,
-            '-Wno-deprecated-declarations',  # Appease the protobuf gods
-            '-Wno-unused-const-variable',  # Appease the protobuf gods
-            '-Wno-shorten-64-to-32',  # Make the fact that size_t is not uint64_t happy
-        ] + system_includes_args + defines_args + ['-fobjc-arc'] + ctx.rule.attr.copts + [
-            '-c', src.path, '-o', obj.path
-        ]
-        xcrun_action(
-            ctx,
-            inputs=[src] + list(target.cc.transitive_headers),
-            outputs=[obj],
-            mnemonic='ObjCcCompile',
-            arguments=args,
-            progress_message=('Compiling %s [ios %s]' % (src.path, arch)))
-
-    if objs:
-        lib = ctx.new_file(label_scoped_path(ctx, 'lib' + target.label.name + '_objc.a'))
-        xcrun_action(
-            ctx,
-            inputs=objs,
-            outputs=(lib,),
-            mnemonic='ObjCcArchive',
-            arguments=[
-                'libtool', '-static', '-arch_only', arch, '-syslibroot',
-                apple_common.apple_toolchain().sdk_dir(), '-o', lib.path
-            ] + [x.path for x in objs],
-            progress_message=('Archiving %s [ios %s]' % (lib.path, arch)))
-
-        libs = libs | [lib]
-        libraries = libraries | [lib]
-
-    # print(target.label.name, 'libs:', libs)
-
-    kwargs = {}
-
-    if target.cc.include_directories:
-        # TODO: Maybe add set(target.cc.quote_include_directories)
-        kwargs['include'] = depset(target.cc.include_directories)
-    if target.cc.system_include_directories:
-        kwargs['include_system'] = depset(target.cc.system_include_directories)
-    if target.cc.defines:
-        kwargs['define'] = depset(target.cc.defines)
-    if target.cc.transitive_headers:
-        kwargs['header'] = target.cc.transitive_headers
-    if libraries:
-        kwargs['library'] = libraries
-
-    objc_provider = apple_common.new_objc_provider(
-        #header=set([output_header]),
-        providers=objc_providers,
-        # include=ctx.rule.attr.includes,
-        #linkopt=_swift_linkopts(ctx) + extra_linker_args,
-        #link_inputs=set([output_module]),
-        **kwargs)
-
-    return struct(
-        objc=objc_provider,
-        objc_libs=libs,
-        files=libs,
-    )
-
-plaidml_objc_cc_library_aspect = aspect(
-    attr_aspects = ["deps"],
-    attrs = {
-        "_xcrunwrapper": attr.label(
-            default = Label(XCRUNWRAPPER_LABEL),
-            executable = True,
-            cfg = "host",
-        ),
-    },
-    fragments = [
-        "apple",
-        "objc",
-    ],
-    implementation = _plaidml_objc_cc_library_aspect_impl,
-)
-
-def _plaidml_objc_cc_library_impl(ctx):
-    return struct(
-        objc=ctx.attr.cc_library.objc,
-        files=ctx.attr.cc_library.objc_libs,
-    )
-
-plaidml_objc_cc_library = rule(
-    attrs = {
-        "cc_library": attr.label(aspects = [plaidml_objc_cc_library_aspect]),
-    },
-    implementation = _plaidml_objc_cc_library_impl,
-)
 
 def run_as_test(name, target, cmd, data=[], **kwargs):
     native.genrule(
@@ -375,9 +152,13 @@ def _plaidml_py_wheel_impl(ctx):
             arguments=[ctx.file.config.path, cfg.path],
             mnemonic="CopySetupCfg")
         pkg_inputs += [cfg]
+    build_src_base = ctx.build_file_path.rsplit('/', 1)[0] + "/"
+    pkg_prefix = ctx.attr.package_prefix
+    if pkg_prefix != '':
+        pkg_prefix = '/' + pkg_prefix
     for tgt in ctx.attr.srcs:
-        for src in tgt.files:
-            dest = ctx.new_file(setup_py, 'pkg/' + ctx.attr.package + '/' + src.basename)
+        for src in tgt.files + tgt.data_runfiles.files:
+            dest = ctx.new_file(setup_py, 'pkg' + pkg_prefix + src.path[src.path.find(build_src_base) + len(build_src_base) - 1:])
             ctx.actions.run_shell(
                 outputs=[dest],
                 inputs=[src],
@@ -385,17 +166,15 @@ def _plaidml_py_wheel_impl(ctx):
                 arguments=[src.path, dest.path],
                 mnemonic="CopyPackageFile")
             pkg_inputs += [dest]
-    pkg_name = ctx.attr.package.replace('/', '_')
     ctx.actions.expand_template(
         template=tpl,
         output=setup_py,
         substitutions={
-            'bzl_package_name': pkg_name,
+            'bzl_package_name': ctx.attr.package_name,
             'bzl_version': version,
-            'bzl_target_cpu': ctx.var['TARGET_CPU'],
-            '{CONSOLE_SCRIPTS}': ",\n".join(ctx.attr.console_scripts)
+            'bzl_target_cpu': ctx.var['TARGET_CPU']
         })
-    wheel_filename = "dist/%s-%s-%s-%s-%s.whl" % (pkg_name, version, ctx.attr.python, ctx.attr.abi,
+    wheel_filename = "dist/%s-%s-%s-%s-%s.whl" % (ctx.attr.package_name, version, ctx.attr.python, ctx.attr.abi,
                                                   ctx.attr.platform)
     wheel = ctx.new_file(setup_py, wheel_filename)
     bdist_wheel_args = [setup_py.path, "--no-user-cfg", "bdist_wheel"]
@@ -426,12 +205,11 @@ plaidml_py_wheel = rule(
             allow_files = True,
         ),
         "config": attr.label(allow_single_file = [".cfg"]),
-        "data_files": attr.label_list(),
-        "package": attr.string(mandatory = True),
+        "package_name": attr.string(mandatory = True),
+        "package_prefix": attr.string(default = ""),
         "python": attr.string(mandatory = True),
         "abi": attr.string(default = "none"),
         "platform": attr.string(default = "any"),
-        "console_scripts": attr.string_list(),
         "_setup_py_tpl": attr.label(
             default = Label("//bzl:setup.tpl.py"),
             allow_single_file = True,

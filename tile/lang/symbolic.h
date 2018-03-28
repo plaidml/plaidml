@@ -51,6 +51,7 @@ class Gradient {
   ValuePtr FuncOp(const ValuePtr& dout, const std::shared_ptr<FunctionValue>& op, size_t idx);
   ValuePtr SumOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx);
   ValuePtr ExtremeOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx);
+  ValuePtr DefaultOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op);
   ComputeUses uses_;
   std::map<ValuePtr, ValuePtr> done_;
 };

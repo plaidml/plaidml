@@ -678,6 +678,10 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
 
     if (op.tag == Op::CONTRACTION) {
       IVLOG(3, "Running contraction " << op << " vars = " << vars);
+      if (vars.at(op.output).shape.byte_size() == 0) {
+        IVLOG(3, "Contraction output " << op.output << " size==0; skipping");
+        continue;
+      }
       std::vector<TensorShape> tshapes = MakeTShapes(op.c, vars);
       std::vector<Polynomial> out_poly;
       FlatContraction flat = Compile(op.c, tshapes, &out_poly);
@@ -840,7 +844,7 @@ TileOptions TileOptimizer::OptionsFor(const std::string& kname, const HardwareSe
     auto by_score = TileOptimize(settings, op, max_options == 1);
     size_t count = 0;
     for (auto it = by_score.rbegin(); it != by_score.rend() && count < max_options; it++, count++) {
-      options.emplace_back(TileOption{"", it->second, it->first, it->first});
+      options.emplace_back(TileOption{"", it->second, it->first, it->first, it->first});
     }
   } else {
     std::multimap<double, TileOption> by_cost;

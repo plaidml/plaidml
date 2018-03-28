@@ -32,8 +32,11 @@ genrule(
         mkdir -p $(location _build/html)/docs
         cp -r $(locations :docsimages) $(location _build/html)/docs
         python -m pip install -r $(location requirements.txt)
-        PLANTUMLSH="java -jar ../../../$(location @plantuml_jar//file)"  python -m sphinx -a -E -b html -c $$(dirname $(location conf.py)) $$(dirname $(location conf.py)) $(location _build/html)
-        zip -q -r $(location docs.zip) $(location _build/html)
+        PLANTUMLSH="java -jar `pwd`/$(location @plantuml_jar//file)"  python -m sphinx -a -E -b html -c $$(dirname $(location conf.py)) $$(dirname $(location conf.py)) $(location _build/html)
+        DOCSZIP=`pwd`/$(location docs.zip)
+        pushd $(location _build/html)/../
+        zip -q -r $${DOCSZIP} html
+	popd
     """,
     local = 1,
 )

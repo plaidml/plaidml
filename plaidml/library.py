@@ -124,15 +124,15 @@ class Library(object):
         try:
             exclass = _PLAIDML_ERRMAP[self._lib.vai_last_status()]
         except KeyError:
-            return Exception(self._lib.vai_last_status_str())
-        return exclass(self._lib.vai_last_status_str())
+            return Exception(self._lib.vai_last_status_str().decode())
+        return exclass(self._lib.vai_last_status_str().decode())
 
     def raise_last_status(self):
         raise self.last_status()
 
     def _logger_callback(self, unused_arg, level, msg):
         severity = _LOG_SEVERITY_MAP.get(level, logging.ERROR)
-        self._logger(severity, msg)
+        self._logger(severity, msg.decode())
 
     def get_perf_counter(self, name):
         return self.vai_get_perf_counter(name)

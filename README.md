@@ -15,9 +15,24 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
 
 - [Current Limitations](#current-limitations)
 - [Installation Instructions](#installation-instructions)
-- [Building PlaidML](BUILDING.md)
-- [Contributing](CONTRIBUTING.md)
+- [Building PlaidML](docs/building.md)
+- [Contributing](docs/contributing.rst)
 - [Reporting Issues](#reporting-issues)
+
+### Recent Release Notes
+* PlaidML 0.3.0
+  * Now supports ONNX 1.1.0 as a backend through [onnx-plaidml](https://github.com/plaidml/onnx-plaidml)
+  * Preliminary support for LLVM. Currently only supports CPUs, and only on Linux and macOS. More soon.
+  * Support for LSTMs & RNNs with static loop sizes, such as examples/imdb_lstm.py (from Keras)
+    * Training networks with embeddings is especially slow (#96)
+    * RNNs are only staticly sized if the input's sequence length is explicitly specified (#97)
+    * Fixes bug related to embeddings (#92)
+  * Adds a shared generic op library in python to make creating frontends easier
+     * plaidml-keras now uses this library
+  * Uses [plaidml/toolchain](https://github.com/plaidml/toolchain) for builds
+     * Building for ARM easy (–-config=linux_arm_32v7)
+  * Various fixes for bugs (#89)
+
 
 ## Current Limitations
 

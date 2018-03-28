@@ -1146,7 +1146,8 @@ class Pool(ptile.Operation):
         else:
             raise ValueError('Unrecognized pool mode \'{}\''.format(pool_mode))
 
-        super(Pool, self).__init__(f, inputs, [('O', ptile.Shape(x.shape.dtype, outshape))], name=name)
+        super(Pool, self).__init__(
+            f, inputs, [('O', ptile.Shape(x.shape.dtype, outshape))], name=name)
 
 
 pool = Pool.function
@@ -1208,10 +1209,21 @@ def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None)
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
     dtype = dtype or floatx()
     rng_state = _make_rng_state(seed)
-    args = ', '.join(['I'] + [str(i) for i in shape])
+    shape_inputs = []
+    shape_vars = []
+    shape_args = []
+    for idx, value in enumerate(shape):
+        if isinstance(value, ptile.Value):
+            shape_var = 'S{}'.format(idx)
+            shape_vars.append(shape_var)
+            shape_args.append(shape_var)
+            shape_inputs.append((shape_var, value))
+        else:
+            shape_args.append(str(value))
     t = ptile.Operation(
-        'function (I) -> (O) {{ O = prng_step({args}); }}'.format(args=args), [('I', rng_state)],
-        [('O', ptile.Shape(plaidml.DType.UINT32, tuple()))],
+        'function ({inputs}) -> (O) {{ O = prng_step({args}); }}'.format(
+            inputs=', '.join(['I'] + shape_vars), args=', '.join(['I'] + shape_args)),
+        [('I', rng_state)] + shape_inputs, [('O', ptile.Shape(plaidml.DType.UINT32, tuple()))],
         name='PrngStep').sole_output()
     n = ptile.Operation(
         'function (I) -> (O) { O = prng_state(I); }', [('I', t)],
@@ -1353,12 +1365,12 @@ def rnn(step_function,
         input_length = inputs.shape.dims[1]
     if isinstance(input_length, ptile.Value):
         raise NotImplementedError('rnn is not implemented for variable sized inputs')
-    if go_backwards:
-        raise NotImplementedError('rnn is not implemented for go_backwards=True')
     if mask is not None:
         raise NotImplementedError('rnn is not implemented with mask support')
+    if constants is None:
+        constants = list()
 
-    def time_expand(val, i, t, prev):
+    def time_expand(val, ii, t, prev):
         if (len(val.shape.dims) < 1):
             raise PlaidMLKerasException('output values must have a batch size dimension')
         ndmo = len(val.shape.dims) - 1
@@ -1366,20 +1378,26 @@ def rnn(step_function,
         idxs = ', '.join(['i' + str(i) for i in range(ndmo)])
         newshape = ptile.Shape(val.shape.dtype, (val.shape.dims[0], t) + val.shape.dims[1:])
         if prev is None:
-            f = "function (I[S, {sizes}]) -> (O) {{ O[n, {i}, {idxs} : N, T, {sizes}] = =(I[n, {idxs}]); }}"
-            f = f.format(sizes=sizes, idxs=idxs, i=i)
+            if ii != 0:
+                raise RuntimeError(
+                    "Generating RNN at time step {} with no previous time step".format(ii))
+            f = "function (I[B, {sizes}]) -> (O) {{ O[b, 0, {idxs} : B, {T}, {sizes}] = =(I[b, {idxs}]); }}"
+            f = f.format(sizes=sizes, idxs=idxs, T=t)
             return ptile.Operation(
                 f, [('I', val)], [('O', newshape)], name='TimeExpand').sole_output()
         else:
-            f = "function (I[S, {sizes}], P) -> (O) {{ O[n : S, {i}, {idxs}] = =(I[n, {idxs}]) default P; }}"
-            f = f.format(sizes=sizes, idxs=idxs, i=i)
+            f = "function (I[B, {sizes}], P) -> (O) {{ O[b, {ii}, {idxs} : B, {T}, {sizes}] = =(I[b, {idxs}]) default P; }}"
+            f = f.format(sizes=sizes, idxs=idxs, ii=ii, T=t)
             return ptile.Operation(
                 f, [('I', val), ('P', prev)], [('O', newshape)], name='TimeExpand').sole_output()
 
     states = initial_states
     output = None
     for i in range(input_length):
-        input_val = inputs[:, i]
+        if go_backwards:
+            input_val = inputs[:, input_length - 1 - i]
+        else:
+            input_val = inputs[:, i]
         output_val, new_states = step_function(input_val, states + constants)
         output = time_expand(output_val, i, input_length, output)
         states = new_states

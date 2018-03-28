@@ -37,8 +37,10 @@ InputDepUpdater::InputDepUpdater(AllocPtr allocp, StepPtr stepp,
     : allocp_{allocp}, stepp_{stepp}, latest_tmp_writer_{latest_tmp_writer} {}
 
 void InputDepUpdater::Visit(const TmpAlloc& tmp_alloc) {
-  IVLOG(5, "  Adding input dep for a" << (*allocp_)->idx << " on last writer s" << (*stepp_)->idx);
-  (*stepp_)->deps.insert(latest_tmp_writer_->at(allocp_));
+  if ((*allocp_)->byte_size) {
+    IVLOG(5, "  Adding input dep for a" << (*allocp_)->idx << " on last writer s" << (*stepp_)->idx);
+    (*stepp_)->deps.insert(latest_tmp_writer_->at(allocp_));
+  }
 }
 
 void InputDepUpdater::Visit(const ProgramOutputAlloc& out_alloc) {
@@ -157,7 +159,7 @@ class AllocOutputValidator final : private AllocVisitor {
       alloc->Accept(&v);
     }
     for (auto& kvp : v.outputs_) {
-      if (!kvp.second) {
+      if (!kvp.second && kl.types.count(kvp.first)) {
         throw error::Internal{"Schedule fails to write program output \"" + kvp.first + "\""};
       }
     }

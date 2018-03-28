@@ -25,6 +25,7 @@ def _git_big_impl(ctx):
         use_default_shell_env = True,
         command = "cd $(cat $1); git big pull --hard $2 --extra $3",
     )
+    return DefaultInfo(files=depset([out]))
 
 git_big_rule = rule(
     attrs = {

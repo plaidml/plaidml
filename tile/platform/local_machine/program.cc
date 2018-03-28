@@ -71,7 +71,8 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
   return std::numeric_limits<int64_t>::max();
 }
 
-lang::KernelList CompileProgram(const tile::proto::Program& program, const DevInfo& devinfo) {
+lang::KernelList CompileProgram(const tile::proto::Program& program, const DevInfo& devinfo,
+                                const lang::TileOptimizer& optimizer) {
   IVLOG(2, "Compiling: " << program.code());
   size_t tile_trials = 1;
   size_t trial_runs = 1;
@@ -82,7 +83,6 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
 
   context::Context ctx;
   lang::Parser parser;
-  lang::TileOptimizer optimizer;
   auto parsed = parser.Parse(program.code());
   auto inputs = to_poco(program.inputs());
   auto outputs = to_poco(program.outputs());
@@ -144,7 +144,8 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
 Program::Program(const context::Context& ctx, const tile::proto::Program& program,
                  const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<Scheduler>& scheduler,
                  const std::shared_ptr<MemStrategy>& output_mem_strategy,
-                 const std::shared_ptr<MemStrategy>& tmp_mem_strategy, hal::Memory* tmp_memory)
+                 const std::shared_ptr<MemStrategy>& tmp_mem_strategy, hal::Memory* tmp_memory,
+                 const lang::TileOptimizer& optimizer)
     : devinfo_{devinfo}, output_mem_strategy_{output_mem_strategy}, tmp_mem_strategy_{tmp_mem_strategy} {
   // TODO: Make this path asynchronous.
   // Asynchronous programming is a little tricky in this case, since if we compile asynchronously, the
@@ -161,7 +162,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
 
   context::Activity activity{ctx, "tile::local_machine::Compile"};
 
-  kernel_list_ = CompileProgram(program, *devinfo_.get());
+  kernel_list_ = CompileProgram(program, *devinfo_.get(), optimizer);
 
   std::vector<std::unique_ptr<hal::Kernel>> kernels;
   auto lib = devinfo_->dev->compiler()->Build(activity.ctx(), kernel_list_.kernels, devinfo_->settings).get();
