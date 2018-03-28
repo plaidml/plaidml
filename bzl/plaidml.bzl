@@ -159,7 +159,6 @@ def _plaidml_py_wheel_impl(ctx):
     for tgt in ctx.attr.srcs:
         for src in tgt.files + tgt.data_runfiles.files:
             dest = ctx.new_file(setup_py, 'pkg' + pkg_prefix + src.path[src.path.find(build_src_base) + len(build_src_base) - 1:])
-            print("src.path: {0}\ndest.path: {1}\nsrc.basename: {2}\nbuild_src_base: {3}\n".format(src.path, dest.path, src.basename, build_src_base))
             ctx.actions.run_shell(
                 outputs=[dest],
                 inputs=[src],
