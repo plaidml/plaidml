@@ -10,7 +10,6 @@ option java_outer_classname = "TensorProtos";
 
 // Encapsulates a tensor of arbitrary dimensionality and data type
 message TensorShape {
-
   // The format of the data in the tensor, integers must be LE, floats IEEE
   enum DataType {
     UNKNOWN_TYPE = 0;
@@ -32,12 +31,13 @@ message TensorShape {
     // The number of elements in a given dimension, inclusive of padding
     uint64 size = 1;
 
-    // The stride for this dimension, inclusive of all suboridnal dimension, in elements.
+    // The stride for this dimension, inclusive of all suboridnal dimension, in
+    // elements.
     int64 stride = 2;
   }
 
   DataType type = 1;
-  bool big_endian = 4; 
+  bool big_endian = 4;
 
   // Specifications of the dimensions, starting with the outermost dimension.
   // (ordinal 0 is the outermost, ordinal N-1 is the innermost)
@@ -49,16 +49,15 @@ message TensorShape {
   // A tensor with no dimensions (i.e, rank 0) is valid and is considered a
   // scalar.
   repeated Dimension dimensions = 3;
-
 }
 
 // A device capable of performing tensor operations.
 message Device {
   string dev_id = 1;
-  
+
   // A short description of the device
   string description = 2;
-  
+
   // Very detailed device information
   string details = 3;
 
@@ -92,7 +91,7 @@ message Session {
 message Buffer {
   string id = 1;
   string session_id = 2;
-  uint64 size = 3; // Measured in bytes.
+  uint64 size = 3;  // Measured in bytes.
 
   // The entity currently writing to the buffer, if any.
   // The buffer may be read once this field has been cleared.
@@ -160,19 +159,22 @@ message Process {
   }
 
   State current_state = 7;
-} 
+}
 
 // Tile API request/return types.
 
 // Returns all the devices detected by the current backend
-message ListDevicesRequest { }
+message ListDevicesRequest {
+}
 
 message ListDevicesResponse {
   repeated Device devices = 1;
   repeated Device unmatched_devices = 2;
 }
 
-message CreateSessionRequest { Session session = 1; }
+message CreateSessionRequest {
+  Session session = 1;
+}
 
 message UpdateSessionExpirationRequest {
   string session_id = 1;
@@ -188,7 +190,8 @@ message DeleteSessionRequest {
   string session_id = 1;
 }
 
-message ListSessionsRequest {}
+message ListSessionsRequest {
+}
 
 message ListSessionsResponse {
   repeated Session session = 1;
@@ -244,7 +247,8 @@ message WriteBufferRequest {
   // a stream.
   string writer_client_id = 7;
 
-  // Indicates that writes are complete; the buffer should be made available to readers.
+  // Indicates that writes are complete; the buffer should be made available to
+  // readers.
   // If present, this must be the last request in the stream.
   bool writes_complete = 8;
 
@@ -255,7 +259,8 @@ message WriteBufferRequest {
 }
 
 message WriteBufferResponse {
-  // No fields; this just acknowledges a write in a stream, allowing the client to
+  // No fields; this just acknowledges a write in a stream, allowing the client
+  // to
   // omit known-written blocks when resuming an upload.
 }
 

@@ -137,6 +137,8 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
   }
 }
 
+void Platform::RegisterCostModel(const lang::TileCostFunction& cost_fn) { tile_optimizer_.RegisterModel(cost_fn); }
+
 std::shared_ptr<tile::Buffer> Platform::MakeBuffer(const context::Context& ctx, const std::string& device_id,
                                                    std::uint64_t size) {
   auto& platform_dev = LookupDevice(device_id);
@@ -147,7 +149,8 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx
   auto& platform_dev = LookupDevice(program.dev_id());
   return compat::make_unique<Program>(
       ctx, program, platform_dev.devinfo, platform_dev.scheduler, platform_dev.mem_strategy,
-      std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source), platform_dev.tmp_mem_source);
+      std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source), platform_dev.tmp_mem_source,
+      tile_optimizer_);
 }
 
 void _fill_device(const Platform::PlatformDev& pdev, tile::proto::Device* dev) {

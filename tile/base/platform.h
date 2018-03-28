@@ -7,6 +7,7 @@
 #include "base/context/context.h"
 #include "tile/base/buffer.h"
 #include "tile/base/program.h"
+#include "tile/lang/generate.h"
 #include "tile/proto/tile.pb.h"
 
 namespace vertexai {
@@ -28,6 +29,8 @@ class Platform {
 
   virtual void ListDevices(const context::Context& ctx, const proto::ListDevicesRequest& request,
                            proto::ListDevicesResponse* response) = 0;
+
+  virtual void RegisterCostModel(const lang::TileCostFunction& cost_fn) = 0;
 };
 
 }  // namespace tile

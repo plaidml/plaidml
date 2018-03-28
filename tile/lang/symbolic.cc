@@ -86,11 +86,13 @@ ValuePtr Gradient::OpGrad(const ValuePtr& dout, const ValuePtr& op, size_t idx) 
     return FuncOp(dout, std::static_pointer_cast<FunctionValue>(op), idx);
   } else if (op->type() == Value::Type::CONTRACTION) {
     auto c = std::static_pointer_cast<ContractionValue>(op);
-    if (c->comb_op() == CombinationOp::EQ) {
+    if (c->use_default() && idx == c->inputs().size() - 1) {
+      return DefaultOp(dout, c);
+    } else if(c->comb_op() == CombinationOp::EQ) {
       return IConstValue::make(0);
     } else if (c->agg_op() == AggregationOp::SUM || c->agg_op() == AggregationOp::ASSIGN) {
       return SumOp(dout, c, idx);
-    } else if ((c->agg_op() == AggregationOp::MAX || c->agg_op() == AggregationOp::MIN) && c->inputs().size() == 1) {
+    } else if ((c->agg_op() == AggregationOp::MAX || c->agg_op() == AggregationOp::MIN) && c->logical_input_size() == 1) {
       return ExtremeOp(dout, c, idx);
     } else if (c->agg_op() == AggregationOp::PROD) {
       throw std::runtime_error("PROD AggregationOp does not support derivatives yet");
@@ -167,7 +169,7 @@ ValuePtr Gradient::SumOp(const ValuePtr& dout, const std::shared_ptr<Contraction
   }
   // Return the result
   return ContractionValue::make(CombinationOp::MULTIPLY, AggregationOp::SUM, specs, op->constraints(), inputs, dims,
-                                op->no_defract());
+                                false, op->no_defract());
 }
 
 ValuePtr Gradient::ExtremeOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op, size_t idx) {
@@ -179,9 +181,15 @@ ValuePtr Gradient::ExtremeOp(const ValuePtr& dout, const std::shared_ptr<Contrac
     dims.push_back(op->inputs()[0]->dim_value(i));
   }
   ValuePtr out = ContractionValue::make(CombinationOp::COND, AggregationOp::SUM, specs, op->constraints(),
-                                        {op->inputs()[0], op, dout}, dims, false);
+                                        {op->inputs()[0], op, dout}, dims, false, false);
   return out;
 }
+
+ValuePtr Gradient::DefaultOp(const ValuePtr& dout, const std::shared_ptr<ContractionValue>& op) {
+  IVLOG(4, "  Gradient::DefaultOp(), dout=" << dout << ", op=" << op);
+  return dout;
+}
+
 
 Program ProgGrad(const Program& p) {
   auto bf = std::make_shared<BoundFunction>(p, std::vector<std::shared_ptr<TensorValue>>{});

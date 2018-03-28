@@ -78,7 +78,8 @@ def plaidml_workspace():
 
     native.http_file(
         name="plantuml_jar",
-        url="http://sourceforge.net/projects/plantuml/files/plantuml.jar/download",
+        url="https://storage.googleapis.com/vertexai-depot/plantuml.jar",
+        sha256="26d60e43c14106a3d220e33c2b2e073b2bce40b433ad3e5fa13c747f58e67ab6",
     )
 
     configure_protobuf()

@@ -312,9 +312,11 @@ std::shared_ptr<Value> ContractionValue::make(CombinationOp comb_op, Aggregation
                                               const std::vector<SymbolicSpec>& specs,
                                               const std::vector<ValueConstraint>& constraints,
                                               const std::vector<std::shared_ptr<Value>>& inputs,
-                                              const std::vector<std::shared_ptr<Value>>& dims, bool no_defract) {
+                                              const std::vector<std::shared_ptr<Value>>& dims,
+                                              bool use_default,
+                                              bool no_defract) {
   auto result = std::shared_ptr<Value>(
-      Interned<ContractionValue>::make(comb_op, agg_op, specs, constraints, inputs, dims, no_defract));
+      Interned<ContractionValue>::make(comb_op, agg_op, specs, constraints, inputs, dims, use_default, no_defract));
   IVLOG(4, "Making ContractionValue " << result.get() << " comb_op=" << static_cast<char>(comb_op)
                                       << " agg_op=" << static_cast<char>(agg_op));
   for (auto in : inputs) {
@@ -659,7 +661,7 @@ std::string BoundFunction::Visit(const std::shared_ptr<ContractionValue>& val) {
     c.output_size.push_back(dsize);
   }
   c.specs.push_back(TensorSpec{op.output, DecomposeSpecs(val->specs()[0], this)});
-  for (size_t i = 0; i < val->inputs().size(); i++) {
+  for (size_t i = 0; i < val->logical_input_size(); i++) {
     std::string vname = Apply(val->inputs()[i]);
     inputs.push_back(vname);
     c.specs.push_back(TensorSpec{vname, DecomposeSpecs(val->specs()[i + 1], this)});
@@ -668,6 +670,10 @@ std::string BoundFunction::Visit(const std::shared_ptr<ContractionValue>& val) {
     std::string rname = Apply(vc.range);
     SymbolicConstraint rc(vc.poly->Decompose(this), rname);
     c.constraints.push_back(rc);
+  }
+  if (val->use_default()) {
+    std::string default_name = Apply(val->inputs().back());
+    c.use_default = default_name;
   }
   c.no_defract = val->no_defract();
   IVLOG(4, "Built op " << op);
@@ -828,8 +834,13 @@ void FunctionApplication::SetDone() {
         std::shared_ptr<Value> top = bindings_.at(con.range);
         cons.push_back(ValueConstraint({con.poly->Compose(*this), top}));
       }
+      bool use_default = false;
+      if (c.use_default != "") {
+        use_default = true;
+        inputs.push_back(bindings_.at(c.use_default));
+      }
       bool no_defract = c.no_defract;
-      bindings_[o.output] = ContractionValue::make(c.comb_op, c.agg_op, specs, cons, inputs, dims, no_defract);
+      bindings_[o.output] = ContractionValue::make(c.comb_op, c.agg_op, specs, cons, inputs, dims, use_default, no_defract);
       IVLOG(4, "FunApp::SetDone " << this << " binding " << o.output << " ->(contraction) " << *bindings_[o.output]);
     }
     for (const auto& attr : o.attributes) {

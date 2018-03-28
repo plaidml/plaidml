@@ -149,17 +149,21 @@ class ContractionValue final : public Value {
                                      const std::vector<SymbolicSpec>& specs,
                                      const std::vector<ValueConstraint>& constraints,
                                      const std::vector<std::shared_ptr<Value>>& inputs,
-                                     const std::vector<std::shared_ptr<Value>>& dims, bool no_defract);
+                                     const std::vector<std::shared_ptr<Value>>& dims,
+                                     bool use_default,
+                                     bool no_defract);
 
   ContractionValue(CombinationOp comb_op, AggregationOp agg_op, const std::vector<SymbolicSpec>& specs,
                    const std::vector<ValueConstraint>& constraints, const std::vector<std::shared_ptr<Value>>& inputs,
-                   const std::vector<std::shared_ptr<Value>>& dims, bool no_defract)
+                   const std::vector<std::shared_ptr<Value>>& dims, bool use_default,
+                   bool no_defract)
       : comb_op_{comb_op},
         agg_op_{agg_op},
         specs_{specs},
         constraints_{constraints},
         inputs_{inputs},
         dims_{dims},
+        use_default_{use_default},
         no_defract_{no_defract} {}
 
   const CombinationOp& comb_op() const { return comb_op_; }
@@ -167,10 +171,12 @@ class ContractionValue final : public Value {
   const std::vector<SymbolicSpec>& specs() const { return specs_; }
   const std::vector<ValueConstraint>& constraints() const { return constraints_; }
   const std::vector<std::shared_ptr<Value>>& inputs() const { return inputs_; }
+  bool use_default() const { return use_default_; }
   bool no_defract() { return no_defract_; }
   Value::Type type() const final { return Value::Type::CONTRACTION; }
   size_t num_dims() const final { return dims_.size(); }
   std::shared_ptr<Value> dim_value(size_t i) const final { return dims_[i]; }
+  size_t logical_input_size() const { return (use_default_ ? inputs_.size() - 1 : inputs_.size()); }
 
  private:
   CombinationOp comb_op_;
@@ -179,6 +185,7 @@ class ContractionValue final : public Value {
   std::vector<ValueConstraint> constraints_;
   std::vector<std::shared_ptr<Value>> inputs_;
   std::vector<std::shared_ptr<Value>> dims_;
+  bool use_default_;
   bool no_defract_;
 };
 

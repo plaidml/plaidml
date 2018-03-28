@@ -27,10 +27,6 @@ def main():
         name='bzl_package_name',
         version='bzl_version',
         package_dir={'': 'pkg'},
-        package_data={
-            '': ['*.so', '*.dll', '*.json'],
-        },
-        entry_points={'console_scripts': [{CONSOLE_SCRIPTS}]},
     )
 
     if 'bzl_target_cpu' == 'x64_windows':

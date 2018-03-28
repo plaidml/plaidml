@@ -13,11 +13,13 @@ backend.py.
 
 To use this module to install the PlaidML backend:
 
+.. code-block:: python
+
     import plaidml.keras
     plaidml.keras.install_backend()
 
-This should be done in the main program module, after __future__ imports
-(if any) and before importing any Keras modules.  Calling install() replaces
+This should be done in the main program module, after ``__future__`` imports
+(if any) and before importing any Keras modules.  Calling ``install()`` replaces
 the standard keras.backend module with plaidml.keras.backend, causing subsequently
 loaded Keras modules to use PlaidML.
 
@@ -26,10 +28,10 @@ You can explicitly set the installed backend via the environment:
                            If this is not set, the standard PlaidML backend is used.
                            Possible values are "plaidml" and "theano".
 
-You can also explicitly pass the backend in the call to install_backend().
+You can also explicitly pass the backend in the call to ``install_backend()``.
 
 (As an aside: we don't use the standard Keras approach of having you edit
-~/.keras/keras.json to set the backend, because we want code that doesn't patch
+``~/.keras/keras.json`` to set the backend, because we want code that doesn't patch
 in the PlaidML backend loader to continue to work.  If Keras ever does support
 dynamic loading of backends that aren't hard-coded into Keras, we will switch
 to that mechanism.)

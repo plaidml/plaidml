@@ -52,10 +52,10 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
-    'sphinx.ext.extlinks',
     'sphinxcontrib.fulltoc',
     'sphinxcontrib.plantuml',
-    'm2r',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.autosummary',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -65,6 +65,10 @@ templates_path = ['_templates']
 # You can specify multiple suffix as a list of string:
 #
 source_suffix = ['.rst', '.md']
+
+source_parsers = {
+    '.md': CommonMarkParser,
+}
 
 # The master toctree document.
 master_doc = 'index'
@@ -86,6 +90,8 @@ pygments_style = 'sphinx'
 
 # -- Options for HTML output -------------------------------------------------
 
+html_short_title = "PlaidML"
+
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
@@ -95,7 +101,10 @@ html_theme = 'alabaster'
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {
+    'sidebar_width': '260px',
+    'show_powered_by': False,
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -110,7 +119,10 @@ html_static_path = ['_static']
 # default: ``['localtoc.html', 'relations.html', 'sourcelink.html',
 # 'searchbox.html']``.
 #
-# html_sidebars = {}
+html_sidebars = {
+    'index': ["about.html", "globaltoc.html", "indexlink.html", "searchbox.html"],
+    '**': ["about.html", "localtoc.html", "indexlink.html", "searchbox.html"]
+}
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
@@ -162,15 +174,52 @@ texinfo_documents = [
 
 # -- Extension configuration -------------------------------------------------
 
-extlinks = {'repo': (repo_root + "/%s", '')}
-
-autodoc_mock_imports = ["enum", "numpy", "scipy"]
-
 plantuml = os.environ.get('PLANTUMLSH')
 
-print("PLANTUML!!!!: ", os.getcwd(), plantuml)
+# The Napoleon extension allows google style doc comments, but it also uses
+# numpy style too, by default; for consistency, we'll use only google style.
+napoleon_numpy_docstring = False
+
+# The rtype option just adds noise; disable it.
+napoleon_use_rtype = False
+
+# The generate mode will recursively produce stub pages for everything listed
+# in an autosummary; this lets us document all the stuff inside plaidml without
+# having to explicitly list each item. It doesn't work on the package itself,
+# though, so we still have to list the contents of 'plaidml' itself inside the
+# 'plaidml.rst' file; everything underneath that is produced into the api/
+# subdirectory as needed.
+autosummary_generate = True
+
+# Autosummary does not respect the autodoc_mock_imports option, so we have to
+# mock out these libraries ourselves; we can't simply require them, since they
+# won't be available on readthedocs.
+import six
+
+if six.PY3:
+    from unittest.mock import MagicMock
+else:
+    from mock import Mock as MagicMock
+
+
+class Mock(MagicMock):
+
+    @classmethod
+    def __getattr__(cls, name):
+        return Mock()
+
+
 def setup(app):
-    app.add_config_value('recommonmark_config', {
-        'auto_toc_tree_section': 'Contents',
-    }, True)
+    MOCK_MODULES = ['numpy', 'scipy']
+    sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+
+    app.add_config_value(
+        'recommonmark_config',
+        {
+            'auto_toc_tree_section': 'Contents',
+            # This feature has been deprecated, and, indeed, recommonmark will
+            # choke on inter-document links if it's left enabled.
+            'enable_auto_doc_ref': False,
+        },
+        True)
     app.add_transform(AutoStructify)

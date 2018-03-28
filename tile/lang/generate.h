@@ -64,16 +64,21 @@ typedef std::vector<uint64_t> TileShape;
 
 struct TileOption {
   TileOption()
-      : tile_cost(std::numeric_limits<double>::infinity()), kernel_cost(std::numeric_limits<double>::infinity()) {}
-  TileOption(const std::string& model, const TileShape& shape, const double& tile_cost, const double& kernel_cost) {
+      : core_tile_cost(std::numeric_limits<double>::infinity()),
+        post_tile_cost(std::numeric_limits<double>::infinity()),
+        kernel_cost(std::numeric_limits<double>::infinity()) {}
+  TileOption(const std::string& model, const TileShape& shape, const double& core_tile_cost,
+             const double& post_tile_cost, const double& kernel_cost) {
     this->model = model;
     this->shape = shape;
-    this->tile_cost = tile_cost;
+    this->core_tile_cost = core_tile_cost;
+    this->post_tile_cost = post_tile_cost;
     this->kernel_cost = kernel_cost;
   }
   std::string model;
   TileShape shape;
-  double tile_cost;
+  double core_tile_cost;
+  double post_tile_cost;
   double kernel_cost;
 };
 

@@ -10,7 +10,7 @@ pip install -r requirements.txt
 ### Linux
 
 ```
-bazel build plaidml:wheel plaidml/keras:wheel
+bazel build --config linux_x86_64 plaidml:wheel plaidml/keras:wheel
 sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 ```
 
@@ -26,7 +26,7 @@ brew install bazel bison flex
 Then, use bazel to build, sepecifying the correct config from tools/bazel.rc: 
 
 ```
-bazel build plaidml:wheel plaidml/keras:wheel --config macos-10.12
+bazel build --config macos_x86_64 plaidml:wheel plaidml/keras:wheel
 sudo pip install -U bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 ```
 

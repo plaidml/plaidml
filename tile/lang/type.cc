@@ -70,15 +70,15 @@ static double ConstantPropagate(const std::string& op, const std::vector<double>
   }
   if (op == "broadcast") {
     if (x[0] != x[1] && x[0] != 1 && x[1] != 1) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
-                               std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
+                               " != " + std::to_string(x[1]));
     }
     return x[0] == 1 ? x[1] : x[0];
   }
   if (op == "match") {
     if (x[0] != x[1]) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
-                               std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
+                               " != " + std::to_string(x[1]));
     }
     return x[0];
   }
@@ -129,6 +129,9 @@ static double ConstantPropagate(const std::string& op, const std::vector<double>
   }
   if (op == "ceil") {
     return std::ceil(x[0]);
+  }
+  if (op == "floor") {
+    return std::floor(x[0]);
   }
   throw std::runtime_error("Unknown op " + op + " during constant propagation");
 }
@@ -775,6 +778,14 @@ void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std:
     }
     if (op.tag != Op::CONTRACTION) {
       continue;
+    }
+    if (op.c.use_default != "") {
+      std::string& i = op.c.use_default;
+      deident(i);
+      if (!keep.count(i) && !inputs.count(i)) {
+        keep.insert(i);
+        to_proc.push(i);
+      }
     }
     for (auto& s : op.c.output_size) {
       deident(s);

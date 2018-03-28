@@ -200,7 +200,7 @@ def opTest(in_data,
                 except AttributeError:
                     # This wasn't an IndexedSlices object, do nothing
                     pass
-                if args.verbose:
+                if args.verbose or verbose:
                     print('data: {}'.format(data))
                     print('fr: {}'.format(fr))
                     print('gr: {}'.format(gr))
@@ -271,6 +271,38 @@ class TestBackendOps(unittest.TestCase):
         pkb.set_learning_phase(0)
         assert isinstance(pkb.learning_phase(), int)
         npt.assert_equal(pkb.learning_phase(), 0)
+
+    @opTest([
+        [m(4, 7, 3), n(4, 3), m(3, 3), n(3, 3), False],
+        [m(4, 7, 3), n(4, 3), m(3, 3), n(3, 3), True],
+    ])
+    def testRNN(self, b, inp, init_state, ker, r_ker, go_back):
+
+        def step_function(inputs, states):
+            prev_out = states[0]
+            activation = b.relu
+            h = b.dot(inputs, ker)
+            output = h + b.dot(prev_out, r_ker)
+            output = activation(output)
+            return output, [output]
+
+        initial_states = [init_state]
+        go_backwards = go_back
+        mask = None
+        constants = None
+        unroll = False
+        input_length = None
+        out_val, all_out, all_states = b.rnn(
+            step_function=step_function,
+            inputs=inp,
+            initial_states=initial_states,
+            go_backwards=go_backwards,
+            mask=mask,
+            constants=constants,
+            unroll=unroll,
+            input_length=input_length)
+        result = [out_val, all_out] + list(all_states)
+        return result
 
     @compareForwardExact()
     def testShape(self, b):
