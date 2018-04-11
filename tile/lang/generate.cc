@@ -219,7 +219,8 @@ static bool SimplifyFlat(FlatContraction* flat) {
 
 static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction flat,  // NOLINT(runtime/references)
                             const std::string& kname, const HardwareSettings& settings, const Bindings& vars,
-                            size_t tile_trials, const VarRewrites& var_rewrites, const TileOptimizer& optimizer) {
+                            size_t tile_trials, const VarRewrites& var_rewrites, const TileOptimizer& optimizer,
+                            std::map<std::string, KernelInfo>* flat_cache) {
   if (!flat.generate_contraction && !flat.post_ops.size()) {
     // The kernel consists entirely of elided elementwise operations; nothing to do.
     return;
@@ -250,9 +251,8 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
     flat = Vectorize(flat, vec_size);
   }
   std::string flat_key = flat.CacheKeyString(vars);
-  static std::map<std::string, KernelInfo> flat_cache;
-  auto it = flat_cache.find(flat_key);
-  if (it != flat_cache.end()) {
+  auto it = flat_cache->find(flat_key);
+  if (it != flat_cache->end()) {
     IVLOG(2, "Cache key: " << flat_key << ", Hit!");
     r.kernels.emplace_back(it->second);
     auto& ki = r.kernels.back();
@@ -283,7 +283,7 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
       primary.candidates.push_back(ki);
     }
   }
-  flat_cache.emplace(flat_key, primary);
+  flat_cache->emplace(flat_key, primary);
   r.kernels.emplace_back(std::move(primary));
 }
 
@@ -669,6 +669,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
   size_t knum = 0;
   auto next_kname = [&knum, kid] { return printstring("%s_%zu", kid.c_str(), knum++); };
   time_t last_update = time(nullptr);
+  std::map<std::string, KernelInfo> flat_cache;
   for (size_t i = 0; i < prog.ops.size(); i++) {
     if (time(nullptr) - last_update >= 2) {
       LOG(INFO) << "Analyzing Ops: " << i << " of " << prog.ops.size() << " operations complete";
@@ -700,7 +701,8 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       } else {
         DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly);
       }
-      ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials, r.var_rewrites, optimizer);
+      ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials, r.var_rewrites, optimizer,
+                      &flat_cache);
       continue;
     }
     // Ignore constants
@@ -765,6 +767,10 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
     // contraction itself later.
 
     FlatContraction flat;
+
+    flat.comb_op = CombinationOp::NONE;
+    flat.agg_op = AggregationOp::NONE;
+
     std::vector<Polynomial> out_poly;
     {
       // The initial elementwise operation's output is used to
@@ -798,7 +804,8 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
 
     DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly);
 
-    ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials, r.var_rewrites, optimizer);
+    ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials, r.var_rewrites, optimizer,
+                    &flat_cache);
   }
 
   // Copy only the relevant typing info across

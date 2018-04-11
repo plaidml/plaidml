@@ -20,9 +20,9 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-enum class AggregationOp : char { SUM = '+', MAX = '>', MIN = '<', PROD = '*', ASSIGN = '=' };
+enum class AggregationOp : char { SUM = '+', MAX = '>', MIN = '<', PROD = '*', ASSIGN = '=', NONE = 'N' };
 
-enum class CombinationOp : char { MULTIPLY = '*', PLUS = '+', EQ = '=', COND = '?' };
+enum class CombinationOp : char { MULTIPLY = '*', PLUS = '+', EQ = '=', COND = '?', NONE = 'N' };
 
 std::string to_string(const AggregationOp& c);
 std::string to_string(const CombinationOp& c);

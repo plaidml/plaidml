@@ -53,8 +53,6 @@ class ReadPlan {
   sem::StmtPtr generate(const std::string& to, const std::string& from, uint64_t threads, uint64_t limit,
                         uint64_t offset) const;
 
-  sem::StmtPtr generate_global(const std::string& to) const;
-
  private:
   uint64_t mem_width_;               // The minimum read size (due to cache, etc)
   uint64_t local_size_;              // Total amount of local memory required

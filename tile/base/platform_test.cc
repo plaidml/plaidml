@@ -89,25 +89,13 @@ TEST_P(PlatformTest, ListDevicesReturnsAtLeastOneDevice) {
 
 namespace multiply {
 
-const char* Code = "function (A[X, Y], B[Y, X]) -> (C) { C[x, y : X, Y] = +(A[x, y] * B[y, x]); }";
+const char* Code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
 const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
 const float Input[] = {
-    0,   // [0, 0]
-    1,   // [0, 1]
-    2,   // [0, 2]
-    3,   // [0, 3]
-    4,   // [1, 0]
-    5,   // [1, 1]
-    6,   // [1, 2]
-    7,   // [1, 3]
-    8,   // [2, 0]
-    9,   // [2, 1]
-    10,  // [2, 2]
-    11,  // [2, 3]
-    12,  // [3, 0]
-    13,  // [3, 1]
-    14,  // [3, 2]
-    15,  // [3, 3]
+    0,  1,  2,  3,   //
+    4,  5,  6,  7,   //
+    8,  9,  10, 11,  //
+    12, 13, 14, 15,  //
 };
 const float Output[] = {
     0, 0, 0, 0,  //
@@ -116,22 +104,10 @@ const float Output[] = {
     0, 0, 0, 0,  //
 };
 const float Expected[] = {
-    0,    // [0, 0]
-    4,    // [0, 1]
-    16,   // [0, 2]
-    36,   // [0, 3]
-    4,    // [1, 0]
-    25,   // [1, 1]
-    54,   // [1, 2]
-    91,   // [1, 3]
-    16,   // [2, 0]
-    54,   // [2, 1]
-    100,  // [2, 2]
-    154,  // [2, 3]
-    36,   // [3, 0]
-    91,   // [3, 1]
-    154,  // [3, 2]
-    225,  // [3, 3]
+    56,  62,  68,  74,   //
+    152, 174, 196, 218,  //
+    248, 286, 324, 362,  //
+    344, 398, 452, 506,  //
 };
 
 }  // namespace multiply
@@ -141,40 +117,16 @@ namespace vector_add {
 const char* Code = "function (A, B) -> (C) { C = A + B; }";
 const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
 const float A[] = {
-    1,  // 1
-    2,  // 2
-    3,  // 3
-    4,  // 4
-    1,  // 1
-    2,  // 2
-    3,  // 3
-    4,  // 4
-    1,  // 1
-    2,  // 2
-    3,  // 3
-    4,  // 4
-    1,  // 1
-    2,  // 2
-    3,  // 3
-    4,  // 4
+    1, 2, 3, 4,  //
+    1, 2, 3, 4,  //
+    1, 2, 3, 4,  //
+    1, 2, 3, 4,  //
 };
 const float B[] = {
-    5,  // 5
-    6,  // 6
-    7,  // 7
-    8,  // 8
-    5,  // 5
-    6,  // 6
-    7,  // 7
-    8,  // 8
-    5,  // 5
-    6,  // 6
-    7,  // 7
-    8,  // 8
-    5,  // 5
-    6,  // 6
-    7,  // 7
-    8,  // 8
+    5, 6, 7, 8,  //
+    5, 6, 7, 8,  //
+    5, 6, 7, 8,  //
+    5, 6, 7, 8,  //
 };
 const float Output[] = {
     0, 0, 0, 0,  //
@@ -216,7 +168,7 @@ TEST_P(PlatformTest, VectorAddWorks) {
   CheckExpected(ctx, c, MakeBuffer(vector_add::Expected, sizeof(vector_add::Expected)));
 }
 
-TEST_P(PlatformTest, PiecewiseMultiplyWorks) {
+TEST_P(PlatformTest, MatMulWorks) {
   context::Context ctx;
   auto device = MakePlatform();
   auto program = MakeProgram(ctx, device, nullptr, multiply::Code, multiply::Shape);

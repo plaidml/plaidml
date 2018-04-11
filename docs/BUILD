@@ -36,7 +36,8 @@ genrule(
         DOCSZIP=`pwd`/$(location docs.zip)
         pushd $(location _build/html)/../
         zip -q -r $${DOCSZIP} html
-	popd
+        popd
+        rm "$$(dirname $(location conf.py))"/api/*.rst
     """,
     local = 1,
 )

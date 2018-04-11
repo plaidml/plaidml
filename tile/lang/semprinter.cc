@@ -215,6 +215,10 @@ void Print::Visit(const LimitConst& n) {
     emit("0");
     return;
   }
+  if (n.which == LimitConst::ONE) {
+    emit("1");
+    return;
+  }
   auto it = LimitConstLookup.find(std::make_pair(n.type, n.which));
   if (it == LimitConstLookup.end()) {
     throw std::runtime_error("Invalid type in LimitConst");

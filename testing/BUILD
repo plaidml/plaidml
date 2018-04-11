@@ -1,5 +1,5 @@
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_py_library", "plaidml_py_test", "run_as_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_py_library", "plaidml_py_test")
 
 package(default_visibility = ["//visibility:public"])
 

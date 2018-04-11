@@ -59,22 +59,6 @@ plaidml_cc_library(
     alwayslink = 1,
 )
 
-plaidml_cc_test(
-    name = "platform_test",
-    srcs = ["platform_test.cc"],
-    deps = [
-        ":local_machine",
-        "//base/config",
-        "//plaidml:proto_cc",
-        "//testing:plaidml_config",
-        "//tile/base:platform_test",
-        "//tile/hal/opencl",
-    ] + select({
-        "@toolchain//:windows_x86_64": [],
-        "//conditions:default": ["//tile/hal/cpu"],
-    }),
-)
-
 plaidml_cc_library(
     name = "placer",
     hdrs = ["placer.h"],

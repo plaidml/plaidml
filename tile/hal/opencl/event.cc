@@ -91,11 +91,16 @@ Event::Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& de
     : queue_{&queue},
       cl_ctx_{device_state->cl_ctx()},
       cl_event_{cl_event},
-      state_{std::make_shared<FutureState>()},
-      fut_{state_->prom.get_future().share()} {
+      state_{std::make_shared<FutureState>()} {
   state_->result = result;
   if (!cl_event_) {
     state_->prom.set_value(state_->result);
+  }
+}
+
+Event::~Event() {
+  if (cl_event_ && !started_) {
+    state_->prom.set_value(std::shared_ptr<hal::Result>());
   }
 }
 
@@ -112,6 +117,9 @@ boost::shared_future<std::shared_ptr<hal::Result>> Event::GetFuture() {
       // -- but it's nice to be explicit and careful with our
       // synchronization.
       std::lock_guard<std::mutex> lock{state_->mu};
+      if (!fut_.valid()) {
+        fut_ = state_->prom.get_future().share();
+      }
       state_->self = state_;
     }
 

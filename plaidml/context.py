@@ -25,7 +25,7 @@ class Context(object):
             '@type': 'type.vertex.ai/vertexai.eventing.file.proto.EventLog',
             'filename': filename
         }
-        self._set_eventlog(self, json.dumps(config))
+        self._set_eventlog(self, json.dumps(config).encode())
 
     def shutdown(self):
         if hasattr(self, '_free') and self._as_parameter_:

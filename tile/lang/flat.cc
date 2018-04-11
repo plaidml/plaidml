@@ -138,7 +138,7 @@ std::string FlatContraction::toString() const {
     for (size_t i = 0; i < c.lhs.size(); i++) {
       ss << c.lhs[i] << (i + 1 == c.lhs.size() ? ')' : ',');
     }
-    ss << c.rhs << std::endl;
+    ss << " <= " << c.rhs << std::endl;
   }
   return ss.str();
 }

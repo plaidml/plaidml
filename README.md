@@ -30,7 +30,7 @@ For background and early benchmarks see our [blog post](http://vertex.ai/blog/an
   * Adds a shared generic op library in python to make creating frontends easier
      * plaidml-keras now uses this library
   * Uses [plaidml/toolchain](https://github.com/plaidml/toolchain) for builds
-     * Building for ARM is now simple (–-config=linux_arm_32v7)
+     * Building for ARM easy (–-config=linux_arm_32v7)
   * Various fixes for bugs (#89)
 
 

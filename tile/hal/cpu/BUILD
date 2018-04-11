@@ -52,11 +52,7 @@ plaidml_cc_library(
     copts = [
         "-D__STDC_LIMIT_MACROS",
         "-D__STDC_CONSTANT_MACROS",
-    ] + select({
-        "@toolchain//:linux_arm_32v7": [],
-        "@toolchain//:linux_arm_64v8": [],
-        "//conditions:default": ["-DENABLE_CPU_DEVICE"],
-    }),
+    ],
     linkopts = select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": ["-ldl"],
@@ -89,6 +85,16 @@ plaidml_cc_test(
     deps = [
         ":cpu",
         "//base/util",
+    ],
+)
+
+plaidml_cc_test(
+    name = "platform_test",
+    srcs = ["platform_test.cc"],
+    tags = ["llvm"],
+    deps = [
+        ":cpu",
         "//tile/base:platform_test",
+        "//tile/platform/local_machine",
     ],
 )

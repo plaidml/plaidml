@@ -1,19 +1,15 @@
 // Copyright 2017, Vertex.AI. CONFIDENTIAL
 
 #include <gmock/gmock.h>
-#include <half.hpp>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 
-#include "tile/base/platform_test.h"
+#include <half.hpp>
+
 #include "tile/hal/cpu/emitllvm.h"
 #include "tile/hal/cpu/runtime.h"
 #include "tile/lang/sembuilder.h"
 #include "tile/lang/semtree.h"
-
-#define CATCH_CONFIG_RUNNER
-#include "base/util/catch.h"
-#include "base/util/logging.h"
 
 using ::testing::Eq;
 using ::testing::Ne;
@@ -359,13 +355,12 @@ TEST(CpuDevice, LLVM_rounding_builtins) {
 }
 
 TEST(CpuDevice, LLVM_half_float_vec) {
-  using namespace sem::builder; // NOLINT
+  using namespace sem::builder;  // NOLINT
   typedef half_float::half half;
-  for (size_t vecwidth: std::vector<size_t>{1, 2, 4, 8}) {
+  for (size_t vecwidth : std::vector<size_t>{1, 2, 4, 8}) {
     sem::Type type{sem::Type::POINTER_MUT, lang::DataType::FLOAT16, vecwidth};
-    auto f = _Function("kernel", voidType, {{type, "a"}, {type, "b"}, {type, "out"}}, {
-      _("out")[_Const(0)] = _("out")[_Const(0)] + _("a")[_Const(0)] * _("b")[_Const(0)]
-    });
+    auto f = _Function("kernel", voidType, {{type, "a"}, {type, "b"}, {type, "out"}},
+                       {_("out")[_Const(0)] = _("out")[_Const(0)] + _("a")[_Const(0)] * _("b")[_Const(0)]});
     auto engine = JIT(*f);
     EXPECT_THAT(engine, NotNull());
     auto kernel = (void (*)(half*, half*, half*))engine->getFunctionAddress("kernel");
@@ -381,20 +376,17 @@ TEST(CpuDevice, LLVM_half_float_vec) {
 }
 
 TEST(CpuDevice, LLVM_vec_add_loop) {
-  using namespace sem::builder; // NOLINT
+  using namespace sem::builder;  // NOLINT
   sem::Type float4{sem::Type::VALUE, lang::DataType::FLOAT32, 4};
   sem::Type ptrFloat4{sem::Type::POINTER_MUT, lang::DataType::FLOAT32, 4};
-  auto f = _Function("kernel", voidType,
-        {{int32Type, "group_id"}, {ptrFloat4, "C"}, {ptrFloat4, "A"}, {ptrFloat4, "B"}}, {
-    _Declare(int32Type, "i1_i2_gid", _("group_id") * _Const(2)),
-    _For("i1_i2_lid", 2, 1, _Block({
-      _Declare(int32Type, "gout_idx", _("i1_i2_gid") + _("i1_i2_lid")),
-      _Declare(float4, "LA", _("A")[_("gout_idx")]),
-      _Declare(float4, "LB", _("B")[_("gout_idx")]),
-      _Declare(float4, "LC", _Cast(float4, _("LA")) + _Cast(float4, _("LB"))),
-      _("C")[_("gout_idx")] = _("LC")
-    }))
-  });
+  auto f = _Function(
+      "kernel", voidType, {{int32Type, "group_id"}, {ptrFloat4, "C"}, {ptrFloat4, "A"}, {ptrFloat4, "B"}},
+      {_Declare(int32Type, "i1_i2_gid", _("group_id") * _Const(2)),
+       _For("i1_i2_lid", 2, 1,
+            _Block({_Declare(int32Type, "gout_idx", _("i1_i2_gid") + _("i1_i2_lid")),
+                    _Declare(float4, "LA", _("A")[_("gout_idx")]), _Declare(float4, "LB", _("B")[_("gout_idx")]),
+                    _Declare(float4, "LC", _Cast(float4, _("LA")) + _Cast(float4, _("LB"))),
+                    _("C")[_("gout_idx")] = _("LC")}))});
   auto engine = JIT(*f);
   EXPECT_THAT(engine, NotNull());
   auto kernel = (void (*)(int32_t, float*, float*, float*))engine->getFunctionAddress("kernel");
