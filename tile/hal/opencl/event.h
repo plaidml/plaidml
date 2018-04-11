@@ -41,6 +41,8 @@ class Event final : public hal::Event {
   Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& device_state, CLObj<cl_event> cl_event,
         const DeviceState::Queue& queue, const std::shared_ptr<hal::Result>& result);
 
+  ~Event() final;
+
   boost::shared_future<std::shared_ptr<hal::Result>> GetFuture() final;
 
  private:
