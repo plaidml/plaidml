@@ -97,3 +97,13 @@ plaidml_cc_library(
     }),
     alwayslink = 1,
 )
+
+plaidml_cc_test(
+    name = "platform_test",
+    srcs = ["platform_test.cc"],
+    deps = [
+        ":opencl",
+        "//tile/base:platform_test",
+        "//tile/platform/local_machine",
+    ],
+)

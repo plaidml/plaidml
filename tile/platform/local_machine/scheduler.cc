@@ -38,6 +38,9 @@ InputDepUpdater::InputDepUpdater(AllocPtr allocp, StepPtr stepp,
 
 void InputDepUpdater::Visit(const TmpAlloc& tmp_alloc) {
   if ((*allocp_)->byte_size) {
+    if (!latest_tmp_writer_->count(allocp_)) {
+      throw error::Internal{std::string{"Program fails to initialize non-empty temporary for alloc a"} + std::to_string((*allocp_)->idx)};
+    }
     IVLOG(5, "  Adding input dep for a" << (*allocp_)->idx << " on last writer s" << (*stepp_)->idx);
     (*stepp_)->deps.insert(latest_tmp_writer_->at(allocp_));
   }

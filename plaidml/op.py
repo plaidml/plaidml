@@ -838,7 +838,7 @@ class Gemm(tile.Operation):
             tile.common_dtype(a.shape.dtype, b.shape.dtype, c.shape.dtype),
             tile.broadcast_dims((
                 a.shape.dims[1] if transA else a.shape.dims[0],
-                b.shape.dims[0] if transB else a.shape.dims[1],
+                b.shape.dims[0] if transB else b.shape.dims[1],
             ), c.shape.dims))
 
         super(Gemm, self).__init__(code, [('A', a), ('B', b), ('C', c)], [('O', outshape)])

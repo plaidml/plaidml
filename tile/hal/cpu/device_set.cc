@@ -14,11 +14,7 @@ namespace tile {
 namespace hal {
 namespace cpu {
 
-DeviceSet::DeviceSet() : host_memory_{new Memory} {
-#if ENABLE_CPU_DEVICE
-    devices_.emplace_back(new Device);
-#endif // ENABLE_CPU_DEVICE
-}
+DeviceSet::DeviceSet() : host_memory_{new Memory} { devices_.emplace_back(new Device); }
 
 const std::vector<std::shared_ptr<hal::Device>>& DeviceSet::devices() { return devices_; }
 

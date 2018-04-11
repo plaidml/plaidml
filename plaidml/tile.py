@@ -445,11 +445,12 @@ class _SliceOf(Operation):
             return 1, 1, None, key[idx], extra_vars
 
         def check(val):
-            if isinstance(val, int):
+            if isinstance(val, six.integer_types):
                 return
             if val is None:
                 return
-            raise ValueError('Must use ints when slicing; received {}'.format(val))
+            raise ValueError('Must use ints when slicing; received {} of type {}'.format(
+                val, val.__class__.__name__))
 
         check(key[idx].start)
         check(key[idx].stop)

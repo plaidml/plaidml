@@ -122,15 +122,6 @@ cp %s $(@D)
         }),
     )
 
-def run_as_test(name, target, cmd, data=[], **kwargs):
-    native.genrule(
-        name=name + "_sh",
-        output_to_bindir=1,
-        outs=[name + ".sh"],
-        cmd="echo 'exec " + ' '.join(cmd) + "' > $@")
-    data = data + [target]
-    native.sh_test(name=name, srcs=[":" + name + "_sh"], data=data, **kwargs)
-
 def plaidml_cp(name, files):
     native.genrule(
         name=name,

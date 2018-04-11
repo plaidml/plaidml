@@ -53,6 +53,8 @@ plaidml_cc_library(
         "@minizip_repo//:minizip",
     ] + select({
         "@toolchain//:windows_x86_64": [],
+        "@toolchain//:linux_arm_32v7": [],
+        "@toolchain//:linux_arm_64v8": [],
         "//conditions:default": ["//tile/hal/cpu"],
     }),
 )
@@ -178,6 +180,8 @@ genrule(
     name = "experimental_json",
     srcs = select({
         "@toolchain//:windows_x86_64": ["experimental.no_llvm.json"],
+        "@toolchain//:linux_arm_32v7": ["experimental.no_llvm.json"],
+        "@toolchain//:linux_arm_64v8": ["experimental.no_llvm.json"],
         "//conditions:default": ["experimental.llvm.json"],
     }),
     outs = ["experimental.json"],

@@ -12,13 +12,46 @@ class ScheduleRunner final : private StepVisitor {
  public:
   static boost::future<std::vector<std::shared_ptr<hal::Result>>> Run(const context::Context& ctx, RunRequest* req) {
     ScheduleRunner runner{ctx, req};
-    runner.deps_.resize(req->program()->schedule().steps.size());
-    for (const auto& step : req->program()->schedule().steps) {
-      IVLOG(1, "Queueing s" << step->idx << ": " << *step);
-      step->Accept(&runner);
+    auto size = req->program()->schedule().steps.size();
+    runner.deps_.resize(size);
+    std::vector<std::shared_ptr<hal::Event>> terminal_deps;
+    terminal_deps.reserve(size);  // Pre-allocate for the worst case.
+    try {
+      for (const auto& step : req->program()->schedule().steps) {
+        IVLOG(1, "Queueing s" << step->idx << ": " << *step);
+        step->Accept(&runner);
+      }
+    } catch (...) {
+      req->shim()->SetLaunchException(std::current_exception());
     }
 
-    return req->program()->devinfo()->dev->executor()->WaitFor(runner.deps_);
+    boost::future<std::vector<std::shared_ptr<hal::Result>>> results;
+
+    if (!runner.dep_set_.size()) {
+      results = boost::make_ready_future<std::vector<std::shared_ptr<hal::Result>>>();
+    } else {
+      for (const auto& dep : runner.dep_set_) {
+        terminal_deps.emplace_back(dep);
+      }
+      results = req->program()->devinfo()->dev->executor()->WaitFor(terminal_deps);
+    }
+    if (ctx.is_logging_events() || VLOG_IS_ON(1)) {
+      // We want to return results for *all* of the steps.
+      std::vector<boost::shared_future<std::shared_ptr<hal::Result>>> dep_futures;
+      for (const auto& dep : runner.deps_) {
+        dep_futures.emplace_back(dep->GetFuture());
+      }
+      results = results.then([dep_futures=std::move(dep_futures)](boost::future<std::vector<std::shared_ptr<hal::Result>>> r) {
+        r.get();
+        // N.B. All of the step futures should be ready.
+        std::vector<std::shared_ptr<hal::Result>> results;
+        for (auto& dep : dep_futures) {
+          results.push_back(dep.get());
+        }
+        return results;
+      });
+    }
+    return results;
   }
 
  private:
@@ -48,6 +81,10 @@ class ScheduleRunner final : private StepVisitor {
       chunk->deps()->AddReadDependency(event);
     }
     req_->AddKernelInfo(run.kidx, event);
+    dep_set_.insert(event);
+    for (const auto& dep : deps) {
+      dep_set_.erase(dep);
+    }
     deps_[run.idx] = std::move(event);
   }
 
@@ -59,6 +96,10 @@ class ScheduleRunner final : private StepVisitor {
                                                                    to_chunk->hal_buffer(), 0, copy.byte_count, deps);
     if (copy.to.add_dep) {
       to_chunk->deps()->AddReadDependency(event);
+    }
+    dep_set_.insert(event);
+    for (const auto& dep : deps) {
+      dep_set_.erase(dep);
     }
     deps_[copy.idx] = std::move(event);
   }
@@ -82,6 +123,7 @@ class ScheduleRunner final : private StepVisitor {
   context::Context ctx_;
   RunRequest* req_;
   std::vector<std::shared_ptr<hal::Event>> deps_;
+  std::set<std::shared_ptr<hal::Event>> dep_set_;
 };
 
 }  // namespace
@@ -105,6 +147,10 @@ boost::future<void> RunRequest::Run(const context::Context& ctx, const Program* 
       results = ScheduleRunner::Run(queueing.ctx(), &req);
     } catch (...) {
       req.shim()->SetLaunchException(std::current_exception());
+      // If this happens, it's probably an OOM.
+      // TODO: Synchronize with the HAL to ensure all ongoing activity is complete,
+      // so that we can safely release any memory we're holding onto.
+      return boost::make_ready_future();
     }
     complete = req.LogResults(queueing.ctx(), std::move(results));
   }
