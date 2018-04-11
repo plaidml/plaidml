@@ -23,7 +23,7 @@ before_install:
   - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
-  - pip install tensorflow theano setuptools h5py
+  - pip install tensorflow theano setuptools h5py click
   - git clone http://github.com/plaidml/plaidbench  
 
 install:
