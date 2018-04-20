@@ -524,6 +524,89 @@ void SummarizeSchedule(hal::proto::CompilationInfo* cinfo, const tile::proto::Pr
   IVLOG(1, "Total memory required: " << allocs.total_bytes << " bytes");
 }
 
+
+void ScheduleToProto(proto::Schedule* pb, const Schedule& schedule) {
+  
+  class AllocToProtoVisitor final : public AllocVisitor {
+   public:
+    explicit AllocToProtoVisitor(proto::Schedule* pb) : pb_{pb} {}
+
+    void Visit(const TmpAlloc& tmp_alloc) final {
+      auto alloc = AddAlloc(tmp_alloc);
+      if (tmp_alloc.location == TmpAlloc::ON_DEVICE) {
+        alloc->mutable_tmp()->mutable_dev();
+      } else {
+        alloc->mutable_tmp()->mutable_host();
+      }
+    }
+
+    void Visit(const ProgramInputAlloc& input_alloc) final {
+      auto alloc = AddAlloc(input_alloc);
+      alloc->set_input(input_alloc.name);
+    }
+
+    void Visit(const ProgramOutputAlloc& output_alloc) final {
+      auto alloc = AddAlloc(output_alloc);
+      alloc->set_output(output_alloc.name);
+    }
+
+  private:
+    proto::Alloc* AddAlloc(const Alloc& alloc) {
+      auto pb = pb_->add_allocs();
+      pb->set_size(alloc.byte_size);
+      return pb;
+    }
+
+    proto::Schedule* pb_;
+  };
+
+  AllocToProtoVisitor alloc_to_proto(pb);
+
+  for (const auto& alloc : schedule.allocs) {
+    alloc->Accept(&alloc_to_proto);
+  }
+
+  class StepToProtoVisitor final : public StepVisitor {
+  public:
+    explicit StepToProtoVisitor(proto::Schedule* pb) : pb_{pb} {}
+
+    void Visit(const RunStep& run_step) final {
+      auto* run_pb = AddStep(run_step)->mutable_run();
+      run_pb->set_kidx(run_step.kidx);
+      for (const auto& output : run_step.outputs) {
+        run_pb->add_output_aidxs((*output.allocp)->idx);
+      }
+      for (const auto& input : run_step.inputs) {
+        run_pb->add_input_aidxs((*input)->idx);
+      }
+    }
+
+    void Visit(const CopyStep& copy_step) final {
+      auto copy_pb = AddStep(copy_step)->mutable_copy();
+      copy_pb->set_from_aidx((*copy_step.from)->idx);
+      copy_pb->set_to_aidx((*copy_step.to.allocp)->idx);
+      copy_pb->set_count_bytes(copy_step.byte_count);
+    }
+
+  private:
+    proto::Step* AddStep(const Step& step) {
+      auto pb = pb_->add_steps();
+      for (auto dep : step.deps) {
+        pb->add_deps((*dep)->idx);
+      }
+      return pb;
+    }
+
+    proto::Schedule* pb_;
+  };
+
+  StepToProtoVisitor step_to_proto(pb);
+
+  for (const auto& step : schedule.steps) {
+    step->Accept(&step_to_proto);
+  }
+}
+
 }  // namespace local_machine
 }  // namespace tile
 }  // namespace vertexai

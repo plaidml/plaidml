@@ -1,4 +1,4 @@
-.. image:: plaid-final.png
+.. image:: images/plaid-final.png
    :alt: The PlaidML Platypus
 
 *A framework for making deep learning work everywhere.*
@@ -25,7 +25,6 @@ alpha quality.
    Installing <installing>
    Building <building>
    Architecture Overview <overview>
-   Tile Op Tutorial <op_tutorial>
    API Reference <plaidml>
    Contributing <contributing>
 

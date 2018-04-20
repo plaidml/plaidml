@@ -1287,6 +1287,8 @@ class Prod(tile.Operation):
 
 
 def prod(value, axes=None, keepdims=False, floatx=plaidml.DType.FLOAT32):
+    if isinstance(value, (tuple, list)):
+        return functools.reduce(lambda x, y: x * y, value)
     if not value.shape.ndims:
         return value
     if isinstance(axes, (tuple, list)) and not len(axes):

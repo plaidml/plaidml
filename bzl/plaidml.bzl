@@ -242,6 +242,7 @@ def _venv_wrapper_impl(ctx):
         output=ctx.outputs.executable,
         substitutions={
             "__BZL_MAIN__": main,
+            "__BZL_PYTHON__": ctx.attr.python,
             "__BZL_REQUIREMENTS__": requirements,
             "__BZL_VENV_ARGS__": venv_args,
             "__BZL_WORKSPACE__": ctx.workspace_name,
@@ -265,6 +266,7 @@ venv_wrapper = rule(
             allow_files = True,
             single_file = True,
         ),
+        "python": attr.string(default = "python2"),
     },
     executable = True,
     implementation = _venv_wrapper_impl,
@@ -276,6 +278,7 @@ def plaidml_py_binary(name,
                       requirements="requirements.txt",
                       data=[],
                       venv_args=[],
+                      python="python2",
                       **kwargs):
     if main == None:
         main = name + ".py"
@@ -283,6 +286,7 @@ def plaidml_py_binary(name,
     venv_wrapper(
         name=venv,
         main=main,
+        python=python,
         requirements=requirements,
         venv_args=venv_args,
     )
@@ -300,6 +304,7 @@ def plaidml_py_test(name,
                     requirements="requirements.txt",
                     data=[],
                     venv_args=[],
+                    python="python2",
                     **kwargs):
     if main == None:
         main = name + ".py"
@@ -307,6 +312,7 @@ def plaidml_py_test(name,
     venv_wrapper(
         name=venv,
         main=main,
+        python=python,
         requirements=requirements,
         venv_args=venv_args,
     )
