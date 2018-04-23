@@ -977,7 +977,7 @@ def compose(ctx, dev, inputs, outputs, updates=None):
         updates ([(original, updated)]): A list of updates to perform (side-effects).
 
     Returns:
-        plaidml.Invoker: The composed TILE function.
+        plaidml._Function: The composed TILE function.
     """
     bindings = _OpBindings(ctx, dev)
     to_be_bound = [val for _, val in outputs]

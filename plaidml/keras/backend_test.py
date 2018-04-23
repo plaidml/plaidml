@@ -501,6 +501,10 @@ class TestBackendOps(unittest.TestCase):
     def testProd(self, b):
         return b.prod(b.variable(m(3, 3)))
 
+    @compareForwardClose()
+    def testProdOfShape(self, b):
+        return b.prod(b.shape(b.variable(m(2, 3, 4))))
+
     # TODO(T1026): Switch to opTest once PROD AggregationOp supports derivatives
     @compareForwardExact()
     def testProdKeepdims(self, b):

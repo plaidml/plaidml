@@ -182,8 +182,12 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
     SummarizeSchedule(&cinfo, program, kernel_list_, schedule_);
     *(cinfo.mutable_program()) = std::move(program);
     activity.AddMetadata(cinfo);
-  } else {
-    SummarizeSchedule(nullptr, program, kernel_list_, schedule_);
+    proto::Schedule sched_pb;
+    ScheduleToProto(&sched_pb, schedule_);
+    for (auto kernel : kernel_list_.kernels) {
+      sched_pb.add_knames(kernel.kname);
+    }
+    activity.AddMetadata(sched_pb);
   }
 
   ValidateSchedule(program, kernel_list_, schedule_);
