@@ -61,13 +61,13 @@ Areas for Contribution
 
   * PlaidML welcomes implementations for currently unimplemented operations as well as Tile code
     for novel operations supported by research.
-  * Please read the `Tile Tutorial <https://github.com/plaidml/plaidml/wiki/Tile-Tutorial>`_ and the `PlaidML Op Tutorial <https://github.com/plaidml/plaidml/wiki/PlaidML-Op-Tutorial>`_ 
+  * Please read the :doc:`adding_ops` and :doc:`writing_tile_code` tutorials
 
 * ML Framework Frontends (e.g., Keras, Pytorch, etc)
 
   * PlaidML welcomes integrations with any established ML framework or interop (NNVM, ONNX, etc)
-  * Currently this involves duplicating tile operations. We will eventually abstract common NN tile operations
-    into a separate C++ library to ease backend development.
+  * You can find commonly used operations in the :doc:`api/plaidml.op` module
+  * Please read the :doc:`building_a_frontend` tutorial.
 
 * HALs for Backend Targets (OpenCL, Vulkan, SPIR-V, HVX, etc)
 
@@ -76,3 +76,12 @@ Areas for Contribution
 
 Please follow the process above before embarking on anything major (like integrating a new frontend or backend).
 
+Tutorials
+---------
+
+.. toctree::
+   :maxdepth: 1
+
+   adding_ops
+   building_a_frontend
+   writing_tile_code

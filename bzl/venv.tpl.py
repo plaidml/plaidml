@@ -13,6 +13,7 @@ MAIN = "__BZL_MAIN__"
 REQUIREMENTS = ["__BZL_REQUIREMENTS__"]
 VENV_ARGS = __BZL_VENV_ARGS__
 WORKSPACE = "__BZL_WORKSPACE__"
+PYTHON = "__BZL_PYTHON__"
 
 
 def _find_in_runfiles(logical_name):
@@ -59,9 +60,9 @@ class VirtualEnv(object):
                 if platform.system() == 'Windows':
                     vpython = []
                 else:
-                    vpython = ['-p', 'python2']
+                    vpython = ['-p', PYTHON]
                 check_call(['virtualenv'] + vpython + VENV_ARGS + [self._path])
-                if platform.system() == 'Darwin':
+                if platform.system() == 'Darwin' and PYTHON == 'python2':
                     check_call([
                         self.python, self._pip, 'install',
                         'git+https://github.com/gldnspud/virtualenv-pythonw-osx.git'
@@ -71,9 +72,7 @@ class VirtualEnv(object):
                         os.path.join(self._venv_bin, 'fix-osx-virtualenv'), self._path
                     ])
                 for requirement in self._requirements:
-                    check_call(
-                        [self._pip, 'install', '-r',
-                         _find_in_runfiles(requirement)])
+                    check_call([self._pip, 'install', '-r', _find_in_runfiles(requirement)])
         except:
             if os.path.exists(self._path):
                 shutil.rmtree(self._path)

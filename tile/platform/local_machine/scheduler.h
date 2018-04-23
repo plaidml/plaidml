@@ -5,6 +5,7 @@
 #include <string>
 
 #include "tile/lang/generate.h"
+#include "tile/platform/local_machine/local_machine.pb.h"
 #include "tile/platform/local_machine/schedule.h"
 #include "tile/proto/hal.pb.h"
 
@@ -55,6 +56,9 @@ void ValidateSchedule(const tile::proto::Program& program, const lang::KernelLis
 // alloc_sizes fields based on the schedule.
 void SummarizeSchedule(hal::proto::CompilationInfo* cinfo, const tile::proto::Program& program,
                        const lang::KernelList& kl, const Schedule& schedule);
+
+// Serializes a schedule to a protocol buffer.
+void ScheduleToProto(proto::Schedule* pb, const Schedule& schedule);
 
 }  // namespace local_machine
 }  // namespace tile

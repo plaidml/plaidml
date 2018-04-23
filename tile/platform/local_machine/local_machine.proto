@@ -15,3 +15,52 @@ message Platform {
   repeated google.protobuf.Any hals = 1;
   repeated vertexai.tile.hal.proto.HardwareConfig hardware_configs = 2;
 }
+
+message HostMem {}
+
+message DevMem {}
+
+message Temporary {
+  oneof loc {
+    HostMem host = 1;
+    DevMem dev = 2;
+  }
+}
+
+message Alloc {
+  uint64 size = 1;
+
+  oneof binding {
+    Temporary tmp = 2;
+    string input = 3;
+    string output = 4;
+  }
+}
+
+message RunStep {
+  uint64 kidx = 1;
+  repeated uint64 output_aidxs = 2;
+  repeated uint64 input_aidxs = 3;
+}
+
+message CopyStep {
+  uint64 from_aidx = 1;
+  uint64 from_offset = 2;
+  uint64 to_aidx = 3;
+  uint64 to_offset = 4;
+  uint64 count_bytes = 5;
+}
+
+message Step {
+  repeated uint64 deps = 1;
+  oneof action {
+    RunStep run = 2;
+    CopyStep copy = 3;
+  }
+}
+
+message Schedule {
+  repeated string knames = 1;
+  repeated Alloc allocs = 2;
+  repeated Step steps = 3;
+}

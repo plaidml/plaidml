@@ -4,8 +4,8 @@ package(default_visibility = ["//visibility:public"])
 
 filegroup(
     name = "docsimages",
-    srcs = glob(["*png"]),
-    path = "docs"
+    srcs = glob(["images/*png"]),
+    path = "docs/images"
 )
 genrule(
     name = "docs",
@@ -29,8 +29,8 @@ genrule(
           echo 'Unable to enter virtual python environment'
           exit 1
         fi
-        mkdir -p $(location _build/html)/docs
-        cp -r $(locations :docsimages) $(location _build/html)/docs
+        mkdir -p $(location _build/html)/docs/images
+        cp -r $(locations :docsimages) $(location _build/html)/docs/images
         python -m pip install -r $(location requirements.txt)
         PLANTUMLSH="java -jar `pwd`/$(location @plantuml_jar//file)"  python -m sphinx -a -E -b html -c $$(dirname $(location conf.py)) $$(dirname $(location conf.py)) $(location _build/html)
         DOCSZIP=`pwd`/$(location docs.zip)
