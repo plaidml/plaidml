@@ -26,6 +26,7 @@ alpha quality.
    Building <building>
    Architecture Overview <overview>
    API Reference <plaidml>
+   life-of-a-tile-function
    Contributing <contributing>
 
 License
