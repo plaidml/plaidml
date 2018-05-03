@@ -40,10 +40,8 @@ plaidml-setup
 You can test your installation by running MobileNet in [plaidbench](https://github.com/plaidml/plaidbench):
 (Remember to use sudo -H if you're not using a Virtualenv)
 ```
-git clone https://github.com/plaidml/plaidbench.git
-cd plaidbench
-pip install -r requirements.txt
-python plaidbench.py mobilenet
+pip install plaidml-keras plaidbench
+plaidbench keras mobilenet
 ```
 
 You can adapt any Keras code by using the PlaidML backend instead of the TensorFlow, CNTK, or Theano backend that you 
@@ -56,4 +54,51 @@ import plaidml.keras
 plaidml.keras.install_backend()
 ```
 
+### macOS
 
+You need a computer listed on Apple's [compatibility list](https://support.apple.com/en-us/HT202823) as having OpenCL 1.2 support (most machines 2011 and later).
+
+Best practices for python include judicious usage of [Virtualenv](https://virtualenv.pypa.io/en/stable/), and we certainly recommend creating one just for plaidml:
+```
+virtualenv plaidml-venv
+. plaidml-venv/bin/activate
+```
+
+Install PlaidML with Keras:
+```
+pip install -U plaidml-keras
+```
+
+Next, setup PlaidML to use your preferred computing device:
+```
+plaidml-setup
+```
+
+PlaidML should now be installed! You can test your installation by running MobileNet in [plaidbench](https://github.com/plaidml/plaidbench):
+```
+pip install plaidml-keras plaidbench
+plaidbench keras mobilenet
+```
+
+### Windows
+
+These instructions assume Windows 10 without python installed; adapt accordingly. First install Chocolatey by starting an Administrator PowerShell and running
+```
+Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+```
+You likely will need to reboot your shell; then you can install Python:
+```
+choco install -y python git vcredist2015
+```
+
+You can now switch to an unpriviledged PowerShell to install and set up PlaidML with Keras:
+```
+pip install -U plaidml-keras
+plaidml-setup
+```
+
+PlaidML should now be installed! You can test your installation by running MobileNet in [plaidbench](https://github.com/plaidml/plaidbench):
+```
+pip install plaidml-keras plaidbench
+plaidbench keras mobilenet
+```
