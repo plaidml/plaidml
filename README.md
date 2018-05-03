@@ -1,21 +1,50 @@
-# PlaidML
+<img src="docs/images/plaid-final.png" height="200"></img>
+
+*A platform for making deep learning work everywhere.*
+
 [![Build Status](https://travis-ci.org/plaidml/plaidml.svg?branch=master)](https://travis-ci.org/plaidml/plaidml)
 
-![The PlaidML Platypus](docs/plaid-final.png)
-*A framework for making deep learning work everywhere.*
+PlaidML is the *easiest, fastest* way to learn and deploy deep learning on any device, especially those running macOS or Windows:
+  * **Fastest:** PlaidML is often 10x faster (or more) than popular platforms (like TensorFlow CPU) because it supports all GPUs, *independent of make and model*. 
+    * PlaidML accelerates deep learning on AMD, Intel, NVIDIA, ARM, and embedded GPUs.
+  * **Easiest:** PlaidML is simple to [install](docs/installing.md) and supports *Keras, ONNX*
+  * **Free:** PlaidML is completely open source and doesn't rely on any vendor libraries with proprietary and restrictive licenses.
 
-PlaidML is a multi-language acceleration framework that: 
+For most platforms, getting started with accelerated deep learning is as easy as running a few commands (assuming you have Python (v2 or v3) installed (if this doesn't work, see the [installation instructions](docs/installing.md)):
+```
+virtualenv plaidml
+source plaidml/bin/activate
+pip install plaidml-keras plaidbench
+```
+Choose which accelerator you'd like to use (many computers, especially laptops, have multiple):
+```
+plaidml-setup
+```
+
+Next, try benchmarking MobileNet inference performance:
+```
+plaidbench keras mobilenet
+```
+Or, try training MobileNet:
+```
+plaidbench --batch-size 16 keras --train mobilenet
+```
+
+
+# About PlaidML
+
+PlaidML is a multi-language acceleration platform that: 
   
   * Enables practitioners to deploy high-performance neural nets on any device
   * Allows hardware developers to quickly integrate with high-level frameworks
   * Allows framework developers to easily add support for many kinds of hardware
-  * Works on all major platforms - linux, [macOS](http://vertex.ai/blog/plaidml-mac-preview), [Windows](http://vertex.ai/blog/deep-learning-for-everyone-plaidml-for-windows)
-  * Allows developers to create hardware accelerated, novel, performance portable research kernes.
+  * Works on all major platforms — Linux, [macOS](http://vertex.ai/blog/plaidml-mac-preview), [Windows](http://vertex.ai/blog/deep-learning-for-everyone-plaidml-for-windows)
+  * Allows developers to create hardware accelerated, novel, performance portable research kernels.
 
 For examples and benchmarks, see our [blog](http://vertex.ai/blog).
 
 - [Documentation](https://vertexai-plaidml.readthedocs-hosted.com/)
-- [Installation Instructions](#installation-instructions)
+- [Installation Instructions](docs/installing.md)
 - [Building PlaidML](docs/building.md)
 - [Contributing](docs/contributing.rst)
 - [Reporting Issues](#reporting-issues)
@@ -43,7 +72,7 @@ Vertex.AI runs a comprehensive set of tests for each release against these hardw
     * RX 480
     * Vega 10
   * NVIDIA
-    * K80, GTX 780
+    * K80, GTX 780, GT 640M
     * GTX 1070, 1050
   * Intel
     * HD4000
@@ -54,74 +83,20 @@ We support all of the Keras application networks from current versions of 2.x. V
 correctness as part of our continuous integration system.
 
  * CNNs
-   * inception_v3
-   * resnet50
-   * vgg19
-   * xception
-   * mobilenet
-   * densenet
-   * shufflenet
+   * Inception v3
+   * ResNet50
+   * VGG19
+   * Xception
+   * MobileNet
+   * DenseNet
+   * ShuffleNet
 
  * LSTM
    * examples/imdb_lstm.py (from keras)
 
 ## Installation Instructions
 
-### Ubuntu Linux
-If necessary, install Python's 'pip' tool.
-```
-sudo add-apt-repository universe && sudo apt update
-sudo apt install python-pip
-```
-Make sure your system has OpenCL.
-```
-sudo apt install clinfo
-clinfo
-```
-If clinfo reports "Number of platforms" == 0, you must install a driver.
-
-If you have an NVIDIA graphics card:
-```
-sudo add-apt-repository ppa:graphics-drivers/ppa && sudo apt update
-sudo apt install nvidia-modprobe nvidia-384 nvidia-opencl-icd-384 libcuda1-384
-```
-If you have an AMD card, [download the AMDGPU PRO driver and install](http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Driver-for-Linux-Release-Notes.aspx) according to AMD's instructions.
-
-Best practices for python include judicious usage of [Virtualenv](https://virtualenv.pypa.io/en/stable/), and we certainly recommend creating one just for plaidml:
-```
-virtualenv plaidml-venv
-source ./plaidml-venv/bin/activate
-pip install -U plaidml-keras
-```
-
-Alternatively, install the PlaidML wheels system-wide:
-```
-sudo -H pip install -U plaidml-keras
-```
-
-Next, setup PlaidML to use your preferred computing device:
-```
-plaidml-setup
-```
-
-You can test your installation by running MobileNet in [plaidbench](https://github.com/plaidml/plaidbench):
-(Remember to use sudo -H if you're not using a Virtualenv)
-```
-git clone https://github.com/plaidml/plaidbench.git
-cd plaidbench
-pip install -r requirements.txt
-python plaidbench.py mobilenet
-```
-
-You can adapt any Keras code by using the PlaidML backend instead of the TensorFlow, CNTK, or Theano backend that you 
-normally use.
-
-Simply insert this code **BEFORE you `import keras`**:
-```
-# Install the plaidml backend
-import plaidml.keras
-plaidml.keras.install_backend()
-```
+See detailed per platform instructions [here](docs/installing.md).
 
 ### Plaidvision and Plaidbench
 
