@@ -41,7 +41,7 @@ PlaidML is a multi-language acceleration platform that:
   * Works on all major platforms — Linux, [macOS](http://vertex.ai/blog/plaidml-mac-preview), [Windows](http://vertex.ai/blog/deep-learning-for-everyone-plaidml-for-windows)
   * Allows developers to create hardware accelerated, novel, performance portable research kernels.
 
-For examples and benchmarks, see our blog [blog](http://vertex.ai/blog).
+For examples and benchmarks, see our [blog](http://vertex.ai/blog).
 
 - [Documentation](https://vertexai-plaidml.readthedocs-hosted.com/)
 - [Installation Instructions](docs/installing.md)
