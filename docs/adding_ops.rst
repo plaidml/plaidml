@@ -14,13 +14,13 @@ It is often easiest to first write a simple case in Tile, for which PlaidML serv
 
 As our simple case for ``categorical_crossentropy``, we'll assume that the ``target`` and ``output`` tensors are 2 dimensional. In this case, the mathematical expression of categorical crossentropy is
 
-.. image:: docs/images/math-cat-xent-raw.png
+.. image:: images/math-cat-xent-raw.png
     :height: 60pt
     :alt: R[x] = sum_y -ln(O[x, y]) * T[x, y]
 
 A key feature of this formula is the summation over the index ``y``. In Tile, such operations cannot typically be performed on the same line as elementwise operations, so we will split this formula into three parts:
 
-.. image:: docs/images/math-cat-xent-split.png
+.. image:: images/math-cat-xent-split.png
     :height: 120pt
     :alt: LO[x, y] = ln(O[x, y]), Temp[x] = sum_y LO[x, y] * T[x, y], R[x] = -Temp[x].
 
