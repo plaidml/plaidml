@@ -24,11 +24,11 @@ We're ready to look at some Tile code! Here's an operation that takes the sum ov
 
 An operation such as this which merges together values across one or more indices is called a *contraction*. The syntax may look a bit odd at first, but it's related to summation notation. Below we show how this Tile code is related to the mathematical formula for the operation by using colors to highlight corresponding pieces:
 
-.. image:: docs/images/math-sum-0.png
+.. image:: images/math-sum-0.png
     :height: 70pt
     :alt: O[n] = sum_m I[m, n]
 
-.. image:: docs/images/code-sum-0.png
+.. image:: images/code-sum-0.png
     :height: 40pt
     :alt: O[n: N] = +(I[m, n]);
 
@@ -42,7 +42,7 @@ Matrix Multiplication
 
 Next we'll consider matrix multiplication. Let's look at the mathematical expression for the matrix multiplication ``C = AB`` written out in element-level detail:
 
-.. image:: docs/images/math-mat-mul.png
+.. image:: images/math-mat-mul.png
     :height: 60pt
     :alt: C[i, j] = sum_k(A[i, k] * B[k, j])
 
@@ -71,11 +71,11 @@ Taking the maximum over axis 0 looks very similar to taking the sum over axis 0.
 
 Again, this corresponds closely to mathematical notation:
 
-.. image:: docs/images/math-max-0.png
+.. image:: images/math-max-0.png
     :height: 60pt
     :alt: O[n] = max_m(I[m, n])
 
-.. image:: docs/images/code-max-0.png
+.. image:: images/code-max-0.png
     :height: 40pt
     :alt: O[n: N] = >(I[m, n]);
 
@@ -165,11 +165,11 @@ Something important to note here is that while we wrote ``j < 2``, this constrai
 
 We determined the Tile code for this example by starting from imperative code, but this Tile code is still very similar to mathematical notation, and we could have started there instead:
 
-.. image:: docs/images/math-pool-1D.png
+.. image:: images/math-pool-1D.png
     :height: 60pt
     :alt: O[i] = max_(0 <= j < 2)(I[2i + j])
 
-.. image:: docs/images/code-pool-1D.png
+.. image:: images/code-pool-1D.png
     :height: 30pt
     :alt: O[i: N / 2] = >(I[2 * i + j]), j < 2;
 
@@ -210,7 +210,7 @@ Cumulative Sum
 ==============
 Suppose we want to take the cumulative sum of a 1D tensor. That is, we want ``O[i]`` to be the sum of all input entries ``I[k]`` where ``k <= i``. In summation notation, this is
 
-.. image:: docs/images/math-cum-sum-raw.png
+.. image:: images/math-cum-sum-raw.png
     :height: 70pt
     :alt: O[i] = sum_(k <= i) I[k]
 
@@ -222,13 +222,13 @@ However, we can't use ``k <= i`` as a constraint in Tile; all the index variable
 
 Alternatively, we could write ``k = i - j`` for ``j`` non-negative as an alternative way of forcing ``k`` to be no larger than ``i``. Then in summation notation we have
 
-.. image:: docs/images/math-cum-sum-sub.png
+.. image:: images/math-cum-sum-sub.png
     :height: 70pt
     :alt: O[i] = sum_(0 <= j) I[i - j]
 
 and in Tile (noting that ``N`` is an upper bound for ``j`` that does not remove any valid indices)
 
-.. image:: docs/images/code-cum-sum-sub.png
+.. image:: images/code-cum-sum-sub.png
     :height: 30pt
     :alt: O[i: N] = +(I[i - j]), j < N;
 
@@ -250,7 +250,7 @@ Let's implement a 1D convolution with output size equal to input size. This is i
 
 Let's start with the mathematical formula for this operation:
 
-.. image:: docs/images/math-conv-1D-raw.png
+.. image:: images/math-conv-1D-raw.png
     :height: 70pt
     :alt: O[n, x, c_o] = sum_k sum_(c_i) I[n, x + k, c_i] * K[k, c_i, c_o]
 
@@ -267,11 +267,11 @@ This generally matches the given formula: The output ``O`` is given as a sum of 
 
 This formula directly translates to Tile, although note that ``padding='valid'`` means that the spatial dimension of the output will be reduced by one less than the kernel size relative to the spatial dimension of the input:
 
-.. image:: docs/images/math-conv-1D-color.png
+.. image:: images/math-conv-1D-color.png
     :height: 80pt
     :alt: O[n, x, c_o] = sum_k sum_(c_i) I[n, x + k, c_i] * K[k, c_i, c_o]
 
-.. image:: docs/images/code-conv-1D-color.png
+.. image:: images/code-conv-1D-color.png
     :height: 60pt
     :alt: function (I[N, L, CI], K[LK, CI, CO]) -> (O) {O[n, x, co: N, L - LK + 1, CO] = +(I[n, x + k, ci] * K[k, ci, co]);}
 
@@ -283,7 +283,7 @@ We can tweak this general formula for a convolution to add various features, suc
 
 The formula for this is very similar to the previous convolution; we just have an additional spatial dimension for each tensor, and the kernel offset index variables are multiplied by dilation scaling factors when used to determine indices for ``I``:
 
-.. image:: docs/images/math-dil-conv-2D.png
+.. image:: images/math-dil-conv-2D.png
     :height: 60pt
     :alt: O[n, x, y, c_o] = sum_(k_x) sum_(k_y) sum_(c_i) I[n, x + 2k_x, y + 3k_y, c_i] * K[k_x, k_y, c_i, c_o]
 
