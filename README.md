@@ -7,7 +7,7 @@
 PlaidML is the *easiest, fastest* way to learn and deploy deep learning on any device, especially those running macOS or Windows:
   * **Fastest:** PlaidML is often 10x faster (or more) than popular platforms (like TensorFlow CPU) because it supports all GPUs, *independent of make and model*. 
     * PlaidML accelerates deep learning on AMD, Intel, NVIDIA, ARM, and embedded GPUs.
-  * **Easiest:** PlaidML is simple to [install](docs/installing.md) and supports *Keras, ONNX*
+  * **Easiest:** PlaidML is simple to [install](docs/installing.md) and supports multiple frontends (Keras and ONNX currently)
   * **Free:** PlaidML is completely open source and doesn't rely on any vendor libraries with proprietary and restrictive licenses.
 
 For most platforms, getting started with accelerated deep learning is as easy as running a few commands (assuming you have Python (v2 or v3) installed (if this doesn't work, see the [installation instructions](docs/installing.md)):
