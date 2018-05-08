@@ -232,6 +232,20 @@ class Simplifier : public Visitor {
           new_expr_ = node.rhs;
         }
       }
+    } else if (node.op == "&") {
+      if (lhs_int_const && rhs_int_const) {
+        new_expr_ = std::make_shared<IntConst>(lhs_int_const->value & rhs_int_const->value);
+      } else if (lhs_int_const) {
+        if (lhs_int_const->value == 0) {
+          // Check for (0 & R), return (0)
+          new_expr_ = node.lhs;
+        }
+      } else if (rhs_int_const) {
+        if (rhs_int_const->value == 0) {
+          // Check for (L & 0), return (0)
+          new_expr_ = node.rhs;
+        }
+      }
     }
   }
 

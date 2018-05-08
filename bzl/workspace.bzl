@@ -1,4 +1,18 @@
+load("//vendor/cuda:configure.bzl", "configure_cuda")
+
 def plaidml_workspace():
+    native.git_repository(
+        name = "bazel_skylib",
+        remote = "https://github.com/bazelbuild/bazel-skylib.git",
+        tag = "0.3.1",
+    )
+
+    native.git_repository(
+        name = "build_bazel_rules_apple",
+        remote = "https://github.com/bazelbuild/rules_apple.git",
+        tag = "0.4.0",
+    )
+
     native.new_http_archive(
         name="boost_archive",
         url="https://dl.bintray.com/boostorg/release/1.66.0/source/boost_1_66_0.tar.gz",
@@ -54,13 +68,15 @@ def plaidml_workspace():
         name="opencl_headers_repo",
         commit="f039db6764d52388658ef15c30b2237bbda49803",
         remote="https://github.com/KhronosGroup/OpenCL-Headers.git",
-        build_file=str(Label("//bzl:opencl_headers.BUILD")))
+        build_file=str(Label("//bzl:opencl_headers.BUILD"))
+    )
 
     native.new_git_repository(
         name="opencl_icd_loader_repo",
         commit="6849f617e991e8a46eebf746df43032175f263b3",
         remote="https://github.com/KhronosGroup/OpenCL-ICD-Loader.git",
-        build_file=str(Label("//bzl:opencl_icd_loader.BUILD")))
+        build_file=str(Label("//bzl:opencl_icd_loader.BUILD"))
+    )
 
     native.new_http_archive(
         name="zlib_archive",
@@ -74,7 +90,8 @@ def plaidml_workspace():
         url="https://storage.googleapis.com/external_build_repo/llvm-3.8.1.src.tar.gz",
         sha256="ad4b83105ce7540c79c36d92ac903c990a665aca54c878a243e1200aab6c756a",
         build_file=str(Label("//bzl:llvm.BUILD")),
-        strip_prefix="llvm-3.8.1.src")
+        strip_prefix="llvm-3.8.1.src"
+    )
 
     native.http_file(
         name="plantuml_jar",
@@ -82,7 +99,15 @@ def plaidml_workspace():
         sha256="26d60e43c14106a3d220e33c2b2e073b2bce40b433ad3e5fa13c747f58e67ab6",
     )
 
+    native.new_git_repository(
+        name="mtlpp_repo",
+        commit="71a38f4e8bcf7a06bdb234cbe13c6299a9bb127e",
+        remote="https://github.com/naleksiev/mtlpp.git",
+        build_file=str(Label("//bzl:mtlpp.BUILD"))
+    )
+
     configure_protobuf()
+    configure_cuda(name = "cuda")
 
 def configure_protobuf():
     native.new_http_archive(
@@ -90,14 +115,16 @@ def configure_protobuf():
         url="https://github.com/google/protobuf/archive/v3.5.1.zip",
         sha256="1f8b9b202e9a4e467ff0b0f25facb1642727cdf5e69092038f15b37c75b99e45",
         strip_prefix="protobuf-3.5.1",
-        build_file=str(Label("//bzl:protobuf.BUILD")))
+        build_file=str(Label("//bzl:protobuf.BUILD"))
+    )
 
     native.new_http_archive(
         name="six_archive",
         url="https://bitbucket.org/gutworth/six/get/1.10.0.zip",
         sha256="016c8313d1fe8eefe706d5c3f88ddc51bd78271ceef0b75e0a9b400b6a8998a9",
         build_file=str(Label("//bzl:six.BUILD")),
-        strip_prefix="gutworth-six-e5218c3f66a2")
+        strip_prefix="gutworth-six-e5218c3f66a2"
+    )
 
     native.bind(
         name="six",

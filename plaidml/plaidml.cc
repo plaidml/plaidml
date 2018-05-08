@@ -1,16 +1,5 @@
 // Copyright Vertex.AI.
 
-// TODO: see T648.
-// We should prefer to use conditional compilation via multiple source files
-// instead of relying on #if.
-// Additionally, this file is starting to get largish.
-// It would be good to split up this file and move impl out of api.
-// Ideally api would be thin wrapper that pulls in impls from deeper modules.
-
-#ifdef __APPLE__
-#include "TargetConditionals.h"
-#endif  // defined(__APPLE__)
-
 #include "plaidml/plaidml.h"
 
 #include <zip.h>
@@ -32,25 +21,22 @@
 #include <utility>
 
 #include "base/config/config.h"
+#include "base/util/any_factory_map.h"
 #include "base/util/compat.h"
 #include "base/util/env.h"
 #include "base/util/error.h"
+#include "base/util/logging.h"
+#include "base/util/runfiles_db.h"
 #include "base/util/sync.h"
+#include "base/util/zipfile.h"
 #include "plaidml/base/base_cpp.h"
 #include "plaidml/base/context.h"
 #include "plaidml/base/status.h"
 #include "plaidml/base/status_strings.h"
-#include "tile/base/buffer.h"
-#include "tile/base/program_cache.h"
-#if TARGET_OS_IPHONE == 1
-#include "tile/dev/metal/platform.h"
-#endif  // TARGET_OS_IPHONE == 1
-#include "base/util/any_factory_map.h"
-#include "base/util/logging.h"
-#include "base/util/runfiles_db.h"
-#include "base/util/zipfile.h"
 #include "plaidml/plaidml.pb.h"
+#include "tile/base/buffer.h"
 #include "tile/base/lru_cache.h"
+#include "tile/base/program_cache.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/symbolic.h"
@@ -238,9 +224,6 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
     context::Activity activity{ctx->activity.ctx(), "vertexai::EnumerateDevices"};
     auto enumerator = vertexai::compat::make_unique<plaidml_device_enumerator>();
     enumerator->config_source = config_source;
-#if TARGET_OS_IPHONE == 1
-    enumerator->platform = std::make_shared<tile::metal::MetalPlatform>();
-#else   // TARGET_OS_IPHONE == 1
     plaidml::proto::Config config;
     try {
       config = vertexai::ParseConfig<plaidml::proto::Config>(configuration);
@@ -251,7 +234,6 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
     }
     enumerator->platform =
         vertexai::AnyFactoryMap<tile::Platform>::Instance()->MakeInstance(activity.ctx(), config.platform());
-#endif  // TARGET_OS_IPHONE == 1 ... else
     tile::proto::ListDevicesRequest req;
     tile::proto::ListDevicesResponse resp;
     enumerator->platform->ListDevices(activity.ctx(), req, &resp);

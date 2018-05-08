@@ -90,7 +90,7 @@ Event::Event(const context::Context& ctx, const std::shared_ptr<DeviceState>& de
              const DeviceState::Queue& queue, const std::shared_ptr<hal::Result>& result)
     : queue_{&queue},
       cl_ctx_{device_state->cl_ctx()},
-      cl_event_{cl_event},
+      cl_event_{std::move(cl_event)},
       state_{std::make_shared<FutureState>()} {
   state_->result = result;
   if (!cl_event_) {

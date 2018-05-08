@@ -303,9 +303,13 @@ class ScheduleValidator final : private StepVisitor {
     if (ainfo.program_input) {
       throw error::Internal{"Schedule specifies a write to an input tensor at s" + std::to_string(sidx_)};
     }
-    // All current accessors should be in the current step's
-    // transitive dependency set.
-    if (((transitive_deps_[sidx_] & ainfo.accessors) ^ ainfo.accessors).any()) {
+    // All current accessors should be in the current step's transitive dependency set.
+    // Note that we add the current step as a self-dependency in this check, to account for steps
+    // that reuse allocs for different temporaries.  TODO: Only add the self-dep for cases where codegen
+    // says it's okay to reuse an input alloc for an output.
+    auto deps = transitive_deps_[sidx_];
+    deps.set(sidx_);
+    if (((deps & ainfo.accessors) ^ ainfo.accessors).any()) {
       throw error::Internal{"Schedule writes a tensor to a live alloc at s" + std::to_string(sidx_)};
     }
     std::uint64_t tensor_size = kl_->types.at(new_contents).byte_size();
@@ -401,7 +405,7 @@ Schedule ToScheduleSteps(const tile::proto::Program& program, const lang::Kernel
   // given output.
   for (std::size_t kidx = 0; kidx < kl.kernels.size(); ++kidx) {
     for (const std::string& output : kl.kernels[kidx].outputs) {
-      tmps[output].last_output_kidx = kidx;
+      tmps.at(output).last_output_kidx = kidx;
     }
   }
 
@@ -414,14 +418,21 @@ Schedule ToScheduleSteps(const tile::proto::Program& program, const lang::Kernel
     // Add the inputs before adding the run step, in case we need to
     // copy inputs locally.
     for (const std::string& input : ki.inputs) {
-      run->inputs.emplace_back(tmps[input].allocp);
+      run->inputs.emplace_back(tmps.at(input).allocp);
     }
 
     // Add the outputs to the step.
     for (const std::string& output : ki.outputs) {
-      OutputInfo oi{tmps[output].allocp, false};
+      OutputInfo oi{tmps.at(output).allocp, false};
       if (program_outputs.count(output)) {
         oi.add_dep = true;
+      }
+      auto it = ki.safe_self_aliases.find(output);
+      if (it != ki.safe_self_aliases.end()) {
+        for (const std::string& safe_self_alias : it->second) {
+          const auto& renamed_alias = kl.var_rewrites.Lookup(safe_self_alias);          
+          (*oi.allocp)->safe_self_alias_allocs.emplace(tmps.at(renamed_alias).allocp);
+        }
       }
       run->outputs.emplace_back(oi);
     }

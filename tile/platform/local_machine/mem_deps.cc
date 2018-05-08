@@ -8,17 +8,15 @@ namespace vertexai {
 namespace tile {
 namespace local_machine {
 
-std::vector<std::shared_ptr<hal::Event>> MemDeps::GetReadDependencies() {
+void MemDeps::GetReadDependencies(std::vector<std::shared_ptr<hal::Event>>* deps) {
   std::lock_guard<std::mutex> lock{mu_};
   if (ep_) {
     std::rethrow_exception(ep_);
   }
-  std::vector<std::shared_ptr<hal::Event>> result;
-  result.reserve(events_.size());
+  deps->reserve(deps->size() + events_.size());
   for (const auto& evt : events_) {
-    result.emplace_back(evt);
+    deps->emplace_back(evt);
   }
-  return result;
 }
 
 void MemDeps::AddReadDependency(std::shared_ptr<hal::Event> event) {

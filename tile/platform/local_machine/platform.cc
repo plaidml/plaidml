@@ -8,9 +8,11 @@
 #include <memory>
 #include <utility>
 
-#include "base/util/any_factory_map.h"
+#include <boost/process/environment.hpp>
+
 #include "base/util/compat.h"
 #include "base/util/error.h"
+#include "base/util/factory.h"
 #include "base/util/logging.h"
 #include "base/util/type_url.h"
 #include "tile/hal/util/selector.h"
@@ -35,32 +37,19 @@ namespace {
 constexpr float kGoalMemPercentage = .85;
 
 void GetMemStrategy(const std::shared_ptr<DevInfo>& devinfo, Platform::PlatformDev* pd) {
-  if (devinfo->dev->executor()->shared_memory()) {
+  if (devinfo->dev->executor() && devinfo->dev->executor()->shared_memory()) {
     IVLOG(1, "Using shared memory for data transfer");
     pd->mem_strategy = std::make_shared<DirectMemStrategy>(devinfo, devinfo->dev->executor()->shared_memory());
     pd->tmp_mem_source = devinfo->dev->executor()->shared_memory();
     return;
   }
 
-#ifdef __APPLE__
-  // TODO: figure out a better strategy for this.
-  //       It looks like the DirectMemStrategy doesn't work on macOS.
-  //       Mapped pointers to device memory return garbage buffers.
-  //       It might be better to have the strategy selection be part of hardware settings.
-  if (devinfo->devset->host_memory() && devinfo->dev->executor() && devinfo->dev->executor()->device_memory()) {
-    IVLOG(1, "Using device memory and explicit copies for data transfer");
-    pd->mem_strategy = std::make_shared<CopyMemStrategy>(devinfo);
-    pd->tmp_mem_source = devinfo->dev->executor()->device_memory();
-    return;
-  }
-#else
-  if (devinfo->devset->host_memory() && devinfo->dev->executor() && devinfo->dev->executor()->device_memory()) {
+  if (devinfo->dev->executor() && devinfo->dev->executor()->device_memory()) {
     IVLOG(1, "Using device memory and direct memory strategy");
     pd->mem_strategy = std::make_shared<DirectMemStrategy>(devinfo, devinfo->dev->executor()->device_memory());
     pd->tmp_mem_source = devinfo->dev->executor()->device_memory();
     return;
   }
-#endif
 
   IVLOG(1, "Using host memory for data transfer");
   pd->mem_strategy = std::make_shared<DirectMemStrategy>(devinfo, devinfo->devset->host_memory());
@@ -84,10 +73,19 @@ bool MatchConfig(const proto::Platform& config, const hal::proto::HardwareInfo& 
 }  // namespace
 
 Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
-  for (auto hal_config : config.hals()) {
-    auto driver = AnyFactoryMap<hal::Driver>::Instance()->MakeInstanceIfSupported(ctx, hal_config);
-    if (driver) {
+  auto env = boost::this_process::environment();
+  if (env.count("PLAIDML_DEBUG")) {
+    LOG(INFO) << "Press any key after attaching a debugger to pid: " << boost::this_process::get_id();
+    std::getchar();
+  }
+
+  for (auto& item : FactoryRegistrar<hal::Driver>::Instance()->Factories()) {
+    try {
+      VLOG(1) << "Creating HAL: " << item.second.name;
+      auto driver = item.second.factory(ctx);
       drivers_.emplace_back(std::move(driver));
+    } catch (const std::exception& ex) {
+      VLOG(1) << "Failed to initialize HAL: " << ex.what();
     }
   }
 

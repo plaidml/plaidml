@@ -87,7 +87,9 @@ CopyMemChunk::CopyMemChunk(const context::Context& ctx, const std::shared_ptr<De
 boost::future<std::unique_ptr<View>> CopyMemChunk::MapCurrent(const context::Context& ctx) {
   auto host_mem = devinfo_->devset->host_memory()->MakeBuffer(
       size_, hal::BufferAccessMask::HOST_READABLE | hal::BufferAccessMask::HOST_WRITEABLE);
-  auto copied = devinfo_->dev->executor()->Copy(ctx, dev_mem_, 0, host_mem, 0, size(), deps_->GetReadDependencies());
+  std::vector<std::shared_ptr<hal::Event>> deps;
+  deps_->GetReadDependencies(&deps);
+  auto copied = devinfo_->dev->executor()->Copy(ctx, dev_mem_, 0, host_mem, 0, size(), deps);
   return host_mem->MapCurrent({copied}).then([
     ctx = context::Context{ctx}, devinfo = devinfo_, deps = deps_, size = size_, dev_mem = dev_mem_, host_mem = host_mem
   ](boost::future<void*> data_future) mutable->std::unique_ptr<View> {

@@ -6,6 +6,13 @@ namespace vertexai {
 namespace tile {
 namespace local_machine {
 
+void Alloc::LogSelfAlias(std::ostream& os) const {
+  os << " self_aliases:";
+  for (const auto& allocp : safe_self_alias_allocs) {
+    os << " a" << (*allocp)->idx;
+  }
+}
+
 void TmpAlloc::Accept(AllocVisitor* visitor) const { visitor->Visit(*this); }
 
 void TmpAlloc::log(std::ostream& os) const {
@@ -18,15 +25,16 @@ void TmpAlloc::log(std::ostream& os) const {
       os << " on-host";
       break;
   }
+  LogSelfAlias(os);
 }
 
 void ProgramInputAlloc::Accept(AllocVisitor* visitor) const { visitor->Visit(*this); }
 
-void ProgramInputAlloc::log(std::ostream& os) const { os << "ProgramInput: " << name; }
+void ProgramInputAlloc::log(std::ostream& os) const { os << "ProgramInput: " << name; LogSelfAlias(os);}
 
 void ProgramOutputAlloc::Accept(AllocVisitor* visitor) const { visitor->Visit(*this); }
 
-void ProgramOutputAlloc::log(std::ostream& os) const { os << "ProgramOutput: " << name; }
+void ProgramOutputAlloc::log(std::ostream& os) const { os << "ProgramOutput: " << name; LogSelfAlias(os);}
 
 void Step::PrintDeps(std::ostream& os) const {
   if (!deps.size()) {
