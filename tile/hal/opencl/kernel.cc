@@ -76,10 +76,11 @@ std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
   }
 
   context::Activity activity{ctx, "tile::hal::opencl::Kernel::Run"};
-  proto::RunInfo rinfo;
-  *rinfo.mutable_kernel_id() = kernel_id_;
-  activity.AddMetadata(rinfo);
-
+  if (ctx.is_logging_events()) {
+    proto::RunInfo rinfo;
+    *rinfo.mutable_kernel_id() = kernel_id_;
+    activity.AddMetadata(rinfo);
+  }
   CLObj<cl_event> done;
   auto local_work_size = ki_.lwork[0] ? ki_.lwork.data() : nullptr;
   auto event_wait_list = deps.size() ? deps.data() : nullptr;

@@ -1,0 +1,7 @@
+{
+    "platform": {
+        "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+        "hals": [],
+        "hardware_configs": []
+    }
+}

@@ -373,7 +373,18 @@ bool BlockPlacement::IsCompatible(const std::vector<boost::dynamic_bitset<>>& de
     // Make it so that 'a' is always the earlier-created temporary.
     std::swap(a, b);
   }
-  return (accessors[a->aidx] & deps[b->sidx_first]) == accessors[a->aidx];
+  auto intersection = accessors[a->aidx] & deps[b->sidx_first];
+
+  // Now: if b is created by a kernel, and it's written elementwise-safely wrt a by that kernel,
+  // we can logically add that kernel to the deps set -- essentially, for any given element in b
+  // written by the kernel, there's effectively a dependency on the phase of the kernel that's
+  // accessing a.
+  if ((*b->tmp)->safe_self_alias_allocs.count(a->tmp)) {
+    // N.B. accessors[a->aidx] will already contain b->sidx_first.
+    intersection.set(b->sidx_first);
+  }
+
+  return intersection == accessors[a->aidx];
 }
 
 }  // namespace

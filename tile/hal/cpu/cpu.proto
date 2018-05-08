@@ -1,9 +1,0 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
-
-syntax = "proto3";
-
-package vertexai.tile.hal.cpu.proto;
-
-message Driver {
-}
-

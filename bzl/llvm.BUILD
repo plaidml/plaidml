@@ -29,12 +29,13 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DLLVM_ENABLE_TERMINFO=OFF
 """,
         "@toolchain//:macos_x86_64": """
-        cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_LIBEDIT=0
 """,
         "//conditions:default": """
-cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) -DLLVM_ENABLE_TERMINFO=OFF
+cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+    -DLLVM_ENABLE_TERMINFO=OFF
 """,
     }),
     local = True,
@@ -454,8 +455,12 @@ PLATFORM_COPTS = select({
     "@toolchain//:macos_x86_64": [
         "-D__STDC_LIMIT_MACROS",
         "-D__STDC_CONSTANT_MACROS",
+        "-w",
     ],
-    "//conditions:default": ["-std=c++1y"],
+    "//conditions:default": [
+        "-w",
+        "-std=c++1y",
+    ],
 })
 
 cc_library(
@@ -478,7 +483,6 @@ cc_library(
         "include/llvm/**/*.h",
     ]) + GENFILES,
     copts = [
-        "-w",
         "-fPIC",
     ] + PLATFORM_COPTS,
     includes = [
@@ -508,9 +512,7 @@ cc_binary(
         "lib/TableGen/**/*.c",
         "lib/TableGen/**/*.h",
     ]),
-    copts = [
-        "-w",
-    ] + PLATFORM_COPTS,
+    copts = PLATFORM_COPTS,
     linkopts = [
         "-lm",
         "-lpthread",
@@ -553,16 +555,12 @@ cc_library(
         "include/**/*.inc",
     ]),
     copts = [
-        "-w",
         "-fPIC",
         "-iquote",
         "$(GENDIR)/external/llvm_archive/lib/LibDriver",
         "-iquote",
         "$(GENDIR)/external/llvm_archive/lib/IR",
-    ] + PLATFORM_COPTS + select({
-        "@toolchain//:macos_x86_64": ["-std=c++14"],
-        "//conditions:default": ["-std=c++1y"],
-    }),
+    ] + PLATFORM_COPTS,
     includes = ["include"],
     linkopts = select({
         "@toolchain//:windows_x86_64": [],
@@ -594,14 +592,10 @@ cc_library(
     ) + GEN_ATTR_OUT + INCS,
     hdrs = GEN_INTRIN_OUT + glob(["lib/**/*.def"]),
     copts = TARGET_INCLUDES + [
-        "-w",
         "-fPIC",
         "-iquote",
         "$(GENDIR)/external/llvm_archive/lib/IR",
-    ] + PLATFORM_COPTS + select({
-        "@toolchain//:macos_x86_64": ["-std=c++14"],
-        "//conditions:default": ["-std=c++1y"],
-    }),
+    ] + PLATFORM_COPTS,
     includes = ["include"],
     deps = [":base"],
     alwayslink = 1,

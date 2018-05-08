@@ -416,7 +416,7 @@ void BoundFunction::AddUpdate(const std::shared_ptr<TensorValue>& lhs, const std
   }
   std::string oname = Apply(rhs);
   if (oname.size() > 2 && oname.substr(0, 2) == "_I") {
-    // Handle case where output is a stright copy of an input by inserting
+    // Handle case where output is a straight copy of an input by inserting
     // an identity function
     std::string tmp = NewTmp();
     Op op = {Op::FUNCTION, tmp, {oname}, {}, {"ident"}};
@@ -563,18 +563,22 @@ RunInfo BoundFunction::PrepareToRun() const {
 }
 
 std::string BoundFunction::Apply(const std::shared_ptr<Value>& val) {
+  IVLOG(4, "Applying value " << *val);
   auto it = bindings_.find(val);
   if (it != bindings_.end()) {
+    IVLOG(4, "  Found previous name " << it->second << " for " << *val);
     return it->second;
   }
   std::string name = ValueVisitor<std::string>::Apply(val);
+  IVLOG(4, "  Constructed new name " << name << " for " << *val);
   auto it2 = g_ids.find(val);
   if (it2 != g_ids.end()) {
-    Attribute attr = {"pid", {}};
+    proto::Attribute attr;
+    attr.set_name("pid");
     for (const auto& s : it2->second) {
-      attr.params.push_back(s);
+      attr.add_params(s);
     }
-    prog_.ops.back().attributes.emplace_back(attr);
+    prog_.ops.back().attributes.emplace_back(std::move(attr));
   }
   /*
   auto it2 = g_deriv_source.find(val);
@@ -844,8 +848,8 @@ void FunctionApplication::SetDone() {
       IVLOG(4, "FunApp::SetDone " << this << " binding " << o.output << " ->(contraction) " << *bindings_[o.output]);
     }
     for (const auto& attr : o.attributes) {
-      if (attr.name == "pid") {
-        for (const auto& s : attr.params) {
+      if (attr.name() == "pid") {
+        for (const auto& s : attr.params()) {
           g_ids[bindings_[o.output]].emplace(s);
         }
       }
@@ -948,13 +952,45 @@ void Value::log(el::base::type::ostream_t& os) const {
       break;
     }
     case Value::Type::FUNCTION: {
-      // const auto* v = static_cast<const FunctionValue*>(this);
-      os << "Function";
+      const auto* v = static_cast<const FunctionValue*>(this);
+      os << "Function(" << v->fn();
+      for (auto input : v->inputs()) {
+        os << ", " << input;
+      }
+      os << ")";
       break;
     }
     case Value::Type::CONTRACTION: {
-      // const auto* v = static_cast<const ContractionValue*>(this);
-      os << "Contraction";
+      const auto* v = static_cast<const ContractionValue*>(this);
+      os << "Contraction(agg=" << static_cast<char>(v->agg_op()) << ", comb=" << static_cast<char>(v->comb_op());
+      for (const auto& spec : v->specs()) {
+        os << ", spec:(";
+        bool first = true;
+        for (const auto& ptr: spec) {
+          if (!first) {
+            os << ", ";
+          } else {
+            first = false;
+          }
+          os << ptr;
+        }
+      }
+      for (const auto& constraint : v->constraints()) {
+        os << ", constraint:(" << constraint.poly << ", " << constraint.range << ")";
+      }
+      for (const auto& input : v->inputs()) {
+        os << ", input:" << input;
+      }
+      for (std::size_t didx = 0; didx < v->num_dims(); ++didx) {
+        os << ", dim:" << v->dim_value(didx);
+      }
+      if (v->use_default()) {
+        os << ", default";
+      }
+      if (v->no_defract()) {
+        os << ", no_defract";
+      }
+      os << ")";
       break;
     }
     default:

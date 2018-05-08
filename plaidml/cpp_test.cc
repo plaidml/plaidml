@@ -30,7 +30,7 @@ TEST(PlaidML_CPP_API, Composition) {
   function weight_mul("function (A[I, K], B[J, K]) -> (C) { C[i,j : I, J] = +(A[i, k] * B[j, k]); }");
   function add_bias("function (A[N, I], B[I]) -> (C) { C[n, i : N, I] = +(A[n, i] + B[i]); }");
   function relu("function (A) -> (R) { R = (A > 0 ? A : 0); }");
-  function sq_err("function (A, B) -> (R) { D = A - B; S = D*D; R[] = +(S[i,j]); }");
+  function sq_err("function (A, B) -> (R) { D = A - B; S = D * D; R[] = +(S[i, j]); }");
 
   placeholder input(2);
 
@@ -42,9 +42,14 @@ TEST(PlaidML_CPP_API, Composition) {
   placeholder goal(2);
   variable err = sq_err(output, goal);
 
-  function forward = compose("forward").input("X", input).output("Y", output);
+  function forward = compose("forward")  //
+                         .input("X", input)
+                         .output("Y", output);
 
-  function error = compose("error").input("X", input).input("Yt", goal).output("E", err);
+  function error = compose("error")  //
+                       .input("X", input)
+                       .input("Yt", goal)
+                       .output("E", err);
 
   gradient derr(err);
   placeholder alpha(0);
@@ -63,7 +68,12 @@ TEST(PlaidML_CPP_API, Composition) {
   tensor<float> Y = dev.allocate(shape<float>(ctx, {64, 50}));
   tensor<float> E = dev.allocate(shape<float>(ctx));
 
-  invoker(ctx, learn).set_input("X", X).set_input("Yt", Y).set_input("Alpha", .001).set_output("E", E).invoke();
+  invoker(ctx, learn)  //
+      .set_input("X", X)
+      .set_input("Yt", Y)
+      .set_input("Alpha", .001)
+      .set_output("E", E)
+      .invoke();
 
   {
     auto _E = E.map(map_for_read);
@@ -73,6 +83,7 @@ TEST(PlaidML_CPP_API, Composition) {
 
 TEST(PlaidML_CPP_API, MultiDep) {
   const std::size_t N0 = 100;
+  const std::size_t N1 = 6;
   const std::size_t N2 = 100;
 
   vai_clear_status();
@@ -89,11 +100,11 @@ TEST(PlaidML_CPP_API, MultiDep) {
     }
   )");
 
-  tensor<float> in = dev.allocate(shape<float>(ctx, {N0, 6, N2}));
+  tensor<float> in = dev.allocate(shape<float>(ctx, {N0, N1, N2}));
   {
     mapping<float> view = in.map(map_for_write);
     for (size_t i = 0; i < N0; i++) {
-      for (size_t j = 0; j < 6; j++) {
+      for (size_t j = 0; j < N1; j++) {
         for (size_t k = 0; k < N2; k++) {
           view(i, j, k) = 7;
         }
@@ -101,14 +112,19 @@ TEST(PlaidML_CPP_API, MultiDep) {
     }
   }
 
-  tensor<float> out = dev.allocate(shape<float>(ctx, {N0, 6, N2}));
+  tensor<float> out = dev.allocate(shape<float>(ctx, {N0, N1, N2}));
 
-  invoker(ctx, multidep).set_input("I0", in).set_input("I1", in).set_input("I2", in).set_output("O", out).invoke();
+  invoker(ctx, multidep)  //
+      .set_input("I0", in)
+      .set_input("I1", in)
+      .set_input("I2", in)
+      .set_output("O", out)
+      .invoke();
 
   {
     mapping<float> view = out.map(map_for_read);
     for (size_t i = 0; i < N0; i++) {
-      for (size_t j = 0; j < 6; j++) {
+      for (size_t j = 0; j < N1; j++) {
         for (size_t k = 0; k < N2; k++) {
           EXPECT_THAT(view(i, j, k), Ne(0));
         }

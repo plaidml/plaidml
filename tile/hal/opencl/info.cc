@@ -69,6 +69,9 @@ hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
   // Enable the use of mad() calls by default. Users may disable this as an override.
   settings->set_disable_mad(false);
 
+  // Enable input/output buffer aliasing by default.  This may be overridden.
+  settings->set_disable_io_aliasing(false);
+
   return result;
 }
 

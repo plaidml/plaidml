@@ -126,7 +126,7 @@ class _Function(object):
         self._input_types = {}
         for name, val in zip(self._input_names, inputs):
             if is_placeholder(val):
-                self._input_types[name] = ptile.PLAIDML_DTYPE_TO_NUMPY[val.shape.dtype]
+                self._input_types[name] = ptile.convert_pml_dtype_to_np(val.shape.dtype)
 
     def __call__(self, inputs):
         # Inputs: a list of bindings for the placeholders.
@@ -327,10 +327,10 @@ def cast(x, dtype):
 
     x = ptile.Value.from_python_value(x)
 
-    if dtype not in ptile.NUMPY_DTYPE_TO_PLAIDML:
+    try:
+        dtype = ptile.convert_np_dtype_to_pml(dtype)
+    except ValueError:
         raise PlaidMLKerasException('Unsupported cast (%s -> %s)' % (x.shape.dtype, dtype))
-
-    dtype = ptile.NUMPY_DTYPE_TO_PLAIDML[dtype]
 
     if x.shape.dtype == dtype:
         return x
@@ -389,8 +389,14 @@ concatenate = op.concatenate
 def constant(value, dtype=None, shape=None, name=None):
     # Enforce sensible defaults if given None
     dtype = dtype or floatx()
-    shape = shape or (1,)
-    np_value = value * np.ones(shape)
+    if shape is None:
+        if isinstance(value, np.ndarray):
+            shape = value.shape
+        elif isinstance(value, list) or isinstance(value, tuple):
+            shape = (len(value),)
+        else:
+            shape = (1,)
+    np_value = np.full(shape, value)
     return variable(np_value, dtype=dtype, name=_prepend_name_scope(name, 'constant'))
 
 
@@ -408,7 +414,7 @@ def conv(x,
     try:
         padding = _AUTO_PAD[padding]
     except KeyError:
-        six.raise_from(NotImplementedError('Unimplemented padding: {}'.format(padding)), None)
+        six.raise_from(ValueError('Unrecognized padding: {}'.format(padding)), None)
 
     if data_format is None:
         data_format = image_data_format()
@@ -416,8 +422,7 @@ def conv(x,
     try:
         data_format = _CONV_DATA_FORMAT[data_format]
     except KeyError:
-        six.raise_from(
-            NotImplementedError('Unimplemented data format: {}'.format(data_format)), None)
+        six.raise_from(ValueError('Unrecognized data format: {}'.format(data_format)), None)
 
     return op.convolution(
         x,
@@ -433,7 +438,7 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
     try:
         padding = _AUTO_PAD[padding]
     except KeyError:
-        six.raise_from(NotImplementedError('Unimplemented padding: {}'.format(padding)), None)
+        six.raise_from(ValueError('Unrecognized padding: {}'.format(padding)), None)
 
     if data_format is None:
         data_format = image_data_format()
@@ -441,8 +446,7 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
     try:
         data_format = _CONV_DATA_FORMAT[data_format]
     except KeyError:
-        six.raise_from(
-            NotImplementedError('Unimplemented data format: {}'.format(data_format)), None)
+        six.raise_from(ValueError('Unrecognized data format: {}'.format(data_format)), None)
 
     return op.convolution_transpose(x, kernel, output_shape, strides, padding, data_format)
 
@@ -536,6 +540,10 @@ def _winograd(x, kernel, padding='valid', block=6):
 
 
 def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rate=1):
+    if padding == 'causal':
+        left_pad = dilation_rate * (kernel.shape.dims[0] - 1)
+        x = temporal_padding(x, (left_pad, 0))
+        padding = 'valid'
     return conv(x, kernel, (strides,), padding, data_format, (dilation_rate,))
 
 
@@ -648,7 +656,7 @@ def dropout(x, level, noise_shape=None, seed=None):
 
 
 def dtype(x):
-    return ptile.PLAIDML_DTYPE_TO_NUMPY[x.shape.dtype]
+    return ptile.convert_pml_dtype_to_np(x.shape.dtype)
 
 
 def elu(x, alpha=1.0):
@@ -742,7 +750,7 @@ def get_value(x):
     tensor = plaidml.Tensor(_device(), shape)
     invoker.set_output('out', tensor)
     invoker.invoke()
-    array = np.ndarray(x.shape.dims, dtype=ptile.PLAIDML_DTYPE_TO_NUMPY[x.shape.dtype])
+    array = np.ndarray(x.shape.dims, dtype=ptile.convert_pml_dtype_to_np(x.shape.dtype))
     with tensor.mmap_current() as view:
         view.copy_to_ndarray(array)
     return array
@@ -875,7 +883,7 @@ maximum = op.maximum
 
 
 def mean(x, axis=None, keepdims=False):
-    return op.mean(x, axes=axis, keepdims=keepdims, floatx=ptile.NUMPY_DTYPE_TO_PLAIDML[floatx()])
+    return op.mean(x, axes=axis, keepdims=keepdims, floatx=ptile.convert_np_dtype_to_pml(floatx()))
 
 
 def min(x, axis=None, keepdims=False):
@@ -995,7 +1003,7 @@ def ones_like(x, dtype=None, name=None):
         }}""".format(
         sizes=sizes, dims=dims)
     return ptile.Operation(f, [('IN', x), ('ONE', a_one)],
-                           [('OUT', ptile.Shape(ptile.NUMPY_DTYPE_TO_PLAIDML[dtype], x.shape.dims))],
+                           [('OUT', ptile.Shape(ptile.convert_np_dtype_to_pml(dtype), x.shape.dims))],
                            name='OnesLike') \
                 .sole_output()
 
@@ -1014,7 +1022,7 @@ def permute_dimensions(x, pattern):
 
 
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
-    dtype = ptile.NUMPY_DTYPE_TO_PLAIDML[dtype or floatx()]
+    dtype = ptile.convert_np_dtype_to_pml(dtype or floatx())
     if shape is not None:
         return ptile.Value.from_dimensions(shape, dtype, name=name)
     elif ndim is not None:
@@ -1035,7 +1043,7 @@ class Pool(ptile.Operation):
         try:
             padding = _AUTO_PAD[padding]
         except KeyError:
-            six.raise_from(NotImplementedError('Unimplemented padding: {}'.format(padding)), None)
+            six.raise_from(ValueError('Unrecognized padding: {}'.format(padding)), None)
 
         # TODO: There are major similarities between pool and conv. I think keeping
         # them separate makes sense, but we could consider merging them.
@@ -1179,7 +1187,7 @@ def print_tensor(x, message=''):
 
 def prod(value, axis=None, keepdims=False):
     return op.prod(
-        value, axes=axis, keepdims=keepdims, floatx=ptile.NUMPY_DTYPE_TO_PLAIDML[floatx()])
+        value, axes=axis, keepdims=keepdims, floatx=ptile.convert_np_dtype_to_pml(floatx()))
 
 
 def random_binomial(shape, p=0.0, dtype=None, see=None):
@@ -1321,7 +1329,17 @@ def resize_images(x, height_factor, width_factor, data_format):
 
 
 def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
-    _report_unimplemented('resize_volumes')
+    if data_format == 'channels_first':
+        ret = repeat_elements(x, depth_factor, axis=2)
+        ret = repeat_elements(ret, height_factor, axis=3)
+        ret = repeat_elements(ret, width_factor, axis=4)
+    elif data_format == 'channels_last':
+        ret = repeat_elements(x, depth_factor, axis=1)
+        ret = repeat_elements(ret, height_factor, axis=2)
+        ret = repeat_elements(ret, width_factor, axis=3)
+    else:
+        raise ValueError('Invalid data_format {}'.format(data_format))
+    return ret
 
 
 def reverse(x, axes):
@@ -1457,7 +1475,7 @@ def separable_conv2d(x,
 
 def set_floatx(dtype):
     keras_set_floatx(dtype)
-    plaidml.set_floatx(ptile.NUMPY_DTYPE_TO_PLAIDML[dtype])
+    plaidml.set_floatx(ptile.convert_np_dtype_to_pml(dtype))
 
 
 def set_learning_phase(value):
@@ -1515,38 +1533,73 @@ def sparse_categorical_crossentropy(target, output, from_logits=False):
         reshape(one_hot(target, output.shape.dims[-1]), output.shape.dims), output, from_logits)
 
 
-class Spatial2DPadding(ptile.Operation):
+class SpatialPadding(ptile.Operation):
 
-    def __init__(self, x, padding=((1, 1), (1, 1)), data_format=None):
+    def __init__(self, x, padding, data_format=None):
         if data_format is None:
             data_format = image_data_format()
-        if data_format != 'channels_last':
-            raise 'Not supported'
+        rank = x.shape.ndims - 2
+        if rank < 1:
+            raise ValueError('Can only perform spatial padding on a tensor with at least one '
+                             'spatial dimension.')
+        if len(padding) != rank:
+            raise ValueError('Failed to pad {} spatial dimensions; received padding '
+                             'amounts for {} spatial dimensions'.format(rank, len(padding)))
+        for pad_amount in padding:
+            if len(pad_amount) != 2:
+                raise ValueError('Expected padding to be tuple of {} length 2 tuples; '
+                                 'received {}'.format(rank, padding))
 
-        yFront = padding[0][0]
-        yTotal = padding[0][0] + padding[0][1]
-        xFront = padding[1][0]
-        xTotal = padding[1][0] + padding[1][1]
+        in_spatial_dims = []
+        out_spatial_dims = []
+        total_padding = []
+        in_spatial_idxs = []
+        out_spatial_idxs = []
+        for i in range(rank):
+            front_padding = padding[i][0]
+            total_padding.append(padding[i][0] + padding[i][1])
+            in_spatial_dims.append('D{}'.format(i))
+            out_spatial_dims.append('D{} + {}'.format(i, total_padding[i]))
+            in_spatial_idxs.append('d{} - {}'.format(i, front_padding))
+            out_spatial_idxs.append('d{}'.format(i))
+        if data_format == 'channels_last':
+            in_dims = 'N, {}, C'.format(', '.join(in_spatial_dims))
+            out_dims = 'N, {}, C'.format(', '.join(out_spatial_dims))
+            in_idxs = 'n, {}, c'.format(', '.join(in_spatial_idxs))
+            out_idxs = 'n, {}, c'.format(', '.join(out_spatial_idxs))
+            numeric_spatial_out_dims = [
+                x.shape.dims[i + 1] + total_padding[i] for i in range(rank)
+            ]
+            numeric_out_dims = tuple([x.shape.dims[0]] + numeric_spatial_out_dims +
+                                     [x.shape.dims[-1]])
+        elif data_format == 'channels_first':
+            in_dims = 'N, C, {}'.format(', '.join(in_spatial_dims))
+            out_dims = 'N, C, {}'.format(', '.join(out_spatial_dims))
+            in_idxs = 'n, c, {}'.format(', '.join(in_spatial_idxs))
+            out_idxs = 'n, c, {}'.format(', '.join(out_spatial_idxs))
+            numeric_spatial_out_dims = [
+                x.shape.dims[i + 2] + total_padding[i] for i in range(rank)
+            ]
+            numeric_out_dims = tuple([x.shape.dims[0], x.shape.dims[1]] + numeric_spatial_out_dims)
+        else:
+            raise ValueError('Unrecognized data_format {}'.format(data_format))
         f = ("""
-            function (I[N, H, W, C]) -> (O) {{
-                O[n, y, x, c : N, H + {yTotal}, W + {xTotal}, C] = =(I[n, y - {yFront}, x - {xFront}, c]);
+            function (I[{in_dims}]) -> (O) {{
+                O[{out_idxs} : {out_dims}] = =(I[{in_idxs}]);
             }}
         """).format(
-            yFront=yFront, yTotal=yTotal, xFront=xFront, xTotal=xTotal)
+            in_dims=in_dims, in_idxs=in_idxs, out_dims=out_dims, out_idxs=out_idxs)
 
-        # TODO: reorder output dimensions in theano ordering case
-        outdims = (x.shape.dims[0], x.shape.dims[1] + yTotal, x.shape.dims[2] + xTotal,
-                   x.shape.dims[3])
-
-        super(Spatial2DPadding, self).__init__(f, [('I', x)],
-                                               [('O', ptile.Shape(x.shape.dtype, outdims))])
+        super(SpatialPadding, self).__init__(f, [('I', x)],
+                                             [('O', ptile.Shape(x.shape.dtype, numeric_out_dims))])
 
 
-spatial_2d_padding = Spatial2DPadding.function
+def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
+    return SpatialPadding.function(x, padding, data_format)
 
 
 def spatial_3d_padding(x, padding=((1, 1), (1, 1), (1, 1)), data_format=None):
-    _report_unimplemented('spatial_3d_padding')
+    return SpatialPadding.function(x, padding, data_format)
 
 
 def square(x):
@@ -1580,7 +1633,7 @@ def stop_gradient(variables):
 
 def sum(x, axis=None, keepdims=False):
     return op.summation(
-        x, axes=axis, keepdims=keepdims, floatx=ptile.NUMPY_DTYPE_TO_PLAIDML[floatx()])
+        x, axes=axis, keepdims=keepdims, floatx=ptile.convert_np_dtype_to_pml(floatx()))
 
 
 class Switch(ptile.Operation):
@@ -1597,7 +1650,10 @@ tanh = op.tanh
 
 
 def temporal_padding(x, padding=(1, 1)):
-    _report_unimplemented('temporal_padding')
+    if x.shape.ndims != 3:
+        raise ValueError('Can only perform temporal_padding on 3D tensor')
+    # Temporal padding is channels_last 1D spatial padding
+    return SpatialPadding.function(x, padding=(padding,), data_format='channels_last')
 
 
 def tile(x, n):
@@ -1647,9 +1703,13 @@ def update_sub(x, decrement):
     return (x, x - decrement)
 
 
+def uses_correlation():
+    return True
+
+
 def var(x, axis=None, keepdims=False):
     return op.variance(
-        x, axes=axis, keepdims=keepdims, floatx=ptile.NUMPY_DTYPE_TO_PLAIDML[floatx()])
+        x, axes=axis, keepdims=keepdims, floatx=ptile.convert_np_dtype_to_pml(floatx()))
 
 
 def variable(value, dtype=None, name=None, constraint=None):
@@ -1657,13 +1717,14 @@ def variable(value, dtype=None, name=None, constraint=None):
     if constraint:
         raise PlaidMLKerasException('Unsupported variable constraint')
     if isinstance(value, float) or isinstance(value, six.integer_types):
-        tensor = plaidml.Tensor(_device(), plaidml.Shape(_ctx,
-                                                         ptile.NUMPY_DTYPE_TO_PLAIDML[dtype]))
+        tensor = plaidml.Tensor(_device(),
+                                plaidml.Shape(_ctx, ptile.convert_np_dtype_to_pml(dtype)))
         with tensor.mmap_discard(_ctx) as view:
             view.copy_from_ndarray(np.array(value))
             view.writeback()
         return ptile.Value.from_var(tensor,
-                                    tuple(), ptile.NUMPY_DTYPE_TO_PLAIDML[dtype],
+                                    tuple(),
+                                    ptile.convert_np_dtype_to_pml(dtype),
                                     _prepend_name_scope(name, 'float_variable' if isinstance(
                                         value, float) else 'int_variable'))
     elif isinstance(value, ptile.Value):
@@ -1674,16 +1735,19 @@ def variable(value, dtype=None, name=None, constraint=None):
         invoker.set_output('out', tensor)
         invoker.invoke()
         return ptile.Value.from_var(tensor, [d.size for d in shape.dimensions], shape.dtype, name)
-    else:
-        # Treat the value as an ndarray.
-        tensor = plaidml.Tensor(_device(),
-                                plaidml.Shape(_ctx, ptile.NUMPY_DTYPE_TO_PLAIDML[dtype],
-                                              *value.shape))
-        with tensor.mmap_discard(_ctx) as view:
-            view.copy_from_ndarray(value)
-            view.writeback()
-        return ptile.Value.from_var(tensor, value.shape, ptile.NUMPY_DTYPE_TO_PLAIDML[dtype],
-                                    _prepend_name_scope(name, 'tensor_variable'))
+    elif isinstance(value, list) or isinstance(value, tuple):
+        value = np.array(value)
+        # Fallthrough
+    # Default to treating the value as an ndarray.
+    tensor = plaidml.Tensor(_device(),
+                            plaidml.Shape(_ctx, ptile.convert_np_dtype_to_pml(dtype),
+                                          *value.shape))
+    with tensor.mmap_discard(_ctx) as view:
+        view.copy_from_ndarray(value)
+        view.writeback()
+    return ptile.Value.from_var(tensor, value.shape,
+                                ptile.convert_np_dtype_to_pml(dtype),
+                                _prepend_name_scope(name, 'tensor_variable'))
 
 
 def zeros(shape, dtype=floatx(), name=None):
@@ -1702,7 +1766,7 @@ def zeros_like(x, dtype=floatx(), name=None):
         }}""".format(
         sizes=sizes, dims=dims)
     return ptile.Operation(f, [('IN', x), ('ZERO', a_zero)],
-                           [('OUT', ptile.Shape(ptile.NUMPY_DTYPE_TO_PLAIDML[dtype], x.shape.dims))],
+                           [('OUT', ptile.Shape(ptile.convert_np_dtype_to_pml(dtype), x.shape.dims))],
                            name='ZerosLike') \
                 .sole_output()
 

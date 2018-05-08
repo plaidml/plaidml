@@ -14,6 +14,7 @@
 #include "base/util/logging.h"
 #include "base/util/printstring.h"
 #include "base/util/transfer_object.h"
+#include "tile/lang/lang.pb.h"
 #include "tile/lang/polynomial.h"
 
 namespace vertexai {
@@ -94,12 +95,7 @@ struct Function {
   }
 };
 
-struct Attribute {
-  std::string name;
-  std::vector<std::string> params;
-};
-
-std::string to_string(const Attribute& attr);
+std::string to_string(const proto::Attribute& attr);
 
 struct Op {
   enum { CONTRACTION, FUNCTION, CONSTANT } tag;
@@ -107,7 +103,7 @@ struct Op {
   std::vector<std::string> inputs;
   Contraction c;
   Function f;
-  std::vector<Attribute> attributes;
+  std::vector<proto::Attribute> attributes;
 };
 
 std::string to_string(const Op& op);

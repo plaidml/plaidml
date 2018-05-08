@@ -32,6 +32,10 @@ struct Alloc : public el::Loggable {
 
   std::size_t idx = 0;
   std::uint64_t byte_size = 0;
+  std::set<AllocPtr, AllocPtrLess> safe_self_alias_allocs;
+
+ protected:
+  void LogSelfAlias(std::ostream& os) const;
 };
 
 struct TmpAlloc final : public Alloc {

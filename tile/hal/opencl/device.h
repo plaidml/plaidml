@@ -21,8 +21,7 @@ namespace opencl {
 // Device implements the hal::Device model as a single OpenCL device.
 class Device final : public hal::Device {
  public:
-  Device(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did,
-         const std::shared_ptr<proto::Driver>& config, proto::DeviceInfo info);
+  Device(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did, proto::DeviceInfo info);
 
   void Initialize(const hal::proto::HardwareSettings& settings) final;
 

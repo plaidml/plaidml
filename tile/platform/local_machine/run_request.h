@@ -25,7 +25,6 @@ class RunRequest {
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> outputs);
 
   void AddProgramDoneDep(const std::shared_ptr<hal::Event>& event);
-  void AddKernelInfo(std::size_t kidx, std::shared_ptr<hal::Event> event);
 
   const Program* program() const { return program_; }
   const Shim* shim() const { return shim_.get(); }
@@ -51,7 +50,6 @@ class RunRequest {
                                  boost::future<std::vector<std::shared_ptr<hal::Result>>> results);
 
   const Program* program_;
-  std::vector<KernelLogInfo> kernel_log_info_;
   std::unique_ptr<Shim> shim_;
 };
 
