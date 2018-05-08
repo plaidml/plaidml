@@ -23,6 +23,7 @@ class SymbolicPolynomial {
   static SymbolicPolynomialPtr MakeBinaryOp(const std::string& op, const SymbolicPolynomialPtr& lhs,
                                             const SymbolicPolynomialPtr& rhs);
 
+  virtual ~SymbolicPolynomial() {}
   virtual SymbolicPolynomialPtr Xify() const = 0;
   virtual SymbolicPolynomialPtr DeXify() const = 0;
   virtual SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const = 0;

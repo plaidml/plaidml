@@ -1,3 +1,5 @@
+load("//vendor/cuda:configure.bzl", "configure_cuda")
+
 def plaidml_workspace():
     native.new_http_archive(
         name="boost_archive",
@@ -83,6 +85,7 @@ def plaidml_workspace():
     )
 
     configure_protobuf()
+    configure_cuda(name = "cuda")
 
 def configure_protobuf():
     native.new_http_archive(

@@ -341,9 +341,7 @@ proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx, const prot
 
 }  // namespace
 
-DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platform_id pid,
-                     const std::shared_ptr<proto::Driver>& config)
-    : config_{config} {
+DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platform_id pid) {
   context::Activity platform_activity{ctx, "tile::hal::opencl::Platform"};
   auto pinfo = GetPlatformInfo(pid);
   LogInfo(std::string("Platform[") + std::to_string(pidx) + "]", pinfo);
@@ -371,7 +369,7 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
     *dinfo.mutable_platform_id() = platform_activity.ctx().activity_id();
     LogInfo(std::string("Platform[") + std::to_string(pidx) + "].Device[" + std::to_string(didx) + "]", dinfo);
     device_activity.AddMetadata(dinfo);
-    auto dev = std::make_shared<Device>(device_activity.ctx(), cl_ctx, did, config_, std::move(dinfo));
+    auto dev = std::make_shared<Device>(device_activity.ctx(), cl_ctx, did, std::move(dinfo));
     if (!first_dev) {
       first_dev = dev;
     }

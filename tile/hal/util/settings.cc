@@ -66,6 +66,7 @@ lang::HardwareSettings ToHardwareSettings(const proto::HardwareSettings& setting
   result.goal_groups = settings.goal_groups();
   result.goal_flops_per_byte = settings.goal_flops_per_byte();
   result.goal_dimension_sizes = std::move(dim_sizes);
+  result.disable_io_aliasing = settings.disable_io_aliasing();
 
   return result;
 }

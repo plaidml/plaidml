@@ -18,8 +18,9 @@ namespace local_machine {
 // order to know whether the memory's contents to be valid, and whether the memory's contents are valid at all.
 class MemDeps final : public std::enable_shared_from_this<MemDeps> {
  public:
-  // Get the current read dependencies.  This will raise an exception if the MemDeps has been poisoned.
-  std::vector<std::shared_ptr<hal::Event>> GetReadDependencies();
+  // Get the current read dependencies, adding them to the supplied vector.  This will raise an exception if the
+  // MemDeps has been poisoned.
+  void GetReadDependencies(std::vector<std::shared_ptr<hal::Event>>* deps);
 
   // Adds to this memory chunk's read dependency, blocking read operations from taking place until the supplied event
   // has reached a final state.  This also clears the poison state of the MemDeps.

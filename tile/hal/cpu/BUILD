@@ -1,17 +1,6 @@
 # Copyright 2017, Vertex.AI. CONFIDENTIAL
 
-load("//bzl:plaidml.bzl", "plaidml_proto_library", "plaidml_cc_library", "plaidml_cc_test")
-
-plaidml_proto_library(
-    name = "proto",
-    srcs = [
-        "cpu.proto",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//tile/proto:hal",
-    ],
-)
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 plaidml_cc_library(
     name = "cpu",
@@ -46,9 +35,6 @@ plaidml_cc_library(
         "runtime.cc",
         "runtime.h",
     ],
-    hdrs = [
-        "cpu.h",
-    ],
     copts = [
         "-D__STDC_LIMIT_MACROS",
         "-D__STDC_CONSTANT_MACROS",
@@ -60,7 +46,6 @@ plaidml_cc_library(
     tags = ["llvm"],
     visibility = ["//visibility:public"],
     deps = [
-        ":proto_cc",
         "//base/util",
         "//lib:llvm",
         "//tile/base",

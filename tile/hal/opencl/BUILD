@@ -73,7 +73,6 @@ plaidml_cc_library(
     hdrs = [
         "emitocl.h",
         "info.h",
-        "opencl.h",
     ],
     linkopts = select({
         "@toolchain//:macos_x86_64": ["-framework OpenCL"],

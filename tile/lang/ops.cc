@@ -89,21 +89,22 @@ std::string to_string(const Contraction& cnt) {
   return r;
 }
 
-std::string to_string(const Attribute& attr) {
-  std::string r = attr.name;
-  if (attr.params.size()) {
-    r += '(';
+std::string to_string(const proto::Attribute& attr) {
+  std::ostringstream os;
+  os << attr.name();
+  if (attr.params_size()) {
+    os << '(';
     bool first = true;
-    for (const auto& param : attr.params) {
+    for (const auto& param : attr.params()) {
       if (!first) {
-        r += ", ";
+        os << ", ";
       }
-      r += param;
+      os << param;
       first = false;
     }
-    r += ')';
+    os << ')';
   }
-  return r;
+  return os.str();
 }
 
 std::string to_string(const Op& op) {

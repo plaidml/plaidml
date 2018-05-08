@@ -12,8 +12,7 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-Driver::Driver(const context::Context& ctx, const proto::Driver& config)
-    : config_{std::make_shared<proto::Driver>(config)} {
+Driver::Driver(const context::Context& ctx) {
   context::Activity enumerating{ctx, "tile::hal::opencl::Enumerating"};
 
   cl_uint platform_count;
@@ -22,7 +21,7 @@ Driver::Driver(const context::Context& ctx, const proto::Driver& config)
   clGetPlatformIDs(platforms.size(), platforms.data(), nullptr);
 
   for (std::uint32_t pidx = 0; pidx < platforms.size(); ++pidx) {
-    auto device_set = std::make_shared<DeviceSet>(enumerating.ctx(), pidx, platforms[pidx], config_);
+    auto device_set = std::make_shared<DeviceSet>(enumerating.ctx(), pidx, platforms[pidx]);
     if (device_set->devices().size()) {
       device_sets_.emplace_back(std::move(device_set));
     }

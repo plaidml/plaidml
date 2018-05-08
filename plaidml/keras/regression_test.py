@@ -26,13 +26,13 @@ class RegressionTests(unittest.TestCase):
         # GitHub), who reported https://github.com/plaidml/plaidml/issues/57,
         # showing a case where PlaidML was producing a kernel that was writing
         # to an output tensor that it already had that output as an input.
-        inputs = Input(shape=(2,2))
+        inputs = Input(shape=(2, 2))
         x = Flatten()(inputs)
         x = BatchNormalization()(x)
         predictions = Dense(2, activation='softmax')(x)
         model = Model(inputs=inputs, outputs=predictions)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        x_train = np.array([[[1,1],[1,1]]])
+        x_train = np.array([[[1, 1], [1, 1]]])
         y = model.predict(x=x_train, batch_size=1)
         model.fit(x_train, np.array([[0., 1.]]), batch_size=1, epochs=1, verbose=1)
 
@@ -42,9 +42,9 @@ class RegressionTests(unittest.TestCase):
         # straightforward Python typing issue in the backend when pooling
         # with channels_first using an existing op as input.
         model = Sequential()
-        model.add(Reshape((1, 64, 64), input_shape=(1, 64*64)))
-        model.add(Conv2D(filters=3, kernel_size=(5,5), padding='same', activation='relu'))
-        model.add(MaxPooling2D(pool_size=(2,2), data_format='channels_first'))
+        model.add(Reshape((1, 64, 64), input_shape=(1, 64 * 64)))
+        model.add(Conv2D(filters=3, kernel_size=(5, 5), padding='same', activation='relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_first'))
 
 
 if __name__ == '__main__':

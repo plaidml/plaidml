@@ -8,7 +8,6 @@
 #include "base/context/context.h"
 #include "tile/base/hal.h"
 #include "tile/hal/opencl/device_set.h"
-#include "tile/hal/opencl/opencl.pb.h"
 
 namespace vertexai {
 namespace tile {
@@ -17,12 +16,11 @@ namespace opencl {
 
 class Driver final : public hal::Driver {
  public:
-  Driver(const context::Context& ctx, const proto::Driver& config);
+  explicit Driver(const context::Context& ctx);
 
   const std::vector<std::shared_ptr<hal::DeviceSet>>& device_sets() final;
 
  private:
-  const std::shared_ptr<proto::Driver> config_;
   std::vector<std::shared_ptr<hal::DeviceSet>> device_sets_;
 };
 

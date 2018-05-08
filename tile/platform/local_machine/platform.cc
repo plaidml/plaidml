@@ -8,9 +8,9 @@
 #include <memory>
 #include <utility>
 
-#include "base/util/any_factory_map.h"
 #include "base/util/compat.h"
 #include "base/util/error.h"
+#include "base/util/factory.h"
 #include "base/util/logging.h"
 #include "base/util/type_url.h"
 #include "tile/hal/util/selector.h"
@@ -84,10 +84,12 @@ bool MatchConfig(const proto::Platform& config, const hal::proto::HardwareInfo& 
 }  // namespace
 
 Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
-  for (auto hal_config : config.hals()) {
-    auto driver = AnyFactoryMap<hal::Driver>::Instance()->MakeInstanceIfSupported(ctx, hal_config);
-    if (driver) {
+  for (auto& item : FactoryRegistrar<hal::Driver>::Instance()->Factories()) {
+    try {
+      auto driver = item.second(ctx);
       drivers_.emplace_back(std::move(driver));
+    } catch (const std::exception& ex) {
+      VLOG(1) << "Failed to initialize HAL: " << ex.what();
     }
   }
 
