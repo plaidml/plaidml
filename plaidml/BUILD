@@ -15,6 +15,7 @@ load(
     "plaidml_cc_version",
 )
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
+load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
 
 exports_files(["requirements.txt"])
 
@@ -56,7 +57,9 @@ plaidml_cc_library(
         "@toolchain//:linux_arm_32v7": [],
         "@toolchain//:linux_arm_64v8": [],
         "//conditions:default": ["//tile/hal/cpu"],
-    }),
+    }) + if_cuda_is_configured([
+        "//tile/hal/cuda",
+    ]),
 )
 
 # The PLAIDML C library, defined as a Bazel dynamically-loaded library.
@@ -172,20 +175,8 @@ filegroup(
     name = "configs",
     srcs = [
         "config.json",
-        ":experimental.json",
+        "experimental.json",
     ],
-)
-
-genrule(
-    name = "experimental_json",
-    srcs = select({
-        "@toolchain//:windows_x86_64": ["experimental.no_llvm.json"],
-        "@toolchain//:linux_arm_32v7": ["experimental.no_llvm.json"],
-        "@toolchain//:linux_arm_64v8": ["experimental.no_llvm.json"],
-        "//conditions:default": ["experimental.llvm.json"],
-    }),
-    outs = ["experimental.json"],
-    cmd = "cp $< $@",
 )
 
 plaidml_py_binary(

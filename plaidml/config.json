@@ -1,69 +1,119 @@
 {
-  "platform": {
-    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
-    "hals": [
-      {
-        "@type": "type.vertex.ai/vertexai.tile.hal.opencl.proto.Driver"
-      }
-    ],
-    "hardware_configs": [
-      {
-        "description": "AMD settings",
-        "sel": {
-          "and": {
-            "sel": [
-              { "vendor_regex": "Advanced Micro Devices.*" },
-              { "or": {
-                  "sel": [
-                    { "name_regex": "Fiji" },
-                    { "name_regex": "Ellesmere" },
-                    { "name_regex": "gfx900" }
-                  ]
+    "platform": {
+        "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+        "hals": [],
+        "hardware_configs": [
+            {
+                "description": "AMD Default",
+                "sel": {
+                    "and": {
+                        "sel": [
+                            {
+                                "vendor_regex": "Advanced Micro Devices.*"
+                            },
+                            {
+                                "or": {
+                                    "sel": [
+                                        {
+                                            "name_regex": "Fiji"
+                                        },
+                                        {
+                                            "name_regex": "Ellesmere"
+                                        },
+                                        {
+                                            "name_regex": "gfx900"
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "threads": 256,
+                    "vec_size": 1,
+                    "mem_width": 128,
+                    "max_mem": 32768,
+                    "max_regs": 16384,
+                    "goal_groups": 16,
+                    "goal_flops_per_byte": 50
                 }
-              }
-            ]
-          }
-        },
-        "settings": {
-          "threads": 256,
-          "vec_size": 1,
-          "mem_width": 128,
-          "max_mem": 32768,
-          "max_regs": 16384,
-          "goal_groups": 16,
-          "goal_flops_per_byte": 50
-        }
-      },
-      {
-        "description": "nvidia settings",
-        "sel": {
-          "and": {
-            "sel": [
-              { "vendor_regex": "NVIDIA.*" },
-              { "or": {
-                  "sel": [
-                    { "name_regex": ".*GeForce.*" },
-                    { "name_regex": ".*GTX.*" },
-                    { "name_regex": ".*Tesla.*" },
-                    { "name_regex": ".*TITAN.*" },
-                    { "name_regex": ".*Pascal.*" },
-                    { "name_regex": ".*Kepler.*" }
-                  ]
+            },
+            {
+                "description": "NVidia Default",
+                "sel": {
+                    "and": {
+                        "sel": [
+                            {
+                                "vendor_regex": "NVIDIA.*"
+                            },
+                            {
+                                "or": {
+                                    "sel": [
+                                        {
+                                            "name_regex": ".*GeForce.*"
+                                        },
+                                        {
+                                            "name_regex": ".*GTX.*"
+                                        },
+                                        {
+                                            "name_regex": ".*Tesla.*"
+                                        },
+                                        {
+                                            "name_regex": ".*TITAN.*"
+                                        },
+                                        {
+                                            "name_regex": ".*Pascal.*"
+                                        },
+                                        {
+                                            "name_regex": ".*Kepler.*"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "not": {
+                                    "name_regex": "GeForce GT 650M"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "threads": 256,
+                    "vec_size": 1,
+                    "mem_width": 64,
+                    "max_mem": 15360,
+                    "max_regs": 32768,
+                    "goal_groups": 16,
+                    "goal_flops_per_byte": 46
                 }
-              }
-            ]
-          }
-        },
-        "settings": {
-          "threads": 256,
-          "vec_size": 1,
-          "mem_width": 64,
-          "max_mem": 15360,
-          "max_regs": 32768,
-          "goal_groups": 16,
-          "goal_flops_per_byte": 46
-        }
-      }
-    ]
-  }
+            },
+            {
+                "description": "NVidia GeForce GT 650M",
+                "sel": {
+                    "and": {
+                        "sel": [
+                            {
+                                "vendor_regex": "NVIDIA.*"
+                            },
+                            {
+                                "name_regex": "GeForce GT 650M"
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "threads": 256,
+                    "vec_size": 1,
+                    "mem_width": 64,
+                    "max_mem": 15360,
+                    "max_regs": 32768,
+                    "goal_groups": 16,
+                    "goal_flops_per_byte": 46,
+                    "disable_io_aliasing": true
+                }
+            }
+        ]
+    }
 }

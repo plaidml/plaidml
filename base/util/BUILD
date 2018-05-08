@@ -28,6 +28,7 @@ plaidml_cc_library(
         "compat.h",
         "env.h",
         "error.h",
+        "factory.h",
         "hexdump.h",
         "intern.h",
         "iterator_util.h",

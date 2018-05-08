@@ -93,7 +93,7 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
   // Execute the broad rescheduling loop.
   bool reached_timeout = false;
   while (!placement || candidates.size()) {
-    if (end_time < std::chrono::steady_clock::now()) {
+    if (placement && (end_time < std::chrono::steady_clock::now())) {
       LOG(WARNING) << "Reached scheduler optimization timeout";
       reached_timeout = true;
       break;

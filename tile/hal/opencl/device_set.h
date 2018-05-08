@@ -21,15 +21,13 @@ namespace opencl {
 // DeviceSet implements the hal::DeviceSet model as a single OpenCL platform.
 class DeviceSet final : public hal::DeviceSet {
  public:
-  DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platform_id pid,
-            const std::shared_ptr<proto::Driver>& config);
+  DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platform_id pid);
 
   const std::vector<std::shared_ptr<hal::Device>>& devices() final;
 
   Memory* host_memory() final;
 
  private:
-  const std::shared_ptr<proto::Driver> config_;
   std::vector<std::shared_ptr<hal::Device>> devices_;
   std::unique_ptr<Memory> host_memory_;
 };

@@ -133,18 +133,19 @@ FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // N
   return op;
 }
 
-PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction& op,
-                           const std::vector<uint64_t>& tile) {
-  PerfStats r;
+proto::PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction& op,
+                                  const std::vector<uint64_t>& tile) {
+  proto::PerfStats r;
   IVLOG(4, "Computing cost for tile size: " << tile);
   uint64_t sz = op.ranges.size();
 
   OutPlan pout(op, tile, settings.threads, settings.mem_width / op.access[0].elem_size());
-  r.out_regs = pout.localSize() * op.access[0].elem_size();
-  r.mem_write = pout.outputs() * settings.mem_width * op.kernel_outputs.size();
-  r.shared_mem = 0;
-  r.mem_read = 0;
-  r.true_ops = 1;
+  r.set_out_regs(pout.localSize() * op.access[0].elem_size());
+  r.set_mem_write(pout.outputs() * settings.mem_width * op.kernel_outputs.size());
+
+  std::uint64_t mem_read = 0;
+  std::uint64_t shared_mem = 0;
+
   for (size_t i = 1; i < op.access.size(); i++) {
     const auto& a = op.access[i];
     uint64_t mem_width = settings.mem_width / a.elem_size();
@@ -152,22 +153,24 @@ PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction
       throw std::runtime_error("Memory width smaller than vector size");
     }
     ReadPlan mi(op.names, a.strides, tile, mem_width);
-    r.mem_read += mi.numLoads() * settings.mem_width;
+    mem_read += mi.numLoads() * settings.mem_width;
     if (!settings.use_global) {
-      r.shared_mem += mi.localSize() * a.elem_size();
+      shared_mem += mi.localSize() * a.elem_size();
     }
   }
   for (const auto& op_input : op.post_op_inputs) {
     // We read the post-op inputs during the output phase.
-    r.mem_read += pout.outputs() * byte_width(op_input.binding.shape.type);
+    mem_read += pout.outputs() * byte_width(op_input.binding.shape.type);
   }
-
-  uint64_t out_tiles = 1;
-  uint64_t all_tiles = 1;
-  uint64_t out_max_threads = 1;
-  uint64_t all_max_threads = 1;
+  
+  std::uint64_t rollups = 0;
+  std::uint64_t true_ops = 1;
+  std::uint64_t out_tiles = 1;
+  std::uint64_t all_tiles = 1;
+  std::uint64_t out_max_threads = 1;
+  std::uint64_t all_max_threads = 1;
   for (size_t i = 0; i < sz; i++) {
-    r.true_ops *= op.ranges[i];
+    true_ops *= op.ranges[i];
     all_max_threads *= tile[i];
     all_tiles *= RoundUp(op.ranges[i], tile[i]);
     if (op.access[0].strides[i] != 0) {
@@ -175,48 +178,51 @@ PerfStats ComputeTileStats(const DirectSettings& settings, const FlatContraction
       out_tiles *= RoundUp(op.ranges[i], tile[i]);
     }
   }
-  r.true_ops *= (op.post_ops.size() + (op.generate_contraction ? 2 : 0));
-
-  r.work_groups = out_tiles;
-  r.inner_loops = all_tiles / out_tiles;
-  r.operations = std::min(settings.threads, all_max_threads);
-  r.true_ops *= op.agg_vec;
-  r.rollups = 0;
-  if (out_max_threads < r.operations) {
-    r.shared_mem += settings.threads * op.access[0].elem_size();
+  true_ops *= (op.post_ops.size() + (op.generate_contraction ? 2 : 0));
+  r.set_work_groups(out_tiles);
+  r.set_inner_loops(all_tiles / out_tiles);
+  r.set_operations(std::min(settings.threads, all_max_threads));
+  true_ops *= op.agg_vec;
+  if (out_max_threads < r.operations()) {
+    shared_mem += settings.threads * op.access[0].elem_size();
   }
-  while (out_max_threads < r.operations) {
-    r.rollups++;
+  while (out_max_threads < r.operations()) {
+    rollups++;
     out_max_threads *= 2;
   }
   std::uint64_t output_threads = 1;
   for (const auto& idx : pout.indexes()) {
     output_threads *= idx.threads;
   }
-  r.threads_used = std::max(r.operations, output_threads);
+  r.set_threads_used(std::max(r.operations(), output_threads));
+  r.set_mem_read(mem_read);
+  r.set_shared_mem(shared_mem);
+  r.set_true_ops(true_ops);
+  r.set_rollups(rollups);
+  
   return r;
 }
 
 // Compute score from PerfStats
-double ComputeScore(const HardwareSettings& settings, const PerfStats& perf) {
+double ComputeScore(const HardwareSettings& settings, const proto::PerfStats& perf) {
   IVLOG(4, "Compute score:"
-               << " to=" << perf.true_ops << " wg=" << perf.work_groups << " il=" << perf.inner_loops << " sm="
-               << perf.shared_mem << " or=" << perf.out_regs << " mr=" << perf.mem_read << " mw=" << perf.mem_write
-               << " op=" << perf.operations << " rp=" << perf.rollups << " tu=" << perf.threads_used);
-  if (perf.shared_mem > settings.max_mem) {
+               << " to=" << perf.true_ops() << " wg=" << perf.work_groups() << " il=" << perf.inner_loops() << " sm="
+               << perf.shared_mem() << " or=" << perf.out_regs() << " mr=" << perf.mem_read() << " mw=" << perf.mem_write()
+               << " op=" << perf.operations() << " rp=" << perf.rollups() << " tu=" << perf.threads_used());
+  if (perf.shared_mem() > settings.max_mem) {
     IVLOG(4, "  over memory");
     return -1;
   }
-  if (perf.out_regs > settings.max_regs) {
+  if (perf.out_regs() > settings.max_regs) {
     IVLOG(4, "  over regs");
     return -1;
   }
   // Compute the logical amount memory io (ignoring OOB)
-  double bytes = perf.work_groups * (perf.inner_loops * perf.mem_read + perf.mem_write);
-  double flops_per_byte = perf.true_ops / bytes;
+  double bytes = perf.work_groups() * (perf.inner_loops() * perf.mem_read() + perf.mem_write());
+  double flops_per_byte = perf.true_ops() / bytes;
   double roof = std::min(flops_per_byte, static_cast<double>(settings.goal_flops_per_byte));
-  double occupancy = std::min(perf.work_groups, settings.goal_groups);
-  double thread_ratio = perf.threads_used / static_cast<double>(settings.threads);
+  double occupancy = std::min(perf.work_groups(), settings.goal_groups);
+  double thread_ratio = perf.threads_used() / static_cast<double>(settings.threads);
   double roof_ratio = roof / static_cast<double>(settings.goal_flops_per_byte);
   double occ_ratio = occupancy / static_cast<double>(settings.goal_groups);
   double score = roof_ratio * occ_ratio * thread_ratio;

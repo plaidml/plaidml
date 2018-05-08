@@ -58,6 +58,7 @@ import functools
 import math
 import re
 
+import numpy as np
 import plaidml
 import six
 import sys
@@ -89,6 +90,25 @@ NUMPY_DTYPE_TO_PLAIDML = {
 }
 
 PLAIDML_DTYPE_TO_NUMPY = dict([[v, k] for k, v in NUMPY_DTYPE_TO_PLAIDML.items()])
+
+
+def convert_np_dtype_to_pml(dtype):
+    if isinstance(dtype, np.dtype):
+        dtype = str(dtype)
+    if isinstance(dtype, plaidml.DType):
+        return dtype
+    try:
+        return NUMPY_DTYPE_TO_PLAIDML[dtype]
+    except KeyError:
+        raise ValueError("Unrecognized Numpy dtype {}".format(dtype))
+
+
+def convert_pml_dtype_to_np(dtype):
+    try:
+        return PLAIDML_DTYPE_TO_NUMPY[dtype]
+    except KeyError:
+        raise ValueError("Unrecognized PlaidML dtype {}".format(dtype))
+
 
 Source = namedtuple('Source', ['op', 'output_name'])
 
@@ -548,13 +568,13 @@ class _NDArray(Operation):
     def __init__(self, value):
         # TODO: Consider copying the value if it's writeable.
         self._value = value
-        shape = Shape(NUMPY_DTYPE_TO_PLAIDML[value.dtype.name], tuple(value.shape))
+        shape = Shape(convert_np_dtype_to_pml(value.dtype.name), tuple(value.shape))
         super(_NDArray, self).__init__(None, [], [('O', shape)], name='NDArray')
 
     def bind(self, bindings):
         tensor = plaidml.Tensor(bindings.dev,
                                 plaidml.Shape(bindings.ctx,
-                                              NUMPY_DTYPE_TO_PLAIDML[self._value.dtype.name],
+                                              convert_np_dtype_to_pml(self._value.dtype.name),
                                               *self._value.shape))
         with tensor.mmap_discard(bindings.ctx) as view:
             view.copy_from_ndarray(self._value)
@@ -784,16 +804,17 @@ class Value(_ShapelessValue):
             # Assume it's an ndarray.
             if ctx and dev:
                 # We have the device; we can return a value immediately.
-                tensor = plaidml.Tensor(
-                    dev,
-                    plaidml.Shape(ctx, NUMPY_DTYPE_TO_PLAIDML[py_val.dtype.name], *py_val.shape))
+                tensor = plaidml.Tensor(dev,
+                                        plaidml.Shape(ctx,
+                                                      convert_np_dtype_to_pml(py_val.dtype.name),
+                                                      *py_val.shape))
                 with tensor.mmap_discard(ctx) as view:
                     view.copy_from_ndarray(py_val)
                     view.writeback()
                 return Value.from_var(
                     tensor,
                     py_val.shape,
-                    NUMPY_DTYPE_TO_PLAIDML[py_val.dtype.name],
+                    convert_np_dtype_to_pml(py_val.dtype.name),
                     name='NDArray')
             # Otherwise, defer the value creation.
             return _NDArray(py_val).sole_output()

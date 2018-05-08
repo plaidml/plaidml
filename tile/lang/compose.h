@@ -172,7 +172,7 @@ class ContractionValue final : public Value {
   const std::vector<ValueConstraint>& constraints() const { return constraints_; }
   const std::vector<std::shared_ptr<Value>>& inputs() const { return inputs_; }
   bool use_default() const { return use_default_; }
-  bool no_defract() { return no_defract_; }
+  bool no_defract() const { return no_defract_; }
   Value::Type type() const final { return Value::Type::CONTRACTION; }
   size_t num_dims() const final { return dims_.size(); }
   std::shared_ptr<Value> dim_value(size_t i) const final { return dims_[i]; }

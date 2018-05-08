@@ -68,6 +68,9 @@ struct FlatContraction {
   std::string comments;
   std::string output;  // The contraction output -- not necessarily written.
 
+  // The map from each output to the set of inputs it's allowed to alias.
+  std::map<std::string, std::set<std::string>> safe_self_aliases;
+
   // Full cache primary key (names replaced to protect the innocent)
   std::vector<Op> post_ops;
   std::vector<FlatPostOpInput> post_op_inputs;  // Additional inputs for the post_ops

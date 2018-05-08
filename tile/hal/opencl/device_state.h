@@ -24,13 +24,11 @@ class DeviceState {
     void Flush() const;
   };
 
-  DeviceState(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did,
-              const std::shared_ptr<proto::Driver>& config, proto::DeviceInfo info);
+  DeviceState(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did, proto::DeviceInfo info);
 
   void Initialize(const hal::proto::HardwareSettings& settings);
 
   const cl_device_id did() const { return did_; }
-  const std::shared_ptr<proto::Driver>& config() const { return config_; }
   const CLObj<cl_context>& cl_ctx() const { return cl_ctx_; }
   const proto::DeviceInfo& info() const { return info_; }
   const Queue& cl_normal_queue() const { return *cl_normal_queue_; }
@@ -52,7 +50,6 @@ class DeviceState {
 
  private:
   const cl_device_id did_;
-  const std::shared_ptr<proto::Driver> config_;
   const proto::DeviceInfo info_;
   const CLObj<cl_context> cl_ctx_;
   std::unique_ptr<const Queue> cl_normal_queue_;

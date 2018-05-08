@@ -1,8 +1,10 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2018, Vertex.AI.
 
 #include <gtest/gtest.h>
 
+#include "base/util/type_url.h"
 #include "tile/base/platform_test.h"
+#include "tile/hal/cuda/hal.h"
 #include "tile/platform/local_machine/platform.h"
 
 using ::testing::ValuesIn;
@@ -23,7 +25,7 @@ std::vector<std::function<std::unique_ptr<Platform>()>> MakeFactories() {
   return factories;
 }
 
-INSTANTIATE_TEST_CASE_P(CpuHal, PlatformTest, ValuesIn(MakeFactories()));
+INSTANTIATE_TEST_CASE_P(CudaHal, PlatformTest, ValuesIn(MakeFactories()));
 
 }  // namespace
 }  // namespace testing
