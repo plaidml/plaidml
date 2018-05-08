@@ -2,6 +2,8 @@
 
 #include "tile/platform/local_machine/run_request.h"
 
+#include <unordered_set>
+
 namespace vertexai {
 namespace tile {
 namespace local_machine {
@@ -58,72 +60,74 @@ class ScheduleRunner final : private StepVisitor {
   ScheduleRunner(const context::Context& ctx, RunRequest* req) : ctx_{ctx}, req_{req} {}
 
   void Visit(const RunStep& run) final {
-    auto deps = InitDeps(run);
-    std::vector<std::shared_ptr<hal::Buffer>> params;
-    std::vector<std::shared_ptr<MemChunk>> dep_chunks;
-    params.reserve(run.outputs.size() + run.inputs.size());
-    dep_chunks.reserve(run.outputs.size());
+    InitDeps(run);
+    current_params_.reserve(run.outputs.size() + run.inputs.size());
+    current_dep_chunks_.reserve(run.outputs.size());
     for (const auto& out : run.outputs) {
-      std::shared_ptr<MemChunk> chunk = AddChunkParam(run.idx, out.allocp, &deps);
-      params.emplace_back(chunk->hal_buffer());
+      std::shared_ptr<MemChunk> chunk = AddChunkParam(run.idx, out.allocp);
+      current_params_.emplace_back(chunk->hal_buffer());
       if (out.add_dep) {
-        dep_chunks.push_back(chunk);
+        current_dep_chunks_.push_back(chunk);
       }
     }
     for (const auto& in : run.inputs) {
-      params.emplace_back(AddChunkParam(run.idx, in, &deps)->hal_buffer());
+      current_params_.emplace_back(AddChunkParam(run.idx, in)->hal_buffer());
     }
     // NOTE: VLOG_IS_ON(1) is needed here because LogResults depends on profiling
     // being enabled in order to print durations.
     auto event =
-        req_->program()->kernels()[run.kidx]->Run(ctx_, params, deps, ctx_.is_logging_events() || VLOG_IS_ON(1));
-    for (const auto& chunk : dep_chunks) {
+        req_->program()->kernels()[run.kidx]->Run(ctx_, current_params_, current_deps_, ctx_.is_logging_events() || VLOG_IS_ON(1));
+    for (const auto& chunk : current_dep_chunks_) {
       chunk->deps()->AddReadDependency(event);
     }
-    req_->AddKernelInfo(run.kidx, event);
     dep_set_.insert(event);
-    for (const auto& dep : deps) {
+    for (const auto& dep : current_deps_) {
       dep_set_.erase(dep);
     }
     deps_[run.idx] = std::move(event);
+    current_deps_.resize(0);
+    current_params_.resize(0);
+    current_dep_chunks_.resize(0);
   }
 
   void Visit(const CopyStep& copy) final {
-    auto deps = InitDeps(copy);
-    std::shared_ptr<MemChunk> from_chunk = AddChunkParam(copy.idx, copy.from, &deps);
-    std::shared_ptr<MemChunk> to_chunk = AddChunkParam(copy.idx, copy.to.allocp, &deps);
+    InitDeps(copy);
+    std::shared_ptr<MemChunk> from_chunk = AddChunkParam(copy.idx, copy.from);
+    std::shared_ptr<MemChunk> to_chunk = AddChunkParam(copy.idx, copy.to.allocp);
     auto event = req_->program()->devinfo()->dev->executor()->Copy(ctx_, from_chunk->hal_buffer(), 0,
-                                                                   to_chunk->hal_buffer(), 0, copy.byte_count, deps);
+                                                                   to_chunk->hal_buffer(), 0, copy.byte_count, current_deps_);
     if (copy.to.add_dep) {
       to_chunk->deps()->AddReadDependency(event);
     }
     dep_set_.insert(event);
-    for (const auto& dep : deps) {
+    for (const auto& dep : current_deps_) {
       dep_set_.erase(dep);
     }
     deps_[copy.idx] = std::move(event);
+    current_deps_.resize(0);
   }
 
-  std::shared_ptr<MemChunk> AddChunkParam(std::size_t sidx, AllocPtr alloc,
-                                          std::vector<std::shared_ptr<hal::Event>>* deps) {
+  std::shared_ptr<MemChunk> AddChunkParam(std::size_t sidx, AllocPtr alloc) {
     std::shared_ptr<MemChunk> chunk = req_->shim()->LookupAlloc(sidx, alloc);
-    auto extra_deps = chunk->deps()->GetReadDependencies();
-    deps->insert(deps->end(), std::make_move_iterator(extra_deps.begin()), std::make_move_iterator(extra_deps.end()));
+    chunk->deps()->GetReadDependencies(&current_deps_);
     return chunk;
   }
 
-  std::vector<std::shared_ptr<hal::Event>> InitDeps(const Step& step) {
-    std::vector<std::shared_ptr<hal::Event>> deps;
+  void InitDeps(const Step& step) {
     for (const auto& dep : step.deps) {
-      deps.emplace_back(deps_[(*dep)->idx]);
+      current_deps_.emplace_back(deps_[(*dep)->idx]);
     }
-    return deps;
   }
 
   context::Context ctx_;
   RunRequest* req_;
   std::vector<std::shared_ptr<hal::Event>> deps_;
-  std::set<std::shared_ptr<hal::Event>> dep_set_;
+  std::unordered_set<std::shared_ptr<hal::Event>> dep_set_;
+
+  // Used while issuing work.
+  std::vector<std::shared_ptr<hal::Event>> current_deps_;
+  std::vector<std::shared_ptr<hal::Buffer>> current_params_;
+  std::vector<std::shared_ptr<MemChunk>> current_dep_chunks_;
 };
 
 }  // namespace
@@ -159,14 +163,7 @@ boost::future<void> RunRequest::Run(const context::Context& ctx, const Program* 
   return complete.then([ req = std::move(req), running = std::move(running) ](decltype(complete) fut) { fut.get(); });
 }
 
-void RunRequest::AddKernelInfo(std::size_t kidx, std::shared_ptr<hal::Event> event) {
-  const lang::KernelInfo& ki = program_->kernel_list().kernels[kidx];
-  kernel_log_info_.emplace_back(KernelLogInfo{std::move(event), ki.kname, ki.tot_bytes, ki.tot_flops});
-}
-
-RunRequest::RunRequest(const Program* program, std::unique_ptr<Shim> shim) : program_{program}, shim_{std::move(shim)} {
-  kernel_log_info_.reserve(program_->kernels().size());
-}
+RunRequest::RunRequest(const Program* program, std::unique_ptr<Shim> shim) : program_{program}, shim_{std::move(shim)} {}
 
 void RunRequest::LogRequest(const Program* program, const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
                             const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs) {

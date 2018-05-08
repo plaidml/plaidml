@@ -67,7 +67,8 @@ static KernelInfo GenerateContractionKernel(const std::string& kname, const Hard
                                             const Contraction* c, const FlatContraction& flat, const TileOption& option,
                                             const std::vector<std::string>& inputs, const Bindings& vars,
                                             const VarRewrites& var_rewrites) {
-  KernelInfo ki = GenContract(kname, settings, flat, option.shape, vars, inputs);
+  proto::PerfStats perf = ComputeTileStats(settings, flat, option.shape);
+  KernelInfo ki = GenContract(kname, settings, flat, option.shape, vars, inputs, perf);
   ki.outputs = flat.kernel_outputs;
   ki.key = flat.TileKeyString();
   ki.settings = settings;
@@ -81,9 +82,9 @@ static KernelInfo GenerateContractionKernel(const std::string& kname, const Hard
   for (const auto& op_input : flat.post_op_inputs) {
     ki.inputs.emplace_back(var_rewrites.Lookup(op_input.name));
   }
-  PerfStats perf = ComputeTileStats(settings, flat, option.shape);
-  ki.tot_bytes = perf.work_groups * ((perf.inner_loops * perf.mem_read) + perf.mem_write);
-  ki.tot_flops = perf.true_ops;
+  ki.tot_bytes = perf.work_groups() * ((perf.inner_loops() * perf.mem_read()) + perf.mem_write());
+  ki.tot_flops = perf.true_ops();
+  *(ki.info.mutable_perf_stats()) = perf;
   if (VLOG_IS_ON(1)) {
     std::string tsize = "";
     for (size_t size : option.shape) {
@@ -343,9 +344,78 @@ static bool CanUnifyOp(const Program& prog, const Bindings& vars, std::size_t ro
   return true;
 }
 
+static void ConsiderConsumers(const Program& prog, const Bindings& vars, std::size_t root_opidx,
+                              const std::set<size_t>& previously_computed, const UseDef& ud, std::set<size_t>* unified,
+                              std::stack<std::string>* unified_frontier, std::set<std::string>* seen_vars,
+                              const std::string& var) {
+  // This function is used by ConnectedComponents to extend the connected components subgraph
+  // from a particular variable, attempting to add downstream operations whose other inputs'
+  // producers have either already been unified or that can be unified into the current
+  // kernel being built.  See ConnectedComponents for a broader overview of the algorithm.
+
+  // Loop over the variable's consumers.
+  for (std::size_t c_start : ud.uses().at(var)) {
+    if (unified->count(c_start) || !CanUnifyOp(prog, vars, root_opidx, c_start) || previously_computed.count(c_start)) {
+      continue;
+    }
+
+    std::set<std::size_t> candidates;
+    std::stack<std::size_t> candidate_frontier;
+
+    candidates.insert(c_start);
+    candidate_frontier.push(c_start);
+
+    while (!candidate_frontier.empty()) {
+      size_t c = candidate_frontier.top();
+      candidate_frontier.pop();
+
+      for (const std::string& input : prog.ops[c].inputs) {
+        auto it = ud.op_defs().find(input);
+        if (it == ud.op_defs().end()) {
+          continue;
+        }
+        size_t i = it->second;
+        if (i < root_opidx || unified->count(i) || candidates.count(i) || previously_computed.count(i)) {
+          continue;
+        }
+        auto tag = prog.ops[i].tag;
+        if (tag == Op::CONSTANT) {
+          continue;
+        }
+        if (!CanUnifyOp(prog, vars, root_opidx, i)) {
+          goto discard_candidate_set;
+        }
+        candidates.insert(i);
+        candidate_frontier.push(i);
+      }
+    }
+
+#ifdef __APPLE__
+    // HACK: this is to avoid limitations in the number of arguments allowed to a kernel under Metal.
+    if (unified->size() + candidates.size() > 10) {
+      goto discard_candidate_set;
+    }
+#endif
+
+    unified->insert(candidates.begin(), candidates.end());
+    for (auto c : candidates) {
+      for (const auto& var : prog.ops[c].inputs) {
+        if (seen_vars->emplace(var).second) {
+          unified_frontier->push(var);
+        }
+      }
+      // By definition, we've never seen the current op's output.
+      seen_vars->emplace(prog.ops[c].output);
+      unified_frontier->push(prog.ops[c].output);
+    }
+
+  discard_candidate_set : {}
+  }
+}
+
 static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings& vars, std::size_t root_opidx,
                                             const std::set<size_t>& previously_computed, const UseDef& ud) {
-  // This method computes the set of function operations that can be unified with the indicated initial operation,
+  // This function computes the set of function operations that can be unified with the indicated initial operation,
   // 'start'.
   //
   // The algorithm is relatively simplistic.  You could imagine unifying function ops with contractions, pushing the
@@ -379,70 +449,37 @@ static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings&
   // We process each frontier depth-first in order to slightly increase memory locality, although at this scale, it
   // doesn't matter much.
   std::set<size_t> unified;
-  std::stack<size_t> unified_frontier;
+  std::stack<std::string> unified_frontier;
+  std::set<std::string> seen_vars;
 
+  // The root operation is always unified.
   unified.insert(root_opidx);
-  unified_frontier.push(root_opidx);
 
-  while (!unified_frontier.empty()) {
-    std::size_t u = unified_frontier.top();
-    unified_frontier.pop();
-
-    // Loop over the current frontier node's output consumers.
-    for (std::size_t c_start : ud.uses().at(prog.ops[u].output)) {
-      if (unified.count(c_start) || !CanUnifyOp(prog, vars, root_opidx, c_start) ||
-          previously_computed.count(c_start)) {
-        continue;
-      }
-
-      std::set<std::size_t> candidates;
-      std::stack<std::size_t> candidate_frontier;
-
-      candidates.insert(c_start);
-      candidate_frontier.push(c_start);
-
-      while (!candidate_frontier.empty()) {
-        size_t c = candidate_frontier.top();
-        candidate_frontier.pop();
-
-        for (const std::string& input : prog.ops[c].inputs) {
-          auto it = ud.op_defs().find(input);
-          if (it == ud.op_defs().end()) {
-            continue;
-          }
-          size_t i = it->second;
-          if (i < root_opidx || unified.count(i) || candidates.count(i) || previously_computed.count(i)) {
-            continue;
-          }
-          auto tag = prog.ops[i].tag;
-          if (tag == Op::CONSTANT) {
-            continue;
-          }
-          if (!CanUnifyOp(prog, vars, root_opidx, i)) {
-            goto discard_candidate_set;
-          }
-          candidates.insert(i);
-          candidate_frontier.push(i);
-        }
-      }
-
-      unified.insert(candidates.begin(), candidates.end());
-      for (auto c : candidates) {
-        unified_frontier.push(c);
-      }
-
-    discard_candidate_set : {}
-    }
+  // Explore unification given the existence of the root operation's inputs and output in the kernel.
+  // This recursively adds all consumers of these vars and their respective inputs (iff those inputs can be unified)
+  // to the unified set.
+  for (const auto& var : prog.ops[root_opidx].inputs) {
+    seen_vars.emplace(var);
+    unified_frontier.push(var);
   }
+  seen_vars.emplace(prog.ops[root_opidx].output);
+  unified_frontier.push(prog.ops[root_opidx].output);
+  while (!unified_frontier.empty()) {
+    std::string var = std::move(unified_frontier.top());
+    unified_frontier.pop();
+    ConsiderConsumers(prog, vars, root_opidx, previously_computed, ud, &unified, &unified_frontier, &seen_vars, var);
+  }
+
   return unified;
 }
 
 static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed, VarRewrites* var_rewrites,
                           const Program& prog, std::size_t opidx, const UseDef& ud, const Bindings& vars,
-                          const ShapeMap& inputs, const ShapeMap& outputs, const std::vector<Polynomial>& out_poly) {
+                          const ShapeMap& inputs, const ShapeMap& outputs, const std::vector<Polynomial>& out_poly,
+                          const HardwareSettings& settings) {
   // Unify the contraction with downstream elementwise operations.
   //
-  // Here's the idea: during the contraction's output phase, we
+  // Here's the idea: during a contraction's output phase, we
   // have some set of outputs available, starting with the
   // actual output of the contraction.  So we scan the uses of
   // those outputs: any downstream elementwise operation that's
@@ -479,6 +516,9 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
 
   // The set of elementwise operations that have been unified with the kernel.
   std::set<std::size_t> unified_opidxs = ConnectedComponents(prog, vars, opidx, *computed, ud);
+
+  // The map of outputs that are allowed to alias inputs.
+  std::map<std::string, std::set<std::string>> aliases;
 
   for (auto unified_opidx : unified_opidxs) {
     auto& unified_op = prog.ops[unified_opidx];
@@ -535,9 +575,12 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
 
     IVLOG(4, "  Unifying op " << unified_op);
 
-    // Adjust inputs to account for local variable rewrites, and add
-    // them to the the post-contraction inputs if needed.
+    // Adjust inputs to account for local variable rewrites, and add them to the the post-contraction
+    // inputs if needed; for each input that's compatible with the output shape (all dimension sizes
+    // and striding identical, and identical element size), mark that the output is allowed to alias
+    // that input, recursively.
     Op copied_op = unified_op;
+    const auto* oshape = &vars.at(copied_op.output).shape;
     for (std::string& input : copied_op.inputs) {
       auto rit = local_var_rewrites.find(input);
       if (rit != local_var_rewrites.end()) {
@@ -550,6 +593,15 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
         if (!post_contraction_set.count(input)) {
           post_contraction_set.insert(input);
           post_contraction_inputs.push_back(input);
+        }
+      }
+
+      const auto* ishape = &vars.at(input).shape;
+      if (!settings.disable_io_aliasing && ishape->dims == oshape->dims && byte_width(ishape->type) == byte_width(oshape->type)) {
+        aliases[copied_op.output].emplace(input);
+        auto it = aliases.find(input);
+        if (it != aliases.end()) {
+          aliases[copied_op.output].insert(it->second.begin(), it->second.end());
         }
       }
     }
@@ -591,6 +643,20 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   }
 
   flat->kernel_outputs.insert(flat->kernel_outputs.end(), kernel_outputs.begin(), kernel_outputs.end());
+  if (!settings.disable_io_aliasing) {
+    for (const std::string& output : flat->kernel_outputs) {
+      auto ait = aliases.find(output);
+      if (ait != aliases.end()) {
+        for (auto it = ait->second.begin(); it != ait->second.end();) {
+          auto eit = it++;
+          if (!post_contraction_set.count(*eit)) {
+            ait->second.erase(eit);
+          }
+        }
+        flat->safe_self_aliases.emplace(output, std::move(ait->second));
+      }
+    }
+  }
 
   // Copy over post contraction inputs and compute strides
   computed->insert(unified_opidxs.begin(), unified_opidxs.end());
@@ -699,7 +765,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
         }
         flat.kernel_outputs.push_back(op.output);
       } else {
-        DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly);
+        DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly, settings);
       }
       ContractionWrap(r, &op.c, std::move(flat), kname, settings, vars, tile_trials, r.var_rewrites, optimizer,
                       &flat_cache);
@@ -802,7 +868,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       flat.access.emplace_back(std::move(access));
     }
 
-    DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly);
+    DoUnification(&flat, &computed, &r.var_rewrites, prog, i, ud, vars, inputs, outputs, out_poly, settings);
 
     ContractionWrap(r, nullptr, std::move(flat), next_kname(), settings, vars, tile_trials, r.var_rewrites, optimizer,
                     &flat_cache);

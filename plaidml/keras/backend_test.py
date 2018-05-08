@@ -794,6 +794,7 @@ class TestBackendOps(unittest.TestCase):
             b.conv1d(im, km, padding='valid', strides=(2), data_format=df),
             b.conv1d(im, km, padding='valid', dilation_rate=3, data_format=df),
             b.conv1d(im, km, padding='same', dilation_rate=2, data_format=df),
+            b.conv1d(im, km, padding='causal', dilation_rate=2, data_format=df),
         ]
 
     @opTest(
@@ -1197,6 +1198,13 @@ class TestBackendOps(unittest.TestCase):
     def testResizeImages(self, b, x, h, w, df):
         return [b.resize_images(x, h, w, df)]
 
+    @opTest([
+        [m(4, 6, 5, 2, 3), 3, 1, 2, 'channels_last'],
+        [m(1, 3, 2, 5, 4), 2, 3, 4, 'channels_first'],
+    ])
+    def testResizeVolumes(self, b, x, d, h, w, df):
+        return [b.resize_volumes(x, d, h, w, df)]
+
     @opTest([[m(3, 5)]])
     def testL2Normalize(self, b, x):
         return [b.l2_normalize(x, axis=1)]
@@ -1322,6 +1330,20 @@ class TestBackendOps(unittest.TestCase):
     ])
     def testCumSum(self, b, t, a):
         return [b.cumsum(t, a)]
+
+    @opTest([[m(4, 7, 1)], [m(2, 8, 3), (1, 3)], [m(2, 5, 7), (0, 0)]])
+    def testTemporalPadding(self, b, x, p=(1, 1)):
+        return [b.temporal_padding(x, padding=p)]
+
+    @opTest([[m(4, 6, 7, 1)], [m(2, 4, 8, 3), ((1, 3), (0, 2))],
+             [m(2, 5, 3, 1), ((4, 0), (0, 0)), 'channels_first']])
+    def testSpatial2DPadding(self, b, x, p=((1, 1), (1, 1)), d=None):
+        return [b.spatial_2d_padding(x, padding=p, data_format=d)]
+
+    @opTest([[m(4, 5, 3, 1, 2)], [m(3, 8, 1, 5, 6), ((0, 2), (3, 5), (1, 4))],
+             [m(4, 3, 7, 2, 2), ((0, 0), (1, 1), (0, 0)), 'channels_first']])
+    def testSpatial3DPadding(self, b, x, p=((1, 1), (1, 1), (1, 1)), d=None):
+        return [b.spatial_3d_padding(x, padding=p, data_format=d)]
 
 
 if __name__ == '__main__':

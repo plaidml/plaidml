@@ -13,9 +13,8 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-Device::Device(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did,
-               const std::shared_ptr<proto::Driver>& config, proto::DeviceInfo info)
-    : device_state_{std::make_shared<DeviceState>(ctx, cl_ctx, did, config, std::move(info))},
+Device::Device(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did, proto::DeviceInfo info)
+    : device_state_{std::make_shared<DeviceState>(ctx, cl_ctx, did, std::move(info))},
       compiler_{compat::make_unique<Compiler>(device_state_)},
       executor_{compat::make_unique<Executor>(device_state_)} {}
 

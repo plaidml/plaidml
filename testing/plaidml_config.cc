@@ -15,7 +15,7 @@ namespace {
 std::string GetConfigFile() {
   RunfilesDB rdb("vertexai_plaidml", nullptr);
   auto filename = env::Get("PLAIDML_CONFIG_FILE");
-  if (!filename.length()) {
+  if (!filename.size()) {
     filename = "plaidml/experimental.json";
   }
   return rdb[filename.c_str()];

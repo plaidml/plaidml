@@ -75,7 +75,8 @@ static sem::ExprPtr aggregate(const AggregationOp& op, sem::ExprPtr lhs, sem::Ex
 
 KernelInfo GenContract(const string& kname, const DirectSettings& settings, const FlatContraction& op,
                        const std::vector<uint64_t>& tile, const Bindings& vars,
-                       const std::vector<std::string>& inputs) {
+                       const std::vector<std::string>& inputs,
+                       const proto::PerfStats& perf) {
   using namespace sem::builder;  // NOLINT
   // Get size
   size_t sz = op.names.size();
@@ -114,10 +115,21 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
   }
   SVLOG(cs, 2, "Tile size: " << to_string(tile));
   SVLOG(cs, 3, "Contraction output var shape: " << vars.at(op.output).shape);
+  SVLOG(cs, 3, "Computed true ops: " << perf.true_ops());
+  SVLOG(cs, 3, "Computed work groups: " << perf.work_groups());
+  SVLOG(cs, 3, "Computed inner loops: " << perf.inner_loops());
+  SVLOG(cs, 3, "Computed shared mem: " << perf.shared_mem());
+  SVLOG(cs, 3, "Computed out regs: " << perf.out_regs());
+  SVLOG(cs, 3, "Computed mem read: " << perf.mem_read());
+  SVLOG(cs, 3, "Computed mem write: " << perf.mem_write());
+  SVLOG(cs, 3, "Computed operations: " << perf.operations());
+  SVLOG(cs, 3, "Computed rollups: " << perf.rollups());
+  SVLOG(cs, 3, "Computed threads used: " << perf.threads_used());
 
   // Map inputs to bindings
   std::vector<const Binding*> bindings;
   bindings.reserve(op.access.size());
+
   bindings.push_back(nullptr);
   for (size_t i = 1; i < op.access.size(); i++) {
     if (inputs.size() < i) {
@@ -149,6 +161,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
   }
   SVLOG(cs, 3, "lwork = " << ki.lwork[0] << ", " << ki.lwork[1] << ", " << ki.lwork[2]);
   SVLOG(cs, 3, "gwork = " << ki.gwork[0] << ", " << ki.gwork[1] << ", " << ki.gwork[2]);
+  ki.safe_self_aliases = op.safe_self_aliases;
 
   // Add comments together + and dump
   std::string comments = op.comments + cs.str();

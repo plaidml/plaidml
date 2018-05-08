@@ -15,6 +15,7 @@ load(
     "plaidml_cc_version",
 )
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
+load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
 
 exports_files(["requirements.txt"])
 
@@ -46,17 +47,32 @@ plaidml_cc_library(
         "//plaidml/base",
         "//tile/base",
         "//tile/base:program_cache",
-        "//tile/hal/opencl",
         "//tile/platform/local_machine",
         "//tile/proto:proto_cc",
         "@half_repo//:half",
         "@minizip_repo//:minizip",
     ] + select({
-        "@toolchain//:windows_x86_64": [],
-        "@toolchain//:linux_arm_32v7": [],
-        "@toolchain//:linux_arm_64v8": [],
-        "//conditions:default": ["//tile/hal/cpu"],
-    }),
+        "@toolchain//:linux_arm_32v7": [
+            "//tile/hal/opencl",
+        ],
+        "@toolchain//:linux_arm_64v8": [
+            "//tile/hal/opencl",
+        ],
+        "@toolchain//:macos_x86_64": [
+            "//tile/hal/cpu",
+            "//tile/hal/metal",
+            "//tile/hal/opencl",
+        ],
+        "@toolchain//:windows_x86_64": [
+            "//tile/hal/opencl",
+        ],
+        "//conditions:default": [
+            "//tile/hal/cpu",
+            "//tile/hal/opencl",
+        ],
+    }) + if_cuda_is_configured([
+        "//tile/hal/cuda",
+    ]),
 )
 
 # The PLAIDML C library, defined as a Bazel dynamically-loaded library.
@@ -168,30 +184,40 @@ plaidml_cc_test(
     ],
 )
 
-filegroup(
-    name = "configs",
-    srcs = [
-        "config.json",
-        ":experimental.json",
-    ],
-)
-
 genrule(
-    name = "experimental_json",
+    name = "configs",
     srcs = select({
-        "@toolchain//:windows_x86_64": ["experimental.no_llvm.json"],
-        "@toolchain//:linux_arm_32v7": ["experimental.no_llvm.json"],
-        "@toolchain//:linux_arm_64v8": ["experimental.no_llvm.json"],
-        "//conditions:default": ["experimental.llvm.json"],
+        "@toolchain//:macos_x86_64": [
+            "configs/empty.json",
+            "configs/macos.json",
+        ],
+        "//conditions:default": [
+            "configs/config.json",
+            "configs/experimental.json",
+        ],
     }),
-    outs = ["experimental.json"],
-    cmd = "cp $< $@",
+    outs = [
+        "config.json",
+        "experimental.json",
+    ],
+    cmd = """
+    srcs=($(SRCS))
+    outs=($(OUTS))
+    cp $${srcs[0]} $${outs[0]}
+    cp $${srcs[1]} $${outs[1]}
+""",
 )
 
 plaidml_py_binary(
     name = "setup",
     srcs = ["plaidml_setup.py"],
     main = "plaidml_setup.py",
+    deps = [":py"],
+)
+
+plaidml_py_binary(
+    name = "enumerate",
+    srcs = ["enumerate.py"],
     deps = [":py"],
 )
 

@@ -4,14 +4,14 @@
 
 // These interfaces define the data model provided by all HAL drivers.
 
-#include <boost/thread/future.hpp>
-
 #include <chrono>
 #include <initializer_list>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include <boost/thread/future.hpp>
 
 #include "base/context/context.h"
 #include "tile/lang/generate.h"
@@ -54,10 +54,18 @@ class Event {
 // Access control flags that can be applied to buffer allocations, indicating the functionality needed by the allocator.
 // The returned buffer may support additional functionality, but only the requested functionality is guaranteed.
 enum class BufferAccessMask : std::uint32_t {
-  DEVICE_READABLE = 0x01,
-  DEVICE_WRITEABLE = 0x02,
-  HOST_READABLE = 0x04,
-  HOST_WRITEABLE = 0x08,
+  READABLE = 0x01,
+  WRITEABLE = 0x02,
+  HOST = 0x04,
+  DEVICE = 0x08,
+  HOST_READABLE = HOST | READABLE,
+  HOST_WRITEABLE = HOST | WRITEABLE,
+  HOST_RW = HOST | READABLE | WRITEABLE,
+  DEVICE_READABLE = DEVICE | READABLE,
+  DEVICE_WRITEABLE = DEVICE | WRITEABLE,
+  DEVICE_RW = DEVICE | READABLE | WRITEABLE,
+  ACCESS_MASK = READABLE | WRITEABLE,
+  LOCATION_MASK = HOST | DEVICE,
   ALL = 0x0F,
 };
 

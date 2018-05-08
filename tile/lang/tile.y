@@ -41,10 +41,10 @@ struct Context {
   }
   void finish_stmt() {
     if (id != "") {
-      vertexai::tile::lang::Attribute attr;
-      attr.name = "pid";
-      attr.params.push_back(id);
-      program.ops.back().attributes.emplace_back(attr);
+      vertexai::tile::lang::proto::Attribute attr;
+      attr.set_name("pid");
+      attr.add_params(id);
+      program.ops.back().attributes.emplace_back(std::move(attr));
     }
   }
 };
@@ -58,8 +58,9 @@ struct Value {
   vertexai::tile::lang::AggregationOp agg_op;
   std::vector<std::string> expr_list;
   vertexai::tile::lang::Op op;
-  vertexai::tile::lang::Attribute attr;
-  std::vector<vertexai::tile::lang::Attribute> attr_list;
+  vertexai::tile::lang::proto::Attribute attr;
+  std::vector<vertexai::tile::lang::proto::Attribute> attr_list;
+  google::protobuf::RepeatedPtrField<std::string> attr_param_list;
 };
 
 #define YYSTYPE Value
@@ -119,7 +120,7 @@ int yyerror(yyscan_t s, Context& context, const char* message) {
 %type <expr_list> expr_list name_list
 %type <op> unary_con binary_con ternary_con
 %type <s> attribute_parameter
-%type <expr_list> attribute_parameter_list attribute_parameters
+%type <attr_param_list> attribute_parameter_list attribute_parameters
 %type <attr> attribute
 %type <attr_list> attribute_list
 
@@ -148,22 +149,22 @@ attributed_stmt
 ;
 
 attribute_list
-  : attribute { $$ = std::vector<vertexai::tile::lang::Attribute>{$1}; }
+  : attribute { $$ = std::vector<vertexai::tile::lang::proto::Attribute>{std::move($1)}; }
   | attribute_list attribute { $1.emplace_back(std::move($2)); $$ = std::move($1); }
 ;
 
 attribute
-  : "[[" IDXID attribute_parameters "]]" { $$ = vertexai::tile::lang::Attribute{$2, std::move($3)}; }
+  : "[[" IDXID attribute_parameters "]]" { $$ = vertexai::tile::lang::proto::Attribute(); $$.set_name($2); $$.mutable_params()->CopyFrom($3); }
 ;
 
 attribute_parameters
-  : /* empty */ { $$ = std::vector<std::string>(); }
+  : /* empty */ { $$ = google::protobuf::RepeatedPtrField<std::string>(); }
   | "(" attribute_parameter_list ")" { $$ = std::move($2); }
 ;
 
 attribute_parameter_list
-  : attribute_parameter { $$ = std::vector<std::string>{std::move($1)}; }
-  | attribute_parameter_list "," attribute_parameter { $1.emplace_back(std::move($3)); $$ = std::move($1); }
+  : attribute_parameter { $$ = google::protobuf::RepeatedPtrField<std::string>(); $$.Add(std::move($1)); }
+  | attribute_parameter_list "," attribute_parameter { $1.Add(std::move($3)); $$ = std::move($1); }
 ;
 
 attribute_parameter:

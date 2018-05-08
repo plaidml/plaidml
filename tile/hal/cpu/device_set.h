@@ -7,7 +7,6 @@
 
 #include "base/context/context.h"
 #include "tile/base/hal.h"
-#include "tile/hal/cpu/cpu.pb.h"
 
 namespace vertexai {
 namespace tile {
