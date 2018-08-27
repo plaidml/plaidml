@@ -782,10 +782,11 @@ _NP_TYPES = {
 }
 
 
-def _internal_set_vlog(l):
-    _lib()._internal_set_vlog(l)
-    logging.getLogger(__name__).setLevel(logging.DEBUG)
-    plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.NOTSET)
+def _internal_set_vlog(level):
+    _lib()._internal_set_vlog(level)
+    if level:
+        logging.getLogger(__name__).setLevel(logging.DEBUG)
+        plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.NOTSET)
 
 
 def quiet():
@@ -816,6 +817,11 @@ def set_backtrace(enable):
         _backtraces = None
 
 
+def is_backtrace_enabled():
+    global _backtraces
+    return _backtraces is not None
+
+
 def Context():
     return plaidml.context.Context(_lib())
 
@@ -839,7 +845,7 @@ class Function(_Function):
     def __init__(self, code, backtrace=None):
         global _backtraces
         fid = ""
-        if _backtraces is not None:
+        if is_backtrace_enabled():
             if backtrace == None:
                 backtrace = "".join(traceback.format_stack()[:-1])
             fid = "id_" + hashlib.md5(backtrace + code).hexdigest()[0:12]
@@ -999,7 +1005,7 @@ class _Enumerator(object):
         self._ctx = ctx
         if settings.config:
             self._as_parameter_ = _lib().plaidml_alloc_device_enumerator_with_config(
-                ctx, settings.config, ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
+                ctx, settings.config.encode(), ctypes.cast(None, _ENUM_DEVICES_FUNCTYPE), None)
         elif settings.config_file and os.path.exists(settings.config_file):
             with open(settings.config_file) as cf:
                 config = cf.read()
@@ -1184,11 +1190,11 @@ class _View(object):
             if src.dtype != 'float16':
                 src = src.astype('float16')
             src = src.view(dtype='uint16')
-        dst = np.ctypeslib.as_array(self, shape=src.shape)
+        dst = np.ctypeslib.as_array(self._base, shape=src.shape)
         np.copyto(dst, src)
 
     def copy_to_ndarray(self, dst):
-        src = np.ctypeslib.as_array(self, shape=dst.shape)
+        src = np.ctypeslib.as_array(self._base, shape=dst.shape)
         if self._dtype == DType.FLOAT16:
             src = src.view(dtype='float16')
         np.copyto(dst, src)
@@ -1312,8 +1318,8 @@ class Shape(_Shape):
             stride *= arg
         for arg in args:
             if arg != 0:
-                stride /= arg
-            _lib().plaidml_add_dimension(ctx, self, arg, int(stride))
+                stride //= arg
+            _lib().plaidml_add_dimension(ctx, self, arg, stride)
 
 
 class Placeholder(Var):

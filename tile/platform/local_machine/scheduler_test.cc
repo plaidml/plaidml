@@ -40,9 +40,12 @@ tile::proto::Program MakeProgram(const std::string& filename) {
 
 std::vector<tile::proto::Program> SchedulerTest::GetTestPrograms() {
   RunfilesDB rdb{"vertexai_plaidml/tile/platform/local_machine/testdata"};
-  std::vector<tile::proto::Program> result{MakeProgram(rdb["prng.tpb"])};
+  std::vector<tile::proto::Program> result;
+  result.emplace_back(MakeProgram(rdb["concat.tpb"]));
+  result.emplace_back(MakeProgram(rdb["prng.tpb"]));
   result.emplace_back(MakeProgram(rdb["xception.tpb"]));
   if (FLAGS_test_long_schedules) {
+    result.emplace_back(MakeProgram(rdb["lstm.tpb"]));
     result.emplace_back(MakeProgram(rdb["resnet50_train.tpb"]));
   }
   return result;
@@ -62,6 +65,9 @@ tile::lang::HardwareSettings SchedulerTest::GetSettings() {
   settings.max_regs = 16384;
   settings.goal_groups = 16;
   settings.goal_flops_per_byte = 50;
+  settings.goal_dimension_sizes.push_back(1024);
+  settings.goal_dimension_sizes.push_back(1024);
+  settings.goal_dimension_sizes.push_back(1024);
   return settings;
 }
 

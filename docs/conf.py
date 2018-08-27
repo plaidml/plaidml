@@ -174,7 +174,7 @@ texinfo_documents = [
 
 # -- Extension configuration -------------------------------------------------
 
-plantuml = os.environ.get('PLANTUMLSH')
+plantuml = os.getenv('PLANTUMLSH')
 
 # The Napoleon extension allows google style doc comments, but it also uses
 # numpy style too, by default; for consistency, we'll use only google style.
@@ -191,28 +191,8 @@ napoleon_use_rtype = False
 # subdirectory as needed.
 autosummary_generate = True
 
-# Autosummary does not respect the autodoc_mock_imports option, so we have to
-# mock out these libraries ourselves; we can't simply require them, since they
-# won't be available on readthedocs.
-import six
-
-if six.PY3:
-    from unittest.mock import MagicMock
-else:
-    from mock import Mock as MagicMock
-
-
-class Mock(MagicMock):
-
-    @classmethod
-    def __getattr__(cls, name):
-        return Mock()
-
 
 def setup(app):
-    MOCK_MODULES = ['numpy', 'scipy']
-    sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
-
     app.add_config_value(
         'recommonmark_config',
         {

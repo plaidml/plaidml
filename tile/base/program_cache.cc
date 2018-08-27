@@ -1,3 +1,5 @@
+// Copyright 2017, Vertex.AI.
+
 #include "tile/base/program_cache.h"
 
 #include <map>
@@ -31,7 +33,7 @@ template <typename M>
 void SerializeShapemap(std::ostringstream* serialized, const M& m) {
   std::map<std::string, const proto::TensorShape&> shapes;
   for (const auto& t : m) {
-    shapes.emplace(t.first, t.second);
+    shapes.emplace(t.first, t.second.shape());
   }
   for (const auto& t : shapes) {
     (*serialized) << t.first.length() << ':';

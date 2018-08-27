@@ -8,10 +8,10 @@ namespace local_machine {
 
 LinearScheduler::LinearScheduler(const std::shared_ptr<Placer>& placer) : placer_{placer} {}
 
-Schedule LinearScheduler::BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) {
-  Schedule schedule = ToScheduleSteps(program, kl);
+schedule::Schedule LinearScheduler::BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) {
+  schedule::Schedule schedule = ToScheduleSteps(program, kl);
   AddLinearDeps(&schedule, 1);
-  placer_->PlaceSchedule(&schedule)->Apply();
+  placer_->PlaceSchedule(program, &schedule)->Apply();
   return schedule;
 }
 

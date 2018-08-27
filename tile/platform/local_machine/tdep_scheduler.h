@@ -20,7 +20,7 @@ class TransitiveDepScheduler final : public Scheduler {
  public:
   explicit TransitiveDepScheduler(const std::shared_ptr<Placer>& placer, std::size_t max_in_flight);
 
-  Schedule BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) final;
+  schedule::Schedule BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) final;
 
   const char* name() const final;
 

@@ -32,8 +32,7 @@ git_big_rule = rule(
         "src": attr.string(),
         "out": attr.output(mandatory = True),
         "env": attr.label(
-            allow_files = True,
-            single_file = True,
+            allow_single_file = True,
             default = Label("@git_big//:env"),
         ),
     },

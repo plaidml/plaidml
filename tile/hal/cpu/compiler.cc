@@ -2,8 +2,9 @@
 
 #include "tile/hal/cpu/compiler.h"
 
-#include <exception>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
+
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -13,7 +14,7 @@
 
 #include "base/util/logging.h"
 #include "tile/hal/cpu/emitllvm.h"
-#include "tile/hal/cpu/kernel.h"
+#include "tile/hal/cpu/executable.h"
 #include "tile/hal/cpu/library.h"
 #include "tile/hal/cpu/runtime.h"
 #include "tile/lang/semprinter.h"
@@ -104,7 +105,7 @@ void Compiler::GenerateInvoker(const lang::KernelInfo& ki, llvm::Module* module)
   llvm::Type* voidtype = llvm::Type::getVoidTy(context);
   auto invokertype = llvm::FunctionType::get(voidtype, invoker_args, false);
   auto linkage = llvm::Function::ExternalLinkage;
-  std::string invokername = Kernel::InvokerName(ki.kname);
+  std::string invokername = Executable::InvokerName(ki.kname);
   const char* nstr = invokername.c_str();
   auto invoker = llvm::Function::Create(invokertype, linkage, nstr, module);
   // The invoker has no branches so we'll only need a single basic block.

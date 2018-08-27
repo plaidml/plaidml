@@ -21,7 +21,19 @@ namespace gp = ::google::protobuf;
 hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
   hal::proto::HardwareInfo result;
   result.set_type(info.type());
-  result.set_name(info.name());
+  auto vendor = info.vendor();
+  if (vendor.find("NVIDIA") != std::string::npos) {
+    vendor = "NVIDIA";
+  } else if (vendor.find("Intel") != std::string::npos) {
+    vendor = "Intel";
+  } else if (vendor.find("Advanced Micro Devices") != std::string::npos) {
+    vendor = "AMD";
+  }
+  if (info.name() == "CPU") {
+    result.set_name(std::string("OpenCL ") + info.name());
+  } else {
+    result.set_name(std::string("OpenCL ") + vendor + " " + info.name());
+  }
   result.set_vendor(info.vendor());
   result.set_vendor_id(info.vendor_id());
   result.set_platform(info.platform_name());

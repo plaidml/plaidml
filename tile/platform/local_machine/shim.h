@@ -25,27 +25,31 @@ namespace local_machine {
 // program (e.g. dealiasing input and output buffers).
 class Shim {
  public:
-  // Construct the Shim.  This should be done at the start of queueing
-  // the program's steps.
-  Shim(const context::Context& ctx, const Program* program, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-       std::map<std::string, std::shared_ptr<tile::Buffer>> outputs);
-
-  // Destroys the Shim, applying its effects to the system state.
-  // This should be done after queueing the program's steps.
-  ~Shim();
-
-  // Translate an input or output for a step.
-  std::shared_ptr<MemChunk> LookupAlloc(std::size_t sidx, AllocPtr alloc) const;
-
-  // Handle execution errors.
-  void SetLaunchException(std::exception_ptr ep) const noexcept;
-
- private:
   struct AliasUpdate {
     std::shared_ptr<Buffer> buffer;
     std::shared_ptr<MemChunk> chunk;
   };
 
+  // Construct the Shim.  This should be done at the start of queueing
+  // the program's steps.
+  Shim(const context::Context& ctx, const Program* program, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
+       std::map<std::string, std::shared_ptr<tile::Buffer>> outputs);
+
+  // Destroys the Shim.  Note that this does not apply side-effects;
+  // OnLaunchSuccess must be invoked in order to remap program output buffers.
+  ~Shim() {}
+
+  // Translate an input or output for a step.
+  std::shared_ptr<MemChunk> LookupAlloc(std::size_t sidx, schedule::Alloc* alloc) const;
+
+  // Handle execution errors.
+  void SetLaunchException(std::exception_ptr ep) const noexcept;
+
+  // Handle successful execution launch.
+  // Note that the shim should stay alive until execution is guaranteed to have completed.
+  void OnLaunchSuccess() noexcept;
+
+ private:
   std::vector<std::shared_ptr<MemChunk>> chunk_infos_;
   std::list<AliasUpdate> updates_;
 };

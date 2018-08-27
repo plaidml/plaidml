@@ -22,6 +22,7 @@ from collections import defaultdict
 import functools
 
 from enum import Enum
+import numpy as np
 import plaidml
 from plaidml import tile
 import six
@@ -37,6 +38,35 @@ class AutoPadding(Enum):
 class ConvolutionDataFormat(Enum):
     CHANNELS_FIRST = 1
     CHANNELS_LAST = 2
+
+
+class ConvolutionKernelFormat(Enum):
+    CHANNELS_FIRST = 1
+    CHANNELS_LAST = 2
+
+
+class ConvolutionGrouping(Enum):
+    NONE = 1
+    MAX = 2
+    EXPLICIT = 3
+    AUTO = 4
+
+
+class GroupedChannelFormat(Enum):
+    FullOutGroupIn = 1
+    GroupGroupOut = 2
+    GroupGroupOutGroupIn = 3
+
+
+class ConvIndex(Enum):
+    ci = 1  # input channel (overall)
+    co = 2  # output channel (overall
+    g = 3  # group
+    gci = 4  # input channel (within-group)
+    gco = 5  # output channel (within-group)
+    k = 6  # spatial location (kernel)
+    n = 7  # batch
+    x = 8  # spatial location (data)
 
 
 def _extend_pads(pads, rank):
@@ -103,149 +133,836 @@ def pad_compute(sym, input_size, filter_size, stride, padding, pads=None):
     return (sym_output_size, sym_padding_before, num_out_size)
 
 
-def _format_conv_strings(
-        rank,
-        in_shape,
-        kernel_shape,
-        strides,
-        padding,
-        data_format,
-        dilation_rate,
-        channelwise,
-        forward=True,
-        expected_output_shape=None,
-):
-    # Variable meanings:
-    # N: Number of items in the batch
-    # L<i>: Spatial dimension i of each (input) item
-    # CI: Number of channels (aka filters) of each input item
-    # LK<i>: Spatial dimension i of kernel
-    # CO: Number of channels (aka filters) of each output item
-    # C: Number of input channels in channelwise convolutions
-    # M: Channel multiplier in channelwise convolutions (each input channel yields
-    #     M output channels for such convolutions)
-    #
-    # n: Which element of the batch we're on
-    # x<i>: The ith coordinate in the output/image
-    # k<i>: The ith coordinate in the kernel
-    # ci: The input channel we're on
-    # co: The output channel we're on
-    # c: The input channel we're on for channelwise convolutions
-    # m: The output channel multiplier we're on for output convolutions
-    if data_format == ConvolutionDataFormat.CHANNELS_FIRST:
-        n = 0
-        c = 1
-        l = [i + 2 for i in range(rank)]
-    elif data_format == ConvolutionDataFormat.CHANNELS_LAST:
-        n = 0
-        l = [i + 1 for i in range(rank)]
-        c = rank + 1
-    else:
-        raise ValueError('Unrecognized data format \'{}\''.format(data_format))
-    if channelwise == True and in_shape[c] != kernel_shape[-2]:
-        raise ValueError(
-            'Channelwise convolution must have same number of channels in both input and kernel:\n'
-            + '{} (from shape {}) v {} (from shape {})'.format(in_shape[c], in_shape,
-                                                               kernel_shape[-2], kernel_shape))
-    sym_out_shape = list()
-    pad_amount = list()
-    num_out_shape = list()
-    for i in range(rank):
-        if forward:
-            sym_out, sym_pad, num_out = pad_compute('L{}'.format(i), in_shape[l[i]],
-                                                    dilation_rate[i] * (kernel_shape[i] - 1) + 1,
-                                                    strides[i], padding, None)
+class _ConvolutionStringFormatter:
+    """Produces the strings needed to write Tile code for a convolution.
+
+    This class provides strings for the dimensions, indices, and supporting code
+    (i.e. padding and reshapes) for a convolution. The convolution operation
+    then only provides skeleton code specifying how the various tensors interact
+    and uses this class's functions when it needs to specify indices or dims for
+    a tensor or when it needs supporting code.
+
+    This class manages the complex interactions between the various tensor
+    formats and the various types of convolutions in constructing these strings.
+
+    Member function categories
+    --------------------------
+     * Index lookup (get_I_axis, get_K_axis, get_O_axis): Given the variable
+    name of an index (as a ConvIndex), returns the axis number (or a list of
+    axis numbers for k and x) of that index
+    for the indicated tensor.
+     * Needs reshape (kernel_needs_reshape, output_needs_reshape): Return a
+    boolean: Is a reshape required for this tensor? (i.e. because the shape most
+    useful for the Tile contraction is not the same as the expected format of
+    the tensor as specified by the format parameters.
+     * Reshape renames (Kitrn, Oitrn): Return the appropriate internal name for
+    the tensor (e.g. either 'K' or 'Kitrn' -- 'K' if no reshape is needed for
+    the kernel and 'Kitrn' if a reshape is needed)
+     * Padding (pad_amount, padding_str): Values and code blocks related to the
+    spatial padding needed to align the kernel to the data.
+     * Parameter lists ([I/K/Ki/O/Oi]_[batch/channel/spatial]_[dim/dims/
+    idx/idxs][_numeric]): Returns a list of strings (or, in the `_numeric` case,
+    a list of ints/SymbolicDims) giving individual parameters.
+     * Parameter code blocks ([I/K/Ki/O/Oi]_dims, [I/Ki/Oi]_idxs): Return fully
+    formatted strings ready to plug in to the convolution Tile code to specify
+    dimension or index parameters for the specified tensor.
+     * Outshape (O_shape_tuple_numeric): Computes dims used to construct the
+    tile.Shape of the output tensor.
+
+    Tile tensor variable names
+    --------------------------
+     * 'I': input data
+     * 'K': kernel (as input by caller)
+     * 'Kitrn': internal kernel (i.e. kernel reshaped for main contraction)
+     * 'O': output (as returned to caller -- possibly reshaped from Oitrn)
+     * 'Oitrn': internal output (i.e. output as produced by main contraction)
+
+    Tile dimension meanings
+    -----------------------
+     * 'CI': input channels (total)
+     * 'CO': output channels (total)
+     * 'G': groups
+     * 'GCI': input channels per group
+     * 'GCO': output channels per group
+     * 'L#': data spatial dimension (number #)
+     * 'LK#': kernel spatial dimension (number #)
+     * 'N': batch size
+     * 'Pad#': padding amount in spatial dimension number #
+
+    Tile index meanings
+    -------------------
+     * 'ci': input channel index (overall)
+     * 'co': output channel index (overall)
+     * 'g': group index
+     * 'gci': within-group input channel index
+     * 'gco': within-group output channel index
+     * 'k#': kernel spatial index (number #)
+     * 'n': batch index
+     * 'x#': data spatial index (number #)
+
+    How grouped convolutions work
+    -----------------------------
+    In a standard convolution, at fixed spatial locations in both the input data
+    and the kernel and at a fixed batch element, input channels are densely
+    mapped to output channels: each input channel affects every output channel:
+
+    IN CHANNELS:        o  o
+                        |\/|
+                        |/\|
+    OUT CHANNELS:       o  o
+
+    In a grouped convolution, channels are split into groups, and input channels
+    affect output channels if and only if they're in the same group:
+
+    IN CHANNELS:        o  o    o  o    o  o
+                        |\/|    |\/|    |\/|
+                        |/\|    |/\|    |/\|
+    OUT CHANNELS:       o  o    o  o    o  o
+    (This is ONE convolution with 6 input and 6 output channels.)
+
+    Grouped convolutions with only one input per group are often called
+    depthwise or channel-wise convolutions:
+
+    IN CHANNELS:           o       o       o
+                          /|\     /|\     /|\
+                         / | \   / | \   / | \
+    OUT CHANNELS:       o  o  o o  o  o o  o  o
+    (A depthwise convolution with multiplicity 3, i.e. 3 output channels per
+    input channel.)
+    """
+
+    def __init__(
+            self,
+            rank,
+            in_shape,
+            kernel_shape,
+            strides,
+            padding,
+            dilation_rate,
+            data_format,
+            kernel_format,
+            pads=None,
+            grouping=ConvolutionGrouping.NONE,
+            groups=None,
+            group_format=None,
+            transposed=False,
+            expected_output_shape=None,
+    ):
+        """
+        Constructs a string formatter for a specific convolution.
+
+        Args:
+            rank (int): The number of spatial dimensions of the convolution
+            in_shape (tuple of ints): All the dimensions of 'I' in the order used by the caller
+            kernel_shape (tuple of ints): All the dimensions of 'K' in the order used by the caller
+            strides (tuple of ints): The stride for each spatial dimension
+            padding (AutoPadding): The padding style to use
+            dilation_rate (tuple of ints): The kernel spacing for each spatial dimension
+            data_format (ConvolutionDataFormat): The parameter order style of 'I'
+            kernel_format (ConvolutionKernelFormat): The parameter order & semantics style of 'K'
+            pads (tuple of (int, int)s or None): For explicit padding, the pre- and post-padding
+            grouping (ConvolutionGrouping): Whether this convolution is grouped and if so how. NONE
+                means standard ungrouped convolution, MAX means channelwise convolution, EXPLICIT
+                means the number of groups will be provided in the `groups` parameter, AUTO means
+                the number of groups will be inferred from in_shape, kernel_shape, and group_format.
+                Note that ONNX's kernel format is consistent between ungrouped and grouped
+                convolutions and so AUTO always works; but Keras' kernel format is not consistent
+                between ungrouped and channelwise convolutions. Keras therefore must explicitly
+                pass NONE or MAX. In Keras EXPLICIT is only possible with custom code for
+                non-standard (to Keras) kernel shapes.
+            groups (int or None): The number of groups for explicit grouping
+            group_format (GroupedChannelFormat): The channel order & semantics 'K' (if grouping
+                isn't NONE)
+            transposed (Boolean): Is this a transposed convolution? (i.e., one that takes 'O' and
+                'K' as inputs and produces 'I' as output)
+            expected_output_shape (tuple of ints/SymbolicDims or None): The shape of the output
+                tensor the caller expects. This shape is also computed from the other parameters,
+                and if this is not None, it is verified that these two versions of the shape match
+        """
+        self.rank = rank
+        self.in_shape = in_shape
+        self.kernel_shape = kernel_shape
+        self.strides = strides
+        self.padding = padding
+        self.dilation_rate = dilation_rate
+        self.data_format = data_format
+        self.kernel_format = kernel_format
+        self.pads = pads
+        self.grouping = grouping
+        self.groups = groups
+        self.group_format = group_format
+        self.transposed = transposed
+        self.expected_output_shape = expected_output_shape
+
+        self._O_spatial_dims = None
+        self._pad_amount = None
+        self._O_spatial_dims_numeric = None
+        self._assertion = ''
+
+        if self.data_format not in [
+                ConvolutionDataFormat.CHANNELS_FIRST, ConvolutionDataFormat.CHANNELS_LAST
+        ]:
+            raise ValueError('Unknown data_format \'{}\''.format(self.data_format))
+        if self.kernel_format not in [
+                ConvolutionKernelFormat.CHANNELS_FIRST, ConvolutionKernelFormat.CHANNELS_LAST
+        ]:
+            raise ValueError('Unknown kernel_format \'{}\''.format(self.kernel_format))
+        if self.grouping not in [
+                ConvolutionGrouping.NONE, ConvolutionGrouping.MAX, ConvolutionGrouping.EXPLICIT,
+                ConvolutionGrouping.AUTO
+        ]:
+            raise ValueError('Unknown grouping \'{}\''.format(self.grouping))
+
+        self._convert_grouping_type()
+        self._verify_expected_output_shape()
+        if self.grouping != ConvolutionGrouping.NONE:
+            if self.transposed:
+                raise NotImplementedError('Grouped transposed convolutions not implemented.')
+            if self.group_format not in [
+                    GroupedChannelFormat.FullOutGroupIn, GroupedChannelFormat.GroupGroupOut,
+                    GroupedChannelFormat.GroupGroupOutGroupIn
+            ]:
+                raise ValueError('Unknown group_format \'{}\''.format(self.group_format))
+
+    def get_I_axis(self, sem_var):
+        """Get the axis of I corresponding to the variable sem_var.
+
+        Args:
+            sem_var (ConvIndex): Variable to get the axis of
+
+        Returns:
+            int or list: The index(es) of the dimension(s) containing this
+                         variable (i.e. axis) in the initial input tensor I. A
+                         list for spatial dims, otherwise an int.
+        """
+        if self.data_format == ConvolutionDataFormat.CHANNELS_FIRST:
+            if sem_var == ConvIndex.n:
+                return 0
+            if sem_var == ConvIndex.ci:
+                return 1
+            if sem_var == ConvIndex.x:
+                return [i + 2 for i in range(self.rank)]
+        elif self.data_format == ConvolutionDataFormat.CHANNELS_LAST:
+            if sem_var == ConvIndex.n:
+                return 0
+            if sem_var == ConvIndex.x:
+                return [i + 1 for i in range(self.rank)]
+            if sem_var == ConvIndex.ci:
+                return self.rank + 1
         else:
-            sym_out, sym_pad, num_out = pad_compute('D{}'.format(i), in_shape[l[i]],
-                                                    dilation_rate[i] * (kernel_shape[i] - 1) + 1,
-                                                    strides[i], padding, None)
-        sym_out_shape.append(sym_out)
-        pad_amount.append(sym_pad)
-        num_out_shape.append(num_out)
-    if expected_output_shape is not None:
+            raise ValueError('Unknown data format \'{}\''.format(self.data_format))
+        raise ValueError('Unknown input variable name \'{}\''.format(sem_var))
+
+    def get_K_axis(self, sem_var):
+        """Get the axis of K corresponding to the variable sem_var.
+
+        Note that which variables are available will depend on the grouping type
+        and grouped channel format. Will raise an exception if sem_var is
+        unavailable.
+
+        Args:
+            sem_var (ConvIndex): Variable to get the axis of
+
+        Returns:
+            int or list: The index(es) of the dimension(s) containing this
+                         variable (i.e. axis) in the initial kernel tensor K. A
+                         list for spatial dims, otherwise an int.
+        """
+        wrong_group_msg = 'Variable {} not a kernel dim for this grouping (type {}, format {})'
+        pos_among_channels = None
+        if self.grouping == ConvolutionGrouping.NONE:
+            channel_count = 2
+            # For this case channel order depends on kernel format and will be
+            # calculated later.
+        else:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                channel_count = 2
+                if sem_var == ConvIndex.co:
+                    pos_among_channels = 0
+                elif sem_var == ConvIndex.gci:
+                    pos_among_channels = 1
+                elif sem_var in [ConvIndex.ci, ConvIndex.g, ConvIndex.gco]:
+                    # These channel types don't appear with this grouped channel format
+                    msg = wrong_group_msg.format(sem_var, self.grouping, self.group_format)
+                    raise ValueError(msg)
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                channel_count = 2
+                if sem_var == ConvIndex.g:
+                    pos_among_channels = 0
+                elif sem_var == ConvIndex.gco:
+                    pos_among_channels = 1
+                elif sem_var in [ConvIndex.ci, ConvIndex.co, ConvIndex.ci]:
+                    # These channel types don't appear with this grouped channel format
+                    msg = wrong_group_msg.format(sem_var, self.grouping, self.group_format)
+                    raise ValueError(msg)
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                channel_count = 3
+                if sem_var == ConvIndex.g:
+                    pos_among_channels = 0
+                elif sem_var == ConvIndex.gco:
+                    pos_among_channels = 1
+                elif sem_var == ConvIndex.gci:
+                    pos_among_channels = 2
+                elif sem_var in [ConvIndex.ci, ConvIndex.co]:
+                    # These channel types don't appear with this grouped channel format
+                    msg = wrong_group_msg.format(sem_var, self.grouping, self.group_format)
+                    raise ValueError(msg)
+            else:
+                raise ValueError('Unknown group format \'{}\''.format(self.group_format))
+        if self.kernel_format == ConvolutionKernelFormat.CHANNELS_FIRST:
+            if pos_among_channels is not None:
+                return pos_among_channels
+            if sem_var == ConvIndex.k:
+                return [i + channel_count for i in range(self.rank)]
+            if self.grouping == ConvolutionGrouping.NONE:
+                if sem_var == ConvIndex.co:
+                    return 0
+                if sem_var == ConvIndex.ci:
+                    return 1
+                if sem_var in [ConvIndex.g, ConvIndex.gci, ConvIndex.gco]:
+                    # These channel types don't appear with this grouped channel format
+                    msg = wrong_group_msg.format(sem_var, self.grouping, self.group_format)
+                    raise ValueError(msg)
+        elif self.kernel_format == ConvolutionKernelFormat.CHANNELS_LAST:
+            if pos_among_channels is not None:
+                return self.rank + pos_among_channels
+            if sem_var == ConvIndex.k:
+                return range(self.rank)
+            if self.grouping == ConvolutionGrouping.NONE:
+                if sem_var == ConvIndex.ci:
+                    return self.rank
+                if sem_var == ConvIndex.co:
+                    return self.rank + 1
+                if sem_var in [ConvIndex.g, ConvIndex.gci, ConvIndex.gco]:
+                    # These channel types don't appear with this grouped channel format
+                    msg = wrong_group_msg.format(sem_var, self.grouping, self.group_format)
+                    raise ValueError(msg)
+            if sem_var == ConvIndex.n:
+                return 0
+            if sem_var == ConvIndex.ci:
+                return self.rank + 1
+        else:
+            raise ValueError('Unknown data format \'{}\''.format(self.data_format))
+        raise ValueError('Unknown kernel variable name \'{}\''.format(sem_var))
+
+    def get_O_axis(self, sem_var):
+        """Get the axis of O corresponding to the variable sem_var.
+
+        Args:
+            sem_var (ConvIndex): Variable to get the axis of
+
+        Returns:
+            int or list: The index(es) of the dimension(s) containing this
+                         variable (i.e. axis) in the final output tensor O. A
+                         list for spatial dims, otherwise an int.
+        """
+        if self.data_format == ConvolutionDataFormat.CHANNELS_FIRST:
+            if sem_var == ConvIndex.n:
+                return 0
+            if sem_var == ConvIndex.co:
+                return 1
+            if sem_var == ConvIndex.x:
+                return [i + 2 for i in range(self.rank)]
+        elif self.data_format == ConvolutionDataFormat.CHANNELS_LAST:
+            if sem_var == ConvIndex.n:
+                return 0
+            if sem_var == ConvIndex.x:
+                return [i + 1 for i in range(self.rank)]
+            if sem_var == ConvIndex.co:
+                return self.rank + 1
+        else:
+            raise ValueError('Unknown data format \'{}\''.format(self.data_format))
+        raise ValueError('Unknown input variable name \'{}\''.format(sem_var))
+
+    def _compute_padding(self):
+        self._O_spatial_dims = list()
+        self._pad_amount = list()
+        self._O_spatial_dims_numeric = list()
+        for i in range(self.rank):
+            if self.transposed:
+                sym_out, sym_pad, num_out = pad_compute(
+                    'D{}'.format(i),
+                    self.in_shape[self.get_I_axis(ConvIndex.x)[i]],
+                    self.dilation_rate[i] *
+                    (self.kernel_shape[self.get_K_axis(ConvIndex.k)[i]] - 1) + 1,
+                    self.strides[i],
+                    self.padding,
+                    (self.pads[i], self.pads[i + self.rank]) if self.pads else None,
+                )
+            else:
+                sym_out, sym_pad, num_out = pad_compute(
+                    'L{}'.format(i),
+                    self.in_shape[self.get_I_axis(ConvIndex.x)[i]],
+                    self.dilation_rate[i] *
+                    (self.kernel_shape[self.get_K_axis(ConvIndex.k)[i]] - 1) + 1,
+                    self.strides[i],
+                    self.padding,
+                    (self.pads[i], self.pads[i + self.rank]) if self.pads else None,
+                )
+            self._O_spatial_dims.append(sym_out)
+            self._pad_amount.append(sym_pad)
+            self._O_spatial_dims_numeric.append(num_out)
+
+    def pad_amount(self):
+        """List of strings giving spatial padding constants"""
+        if self._pad_amount is None:
+            self._compute_padding()
+        return self._pad_amount
+
+    def padding_str(self):
+        padding_list = ['Pad{} = {};'.format(i, self.pad_amount()[i]) for i in range(self.rank)]
+        return ''.join(p + '\n    ' for p in padding_list)
+
+    def assertion(self):
+        return self._assertion
+
+    def _convert_grouping_type(self):
+        """Converts EXPLICIT and MAX grouping to AUTO.
+
+        Assertions can be added here to ensure the requested type is run."""
+        if self.grouping == ConvolutionGrouping.EXPLICIT:
+            if not isinstance(self.groups, six.integer_types):
+                raise ValueError(
+                    'Must provide integer number of groups when using explicit convolution grouping (received {})'.
+                    format(self.groups))
+            if self.groups == 1:
+                self.grouping = ConvolutionGrouping.NONE
+            else:
+                self.grouping = ConvolutionGrouping.AUTO
+                self._assertion = 'Assert = assert_group_count({} == {});\n    '.format(
+                    self._G(), self.groups)
+        elif self.grouping == ConvolutionGrouping.MAX:
+            self.grouping = ConvolutionGrouping.AUTO
+            self._assertion = 'Assert = assert_group_count({} == {});\n    '.format(
+                self._G(), self._CI())
+
+    def _verify_expected_output_shape(self):
+        if self.expected_output_shape is None:
+            # Nothing to check
+            return
+        if self.grouping != ConvolutionGrouping.NONE:
+            raise ValueError('Grouped convolutions do not currently support'
+                             'expected_output_shape')
         # Confirm that the output shape is consistent with the rest of the convolution
-        computed_output_shape = [0] * (rank + 2)
-        computed_output_shape[n] = in_shape[n]
-        computed_output_shape[c] = kernel_shape[-1]
-        for i in range(rank):
-            computed_output_shape[l[i]] = num_out_shape[i]
-        for i in range(rank + 2):
+        computed_output_shape = [0] * (self.rank + 2)
+        computed_output_shape[self.get_O_axis(ConvIndex.n)] = self.O_batch_dim_numeric()[0]
+        computed_output_shape[self.get_O_axis(ConvIndex.co)] = self.kernel_shape[self.get_K_axis(
+            ConvIndex.co)]
+        for i in range(self.rank):
+            computed_output_shape[self.get_O_axis(
+                ConvIndex.x)[i]] = self.O_spatial_dims_numeric()[i]
+        for i in range(self.rank + 2):
             if (not isinstance(computed_output_shape[i], tile.Value) and
-                    not isinstance(expected_output_shape[i], tile.Value) and
-                    computed_output_shape[i] != expected_output_shape[i]):
+                    not isinstance(self.expected_output_shape[i], tile.Value) and
+                    computed_output_shape[i] != self.expected_output_shape[i]):
                 raise ValueError('Expected convolution output of shape {}, received {}'.format(
-                    expected_output_shape, computed_output_shape))
-    padding_list = ['Pad{} = {};'.format(i, pad_amount[i]) for i in range(rank)]
-    padding_str = ''.join(p + '\n                   ' for p in padding_list)
-    input_idx_list = [
-        '{s}*{x} + {d}*{k} - {p}'.format(
-            s=strides[i],
-            x='x{}'.format(i),
-            d='{}'.format(dilation_rate[i]),
-            k='k{}'.format(i),
-            p='Pad{}'.format(i)) for i in range(rank)
-    ]
-    if data_format == ConvolutionDataFormat.CHANNELS_FIRST and not channelwise:
-        if forward:
-            input_dims_str = 'N, CI, ' + ', '.join(['L{}'.format(i) for i in range(rank)])
-            out_dims_str = 'N, CO, ' + ', '.join(
-                ['{}'.format(sym_out_shape[i]) for i in range(rank)])
-            outshape = [in_shape[0]] + [kernel_shape[-1]] + num_out_shape
+                    self.expected_output_shape, computed_output_shape))
+
+    def _CI(self):
+        """Tile variable or formula for total input channels"""
+        if self.grouping == ConvolutionGrouping.NONE:
+            return 'CI'
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                return 'CI'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                return 'CI'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                return 'CI'
+            else:
+                raise ValueError('Unknown grouped channel format {}'.format(self.group_format))
         else:
-            input_dims_str = 'N, CI, ' + ', '.join('D{}'.format(i) for i in range(rank))
-            out_dims_str = 'N, CO, ' + ', '.join(['L{}'.format(i) for i in range(rank)])
-        out_idx_str = 'n, co, ' + ', '.join(['x{}'.format(i) for i in range(rank)])
-        input_idx_str = 'n, ci, ' + ', '.join(input_idx_list)
-    elif data_format == ConvolutionDataFormat.CHANNELS_LAST and not channelwise:
-        if forward:
-            input_dims_str = 'N, ' + ', '.join(['L{}'.format(i) for i in range(rank)]) + ', CI'
-            out_dims_str = 'N, ' + ', '.join(['{}'.format(sym_out_shape[i])
-                                              for i in range(rank)]) + ', CO'
-            outshape = [in_shape[0]] + num_out_shape + [kernel_shape[-1]]
+            raise ValueError('Unrecognized grouping type \'{}\''.format(self.grouping))
+
+    def _CO(self):
+        """Tile variable or formula for total output channels"""
+        if self.grouping == ConvolutionGrouping.NONE:
+            return 'CO'
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                return 'CO'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                return '(G*GCO)'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                return '(G*GCO)'
+            else:
+                raise ValueError('Unknown grouped channel format {}'.format(self.group_format))
         else:
-            input_dims_str = 'N, ' + ', '.join('D{}'.format(i) for i in range(rank)) + ', CI'
-            out_dims_str = 'N, ' + ', '.join(['L{}'.format(i) for i in range(rank)]) + ', CO'
-        out_idx_str = 'n, ' + ', '.join(['x{}'.format(i) for i in range(rank)]) + ', co'
-        input_idx_str = 'n, ' + ', '.join(input_idx_list) + ', ci'
-    elif data_format == ConvolutionDataFormat.CHANNELS_FIRST and channelwise:
-        if not forward:
-            raise NotImplementedError('Channelwise transposed convolutions not implemented.')
-        input_dims_str = 'N, C, ' + ', '.join(['L{}'.format(i) for i in range(rank)])
-        out_idx_str = 'n, c*M + m, ' + ', '.join(['x{}'.format(i) for i in range(rank)])
-        out_dims_str = 'N, C*M, ' + ', '.join(['{}'.format(sym_out_shape[i]) for i in range(rank)])
-        input_idx_str = 'n, c, ' + ', '.join(input_idx_list)
-        outshape = [in_shape[0]] + [kernel_shape[-2] * kernel_shape[-1]] + num_out_shape
-    elif data_format == ConvolutionDataFormat.CHANNELS_LAST and channelwise:
-        if not forward:
-            raise NotImplementedError('Channelwise transposed convolutions not implemented.')
-        input_dims_str = 'N, ' + ', '.join(['L{}'.format(i) for i in range(rank)]) + ', C'
-        out_idx_str = 'n, ' + ', '.join(['x{}'.format(i) for i in range(rank)]) + ', c*M + m'
-        out_dims_str = 'N, ' + ', '.join(['{}'.format(sym_out_shape[i])
-                                          for i in range(rank)]) + ', C*M'
-        input_idx_str = 'n, ' + ', '.join(input_idx_list) + ', c'
-        outshape = [in_shape[0]] + num_out_shape + [kernel_shape[-2] * kernel_shape[-1]]
-    else:
-        raise ValueError('Unrecognized data format \'{}\''.format(data_format))
-    if channelwise:
-        ker_dims_str = ', '.join(['LK{}'.format(i) for i in range(rank)]) + ', C, M'
-        ker_idx_str = ', '.join(['k{}'.format(i) for i in range(rank)]) + ', c, m'
-    else:
-        ker_dims_str = ', '.join(['LK{}'.format(i) for i in range(rank)]) + ', CI, CO'
-        ker_idx_str = ', '.join(['k{}'.format(i) for i in range(rank)]) + ', ci, co'
-    ret = {
-        'input_dims_str': input_dims_str,
-        'ker_dims_str': ker_dims_str,
-        'out_idx_str': out_idx_str,
-        'out_dims_str': out_dims_str,
-        'input_idx_str': input_idx_str,
-        'ker_idx_str': ker_idx_str,
-        'padding_str': padding_str
-    }
-    if forward:
-        ret['outshape_tuple'] = outshape
-    else:
-        ret['dim_input'] = ', ' + ', '.join(['D{}'.format(i) for i in range(rank)])
-    return ret
+            raise ValueError('Unrecognized grouping type \'{}\''.format(self.grouping))
+
+    def _G(self):
+        """Tile variable or formula for number of groups"""
+        if self.grouping == ConvolutionGrouping.NONE:
+            raise LogicError("Requested per-group out channels for ungrouped convolution.")
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                return '(CI/GCI)'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                return 'G'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                return 'G'
+            else:
+                raise ValueError('Unknown grouped channel format {}'.format(self.group_format))
+        else:
+            raise ValueError('Unrecognized grouping type \'{}\''.format(self.grouping))
+
+    def _GCI(self):
+        """Tile variable or formula for input channels per group"""
+        if self.grouping == ConvolutionGrouping.NONE:
+            raise LogicError("Requested per-group input channels for ungrouped convolution.")
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                return 'GCI'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                return '(CI/G)'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                return 'GCI'
+            else:
+                raise ValueError('Unknown grouped channel format {}'.format(self.group_format))
+        else:
+            raise ValueError('Unknown grouping type \'{}\''.format(self.grouping))
+
+    def _GCO(self):
+        """Tile variable or formula for out channels per group"""
+        if self.grouping == ConvolutionGrouping.NONE:
+            raise LogicError("Requested per-group out channels for ungrouped convolution.")
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                return '(CO*GCI/CI)'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                return 'GCO'
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                return 'GCO'
+            else:
+                raise ValueError('Unknown grouped channel format {}'.format(self.group_format))
+        else:
+            raise ValueError('Unrecognized grouping type \'{}\''.format(self.grouping))
+
+    def kernel_needs_reshape(self):
+        """Whether the kernel tensor need to be reshaped before it's used"""
+        if self.grouping == ConvolutionGrouping.NONE:
+            return False
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                return True
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                return True
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                return False
+            else:
+                raise ValueError('Unknown grouped channel format {}'.format(self.group_format))
+        else:
+            raise RuntimeError(
+                'ConvolutionGrouping should have been converted to NONE or AUTO, but received {}'.
+                format(self.grouping))
+
+    def output_needs_reshape(self):
+        """Whether the output tensor need to be reshaped before it's returned"""
+
+        if self.grouping == ConvolutionGrouping.NONE:
+            return False
+        return True
+
+    def Kitrn(self):
+        if self.kernel_needs_reshape():
+            return 'Kitrn'
+        else:
+            return 'K'
+
+    def Oitrn(self):
+        if self.output_needs_reshape():
+            return 'Oitrn'
+        else:
+            return 'O'
+
+    def I_batch_dim(self):
+        """String list giving the input batch dimension name."""
+        return ['N']
+
+    def I_batch_idx(self):
+        """String list giving the input batch index name."""
+        return ['n']
+
+    def I_channel_dim(self):
+        """String list giving the input channel dimension name."""
+        return ['CI']
+
+    def I_channel_idx(self):
+        """String list giving the input channel index name."""
+        if self.grouping == ConvolutionGrouping.NONE:
+            return ['ci']
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            return ['g * ({}) + gci'.format(self._GCI())]
+        else:
+            raise RuntimeError(
+                'ConvolutionGrouping should have been converted to NONE or AUTO, but received {}'.
+                format(self.grouping))
+
+    def I_spatial_dims(self):
+        """String list giving the input spatial dimension names."""
+        if self.transposed:
+            return ['D{}'.format(i) for i in range(self.rank)]
+        else:
+            return ['L{}'.format(i) for i in range(self.rank)]
+
+    def I_spatial_idxs(self):
+        """String list giving the input spatial index names."""
+        strs = [{
+            's': self.strides[i],
+            'idx': i,
+            'd': self.dilation_rate[i],
+            'p': 'Pad{}'.format(i),
+        } for i in range(self.rank)]
+        return ['{s}*x{idx} + {d}*k{idx} - {p}'.format(**strs[i]) for i in range(self.rank)]
+
+    def K_channel_dims(self):
+        """String list giving the kernel channel dimension names
+
+        Returns a list of strings. They are to be used in the function header of
+        the Tile convolution code for the channel dimension(s) of the kernel.
+        They are to be used in the same order as the list."""
+        if self.grouping == ConvolutionGrouping.NONE:
+            if self.kernel_format == ConvolutionKernelFormat.CHANNELS_FIRST:
+                return ['CO', 'CI']
+            elif self.kernel_format == ConvolutionKernelFormat.CHANNELS_LAST:
+                return ['CI', 'CO']
+            else:
+                raise ValueError('Unknown kernel format {}'.format(self.kernel_format))
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                return ['CO', 'GCI']
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                return ['G', 'GCO']
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                return ['G', 'GCO', 'GCI']
+            else:
+                raise ValueError('Unknown grouped channel format {}'.format(self.group_format))
+        else:
+            raise ValueError('Unknown grouping type \'{}\''.format(self.grouping))
+
+    def K_spatial_dims(self):
+        """String list giving the kernel spatial dimension names."""
+        return ['LK{}'.format(i) for i in range(self.rank)]
+
+    def Ki_channel_dims(self):
+        """String list giving the kernel channel dimension names. Post-reshape.
+
+        Returns None instead if no reshape is needed."""
+        if not self.kernel_needs_reshape():
+            return None
+        if self.grouping == ConvolutionGrouping.NONE:
+            raise RuntimeError("Unexpected kernel reshape in ungrouped convolution.")
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            return [self._G(), self._GCO(), self._GCI()]
+        else:
+            raise RuntimeError(
+                'ConvolutionGrouping should have been converted to NONE or AUTO, but received {}'.
+                format(self.grouping))
+
+    def Ki_channel_idxs(self):
+        """String list giving the kernel channel index names.
+
+        These are used in the core convolution contraction, and as such they are
+        given in a post-reshape format if any kernel reshaping happens."""
+        if self.grouping == ConvolutionGrouping.NONE:
+            ker_out_channel_idx = self.Oi_channel_idxs()
+            ker_in_channel_idx = self.I_channel_idx()
+            if self.kernel_format == ConvolutionKernelFormat.CHANNELS_FIRST:
+                return ker_out_channel_idx + ker_in_channel_idx
+            elif self.kernel_format == ConvolutionKernelFormat.CHANNELS_LAST:
+                return ker_in_channel_idx + ker_out_channel_idx
+            else:
+                raise ValueError('Unknown kernel format {}'.format(self.kernel_format))
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            return ['g', 'gco', 'gci']
+        else:
+            raise RuntimeError(
+                'ConvolutionGrouping should have been converted to NONE or AUTO, but received {}'.
+                format(self.grouping))
+
+    def Ki_spatial_dims(self):
+        """String list giving the kernel spatial dimension names (post-reshape)."""
+        return self.K_spatial_dims()
+
+    def Ki_spatial_idxs(self):
+        """String list giving the kernel spatial index names."""
+        return ['k{}'.format(i) for i in range(self.rank)]
+
+    def O_batch_dim(self):
+        """String list giving the final output batch dimension name."""
+        return self.I_batch_dim()
+
+    def O_batch_dim_numeric(self):
+        """SymbolicDim or int list giving the final output batch dimension."""
+        return [self.in_shape[self.get_I_axis(ConvIndex.n)]]
+
+    def O_channel_dims(self):
+        """String list giving the output channel dimension names. Post-reshape."""
+        return [self._CO()]
+
+    def O_channel_dims_numeric(self):
+        """SymbolicDim or int list giving the output channel dimensions. Final.
+
+        These are used to tell PlaidML the shape of the final output. In
+        particular, this means these dimensions are post-reshape."""
+        if self.grouping == ConvolutionGrouping.NONE:
+            return [self.kernel_shape[self.get_K_axis(ConvIndex.co)]]
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            if self.group_format == GroupedChannelFormat.FullOutGroupIn:
+                return [self.kernel_shape[self.get_K_axis(ConvIndex.co)]]
+            elif self.group_format == GroupedChannelFormat.GroupGroupOut:
+                return [
+                    self.kernel_shape[self.get_K_axis(ConvIndex.g)] *
+                    self.kernel_shape[self.get_K_axis(ConvIndex.gco)]
+                ]
+            elif self.group_format == GroupedChannelFormat.GroupGroupOutGroupIn:
+                return [
+                    self.kernel_shape[self.get_K_axis(ConvIndex.g)] *
+                    self.kernel_shape[self.get_K_axis(ConvIndex.gco)]
+                ]
+            else:
+                raise ValueError('Unknown grouped channel format {}'.format(self.group_format))
+        else:
+            raise RuntimeError(
+                'ConvolutionGrouping should have been converted to NONE or AUTO, but received {}'.
+                format(self.grouping))
+
+    def O_spatial_dims(self):
+        """String list giving the output spatial dimension names."""
+        if self.transposed:
+            return ['L{}'.format(i) for i in range(self.rank)]
+        else:
+            if self._O_spatial_dims is None:
+                self._compute_padding()
+            return self._O_spatial_dims
+
+    def O_spatial_dims_numeric(self):
+        """SymbolicDim or int list giving the output spatial dimensions."""
+        if self._O_spatial_dims_numeric is None:
+            self._compute_padding()
+        return self._O_spatial_dims_numeric
+
+    def Oi_batch_dim(self):
+        """String list giving the internal output batch dimension name."""
+        return self.I_batch_dim()
+
+    def Oi_batch_idx(self):
+        """String list giving the output batch dimension name."""
+        return self.I_batch_idx()
+
+    def Oi_channel_dims(self):
+        """String list giving the output channel dimension names. Pre-reshape."""
+        if self.grouping == ConvolutionGrouping.NONE:
+            return ['CO']
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            return [self._G(), self._GCO()]
+        else:
+            raise RuntimeError(
+                'ConvolutionGrouping should have been converted to NONE or AUTO, but received {}'.
+                format(self.grouping))
+
+    def Oi_channel_idxs(self):
+        """String list giving the output channel index names."""
+        if self.grouping == ConvolutionGrouping.NONE:
+            return ['co']
+        elif self.grouping == ConvolutionGrouping.AUTO:
+            return ['g', 'gco']
+        else:
+            raise RuntimeError(
+                'ConvolutionGrouping should have been converted to NONE or AUTO, but received {}'.
+                format(self.grouping))
+
+    def Oi_spatial_dims(self):
+        return self.O_spatial_dims()
+
+    def Oi_spatial_idxs(self):
+        """String list giving the output spatial index names."""
+        return ['x{}'.format(i) for i in range(self.rank)]
+
+    def I_dims(self):
+        if self.data_format == ConvolutionDataFormat.CHANNELS_FIRST:
+            return ', '.join(self.I_batch_dim() + self.I_channel_dim() + self.I_spatial_dims())
+        elif self.data_format == ConvolutionDataFormat.CHANNELS_LAST:
+            return ', '.join(self.I_batch_dim() + self.I_spatial_dims() + self.I_channel_dim())
+        else:
+            raise ValueError('Unrecognized data format \'{}\''.format(self.data_format))
+
+    def I_idxs(self):
+        if self.data_format == ConvolutionDataFormat.CHANNELS_FIRST:
+            return ', '.join(self.I_batch_idx() + self.I_channel_idx() + self.I_spatial_idxs())
+        elif self.data_format == ConvolutionDataFormat.CHANNELS_LAST:
+            return ', '.join(self.I_batch_idx() + self.I_spatial_idxs() + self.I_channel_idx())
+        else:
+            raise ValueError('Unrecognized data format \'{}\''.format(self.data_format))
+
+    def K_dims(self):
+        if self.kernel_format == ConvolutionKernelFormat.CHANNELS_FIRST:
+            return ', '.join(self.K_channel_dims() + self.K_spatial_dims())
+        elif self.kernel_format == ConvolutionKernelFormat.CHANNELS_LAST:
+            return ', '.join(self.K_spatial_dims() + self.K_channel_dims())
+        else:
+            raise ValueError('Unrecognized kernel format \'{}\''.format(self.kernel_format))
+
+    def Ki_dims(self):
+        if self.kernel_needs_reshape():
+            if self.kernel_format == ConvolutionKernelFormat.CHANNELS_FIRST:
+                return ', '.join(self.Ki_channel_dims() + self.Ki_spatial_dims())
+            elif self.kernel_format == ConvolutionKernelFormat.CHANNELS_LAST:
+                return ', '.join(self.Ki_spatial_dims() + self.Ki_channel_dims())
+            else:
+                raise ValueError('Unrecognized kernel format \'{}\''.format(self.kernel_format))
+        else:
+            # K == Kitrn
+            return self.K_dims()
+
+    def Ki_idxs(self):
+        if self.kernel_format == ConvolutionKernelFormat.CHANNELS_FIRST:
+            return ', '.join(self.Ki_channel_idxs() + self.Ki_spatial_idxs())
+        elif self.kernel_format == ConvolutionKernelFormat.CHANNELS_LAST:
+            return ', '.join(self.Ki_spatial_idxs() + self.Ki_channel_idxs())
+        else:
+            raise ValueError('Unrecognized kernel format \'{}\''.format(self.kernel_format))
+
+    def O_dims(self):
+        if self.output_needs_reshape():
+            if self.transposed:
+                raise RuntimeError("Output reshaping not implemented for transposed convolutions")
+            if self.data_format == ConvolutionDataFormat.CHANNELS_FIRST:
+                return ', '.join(self.O_batch_dim() + self.O_channel_dims() +
+                                 self.O_spatial_dims())
+            elif self.data_format == ConvolutionDataFormat.CHANNELS_LAST:
+                return ', '.join(self.O_batch_dim() + self.O_spatial_dims() +
+                                 self.O_channel_dims())
+        else:
+            # O == Oitrn
+            return self.Oi_dims()
+
+    def Oi_dims(self):
+        if self.data_format == ConvolutionDataFormat.CHANNELS_FIRST:
+            return ', '.join(self.Oi_batch_dim() + self.Oi_channel_dims() + self.Oi_spatial_dims())
+        elif self.data_format == ConvolutionDataFormat.CHANNELS_LAST:
+            return ', '.join(self.Oi_batch_dim() + self.Oi_spatial_dims() + self.Oi_channel_dims())
+        else:
+            raise ValueError('Unrecognized data format \'{}\''.format(self.data_format))
+
+    def Oi_idxs(self):
+        if self.data_format == ConvolutionDataFormat.CHANNELS_FIRST:
+            return ', '.join(self.Oi_batch_idx() + self.Oi_channel_idxs() + self.Oi_spatial_idxs())
+        elif self.data_format == ConvolutionDataFormat.CHANNELS_LAST:
+            return ', '.join(self.Oi_batch_idx() + self.Oi_spatial_idxs() + self.Oi_channel_idxs())
+        else:
+            raise ValueError('Unrecognized data format \'{}\''.format(self.data_format))
+
+    def O_shape_tuple_numeric(self):
+        """SymbolicDim or int tuple giving the final output shape."""
+        if self.transposed:
+            raise RuntimeError("Outshape not defined for transposed convolutions")
+        if self.data_format == ConvolutionDataFormat.CHANNELS_FIRST:
+            return tuple(self.O_batch_dim_numeric() + self.O_channel_dims_numeric() +
+                         self.O_spatial_dims_numeric())
+        elif self.data_format == ConvolutionDataFormat.CHANNELS_LAST:
+            return tuple(self.O_batch_dim_numeric() + self.O_spatial_dims_numeric() +
+                         self.O_channel_dims_numeric())
 
 
 class ArgMax(tile.Operation):
@@ -274,9 +991,9 @@ class AveragePool(tile.Operation):
         if not strides:
             strides = tuple(1 for _ in range(rank))
         elif len(strides) != rank:
-            raise ValueError('Pool strides length inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(strides,
-                                                                  len(strides), data.shape, rank))
+            raise ValueError(
+                'Pool strides length inconsistent with input shape: ' +
+                '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.shape, rank))
         out_dims = ['N', 'C']
         num_out_shape = list()
         in_idxs = list()
@@ -345,8 +1062,9 @@ class Cast(tile.Operation):
 
     def __init__(self, x, dtype):
         info = tile.DTYPE_INFOS[dtype]
-        super(Cast, self).__init__('function (I) -> (O) {{ O = as_{}(I, {}); }}'.format(
-            info.base, info.bitwidth), [('I', x)], [('O', tile.Shape(dtype, x.shape.dims))])
+        super(Cast, self).__init__(
+            'function (I) -> (O) {{ O = as_{}(I, {}); }}'.format(info.base, info.bitwidth),
+            [('I', x)], [('O', tile.Shape(dtype, x.shape.dims))])
 
 
 cast = Cast.function
@@ -402,7 +1120,8 @@ class Concatenate(tile.Operation):
 
         def __clear_axis(dims):
             return [
-                None if isinstance(dims[i], tile.Value) else dims[i] for i in range(len(dims))
+                None if isinstance(dims[i], tile.Value) else dims[i]
+                for i in range(len(dims))
                 if i != axis
             ]
 
@@ -479,20 +1198,23 @@ class Convolution(tile.Operation):
     """
     A standard ML convolution operator.
     """
+    _winograd_transforms_cache = dict()
 
-    def __init__(self,
-                 data,
-                 kernel,
-                 strides=None,
-                 padding=AutoPadding.EXPLICIT,
-                 pads=None,
-                 group=1,
-                 kernel_shape=None,
-                 data_format=None,
-                 dilation_rate=None,
-                 channelwise=False):
-        if group != 1:
-            raise NotImplementedError('Grouped convolutions are not currently implemented')
+    def __init__(
+            self,
+            data,
+            kernel,
+            strides=None,
+            padding=AutoPadding.EXPLICIT,
+            pads=None,
+            group=1,
+            kernel_shape=None,
+            data_format=None,
+            kernel_format=None,
+            dilation_rate=None,
+            grouping=ConvolutionGrouping.NONE,
+            group_format=None,
+    ):
         rank = data.shape.ndims - 2
         if strides is None:
             strides = tuple(1 for _ in range(rank))
@@ -501,7 +1223,14 @@ class Convolution(tile.Operation):
         if not kernel_shape:
             kernel_shape = kernel.shape.dims
         else:
-            kernel_shape = tuple([kernel.shape.dims[0], kernel.shape.dims[1]] + list(kernel_shape))
+            if kernel_format == ConvolutionKernelFormat.CHANNELS_FIRST:
+                kernel_shape = tuple([kernel.shape.dims[0], kernel.shape.dims[1]] +
+                                     list(kernel_shape))
+            elif kernel_format == ConvolutionKernelFormat.CHANNELS_LAST:
+                kernel_shape = tuple(
+                    list(kernel_shape) + [kernel.shape.dims[0], kernel.shape.dims[1]])
+            else:
+                raise ValueError('Unknown kernel format {}'.format(kernel_format))
 
         for entry in dilation_rate:
             if not isinstance(entry, int) or entry <= 0:
@@ -513,26 +1242,143 @@ class Convolution(tile.Operation):
                                  len(kernel_shape) - 2, data.shape, data.shape.ndims - 2))
         if len(strides) != rank:
             raise ValueError('Convolution strides length inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(
-                                 strides, len(strides), data.shape, data.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(strides, len(
+                                 strides), data.shape, data.shape.ndims - 2))
         if len(dilation_rate) != rank:
             raise ValueError('Convolution dilation_rate length inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(dilation_rate,
-                                                                  len(dilation_rate), data.shape,
-                                                                  data.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(dilation_rate, len(
+                                 dilation_rate), data.shape, data.shape.ndims - 2))
 
-        conv_strs = _format_conv_strings(rank, data.shape.dims, kernel_shape, strides, padding,
-                                         data_format, dilation_rate, channelwise)
-        code = """
-               function (I[{input_dims_str}], K[{ker_dims_str}]) -> (O) {{
-                   {padding_str}O[{out_idx_str} : {out_dims_str}] = +(I[{input_idx_str}]*K[{ker_idx_str}]);
-               }}""".format(**conv_strs)
-
-        outshape = tile.Shape(data.shape.dtype, conv_strs['outshape_tuple'])
+        use_winograd = (rank == 2 and data_format == ConvolutionDataFormat.CHANNELS_LAST and
+                        kernel_shape[0] == 3 and kernel_shape[1] == 3 and strides == (1, 1) and
+                        dilation_rate == (1, 1) and kernel_shape[2] > 4 and kernel_shape[3] > 4 and
+                        grouping == ConvolutionGrouping.NONE)
+        if use_winograd:
+            conv_strs = self._winograd_conv_strs(data.shape.dims, kernel_shape, padding)
+            code = self._winograd_code_template().format(**conv_strs)
+            A, B, G = self._compute_winograd_transforms(conv_strs['block'], kernel_shape[0])
+            input_list = [('I', data), ('K', kernel), ('A', A), ('B', B), ('G', G)]
+            outshape = tile.Shape(data.shape.dtype, conv_strs['outshape_tuple'])
+        else:
+            csf = _ConvolutionStringFormatter(
+                rank,
+                data.shape.dims,
+                kernel_shape,
+                strides,
+                padding,
+                dilation_rate,
+                data_format,
+                kernel_format,
+                pads=pads,
+                grouping=grouping,
+                groups=group,
+                group_format=group_format)
+            if csf.kernel_needs_reshape():
+                ker_reshape_str = '{Kitrn} = reshape(K, {Ki_dims});\n    '.format(
+                    Kitrn=csf.Kitrn(), Ki_dims=csf.Ki_dims())
+            else:
+                ker_reshape_str = ''
+            if csf.output_needs_reshape():
+                out_reshape_str = '\n    O = reshape({Oitrn}, {O_dims});'.format(
+                    Oitrn=csf.Oitrn(), O_dims=csf.O_dims())
+            else:
+                out_reshape_str = ''
+            code = """function (I[{I_dims}], K[{K_dims}]) -> (O) {{\n""" \
+                   """    {assertion}{padding_str}{ker_reshape_str}{Oitrn}[{Oi_idxs}: {Oi_dims}] = +(I[{I_idxs}]*{Kitrn}[{Ki_idxs}]);{out_reshape_str}\n""" \
+                   """}}"""
+            code = code.format(
+                I_dims=csf.I_dims(),
+                K_dims=csf.K_dims(),
+                assertion=csf.assertion(),
+                padding_str=csf.padding_str(),
+                ker_reshape_str=ker_reshape_str,
+                Oitrn=csf.Oitrn(),
+                Oi_idxs=csf.Oi_idxs(),
+                Oi_dims=csf.Oi_dims(),
+                I_idxs=csf.I_idxs(),
+                Kitrn=csf.Kitrn(),
+                Ki_idxs=csf.Ki_idxs(),
+                out_reshape_str=out_reshape_str)
+            input_list = [('I', data), ('K', kernel)]
+            outshape = tile.Shape(data.shape.dtype, csf.O_shape_tuple_numeric())
 
         super(Convolution, self).__init__(
-            code, [('I', data), ('K', kernel)], [('O', outshape)],
-            name='Convolution-{}d'.format(rank))
+            code, input_list, [('O', outshape)], name='Convolution-{}d'.format(rank))
+
+    def _winograd_code_template(self):
+        f = """
+            function (I[N, X, Y, CI], K[S, S, CI, CO], A[BI, BO], B[BI, BI], G[BI, S] ) -> (O) {{
+                Assert = assert_winograd_valid(BI - CI + 1 == BO);
+                XO = {XO};
+                YO = {YO};
+                XB = (XO + BO - 1) / BO;
+                YB = (YO + BO - 1) / BO;
+                XP = {XP};
+                YP = {YP};
+                U1[i, j, ci, co : BI, S, CI, CO] = +(G[i, k] * K[k, j, ci, co]);
+                U[i, j, ci, co : BI, BI, CI, CO] = +(U1[i, k, ci, co] * G[j, k]);
+                V1[n, i, j, x, y, ci : N, BI, BI, XB, YB, CI] = +(B[k, i] * I[n, BO*x + k - XP, BO*y + j - YP, ci]);
+                V[n, i, j, x, y, ci : N, BI, BI, XB, YB, CI] = +(V1[n, i, k, x, y, ci] * B[k, j]);
+                M[n, i, j, x, y, co : N, BI, BI, XB, YB, CO] = +(V[n, i, j, x, y, ci] * U[i, j, ci, co]);
+                O1[n, i, j, x, y, co : N, BO, BI, XB, YB, CO] = +(A[k, i] * M[n, k, j, x, y, co]);
+                O[n, BO*x + i, BO*y + j, co : N, XO, YO, CO] = +(O1[n, i, k, x, y, co] * A[k, j]) no_defract;
+            }}"""
+        return f
+
+    def _winograd_conv_strs(self, in_shape, kernel_shape, padding):
+        (XO, XP, NXO) = pad_compute('X', in_shape[1], kernel_shape[0], 1, padding)
+        (YO, YP, NYO) = pad_compute('Y', in_shape[2], kernel_shape[0], 1, padding)
+        outdims = (in_shape[0], NXO, NYO, kernel_shape[3])
+        return {'XO': XO, 'XP': XP, 'YO': YO, 'YP': YP, 'block': 6, 'outshape_tuple': outdims}
+
+    def _compute_winograd_transforms(self, block, conv):
+        # Returns (A, B, G)
+        if (block, conv) in Convolution._winograd_transforms_cache:
+            return Convolution._winograd_transforms_cache[(block, conv)]
+        out = block - conv + 1
+        if (out == 2 and conv == 3):
+            A = np.array([[1, 0], [1, 1], [1, -1], [0, -1]], dtype='float32')
+            B = np.array(
+                [[1, 0, 0, 0], [0, 1, -1, 1], [-1, 1, 1, 0], [0, 0, 0, -1]], dtype='float32')
+            G = np.array([[1, 0, 0], [.5, .5, .5], [.5, -.5, .5], [0, 0, 1]], dtype='float32')
+        elif (out == 4 and conv == 3):
+            #s2 = np.sqrt(2.0)
+            #A = np.array([[1., 0., 0., 0.], [1., s2/2., 1./2., s2/4.], [1, -s2/2., 1./2., -s2/4.],
+            #              [1., s2, 2., 2.*s2], [1., -s2, 2., -2.*s2], [0., 0., 0., 1.]])
+            #B = np.array([[1., 0., 0., 0., 0., 0.], [0., -s2, s2, -s2/2., s2/2., 1], [-5./2., -2., -2., -1./2., -1./2., 0],
+            #              [0., s2/2., -s2/2., s2, -s2, -5./2], [1., 1., 1., 1., 1., 0.], [0., 0., 0., 0., 0., 1.]])
+            #G = np.array([[1., 0., 0.], [-2./3., -s2/3., -1./3.], [-2./3., s2/3., -1./3.],
+            #              [1./6., s2/6., 1./3.], [1./6., -s2/6., 1./3.], [0., 0., 1.]])
+            # yapf: disable
+            A = np.array([
+                [ 1.13777777777778,   0,                  0,                 0,                ],
+                [-0.688403361344538, -0.430252100840336, -0.26890756302521, -0.168067226890756 ],
+                [-0.688403361344538,  0.430252100840336, -0.26890756302521,  0.168067226890756 ],
+                [ 0.119514472455649,  0.179271708683473,  0.26890756302521,  0.403361344537815 ],
+                [ 0.119514472455649, -0.179271708683473,  0.26890756302521, -0.403361344537815 ],
+                [ 0,                  0,                  0,                 1,                ]],
+                dtype='float32')
+            B = np.array([
+                [ 0.87890625,  0,          -2.640625,  0,        1, 0 ],
+                [ 0,          -1.40625,    -2.25,      0.625,    1, 0 ],
+                [ 0,           1.40625,    -2.25,     -0.625,    1, 0 ],
+                [ 0,          -0.5859375,  -0.390625,  1.5,      1, 0 ],
+                [ 0,           0.5859375,  -0.390625, -1.5,      1, 0 ],
+                [ 0,           0.87890625,  0,        -2.640625, 0, 1 ]],
+                dtype='float32').T
+            G = np.array([
+                [ 1, 1,         1 ,       1,     1,     0 ],
+                [ 0, 0.625,    -0.625,    1.5,  -1.5,   0 ],
+                [ 0, 0.390625,  0.390625, 2.25,  2.25,  1 ]],
+                dtype='float32').T
+            # yapf: enable
+        else:
+            raise plaidml.exceptions.InvalidArgument(
+                'Only L(2, 3) and L(4, 3) currently supported for Winograd')
+        Convolution._winograd_transforms_cache[(block, conv)] = (tile.Value.from_python_value(A),
+                                                                 tile.Value.from_python_value(B),
+                                                                 tile.Value.from_python_value(G))
+        return Convolution._winograd_transforms_cache[(block, conv)]
 
 
 convolution = Convolution.function
@@ -543,7 +1389,16 @@ class ConvolutionTranspose(tile.Operation):
     A transposed convolution operator.
     """
 
-    def __init__(self, x, kernel, output_shape, strides, padding, data_format):
+    def __init__(
+            self,
+            x,
+            kernel,
+            output_shape,
+            strides,
+            padding,
+            data_format,
+            kernel_format,
+    ):
         rank = x.shape.ndims - 2
 
         if kernel.shape.ndims != rank + 2:
@@ -552,40 +1407,51 @@ class ConvolutionTranspose(tile.Operation):
                                  kernel.shape, kernel.shape.ndims - 2, x.shape, x.shape.ndims - 2))
         if len(output_shape) != rank + 2:
             raise ValueError('Transpose convolution output_shape inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(
-                                 output_shape, len(output_shape) - 2, x.shape, x.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(output_shape,
+                                                                  len(output_shape) -
+                                                                  2, x.shape, x.shape.ndims - 2))
         if len(strides) != rank:
             raise ValueError('Transpose convolution strides inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(
-                                 strides, len(strides), x.shape, x.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(strides, len(strides), x.shape,
+                                                                  x.shape.ndims - 2))
         if (x.shape.dims[0] != output_shape[0] and
                 isinstance(x.shape.dims[0], six.integer_types) and
                 isinstance(output_shape[0], six.integer_types)):
             raise ValueError('Transpose convolution batch size inconsistent between input ' +
                              'and output: {} v {}'.format(x.shape.dims[0], output_shape[0]))
 
-        conv_strs = _format_conv_strings(rank, output_shape, kernel.shape.dims, strides, padding,
-                                         data_format, (1,) * rank, False, False, x.shape.dims)
-
-        f = """
-            function (O[{out_dims_str}], K[{ker_dims_str}]{dim_input}) -> (I) {{
-                {padding_str}
-                I[{input_idx_str} : {input_dims_str}] = +(O[{out_idx_str}]*K[{ker_idx_str}]);
-            }}""".format(**conv_strs)
+        csf = _ConvolutionStringFormatter(
+            rank,
+            output_shape,
+            kernel.shape.dims,
+            strides,
+            padding,
+            (1,) * rank,
+            data_format,
+            kernel_format,
+            transposed=True,
+            expected_output_shape=x.shape.dims,
+        )
+        code = """function (O[{O_dims}], K[{K_dims}]{dim_input}) -> (I) {{\n""" \
+               """    {padding_str}I[{I_idxs}: {I_dims}] = +(O[{Oi_idxs}]*K[{Ki_idxs}]);\n""" \
+               """}}"""
+        code = code.format(
+            O_dims=csf.O_dims(),
+            K_dims=csf.K_dims(),
+            dim_input=', ' + ', '.join(['D{}'.format(i) for i in range(rank)]),
+            padding_str=csf.padding_str(),
+            I_idxs=csf.I_idxs(),
+            I_dims=csf.I_dims(),
+            Oi_idxs=csf.Oi_idxs(),
+            Ki_idxs=csf.Ki_idxs())
 
         # Output shape may be dynamic, so pass its sizes as inputs to Tile
-        if data_format == ConvolutionDataFormat.CHANNELS_FIRST:
-            l = [i + 2 for i in range(rank)]
-        elif data_format == ConvolutionDataFormat.CHANNELS_LAST:
-            l = [i + 1 for i in range(rank)]
-        else:
-            raise ValueError('Unrecognized data format \'{}\''.format(data_format))
-
+        l = csf.get_O_axis(ConvIndex.x)
         input_tensors = [('O', x), ('K', kernel)] + \
                         [('D{}'.format(i), output_shape[l[i]]) for i in range(rank)]
 
         super(ConvolutionTranspose, self).__init__(
-            f,
+            code,
             input_tensors, [('I', tile.Shape(x.shape.dtype, tuple(output_shape)))],
             name='ConvolutionTranspose-{}d'.format(rank))
 
@@ -795,12 +1661,7 @@ class Gemm(tile.Operation):
     """
 
     def __init__(self, a, b, c, alpha=None, beta=None, broadcast=True, transA=False, transB=False):
-        if broadcast:
-            if c.shape.ndims != 1:
-                raise NotImplementedError(
-                    'Gemm with multiplier broadcast requires a one-dimensional scalar multiplier; multiplier rank={}'.
-                    format(c.shape.ndims))
-        elif c.shape.ndims != 2:
+        if not broadcast and c.shape.ndims != 2:
             raise NotImplementedError(
                 'Gemm without multiplier broadcast requires a two-dimensional scalar multiplier; multiplier rank={}'.
                 format(c.shape.ndims))
@@ -811,25 +1672,24 @@ class Gemm(tile.Operation):
                     'Invalid Gemm input; two-dimensions required, got: {}'.format(value.shape))
             if value.shape.ndims == 2:
                 return value
-            newdims = (value.shape.dims[0], functools.reduce(lambda x, y: x * y,
-                                                             value.shape.dims[1:]))
+            newdims = (value.shape.dims[0],
+                       functools.reduce(lambda x, y: x * y, value.shape.dims[1:]))
             return reshape(value, newdims)
 
         a = gemm_reshape(a)
         b = gemm_reshape(b)
 
         code = """
-        function (A[{a_dims}], B[{b_dims}], C[{c_dims}]) -> (O) {{
+        function (A[{a_dims}], B[{b_dims}], C) -> (O) {{
           OM[row, col : ROW, COL] = +(A[{a_idxs}] * B[{b_idxs}]);
           OA = {alpha_expr};
           CB = {beta_expr};
           O = OA + CB;
         }}""".format(
             a_dims='MID, ROW' if transA else 'ROW, MID',
-            b_dims='COL, MID' if transB else 'COL, MID',
-            c_dims='ROW, COL' if c.shape.ndims == 2 else 'COL',
+            b_dims='COL, MID' if transB else 'MID, COL',
             a_idxs='mid, row' if transA else 'row, mid',
-            b_idxs='col, mid' if transB else 'col, mid',
+            b_idxs='col, mid' if transB else 'mid, col',
             alpha_expr='OM * {}'.format(alpha) if alpha else 'OM',
             beta_expr='C * {}'.format(beta) if beta else 'C',
         )
@@ -853,10 +1713,9 @@ class Gradients(tile.Operation):
     """
 
     def __init__(self, loss, variables):
-        super(Gradients, self).__init__(None, [('Loss', loss)] + [('I' + str(i), variables[i])
-                                                                  for i in range(len(variables))],
-                                        [('O' + str(i), variables[i].shape)
-                                         for i in range(len(variables))])
+        super(Gradients, self).__init__(
+            None, [('Loss', loss)] + [('I' + str(i), variables[i]) for i in range(len(variables))],
+            [('O' + str(i), variables[i].shape) for i in range(len(variables))])
         self.num_vars = len(variables)
 
     def bind(self, bindings):
@@ -1037,10 +1896,10 @@ class MatMul(tile.Operation):
                 c_shape = tuple(b.dims[:-2] + b.dims[-1])
                 a_ranges = ['S']
                 a_indicies = ['s']
-                b_ranges = (['I{}'.format(n)
-                             for n in range(b_ndims - 2)] + ['S', 'I{}'.format(b_ndims - 1)])
-                b_indicies = (['i{}'.format(n)
-                               for n in range(b_ndims - 2)] + ['s', 'i{}'.format(b_ndims - 1)])
+                b_ranges = (['I{}'.format(n) for n in range(b_ndims - 2)] +
+                            ['S', 'I{}'.format(b_ndims - 1)])
+                b_indicies = (['i{}'.format(n) for n in range(b_ndims - 2)] +
+                              ['s', 'i{}'.format(b_ndims - 1)])
                 c_ranges = ['I{}'.format(n) for n in range(b_ndims - 2) + [b_ndims - 1]]
                 c_indicies = ['i{}'.format(n) for n in range(b_ndims - 2) + [b_ndims - 1]]
         else:
@@ -1066,10 +1925,10 @@ class MatMul(tile.Operation):
                     [a.shape.dims[-2], b.shape.dims[-1]])
                 a_ranges = ['I{}'.format(n) for n in range(a_ndims - 1)] + ['S']
                 a_indicies = ['i{}'.format(n) for n in range(a_ndims - 1)] + ['s']
-                b_ranges = (['I{}'.format(n)
-                             for n in range(b_ndims - 2)] + ['S', 'I{}'.format(b_ndims - 1)])
-                b_indicies = (['i{}'.format(n)
-                               for n in range(b_ndims - 2)] + ['s', 'i{}'.format(b_ndims - 1)])
+                b_ranges = (['I{}'.format(n) for n in range(b_ndims - 2)] +
+                            ['S', 'I{}'.format(b_ndims - 1)])
+                b_indicies = (['i{}'.format(n) for n in range(b_ndims - 2)] +
+                              ['s', 'i{}'.format(b_ndims - 1)])
                 c_ranges = ['I{}'.format(n) for n in range(len(c_dims))]
                 c_indicies = ['i{}'.format(n) for n in range(len(c_dims))]
 
@@ -1132,9 +1991,9 @@ class MaxPool(tile.Operation):
         if not strides:
             strides = tuple(1 for _ in range(rank))
         elif len(strides) != rank:
-            raise ValueError('Pool strides length inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(strides,
-                                                                  len(strides), data.shape, rank))
+            raise ValueError(
+                'Pool strides length inconsistent with input shape: ' +
+                '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.shape, rank))
         sym_out_shape = list()
         num_out_shape = list()
         in_idxs = list()
@@ -1417,9 +2276,10 @@ class Reshape(tile.Operation):
                 inputs.append((dname, dim))
                 dstrs[idx] = dname
 
-        super(Reshape, self).__init__('function ({}) -> (O) {{ O = reshape(I, {}); }}'.format(
-            ', '.join(inp[0] for inp in inputs), ', '.join([str(d) for d in dstrs])), inputs,
-                                      [('O', tile.Shape(x.shape.dtype, dims))])
+        super(Reshape, self).__init__(
+            'function ({}) -> (O) {{ O = reshape(I, {}); }}'.format(
+                ', '.join(inp[0] for inp in inputs), ', '.join([str(d) for d in dstrs])), inputs,
+            [('O', tile.Shape(x.shape.dtype, dims))])
 
 
 reshape = Reshape.function
@@ -1544,7 +2404,8 @@ class Sqrt(tile.Operation):
     """
 
     def __init__(self, x):
-        super(Sqrt, self).__init__("""
+        super(Sqrt, self).__init__(
+            """
             function (I) -> (O) {
                 IC = (I < 0 ? 0 : I);
                 O = sqrt(IC);

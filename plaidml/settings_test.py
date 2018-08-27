@@ -6,7 +6,7 @@ import unittest
 import uuid
 
 import plaidml.exceptions
-import plaidml.settings as s
+from plaidml import settings
 
 VALID_CONF = r'''{
     "PLAIDML_CONFIG": "tmp",
@@ -22,74 +22,74 @@ INVALID_CONF = '{"PLAIDML_INVALID":"1"}'
 class TestSettings(unittest.TestCase):
 
     def setUp(self):
-        s._setup_for_test()
+        settings._setup_for_test()
 
     def testDefaults(self):
-        self.assertEquals(s.config, None)
-        self.assertEquals(s.device_ids, [])
-        self.assertEquals(s.experimental, False)
-        self.assertEquals(s.session, None)
-        self.assertEquals(s.telemetry, False)
+        self.assertEquals(settings.config, None)
+        self.assertEquals(settings.device_ids, [])
+        self.assertEquals(settings.experimental, False)
+        self.assertEquals(settings.session, None)
+        self.assertEquals(settings.telemetry, False)
 
     def testSetting(self):
-        s.config = 'test'
-        s.device_ids = ['1', '2']
-        s.experimental = True
-        s.telemetry = True
-        s.session = "123"
-        self.assertEquals(s.config, 'test')
-        self.assertEquals(s.device_ids, ['1', '2'])
-        self.assertEquals(s.experimental, True)
-        self.assertEquals(s.session, "123")
-        self.assertEquals(s.telemetry, True)
+        settings.config = 'test'
+        settings.device_ids = ['1', '2']
+        settings.experimental = True
+        settings.telemetry = True
+        settings.session = "123"
+        self.assertEquals(settings.config, 'test')
+        self.assertEquals(settings.device_ids, ['1', '2'])
+        self.assertEquals(settings.experimental, True)
+        self.assertEquals(settings.session, "123")
+        self.assertEquals(settings.telemetry, True)
 
     def testStartSession(self):
         with self.assertRaises(plaidml.exceptions.PlaidMLError):
-            s.start_session()
-        s.setup = True
-        s.start_session()
-        s._setup_for_test()
-        s.setup = False
+            settings.start_session()
+        settings.setup = True
+        settings.start_session()
+        settings._setup_for_test()
+        settings.setup = False
         with self.assertRaises(plaidml.exceptions.PlaidMLError):
-            s.start_session()
-        s._setup_for_test()
-        s.experimental = True
-        s.start_session()
-        u = uuid.UUID(s.session)
+            settings.start_session()
+        settings._setup_for_test()
+        settings.experimental = True
+        settings.start_session()
+        u = uuid.UUID(settings.session)
 
     def testSettingsFileLoading(self):
-        with tempfile.NamedTemporaryFile(delete=False) as val:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as val:
             val.write(VALID_CONF)
-        with tempfile.NamedTemporaryFile(delete=False) as inv:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as inv:
             inv.write(INVALID_CONF)
         # Explicit settings files should take precedence
-        s._setup_for_test(inv.name, inv.name)
+        settings._setup_for_test(inv.name, inv.name)
         os.environ['PLAIDML_SETTINGS'] = val.name
-        s._load()
-        self.assertEquals(s.config, 'tmp')
-        self.assertEquals(s.experimental, True)
-        self.assertEquals(s.device_ids, ['1', '3', '5'])
-        self.assertEquals(s.telemetry, True)
+        settings._load()
+        self.assertEquals(settings.config, 'tmp')
+        self.assertEquals(settings.experimental, True)
+        self.assertEquals(settings.device_ids, ['1', '3', '5'])
+        self.assertEquals(settings.telemetry, True)
 
         # User config should shadow system config
-        s._setup_for_test(val.name, inv.name)
-        s._load()
-        self.assertEquals(s.experimental, True)
-        s._setup_for_test('nottafile', inv.name)
+        settings._setup_for_test(val.name, inv.name)
+        settings._load()
+        self.assertEquals(settings.experimental, True)
+        settings._setup_for_test('nottafile', inv.name)
         with self.assertRaises(plaidml.exceptions.OutOfRange):
-            s._load()
+            settings._load()
         os.remove(val.name)
         os.remove(inv.name)
 
     def testSettingsOverridesLoading(self):
-        with tempfile.NamedTemporaryFile(delete=False) as tf:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tf:
             tf.write(VALID_CONF)
             os.environ['PLAIDML_SETTINGS'] = tf.name
         os.environ['PLAIDML_CONFIG'] = 'other'
-        s.telemetry = False
-        s._load()
-        self.assertEquals(s.config, 'other')
-        self.assertEquals(s.telemetry, False)
+        settings.telemetry = False
+        settings._load()
+        self.assertEquals(settings.config, 'other')
+        self.assertEquals(settings.telemetry, False)
         os.remove(tf.name)
 
 

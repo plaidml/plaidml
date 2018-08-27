@@ -25,7 +25,7 @@ class Device final : public hal::Device {
 
   void Initialize(const hal::proto::HardwareSettings& settings) final;
 
-  std::string description() final { return device_state()->info().vendor() + " " + device_state()->info().name(); }
+  std::string description() final;
 
   hal::Compiler* compiler() final { return compiler_.get(); }
 

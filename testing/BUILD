@@ -1,5 +1,6 @@
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_py_library", "plaidml_py_test")
+load("@vertexai_plaidml//bzl:conda.bzl", "conda_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_py_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -36,11 +37,11 @@ plaidml_py_library(
     data = ["//plaidml:configs"],
 )
 
-plaidml_py_test(
+conda_test(
     name = "configs_test",
     srcs = ["configs_test.py"],
     data = ["//plaidml:configs"],
-    requirements = "//plaidml:requirements.txt",
+    env = "@vertexai_plaidml_conda//:env",
     deps = ["//plaidml:py"],
 )
 

@@ -53,15 +53,18 @@ for more information about how the TILE language works, or check out the
 `PlaidML Op Tutorial <https://github.com/plaidml/plaidml/wiki/PlaidML-Op-Tutorial>`_
 for the details of writing your own operations.
 """
-from collections import namedtuple
 import functools
+import logging
 import math
 import re
+import sys
+import traceback
+from collections import namedtuple
 
 import numpy as np
-import plaidml
 import six
-import sys
+
+import plaidml
 
 
 class Error(Exception):
@@ -204,14 +207,19 @@ class Operation(object):
             side_effects ([Value, Value]): A dict of side-effects of this operation.
         """
         self.code = code
-        self.inputs = dict([(k, _ShapelessValue.from_value(Value.from_python_value(v)))
-                            for k, v in inputs])
-        output_list = [(output_name, Value.for_op(shape, self, output_name))
-                       for output_name, shape in outputs]
+        self.inputs = dict(
+            [(k, _ShapelessValue.from_value(Value.from_python_value(v))) for k, v in inputs])
+        output_list = [
+            (output_name, Value.for_op(shape, self, output_name)) for output_name, shape in outputs
+        ]
         self.output_tuple = tuple([val for _, val in output_list])
         self.outputs = dict(output_list)
         self.name = name or self.__class__.__name__
         self.side_effects = side_effects or []
+        if plaidml.is_backtrace_enabled():
+            self.backtrace = ''.join(traceback.format_stack()[:-1])
+        else:
+            self.backtrace = None
 
     def sole_output(self):
         if len(self.output_tuple) != 1:
@@ -266,7 +274,8 @@ class Operation(object):
         if not self.code:
             raise NotImplementedError('{} is not directly implemented.'.format(
                 self.__class__.__name__))
-        applier = plaidml.Applier(bindings.ctx, plaidml.Function(self.code))
+        applier = plaidml.Applier(bindings.ctx,
+                                  plaidml.Function(self.code, backtrace=self.backtrace))
         for input_name, input_value in self.inputs.items():
             applier.add_input(input_name, input_value.bind(bindings))
         outputs = {}
@@ -394,8 +403,8 @@ class _SliceOf(Operation):
                 raise ValueError('Slice key too long. Tensor has {} dimensions, key is {}'.format(
                     value.shape.ndims, key))
             key = tuple(
-                list(key[:ellipsis_idx]) + [slice(None, None, None)] * ellipsis_length + list(
-                    key[ellipsis_idx + 1:]))
+                list(key[:ellipsis_idx]) + [slice(None, None, None)] * ellipsis_length +
+                list(key[ellipsis_idx + 1:]))
         for idx in range(len(key)):
             length_numerator, length_numerator_value, step, offset, idx_extra_vars = self._parse_slice(
                 value.shape.dims, key, idx)
@@ -572,10 +581,10 @@ class _NDArray(Operation):
         super(_NDArray, self).__init__(None, [], [('O', shape)], name='NDArray')
 
     def bind(self, bindings):
-        tensor = plaidml.Tensor(bindings.dev,
-                                plaidml.Shape(bindings.ctx,
-                                              convert_np_dtype_to_pml(self._value.dtype.name),
-                                              *self._value.shape))
+        tensor = plaidml.Tensor(
+            bindings.dev,
+            plaidml.Shape(bindings.ctx, convert_np_dtype_to_pml(self._value.dtype.name),
+                          *self._value.shape))
         with tensor.mmap_discard(bindings.ctx) as view:
             view.copy_from_ndarray(self._value)
             view.writeback()
@@ -802,12 +811,14 @@ class Value(_ShapelessValue):
             return Value.from_var(plaidml.Real(py_val), tuple(), dtype, name=name)
         elif hasattr(py_val, 'shape') and hasattr(py_val, 'dtype'):
             # Assume it's an ndarray.
+            if len(py_val.shape) == 0:
+                # Handle 0-dimensional numpy arrays as scalars
+                return Value.from_python_value(py_val.item())
             if ctx and dev:
                 # We have the device; we can return a value immediately.
-                tensor = plaidml.Tensor(dev,
-                                        plaidml.Shape(ctx,
-                                                      convert_np_dtype_to_pml(py_val.dtype.name),
-                                                      *py_val.shape))
+                tensor = plaidml.Tensor(
+                    dev,
+                    plaidml.Shape(ctx, convert_np_dtype_to_pml(py_val.dtype.name), *py_val.shape))
                 with tensor.mmap_discard(ctx) as view:
                     view.copy_from_ndarray(py_val)
                     view.writeback()
@@ -987,7 +998,7 @@ class Value(_ShapelessValue):
         return binary_op(other, self, 'L ^ R', name='RevXor')
 
 
-def compose(ctx, dev, inputs, outputs, updates=None):
+def compose(ctx, dev, inputs, outputs, updates=None, name='unnamed_function'):
     """Builds a TILE Function that computes the indicated values.
 
     Args:
@@ -1000,6 +1011,18 @@ def compose(ctx, dev, inputs, outputs, updates=None):
     Returns:
         plaidml._Function: The composed TILE function.
     """
+    logger = logging.getLogger('plaidml')
+    logger.debug('compose: {}'.format(name))
+    logger.debug('  Inputs:')
+    for input in inputs:
+        logger.debug('    {}'.format(input))
+    logger.debug('  Outputs:')
+    for output in outputs:
+        logger.debug('    {}'.format(output))
+    if updates:
+        logger.debug('  Updates:')
+        for update in updates:
+            logger.debug('    {}'.format(update))
     bindings = _OpBindings(ctx, dev)
     to_be_bound = [val for _, val in outputs]
     if updates is None:
@@ -1289,7 +1312,8 @@ def broadcast_dims(*args):
                 raise LogicError(
                     'Broadcast mismatch: {} and {} are incompatible; inputs were: {}'.format(
                         this_size, size, ', '.join([
-                            '({})'.format(', '.join(str(dim) for dim in dtuple))
+                            '({})'.format(', '.join(str(dim)
+                                                    for dim in dtuple))
                             for dtuple in dtuples
                         ])))
             size = this_size

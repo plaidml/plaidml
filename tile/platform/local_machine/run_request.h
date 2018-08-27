@@ -27,7 +27,6 @@ class RunRequest {
   void AddProgramDoneDep(const std::shared_ptr<hal::Event>& event);
 
   const Program* program() const { return program_; }
-  const Shim* shim() const { return shim_.get(); }
 
  private:
   struct KernelLogInfo {
@@ -37,11 +36,7 @@ class RunRequest {
     std::size_t tot_flops;
   };
 
-  RunRequest(const Program* program, std::unique_ptr<Shim> shim);
-  RunRequest(const RunRequest&) = delete;
-  RunRequest(RunRequest&&) = default;
-  RunRequest& operator=(const RunRequest&) = delete;
-  RunRequest& operator=(RunRequest&&) = default;
+  explicit RunRequest(const Program* program) : program_{program} {}
 
   static void LogRequest(const Program* program, const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
                          const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs);
@@ -50,7 +45,6 @@ class RunRequest {
                                  boost::future<std::vector<std::shared_ptr<hal::Result>>> results);
 
   const Program* program_;
-  std::unique_ptr<Shim> shim_;
 };
 
 }  // namespace local_machine

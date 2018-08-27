@@ -50,6 +50,13 @@ For examples and benchmarks, see our [blog](http://vertex.ai/blog).
 - [Reporting Issues](#reporting-issues)
 
 ### Recent Release Notes
+* PlaidML 0.3.3 - 0.3.5
+  * Support Keras 2.2.0
+  * Support ONNX 1.2.1
+  * Upgrade kernel scheduling
+  * Revise documentation
+  * Add HALs for CUDA and Metal
+  * Various bugfixes and improvements
 * PlaidML 0.3.2
   * Now supports ONNX 1.1.0 as a backend through [onnx-plaidml](https://github.com/plaidml/onnx-plaidml)
   * Preliminary support for LLVM. Currently only supports CPUs, and only on Linux and macOS. More soon.
@@ -113,11 +120,10 @@ need to run VGG-19:
 ```python
 #!/usr/bin/env python
 import numpy as np
+import os
 import time
 
-# Install the plaidml backend
-import plaidml.keras
-plaidml.keras.install_backend()
+os.environ["KERAS_BACKEND"] = "plaidml.keras.backend"
 
 import keras
 import keras.applications as kapp

@@ -2,9 +2,6 @@ syntax = "proto3";
 
 package vertexai.tile.proto;
 
-import "google/protobuf/duration.proto";
-import "google/protobuf/timestamp.proto";
-
 option java_package = "ai.vertex.tile";
 option java_outer_classname = "TensorProtos";
 
@@ -51,6 +48,17 @@ message TensorShape {
   repeated Dimension dimensions = 3;
 }
 
+// Information about a program input.
+message ProgramInput {
+  TensorShape shape = 1;
+  bool consumed = 2;  // If true, input tensor state may be discarded.
+}
+
+// Information about a program output.
+message ProgramOutput {
+  TensorShape shape = 1;
+}
+
 // A device capable of performing tensor operations.
 message Device {
   string dev_id = 1;
@@ -65,50 +73,6 @@ message Device {
   string config = 4;
 }
 
-// A Tile backend session resource.
-// Sessions are the logical containers for resources allocated on the backend;
-// deleting a session deletes all of the associated resources.  As part of
-// this, sessions provide scopes for resource names, providing coordination
-// between otherwise unconnected clients.
-message Session {
-  string id = 1;
-
-  // The server time after which the session may be automatically expired.
-  // If set, clients are responsible for periodically updating this field
-  // as long as they require the session's state to be retained.
-  // Note that this may be set even if the initial expiration duration is
-  // not specified.
-  google.protobuf.Timestamp expiration_time = 2;
-
-  // The initial expiration duration, specified when creating a session.
-  // Note that servers may mandate a smaller duration.
-  google.protobuf.Duration initial_expiration_duration = 3;
-}
-
-// A Tile session buffer resource.
-//
-// Buffers are immutable blocks of memory referenced by ID.
-message Buffer {
-  string id = 1;
-  string session_id = 2;
-  uint64 size = 3;  // Measured in bytes.
-
-  // The entity currently writing to the buffer, if any.
-  // The buffer may be read once this field has been cleared.
-  BufferWriter writer = 4;
-}
-
-message BufferWriter {
-  oneof writer {
-    // The process writing to the buffer (if any).
-    string process_id = 4;
-
-    // A buffer may also be written via a streamed API call; in this case,
-    // this field will be the opaque client identifier.
-    string client_id = 5;
-  }
-}
-
 message TileScanningParameters {
   uint64 max_trials = 1;
   uint64 max_trial_runs = 2;
@@ -120,45 +84,9 @@ message Program {
   string id = 1;
   string dev_id = 2;
   string code = 3;
-  map<string, TensorShape> inputs = 5;
-  map<string, TensorShape> outputs = 6;
+  map<string, ProgramInput> inputs = 5;
+  map<string, ProgramOutput> outputs = 6;
   TileScanningParameters tile_scanning_params = 7;
-}
-
-// A Tile process resource.
-// An process represents the ongoing state of the evaluation of a Tile program.
-message Process {
-  string id = 1;
-  string session_id = 2;
-
-  // The program being evaluated by the process.
-  // This field is not returned by queries.
-  Program program = 4;
-
-  // Name to buffer id mappings for the process inputs.
-  // This field is not returned by queries.
-  map<string, string> inputs = 5;
-
-  // Name to buffer id mappings for the process outputs.
-  // This field is not returned by queries.
-  map<string, string> outputs = 6;
-
-  // The state of a Tile process.
-  enum State {
-    UNKNOWN_STATE = 0;
-
-    // STATE_RUN indicates an actively running process.  This should be the
-    // state supplied for process creation.
-    STATE_RUN = 1;
-
-    // STATE_COMPLETE indicates a process that's run to completion.  This is
-    // a terminal process state; once set, the state cannot be subsequently
-    // changed.  This state is set by the backend as a result of executing the
-    // process; it cannot be set as a process state via the API.
-    STATE_COMPLETE = 2;
-  }
-
-  State current_state = 7;
 }
 
 // Tile API request/return types.
@@ -170,136 +98,4 @@ message ListDevicesRequest {
 message ListDevicesResponse {
   repeated Device devices = 1;
   repeated Device unmatched_devices = 2;
-}
-
-message CreateSessionRequest {
-  Session session = 1;
-}
-
-message UpdateSessionExpirationRequest {
-  string session_id = 1;
-  google.protobuf.Timestamp previous_expiration_time = 2;
-  google.protobuf.Timestamp updated_expiration_time = 3;
-}
-
-message UpdateSessionExpirationResponse {
-  google.protobuf.Timestamp current_expiration_time = 1;
-}
-
-message DeleteSessionRequest {
-  string session_id = 1;
-}
-
-message ListSessionsRequest {
-}
-
-message ListSessionsResponse {
-  repeated Session session = 1;
-}
-
-message GetSessionRequest {
-  string session_id = 1;
-}
-
-message DeleteBufferRequest {
-  string session_id = 1;
-  string buffer_id = 2;
-}
-
-message ListBuffersRequest {
-  string session_id = 1;
-}
-
-message ListBuffersResponse {
-  repeated Buffer buffer = 1;
-}
-
-message GetBufferRequest {
-  string session_id = 1;
-  string buffer_id = 2;
-}
-
-message WriteBufferRequest {
-  // Where to write the data.
-  uint64 offset = 1;
-
-  // The data to be written.
-  bytes data = 2;
-
-  // Identifies the buffer to write.  A non-empty session and buffer ID is
-  // required in the first WriteBufferRequest in a stream, and a protocol error
-  // after the first WriteBufferRequest in a stream.
-  string session_id = 3;
-  string buffer_id = 4;
-  string dev_id = 5;
-
-  // The size of the buffer being written.  If the buffer already has a
-  // non-zero size, this must be equal to the buffer's current size, or the
-  // write will fail.  It's a protocol error to include this field after the
-  // first WriteBufferRequest in a stream.
-  uint64 size = 6;
-
-  // The identifier of the client writing the buffer.  Either this field should
-  // be non-empty, or all of the buffer's data should be written in a single
-  // message with the 'writes_complete' flag set.  If present, this field must
-  // match the buffer's existing writer (if the buffer has one), and it's a
-  // protocol error to include this field after the first WriteBufferRequest in
-  // a stream.
-  string writer_client_id = 7;
-
-  // Indicates that writes are complete; the buffer should be made available to
-  // readers.
-  // If present, this must be the last request in the stream.
-  bool writes_complete = 8;
-
-  // If set, atomically deletes the indicated buffer and reuses its backing
-  // storage for the current buffer being written.  It's a protocol error to
-  // include this field after the first WriteBufferRequest in a stream.
-  string replace_buffer_id = 9;
-}
-
-message WriteBufferResponse {
-  // No fields; this just acknowledges a write in a stream, allowing the client
-  // to
-  // omit known-written blocks when resuming an upload.
-}
-
-message ReadBufferRequest {
-  // Where to read the data.
-  uint64 offset = 1;
-
-  // How much data to read.
-  uint64 length = 2;
-
-  // Identifies the buffer to read.  A non-empty session and buffer ID is
-  // required in the first ReadBufferRequest in a stream, and a protocol error
-  // after the first ReadBufferRequest in a stream.
-  string session_id = 3;
-  string buffer_id = 4;
-}
-
-message ReadBufferResponse {
-  bytes data = 1;
-}
-
-message UpdateProcessRequest {
-  Process process = 1;
-}
-
-message DeleteProcessRequest {
-  string session_id = 1;
-  string process_id = 2;
-}
-
-message ListProcessesRequest {
-  string session_id = 1;
-}
-
-message ListProcessesResponse {
-  repeated Process process = 1;
-}
-
-message GetProcessRequest {
-  string session_id = 1;
-  string process_id = 2;
 }

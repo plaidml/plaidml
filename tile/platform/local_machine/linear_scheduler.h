@@ -27,7 +27,7 @@ class LinearScheduler final : public Scheduler {
  public:
   explicit LinearScheduler(const std::shared_ptr<Placer>& placer);
 
-  Schedule BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) final;
+  schedule::Schedule BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) final;
 
   const char* name() const final;
 

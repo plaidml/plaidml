@@ -1,18 +1,17 @@
+// Copyright 2017, Vertex.AI.
+
 #include "tile/base/platform_test.h"
 
 #include <gmock/gmock.h>
-
-#include <google/protobuf/text_format.h>
+#include <half.hpp>
 
 #include "base/util/error.h"
 #include "base/util/logging.h"
 #include "testing/matchers.h"
+#include "tile/proto/support.h"
 
 using ::testing::Eq;
-using ::testing::EqualsProto;
-using ::testing::Ge;
 using ::testing::NotNull;
-using ::testing::SizeIs;
 
 namespace pb = google::protobuf;
 
@@ -20,94 +19,174 @@ namespace vertexai {
 namespace tile {
 namespace testing {
 
-std::unique_ptr<Program> MakeProgram(const context::Context& ctx, const std::unique_ptr<Platform>& device,
-                                     tile::proto::TileScanningParameters* params, const char* code,
-                                     const char* shape_str) {
-  proto::TensorShape shape;
-  proto::Program pprogram;
-  pprogram.set_code(code);
-  pb::TextFormat::ParseFromString(shape_str, &shape);
+void PlatformTest::SetUp() {
+  auto param = GetParam();
+  param_ = param.param;
+  platform_ = param.factory();
+}
+
+std::unique_ptr<Program> PlatformTest::MakeProgram(tile::proto::TileScanningParameters* params,  //
+                                                   const char* code,                             //
+                                                   const lang::TensorShape& shape) {
+  proto::Program pb_program;
+  pb_program.set_code(code);
   if (params) {
-    *pprogram.mutable_tile_scanning_params() = *params;
+    *pb_program.mutable_tile_scanning_params() = *params;
   }
-  (*pprogram.mutable_inputs())["A"] = shape;
-  (*pprogram.mutable_inputs())["B"] = shape;
-  (*pprogram.mutable_outputs())["C"] = shape;
-  auto program = device->MakeProgram(ctx, pprogram);
+  proto::TensorShape pb_shape = proto::to_proto(shape);
+  *(*pb_program.mutable_inputs())["A"].mutable_shape() = pb_shape;
+  *(*pb_program.mutable_inputs())["B"].mutable_shape() = pb_shape;
+  *(*pb_program.mutable_outputs())["C"].mutable_shape() = pb_shape;
+  auto program = platform_->MakeProgram(ctx_, pb_program);
 
   EXPECT_THAT(program, NotNull());
   return program;
 }
 
-std::shared_ptr<Buffer> MakeInput(const context::Context& ctx, const std::unique_ptr<Platform>& device,
-                                  const std::string& str) {
-  auto buf = device->MakeBuffer(ctx, "", str.size());
+std::vector<int> CastOutput(const lang::TensorShape& shape, View* view) {
+  std::vector<int> into;
+  switch (shape.type) {
+    case lang::DataType::INT8: {
+      auto ptr = reinterpret_cast<int8_t*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::INT16: {
+      auto ptr = reinterpret_cast<int16_t*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::INT32: {
+      auto ptr = reinterpret_cast<int32_t*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::INT64: {
+      auto ptr = reinterpret_cast<int64_t*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::UINT8: {
+      auto ptr = reinterpret_cast<uint8_t*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::UINT16: {
+      auto ptr = reinterpret_cast<uint16_t*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::UINT32: {
+      auto ptr = reinterpret_cast<uint32_t*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::UINT64: {
+      auto ptr = reinterpret_cast<uint64_t*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::FLOAT16: {
+      auto ptr = reinterpret_cast<half_float::half*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::FLOAT32: {
+      auto ptr = reinterpret_cast<float*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    case lang::DataType::FLOAT64: {
+      auto ptr = reinterpret_cast<double*>(view->data());
+      std::copy(ptr, ptr + shape.elem_size(), std::back_inserter(into));
+      break;
+    }
+    default:
+      throw std::runtime_error("Unsupported dtype");
+  }
+  return into;
+}
+
+std::shared_ptr<Buffer> PlatformTest::MakeInput(const lang::TensorShape& shape,  //
+                                                const std::vector<int>& data) {
+  auto buf = platform_->MakeBuffer(ctx_, "", shape.byte_size());
   EXPECT_THAT(buf, NotNull());
 
-  auto view = buf->MapDiscard(ctx);
-  str.copy(reinterpret_cast<char*>(view->data()), view->size());
-  view->WriteBack(ctx);
+  auto view = buf->MapDiscard(ctx_);
+  switch (shape.type) {
+    case lang::DataType::INT8:
+      std::copy(data.begin(), data.end(), reinterpret_cast<int8_t*>(view->data()));
+      break;
+    case lang::DataType::INT16:
+      std::copy(data.begin(), data.end(), reinterpret_cast<int16_t*>(view->data()));
+      break;
+    case lang::DataType::INT32:
+      std::copy(data.begin(), data.end(), reinterpret_cast<int32_t*>(view->data()));
+      break;
+    case lang::DataType::INT64:
+      std::copy(data.begin(), data.end(), reinterpret_cast<int64_t*>(view->data()));
+      break;
+    case lang::DataType::UINT8:
+      std::copy(data.begin(), data.end(), reinterpret_cast<uint8_t*>(view->data()));
+      break;
+    case lang::DataType::UINT16:
+      std::copy(data.begin(), data.end(), reinterpret_cast<uint16_t*>(view->data()));
+      break;
+    case lang::DataType::UINT32:
+      std::copy(data.begin(), data.end(), reinterpret_cast<uint32_t*>(view->data()));
+      break;
+    case lang::DataType::UINT64:
+      std::copy(data.begin(), data.end(), reinterpret_cast<uint64_t*>(view->data()));
+      break;
+    case lang::DataType::FLOAT16:
+      std::copy(data.begin(), data.end(), reinterpret_cast<half_float::half*>(view->data()));
+      break;
+    case lang::DataType::FLOAT32:
+      std::copy(data.begin(), data.end(), reinterpret_cast<float*>(view->data()));
+      break;
+    case lang::DataType::FLOAT64:
+      std::copy(data.begin(), data.end(), reinterpret_cast<double*>(view->data()));
+      break;
+    default:
+      throw std::runtime_error("Unsupported dtype");
+  }
+  view->WriteBack(ctx_);
 
-  auto read_result = buf->MapCurrent(ctx).get()->str();
-  EXPECT_THAT(read_result, Eq(str));
+  std::vector<int> read_result = CastOutput(shape, buf->MapCurrent(ctx_).get().get());
+  EXPECT_THAT(read_result, Eq(data));
 
   return buf;
 }
 
-std::shared_ptr<Buffer> MakeOutput(const context::Context& ctx, const std::unique_ptr<Platform>& device,
-                                   const std::string& str) {
-  auto buf = device->MakeBuffer(ctx, "", str.size());
+std::shared_ptr<Buffer> PlatformTest::MakeOutput(const lang::TensorShape& shape) {
+  auto buf = platform_->MakeBuffer(ctx_, "", shape.byte_size());
   EXPECT_THAT(buf, NotNull());
-
-  auto view = buf->MapDiscard(ctx);
-  str.copy(reinterpret_cast<char*>(view->data()), view->size());
-  view->WriteBack(ctx);
-
   return buf;
 }
 
-void CheckExpected(const context::Context& ctx, const std::shared_ptr<Buffer>& buf, const std::string& expected) {
-  auto read_result = buf->MapCurrent(ctx).get()->str();
-  EXPECT_THAT(read_result, Eq(expected));
-}
-
-std::unique_ptr<tile::Platform> PlatformTest::MakePlatform() { return GetParam()(); }
-
-TEST_P(PlatformTest, ConstructDestruct) {
-  auto device = MakePlatform();
-  EXPECT_THAT(device, NotNull());
-}
-
-TEST_P(PlatformTest, ListDevicesReturnsAtLeastOneDevice) {
-  auto device = MakePlatform();
-
-  proto::ListDevicesRequest request;
-  proto::ListDevicesResponse response;
-  device->ListDevices(context::Context(), request, &response);
-  EXPECT_THAT(response.devices(), SizeIs(Ge(1)));
+void PlatformTest::CheckExpected(const lang::TensorShape& shape,      //
+                                 const std::shared_ptr<Buffer>& buf,  //
+                                 const std::vector<int>& expected) {
+  auto view = buf->MapCurrent(ctx_).get();
+  std::vector<int> actual = CastOutput(shape, view.get());
+  EXPECT_THAT(actual, Eq(expected));
 }
 
 namespace multiply {
 
 const char* Code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
-const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
-const float Input[] = {
-    0,  1,  2,  3,   //
-    4,  5,  6,  7,   //
-    8,  9,  10, 11,  //
-    12, 13, 14, 15,  //
+// const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
+const std::vector<int> Input = {
+    0, 1, 2, 3,  //
+    4, 5, 6, 7,  //
+    0, 1, 2, 3,  //
+    4, 5, 6, 7,  //
 };
-const float Output[] = {
-    0, 0, 0, 0,  //
-    0, 0, 0, 0,  //
-    0, 0, 0, 0,  //
-    0, 0, 0, 0,  //
-};
-const float Expected[] = {
-    56,  62,  68,  74,   //
-    152, 174, 196, 218,  //
-    248, 286, 324, 362,  //
-    344, 398, 452, 506,  //
+const std::vector<int> Expected = {
+    16, 22, 28, 34,   //
+    48, 70, 92, 114,  //
+    16, 22, 28, 34,   //
+    48, 70, 92, 114,  //
 };
 
 }  // namespace multiply
@@ -115,26 +194,26 @@ const float Expected[] = {
 namespace vector_add {
 
 const char* Code = "function (A, B) -> (C) { C = A + B; }";
-const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
-const float A[] = {
+// const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
+const std::vector<int> A = {
     1, 2, 3, 4,  //
     1, 2, 3, 4,  //
     1, 2, 3, 4,  //
     1, 2, 3, 4,  //
 };
-const float B[] = {
+const std::vector<int> B = {
     5, 6, 7, 8,  //
     5, 6, 7, 8,  //
     5, 6, 7, 8,  //
     5, 6, 7, 8,  //
 };
-const float Output[] = {
-    0, 0, 0, 0,  //
-    0, 0, 0, 0,  //
-    0, 0, 0, 0,  //
-    0, 0, 0, 0,  //
-};
-const float Expected[] = {
+// const std::vector<int> Output = {
+//     0, 0, 0, 0,  //
+//     0, 0, 0, 0,  //
+//     0, 0, 0, 0,  //
+//     0, 0, 0, 0,  //
+// };
+const std::vector<int> Expected = {
     6,   // 1 + 5 = 6
     8,   // 2 + 6 = 8
     10,  // 3 + 7 = 10
@@ -155,42 +234,37 @@ const float Expected[] = {
 
 }  // namespace vector_add
 
-std::string MakeBuffer(const float* data, size_t len) { return std::string(reinterpret_cast<const char*>(data), len); }
-
 TEST_P(PlatformTest, VectorAddWorks) {
-  context::Context ctx;
-  auto device = MakePlatform();
-  auto program = MakeProgram(ctx, device, nullptr, vector_add::Code, vector_add::Shape);
-  auto a = MakeInput(ctx, device, MakeBuffer(vector_add::A, sizeof(vector_add::A)));
-  auto b = MakeInput(ctx, device, MakeBuffer(vector_add::B, sizeof(vector_add::B)));
-  auto c = MakeOutput(ctx, device, MakeBuffer(vector_add::Output, sizeof(vector_add::Output)));
-  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}}).get();
-  CheckExpected(ctx, c, MakeBuffer(vector_add::Expected, sizeof(vector_add::Expected)));
+  auto shape = lang::SimpleShape(param_.dtype, {4, 4});
+  auto program = MakeProgram(nullptr, vector_add::Code, shape);
+  auto a = MakeInput(shape, vector_add::A);
+  auto b = MakeInput(shape, vector_add::B);
+  auto c = MakeOutput(shape);
+  program->Run(ctx_, {{"A", a}, {"B", b}}, {{"C", c}}).get();
+  CheckExpected(shape, c, vector_add::Expected);
 }
 
 TEST_P(PlatformTest, MatMulWorks) {
-  context::Context ctx;
-  auto device = MakePlatform();
-  auto program = MakeProgram(ctx, device, nullptr, multiply::Code, multiply::Shape);
-  auto a = MakeInput(ctx, device, MakeBuffer(multiply::Input, sizeof(multiply::Input)));
-  auto b = MakeInput(ctx, device, MakeBuffer(multiply::Input, sizeof(multiply::Input)));
-  auto c = MakeOutput(ctx, device, MakeBuffer(multiply::Output, sizeof(multiply::Output)));
-  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}}).get();
-  CheckExpected(ctx, c, MakeBuffer(multiply::Expected, sizeof(multiply::Expected)));
+  auto shape = lang::SimpleShape(param_.dtype, {4, 4});
+  auto program = MakeProgram(nullptr, multiply::Code, shape);
+  auto a = MakeInput(shape, multiply::Input);
+  auto b = MakeInput(shape, multiply::Input);
+  auto c = MakeOutput(shape);
+  program->Run(ctx_, {{"A", a}, {"B", b}}, {{"C", c}}).get();
+  CheckExpected(shape, c, multiply::Expected);
 }
 
-TEST_P(PlatformTest, DISABLED_RuntimeTileScannerWorks) {
-  context::Context ctx;
+TEST_P(PlatformTest, RuntimeTileScannerWorks) {
   tile::proto::TileScanningParameters params;
   params.set_max_trials(2);
   params.set_max_trial_runs(2);
-  auto device = MakePlatform();
-  auto program = MakeProgram(ctx, device, &params, multiply::Code, multiply::Shape);
-  auto a = MakeInput(ctx, device, MakeBuffer(multiply::Input, sizeof(multiply::Input)));
-  auto b = MakeInput(ctx, device, MakeBuffer(multiply::Input, sizeof(multiply::Input)));
-  auto c = MakeOutput(ctx, device, MakeBuffer(multiply::Output, sizeof(multiply::Output)));
-  program->Run(ctx, {{"A", a}, {"B", b}}, {{"C", c}}).get();
-  CheckExpected(ctx, c, MakeBuffer(multiply::Expected, sizeof(multiply::Expected)));
+  auto shape = lang::SimpleShape(param_.dtype, {4, 4});
+  auto program = MakeProgram(&params, multiply::Code, shape);
+  auto a = MakeInput(shape, multiply::Input);
+  auto b = MakeInput(shape, multiply::Input);
+  auto c = MakeOutput(shape);
+  program->Run(ctx_, {{"A", a}, {"B", b}}, {{"C", c}}).get();
+  CheckExpected(shape, c, multiply::Expected);
 }
 
 }  // namespace testing

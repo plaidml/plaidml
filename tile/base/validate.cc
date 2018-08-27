@@ -1,3 +1,5 @@
+// Copyright 2017, Vertex.AI.
+
 #include "tile/base/validate.h"
 
 #include <cstdint>

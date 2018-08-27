@@ -3,28 +3,44 @@
 #include <gtest/gtest.h>
 
 #include "tile/base/platform_test.h"
-#include "tile/hal/cuda/hal.h"
 #include "tile/platform/local_machine/platform.h"
-
-using ::testing::ValuesIn;
 
 namespace vertexai {
 namespace tile {
 namespace testing {
 namespace {
 
-std::vector<std::function<std::unique_ptr<Platform>()>> MakeFactories() {
-  std::vector<std::function<std::unique_ptr<Platform>()>> factories;
-  factories.emplace_back(std::function<std::unique_ptr<Platform>()>([] {
-    context::Context ctx;
-    local_machine::proto::Platform config;
-    config.add_hardware_configs()->mutable_sel()->set_value(true);
-    return compat::make_unique<local_machine::Platform>(context::Context(), config);
-  }));
-  return factories;
+Param supported_params[] = {
+    {lang::DataType::INT8, 1},    //
+    {lang::DataType::INT16, 1},   //
+    {lang::DataType::INT32, 1},   //
+    {lang::DataType::INT64, 1},   //
+    {lang::DataType::UINT8, 1},   //
+    {lang::DataType::UINT16, 1},  //
+    {lang::DataType::UINT32, 1},  //
+    {lang::DataType::UINT64, 1},  //
+    // {lang::DataType::FLOAT16, 1},  //
+    {lang::DataType::FLOAT32, 1},  //
+    {lang::DataType::FLOAT64, 1},  //
+};
+
+std::vector<FactoryParam> SupportedParams() {
+  std::vector<FactoryParam> params;
+  for (const Param& param : supported_params) {
+    auto factory = [param] {
+      context::Context ctx;
+      local_machine::proto::Platform config;
+      auto hw_config = config.add_hardware_configs();
+      hw_config->mutable_sel()->set_value(true);
+      hw_config->mutable_settings()->set_vec_size(param.vec_size);
+      return compat::make_unique<local_machine::Platform>(ctx, config);
+    };
+    params.push_back({factory, param});
+  }
+  return params;
 }
 
-INSTANTIATE_TEST_CASE_P(CudaHal, PlatformTest, ValuesIn(MakeFactories()));
+INSTANTIATE_TEST_CASE_P(Cuda, PlatformTest, ::testing::ValuesIn(SupportedParams()));
 
 }  // namespace
 }  // namespace testing

@@ -70,15 +70,15 @@ static double ConstantPropagate(const std::string& op, const std::vector<double>
   }
   if (op == "broadcast") {
     if (x[0] != x[1] && x[0] != 1 && x[1] != 1) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
-                               " != " + std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
+                               std::to_string(x[1]));
     }
     return x[0] == 1 ? x[1] : x[0];
   }
   if (op == "match") {
     if (x[0] != x[1]) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
-                               " != " + std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
+                               std::to_string(x[1]));
     }
     return x[0];
   }
@@ -661,6 +661,23 @@ void TypeCheck(Program* prog, Bindings* vars) {
           out_shape.push_back(val.shape.dims[i].size);
         }
         vars->emplace(op.output, Binding(SimpleShape(out_type, out_shape)));
+        continue;
+      }
+
+      if (op.f.fn == "index") {
+        Binding val = vars->at(op.inputs[0]);
+        Binding idx_num_var = vars->at(op.inputs[1]);
+        // Index must be bound to an integer constant
+        if (idx_num_var.tag != Binding::ICONST) {
+          throw std::runtime_error("Index number must be an integer constant");
+        }
+        int64_t idx_num = idx_num_var.iconst;
+        // compute out_type from the function name and possibly inputs[1]
+        std::vector<size_t> out_shape;
+        for (size_t i = 0; i < val.shape.dims.size(); ++i) {
+          out_shape.push_back(val.shape.dims[i].size);
+        }
+        vars->emplace(op.output, Binding(SimpleShape(DataType::INT32, out_shape)));
         continue;
       }
 

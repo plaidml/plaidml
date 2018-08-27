@@ -2,9 +2,9 @@
 
 #include <utility>
 
-#include "tile/hal/metal/hal.h"
-#include "tile/lang/emitc.h"
 #include "tile/lang/exprtype.h"
+#include "tile/lang/fpconv.h"
+#include "tile/lang/generate.h"
 #include "tile/lang/scope.h"
 
 namespace vertexai {
@@ -42,39 +42,258 @@ inline std::string c_dtype(const lang::DataType& dt) {
   }
 }
 
-class Emitter : public lang::EmitC {
+static std::map<std::pair<lang::DataType, sem::LimitConst::Which>, std::string> LimitConstLookup = {
+    {{lang::DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::INT8, sem::LimitConst::MIN}, "SCHAR_MIN"},
+    {{lang::DataType::INT16, sem::LimitConst::MIN}, "SHRT_MIN"},
+    {{lang::DataType::INT32, sem::LimitConst::MIN}, "INT_MIN"},
+    {{lang::DataType::INT64, sem::LimitConst::MIN}, "LONG_MIN"},
+    {{lang::DataType::UINT8, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::UINT16, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::UINT32, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::UINT64, sem::LimitConst::MIN}, "0"},
+    {{lang::DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
+    {{lang::DataType::FLOAT32, sem::LimitConst::MIN}, "-FLT_MAX"},
+    {{lang::DataType::FLOAT64, sem::LimitConst::MIN}, "-DBL_MAX"},
+
+    {{lang::DataType::BOOLEAN, sem::LimitConst::MAX}, "0"},
+    {{lang::DataType::INT8, sem::LimitConst::MAX}, "SCHAR_MAX"},
+    {{lang::DataType::INT16, sem::LimitConst::MAX}, "SHRT_MAX"},
+    {{lang::DataType::INT32, sem::LimitConst::MAX}, "INT_MAX"},
+    {{lang::DataType::INT64, sem::LimitConst::MAX}, "LONG_MAX"},
+    {{lang::DataType::UINT8, sem::LimitConst::MAX}, "UCHAR_MAX"},
+    {{lang::DataType::UINT16, sem::LimitConst::MAX}, "USHRT_MAX"},
+    {{lang::DataType::UINT32, sem::LimitConst::MAX}, "UINT_MAX"},
+    {{lang::DataType::UINT64, sem::LimitConst::MAX}, "ULONG_MAX"},
+    {{lang::DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
+    {{lang::DataType::FLOAT32, sem::LimitConst::MAX}, "FLT_MAX"},
+    {{lang::DataType::FLOAT64, sem::LimitConst::MAX}, "DBL_MAX"},
+};
+
+class Emitter : public sem::Visitor {
  public:
-  void Visit(const sem::CondExpr& node) final {  //
+  std::string str() const {  //
+    return result_.str();
+  }
+
+  void Visit(const sem::LimitConst& node) {
+    if (node.which == sem::LimitConst::ZERO) {
+      emit("0");
+      return;
+    } else if (node.which == sem::LimitConst::ONE) {
+      emit("1");
+      return;
+    }
+    auto it = LimitConstLookup.find(std::make_pair(node.type, node.which));
+    if (it == LimitConstLookup.end()) {
+      throw std::runtime_error("Invalid type in LimitConst");
+    }
+    emit(it->second);
+  }
+
+  void Visit(const sem::IntConst& node) {  //
+    emit(std::to_string(node.value));
+  }
+
+  void Visit(const sem::FloatConst& node) {
+    std::string c = lang::DoubleToString(node.value);
+    if (c.find_first_of(".e") == std::string::npos) {
+      c += ".0";
+    }
+    emit(c + "f");
+  }
+
+  void Visit(const sem::LookupLVal& node) {  //
+    emit(node.name);
+  }
+
+  void Visit(const sem::LoadExpr& node) {  //
+    node.inner->Accept(*this);
+  }
+
+  void Visit(const sem::StoreStmt& node) {
+    emitTab();
+    node.lhs->Accept(*this);
+    emit(" = ");
+    node.rhs->Accept(*this);
+    emit(";\n");
+  }
+
+  void Visit(const sem::SubscriptLVal& node) {
+    node.ptr->Accept(*this);
+    emit("[");
+    node.offset->Accept(*this);
+    emit("]");
+  }
+
+  void Visit(const sem::UnaryExpr& node) {
+    emit("(");
+    emit(node.op);
+    node.inner->Accept(*this);
+    emit(")");
+  }
+
+  void Visit(const sem::BinaryExpr& node) {
+    emit("(");
+    node.lhs->Accept(*this);
+    emit(" ");
+    emit(node.op);
+    emit(" ");
+    node.rhs->Accept(*this);
+    emit(")");
+  }
+
+  void Visit(const sem::CondExpr& node) {  //
     Select(node.cond, node.tcase, node.fcase);
   }
 
-  void Visit(const sem::SelectExpr& node) final {  //
+  void Visit(const sem::SelectExpr& node) {  //
     Select(node.cond, node.tcase, node.fcase);
   }
 
-  void Visit(const sem::Block& node) final {
+  void Visit(const sem::Block& node) {
     auto previous_scope = scope_;
     lang::Scope<sem::Type> scope{scope_};
     scope_ = &scope;
-    EmitC::Visit(node);
+    emitTab();
+    emit("{\n");
+    ++indent_;
+    if (initial_block_) {
+      initial_block_ = false;
+      for (size_t i = 0; i < params_.size(); i++) {
+        const auto& item = params_[i];
+        emitTab();
+        emitType(item.first);
+        emit(" ");
+        emit(item.second);
+        emit(" = ");
+        emit("static_cast<");
+        emitType(item.first);
+        emit(">(");
+        emit(item.second);
+        emit("_arg_);\n");
+      }
+    }
+    for (const sem::StmtPtr& ptr : node.statements) {
+      ptr->Accept(*this);
+    }
+    --indent_;
+    emitTab();
+    emit("}\n");
     scope_ = previous_scope;
   }
 
-  void Visit(const sem::DeclareStmt& node) final {
-    EmitC::Visit(node);
+  void Visit(const sem::ClampExpr& node) {
+    emit("clamp(");
+    node.val->Accept(*this);
+    emit(", ");
+    node.min->Accept(*this);
+    emit(", ");
+    node.max->Accept(*this);
+    emit(")");
+  }
+
+  void Visit(const sem::CallExpr& node) {
+    emit(node.name);
+    emit("(");
+    for (size_t i = 0; i < node.vals.size(); i++) {
+      if (i) {
+        emit(", ");
+      }
+      node.vals[i]->Accept(*this);
+    }
+    emit(")");
+  }
+
+  void Visit(const sem::DeclareStmt& node) {
+    emitTab();
+    emitType(node.type);
+    emit(" ");
+    emit(node.name);
+    if (node.type.array) {
+      emit("[" + std::to_string(node.type.array) + "]");
+    }
+    if (node.init) {
+      emit(" = ");
+      if (node.type.array) {
+        emit("{");
+        for (size_t i = 0; i < node.type.array; i++) {
+          node.init->Accept(*this);
+          emit(", ");
+        }
+        emit("}");
+      } else {
+        node.init->Accept(*this);
+      }
+    }
+    emit(";\n");
     scope_->Bind(node.name, node.type);
   }
 
-  void Visit(const sem::ForStmt& node) final {
+  void Visit(const sem::IfStmt& node) {
+    emitTab();
+    if (node.iftrue && node.iffalse) {
+      emit("if (");
+      node.cond->Accept(*this);
+      emit(")\n");
+      node.iftrue->Accept(*this);
+      emitTab();
+      emit("else\n");
+      node.iffalse->Accept(*this);
+    } else if (node.iftrue) {
+      emit("if (");
+      node.cond->Accept(*this);
+      emit(")\n");
+      node.iftrue->Accept(*this);
+    } else if (node.iffalse) {
+      // This code is required since it is possible for node.iftrue to be a nullptr.
+      // It needs to stay in place because its possible for verbose logging to print
+      // pre-simplified code; this would cause a null pointer to be dereferencd and hence a crash.
+      emit("if !(");
+      node.cond->Accept(*this);
+      emit(")\n");
+      node.iffalse->Accept(*this);
+    }
+  }
+
+  void Visit(const sem::ForStmt& node) {
     auto previous_scope = scope_;
     lang::Scope<sem::Type> scope{scope_};
     scope_ = &scope;
     scope.Bind(node.var, sem::Type{sem::Type::INDEX});
-    EmitC::Visit(node);
+    emitTab();
+    emit("for (int ");
+    emit(node.var);
+    emit(" = 0; ");
+    emit(node.var);
+    emit(" < ");
+    emit(std::to_string(node.num * node.step));
+    emit("; ");
+    emit(node.var);
+    emit(" += ");
+    emit(std::to_string(node.step));
+    emit(")\n");
+    node.inner->Accept(*this);
     scope_ = previous_scope;
   }
 
-  void Visit(const sem::IndexExpr& node) final {
+  void Visit(const sem::WhileStmt& node) {
+    emitTab();
+    emit("while (");
+    node.cond->Accept(*this);
+    emit(")\n");
+    node.inner->Accept(*this);
+  }
+
+  void Visit(const sem::CastExpr& node) {
+    emit("((");
+    emitType(node.type);
+    emit(")");
+    node.val->Accept(*this);
+    emit(")");
+  }
+
+  void Visit(const sem::IndexExpr& node) {
     switch (node.type) {
       case sem::IndexExpr::GLOBAL:
         emit("_globalid[" + std::to_string(node.dim) + "]");
@@ -90,15 +309,25 @@ class Emitter : public lang::EmitC {
     }
   }
 
-  void Visit(const sem::BarrierStmt& node) final {
+  void Visit(const sem::BarrierStmt& node) {
     emitTab();
     emit("threadgroup_barrier(mem_flags::mem_threadgroup);\n");
   }
 
-  void Visit(const sem::Function& node) final {
+  void Visit(const sem::ReturnStmt& node) {
+    emitTab();
+    emit("return");
+    if (node.value) {
+      emit(" (");
+      node.value->Accept(*this);
+      emit(")");
+    }
+    emit(";\n");
+  }
+
+  void Visit(const sem::Function& node) {
     lang::Scope<sem::Type> scope;
     scope_ = &scope;
-
     emit("kernel ");
     emitType(node.ret);
     emit(" ");
@@ -107,9 +336,10 @@ class Emitter : public lang::EmitC {
     for (size_t i = 0; i < node.params.size(); i++) {
       const auto& item = node.params[i];
       emit("    ");
-      emitType(item.first);
+      emitType(item.first, true);
       emit(" ");
       emit(item.second);
+      emit("_arg_");
       emit(" [[ buffer(" + std::to_string(i) + ") ]],\n");
       scope.Bind(item.second, item.first);
     }
@@ -117,8 +347,8 @@ class Emitter : public lang::EmitC {
     emit("    uint3 _groupid [[ threadgroup_position_in_grid ]],\n");
     emit("    uint3 _globalid [[ thread_position_in_grid ]]\n");
     emit(")\n");
+    params_ = node.params;
     node.body->Accept(*this);
-
     scope_ = nullptr;
   }
 
@@ -155,7 +385,7 @@ class Emitter : public lang::EmitC {
       return;
     }
     emit("(");
-    EmitC::emitType(to);
+    emitType(to);
     emit(")");
     expr->Accept(*this);
   }
@@ -168,7 +398,7 @@ class Emitter : public lang::EmitC {
     return lang::ExprType::TypeOf(scope_, true, lvalue);
   }
 
-  void emitType(const sem::Type& type) final {
+  void emitType(const sem::Type& type, bool is_param = false) {
     if (type.region == sem::Type::LOCAL) {
       emit("threadgroup ");
     } else if (type.region == sem::Type::GLOBAL) {
@@ -185,17 +415,33 @@ class Emitter : public lang::EmitC {
     if (type.base == sem::Type::POINTER_CONST) {
       emit("const ");
     }
-    emit(c_dtype(type.dtype));
-    if (type.vec_width > 1) {
-      emit(std::to_string(type.vec_width));
+    if (is_param) {
+      emit("void");
+    } else {
+      emit(c_dtype(type.dtype));
+      if (type.vec_width > 1) {
+        emit(std::to_string(type.vec_width));
+      }
     }
     if (type.base == sem::Type::POINTER_MUT || type.base == sem::Type::POINTER_CONST) {
       emit("*");
     }
   }
 
+  void emit(const std::string& s) {  //
+    result_ << s;
+  }
+
+  void emitTab() {  //
+    result_ << std::string(indent_ << 1, ' ');
+  }
+
  private:
+  std::ostringstream result_;
+  size_t indent_ = 0;
   lang::Scope<sem::Type>* scope_ = nullptr;
+  bool initial_block_ = true;
+  sem::Function::params_t params_;
 };
 
 std::string EmitMetal(const lang::KernelInfo& ki) {

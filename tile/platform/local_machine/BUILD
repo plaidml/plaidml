@@ -46,6 +46,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":block_placer",
+        ":fifo_scheduler",
         ":loose_scheduler",
         ":proto_cc",
         ":tdep_scheduler",
@@ -85,16 +86,15 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "scheduler",
     srcs = [
-        "schedule.cc",
         "scheduler.cc",
     ],
     hdrs = [
-        "schedule.h",
         "scheduler.h",
     ],
     visibility = ["//visibility:private"],
     deps = [
         ":proto_cc",
+        "//tile/base:hal",
         "//tile/lang",
     ],
 )
@@ -107,6 +107,8 @@ plaidml_cc_library(
     ],
     hdrs = ["scheduler_test.h"],
     data = [
+        "testdata/concat.tpb",
+        "testdata/lstm.tpb",
         "testdata/prng.tpb",
         "testdata/resnet50_train.tpb",
         "testdata/xception.tpb",
@@ -122,6 +124,28 @@ plaidml_cc_library(
         "//tile/proto:support",
     ],
     alwayslink = True,
+)
+
+plaidml_cc_library(
+    name = "fifo_scheduler",
+    srcs = [
+        "fifo_scheduler.cc",
+        "fifo_scheduler.h",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":scheduler",
+    ],
+)
+
+plaidml_cc_test(
+    name = "fifo_scheduler_test",
+    srcs = ["fifo_scheduler_test.cc"],
+    tags = ["rtest_fail"],
+    deps = [
+        ":fifo_scheduler",
+        ":scheduler_test",
+    ],
 )
 
 plaidml_cc_library(
@@ -142,7 +166,6 @@ plaidml_cc_test(
     srcs = ["loose_scheduler_test.cc"],
     tags = [
         "rtest_fail",
-        "windows_path_fail",
     ],
     deps = [
         ":loose_scheduler",
@@ -168,7 +191,6 @@ plaidml_cc_test(
     srcs = ["linear_scheduler_test.cc"],
     tags = [
         "rtest_fail",
-        "windows_path_fail",
     ],
     deps = [
         ":linear_scheduler",
@@ -194,7 +216,6 @@ plaidml_cc_test(
     srcs = ["tdep_scheduler_test.cc"],
     tags = [
         "rtest_fail",
-        "windows_path_fail",
     ],
     deps = [
         ":scheduler_test",

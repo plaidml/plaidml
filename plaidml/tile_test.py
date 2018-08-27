@@ -43,7 +43,7 @@ class TestTile(unittest.TestCase):
         shape = plaidml.Shape(self._ctx, dtype, *dims)
         tensor = plaidml.Tensor(self._dev, shape)
         with tensor.mmap_discard(self._ctx) as view:
-            for idx in xrange(len(view)):
+            for idx in range(len(view)):
                 view[idx] = start + (idx * step)
             view.writeback()
         return tensor
@@ -65,7 +65,8 @@ class TestTile(unittest.TestCase):
         B = tile.Value.from_ndims(2)
         out_dims = (A.shape.dims[0], B.shape.dims[1])
         out_shape = tile.Shape(tile.common_dtype(A.shape.dtype, B.shape.dtype), out_dims)
-        out = tile.Operation("""
+        out = tile.Operation(
+            """
             function (A[I, K], B[K, J]) -> (O) {
                 T = tuple(A, B);
                 C = element(T, 0);

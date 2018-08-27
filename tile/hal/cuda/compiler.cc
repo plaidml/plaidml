@@ -105,15 +105,15 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   Error cuda_err = cuModuleLoadDataEx(&module, ptx.data(), 0, 0, 0);
   Error::Check(cuda_err, "cuModuleLoadDataEx() failed");
 
-  std::vector<std::unique_ptr<hal::Kernel>> result;
+  std::vector<std::shared_ptr<Kernel>> result;
   for (const auto& ki : kernels) {
     if (ki.ktype == lang::KernelType::kZero) {
-      result.emplace_back(compat::make_unique<ZeroKernel>(device_, ki));
+      result.emplace_back(std::make_shared<ZeroKernel>(device_, ki));
     } else {
       CUfunction function;
       cuda_err = cuModuleGetFunction(&function, module, ki.kname.c_str());
       Error::Check(cuda_err, "cuModuleGetFunction() failed");
-      result.emplace_back(compat::make_unique<Kernel>(device_, ki, function));
+      result.emplace_back(std::make_shared<CodeKernel>(device_, ki, function));
     }
   }
   std::unique_ptr<hal::Library> lib(new Library(std::move(result)));

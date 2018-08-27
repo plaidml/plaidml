@@ -1,43 +1,22 @@
 # Copyright Vertex.AI.
 
+load("//bzl:conda.bzl", "conda_binary")
+load("//bzl:docs.bzl", "sphinx")
+
 package(default_visibility = ["//visibility:public"])
 
-filegroup(
-    name = "docsimages",
-    srcs = glob(["images/*png"]),
-    path = "docs/images"
+conda_binary(
+    name = "sphinx",
+    srcs = ["//bzl:sphinx.py"],
+    env = "@vertexai_plaidml_conda_sphinx//:env",
+    deps = ["//plaidml/keras"],
 )
-genrule(
+
+sphinx(
     name = "docs",
-    srcs = [
-        ":docsimages",
-        "//:mddocs",
-        "@plantuml_jar//file"
-    ] + glob(
-        ["**/*"],
-    ),
-    outs = ["docs.zip", "_build/html"],
-    cmd = """
-        set -x
-        virtualenv --clear venv
-        VIRTUAL_ENV_DISABLE_PROMPT=1
-        if [ -e 'venv/bin/activate' ]; then
-          . venv/bin/activate
-        elif [ -e 'venv/Scripts/activate' ]; then
-          . venv/Scripts/activate
-        else
-          echo 'Unable to enter virtual python environment'
-          exit 1
-        fi
-        mkdir -p $(location _build/html)/docs/images
-        cp -r $(locations :docsimages) $(location _build/html)/docs/images
-        python -m pip install -r $(location requirements.txt)
-        PLANTUMLSH="java -jar `pwd`/$(location @plantuml_jar//file)"  python -m sphinx -a -E -b html -c $$(dirname $(location conf.py)) $$(dirname $(location conf.py)) $(location _build/html)
-        DOCSZIP=`pwd`/$(location docs.zip)
-        pushd $(location _build/html)/../
-        zip -q -r $${DOCSZIP} html
-        popd
-        rm "$$(dirname $(location conf.py))"/api/*.rst
-    """,
-    local = 1,
+    srcs = glob(["**/*"]),
+    out = "html",
+    conf = "conf.py",
+    sphinx = ":sphinx",
+    tags = ["docs"],
 )
