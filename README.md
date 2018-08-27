@@ -2,6 +2,8 @@
 
 *A platform for making deep learning work everywhere.*
 
+** Vertex.AI (the creators of PlaidML) is excited to be join Intel's Artificial Intelligence Products Group. PlaidML will soon be re-licensed under Apache 2. Read the announcement [here!](https://vertex.ai) **
+
 [![Build Status](https://travis-ci.org/plaidml/plaidml.svg?branch=master)](https://travis-ci.org/plaidml/plaidml)
 
 PlaidML is the *easiest, fastest* way to learn and deploy deep learning on any device, especially those running macOS or Windows:
