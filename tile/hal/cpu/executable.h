@@ -10,7 +10,7 @@
 #include "tile/base/hal.h"
 
 namespace llvm {
-  class ExecutionEngine;
+class ExecutionEngine;
 }
 
 namespace vertexai {
@@ -18,20 +18,20 @@ namespace tile {
 namespace hal {
 namespace cpu {
 
-class Kernel final : public hal::Kernel {
+class Executable final : public hal::Executable {
  public:
-  Kernel(std::shared_ptr<llvm::ExecutionEngine> engine, const lang::KernelInfo& ki);
+  Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis);
 
-  std::shared_ptr<hal::Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<hal::Buffer>>& params,
+  std::shared_ptr<hal::Event> Run(const context::Context& ctx, std::size_t kidx,
+                                  const std::vector<std::shared_ptr<hal::Buffer>>& params,
                                   const std::vector<std::shared_ptr<hal::Event>>& dependencies,
                                   bool enable_profiling) final;
 
   static std::string InvokerName(std::string kname);
 
  private:
-  std::shared_ptr<llvm::ExecutionEngine> engine_;
-  lang::KernelInfo ki_;
-  static const char invoker_prefix_[];
+  std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines_;
+  std::vector<lang::KernelInfo> kis_;
 };
 
 }  // namespace cpu
