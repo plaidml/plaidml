@@ -53,7 +53,7 @@ For examples and benchmarks, see our [blog](http://vertex.ai/blog).
 
 ### Recent Release Notes
 * PlaidML 0.3.3 - 0.3.5
-  * Support Keras 2.2.0
+  * Support Keras 2.2.0 - 2.2.2
   * Support ONNX 1.2.1
   * Upgrade kernel scheduling
   * Revise documentation
