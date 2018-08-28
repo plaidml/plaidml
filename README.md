@@ -2,7 +2,7 @@
 
 *A platform for making deep learning work everywhere.*
 
-** Vertex.AI (the creators of PlaidML) is excited to join Intel's Artificial Intelligence Products Group. PlaidML will soon be re-licensed under Apache 2. Read the announcement [here!](https://vertex.ai) **
+**Vertex.AI (the creators of PlaidML) is excited to join Intel's Artificial Intelligence Products Group. PlaidML will soon be re-licensed under Apache 2. Read the announcement [here!](https://vertex.ai)**
 
 [![Build Status](https://travis-ci.org/plaidml/plaidml.svg?branch=master)](https://travis-ci.org/plaidml/plaidml)
 
