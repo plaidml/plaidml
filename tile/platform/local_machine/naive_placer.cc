@@ -26,10 +26,11 @@ class NaivePlacement final : public Placement {
 
 NaivePlacer::NaivePlacer(std::size_t alignment) : alignment_{alignment} {}
 
-std::unique_ptr<Placement> NaivePlacer::PlaceSchedule(Schedule* schedule) const {
+std::unique_ptr<Placement> NaivePlacer::PlaceSchedule(const tile::proto::Program& program,
+                                                      schedule::Schedule* schedule) const {
   std::uint64_t sum = 0;
   for (const auto& alloc : schedule->allocs) {
-    sum += ((alloc->byte_size + alignment_ - 1) / alignment_) * alignment_;
+    sum += ((alloc.byte_size + alignment_ - 1) / alignment_) * alignment_;
   }
   return compat::make_unique<NaivePlacement>(sum);
 }

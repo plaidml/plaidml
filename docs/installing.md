@@ -47,12 +47,19 @@ plaidbench keras mobilenet
 You can adapt any Keras code by using the PlaidML backend instead of the TensorFlow, CNTK, or Theano backend that you 
 normally use.
 
-Simply insert this code **BEFORE you `import keras`**:
+Simply change the Keras backend to `plaidml.keras.backend`. You can do this by modifying `~/.keras/keras.json` so that the backend line reads `"backend": "plaidml.keras.backend" (if this file does not exist, see the [Keras backend instructions](https://keras.io/backend/)). If you don't need anything special in your keras settings, you can set `~/.keras/keras.json` to be the following:
 ```
-# Install the plaidml backend
-import plaidml.keras
-plaidml.keras.install_backend()
+{
+    "epsilon": 1e-07,
+    "floatx": "float32",
+    "image_data_format": "channels_last",
+    "backend": "plaidml.keras.backend"
+}
 ```
+
+Alternatively, you can set the environment variable `KERAS_BACKEND` to `plaidml.keras.backend`.
+
+There is also a monkey patch technique (involving `plaidml.keras.install_backend()`) that still works, but is considered deprecated in favor of the above methods.
 
 ### macOS
 

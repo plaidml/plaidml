@@ -18,27 +18,30 @@ genrule(
     cmd = select({
         "@toolchain//:linux_arm_32v7": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+    -DPYTHON_EXECUTABLE=$$(which python3) \
     -DCMAKE_CROSSCOMPILING=True \
     -DLLVM_DEFAULT_TARGET_TRIPLE=arm-linux-gnueabihf \
     -DLLVM_ENABLE_TERMINFO=OFF
 """,
         "@toolchain//:linux_arm_64v8": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+    -DPYTHON_EXECUTABLE=$$(which python3) \
     -DCMAKE_CROSSCOMPILING=True \
     -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-linux-gnueabi \
     -DLLVM_ENABLE_TERMINFO=OFF
 """,
         "@toolchain//:macos_x86_64": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+    -DPYTHON_EXECUTABLE=$$(which python3) \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_LIBEDIT=0
 """,
         "//conditions:default": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+    -DPYTHON_EXECUTABLE=$$(which python3) \
     -DLLVM_ENABLE_TERMINFO=OFF
 """,
     }),
-    local = True,
 )
 
 TARGETS = {

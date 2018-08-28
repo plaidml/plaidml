@@ -1,6 +1,6 @@
 // Copyright 2017, Vertex.AI.
 
-#include "tile/hal/opencl/kernel.h"
+#include "tile/hal/opencl/compute_kernel.h"
 
 #include <utility>
 
@@ -15,8 +15,8 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-Kernel::Kernel(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_kernel> kernel, const lang::KernelInfo& info,
-               context::proto::ActivityID kernel_id)
+ComputeKernel::ComputeKernel(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_kernel> kernel,
+                             const lang::KernelInfo& info, context::proto::ActivityID kernel_id)
     : device_state_{device_state}, kernel_{std::move(kernel)}, ki_(info), kernel_id_(kernel_id) {
   if (VLOG_IS_ON(3)) {
     size_t work_group_size;
@@ -53,10 +53,10 @@ Kernel::Kernel(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_kernel
   }
 }
 
-std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
-                                        const std::vector<std::shared_ptr<hal::Buffer>>& params,
-                                        const std::vector<std::shared_ptr<hal::Event>>& dependencies,
-                                        bool enable_profiling) {
+std::shared_ptr<hal::Event> ComputeKernel::Run(const context::Context& ctx,
+                                               const std::vector<std::shared_ptr<hal::Buffer>>& params,
+                                               const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                               bool enable_profiling) {
   const auto& queue = device_state_->cl_queue(enable_profiling);
   auto deps = Event::Downcast(dependencies, device_state_->cl_ctx(), queue);
   VLOG(4) << "Running kernel " << ki_.kname;

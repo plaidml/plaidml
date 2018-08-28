@@ -169,10 +169,10 @@ class base_shape {
 template <typename T>
 class shape : public base_shape {
  public:
-  explicit shape(const std::shared_ptr<ctx>& ctx) : base_shape(ctx, to_plaidml_datatype<T>::value) {}
+  explicit shape(const std::shared_ptr<ctx>& ctx, datatype dt=to_plaidml_datatype<T>::value) : base_shape(ctx, dt) {}
 
-  explicit shape(const base_shape& base) : base_shape(base) {
-    if (to_plaidml_datatype<T>::value != base.type()) {
+  explicit shape(const base_shape& base, datatype dt=to_plaidml_datatype<T>::value) : base_shape(base) {
+    if (dt != base.type()) {
       throw vai_exception(VAI_STATUS_INVALID_ARGUMENT, "Mismatched shape");
     }
   }
@@ -252,7 +252,8 @@ class mapping {
 
   // Allow moves
   mapping(mapping&& rhs)
-      : buf_{std::move(rhs.buf_)},
+      : ctx_{std::move(rhs.ctx_)},
+        buf_{std::move(rhs.buf_)},
         sizes_{std::move(rhs.sizes_)},
         strides_{std::move(rhs.strides_)},
         map_{std::move(rhs.map_)},
@@ -263,6 +264,7 @@ class mapping {
 
   mapping& operator=(mapping&& rhs) {
     release();
+    ctx_ = std::move(rhs.ctx_);
     buf_ = std::move(rhs.buf_);
     sizes_ = std::move(rhs.sizes_);
     strides_ = std::move(rhs.strides_);
@@ -353,7 +355,7 @@ class tensor : public base_tensor {
   tensor() {}
   tensor(const std::shared_ptr<ctx>& ctx, const buffer& buf, const shape<T>& shape) : base_tensor(ctx, buf, shape) {}
 
-  mapping<T> map(map_for_read_t) {
+  mapping<T> map(map_for_read_t) const {
     std::unique_ptr<plaidml_mapping> m{plaidml_map_buffer_current(buf_.get(), NULL, NULL)};
     return mapping<T>{ctx_, buf_, shape_, std::move(m), mapping_destructor_behavior::discard};
   }
@@ -361,7 +363,7 @@ class tensor : public base_tensor {
   // Asynchronously creates a readable mapping.  The completion function should take a std::future<mapping<T>>,
   // which will be a ready future for the result of the mapping call.
   template <typename C>
-  void map(map_for_read_t, vai_ctx* ctx, C&& on_complete) {
+  void map(map_for_read_t, vai_ctx* ctx, C&& on_complete) const {
     std::unique_ptr<completion> comp{
         static_cast<completion*>(new typed_completion<C>(ctx_, buf_, shape_, std::forward<C>(on_complete)))};
     plaidml_map_buffer_current(buf_.get(), &OnMapped, comp.release());

@@ -1,0 +1,20 @@
+channels:
+  - conda-forge
+dependencies:
+  - h5py
+  - numpy
+  - python=3.6
+  - scipy
+  - pip:
+    - click
+    - keras==2.2.2
+    - matplotlib
+    - olefile
+    - onnx
+    - onnx-tf
+    - pillow
+    - protobuf
+    - requests
+    - six
+    - tensorflow==1.8.0
+    - theano

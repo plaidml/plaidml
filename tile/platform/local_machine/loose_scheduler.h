@@ -23,7 +23,7 @@ class LooseScheduler final : public Scheduler {
  public:
   LooseScheduler(const std::shared_ptr<Placer>& placer, std::uint64_t size_goal);
 
-  Schedule BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) final;
+  schedule::Schedule BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) final;
 
   const char* name() const final;
 

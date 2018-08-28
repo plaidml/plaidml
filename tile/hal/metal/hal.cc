@@ -25,26 +25,30 @@ Driver::Driver(const context::Context& ctx) {  //
 
 DeviceSet::DeviceSet() {
   VLOG(1) << "Enumerating Metal devices";
-  auto devices = mtlpp::Device::CopyAllDevices();
-  for (size_t i = 0; i < devices.GetSize(); i++) {
-    devices_.push_back(std::make_shared<Device>(devices[i]));
+  auto devices = MTLCopyAllDevices();
+  for (size_t i = 0; i < [devices count]; i++) {
+    devices_.push_back(std::make_shared<Device>([devices objectAtIndexedSubscript:i]));
   }
 }
 
-Device::Device(mtlpp::Device device)  //
+Device::Device(id<MTLDevice> device)  //
     : device_(device) {
   compiler_.reset(new Compiler(this));
   executor_.reset(new Executor(this));
 }
 
+std::string Device::name() {  //
+  return [[device_ name] cStringUsingEncoding:NSUTF8StringEncoding];
+}
+
 std::string Device::description() {  //
-  return device_.GetName().GetCStr();
+  return name() + " (Metal)";
 }
 
 hal::proto::HardwareInfo Device::GetHardwareInfo() {
   hal::proto::HardwareInfo info;
 
-  info.set_name(std::string("Metal ") + description());
+  info.set_name(std::string("Metal ") + name());
   info.set_vendor("Metal");
 
   hal::proto::HardwareSettings* settings = info.mutable_settings();
@@ -52,23 +56,23 @@ hal::proto::HardwareInfo Device::GetHardwareInfo() {
   settings->set_vec_size(1);
   settings->set_use_global(false);
   settings->set_mem_width(64);
-  settings->set_max_mem(device_.GetRecommendedMaxWorkingSetSize());
+  settings->set_max_mem([device_ recommendedMaxWorkingSetSize]);
   settings->set_max_regs(16 * 1024);
   settings->set_goal_groups(4);
   settings->set_goal_flops_per_byte(50);
 
-  auto dims = device_.GetMaxThreadsPerThreadgroup();
-  settings->add_dim_sizes(dims.Width);
-  settings->add_dim_sizes(dims.Height);
-  settings->add_dim_sizes(dims.Depth);
+  auto dims = [device_ maxThreadsPerThreadgroup];
+  settings->add_dim_sizes(dims.width);
+  settings->add_dim_sizes(dims.height);
+  settings->add_dim_sizes(dims.depth);
 
   return info;
 }
 
-mtlpp::CommandQueue Device::queue() {
+id<MTLCommandQueue> Device::queue() {
   std::lock_guard<std::mutex> guard(mutex_);
   if (!queue_) {
-    queue_ = device_.NewCommandQueue();
+    queue_ = [device_ newCommandQueue];
   }
   return queue_;
 }
@@ -78,14 +82,14 @@ Memory::Memory(Device* device)  //
 {}
 
 std::shared_ptr<hal::Buffer> Memory::MakeBuffer(std::uint64_t size, BufferAccessMask access) {
-  mtlpp::ResourceOptions options;
+  MTLResourceOptions options;
   if ((access & BufferAccessMask::LOCATION_MASK) == BufferAccessMask::DEVICE) {
     // This is a device-only accessible buffer.
-    options = mtlpp::ResourceOptions::StorageModePrivate;
+    options = MTLResourceStorageModePrivate;
   } else {
-    options = mtlpp::ResourceOptions::StorageModeManaged;
+    options = MTLResourceStorageModeManaged;
   }
-  auto buf = device_->dev().NewBuffer(size, options);
+  auto buf = [device_->dev() newBufferWithLength:size options:options];
   return std::make_shared<Buffer>(device_, buf, size, access);
 }
 
@@ -94,14 +98,14 @@ std::shared_ptr<hal::Arena> Memory::MakeArena(std::uint64_t size, BufferAccessMa
 }
 
 Buffer::Buffer(Device* device,           //
-               mtlpp::Buffer buffer,     //
+               id<MTLBuffer> buffer,     //
                std::uint64_t size,       //
                BufferAccessMask access)  //
     : device_(device),                   //
       buffer_(buffer),                   //
       size_(size),                       //
-      access_(access)                    //
-{}
+      access_(access) {                  //
+}
 
 std::shared_ptr<Buffer> Buffer::Downcast(const std::shared_ptr<hal::Buffer>& buffer) {
   auto buf = std::dynamic_pointer_cast<Buffer>(buffer);
@@ -115,36 +119,42 @@ boost::future<void*> Buffer::MapCurrent(const std::vector<std::shared_ptr<hal::E
   if ((access_ & BufferAccessMask::LOCATION_MASK) == BufferAccessMask::DEVICE) {
     throw error::Unimplemented("Not Implemented: Buffer::MapCurrent for device-only accessible memory");
   }
-  auto cmdbuf = device_->queue().CommandBuffer();
-  auto encoder = cmdbuf.BlitCommandEncoder();
-  encoder.Synchronize(buffer_);
-  encoder.EndEncoding();
   auto promise = std::make_shared<boost::promise<void*>>();
-  cmdbuf.AddCompletedHandler([this, promise](mtlpp::CommandBuffer cmdbuf) {  //
-    promise->set_value(buffer_.GetContents());
-  });
-  cmdbuf.Commit();
-  return promise->get_future();
+  auto handler = [buffer = buffer_, promise](id<MTLCommandBuffer> cmdbuf) mutable {
+    promise->set_value([buffer contents]);
+  };
+  @autoreleasepool {
+    auto cmdbuf = [device_->queue() commandBuffer];
+    auto encoder = [cmdbuf blitCommandEncoder];
+    [encoder synchronizeResource:buffer_];
+    [encoder endEncoding];
+    [cmdbuf addCompletedHandler:handler];
+    [cmdbuf commit];
+    return promise->get_future();
+  }
 }
 
 boost::future<void*> Buffer::MapDiscard(const std::vector<std::shared_ptr<hal::Event>>& deps) {
   if ((access_ & BufferAccessMask::LOCATION_MASK) == BufferAccessMask::DEVICE) {
     throw error::Unimplemented("Not Implemented: Buffer::MapDiscard for device-only accessible memory");
   }
-  return boost::make_ready_future(buffer_.GetContents());
+  return boost::make_ready_future([buffer_ contents]);
 }
 
 std::shared_ptr<hal::Event> Buffer::Unmap(const context::Context& ctx) {
   if ((access_ & BufferAccessMask::LOCATION_MASK) == BufferAccessMask::DEVICE) {
     throw error::Unimplemented("Not Implemented: Buffer::Unmap for device-only accessible memory");
   }
-  buffer_.DidModify(ns::Range(0, size_));
-  auto cmdbuf = device_->queue().CommandBuffer();
-  auto encoder = cmdbuf.BlitCommandEncoder();
-  encoder.EndEncoding();
-  auto event = std::make_shared<Event>(ctx, cmdbuf, "tile::hal::opencl::Buffer::Unmap");
-  cmdbuf.Commit();
-  return event;
+  @autoreleasepool {
+    [buffer_ didModifyRange:NSMakeRange(0, size_)];
+    // NOTE: This encoder which seems to do nothing appears to be required for some Metal devices.
+    auto cmdbuf = [device_->queue() commandBuffer];
+    auto encoder = [cmdbuf blitCommandEncoder];
+    [encoder endEncoding];
+    auto event = std::make_shared<Event>(ctx, cmdbuf, "tile::hal::opencl::Buffer::Unmap");
+    [cmdbuf commit];
+    return event;
+  }
 }
 
 Compiler::Compiler(Device* device)  //
@@ -163,11 +173,6 @@ std::string WithLineNumbers(const std::string& src) {
   }
   return ss_out.str();
 }
-
-struct BuildResult {
-  mtlpp::Library lib;
-  ns::Error err;
-};
 
 }  // namespace
 
@@ -197,15 +202,13 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   auto code = src.str();
   IVLOG(3, "Compiling Metal:\n" << WithLineNumbers(code));
 
-  mtlpp::CompileOptions options;
-  options.SetFastMathEnabled(true);
+  auto options = [[MTLCompileOptions alloc] init];
+  options.fastMathEnabled = true;
   auto promise = std::make_shared<boost::promise<std::unique_ptr<hal::Library>>>();
-  device_->dev().NewLibrary(code.c_str(), options, [
-    activity,          //
-    device = device_,  //
-    promise,           //
-    kernel_ctxs = std::move(kernel_ctxs)
-  ](const mtlpp::Library& lib, const ns::Error& err) mutable {  //
+  auto handler = [activity,          //
+                  device = device_,  //
+                  promise,           //
+                  kernel_ctxs = std::move(kernel_ctxs)](id<MTLLibrary> lib, NSError* err) mutable {
     try {
       if (activity->ctx().is_logging_events()) {
         opencl::proto::BuildInfo binfo;
@@ -213,7 +216,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
       }
       std::string desc;
       if (err) {
-        desc = err.GetLocalizedDescription().GetCStr();
+        desc = [[err localizedDescription] cStringUsingEncoding:NSUTF8StringEncoding];
         VLOG(1) << "Build log:\n" << desc;
       }
       if (!lib) {
@@ -228,13 +231,16 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
       } catch (...) {
       }  // set_exception() may throw too
     }
-  });
+  };
+  [device_->dev() newLibraryWithSource:[NSString stringWithUTF8String:code.c_str()]
+                               options:options
+                     completionHandler:handler];
   return promise->get_future();
 }
 
 Library::Library(const context::Context& ctx,                    //
                  Device* device,                                 //
-                 mtlpp::Library library,                         //
+                 id<MTLLibrary> library,                         //
                  const std::vector<KernelContext>& kernel_ctxs)  //
     : ctx_(ctx),                                                 //
       device_(device),                                           //
@@ -250,49 +256,71 @@ std::string Library::Serialize() {  //
   throw error::Unimplemented("Not implemented: Library::Serialize");
 }
 
-boost::future<std::unique_ptr<hal::Kernel>> Library::Prepare(std::size_t kidx) {
-  context::Activity kbuild{ctx_, "tile::hal::opencl::BuildKernel"};
-  const auto& kctx = kernel_ctxs_[kidx];
+boost::future<std::unique_ptr<hal::Executable>> Library::Prepare() {
+  std::vector<boost::future<std::unique_ptr<Kernel>>> kernels;
+  kernels.reserve(kernel_ctxs_.size());
 
-  opencl::proto::KernelInfo kinfo;
-  kinfo.set_kname(kctx.ki.kname);
+  for (std::size_t kidx = 0; kidx < kernel_ctxs_.size(); ++kidx) {
+    context::Activity kbuild{ctx_, "tile::hal::opencl::BuildKernel"};
+    const auto& kctx = kernel_ctxs_[kidx];
 
-  *(kinfo.mutable_kinfo()) = kctx.ki.info;
-  kbuild.AddMetadata(kinfo);
+    opencl::proto::KernelInfo kinfo;
+    kinfo.set_kname(kctx.ki.kname);
 
-  auto kernel_id = kbuild.ctx().activity_id();
+    *(kinfo.mutable_kinfo()) = kctx.ki.info;
+    kbuild.AddMetadata(kinfo);
 
-  if (kctx.ki.ktype == lang::KernelType::kZero) {
-    // kinfo.set_src("// Builtin zero kernel");
-    std::unique_ptr<hal::Kernel> kernel(new ZeroKernel(device_, kctx.ki, kernel_id));
-    return boost::make_ready_future(std::move(kernel));
-  }
-  if (kctx.ki.ktype == lang::KernelType::kCopy) {
-    std::unique_ptr<hal::Kernel> kernel(new CopyKernel(device_, kctx.ki, kernel_id));
-    return boost::make_ready_future(std::move(kernel));
-  }
-  // kinfo.set_src(src);
-  auto function = library_.NewFunction(kctx.ki.kname.c_str());
-  auto promise = std::make_shared<boost::promise<std::unique_ptr<hal::Kernel>>>();
-  device_->dev().NewComputePipelineState(function, [ promise, device = device_, kctx, kernel_id ](
-                                                       const mtlpp::ComputePipelineState& state, const ns::Error& err) {
-    try {
-      if (err) {
-        auto desc = err.GetLocalizedDescription().GetCStr();
-        LOG(ERROR) << "NewComputePipelineState(" << kctx.ki.kname << ") failed: " << desc;
-        LOG(ERROR) << "Source code: \n" << kctx.ki.comments << "\n" << kctx.src;
-        throw std::runtime_error(desc);
-      }
-      std::unique_ptr<hal::Kernel> kernel(new Kernel(device, kctx.ki, kernel_id, state));
-      promise->set_value(std::move(kernel));
-    } catch (...) {
-      try {
-        promise->set_exception(std::current_exception());
-      } catch (...) {
-      }  // set_exception() may throw too
+    auto kernel_id = kbuild.ctx().activity_id();
+
+    if (kctx.ki.ktype == lang::KernelType::kZero) {
+      // kinfo.set_src("// Builtin zero kernel");
+      kernels.emplace_back(boost::make_ready_future(
+          std::unique_ptr<Kernel>(compat::make_unique<ZeroKernel>(device_, kctx.ki, kernel_id))));
+      continue;
     }
-  });
-  return promise->get_future();
+    if (kctx.ki.ktype == lang::KernelType::kCopy) {
+      kernels.emplace_back(boost::make_ready_future(
+          std::unique_ptr<Kernel>(compat::make_unique<CopyKernel>(device_, kctx.ki, kernel_id))));
+      continue;
+    }
+    // kinfo.set_src(src);
+    auto function = [library_ newFunctionWithName:[NSString stringWithUTF8String:kctx.ki.kname.c_str()]];
+    auto promise = std::make_shared<boost::promise<std::unique_ptr<Kernel>>>();
+    auto handler = [promise,           //
+                    device = device_,  //
+                    kctx,              //
+                    kernel_id](const id<MTLComputePipelineState> state, NSError* err) {
+      try {
+        if (err) {
+          auto desc = [[err localizedDescription] cStringUsingEncoding:NSUTF8StringEncoding];
+          LOG(ERROR) << "NewComputePipelineState(" << kctx.ki.kname << ") failed: " << desc;
+          LOG(ERROR) << "Source code: \n" << kctx.ki.comments << "\n" << kctx.src;
+          throw std::runtime_error(desc);
+        }
+        std::unique_ptr<Kernel> kernel = compat::make_unique<ComputeKernel>(device, kctx.ki, kernel_id, state);
+        promise->set_value(std::move(kernel));
+      } catch (...) {
+        try {
+          promise->set_exception(std::current_exception());
+        } catch (...) {
+        }  // set_exception() may throw too
+      }
+    };
+    [device_->dev() newComputePipelineStateWithFunction:function  //
+                                      completionHandler:handler];
+    kernels.emplace_back(promise->get_future());
+  }
+
+  return boost::when_all(kernels.begin(), kernels.end())
+      .then([](boost::future<std::vector<boost::future<std::unique_ptr<Kernel>>>> kernel_futures_future) {
+        std::vector<boost::future<std::unique_ptr<Kernel>>> kernel_futures = kernel_futures_future.get();
+        std::vector<std::unique_ptr<Kernel>> kernels;
+        kernels.reserve(kernel_futures.size());
+        for (auto& fut : kernel_futures) {
+          kernels.emplace_back(fut.get());
+        }
+        return std::unique_ptr<hal::Executable>(compat::make_unique<Executable>(std::move(kernels)));
+      });
 }
 
 Executor::Executor(Device* device)       //
@@ -310,9 +338,9 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx,         
   throw error::Unimplemented("Not implemented: Executor::Copy");
 }
 
-boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* library, std::size_t kidx) {
+boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* library) {
   auto lib = Library::Downcast(library);
-  return lib->Prepare(kidx);
+  return lib->Prepare();
 }
 
 boost::future<std::vector<std::shared_ptr<hal::Result>>> Executor::WaitFor(
@@ -332,42 +360,49 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> Executor::WaitFor(
   return results_future;
 }
 
-Kernel::Kernel(Device* device,                        //
-               const lang::KernelInfo& ki,            //
-               context::proto::ActivityID kernel_id,  //
-               mtlpp::ComputePipelineState state)     //
-    : device_(device),                                //
-      ki_(ki),                                        //
-      kernel_id_(kernel_id),                          //
-      state_(state)                                   //
-{}
+Executable::Executable(std::vector<std::unique_ptr<Kernel>> kernels) : kernels_{std::move(kernels)} {}
 
-std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,                              //
-                                        const std::vector<std::shared_ptr<hal::Buffer>>& params,  //
-                                        const std::vector<std::shared_ptr<hal::Event>>& deps,     //
-                                        bool enable_profiling) {
-  mtlpp::Size threads(ki_.lwork[0], ki_.lwork[1], ki_.lwork[2]);
-  mtlpp::Size groups(ki_.gwork[0] / threads.Width,   //
-                     ki_.gwork[1] / threads.Height,  //
-                     ki_.gwork[2] / threads.Depth);
-  auto cmdbuf = device_->queue().CommandBuffer();
-  auto encoder = cmdbuf.ComputeCommandEncoder();
-  encoder.SetComputePipelineState(state_);
-  for (size_t i = 0; i < params.size(); i++) {
-    auto buf = Buffer::Downcast(params[i]);
-    encoder.SetBuffer(buf->buffer(), 0, i);
+std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::size_t kernel_index,
+                                            const std::vector<std::shared_ptr<hal::Buffer>>& params,
+                                            const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                            bool enable_profiling) {
+  return kernels_[kernel_index]->Run(ctx, params, dependencies, enable_profiling);
+}
+
+ComputeKernel::ComputeKernel(Device* device, const lang::KernelInfo& ki, context::proto::ActivityID kernel_id,
+                             id<MTLComputePipelineState> state)
+    : device_(device), ki_(ki), kernel_id_(kernel_id), state_(state) {}
+
+std::shared_ptr<hal::Event> ComputeKernel::Run(const context::Context& ctx,
+                                               const std::vector<std::shared_ptr<hal::Buffer>>& params,
+                                               const std::vector<std::shared_ptr<hal::Event>>& deps,
+                                               bool enable_profiling) {
+  @autoreleasepool {
+    MTLSize threads = MTLSizeMake(ki_.lwork[0], ki_.lwork[1], ki_.lwork[2]);
+    MTLSize groups = MTLSizeMake(ki_.gwork[0] / threads.width,   //
+                                 ki_.gwork[1] / threads.height,  //
+                                 ki_.gwork[2] / threads.depth);
+    auto cmdbuf = [device_->queue() commandBuffer];
+    auto encoder = [cmdbuf computeCommandEncoder];
+    [encoder setComputePipelineState:state_];
+    for (size_t i = 0; i < params.size(); i++) {
+      auto buf = Buffer::Downcast(params[i]);
+      [encoder setBuffer:buf->buffer()  //
+                  offset:0
+                 atIndex:i];
+    }
+    [encoder dispatchThreadgroups:groups threadsPerThreadgroup:threads];
+    [encoder endEncoding];
+    context::Activity activity{ctx, "tile::hal::opencl::Kernel::Run"};
+    if (ctx.is_logging_events()) {
+      opencl::proto::RunInfo rinfo;
+      *rinfo.mutable_kernel_id() = kernel_id_;
+      activity.AddMetadata(rinfo);
+    }
+    auto event = std::make_shared<Event>(activity.ctx(), cmdbuf, "tile::hal::opencl::Executing");
+    [cmdbuf commit];
+    return event;
   }
-  encoder.DispatchThreadgroups(groups, threads);
-  encoder.EndEncoding();
-  context::Activity activity{ctx, "tile::hal::opencl::Kernel::Run"};
-  if (ctx.is_logging_events()) {
-    opencl::proto::RunInfo rinfo;
-    *rinfo.mutable_kernel_id() = kernel_id_;
-    activity.AddMetadata(rinfo);
-  }
-  auto event = std::make_shared<Event>(activity.ctx(), cmdbuf, "tile::hal::opencl::Executing");
-  cmdbuf.Commit();
-  return event;
 }
 
 CopyKernel::CopyKernel(Device* device,                        //
@@ -382,21 +417,27 @@ std::shared_ptr<hal::Event> CopyKernel::Run(const context::Context& ctx,
                                             const std::vector<std::shared_ptr<hal::Buffer>>& params,
                                             const std::vector<std::shared_ptr<hal::Event>>& deps,
                                             bool enable_profiling) {
-  auto cmdbuf = device_->queue().CommandBuffer();
-  auto encoder = cmdbuf.BlitCommandEncoder();
-  auto dst_buf = Buffer::Downcast(params[0]);
-  auto src_buf = Buffer::Downcast(params[1]);
-  encoder.Copy(src_buf->buffer(), 0, dst_buf->buffer(), 0, src_buf->size());
-  encoder.EndEncoding();
-  context::Activity activity{ctx, "tile::hal::opencl::Buffer::Copy"};
-  if (ctx.is_logging_events()) {
-    opencl::proto::RunInfo rinfo;
-    *rinfo.mutable_kernel_id() = kernel_id_;
-    activity.AddMetadata(rinfo);
+  @autoreleasepool {
+    auto cmdbuf = [device_->queue() commandBuffer];
+    auto encoder = [cmdbuf blitCommandEncoder];
+    auto dst_buf = Buffer::Downcast(params[0]);
+    auto src_buf = Buffer::Downcast(params[1]);
+    [encoder copyFromBuffer:src_buf->buffer()
+               sourceOffset:0
+                   toBuffer:dst_buf->buffer()
+          destinationOffset:0
+                       size:src_buf->size()];
+    [encoder endEncoding];
+    context::Activity activity{ctx, "tile::hal::opencl::Buffer::Copy"};
+    if (ctx.is_logging_events()) {
+      opencl::proto::RunInfo rinfo;
+      *rinfo.mutable_kernel_id() = kernel_id_;
+      activity.AddMetadata(rinfo);
+    }
+    auto event = std::make_shared<Event>(activity.ctx(), cmdbuf, "tile::hal::opencl::Executing");
+    [cmdbuf commit];
+    return event;
   }
-  auto event = std::make_shared<Event>(activity.ctx(), cmdbuf, "tile::hal::opencl::Executing");
-  cmdbuf.Commit();
-  return event;
 }
 
 ZeroKernel::ZeroKernel(Device* device,                        //
@@ -411,34 +452,41 @@ std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
                                             const std::vector<std::shared_ptr<hal::Buffer>>& params,
                                             const std::vector<std::shared_ptr<hal::Event>>& deps,
                                             bool enable_profiling) {
-  auto cmdbuf = device_->queue().CommandBuffer();
-  auto encoder = cmdbuf.BlitCommandEncoder();
-  auto buf = Buffer::Downcast(params[0]);
-  encoder.Fill(buf->buffer(), ns::Range(0, buf->size()), 0);
-  encoder.EndEncoding();
-  context::Activity activity{ctx, "tile::hal::opencl::Buffer::Fill"};
-  if (ctx.is_logging_events()) {
-    opencl::proto::RunInfo rinfo;
-    *rinfo.mutable_kernel_id() = kernel_id_;
-    activity.AddMetadata(rinfo);
+  @autoreleasepool {
+    auto cmdbuf = [device_->queue() commandBuffer];
+    auto encoder = [cmdbuf blitCommandEncoder];
+    auto buf = Buffer::Downcast(params[0]);
+    [encoder fillBuffer:buf->buffer()  //
+                  range:NSMakeRange(0, buf->size())
+                  value:0];
+    [encoder endEncoding];
+    context::Activity activity{ctx, "tile::hal::opencl::Buffer::Fill"};
+    if (ctx.is_logging_events()) {
+      opencl::proto::RunInfo rinfo;
+      *rinfo.mutable_kernel_id() = kernel_id_;
+      activity.AddMetadata(rinfo);
+    }
+    auto event = std::make_shared<Event>(activity.ctx(), cmdbuf, "tile::hal::opencl::Executing");
+    [cmdbuf commit];
+    return event;
   }
-  auto event = std::make_shared<Event>(activity.ctx(), cmdbuf, "tile::hal::opencl::Executing");
-  cmdbuf.Commit();
-  return event;
 }
 
 Event::Event(const context::Context& ctx,  //
-             mtlpp::CommandBuffer cmdbuf,  //
+             id<MTLCommandBuffer> cmdbuf,  //
              const char* verb)             //
     : ctx_(ctx),                           //
       verb_(verb) {                        //
   auto promise = std::make_shared<boost::promise<std::shared_ptr<hal::Result>>>();
   future_ = promise->get_future();
   auto start = std::chrono::high_resolution_clock::now();
-  cmdbuf.AddCompletedHandler([ ctx = ctx_, verb = verb_, start, promise ](mtlpp::CommandBuffer cmdbuf) {  //
+  auto handler = [ctx = ctx_,    //
+                  verb = verb_,  //
+                  start,         //
+                  promise](id<MTLCommandBuffer> cmdbuf) {
     try {
-      if (cmdbuf.GetStatus() == mtlpp::CommandBufferStatus::Error) {
-        auto msg = cmdbuf.GetError().GetLocalizedDescription().GetCStr();
+      if ([cmdbuf status] == MTLCommandBufferStatusError) {
+        auto msg = [[[cmdbuf error] localizedDescription] cStringUsingEncoding:NSUTF8StringEncoding];
         LOG(ERROR) << msg;
         throw std::runtime_error(std::string("Kernel execution failure: ") + msg);
       }
@@ -451,7 +499,19 @@ Event::Event(const context::Context& ctx,  //
       } catch (...) {
       }  // set_exception() may throw too
     }
-  });
+  };
+  [cmdbuf addCompletedHandler:handler];
+}
+
+Event::Event(const context::Context& ctx,  //
+             const char* verb)             //
+    : ctx_(ctx),                           //
+      verb_(verb) {                        //
+  boost::promise<std::shared_ptr<hal::Result>> promise;
+  future_ = promise.get_future();
+  auto now = std::chrono::high_resolution_clock::now();
+  std::shared_ptr<hal::Result> result = std::make_shared<Result>(ctx, verb, now, now);
+  promise.set_value(result);
 }
 
 Result::Result(const context::Context& ctx,                           //

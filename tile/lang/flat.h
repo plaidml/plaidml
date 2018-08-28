@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -75,6 +76,7 @@ struct FlatContraction {
   std::vector<Op> post_ops;
   std::vector<FlatPostOpInput> post_op_inputs;  // Additional inputs for the post_ops
   std::vector<std::string> kernel_outputs;      // Outputs written by the kernel.
+  std::map<std::string, std::vector<Polynomial>> index_mapping;
 
   std::string CacheKeyString(const Bindings& vars) const;
 

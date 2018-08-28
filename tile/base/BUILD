@@ -1,3 +1,5 @@
+# Copyright 2017, Vertex.AI.
+
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
@@ -35,10 +37,25 @@ plaidml_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":schedule",
         "//base/context",
         "//tile/lang",
         "//tile/proto:hal_cc",
         "@boost_archive//:thread",
+    ],
+)
+
+plaidml_cc_library(
+    name = "schedule",
+    srcs = ["schedule.cc"],
+    hdrs = [
+        "schedule.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base/context",
+        "//base/util",
+        "//tile/proto:schedule_cc",
     ],
 )
 
@@ -62,7 +79,9 @@ plaidml_cc_library(
     deps = [
         ":base",
         "//testing:matchers",
+        "//tile/proto:support",
         "@gmock_archive//:gtest",
+        "@half_repo//:half",
     ],
     alwayslink = True,
 )

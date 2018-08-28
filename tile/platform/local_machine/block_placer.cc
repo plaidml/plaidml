@@ -12,215 +12,156 @@ namespace tile {
 namespace local_machine {
 namespace {
 
-// Adds a synthetic output-consuming step to a schedule.
-class SyntheticOutputConsumer final : private AllocVisitor {
- public:
-  static void AddOutputStep(Schedule* schedule) {
-    SyntheticOutputConsumer oc;
-    for (auto allocp = schedule->allocs.begin(); allocp != schedule->allocs.end(); ++allocp) {
-      oc.allocp_ = allocp;
-      (*allocp)->Accept(&oc);
-    }
-    auto step = compat::make_unique<RunStep>();
-    step->inputs = std::move(oc.inputs_);
-    step->idx = schedule->steps.back()->idx + 1;
-    schedule->steps.emplace_back(std::move(step));
-  }
+struct TmpInfo;
 
- private:
-  void Visit(const TmpAlloc& /* tmp_alloc */) final {}
-  void Visit(const ProgramInputAlloc& /* input_alloc */) final {}
-  void Visit(const ProgramOutputAlloc& /* output_alloc */) final { inputs_.push_back(allocp_); }
-
-  std::vector<AllocPtr> inputs_;
-  AllocPtr allocp_;
+struct AllocInfo {
+  std::unordered_set<TmpInfo*> assigned_tmps;
+  std::uint64_t byte_size;
+  schedule::Alloc* alloc = nullptr;
+  std::string input;
+  std::string output;
+  bool read_only;
 };
+
+struct TmpInfo {
+  std::size_t aidx;
+  std::size_t sidx_first = 0;
+  schedule::Alloc* tmp = nullptr;  // The original alloc associated with this temporary.
+  std::uint64_t byte_size;
+  std::string input;
+  std::string output;
+  AllocInfo* assignment = nullptr;
+  bool read_only;
+};
+
+// Adds a synthetic input-producing step to a schedule.
+std::unordered_set<schedule::Alloc*> AddInputStep(const tile::proto::Program& program, schedule::Schedule* schedule) {
+  std::vector<schedule::OutputInfo> outputs;
+  std::unordered_set<schedule::Alloc*> consumed_inputs;
+
+  schedule::Step step{schedule::Step::Tag::kRun};
+  step.idx = 0;
+  for (auto& alloc : schedule->allocs) {
+    if (!alloc.is_input()) {
+      continue;
+    }
+    if (program.inputs().at(alloc.input).consumed()) {
+      step.outputs.push_back(schedule::OutputInfo{&alloc, false});
+      consumed_inputs.insert(&alloc);
+    }
+  }
+  schedule->steps.emplace_front(std::move(step));
+  return consumed_inputs;
+}
+
+// Adds a synthetic output-consuming step to a schedule.
+void AddOutputStep(schedule::Schedule* schedule) {
+  schedule::Step step{schedule::Step::Tag::kRun};
+  step.idx = schedule->steps.back().idx + 1;
+  for (auto& alloc : schedule->allocs) {
+    if (!alloc.is_output()) {
+      continue;
+    }
+    step.inputs.push_back(&alloc);
+  }
+  schedule->steps.emplace_back(std::move(step));
+}
 
 // Given a schedule, returns a vector of bitsets, one bit and bitset
 // for each step.  In each step's bitset, bit N is set iff the step
 // has a transitive dependency on step N.
-std::vector<boost::dynamic_bitset<>> BuildTransitiveDeps(const Schedule& schedule) {
-  std::vector<boost::dynamic_bitset<>> deps(schedule.steps.size(), boost::dynamic_bitset<>(schedule.steps.size()));
+std::vector<boost::dynamic_bitset<>> BuildTransitiveDeps(const schedule::Schedule& schedule) {
+  // N.B. We initialize the deps s.t. every step has a dependency on the initial input-producing step.
+  std::vector<boost::dynamic_bitset<>> deps(schedule.steps.size(), boost::dynamic_bitset<>(schedule.steps.size(), 1));
   std::size_t sidx = 0;
   for (const auto& step : schedule.steps) {
-    for (const auto& dep : step->deps) {
-      std::size_t dep_sidx = (*dep)->idx;
+    for (const auto& dep : step.deps) {
+      std::size_t dep_sidx = dep->idx;
       deps[sidx].set(dep_sidx);
       deps[sidx] |= deps[dep_sidx];
     }
     ++sidx;
   }
+
+  // Special case: the final output-consuming step depends on everything.
+  deps[schedule.steps.size() - 1].set();
+
   return deps;
 }
 
 // Builds a vector of bitsets, one bitset per alloc, and one bit per
 // step.  In each alloc's bitset, bit N is set iff the alloc is
 // accessed by step N.
-class AllocAccessors final : private StepVisitor {
- public:
-  static std::vector<boost::dynamic_bitset<>> Build(const Schedule& schedule) {
-    AllocAccessors a{schedule};
-    for (const auto& step : schedule.steps) {
-      step->Accept(&a);
-      ++a.sidx_;
+std::vector<boost::dynamic_bitset<>> BuildAllocAccessors(const schedule::Schedule& schedule) {
+  std::size_t sidx = 0;
+  std::vector<boost::dynamic_bitset<>> accessors{schedule.allocs.size(),
+                                                 boost::dynamic_bitset<>(schedule.steps.size())};
+  for (const auto& step : schedule.steps) {
+    for (schedule::OutputInfo oi : step.outputs) {
+      accessors[oi.allocp->idx].set(sidx);
     }
-    return std::move(a.accessors_);
-  }
-
- private:
-  explicit AllocAccessors(const Schedule& schedule)
-      : accessors_(schedule.allocs.size(), boost::dynamic_bitset<>(schedule.steps.size())) {}
-
-  void Visit(const RunStep& run) final {
-    for (OutputInfo oi : run.outputs) {
-      accessors_[(*oi.allocp)->idx].set(sidx_);
+    for (schedule::Alloc* allocp : step.inputs) {
+      accessors[allocp->idx].set(sidx);
     }
-    for (AllocPtr allocp : run.inputs) {
-      accessors_[(*allocp)->idx].set(sidx_);
-    }
+    sidx++;
   }
-
-  void Visit(const CopyStep& copy) final {
-    accessors_[(*copy.from)->idx].set(sidx_);
-    accessors_[(*copy.to.allocp)->idx].set(sidx_);
-  }
-
-  std::size_t sidx_ = 0;
-  std::vector<boost::dynamic_bitset<>> accessors_;
-};
-
-struct TmpInfo;
-
-struct AllocInfo {
-  std::set<TmpInfo*> assigned_tmps;
-  std::uint64_t byte_size;
-  AllocPtr alloc;
-  std::string output_name;
-};
-
-struct TmpInfo {
-  std::size_t aidx;
-  std::size_t sidx_first = 0;
-  AllocPtr tmp;  // The original alloc associated with this temporary.
-  std::uint64_t byte_size;
-  std::string output_name;
-  AllocInfo* assignment;
-};
+  return accessors;
+}
 
 // Builds a map of TmpInfo (containing information about the
 // schedule's temporary memory allocations), and the schedule's input/output buffer size.
-class MemInfo final : private AllocVisitor, private StepVisitor {
- public:
-  static std::pair<std::map<AllocPtr, TmpInfo, AllocPtrLess>, std::uint64_t> Build(Schedule* schedule,
-                                                                                   std::size_t alignment) {
-    MemInfo mi{alignment};
-    for (mi.current_ = schedule->allocs.begin(); mi.current_ != schedule->allocs.end(); ++mi.current_) {
-      (*mi.current_)->Accept(&mi);
-      ++mi.aidx_;
-    }
-    mi.sidx_ = schedule->steps.size();
-    for (auto it = schedule->steps.rbegin(); it != schedule->steps.rend(); ++it) {
-      --mi.sidx_;
-      (*it)->Accept(&mi);
-    }
-    return std::make_pair(std::move(mi.infos_), mi.io_sum_);
-  }
-
- private:
-  explicit MemInfo(std::size_t alignment) : alignment_{alignment} {}
-
-  void Visit(const TmpAlloc& tmp_alloc) final {
-    if (tmp_alloc.location != TmpAlloc::ON_DEVICE) {
-      return;
-    }
-    AddTmpInfo(tmp_alloc, "");
-  }
-
-  void Visit(const ProgramInputAlloc& input_alloc) final {
-    io_sum_ += ((input_alloc.byte_size + alignment_ - 1) / alignment_) * alignment_;
-  }
-
-  void Visit(const ProgramOutputAlloc& output_alloc) final {
-    io_sum_ += ((output_alloc.byte_size + alignment_ - 1) / alignment_) * alignment_;
-    AddTmpInfo(output_alloc, output_alloc.name);
-  }
-
-  void AddTmpInfo(const Alloc& alloc, const std::string& output_name) {
+std::map<schedule::Alloc*, TmpInfo> BuildMemInfo(schedule::Schedule* schedule, std::size_t alignment,
+                                                 const std::unordered_set<schedule::Alloc*>& consumed_inputs) {
+  std::map<schedule::Alloc*, TmpInfo> infos;
+  std::size_t aidx = 0;
+  for (auto& alloc : schedule->allocs) {
+    bool read_only = alloc.is_input() && !consumed_inputs.count(&alloc);
     TmpInfo info;
-    info.aidx = aidx_;
-    info.tmp = current_;
+    info.aidx = aidx;
+    info.tmp = &alloc;
     info.byte_size = alloc.byte_size;
-    info.output_name = output_name;
-    infos_.emplace(std::make_pair(current_, std::move(info)));
+    info.input = alloc.input;
+    info.output = alloc.output;
+    info.read_only = read_only;
+    infos.emplace(&alloc, std::move(info));
+    ++aidx;
   }
-
-  void Visit(const RunStep& run) final {
-    for (OutputInfo oi : run.outputs) {
-      SawOutput(oi.allocp);
+  std::size_t sidx = schedule->steps.size();
+  for (auto sit = schedule->steps.rbegin(); sit != schedule->steps.rend(); ++sit) {
+    --sidx;
+    for (const schedule::OutputInfo& oi : sit->outputs) {
+      auto it = infos.find(oi.allocp);
+      if (it != infos.end()) {
+        it->second.sidx_first = sidx;
+      }
     }
   }
-
-  void Visit(const CopyStep& copy) final { SawOutput(copy.to.allocp); }
-
-  void SawOutput(AllocPtr output) {
-    auto it = infos_.find(output);
-    if (it != infos_.end()) {
-      it->second.sidx_first = sidx_;
-    }
-  }
-
-  std::size_t aidx_ = 0;
-  std::size_t sidx_;
-  AllocPtr current_;
-  std::map<AllocPtr, TmpInfo, AllocPtrLess> infos_;
-  std::size_t alignment_;
-  std::uint64_t io_sum_ = 0;
-};
+  return infos;
+}
 
 // Rewrites a schedule's steps according to a set of block placements.
-class StepRewriter final : private StepVisitor {
- public:
-  static void ApplyRewrites(std::map<AllocPtr, TmpInfo, AllocPtrLess>* tmp_info_map, Schedule* schedule) {
-    StepRewriter rewriter{tmp_info_map};
-    for (const auto& step : schedule->steps) {
-      step->Accept(&rewriter);
-    }
-  }
-
- private:
-  explicit StepRewriter(std::map<AllocPtr, TmpInfo, AllocPtrLess>* tmp_info_map) : tmp_info_map_{tmp_info_map} {}
-
-  void Visit(const RunStep& const_run) final {
-    RunStep* run = const_cast<RunStep*>(&const_run);
-    for (auto& oi : run->outputs) {
-      oi.allocp = Lookup(oi.allocp);
-    }
-    for (auto& allocp : run->inputs) {
-      allocp = Lookup(allocp);
-    }
-  }
-
-  void Visit(const CopyStep& const_copy) final {
-    CopyStep* copy = const_cast<CopyStep*>(&const_copy);
-    copy->to.allocp = Lookup(copy->to.allocp);
-    copy->from = Lookup(copy->from);
-  }
-
- private:
-  AllocPtr Lookup(AllocPtr p) {
-    auto it = tmp_info_map_->find(p);
-    if (it == tmp_info_map_->end()) {
-      return p;
+void ApplyStepRewrites(const std::map<schedule::Alloc*, TmpInfo>& tmp_info_map, schedule::Schedule* schedule) {
+  auto lookup = [&tmp_info_map](schedule::Alloc* allocp) {
+    auto it = tmp_info_map.find(allocp);
+    if (it == tmp_info_map.end()) {
+      return allocp;
     }
     return it->second.assignment->alloc;
-  }
+  };
 
-  std::map<AllocPtr, TmpInfo, AllocPtrLess>* tmp_info_map_;
-};
+  for (auto& step : schedule->steps) {
+    for (auto& oi : step.outputs) {
+      oi.allocp = lookup(oi.allocp);
+    }
+    for (auto& allocp : step.inputs) {
+      allocp = lookup(allocp);
+    }
+  }
+}
 
 class BlockPlacement final : public Placement {
  public:
-  BlockPlacement(Schedule* schedule, std::size_t alignment);
+  BlockPlacement(const tile::proto::Program& program, schedule::Schedule* schedule, std::size_t alignment);
 
   std::uint64_t device_memory_bytes() const final;
   void Apply() final;
@@ -229,15 +170,39 @@ class BlockPlacement final : public Placement {
   bool IsCompatible(const std::vector<boost::dynamic_bitset<>>& deps,
                     const std::vector<boost::dynamic_bitset<>>& accessors, const TmpInfo* a, const TmpInfo* b);
 
-  Schedule* schedule_;
+  schedule::Schedule* schedule_;
   std::vector<boost::dynamic_bitset<>> tmp_accessors_;
   std::size_t alignment_;
-  std::map<AllocPtr, TmpInfo, AllocPtrLess> tmp_info_map_;
+  std::map<schedule::Alloc*, TmpInfo> tmp_info_map_;
   std::vector<AllocInfo> alloc_infos_;
   std::uint64_t sum_ = 0;
 };
 
-BlockPlacement::BlockPlacement(Schedule* schedule, std::size_t alignment) : schedule_{schedule}, alignment_{alignment} {
+BlockPlacement::BlockPlacement(const tile::proto::Program& program, schedule::Schedule* schedule, std::size_t alignment)
+    : schedule_{schedule}, alignment_{alignment} {
+  // Declare routines for creating and augmenting allocs.
+  auto create_alloc = [this](TmpInfo* tmp_info) {
+    auto ait = alloc_infos_.emplace(alloc_infos_.end(), AllocInfo{});
+    ait->byte_size = tmp_info->byte_size;
+    ait->assigned_tmps.insert(tmp_info);
+    ait->input = tmp_info->input;
+    ait->output = tmp_info->output;
+    ait->read_only = tmp_info->read_only;
+    tmp_info->assignment = &(*ait);
+    sum_ += ((tmp_info->byte_size + alignment_ - 1) / alignment_) * alignment_;
+  };
+
+  auto add_to_alloc = [](TmpInfo* tmp_info, AllocInfo* alloc_info) {
+    alloc_info->assigned_tmps.insert(tmp_info);
+    if (!alloc_info->input.length()) {
+      alloc_info->input = tmp_info->input;
+    }
+    if (!alloc_info->output.length()) {
+      alloc_info->output = tmp_info->output;
+    }
+    tmp_info->assignment = alloc_info;
+  };
+
   // In placement:
   //   * The kernel issue ordering is fixed.
   //   * All dependencies are accounted for in the steps.
@@ -264,100 +229,126 @@ BlockPlacement::BlockPlacement(Schedule* schedule, std::size_t alignment) : sche
   // of the schedule, allowing output buffers to be used for
   // temporaries while ensuring that they contain their correct final
   // outputs at the end of the program.
-  SyntheticOutputConsumer::AddOutputStep(schedule);
+  AddOutputStep(schedule);
+
+  // We also add a synthetic input-producing step to the front
+  // of the schedule, allowing input buffers to be used for
+  // temporaries and outputs while ensuring that they contain their
+  // correct input values until fully used by the program.
+  std::unordered_set<schedule::Alloc*> consumed_inputs = AddInputStep(program, schedule);
+  schedule->Reindex();
 
   // Next, we build the transitive dependency set of the kernels,
   // and the accessor steps of the various allocs.
-  auto deps = BuildTransitiveDeps(*schedule_);
-  auto accessors = AllocAccessors::Build(*schedule_);
+  auto deps = BuildTransitiveDeps(*schedule);
+  auto accessors = BuildAllocAccessors(*schedule);
 
-  // Next, we extract the existing temporary allocs, and sort them by
-  // size, biggest-first.
-  std::tie(tmp_info_map_, sum_) = MemInfo::Build(schedule_, alignment_);
-  std::vector<TmpInfo*> tmp_infos;
-  tmp_infos.reserve(tmp_info_map_.size());
+  // Next, we extract the existing allocs.
+  tmp_info_map_ = BuildMemInfo(schedule_, alignment_, consumed_inputs);
+  alloc_infos_.reserve(tmp_info_map_.size());
+
+  // Build a list of the remaining temporaries, and sort it.
+  // We want to process inputs and outputs, then non-IO allocs; within each
+  // group, we want to process temporaries in largest->smallest order.
+  std::list<TmpInfo*> tmp_infos;
   for (auto& kvp : tmp_info_map_) {
+    if (kvp.second.assignment) {
+      continue;
+    }
+    if (kvp.second.input.length()) {
+      // We handle inputs upfront, since they're guaranteed to not alias.
+      create_alloc(&kvp.second);
+      continue;
+    }
     tmp_infos.emplace_back(&kvp.second);
   }
-  std::sort(tmp_infos.begin(), tmp_infos.end(),
-            [](const TmpInfo* lhs, const TmpInfo* rhs) { return lhs->byte_size > rhs->byte_size; });
 
-  // Pre-populate the allocations with program output buffers.
-  alloc_infos_.reserve(tmp_infos.size());
-
-  for (TmpInfo* tmp_info : tmp_infos) {
-    if (!tmp_info->output_name.size()) {
-      continue;
+  tmp_infos.sort([](const TmpInfo* lhs, const TmpInfo* rhs) {
+    if (lhs == rhs) {
+      return false;
     }
-    auto ait = alloc_infos_.emplace(alloc_infos_.end(), AllocInfo{});
-    ait->byte_size = tmp_info->byte_size;
-    ait->assigned_tmps.insert(tmp_info);
-    ait->output_name = tmp_info->output_name;
-    tmp_info->assignment = &(*ait);
-  }
-
-  // Create tmp->alloc assignments, largest->smallest.
-  for (TmpInfo* tmp_info : tmp_infos) {
-    if (tmp_info->output_name.size()) {
-      continue;
+    // N.B. At this point, there will be no inputs.
+    auto lo = lhs->output.length();
+    auto ro = rhs->output.length();
+    if (lo && !ro) {
+      return true;
     }
-    bool assigned = false;
-    for (auto& alloc_info : alloc_infos_) {
-      if (alloc_info.byte_size < tmp_info->byte_size) {
-        continue;
-      }
-      bool compatible = true;
-      for (TmpInfo* assigned_tmp : alloc_info.assigned_tmps) {
-        if (!IsCompatible(deps, accessors, assigned_tmp, tmp_info)) {
-          compatible = false;
+    if (ro && !lo) {
+      return false;
+    }
+    return lhs->byte_size > rhs->byte_size;
+  });
+
+  // Create tmp->alloc assignments.  When assigning temporaries, we first try to reuse
+  // existing temporary allocs, then try using IO memory, and finally create new
+  // allocations when we need one.
+  for (TmpInfo* tmp_info : tmp_infos) {
+    bool is_output = tmp_info->output.length();
+    for (bool consider_io_allocs = is_output;; consider_io_allocs = true) {
+      for (auto& alloc_info : alloc_infos_) {
+        bool is_io_alloc = alloc_info.input.length() || alloc_info.output.length();
+        if ((!consider_io_allocs && is_io_alloc) || (consider_io_allocs && !is_io_alloc)) {
+          continue;
+        }
+        if (is_output && (alloc_info.byte_size != tmp_info->byte_size)) {
+          // Require output buffer reuse to be identical size.
+          continue;
+        }
+        if (alloc_info.byte_size < tmp_info->byte_size) {
+          continue;
+        }
+        if (alloc_info.read_only) {
+          continue;
+        }
+        bool compatible = true;
+        for (TmpInfo* assigned_tmp : alloc_info.assigned_tmps) {
+          if (!IsCompatible(deps, accessors, assigned_tmp, tmp_info)) {
+            compatible = false;
+            break;
+          }
+        }
+        if (compatible) {
+          add_to_alloc(tmp_info, &alloc_info);
           break;
         }
       }
-      if (compatible) {
-        alloc_info.assigned_tmps.insert(tmp_info);
-        tmp_info->assignment = &alloc_info;
-        assigned = true;
+      if (tmp_info->assignment) {
+        break;
+      }
+      if (consider_io_allocs) {
+        // We weren't able to find an assignment; we need a new alloc.
+        create_alloc(tmp_info);
         break;
       }
     }
-    if (!assigned) {
-      // We need a new alloc for this temporary.
-      auto ait = alloc_infos_.emplace(alloc_infos_.end(), AllocInfo{});
-      ait->byte_size = tmp_info->byte_size;
-      ait->assigned_tmps.insert(tmp_info);
-      tmp_info->assignment = &(*ait);
-      sum_ += ((tmp_info->byte_size + alignment_ - 1) / alignment_) * alignment_;
-    }
   }
 
-  // Remove the synthetic final step.
+  // Remove the synthetic initial and final steps.
+  schedule->steps.pop_front();
   schedule->steps.pop_back();
+  schedule->Reindex();
 }
 
 std::uint64_t BlockPlacement::device_memory_bytes() const { return sum_; }
 
 void BlockPlacement::Apply() {
+  // Clear the original allocs.  Note that after this, the original steps and the
+  // tmp_info_map_ point to undefined memory; we can continue looking at these
+  // as values (for mapping an original alloc to the TmpInfo describing its new
+  // assignment), but we must be very careful to never dereference them.
+  schedule_->allocs.clear();
+
   // Create the new allocs.
   for (auto& alloc_info : alloc_infos_) {
-    if (alloc_info.output_name.length()) {
-      auto alloc = compat::make_unique<ProgramOutputAlloc>();
-      alloc->name = alloc_info.output_name;
-      alloc->byte_size = alloc_info.byte_size;
-      alloc_info.alloc = schedule_->allocs.emplace(schedule_->allocs.end(), std::move(alloc));
-    } else {
-      auto alloc = compat::make_unique<TmpAlloc>();
-      alloc->byte_size = alloc_info.byte_size;
-      alloc_info.alloc = schedule_->allocs.emplace(schedule_->allocs.end(), std::move(alloc));
-    }
+    schedule::Alloc alloc;
+    alloc.byte_size = alloc_info.byte_size;
+    alloc.input = alloc_info.input;
+    alloc.output = alloc_info.output;
+    alloc_info.alloc = &*schedule_->allocs.emplace(schedule_->allocs.end(), std::move(alloc));
   }
 
   // Rewrite the existing steps to point to the new allocs.
-  StepRewriter::ApplyRewrites(&tmp_info_map_, schedule_);
-
-  // Erase the original allocs.
-  for (const auto& kvp : tmp_info_map_) {
-    schedule_->allocs.erase(kvp.first);
-  }
+  ApplyStepRewrites(tmp_info_map_, schedule_);
 
   schedule_->Reindex();
 
@@ -379,7 +370,7 @@ bool BlockPlacement::IsCompatible(const std::vector<boost::dynamic_bitset<>>& de
   // we can logically add that kernel to the deps set -- essentially, for any given element in b
   // written by the kernel, there's effectively a dependency on the phase of the kernel that's
   // accessing a.
-  if ((*b->tmp)->safe_self_alias_allocs.count(a->tmp)) {
+  if (b->tmp->safe_self_alias_allocs.count(a->tmp)) {
     // N.B. accessors[a->aidx] will already contain b->sidx_first.
     intersection.set(b->sidx_first);
   }
@@ -391,8 +382,9 @@ bool BlockPlacement::IsCompatible(const std::vector<boost::dynamic_bitset<>>& de
 
 BlockPlacer::BlockPlacer(std::size_t alignment) : alignment_{alignment} {}
 
-std::unique_ptr<Placement> BlockPlacer::PlaceSchedule(Schedule* schedule) const {
-  return compat::make_unique<BlockPlacement>(schedule, alignment_);
+std::unique_ptr<Placement> BlockPlacer::PlaceSchedule(const tile::proto::Program& program,
+                                                      schedule::Schedule* schedule) const {
+  return compat::make_unique<BlockPlacement>(program, schedule, alignment_);
 }
 
 }  // namespace local_machine

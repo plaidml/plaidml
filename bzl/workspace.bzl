@@ -1,4 +1,6 @@
 load("//vendor/cuda:configure.bzl", "configure_cuda")
+load("//bzl:conda_repo.bzl", "conda_repo")
+load('@bazel_tools//tools/build_defs/repo:git.bzl', 'git_repository')
 
 def plaidml_workspace():
     native.git_repository(
@@ -7,15 +9,15 @@ def plaidml_workspace():
         tag = "0.3.1",
     )
 
-    native.git_repository(
-        name = "build_bazel_rules_apple",
-        remote = "https://github.com/bazelbuild/rules_apple.git",
-        tag = "0.4.0",
-    )
+    # native.git_repository(
+    #     name = "build_bazel_rules_apple",
+    #     remote = "https://github.com/bazelbuild/rules_apple.git",
+    #     tag = "0.4.0",
+    # )
 
     native.new_http_archive(
         name="boost_archive",
-        url="https://dl.bintray.com/boostorg/release/1.66.0/source/boost_1_66_0.tar.gz",
+        url="https://storage.googleapis.com/vertexai-depot/boost_1_66_0.tar.gz",
         sha256="bd0df411efd9a585e5a2212275f8762079fed8842264954675a4fddc46cfcf60",
         build_file=str(Label("//bzl:boost.BUILD")),
         strip_prefix="boost_1_66_0",
@@ -99,15 +101,22 @@ def plaidml_workspace():
         sha256="26d60e43c14106a3d220e33c2b2e073b2bce40b433ad3e5fa13c747f58e67ab6",
     )
 
-    native.new_git_repository(
-        name="mtlpp_repo",
-        commit="71a38f4e8bcf7a06bdb234cbe13c6299a9bb127e",
-        remote="https://github.com/naleksiev/mtlpp.git",
-        build_file=str(Label("//bzl:mtlpp.BUILD"))
-    )
-
     configure_protobuf()
     configure_cuda(name = "cuda")
+
+    conda_repo(
+        name = "vertexai_plaidml_conda",
+        specs = {
+            "env": str(Label("//conda:plaidml.yml")),
+        },
+    )
+
+    conda_repo(
+        name = "vertexai_plaidml_conda_sphinx",
+        specs = {
+            "env": str(Label("//conda:sphinx.yml")),
+        },
+    )
 
 def configure_protobuf():
     native.new_http_archive(

@@ -74,8 +74,7 @@ static sem::ExprPtr aggregate(const AggregationOp& op, sem::ExprPtr lhs, sem::Ex
 }
 
 KernelInfo GenContract(const string& kname, const DirectSettings& settings, const FlatContraction& op,
-                       const std::vector<uint64_t>& tile, const Bindings& vars,
-                       const std::vector<std::string>& inputs,
+                       const std::vector<uint64_t>& tile, const Bindings& vars, const std::vector<std::string>& inputs,
                        const proto::PerfStats& perf) {
   using namespace sem::builder;  // NOLINT
   // Get size
@@ -562,6 +561,28 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
     } else if (post_op.f.fn == "as_float" || post_op.f.fn == "as_int" || post_op.f.fn == "as_uint") {
       sem::Type declatype{sem::Type::VALUE, vars.at(post_op.output).shape.type, op.agg_vec};
       opexpr = _Cast(declatype, inexprs[0]);
+    } else if (post_op.f.fn == "index") {
+      // Pull constant back out of semtree node
+      sem::IntConst* val = dynamic_cast<sem::IntConst*>(inexprs[1].get());
+      if (val == nullptr) {
+        throw std::runtime_error("Second argument of index must be an integer");
+      }
+      int64_t idx_num = val->value;
+      const auto& polys = op.index_mapping.at(post_op.inputs[0]);
+      if (idx_num < 0 || idx_num >= polys.size()) {
+        throw std::runtime_error("In call to index, index number is out of bounds");
+      }
+      const auto& poly = polys[idx_num];
+      sem::ExprPtr poly_eval = _Const(0);
+      for (const auto& kvp : poly.getMap()) {
+        sem::ExprPtr mul = _Const(static_cast<int64_t>(Floor(kvp.second)));
+        if (kvp.first == "") {
+          poly_eval = poly_eval + mul;
+        } else {
+          poly_eval = poly_eval + mul * _(kvp.first);
+        }
+      }
+      opexpr = poly_eval;
     } else {
       opexpr = std::make_shared<sem::CallExpr>(_(post_op.f.fn), inexprs);
     }

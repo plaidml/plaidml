@@ -19,9 +19,12 @@ namespace cuda {
   return 0;
 }();
 
-Driver::Driver(const context::Context& ctx) { device_sets_.emplace_back(std::make_shared<DeviceSet>()); }
+Driver::Driver(const context::Context& ctx) {  //
+  device_sets_.emplace_back(std::make_shared<DeviceSet>());
+}
 
-DeviceSet::DeviceSet() : host_memory_{new HostMemory} {
+DeviceSet::DeviceSet()  //
+    : host_memory_{new HostMemory} {
   VLOG(1) << "Enumerating CUDA devices";
 
   Error err = cuInit(0);
@@ -52,7 +55,9 @@ std::shared_ptr<HostBuffer> HostBuffer::Downcast(const std::shared_ptr<hal::Buff
   return buf;
 }
 
-HostBuffer::HostBuffer(std::uint64_t size) { buf_.resize(size, '\0'); }
+HostBuffer::HostBuffer(std::uint64_t size) {  //
+  buf_.resize(size, '\0');
+}
 
 boost::future<void*> HostBuffer::MapCurrent(const std::vector<std::shared_ptr<hal::Event>>& deps) {
   void* ptr = buf_.data();
@@ -94,7 +99,7 @@ std::string Device::description() {
   char name[128];
   Error err = cuDeviceGetName(name, sizeof(name), device_);
   Error::Check(err, "cuDeviceGetName() failed");
-  return printstring("%s (CUDA)", name);
+  return printstring("NVIDIA %s (CUDA)", name);
 }
 
 void Device::SetCurrentContext() {
@@ -109,8 +114,8 @@ hal::proto::HardwareInfo Device::GetHardwareInfo() {
   Error err = cuDeviceGetName(name, sizeof(name), device_);
   Error::Check(err, "cuDeviceGetName() failed");
 
-  info.set_name(std::string("CUDA ") + name);
-  info.set_vendor("CUDA");
+  info.set_name(std::string("CUDA NVIDIA ") + name);
+  info.set_vendor("NVIDIA");
 
   hal::proto::HardwareSettings* settings = info.mutable_settings();
   settings->set_threads(1);
@@ -126,7 +131,9 @@ hal::proto::HardwareInfo Device::GetHardwareInfo() {
   return info;
 }
 
-DeviceMemory::DeviceMemory(Device* device) : device_(device) {}
+DeviceMemory::DeviceMemory(Device* device)  //
+    : device_(device)                       //
+{}
 
 std::shared_ptr<hal::Buffer> DeviceMemory::MakeBuffer(std::uint64_t size, BufferAccessMask access) {
   device_->SetCurrentContext();
@@ -149,7 +156,10 @@ std::shared_ptr<DeviceBuffer> DeviceBuffer::Downcast(const std::shared_ptr<hal::
 }
 
 DeviceBuffer::DeviceBuffer(Device* device, CUdeviceptr dptr, std::uint64_t size)
-    : size_(size), dptr_(dptr), device_(device) {}
+    : size_(size),     //
+      dptr_(dptr),     //
+      device_(device)  //
+{}
 
 DeviceBuffer::~DeviceBuffer() {
   device_->SetCurrentContext();
@@ -182,17 +192,22 @@ std::shared_ptr<hal::Event> DeviceBuffer::Unmap(const context::Context& ctx) {
   return std::make_shared<Event>(std::move(result));
 }
 
-Executor::Executor(Device* device)
-    : info_{device->GetHardwareInfo()}, device_memory_(new DeviceMemory(device)), device_(device) {}
+Executor::Executor(Device* device)              //
+    : info_{device->GetHardwareInfo()},         //
+      device_memory_(new DeviceMemory(device))  //
+{}
 
-std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const std::shared_ptr<hal::Buffer>& from,
-                                           std::size_t from_offset, const std::shared_ptr<hal::Buffer>& to,
-                                           std::size_t to_offset, std::size_t length,
+std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx,               //
+                                           const std::shared_ptr<hal::Buffer>& from,  //
+                                           std::size_t from_offset,                   //
+                                           const std::shared_ptr<hal::Buffer>& to,    //
+                                           std::size_t to_offset,                     //
+                                           std::size_t length,                        //
                                            const std::vector<std::shared_ptr<hal::Event>>& dependencies) {
   throw error::Unimplemented("Not implemented: Executor::Copy");
 }
 
-boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* library, std::size_t kidx) {
+boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* library, std::size_t kidx) {
   auto lib = Library::Downcast(library);
   return lib->Prepare(kidx);
 }
@@ -204,12 +219,25 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> Executor::WaitFor(
 
 void Executor::Flush() {}
 
-Kernel::Kernel(Device* device, const lang::KernelInfo& ki, CUfunction function)
-    : ki_(ki), function_(function), device_(device) {}
+Executable::Executable(std::vector<std::shared_ptr<Kernel>> kernels) : kernels_{std::move(kernels)} {}
 
-std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
-                                        const std::vector<std::shared_ptr<hal::Buffer>>& params,
-                                        const std::vector<std::shared_ptr<hal::Event>>& deps, bool enable_profiling) {
+std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::size_t kernel_index,
+                                            const std::vector<std::shared_ptr<Buffer>>& params,
+                                            const std::vector<std::shared_ptr<Event>>& dependencies,
+                                            bool enable_profiling = false) {
+  return kernels_[kernel_index]->Run(ctx, params, dependencies, enable_profiling);
+}
+
+ComputeKernel::ComputeKernel(Device* device, const lang::KernelInfo& ki, CUfunction function)
+    : ki_(ki),              //
+      function_(function),  //
+      device_(device)       //
+{}
+
+std::shared_ptr<hal::Event> ComputeKernel::Run(const context::Context& ctx,                              //
+                                               const std::vector<std::shared_ptr<hal::Buffer>>& params,  //
+                                               const std::vector<std::shared_ptr<hal::Event>>& deps,     //
+                                               bool enable_profiling) {
   size_t shared_bytes = 0;
 
   lang::GridSize block{{
@@ -251,7 +279,10 @@ std::shared_ptr<hal::Event> Kernel::Run(const context::Context& ctx,
   return std::make_shared<Event>(std::move(result));
 }
 
-ZeroKernel::ZeroKernel(Device* device, const lang::KernelInfo& ki) : ki_(ki), device_(device) {}
+ZeroKernel::ZeroKernel(Device* device, const lang::KernelInfo& ki)  //
+    : ki_(ki),                                                      //
+      device_(device)                                               //
+{}
 
 std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
                                             const std::vector<std::shared_ptr<hal::Buffer>>& params,
@@ -275,17 +306,19 @@ std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
   return std::make_shared<Event>(std::move(result));
 }
 
-Library::Library(std::vector<std::unique_ptr<hal::Kernel>> kernels) : kernels_{std::move(kernels)} {}
+Library::Library(std::vector<std::shared_ptr<Kernel>> kernels) : kernels_{std::move(kernels)} {}
 
-Library* Library::Downcast(hal::Library* library) { return dynamic_cast<Library*>(library); }
-
-boost::future<std::unique_ptr<hal::Kernel>> Library::Prepare(std::size_t kidx) {
-  return boost::make_ready_future(std::move(kernels_[kidx]));
+Library* Library::Downcast(hal::Library* library) {  //
+  return dynamic_cast<Library*>(library);
 }
 
-Event::Event(std::shared_ptr<hal::Result> result) : result_(std::move(result)) {}
+boost::future<std::unique_ptr<hal::Executable>> Library::Prepare() {
+  return boost::make_ready_future<std::unique_ptr<hal::Executable>>(compat::make_unique<Executable>(kernels_));
+}
 
-Event::~Event() {}
+Event::Event(std::shared_ptr<hal::Result> result)  //
+    : result_(std::move(result))                   //
+{}
 
 std::shared_ptr<Event> Event::Downcast(const std::shared_ptr<hal::Event>& event) {
   auto evt = std::dynamic_pointer_cast<Event>(event);
@@ -312,13 +345,23 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> Event::WaitFor(
   return results;
 }
 
-boost::shared_future<std::shared_ptr<hal::Result>> Event::GetFuture() { return boost::make_ready_future(result_); }
+boost::shared_future<std::shared_ptr<hal::Result>> Event::GetFuture() {  //
+  return boost::make_ready_future(result_);
+}
 
-Result::Result(const context::Context& ctx, const char* verb, std::chrono::high_resolution_clock::time_point start,
-               std::chrono::high_resolution_clock::time_point end)
-    : ctx_{ctx}, verb_{verb}, start_{start}, end_{end} {}
+Result::Result(const context::Context& ctx,                           //
+               const char* verb,                                      //
+               std::chrono::high_resolution_clock::time_point start,  //
+               std::chrono::high_resolution_clock::time_point end)    //
+    : ctx_{ctx},                                                      //
+      verb_{verb},                                                    //
+      start_{start},                                                  //
+      end_{end}                                                       //
+{}
 
-std::chrono::high_resolution_clock::duration Result::GetDuration() const { return end_ - start_; }
+std::chrono::high_resolution_clock::duration Result::GetDuration() const {  //
+  return end_ - start_;
+}
 
 namespace {
 const context::Clock kSystemClock;

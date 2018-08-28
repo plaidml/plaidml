@@ -2,10 +2,16 @@
 
 #pragma once
 
+#include <Metal/MTLBuffer.h>
+#include <Metal/MTLCommandBuffer.h>
+#include <Metal/MTLCommandQueue.h>
+#include <Metal/MTLComputePipeline.h>
+#include <Metal/MTLDevice.h>
+#include <Metal/MTLLibrary.h>
+
 #include <string>
 #include <vector>
 
-#include "mtlpp.hpp"
 #include "tile/base/hal.h"
 
 namespace vertexai {
@@ -37,12 +43,13 @@ class DeviceSet final : public hal::DeviceSet {
 
 class Device final : public hal::Device {
  public:
-  explicit Device(mtlpp::Device device);
+  explicit Device(id<MTLDevice> device);
 
   void Initialize(const hal::proto::HardwareSettings& settings) final {
     // NOP
   }
 
+  std::string name();
   std::string description() final;
 
   hal::Compiler* compiler() final { return compiler_.get(); }
@@ -56,12 +63,12 @@ class Device final : public hal::Device {
  public:
   hal::proto::HardwareInfo GetHardwareInfo();
 
-  mtlpp::Device dev() const { return device_; }
-  mtlpp::CommandQueue queue();
+  id<MTLDevice> dev() const { return device_; }
+  id<MTLCommandQueue> queue();
 
  private:
-  mtlpp::Device device_;
-  mtlpp::CommandQueue queue_;
+  id<MTLDevice> device_;
+  id<MTLCommandQueue> queue_;
   std::unique_ptr<hal::Compiler> compiler_;
   std::unique_ptr<hal::Executor> executor_;
   const std::unordered_map<std::string, std::unique_ptr<hal::Loader>> il_loader_map_;
@@ -86,7 +93,7 @@ class Memory final : public hal::Memory {
 class Buffer : public hal::Buffer {
  public:
   Buffer(Device* device,        //
-         mtlpp::Buffer buffer,  //
+         id<MTLBuffer> buffer,  //
          std::uint64_t size,    //
          BufferAccessMask access);
 
@@ -97,12 +104,12 @@ class Buffer : public hal::Buffer {
  public:
   static std::shared_ptr<Buffer> Downcast(const std::shared_ptr<hal::Buffer>& buffer);
 
-  mtlpp::Buffer buffer() const { return buffer_; }
+  id<MTLBuffer> buffer() const { return buffer_; }
   std::uint64_t size() const { return size_; }
 
  private:
   Device* device_;
-  mtlpp::Buffer buffer_;
+  id<MTLBuffer> buffer_;
   std::uint64_t size_;
   BufferAccessMask access_;
 };
@@ -139,7 +146,7 @@ class Executor : public hal::Executor {
                                    std::size_t length,
                                    const std::vector<std::shared_ptr<hal::Event>>& dependencies) final;
 
-  boost::future<std::unique_ptr<hal::Kernel>> Prepare(hal::Library* library, std::size_t kidx) final;
+  boost::future<std::unique_ptr<hal::Executable>> Prepare(hal::Library* library) final;
 
   boost::future<std::vector<std::shared_ptr<hal::Result>>> WaitFor(
       const std::vector<std::shared_ptr<hal::Event>>& events) final;
@@ -153,15 +160,35 @@ class Executor : public hal::Executor {
   std::unique_ptr<hal::Memory> memory_;
 };
 
-class Kernel final : public hal::Kernel {
+class Kernel {
  public:
-  Kernel(Device* device,                        //
-         const lang::KernelInfo& ki,            //
-         context::proto::ActivityID kernel_id,  //
-         mtlpp::ComputePipelineState state);
+  virtual ~Kernel() {}
 
-  std::shared_ptr<hal::Event> Run(const context::Context& ctx,  //
+  virtual std::shared_ptr<hal::Event> Run(const context::Context& ctx,
+                                          const std::vector<std::shared_ptr<hal::Buffer>>& params,
+                                          const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                          bool enable_profiling) = 0;
+};
+
+class Executable final : public hal::Executable {
+ public:
+  explicit Executable(std::vector<std::unique_ptr<Kernel>> kernels);
+
+  std::shared_ptr<hal::Event> Run(const context::Context& ctx, std::size_t kernel_index,
                                   const std::vector<std::shared_ptr<hal::Buffer>>& params,
+                                  const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                  bool enable_profiling = false) final;
+
+ private:
+  std::vector<std::unique_ptr<Kernel>> kernels_;
+};
+
+class ComputeKernel final : public Kernel {
+ public:
+  ComputeKernel(Device* device, const lang::KernelInfo& ki, context::proto::ActivityID kernel_id,
+                id<MTLComputePipelineState> state);
+
+  std::shared_ptr<hal::Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<hal::Buffer>>& params,
                                   const std::vector<std::shared_ptr<hal::Event>>& dependencies,
                                   bool enable_profiling) final;
 
@@ -169,17 +196,14 @@ class Kernel final : public hal::Kernel {
   Device* device_;
   lang::KernelInfo ki_;
   context::proto::ActivityID kernel_id_;
-  mtlpp::ComputePipelineState state_;
+  id<MTLComputePipelineState> state_;
 };
 
-class CopyKernel final : public hal::Kernel {
+class CopyKernel final : public Kernel {
  public:
-  CopyKernel(Device* device,              //
-             const lang::KernelInfo& ki,  //
-             context::proto::ActivityID kernel_id);
+  CopyKernel(Device* device, const lang::KernelInfo& ki, context::proto::ActivityID kernel_id);
 
-  std::shared_ptr<hal::Event> Run(const context::Context& ctx,  //
-                                  const std::vector<std::shared_ptr<hal::Buffer>>& params,
+  std::shared_ptr<hal::Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<hal::Buffer>>& params,
                                   const std::vector<std::shared_ptr<hal::Event>>& dependencies,
                                   bool enable_profiling) final;
 
@@ -189,14 +213,11 @@ class CopyKernel final : public hal::Kernel {
   context::proto::ActivityID kernel_id_;
 };
 
-class ZeroKernel final : public hal::Kernel {
+class ZeroKernel final : public Kernel {
  public:
-  ZeroKernel(Device* device,              //
-             const lang::KernelInfo& ki,  //
-             context::proto::ActivityID kernel_id);
+  ZeroKernel(Device* device, const lang::KernelInfo& ki, context::proto::ActivityID kernel_id);
 
-  std::shared_ptr<hal::Event> Run(const context::Context& ctx,  //
-                                  const std::vector<std::shared_ptr<hal::Buffer>>& params,
+  std::shared_ptr<hal::Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<hal::Buffer>>& params,
                                   const std::vector<std::shared_ptr<hal::Event>>& dependencies,
                                   bool enable_profiling) final;
 
@@ -217,7 +238,7 @@ class Library final : public hal::Library {
  public:
   Library(const context::Context& ctx,  //
           Device* device,               //
-          mtlpp::Library library,       //
+          id<MTLLibrary> library,       //
           const std::vector<KernelContext>& kernel_ctxs);
 
   std::string Serialize() final;
@@ -225,19 +246,22 @@ class Library final : public hal::Library {
  public:
   static Library* Downcast(hal::Library* library);
 
-  boost::future<std::unique_ptr<hal::Kernel>> Prepare(std::size_t kidx);
+  boost::future<std::unique_ptr<hal::Executable>> Prepare();
 
  private:
   context::Context ctx_;
   Device* device_;
-  mtlpp::Library library_;
+  id<MTLLibrary> library_;
   std::vector<KernelContext> kernel_ctxs_;
 };
 
 class Event final : public hal::Event {
  public:
   Event(const context::Context& ctx,  //
-        mtlpp::CommandBuffer cmdbuf,  //
+        id<MTLCommandBuffer> cmdbuf,  //
+        const char* verb);
+
+  Event(const context::Context& ctx,  //
         const char* verb);
 
   boost::shared_future<std::shared_ptr<hal::Result>> GetFuture() final { return future_; }

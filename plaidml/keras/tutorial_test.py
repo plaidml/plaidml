@@ -137,7 +137,7 @@ class TestTileTutorial(unittest.TestCase):
                   }"""
         value = tile.Operation(code,
                                [('I', I)],
-                               [('O', tile.Shape(I.shape.dtype, (I.shape.dims[0] / 2,)))],
+                               [('O', tile.Shape(I.shape.dtype, (I.shape.dims[0] // 2,)))],
                                name='BrokenMaxpool') \
                     .sole_output()
         reference = K.max(I)
@@ -150,7 +150,7 @@ class TestTileTutorial(unittest.TestCase):
                   }"""
         value = tile.Operation(code,
                                [('I', I)],
-                               [('O', tile.Shape(I.shape.dtype, (I.shape.dims[0] / 2,)))],
+                               [('O', tile.Shape(I.shape.dtype, (I.shape.dims[0] // 2,)))],
                                name='ValidMaxpool') \
                     .sole_output()
         npt.assert_allclose(value.eval(), [2., 4.])
@@ -162,7 +162,7 @@ class TestTileTutorial(unittest.TestCase):
                   }"""
         value = tile.Operation(code,
                                [('I', I)],
-                               [('O', tile.Shape(I.shape.dtype, ((I.shape.dims[0] + 1) / 2,)))],
+                               [('O', tile.Shape(I.shape.dtype, ((I.shape.dims[0] + 1) // 2,)))],
                                name='ValidMaxpool') \
                     .sole_output()
         npt.assert_allclose(value.eval(), np.array([2., 4., 5.]))

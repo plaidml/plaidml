@@ -23,16 +23,23 @@ std::shared_ptr<Buffer> Buffer::Downcast(const std::shared_ptr<tile::Buffer>& bu
   return result;
 }
 
-Buffer::Buffer(const std::shared_ptr<DevInfo>& devinfo, std::shared_ptr<MemChunk> chunk)
-    : devinfo_{devinfo}, chunk_{std::move(chunk)} {}
+Buffer::Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy, std::shared_ptr<MemChunk> chunk)
+    : devinfo_{devinfo}, mem_strategy_{mem_strategy}, size_{chunk->size()}, chunk_{std::move(chunk)} {}
+
+Buffer::Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy, std::uint64_t size)
+    : devinfo_{devinfo}, mem_strategy_{mem_strategy}, size_{size} {}
 
 boost::future<std::unique_ptr<View>> Buffer::MapCurrent(const context::Context& ctx) {
+  EnsureChunk(ctx);
   return chunk()->MapCurrent(ctx);
 }
 
-std::unique_ptr<View> Buffer::MapDiscard(const context::Context& ctx) { return chunk()->MapDiscard(ctx); }
+std::unique_ptr<View> Buffer::MapDiscard(const context::Context& ctx) {
+  EnsureChunk(ctx);
+  return chunk()->MapDiscard(ctx);
+}
 
-std::uint64_t Buffer::size() const { return chunk()->size(); }
+std::uint64_t Buffer::size() const { return size_; }
 
 void Buffer::RemapTo(std::shared_ptr<MemChunk> chunk) {
   if (size() != chunk->size()) {
@@ -40,6 +47,13 @@ void Buffer::RemapTo(std::shared_ptr<MemChunk> chunk) {
   }
   std::lock_guard<std::mutex> lock{mu_};
   chunk_ = std::move(chunk);
+}
+
+void Buffer::EnsureChunk(const context::Context& ctx) {
+  std::lock_guard<std::mutex> lock{mu_};
+  if (!chunk_) {
+    chunk_ = mem_strategy_->MakeChunk(ctx, size_);
+  }
 }
 
 }  // namespace local_machine

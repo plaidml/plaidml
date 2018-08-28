@@ -28,9 +28,6 @@ message Tensor {
 
   // For an input, the data to supply for inference;
   // for an output, the expected output data.
-  // Exactly one of these fields should be non-empty.
 
   string filename = 2;  // Represents an external file.
-  repeated float float_data = 3;
-  repeated int64 int_data = 4;
 }

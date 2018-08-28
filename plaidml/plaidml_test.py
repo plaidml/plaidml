@@ -7,6 +7,7 @@ import sys
 import unittest
 
 import numpy as np
+
 import plaidml
 import plaidml.context
 import plaidml.exceptions
@@ -19,11 +20,8 @@ class TestPlaidML(unittest.TestCase):
         testing.plaidml_config.unittest_config()
 
     def testVersion(self):
-        # From https://www.python.org/dev/peps/pep-0440/
-        self.assertRegexpMatches(
-            plaidml.__version__,
-            r'^([1-9]\d*!)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)(0|[1-9]\d*))?(\.post(0|[1-9]\d*))?(\.dev(0|[1-9]\d*))?$'
-        )
+        import pkg_resources
+        self.assertIsInstance(pkg_resources.parse_version(plaidml.__version__), type(pkg_resources.parse_version("1.0.0")))
 
     def testDeviceEnumerator(self):
         ctx = plaidml.Context()

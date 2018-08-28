@@ -4,19 +4,27 @@ load(
     "plaidml_cc_test",
 )
 
+# objc_library has many problems:
+#   - linker errors
+#   - deps aren't transitive (to other cc_librarys that depend on an objc_library)
+
 plaidml_cc_library(
     name = "metal",
     srcs = [
         "emit.cc",
         "hal.cc",
+        "hal.h",
     ],
-    hdrs = ["hal.h"],
+    copts = [
+        "-ObjC++",
+        "-fobjc-arc",
+    ],
+    linkopts = ["-framework Metal"],
     tags = ["metal"],
     visibility = ["//visibility:public"],
     deps = [
         "//tile/base:hal",
         "//tile/hal/opencl:proto_cc",
-        "@mtlpp_repo//:mtlpp_cc",
     ],
     alwayslink = 1,
 )

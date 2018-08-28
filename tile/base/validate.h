@@ -1,3 +1,5 @@
+// Copyright 2017, Vertex.AI.
+
 #pragma once
 
 #include <cstdint>

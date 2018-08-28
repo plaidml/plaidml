@@ -7,6 +7,7 @@
 
 #include "tile/platform/local_machine/devinfo.h"
 #include "tile/platform/local_machine/mem_chunk.h"
+#include "tile/platform/local_machine/mem_strategy.h"
 
 namespace vertexai {
 namespace tile {
@@ -22,7 +23,9 @@ class Buffer : public tile::Buffer, public std::enable_shared_from_this<Buffer> 
   static std::shared_ptr<Buffer> Downcast(const std::shared_ptr<tile::Buffer>& buffer,
                                           const std::shared_ptr<DevInfo>& devinfo);
 
-  Buffer(const std::shared_ptr<DevInfo>& devinfo, std::shared_ptr<MemChunk> chunk);
+  Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy, std::shared_ptr<MemChunk> chunk);
+
+  Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy, std::uint64_t size);
 
   const std::shared_ptr<DevInfo>& devinfo() const { return devinfo_; }
 
@@ -37,9 +40,12 @@ class Buffer : public tile::Buffer, public std::enable_shared_from_this<Buffer> 
   std::uint64_t size() const final;
 
   void RemapTo(std::shared_ptr<MemChunk> chunk);
+  void EnsureChunk(const context::Context& ctx);
 
  private:
   const std::shared_ptr<DevInfo> devinfo_;
+  const std::shared_ptr<MemStrategy> mem_strategy_;
+  const std::uint64_t size_;
   mutable std::mutex mu_;
   std::shared_ptr<MemChunk> chunk_;
 };

@@ -2,15 +2,14 @@
 
 package(default_visibility = ["//visibility:public"])
 
+load("//bzl:conda.bzl", "conda_binary", "conda_test")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_binary",
     "plaidml_cc_library",
     "plaidml_cc_test",
     "plaidml_proto_library",
-    "plaidml_py_binary",
     "plaidml_py_library",
-    "plaidml_py_test",
     "plaidml_py_wheel",
     "plaidml_cc_version",
 )
@@ -123,20 +122,6 @@ plaidml_cc_test(
 )
 
 plaidml_cc_test(
-    name = "dtype_vec_test",
-    srcs = ["dtype_vec_test.cc"],
-    deps = [
-        ":api",
-        "//plaidml:proto_cc",
-        "//testing:matchers",
-        "//testing:plaidml_config",
-        "//tile/hal/opencl:proto_cc",
-        "//tile/platform/local_machine:proto_cc",
-        "@half_repo//:half",
-    ],
-)
-
-plaidml_cc_test(
     name = "matmul_fuzz_test",
     timeout = "eternal",
     srcs = ["matmul_fuzz_test.cc"],
@@ -208,16 +193,18 @@ genrule(
 """,
 )
 
-plaidml_py_binary(
-    name = "setup",
-    srcs = ["plaidml_setup.py"],
-    main = "plaidml_setup.py",
+conda_binary(
+    name = "enumerate",
+    srcs = ["enumerate.py"],
+    env = "@vertexai_plaidml_conda//:env",
     deps = [":py"],
 )
 
-plaidml_py_binary(
-    name = "enumerate",
-    srcs = ["enumerate.py"],
+conda_binary(
+    name = "setup",
+    srcs = ["plaidml_setup.py"],
+    env = "@vertexai_plaidml_conda//:env",
+    main = "plaidml_setup.py",
     deps = [":py"],
 )
 
@@ -239,17 +226,19 @@ plaidml_py_library(
     }),
 )
 
-plaidml_py_test(
+conda_test(
     name = "settings_test",
     srcs = ["settings_test.py"],
+    env = "@vertexai_plaidml_conda//:env",
     deps = [
         ":py",
     ],
 )
 
-plaidml_py_test(
+conda_test(
     name = "py_plaidml_test",
     srcs = ["plaidml_test.py"],
+    env = "@vertexai_plaidml_conda//:env",
     main = "plaidml_test.py",
     deps = [
         ":py",
@@ -257,9 +246,10 @@ plaidml_py_test(
     ],
 )
 
-plaidml_py_test(
+conda_test(
     name = "py_tile_test",
     srcs = ["tile_test.py"],
+    env = "@vertexai_plaidml_conda//:env",
     main = "tile_test.py",
     deps = [
         ":py",
@@ -312,6 +302,7 @@ plaidml_py_wheel(
     package_prefix = "plaidml",
     platform = select({
         "@toolchain//:linux_arm_32v7": "linux_armv7l",
+        "@toolchain//:linux_arm_64v8": "linux_aarch64",
         "@toolchain//:macos_x86_64": "macosx_10_10_x86_64",
         "@toolchain//:windows_x86_64": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
@@ -319,17 +310,40 @@ plaidml_py_wheel(
     python = "py2.py3",
 )
 
-# HACK: pex doesn't yet support manylinux wheels.
-plaidml_py_wheel(
-    name = "wheel_linux_x86_64",
-    package_name = "plaidml",
+pkg_tar(
+    name = "sdk_configs",
+    srcs = [":configs"],
+    package_dir = "share/plaidml",
+)
+
+pkg_tar(
+    name = "sdk_includes",
     srcs = [
-        ":configs",
-        ":py",
-        "//plaidml:libplaidml.so",
+        "plaidml.h",
+        "plaidml++.h",
     ],
-    config = ":setup.cfg",
-    package_prefix = "plaidml",
-    platform = "linux_x86_64",
-    python = "py2.py3",
+    package_dir = "include/plaidml",
+)
+
+pkg_tar(
+    name = "sdk_libs",
+    srcs = select({
+        "@toolchain//:windows_x86_64": [":plaidml.dll"],
+        "//conditions:default": ["libplaidml.so"],
+    }),
+    package_dir = "lib",
+)
+
+pkg_tar(
+    name = "sdk",
+    srcs = ["plaidml-config.cmake"],
+    deps = [
+        ":sdk_configs",
+        ":sdk_includes",
+        ":sdk_libs",
+        "//plaidml/base:sdk_includes",
+        "@half_repo//:sdk_includes",
+    ],
+    # TODO: Build package_dir from the --define=version= config setting.
+    package_dir = "plaidml-0.5.0",
 )

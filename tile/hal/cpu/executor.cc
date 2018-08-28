@@ -9,7 +9,7 @@
 #include "base/util/error.h"
 #include "tile/hal/cpu/buffer.h"
 #include "tile/hal/cpu/event.h"
-#include "tile/hal/cpu/kernel.h"
+#include "tile/hal/cpu/executable.h"
 #include "tile/hal/cpu/library.h"
 #include "tile/hal/cpu/memory.h"
 #include "tile/hal/util/selector.h"
@@ -26,7 +26,7 @@ hal::proto::HardwareInfo GetHardwareInfo() {
 
   // TODO: We should use the actual processor identifier here.
   info.set_type(hal::proto::HardwareType::CPU);
-  info.set_name("LLVM_preview_CPU");
+  info.set_name("LLVM CPU");
   info.set_vendor("LLVM");
 
   hal::proto::HardwareSettings* settings = info.mutable_settings();
@@ -88,9 +88,8 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
   }
   auto deps = Event::WaitFor(dependencies);
   context::Context ctx_copy{ctx};
-  auto evt = deps.then([
-    ctx = std::move(ctx_copy), f, t, from_offset, to_offset, length
-  ](decltype(deps) fut)->std::shared_ptr<hal::Result> {
+  auto evt = deps.then([ctx = std::move(ctx_copy), f, t, from_offset, to_offset,
+                        length](decltype(deps) fut) -> std::shared_ptr<hal::Result> {
     fut.get();
     char* fb = static_cast<char*>(f->base()) + to_offset;
     char* tb = static_cast<char*>(t->base()) + from_offset;
@@ -102,12 +101,10 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
   return std::make_shared<cpu::Event>(std::move(evt));
 }
 
-boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* library, std::size_t kernel_index) {
+boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* library) {
   auto lib = Library::Downcast(library);
-  auto engine = lib->engines()[kernel_index];
-  auto ki = lib->kernels()[kernel_index];
-  auto k = compat::make_unique<cpu::Kernel>(engine, ki);
-  return boost::make_ready_future(std::unique_ptr<hal::Kernel>(std::move(k)));
+  auto k = compat::make_unique<cpu::Executable>(lib->engines(), lib->kernels());
+  return boost::make_ready_future(std::unique_ptr<hal::Executable>(std::move(k)));
 }
 
 boost::future<std::vector<std::shared_ptr<hal::Result>>> Executor::WaitFor(

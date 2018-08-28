@@ -8,8 +8,10 @@
 #include "base/util/compat.h"
 #include "base/util/error.h"
 #include "tile/hal/opencl/buffer.h"
+#include "tile/hal/opencl/compute_kernel.h"
 #include "tile/hal/opencl/device_memory.h"
 #include "tile/hal/opencl/event.h"
+#include "tile/hal/opencl/executable.h"
 #include "tile/hal/opencl/info.h"
 #include "tile/hal/opencl/kernel.h"
 #include "tile/hal/opencl/library.h"
@@ -40,10 +42,10 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
 
   if (from_buf->size() <= from_offset || from_buf->size() < length || from_buf->size() < from_offset + length ||
       to_buf->size() <= to_offset || to_buf->size() < length || to_buf->size() < to_offset + length) {
-    throw error::InvalidArgument{"Invalid copy request: from=" + std::to_string(from_buf->size()) +
-                                 " bytes, from_offset=" + std::to_string(from_offset) + ", to=" +
-                                 std::to_string(to_buf->size()) + " bytes, to_offset=" + std::to_string(to_offset) +
-                                 ", length=" + std::to_string(length)};
+    throw error::InvalidArgument{
+        "Invalid copy request: from=" + std::to_string(from_buf->size()) +
+        " bytes, from_offset=" + std::to_string(from_offset) + ", to=" + std::to_string(to_buf->size()) +
+        " bytes, to_offset=" + std::to_string(to_offset) + ", length=" + std::to_string(length)};
   }
 
   context::Activity activity{ctx, "tile::hal::opencl::Copy"};
@@ -142,26 +144,34 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
   throw error::Unimplemented("Unable to copy data between the provided buffers");
 }
 
-boost::future<std::unique_ptr<hal::Kernel>> Executor::Prepare(hal::Library* library, std::size_t kernel_index) {
+boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* library) {
   Library* exe = Library::Downcast(library, device_state_);
 
-  const lang::KernelInfo& kinfo = exe->kernel_info()[kernel_index];
-  auto kid = exe->kernel_ids()[kernel_index];
+  std::vector<std::unique_ptr<Kernel>> kernels;
+  kernels.reserve(exe->kernel_ids().size());
 
-  if (kinfo.ktype == lang::KernelType::kZero) {
-    return boost::make_ready_future(
-        std::unique_ptr<hal::Kernel>(compat::make_unique<ZeroKernel>(device_state_, kinfo, kid)));
+  for (std::size_t kidx = 0; kidx < exe->kernel_ids().size(); ++kidx) {
+    const lang::KernelInfo& kinfo = exe->kernel_info()[kidx];
+    auto kid = exe->kernel_ids()[kidx];
+
+    if (kinfo.ktype == lang::KernelType::kZero) {
+      kernels.emplace_back(compat::make_unique<ZeroKernel>(device_state_, kinfo, kid));
+      continue;
+    }
+
+    Err err;
+    std::string kname = kinfo.kname;
+    CLObj<cl_kernel> kernel = clCreateKernel(exe->program().get(), kname.c_str(), err.ptr());
+    if (!kernel) {
+      throw std::runtime_error(std::string("Unable to initialize OpenCL kernel: ") + err.str());
+    }
+
+    kernels.emplace_back(
+        compat::make_unique<ComputeKernel>(device_state_, std::move(kernel), exe->kernel_info()[kidx], kid));
   }
 
-  Err err;
-  std::string kname = kinfo.kname;
-  CLObj<cl_kernel> kernel = clCreateKernel(exe->program().get(), kname.c_str(), err.ptr());
-  if (!kernel) {
-    throw std::runtime_error(std::string("Unable to initialize OpenCL kernel: ") + err.str());
-  }
-
-  return boost::make_ready_future(std::unique_ptr<hal::Kernel>(
-      compat::make_unique<Kernel>(device_state_, std::move(kernel), exe->kernel_info()[kernel_index], kid)));
+  return boost::make_ready_future(
+      std::unique_ptr<hal::Executable>(compat::make_unique<Executable>(std::move(kernels))));
 }
 
 void Executor::Flush() { device_state_->FlushCommandQueue(); }
