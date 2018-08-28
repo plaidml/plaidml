@@ -227,7 +227,7 @@ proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx, const prot
     // Strip leading and trailing whitespace, because some vendors want to include it in their device names.
     std::string name = CLInfo<CL_DEVICE_NAME>(did);
     if (info.type() == hal::proto::HardwareType::CPU) {
-      name = "OpenCL CPU";
+      name = "CPU";
     }
     auto name_begin = name.begin();
     auto name_end = name.end();

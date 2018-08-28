@@ -5,7 +5,8 @@
 #include <cstdint>
 #include <memory>
 
-#include "tile/platform/local_machine/schedule.h"
+#include "tile/base/schedule.h"
+#include "tile/proto/tile.pb.h"
 
 namespace vertexai {
 namespace tile {
@@ -31,7 +32,8 @@ class Placer {
   virtual ~Placer() {}
 
   // Returns a Placement for the memory required by a schedule.
-  virtual std::unique_ptr<Placement> PlaceSchedule(Schedule* schedule) const = 0;
+  virtual std::unique_ptr<Placement> PlaceSchedule(const tile::proto::Program& program,
+                                                   schedule::Schedule* schedule) const = 0;
 };
 
 }  // namespace local_machine

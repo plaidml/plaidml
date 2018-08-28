@@ -2,6 +2,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_py_library", "plaidml_py_init")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 plaidml_cc_library(
     name = "base",
@@ -42,4 +43,13 @@ plaidml_cc_test(
     deps = [
         ":base",
     ],
+)
+
+pkg_tar(
+    name = "sdk_includes",
+    srcs = [
+        "base.h",
+        "base_cpp.h",
+    ],
+    package_dir = "include/plaidml/base",
 )

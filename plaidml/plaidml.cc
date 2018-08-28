@@ -289,7 +289,7 @@ extern "C" void plaidml_free_device_enumerator(plaidml_device_enumerator* device
 }
 
 // Gets the configuration file that was used to initialize devices
-PLAIDML_API const char* plaidml_get_enumerator_config_source(plaidml_device_enumerator* enumerator) {
+extern "C" const char* plaidml_get_enumerator_config_source(plaidml_device_enumerator* enumerator) {
   return enumerator->config_source.c_str();
 }
 
@@ -759,8 +759,6 @@ uint64_t plaidml_get_shape_element_count(plaidml_shape* shape) {
 
 struct plaidml_function {
   std::shared_ptr<BoundFunction> func;
-  std::unique_ptr<RunInfo> info;
-  std::shared_ptr<tile::Program> prog;
 };
 
 extern "C" plaidml_function* plaidml_build_coded_function(const char* code, const char* id) {
@@ -1421,6 +1419,11 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     auto in_buffers = BindBuffers(invoker->runinfo->input_buffers, invoker->inputs, &evaluator);
     auto out_buffers = BindBuffers(invoker->runinfo->output_buffers, invoker->outputs, &evaluator);
 
+    std::unordered_set<const tile::Buffer*> output_set;
+    for (const auto& kv : out_buffers) {
+      output_set.insert(kv.second.get());
+    }
+
     if (!evaluator) {
       throw vertexai::error::FailedPrecondition{"Function has neither inputs nor outputs"};
     }
@@ -1428,8 +1431,16 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     tile::proto::Program prog;
     prog.set_dev_id(evaluator->get_id());
     prog.set_code(invoker->runinfo->code);
-    *prog.mutable_inputs() = tile::proto::to_proto(invoker->runinfo->input_shapes);
-    *prog.mutable_outputs() = tile::proto::to_proto(invoker->runinfo->output_shapes);
+    for (const auto& kv : invoker->runinfo->input_shapes) {
+      auto& input = (*prog.mutable_inputs())[kv.first];
+      *input.mutable_shape() = tile::proto::to_proto(kv.second);
+      if (output_set.count(in_buffers[kv.first].get())) {
+        input.set_consumed(true);
+      }
+    }
+    for (const auto& kv : invoker->runinfo->output_shapes) {
+      *(*prog.mutable_outputs())[kv.first].mutable_shape() = tile::proto::to_proto(kv.second);
+    }
 
     size_t max_trials = 1;
     auto env_trials = vertexai::env::Get("PLAIDML_KERNEL_TRIALS");

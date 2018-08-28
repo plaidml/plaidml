@@ -10,13 +10,14 @@
 #include "tile/base/hal.h"
 #include "tile/hal/opencl/buffer.h"
 #include "tile/hal/opencl/device_state.h"
+#include "tile/hal/opencl/kernel.h"
 
 namespace vertexai {
 namespace tile {
 namespace hal {
 namespace opencl {
 
-class ZeroKernel final : public hal::Kernel {
+class ZeroKernel final : public Kernel {
  public:
   ZeroKernel(const std::shared_ptr<DeviceState>& device_state, const lang::KernelInfo& kinfo,
              context::proto::ActivityID kid);

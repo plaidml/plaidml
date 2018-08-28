@@ -9,13 +9,14 @@ namespace local_machine {
 TransitiveDepScheduler::TransitiveDepScheduler(const std::shared_ptr<Placer>& placer, std::size_t max_in_flight)
     : placer_{placer}, max_in_flight_{max_in_flight} {}
 
-Schedule TransitiveDepScheduler::BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) {
-  Schedule schedule = ToScheduleSteps(program, kl);
+schedule::Schedule TransitiveDepScheduler::BuildSchedule(const tile::proto::Program& program,
+                                                         const lang::KernelList& kl) {
+  schedule::Schedule schedule = ToScheduleSteps(program, kl);
   AddDataflowDeps(&schedule);
   if (max_in_flight_) {
     AddLinearDeps(&schedule, max_in_flight_);
   }
-  placer_->PlaceSchedule(&schedule)->Apply();
+  placer_->PlaceSchedule(program, &schedule)->Apply();
   return schedule;
 }
 

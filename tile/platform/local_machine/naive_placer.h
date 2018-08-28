@@ -18,7 +18,8 @@ class NaivePlacer final : public Placer {
  public:
   explicit NaivePlacer(std::size_t alignment);
 
-  std::unique_ptr<Placement> PlaceSchedule(Schedule* schedule) const final;
+  std::unique_ptr<Placement> PlaceSchedule(const tile::proto::Program& program,
+                                           schedule::Schedule* schedule) const final;
 
  private:
   std::size_t alignment_;

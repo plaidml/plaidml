@@ -24,7 +24,7 @@ inline std::string c_dtype(const lang::DataType& dt) {
     case lang::DataType::INT16:
       return "short";
     case lang::DataType::INT32:
-      return "long";
+      return "int";
     case lang::DataType::INT64:
       return "long long";
     case lang::DataType::UINT8:
@@ -32,7 +32,7 @@ inline std::string c_dtype(const lang::DataType& dt) {
     case lang::DataType::UINT16:
       return "unsigned short";
     case lang::DataType::UINT32:
-      return "unsigned long";
+      return "unsigned int";
     case lang::DataType::FLOAT16:
       return "half";
     case lang::DataType::FLOAT32:

@@ -2,10 +2,11 @@
 
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <functional>
 #include <memory>
-
-#include <gtest/gtest.h>
+#include <vector>
 
 #include "base/util/compat.h"
 #include "tile/base/platform.h"
@@ -16,50 +17,62 @@ namespace testing {
 
 typedef std::function<std::unique_ptr<tile::Platform>()> PlatformFactory;
 
+struct Param {
+  lang::DataType dtype;
+  std::size_t vec_size;
+};
+
+struct FactoryParam {
+  PlatformFactory factory;
+  Param param;
+};
+
 // Platform implementation conformance tests.
 //
 // To test a platform, #include this header (linking with the :platform_tests
 // target), and use INSTANTIATE_TEST_CASE_P to instantiate the conformance
 // tests with factories producing Platform instances -- e.g.
 //
-//   INSTANTIATE_TEST_CASE_P(
-//       MyPlatform,
-//       PlatformTest,
-//       ::testing::Values(std::function<unique_ptr<Platform>()>[](){
-//         return compat::make_unique<MyPlatform>();
-//       }));
+//    Param supported_params[] = {
+//        {lang::DataType::FLOAT32, 1},  //
+//        {lang::DataType::FLOAT32, 2},  //
+//    };
 //
-class PlatformTest : public ::testing::TestWithParam<PlatformFactory> {
+//    std::vector<FactoryParam> SupportedParams() {
+//      std::vector<FactoryParam> params;
+//      for (const Param& param : supported_params) {
+//        auto factory = [param] {
+//          context::Context ctx;
+//          local_machine::proto::Platform config;
+//          auto hw_config = config.add_hardware_configs();
+//          hw_config->mutable_sel()->set_value(true);
+//          hw_config->mutable_settings()->set_vec_size(param.vec_size);
+//          return compat::make_unique<local_machine::Platform>(ctx, config);
+//        };
+//        params.push_back({factory, param});
+//      }
+//      return params;
+//    }
+class PlatformTest : public ::testing::TestWithParam<FactoryParam> {
  protected:
-  std::unique_ptr<tile::Platform> MakePlatform();
+  void SetUp() final;
+
+  std::unique_ptr<Program> MakeProgram(proto::TileScanningParameters* params,  //
+                                       const char* code,                       //
+                                       const lang::TensorShape& shape);
+  std::shared_ptr<Buffer> MakeInput(const lang::TensorShape& shape,  //
+                                    const std::vector<int>& data);
+  std::shared_ptr<Buffer> MakeOutput(const lang::TensorShape& shape);
+  void CheckExpected(const lang::TensorShape& shape,      //
+                     const std::shared_ptr<Buffer>& buf,  //
+                     const std::vector<int>& expected);
+
+ protected:
+  context::Context ctx_;
+  Param param_;
+  std::unique_ptr<tile::Platform> platform_;
 };
 
-namespace multiply {
-
-// The following functions can be used to build up a simple matrix multiplication test.
-// All buffers in this code have the same shape: INT16, dim{size=4, stride=8}, dim{size=4, stride=2}.
-
-// Make a program: C[x, y] = +(A[x, y] * B[y, x]).
-std::unique_ptr<Program> MakeProgram(const context::Context& ctx, const std::unique_ptr<Platform>& device,
-                                     tile::proto::TileScanningParameters* params = nullptr);
-
-// Create A, the first input.
-std::shared_ptr<Buffer> MakeInA(const context::Context& ctx, const std::unique_ptr<Platform>& device);
-
-// Create B, the second input.
-std::shared_ptr<Buffer> MakeInB(const context::Context& ctx, const std::unique_ptr<Platform>& device);
-
-// Create C, the output buffer.
-std::shared_ptr<Buffer> MakeOutC(const context::Context& ctx, const std::unique_ptr<Platform>& device);
-
-// Run the program with the specified inputs and outputs.
-void Run(const context::Context& ctx, const std::unique_ptr<Program>& program, const std::shared_ptr<Buffer>& a,
-         const std::shared_ptr<Buffer>& b, const std::shared_ptr<Buffer>& c);
-
-// Validate the final contents of C.
-void CheckExpected(const context::Context& ctx, const std::shared_ptr<Buffer>& c);
-
-}  // namespace multiply
 }  // namespace testing
 }  // namespace tile
 }  // namespace vertexai

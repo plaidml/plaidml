@@ -156,7 +156,7 @@ class Executor : public hal::Executor {
                                    std::size_t to_offset, std::size_t length,
                                    const std::vector<std::shared_ptr<hal::Event>>& dependencies) final;
 
-  boost::future<std::unique_ptr<hal::Kernel>> Prepare(hal::Library* library, std::size_t kidx) final;
+  boost::future<std::unique_ptr<hal::Executable>> Prepare(hal::Library* library) final;
 
   boost::future<std::vector<std::shared_ptr<hal::Result>>> WaitFor(
       const std::vector<std::shared_ptr<hal::Event>>& events) final;
@@ -166,12 +166,34 @@ class Executor : public hal::Executor {
  private:
   const hal::proto::HardwareInfo info_;
   std::unique_ptr<hal::Memory> device_memory_;
-  Device* device_;
 };
 
-class Kernel final : public hal::Kernel {
+class Kernel {
  public:
-  Kernel(Device* device, const lang::KernelInfo& ki, CUfunction function);
+  virtual ~Kernel() {}
+
+  virtual std::shared_ptr<hal::Event> Run(const context::Context& ctx,
+                                          const std::vector<std::shared_ptr<hal::Buffer>>& params,
+                                          const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                          bool enable_profiling) = 0;
+};
+
+class Executable final : public hal::Executable {
+ public:
+  explicit Executable(std::vector<std::unique_ptr<hal::Kernel>> kernels);
+
+  std::shared_ptr<hal::Event> Run(const context::Context& ctx, std::size_t kernel_index,
+                                  const std::vector<std::shared_ptr<hal::Buffer>>& params,
+                                  const std::vector<std::shared_ptr<hal::Event>>& dependencies,
+                                  bool enable_profiling = false) final;
+
+ private:
+  std::vector<std::shared_ptr<Kernel>> kernels_;
+};
+
+class ComputeKernel final : public Kernel {
+ public:
+  ComputeKernel(Device* device, const lang::KernelInfo& ki, CUfunction function);
 
   std::shared_ptr<hal::Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<hal::Buffer>>& params,
                                   const std::vector<std::shared_ptr<hal::Event>>& dependencies,
@@ -183,7 +205,7 @@ class Kernel final : public hal::Kernel {
   Device* device_;
 };
 
-class ZeroKernel final : public hal::Kernel {
+class ZeroKernel final : public Kernel {
  public:
   explicit ZeroKernel(Device* device, const lang::KernelInfo& ki);
 
@@ -200,20 +222,19 @@ class Library final : public hal::Library {
  public:
   static Library* Downcast(hal::Library* library);
 
-  explicit Library(std::vector<std::unique_ptr<hal::Kernel>> kernels);
+  explicit Library(std::vector<std::shared_ptr<Kernel>> kernels);
 
   std::string Serialize() final { return ""; }
 
-  boost::future<std::unique_ptr<hal::Kernel>> Prepare(std::size_t kidx);
+  boost::future<std::unique_ptr<hal::Executable>> Prepare();
 
  private:
-  std::vector<std::unique_ptr<hal::Kernel>> kernels_;
+  std::vector<std::shared_ptr<Kernel>> kernels_;
 };
 
 class Event final : public hal::Event {
  public:
   explicit Event(std::shared_ptr<hal::Result> result);
-  ~Event();
 
   static std::shared_ptr<Event> Downcast(const std::shared_ptr<hal::Event>& event);
 

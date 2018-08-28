@@ -20,6 +20,10 @@ Device::Device(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_
 
 void Device::Initialize(const hal::proto::HardwareSettings& settings) { device_state_->Initialize(settings); }
 
+std::string Device::description() {  //
+  return device_state()->info().vendor() + " " + device_state()->info().name() + " (OpenCL)";
+}
+
 }  // namespace opencl
 }  // namespace hal
 }  // namespace tile

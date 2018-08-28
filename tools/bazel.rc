@@ -48,8 +48,8 @@ build:macos_x86_64 --host_cpu=darwin_x86_64
 build:macos_x86_64 --build_tag_filters=-large,-darwin_fail,-msvc,-opengl
 test:macos_x86_64 --test_tag_filters=-large,-darwin_fail,-msvc,-opengl
 
-build:windows-10 --build_tag_filters=-deb,-git_big,-keras,-llvm,-metal,-omnetpp,-opengl,-shell,-tensorflow,-uvc --action_env=NUMBER_OF_PROCESSORS
-test:windows-10 --test_tag_filters=-deb,-git_big,-keras,-llvm,-metal,-omnetpp,-opengl,-shell,-tensorflow,-uvc,-windows_path_fail --test_env=NUMBER_OF_PROCESSORS
+build:windows_x86_64 --build_tag_filters=-deb,-git_big,-keras,-llvm,-metal,-omnetpp,-opengl,-shell,-tensorflow,-uvc --action_env=NUMBER_OF_PROCESSORS
+test:windows_x86_64 --test_tag_filters=-deb,-git_big,-keras,-llvm,-metal,-omnetpp,-opengl,-shell,-tensorflow,-uvc,-windows_path_fail --test_env=NUMBER_OF_PROCESSORS
 
 build:callgrind -c dbg
 build:callgrind --cxxopt=-O3

@@ -157,6 +157,12 @@ static bool SimplifyFlat(FlatContraction* flat) {
   if (flat->constraints.size() > 0) {
     return false;
   }
+  // Skip any case where we use the index builtin
+  for (const auto& op : flat->post_ops) {
+    if (op.f.fn == "index") {
+      return false;
+    }
+  }
   // This algorithm is n^3 at worst (n calls to flatten, each doing n^2 work)
   // Hopefully n is pretty small.
   size_t sz = flat->ranges.size();
@@ -400,6 +406,9 @@ static void ConsiderConsumers(const Program& prog, const Bindings& vars, std::si
     unified->insert(candidates.begin(), candidates.end());
     for (auto c : candidates) {
       for (const auto& var : prog.ops[c].inputs) {
+        if (vars.at(var).tag != Binding::TENSOR) {
+          continue;
+        }
         if (seen_vars->emplace(var).second) {
           unified_frontier->push(var);
         }
@@ -459,6 +468,9 @@ static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings&
   // This recursively adds all consumers of these vars and their respective inputs (iff those inputs can be unified)
   // to the unified set.
   for (const auto& var : prog.ops[root_opidx].inputs) {
+    if (vars.at(var).tag != Binding::TENSOR) {
+      continue;
+    }
     seen_vars.emplace(var);
     unified_frontier.push(var);
   }
@@ -491,6 +503,7 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   // be added.
 
   const Op& op = prog.ops[opidx];
+  const TensorShape& out_shape = vars.at(flat->output).shape;
 
   // Additional inputs required for the unified kernel.
   std::set<std::string> post_contraction_set;
@@ -582,6 +595,19 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
     Op copied_op = unified_op;
     const auto* oshape = &vars.at(copied_op.output).shape;
     for (std::string& input : copied_op.inputs) {
+      //// For each input compute the mapping from tensor indexes to global indexes
+      const TensorShape* shape = &vars.at(input).shape;
+      if (shape->elem_size() == out_shape.elem_size()) {
+        shape = &out_shape;
+      }
+      std::vector<Polynomial> indexes;
+      size_t off = out_poly.size() - shape->dims.size();
+      for (size_t i = 0; i < shape->dims.size(); i++, off++) {
+        indexes.push_back(out_poly[off]);
+      }
+      flat->index_mapping.emplace(input, indexes);
+      IVLOG(4, "Adding mapping for " << input << "=" << indexes);
+
       auto rit = local_var_rewrites.find(input);
       if (rit != local_var_rewrites.end()) {
         input = rit->second;
@@ -597,7 +623,8 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
       }
 
       const auto* ishape = &vars.at(input).shape;
-      if (!settings.disable_io_aliasing && ishape->dims == oshape->dims && byte_width(ishape->type) == byte_width(oshape->type)) {
+      if (!settings.disable_io_aliasing && ishape->dims == oshape->dims &&
+          byte_width(ishape->type) == byte_width(oshape->type)) {
         aliases[copied_op.output].emplace(input);
         auto it = aliases.find(input);
         if (it != aliases.end()) {
@@ -660,7 +687,6 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
 
   // Copy over post contraction inputs and compute strides
   computed->insert(unified_opidxs.begin(), unified_opidxs.end());
-  const TensorShape& out_shape = vars.at(flat->output).shape;
   for (const auto& name : post_contraction_inputs) {
     const TensorShape* shape = &vars.at(name).shape;
     if (shape->elem_size() == out_shape.elem_size()) {

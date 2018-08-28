@@ -18,7 +18,7 @@ constexpr auto kSchedulerTimeout = std::chrono::seconds(3);
 LooseScheduler::LooseScheduler(const std::shared_ptr<Placer>& placer, std::uint64_t size_goal)
     : placer_{placer}, size_goal_{size_goal} {}
 
-Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) {
+schedule::Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, const lang::KernelList& kl) {
   IVLOG(1, "Loose scheduler: attempting to use up to " << size_goal_ << " bytes");
 
   std::uint_fast32_t broad_loop_count = 0;
@@ -55,7 +55,7 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
   // step's direct dependencies.  This has no logical effect, but
   // simplifies things a little for the driver and the hardware
   // device, and makes for simpler workflow graphs.
-  Schedule schedule = ToScheduleSteps(program, kl);
+  schedule::Schedule schedule = ToScheduleSteps(program, kl);
 
   IVLOG(3, "Loose scheduler: original linear schedule is:\n" << schedule);
 
@@ -67,8 +67,8 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
   // Here's what we're going to keep track of, for each candidate step
   // (i.e. steps that we're still shifting dependencies on).
   struct StepInfo {
-    Step* step;   // The step
-    StepPtr dep;  // The current synthetic dependency
+    schedule::Step* step;                     // The step
+    std::list<schedule::Step>::iterator dep;  // The current synthetic dependency
   };
 
   // Initialize the candidates for loosening.  Note that we skip the
@@ -79,7 +79,7 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
   std::list<StepInfo> candidates;
   auto it = schedule.steps.begin();
   while (++it != schedule.steps.end()) {
-    candidates.push_back(StepInfo{it->get(), it});
+    candidates.push_back(StepInfo{&*it, it});
   }
 
   // Set each step's dependencies to the dependencies required for correct dataflow.
@@ -111,7 +111,7 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
         continue;
       }
       --candidate.dep;
-      auto res = candidate.step->deps.emplace(candidate.dep);
+      auto res = candidate.step->deps.emplace(&*candidate.dep);
       if (!res.second) {
         // The step already had this dep in its dependencies -- so the
         // updated synthetic dependency is actually a real data
@@ -127,7 +127,7 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
     }
 
     // Create new_placement based on new_candidates.
-    auto new_placement = placer_->PlaceSchedule(&schedule);
+    auto new_placement = placer_->PlaceSchedule(program, &schedule);
 
     IVLOG(4, "Loose scheduler: trial broad schedule uses " << new_placement->device_memory_bytes() << " bytes:\n"
                                                            << schedule);
@@ -136,7 +136,7 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
     // were the synthetic deps earlier added in order to create the
     // new placement.
     for (auto& candidate : new_candidates) {
-      candidate.step->deps.erase(candidate.dep);
+      candidate.step->deps.erase(&*candidate.dep);
     }
 
     // If we already have a placement, and the new one exceeds the
@@ -157,7 +157,7 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
   // create the current placement; we know they're valid and don't
   // equal any current dependencies for any given step.
   for (StepInfo& candidate : candidates) {
-    candidate.step->deps.emplace(candidate.dep);
+    candidate.step->deps.emplace(&*candidate.dep);
   }
 
   IVLOG(3, "Loose scheduler: broad schedule is:\n" << schedule);
@@ -175,14 +175,14 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
       // Try moving this candidate's dependency back a step, and
       // seeing what that does to the temporary allocations.
       auto& candidate = *current;
-      candidate.step->deps.erase(candidate.dep);
+      candidate.step->deps.erase(&*candidate.dep);
       bool using_trial_dep = false;
       auto trial_dep = candidate.dep;
       if (candidate.dep != schedule.steps.begin()) {
         --trial_dep;
-        using_trial_dep = candidate.step->deps.emplace(trial_dep).second;
+        using_trial_dep = candidate.step->deps.emplace(&*trial_dep).second;
       }
-      auto new_placement = placer_->PlaceSchedule(&schedule);
+      auto new_placement = placer_->PlaceSchedule(program, &schedule);
       IVLOG(4, "Loose scheduler: trial narrow schedule uses " << new_placement->device_memory_bytes() << " bytes:\n"
                                                               << schedule);
 
@@ -195,9 +195,9 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
         // placement.  So let's put the dependency back where it was,
         // and stop considering this candidate.
         if (using_trial_dep) {
-          candidate.step->deps.erase(trial_dep);
+          candidate.step->deps.erase(&*trial_dep);
         }
-        candidate.step->deps.emplace(candidate.dep);
+        candidate.step->deps.emplace(&*candidate.dep);
         keep_candidate = false;
       } else {
         // Either the new placement uses the same amount of memory (or
@@ -230,17 +230,17 @@ Schedule LooseScheduler::BuildSchedule(const tile::proto::Program& program, cons
   IVLOG(3, "Loose scheduler: loose schedule is:\n" << schedule);
 
   // Remove implied dependencies.
-  std::vector<std::set<StepPtr, StepPtrLess>> transitive_deps{schedule.steps.size()};
+  std::vector<std::set<schedule::Step*>> transitive_deps{schedule.steps.size()};
   for (auto& step : schedule.steps) {
-    auto& tdeps = transitive_deps[step->idx];
-    std::set<StepPtr, StepPtrLess> sdeps;
-    sdeps.swap(step->deps);
+    auto& tdeps = transitive_deps[step.idx];
+    std::set<schedule::Step*> sdeps;
+    sdeps.swap(step.deps);
     for (auto dep : sdeps) {
-      tdeps.insert(transitive_deps[(*dep)->idx].begin(), transitive_deps[(*dep)->idx].end());
+      tdeps.insert(transitive_deps[dep->idx].begin(), transitive_deps[dep->idx].end());
     }
     std::set_difference(sdeps.begin(), sdeps.end(), tdeps.begin(), tdeps.end(),
-                        std::inserter(step->deps, step->deps.end()), StepPtrLess{});
-    std::copy(step->deps.begin(), step->deps.end(), std::inserter(tdeps, tdeps.end()));
+                        std::inserter(step.deps, step.deps.end()));
+    std::copy(step.deps.begin(), step.deps.end(), std::inserter(tdeps, tdeps.end()));
   }
 
   // Apply the placement, generating the final schedule.

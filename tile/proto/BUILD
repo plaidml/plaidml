@@ -31,6 +31,18 @@ plaidml_proto_library(
     ],
 )
 
+plaidml_proto_library(
+    name = "schedule",
+    srcs = [
+        "schedule.proto",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":proto",
+        "//tile/lang:proto",
+    ],
+)
+
 plaidml_cc_library(
     name = "support",
     srcs = ["support.cc"],

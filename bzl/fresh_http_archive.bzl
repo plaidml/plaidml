@@ -1,14 +1,16 @@
-def _fresh_http_archive_impl(ctx):
-    ctx.download_and_extract(
-        ctx.attr.url, sha256=ctx.attr.sha256, stripPrefix=ctx.attr.strip_prefix)
+def _fresh_http_archive_impl(repository_ctx):
+    url = repository_ctx.attr.url
+    sha256 = repository_ctx.attr.sha256
+    strip_prefix = repository_ctx.attr.strip_prefix
+    repository_ctx.download_and_extract(url, sha256=sha256, stripPrefix=strip_prefix)
     args = [
         "python",
-        ctx.path(ctx.attr._script),
+        repository_ctx.path(repository_ctx.attr._script),
     ]
-    result = ctx.execute(args)
+    result = repository_ctx.execute(args)
     if result.return_code:
         fail("clean.py failed: %s (%s)" % (result.stdout, result.stderr))
-    ctx.symlink(ctx.path(ctx.attr.build_file), "BUILD")
+    repository_ctx.symlink(repository_ctx.path(repository_ctx.attr.build_file), "BUILD")
 
 fresh_http_archive = repository_rule(
     attrs = {
@@ -16,9 +18,8 @@ fresh_http_archive = repository_rule(
         "sha256": attr.string(),
         "strip_prefix": attr.string(),
         "build_file": attr.label(
-            allow_files = True,
+            allow_single_file = True,
             mandatory = True,
-            single_file = True,
         ),
         "_script": attr.label(
             executable = True,

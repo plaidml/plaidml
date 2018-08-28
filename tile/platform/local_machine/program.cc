@@ -48,12 +48,12 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
     // Prep to do a real run
     auto& device = *devinfo.dev;
     auto library = device.compiler()->Build(ctx, {ki}, devinfo.settings).get();
-    auto kernel = device.executor()->Prepare(library.get(), 0).get();
+    auto executable = device.executor()->Prepare(library.get()).get();
     int64_t best_time = std::numeric_limits<int64_t>::max();
 
     // Run trial_runs number of times, picking minimum time
     for (size_t i = 0; i < trial_runs; i++) {
-      auto evt = kernel->Run(ctx, buffers, {}, true);
+      auto evt = executable->Run(ctx, 0, buffers, {}, true);
       device.executor()->Flush();
       auto result = evt->GetFuture().get();
       int64_t time = result->GetDuration().count();
@@ -164,14 +164,8 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
 
   kernel_list_ = CompileProgram(program, *devinfo_.get(), optimizer);
 
-  std::vector<std::unique_ptr<hal::Kernel>> kernels;
   auto lib = devinfo_->dev->compiler()->Build(activity.ctx(), kernel_list_.kernels, devinfo_->settings).get();
-  kernels_.reserve(kernel_list_.kernels.size() + 1);
-  for (std::size_t kidx = 0; kidx < kernel_list_.kernels.size(); ++kidx) {
-    // Prepare the kernel for execution (loading it into the GPU, making it executable, &c).
-    kernels_.emplace_back(devinfo_->dev->executor()->Prepare(lib.get(), kidx).get());
-  }
-
+  executable_ = devinfo_->dev->executor()->Prepare(lib.get()).get();
   schedule_ = scheduler->BuildSchedule(program, kernel_list_);
 
   if (activity.ctx().is_logging_events()) {
@@ -182,8 +176,8 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
     SummarizeSchedule(&cinfo, program, kernel_list_, schedule_);
     *(cinfo.mutable_program()) = std::move(program);
     activity.AddMetadata(cinfo);
-    proto::Schedule sched_pb;
-    ScheduleToProto(&sched_pb, schedule_);
+    schedule::proto::Schedule sched_pb;
+    schedule::ScheduleToProto(&sched_pb, schedule_);
     for (auto kernel : kernel_list_.kernels) {
       sched_pb.add_knames(kernel.kname);
     }
@@ -196,10 +190,6 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
 boost::future<void> Program::Run(const context::Context& ctx,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
-  for (const auto& it : outputs) {
-    VLOG(4) << "Original output " << it.first << " -> Buffer " << it.second.get() << " -> HAL Buffer "
-            << Buffer::Downcast(it.second, devinfo())->chunk()->hal_buffer().get();
-  }
   std::map<std::string, std::shared_ptr<tile::Buffer>> rewrite_outputs;
   for (auto kvp : outputs) {
     rewrite_outputs.emplace(kernel_list_.var_rewrites.Lookup(kvp.first), std::move(kvp.second));

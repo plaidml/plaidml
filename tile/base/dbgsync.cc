@@ -1,3 +1,5 @@
+// Copyright 2017, Vertex.AI.
+
 #include "tile/base/dbgsync.h"
 
 DEFINE_bool(tile_enable_dbgsync, false, "Enable debug operation synchronization");

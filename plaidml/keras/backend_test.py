@@ -308,6 +308,16 @@ class TestBackendOps(unittest.TestCase):
     def testShape(self, b):
         return b.shape(b.variable(m(3, 3, 3, 3, 4)))
 
+    def testClearSession(self):
+        # If this test is run as anything other than the first test, there will
+        # already be a context and device. pkb.clear_session() blows those away;
+        # if a (new) context & device work after that, this test will pass, if
+        # not it will fail (and probably other tests will too).
+        data = m(3, 3)
+        pkb.clear_session()
+        x = pkb.identity(pkb.variable(data))
+        npt.assert_array_equal(x.eval(), data, "x=plaidml, y=input")
+
     @compareForwardExact()
     def testPassthrough(self, b):
         return b.variable(m(3, 3))
@@ -601,6 +611,10 @@ class TestBackendOps(unittest.TestCase):
     def testGreaterEqual(self, b):
         return b.greater_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
+    @opTest([[m(3, 3) - 0.0001]])
+    def testAbs(self, b, x):
+        return [b.abs(x)]
+
     @opTest([[m(3, 3)]])
     def testSquare(self, b, x):
         return [b.square(x)]
@@ -676,7 +690,6 @@ class TestBackendOps(unittest.TestCase):
             b.sparse_categorical_crossentropy(sbest, smax, from_logits=True)
         ]
 
-    @unittest.skip("TODO: Broken in TF until Keras 2.1.2 or later")
     @opTest([[m(3, 3, 2, 10)]], skip_theano=True, tol=0.01)
     def testSparseCategoricalCrossentropyLong(self, b, x):
         smax = b.softmax(x)
@@ -688,7 +701,6 @@ class TestBackendOps(unittest.TestCase):
             b.sparse_categorical_crossentropy(sbest, smax, from_logits=True)
         ]
 
-    @unittest.skip("TODO: Broken in TF until Keras 2.1.2 or later")
     @opTest([[m(3, 3, 2, 1, 10)]], skip_theano=True, tol=0.01)
     def testSparseCategoricalCrossentropyXLong(self, b, x):
         smax = b.softmax(x)
@@ -748,12 +760,11 @@ class TestBackendOps(unittest.TestCase):
 
     @opTest(
         [
-            _conv_inp(IN=1, IC=16, OC=16, IS=[4, 5], KS=[3, 3]),
+            _conv_inp(IN=1, IC=16, OC=16, IS=[6, 5], KS=[3, 3]),
         ], 1e-04, skip_theano=True)
     def testWinograd(self, b, im, km, df):
         return [
-            b.conv2d(im, km, padding='same', force_winograd=True)
-            if b == pkb else b.conv2d(im, km, padding='same'),
+            b.conv2d(im, km, padding='same') if b == pkb else b.conv2d(im, km, padding='same'),
         ]
 
     # Asymmetric stride examples not included for separable convolutions b/c they
@@ -1151,11 +1162,17 @@ class TestBackendOps(unittest.TestCase):
     def testReverse(self, b, x, ax):
         return [b.reverse(x, ax)]
 
-    @opTest([[np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]])], [
-        np.array([[[3., 2., 4.], [1., 0., -1.], [1.4, 2.5, 3.4], [2.4, 3.6, 4.4]],
-                  [[-3., 1.1, 4.1], [3.2, -0.4, -4.], [-1.5, 2.2, 3.99], [2.114, -3.2, -4.]],
-                  [[4.1, -1.2, .1234], [4.2, .943, 9.21], [43.4, 47.1, 22.], [0.0, -3434., -2.4]]])
-    ]])
+    # Test vs. Theano not TF b/c TF seems to be doing something weird (perhaps
+    # returning a pre-sparse-to-dense-conversion version?) with the gradient
+    # and it doesn't match Theano & us.
+    @opTest(
+        [[np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]])], [
+            np.array([[[3., 2., 4.], [1., 0., -1.], [1.4, 2.5, 3.4], [2.4, 3.6, 4.4]], [
+                [-3., 1.1, 4.1], [3.2, -0.4, -4.], [-1.5, 2.2, 3.99], [2.114, -3.2, -4.]
+            ], [[4.1, -1.2, .1234], [4.2, .943, 9.21], [43.4, 47.1, 22.], [0.0, -3434., -2.4]]])
+        ]],
+        skip_theano=False,
+        skip_tensorflow=True)
     def testGather(self, b, v):
         I = b.variable(np.array([0, 2, 1, 0], dtype='int32'), dtype='int32')
         I2 = b.variable(

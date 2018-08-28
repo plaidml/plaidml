@@ -2,12 +2,11 @@
 
 licenses(["by_exception_only"])
 
-load("//bzl:plaidml.bzl", "plaidml_py_library", "plaidml_py_test", "plaidml_py_wheel")
+load("//bzl:conda.bzl", "conda_test")
+load("//bzl:plaidml.bzl", "plaidml_py_library", "plaidml_py_wheel")
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_deb", "pkg_tar")
 
 package(default_visibility = ["//visibility:public"])
-
-exports_files(["requirements.txt"])
 
 plaidml_py_library(
     name = "keras",
@@ -29,13 +28,13 @@ pkg_tar(
     strip_prefix = ".",
 )
 
-plaidml_py_test(
+conda_test(
     name = "backend_test",
     timeout = "long",
     srcs = [
         "backend_test.py",
     ],
-    requirements = "backend_test.txt",
+    env = "@vertexai_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -47,11 +46,12 @@ plaidml_py_test(
     ],
 )
 
-plaidml_py_test(
+conda_test(
     name = "mnist_mlp_test",
     srcs = [
         "mnist_mlp_test.py",
     ],
+    env = "@vertexai_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -62,11 +62,12 @@ plaidml_py_test(
     ],
 )
 
-plaidml_py_test(
+conda_test(
     name = "regression_test",
     srcs = [
         "regression_test.py",
     ],
+    env = "@vertexai_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -77,11 +78,12 @@ plaidml_py_test(
     ],
 )
 
-plaidml_py_test(
+conda_test(
     name = "tile_sandbox",
     srcs = [
         "tile_sandbox.py",
     ],
+    env = "@vertexai_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -92,11 +94,12 @@ plaidml_py_test(
     ],
 )
 
-plaidml_py_test(
+conda_test(
     name = "trivial_model_test",
     srcs = [
         "trivial_model_test.py",
     ],
+    env = "@vertexai_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -107,11 +110,12 @@ plaidml_py_test(
     ],
 )
 
-plaidml_py_test(
+conda_test(
     name = "tutorial_test",
     srcs = [
         "tutorial_test.py",
     ],
+    env = "@vertexai_plaidml_conda//:env",
     tags = [
         "keras",
         "trusty",

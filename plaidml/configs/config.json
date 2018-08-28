@@ -15,13 +15,13 @@
                                 "or": {
                                     "sel": [
                                         {
-                                            "name_regex": "Fiji"
+                                            "name_regex": ".*Fiji.*"
                                         },
                                         {
-                                            "name_regex": "Ellesmere"
+                                            "name_regex": ".*Ellesmere.*"
                                         },
                                         {
-                                            "name_regex": "gfx900"
+                                            "name_regex": ".*gfx900.*"
                                         }
                                     ]
                                 }

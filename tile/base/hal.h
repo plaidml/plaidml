@@ -148,12 +148,12 @@ class Memory {
   virtual std::shared_ptr<Arena> MakeArena(std::uint64_t size, BufferAccessMask access) = 0;
 };
 
-// A Tile kernel that can be run on a processor.
-class Kernel {
+// A Tile executable program that can be run on a processor.
+class Executable {
  public:
-  virtual ~Kernel() noexcept {}
+  virtual ~Executable() noexcept {}
 
-  // Runs a kernel on the device that created it once the supplied dependencies have been resolved.
+  // Runs a kernel within an executable on the device that created it once the supplied dependencies have been resolved.
   // Buffers used as kernel inputs must have been created with DEVICE_READABLE access; buffers used as kernel outputs
   // must have been created with DEVICE_WRITEABLE access.
   //
@@ -161,7 +161,8 @@ class Kernel {
   // Callers MUST ensure that buffers remain referenced for the duration of the kernel's execution, either by attaching
   // a callback to the event returned by this call, or by attaching a callback to the returned event of a subsequent
   // operation whose dependencies include the event returned by this call.
-  virtual std::shared_ptr<Event> Run(const context::Context& ctx, const std::vector<std::shared_ptr<Buffer>>& params,
+  virtual std::shared_ptr<Event> Run(const context::Context& ctx, std::size_t kernel_index,
+                                     const std::vector<std::shared_ptr<Buffer>>& params,
                                      const std::vector<std::shared_ptr<Event>>& dependencies,
                                      bool enable_profiling = false) = 0;
 };
@@ -240,8 +241,8 @@ class Executor {
     return Copy(ctx, from, from_offset, to, to_offset, length, vec);
   }
 
-  // Prepares a kernel to run on the device.
-  virtual boost::future<std::unique_ptr<Kernel>> Prepare(Library* library, std::size_t kernel_index) = 0;
+  // Prepares an image to run on the device, making it executable.
+  virtual boost::future<std::unique_ptr<Executable>> Prepare(Library* library) = 0;
 
   // Returns a future that waits for all of the supplied events to complete, allowing users to obtain the corresponding
   // results.

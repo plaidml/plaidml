@@ -29,7 +29,7 @@ class Executor : public hal::Executor {
                                    std::size_t to_offset, std::size_t length,
                                    const std::vector<std::shared_ptr<hal::Event>>& dependencies) final;
 
-  boost::future<std::unique_ptr<Kernel>> Prepare(Library* library, std::size_t kernel_index) final;
+  boost::future<std::unique_ptr<Executable>> Prepare(Library* library) final;
 
   boost::future<std::vector<std::shared_ptr<hal::Result>>> WaitFor(
       const std::vector<std::shared_ptr<hal::Event>>& events) final;

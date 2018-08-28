@@ -61,7 +61,7 @@ std::map<std::string, Program> InlineDefines = {
 };
 
 std::map<std::string, std::shared_ptr<BoundFunction>> DerivDefines = {
-    {"abs", ddef({"(Y < 0 ? -DY : DY)"})},
+    {"abs", ddef({"(X1 < 0 ? -DY : DY)"})},
     {"add", ddef({"DY", "DY"})},
     {"as_float", ddef({"0", "0"})},
     {"as_int", ddef({"0", "0"})},
@@ -94,6 +94,7 @@ std::map<std::string, std::shared_ptr<BoundFunction>> DerivDefines = {
     {"relu", ddef({"(Y <= 0.0 ? 0.0 : DY)"})},
     {"sigmoid", ddef({"Y*(1.0 - Y)*DY"})},
     {"shape", ddef({"0"})},
+    {"index", ddef({"0", "0"})},
     {"gather", std::make_shared<BoundFunction>(R"***(
       function (X1, X2, Y, DY) -> (DX1, DX2) {
         DX1 = scatter(DY, X2, X1);

@@ -46,6 +46,17 @@ from keras.backend.common import set_floatx as keras_set_floatx
 from keras.backend.common import set_image_data_format
 
 
+def _normalize_data_format_unavailable(*args, **kwargs):
+    raise RuntimeError('Did not find function "normalize_data_format" in Keras common ' +
+                       'backend. Are you running Keras 2.2.1+ code with Keras 2.2.0-?')
+
+
+try:
+    from keras.backend.common import normalize_data_format
+except ImportError:
+    normalize_data_format = _normalize_data_format_unavailable
+
+
 class PlaidMLKerasException(Exception):
     pass
 
@@ -117,10 +128,13 @@ class _Function(object):
         self._name = name
         self._input_names = ['I' + str(n) for n in range(len(inputs))]
         self._output_names = ['O' + str(n) for n in range(len(outputs))]
-        self._func = ptile.compose(_ctx,
-                                   _device(),
-                                   list(zip(self._input_names, inputs)),
-                                   list(zip(self._output_names, outputs)), updates)
+        self._func = ptile.compose(
+            _ctx,
+            _device(),
+            list(zip(self._input_names, inputs)),
+            list(zip(self._output_names, outputs)),
+            updates,
+            name=name)
         self._invoker = plaidml.Invoker(_ctx, self._func)
 
         self._input_types = {}
@@ -276,9 +290,11 @@ def batch_get_value(xs):
     return [get_value(x) for x in xs]
 
 
-def batch_normalization(x, mean, var, beta, gamma, epsilon=1e-3):
+def batch_normalization(x, mean, var, beta, gamma, axis=-1, epsilon=1e-3):
     # gamma == scale
     # beta == offset
+    # The `axis` parameter is only used to tell TF the format of a fused batchnorm,
+    # so we ignore it.
     denom = sqrt(var + epsilon)
     if gamma is not None and beta is not None:
         return ((x - mean) * gamma / denom) + beta
@@ -378,7 +394,12 @@ ceil = op.ceiling
 
 
 def clear_session():
-    _report_unimplemented('clear_session')
+    global _in_train_phase, _ctx, _dev, PLAIDML_EVENTLOG_FILENAME
+    _in_train_phase = None
+    _ctx = plaidml.Context()
+    _dev = None
+    if PLAIDML_EVENTLOG_FILENAME:
+        _ctx.set_eventlog_filename(PLAIDML_EVENTLOG_FILENAME)
 
 
 clip = op.clip
@@ -418,12 +439,15 @@ def conv(x,
 
     if data_format is None:
         data_format = image_data_format()
-
     try:
         data_format = _CONV_DATA_FORMAT[data_format]
     except KeyError:
         six.raise_from(ValueError('Unrecognized data format: {}'.format(data_format)), None)
 
+    if channelwise:
+        grouping = op.ConvolutionGrouping.MAX
+    else:
+        grouping = op.ConvolutionGrouping.NONE
     return op.convolution(
         x,
         kernel,
@@ -431,7 +455,10 @@ def conv(x,
         dilation_rate=dilation_rate,
         strides=strides,
         data_format=data_format,
-        channelwise=channelwise)
+        grouping=grouping,
+        kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
+        group_format=op.GroupedChannelFormat.GroupGroupOut,
+    )
 
 
 def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
@@ -448,95 +475,15 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
     except KeyError:
         six.raise_from(ValueError('Unrecognized data format: {}'.format(data_format)), None)
 
-    return op.convolution_transpose(x, kernel, output_shape, strides, padding, data_format)
-
-
-def _func_once(func):
-    """A decorator that runs a function only once."""
-
-    def decorated(*args, **kwargs):
-        try:
-            return decorated._once_result
-        except AttributeError:
-            decorated._once_result = func(*args, **kwargs)
-            return decorated._once_result
-
-    return decorated
-
-
-@_func_once
-def _compute_transforms(block, conv):
-    # Returns (A, B, G)
-    out = block - conv + 1
-    if (out == 2 and conv == 3):
-        A = constant([[1, 0], [1, 1], [1, -1], [0, -1]])
-        B = constant([[1, 0, 0, 0], [0, 1, -1, 1], [-1, 1, 1, 0], [0, 0, 0, -1]])
-        G = constant([[1, 0, 0], [.5, .5, .5], [.5, -.5, .5], [0, 0, 1]])
-        return (A, B, G)
-    if (out == 4 and conv == 3):
-        #s2 = np.sqrt(2.0)
-        #A = constant([[1., 0., 0., 0.], [1., s2/2., 1./2., s2/4.], [1, -s2/2., 1./2., -s2/4.],
-        #              [1., s2, 2., 2.*s2], [1., -s2, 2., -2.*s2], [0., 0., 0., 1.]])
-        #B = constant([[1., 0., 0., 0., 0., 0.], [0., -s2, s2, -s2/2., s2/2., 1], [-5./2., -2., -2., -1./2., -1./2., 0],
-        #              [0., s2/2., -s2/2., s2, -s2, -5./2], [1., 1., 1., 1., 1., 0.], [0., 0., 0., 0., 0., 1.]])
-        #G = constant([[1., 0., 0.], [-2./3., -s2/3., -1./3.], [-2./3., s2/3., -1./3.],
-        #              [1./6., s2/6., 1./3.], [1./6., -s2/6., 1./3.], [0., 0., 1.]])
-        #return (A, B, G)
-        # yapf: disable
-        A = np.array([
-            [ 1.13777777777778,   0,                  0,                 0,                ],
-            [-0.688403361344538, -0.430252100840336, -0.26890756302521, -0.168067226890756 ],
-            [-0.688403361344538,  0.430252100840336, -0.26890756302521,  0.168067226890756 ],
-            [ 0.119514472455649,  0.179271708683473,  0.26890756302521,  0.403361344537815 ],
-            [ 0.119514472455649, -0.179271708683473,  0.26890756302521, -0.403361344537815 ],
-            [ 0,                  0,                  0,                 1,                ]])
-        B = np.array([
-            [ 0.87890625,  0,          -2.640625,  0,        1, 0 ],
-            [ 0,          -1.40625,    -2.25,      0.625,    1, 0 ],
-            [ 0,           1.40625,    -2.25,     -0.625,    1, 0 ],
-            [ 0,          -0.5859375,  -0.390625,  1.5,      1, 0 ],
-            [ 0,           0.5859375,  -0.390625, -1.5,      1, 0 ],
-            [ 0,           0.87890625,  0,        -2.640625, 0, 1 ]]).T
-        G = np.array([
-            [ 1, 1,         1 ,       1,     1,     0 ],
-            [ 0, 0.625,    -0.625,    1.5,  -1.5,   0 ],
-            [ 0, 0.390625,  0.390625, 2.25,  2.25,  1 ]]).T
-        # yapf: enable
-
-        return (constant(A), constant(B), constant(G))
-
-    raise PlaidMLKerasException('Only support L(2, 3) and L(4, 3) right now')
-
-
-def _winograd(x, kernel, padding='valid', block=6):
-    (A, B, G) = _compute_transforms(block, kernel.shape.dims[0])
-    s = kernel.shape.dims[0]
-    (XO, XP, NXO) = op.pad_compute('X', x.shape.dims[1], s, 1, _AUTO_PAD[padding])
-    (YO, YP, NYO) = op.pad_compute('Y', x.shape.dims[2], s, 1, _AUTO_PAD[padding])
-    outdims = (x.shape.dims[0], NXO, NYO, kernel.shape.dims[3])
-    f = """
-        function (I[N, X, Y, CI], K[S, S, CI, CO], A[BI, BO], B[BI, BI], G[BI, S] ) -> (O) {{
-            Assert = assert_winograd_valid(BI - CI + 1 == BO);
-            XO = {XO};
-            YO = {YO};
-            XB = (XO + BO - 1) / BO;
-            YB = (YO + BO - 1) / BO;
-            XP = {XP};
-            YP = {YP};
-            U1[i, j, ci, co : BI, S, CI, CO] = +(G[i, k] * K[k, j, ci, co]);
-            U[i, j, ci, co : BI, BI, CI, CO] = +(U1[i, k, ci, co] * G[j, k]);
-            V1[n, i, j, x, y, ci : N, BI, BI, XB, YB, CI] = +(B[k, i] * I[n, BO*x + k - XP, BO*y + j - YP, ci]);
-            V[n, i, j, x, y, ci : N, BI, BI, XB, YB, CI] = +(V1[n, i, k, x, y, ci] * B[k, j]);
-            M[n, i, j, x, y, co : N, BI, BI, XB, YB, CO] = +(V[n, i, j, x, y, ci] * U[i, j, ci, co]);
-            O1[n, i, j, x, y, co : N, BO, BI, XB, YB, CO] = +(A[k, i] * M[n, k, j, x, y, co]);
-            O[n, BO*x + i, BO*y + j, co : N, XO, YO, CO] = +(O1[n, i, k, x, y, co] * A[k, j]) no_defract;
-        }}""".format(
-        XO=XO, YO=YO, XP=XP, YP=YP)
-
-    return ptile.Operation(
-        f, [('I', x), ('K', kernel), ('A', A), ('B', B), ('G', G)],
-        [('O', ptile.Shape(x.shape.dtype, outdims))],
-        name='Winograd').sole_output()
+    return op.convolution_transpose(
+        x,
+        kernel,
+        output_shape,
+        strides,
+        padding,
+        data_format,
+        kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
+    )
 
 
 def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rate=1):
@@ -547,20 +494,9 @@ def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rat
     return conv(x, kernel, (strides,), padding, data_format, (dilation_rate,))
 
 
-def conv2d(x,
-           kernel,
-           strides=(1, 1),
-           padding='valid',
-           dilation_rate=(1, 1),
-           data_format=None,
-           force_winograd=False):
+def conv2d(x, kernel, strides=(1, 1), padding='valid', dilation_rate=(1, 1), data_format=None):
     if data_format is None:
         data_format = image_data_format()
-    if (force_winograd or
-        (data_format == 'channels_last' and kernel.shape.dims[0] == 3 and
-         kernel.shape.dims[1] == 3 and strides == (1, 1) and dilation_rate == (1, 1) and
-         kernel.shape.dims[2] > 4 and kernel.shape.dims[3] > 4)):
-        return _winograd(x, kernel, padding=padding)
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
@@ -678,9 +614,6 @@ def eye(size, dtype=None, name=None):
     _report_unimplemented('eye')
 
 
-pow = op.pow
-
-
 class ExpandDims(ptile.Operation):
 
     def __init__(self, x, axis=-1, name=None):
@@ -744,7 +677,7 @@ def get_uid(prefix=''):
 
 
 def get_value(x):
-    func = ptile.compose(_ctx, _device(), [], [('out', x)])
+    func = ptile.compose(_ctx, _device(), [], [('out', x)], name='get_value')
     invoker = plaidml.Invoker(_ctx, func)
     shape = invoker.get_output_shape('out')
     tensor = plaidml.Tensor(_device(), shape)
@@ -816,8 +749,9 @@ def int_shape(x):
 
 
 def is_keras_tensor(x):
-    if not isinstance(x, ptile.Value):
-        return False
+    if not is_tensor(x):
+        raise ValueError('Unexpectedly found an instance of type `' + str(type(x)) + '`. '
+                         'Expected a symbolic tensor instance.')
     return hasattr(x, '_keras_history')
 
 
@@ -829,6 +763,10 @@ def is_placeholder(x):
 
 def is_sparse(x):
     return False
+
+
+def is_tensor(x):
+    return isinstance(x, ptile.Value)
 
 
 def l2_normalize(x, axis):
@@ -1024,9 +962,10 @@ def permute_dimensions(x, pattern):
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     dtype = ptile.convert_np_dtype_to_pml(dtype or floatx())
     if shape is not None:
-        return ptile.Value.from_dimensions(shape, dtype, name=name)
+        return ptile.Value.from_dimensions(
+            shape, dtype, name=_prepend_name_scope(name, 'placeholder'))
     elif ndim is not None:
-        return ptile.Value.from_ndims(ndim, dtype, name=name)
+        return ptile.Value.from_ndims(ndim, dtype, name=_prepend_name_scope(name, 'placeholder'))
     else:
         raise PlaidMLKerasException('Specify either a shape or ndim value for placeholder.')
 
@@ -1179,6 +1118,12 @@ def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, p
         padding=padding,
         data_format=data_format,
         pool_mode=pool_mode)
+
+
+def pow(x, a):
+    if not isinstance(x, ptile.Value):
+        x = variable(x)
+    return op.pow(x, a)
 
 
 def print_tensor(x, message=''):
@@ -1703,10 +1648,6 @@ def update_sub(x, decrement):
     return (x, x - decrement)
 
 
-def uses_correlation():
-    return True
-
-
 def var(x, axis=None, keepdims=False):
     return op.variance(
         x, axes=axis, keepdims=keepdims, floatx=ptile.convert_np_dtype_to_pml(floatx()))
@@ -1728,13 +1669,14 @@ def variable(value, dtype=None, name=None, constraint=None):
                                     _prepend_name_scope(name, 'float_variable' if isinstance(
                                         value, float) else 'int_variable'))
     elif isinstance(value, ptile.Value):
-        func = ptile.compose(_ctx, _device(), [], [('out', value)])
+        func = ptile.compose(_ctx, _device(), [], [('out', value)], name='variable')
         invoker = plaidml.Invoker(_ctx, func)
         shape = invoker.get_output_shape('out')
         tensor = plaidml.Tensor(_device(), shape)
         invoker.set_output('out', tensor)
         invoker.invoke()
-        return ptile.Value.from_var(tensor, [d.size for d in shape.dimensions], shape.dtype, name)
+        return ptile.Value.from_var(tensor, [d.size for d in shape.dimensions], shape.dtype,
+                                    _prepend_name_scope(name, 'variable'))
     elif isinstance(value, list) or isinstance(value, tuple):
         value = np.array(value)
         # Fallthrough
