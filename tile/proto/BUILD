@@ -1,29 +1,30 @@
 # Copyright 2017, Vertex.AI.
 
-load("//bzl:plaidml.bzl", "plaidml_proto_library", "plaidml_cc_library")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_proto_library")
 
 plaidml_proto_library(
     name = "proto",
-    srcs = [
-        "tile.proto",
-    ],
+    srcs = ["tile.proto"],
+    visibility = ["//visibility:public"],
+    deps = [":shape"],
+)
+
+plaidml_proto_library(
+    name = "shape",
+    srcs = ["shape.proto"],
     visibility = ["//visibility:public"],
 )
 
 plaidml_proto_library(
     name = "metadata",
-    srcs = [
-        "metadata.proto",
-    ],
+    srcs = ["metadata.proto"],
     visibility = ["//visibility:public"],
-    deps = [":proto"],
+    deps = [":shape"],
 )
 
 plaidml_proto_library(
     name = "hal",
-    srcs = [
-        "hal.proto",
-    ],
+    srcs = ["hal.proto"],
     visibility = ["//visibility:public"],
     deps = [
         ":proto",
@@ -33,14 +34,19 @@ plaidml_proto_library(
 
 plaidml_proto_library(
     name = "schedule",
-    srcs = [
-        "schedule.proto",
-    ],
+    srcs = ["schedule.proto"],
     visibility = ["//visibility:public"],
     deps = [
         ":proto",
         "//tile/lang:proto",
     ],
+)
+
+plaidml_proto_library(
+    name = "stripe",
+    srcs = ["stripe.proto"],
+    visibility = ["//visibility:public"],
+    deps = [":shape"],
 )
 
 plaidml_cc_library(

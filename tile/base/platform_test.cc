@@ -33,7 +33,7 @@ std::unique_ptr<Program> PlatformTest::MakeProgram(tile::proto::TileScanningPara
   if (params) {
     *pb_program.mutable_tile_scanning_params() = *params;
   }
-  proto::TensorShape pb_shape = proto::to_proto(shape);
+  auto pb_shape = shape::proto::to_proto(shape);
   *(*pb_program.mutable_inputs())["A"].mutable_shape() = pb_shape;
   *(*pb_program.mutable_inputs())["B"].mutable_shape() = pb_shape;
   *(*pb_program.mutable_outputs())["C"].mutable_shape() = pb_shape;

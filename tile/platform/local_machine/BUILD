@@ -16,8 +16,6 @@ plaidml_cc_library(
     srcs = [
         "buffer.cc",
         "buffer.h",
-        "copy_mem_strategy.cc",
-        "copy_mem_strategy.h",
         "devinfo.h",
         "direct_mem_strategy.cc",
         "direct_mem_strategy.h",
