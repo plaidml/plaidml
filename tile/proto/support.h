@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <map>
 #include <string>
 #include <utility>
 
@@ -11,6 +12,7 @@
 
 namespace vertexai {
 namespace tile {
+namespace shape {
 namespace proto {
 
 inline lang::DataType to_poco(const TensorShape_DataType& dt) {
@@ -126,20 +128,6 @@ inline TensorShape to_proto(const lang::TensorShape& shape) {
   return ret;
 }
 
-inline lang::ShapeMap to_poco(const google::protobuf::Map<std::string, ProgramInput> m) {
-  std::map<std::string, lang::TensorShape> ret;
-  std::for_each(m.cbegin(), m.cend(),
-                [&ret](const std::pair<std::string, ProgramInput>& p) { ret[p.first] = to_poco(p.second.shape()); });
-  return ret;
-};
-
-inline lang::ShapeMap to_poco(const google::protobuf::Map<std::string, ProgramOutput> m) {
-  std::map<std::string, lang::TensorShape> ret;
-  std::for_each(m.cbegin(), m.cend(),
-                [&ret](const std::pair<std::string, ProgramOutput>& p) { ret[p.first] = to_poco(p.second.shape()); });
-  return ret;
-};
-
 inline const bool cmp(const TensorShape::Dimension& a, const TensorShape::Dimension& b) {
   return (a.stride() * a.size()) < (b.stride() * b.size());
 }
@@ -152,13 +140,28 @@ inline int size_in_bytes(const TensorShape& shape) {
   return d.size() * d.stride() * size_in_bytes(shape.type());
 }
 
-inline int size_in_bytes(const ProgramInput& input) {
-  return size_in_bytes(input.shape());
+}  // namespace proto
+}  // namespace shape
+
+namespace proto {
+
+inline lang::ShapeMap to_poco(const google::protobuf::Map<std::string, ProgramInput> m) {
+  std::map<std::string, lang::TensorShape> ret;
+  std::for_each(m.cbegin(), m.cend(),
+                [&ret](const std::pair<std::string, ProgramInput>& p) { ret[p.first] = to_poco(p.second.shape()); });
+  return ret;
 }
 
-inline int size_in_bytes(const ProgramOutput& output) {
-  return size_in_bytes(output.shape());
+inline lang::ShapeMap to_poco(const google::protobuf::Map<std::string, ProgramOutput> m) {
+  std::map<std::string, lang::TensorShape> ret;
+  std::for_each(m.cbegin(), m.cend(),
+                [&ret](const std::pair<std::string, ProgramOutput>& p) { ret[p.first] = to_poco(p.second.shape()); });
+  return ret;
 }
+
+inline int size_in_bytes(const ProgramInput& input) { return size_in_bytes(input.shape()); }
+
+inline int size_in_bytes(const ProgramOutput& output) { return size_in_bytes(output.shape()); }
 
 }  // namespace proto
 }  // namespace tile

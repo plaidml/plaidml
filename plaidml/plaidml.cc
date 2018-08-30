@@ -58,14 +58,14 @@ namespace status_strings = vertexai::status_strings;
 namespace tile = vertexai::tile;
 
 using tile::lang::BoundFunction;
-using tile::lang::FunctionApplication;
-using tile::lang::IConstValue;
 using tile::lang::FConstValue;
+using tile::lang::FunctionApplication;
+using tile::lang::Gradient;
+using tile::lang::IConstValue;
 using tile::lang::PlaceholderValue;
 using tile::lang::RunInfo;
 using tile::lang::TensorValue;
 using tile::lang::Value;
-using tile::lang::Gradient;
 
 struct plaidml_devconf {
   std::shared_ptr<tile::Platform> platform;
@@ -803,7 +803,7 @@ static void write_tensor(zipFile f, const std::string& name, const TensorValue& 
     throw std::runtime_error("Could not write file into zip file");
   }
   std::string shape_buf;
-  tile::proto::to_proto(tensor.shape()).SerializeToString(&shape_buf);
+  tile::shape::proto::to_proto(tensor.shape()).SerializeToString(&shape_buf);
   uint64_t shape_sz = shape_buf.size();
   zipWriteInFileInZip(f, &shape_sz, sizeof(shape_sz));
   zipWriteInFileInZip(f, &shape_buf[0], shape_sz);
@@ -836,9 +836,9 @@ static std::shared_ptr<TensorValue> ReadTensor(vai_ctx* ctx, vertexai::UnZipArch
   std::string proto_buf(shape_size, '\0');
   tensor_file.ReadInto(&proto_buf[0], proto_buf.size());
 
-  tile::proto::TensorShape ts_proto;
+  tile::shape::proto::TensorShape ts_proto;
   ts_proto.ParseFromString(proto_buf);
-  tile::lang::TensorShape ts = tile::proto::to_poco(ts_proto);
+  tile::lang::TensorShape ts = tile::shape::proto::to_poco(ts_proto);
   std::shared_ptr<BufferState> bs = std::make_shared<BufferState>(
       evaluator->get_platform()->MakeBuffer(ctx->activity.ctx(), evaluator->get_id(), ts.byte_size()), evaluator);
   plaidml_buffer tb{std::move(activity), bs};
@@ -1433,13 +1433,13 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     prog.set_code(invoker->runinfo->code);
     for (const auto& kv : invoker->runinfo->input_shapes) {
       auto& input = (*prog.mutable_inputs())[kv.first];
-      *input.mutable_shape() = tile::proto::to_proto(kv.second);
+      *input.mutable_shape() = tile::shape::proto::to_proto(kv.second);
       if (output_set.count(in_buffers[kv.first].get())) {
         input.set_consumed(true);
       }
     }
     for (const auto& kv : invoker->runinfo->output_shapes) {
-      *(*prog.mutable_outputs())[kv.first].mutable_shape() = tile::proto::to_proto(kv.second);
+      *(*prog.mutable_outputs())[kv.first].mutable_shape() = tile::shape::proto::to_proto(kv.second);
     }
 
     size_t max_trials = 1;

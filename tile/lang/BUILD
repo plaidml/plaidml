@@ -1,10 +1,14 @@
-load("//bzl:plaidml.bzl", "plaidml_grammar", "plaidml_cc_library", "plaidml_cc_test", "plaidml_proto_library")
+load(
+    "//bzl:plaidml.bzl",
+    "plaidml_cc_library",
+    "plaidml_cc_test",
+    "plaidml_grammar",
+    "plaidml_proto_library",
+)
 
 plaidml_proto_library(
     name = "proto",
-    srcs = [
-        "lang.proto",
-    ],
+    srcs = ["lang.proto"],
     visibility = ["//visibility:public"],
 )
 
@@ -31,6 +35,8 @@ plaidml_cc_library(
         "gen_contract.h",
         "gen_special.cc",
         "gen_special.h",
+        "gen_stripe.cc",
+        "gen_stripe.h",
         "gen_trivial.cc",
         "gen_trivial.h",
         "generate.cc",
@@ -53,6 +59,7 @@ plaidml_cc_library(
         "semprinter.cc",
         "semtree.cc",
         "simplifier.cc",
+        "stripe.cc",
         "sym_poly.cc",
         "sym_poly.h",
         "symbolic.cc",
@@ -72,11 +79,13 @@ plaidml_cc_library(
         "generate.h",
         "ops.h",
         "parser.h",
+        "primitives.h",
         "sembuilder.h",
         "semprinter.h",
         "semtree.h",
         "shape.h",
         "simplifier.h",
+        "stripe.h",
         "symbolic.h",
         "type.h",
     ],
@@ -97,6 +106,7 @@ plaidml_cc_library(
         ":proto_cc",
         "//base/util",
         "//tile/lang/bilp",
+        "//tile/proto:stripe_cc",
         "@boost_archive//:boost",
     ],
 )

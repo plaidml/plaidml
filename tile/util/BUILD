@@ -12,6 +12,8 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
+        "//tile/lang",
         "//tile/proto:metadata_cc",
+        "//tile/proto:support",
     ],
 )

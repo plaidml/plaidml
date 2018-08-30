@@ -8,11 +8,16 @@ def _conda_repo_impl(repository_ctx):
         spec_path = repository_ctx.path(Label(value))
         prefix_path = repository_ctx.path(key)
         args = [
-            'python', wrapper, 'env', 'create',
-            '-f', spec_path,
-            '-p', prefix_path
+            "python",
+            wrapper,
+            "env",
+            "create",
+            "-f",
+            spec_path,
+            "-p",
+            prefix_path,
         ]
-        result = repository_ctx.execute(args, quiet=False)
+        result = repository_ctx.execute(args, quiet = False)
         if result.return_code:
             fail("conda_repo failed: %s (%s)" % (result.stdout, result.stderr))
 
