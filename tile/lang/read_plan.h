@@ -20,7 +20,9 @@ class ReadPlan {
   // The original indexes, before merging occurs
   struct OrigIndex {
     OrigIndex(const std::string& _name, int64_t _stride, uint64_t _range)
-        : name(_name), stride(_stride), range(_range) {}
+        : name(_name),  //
+          stride(_stride),
+          range(_range) {}
     std::string name;         // The name of the index (ie 'i')
     int64_t stride;           // The index's stride in global memory
     uint64_t range;           // The tile-range of the index (ie, size of tile)
@@ -29,7 +31,10 @@ class ReadPlan {
   };
   // The merged indexes
   struct MergedIndex {
-    explicit MergedIndex(const OrigIndex& orig) : name(orig.name), stride(std::abs(orig.stride)), range(orig.range) {}
+    explicit MergedIndex(const OrigIndex& orig)
+        : name(orig.name),  //
+          stride(std::abs(orig.stride)),
+          range(orig.range) {}
     std::string name;           // The name of the merged index (ie, 'i_j')
     int64_t stride;             // The stride of the merged index in global memory
     uint64_t range;             // The tile-range of the merged indedx
@@ -39,8 +44,10 @@ class ReadPlan {
 
  public:
   // Analyse IO for a set of indexes, strides, and tile-size, as well as cache/phy memory width (in elements)
-  ReadPlan(const std::vector<std::string>& names, const std::vector<int64_t>& strides,
-           const std::vector<uint64_t>& ranges, uint64_t mem_width);
+  ReadPlan(const std::vector<std::string>& names,  //
+           const std::vector<int64_t>& strides,    //
+           const std::vector<uint64_t>& ranges,    //
+           uint64_t mem_width);
   // Return the number of cache lines hit
   uint64_t numLoads() const;
   // Return number of logical elements for this tile size, considering merged indexes
@@ -50,7 +57,10 @@ class ReadPlan {
   // Compute the global load expression
   sem::ExprPtr globalOffset() const;
   // New version of transfer code generation
-  sem::StmtPtr generate(const std::string& to, const std::string& from, uint64_t threads, uint64_t limit,
+  sem::StmtPtr generate(const std::string& to,    //
+                        const std::string& from,  //
+                        uint64_t threads,         //
+                        uint64_t limit,           //
                         uint64_t offset) const;
 
  private:

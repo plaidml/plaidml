@@ -2,61 +2,20 @@ syntax = "proto3";
 
 package vertexai.tile.proto;
 
+import "tile/proto/shape.proto";
+
 option java_package = "ai.vertex.tile";
 option java_outer_classname = "TensorProtos";
 
-// Encapsulates a tensor of arbitrary dimensionality and data type
-message TensorShape {
-  // The format of the data in the tensor, integers must be LE, floats IEEE
-  enum DataType {
-    UNKNOWN_TYPE = 0;
-    BOOLEAN = 2;
-    INT8 = 16;
-    INT16 = 17;
-    INT32 = 18;
-    INT64 = 19;
-    UINT8 = 32;
-    UINT16 = 33;
-    UINT32 = 34;
-    UINT64 = 35;
-    FLOAT16 = 49;
-    FLOAT32 = 50;
-    FLOAT64 = 51;
-  }
-
-  message Dimension {
-    // The number of elements in a given dimension, inclusive of padding
-    uint64 size = 1;
-
-    // The stride for this dimension, inclusive of all suboridnal dimension, in
-    // elements.
-    int64 stride = 2;
-  }
-
-  DataType type = 1;
-  bool big_endian = 4;
-
-  // Specifications of the dimensions, starting with the outermost dimension.
-  // (ordinal 0 is the outermost, ordinal N-1 is the innermost)
-  // Memory must be layed in the order of the specified dimension, e.g.,
-  // given an INT16 rank 2 tensor with size (13,6) and stride (16,8), the
-  // first 26 bytes will contain the first dimension along ordinal 0 of the
-  // second dimension, the next 6 bytes will be padding, then ordinal 1, etc.
-  //
-  // A tensor with no dimensions (i.e, rank 0) is valid and is considered a
-  // scalar.
-  repeated Dimension dimensions = 3;
-}
-
 // Information about a program input.
 message ProgramInput {
-  TensorShape shape = 1;
+  shape.proto.TensorShape shape = 1;
   bool consumed = 2;  // If true, input tensor state may be discarded.
 }
 
 // Information about a program output.
 message ProgramOutput {
-  TensorShape shape = 1;
+  shape.proto.TensorShape shape = 1;
 }
 
 // A device capable of performing tensor operations.

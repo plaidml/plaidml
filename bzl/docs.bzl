@@ -5,11 +5,11 @@ def _impl(ctx):
         inputs = ctx.files.srcs,
         outputs = [out],
         executable = ctx.file.sphinx,
-        arguments = [srcdir, out.path, '--plantuml', ctx.file._plantuml.path],
+        arguments = [srcdir, out.path, "--plantuml", ctx.file._plantuml.path],
         use_default_shell_env = True,
         mnemonic = "SphinxBuild",
     )
-    return DefaultInfo(files=depset([out]))
+    return DefaultInfo(files = depset([out]))
 
 sphinx = rule(
     attrs = {
