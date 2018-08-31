@@ -1,7 +1,7 @@
 #include "tile/lang/gen_stripe.h"
 
 #include "tile/lang/compile.h"
-#include "tile/lang/primitives.h"
+#include "tile/lang/intrinsics.h"
 
 namespace vertexai {
 namespace tile {
@@ -22,42 +22,83 @@ class StripeGenerator {
   {}
 
   stripe::proto::Block Run(const std::string& name) {
-    program_.set_name(name);
     LOG(INFO) << "Compiling " << parsed_.ops.size() << " ops";
-    AddDecls(inputs_);
-    AddDecls(outputs_);
+    // The top level block represents a program.
+    // A single inner block of the program respresents the entry point to the program.
+    // Declarations made on the program relate to user supplied inputs and outputs.
+    // Declarations made on main relate to temporaries needed for communication between kernels.
+    // The list of kernels to execute are the list of blocks defined within main.
+    stripe::proto::Block program;
+    program.set_name(name);
+    auto stmt = program.add_stmts();
+    auto main = stmt->mutable_block();
+    main->set_name("main");
+    // Add decls for external inputs/outputs
+    AddDecls(&program, main, inputs_, true);
+    AddDecls(&program, main, outputs_, false);
+    // Add decls for temporaries
+    for (const auto& item : vars_) {
+      if (externals_.count(item.first) == 0) {
+        const auto& binding = item.second;
+        if (binding.tag == Binding::TENSOR) {
+          AddDecl(main, item.first, binding.shape);
+        }
+      }
+    }
+    // Add kernels to main
     for (size_t i = 0; i < parsed_.ops.size(); i++) {
       const Op& op = parsed_.ops[i];
       switch (op.tag) {
         case Op::CONTRACTION:
-          ProcessContraction(op);
+          ProcessContraction(main, op);
           break;
         case Op::FUNCTION:
-          ProcessElementwise(op);
+          if (op.f.is_special()) {
+            ProcessSpecial(main, op);
+          } else {
+            ProcessElementwise(main, op);
+          }
           break;
         case Op::CONSTANT:
           break;
       }
     }
-    return program_;
+    return program;
   }
 
  private:
-  void AddDecls(const ShapeMap& shapes) {
+  void AddDecls(stripe::proto::Block* program, stripe::proto::Block* main, const ShapeMap& shapes, bool is_input) {
     for (const auto& item : shapes) {
-      auto decl = program_.add_decls();
-      decl->set_name(item.first);
-      auto shape = decl->mutable_shape();
-      shape->set_type(static_cast<shape::proto::TensorShape::DataType>(item.second.type));
-      for (const auto& src : item.second.dims) {
-        auto dst = shape->add_dimensions();
-        dst->set_size(src.size);
-        dst->set_stride(src.stride);
+      externals_.insert(item.first);
+      AddDecl(program, item.first, item.second);
+      if (is_input) {
+        auto input = main->add_ref_ins();
+        input->set_name(item.first);
+        auto access = input->mutable_access();
+        access->set_offset(0);
+      } else {
+        auto output = main->add_ref_outs();
+        output->set_name(item.first);
+        output->set_agg_op(intrinsic::ASSIGN);
+        auto access = output->mutable_access();
+        access->set_offset(0);
       }
     }
   }
 
-  void ProcessContraction(const Op& op) {
+  void AddDecl(stripe::proto::Block* parent, const std::string& name, const TensorShape& shape) {
+    auto decl = parent->add_decls();
+    decl->set_name(name);
+    auto pb_shape = decl->mutable_shape();
+    pb_shape->set_type(static_cast<shape::proto::TensorShape::DataType>(shape.type));
+    for (const auto& src : shape.dims) {
+      auto dst = pb_shape->add_dimensions();
+      dst->set_size(src.size);
+      dst->set_stride(src.stride);
+    }
+  }
+
+  void ProcessContraction(stripe::proto::Block* parent, const Op& op) {
     IVLOG(3, "Compiling contraction: " << op << ", vars = " << vars_);
     if (vars_.at(op.output).shape.byte_size() == 0) {
       IVLOG(3, "Contraction output " << op.output << " size==0; skipping");
@@ -67,7 +108,21 @@ class StripeGenerator {
     FlatContraction flat = Compile(op.c, MakeTShapes(op.c), &out_poly);
     flat.output = op.output;
 
-    auto kernel = AddKernel();
+    if (NeedsZero(flat)) {
+      Op special_op;
+      special_op.tag = Op::FUNCTION;
+      special_op.output = op.output;
+      if (op.c.use_default.empty()) {
+        special_op.f.fn = intrinsic::ZERO;
+        special_op.inputs.push_back(op.output);
+      } else {
+        special_op.f.fn = intrinsic::COPY;
+        special_op.inputs.push_back(op.c.use_default);
+      }
+      ProcessSpecial(parent, special_op);
+    }
+
+    auto kernel = AddKernel(parent);
     kernel->set_comments(flat.comments);
     for (const auto& name : flat.names) {
       kernel->add_index_names(name);
@@ -81,14 +136,6 @@ class StripeGenerator {
         out->add_lhs(lhs);
       }
       out->set_rhs(constraint.rhs);
-    }
-
-    if (NeedsZero(flat)) {
-      if (op.c.use_default.empty()) {
-        AddPrimitive(kernel, primitive::ZERO, {op.output}, {op.output});
-      } else {
-        AddPrimitive(kernel, primitive::COPY, {op.c.use_default}, {op.output});
-      }
     }
 
     std::vector<std::string> scalar_inputs;
@@ -111,16 +158,16 @@ class StripeGenerator {
       case CombinationOp::NONE:
         break;
       case CombinationOp::MULTIPLY:
-        AddPrimitive(kernel, primitive::MUL, scalar_inputs, {ScalarName(flat.output)});
+        AddIntrinsic(kernel, intrinsic::MUL, scalar_inputs, {ScalarName(flat.output)});
         break;
       case CombinationOp::PLUS:
-        AddPrimitive(kernel, primitive::ADD, scalar_inputs, {ScalarName(flat.output)});
+        AddIntrinsic(kernel, intrinsic::ADD, scalar_inputs, {ScalarName(flat.output)});
         break;
       case CombinationOp::EQ:
-        AddPrimitive(kernel, primitive::EQ, scalar_inputs, {ScalarName(flat.output)});
+        AddIntrinsic(kernel, intrinsic::EQ, scalar_inputs, {ScalarName(flat.output)});
         break;
       case CombinationOp::COND:
-        AddPrimitive(kernel, primitive::COND, scalar_inputs, {ScalarName(flat.output)});
+        AddIntrinsic(kernel, intrinsic::COND, scalar_inputs, {ScalarName(flat.output)});
         break;
     }
 
@@ -128,19 +175,19 @@ class StripeGenerator {
     output->set_name(flat.output);
     switch (flat.agg_op) {
       case AggregationOp::SUM:
-        output->set_agg_op(primitive::SUM);
+        output->set_agg_op(intrinsic::SUM);
         break;
       case AggregationOp::MAX:
-        output->set_agg_op(primitive::MAX);
+        output->set_agg_op(intrinsic::MAX);
         break;
       case AggregationOp::MIN:
-        output->set_agg_op(primitive::MIN);
+        output->set_agg_op(intrinsic::MIN);
         break;
       case AggregationOp::PROD:
-        output->set_agg_op(primitive::PROD);
+        output->set_agg_op(intrinsic::PROD);
         break;
       case AggregationOp::ASSIGN:
-        output->set_agg_op(primitive::ASSIGN);
+        output->set_agg_op(intrinsic::ASSIGN);
         break;
       case AggregationOp::NONE:
         break;
@@ -153,8 +200,8 @@ class StripeGenerator {
     stmt->set_into(flat.output);
   }
 
-  void ProcessElementwise(const Op& op) {
-    auto kernel = AddKernel();
+  void ProcessElementwise(stripe::proto::Block* parent, const Op& op) {
+    auto kernel = AddKernel(parent);
     // kernel->set_comments(src.comments);
 
     const TensorShape& out_shape = vars_.at(op.output).shape;
@@ -189,8 +236,8 @@ class StripeGenerator {
       stmt_load->set_into(ScalarName(input));
     }
 
-    // PRIMITIVE
-    auto stmt_core = kernel->add_stmts()->mutable_primitive();
+    // INTRINSIC
+    auto stmt_core = kernel->add_stmts()->mutable_intrinsic();
     stmt_core->set_name(op.f.fn);
     for (const auto& input : op.inputs) {
       stmt_core->add_inputs(ScalarName(input));
@@ -203,9 +250,50 @@ class StripeGenerator {
     stmt_store->set_into(op.output);
   }
 
-  stripe::proto::Block* AddKernel(const char* prefix = "") {
-    auto name = printstring("%skernel_%zu", prefix, program_.stmts_size());
-    auto stmt = program_.add_stmts();
+  void ProcessSpecial(stripe::proto::Block* parent, const Op& op) {
+    auto kernel = AddKernel(parent);
+    // kernel->set_comments(src.comments);
+
+    const TensorShape& out_shape = vars_.at(op.output).shape;
+    for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
+      kernel->add_index_names(printstring("i%zu", i + 1));
+      kernel->add_index_ranges(out_shape.dims[i].size);
+    }
+
+    for (const auto& input : op.inputs) {
+      const TensorShape& shape = vars_.at(input).shape;
+      auto ref_in = kernel->add_ref_ins();
+      ref_in->set_name(input);
+      auto access = ref_in->mutable_access();
+      access->set_offset(0);
+      for (const auto& dim : shape.dims) {
+        access->add_strides(dim.stride);
+      }
+    }
+
+    auto ref_out = kernel->add_ref_outs();
+    ref_out->set_name(op.output);
+    auto access = ref_out->mutable_access();
+    access->set_offset(0);
+    for (const auto& dim : out_shape.dims) {
+      access->add_strides(dim.stride);
+    }
+
+    // SPECIAL
+    auto stmt = kernel->add_stmts()->mutable_special();
+    stmt->set_name(op.f.fn);
+    for (const auto& input : op.inputs) {
+      stmt->add_inputs(input);
+    }
+    for (const auto& param : op.f.params) {
+      stmt->add_params(param);
+    }
+    stmt->add_outputs(op.output);
+  }
+
+  stripe::proto::Block* AddKernel(stripe::proto::Block* parent, const char* prefix = "") {
+    auto name = printstring("%skernel_%zu", prefix, parent->stmts_size());
+    auto stmt = parent->add_stmts();
     auto block = stmt->mutable_block();
     block->set_name(name);
     return block;
@@ -268,11 +356,29 @@ class StripeGenerator {
     }
   }
 
-  void AddPrimitive(stripe::proto::Block* block,             //
+  void AddSpecial(stripe::proto::Block* block,              //
+                  const std::string& name,                  //
+                  const std::vector<std::string>& inputs,   //
+                  const std::vector<std::string>& outputs,  //
+                  const std::vector<std::string>& params) {
+    auto stmt = block->add_stmts()->mutable_special();
+    stmt->set_name(name);
+    for (const auto& param : params) {
+      stmt->add_params(param);
+    }
+    for (const auto& input : inputs) {
+      stmt->add_inputs(input);
+    }
+    for (const auto& output : outputs) {
+      stmt->add_outputs(output);
+    }
+  }
+
+  void AddIntrinsic(stripe::proto::Block* block,             //
                     const std::string& name,                 //
                     const std::vector<std::string>& inputs,  //
                     const std::vector<std::string>& outputs) {
-    auto stmt = block->add_stmts()->mutable_primitive();
+    auto stmt = block->add_stmts()->mutable_intrinsic();
     stmt->set_name(name);
     for (const auto& input : inputs) {
       stmt->add_inputs(input);
@@ -285,11 +391,11 @@ class StripeGenerator {
   inline std::string ScalarName(const std::string& name) { return printstring("$%s", name.c_str()); }
 
  private:
-  stripe::proto::Block program_;
   Program parsed_;
   Bindings vars_;
   ShapeMap inputs_;
   ShapeMap outputs_;
+  std::set<std::string> externals_;
 };
 
 }  // namespace
