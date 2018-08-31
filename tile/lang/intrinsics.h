@@ -3,8 +3,7 @@
 namespace vertexai {
 namespace tile {
 namespace lang {
-
-namespace primitive {
+namespace intrinsic {
 
 const char* ZERO = "zero";
 const char* COPY = "copy";
@@ -20,7 +19,7 @@ const char* MIN = "min";
 const char* PROD = "prod";
 const char* ASSIGN = "assign";
 
-}  // namespace primitive
+}  // namespace intrinsic
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

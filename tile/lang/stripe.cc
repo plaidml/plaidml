@@ -2,6 +2,9 @@
 
 #include <sstream>
 
+typedef google::protobuf::RepeatedField<::google::protobuf::int64> RepeatedInt64;
+typedef google::protobuf::RepeatedPtrField<::std::string> RepeatedString;
+
 namespace vertexai {
 namespace tile {
 namespace lang {
@@ -77,19 +80,6 @@ std::ostream& operator<<(std::ostream& os, const stripe::proto::Declaration& dec
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::RefineIn& ref) {
-  os << ref.name() << ref.access();
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const stripe::proto::RefineOut& ref) {
-  os << ref.name() << ref.access();
-  if (!ref.agg_op().empty()) {
-    os << ":" << ref.agg_op();
-  }
-  return os;
-}
-
 std::ostream& operator<<(std::ostream& os, const stripe::proto::Constraint& constraint) {  //
   return os;
 }
@@ -104,9 +94,13 @@ void Print(std::ostream& os, const stripe::proto::Statement& stmt, size_t depth)
       PrintTab(os, depth);
       os << stmt.store() << std::endl;
       break;
-    case stripe::proto::Statement::kPrimitive:
+    case stripe::proto::Statement::kIntrinsic:
       PrintTab(os, depth);
-      os << stmt.primitive() << std::endl;
+      os << stmt.intrinsic() << std::endl;
+      break;
+    case stripe::proto::Statement::kSpecial:
+      PrintTab(os, depth);
+      os << stmt.special() << std::endl;
       break;
     case stripe::proto::Statement::kConstant:
       PrintTab(os, depth);
@@ -130,7 +124,31 @@ std::ostream& operator<<(std::ostream& os, const stripe::proto::Store& op) {
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Primitive& op) {
+std::ostream& operator<<(std::ostream& os, const stripe::proto::Intrinsic& op) {
+  if (op.outputs_size() > 1) {
+    os << "(";
+  }
+  for (size_t i = 0; i < op.outputs_size(); i++) {
+    if (i > 0) {
+      os << ", ";
+    }
+    os << op.outputs(i);
+  }
+  if (op.outputs_size() > 1) {
+    os << ")";
+  }
+  os << " = " << op.name() << "(";
+  for (size_t i = 0; i < op.inputs_size(); i++) {
+    if (i > 0) {
+      os << ", ";
+    }
+    os << op.inputs(i);
+  }
+  os << ")";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const stripe::proto::Special& op) {
   if (op.outputs_size() > 1) {
     os << "(";
   }
@@ -169,38 +187,91 @@ std::ostream& operator<<(std::ostream& os, const stripe::proto::Constant& op) {
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::BufferAccess& access) {
-  if (access.offset()) {
-    os << ":" << access.offset();
+void Print(std::ostream& os, const RepeatedInt64& strides, const RepeatedString& index_names, bool first = true) {
+  for (size_t i = 0; i < strides.size(); i++) {
+    const auto& stride = strides[i];
+    if (stride) {
+      if (stride < 1) {
+        if (first) {
+          os << "-";
+        } else {
+          os << " - ";
+        }
+      } else if (!first) {
+        os << " + ";
+      }
+      if (std::abs(stride) != 1) {
+        os << std::abs(stride) << "*";
+      }
+      if (i < index_names.size()) {
+        os << index_names[i];
+      } else {
+        os << "#" << i;
+      }
+      first = false;
+    }
+  }
+}
+
+void Print(std::ostream& os, const stripe::proto::BufferAccess& access, const stripe::proto::Block& block) {
+  if (access.offset() == 0 && access.strides_size() == 0) {
+    return;
   }
   os << "[";
-  for (size_t j = 0; j < access.strides_size(); j++) {
-    const auto& stride = access.strides(j);
-    if (j > 0) {
-      os << ", ";
-    }
-    os << stride;
+  bool first = true;
+  if (access.offset()) {
+    os << access.offset();
+    first = false;
   }
+  Print(os, access.strides(), block.index_names(), first);
   os << "]";
-  return os;
+}
+
+void Print(std::ostream& os, const stripe::proto::Constraint& constraint, const stripe::proto::Block& block) {
+  Print(os, constraint.lhs(), block.index_names());
+  os << " < " << constraint.rhs();
 }
 
 void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth) {
   PrintTab(os, depth);
-  os << "def " << block.name() << "[";
+  os << "block [";
   for (size_t i = 0; i < block.index_names_size(); i++) {
     if (i > 0) {
       os << ", ";
     }
     os << block.index_names(i) << ":" << block.index_ranges(i);
   }
-  os << "] (";
+  os << "]";
+  if (!block.name().empty()) {
+    os << " // " << block.name();
+  }
+  os << std::endl;
+
+  if (!block.comments().empty()) {
+    std::stringstream ss(block.comments());
+    for (size_t i = 0; i < 2; i++) {
+      std::string line;
+      std::getline(ss, line, '\n');
+      if (i > 0) {
+        PrintTab(os, depth + 2);
+        os << "// " << line << std::endl;
+      }
+    }
+  }
+  for (const auto& constraint : block.constraints()) {
+    PrintTab(os, depth + 2);
+    Print(os, constraint, block);
+    os << std::endl;
+  }
+  PrintTab(os, depth + 2);
+  os << "(";
   for (size_t i = 0; i < block.ref_ins_size(); i++) {
     const auto& input = block.ref_ins(i);
     if (i > 0) {
       os << ", ";
     }
-    os << input;
+    os << input.name();
+    Print(os, input.access(), block);
   }
   os << ") -> (";
   for (size_t i = 0; i < block.ref_outs_size(); i++) {
@@ -208,20 +279,13 @@ void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth) {
     if (i > 0) {
       os << ", ";
     }
-    os << output;
-  }
-  os << "):" << std::endl;
-  if (!block.comments().empty()) {
-    std::stringstream ss(block.comments());
-    for (size_t i = 0; i < 2; i++) {
-      std::string line;
-      std::getline(ss, line, '\n');
-      if (i > 0) {
-        PrintTab(os, depth + 1);
-        os << "// " << line << std::endl;
-      }
+    os << output.name();
+    Print(os, output.access(), block);
+    if (!output.agg_op().empty()) {
+      os << ":" << output.agg_op();
     }
   }
+  os << ") {" << std::endl;
   for (const auto& decl : block.decls()) {
     PrintTab(os, depth + 1);
     os << decl << std::endl;
@@ -229,8 +293,8 @@ void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth) {
   for (const auto& stmt : block.stmts()) {
     Print(os, stmt, depth + 1);
   }
-  // PrintTab(os, depth);
-  // os << "}" << std::endl;
+  PrintTab(os, depth);
+  os << "}" << std::endl;
 }
 
 }  // namespace lang
