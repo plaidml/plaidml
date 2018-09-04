@@ -1,3 +1,5 @@
+// Copyright 2018, Intel Corp.
+
 #pragma once
 
 namespace vertexai {
@@ -5,19 +7,19 @@ namespace tile {
 namespace lang {
 namespace intrinsic {
 
-const char* ZERO = "zero";
-const char* COPY = "copy";
+extern const char* ZERO;
+extern const char* COPY;
 
-const char* MUL = "mul";
-const char* ADD = "add";
-const char* EQ = "eq";
-const char* COND = "cond";
+extern const char* MUL;
+extern const char* ADD;
+extern const char* EQ;
+extern const char* COND;
 
-const char* SUM = "sum";
-const char* MAX = "max";
-const char* MIN = "min";
-const char* PROD = "prod";
-const char* ASSIGN = "assign";
+extern const char* SUM;
+extern const char* MAX;
+extern const char* MIN;
+extern const char* PROD;
+extern const char* ASSIGN;
 
 }  // namespace intrinsic
 }  // namespace lang

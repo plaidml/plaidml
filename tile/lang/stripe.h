@@ -17,7 +17,7 @@ std::ostream& operator<<(std::ostream& os, const stripe::proto::Constraint& cons
 void Print(std::ostream& os, const stripe::proto::BufferAccess& access, const stripe::proto::Block& block);
 void Print(std::ostream& os, const stripe::proto::Constraint& constraint, const stripe::proto::Block& block);
 void Print(std::ostream& os, const stripe::proto::Statement& stmt, size_t depth);
-void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth);
+void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth = 0);
 
 }  // namespace lang
 }  // namespace tile
