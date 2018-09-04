@@ -39,7 +39,7 @@ class VirtualMachine {
  private:
   void Loop(const stripe::proto::Block& block,                  //
             const std::map<std::string, std::string>& agg_ops,  //
-            size_t idx) {
+            int idx) {
     for (size_t i = 0; i < block.index_ranges(idx); i++) {
       LOG(INFO) << "Index Bump: " << block.index_names(idx) << " = " << i;
       idxs_[idx] = i;
