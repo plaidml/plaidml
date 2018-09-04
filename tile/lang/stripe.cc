@@ -80,10 +80,6 @@ std::ostream& operator<<(std::ostream& os, const stripe::proto::Declaration& dec
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Constraint& constraint) {  //
-  return os;
-}
-
 void Print(std::ostream& os, const stripe::proto::Statement& stmt, size_t depth) {
   switch (stmt.op_case()) {
     case stripe::proto::Statement::kLoad:

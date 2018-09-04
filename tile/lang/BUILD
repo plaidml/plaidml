@@ -42,6 +42,7 @@ plaidml_cc_library(
         "generate.cc",
         "gid.cc",
         "gid.h",
+        "intrinsics.cc",
         "loop.cc",
         "loop.h",
         "mutil.h",
