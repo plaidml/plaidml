@@ -9,13 +9,18 @@ import "tile/proto/shape.proto";
 message Block {
   string name = 1;
   string comments = 2;
-  repeated string index_names = 3;
-  repeated uint64 index_ranges = 4;
-  repeated Constraint constraints = 5;
-  repeated Declaration decls = 6;
-  repeated RefineIn ref_ins = 7;
-  repeated RefineOut ref_outs = 8;
-  repeated Statement stmts = 9;
+  repeated Index idxs = 3;
+  repeated Constraint constraints = 4;
+  repeated Declaration decls = 5;
+  repeated RefineIn ref_ins = 6;
+  repeated RefineOut ref_outs = 7;
+  repeated Statement stmts = 8;
+}
+
+message Index {
+  string name = 1;
+  uint64 range = 2;
+  int64 factor = 3;
 }
 
 message Declaration {
@@ -64,6 +69,20 @@ message Intrinsic {
   string name = 1;
   repeated string inputs = 2;
   repeated string outputs = 3;
+
+  enum Value {
+    ZERO = 0;
+    COPY = 1;
+    MUL = 2;
+    ADD = 3;
+    EQ = 4;
+    COND = 5;
+    SUM = 6;
+    MAX = 7;
+    MIN = 8;
+    PROD = 9;
+    ASSIGN = 10;
+  }
 }
 
 message Special {

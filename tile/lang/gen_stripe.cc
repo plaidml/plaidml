@@ -1,11 +1,12 @@
 #include "tile/lang/gen_stripe.h"
 
 #include "tile/lang/compile.h"
-#include "tile/lang/intrinsics.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+using stripe::proto::Intrinsic;
 
 namespace {
 
@@ -79,7 +80,7 @@ class StripeGenerator {
       } else {
         auto output = main->add_ref_outs();
         output->set_name(item.first);
-        output->set_agg_op(intrinsic::ASSIGN);
+        output->set_agg_op(Intrinsic::Value_Name(Intrinsic::ASSIGN));
         auto access = output->mutable_access();
         access->set_offset(0);
       }
@@ -113,10 +114,10 @@ class StripeGenerator {
       special_op.tag = Op::FUNCTION;
       special_op.output = op.output;
       if (op.c.use_default.empty()) {
-        special_op.f.fn = intrinsic::ZERO;
+        special_op.f.fn = Intrinsic::Value_Name(Intrinsic::ZERO);
         special_op.inputs.push_back(op.output);
       } else {
-        special_op.f.fn = intrinsic::COPY;
+        special_op.f.fn = Intrinsic::Value_Name(Intrinsic::COPY);
         special_op.inputs.push_back(op.c.use_default);
       }
       ProcessSpecial(parent, special_op);
@@ -124,11 +125,11 @@ class StripeGenerator {
 
     auto kernel = AddKernel(parent);
     kernel->set_comments(flat.comments);
-    for (const auto& name : flat.names) {
-      kernel->add_index_names(name);
-    }
-    for (const auto& range : flat.ranges) {
-      kernel->add_index_ranges(range);
+    for (int i = 0; i < flat.names.size(); i++) {
+      auto idx = kernel->add_idxs();
+      idx->set_name(flat.names[i]);
+      idx->set_range(flat.ranges[i]);
+      idx->set_factor(0);
     }
     for (const auto& constraint : flat.constraints) {
       auto out = kernel->add_constraints();
@@ -158,16 +159,16 @@ class StripeGenerator {
       case CombinationOp::NONE:
         break;
       case CombinationOp::MULTIPLY:
-        AddIntrinsic(kernel, intrinsic::MUL, scalar_inputs, {ScalarName(flat.output)});
+        AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::MUL), scalar_inputs, {ScalarName(flat.output)});
         break;
       case CombinationOp::PLUS:
-        AddIntrinsic(kernel, intrinsic::ADD, scalar_inputs, {ScalarName(flat.output)});
+        AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::ADD), scalar_inputs, {ScalarName(flat.output)});
         break;
       case CombinationOp::EQ:
-        AddIntrinsic(kernel, intrinsic::EQ, scalar_inputs, {ScalarName(flat.output)});
+        AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::EQ), scalar_inputs, {ScalarName(flat.output)});
         break;
       case CombinationOp::COND:
-        AddIntrinsic(kernel, intrinsic::COND, scalar_inputs, {ScalarName(flat.output)});
+        AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::COND), scalar_inputs, {ScalarName(flat.output)});
         break;
     }
 
@@ -175,19 +176,19 @@ class StripeGenerator {
     output->set_name(flat.output);
     switch (flat.agg_op) {
       case AggregationOp::SUM:
-        output->set_agg_op(intrinsic::SUM);
+        output->set_agg_op(Intrinsic::Value_Name(Intrinsic::SUM));
         break;
       case AggregationOp::MAX:
-        output->set_agg_op(intrinsic::MAX);
+        output->set_agg_op(Intrinsic::Value_Name(Intrinsic::MAX));
         break;
       case AggregationOp::MIN:
-        output->set_agg_op(intrinsic::MIN);
+        output->set_agg_op(Intrinsic::Value_Name(Intrinsic::MIN));
         break;
       case AggregationOp::PROD:
-        output->set_agg_op(intrinsic::PROD);
+        output->set_agg_op(Intrinsic::Value_Name(Intrinsic::PROD));
         break;
       case AggregationOp::ASSIGN:
-        output->set_agg_op(intrinsic::ASSIGN);
+        output->set_agg_op(Intrinsic::Value_Name(Intrinsic::ASSIGN));
         break;
       case AggregationOp::NONE:
         break;
@@ -206,8 +207,10 @@ class StripeGenerator {
 
     const TensorShape& out_shape = vars_.at(op.output).shape;
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
-      kernel->add_index_names(printstring("i%zu", i + 1));
-      kernel->add_index_ranges(out_shape.dims[i].size);
+      auto idx = kernel->add_idxs();
+      idx->set_name(printstring("i%zu", i + 1));
+      idx->set_range(out_shape.dims[i].size);
+      idx->set_factor(0);
     }
 
     for (const auto& input : op.inputs) {
@@ -256,8 +259,10 @@ class StripeGenerator {
 
     const TensorShape& out_shape = vars_.at(op.output).shape;
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
-      kernel->add_index_names(printstring("i%zu", i + 1));
-      kernel->add_index_ranges(out_shape.dims[i].size);
+      auto idx = kernel->add_idxs();
+      idx->set_name(printstring("i%zu", i + 1));
+      idx->set_range(out_shape.dims[i].size);
+      idx->set_factor(0);
     }
 
     for (const auto& input : op.inputs) {

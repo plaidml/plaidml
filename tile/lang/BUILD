@@ -77,7 +77,6 @@ plaidml_cc_library(
         "compose.h",
         "emitc.h",
         "generate.h",
-        "intrinsics.h",
         "ops.h",
         "parser.h",
         "sembuilder.h",
