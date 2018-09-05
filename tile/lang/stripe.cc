@@ -2,12 +2,15 @@
 
 #include <sstream>
 
-typedef google::protobuf::RepeatedField<::google::protobuf::int64> RepeatedInt64;
-typedef google::protobuf::RepeatedPtrField<::std::string> RepeatedString;
+#include "base/util/printstring.h"
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace stripe {
+namespace proto {
+
+typedef google::protobuf::RepeatedField<google::protobuf::int64> RepeatedInt64;
+typedef google::protobuf::RepeatedPtrField<Index> RepeatedIndex;
 
 void PrintTab(std::ostream& os, size_t depth) {  //
   os << std::string(depth * 2, ' ');
@@ -58,12 +61,12 @@ std::ostream& operator<<(std::ostream& os, const shape::proto::TensorShape::Data
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const shape::proto::TensorShape::Dimension& dim) {  //
+std::ostream& operator<<(std::ostream& os, const shape::proto::TensorShape::Dimension& dim) {
   os << dim.size() << ":" << dim.stride();
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const shape::proto::TensorShape& shape) {  //
+std::ostream& operator<<(std::ostream& os, const shape::proto::TensorShape& shape) {
   os << shape.type() << "[";
   for (size_t i = 0; i < shape.dimensions_size(); i++) {
     if (i > 0) {
@@ -75,52 +78,52 @@ std::ostream& operator<<(std::ostream& os, const shape::proto::TensorShape& shap
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Declaration& decl) {
+std::ostream& operator<<(std::ostream& os, const Declaration& decl) {
   os << "var " << decl.name() << " : " << decl.shape();
   return os;
 }
 
-void Print(std::ostream& os, const stripe::proto::Statement& stmt, size_t depth) {
+void PrintStatement(std::ostream& os, const Statement& stmt, size_t depth) {
   switch (stmt.op_case()) {
-    case stripe::proto::Statement::kLoad:
+    case Statement::kLoad:
       PrintTab(os, depth);
       os << stmt.load() << std::endl;
       break;
-    case stripe::proto::Statement::kStore:
+    case Statement::kStore:
       PrintTab(os, depth);
       os << stmt.store() << std::endl;
       break;
-    case stripe::proto::Statement::kIntrinsic:
+    case Statement::kIntrinsic:
       PrintTab(os, depth);
       os << stmt.intrinsic() << std::endl;
       break;
-    case stripe::proto::Statement::kSpecial:
+    case Statement::kSpecial:
       PrintTab(os, depth);
       os << stmt.special() << std::endl;
       break;
-    case stripe::proto::Statement::kConstant:
+    case Statement::kConstant:
       PrintTab(os, depth);
       os << stmt.constant() << std::endl;
       break;
-    case stripe::proto::Statement::kBlock:
-      Print(os, stmt.block(), depth);
+    case Statement::kBlock:
+      PrintBlock(os, stmt.block(), depth);
       break;
     default:
       break;
   }
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Load& op) {
+std::ostream& operator<<(std::ostream& os, const Load& op) {
   os << op.into() << " = load(" << op.from() << ")";
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Store& op) {
+std::ostream& operator<<(std::ostream& os, const Store& op) {
   os << op.into() << " = store(" << op.from() << ")";
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Intrinsic& op) {
+std::ostream& operator<<(std::ostream& os, const Intrinsic& op) {
   if (op.outputs_size() > 1) {
     os << "(";
   }
@@ -144,7 +147,7 @@ std::ostream& operator<<(std::ostream& os, const stripe::proto::Intrinsic& op) {
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Special& op) {
+std::ostream& operator<<(std::ostream& os, const Special& op) {
   if (op.outputs_size() > 1) {
     os << "(";
   }
@@ -168,13 +171,13 @@ std::ostream& operator<<(std::ostream& os, const stripe::proto::Special& op) {
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Constant& op) {
+std::ostream& operator<<(std::ostream& os, const Constant& op) {
   os << op.name() << " = ";
   switch (op.value_case()) {
-    case stripe::proto::Constant::kIconst:
+    case Constant::kIconst:
       os << op.iconst();
       break;
-    case stripe::proto::Constant::kFconst:
+    case Constant::kFconst:
       os << op.fconst();
       break;
     default:
@@ -183,33 +186,38 @@ std::ostream& operator<<(std::ostream& os, const stripe::proto::Constant& op) {
   return os;
 }
 
-void Print(std::ostream& os, const RepeatedInt64& strides, const RepeatedString& index_names, bool first = true) {
+void PrintStride(std::ostream& os, int64_t stride, const std::string& name, bool first) {
+  if (stride < 1) {
+    if (first) {
+      os << "-";
+    } else {
+      os << " - ";
+    }
+  } else if (!first) {
+    os << " + ";
+  }
+  if (std::abs(stride) != 1) {
+    os << std::abs(stride) << "*";
+  }
+  os << name;
+}
+
+void PrintStrides(std::ostream& os, const RepeatedInt64& strides, const RepeatedIndex& idxs, bool global, bool first) {
   for (size_t i = 0; i < strides.size(); i++) {
+    const auto& idx = idxs[i];
     const auto& stride = strides[i];
     if (stride) {
-      if (stride < 1) {
-        if (first) {
-          os << "-";
-        } else {
-          os << " - ";
-        }
-      } else if (!first) {
-        os << " + ";
+      if (global && idx.factor()) {
+        PrintStride(os, idx.factor(), printstring("o.%s", idx.name().c_str()), first);
+        first = false;
       }
-      if (std::abs(stride) != 1) {
-        os << std::abs(stride) << "*";
-      }
-      if (i < index_names.size()) {
-        os << index_names[i];
-      } else {
-        os << "#" << i;
-      }
+      PrintStride(os, stride, idx.name(), first);
       first = false;
     }
   }
 }
 
-void Print(std::ostream& os, const stripe::proto::BufferAccess& access, const stripe::proto::Block& block) {
+void PrintAccess(std::ostream& os, const BufferAccess& access, const Block& block) {
   if (access.offset() == 0 && access.strides_size() == 0) {
     return;
   }
@@ -219,23 +227,23 @@ void Print(std::ostream& os, const stripe::proto::BufferAccess& access, const st
     os << access.offset();
     first = false;
   }
-  Print(os, access.strides(), block.index_names(), first);
+  PrintStrides(os, access.strides(), block.idxs(), false, first);
   os << "]";
 }
 
-void Print(std::ostream& os, const stripe::proto::Constraint& constraint, const stripe::proto::Block& block) {
-  Print(os, constraint.lhs(), block.index_names());
+void PrintConstraint(std::ostream& os, const Constraint& constraint, const Block& block) {
+  PrintStrides(os, constraint.lhs(), block.idxs(), true, true);
   os << " < " << constraint.rhs();
 }
 
-void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth) {
+void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
   PrintTab(os, depth);
   os << "block [";
-  for (size_t i = 0; i < block.index_names_size(); i++) {
+  for (size_t i = 0; i < block.idxs_size(); i++) {
     if (i > 0) {
       os << ", ";
     }
-    os << block.index_names(i) << ":" << block.index_ranges(i);
+    os << block.idxs(i).name() << ":" << block.idxs(i).range();
   }
   os << "]";
   if (!block.name().empty()) {
@@ -256,7 +264,7 @@ void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth) {
   }
   for (const auto& constraint : block.constraints()) {
     PrintTab(os, depth + 2);
-    Print(os, constraint, block);
+    PrintConstraint(os, constraint, block);
     os << std::endl;
   }
   PrintTab(os, depth + 2);
@@ -267,7 +275,7 @@ void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth) {
       os << ", ";
     }
     os << input.name();
-    Print(os, input.access(), block);
+    PrintAccess(os, input.access(), block);
   }
   os << ") -> (";
   for (size_t i = 0; i < block.ref_outs_size(); i++) {
@@ -276,7 +284,7 @@ void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth) {
       os << ", ";
     }
     os << output.name();
-    Print(os, output.access(), block);
+    PrintAccess(os, output.access(), block);
     if (!output.agg_op().empty()) {
       os << ":" << output.agg_op();
     }
@@ -287,12 +295,18 @@ void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth) {
     os << decl << std::endl;
   }
   for (const auto& stmt : block.stmts()) {
-    Print(os, stmt, depth + 1);
+    PrintStatement(os, stmt, depth + 1);
   }
   PrintTab(os, depth);
   os << "}" << std::endl;
 }
 
-}  // namespace lang
+std::ostream& operator<<(std::ostream& os, const Block& block) {
+  PrintBlock(os, block, 0);
+  return os;
+}
+
+}  // namespace proto
+}  // namespace stripe
 }  // namespace tile
 }  // namespace vertexai

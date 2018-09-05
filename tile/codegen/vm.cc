@@ -3,7 +3,6 @@
 #include "tile/codegen/vm.h"
 
 #include "base/util/logging.h"
-#include "tile/lang/intrinsics.h"
 #include "tile/lang/stripe.h"
 
 namespace vertexai {
@@ -11,11 +10,13 @@ namespace tile {
 namespace codegen {
 namespace {
 
+using stripe::proto::Intrinsic;
+
 class VirtualMachine {
  public:
   void ExecuteBlock(const stripe::proto::Block& block, const std::map<std::string, float*>& buffers) {
     std::map<std::string, std::string> agg_ops;
-    for (int i = 0; i < block.index_ranges_size(); i++) {
+    for (int i = 0; i < block.idxs_size(); i++) {
       idxs_.push_back(0);
     }
     for (const auto& ref : block.ref_ins()) {
@@ -40,10 +41,10 @@ class VirtualMachine {
   void Loop(const stripe::proto::Block& block,                  //
             const std::map<std::string, std::string>& agg_ops,  //
             int idx) {
-    for (size_t i = 0; i < block.index_ranges(idx); i++) {
-      LOG(INFO) << "Index Bump: " << block.index_names(idx) << " = " << i;
+    for (size_t i = 0; i < block.idxs(idx).range(); i++) {
+      LOG(INFO) << "Index Bump: " << block.idxs(idx).name() << " = " << i;
       idxs_[idx] = i;
-      if (idx < block.index_ranges_size() - 1) {
+      if (idx < block.idxs_size() - 1) {
         Loop(block, agg_ops, idx + 1);
       } else {
         ComputeOffsets(block);
@@ -70,7 +71,7 @@ class VirtualMachine {
       if (i > 0) {
         std::cout << " + ";
       }
-      std::cout << access.strides(i) << " * " << block.index_names(i) << "(" << idxs_[i] << ")";
+      std::cout << access.strides(i) << " * " << block.idxs(i).name() << "(" << idxs_[i] << ")";
       offset += access.strides(i) * idxs_[i];
     }
     std::cout << " = " << offset << std::endl;
@@ -88,7 +89,7 @@ class VirtualMachine {
         case stripe::proto::Statement::kStore: {
           const auto& op = stmt.store();
           auto it = agg_ops.find(op.into());
-          if (it->second == lang::intrinsic::SUM) {
+          if (it->second == Intrinsic::Value_Name(Intrinsic::SUM)) {
             ptrs_[op.into()][offsets_[op.into()]] += vars_[op.from()];
           } else {
             ptrs_[op.into()][offsets_[op.into()]] = vars_[op.from()];
@@ -96,7 +97,7 @@ class VirtualMachine {
         } break;
         case stripe::proto::Statement::kIntrinsic: {
           const auto& op = stmt.intrinsic();
-          if (op.name() == lang::intrinsic::MUL) {
+          if (op.name() == Intrinsic::Value_Name(Intrinsic::MUL)) {
             vars_[op.outputs(0)] = vars_[op.inputs(0)] * vars_[op.inputs(1)];
           }
         } break;
