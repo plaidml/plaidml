@@ -6,7 +6,6 @@
 #include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
-#include "tile/lang/intrinsics.h"
 #include "tile/lang/stripe.h"
 
 namespace vertexai {
@@ -73,21 +72,29 @@ TEST(Codegen, Basic) {
       {"C", data["C"].data()},
   };
 
-  // ExecuteProgram(program, buffers);
+  std::cout << "Before>" << std::endl << program << std::endl;
 
-  // std::cout << "A: " << data["A"] << std::endl;
-  // std::cout << "B: " << data["B"] << std::endl;
-  // std::cout << "C: " << data["C"] << std::endl;
+  ExecuteProgram(program, buffers);
 
-  std::cout << "Before>" << std::endl;
-  lang::Print(std::cout, program);
+  std::cout << "A: " << data["A"] << std::endl;
+  std::cout << "B: " << data["B"] << std::endl;
+  std::cout << "C: " << data["C"] << std::endl;
 
   auto main = program.mutable_stmts(0)->mutable_block();
   auto kernel = main->mutable_stmts(0)->mutable_block();
   ApplyTile(kernel, {5, 2, 2});
 
-  std::cout << "After>" << std::endl;
-  lang::Print(std::cout, program);
+  for (size_t i = 0; i < data["C"].size(); i++) {
+    data["C"][i] = 0;
+  }
+
+  std::cout << "After>" << std::endl << program << std::endl;
+
+  ExecuteProgram(program, buffers);
+
+  std::cout << "A: " << data["A"] << std::endl;
+  std::cout << "B: " << data["B"] << std::endl;
+  std::cout << "C: " << data["C"] << std::endl;
 
   // for (int m = 0; m < M; m++) {
   //   for (int n = 0; n < N; n++) {
