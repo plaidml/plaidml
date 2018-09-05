@@ -4,21 +4,23 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace stripe {
+namespace proto {
 
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Declaration& decl);
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Load& op);
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Store& op);
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Special& op);
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Intrinsic& op);
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Constant& op);
-std::ostream& operator<<(std::ostream& os, const stripe::proto::Constraint& constraint);
+std::ostream& operator<<(std::ostream& os, const Declaration& decl);
+std::ostream& operator<<(std::ostream& os, const Load& op);
+std::ostream& operator<<(std::ostream& os, const Store& op);
+std::ostream& operator<<(std::ostream& os, const Special& op);
+std::ostream& operator<<(std::ostream& os, const Intrinsic& op);
+std::ostream& operator<<(std::ostream& os, const Constant& op);
+std::ostream& operator<<(std::ostream& os, const Block& block);
 
-void Print(std::ostream& os, const stripe::proto::BufferAccess& access, const stripe::proto::Block& block);
-void Print(std::ostream& os, const stripe::proto::Constraint& constraint, const stripe::proto::Block& block);
-void Print(std::ostream& os, const stripe::proto::Statement& stmt, size_t depth);
-void Print(std::ostream& os, const stripe::proto::Block& block, size_t depth);
+void PrintAccess(std::ostream& os, const BufferAccess& access, const Block& block);
+void PrintConstraint(std::ostream& os, const Constraint& constraint, const Block& block);
+void PrintStatement(std::ostream& os, const Statement& stmt, size_t depth);
+void PrintBlock(std::ostream& os, const Block& block, size_t depth = 0);
 
-}  // namespace lang
+}  // namespace proto
+}  // namespace stripe
 }  // namespace tile
 }  // namespace vertexai
