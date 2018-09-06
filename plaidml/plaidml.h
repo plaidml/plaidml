@@ -370,10 +370,10 @@ PLAIDML_API plaidml_function* plaidml_build_coded_function(const char* code, con
 // TODO: Make more general method to serialize things.
 
 // Load a function (possibly with bound tensors) from a file
-PLAIDML_API plaidml_function* plaidml_load_function(vai_ctx* ctx, plaidml_device* dev, const char* file);
+PLAIDML_API plaidml_function* plaidml_load_function(vai_ctx* ctx, plaidml_device* dev, const char* filename);
 
 // Store a function (possibly with bound tensors) from to a file
-PLAIDML_API bool plaidml_save_function(plaidml_function* func, const char* file);
+PLAIDML_API bool plaidml_save_function(plaidml_function* func, const char* filename);
 
 // Predeclare applier
 // A PlaidML applier describes the application of a PlaidML function to some
@@ -509,6 +509,19 @@ PLAIDML_API plaidml_shape* plaidml_alloc_invoker_output_shape(plaidml_invoker* i
 // needed.
 PLAIDML_API bool plaidml_set_invoker_output(plaidml_invoker* invoker, const char* name, plaidml_var* var);
 
+// PlaidML Stripe file formats.
+typedef enum {
+  PLAIDML_FILE_FORMAT_TILE = 1,
+  PLAIDML_FILE_FORMAT_STRIPE_HUMAN = 2,
+  PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT = 3,
+  PLAIDML_FILE_FORMAT_STRIPE_BINARY = 4,
+  PLAIDML_FILE_FORMAT_STRIPE_JSON = 5,
+} plaidml_file_format;
+
+// Serializes an invoker to a file.  All inputs to the invoker must
+// already be set to concrete values that are consistent in size.
+PLAIDML_API bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filename, plaidml_file_format format);
+
 // A PlaidML invocation describes one particular run of a function.
 #ifdef __cplusplus
 struct plaidml_invocation;
@@ -567,64 +580,64 @@ PLAIDML_API plaidml_var* plaidml_compute_grad_wrt(plaidml_gradient* grad, plaidm
 namespace std {
 
 template <>
-struct default_delete< ::plaidml_device> {
+struct default_delete<::plaidml_device> {
   void operator()(::plaidml_device* device) const noexcept { ::plaidml_close_device(device); }
 };
 
 template <>
-struct default_delete< ::plaidml_device_enumerator> {
+struct default_delete<::plaidml_device_enumerator> {
   void operator()(::plaidml_device_enumerator* enumerator) const noexcept {
     ::plaidml_free_device_enumerator(enumerator);
   }
 };
 
 template <>
-struct default_delete< ::plaidml_buffer> {
+struct default_delete<::plaidml_buffer> {
   void operator()(::plaidml_buffer* buffer) const noexcept { ::plaidml_free_buffer(buffer); }
 };
 
 template <>
-struct default_delete< ::plaidml_mapping> {
+struct default_delete<::plaidml_mapping> {
   void operator()(::plaidml_mapping* mapping) const noexcept { ::plaidml_free_mapping(mapping); }
 };
 
 template <>
-struct default_delete< ::plaidml_shape> {
+struct default_delete<::plaidml_shape> {
   void operator()(::plaidml_shape* shape) const noexcept { ::plaidml_free_shape(shape); }
 };
 
 template <>
-struct default_delete< ::plaidml_function> {
+struct default_delete<::plaidml_function> {
   void operator()(::plaidml_function* function) const noexcept { ::plaidml_free_function(function); }
 };
 
 template <>
-struct default_delete< ::plaidml_var> {
+struct default_delete<::plaidml_var> {
   void operator()(::plaidml_var* var) const noexcept { ::plaidml_free_var(var); }
 };
 
 template <>
-struct default_delete< ::plaidml_composer> {
+struct default_delete<::plaidml_composer> {
   void operator()(::plaidml_composer* composer) const noexcept { ::plaidml_free_composer(composer); }
 };
 
 template <>
-struct default_delete< ::plaidml_applier> {
+struct default_delete<::plaidml_applier> {
   void operator()(::plaidml_applier* applier) const noexcept { ::plaidml_free_applier(applier); }
 };
 
 template <>
-struct default_delete< ::plaidml_invoker> {
+struct default_delete<::plaidml_invoker> {
   void operator()(::plaidml_invoker* invoker) const noexcept { ::plaidml_free_invoker(invoker); }
 };
 
 template <>
-struct default_delete< ::plaidml_invocation> {
+struct default_delete<::plaidml_invocation> {
   void operator()(::plaidml_invocation* invocation) const noexcept { ::plaidml_free_invocation(invocation); }
 };
 
 template <>
-struct default_delete< ::plaidml_gradient> {
+struct default_delete<::plaidml_gradient> {
   void operator()(::plaidml_gradient* gradient) const noexcept { ::plaidml_free_gradient(gradient); }
 };
 
