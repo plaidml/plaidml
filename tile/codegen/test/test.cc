@@ -1,12 +1,14 @@
 // Copyright 2018, Intel Corp.
 
-#include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lang/stripe.h"
+
+using ::testing::Eq;
 
 namespace vertexai {
 namespace tile {
@@ -66,23 +68,29 @@ TEST(Codegen, Basic) {
        }},
   };
 
-  std::map<std::string, float*> buffers = {
-      {"A", data["A"].data()},  //
-      {"B", data["B"].data()},
-      {"C", data["C"].data()},
+  std::vector<float> expected = {
+      15, 30, 45,  15, 30,  //
+      30, 60, 90,  30, 60,  //
+      39, 78, 117, 39, 78,  //
+      9,  18, 27,  9,  18,  //
+      9,  18, 27,  9,  18,  //
   };
 
   std::cout << "Before>" << std::endl << program << std::endl;
 
-  ExecuteProgram(program, buffers);
+  ExecuteProgram(program, &data);
 
   std::cout << "A: " << data["A"] << std::endl;
   std::cout << "B: " << data["B"] << std::endl;
   std::cout << "C: " << data["C"] << std::endl;
+  EXPECT_THAT(data["C"], Eq(expected));
 
   auto main = program.mutable_stmts(0)->mutable_block();
   auto kernel = main->mutable_stmts(0)->mutable_block();
-  ApplyTile(kernel, {5, 2, 2});
+  ApplyTile(kernel, {5, 4, 4});
+  auto inner = kernel->mutable_stmts(0)->mutable_block();
+  std::cout << "Inner>" << std::endl << *inner << std::endl;
+  ApplyTile(inner, {5, 2, 2});
 
   for (size_t i = 0; i < data["C"].size(); i++) {
     data["C"][i] = 0;
@@ -90,21 +98,12 @@ TEST(Codegen, Basic) {
 
   std::cout << "After>" << std::endl << program << std::endl;
 
-  ExecuteProgram(program, buffers);
+  ExecuteProgram(program, &data);
 
   std::cout << "A: " << data["A"] << std::endl;
   std::cout << "B: " << data["B"] << std::endl;
   std::cout << "C: " << data["C"] << std::endl;
-
-  // for (int m = 0; m < M; m++) {
-  //   for (int n = 0; n < N; n++) {
-  //     float acc = 0.0f;
-  //     for (int k = 0; k < K; k++) {
-  //       acc += A[k * M + m] * B[n * K + k];
-  //     }
-  //     C[n * M + m] = acc;
-  //   }
-  // }
+  EXPECT_THAT(data["C"], Eq(expected));
 
   // Stencils:
   // k=16, x=16, c=?
@@ -119,55 +118,6 @@ TEST(Codegen, Basic) {
   // x:  4  C: !0  A:  0  B: !0
   // y:  4  C: !0  A:  0  B: !0
   // c: ??  C:  0  A:  1  B:  1
-
-  // Transformation:
-  // original
-  // --------
-  // block [] // $matmul
-  //     () -> () {
-  //   var A : FLOAT32[100:100, 100:1]
-  //   var B : FLOAT32[100:100, 100:1]
-  //   var C : FLOAT32[100:100, 100:1]
-  //   block [] // main
-  //       (A, B) -> (C:assign) {
-  //     block [k:100, m:100, n:100] // kernel_0
-  //         // C[m, n : M, N] = +(A[m, k] * B[k, n])
-  //         (A[k + 100*m], B[100*k + n]) -> (C[100*m + n]:sum) {
-  //       $A = load(A)
-  //       $B = load(B)
-  //       $C = mul($A, $B)
-  //       C = store($C)
-  //     }
-  //   }
-  // }
-  // strides:
-  // A -> k(c):   1  m(x):  100  n(k):  0
-  // B -> k(c): 100  m(x):    0  n(k):  1
-  // C -> k(c):   0  m(x):  100  n(k):  1
-  // result
-  // ------
-  // block [] // $matmul
-  //     () -> () {
-  //   var A : FLOAT32[100:100, 100:1]
-  //   var B : FLOAT32[100:100, 100:1]
-  //   var C : FLOAT32[100:100, 100:1]
-  //   block [] // main
-  //       (A, B) -> (C:assign) {
-  //     block [m_o:7, n_o:7] // kernel_0
-  //         // C[m, n : M, N] = +(A[m, k] * B[k, n])
-  //         (A[1600*m_o], B[16*n_o]) -> (C[1600*m_o + 16*n_o]:sum) {
-  //       block [k: 100, m_i: 16, n_i: 16]  // VPU2 NCE DPU
-  //           16*m_o + m_i < 100
-  //           16*n_o + n_i < 100
-  //           (A[k_i + 16*m_i], B[k_i + n_i]) -> (C[16*m_i + n_i]) {
-  //         $A = load(A)
-  //         $B = load(B)
-  //         $C = mul($A, $B)
-  //         C = store($C)
-  //       }
-  //     }
-  //   }
-  // }
 }
 
 }  // namespace test
