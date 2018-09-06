@@ -11,7 +11,7 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ExecuteProgram(const stripe::proto::Block& program, const std::map<std::string, float*>& buffers);
+void ExecuteProgram(const stripe::proto::Block& program, std::map<std::string, std::vector<float>>* buffers);
 
 }  // namespace codegen
 }  // namespace tile

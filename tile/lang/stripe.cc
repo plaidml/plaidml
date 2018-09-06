@@ -202,15 +202,11 @@ void PrintStride(std::ostream& os, int64_t stride, const std::string& name, bool
   os << name;
 }
 
-void PrintStrides(std::ostream& os, const RepeatedInt64& strides, const RepeatedIndex& idxs, bool global, bool first) {
+void PrintStrides(std::ostream& os, const RepeatedInt64& strides, const RepeatedIndex& idxs, bool first) {
   for (size_t i = 0; i < strides.size(); i++) {
     const auto& idx = idxs[i];
     const auto& stride = strides[i];
     if (stride) {
-      if (global && idx.factor()) {
-        PrintStride(os, idx.factor(), printstring("o.%s", idx.name().c_str()), first);
-        first = false;
-      }
       PrintStride(os, stride, idx.name(), first);
       first = false;
     }
@@ -227,12 +223,12 @@ void PrintAccess(std::ostream& os, const BufferAccess& access, const Block& bloc
     os << access.offset();
     first = false;
   }
-  PrintStrides(os, access.strides(), block.idxs(), false, first);
+  PrintStrides(os, access.strides(), block.idxs(), first);
   os << "]";
 }
 
 void PrintConstraint(std::ostream& os, const Constraint& constraint, const Block& block) {
-  PrintStrides(os, constraint.lhs(), block.idxs(), true, true);
+  PrintStrides(os, constraint.lhs(), block.idxs(), true);
   os << " < " << constraint.rhs();
 }
 

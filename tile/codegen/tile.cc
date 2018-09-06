@@ -25,7 +25,7 @@ void ApplyTile(stripe::proto::Block* outer, const lang::TileShape& tile) {
     auto inner_idx = inner.mutable_idxs(i);
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
-    outer_idx->set_range(std::ceil(outer_idx->range() / tile[i]));
+    outer_idx->set_range((outer_idx->range() + tile[i] - 1) / tile[i]);
     // Make ranges of the inner blocks: [ti, tk, tk]
     inner_idx->set_range(tile[i]);
     inner_idx->set_factor(tile[i]);
@@ -49,7 +49,6 @@ void ApplyTile(stripe::proto::Block* outer, const lang::TileShape& tile) {
     }
   }
   for (auto& ref : *outer->mutable_ref_outs()) {
-    ref.set_agg_op(Intrinsic::Value_Name(Intrinsic::ASSIGN));
     auto access = ref.mutable_access();
     for (int i = 0; i < access->strides_size(); i++) {
       access->set_strides(i, access->strides(i) * tile[i]);
