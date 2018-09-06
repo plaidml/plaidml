@@ -169,9 +169,9 @@ class base_shape {
 template <typename T>
 class shape : public base_shape {
  public:
-  explicit shape(const std::shared_ptr<ctx>& ctx, datatype dt=to_plaidml_datatype<T>::value) : base_shape(ctx, dt) {}
+  explicit shape(const std::shared_ptr<ctx>& ctx, datatype dt = to_plaidml_datatype<T>::value) : base_shape(ctx, dt) {}
 
-  explicit shape(const base_shape& base, datatype dt=to_plaidml_datatype<T>::value) : base_shape(base) {
+  explicit shape(const base_shape& base, datatype dt = to_plaidml_datatype<T>::value) : base_shape(base) {
     if (dt != base.type()) {
       throw vai_exception(VAI_STATUS_INVALID_ARGUMENT, "Mismatched shape");
     }
@@ -643,9 +643,14 @@ class invoker {
   }
 
   base_shape output_shape(const std::string& name) {
-    std::shared_ptr<plaidml_shape> shp{plaidml_alloc_invoker_output_shape(invoker_.get(), name.c_str()), plaidml_free_shape};
+    std::shared_ptr<plaidml_shape> shp{plaidml_alloc_invoker_output_shape(invoker_.get(), name.c_str()),
+                                       plaidml_free_shape};
     vai_exception::check_and_throw(shp);
     return base_shape{ctx_, std::move(shp)};
+  }
+
+  void save(const std::string& file, plaidml_file_format format) {
+    vai_exception::check_and_throw(plaidml_save_invoker(invoker_.get(), file.c_str(), format));
   }
 
   std::unique_ptr<plaidml_invocation> invoke() {
@@ -690,9 +695,7 @@ class device {
  public:
   device() = default;
 
-  bool operator!() const {
-    return !ptr_;
-  }
+  bool operator!() const { return !ptr_; }
 
   buffer allocate(uint64_t size) const {
     buffer r;

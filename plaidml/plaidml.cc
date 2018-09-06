@@ -20,6 +20,14 @@
 #include <string>
 #include <utility>
 
+#include <boost/filesystem.hpp>
+
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/util/json_util.h>
+#include <google/protobuf/util/type_resolver_util.h>
+
 #include "base/config/config.h"
 #include "base/util/any_factory_map.h"
 #include "base/util/compat.h"
@@ -28,6 +36,7 @@
 #include "base/util/logging.h"
 #include "base/util/runfiles_db.h"
 #include "base/util/sync.h"
+#include "base/util/type_url.h"
 #include "base/util/zipfile.h"
 #include "plaidml/base/base_cpp.h"
 #include "plaidml/base/context.h"
@@ -38,8 +47,11 @@
 #include "tile/base/lru_cache.h"
 #include "tile/base/program_cache.h"
 #include "tile/lang/compose.h"
+#include "tile/lang/gen_stripe.h"
 #include "tile/lang/parser.h"
+#include "tile/lang/stripe.h"
 #include "tile/lang/symbolic.h"
+#include "tile/proto/metadata.pb.h"
 #include "tile/proto/support.h"
 #include "tile/proto/tile.pb.h"
 
@@ -56,6 +68,9 @@ namespace context = vertexai::context;
 namespace plaidml = vertexai::plaidml;
 namespace status_strings = vertexai::status_strings;
 namespace tile = vertexai::tile;
+namespace gp = google::protobuf;
+namespace gpi = google::protobuf::io;
+namespace gpu = google::protobuf::util;
 
 using tile::lang::BoundFunction;
 using tile::lang::FConstValue;
@@ -776,11 +791,13 @@ extern "C" plaidml_function* plaidml_build_coded_function(const char* code, cons
 
 extern "C" void plaidml_free_function(plaidml_function* function) { delete function; }
 
+namespace {
+
 //  V0 format:
 //  0..7  : shape size
 //  8..ss : shape
 //  ...   : tensor data
-static void write_tensor(zipFile f, const std::string& name, const TensorValue& tensor) {
+void WriteTensor(zipFile f, const std::string& name, const TensorValue& tensor) {
   std::vector<size_t> rdims;
   const auto& tdims = tensor.shape().dims;
   for (size_t i = 0; i < tdims.size(); i++) {
@@ -789,7 +806,7 @@ static void write_tensor(zipFile f, const std::string& name, const TensorValue& 
 
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
   if (!ctx) {
-    throw std::runtime_error("Unable to allocate context in write_tensor");
+    throw std::runtime_error("Unable to allocate context while writing tensor");
   }
 
   std::shared_ptr<BufferState> bs = std::static_pointer_cast<BufferState>(tensor.buffer());
@@ -797,7 +814,7 @@ static void write_tensor(zipFile f, const std::string& name, const TensorValue& 
   plaidml_buffer tb{std::move(activity), bs};
   std::unique_ptr<plaidml_mapping> tm{plaidml_map_buffer_current(&tb, nullptr, nullptr)};
   if (!tm) {
-    throw std::runtime_error("Unable to map tensor in write_tensor");
+    throw std::runtime_error("Unable to map tensor in order to write tensor data");
   }
   if (zipOpenNewFileInZip64(f, name.c_str(), NULL, NULL, 0, NULL, 0, NULL, Z_NO_COMPRESSION, 0, 1) != ZIP_OK) {
     throw std::runtime_error("Could not write file into zip file");
@@ -814,7 +831,7 @@ static void write_tensor(zipFile f, const std::string& name, const TensorValue& 
   zipCloseFileInZip(f);
 }
 
-static void write_string(zipFile f, const std::string& name, const std::string& value) {
+void WriteString(zipFile f, const std::string& name, const std::string& value) {
   if (zipOpenNewFileInZip64(f, name.c_str(), NULL, NULL, 0, NULL, 0, NULL, Z_DEFLATED, Z_DEFAULT_COMPRESSION, 1) !=
       ZIP_OK) {
     throw std::runtime_error("Could not open new file in zip file");
@@ -825,8 +842,48 @@ static void write_string(zipFile f, const std::string& name, const std::string& 
   zipCloseFileInZip(f);
 }
 
-static std::shared_ptr<TensorValue> ReadTensor(vai_ctx* ctx, vertexai::UnZipArchive* zip_file,
-                                               const std::shared_ptr<Evaluator>& evaluator, const std::string& name) {
+void WriteVersion(zipFile f) { WriteString(f, "version", "0"); }
+
+void WriteFunction(zipFile f, const BoundFunction& func) {
+  if (func.out_bound().size() > 0) {
+    throw std::runtime_error("Can't save a function that has bound outputs");
+  }
+  if (func.out_bound().size() > 0) {
+    throw std::runtime_error("Can't save a function that has bound outputs");
+  }
+  std::string xo = to_string(Xify(func.prog()));
+  WriteString(f, "code", xo);
+  for (const auto& kvp : func.in_bound()) {
+    WriteTensor(f, "data_" + kvp.first, *kvp.second);
+  }
+}
+
+void WriteMetadata(zipFile f, const BoundFunction& func, const std::map<std::string, std::shared_ptr<Value>>& inputs) {
+  tile::metadata::proto::Metadata md;
+
+  for (std::size_t idx = 0; idx < func.num_inputs(); ++idx) {
+    auto it = inputs.find(func.input_name(idx));
+    if (it == inputs.end()) {
+      throw std::runtime_error{"Unbound invoker input: " + func.input_name(idx)};
+    }
+    TensorValue* tv = dynamic_cast<TensorValue*>(it->second.get());
+    if (!tv) {
+      continue;
+    }
+    (*md.mutable_inputs())[func.input_name(idx)] = tile::shape::proto::to_proto(tv->shape());
+  }
+
+  gpu::JsonPrintOptions options;
+  options.add_whitespace = true;
+  auto resolver = gpu::NewTypeResolverForDescriptorPool(vertexai::kTypeVertexAI, gp::DescriptorPool::generated_pool());
+  std::string serialized;
+  gpu::BinaryToJsonString(resolver, vertexai::kTypeVertexAIPrefix + md.GetDescriptor()->full_name(),
+                          md.SerializeAsString(), &serialized, options);
+  WriteString(f, "metadata", serialized);
+}
+
+std::shared_ptr<TensorValue> ReadTensor(vai_ctx* ctx, vertexai::UnZipArchive* zip_file,
+                                        const std::shared_ptr<Evaluator>& evaluator, const std::string& name) {
   auto tensor_file = zip_file->OpenFile(name);
   context::Activity activity(ctx->activity.ctx(), "vertexai::ReadTensor");
 
@@ -852,24 +909,15 @@ static std::shared_ptr<TensorValue> ReadTensor(vai_ctx* ctx, vertexai::UnZipArch
   return tile::lang::TensorValue::make(bs, ts);
 }
 
+}  // namespace
+
 extern "C" bool plaidml_save_function(plaidml_function* function, const char* filename) {
   std::unique_ptr<vai_ctx> ctx{vai_alloc_ctx()};
   try {
     zipFile out_file = zipOpen64(filename, 0);
-    const auto& func = *function->func;
-    if (func.out_bound().size() > 0) {
-      throw std::runtime_error("Can't save a function that has bound outputs");
-    }
-    if (func.out_bound().size() > 0) {
-      throw std::runtime_error("Can't save a function that has bound outputs");
-    }
-    std::string xo = to_string(Xify(func.prog()));
-    write_string(out_file, "version", "0");
-    write_string(out_file, "code", xo);
-    for (const auto& kvp : func.in_bound()) {
-      write_tensor(out_file, "data_" + kvp.first, *kvp.second);
-    }
-    zipClose(out_file, NULL);
+    WriteVersion(out_file);
+    WriteFunction(out_file, *function->func);
+    zipClose(out_file, nullptr);
     return true;
   } catch (...) {
     vertexai::SetLastException(std::current_exception());
@@ -1266,6 +1314,40 @@ struct plaidml_invoker {
   std::shared_ptr<RunInfo> runinfo;
 };
 
+namespace {
+
+void BuildInvokerRunInfo(plaidml_invoker* invoker) {
+  if (invoker->runinfo) {
+    return;
+  }
+  invoker->runinfo = invoker->runinfo_cache.Lookup(
+      std::make_pair(ToApplierParameterShapes(invoker->inputs), ToApplierParameterShapes(invoker->outputs)),
+      [invoker]() {
+        auto applier = std::make_shared<FunctionApplication>(invoker->func);
+        for (const auto& it : invoker->inputs) {
+          if (it.second->type() == Value::TENSOR) {
+            applier->SetInput(
+                it.first, std::make_shared<TensorValue>(std::make_shared<NamedBuffer>(it.first),
+                                                        std::dynamic_pointer_cast<TensorValue>(it.second)->shape()));
+          } else {
+            applier->SetInput(it.first, it.second);
+          }
+        }
+        applier->SetDone();
+        auto composer = vertexai::compat::make_unique<BoundFunction>();
+        composer->AddDependency(*applier);
+        for (const auto& it : invoker->outputs) {
+          composer->AddUpdate(std::make_shared<TensorValue>(std::make_shared<NamedBuffer>(it.first),
+                                                            std::dynamic_pointer_cast<TensorValue>(it.second)->shape()),
+                              applier->GetOutput(it.first));
+        }
+        composer->Done();
+        return std::make_shared<RunInfo>(composer->PrepareToRun());
+      });
+}
+
+}  // namespace
+
 extern "C" plaidml_invoker* plaidml_alloc_invoker(vai_ctx* ctx, plaidml_function* function) {
   if (!ctx || !function) {
     vertexai::SetLastOOM();
@@ -1365,6 +1447,87 @@ extern "C" bool plaidml_set_invoker_output(plaidml_invoker* invoker, const char*
   }
 }
 
+extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filename, plaidml_file_format format) {
+  if (!invoker || !filename || !format) {
+    vertexai::SetLastOOM();
+    return false;
+  }
+
+  try {
+    auto path = boost::filesystem::path(filename);
+    if (!boost::filesystem::exists(path.parent_path())) {
+      boost::filesystem::create_directory(path.parent_path());
+    }
+
+    switch (format) {
+      case PLAIDML_FILE_FORMAT_TILE: {
+        zipFile out_file = zipOpen64(filename, 0);
+        WriteVersion(out_file);
+        WriteFunction(out_file, *invoker->func);
+        WriteMetadata(out_file, *invoker->func, invoker->inputs);
+        zipClose(out_file, nullptr);
+        return true;
+      }
+
+      case PLAIDML_FILE_FORMAT_STRIPE_HUMAN:
+      case PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT:
+      case PLAIDML_FILE_FORMAT_STRIPE_BINARY:
+      case PLAIDML_FILE_FORMAT_STRIPE_JSON:
+        // We'll handle the Stripe file formats after the switch().
+        break;
+
+      default:
+        throw std::runtime_error{"Unsupported save file format"};
+    }
+
+    // At this point, we're saving a Stripe file format.
+    BuildInvokerRunInfo(invoker);
+    auto block = GenerateStripe(path.stem().string(), *invoker->runinfo);
+
+    std::ofstream file{path.string()};
+
+    std::string stripe;
+    switch (format) {
+      case PLAIDML_FILE_FORMAT_STRIPE_HUMAN: {
+        file << block;
+        break;
+      }
+
+      case PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT: {
+        gpi::OstreamOutputStream out{&file};
+        gp::TextFormat::Print(block, &out);
+        break;
+      }
+
+      case PLAIDML_FILE_FORMAT_STRIPE_BINARY:
+        block.SerializeToOstream(&file);
+        break;
+
+      case PLAIDML_FILE_FORMAT_STRIPE_JSON: {
+        gpu::JsonPrintOptions options;
+        options.add_whitespace = true;
+        std::string stripe = block.SerializeAsString();
+        gpi::ArrayInputStream in{stripe.c_str(), static_cast<int>(stripe.length())};
+        gpi::OstreamOutputStream out{&file};
+        auto resolver =
+            gpu::NewTypeResolverForDescriptorPool(vertexai::kTypeVertexAI, gp::DescriptorPool::generated_pool());
+        gpu::BinaryToJsonStream(resolver, vertexai::kTypeVertexAIPrefix + block.GetDescriptor()->full_name(), &in, &out,
+                                options);
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    return true;
+
+  } catch (...) {
+    vertexai::SetLastException(std::current_exception());
+    return false;
+  }
+}
+
 // plaidml_invocation
 //
 // Currently, the actual invocation structure is a placeholder; it
@@ -1385,33 +1548,7 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     auto invocation = vertexai::compat::make_unique<plaidml_invocation>();
     auto rundown = std::make_shared<context::Rundown>();
     rundown->TryEnterGate(activity.ctx().gate());
-    if (!invoker->runinfo) {
-      invoker->runinfo = invoker->runinfo_cache.Lookup(
-          std::make_pair(ToApplierParameterShapes(invoker->inputs), ToApplierParameterShapes(invoker->outputs)),
-          [invoker]() {
-            auto applier = std::make_shared<FunctionApplication>(invoker->func);
-            for (const auto& it : invoker->inputs) {
-              if (it.second->type() == Value::TENSOR) {
-                applier->SetInput(it.first, std::make_shared<TensorValue>(
-                                                std::make_shared<NamedBuffer>(it.first),
-                                                std::dynamic_pointer_cast<TensorValue>(it.second)->shape()));
-              } else {
-                applier->SetInput(it.first, it.second);
-              }
-            }
-            applier->SetDone();
-            auto composer = vertexai::compat::make_unique<BoundFunction>();
-            composer->AddDependency(*applier);
-            for (const auto& it : invoker->outputs) {
-              composer->AddUpdate(
-                  std::make_shared<TensorValue>(std::make_shared<NamedBuffer>(it.first),
-                                                std::dynamic_pointer_cast<TensorValue>(it.second)->shape()),
-                  applier->GetOutput(it.first));
-            }
-            composer->Done();
-            return std::make_shared<RunInfo>(composer->PrepareToRun());
-          });
-    }
+    BuildInvokerRunInfo(invoker);
 
     // Gather up the appropriate buffers
     std::shared_ptr<Evaluator> evaluator;

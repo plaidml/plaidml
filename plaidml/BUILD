@@ -50,6 +50,7 @@ plaidml_cc_library(
         "//tile/proto:proto_cc",
         "@half_repo//:half",
         "@minizip_repo//:minizip",
+        "@vertexai_plaidml//tile/proto:metadata_cc",
     ] + select({
         "@toolchain//:linux_arm_32v7": [
             "//tile/hal/opencl",
