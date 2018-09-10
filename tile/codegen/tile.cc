@@ -58,6 +58,94 @@ void ApplyTile(stripe::proto::Block* outer, const lang::TileShape& tile) {
   outer->add_stmts()->mutable_block()->Swap(&inner);
 }
 
+inline bool IsLegal(int64_t rule, int64_t candidate) {  //
+  return rule == -1 || candidate == rule;
+}
+
+void FindStencilMatches(std::set<StencilMatch>* into,                  //
+                        const std::vector<StencilCriteria>& criteria,  //
+                        const stripe::proto::Block& block,             //
+                        const std::vector<size_t>& cur) {
+  if (cur.size() == criteria.size()) {
+    // base case
+    StencilMatch match{
+        1,                                                 // total
+        std::vector<std::string>(block.idxs_size(), "*"),  // names
+        lang::TileShape(block.idxs_size(), 1)              // tile
+    };
+    for (size_t i = 0; i < cur.size(); i++) {
+      size_t j = cur[i];
+      match.names[j] = criteria[i].name;
+      if (criteria[i].size == -1) {
+        match.tile[j] = block.idxs(j).range();
+      } else {
+        match.tile[j] = criteria[i].size;
+      }
+      match.total *= match.tile[j];
+    }
+    LOG(INFO) << "Match: " << match;
+    into->emplace(match);
+  } else {
+    size_t i = cur.size();
+    for (int j = 0; j < block.idxs_size(); j++) {
+      if (std::find(cur.cbegin(), cur.cend(), j) == cur.cend()) {
+        if (IsLegal(criteria[i].strides[0], block.ref_outs(0).access().strides(j)) &&  //
+            IsLegal(criteria[i].strides[1], block.ref_ins(0).access().strides(j)) &&   //
+            IsLegal(criteria[i].strides[2], block.ref_ins(1).access().strides(j))) {
+          // found a match on this index, keep going
+          std::vector<size_t> next = cur;
+          next.push_back(j);
+          FindStencilMatches(into, criteria, block, next);
+        }
+      }
+    }
+  }
+}
+
+StencilMatch FindBestStencil(const std::vector<std::vector<StencilCriteria>>& criteria,  //
+                             const stripe::proto::Block& block) {
+  std::set<StencilMatch> matches;
+  for (const auto& rules : criteria) {
+    FindStencilMatches(&matches, rules, block, {});
+  }
+  if (matches.empty()) {
+    throw std::runtime_error("Could not find suitable tile");
+  }
+  return *matches.rbegin();
+}
+
+void TilePass(stripe::proto::Block* block, const TileGenerator& generator) {
+  bool is_leaf = true;
+  for (auto& stmt : *block->mutable_stmts()) {
+    if (stmt.has_block()) {
+      TilePass(stmt.mutable_block(), generator);
+      is_leaf = false;
+    }
+  }
+  if (is_leaf) {
+    ApplyTile(block, generator(*block));
+  }
+}
+
+void TilePass(stripe::proto::Block* block, const std::vector<std::vector<StencilCriteria>>& criteria) {
+  TilePass(block, [&criteria](const stripe::proto::Block& block) {  //
+    return FindBestStencil(criteria, block).tile;
+  });
+}
+
+MAKE_LOGGABLE(StencilMatch, match, os) {
+  os << match.total << ":" << to_string(match.names) << ":" << to_string(match.tile);
+  return os;
+}
+
+bool operator==(const StencilMatch& lhs, const StencilMatch& rhs) {  //
+  return std::tie(lhs.total, lhs.names, lhs.tile) == std::tie(rhs.total, rhs.names, rhs.tile);
+}
+
+bool operator<(const StencilMatch& lhs, const StencilMatch& rhs) {  //
+  return std::tie(lhs.total, lhs.names, lhs.tile) < std::tie(rhs.total, rhs.names, rhs.tile);
+}
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

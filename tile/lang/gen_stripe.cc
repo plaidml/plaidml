@@ -49,6 +49,7 @@ class StripeGenerator {
     // Add kernels to main
     for (size_t i = 0; i < parsed_.ops.size(); i++) {
       const Op& op = parsed_.ops[i];
+      IVLOG(2, "Processing: " << op);
       switch (op.tag) {
         case Op::CONTRACTION:
           ProcessContraction(main, op);
@@ -61,9 +62,11 @@ class StripeGenerator {
           }
           break;
         case Op::CONSTANT:
+          // LOG(INFO) << "CONSTANT";
           break;
       }
     }
+    IVLOG(2, "Done");
     return program;
   }
 
@@ -100,7 +103,6 @@ class StripeGenerator {
   }
 
   void ProcessContraction(stripe::proto::Block* parent, const Op& op) {
-    IVLOG(3, "Compiling contraction: " << op << ", vars = " << vars_);
     if (vars_.at(op.output).shape.byte_size() == 0) {
       IVLOG(3, "Contraction output " << op.output << " size==0; skipping");
       return;
@@ -124,7 +126,8 @@ class StripeGenerator {
     }
 
     auto kernel = AddKernel(parent);
-    kernel->set_comments(flat.comments);
+    kernel->set_comments(to_string(op));
+    assert(flat.names.size() == flat.ranges.size());
     for (int i = 0; i < flat.names.size(); i++) {
       auto idx = kernel->add_idxs();
       idx->set_name(flat.names[i]);
@@ -155,21 +158,23 @@ class StripeGenerator {
     }
 
     // Combination Op
-    switch (flat.comb_op) {
-      case CombinationOp::NONE:
-        break;
-      case CombinationOp::MULTIPLY:
-        AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::MUL), scalar_inputs, {ScalarName(flat.output)});
-        break;
-      case CombinationOp::PLUS:
-        AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::ADD), scalar_inputs, {ScalarName(flat.output)});
-        break;
-      case CombinationOp::EQ:
-        AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::EQ), scalar_inputs, {ScalarName(flat.output)});
-        break;
-      case CombinationOp::COND:
-        AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::COND), scalar_inputs, {ScalarName(flat.output)});
-        break;
+    if (kernel->ref_ins_size() > 1) {
+      switch (flat.comb_op) {
+        case CombinationOp::NONE:
+          break;
+        case CombinationOp::MULTIPLY:
+          AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::MUL), scalar_inputs, {ScalarName(flat.output)});
+          break;
+        case CombinationOp::PLUS:
+          AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::ADD), scalar_inputs, {ScalarName(flat.output)});
+          break;
+        case CombinationOp::EQ:
+          AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::EQ), scalar_inputs, {ScalarName(flat.output)});
+          break;
+        case CombinationOp::COND:
+          AddIntrinsic(kernel, Intrinsic::Value_Name(Intrinsic::COND), scalar_inputs, {ScalarName(flat.output)});
+          break;
+      }
     }
 
     auto output = kernel->add_ref_outs();
@@ -202,8 +207,22 @@ class StripeGenerator {
   }
 
   void ProcessElementwise(stripe::proto::Block* parent, const Op& op) {
+    if (op.f.fn == "reshape") {
+      // TODO: we need to elide reshapes somehow
+      auto stmt = parent->add_stmts()->mutable_special();
+      stmt->set_name(op.f.fn);
+      for (const auto& input : op.inputs) {
+        stmt->add_inputs(input);
+      }
+      for (const auto& param : op.f.params) {
+        stmt->add_params(param);
+      }
+      stmt->add_outputs(op.output);
+      return;
+    }
+
     auto kernel = AddKernel(parent);
-    // kernel->set_comments(src.comments);
+    kernel->set_comments(to_string(op));
 
     const TensorShape& out_shape = vars_.at(op.output).shape;
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
@@ -214,13 +233,35 @@ class StripeGenerator {
     }
 
     for (const auto& input : op.inputs) {
-      const TensorShape& shape = vars_.at(input).shape;
-      auto ref_in = kernel->add_ref_ins();
-      ref_in->set_name(input);
-      auto access = ref_in->mutable_access();
-      access->set_offset(0);
-      for (const auto& dim : shape.dims) {
-        access->add_strides(dim.stride);
+      const auto& binding = vars_.at(input);
+      IVLOG(2, "  " << input << ": " << binding);
+      switch (binding.tag) {
+        case Binding::TENSOR: {
+          auto ref_in = kernel->add_ref_ins();
+          ref_in->set_name(input);
+          auto access = ref_in->mutable_access();
+          access->set_offset(0);
+          for (const auto& dim : binding.shape.dims) {
+            access->add_strides(dim.stride);
+          }
+          // LOAD
+          auto stmt_load = kernel->add_stmts()->mutable_load();
+          stmt_load->set_from(input);
+          stmt_load->set_into(ScalarName(input));
+        } break;
+        case Binding::ICONST: {
+          auto stmt_const = kernel->add_stmts()->mutable_constant();
+          stmt_const->set_name(ScalarName(input));
+          stmt_const->set_iconst(binding.iconst);
+        } break;
+        case Binding::FCONST: {
+          auto stmt_const = kernel->add_stmts()->mutable_constant();
+          stmt_const->set_name(ScalarName(input));
+          stmt_const->set_fconst(binding.fconst);
+        } break;
+        case Binding::TUPLE:
+          throw std::runtime_error("Not implemented!");
+          break;
       }
     }
 
@@ -230,13 +271,6 @@ class StripeGenerator {
     access->set_offset(0);
     for (const auto& dim : out_shape.dims) {
       access->add_strides(dim.stride);
-    }
-
-    // LOAD
-    for (const auto& input : op.inputs) {
-      auto stmt_load = kernel->add_stmts()->mutable_load();
-      stmt_load->set_from(input);
-      stmt_load->set_into(ScalarName(input));
     }
 
     // INTRINSIC
@@ -255,7 +289,7 @@ class StripeGenerator {
 
   void ProcessSpecial(stripe::proto::Block* parent, const Op& op) {
     auto kernel = AddKernel(parent);
-    // kernel->set_comments(src.comments);
+    kernel->set_comments(to_string(op));
 
     const TensorShape& out_shape = vars_.at(op.output).shape;
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
