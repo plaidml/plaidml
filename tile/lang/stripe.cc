@@ -203,11 +203,17 @@ void PrintStride(std::ostream& os, int64_t stride, const std::string& name, bool
 }
 
 void PrintStrides(std::ostream& os, const RepeatedInt64& strides, const RepeatedIndex& idxs, bool first) {
+  // assert(strides.size() == idxs.size());
   for (size_t i = 0; i < strides.size(); i++) {
-    const auto& idx = idxs[i];
     const auto& stride = strides[i];
     if (stride) {
-      PrintStride(os, stride, idx.name(), first);
+      std::string name;
+      if (i < idxs.size()) {
+        name = idxs[i].name();
+      } else {
+        name = printstring("#%zu", i);
+      }
+      PrintStride(os, stride, name, first);
       first = false;
     }
   }
@@ -249,13 +255,9 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
 
   if (!block.comments().empty()) {
     std::stringstream ss(block.comments());
-    for (size_t i = 0; i < 2; i++) {
-      std::string line;
-      std::getline(ss, line, '\n');
-      if (i > 0) {
-        PrintTab(os, depth + 2);
-        os << "// " << line << std::endl;
-      }
+    for (std::string line; std::getline(ss, line, '\n');) {
+      PrintTab(os, depth + 2);
+      os << "// " << line << std::endl;
     }
   }
   for (const auto& constraint : block.constraints()) {
