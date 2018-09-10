@@ -515,7 +515,6 @@ typedef enum {
   PLAIDML_FILE_FORMAT_STRIPE_HUMAN = 2,
   PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT = 3,
   PLAIDML_FILE_FORMAT_STRIPE_BINARY = 4,
-  PLAIDML_FILE_FORMAT_STRIPE_JSON = 5,
 } plaidml_file_format;
 
 // Serializes an invoker to a file.  All inputs to the invoker must
