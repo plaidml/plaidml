@@ -1472,7 +1472,6 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
       case PLAIDML_FILE_FORMAT_STRIPE_HUMAN:
       case PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT:
       case PLAIDML_FILE_FORMAT_STRIPE_BINARY:
-      case PLAIDML_FILE_FORMAT_STRIPE_JSON:
         // We'll handle the Stripe file formats after the switch().
         break;
 
@@ -1486,7 +1485,6 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
 
     std::ofstream file{path.string()};
 
-    std::string stripe;
     switch (format) {
       case PLAIDML_FILE_FORMAT_STRIPE_HUMAN: {
         file << block;
@@ -1502,19 +1500,6 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
       case PLAIDML_FILE_FORMAT_STRIPE_BINARY:
         block.SerializeToOstream(&file);
         break;
-
-      case PLAIDML_FILE_FORMAT_STRIPE_JSON: {
-        gpu::JsonPrintOptions options;
-        options.add_whitespace = true;
-        std::string stripe = block.SerializeAsString();
-        gpi::ArrayInputStream in{stripe.c_str(), static_cast<int>(stripe.length())};
-        gpi::OstreamOutputStream out{&file};
-        auto resolver =
-            gpu::NewTypeResolverForDescriptorPool(vertexai::kTypeVertexAI, gp::DescriptorPool::generated_pool());
-        gpu::BinaryToJsonStream(resolver, vertexai::kTypeVertexAIPrefix + block.GetDescriptor()->full_name(), &in, &out,
-                                options);
-        break;
-      }
 
       default:
         break;
