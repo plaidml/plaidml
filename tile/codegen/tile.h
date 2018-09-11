@@ -12,7 +12,8 @@ namespace codegen {
 struct StencilCriteria {
   std::string name;
   int size;
-  std::vector<int> strides;
+  std::vector<int> out_strides;
+  std::vector<int> in_strides;
 };
 
 struct StencilMatch {

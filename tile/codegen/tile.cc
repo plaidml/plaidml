@@ -3,6 +3,7 @@
 #include "tile/codegen/tile.h"
 
 #include "base/util/printstring.h"
+#include "tile/lang/stripe.h"
 
 namespace vertexai {
 namespace tile {
@@ -83,19 +84,27 @@ void FindStencilMatches(std::set<StencilMatch>* into,                  //
       }
       match.total *= match.tile[j];
     }
-    LOG(INFO) << "Match: " << match;
     into->emplace(match);
   } else {
     size_t i = cur.size();
-    for (int j = 0; j < block.idxs_size(); j++) {
-      if (std::find(cur.cbegin(), cur.cend(), j) == cur.cend()) {
-        if (IsLegal(criteria[i].strides[0], block.ref_outs(0).access().strides(j)) &&  //
-            IsLegal(criteria[i].strides[1], block.ref_ins(0).access().strides(j)) &&   //
-            IsLegal(criteria[i].strides[2], block.ref_ins(1).access().strides(j))) {
-          // found a match on this index, keep going
-          std::vector<size_t> next = cur;
-          next.push_back(j);
-          FindStencilMatches(into, criteria, block, next);
+    const auto& rule = criteria[i];
+    if (rule.out_strides.size() == static_cast<size_t>(block.ref_outs_size()) &&  //
+        rule.in_strides.size() == static_cast<size_t>(block.ref_ins_size())) {
+      for (int j = 0; j < block.idxs_size(); j++) {
+        if (std::find(cur.cbegin(), cur.cend(), j) == cur.cend()) {
+          bool is_legal = true;
+          for (size_t k = 0; k < rule.out_strides.size(); k++) {
+            is_legal &= IsLegal(rule.out_strides[k], block.ref_outs(k).access().strides(j));
+          }
+          for (size_t k = 0; k < rule.in_strides.size(); k++) {
+            is_legal &= IsLegal(rule.in_strides[k], block.ref_ins(k).access().strides(j));
+          }
+          if (is_legal) {
+            // found a match on this index, keep going
+            std::vector<size_t> next = cur;
+            next.push_back(j);
+            FindStencilMatches(into, criteria, block, next);
+          }
         }
       }
     }
@@ -109,7 +118,19 @@ StencilMatch FindBestStencil(const std::vector<std::vector<StencilCriteria>>& cr
     FindStencilMatches(&matches, rules, block, {});
   }
   if (matches.empty()) {
-    throw std::runtime_error("Could not find suitable tile");
+    StencilMatch fallback{
+        1,                                                 // total
+        std::vector<std::string>(block.idxs_size(), "*"),  // names
+        lang::TileShape(block.idxs_size(), 1)              // tile
+    };
+    for (int i = 0; i < block.idxs_size(); i++) {
+      auto range = block.idxs(i).range();
+      fallback.total *= range;
+      fallback.tile[i] = range;
+    }
+    LOG(WARNING) << "Fallback: " << fallback;
+    return fallback;
+    // throw std::runtime_error("Could not find suitable tile");
   }
   return *matches.rbegin();
 }
