@@ -8,6 +8,7 @@
 #include "tile/lang/gen_stripe.h"
 #include "tile/lang/stripe.h"
 
+using ::testing::ContainerEq;
 using ::testing::Eq;
 
 namespace vertexai {
@@ -15,13 +16,34 @@ namespace tile {
 namespace codegen {
 namespace test {
 
-lang::RunInfo LoadMatMul() {
-  const size_t DIM = 5;
+lang::RunInfo LoadMatMul(size_t dim) {
   lang::RunInfo runinfo;
   runinfo.code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
-  runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {DIM, DIM}));
-  runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {DIM, DIM}));
-  runinfo.output_shapes.emplace("C", lang::SimpleShape(lang::DataType::FLOAT32, {DIM, DIM}));
+  runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {dim, dim}));
+  runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {dim, dim}));
+  runinfo.output_shapes.emplace("C", lang::SimpleShape(lang::DataType::FLOAT32, {dim, dim}));
+  return runinfo;
+}
+
+lang::RunInfo LoadConv1D(size_t n, size_t x, size_t c, size_t k) {
+  lang::RunInfo runinfo;
+  runinfo.code = R"(function (I[N, X, CI], K[KX, CI, CO]) -> (O) {
+    O[n, x, co : N, X - KX + 1, CO] = +(I[n, x + k, ci] * K[k, ci, co]);
+})";
+  runinfo.input_shapes.emplace("I", lang::SimpleShape(lang::DataType::FLOAT32, {n, x, c}));
+  runinfo.input_shapes.emplace("K", lang::SimpleShape(lang::DataType::FLOAT32, {k, c, c}));
+  runinfo.output_shapes.emplace("O", lang::SimpleShape(lang::DataType::FLOAT32, {n, x - k + 1, c}));
+  return runinfo;
+}
+
+lang::RunInfo LoadConv2D(size_t n, size_t x, size_t c, size_t k) {
+  lang::RunInfo runinfo;
+  runinfo.code = R"(function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
+    O[n, x, y, co : N, X - KX + 1, Y - KY + 1, CO] = +(I[n, x + kx, y + ky, ci] * K[kx, ky, ci, co]);
+})";
+  runinfo.input_shapes.emplace("I", lang::SimpleShape(lang::DataType::FLOAT32, {n, x, x, c}));
+  runinfo.input_shapes.emplace("K", lang::SimpleShape(lang::DataType::FLOAT32, {k, k, c, c}));
+  runinfo.output_shapes.emplace("O", lang::SimpleShape(lang::DataType::FLOAT32, {n, x - k + 1, x - k + 1, c}));
   return runinfo;
 }
 
@@ -37,10 +59,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<float>& data) {
   return os;
 }
 
-TEST(Codegen, Basic) {
-  auto runinfo = LoadMatMul();
-  auto program = GenerateStripe("matmul", runinfo);
-
+TEST(Codegen, ApplyTile) {
   std::map<std::string, std::vector<float>> data = {
       {"A",
        {
@@ -76,48 +95,140 @@ TEST(Codegen, Basic) {
       9,  18, 27,  9,  18,  //
   };
 
-  std::cout << "Before>" << std::endl << program << std::endl;
+  auto runinfo = LoadMatMul(sqrt(expected.size()));
+  auto program = GenerateStripe("matmul", runinfo);
+
+  IVLOG(2, "Before>\n" << program);
 
   ExecuteProgram(program, &data);
 
-  std::cout << "A: " << data["A"] << std::endl;
-  std::cout << "B: " << data["B"] << std::endl;
-  std::cout << "C: " << data["C"] << std::endl;
-  EXPECT_THAT(data["C"], Eq(expected));
+  IVLOG(2, "A: " << data["A"]);
+  IVLOG(2, "B: " << data["B"]);
+  IVLOG(2, "C: " << data["C"]);
+  EXPECT_THAT(data["C"], ContainerEq(expected));
 
   auto main = program.mutable_stmts(0)->mutable_block();
   auto kernel = main->mutable_stmts(0)->mutable_block();
   ApplyTile(kernel, {5, 4, 4});
   auto inner = kernel->mutable_stmts(0)->mutable_block();
-  std::cout << "Inner>" << std::endl << *inner << std::endl;
+  IVLOG(2, "Inner>\n" << *inner);
   ApplyTile(inner, {5, 2, 2});
 
   for (size_t i = 0; i < data["C"].size(); i++) {
     data["C"][i] = 0;
   }
 
-  std::cout << "After>" << std::endl << program << std::endl;
+  IVLOG(2, "After>\n" << program);
 
   ExecuteProgram(program, &data);
 
-  std::cout << "A: " << data["A"] << std::endl;
-  std::cout << "B: " << data["B"] << std::endl;
-  std::cout << "C: " << data["C"] << std::endl;
-  EXPECT_THAT(data["C"], Eq(expected));
+  IVLOG(2, "A: " << data["A"]);
+  IVLOG(2, "B: " << data["B"]);
+  IVLOG(2, "C: " << data["C"]);
+  EXPECT_THAT(data["C"], ContainerEq(expected));
+}
 
-  // Stencils:
-  // k=16, x=16, c=?
-  // k=16, x=4, y=4, c=?
+TEST(Codegen, StencilMatchMatMul) {
+  std::vector<StencilCriteria> criteria = {
+      {"k", 16, {-1}, {-1, 0}},
+      {"x", 16, {-1}, {0, -1}},
+      {"c", -1, {0}, {-1, -1}},
+  };
 
-  // Criteria:
-  // k: 16  C:  1  A: !0  B:  0
-  // x: 16  C: !0  A:  0  B: !0
-  // c: ??  C:  0  A:  1  B:  1
-  // or
-  // k: 16  C:  1  A: !0  B:  0
-  // x:  4  C: !0  A:  0  B: !0
-  // y:  4  C: !0  A:  0  B: !0
-  // c: ??  C:  0  A:  1  B:  1
+  auto runinfo = LoadMatMul(100);
+  auto program = GenerateStripe("matmul", runinfo);
+  auto main = program.stmts(0).block();
+  auto kernel = main.stmts(0).block();
+
+  IVLOG(2, kernel);
+
+  auto match = FindBestStencil({criteria}, kernel);
+  LOG(INFO) << "Best match: " << match;
+  StencilMatch expected{
+      25600,            // total
+      {"c", "k", "x"},  // names
+      {100, 16, 16},    // tile
+  };
+  EXPECT_THAT(match, Eq(expected));
+}
+
+TEST(Codegen, StencilMatchConv1D) {
+  std::vector<StencilCriteria> criteria = {
+      {"k", 16, {-1}, {-1, 0}},
+      {"x", 16, {-1}, {0, -1}},
+      {"c", -1, {0}, {-1, -1}},
+  };
+
+  auto runinfo = LoadConv1D(1, 100, 64, 3);
+  auto program = GenerateStripe("conv1d", runinfo);
+  auto main = program.stmts(0).block();
+  auto kernel = main.stmts(0).block();
+
+  IVLOG(2, kernel);
+
+  auto match = FindBestStencil({criteria}, kernel);
+  LOG(INFO) << "Best match: " << match;
+  StencilMatch expected{
+      16384,                 // total
+      {"c", "x", "*", "k"},  // names
+      {64, 16, 1, 16},       // tile
+  };
+  EXPECT_THAT(match, Eq(expected));
+}
+
+TEST(Codegen, StencilMatchConv2D) {
+  std::vector<std::vector<StencilCriteria>> criteria = {
+      {
+          {"k", 16, {-1}, {-1, 0}},  //
+          {"x", 16, {-1}, {0, -1}},  //
+          {"c", -1, {0}, {-1, -1}},  //
+      },
+      {
+          {"k", 16, {-1}, {-1, 0}},  //
+          {"x", 4, {-1}, {0, -1}},   //
+          {"y", 4, {-1}, {0, -1}},   //
+          {"c", -1, {0}, {-1, -1}}   //
+      }                              //
+  };
+
+  auto runinfo = LoadConv2D(1, 100, 64, 3);
+  auto program = GenerateStripe("conv2d", runinfo);
+  auto main = program.stmts(0).block();
+  auto kernel = main.stmts(0).block();
+
+  IVLOG(2, kernel);
+
+  auto match = FindBestStencil({criteria}, kernel);
+  LOG(INFO) << "Best match: " << match;
+  StencilMatch expected{
+      16384,                           // total
+      {"c", "x", "*", "*", "k", "*"},  // names
+      {64, 16, 1, 1, 16, 1},           // tile
+  };
+  EXPECT_THAT(match, Eq(expected));
+}
+
+TEST(Codegen, TilePass) {
+  std::vector<std::vector<StencilCriteria>> criteria = {{
+      {"k", 16, {-1}, {-1, 0}},
+      {"x", 16, {-1}, {0, -1}},
+      {"c", -1, {0}, {-1, -1}},
+  }};
+  auto runinfo = LoadMatMul(100);
+  auto program = GenerateStripe("matmul", runinfo);
+  TilePass(&program, criteria);
+  IVLOG(2, program);
+}
+
+TEST(Codegen, TilePassBroadcast) {
+  lang::RunInfo runinfo;
+  runinfo.code = "function (A, B) -> (C) { C = add(A, B); }";
+  runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {1, 112, 112, 32}));
+  runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {32}));
+  runinfo.output_shapes.emplace("C", lang::SimpleShape(lang::DataType::FLOAT32, {1, 112, 112, 32}));
+  auto program = GenerateStripe("broadcast", runinfo);
+
+  LOG(INFO) << "\n" << program;
 }
 
 }  // namespace test
