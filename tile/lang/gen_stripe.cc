@@ -77,12 +77,14 @@ class StripeGenerator {
       AddDecl(program, item.first, item.second);
       if (is_input) {
         auto input = main->add_ref_ins();
-        input->set_name(item.first);
+        input->set_into(item.first);
+        input->set_from(item.first);
         auto access = input->mutable_access();
         access->set_offset(0);
       } else {
         auto output = main->add_ref_outs();
-        output->set_name(item.first);
+        output->set_into(item.first);
+        output->set_from(item.first);
         output->set_agg_op(Intrinsic::Value_Name(Intrinsic::ASSIGN));
         auto access = output->mutable_access();
         access->set_offset(0);
@@ -148,7 +150,8 @@ class StripeGenerator {
       scalar_inputs.push_back(scalar_name);
 
       auto input = kernel->add_ref_ins();
-      input->set_name(flat.inputs[i]);
+      input->set_into(flat.inputs[i]);
+      input->set_from(flat.inputs[i]);
       IntoAccess(flat.access[i], input->mutable_access());
 
       // LOAD
@@ -178,7 +181,8 @@ class StripeGenerator {
     }
 
     auto output = kernel->add_ref_outs();
-    output->set_name(flat.output);
+    output->set_into(flat.output);
+    output->set_from(flat.output);
     switch (flat.agg_op) {
       case AggregationOp::SUM:
         output->set_agg_op(Intrinsic::Value_Name(Intrinsic::SUM));
@@ -224,7 +228,8 @@ class StripeGenerator {
       switch (binding.tag) {
         case Binding::TENSOR: {
           auto ref_in = kernel->add_ref_ins();
-          ref_in->set_name(input);
+          ref_in->set_into(input);
+          ref_in->set_from(input);
           auto access = ref_in->mutable_access();
           access->set_offset(0);
           // Be careful to handle broadcasts
@@ -263,7 +268,8 @@ class StripeGenerator {
     }
 
     auto ref_out = kernel->add_ref_outs();
-    ref_out->set_name(op.output);
+    ref_out->set_into(op.output);
+    ref_out->set_from(op.output);
     auto access = ref_out->mutable_access();
     access->set_offset(0);
     for (const auto& dim : out_shape.dims) {

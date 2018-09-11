@@ -29,14 +29,16 @@ message Declaration {
 }
 
 message RefineIn {
-  string name = 1;
-  BufferAccess access = 2;
+  string from = 1;
+  string into = 2;
+  BufferAccess access = 3;
 }
 
 message RefineOut {
-  string name = 1;
-  BufferAccess access = 2;
-  string agg_op = 3;
+  string from = 1;
+  string into = 2;
+  BufferAccess access = 3;
+  string agg_op = 4;
 }
 
 message BufferAccess {
