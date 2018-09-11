@@ -20,7 +20,6 @@ FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& sh
     throw std::runtime_error("Currently, we only support 1, 2, or 3 element Contractions");
   }
   std::ostringstream cs;
-  IVLOG(2, "Doing Compile");
   SVLOG(cs, 3, "Original:\n" << to_string(c).c_str());
   Contraction int_idx_cntrc = ConstrainIndexVarsToInts(c);
   SVLOG(cs, 3, "With Index Variables Made Integral:\n" << to_string(int_idx_cntrc).c_str());

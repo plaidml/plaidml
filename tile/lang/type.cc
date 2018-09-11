@@ -70,15 +70,15 @@ static double ConstantPropagate(const std::string& op, const std::vector<double>
   }
   if (op == "broadcast") {
     if (x[0] != x[1] && x[0] != 1 && x[1] != 1) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
-                               std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
+                               " != " + std::to_string(x[1]));
     }
     return x[0] == 1 ? x[1] : x[0];
   }
   if (op == "match") {
     if (x[0] != x[1]) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
-                               std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
+                               " != " + std::to_string(x[1]));
     }
     return x[0];
   }
@@ -837,8 +837,8 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
   }
   // Do typing
   TypeCheck(p, &vars);
-  IVLOG(2, "After typecheck: " << p->ops);
-  IVLOG(2, "Types:: " << vars);
+  IVLOG(3, "After typecheck: " << p->ops);
+  IVLOG(3, "Types:: " << vars);
   // Verify outputs match
   for (const auto& kvp : outputs) {
     auto it = vars.find(kvp.first);
@@ -855,7 +855,7 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
   }
   // Finally, run program 'optimization' pass
   OptimizeProgram(p, input_vars, output_vars, vars);
-  IVLOG(2, "After optimize: " << p->ops);
+  IVLOG(3, "After optimize: " << p->ops);
 
   return vars;
 }
