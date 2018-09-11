@@ -55,7 +55,7 @@ class StripeGenerator {
           ProcessContraction(main, op);
           break;
         case Op::FUNCTION:
-          if (op.f.is_special()) {
+          if (op.f.is_special() || (op.f.fn == "reshape")) {
             ProcessSpecial(main, op);
           } else {
             ProcessElementwise(main, op);
@@ -207,20 +207,6 @@ class StripeGenerator {
   }
 
   void ProcessElementwise(stripe::proto::Block* parent, const Op& op) {
-    if (op.f.fn == "reshape") {
-      // TODO: we need to elide reshapes somehow
-      auto stmt = parent->add_stmts()->mutable_special();
-      stmt->set_name(op.f.fn);
-      for (const auto& input : op.inputs) {
-        stmt->add_inputs(input);
-      }
-      for (const auto& param : op.f.params) {
-        stmt->add_params(param);
-      }
-      stmt->add_outputs(op.output);
-      return;
-    }
-
     auto kernel = AddKernel(parent);
     kernel->set_comments(to_string(op));
 
@@ -241,8 +227,19 @@ class StripeGenerator {
           ref_in->set_name(input);
           auto access = ref_in->mutable_access();
           access->set_offset(0);
-          for (const auto& dim : binding.shape.dims) {
-            access->add_strides(dim.stride);
+          // Be careful to handle broadcasts
+          int diff = out_shape.dims.size() - binding.shape.dims.size();
+          for (int i = 0; i < out_shape.dims.size(); i++) {
+            if (i < diff) {
+              access->add_strides(0);
+            } else {
+              const auto& dim = binding.shape.dims[i - diff];
+              auto stride = dim.stride;
+              if (dim.size == 1) {
+                stride = 0;
+              }
+              access->add_strides(stride);
+            }
           }
           // LOAD
           auto stmt_load = kernel->add_stmts()->mutable_load();
@@ -288,38 +285,8 @@ class StripeGenerator {
   }
 
   void ProcessSpecial(stripe::proto::Block* parent, const Op& op) {
-    auto kernel = AddKernel(parent);
-    kernel->set_comments(to_string(op));
-
-    const TensorShape& out_shape = vars_.at(op.output).shape;
-    for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
-      auto idx = kernel->add_idxs();
-      idx->set_name(printstring("i%zu", i + 1));
-      idx->set_range(out_shape.dims[i].size);
-      idx->set_factor(0);
-    }
-
-    for (const auto& input : op.inputs) {
-      const TensorShape& shape = vars_.at(input).shape;
-      auto ref_in = kernel->add_ref_ins();
-      ref_in->set_name(input);
-      auto access = ref_in->mutable_access();
-      access->set_offset(0);
-      for (const auto& dim : shape.dims) {
-        access->add_strides(dim.stride);
-      }
-    }
-
-    auto ref_out = kernel->add_ref_outs();
-    ref_out->set_name(op.output);
-    auto access = ref_out->mutable_access();
-    access->set_offset(0);
-    for (const auto& dim : out_shape.dims) {
-      access->add_strides(dim.stride);
-    }
-
     // SPECIAL
-    auto stmt = kernel->add_stmts()->mutable_special();
+    auto stmt = parent->add_stmts()->mutable_special();
     stmt->set_name(op.f.fn);
     for (const auto& input : op.inputs) {
       stmt->add_inputs(input);

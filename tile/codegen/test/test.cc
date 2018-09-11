@@ -98,41 +98,41 @@ TEST(Codegen, ApplyTile) {
   auto runinfo = LoadMatMul(sqrt(expected.size()));
   auto program = GenerateStripe("matmul", runinfo);
 
-  std::cout << "Before>" << std::endl << program << std::endl;
+  IVLOG(2, "Before>\n" << program);
 
   ExecuteProgram(program, &data);
 
-  std::cout << "A: " << data["A"] << std::endl;
-  std::cout << "B: " << data["B"] << std::endl;
-  std::cout << "C: " << data["C"] << std::endl;
+  IVLOG(2, "A: " << data["A"]);
+  IVLOG(2, "B: " << data["B"]);
+  IVLOG(2, "C: " << data["C"]);
   EXPECT_THAT(data["C"], ContainerEq(expected));
 
   auto main = program.mutable_stmts(0)->mutable_block();
   auto kernel = main->mutable_stmts(0)->mutable_block();
   ApplyTile(kernel, {5, 4, 4});
   auto inner = kernel->mutable_stmts(0)->mutable_block();
-  std::cout << "Inner>" << std::endl << *inner << std::endl;
+  IVLOG(2, "Inner>\n" << *inner);
   ApplyTile(inner, {5, 2, 2});
 
   for (size_t i = 0; i < data["C"].size(); i++) {
     data["C"][i] = 0;
   }
 
-  std::cout << "After>" << std::endl << program << std::endl;
+  IVLOG(2, "After>\n" << program);
 
   ExecuteProgram(program, &data);
 
-  std::cout << "A: " << data["A"] << std::endl;
-  std::cout << "B: " << data["B"] << std::endl;
-  std::cout << "C: " << data["C"] << std::endl;
+  IVLOG(2, "A: " << data["A"]);
+  IVLOG(2, "B: " << data["B"]);
+  IVLOG(2, "C: " << data["C"]);
   EXPECT_THAT(data["C"], ContainerEq(expected));
 }
 
 TEST(Codegen, StencilMatchMatMul) {
   std::vector<StencilCriteria> criteria = {
-      {"k", 16, {-1, -1, 0}},
-      {"x", 16, {-1, 0, -1}},
-      {"c", -1, {0, -1, -1}},
+      {"k", 16, {-1}, {-1, 0}},
+      {"x", 16, {-1}, {0, -1}},
+      {"c", -1, {0}, {-1, -1}},
   };
 
   auto runinfo = LoadMatMul(100);
@@ -140,7 +140,7 @@ TEST(Codegen, StencilMatchMatMul) {
   auto main = program.stmts(0).block();
   auto kernel = main.stmts(0).block();
 
-  std::cout << kernel << std::endl;
+  IVLOG(2, kernel);
 
   auto match = FindBestStencil({criteria}, kernel);
   LOG(INFO) << "Best match: " << match;
@@ -154,9 +154,9 @@ TEST(Codegen, StencilMatchMatMul) {
 
 TEST(Codegen, StencilMatchConv1D) {
   std::vector<StencilCriteria> criteria = {
-      {"k", 16, {-1, -1, 0}},
-      {"x", 16, {-1, 0, -1}},
-      {"c", -1, {0, -1, -1}},
+      {"k", 16, {-1}, {-1, 0}},
+      {"x", 16, {-1}, {0, -1}},
+      {"c", -1, {0}, {-1, -1}},
   };
 
   auto runinfo = LoadConv1D(1, 100, 64, 3);
@@ -164,7 +164,7 @@ TEST(Codegen, StencilMatchConv1D) {
   auto main = program.stmts(0).block();
   auto kernel = main.stmts(0).block();
 
-  std::cout << kernel << std::endl;
+  IVLOG(2, kernel);
 
   auto match = FindBestStencil({criteria}, kernel);
   LOG(INFO) << "Best match: " << match;
@@ -179,16 +179,16 @@ TEST(Codegen, StencilMatchConv1D) {
 TEST(Codegen, StencilMatchConv2D) {
   std::vector<std::vector<StencilCriteria>> criteria = {
       {
-          {"k", 16, {-1, -1, 0}},  //
-          {"x", 16, {-1, 0, -1}},  //
-          {"c", -1, {0, -1, -1}},  //
+          {"k", 16, {-1}, {-1, 0}},  //
+          {"x", 16, {-1}, {0, -1}},  //
+          {"c", -1, {0}, {-1, -1}},  //
       },
       {
-          {"k", 16, {-1, -1, 0}},  //
-          {"x", 4, {-1, 0, -1}},   //
-          {"y", 4, {-1, 0, -1}},   //
-          {"c", -1, {0, -1, -1}}   //
-      }                            //
+          {"k", 16, {-1}, {-1, 0}},  //
+          {"x", 4, {-1}, {0, -1}},   //
+          {"y", 4, {-1}, {0, -1}},   //
+          {"c", -1, {0}, {-1, -1}}   //
+      }                              //
   };
 
   auto runinfo = LoadConv2D(1, 100, 64, 3);
@@ -196,7 +196,7 @@ TEST(Codegen, StencilMatchConv2D) {
   auto main = program.stmts(0).block();
   auto kernel = main.stmts(0).block();
 
-  std::cout << kernel << std::endl;
+  IVLOG(2, kernel);
 
   auto match = FindBestStencil({criteria}, kernel);
   LOG(INFO) << "Best match: " << match;
@@ -210,14 +210,25 @@ TEST(Codegen, StencilMatchConv2D) {
 
 TEST(Codegen, TilePass) {
   std::vector<std::vector<StencilCriteria>> criteria = {{
-      {"k", 16, {-1, -1, 0}},
-      {"x", 16, {-1, 0, -1}},
-      {"c", -1, {0, -1, -1}},
+      {"k", 16, {-1}, {-1, 0}},
+      {"x", 16, {-1}, {0, -1}},
+      {"c", -1, {0}, {-1, -1}},
   }};
   auto runinfo = LoadMatMul(100);
   auto program = GenerateStripe("matmul", runinfo);
   TilePass(&program, criteria);
-  std::cout << program << std::endl;
+  IVLOG(2, program);
+}
+
+TEST(Codegen, TilePassBroadcast) {
+  lang::RunInfo runinfo;
+  runinfo.code = "function (A, B) -> (C) { C = add(A, B); }";
+  runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {1, 112, 112, 32}));
+  runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {32}));
+  runinfo.output_shapes.emplace("C", lang::SimpleShape(lang::DataType::FLOAT32, {1, 112, 112, 32}));
+  auto program = GenerateStripe("broadcast", runinfo);
+
+  LOG(INFO) << "\n" << program;
 }
 
 }  // namespace test
