@@ -127,11 +127,11 @@ class VirtualMachine {
     std::map<std::string, size_t> offsets;
     std::map<std::string, std::string> agg_ops;
     for (const auto& ref : block.ref_ins()) {
-      offsets[ref.name()] = scope->offsets[ref.name()] + ComputeOffsetFor(*scope, block, ref.access());
+      offsets[ref.into()] = scope->offsets[ref.from()] + ComputeOffsetFor(*scope, block, ref.access());
     }
     for (const auto& ref : block.ref_outs()) {
-      offsets[ref.name()] = scope->offsets[ref.name()] + ComputeOffsetFor(*scope, block, ref.access());
-      agg_ops[ref.name()] = ref.agg_op();
+      offsets[ref.into()] = scope->offsets[ref.from()] + ComputeOffsetFor(*scope, block, ref.access());
+      agg_ops[ref.into()] = ref.agg_op();
     }
     std::map<std::string, float> vars;
     for (const auto& stmt : block.stmts()) {

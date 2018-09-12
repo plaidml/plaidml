@@ -10,7 +10,7 @@ dependencies:
     - keras==2.2.2
     - matplotlib
     - olefile
-    - onnx
+    - onnx==1.2.2
     - onnx-tf
     - pillow
     - protobuf
