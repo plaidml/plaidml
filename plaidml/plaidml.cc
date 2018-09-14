@@ -1481,7 +1481,8 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
 
     // At this point, we're saving a Stripe file format.
     BuildInvokerRunInfo(invoker);
-    auto block = GenerateStripe(path.stem().string(), *invoker->runinfo);
+    invoker->runinfo->program_name = path.stem().string();
+    auto block = GenerateStripe(*invoker->runinfo);
 
     std::ofstream file{path.string()};
 
