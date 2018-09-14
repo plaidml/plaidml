@@ -44,26 +44,26 @@ void ComputeAccessRecursive(std::vector<AccessPattern>* out, const stripe::proto
   self.constraints = up.constraints;
   // First process all refinements
   // We make a templated lambda so we can work on both input/output refinements
-  auto proc_refine = [&](const auto& ref) {
+  auto proc_refine = [&](const std::string& from, const std::string& into, const stripe::proto::BufferAccess& access) {
     // Check if source is in our parent
-    auto it = up.access.find(ref.from());
+    auto it = up.access.find(from);
     // If not, don't don't bother
     if (it == up.access.end()) { return; }
     // Make a new access info for the 'into' name
-    AccessInfo& ai = self.access[ref.into()];
+    AccessInfo& ai = self.access[into];
     // Copy across from as a starting point
     ai = it->second;
     // Add the additional strides
-    for (int64_t s : ref.access().strides()) {
+    for (int64_t s : access.strides()) {
       ai.strides.push_back(s);
     }
   };
   // Now we run it on ref_ins and ref_outs
   for (const auto& ref : block.ref_ins()) {
-    proc_refine(ref);
+    proc_refine(ref.from(), ref.into(), ref.access());
   }
   for (const auto& ref : block.ref_outs()) {
-    proc_refine(ref);
+    proc_refine(ref.from(), ref.into(), ref.access());
   }
   // If we have no refinements left, early return
   if (self.access.size() == 0) {

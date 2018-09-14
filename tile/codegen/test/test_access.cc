@@ -19,6 +19,7 @@ namespace test {
 static lang::RunInfo LoadMatMul() {
   const size_t DIM = 5;
   lang::RunInfo runinfo;
+  runinfo.program_name = "MatMul";
   runinfo.code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
   runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {DIM, DIM}));
   runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {DIM, DIM}));
@@ -28,7 +29,7 @@ static lang::RunInfo LoadMatMul() {
 
 TEST(Codegen, Access) {
   auto runinfo = LoadMatMul();
-  auto program = GenerateStripe("matmul", runinfo);
+  auto program = GenerateStripe(runinfo);
 
   auto main = program.mutable_stmts(0)->mutable_block();
   auto kernel = main->mutable_stmts(0)->mutable_block();
