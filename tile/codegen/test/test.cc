@@ -18,6 +18,7 @@ namespace test {
 
 lang::RunInfo LoadMatMul(size_t dim) {
   lang::RunInfo runinfo;
+  runinfo.program_name = "matmul";
   runinfo.code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
   runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {dim, dim}));
   runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {dim, dim}));
@@ -27,6 +28,7 @@ lang::RunInfo LoadMatMul(size_t dim) {
 
 lang::RunInfo LoadConv1D(size_t n, size_t x, size_t c, size_t k) {
   lang::RunInfo runinfo;
+  runinfo.program_name = "conv1d";
   runinfo.code = R"(function (I[N, X, CI], K[KX, CI, CO]) -> (O) {
     O[n, x, co : N, X - KX + 1, CO] = +(I[n, x + k, ci] * K[k, ci, co]);
 })";
@@ -38,6 +40,7 @@ lang::RunInfo LoadConv1D(size_t n, size_t x, size_t c, size_t k) {
 
 lang::RunInfo LoadConv2D(size_t n, size_t x, size_t c, size_t k) {
   lang::RunInfo runinfo;
+  runinfo.program_name = "conv2d";
   runinfo.code = R"(function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
     O[n, x, y, co : N, X - KX + 1, Y - KY + 1, CO] = +(I[n, x + kx, y + ky, ci] * K[kx, ky, ci, co]);
 })";
@@ -96,7 +99,7 @@ TEST(Codegen, ApplyTile) {
   };
 
   auto runinfo = LoadMatMul(sqrt(expected.size()));
-  auto program = GenerateStripe("matmul", runinfo);
+  auto program = GenerateStripe(runinfo);
 
   IVLOG(2, "Before>\n" << program);
 
@@ -136,11 +139,11 @@ TEST(Codegen, StencilMatchMatMul) {
   };
 
   auto runinfo = LoadMatMul(100);
-  auto program = GenerateStripe("matmul", runinfo);
-  auto main = program.stmts(0).block();
-  auto kernel = main.stmts(0).block();
+  auto program = GenerateStripe(runinfo);
+  auto main = program.mutable_stmts(0)->mutable_block();
+  auto kernel = main->mutable_stmts(0)->mutable_block();
 
-  IVLOG(2, kernel);
+  IVLOG(2, *kernel);
 
   auto match = FindBestStencil({criteria}, kernel);
   LOG(INFO) << "Best match: " << match;
@@ -160,11 +163,11 @@ TEST(Codegen, StencilMatchConv1D) {
   };
 
   auto runinfo = LoadConv1D(1, 100, 64, 3);
-  auto program = GenerateStripe("conv1d", runinfo);
-  auto main = program.stmts(0).block();
-  auto kernel = main.stmts(0).block();
+  auto program = GenerateStripe(runinfo);
+  auto main = program.mutable_stmts(0)->mutable_block();
+  auto kernel = main->mutable_stmts(0)->mutable_block();
 
-  IVLOG(2, kernel);
+  IVLOG(2, *kernel);
 
   auto match = FindBestStencil({criteria}, kernel);
   LOG(INFO) << "Best match: " << match;
@@ -192,11 +195,11 @@ TEST(Codegen, StencilMatchConv2D) {
   };
 
   auto runinfo = LoadConv2D(1, 100, 64, 3);
-  auto program = GenerateStripe("conv2d", runinfo);
-  auto main = program.stmts(0).block();
-  auto kernel = main.stmts(0).block();
+  auto program = GenerateStripe(runinfo);
+  auto main = program.mutable_stmts(0)->mutable_block();
+  auto kernel = main->mutable_stmts(0)->mutable_block();
 
-  IVLOG(2, kernel);
+  IVLOG(2, *kernel);
 
   auto match = FindBestStencil({criteria}, kernel);
   LOG(INFO) << "Best match: " << match;
@@ -215,18 +218,19 @@ TEST(Codegen, TilePass) {
       {"c", -1, {0}, {-1, -1}},
   }};
   auto runinfo = LoadMatMul(100);
-  auto program = GenerateStripe("matmul", runinfo);
+  auto program = GenerateStripe(runinfo);
   TilePass(&program, criteria);
   IVLOG(2, program);
 }
 
 TEST(Codegen, TilePassBroadcast) {
   lang::RunInfo runinfo;
+  runinfo.program_name = "broadcast";
   runinfo.code = "function (A, B) -> (C) { C = add(A, B); }";
   runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {1, 112, 112, 32}));
   runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {32}));
   runinfo.output_shapes.emplace("C", lang::SimpleShape(lang::DataType::FLOAT32, {1, 112, 112, 32}));
-  auto program = GenerateStripe("broadcast", runinfo);
+  auto program = GenerateStripe(runinfo);
 
   LOG(INFO) << "\n" << program;
 }

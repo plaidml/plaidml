@@ -72,7 +72,8 @@ void FindStencilMatches(std::set<StencilMatch>* into,                  //
     StencilMatch match{
         1,                                                 // total
         std::vector<std::string>(block.idxs_size(), "*"),  // names
-        lang::TileShape(block.idxs_size(), 1)              // tile
+        lang::TileShape(block.idxs_size(), 1),             // tile
+        false                                              // is_fallback
     };
     for (size_t i = 0; i < cur.size(); i++) {
       size_t j = cur[i];
@@ -112,26 +113,34 @@ void FindStencilMatches(std::set<StencilMatch>* into,                  //
 }
 
 StencilMatch FindBestStencil(const std::vector<std::vector<StencilCriteria>>& criteria,  //
-                             const stripe::proto::Block& block) {
+                             stripe::proto::Block* block) {
   std::set<StencilMatch> matches;
   for (const auto& rules : criteria) {
-    FindStencilMatches(&matches, rules, block, {});
+    FindStencilMatches(&matches, rules, *block, {});
   }
   if (matches.empty()) {
     StencilMatch fallback{
-        1,                                                 // total
-        std::vector<std::string>(block.idxs_size(), "*"),  // names
-        lang::TileShape(block.idxs_size(), 1)              // tile
+        1,                                                  // total
+        std::vector<std::string>(block->idxs_size(), "*"),  // names
+        lang::TileShape(block->idxs_size(), 1),             // tile
+        true                                                // is_fallback
     };
-    for (int i = 0; i < block.idxs_size(); i++) {
-      auto range = block.idxs(i).range();
+    for (int i = 0; i < block->idxs_size(); i++) {
+      auto range = block->idxs(i).range();
       fallback.total *= range;
       fallback.tile[i] = range;
     }
     LOG(WARNING) << "Fallback: " << fallback;
+    google::protobuf::Value value;
+    value.set_bool_value(true);
+    auto& annotations = *block->mutable_annotations()->mutable_fields();
+    annotations["is_fallback"] = value;
     return fallback;
-    // throw std::runtime_error("Could not find suitable tile");
   }
+  google::protobuf::Value value;
+  value.set_bool_value(false);
+  auto& annotations = *block->mutable_annotations()->mutable_fields();
+  annotations["is_fallback"] = value;
   return *matches.rbegin();
 }
 
@@ -144,12 +153,12 @@ void TilePass(stripe::proto::Block* block, const TileGenerator& generator) {
     }
   }
   if (is_leaf) {
-    ApplyTile(block, generator(*block));
+    ApplyTile(block, generator(block));
   }
 }
 
 void TilePass(stripe::proto::Block* block, const std::vector<std::vector<StencilCriteria>>& criteria) {
-  TilePass(block, [&criteria](const stripe::proto::Block& block) {  //
+  TilePass(block, [&criteria](stripe::proto::Block* block) {  //
     return FindBestStencil(criteria, block).tile;
   });
 }

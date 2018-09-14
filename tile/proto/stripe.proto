@@ -4,6 +4,7 @@ syntax = "proto3";
 
 package vertexai.tile.stripe.proto;
 
+import "google/protobuf/struct.proto";
 import "tile/proto/shape.proto";
 
 message Block {
@@ -15,6 +16,7 @@ message Block {
   repeated RefineIn ref_ins = 6;
   repeated RefineOut ref_outs = 7;
   repeated Statement stmts = 8;
+  google.protobuf.Struct annotations = 9;
 }
 
 message Index {
