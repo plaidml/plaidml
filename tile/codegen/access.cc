@@ -24,6 +24,7 @@ struct Context {
   size_t idx_count = 0;  // How many indexes exist in this + parent contexts?  
   bool exact = true; // Are we still exact, or did we skip constraints based on incomplete indexes?
   std::vector<std::string> names;  // What is the friendly name of each index (not unique!)
+  std::vector<uint64_t> ranges;  // What is the range of each index (not unique!)
   std::vector<Constraint> constraints;  // Current constraints
   std::map<std::string, IdxInfo> indexes;  // Information on each current index
   std::map<std::string, AccessInfo> access;  // The information on each in scope buffer
@@ -36,8 +37,9 @@ void ComputeAccessRecursive(std::vector<AccessPattern>* out, const stripe::proto
   self.idx_count = up.idx_count + block.idxs().size();
   // Copy across exactness
   self.exact = up.exact;
-  // Copy across existing names
+  // Copy across existing names + ranges
   self.names = up.names;
+  self.ranges = up.ranges;
   // Copy across any constraints
   self.constraints = up.constraints;
   // First process all refinements
@@ -71,8 +73,9 @@ void ComputeAccessRecursive(std::vector<AccessPattern>* out, const stripe::proto
   for (const auto& idx : block.idxs()) {
     // Get the id of this index
     size_t iid = self.names.size();
-    // Add the index name
+    // Add the index name + range
     self.names.push_back(idx.name());
+    self.ranges.push_back(idx.range());
     // Make a place to put the info on this index
     IdxInfo &info = self.indexes[idx.name()];
     // Check for the index in the outer context
@@ -108,13 +111,13 @@ void ComputeAccessRecursive(std::vector<AccessPattern>* out, const stripe::proto
     con.lhs.resize(self.idx_count);
     bool exact = true;
     for(size_t i = 0; i < pcon.lhs().size(); i++) {
-      int64_t mul = pcon.lhs()[i];
-      const auto& info = self.indexes[block.idxs()[i].name()];
+      int64_t mul = pcon.lhs(i);
+      const auto& info = self.indexes[block.idxs(i).name()];
       if (info.incomplete && mul != 0) {
         exact = false;
         break;
       }
-      const auto& gid = self.indexes[block.idxs()[i].name()].gid;
+      const auto& gid = self.indexes[block.idxs(i).name()].gid;
       for(size_t j = 0; j < gid.size(); j++) {
         con.lhs[j] += mul * gid[j];
       }
@@ -140,11 +143,10 @@ void ComputeAccessRecursive(std::vector<AccessPattern>* out, const stripe::proto
       IndexAccess ia;
       ia.name = self.names[i];
       ia.stride = a.strides[i];
-      ia.range = 5;  // TODO
+      ia.range = self.ranges[i];
       r.access.push_back(ia);
     }
     r.constraints = self.constraints; 
-    printf("w00t!\n");
   };
   // Now go over all statements (and possibly recurse)
   for (const auto& stmt : block.stmts()) {
@@ -163,6 +165,22 @@ void ComputeAccessRecursive(std::vector<AccessPattern>* out, const stripe::proto
         break;
     }
   }
+}
+
+std::ostream& operator<<(std::ostream& stream, const AccessPattern& ap) {
+  stream << "Access Pattern: (is_write=" << ap.is_write << " exact=" << ap.is_exact << " offset=" << ap.offset << ") {\n";
+  for(const auto& ia : ap.access) {
+    stream << "  " << ia.name << " range=" << ia.range << " stride=" << ia.stride << "\n";
+  }
+  for(const auto& c : ap.constraints) {
+    stream << "  ";
+    for(const auto& v : c.lhs) {
+      stream << v << " ";
+    }
+    stream << "< " << c.rhs << "\n";
+  }
+  stream << "}\n";
+  return stream;
 }
 
 std::vector<AccessPattern> ComputeAccess(const stripe::proto::Block& block, const std::string& buffer) {
