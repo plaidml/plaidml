@@ -37,12 +37,12 @@ class StripeGenerator {
     // Add decls for external inputs/outputs
     AddDecls(&program, main, inputs_, true);
     AddDecls(&program, main, outputs_, false);
-    // Add decls for temporaries
+    // Add references for temporaries, reshapes may elide some
     for (const auto& item : vars_) {
       if (externals_.count(item.first) == 0) {
         const auto& binding = item.second;
         if (binding.tag == Binding::TENSOR) {
-          AddDecl(main, item.first, binding.shape);
+          tmps_.insert(std::make_pair(item.first, binding.shape));
         }
       }
     }
@@ -55,8 +55,10 @@ class StripeGenerator {
           ProcessContraction(main, op);
           break;
         case Op::FUNCTION:
-          if (op.f.is_special() || (op.f.fn == "reshape")) {
+          if (op.f.is_special()) {
             ProcessSpecial(main, op);
+          } else if (op.f.fn == "reshape") {
+            ProcessReshape(main, op);
           } else {
             ProcessElementwise(main, op);
           }
@@ -65,6 +67,10 @@ class StripeGenerator {
           // LOG(INFO) << "CONSTANT";
           break;
       }
+    }
+    // Add decls for temporaries that are not aliased
+    for (const auto& tmp : tmps_) {
+      AddDecl(main, tmp.first, tmp.second);
     }
     IVLOG(2, "Done");
     return program;
@@ -79,21 +85,18 @@ class StripeGenerator {
         auto input = main->add_ref_ins();
         input->set_into(item.first);
         input->set_from(item.first);
-        auto access = input->mutable_access();
-        access->set_offset(0);
       } else {
         auto output = main->add_ref_outs();
         output->set_into(item.first);
         output->set_from(item.first);
         output->set_agg_op(Intrinsic::Value_Name(Intrinsic::ASSIGN));
-        auto access = output->mutable_access();
-        access->set_offset(0);
+        ref_outs_.insert(std::make_pair(item.first, output));
       }
     }
   }
 
-  void AddDecl(stripe::proto::Block* parent, const std::string& name, const TensorShape& shape) {
-    auto decl = parent->add_decls();
+  void AddDecl(stripe::proto::Block* block, const std::string& name, const TensorShape& shape) {
+    auto decl = block->add_decls();
     decl->set_name(name);
     auto pb_shape = decl->mutable_shape();
     pb_shape->set_type(static_cast<shape::proto::TensorShape::DataType>(shape.type));
@@ -104,7 +107,27 @@ class StripeGenerator {
     }
   }
 
-  void ProcessContraction(stripe::proto::Block* parent, const Op& op) {
+  void ProcessReshape(stripe::proto::Block* main, const Op& op) {
+    auto it = ref_outs_.find(op.output);
+    if (it != ref_outs_.end()) {
+      // Remove the temporary
+      // tmps_.erase(op.inputs[0]);
+      it->second->set_from(op.inputs[0]);
+      // Add an alias
+      auto alias = main->add_ref_ins();
+      alias->set_into(op.inputs[0]);
+      alias->set_from(op.output);
+    } else {
+      // Remove the temporary
+      // tmps_.erase(op.output);
+      // Add an alias
+      auto alias = main->add_ref_ins();
+      alias->set_into(op.output);
+      alias->set_from(op.inputs[0]);
+    }
+  }
+
+  void ProcessContraction(stripe::proto::Block* main, const Op& op) {
     if (vars_.at(op.output).shape.byte_size() == 0) {
       IVLOG(3, "Contraction output " << op.output << " size==0; skipping");
       return;
@@ -124,10 +147,10 @@ class StripeGenerator {
         special_op.f.fn = Intrinsic::Value_Name(Intrinsic::COPY);
         special_op.inputs.push_back(op.c.use_default);
       }
-      ProcessSpecial(parent, special_op);
+      ProcessSpecial(main, special_op);
     }
 
-    auto kernel = AddKernel(parent);
+    auto kernel = AddKernel(main);
     kernel->set_comments(to_string(op));
     assert(flat.names.size() == flat.ranges.size());
     for (int i = 0; i < flat.names.size(); i++) {
@@ -210,8 +233,8 @@ class StripeGenerator {
     stmt->set_into(flat.output);
   }
 
-  void ProcessElementwise(stripe::proto::Block* parent, const Op& op) {
-    auto kernel = AddKernel(parent);
+  void ProcessElementwise(stripe::proto::Block* main, const Op& op) {
+    auto kernel = AddKernel(main);
     kernel->set_comments(to_string(op));
 
     const TensorShape& out_shape = vars_.at(op.output).shape;
@@ -231,7 +254,6 @@ class StripeGenerator {
           ref_in->set_into(input);
           ref_in->set_from(input);
           auto access = ref_in->mutable_access();
-          access->set_offset(0);
           // Be careful to handle broadcasts
           int diff = out_shape.dims.size() - binding.shape.dims.size();
           for (int i = 0; i < out_shape.dims.size(); i++) {
@@ -271,7 +293,6 @@ class StripeGenerator {
     ref_out->set_into(op.output);
     ref_out->set_from(op.output);
     auto access = ref_out->mutable_access();
-    access->set_offset(0);
     for (const auto& dim : out_shape.dims) {
       access->add_strides(dim.stride);
     }
@@ -290,9 +311,8 @@ class StripeGenerator {
     stmt_store->set_into(op.output);
   }
 
-  void ProcessSpecial(stripe::proto::Block* parent, const Op& op) {
-    // SPECIAL
-    auto stmt = parent->add_stmts()->mutable_special();
+  void ProcessSpecial(stripe::proto::Block* main, const Op& op) {
+    auto stmt = main->add_stmts()->mutable_special();
     stmt->set_name(op.f.fn);
     for (const auto& input : op.inputs) {
       stmt->add_inputs(input);
@@ -368,24 +388,6 @@ class StripeGenerator {
     }
   }
 
-  void AddSpecial(stripe::proto::Block* block,              //
-                  const std::string& name,                  //
-                  const std::vector<std::string>& inputs,   //
-                  const std::vector<std::string>& outputs,  //
-                  const std::vector<std::string>& params) {
-    auto stmt = block->add_stmts()->mutable_special();
-    stmt->set_name(name);
-    for (const auto& param : params) {
-      stmt->add_params(param);
-    }
-    for (const auto& input : inputs) {
-      stmt->add_inputs(input);
-    }
-    for (const auto& output : outputs) {
-      stmt->add_outputs(output);
-    }
-  }
-
   void AddIntrinsic(stripe::proto::Block* block,             //
                     const std::string& name,                 //
                     const std::vector<std::string>& inputs,  //
@@ -408,16 +410,18 @@ class StripeGenerator {
   ShapeMap inputs_;
   ShapeMap outputs_;
   std::set<std::string> externals_;
+  std::map<std::string, TensorShape> tmps_;
+  std::map<std::string, stripe::proto::RefineOut*> ref_outs_;
 };
 
 }  // namespace
 
-stripe::proto::Block GenerateStripe(const std::string& name, const RunInfo& runinfo) {
+stripe::proto::Block GenerateStripe(const RunInfo& runinfo) {
   Parser parser;
   auto parsed = parser.Parse(runinfo.code);
   auto vars = BindProgram(&parsed, runinfo.input_shapes, runinfo.output_shapes);
   StripeGenerator gen(parsed, vars, runinfo.input_shapes, runinfo.output_shapes);
-  return gen.Run(name);
+  return gen.Run(runinfo.program_name);
 }
 
 }  // namespace lang

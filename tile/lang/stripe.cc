@@ -272,7 +272,10 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     if (i > 0) {
       os << ", ";
     }
-    os << input.into() << " = " << input.from();
+    os << input.into();
+    if (input.into() != input.from()) {
+      os << " = " << input.from();
+    }
     PrintAccess(os, input.access(), block);
   }
   os << ") -> (";
@@ -281,7 +284,10 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     if (i > 0) {
       os << ", ";
     }
-    os << output.into() << " = " << output.from();
+    os << output.into();
+    if (output.into() != output.from()) {
+      os << " = " << output.from();
+    }
     PrintAccess(os, output.access(), block);
     if (!output.agg_op().empty()) {
       os << ":" << output.agg_op();
