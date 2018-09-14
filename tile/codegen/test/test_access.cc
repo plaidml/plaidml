@@ -26,77 +26,39 @@ static lang::RunInfo LoadMatMul() {
   return runinfo;
 }
 
-static std::ostream& operator<<(std::ostream& os, const std::vector<float>& data) {
-  bool first = true;
-  for (const auto& x : data) {
-    if (!first) {
-      os << ", ";
-    }
-    os << x;
-    first = false;
-  }
-  return os;
-}
-
-TEST(Codegen, Cache) {
+TEST(Codegen, Access) {
   auto runinfo = LoadMatMul();
   auto program = GenerateStripe("matmul", runinfo);
-
-  std::map<std::string, std::vector<float>> data = {
-      {"A",
-       {
-           1, 2, 3, 4, 5,  //
-           4, 5, 6, 7, 8,  //
-           7, 8, 9, 7, 8,  //
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-       }},
-      {"B",
-       {
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-       }},
-      {"C",
-       {
-           0, 0, 0, 0, 0,  //
-           0, 0, 0, 0, 0,  //
-           0, 0, 0, 0, 0,  //
-           0, 0, 0, 0, 0,  //
-           0, 0, 0, 0, 0,  //
-       }},
-  };
-
-  std::vector<float> expected = {
-      15, 30, 45,  15, 30,  //
-      30, 60, 90,  30, 60,  //
-      39, 78, 117, 39, 78,  //
-      9,  18, 27,  9,  18,  //
-      9,  18, 27,  9,  18,  //
-  };
 
   auto main = program.mutable_stmts(0)->mutable_block();
   auto kernel = main->mutable_stmts(0)->mutable_block();
   ApplyTile(kernel, {2, 2, 2});
   auto inner = kernel->mutable_stmts(0)->mutable_block();
-  std::cout << "Inner>" << std::endl << *inner << std::endl;
 
-  ComputeAccess(*kernel, "A");  
+  auto access = ComputeAccess(*kernel, "A");
+  EXPECT_THAT(access.size(), Eq(1));
+  AccessPattern expected1 = { false, true, 0, {
+      {"k", 2, 3}, //
+      {"m", 10, 3}, //
+      {"n", 0, 3}, //
+      {"k", 1, 2}, //
+      {"m", 5, 2}, //
+      {"n", 0, 2}, //
+    }, {
+      {{2, 0, 0, 1, 0, 0}, 5},
+      {{0, 2, 0, 0, 1, 0}, 5},
+      {{0, 0, 2, 0, 0, 1}, 5},
+    }};
+  EXPECT_THAT(access[0], Eq(expected1));
 
-  for (size_t i = 0; i < data["C"].size(); i++) {
-    data["C"][i] = 0;
-  }
-
-  std::cout << "After>" << std::endl << program << std::endl;
-
-  ExecuteProgram(program, &data);
-
-  std::cout << "A: " << data["A"] << std::endl;
-  std::cout << "B: " << data["B"] << std::endl;
-  std::cout << "C: " << data["C"] << std::endl;
-  EXPECT_THAT(data["C"], Eq(expected));
+  access = ComputeAccess(*inner, "A");
+  EXPECT_THAT(access.size(), Eq(1));
+  AccessPattern expected2 = { false, false, 0, {
+      {"k", 1, 2}, //
+      {"m", 5, 2}, //
+      {"n", 0, 2}, //
+    }, {}};
+  EXPECT_THAT(access[0], Eq(expected2));
 }
 
 }  // namespace test
