@@ -110,7 +110,7 @@ void ComputeAccessRecursive(std::vector<AccessPattern>* out, const stripe::proto
     Constraint con;
     con.lhs.resize(self.idx_count);
     bool exact = true;
-    for(size_t i = 0; i < pcon.lhs().size(); i++) {
+    for(size_t i = 0; i < size_t(pcon.lhs().size()); i++) {
       int64_t mul = pcon.lhs(i);
       const auto& info = self.indexes[block.idxs(i).name()];
       if (info.incomplete && mul != 0) {
