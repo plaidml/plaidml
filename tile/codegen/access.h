@@ -27,9 +27,9 @@ struct Constraint {
 };
 
 struct AccessPattern {
-  bool is_write = false;
-  bool is_exact = false;
-  int64_t offset = 0;
+  bool is_write;
+  bool is_exact;
+  int64_t offset;
   std::vector<IndexAccess> access;
   std::vector<Constraint> constraints;
   bool operator==(const AccessPattern& o) const { 
