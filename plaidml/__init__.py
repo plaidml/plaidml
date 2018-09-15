@@ -1024,7 +1024,8 @@ class _Enumerator(object):
             self._valid_devs = []
             for i in range(0, _lib().plaidml_get_devconf_count(self._ctx, self, True)):
                 self._valid_devs += [
-                    _DeviceConfig(self._ctx, self, _lib().plaidml_get_devconf(self._ctx, self, i))
+                    _DeviceConfig(self._ctx, self,
+                                  _lib().plaidml_get_devconf(self._ctx, self, i))
                 ]
         return self._valid_devs
 
@@ -1077,7 +1078,8 @@ class _Buffer(object):
 
     def __init__(self, ctx, dev, shape):
         self._as_parameter_ = _lib().plaidml_alloc_buffer(
-            ctx, dev, _lib().plaidml_get_shape_buffer_size(shape))
+            ctx, dev,
+            _lib().plaidml_get_shape_buffer_size(shape))
         self._ctx = ctx
         dev._register_buffer(self)
 

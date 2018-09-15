@@ -96,8 +96,8 @@ class Group(object):
                 raise Exception("Subtype name must be a string in group type " + subtype +
                                 ", not: " + str(subtype))
             if not isinstance(submap, dict):
-                raise Exception("All types must be a yaml map, invalid type " + subtype + ", not: "
-                                + str(submap))
+                raise Exception("All types must be a yaml map, invalid type " + subtype +
+                                ", not: " + str(submap))
             if len(submap) == 0:
                 raise Exception("Empty types not allowed: " + subtype)
             if isinstance(submap.itervalues().next(), string_types):

@@ -5,8 +5,8 @@
 #include "tile/platform/local_machine/scheduler_test.h"
 
 using ::testing::AnyOf;
-using ::testing::Eq;
 using ::testing::Combine;
+using ::testing::Eq;
 using ::testing::UnorderedElementsAre;
 using ::testing::Values;
 using ::testing::ValuesIn;

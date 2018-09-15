@@ -144,10 +144,10 @@ Rational UnifiedOffset(const Rational& c1, const Rational& c2, const Integer& n1
     throw std::out_of_range("Cannot unify offset when relative quotient exceeds size_t.");
   }
   for (size_t i = 0; i < Abs(n1); ++i) {
-    offsets.insert(std::end(offsets), FracPart((c1 + i)/n1));
+    offsets.insert(std::end(offsets), FracPart((c1 + i) / n1));
   }
   for (size_t j = 0; j < Abs(n2); ++j) {
-    Rational offset = FracPart((c2 + j)/n2);
+    Rational offset = FracPart((c2 + j) / n2);
     if (offsets.count(offset)) {
       return offset;
     }
@@ -174,17 +174,17 @@ RangeConstraint IntersectParallelConstraintPair(const RangeConstraint& constrain
   // Range unification requires solving the following equations for q:
   //    n1*q + c1 = 0           n2*q + c2 = 0
   //    n1*q + c1 = r1 - 1      n2*q + c2 = r2 - 1
-  Rational q1_low = Min(-c1/n1, (constraint1.range - 1 - c1)/n1);
-  Rational q1_hi = Max(-c1/n1, (constraint1.range - 1 - c1)/n1);
-  Rational q2_low = Min(-c2/n2, (constraint2.range - 1 - c2)/n2);
-  Rational q2_hi = Max(-c2/n2, (constraint2.range - 1 - c2)/n2);
+  Rational q1_low = Min(-c1 / n1, (constraint1.range - 1 - c1) / n1);
+  Rational q1_hi = Max(-c1 / n1, (constraint1.range - 1 - c1) / n1);
+  Rational q2_low = Min(-c2 / n2, (constraint2.range - 1 - c2) / n2);
+  Rational q2_hi = Max(-c2 / n2, (constraint2.range - 1 - c2) / n2);
   Integer lower_bound = Max(Ceil(q1_low + d), Ceil(q2_low + d));
   Integer upper_bound = Min(Floor(q1_hi + d), Floor(q2_hi + d));
   Rational merged_offset = -lower_bound + d;
   Integer range = upper_bound - lower_bound + 1;
   if (range <= 0) {
-    throw std::runtime_error("Merging constraints with empty intersection: "
-        + to_string(constraint1) + ", " + to_string(constraint2));
+    throw std::runtime_error("Merging constraints with empty intersection: " + to_string(constraint1) + ", " +
+                             to_string(constraint2));
   }
   if (range > INT64_MAX) {
     throw std::out_of_range("Bound range in IntersectParallelConstraintPair overflows int64.");

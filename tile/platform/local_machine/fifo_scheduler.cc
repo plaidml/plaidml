@@ -169,7 +169,7 @@ bool PendingStepHeapLess(const PendingStep* lhs, const PendingStep* rhs) {
   // dependencies.  Since std:: heaps are max-heaps, an element lhs always "less than" an element
   // rhs if lhs has more outstanding dependencies:
   return lhs->dependency_count > rhs->dependency_count;
-};
+}
 
 // Rounds a byte size up to the next divisible-by-alignment value.
 std::uint64_t AlignUp(Build* b, std::uint64_t byte_size) {
@@ -605,8 +605,9 @@ void AddDeps(schedule::Schedule* schedule) {
       auto bit = busy_infos.emplace(allocp, BusyInfo{nullptr}).first;
       if (!bit->second.latest_writer) {
         if (!allocp->is_input()) {
-          throw error::Internal{std::string{"Program fails to initialize non-empty temporary for a"} +
-                                std::to_string(allocp->idx)};
+          std::stringstream ss;
+          ss << "Program fails to initialize non-empty temporary for a" << allocp->idx;
+          throw error::Internal(ss.str());
         }
         IVLOG(3, "  a" << allocp->idx << " is input \"" << allocp->input << "\"; no deps needed");
       } else {

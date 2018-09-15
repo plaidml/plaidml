@@ -1,19 +1,20 @@
 #pragma once
 
 #include <istream>
+#include <string>
 
 #define JSON_HAS_INT64
-#include <json/json.h>
-#include <json/reader.h>
+#include "json/json.h"
+#include "json/reader.h"
 
-#include "transfer_object.h"
+#include "base/util/transfer_object.h"
 
 namespace vertexai {
 
 void throw_bad_type(const Json::ValueType& found_type, const Json::ValueType& expected_type);
 
 template <class T>
-Json::Value json_wrap(T& val);
+Json::Value json_wrap(T& val);  // NOLINT
 
 template <class ST, class T>
 struct json_wrap_impl {};
@@ -32,7 +33,9 @@ WRAP_PRIMITIVE(std::string, std::string)
 
 template <class T>
 struct json_wrap_impl<transfer_type_null, T> {
-  static Json::Value wrap(T& val) { return Json::Value(); }
+  static Json::Value wrap(T& val) {  // NOLINT
+    return Json::Value();
+  }
 };
 
 class json_serialize_context {
@@ -51,7 +54,7 @@ class json_serialize_context {
   size_t get_version() { return m_version; }
 
   template <class T>
-  void transfer_field(const std::string& name, size_t tag, T& obj) {
+  void transfer_field(const std::string& name, size_t tag, T& obj) {  // NOLINT
     m_obj[name] = json_wrap(obj);
   }
   const Json::Value& get_result() { return m_obj; }
@@ -63,12 +66,14 @@ class json_serialize_context {
 
 template <>
 struct json_wrap_impl<transfer_type_object, Json::Value> {
-  static Json::Value wrap(Json::Value& val) { return val; }
+  static Json::Value wrap(Json::Value& val) {  // NOLINT
+    return val;
+  }
 };
 
 template <class T>
 struct json_wrap_impl<transfer_type_object, T> {
-  static Json::Value wrap(T& val) {
+  static Json::Value wrap(T& val) {  // NOLINT
     json_serialize_context ctx;
     transfer_info<T>::object_transfer(ctx, val);
     return ctx.get_result();
@@ -77,7 +82,7 @@ struct json_wrap_impl<transfer_type_object, T> {
 
 template <class T>
 struct json_wrap_impl<transfer_type_array, T> {
-  static Json::Value wrap(T& val) {
+  static Json::Value wrap(T& val) {  // NOLINT
     typedef typename transfer_info<T>::iterator iterator;
     iterator itEnd = transfer_info<T>::end(val);
     Json::Value r;
@@ -114,7 +119,7 @@ struct json_wrap_impl<transfer_type_tuple, T>
 
 template <class T>
 struct json_wrap_impl<transfer_type_map_object, T> {
-  static Json::Value wrap(T& val) {
+  static Json::Value wrap(T& val) {  // NOLINT
     Json::Value r;
     typename T::iterator itEnd = val.end();
     for (typename T::iterator it = val.begin(); it != itEnd; ++it) {
@@ -125,7 +130,7 @@ struct json_wrap_impl<transfer_type_map_object, T> {
 };
 
 template <class T>
-Json::Value json_wrap(T& val) {
+Json::Value json_wrap(T& val) {  // NOLINT
   typedef typename transfer_info<T>::type sub_type;
   return json_wrap_impl<sub_type, T>::wrap(val);
 }
@@ -143,7 +148,7 @@ std::string json_serialize(const T& obj, bool pretty = false) {
 }
 
 template <class T>
-void json_unwrap(T& val, const Json::Value& json);
+void json_unwrap(T& val, const Json::Value& json);  // NOLINT
 
 template <class ST, class T>
 struct json_unwrap_impl {};
@@ -167,7 +172,7 @@ UNWRAP_PRIMITIVE(std::string, String)
 
 class json_deserialize_context {
  public:
-  json_deserialize_context(const Json::Value& obj) : m_obj(obj) {}
+  explicit json_deserialize_context(const Json::Value& obj) : m_obj(obj) {}
 
   void set_version(size_t version) {}
   bool is_serialize() { return false; }
@@ -187,7 +192,7 @@ class json_deserialize_context {
   }
 
   template <class T>
-  void transfer_field(const std::string& name, size_t tag, T& obj) {
+  void transfer_field(const std::string& name, size_t tag, T& obj) {  // NOLINT
     const Json::Value& val = m_obj[name];
     if (val.isNull()) {
       throw deserialization_error("Null field or missing field: " + name);
@@ -201,7 +206,7 @@ class json_deserialize_context {
 
 template <class T>
 struct json_unwrap_impl<transfer_type_object, T> {
-  static void unwrap(T& val, const Json::Value& json) {
+  static void unwrap(T& val, const Json::Value& json) {  // NOLINT
     if (json.type() != Json::objectValue) {
       throw_bad_type(json.type(), Json::objectValue);
     }
@@ -212,12 +217,14 @@ struct json_unwrap_impl<transfer_type_object, T> {
 
 template <>
 struct json_unwrap_impl<transfer_type_object, Json::Value> {
-  static void unwrap(Json::Value& val, const Json::Value& json) { val = json; }
+  static void unwrap(Json::Value& val, const Json::Value& json) {  // NOLINT
+    val = json;
+  }
 };
 
 template <class T>
 struct json_unwrap_impl<transfer_type_array, T> {
-  static void unwrap(T& val, const Json::Value& json) {
+  static void unwrap(T& val, const Json::Value& json) {  // NOLINT
     typedef typename transfer_info<T>::value_type value_type;
 
     if (json.type() != Json::arrayValue) {
@@ -267,7 +274,7 @@ struct json_unwrap_impl<transfer_type_tuple, T>
 
 template <class T>
 struct json_unwrap_impl<transfer_type_map_object, T> {
-  static void unwrap(T& val, const Json::Value& json) {
+  static void unwrap(T& val, const Json::Value& json) {  // NOLINT
     typedef typename transfer_info<T>::value_type value_type;
 
     if (json.type() != Json::objectValue) {
@@ -285,13 +292,13 @@ struct json_unwrap_impl<transfer_type_map_object, T> {
 };
 
 template <class T>
-void json_unwrap(T& val, const Json::Value& json) {
+void json_unwrap(T& val, const Json::Value& json) {  // NOLINT
   typedef typename transfer_info<T>::type sub_type;
   json_unwrap_impl<sub_type, T>::unwrap(val, json);
 }
 
 template <class T>
-void json_deserialize(T& out, const std::string& str) {
+void json_deserialize(T& out, const std::string& str) {  // NOLINT
   Json::Reader reader;
   Json::Value json;
   bool r = reader.parse(str, json);

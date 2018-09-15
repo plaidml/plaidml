@@ -1,7 +1,8 @@
 #pragma once
 
-#include <boost/multiprecision/cpp_int.hpp>
 #include <string>
+
+#include <boost/multiprecision/cpp_int.hpp>
 
 namespace vertexai {
 namespace tile {

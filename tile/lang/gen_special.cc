@@ -187,7 +187,7 @@ static void GenScatter(KernelList& r, const Op& op, const Bindings& bindings,  /
   inner->append(_("out")[_("out_offset")] = _("out")[_("out_offset")] + _("expn")[_("expn_offset")]);
 
   // Loop over the index dimensions
-  for(size_t i = 0; i < idx_shape.dims.size(); ++i) {
+  for (size_t i = 0; i < idx_shape.dims.size(); ++i) {
     auto next = _Block({});
     next->append(_For("i_" + std::to_string(i), idx_shape.dims[i].size, 1, inner));
     inner = next;
