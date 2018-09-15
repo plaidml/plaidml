@@ -16,7 +16,7 @@ namespace tile {
 // Program represents a Tile program that's been compiled by a Platform.
 class Program {
  public:
-  virtual ~Program(){};
+  virtual ~Program() {}
 
   // Run the program.  The bindings are applied to the proto::Op list that was
   // used to create the Program, in order. Bindings are passed by value so the

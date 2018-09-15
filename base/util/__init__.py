@@ -1,5 +1,4 @@
 # Copyright Vertex.AI.
-
 """Various general-purpose utility classes."""
 
 import os

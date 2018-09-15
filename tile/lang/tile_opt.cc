@@ -162,7 +162,7 @@ proto::PerfStats ComputeTileStats(const DirectSettings& settings, const FlatCont
     // We read the post-op inputs during the output phase.
     mem_read += pout.outputs() * byte_width(op_input.binding.shape.type);
   }
-  
+
   std::uint64_t rollups = 0;
   std::uint64_t true_ops = 1;
   std::uint64_t out_tiles = 1;
@@ -199,16 +199,17 @@ proto::PerfStats ComputeTileStats(const DirectSettings& settings, const FlatCont
   r.set_shared_mem(shared_mem);
   r.set_true_ops(true_ops);
   r.set_rollups(rollups);
-  
+
   return r;
 }
 
 // Compute score from PerfStats
 double ComputeScore(const HardwareSettings& settings, const proto::PerfStats& perf) {
   IVLOG(4, "Compute score:"
-               << " to=" << perf.true_ops() << " wg=" << perf.work_groups() << " il=" << perf.inner_loops() << " sm="
-               << perf.shared_mem() << " or=" << perf.out_regs() << " mr=" << perf.mem_read() << " mw=" << perf.mem_write()
-               << " op=" << perf.operations() << " rp=" << perf.rollups() << " tu=" << perf.threads_used());
+               << " to=" << perf.true_ops() << " wg=" << perf.work_groups() << " il=" << perf.inner_loops()
+               << " sm=" << perf.shared_mem() << " or=" << perf.out_regs() << " mr=" << perf.mem_read()
+               << " mw=" << perf.mem_write() << " op=" << perf.operations() << " rp=" << perf.rollups()
+               << " tu=" << perf.threads_used());
   if (perf.shared_mem() > settings.max_mem) {
     IVLOG(4, "  over memory");
     return -1;

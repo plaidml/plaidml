@@ -124,14 +124,14 @@ void ScheduleToProto(proto::Schedule* pb, const Schedule& schedule) {
       case Step::Tag::kCopy: {
         auto* copy_pb = spb->mutable_copy();
         if (step.outputs.size() != 1) {
-          throw error::Internal{"In schedule proto construction: copy step " + std::to_string(sidx) +
-                                " has an incorrect output count; expected: 1, got: " +
-                                std::to_string(step.outputs.size())};
+          throw error::Internal{
+              "In schedule proto construction: copy step " + std::to_string(sidx) +
+              " has an incorrect output count; expected: 1, got: " + std::to_string(step.outputs.size())};
         }
         if (step.inputs.size() != 1) {
-          throw error::Internal{"In schedule proto construction: copy step " + std::to_string(sidx) +
-                                " has an incorrect input count; expected: 1, got: " +
-                                std::to_string(step.inputs.size())};
+          throw error::Internal{
+              "In schedule proto construction: copy step " + std::to_string(sidx) +
+              " has an incorrect input count; expected: 1, got: " + std::to_string(step.inputs.size())};
         }
         copy_pb->set_from_aidx(step.inputs[0]->idx);
         copy_pb->set_to_aidx(step.outputs[0].allocp->idx);

@@ -67,17 +67,10 @@ void ClampExpr::Accept(Visitor& v) const { v.Visit(*this); }
 void CastExpr::Accept(Visitor& v) const { v.Visit(*this); }
 
 CallExpr::CallExpr(Function f, const std::vector<ExprPtr>& v) : function(f), vals(v) {
-  static std::map<Function, std::string> names {
-    {Function::CEIL, "ceil"},
-    {Function::COS, "cos"},
-    {Function::EXP, "exp"},
-    {Function::FLOOR, "floor"},
-    {Function::LOG, "log"},
-    {Function::MAD, "mad"},
-    {Function::POW, "pow"},
-    {Function::ROUND, "round"},
-    {Function::SQRT, "sqrt"},
-    {Function::TANH, "tanh"},
+  static std::map<Function, std::string> names{
+      {Function::CEIL, "ceil"}, {Function::COS, "cos"},   {Function::EXP, "exp"}, {Function::FLOOR, "floor"},
+      {Function::LOG, "log"},   {Function::MAD, "mad"},   {Function::POW, "pow"}, {Function::ROUND, "round"},
+      {Function::SQRT, "sqrt"}, {Function::TANH, "tanh"},
   };
   name = names.at(f);
 }
@@ -97,17 +90,10 @@ CallExpr::CallExpr(ExprPtr f, const std::vector<ExprPtr>& v) : vals(v) {
   auto lookup = std::dynamic_pointer_cast<sem::LookupLVal>(load->inner);
   if (!lookup) throw std::runtime_error("CallExpr only invokes lval");
   name = lookup->name;
-  static std::map<std::string, Function> functions {
-    {"ceil", Function::CEIL},
-    {"cos", Function::COS},
-    {"exp", Function::EXP},
-    {"floor", Function::FLOOR},
-    {"log", Function::LOG},
-    {"mad", Function::MAD},
-    {"pow", Function::POW},
-    {"round", Function::ROUND},
-    {"sqrt", Function::SQRT},
-    {"tanh", Function::TANH},
+  static std::map<std::string, Function> functions{
+      {"ceil", Function::CEIL}, {"cos", Function::COS},   {"exp", Function::EXP}, {"floor", Function::FLOOR},
+      {"log", Function::LOG},   {"mad", Function::MAD},   {"pow", Function::POW}, {"round", Function::ROUND},
+      {"sqrt", Function::SQRT}, {"tanh", Function::TANH},
   };
   function = functions.at(name);
 }

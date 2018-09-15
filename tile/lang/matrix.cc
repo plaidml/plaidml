@@ -218,9 +218,7 @@ struct HermiteCompute {
   size_t columns_;
   Matrix lhs_;
 
-  void swap(size_t i, size_t j) {
-    lhs_.swapRows(i, j);
-  }
+  void swap(size_t i, size_t j) { lhs_.swapRows(i, j); }
 
   void mult(size_t i, Integer m) {
     if (m != 1 && m != -1) {
@@ -324,8 +322,7 @@ struct HermiteCompute {
   }
 
  public:
-  HermiteCompute(const Matrix& m) : rows_(m.size1()), columns_(m.size2()), lhs_(m) {
-  }
+  explicit HermiteCompute(const Matrix& m) : rows_(m.size1()), columns_(m.size2()), lhs_(m) {}
 
   bool compute() {
     if (rows_ < columns_) {

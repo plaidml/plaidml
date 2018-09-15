@@ -312,8 +312,7 @@ std::shared_ptr<Value> ContractionValue::make(CombinationOp comb_op, Aggregation
                                               const std::vector<SymbolicSpec>& specs,
                                               const std::vector<ValueConstraint>& constraints,
                                               const std::vector<std::shared_ptr<Value>>& inputs,
-                                              const std::vector<std::shared_ptr<Value>>& dims,
-                                              bool use_default,
+                                              const std::vector<std::shared_ptr<Value>>& dims, bool use_default,
                                               bool no_defract) {
   auto result = std::shared_ptr<Value>(
       Interned<ContractionValue>::make(comb_op, agg_op, specs, constraints, inputs, dims, use_default, no_defract));
@@ -844,7 +843,8 @@ void FunctionApplication::SetDone() {
         inputs.push_back(bindings_.at(c.use_default));
       }
       bool no_defract = c.no_defract;
-      bindings_[o.output] = ContractionValue::make(c.comb_op, c.agg_op, specs, cons, inputs, dims, use_default, no_defract);
+      bindings_[o.output] =
+          ContractionValue::make(c.comb_op, c.agg_op, specs, cons, inputs, dims, use_default, no_defract);
       IVLOG(4, "FunApp::SetDone " << this << " binding " << o.output << " ->(contraction) " << *bindings_[o.output]);
     }
     for (const auto& attr : o.attributes) {
@@ -966,7 +966,7 @@ void Value::log(el::base::type::ostream_t& os) const {
       for (const auto& spec : v->specs()) {
         os << ", spec:(";
         bool first = true;
-        for (const auto& ptr: spec) {
+        for (const auto& ptr : spec) {
           if (!first) {
             os << ", ";
           } else {

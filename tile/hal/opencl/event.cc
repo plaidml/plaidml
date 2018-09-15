@@ -63,7 +63,7 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> Event::WaitFor(
   context::Context ctx{};
   Event event{ctx, device_state, std::move(evt), queue};
   auto future = event.GetFuture();
-  auto results = future.then([ hal_events = std::move(hal_events), device_state ](decltype(future) fut) {
+  auto results = future.then([hal_events = std::move(hal_events), device_state](decltype(future) fut) {
     std::vector<std::shared_ptr<hal::Result>> results;
     results.reserve(hal_events.size());
     try {

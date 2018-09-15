@@ -1,21 +1,24 @@
 #pragma once
 
+#include <stdint.h>
+
 #include <map>
 #include <set>
 #include <stdexcept>
-#include <stdint.h>
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
-#include "printstring.h"
+#include "base/util/printstring.h"
 
 namespace vertexai {
 
 class deserialization_error : public std::runtime_error {
  public:
-  deserialization_error(const std::string& err) : std::runtime_error(printstring("deserialization: %s", err.c_str())) {}
+  explicit deserialization_error(const std::string& err)
+      : std::runtime_error(printstring("deserialization: %s", err.c_str())) {}
 };
 
 class transfer_flags {
@@ -49,7 +52,7 @@ template <class Obj>
 struct transfer_info {
   typedef transfer_type_object type;
   template <class Context>
-  static void object_transfer(Context& ctx, Obj& obj) {
+  static void object_transfer(Context& ctx, Obj& obj) {  // NOLINT
     obj.transfer(ctx);
   }
 };
@@ -59,7 +62,7 @@ template <class Obj>
 struct transfer_info<const Obj> {
   typedef transfer_type_object type;
   template <class Context>
-  static void object_transfer(Context& ctx, const Obj& obj) {
+  static void object_transfer(Context& ctx, const Obj& obj) {  // NOLINT
     const_cast<Obj&>(obj).transfer(ctx);
   }
 };
@@ -74,8 +77,8 @@ struct transfer_info<const Obj> {
 
 BASE_TYPE(char, transfer_type_signed);
 BASE_TYPE(unsigned char, transfer_type_unsigned);
-BASE_TYPE(short, transfer_type_signed);
-BASE_TYPE(unsigned short, transfer_type_unsigned);
+BASE_TYPE(int16_t, transfer_type_signed);
+BASE_TYPE(uint16_t, transfer_type_unsigned);
 BASE_TYPE(int, transfer_type_signed);
 BASE_TYPE(unsigned int, transfer_type_unsigned);
 BASE_TYPE(int64_t, transfer_type_signed);
@@ -92,10 +95,18 @@ struct transfer_info<std::vector<Inner>> {
   typedef transfer_type_array type;
   typedef Inner value_type;
   typedef typename std::vector<Inner>::iterator iterator;
-  static size_t size(std::vector<Inner>& arr) { return arr.size(); }
-  static iterator begin(std::vector<Inner>& arr) { return arr.begin(); }
-  static iterator end(std::vector<Inner>& arr) { return arr.end(); }
-  static void push_back(std::vector<Inner>& arr, const Inner& inner) { arr.push_back(inner); }
+  static size_t size(std::vector<Inner>& arr) {  // NOLINT
+    return arr.size();
+  }
+  static iterator begin(std::vector<Inner>& arr) {  // NOLINT
+    return arr.begin();
+  }
+  static iterator end(std::vector<Inner>& arr) {  // NOLINT
+    return arr.end();
+  }
+  static void push_back(std::vector<Inner>& arr, const Inner& inner) {  // NOLINT
+    arr.push_back(inner);
+  }
 };
 
 template <class Inner>
@@ -103,10 +114,18 @@ struct transfer_info<std::set<Inner>> {
   typedef transfer_type_array type;
   typedef Inner value_type;
   typedef typename std::set<Inner>::iterator iterator;
-  static size_t size(std::set<Inner>& arr) { return arr.size(); }
-  static iterator begin(std::set<Inner>& arr) { return arr.begin(); }
-  static iterator end(std::set<Inner>& arr) { return arr.end(); }
-  static void push_back(std::set<Inner>& arr, const Inner& inner) { arr.insert(inner); }
+  static size_t size(std::set<Inner>& arr) {  // NOLINT
+    return arr.size();
+  }
+  static iterator begin(std::set<Inner>& arr) {  // NOLINT
+    return arr.begin();
+  }
+  static iterator end(std::set<Inner>& arr) {  // NOLINT
+    return arr.end();
+  }
+  static void push_back(std::set<Inner>& arr, const Inner& inner) {  // NOLINT
+    arr.insert(inner);
+  }
 };
 
 template <class T1, class T2>
@@ -114,7 +133,7 @@ struct transfer_info<std::pair<T1, T2>> {
   typedef transfer_type_tuple type;
   typedef std::tuple<T1, T2> tuple_type;
   static tuple_type as_tuple(const std::pair<T1, T2>& pair) { return std::make_tuple(pair.first, pair.second); }
-  static void from_tuple(std::pair<T1, T2>& pair, const tuple_type& t) {
+  static void from_tuple(std::pair<T1, T2>& pair, const tuple_type& t) {  // NOLINT
     pair = std::make_pair(std::get<0>(t), std::get<1>(t));
   }
 };
@@ -126,7 +145,7 @@ struct transfer_info<std::pair<const T1, T2>> {
   typedef transfer_type_tuple type;
   typedef std::tuple<T1, T2> tuple_type;
   static tuple_type as_tuple(const std::pair<const T1, T2>& pair) { return std::make_tuple(pair.first, pair.second); }
-  static void from_tuple(std::pair<const T1, T2>& pair, const tuple_type& t) {
+  static void from_tuple(std::pair<const T1, T2>& pair, const tuple_type& t) {  // NOLINT
     pair = std::make_pair(std::get<0>(t), std::get<1>(t));
   }
 };
@@ -136,10 +155,18 @@ struct transfer_info<std::map<K, V>> {
   typedef transfer_type_array type;
   typedef std::pair<K, V> value_type;
   typedef typename std::map<K, V>::iterator iterator;
-  static size_t size(std::map<K, V>& m) { return m.size(); }
-  static iterator begin(std::map<K, V>& m) { return m.begin(); }
-  static iterator end(std::map<K, V>& m) { return m.end(); }
-  static void push_back(std::map<K, V>& m, const value_type& inner) { m.insert(inner); }
+  static size_t size(std::map<K, V>& m) {  // NOLINT
+    return m.size();
+  }
+  static iterator begin(std::map<K, V>& m) {  // NOLINT
+    return m.begin();
+  }
+  static iterator end(std::map<K, V>& m) {  // NOLINT
+    return m.end();
+  }
+  static void push_back(std::map<K, V>& m, const value_type& inner) {  // NOLINT
+    m.insert(inner);
+  }
 };
 
 template <class K, class V>
@@ -147,10 +174,18 @@ struct transfer_info<std::unordered_map<K, V>> {
   typedef transfer_type_array type;
   typedef std::pair<K, V> value_type;
   typedef typename std::unordered_map<K, V>::iterator iterator;
-  static size_t size(std::unordered_map<K, V>& m) { return m.size(); }
-  static iterator begin(std::unordered_map<K, V>& m) { return m.begin(); }
-  static iterator end(std::unordered_map<K, V>& m) { return m.end(); }
-  static void push_back(std::unordered_map<K, V>& m, const value_type& inner) { m.insert(inner); }
+  static size_t size(std::unordered_map<K, V>& m) {  // NOLINT
+    return m.size();
+  }
+  static iterator begin(std::unordered_map<K, V>& m) {  // NOLINT
+    return m.begin();
+  }
+  static iterator end(std::unordered_map<K, V>& m) {  // NOLINT
+    return m.end();
+  }
+  static void push_back(std::unordered_map<K, V>& m, const value_type& inner) {  // NOLINT
+    m.insert(inner);
+  }
 };
 
 template <class K, class V, class H>
@@ -158,10 +193,18 @@ struct transfer_info<std::unordered_map<K, V, H>> {
   typedef transfer_type_array type;
   typedef std::pair<K, V> value_type;
   typedef typename std::unordered_map<K, V, H>::iterator iterator;
-  static size_t size(std::unordered_map<K, V, H>& m) { return m.size(); }
-  static iterator begin(std::unordered_map<K, V, H>& m) { return m.begin(); }
-  static iterator end(std::unordered_map<K, V, H>& m) { return m.end(); }
-  static void push_back(std::unordered_map<K, V, H>& m, const value_type& inner) { m.insert(inner); }
+  static size_t size(std::unordered_map<K, V, H>& m) {  // NOLINT
+    return m.size();
+  }
+  static iterator begin(std::unordered_map<K, V, H>& m) {  // NOLINT
+    return m.begin();
+  }
+  static iterator end(std::unordered_map<K, V, H>& m) {  // NOLINT
+    return m.end();
+  }
+  static void push_back(std::unordered_map<K, V, H>& m, const value_type& inner) {  // NOLINT
+    m.insert(inner);
+  }
 };
 
 template <class V>
@@ -175,7 +218,7 @@ struct transfer_info<std::map<std::string, V>> {
 #define TF_NO_DEFAULT transfer_flags(4) /* Don't default construct missing fields */
 
 template <class Context, class Object>
-void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj, const Object& def,
+void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj, const Object& def,  // NOLINT
                     const transfer_flags& flags) {
   if (ctx.is_serialize()) {
     ctx.transfer_field(name, tag, obj);
@@ -201,23 +244,24 @@ void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj,
 }
 
 template <class Context, class Object>
-void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj, const Object& def) {
+void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj, const Object& def) {  // NOLINT
   transfer_field(ctx, name, tag, obj, def, transfer_flags(0));
 }
 
 template <class Context, class Object>
-void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj, const transfer_flags& flags) {
+void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj,  // NOLINT
+                    const transfer_flags& flags) {
   transfer_field(ctx, name, tag, obj, Object(), flags);
 }
 
 template <class Context, class Object>
-void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj) {
+void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj) {  // NOLINT
   transfer_field(ctx, name, tag, obj, Object(), transfer_flags(0));
 }
 
 #define TRANSFER_OBJECT    \
   template <class Context> \
-  void transfer(Context& _ctx)
+  void transfer(Context& _ctx) /* NOLINT */
 
 #define VERSION(v)   \
   int _next_tag = 1; \

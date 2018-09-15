@@ -2,12 +2,12 @@
 
 #include "tile/platform/local_machine/scheduler.h"
 
-#include <boost/dynamic_bitset.hpp>
-
 #include <iterator>
 #include <map>
 #include <set>
 #include <unordered_map>
+
+#include <boost/dynamic_bitset.hpp>
 
 #include "base/util/compat.h"
 #include "base/util/error.h"
@@ -170,8 +170,9 @@ void AddDataflowDeps(schedule::Schedule* schedule) {
       auto ltwit = latest_tmp_writer.find(allocp);
       if (ltwit == latest_tmp_writer.end()) {
         if (!allocp->is_input()) {
-          throw error::Internal{std::string{"Program fails to initialize non-empty temporary for a"} +
-                                std::to_string(allocp->idx)};
+          std::stringstream ss;
+          ss << "Program fails to initialize non-empty temporary for a" << allocp->idx;
+          throw error::Internal(ss.str());
         }
       } else {
         IVLOG(5, "  Adding dep on a" << allocp->idx << " with last writer s" << ltwit->second->idx);
@@ -265,14 +266,14 @@ void ValidateSchedule(const tile::proto::Program& program, const lang::KernelLis
       }
       case schedule::Step::Tag::kCopy: {
         if (step.outputs.size() != 1) {
-          throw error::Internal{"In schedule validation: copy step " + std::to_string(sidx) +
-                                " has an incorrect output count; expected: 1, got: " +
-                                std::to_string(step.outputs.size())};
+          throw error::Internal{
+              "In schedule validation: copy step " + std::to_string(sidx) +
+              " has an incorrect output count; expected: 1, got: " + std::to_string(step.outputs.size())};
         }
         if (step.inputs.size() != 1) {
-          throw error::Internal{"In schedule validation: copy step " + std::to_string(sidx) +
-                                " has an incorrect input count; expected: 1, got: " +
-                                std::to_string(step.inputs.size())};
+          throw error::Internal{
+              "In schedule validation: copy step " + std::to_string(sidx) +
+              " has an incorrect input count; expected: 1, got: " + std::to_string(step.inputs.size())};
         }
         const std::string& contents = alloc_infos[step.inputs[0]->idx].contents;
         std::uint64_t tensor_size = kl.types.at(contents).byte_size();

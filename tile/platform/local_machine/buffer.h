@@ -23,7 +23,8 @@ class Buffer : public tile::Buffer, public std::enable_shared_from_this<Buffer> 
   static std::shared_ptr<Buffer> Downcast(const std::shared_ptr<tile::Buffer>& buffer,
                                           const std::shared_ptr<DevInfo>& devinfo);
 
-  Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy, std::shared_ptr<MemChunk> chunk);
+  Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy,
+         std::shared_ptr<MemChunk> chunk);
 
   Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy, std::uint64_t size);
 

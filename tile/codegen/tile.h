@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "tile/lang/generate.h"
 #include "tile/proto/stripe.pb.h"
 

@@ -1,7 +1,7 @@
 // Copyright 2017, Vertex.AI.
 
-#include "tile/hal/opencl/zero_kernel.h"
 #include "base/util/error.h"
+#include "tile/hal/opencl/zero_kernel.h"
 
 namespace vertexai {
 namespace tile {

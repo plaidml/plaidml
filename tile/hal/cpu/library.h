@@ -10,7 +10,7 @@
 #include "tile/lang/generate.h"
 
 namespace llvm {
-  class ExecutionEngine;
+class ExecutionEngine;
 }
 
 namespace vertexai {
