@@ -20,7 +20,6 @@ namespace tile {
 namespace hal {
 namespace cpu {
 
-
 class Error : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
@@ -341,7 +340,7 @@ void Emit::Visit(const sem::CondExpr& n) {
   llvm::Type* condtype = cond.v->getType();
   if (condtype->isVectorTy()) {
     // Vector of booleans: operands must also be vectors of equal size.
-    llvm::Value *selexpr = ToBool(cond.v);
+    llvm::Value* selexpr = ToBool(cond.v);
     value tcase = Eval(n.tcase);
     value fcase = Eval(n.fcase);
     sem::Type comtype = ConvergeOperands(&tcase, &fcase);
@@ -473,7 +472,7 @@ void Emit::Visit(const sem::CallExpr& n) {
       linkName = "llvm.fma" + typefix;
       break;
     case sem::CallExpr::Function::ROUND:
-      linkName = (gentype.vec_width > 1)? ("llvm.rint" + typefix): "round";
+      linkName = (gentype.vec_width > 1) ? ("llvm.rint" + typefix) : "round";
       break;
     case sem::CallExpr::Function::TANH:
       linkName = n.name;
@@ -489,9 +488,9 @@ void Emit::Visit(const sem::CallExpr& n) {
   } else {
     sem::Type restype = gentype;
     if (devectorize) {
-     restype.vec_width = 1;
+      restype.vec_width = 1;
     }
-    llvm::Type *ltype = CType(restype);
+    llvm::Type* ltype = CType(restype);
     std::vector<llvm::Type*> paramTypes(args.size(), ltype);
     auto funcType = llvm::FunctionType::get(ltype, paramTypes, false);
     auto link = llvm::Function::ExternalLinkage;
@@ -508,12 +507,12 @@ void Emit::Visit(const sem::CallExpr& n) {
     auto zero = llvm::ConstantFP::get(context_, apzero);
     auto ltype = CType(gentype);
     auto op = llvm::CastInst::getCastOpcode(zero, true, ltype, true);
-    llvm::Value *outvec = builder_.CreateCast(op, zero, ltype);
+    llvm::Value* outvec = builder_.CreateCast(op, zero, ltype);
     for (unsigned i = 0; i < gentype.vec_width; ++i) {
       llvm::Value* index = llvm::ConstantInt::get(int32type_, i);
-      llvm::Value *inelement = builder_.CreateExtractElement(args[0], index);
+      llvm::Value* inelement = builder_.CreateExtractElement(args[0], index);
       std::vector<llvm::Value*> callarg(1, inelement);
-      llvm::Value *outelement = builder_.CreateCall(func, callarg, "");
+      llvm::Value* outelement = builder_.CreateCall(func, callarg, "");
       outvec = builder_.CreateInsertElement(outvec, outelement, index);
     }
     Resolve(value{outvec, gentype});

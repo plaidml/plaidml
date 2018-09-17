@@ -2,12 +2,12 @@
 
 #include "base/util/uuid.h"
 
+#include <mutex>
+#include <random>
+
 #include <boost/uuid/name_generator.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/string_generator.hpp>
-
-#include <mutex>
-#include <random>
 
 namespace bu = boost::uuids;
 

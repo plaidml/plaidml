@@ -1,8 +1,8 @@
-#include <string>
-
 #include <gflags/gflags.h>
 
-#include "logging.h"
+#include <string>
+
+#include "base/util/logging.h"
 
 INITIALIZE_EASYLOGGINGPP;
 

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <boost/operators.hpp>
-
 #include <array>
 #include <map>
 #include <memory>
@@ -10,6 +8,8 @@
 #include <string>
 #include <tuple>
 #include <vector>
+
+#include <boost/operators.hpp>
 
 #include "base/util/logging.h"
 #include "base/util/printstring.h"

@@ -2,8 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "tile/lang/semprinter.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/lang/semprinter.h"
 
 namespace vertexai {
 namespace tile {

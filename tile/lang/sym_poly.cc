@@ -16,12 +16,8 @@ class LiteralPolynomial : public SymbolicPolynomial {
   explicit LiteralPolynomial(int64_t value) : value_(value) {}
   SymbolicPolynomialPtr Xify() const override { return MakeLiteral(value_); }
   SymbolicPolynomialPtr DeXify() const override { return MakeLiteral(value_); }
-  SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override {
-    return MakeLiteral(value_);
-  }
-  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
-    return MakeLiteral(value_);
-  }
+  SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override { return MakeLiteral(value_); }
+  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override { return MakeLiteral(value_); }
   Polynomial Evaluate(const Bindings& bindings) const override { return Polynomial(value_); }
   std::string ToString() const override { return std::to_string(value_); }
 
@@ -95,12 +91,8 @@ class IndexPolynomial : public SymbolicPolynomial {
   explicit IndexPolynomial(const std::string& index) : index_(index) {}
   SymbolicPolynomialPtr Xify() const override { return MakeIndex(index_); }
   SymbolicPolynomialPtr DeXify() const override { return MakeIndex(index_); }
-  SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override {
-    return MakeIndex(index_);
-  }
-  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
-    return MakeIndex(index_);
-  }
+  SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override { return MakeIndex(index_); }
+  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override { return MakeIndex(index_); }
   Polynomial Evaluate(const Bindings& bindings) const override { return Polynomial(index_); }
   std::string ToString() const override { return index_; }
 
@@ -116,9 +108,7 @@ class UnaryOpPolynomial : public SymbolicPolynomial {
   SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override {
     return MakeUnaryOp(op_, val_->Compose(fa));
   }
-  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
-    return MakeUnaryOp(op_, val_->Decompose(bf));
-  }
+  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override { return MakeUnaryOp(op_, val_->Decompose(bf)); }
   Polynomial Evaluate(const Bindings& bindings) const override {
     if (op_ != "-") {
       throw std::runtime_error("Unknown unary polynomial op");
@@ -136,12 +126,8 @@ class BinaryOpPolynomial : public SymbolicPolynomial {
  public:
   BinaryOpPolynomial(const std::string& op, const SymbolicPolynomialPtr& lhs, const SymbolicPolynomialPtr& rhs)
       : op_(op), lhs_(lhs), rhs_(rhs) {}
-  SymbolicPolynomialPtr Xify() const override {
-    return MakeBinaryOp(op_, lhs_->Xify(), rhs_->Xify());
-  }
-  SymbolicPolynomialPtr DeXify() const override {
-    return MakeBinaryOp(op_, lhs_->DeXify(), rhs_->DeXify());
-  }
+  SymbolicPolynomialPtr Xify() const override { return MakeBinaryOp(op_, lhs_->Xify(), rhs_->Xify()); }
+  SymbolicPolynomialPtr DeXify() const override { return MakeBinaryOp(op_, lhs_->DeXify(), rhs_->DeXify()); }
   SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override {
     return MakeBinaryOp(op_, lhs_->Compose(fa), rhs_->Compose(fa));
   }

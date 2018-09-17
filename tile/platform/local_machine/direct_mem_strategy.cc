@@ -76,9 +76,8 @@ boost::future<std::unique_ptr<View>> DirectMemChunk::MapCurrent(const context::C
   context::Context ctx_copy{ctx};
   std::vector<std::shared_ptr<hal::Event>> deps;
   deps_->GetReadDependencies(&deps);
-  return mem_->MapCurrent(deps).then([
-    ctx = std::move(ctx_copy), deps = deps_, size = size_, mem = mem_
-  ](boost::future<void*> data_future) mutable->std::unique_ptr<View> {
+  return mem_->MapCurrent(deps).then([ctx = std::move(ctx_copy), deps = deps_, size = size_,
+                                      mem = mem_](boost::future<void*> data_future) mutable -> std::unique_ptr<View> {
     void* data = data_future.get();
     return compat::make_unique<DirectMemView>(ctx, std::move(deps), data, size, std::move(mem));
   });

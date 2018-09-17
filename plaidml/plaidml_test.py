@@ -21,7 +21,9 @@ class TestPlaidML(unittest.TestCase):
 
     def testVersion(self):
         import pkg_resources
-        self.assertIsInstance(pkg_resources.parse_version(plaidml.__version__), type(pkg_resources.parse_version("1.0.0")))
+        self.assertIsInstance(
+            pkg_resources.parse_version(plaidml.__version__),
+            type(pkg_resources.parse_version("1.0.0")))
 
     def testDeviceEnumerator(self):
         ctx = plaidml.Context()

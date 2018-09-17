@@ -38,7 +38,7 @@ message RpcRequest {
   string peer = 1;
   google.protobuf.Any request = 2;
 }
- 
+
 message RpcResponse {
   Status status = 1;
   google.protobuf.Any response = 2;
@@ -64,7 +64,8 @@ message ClockID {
 // An activity is typically described by multiple events that
 // have the same activity ID.
 message Event {
-  // The parent of this event's activity (what was going on when this activity started).
+  // The parent of this event's activity (what was going on when this activity
+  // started).
   ActivityID parent_id = 1;
 
   // The instance of this activity (e.g. a particular run of some RPC).
@@ -87,6 +88,7 @@ message Event {
   // Activity metadata.
   repeated google.protobuf.Any metadata = 7;
 
-  // Identifies the domain of this event -- i.e. the process in which the event takes place.
+  // Identifies the domain of this event -- i.e. the process in which the event
+  // takes place.
   ActivityID domain_id = 8;
 }

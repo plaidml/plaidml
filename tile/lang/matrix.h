@@ -1,11 +1,12 @@
 #pragma once
 
-#include <boost/numeric/ublas/io.hpp>
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/vector.hpp>
 #include <string>
 #include <tuple>
 #include <vector>
+
+#include <boost/numeric/ublas/io.hpp>
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/vector.hpp>
 
 #include "base/util/compat.h"
 #include "tile/lang/polynomial.h"
@@ -51,8 +52,8 @@ inline std::string to_string(const Matrix& m) { return m.toString(); }
 typedef boost::numeric::ublas::vector<Rational> Vector;
 typedef boost::numeric::ublas::identity_matrix<Rational> IdentityMatrix;
 
-using boost::numeric::ublas::trans;
 using boost::numeric::ublas::prod;
+using boost::numeric::ublas::trans;
 
 // Matrix literals to make things easier
 Vector VectorLit(const std::vector<Rational>& vec);

@@ -76,7 +76,8 @@ TEST(CpuDevice, LLVM_factorial) {
   auto f = _Function("factorial", idxType, {{idxType, "n"}},
                      {_DeclareConst(idxType, "r", 1),
                       _Block({
-                          _DeclareConst(idxType, "i", 1), _While(i <= n, _Block({r = r * i, i = i + 1})),
+                          _DeclareConst(idxType, "i", 1),
+                          _While(i <= n, _Block({r = r * i, i = i + 1})),
                       }),
                       _Return(r)});
 
@@ -189,11 +190,13 @@ TEST(CpuDevice, LLVM_fp_add) {
   auto out = _("out");
   auto i = _("i");
   const size_t arraylen = 4;
-  auto f = _Function("fp_add", voidType, {{
-                                              ptrFP32Type, "a",
-                                          },
-                                          {ptrFP32Type, "b"},
-                                          {ptrFP32Type, "out"}},
+  auto f = _Function("fp_add", voidType,
+                     {{
+                          ptrFP32Type,
+                          "a",
+                      },
+                      {ptrFP32Type, "b"},
+                      {ptrFP32Type, "out"}},
                      {_For("i", arraylen, 1, out[i] = a[i] + b[i])});
   auto engine = JIT(*f);
   EXPECT_THAT(engine, NotNull());
@@ -215,11 +218,13 @@ TEST(CpuDevice, LLVM_mix_mult) {
   auto out = _("out");
   auto i = _("i");
   const size_t arraylen = 4;
-  auto f = _Function("fp_add", voidType, {{
-                                              ptrFP32Type, "a",
-                                          },
-                                          {ptrInt32Type, "b"},
-                                          {ptrFP32Type, "out"}},
+  auto f = _Function("fp_add", voidType,
+                     {{
+                          ptrFP32Type,
+                          "a",
+                      },
+                      {ptrInt32Type, "b"},
+                      {ptrFP32Type, "out"}},
                      {_For("i", arraylen, 1, out[i] = a[i] * b[i])});
   auto engine = JIT(*f);
   EXPECT_THAT(engine, NotNull());
