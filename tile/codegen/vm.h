@@ -4,6 +4,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "tile/proto/stripe.pb.h"
 

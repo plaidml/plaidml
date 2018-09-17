@@ -1,13 +1,13 @@
 #pragma once
 
-#include <boost/operators.hpp>
-
 #include <array>
 #include <map>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include <boost/operators.hpp>
 
 #include "base/util/logging.h"
 #include "base/util/printstring.h"

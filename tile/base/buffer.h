@@ -2,12 +2,12 @@
 
 #pragma once
 
-#include <boost/thread/future.hpp>
-
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
+
+#include <boost/thread/future.hpp>
 
 #include "base/context/context.h"
 

@@ -1,12 +1,13 @@
 #pragma once
 
+#include <map>
+#include <string>
+#include <vector>
+
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/matrix_proxy.hpp>
 #include <boost/numeric/ublas/vector.hpp>
-#include <map>
-#include <string>
-#include <vector>
 
 #include "tile/lang/matrix.h"
 

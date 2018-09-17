@@ -16,9 +16,8 @@ message Platform {
   repeated vertexai.tile.hal.proto.HardwareConfig hardware_configs = 2;
 }
 
-
-// N.B. The following schedule definitions are being kept to enable parsing of older eventlogs,
-// but should not be used in new code.
+// N.B. The following schedule definitions are being kept to enable parsing of
+// older eventlogs, but should not be used in new code.
 
 message Alloc {
   uint64 size = 1;

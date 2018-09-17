@@ -28,7 +28,7 @@ void MemDeps::AddReadDependency(std::shared_ptr<hal::Event> event) {
     fut = event->GetFuture();
     it = events_.emplace(events_.end(), std::move(event));
   }
-  fut.then([ self = shared_from_this(), it ](boost::shared_future<std::shared_ptr<hal::Result>> future) {
+  fut.then([self = shared_from_this(), it](boost::shared_future<std::shared_ptr<hal::Result>> future) {
     future.get();
     std::lock_guard<std::mutex> lock{self->mu_};
     self->events_.erase(it);

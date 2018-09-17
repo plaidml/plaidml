@@ -25,7 +25,7 @@ struct Scope {
 
 class VirtualMachine {
  public:
-  VirtualMachine(std::map<std::string, std::vector<float>>* buffers)
+  explicit VirtualMachine(std::map<std::string, std::vector<float>>* buffers)
       : buffers_(*buffers)  //
   {}
 

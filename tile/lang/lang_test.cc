@@ -132,21 +132,21 @@ TEST_CASE("Subdivision 1D input width 2**n", "[subdivision]") {
 TEST_CASE("Awkward Flatten") {
   Parser p;
   Contraction c = p.ParseContraction("X_T10[24*n0 + 8*n1 + 4*n2 + n3 : 168] = +(X_I_0[n0, n1, n2, n3])");
-  FlatContraction f =
-      Compile(c, {
-                     SimpleShape(DataType::FLOAT32, {168}), SimpleShape(DataType::FLOAT32, {7, 3, 2, 4}),
-                 });
+  FlatContraction f = Compile(c, {
+                                     SimpleShape(DataType::FLOAT32, {168}),
+                                     SimpleShape(DataType::FLOAT32, {7, 3, 2, 4}),
+                                 });
   IVLOG(1, "Flat:\n" << f.toString());
 }
 
 TEST_CASE("Optimization of Convolution", "[conv_opt][opt]") {
   Parser p;
   auto c = p.ParseContraction("O[n, x, y, co] = +(K[i, j, co, ci] * I[n, x+i, y+j, ci])");
-  FlatContraction op = Flatten(
-      c, {
-             SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}), SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
-             SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
-         });
+  FlatContraction op = Flatten(c, {
+                                      SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}),
+                                      SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
+                                      SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
+                                  });
   IVLOG(1, "Flat:\n" << op.toString());
   auto settings = TestGPU();
   auto vectorized_op = Vectorize(op, settings.vec_size);
@@ -160,11 +160,11 @@ TEST_CASE("Optimization of Convolution", "[conv_opt][opt]") {
 TEST_CASE("Vectorized Flop Computation", "[conv_opt][opt]") {
   Parser p;
   auto c = p.ParseContraction("O[n, x, y, co] = +(K[i, j, co, ci] * I[n, x+i, y+j, ci])");
-  FlatContraction op = Flatten(
-      c, {
-             SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}), SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
-             SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
-         });
+  FlatContraction op = Flatten(c, {
+                                      SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}),
+                                      SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
+                                      SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
+                                  });
   uint64_t ops = 128ll * 3 * 3 * 25 * 25 * 384 * 256 * 2;
   auto settings = TestGPU();
   auto vectorized_gpu = TestGPU();
@@ -220,7 +220,8 @@ TEST_CASE("Compile unpool overlap", "[compile][unpool]") {
   Parser p;
   Contraction c = p.ParseContraction("O[2*x + i] = +(I[x]), i < 4");
   std::vector<TensorShape> shapes = {
-      {DataType::FLOAT32, {{1, 100UL}}}, {DataType::FLOAT32, {{1, 50UL}}},
+      {DataType::FLOAT32, {{1, 100UL}}},
+      {DataType::FLOAT32, {{1, 50UL}}},
   };
   FlatContraction r = Compile(c, shapes);
   REQUIRE(r.names == (std::vector<std::string>{"v0_0", "v0_1", "v1_0"}));
@@ -241,7 +242,8 @@ TEST_CASE("Compile unpool clean", "[compile][unpool]") {
   Parser p;
   Contraction c = p.ParseContraction("O[2*x + i] = +(I[x]), i < 2");
   std::vector<TensorShape> shapes = {
-      {DataType::FLOAT32, {{1, 100UL}}}, {DataType::FLOAT32, {{1, 50UL}}},
+      {DataType::FLOAT32, {{1, 100UL}}},
+      {DataType::FLOAT32, {{1, 50UL}}},
   };
   FlatContraction r = Compile(c, shapes);
   REQUIRE(r.names == (std::vector<std::string>{"v0_0", "v0_1"}));
@@ -260,7 +262,8 @@ TEST_CASE("Compile strided convolution derivate", "[compile][conv_d]") {
   Parser p;
   Contraction c = p.ParseContraction("DA[n, i + x, j + 2*y, ci] = +(DC[n, x, y, co] * B[i, j, ci, co])");
   std::vector<TensorShape> shapes = {
-      SimpleShape(DataType::FLOAT32, {1, 3, 6, 1}), SimpleShape(DataType::FLOAT32, {1, 2, 3, 1}),
+      SimpleShape(DataType::FLOAT32, {1, 3, 6, 1}),
+      SimpleShape(DataType::FLOAT32, {1, 2, 3, 1}),
       SimpleShape(DataType::FLOAT32, {2, 2, 1, 1}),
   };
   FlatContraction r = Compile(c, shapes);
@@ -517,7 +520,8 @@ TEST_CASE("Ast", "[ast]") {
   auto f = _Function("factorial", idxType, {{idxType, "n"}},
                      {_DeclareConst(idxType, "r", 1),
                       _Block({
-                          _DeclareConst(idxType, "i", 1), _While(i <= n, _Block({r = r * i, i = i + 1})),
+                          _DeclareConst(idxType, "i", 1),
+                          _While(i <= n, _Block({r = r * i, i = i + 1})),
                       }),
                       _Return(r)});
 

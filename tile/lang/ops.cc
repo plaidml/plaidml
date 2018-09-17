@@ -1,10 +1,11 @@
 #include "tile/lang/ops.h"
-#include "tile/lang/sym_poly.h"
 
 #include <cinttypes>
 #include <sstream>
 
 #include <boost/math/common_factor_rt.hpp>
+
+#include "tile/lang/sym_poly.h"
 
 namespace vertexai {
 namespace tile {

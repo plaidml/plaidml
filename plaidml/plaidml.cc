@@ -2,6 +2,11 @@
 
 #include "plaidml/plaidml.h"
 
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/util/json_util.h>
+#include <google/protobuf/util/type_resolver_util.h>
 #include <zip.h>
 
 #include <algorithm>
@@ -21,12 +26,6 @@
 #include <utility>
 
 #include <boost/filesystem.hpp>
-
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/text_format.h>
-#include <google/protobuf/util/json_util.h>
-#include <google/protobuf/util/type_resolver_util.h>
 
 #include "base/config/config.h"
 #include "base/util/any_factory_map.h"
@@ -1507,7 +1506,6 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
     }
 
     return true;
-
   } catch (...) {
     vertexai::SetLastException(std::current_exception());
     return false;

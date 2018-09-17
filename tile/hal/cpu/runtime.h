@@ -14,8 +14,8 @@ namespace cpu {
 
 class Runtime : public llvm::RuntimeDyld::SymbolResolver {
  public:
-  llvm::RuntimeDyld::SymbolInfo findSymbol(const std::string &) override;
-  llvm::RuntimeDyld::SymbolInfo findSymbolInLogicalDylib(const std::string &) override;
+  llvm::RuntimeDyld::SymbolInfo findSymbol(const std::string&) override;
+  llvm::RuntimeDyld::SymbolInfo findSymbolInLogicalDylib(const std::string&) override;
 };
 
 }  // namespace cpu

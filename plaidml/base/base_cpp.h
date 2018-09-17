@@ -3,6 +3,8 @@
 // This is the Vertex.AI common C++ interface, which provides a higher level object
 // oriented wrapper on top of the Vertex.AI common C API.
 
+#pragma once
+
 #include <exception>
 #include <memory>
 #include <string>

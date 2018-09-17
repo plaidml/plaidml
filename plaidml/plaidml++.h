@@ -5,14 +5,14 @@
 
 #pragma once
 
-#include <half.hpp>
-
 #include <exception>
 #include <future>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <half.hpp>
 
 #include "plaidml/base/base_cpp.h"
 #include "plaidml/plaidml.h"

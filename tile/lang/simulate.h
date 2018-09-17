@@ -1,12 +1,12 @@
 #pragma once
 
-#include <boost/multi_array.hpp>
-
 #include <algorithm>
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/multi_array.hpp>
 
 #include "tile/lang/flat.h"
 #include "tile/lang/ops.h"

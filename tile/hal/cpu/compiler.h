@@ -8,9 +8,9 @@
 #include "tile/base/hal.h"
 
 namespace llvm {
-  class ExecutionEngine;
-  class Module;
-}
+class ExecutionEngine;
+class Module;
+}  // namespace llvm
 
 namespace vertexai {
 namespace tile {
