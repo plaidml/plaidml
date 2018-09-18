@@ -11,7 +11,7 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//plaidml/base",
-        "@gmock_archive//:gtest",
+        "@gmock//:gtest",
     ],
 )
 
@@ -51,8 +51,8 @@ plaidml_cc_library(
     srcs = ["gtest_main.cc"],
     deps = [
         "//base/util",
-        "@com_github_gflags_gflags//:gflags",
-        "@easylogging_repo//:easylogging",
-        "@gmock_archive//:gtest",
+        "@easylogging",
+        "@gflags",
+        "@gmock//:gtest",
     ],
 )

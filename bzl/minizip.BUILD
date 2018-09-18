@@ -7,30 +7,26 @@ config_setting(
     values = {"cpu": "x64_windows"},
 )
 
-SRCS = [
-    "crypt.c",
-    "ioapi.c",
-    "ioapi_buf.c",
-    "ioapi_mem.c",
-    "minishared.c",
-    "unzip.c",
-    "zip.c",
-]
-
-HDRS = [
-    "crypt.h",
-    "ioapi.h",
-    "ioapi_buf.h",
-    "ioapi_mem.h",
-    "minishared.h",
-    "unzip.h",
-    "zip.h",
-]
-
 cc_library(
     name = "minizip",
-    srcs = SRCS,
-    hdrs = HDRS,
+    srcs = [
+        "crypt.c",
+        "ioapi.c",
+        "ioapi_buf.c",
+        "ioapi_mem.c",
+        "minishared.c",
+        "unzip.c",
+        "zip.c",
+    ],
+    hdrs = [
+        "crypt.h",
+        "ioapi.h",
+        "ioapi_buf.h",
+        "ioapi_mem.h",
+        "minishared.h",
+        "unzip.h",
+        "zip.h",
+    ],
     copts = select({
         ":x64_windows": [],
         "//conditions:default": [
@@ -43,6 +39,6 @@ cc_library(
             "-D_FILE_OFFSET_BIT=64",
         ],
     }),
-    includes = [""],
+    # includes = [""],
     deps = ["@zlib_archive//:zlib"],
 )
