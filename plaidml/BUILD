@@ -8,12 +8,12 @@ load(
     "plaidml_cc_binary",
     "plaidml_cc_library",
     "plaidml_cc_test",
+    "plaidml_cc_version",
     "plaidml_proto_library",
     "plaidml_py_library",
     "plaidml_py_wheel",
-    "plaidml_cc_version",
 )
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_deb", "pkg_tar")
 load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
 
 exports_files(["requirements.txt"])
@@ -48,8 +48,8 @@ plaidml_cc_library(
         "//tile/base:program_cache",
         "//tile/platform/local_machine",
         "//tile/proto:proto_cc",
-        "@half_repo//:half",
-        "@minizip_repo//:minizip",
+        "@half//:half",
+        "@minizip//:minizip",
         "@vertexai_plaidml//tile/proto:metadata_cc",
     ] + select({
         "@toolchain//:linux_arm_32v7": [
@@ -338,13 +338,13 @@ pkg_tar(
 pkg_tar(
     name = "sdk",
     srcs = ["plaidml-config.cmake"],
+    # TODO: Build package_dir from the --define=version= config setting.
+    package_dir = "plaidml-0.5.0",
     deps = [
         ":sdk_configs",
         ":sdk_includes",
         ":sdk_libs",
         "//plaidml/base:sdk_includes",
-        "@half_repo//:sdk_includes",
+        "@half//:sdk_includes",
     ],
-    # TODO: Build package_dir from the --define=version= config setting.
-    package_dir = "plaidml-0.5.0",
 )

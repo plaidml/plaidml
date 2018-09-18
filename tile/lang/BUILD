@@ -106,7 +106,7 @@ plaidml_cc_library(
         "//base/util",
         "//tile/lang/bilp",
         "//tile/proto:stripe_cc",
-        "@boost_archive//:boost",
+        "@boost",
     ],
 )
 
@@ -145,7 +145,7 @@ plaidml_cc_library(
     visibility = ["//tile/lang/bilp:__pkg__"],
     deps = [
         "//base/util",
-        "@boost_archive//:boost",
+        "@boost",
     ],
 )
 

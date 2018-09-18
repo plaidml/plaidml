@@ -1,6 +1,6 @@
 # Copyright 2017, Vertex.AI.
 
-load("//bzl:plaidml.bzl", "plaidml_proto_library", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_proto_library")
 
 plaidml_proto_library(
     name = "proto",
@@ -85,8 +85,8 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util",
-        "@boost_archive//:filesystem",
-        "@boost_archive//:regex",
+        "@boost//:filesystem",
+        "@boost//:regex",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
@@ -95,7 +95,7 @@ plaidml_cc_library(
         "//tile/proto:support",
     ] + select({
         "@toolchain//:macos_x86_64": [],
-        "//conditions:default": ["@opencl_icd_loader_repo//:lib"],
+        "//conditions:default": ["@opencl_icd_loader//:lib"],
     }),
     alwayslink = 1,
 )

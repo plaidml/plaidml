@@ -45,11 +45,11 @@ plaidml_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@boost_archive//:boost",
-        "@com_github_gflags_gflags//:gflags",
-        "@easylogging_repo//:easylogging",
-        "@jsoncpp_git//:jsoncpp",
-        "@minizip_repo//:minizip",
+        "@boost",
+        "@easylogging",
+        "@gflags",
+        "@jsoncpp",
+        "@minizip",
     ],
 )
 

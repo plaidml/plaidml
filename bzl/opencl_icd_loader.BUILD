@@ -24,7 +24,7 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        "@opencl_headers_repo//:inc",
+        "@opencl_headers//:inc",
         "@opengl_repo//:inc",
     ],
 )

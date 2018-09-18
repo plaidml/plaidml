@@ -23,10 +23,10 @@ plaidml_cc_library(
         "//base/util",
         "//tile/lang",
         "//tile/proto:proto_cc",
-        "@boost_archive//:boost",
-        "@boost_archive//:thread",
-        "@com_github_gflags_gflags//:gflags",
-        "@easylogging_repo//:easylogging",
+        "@boost",
+        "@boost//:thread",
+        "@easylogging",
+        "@gflags",
     ],
 )
 
@@ -41,7 +41,7 @@ plaidml_cc_library(
         "//base/context",
         "//tile/lang",
         "//tile/proto:hal_cc",
-        "@boost_archive//:thread",
+        "@boost//:thread",
     ],
 )
 
@@ -80,8 +80,8 @@ plaidml_cc_library(
         ":base",
         "//testing:matchers",
         "//tile/proto:support",
-        "@gmock_archive//:gtest",
-        "@half_repo//:half",
+        "@gmock//:gtest",
+        "@half",
     ],
     alwayslink = True,
 )
