@@ -2,9 +2,9 @@
 
 #pragma once
 
-#include <string>
+#include <unzip.h>
 
-#include "unzip.h"  // NOLINT
+#include <string>
 
 namespace vertexai {
 
