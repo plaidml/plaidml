@@ -26,9 +26,9 @@ def plaidml_workspace():
 
     native.http_archive(
         name = "gflags",
-        url = "https://github.com/gflags/gflags/archive/v2.2.1.tar.gz",
-        sha256 = "ae27cdbcd6a2f935baa78e4f21f675649271634c092b1be01469440495609d0e",
-        strip_prefix = "gflags-2.2.1",
+        url = "https://github.com/gflags/gflags/archive/e292e0452fcfd5a8ae055b59052fc041cbab4abf.zip",
+        sha256 = "7d17922978692175c67ef5786a014df44bfbfe3b48b30937cca1413d4ff65f75",
+        strip_prefix = "gflags-e292e0452fcfd5a8ae055b59052fc041cbab4abf",
     )
 
     native.new_http_archive(
