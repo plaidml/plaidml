@@ -73,9 +73,9 @@ def plaidml_workspace():
 
     native.new_http_archive(
         name = "opencl_icd_loader",
-        url = "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/b342ff7b7f70a4b3f2cfc53215af8fa20adc3d86.zip",
-        sha256 = "bc0acd1bc1307643d042f575fa3582115887f29f90b25dfe0ad4dbef5d5fb5e8",
-        strip_prefix = "OpenCL-ICD-Loader-b342ff7b7f70a4b3f2cfc53215af8fa20adc3d86",
+        url = "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/6849f617e991e8a46eebf746df43032175f263b3.zip",
+        sha256 = "1c82be071237ccce36753be9331de3c6b8d4f461d931b40bc070d6c0fb80ff83",
+        strip_prefix = "OpenCL-ICD-Loader-6849f617e991e8a46eebf746df43032175f263b3",
         build_file = str(Label("//bzl:opencl_icd_loader.BUILD")),
     )
 
