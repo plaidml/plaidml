@@ -39,6 +39,6 @@ cc_library(
             "-D_FILE_OFFSET_BIT=64",
         ],
     }),
-    # includes = [""],
+    includes = ["."],
     deps = ["@zlib_archive//:zlib"],
 )
