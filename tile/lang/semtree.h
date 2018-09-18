@@ -41,6 +41,7 @@ class Visitor;
 
 // All semtree elements are nodes.
 struct Node {
+  virtual ~Node() = default;
   virtual void Accept(Visitor&) const = 0;
 };
 

@@ -7,7 +7,6 @@
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/util/json_util.h>
 #include <google/protobuf/util/type_resolver_util.h>
-#include <zip.h>
 
 #include <algorithm>
 #include <atomic>
@@ -53,6 +52,7 @@
 #include "tile/proto/metadata.pb.h"
 #include "tile/proto/support.h"
 #include "tile/proto/tile.pb.h"
+#include "zip.h"  // NOLINT
 
 namespace {
 constexpr std::size_t kApplierForShapeCacheSize = 8;

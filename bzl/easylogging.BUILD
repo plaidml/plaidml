@@ -1,7 +1,7 @@
 cc_library(
     name = "easylogging",
-    srcs = ["src/easylogging++.cc"],
-    hdrs = ["src/easylogging++.h"],
+    srcs = ["easylogging++.cc"],
+    hdrs = ["easylogging++.h"],
     copts = [
         "-DELPP_THREAD_SAFE",
         "-DELPP_CUSTOM_COUT=std::cerr",
@@ -13,6 +13,6 @@ cc_library(
         "-DELPP_DISABLE_DEFAULT_CRASH_HANDLING",
         "-DELPP_WINSOCK2",
     ],
-    includes = ["src"],
+    includes = ["."],
     visibility = ["//visibility:public"],
 )
