@@ -465,6 +465,7 @@ void Emit::Visit(const sem::CallExpr& n) {
     case sem::CallExpr::Function::FLOOR:
     case sem::CallExpr::Function::LOG:
     case sem::CallExpr::Function::POW:
+    case sem::CallExpr::Function::SIN:
     case sem::CallExpr::Function::SQRT:
       linkName = "llvm." + n.name + typefix;
       break;
@@ -474,6 +475,12 @@ void Emit::Visit(const sem::CallExpr& n) {
     case sem::CallExpr::Function::ROUND:
       linkName = (gentype.vec_width > 1) ? ("llvm.rint" + typefix) : "round";
       break;
+    case sem::CallExpr::Function::ACOS:
+    case sem::CallExpr::Function::ASIN:
+    case sem::CallExpr::Function::ATAN:
+    case sem::CallExpr::Function::COSH:
+    case sem::CallExpr::Function::SINH:
+    case sem::CallExpr::Function::TAN:
     case sem::CallExpr::Function::TANH:
       linkName = n.name;
       devectorize = true;
