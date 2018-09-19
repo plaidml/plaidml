@@ -165,7 +165,25 @@ struct CastExpr : public Expression {
 
 // A call of a function
 struct CallExpr : public Expression {
-  enum class Function { CEIL, COS, EXP, FLOOR, LOG, MAD, POW, ROUND, SQRT, TANH };
+  enum class Function {
+    ACOS,
+    ASIN,
+    ATAN,
+    CEIL,
+    COS,
+    COSH,
+    EXP,
+    FLOOR,
+    LOG,
+    MAD,
+    POW,
+    ROUND,
+    SIN,
+    SINH,
+    SQRT,
+    TAN,
+    TANH
+  };
   Function function;
   std::string name;
   std::vector<ExprPtr> vals;
