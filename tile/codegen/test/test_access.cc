@@ -2,8 +2,9 @@
 
 #include <gmock/gmock.h>
 
-#include "tile/codegen/tile.h"
 #include "tile/codegen/access.h"
+#include "tile/codegen/cache.h"
+#include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
@@ -38,28 +39,49 @@ TEST(Codegen, Access) {
 
   auto access = ComputeAccess(*kernel, "A");
   EXPECT_THAT(access.size(), Eq(1));
-  AccessPattern expected1 = { false, true, 0, {
-      {"k", 2, 3}, //
-      {"m", 10, 3}, //
-      {"n", 0, 3}, //
-      {"k", 1, 2}, //
-      {"m", 5, 2}, //
-      {"n", 0, 2}, //
-    }, {
-      {{2, 0, 0, 1, 0, 0}, 5},
-      {{0, 2, 0, 0, 1, 0}, 5},
-      {{0, 0, 2, 0, 0, 1}, 5},
-    }};
+  AccessPattern expected1 = {false,
+                             true,
+                             {
+                                 {"k", 3, 0},  //
+                                 {"m", 3, 0},  //
+                                 {"n", 3, 0},  //
+                                 {"k", 2, 2},  //
+                                 {"m", 2, 2},  //
+                                 {"n", 2, 2},  //
+                             },
+                             {0, {2, 10, 0, 1, 5, 0}},
+                             {
+                                 {{2, 0, 0, 1, 0, 0}, 5},
+                                 {{0, 2, 0, 0, 1, 0}, 5},
+                                 {{0, 0, 2, 0, 0, 1}, 5},
+                             }};
   EXPECT_THAT(access[0], Eq(expected1));
 
   access = ComputeAccess(*inner, "A");
   EXPECT_THAT(access.size(), Eq(1));
-  AccessPattern expected2 = { false, false, 0, {
-      {"k", 1, 2}, //
-      {"m", 5, 2}, //
-      {"n", 0, 2}, //
-    }, {}};
+  AccessPattern expected2 = {false,
+                             false,
+                             {
+                                 {"k", 2, 2},  //
+                                 {"m", 2, 2},  //
+                                 {"n", 2, 2},  //
+                             },
+                             {0, {1, 5, 0}},
+                             {}};
   EXPECT_THAT(access[0], Eq(expected2));
+}
+
+TEST(Codegen, Cache) {
+  auto runinfo = LoadMatMul();
+  auto program = GenerateStripe(runinfo);
+
+  auto main = program.mutable_stmts(0)->mutable_block();
+  auto kernel = main->mutable_stmts(0)->mutable_block();
+  ApplyTile(kernel, {2, 2, 2});
+  auto inner = kernel->mutable_stmts(0)->mutable_block();
+  ApplyCache(inner, "A");
+  std::cout << *inner;
+  std::cout << "W00t\n";
 }
 
 }  // namespace test

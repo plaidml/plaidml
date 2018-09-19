@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "tile/lang/generate.h"
 #include "tile/proto/stripe.pb.h"
 
@@ -9,31 +12,40 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-struct IndexAccess {
-  std::string name;
-  int64_t stride;
-  uint64_t range;
-  bool operator==(const IndexAccess& o) const { 
-    return name == o.name && stride == o.stride && range == o.range;
-  }
+struct BufferAccess {
+  int64_t offset;
+  std::vector<int64_t> strides;
+  bool operator==(const BufferAccess& o) const { return offset == o.offset && strides == o.strides; }
 };
+
+std::ostream& operator<<(std::ostream& stream, const BufferAccess& a);
+
+struct Index {
+  std::string name;
+  uint64_t range;
+  int64_t factor;
+  bool operator==(const Index& o) const { return name == o.name && range == o.range && factor == o.factor; }
+};
+typedef std::vector<Index> Indexes;
+
+std::ostream& operator<<(std::ostream& stream, const Index& a);
 
 struct Constraint {
   std::vector<int64_t> lhs;
   int64_t rhs;
-  bool operator==(const Constraint& o) const { 
-    return lhs == o.lhs && rhs == o.rhs;
-  }
+  bool operator==(const Constraint& o) const { return lhs == o.lhs && rhs == o.rhs; }
 };
+typedef std::vector<Constraint> Constraints;
 
 struct AccessPattern {
   bool is_write;
   bool is_exact;
-  int64_t offset;
-  std::vector<IndexAccess> access;
-  std::vector<Constraint> constraints;
-  bool operator==(const AccessPattern& o) const { 
-    return is_write == o.is_write && is_exact == o.is_exact && offset == o.offset && access == o.access && constraints == o.constraints;
+  Indexes indexes;
+  BufferAccess access;
+  Constraints constraints;
+  bool operator==(const AccessPattern& o) const {
+    return is_write == o.is_write && is_exact == o.is_exact && indexes == o.indexes && access == o.access &&
+           constraints == o.constraints;
   }
 };
 
