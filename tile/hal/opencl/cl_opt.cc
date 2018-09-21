@@ -105,9 +105,9 @@ class InsnOptimizer : public sem::Visitor {
     scope_ = &scope;
     for (const auto& p : node.params) {
       auto ty = p.first;
-      if (ty.dtype == lang::DataType::BOOLEAN) {
+      if (ty.dtype == DataType::BOOLEAN) {
         // Global booleans are stored as INT8.
-        ty.dtype = lang::DataType::INT8;
+        ty.dtype = DataType::INT8;
       }
       scope.Bind(p.second, ty);
     }

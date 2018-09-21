@@ -48,11 +48,11 @@
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lang/parser.h"
-#include "tile/lang/stripe.h"
 #include "tile/lang/symbolic.h"
 #include "tile/proto/metadata.pb.h"
 #include "tile/proto/support.h"
 #include "tile/proto/tile.pb.h"
+#include "tile/stripe/stripe.h"
 
 namespace {
 constexpr std::size_t kApplierForShapeCacheSize = 8;
@@ -578,42 +578,42 @@ extern "C" void plaidml_free_mapping(plaidml_mapping* mapping) { delete mapping;
 
 namespace {
 
-tile::lang::DataType MakeTileDataType(plaidml_datatype datatype) {
+tile::DataType MakeTileDataType(plaidml_datatype datatype) {
   switch (datatype) {
     case PLAIDML_DATA_BOOLEAN:
-      return tile::lang::DataType::BOOLEAN;
+      return tile::DataType::BOOLEAN;
     case PLAIDML_DATA_INT8:
-      return tile::lang::DataType::INT8;
+      return tile::DataType::INT8;
     case PLAIDML_DATA_INT16:
-      return tile::lang::DataType::INT16;
+      return tile::DataType::INT16;
     case PLAIDML_DATA_INT32:
-      return tile::lang::DataType::INT32;
+      return tile::DataType::INT32;
     case PLAIDML_DATA_INT64:
-      return tile::lang::DataType::INT64;
+      return tile::DataType::INT64;
     case PLAIDML_DATA_UINT8:
-      return tile::lang::DataType::UINT8;
+      return tile::DataType::UINT8;
     case PLAIDML_DATA_UINT16:
-      return tile::lang::DataType::UINT16;
+      return tile::DataType::UINT16;
     case PLAIDML_DATA_UINT32:
-      return tile::lang::DataType::UINT32;
+      return tile::DataType::UINT32;
     case PLAIDML_DATA_UINT64:
-      return tile::lang::DataType::UINT64;
+      return tile::DataType::UINT64;
     case PLAIDML_DATA_FLOAT16:
-      return tile::lang::DataType::FLOAT16;
+      return tile::DataType::FLOAT16;
     case PLAIDML_DATA_FLOAT32:
-      return tile::lang::DataType::FLOAT32;
+      return tile::DataType::FLOAT32;
     case PLAIDML_DATA_FLOAT64:
-      return tile::lang::DataType::FLOAT64;
+      return tile::DataType::FLOAT64;
     default:
-      return tile::lang::DataType::INVALID;
+      return tile::DataType::INVALID;
   }
 }
 
 }  // namespace
 
 extern "C" void plaidml_set_floatx(plaidml_datatype datatype) {
-  tile::lang::DataType dt = MakeTileDataType(datatype);
-  if (dt == tile::lang::DataType::INVALID) {
+  tile::DataType dt = MakeTileDataType(datatype);
+  if (dt == tile::DataType::INVALID) {
     vertexai::SetLastStatus(VAI_STATUS_INVALID_ARGUMENT, status_strings::kInvalidArgument);
     return;
   }
@@ -623,7 +623,7 @@ extern "C" void plaidml_set_floatx(plaidml_datatype datatype) {
 // plaidml_shape
 
 struct plaidml_shape {
-  tile::lang::TensorShape shape;
+  tile::TensorShape shape;
   size_t offset_in_elements = 0;
   bool valid = true;
 };
@@ -634,8 +634,8 @@ extern "C" plaidml_shape* plaidml_alloc_shape(vai_ctx* ctx, plaidml_datatype dat
     return nullptr;
   }
 
-  tile::lang::DataType dt = MakeTileDataType(datatype);
-  if (dt == tile::lang::DataType::INVALID) {
+  tile::DataType dt = MakeTileDataType(datatype);
+  if (dt == tile::DataType::INVALID) {
     vertexai::SetLastStatus(VAI_STATUS_INVALID_ARGUMENT, status_strings::kInvalidArgument);
     return nullptr;
   }
@@ -684,29 +684,29 @@ extern "C" plaidml_datatype plaidml_get_shape_type(plaidml_shape* shape) {
     return PLAIDML_DATA_INVALID;
   }
   switch (shape->shape.type) {
-    case tile::lang::DataType::BOOLEAN:
+    case tile::DataType::BOOLEAN:
       return PLAIDML_DATA_BOOLEAN;
-    case tile::lang::DataType::INT8:
+    case tile::DataType::INT8:
       return PLAIDML_DATA_INT8;
-    case tile::lang::DataType::INT16:
+    case tile::DataType::INT16:
       return PLAIDML_DATA_INT16;
-    case tile::lang::DataType::INT32:
+    case tile::DataType::INT32:
       return PLAIDML_DATA_INT32;
-    case tile::lang::DataType::INT64:
+    case tile::DataType::INT64:
       return PLAIDML_DATA_INT64;
-    case tile::lang::DataType::UINT8:
+    case tile::DataType::UINT8:
       return PLAIDML_DATA_UINT8;
-    case tile::lang::DataType::UINT16:
+    case tile::DataType::UINT16:
       return PLAIDML_DATA_UINT16;
-    case tile::lang::DataType::UINT32:
+    case tile::DataType::UINT32:
       return PLAIDML_DATA_UINT32;
-    case tile::lang::DataType::UINT64:
+    case tile::DataType::UINT64:
       return PLAIDML_DATA_UINT64;
-    case tile::lang::DataType::FLOAT16:
+    case tile::DataType::FLOAT16:
       return PLAIDML_DATA_FLOAT16;
-    case tile::lang::DataType::FLOAT32:
+    case tile::DataType::FLOAT32:
       return PLAIDML_DATA_FLOAT32;
-    case tile::lang::DataType::FLOAT64:
+    case tile::DataType::FLOAT64:
       return PLAIDML_DATA_FLOAT64;
     default:
       return PLAIDML_DATA_INVALID;
@@ -819,7 +819,7 @@ void WriteTensor(zipFile f, const std::string& name, const TensorValue& tensor) 
     throw std::runtime_error("Could not write file into zip file");
   }
   std::string shape_buf;
-  tile::shape::proto::to_proto(tensor.shape()).SerializeToString(&shape_buf);
+  IntoProto(tensor.shape()).SerializeToString(&shape_buf);
   uint64_t shape_sz = shape_buf.size();
   zipWriteInFileInZip(f, &shape_sz, sizeof(shape_sz));
   zipWriteInFileInZip(f, &shape_buf[0], shape_sz);
@@ -869,7 +869,7 @@ void WriteMetadata(zipFile f, const BoundFunction& func, const std::map<std::str
     if (!tv) {
       continue;
     }
-    (*md.mutable_inputs())[func.input_name(idx)] = tile::shape::proto::to_proto(tv->shape());
+    (*md.mutable_inputs())[func.input_name(idx)] = tile::IntoProto(tv->shape());
   }
 
   gpu::JsonPrintOptions options;
@@ -892,9 +892,9 @@ std::shared_ptr<TensorValue> ReadTensor(vai_ctx* ctx, vertexai::UnZipArchive* zi
   std::string proto_buf(shape_size, '\0');
   tensor_file.ReadInto(&proto_buf[0], proto_buf.size());
 
-  tile::shape::proto::TensorShape ts_proto;
+  tile::proto::TensorShape ts_proto;
   ts_proto.ParseFromString(proto_buf);
-  tile::lang::TensorShape ts = tile::shape::proto::to_poco(ts_proto);
+  auto ts = tile::FromProto(ts_proto);
   std::shared_ptr<BufferState> bs = std::make_shared<BufferState>(
       evaluator->get_platform()->MakeBuffer(ctx->activity.ctx(), evaluator->get_id(), ts.byte_size()), evaluator);
   plaidml_buffer tb{std::move(activity), bs};
@@ -1261,7 +1261,7 @@ struct ApplierParameterShape {
   }
 
   Value::Type type;
-  tile::lang::TensorShape shape;
+  tile::TensorShape shape;
   std::int64_t iconst = 0;
   double fconst = 0.0;
 };
@@ -1481,25 +1481,25 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
     // At this point, we're saving a Stripe file format.
     BuildInvokerRunInfo(invoker);
     invoker->runinfo->program_name = path.stem().string();
-    auto block = GenerateStripe(*invoker->runinfo);
+    auto program = GenerateStripe(*invoker->runinfo);
 
     std::ofstream file{path.string()};
 
     switch (format) {
-      case PLAIDML_FILE_FORMAT_STRIPE_HUMAN: {
-        file << block;
+      case PLAIDML_FILE_FORMAT_STRIPE_HUMAN:
+        file << program;
         break;
-      }
 
       case PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT: {
+        auto pb_program = tile::stripe::IntoProto(program);
         gpi::OstreamOutputStream out{&file};
-        gp::TextFormat::Print(block, &out);
-        break;
-      }
+        gp::TextFormat::Print(pb_program, &out);
+      } break;
 
-      case PLAIDML_FILE_FORMAT_STRIPE_BINARY:
-        block.SerializeToOstream(&file);
-        break;
+      case PLAIDML_FILE_FORMAT_STRIPE_BINARY: {
+        auto pb_program = tile::stripe::IntoProto(program);
+        pb_program.SerializeToOstream(&file);
+      } break;
 
       default:
         break;
@@ -1554,13 +1554,13 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     prog.set_code(invoker->runinfo->code);
     for (const auto& kv : invoker->runinfo->input_shapes) {
       auto& input = (*prog.mutable_inputs())[kv.first];
-      *input.mutable_shape() = tile::shape::proto::to_proto(kv.second);
+      *input.mutable_shape() = tile::IntoProto(kv.second);
       if (output_set.count(in_buffers[kv.first].get())) {
         input.set_consumed(true);
       }
     }
     for (const auto& kv : invoker->runinfo->output_shapes) {
-      *(*prog.mutable_outputs())[kv.first].mutable_shape() = tile::shape::proto::to_proto(kv.second);
+      *(*prog.mutable_outputs())[kv.first].mutable_shape() = tile::IntoProto(kv.second);
     }
 
     size_t max_trials = 1;

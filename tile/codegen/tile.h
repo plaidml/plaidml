@@ -5,8 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "tile/lang/generate.h"
-#include "tile/proto/stripe.pb.h"
+#include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
@@ -22,23 +21,23 @@ struct StencilCriteria {
 struct StencilMatch {
   size_t total;
   std::vector<std::string> names;
-  lang::TileShape tile;
+  TileShape tile;
   bool is_fallback;
 };
 
-MAKE_LOGGABLE(StencilMatch, match, os);
+std::ostream& operator<<(std::ostream& os, const StencilMatch& match);
 bool operator==(const StencilMatch& lhs, const StencilMatch& rhs);
 bool operator<(const StencilMatch& lhs, const StencilMatch& rhs);
 
 StencilMatch FindBestStencil(const std::vector<std::vector<StencilCriteria>>& criteria,  //
-                             stripe::proto::Block* block);
+                             stripe::Block* block);
 
-void ApplyTile(stripe::proto::Block* outer, const lang::TileShape& tile);
+void ApplyTile(stripe::Block* outer, const TileShape& tile);
 
-typedef std::function<lang::TileShape(stripe::proto::Block* block)> TileGenerator;
+typedef std::function<TileShape(stripe::Block* block)> TileGenerator;
 
-void TilePass(stripe::proto::Block* block, const std::vector<std::vector<StencilCriteria>>& criteria);
-void TilePass(stripe::proto::Block* block, const TileGenerator& generator);
+void TilePass(stripe::Block* block, const std::vector<std::vector<StencilCriteria>>& criteria);
+void TilePass(stripe::Block* block, const TileGenerator& generator);
 
 }  // namespace codegen
 }  // namespace tile

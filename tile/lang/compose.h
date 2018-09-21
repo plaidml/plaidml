@@ -10,9 +10,9 @@
 #include <vector>
 
 #include "base/util/intern.h"
+#include "tile/base/shape.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/type.h"
 
 namespace vertexai {

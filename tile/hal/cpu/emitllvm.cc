@@ -64,13 +64,13 @@ Emit::Emit()
 
 void Emit::Visit(const sem::IntConst& n) {
   llvm::Value* ret = llvm::ConstantInt::get(int32type_, n.value);
-  Resolve(value{ret, {sem::Type::VALUE, lang::DataType::INT32}});
+  Resolve(value{ret, {sem::Type::VALUE, DataType::INT32}});
 }
 
 void Emit::Visit(const sem::FloatConst& n) {
   llvm::Type* ty = llvm::Type::getFloatTy(context_);
   llvm::Value* ret = llvm::ConstantFP::get(ty, n.value);
-  Resolve(value{ret, {sem::Type::VALUE, lang::DataType::FLOAT32}});
+  Resolve(value{ret, {sem::Type::VALUE, DataType::FLOAT32}});
 }
 
 void Emit::Visit(const sem::LookupLVal& n) {
@@ -114,7 +114,7 @@ void Emit::Visit(const sem::SubscriptLVal& n) {
   // a pointer to the element value, which just happens to be the same thing
   // GetElementPtr wants to return.
   value offset = Eval(n.offset);
-  indexes.push_back(CastTo(offset, {sem::Type::VALUE, lang::DataType::INT32}));
+  indexes.push_back(CastTo(offset, {sem::Type::VALUE, DataType::INT32}));
   llvm::Value* resptr = builder_.CreateGEP(ptr.v, indexes);
   sem::Type restype = ptr.t;
   restype.base = sem::Type::VALUE;
@@ -174,7 +174,7 @@ void Emit::Visit(const sem::BinaryExpr& n) {
   if (n.op == "+" && PointerAddition(lhs, rhs)) return;
 
   sem::Type comtype = ConvergeOperands(&lhs, &rhs);
-  sem::Type booltype{sem::Type::VALUE, lang::DataType::BOOLEAN};
+  sem::Type booltype{sem::Type::VALUE, DataType::BOOLEAN};
 
   // Create the instruction that represents this operator, which depends on
   // whether our operands are floats, signed ints, or unsigned ints.
@@ -438,7 +438,7 @@ void Emit::Visit(const sem::CallExpr& n) {
   // have the same type, which is 'double' by default, and the result will have
   // the same type. If one or more of the arguments are vectors, we will convert
   // non-vector arguments up to the vector size.
-  sem::Type gentype{sem::Type::VALUE, lang::DataType::FLOAT64};
+  sem::Type gentype{sem::Type::VALUE, DataType::FLOAT64};
   std::string typefix = ".";
   std::vector<value> vals;
   for (auto& expr : n.vals) {
@@ -545,13 +545,13 @@ void Emit::LimitConstSInt(unsigned bits, sem::LimitConst::Which which) {
   llvm::IntegerType* ty = llvm::IntegerType::get(context_, bits);
   sem::Type comtype{sem::Type::VALUE};
   if (bits <= 8) {
-    comtype.dtype = lang::DataType::INT8;
+    comtype.dtype = DataType::INT8;
   } else if (bits <= 16) {
-    comtype.dtype = lang::DataType::INT16;
+    comtype.dtype = DataType::INT16;
   } else if (bits <= 32) {
-    comtype.dtype = lang::DataType::INT32;
+    comtype.dtype = DataType::INT32;
   } else {
-    comtype.dtype = lang::DataType::INT64;
+    comtype.dtype = DataType::INT64;
   }
   Resolve(value{llvm::ConstantInt::get(ty, apval), comtype});
 }
@@ -575,15 +575,15 @@ void Emit::LimitConstUInt(unsigned bits, sem::LimitConst::Which which) {
   llvm::IntegerType* ty = llvm::IntegerType::get(context_, bits);
   sem::Type comtype{sem::Type::VALUE};
   if (bits == 1) {
-    comtype.dtype = lang::DataType::BOOLEAN;
+    comtype.dtype = DataType::BOOLEAN;
   } else if (bits <= 8) {
-    comtype.dtype = lang::DataType::UINT8;
+    comtype.dtype = DataType::UINT8;
   } else if (bits <= 16) {
-    comtype.dtype = lang::DataType::UINT16;
+    comtype.dtype = DataType::UINT16;
   } else if (bits <= 32) {
-    comtype.dtype = lang::DataType::UINT32;
+    comtype.dtype = DataType::UINT32;
   } else {
-    comtype.dtype = lang::DataType::UINT64;
+    comtype.dtype = DataType::UINT64;
   }
   Resolve(value{llvm::ConstantInt::get(ty, apval), comtype});
 }
@@ -604,50 +604,50 @@ void Emit::LimitConstFP(const llvm::fltSemantics& sem, sem::LimitConst::Which wh
       apval = llvm::APFloat::getLargest(sem, /*Negative*/ false);
       break;
   }
-  sem::Type comtype{sem::Type::VALUE, lang::DataType::FLOAT64};
+  sem::Type comtype{sem::Type::VALUE, DataType::FLOAT64};
   Resolve(value{llvm::ConstantFP::get(context_, apval), comtype});
 }
 
 void Emit::Visit(const sem::LimitConst& n) {
   switch (n.type) {
-    case lang::DataType::BOOLEAN:
+    case DataType::BOOLEAN:
       LimitConstUInt(1, n.which);
       break;
-    case lang::DataType::INT8:
+    case DataType::INT8:
       LimitConstSInt(8, n.which);
       break;
-    case lang::DataType::INT16:
+    case DataType::INT16:
       LimitConstSInt(16, n.which);
       break;
-    case lang::DataType::INT32:
+    case DataType::INT32:
       LimitConstSInt(32, n.which);
       break;
-    case lang::DataType::INT64:
+    case DataType::INT64:
       LimitConstSInt(64, n.which);
       break;
-    case lang::DataType::UINT8:
+    case DataType::UINT8:
       LimitConstUInt(8, n.which);
       break;
-    case lang::DataType::UINT16:
+    case DataType::UINT16:
       LimitConstUInt(16, n.which);
       break;
-    case lang::DataType::UINT32:
+    case DataType::UINT32:
       LimitConstUInt(32, n.which);
       break;
-    case lang::DataType::UINT64:
+    case DataType::UINT64:
       LimitConstUInt(64, n.which);
       break;
-    case lang::DataType::FLOAT16:
+    case DataType::FLOAT16:
       LimitConstFP(llvm::APFloat::IEEEhalf, n.which);
       break;
-    case lang::DataType::FLOAT32:
+    case DataType::FLOAT32:
       LimitConstFP(llvm::APFloat::IEEEsingle, n.which);
       break;
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT64:
       LimitConstFP(llvm::APFloat::IEEEdouble, n.which);
       break;
-    case lang::DataType::INVALID:
-    case lang::DataType::PRNG:
+    case DataType::INVALID:
+    case DataType::PRNG:
       throw Error("Unknown type has no constants");
   }
 }
@@ -900,13 +900,13 @@ llvm::Type* Emit::CType(const sem::Type& type) {
   }
   llvm::Type* t = nullptr;
   switch (type.dtype) {
-    case lang::DataType::FLOAT16:
+    case DataType::FLOAT16:
       t = llvm::Type::getHalfTy(context_);
       break;
-    case lang::DataType::FLOAT32:
+    case DataType::FLOAT32:
       t = llvm::Type::getFloatTy(context_);
       break;
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT64:
       t = llvm::Type::getDoubleTy(context_);
       break;
     default:
@@ -987,11 +987,11 @@ bool Emit::IsUnsignedIntegerType(const sem::Type& t) {
   if (t.base != sem::Type::VALUE) return false;
   if (t.array > 0) return false;
   switch (t.dtype) {
-    case lang::DataType::BOOLEAN:
-    case lang::DataType::UINT8:
-    case lang::DataType::UINT16:
-    case lang::DataType::UINT32:
-    case lang::DataType::UINT64:
+    case DataType::BOOLEAN:
+    case DataType::UINT8:
+    case DataType::UINT16:
+    case DataType::UINT32:
+    case DataType::UINT64:
       return true;
     default:
       return false;
@@ -1002,9 +1002,9 @@ bool Emit::IsFloatingPointType(const sem::Type& t) {
   if (t.base != sem::Type::VALUE) return false;
   if (t.array > 0) return false;
   switch (t.dtype) {
-    case lang::DataType::FLOAT16:
-    case lang::DataType::FLOAT32:
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT16:
+    case DataType::FLOAT32:
+    case DataType::FLOAT64:
       return true;
     default:
       return false;

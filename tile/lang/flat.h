@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "base/util/transfer_object.h"
+#include "tile/base/shape.h"
 #include "tile/lang/ops.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/type.h"
 
 namespace vertexai {

@@ -26,7 +26,7 @@ namespace {
 static PerfCounter pre_scan_time("pre_scan_time");
 static PerfCounter post_scan_time("post_scan_time");
 
-void AllocateBuffers(const std::vector<std::string>& names, const lang::ShapeMap& types, hal::Memory* memory,
+void AllocateBuffers(const std::vector<std::string>& names, const ShapeMap& types, hal::Memory* memory,
                      std::vector<std::shared_ptr<hal::Buffer>>* buffers) {
   for (const auto& name : names) {
     const auto& shape = types.find(name)->second;
@@ -84,8 +84,8 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
   context::Context ctx;
   lang::Parser parser;
   auto parsed = parser.Parse(program.code());
-  auto inputs = to_poco(program.inputs());
-  auto outputs = to_poco(program.outputs());
+  auto inputs = FromProto(program.inputs());
+  auto outputs = FromProto(program.outputs());
   auto settings = hal::settings::ToHardwareSettings(devinfo.settings);
   auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, optimizer, program.id(), tile_trials);
 
