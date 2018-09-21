@@ -147,20 +147,9 @@ bool operator==(const Index& lhs, const Index& rhs);
 bool operator==(const Constraint& lhs, const Constraint& rhs);
 bool operator==(const BufferAccess& lhs, const BufferAccess& rhs);
 
-// std::ostream& operator<<(std::ostream& os, const Declaration& decl);
-// std::ostream& operator<<(std::ostream& os, const Load& op);
-// std::ostream& operator<<(std::ostream& os, const Store& op);
-// std::ostream& operator<<(std::ostream& os, const Special& op);
-// std::ostream& operator<<(std::ostream& os, const Intrinsic& op);
-// std::ostream& operator<<(std::ostream& os, const Constant& op);
 std::ostream& operator<<(std::ostream& os, const Index& idx);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 std::ostream& operator<<(std::ostream& os, const BufferAccess& a);
-
-// void PrintAccess(std::ostream& os, const BufferAccess& access, const Block& block);
-// void PrintConstraint(std::ostream& os, const Constraint& constraint, const Block& block);
-// void PrintStatement(std::ostream& os, const Statement& stmt, size_t depth);
-// void PrintBlock(std::ostream& os, const Block& block, size_t depth = 0);
 
 Block FromProto(const proto::Block& block);
 proto::Block IntoProto(const Block& block);
