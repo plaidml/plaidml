@@ -46,11 +46,11 @@ plaidml_cc_library(
         "//plaidml/base",
         "//tile/base",
         "//tile/base:program_cache",
+        "//tile/stripe",
         "//tile/platform/local_machine",
-        "//tile/proto:proto_cc",
-        "@half//:half",
-        "@minizip//:minizip",
-        "@vertexai_plaidml//tile/proto:metadata_cc",
+        "//tile/proto:metadata_cc",
+        "@half",
+        "@minizip",
     ] + select({
         "@toolchain//:linux_arm_32v7": [
             "//tile/hal/opencl",
@@ -108,7 +108,7 @@ plaidml_cc_library(
         ":proto_cc",
         "//tile/base",
         "//tile/base:program_cache",
-        "//tile/proto:proto_cc",
+        "//tile/stripe",
     ],
 )
 

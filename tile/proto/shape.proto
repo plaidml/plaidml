@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package vertexai.tile.shape.proto;
+package vertexai.tile.proto;
 
 // Encapsulates a tensor of arbitrary dimensionality and data type
 message TensorShape {

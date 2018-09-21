@@ -6,7 +6,7 @@
 #include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
-#include "tile/lang/stripe.h"
+#include "tile/stripe/stripe.h"
 
 using ::testing::ContainerEq;
 using ::testing::Eq;
@@ -20,9 +20,9 @@ lang::RunInfo LoadMatMul(size_t dim) {
   lang::RunInfo runinfo;
   runinfo.program_name = "matmul";
   runinfo.code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
-  runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {dim, dim}));
-  runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {dim, dim}));
-  runinfo.output_shapes.emplace("C", lang::SimpleShape(lang::DataType::FLOAT32, {dim, dim}));
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {dim, dim}));
+  runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {dim, dim}));
+  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {dim, dim}));
   return runinfo;
 }
 
@@ -32,9 +32,9 @@ lang::RunInfo LoadConv1D(size_t n, size_t x, size_t c, size_t k) {
   runinfo.code = R"(function (I[N, X, CI], K[KX, CI, CO]) -> (O) {
     O[n, x, co : N, X - KX + 1, CO] = +(I[n, x + k, ci] * K[k, ci, co]);
 })";
-  runinfo.input_shapes.emplace("I", lang::SimpleShape(lang::DataType::FLOAT32, {n, x, c}));
-  runinfo.input_shapes.emplace("K", lang::SimpleShape(lang::DataType::FLOAT32, {k, c, c}));
-  runinfo.output_shapes.emplace("O", lang::SimpleShape(lang::DataType::FLOAT32, {n, x - k + 1, c}));
+  runinfo.input_shapes.emplace("I", SimpleShape(DataType::FLOAT32, {n, x, c}));
+  runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {k, c, c}));
+  runinfo.output_shapes.emplace("O", SimpleShape(DataType::FLOAT32, {n, x - k + 1, c}));
   return runinfo;
 }
 
@@ -44,9 +44,9 @@ lang::RunInfo LoadConv2D(size_t n, size_t x, size_t c, size_t k) {
   runinfo.code = R"(function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
     O[n, x, y, co : N, X - KX + 1, Y - KY + 1, CO] = +(I[n, x + kx, y + ky, ci] * K[kx, ky, ci, co]);
 })";
-  runinfo.input_shapes.emplace("I", lang::SimpleShape(lang::DataType::FLOAT32, {n, x, x, c}));
-  runinfo.input_shapes.emplace("K", lang::SimpleShape(lang::DataType::FLOAT32, {k, k, c, c}));
-  runinfo.output_shapes.emplace("O", lang::SimpleShape(lang::DataType::FLOAT32, {n, x - k + 1, x - k + 1, c}));
+  runinfo.input_shapes.emplace("I", SimpleShape(DataType::FLOAT32, {n, x, x, c}));
+  runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {k, k, c, c}));
+  runinfo.output_shapes.emplace("O", SimpleShape(DataType::FLOAT32, {n, x - k + 1, x - k + 1, c}));
   return runinfo;
 }
 
@@ -110,12 +110,12 @@ TEST(Codegen, ApplyTile) {
   IVLOG(2, "C: " << data["C"]);
   EXPECT_THAT(data["C"], ContainerEq(expected));
 
-  auto main = program.mutable_stmts(0)->mutable_block();
-  auto kernel = main->mutable_stmts(0)->mutable_block();
-  ApplyTile(kernel, {5, 4, 4});
-  auto inner = kernel->mutable_stmts(0)->mutable_block();
+  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
+  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
+  ApplyTile(kernel.get(), {5, 4, 4});
+  auto inner = std::dynamic_pointer_cast<stripe::Block>(kernel->stmts[0]);
   IVLOG(2, "Inner>\n" << *inner);
-  ApplyTile(inner, {5, 2, 2});
+  ApplyTile(inner.get(), {5, 2, 2});
 
   for (size_t i = 0; i < data["C"].size(); i++) {
     data["C"][i] = 0;
@@ -140,12 +140,12 @@ TEST(Codegen, StencilMatchMatMul) {
 
   auto runinfo = LoadMatMul(100);
   auto program = GenerateStripe(runinfo);
-  auto main = program.mutable_stmts(0)->mutable_block();
-  auto kernel = main->mutable_stmts(0)->mutable_block();
+  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
+  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({criteria}, kernel);
+  auto match = FindBestStencil({criteria}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
       25600,            // total
@@ -164,12 +164,12 @@ TEST(Codegen, StencilMatchConv1D) {
 
   auto runinfo = LoadConv1D(1, 100, 64, 3);
   auto program = GenerateStripe(runinfo);
-  auto main = program.mutable_stmts(0)->mutable_block();
-  auto kernel = main->mutable_stmts(0)->mutable_block();
+  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
+  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({criteria}, kernel);
+  auto match = FindBestStencil({criteria}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
       16384,                 // total
@@ -196,12 +196,12 @@ TEST(Codegen, StencilMatchConv2D) {
 
   auto runinfo = LoadConv2D(1, 100, 64, 3);
   auto program = GenerateStripe(runinfo);
-  auto main = program.mutable_stmts(0)->mutable_block();
-  auto kernel = main->mutable_stmts(0)->mutable_block();
+  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
+  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({criteria}, kernel);
+  auto match = FindBestStencil({criteria}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
       16384,                           // total
@@ -227,9 +227,9 @@ TEST(Codegen, TilePassBroadcast) {
   lang::RunInfo runinfo;
   runinfo.program_name = "broadcast";
   runinfo.code = "function (A, B) -> (C) { C = add(A, B); }";
-  runinfo.input_shapes.emplace("A", lang::SimpleShape(lang::DataType::FLOAT32, {1, 112, 112, 32}));
-  runinfo.input_shapes.emplace("B", lang::SimpleShape(lang::DataType::FLOAT32, {32}));
-  runinfo.output_shapes.emplace("C", lang::SimpleShape(lang::DataType::FLOAT32, {1, 112, 112, 32}));
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
+  runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {32}));
+  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
   auto program = GenerateStripe(runinfo);
 
   LOG(INFO) << "\n" << program;

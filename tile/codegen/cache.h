@@ -3,6 +3,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "tile/codegen/access.h"
 
@@ -11,17 +12,17 @@ namespace tile {
 namespace codegen {
 
 struct CacheInfo {
-  Indexes indexes;
-  BufferAccess far;
-  BufferAccess near;
-  Indexes xfer_indexes;
-  BufferAccess xfer_far;
-  BufferAccess xfew_near;
+  std::vector<stripe::Index> idxs;
+  stripe::BufferAccess far;
+  stripe::BufferAccess near;
+  std::vector<stripe::Index> xfer_idxs;
+  stripe::BufferAccess xfer_far;
+  stripe::BufferAccess xfer_near;
 };
 
-CacheInfo ComputeCacheInfo(const Indexes& indexes, const BufferAccess& access);
+CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe::BufferAccess& access);
 
-void ApplyCache(stripe::proto::Block* block, const std::string& buffer);
+void ApplyCache(stripe::Block* block, const std::string& buffer);
 
 }  // namespace codegen
 }  // namespace tile

@@ -6,13 +6,13 @@
 #include <string>
 #include <vector>
 
-#include "tile/proto/stripe.pb.h"
+#include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ExecuteProgram(const stripe::proto::Block& program, std::map<std::string, std::vector<float>>* buffers);
+void ExecuteProgram(const stripe::Block& program, std::map<std::string, std::vector<float>>* buffers);
 
 }  // namespace codegen
 }  // namespace tile

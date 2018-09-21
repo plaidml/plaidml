@@ -62,8 +62,6 @@ enum class KernelType {
   kCopy,      // A direct memcpy kernel.
 };
 
-typedef std::vector<uint64_t> TileShape;
-
 struct TileOption {
   TileOption()
       : core_tile_cost(std::numeric_limits<double>::infinity()),

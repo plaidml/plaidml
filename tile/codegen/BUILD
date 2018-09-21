@@ -9,7 +9,6 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
-        "//tile/lang",
-        "//tile/proto:stripe_cc",
+        "//tile/stripe",
     ],
 )

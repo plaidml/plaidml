@@ -1,5 +1,6 @@
 #include <mutex>
 
+#include "tile/base/shape.h"
 #include "tile/lang/bound.h"
 #include "tile/lang/compile.h"
 #include "tile/lang/defract.h"
@@ -15,7 +16,6 @@
 #include "tile/lang/sembuilder.h"
 #include "tile/lang/semprinter.h"
 #include "tile/lang/semtree.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/sym_poly.h"
 #include "tile/lang/symbolic.h"
 #include "tile/lang/tile_opt.h"

@@ -12,62 +12,50 @@ namespace tile {
 namespace hal {
 namespace metal {
 
-inline std::string c_dtype(const lang::DataType& dt) {
+inline std::string c_dtype(const DataType& dt) {
   switch (dt) {
-    case lang::DataType::BOOLEAN:
+    case DataType::BOOLEAN:
       return "bool";
-    case lang::DataType::INT8:
+    case DataType::INT8:
       return "char";
-    case lang::DataType::INT16:
+    case DataType::INT16:
       return "short";
-    case lang::DataType::INT32:
+    case DataType::INT32:
       return "int";
-    case lang::DataType::INT64:
+    case DataType::INT64:
       return "ptrdiff_t";
-    case lang::DataType::UINT8:
+    case DataType::UINT8:
       return "uchar";
-    case lang::DataType::UINT16:
+    case DataType::UINT16:
       return "ushort";
-    case lang::DataType::UINT32:
+    case DataType::UINT32:
       return "uint";
-    case lang::DataType::UINT64:
+    case DataType::UINT64:
       return "size_t";
-    case lang::DataType::FLOAT16:
+    case DataType::FLOAT16:
       return "half";
-    case lang::DataType::FLOAT32:
+    case DataType::FLOAT32:
       return "float";
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT64:
     default:
       throw std::runtime_error("Invalid tile type");
   }
 }
 
-static std::map<std::pair<lang::DataType, sem::LimitConst::Which>, std::string> LimitConstLookup = {
-    {{lang::DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::INT8, sem::LimitConst::MIN}, "SCHAR_MIN"},
-    {{lang::DataType::INT16, sem::LimitConst::MIN}, "SHRT_MIN"},
-    {{lang::DataType::INT32, sem::LimitConst::MIN}, "INT_MIN"},
-    {{lang::DataType::INT64, sem::LimitConst::MIN}, "LONG_MIN"},
-    {{lang::DataType::UINT8, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::UINT16, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::UINT32, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::UINT64, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
-    {{lang::DataType::FLOAT32, sem::LimitConst::MIN}, "-FLT_MAX"},
-    {{lang::DataType::FLOAT64, sem::LimitConst::MIN}, "-DBL_MAX"},
+static std::map<std::pair<DataType, sem::LimitConst::Which>, std::string> LimitConstLookup = {
+    {{DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},        {{DataType::INT8, sem::LimitConst::MIN}, "SCHAR_MIN"},
+    {{DataType::INT16, sem::LimitConst::MIN}, "SHRT_MIN"},   {{DataType::INT32, sem::LimitConst::MIN}, "INT_MIN"},
+    {{DataType::INT64, sem::LimitConst::MIN}, "LONG_MIN"},   {{DataType::UINT8, sem::LimitConst::MIN}, "0"},
+    {{DataType::UINT16, sem::LimitConst::MIN}, "0"},         {{DataType::UINT32, sem::LimitConst::MIN}, "0"},
+    {{DataType::UINT64, sem::LimitConst::MIN}, "0"},         {{DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
+    {{DataType::FLOAT32, sem::LimitConst::MIN}, "-FLT_MAX"}, {{DataType::FLOAT64, sem::LimitConst::MIN}, "-DBL_MAX"},
 
-    {{lang::DataType::BOOLEAN, sem::LimitConst::MAX}, "0"},
-    {{lang::DataType::INT8, sem::LimitConst::MAX}, "SCHAR_MAX"},
-    {{lang::DataType::INT16, sem::LimitConst::MAX}, "SHRT_MAX"},
-    {{lang::DataType::INT32, sem::LimitConst::MAX}, "INT_MAX"},
-    {{lang::DataType::INT64, sem::LimitConst::MAX}, "LONG_MAX"},
-    {{lang::DataType::UINT8, sem::LimitConst::MAX}, "UCHAR_MAX"},
-    {{lang::DataType::UINT16, sem::LimitConst::MAX}, "USHRT_MAX"},
-    {{lang::DataType::UINT32, sem::LimitConst::MAX}, "UINT_MAX"},
-    {{lang::DataType::UINT64, sem::LimitConst::MAX}, "ULONG_MAX"},
-    {{lang::DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
-    {{lang::DataType::FLOAT32, sem::LimitConst::MAX}, "FLT_MAX"},
-    {{lang::DataType::FLOAT64, sem::LimitConst::MAX}, "DBL_MAX"},
+    {{DataType::BOOLEAN, sem::LimitConst::MAX}, "0"},        {{DataType::INT8, sem::LimitConst::MAX}, "SCHAR_MAX"},
+    {{DataType::INT16, sem::LimitConst::MAX}, "SHRT_MAX"},   {{DataType::INT32, sem::LimitConst::MAX}, "INT_MAX"},
+    {{DataType::INT64, sem::LimitConst::MAX}, "LONG_MAX"},   {{DataType::UINT8, sem::LimitConst::MAX}, "UCHAR_MAX"},
+    {{DataType::UINT16, sem::LimitConst::MAX}, "USHRT_MAX"}, {{DataType::UINT32, sem::LimitConst::MAX}, "UINT_MAX"},
+    {{DataType::UINT64, sem::LimitConst::MAX}, "ULONG_MAX"}, {{DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
+    {{DataType::FLOAT32, sem::LimitConst::MAX}, "FLT_MAX"},  {{DataType::FLOAT64, sem::LimitConst::MAX}, "DBL_MAX"},
 };
 
 class Emitter : public sem::Visitor {

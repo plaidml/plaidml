@@ -11,17 +11,17 @@ namespace testing {
 namespace {
 
 Param supported_params[] = {
-    {lang::DataType::INT8, 1},    //
-    {lang::DataType::INT16, 1},   //
-    {lang::DataType::INT32, 1},   //
-    {lang::DataType::INT64, 1},   //
-    {lang::DataType::UINT8, 1},   //
-    {lang::DataType::UINT16, 1},  //
-    {lang::DataType::UINT32, 1},  //
-    {lang::DataType::UINT64, 1},  //
-    // {lang::DataType::FLOAT16, 1},  //
-    {lang::DataType::FLOAT32, 1},  //
-    {lang::DataType::FLOAT64, 1},  //
+    {DataType::INT8, 1},    //
+    {DataType::INT16, 1},   //
+    {DataType::INT32, 1},   //
+    {DataType::INT64, 1},   //
+    {DataType::UINT8, 1},   //
+    {DataType::UINT16, 1},  //
+    {DataType::UINT32, 1},  //
+    {DataType::UINT64, 1},  //
+    // {DataType::FLOAT16, 1},  //
+    {DataType::FLOAT32, 1},  //
+    {DataType::FLOAT64, 1},  //
 };
 
 std::vector<FactoryParam> SupportedParams() {

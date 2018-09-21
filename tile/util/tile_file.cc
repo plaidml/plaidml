@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "tile/lang/parser.h"
-#include "tile/proto/support.h"
 #include "tile/proto/tile.pb.h"
 
 namespace vertexai {
@@ -28,16 +27,16 @@ std::shared_ptr<lang::TensorValue> ReadTensor(UnZipArchive* zip_file, const std:
   std::string proto_buf(shape_size, '\0');
   tensor_file.ReadInto(&proto_buf[0], proto_buf.size());
 
-  shape::proto::TensorShape tensor_shape_proto;
-  tensor_shape_proto.ParseFromString(proto_buf);
+  proto::TensorShape pb_shape;
+  pb_shape.ParseFromString(proto_buf);
 
-  auto tensor_shape = shape::proto::to_poco(tensor_shape_proto);
+  auto tensor_shape = FromProto(pb_shape);
 
   auto null_buffer = std::make_shared<NullBuffer>();
   return lang::TensorValue::make(null_buffer, tensor_shape);
 }
 
-std::shared_ptr<lang::TensorValue> MakeTensor(lang::TensorShape shape) {
+std::shared_ptr<lang::TensorValue> MakeTensor(TensorShape shape) {
   auto null_buffer = std::make_shared<NullBuffer>();
   return lang::TensorValue::make(null_buffer, shape);
 }
@@ -87,7 +86,7 @@ lang::RunInfo TileFile::Load() {
   auto num_inputs = bound->num_inputs();
   for (size_t i = 0; i < num_inputs; i++) {
     std::string input_name = bound->input_name(i);
-    lang::TensorShape shape = to_poco(metadata.inputs().at(input_name));
+    auto shape = FromProto(metadata.inputs().at(input_name));
     for (auto& dim : shape.dims) {
       if (dim.size == 0) {
         dim.size = 1;
@@ -111,10 +110,10 @@ lang::RunInfo TileFile::Load() {
   return composer.PrepareToRun();
 }
 
-tile::metadata::proto::Metadata TileFile::ReadMetadata() {
+metadata::proto::Metadata TileFile::ReadMetadata() {
   auto metadata_file = archive_.OpenFile("metadata");
   auto metadata_coded = metadata_file.ReadString();
-  tile::metadata::proto::Metadata metadata;
+  metadata::proto::Metadata metadata;
   if (!::google::protobuf::util::JsonStringToMessage(metadata_coded, &metadata).ok()) {
     throw std::runtime_error("Unable to parse benchmark metadata");
   }

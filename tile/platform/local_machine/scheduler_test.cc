@@ -78,8 +78,8 @@ TEST_P(SchedulerTest, Schedule) {
   lang::Parser parser;
   lang::TileOptimizer optimizer;
   auto parsed = parser.Parse(program.code());
-  auto inputs = to_poco(program.inputs());
-  auto outputs = to_poco(program.outputs());
+  auto inputs = FromProto(program.inputs());
+  auto outputs = FromProto(program.outputs());
   auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, GetSettings(), optimizer, program.id(), 1);
 
   auto schedule = GetScheduler()->BuildSchedule(program, kernel_list);

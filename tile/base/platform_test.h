@@ -18,7 +18,7 @@ namespace testing {
 typedef std::function<std::unique_ptr<tile::Platform>()> PlatformFactory;
 
 struct Param {
-  lang::DataType dtype;
+  DataType dtype;
   std::size_t vec_size;
 };
 
@@ -34,8 +34,8 @@ struct FactoryParam {
 // tests with factories producing Platform instances -- e.g.
 //
 //    Param supported_params[] = {
-//        {lang::DataType::FLOAT32, 1},  //
-//        {lang::DataType::FLOAT32, 2},  //
+//        {DataType::FLOAT32, 1},  //
+//        {DataType::FLOAT32, 2},  //
 //    };
 //
 //    std::vector<FactoryParam> SupportedParams() {
@@ -59,11 +59,11 @@ class PlatformTest : public ::testing::TestWithParam<FactoryParam> {
 
   std::unique_ptr<Program> MakeProgram(proto::TileScanningParameters* params,  //
                                        const char* code,                       //
-                                       const lang::TensorShape& shape);
-  std::shared_ptr<Buffer> MakeInput(const lang::TensorShape& shape,  //
+                                       const TensorShape& shape);
+  std::shared_ptr<Buffer> MakeInput(const TensorShape& shape,  //
                                     const std::vector<int>& data);
-  std::shared_ptr<Buffer> MakeOutput(const lang::TensorShape& shape);
-  void CheckExpected(const lang::TensorShape& shape,      //
+  std::shared_ptr<Buffer> MakeOutput(const TensorShape& shape);
+  void CheckExpected(const TensorShape& shape,            //
                      const std::shared_ptr<Buffer>& buf,  //
                      const std::vector<int>& expected);
 

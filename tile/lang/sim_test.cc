@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "tile/base/shape.h"
 #include "tile/lang/bound.h"
 #include "tile/lang/compile.h"
 #include "tile/lang/defract.h"
@@ -10,7 +11,6 @@
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/reduce.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/simulate.h"
 
 #include "base/util/catch.h"
