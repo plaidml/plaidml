@@ -26,13 +26,13 @@ namespace {
 
 static const sem::Type idxType{sem::Type::INDEX};
 static const sem::Type voidType{sem::Type::TVOID};
-static const sem::Type int16Type{sem::Type::VALUE, lang::DataType::INT16};
-static const sem::Type int32Type{sem::Type::VALUE, lang::DataType::INT32};
-static const sem::Type int64Type{sem::Type::VALUE, lang::DataType::INT64};
-static const sem::Type fp32Type{sem::Type::VALUE, lang::DataType::FLOAT32};
-static const sem::Type fp64Type{sem::Type::VALUE, lang::DataType::FLOAT64};
-static const sem::Type ptrInt32Type{sem::Type::POINTER_MUT, lang::DataType::INT32};
-static const sem::Type ptrFP32Type{sem::Type::POINTER_MUT, lang::DataType::FLOAT32};
+static const sem::Type int16Type{sem::Type::VALUE, DataType::INT16};
+static const sem::Type int32Type{sem::Type::VALUE, DataType::INT32};
+static const sem::Type int64Type{sem::Type::VALUE, DataType::INT64};
+static const sem::Type fp32Type{sem::Type::VALUE, DataType::FLOAT32};
+static const sem::Type fp64Type{sem::Type::VALUE, DataType::FLOAT64};
+static const sem::Type ptrInt32Type{sem::Type::POINTER_MUT, DataType::INT32};
+static const sem::Type ptrFP32Type{sem::Type::POINTER_MUT, DataType::FLOAT32};
 
 static llvm::ExecutionEngine* JIT(const sem::Node& n) {
   tile::hal::cpu::Emit emit;
@@ -242,7 +242,7 @@ TEST(CpuDevice, LLVM_mix_mult) {
 TEST(CpuDevice, LLVM_array_init) {
   using namespace sem::builder;  // NOLINT
   const size_t arraylen = 4;
-  sem::Type fp32arr = {sem::Type::VALUE, lang::DataType::FLOAT32, 1, arraylen};
+  sem::Type fp32arr = {sem::Type::VALUE, DataType::FLOAT32, 1, arraylen};
   auto v = _("v");
   auto a = _("a");
   auto out = _("out");
@@ -363,7 +363,7 @@ TEST(CpuDevice, LLVM_half_float_vec) {
   using namespace sem::builder;  // NOLINT
   typedef half_float::half half;
   for (size_t vecwidth : std::vector<size_t>{1, 2, 4, 8}) {
-    sem::Type type{sem::Type::POINTER_MUT, lang::DataType::FLOAT16, vecwidth};
+    sem::Type type{sem::Type::POINTER_MUT, DataType::FLOAT16, vecwidth};
     auto f = _Function("kernel", voidType, {{type, "a"}, {type, "b"}, {type, "out"}},
                        {_("out")[_Const(0)] = _("out")[_Const(0)] + _("a")[_Const(0)] * _("b")[_Const(0)]});
     auto engine = JIT(*f);
@@ -382,8 +382,8 @@ TEST(CpuDevice, LLVM_half_float_vec) {
 
 TEST(CpuDevice, LLVM_vec_add_loop) {
   using namespace sem::builder;  // NOLINT
-  sem::Type float4{sem::Type::VALUE, lang::DataType::FLOAT32, 4};
-  sem::Type ptrFloat4{sem::Type::POINTER_MUT, lang::DataType::FLOAT32, 4};
+  sem::Type float4{sem::Type::VALUE, DataType::FLOAT32, 4};
+  sem::Type ptrFloat4{sem::Type::POINTER_MUT, DataType::FLOAT32, 4};
   auto f = _Function(
       "kernel", voidType, {{int32Type, "group_id"}, {ptrFloat4, "C"}, {ptrFloat4, "A"}, {ptrFloat4, "B"}},
       {_Declare(int32Type, "i1_i2_gid", _("group_id") * _Const(2)),

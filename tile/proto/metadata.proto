@@ -7,7 +7,7 @@ import "tile/proto/shape.proto";
 // Describes metadata for a Tile model.  This is attached to .tile files
 // as a JSON-encoded internal file named "metadata".
 message Metadata {
-  map<string, shape.proto.TensorShape> inputs = 1;
+  map<string, tile.proto.TensorShape> inputs = 1;
 
   repeated TestCase testcases = 2;
 }
@@ -24,7 +24,7 @@ message TestCase {
 
 message Tensor {
   // The actual tensor data shape.
-  shape.proto.TensorShape shape = 1;
+  tile.proto.TensorShape shape = 1;
 
   // For an input, the data to supply for inference;
   // for an output, the expected output data.

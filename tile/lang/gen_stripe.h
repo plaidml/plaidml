@@ -3,13 +3,13 @@
 #include <string>
 
 #include "tile/lang/compose.h"
-#include "tile/proto/stripe.pb.h"
+#include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
 
-stripe::proto::Block GenerateStripe(const RunInfo& runinfo);
+stripe::Block GenerateStripe(const RunInfo& runinfo);
 
 }  // namespace lang
 }  // namespace tile

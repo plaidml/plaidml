@@ -9,13 +9,13 @@ option java_outer_classname = "TensorProtos";
 
 // Information about a program input.
 message ProgramInput {
-  shape.proto.TensorShape shape = 1;
+  TensorShape shape = 1;
   bool consumed = 2;  // If true, input tensor state may be discarded.
 }
 
 // Information about a program output.
 message ProgramOutput {
-  shape.proto.TensorShape shape = 1;
+  TensorShape shape = 1;
 }
 
 // A device capable of performing tensor operations.

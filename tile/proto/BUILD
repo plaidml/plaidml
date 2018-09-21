@@ -42,13 +42,6 @@ plaidml_proto_library(
     ],
 )
 
-plaidml_proto_library(
-    name = "stripe",
-    srcs = ["stripe.proto"],
-    visibility = ["//visibility:public"],
-    deps = [":shape"],
-)
-
 plaidml_cc_library(
     name = "support",
     srcs = ["support.cc"],
@@ -56,6 +49,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":proto_cc",
+        "//tile/base",
         "//tile/lang",
     ],
 )

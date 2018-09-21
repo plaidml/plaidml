@@ -5,5 +5,6 @@ plaidml_cc_test(
     srcs = glob(["*.cc"]),
     deps = [
         "//tile/codegen",
+        "//tile/lang",
     ],
 )

@@ -27,7 +27,7 @@ message Index {
 
 message Declaration {
   string name = 1;
-  shape.proto.TensorShape shape = 2;
+  tile.proto.TensorShape shape = 2;
 }
 
 message RefineIn {

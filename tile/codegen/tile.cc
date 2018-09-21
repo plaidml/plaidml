@@ -2,61 +2,55 @@
 
 #include "tile/codegen/tile.h"
 
+#include "base/util/logging.h"
 #include "base/util/printstring.h"
-#include "tile/lang/stripe.h"
+#include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-using stripe::proto::Intrinsic;
+using namespace stripe;  // NOLINT
 
-void ApplyTile(stripe::proto::Block* outer, const lang::TileShape& tile) {
+void ApplyTile(Block* outer, const TileShape& tile) {
   // Create a new inner block
-  stripe::proto::Block inner;
+  auto inner = std::make_shared<Block>();
+  // Block inner;
   // Move all statements from the outer block into the inner block
-  inner.mutable_stmts()->Swap(outer->mutable_stmts());
+  std::swap(inner->stmts, outer->stmts);
   // Move all constraints on the outer block into the inner block
-  inner.mutable_constraints()->Swap(outer->mutable_constraints());
+  std::swap(inner->constraints, outer->constraints);
   // Add indicies to the inner block
-  inner.mutable_idxs()->CopyFrom(outer->idxs());
-  for (int i = 0; i < outer->idxs_size(); i++) {
-    auto range = outer->idxs(i).range();
-    auto outer_idx = outer->mutable_idxs(i);
-    auto inner_idx = inner.mutable_idxs(i);
+  inner->idxs = outer->idxs;
+  for (size_t i = 0; i < outer->idxs.size(); i++) {
+    int64_t range = outer->idxs[i].range;
+    auto& outer_idx = outer->idxs[i];
+    auto& inner_idx = inner->idxs[i];
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
-    outer_idx->set_range((outer_idx->range() + tile[i] - 1) / tile[i]);
+    outer_idx.range = (outer_idx.range + tile[i] - 1) / tile[i];
     // Make ranges of the inner blocks: [ti, tk, tk]
-    inner_idx->set_range(tile[i]);
-    inner_idx->set_factor(tile[i]);
+    inner_idx.range = tile[i];
+    inner_idx.factor = tile[i];
     // For each index i, if (r_i/t_i) is not integral, add a constraint to the inner block of `o_i * t_i + i_i < r_i`.
     if (range % tile[i]) {
-      auto constraint = inner.add_constraints();
-      for (int j = 0; j < outer->idxs_size(); j++) {
-        constraint->add_lhs(i == j ? 1 : 0);
+      std::vector<int64_t> lhs;
+      for (size_t j = 0; j < outer->idxs.size(); j++) {
+        lhs.push_back(i == j ? 1 : 0);
       }
-      constraint->set_rhs(range);
+      inner->constraints.emplace_back(Constraint{lhs, range});
     }
   }
   // Copy all refinements from outer to inner block
-  inner.mutable_ref_ins()->CopyFrom(outer->ref_ins());
-  inner.mutable_ref_outs()->CopyFrom(outer->ref_outs());
+  inner->refs = outer->refs;
   // Multiply each stride in the outer block refinements by the appropriate tile size
-  for (auto& ref : *outer->mutable_ref_ins()) {
-    auto access = ref.mutable_access();
-    for (int i = 0; i < access->strides_size(); i++) {
-      access->set_strides(i, access->strides(i) * tile[i]);
-    }
-  }
-  for (auto& ref : *outer->mutable_ref_outs()) {
-    auto access = ref.mutable_access();
-    for (int i = 0; i < access->strides_size(); i++) {
-      access->set_strides(i, access->strides(i) * tile[i]);
+  for (auto& ref : outer->refs) {
+    for (size_t i = 0; i < ref.access.strides.size(); i++) {
+      ref.access.strides[i] *= tile[i];
     }
   }
   // Make the inner block the sole stmt of the outer block
-  outer->add_stmts()->mutable_block()->Swap(&inner);
+  outer->stmts = {inner};
 }
 
 inline bool IsLegal(int64_t rule, int64_t candidate) {  //
@@ -65,21 +59,21 @@ inline bool IsLegal(int64_t rule, int64_t candidate) {  //
 
 void FindStencilMatches(std::set<StencilMatch>* into,                  //
                         const std::vector<StencilCriteria>& criteria,  //
-                        const stripe::proto::Block& block,             //
+                        const Block& block,                            //
                         const std::vector<size_t>& cur) {
   if (cur.size() == criteria.size()) {
     // base case
     StencilMatch match{
         1,                                                 // total
-        std::vector<std::string>(block.idxs_size(), "*"),  // names
-        lang::TileShape(block.idxs_size(), 1),             // tile
+        std::vector<std::string>(block.idxs.size(), "*"),  // names
+        TileShape(block.idxs.size(), 1),                   // tile
         false                                              // is_fallback
     };
     for (size_t i = 0; i < cur.size(); i++) {
       size_t j = cur[i];
       match.names[j] = criteria[i].name;
       if (criteria[i].size == -1) {
-        match.tile[j] = block.idxs(j).range();
+        match.tile[j] = block.idxs[j].range;
       } else {
         match.tile[j] = criteria[i].size;
       }
@@ -89,16 +83,18 @@ void FindStencilMatches(std::set<StencilMatch>* into,                  //
   } else {
     size_t i = cur.size();
     const auto& rule = criteria[i];
-    if (rule.out_strides.size() == static_cast<size_t>(block.ref_outs_size()) &&  //
-        rule.in_strides.size() == static_cast<size_t>(block.ref_ins_size())) {
-      for (int j = 0; j < block.idxs_size(); j++) {
+    auto ref_outs = block.ref_outs();
+    auto ref_ins = block.ref_ins();
+    if (rule.out_strides.size() == ref_outs.size() &&  //
+        rule.in_strides.size() == ref_ins.size()) {
+      for (size_t j = 0; j < block.idxs.size(); j++) {
         if (std::find(cur.cbegin(), cur.cend(), j) == cur.cend()) {
           bool is_legal = true;
           for (size_t k = 0; k < rule.out_strides.size(); k++) {
-            is_legal &= IsLegal(rule.out_strides[k], block.ref_outs(k).access().strides(j));
+            is_legal &= IsLegal(rule.out_strides[k], ref_outs[k].access.strides[j]);
           }
           for (size_t k = 0; k < rule.in_strides.size(); k++) {
-            is_legal &= IsLegal(rule.in_strides[k], block.ref_ins(k).access().strides(j));
+            is_legal &= IsLegal(rule.in_strides[k], ref_ins[k].access.strides[j]);
           }
           if (is_legal) {
             // found a match on this index, keep going
@@ -113,7 +109,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,                  //
 }
 
 StencilMatch FindBestStencil(const std::vector<std::vector<StencilCriteria>>& criteria,  //
-                             stripe::proto::Block* block) {
+                             Block* block) {
   std::set<StencilMatch> matches;
   for (const auto& rules : criteria) {
     FindStencilMatches(&matches, rules, *block, {});
@@ -121,34 +117,28 @@ StencilMatch FindBestStencil(const std::vector<std::vector<StencilCriteria>>& cr
   if (matches.empty()) {
     StencilMatch fallback{
         1,                                                  // total
-        std::vector<std::string>(block->idxs_size(), "*"),  // names
-        lang::TileShape(block->idxs_size(), 1),             // tile
+        std::vector<std::string>(block->idxs.size(), "*"),  // names
+        TileShape(block->idxs.size(), 1),                   // tile
         true                                                // is_fallback
     };
-    for (int i = 0; i < block->idxs_size(); i++) {
-      auto range = block->idxs(i).range();
+    for (size_t i = 0; i < block->idxs.size(); i++) {
+      auto range = block->idxs[i].range;
       fallback.total *= range;
       fallback.tile[i] = range;
     }
     LOG(WARNING) << "Fallback: " << fallback;
-    google::protobuf::Value value;
-    value.set_bool_value(true);
-    auto& annotations = *block->mutable_annotations()->mutable_fields();
-    annotations["is_fallback"] = value;
+    block->annotations.emplace("is_fallback", std::make_shared<BoolAnnotation>(true));
     return fallback;
   }
-  google::protobuf::Value value;
-  value.set_bool_value(false);
-  auto& annotations = *block->mutable_annotations()->mutable_fields();
-  annotations["is_fallback"] = value;
+  block->annotations.emplace("is_fallback", std::make_shared<BoolAnnotation>(false));
   return *matches.rbegin();
 }
 
-void TilePass(stripe::proto::Block* block, const TileGenerator& generator) {
+void TilePass(Block* block, const TileGenerator& generator) {
   bool is_leaf = true;
-  for (auto& stmt : *block->mutable_stmts()) {
-    if (stmt.has_block()) {
-      TilePass(stmt.mutable_block(), generator);
+  for (auto stmt : block->stmts) {
+    if (stmt->kind() == StmtKind::Block) {
+      TilePass(std::dynamic_pointer_cast<Block>(stmt).get(), generator);
       is_leaf = false;
     }
   }
@@ -157,13 +147,13 @@ void TilePass(stripe::proto::Block* block, const TileGenerator& generator) {
   }
 }
 
-void TilePass(stripe::proto::Block* block, const std::vector<std::vector<StencilCriteria>>& criteria) {
-  TilePass(block, [&criteria](stripe::proto::Block* block) {  //
+void TilePass(Block* block, const std::vector<std::vector<StencilCriteria>>& criteria) {
+  TilePass(block, [&criteria](Block* block) {  //
     return FindBestStencil(criteria, block).tile;
   });
 }
 
-MAKE_LOGGABLE(StencilMatch, match, os) {
+std::ostream& operator<<(std::ostream& os, const StencilMatch& match) {
   os << match.total << ":" << to_string(match.names) << ":" << to_string(match.tile);
   return os;
 }

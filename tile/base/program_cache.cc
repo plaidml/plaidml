@@ -31,7 +31,7 @@ namespace {
 
 template <typename M>
 void SerializeShapemap(std::ostringstream* serialized, const M& m) {
-  std::map<std::string, const shape::proto::TensorShape&> shapes;
+  std::map<std::string, const proto::TensorShape&> shapes;
   for (const auto& t : m) {
     shapes.emplace(t.first, t.second.shape());
   }
