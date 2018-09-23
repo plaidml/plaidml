@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include "base/util/printstring.h"
+#include "tile/base/shape.h"
 
 namespace vertexai {
 namespace tile {
@@ -297,13 +298,225 @@ bool operator==(const Constraint& lhs, const Constraint& rhs) {
 
 Block FromProto(const proto::Block& block) {
   Block ret;
-  // TODO
+  ret.name = block.name();
+  ret.comments = block.comments();
+  for (const auto& pb_idx : block.idxs()) {
+    ret.idxs.emplace_back(Index{
+        pb_idx.name(),   //
+        pb_idx.range(),  //
+        pb_idx.factor()  //
+    });
+  }
+  for (const auto& pb_cons : block.constraints()) {
+    Constraint cons;
+    for (const auto& pb_lhs : pb_cons.lhs()) {
+      cons.lhs.push_back(pb_lhs);
+    }
+    cons.rhs = pb_cons.rhs();
+    ret.constraints.emplace_back(cons);
+  }
+  for (const auto& pb_decl : block.decls()) {
+    ret.decls.insert(std::make_pair(pb_decl.first, tile::FromProto(pb_decl.second)));
+  }
+  for (const auto& pb_ref : block.refs()) {
+    Refinement ref;
+    switch (pb_ref.dir()) {
+      case proto::Refinement::In:
+        ref.dir = RefDir::In;
+        break;
+      case proto::Refinement::Out:
+        ref.dir = RefDir::Out;
+        break;
+      case proto::Refinement::InOut:
+        ref.dir = RefDir::InOut;
+        break;
+      default:
+        break;
+    }
+    ref.from = pb_ref.from();
+    ref.into = pb_ref.into();
+    ref.access.offset = pb_ref.access().offset();
+    for (const auto& stride : pb_ref.access().strides()) {
+      ref.access.strides.push_back(stride);
+    }
+    ref.agg_op = pb_ref.agg_op();
+    ret.refs.emplace_back(ref);
+  }
+  for (const auto& pb_stmt : block.stmts()) {
+    switch (pb_stmt.op_case()) {
+      case proto::Statement::kLoad:
+        ret.stmts.emplace_back(std::make_shared<Load>(pb_stmt.load().from(), pb_stmt.load().into()));
+        break;
+      case proto::Statement::kStore:
+        ret.stmts.emplace_back(std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into()));
+        break;
+      case proto::Statement::kConstant:
+        switch (pb_stmt.constant().value_case()) {
+          case proto::Constant::kIconst:
+            ret.stmts.emplace_back(std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().iconst()));
+            break;
+          case proto::Constant::kFconst:
+            ret.stmts.emplace_back(std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().fconst()));
+            break;
+          default:
+            break;
+        }
+        break;
+      case proto::Statement::kSpecial: {
+        auto stmt = std::make_shared<Special>();
+        stmt->name = pb_stmt.special().name();
+        for (const auto& item : pb_stmt.special().params()) {
+          stmt->params.push_back(item);
+        }
+        for (const auto& item : pb_stmt.special().inputs()) {
+          stmt->inputs.push_back(item);
+        }
+        for (const auto& item : pb_stmt.special().outputs()) {
+          stmt->outputs.push_back(item);
+        }
+        ret.stmts.emplace_back(stmt);
+      } break;
+      case proto::Statement::kIntrinsic: {
+        auto stmt = std::make_shared<Intrinsic>();
+        stmt->name = pb_stmt.intrinsic().name();
+        for (const auto& item : pb_stmt.intrinsic().inputs()) {
+          stmt->inputs.push_back(item);
+        }
+        for (const auto& item : pb_stmt.intrinsic().outputs()) {
+          stmt->outputs.push_back(item);
+        }
+        ret.stmts.emplace_back(stmt);
+      } break;
+      case proto::Statement::kBlock: {
+        auto stmt = std::make_shared<Block>();
+        *stmt = FromProto(pb_stmt.block());
+        ret.stmts.emplace_back(stmt);
+      } break;
+      default:
+        break;
+    }
+  }
+  for (const auto& item : block.annotations()) {
+    if (item.second.type_url() == "type.vertex.ai/vertexai.tile.stripe.proto.BoolAnnotation") {
+      proto::BoolAnnotation pb_ann;
+      item.second.UnpackTo(&pb_ann);
+      auto ann = std::make_shared<BoolAnnotation>(pb_ann.value());
+      ret.annotations.insert(std::make_pair(item.first, ann));
+    }
+  }
   return ret;
 }
 
 proto::Block IntoProto(const Block& block) {
   proto::Block ret;
-  // TODO
+  ret.set_name(block.name);
+  ret.set_comments(block.comments);
+  for (const auto& idx : block.idxs) {
+    auto pb_idx = ret.add_idxs();
+    pb_idx->set_name(idx.name);
+    pb_idx->set_range(idx.range);
+    pb_idx->set_factor(idx.factor);
+  }
+  for (const auto& cons : block.constraints) {
+    auto pb_cons = ret.add_constraints();
+    for (const auto& lhs : cons.lhs) {
+      pb_cons->add_lhs(lhs);
+    }
+    pb_cons->set_rhs(cons.rhs);
+  }
+  for (const auto& decl : block.decls) {
+    (*ret.mutable_decls())[decl.first] = IntoProto(decl.second);
+  }
+  for (const auto& ref : block.refs) {
+    auto pb_ref = ret.add_refs();
+    switch (ref.dir) {
+      case RefDir::In:
+        pb_ref->set_dir(proto::Refinement::In);
+        break;
+      case RefDir::Out:
+        pb_ref->set_dir(proto::Refinement::Out);
+        break;
+      case RefDir::InOut:
+        pb_ref->set_dir(proto::Refinement::InOut);
+        break;
+    }
+    pb_ref->set_from(ref.from);
+    pb_ref->set_into(ref.into);
+    auto pb_access = pb_ref->mutable_access();
+    pb_access->set_offset(ref.access.offset);
+    for (const auto& stride : ref.access.strides) {
+      pb_access->add_strides(stride);
+    }
+    pb_ref->set_agg_op(ref.agg_op);
+  }
+  for (const auto& stmt : block.stmts) {
+    auto pb_stmt = ret.add_stmts();
+    switch (stmt->kind()) {
+      case StmtKind::Load: {
+        auto load = std::dynamic_pointer_cast<Load>(stmt);
+        auto pb_load = pb_stmt->mutable_load();
+        pb_load->set_from(load->from);
+        pb_load->set_into(load->into);
+      } break;
+      case StmtKind::Store: {
+        auto store = std::dynamic_pointer_cast<Store>(stmt);
+        auto pb_store = pb_stmt->mutable_store();
+        pb_store->set_from(store->from);
+        pb_store->set_into(store->into);
+      } break;
+      case StmtKind::Constant: {
+        auto constant = std::dynamic_pointer_cast<Constant>(stmt);
+        auto pb_const = pb_stmt->mutable_constant();
+        pb_const->set_name(constant->name);
+        switch (constant->type) {
+          case ConstType::Integer:
+            pb_const->set_iconst(constant->iconst);
+            break;
+          case ConstType::Float:
+            pb_const->set_fconst(constant->fconst);
+            break;
+        }
+      } break;
+      case StmtKind::Special: {
+        auto special = std::dynamic_pointer_cast<Special>(stmt);
+        auto pb_special = pb_stmt->mutable_special();
+        pb_special->set_name(special->name);
+        for (const auto& param : special->params) {
+          pb_special->add_params(param);
+        }
+        for (const auto& input : special->inputs) {
+          pb_special->add_inputs(input);
+        }
+        for (const auto& output : special->outputs) {
+          pb_special->add_outputs(output);
+        }
+      } break;
+      case StmtKind::Intrinsic: {
+        auto intrinsic = std::dynamic_pointer_cast<Intrinsic>(stmt);
+        auto pb_intrinsic = pb_stmt->mutable_intrinsic();
+        pb_intrinsic->set_name(intrinsic->name);
+        for (const auto& input : intrinsic->inputs) {
+          pb_intrinsic->add_inputs(input);
+        }
+        for (const auto& output : intrinsic->outputs) {
+          pb_intrinsic->add_outputs(output);
+        }
+      } break;
+      case StmtKind::Block: {
+        auto inner = std::dynamic_pointer_cast<Block>(stmt);
+        *pb_stmt->mutable_block() = IntoProto(*inner);
+      } break;
+    }
+  }
+  for (const auto& item : block.annotations) {
+    google::protobuf::Any any;
+    if (auto ann = std::dynamic_pointer_cast<BoolAnnotation>(item.second)) {
+      proto::BoolAnnotation pb_ann;
+      pb_ann.set_value(ann->value);
+      any.PackFrom(pb_ann);
+    }
+    (*ret.mutable_annotations())[item.first] = any;
+  }
   return ret;
 }
 
