@@ -193,7 +193,7 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     }
     os << block.idxs[i].name << ":" << block.idxs[i].range;
   }
-  os << "]";
+  os << "] (";
   if (!block.name.empty()) {
     os << " // " << block.name;
   }
@@ -211,13 +211,9 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     PrintConstraint(os, constraint, block);
     os << std::endl;
   }
-  PrintTab(os, depth + 2);
-  os << "(";
   for (size_t i = 0; i < block.refs.size(); i++) {
+    PrintTab(os, depth + 2);
     const auto& ref = block.refs[i];
-    if (i > 0) {
-      os << ", ";
-    }
     switch (ref.dir) {
       case RefDir::In:
         os << "in ";
@@ -237,7 +233,13 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     if (!ref.agg_op.empty()) {
       os << ":" << ref.agg_op;
     }
+    os << " " << ref.shape;
+    if (ref.into != ref.from) {
+      os << " // reshape";
+    }
+    os << std::endl;
   }
+  PrintTab(os, depth);
   os << ") {" << std::endl;
   for (const auto& decl : block.decls) {
     PrintTab(os, depth + 1);
@@ -273,16 +275,6 @@ std::vector<Refinement> Block::ref_outs() const {
     }
   }
   return results;
-}
-
-std::ostream& operator<<(std::ostream& os, const BufferAccess& access) {
-  os << access.offset << ":" << StreamContainer(access.strides);
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const Index& idx) {
-  os << idx.name << ":" << idx.range << ":" << idx.factor;
-  return os;
 }
 
 bool operator==(const BufferAccess& lhs, const BufferAccess& rhs) {
@@ -343,6 +335,7 @@ Block FromProto(const proto::Block& block) {
     for (const auto& stride : pb_ref.access().strides()) {
       ref.access.strides.push_back(stride);
     }
+    ref.shape = tile::FromProto(pb_ref.shape());
     ref.agg_op = pb_ref.agg_op();
     ret.refs.emplace_back(ref);
   }
@@ -451,6 +444,7 @@ proto::Block IntoProto(const Block& block) {
     for (const auto& stride : ref.access.strides) {
       pb_access->add_strides(stride);
     }
+    *pb_ref->mutable_shape() = IntoProto(ref.shape);
     pb_ref->set_agg_op(ref.agg_op);
   }
   for (const auto& stmt : block.stmts) {

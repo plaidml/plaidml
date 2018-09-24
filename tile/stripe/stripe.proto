@@ -36,7 +36,8 @@ message Refinement {
   string from = 2;
   string into = 3;
   BufferAccess access = 4;
-  string agg_op = 5;
+  tile.proto.TensorShape shape = 5;
+  string agg_op = 6;
 }
 
 message BufferAccess {
