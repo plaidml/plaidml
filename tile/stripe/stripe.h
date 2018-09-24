@@ -32,8 +32,8 @@ struct Annotation {
 
 struct Index {
   std::string name;
-  uint64_t range;
-  int64_t factor;
+  uint64_t range = 0;
+  int64_t factor = 0;
 };
 
 enum class RefDir {
@@ -43,7 +43,7 @@ enum class RefDir {
 };
 
 struct BufferAccess {
-  int64_t offset;
+  int64_t offset = 0;
   std::vector<int64_t> strides;
 };
 
@@ -57,7 +57,7 @@ struct Refinement {
 
 struct Constraint {
   std::vector<int64_t> lhs;
-  int64_t rhs;
+  int64_t rhs = 0;
 };
 
 struct Load : Statement {
@@ -119,8 +119,8 @@ struct Constant : Statement {
 
   std::string name;
   ConstType type;
-  int64_t iconst;
-  double fconst;
+  int64_t iconst = 0;
+  double fconst = 0.0;
 };
 
 struct Block : Statement {

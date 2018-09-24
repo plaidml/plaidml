@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include "base/util/printstring.h"
+#include "base/util/stream_container.h"
 
 namespace vertexai {
 namespace tile {
@@ -275,8 +276,12 @@ std::vector<Refinement> Block::ref_outs() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const BufferAccess& access) {
-  os << access.offset << ":"
-     << "TODO";
+  os << access.offset << ":" << StreamContainer(access.strides);
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const Index& idx) {
+  os << idx.name << ":" << idx.range << ":" << idx.factor;
   return os;
 }
 

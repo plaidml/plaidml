@@ -18,7 +18,14 @@ struct CacheInfo {
   std::vector<stripe::Index> xfer_idxs;
   stripe::BufferAccess xfer_far;
   stripe::BufferAccess xfer_near;
+
+  inline bool operator==(const CacheInfo& o) const {
+    return std::tie(idxs, far, near, xfer_idxs, xfer_far, xfer_near) ==  //
+           std::tie(o.idxs, o.far, o.near, o.xfer_idxs, o.xfer_far, o.xfer_near);
+  }
 };
+
+std::ostream& operator<<(std::ostream& os, const CacheInfo& x);
 
 CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe::BufferAccess& access);
 

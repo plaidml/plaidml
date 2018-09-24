@@ -37,6 +37,7 @@ plaidml_cc_library(
         "pdebug.h",
         "perf_counter.h",
         "printstring.h",
+        "stream_container.h",
         "sync.h",
         "transfer_object.h",
         "type_url.h",

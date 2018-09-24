@@ -82,6 +82,30 @@ TEST(Codegen, Access) {
   EXPECT_THAT(access[0], Eq(expected2));
 }
 
+TEST(Codegen, CacheInfo) {
+  auto c1 = ComputeCacheInfo({{"I", 10, 0}, {"K", 10, 0}, {"Q", 10, 0}, {"J", 3, 0}}, {0, {1, 100, 0, 1}});
+  CacheInfo expected1 = {
+      {{"I", 10, 0}, {"K", 10, 0}, {"Q", 10, 0}, {"J", 3, 0}},  // idxs
+      {0, {1, 100, 0, 1}},                                      // far
+      {0, {1, 12, 0, 1}},                                       // near
+      {{"I_J", 12, 0}, {"K", 10, 0}},                           // xfer_idxs
+      {0, {1, 100}},                                            // xfer_far
+      {0, {1, 12}},                                             // xfer_near
+  };
+  EXPECT_THAT(c1, Eq(expected1));
+
+  auto c2 = ComputeCacheInfo({{"I", 10, 0}, {"K", 10, 0}, {"J", 3, 0}}, {0, {1, 12, 1}});
+  CacheInfo expected2 = {
+      {{"I", 10, 0}, {"K", 10, 0}, {"J", 3, 0}},  // idxs
+      {0, {1, 12, 1}},                            // far
+      {0, {1, 12, 1}},                            // near
+      {{"I_J_K", 120, 0}},                        // xfer_idxs
+      {0, {1}},                                   // xfer_far
+      {0, {1}},                                   // xfer_near
+  };
+  EXPECT_THAT(c2, Eq(expected2));
+}
+
 TEST(Codegen, Cache) {
   auto runinfo = LoadMatMul();
   auto program = GenerateStripe(runinfo);
