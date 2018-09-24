@@ -4,7 +4,7 @@ syntax = "proto3";
 
 package vertexai.tile.stripe.proto;
 
-import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
 import "tile/proto/shape.proto";
 
 message Block {
@@ -12,11 +12,10 @@ message Block {
   string comments = 2;
   repeated Index idxs = 3;
   repeated Constraint constraints = 4;
-  repeated Declaration decls = 5;
-  repeated RefineIn ref_ins = 6;
-  repeated RefineOut ref_outs = 7;
-  repeated Statement stmts = 8;
-  google.protobuf.Struct annotations = 9;
+  map<string, tile.proto.TensorShape> decls = 5;
+  repeated Refinement refs = 6;
+  repeated Statement stmts = 7;
+  map<string, google.protobuf.Any> annotations = 8;
 }
 
 message Index {
@@ -25,22 +24,20 @@ message Index {
   int64 factor = 3;
 }
 
-message Declaration {
-  string name = 1;
-  tile.proto.TensorShape shape = 2;
-}
+message Refinement {
+  enum Dir {
+    None = 0;
+    In = 1;
+    Out = 2;
+    InOut = 3;
+  }
 
-message RefineIn {
-  string from = 1;
-  string into = 2;
-  BufferAccess access = 3;
-}
-
-message RefineOut {
-  string from = 1;
-  string into = 2;
-  BufferAccess access = 3;
-  string agg_op = 4;
+  Dir dir = 1;
+  string from = 2;
+  string into = 3;
+  BufferAccess access = 4;
+  tile.proto.TensorShape shape = 5;
+  string agg_op = 6;
 }
 
 message BufferAccess {
@@ -107,4 +104,8 @@ message Constant {
 message Constraint {
   repeated int64 lhs = 1;
   int64 rhs = 2;
+}
+
+message BoolAnnotation {
+  bool value = 1;
 }

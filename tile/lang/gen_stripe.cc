@@ -37,18 +37,14 @@ class StripeGenerator {
     // Add decls for external inputs/outputs
     AddDecls(&program, main.get(), inputs_, true);
     AddDecls(&program, main.get(), outputs_, false);
-    // Add references for temporaries, reshapes may elide some
-    for (const auto& item : vars_) {
-      if (externals_.count(item.first) == 0) {
-        const auto& binding = item.second;
-        if (binding.tag == Binding::TENSOR) {
-          tmps_.insert(std::make_pair(item.first, binding.shape));
-        }
+    // Process reshapes
+    for (const auto& op : parsed_.ops) {
+      if (op.tag == Op::FUNCTION && op.f.fn == "reshape") {
+        ProcessReshape(main.get(), op);
       }
     }
     // Add kernels to main
-    for (size_t i = 0; i < parsed_.ops.size(); i++) {
-      const Op& op = parsed_.ops[i];
+    for (const auto& op : parsed_.ops) {
       IVLOG(2, "Processing: " << op);
       switch (op.tag) {
         case Op::CONTRACTION:
@@ -57,9 +53,7 @@ class StripeGenerator {
         case Op::FUNCTION:
           if (op.f.is_special()) {
             ProcessSpecial(main.get(), op);
-          } else if (op.f.fn == "reshape") {
-            ProcessReshape(main.get(), op);
-          } else {
+          } else if (op.f.fn != "reshape") {
             ProcessElementwise(main.get(), op);
           }
           break;
@@ -69,8 +63,13 @@ class StripeGenerator {
       }
     }
     // Add decls for temporaries that are not aliased
-    for (const auto& tmp : tmps_) {
-      main->decls.insert(tmp);
+    for (const auto& item : vars_) {
+      if (externals_.count(item.first) == 0 && reshapes_.count(item.first) == 0) {
+        const auto& binding = item.second;
+        if (binding.tag == Binding::TENSOR) {
+          main->decls.insert(std::make_pair(item.first, binding.shape));
+        }
+      }
     }
     IVLOG(2, "Done");
     return program;
@@ -82,9 +81,22 @@ class StripeGenerator {
       externals_.insert(item.first);
       program->decls.insert(item);
       if (is_input) {
-        main->refs.emplace_back(Refinement{RefDir::In, item.first, item.first, BufferAccess{0}});
+        main->refs.emplace_back(Refinement{
+            RefDir::In,       // dir
+            item.first,       // from
+            item.first,       // into
+            BufferAccess{0},  // access
+            item.second       // shape
+        });
       } else {
-        main->refs.emplace_back(Refinement{RefDir::Out, item.first, item.first, BufferAccess{0}, Intrinsic::ASSIGN});
+        main->refs.emplace_back(Refinement{
+            RefDir::Out,       // dir
+            item.first,        // from
+            item.first,        // into
+            BufferAccess{0},   // access
+            item.second,       // shape
+            Intrinsic::ASSIGN  // agg_op
+        });
         auto ref = main->refs.back();
         ref_outs_.insert(std::make_pair(item.first, &ref));
       }
@@ -94,36 +106,21 @@ class StripeGenerator {
   void ProcessReshape(Block* main, const Op& op) {
     auto it = ref_outs_.find(op.output);
     if (it != ref_outs_.end()) {
-      // Remove the temporary
-      // tmps_.erase(op.inputs[0]);
-      it->second->from = op.inputs[0];
-      // Add an alias
-      main->refs.emplace_back(Refinement{
-          RefDir::In,       // dir
-          op.inputs[0],     // from
-          op.output,        // into
-          BufferAccess{0},  // access
-      });
+      IVLOG(2, "reshape output");
+      reshapes_.insert(std::make_pair(op.inputs[0], op.output));
     } else {
-      // Remove the temporary
-      // tmps_.erase(op.output);
-      // Add an alias
-      main->refs.emplace_back(Refinement{
-          RefDir::In,       // dir
-          op.output,        // from
-          op.inputs[0],     // into
-          BufferAccess{0},  // offset
-      });
+      reshapes_.insert(std::make_pair(op.output, op.inputs[0]));
     }
   }
 
   void ProcessContraction(Block* main, const Op& op) {
-    if (vars_.at(op.output).shape.byte_size() == 0) {
+    auto out_shape = GetShape(op.output);
+    if (out_shape.byte_size() == 0) {
       IVLOG(3, "Contraction output " << op.output << " size==0; skipping");
       return;
     }
     std::vector<Polynomial> out_poly;
-    FlatContraction flat = Compile(op.c, MakeTShapes(op.c), &out_poly);
+    FlatContraction flat = Compile(op.c, MakeShapes(op.c), &out_poly);
     flat.output = op.output;
 
     if (NeedsZero(flat)) {
@@ -154,13 +151,8 @@ class StripeGenerator {
     for (size_t i = 1; i < flat.inputs.size(); i++) {
       auto scalar_name = ScalarName(flat.inputs[i]);
       scalar_inputs.push_back(scalar_name);
-
-      kernel->refs.emplace_back(Refinement{
-          RefDir::In,                                                  // dir
-          flat.inputs[i],                                              // from
-          flat.inputs[i],                                              // into
-          BufferAccess{flat.access[i].offset, flat.access[i].strides}  // access
-      });
+      auto access = BufferAccess{flat.access[i].offset, flat.access[i].strides};
+      kernel->refs.emplace_back(MakeRefinement(RefDir::In, flat.inputs[i], access));
 
       // LOAD
       kernel->stmts.push_back(std::make_shared<Load>(flat.inputs[i], scalar_name));
@@ -206,13 +198,8 @@ class StripeGenerator {
       case AggregationOp::NONE:
         break;
     }
-    kernel->refs.emplace_back(Refinement{
-        RefDir::Out,                                                  // dir
-        flat.output,                                                  // from
-        flat.output,                                                  // into
-        BufferAccess{flat.access[0].offset, flat.access[0].strides},  // access
-        agg_op                                                        // agg_op
-    });
+    auto access = BufferAccess{flat.access[0].offset, flat.access[0].strides};
+    kernel->refs.emplace_back(MakeRefinement(RefDir::Out, flat.output, access, agg_op));
 
     // STORE
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(flat.output), flat.output));
@@ -222,7 +209,7 @@ class StripeGenerator {
     auto kernel = AddKernel(main);
     kernel->comments = to_string(op);
 
-    const TensorShape& out_shape = vars_.at(op.output).shape;
+    auto out_shape = GetShape(op.output);
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
       kernel->idxs.emplace_back(Index{
           printstring("i%zu", i + 1),  // name
@@ -251,12 +238,7 @@ class StripeGenerator {
               strides.push_back(stride);
             }
           }
-          kernel->refs.emplace_back(Refinement{
-              RefDir::In,                // dir
-              input,                     // from
-              input,                     // into
-              BufferAccess{0, strides},  // access
-          });
+          kernel->refs.emplace_back(MakeRefinement(RefDir::In, input, BufferAccess{0, strides}));
           // LOAD
           kernel->stmts.push_back(std::make_shared<Load>(input, ScalarName(input)));
         } break;
@@ -277,12 +259,7 @@ class StripeGenerator {
       strides.push_back(dim.stride);
     }
 
-    kernel->refs.emplace_back(Refinement{
-        RefDir::Out,              // dir
-        op.output,                // from
-        op.output,                // into
-        BufferAccess{0, strides}  // access
-    });
+    kernel->refs.emplace_back(MakeRefinement(RefDir::Out, op.output, BufferAccess{0, strides}));
 
     // INTRINSIC
     std::vector<std::string> scalar_inputs;
@@ -311,17 +288,12 @@ class StripeGenerator {
     return block;
   }
 
-  std::vector<TensorShape> MakeTShapes(const Contraction& con) {
-    std::vector<TensorShape> tshapes;
+  std::vector<TensorShape> MakeShapes(const Contraction& con) {
+    std::vector<TensorShape> shapes;
     for (const TensorSpec& spec : con.specs) {
-      auto it = vars_.find(spec.id);
-      if (it == vars_.end()) {
-        IVLOG(1, "Something went wrong: " << vars_);
-        throw std::runtime_error(printstring("Unable to find tensor shape for id %s, ug", spec.id.c_str()));
-      }
-      tshapes.push_back(it->second.shape);
+      shapes.push_back(GetShape(spec.id));
     }
-    return tshapes;
+    return shapes;
   }
 
   bool NeedsZero(const FlatContraction& flat) {
@@ -376,13 +348,33 @@ class StripeGenerator {
     return printstring("$%s", name.c_str());
   }
 
+  TensorShape GetShape(const std::string& name) const {
+    auto it = vars_.find(name);
+    if (it == vars_.end()) {
+      throw std::runtime_error(printstring("Unknown shape: %s", name.c_str()));
+    }
+    return it->second.shape;
+  }
+
+  Refinement MakeRefinement(RefDir dir,                  //
+                            const std::string& name,     //
+                            const BufferAccess& access,  //
+                            const std::string& agg_op = "") const {
+    Refinement ref{dir, name, name, access, GetShape(name), agg_op};
+    auto it = reshapes_.find(name);
+    if (it != reshapes_.end()) {
+      ref.from = it->second;
+    }
+    return ref;
+  }
+
  private:
   Program parsed_;
   Bindings vars_;
   ShapeMap inputs_;
   ShapeMap outputs_;
   std::set<std::string> externals_;
-  std::map<std::string, TensorShape> tmps_;
+  std::map<std::string, std::string> reshapes_;
   std::map<std::string, Refinement*> ref_outs_;
 };
 
