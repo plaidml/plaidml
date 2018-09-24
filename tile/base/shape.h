@@ -89,29 +89,29 @@ inline size_t bit_width(const DataType& dt) {
 inline std::string to_string(const DataType& dt) {
   switch (dt) {
     case DataType::BOOLEAN:
-      return "boolean";
+      return "bool";
     case DataType::INT8:
-      return "int8";
+      return "i8";
     case DataType::INT16:
-      return "int16";
+      return "i16";
     case DataType::INT32:
-      return "int32";
+      return "i32";
     case DataType::INT64:
-      return "int64";
+      return "i64";
     case DataType::UINT8:
-      return "uint8";
+      return "u8";
     case DataType::UINT16:
-      return "uint16";
+      return "u16";
     case DataType::UINT32:
-      return "uint32";
+      return "u32";
     case DataType::UINT64:
-      return "uint64";
+      return "u64";
     case DataType::FLOAT16:
-      return "float16";
+      return "fp16";
     case DataType::FLOAT32:
-      return "float32";
+      return "fp32";
     case DataType::FLOAT64:
-      return "float64";
+      return "fp64";
     case DataType::PRNG:
       return "prng";
     default:
@@ -123,27 +123,29 @@ inline size_t byte_width(const DataType& dt) { return (bit_width(dt) + 7) / 8; }
 
 struct TensorDimension {
   TensorDimension() = default;
-  TensorDimension(int64_t _stride, uint64_t _size) : stride(_stride), size(_size) {}
-  // Stride over element count
-  int64_t stride;
-  // Number of elements
-  uint64_t size;
-  // Comparison operators
-  bool operator==(const TensorDimension& rhs) const { return (stride == rhs.stride && size == rhs.size); }
-  bool operator<(const TensorDimension& rhs) const {
-    return std::make_pair(stride, size) < std::make_pair(rhs.stride, rhs.size);
+  TensorDimension(int64_t stride, uint64_t size) : stride(stride), size(size) {}
+
+  int64_t stride;  // Stride over element count
+  uint64_t size;   // Number of elements
+
+  inline bool operator==(const TensorDimension& rhs) const {
+    return std::tie(stride, size) ==  //
+           std::tie(rhs.stride, rhs.size);
+  }
+
+  inline bool operator<(const TensorDimension& rhs) const {
+    return std::tie(stride, size) <  //
+           std::tie(rhs.stride, rhs.size);
   }
 };
 
 struct TensorShape {
   TensorShape() = default;
-  TensorShape(DataType _type, const std::vector<TensorDimension>& _dims) : type(_type), dims(_dims) {}
+  TensorShape(DataType type, const std::vector<TensorDimension>& dims) : type(type), dims(dims) {}
+
   DataType type = DataType::INVALID;
   std::vector<TensorDimension> dims;
-  bool operator==(const TensorShape& rhs) const { return type == rhs.type && dims == rhs.dims; }
-  bool operator<(const TensorShape& rhs) const {
-    return std::make_pair(type, dims) < std::make_pair(rhs.type, rhs.dims);
-  }
+
   uint64_t byte_size() const { return elem_size() * byte_width(type); }
   uint64_t elem_size() const {
     uint64_t max_elem = 0;
@@ -154,15 +156,25 @@ struct TensorShape {
     }
     return max_elem + 1;
   }
+
+  inline bool operator==(const TensorShape& rhs) const {
+    return std::tie(type, dims) ==  //
+           std::tie(rhs.type, rhs.dims);
+  }
+
+  inline bool operator<(const TensorShape& rhs) const {
+    return std::tie(type, dims) <  //
+           std::tie(rhs.type, rhs.dims);
+  }
 };
 
 inline std::ostream& operator<<(std::ostream& os, const TensorShape& shape) {
   os << to_string(shape.type) << "(";
   for (size_t i = 0; i < shape.dims.size(); i++) {
-    os << shape.dims[i].size << ":" << shape.dims[i].stride;
-    if (i != shape.dims.size() - 1) {
+    if (i > 0) {
       os << ", ";
     }
+    os << shape.dims[i].size << ":" << shape.dims[i].stride;
   }
   os << ")";
   return os;
@@ -266,9 +278,8 @@ inline int size_in_bytes(const proto::TensorShape_DataType& dt) {
   }
 }
 
-inline TensorDimension FromProto(const proto::TensorShape::Dimension& dim) {
-  TensorDimension ret = {dim.stride(), dim.size()};
-  return ret;
+inline TensorDimension FromProto(const proto::TensorShape::Dimension& dim) {  //
+  return {dim.stride(), dim.size()};
 }
 
 inline proto::TensorShape::Dimension IntoProto(const TensorDimension& dim) {
@@ -279,9 +290,11 @@ inline proto::TensorShape::Dimension IntoProto(const TensorDimension& dim) {
 }
 
 inline TensorShape FromProto(const proto::TensorShape& shape) {
-  TensorShape ret = {FromProto(shape.type()), {}};
-  std::transform(shape.dimensions().cbegin(), shape.dimensions().cend(), std::back_inserter(ret.dims),
-                 [](const proto::TensorShape::Dimension& d) { return FromProto(d); });
+  TensorShape ret;
+  ret.type = FromProto(shape.type());
+  for (const auto& dim : shape.dimensions()) {
+    ret.dims.emplace_back(FromProto(dim));
+  }
   return ret;
 }
 
@@ -294,15 +307,16 @@ inline proto::TensorShape IntoProto(const TensorShape& shape) {
   return ret;
 }
 
-inline const bool cmp(const proto::TensorShape::Dimension& a, const proto::TensorShape::Dimension& b) {
-  return (a.stride() * a.size()) < (b.stride() * b.size());
-}
-
 inline int size_in_bytes(const proto::TensorShape& shape) {
   if (shape.dimensions().size() == 0) {
     return size_in_bytes(shape.type());
   }
-  auto dim = *std::max_element(shape.dimensions().cbegin(), shape.dimensions().cend(), cmp);
+  auto dim = *std::max_element(shape.dimensions().cbegin(),                    //
+                               shape.dimensions().cend(),                      //
+                               [](const proto::TensorShape::Dimension& lhs,    //
+                                  const proto::TensorShape::Dimension& rhs) {  //
+                                 return (lhs.stride() * lhs.size()) < (rhs.stride() * rhs.size());
+                               });
   return dim.size() * dim.stride() * size_in_bytes(shape.type());
 }
 

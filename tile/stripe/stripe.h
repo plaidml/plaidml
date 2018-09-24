@@ -52,6 +52,7 @@ struct Refinement {
   std::string from;
   std::string into;
   BufferAccess access;
+  TensorShape shape;
   std::string agg_op;
 };
 
