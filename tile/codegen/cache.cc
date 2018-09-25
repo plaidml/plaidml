@@ -94,8 +94,43 @@ CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe:
   return info;
 }
 
-void ApplyCache(stripe::Block* block, const std::string& buffer) {
-  auto accesses = ComputeAccess(*block, buffer);
+static void RecurseUpdate(std::shared_ptr<stripe::Block> block, const std::vector<int64_t>& strides,
+                          std::string orig_name, std::string new_name) {
+  // Fix any refinements
+  for (auto& ref : block->refs) {
+    if (ref.from == orig_name) {
+      ref.from = new_name;
+      orig_name = ref.into;
+      new_name = ref.into;
+      for (size_t i = 0; i < ref.access.strides.size(); i++) {
+        ref.access.strides[i] = strides[i];
+      }
+    }
+  }
+  // Descend
+  std::vector<int64_t> remaining;
+  for (size_t i = block->idxs.size(); i < strides.size(); i++) {
+    remaining.push_back(strides[i]);
+  }
+  for (auto& stmt : block->stmts) {
+    std::shared_ptr<stripe::Block> down = std::dynamic_pointer_cast<stripe::Block>(stmt);
+    if (!down) {
+      continue;
+    }
+    RecurseUpdate(down, remaining, orig_name, new_name);
+  }
+}
+
+void ApplyCache(std::shared_ptr<stripe::Block> outer, size_t inner_stmt_id, const std::string& buffer) {
+  std::cout << *outer << "\n";
+  if (inner_stmt_id >= outer->stmts.size()) {
+    throw std::runtime_error("Invalid statement id (out of bounds");
+  }
+  std::shared_ptr<stripe::Block> inner = std::dynamic_pointer_cast<stripe::Block>(outer->stmts[inner_stmt_id]);
+  if (!inner) {
+    throw std::runtime_error("Invalid statement id (wrong type)");
+  }
+  auto accesses = ComputeAccess(*inner, buffer);
   if (accesses.size() != 1) {
     throw std::runtime_error("Currently we don't support multi-access caching");
   }
@@ -103,7 +138,26 @@ void ApplyCache(stripe::Block* block, const std::string& buffer) {
   if (access.is_write) {
     throw std::runtime_error("Currently we only support caching of reads");
   }
-  ComputeCacheInfo(access.idxs, access.access);
+  auto info = ComputeCacheInfo(access.idxs, access.access);
+  // TODO: Set data type!?
+  TensorShape ts_far(DataType::FLOAT32, {});
+  TensorShape ts_near(DataType::FLOAT32, {});
+  for (size_t i = 0; i < info.xfer_idxs.size(); i++) {
+    ts_far.dims.emplace_back(info.xfer_idxs[i].range, info.xfer_far.strides[i]);
+    ts_near.dims.emplace_back(info.xfer_idxs[i].range, info.xfer_near.strides[i]);
+  }
+  std::string cached_name = buffer + "_cache";
+  outer->decls.emplace(cached_name, ts_near);
+  // Make the xfer block
+  auto xfer_block = std::make_shared<stripe::Block>();
+  xfer_block->idxs = info.xfer_idxs;
+  xfer_block->refs.push_back({stripe::RefDir::In, buffer, buffer, info.xfer_far, ts_far, stripe::Intrinsic::ASSIGN});
+  xfer_block->refs.push_back(
+      {stripe::RefDir::Out, cached_name, cached_name, info.xfer_near, ts_near, stripe::Intrinsic::ASSIGN});
+  xfer_block->stmts.push_back(std::make_shared<stripe::Load>(buffer, "$X"));
+  xfer_block->stmts.push_back(std::make_shared<stripe::Store>("$X", cached_name));
+  outer->stmts.insert(outer->stmts.begin() + inner_stmt_id, xfer_block);
+  RecurseUpdate(inner, info.near.strides, buffer, cached_name);
 }
 
 }  // namespace codegen
