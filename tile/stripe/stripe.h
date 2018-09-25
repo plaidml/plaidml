@@ -31,9 +31,12 @@ struct Annotation {
 };
 
 struct Index {
+  Index() : range(0), factor(0) {}
+  Index(const std::string& name, uint64_t range, int64_t factor) : name(name), range(range), factor(factor) {}
+
   std::string name;
-  uint64_t range = 0;
-  int64_t factor = 0;
+  uint64_t range;
+  int64_t factor;
 };
 
 enum class RefDir {
@@ -43,7 +46,10 @@ enum class RefDir {
 };
 
 struct BufferAccess {
-  int64_t offset = 0;
+  BufferAccess() : offset(0) {}
+  BufferAccess(int64_t offset, const std::vector<int64_t>& strides) : offset(offset), strides(strides) {}
+
+  int64_t offset;
   std::vector<int64_t> strides;
 };
 
@@ -57,8 +63,11 @@ struct Refinement {
 };
 
 struct Constraint {
+  Constraint() : rhs(0) {}
+  Constraint(const std::vector<int64_t>& lhs, int64_t rhs) : lhs(lhs), rhs(rhs) {}
+
   std::vector<int64_t> lhs;
-  int64_t rhs = 0;
+  int64_t rhs;
 };
 
 struct Load : Statement {
@@ -120,8 +129,8 @@ struct Constant : Statement {
 
   std::string name;
   ConstType type;
-  int64_t iconst = 0;
-  double fconst = 0.0;
+  int64_t iconst;
+  double fconst;
 };
 
 struct Block : Statement {
