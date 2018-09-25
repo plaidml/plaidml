@@ -1215,6 +1215,7 @@ class Convolution(tile.Operation):
             dilation_rate=None,
             grouping=ConvolutionGrouping.NONE,
             group_format=None,
+            winograd_allowed=True,
     ):
         rank = data.shape.ndims - 2
         if strides is None:
@@ -1253,7 +1254,7 @@ class Convolution(tile.Operation):
         use_winograd = (rank == 2 and data_format == ConvolutionDataFormat.CHANNELS_LAST and
                         kernel_shape[0] == 3 and kernel_shape[1] == 3 and strides == (1, 1) and
                         dilation_rate == (1, 1) and kernel_shape[2] > 4 and kernel_shape[3] > 4 and
-                        grouping == ConvolutionGrouping.NONE)
+                        grouping == ConvolutionGrouping.NONE and winograd_allowed)
         if use_winograd:
             conv_strs = self._winograd_conv_strs(data.shape.dims, kernel_shape, padding)
             code = self._winograd_code_template().format(**conv_strs)

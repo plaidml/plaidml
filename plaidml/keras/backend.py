@@ -26,6 +26,7 @@ import numpy as np
 import os
 import plaidml
 import plaidml.op as op
+import plaidml.settings
 import plaidml.tile as ptile
 import scipy.stats
 import six
@@ -458,6 +459,7 @@ def conv(x,
         grouping=grouping,
         kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
         group_format=op.GroupedChannelFormat.GroupGroupOut,
+        winograd_allowed=not plaidml.settings.prohibit_winograd,
     )
 
 
