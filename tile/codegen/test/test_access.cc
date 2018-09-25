@@ -113,10 +113,8 @@ TEST(Codegen, Cache) {
   auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
   auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
   ApplyTile(kernel.get(), {2, 2, 2});
-  auto inner = std::dynamic_pointer_cast<stripe::Block>(kernel->stmts[0]);
-  ApplyCache(inner.get(), "A");
-  std::cout << *inner;
-  std::cout << "W00t\n";
+  ApplyCache(kernel, 0, "A");
+  std::cout << *kernel;
 }
 
 }  // namespace test
