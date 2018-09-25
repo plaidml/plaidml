@@ -19,7 +19,7 @@ std::ostream& operator<<(std::ostream& os, const CacheInfo& x) {
 static int64_t Sign(int64_t x) { return (x < 0 ? -1 : 1); }
 
 CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe::BufferAccess& access) {
-  CacheInfo r;
+  CacheInfo info;
 
   // Get index count and verify consistency
   size_t idx_count = idxs.size();
@@ -28,20 +28,20 @@ CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe:
   }
 
   // Copy across initial state
-  r.idxs = idxs;
-  r.far = access;
+  info.idxs = idxs;
+  info.far = access;
 
   // Make a list of index ids which are actually relevant
   std::vector<size_t> iids;
   for (size_t i = 0; i < idx_count; i++) {
-    if (r.idxs[i].range > 1 && r.far.strides[i] != 0) {
+    if (info.idxs[i].range > 1 && info.far.strides[i] != 0) {
       iids.push_back(i);
     }
   }
 
   // Sort ranges by absolute far stride
   std::sort(iids.begin(), iids.end(),
-            [&](size_t a, size_t b) { return std::abs(r.far.strides[a]) < std::abs(r.far.strides[b]); });
+            [&](size_t a, size_t b) { return std::abs(info.far.strides[a]) < std::abs(info.far.strides[b]); });
 
   // Merge indexes.  Basically, we copy indexes from indexes to xfer_indexes
   // and merge them as we go.  We merge whenever a new index is an even multiple
@@ -51,18 +51,18 @@ CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe:
   for (size_t i : iids) {  // For each meaningful index
     bool merged = false;
     // Extract orignal stride info
-    int64_t ostride = r.far.strides[i];
-    uint64_t orange = r.idxs[i].range;
-    const std::string& oname = r.idxs[i].name;
-    for (size_t j = 0; j < r.xfer_idxs.size(); j++) {  // Look for an index in merged to merge it with
+    int64_t ostride = info.far.strides[i];
+    uint64_t orange = info.idxs[i].range;
+    const std::string& oname = info.idxs[i].name;
+    for (size_t j = 0; j < info.xfer_idxs.size(); j++) {  // Look for an index in merged to merge it with
       // Get refs for merged stride info
-      int64_t& mstride = r.xfer_far.strides[j];
-      uint64_t& mrange = r.xfer_idxs[j].range;
-      std::string& mname = r.xfer_idxs[j].name;
+      int64_t& mstride = info.xfer_far.strides[j];
+      uint64_t& mrange = info.xfer_idxs[j].range;
+      std::string& mname = info.xfer_idxs[j].name;
       // Compute the divisor + remainder
       auto div = std::div(std::abs(ostride), std::abs(mstride));
       // If it's mergeable, adjust the index in question and break
-      if (div.rem == 0 && mrange >= div.quot) {
+      if (div.rem == 0 && mrange >= static_cast<uint64_t>(div.quot)) {
         mrange += div.quot * (orange - 1);
         mname += std::string("_") + oname;
         merge_into.push_back(j);
@@ -73,25 +73,25 @@ CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe:
     }
     // Create a new index if this index was not merged.
     if (!merged) {
-      merge_into.push_back(r.xfer_idxs.size());
+      merge_into.push_back(info.xfer_idxs.size());
       merge_scale.push_back(Sign(ostride));
-      r.xfer_idxs.push_back(r.idxs[i]);
-      r.xfer_far.strides.push_back(std::abs(ostride));
+      info.xfer_idxs.push_back(info.idxs[i]);
+      info.xfer_far.strides.push_back(std::abs(ostride));
     }
   }
 
   // Compute near strides
   int64_t cur_stride = 1;
-  for (const auto& idx : r.xfer_idxs) {
-    r.xfer_near.strides.push_back(cur_stride);
+  for (const auto& idx : info.xfer_idxs) {
+    info.xfer_near.strides.push_back(cur_stride);
     cur_stride *= idx.range;
   }
-  r.near.strides.resize(r.far.strides.size());
+  info.near.strides.resize(info.far.strides.size());
   for (size_t ri = 0; ri < iids.size(); ri++) {
     size_t i = iids[ri];
-    r.near.strides[i] = r.xfer_near.strides[merge_into[ri]] * merge_scale[ri];
+    info.near.strides[i] = info.xfer_near.strides[merge_into[ri]] * merge_scale[ri];
   }
-  return r;
+  return info;
 }
 
 void ApplyCache(stripe::Block* block, const std::string& buffer) {
