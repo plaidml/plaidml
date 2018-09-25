@@ -82,18 +82,18 @@ class StripeGenerator {
       program->decls.insert(item);
       if (is_input) {
         main->refs.emplace_back(Refinement{
-            RefDir::In,       // dir
-            item.first,       // from
-            item.first,       // into
-            BufferAccess{0},  // access
-            item.second       // shape
+            RefDir::In,  // dir
+            item.first,  // from
+            item.first,  // into
+            {},          // access
+            item.second  // shape
         });
       } else {
         main->refs.emplace_back(Refinement{
             RefDir::Out,       // dir
             item.first,        // from
             item.first,        // into
-            BufferAccess{0},   // access
+            {},                // access
             item.second,       // shape
             Intrinsic::ASSIGN  // agg_op
         });
