@@ -73,6 +73,10 @@ plaidml_cc_library(
         "@toolchain//:macos_x86_64": OPENCL_1_0_IMPL,
         "//conditions:default": OPENCL_2_0_IMPL,
     }),
+    copts = select({
+        "@toolchain//:macos_x86_64": ["-DCL_SILENCE_DEPRECATION"],
+        "//conditions:default": [],
+    }),
     hdrs = [
         "emitocl.h",
         "info.h",
