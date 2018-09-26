@@ -103,6 +103,13 @@ plaidml_cc_binary(
     ],
 )
 
+apple_binary(
+    name = "libplaidml.dylib",
+    platform_type = "macos",
+    binary_type = "dylib",
+    deps = [":api"],
+)
+
 plaidml_cc_library(
     name = "api_cc_deps",
     visibility = ["//visibility:private"],
@@ -329,12 +336,27 @@ pkg_tar(
 )
 
 pkg_tar(
+    name = "macos_sdk_bin",
+    srcs = [
+        "update_sdk_rpaths"
+    ],
+    package_dir = "bin",
+)
+
+pkg_tar(
     name = "sdk_libs",
     srcs = select({
         "@toolchain//:windows_x86_64": [":plaidml.dll"],
+        "@toolchain//:macos_x86_64": [":libplaidml.dylib"],
         "//conditions:default": ["libplaidml.so"],
     }),
     package_dir = "lib",
+    symlinks = select({
+        "@toolchain//:macos_x86_64": {
+            "lib/libplaidml.dylib": "libplaidml.dylib_lipobin",
+        },
+        "//conditions:default": {},
+    }),
 )
 
 pkg_tar(
@@ -348,5 +370,8 @@ pkg_tar(
         ":sdk_libs",
         "//plaidml/base:sdk_includes",
         "@half//:sdk_includes",
-    ],
+    ] + select({
+        "@toolchain//:macos_x86_64": [":macos_sdk_bin"],
+        "//conditions:default": [],
+    }),
 )
