@@ -49,6 +49,7 @@ plaidml_cc_library(
         "//tile/stripe",
         "//tile/platform/local_machine",
         "//tile/proto:metadata_cc",
+        "@boost//:filesystem",
         "@half",
         "@minizip",
     ] + select({
@@ -73,6 +74,7 @@ plaidml_cc_library(
     }) + if_cuda_is_configured([
         "//tile/hal/cuda",
     ]),
+    alwayslink = 1,
 )
 
 # The PLAIDML C library, defined as a Bazel dynamically-loaded library.

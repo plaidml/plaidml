@@ -122,12 +122,15 @@ class Emitter : public sem::Visitor {
   }
 
   void Visit(const sem::BinaryExpr& node) {
+    auto lhs_type = TypeOf(node.lhs);
+    auto rhs_type = TypeOf(node.rhs);
+    auto tgt_type = lang::Promote({lhs_type, rhs_type});
     emit("(");
-    node.lhs->Accept(*this);
+    EmitWithTypeConversion(lhs_type, tgt_type, node.lhs, false);
     emit(" ");
     emit(node.op);
     emit(" ");
-    node.rhs->Accept(*this);
+    EmitWithTypeConversion(rhs_type, tgt_type, node.rhs, false);
     emit(")");
   }
 
