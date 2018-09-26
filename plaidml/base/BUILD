@@ -27,6 +27,7 @@ plaidml_cc_library(
         "//base/context",
         "//base/util",
     ],
+    alwayslink = 1,
 )
 
 plaidml_cc_test(
