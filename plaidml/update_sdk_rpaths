@@ -1,0 +1,26 @@
+#!/bin/bash
+# Copyright 2018, Intel Corporation
+
+# On MacOS, dylibs contain the path to their installation location (the rpath);
+# this is the path used at runtime to load the dylib, regardless of where the
+# dylib was found at link time.
+#
+# This script updates the PlaidML SDK's libraries to point to the current SDK
+# installation path.
+#
+# This should be seen as a temporary patch to get the SDK working on MacOS.
+# Eventually, this script should be replaced by an actual PlaidML framework,
+# with an installer that takes care of correctly setting the rpath (and
+# periodically checks for updates).
+
+sdk_dir=$(cd $(dirname $(dirname ${BASH_SOURCE[0]})); pwd)
+echo "Updating PlaidML SDK library rpaths to point to ${sdk_dir}"
+
+plaidml_dylib=${sdk_dir}/lib/libplaidml.dylib_lipobin
+
+set -ex
+
+original_mode=$(stat -f%#p ${plaidml_dylib})
+chmod u+w ${plaidml_dylib}
+install_name_tool -id ${plaidml_dylib} ${plaidml_dylib}
+chmod ${original_mode} ${plaidml_dylib}
