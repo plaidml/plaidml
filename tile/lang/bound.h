@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "tile/base/shape.h"
-#include "tile/lang/bilp/ilp_solver.h"
+#include "tile/bilp/ilp_solver.h"
 #include "tile/lang/ops.h"
 
 namespace vertexai {

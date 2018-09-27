@@ -9,7 +9,7 @@
 #include <boost/numeric/ublas/vector.hpp>
 
 #include "base/util/compat.h"
-#include "tile/lang/polynomial.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {
