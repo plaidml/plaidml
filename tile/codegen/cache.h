@@ -29,7 +29,8 @@ std::ostream& operator<<(std::ostream& os, const CacheInfo& x);
 
 CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe::BufferAccess& access);
 
-void ApplyCache(std::shared_ptr<stripe::Block> outer, size_t inner_stmt_id, const std::string& buffer);
+void ApplyCache(stripe::Block* outer, std::vector<std::shared_ptr<stripe::Statement>>::iterator inner_it,
+                const std::string& buffer);
 
 }  // namespace codegen
 }  // namespace tile
