@@ -1,4 +1,4 @@
-#include "tile/lang/polynomial.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {

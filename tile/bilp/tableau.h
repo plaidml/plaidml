@@ -9,7 +9,7 @@
 #include <boost/numeric/ublas/matrix_proxy.hpp>
 #include <boost/numeric/ublas/vector.hpp>
 
-#include "tile/lang/matrix.h"
+#include "tile/math/matrix.h"
 
 namespace vertexai {
 namespace tile {

@@ -1,10 +1,10 @@
 
 #include "base/util/catch.h"
 #include "base/util/logging.h"
-#include "tile/lang/basis.h"
-#include "tile/lang/bignum.h"
-#include "tile/lang/matrix.h"
-#include "tile/lang/polynomial.h"
+#include "tile/math/basis.h"
+#include "tile/math/bignum.h"
+#include "tile/math/matrix.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {

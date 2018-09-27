@@ -98,11 +98,11 @@ plaidml_cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        ":math",
+        "//tile/math",
         ":proto_cc",
         "//base/util",
         "//tile/base",
-        "//tile/lang/bilp",
+        "//tile/bilp",
         "//tile/stripe",
         "@boost",
     ],
@@ -112,38 +112,12 @@ plaidml_cc_test(
     name = "test",
     srcs = [
         "lang_test.cc",
-        "math_test.cc",
         "sim_test.cc",
         "simulate.h",
         "test.cc",
     ],
     deps = [
         ":lang",
-    ],
-)
-
-plaidml_cc_library(
-    name = "math",
-    srcs = [
-        "basis.cc",
-        "bignum.cc",
-        "matrix.cc",
-        "polynomial.cc",
-    ],
-    hdrs = [
-        "basis.h",
-        "bignum.h",
-        "matrix.h",
-        "polynomial.h",
-    ],
-    copts = select({
-        "@toolchain//:windows_x86_64": [],
-        "//conditions:default": ["-Wno-error"],
-    }),
-    visibility = ["//tile/lang/bilp:__pkg__"],
-    deps = [
-        "//base/util",
-        "@boost",
     ],
 )
 
