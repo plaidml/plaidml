@@ -113,7 +113,7 @@ TEST(Codegen, Cache) {
   auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
   auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
   ApplyTile(kernel.get(), {2, 2, 2});
-  ApplyCache(kernel, 0, "A");
+  ApplyCache(kernel.get(), kernel->stmts.begin(), "A");
   std::cout << *kernel;
 }
 
