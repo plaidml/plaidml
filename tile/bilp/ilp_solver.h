@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "tile/lang/bignum.h"
-#include "tile/lang/bilp/tableau.h"
+#include "tile/bilp/tableau.h"
+#include "tile/math/bignum.h"
 
 namespace vertexai {
 namespace tile {

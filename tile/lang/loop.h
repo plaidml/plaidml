@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "base/util/compat.h"
-#include "tile/lang/polynomial.h"
 #include "tile/lang/semtree.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {

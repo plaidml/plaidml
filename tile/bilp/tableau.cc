@@ -1,4 +1,4 @@
-#include "tile/lang/bilp/tableau.h"
+#include "tile/bilp/tableau.h"
 
 namespace vertexai {
 namespace tile {

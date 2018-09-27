@@ -15,7 +15,7 @@
 #include "base/util/printstring.h"
 #include "base/util/transfer_object.h"
 #include "tile/lang/lang.pb.h"
-#include "tile/lang/polynomial.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {
