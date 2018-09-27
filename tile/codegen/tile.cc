@@ -57,32 +57,40 @@ inline bool IsLegal(int64_t rule, int64_t candidate) {  //
   return rule == -1 || candidate == rule;
 }
 
-void FindStencilMatches(std::set<StencilMatch>* into,                  //
-                        const std::vector<StencilCriteria>& criteria,  //
-                        const Block& block,                            //
+void FindStencilMatches(std::set<StencilMatch>* into,  //
+                        const StencilSpec& spec,       //
+                        const Block& block,            //
                         const std::vector<size_t>& cur) {
-  if (cur.size() == criteria.size()) {
+  if (cur.size() == spec.idxs.size()) {
     // base case
     StencilMatch match{
-        1,                                                 // total
+        1,                                                 // cost
         std::vector<std::string>(block.idxs.size(), "*"),  // names
         TileShape(block.idxs.size(), 1),                   // tile
         false                                              // is_fallback
     };
     for (size_t i = 0; i < cur.size(); i++) {
       size_t j = cur[i];
-      match.names[j] = criteria[i].name;
-      if (criteria[i].size == -1) {
+      match.names[j] = spec.idxs[i].name;
+      if (spec.idxs[i].size == -1) {
         match.tile[j] = block.idxs[j].range;
       } else {
-        match.tile[j] = criteria[i].size;
+        match.tile[j] = spec.idxs[i].size;
       }
-      match.total *= match.tile[j];
     }
+    match.cost = 1;
+    size_t total_tiles = 1;
+    for (size_t i = 0; i < block.idxs.size(); i++) {
+      size_t num_tiles = ((block.idxs[i].range + match.tile[i] - 1) / match.tile[i]);
+      total_tiles *= num_tiles;
+      match.cost *= num_tiles * match.tile[i];
+    }
+    match.cost += spec.alpha * total_tiles;
+    IVLOG(4, "Candidate: " << match);
     into->emplace(match);
   } else {
     size_t i = cur.size();
-    const auto& rule = criteria[i];
+    const auto& rule = spec.idxs[i];
     auto ref_outs = block.ref_outs();
     auto ref_ins = block.ref_ins();
     if (rule.out_strides.size() == ref_outs.size() &&  //
@@ -100,7 +108,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,                  //
             // found a match on this index, keep going
             std::vector<size_t> next = cur;
             next.push_back(j);
-            FindStencilMatches(into, criteria, block, next);
+            FindStencilMatches(into, spec, block, next);
           }
         }
       }
@@ -108,30 +116,30 @@ void FindStencilMatches(std::set<StencilMatch>* into,                  //
   }
 }
 
-StencilMatch FindBestStencil(const std::vector<std::vector<StencilCriteria>>& criteria,  //
+StencilMatch FindBestStencil(const std::vector<StencilSpec>& specs,  //
                              Block* block) {
   std::set<StencilMatch> matches;
-  for (const auto& rules : criteria) {
-    FindStencilMatches(&matches, rules, *block, {});
+  for (const auto& spec : specs) {
+    FindStencilMatches(&matches, spec, *block, {});
   }
   if (matches.empty()) {
     StencilMatch fallback{
-        1,                                                  // total
+        1,                                                  // cost
         std::vector<std::string>(block->idxs.size(), "*"),  // names
         TileShape(block->idxs.size(), 1),                   // tile
         true                                                // is_fallback
     };
     for (size_t i = 0; i < block->idxs.size(); i++) {
       auto range = block->idxs[i].range;
-      fallback.total *= range;
+      fallback.cost *= range;
       fallback.tile[i] = range;
     }
-    LOG(WARNING) << "Fallback: " << fallback;
+    IVLOG(3, "Fallback: " << fallback);
     block->annotations.emplace("is_fallback", std::make_shared<BoolAnnotation>(true));
     return fallback;
   }
   block->annotations.emplace("is_fallback", std::make_shared<BoolAnnotation>(false));
-  return *matches.rbegin();
+  return *matches.begin();
 }
 
 void TilePass(Block* block, const TileGenerator& generator) {
@@ -147,23 +155,23 @@ void TilePass(Block* block, const TileGenerator& generator) {
   }
 }
 
-void TilePass(Block* block, const std::vector<std::vector<StencilCriteria>>& criteria) {
-  TilePass(block, [&criteria](Block* block) {  //
-    return FindBestStencil(criteria, block).tile;
+void TilePass(Block* block, const std::vector<StencilSpec>& specs) {
+  TilePass(block, [&specs](Block* block) {  //
+    return FindBestStencil(specs, block).tile;
   });
 }
 
 std::ostream& operator<<(std::ostream& os, const StencilMatch& match) {
-  os << match.total << ":" << to_string(match.names) << ":" << to_string(match.tile);
+  os << match.cost << ":" << to_string(match.names) << ":" << to_string(match.tile);
   return os;
 }
 
 bool operator==(const StencilMatch& lhs, const StencilMatch& rhs) {  //
-  return std::tie(lhs.total, lhs.names, lhs.tile) == std::tie(rhs.total, rhs.names, rhs.tile);
+  return std::tie(lhs.cost, lhs.names, lhs.tile) == std::tie(rhs.cost, rhs.names, rhs.tile);
 }
 
 bool operator<(const StencilMatch& lhs, const StencilMatch& rhs) {  //
-  return std::tie(lhs.total, lhs.names, lhs.tile) < std::tie(rhs.total, rhs.names, rhs.tile);
+  return std::tie(lhs.cost, lhs.names, lhs.tile) < std::tie(rhs.cost, rhs.names, rhs.tile);
 }
 
 }  // namespace codegen

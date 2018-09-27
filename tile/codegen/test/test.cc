@@ -132,10 +132,13 @@ TEST(Codegen, ApplyTile) {
 }
 
 TEST(Codegen, StencilMatchMatMul) {
-  std::vector<StencilCriteria> criteria = {
-      {"k", 16, {-1}, {-1, 0}},
-      {"x", 16, {-1}, {0, -1}},
-      {"c", -1, {0}, {-1, -1}},
+  StencilSpec spec = {
+      32,  // alpha
+      {
+          {"k", 16, {-1}, {-1, 0}},
+          {"x", 16, {-1}, {0, -1}},
+          {"c", -1, {0}, {-1, -1}},
+      }  // idxs
   };
 
   auto runinfo = LoadMatMul(100);
@@ -145,10 +148,10 @@ TEST(Codegen, StencilMatchMatMul) {
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({criteria}, kernel.get());
+  auto match = FindBestStencil({spec}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      25600,            // total
+      1255968,          // total
       {"c", "k", "x"},  // names
       {100, 16, 16},    // tile
   };
@@ -156,10 +159,13 @@ TEST(Codegen, StencilMatchMatMul) {
 }
 
 TEST(Codegen, StencilMatchConv1D) {
-  std::vector<StencilCriteria> criteria = {
-      {"k", 16, {-1}, {-1, 0}},
-      {"x", 16, {-1}, {0, -1}},
-      {"c", -1, {0}, {-1, -1}},
+  StencilSpec spec = {
+      32,  // alpha
+      {
+          {"k", 16, {-1}, {-1, 0}},
+          {"x", 16, {-1}, {0, -1}},
+          {"c", -1, {0}, {-1, -1}},
+      }  // idxs
   };
 
   auto runinfo = LoadConv1D(1, 100, 64, 3);
@@ -169,10 +175,10 @@ TEST(Codegen, StencilMatchConv1D) {
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({criteria}, kernel.get());
+  auto match = FindBestStencil({spec}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      16384,                 // total
+      1378944,               // total
       {"c", "x", "*", "k"},  // names
       {64, 16, 1, 16},       // tile
   };
@@ -180,46 +186,66 @@ TEST(Codegen, StencilMatchConv1D) {
 }
 
 TEST(Codegen, StencilMatchConv2D) {
-  std::vector<std::vector<StencilCriteria>> criteria = {
+  std::vector<StencilSpec> specs = {
       {
-          {"k", 16, {-1}, {-1, 0}},  //
-          {"x", 16, {-1}, {0, -1}},  //
-          {"c", -1, {0}, {-1, -1}},  //
+          32,  // alpha
+          {
+              {"k", 16, {-1}, {-1, 0}},  //
+              {"x", 16, {-1}, {0, -1}},  //
+              {"c", -1, {0}, {-1, -1}},  //
+          }                              // idxs
       },
       {
-          {"k", 16, {-1}, {-1, 0}},  //
-          {"x", 4, {-1}, {0, -1}},   //
-          {"y", 4, {-1}, {0, -1}},   //
-          {"c", -1, {0}, {-1, -1}}   //
-      }                              //
+          32,  // alpha
+          {
+              {"k", 16, {-1}, {-1, 0}},  //
+              {"x", 4, {-1}, {0, -1}},   //
+              {"y", 4, {-1}, {0, -1}},   //
+              {"c", -1, {0}, {-1, -1}}   //
+          }                              // idxs
+      },
+      {
+          32,  // alpha
+          {
+              {"k", 16, {-1}, {0, -1}},  //
+              {"x", 4, {-1}, {-1, 0}},   //
+              {"y", 4, {-1}, {-1, 0}},   //
+              {"c", -1, {0}, {-1, -1}}   //
+          }                              // idxs
+      }                                  //
   };
 
-  auto runinfo = LoadConv2D(1, 100, 64, 3);
+  auto runinfo = LoadConv2D(1, 100, 56, 3);
   auto program = GenerateStripe(runinfo);
   auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
   auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({criteria}, kernel.get());
+  auto match = FindBestStencil(specs, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      16384,                           // total
-      {"c", "x", "*", "*", "k", "*"},  // names
-      {64, 16, 1, 1, 16, 1},           // tile
+      323280000,                       // total
+      {"c", "k", "*", "*", "x", "y"},  // names
+      {56, 16, 1, 1, 4, 4},            // tile
   };
   EXPECT_THAT(match, Eq(expected));
 }
 
 TEST(Codegen, TilePass) {
-  std::vector<std::vector<StencilCriteria>> criteria = {{
-      {"k", 16, {-1}, {-1, 0}},
-      {"x", 16, {-1}, {0, -1}},
-      {"c", -1, {0}, {-1, -1}},
-  }};
+  std::vector<StencilSpec> specs = {
+      {
+          32,  // alpha
+          {
+              {"k", 16, {-1}, {-1, 0}},
+              {"x", 16, {-1}, {0, -1}},
+              {"c", -1, {0}, {-1, -1}},
+          }  // idxs
+      }      //
+  };
   auto runinfo = LoadMatMul(100);
   auto program = GenerateStripe(runinfo);
-  TilePass(&program, criteria);
+  TilePass(&program, specs);
   IVLOG(2, program);
 }
 
