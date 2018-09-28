@@ -191,7 +191,7 @@ bool operator==(const Vector& a, const Vector& b) {
   return true;
 }
 
-std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial>& polys) {
+std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial<Rational>>& polys) {
   std::set<std::string> vars;
   for (size_t i = 0; i < polys.size(); i++) {
     for (const auto& kvp : polys[i].getMap()) {

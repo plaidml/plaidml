@@ -19,8 +19,8 @@ Contraction ConstrainIndexVarsToInts(const Contraction& c) {
   for (const auto& variable : varsUsed) {
     if (!variable.empty()) {  // Constant components not used
       const int32_t constraintBoundWidth = 1000000000;
-      c_new.constraints.push_back(
-          SymbolicConstraint(RangeConstraint(Polynomial(variable) + constraintBoundWidth / 2, constraintBoundWidth)));
+      c_new.constraints.push_back(SymbolicConstraint(
+          RangeConstraint(Polynomial<Rational>(variable) + constraintBoundWidth / 2, constraintBoundWidth)));
     }
   }
 
@@ -75,7 +75,7 @@ std::vector<RangeConstraint> GatherConstraints(const Contraction& c, const std::
 }
 
 bool IsImplied(const SimpleConstraint& c, const IndexBounds& b) {
-  const Polynomial& p = c.poly;
+  const Polynomial<Rational>& p = c.poly;
   Rational worst = p.constant();
   for (const auto& kvp : p.getMap()) {
     if (kvp.first == "") {
@@ -190,7 +190,7 @@ RangeConstraint IntersectParallelConstraintPair(const RangeConstraint& constrain
     throw std::out_of_range("Bound range in IntersectParallelConstraintPair overflows int64.");
   }
   int64_t r = (int64_t)range;
-  Polynomial p(constraint1.poly / n1);
+  Polynomial<Rational> p(constraint1.poly / n1);
   p.setConstant(merged_offset);
   return RangeConstraint(p, r);
 }
@@ -218,12 +218,12 @@ std::tuple<IndexBounds, std::vector<SimpleConstraint>> ComputeBounds(const std::
   // Run the solver for each variable min + max
   bilp::ILPSolver solver;
   IndexBounds out;
-  std::vector<Polynomial> objectives;
+  std::vector<Polynomial<Rational>> objectives;
   for (const std::string& var : variableNames) {
     objectives.emplace_back(var);
     objectives.emplace_back(var, -1);
   }
-  std::map<Polynomial, bilp::ILPResult> result = solver.batch_solve(constraints, objectives);
+  std::map<Polynomial<Rational>, bilp::ILPResult> result = solver.batch_solve(constraints, objectives);
   for (const auto& kvp : result) {
     // ILPResult lists the objective for each requested optimization. Since we
     // used a monomial for each objective, GetNonzeroIndex returns the name of

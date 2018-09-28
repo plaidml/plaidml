@@ -15,8 +15,8 @@ TEST(BilpTest, RationalTest) { EXPECT_EQ(Rational(0, 1), 0); }
 
 TEST(BilpTest, BasicTableauTest) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(Polynomial("x") + 4, 4);
-  Polynomial obj = Polynomial("x", 3);
+  constraints.emplace_back(Polynomial<Rational>("x") + 4, 4);
+  Polynomial<Rational> obj = Polynomial<Rational>("x", 3);
   ILPSolver solver;
   Tableau t = solver.makeStandardFormTableau(constraints, obj);
 
@@ -87,8 +87,8 @@ TEST(BilpTest, OptimizeCanonicalTest) {
 
 TEST(BilpTest, SimpleOptimizeTest) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(Polynomial("x") + 4, 4);
-  Polynomial obj = 3 * Polynomial("x");
+  constraints.emplace_back(Polynomial<Rational>("x") + 4, 4);
+  Polynomial<Rational> obj = 3 * Polynomial<Rational>("x");
   ILPSolver solver;
   Tableau t = solver.makeStandardFormTableau(constraints, obj);
   EXPECT_EQ(t.makeOptimal(), true);
@@ -103,10 +103,10 @@ TEST(BilpTest, SimpleOptimizeTest) {
 
 TEST(BilpTest, OptimizeTest2D) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(Polynomial("x") + Polynomial("y") + 2, 4);
-  constraints.emplace_back(Polynomial("x") + 1, 4);
-  constraints.emplace_back(Polynomial("y") + 2, 5);
-  Polynomial obj = -3 * Polynomial("x") + 2 * Polynomial("y");
+  constraints.emplace_back(Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 4);
+  constraints.emplace_back(Polynomial<Rational>("x") + 1, 4);
+  constraints.emplace_back(Polynomial<Rational>("y") + 2, 5);
+  Polynomial<Rational> obj = -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
   ILPSolver solver;
   Tableau t = solver.makeStandardFormTableau(constraints, obj);
   EXPECT_EQ(t.makeOptimal(), true);
@@ -125,10 +125,10 @@ TEST(BilpTest, OptimizeTest2D) {
 
 TEST(BilpTest, TrivialILPTest) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(Polynomial("x") + Polynomial("y") + 2, 4);
-  constraints.emplace_back(Polynomial("x") + 1, 4);
-  constraints.emplace_back(Polynomial("y") + 2, 5);
-  Polynomial obj = -3 * Polynomial("x") + 2 * Polynomial("y");
+  constraints.emplace_back(Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 4);
+  constraints.emplace_back(Polynomial<Rational>("x") + 1, 4);
+  constraints.emplace_back(Polynomial<Rational>("y") + 2, 5);
+  Polynomial<Rational> obj = -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
   ILPSolver solver;
   Tableau t = solver.makeStandardFormTableau(constraints, obj);
   ILPResult res = solver.solve(t);
@@ -141,10 +141,10 @@ TEST(BilpTest, TrivialILPTest) {
 
 TEST(BilpTest, ILPTest2D) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(2 * Polynomial("x") + Polynomial("y") + 2, 6);
-  constraints.emplace_back(Polynomial("x") + 1, 4);
-  constraints.emplace_back(Polynomial("y") + 2, 5);
-  Polynomial obj = -3 * Polynomial("x") + 2 * Polynomial("y");
+  constraints.emplace_back(2 * Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 6);
+  constraints.emplace_back(Polynomial<Rational>("x") + 1, 4);
+  constraints.emplace_back(Polynomial<Rational>("y") + 2, 5);
+  Polynomial<Rational> obj = -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
   ILPSolver solver;
   ILPResult res = solver.solve(constraints, obj);
 
@@ -156,45 +156,46 @@ TEST(BilpTest, ILPTest2D) {
 
 TEST(BilpTest, Subdivision1D) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(Polynomial("i_0"), 2);
-  constraints.emplace_back(Polynomial("i_0") + 2 * Polynomial("k_0"), 5);
-  constraints.emplace_back(Polynomial("i_0") + Polynomial("i_1") + Polynomial("k_0"), 35);
-  constraints.emplace_back(Polynomial("i_0") + 2 * Polynomial("i_1"), 70);
+  constraints.emplace_back(Polynomial<Rational>("i_0"), 2);
+  constraints.emplace_back(Polynomial<Rational>("i_0") + 2 * Polynomial<Rational>("k_0"), 5);
+  constraints.emplace_back(Polynomial<Rational>("i_0") + Polynomial<Rational>("i_1") + Polynomial<Rational>("k_0"), 35);
+  constraints.emplace_back(Polynomial<Rational>("i_0") + 2 * Polynomial<Rational>("i_1"), 70);
 
-  std::vector<Polynomial> objectives;
-  objectives.emplace_back(Polynomial("i_0"));
-  objectives.emplace_back(-Polynomial("i_0"));
-  objectives.emplace_back(Polynomial("i_1"));
-  objectives.emplace_back(-Polynomial("i_1"));
-  objectives.emplace_back(Polynomial("k_0"));
-  objectives.emplace_back(-Polynomial("k_0"));
+  std::vector<Polynomial<Rational>> objectives;
+  objectives.emplace_back(Polynomial<Rational>("i_0"));
+  objectives.emplace_back(-Polynomial<Rational>("i_0"));
+  objectives.emplace_back(Polynomial<Rational>("i_1"));
+  objectives.emplace_back(-Polynomial<Rational>("i_1"));
+  objectives.emplace_back(Polynomial<Rational>("k_0"));
+  objectives.emplace_back(-Polynomial<Rational>("k_0"));
   ILPSolver solver;
-  std::map<Polynomial, ILPResult> res = solver.batch_solve(constraints, objectives);
+  std::map<Polynomial<Rational>, ILPResult> res = solver.batch_solve(constraints, objectives);
 
-  EXPECT_EQ(res[Polynomial("i_0")].obj_val, 0);
-  EXPECT_EQ(res[-Polynomial("i_0")].obj_val, -1);
-  EXPECT_EQ(res[Polynomial("i_1")].obj_val, 0);
-  EXPECT_EQ(res[-Polynomial("i_1")].obj_val, -34);
-  EXPECT_EQ(res[Polynomial("k_0")].obj_val, 0);
-  EXPECT_EQ(res[-Polynomial("k_0")].obj_val, -2);
+  EXPECT_EQ(res[Polynomial<Rational>("i_0")].obj_val, 0);
+  EXPECT_EQ(res[-Polynomial<Rational>("i_0")].obj_val, -1);
+  EXPECT_EQ(res[Polynomial<Rational>("i_1")].obj_val, 0);
+  EXPECT_EQ(res[-Polynomial<Rational>("i_1")].obj_val, -34);
+  EXPECT_EQ(res[Polynomial<Rational>("k_0")].obj_val, 0);
+  EXPECT_EQ(res[-Polynomial<Rational>("k_0")].obj_val, -2);
 }
 
 TEST(MilpTest, RandomConstraintsTest) {
   const int varSize = 8;
   for (size_t test_count = 0; test_count < 20; ++test_count) {
     std::vector<RangeConstraint> constraints;
-    constraints.emplace_back(Polynomial("x"), varSize);
-    constraints.emplace_back(Polynomial("y"), varSize);
-    constraints.emplace_back(Polynomial("z"), varSize);
-    constraints.emplace_back(Polynomial("w"), varSize);
+    constraints.emplace_back(Polynomial<Rational>("x"), varSize);
+    constraints.emplace_back(Polynomial<Rational>("y"), varSize);
+    constraints.emplace_back(Polynomial<Rational>("z"), varSize);
+    constraints.emplace_back(Polynomial<Rational>("w"), varSize);
     for (int i = 0; i < rand() % 4 + 2; ++i) {                           // NOLINT (runtime/threadsafe_fn)
       Rational x_coeff = Rational(rand() % 9 - 4, rand() % 4 + 1);       // NOLINT (runtime/threadsafe_fn)
       Rational y_coeff = Rational(rand() % 11 - 5, rand() % 3 + 1);      // NOLINT (runtime/threadsafe_fn)
       Rational z_coeff = Rational(rand() % 11 - 5, rand() % 5 + 1);      // NOLINT (runtime/threadsafe_fn)
       Rational w_coeff = Rational(rand() % 15 - 7, rand() % 4 + 1);      // NOLINT (runtime/threadsafe_fn)
       Rational const_term = Rational(rand() % 31 - 20, rand() % 4 + 1);  // NOLINT (runtime/threadsafe_fn)
-      constraints.emplace_back(x_coeff * Polynomial("x") + y_coeff * Polynomial("y") + z_coeff * Polynomial("z") +
-                                   w_coeff * Polynomial("w") + const_term,
+      constraints.emplace_back(x_coeff * Polynomial<Rational>("x") + y_coeff * Polynomial<Rational>("y") +
+                                   z_coeff * Polynomial<Rational>("z") + w_coeff * Polynomial<Rational>("w") +
+                                   const_term,
                                rand() % 10 + 12);
     }
 
@@ -256,18 +257,18 @@ TEST(MilpTest, RandomConstraintsTest) {
         }
       }
     }
-    std::vector<Polynomial> objectives;
-    objectives.emplace_back(Polynomial("x"));
-    objectives.emplace_back(Polynomial("x", -1));
-    objectives.emplace_back(Polynomial("y"));
-    objectives.emplace_back(Polynomial("y", -1));
-    objectives.emplace_back(Polynomial("z"));
-    objectives.emplace_back(Polynomial("z", -1));
-    objectives.emplace_back(Polynomial("w"));
-    objectives.emplace_back(Polynomial("w", -1));
+    std::vector<Polynomial<Rational>> objectives;
+    objectives.emplace_back(Polynomial<Rational>("x"));
+    objectives.emplace_back(Polynomial<Rational>("x", -1));
+    objectives.emplace_back(Polynomial<Rational>("y"));
+    objectives.emplace_back(Polynomial<Rational>("y", -1));
+    objectives.emplace_back(Polynomial<Rational>("z"));
+    objectives.emplace_back(Polynomial<Rational>("z", -1));
+    objectives.emplace_back(Polynomial<Rational>("w"));
+    objectives.emplace_back(Polynomial<Rational>("w", -1));
     if (is_feasible) {
       ILPSolver solver;
-      std::map<Polynomial, ILPResult> result = solver.batch_solve(constraints, objectives);
+      std::map<Polynomial<Rational>, ILPResult> result = solver.batch_solve(constraints, objectives);
       for (const auto& kvp : result) {
         std::string var = kvp.first.GetNonzeroIndex();
         Rational obj_val = kvp.second.obj_val;

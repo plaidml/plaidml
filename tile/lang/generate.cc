@@ -487,8 +487,8 @@ static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings&
 
 static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed, VarRewrites* var_rewrites,
                           const Program& prog, std::size_t opidx, const UseDef& ud, const Bindings& vars,
-                          const ShapeMap& inputs, const ShapeMap& outputs, const std::vector<Polynomial>& out_poly,
-                          const HardwareSettings& settings) {
+                          const ShapeMap& inputs, const ShapeMap& outputs,
+                          const std::vector<Polynomial<Rational>>& out_poly, const HardwareSettings& settings) {
   // Unify the contraction with downstream elementwise operations.
   //
   // Here's the idea: during a contraction's output phase, we
@@ -600,7 +600,7 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
       if (shape->elem_size() == out_shape.elem_size()) {
         shape = &out_shape;
       }
-      std::vector<Polynomial> indexes;
+      std::vector<Polynomial<Rational>> indexes;
       size_t off = out_poly.size() - shape->dims.size();
       for (size_t i = 0; i < shape->dims.size(); i++, off++) {
         indexes.push_back(out_poly[off]);
@@ -717,7 +717,7 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
     }
     FlatTensorAccess access;
     access.global_index_limit = shape->elem_size();
-    Polynomial p;
+    Polynomial<Rational> p;
     size_t off = out_poly.size() - shape->dims.size();
     for (size_t i = 0; i < shape->dims.size(); i++, off++) {
       // We add things if they are not broadcast, we treat 1, 1 as non broadcast in this case
@@ -776,7 +776,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
         continue;
       }
       std::vector<TensorShape> tshapes = MakeTShapes(op.c, vars);
-      std::vector<Polynomial> out_poly;
+      std::vector<Polynomial<Rational>> out_poly;
       FlatContraction flat = Compile(op.c, tshapes, &out_poly);
       flat.output = op.output;
 
@@ -863,7 +863,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
     flat.comb_op = CombinationOp::NONE;
     flat.agg_op = AggregationOp::NONE;
 
-    std::vector<Polynomial> out_poly;
+    std::vector<Polynomial<Rational>> out_poly;
     {
       // The initial elementwise operation's output is used to
       // determine the shape of the overall kernel -- which is
@@ -879,7 +879,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       for (std::size_t idx = 0; idx < shape.dims.size(); ++idx) {
         std::string idx_name = std::string("i") + std::to_string(idx + 1);
         flat.names.push_back(idx_name);
-        out_poly.push_back(Polynomial(idx_name));
+        out_poly.push_back(Polynomial<Rational>(idx_name));
         flat.ranges.push_back(shape.dims[idx].size);
       }
 
