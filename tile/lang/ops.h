@@ -28,7 +28,7 @@ enum class CombinationOp : char { MULTIPLY = '*', PLUS = '+', EQ = '=', COND = '
 std::string to_string(const AggregationOp& c);
 std::string to_string(const CombinationOp& c);
 
-typedef std::vector<Polynomial> IndexSpec;
+typedef std::vector<Polynomial<Rational>> IndexSpec;
 
 class SymbolicPolynomial;
 typedef std::shared_ptr<SymbolicPolynomial> SymbolicPolynomialPtr;

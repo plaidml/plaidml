@@ -29,10 +29,10 @@ class ILPSolver {
  public:
   // Finds minimal value of objective subject to constraints (and subject to
   // every variable and every constraint value being an integer)
-  ILPResult solve(const std::vector<RangeConstraint>& constraints, const Polynomial objective);
+  ILPResult solve(const std::vector<RangeConstraint>& constraints, const Polynomial<Rational> objective);
   // Returns a solution for each objective, all subject to the same constraints
-  std::map<Polynomial, ILPResult> batch_solve(const std::vector<RangeConstraint>& constraints,
-                                              const std::vector<Polynomial>& objectives);
+  std::map<Polynomial<Rational>, ILPResult> batch_solve(const std::vector<RangeConstraint>& constraints,
+                                                        const std::vector<Polynomial<Rational>>& objectives);
 
  private:
   FRIEND_TEST(BilpTest, BasicTableauTest);
@@ -60,7 +60,7 @@ class ILPSolver {
   // Can omit objective to set up just the constraints; this tableau can then be
   // copied to solve multiple problems with the same constraints
   Tableau makeStandardFormTableau(const std::vector<RangeConstraint>& constraints,
-                                  const Polynomial objective = Polynomial());
+                                  const Polynomial<Rational> objective = Polynomial<Rational>());
   // Add an additional constraint that reduces the real feasible region but that
   // leaves the integral feasible region unchanged
   Tableau addGomoryCut(const Tableau& t, size_t row);

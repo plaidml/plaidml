@@ -9,11 +9,11 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-bool BasisBuilder::addEquation(const Polynomial& orig) {
+bool BasisBuilder::addEquation(const Polynomial<Rational>& orig) {
   IVLOG(4, "In basis builder, adding poly " << orig);
   // Remove any constants
-  Polynomial nc = orig - orig.constant();
-  Polynomial p = nc;
+  Polynomial<Rational> nc = orig - orig.constant();
+  Polynomial<Rational> p = nc;
 
   // Reduce the polynomial via existing polynomials
   for (size_t i = 0; i < reduced_.size(); i++) {
@@ -24,7 +24,7 @@ bool BasisBuilder::addEquation(const Polynomial& orig) {
   }
   IVLOG(4, "Reduced verion:" << p);
   // If the result is 0, equation is linearly dependant on existing basis
-  if (p == Polynomial()) {
+  if (p == Polynomial<Rational>()) {
     return false;
   }
 

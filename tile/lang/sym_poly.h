@@ -28,7 +28,7 @@ class SymbolicPolynomial {
   virtual SymbolicPolynomialPtr DeXify() const = 0;
   virtual SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const = 0;
   virtual SymbolicPolynomialPtr Decompose(BoundFunction* bf) const = 0;
-  virtual Polynomial Evaluate(const Bindings& bindings) const = 0;
+  virtual Polynomial<Rational> Evaluate(const Bindings& bindings) const = 0;
   virtual std::string ToString() const = 0;
 };
 

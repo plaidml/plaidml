@@ -8,7 +8,6 @@
 #include "tile/lang/gen_contract.h"
 #include "tile/lang/generate.h"
 #include "tile/lang/loop.h"
-#include "tile/lang/matrix.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/reduce.h"
@@ -20,6 +19,7 @@
 #include "tile/lang/symbolic.h"
 #include "tile/lang/tile_opt.h"
 #include "tile/lang/type.h"
+#include "tile/math/matrix.h"
 
 #include "base/util/catch.h"
 #include "base/util/logging.h"
@@ -51,7 +51,7 @@ const HardwareSettings& TestGPU() {
 }
 
 TEST_CASE("Bound check convolution edged", "[bound]") {
-  Polynomial x("x"), i("i");
+  Polynomial<Rational> x("x"), i("i");
   std::vector<RangeConstraint> cons = {{x, 5}, {x + i, 7}, {i, 3}};
   IndexBounds out;
   std::vector<SimpleConstraint> rcons;
@@ -65,7 +65,7 @@ TEST_CASE("Bound check convolution edged", "[bound]") {
 }
 
 TEST_CASE("Bound check convolution equal sized", "[bound]") {
-  Polynomial x("x"), i("i");
+  Polynomial<Rational> x("x"), i("i");
   std::vector<RangeConstraint> cons = {{x, 7}, {x + i, 7}, {i + 1, 3}};
   IndexBounds out;
   std::vector<SimpleConstraint> rcons;
@@ -284,7 +284,7 @@ TEST_CASE("Flatten wacky matrix multiply type thing", "[flatten]") {
   Contraction c(2);
   c.comb_op = CombinationOp::MULTIPLY;
   c.agg_op = AggregationOp::SUM;
-  Polynomial i("i"), j("j"), k("k");
+  Polynomial<Rational> i("i"), j("j"), k("k");
   c.specs[0].spec = {i, j};
   c.specs[1].spec = {i + 2, k};
   c.specs[2].spec = {k, j};
@@ -340,7 +340,7 @@ TEST_CASE("Two outputs", "[multiout]") {
 }
 
 TEST_CASE("Gausian Elimination 1", "[reduce]") {
-  Polynomial i("i"), j("j"), k("k"), x("x"), y("y");
+  Polynomial<Rational> i("i"), j("j"), k("k"), x("x"), y("y");
   Contraction op(2);
   op.specs[0].spec = {k + j, 2 * x + i + 3, j - x, 2 * k + 2 * j};
   op.specs[1].spec = {5 * i, -3 * j + x, y};
@@ -351,7 +351,7 @@ TEST_CASE("Gausian Elimination 1", "[reduce]") {
 }
 
 TEST_CASE("Doc examples", "[doc]") {
-  Polynomial i("i"), j("j"), k("k");
+  Polynomial<Rational> i("i"), j("j"), k("k");
   Contraction op(2);
   op.specs[0].spec = {k, 2 * k + 5, k - 2 * j};
   op.specs[1].spec = {5 * i - 2, -3 * j};
@@ -370,7 +370,7 @@ TEST_CASE("Doc examples", "[doc]") {
 }
 
 TEST_CASE("MatMulBadGrad", "[reduce]") {
-  Polynomial i("i"), y("y"), x("x");
+  Polynomial<Rational> i("i"), y("y"), x("x");
   Contraction op(2);
 
   op.specs[0].spec = {y, i};
@@ -437,7 +437,7 @@ TEST_CASE("Function", "[parsing]") {
   REQUIRE(prog.ops[0].output == "B");
 }
 
-TEST_CASE("Naked Polynomial", "[parsing]") {
+TEST_CASE("Naked Polynomial<Rational>", "[parsing]") {
   Parser parser;
   REQUIRE(parser.ParsePolynomial("3*x-i+4").toString() == "4 - i + 3*x");
   REQUIRE(parser.ParsePolynomial("x*3-i+4").toString() == "4 - i + 3*x");
