@@ -179,11 +179,11 @@ FlatContraction Flatten(const Contraction& c, const std::vector<TensorShape>& sh
 
   // Gather all the index names + compute strides
   std::set<std::string> index_names;
-  std::vector<Polynomial> flat_polys(c.specs.size());
+  std::vector<Polynomial<Rational>> flat_polys(c.specs.size());
   for (size_t i = 0; i < c.specs.size(); i++) {
     const IndexSpec& spec = c.specs[i].spec;
     for (size_t j = 0; j < spec.size(); j++) {
-      const Polynomial& p = spec[j];
+      const Polynomial<Rational>& p = spec[j];
       Rational offset_coeff = p.constant();
       for (const auto& kvp : p.getMap()) {
         if (kvp.first != "") {
@@ -192,7 +192,7 @@ FlatContraction Flatten(const Contraction& c, const std::vector<TensorShape>& sh
             offset_coeff += bounds[kvp.first].min * kvp.second;
             // It also must be merged into any constraints
             for (auto cons = new_cons.begin(); cons != new_cons.end(); ++cons) {
-              cons->poly.substitute(kvp.first, Polynomial(bounds[kvp.first].min));
+              cons->poly.substitute(kvp.first, Polynomial<Rational>(bounds[kvp.first].min));
             }
             IVLOG(5, "New constraints after replacing " << kvp.first << " with constant " << bounds[kvp.first].min
                                                         << ": " << new_cons);

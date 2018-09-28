@@ -66,7 +66,7 @@ bool operator==(const Matrix& a, const Matrix& b);
 // Returns a matrix of polys.size() rows and with one column for each
 // variable in polys (in lexigraphical order).  Also, returns a vector of
 // polys.size() containing the constants for each polynomial
-std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial>& polys);
+std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial<Rational>>& polys);
 
 // Convert matrix + vector of offsets to Hermite Normal Form
 bool HermiteNormalForm(Matrix& m);  // NOLINT(runtime/references)

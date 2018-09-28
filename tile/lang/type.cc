@@ -430,7 +430,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
         // Bind the range
         int64_t range = ExtractInteger(*vars, cc.range);
         // Bind the polynomial
-        Polynomial poly = cc.poly->Evaluate(*vars);
+        Polynomial<Rational> poly = cc.poly->Evaluate(*vars);
         // Update the concrete range
         cc.bound = RangeConstraint(poly, range);
         cc.poly = SymbolicPolynomialPtr();

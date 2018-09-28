@@ -7,11 +7,11 @@
 #include "tile/lang/flat.h"
 #include "tile/lang/gen_contract.h"
 #include "tile/lang/generate.h"
-#include "tile/lang/matrix.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/reduce.h"
 #include "tile/lang/simulate.h"
+#include "tile/math/matrix.h"
 
 #include "base/util/catch.h"
 #include "base/util/logging.h"

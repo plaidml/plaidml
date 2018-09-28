@@ -15,7 +15,7 @@ namespace tile {
 namespace lang {
 
 FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& shapes,
-                        std::vector<Polynomial>* out_poly) {
+                        std::vector<Polynomial<Rational>>* out_poly) {
   if (c.specs.size() != 2 && c.specs.size() != 3 && c.specs.size() != 4) {
     throw std::runtime_error("Currently, we only support 1, 2, or 3 element Contractions");
   }
@@ -25,7 +25,7 @@ FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& sh
   SVLOG(cs, 3, "With Index Variables Made Integral:\n" << to_string(int_idx_cntrc).c_str());
   // Check if we can skip reduce
   bool fancy = false;
-  for (const Polynomial& p : c.specs[0].spec) {
+  for (const Polynomial<Rational>& p : c.specs[0].spec) {
     if (p.getMap().size() > 2 || (p.getMap().size() == 2 && p.constant() == 0)) {
       fancy = true;
       break;

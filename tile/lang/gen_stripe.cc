@@ -119,7 +119,7 @@ class StripeGenerator {
       IVLOG(3, "Contraction output " << op.output << " size==0; skipping");
       return;
     }
-    std::vector<Polynomial> out_poly;
+    std::vector<Polynomial<Rational>> out_poly;
     FlatContraction flat = Compile(op.c, MakeShapes(op.c), &out_poly);
     flat.output = op.output;
 
