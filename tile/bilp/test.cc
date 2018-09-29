@@ -1,8 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "tile/lang/bignum.h"
-#include "tile/lang/bilp/ilp_solver.h"
+#include "tile/bilp/ilp_solver.h"
+#include "tile/math/bignum.h"
 
 namespace vertexai {
 namespace tile {
