@@ -32,10 +32,10 @@ TEST(Codegen, Access) {
   auto runinfo = LoadMatMul();
   auto program = GenerateStripe(runinfo);
 
-  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
-  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
+  auto main = stripe::Block::Downcast(program.stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
   ApplyTile(kernel.get(), {2, 2, 2});
-  auto inner = std::dynamic_pointer_cast<stripe::Block>(kernel->stmts[0]);
+  auto inner = stripe::Block::Downcast(kernel->stmts.front());
 
   auto access = ComputeAccess(*kernel, "A");
   ASSERT_THAT(access.size(), Eq(1));
@@ -110,8 +110,8 @@ TEST(Codegen, Cache) {
   auto runinfo = LoadMatMul();
   auto program = GenerateStripe(runinfo);
 
-  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
-  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
+  auto main = stripe::Block::Downcast(program.stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
   ApplyTile(kernel.get(), {2, 2, 2});
   ApplyCache(kernel.get(), kernel->stmts.begin(), "A");
   std::cout << *kernel;

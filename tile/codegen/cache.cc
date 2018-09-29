@@ -43,7 +43,7 @@ CacheInfo ComputeCacheInfo(const std::vector<stripe::Index>& idxs, const stripe:
   std::sort(iids.begin(), iids.end(),
             [&](size_t a, size_t b) { return std::abs(info.far.strides[a]) < std::abs(info.far.strides[b]); });
 
-  // Merge indexes.  Basically, we copy indexes from indexes to xfer_indexes
+  // Merge indexes.  Basically, we copy from indexes to xfer_indexes
   // and merge them as we go.  We merge whenever a new index is an even multiple
   // of another and its ranges overlap.  We also track the multiplier and new ID
   std::vector<size_t> merge_into;
@@ -113,7 +113,7 @@ static void RecurseUpdate(std::shared_ptr<stripe::Block> block, const std::vecto
     remaining.push_back(strides[i]);
   }
   for (auto& stmt : block->stmts) {
-    auto down = std::dynamic_pointer_cast<stripe::Block>(stmt);
+    auto down = stripe::Block::Downcast(stmt);
     if (!down) {
       continue;
     }
@@ -123,8 +123,7 @@ static void RecurseUpdate(std::shared_ptr<stripe::Block> block, const std::vecto
 
 void ApplyCache(stripe::Block* outer, std::vector<std::shared_ptr<stripe::Statement>>::iterator inner_it,
                 const std::string& buffer) {
-  std::cout << *outer << "\n";
-  auto inner = std::dynamic_pointer_cast<stripe::Block>(*inner_it);
+  auto inner = stripe::Block::Downcast(*inner_it);
   if (!inner) {
     throw std::runtime_error("Invalid statement (wrong type)");
   }

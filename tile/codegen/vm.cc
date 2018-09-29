@@ -128,11 +128,11 @@ class VirtualMachine {
     for (const auto& stmt : block.stmts) {
       switch (stmt->kind()) {
         case StmtKind::Load: {
-          const auto& op = std::dynamic_pointer_cast<Load>(stmt);
+          const auto& op = Load::Downcast(stmt);
           vars[op->into] = DoLoad(op->from, offsets[op->from]);
         } break;
         case StmtKind::Store: {
-          const auto& op = std::dynamic_pointer_cast<Store>(stmt);
+          const auto& op = Store::Downcast(stmt);
           auto it = refs_by_into.find(op->into);
           if (it == refs_by_into.end()) {
             throw std::runtime_error("Missing agg_op");
@@ -140,7 +140,7 @@ class VirtualMachine {
           DoStore(op->into, offsets[op->into], vars[op->from], it->second->agg_op);
         } break;
         case StmtKind::Intrinsic: {
-          const auto& op = std::dynamic_pointer_cast<Intrinsic>(stmt);
+          const auto& op = Intrinsic::Downcast(stmt);
           if (op->name == Intrinsic::MUL) {
             vars[op->outputs[0]] = vars[op->inputs[0]] * vars[op->inputs[1]];
           }
@@ -148,7 +148,7 @@ class VirtualMachine {
         case StmtKind::Constant:
           break;
         case StmtKind::Block:
-          ExecuteBlock(*std::dynamic_pointer_cast<Block>(stmt), *scope, offsets);
+          ExecuteBlock(*Block::Downcast(stmt), *scope, offsets);
           break;
         default:
           break;

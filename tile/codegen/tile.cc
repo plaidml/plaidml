@@ -13,6 +13,9 @@ namespace codegen {
 using namespace stripe;  // NOLINT
 
 void ApplyTile(Block* outer, const TileShape& tile) {
+  if (outer->idxs.size() != tile.size()) {
+    throw std::runtime_error("Invalid tile specified");
+  }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
   // Block inner;
@@ -99,10 +102,10 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
         if (std::find(cur.cbegin(), cur.cend(), j) == cur.cend()) {
           bool is_legal = true;
           for (size_t k = 0; k < rule.out_strides.size(); k++) {
-            is_legal &= IsLegal(rule.out_strides[k], ref_outs[k].access.strides[j]);
+            is_legal &= IsLegal(rule.out_strides[k], ref_outs[k]->access.strides[j]);
           }
           for (size_t k = 0; k < rule.in_strides.size(); k++) {
-            is_legal &= IsLegal(rule.in_strides[k], ref_ins[k].access.strides[j]);
+            is_legal &= IsLegal(rule.in_strides[k], ref_ins[k]->access.strides[j]);
           }
           if (is_legal) {
             // found a match on this index, keep going
@@ -146,7 +149,7 @@ void TilePass(Block* block, const TileGenerator& generator) {
   bool is_leaf = true;
   for (auto stmt : block->stmts) {
     if (stmt->kind() == StmtKind::Block) {
-      TilePass(std::dynamic_pointer_cast<Block>(stmt).get(), generator);
+      TilePass(Block::Downcast(stmt).get(), generator);
       is_leaf = false;
     }
   }
