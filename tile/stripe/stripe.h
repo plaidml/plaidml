@@ -72,6 +72,7 @@ struct Constraint {
 
 struct Load : Statement {
   Load(const std::string& from, const std::string& into) : from(from), into(into) {}
+  static std::shared_ptr<Load> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Load; }
 
   std::string from;
@@ -80,6 +81,7 @@ struct Load : Statement {
 
 struct Store : Statement {
   Store(const std::string& from, const std::string& into) : from(from), into(into) {}
+  static std::shared_ptr<Store> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Store; }
 
   std::string from;
@@ -87,6 +89,7 @@ struct Store : Statement {
 };
 
 struct Intrinsic : Statement {
+  static std::shared_ptr<Intrinsic> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Intrinsic; }
 
   std::string name;
@@ -109,6 +112,7 @@ struct Intrinsic : Statement {
 };
 
 struct Special : Statement {
+  static std::shared_ptr<Special> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Special; }
 
   std::string name;
@@ -125,6 +129,7 @@ enum class ConstType {
 struct Constant : Statement {
   Constant(const std::string& name, int64_t value) : name(name), type(ConstType::Integer), iconst(value) {}
   Constant(const std::string& name, double value) : name(name), type(ConstType::Float), fconst(value) {}
+  static std::shared_ptr<Constant> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Constant; }
 
   std::string name;
@@ -134,9 +139,10 @@ struct Constant : Statement {
 };
 
 struct Block : Statement {
+  static std::shared_ptr<Block> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Block; }
-  std::vector<Refinement> ref_ins() const;
-  std::vector<Refinement> ref_outs() const;
+  std::vector<const Refinement*> ref_ins() const;
+  std::vector<const Refinement*> ref_outs() const;
 
   std::string name;
   std::string comments;
@@ -150,6 +156,7 @@ struct Block : Statement {
 
 struct BoolAnnotation : Annotation {
   explicit BoolAnnotation(bool value) : value(value) {}
+  static std::shared_ptr<BoolAnnotation> Downcast(const std::shared_ptr<Annotation>& ann);
   bool value;
 };
 

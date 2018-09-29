@@ -139,14 +139,14 @@ void ComputeAccessRecursive(std::vector<AccessPattern>* out, const Block& block,
   for (const auto& stmt : block.stmts) {
     switch (stmt->kind()) {
       case StmtKind::Load:
-        add_access(std::dynamic_pointer_cast<Load>(stmt)->from, false);
+        add_access(Load::Downcast(stmt)->from, false);
         break;
       case StmtKind::Store:
-        add_access(std::dynamic_pointer_cast<Store>(stmt)->from, true);
+        add_access(Store::Downcast(stmt)->from, true);
         break;
       case StmtKind::Block:
         // TODO: Consider prequalifying block (does it refine anything I care about) before descending
-        ComputeAccessRecursive(out, *std::dynamic_pointer_cast<Block>(stmt), self);
+        ComputeAccessRecursive(out, *Block::Downcast(stmt), self);
         break;
       default:
         break;

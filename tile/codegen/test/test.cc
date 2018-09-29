@@ -110,10 +110,10 @@ TEST(Codegen, ApplyTile) {
   IVLOG(2, "C: " << data["C"]);
   EXPECT_THAT(data["C"], ContainerEq(expected));
 
-  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
-  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
+  auto main = stripe::Block::Downcast(program.stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
   ApplyTile(kernel.get(), {5, 4, 4});
-  auto inner = std::dynamic_pointer_cast<stripe::Block>(kernel->stmts[0]);
+  auto inner = stripe::Block::Downcast(kernel->stmts.front());
   IVLOG(2, "Inner>\n" << *inner);
   ApplyTile(inner.get(), {5, 2, 2});
 
@@ -143,8 +143,8 @@ TEST(Codegen, StencilMatchMatMul) {
 
   auto runinfo = LoadMatMul(100);
   auto program = GenerateStripe(runinfo);
-  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
-  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
+  auto main = stripe::Block::Downcast(program.stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
 
   IVLOG(2, *kernel);
 
@@ -170,8 +170,8 @@ TEST(Codegen, StencilMatchConv1D) {
 
   auto runinfo = LoadConv1D(1, 100, 64, 3);
   auto program = GenerateStripe(runinfo);
-  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
-  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
+  auto main = stripe::Block::Downcast(program.stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
 
   IVLOG(2, *kernel);
 
@@ -217,8 +217,8 @@ TEST(Codegen, StencilMatchConv2D) {
 
   auto runinfo = LoadConv2D(1, 100, 56, 3);
   auto program = GenerateStripe(runinfo);
-  auto main = std::dynamic_pointer_cast<stripe::Block>(program.stmts[0]);
-  auto kernel = std::dynamic_pointer_cast<stripe::Block>(main->stmts[0]);
+  auto main = stripe::Block::Downcast(program.stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
 
   IVLOG(2, *kernel);
 

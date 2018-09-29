@@ -15,6 +15,14 @@ namespace tile {
 
 typedef std::vector<uint64_t> TileShape;
 
+inline int64_t tile_shape_product(const TileShape& shape) {
+  int64_t product = 1;
+  for (auto dim : shape) {
+    product *= dim;
+  }
+  return product;
+}
+
 enum class DataType : int {
   INVALID = 0,
   BOOLEAN = 0x02,

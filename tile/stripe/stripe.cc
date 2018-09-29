@@ -30,6 +30,34 @@ void PrintTab(std::ostream& os, size_t depth) {  //
   os << std::string(depth * 2, ' ');
 }
 
+std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
+  return std::dynamic_pointer_cast<Load>(stmt);
+}
+
+std::shared_ptr<Store> Store::Downcast(const std::shared_ptr<Statement>& stmt) {  //
+  return std::dynamic_pointer_cast<Store>(stmt);
+}
+
+std::shared_ptr<Intrinsic> Intrinsic::Downcast(const std::shared_ptr<Statement>& stmt) {  //
+  return std::dynamic_pointer_cast<Intrinsic>(stmt);
+}
+
+std::shared_ptr<Special> Special::Downcast(const std::shared_ptr<Statement>& stmt) {  //
+  return std::dynamic_pointer_cast<Special>(stmt);
+}
+
+std::shared_ptr<Constant> Constant::Downcast(const std::shared_ptr<Statement>& stmt) {  //
+  return std::dynamic_pointer_cast<Constant>(stmt);
+}
+
+std::shared_ptr<Block> Block::Downcast(const std::shared_ptr<Statement>& stmt) {  //
+  return std::dynamic_pointer_cast<Block>(stmt);
+}
+
+std::shared_ptr<BoolAnnotation> BoolAnnotation::Downcast(const std::shared_ptr<Annotation>& ann) {  //
+  return std::dynamic_pointer_cast<BoolAnnotation>(ann);
+}
+
 std::ostream& operator<<(std::ostream& os, const Load& op) {
   os << op.into << " = load(" << op.from << ")";
   return os;
@@ -107,26 +135,26 @@ void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& stmt, si
   switch (stmt->kind()) {
     case StmtKind::Load:
       PrintTab(os, depth);
-      os << *std::dynamic_pointer_cast<Load>(stmt) << std::endl;
+      os << *Load::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Store:
       PrintTab(os, depth);
-      os << *std::dynamic_pointer_cast<Store>(stmt) << std::endl;
+      os << *Store::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Intrinsic:
       PrintTab(os, depth);
-      os << *std::dynamic_pointer_cast<Intrinsic>(stmt) << std::endl;
+      os << *Intrinsic::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Special:
       PrintTab(os, depth);
-      os << *std::dynamic_pointer_cast<Special>(stmt) << std::endl;
+      os << *Special::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Constant:
       PrintTab(os, depth);
-      os << *std::dynamic_pointer_cast<Constant>(stmt) << std::endl;
+      os << *Constant::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Block:
-      PrintBlock(os, *std::dynamic_pointer_cast<Block>(stmt), depth);
+      PrintBlock(os, *Block::Downcast(stmt), depth);
       break;
     default:
       break;
@@ -236,7 +264,7 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     }
     os << " " << ref.shape;
     if (ref.into != ref.from) {
-      os << " // reshape";
+      os << " // alias";
     }
     os << std::endl;
   }
@@ -258,21 +286,21 @@ std::ostream& operator<<(std::ostream& os, const Block& block) {
   return os;
 }
 
-std::vector<Refinement> Block::ref_ins() const {
-  std::vector<Refinement> results;
+std::vector<const Refinement*> Block::ref_ins() const {
+  std::vector<const Refinement*> results;
   for (const auto& ref : refs) {
     if (ref.dir == RefDir::In) {
-      results.push_back(ref);
+      results.push_back(&ref);
     }
   }
   return results;
 }
 
-std::vector<Refinement> Block::ref_outs() const {
-  std::vector<Refinement> results;
+std::vector<const Refinement*> Block::ref_outs() const {
+  std::vector<const Refinement*> results;
   for (const auto& ref : refs) {
     if (ref.dir == RefDir::Out) {
-      results.push_back(ref);
+      results.push_back(&ref);
     }
   }
   return results;
@@ -462,19 +490,19 @@ proto::Block IntoProto(const Block& block) {
     auto pb_stmt = ret.add_stmts();
     switch (stmt->kind()) {
       case StmtKind::Load: {
-        auto load = std::dynamic_pointer_cast<Load>(stmt);
+        auto load = Load::Downcast(stmt);
         auto pb_load = pb_stmt->mutable_load();
         pb_load->set_from(load->from);
         pb_load->set_into(load->into);
       } break;
       case StmtKind::Store: {
-        auto store = std::dynamic_pointer_cast<Store>(stmt);
+        auto store = Store::Downcast(stmt);
         auto pb_store = pb_stmt->mutable_store();
         pb_store->set_from(store->from);
         pb_store->set_into(store->into);
       } break;
       case StmtKind::Constant: {
-        auto constant = std::dynamic_pointer_cast<Constant>(stmt);
+        auto constant = Constant::Downcast(stmt);
         auto pb_const = pb_stmt->mutable_constant();
         pb_const->set_name(constant->name);
         switch (constant->type) {
@@ -487,7 +515,7 @@ proto::Block IntoProto(const Block& block) {
         }
       } break;
       case StmtKind::Special: {
-        auto special = std::dynamic_pointer_cast<Special>(stmt);
+        auto special = Special::Downcast(stmt);
         auto pb_special = pb_stmt->mutable_special();
         pb_special->set_name(special->name);
         for (const auto& param : special->params) {
@@ -501,7 +529,7 @@ proto::Block IntoProto(const Block& block) {
         }
       } break;
       case StmtKind::Intrinsic: {
-        auto intrinsic = std::dynamic_pointer_cast<Intrinsic>(stmt);
+        auto intrinsic = Intrinsic::Downcast(stmt);
         auto pb_intrinsic = pb_stmt->mutable_intrinsic();
         pb_intrinsic->set_name(intrinsic->name);
         for (const auto& input : intrinsic->inputs) {
@@ -512,14 +540,14 @@ proto::Block IntoProto(const Block& block) {
         }
       } break;
       case StmtKind::Block: {
-        auto inner = std::dynamic_pointer_cast<Block>(stmt);
+        auto inner = Block::Downcast(stmt);
         *pb_stmt->mutable_block() = IntoProto(*inner);
       } break;
     }
   }
   for (const auto& item : block.annotations) {
     google::protobuf::Any any;
-    if (auto ann = std::dynamic_pointer_cast<BoolAnnotation>(item.second)) {
+    if (auto ann = BoolAnnotation::Downcast(item.second)) {
       proto::BoolAnnotation pb_ann;
       pb_ann.set_value(ann->value);
       any.PackFrom(pb_ann);
