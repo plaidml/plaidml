@@ -1487,17 +1487,17 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
 
     switch (format) {
       case PLAIDML_FILE_FORMAT_STRIPE_HUMAN:
-        file << program;
+        file << *program;
         break;
 
       case PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT: {
-        auto pb_program = tile::stripe::IntoProto(program);
+        auto pb_program = tile::stripe::IntoProto(*program);
         gpi::OstreamOutputStream out{&file};
         gp::TextFormat::Print(pb_program, &out);
       } break;
 
       case PLAIDML_FILE_FORMAT_STRIPE_BINARY: {
-        auto pb_program = tile::stripe::IntoProto(program);
+        auto pb_program = tile::stripe::IntoProto(*program);
         pb_program.SerializeToOstream(&file);
       } break;
 

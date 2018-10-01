@@ -5,7 +5,17 @@
 #include <algorithm>
 
 #include "base/util/printstring.h"
+#include "base/util/stream_container.h"
 #include "tile/stripe/stripe.h"
+
+namespace std {
+
+ostream& operator<<(ostream& os, const pair<string, int64_t>& item) {
+  os << item.first << ":" << item.second;
+  return os;
+}
+
+}  // namespace std
 
 namespace vertexai {
 namespace tile {
@@ -14,15 +24,9 @@ namespace {
 
 using namespace stripe;  // NOLINT
 
-struct NamedIndex {
-  std::string name;
-  int64_t value;
-};
-
 struct Scope {
-  std::map<std::string, size_t> offsets;
-  std::vector<NamedIndex> global_idxs;
-  std::vector<NamedIndex> local_idxs;
+  std::map<std::string, int64_t> global_idxs;
+  std::map<std::string, int64_t> idxs;
 };
 
 class VirtualMachine {
@@ -31,25 +35,16 @@ class VirtualMachine {
       : buffers_(*buffers)  //
   {}
 
-  void ExecuteBlock(const Block& block, const Scope& outer, const std::map<std::string, size_t>& offsets) {
+  void ExecuteBlock(const Block& block, const Scope& outer) {
     Scope scope;
-    scope.offsets = offsets;
     for (size_t i = 0; i < block.idxs.size(); i++) {
       const auto& idx = block.idxs[i];
-      auto name = idx.name;
-      scope.local_idxs.emplace_back(NamedIndex{name, 0});
       auto global_idx = 0;
-      auto it = std::find_if(outer.local_idxs.begin(), outer.local_idxs.end(),
-                             [&name](const NamedIndex& idx) { return idx.name == name; });
-      if (it != outer.local_idxs.end()) {
-        global_idx = idx.factor * it->value;
-        auto jt = std::find_if(outer.global_idxs.begin(), outer.global_idxs.end(),
-                               [&name](const NamedIndex& idx) { return idx.name == name; });
-        if (jt != outer.global_idxs.end()) {
-          global_idx += jt->value;
-        }
+      auto it = outer.idxs.find(idx.name);
+      if (it != outer.idxs.end()) {
+        global_idx = idx.factor * it->second;
       }
-      scope.global_idxs.emplace_back(NamedIndex{name, global_idx});
+      scope.global_idxs.insert(std::make_pair(idx.name, global_idx));
     }
     if (block.idxs.size()) {
       Loop(&scope, block, 0);
@@ -61,7 +56,8 @@ class VirtualMachine {
  private:
   void Loop(Scope* scope, const Block& block, size_t idx) {
     for (size_t i = 0; i < block.idxs[idx].range; i++) {
-      scope->local_idxs[idx].value = i;
+      auto idx_name = block.idxs[idx].name;
+      scope->idxs[idx_name] = scope->global_idxs[idx_name] + i;
       if (idx < block.idxs.size() - 1) {
         Loop(scope, block, idx + 1);
       } else if (CheckConstraints(*scope, block)) {
@@ -72,22 +68,30 @@ class VirtualMachine {
 
   bool CheckConstraints(const Scope& scope, const Block& block) {
     for (const auto& constraint : block.constraints) {
-      int lhs = 0;
-      for (size_t i = 0; i < constraint.lhs.size(); i++) {
-        lhs += constraint.lhs[i] * scope.global_idxs[i].value + constraint.lhs[i] * scope.local_idxs[i].value;
-      }
-      if (!(lhs < constraint.rhs)) {
+      auto result = constraint.eval(scope.idxs);
+      if (result < 0) {
         return false;
       }
     }
     return true;
   }
 
-  size_t ComputeOffsetFor(const Scope& scope, const Block& block, const BufferAccess& access) {
-    int offset = access.offset;
-    for (size_t i = 0; i < access.strides.size(); i++) {
-      offset += access.strides[i] * scope.local_idxs[i].value;
+  size_t ComputeOffsetFor(const Scope& scope, const Block& block, const Refinement& ref) {
+    int offset = 0;
+    std::stringstream ss;
+    ss << "ref: " << ref.into << ", offset = ";
+    assert(ref.shape.dims.size() == ref.access.size());
+    for (size_t i = 0; i < ref.shape.dims.size(); i++) {
+      auto access = ref.access[i].eval(scope.idxs);
+      auto stride = ref.shape.dims[i].stride;
+      offset += access * stride;
+      if (i > 0) {
+        ss << " + ";
+      }
+      ss << "(" << access << " * " << stride << ")";
     }
+    ss << " = " << offset;
+    IVLOG(5, ss.str());
     return offset;
   }
 
@@ -118,13 +122,12 @@ class VirtualMachine {
   }
 
   void ExecuteStatements(Scope* scope, const Block& block) {
-    std::map<std::string, size_t> offsets;
-    std::map<std::string, const Refinement*> refs_by_into;
-    for (const auto& ref : block.refs) {
-      offsets[ref.into] = scope->offsets[ref.from] + ComputeOffsetFor(*scope, block, ref.access);
-      refs_by_into.insert(std::make_pair(ref.into, &ref));
-    }
     std::map<std::string, float> vars;
+    std::map<std::string, size_t> offsets;
+    IVLOG(5, "idxs: " << StreamContainer(scope->idxs));
+    for (const auto& ref : block.refs) {
+      offsets[ref.into] = ComputeOffsetFor(*scope, block, ref);
+    }
     for (const auto& stmt : block.stmts) {
       switch (stmt->kind()) {
         case StmtKind::Load: {
@@ -133,11 +136,11 @@ class VirtualMachine {
         } break;
         case StmtKind::Store: {
           const auto& op = Store::Downcast(stmt);
-          auto it = refs_by_into.find(op->into);
-          if (it == refs_by_into.end()) {
+          auto it = block.ref_by_into(op->into);
+          if (it == block.refs.end()) {
             throw std::runtime_error("Missing agg_op");
           }
-          DoStore(op->into, offsets[op->into], vars[op->from], it->second->agg_op);
+          DoStore(op->into, offsets[op->into], vars[op->from], it->agg_op);
         } break;
         case StmtKind::Intrinsic: {
           const auto& op = Intrinsic::Downcast(stmt);
@@ -148,7 +151,7 @@ class VirtualMachine {
         case StmtKind::Constant:
           break;
         case StmtKind::Block:
-          ExecuteBlock(*Block::Downcast(stmt), *scope, offsets);
+          ExecuteBlock(*Block::Downcast(stmt), *scope);
           break;
         default:
           break;
@@ -164,9 +167,8 @@ class VirtualMachine {
 
 void ExecuteProgram(const Block& program, std::map<std::string, std::vector<float>>* buffers) {
   Scope scope;
-  std::map<std::string, size_t> offsets;
   VirtualMachine vm(buffers);
-  vm.ExecuteBlock(program, scope, offsets);
+  vm.ExecuteBlock(program, scope);
 }
 
 }  // namespace codegen

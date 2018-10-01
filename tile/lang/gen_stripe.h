@@ -9,7 +9,7 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-stripe::Block GenerateStripe(const RunInfo& runinfo);
+std::shared_ptr<stripe::Block> GenerateStripe(const RunInfo& runinfo);
 
 }  // namespace lang
 }  // namespace tile

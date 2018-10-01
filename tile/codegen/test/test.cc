@@ -16,6 +16,8 @@ namespace tile {
 namespace codegen {
 namespace test {
 
+namespace {
+
 lang::RunInfo LoadMatMul(size_t dim) {
   lang::RunInfo runinfo;
   runinfo.program_name = "matmul";
@@ -50,17 +52,7 @@ lang::RunInfo LoadConv2D(size_t n, size_t x, size_t c, size_t k) {
   return runinfo;
 }
 
-std::ostream& operator<<(std::ostream& os, const std::vector<float>& data) {
-  bool first = true;
-  for (const auto& x : data) {
-    if (!first) {
-      os << ", ";
-    }
-    os << x;
-    first = false;
-  }
-  return os;
-}
+}  // namespace
 
 TEST(Codegen, ApplyTile) {
   std::map<std::string, std::vector<float>> data = {
@@ -101,29 +93,27 @@ TEST(Codegen, ApplyTile) {
   auto runinfo = LoadMatMul(sqrt(expected.size()));
   auto program = GenerateStripe(runinfo);
 
-  IVLOG(2, "Before>\n" << program);
+  IVLOG(2, "Before>\n" << *program);
 
-  ExecuteProgram(program, &data);
+  ExecuteProgram(*program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
   IVLOG(2, "C: " << data["C"]);
   EXPECT_THAT(data["C"], ContainerEq(expected));
 
-  auto main = stripe::Block::Downcast(program.stmts.front());
-  auto kernel = stripe::Block::Downcast(main->stmts.front());
+  auto kernel = stripe::Block::Downcast(program->stmts.front());
   ApplyTile(kernel.get(), {5, 4, 4});
   auto inner = stripe::Block::Downcast(kernel->stmts.front());
-  IVLOG(2, "Inner>\n" << *inner);
   ApplyTile(inner.get(), {5, 2, 2});
 
   for (size_t i = 0; i < data["C"].size(); i++) {
     data["C"][i] = 0;
   }
 
-  IVLOG(2, "After>\n" << program);
+  IVLOG(2, "After>\n" << *program);
 
-  ExecuteProgram(program, &data);
+  ExecuteProgram(*program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -143,17 +133,19 @@ TEST(Codegen, StencilMatchMatMul) {
 
   auto runinfo = LoadMatMul(100);
   auto program = GenerateStripe(runinfo);
-  auto main = stripe::Block::Downcast(program.stmts.front());
-  auto kernel = stripe::Block::Downcast(main->stmts.front());
+  auto kernel = stripe::Block::Downcast(program->stmts.front());
 
   IVLOG(2, *kernel);
 
   auto match = FindBestStencil({spec}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      1255968,          // total
-      {"c", "k", "x"},  // names
-      {100, 16, 16},    // tile
+      1255968,  // total
+      {
+          {"k", "c", 100},
+          {"m", "k", 16},
+          {"n", "x", 16},
+      }  // idxs
   };
   EXPECT_THAT(match, Eq(expected));
 }
@@ -170,17 +162,20 @@ TEST(Codegen, StencilMatchConv1D) {
 
   auto runinfo = LoadConv1D(1, 100, 64, 3);
   auto program = GenerateStripe(runinfo);
-  auto main = stripe::Block::Downcast(program.stmts.front());
-  auto kernel = stripe::Block::Downcast(main->stmts.front());
+  auto kernel = stripe::Block::Downcast(program->stmts.front());
 
   IVLOG(2, *kernel);
 
   auto match = FindBestStencil({spec}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      1378944,               // total
-      {"c", "x", "*", "k"},  // names
-      {64, 16, 1, 16},       // tile
+      1378944,  // total
+      {
+          {"ci", "c", 64},
+          {"co", "x", 16},
+          {"k", "*", 1},
+          {"x", "k", 16},
+      }  // idxs
   };
   EXPECT_THAT(match, Eq(expected));
 }
@@ -190,63 +185,111 @@ TEST(Codegen, StencilMatchConv2D) {
       {
           32,  // alpha
           {
-              {"k", 16, {-1}, {-1, 0}},  //
-              {"x", 16, {-1}, {0, -1}},  //
-              {"c", -1, {0}, {-1, -1}},  //
-          }                              // idxs
+              {"k", 16, {-1}, {-1, 0}},
+              {"x", 16, {-1}, {0, -1}},
+              {"c", -1, {0}, {-1, -1}},
+          }  // idxs
       },
       {
           32,  // alpha
           {
-              {"k", 16, {-1}, {-1, 0}},  //
-              {"x", 4, {-1}, {0, -1}},   //
-              {"y", 4, {-1}, {0, -1}},   //
-              {"c", -1, {0}, {-1, -1}}   //
-          }                              // idxs
+              {"k", 16, {-1}, {-1, 0}},
+              {"x", 4, {-1}, {0, -1}},
+              {"y", 4, {-1}, {0, -1}},
+              {"c", -1, {0}, {-1, -1}},
+          }  // idxs
       },
       {
           32,  // alpha
           {
-              {"k", 16, {-1}, {0, -1}},  //
-              {"x", 4, {-1}, {-1, 0}},   //
-              {"y", 4, {-1}, {-1, 0}},   //
-              {"c", -1, {0}, {-1, -1}}   //
-          }                              // idxs
-      }                                  //
+              {"k", 16, {-1}, {0, -1}},
+              {"x", 4, {-1}, {-1, 0}},
+              {"y", 4, {-1}, {-1, 0}},
+              {"c", -1, {0}, {-1, -1}},
+          }  // idxs
+      }      //
   };
 
   auto runinfo = LoadConv2D(1, 100, 56, 3);
   auto program = GenerateStripe(runinfo);
-  auto main = stripe::Block::Downcast(program.stmts.front());
-  auto kernel = stripe::Block::Downcast(main->stmts.front());
+  auto kernel = stripe::Block::Downcast(program->stmts.front());
 
-  IVLOG(2, *kernel);
+  IVLOG(2, "\n" << *kernel);
 
   auto match = FindBestStencil(specs, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      323280000,                       // total
-      {"c", "k", "*", "*", "x", "y"},  // names
-      {56, 16, 1, 1, 4, 4},            // tile
+      323280000,  // total
+      {
+          {"ci", "c", 56},
+          {"co", "k", 16},
+          {"kx", "*", 1},
+          {"ky", "*", 1},
+          {"x", "x", 4},
+          {"y", "y", 4},
+      }  // idxs
   };
   EXPECT_THAT(match, Eq(expected));
 }
 
 TEST(Codegen, TilePass) {
+  std::map<std::string, std::vector<float>> data = {
+      {"A",
+       {
+           1, 2, 3, 4, 5,  //
+           4, 5, 6, 7, 8,  //
+           7, 8, 9, 7, 8,  //
+           1, 2, 3, 1, 2,  //
+           1, 2, 3, 1, 2,  //
+       }},
+      {"B",
+       {
+           1, 2, 3, 1, 2,  //
+           1, 2, 3, 1, 2,  //
+           1, 2, 3, 1, 2,  //
+           1, 2, 3, 1, 2,  //
+           1, 2, 3, 1, 2,  //
+       }},
+      {"C",
+       {
+           0, 0, 0, 0, 0,  //
+           0, 0, 0, 0, 0,  //
+           0, 0, 0, 0, 0,  //
+           0, 0, 0, 0, 0,  //
+           0, 0, 0, 0, 0,  //
+       }},
+  };
+
+  std::vector<float> expected = {
+      15, 30, 45,  15, 30,  //
+      30, 60, 90,  30, 60,  //
+      39, 78, 117, 39, 78,  //
+      9,  18, 27,  9,  18,  //
+      9,  18, 27,  9,  18,  //
+  };
+
   std::vector<StencilSpec> specs = {
       {
           32,  // alpha
           {
-              {"k", 16, {-1}, {-1, 0}},
-              {"x", 16, {-1}, {0, -1}},
+              {"k", 2, {-1}, {-1, 0}},
+              {"x", 2, {-1}, {0, -1}},
               {"c", -1, {0}, {-1, -1}},
           }  // idxs
       }      //
   };
-  auto runinfo = LoadMatMul(100);
+
+  auto runinfo = LoadMatMul(5);
   auto program = GenerateStripe(runinfo);
-  TilePass(&program, specs);
-  IVLOG(2, program);
+  TilePass(program.get(), specs);
+  IVLOG(2, "\n" << *program);
+
+  ExecuteProgram(*program, &data);
+
+  IVLOG(2, "A: " << data["A"]);
+  IVLOG(2, "B: " << data["B"]);
+  IVLOG(2, "C: " << data["C"]);
+  EXPECT_THAT(data["C"], ContainerEq(expected));
 }
 
 TEST(Codegen, TilePassBroadcast) {
@@ -258,7 +301,7 @@ TEST(Codegen, TilePassBroadcast) {
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
   auto program = GenerateStripe(runinfo);
 
-  LOG(INFO) << "\n" << program;
+  LOG(INFO) << "\n" << *program;
 }
 
 }  // namespace test
