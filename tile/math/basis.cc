@@ -7,7 +7,7 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 bool BasisBuilder::addEquation(const Polynomial<Rational>& orig) {
   IVLOG(4, "In basis builder, adding poly " << orig);
@@ -50,6 +50,6 @@ bool BasisBuilder::addEquation(const Polynomial<Rational>& orig) {
   return true;
 }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

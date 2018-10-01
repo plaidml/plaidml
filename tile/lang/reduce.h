@@ -8,7 +8,7 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-Contraction ReduceOutputPolynomials(const Contraction& op, const std::vector<RangeConstraint>& order);
+Contraction ReduceOutputPolynomials(const Contraction& op, const std::vector<math::RangeConstraint>& order);
 
 }  // namespace lang
 }  // namespace tile

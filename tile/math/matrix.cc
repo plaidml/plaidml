@@ -10,7 +10,7 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 struct DualMatrix {
   size_t size_;
@@ -378,6 +378,6 @@ bool HermiteNormalForm(Matrix& m) {  // NOLINT(runtime/references)
   return r;
 }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

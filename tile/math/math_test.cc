@@ -8,7 +8,7 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 TEST_CASE("Ceil", "[lattice]") {
   REQUIRE(Ceil(Rational(5, 3)) == 2);
@@ -152,6 +152,6 @@ TEST_CASE("Basis reduction test", "[basis]") {
   REQUIRE(r == false);
 }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

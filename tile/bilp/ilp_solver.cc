@@ -2,8 +2,9 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
 namespace bilp {
+
+using namespace math;  // NOLINT
 
 std::map<std::string, Rational> ILPSolver::reportSolution() const {
   std::vector<Rational> sym_soln = getSymbolicSolution();
@@ -265,7 +266,7 @@ void ILPSolver::clean() {
   best_solution.clear();
   var_names_.clear();
 }
+
 }  // namespace bilp
-}  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

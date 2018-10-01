@@ -10,6 +10,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 Context parse_helper(const std::string& code, int64_t start_tmp, const std::string& id = "") {
   try {
     Context ctx;
