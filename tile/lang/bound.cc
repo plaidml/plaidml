@@ -10,6 +10,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 Contraction ConstrainIndexVarsToInts(const Contraction& c) {
   Contraction c_new = c;
 

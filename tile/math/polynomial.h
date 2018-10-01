@@ -15,7 +15,7 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 // A linear Polynomial<Rational> of Rational coefficients
 template <typename T>
@@ -109,6 +109,6 @@ inline MAKE_LOGGABLE(Polynomial<Rational>, c, os) {
   return os;
 }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

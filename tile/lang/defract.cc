@@ -12,6 +12,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 static Polynomial<Rational> ConvertPoly(Polynomial<Rational> in,
                                         const std::map<std::string, Polynomial<Rational>>& polys,
                                         bool transform_constant = false) {

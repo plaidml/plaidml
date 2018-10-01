@@ -27,6 +27,9 @@
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+using namespace math;  // NOLINT
+
 namespace {
 
 const HardwareSettings& TestGPU() {

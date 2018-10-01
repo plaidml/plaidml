@@ -2,8 +2,9 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
 namespace bilp {
+
+using namespace math;  // NOLINT
 
 Tableau::Tableau(const Matrix& m, const std::vector<std::string>& var_names, const std::vector<size_t>* opposites)
     : matrix_(m), var_names_(var_names), opposites_(var_names.size(), 0) {
@@ -247,7 +248,7 @@ std::vector<Rational> Tableau::getSymbolicSolution() const {
 }
 
 Rational Tableau::reportObjectiveValue() const { return mat()(0, mat().size2() - 1); }
+
 }  // namespace bilp
-}  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

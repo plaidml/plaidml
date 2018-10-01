@@ -12,8 +12,8 @@
 #include "tile/lang/sym_poly.h"
 #include "base/util/logging.h"
 
-using vertexai::tile::lang::Integer;
-using vertexai::tile::lang::Rational;
+using vertexai::tile::math::Integer;
+using vertexai::tile::math::Rational;
 
 struct Context {
   std::string id;

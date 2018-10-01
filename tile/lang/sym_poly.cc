@@ -11,6 +11,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 class LiteralPolynomial : public SymbolicPolynomial {
  public:
   explicit LiteralPolynomial(int64_t value) : value_(value) {}

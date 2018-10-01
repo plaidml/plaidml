@@ -6,8 +6,9 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
 namespace bilp {
+
+using namespace math;  // NOLINT
 
 TEST(BilpTest, TestTest) { EXPECT_EQ(0, 0); }
 
@@ -305,7 +306,7 @@ TEST(MilpTest, RandomConstraintsTest) {
     }
   }
 }
+
 }  // namespace bilp
-}  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

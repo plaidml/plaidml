@@ -23,6 +23,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 namespace {
 const size_t SELECT_THRESHOLD = 32;
 }  // namespace
