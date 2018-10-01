@@ -15,6 +15,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 #if defined(__ANDROID__)
 #define PRId64 "lld"
 #define PRIu64 "llu"

@@ -8,7 +8,7 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 class BasisBuilder {
  public:
@@ -28,6 +28,6 @@ class BasisBuilder {
   std::set<std::string> vars_set_;             // All the variables found, as a set
 };
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

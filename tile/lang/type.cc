@@ -19,6 +19,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 namespace {
 DataType g_floatx = DataType::FLOAT32;
 }  // namespace

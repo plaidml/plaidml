@@ -13,7 +13,7 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 class Matrix : public boost::numeric::ublas::matrix<Rational> {
  public:
@@ -71,6 +71,6 @@ std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial<Rational
 // Convert matrix + vector of offsets to Hermite Normal Form
 bool HermiteNormalForm(Matrix& m);  // NOLINT(runtime/references)
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

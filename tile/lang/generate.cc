@@ -26,6 +26,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 static bool NeedsZero(const FlatContraction& flat, const TensorShape& ts) {
   std::vector<std::pair<size_t, size_t>> out_pattern;
   if (flat.access[0].offset != 0) {

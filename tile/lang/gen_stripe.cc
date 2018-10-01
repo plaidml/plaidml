@@ -6,6 +6,7 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;    // NOLINT
 using namespace stripe;  // NOLINT
 
 namespace {

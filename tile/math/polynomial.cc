@@ -2,7 +2,7 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 template <typename T>
 Polynomial<T>::Polynomial() {}
@@ -206,6 +206,6 @@ SimpleConstraint RangeConstraint::lowerBound() const { return SimpleConstraint(-
 
 SimpleConstraint RangeConstraint::upperBound() const { return SimpleConstraint(poly, range - 1); }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

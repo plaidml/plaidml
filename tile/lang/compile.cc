@@ -14,6 +14,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 FlatContraction Compile(const Contraction& c, const std::vector<TensorShape>& shapes,
                         std::vector<Polynomial<Rational>>* out_poly) {
   if (c.specs.size() != 2 && c.specs.size() != 3 && c.specs.size() != 4) {
