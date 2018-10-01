@@ -24,9 +24,9 @@ const char* Intrinsic::ADD = "ADD";
 const char* Intrinsic::EQ = "EQ";
 const char* Intrinsic::COND = "COND";
 
-void PrintBlock(std::ostream& os, const Block& block, size_t depth);
+static void PrintBlock(std::ostream& os, const Block& block, size_t depth);
 
-void PrintTab(std::ostream& os, size_t depth) {  //
+static void PrintTab(std::ostream& os, size_t depth) {  //
   os << std::string(depth * 2, ' ');
 }
 
@@ -131,7 +131,7 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
   return os;
 }
 
-void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& stmt, size_t depth) {
+static void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& stmt, size_t depth) {
   switch (stmt->kind()) {
     case StmtKind::Load:
       PrintTab(os, depth);
@@ -161,59 +161,7 @@ void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& stmt, si
   }
 }
 
-void PrintStride(std::ostream& os, int64_t stride, const std::string& name, bool first) {
-  if (stride < 1) {
-    if (first) {
-      os << "-";
-    } else {
-      os << " - ";
-    }
-  } else if (!first) {
-    os << " + ";
-  }
-  if (std::abs(stride) != 1) {
-    os << std::abs(stride) << "*";
-  }
-  os << name;
-}
-
-void PrintStrides(std::ostream& os, const std::vector<int64_t>& strides, const std::vector<Index>& idxs, bool first) {
-  // assert(strides.size() == idxs.size());
-  for (size_t i = 0; i < strides.size(); i++) {
-    const auto& stride = strides[i];
-    if (stride) {
-      std::string name;
-      if (i < idxs.size()) {
-        name = idxs[i].name;
-      } else {
-        name = printstring("#%zu", i);
-      }
-      PrintStride(os, stride, name, first);
-      first = false;
-    }
-  }
-}
-
-void PrintAccess(std::ostream& os, const BufferAccess& access, const Block& block) {
-  if (access.offset == 0 && access.strides.size() == 0) {
-    return;
-  }
-  os << "[";
-  bool first = true;
-  if (access.offset) {
-    os << access.offset;
-    first = false;
-  }
-  PrintStrides(os, access.strides, block.idxs, first);
-  os << "]";
-}
-
-void PrintConstraint(std::ostream& os, const Constraint& constraint, const Block& block) {
-  PrintStrides(os, constraint.lhs, block.idxs, true);
-  os << " < " << constraint.rhs;
-}
-
-void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
+static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
   PrintTab(os, depth);
   os << "block [";
   for (size_t i = 0; i < block.idxs.size(); i++) {
@@ -221,6 +169,9 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
       os << ", ";
     }
     os << block.idxs[i].name << ":" << block.idxs[i].range;
+    if (block.idxs[i].factor != 0) {
+      os << ":" << block.idxs[i].factor;
+    }
   }
   os << "] (";
   if (!block.name.empty()) {
@@ -237,13 +188,16 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
   }
   for (const auto& constraint : block.constraints) {
     PrintTab(os, depth + 2);
-    PrintConstraint(os, constraint, block);
+    os << constraint.toString() << " >= 0";
     os << std::endl;
   }
   for (size_t i = 0; i < block.refs.size(); i++) {
     PrintTab(os, depth + 2);
     const auto& ref = block.refs[i];
     switch (ref.dir) {
+      case RefDir::None:
+        os << "none ";
+        break;
       case RefDir::In:
         os << "in ";
         break;
@@ -254,26 +208,36 @@ void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
         os << "inout ";
         break;
     }
+    if (ref.from.empty()) {
+      os << "new ";
+    }
     os << ref.into;
     if (ref.into != ref.from) {
-      os << " = " << ref.from;
+      if (!ref.from.empty()) {
+        os << " = " << ref.from;
+      }
     }
-    PrintAccess(os, ref.access, block);
+    bool first = true;
+    os << "[";
+    for (const auto& acc : ref.access) {
+      if (!first) {
+        os << ", ";
+      }
+      os << acc.toString();
+      first = false;
+    }
+    os << "]";
     if (!ref.agg_op.empty()) {
       os << ":" << ref.agg_op;
     }
     os << " " << ref.shape;
-    if (ref.into != ref.from) {
+    if (!ref.from.empty() && ref.into != ref.from) {
       os << " // alias";
     }
     os << std::endl;
   }
   PrintTab(os, depth);
   os << ") {" << std::endl;
-  for (const auto& decl : block.decls) {
-    PrintTab(os, depth + 1);
-    os << "var " << decl.first << " : " << decl.second << std::endl;
-  }
   for (const auto& stmt : block.stmts) {
     PrintStatement(os, stmt, depth + 1);
   }
@@ -306,19 +270,9 @@ std::vector<const Refinement*> Block::ref_outs() const {
   return results;
 }
 
-std::ostream& operator<<(std::ostream& os, const BufferAccess& access) {
-  os << access.offset << ":" << StreamContainer(access.strides);
-  return os;
-}
-
 std::ostream& operator<<(std::ostream& os, const Index& idx) {
   os << idx.name << ":" << idx.range << ":" << idx.factor;
   return os;
-}
-
-bool operator==(const BufferAccess& lhs, const BufferAccess& rhs) {
-  return std::tie(lhs.offset, lhs.strides) ==  //
-         std::tie(rhs.offset, rhs.strides);
 }
 
 bool operator==(const Index& lhs, const Index& rhs) {
@@ -326,9 +280,12 @@ bool operator==(const Index& lhs, const Index& rhs) {
          std::tie(rhs.name, rhs.range, rhs.factor);
 }
 
-bool operator==(const Constraint& lhs, const Constraint& rhs) {
-  return std::tie(lhs.lhs, lhs.rhs) ==  //
-         std::tie(rhs.lhs, rhs.rhs);
+Affine FromProto(const proto::Affine& affine) {
+  Affine r = affine.offset();
+  for (const auto& kvp : affine.terms()) {
+    r += Affine(kvp.first, kvp.second);
+  }
+  return r;
 }
 
 Block FromProto(const proto::Block& block) {
@@ -342,20 +299,15 @@ Block FromProto(const proto::Block& block) {
         pb_idx.factor()  //
     });
   }
-  for (const auto& pb_cons : block.constraints()) {
-    Constraint cons;
-    for (const auto& pb_lhs : pb_cons.lhs()) {
-      cons.lhs.push_back(pb_lhs);
-    }
-    cons.rhs = pb_cons.rhs();
-    ret.constraints.emplace_back(cons);
-  }
-  for (const auto& pb_decl : block.decls()) {
-    ret.decls.insert(std::make_pair(pb_decl.first, tile::FromProto(pb_decl.second)));
+  for (const auto& pb_con : block.constraints()) {
+    ret.constraints.emplace_back(FromProto(pb_con));
   }
   for (const auto& pb_ref : block.refs()) {
     Refinement ref;
     switch (pb_ref.dir()) {
+      case proto::Refinement::None:
+        ref.dir = RefDir::None;
+        break;
       case proto::Refinement::In:
         ref.dir = RefDir::In;
         break;
@@ -370,9 +322,8 @@ Block FromProto(const proto::Block& block) {
     }
     ref.from = pb_ref.from();
     ref.into = pb_ref.into();
-    ref.access.offset = pb_ref.access().offset();
-    for (const auto& stride : pb_ref.access().strides()) {
-      ref.access.strides.push_back(stride);
+    for (const auto& pb_off : pb_ref.access()) {
+      ref.access.emplace_back(FromProto(pb_off));
     }
     ref.shape = tile::FromProto(pb_ref.shape());
     ref.agg_op = pb_ref.agg_op();
@@ -443,6 +394,19 @@ Block FromProto(const proto::Block& block) {
   return ret;
 }
 
+proto::Affine IntoProto(const Affine& affine) {
+  proto::Affine ret;
+  for (const auto& kvp : affine.getMap()) {
+    if (kvp.first.empty()) {
+      ret.set_offset(kvp.second);
+    } else {
+      std::string str = kvp.first;
+      (*ret.mutable_terms())[str] = kvp.second;
+    }
+  }
+  return ret;
+}
+
 proto::Block IntoProto(const Block& block) {
   proto::Block ret;
   ret.set_name(block.name);
@@ -453,19 +417,15 @@ proto::Block IntoProto(const Block& block) {
     pb_idx->set_range(idx.range);
     pb_idx->set_factor(idx.factor);
   }
-  for (const auto& cons : block.constraints) {
-    auto pb_cons = ret.add_constraints();
-    for (const auto& lhs : cons.lhs) {
-      pb_cons->add_lhs(lhs);
-    }
-    pb_cons->set_rhs(cons.rhs);
-  }
-  for (const auto& decl : block.decls) {
-    (*ret.mutable_decls())[decl.first] = IntoProto(decl.second);
+  for (const auto& con : block.constraints) {
+    *ret.add_constraints() = IntoProto(con);
   }
   for (const auto& ref : block.refs) {
     auto pb_ref = ret.add_refs();
     switch (ref.dir) {
+      case RefDir::None:
+        pb_ref->set_dir(proto::Refinement::None);
+        break;
       case RefDir::In:
         pb_ref->set_dir(proto::Refinement::In);
         break;
@@ -478,10 +438,8 @@ proto::Block IntoProto(const Block& block) {
     }
     pb_ref->set_from(ref.from);
     pb_ref->set_into(ref.into);
-    auto pb_access = pb_ref->mutable_access();
-    pb_access->set_offset(ref.access.offset);
-    for (const auto& stride : ref.access.strides) {
-      pb_access->add_strides(stride);
+    for (const auto& access : ref.access) {
+      *pb_ref->add_access() = IntoProto(access);
     }
     *pb_ref->mutable_shape() = IntoProto(ref.shape);
     pb_ref->set_agg_op(ref.agg_op);
@@ -553,6 +511,46 @@ proto::Block IntoProto(const Block& block) {
       any.PackFrom(pb_ann);
     }
     (*ret.mutable_annotations())[item.first] = any;
+  }
+  return ret;
+}
+
+const Index* Block::idx_by_name(const std::string& name) const {
+  auto it = std::find_if(idxs.begin(), idxs.end(), [&name](const Index& idx) { return idx.name == name; });
+  if (it == idxs.end()) {
+    return nullptr;
+  }
+  return &*it;
+}
+
+std::vector<Refinement>::iterator Block::ref_by_into(const std::string& name) {
+  return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+}
+
+std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& name) const {
+  return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+}
+
+std::string Block::unique_ref_name(const std::string& in) {
+  if (ref_by_into(in) == refs.end()) {
+    return in;
+  }
+  size_t i = 0;
+  while (true) {
+    std::string name = in + "_" + std::to_string(i++);
+    if (ref_by_into(name) == refs.end()) {
+      return name;
+    }
+  }
+  // Unreachable
+  return "";
+}
+
+Affine Refinement::FlatAccess() const {
+  assert(access.size() == shape.dims.size());
+  Affine ret;
+  for (size_t i = 0; i < access.size(); i++) {
+    ret += shape.dims[i].stride * access[i];
   }
   return ret;
 }

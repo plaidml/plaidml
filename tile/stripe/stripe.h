@@ -1,16 +1,20 @@
 #pragma once
 
+#include <list>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "tile/base/shape.h"
+#include "tile/math/polynomial.h"
 #include "tile/stripe/stripe.pb.h"
 
 namespace vertexai {
 namespace tile {
 namespace stripe {
+
+using Affine = math::Polynomial<int64_t>;
 
 enum class StmtKind {
   Load,
@@ -40,34 +44,21 @@ struct Index {
 };
 
 enum class RefDir {
+  None,
   In,
   Out,
   InOut,
-};
-
-struct BufferAccess {
-  BufferAccess() : offset(0) {}
-  BufferAccess(int64_t offset, const std::vector<int64_t>& strides) : offset(offset), strides(strides) {}
-
-  int64_t offset;
-  std::vector<int64_t> strides;
 };
 
 struct Refinement {
   RefDir dir;
   std::string from;
   std::string into;
-  BufferAccess access;
+  std::vector<Affine> access;
   TensorShape shape;
   std::string agg_op;
-};
 
-struct Constraint {
-  Constraint() : rhs(0) {}
-  Constraint(const std::vector<int64_t>& lhs, int64_t rhs) : lhs(lhs), rhs(rhs) {}
-
-  std::vector<int64_t> lhs;
-  int64_t rhs;
+  Affine FlatAccess() const;
 };
 
 struct Load : Statement {
@@ -138,20 +129,30 @@ struct Constant : Statement {
   double fconst;
 };
 
+using StatementList = std::list<std::shared_ptr<Statement>>;
+using StatementIt = StatementList::iterator;
+
 struct Block : Statement {
   static std::shared_ptr<Block> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Block; }
-  std::vector<const Refinement*> ref_ins() const;
-  std::vector<const Refinement*> ref_outs() const;
 
   std::string name;
   std::string comments;
   std::vector<Index> idxs;
-  std::vector<Constraint> constraints;
-  std::map<std::string, TensorShape> decls;
+  std::vector<Affine> constraints;
   std::vector<Refinement> refs;
-  std::vector<std::shared_ptr<Statement>> stmts;
+  StatementList stmts;
   std::map<std::string, std::shared_ptr<Annotation>> annotations;
+
+  // Helper methods
+  std::vector<const Refinement*> ref_ins() const;
+  std::vector<const Refinement*> ref_outs() const;
+  const Index* idx_by_name(const std::string& name) const;
+  // Find which refinement has an into called 'name'
+  std::vector<Refinement>::iterator ref_by_into(const std::string& name);
+  std::vector<Refinement>::const_iterator ref_by_into(const std::string& name) const;
+  // Make a unique refinement name for an into (by appending _2, etc, if needed)
+  std::string unique_ref_name(const std::string& in);
 };
 
 struct BoolAnnotation : Annotation {
@@ -161,12 +162,14 @@ struct BoolAnnotation : Annotation {
 };
 
 bool operator==(const Index& lhs, const Index& rhs);
-bool operator==(const Constraint& lhs, const Constraint& rhs);
-bool operator==(const BufferAccess& lhs, const BufferAccess& rhs);
 
 std::ostream& operator<<(std::ostream& os, const Index& idx);
+std::ostream& operator<<(std::ostream& os, const Load& op);
+std::ostream& operator<<(std::ostream& os, const Store& op);
+std::ostream& operator<<(std::ostream& os, const Intrinsic& op);
+std::ostream& operator<<(std::ostream& os, const Special& op);
+std::ostream& operator<<(std::ostream& os, const Constant& op);
 std::ostream& operator<<(std::ostream& os, const Block& block);
-std::ostream& operator<<(std::ostream& os, const BufferAccess& a);
 
 Block FromProto(const proto::Block& block);
 proto::Block IntoProto(const Block& block);

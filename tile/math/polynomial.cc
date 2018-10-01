@@ -48,6 +48,11 @@ const std::map<std::string, T>& Polynomial<T>::getMap() const {
 }
 
 template <typename T>
+std::map<std::string, T>& Polynomial<T>::mutateMap() {
+  return map_;
+}
+
+template <typename T>
 Polynomial<T>& Polynomial<T>::operator+=(const Polynomial<T>& rhs) {
   for (const auto& kvp : rhs.map_) {
     T new_val = (map_[kvp.first] += kvp.second);
@@ -145,6 +150,11 @@ void Polynomial<T>::substitute(const std::string& var, const Polynomial<T>& repl
 }
 
 template <typename T>
+void Polynomial<T>::substitute(const std::string& var, const T& replacement) {
+  substitute(var, Polynomial<T>(replacement));
+}
+
+template <typename T>
 std::string Polynomial<T>::GetNonzeroIndex() const {
   // Returns a nonconstant nonzero index, if one exists; otherwise returns empty string
   for (const auto& kvp : map_) {
@@ -153,6 +163,15 @@ std::string Polynomial<T>::GetNonzeroIndex() const {
 
   // No nonconstant index has a nonzero coefficient
   return std::string();
+}
+
+template <typename T>
+T Polynomial<T>::get(const std::string& name) const {
+  auto it = map_.find(name);
+  if (it == map_.end()) {
+    return T();
+  }
+  return it->second;
 }
 
 using std::to_string;

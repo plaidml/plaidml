@@ -1,6 +1,8 @@
 #include "tile/lang/gen_stripe.h"
 
-#include "tile/lang/compile.h"
+#include "tile/lang/bound.h"
+#include "tile/lang/defract.h"
+#include "tile/lang/reduce.h"
 
 namespace vertexai {
 namespace tile {
@@ -23,21 +25,17 @@ class StripeGenerator {
         outputs_(outputs)  //
   {}
 
-  Block Run(const std::string& name) {
+  std::shared_ptr<Block> Run(const std::string& name) {
     LOG(INFO) << "Compiling " << parsed_.ops.size() << " ops";
-    // The top level block represents a program.
-    // A single inner block of the program respresents the entry point to the program.
-    // Declarations made on the program relate to user supplied inputs and outputs.
-    // Declarations made on main relate to temporaries needed for communication between kernels.
+    // The top level block is a 'main' function.
+    // In/Out/InOut refinements made on main relate to user supplied inputs and outputs.
+    // None refinements made on main relate to temporaries needed for communication between kernels.
     // The list of kernels to execute are the list of blocks defined within main.
-    Block program;
-    program.name = name;
     auto main = std::make_shared<Block>();
-    main->name = "main";
-    program.stmts.push_back(main);
+    main->name = name;
     // Add decls for external inputs/outputs
-    AddDecls(&program, main.get(), inputs_, true);
-    AddDecls(&program, main.get(), outputs_, false);
+    AddDecls(main.get(), inputs_, true);
+    AddDecls(main.get(), outputs_, false);
     // Process reshapes
     for (const auto& op : parsed_.ops) {
       if (op.tag == Op::FUNCTION && op.f.fn == "reshape") {
@@ -68,25 +66,32 @@ class StripeGenerator {
       if (externals_.count(item.first) == 0 && reshapes_.count(item.first) == 0) {
         const auto& binding = item.second;
         if (binding.tag == Binding::TENSOR) {
-          main->decls.insert(std::make_pair(item.first, binding.shape));
+          std::vector<Affine> access(binding.shape.dims.size());
+          main->refs.emplace_back(Refinement{
+              RefDir::None,  // dir
+              "",            // from
+              item.first,    // into
+              access,        // access
+              binding.shape  // shape
+          });
         }
       }
     }
     IVLOG(2, "Done");
-    return program;
+    return main;
   }
 
  private:
-  void AddDecls(Block* program, Block* main, const ShapeMap& shapes, bool is_input) {
+  void AddDecls(Block* main, const ShapeMap& shapes, bool is_input) {
     for (const auto& item : shapes) {
       externals_.insert(item.first);
-      program->decls.insert(item);
+      std::vector<Affine> access(item.second.dims.size());
       if (is_input) {
         main->refs.emplace_back(Refinement{
             RefDir::In,  // dir
             item.first,  // from
             item.first,  // into
-            {},          // access
+            access,      // access
             item.second  // shape
         });
       } else {
@@ -94,12 +99,10 @@ class StripeGenerator {
             RefDir::Out,       // dir
             item.first,        // from
             item.first,        // into
-            {},                // access
+            access,            // access
             item.second,       // shape
             Intrinsic::ASSIGN  // agg_op
         });
-        auto ref = main->refs.back();
-        ref_outs_.insert(std::make_pair(item.first, &ref));
       }
     }
   }
@@ -115,95 +118,99 @@ class StripeGenerator {
   }
 
   void ProcessContraction(Block* main, const Op& op) {
-    auto out_shape = GetShape(op.output);
-    if (out_shape.byte_size() == 0) {
+    if (GetShape(op.output).byte_size() == 0) {
       IVLOG(3, "Contraction output " << op.output << " size==0; skipping");
       return;
     }
-    std::vector<Polynomial<Rational>> out_poly;
-    FlatContraction flat = Compile(op.c, MakeShapes(op.c), &out_poly);
-    flat.output = op.output;
+    Contraction cion;
+    std::vector<math::RangeConstraint> range_cons;
+    auto shapes = MakeShapes(op.c);
+    std::tie(cion, range_cons) = CompileContraction(op.c, shapes);
 
-    if (NeedsZero(flat)) {
-      Op special_op;
-      special_op.tag = Op::FUNCTION;
-      special_op.output = op.output;
-      if (op.c.use_default.empty()) {
-        special_op.f.fn = Intrinsic::ZERO;
-        special_op.inputs.push_back(op.output);
-      } else {
-        special_op.f.fn = Intrinsic::COPY;
-        special_op.inputs.push_back(op.c.use_default);
-      }
-      ProcessSpecial(main, special_op);
+    // Compute bounds
+    IndexBounds bounds;
+    std::vector<SimpleConstraint> simple_cons;
+    try {
+      std::tie(bounds, simple_cons) = ComputeBounds(range_cons);
+    } catch (const std::runtime_error& ex) {
+      LOG(WARNING) << "Unable to compute bounds for contraction: " << to_string(cion);
+      throw;
     }
 
     auto kernel = AddKernel(main);
     kernel->comments = to_string(op);
-    assert(flat.names.size() == flat.ranges.size());
-    for (int i = 0; i < flat.names.size(); i++) {
-      kernel->idxs.emplace_back(Index{flat.names[i], flat.ranges[i], 0});
-    }
-    for (const auto& constraint : flat.constraints) {
-      kernel->constraints.emplace_back(Constraint{constraint.lhs, constraint.rhs});
-    }
 
     std::vector<std::string> scalar_inputs;
-    for (size_t i = 1; i < flat.inputs.size(); i++) {
-      auto scalar_name = ScalarName(flat.inputs[i]);
-      scalar_inputs.push_back(scalar_name);
-      auto access = BufferAccess{flat.access[i].offset, flat.access[i].strides};
-      kernel->refs.emplace_back(MakeRefinement(RefDir::In, flat.inputs[i], access));
-
-      // LOAD
-      kernel->stmts.push_back(std::make_shared<Load>(flat.inputs[i], scalar_name));
-    }
-
-    // Combination Op
-    if (scalar_inputs.size() > 1) {
-      switch (flat.comb_op) {
-        case CombinationOp::NONE:
-          break;
-        case CombinationOp::MULTIPLY:
-          AddIntrinsic(kernel.get(), Intrinsic::MUL, scalar_inputs, {ScalarName(flat.output)});
-          break;
-        case CombinationOp::PLUS:
-          AddIntrinsic(kernel.get(), Intrinsic::ADD, scalar_inputs, {ScalarName(flat.output)});
-          break;
-        case CombinationOp::EQ:
-          AddIntrinsic(kernel.get(), Intrinsic::EQ, scalar_inputs, {ScalarName(flat.output)});
-          break;
-        case CombinationOp::COND:
-          AddIntrinsic(kernel.get(), Intrinsic::COND, scalar_inputs, {ScalarName(flat.output)});
-          break;
+    for (size_t i = 0; i < cion.specs.size(); i++) {
+      const auto& spec = cion.specs[i];
+      auto shape = ScalarShape(cion.specs[i].id);
+      std::vector<Affine> access;
+      for (const auto& poly : spec.spec) {
+        access.emplace_back(Integerize(poly, bounds));
+      }
+      if (i == 0) {
+        kernel->refs.emplace_back(Refinement{
+            RefDir::Out,           // dir
+            spec.id,               // from
+            spec.id,               // into
+            access,                // access
+            shape,                 // shape
+            GetAggOp(cion.agg_op)  // agg_op
+        });
+      } else {
+        auto scalar_name = ScalarName(spec.id);
+        scalar_inputs.push_back(scalar_name);
+        kernel->refs.emplace_back(Refinement{
+            RefDir::In,  // dir
+            spec.id,     // from
+            spec.id,     // into
+            access,      // access
+            shape        // shape
+                         // agg_op
+        });
+        // LOAD
+        kernel->stmts.push_back(std::make_shared<Load>(spec.id, scalar_name));
       }
     }
 
-    std::string agg_op;
-    switch (flat.agg_op) {
-      case AggregationOp::SUM:
-        agg_op = Intrinsic::SUM;
-        break;
-      case AggregationOp::MAX:
-        agg_op = Intrinsic::MAX;
-        break;
-      case AggregationOp::MIN:
-        agg_op = Intrinsic::MIN;
-        break;
-      case AggregationOp::PROD:
-        agg_op = Intrinsic::PROD;
-        break;
-      case AggregationOp::ASSIGN:
-        agg_op = Intrinsic::ASSIGN;
-        break;
-      case AggregationOp::NONE:
-        break;
+    for (const auto& kvp : bounds) {
+      uint64_t range = kvp.second.max - kvp.second.min + 1;
+      if (range == 1) {
+        continue;
+      }
+      kernel->idxs.emplace_back(Index{kvp.first, range, 0});
     }
-    auto access = BufferAccess{flat.access[0].offset, flat.access[0].strides};
-    kernel->refs.emplace_back(MakeRefinement(RefDir::Out, flat.output, access, agg_op));
+    for (const auto& constraint : simple_cons) {
+      auto lhs = Integerize(constraint.poly, bounds);  // lhs <= rhs;
+      lhs -= constraint.rhs;                           // lhs <= 0;
+      lhs = -lhs;                                      // lhs >= 0
+      kernel->constraints.emplace_back(lhs);
+    }
+
+    // if (NeedsZero(flat)) {
+    //   Op special_op;
+    //   special_op.tag = Op::FUNCTION;
+    //   special_op.output = op.output;
+    //   if (op.c.use_default.empty()) {
+    //     special_op.f.fn = Intrinsic::ZERO;
+    //     special_op.inputs.push_back(op.output);
+    //   } else {
+    //     special_op.f.fn = Intrinsic::COPY;
+    //     special_op.inputs.push_back(op.c.use_default);
+    //   }
+    //   ProcessSpecial(main, special_op);
+    // }
+
+    // Combination Op
+    if (scalar_inputs.size() > 1) {
+      auto combo_op = GetComboOp(cion.comb_op);
+      if (!combo_op.empty()) {
+        AddIntrinsic(kernel.get(), combo_op, scalar_inputs, {ScalarName(op.output)});
+      }
+    }
 
     // STORE
-    kernel->stmts.push_back(std::make_shared<Store>(ScalarName(flat.output), flat.output));
+    kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));
   }
 
   void ProcessElementwise(Block* main, const Op& op) {
@@ -211,12 +218,15 @@ class StripeGenerator {
     kernel->comments = to_string(op);
 
     auto out_shape = GetShape(op.output);
+    std::vector<Affine> out_access;
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
-      kernel->idxs.emplace_back(Index{
+      auto idx = Index{
           printstring("i%zu", i + 1),  // name
           out_shape.dims[i].size,      // range
           0                            // factor
-      });
+      };
+      out_access.emplace_back(Affine{idx.name});
+      kernel->idxs.emplace_back(idx);
     }
 
     for (const auto& input : op.inputs) {
@@ -224,22 +234,20 @@ class StripeGenerator {
       IVLOG(2, "  " << input << ": " << binding);
       switch (binding.tag) {
         case Binding::TENSOR: {
-          std::vector<int64_t> strides;
           // Be careful to handle broadcasts
+          std::vector<Affine> access;
           int diff = out_shape.dims.size() - binding.shape.dims.size();
           for (int i = 0; i < out_shape.dims.size(); i++) {
-            if (i < diff) {
-              strides.push_back(0);
-            } else {
+            if (i >= diff) {
               const auto& dim = binding.shape.dims[i - diff];
-              auto stride = dim.stride;
-              if (dim.size == 1) {
-                stride = 0;
+              if (dim.size > 1) {
+                access.emplace_back(Affine{kernel->idxs[i].name});
+              } else {
+                access.emplace_back(Affine{});
               }
-              strides.push_back(stride);
             }
           }
-          kernel->refs.emplace_back(MakeRefinement(RefDir::In, input, BufferAccess{0, strides}));
+          kernel->refs.emplace_back(Refinement{RefDir::In, input, input, access, GetShape(input)});
           // LOAD
           kernel->stmts.push_back(std::make_shared<Load>(input, ScalarName(input)));
         } break;
@@ -255,12 +263,7 @@ class StripeGenerator {
       }
     }
 
-    std::vector<int64_t> strides;
-    for (const auto& dim : out_shape.dims) {
-      strides.push_back(dim.stride);
-    }
-
-    kernel->refs.emplace_back(MakeRefinement(RefDir::Out, op.output, BufferAccess{0, strides}));
+    kernel->refs.emplace_back(Refinement{RefDir::Out, op.output, op.output, out_access, out_shape});
 
     // INTRINSIC
     std::vector<std::string> scalar_inputs;
@@ -297,42 +300,42 @@ class StripeGenerator {
     return shapes;
   }
 
-  bool NeedsZero(const FlatContraction& flat) {
-    std::vector<std::pair<size_t, size_t>> out_pattern;
-    if (flat.access[0].offset != 0) {
-      return true;
-    }
-    for (size_t i = 0; i < flat.names.size(); i++) {
-      if (flat.access[0].strides[i] == 0) {
-        continue;
-      }
-      if (flat.access[0].strides[i] < 0) {
-        return true;
-      }  // Don't try to be fancy, fallback
-      out_pattern.emplace_back(flat.access[0].strides[i], flat.ranges[i]);
-    }
-    for (const FlatConstraint& fc : flat.constraints) {
-      bool output_only = true;
-      for (size_t i = 0; i < flat.names.size(); i++) {
-        if (fc.lhs[i] != 0 && flat.access[0].strides[i] == 0) {
-          output_only = false;
-          break;
-        }
-      }
-      if (output_only) {
-        return true;
-      }
-    }
-    std::sort(out_pattern.begin(), out_pattern.end());
-    size_t curskip = 1;
-    for (const auto& p : out_pattern) {
-      if (curskip != p.first) {
-        return true;
-      }
-      curskip *= p.second;
-    }
-    return curskip != flat.access[0].global_index_limit;
-  }
+  // bool NeedsZero(const FlatContraction& flat) {
+  //   std::vector<std::pair<size_t, size_t>> out_pattern;
+  //   if (flat.access[0].offset != 0) {
+  //     return true;
+  //   }
+  //   for (size_t i = 0; i < flat.names.size(); i++) {
+  //     if (flat.access[0].strides[i] == 0) {
+  //       continue;
+  //     }
+  //     if (flat.access[0].strides[i] < 0) {
+  //       return true;
+  //     }  // Don't try to be fancy, fallback
+  //     out_pattern.emplace_back(flat.access[0].strides[i], flat.ranges[i]);
+  //   }
+  //   for (const auto& fc : flat.constraints) {
+  //     bool output_only = true;
+  //     for (size_t i = 0; i < flat.names.size(); i++) {
+  //       if (fc.lhs[i] != 0 && flat.access[0].strides[i] == 0) {
+  //         output_only = false;
+  //         break;
+  //       }
+  //     }
+  //     if (output_only) {
+  //       return true;
+  //     }
+  //   }
+  //   std::sort(out_pattern.begin(), out_pattern.end());
+  //   size_t curskip = 1;
+  //   for (const auto& p : out_pattern) {
+  //     if (curskip != p.first) {
+  //       return true;
+  //     }
+  //     curskip *= p.second;
+  //   }
+  //   return curskip != flat.access[0].global_index_limit;
+  // }
 
   void AddIntrinsic(Block* block,                            //
                     const std::string& name,                 //
@@ -357,16 +360,109 @@ class StripeGenerator {
     return it->second.shape;
   }
 
-  Refinement MakeRefinement(RefDir dir,                  //
-                            const std::string& name,     //
-                            const BufferAccess& access,  //
-                            const std::string& agg_op = "") const {
-    Refinement ref{dir, name, name, access, GetShape(name), agg_op};
-    auto it = reshapes_.find(name);
-    if (it != reshapes_.end()) {
-      ref.from = it->second;
+  TensorShape ScalarShape(const std::string& name) const {
+    auto it = vars_.find(name);
+    if (it == vars_.end()) {
+      throw std::runtime_error(printstring("Unknown shape: %s", name.c_str()));
     }
-    return ref;
+    TensorShape shape(it->second.shape.type, {});
+    for (const auto& dim : it->second.shape.dims) {
+      shape.dims.push_back(TensorDimension(dim.stride, 1));
+    }
+    return shape;
+  }
+
+  Affine Integerize(const Polynomial<Rational>& poly, const IndexBounds& bounds) {
+    Affine result;
+    for (const auto& term : poly.getMap()) {
+      if (denominator(term.second) != 1) {
+        throw std::runtime_error("Non-integer polynomial in Integerize");
+      }
+      auto int_value = static_cast<int64_t>(numerator(term.second));
+      if (term.first.empty()) {
+        result += int_value;
+      } else {
+        const auto& bound = bounds.at(term.first);
+        result += int_value * bound.min;
+        if (bound.min != bound.max) {
+          result += Polynomial<int64_t>(term.first, int_value);
+        }
+      }
+    }
+    return result;
+  }
+
+  std::string GetAggOp(AggregationOp op) {
+    switch (op) {
+      case AggregationOp::SUM:
+        return Intrinsic::SUM;
+      case AggregationOp::MAX:
+        return Intrinsic::MAX;
+      case AggregationOp::MIN:
+        return Intrinsic::MIN;
+      case AggregationOp::PROD:
+        return Intrinsic::PROD;
+      case AggregationOp::ASSIGN:
+        return Intrinsic::ASSIGN;
+      default:
+        return "";
+    }
+  }
+
+  std::string GetComboOp(CombinationOp op) {
+    switch (op) {
+      case CombinationOp::MULTIPLY:
+        return Intrinsic::MUL;
+      case CombinationOp::PLUS:
+        return Intrinsic::ADD;
+      case CombinationOp::EQ:
+        return Intrinsic::EQ;
+      case CombinationOp::COND:
+        return Intrinsic::COND;
+      default:
+        return "";
+    }
+  }
+
+  std::pair<Contraction, std::vector<math::RangeConstraint>>  //
+  CompileContraction(const Contraction& cion, const std::vector<TensorShape>& shapes) {
+    if (cion.specs.size() != 2 && cion.specs.size() != 3 && cion.specs.size() != 4) {
+      throw std::runtime_error("Currently, we only support 1, 2, or 3 element Contractions");
+    }
+    std::ostringstream cs;
+    SVLOG(cs, 3, "Original:\n" << to_string(cion).c_str());
+    auto integral_cion = ConstrainIndexVarsToInts(cion);
+    SVLOG(cs, 3, "With Index Variables Made Integral:\n" << to_string(integral_cion).c_str());
+    // Check if we can skip reduce
+    bool fancy = false;
+    for (const auto& poly : cion.specs[0].spec) {
+      if (poly.getMap().size() > 2 || (poly.getMap().size() == 2 && poly.constant() == 0)) {
+        fancy = true;
+        break;
+      }
+    }
+    auto cons = GatherConstraints(integral_cion, shapes);
+    SVLOG(cs, 3, "Constraints:" << to_string(cons));
+    // Reduce if needed
+    Contraction reduced;
+    if (fancy && !cion.no_defract) {
+      reduced = ReduceOutputPolynomials(integral_cion, cons);
+      SVLOG(cs, 3, "Reduced:\n" << to_string(reduced));
+      cons = GatherConstraints(reduced, shapes);
+      SVLOG(cs, 3, "Reduced Constraints:" << to_string(cons));
+    } else {
+      reduced = integral_cion;
+    }
+    MergeParallelConstraints(&cons);
+    SVLOG(cs, 3, "Merged Parallel Constraints:" << to_string(cons));
+    // Defract if needed (defract does early return if not required)
+    auto defracted = Defract(reduced, cons);
+    SVLOG(cs, 3, "Defracted:\n" << to_string(defracted));
+    // Gather the constraints from index bounds
+    cons = GatherConstraints(defracted, shapes);
+    // New parallel constraints might have been introduced by defract; re-merge them
+    MergeParallelConstraints(&cons);
+    return std::make_pair(defracted, cons);
   }
 
  private:
@@ -381,9 +477,10 @@ class StripeGenerator {
 
 }  // namespace
 
-Block GenerateStripe(const RunInfo& runinfo) {
+std::shared_ptr<Block> GenerateStripe(const RunInfo& runinfo) {
   Parser parser;
   auto parsed = parser.Parse(runinfo.code);
+  // process reshape
   auto vars = BindProgram(&parsed, runinfo.input_shapes, runinfo.output_shapes);
   StripeGenerator gen(parsed, vars, runinfo.input_shapes, runinfo.output_shapes);
   return gen.Run(runinfo.program_name);
