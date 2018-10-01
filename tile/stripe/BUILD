@@ -23,6 +23,7 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util",
+        "//tile/math",
         "//tile/base",
     ],
 )

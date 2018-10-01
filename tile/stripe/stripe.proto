@@ -7,15 +7,19 @@ package vertexai.tile.stripe.proto;
 import "google/protobuf/any.proto";
 import "tile/proto/shape.proto";
 
+message Affine {
+  int64 offset = 1;
+  map<string, int64> terms = 2;
+}
+
 message Block {
   string name = 1;
   string comments = 2;
   repeated Index idxs = 3;
-  repeated Constraint constraints = 4;
-  map<string, tile.proto.TensorShape> decls = 5;
-  repeated Refinement refs = 6;
-  repeated Statement stmts = 7;
-  map<string, google.protobuf.Any> annotations = 8;
+  repeated Affine constraints = 4;
+  repeated Refinement refs = 5;
+  repeated Statement stmts = 6;
+  map<string, google.protobuf.Any> annotations = 7;
 }
 
 message Index {
@@ -35,14 +39,9 @@ message Refinement {
   Dir dir = 1;
   string from = 2;
   string into = 3;
-  BufferAccess access = 4;
+  repeated Affine access = 4;
   tile.proto.TensorShape shape = 5;
   string agg_op = 6;
-}
-
-message BufferAccess {
-  int64 offset = 1;
-  repeated int64 strides = 2;
 }
 
 message Statement {
@@ -99,11 +98,6 @@ message Constant {
     int64 iconst = 2;
     double fconst = 3;
   }
-}
-
-message Constraint {
-  repeated int64 lhs = 1;
-  int64 rhs = 2;
 }
 
 message BoolAnnotation {

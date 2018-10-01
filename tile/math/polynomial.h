@@ -34,6 +34,7 @@ class Polynomial : boost::additive<Polynomial<T>>,
   // clang-format on
   T operator[](const std::string& var) const;      // Quick coefficent access
   const std::map<std::string, T>& getMap() const;  // Get inner map
+  std::map<std::string, T>& mutateMap();           // Get inner map for editing
   bool operator==(const Polynomial& rhs) const;    // Equality
   bool operator<(const Polynomial& rhs) const;     // Lexigraphical order
   Polynomial& operator+=(const Polynomial& rhs);   // Addition
@@ -50,10 +51,13 @@ class Polynomial : boost::additive<Polynomial<T>>,
   T tryDivide(const Polynomial& p, bool ignoreConst = false) const;
   // Substitute replacement in for var in this polynomial
   void substitute(const std::string& var, const Polynomial<T>& replacement);
+  void substitute(const std::string& var, const T& replacement);
   // If the string has a nonzero coefficient for at least one of its nonconstant
   // indices, it will return the index name of one such index. No promises about
   // which index you'll get. Returns empty string if no index w/ nonconst coeff
   std::string GetNonzeroIndex() const;
+
+  T get(const std::string& name) const;
 
   std::string toString() const;  // Pretty-print to string
 
@@ -74,7 +78,7 @@ struct SimpleConstraint {
   SimpleConstraint(const Polynomial<Rational>& _poly, int64_t _rhs);
 
   Polynomial<Rational> poly;  // Polynomial<Rational> constraints apply to
-  int64_t rhs;                // Exclusive upper bound, range [0, upper)
+  int64_t rhs;                // poly <= rhs
 };
 
 // Range Constraint object, means 0 <= poly < upper, and value of poly is an integer
