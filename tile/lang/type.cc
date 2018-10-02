@@ -772,6 +772,10 @@ void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std:
   std::queue<std::string> to_proc;
   std::set<std::string> keep;
   for (const auto& s : outputs) {
+    if (vars.at(s).tag == Binding::TENSOR && !vars.at(s).shape.elem_size()) {
+      // This is a zero-sized tensor; we don't need to generate it.
+      continue;
+    }
     keep.insert(s);
     to_proc.push(s);
   }
@@ -790,6 +794,10 @@ void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std:
     for (std::string& i : op.inputs) {
       deident(i);
       if (keep.count(i) || inputs.count(i)) {
+        continue;
+      }
+      if (vars.at(i).tag == Binding::TENSOR && !vars.at(i).shape.elem_size()) {
+        // This is a zero-sized tensor; we don't need to generate it.
         continue;
       }
       keep.insert(i);
@@ -835,6 +843,9 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
     input_vars.insert(kvp.first);
   }
   for (const auto& kvp : outputs) {
+    if (!kvp.second.elem_size()) {
+      continue;
+    }
     output_vars.insert(kvp.first);
   }
   // Do typing
@@ -843,6 +854,9 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
   IVLOG(3, "Types:: " << vars);
   // Verify outputs match
   for (const auto& kvp : outputs) {
+    if (!kvp.second.elem_size()) {
+      continue;
+    }
     auto it = vars.find(kvp.first);
     if (it == vars.end()) {
       throw std::runtime_error("No type deduced for output " + kvp.first);

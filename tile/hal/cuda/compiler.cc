@@ -55,6 +55,11 @@ Compiler::Compiler(Device* device) : device_(device) {}
 boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Context& ctx,
                                                              const std::vector<lang::KernelInfo>& kernels,
                                                              const hal::proto::HardwareSettings& settings) {
+  if (!kernels.size()) {
+    return boost::make_ready_future(
+        std::unique_ptr<hal::Library>{compat::make_unique<Library>(std::vector<std::shared_ptr<Kernel>>{})});
+  }
+
   auto src = EmitCudaC(kernels);
   VLOG(3) << "Compiling CUDA C:\n" << WithLineNumbers(src);
 

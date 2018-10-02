@@ -172,7 +172,7 @@ attribute_parameter:
 ;
 
 body
-  : attributed_stmt ";" { context.finish_stmt(); }
+  : /* empty */
   | body attributed_stmt ";" {  context.finish_stmt(); }
 ;
 
