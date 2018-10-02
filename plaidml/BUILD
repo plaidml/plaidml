@@ -108,6 +108,7 @@ apple_binary(
     platform_type = "macos",
     binary_type = "dylib",
     deps = [":api"],
+    tags = ["darwin"],
 )
 
 plaidml_cc_library(
@@ -341,6 +342,7 @@ pkg_tar(
         "update_sdk_rpaths"
     ],
     package_dir = "bin",
+    tags = ["darwin"],
 )
 
 pkg_tar(
