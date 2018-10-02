@@ -25,22 +25,22 @@ build:linux_x86_64 --cpu=linux_x86_64
 build:linux_x86_64 --host_cpu=linux_x86_64
 build:linux_x86_64 --crosstool_top=@toolchain//:toolchain
 build:linux_x86_64 --host_crosstool_top=@toolchain//:toolchain
-build:linux_x86_64 --build_tag_filters=-metal,-msvc,-trusty
-test:linux_x86_64 --test_tag_filters=-metal,-msvc,-trusty
+build:linux_x86_64 --build_tag_filters=-darwin,-metal,-msvc,-trusty
+test:linux_x86_64 --test_tag_filters=-darwin,-metal,-msvc,-trusty
 
 build:linux_arm_32v7 --cpu=linux_arm_32v7
 build:linux_arm_32v7 --host_cpu=linux_x86_64
 build:linux_arm_32v7 --crosstool_top=@toolchain//:toolchain
 build:linux_arm_32v7 --host_crosstool_top=@toolchain//:toolchain
-build:linux_arm_32v7 --build_tag_filters=-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
-test:linux_arm_32v7 --test_tag_filters=-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
+build:linux_arm_32v7 --build_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
+test:linux_arm_32v7 --test_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
 
 build:linux_arm_64v8 --cpu=linux_arm_64v8
 build:linux_arm_64v8 --host_cpu=linux_x86_64
 build:linux_arm_64v8 --crosstool_top=@toolchain//:toolchain
 build:linux_arm_64v8 --host_crosstool_top=@toolchain//:toolchain
-build:linux_arm_64v8 --build_tag_filters=-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
-test:linux_arm_64v8 --test_tag_filters=-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
+build:linux_arm_64v8 --build_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
+test:linux_arm_64v8 --test_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
 
 build:macos_x86_64 --apple_platform_type=macos
 build:macos_x86_64 --cpu=darwin_x86_64
@@ -48,8 +48,8 @@ build:macos_x86_64 --host_cpu=darwin_x86_64
 build:macos_x86_64 --build_tag_filters=-large,-darwin_fail,-msvc,-opengl
 test:macos_x86_64 --test_tag_filters=-large,-darwin_fail,-msvc,-opengl
 
-build:windows_x86_64 --build_tag_filters=-deb,-git_big,-keras,-llvm,-metal,-omnetpp,-opengl,-shell,-tensorflow,-uvc --action_env=NUMBER_OF_PROCESSORS
-test:windows_x86_64 --test_tag_filters=-deb,-git_big,-keras,-llvm,-metal,-omnetpp,-opengl,-shell,-tensorflow,-uvc,-windows_path_fail --test_env=NUMBER_OF_PROCESSORS
+build:windows_x86_64 --build_tag_filters=-darwin,-deb,-git_big,-keras,-llvm,-metal,-omnetpp,-opengl,-shell,-tensorflow,-uvc --action_env=NUMBER_OF_PROCESSORS
+test:windows_x86_64 --test_tag_filters=-darwin,-deb,-git_big,-keras,-llvm,-metal,-omnetpp,-opengl,-shell,-tensorflow,-uvc,-windows_path_fail --test_env=NUMBER_OF_PROCESSORS
 
 build:callgrind -c dbg
 build:callgrind --cxxopt=-O3
