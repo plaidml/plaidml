@@ -73,7 +73,7 @@ def _tpl(ctx, tpl, substitutions = {}, out = None):
         out = tpl.replace(":", "/")
     ctx.template(
         out,
-        Label("@vertexai_plaidml//vendor/cuda:%s.tpl" % tpl),
+        Label("@com_intel_plaidml//vendor/cuda:%s.tpl" % tpl),
         substitutions,
     )
 

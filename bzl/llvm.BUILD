@@ -615,7 +615,7 @@ cc_library(
 )
 
 # This is a dummy target used for eliciting the static libraries created by ":llvm".
-# See @vertexai_plaidml//lib/README.md
+# See @com_intel_plaidml//lib/README.md
 cc_binary(
     name = "static.so",
     linkshared = 1,
