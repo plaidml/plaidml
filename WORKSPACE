@@ -1,5 +1,5 @@
-# Bazel Workspace for Vertex.AI
-workspace(name = "vertexai_plaidml")
+# Bazel Workspace for PlaidML
+workspace(name = "com_intel_plaidml")
 
 git_repository(
     name = "toolchain",

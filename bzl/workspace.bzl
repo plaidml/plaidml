@@ -104,14 +104,14 @@ def plaidml_workspace():
     configure_cuda(name = "cuda")
 
     conda_repo(
-        name = "vertexai_plaidml_conda",
+        name = "com_intel_plaidml_conda",
         specs = {
             "env": str(Label("//conda:plaidml.yml")),
         },
     )
 
     conda_repo(
-        name = "vertexai_plaidml_conda_sphinx",
+        name = "com_intel_plaidml_conda_sphinx",
         specs = {
             "env": str(Label("//conda:sphinx.yml")),
         },

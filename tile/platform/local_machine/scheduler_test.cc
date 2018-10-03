@@ -39,7 +39,7 @@ tile::proto::Program MakeProgram(const std::string& filename) {
 }  // namespace
 
 std::vector<tile::proto::Program> SchedulerTest::GetTestPrograms() {
-  RunfilesDB rdb{"vertexai_plaidml/tile/platform/local_machine/testdata"};
+  RunfilesDB rdb{"com_intel_plaidml/tile/platform/local_machine/testdata"};
   std::vector<tile::proto::Program> result;
   result.emplace_back(MakeProgram(rdb["concat.tpb"]));
   result.emplace_back(MakeProgram(rdb["prng.tpb"]));
