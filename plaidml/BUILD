@@ -207,14 +207,14 @@ genrule(
 conda_binary(
     name = "enumerate",
     srcs = ["enumerate.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     deps = [":py"],
 )
 
 conda_binary(
     name = "setup",
     srcs = ["plaidml_setup.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     main = "plaidml_setup.py",
     deps = [":py"],
 )
@@ -240,7 +240,7 @@ plaidml_py_library(
 conda_test(
     name = "settings_test",
     srcs = ["settings_test.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     deps = [
         ":py",
     ],
@@ -249,7 +249,7 @@ conda_test(
 conda_test(
     name = "py_plaidml_test",
     srcs = ["plaidml_test.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     main = "plaidml_test.py",
     deps = [
         ":py",
@@ -260,7 +260,7 @@ conda_test(
 conda_test(
     name = "py_tile_test",
     srcs = ["tile_test.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     main = "tile_test.py",
     deps = [
         ":py",

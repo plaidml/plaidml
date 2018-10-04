@@ -158,6 +158,9 @@ struct TensorShape {
   uint64_t elem_size() const {
     uint64_t max_elem = 0;
     for (const auto& dim : dims) {
+      if (!dim.size) {
+        return 0;
+      }
       if (dim.stride > 0) {
         max_elem += (dim.size - 1) * dim.stride;
       }

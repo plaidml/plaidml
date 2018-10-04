@@ -276,7 +276,7 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
 
 extern "C" plaidml_device_enumerator* plaidml_alloc_device_enumerator(
     vai_ctx* ctx, void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
-  static vertexai::RunfilesDB runfiles_db{"vertexai_plaidml"};
+  static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
 
   std::string config_file;
   std::string exp = vertexai::env::Get(PLAIDML_EXPERIMENTAL);

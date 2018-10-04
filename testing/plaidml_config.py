@@ -11,7 +11,7 @@ def unittest_config():
 
 
 def config():
-    filename = os.getenv('PLAIDML_CONFIG_FILE', '../vertexai_plaidml/plaidml/experimental.json')
+    filename = os.getenv('PLAIDML_CONFIG_FILE', '../com_intel_plaidml/plaidml/experimental.json')
     with open(filename) as file_:
         return file_.read()
 
