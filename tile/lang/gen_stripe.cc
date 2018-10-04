@@ -213,6 +213,9 @@ class StripeGenerator {
     std::set<std::string> out_idxs;
     for (size_t i = 0; i < out_shape.dims.size(); i++) {
       Affine a = block.refs[0].access[i];
+      if (a == 0 && out_shape.dims[i].size == 1) {
+        continue;
+      }
       if (a.constant() != 0 || a.getMap().size() != 1 || a.getMap().begin()->second != 1) {
         return true;  // If it's not a single index with a multiplier of 1, bail
       }
