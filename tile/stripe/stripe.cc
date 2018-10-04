@@ -281,26 +281,26 @@ bool operator==(const Index& lhs, const Index& rhs) {
 }
 
 Affine FromProto(const proto::Affine& affine) {
-  Affine r = affine.offset();
+  Affine ret = affine.offset();
   for (const auto& kvp : affine.terms()) {
-    r += Affine(kvp.first, kvp.second);
+    ret += Affine(kvp.first, kvp.second);
   }
-  return r;
+  return ret;
 }
 
-Block FromProto(const proto::Block& block) {
-  Block ret;
-  ret.name = block.name();
-  ret.comments = block.comments();
+std::shared_ptr<Block> FromProto(const proto::Block& block) {
+  std::shared_ptr<Block> ret;
+  ret->name = block.name();
+  ret->comments = block.comments();
   for (const auto& pb_idx : block.idxs()) {
-    ret.idxs.emplace_back(Index{
+    ret->idxs.emplace_back(Index{
         pb_idx.name(),   //
         pb_idx.range(),  //
         pb_idx.factor()  //
     });
   }
   for (const auto& pb_con : block.constraints()) {
-    ret.constraints.emplace_back(FromProto(pb_con));
+    ret->constraints.emplace_back(FromProto(pb_con));
   }
   for (const auto& pb_ref : block.refs()) {
     Refinement ref;
@@ -327,23 +327,23 @@ Block FromProto(const proto::Block& block) {
     }
     ref.shape = tile::FromProto(pb_ref.shape());
     ref.agg_op = pb_ref.agg_op();
-    ret.refs.emplace_back(ref);
+    ret->refs.emplace_back(ref);
   }
   for (const auto& pb_stmt : block.stmts()) {
     switch (pb_stmt.op_case()) {
       case proto::Statement::kLoad:
-        ret.stmts.emplace_back(std::make_shared<Load>(pb_stmt.load().from(), pb_stmt.load().into()));
+        ret->stmts.emplace_back(std::make_shared<Load>(pb_stmt.load().from(), pb_stmt.load().into()));
         break;
       case proto::Statement::kStore:
-        ret.stmts.emplace_back(std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into()));
+        ret->stmts.emplace_back(std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into()));
         break;
       case proto::Statement::kConstant:
         switch (pb_stmt.constant().value_case()) {
           case proto::Constant::kIconst:
-            ret.stmts.emplace_back(std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().iconst()));
+            ret->stmts.emplace_back(std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().iconst()));
             break;
           case proto::Constant::kFconst:
-            ret.stmts.emplace_back(std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().fconst()));
+            ret->stmts.emplace_back(std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().fconst()));
             break;
           default:
             break;
@@ -361,7 +361,7 @@ Block FromProto(const proto::Block& block) {
         for (const auto& item : pb_stmt.special().outputs()) {
           stmt->outputs.push_back(item);
         }
-        ret.stmts.emplace_back(stmt);
+        ret->stmts.emplace_back(stmt);
       } break;
       case proto::Statement::kIntrinsic: {
         auto stmt = std::make_shared<Intrinsic>();
@@ -372,13 +372,11 @@ Block FromProto(const proto::Block& block) {
         for (const auto& item : pb_stmt.intrinsic().outputs()) {
           stmt->outputs.push_back(item);
         }
-        ret.stmts.emplace_back(stmt);
+        ret->stmts.emplace_back(stmt);
       } break;
-      case proto::Statement::kBlock: {
-        auto stmt = std::make_shared<Block>();
-        *stmt = FromProto(pb_stmt.block());
-        ret.stmts.emplace_back(stmt);
-      } break;
+      case proto::Statement::kBlock:
+        ret->stmts.emplace_back(FromProto(pb_stmt.block()));
+        break;
       default:
         break;
     }
@@ -388,7 +386,7 @@ Block FromProto(const proto::Block& block) {
       proto::BoolAnnotation pb_ann;
       item.second.UnpackTo(&pb_ann);
       auto ann = std::make_shared<BoolAnnotation>(pb_ann.value());
-      ret.annotations.insert(std::make_pair(item.first, ann));
+      ret->annotations.insert(std::make_pair(item.first, ann));
     }
   }
   return ret;
