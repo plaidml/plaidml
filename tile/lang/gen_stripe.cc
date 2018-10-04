@@ -36,12 +36,6 @@ class StripeGenerator {
     // Add decls for external inputs/outputs
     AddDecls(main.get(), inputs_, true);
     AddDecls(main.get(), outputs_, false);
-    // Process reshapes
-    for (const auto& op : parsed_.ops) {
-      if (op.tag == Op::FUNCTION && op.f.fn == "reshape") {
-        ProcessReshape(main.get(), op);
-      }
-    }
     // Add kernels to main
     for (const auto& op : parsed_.ops) {
       IVLOG(2, "Processing: " << op);
@@ -52,7 +46,9 @@ class StripeGenerator {
         case Op::FUNCTION:
           if (op.f.is_special()) {
             ProcessSpecial(main.get(), op);
-          } else if (op.f.fn != "reshape") {
+          } else if (op.f.fn == "reshape") {
+            ProcessReshape(main.get(), op);
+          } else {
             ProcessElementwise(main.get(), op);
           }
           break;
@@ -61,9 +57,9 @@ class StripeGenerator {
           break;
       }
     }
-    // Add decls for temporaries that are not aliased
+    // Add decls for temporaries
     for (const auto& item : vars_) {
-      if (externals_.count(item.first) == 0 && reshapes_.count(item.first) == 0) {
+      if (externals_.count(item.first) == 0) {
         const auto& binding = item.second;
         if (binding.tag == Binding::TENSOR) {
           std::vector<Affine> access(binding.shape.dims.size());
@@ -108,13 +104,12 @@ class StripeGenerator {
   }
 
   void ProcessReshape(Block* main, const Op& op) {
-    auto it = ref_outs_.find(op.output);
-    if (it != ref_outs_.end()) {
-      IVLOG(2, "reshape output");
-      reshapes_.insert(std::make_pair(op.inputs[0], op.output));
-    } else {
-      reshapes_.insert(std::make_pair(op.output, op.inputs[0]));
-    }
+    auto stmt = std::make_shared<Special>();
+    stmt->name = op.f.fn;
+    stmt->params = op.f.params;
+    stmt->inputs = op.inputs;
+    stmt->outputs = {op.output};
+    main->stmts.push_back(stmt);
   }
 
   void ProcessContraction(Block* main, const Op& op) {
@@ -187,19 +182,17 @@ class StripeGenerator {
       kernel->constraints.emplace_back(lhs);
     }
 
-    // if (NeedsZero(flat)) {
-    //   Op special_op;
-    //   special_op.tag = Op::FUNCTION;
-    //   special_op.output = op.output;
-    //   if (op.c.use_default.empty()) {
-    //     special_op.f.fn = Intrinsic::ZERO;
-    //     special_op.inputs.push_back(op.output);
-    //   } else {
-    //     special_op.f.fn = Intrinsic::COPY;
-    //     special_op.inputs.push_back(op.c.use_default);
-    //   }
-    //   ProcessSpecial(main, special_op);
-    // }
+    if (NeedsInitialize(*kernel, shapes[0])) {
+      auto stmt = std::make_shared<Special>();
+      stmt->outputs = {op.output};
+      if (op.c.use_default.empty()) {
+        stmt->name = Intrinsic::ZERO;
+      } else {
+        stmt->name = Intrinsic::COPY;
+        stmt->inputs.push_back(op.c.use_default);
+      }
+      main->stmts.insert(std::prev(main->stmts.end()), stmt);
+    }
 
     // Combination Op
     if (scalar_inputs.size() > 1) {
@@ -211,6 +204,42 @@ class StripeGenerator {
 
     // STORE
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));
+  }
+
+  bool NeedsInitialize(const Block& block, const TensorShape& out_shape) {
+    // Check if have a simple output: 1 unique index per dimension, each full range
+    // If not, presume we need initialization for safety
+    // We assume here that the 0'th refinement is the output refinement
+    std::set<std::string> out_idxs;
+    for (size_t i = 0; i < out_shape.dims.size(); i++) {
+      Affine a = block.refs[0].access[i];
+      if (a.constant() != 0 || a.getMap().size() != 1 || a.getMap().begin()->second != 1) {
+        return true;  // If it's not a single index with a multiplier of 1, bail
+      }
+      std::string idx = a.getMap().begin()->first;
+      if (out_idxs.count(idx)) {
+        return true;  // If the index isn't unique, bail
+      }
+      out_idxs.insert(idx);
+      if (block.idx_by_name(idx)->range != out_shape.dims[i].size) {
+        return true;  // Index range doesn't match out_shape size
+      }
+    }
+    // Now we check if we have any constraints that are 'output only'
+    // Output only indexes actually reduce the range we write to, whereas constraints
+    // that use both input + output make writes but only process some of the input
+    for (const auto& con : block.constraints) {
+      bool any_inputs = false;
+      for (const auto& kvp : con.getMap()) {
+        if (!kvp.first.empty() && out_idxs.count(kvp.first) == 0) {
+          any_inputs = true;
+        }
+      }
+      if (!any_inputs) {
+        return true;  // Found at least one output only constraint
+      }
+    }
+    return false;  // Looks good!
   }
 
   void ProcessElementwise(Block* main, const Op& op) {
@@ -471,8 +500,6 @@ class StripeGenerator {
   ShapeMap inputs_;
   ShapeMap outputs_;
   std::set<std::string> externals_;
-  std::map<std::string, std::string> reshapes_;
-  std::map<std::string, Refinement*> ref_outs_;
 };
 
 }  // namespace
