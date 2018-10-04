@@ -173,6 +173,11 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   std::vector<context::proto::ActivityID> kernel_ids;
   std::ostringstream code;
 
+  if (!kernel_info.size()) {
+    return boost::make_ready_future(std::unique_ptr<hal::Library>{
+        compat::make_unique<Library>(device_state_, nullptr, kernel_info, std::vector<context::proto::ActivityID>{})});
+  }
+
   context::Activity activity{ctx, "tile::hal::opencl::Build"};
 
   bool cl_khr_fp16 = device_state_->HasDeviceExtension("cl_khr_fp16");

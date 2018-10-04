@@ -599,7 +599,7 @@ void AddDeps(schedule::Schedule* schedule) {
     IVLOG(3, "Adding dataflow deps to s" << step.idx);
     for (schedule::Alloc* allocp : step.inputs) {
       if (!allocp->byte_size) {
-        return;
+        continue;
       }
       IVLOG(3, "  Getting input deps for a" << allocp->idx);
       auto bit = busy_infos.emplace(allocp, BusyInfo{nullptr}).first;
