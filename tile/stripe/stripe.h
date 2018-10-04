@@ -171,7 +171,7 @@ std::ostream& operator<<(std::ostream& os, const Special& op);
 std::ostream& operator<<(std::ostream& os, const Constant& op);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 
-Block FromProto(const proto::Block& block);
+std::shared_ptr<Block> FromProto(const proto::Block& block);
 proto::Block IntoProto(const Block& block);
 
 }  // namespace stripe
