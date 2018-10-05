@@ -1,10 +1,4 @@
-# Copyright Vertex.AI
-#
-# Licensed under the GNU Affero General Public License V3 (the License) ;
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    https://www.gnu.org/licenses/agpl-3.0.en.html
+# Copyright 2018 Intel Corporation
 """
 PlaidML
 =======
@@ -951,54 +945,6 @@ def open_first_device(ctx):
     dev.close()
 
 
-def _record_usage(device_id, config_source, valid_devices, invalid_devices, status, sync=False):
-    # Collects basic information about the GPUs being used.
-    if not plaidml.settings.telemetry:
-        return
-    table = 'usage_v1'
-    version = _lib().plaidml_get_version().decode()
-    record = {
-        'version':
-            version,
-        'session':
-            plaidml.settings.session,
-        'machine':
-            str(uuid.uuid1())[14:],
-        'device_id':
-            str(device_id),
-        'status':
-            status,
-        'hal':
-            'OpenCL',  # TODO(T1191): plumb from hal
-        'platform':
-            "|".join([platform.system(), platform.release(),
-                      platform.machine()]),
-        'config_source':
-            os.path.basename(config_source).decode(),  # ensure only the filename is included
-        'devices': [{
-            'id': d.id.decode(),
-            'config': d.config.decode(),
-            'details': d.details.decode(),
-            'valid': True
-        } for d in valid_devices] + [{
-            'id': d.id.decode(),
-            'config': d.config.decode(),
-            'details': d.details.decode(),
-            'valid': False
-        } for d in invalid_devices],
-    }
-    body = {'table': table, 'data': record}
-    ex = lambda: requests.post("https://us-central1-vertexai-release.cloudfunctions.net/record_usage",
-        data=json.dumps(body),
-        headers={'content-type': 'application/json'})
-    thread = threading.Thread(target=ex)
-    thread.daemon = True
-    if sync:
-        thread.run()
-    else:
-        thread.start()
-
-
 class _Enumerator(object):
 
     def __init__(self, ctx):
@@ -1061,16 +1007,10 @@ def devices(ctx, limit=1, return_all=False):
         return enumerator.valid_devs, enumerator.invalid_devs
     else:
         if len(enumerator.valid_devs) == 0:
-            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
-                          "ERR_NO_DEVICES", True)
             _setup_fail("No devices found.", enumerator.invalid_devs)
         if limit and len(enumerator.valid_devs) > limit:
-            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
-                          "ERR_TOO_MANY_DEVICES", True)
             _setup_fail("Too many devices configured (limit={})".format(limit),
                         enumerator.valid_devs)
-            _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs,
-                          enumerator.invalid_devs, "OK")
         return enumerator.valid_devs
 
 
