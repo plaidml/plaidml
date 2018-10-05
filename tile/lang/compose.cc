@@ -414,14 +414,20 @@ void BoundFunction::AddUpdate(const std::shared_ptr<TensorValue>& lhs, const std
     throw std::runtime_error("Duplicate updates");
   }
   std::string oname = Apply(rhs);
-  if (oname.size() > 2 && oname.substr(0, 2) == "_I") {
-    // Handle case where output is a straight copy of an input by inserting
-    // an identity function
+
+  // We have a couple of interesting cases in which we need to insert an identity function (because we can't use the
+  // exising name):
+  // * When the output is a straight copy of an input
+  // * When the output is already in the output binding set.
+  if ((oname.size() > 2 && oname.substr(0, 2) == "_I")  // The output is a copy of an input
+      || (out_bound_.count(oname))                      // The output is already in the output binding set
+  ) {
     std::string tmp = NewTmp();
     Op op = {Op::FUNCTION, tmp, {oname}, {}, {"ident"}};
     prog_.ops.push_back(op);
     oname = tmp;
   }
+
   out_bound_[oname] = lhs;
   prog_.outputs.push_back(oname);
   updated_.emplace(lhs);
