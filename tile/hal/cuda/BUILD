@@ -1,4 +1,4 @@
-# Copyright 2018, Vertex.AI.
+# Copyright 2018, Intel Corporation.
 
 load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
 load(

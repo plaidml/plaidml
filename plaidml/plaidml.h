@@ -1,4 +1,4 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 //
 // This is the PlaidML library interface, used to construct and manipulate
 // programs defined as a sequence of operations over tensors.

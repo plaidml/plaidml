@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017, Intel Corporation.
 
 #pragma once
 

@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/platform/local_machine/mem_deps.h"
 

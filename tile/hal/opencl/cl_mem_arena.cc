@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/opencl/cl_mem_arena.h"
 

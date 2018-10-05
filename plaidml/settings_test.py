@@ -29,19 +29,16 @@ class TestSettings(unittest.TestCase):
         self.assertEquals(settings.device_ids, [])
         self.assertEquals(settings.experimental, False)
         self.assertEquals(settings.session, None)
-        self.assertEquals(settings.telemetry, False)
 
     def testSetting(self):
         settings.config = 'test'
         settings.device_ids = ['1', '2']
         settings.experimental = True
-        settings.telemetry = True
         settings.session = "123"
         self.assertEquals(settings.config, 'test')
         self.assertEquals(settings.device_ids, ['1', '2'])
         self.assertEquals(settings.experimental, True)
         self.assertEquals(settings.session, "123")
-        self.assertEquals(settings.telemetry, True)
 
     def testStartSession(self):
         with self.assertRaises(plaidml.exceptions.PlaidMLError):
@@ -69,7 +66,6 @@ class TestSettings(unittest.TestCase):
         self.assertEquals(settings.config, 'tmp')
         self.assertEquals(settings.experimental, True)
         self.assertEquals(settings.device_ids, ['1', '3', '5'])
-        self.assertEquals(settings.telemetry, True)
 
         # User config should shadow system config
         settings._setup_for_test(val.name, inv.name)
@@ -86,10 +82,8 @@ class TestSettings(unittest.TestCase):
             tf.write(VALID_CONF)
             os.environ['PLAIDML_SETTINGS'] = tf.name
         os.environ['PLAIDML_CONFIG'] = 'other'
-        settings.telemetry = False
         settings._load()
         self.assertEquals(settings.config, 'other')
-        self.assertEquals(settings.telemetry, False)
         os.remove(tf.name)
 
 

@@ -1,10 +1,4 @@
-# Copyright Vertex.AI.
-#
-# Licensed under the GNU Affero General Public License V3 (the License) ;
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    https://www.gnu.org/licenses/agpl-3.0.en.html
+# Copyright 2018 Intel Corporation.
 """Patches in a PlaidML backend for Keras.
 
 This module hooks the system meta module path to add a backend for Keras
