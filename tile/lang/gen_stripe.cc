@@ -26,16 +26,19 @@ class StripeGenerator {
   {}
 
   std::shared_ptr<Block> Run(const std::string& name) {
+    auto program = std::make_shared<Block>();
+    program->name = name;
     LOG(INFO) << "Compiling " << parsed_.ops.size() << " ops";
     // The top level block is a 'main' function.
     // In/Out/InOut refinements made on main relate to user supplied inputs and outputs.
     // None refinements made on main relate to temporaries needed for communication between kernels.
     // The list of kernels to execute are the list of blocks defined within main.
     auto main = std::make_shared<Block>();
-    main->name = name;
+    program->stmts.push_back(main);
+    main->name = "main";
     // Add decls for external inputs/outputs
-    AddDecls(main.get(), inputs_, true);
-    AddDecls(main.get(), outputs_, false);
+    AddDecls(program.get(), main.get(), inputs_, true);
+    AddDecls(program.get(), main.get(), outputs_, false);
     // Add kernels to main
     for (const auto& op : parsed_.ops) {
       IVLOG(2, "Processing: " << op);
@@ -74,14 +77,21 @@ class StripeGenerator {
       }
     }
     IVLOG(2, "Done");
-    return main;
+    return program;
   }
 
  private:
-  void AddDecls(Block* main, const ShapeMap& shapes, bool is_input) {
+  void AddDecls(Block* program, Block* main, const ShapeMap& shapes, bool is_input) {
     for (const auto& item : shapes) {
       externals_.insert(item.first);
       std::vector<Affine> access(item.second.dims.size());
+      program->refs.emplace_back(Refinement{
+          RefDir::None,  // dir
+          "",            // from
+          item.first,    // into
+          access,        // access
+          item.second    // shape
+      });
       if (is_input) {
         main->refs.emplace_back(Refinement{
             RefDir::In,  // dir
@@ -173,7 +183,7 @@ class StripeGenerator {
       if (range == 1) {
         continue;
       }
-      kernel->idxs.emplace_back(Index{kvp.first, range, 0});
+      kernel->idxs.emplace_back(Index{kvp.first, "", range, 0});
     }
     for (const auto& constraint : simple_cons) {
       auto lhs = Integerize(constraint.poly, bounds);  // lhs <= rhs;
@@ -254,6 +264,7 @@ class StripeGenerator {
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
       auto idx = Index{
           printstring("i%zu", i + 1),  // name
+          "",                          // from
           out_shape.dims[i].size,      // range
           0                            // factor
       };
@@ -279,7 +290,7 @@ class StripeGenerator {
               }
             }
           }
-          kernel->refs.emplace_back(Refinement{RefDir::In, input, input, access, GetShape(input)});
+          kernel->refs.emplace_back(Refinement{RefDir::In, input, input, access, ScalarShape(input)});
           // LOAD
           kernel->stmts.push_back(std::make_shared<Load>(input, ScalarName(input)));
         } break;
@@ -295,7 +306,7 @@ class StripeGenerator {
       }
     }
 
-    kernel->refs.emplace_back(Refinement{RefDir::Out, op.output, op.output, out_access, out_shape});
+    kernel->refs.emplace_back(Refinement{RefDir::Out, op.output, op.output, out_access, ScalarShape(op.output)});
 
     // INTRINSIC
     std::vector<std::string> scalar_inputs;
