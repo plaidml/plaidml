@@ -29,8 +29,8 @@ from recommonmark.transform import AutoStructify
 # -- Project information -----------------------------------------------------
 
 project = u'PlaidML'
-copyright = u'2018, Vertex.AI'
-author = u'Vertex.AI'
+copyright = u'2018, Intel Corporation'
+author = u'Intel Corporation'
 
 # The short X.Y version
 version = u''
@@ -153,7 +153,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'PlaidML.tex', u'PlaidML Documentation', u'Vertex.AI', 'manual'),
+    (master_doc, 'PlaidML.tex', u'PlaidML Documentation', u'Intel Corporation', 'manual'),
 ]
 
 # -- Options for manual page output ------------------------------------------

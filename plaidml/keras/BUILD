@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 
 licenses(["by_exception_only"])
 

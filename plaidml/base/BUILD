@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_py_library", "plaidml_py_init")

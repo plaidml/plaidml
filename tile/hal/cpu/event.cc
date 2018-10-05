@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/cpu/event.h"
 

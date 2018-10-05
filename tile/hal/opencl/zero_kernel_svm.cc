@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "base/util/error.h"
 #include "tile/hal/opencl/zero_kernel.h"
