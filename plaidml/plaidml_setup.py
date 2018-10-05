@@ -94,13 +94,6 @@ Please choose a default device:
         plaidml.settings.device_ids = [devices[int(dev) - 1].id.decode()]
 
     print("\nSelected device:\n    {0}".format(plaidml.devices(ctx)[0]))
-    print("""
-PlaidML sends anonymous usage statistics to help guide improvements.
-We'd love your help making it better.
-""")
-
-    tel = choice_prompt("Enable telemetry reporting", ["y", "n"], "y")
-    plaidml.settings.telemetry = tel == "y"
 
     print("\nAlmost done. Multiplying some matrices...")
     # Reinitialize to send a usage report

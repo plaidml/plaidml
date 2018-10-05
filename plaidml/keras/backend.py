@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 """Implements a Keras backend using PlaidML.
 
 This module implements the Keras backend interface, using PlaidML for computation.

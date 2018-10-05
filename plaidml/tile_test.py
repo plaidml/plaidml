@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 """Tile program construction tests."""
 
 from __future__ import print_function
