@@ -1,4 +1,4 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 
 #include <gtest/gtest.h>
 

@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "base/util/any_factory_map.h"
 #include "base/util/compat.h"

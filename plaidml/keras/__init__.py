@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 #
 # Licensed under the GNU Affero General Public License V3 (the License) ;
 # you may not use this file except in compliance with the License.

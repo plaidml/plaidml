@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 
 package(default_visibility = ["//visibility:public"])
 

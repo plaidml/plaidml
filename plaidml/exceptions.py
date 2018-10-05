@@ -1,4 +1,4 @@
-# Copyright Vertex.AI
+# Copyright 2018 Intel Corporation
 
 
 class PlaidMLError(Exception):

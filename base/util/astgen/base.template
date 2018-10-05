@@ -1,5 +1,5 @@
 {{=$ $=}}
-// Copyright 2017, Vertex.AI. 
+// Copyright 2017-2018 Intel Corporation. 
 // This file was produced by astgen using the base template
 
 #pragma once

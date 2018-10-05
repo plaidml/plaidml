@@ -1,4 +1,4 @@
-# Copyright 2017, Vertex.AI.
+# Copyright 2017-2018 Intel Corporation.
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(

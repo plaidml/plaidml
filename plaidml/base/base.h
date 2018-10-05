@@ -1,4 +1,4 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 //
 // This is the PlaidML base library interface, handling functionality common across the Vertex.AI libraries.
 

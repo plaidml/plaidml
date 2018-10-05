@@ -1,4 +1,4 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 #include <gmock/gmock.h>
 
 #include "tile/platform/local_machine/fifo_scheduler.h"

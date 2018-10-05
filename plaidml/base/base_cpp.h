@@ -1,4 +1,4 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 //
 // This is the Vertex.AI common C++ interface, which provides a higher level object
 // oriented wrapper on top of the Vertex.AI common C API.
