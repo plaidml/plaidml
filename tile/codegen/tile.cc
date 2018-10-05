@@ -36,6 +36,7 @@ void ApplyTile(Block* outer, const TileShape& tile) {
     int64_t range = outer->idxs[i].range;
     auto& outer_idx = outer->idxs[i];
     auto& inner_idx = inner->idxs[i];
+    inner_idx.from = outer_idx.name;
     if (range % tile[i]) {
       inner->constraints.emplace_back(Affine(outer_idx.name, -1) + int64_t(outer_idx.range - 1));
     }

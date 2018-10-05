@@ -33,16 +33,16 @@ lang::RunInfo LoadMatMul() {
 
 TEST(Codegen, Cache) {
   auto runinfo = LoadMatMul();
-  auto program = GenerateStripe(runinfo);
-  auto kernel = stripe::Block::Downcast(program->stmts.front());
+  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
   std::cout << "Original\n";
-  std::cout << *program;
+  std::cout << *main;
   ApplyTile(kernel.get(), {2, 2, 2});
   std::cout << "Tiled\n";
-  std::cout << *program;
+  std::cout << *main;
   ApplyCache(kernel.get(), "A");
   std::cout << "Cached\n";
-  std::cout << *program;
+  std::cout << *main;
 }
 
 }  // namespace test
