@@ -8,6 +8,9 @@
 #include <thread>
 #include <utility>
 
+#include <boost/asio.hpp>
+#include <boost/asio/thread_pool.hpp>
+
 #include "base/util/error.h"
 #include "tile/hal/cpu/buffer.h"
 #include "tile/hal/cpu/event.h"
@@ -20,6 +23,8 @@ namespace cpu {
 namespace {
 
 const char invoker_prefix_[] = "__invoke_";
+
+boost::asio::thread_pool thread_pool_(std::thread::hardware_concurrency());
 
 }  // namespace
 
@@ -53,22 +58,18 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
     lang::GridSize denom = {{gwork[2] * gwork[1], gwork[2], 1}};
     size_t cores = std::thread::hardware_concurrency();
     size_t threads = std::min(iterations, cores);
-    auto runLoop = [=](size_t offset) {
-      for (size_t i = offset; i < iterations; i += threads) {
-        lang::GridSize index;
-        index[0] = i / denom[0] % gwork[0];
-        index[1] = i / denom[1] % gwork[1];
-        index[2] = i / denom[2] % gwork[2];
-        ((void (*)(void*, lang::GridSize*))entrypoint)(argvec, &index);
-      }
-    };
-    std::vector<std::thread> workers;
-    for (size_t i = 0; i < threads; ++i) {
-      workers.emplace_back(runLoop, i);
+    for (size_t offset = 0; offset < threads; ++offset) {
+      boost::asio::post(thread_pool_, [=]() {
+        for (size_t i = offset; i < iterations; i += threads) {
+          lang::GridSize index;
+          index[0] = i / denom[0] % gwork[0];
+          index[1] = i / denom[1] % gwork[1];
+          index[2] = i / denom[2] % gwork[2];
+          ((void (*)(void*, lang::GridSize*))entrypoint)(argvec, &index);
+        }
+      });
     }
-    for (auto& worker : workers) {
-      worker.join();
-    }
+    thread_pool_.join();
     return std::make_shared<Result>(act.ctx(), "tile::hal::cpu::Executing", start,
                                     std::chrono::high_resolution_clock::now());
   });
