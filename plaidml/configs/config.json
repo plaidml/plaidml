@@ -67,6 +67,9 @@
                                         },
                                         {
                                             "name_regex": ".*Kepler.*"
+                                        },
+                                        {
+                                            "name_regex": ".*Quadro.*"
                                         }
                                     ]
                                 }
