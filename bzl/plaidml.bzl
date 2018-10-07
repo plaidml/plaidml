@@ -98,29 +98,46 @@ def plaidml_ast(name, ast, output, template = "base", visibility = None):
         cmd = "$(location //base/util/astgen) -i $(SRCS) -t {} -o $(OUTS)".format(template),
     )
 
-def plaidml_grammar(name, bison_src, flex_src, outs, visibility = None):
+def plaidml_bison(name, srcs, outs, visibility = None):
     native.genrule(
         name = name,
+        srcs = srcs,
         outs = outs,
-        srcs = [bison_src, flex_src],
         visibility = visibility,
         cmd = select({
             "@toolchain//:macos_x86_64": """
 ssrcs=($(SRCS))
 /usr/local/opt/bison/bin/bison --verbose $${ssrcs[0]}
-/usr/local/opt/flex/bin/flex $${ssrcs[1]}
-cp %s $(@D)
-""" % (" ".join(outs)),
-            "@toolchain//:windows_x86_64": """
-ssrcs=($(SRCS))
-bison --verbose $${ssrcs[0]}
-flex --nounistd $${ssrcs[1]}
 cp %s $(@D)
 """ % (" ".join(outs)),
             "//conditions:default": """
 ssrcs=($(SRCS))
 bison --verbose $${ssrcs[0]}
-flex $${ssrcs[1]}
+cp %s $(@D)
+""" % (" ".join(outs)),
+        }),
+    )
+
+def plaidml_flex(name, srcs, outs, visibility = None):
+    native.genrule(
+        name = name,
+        srcs = srcs,
+        outs = outs,
+        visibility = visibility,
+        cmd = select({
+            "@toolchain//:macos_x86_64": """
+ssrcs=($(SRCS))
+/usr/local/opt/flex/bin/flex $${ssrcs[0]}
+cp %s $(@D)
+""" % (" ".join(outs)),
+            "@toolchain//:windows_x86_64": """
+ssrcs=($(SRCS))
+flex --nounistd $${ssrcs[0]}
+cp %s $(@D)
+""" % (" ".join(outs)),
+            "//conditions:default": """
+ssrcs=($(SRCS))
+flex $${ssrcs[0]}
 cp %s $(@D)
 """ % (" ".join(outs)),
         }),
