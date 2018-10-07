@@ -1,8 +1,9 @@
 load(
     "//bzl:plaidml.bzl",
+    "plaidml_bison",
     "plaidml_cc_library",
     "plaidml_cc_test",
-    "plaidml_grammar",
+    "plaidml_flex",
     "plaidml_proto_library",
 )
 
@@ -69,7 +70,8 @@ plaidml_cc_library(
         "type.cc",
         "usedef.cc",
         "usedef.h",
-        ":grammar",
+        ":lexer",
+        ":parser",
     ],
     hdrs = [
         "compile.h",
@@ -98,11 +100,11 @@ plaidml_cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        "//tile/math",
         ":proto_cc",
         "//base/util",
         "//tile/base",
         "//tile/bilp",
+        "//tile/math",
         "//tile/stripe",
         "@boost",
     ],
@@ -121,16 +123,22 @@ plaidml_cc_test(
     ],
 )
 
-plaidml_grammar(
-    name = "grammar",
+plaidml_bison(
+    name = "parser",
+    srcs = ["tile.y"],
     outs = [
         "parser.y.cc",
         "parser.y.h",
+    ],
+)
+
+plaidml_flex(
+    name = "lexer",
+    srcs = ["tile.l"],
+    outs = [
         "parser_lex.cc",
         "parser_lex.h",
     ],
-    bison_src = "tile.y",
-    flex_src = "tile.l",
 )
 
 plaidml_cc_test(
