@@ -535,6 +535,11 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   // The map of outputs that are allowed to alias inputs.
   std::map<std::string, std::set<std::string>> aliases;
 
+  // The set of operation inputs that have been used to elide program
+  // outputs.  N.B. An input cannot be used to elide multiple program
+  // outputs, since each program output must be independently written.
+  std::set<std::string> inputs_unified_with_prog_outputs;
+
   for (auto unified_opidx : unified_opidxs) {
     auto& unified_op = prog.ops[unified_opidx];
 
@@ -578,9 +583,19 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
 
       std::string input;
       input = var_rewrites->Lookup(unified_op.inputs[0]);
-      if (!outputs.count(unified_op.output) || (!outputs.count(input) && !inputs.count(input))) {
+      if (!outputs.count(unified_op.output)  // The op output is not a program output; always elide it.
+          || (!outputs.count(input)  // The op input is not itself a program output (if it were, it couldn't be used to
+                                     // elide another program output)
+              && !inputs.count(input)  // And the op input is not a program input (if it were, it couldn't be used to
+                                       // elide a program output)
+              && !inputs_unified_with_prog_outputs.count(
+                     input))  // And the op input hasn't been used to elide another program output
+      ) {
         IVLOG(4, "  Eliding op:" << unified_op << "; replacing " << unified_op.output << " with " << input);
         var_rewrites->Insert(unified_op.output, input);
+        if (outputs.count(unified_op.output)) {
+          inputs_unified_with_prog_outputs.emplace(input);
+        }
         local_var_rewrites.emplace(unified_op.output, std::move(input));
         continue;
       } else {
