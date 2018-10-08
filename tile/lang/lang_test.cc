@@ -1,5 +1,6 @@
 #include <mutex>
 
+#include "tile/base/shape.h"
 #include "tile/lang/bound.h"
 #include "tile/lang/compile.h"
 #include "tile/lang/defract.h"
@@ -7,7 +8,6 @@
 #include "tile/lang/gen_contract.h"
 #include "tile/lang/generate.h"
 #include "tile/lang/loop.h"
-#include "tile/lang/matrix.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/reduce.h"
@@ -15,11 +15,11 @@
 #include "tile/lang/sembuilder.h"
 #include "tile/lang/semprinter.h"
 #include "tile/lang/semtree.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/sym_poly.h"
 #include "tile/lang/symbolic.h"
 #include "tile/lang/tile_opt.h"
 #include "tile/lang/type.h"
+#include "tile/math/matrix.h"
 
 #include "base/util/catch.h"
 #include "base/util/logging.h"
@@ -27,6 +27,9 @@
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+using namespace math;  // NOLINT
+
 namespace {
 
 const HardwareSettings& TestGPU() {
@@ -51,7 +54,7 @@ const HardwareSettings& TestGPU() {
 }
 
 TEST_CASE("Bound check convolution edged", "[bound]") {
-  Polynomial x("x"), i("i");
+  Polynomial<Rational> x("x"), i("i");
   std::vector<RangeConstraint> cons = {{x, 5}, {x + i, 7}, {i, 3}};
   IndexBounds out;
   std::vector<SimpleConstraint> rcons;
@@ -65,7 +68,7 @@ TEST_CASE("Bound check convolution edged", "[bound]") {
 }
 
 TEST_CASE("Bound check convolution equal sized", "[bound]") {
-  Polynomial x("x"), i("i");
+  Polynomial<Rational> x("x"), i("i");
   std::vector<RangeConstraint> cons = {{x, 7}, {x + i, 7}, {i + 1, 3}};
   IndexBounds out;
   std::vector<SimpleConstraint> rcons;
@@ -132,21 +135,21 @@ TEST_CASE("Subdivision 1D input width 2**n", "[subdivision]") {
 TEST_CASE("Awkward Flatten") {
   Parser p;
   Contraction c = p.ParseContraction("X_T10[24*n0 + 8*n1 + 4*n2 + n3 : 168] = +(X_I_0[n0, n1, n2, n3])");
-  FlatContraction f =
-      Compile(c, {
-                     SimpleShape(DataType::FLOAT32, {168}), SimpleShape(DataType::FLOAT32, {7, 3, 2, 4}),
-                 });
+  FlatContraction f = Compile(c, {
+                                     SimpleShape(DataType::FLOAT32, {168}),
+                                     SimpleShape(DataType::FLOAT32, {7, 3, 2, 4}),
+                                 });
   IVLOG(1, "Flat:\n" << f.toString());
 }
 
 TEST_CASE("Optimization of Convolution", "[conv_opt][opt]") {
   Parser p;
   auto c = p.ParseContraction("O[n, x, y, co] = +(K[i, j, co, ci] * I[n, x+i, y+j, ci])");
-  FlatContraction op = Flatten(
-      c, {
-             SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}), SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
-             SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
-         });
+  FlatContraction op = Flatten(c, {
+                                      SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}),
+                                      SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
+                                      SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
+                                  });
   IVLOG(1, "Flat:\n" << op.toString());
   auto settings = TestGPU();
   auto vectorized_op = Vectorize(op, settings.vec_size);
@@ -160,11 +163,11 @@ TEST_CASE("Optimization of Convolution", "[conv_opt][opt]") {
 TEST_CASE("Vectorized Flop Computation", "[conv_opt][opt]") {
   Parser p;
   auto c = p.ParseContraction("O[n, x, y, co] = +(K[i, j, co, ci] * I[n, x+i, y+j, ci])");
-  FlatContraction op = Flatten(
-      c, {
-             SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}), SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
-             SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
-         });
+  FlatContraction op = Flatten(c, {
+                                      SimpleShape(DataType::FLOAT32, {128, 25, 25, 384}),
+                                      SimpleShape(DataType::FLOAT32, {3, 3, 384, 256}),
+                                      SimpleShape(DataType::FLOAT32, {128, 27, 27, 256}),
+                                  });
   uint64_t ops = 128ll * 3 * 3 * 25 * 25 * 384 * 256 * 2;
   auto settings = TestGPU();
   auto vectorized_gpu = TestGPU();
@@ -220,7 +223,8 @@ TEST_CASE("Compile unpool overlap", "[compile][unpool]") {
   Parser p;
   Contraction c = p.ParseContraction("O[2*x + i] = +(I[x]), i < 4");
   std::vector<TensorShape> shapes = {
-      {DataType::FLOAT32, {{1, 100UL}}}, {DataType::FLOAT32, {{1, 50UL}}},
+      {DataType::FLOAT32, {{1, 100UL}}},
+      {DataType::FLOAT32, {{1, 50UL}}},
   };
   FlatContraction r = Compile(c, shapes);
   REQUIRE(r.names == (std::vector<std::string>{"v0_0", "v0_1", "v1_0"}));
@@ -241,7 +245,8 @@ TEST_CASE("Compile unpool clean", "[compile][unpool]") {
   Parser p;
   Contraction c = p.ParseContraction("O[2*x + i] = +(I[x]), i < 2");
   std::vector<TensorShape> shapes = {
-      {DataType::FLOAT32, {{1, 100UL}}}, {DataType::FLOAT32, {{1, 50UL}}},
+      {DataType::FLOAT32, {{1, 100UL}}},
+      {DataType::FLOAT32, {{1, 50UL}}},
   };
   FlatContraction r = Compile(c, shapes);
   REQUIRE(r.names == (std::vector<std::string>{"v0_0", "v0_1"}));
@@ -260,7 +265,8 @@ TEST_CASE("Compile strided convolution derivate", "[compile][conv_d]") {
   Parser p;
   Contraction c = p.ParseContraction("DA[n, i + x, j + 2*y, ci] = +(DC[n, x, y, co] * B[i, j, ci, co])");
   std::vector<TensorShape> shapes = {
-      SimpleShape(DataType::FLOAT32, {1, 3, 6, 1}), SimpleShape(DataType::FLOAT32, {1, 2, 3, 1}),
+      SimpleShape(DataType::FLOAT32, {1, 3, 6, 1}),
+      SimpleShape(DataType::FLOAT32, {1, 2, 3, 1}),
       SimpleShape(DataType::FLOAT32, {2, 2, 1, 1}),
   };
   FlatContraction r = Compile(c, shapes);
@@ -281,7 +287,7 @@ TEST_CASE("Flatten wacky matrix multiply type thing", "[flatten]") {
   Contraction c(2);
   c.comb_op = CombinationOp::MULTIPLY;
   c.agg_op = AggregationOp::SUM;
-  Polynomial i("i"), j("j"), k("k");
+  Polynomial<Rational> i("i"), j("j"), k("k");
   c.specs[0].spec = {i, j};
   c.specs[1].spec = {i + 2, k};
   c.specs[2].spec = {k, j};
@@ -337,7 +343,7 @@ TEST_CASE("Two outputs", "[multiout]") {
 }
 
 TEST_CASE("Gausian Elimination 1", "[reduce]") {
-  Polynomial i("i"), j("j"), k("k"), x("x"), y("y");
+  Polynomial<Rational> i("i"), j("j"), k("k"), x("x"), y("y");
   Contraction op(2);
   op.specs[0].spec = {k + j, 2 * x + i + 3, j - x, 2 * k + 2 * j};
   op.specs[1].spec = {5 * i, -3 * j + x, y};
@@ -348,7 +354,7 @@ TEST_CASE("Gausian Elimination 1", "[reduce]") {
 }
 
 TEST_CASE("Doc examples", "[doc]") {
-  Polynomial i("i"), j("j"), k("k");
+  Polynomial<Rational> i("i"), j("j"), k("k");
   Contraction op(2);
   op.specs[0].spec = {k, 2 * k + 5, k - 2 * j};
   op.specs[1].spec = {5 * i - 2, -3 * j};
@@ -367,7 +373,7 @@ TEST_CASE("Doc examples", "[doc]") {
 }
 
 TEST_CASE("MatMulBadGrad", "[reduce]") {
-  Polynomial i("i"), y("y"), x("x");
+  Polynomial<Rational> i("i"), y("y"), x("x");
   Contraction op(2);
 
   op.specs[0].spec = {y, i};
@@ -434,7 +440,7 @@ TEST_CASE("Function", "[parsing]") {
   REQUIRE(prog.ops[0].output == "B");
 }
 
-TEST_CASE("Naked Polynomial", "[parsing]") {
+TEST_CASE("Naked Polynomial<Rational>", "[parsing]") {
   Parser parser;
   REQUIRE(parser.ParsePolynomial("3*x-i+4").toString() == "4 - i + 3*x");
   REQUIRE(parser.ParsePolynomial("x*3-i+4").toString() == "4 - i + 3*x");
@@ -517,7 +523,8 @@ TEST_CASE("Ast", "[ast]") {
   auto f = _Function("factorial", idxType, {{idxType, "n"}},
                      {_DeclareConst(idxType, "r", 1),
                       _Block({
-                          _DeclareConst(idxType, "i", 1), _While(i <= n, _Block({r = r * i, i = i + 1})),
+                          _DeclareConst(idxType, "i", 1),
+                          _While(i <= n, _Block({r = r * i, i = i + 1})),
                       }),
                       _Return(r)});
 

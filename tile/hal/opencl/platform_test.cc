@@ -1,4 +1,4 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 
 #include <gtest/gtest.h>
 
@@ -11,62 +11,62 @@ namespace testing {
 namespace {
 
 Param supported_params[] = {
-    {lang::DataType::INT8, 1},   //
-    {lang::DataType::INT8, 2},   //
-    {lang::DataType::INT8, 4},   //
-    {lang::DataType::INT8, 8},   //
-    {lang::DataType::INT8, 16},  //
+    {DataType::INT8, 1},   //
+    {DataType::INT8, 2},   //
+    {DataType::INT8, 4},   //
+    {DataType::INT8, 8},   //
+    {DataType::INT8, 16},  //
 
-    {lang::DataType::INT16, 1},   //
-    {lang::DataType::INT16, 2},   //
-    {lang::DataType::INT16, 4},   //
-    {lang::DataType::INT16, 8},   //
-    {lang::DataType::INT16, 16},  //
+    {DataType::INT16, 1},   //
+    {DataType::INT16, 2},   //
+    {DataType::INT16, 4},   //
+    {DataType::INT16, 8},   //
+    {DataType::INT16, 16},  //
 
-    {lang::DataType::INT32, 1},   //
-    {lang::DataType::INT32, 2},   //
-    {lang::DataType::INT32, 4},   //
-    {lang::DataType::INT32, 8},   //
-    {lang::DataType::INT32, 16},  //
+    {DataType::INT32, 1},   //
+    {DataType::INT32, 2},   //
+    {DataType::INT32, 4},   //
+    {DataType::INT32, 8},   //
+    {DataType::INT32, 16},  //
 
-    {lang::DataType::INT64, 1},  //
-    {lang::DataType::INT64, 2},  //
+    {DataType::INT64, 1},  //
+    {DataType::INT64, 2},  //
 
-    {lang::DataType::UINT8, 1},   //
-    {lang::DataType::UINT8, 2},   //
-    {lang::DataType::UINT8, 4},   //
-    {lang::DataType::UINT8, 8},   //
-    {lang::DataType::UINT8, 16},  //
+    {DataType::UINT8, 1},   //
+    {DataType::UINT8, 2},   //
+    {DataType::UINT8, 4},   //
+    {DataType::UINT8, 8},   //
+    {DataType::UINT8, 16},  //
 
-    {lang::DataType::UINT16, 1},   //
-    {lang::DataType::UINT16, 2},   //
-    {lang::DataType::UINT16, 4},   //
-    {lang::DataType::UINT16, 8},   //
-    {lang::DataType::UINT16, 16},  //
+    {DataType::UINT16, 1},   //
+    {DataType::UINT16, 2},   //
+    {DataType::UINT16, 4},   //
+    {DataType::UINT16, 8},   //
+    {DataType::UINT16, 16},  //
 
-    {lang::DataType::UINT32, 1},   //
-    {lang::DataType::UINT32, 2},   //
-    {lang::DataType::UINT32, 4},   //
-    {lang::DataType::UINT32, 8},   //
-    {lang::DataType::UINT32, 16},  //
+    {DataType::UINT32, 1},   //
+    {DataType::UINT32, 2},   //
+    {DataType::UINT32, 4},   //
+    {DataType::UINT32, 8},   //
+    {DataType::UINT32, 16},  //
 
-    {lang::DataType::UINT64, 1},  //
-    {lang::DataType::UINT64, 2},  //
+    {DataType::UINT64, 1},  //
+    {DataType::UINT64, 2},  //
 
-    {lang::DataType::FLOAT16, 1},   //
-    {lang::DataType::FLOAT16, 2},   //
-    {lang::DataType::FLOAT16, 4},   //
-    {lang::DataType::FLOAT16, 8},   //
-    {lang::DataType::FLOAT16, 16},  //
+    {DataType::FLOAT16, 1},   //
+    {DataType::FLOAT16, 2},   //
+    {DataType::FLOAT16, 4},   //
+    {DataType::FLOAT16, 8},   //
+    {DataType::FLOAT16, 16},  //
 
-    {lang::DataType::FLOAT32, 1},   //
-    {lang::DataType::FLOAT32, 2},   //
-    {lang::DataType::FLOAT32, 4},   //
-    {lang::DataType::FLOAT32, 8},   //
-    {lang::DataType::FLOAT32, 16},  //
+    {DataType::FLOAT32, 1},   //
+    {DataType::FLOAT32, 2},   //
+    {DataType::FLOAT32, 4},   //
+    {DataType::FLOAT32, 8},   //
+    {DataType::FLOAT32, 16},  //
 
-    {lang::DataType::FLOAT64, 1},  //
-    {lang::DataType::FLOAT64, 2},  //
+    {DataType::FLOAT64, 1},  //
+    {DataType::FLOAT64, 2},  //
 };
 
 std::vector<FactoryParam> SupportedParams() {

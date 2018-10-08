@@ -1,11 +1,15 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 
 #pragma once
 
+#include <list>
 #include <map>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "tile/platform/local_machine/scheduler.h"
 
@@ -16,7 +20,7 @@ namespace fifo_scheduler {
 
 // Tracks the state of an alloc-to-be-created.
 struct Loc {
-  Loc(std::uint64_t byte_size_, bool is_io_ = false) : byte_size{byte_size_}, is_io{is_io_} {}
+  explicit Loc(std::uint64_t byte_size_, bool is_io_ = false) : byte_size{byte_size_}, is_io{is_io_} {}
   std::uint64_t byte_size;
   bool is_io;
   bool is_host = false;
@@ -143,7 +147,7 @@ class RunnableStepsIterator final {
   bool operator!=(const RunnableStepsIterator& other) const noexcept { return !(*this == other); }
   PendingStep* operator*() const { return pending_->at(pos_); }
   RunnableStepsIterator& operator++() noexcept;
-  RunnableStepsIterator operator++(int)noexcept {
+  RunnableStepsIterator operator++(int) noexcept {
     RunnableStepsIterator res{*this};
     ++*this;
     return res;

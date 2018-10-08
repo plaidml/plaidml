@@ -10,9 +10,9 @@
 #include <vector>
 
 #include "base/util/intern.h"
+#include "tile/base/shape.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/type.h"
 
 namespace vertexai {
@@ -149,14 +149,12 @@ class ContractionValue final : public Value {
                                      const std::vector<SymbolicSpec>& specs,
                                      const std::vector<ValueConstraint>& constraints,
                                      const std::vector<std::shared_ptr<Value>>& inputs,
-                                     const std::vector<std::shared_ptr<Value>>& dims,
-                                     bool use_default,
+                                     const std::vector<std::shared_ptr<Value>>& dims, bool use_default,
                                      bool no_defract);
 
   ContractionValue(CombinationOp comb_op, AggregationOp agg_op, const std::vector<SymbolicSpec>& specs,
                    const std::vector<ValueConstraint>& constraints, const std::vector<std::shared_ptr<Value>>& inputs,
-                   const std::vector<std::shared_ptr<Value>>& dims, bool use_default,
-                   bool no_defract)
+                   const std::vector<std::shared_ptr<Value>>& dims, bool use_default, bool no_defract)
       : comb_op_{comb_op},
         agg_op_{agg_op},
         specs_{specs},
@@ -221,6 +219,7 @@ class ValueVisitor {
 };
 
 struct RunInfo {
+  std::string program_name;
   std::string code;
   ShapeMap input_shapes;
   ShapeMap output_shapes;

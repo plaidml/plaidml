@@ -1,14 +1,14 @@
 
 #include "base/util/catch.h"
 #include "base/util/logging.h"
-#include "tile/lang/basis.h"
-#include "tile/lang/bignum.h"
-#include "tile/lang/matrix.h"
-#include "tile/lang/polynomial.h"
+#include "tile/math/basis.h"
+#include "tile/math/bignum.h"
+#include "tile/math/matrix.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 TEST_CASE("Ceil", "[lattice]") {
   REQUIRE(Ceil(Rational(5, 3)) == 2);
@@ -67,7 +67,7 @@ TEST_CASE("XGCD", "[lattice]") {
 }
 
 TEST_CASE("From Poly Test", "[matrix][fromPoly]") {
-  Polynomial x("x"), y("y"), z("z");
+  Polynomial<Rational> x("x"), y("y"), z("z");
   Matrix m;
   Vector v;
   std::tie(m, v) = FromPolynomials({{x + 5}, {3 * y - 2 * z}, {-x + z - 2}});
@@ -104,16 +104,16 @@ TEST_CASE("Inversion Test (Singular)", "[matrix][invert]") {
   REQUIRE(m.invert() == false);
 }
 
-TEST_CASE("Basic Polynomial compilation", "[]") {
-  Polynomial i("i"), j("j"), k("k");
-  Polynomial x = 3 * i - j + 17;
-  Polynomial y = -x / 3 + k;
+TEST_CASE("Basic Polynomial<Rational> compilation", "[]") {
+  Polynomial<Rational> i("i"), j("j"), k("k");
+  Polynomial<Rational> x = 3 * i - j + 17;
+  Polynomial<Rational> y = -x / 3 + k;
   REQUIRE(to_string(y) == "-17/3 - i + 1/3*j + k");
 }
 
-TEST_CASE("Basic Polynomial evaluation", "[]") {
-  Polynomial a0("a0"), a1("a1");
-  Polynomial r = a0 + 3 * a1 + 1;
+TEST_CASE("Basic Polynomial<Rational> evaluation", "[]") {
+  Polynomial<Rational> a0("a0"), a1("a1");
+  Polynomial<Rational> r = a0 + 3 * a1 + 1;
   REQUIRE(to_string(r) == "1 + a0 + 3*a1");
   REQUIRE(r.eval({{"a0", 5}, {"a1", 9}}) == 33);
 }
@@ -141,7 +141,7 @@ TEST_CASE("HNFMatrix Low Rank ", "[hnf]") {
 }
 
 TEST_CASE("Basis reduction test", "[basis]") {
-  Polynomial x("x"), y("y"), i("i"), j("j");
+  Polynomial<Rational> x("x"), y("y"), i("i"), j("j");
   BasisBuilder bb;
   bool r;
   r = bb.addEquation(2 * x + 3 * i);
@@ -152,6 +152,6 @@ TEST_CASE("Basis reduction test", "[basis]") {
   REQUIRE(r == false);
 }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

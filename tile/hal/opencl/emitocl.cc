@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/opencl/emitocl.h"
 
@@ -21,7 +21,7 @@ static std::map<std::string, std::string> FuncNameMap = {
 void Emit::Visit(const sem::LoadExpr& n) {
   auto ty = TypeOf(n.inner);
   auto inner = std::dynamic_pointer_cast<sem::SubscriptLVal>(n.inner);
-  if (!cl_khr_fp16_ && inner && ty.dtype == lang::DataType::FLOAT16) {
+  if (!cl_khr_fp16_ && inner && ty.dtype == DataType::FLOAT16) {
     // Half-width floats can't be loaded directly on this device.
     if (ty.vec_width == 1) {
       emit("vload_half");
@@ -41,7 +41,7 @@ void Emit::Visit(const sem::LoadExpr& n) {
 void Emit::Visit(const sem::StoreStmt& n) {
   auto ty_lhs = TypeOf(n.lhs);
   auto lhs = std::dynamic_pointer_cast<sem::SubscriptLVal>(n.lhs);
-  if (!cl_khr_fp16_ && lhs && ty_lhs.dtype == lang::DataType::FLOAT16) {
+  if (!cl_khr_fp16_ && lhs && ty_lhs.dtype == DataType::FLOAT16) {
     // Half-width floats can't be stored directly on this device.
     emitTab();
     if (ty_lhs.vec_width == 1) {
@@ -73,19 +73,19 @@ void Emit::Visit(const sem::DeclareStmt& n) {
   }
 
   if (ty.base == sem::Type::VALUE) {
-    if (ty.dtype == lang::DataType::FLOAT16 && !cl_khr_fp16_) {
-      ty.dtype = lang::DataType::FLOAT32;
-    } else if (ty.dtype == lang::DataType::BOOLEAN) {
+    if (ty.dtype == DataType::FLOAT16 && !cl_khr_fp16_) {
+      ty.dtype = DataType::FLOAT32;
+    } else if (ty.dtype == DataType::BOOLEAN) {
       if (n.init) {
         ty.dtype = lang::Promote({init_type}).dtype;
-        if (ty.dtype == lang::DataType::BOOLEAN) {
+        if (ty.dtype == DataType::BOOLEAN) {
           // If the initializer was booleans, make it INT8.
-          ty.dtype = lang::DataType::INT8;
+          ty.dtype = DataType::INT8;
         }
       } else {
         // Assume that this is being initialized from an inter-kernel
         // boolean tensor -- which, in OpenCL, we represent as INT8.
-        ty.dtype = lang::DataType::INT8;
+        ty.dtype = DataType::INT8;
       }
     }
   }
@@ -168,7 +168,7 @@ void Emit::Visit(const sem::ClampExpr& n) {
   if (ty_val.base == sem::Type::VALUE) {
     ty_clamp.dtype = ty_val.dtype;
   } else {
-    ty_clamp.dtype = lang::DataType::INT32;
+    ty_clamp.dtype = DataType::INT32;
   }
   if (ty_min.vec_width != 1) {
     ty_clamp.vec_width = ty_min.vec_width;
@@ -251,9 +251,9 @@ void Emit::Visit(const sem::Function& n) {
 
   for (const auto& p : n.params) {
     auto ty = p.first;
-    if (ty.dtype == lang::DataType::BOOLEAN) {
+    if (ty.dtype == DataType::BOOLEAN) {
       // Global booleans are stored as INT8.
-      ty.dtype = lang::DataType::INT8;
+      ty.dtype = DataType::INT8;
     }
     CheckValidType(ty);
     scope.Bind(p.second, ty);
@@ -271,16 +271,16 @@ void Emit::Visit(const sem::Function& n) {
       emit(", ");
     }
     auto ty = p.first;
-    if (!cl_khr_fp16_ && ty.dtype == lang::DataType::FLOAT16) {
+    if (!cl_khr_fp16_ && ty.dtype == DataType::FLOAT16) {
       // The device can only use half-width floats as a pointer type, not as a value
       // or a vector element type.  We'll use vloada_half and vstorea_half to access
       // the memory, but the parameter must be declared with a vector width of 1.
       // Note that what's stored in the scope must have the original vector width,
       // which is why we set up the scope using a separate loop.
       ty.vec_width = 1;
-    } else if (ty.dtype == lang::DataType::BOOLEAN) {
+    } else if (ty.dtype == DataType::BOOLEAN) {
       // Global booleans are stored as INT8.
-      ty.dtype = lang::DataType::INT8;
+      ty.dtype = DataType::INT8;
     }
     emitType(ty);
     emit(" ");
@@ -299,7 +299,7 @@ void Emit::CheckValidType(const sem::Type& ty) {
   if (ty.base == sem::Type::TVOID || ty.base == sem::Type::INDEX) {
     return;
   }
-  if (ty.dtype == lang::DataType::FLOAT64) {
+  if (ty.dtype == DataType::FLOAT64) {
     throw error::Unimplemented{"The device does not support 64-bit floating-point types"};
   }
 }
@@ -347,25 +347,25 @@ void Emit::EmitWithWidthConversion(const sem::Type& from, const sem::Type& to, c
   // Based on the target type, convert to the appropriate condition type.
   sem::Type condition_type = to;
   switch (condition_type.dtype) {
-    case lang::DataType::BOOLEAN:
-    case lang::DataType::INT8:
-    case lang::DataType::UINT8:
-      condition_type.dtype = lang::DataType::INT8;
+    case DataType::BOOLEAN:
+    case DataType::INT8:
+    case DataType::UINT8:
+      condition_type.dtype = DataType::INT8;
       break;
-    case lang::DataType::INT16:
-    case lang::DataType::UINT16:
-    case lang::DataType::FLOAT16:
-      condition_type.dtype = lang::DataType::INT16;
+    case DataType::INT16:
+    case DataType::UINT16:
+    case DataType::FLOAT16:
+      condition_type.dtype = DataType::INT16;
       break;
-    case lang::DataType::INT32:
-    case lang::DataType::UINT32:
-    case lang::DataType::FLOAT32:
-      condition_type.dtype = lang::DataType::INT32;
+    case DataType::INT32:
+    case DataType::UINT32:
+    case DataType::FLOAT32:
+      condition_type.dtype = DataType::INT32;
       break;
-    case lang::DataType::INT64:
-    case lang::DataType::UINT64:
-    case lang::DataType::FLOAT64:
-      condition_type.dtype = lang::DataType::INT64;
+    case DataType::INT64:
+    case DataType::UINT64:
+    case DataType::FLOAT64:
+      condition_type.dtype = DataType::INT64;
       break;
     default:
       break;

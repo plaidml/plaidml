@@ -1,6 +1,6 @@
-# Copyright 2017, Vertex.AI.
+# Copyright 2018, Intel Corp.
 
-load("//bzl:plaidml.bzl", "plaidml_cc_library")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_proto_library")
 
 plaidml_cc_library(
     name = "base",
@@ -15,18 +15,17 @@ plaidml_cc_library(
         "namespaces.h",
         "platform.h",
         "program.h",
+        "shape.h",
         "validate.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//base/context",
         "//base/util",
-        "//tile/lang",
-        "//tile/proto:proto_cc",
-        "@boost_archive//:boost",
-        "@boost_archive//:thread",
-        "@com_github_gflags_gflags//:gflags",
-        "@easylogging_repo//:easylogging",
+        "@boost",
+        "@boost//:thread",
+        "@easylogging",
+        "@gflags",
     ],
 )
 
@@ -41,16 +40,14 @@ plaidml_cc_library(
         "//base/context",
         "//tile/lang",
         "//tile/proto:hal_cc",
-        "@boost_archive//:thread",
+        "@boost//:thread",
     ],
 )
 
 plaidml_cc_library(
     name = "schedule",
     srcs = ["schedule.cc"],
-    hdrs = [
-        "schedule.h",
-    ],
+    hdrs = ["schedule.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/context",
@@ -67,6 +64,7 @@ plaidml_cc_library(
     deps = [
         ":base",
         "//tile/lang",
+        "//tile/proto:support",
     ],
 )
 
@@ -80,8 +78,8 @@ plaidml_cc_library(
         ":base",
         "//testing:matchers",
         "//tile/proto:support",
-        "@gmock_archive//:gtest",
-        "@half_repo//:half",
+        "@gmock//:gtest",
+        "@half",
     ],
     alwayslink = True,
 )

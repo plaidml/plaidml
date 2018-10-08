@@ -1,4 +1,4 @@
-# Copyright 2017, Vertex.AI.
+# Copyright 2017-2018 Intel Corporation.
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
@@ -12,6 +12,8 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
+        "//tile/lang",
         "//tile/proto:metadata_cc",
+        "//tile/proto:proto_cc",
     ],
 )

@@ -1,4 +1,4 @@
-# Copyright 2017, Vertex.AI.
+# Copyright 2017-2018 Intel Corporation.
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
@@ -9,8 +9,8 @@ plaidml_cc_library(
     srcs = ["selector.cc"],
     hdrs = ["selector.h"],
     deps = [
-        "@boost_archive//:regex",
         "//tile/proto:hal_cc",
+        "@boost//:regex",
     ],
 )
 

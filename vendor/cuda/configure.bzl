@@ -39,7 +39,7 @@ def _is_windows(ctx):
     """Returns true if the host operating system is windows."""
     return get_cpu_value(ctx) == "Windows"
 
-def _lib_name(lib, cpu_value, version="", static=False):
+def _lib_name(lib, cpu_value, version = "", static = False):
     """Constructs the platform-specific name of a library.
 
     Args:
@@ -68,13 +68,13 @@ def _lib_name(lib, cpu_value, version="", static=False):
         return "lib%s%s.dylib" % (lib, version)
     fail("Invalid cpu_value: %s" % cpu_value)
 
-def _tpl(ctx, tpl, substitutions={}, out=None):
+def _tpl(ctx, tpl, substitutions = {}, out = None):
     if not out:
         out = tpl.replace(":", "/")
     ctx.template(
         out,
-        Label("@vertexai_plaidml//vendor/cuda:%s.tpl" % tpl),
-        substitutions
+        Label("@com_intel_plaidml//vendor/cuda:%s.tpl" % tpl),
+        substitutions,
     )
 
 def _cuda_toolkit_path(ctx):
@@ -100,7 +100,7 @@ def _get_cuda_config(ctx):
     return struct(
         cuda_toolkit_path = cuda_toolkit_path,
         # compute_capabilities = _compute_capabilities(ctx),
-        cpu_value = cpu_value
+        cpu_value = cpu_value,
     )
 
 def _find_cuda_include_path(ctx, cuda_config):
@@ -128,14 +128,14 @@ def _create_dummy_repository(ctx):
         "%{cuda_driver_lib}": _lib_name("cuda", cpu_value),
         "%{nvrtc_lib}": _lib_name("nvrtc", cpu_value),
         "%{nvrtc_builtins_lib}": _lib_name("nvrtc-builtins", cpu_value),
-        "%{cuda_include_genrules}": '',
-        "%{cuda_headers}": '',
+        "%{cuda_include_genrules}": "",
+        "%{cuda_headers}": "",
     })
 
     ctx.file("include/cuda.h", "")
     ctx.file("lib/%s" % _lib_name("cuda", cpu_value))
 
-def _find_cuda_lib(lib, ctx, cpu_value, basedir, version="", static=False):
+def _find_cuda_lib(lib, ctx, cpu_value, basedir, version = "", static = False):
     """Finds the given CUDA or cuDNN library on the system.
 
     Args:
@@ -155,7 +155,7 @@ def _find_cuda_lib(lib, ctx, cpu_value, basedir, version="", static=False):
     for relative_path in CUDA_LIB_PATHS:
         path = ctx.path("%s/%s%s" % (basedir, relative_path, file_name))
         if path.exists:
-            return struct(file_name=file_name, path=str(path.realpath))
+            return struct(file_name = file_name, path = str(path.realpath))
     fail("Cannot find cuda library %s" % file_name)
 
 def _find_libs(ctx, cuda_config):
@@ -175,7 +175,7 @@ def _find_libs(ctx, cuda_config):
         "nvrtc_builtins": _find_cuda_lib("nvrtc-builtins", ctx, cpu_value, cuda_config.cuda_toolkit_path),
     }
 
-def _execute(ctx, cmdline, error_msg=None, error_details=None, empty_stdout_fine=False):
+def _execute(ctx, cmdline, error_msg = None, error_details = None, empty_stdout_fine = False):
     """Executes an arbitrary shell command.
 
     Args:
@@ -194,7 +194,9 @@ def _execute(ctx, cmdline, error_msg=None, error_details=None, empty_stdout_fine
             "\n".join([
                 error_msg.strip() if error_msg else "Repository command failed",
                 result.stderr.strip(),
-                error_details if error_details else ""]))
+                error_details if error_details else "",
+            ]),
+        )
     return result
 
 def _read_dir(ctx, src_dir):
@@ -207,15 +209,20 @@ def _read_dir(ctx, src_dir):
     if _is_windows(ctx):
         src_dir = src_dir.replace("/", "\\")
         find_result = _execute(
-            ctx, ["cmd.exe", "/c", "dir", src_dir, "/b", "/s", "/a-d"],
-            empty_stdout_fine=True)
+            ctx,
+            ["cmd.exe", "/c", "dir", src_dir, "/b", "/s", "/a-d"],
+            empty_stdout_fine = True,
+        )
+
         # src_files will be used in genrule.outs where the paths must
         # use forward slashes.
         result = find_result.stdout.replace("\\", "/")
     else:
         find_result = _execute(
-            ctx, ["find", src_dir, "-follow", "-type", "f"],
-            empty_stdout_fine=True)
+            ctx,
+            ["find", src_dir, "-follow", "-type", "f"],
+            empty_stdout_fine = True,
+        )
         result = find_result.stdout
     return result
 
@@ -235,24 +242,26 @@ def symlink_genrule_for_dir(ctx, src_dir, dest_dir, genrule_name, src_files = []
     if src_dir != None:
         src_dir = _norm_path(src_dir)
         dest_dir = _norm_path(dest_dir)
-        files = '\n'.join(sorted(_read_dir(ctx, src_dir).splitlines()))
+        files = "\n".join(sorted(_read_dir(ctx, src_dir).splitlines()))
+
         # Create a list with the src_dir stripped to use for outputs.
-        dest_files = files.replace(src_dir, '').splitlines()
+        dest_files = files.replace(src_dir, "").splitlines()
         src_files = files.splitlines()
     command = []
+
     # We clear folders that might have been generated previously to avoid undesired inclusions
-    if genrule_name == 'cuda-include':
+    if genrule_name == "cuda-include":
         command.append('if [ -d "$(@D)/cuda/include" ]; then rm -rf $(@D)/cuda/include; fi')
-    elif genrule_name == 'cuda-lib':
+    elif genrule_name == "cuda-lib":
         command.append('if [ -d "$(@D)/cuda/lib" ]; then rm -rf $(@D)/cuda/lib; fi')
     outs = []
     for i in range(len(dest_files)):
         if dest_files[i] != "":
             # If we have only one file to link we do not want to use the dest_dir, as
             # $(@D) will include the full path to the file.
-            dest = '$(@D)/' + dest_dir + dest_files[i] if len(dest_files) != 1 else '$(@D)/' + dest_files[i]
-            command.append('mkdir -p $$(dirname {})'.format(dest))
-            command.append('cp -f "{}" "{}"'.format(src_files[i] , dest))
+            dest = "$(@D)/" + dest_dir + dest_files[i] if len(dest_files) != 1 else "$(@D)/" + dest_files[i]
+            command.append("mkdir -p $$(dirname {})".format(dest))
+            command.append('cp -f "{}" "{}"'.format(src_files[i], dest))
             outs.append('        "{}{}",'.format(dest_dir, dest_files[i]))
     return _genrule(src_dir, genrule_name, command, outs)
 
@@ -261,16 +270,16 @@ def _genrule(src_dir, genrule_name, command, outs):
 
     Genrule executes the given command and produces the given outputs.
     """
-    return '\n'.join([
-        'genrule(',
+    return "\n".join([
+        "genrule(",
         '    name = "{}",'.format(genrule_name),
-        '    outs = [',
+        "    outs = [",
     ] + outs + [
-        '    ],',
+        "    ],",
         '    cmd = """',
     ] + command + [
         '    """,',
-        ')'
+        ")",
     ])
 
 def _create_cuda_repository(ctx):
@@ -297,13 +306,13 @@ def _create_cuda_repository(ctx):
         "%{cuda_driver_lib}": cuda_libs["cuda"].file_name,
         "%{nvrtc_lib}": cuda_libs["nvrtc"].file_name,
         "%{nvrtc_builtins_lib}": cuda_libs["nvrtc_builtins"].file_name,
-        "%{cuda_include_genrules}": '\n'.join(genrules),
+        "%{cuda_include_genrules}": "\n".join(genrules),
         "%{cuda_headers}": '":cuda-include",',
     })
 
 def _configure_cuda_impl(ctx):
-    enable_cuda = ctx.os.environ.get(_VAI_NEED_CUDA, '0').strip()
-    if enable_cuda == '1':
+    enable_cuda = ctx.os.environ.get(_VAI_NEED_CUDA, "0").strip()
+    if enable_cuda == "1":
         _create_cuda_repository(ctx)
     else:
         _create_dummy_repository(ctx)

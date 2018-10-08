@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 
 package(default_visibility = ["//visibility:public"])
 
@@ -8,12 +8,12 @@ load(
     "plaidml_cc_binary",
     "plaidml_cc_library",
     "plaidml_cc_test",
+    "plaidml_cc_version",
     "plaidml_proto_library",
     "plaidml_py_library",
     "plaidml_py_wheel",
-    "plaidml_cc_version",
 )
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_deb", "pkg_tar")
 load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
 
 exports_files(["requirements.txt"])
@@ -46,10 +46,12 @@ plaidml_cc_library(
         "//plaidml/base",
         "//tile/base",
         "//tile/base:program_cache",
+        "//tile/stripe",
         "//tile/platform/local_machine",
-        "//tile/proto:proto_cc",
-        "@half_repo//:half",
-        "@minizip_repo//:minizip",
+        "//tile/proto:metadata_cc",
+        "@boost//:filesystem",
+        "@half",
+        "@minizip",
     ] + select({
         "@toolchain//:linux_arm_32v7": [
             "//tile/hal/opencl",
@@ -72,6 +74,7 @@ plaidml_cc_library(
     }) + if_cuda_is_configured([
         "//tile/hal/cuda",
     ]),
+    alwayslink = 1,
 )
 
 # The PLAIDML C library, defined as a Bazel dynamically-loaded library.
@@ -100,6 +103,14 @@ plaidml_cc_binary(
     ],
 )
 
+apple_binary(
+    name = "libplaidml.dylib",
+    platform_type = "macos",
+    binary_type = "dylib",
+    deps = [":api"],
+    tags = ["darwin"],
+)
+
 plaidml_cc_library(
     name = "api_cc_deps",
     visibility = ["//visibility:private"],
@@ -107,7 +118,7 @@ plaidml_cc_library(
         ":proto_cc",
         "//tile/base",
         "//tile/base:program_cache",
-        "//tile/proto:proto_cc",
+        "//tile/stripe",
     ],
 )
 
@@ -196,14 +207,14 @@ genrule(
 conda_binary(
     name = "enumerate",
     srcs = ["enumerate.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     deps = [":py"],
 )
 
 conda_binary(
     name = "setup",
     srcs = ["plaidml_setup.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     main = "plaidml_setup.py",
     deps = [":py"],
 )
@@ -229,7 +240,7 @@ plaidml_py_library(
 conda_test(
     name = "settings_test",
     srcs = ["settings_test.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     deps = [
         ":py",
     ],
@@ -238,7 +249,7 @@ conda_test(
 conda_test(
     name = "py_plaidml_test",
     srcs = ["plaidml_test.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     main = "plaidml_test.py",
     deps = [
         ":py",
@@ -249,7 +260,7 @@ conda_test(
 conda_test(
     name = "py_tile_test",
     srcs = ["tile_test.py"],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     main = "tile_test.py",
     deps = [
         ":py",
@@ -326,24 +337,43 @@ pkg_tar(
 )
 
 pkg_tar(
+    name = "macos_sdk_bin",
+    srcs = [
+        "update_sdk_rpaths"
+    ],
+    package_dir = "bin",
+    tags = ["darwin"],
+)
+
+pkg_tar(
     name = "sdk_libs",
     srcs = select({
         "@toolchain//:windows_x86_64": [":plaidml.dll"],
+        "@toolchain//:macos_x86_64": [":libplaidml.dylib"],
         "//conditions:default": ["libplaidml.so"],
     }),
     package_dir = "lib",
+    symlinks = select({
+        "@toolchain//:macos_x86_64": {
+            "lib/libplaidml.dylib": "libplaidml.dylib_lipobin",
+        },
+        "//conditions:default": {},
+    }),
 )
 
 pkg_tar(
     name = "sdk",
     srcs = ["plaidml-config.cmake"],
+    # TODO: Build package_dir from the --define=version= config setting.
+    package_dir = "plaidml-0.5.0",
     deps = [
         ":sdk_configs",
         ":sdk_includes",
         ":sdk_libs",
         "//plaidml/base:sdk_includes",
-        "@half_repo//:sdk_includes",
-    ],
-    # TODO: Build package_dir from the --define=version= config setting.
-    package_dir = "plaidml-0.5.0",
+        "@half//:sdk_includes",
+    ] + select({
+        "@toolchain//:macos_x86_64": [":macos_sdk_bin"],
+        "//conditions:default": [],
+    }),
 )

@@ -2,8 +2,8 @@
 
 #include <string>
 
+#include "tile/base/shape.h"
 #include "tile/lang/generate.h"
-#include "tile/lang/shape.h"
 
 namespace vertexai {
 namespace tile {

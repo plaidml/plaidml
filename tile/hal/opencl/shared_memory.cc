@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include <cstdint>
 #include <mutex>
@@ -119,13 +119,12 @@ void SharedBuffer::SetKernelArg(const CLObj<cl_kernel>& kernel, std::size_t inde
 
 boost::future<void*> SharedBuffer::MapCurrent(const std::vector<std::shared_ptr<hal::Event>>& deps) {
   VLOG(4) << "OCL SharedBuffer MapCurrent: waiting this: " << this;
-  return Event::WaitFor(deps, arena_->device_state()).then([
-    this, base = base_
-  ](boost::shared_future<std::vector<std::shared_ptr<hal::Result>>> f) {
-    VLOG(4) << "OCL SharedBuffer MapCurrent: complete this: " << this;
-    f.get();
-    return base;
-  });
+  return Event::WaitFor(deps, arena_->device_state())
+      .then([this, base = base_](boost::shared_future<std::vector<std::shared_ptr<hal::Result>>> f) {
+        VLOG(4) << "OCL SharedBuffer MapCurrent: complete this: " << this;
+        f.get();
+        return base;
+      });
 }
 
 boost::future<void*> SharedBuffer::MapDiscard(const std::vector<std::shared_ptr<hal::Event>>& deps) {

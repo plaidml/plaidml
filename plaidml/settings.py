@@ -24,8 +24,17 @@ EXPERIMENTAL = 'PLAIDML_EXPERIMENTAL'
 SESSION = 'PLAIDML_SESSION'
 SETTINGS = 'PLAIDML_SETTINGS'
 TELEMETRY = 'PLAIDML_TELEMETRY'
+PROHIBIT_WINOGRAD = 'PLAIDML_PROHIBIT_WINOGRAD'
 
-ENV_SETTINGS = [CONFIG, CONFIG_FILE, DEVICE_IDS, EXPERIMENTAL, SESSION, TELEMETRY]
+ENV_SETTINGS = [
+    CONFIG,
+    CONFIG_FILE,
+    DEVICE_IDS,
+    EXPERIMENTAL,
+    SESSION,
+    TELEMETRY,
+    PROHIBIT_WINOGRAD,
+]
 
 USER_SETTINGS = os.path.expanduser(os.path.join('~', '.plaidml'))
 SYSTEM_SETTINGS = os.path.normpath('/etc/plaidml')
@@ -160,6 +169,14 @@ class _Settings(object):
     @telemetry.setter
     def telemetry(self, val):
         os.environ[TELEMETRY] = '1' if val else '0'
+
+    @property
+    def prohibit_winograd(self):
+        return os.environ.get(PROHIBIT_WINOGRAD, '0') is not '0'
+
+    @prohibit_winograd.setter
+    def prohibit_winograd(self, val):
+        os.environ[PROHIBIT_WINOGRAD] = '1' if val else '0'
 
 
 module = _Settings()

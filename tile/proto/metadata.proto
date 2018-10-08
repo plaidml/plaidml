@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package vertexai.tile.metadata.proto;
 
-import "tile/proto/tile.proto";
+import "tile/proto/shape.proto";
 
 // Describes metadata for a Tile model.  This is attached to .tile files
 // as a JSON-encoded internal file named "metadata".

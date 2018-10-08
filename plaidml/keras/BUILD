@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 
 licenses(["by_exception_only"])
 
@@ -34,7 +34,7 @@ conda_test(
     srcs = [
         "backend_test.py",
     ],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -51,7 +51,7 @@ conda_test(
     srcs = [
         "mnist_mlp_test.py",
     ],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -67,7 +67,7 @@ conda_test(
     srcs = [
         "regression_test.py",
     ],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -83,7 +83,7 @@ conda_test(
     srcs = [
         "tile_sandbox.py",
     ],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -99,7 +99,7 @@ conda_test(
     srcs = [
         "trivial_model_test.py",
     ],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -115,7 +115,7 @@ conda_test(
     srcs = [
         "tutorial_test.py",
     ],
-    env = "@vertexai_plaidml_conda//:env",
+    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "trusty",

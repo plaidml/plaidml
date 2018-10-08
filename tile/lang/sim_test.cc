@@ -1,17 +1,17 @@
 #include <algorithm>
 
+#include "tile/base/shape.h"
 #include "tile/lang/bound.h"
 #include "tile/lang/compile.h"
 #include "tile/lang/defract.h"
 #include "tile/lang/flat.h"
 #include "tile/lang/gen_contract.h"
 #include "tile/lang/generate.h"
-#include "tile/lang/matrix.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/reduce.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/simulate.h"
+#include "tile/math/matrix.h"
 
 #include "base/util/catch.h"
 #include "base/util/logging.h"
@@ -125,9 +125,9 @@ TEST_CASE("Example function used in maxpool", "[maxpool][keras]") {
     for (size_t i = 0; i < 3; i++) {
       for (size_t k = 0; k < 3; k++) {
         for (size_t j = 0; j < 2; j++) {
-          IVLOG(3, std::to_string(O[i][j][k][l]) << " from TILE vs " << std::to_string(Omanual[i][j][k][l])
-                                                 << " expected; at (" << i << ", " << j << ", " << k << ", " << l
-                                                 << ")");
+          IVLOG(3, std::to_string(O[i][j][k][l])
+                       << " from TILE vs " << std::to_string(Omanual[i][j][k][l]) << " expected; at (" << i << ", " << j
+                       << ", " << k << ", " << l << ")");
           REQUIRE(O[i][j][k][l] == Omanual[i][j][k][l]);
         }
       }

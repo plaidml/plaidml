@@ -1,9 +1,6 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 
 #pragma once
-
-#include <boost/uuid/nil_generator.hpp>
-#include <boost/uuid/uuid.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -13,6 +10,9 @@
 #include <mutex>
 #include <string>
 #include <utility>
+
+#include <boost/uuid/nil_generator.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #include "base/context/eventlog.h"
 #include "base/context/gate.h"

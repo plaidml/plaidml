@@ -1,9 +1,10 @@
-#include "tile/lang/bilp/ilp_solver.h"
+#include "tile/bilp/ilp_solver.h"
 
 namespace vertexai {
 namespace tile {
-namespace lang {
 namespace bilp {
+
+using namespace math;  // NOLINT
 
 std::map<std::string, Rational> ILPSolver::reportSolution() const {
   std::vector<Rational> sym_soln = getSymbolicSolution();
@@ -19,8 +20,8 @@ std::map<std::string, Rational> ILPSolver::reportSolution() const {
   return soln;
 }
 
-std::map<Polynomial, ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>& constraints,
-                                                       const std::vector<Polynomial>& objectives) {
+std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>& constraints,
+                                                                 const std::vector<Polynomial<Rational>>& objectives) {
   // Solve a batch of ILP problems, all with the same constraints but different objectives
   Tableau t = makeStandardFormTableau(constraints);
   if (!t.convertToCanonicalForm()) {
@@ -29,8 +30,8 @@ std::map<Polynomial, ILPResult> ILPSolver::batch_solve(const std::vector<RangeCo
   var_names_ = t.varNames();
   t.convertToCanonicalForm();
 
-  std::map<Polynomial, ILPResult> ret;
-  for (const Polynomial& obj : objectives) {
+  std::map<Polynomial<Rational>, ILPResult> ret;
+  for (const Polynomial<Rational>& obj : objectives) {
     clean();
     var_names_ = t.varNames();
 
@@ -57,7 +58,7 @@ std::map<Polynomial, ILPResult> ILPSolver::batch_solve(const std::vector<RangeCo
   return ret;
 }
 
-ILPResult ILPSolver::solve(const std::vector<RangeConstraint>& constraints, const Polynomial objective) {
+ILPResult ILPSolver::solve(const std::vector<RangeConstraint>& constraints, const Polynomial<Rational> objective) {
   if (VLOG_IS_ON(2)) {
     std::ostringstream msg;
     msg << "Starting ILPSolver with constraints\n";
@@ -163,10 +164,10 @@ Tableau ILPSolver::addGomoryCut(const Tableau& t, size_t row) {
 }
 
 Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& constraints,
-                                           const Polynomial objective) {
+                                           const Polynomial<Rational> objective) {
   // Create the standard form linear program for minimizing objective subject to the given constraints
 
-  std::vector<Polynomial> lp_constraints;  // The represented constraint is poly == 0
+  std::vector<Polynomial<Rational>> lp_constraints;  // The represented constraint is poly == 0
   unsigned int slack_count = 0;
 
   std::vector<std::string> var_names;  // Ordered list of variable names used in this Tableau
@@ -176,7 +177,7 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& c
   // column in the Tableau is for the objective and does not have a variable name
   std::map<std::string, size_t> var_index;
   for (const RangeConstraint& c : constraints) {
-    Polynomial poly(c.poly);
+    Polynomial<Rational> poly(c.poly);
 
     // Split each variable into + and - parts
     // First extract keys (i.e. var names)
@@ -192,7 +193,7 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& c
     for (const std::string& var : local_vars) {
       std::map<std::string, size_t>::iterator unused;
       bool added_new_var;
-      poly.substitute(var, Polynomial("_" + var + "_pos") - Polynomial("_" + var + "_neg"));
+      poly.substitute(var, Polynomial<Rational>("_" + var + "_pos") - Polynomial<Rational>("_" + var + "_neg"));
       std::tie(unused, added_new_var) = var_index.emplace("_" + var + "_pos", var_index.size() + 1);
       if (added_new_var) {
         var_names.emplace_back("_" + var + "_pos");
@@ -205,14 +206,14 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& c
 
     // Make LP constraint from lower bound
     std::string slack_var = "_slack" + std::to_string(slack_count);
-    lp_constraints.emplace_back(poly - Polynomial(slack_var));
+    lp_constraints.emplace_back(poly - Polynomial<Rational>(slack_var));
     var_names.emplace_back(slack_var);
     var_index.emplace(slack_var, var_index.size() + 1);
     ++slack_count;
 
     // Make LP constraint from upper bound
     slack_var = "_slack" + std::to_string(slack_count);
-    lp_constraints.emplace_back(poly + Polynomial(slack_var) - c.range + 1);
+    lp_constraints.emplace_back(poly + Polynomial<Rational>(slack_var) - c.range + 1);
     var_names.emplace_back(slack_var);
     var_index.emplace(slack_var, var_index.size() + 1);
     ++slack_count;
@@ -240,7 +241,7 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& c
 
   // Now the constraints:
   size_t constraint_idx = 1;  // Start from 1 b/c the first row is for the object
-  for (const Polynomial& poly : lp_constraints) {
+  for (const Polynomial<Rational>& poly : lp_constraints) {
     short const_sign = 1;  // NOLINT (runtime/int)
     if (poly.constant() <= 0) {
       const_sign = -1;  // Last column must be positive, so negate everything if const term is positive
@@ -265,7 +266,7 @@ void ILPSolver::clean() {
   best_solution.clear();
   var_names_.clear();
 }
+
 }  // namespace bilp
-}  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

@@ -2,7 +2,7 @@ def _fresh_http_archive_impl(repository_ctx):
     url = repository_ctx.attr.url
     sha256 = repository_ctx.attr.sha256
     strip_prefix = repository_ctx.attr.strip_prefix
-    repository_ctx.download_and_extract(url, sha256=sha256, stripPrefix=strip_prefix)
+    repository_ctx.download_and_extract(url, sha256 = sha256, stripPrefix = strip_prefix)
     args = [
         "python",
         repository_ctx.path(repository_ctx.attr._script),

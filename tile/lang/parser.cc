@@ -10,6 +10,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 Context parse_helper(const std::string& code, int64_t start_tmp, const std::string& id = "") {
   try {
     Context ctx;
@@ -37,10 +39,10 @@ Program Parser::ParseExpr(const std::string& code, int64_t start_tmp) const {
   return parse_helper("expression " + code + ";", start_tmp).program;
 }
 
-Polynomial Parser::ParsePolynomial(const std::string& code) const {
+Polynomial<Rational> Parser::ParsePolynomial(const std::string& code) const {
   Bindings empty;
   SymbolicPolynomialPtr sp = parse_helper("polynomial " + code + ";", 0).polynomial;
-  Polynomial p = sp->Evaluate(empty);
+  Polynomial<Rational> p = sp->Evaluate(empty);
   return p;
 }
 

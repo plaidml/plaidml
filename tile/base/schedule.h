@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #pragma once
 
@@ -22,7 +22,7 @@ struct Alloc {
   bool is_output() const { return output.length() > 0; }
   bool is_tmp() const { return !is_input() && !is_output(); }
 
-  void Log(el::base::type::ostream_t& os) const;
+  void Log(el::base::type::ostream_t& os) const;  // NOLINT
 
   std::size_t idx = 0;
   std::uint64_t byte_size = 0;
@@ -43,14 +43,11 @@ struct OutputInfo {
 
 // A particular step to take in evaluating a program.
 struct Step {
-  enum class Tag {
-    kRun,
-    kCopy
-  };
+  enum class Tag { kRun, kCopy };
 
   explicit Step(Tag tag_) : tag{tag_} {}
 
-  void Log(el::base::type::ostream_t& os) const;
+  void Log(el::base::type::ostream_t& os) const;  // NOLINT
 
   Tag tag;
   std::size_t idx = 0;
@@ -58,7 +55,7 @@ struct Step {
   std::vector<OutputInfo> outputs;
   std::vector<Alloc*> inputs;
 
-  std::size_t kidx = 0;  // Used for run steps
+  std::size_t kidx = 0;          // Used for run steps
   std::uint64_t byte_count = 0;  // Used for copy steps
 };
 
@@ -70,7 +67,7 @@ inline MAKE_LOGGABLE(Step, step, os) {
 // An execution schedule, describing how to run a particular program.
 struct Schedule {
   void Reindex();
-  void Log(el::base::type::ostream_t& os) const;
+  void Log(el::base::type::ostream_t& os) const;  // NOLINT
 
   std::list<Alloc> allocs;
   std::list<Step> steps;

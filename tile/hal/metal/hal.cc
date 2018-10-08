@@ -1,4 +1,4 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 
 #include "tile/hal/metal/hal.h"
 
@@ -179,6 +179,11 @@ std::string WithLineNumbers(const std::string& src) {
 boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Context& ctx,
                                                              const std::vector<lang::KernelInfo>& kernel_infos,
                                                              const hal::proto::HardwareSettings& settings) {
+  if (!kernel_infos.size()) {
+    return boost::make_ready_future(std::unique_ptr<hal::Library>{
+        compat::make_unique<Library>(ctx, device_, nullptr, std::vector<KernelContext>{})});
+  }
+
   auto activity = std::make_shared<context::Activity>(ctx, "tile::hal::opencl::Build");
 
   std::vector<KernelContext> kernel_ctxs;

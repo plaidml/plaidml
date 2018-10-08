@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017-2018 Intel Corporation.
 
 #pragma once
 
@@ -50,7 +50,7 @@ class Emit : public sem::Visitor {
 
  private:
   struct value {
-    explicit value(llvm::Value* v_in = nullptr, sem::Type t_in = sem::Type{sem::Type::TVOID, lang::DataType::INVALID})
+    explicit value(llvm::Value* v_in = nullptr, sem::Type t_in = sem::Type{sem::Type::TVOID, DataType::INVALID})
         : v{v_in}, t{t_in} {}
     llvm::Value* v;
     sem::Type t;

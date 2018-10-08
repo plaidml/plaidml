@@ -1,11 +1,12 @@
 #pragma once
 
-#include <boost/multiprecision/cpp_int.hpp>
 #include <string>
+
+#include <boost/multiprecision/cpp_int.hpp>
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 typedef boost::multiprecision::cpp_int_backend<> IntegerBackend;
 typedef boost::multiprecision::rational_adaptor<IntegerBackend> RationalBackend;
@@ -47,6 +48,6 @@ Rational Max(const Rational& a, const Rational& b);
 // Returns the integer quotient of dividing a by b, w/ rational remainder 0 <= r < b
 Integer RatDiv(const Rational& a, const Rational& b, Rational& r);  // NOLINT(runtime/references)
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

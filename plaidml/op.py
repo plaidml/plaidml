@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 """
 The TILE standard operation library.
 
@@ -523,8 +523,8 @@ class _ConvolutionStringFormatter:
         if self.grouping == ConvolutionGrouping.EXPLICIT:
             if not isinstance(self.groups, six.integer_types):
                 raise ValueError(
-                    'Must provide integer number of groups when using explicit convolution grouping (received {})'.
-                    format(self.groups))
+                    'Must provide integer number of groups when using explicit convolution grouping (received {})'
+                    .format(self.groups))
             if self.groups == 1:
                 self.grouping = ConvolutionGrouping.NONE
             else:
@@ -1026,8 +1026,9 @@ class AveragePool(tile.Operation):
 
         outshape = tile.Shape(data.shape.dtype, list(data.shape.dims[0:2]) + num_out_shape)
 
-        super(AveragePool, self).__init__(
-            code, [('I', data), ('One', tile.Value.from_var(1., tuple()))], [('O', outshape)])
+        super(AveragePool, self).__init__(code, [('I', data),
+                                                 ('One', tile.Value.from_var(1., tuple()))],
+                                          [('O', outshape)])
 
 
 average_pool = AveragePool.function
@@ -1214,6 +1215,7 @@ class Convolution(tile.Operation):
             dilation_rate=None,
             grouping=ConvolutionGrouping.NONE,
             group_format=None,
+            winograd_allowed=True,
     ):
         rank = data.shape.ndims - 2
         if strides is None:
@@ -1237,13 +1239,13 @@ class Convolution(tile.Operation):
                 raise ValueError('Invalid dilation_rate: {}'.format(dilation_rate))
         if len(kernel_shape) != rank + 2:
             raise ValueError('Convolution kernel shape inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(
-                                 kernel_shape,
-                                 len(kernel_shape) - 2, data.shape, data.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(kernel_shape,
+                                                                  len(kernel_shape) - 2, data.
+                                                                  shape, data.shape.ndims - 2))
         if len(strides) != rank:
             raise ValueError('Convolution strides length inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(strides, len(
-                                 strides), data.shape, data.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.
+                                                                  shape, data.shape.ndims - 2))
         if len(dilation_rate) != rank:
             raise ValueError('Convolution dilation_rate length inconsistent with input shape: ' +
                              '{} (rank {}) v {} (rank {})'.format(dilation_rate, len(
@@ -1252,7 +1254,7 @@ class Convolution(tile.Operation):
         use_winograd = (rank == 2 and data_format == ConvolutionDataFormat.CHANNELS_LAST and
                         kernel_shape[0] == 3 and kernel_shape[1] == 3 and strides == (1, 1) and
                         dilation_rate == (1, 1) and kernel_shape[2] > 4 and kernel_shape[3] > 4 and
-                        grouping == ConvolutionGrouping.NONE)
+                        grouping == ConvolutionGrouping.NONE and winograd_allowed)
         if use_winograd:
             conv_strs = self._winograd_conv_strs(data.shape.dims, kernel_shape, padding)
             code = self._winograd_code_template().format(**conv_strs)
@@ -1338,8 +1340,8 @@ class Convolution(tile.Operation):
         out = block - conv + 1
         if (out == 2 and conv == 3):
             A = np.array([[1, 0], [1, 1], [1, -1], [0, -1]], dtype='float32')
-            B = np.array(
-                [[1, 0, 0, 0], [0, 1, -1, 1], [-1, 1, 1, 0], [0, 0, 0, -1]], dtype='float32')
+            B = np.array([[1, 0, 0, 0], [0, 1, -1, 1], [-1, 1, 1, 0], [0, 0, 0, -1]],
+                         dtype='float32')
             G = np.array([[1, 0, 0], [.5, .5, .5], [.5, -.5, .5], [0, 0, 1]], dtype='float32')
         elif (out == 4 and conv == 3):
             #s2 = np.sqrt(2.0)
@@ -1561,8 +1563,9 @@ class Equal(tile.Operation):
         if isinstance(rhs, tile.Value):
             shape = tile.Shape(plaidml.DType.BOOLEAN,
                                tile.broadcast_dims(lhs.shape.dims, rhs.shape.dims))
-            super(Equal, self).__init__('function (L, R) -> (O) { O = (L == R); }',
-                                        [('L', lhs), ('R', rhs)], [('O', shape)])
+            super(Equal, self).__init__('function (L, R) -> (O) { O = (L == R); }', [('L', lhs),
+                                                                                     ('R', rhs)],
+                                        [('O', shape)])
         else:
             shape = tile.Shape(plaidml.DType.BOOLEAN, lhs.shape.dims)
             super(Equal, self).__init__('function (L) -> (O) {{ O = (L == {}); }}'.format(rhs),
@@ -1663,8 +1666,8 @@ class Gemm(tile.Operation):
     def __init__(self, a, b, c, alpha=None, beta=None, broadcast=True, transA=False, transB=False):
         if not broadcast and c.shape.ndims != 2:
             raise NotImplementedError(
-                'Gemm without multiplier broadcast requires a two-dimensional scalar multiplier; multiplier rank={}'.
-                format(c.shape.ndims))
+                'Gemm without multiplier broadcast requires a two-dimensional scalar multiplier; multiplier rank={}'
+                .format(c.shape.ndims))
 
         def gemm_reshape(value):
             if value.shape.ndims < 2:

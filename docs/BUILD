@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 
 load("//bzl:conda.bzl", "conda_binary")
 load("//bzl:docs.bzl", "sphinx")
@@ -8,7 +8,7 @@ package(default_visibility = ["//visibility:public"])
 conda_binary(
     name = "sphinx",
     srcs = ["//bzl:sphinx.py"],
-    env = "@vertexai_plaidml_conda_sphinx//:env",
+    env = "@com_intel_plaidml_conda_sphinx//:env",
     deps = ["//plaidml/keras"],
 )
 

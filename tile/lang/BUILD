@@ -1,10 +1,14 @@
-load("//bzl:plaidml.bzl", "plaidml_grammar", "plaidml_cc_library", "plaidml_cc_test", "plaidml_proto_library")
+load(
+    "//bzl:plaidml.bzl",
+    "plaidml_cc_library",
+    "plaidml_cc_test",
+    "plaidml_grammar",
+    "plaidml_proto_library",
+)
 
 plaidml_proto_library(
     name = "proto",
-    srcs = [
-        "lang.proto",
-    ],
+    srcs = ["lang.proto"],
     visibility = ["//visibility:public"],
 )
 
@@ -31,6 +35,8 @@ plaidml_cc_library(
         "gen_contract.h",
         "gen_special.cc",
         "gen_special.h",
+        "gen_stripe.cc",
+        "gen_stripe.h",
         "gen_trivial.cc",
         "gen_trivial.h",
         "generate.cc",
@@ -75,7 +81,6 @@ plaidml_cc_library(
         "sembuilder.h",
         "semprinter.h",
         "semtree.h",
-        "shape.h",
         "simplifier.h",
         "symbolic.h",
         "type.h",
@@ -93,11 +98,13 @@ plaidml_cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        ":math",
+        "//tile/math",
         ":proto_cc",
         "//base/util",
-        "//tile/lang/bilp",
-        "@boost_archive//:boost",
+        "//tile/base",
+        "//tile/bilp",
+        "//tile/stripe",
+        "@boost",
     ],
 )
 
@@ -105,38 +112,12 @@ plaidml_cc_test(
     name = "test",
     srcs = [
         "lang_test.cc",
-        "math_test.cc",
         "sim_test.cc",
         "simulate.h",
         "test.cc",
     ],
     deps = [
         ":lang",
-    ],
-)
-
-plaidml_cc_library(
-    name = "math",
-    srcs = [
-        "basis.cc",
-        "bignum.cc",
-        "matrix.cc",
-        "polynomial.cc",
-    ],
-    hdrs = [
-        "basis.h",
-        "bignum.h",
-        "matrix.h",
-        "polynomial.h",
-    ],
-    copts = select({
-        "@toolchain//:windows_x86_64": [],
-        "//conditions:default": ["-Wno-error"],
-    }),
-    visibility = ["//tile/lang/bilp:__pkg__"],
-    deps = [
-        "//base/util",
-        "@boost_archive//:boost",
     ],
 )
 

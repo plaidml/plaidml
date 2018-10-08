@@ -6,15 +6,18 @@
 
 #include "base/util/logging.h"
 #include "base/util/printstring.h"
-#include "tile/lang/matrix.h"
+#include "tile/math/matrix.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
 
-static Polynomial ConvertPoly(Polynomial in, const std::map<std::string, Polynomial>& polys,
-                              bool transform_constant = false) {
-  Polynomial out;
+using namespace math;  // NOLINT
+
+static Polynomial<Rational> ConvertPoly(Polynomial<Rational> in,
+                                        const std::map<std::string, Polynomial<Rational>>& polys,
+                                        bool transform_constant = false) {
+  Polynomial<Rational> out;
   for (const auto& kvp : in.getMap()) {
     if (kvp.first == "" && !transform_constant) {
       out += kvp.second;
@@ -30,7 +33,7 @@ static Polynomial ConvertPoly(Polynomial in, const std::map<std::string, Polynom
 }
 
 Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& cons) {
-  std::vector<Polynomial> polys;
+  std::vector<Polynomial<Rational>> polys;
   bool has_fract = false;
   std::set<std::string> vars;
   for (const auto& c : cons) {
@@ -98,7 +101,7 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
   }
 
   std::vector<RangeConstraint> new_cons;
-  std::vector<std::map<Integer, Polynomial>> mod_polys;
+  std::vector<std::map<Integer, Polynomial<Rational>>> mod_polys;
   for (size_t i = 0; i < d.size2(); i++) {
     IVLOG(4, "Computing splits for " << vvars[i]);
     std::set<Integer> splits;
@@ -111,8 +114,8 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
     std::vector<Integer> split_vec(splits.begin(), splits.end());
     IVLOG(4, "List of splits: " << split_vec);
     // Now, break those into constraints + polynomials
-    Polynomial cpoly;
-    std::map<Integer, Polynomial> ipoly;
+    Polynomial<Rational> cpoly;
+    std::map<Integer, Polynomial<Rational>> ipoly;
     for (size_t j = 0; j < split_vec.size(); j++) {
       std::string var = vvars[i] + "_" + std::to_string(j);
       // Add a constraint for non-final cases
@@ -121,10 +124,10 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
           throw std::runtime_error("Unable to remove modulo operations during defractionalization");
         }
         Integer div = split_vec[j + 1] / split_vec[j];
-        new_cons.emplace_back(Polynomial(var), static_cast<int64_t>(div));
+        new_cons.emplace_back(Polynomial<Rational>(var), static_cast<int64_t>(div));
       }
       // Add an entry to the polynomial
-      cpoly += split_vec[j] * Polynomial(var);
+      cpoly += split_vec[j] * Polynomial<Rational>(var);
       // Add the polynomial to a lookup table
       Integer modof = (j + 1 < split_vec.size() ? split_vec[j + 1] : 0);
       ipoly[modof] = cpoly;
@@ -134,9 +137,9 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
   }
 
   // Now, make replacements
-  std::map<std::string, Polynomial> replacements;
+  std::map<std::string, Polynomial<Rational>> replacements;
   for (size_t i = 0; i < d.size2(); i++) {
-    Polynomial poly = d(i, i) * mod_polys[i][0];
+    Polynomial<Rational> poly = d(i, i) * mod_polys[i][0];
     for (size_t j = 0; j < i; j++) {
       poly += d(j, i) * mod_polys[j][denominator(d(j, i) / d(i, i))];
     }
@@ -164,8 +167,8 @@ Contraction Defract(const Contraction& op, const std::vector<RangeConstraint>& c
   }
   if (transform_constant) {
     // Add constraint for the constant term if it's being transformed
-    new_op.constraints.push_back(
-        SymbolicConstraint(RangeConstraint(ConvertPoly(Polynomial(1), replacements, transform_constant) - 1, 1)));
+    new_op.constraints.push_back(SymbolicConstraint(
+        RangeConstraint(ConvertPoly(Polynomial<Rational>(1), replacements, transform_constant) - 1, 1)));
   }
 
   for (const RangeConstraint& c : new_cons) {

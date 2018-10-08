@@ -1,11 +1,11 @@
 
-#include "tile/lang/bignum.h"
+#include "tile/math/bignum.h"
 
 #include <boost/math/common_factor_rt.hpp>
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 Integer Floor(const Rational& x) {
   if (x < 0) {
@@ -112,6 +112,6 @@ Integer RatDiv(const Rational& a, const Rational& b, Rational& r) {  // NOLINT(r
   return q;
 }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

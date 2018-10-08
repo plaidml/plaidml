@@ -1,4 +1,4 @@
-#include "tile/lang/matrix.h"
+#include "tile/math/matrix.h"
 
 #include <algorithm>
 #include <set>
@@ -10,7 +10,7 @@
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 struct DualMatrix {
   size_t size_;
@@ -191,7 +191,7 @@ bool operator==(const Vector& a, const Vector& b) {
   return true;
 }
 
-std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial>& polys) {
+std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial<Rational>>& polys) {
   std::set<std::string> vars;
   for (size_t i = 0; i < polys.size(); i++) {
     for (const auto& kvp : polys[i].getMap()) {
@@ -218,9 +218,7 @@ struct HermiteCompute {
   size_t columns_;
   Matrix lhs_;
 
-  void swap(size_t i, size_t j) {
-    lhs_.swapRows(i, j);
-  }
+  void swap(size_t i, size_t j) { lhs_.swapRows(i, j); }
 
   void mult(size_t i, Integer m) {
     if (m != 1 && m != -1) {
@@ -324,8 +322,7 @@ struct HermiteCompute {
   }
 
  public:
-  HermiteCompute(const Matrix& m) : rows_(m.size1()), columns_(m.size2()), lhs_(m) {
-  }
+  explicit HermiteCompute(const Matrix& m) : rows_(m.size1()), columns_(m.size2()), lhs_(m) {}
 
   bool compute() {
     if (rows_ < columns_) {
@@ -381,6 +378,6 @@ bool HermiteNormalForm(Matrix& m) {  // NOLINT(runtime/references)
   return r;
 }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

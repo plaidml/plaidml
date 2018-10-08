@@ -1,4 +1,4 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 //
 // This is the PlaidML base library interface, handling functionality common across the Vertex.AI libraries.
 
@@ -221,7 +221,7 @@ VAI_API void vai_set_perf_counter(const char* name, int64_t value);
 namespace std {
 
 template <>
-struct default_delete< ::vai_ctx> {
+struct default_delete<::vai_ctx> {
   void operator()(::vai_ctx* ctx) const noexcept { ::vai_free_ctx(ctx); }
 };
 

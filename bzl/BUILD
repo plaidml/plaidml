@@ -25,5 +25,5 @@ config_setting(
 conda_binary(
     name = "sphinx",
     srcs = [":sphinx.py"],
-    env = "@vertexai_plaidml_conda_sphinx//:env",
+    env = "@com_intel_plaidml_conda_sphinx//:env",
 )

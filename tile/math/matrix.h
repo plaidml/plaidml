@@ -1,18 +1,19 @@
 #pragma once
 
-#include <boost/numeric/ublas/io.hpp>
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/vector.hpp>
 #include <string>
 #include <tuple>
 #include <vector>
 
+#include <boost/numeric/ublas/io.hpp>
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/vector.hpp>
+
 #include "base/util/compat.h"
-#include "tile/lang/polynomial.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
 class Matrix : public boost::numeric::ublas::matrix<Rational> {
  public:
@@ -51,8 +52,8 @@ inline std::string to_string(const Matrix& m) { return m.toString(); }
 typedef boost::numeric::ublas::vector<Rational> Vector;
 typedef boost::numeric::ublas::identity_matrix<Rational> IdentityMatrix;
 
-using boost::numeric::ublas::trans;
 using boost::numeric::ublas::prod;
+using boost::numeric::ublas::trans;
 
 // Matrix literals to make things easier
 Vector VectorLit(const std::vector<Rational>& vec);
@@ -65,11 +66,11 @@ bool operator==(const Matrix& a, const Matrix& b);
 // Returns a matrix of polys.size() rows and with one column for each
 // variable in polys (in lexigraphical order).  Also, returns a vector of
 // polys.size() containing the constants for each polynomial
-std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial>& polys);
+std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial<Rational>>& polys);
 
 // Convert matrix + vector of offsets to Hermite Normal Form
 bool HermiteNormalForm(Matrix& m);  // NOLINT(runtime/references)
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

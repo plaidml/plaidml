@@ -8,7 +8,8 @@
 #include <utility>
 #include <vector>
 
-#include "tile/lang/shape.h"
+#include "base/util/logging.h"
+#include "tile/base/shape.h"
 
 namespace vertexai {
 namespace tile {
@@ -20,14 +21,14 @@ struct Type : public el::Loggable {
   enum BaseType { TVOID, INDEX, VALUE, POINTER_MUT, POINTER_CONST };
   enum MemoryRegion { NORMAL, LOCAL, GLOBAL };
 
-  Type(BaseType base_in = TVOID, lang::DataType dtype_in = lang::DataType::INVALID, uint64_t vec_width_in = 1,
+  Type(BaseType base_in = TVOID, DataType dtype_in = DataType::INVALID, uint64_t vec_width_in = 1,
        uint64_t array_in = 0, MemoryRegion region_in = NORMAL)
       : base{base_in}, dtype{dtype_in}, vec_width{vec_width_in}, array{array_in}, region{region_in} {}
 
   void log(el::base::type::ostream_t& os) const final;  // NOLINT(runtime/references)
 
   BaseType base;
-  lang::DataType dtype;
+  DataType dtype;
   uint64_t vec_width;  // 1 is non-vector
   uint64_t array;      // 0 is non-array, otherwise, array size
   MemoryRegion region;
@@ -41,6 +42,7 @@ class Visitor;
 
 // All semtree elements are nodes.
 struct Node {
+  virtual ~Node() = default;
   virtual void Accept(Visitor&) const = 0;
 };
 
@@ -164,7 +166,25 @@ struct CastExpr : public Expression {
 
 // A call of a function
 struct CallExpr : public Expression {
-  enum class Function { CEIL, COS, EXP, FLOOR, LOG, MAD, POW, ROUND, SQRT, TANH };
+  enum class Function {
+    ACOS,
+    ASIN,
+    ATAN,
+    CEIL,
+    COS,
+    COSH,
+    EXP,
+    FLOOR,
+    LOG,
+    MAD,
+    POW,
+    ROUND,
+    SIN,
+    SINH,
+    SQRT,
+    TAN,
+    TANH
+  };
   Function function;
   std::string name;
   std::vector<ExprPtr> vals;
@@ -179,8 +199,8 @@ struct CallExpr : public Expression {
 struct LimitConst : public Expression {
   enum Which { MIN, MAX, ZERO, ONE };
   Which which;
-  lang::DataType type;
-  LimitConst(Which _which, const lang::DataType& _type) : which(_which), type(_type) {}
+  DataType type;
+  LimitConst(Which _which, const DataType& _type) : which(_which), type(_type) {}
   void Accept(Visitor&) const final;
 };
 

@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/platform/local_machine/platform.h"
 
@@ -19,7 +19,6 @@
 #include "tile/hal/util/settings.h"
 #include "tile/platform/local_machine/block_placer.h"
 #include "tile/platform/local_machine/buffer.h"
-#include "tile/platform/local_machine/copy_mem_strategy.h"
 #include "tile/platform/local_machine/direct_mem_strategy.h"
 #include "tile/platform/local_machine/fifo_scheduler.h"
 #include "tile/platform/local_machine/loose_scheduler.h"
@@ -128,8 +127,7 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
           auto size_goal = memory->size_goal() * kGoalMemPercentage;
           IVLOG(1, "Using fifo scheduler; size_goal=" << size_goal);
           pd.scheduler = std::make_shared<fifo_scheduler::FifoScheduler>(memory->ArenaBufferAlignment(),
-                                                                         std::lround(std::floor(size_goal)),
-                                                                         settings);
+                                                                         std::lround(std::floor(size_goal)), settings);
           devs_[id] = std::move(pd);
         }
       }
@@ -142,7 +140,7 @@ void Platform::RegisterCostModel(const lang::TileCostFunction& cost_fn) { tile_o
 std::shared_ptr<tile::Buffer> Platform::MakeBuffer(const context::Context& ctx, const std::string& device_id,
                                                    std::uint64_t size) {
   auto& platform_dev = LookupDevice(device_id);
-  return std::make_shared<Buffer>(platform_dev.devinfo, platform_dev.mem_strategy, size);  // platform_dev.mem_strategy->MakeChunk(ctx, size));
+  return std::make_shared<Buffer>(platform_dev.devinfo, platform_dev.mem_strategy, size);
 }
 
 std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx, const tile::proto::Program& program) {

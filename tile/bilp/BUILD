@@ -11,8 +11,8 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
-        "@gmock_archive//:gtest",
-        "//tile/lang:math",
+        "//tile/math",
+        "@gmock//:gtest",
     ],
 )
 

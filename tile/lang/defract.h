@@ -9,7 +9,7 @@ namespace tile {
 namespace lang {
 
 // Remove any fractional polynomial multipliers (IE, any non-integers).
-Contraction Defract(const Contraction& in, const std::vector<RangeConstraint>& order);
+Contraction Defract(const Contraction& in, const std::vector<math::RangeConstraint>& order);
 
 }  // namespace lang
 }  // namespace tile

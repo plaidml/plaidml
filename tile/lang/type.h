@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "tile/base/shape.h"
 #include "tile/lang/ops.h"
-#include "tile/lang/shape.h"
 
 namespace vertexai {
 namespace tile {

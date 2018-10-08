@@ -1,14 +1,14 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 
 #pragma once
-
-#include <boost/thread/future.hpp>
 
 #include <condition_variable>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <utility>
+
+#include <boost/thread/future.hpp>
 
 #include "base/util/compat.h"
 

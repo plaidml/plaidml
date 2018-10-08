@@ -1,0 +1,105 @@
+// Copyright 2018, Intel Corp.
+
+syntax = "proto3";
+
+package vertexai.tile.stripe.proto;
+
+import "google/protobuf/any.proto";
+import "tile/proto/shape.proto";
+
+message Affine {
+  int64 offset = 1;
+  map<string, int64> terms = 2;
+}
+
+message Block {
+  string name = 1;
+  string comments = 2;
+  repeated Index idxs = 3;
+  repeated Affine constraints = 4;
+  repeated Refinement refs = 5;
+  repeated Statement stmts = 6;
+  map<string, google.protobuf.Any> annotations = 7;
+}
+
+message Index {
+  string name = 1;
+  uint64 range = 2;
+  int64 factor = 3;
+}
+
+message Refinement {
+  enum Dir {
+    None = 0;
+    In = 1;
+    Out = 2;
+    InOut = 3;
+  }
+
+  Dir dir = 1;
+  string from = 2;
+  string into = 3;
+  repeated Affine access = 4;
+  tile.proto.TensorShape shape = 5;
+  string agg_op = 6;
+}
+
+message Statement {
+  oneof op {
+    Load load = 1;
+    Store store = 2;
+    Intrinsic intrinsic = 3;
+    Constant constant = 4;
+    Block block = 5;
+    Special special = 6;
+  }
+}
+
+message Load {
+  string from = 1;
+  string into = 2;
+}
+
+message Store {
+  string from = 1;
+  string into = 2;
+}
+
+message Intrinsic {
+  string name = 1;
+  repeated string inputs = 2;
+  repeated string outputs = 3;
+
+  enum Value {
+    ZERO = 0;
+    COPY = 1;
+    MUL = 2;
+    ADD = 3;
+    EQ = 4;
+    COND = 5;
+    SUM = 6;
+    MAX = 7;
+    MIN = 8;
+    PROD = 9;
+    ASSIGN = 10;
+  }
+}
+
+message Special {
+  string name = 1;
+  repeated string params = 2;
+  repeated string inputs = 3;
+  repeated string outputs = 4;
+}
+
+message Constant {
+  string name = 1;
+  oneof value {
+    int64 iconst = 2;
+    double fconst = 3;
+  }
+}
+
+message BoolAnnotation {
+  bool value = 1;
+}

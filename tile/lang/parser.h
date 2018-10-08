@@ -12,7 +12,7 @@ class Parser final {
  public:
   Program Parse(const std::string& code, const std::string& id = "") const;
   Program ParseExpr(const std::string& code, int64_t start_tmp = 0) const;
-  Polynomial ParsePolynomial(const std::string& poly) const;
+  math::Polynomial<math::Rational> ParsePolynomial(const std::string& poly) const;
   Contraction ParseContraction(const std::string& contract) const;
 };
 

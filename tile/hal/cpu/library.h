@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017-2018 Intel Corporation.
 
 #pragma once
 
@@ -10,7 +10,7 @@
 #include "tile/lang/generate.h"
 
 namespace llvm {
-  class ExecutionEngine;
+class ExecutionEngine;
 }
 
 namespace vertexai {

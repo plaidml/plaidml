@@ -11,18 +11,16 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 class LiteralPolynomial : public SymbolicPolynomial {
  public:
   explicit LiteralPolynomial(int64_t value) : value_(value) {}
   SymbolicPolynomialPtr Xify() const override { return MakeLiteral(value_); }
   SymbolicPolynomialPtr DeXify() const override { return MakeLiteral(value_); }
-  SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override {
-    return MakeLiteral(value_);
-  }
-  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
-    return MakeLiteral(value_);
-  }
-  Polynomial Evaluate(const Bindings& bindings) const override { return Polynomial(value_); }
+  SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override { return MakeLiteral(value_); }
+  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override { return MakeLiteral(value_); }
+  Polynomial<Rational> Evaluate(const Bindings& bindings) const override { return Polynomial<Rational>(value_); }
   std::string ToString() const override { return std::to_string(value_); }
 
  private:
@@ -43,7 +41,7 @@ class LookupPolynomial : public SymbolicPolynomial {
   SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
     throw std::runtime_error("Decompose not implemented for LookupPolynomial, lookup value = " + name_);
   }
-  Polynomial Evaluate(const Bindings& bindings) const override {
+  Polynomial<Rational> Evaluate(const Bindings& bindings) const override {
     auto it = bindings.find(name_);
     if (it == bindings.end()) {
       throw std::runtime_error("Unknown variable " + name_ + " in polynomial");
@@ -52,7 +50,7 @@ class LookupPolynomial : public SymbolicPolynomial {
       throw std::runtime_error("Variable " + name_ +
                                " used in a polynomial which requires it to be a constant integer");
     }
-    return Polynomial(it->second.iconst);
+    return Polynomial<Rational>(it->second.iconst);
   }
   std::string ToString() const override { return name_; }
 
@@ -73,7 +71,7 @@ class ValuePolynomial : public SymbolicPolynomial {
   SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
     return Interned<LookupPolynomial>::make(bf->Apply(value_));
   }
-  Polynomial Evaluate(const Bindings& bindings) const override {
+  Polynomial<Rational> Evaluate(const Bindings& bindings) const override {
     throw std::runtime_error("Evaluate not implemented for ValuePolynomial");
   }
   std::string ToString() const override { throw std::runtime_error("ToString not implemented for ValuePolynomial"); }
@@ -95,13 +93,9 @@ class IndexPolynomial : public SymbolicPolynomial {
   explicit IndexPolynomial(const std::string& index) : index_(index) {}
   SymbolicPolynomialPtr Xify() const override { return MakeIndex(index_); }
   SymbolicPolynomialPtr DeXify() const override { return MakeIndex(index_); }
-  SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override {
-    return MakeIndex(index_);
-  }
-  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
-    return MakeIndex(index_);
-  }
-  Polynomial Evaluate(const Bindings& bindings) const override { return Polynomial(index_); }
+  SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override { return MakeIndex(index_); }
+  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override { return MakeIndex(index_); }
+  Polynomial<Rational> Evaluate(const Bindings& bindings) const override { return Polynomial<Rational>(index_); }
   std::string ToString() const override { return index_; }
 
  private:
@@ -116,10 +110,8 @@ class UnaryOpPolynomial : public SymbolicPolynomial {
   SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override {
     return MakeUnaryOp(op_, val_->Compose(fa));
   }
-  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
-    return MakeUnaryOp(op_, val_->Decompose(bf));
-  }
-  Polynomial Evaluate(const Bindings& bindings) const override {
+  SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override { return MakeUnaryOp(op_, val_->Decompose(bf)); }
+  Polynomial<Rational> Evaluate(const Bindings& bindings) const override {
     if (op_ != "-") {
       throw std::runtime_error("Unknown unary polynomial op");
     }
@@ -136,19 +128,15 @@ class BinaryOpPolynomial : public SymbolicPolynomial {
  public:
   BinaryOpPolynomial(const std::string& op, const SymbolicPolynomialPtr& lhs, const SymbolicPolynomialPtr& rhs)
       : op_(op), lhs_(lhs), rhs_(rhs) {}
-  SymbolicPolynomialPtr Xify() const override {
-    return MakeBinaryOp(op_, lhs_->Xify(), rhs_->Xify());
-  }
-  SymbolicPolynomialPtr DeXify() const override {
-    return MakeBinaryOp(op_, lhs_->DeXify(), rhs_->DeXify());
-  }
+  SymbolicPolynomialPtr Xify() const override { return MakeBinaryOp(op_, lhs_->Xify(), rhs_->Xify()); }
+  SymbolicPolynomialPtr DeXify() const override { return MakeBinaryOp(op_, lhs_->DeXify(), rhs_->DeXify()); }
   SymbolicPolynomialPtr Compose(const FunctionApplication& fa) const override {
     return MakeBinaryOp(op_, lhs_->Compose(fa), rhs_->Compose(fa));
   }
   SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override {
     return MakeBinaryOp(op_, lhs_->Decompose(bf), rhs_->Decompose(bf));
   }
-  Polynomial Evaluate(const Bindings& bindings) const override {
+  Polynomial<Rational> Evaluate(const Bindings& bindings) const override {
     if (op_ == "+") {
       return lhs_->Evaluate(bindings) + rhs_->Evaluate(bindings);
     }
@@ -156,8 +144,8 @@ class BinaryOpPolynomial : public SymbolicPolynomial {
       return lhs_->Evaluate(bindings) - rhs_->Evaluate(bindings);
     }
     if (op_ == "*") {
-      Polynomial lhs = lhs_->Evaluate(bindings);
-      Polynomial rhs = rhs_->Evaluate(bindings);
+      Polynomial<Rational> lhs = lhs_->Evaluate(bindings);
+      Polynomial<Rational> rhs = rhs_->Evaluate(bindings);
       if (lhs.isConstant()) {
         return rhs * lhs.constant();
       }
@@ -167,8 +155,8 @@ class BinaryOpPolynomial : public SymbolicPolynomial {
       throw std::runtime_error("Non-linear polynomial");
     }
     if (op_ == "/") {
-      Polynomial lhs = lhs_->Evaluate(bindings);
-      Polynomial rhs = rhs_->Evaluate(bindings);
+      Polynomial<Rational> lhs = lhs_->Evaluate(bindings);
+      Polynomial<Rational> rhs = rhs_->Evaluate(bindings);
       if (!rhs.isConstant()) {
         throw std::runtime_error("Divisor of polynomials must be a constant");
       }

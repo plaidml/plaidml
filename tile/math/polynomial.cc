@@ -1,21 +1,25 @@
-#include "tile/lang/polynomial.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {
-namespace lang {
+namespace math {
 
-Polynomial::Polynomial() {}
+template <typename T>
+Polynomial<T>::Polynomial() {}
 
-Polynomial::Polynomial(const Rational& c) : Polynomial("", c) {}
+template <typename T>
+Polynomial<T>::Polynomial(const T& c) : Polynomial<T>("", c) {}
 
-Polynomial::Polynomial(const std::string& i, const Rational& c) {
+template <typename T>
+Polynomial<T>::Polynomial(const std::string& i, const T& c) {
   if (c) {
     map_[i] = c;
   }
 }
 
-Rational Polynomial::eval(const std::map<std::string, Rational>& values) const {
-  Rational res = 0;
+template <typename T>
+T Polynomial<T>::eval(const std::map<std::string, T>& values) const {
+  T res = 0;
   for (const auto& kvp : map_) {
     if (kvp.first == "") {
       res += kvp.second;
@@ -29,18 +33,29 @@ Rational Polynomial::eval(const std::map<std::string, Rational>& values) const {
   return res;
 }
 
-Rational Polynomial::operator[](const std::string& var) const {
+template <typename T>
+T Polynomial<T>::operator[](const std::string& var) const {
   auto it = map_.find(var);
   if (it == map_.end()) {
     return 0;
   }
   return it->second;
 }
-const std::map<std::string, Rational>& Polynomial::getMap() const { return map_; }
 
-Polynomial& Polynomial::operator+=(const Polynomial& rhs) {
+template <typename T>
+const std::map<std::string, T>& Polynomial<T>::getMap() const {
+  return map_;
+}
+
+template <typename T>
+std::map<std::string, T>& Polynomial<T>::mutateMap() {
+  return map_;
+}
+
+template <typename T>
+Polynomial<T>& Polynomial<T>::operator+=(const Polynomial<T>& rhs) {
   for (const auto& kvp : rhs.map_) {
-    Rational new_val = (map_[kvp.first] += kvp.second);
+    T new_val = (map_[kvp.first] += kvp.second);
     if (new_val == 0) {
       map_.erase(kvp.first);
     }
@@ -48,15 +63,28 @@ Polynomial& Polynomial::operator+=(const Polynomial& rhs) {
   return *this;
 }
 
-bool Polynomial::operator==(const Polynomial& rhs) const { return map_ == rhs.map_; }
+template <typename T>
+bool Polynomial<T>::operator==(const Polynomial<T>& rhs) const {
+  return map_ == rhs.map_;
+}
 
-bool Polynomial::operator<(const Polynomial& rhs) const { return map_ < rhs.map_; }
+template <typename T>
+bool Polynomial<T>::operator<(const Polynomial<T>& rhs) const {
+  return map_ < rhs.map_;
+}
 
-Polynomial& Polynomial::operator-=(const Polynomial& rhs) { return *this += -1 * rhs; }
+template <typename T>
+Polynomial<T>& Polynomial<T>::operator-=(const Polynomial<T>& rhs) {
+  return *this += -1 * rhs;
+}
 
-Polynomial Polynomial::operator-() const { return -1 * (*this); }
+template <typename T>
+Polynomial<T> Polynomial<T>::operator-() const {
+  return -1 * (*this);
+}
 
-Polynomial& Polynomial::operator*=(const Rational& rhs) {
+template <typename T>
+Polynomial<T>& Polynomial<T>::operator*=(const T& rhs) {
   if (rhs == 0) {
     map_.clear();
   } else {
@@ -67,21 +95,29 @@ Polynomial& Polynomial::operator*=(const Rational& rhs) {
   return *this;
 }
 
-Polynomial& Polynomial::operator/=(const Rational& rhs) { return *this *= (1 / rhs); }
+template <typename T>
+Polynomial<T>& Polynomial<T>::operator/=(const T& rhs) {
+  return *this *= (1 / rhs);
+}
 
-Rational Polynomial::constant() const {
+template <typename T>
+T Polynomial<T>::constant() const {
   auto it = map_.find("");
   return (it == map_.end() ? 0 : it->second);
 }
 
-void Polynomial::setConstant(Rational value) { map_[""] = value; }
+template <typename T>
+void Polynomial<T>::setConstant(T value) {
+  map_[""] = value;
+}
 
-Rational Polynomial::tryDivide(const Polynomial& p, bool ignoreConst) const {
+template <typename T>
+T Polynomial<T>::tryDivide(const Polynomial<T>& p, bool ignoreConst) const {
   auto it = p.map_.begin();
   if (ignoreConst && it != p.map_.end() && it->first == "") {
     it++;
   }
-  Rational val = 0;
+  T val = 0;
   for (const auto& kvp : map_) {
     if (ignoreConst && kvp.first == "") {
       continue;
@@ -89,7 +125,7 @@ Rational Polynomial::tryDivide(const Polynomial& p, bool ignoreConst) const {
     if (it == p.map_.end() || it->first != kvp.first) {
       return 0;  // Indexes don't exactly line up, fail
     }
-    Rational div = kvp.second / it->second;
+    T div = kvp.second / it->second;
     if (val != 0 && div != val) {
       return 0;  // They don't all divide by the same number
     }
@@ -102,17 +138,24 @@ Rational Polynomial::tryDivide(const Polynomial& p, bool ignoreConst) const {
   return val;
 }
 
-void Polynomial::substitute(const std::string& var, const Polynomial& replacement) {
+template <typename T>
+void Polynomial<T>::substitute(const std::string& var, const Polynomial<T>& replacement) {
   if (map_.count(var) == 0) {
     // If var isn't in this polynomial, nothing needs to be done
     return;
   }
-  Rational coeff = map_.at(var);
+  T coeff = map_.at(var);
   map_.erase(var);
   (*this) += coeff * replacement;
 }
 
-std::string Polynomial::GetNonzeroIndex() const {
+template <typename T>
+void Polynomial<T>::substitute(const std::string& var, const T& replacement) {
+  substitute(var, Polynomial<T>(replacement));
+}
+
+template <typename T>
+std::string Polynomial<T>::GetNonzeroIndex() const {
   // Returns a nonconstant nonzero index, if one exists; otherwise returns empty string
   for (const auto& kvp : map_) {
     if (!(kvp.first.empty()) && kvp.second != 0) return kvp.first;
@@ -122,7 +165,19 @@ std::string Polynomial::GetNonzeroIndex() const {
   return std::string();
 }
 
-std::string Polynomial::toString() const {
+template <typename T>
+T Polynomial<T>::get(const std::string& name) const {
+  auto it = map_.find(name);
+  if (it == map_.end()) {
+    return T();
+  }
+  return it->second;
+}
+
+using std::to_string;
+
+template <typename T>
+std::string Polynomial<T>::toString() const {
   std::string r;
   if (map_.size() == 0) {
     return "0";
@@ -138,10 +193,13 @@ std::string Polynomial::toString() const {
       r += "-";
     }
     if (abs(kvp.second) != 1 || kvp.first == "") {
+      /*
       r += to_string(abs(numerator(kvp.second)));
       if (denominator(kvp.second) != 1) {
         r += "/" + to_string(denominator(kvp.second));
       }
+      */
+      r += to_string(abs(kvp.second));
       if (kvp.first != "") {
         r += "*";
       }
@@ -151,9 +209,12 @@ std::string Polynomial::toString() const {
   return r;
 }
 
-SimpleConstraint::SimpleConstraint(const Polynomial& _poly, int64_t _rhs) : poly(_poly), rhs(_rhs) {}
+template class Polynomial<Rational>;
+template class Polynomial<int64_t>;
 
-RangeConstraint::RangeConstraint(const Polynomial& _poly, int64_t _range) : poly(_poly), range(_range) {}
+SimpleConstraint::SimpleConstraint(const Polynomial<Rational>& _poly, int64_t _rhs) : poly(_poly), rhs(_rhs) {}
+
+RangeConstraint::RangeConstraint(const Polynomial<Rational>& _poly, int64_t _range) : poly(_poly), range(_range) {}
 
 bool RangeConstraint::IsParallel(const RangeConstraint& c) {
   if (this->poly.tryDivide(c.poly, true) != 0) return true;
@@ -164,6 +225,6 @@ SimpleConstraint RangeConstraint::lowerBound() const { return SimpleConstraint(-
 
 SimpleConstraint RangeConstraint::upperBound() const { return SimpleConstraint(poly, range - 1); }
 
-}  // namespace lang
+}  // namespace math
 }  // namespace tile
 }  // namespace vertexai

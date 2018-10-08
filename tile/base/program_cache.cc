@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/base/program_cache.h"
 
@@ -62,20 +62,19 @@ std::shared_ptr<ProgramCache::Entry> ProgramCache::GetEntry(const std::string& f
   // The cache itself must be externally synchronized.
   std::lock_guard<std::mutex> lock{mu_};
 
-  return cache_.Lookup(Key{program.dev_id(), serialized.str()},
-                       [&]() {
-                         std::string cid = "c" + std::to_string(next_id_++);
-                         if (program.id().size()) {
-                           cid = cid + '_' + program.id();
-                         } else if (fallback_id.size()) {
-                           cid = cid + '_' + fallback_id;
-                         }
-                         VLOG(3) << "Compiling program as " << cid;
-                         tile::proto::Program cprog;
-                         cprog.CopyFrom(program);
-                         cprog.set_id(cid);
-                         return std::make_shared<ProgramCache::Entry>(cid, cprog);
-                       });
+  return cache_.Lookup(Key{program.dev_id(), serialized.str()}, [&]() {
+    std::string cid = "c" + std::to_string(next_id_++);
+    if (program.id().size()) {
+      cid = cid + '_' + program.id();
+    } else if (fallback_id.size()) {
+      cid = cid + '_' + fallback_id;
+    }
+    VLOG(3) << "Compiling program as " << cid;
+    tile::proto::Program cprog;
+    cprog.CopyFrom(program);
+    cprog.set_id(cid);
+    return std::make_shared<ProgramCache::Entry>(cid, cprog);
+  });
 }
 
 std::shared_ptr<Program> ProgramCache::Entry::GetProgram(const context::Context& ctx, Platform* dev) {
