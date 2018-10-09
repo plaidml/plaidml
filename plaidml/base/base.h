@@ -138,13 +138,13 @@ VAI_API const char* vai_last_status_str();
 
 // Logger configuration.
 typedef enum {
-  VAI_LOG_SEVERITY_VERBOSE = 1,
   VAI_LOG_SEVERITY_TRACE = 2,
-  VAI_LOG_SEVERITY_DEBUG = 3,
-  VAI_LOG_SEVERITY_INFO = 4,
-  VAI_LOG_SEVERITY_WARNING = 5,
-  VAI_LOG_SEVERITY_ERROR = 6,
-  VAI_LOG_SEVERITY_FATAL = 7,
+  VAI_LOG_SEVERITY_DEBUG = 4,
+  VAI_LOG_SEVERITY_FATAL = 8,
+  VAI_LOG_SEVERITY_ERROR = 16,
+  VAI_LOG_SEVERITY_WARNING = 32,
+  VAI_LOG_SEVERITY_VERBOSE = 64,
+  VAI_LOG_SEVERITY_INFO = 128,
 } vai_log_severity;
 
 // Sets the process-global logging callback.
