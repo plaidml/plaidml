@@ -13,6 +13,7 @@ VALID_CONF = r'''{
     "PLAIDML_CONFIG_FILE": "/tmp",
     "PLAIDML_DEVICE_IDS": ["1", "3", "5"],
     "PLAIDML_EXPERIMENTAL": true,
+    "PLAIDML_TELEMETRY": true
 }
 '''
 INVALID_CONF = '{"PLAIDML_INVALID":"1"}'
