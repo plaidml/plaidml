@@ -1,4 +1,4 @@
-// Copyright 2017-2018 Intel Corporationporation.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/platform/local_machine/buffer.h"
 
