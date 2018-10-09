@@ -60,8 +60,16 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
     lang::GridSize denom = {{gwork[2] * gwork[1], gwork[2], 1}};
     size_t cores = std::thread::hardware_concurrency();
     size_t threads = std::min(iterations, cores);
+
+    // The condition variable will guard the completion count. Each worker
+    // will increment the completion count, and we'll wait until it reaches
+    // the number of threads before returning.
+    std::mutex mutex;
+    std::condition_variable cv;
+    size_t completed = 0;
+
     for (size_t offset = 0; offset < threads; ++offset) {
-      boost::asio::post(thread_pool_, [=]() {
+      boost::asio::post(thread_pool_, [=, &mutex, &cv, &completed]() {
         for (size_t i = offset; i < iterations; i += threads) {
           lang::GridSize index;
           index[0] = i / denom[0] % gwork[0];
@@ -69,9 +77,20 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
           index[2] = i / denom[2] % gwork[2];
           ((void (*)(void*, lang::GridSize*))entrypoint)(argvec, &index);
         }
+        {
+          std::unique_lock<std::mutex> lock(mutex);
+          ++completed;
+          cv.notify_all();
+        }
       });
     }
-    thread_pool_.join();
+    {
+      std::unique_lock<std::mutex> lock(mutex);
+      while (completed < threads) {
+        cv.wait(lock);
+      }
+    }
+
     return std::make_shared<Result>(act.ctx(), "tile::hal::cpu::Executing", start,
                                     std::chrono::high_resolution_clock::now());
   });
