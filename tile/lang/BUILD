@@ -125,20 +125,16 @@ plaidml_cc_test(
 
 plaidml_bison(
     name = "parser",
-    srcs = ["tile.y"],
-    outs = [
-        "parser.y.cc",
-        "parser.y.h",
-    ],
+    src = "tile.y",
+    out = "parser.y.cc",
+    defines = "parser.y.h",
 )
 
 plaidml_flex(
     name = "lexer",
-    srcs = ["tile.l"],
-    outs = [
-        "parser_lex.cc",
-        "parser_lex.h",
-    ],
+    src = "tile.lex",
+    out = "parser_lex.cc",
+    hdr = "parser_lex.h",
 )
 
 plaidml_cc_test(

@@ -1,5 +1,3 @@
-%output "parser.y.cc"
-%defines "parser.y.h"
 %define api.pure full
 %error-verbose
  
