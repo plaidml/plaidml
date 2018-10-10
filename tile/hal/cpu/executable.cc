@@ -79,16 +79,15 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
         }
         {
           std::unique_lock<std::mutex> lock(mutex);
-          ++completed;
-          cv.notify_all();
+          if (++completed == threads) {
+            cv.notify_all();
+          }
         }
       });
     }
     {
       std::unique_lock<std::mutex> lock(mutex);
-      while (completed < threads) {
-        cv.wait(lock);
-      }
+      cv.wait(lock, [&]() { return threads <= completed; });
     }
 
     return std::make_shared<Result>(act.ctx(), "tile::hal::cpu::Executing", start,
