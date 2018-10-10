@@ -5,7 +5,6 @@
 
 %}
 
-%option outfile="parser_lex.cc" header-file="parser_lex.h"
 %option reentrant bison-bridge
 %option noyywrap never-interactive
 

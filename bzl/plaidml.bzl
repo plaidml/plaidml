@@ -98,48 +98,30 @@ def plaidml_ast(name, ast, output, template = "base", visibility = None):
         cmd = "$(location //base/util/astgen) -i $(SRCS) -t {} -o $(OUTS)".format(template),
     )
 
-def plaidml_bison(name, srcs, outs, visibility = None):
+def plaidml_bison(name, src, out, defines, visibility = None):
+    COMMON_ARGS = "-o $(location %s) --defines=$(location %s) $(SRCS)" % (out, defines)
     native.genrule(
         name = name,
-        srcs = srcs,
-        outs = outs,
+        srcs = [src],
+        outs = [out, defines],
         visibility = visibility,
         cmd = select({
-            "@toolchain//:macos_x86_64": """
-ssrcs=($(SRCS))
-/usr/local/opt/bison/bin/bison --verbose $${ssrcs[0]}
-cp %s $(@D)
-""" % (" ".join(outs)),
-            "//conditions:default": """
-ssrcs=($(SRCS))
-bison --verbose $${ssrcs[0]}
-cp %s $(@D)
-""" % (" ".join(outs)),
+            "@toolchain//:macos_x86_64": "/usr/local/opt/bison/bin/bison --verbose " + COMMON_ARGS,
+            "//conditions:default": "bison --verbose " + COMMON_ARGS,
         }),
     )
 
-def plaidml_flex(name, srcs, outs, visibility = None):
+def plaidml_flex(name, src, out, hdr, visibility = None):
+    COMMON_ARGS = "-o $(location %s) --header-file=$(location %s) $(SRCS)" % (out, hdr)
     native.genrule(
         name = name,
-        srcs = srcs,
-        outs = outs,
+        srcs = [src],
+        outs = [out, hdr],
         visibility = visibility,
         cmd = select({
-            "@toolchain//:macos_x86_64": """
-ssrcs=($(SRCS))
-/usr/local/opt/flex/bin/flex $${ssrcs[0]}
-cp %s $(@D)
-""" % (" ".join(outs)),
-            "@toolchain//:windows_x86_64": """
-ssrcs=($(SRCS))
-flex --nounistd $${ssrcs[0]}
-cp %s $(@D)
-""" % (" ".join(outs)),
-            "//conditions:default": """
-ssrcs=($(SRCS))
-flex $${ssrcs[0]}
-cp %s $(@D)
-""" % (" ".join(outs)),
+            "@toolchain//:macos_x86_64": "/usr/local/opt/flex/bin/flex " + COMMON_ARGS,
+            "@toolchain//:windows_x86_64": "flex --nounistd " + COMMON_ARGS,
+            "//conditions:default": "flex " + COMMON_ARGS,
         }),
     )
 
