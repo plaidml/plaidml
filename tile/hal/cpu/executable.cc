@@ -78,7 +78,7 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
           ((void (*)(void*, lang::GridSize*))entrypoint)(argvec, &index);
         }
         {
-          std::unique_lock<std::mutex> lock(mutex);
+          std::unique_lock<std::mutex> lock{mutex};
           if (++completed == threads) {
             cv.notify_all();
           }
@@ -86,7 +86,7 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
       });
     }
     {
-      std::unique_lock<std::mutex> lock(mutex);
+      std::unique_lock<std::mutex> lock{mutex};
       cv.wait(lock, [&]() { return threads <= completed; });
     }
 
