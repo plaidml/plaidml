@@ -40,7 +40,7 @@ class VirtualMachine {
     for (size_t i = 0; i < block.idxs.size(); i++) {
       const auto& idx = block.idxs[i];
       auto global_idx = 0;
-      auto it = outer.idxs.find(idx.name);
+      auto it = outer.idxs.find(idx.from);
       if (it != outer.idxs.end()) {
         global_idx = idx.factor * it->second;
       }

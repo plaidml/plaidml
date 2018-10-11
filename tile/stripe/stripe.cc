@@ -168,10 +168,7 @@ static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     if (i > 0) {
       os << ", ";
     }
-    os << block.idxs[i].name << ":" << block.idxs[i].range;
-    if (block.idxs[i].factor != 0) {
-      os << ":" << block.idxs[i].factor;
-    }
+    os << block.idxs[i];
   }
   os << "] (";
   if (!block.name.empty()) {
@@ -271,7 +268,10 @@ std::vector<const Refinement*> Block::ref_outs() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const Index& idx) {
-  os << idx.name << ":" << idx.range << ":" << idx.factor;
+  os << idx.name << ":" << idx.range;
+  if (idx.factor != 0) {
+    os << ":" << idx.factor << "*" << idx.from;
+  }
   return os;
 }
 
@@ -295,6 +295,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
   for (const auto& pb_idx : block.idxs()) {
     ret->idxs.emplace_back(Index{
         pb_idx.name(),   //
+        pb_idx.from(),   //
         pb_idx.range(),  //
         pb_idx.factor()  //
     });
@@ -527,6 +528,14 @@ std::vector<Refinement>::iterator Block::ref_by_into(const std::string& name) {
 
 std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& name) const {
   return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+}
+
+std::vector<Refinement>::iterator Block::ref_by_from(const std::string& name) {
+  return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
+}
+
+std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& name) const {
+  return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
 }
 
 std::string Block::unique_ref_name(const std::string& in) {
