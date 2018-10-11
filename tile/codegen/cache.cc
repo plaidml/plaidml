@@ -44,7 +44,7 @@ void ApplyCache(stripe::Block* block, const std::string& var_name) {
   std::vector<stripe::Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
     std::string iname = std::string("i") + std::to_string(i);
-    xfer_block.idxs.emplace_back(iname, sizes[i], 0);
+    xfer_block.idxs.emplace_back(iname, "", sizes[i], 0);
     xfer_access.push_back(stripe::Affine(iname));
   }
   TensorShape raw_xfer_shape = raw_ts;

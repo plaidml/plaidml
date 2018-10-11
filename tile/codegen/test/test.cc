@@ -91,18 +91,18 @@ TEST(Codegen, ApplyTile) {
   };
 
   auto runinfo = LoadMatMul(sqrt(expected.size()));
-  auto program = GenerateStripe(runinfo);
+  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
 
-  IVLOG(2, "Before>\n" << *program);
+  IVLOG(2, "Before>\n" << *main);
 
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*main, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
   IVLOG(2, "C: " << data["C"]);
   EXPECT_THAT(data["C"], ContainerEq(expected));
 
-  auto kernel = stripe::Block::Downcast(program->stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
   ApplyTile(kernel.get(), {5, 4, 4});
   auto inner = stripe::Block::Downcast(kernel->stmts.front());
   ApplyTile(inner.get(), {5, 2, 2});
@@ -111,9 +111,9 @@ TEST(Codegen, ApplyTile) {
     data["C"][i] = 0;
   }
 
-  IVLOG(2, "After>\n" << *program);
+  IVLOG(2, "After>\n" << *main);
 
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*main, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -132,8 +132,8 @@ TEST(Codegen, StencilMatchMatMul) {
   };
 
   auto runinfo = LoadMatMul(100);
-  auto program = GenerateStripe(runinfo);
-  auto kernel = stripe::Block::Downcast(program->stmts.front());
+  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
 
   IVLOG(2, *kernel);
 
@@ -161,8 +161,8 @@ TEST(Codegen, StencilMatchConv1D) {
   };
 
   auto runinfo = LoadConv1D(1, 100, 64, 3);
-  auto program = GenerateStripe(runinfo);
-  auto kernel = stripe::Block::Downcast(program->stmts.front());
+  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
 
   IVLOG(2, *kernel);
 
@@ -211,8 +211,8 @@ TEST(Codegen, StencilMatchConv2D) {
   };
 
   auto runinfo = LoadConv2D(1, 100, 56, 3);
-  auto program = GenerateStripe(runinfo);
-  auto kernel = stripe::Block::Downcast(program->stmts.front());
+  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
 
   IVLOG(2, "\n" << *kernel);
 
@@ -280,11 +280,11 @@ TEST(Codegen, TilePass) {
   };
 
   auto runinfo = LoadMatMul(5);
-  auto program = GenerateStripe(runinfo);
-  TilePass(program.get(), specs);
-  IVLOG(2, "\n" << *program);
+  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
+  TilePass(main.get(), specs);
+  IVLOG(2, "\n" << *main);
 
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*main, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -299,9 +299,9 @@ TEST(Codegen, TilePassBroadcast) {
   runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {32}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
-  auto program = GenerateStripe(runinfo);
+  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
 
-  LOG(INFO) << "\n" << *program;
+  LOG(INFO) << "\n" << *main;
 }
 
 }  // namespace test
