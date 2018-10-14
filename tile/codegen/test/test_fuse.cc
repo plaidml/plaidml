@@ -88,7 +88,7 @@ TEST(Codegen, FuseComplex) {
   ASSERT_TRUE(r);
 
   // Tile it just for fun!
-  ApplyTile(r1.get(), {16, 4, 4, 64});
+  ApplyTile(r1.get(), {16, 4, 4, 64}, "test");
 
   IVLOG(2, "Tiled\n" << *r1);
 }
