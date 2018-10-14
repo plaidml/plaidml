@@ -11,7 +11,7 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ApplyCache(stripe::Block* block, const std::string& var_name);
+void ApplyCache(stripe::Block* block, const std::string& var_name, const std::string& cache_name);
 
 }  // namespace codegen
 }  // namespace tile

@@ -13,7 +13,7 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyTile(Block* outer, const TileShape& tile) {
+void ApplyTile(Block* outer, const TileShape& tile, const std::string& tile_name) {
   // Verify tile shape is correct
   if (outer->idxs.size() != tile.size()) {
     throw std::runtime_error("Invalid tile specified");
@@ -25,6 +25,7 @@ void ApplyTile(Block* outer, const TileShape& tile) {
   }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
+  inner->name = tile_name;
   // Block inner;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
@@ -102,7 +103,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
                         const StencilMap& cur) {
   if (cur.size() == spec.idxs.size()) {
     // base case
-    StencilMatch match{1, {}, false};
+    StencilMatch match{spec.name, 1, {}, false};
     std::map<std::string, StencilIndexMatch> idx_matches;
     for (const auto& idx : block.idxs) {
       idx_matches[idx.name] = StencilIndexMatch{idx.name, "*", 1};
@@ -171,7 +172,7 @@ StencilMatch FindBestStencil(const std::vector<StencilSpec>& specs,  //
     FindStencilMatches(&matches, spec, *block, {});
   }
   if (matches.empty()) {
-    StencilMatch fallback{1, {}, true};
+    StencilMatch fallback{"fallback", 1, {}, true};
     for (const auto& idx : block->idxs) {
       fallback.cost *= idx.range;
       fallback.idxs.emplace_back(StencilIndexMatch{idx.name, "*", idx.range});
@@ -193,7 +194,7 @@ void TilePass(Block* block, const TileGenerator& generator) {
     }
   }
   if (is_leaf) {
-    ApplyTile(block, generator(block));
+    ApplyTile(block, generator(block), "tile");
   }
 }
 
@@ -224,18 +225,18 @@ bool operator<(const StencilIndexMatch& lhs, const StencilIndexMatch& rhs) {
 }
 
 std::ostream& operator<<(std::ostream& os, const StencilMatch& match) {
-  os << match.cost << ":" << StreamContainer(match.idxs);
+  os << match.name << ":" << match.cost << ":" << StreamContainer(match.idxs);
   return os;
 }
 
 bool operator==(const StencilMatch& lhs, const StencilMatch& rhs) {
-  return std::tie(lhs.cost, lhs.idxs) ==  //
-         std::tie(rhs.cost, rhs.idxs);
+  return std::tie(lhs.cost, lhs.idxs, lhs.name) ==  //
+         std::tie(rhs.cost, rhs.idxs, rhs.name);
 }
 
 bool operator<(const StencilMatch& lhs, const StencilMatch& rhs) {
-  return std::tie(lhs.cost, lhs.idxs) <  //
-         std::tie(rhs.cost, rhs.idxs);
+  return std::tie(lhs.cost, lhs.idxs, lhs.name) <  //
+         std::tie(rhs.cost, rhs.idxs, rhs.name);
 }
 
 }  // namespace codegen
