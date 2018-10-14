@@ -65,9 +65,9 @@ class RewriteStmtVisitor {
 struct Statement {
   virtual ~Statement() = default;
   virtual StmtKind kind() const = 0;
-  virtual void Accept(ConstStmtVisitor&) const = 0;    // NOLINT(runtime/references)
-  virtual void Accept(MutableStmtVisitor&) = 0;        // NOLINT(runtime/references)
-  virtual Statement* Accept(RewriteStmtVisitor&) = 0;  // NOLINT(runtime/references)
+  virtual void Accept(ConstStmtVisitor*) const = 0;
+  virtual void Accept(MutableStmtVisitor*) = 0;
+  virtual Statement* Accept(RewriteStmtVisitor*) = 0;
 };
 
 struct Annotation {
@@ -92,9 +92,17 @@ enum class RefDir {
   InOut = 3,
 };
 
-inline bool IsReadDir(const RefDir& dir) { return dir == RefDir::In || dir == RefDir::InOut; }
-inline bool IsWriteDir(const RefDir& dir) { return dir == RefDir::Out || dir == RefDir::InOut; }
-inline RefDir UnionDir(const RefDir& a, const RefDir& b) { return RefDir(static_cast<int>(a) | static_cast<int>(b)); }
+inline bool IsReadDir(const RefDir& dir) {  //
+  return dir == RefDir::In || dir == RefDir::InOut;
+}
+
+inline bool IsWriteDir(const RefDir& dir) {  //
+  return dir == RefDir::Out || dir == RefDir::InOut;
+}
+
+inline RefDir UnionDir(const RefDir& a, const RefDir& b) {  //
+  return RefDir(static_cast<int>(a) | static_cast<int>(b));
+}
 
 struct Refinement {
   RefDir dir;
@@ -103,6 +111,7 @@ struct Refinement {
   std::vector<Affine> access;
   TensorShape shape;
   std::string agg_op;
+  std::string location;
 
   Affine FlatAccess() const;
 };
@@ -111,9 +120,9 @@ struct Load : Statement {
   Load(const std::string& from, const std::string& into) : from(from), into(into) {}
   static std::shared_ptr<Load> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Load; }
-  void Accept(ConstStmtVisitor& v) const { v.Visit(*this); }      // NOLINT(runtime/references)
-  void Accept(MutableStmtVisitor& v) { v.Visit(this); }           // NOLINT(runtime/references)
-  Load* Accept(RewriteStmtVisitor& v) { return v.Visit(*this); }  // NOLINT(runtime/references)
+  void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
+  void Accept(MutableStmtVisitor* v) { v->Visit(this); }
+  Load* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
 
   std::string from;
   std::string into;
@@ -123,9 +132,9 @@ struct Store : Statement {
   Store(const std::string& from, const std::string& into) : from(from), into(into) {}
   static std::shared_ptr<Store> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Store; }
-  void Accept(ConstStmtVisitor& v) const { v.Visit(*this); }       // NOLINT(runtime/references)
-  void Accept(MutableStmtVisitor& v) { v.Visit(this); }            // NOLINT(runtime/references)
-  Store* Accept(RewriteStmtVisitor& v) { return v.Visit(*this); }  // NOLINT(runtime/references)
+  void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
+  void Accept(MutableStmtVisitor* v) { v->Visit(this); }
+  Store* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
 
   std::string from;
   std::string into;
@@ -134,9 +143,9 @@ struct Store : Statement {
 struct Intrinsic : Statement {
   static std::shared_ptr<Intrinsic> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Intrinsic; }
-  void Accept(ConstStmtVisitor& v) const { v.Visit(*this); }           // NOLINT(runtime/references)
-  void Accept(MutableStmtVisitor& v) { v.Visit(this); }                // NOLINT(runtime/references)
-  Intrinsic* Accept(RewriteStmtVisitor& v) { return v.Visit(*this); }  // NOLINT(runtime/references)
+  void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
+  void Accept(MutableStmtVisitor* v) { v->Visit(this); }
+  Intrinsic* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
 
   std::string name;
   std::vector<std::string> inputs;
@@ -160,9 +169,9 @@ struct Intrinsic : Statement {
 struct Special : Statement {
   static std::shared_ptr<Special> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Special; }
-  void Accept(ConstStmtVisitor& v) const { v.Visit(*this); }         // NOLINT(runtime/references)
-  void Accept(MutableStmtVisitor& v) { v.Visit(this); }              // NOLINT(runtime/references)
-  Special* Accept(RewriteStmtVisitor& v) { return v.Visit(*this); }  // NOLINT(runtime/references)
+  void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
+  void Accept(MutableStmtVisitor* v) { v->Visit(this); }
+  Special* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
 
   std::string name;
   std::vector<std::string> params;
@@ -180,9 +189,9 @@ struct Constant : Statement {
   Constant(const std::string& name, double value) : name(name), type(ConstType::Float), fconst(value) {}
   static std::shared_ptr<Constant> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Constant; }
-  void Accept(ConstStmtVisitor& v) const { v.Visit(*this); }          // NOLINT(runtime/references)
-  void Accept(MutableStmtVisitor& v) { v.Visit(this); }               // NOLINT(runtime/references)
-  Constant* Accept(RewriteStmtVisitor& v) { return v.Visit(*this); }  // NOLINT(runtime/references)
+  void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
+  void Accept(MutableStmtVisitor* v) { v->Visit(this); }
+  Constant* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
 
   std::string name;
   ConstType type;
@@ -196,9 +205,9 @@ using StatementIt = StatementList::iterator;
 struct Block : Statement {
   static std::shared_ptr<Block> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Block; }
-  void Accept(ConstStmtVisitor& v) const { v.Visit(*this); }       // NOLINT(runtime/references)
-  void Accept(MutableStmtVisitor& v) { v.Visit(this); }            // NOLINT(runtime/references)
-  Block* Accept(RewriteStmtVisitor& v) { return v.Visit(*this); }  // NOLINT(runtime/references)
+  void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
+  void Accept(MutableStmtVisitor* v) { v->Visit(this); }
+  Block* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
 
   std::string name;
   std::string comments;
@@ -250,16 +259,16 @@ class CloneVisitor : RewriteStmtVisitor {
   Special* Visit(const Special& x) { return new Special(x); }
   Intrinsic* Visit(const Intrinsic& x) { return new Intrinsic(x); }
   Block* Visit(const Block& x) {
-    auto r = new Block(x);
+    auto ret = new Block(x);
     if (depth_ == 0) {
-      return r;
+      return ret;
     }
     depth_--;
-    for (auto& stmt_ptr : r->stmts) {
-      stmt_ptr = std::shared_ptr<Statement>(stmt_ptr->Accept(*this));
+    for (auto& stmt_ptr : ret->stmts) {
+      stmt_ptr = std::shared_ptr<Statement>(stmt_ptr->Accept(this));
     }
     depth_++;
-    return r;
+    return ret;
   }
 
  private:
@@ -267,8 +276,8 @@ class CloneVisitor : RewriteStmtVisitor {
 };
 
 inline std::shared_ptr<Block> CloneBlock(const Block& orig, size_t depth = -1) {
-  CloneVisitor Visitor(depth);
-  return std::shared_ptr<Block>(Visitor.Visit(orig));
+  CloneVisitor visitor(depth);
+  return std::shared_ptr<Block>(visitor.Visit(orig));
 }
 
 }  // namespace stripe

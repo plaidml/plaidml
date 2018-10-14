@@ -8,39 +8,54 @@
 namespace vertexai {
 
 template <typename T>
-struct StreamContainerHolder {
+struct StreamContainerContext {
   const T& container;
   bool multiline;
+  bool outer;
   size_t indent;
-  StreamContainerHolder(const T& _container, bool _multiline, size_t _indent)
-      : container(_container), multiline(_multiline), indent(_indent) {}
 };
 
 template <typename T>
-StreamContainerHolder<T> StreamContainer(const T& container, bool multiline = false, size_t indent = 0) {
-  return StreamContainerHolder<T>(container, multiline, indent);
+StreamContainerContext<T> StreamContainer(const T& container,      //
+                                          bool multiline = false,  //
+                                          bool outer = true,       //
+                                          size_t indent = 0) {
+  return StreamContainerContext<T>{container, multiline, outer, indent};
 }
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, const StreamContainerHolder<T>& x) {
-  std::string istr(2 * x.indent, ' ');
-  if (x.multiline) {
-    os << istr << "{\n";
-    for (const auto& v : x.container) {
-      os << istr << "  " << v << ",\n";
+std::ostream& operator<<(std::ostream& os, const StreamContainerContext<T>& holder) {
+  std::string indent(2 * holder.indent, ' ');
+  if (holder.multiline) {
+    os << indent;
+    if (holder.outer) {
+      os << "{";
     }
-    os << istr << "}\n";
+    os << "\n";
+    for (const auto& item : holder.container) {
+      os << indent << "  " << item << ",\n";
+    }
+    os << indent;
+    if (holder.outer) {
+      os << "}";
+    }
+    os << "\n";
   } else {
-    size_t size = x.container.size();
+    size_t size = holder.container.size();
     size_t cur = 0;
-    os << istr << "{";
-    for (const auto& v : x.container) {
-      os << " " << v;
+    os << indent;
+    if (holder.outer) {
+      os << "{";
+    }
+    for (const auto& item : holder.container) {
+      os << item;
       if (cur++ != size - 1) {
-        os << ",";
+        os << ", ";
       }
     }
-    os << " }";
+    if (holder.outer) {
+      os << "}";
+    }
   }
   return os;
 }

@@ -103,9 +103,9 @@ TEST(Codegen, ApplyTile) {
   EXPECT_THAT(data["C"], ContainerEq(expected));
 
   auto kernel = stripe::Block::Downcast(main->stmts.front());
-  ApplyTile(kernel.get(), {5, 4, 4});
+  ApplyTile(kernel.get(), {5, 4, 4}, "test");
   auto inner = stripe::Block::Downcast(kernel->stmts.front());
-  ApplyTile(inner.get(), {5, 2, 2});
+  ApplyTile(inner.get(), {5, 2, 2}, "test");
 
   for (size_t i = 0; i < data["C"].size(); i++) {
     data["C"][i] = 0;
@@ -123,7 +123,8 @@ TEST(Codegen, ApplyTile) {
 
 TEST(Codegen, StencilMatchMatMul) {
   StencilSpec spec = {
-      32,  // alpha
+      "16x16x*",  // name
+      32,         // alpha
       {
           {"k", 16, {-1}, {-1, 0}},
           {"x", 16, {-1}, {0, -1}},
@@ -140,7 +141,8 @@ TEST(Codegen, StencilMatchMatMul) {
   auto match = FindBestStencil({spec}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      1255968,  // total
+      "16x16x*",  // name
+      1255968,    // total
       {
           {"k", "c", 100},
           {"m", "k", 16},
@@ -152,7 +154,8 @@ TEST(Codegen, StencilMatchMatMul) {
 
 TEST(Codegen, StencilMatchConv1D) {
   StencilSpec spec = {
-      32,  // alpha
+      "16x16x*",  // name
+      32,         // alpha
       {
           {"k", 16, {-1}, {-1, 0}},
           {"x", 16, {-1}, {0, -1}},
@@ -169,7 +172,8 @@ TEST(Codegen, StencilMatchConv1D) {
   auto match = FindBestStencil({spec}, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      1378944,  // total
+      "16x16x*",  // name
+      1378944,    // total
       {
           {"ci", "c", 64},
           {"co", "x", 16},
@@ -183,7 +187,8 @@ TEST(Codegen, StencilMatchConv1D) {
 TEST(Codegen, StencilMatchConv2D) {
   std::vector<StencilSpec> specs = {
       {
-          32,  // alpha
+          "16x16x*",  // name
+          32,         // alpha
           {
               {"k", 16, {-1}, {-1, 0}},
               {"x", 16, {-1}, {0, -1}},
@@ -191,7 +196,8 @@ TEST(Codegen, StencilMatchConv2D) {
           }  // idxs
       },
       {
-          32,  // alpha
+          "16x4x4x*",  // name
+          32,          // alpha
           {
               {"k", 16, {-1}, {-1, 0}},
               {"x", 4, {-1}, {0, -1}},
@@ -200,7 +206,8 @@ TEST(Codegen, StencilMatchConv2D) {
           }  // idxs
       },
       {
-          32,  // alpha
+          "4x4x16x*",  // name
+          32,          // alpha
           {
               {"k", 16, {-1}, {0, -1}},
               {"x", 4, {-1}, {-1, 0}},
@@ -219,7 +226,8 @@ TEST(Codegen, StencilMatchConv2D) {
   auto match = FindBestStencil(specs, kernel.get());
   LOG(INFO) << "Best match: " << match;
   StencilMatch expected{
-      323280000,  // total
+      "4x4x16x*",  // name
+      323280000,   // total
       {
           {"ci", "c", 56},
           {"co", "k", 16},
@@ -270,7 +278,8 @@ TEST(Codegen, TilePass) {
 
   std::vector<StencilSpec> specs = {
       {
-          32,  // alpha
+          "16x16x*",  // name
+          32,         // alpha
           {
               {"k", 2, {-1}, {-1, 0}},
               {"x", 2, {-1}, {0, -1}},

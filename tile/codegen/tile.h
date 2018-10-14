@@ -19,6 +19,7 @@ struct StencilIndex {
 };
 
 struct StencilSpec {
+  std::string name;
   size_t alpha;
   std::vector<StencilIndex> idxs;
 };
@@ -30,6 +31,7 @@ struct StencilIndexMatch {
 };
 
 struct StencilMatch {
+  std::string name;
   size_t cost;
   std::vector<StencilIndexMatch> idxs;
   bool is_fallback;
@@ -41,7 +43,7 @@ bool operator<(const StencilMatch& lhs, const StencilMatch& rhs);
 
 StencilMatch FindBestStencil(const std::vector<StencilSpec>& specs, stripe::Block* block);
 
-void ApplyTile(stripe::Block* inner, const TileShape& tile);
+void ApplyTile(stripe::Block* inner, const TileShape& tile, const std::string& tile_name);
 
 typedef std::function<TileShape(stripe::Block* block)> TileGenerator;
 

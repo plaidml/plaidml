@@ -160,53 +160,28 @@ static void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& s
   }
 }
 
-static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
-  PrintTab(os, depth);
-  os << "block [";
-  for (size_t i = 0; i < block.idxs.size(); i++) {
-    if (i > 0) {
-      os << ", ";
-    }
-    os << block.idxs[i];
-  }
-  os << "] (";
-  if (!block.name.empty()) {
-    os << " // " << block.name;
-  }
-  os << std::endl;
-
-  if (!block.comments.empty()) {
-    std::stringstream ss(block.comments);
-    for (std::string line; std::getline(ss, line, '\n');) {
-      PrintTab(os, depth + 2);
-      os << "// " << line << std::endl;
-    }
-  }
-  for (const auto& constraint : block.constraints) {
-    PrintTab(os, depth + 2);
-    os << constraint.toString() << " >= 0";
-    os << std::endl;
-  }
+static void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
   for (size_t i = 0; i < block.refs.size(); i++) {
     PrintTab(os, depth + 2);
     const auto& ref = block.refs[i];
     switch (ref.dir) {
       case RefDir::None:
-        os << "none ";
+        os << "none";
         break;
       case RefDir::In:
-        os << "in ";
+        os << "in";
         break;
       case RefDir::Out:
-        os << "out ";
+        os << "out";
         break;
       case RefDir::InOut:
-        os << "inout ";
+        os << "inout";
         break;
     }
     if (ref.from.empty()) {
-      os << "new ";
+      os << " new";
     }
+    os << "<" << ref.location << "> ";
     os << ref.into;
     if (ref.into != ref.from) {
       if (!ref.from.empty()) {
@@ -232,6 +207,39 @@ static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     }
     os << std::endl;
   }
+}
+
+static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
+  PrintTab(os, depth);
+  os << "block [";
+  for (size_t i = 0; i < block.idxs.size(); i++) {
+    if (i > 0) {
+      os << ", ";
+    }
+    os << block.idxs[i].name << ":" << block.idxs[i].range;
+    if (block.idxs[i].factor != 0) {
+      os << ":" << block.idxs[i].factor;
+    }
+  }
+  os << "] (";
+  if (!block.name.empty()) {
+    os << " // " << block.name;
+  }
+  os << std::endl;
+
+  if (!block.comments.empty()) {
+    std::stringstream ss(block.comments);
+    for (std::string line; std::getline(ss, line, '\n');) {
+      PrintTab(os, depth + 2);
+      os << "// " << line << std::endl;
+    }
+  }
+  for (const auto& constraint : block.constraints) {
+    PrintTab(os, depth + 2);
+    os << constraint.toString() << " >= 0";
+    os << std::endl;
+  }
+  PrintRefinements(os, block, depth);
   PrintTab(os, depth);
   os << ") {" << std::endl;
   for (const auto& stmt : block.stmts) {

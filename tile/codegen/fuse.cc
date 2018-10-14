@@ -162,25 +162,25 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
   for (const auto& stmt : b->stmts) {
     switch (stmt->kind()) {
       case StmtKind::Load: {
-        auto lstmt = Load::Downcast(stmt);
-        lstmt->from = remap_b.at(lstmt->from);
+        auto op = Load::Downcast(stmt);
+        op->from = remap_b.at(op->from);
       } break;
       case StmtKind::Store: {
-        auto sstmt = Store::Downcast(stmt);
-        sstmt->into = remap_b.at(sstmt->into);
+        auto op = Store::Downcast(stmt);
+        op->into = remap_b.at(op->into);
       } break;
       case StmtKind::Special: {
-        auto sstmt = Special::Downcast(stmt);
-        for (auto& s : sstmt->inputs) {
+        auto op = Special::Downcast(stmt);
+        for (auto& s : op->inputs) {
           s = remap_b.at(s);
         }
-        for (auto& s : sstmt->outputs) {
+        for (auto& s : op->outputs) {
           s = remap_b.at(s);
         }
       } break;
       case StmtKind::Block: {
-        auto bstmt = Block::Downcast(stmt);
-        for (auto& ref : bstmt->refs) {
+        auto op = Block::Downcast(stmt);
+        for (auto& ref : op->refs) {
           ref.from = remap_b.at(ref.from);
         }
       } break;

@@ -13,6 +13,8 @@ using namespace stripe;  // NOLINT
 
 namespace {
 
+const char* INITIAL_LOCATION = "DRAM";
+
 class StripeGenerator {
  public:
   StripeGenerator(const Program& parsed,  //
@@ -67,11 +69,13 @@ class StripeGenerator {
         if (binding.tag == Binding::TENSOR) {
           std::vector<Affine> access(binding.shape.dims.size());
           main->refs.emplace_back(Refinement{
-              RefDir::None,  // dir
-              "",            // from
-              item.first,    // into
-              access,        // access
-              binding.shape  // shape
+              RefDir::None,     // dir
+              "",               // from
+              item.first,       // into
+              access,           // access
+              binding.shape,    // shape
+              "",               // agg_op
+              INITIAL_LOCATION  // location
           });
         }
       }
@@ -86,28 +90,33 @@ class StripeGenerator {
       externals_.insert(item.first);
       std::vector<Affine> access(item.second.dims.size());
       program->refs.emplace_back(Refinement{
-          RefDir::None,  // dir
-          "",            // from
-          item.first,    // into
-          access,        // access
-          item.second    // shape
+          RefDir::None,     // dir
+          "",               // from
+          item.first,       // into
+          access,           // access
+          item.second,      // shape
+          "",               // agg_op
+          INITIAL_LOCATION  // location
       });
       if (is_input) {
         main->refs.emplace_back(Refinement{
-            RefDir::In,  // dir
-            item.first,  // from
-            item.first,  // into
-            access,      // access
-            item.second  // shape
+            RefDir::In,       // dir
+            item.first,       // from
+            item.first,       // into
+            access,           // access
+            item.second,      // shape
+            "",               // agg_op
+            INITIAL_LOCATION  // location
         });
       } else {
         main->refs.emplace_back(Refinement{
-            RefDir::Out,       // dir
-            item.first,        // from
-            item.first,        // into
-            access,            // access
-            item.second,       // shape
-            Intrinsic::ASSIGN  // agg_op
+            RefDir::Out,        // dir
+            item.first,         // from
+            item.first,         // into
+            access,             // access
+            item.second,        // shape
+            Intrinsic::ASSIGN,  // agg_op
+            INITIAL_LOCATION    // location
         });
       }
     }
@@ -155,23 +164,25 @@ class StripeGenerator {
       }
       if (i == 0) {
         kernel->refs.emplace_back(Refinement{
-            RefDir::Out,           // dir
-            spec.id,               // from
-            spec.id,               // into
-            access,                // access
-            shape,                 // shape
-            GetAggOp(cion.agg_op)  // agg_op
+            RefDir::Out,            // dir
+            spec.id,                // from
+            spec.id,                // into
+            access,                 // access
+            shape,                  // shape
+            GetAggOp(cion.agg_op),  // agg_op
+            INITIAL_LOCATION        // location
         });
       } else {
         auto scalar_name = ScalarName(spec.id);
         scalar_inputs.push_back(scalar_name);
         kernel->refs.emplace_back(Refinement{
-            RefDir::In,  // dir
-            spec.id,     // from
-            spec.id,     // into
-            access,      // access
-            shape        // shape
-                         // agg_op
+            RefDir::In,       // dir
+            spec.id,          // from
+            spec.id,          // into
+            access,           // access
+            shape,            // shape
+            "",               // agg_op
+            INITIAL_LOCATION  // location
         });
         // LOAD
         kernel->stmts.push_back(std::make_shared<Load>(spec.id, scalar_name));
@@ -290,7 +301,15 @@ class StripeGenerator {
               }
             }
           }
-          kernel->refs.emplace_back(Refinement{RefDir::In, input, input, access, ScalarShape(input)});
+          kernel->refs.emplace_back(Refinement{
+              RefDir::In,          // dir
+              input,               // from
+              input,               // into
+              access,              // access
+              ScalarShape(input),  // shape
+              "",                  // agg_op
+              INITIAL_LOCATION     // location
+          });
           // LOAD
           kernel->stmts.push_back(std::make_shared<Load>(input, ScalarName(input)));
         } break;
@@ -306,7 +325,15 @@ class StripeGenerator {
       }
     }
 
-    kernel->refs.emplace_back(Refinement{RefDir::Out, op.output, op.output, out_access, ScalarShape(op.output)});
+    kernel->refs.emplace_back(Refinement{
+        RefDir::Out,             // dir
+        op.output,               // from
+        op.output,               // into
+        out_access,              // access
+        ScalarShape(op.output),  // shape
+        "",                      // agg_op
+        INITIAL_LOCATION         // location
+    });
 
     // INTRINSIC
     std::vector<std::string> scalar_inputs;
@@ -342,43 +369,6 @@ class StripeGenerator {
     }
     return shapes;
   }
-
-  // bool NeedsZero(const FlatContraction& flat) {
-  //   std::vector<std::pair<size_t, size_t>> out_pattern;
-  //   if (flat.access[0].offset != 0) {
-  //     return true;
-  //   }
-  //   for (size_t i = 0; i < flat.names.size(); i++) {
-  //     if (flat.access[0].strides[i] == 0) {
-  //       continue;
-  //     }
-  //     if (flat.access[0].strides[i] < 0) {
-  //       return true;
-  //     }  // Don't try to be fancy, fallback
-  //     out_pattern.emplace_back(flat.access[0].strides[i], flat.ranges[i]);
-  //   }
-  //   for (const auto& fc : flat.constraints) {
-  //     bool output_only = true;
-  //     for (size_t i = 0; i < flat.names.size(); i++) {
-  //       if (fc.lhs[i] != 0 && flat.access[0].strides[i] == 0) {
-  //         output_only = false;
-  //         break;
-  //       }
-  //     }
-  //     if (output_only) {
-  //       return true;
-  //     }
-  //   }
-  //   std::sort(out_pattern.begin(), out_pattern.end());
-  //   size_t curskip = 1;
-  //   for (const auto& p : out_pattern) {
-  //     if (curskip != p.first) {
-  //       return true;
-  //     }
-  //     curskip *= p.second;
-  //   }
-  //   return curskip != flat.access[0].global_index_limit;
-  // }
 
   void AddIntrinsic(Block* block,                            //
                     const std::string& name,                 //
