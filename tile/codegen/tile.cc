@@ -18,10 +18,17 @@ void ApplyTile(Block* outer, const TileShape& tile, const std::string& tile_name
   if (outer->idxs.size() != tile.size()) {
     throw std::runtime_error("Invalid tile specified");
   }
-  // Make a 'by-name' version of tile
+  // Make a 'by-name' version of tile and check for trivality
+  bool trivial = true;
   std::map<std::string, size_t> tile_by_name;
   for (size_t i = 0; i < outer->idxs.size(); i++) {
     tile_by_name[outer->idxs[i].name] = tile[i];
+    if (tile[i] != 1) {
+      trivial = false;
+    }
+  }
+  if (trivial) {
+    return;
   }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
