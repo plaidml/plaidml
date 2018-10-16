@@ -14,7 +14,9 @@ namespace tile {
 namespace codegen {
 
 struct FusionPlan {
+  TileShape tile_a;
   std::map<std::string, std::string> remap_a;
+  TileShape tile_b;
   std::map<std::string, std::string> remap_b;
 };
 
@@ -24,7 +26,7 @@ boost::optional<FusionPlan> ComputeFusionPlan(const stripe::Block& a, const stri
 
 // Prepare each block for fusion by renaming / moving indexes
 std::shared_ptr<stripe::Block> FusionRefactor(const stripe::Block& block,
-                                              const std::map<std::string, std::string>& mapping);
+                                              const std::map<std::string, std::string>& mapping, const TileShape& tile);
 
 // Attempt to fuse b into a.  Return true on success, in which case blocks have been
 // destructively modified.  Otherwise returns false and leave blocks unaltered.

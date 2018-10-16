@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <string>
+#include <utility>
 
 namespace vertexai {
 
@@ -61,3 +62,16 @@ std::ostream& operator<<(std::ostream& os, const StreamContainerContext<T>& hold
 }
 
 }  // namespace vertexai
+
+namespace std {
+
+// Overload operator<< for pairs to make maps stream nicely
+// TODO: Should we 'wrap' pairs/element similarly to containers to avoid
+// overloading in the general case?
+template <typename A, typename B>
+std::ostream& operator<<(std::ostream& os, const pair<A, B>& value) {
+  os << "(" << value.first << "->" << value.second << ")";
+  return os;
+}
+
+}  // namespace std

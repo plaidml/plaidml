@@ -217,10 +217,7 @@ static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
     if (i > 0) {
       os << ", ";
     }
-    os << block.idxs[i].name << ":" << block.idxs[i].range;
-    if (block.idxs[i].factor != 0) {
-      os << ":" << block.idxs[i].factor;
-    }
+    os << block.idxs[i];
   }
   os << "] (";
   if (!block.name.empty()) {
