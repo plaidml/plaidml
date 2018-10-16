@@ -13,7 +13,11 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyTile(Block* outer, const TileShape& tile, const std::string& tile_name) {
+void ApplyTile(Block* outer,                  //
+               const TileShape& tile,         //
+               const std::string& tile_name,  //
+               const std::string& location,   //
+               bool elide_trivial) {
   // Verify tile shape is correct
   if (outer->idxs.size() != tile.size()) {
     throw std::runtime_error("Invalid tile specified");
@@ -27,12 +31,13 @@ void ApplyTile(Block* outer, const TileShape& tile, const std::string& tile_name
       trivial = false;
     }
   }
-  if (trivial) {
+  if (elide_trivial && trivial) {
     return;
   }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
   inner->name = tile_name;
+  inner->location = location;
   // Block inner;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
@@ -139,7 +144,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
       match.cost *= num_tiles * tile.value;
       match.idxs.push_back(tile);
     }
-    match.cost += spec.alpha * total_tiles;
+    match.cost += spec.startup_cost * total_tiles;
     IVLOG(4, "Candidate: " << match);
     into->emplace(match);
   } else {
@@ -201,7 +206,7 @@ void TilePass(Block* block, const TileGenerator& generator) {
     }
   }
   if (is_leaf) {
-    ApplyTile(block, generator(block), "tile");
+    ApplyTile(block, generator(block), "tile", "");
   }
 }
 

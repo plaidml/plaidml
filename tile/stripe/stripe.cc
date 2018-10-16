@@ -212,7 +212,11 @@ static void PrintRefinements(std::ostream& os, const Block& block, size_t depth)
 
 static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
   PrintTab(os, depth);
-  os << "block [";
+  os << "block";
+  if (!block.location.empty()) {
+    os << "<" << block.location << ">";
+  }
+  os << " [";
   for (size_t i = 0; i < block.idxs.size(); i++) {
     if (i > 0) {
       os << ", ";
