@@ -25,8 +25,10 @@ boost::optional<FusionPlan> ComputeFusionPlan(const stripe::Block& a, const stri
                                               const std::string& buf_name);
 
 // Prepare each block for fusion by renaming / moving indexes
-std::shared_ptr<stripe::Block> FusionRefactor(const stripe::Block& block,
-                                              const std::map<std::string, std::string>& mapping, const TileShape& tile);
+std::shared_ptr<stripe::Block> FusionRefactor(const stripe::Block& block,                         //
+                                              const std::map<std::string, std::string>& mapping,  //
+                                              const TileShape& tile,                              //
+                                              const std::string& location);
 
 // Attempt to fuse b into a.  Return true on success, in which case blocks have been
 // destructively modified.  Otherwise returns false and leave blocks unaltered.
