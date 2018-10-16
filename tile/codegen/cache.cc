@@ -27,7 +27,10 @@ static void FixupCacheRefs(Block* block, const std::string& var_name, const std:
   }
 }
 
-void ApplyCache(Block* block, const std::string& var_name, const std::string& cache_name) {
+void ApplyCache(Block* block,                   //
+                const std::string& var_name,    //
+                const std::string& cache_name,  //
+                const std::string& xfer_location) {
   // Find the appropriate refinement
   auto ref_it = block->ref_by_into(var_name);
   if (ref_it == block->refs.end()) {
@@ -55,6 +58,7 @@ void ApplyCache(Block* block, const std::string& var_name, const std::string& ca
   // Set both from refinements to the cached version, we will replace
   // one of them with the 'raw' version based on transfer direction
   Block xfer_block;
+  xfer_block.location = xfer_location;
   std::vector<Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
     std::string iname = std::string("i") + std::to_string(i);

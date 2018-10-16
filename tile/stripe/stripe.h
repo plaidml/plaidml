@@ -216,6 +216,7 @@ struct Block : Statement {
   std::vector<Refinement> refs;
   StatementList stmts;
   std::map<std::string, std::shared_ptr<Annotation>> annotations;
+  std::string location;
 
   // Helper methods
   std::vector<const Refinement*> ref_ins() const;

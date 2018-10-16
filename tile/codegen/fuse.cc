@@ -56,11 +56,13 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
   return plan;
 }
 
-std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig, const std::map<std::string, std::string>& mapping,
-                                      const TileShape& tile) {
+std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                          //
+                                      const std::map<std::string, std::string>& mapping,  //
+                                      const TileShape& tile,                              //
+                                      const std::string& location) {
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
-  ApplyTile(tiled.get(), tile, "fusion_tile");
+  ApplyTile(tiled.get(), tile, "fusion_tile", location);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
   auto inner = std::make_shared<Block>();
