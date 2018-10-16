@@ -1,6 +1,7 @@
 // Copyright 2018, Intel Corp.
 
 #include "tile/codegen/fuse.h"
+#include "tile/codegen/tile.h"
 
 namespace vertexai {
 namespace tile {
@@ -10,6 +11,8 @@ using namespace stripe;  // NOLINT
 
 boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, const std::string& buf_name) {
   FusionPlan plan;
+  plan.tile_a = TileShape(a.idxs.size(), 1);
+  plan.tile_b = TileShape(b.idxs.size(), 1);
   // This is quite hueristic right now, but still beats our prior implementation
   auto it_a = a.ref_by_from(buf_name);
   if (it_a == a.refs.end()) {
@@ -37,19 +40,33 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
     if (plan.remap_a.find(idx_a) != plan.remap_a.end()) {
       return boost::none;
     }
+    int64_t mul_a = poly_a[idx_a];
+    int64_t mul_b = poly_b[idx_b];
+    if (mul_a % mul_b != 0) {
+      return boost::none;
+    }
+    for (size_t i = 0; i < b.idxs.size(); i++) {
+      if (b.idxs[i].name == idx_b) {
+        plan.tile_b[i] = mul_a / mul_b;
+      }
+    }
     plan.remap_a.emplace(idx_a, idx_a);
     plan.remap_b.emplace(idx_b, idx_a);
   }
   return plan;
 }
 
-std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig, const std::map<std::string, std::string>& mapping) {
+std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig, const std::map<std::string, std::string>& mapping,
+                                      const TileShape& tile) {
+  // Possibly tile
+  auto tiled = std::make_shared<Block>(orig);
+  ApplyTile(tiled.get(), tile, "fusion_tile");
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
   auto inner = std::make_shared<Block>();
   outer->stmts.push_back(inner);
   // Move / rename each index to the appropriate block
-  for (const auto& idx : orig.idxs) {
+  for (const auto& idx : tiled->idxs) {
     auto it = mapping.find(idx.name);
     if (it == mapping.end()) {
       inner->idxs.push_back(idx);
@@ -62,12 +79,12 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig, const std::map<
   // Sort outer indexes by names
   std::sort(outer->idxs.begin(), outer->idxs.end(), [](const Index& a, const Index& b) { return a.name < b.name; });
   // Copy constraints to inner block
-  inner->constraints = orig.constraints;
+  inner->constraints = tiled->constraints;
   // Copy statements to the inner block
-  inner->stmts = orig.stmts;
+  inner->stmts = tiled->stmts;
   // Copy refinements to both blocks
-  outer->refs = orig.refs;
-  inner->refs = orig.refs;
+  outer->refs = tiled->refs;
+  inner->refs = tiled->refs;
   // Rename mapped, and remove unmapped access elements from outer refinements
   // Also expand sizes base on inner indexes that have been removed.
   for (auto& ref : outer->refs) {
@@ -82,7 +99,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig, const std::map<
             if (kvp.second < 0) {
               throw std::runtime_error("FusionRefactor: Unable to handle negative strides");
             }
-            max_val += (orig.idx_by_name(kvp.first)->range - 1) * kvp.second;
+            max_val += (tiled->idx_by_name(kvp.first)->range - 1) * kvp.second;
           }
           continue;
         }
