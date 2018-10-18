@@ -3,6 +3,7 @@
 #include "tile/hal/cpu/emitllvm.h"
 
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Scalar.h>
 
 #include <algorithm>
@@ -29,7 +30,7 @@ Emit::Emit()
     : context_(llvm::getGlobalContext()),
       builder_{context_},
       module_{new llvm::Module("tile", context_)},
-      funcopt_{new llvm::legacy::FunctionPassManager(module_.get())},
+      funcopt_{module_.get()},
       int32type_{llvm::IntegerType::get(context_, 32)},
       booltype_{llvm::IntegerType::get(context_, 1)},
       blocks_{1} {
@@ -48,18 +49,16 @@ Emit::Emit()
 
   // Configure the function pass manager for specific optimization passes which
   // might be relevant for Tile code.
-  funcopt_->add(llvm::createEarlyCSEPass());
-  funcopt_->add(llvm::createLICMPass());
-  funcopt_->add(llvm::createLoopInstSimplifyPass());
-  funcopt_->add(llvm::createGVNPass());
-  funcopt_->add(llvm::createDeadStoreEliminationPass());
-  funcopt_->add(llvm::createSCCPPass());
-  funcopt_->add(llvm::createReassociatePass());
-  funcopt_->add(llvm::createInstructionCombiningPass());
-  funcopt_->add(llvm::createInstructionSimplifierPass());
-  funcopt_->add(llvm::createAggressiveDCEPass());
-  funcopt_->add(llvm::createCFGSimplificationPass());
-  funcopt_->doInitialization();
+  llvm::PassManagerBuilder pmb;
+  pmb.OptLevel = 3;
+  pmb.SizeLevel = 0;
+  pmb.BBVectorize = true;
+  pmb.SLPVectorize = true;
+  pmb.LoopVectorize = true;
+  pmb.MergeFunctions = true;
+  pmb.populateFunctionPassManager(funcopt_);
+  pmb.populateModulePassManager(modopt_);
+  funcopt_.doInitialization();
 }
 
 void Emit::Visit(const sem::IntConst& n) {
@@ -847,7 +846,7 @@ void Emit::Visit(const sem::Function& n) {
   Leave();
   returntype_.base = sem::Type::TVOID;
 
-  funcopt_->run(*function_);
+  funcopt_.run(*function_);
 }
 
 std::string Emit::str() const {
@@ -856,6 +855,11 @@ std::string Emit::str() const {
   os << *module_;
   os.flush();
   return r;
+}
+
+std::unique_ptr<llvm::Module>&& Emit::result() {
+  modopt_.run(*module_);
+  return std::move(module_);
 }
 
 Emit::value Emit::Process(const sem::Node& n) {

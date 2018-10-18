@@ -5,6 +5,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/PassManager.h>
 
 #include <deque>
 #include <map>
@@ -46,7 +47,7 @@ class Emit : public sem::Visitor {
   void Visit(const sem::ReturnStmt&) override;
   void Visit(const sem::Function&) override;
   std::string str() const;
-  std::unique_ptr<llvm::Module>&& result() { return std::move(module_); }
+  std::unique_ptr<llvm::Module>&& result();
 
  private:
   struct value {
@@ -90,7 +91,8 @@ class Emit : public sem::Visitor {
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
   std::unique_ptr<llvm::Module> module_;
-  std::unique_ptr<llvm::legacy::FunctionPassManager> funcopt_;
+  llvm::legacy::FunctionPassManager funcopt_;
+  llvm::legacy::PassManager modopt_;
   llvm::IntegerType* int32type_ = nullptr;
   llvm::IntegerType* booltype_ = nullptr;
   llvm::IntegerType* ssizetype_ = nullptr;
