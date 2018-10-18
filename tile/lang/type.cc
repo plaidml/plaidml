@@ -515,29 +515,29 @@ void TypeCheck(Program* prog, Bindings* vars) {
       }
       if (op.f.fn == "element") {
         if (op.inputs.size() != 2) {
-          throw new std::runtime_error("Element requires exactly two inputs.");
+          throw std::runtime_error("Element requires exactly two inputs.");
         }
         const Binding& it = vars->at(op.inputs[0]);
         if (it.tag != Binding::TUPLE) {
-          throw new std::runtime_error("Element requires it's first input to be a tuple");
+          throw std::runtime_error("Element requires it's first input to be a tuple");
         }
         if (vars->at(op.inputs[1]).tag != Binding::ICONST) {
-          throw new std::runtime_error("Element requires it's second input to be an integer");
+          throw std::runtime_error("Element requires it's second input to be an integer");
         }
         int64_t elem = vars->at(op.inputs[1]).iconst;
         if (elem < 0 || elem >= it.tuple.size()) {
-          throw new std::runtime_error("Element requires it's tuple position to be in bound");
+          throw std::runtime_error("Element requires it's tuple position to be in bound");
         }
         vars->emplace(op.output, it.tuple[elem]);
         continue;
       }
       if (op.f.fn == "shape") {
         if (op.inputs.size() != 1) {
-          throw new std::runtime_error("Shape requires exactly one input.");
+          throw std::runtime_error("Shape requires exactly one input.");
         }
         Binding it = vars->at(op.inputs[0]);
         if (it.tag != Binding::TENSOR) {
-          throw new std::runtime_error("Shape requires one input that is a tensor");
+          throw std::runtime_error("Shape requires one input that is a tensor");
         }
         out_type = DataType::INT32;
         std::vector<size_t> out_shape;
@@ -547,11 +547,11 @@ void TypeCheck(Program* prog, Bindings* vars) {
       }
       if (op.f.fn == "reshape") {
         if (op.inputs.size() < 1) {
-          throw new std::runtime_error("Reshape requires at least one input.");
+          throw std::runtime_error("Reshape requires at least one input.");
         }
         const Binding& it = vars->at(op.inputs[0]);
         if (it.tag != Binding::TENSOR) {
-          throw new std::runtime_error("Reshape requires one input that is a tensor");
+          throw std::runtime_error("Reshape requires one input that is a tensor");
         }
         std::vector<size_t> sizes;
         for (size_t i = 1; i < op.inputs.size(); i++) {
