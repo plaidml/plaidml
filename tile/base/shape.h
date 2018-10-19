@@ -123,7 +123,7 @@ inline std::string to_string(const DataType& dt) {
     case DataType::PRNG:
       return "prng";
     default:
-      return "!!invalid data type";
+      return "!!invalid data type: " + std::to_string(static_cast<int>(dt));
   }
 }
 
