@@ -355,7 +355,7 @@ class Emitter : public sem::Visitor {
     emit(", ");
     EmitWithTypeConversion(tcase_type, tgt_type, tcase, true);
     emit(", ");
-    cond->Accept(*this);
+    EmitWithWidthConversion(cond_type, tgt_type, cond, true);
     emit(")");
   }
 
@@ -380,6 +380,28 @@ class Emitter : public sem::Visitor {
     emitType(to);
     emit(")");
     expr->Accept(*this);
+  }
+
+  void EmitWithWidthConversion(const sem::Type& from, const sem::Type& to, const sem::ExprPtr& expr,
+                               bool force_conversion) {
+    if (to.base == sem::Type::POINTER_MUT || to.base == sem::Type::POINTER_CONST) {
+      // No conversion required.
+      expr->Accept(*this);
+      return;
+    }
+
+    sem::Type condition_type = to;
+    condition_type.dtype = DataType::BOOLEAN;
+
+    EmitWithTypeConversion(from, condition_type, expr, force_conversion);
+    if (from.vec_width != to.vec_width) {
+      // We need to convert a scalar into a vector.
+      emit(" != ");
+      emit("(");
+      emitType(condition_type);
+      emit(")");
+      emit("0");
+    }
   }
 
   sem::Type TypeOf(const sem::ExprPtr& expr) {  //
