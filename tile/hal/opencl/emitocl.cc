@@ -315,9 +315,10 @@ void Emit::EmitWithTypeConversion(const sem::Type& from, const sem::Type& to, co
     expr->Accept(*this);
     return;
   }
-  if (!force_conversion && ((from.vec_width == 1 && from.base == sem::Type::VALUE && is_int(from.dtype) &&
-                             (to.base == sem::Type::INDEX || (to.base == sem::Type::VALUE && is_int(to.dtype)))) ||
-                            (from.base == to.base && from.dtype == to.dtype && from.vec_width == to.vec_width))) {
+  if (!force_conversion && (from.vec_width == to.vec_width) &&
+      ((from.vec_width == 1 && from.base == sem::Type::VALUE && is_int(from.dtype) &&
+        (to.base == sem::Type::INDEX || (to.base == sem::Type::VALUE && is_int(to.dtype)))) ||
+       (from.base == to.base && from.dtype == to.dtype))) {
     // No conversion required.
     expr->Accept(*this);
     return;
