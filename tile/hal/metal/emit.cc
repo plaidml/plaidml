@@ -399,11 +399,11 @@ class Emitter : public sem::Visitor {
   }
 
   sem::Type TypeOf(const sem::ExprPtr& expr) {  //
-    return lang::ExprType::TypeOf(scope_, true, expr);
+    return lang::ExprType::TypeOf(scope_, true, false, expr);
   }
 
   sem::Type TypeOf(const sem::LValPtr& lvalue) {  //
-    return lang::ExprType::TypeOf(scope_, true, lvalue);
+    return lang::ExprType::TypeOf(scope_, true, false, lvalue);
   }
 
   void emitType(const sem::Type& type, bool is_param = false) {
