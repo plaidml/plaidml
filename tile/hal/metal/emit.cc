@@ -38,7 +38,7 @@ inline std::string c_dtype(const DataType& dt) {
       return "float";
     case DataType::FLOAT64:
     default:
-      throw std::runtime_error("Invalid tile type");
+      throw std::runtime_error{"Unusable hardware type: " + to_string(dt)};
   }
 }
 
