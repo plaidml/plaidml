@@ -123,7 +123,7 @@ class InsnOptimizer : public sem::Visitor {
     scope_ = previous_scope;
   }
 
-  sem::Type TypeOf(const sem::ExprPtr& expr) { return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, expr); }
+  sem::Type TypeOf(const sem::ExprPtr& expr) { return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, true, expr); }
 
   void EvalStmt(const sem::StmtPtr& stmt) { stmt->Accept(*this); }
 

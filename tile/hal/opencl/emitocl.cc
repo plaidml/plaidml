@@ -304,9 +304,11 @@ void Emit::CheckValidType(const sem::Type& ty) {
   }
 }
 
-sem::Type Emit::TypeOf(const sem::ExprPtr& expr) { return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, expr); }
+sem::Type Emit::TypeOf(const sem::ExprPtr& expr) { return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, true, expr); }
 
-sem::Type Emit::TypeOf(const sem::LValPtr& lvalue) { return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, lvalue); }
+sem::Type Emit::TypeOf(const sem::LValPtr& lvalue) {
+  return lang::ExprType::TypeOf(scope_, cl_khr_fp16_, true, lvalue);
+}
 
 void Emit::EmitWithTypeConversion(const sem::Type& from, const sem::Type& to, const sem::ExprPtr& expr,
                                   bool force_conversion) {

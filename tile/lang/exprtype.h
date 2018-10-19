@@ -15,11 +15,13 @@ namespace lang {
 sem::Type Promote(const std::vector<sem::Type>& types);
 
 // Analyzes expression types.
-class ExprType final : public sem::Visitor {
+class ExprType : public sem::Visitor {
  public:
-  static sem::Type TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, const sem::ExprPtr& expr);
+  static sem::Type TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic,
+                          const sem::ExprPtr& expr);
 
-  static sem::Type TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, const sem::LValPtr& lvalue);
+  static sem::Type TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic,
+                          const sem::LValPtr& lvalue);
 
   void Visit(const sem::IntConst&) final;
   void Visit(const sem::FloatConst&) final;
@@ -46,7 +48,7 @@ class ExprType final : public sem::Visitor {
   void Visit(const sem::Function&) final;
 
  private:
-  ExprType(const lang::Scope<sem::Type>* scope, bool enable_fp16);
+  ExprType(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic);
 
   sem::Type TypeOf(const sem::ExprPtr& expr);
 
@@ -54,6 +56,7 @@ class ExprType final : public sem::Visitor {
 
   const lang::Scope<sem::Type>* scope_;
   bool enable_fp16_;
+  bool use_int_for_logic_;
   sem::Type ty_;
 };
 

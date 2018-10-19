@@ -32,7 +32,7 @@ class ExprTypeTest : public ::testing::Test {
     scope_.Bind("val_int8", sem::Type{sem::Type::VALUE, DataType::INT8});
   }
 
-  sem::Type TypeOf(const sem::ExprPtr& expr) { return ExprType::TypeOf(&scope_, enable_fp16_, expr); }
+  sem::Type TypeOf(const sem::ExprPtr& expr) { return ExprType::TypeOf(&scope_, enable_fp16_, true, expr); }
 
   bool enable_fp16_ = false;
   lang::Scope<sem::Type> scope_;

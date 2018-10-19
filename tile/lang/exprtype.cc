@@ -48,14 +48,16 @@ unsigned Rank(sem::Type ty) {
 
 }  // namespace
 
-sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, const sem::ExprPtr& expr) {
-  ExprType et{scope, enable_fp16};
+sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic,
+                           const sem::ExprPtr& expr) {
+  ExprType et{scope, enable_fp16, use_int_for_logic};
   expr->Accept(et);
   return et.ty_;
 }
 
-sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, const sem::LValPtr& lvalue) {
-  ExprType et{scope, enable_fp16};
+sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic,
+                           const sem::LValPtr& lvalue) {
+  ExprType et{scope, enable_fp16, use_int_for_logic};
   lvalue->Accept(et);
   return et.ty_;
 }
@@ -252,16 +254,21 @@ void ExprType::Visit(const sem::ReturnStmt&) { throw std::logic_error{"Unexpecte
 
 void ExprType::Visit(const sem::Function&) { throw std::logic_error{"Unexpected expression component"}; }
 
-ExprType::ExprType(const lang::Scope<sem::Type>* scope, bool enable_fp16) : scope_{scope}, enable_fp16_{enable_fp16} {}
+ExprType::ExprType(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic)
+    : scope_{scope}, enable_fp16_{enable_fp16}, use_int_for_logic_{use_int_for_logic} {}
 
 sem::Type ExprType::TypeOf(const sem::ExprPtr& expr) {
-  ExprType et{scope_, enable_fp16_};
+  ExprType et{scope_, enable_fp16_, use_int_for_logic_};
   expr->Accept(et);
   return et.ty_;
 }
 
 void ExprType::AdjustLogicOpResult() {
   ty_.base = sem::Type::VALUE;
+  if (!use_int_for_logic_) {
+    ty_.dtype = DataType::BOOLEAN;
+    return;
+  }
   if (ty_.vec_width == 1) {
     ty_.dtype = DataType::INT32;
   } else {
