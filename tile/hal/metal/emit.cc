@@ -214,7 +214,7 @@ class Emitter : public sem::Visitor {
         }
         emit("}");
       } else {
-        node.init->Accept(*this);
+        EmitWithTypeConversion(TypeOf(node.init), node.type, node.init, false);
       }
     }
     emit(";\n");
