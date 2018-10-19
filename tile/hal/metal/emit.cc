@@ -276,13 +276,7 @@ class Emitter : public sem::Visitor {
     node.inner->Accept(*this);
   }
 
-  void Visit(const sem::CastExpr& node) {
-    emit("((");
-    emitType(node.type);
-    emit(")");
-    node.val->Accept(*this);
-    emit(")");
-  }
+  void Visit(const sem::CastExpr& node) { node.val->Accept(*this); }
 
   void Visit(const sem::IndexExpr& node) {
     switch (node.type) {
