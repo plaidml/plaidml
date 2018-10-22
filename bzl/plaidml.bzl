@@ -245,3 +245,21 @@ plaidml_cc_version = rule(
     outputs = {"version_file": "_version.cc"},
     implementation = _plaidml_version_impl,
 )
+
+def plaidml_macos_dylib(name, lib, src, tags):
+    # Builds an output .dylib with the runtime path set to @rpath/{name}.
+    # The output is a single file, ${lib}, which should end with ".dylib".
+    native.genrule(
+        name = name,
+        tags = tags,
+        srcs = [src],
+        outs = [lib],
+        message = "Setting rpath for " + lib,
+        cmd = "lib=\"" + lib + "\"" + """
+            cp $< $@
+            original_mode=$$(stat -f%#p $@)
+            chmod u+w $@
+            install_name_tool -id @rpath/$${lib} $@
+            chmod $${original_mode} $@
+        """,
+    )

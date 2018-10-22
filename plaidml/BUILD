@@ -9,6 +9,7 @@ load(
     "plaidml_cc_library",
     "plaidml_cc_test",
     "plaidml_cc_version",
+    "plaidml_macos_dylib",
     "plaidml_proto_library",
     "plaidml_py_library",
     "plaidml_py_wheel",
@@ -104,10 +105,17 @@ plaidml_cc_binary(
 )
 
 apple_binary(
-    name = "libplaidml.dylib",
+    name = "libplaidml_raw.dylib",
     platform_type = "macos",
     binary_type = "dylib",
     deps = [":api"],
+    tags = ["darwin"],
+)
+
+plaidml_macos_dylib(
+    name = "libplaidml_macos",
+    lib = "libplaidml.dylib",
+    src = ":libplaidml_raw.dylib",
     tags = ["darwin"],
 )
 
@@ -337,28 +345,13 @@ pkg_tar(
 )
 
 pkg_tar(
-    name = "macos_sdk_bin",
-    srcs = [
-        "update_sdk_rpaths"
-    ],
-    package_dir = "bin",
-    tags = ["darwin"],
-)
-
-pkg_tar(
     name = "sdk_libs",
     srcs = select({
         "@toolchain//:windows_x86_64": [":plaidml.dll"],
-        "@toolchain//:macos_x86_64": [":libplaidml.dylib"],
+        "@toolchain//:macos_x86_64": [":libplaidml_macos"],
         "//conditions:default": ["libplaidml.so"],
     }),
     package_dir = "lib",
-    symlinks = select({
-        "@toolchain//:macos_x86_64": {
-            "lib/libplaidml.dylib": "libplaidml.dylib_lipobin",
-        },
-        "//conditions:default": {},
-    }),
 )
 
 pkg_tar(
@@ -372,8 +365,5 @@ pkg_tar(
         ":sdk_libs",
         "//plaidml/base:sdk_includes",
         "@half//:sdk_includes",
-    ] + select({
-        "@toolchain//:macos_x86_64": [":macos_sdk_bin"],
-        "//conditions:default": [],
-    }),
+    ],
 )
