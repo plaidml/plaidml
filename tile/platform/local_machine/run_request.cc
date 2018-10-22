@@ -19,7 +19,7 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> RunSchedule(const conte
   std::unordered_set<std::shared_ptr<hal::Event>> dep_set;
 
   for (const auto& step : req->program()->schedule().steps) {
-    IVLOG(1, "Queueing s" << step.idx << ": " << step);
+    IVLOG(2, "Queueing s" << step.idx << ": " << step);
     std::vector<std::shared_ptr<hal::Event>> current_deps;
     std::vector<std::shared_ptr<hal::Buffer>> current_params;
     std::vector<std::shared_ptr<MemChunk>> current_dep_chunks;
@@ -143,16 +143,16 @@ boost::future<void> RunRequest::Run(const context::Context& ctx, const Program* 
 
 void RunRequest::LogRequest(const Program* program, const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
                             const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs) {
-  if (VLOG_IS_ON(1)) {
-    VLOG(1) << "Running program " << program;
+  VLOG(1) << "Running program " << program;
+  if (VLOG_IS_ON(2)) {
     for (const auto& it : inputs) {
       std::shared_ptr<Buffer> buffer = Buffer::Downcast(it.second, program->devinfo());
       std::shared_ptr<MemChunk> chunk = buffer->chunk();
       if (chunk) {
-        VLOG(1) << "Input  " << it.first << " -> Buffer " << buffer.get() << " -> HAL Buffer "
+        VLOG(2) << "Input  " << it.first << " -> Buffer " << buffer.get() << " -> HAL Buffer "
                 << chunk->hal_buffer().get() << ", size=" << chunk->size() << " bytes";
       } else {
-        VLOG(1) << "Input  " << it.first << " -> Buffer " << buffer.get() << " -> No chunk, size=" << buffer->size()
+        VLOG(2) << "Input  " << it.first << " -> Buffer " << buffer.get() << " -> No chunk, size=" << buffer->size()
                 << " bytes";
       }
     }
@@ -160,10 +160,10 @@ void RunRequest::LogRequest(const Program* program, const std::map<std::string, 
       std::shared_ptr<Buffer> buffer = Buffer::Downcast(it.second, program->devinfo());
       std::shared_ptr<MemChunk> chunk = buffer->chunk();
       if (chunk) {
-        VLOG(1) << "Output " << it.first << " -> Buffer " << buffer.get() << " -> HAL Buffer "
+        VLOG(2) << "Output " << it.first << " -> Buffer " << buffer.get() << " -> HAL Buffer "
                 << chunk->hal_buffer().get() << ", size=" << chunk->size() << " bytes";
       } else {
-        VLOG(1) << "Output " << it.first << " -> Buffer " << buffer.get() << " -> No chunk, size=" << buffer->size()
+        VLOG(2) << "Output " << it.first << " -> Buffer " << buffer.get() << " -> No chunk, size=" << buffer->size()
                 << " bytes";
       }
     }
