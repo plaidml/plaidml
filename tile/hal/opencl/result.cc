@@ -79,7 +79,7 @@ void Result::LogStatistics() const {
     LOG(ERROR) << "Event " << event_.get() << " failed with: " << err.str();
   } else {
     auto duration = info_->execution_duration.count();
-    VLOG(1) << "Result: dur=" << duration;
+    VLOG(2) << "Result: dur=" << duration;
     LogActivity(ctx_, device_state_, *info_);
   }
 }
@@ -111,7 +111,7 @@ void KernelResult::LogStatistics() const {
       // Prevent division by 0
       duration = 1;
     }
-    VLOG(1) << "Ran " << ki_.kname << ": dur=" << duration << " GFL/s=" << ki_.tot_flops / duration
+    VLOG(2) << "Ran " << ki_.kname << ": dur=" << duration << " GFL/s=" << ki_.tot_flops / duration
             << " GBP/s=" << ki_.tot_bytes / duration;
     LogActivity(ctx_, device_state_, *info_);
   }
