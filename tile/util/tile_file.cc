@@ -33,12 +33,12 @@ std::shared_ptr<lang::TensorValue> ReadTensor(UnZipArchive* zip_file, const std:
   auto tensor_shape = FromProto(pb_shape);
 
   auto null_buffer = std::make_shared<NullBuffer>();
-  return lang::TensorValue::make(null_buffer, tensor_shape);
+  return lang::TensorValue::make(null_buffer, tensor_shape, true);
 }
 
 std::shared_ptr<lang::TensorValue> MakeTensor(TensorShape shape) {
   auto null_buffer = std::make_shared<NullBuffer>();
-  return lang::TensorValue::make(null_buffer, shape);
+  return lang::TensorValue::make(null_buffer, shape, false);
 }
 
 }  // namespace

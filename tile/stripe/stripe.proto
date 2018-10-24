@@ -20,6 +20,7 @@ message Block {
   repeated Refinement refs = 5;
   repeated Statement stmts = 6;
   map<string, google.protobuf.Any> annotations = 7;
+  Location location = 8;
 }
 
 message Index {
@@ -43,6 +44,8 @@ message Refinement {
   repeated Affine access = 4;
   tile.proto.TensorShape shape = 5;
   string agg_op = 6;
+  Location location = 7;
+  bool is_const = 8;
 }
 
 message Statement {
@@ -71,18 +74,16 @@ message Intrinsic {
   repeated string inputs = 2;
   repeated string outputs = 3;
 
-  enum Value {
-    ZERO = 0;
-    COPY = 1;
-    MUL = 2;
-    ADD = 3;
-    EQ = 4;
-    COND = 5;
-    SUM = 6;
-    MAX = 7;
-    MIN = 8;
-    PROD = 9;
-    ASSIGN = 10;
+  enum Std {
+    MUL = 0;
+    ADD = 1;
+    EQ = 2;
+    COND = 3;
+    SUM = 4;
+    MAX = 5;
+    MIN = 6;
+    PROD = 7;
+    ASSIGN = 8;
   }
 }
 
@@ -91,6 +92,11 @@ message Special {
   repeated string params = 2;
   repeated string inputs = 3;
   repeated string outputs = 4;
+
+  enum Std {
+    ZERO = 0;
+    COPY = 1;
+  }
 }
 
 message Constant {
@@ -99,6 +105,11 @@ message Constant {
     int64 iconst = 2;
     double fconst = 3;
   }
+}
+
+message Location {
+  string name = 1;
+  Affine unit = 2;
 }
 
 message BoolAnnotation {

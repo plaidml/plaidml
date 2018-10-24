@@ -541,6 +541,9 @@ RunInfo BoundFunction::PrepareToRun() const {
     std::string n = "X" + kvp.first;
     r.input_shapes[n] = kvp.second->shape();
     r.input_buffers[n] = kvp.second->buffer();
+    if (kvp.second->is_const()) {
+      r.const_inputs.insert(n);
+    }
   }
   for (const auto& kvp : out_bound_) {
     std::string n = "X" + kvp.first;

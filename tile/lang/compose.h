@@ -80,14 +80,21 @@ class IConstValue final : public Value {
 // Tensor values represent mutable tensors
 class TensorValue final : public Value {
  public:
-  static std::shared_ptr<TensorValue> make(const std::shared_ptr<BufferBase>& _buffer, const TensorShape& _shape) {
-    return Interned<TensorValue>::make(_buffer, _shape);
+  static std::shared_ptr<TensorValue> make(const std::shared_ptr<BufferBase>& buffer,  //
+                                           const TensorShape& shape,                   //
+                                           bool is_const = false) {
+    return Interned<TensorValue>::make(buffer, shape, is_const);
   }
 
-  TensorValue(const std::shared_ptr<BufferBase>& buffer, const TensorShape& shape) : buffer_{buffer}, shape_{shape} {}
+  TensorValue(const std::shared_ptr<BufferBase>& buffer, const TensorShape& shape, bool is_const)
+      : buffer_{buffer},     //
+        shape_{shape},       //
+        is_const_(is_const)  //
+  {}
 
   const std::shared_ptr<BufferBase>& buffer() const { return buffer_; }
   const TensorShape& shape() const { return shape_; }
+  bool is_const() const { return is_const_; }
   Value::Type type() const final { return Value::Type::TENSOR; }
   size_t num_dims() const final { return shape_.dims.size(); }
   std::shared_ptr<Value> dim_value(size_t i) const final {
@@ -97,6 +104,7 @@ class TensorValue final : public Value {
  private:
   std::shared_ptr<BufferBase> buffer_;
   TensorShape shape_;
+  bool is_const_;
 };
 
 // Placeholders represent 'variables' to be filled in latter
@@ -225,6 +233,7 @@ struct RunInfo {
   ShapeMap output_shapes;
   std::map<std::string, std::shared_ptr<BufferBase>> input_buffers;
   std::map<std::string, std::shared_ptr<BufferBase>> output_buffers;
+  std::set<std::string> const_inputs;
 };
 
 class FunctionApplication;
