@@ -37,7 +37,7 @@ void ApplyTile(Block* outer,                  //
   // Create a new inner block
   auto inner = std::make_shared<Block>();
   inner->name = tile_name;
-  inner->location = location;
+  inner->location = {location};
   // Block inner;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
