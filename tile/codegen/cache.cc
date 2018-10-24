@@ -18,7 +18,7 @@ static void FixupCacheRefs(Block* block, const std::string& var_name, const std:
   if (ref_it == block->refs.end()) {
     return;
   }
-  ref_it->location = cache_name;
+  ref_it->location = {cache_name};
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
@@ -58,7 +58,7 @@ void ApplyCache(Block* block,                   //
   // Set both from refinements to the cached version, we will replace
   // one of them with the 'raw' version based on transfer direction
   Block xfer_block;
-  xfer_block.location = xfer_location;
+  xfer_block.location = {xfer_location};
   std::vector<Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
     std::string iname = std::string("i") + std::to_string(i);
@@ -78,7 +78,8 @@ void ApplyCache(Block* block,                   //
       xfer_access,        // access
       cached_xfer_shape,  // shape
       "",                 // agg_op
-      ref_it->location    // location
+      ref_it->location,   // location
+      ref_it->is_const    // is_const
   });
   xfer_block.refs.push_back(Refinement{
       RefDir::Out,        // dir
@@ -87,7 +88,8 @@ void ApplyCache(Block* block,                   //
       xfer_access,        // access
       cached_xfer_shape,  // shape
       "",                 // agg_op
-      ref_it->location    // location
+      ref_it->location,   // location
+      ref_it->is_const    // is_const
   });
   xfer_block.stmts.push_back(std::make_shared<Load>("src", "$X"));
   xfer_block.stmts.push_back(std::make_shared<Store>("$X", "dst"));
@@ -97,7 +99,7 @@ void ApplyCache(Block* block,                   //
     cache_load->name = printstring("load_%s", var_name.c_str());
     cache_load->refs[0].from = raw_name;
     cache_load->refs[0].shape = raw_xfer_shape;
-    cache_load->refs[1].location = cache_name;
+    cache_load->refs[1].location = {cache_name};
     block->stmts.push_front(cache_load);
   }
   // If original refinement was output, flush from cache
@@ -106,7 +108,7 @@ void ApplyCache(Block* block,                   //
     cache_store->name = printstring("store_%s", var_name.c_str());
     cache_store->refs[1].from = raw_name;
     cache_store->refs[1].shape = raw_xfer_shape;
-    cache_store->refs[0].location = cache_name;
+    cache_store->refs[0].location = {cache_name};
     block->stmts.push_back(cache_store);
   }
   // Add the new declaration (replacing the original)
@@ -118,7 +120,7 @@ void ApplyCache(Block* block,                   //
       {},            // access
       cached_ts,     // shape
       "",            // agg_op
-      cache_name     // location
+      {cache_name}   // location
   });
 }
 

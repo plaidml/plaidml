@@ -905,7 +905,7 @@ std::shared_ptr<TensorValue> ReadTensor(vai_ctx* ctx, vertexai::UnZipArchive* zi
 
   tensor_file.ReadInto(plaidml_get_mapping_base(ctx, tm.get()), plaidml_get_mapping_size(ctx, tm.get()));
   plaidml_writeback_mapping(ctx, tm.get());
-  return tile::lang::TensorValue::make(bs, ts);
+  return tile::lang::TensorValue::make(bs, ts, true);
 }
 
 }  // namespace
@@ -1325,9 +1325,10 @@ void BuildInvokerRunInfo(plaidml_invoker* invoker) {
         auto applier = std::make_shared<FunctionApplication>(invoker->func);
         for (const auto& it : invoker->inputs) {
           if (it.second->type() == Value::TENSOR) {
-            applier->SetInput(
-                it.first, std::make_shared<TensorValue>(std::make_shared<NamedBuffer>(it.first),
-                                                        std::dynamic_pointer_cast<TensorValue>(it.second)->shape()));
+            auto from = std::dynamic_pointer_cast<TensorValue>(it.second);
+            auto value =
+                std::make_shared<TensorValue>(std::make_shared<NamedBuffer>(it.first), from->shape(), from->is_const());
+            applier->SetInput(it.first, value);
           } else {
             applier->SetInput(it.first, it.second);
           }
@@ -1336,9 +1337,10 @@ void BuildInvokerRunInfo(plaidml_invoker* invoker) {
         auto composer = vertexai::compat::make_unique<BoundFunction>();
         composer->AddDependency(*applier);
         for (const auto& it : invoker->outputs) {
-          composer->AddUpdate(std::make_shared<TensorValue>(std::make_shared<NamedBuffer>(it.first),
-                                                            std::dynamic_pointer_cast<TensorValue>(it.second)->shape()),
-                              applier->GetOutput(it.first));
+          auto from = std::dynamic_pointer_cast<TensorValue>(it.second);
+          auto value =
+              std::make_shared<TensorValue>(std::make_shared<NamedBuffer>(it.first), from->shape(), from->is_const());
+          composer->AddUpdate(value, applier->GetOutput(it.first));
         }
         composer->Done();
         return std::make_shared<RunInfo>(composer->PrepareToRun());
@@ -1404,9 +1406,10 @@ extern "C" plaidml_shape* plaidml_alloc_invoker_output_shape(plaidml_invoker* in
             auto applier = std::make_shared<FunctionApplication>(invoker->func);
             for (const auto& it : invoker->inputs) {
               if (it.second->type() == Value::TENSOR) {
-                applier->SetInput(it.first, std::make_shared<TensorValue>(
-                                                std::make_shared<NamedBuffer>(it.first),
-                                                std::dynamic_pointer_cast<TensorValue>(it.second)->shape()));
+                auto from = std::dynamic_pointer_cast<TensorValue>(it.second);
+                auto value = std::make_shared<TensorValue>(std::make_shared<NamedBuffer>(it.first), from->shape(),
+                                                           from->is_const());
+                applier->SetInput(it.first, value);
               } else {
                 applier->SetInput(it.first, it.second);
               }

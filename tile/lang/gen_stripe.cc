@@ -13,23 +13,19 @@ using namespace stripe;  // NOLINT
 
 namespace {
 
-const char* INITIAL_LOCATION = "DRAM";
+Location INITIAL_LOCATION = {"DRAM"};
 
 class StripeGenerator {
  public:
-  StripeGenerator(const Program& parsed,  //
-                  const Bindings& vars,   //
-                  const ShapeMap& inputs,
-                  const ShapeMap& outputs)
-      : parsed_(parsed),   //
-        vars_(vars),       //
-        inputs_(inputs),   //
-        outputs_(outputs)  //
-  {}
+  explicit StripeGenerator(const RunInfo& runinfo) : runinfo_(runinfo) {
+    Parser parser;
+    parsed_ = parser.Parse(runinfo_.code);
+    vars_ = BindProgram(&parsed_, runinfo_.input_shapes, runinfo_.output_shapes);
+  }
 
-  std::shared_ptr<Block> Run(const std::string& name) {
+  std::shared_ptr<Block> Run() {
     auto program = std::make_shared<Block>();
-    program->name = name;
+    program->name = runinfo_.program_name;
     LOG(INFO) << "Compiling " << parsed_.ops.size() << " ops";
     // The top level block is a 'main' function.
     // In/Out/InOut refinements made on main relate to user supplied inputs and outputs.
@@ -39,8 +35,8 @@ class StripeGenerator {
     program->stmts.push_back(main);
     main->name = "main";
     // Add decls for external inputs/outputs
-    AddDecls(program.get(), main.get(), inputs_, true);
-    AddDecls(program.get(), main.get(), outputs_, false);
+    AddDecls(program.get(), main.get(), runinfo_.input_shapes, true);
+    AddDecls(program.get(), main.get(), runinfo_.output_shapes, false);
     // Add kernels to main
     for (const auto& op : parsed_.ops) {
       IVLOG(2, "Processing: " << op);
@@ -49,16 +45,14 @@ class StripeGenerator {
           ProcessContraction(main.get(), op);
           break;
         case Op::FUNCTION:
-          if (op.f.is_special()) {
+          if (op.f.is_special() || op.f.fn == "reshape") {
             ProcessSpecial(main.get(), op);
-          } else if (op.f.fn == "reshape") {
-            ProcessReshape(main.get(), op);
           } else {
             ProcessElementwise(main.get(), op);
           }
           break;
         case Op::CONSTANT:
-          // LOG(INFO) << "CONSTANT";
+          LOG(WARNING) << "CONSTANT: " << op;
           break;
       }
     }
@@ -69,13 +63,14 @@ class StripeGenerator {
         if (binding.tag == Binding::TENSOR) {
           std::vector<Affine> access(binding.shape.dims.size());
           main->refs.emplace_back(Refinement{
-              RefDir::None,     // dir
-              "",               // from
-              item.first,       // into
-              access,           // access
-              binding.shape,    // shape
-              "",               // agg_op
-              INITIAL_LOCATION  // location
+              RefDir::None,        // dir
+              "",                  // from
+              item.first,          // into
+              access,              // access
+              binding.shape,       // shape
+              "",                  // agg_op
+              INITIAL_LOCATION,    // location
+              IsConst(item.first)  // is_const
           });
         }
       }
@@ -90,23 +85,25 @@ class StripeGenerator {
       externals_.insert(item.first);
       std::vector<Affine> access(item.second.dims.size());
       program->refs.emplace_back(Refinement{
-          RefDir::None,     // dir
-          "",               // from
-          item.first,       // into
-          access,           // access
-          item.second,      // shape
-          "",               // agg_op
-          INITIAL_LOCATION  // location
+          RefDir::None,        // dir
+          "",                  // from
+          item.first,          // into
+          access,              // access
+          item.second,         // shape
+          "",                  // agg_op
+          INITIAL_LOCATION,    // location
+          IsConst(item.first)  // is_const
       });
       if (is_input) {
         main->refs.emplace_back(Refinement{
-            RefDir::In,       // dir
-            item.first,       // from
-            item.first,       // into
-            access,           // access
-            item.second,      // shape
-            "",               // agg_op
-            INITIAL_LOCATION  // location
+            RefDir::In,          // dir
+            item.first,          // from
+            item.first,          // into
+            access,              // access
+            item.second,         // shape
+            "",                  // agg_op
+            INITIAL_LOCATION,    // location
+            IsConst(item.first)  // is_const
         });
       } else {
         main->refs.emplace_back(Refinement{
@@ -116,19 +113,11 @@ class StripeGenerator {
             access,             // access
             item.second,        // shape
             Intrinsic::ASSIGN,  // agg_op
-            INITIAL_LOCATION    // location
+            INITIAL_LOCATION,   // location
+            false               // is_const
         });
       }
     }
-  }
-
-  void ProcessReshape(Block* main, const Op& op) {
-    auto stmt = std::make_shared<Special>();
-    stmt->name = op.f.fn;
-    stmt->params = op.f.params;
-    stmt->inputs = op.inputs;
-    stmt->outputs = {op.output};
-    main->stmts.push_back(stmt);
   }
 
   void ProcessContraction(Block* main, const Op& op) {
@@ -170,19 +159,21 @@ class StripeGenerator {
             access,                 // access
             shape,                  // shape
             GetAggOp(cion.agg_op),  // agg_op
-            INITIAL_LOCATION        // location
+            INITIAL_LOCATION,       // location
+            false                   // is_const
         });
       } else {
         auto scalar_name = ScalarName(spec.id);
         scalar_inputs.push_back(scalar_name);
         kernel->refs.emplace_back(Refinement{
-            RefDir::In,       // dir
-            spec.id,          // from
-            spec.id,          // into
-            access,           // access
-            shape,            // shape
-            "",               // agg_op
-            INITIAL_LOCATION  // location
+            RefDir::In,        // dir
+            spec.id,           // from
+            spec.id,           // into
+            access,            // access
+            shape,             // shape
+            "",                // agg_op
+            INITIAL_LOCATION,  // location
+            IsConst(spec.id)   // is_const
         });
         // LOAD
         kernel->stmts.push_back(std::make_shared<Load>(spec.id, scalar_name));
@@ -207,9 +198,9 @@ class StripeGenerator {
       auto stmt = std::make_shared<Special>();
       stmt->outputs = {op.output};
       if (op.c.use_default.empty()) {
-        stmt->name = Intrinsic::ZERO;
+        stmt->name = Special::ZERO;
       } else {
-        stmt->name = Intrinsic::COPY;
+        stmt->name = Special::COPY;
         stmt->inputs.push_back(op.c.use_default);
       }
       main->stmts.insert(std::prev(main->stmts.end()), stmt);
@@ -308,7 +299,8 @@ class StripeGenerator {
               access,              // access
               ScalarShape(input),  // shape
               "",                  // agg_op
-              INITIAL_LOCATION     // location
+              INITIAL_LOCATION,    // location
+              IsConst(input)       // is_const
           });
           // LOAD
           kernel->stmts.push_back(std::make_shared<Load>(input, ScalarName(input)));
@@ -332,7 +324,8 @@ class StripeGenerator {
         out_access,              // access
         ScalarShape(op.output),  // shape
         "",                      // agg_op
-        INITIAL_LOCATION         // location
+        INITIAL_LOCATION,        // location
+        false                    // is_const
     });
 
     // INTRINSIC
@@ -498,24 +491,21 @@ class StripeGenerator {
     return std::make_pair(defracted, cons);
   }
 
+  bool IsConst(const std::string& name) const {
+    // Returns whether the specified tensor input is constant
+    return runinfo_.const_inputs.count(name);
+  }
+
  private:
   Program parsed_;
   Bindings vars_;
-  ShapeMap inputs_;
-  ShapeMap outputs_;
+  const RunInfo& runinfo_;
   std::set<std::string> externals_;
 };
 
 }  // namespace
 
-std::shared_ptr<Block> GenerateStripe(const RunInfo& runinfo) {
-  Parser parser;
-  auto parsed = parser.Parse(runinfo.code);
-  // process reshape
-  auto vars = BindProgram(&parsed, runinfo.input_shapes, runinfo.output_shapes);
-  StripeGenerator gen(parsed, vars, runinfo.input_shapes, runinfo.output_shapes);
-  return gen.Run(runinfo.program_name);
-}
+std::shared_ptr<Block> GenerateStripe(const RunInfo& runinfo) { return StripeGenerator(runinfo).Run(); }
 
 }  // namespace lang
 }  // namespace tile

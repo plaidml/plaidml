@@ -104,6 +104,11 @@ inline RefDir UnionDir(const RefDir& a, const RefDir& b) {  //
   return RefDir(static_cast<int>(a) | static_cast<int>(b));
 }
 
+struct Location {
+  std::string name;
+  Affine unit;
+};
+
 struct Refinement {
   RefDir dir;
   std::string from;
@@ -111,7 +116,8 @@ struct Refinement {
   std::vector<Affine> access;
   TensorShape shape;
   std::string agg_op;
-  std::string location;
+  Location location;
+  bool is_const;
 
   Affine FlatAccess() const;
 };
@@ -151,9 +157,6 @@ struct Intrinsic : Statement {
   std::vector<std::string> inputs;
   std::vector<std::string> outputs;
 
-  static const char* ZERO;
-  static const char* COPY;
-
   static const char* ASSIGN;
   static const char* SUM;
   static const char* MIN;
@@ -177,6 +180,9 @@ struct Special : Statement {
   std::vector<std::string> params;
   std::vector<std::string> inputs;
   std::vector<std::string> outputs;
+
+  static const char* ZERO;
+  static const char* COPY;
 };
 
 enum class ConstType {
@@ -216,7 +222,7 @@ struct Block : Statement {
   std::vector<Refinement> refs;
   StatementList stmts;
   std::map<std::string, std::shared_ptr<Annotation>> annotations;
-  std::string location;
+  Location location;
 
   // Helper methods
   std::vector<const Refinement*> ref_ins() const;
@@ -240,6 +246,7 @@ struct BoolAnnotation : Annotation {
 
 bool operator==(const Index& lhs, const Index& rhs);
 
+std::ostream& operator<<(std::ostream& os, const Location& loc);
 std::ostream& operator<<(std::ostream& os, const Index& idx);
 std::ostream& operator<<(std::ostream& os, const Load& op);
 std::ostream& operator<<(std::ostream& os, const Store& op);

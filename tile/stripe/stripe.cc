@@ -9,8 +9,8 @@ namespace vertexai {
 namespace tile {
 namespace stripe {
 
-const char* Intrinsic::ZERO = "ZERO";
-const char* Intrinsic::COPY = "COPY";
+const char* Special::ZERO = "ZERO";
+const char* Special::COPY = "COPY";
 
 const char* Intrinsic::ASSIGN = "ASSIGN";
 const char* Intrinsic::SUM = "SUM";
@@ -55,6 +55,11 @@ std::shared_ptr<Block> Block::Downcast(const std::shared_ptr<Statement>& stmt) {
 
 std::shared_ptr<BoolAnnotation> BoolAnnotation::Downcast(const std::shared_ptr<Annotation>& ann) {  //
   return std::dynamic_pointer_cast<BoolAnnotation>(ann);
+}
+
+std::ostream& operator<<(std::ostream& os, const Location& loc) {
+  os << loc.name << "[" << loc.unit.toString() << "]";
+  return os;
 }
 
 std::ostream& operator<<(std::ostream& os, const Load& op) {
@@ -178,6 +183,9 @@ static void PrintRefinements(std::ostream& os, const Block& block, size_t depth)
         os << "inout";
         break;
     }
+    if (ref.is_const) {
+      os << " const";
+    }
     if (ref.from.empty()) {
       os << " new";
     }
@@ -212,7 +220,7 @@ static void PrintRefinements(std::ostream& os, const Block& block, size_t depth)
 static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
   PrintTab(os, depth);
   os << "block";
-  if (!block.location.empty()) {
+  if (!block.location.name.empty()) {
     os << "<" << block.location << ">";
   }
   os << " [";
@@ -296,10 +304,15 @@ Affine FromProto(const proto::Affine& affine) {
   return ret;
 }
 
+Location FromProto(const proto::Location& loc) {  //
+  return Location{loc.name(), FromProto(loc.unit())};
+}
+
 std::shared_ptr<Block> FromProto(const proto::Block& block) {
   std::shared_ptr<Block> ret;
   ret->name = block.name();
   ret->comments = block.comments();
+  ret->location = FromProto(block.location());
   for (const auto& pb_idx : block.idxs()) {
     ret->idxs.emplace_back(Index{
         pb_idx.name(),   //
@@ -336,6 +349,8 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     }
     ref.shape = tile::FromProto(pb_ref.shape());
     ref.agg_op = pb_ref.agg_op();
+    ref.location = FromProto(pb_ref.location());
+    ref.is_const = pb_ref.is_const();
     ret->refs.emplace_back(ref);
   }
   for (const auto& pb_stmt : block.stmts()) {
@@ -414,10 +429,18 @@ proto::Affine IntoProto(const Affine& affine) {
   return ret;
 }
 
+proto::Location IntoProto(const Location& loc) {
+  proto::Location ret;
+  ret.set_name(loc.name);
+  *ret.mutable_unit() = IntoProto(loc.unit);
+  return ret;
+}
+
 proto::Block IntoProto(const Block& block) {
   proto::Block ret;
   ret.set_name(block.name);
   ret.set_comments(block.comments);
+  *ret.mutable_location() = IntoProto(block.location);
   for (const auto& idx : block.idxs) {
     auto pb_idx = ret.add_idxs();
     pb_idx->set_name(idx.name);
@@ -450,6 +473,8 @@ proto::Block IntoProto(const Block& block) {
     }
     *pb_ref->mutable_shape() = IntoProto(ref.shape);
     pb_ref->set_agg_op(ref.agg_op);
+    *pb_ref->mutable_location() = IntoProto(ref.location);
+    pb_ref->set_is_const(ref.is_const);
   }
   for (const auto& stmt : block.stmts) {
     auto pb_stmt = ret.add_stmts();
