@@ -310,7 +310,7 @@ Location FromProto(const proto::Location& loc) {  //
 }
 
 std::shared_ptr<Block> FromProto(const proto::Block& block) {
-  std::shared_ptr<Block> ret;
+  auto ret = std::make_shared<Block>();
   ret->name = block.name();
   ret->comments = block.comments();
   ret->location = FromProto(block.location());
@@ -354,22 +354,40 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     ref.is_const = pb_ref.is_const();
     ret->refs.emplace_back(ref);
   }
+  std::vector<Statement*> stmts;
+  stmts.reserve(block.stmts_size());
   for (const auto& pb_stmt : block.stmts()) {
+    std::list<Statement*> deps;
+    for (std::size_t dep_idx : pb_stmt.deps()) {
+      deps.push_back(stmts[dep_idx]);
+    }
     switch (pb_stmt.op_case()) {
-      case proto::Statement::kLoad:
-        ret->stmts.emplace_back(std::make_shared<Load>(pb_stmt.load().from(), pb_stmt.load().into()));
-        break;
-      case proto::Statement::kStore:
-        ret->stmts.emplace_back(std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into()));
-        break;
+      case proto::Statement::kLoad: {
+        auto stmt = std::make_shared<Load>(pb_stmt.load().from(), pb_stmt.load().into());
+        stmt->deps = std::move(deps);
+        stmts.push_back(stmt.get());
+        ret->stmts.emplace_back(std::move(stmt));
+      } break;
+      case proto::Statement::kStore: {
+        auto stmt = std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into());
+        stmt->deps = std::move(deps);
+        stmts.push_back(stmt.get());
+        ret->stmts.emplace_back(std::move(stmt));
+      } break;
       case proto::Statement::kConstant:
         switch (pb_stmt.constant().value_case()) {
-          case proto::Constant::kIconst:
-            ret->stmts.emplace_back(std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().iconst()));
-            break;
-          case proto::Constant::kFconst:
-            ret->stmts.emplace_back(std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().fconst()));
-            break;
+          case proto::Constant::kIconst: {
+            auto stmt = std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().iconst());
+            stmt->deps = std::move(deps);
+            stmts.push_back(stmt.get());
+            ret->stmts.emplace_back(std::move(stmt));
+          } break;
+          case proto::Constant::kFconst: {
+            auto stmt = std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().fconst());
+            stmt->deps = std::move(deps);
+            stmts.push_back(stmt.get());
+            ret->stmts.emplace_back(std::move(stmt));
+          } break;
           default:
             break;
         }
@@ -377,6 +395,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
       case proto::Statement::kSpecial: {
         auto stmt = std::make_shared<Special>();
         stmt->name = pb_stmt.special().name();
+        stmt->deps = std::move(deps);
         for (const auto& item : pb_stmt.special().params()) {
           stmt->params.push_back(item);
         }
@@ -386,22 +405,28 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
         for (const auto& item : pb_stmt.special().outputs()) {
           stmt->outputs.push_back(item);
         }
-        ret->stmts.emplace_back(stmt);
+        stmts.push_back(stmt.get());
+        ret->stmts.emplace_back(std::move(stmt));
       } break;
       case proto::Statement::kIntrinsic: {
         auto stmt = std::make_shared<Intrinsic>();
         stmt->name = pb_stmt.intrinsic().name();
+        stmt->deps = std::move(deps);
         for (const auto& item : pb_stmt.intrinsic().inputs()) {
           stmt->inputs.push_back(item);
         }
         for (const auto& item : pb_stmt.intrinsic().outputs()) {
           stmt->outputs.push_back(item);
         }
-        ret->stmts.emplace_back(stmt);
+        stmts.push_back(stmt.get());
+        ret->stmts.emplace_back(std::move(stmt));
       } break;
-      case proto::Statement::kBlock:
-        ret->stmts.emplace_back(FromProto(pb_stmt.block()));
-        break;
+      case proto::Statement::kBlock: {
+        auto stmt = FromProto(pb_stmt.block());
+        stmt->deps = std::move(deps);
+        stmts.push_back(stmt.get());
+        ret->stmts.emplace_back(std::move(stmt));
+      } break;
       default:
         break;
     }
@@ -477,8 +502,19 @@ proto::Block IntoProto(const Block& block) {
     *pb_ref->mutable_location() = IntoProto(ref.location);
     pb_ref->set_is_const(ref.is_const);
   }
+  std::unordered_map<Statement*, std::size_t> dep_idxs;
+  std::size_t stmt_idx = 0;
   for (const auto& stmt : block.stmts) {
+    dep_idxs[stmt.get()] = stmt_idx++;
     auto pb_stmt = ret.add_stmts();
+    std::vector<std::size_t> deps;
+    for (Statement* dep : stmt->deps) {
+      deps.push_back(dep_idxs[dep]);
+    }
+    std::sort(deps.begin(), deps.end());  // Provide stable output ordering
+    for (std::size_t dep : deps) {
+      pb_stmt->add_deps(dep);
+    }
     switch (stmt->kind()) {
       case StmtKind::Load: {
         auto load = Load::Downcast(stmt);

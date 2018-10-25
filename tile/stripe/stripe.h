@@ -68,6 +68,10 @@ struct Statement {
   virtual void Accept(ConstStmtVisitor*) const = 0;
   virtual void Accept(MutableStmtVisitor*) = 0;
   virtual Statement* Accept(RewriteStmtVisitor*) = 0;
+
+  // The set of statements within the same Block that must complete
+  // before this statement is evaluated.
+  std::list<Statement*> deps;
 };
 
 struct Annotation {
