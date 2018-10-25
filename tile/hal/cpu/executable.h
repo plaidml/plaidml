@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/asio/thread_pool.hpp>
+
 #include "tile/base/hal.h"
 
 namespace llvm {
@@ -20,7 +22,8 @@ namespace cpu {
 
 class Executable final : public hal::Executable {
  public:
-  Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis);
+  Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis,
+             std::shared_ptr<boost::asio::thread_pool> thread_pool);
 
   std::shared_ptr<hal::Event> Run(const context::Context& ctx, std::size_t kidx,
                                   const std::vector<std::shared_ptr<hal::Buffer>>& params,
@@ -32,6 +35,7 @@ class Executable final : public hal::Executable {
  private:
   std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines_;
   std::vector<lang::KernelInfo> kis_;
+  std::shared_ptr<boost::asio::thread_pool> thread_pool_;
 };
 
 }  // namespace cpu
