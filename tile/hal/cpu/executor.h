@@ -5,6 +5,8 @@
 #include <memory>
 #include <vector>
 
+#include <boost/asio/thread_pool.hpp>
+
 #include "tile/base/hal.h"
 
 namespace vertexai {
@@ -41,6 +43,7 @@ class Executor : public hal::Executor {
  private:
   const hal::proto::HardwareInfo info_;
   std::unique_ptr<Memory> memory_;
+  std::shared_ptr<boost::asio::thread_pool> thread_pool_;
 };
 
 }  // namespace cpu
