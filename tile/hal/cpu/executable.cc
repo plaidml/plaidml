@@ -26,12 +26,11 @@ namespace {
 
 const char invoker_prefix_[] = "__invoke_";
 
-boost::asio::thread_pool thread_pool_(std::thread::hardware_concurrency());
-
 }  // namespace
 
-Executable::Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis)
-    : engines_{engines}, kis_(kis) {}
+Executable::Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis,
+                       std::shared_ptr<boost::asio::thread_pool> thread_pool)
+    : engines_{engines}, kis_(kis), thread_pool_(thread_pool) {}
 
 std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::size_t kidx,
                                             const std::vector<std::shared_ptr<hal::Buffer>>& params,
@@ -41,7 +40,7 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
   std::vector<std::shared_ptr<hal::Buffer>> param_refs{params};
   auto deps = Event::WaitFor(dependencies);
   auto evt = deps.then([params = std::move(param_refs), act = std::move(activity), engine = engines_[kidx],
-                        invoker_name = InvokerName(kis_[kidx].kname),
+                        invoker_name = InvokerName(kis_[kidx].kname), thread_pool = thread_pool_,
                         gwork = kis_[kidx].gwork](decltype(deps) future) -> std::shared_ptr<hal::Result> {
     future.get();
     auto start = std::chrono::high_resolution_clock::now();
@@ -69,7 +68,7 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
     size_t completed = 0;
 
     for (size_t offset = 0; offset < threads; ++offset) {
-      boost::asio::post(thread_pool_, [=, &mutex, &cv, &completed]() {
+      boost::asio::post(*thread_pool, [=, &mutex, &cv, &completed]() {
         for (size_t i = offset; i < iterations; i += threads) {
           lang::GridSize index;
           index[0] = i / denom[0] % gwork[0];
