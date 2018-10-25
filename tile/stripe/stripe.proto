@@ -57,6 +57,9 @@ message Statement {
     Block block = 5;
     Special special = 6;
   }
+
+  // Indices of intra-block dependencies.
+  repeated uint32 deps = 7;
 }
 
 message Load {
