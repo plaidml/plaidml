@@ -52,7 +52,7 @@ TEST(DepsTest, SmallDepMix) {
 
   stripe::proto::Block output_proto{IntoProto(*block)};
 
-  EXPECT_THAT(output_proto, EqualsProto(R"proto(
+  const char* expected = R"(
     location { unit { } }
     refs {
       location { unit { } }
@@ -77,7 +77,9 @@ TEST(DepsTest, SmallDepMix) {
     stmts { intrinsic { name:"ADD" inputs:"$2" inputs:"$3" outputs:"$4"} deps: 2 deps: 3}
     stmts { special { name:"COPY" inputs:"b1" outputs:"b2"} deps: 2}
     stmts { store { from:"$4" into:"b2"} deps: 4 deps: 5}
-  )proto"));
+  )";
+
+  EXPECT_THAT(output_proto, EqualsProto(expected));
 }
 
 }  // namespace schedule
