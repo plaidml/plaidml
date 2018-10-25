@@ -3,8 +3,8 @@
 #include "tile/codegen/schedule/deps.h"
 
 #include <set>
+#include <sstream>
 #include <stdexcept>
-#include <strstream>
 #include <unordered_map>
 #include <unordered_set>
 
