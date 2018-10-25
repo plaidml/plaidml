@@ -26,6 +26,13 @@ namespace {
 
 const char invoker_prefix_[] = "__invoke_";
 
+// std::thread::hardware_concurrency reports the number of cores including
+// hyperthreaded cores, but hyperthreading does not help our performance and
+// the overhead of additional threads harms it; we will therefore use only the
+// physical number of cores when dividing up our workloads. This function takes
+// a long time, so we'll perform the count only once at startup.
+const size_t physical_cores_ = boost::thread::physical_concurrency();
+
 }  // namespace
 
 Executable::Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis,
@@ -57,8 +64,7 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
     // run one loop in each thread, staggering kernel invocations accordingly.
     size_t iterations = gwork[0] * gwork[1] * gwork[2];
     lang::GridSize denom = {{gwork[2] * gwork[1], gwork[2], 1}};
-    size_t cores = std::thread::hardware_concurrency();
-    size_t threads = std::min(iterations, cores);
+    size_t threads = std::min(iterations, physical_cores_);
 
     // The condition variable will guard the completion count. Each worker
     // will increment the completion count, and we'll wait until it reaches
