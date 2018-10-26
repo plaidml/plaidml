@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <list>
 #include <map>
 #include <memory>
@@ -300,9 +301,13 @@ inline std::shared_ptr<Block> CloneBlock(const Block& orig, size_t depth = -1) {
 }  // namespace tile
 }  // namespace vertexai
 
+namespace std {
+
 template <>
-struct std::hash<vertexai::tile::stripe::StatementIt> {
+struct hash<vertexai::tile::stripe::StatementIt> {
   std::size_t operator()(const vertexai::tile::stripe::StatementIt& it) const {
-    return std::hash<vertexai::tile::stripe::Statement*>{}(it->get());
+    return hash<vertexai::tile::stripe::Statement*>{}(it->get());
   }
 };
+
+}  // namespace std
