@@ -62,6 +62,13 @@ class RewriteStmtVisitor {
   virtual Block* Visit(const Block&) = 0;
 };
 
+struct Statement;
+
+using StatementList = std::list<std::shared_ptr<Statement>>;
+using StatementIt = StatementList::iterator;
+
+inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) { return lhs->get() < rhs->get(); }
+
 struct Statement {
   virtual ~Statement() = default;
   virtual StmtKind kind() const = 0;
@@ -71,7 +78,7 @@ struct Statement {
 
   // The set of statements within the same Block that must complete
   // before this statement is evaluated.
-  std::list<Statement*> deps;
+  std::list<StatementIt> deps;
 };
 
 struct Annotation {
@@ -209,9 +216,6 @@ struct Constant : Statement {
   double fconst;
 };
 
-using StatementList = std::list<std::shared_ptr<Statement>>;
-using StatementIt = StatementList::iterator;
-
 struct Block : Statement {
   static std::shared_ptr<Block> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Block; }
@@ -295,3 +299,10 @@ inline std::shared_ptr<Block> CloneBlock(const Block& orig, size_t depth = -1) {
 }  // namespace stripe
 }  // namespace tile
 }  // namespace vertexai
+
+template <>
+struct std::hash<vertexai::tile::stripe::StatementIt> {
+  std::size_t operator()(const vertexai::tile::stripe::StatementIt& it) const {
+    return std::hash<vertexai::tile::stripe::Statement*>{}(it->get());
+  }
+};
