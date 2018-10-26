@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "base/util/stream_container.h"
+#include "tile/codegen/localize.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -12,20 +13,6 @@ namespace tile {
 namespace codegen {
 
 using namespace stripe;  // NOLINT
-
-static void FixupCacheRefs(Block* block, const std::string& var_name, const std::string& cache_name) {
-  auto ref_it = block->ref_by_from(var_name);
-  if (ref_it == block->refs.end()) {
-    return;
-  }
-  ref_it->location = {cache_name};
-  for (auto stmt : block->stmts) {
-    auto inner = Block::Downcast(stmt);
-    if (inner) {
-      FixupCacheRefs(inner.get(), ref_it->into, cache_name);
-    }
-  }
-}
 
 void ApplyCache(Block* block,                   //
                 const std::string& var_name,    //
@@ -35,13 +22,6 @@ void ApplyCache(Block* block,                   //
   auto ref_it = block->ref_by_into(var_name);
   if (ref_it == block->refs.end()) {
     throw std::runtime_error("ApplyCache: Invalid var_name");
-  }
-  // Fixup the location all inner blocks that have refs that derive from var_name
-  for (auto stmt : block->stmts) {
-    auto inner = Block::Downcast(stmt);
-    if (inner) {
-      FixupCacheRefs(inner.get(), var_name, cache_name);
-    }
   }
   // Get the shape
   TensorShape raw_ts = ref_it->shape;
@@ -122,6 +102,8 @@ void ApplyCache(Block* block,                   //
       "",            // agg_op
       {cache_name}   // location
   });
+  // Update inner blocks strides + locations
+  FixupRefs(block, var_name);
 }
 
 }  // namespace codegen

@@ -73,6 +73,10 @@ inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) { return l
 struct Statement {
   virtual ~Statement() = default;
   virtual StmtKind kind() const = 0;
+  virtual std::vector<std::string> buffer_reads() const { return {}; }
+  virtual std::vector<std::string> buffer_writes() const { return {}; }
+  virtual std::vector<std::string> scalar_uses() const { return {}; }
+  virtual std::vector<std::string> scalar_defs() const { return {}; }
   virtual void Accept(ConstStmtVisitor*) const = 0;
   virtual void Accept(MutableStmtVisitor*) = 0;
   virtual Statement* Accept(RewriteStmtVisitor*) = 0;
@@ -138,6 +142,8 @@ struct Load : Statement {
   Load(const std::string& from, const std::string& into) : from(from), into(into) {}
   static std::shared_ptr<Load> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Load; }
+  std::vector<std::string> buffer_reads() const { return {from}; }
+  std::vector<std::string> scalar_defs() const { return {into}; }
   void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
   void Accept(MutableStmtVisitor* v) { v->Visit(this); }
   Load* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
@@ -150,6 +156,8 @@ struct Store : Statement {
   Store(const std::string& from, const std::string& into) : from(from), into(into) {}
   static std::shared_ptr<Store> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Store; }
+  std::vector<std::string> buffer_writes() const { return {into}; }
+  std::vector<std::string> scalar_uses() const { return {from}; }
   void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
   void Accept(MutableStmtVisitor* v) { v->Visit(this); }
   Store* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
@@ -161,6 +169,8 @@ struct Store : Statement {
 struct Intrinsic : Statement {
   static std::shared_ptr<Intrinsic> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Intrinsic; }
+  std::vector<std::string> scalar_uses() const { return inputs; }
+  std::vector<std::string> scalar_defs() const { return outputs; }
   void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
   void Accept(MutableStmtVisitor* v) { v->Visit(this); }
   Intrinsic* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
@@ -184,6 +194,8 @@ struct Intrinsic : Statement {
 struct Special : Statement {
   static std::shared_ptr<Special> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Special; }
+  std::vector<std::string> buffer_reads() const { return inputs; }
+  std::vector<std::string> buffer_writes() const { return outputs; }
   void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
   void Accept(MutableStmtVisitor* v) { v->Visit(this); }
   Special* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
@@ -207,6 +219,7 @@ struct Constant : Statement {
   Constant(const std::string& name, double value) : name(name), type(ConstType::Float), fconst(value) {}
   static std::shared_ptr<Constant> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Constant; }
+  std::vector<std::string> scalar_defs() const { return {name}; }
   void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
   void Accept(MutableStmtVisitor* v) { v->Visit(this); }
   Constant* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
@@ -220,6 +233,8 @@ struct Constant : Statement {
 struct Block : Statement {
   static std::shared_ptr<Block> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Block; }
+  std::vector<std::string> buffer_reads() const;
+  std::vector<std::string> buffer_writes() const;
   void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
   void Accept(MutableStmtVisitor* v) { v->Visit(this); }
   Block* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
