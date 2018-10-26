@@ -264,6 +264,26 @@ std::ostream& operator<<(std::ostream& os, const Block& block) {
   return os;
 }
 
+std::vector<std::string> Block::buffer_reads() const {
+  std::vector<std::string> results;
+  for (const auto& ref : refs) {
+    if (IsReadDir(ref.dir)) {
+      results.push_back(ref.from);
+    }
+  }
+  return results;
+}
+
+std::vector<std::string> Block::buffer_writes() const {
+  std::vector<std::string> results;
+  for (const auto& ref : refs) {
+    if (IsWriteDir(ref.dir)) {
+      results.push_back(ref.from);
+    }
+  }
+  return results;
+}
+
 std::vector<const Refinement*> Block::ref_ins() const {
   std::vector<const Refinement*> results;
   for (const auto& ref : refs) {

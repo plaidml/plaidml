@@ -5,6 +5,7 @@
 #include "base/util/stream_container.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/fuse.h"
+#include "tile/codegen/localize.h"
 #include "tile/codegen/tile.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
@@ -98,7 +99,7 @@ TEST(Codegen, FuseComplex) {
   ASSERT_TRUE(r);
 
   // Tile it just for fun!
-  ApplyTile(r1.get(), {16, 4, 4, 64}, "test", "location");
+  ApplyTile(r1.get(), {16, 16, 1, 1}, "test", "location");
 
   IVLOG(2, "Tiled\n" << *r1);
 }
@@ -211,6 +212,40 @@ TEST(Codegen, FuseFancy) {
   IVLOG(2, "Cached\n" << *r1);
 
   ASSERT_TRUE(r);
+}
+
+TEST(Codegen, FuseAuto) {
+  lang::RunInfo runinfo;
+  runinfo.program_name = "tiled_fuse";
+  runinfo.code = R"***(
+    function (In[N, X, Y, CI], K[I, J, CI, CO], B[CO]) -> (R) { 
+      O[n, x, y, co : N, X, Y, CO] = +(In[n, x+i-1, y+j-1, ci] * K[i, j, ci, co]);
+      BO = O + B;
+      R = relu(BO);
+    }
+  )***";
+  runinfo.input_shapes.emplace("In", SimpleShape(DataType::FLOAT32, {16, 100, 100, 64}));
+  runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {3, 3, 64, 128}));
+  runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {128}));
+  runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
+  auto program = GenerateStripe(runinfo);
+  auto main = SubBlock(0, program);
+
+  // Get the convolution + tile it
+  auto k1 = SubBlock(0, main);
+  ApplyTile(k1.get(), {16, 16, 1, 1, 16, 1, 1}, "test", "location");
+
+  IVLOG(2, "Before>\n" << *program);
+
+  AliasMap base;
+  AliasMap prog_map(base, *program);
+  AliasMap main_map(prog_map, *main);
+
+  AlwaysFuseRecursive afr;
+  FusionPass(main_map, main.get(), &afr);
+  LocalizePass(main_map, main.get());
+
+  IVLOG(2, "After>\n" << *program);
 }
 
 }  // namespace test
