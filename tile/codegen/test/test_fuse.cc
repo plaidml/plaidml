@@ -6,6 +6,7 @@
 #include "tile/codegen/cache.h"
 #include "tile/codegen/fuse.h"
 #include "tile/codegen/localize.h"
+#include "tile/codegen/scalarize.h"
 #include "tile/codegen/tile.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
@@ -244,6 +245,7 @@ TEST(Codegen, FuseAuto) {
   AlwaysFuseRecursive afr;
   FusionPass(main_map, main.get(), &afr);
   LocalizePass(main_map, main.get());
+  Scalarize(main.get(), true);
 
   IVLOG(2, "After>\n" << *program);
 }
