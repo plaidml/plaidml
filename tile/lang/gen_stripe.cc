@@ -13,7 +13,7 @@ using namespace stripe;  // NOLINT
 
 namespace {
 
-Location INITIAL_LOCATION = {"DRAM"};
+Location INITIAL_LOCATION = {"CMX"};
 
 class StripeGenerator {
  public:
@@ -52,7 +52,7 @@ class StripeGenerator {
           }
           break;
         case Op::CONSTANT:
-          LOG(WARNING) << "CONSTANT: " << op;
+          // LOG(WARNING) << "CONSTANT: " << op;
           break;
       }
     }
@@ -224,14 +224,14 @@ class StripeGenerator {
     // We assume here that the 0'th refinement is the output refinement
     std::set<std::string> out_idxs;
     for (size_t i = 0; i < out_shape.dims.size(); i++) {
-      Affine a = block.refs[0].access[i];
-      if (a == 0 && out_shape.dims[i].size == 1) {
+      Affine affine = block.refs.front().access[i];
+      if (affine == 0 && out_shape.dims[i].size == 1) {
         continue;
       }
-      if (a.constant() != 0 || a.getMap().size() != 1 || a.getMap().begin()->second != 1) {
+      if (affine.constant() != 0 || affine.getMap().size() != 1 || affine.getMap().begin()->second != 1) {
         return true;  // If it's not a single index with a multiplier of 1, bail
       }
-      std::string idx = a.getMap().begin()->first;
+      std::string idx = affine.getMap().begin()->first;
       if (out_idxs.count(idx)) {
         return true;  // If the index isn't unique, bail
       }
