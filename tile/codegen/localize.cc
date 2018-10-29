@@ -47,7 +47,7 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   // Change dir + from
   it_ref->dir = RefDir::None;
   it_ref->from = "";
-  // Clear it's affines
+  // Clear its affines
   for (auto& aff : it_ref->access) {
     aff = 0;
   }
