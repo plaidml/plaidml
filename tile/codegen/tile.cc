@@ -13,21 +13,17 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyTile(Block* outer,                  //
-               const TileShape& tile,         //
-               const std::string& tile_name,  //
-               const std::string& location,   //
-               bool elide_trivial) {
+void ApplyTile(Block* outer, const TileSpec& spec, bool elide_trivial) {
   // Verify tile shape is correct
-  if (outer->idxs.size() != tile.size()) {
+  if (outer->idxs.size() != spec.shape.size()) {
     throw std::runtime_error("Invalid tile specified");
   }
   // Make a 'by-name' version of tile and check for trivality
   bool trivial = true;
   std::map<std::string, size_t> tile_by_name;
   for (size_t i = 0; i < outer->idxs.size(); i++) {
-    tile_by_name[outer->idxs[i].name] = tile[i];
-    if (tile[i] != 1) {
+    tile_by_name[outer->idxs[i].name] = spec.shape[i];
+    if (spec.shape[i] != 1) {
       trivial = false;
     }
   }
@@ -36,8 +32,8 @@ void ApplyTile(Block* outer,                  //
   }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
-  inner->name = tile_name;
-  inner->location = {location};
+  inner->name = spec.name;
+  inner->location = spec.loc;
   // Block inner;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
@@ -50,19 +46,19 @@ void ApplyTile(Block* outer,                  //
     auto& outer_idx = outer->idxs[i];
     auto& inner_idx = inner->idxs[i];
     inner_idx.from = outer_idx.name;
-    if (range % tile[i]) {
+    if (range % spec.shape[i]) {
       inner->constraints.emplace_back(Affine(outer_idx.name, -1) + int64_t(outer_idx.range - 1));
     }
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
-    outer_idx.range = (outer_idx.range + tile[i] - 1) / tile[i];
+    outer_idx.range = (outer_idx.range + spec.shape[i] - 1) / spec.shape[i];
     // Make ranges of the inner blocks: [ti, tk, tk]
-    inner_idx.range = tile[i];
-    inner_idx.factor = tile[i];
-    if (outer_idx.factor > 0 && outer_idx.factor % tile[i] != 0) {
+    inner_idx.range = spec.shape[i];
+    inner_idx.factor = spec.shape[i];
+    if (outer_idx.factor > 0 && outer_idx.factor % spec.shape[i] != 0) {
       throw std::runtime_error("ApplyTile: unhandled uneven subtiling");
     }
-    outer_idx.factor /= tile[i];
+    outer_idx.factor /= spec.shape[i];
     // For each index i, if (r_i/t_i) is not integral, add a constraint to the inner block of `o_i * t_i + i_i < r_i`.
   }
   // Copy all refinements from outer to inner block
@@ -206,7 +202,7 @@ void TilePass(Block* block, const TileGenerator& generator) {
     }
   }
   if (is_leaf) {
-    ApplyTile(block, generator(block), "tile", "");
+    ApplyTile(block, generator(block));
   }
 }
 
@@ -217,7 +213,7 @@ void TilePass(Block* block, const std::vector<StencilSpec>& specs) {
     for (const auto& idx : stencil.idxs) {
       tile.push_back(idx.value);
     }
-    return tile;
+    return TileSpec{stencil.name, tile, Location{}};
   });
 }
 

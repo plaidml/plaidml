@@ -57,8 +57,12 @@ std::shared_ptr<BoolAnnotation> BoolAnnotation::Downcast(const std::shared_ptr<A
   return std::dynamic_pointer_cast<BoolAnnotation>(ann);
 }
 
+std::string to_string(const Location& loc) {  //
+  return printstring("%s[%s]", loc.name.c_str(), loc.unit.toString().c_str());
+}
+
 std::ostream& operator<<(std::ostream& os, const Location& loc) {
-  os << loc.name << "[" << loc.unit.toString() << "]";
+  os << to_string(loc);
   return os;
 }
 
@@ -166,9 +170,8 @@ static void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& s
 }
 
 static void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
-  for (size_t i = 0; i < block.refs.size(); i++) {
+  for (const auto& ref : block.refs) {
     PrintTab(os, depth + 2);
-    const auto& ref = block.refs[i];
     switch (ref.dir) {
       case RefDir::None:
         os << "none";
@@ -314,6 +317,11 @@ std::ostream& operator<<(std::ostream& os, const Index& idx) {
 bool operator==(const Index& lhs, const Index& rhs) {
   return std::tie(lhs.name, lhs.range, lhs.factor) ==  //
          std::tie(rhs.name, rhs.range, rhs.factor);
+}
+
+bool operator==(const Location& lhs, const Location& rhs) {
+  return std::tie(lhs.name, lhs.unit) ==  //
+         std::tie(rhs.name, rhs.unit);
 }
 
 Affine FromProto(const proto::Affine& affine) {

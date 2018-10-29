@@ -103,9 +103,9 @@ TEST(Codegen, ApplyTile) {
   EXPECT_THAT(data["C"], ContainerEq(expected));
 
   auto kernel = stripe::Block::Downcast(main->stmts.front());
-  ApplyTile(kernel.get(), {5, 4, 4}, "test", "location");
+  ApplyTile(kernel.get(), TileSpec{"test", {5, 4, 4}, {"location"}});
   auto inner = stripe::Block::Downcast(kernel->stmts.front());
-  ApplyTile(inner.get(), {5, 2, 2}, "test", "location");
+  ApplyTile(inner.get(), TileSpec{"test", {5, 2, 2}, {"location"}});
 
   for (size_t i = 0; i < data["C"].size(); i++) {
     data["C"][i] = 0;

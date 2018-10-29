@@ -90,8 +90,8 @@ TEST(Codegen, FuseComplex) {
   auto k2 = SubBlock(1, main);
   auto plan = ComputeFusionPlan(*k1, *k2, "O");
   ASSERT_TRUE(static_cast<bool>(plan));
-  auto r1 = FusionRefactor(*k1, plan->remap_a, plan->tile_a, "DPU");
-  auto r2 = FusionRefactor(*k2, plan->remap_b, plan->tile_b, "DPU");
+  auto r1 = FusionRefactor(*k1, plan->remap_a, TileSpec{"fusion_tile", plan->tile_a, {"DPU"}});
+  auto r2 = FusionRefactor(*k2, plan->remap_b, TileSpec{"fusion_tile", plan->tile_b, {"DPU"}});
   IVLOG(2, "r1\n" << *r1);
   IVLOG(2, "r2\n" << *r2);
   bool r = FuseBlocks(main_map, r1.get(), r2.get());
@@ -100,7 +100,7 @@ TEST(Codegen, FuseComplex) {
   ASSERT_TRUE(r);
 
   // Tile it just for fun!
-  ApplyTile(r1.get(), {16, 16, 1, 1}, "test", "location");
+  ApplyTile(r1.get(), TileSpec{"test", {16, 16, 1, 1}, {"DPU"}});
 
   IVLOG(2, "Tiled\n" << *r1);
 }
@@ -131,7 +131,7 @@ TEST(Codegen, FuseTiled) {
   // Get the convolution
   auto k1 = SubBlock(0, main);
   // Tile it
-  ApplyTile(k1.get(), {16, 16, 1, 1, 16, 1, 1}, "test", "location");
+  ApplyTile(k1.get(), TileSpec{"test", {16, 16, 1, 1, 16, 1, 1}, {"DPU"}});
   // Get the bias add
   auto k2 = SubBlock(1, main);
   // Try to fuse it
@@ -143,24 +143,25 @@ TEST(Codegen, FuseTiled) {
   IVLOG(2, "Tile b: " << StreamContainer(plan->tile_b));
   // Refactor a, tile and refactor b, fuse
   ASSERT_TRUE(static_cast<bool>(plan));
-  auto r1 = FusionRefactor(*k1, plan->remap_a, plan->tile_a, "DPU");
-  auto r2 = FusionRefactor(*k2, plan->remap_b, plan->tile_b, "DPU");
+  auto r1 = FusionRefactor(*k1, plan->remap_a, TileSpec{"fusion_tile", plan->tile_a, {"DPU"}});
+  auto r2 = FusionRefactor(*k2, plan->remap_b, TileSpec{"fusion_tile", plan->tile_b, {"DPU"}});
   IVLOG(2, "r1\n" << *r1);
   IVLOG(2, "r2\n" << *r2);
   bool r = FuseBlocks(main_map, r1.get(), r2.get());
+  ASSERT_TRUE(r);
   IVLOG(2, "Fused\n" << *r1);
 
   // Now cache output for fun
-  ApplyCache(r1.get(), "B", "CMX", "DMA");
-  ApplyCache(r1.get(), "O", "CMX", "DMA");
-  ApplyCache(r1.get(), "BO", "CMX", "DMA");
+  ApplyCache(r1.get(), "B", {"CMX"}, {"DMA"});
+  ApplyCache(r1.get(), "O", {"CMX"}, {"DMA"});
+  ApplyCache(r1.get(), "BO", {"CMX"}, {"DMA"});
+  IVLOG(1, "Cached\n" << *program);
+
   auto inner = SubBlock(1, r1);
   IVLOG(1, "Inner\n" << *inner);
-  ApplyCache(inner.get(), "In", "CMX", "DMA");
-  ApplyCache(inner.get(), "K", "CMX", "DMA");
+  ApplyCache(inner.get(), "In", {"CMX"}, {"DMA"});
+  ApplyCache(inner.get(), "K", {"CMX"}, {"DMA"});
   IVLOG(2, "Fused + Cached\n" << *r1);
-
-  ASSERT_TRUE(r);
 }
 
 TEST(Codegen, FuseFancy) {
@@ -188,11 +189,11 @@ TEST(Codegen, FuseFancy) {
   // Get the first convolution
   auto k1 = SubBlock(0, main);
   // Tile it
-  ApplyTile(k1.get(), {16, 16, 1, 1, 16, 1, 1}, "test", "location");
+  ApplyTile(k1.get(), TileSpec{"test", {16, 16, 1, 1, 16, 1, 1}, {"DPU"}});
   // Get the second convolution
   auto k2 = SubBlock(1, main);
   // Tile it as well
-  ApplyTile(k2.get(), {16, 16, 16, 1, 1}, "test", "location");
+  ApplyTile(k2.get(), TileSpec{"test", {16, 16, 16, 1, 1}, {"DPU"}});
   // Try to fuse it
   auto plan = ComputeFusionPlan(*k1, *k2, "O1");
   IVLOG(2, "Plan as bool: " << static_cast<bool>(plan));
@@ -202,14 +203,14 @@ TEST(Codegen, FuseFancy) {
   IVLOG(2, "Tile b: " << StreamContainer(plan->tile_b));
   // Refactor a, tile and refactor b, fuse
   ASSERT_TRUE(static_cast<bool>(plan));
-  auto r1 = FusionRefactor(*k1, plan->remap_a, plan->tile_a, "DPU");
-  auto r2 = FusionRefactor(*k2, plan->remap_b, plan->tile_b, "DPU");
+  auto r1 = FusionRefactor(*k1, plan->remap_a, TileSpec{"fusion_tile", plan->tile_a, {"DPU"}});
+  auto r2 = FusionRefactor(*k2, plan->remap_b, TileSpec{"fusion_tile", plan->tile_b, {"DPU"}});
   IVLOG(2, "r1\n" << *r1);
   IVLOG(2, "r2\n" << *r2);
   bool r = FuseBlocks(main_map, r1.get(), r2.get());
   IVLOG(2, "Fused\n" << *r1);
   // Do some caching
-  ApplyCache(r1.get(), "O1", "CMX", "DMA");
+  ApplyCache(r1.get(), "O1", {"CMX"}, {"DMA"});
   IVLOG(2, "Cached\n" << *r1);
 
   ASSERT_TRUE(r);
@@ -234,7 +235,7 @@ TEST(Codegen, FuseAuto) {
 
   // Get the convolution + tile it
   auto k1 = SubBlock(0, main);
-  ApplyTile(k1.get(), {16, 16, 1, 1, 16, 1, 1}, "test", "location");
+  ApplyTile(k1.get(), TileSpec{"test", {16, 16, 1, 1, 16, 1, 1}, {"DPU"}});
 
   IVLOG(2, "Before>\n" << *program);
 

@@ -43,16 +43,17 @@ bool operator<(const StencilMatch& lhs, const StencilMatch& rhs);
 
 StencilMatch FindBestStencil(const std::vector<StencilSpec>& specs, stripe::Block* block);
 
-void ApplyTile(stripe::Block* inner,          //
-               const TileShape& tile,         //
-               const std::string& tile_name,  //
-               const std::string& location,   //
-               bool elide_trivial = true);
+struct TileSpec {
+  std::string name;
+  TileShape shape;
+  stripe::Location loc;
+};
 
-typedef std::function<TileShape(stripe::Block* block)> TileGenerator;
+void ApplyTile(stripe::Block* inner, const TileSpec& spec, bool elide_trivial = true);
 
-void TilePass(stripe::Block* block, const std::vector<StencilSpec>& specs);
+typedef std::function<TileSpec(stripe::Block* block)> TileGenerator;
 void TilePass(stripe::Block* block, const TileGenerator& generator);
+void TilePass(stripe::Block* block, const std::vector<StencilSpec>& specs);
 
 }  // namespace codegen
 }  // namespace tile

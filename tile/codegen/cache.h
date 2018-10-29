@@ -11,10 +11,10 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ApplyCache(stripe::Block* block,           //
-                const std::string& var_name,    //
-                const std::string& cache_name,  //
-                const std::string& xfer_location);
+void ApplyCache(stripe::Block* block,             //
+                const std::string& var_name,      //
+                const stripe::Location& mem_loc,  //
+                const stripe::Location& xfer_loc);
 
 }  // namespace codegen
 }  // namespace tile

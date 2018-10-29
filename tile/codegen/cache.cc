@@ -14,11 +14,10 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyCache(Block* block,                   //
-                const std::string& var_name,    //
-                const std::string& cache_name,  //
-                const std::string& xfer_location) {
-  // Find the appropriate refinement
+void ApplyCache(Block* block,                 //
+                const std::string& var_name,  //
+                const Location& mem_loc,      //
+                const Location& xfer_loc) {
   auto ref_it = block->ref_by_into(var_name);
   if (ref_it == block->refs.end()) {
     throw std::runtime_error("ApplyCache: Invalid var_name");
@@ -38,7 +37,7 @@ void ApplyCache(Block* block,                   //
   // Set both from refinements to the cached version, we will replace
   // one of them with the 'raw' version based on transfer direction
   Block xfer_block;
-  xfer_block.location = {xfer_location};
+  xfer_block.location = xfer_loc;
   std::vector<Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
     std::string iname = std::string("i") + std::to_string(i);
@@ -79,7 +78,7 @@ void ApplyCache(Block* block,                   //
     cache_load->name = printstring("load_%s", var_name.c_str());
     cache_load->refs[0].from = raw_name;
     cache_load->refs[0].shape = raw_xfer_shape;
-    cache_load->refs[1].location = {cache_name};
+    cache_load->refs[1].location = mem_loc;
     block->stmts.push_front(cache_load);
   }
   // If original refinement was output, flush from cache
@@ -88,11 +87,10 @@ void ApplyCache(Block* block,                   //
     cache_store->name = printstring("store_%s", var_name.c_str());
     cache_store->refs[1].from = raw_name;
     cache_store->refs[1].shape = raw_xfer_shape;
-    cache_store->refs[0].location = {cache_name};
+    cache_store->refs[0].location = mem_loc;
     block->stmts.push_back(cache_store);
   }
   // Add the new declaration (replacing the original)
-  // NOTE: we do this last since otherwise `ref_it` could become invalid after mutating `block->refs`!
   block->refs.push_back(Refinement{
       RefDir::None,  // dir
       "",            // from
@@ -100,7 +98,7 @@ void ApplyCache(Block* block,                   //
       {},            // access
       cached_ts,     // shape
       "",            // agg_op
-      {cache_name}   // location
+      mem_loc        // location
   });
   // Update inner blocks strides + locations
   FixupRefs(block, var_name);

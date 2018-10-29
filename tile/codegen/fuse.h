@@ -8,6 +8,7 @@
 #include <boost/optional.hpp>
 
 #include "tile/codegen/alias.h"
+#include "tile/codegen/tile.h"
 
 namespace vertexai {
 namespace tile {
@@ -30,8 +31,7 @@ void FlattenTrivial(stripe::Block* block);
 // Prepare each block for fusion by renaming / moving indexes
 std::shared_ptr<stripe::Block> FusionRefactor(const stripe::Block& block,                         //
                                               const std::map<std::string, std::string>& mapping,  //
-                                              const TileShape& tile,                              //
-                                              const std::string& location);
+                                              const TileSpec& tile);
 
 // Attempt to fuse b into a.  Return true on success, in which case blocks have been
 // destructively modified.  Otherwise returns false and leave blocks unaltered.

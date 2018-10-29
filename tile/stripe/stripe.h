@@ -68,8 +68,6 @@ struct Statement;
 using StatementList = std::list<std::shared_ptr<Statement>>;
 using StatementIt = StatementList::iterator;
 
-inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) { return lhs->get() < rhs->get(); }
-
 struct Statement {
   virtual ~Statement() = default;
   virtual StmtKind kind() const = 0;
@@ -245,7 +243,7 @@ struct Block : Statement {
   std::vector<Affine> constraints;
   std::vector<Refinement> refs;
   StatementList stmts;
-  std::map<std::string, std::shared_ptr<Annotation>> annotations;
+  std::map<std::string, std::shared_ptr<Annotation>> annotations;  // key: name
   Location location;
 
   // Helper methods
@@ -268,7 +266,14 @@ struct BoolAnnotation : Annotation {
   bool value;
 };
 
+inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) {  //
+  return lhs->get() < rhs->get();
+}
+
 bool operator==(const Index& lhs, const Index& rhs);
+bool operator==(const Location& lhs, const Location& rhs);
+
+std::string to_string(const Location& loc);
 
 std::ostream& operator<<(std::ostream& os, const Location& loc);
 std::ostream& operator<<(std::ostream& os, const Index& idx);
