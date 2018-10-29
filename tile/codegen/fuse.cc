@@ -113,11 +113,10 @@ void FlattenTrivial(stripe::Block* outer) {
 
 std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                          //
                                       const std::map<std::string, std::string>& mapping,  //
-                                      const TileShape& tile,                              //
-                                      const std::string& location) {
+                                      const TileSpec& tile) {
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
-  ApplyTile(tiled.get(), tile, "fusion_tile", location);
+  ApplyTile(tiled.get(), tile);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
   auto inner = std::make_shared<Block>();
@@ -228,8 +227,8 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
       // Copy across as a new ref
       std::string new_name = r->unique_ref_name(new_ref.into);
       remap_b[new_ref.into] = new_name;
-      r->refs.push_back(new_ref);
-      r->refs.back().into = new_name;
+      auto ref_it = r->refs.insert(r->refs.end(), new_ref);
+      ref_it->into = new_name;
     }
   }
   // We are now safe (cannot fail), move new reference over A's
@@ -366,8 +365,8 @@ void FusionPass(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
         break;
       }
       // Do the appropriate refactors
-      auto ref1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a, "");
-      auto ref2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b, "");
+      auto ref1 = FusionRefactor(*block1, plan->remap_a, TileSpec{"fusion_tile", plan->tile_a, {""}});
+      auto ref2 = FusionRefactor(*block2, plan->remap_b, TileSpec{"fusion_tile", plan->tile_b, {""}});
       // IVLOG(3, "Fusion refactor 1:\n" << *ref1);
       // IVLOG(3, "Fusion refactor 2:\n" << *ref2);
       // Try the actual fusion
