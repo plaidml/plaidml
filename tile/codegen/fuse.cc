@@ -187,12 +187,12 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
 bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
   // If indexes don't match, fail
   if (!(a->idxs == b->idxs)) {
-    IVLOG(3, "Fuse failed dues to mismatched indexes");
+    IVLOG(3, "Fuse failed due to mismatched indexes");
     return false;
   }
   // If constraints don't match, fail
   if (!(a->constraints == b->constraints)) {
-    IVLOG(3, "Fuse failed dues to mismatched constraints");
+    IVLOG(3, "Fuse failed due to mismatched constraints");
     return true;
   }
   // Make AliasMaps for the two blocks
@@ -214,7 +214,7 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
       if (atype == AliasType::Partial) {
         // Conflict, if either do any writing, we have a problem
         if (IsWriteDir(new_ref.dir) || IsWriteDir(old_ref.dir)) {
-          IVLOG(3, "Fuse failed dues to mismatched aliases: " << old_ref.into << " vs " << new_ref.into);
+          IVLOG(3, "Fuse failed due to mismatched aliases: " << old_ref.into << " vs " << new_ref.into);
           return false;  // Fuse will not work, bail
         }
       } else if (atype == AliasType::Exact) {
@@ -236,7 +236,7 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
   std::swap(a->refs, r->refs);
   // Load all the scalars that exist as of block A
   std::set<std::string> all_scalars;
-  std::map<std::string, std::string> smap_b;
+  std::map<std::string, std::string> scalar_rename;
   for (const auto& stmt : a->stmts) {
     for (const auto& name : stmt->scalar_defs()) {
       all_scalars.emplace(name);
@@ -245,14 +245,14 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
   auto def_scalar = [&](const std::string& orig) -> std::string {
     if (all_scalars.count(orig) == 0) {
       all_scalars.emplace(orig);
-      smap_b[orig] = orig;
+      scalar_rename[orig] = orig;
       return orig;
     }
     for (size_t i = 0; true; i++) {
       std::string with_suffix = orig + "_" + std::to_string(i);
       if (all_scalars.count(with_suffix) == 0) {
         all_scalars.emplace(with_suffix);
-        smap_b[orig] = with_suffix;
+        scalar_rename[orig] = with_suffix;
         return with_suffix;
       }
     }
@@ -269,7 +269,7 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
       case StmtKind::Store: {
         auto op = Store::Downcast(stmt);
         op->into = remap_b.at(op->into);
-        op->from = smap_b.at(op->from);
+        op->from = scalar_rename.at(op->from);
       } break;
       case StmtKind::Special: {
         auto op = Special::Downcast(stmt);
@@ -293,7 +293,7 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
       case StmtKind::Intrinsic: {
         auto op = Intrinsic::Downcast(stmt);
         for (auto& in : op->inputs) {
-          in = smap_b.at(in);
+          in = scalar_rename.at(in);
         }
         for (auto& out : op->outputs) {
           out = def_scalar(out);
@@ -326,11 +326,12 @@ void FusionPass(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
       if (it_next == block->stmts.end()) {
         break;
       }
+      // Convert to block
+      auto block2 = Block::Downcast(*it_next);
       // If it's not a block, forget it
-      if ((*it_next)->kind() != StmtKind::Block) {
+      if (!block2) {
         break;
       }
-      auto block2 = Block::Downcast(*it_next);
       // Get the list of outputs for this block
       std::set<std::string> outs_for_fuse;
       for (const auto& ro : block1->ref_outs()) {
@@ -360,7 +361,7 @@ void FusionPass(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
         break;
       }
       // Now call the strategy to see if we should fuse
-      if (!strategy->attempt_fuse(*block1, *block2)) {
+      if (!strategy->AttemptFuse(*block1, *block2)) {
         IVLOG(3, "Fusion denied by strategy");
         break;
       }
@@ -371,7 +372,7 @@ void FusionPass(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
       // IVLOG(3, "Fusion refactor 2:\n" << *ref2);
       // Try the actual fusion
       if (!FuseBlocks(scope, ref1.get(), ref2.get())) {
-        strategy->fusion_failed();
+        strategy->OnFailed();
         IVLOG(3, "Actual fusion failed");
         break;
       }
@@ -379,7 +380,7 @@ void FusionPass(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
       // If it worked, update
       *it = ref1;
       block->stmts.erase(it_next);
-      strategy->on_fused(scope, ref1.get());
+      strategy->OnFused(scope, ref1.get());
     }
     it++;
   }

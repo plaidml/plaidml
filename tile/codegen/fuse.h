@@ -40,20 +40,20 @@ bool FuseBlocks(const AliasMap& scope, stripe::Block* a, stripe::Block* b);
 class FusionStrategy {
  public:
   // Called when candidate blocks for fusion are located, returns whether to attempt a fusion
-  virtual bool attempt_fuse(const stripe::Block& a, const stripe::Block& b) = 0;
+  virtual bool AttemptFuse(const stripe::Block& a, const stripe::Block& b) = 0;
   // Called when an attempted fusion fails
-  virtual void fusion_failed() = 0;
+  virtual void OnFailed() = 0;
   // Called when a fusion succeeds, with the new fused block (which can be edited)
-  virtual void on_fused(const AliasMap& outer, stripe::Block* block) = 0;
+  virtual void OnFused(const AliasMap& outer, stripe::Block* block) = 0;
 };
 
 void FusionPass(const AliasMap& scope, stripe::Block* block, FusionStrategy* strategy);
 
 class AlwaysFuseRecursive : public FusionStrategy {
  public:
-  bool attempt_fuse(const stripe::Block& a, const stripe::Block& b) { return true; }
-  void fusion_failed() {}
-  void on_fused(const AliasMap& outer, stripe::Block* block) {
+  bool AttemptFuse(const stripe::Block& a, const stripe::Block& b) { return true; }
+  void OnFailed() {}
+  void OnFused(const AliasMap& outer, stripe::Block* block) {
     AliasMap inner(outer, *block);
     FusionPass(inner, block, this);
   }
