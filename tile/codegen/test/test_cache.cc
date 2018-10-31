@@ -37,7 +37,7 @@ TEST(Codegen, Cache) {
   auto kernel = stripe::Block::Downcast(main->stmts.front());
   std::cout << "Original\n";
   std::cout << *main;
-  ApplyTile(kernel.get(), TileSpec{"block_name", {2, 2, 2}, {"MPE"}});
+  ApplyTile(kernel.get(), {2, 2, 2});
   std::cout << "Tiled\n";
   std::cout << *main;
   ApplyCache(kernel.get(), "A", {"MRM"}, {"IDU"});

@@ -19,7 +19,6 @@ message Block {
   repeated Affine constraints = 4;
   repeated Refinement refs = 5;
   repeated Statement stmts = 6;
-  map<string, google.protobuf.Any> annotations = 7;
   Location location = 8;
 }
 
@@ -61,6 +60,7 @@ message Statement {
 
   // Indices of intra-block dependencies.
   repeated uint32 deps = 7;
+  repeated string tags = 8;
 }
 
 message Load {
@@ -115,8 +115,4 @@ message Constant {
 message Location {
   string name = 1;
   Affine unit = 2;
-}
-
-message BoolAnnotation {
-  bool value = 1;
 }

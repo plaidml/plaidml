@@ -13,8 +13,6 @@ using namespace stripe;  // NOLINT
 
 namespace {
 
-Location INITIAL_LOCATION = {"CMX"};
-
 class StripeGenerator {
  public:
   explicit StripeGenerator(const RunInfo& runinfo) : runinfo_(runinfo) {
@@ -25,6 +23,7 @@ class StripeGenerator {
 
   std::shared_ptr<Block> Run() {
     auto program = std::make_shared<Block>();
+    program->set_tag("program");
     program->name = runinfo_.program_name;
     LOG(INFO) << "Compiling " << parsed_.ops.size() << " ops";
     // The top level block is a 'main' function.
@@ -32,6 +31,7 @@ class StripeGenerator {
     // None refinements made on main relate to temporaries needed for communication between kernels.
     // The list of kernels to execute are the list of blocks defined within main.
     auto main = std::make_shared<Block>();
+    main->set_tag("main");
     program->stmts.push_back(main);
     main->name = "main";
     // Add decls for external inputs/outputs
@@ -69,7 +69,7 @@ class StripeGenerator {
               access,              // access
               binding.shape,       // shape
               "",                  // agg_op
-              INITIAL_LOCATION,    // location
+              {},                  // location
               IsConst(item.first)  // is_const
           });
         }
@@ -91,7 +91,7 @@ class StripeGenerator {
           access,              // access
           item.second,         // shape
           "",                  // agg_op
-          INITIAL_LOCATION,    // location
+          {},                  // location
           IsConst(item.first)  // is_const
       });
       if (is_input) {
@@ -102,7 +102,7 @@ class StripeGenerator {
             access,              // access
             item.second,         // shape
             "",                  // agg_op
-            INITIAL_LOCATION,    // location
+            {},                  // location
             IsConst(item.first)  // is_const
         });
       } else {
@@ -113,7 +113,7 @@ class StripeGenerator {
             access,             // access
             item.second,        // shape
             Intrinsic::ASSIGN,  // agg_op
-            INITIAL_LOCATION,   // location
+            {},                 // location
             false               // is_const
         });
       }
@@ -142,6 +142,9 @@ class StripeGenerator {
 
     auto kernel = AddKernel(main);
     kernel->comments = to_string(op);
+    kernel->set_tag("kernel");
+    kernel->set_tag("contraction");
+    kernel->set_tag("agg_op_" + GetAggOp(cion.agg_op));
 
     std::vector<std::string> scalar_inputs;
     for (size_t i = 0; i < cion.specs.size(); i++) {
@@ -159,21 +162,21 @@ class StripeGenerator {
             access,                 // access
             shape,                  // shape
             GetAggOp(cion.agg_op),  // agg_op
-            INITIAL_LOCATION,       // location
+            {},                     // location
             false                   // is_const
         });
       } else {
         auto scalar_name = ScalarName(spec.id);
         scalar_inputs.push_back(scalar_name);
         kernel->refs.emplace_back(Refinement{
-            RefDir::In,        // dir
-            spec.id,           // from
-            spec.id,           // into
-            access,            // access
-            shape,             // shape
-            "",                // agg_op
-            INITIAL_LOCATION,  // location
-            IsConst(spec.id)   // is_const
+            RefDir::In,       // dir
+            spec.id,          // from
+            spec.id,          // into
+            access,           // access
+            shape,            // shape
+            "",               // agg_op
+            {},               // location
+            IsConst(spec.id)  // is_const
         });
         // LOAD
         kernel->stmts.push_back(std::make_shared<Load>(spec.id, scalar_name));
@@ -211,6 +214,7 @@ class StripeGenerator {
       auto combo_op = GetComboOp(cion.comb_op);
       if (!combo_op.empty()) {
         AddIntrinsic(kernel.get(), combo_op, scalar_inputs, {ScalarName(op.output)});
+        kernel->set_tag("comb_op_" + combo_op);
       }
     } else {
       AddIntrinsic(kernel.get(), "assign", scalar_inputs, {ScalarName(op.output)});
@@ -262,6 +266,8 @@ class StripeGenerator {
   void ProcessElementwise(Block* main, const Op& op) {
     auto kernel = AddKernel(main);
     kernel->comments = to_string(op);
+    kernel->set_tag("elementwise");
+    kernel->set_tag("elementwise_" + op.f.fn);
 
     auto out_shape = GetShape(op.output);
     std::vector<Affine> out_access;
@@ -272,7 +278,11 @@ class StripeGenerator {
           out_shape.dims[i].size,      // range
           0                            // factor
       };
-      out_access.emplace_back(Affine{idx.name});
+      if (out_shape.dims[i].size > 1) {
+        out_access.emplace_back(Affine{idx.name});
+      } else {
+        out_access.emplace_back(Affine{0});
+      }
       kernel->idxs.emplace_back(idx);
     }
 
@@ -301,7 +311,7 @@ class StripeGenerator {
               access,              // access
               ScalarShape(input),  // shape
               "",                  // agg_op
-              INITIAL_LOCATION,    // location
+              {},                  // location
               IsConst(input)       // is_const
           });
           // LOAD
@@ -319,6 +329,11 @@ class StripeGenerator {
       }
     }
 
+    // Remove unused indexes
+    kernel->idxs.erase(
+        remove_if(kernel->idxs.begin(), kernel->idxs.end(), [](const auto& idx) { return idx.range == 1; }),
+        kernel->idxs.end());
+
     kernel->refs.emplace_back(Refinement{
         RefDir::Out,             // dir
         op.output,               // from
@@ -326,7 +341,7 @@ class StripeGenerator {
         out_access,              // access
         ScalarShape(op.output),  // shape
         "",                      // agg_op
-        INITIAL_LOCATION,        // location
+        {},                      // location
         false                    // is_const
     });
 

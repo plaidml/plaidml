@@ -13,17 +13,17 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyTile(Block* outer, const TileSpec& spec, bool elide_trivial) {
+void ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   // Verify tile shape is correct
-  if (outer->idxs.size() != spec.shape.size()) {
+  if (outer->idxs.size() != shape.size()) {
     throw std::runtime_error("Invalid tile specified");
   }
   // Make a 'by-name' version of tile and check for trivality
   bool trivial = true;
   std::map<std::string, size_t> tile_by_name;
   for (size_t i = 0; i < outer->idxs.size(); i++) {
-    tile_by_name[outer->idxs[i].name] = spec.shape[i];
-    if (spec.shape[i] != 1) {
+    tile_by_name[outer->idxs[i].name] = shape[i];
+    if (shape[i] != 1) {
       trivial = false;
     }
   }
@@ -32,8 +32,6 @@ void ApplyTile(Block* outer, const TileSpec& spec, bool elide_trivial) {
   }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
-  inner->name = spec.name;
-  inner->location = spec.loc;
   // Block inner;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
@@ -46,19 +44,19 @@ void ApplyTile(Block* outer, const TileSpec& spec, bool elide_trivial) {
     auto& outer_idx = outer->idxs[i];
     auto& inner_idx = inner->idxs[i];
     inner_idx.from = outer_idx.name;
-    if (range % spec.shape[i]) {
+    if (range % shape[i]) {
       inner->constraints.emplace_back(Affine(outer_idx.name, -1) + int64_t(outer_idx.range - 1));
     }
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
-    outer_idx.range = (outer_idx.range + spec.shape[i] - 1) / spec.shape[i];
+    outer_idx.range = (outer_idx.range + shape[i] - 1) / shape[i];
     // Make ranges of the inner blocks: [ti, tk, tk]
-    inner_idx.range = spec.shape[i];
-    inner_idx.factor = spec.shape[i];
-    if (outer_idx.factor > 0 && outer_idx.factor % spec.shape[i] != 0) {
+    inner_idx.range = shape[i];
+    inner_idx.factor = shape[i];
+    if (outer_idx.factor > 0 && outer_idx.factor % shape[i] != 0) {
       throw std::runtime_error("ApplyTile: unhandled uneven subtiling");
     }
-    outer_idx.factor /= spec.shape[i];
+    outer_idx.factor /= shape[i];
     // For each index i, if (r_i/t_i) is not integral, add a constraint to the inner block of `o_i * t_i + i_i < r_i`.
   }
   // Copy all refinements from outer to inner block
@@ -173,48 +171,40 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
   }
 }
 
-StencilMatch FindBestStencil(const std::vector<StencilSpec>& specs,  //
-                             Block* block) {
+boost::optional<StencilMatch> FindBestStencil(const std::vector<StencilSpec>& specs,  //
+                                              const Block& block) {
   std::set<StencilMatch> matches;
   for (const auto& spec : specs) {
-    FindStencilMatches(&matches, spec, *block, {});
+    FindStencilMatches(&matches, spec, block, {});
   }
-  if (matches.empty()) {
-    StencilMatch fallback{"fallback", 1, {}, true};
-    for (const auto& idx : block->idxs) {
-      fallback.cost *= idx.range;
-      fallback.idxs.emplace_back(StencilIndexMatch{idx.name, "*", idx.range});
-    }
-    IVLOG(3, "Fallback: " << fallback);
-    block->annotations.emplace("is_fallback", std::make_shared<BoolAnnotation>(true));
-    return fallback;
+  boost::optional<StencilMatch> r;
+  if (!matches.empty()) {
+    r = *matches.begin();
   }
-  block->annotations.emplace("is_fallback", std::make_shared<BoolAnnotation>(false));
-  return *matches.begin();
+  return r;
 }
 
-void TilePass(Block* block, const TileGenerator& generator) {
-  bool is_leaf = true;
+void StencilPass(stripe::Block* block, const StencilPassOptions& options) {
   for (auto stmt : block->stmts) {
-    if (stmt->kind() == StmtKind::Block) {
-      TilePass(Block::Downcast(stmt).get(), generator);
-      is_leaf = false;
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      StencilPass(inner.get(), options);
     }
   }
-  if (is_leaf) {
-    ApplyTile(block, generator(block));
-  }
-}
-
-void TilePass(Block* block, const std::vector<StencilSpec>& specs) {
-  TilePass(block, [&specs](Block* block) {
-    auto stencil = FindBestStencil(specs, block);
+  if (HasTags(*block, options.reqs)) {
+    auto match = FindBestStencil(options.specs, *block);
+    if (!match) {
+      return;
+    }
     TileShape tile;
-    for (const auto& idx : stencil.idxs) {
+    for (const auto& idx : match->idxs) {
       tile.push_back(idx.value);
     }
-    return TileSpec{stencil.name, tile, Location{}};
-  });
+    ApplyTile(block, tile, false);
+    AddTags(block, options.set_outer);
+    auto inner = Block::Downcast(*block->stmts.begin());
+    AddTags(inner.get(), options.set_inner);
+  }
 }
 
 std::ostream& operator<<(std::ostream& os, const StencilIndexMatch& idx) {

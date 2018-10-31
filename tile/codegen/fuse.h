@@ -31,7 +31,7 @@ void FlattenTrivial(stripe::Block* block);
 // Prepare each block for fusion by renaming / moving indexes
 std::shared_ptr<stripe::Block> FusionRefactor(const stripe::Block& block,                         //
                                               const std::map<std::string, std::string>& mapping,  //
-                                              const TileSpec& tile);
+                                              const TileShape& tile);
 
 // Attempt to fuse b into a.  Return true on success, in which case blocks have been
 // destructively modified.  Otherwise returns false and leave blocks unaltered.
@@ -40,24 +40,34 @@ bool FuseBlocks(const AliasMap& scope, stripe::Block* a, stripe::Block* b);
 class FusionStrategy {
  public:
   // Called when candidate blocks for fusion are located, returns whether to attempt a fusion
-  virtual bool AttemptFuse(const stripe::Block& a, const stripe::Block& b) = 0;
+  virtual bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) = 0;
   // Called when an attempted fusion fails
   virtual void OnFailed() = 0;
   // Called when a fusion succeeds, with the new fused block (which can be edited)
-  virtual void OnFused(const AliasMap& outer, stripe::Block* block) = 0;
+  virtual void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) = 0;
 };
 
-void FusionPass(const AliasMap& scope, stripe::Block* block, FusionStrategy* strategy);
+void FusionInner(const AliasMap& scope, stripe::Block* block, FusionStrategy* strategy);
 
 class AlwaysFuseRecursive : public FusionStrategy {
  public:
-  bool AttemptFuse(const stripe::Block& a, const stripe::Block& b) { return true; }
+  bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) { return true; }
   void OnFailed() {}
-  void OnFused(const AliasMap& outer, stripe::Block* block) {
+  void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
+    block->location = a.location;
     AliasMap inner(outer, *block);
-    FusionPass(inner, block, this);
+    FusionInner(inner, block, this);
   }
 };
+
+struct FusionPassOptions {
+  Tags parent_reqs;
+  Tags a_block_reqs;
+  Tags b_block_reqs;
+  Tags fused_set;
+};
+
+void FusionPass(stripe::Block* block, const FusionPassOptions& options);
 
 }  // namespace codegen
 }  // namespace tile
