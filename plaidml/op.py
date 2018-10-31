@@ -968,13 +968,25 @@ class _ConvolutionStringFormatter:
 class ArgMax(tile.Operation):
     """Maximum of elements along an axis.
 
-    Builds a tensor whose elements are the maximum value on some axis of an input tensor.
+    Builds a tensor (uint64) whose elements are the maximum value on some axis of an input tensor.
     """
 
     def __init__(self, value, axis=-1):
         self.axis = axis
         self.value = value
-        super(ArgMax, self).__init__(None, [('I', value)], [('O', value.shape)])
+        shape, axes, subs = tile.compute_aggregation_axes(value.shape.dims, [axis], False)
+
+        code = """
+        function (I[{src_ranges}], One[]) -> (O) {{
+            Max[{dest_indices}{dest_sep}{dest_ranges}] = >(I[{src_indices}]);
+            IndexT[{reduce_indices} : {reduce_ranges}] = =(One[]);
+            Index = index(IndexT, 0);
+            AM[{dest_indices}{dest_sep}{dest_ranges}] = >(I[{src_indices}] == Max[{dest_indices}] ? Index[{reduce_indices}]);
+            O = as_uint(AM, 64);
+        }}""".format(**subs)
+        super(ArgMax, self).__init__(code, [('I', value),
+                                            ('One', tile.Value.from_var(1., tuple()))],
+                                     [('O', tile.Shape(plaidml.DType.INT64, shape))])
 
 
 argmax = ArgMax.function
@@ -1572,22 +1584,6 @@ class Equal(tile.Operation):
                                         [('L', lhs)], [('O', shape)])
 
 
-class Equal_ArgMax(tile.Operation):
-
-    def __init__(self, lhs, rhs):
-        lmax = ismax(lhs.source.op.value, axes=(lhs.source.op.axis,))
-        rmax = ismax(rhs.source.op.value, axes=(rhs.source.op.axis,))
-
-        and_shape = tile.Shape(plaidml.DType.INT32,
-                               tile.broadcast_dims(lmax.shape.dims, rmax.shape.dims))
-        and_op = tile.Operation('function (L, R) -> (O) { O = L ? (R ? 1 : 0) : 0; }',
-                                [('L', lmax), ('R', rmax)], [('O', and_shape)])
-        sum_val = summation(and_op.output_tuple[0], axes=(lhs.source.op.axis,), keepdims=True)
-        eq_shape = tile.Shape(plaidml.DType.BOOLEAN, sum_val.shape.dims)
-        super(Equal_ArgMax, self).__init__('function (I) -> (O) { O = 0 < I; }', [('I', sum_val)],
-                                           [('O', eq_shape)])
-
-
 def equal(lhs, rhs):
     """Elementwise tensor equality.
 
@@ -1601,15 +1597,6 @@ def equal(lhs, rhs):
     Returns:
         tile.Value: The output value
     """
-    # TODO: Separate function builders from optimization/composition logic.
-    #
-    # Putting the composition logic in functions like this makes it a little hard for
-    # higher-layer modules to add their own compositions -- think eq(MySpecialOp, MySpecialOp),
-    # when some completely unrelated module is invoking the eq.  It would be better to have
-    # something like a rewriter registry that could be consulted to match patterns during binding.
-    if (lhs.source and isinstance(lhs.source.op, ArgMax) and rhs.source and
-            isinstance(rhs.source.op, ArgMax)):
-        return Equal_ArgMax.function(lhs, rhs)
     return Equal.function(lhs, rhs)
 
 

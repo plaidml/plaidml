@@ -1349,6 +1349,8 @@ def compute_aggregation_axes(dims, axes=None, keepdims=False):
     src_ranges = ['X' + str(i) for i in range(len(dims))]
     dest_indices = src_indices[:]
     dest_ranges = src_ranges[:]
+    reduce_indices = [dest_indices[i] for i in axes]
+    reduce_ranges = [dest_ranges[i] for i in axes]
     dims = list(dims)
     if keepdims:
         for axis in axes:
@@ -1368,4 +1370,7 @@ def compute_aggregation_axes(dims, axes=None, keepdims=False):
         'dest_indices': ', '.join(dest_indices),
         'dest_ranges': ', '.join(dest_ranges),
         'dest_sep': ' : ' if dest_indices else '',
+        'reduce_indices': ', '.join(reduce_indices),
+        'reduce_ranges': ', '.join(reduce_ranges),
+        'reduce_sep': ' : ' if reduce_indices else '',
     }
