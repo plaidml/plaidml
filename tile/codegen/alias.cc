@@ -59,7 +59,8 @@ AliasMap::AliasMap(const AliasMap& outer, const stripe::Block& block) : depth_(o
       info.access.resize(ref.access.size());
     }
     if (info.access.size() != ref.access.size()) {
-      throw std::runtime_error("AliasMap::AliasMap: Mismatched sizes on refinement");
+      throw std::runtime_error("AliasMap::AliasMap: Mismatched sizes on refinement: " + info.base_name + " " +
+                               ref.into);
     }
     // Add in indexes from this block
     for (size_t i = 0; i < ref.access.size(); i++) {

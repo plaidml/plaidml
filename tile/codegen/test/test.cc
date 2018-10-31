@@ -103,9 +103,9 @@ TEST(Codegen, ApplyTile) {
   EXPECT_THAT(data["C"], ContainerEq(expected));
 
   auto kernel = stripe::Block::Downcast(main->stmts.front());
-  ApplyTile(kernel.get(), TileSpec{"test", {5, 4, 4}, {"location"}});
+  ApplyTile(kernel.get(), {5, 4, 4});
   auto inner = stripe::Block::Downcast(kernel->stmts.front());
-  ApplyTile(inner.get(), TileSpec{"test", {5, 2, 2}, {"location"}});
+  ApplyTile(inner.get(), {5, 2, 2});
 
   for (size_t i = 0; i < data["C"].size(); i++) {
     data["C"][i] = 0;
@@ -138,8 +138,8 @@ TEST(Codegen, StencilMatchMatMul) {
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({spec}, kernel.get());
-  LOG(INFO) << "Best match: " << match;
+  auto match = FindBestStencil({spec}, *kernel);
+  LOG(INFO) << "Best match: " << *match;
   StencilMatch expected{
       "16x16x*",  // name
       1255968,    // total
@@ -149,7 +149,7 @@ TEST(Codegen, StencilMatchMatMul) {
           {"n", "x", 16},
       }  // idxs
   };
-  EXPECT_THAT(match, Eq(expected));
+  EXPECT_THAT(*match, Eq(expected));
 }
 
 TEST(Codegen, StencilMatchConv1D) {
@@ -169,8 +169,8 @@ TEST(Codegen, StencilMatchConv1D) {
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({spec}, kernel.get());
-  LOG(INFO) << "Best match: " << match;
+  auto match = FindBestStencil({spec}, *kernel);
+  LOG(INFO) << "Best match: " << *match;
   StencilMatch expected{
       "16x16x*",  // name
       1378944,    // total
@@ -181,7 +181,7 @@ TEST(Codegen, StencilMatchConv1D) {
           {"x", "k", 16},
       }  // idxs
   };
-  EXPECT_THAT(match, Eq(expected));
+  EXPECT_THAT(*match, Eq(expected));
 }
 
 TEST(Codegen, StencilMatchConv2D) {
@@ -223,8 +223,8 @@ TEST(Codegen, StencilMatchConv2D) {
 
   IVLOG(2, "\n" << *kernel);
 
-  auto match = FindBestStencil(specs, kernel.get());
-  LOG(INFO) << "Best match: " << match;
+  auto match = FindBestStencil(specs, *kernel);
+  LOG(INFO) << "Best match: " << *match;
   StencilMatch expected{
       "4x4x16x*",  // name
       323280000,   // total
@@ -237,7 +237,7 @@ TEST(Codegen, StencilMatchConv2D) {
           {"y", "y", 4},
       }  // idxs
   };
-  EXPECT_THAT(match, Eq(expected));
+  EXPECT_THAT(*match, Eq(expected));
 }
 
 TEST(Codegen, TilePass) {
@@ -290,7 +290,7 @@ TEST(Codegen, TilePass) {
 
   auto runinfo = LoadMatMul(5);
   auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
-  TilePass(main.get(), specs);
+  StencilPass(main.get(), {{}, specs, {}, {}});
   IVLOG(2, "\n" << *main);
 
   ExecuteProgram(*main, &data);

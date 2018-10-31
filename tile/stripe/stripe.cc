@@ -9,19 +9,19 @@ namespace vertexai {
 namespace tile {
 namespace stripe {
 
-const char* Special::ZERO = "ZERO";
-const char* Special::COPY = "COPY";
+const char* Special::ZERO = "zero";
+const char* Special::COPY = "copy";
 
-const char* Intrinsic::ASSIGN = "ASSIGN";
-const char* Intrinsic::SUM = "SUM";
-const char* Intrinsic::MIN = "MIN";
-const char* Intrinsic::MAX = "MAX";
-const char* Intrinsic::PROD = "PROD";
+const char* Intrinsic::ASSIGN = "assign";
+const char* Intrinsic::SUM = "add";
+const char* Intrinsic::MIN = "min";
+const char* Intrinsic::MAX = "max";
+const char* Intrinsic::PROD = "mul";
 
-const char* Intrinsic::MUL = "MUL";
-const char* Intrinsic::ADD = "ADD";
-const char* Intrinsic::EQ = "EQ";
-const char* Intrinsic::COND = "COND";
+const char* Intrinsic::MUL = "mul";
+const char* Intrinsic::ADD = "add";
+const char* Intrinsic::EQ = "cmp_eq";
+const char* Intrinsic::COND = "cond";
 
 static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_t block_idx,
                        const std::unordered_map<const Statement*, size_t>& block_deps);
@@ -30,9 +30,13 @@ static void PrintTab(std::ostream& os, size_t depth) {  //
   os << std::string(depth * 2, ' ');
 }
 
-static void PrintDepsTab(std::ostream& os, size_t depth, const Statement* stmt, size_t idx,
+static void PrintPreStmt(std::ostream& os, size_t depth, const Statement* stmt, size_t idx,
                          const std::unordered_map<const Statement*, size_t>& deps) {  //
-  os << std::string(depth * 2, ' ') << "[" << idx;
+  os << std::string(depth * 2, ' ');
+  for (const auto& tag : stmt->tags) {
+    os << "#" << tag << " ";
+  }
+  os << "[" << idx;
   if (stmt->deps.size()) {
     os << ", deps:";
     for (const auto& it : stmt->deps) {
@@ -44,7 +48,7 @@ static void PrintDepsTab(std::ostream& os, size_t depth, const Statement* stmt, 
       }
     }
   }
-  os << "]\n" << std::string(depth * 2, ' ');
+  os << "] ";
 }
 
 std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
@@ -69,10 +73,6 @@ std::shared_ptr<Constant> Constant::Downcast(const std::shared_ptr<Statement>& s
 
 std::shared_ptr<Block> Block::Downcast(const std::shared_ptr<Statement>& stmt) {  //
   return std::dynamic_pointer_cast<Block>(stmt);
-}
-
-std::shared_ptr<BoolAnnotation> BoolAnnotation::Downcast(const std::shared_ptr<Annotation>& ann) {  //
-  return std::dynamic_pointer_cast<BoolAnnotation>(ann);
 }
 
 std::string to_string(const Location& loc) {  //
@@ -159,25 +159,24 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
 
 static void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& stmt, size_t depth, size_t idx,
                            const std::unordered_map<const Statement*, size_t>& deps) {
+  if (stmt->kind() != StmtKind::Block) {
+    // Block handles it's own pre-statement setup
+    PrintPreStmt(os, depth, stmt.get(), idx, deps);
+  }
   switch (stmt->kind()) {
     case StmtKind::Load:
-      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Load::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Store:
-      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Store::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Intrinsic:
-      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Intrinsic::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Special:
-      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Special::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Constant:
-      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Constant::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Block:
@@ -188,62 +187,66 @@ static void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& s
   }
 }
 
+std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
+  switch (ref.dir) {
+    case RefDir::None:
+      os << "none";
+      break;
+    case RefDir::In:
+      os << "in";
+      break;
+    case RefDir::Out:
+      os << "out";
+      break;
+    case RefDir::InOut:
+      os << "inout";
+      break;
+  }
+  if (ref.is_const) {
+    os << " const";
+  }
+  if (ref.from.empty()) {
+    os << " new@";
+    os << ref.offset;
+  }
+  os << "<" << ref.location << "> ";
+  os << ref.into;
+  if (ref.into != ref.from) {
+    if (!ref.from.empty()) {
+      os << " = " << ref.from;
+    }
+  }
+  bool first = true;
+  os << "[";
+  for (const auto& acc : ref.access) {
+    if (!first) {
+      os << ", ";
+    }
+    os << acc.toString();
+    first = false;
+  }
+  os << "]";
+  if (!ref.agg_op.empty()) {
+    os << ":" << ref.agg_op;
+  }
+  os << " " << ref.shape;
+  if (!ref.from.empty() && ref.into != ref.from) {
+    os << " // alias";
+  }
+  return os;
+}
+
 static void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
   for (const auto& ref : block.refs) {
     PrintTab(os, depth + 2);
-    switch (ref.dir) {
-      case RefDir::None:
-        os << "none";
-        break;
-      case RefDir::In:
-        os << "in";
-        break;
-      case RefDir::Out:
-        os << "out";
-        break;
-      case RefDir::InOut:
-        os << "inout";
-        break;
-    }
-    if (ref.is_const) {
-      os << " const";
-    }
-    if (ref.from.empty()) {
-      os << " new[";
-      os << ref.offset;
-      os << "]";
-    }
-    os << "<" << ref.location << "> ";
-    os << ref.into;
-    if (ref.into != ref.from) {
-      if (!ref.from.empty()) {
-        os << " = " << ref.from;
-      }
-    }
-    bool first = true;
-    os << "[";
-    for (const auto& acc : ref.access) {
-      if (!first) {
-        os << ", ";
-      }
-      os << acc.toString();
-      first = false;
-    }
-    os << "]";
-    if (!ref.agg_op.empty()) {
-      os << ":" << ref.agg_op;
-    }
-    os << " " << ref.shape;
-    if (!ref.from.empty() && ref.into != ref.from) {
-      os << " // alias";
-    }
+    os << ref;
     os << std::endl;
   }
 }
 
 static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_t block_idx,
                        const std::unordered_map<const Statement*, size_t>& block_deps) {
-  PrintDepsTab(os, depth, &block, block_idx, block_deps);
+  PrintPreStmt(os, depth, &block, block_idx, block_deps);
   os << "block";
   if (!block.location.name.empty()) {
     os << "<" << block.location << ">";
@@ -411,31 +414,23 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
   std::vector<StatementIt> stmts;
   stmts.reserve(block.stmts_size());
   for (const auto& pb_stmt : block.stmts()) {
-    std::list<StatementIt> deps;
-    for (std::size_t dep_idx : pb_stmt.deps()) {
-      deps.push_back(stmts[dep_idx]);
-    }
     switch (pb_stmt.op_case()) {
       case proto::Statement::kLoad: {
         auto stmt = std::make_shared<Load>(pb_stmt.load().from(), pb_stmt.load().into());
-        stmt->deps = std::move(deps);
         stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
       } break;
       case proto::Statement::kStore: {
         auto stmt = std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into());
-        stmt->deps = std::move(deps);
         stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
       } break;
       case proto::Statement::kConstant:
         switch (pb_stmt.constant().value_case()) {
           case proto::Constant::kIconst: {
             auto stmt = std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().iconst());
-            stmt->deps = std::move(deps);
             stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
           } break;
           case proto::Constant::kFconst: {
             auto stmt = std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().fconst());
-            stmt->deps = std::move(deps);
             stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
           } break;
           default:
@@ -445,7 +440,6 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
       case proto::Statement::kSpecial: {
         auto stmt = std::make_shared<Special>();
         stmt->name = pb_stmt.special().name();
-        stmt->deps = std::move(deps);
         for (const auto& item : pb_stmt.special().params()) {
           stmt->params.push_back(item);
         }
@@ -461,7 +455,6 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
         auto stmt = std::make_shared<Intrinsic>();
         stmt->name = pb_stmt.intrinsic().name();
         stmt->type = tile::FromProto(pb_stmt.intrinsic().type());
-        stmt->deps = std::move(deps);
         for (const auto& item : pb_stmt.intrinsic().inputs()) {
           stmt->inputs.push_back(item);
         }
@@ -472,19 +465,17 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
       } break;
       case proto::Statement::kBlock: {
         auto stmt = FromProto(pb_stmt.block());
-        stmt->deps = std::move(deps);
         stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
       } break;
       default:
         break;
     }
-  }
-  for (const auto& item : block.annotations()) {
-    if (item.second.type_url() == "type.vertex.ai/vertexai.tile.stripe.proto.BoolAnnotation") {
-      proto::BoolAnnotation pb_ann;
-      item.second.UnpackTo(&pb_ann);
-      auto ann = std::make_shared<BoolAnnotation>(pb_ann.value());
-      ret->annotations.insert(std::make_pair(item.first, ann));
+    std::shared_ptr<Statement> stmt = *stmts.back();
+    for (std::size_t dep_idx : pb_stmt.deps()) {
+      stmt->deps.push_back(stmts[dep_idx]);
+    }
+    for (const auto& tag : pb_stmt.tags()) {
+      stmt->tags.emplace(tag);
     }
   }
   return ret;
@@ -564,6 +555,9 @@ proto::Block IntoProto(const Block& block) {
     for (std::size_t dep : deps) {
       pb_stmt->add_deps(dep);
     }
+    for (const auto& tag : stmt->tags) {
+      pb_stmt->add_tags(tag);
+    }
     switch (stmt->kind()) {
       case StmtKind::Load: {
         auto load = Load::Downcast(stmt);
@@ -621,15 +615,6 @@ proto::Block IntoProto(const Block& block) {
         *pb_stmt->mutable_block() = IntoProto(*inner);
       } break;
     }
-  }
-  for (const auto& item : block.annotations) {
-    google::protobuf::Any any;
-    if (auto ann = BoolAnnotation::Downcast(item.second)) {
-      proto::BoolAnnotation pb_ann;
-      pb_ann.set_value(ann->value);
-      any.PackFrom(pb_ann);
-    }
-    (*ret.mutable_annotations())[item.first] = any;
   }
   return ret;
 }

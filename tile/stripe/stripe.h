@@ -2,8 +2,8 @@
 
 #include <functional>
 #include <list>
-#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -82,10 +82,11 @@ struct Statement {
   // The set of statements within the same Block that must complete
   // before this statement is evaluated.
   std::list<StatementIt> deps;
-};
+  // Generic properties on the statement used by optimization passes
+  std::set<std::string> tags;
 
-struct Annotation {
-  virtual ~Annotation() = default;
+  bool has_tag(const std::string& tag) const { return tags.count(tag) != 0; }
+  void set_tag(const std::string& tag) { tags.emplace(tag); }
 };
 
 struct Index {
@@ -249,7 +250,6 @@ struct Block : Statement {
   std::vector<Affine> constraints;
   std::vector<Refinement> refs;
   StatementList stmts;
-  std::map<std::string, std::shared_ptr<Annotation>> annotations;  // key: name
   Location location;
 
   // Helper methods
@@ -264,12 +264,6 @@ struct Block : Statement {
   std::vector<Refinement>::const_iterator ref_by_from(const std::string& name) const;
   // Make a unique refinement name for an into (by appending _2, etc, if needed)
   std::string unique_ref_name(const std::string& in);
-};
-
-struct BoolAnnotation : Annotation {
-  explicit BoolAnnotation(bool value) : value(value) {}
-  static std::shared_ptr<BoolAnnotation> Downcast(const std::shared_ptr<Annotation>& ann);
-  bool value;
 };
 
 inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) {  //
@@ -288,6 +282,7 @@ std::ostream& operator<<(std::ostream& os, const Store& op);
 std::ostream& operator<<(std::ostream& os, const Intrinsic& op);
 std::ostream& operator<<(std::ostream& os, const Special& op);
 std::ostream& operator<<(std::ostream& os, const Constant& op);
+std::ostream& operator<<(std::ostream& os, const Refinement& ref);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 
 std::shared_ptr<Block> FromProto(const proto::Block& block);

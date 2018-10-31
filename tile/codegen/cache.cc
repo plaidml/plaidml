@@ -100,8 +100,18 @@ void ApplyCache(Block* block,                 //
       "",            // agg_op
       mem_loc        // location
   });
+  block->refs.back().access.resize(cached_ts.dims.size());
   // Update inner blocks strides + locations
   FixupRefs(block, var_name);
+}
+
+void CacheBlock(Block* block, const std::set<RefDir>& dirs, const Location& mem_loc, const Location& xfer_loc) {
+  auto refs = block->refs;
+  for (const auto& ref : refs) {
+    if (dirs.count(ref.dir)) {
+      codegen::ApplyCache(block, ref.into, mem_loc, xfer_loc);
+    }
+  }
 }
 
 }  // namespace codegen

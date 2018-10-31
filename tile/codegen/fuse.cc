@@ -17,33 +17,39 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
   // This is quite hueristic right now, but still beats our prior implementation
   auto it_a = a.ref_by_from(buf_name);
   if (it_a == a.refs.end()) {
+    IVLOG(3, "ComputeFusionPlan: buffer name unknown in block a");
     return boost::none;
   }
   auto it_b = b.ref_by_from(buf_name);
   if (it_b == b.refs.end()) {
+    IVLOG(3, "ComputeFusionPlan: buffer name unknown in block b");
     return boost::none;
   }
   assert(it_a->access.size() == it_b->access.size());
   for (size_t i = 0; i < it_a->access.size(); i++) {
     const Affine& poly_a = it_a->access[i];
     const Affine& poly_b = it_b->access[i];
+    if (poly_a == 0 && poly_b == 0) {
+      continue;
+    }
     if (poly_a.getMap().size() != 1 || poly_a.getMap().begin()->first.empty()) {
+      IVLOG(3, "ComputeFusionPlan: complex access in a: " << poly_a.toString());
       return boost::none;
     }
     if (poly_b.getMap().size() != 1 || poly_b.getMap().begin()->first.empty()) {
+      IVLOG(3, "ComputeFusionPlan: complex access in b" << poly_b.toString());
       return boost::none;
     }
     std::string idx_a = poly_a.getMap().begin()->first;
     std::string idx_b = poly_b.getMap().begin()->first;
     if (plan.remap_a.find(idx_a) != plan.remap_a.end()) {
-      return boost::none;
-    }
-    if (plan.remap_a.find(idx_a) != plan.remap_a.end()) {
+      IVLOG(3, "ComputeFusionPlan: duplicate index");
       return boost::none;
     }
     int64_t mul_a = poly_a[idx_a];
     int64_t mul_b = poly_b[idx_b];
     if (mul_a % mul_b != 0) {
+      IVLOG(3, "ComputeFusionPlan: uneven index division");
       return boost::none;
     }
     for (size_t i = 0; i < b.idxs.size(); i++) {
@@ -113,7 +119,7 @@ void FlattenTrivial(stripe::Block* outer) {
 
 std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                          //
                                       const std::map<std::string, std::string>& mapping,  //
-                                      const TileSpec& tile) {
+                                      const TileShape& tile) {
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
   ApplyTile(tiled.get(), tile);
@@ -305,7 +311,7 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
   return true;
 }
 
-void FusionPass(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
+void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
   // Start with the first statement, and keep tying to fuse until you can't anymore, then move to the next
   auto it = block->stmts.begin();
   while (it != block->stmts.end()) {
@@ -360,13 +366,13 @@ void FusionPass(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
         break;
       }
       // Now call the strategy to see if we should fuse
-      if (!strategy->AttemptFuse(*block1, *block2)) {
+      if (!strategy->AttemptFuse(*block, *block1, *block2)) {
         IVLOG(3, "Fusion denied by strategy");
         break;
       }
       // Do the appropriate refactors
-      auto ref1 = FusionRefactor(*block1, plan->remap_a, TileSpec{"fusion_tile", plan->tile_a, {""}});
-      auto ref2 = FusionRefactor(*block2, plan->remap_b, TileSpec{"fusion_tile", plan->tile_b, {""}});
+      auto ref1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a);
+      auto ref2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b);
       // IVLOG(3, "Fusion refactor 1:\n" << *ref1);
       // IVLOG(3, "Fusion refactor 2:\n" << *ref2);
       // Try the actual fusion
@@ -379,10 +385,45 @@ void FusionPass(const AliasMap& scope, Block* block, FusionStrategy* strategy) {
       // If it worked, update
       *it = ref1;
       block->stmts.erase(it_next);
-      strategy->OnFused(scope, ref1.get());
+      strategy->OnFused(scope, ref1.get(), *block1, *block2);
     }
     it++;
   }
+}
+
+class TagFusionStrategy : public FusionStrategy {
+ public:
+  explicit TagFusionStrategy(const FusionPassOptions& options) : options_(options) {}
+  bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
+    return HasTags(parent, options_.parent_reqs) && HasTags(a, options_.a_block_reqs) &&
+           HasTags(b, options_.b_block_reqs);
+  }
+  void OnFailed() {}
+  void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
+    AddTags(block, options_.fused_set);
+  }
+
+ private:
+  const FusionPassOptions& options_;
+};
+
+static void FusionPassRecurse(const AliasMap& map, stripe::Block* block, TagFusionStrategy* strategy) {
+  FusionInner(map, block, strategy);
+  for (const auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      AliasMap inner_map(map, *inner);
+      FusionPassRecurse(inner_map, inner.get(), strategy);
+    }
+  }
+}
+
+void FusionPass(stripe::Block* root, const FusionPassOptions& options) {
+  AliasMap base;
+  AliasMap root_map(base, *root);
+  // Check if we should fuse this block
+  TagFusionStrategy strategy(options);
+  FusionPassRecurse(root_map, root, &strategy);
 }
 
 }  // namespace codegen
