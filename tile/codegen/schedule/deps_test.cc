@@ -40,7 +40,7 @@ TEST(DepsTest, SmallDepMix) {
     stmts { store { from:"$1" into:"b2" } }
     stmts { load { from:"b2" into:"$2" } deps: 0}
     stmts { constant { name:"$3" iconst: 0 } }
-    stmts { intrinsic { name:"ADD" inputs:"$2" inputs:"$3" outputs:"$4"} }
+    stmts { intrinsic { name:"ADD" type:FLOAT32 inputs:"$2" inputs:"$3" outputs:"$4"} }
     stmts { special { name:"COPY" inputs:"b1" outputs:"b2"} }
     stmts { store { from:"$4" into:"b2"} }
   )",
@@ -74,7 +74,7 @@ TEST(DepsTest, SmallDepMix) {
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { load { from:"b2" into:"$2" } deps: 1}
     stmts { constant { name:"$3" iconst: 0 } }
-    stmts { intrinsic { name:"ADD" inputs:"$2" inputs:"$3" outputs:"$4"} deps: 2 deps: 3}
+    stmts { intrinsic { name:"ADD" type:FLOAT32 inputs:"$2" inputs:"$3" outputs:"$4"} deps: 2 deps: 3}
     stmts { special { name:"COPY" inputs:"b1" outputs:"b2"} deps: 2}
     stmts { store { from:"$4" into:"b2"} deps: 4 deps: 5}
   )";

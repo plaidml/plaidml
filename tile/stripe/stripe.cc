@@ -434,6 +434,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
       case proto::Statement::kIntrinsic: {
         auto stmt = std::make_shared<Intrinsic>();
         stmt->name = pb_stmt.intrinsic().name();
+        stmt->type = tile::FromProto(pb_stmt.intrinsic().type());
         stmt->deps = std::move(deps);
         for (const auto& item : pb_stmt.intrinsic().inputs()) {
           stmt->inputs.push_back(item);
@@ -580,6 +581,7 @@ proto::Block IntoProto(const Block& block) {
         auto intrinsic = Intrinsic::Downcast(stmt);
         auto pb_intrinsic = pb_stmt->mutable_intrinsic();
         pb_intrinsic->set_name(intrinsic->name);
+        pb_intrinsic->set_type(tile::IntoProto(intrinsic->type));
         for (const auto& input : intrinsic->inputs) {
           pb_intrinsic->add_inputs(input);
         }
