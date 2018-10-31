@@ -123,6 +123,10 @@ struct Location {
   Affine unit;
 };
 
+inline bool operator!=(const Location& lhs, const Location& rhs) {
+  return lhs.name != rhs.name || lhs.unit != rhs.unit;
+}
+
 struct Refinement {
   RefDir dir;
   std::string from;
@@ -132,6 +136,7 @@ struct Refinement {
   std::string agg_op;
   Location location;
   bool is_const;
+  std::size_t offset;  // Offset within the location's arena.
 
   Affine FlatAccess() const;
 };
