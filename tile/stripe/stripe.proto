@@ -46,6 +46,7 @@ message Refinement {
   string agg_op = 6;
   Location location = 7;
   bool is_const = 8;
+  uint64 offset = 9;
 }
 
 message Statement {

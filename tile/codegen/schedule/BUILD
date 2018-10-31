@@ -6,9 +6,11 @@ plaidml_cc_library(
     name = "schedule",
     srcs = [
         "deps.cc",
+        "deps.h",
+        "placer.cc",
+        "placer.h",
     ],
     hdrs = [
-        "deps.h",
         "scheduler.h",
     ],
     visibility = ["//visibility:public"],
@@ -24,5 +26,14 @@ plaidml_cc_test(
     deps = [
         ":schedule",
         "//testing:matchers",
-        ],
+    ],
+)
+
+plaidml_cc_test(
+    name = "placer_test",
+    srcs = ["placer_test.cc"],
+    deps = [
+        ":schedule",
+        "//testing:matchers",
+    ],
 )
