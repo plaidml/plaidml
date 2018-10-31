@@ -174,6 +174,7 @@ struct Intrinsic : Statement {
   Intrinsic* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
 
   std::string name;
+  DataType type = DataType::FLOAT32;
   std::vector<std::string> inputs;
   std::vector<std::string> outputs;
 
