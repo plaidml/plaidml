@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+#include <boost/optional.hpp>
+
+#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -41,19 +44,18 @@ std::ostream& operator<<(std::ostream& os, const StencilMatch& match);
 bool operator==(const StencilMatch& lhs, const StencilMatch& rhs);
 bool operator<(const StencilMatch& lhs, const StencilMatch& rhs);
 
-StencilMatch FindBestStencil(const std::vector<StencilSpec>& specs, stripe::Block* block);
+boost::optional<StencilMatch> FindBestStencil(const std::vector<StencilSpec>& specs, const stripe::Block& block);
 
-struct TileSpec {
-  std::string name;
-  TileShape shape;
-  stripe::Location loc;
+void ApplyTile(stripe::Block* inner, const TileShape& shape, bool elide_trivial = true);
+
+struct StencilPassOptions {
+  Tags reqs;
+  std::vector<StencilSpec> specs;
+  Tags set_outer;
+  Tags set_inner;
 };
 
-void ApplyTile(stripe::Block* inner, const TileSpec& spec, bool elide_trivial = true);
-
-typedef std::function<TileSpec(stripe::Block* block)> TileGenerator;
-void TilePass(stripe::Block* block, const TileGenerator& generator);
-void TilePass(stripe::Block* block, const std::vector<StencilSpec>& specs);
+void StencilPass(stripe::Block* block, const StencilPassOptions& options);
 
 }  // namespace codegen
 }  // namespace tile
