@@ -111,24 +111,23 @@ class TestTile(unittest.TestCase):
             self.assertEqual(view[7], 14.0 + 40.0 + 72.0)
             self.assertEqual(view[8], 21.0 + 48.0 + 81.0)
 
-    def test_equals_argmax(self):
-        """Validates that the =(argmax, argmax) composition works."""
-        lhs = tile.Value.from_ndims(2)
-        rhs = tile.Value.from_ndims(2)
-        out = op.equal(op.argmax(lhs), op.argmax(rhs))
-        func = tile.compose(
-            self._ctx, self._dev, inputs=[('lhs', lhs), ('rhs', rhs)], outputs=[('out', out)])
+    def test_argmax(self):
+        """Validates that the composition works."""
+        inp = tile.Value.from_ndims(2)
+        out = op.argmax(inp)
+        func = tile.compose(self._ctx, self._dev, inputs=[('inp', inp)], outputs=[('out', out)])
 
         invoker = plaidml.Invoker(self._ctx, func)
-        invoker.set_input('lhs', self.make_inited_tensor((3, 4)))
-        invoker.set_input('rhs', self.make_inited_tensor((3, 4)))
+        invoker.set_input('inp', self.make_inited_tensor((3, 4)))
         output = self.make_output_tensor(invoker.get_output_shape('out'))
         invoker.set_output('out', output)
         invoker.invoke()
 
+        # Any increasing tensor reduced along an increasing dimension will
+        # have an argmax equal to the dimension size
         with output.mmap_current() as view:
-            for dim in range(0, 2):
-                self.assertEqual(view[(dim, 0)], True)
+            for dim in range(0, 3):
+                self.assertEqual(view[(dim)], 3)
 
 
 def main():
