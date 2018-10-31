@@ -112,7 +112,6 @@ def compareForwardExact(skip_theano=True, skip_tensorflow=False):
                 tf_session.run(tensorflow.global_variables_initializer())
                 tensorflow_result = tensorflow_result_intermediate.eval(session=tf_session)
             plaidml_result = test_func(self, pkb, *args).eval()
-
             if not skip_theano:
                 npt.assert_array_equal(
                     plaidml_result, theano_result, err_msg='x=plaidml, y=theano')
@@ -322,26 +321,26 @@ class TestBackendOps(unittest.TestCase):
     def testPassthrough(self, b):
         return b.variable(m(3, 3))
 
-    @compareForwardExact(skip_tensorflow=True)
+    @compareForwardExact()
     def testArgmax(self, b):
-        # We are using Theano style (keepdims), not TF style (not keepdims)
-        return b.equal(b.argmax(b.variable(m(3, 3))), b.argmax(b.variable(m(3, 3))))
+        return b.argmax(b.variable(m(3, 3)))
 
-    @compareForwardExact(skip_tensorflow=True)
+    @compareForwardExact()
+    def testArgmaxWithAxis(self, b):
+        return b.argmax(b.variable(n(2, 3, 4) % 3), axis=-2)
+
+    @compareForwardExact()
     def testArgmaxUnequal(self, b):
-        # We are using Theano style (keepdims), not TF style (not keepdims)
         x = b.variable(m(3, 2))
         y = b.variable(np.array([[2, 4], [5, -1], [3, 0]]))
         return b.equal(b.argmax(x, axis=0), b.argmax(y, axis=0))
 
-    @compareForwardExact(skip_tensorflow=True)
+    @compareForwardExact()
     def testArgmin(self, b):
-        # We are using Theano style (keepdims), not TF style (not keepdims)
-        return b.equal(b.argmax(-b.variable(m(3, 3))), b.argmin(b.variable(m(3, 3))))
+        return b.argmin(b.variable(m(7, 2)))
 
-    @compareForwardExact(skip_tensorflow=True)
+    @compareForwardExact()
     def testArgminUnequal(self, b):
-        # We are using Theano style (keepdims), not TF style (not keepdims)
         x = b.variable(m(3, 2))
         y = b.variable(np.array([[2, 4], [5, -1], [3, 0]]))
         return b.equal(b.argmin(x, axis=0), b.argmin(y, axis=0))
