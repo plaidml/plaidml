@@ -190,7 +190,8 @@ static void PrintRefinements(std::ostream& os, const Block& block, size_t depth)
       os << " const";
     }
     if (ref.from.empty()) {
-      os << " new";
+      os << " new@";
+      os << ref.offset;
     }
     os << "<" << ref.location << "> ";
     os << ref.into;
@@ -379,6 +380,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     ref.agg_op = pb_ref.agg_op();
     ref.location = FromProto(pb_ref.location());
     ref.is_const = pb_ref.is_const();
+    ref.offset = pb_ref.offset();
     ret->refs.emplace_back(ref);
   }
   std::vector<StatementIt> stmts;
@@ -522,6 +524,7 @@ proto::Block IntoProto(const Block& block) {
     pb_ref->set_agg_op(ref.agg_op);
     *pb_ref->mutable_location() = IntoProto(ref.location);
     pb_ref->set_is_const(ref.is_const);
+    pb_ref->set_offset(ref.offset);
   }
   std::unordered_map<Statement*, std::size_t> dep_idxs;
   std::size_t stmt_idx = 0;
