@@ -23,10 +23,23 @@ const char* Intrinsic::ADD = "ADD";
 const char* Intrinsic::EQ = "EQ";
 const char* Intrinsic::COND = "COND";
 
-static void PrintBlock(std::ostream& os, const Block& block, size_t depth);
+static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_t block_idx,
+                       const std::unordered_map<const Statement*, size_t>& block_deps);
 
 static void PrintTab(std::ostream& os, size_t depth) {  //
   os << std::string(depth * 2, ' ');
+}
+
+static void PrintDepsTab(std::ostream& os, size_t depth, const Statement* stmt, size_t idx,
+                         const std::unordered_map<const Statement*, size_t>& deps) {  //
+  os << std::string(depth * 2, ' ') << "[" << idx;
+  if (stmt->deps.size()) {
+    os << ", deps:";
+    for (const auto& it : stmt->deps) {
+      os << " " << deps.at(it->get());
+    }
+  }
+  os << "]\n" << std::string(depth * 2, ' ');
 }
 
 std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
@@ -139,30 +152,31 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
   return os;
 }
 
-static void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& stmt, size_t depth) {
+static void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& stmt, size_t depth, size_t idx,
+                           const std::unordered_map<const Statement*, size_t>& deps) {
   switch (stmt->kind()) {
     case StmtKind::Load:
-      PrintTab(os, depth);
+      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Load::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Store:
-      PrintTab(os, depth);
+      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Store::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Intrinsic:
-      PrintTab(os, depth);
+      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Intrinsic::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Special:
-      PrintTab(os, depth);
+      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Special::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Constant:
-      PrintTab(os, depth);
+      PrintDepsTab(os, depth, stmt.get(), idx, deps);
       os << *Constant::Downcast(stmt) << std::endl;
       break;
     case StmtKind::Block:
-      PrintBlock(os, *Block::Downcast(stmt), depth);
+      PrintBlock(os, *Block::Downcast(stmt), depth, idx, deps);
       break;
     default:
       break;
@@ -190,8 +204,9 @@ static void PrintRefinements(std::ostream& os, const Block& block, size_t depth)
       os << " const";
     }
     if (ref.from.empty()) {
-      os << " new@";
+      os << " new[";
       os << ref.offset;
+      os << "]";
     }
     os << "<" << ref.location << "> ";
     os << ref.into;
@@ -221,8 +236,9 @@ static void PrintRefinements(std::ostream& os, const Block& block, size_t depth)
   }
 }
 
-static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
-  PrintTab(os, depth);
+static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_t block_idx,
+                       const std::unordered_map<const Statement*, size_t>& block_deps) {
+  PrintDepsTab(os, depth, &block, block_idx, block_deps);
   os << "block";
   if (!block.location.name.empty()) {
     os << "<" << block.location << ">";
@@ -255,15 +271,19 @@ static void PrintBlock(std::ostream& os, const Block& block, size_t depth) {
   PrintRefinements(os, block, depth);
   PrintTab(os, depth);
   os << ") {" << std::endl;
+  std::size_t idx = 0;
+  std::unordered_map<const Statement*, size_t> deps;
   for (const auto& stmt : block.stmts) {
-    PrintStatement(os, stmt, depth + 1);
+    PrintStatement(os, stmt, depth + 1, idx, deps);
+    deps[stmt.get()] = idx++;
   }
   PrintTab(os, depth);
   os << "}" << std::endl;
 }
 
 std::ostream& operator<<(std::ostream& os, const Block& block) {
-  PrintBlock(os, block, 0);
+  std::unordered_map<const Statement*, size_t> deps;
+  PrintBlock(os, block, 0, 0, deps);
   return os;
 }
 
