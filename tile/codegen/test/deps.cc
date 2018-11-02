@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "testing/matchers.h"
-#include "tile/codegen/schedule/deps.h"
+#include "tile/codegen/deps.h"
 #include "tile/stripe/stripe.h"
 #include "tile/stripe/stripe.pb.h"
 
@@ -14,7 +14,6 @@ using ::testing::EqualsProto;
 namespace vertexai {
 namespace tile {
 namespace codegen {
-namespace schedule {
 
 TEST(DepsTest, SmallDepMix) {
   stripe::proto::Block input_proto;
@@ -82,7 +81,6 @@ TEST(DepsTest, SmallDepMix) {
   EXPECT_THAT(output_proto, EqualsProto(expected));
 }
 
-}  // namespace schedule
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

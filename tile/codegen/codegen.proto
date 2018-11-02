@@ -1,0 +1,44 @@
+syntax = "proto2";
+
+package vertexai.tile.codegen.proto;
+
+message Config {
+  required uint32 clock_mhz = 1;
+  map<string, ExecutionUnit> exec_units = 2;
+  map<string, MemoryUnit> mem_units = 3;
+  map<string, TransferUnit> tx_units = 4;
+  repeated Bus buses = 5;
+}
+
+message ExecutionUnit {
+  optional uint32 count = 1 [default = 1];
+  required uint32 ops_per_cycle = 2;
+  repeated Stencil stencils = 3;
+}
+
+message MemoryUnit {
+  optional uint32 count = 1 [default = 1];
+  required uint32 size_KiB = 2;
+}
+
+message TransferUnit {
+  optional uint32 count = 1 [default = 1];
+}
+
+message Bus {
+  repeated string sources = 1;
+  repeated string sinks = 2;
+  required double bytes_per_cycle = 3;
+}
+
+message Stencil {
+  required uint64 startup_cost = 1;
+  repeated StencilIndex idxs = 2;
+}
+
+message StencilIndex {
+  required string name = 1;
+  required int32 size = 2;
+  repeated int32 out_strides = 3;
+  repeated int32 in_strides = 4;
+}

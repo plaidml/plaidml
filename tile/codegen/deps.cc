@@ -1,6 +1,6 @@
 // Copyright 2018, Intel Corporation
 
-#include "tile/codegen/schedule/deps.h"
+#include "tile/codegen/deps.h"
 
 #include <set>
 #include <sstream>
@@ -13,7 +13,6 @@
 namespace vertexai {
 namespace tile {
 namespace codegen {
-namespace schedule {
 namespace {
 
 class BlockDepComputer : private stripe::MutableStmtVisitor {
@@ -251,7 +250,6 @@ void ComputeDepsForTree(stripe::Block* outermost_block) {
   }
 }
 
-}  // namespace schedule
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
