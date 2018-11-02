@@ -1,6 +1,6 @@
 // Copyright 2018, Intel Corporation
 
-#include "tile/codegen/schedule/placer.h"
+#include "tile/codegen/placer.h"
 
 #include <list>
 #include <stack>
@@ -67,7 +67,6 @@
 namespace vertexai {
 namespace tile {
 namespace codegen {
-namespace schedule {
 namespace {
 
 struct Chunk;
@@ -412,7 +411,6 @@ void PlaceRefinements(stripe::Block* outermost_block, std::size_t alignment) {
   }
 }
 
-}  // namespace schedule
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

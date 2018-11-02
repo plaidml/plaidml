@@ -29,6 +29,15 @@ inline void LocalizePass(stripe::Block* root, const Tags& reqs) {
   RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) { LocalizePass(map, block); });
 }
 
+struct LocateMemoryPassOptions {
+  Tags reqs;
+  stripe::Location location;
+};
+
+void LocateMemoryPass(stripe::Block* root, const LocateMemoryPassOptions& options);
+void LocateBlockPass(stripe::Block* root, const LocateMemoryPassOptions& options);
+void LocateInnerBlockPass(stripe::Block* root, const LocateMemoryPassOptions& options);
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

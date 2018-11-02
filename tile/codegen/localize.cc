@@ -55,7 +55,7 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   FixupRefs(block, var_name);
 }
 
-void LocalizePass(const AliasMap& scope, stripe::Block* block) {
+void LocalizePass(const AliasMap& scope, Block* block) {
   // Compute statement use count of each buffer
   std::map<std::string, size_t> use_count;
   for (const auto& stmt : block->stmts) {
@@ -99,6 +99,40 @@ void LocalizePass(const AliasMap& scope, stripe::Block* block) {
     AliasMap inner_map(scope, *inner);
     LocalizePass(inner_map, inner.get());
   }
+}
+
+void RecursiveLocate(Block* block, Location location) {
+  for (const auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (!inner) {
+      continue;
+    }
+    inner->location = location;
+    RecursiveLocate(inner.get(), location);
+  }
+}
+
+void LocateMemoryPass(Block* root, const LocateMemoryPassOptions& options) {
+  RunOnBlocks(root, options.reqs, [&](const AliasMap& map, Block* block) {
+    for (auto& ref : block->refs) {
+      if (ref.dir == RefDir::None) {
+        ref.location = options.location;
+        FixupRefs(block, ref.into);
+      }
+    }
+  });
+}
+
+void LocateBlockPass(Block* root, const LocateMemoryPassOptions& options) {
+  RunOnBlocks(root, options.reqs, [&](const AliasMap& map, Block* block) {  //
+    block->location = options.location;
+  });
+}
+
+void LocateInnerBlockPass(Block* root, const LocateMemoryPassOptions& options) {
+  RunOnBlocks(root, options.reqs, [&](const AliasMap& map, Block* block) {  //
+    RecursiveLocate(block, options.location);
+  });
 }
 
 }  // namespace codegen
