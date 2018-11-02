@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "testing/matchers.h"
-#include "tile/codegen/schedule/placer.h"
+#include "tile/codegen/placer.h"
 #include "tile/stripe/stripe.h"
 #include "tile/stripe/stripe.pb.h"
 
@@ -14,7 +14,6 @@ using ::testing::EqualsProto;
 namespace vertexai {
 namespace tile {
 namespace codegen {
-namespace schedule {
 
 TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
   stripe::proto::Block input_proto;
@@ -189,7 +188,6 @@ TEST(PlacerTest, DistinctLocationCausesSpacialReuse) {
   EXPECT_THAT(output_proto, EqualsProto(expected));
 }
 
-}  // namespace schedule
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

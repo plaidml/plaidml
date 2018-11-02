@@ -1,4 +1,9 @@
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_proto_library")
+
+plaidml_proto_library(
+    name = "proto",
+    srcs = ["codegen.proto"],
+)
 
 plaidml_cc_library(
     name = "codegen",
@@ -8,6 +13,7 @@ plaidml_cc_library(
     ]),
     visibility = ["//visibility:public"],
     deps = [
+        ":proto_cc",
         "//base/util",
         "//tile/stripe",
     ],
