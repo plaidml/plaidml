@@ -212,6 +212,8 @@ class StripeGenerator {
       if (!combo_op.empty()) {
         AddIntrinsic(kernel.get(), combo_op, scalar_inputs, {ScalarName(op.output)});
       }
+    } else {
+      AddIntrinsic(kernel.get(), "assign", scalar_inputs, {ScalarName(op.output)});
     }
 
     // STORE
