@@ -331,7 +331,7 @@ class StripeGenerator {
 
     // Remove unused indexes
     kernel->idxs.erase(
-        remove_if(kernel->idxs.begin(), kernel->idxs.end(), [](const auto& idx) { return idx.range == 1; }),
+        remove_if(kernel->idxs.begin(), kernel->idxs.end(), [](const Index& idx) { return idx.range == 1; }),
         kernel->idxs.end());
 
     kernel->refs.emplace_back(Refinement{
