@@ -36,7 +36,12 @@ static void PrintDepsTab(std::ostream& os, size_t depth, const Statement* stmt, 
   if (stmt->deps.size()) {
     os << ", deps:";
     for (const auto& it : stmt->deps) {
-      os << " " << deps.at(it->get());
+      auto dep_idx_it = deps.find(it->get());
+      if (dep_idx_it != deps.end()) {
+        os << " " << dep_idx_it->second;
+      } else {
+        os << " [parent]";
+      }
     }
   }
   os << "]\n" << std::string(depth * 2, ' ');
