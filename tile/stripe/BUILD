@@ -1,4 +1,4 @@
-# Copyright 2018, Intel Corp.
+# Copyright 2018, Intel Corporation
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_proto_library")
 
@@ -23,7 +23,7 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util",
-        "//tile/math",
         "//tile/base",
+        "//tile/math",
     ],
 )

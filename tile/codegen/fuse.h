@@ -1,4 +1,4 @@
-// Copyright 2018, Intel Corp.
+// Copyright 2018, Intel Corporation
 
 #pragma once
 
@@ -8,6 +8,7 @@
 #include <boost/optional.hpp>
 
 #include "tile/codegen/alias.h"
+#include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/tile.h"
 
 namespace vertexai {
@@ -60,14 +61,7 @@ class AlwaysFuseRecursive : public FusionStrategy {
   }
 };
 
-struct FusionPassOptions {
-  Tags parent_reqs;
-  Tags a_block_reqs;
-  Tags b_block_reqs;
-  Tags fused_set;
-};
-
-void FusionPass(stripe::Block* block, const FusionPassOptions& options);
+void FusionPass(stripe::Block* block, const proto::FusionPass& options);
 
 }  // namespace codegen
 }  // namespace tile

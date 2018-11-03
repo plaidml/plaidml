@@ -1,4 +1,4 @@
-// Copyright 2018, Intel Corp.
+// Copyright 2018, Intel Corporation
 
 #include "tile/codegen/fuse.h"
 #include "tile/codegen/localize.h"
@@ -391,6 +391,13 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
   }
 }
 
+struct FusionPassOptions {
+  Tags parent_reqs;
+  Tags a_block_reqs;
+  Tags b_block_reqs;
+  Tags fused_set;
+};
+
 class TagFusionStrategy : public FusionStrategy {
  public:
   explicit TagFusionStrategy(const FusionPassOptions& options) : options_(options) {}
@@ -418,11 +425,17 @@ static void FusionPassRecurse(const AliasMap& map, stripe::Block* block, TagFusi
   }
 }
 
-void FusionPass(stripe::Block* root, const FusionPassOptions& options) {
+void FusionPass(stripe::Block* root, const proto::FusionPass& options) {
+  FusionPassOptions fopts = {
+      FromProto(options.parent_reqs()),  // parent_reqs
+      FromProto(options.a_reqs()),       // a_block_reqs
+      FromProto(options.b_reqs()),       // b_block_reqs
+      FromProto(options.fused_set())     // fused_set
+  };
   AliasMap base;
   AliasMap root_map(base, *root);
   // Check if we should fuse this block
-  TagFusionStrategy strategy(options);
+  TagFusionStrategy strategy(fopts);
   FusionPassRecurse(root_map, root, &strategy);
 }
 

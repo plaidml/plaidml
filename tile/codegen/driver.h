@@ -2,17 +2,14 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-#include <vector>
-
+#include "tile/codegen/codegen.pb.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ExecuteProgram(const stripe::Block& program, std::map<std::string, std::vector<float>>* buffers);
+void Optimize(stripe::Block* block, const proto::Config& cfg);
 
 }  // namespace codegen
 }  // namespace tile
