@@ -1,3 +1,5 @@
+// Copyright 2018, Intel Corporation
+
 #include "tile/stripe/stripe.h"
 
 #include <sstream>
@@ -207,8 +209,8 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
     os << " const";
   }
   if (ref.from.empty()) {
-    os << " new@";
-    os << ref.offset;
+    os << " new@0x";
+    os << std::hex << std::setw(8) << std::setfill('0') << ref.offset;
   }
   os << "<" << ref.location << "> ";
   os << ref.into;
@@ -366,6 +368,21 @@ Location FromProto(const proto::Location& loc) {  //
   return Location{loc.name(), FromProto(loc.unit())};
 }
 
+RefDir FromProto(const proto::Refinement::Dir& dir) {
+  switch (dir) {
+    case proto::Refinement::None:
+      return RefDir::None;
+    case proto::Refinement::In:
+      return RefDir::In;
+    case proto::Refinement::Out:
+      return RefDir::Out;
+    case proto::Refinement::InOut:
+      return RefDir::InOut;
+    default:
+      throw std::runtime_error("Invalid RefDir");
+  }
+}
+
 std::shared_ptr<Block> FromProto(const proto::Block& block) {
   auto ret = std::make_shared<Block>();
   ret->name = block.name();
@@ -384,22 +401,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
   }
   for (const auto& pb_ref : block.refs()) {
     Refinement ref;
-    switch (pb_ref.dir()) {
-      case proto::Refinement::None:
-        ref.dir = RefDir::None;
-        break;
-      case proto::Refinement::In:
-        ref.dir = RefDir::In;
-        break;
-      case proto::Refinement::Out:
-        ref.dir = RefDir::Out;
-        break;
-      case proto::Refinement::InOut:
-        ref.dir = RefDir::InOut;
-        break;
-      default:
-        break;
-    }
+    ref.dir = FromProto(pb_ref.dir());
     ref.from = pb_ref.from();
     ref.into = pb_ref.into();
     for (const auto& pb_off : pb_ref.access()) {

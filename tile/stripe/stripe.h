@@ -1,3 +1,5 @@
+// Copyright 2018, Intel Corporation
+
 #pragma once
 
 #include <functional>
@@ -286,7 +288,13 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 
 std::shared_ptr<Block> FromProto(const proto::Block& block);
+Affine FromProto(const proto::Affine& affine);
+Location FromProto(const proto::Location& loc);
+RefDir FromProto(const proto::Refinement::Dir& dir);
+
 proto::Block IntoProto(const Block& block);
+proto::Affine IntoProto(const Affine& affine);
+proto::Location IntoProto(const Location& loc);
 
 class CloneVisitor : RewriteStmtVisitor {
  public:

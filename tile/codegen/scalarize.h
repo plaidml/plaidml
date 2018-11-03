@@ -1,10 +1,8 @@
-// Copyright 2018, Intel Corp.
+// Copyright 2018, Intel Corporation
 
 #pragma once
 
-#include <string>
-#include <vector>
-
+#include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
@@ -14,8 +12,11 @@ namespace codegen {
 
 void Scalarize(stripe::Block* block, bool recursive = false);
 
-inline void ScalarizePass(stripe::Block* root, const Tags& reqs) {
-  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) { Scalarize(block, true); });
+inline void ScalarizePass(stripe::Block* root, const proto::GenericPass& options) {
+  auto reqs = FromProto(options.reqs());
+  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
+    Scalarize(block, true);
+  });
 }
 
 }  // namespace codegen

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
@@ -16,8 +17,9 @@ namespace codegen {
 // TODO: Compute alignment correctly.
 void PlaceRefinements(stripe::Block* outermost_block, std::size_t alignment = 16);
 
-inline void MemPlacementPass(stripe::Block* root, const Tags& reqs) {
-  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+inline void MemPlacementPass(stripe::Block* root, const proto::GenericPass& options) {
+  auto reqs = FromProto(options.reqs());
+  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
     PlaceRefinements(block, 4);
   });
 }

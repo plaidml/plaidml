@@ -1,4 +1,4 @@
-// Copyright 2018, Intel Corp.
+// Copyright 2018, Intel Corporation
 
 #include "tile/codegen/localize.h"
 
@@ -112,26 +112,32 @@ void RecursiveLocate(Block* block, Location location) {
   }
 }
 
-void LocateMemoryPass(Block* root, const LocateMemoryPassOptions& options) {
-  RunOnBlocks(root, options.reqs, [&](const AliasMap& map, Block* block) {
+void LocateMemoryPass(Block* root, const proto::LocateMemoryPass& options) {
+  auto reqs = FromProto(options.reqs());
+  auto loc = stripe::FromProto(options.loc());
+  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {
     for (auto& ref : block->refs) {
       if (ref.dir == RefDir::None) {
-        ref.location = options.location;
+        ref.location = loc;
         FixupRefs(block, ref.into);
       }
     }
   });
 }
 
-void LocateBlockPass(Block* root, const LocateMemoryPassOptions& options) {
-  RunOnBlocks(root, options.reqs, [&](const AliasMap& map, Block* block) {  //
-    block->location = options.location;
+void LocateBlockPass(Block* root, const proto::LocateMemoryPass& options) {
+  auto reqs = FromProto(options.reqs());
+  auto loc = stripe::FromProto(options.loc());
+  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {  //
+    block->location = loc;
   });
 }
 
-void LocateInnerBlockPass(Block* root, const LocateMemoryPassOptions& options) {
-  RunOnBlocks(root, options.reqs, [&](const AliasMap& map, Block* block) {  //
-    RecursiveLocate(block, options.location);
+void LocateInnerBlockPass(Block* root, const proto::LocateMemoryPass& options) {
+  auto reqs = FromProto(options.reqs());
+  auto loc = stripe::FromProto(options.loc());
+  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {  //
+    RecursiveLocate(block, loc);
   });
 }
 

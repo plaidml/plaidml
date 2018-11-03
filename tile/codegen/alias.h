@@ -1,5 +1,4 @@
-
-// Copyright 2018, Intel Corp.
+// Copyright 2018, Intel Corporation
 
 #pragma once
 

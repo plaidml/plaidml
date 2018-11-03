@@ -3,6 +3,7 @@
 #pragma once
 
 #include "tile/codegen/alias.h"
+#include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
@@ -16,8 +17,9 @@ void ComputeDepsForBlock(stripe::Block* block, const AliasMap& alias_map);
 // Recomputes Statement dependencies within a Block, including all nested sub-Blocks.
 void ComputeDepsForTree(stripe::Block* outermost_block);
 
-inline void ComputeDepsPass(stripe::Block* root, const Tags& reqs) {
-  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+inline void ComputeDepsPass(stripe::Block* root, const proto::GenericPass& options) {
+  auto reqs = FromProto(options.reqs());
+  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
     ComputeDepsForBlock(block, map);
   });
 }

@@ -1,6 +1,11 @@
+// Copyright 2018, Intel Corporation
+
 syntax = "proto2";
 
 package vertexai.tile.codegen.proto;
+
+import "google/protobuf/any.proto";
+import "tile/stripe/stripe.proto";
 
 message Config {
   required uint32 clock_mhz = 1;
@@ -8,6 +13,7 @@ message Config {
   map<string, MemoryUnit> mem_units = 3;
   map<string, TransferUnit> tx_units = 4;
   repeated Bus buses = 5;
+  repeated Pass passes = 6;
 }
 
 message ExecutionUnit {
@@ -31,6 +37,53 @@ message Bus {
   required double bytes_per_cycle = 3;
 }
 
+message Pass {
+  required string name = 1;
+  oneof pass {
+    CachePass cache = 2;
+    GenericPass compute_deps = 3;
+    FusionPass fusion = 4;
+    GenericPass localize = 5;
+    LocateMemoryPass locate_block = 6;
+    LocateMemoryPass locate_inner_block = 7;
+    LocateMemoryPass locate_memory = 8;
+    GenericPass memory_placement = 9;
+    GenericPass scalarize = 10;
+    StencilPass stencil = 11;
+    google.protobuf.Any custom = 12;
+  }
+}
+
+message GenericPass {
+  repeated string reqs = 1;
+}
+
+message CachePass {
+  repeated string reqs = 1;
+  repeated stripe.proto.Refinement.Dir dirs = 2;
+  required stripe.proto.Location mem_loc = 3;
+  required stripe.proto.Location xfer_loc = 4;
+}
+
+message FusionPass {
+  repeated string parent_reqs = 1;
+  repeated string a_reqs = 2;
+  repeated string b_reqs = 3;
+  repeated string fused_set = 4;
+}
+
+message LocateMemoryPass {
+  repeated string reqs = 1;
+  required stripe.proto.Location loc = 2;
+}
+
+message StencilPass {
+  repeated string reqs = 1;
+  repeated Stencil stencils = 2;
+  repeated string outer_set = 3;
+  repeated string inner_set = 4;
+}
+
 message Stencil {
   required uint64 startup_cost = 1;
   repeated StencilIndex idxs = 2;
@@ -39,6 +92,6 @@ message Stencil {
 message StencilIndex {
   required string name = 1;
   required int32 size = 2;
-  repeated int32 out_strides = 3;
-  repeated int32 in_strides = 4;
+  repeated int32 outs = 3;
+  repeated int32 ins = 4;
 }

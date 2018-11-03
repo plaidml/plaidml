@@ -1,4 +1,4 @@
-// Copyright 2018, Intel Corp.
+// Copyright 2018, Intel Corporation
 
 #pragma once
 
@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "tile/codegen/alias.h"
+#include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
@@ -25,18 +26,16 @@ void LocalizeRef(stripe::Block* block, const std::string& var_name);
 void LocalizePass(const AliasMap& scope, stripe::Block* block);
 
 // Localize starting from root for things that match reqs
-inline void LocalizePass(stripe::Block* root, const Tags& reqs) {
-  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) { LocalizePass(map, block); });
+inline void LocalizePass(stripe::Block* root, const proto::GenericPass& options) {
+  auto reqs = FromProto(options.reqs());
+  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
+    LocalizePass(map, block);
+  });
 }
 
-struct LocateMemoryPassOptions {
-  Tags reqs;
-  stripe::Location location;
-};
-
-void LocateMemoryPass(stripe::Block* root, const LocateMemoryPassOptions& options);
-void LocateBlockPass(stripe::Block* root, const LocateMemoryPassOptions& options);
-void LocateInnerBlockPass(stripe::Block* root, const LocateMemoryPassOptions& options);
+void LocateMemoryPass(stripe::Block* root, const proto::LocateMemoryPass& options);
+void LocateBlockPass(stripe::Block* root, const proto::LocateMemoryPass& options);
+void LocateInnerBlockPass(stripe::Block* root, const proto::LocateMemoryPass& options);
 
 }  // namespace codegen
 }  // namespace tile
