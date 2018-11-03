@@ -1,6 +1,7 @@
 // Copyright 2018, Intel Corp.
 
 #include <gmock/gmock.h>
+#include <google/protobuf/util/json_util.h>
 
 #include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
@@ -17,6 +18,13 @@ namespace codegen {
 namespace test {
 
 namespace {
+
+template <typename T>
+T ParseProtoJson(const std::string& str) {
+  T proto;
+  google::protobuf::util::JsonStringToMessage(str, &proto);
+  return proto;
+}
 
 lang::RunInfo LoadMatMul(size_t dim) {
   lang::RunInfo runinfo;
@@ -122,15 +130,16 @@ TEST(Codegen, ApplyTile) {
 }
 
 TEST(Codegen, StencilMatchMatMul) {
-  StencilSpec spec = {
-      "16x16x*",  // name
-      32,         // alpha
-      {
-          {"k", 16, {-1}, {-1, 0}},
-          {"x", 16, {-1}, {0, -1}},
-          {"c", -1, {0}, {-1, -1}},
-      }  // idxs
-  };
+  auto spec = ParseProtoJson<proto::Stencil>(R"(
+    {
+      "startup_cost": 32,
+      "idxs": [
+        { "name": "k", "size": 16, "outs": [ -1 ], "ins": [ -1,  0 ] },
+        { "name": "x", "size": 16, "outs": [ -1 ], "ins": [  0, -1 ] },
+        { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
+      ]
+    }
+  )");
 
   auto runinfo = LoadMatMul(100);
   auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
@@ -141,8 +150,7 @@ TEST(Codegen, StencilMatchMatMul) {
   auto match = FindBestStencil({spec}, *kernel);
   LOG(INFO) << "Best match: " << *match;
   StencilMatch expected{
-      "16x16x*",  // name
-      1255968,    // total
+      1255968,  // total
       {
           {"k", "c", 100},
           {"m", "k", 16},
@@ -153,15 +161,16 @@ TEST(Codegen, StencilMatchMatMul) {
 }
 
 TEST(Codegen, StencilMatchConv1D) {
-  StencilSpec spec = {
-      "16x16x*",  // name
-      32,         // alpha
-      {
-          {"k", 16, {-1}, {-1, 0}},
-          {"x", 16, {-1}, {0, -1}},
-          {"c", -1, {0}, {-1, -1}},
-      }  // idxs
-  };
+  auto spec = ParseProtoJson<proto::Stencil>(R"(
+    {
+      "startup_cost": 32,
+      "idxs": [
+        { "name": "k", "size": 16, "outs": [ -1 ], "ins": [ -1,  0 ] },
+        { "name": "x", "size": 16, "outs": [ -1 ], "ins": [  0, -1 ] },
+        { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
+      ]
+    }
+  )");
 
   auto runinfo = LoadConv1D(1, 100, 64, 3);
   auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
@@ -172,8 +181,7 @@ TEST(Codegen, StencilMatchConv1D) {
   auto match = FindBestStencil({spec}, *kernel);
   LOG(INFO) << "Best match: " << *match;
   StencilMatch expected{
-      "16x16x*",  // name
-      1378944,    // total
+      1378944,  // total
       {
           {"ci", "c", 64},
           {"co", "x", 16},
@@ -185,37 +193,42 @@ TEST(Codegen, StencilMatchConv1D) {
 }
 
 TEST(Codegen, StencilMatchConv2D) {
-  std::vector<StencilSpec> specs = {
-      {
-          "16x16x*",  // name
-          32,         // alpha
-          {
-              {"k", 16, {-1}, {-1, 0}},
-              {"x", 16, {-1}, {0, -1}},
-              {"c", -1, {0}, {-1, -1}},
-          }  // idxs
-      },
-      {
-          "16x4x4x*",  // name
-          32,          // alpha
-          {
-              {"k", 16, {-1}, {-1, 0}},
-              {"x", 4, {-1}, {0, -1}},
-              {"y", 4, {-1}, {0, -1}},
-              {"c", -1, {0}, {-1, -1}},
-          }  // idxs
-      },
-      {
-          "4x4x16x*",  // name
-          32,          // alpha
-          {
-              {"k", 16, {-1}, {0, -1}},
-              {"x", 4, {-1}, {-1, 0}},
-              {"y", 4, {-1}, {-1, 0}},
-              {"c", -1, {0}, {-1, -1}},
-          }  // idxs
-      }      //
-  };
+  auto options = ParseProtoJson<proto::StencilPass>(R"(
+    {
+      "stencils": [
+        {
+          "startup_cost": 32,
+          "idxs": [
+            { "name": "k", "size": 16, "outs": [ -1 ], "ins": [ -1,  0 ] },
+            { "name": "x", "size": 16, "outs": [ -1 ], "ins": [  0, -1 ] },
+            { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
+          ]
+        },
+        {
+          "startup_cost": 32,
+          "idxs": [
+            { "name": "k", "size": 16, "outs": [ -1 ], "ins": [ -1,  0 ] },
+            { "name": "x", "size":  4, "outs": [ -1 ], "ins": [  0, -1 ] },
+            { "name": "y", "size":  4, "outs": [ -1 ], "ins": [  0, -1 ] },
+            { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
+          ]
+        },
+        {
+          "startup_cost": 32,
+          "idxs": [
+            { "name": "k", "size": 16, "outs": [ -1 ], "ins": [  0, -1 ] },
+            { "name": "x", "size":  4, "outs": [ -1 ], "ins": [ -1,  0 ] },
+            { "name": "y", "size":  4, "outs": [ -1 ], "ins": [ -1,  0 ] },
+            { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
+          ]
+        }
+      ]
+    }
+  )");
+  std::vector<proto::Stencil> specs;
+  for (const auto& stencil : options.stencils()) {
+    specs.push_back(stencil);
+  }
 
   auto runinfo = LoadConv2D(1, 100, 56, 3);
   auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
@@ -226,8 +239,7 @@ TEST(Codegen, StencilMatchConv2D) {
   auto match = FindBestStencil(specs, *kernel);
   LOG(INFO) << "Best match: " << *match;
   StencilMatch expected{
-      "4x4x16x*",  // name
-      323280000,   // total
+      323280000,  // total
       {
           {"ci", "c", 56},
           {"co", "k", 16},
@@ -240,7 +252,7 @@ TEST(Codegen, StencilMatchConv2D) {
   EXPECT_THAT(*match, Eq(expected));
 }
 
-TEST(Codegen, TilePass) {
+TEST(Codegen, StencilPass) {
   std::map<std::string, std::vector<float>> data = {
       {"A",
        {
@@ -276,21 +288,20 @@ TEST(Codegen, TilePass) {
       9,  18, 27,  9,  18,  //
   };
 
-  std::vector<StencilSpec> specs = {
-      {
-          "16x16x*",  // name
-          32,         // alpha
-          {
-              {"k", 2, {-1}, {-1, 0}},
-              {"x", 2, {-1}, {0, -1}},
-              {"c", -1, {0}, {-1, -1}},
-          }  // idxs
-      }      //
-  };
+  auto options = ParseProtoJson<proto::StencilPass>(R"(
+    {
+      "startup_cost": 32,
+      "idxs": [
+        { "name": "k", "size":  2, "outs": [ -1 ], "ins": [ -1,  0 ] },
+        { "name": "x", "size":  2, "outs": [ -1 ], "ins": [  0, -1 ] },
+        { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
+      ]
+    }
+  )");
 
   auto runinfo = LoadMatMul(5);
   auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
-  StencilPass(main.get(), {{}, specs, {}, {}});
+  StencilPass(main.get(), options);
   IVLOG(2, "\n" << *main);
 
   ExecuteProgram(*main, &data);

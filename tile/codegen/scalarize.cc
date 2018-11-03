@@ -1,4 +1,4 @@
-// Copyright 2018, Intel Corp.
+// Copyright 2018, Intel Corporation
 
 #include "tile/codegen/scalarize.h"
 

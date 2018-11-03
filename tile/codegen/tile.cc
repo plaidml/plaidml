@@ -1,4 +1,4 @@
-// Copyright 2018, Intel Corp.
+// Copyright 2018, Intel Corporation
 
 #include "tile/codegen/tile.h"
 
@@ -104,26 +104,30 @@ using StencilMapEntry = std::pair<std::string, std::string>;
 using StencilMap = std::vector<StencilMapEntry>;
 
 void FindStencilMatches(std::set<StencilMatch>* into,  //
-                        const StencilSpec& spec,       //
+                        const proto::Stencil& spec,    //
                         const Block& block,            //
                         const StencilMap& cur) {
-  if (cur.size() == spec.idxs.size()) {
+  if (cur.size() == static_cast<size_t>(spec.idxs_size())) {
     // base case
-    StencilMatch match{spec.name, 1, {}, false};
+    StencilMatch match{1, {}};
     std::map<std::string, StencilIndexMatch> idx_matches;
     for (const auto& idx : block.idxs) {
       idx_matches[idx.name] = StencilIndexMatch{idx.name, "*", 1};
     }
     for (size_t i = 0; i < cur.size(); i++) {
       const auto& item = cur[i];
-      auto it = std::find_if(spec.idxs.cbegin(), spec.idxs.cend(),
-                             [&item](const StencilIndex& idx) { return idx.name == item.second; });
-      if (it == spec.idxs.end()) {
+      auto it = std::find_if(                        //
+          spec.idxs().cbegin(),                      //
+          spec.idxs().cend(),                        //
+          [&item](const proto::StencilIndex& idx) {  //
+            return idx.name() == item.second;
+          });
+      if (it == spec.idxs().end()) {
         throw std::runtime_error("Invalid idx name");
       }
       StencilIndexMatch idx_match;
-      if (it->size != -1) {
-        idx_match = StencilIndexMatch{item.first, item.second, static_cast<uint64_t>(it->size)};
+      if (it->size() != -1) {
+        idx_match = StencilIndexMatch{item.first, item.second, static_cast<uint64_t>(it->size())};
       } else {
         auto block_idx = block.idx_by_name(item.first);
         idx_match = StencilIndexMatch{item.first, item.second, block_idx->range};
@@ -138,31 +142,35 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
       match.cost *= num_tiles * tile.value;
       match.idxs.push_back(tile);
     }
-    match.cost += spec.startup_cost * total_tiles;
+    match.cost += spec.startup_cost() * total_tiles;
     IVLOG(4, "Candidate: " << match);
     into->emplace(match);
   } else {
     size_t i = cur.size();
-    const auto& rule = spec.idxs[i];
+    const auto& rule = spec.idxs(i);
     auto ref_outs = block.ref_outs();
     auto ref_ins = block.ref_ins();
-    if (rule.out_strides.size() == ref_outs.size() &&  //
-        rule.in_strides.size() == ref_ins.size()) {
+    if (ref_outs.size() == static_cast<size_t>(rule.outs_size()) &&  //
+        ref_ins.size() == static_cast<size_t>(rule.ins_size())) {
       for (const auto& idx : block.idxs) {
-        auto it = std::find_if(cur.cbegin(), cur.cend(),
-                               [&idx](const StencilMapEntry& item) { return item.first == idx.name; });
+        auto it = std::find_if(                    //
+            cur.cbegin(),                          //
+            cur.cend(),                            //
+            [&idx](const StencilMapEntry& item) {  //
+              return item.first == idx.name;
+            });
         if (it == cur.end()) {
           bool is_legal = true;
-          for (size_t k = 0; k < rule.out_strides.size(); k++) {
-            is_legal &= IsLegal(rule.out_strides[k], ref_outs[k]->FlatAccess().get(idx.name));
+          for (size_t k = 0; k < ref_outs.size(); k++) {
+            is_legal &= IsLegal(rule.outs(k), ref_outs[k]->FlatAccess().get(idx.name));
           }
-          for (size_t k = 0; k < rule.in_strides.size(); k++) {
-            is_legal &= IsLegal(rule.in_strides[k], ref_ins[k]->FlatAccess().get(idx.name));
+          for (size_t k = 0; k < ref_ins.size(); k++) {
+            is_legal &= IsLegal(rule.ins(k), ref_ins[k]->FlatAccess().get(idx.name));
           }
           if (is_legal) {
             // found a match on this index, keep going
             auto next = cur;
-            next.push_back(std::make_pair(idx.name, rule.name));
+            next.push_back(std::make_pair(idx.name, rule.name()));
             FindStencilMatches(into, spec, block, next);
           }
         }
@@ -171,24 +179,30 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
   }
 }
 
-boost::optional<StencilMatch> FindBestStencil(const std::vector<StencilSpec>& specs,  //
+boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs,  //
                                               const Block& block) {
   std::set<StencilMatch> matches;
   for (const auto& spec : specs) {
     FindStencilMatches(&matches, spec, block, {});
   }
-  boost::optional<StencilMatch> r;
   if (!matches.empty()) {
-    r = *matches.begin();
+    return *matches.begin();
   }
-  return r;
+  return boost::none;
 }
 
-void StencilPass(stripe::Block* block, const StencilPassOptions& options) {
+struct StencilPassOptions {
+  Tags reqs;
+  std::vector<proto::Stencil> specs;
+  Tags set_outer;
+  Tags set_inner;
+};
+
+void StencilPassRecurse(stripe::Block* block, const StencilPassOptions& options) {
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
-      StencilPass(inner.get(), options);
+      StencilPassRecurse(inner.get(), options);
     }
   }
   if (HasTags(*block, options.reqs)) {
@@ -207,6 +221,19 @@ void StencilPass(stripe::Block* block, const StencilPassOptions& options) {
   }
 }
 
+void StencilPass(stripe::Block* block, const proto::StencilPass& options) {
+  StencilPassOptions sopts = {
+      FromProto(options.reqs()),       // reqs
+      {},                              // specs
+      FromProto(options.outer_set()),  // set_outer
+      FromProto(options.inner_set())   // set_inner
+  };
+  for (const auto& stencil : options.stencils()) {
+    sopts.specs.push_back(stencil);
+  }
+  StencilPassRecurse(block, sopts);
+}
+
 std::ostream& operator<<(std::ostream& os, const StencilIndexMatch& idx) {
   os << idx.block_idx_name << "->" << idx.stencil_idx_name << ":" << idx.value;
   return os;
@@ -223,18 +250,18 @@ bool operator<(const StencilIndexMatch& lhs, const StencilIndexMatch& rhs) {
 }
 
 std::ostream& operator<<(std::ostream& os, const StencilMatch& match) {
-  os << match.name << ":" << match.cost << ":" << StreamContainer(match.idxs);
+  os << match.cost << ":" << StreamContainer(match.idxs);
   return os;
 }
 
 bool operator==(const StencilMatch& lhs, const StencilMatch& rhs) {
-  return std::tie(lhs.cost, lhs.idxs, lhs.name) ==  //
-         std::tie(rhs.cost, rhs.idxs, rhs.name);
+  return std::tie(lhs.cost, lhs.idxs) ==  //
+         std::tie(rhs.cost, rhs.idxs);
 }
 
 bool operator<(const StencilMatch& lhs, const StencilMatch& rhs) {
-  return std::tie(lhs.cost, lhs.idxs, lhs.name) <  //
-         std::tie(rhs.cost, rhs.idxs, rhs.name);
+  return std::tie(lhs.cost, lhs.idxs) <  //
+         std::tie(rhs.cost, rhs.idxs);
 }
 
 }  // namespace codegen
