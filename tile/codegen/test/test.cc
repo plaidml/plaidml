@@ -62,7 +62,7 @@ lang::RunInfo LoadConv2D(size_t n, size_t x, size_t c, size_t k) {
 
 }  // namespace
 
-TEST(Codegen, ApplyTile) {
+TEST(DISABLED_Codegen, ApplyTile) {
   std::map<std::string, std::vector<float>> data = {
       {"A",
        {
