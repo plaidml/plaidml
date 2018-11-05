@@ -16,6 +16,7 @@ namespace codegen {
 
 void Optimize(stripe::Block* block, const proto::Config& cfg) {
   for (const auto& pass : cfg.passes()) {
+    IVLOG(2, "Optimization Pass " << pass.name());
     switch (pass.pass_case()) {
       case proto::Pass::kCache:
         CachePass(block, pass.cache());
