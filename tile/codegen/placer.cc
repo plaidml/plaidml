@@ -3,6 +3,7 @@
 #include "tile/codegen/placer.h"
 
 #include <list>
+#include <set>
 #include <stack>
 
 #include <boost/dynamic_bitset.hpp>
@@ -68,6 +69,8 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 namespace {
+
+constexpr std::size_t kDefaultAlignment = 4;
 
 struct Chunk;
 
@@ -157,7 +160,12 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
  private:
   void RecordUse(const std::string& name) {
     const AliasInfo& info = alias_map_->at(name);
-    Chunk* chunk = chunks_->at(info.base_name);
+    auto it = chunks_->find(info.base_name);
+    if (it == chunks_->end()) {
+      // This must be a chunk type we're not placing.
+      return;
+    }
+    Chunk* chunk = it->second;
     chunk->accessors.set(stmt_info_->idx);
     if (!chunk->saw_first_accessor) {
       chunk->saw_first_accessor = true;
@@ -174,7 +182,8 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
   stripe::Block* block_ = nullptr;
 };
 
-std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, std::size_t alignment, std::size_t stmt_limit) {
+std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<stripe::Location>& locations,
+                                std::size_t alignment, std::size_t stmt_limit) {
   // This function:
   //
   // * Logically numbers each statement within the block
@@ -197,7 +206,7 @@ std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, std::size_t alig
 
   auto add_block_chunks = [&](stripe::Block* block, const AliasMap& alias_map) {
     for (stripe::Refinement& ref : block->refs) {
-      if (ref.dir == stripe::RefDir::None) {
+      if (ref.dir == stripe::RefDir::None && locations.count(ref.location)) {
         auto chunk_it = result.emplace(result.end(), Chunk{&ref, alignment, stmt_limit});
         chunks[alias_map.at(ref.into).base_name] = &*chunk_it;
       }
@@ -269,10 +278,16 @@ std::size_t CountStatements(stripe::Block* outermost_block) {
 
 }  // namespace
 
-void PlaceRefinements(stripe::Block* outermost_block, std::size_t alignment) {
+void PlaceRefinements(stripe::Block* outermost_block, const proto::MemoryPlacementPass& options) {
+  std::set<stripe::Location> locations;
+  for (const auto& loc : options.locs()) {
+    locations.emplace(stripe::FromProto(loc));
+  }
+
   std::size_t stmt_limit = CountStatements(outermost_block);
 
-  std::list<Chunk> chunks = BuildChunkList(outermost_block, alignment, stmt_limit);
+  std::list<Chunk> chunks = BuildChunkList(outermost_block, locations,
+                                           options.alignment() ? options.alignment() : kDefaultAlignment, stmt_limit);
 
   // Edge case: no chunks means nothing to do.  And then after this,
   // we can assume there's at least one chunk.

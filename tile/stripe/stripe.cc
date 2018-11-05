@@ -366,6 +366,14 @@ bool operator==(const Location& lhs, const Location& rhs) {
          std::tie(rhs.name, rhs.unit);
 }
 
+bool operator!=(const Location& lhs, const Location& rhs) {
+  return std::tie(lhs.name, lhs.unit) != std::tie(rhs.name, rhs.unit);
+}
+
+bool operator<(const Location& lhs, const Location& rhs) {
+  return std::tie(lhs.name, lhs.unit) < std::tie(rhs.name, rhs.unit);
+}
+
 Affine FromProto(const proto::Affine& affine) {
   Affine ret = affine.offset();
   for (const auto& kvp : affine.terms()) {

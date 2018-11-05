@@ -126,10 +126,6 @@ struct Location {
   Affine unit;
 };
 
-inline bool operator!=(const Location& lhs, const Location& rhs) {
-  return lhs.name != rhs.name || lhs.unit != rhs.unit;
-}
-
 struct Refinement {
   RefDir dir;
   std::string from;
@@ -282,6 +278,8 @@ inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) {  //
 
 bool operator==(const Index& lhs, const Index& rhs);
 bool operator==(const Location& lhs, const Location& rhs);
+bool operator!=(const Location& lhs, const Location& rhs);
+bool operator<(const Location& lhs, const Location& rhs);
 
 std::string to_string(const Location& loc);
 

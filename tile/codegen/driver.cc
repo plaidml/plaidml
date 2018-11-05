@@ -9,6 +9,7 @@
 #include "tile/codegen/localize.h"
 #include "tile/codegen/placer.h"
 #include "tile/codegen/scalarize.h"
+#include "tile/codegen/schedule.h"
 #include "tile/codegen/tile.h"
 
 namespace vertexai {
@@ -64,6 +65,9 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
         break;
       case proto::Pass::kScalarize:
         ScalarizePass(block, pass.scalarize());
+        break;
+      case proto::Pass::kSchedule:
+        SchedulePass(block, pass.schedule());
         break;
       case proto::Pass::kStencil:
         StencilPass(block, pass.stencil());
