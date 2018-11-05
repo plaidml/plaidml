@@ -47,16 +47,31 @@ message Pass {
     LocateMemoryPass locate_block = 6;
     LocateMemoryPass locate_inner_block = 7;
     LocateMemoryPass locate_memory = 8;
-    GenericPass memory_placement = 9;
+    MemoryPlacementPass memory_placement = 9;
     GenericPass scalarize = 10;
     StencilPass stencil = 11;
     AutotilePass autotile = 12;
     google.protobuf.Any custom = 13;
+    SchedulePass schedule = 14;
   }
 }
 
 message GenericPass {
   repeated string reqs = 1;
+}
+
+message SchedulePass {
+  repeated string reqs = 1;
+  required stripe.proto.Location mem_loc = 2;
+  required uint64 mem_KiB = 3;
+  required uint32 alignment = 4;
+  required stripe.proto.Location xfer_loc = 5;
+}
+
+message MemoryPlacementPass {
+  repeated string reqs = 1;
+  required uint32 alignment = 2;
+  repeated stripe.proto.Location locs = 3;
 }
 
 message CachePass {
