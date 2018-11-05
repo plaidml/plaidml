@@ -50,7 +50,6 @@ import plaidml.library
 import plaidml.settings
 import platform
 import pkg_resources
-import requests
 import sys
 import threading
 import traceback

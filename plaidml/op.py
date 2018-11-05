@@ -982,7 +982,7 @@ class ArgMax(tile.Operation):
             IndexT[{reduce_indices} : {reduce_ranges}] = =(One[]);
             Index = index(IndexT, 0);
             AM[{dest_indices}{dest_sep}{dest_ranges}] = >(I[{src_indices}] == Max[{dest_indices}] ? Index[{reduce_indices}]);
-            O = as_uint(AM, 64);
+            O = as_uint(AM, 32);
         }}""".format(**subs)
         super(ArgMax, self).__init__(code, [('I', value),
                                             ('One', tile.Value.from_var(1., tuple()))],
