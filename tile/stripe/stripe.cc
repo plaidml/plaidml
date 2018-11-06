@@ -35,22 +35,31 @@ static void PrintTab(std::ostream& os, size_t depth) {  //
 static void PrintPreStmt(std::ostream& os, size_t depth, const Statement* stmt, size_t idx,
                          const std::unordered_map<const Statement*, size_t>& deps) {  //
   os << std::string(depth * 2, ' ');
-  for (const auto& tag : stmt->tags) {
-    os << "#" << tag << " ";
-  }
-  os << "[" << idx;
+  os << idx;
   if (stmt->deps.size()) {
-    os << ", deps:";
+    os << "[";
+    bool first = true;
     for (const auto& it : stmt->deps) {
+      if (first) {
+        first = false;
+      } else {
+        os << ", ";
+      }
       auto dep_idx_it = deps.find(it->get());
       if (dep_idx_it != deps.end()) {
-        os << " " << dep_idx_it->second;
+        os << dep_idx_it->second;
       } else {
-        os << " [parent]";
+        os << "parent";
       }
     }
+    os << "]";
   }
-  os << "] ";
+  os << ": ";
+  if (stmt->tags.size()) {
+    for (const auto& tag : stmt->tags) {
+      os << "#" << tag << " ";
+    }
+  }
 }
 
 std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
@@ -209,7 +218,7 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
   }
   if (ref.from.empty()) {
     os << " new@0x";
-    os << std::hex << std::setw(8) << std::setfill('0') << ref.offset;
+    os << std::hex << std::setw(8) << std::setfill('0') << ref.offset << std::dec;
   }
   os << "<" << ref.location << "> ";
   os << ref.into;

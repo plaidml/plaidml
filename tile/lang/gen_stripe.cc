@@ -266,6 +266,7 @@ class StripeGenerator {
   void ProcessElementwise(Block* main, const Op& op) {
     auto kernel = AddKernel(main);
     kernel->comments = to_string(op);
+    kernel->set_tag("kernel");
     kernel->set_tag("elementwise");
     kernel->set_tag("elementwise_" + op.f.fn);
 

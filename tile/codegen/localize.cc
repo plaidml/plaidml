@@ -23,6 +23,7 @@ void FixupRefs(Block* block, const std::string& var_name) {
       for (auto& ref : inner->refs) {
         if (ref.from == var_name) {
           ref.location = ref_it->location;
+          ref.offset = ref_it->offset;
           for (size_t i = 0; i < ref.shape.dims.size(); i++) {
             ref.shape.dims[i].stride = ref_it->shape.dims[i].stride;
           }
@@ -78,8 +79,8 @@ void LocalizePass(const AliasMap& scope, Block* block) {
     std::set<std::string> refs_to_localize;
     std::set<std::string> refs_to_remove;
     for (const auto& ref : inner->refs) {
-      // If ref not defined in the outer block, don't consider
-      if (block->ref_by_into(ref.from)->dir != RefDir::None) {
+      auto it = block->ref_by_into(ref.from);
+      if (it == block->refs.end() || it->dir != RefDir::None) {
         continue;
       }
       // If it's not uniquely located in this block, don't consider
