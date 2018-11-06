@@ -140,9 +140,7 @@ class StripeGenerator {
       throw;
     }
 
-    auto kernel = AddKernel(main);
-    kernel->comments = to_string(op);
-    kernel->set_tag("kernel");
+    auto kernel = AddKernel(main, op);
     kernel->set_tag("contraction");
     kernel->set_tag("agg_op_" + GetAggOp(cion.agg_op));
 
@@ -264,9 +262,7 @@ class StripeGenerator {
   }
 
   void ProcessElementwise(Block* main, const Op& op) {
-    auto kernel = AddKernel(main);
-    kernel->comments = to_string(op);
-    kernel->set_tag("kernel");
+    auto kernel = AddKernel(main, op);
     kernel->set_tag("elementwise");
     kernel->set_tag("elementwise_" + op.f.fn);
 
@@ -366,9 +362,16 @@ class StripeGenerator {
     main->stmts.push_back(stmt);
   }
 
-  std::shared_ptr<Block> AddKernel(Block* parent, const char* prefix = "") {
+  std::shared_ptr<Block> AddKernel(Block* parent, const Op& op, const char* prefix = "") {
     auto block = std::make_shared<Block>();
     block->name = printstring("%skernel_%zu", prefix, parent->stmts.size());
+    block->comments = to_string(op);
+    block->set_tag("kernel");
+    for (const auto& attr : op.attributes) {
+      if (attr.name() == "pid" && attr.params_size()) {
+        block->name = attr.params(0);
+      }
+    }
     parent->stmts.push_back(block);
     return block;
   }
