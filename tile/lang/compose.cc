@@ -24,7 +24,16 @@ std::shared_ptr<IConstValue> IConstValue::make(const int64_t& val) {
   return result;
 }
 
-std::map<std::shared_ptr<Value>, std::set<std::string>> g_ids;
+struct IDMap {
+  std::mutex mu;
+  std::map<std::weak_ptr<Value>, std::set<std::string>, std::owner_less<std::weak_ptr<Value>>> ids;
+};
+
+IDMap* GetIDMap() {
+  // TODO: Periodically remove dead weak pointer references from this map.
+  static IDMap idmap;
+  return &idmap;
+}
 
 std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shared_ptr<Value>> inputs) {
   static std::shared_ptr<Value> zeroi = IConstValue::make(0);
@@ -579,14 +588,18 @@ std::string BoundFunction::Apply(const std::shared_ptr<Value>& val) {
   }
   std::string name = ValueVisitor<std::string>::Apply(val);
   IVLOG(4, "  Constructed new name " << name << " for " << *val);
-  auto it2 = g_ids.find(val);
-  if (it2 != g_ids.end()) {
-    proto::Attribute attr;
-    attr.set_name("pid");
-    for (const auto& s : it2->second) {
-      attr.add_params(s);
+  auto* idmap = GetIDMap();
+  if (prog_.ops.size()) {
+    std::unique_lock<std::mutex> lk{idmap->mu};
+    auto it2 = idmap->ids.find(val);
+    if (it2 != idmap->ids.end()) {
+      proto::Attribute attr;
+      attr.set_name("pid");
+      for (const auto& s : it2->second) {
+        attr.add_params(s);
+      }
+      prog_.ops.back().attributes.emplace_back(std::move(attr));
     }
-    prog_.ops.back().attributes.emplace_back(std::move(attr));
   }
   /*
   auto it2 = g_deriv_source.find(val);
@@ -856,10 +869,14 @@ void FunctionApplication::SetDone() {
           ContractionValue::make(c.comb_op, c.agg_op, specs, cons, inputs, dims, use_default, no_defract);
       IVLOG(4, "FunApp::SetDone " << this << " binding " << o.output << " ->(contraction) " << *bindings_[o.output]);
     }
-    for (const auto& attr : o.attributes) {
-      if (attr.name() == "pid") {
-        for (const auto& s : attr.params()) {
-          g_ids[bindings_[o.output]].emplace(s);
+    {
+      auto* idmap = GetIDMap();
+      std::unique_lock<std::mutex> lk{idmap->mu};
+      for (const auto& attr : o.attributes) {
+        if (attr.name() == "pid") {
+          for (const auto& s : attr.params()) {
+            idmap->ids[bindings_[o.output]].emplace(s);
+          }
         }
       }
     }

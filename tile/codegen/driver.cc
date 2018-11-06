@@ -14,7 +14,26 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void Optimize(stripe::Block* block, const proto::Config& cfg) {
+namespace {
+
+void DumpProgram(const stripe::Block& program,    //
+                 const OptimizeOptions& options,  //
+                 const std::string& name,         //
+                 size_t counter) {
+  if (options.dump_passes) {
+    boost::filesystem::create_directory(options.dbg_dir);
+    auto filename = printstring("%02zu_%s.txt", counter, name.c_str());
+    auto path = (options.dbg_dir / filename).string();
+    std::ofstream fout(path);
+    fout << program << std::endl;
+  }
+}
+
+}  // namespace
+
+void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOptions& options) {
+  size_t counter = 0;
+  DumpProgram(*block, options, "initial", counter++);
   for (const auto& pass : cfg.passes()) {
     IVLOG(2, "Optimization Pass " << pass.name());
     switch (pass.pass_case()) {
@@ -54,6 +73,7 @@ void Optimize(stripe::Block* block, const proto::Config& cfg) {
       default:
         break;
     }
+    DumpProgram(*block, options, pass.name(), counter++);
   }
 }
 

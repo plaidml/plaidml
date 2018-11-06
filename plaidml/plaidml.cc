@@ -778,7 +778,7 @@ struct plaidml_function {
 extern "C" plaidml_function* plaidml_build_coded_function(const char* code, const char* id) {
   try {
     std::string sid;
-    if (id != NULL) {
+    if (id) {
       sid = std::string(id);
     }
     return new plaidml_function{std::make_shared<BoundFunction>(code, sid)};

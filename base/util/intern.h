@@ -27,12 +27,18 @@ struct Interned {
   static std::shared_ptr<T> make(const Args&... args) {
     typedef std::tuple<Args...> tuple_t;
 
-    // N.B. We use a recursive mutex here so that the deleter can be invoked while we hold the internment mutex.
-    static std::recursive_mutex interned_mu;
-    static std::map<tuple_t, std::pair<unsigned, std::weak_ptr<T>>> interned;
+    static bool ran_destructor = false;
+    struct InternmentMap {
+      // N.B. We use a recursive mutex here so that the deleter can be invoked while we hold the internment mutex.
+      std::recursive_mutex interned_mu;
+      std::map<tuple_t, std::pair<unsigned, std::weak_ptr<T>>> interned;
+      ~InternmentMap() { ran_destructor = true; }
+    };
+
+    static InternmentMap imap;
 
     tuple_t key(args...);
-    std::lock_guard<std::recursive_mutex> lock{interned_mu};
+    std::lock_guard<std::recursive_mutex> lock{imap.interned_mu};
 
     // N.B. There may already be an entry in the map for this value.
     //
@@ -59,7 +65,7 @@ struct Interned {
     // pointer within an existing entry may have been cleared.  So we do the insert, and attempt to lock the weak
     // pointer; if we succeed, we have something to return, and if we don't, then we need to allocate the object
     // regardless of whether or not the entry already existed in the map.
-    auto it = interned.insert(std::make_pair(key, std::make_pair(0, std::weak_ptr<T>()))).first;
+    auto it = imap.interned.insert(std::make_pair(key, std::make_pair(0, std::weak_ptr<T>()))).first;
     std::shared_ptr<T> result = it->second.second.lock();
     if (result) {
       return result;
@@ -67,9 +73,12 @@ struct Interned {
 
     auto cleanup = [it](T * t) noexcept {
       delete t;
-      std::lock_guard<std::recursive_mutex> lock{interned_mu};
+      if (ran_destructor) {
+        return;
+      }
+      std::lock_guard<std::recursive_mutex> lock{imap.interned_mu};
       if (!--it->second.first) {
-        interned.erase(it);
+        imap.interned.erase(it);
       }
     };
 
