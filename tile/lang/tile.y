@@ -165,8 +165,9 @@ attribute_parameter_list
   | attribute_parameter_list "," attribute_parameter { $1.Add(std::move($3)); $$ = std::move($1); }
 ;
 
-attribute_parameter:
-  IDXID
+attribute_parameter
+  : ID
+  | IDXID
 ;
 
 body

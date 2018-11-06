@@ -997,7 +997,7 @@ class AveragePool(tile.Operation):
     A standard ML average pooling operator.
     """
 
-    def __init__(self, data, kernel_shape, pads, strides, padding=AutoPadding.EXPLICIT):
+    def __init__(self, data, kernel_shape, pads, strides, padding=AutoPadding.EXPLICIT, name=None):
         rank = data.shape.ndims - 2
         pads = _extend_pads(pads, rank)
         if not strides:
@@ -1038,9 +1038,9 @@ class AveragePool(tile.Operation):
 
         outshape = tile.Shape(data.shape.dtype, list(data.shape.dims[0:2]) + num_out_shape)
 
-        super(AveragePool, self).__init__(code, [('I', data),
-                                                 ('One', tile.Value.from_var(1., tuple()))],
-                                          [('O', outshape)])
+        inputs = [('I', data), ('One', tile.Value.from_var(1., tuple()))]
+        outputs = [('O', outshape)]
+        super(AveragePool, self).__init__(code, inputs, outputs, name=name)
 
 
 average_pool = AveragePool.function
@@ -1228,8 +1228,11 @@ class Convolution(tile.Operation):
             grouping=ConvolutionGrouping.NONE,
             group_format=None,
             winograd_allowed=True,
+            name=None,
     ):
         rank = data.shape.ndims - 2
+        if name is None:
+            name = 'Convolution{}d'.format(rank)
         if strides is None:
             strides = tuple(1 for _ in range(rank))
         if dilation_rate is None:
@@ -1316,8 +1319,7 @@ class Convolution(tile.Operation):
             input_list = [('I', data), ('K', kernel)]
             outshape = tile.Shape(data.shape.dtype, csf.O_shape_tuple_numeric())
 
-        super(Convolution, self).__init__(
-            code, input_list, [('O', outshape)], name='Convolution-{}d'.format(rank))
+        super(Convolution, self).__init__(code, input_list, [('O', outshape)], name=name)
 
     def _winograd_code_template(self):
         f = """
@@ -1467,7 +1469,7 @@ class ConvolutionTranspose(tile.Operation):
         super(ConvolutionTranspose, self).__init__(
             code,
             input_tensors, [('I', tile.Shape(x.shape.dtype, tuple(output_shape)))],
-            name='ConvolutionTranspose-{}d'.format(rank))
+            name='ConvolutionTranspose{}d'.format(rank))
 
 
 convolution_transpose = ConvolutionTranspose.function
@@ -1501,7 +1503,7 @@ cumulative_sum = CumulativeSum.function
 class Dot(tile.Operation):
     """Dot-product of two tensors."""
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, name=None):
         if x.shape.dtype != y.shape.dtype:
             raise ValueError(
                 'Invalid dtype in multiplication: x.dtype=\'{}\', y.dtype=\'{}\''.format(
@@ -1532,7 +1534,7 @@ class Dot(tile.Operation):
             raise NotImplementedError('Implement dot when x.dims={} and y.dims={}'.format(
                 x.shape.dims, y.shape.dims))
 
-        super(Dot, self).__init__(f, [('X', x), ('Y', y)], [('R', shape)])
+        super(Dot, self).__init__(f, [('X', x), ('Y', y)], [('R', shape)], name=name)
 
 
 dot = Dot.function
@@ -1975,7 +1977,7 @@ class MaxPool(tile.Operation):
     A standard ML max pooling operator.
     """
 
-    def __init__(self, data, padding, kernel_shape, pads, strides):
+    def __init__(self, data, padding, kernel_shape, pads, strides, name=None):
         rank = data.shape.ndims - 2
         pads = _extend_pads(pads, rank)
         if not strides:
@@ -2007,7 +2009,7 @@ class MaxPool(tile.Operation):
 
         outshape = tile.Shape(data.shape.dtype, list(data.shape.dims[0:2]) + num_out_shape)
 
-        super(MaxPool, self).__init__(code, [('I', data)], [('O', outshape)])
+        super(MaxPool, self).__init__(code, [('I', data)], [('O', outshape)], name=name)
 
 
 max_pool = MaxPool.function
@@ -2356,7 +2358,7 @@ class Softmax(tile.Operation):
     Implements a standard ML softmax.
     """
 
-    def __init__(self, data):
+    def __init__(self, data, name=None):
         if data.shape.ndims != 2:
             raise NotImplementedError(
                 'Softmax with a non-two-dimensional tensor is not currently implemented')
@@ -2366,10 +2368,10 @@ class Softmax(tile.Operation):
             O = builtin_softmax(I, X, Y);
         }"""
 
-        super(Softmax, self).__init__(code, [('I', data)], [('O', data.shape)])
+        super(Softmax, self).__init__(code, [('I', data)], [('O', data.shape)], name=name)
 
 
-def softmax(x, axis=None):
+def softmax(x, axis=None, name=None):
     if x.shape.ndims == 2:
         return Softmax.function(x)
     if axis is None:
@@ -2384,7 +2386,7 @@ def softmax(x, axis=None):
     else:
         values = functools.reduce(lambda x, y: x * y, x.shape.dims[axis:])
     flat_x = reshape(x, (group, values))
-    result = Softmax.function(flat_x)
+    result = Softmax.function(flat_x, name=name)
     return reshape(result, full_dims)
 
 

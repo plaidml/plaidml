@@ -632,6 +632,16 @@ class _Library(plaidml.library.Library):
             ctypes.POINTER(_C_Invoker)  # plaidml_invoker* invoker
         ]
 
+        # bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filename, plaidml_file_format format)
+        self.plaidml_save_invoker = lib.plaidml_save_invoker
+        self.plaidml_save_invoker.argtypes = [
+            ctypes.POINTER(_C_Invoker),  # plaidml_function* func
+            ctypes.c_char_p,  # const char* file
+            ctypes.c_int,  # plaidml_file_format format
+        ]
+        self.plaidml_save_invoker.restype = ctypes.c_bool
+        self.plaidml_save_invoker.errcheck = self._check_err
+
         # PLAIDML_API bool plaidml_set_invoker_input(plaidml_invoker* invoker, const char* name, plaidml_var* var);
         self.plaidml_set_invoker_input = lib.plaidml_set_invoker_input
         self.plaidml_set_invoker_input.argtypes = [
@@ -830,21 +840,21 @@ class _Function(object):
             self._free(self)
 
     def save(self, filename):
-        _lib().plaidml_save_function(self._as_parameter_, filename.encode())
+        _lib().plaidml_save_function(self, filename.encode())
 
 
 class Function(_Function):
 
-    def __init__(self, code, backtrace=None):
+    def __init__(self, code, backtrace=None, fid=''):
         global _backtraces
-        fid = ""
         if is_backtrace_enabled():
             if backtrace == None:
-                backtrace = "".join(traceback.format_stack()[:-1])
-            fid = "id_" + hashlib.md5(backtrace + code).hexdigest()[0:12]
+                backtrace = ''.join(traceback.format_stack()[:-1])
+            content = (backtrace + code).encode()
+            fid = 'id_' + hashlib.md5(content).hexdigest()[0:12]
             if fid not in _backtraces:
                 _backtraces[fid] = backtrace
-                logging.getLogger(__name__).info("Adding function ID: " + fid)
+                logging.getLogger(__name__).info('Adding function ID: ' + fid)
                 logging.getLogger(__name__).info(code)
                 logging.getLogger(__name__).info(backtrace)
 
@@ -1371,6 +1381,9 @@ class Invoker(object):
 
     def invoke(self):
         return Invocation(self._ctx, self)
+
+    def save(self, filename):
+        _lib().plaidml_save_invoker(self, filename.encode(), 1)
 
 
 class Invocation(object):
