@@ -105,6 +105,8 @@ Compiler::Compiler() : context_(llvm::getGlobalContext()), builder_{context_} {
 }
 
 std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& program) {
+  std::cerr << "Compiler::CompileProgram:" << std::endl;
+  std::cerr << program << std::endl << "----------------" << std::endl;
   module_ = new llvm::Module("stripe", context_);
   llvm::Function* main = CompileBlock(program);
   GenerateInvoker(program, main);
@@ -112,7 +114,7 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
   for (auto& ref : program.refs) {
     param_names.push_back(ref.into);
   }
-  // module_->print(llvm::errs(), nullptr);
+  module_->print(llvm::errs(), nullptr);
   std::unique_ptr<llvm::Module> xfermod(module_);
   module_ = nullptr;
   return std::make_unique<Executable>(std::move(xfermod), param_names);
@@ -283,10 +285,16 @@ void Compiler::Visit(const stripe::Block& block) {
   // Compile a nested block as a function in the same module
   Compiler nested(module_);
   auto function = nested.CompileBlock(block);
-  // Generate a list of args which are the buffers the block expects to receive
-  std::vector<llvm::Value*> callarg;
+  // Generate a list of args which are the buffers the block expects to receive.
+  std::vector<llvm::Value*> args;
+  for (auto& ref : block.refs) {
+    std::string name = ref.from.empty() ? ref.into : ref.from;
+    llvm::Value* base = buffers_[name].base;
+    llvm::Type* eltype = CType(ref.shape)->getPointerTo();
+    args.push_back(builder_.CreateBitCast(base, eltype));
+  }
   // Invoke the function
-  builder_.CreateCall(function, callarg, "");
+  builder_.CreateCall(function, args, "");
 }
 
 void Compiler::Add(const stripe::Intrinsic& add) {

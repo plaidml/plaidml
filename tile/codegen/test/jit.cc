@@ -20,7 +20,7 @@ namespace tile {
 namespace codegen {
 namespace test {
 
-TEST(Codegen, JitIntrinsicMUL) {
+TEST(Codegen, JitIntrinsicMUL_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     location { unit { } }
@@ -50,7 +50,7 @@ TEST(Codegen, JitIntrinsicMUL) {
   EXPECT_THAT(b2[0], Eq(6.0));
 }
 
-TEST(Codegen, JitIntrinsicADD) {
+TEST(Codegen, JitIntrinsicADD_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     location { unit { } }
@@ -83,6 +83,84 @@ TEST(Codegen, JitIntrinsicADD) {
 TEST(Codegen, JitIntrinsicEQ) {}
 
 TEST(Codegen, JitIntrinsicCOND) {}
+
+TEST(Codegen, JitMatMul) {
+  std::vector<float> bufA = {
+      1, 2, 3, 4, 5,  //
+      4, 5, 6, 7, 8,  //
+      7, 8, 9, 7, 8,  //
+      1, 2, 3, 1, 2,  //
+      1, 2, 3, 1, 2,  //
+  };
+
+  std::vector<float> bufB = {
+      1, 2, 3, 1, 2,  //
+      1, 2, 3, 1, 2,  //
+      1, 2, 3, 1, 2,  //
+      1, 2, 3, 1, 2,  //
+      1, 2, 3, 1, 2,  //
+  };
+
+  std::vector<float> bufC = {
+      0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0,  //
+  };
+
+  std::vector<float> expected = {
+      15, 30, 45,  15, 30,  //
+      30, 60, 90,  30, 60,  //
+      39, 78, 117, 39, 78,  //
+      9,  18, 27,  9,  18,  //
+      9,  18, 27,  9,  18,  //
+  };
+
+  lang::RunInfo runinfo;
+  runinfo.program_name = "matmul";
+  runinfo.code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
+  size_t dim = sqrt(expected.size());
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {dim, dim}));
+  runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {dim, dim}));
+  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {dim, dim}));
+
+  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
+
+  IVLOG(2, "Before>\n" << *main);
+
+  std::map<std::string, void*> data = {
+      {"A", bufA.data()},
+      {"B", bufB.data()},
+      {"C", bufC.data()},
+  };
+  JitExecute(*main, data);
+
+  IVLOG(2, "A: " << bufA);
+  IVLOG(2, "B: " << bufB);
+  IVLOG(2, "C: " << bufC);
+  EXPECT_THAT(bufC, ContainerEq(expected));
+
+  /*
+  auto kernel = stripe::Block::Downcast(main->stmts.front());
+  ApplyTile(kernel.get(), {5, 4, 4});
+  auto inner = stripe::Block::Downcast(kernel->stmts.front());
+  ApplyTile(inner.get(), {5, 2, 2});
+
+  for (size_t i = 0; i < data["C"].size(); i++) {
+    data["C"][i] = 0;
+  }
+
+  IVLOG(2, "After>\n" << *main);
+
+  JitExecuteProgram(*main, &data);
+
+  IVLOG(2, "A: " << data["A"]);
+  IVLOG(2, "B: " << data["B"]);
+  IVLOG(2, "C: " << data["C"]);
+  EXPECT_THAT(data["C"], ContainerEq(expected));
+  */
+}
 
 }  // namespace test
 }  // namespace codegen
