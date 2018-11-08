@@ -11,7 +11,7 @@
 #include "testing/matchers.h"
 
 using ::testing::Eq;
-using ::testing::EqualsProto;
+using ::testing::EqualsProtoText;
 
 namespace vertexai {
 namespace eventing {
@@ -44,7 +44,7 @@ TEST_F(EventLogTest, CanReport) {
     EXPECT_THAT(reader.Read(&event), Eq(true));
     EXPECT_THAT(event.activity_id().stream_uuid().length(), Eq(16));
     event.clear_activity_id();
-    EXPECT_THAT(event, EqualsProto(R"(verb: "Hello, World!")"));
+    EXPECT_THAT(event, EqualsProtoText(R"(verb: "Hello, World!")"));
     EXPECT_THAT(reader.Read(&event), Eq(false));
   }
 }

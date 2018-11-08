@@ -266,6 +266,14 @@ struct Block : Statement {
   std::vector<Refinement>::const_iterator ref_by_from(const std::string& name) const;
   // Make a unique refinement name for an into (by appending _2, etc, if needed)
   std::string unique_ref_name(const std::string& in);
+
+  std::shared_ptr<Block> SubBlock(size_t pos) {
+    auto it = stmts.begin();
+    for (size_t i = 0; i < pos; i++) {
+      ++it;
+    }
+    return Block::Downcast(*it);
+  }
 };
 
 inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) {  //
@@ -324,6 +332,12 @@ class CloneVisitor : RewriteStmtVisitor {
 inline std::shared_ptr<Block> CloneBlock(const Block& orig, size_t depth = -1) {
   CloneVisitor visitor(depth);
   return std::shared_ptr<Block>(visitor.Visit(orig));
+}
+
+inline std::string to_string(const Block& block) {
+  std::stringstream ss;
+  ss << block;
+  return ss.str();
 }
 
 }  // namespace stripe
