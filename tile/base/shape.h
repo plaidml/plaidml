@@ -52,6 +52,18 @@ inline bool is_int(const DataType& dt) {
   }
 }
 
+inline bool is_uint(const DataType& dt) {
+  switch (dt) {
+    case DataType::UINT8:
+    case DataType::UINT16:
+    case DataType::UINT32:
+    case DataType::UINT64:
+      return true;
+    default:
+      return false;
+  }
+}
+
 inline bool is_float(const DataType& dt) {
   switch (dt) {
     case DataType::FLOAT16:

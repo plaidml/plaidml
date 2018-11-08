@@ -17,6 +17,8 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util",
+        "//lib:llvm",
         "//tile/stripe",
+        "@half",
     ],
 )
