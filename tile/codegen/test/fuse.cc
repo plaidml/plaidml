@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 
 #include "base/util/stream_container.h"
+#include "testing/matchers.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/fuse.h"
 #include "tile/codegen/localize.h"
@@ -14,6 +15,7 @@
 
 using ::testing::ContainerEq;
 using ::testing::Eq;
+using ::testing::LinesEq;
 
 namespace vertexai {
 namespace tile {
@@ -22,45 +24,74 @@ namespace test {
 
 using namespace stripe;  // NOLINT
 
-static std::shared_ptr<Block> SubBlock(size_t pos, const std::shared_ptr<Block>& block) {
-  auto it = block->stmts.begin();
-  for (size_t i = 0; i < pos; i++) {
-    ++it;
-  }
-  return Block::Downcast(*it);
-}
-
 TEST(Codegen, FuseSimple) {
   lang::RunInfo runinfo;
   runinfo.program_name = "simple_fuse";
   runinfo.code = R"***(
     function (A, B) -> (C) { 
-      T = A + B;
-      C = (T < 0 ? 0 : T);
+      [[pid(add)]] T = A + B;
+      [[pid(cmp_lt)]] X = T < 0;
+      [[pid(cond)]] C = (X ? 0 : T);
     }
   )***";
   runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {100, 20}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {20}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {100, 20}));
   auto program = GenerateStripe(runinfo);
-  auto main = SubBlock(0, program);
 
   IVLOG(2, "Before>\n" << *program);
 
-  AliasMap base;
-  AliasMap prog_map(base, *program);
-  AliasMap main_map(prog_map, *main);
+  proto::FusionPass pass1;
+  pass1.add_a_reqs("elementwise_add");
+  pass1.add_b_reqs("elementwise_cmp_lt");
+  pass1.add_fused_set("fused");
+  FusionPass(program.get(), pass1);
 
-  auto k1 = SubBlock(0, main);
-  auto k2 = SubBlock(1, main);
-  auto k3 = SubBlock(2, main);
+  proto::FusionPass pass2;
+  pass2.add_a_reqs("fused");
+  pass2.add_b_reqs("elementwise_cond");
+  pass2.add_fused_set("fused");
+  FusionPass(program.get(), pass2);
 
-  bool r = FuseBlocks(main_map, k1.get(), k2.get());
-  r &= FuseBlocks(main_map, k1.get(), k3.get());
-  IVLOG(2, "fuse r = " << r);
-  IVLOG(2, "ki>\n" << *k1);
+  IVLOG(2, "After>\n" << *program);
 
-  ASSERT_TRUE(r);
+  auto expected = R"**(0: #program block [] ( // simple_fuse
+    none new@0x00000000<[0]> A[0, 0] fp32(100:20, 20:1)
+    none new@0x00000000<[0]> B[0] fp32(20:1)
+    none new@0x00000000<[0]> C[0, 0] fp32(100:20, 20:1)
+) {
+  0: #main block [] ( // main
+      in<[0]> A[0, 0] fp32(100:20, 20:1)
+      in<[0]> B[0] fp32(20:1)
+      out<[0]> C[0, 0]:assign fp32(100:20, 20:1)
+      none new@0x00000000<[0]> T[0, 0] fp32(100:20, 20:1)
+      none new@0x00000000<[0]> X[0, 0] bool(100:20, 20:1)
+  ) {
+    0: #fused block [i1:100, i2:20] ( // add+cmp_lt+cond
+        in<[0]> A[i1, i2] fp32(1:20, 1:1)
+        in<[0]> B[i2] fp32(1:1)
+        out<[0]> T[i1, i2] fp32(1:20, 1:1)
+        out<[0]> X[i1, i2] bool(1:20, 1:1)
+        out<[0]> C[i1, i2] fp32(1:20, 1:1)
+    ) {
+      0: $A = load(A)
+      1: $B = load(B)
+      2: $T = add($A, $B)
+      3: T = store($T)
+      4: $T_0 = load(T)
+      5: $_T1 = 0
+      6: $X = cmp_lt($T_0, $_T1)
+      7: X = store($X)
+      8: $X_0 = load(X)
+      9: $_T3 = 0
+      10: $T_1 = load(T)
+      11: $C = cond($X_0, $_T3, $T_1)
+      12: C = store($C)
+    }
+  }
+}
+)**";
+  EXPECT_THAT(to_string(*program), LinesEq(expected));
 }
 
 TEST(Codegen, FuseComplex) {
@@ -68,9 +99,9 @@ TEST(Codegen, FuseComplex) {
   runinfo.program_name = "complex_fuse";
   runinfo.code = R"***(
     function (In[N, X, Y, CI], K[I, J, CI, CO], B[CO]) -> (R) { 
-      O[n, x, y, co : N, X, Y, CO] = +(In[n, x+i-1, y+j-1, ci] * K[i, j, ci, co]);
-      BO = O + B;
-      R = relu(BO);
+      [[pid(conv)]]     O[n, x, y, co : N, X, Y, CO] = +(In[n, x+i-1, y+j-1, ci] * K[i, j, ci, co]);
+      [[pid(bias_add)]] BO = O + B;
+      [[pid(relu)]]     R = relu(BO);
     }
   )***";
   runinfo.input_shapes.emplace("In", SimpleShape(DataType::FLOAT32, {16, 100, 100, 64}));
@@ -78,7 +109,7 @@ TEST(Codegen, FuseComplex) {
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {128}));
   runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
   auto program = GenerateStripe(runinfo);
-  auto main = SubBlock(0, program);
+  auto main = program->SubBlock(0);
 
   IVLOG(2, "Before>\n" << *program);
 
@@ -86,8 +117,8 @@ TEST(Codegen, FuseComplex) {
   AliasMap prog_map(base, *program);
   AliasMap main_map(prog_map, *main);
 
-  auto k1 = SubBlock(0, main);
-  auto k2 = SubBlock(1, main);
+  auto k1 = main->SubBlock(0);
+  auto k2 = main->SubBlock(1);
   auto plan = ComputeFusionPlan(*k1, *k2, "O");
   ASSERT_TRUE(static_cast<bool>(plan));
   auto r1 = FusionRefactor(*k1, plan->remap_a, plan->tile_a);
@@ -102,7 +133,7 @@ TEST(Codegen, FuseComplex) {
   // Tile it just for fun!
   ApplyTile(r1.get(), {16, 16, 1, 1});
 
-  IVLOG(2, "Tiled\n" << *r1);
+  IVLOG(2, "Tiled\n" << *program);
 }
 
 TEST(Codegen, FuseTiled) {
@@ -110,9 +141,9 @@ TEST(Codegen, FuseTiled) {
   runinfo.program_name = "tiled_fuse";
   runinfo.code = R"***(
     function (In[N, X, Y, CI], K[I, J, CI, CO], B[CO]) -> (R) { 
-      O[n, x, y, co : N, X, Y, CO] = +(In[n, x+i-1, y+j-1, ci] * K[i, j, ci, co]);
-      BO = O + B;
-      R = relu(BO);
+      [[pid(conv)]]     O[n, x, y, co : N, X, Y, CO] = +(In[n, x+i-1, y+j-1, ci] * K[i, j, ci, co]);
+      [[pid(bias_add)]] BO = O + B;
+      [[pid(relu)]]     R = relu(BO);
     }
   )***";
   runinfo.input_shapes.emplace("In", SimpleShape(DataType::FLOAT32, {16, 100, 100, 64}));
@@ -120,7 +151,7 @@ TEST(Codegen, FuseTiled) {
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {128}));
   runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
   auto program = GenerateStripe(runinfo);
-  auto main = SubBlock(0, program);
+  auto main = program->SubBlock(0);
 
   // IVLOG(2, "Before>\n" << *program);
 
@@ -129,11 +160,11 @@ TEST(Codegen, FuseTiled) {
   AliasMap main_map(prog_map, *main);
 
   // Get the convolution
-  auto k1 = SubBlock(0, main);
+  auto k1 = main->SubBlock(0);
   // Tile it
   ApplyTile(k1.get(), {16, 16, 1, 1, 16, 1, 1});
   // Get the bias add
-  auto k2 = SubBlock(1, main);
+  auto k2 = main->SubBlock(1);
   // Try to fuse it
   auto plan = ComputeFusionPlan(*k1, *k2, "O");
   IVLOG(2, "Plan as bool: " << static_cast<bool>(plan));
@@ -157,7 +188,7 @@ TEST(Codegen, FuseTiled) {
   ApplyCache(r1.get(), "BO", {"CMX"}, {"DMA"});
   IVLOG(1, "Cached\n" << *program);
 
-  auto inner = SubBlock(1, r1);
+  auto inner = r1->SubBlock(1);
   IVLOG(1, "Inner\n" << *inner);
   ApplyCache(inner.get(), "In", {"CMX"}, {"DMA"});
   ApplyCache(inner.get(), "K", {"CMX"}, {"DMA"});
@@ -178,7 +209,7 @@ TEST(Codegen, FuseFancy) {
   runinfo.input_shapes.emplace("K2", SimpleShape(DataType::FLOAT32, {1, 1, 128, 128}));
   runinfo.output_shapes.emplace("O2", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
   auto program = GenerateStripe(runinfo);
-  auto main = SubBlock(0, program);
+  auto main = program->SubBlock(0);
 
   IVLOG(2, "Before>\n" << *program);
 
@@ -187,11 +218,11 @@ TEST(Codegen, FuseFancy) {
   AliasMap main_map(prog_map, *main);
 
   // Get the first convolution
-  auto k1 = SubBlock(0, main);
+  auto k1 = main->SubBlock(0);
   // Tile it
   ApplyTile(k1.get(), {16, 16, 1, 1, 16, 1, 1});
   // Get the second convolution
-  auto k2 = SubBlock(1, main);
+  auto k2 = main->SubBlock(1);
   // Tile it as well
   ApplyTile(k2.get(), {16, 16, 16, 1, 1});
   // Try to fuse it
@@ -231,10 +262,10 @@ TEST(Codegen, FuseAuto) {
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {128}));
   runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
   auto program = GenerateStripe(runinfo);
-  auto main = SubBlock(0, program);
+  auto main = program->SubBlock(0);
 
   // Get the convolution + tile it
-  auto k1 = SubBlock(0, main);
+  auto k1 = main->SubBlock(0);
   ApplyTile(k1.get(), {16, 16, 1, 1, 16, 1, 1});
 
   IVLOG(2, "Before>\n" << *program);

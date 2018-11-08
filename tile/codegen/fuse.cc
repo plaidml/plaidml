@@ -125,7 +125,9 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   ApplyTile(tiled.get(), tile);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
+  outer->name = tiled->name;
   auto inner = std::make_shared<Block>();
+  inner->name = tiled->name;
   outer->stmts.push_back(inner);
   // Move / rename each index to the appropriate block
   for (const auto& idx : tiled->idxs) {
@@ -189,32 +191,32 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   return outer;
 }
 
-bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
+bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   // If indexes don't match, fail
-  if (!(a->idxs == b->idxs)) {
+  if (!(block_a->idxs == block_b->idxs)) {
     IVLOG(3, "Fuse failed due to mismatched indexes");
     return false;
   }
   // If constraints don't match, fail
-  if (!(a->constraints == b->constraints)) {
+  if (!(block_a->constraints == block_b->constraints)) {
     IVLOG(3, "Fuse failed due to mismatched constraints");
     return true;
   }
   // Make AliasMaps for the two blocks
-  AliasMap a_map(scope, *a);
-  AliasMap b_map(scope, *b);
+  AliasMap a_map(scope, *block_a);
+  AliasMap b_map(scope, *block_b);
   // Start by copying A's reference across
   auto r = std::make_shared<Block>();
-  r->refs = a->refs;
+  r->refs = block_a->refs;
   // Walk over refinements in B and move them across
   // Rename duplicate refinements in B to their name in A
   // Otherwise make a new unique name (keeping original if possible)
   std::map<std::string, std::string> remap_b;
-  for (const auto& new_ref : b->refs) {
+  for (const auto& new_ref : block_b->refs) {
     // If it's a local, always safe to copy if across
     // Check if b matches something in the existing block
     bool merged = false;
-    for (auto& old_ref : a->refs) {
+    for (auto& old_ref : block_a->refs) {
       auto atype = AliasInfo::Compare(a_map.at(old_ref.into), b_map.at(new_ref.into));
       if (atype == AliasType::Partial) {
         // Conflict, if either do any writing, we have a problem
@@ -238,11 +240,16 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
     }
   }
   // We are now safe (cannot fail), move new reference over A's
-  std::swap(a->refs, r->refs);
+  std::swap(block_a->refs, r->refs);
+  if (!block_a->name.empty()) {
+    block_a->name = printstring("%s+%s", block_a->name.c_str(), block_b->name.c_str());
+  } else if (!block_b->name.empty()) {
+    block_a->name = block_b->name;
+  }
   // Load all the scalars that exist as of block A
   std::set<std::string> all_scalars;
   std::map<std::string, std::string> scalar_rename;
-  for (const auto& stmt : a->stmts) {
+  for (const auto& stmt : block_a->stmts) {
     for (const auto& name : stmt->scalar_defs()) {
       all_scalars.emplace(name);
     }
@@ -264,7 +271,7 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
     return "";
   };
   // Now move across statements, updating references/scalars as we do:
-  for (const auto& stmt : b->stmts) {
+  for (const auto& stmt : block_b->stmts) {
     switch (stmt->kind()) {
       case StmtKind::Load: {
         auto op = Load::Downcast(stmt);
@@ -305,7 +312,7 @@ bool FuseBlocks(const AliasMap& scope, Block* a, Block* b) {
         }
       } break;
     }
-    a->stmts.push_back(stmt);
+    block_a->stmts.push_back(stmt);
   }
   // All is well
   return true;

@@ -32,7 +32,7 @@ void ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
-  // Block inner;
+  inner->name = outer->name;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
   // Move all constraints on the outer block into the inner block

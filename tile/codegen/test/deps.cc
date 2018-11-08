@@ -9,7 +9,7 @@
 
 namespace gp = google::protobuf;
 
-using ::testing::EqualsProto;
+using ::testing::EqualsProtoText;
 
 namespace vertexai {
 namespace tile {
@@ -78,7 +78,7 @@ TEST(DepsTest, SmallDepMix) {
     stmts { store { from:"$4" into:"b2"} deps: 4 deps: 5}
   )";
 
-  EXPECT_THAT(output_proto, EqualsProto(expected));
+  EXPECT_THAT(output_proto, EqualsProtoText(expected));
 }
 
 }  // namespace codegen
