@@ -69,6 +69,16 @@ class ConvIndex(Enum):
     x = 8  # spatial location (data)
 
 
+class PoolDataFormat(Enum):
+    NXC = 1
+    NCX = 2
+
+
+class PoolMode(Enum):
+    MAX = 1
+    AVG = 2
+
+
 def _extend_pads(pads, rank):
     """Extends a padding list to match the necessary rank.
     
@@ -992,58 +1002,22 @@ class ArgMax(tile.Operation):
 argmax = ArgMax.function
 
 
-class AveragePool(tile.Operation):
-    """
-    A standard ML average pooling operator.
-    """
-
-    def __init__(self, data, kernel_shape, pads, strides, padding=AutoPadding.EXPLICIT, name=None):
-        rank = data.shape.ndims - 2
-        pads = _extend_pads(pads, rank)
-        if not strides:
-            strides = tuple(1 for _ in range(rank))
-        elif len(strides) != rank:
-            raise ValueError(
-                'Pool strides length inconsistent with input shape: ' +
-                '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.shape, rank))
-        out_dims = ['N', 'C']
-        num_out_shape = list()
-        in_idxs = list()
-        for i in range(rank):
-            sym_out, sym_pad, num_out = pad_compute('L{}'.format(i), data.shape.dims[i + 2],
-                                                    kernel_shape[i], strides[i], padding,
-                                                    (pads[i], pads[i + rank]) if pads else None)
-            out_dims.append(sym_out)
-            num_out_shape.append(num_out)
-            in_idxs.append('{stride}*x{idx} + a{idx} - {pad}'.format(
-                stride=strides[i], idx=i, pad=sym_pad))
-        out_idxs = ['n', 'c'] + ['x{}'.format(i) for i in range(rank)]
-
-        code = """
-        function (I[N, C, {in_dims}], One[]) -> (O) {{
-            Ones[{one_idxs} : {in_dims}] = =(One[]);
-            Count[{cout_idxs}{cout_sep}{cout_dims}] = +(Ones[{in_idxs}]), {pool_bounds};
-            S[{out_idxs} : {out_dims}] = +(I[n, c, {in_idxs}]), {pool_bounds};
-            O = S / Count;
-        }}""".format(
-            out_idxs=', '.join(out_idxs),
-            out_dims=', '.join(out_dims),
-            cout_idxs=', '.join(out_idxs[2:]),
-            cout_dims=', '.join(out_dims[2:]),
-            cout_sep=' : ' if len(out_idxs) > 2 else '',
-            one_idxs=', '.join(['o{}'.format(i) for i in range(rank)]),
-            in_idxs=', '.join(in_idxs),
-            in_dims=', '.join(['L{}'.format(i) for i in range(rank)]),
-            pool_bounds=', '.join(['a{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
-
-        outshape = tile.Shape(data.shape.dtype, list(data.shape.dims[0:2]) + num_out_shape)
-
-        inputs = [('I', data), ('One', tile.Value.from_var(1., tuple()))]
-        outputs = [('O', outshape)]
-        super(AveragePool, self).__init__(code, inputs, outputs, name=name)
-
-
-average_pool = AveragePool.function
+def average_pool(data,
+                 kernel_shape,
+                 strides,
+                 pads=None,
+                 padding=AutoPadding.EXPLICIT,
+                 data_format=PoolDataFormat.NCX,
+                 name=None):
+    return pool(
+        data=data,
+        mode=PoolMode.AVG,
+        kernel_shape=kernel_shape,
+        pads=pads,
+        strides=strides,
+        padding=padding,
+        data_format=data_format,
+        name=name)
 
 
 class BinaryCrossentropy(tile.Operation):
@@ -1972,47 +1946,22 @@ def max_reduce(x, axes=None, keepdims=False):
 maximum = tile.maximum
 
 
-class MaxPool(tile.Operation):
-    """
-    A standard ML max pooling operator.
-    """
-
-    def __init__(self, data, padding, kernel_shape, pads, strides, name=None):
-        rank = data.shape.ndims - 2
-        pads = _extend_pads(pads, rank)
-        if not strides:
-            strides = tuple(1 for _ in range(rank))
-        elif len(strides) != rank:
-            raise ValueError(
-                'Pool strides length inconsistent with input shape: ' +
-                '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.shape, rank))
-        sym_out_shape = list()
-        num_out_shape = list()
-        in_idxs = list()
-        for i in range(rank):
-            sym_out, sym_pad, num_out = pad_compute('L{}'.format(i), data.shape.dims[i + 2],
-                                                    kernel_shape[i], strides[i], padding,
-                                                    (pads[i], pads[i + rank]) if pads else None)
-            sym_out_shape.append(sym_out)
-            num_out_shape.append(num_out)
-            in_idxs.append('{stride}*x{idx} + k{idx} - {pad}'.format(
-                stride=strides[i], idx=i, pad=sym_pad))
-        code = """
-        function (I[N, C, {in_dims}]) -> (O) {{
-            O[n, c, {out_idxs} : N, C, {out_dims}] = >(I[n, c, {in_idxs}]), {pool_bounds};
-        }}""".format(
-            out_idxs=', '.join(['x{}'.format(i) for i in range(rank)]),
-            out_dims=', '.join(sym_out_shape),
-            in_idxs=', '.join(in_idxs),
-            in_dims=', '.join(['L{}'.format(i) for i in range(rank)]),
-            pool_bounds=', '.join(['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
-
-        outshape = tile.Shape(data.shape.dtype, list(data.shape.dims[0:2]) + num_out_shape)
-
-        super(MaxPool, self).__init__(code, [('I', data)], [('O', outshape)], name=name)
-
-
-max_pool = MaxPool.function
+def max_pool(data,
+             kernel_shape,
+             strides,
+             pads=None,
+             padding=AutoPadding.EXPLICIT,
+             data_format=PoolDataFormat.NCX,
+             name=None):
+    return pool(
+        data=data,
+        mode=PoolMode.MAX,
+        kernel_shape=kernel_shape,
+        pads=pads,
+        strides=strides,
+        padding=padding,
+        data_format=data_format,
+        name=name)
 
 
 class Mean(tile.Operation):
@@ -2104,6 +2053,126 @@ class NotEqual(tile.Operation):
 
 
 not_equal = NotEqual.function
+
+
+class Pool(tile.Operation):
+    """
+    A standard ML pooling operator. Handles both MAX & AVG
+    """
+
+    def __init__(self,
+                 data,
+                 mode,
+                 kernel_shape,
+                 strides,
+                 pads=None,
+                 padding=AutoPadding.EXPLICIT,
+                 data_format=PoolDataFormat.NCX,
+                 name=None):
+        rank = data.shape.ndims - 2
+        pads = _extend_pads(pads, rank)
+        if not strides:
+            strides = tuple(1 for _ in range(rank))
+        elif len(strides) != rank:
+            raise ValueError(
+                'Pool strides length inconsistent with input shape: ' +
+                '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.shape, rank))
+        in_spatial_dims = ['L{}'.format(i) for i in range(rank)]
+        in_spatial_idxs = list()
+        out_spatial_dims = []
+        if data_format == PoolDataFormat.NCX:
+            data_spatial_dims = data.shape.dims[2:rank + 2]
+        elif data_format == PoolDataFormat.NXC:
+            data_spatial_dims = data.shape.dims[1:rank + 1]
+        else:
+            raise ValueError('Invalid data_format')
+        num_out_spatial_shape = list()
+        pad_amount = list()
+        for i in range(rank):
+            sym_out, sym_pad, num_out = pad_compute('L{}'.format(i), data_spatial_dims[i],
+                                                    kernel_shape[i], strides[i], padding,
+                                                    (pads[i], pads[i + rank]) if pads else None)
+            out_spatial_dims.append(sym_out)
+            num_out_spatial_shape.append(num_out)
+            pad_amount.append(sym_pad)
+            in_spatial_idxs.append('{stride}*x{idx} + a{idx} - Pad{idx}'.format(
+                stride=strides[i], idx=i))
+        out_spatial_idxs = ['x{}'.format(i) for i in range(rank)]
+        padding_list = ['Pad{} = {};'.format(i, pad_amount[i]) for i in range(rank)]
+        padding_str = '\n            '.join(padding_list)
+        if data_format == PoolDataFormat.NCX:
+            in_dims = ['N', 'C'] + in_spatial_dims
+            in_idxs = ['n', 'c'] + in_spatial_idxs
+            out_dims = ['N', 'C'] + out_spatial_dims
+            out_idxs = ['n', 'c'] + out_spatial_idxs
+            ones_write_idxs = ['n', 'c'] + ['o{}'.format(i) for i in range(rank)]
+            num_out_shape = list(data.shape.dims[0:2]) + num_out_spatial_shape
+        elif data_format == PoolDataFormat.NXC:
+            in_dims = ['N'] + in_spatial_dims + ['C']
+            in_idxs = ['n'] + in_spatial_idxs + ['c']
+            out_dims = ['N'] + out_spatial_dims + ['C']
+            out_idxs = ['n'] + out_spatial_idxs + ['c']
+            ones_write_idxs = ['n'] + ['o{}'.format(i) for i in range(rank)] + ['c']
+            num_out_shape = list(data.shape.dims[0:1]) + num_out_spatial_shape + list(
+                data.shape.dims[rank + 1:rank + 2])
+        else:
+            raise ValueError('Invalid data_format')
+
+        if mode == PoolMode.AVG:
+            pool_contraction_op = "+"
+            pool_contraction_out_name = "S"
+            # Want average pooling not sum pooling, so divide by number of elements in a pool
+            # However, the number of elements in the pool should only count true elements,
+            # not zero padding. Thus, we build a tensor that is 1 everywhere the original
+            # tensor is defined, and we sum that tensor over the pool area to find the
+            # number of elements in the pool for the corresponding output entry.
+            denom_gen_code = """
+            Ones[{ones_write_idxs} : {ones_dims}] = =(One[]);
+            Count[{cout_idxs} : {cout_dims}] = +(Ones[{ones_read_idxs}]), {pool_bounds};""".format(
+                ones_write_idxs=', '.join(ones_write_idxs),
+                ones_dims=', '.join(in_dims),
+                ones_read_idxs=', '.join(in_idxs),
+                cout_idxs=', '.join(out_idxs),
+                cout_dims=', '.join(out_dims),
+                pool_bounds=', '.join(
+                    ['a{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]),
+            )
+            denom_divide_code = """
+            O = S / Count;"""
+            extra_input = ", One[]"
+            input_tensors = [('I', data), ('One', tile.Value.from_var(1., tuple()))]
+        elif mode == PoolMode.MAX:
+            pool_contraction_op = ">"
+            pool_contraction_out_name = "O"
+            denom_gen_code = ""
+            denom_divide_code = ""
+            extra_input = ""
+            input_tensors = [('I', data)]
+        else:
+            raise ValueError('Invalid mode for Pool operation')
+        code = """
+        function (I[{in_dims}]{extra_input}) -> (O) {{
+            {padding_str}{denom_gen}
+            {out_name}[{out_idxs} : {out_dims}] = {op}(I[{in_idxs}]), {pool_bounds}; {denom_divide}
+        }}""".format(
+            op=pool_contraction_op,
+            extra_input=extra_input,
+            denom_gen=denom_gen_code,
+            denom_divide=denom_divide_code,
+            padding_str=padding_str,
+            out_idxs=', '.join(out_idxs),
+            out_dims=', '.join(out_dims),
+            in_idxs=', '.join(in_idxs),
+            in_dims=', '.join(in_dims),
+            out_name=pool_contraction_out_name,
+            pool_bounds=', '.join(['a{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
+
+        outshape = tile.Shape(data.shape.dtype, num_out_shape)
+
+        super(Pool, self).__init__(code, input_tensors, [('O', outshape)], name=name)
+
+
+pool = Pool.function
 
 
 class Pow(tile.Operation):
