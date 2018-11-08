@@ -9,7 +9,7 @@
 
 namespace gp = google::protobuf;
 
-using ::testing::EqualsProto;
+using ::testing::EqualsProtoText;
 
 namespace vertexai {
 namespace tile {
@@ -68,7 +68,7 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
     stmts { store { from:"$1" into:"b2" } deps: 0 }
   )";
 
-  EXPECT_THAT(output_proto, EqualsProto(expected));
+  EXPECT_THAT(output_proto, EqualsProtoText(expected));
 }
 
 TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
@@ -127,7 +127,7 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
   )";
 
-  EXPECT_THAT(output_proto, EqualsProto(expected));
+  EXPECT_THAT(output_proto, EqualsProtoText(expected));
 }
 
 TEST(PlacerTest, DistinctLocationCausesSpacialReuse) {
@@ -185,7 +185,7 @@ TEST(PlacerTest, DistinctLocationCausesSpacialReuse) {
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
   )";
 
-  EXPECT_THAT(output_proto, EqualsProto(expected));
+  EXPECT_THAT(output_proto, EqualsProtoText(expected));
 }
 
 }  // namespace codegen
