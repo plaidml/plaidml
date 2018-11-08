@@ -66,7 +66,13 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Negate(const stripe::Intrinsic&);
   void Multiply(const stripe::Intrinsic&);
   void Divide(const stripe::Intrinsic&);
+  void Mod(const stripe::Intrinsic&);
+  void LessThan(const stripe::Intrinsic&);
+  void LessThanOrEqualTo(const stripe::Intrinsic&);
+  void GreaterThan(const stripe::Intrinsic&);
+  void GreaterThanOrEqualTo(const stripe::Intrinsic&);
   void Equal(const stripe::Intrinsic&);
+  void Unequal(const stripe::Intrinsic&);
   void Conditional(const stripe::Intrinsic&);
   void VisitZERO(const stripe::Special&);
   void VisitCOPY(const stripe::Special&);
@@ -85,6 +91,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   scalar Cast(scalar, DataType);
   llvm::Type* CType(DataType);
   llvm::Type* CType(const TensorShape&);
+  void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
+  void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
 
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
@@ -265,13 +273,13 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"neg", [&]() { Negate(intrinsic); }},
       {"mul", [&]() { Multiply(intrinsic); }},
       {"div", [&]() { Divide(intrinsic); }},
-      //    {"mod", [&](){ Mod(intrinsic); }},
-      //    {"lt", [&](){ LessThan(intrinsic); }},
-      //    {"lte", [&](){ LessThanOrEqualTo(intrinsic); }},
-      //    {"gt", [&](){ GreaterThan(intrinsic); }},
-      //    {"gte", [&](){ GreaterThanOrEqualTo(intrinsic); }},
+      {"mod", [&]() { Mod(intrinsic); }},
+      {"lt", [&]() { LessThan(intrinsic); }},
+      {"lte", [&]() { LessThanOrEqualTo(intrinsic); }},
+      {"gt", [&]() { GreaterThan(intrinsic); }},
+      {"gte", [&]() { GreaterThanOrEqualTo(intrinsic); }},
       {"eq", [&]() { Equal(intrinsic); }},
-      //    {"neq", [&](){ Unequal(intrinsic); }},
+      {"neq", [&]() { Unequal(intrinsic); }},
       //    {"and", [&](){ And(intrinsic); }},
       //    {"or", [&](){ Or(intrinsic); }},
       //    {"not", [&](){ Not(intrinsic); }},
@@ -312,8 +320,7 @@ void Compiler::Add(const stripe::Intrinsic& add) {
   } else {
     throw Error("Invalid addition type: " + to_string(add.type));
   }
-  assert(1 == add.outputs.size());
-  scalars_[add.outputs[0]] = scalar{ret, add.type};
+  OutputType(ret, add);
 }
 
 void Compiler::Subtract(const stripe::Intrinsic& sub) {
@@ -331,8 +338,7 @@ void Compiler::Subtract(const stripe::Intrinsic& sub) {
   } else {
     throw Error("Invalid subtraction type: " + to_string(sub.type));
   }
-  assert(1 == sub.outputs.size());
-  scalars_[sub.outputs[0]] = scalar{ret, sub.type};
+  OutputType(ret, sub);
 }
 
 void Compiler::Negate(const stripe::Intrinsic& neg) {
@@ -349,8 +355,7 @@ void Compiler::Negate(const stripe::Intrinsic& neg) {
   } else {
     throw Error("Invalid negation type: " + to_string(neg.type));
   }
-  assert(1 == neg.outputs.size());
-  scalars_[neg.outputs[0]] = scalar{ret, neg.type};
+  OutputType(ret, neg);
 }
 
 void Compiler::Multiply(const stripe::Intrinsic& mul) {
@@ -368,8 +373,7 @@ void Compiler::Multiply(const stripe::Intrinsic& mul) {
   } else {
     throw Error("Invalid multiplication type: " + to_string(mul.type));
   }
-  assert(1 == mul.outputs.size());
-  scalars_[mul.outputs[0]] = scalar{ret, mul.type};
+  OutputType(ret, mul);
 }
 
 void Compiler::Divide(const stripe::Intrinsic& div) {
@@ -389,8 +393,109 @@ void Compiler::Divide(const stripe::Intrinsic& div) {
   } else {
     throw Error("Invalid division type: " + to_string(div.type));
   }
-  assert(1 == div.outputs.size());
-  scalars_[div.outputs[0]] = scalar{ret, div.type};
+  OutputType(ret, div);
+}
+
+void Compiler::Mod(const stripe::Intrinsic& mod) {
+  // Accepts two inputs, cast to operation type
+  assert(2 == mod.inputs.size());
+  scalar lhs = Cast(scalars_[mod.inputs[0]], mod.type);
+  scalar rhs = Cast(scalars_[mod.inputs[1]], mod.type);
+  // Product placed into the single output
+  // Output type is operation type
+  llvm::Value* ret = nullptr;
+  if (is_int(mod.type)) {
+    ret = builder_.CreateSRem(lhs.value, rhs.value);
+  } else if (is_uint(mod.type)) {
+    ret = builder_.CreateURem(lhs.value, rhs.value);
+  } else {
+    throw Error("Invalid modulo type: " + to_string(mod.type));
+  }
+  OutputType(ret, mod);
+}
+
+void Compiler::LessThan(const stripe::Intrinsic& lt) {
+  // Accepts two inputs
+  assert(2 == lt.inputs.size());
+  scalar lhs = Cast(scalars_[lt.inputs[0]], lt.type);
+  scalar rhs = Cast(scalars_[lt.inputs[1]], lt.type);
+  // Inputs are cast to operation type
+  // Equality placed into single output
+  // Output type is boolean
+  llvm::Value* ret = nullptr;
+  if (is_float(lt.type)) {
+    ret = builder_.CreateFCmpOLT(lhs.value, rhs.value);
+  } else if (is_int(lt.type)) {
+    ret = builder_.CreateICmpSLT(lhs.value, rhs.value);
+  } else if (is_uint(lt.type)) {
+    ret = builder_.CreateICmpULT(lhs.value, rhs.value);
+  } else {
+    throw Error("Invalid comparison type: " + to_string(lt.type));
+  }
+  OutputBool(ret, lt);
+}
+
+void Compiler::LessThanOrEqualTo(const stripe::Intrinsic& lte) {
+  // Accepts two inputs
+  assert(2 == lte.inputs.size());
+  scalar lhs = Cast(scalars_[lte.inputs[0]], lte.type);
+  scalar rhs = Cast(scalars_[lte.inputs[1]], lte.type);
+  // Inputs are cast to operation type
+  // Equality placed into single output
+  // Output type is boolean
+  llvm::Value* ret = nullptr;
+  if (is_float(lte.type)) {
+    ret = builder_.CreateFCmpOLE(lhs.value, rhs.value);
+  } else if (is_int(lte.type)) {
+    ret = builder_.CreateICmpSLE(lhs.value, rhs.value);
+  } else if (is_uint(lte.type)) {
+    ret = builder_.CreateICmpULE(lhs.value, rhs.value);
+  } else {
+    throw Error("Invalid comparison type: " + to_string(lte.type));
+  }
+  OutputBool(ret, lte);
+}
+
+void Compiler::GreaterThan(const stripe::Intrinsic& gt) {
+  // Accepts two inputs
+  assert(2 == gt.inputs.size());
+  scalar lhs = Cast(scalars_[gt.inputs[0]], gt.type);
+  scalar rhs = Cast(scalars_[gt.inputs[1]], gt.type);
+  // Inputs are cast to operation type
+  // Equality placed into single output
+  // Output type is boolean
+  llvm::Value* ret = nullptr;
+  if (is_float(gt.type)) {
+    ret = builder_.CreateFCmpOGT(lhs.value, rhs.value);
+  } else if (is_int(gt.type)) {
+    ret = builder_.CreateICmpSGT(lhs.value, rhs.value);
+  } else if (is_uint(gt.type)) {
+    ret = builder_.CreateICmpUGT(lhs.value, rhs.value);
+  } else {
+    throw Error("Invalid comparison type: " + to_string(gt.type));
+  }
+  OutputBool(ret, gt);
+}
+
+void Compiler::GreaterThanOrEqualTo(const stripe::Intrinsic& gte) {
+  // Accepts two inputs
+  assert(2 == gte.inputs.size());
+  scalar lhs = Cast(scalars_[gte.inputs[0]], gte.type);
+  scalar rhs = Cast(scalars_[gte.inputs[1]], gte.type);
+  // Inputs are cast to operation type
+  // Equality placed into single output
+  // Output type is boolean
+  llvm::Value* ret = nullptr;
+  if (is_float(gte.type)) {
+    ret = builder_.CreateFCmpOGE(lhs.value, rhs.value);
+  } else if (is_int(gte.type)) {
+    ret = builder_.CreateICmpSGE(lhs.value, rhs.value);
+  } else if (is_uint(gte.type)) {
+    ret = builder_.CreateICmpUGE(lhs.value, rhs.value);
+  } else {
+    throw Error("Invalid comparison type: " + to_string(gte.type));
+  }
+  OutputBool(ret, gte);
 }
 
 void Compiler::Equal(const stripe::Intrinsic& eq) {
@@ -406,13 +511,29 @@ void Compiler::Equal(const stripe::Intrinsic& eq) {
     ret = builder_.CreateFCmpOEQ(lhs.value, rhs.value);
   } else if (is_int(eq.type) || is_uint(eq.type)) {
     ret = builder_.CreateICmpEQ(lhs.value, rhs.value);
-  } else if (DataType::BOOLEAN == eq.type) {
-    ret = builder_.CreateICmpEQ(lhs.value, rhs.value);
   } else {
     throw Error("Invalid comparison type: " + to_string(eq.type));
   }
-  assert(1 == eq.outputs.size());
-  scalars_[eq.outputs[0]] = scalar{ret, DataType::BOOLEAN};
+  OutputBool(ret, eq);
+}
+
+void Compiler::Unequal(const stripe::Intrinsic& neq) {
+  // Accepts two inputs
+  assert(2 == neq.inputs.size());
+  scalar lhs = Cast(scalars_[neq.inputs[0]], neq.type);
+  scalar rhs = Cast(scalars_[neq.inputs[1]], neq.type);
+  // Inputs are cast to operation type
+  // Equality placed into single output
+  // Output type is boolean
+  llvm::Value* ret = nullptr;
+  if (is_float(neq.type)) {
+    ret = builder_.CreateFCmpONE(lhs.value, rhs.value);
+  } else if (is_int(neq.type) || is_uint(neq.type)) {
+    ret = builder_.CreateICmpNE(lhs.value, rhs.value);
+  } else {
+    throw Error("Invalid comparison type: " + to_string(neq.type));
+  }
+  OutputBool(ret, neq);
 }
 
 void Compiler::Conditional(const stripe::Intrinsic& cond) {
@@ -427,8 +548,7 @@ void Compiler::Conditional(const stripe::Intrinsic& cond) {
   // Single output will be one of T or F
   // Output type is operation type
   llvm::Value* ret = builder_.CreateSelect(c.value, t.value, f.value);
-  assert(1 == cond.outputs.size());
-  scalars_[cond.outputs[0]] = scalar{ret, cond.type};
+  OutputType(ret, cond);
 }
 
 void Compiler::VisitZERO(const stripe::Special& zero) {
@@ -487,6 +607,16 @@ llvm::Type* Compiler::CType(const TensorShape& shape) {
     type = llvm::ArrayType::get(type, bound.size);
   }
   return type;
+}
+
+void Compiler::OutputType(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
+  assert(1 == intrinsic.outputs.size());
+  scalars_[intrinsic.outputs[0]] = scalar{ret, intrinsic.type};
+}
+
+void Compiler::OutputBool(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
+  assert(1 == intrinsic.outputs.size());
+  scalars_[intrinsic.outputs[0]] = scalar{ret, DataType::BOOLEAN};
 }
 
 Executable::Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters)
