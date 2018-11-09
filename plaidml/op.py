@@ -2095,7 +2095,7 @@ class Pool(tile.Operation):
             out_spatial_dims.append(sym_out)
             num_out_spatial_shape.append(num_out)
             pad_amount.append(sym_pad)
-            in_spatial_idxs.append('{stride}*x{idx} + a{idx} - Pad{idx}'.format(
+            in_spatial_idxs.append('{stride}*x{idx} + k{idx} - Pad{idx}'.format(
                 stride=strides[i], idx=i))
         out_spatial_idxs = ['x{}'.format(i) for i in range(rank)]
         padding_list = ['Pad{} = {};'.format(i, pad_amount[i]) for i in range(rank)]
@@ -2135,7 +2135,7 @@ class Pool(tile.Operation):
                 cout_idxs=', '.join(out_idxs),
                 cout_dims=', '.join(out_dims),
                 pool_bounds=', '.join(
-                    ['a{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]),
+                    ['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]),
             )
             denom_divide_code = """
             O = S / Count;"""
@@ -2165,7 +2165,7 @@ class Pool(tile.Operation):
             in_idxs=', '.join(in_idxs),
             in_dims=', '.join(in_dims),
             out_name=pool_contraction_out_name,
-            pool_bounds=', '.join(['a{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
+            pool_bounds=', '.join(['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
 
         outshape = tile.Shape(data.shape.dtype, num_out_shape)
 
