@@ -84,13 +84,18 @@ class Compiler : private stripe::ConstStmtVisitor {
 
   struct buffer {
     llvm::Value* base = nullptr;
-    TensorShape shape;
+    const stripe::Refinement* refinement;
+  };
+
+  struct index {
+    llvm::Value* variable = nullptr;
   };
 
  private:
   scalar Cast(scalar, DataType);
   llvm::Type* CType(DataType);
   llvm::Type* CType(const TensorShape&);
+  llvm::Value* IndexElement(const buffer& buf);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
 
@@ -100,6 +105,7 @@ class Compiler : private stripe::ConstStmtVisitor {
 
   std::map<std::string, scalar> scalars_;
   std::map<std::string, buffer> buffers_;
+  std::map<std::string, index> indexes_;
 };
 
 Compiler::Compiler() : context_(llvm::getGlobalContext()), builder_{context_} {
@@ -128,7 +134,11 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
   return std::make_unique<Executable>(std::move(xfermod), param_names);
 }
 
-Compiler::Compiler(llvm::Module* module) : context_(llvm::getGlobalContext()), builder_{context_}, module_(module) {}
+Compiler::Compiler(llvm::Module* module) : context_(llvm::getGlobalContext()), builder_{context_}, module_(module) {
+  // This private constructor sets up a nested compiler instance which will
+  // process a nested block, generating output into the same module as its
+  // containing compiler instance.
+}
 
 void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* main) {
   // Generate a wrapper function for this program, so that we can call it
@@ -170,6 +180,8 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
 }
 
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
+  // Generate a function implementing the body of this block.
+  // Buffers (refinements) will be passed in as function parameters.
   // create an array of parameter types, one for each buffer
   std::vector<llvm::Type*> param_types;
   for (const auto& ref : block.refs) {
@@ -190,8 +202,18 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     unsigned idx = ai->getArgNo();
     std::string param_name = block.refs[idx].into;
     ai->setName(param_name);
-    buffers_[param_name] = buffer{&(*ai), block.refs[idx].shape};
+    buffers_[param_name] = buffer{&(*ai), &block.refs[idx]};
   }
+  // allocate storage for the indexes and assign their initial values
+  unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
+  llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
+  llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
+  for (auto& idx : block.idxs) {
+    llvm::Value* variable = builder_.CreateAlloca(ssizetype);
+    builder_.CreateStore(zero, variable);
+    indexes_[idx.name] = index{variable};
+  }
+
   // process each statement in the block body, generating code to modify the
   // parameter buffer contents
   for (const auto& stmt : block.stmts) {
@@ -205,18 +227,13 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
 void Compiler::Visit(const stripe::Load& load) {
   // op->from is the name of a source buffer
   // op->into is the name of a destination scalar
-  // get the current offset into the source buffer from the scope context
-  // use GEP to compute the source element address
-  // load the value from that address
-  // store the value into the destination variable
   buffer from = buffers_[load.from];
-  unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
-  llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
-  llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
-  std::vector<llvm::Value*> idxList{zero, zero};
-  llvm::Value* element = builder_.CreateGEP(from.base, idxList);
+  // Look up the address of the target element.
+  // Load the value from that address and use it to redefine the
+  // destination scalar.
+  llvm::Value* element = IndexElement(from);
   llvm::Value* value = builder_.CreateLoad(element);
-  scalars_[load.into] = scalar{value, from.shape.type};
+  scalars_[load.into] = scalar{value, from.refinement->shape.type};
 }
 
 void Compiler::Visit(const stripe::Store& store) {
@@ -229,11 +246,7 @@ void Compiler::Visit(const stripe::Store& store) {
   // use the specified aggregation to store the value
   buffer into = buffers_[store.into];
   llvm::Value* value = scalars_[store.from].value;
-  unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
-  llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
-  llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
-  std::vector<llvm::Value*> idxList{zero, zero};
-  llvm::Value* element = builder_.CreateGEP(into.base, idxList);
+  llvm::Value* element = IndexElement(into);
   builder_.CreateStore(value, element);
 }
 
@@ -607,6 +620,27 @@ llvm::Type* Compiler::CType(const TensorShape& shape) {
     type = llvm::ArrayType::get(type, bound.size);
   }
   return type;
+}
+
+llvm::Value* Compiler::IndexElement(const buffer& buf) {
+  unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
+  llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
+  llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
+  std::vector<llvm::Value*> idxList{zero};
+  // Iterate through the source refinement's "access" elements to find
+  // the names of the element indexes. Load the current value of each
+  // index variable and add it to the GEP index list.
+  if (buf.refinement->access.size()) {
+    for (const auto& access : buf.refinement->access) {
+      std::string indexName = access.toString();
+      llvm::Value* indexVar = indexes_[indexName].variable;
+      idxList.push_back(builder_.CreateLoad(indexVar));
+    }
+  } else {
+    // Special case for a one-dimensional, one-element array
+    idxList.push_back(zero);
+  }
+  return builder_.CreateGEP(buf.base, idxList);
 }
 
 void Compiler::OutputType(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
