@@ -14,9 +14,7 @@ namespace codegen {
 // Recomputes Statement dependencies within a single Block.
 void ComputeDepsForBlock(stripe::Block* block, const AliasMap& alias_map);
 
-// Recomputes Statement dependencies within a Block, including all nested sub-Blocks.
-void ComputeDepsForTree(stripe::Block* outermost_block);
-
+// Recomputes Statement dependencies within all matching Blocks.
 inline void ComputeDepsPass(stripe::Block* root, const proto::GenericPass& options) {
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
