@@ -3,8 +3,10 @@
 #include "tile/codegen/tile.h"
 
 #include "base/util/logging.h"
+#include "base/util/lookup.h"
 #include "base/util/printstring.h"
 #include "base/util/stream_container.h"
+#include "base/util/throw.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -16,7 +18,7 @@ using namespace stripe;  // NOLINT
 void ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   // Verify tile shape is correct
   if (outer->idxs.size() != shape.size()) {
-    throw std::runtime_error("Invalid tile specified");
+    throw_with_trace(std::runtime_error("Invalid tile specified"));
   }
   // Make a 'by-name' version of tile and check for trivality
   bool trivial = true;
@@ -58,7 +60,7 @@ void ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
     inner_idx.range = shape[i];
     inner_idx.factor = shape[i];
     if (outer_idx.factor > 0 && outer_idx.factor % shape[i] != 0) {
-      throw std::runtime_error("ApplyTile: unhandled uneven subtiling");
+      throw_with_trace(std::runtime_error("ApplyTile: unhandled uneven subtiling"));
     }
     outer_idx.factor /= shape[i];
   }
@@ -126,7 +128,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
             return idx.name() == item.second;
           });
       if (it == spec.idxs().end()) {
-        throw std::runtime_error("Invalid idx name");
+        throw_with_trace(std::runtime_error("Invalid idx name"));
       }
       StencilIndexMatch idx_match;
       if (it->size() != -1) {
@@ -139,7 +141,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
     }
     size_t total_tiles = 1;
     for (const auto& idx : block.idxs) {
-      auto tile = idx_matches.at(idx.name);
+      auto tile = safe_at(idx_matches, idx.name);
       size_t num_tiles = (idx.range + tile.value - 1) / tile.value;
       total_tiles *= num_tiles;
       match.cost *= num_tiles * tile.value;

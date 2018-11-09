@@ -11,6 +11,10 @@ namespace vertexai {
 namespace tile {
 namespace util {
 
+struct SimpleBuffer : lang::BufferBase {
+  std::vector<uint8_t> bytes;
+};
+
 class TileFile {
  public:
   explicit TileFile(const std::string& path);

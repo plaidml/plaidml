@@ -37,6 +37,19 @@ cc_library(
 )
 
 cc_library(
+    name = "stacktrace",
+    defines = select({
+        "@toolchain//:macos_x86_64": ["_GNU_SOURCE"],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "@toolchain//:macos_x86_64": [],
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["-ldl"],
+    }),
+)
+
+cc_library(
     name = "iostreams",
     srcs = glob(["libs/iostreams/src/*.cpp"]),
     deps = [
