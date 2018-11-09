@@ -15,7 +15,7 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
+bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   // Verify tile shape is correct
   if (outer->idxs.size() != shape.size()) {
     throw_with_trace(std::runtime_error("Invalid tile specified"));
@@ -30,7 +30,7 @@ void ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
     }
   }
   if (elide_trivial && trivial) {
-    return;
+    return false;
   }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
@@ -99,6 +99,7 @@ void ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
 
   // Make the inner block the sole stmt of the outer block
   outer->stmts = {inner};
+  return true;
 }
 
 inline bool IsLegal(int64_t rule, int64_t candidate) {  //

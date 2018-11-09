@@ -2,6 +2,7 @@
 
 #include "tile/codegen/driver.h"
 
+#include "tile/codegen/autotile.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/deps.h"
 #include "tile/codegen/fuse.h"
@@ -66,6 +67,9 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
         break;
       case proto::Pass::kStencil:
         StencilPass(block, pass.stencil());
+        break;
+      case proto::Pass::kAutotile:
+        AutotilePass(block, pass.autotile());
         break;
       case proto::Pass::kCustom:
         // TODO
