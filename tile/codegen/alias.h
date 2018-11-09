@@ -31,9 +31,7 @@ class AliasMap {
  public:
   AliasMap();                                                   // Constructs a root level alias info
   AliasMap(const AliasMap& outer, const stripe::Block& block);  // Construct info for an inner block
-  const AliasInfo& at(const std::string& name) const {          //
-    return safe_at(info_, name);
-  }
+  const AliasInfo& at(const std::string& name) const { return safe_at(info_, name); }
 
  private:
   size_t depth_;                           // How deep is this AliasInfo
