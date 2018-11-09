@@ -50,7 +50,8 @@ message Pass {
     GenericPass memory_placement = 9;
     GenericPass scalarize = 10;
     StencilPass stencil = 11;
-    google.protobuf.Any custom = 12;
+    AutotilePass autotile = 12;
+    google.protobuf.Any custom = 13;
   }
 }
 
@@ -94,4 +95,18 @@ message StencilIndex {
   required int32 size = 2;
   repeated int32 outs = 3;
   repeated int32 ins = 4;
+}
+
+message AutotilePass {
+  repeated string reqs = 1;
+  repeated string outer_set = 2;
+  repeated string inner_set = 3;
+  required bool only_po2 = 4;
+  required bool fast = 5;
+  required bool use_bytes = 6;
+  required bool skip_1d = 7;
+  required int64 max_output_size = 8;
+  required int64 max_input_size = 9;
+  required double output_cost = 10;
+  required double input_cost = 11;
 }
