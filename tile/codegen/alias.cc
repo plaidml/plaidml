@@ -2,6 +2,8 @@
 
 #include "tile/codegen/alias.h"
 
+#include "base/util/throw.h"
+
 namespace vertexai {
 namespace tile {
 namespace codegen {
@@ -48,7 +50,7 @@ AliasMap::AliasMap(const AliasMap& outer, const stripe::Block& block) : depth_(o
       // Get the state from the outer context, fail if not found
       auto it = outer.info_.find(ref.from);
       if (it == outer.info_.end()) {
-        throw std::runtime_error("AliasMap::AliasMap: invalid ref.from during aliasing computation");
+        throw_with_trace(std::runtime_error("AliasMap::AliasMap: invalid ref.from during aliasing computation"));
       }
       // Copy data across
       info.base_name = it->second.base_name;
@@ -59,8 +61,8 @@ AliasMap::AliasMap(const AliasMap& outer, const stripe::Block& block) : depth_(o
       info.access.resize(ref.access.size());
     }
     if (info.access.size() != ref.access.size()) {
-      throw std::runtime_error("AliasMap::AliasMap: Mismatched sizes on refinement: " + info.base_name + " " +
-                               ref.into);
+      throw_with_trace(
+          std::runtime_error("AliasMap::AliasMap: Mismatched sizes on refinement: " + info.base_name + " " + ref.into));
     }
     // Add in indexes from this block
     for (size_t i = 0; i < ref.access.size(); i++) {

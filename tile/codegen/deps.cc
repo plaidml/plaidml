@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "base/util/throw.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -116,7 +117,7 @@ void BlockDepComputer::WriteScalar(const std::string& name) {
   if (!it_inserted.second) {
     std::stringstream ss;
     ss << "Scalar " << name << " written multiple times in " << *block_;
-    throw std::logic_error{ss.str()};
+    throw_with_trace(std::logic_error{ss.str()});
   }
 }
 
@@ -125,7 +126,7 @@ void BlockDepComputer::ReadScalar(const std::string& name) {
   if (it == scalars_.end()) {
     std::stringstream ss;
     ss << "Read scalar " << name << " before it was written in " << *block_;
-    throw std::logic_error{ss.str()};
+    throw_with_trace(std::logic_error{ss.str()});
   }
   dataflow_deps_.emplace(it->second);
 }

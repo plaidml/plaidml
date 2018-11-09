@@ -263,8 +263,8 @@ class StripeGenerator {
 
   void ProcessElementwise(Block* main, const Op& op) {
     auto kernel = AddKernel(main, op);
-    kernel->set_tag("elementwise");
-    kernel->set_tag("elementwise_" + op.f.fn);
+    kernel->set_tag("eltwise");
+    kernel->set_tag("eltwise_" + op.f.fn);
 
     auto out_shape = GetShape(op.output);
     std::vector<Affine> out_access;

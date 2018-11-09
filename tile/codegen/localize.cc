@@ -13,7 +13,7 @@ namespace codegen {
 using namespace stripe;  // NOLINT
 
 void FixupRefs(Block* block, const std::string& var_name) {
-  auto ref_it = block->ref_by_into(var_name);
+  auto ref_it = block->ref_by_into(var_name, false);
   if (ref_it == block->refs.end()) {
     return;
   }
@@ -79,7 +79,7 @@ void LocalizePass(const AliasMap& scope, Block* block) {
     std::set<std::string> refs_to_localize;
     std::set<std::string> refs_to_remove;
     for (const auto& ref : inner->refs) {
-      auto it = block->ref_by_into(ref.from);
+      auto it = block->ref_by_into(ref.from, false);
       if (it == block->refs.end() || it->dir != RefDir::None) {
         continue;
       }

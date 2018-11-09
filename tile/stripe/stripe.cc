@@ -6,6 +6,7 @@
 
 #include "base/util/printstring.h"
 #include "base/util/stream_container.h"
+#include "base/util/throw.h"
 #include "tile/base/shape.h"
 
 namespace vertexai {
@@ -639,30 +640,50 @@ const Index* Block::idx_by_name(const std::string& name) const {
   return &*it;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_into(const std::string& name) {
-  return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+std::vector<Refinement>::iterator Block::ref_by_into(const std::string& name, bool fail) {
+  auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+  if (fail && it == refs.end()) {
+    throw_with_trace(std::runtime_error(
+        printstring("Refinement not found on block '%s' via into: %s", this->name.c_str(), name.c_str())));
+  }
+  return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& name) const {
-  return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& name, bool fail) const {
+  auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+  if (fail && it == refs.end()) {
+    throw_with_trace(std::runtime_error(
+        printstring("Refinement not found on block '%s' via into: %s", this->name.c_str(), name.c_str())));
+  }
+  return it;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_from(const std::string& name) {
-  return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
+std::vector<Refinement>::iterator Block::ref_by_from(const std::string& name, bool fail) {
+  auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
+  if (fail && it == refs.end()) {
+    throw_with_trace(std::runtime_error(
+        printstring("Refinement not found on block '%s' via from: %s", this->name.c_str(), name.c_str())));
+  }
+  return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& name) const {
-  return std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
+std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& name, bool fail) const {
+  auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
+  if (fail && it == refs.end()) {
+    throw_with_trace(std::runtime_error(
+        printstring("Refinement not found on block '%s' via from: %s", this->name.c_str(), name.c_str())));
+  }
+  return it;
 }
 
 std::string Block::unique_ref_name(const std::string& in) {
-  if (ref_by_into(in) == refs.end()) {
+  if (ref_by_into(in, false) == refs.end()) {
     return in;
   }
   size_t i = 0;
   while (true) {
     std::string name = in + "_" + std::to_string(i++);
-    if (ref_by_into(name) == refs.end()) {
+    if (ref_by_into(name, false) == refs.end()) {
       return name;
     }
   }

@@ -102,3 +102,6 @@ ENV/
 
 # bazel generates a group of directories for build products
 /bazel-*
+
+# macos
+.DS_Store

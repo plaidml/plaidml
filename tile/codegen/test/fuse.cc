@@ -42,14 +42,14 @@ TEST(Codegen, FuseSimple) {
   IVLOG(2, "Before>\n" << *program);
 
   proto::FusionPass pass1;
-  pass1.add_a_reqs("elementwise_add");
-  pass1.add_b_reqs("elementwise_cmp_lt");
+  pass1.add_a_reqs("eltwise_add");
+  pass1.add_b_reqs("eltwise_cmp_lt");
   pass1.add_fused_set("fused");
   FusionPass(program.get(), pass1);
 
   proto::FusionPass pass2;
   pass2.add_a_reqs("fused");
-  pass2.add_b_reqs("elementwise_cond");
+  pass2.add_b_reqs("eltwise_cond");
   pass2.add_fused_set("fused");
   FusionPass(program.get(), pass2);
 

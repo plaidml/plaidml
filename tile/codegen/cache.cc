@@ -18,7 +18,7 @@ void ApplyCache(Block* block,                 //
                 const std::string& var_name,  //
                 const Location& mem_loc,      //
                 const Location& xfer_loc) {
-  auto ref_it = block->ref_by_into(var_name);
+  auto ref_it = block->ref_by_into(var_name, false);
   if (ref_it == block->refs.end()) {
     throw std::runtime_error("ApplyCache: Invalid var_name");
   }

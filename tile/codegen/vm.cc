@@ -8,15 +8,6 @@
 #include "base/util/stream_container.h"
 #include "tile/stripe/stripe.h"
 
-namespace std {
-
-ostream& operator<<(ostream& os, const pair<string, int64_t>& item) {
-  os << item.first << ":" << item.second;
-  return os;
-}
-
-}  // namespace std
-
 namespace vertexai {
 namespace tile {
 namespace codegen {
@@ -36,6 +27,7 @@ class VirtualMachine {
   {}
 
   void ExecuteBlock(const Block& block, const Scope& outer) {
+    IVLOG(4, "ExecuteBlock: " << block.name);
     Scope scope;
     for (size_t i = 0; i < block.idxs.size(); i++) {
       const auto& idx = block.idxs[i];
@@ -101,7 +93,8 @@ class VirtualMachine {
       throw std::runtime_error("Unknown buffer");
     }
     if (offset >= it->second.size()) {
-      throw std::runtime_error(printstring("LOAD: Out of bounds access"));
+      throw std::runtime_error(printstring("LOAD: Out of bounds access on '%s', offset: %zu, size: %zu",  //
+                                           name.c_str(), offset, it->second.size()));
     }
     return it->second[offset];
   }
@@ -136,7 +129,7 @@ class VirtualMachine {
         } break;
         case StmtKind::Store: {
           const auto& op = Store::Downcast(stmt);
-          auto it = block.ref_by_into(op->into);
+          auto it = block.ref_by_into(op->into, false);
           if (it == block.refs.end()) {
             throw std::runtime_error("Missing agg_op");
           }
