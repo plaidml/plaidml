@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "base/util/lookup.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -30,7 +31,9 @@ class AliasMap {
  public:
   AliasMap();                                                   // Constructs a root level alias info
   AliasMap(const AliasMap& outer, const stripe::Block& block);  // Construct info for an inner block
-  const AliasInfo& at(const std::string& name) const { return info_.at(name); }
+  const AliasInfo& at(const std::string& name) const {          //
+    return safe_at(info_, name);
+  }
 
  private:
   size_t depth_;                           // How deep is this AliasInfo

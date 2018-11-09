@@ -1,6 +1,8 @@
 // Copyright 2018, Intel Corporation
 
 #include "tile/codegen/fuse.h"
+
+#include "base/util/throw.h"
 #include "tile/codegen/localize.h"
 #include "tile/codegen/tile.h"
 
@@ -15,12 +17,12 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
   plan.tile_a = TileShape(a.idxs.size(), 1);
   plan.tile_b = TileShape(b.idxs.size(), 1);
   // This is quite hueristic right now, but still beats our prior implementation
-  auto it_a = a.ref_by_from(buf_name);
+  auto it_a = a.ref_by_from(buf_name, false);
   if (it_a == a.refs.end()) {
     IVLOG(3, "ComputeFusionPlan: buffer name unknown in block a");
     return boost::none;
   }
-  auto it_b = b.ref_by_from(buf_name);
+  auto it_b = b.ref_by_from(buf_name, false);
   if (it_b == b.refs.end()) {
     IVLOG(3, "ComputeFusionPlan: buffer name unknown in block b");
     return boost::none;
@@ -161,7 +163,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
         if (it == mapping.end()) {
           if (kvp.first != "") {
             if (kvp.second < 0) {
-              throw std::runtime_error("FusionRefactor: Unable to handle negative strides");
+              throw_with_trace(std::runtime_error("FusionRefactor: Unable to handle negative strides"));
             }
             max_val += (tiled->idx_by_name(kvp.first)->range - 1) * kvp.second;
           }

@@ -259,15 +259,15 @@ struct Block : Statement {
   std::vector<const Refinement*> ref_outs() const;
   const Index* idx_by_name(const std::string& name) const;
   // Find which refinement has an into called 'name'
-  std::vector<Refinement>::iterator ref_by_into(const std::string& name);
-  std::vector<Refinement>::const_iterator ref_by_into(const std::string& name) const;
+  std::vector<Refinement>::iterator ref_by_into(const std::string& name, bool fail = true);
+  std::vector<Refinement>::const_iterator ref_by_into(const std::string& name, bool fail = true) const;
   // Find which refinement has a from called 'name'
-  std::vector<Refinement>::iterator ref_by_from(const std::string& name);
-  std::vector<Refinement>::const_iterator ref_by_from(const std::string& name) const;
+  std::vector<Refinement>::iterator ref_by_from(const std::string& name, bool fail = true);
+  std::vector<Refinement>::const_iterator ref_by_from(const std::string& name, bool fail = true) const;
   // Make a unique refinement name for an into (by appending _2, etc, if needed)
   std::string unique_ref_name(const std::string& in);
 
-  std::shared_ptr<Block> SubBlock(size_t pos) {
+  std::shared_ptr<Block> SubBlock(size_t pos) const {
     auto it = stmts.begin();
     for (size_t i = 0; i < pos; i++) {
       ++it;

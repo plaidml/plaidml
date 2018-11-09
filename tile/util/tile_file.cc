@@ -14,9 +14,6 @@ namespace tile {
 namespace util {
 
 namespace {
-// This is a dummy buffer to satisfy the BoundFunction and FunctionApplication.
-// In this case, we have no need for allocating actual buffers.
-struct NullBuffer : lang::BufferBase {};
 
 std::shared_ptr<lang::TensorValue> ReadTensor(UnZipArchive* zip_file, const std::string& name) {
   auto tensor_file = zip_file->OpenFile(name);
@@ -24,17 +21,24 @@ std::shared_ptr<lang::TensorValue> ReadTensor(UnZipArchive* zip_file, const std:
   uint64_t shape_size;
   tensor_file.ReadInto(&shape_size, sizeof(shape_size));
 
-  std::string proto_buf(shape_size, '\0');
-  tensor_file.ReadInto(&proto_buf[0], proto_buf.size());
+  std::string shape_buf(shape_size, '\0');
+  tensor_file.ReadInto(&shape_buf[0], shape_buf.size());
 
   proto::TensorShape pb_shape;
-  pb_shape.ParseFromString(proto_buf);
+  pb_shape.ParseFromString(shape_buf);
 
   auto tensor_shape = FromProto(pb_shape);
 
-  auto null_buffer = std::make_shared<NullBuffer>();
-  return lang::TensorValue::make(null_buffer, tensor_shape, true);
+  auto buffer = std::make_shared<SimpleBuffer>();
+  buffer->bytes.resize(tensor_shape.byte_size());
+  tensor_file.ReadInto(buffer->bytes.data(), buffer->bytes.size());
+
+  return lang::TensorValue::make(buffer, tensor_shape, true);
 }
+
+// This is a dummy buffer to satisfy the BoundFunction and FunctionApplication.
+// In this case, we have no need for allocating actual buffers.
+struct NullBuffer : lang::BufferBase {};
 
 std::shared_ptr<lang::TensorValue> MakeTensor(TensorShape shape) {
   auto null_buffer = std::make_shared<NullBuffer>();
