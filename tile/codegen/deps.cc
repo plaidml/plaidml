@@ -14,240 +14,173 @@
 namespace vertexai {
 namespace tile {
 namespace codegen {
+
+using namespace stripe;  // NOLINT
+
 namespace {
 
-class BlockDepComputer : private stripe::MutableStmtVisitor {
- public:
-  static void Run(stripe::Block* block, const AliasMap& alias_map);
-
- private:
-  BlockDepComputer(stripe::Block* block, const AliasMap& alias_map);
-
-  void WriteScalar(const std::string& name);
-  void ReadScalar(const std::string& name);
-
-  void WriteBuffer(const std::string& name);
-  void ReadBuffer(const std::string& name);
-
+struct Tracker {
   // Tracks the state of a buffer as it's operated on by the Block's Statements.
   struct BufferInfo {
     // TODO: Instead of tracking the latest writer, keep track of a
     // list of all currently active writers, removing writers from the
-    // list when all written memory has been overwritten by subsequent
-    // writers.
+    // list when all written memory has been overwritten by subsequent writers.
     bool has_latest_writer = false;
-    stripe::StatementIt latest_writer;
-    std::unordered_set<stripe::StatementIt> current_readers;
+    StatementIt latest_writer;
+    std::unordered_set<StatementIt> current_readers;
   };
-
-  void Visit(stripe::Load* load) final;
-  void Visit(stripe::Store* store) final;
-  void Visit(stripe::Constant* constant) final;
-  void Visit(stripe::Special* special) final;
-  void Visit(stripe::Intrinsic* intrinsic) final;
-  void Visit(stripe::Block* block) final;
-
-  // The block being processed.
-  stripe::Block* block_;
-
-  // The current statement being processed.
-  stripe::StatementIt current_stmt_;
-
-  // The buffer's alias map.
-  const AliasMap& alias_map_;
-
-  // The dataflow dependencies of the current Statement being processed.
-  std::set<stripe::StatementIt> dataflow_deps_;
 
   // For each scalar: the Statement that wrote the scalar.
-  std::unordered_map<std::string, stripe::StatementIt> scalars_;
+  std::unordered_map<std::string, StatementIt> scalars;
 
-  // For each buffer (keyed by the buffer base name from the alias
-  // map): information about the buffer's accessors (as of the current
-  // Statement being processed).
-  std::unordered_map<std::string, BufferInfo> buffers_;
+  // The dataflow dependencies of the current Statement being processed.
+  std::set<StatementIt> dataflow_deps;
 
-  // The transitive dependencies of each Statement within the current
-  // Block.
-  std::unordered_map<stripe::StatementIt, std::set<stripe::StatementIt>> transitive_deps_;
-};
+  // For each buffer (keyed by the buffer base name from the alias map):
+  // information about the buffer's accessors (as of the current Statement being processed).
+  std::unordered_map<std::string, BufferInfo> buffers;
 
-void BlockDepComputer::Run(stripe::Block* block, const AliasMap& alias_map) {
-  BlockDepComputer c{block, alias_map};
-
-  for (c.current_stmt_ = block->stmts.begin(); c.current_stmt_ != block->stmts.end(); ++c.current_stmt_) {
-    // Visit the statement, adjusting the current scalar and buffer
-    // tracking structures and updating c.dataflow_deps_.
-    (*c.current_stmt_)->Accept(&c);
-
-    // At this point, dataflow_deps_ describes the dataflow
-    // dependencies of the current Statement.  Use it to compute the
-    // Statement's transitive dependencies.
-    std::set<stripe::StatementIt>* tdeps = &c.transitive_deps_[c.current_stmt_];
-    for (stripe::StatementIt dep : c.dataflow_deps_) {
-      const std::set<stripe::StatementIt>& dep_tdeps = c.transitive_deps_.at(dep);
-      tdeps->insert(dep_tdeps.begin(), dep_tdeps.end());
-    }
-
-    // (dataflow_deps_ - tdeps) is now the set of actual dependencies
-    // for this Statement.
-    (*c.current_stmt_)->deps.clear();
-    std::set_difference(c.dataflow_deps_.begin(), c.dataflow_deps_.end(), tdeps->begin(), tdeps->end(),
-                        std::back_inserter((*c.current_stmt_)->deps));
-
-    // Add those actual dependencies back into the transitive deps
-    // (note that dataflow_deps_ that are transitively covered by the
-    // actual dependencies are already in the set of transitive
-    // deps).
-    for (stripe::StatementIt dep : (*c.current_stmt_)->deps) {
-      tdeps->emplace(dep);
-    }
-
-    // Reset dataflow_deps_ for the next Statement.
-    c.dataflow_deps_.clear();
-  }
-}
-
-BlockDepComputer::BlockDepComputer(stripe::Block* block, const AliasMap& alias_map)
-    : block_{block}, alias_map_{alias_map} {}
-
-void BlockDepComputer::WriteScalar(const std::string& name) {
-  // Note that scalars are SSA, so there will only ever be one writer per block.
-  auto it_inserted = scalars_.emplace(name, current_stmt_);
-  if (!it_inserted.second) {
-    std::stringstream ss;
-    ss << "Scalar " << name << " written multiple times in " << *block_;
-    throw_with_trace(std::logic_error{ss.str()});
-  }
-}
-
-void BlockDepComputer::ReadScalar(const std::string& name) {
-  auto it = scalars_.find(name);
-  if (it == scalars_.end()) {
-    std::stringstream ss;
-    ss << "Read scalar " << name << " before it was written in " << *block_;
-    throw_with_trace(std::logic_error{ss.str()});
-  }
-  dataflow_deps_.emplace(it->second);
-}
-
-void BlockDepComputer::WriteBuffer(const std::string& name) {
-  const AliasInfo& alias_info = alias_map_.at(name);
-  BufferInfo& buffer_info = buffers_[alias_info.base_name];
-
-  // For now, we assume that each writing statement writes the entire
-  // buffer.  TODO: Track child blocks as sub-buffer writes.
-  if (buffer_info.has_latest_writer && buffer_info.latest_writer != current_stmt_) {
-    dataflow_deps_.emplace(buffer_info.latest_writer);
-  }
-
-  for (stripe::StatementIt reader : buffer_info.current_readers) {
-    // Writing a buffer we're also reading blocks on all readers that
-    // aren't us, but otherwise looks like a normal write of a buffer
-    // that something else is reading.
-    if (reader != current_stmt_) {
-      dataflow_deps_.emplace(reader);
+  void WriteScalar(const Block& block, StatementIt it, const std::string& name) {
+    // Note that scalars are SSA, so there will only ever be one writer per block.
+    auto it_inserted = scalars.insert(std::make_pair(name, it));
+    if (!it_inserted.second) {
+      throw_with_trace(
+          std::logic_error(printstring("Scalar %s written multiple times in %s", name.c_str(), block.name.c_str())));
     }
   }
 
-  buffer_info.has_latest_writer = true;
-  buffer_info.latest_writer = current_stmt_;
-  buffer_info.current_readers.clear();
-}
-
-void BlockDepComputer::ReadBuffer(const std::string& name) {
-  const AliasInfo& alias_info = alias_map_.at(name);
-  BufferInfo& buffer_info = buffers_[alias_info.base_name];
-
-  if (buffer_info.has_latest_writer && buffer_info.latest_writer == current_stmt_) {
-    // Reading a buffer we're also writing doesn't do anything; we just track the write.
-    return;
-  }
-
-  if (buffer_info.has_latest_writer) {
-    dataflow_deps_.emplace(buffer_info.latest_writer);
-  }
-
-  buffer_info.current_readers.emplace(current_stmt_);
-}
-
-void BlockDepComputer::Visit(stripe::Load* load) {
-  ReadBuffer(load->from);
-  WriteScalar(load->into);
-}
-
-void BlockDepComputer::Visit(stripe::Store* store) {
-  ReadScalar(store->from);
-  WriteBuffer(store->into);
-}
-
-void BlockDepComputer::Visit(stripe::Constant* constant) { WriteScalar(constant->name); }
-
-void BlockDepComputer::Visit(stripe::Special* special) {
-  for (const auto& in : special->inputs) {
-    ReadBuffer(in);
-  }
-  for (const auto& out : special->outputs) {
-    WriteBuffer(out);
-  }
-}
-
-void BlockDepComputer::Visit(stripe::Intrinsic* intrinsic) {
-  for (const auto& in : intrinsic->inputs) {
-    ReadScalar(in);
-  }
-  for (const auto& out : intrinsic->outputs) {
-    WriteScalar(out);
-  }
-}
-
-void BlockDepComputer::Visit(stripe::Block* block) {
-  for (const auto& ref : block->refs) {
-    // N.B It doesn't matter whether we process IsReadDir or
-    // IsWriteDir first, since a subsequent refinement might access
-    // the same underlying physical buffer; we handle these cases in
-    // ReadBuffer() and WriteBuffer().
-    if (IsReadDir(ref.dir)) {
-      ReadBuffer(ref.from);
+  void ReadScalar(const Block& block, const std::string& name) {
+    auto it = scalars.find(name);
+    if (it == scalars.end()) {
+      throw_with_trace(std::logic_error(
+          printstring("Scalar %s read before it was written in %s", name.c_str(), block.name.c_str())));
     }
-    if (IsWriteDir(ref.dir)) {
-      WriteBuffer(ref.from);
-    }
+    dataflow_deps.insert(it->second);
   }
-}
 
-}  // namespace
+  void WriteBuffer(StatementIt it, const std::string& name, const AliasMap& alias_map) {
+    const AliasInfo& alias_info = alias_map.at(name);
+    BufferInfo& buffer_info = buffers[alias_info.base_name];
 
-void ComputeDepsForBlock(stripe::Block* block, const AliasMap& alias_map) { BlockDepComputer::Run(block, alias_map); }
+    // For now, we assume that each writing statement writes the entire
+    // buffer.  TODO: Track child blocks as sub-buffer writes.
+    if (buffer_info.has_latest_writer && buffer_info.latest_writer != it) {
+      dataflow_deps.insert(buffer_info.latest_writer);
+    }
 
-void ComputeDepsForTree(stripe::Block* outermost_block) {
-  // Tracks a block to be processed.
-  struct PendingBlock {
-    stripe::Block* block;
-    AliasMap alias_map;
-  };
-
-  // The queue of blocks whose dependencies are to be computed.
-  std::queue<PendingBlock> pending;
-  AliasMap root;
-
-  pending.push(PendingBlock{outermost_block, AliasMap{root, *outermost_block}});
-
-  while (pending.size()) {
-    PendingBlock& todo = pending.front();
-
-    // Schedule dependencies within this block.
-    ComputeDepsForBlock(todo.block, todo.alias_map);
-
-    // Add child blocks to the queue.
-    for (const auto& stmt : todo.block->stmts) {
-      stripe::Block* child_block = dynamic_cast<stripe::Block*>(stmt.get());
-      if (child_block) {
-        pending.push(PendingBlock{child_block, AliasMap{todo.alias_map, *child_block}});
+    for (StatementIt reader : buffer_info.current_readers) {
+      // Writing a buffer we're also reading blocks on all readers that
+      // aren't us, but otherwise looks like a normal write of a buffer
+      // that something else is reading.
+      if (reader != it) {
+        dataflow_deps.insert(reader);
       }
     }
 
-    pending.pop();
+    buffer_info.has_latest_writer = true;
+    buffer_info.latest_writer = it;
+    buffer_info.current_readers.clear();
+  }
+
+  void ReadBuffer(StatementIt it, const std::string& name, const AliasMap& alias_map) {
+    const AliasInfo& alias_info = alias_map.at(name);
+    BufferInfo& buffer_info = buffers[alias_info.base_name];
+
+    if (buffer_info.has_latest_writer && buffer_info.latest_writer == it) {
+      // Reading a buffer we're also writing doesn't do anything; we just track the write.
+      return;
+    }
+
+    if (buffer_info.has_latest_writer) {
+      dataflow_deps.insert(buffer_info.latest_writer);
+    }
+
+    buffer_info.current_readers.insert(it);
+  }
+};
+
+}  // namespace
+
+void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {  //
+  Tracker tracker;
+  std::unordered_map<StatementIt, std::set<StatementIt>> transitive_deps;
+  for (auto it = block->stmts.begin(); it != block->stmts.end(); it++) {
+    // Adjust the current scalar and buffer tracking structures and update dataflow_deps.
+    switch ((*it)->kind()) {
+      case StmtKind::Load: {
+        auto load = Load::Downcast(*it);
+        tracker.ReadBuffer(it, load->from, alias_map);
+        tracker.WriteScalar(*block, it, load->into);
+      } break;
+      case StmtKind::Store: {
+        auto store = Store::Downcast(*it);
+        tracker.ReadScalar(*block, store->from);
+        tracker.WriteBuffer(it, store->into, alias_map);
+      } break;
+      case StmtKind::Special: {
+        auto special = Special::Downcast(*it);
+        for (const auto& in : special->inputs) {
+          tracker.ReadBuffer(it, in, alias_map);
+        }
+        for (const auto& out : special->outputs) {
+          tracker.WriteBuffer(it, out, alias_map);
+        }
+      } break;
+      case StmtKind::Intrinsic: {
+        auto intrinsic = Intrinsic::Downcast(*it);
+        for (const auto& in : intrinsic->inputs) {
+          tracker.ReadScalar(*block, in);
+        }
+        for (const auto& out : intrinsic->outputs) {
+          tracker.WriteScalar(*block, it, out);
+        }
+      } break;
+      case StmtKind::Constant: {
+        auto constant = Constant::Downcast(*it);
+        tracker.WriteScalar(*block, it, constant->name);
+      } break;
+      case StmtKind::Block: {
+        auto inner = Block::Downcast(*it);
+        for (const auto& ref : inner->refs) {
+          // N.B It doesn't matter whether we process IsReadDir or
+          // IsWriteDir first, since a subsequent refinement might access
+          // the same underlying physical buffer; we handle these cases in
+          // ReadBuffer() and WriteBuffer().
+          if (IsReadDir(ref.dir)) {
+            tracker.ReadBuffer(it, ref.from, alias_map);
+          }
+          if (IsWriteDir(ref.dir)) {
+            tracker.WriteBuffer(it, ref.from, alias_map);
+          }
+        }
+      } break;
+    }
+
+    // At this point, dataflow_deps describes the dataflow dependencies of the current Statement.
+    // Use it to compute the Statement's transitive dependencies.
+    auto& tdeps = transitive_deps[it];
+    for (auto dep : tracker.dataflow_deps) {
+      const auto& dep_tdeps = transitive_deps.at(dep);
+      tdeps.insert(dep_tdeps.begin(), dep_tdeps.end());
+    }
+
+    // (dataflow_deps - tdeps) is now the set of actual dependencies for this Statement.
+    (*it)->deps.clear();
+    std::set_difference(tracker.dataflow_deps.begin(),  //
+                        tracker.dataflow_deps.end(),    //
+                        tdeps.begin(),                  //
+                        tdeps.end(),                    //
+                        std::back_inserter((*it)->deps));
+
+    // Add those actual dependencies back into the transitive deps
+    // (note that dataflow_deps that are transitively covered by the
+    // actual dependencies are already in the set of transitive deps).
+    for (auto dep : (*it)->deps) {
+      tdeps.insert(dep);
+    }
+
+    // Reset dataflow_deps for the next Statement.
+    tracker.dataflow_deps.clear();
   }
 }
 
