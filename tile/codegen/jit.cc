@@ -84,11 +84,18 @@ class Compiler : private stripe::ConstStmtVisitor {
 
   struct buffer {
     llvm::Value* base = nullptr;
-    const stripe::Refinement* refinement;
+    const stripe::Refinement* refinement = nullptr;
   };
 
   struct index {
     llvm::Value* variable = nullptr;
+  };
+
+  struct loop {
+    llvm::BasicBlock* init = nullptr;
+    llvm::BasicBlock* test = nullptr;
+    llvm::BasicBlock* body = nullptr;
+    llvm::BasicBlock* done = nullptr;
   };
 
  private:
@@ -204,14 +211,37 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     ai->setName(param_name);
     buffers_[param_name] = buffer{&(*ai), &block.refs[idx]};
   }
-  // allocate storage for the indexes and assign their initial values
+  // allocate storage for each loop index
   unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
   llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
-  llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
   for (auto& idx : block.idxs) {
     llvm::Value* variable = builder_.CreateAlloca(ssizetype);
-    builder_.CreateStore(zero, variable);
     indexes_[idx.name] = index{variable};
+  }
+  // generate the basic blocks for each nested loop's evaluation stages
+  std::vector<loop> loops;
+  for (auto& idx : block.idxs) {
+    std::string name = idx.name;
+    auto init = llvm::BasicBlock::Create(context_, "init_" + name, function);
+    auto test = llvm::BasicBlock::Create(context_, "test_" + name, function);
+    auto body = llvm::BasicBlock::Create(context_, "body_" + name, function);
+    auto done = llvm::BasicBlock::Create(context_, "done_" + name, function);
+    loops.push_back({init, test, body, done});
+  }
+  // initialize each loop index and generate the termination check
+  llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
+  for (size_t i = 0; i < block.idxs.size(); ++i) {
+    builder_.CreateBr(loops[i].init);
+    builder_.SetInsertPoint(loops[i].init);
+    llvm::Value* variable = indexes_[block.idxs[i].name].variable;
+    builder_.CreateStore(zero, variable);
+    builder_.CreateBr(loops[i].test);
+    builder_.SetInsertPoint(loops[i].test);
+    llvm::Value* index = builder_.CreateLoad(variable);
+    llvm::Value* range = llvm::ConstantInt::get(ssizetype, block.idxs[i].range);
+    llvm::Value* go = builder_.CreateICmpULT(index, range);
+    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
+    builder_.SetInsertPoint(loops[i].body);
   }
 
   // process each statement in the block body, generating code to modify the
@@ -219,6 +249,18 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   for (const auto& stmt : block.stmts) {
     stmt->Accept(this);
   }
+
+  // increment each index, from innermost to outermost, then jump back to the test
+  for (size_t i = block.idxs.size(); i-- > 0;) {
+    llvm::Value* variable = indexes_[block.idxs[i].name].variable;
+    llvm::Value* index = builder_.CreateLoad(variable);
+    llvm::Value* increment = llvm::ConstantInt::get(ssizetype, 1);
+    index = builder_.CreateAdd(index, increment);
+    builder_.CreateStore(index, variable);
+    builder_.CreateBr(loops[i].test);
+    builder_.SetInsertPoint(loops[i].done);
+  }
+
   // advance the indexes and repeat if necessary
   builder_.CreateRetVoid();
   return function;
