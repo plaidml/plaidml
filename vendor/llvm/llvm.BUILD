@@ -14,6 +14,8 @@ CFG_FILES = [
 
 PLATFORM_COPTS = select({
     "@toolchain//:macos_x86_64": [
+        "-D__STDC_LIMIT_MACROS",
+        "-D__STDC_CONSTANT_MACROS",
         "-w",
     ],
     "//conditions:default": [
