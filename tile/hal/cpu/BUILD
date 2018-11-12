@@ -35,6 +35,10 @@ plaidml_cc_library(
         "runtime.cc",
         "runtime.h",
     ],
+    copts = [
+        "-D__STDC_LIMIT_MACROS",
+        "-D__STDC_CONSTANT_MACROS",
+    ],
     tags = ["llvm"],
     visibility = ["//visibility:public"],
     deps = [
@@ -54,6 +58,10 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "llvm_test",
     srcs = ["llvm_test.cc"],
+    copts = [
+        "-D__STDC_LIMIT_MACROS",
+        "-D__STDC_CONSTANT_MACROS",
+    ],
     tags = ["llvm"],
     deps = [
         ":cpu",
