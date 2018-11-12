@@ -50,16 +50,6 @@ cc_library(
 )
 
 cc_library(
-    name = "iostreams",
-    srcs = glob(["libs/iostreams/src/*.cpp"]),
-    deps = [
-        ":boost",
-        "@bzip2_archive//:bz2lib",
-        "@zlib_archive//:zlib",
-    ],
-)
-
-cc_library(
     name = "program_options",
     srcs = glob(["libs/program_options/src/*.cpp"]),
     deps = [

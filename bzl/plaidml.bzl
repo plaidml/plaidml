@@ -5,24 +5,17 @@ load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_librar
 PY_SRCS_VER = "PY2AND3"
 
 PLAIDML_COPTS = select({
-    "@toolchain//:macos_x86_64": [
-        "-std=c++14",
-        "-Werror",
-    ],
     "@toolchain//:windows_x86_64": [
         "/std:c++14",
         "/DWIN32_LEAN_AND_MEAN",
     ],
     "//conditions:default": [
+        "-std=c++14",
         "-Werror",
     ],
 })
 
 PLAIDML_LINKOPTS = select({
-    "//bzl:android": [
-        "-Lexternal/androidndk/ndk/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/",
-        "-pie",
-    ],
     "@toolchain//:windows_x86_64": [],
     "@toolchain//:macos_x86_64": [],
     "//conditions:default": [
