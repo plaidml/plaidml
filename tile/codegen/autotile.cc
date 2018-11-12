@@ -55,7 +55,8 @@ static double TileCost(const Block& block, const proto::AutotilePass& options, c
     tile_by_name[block.idxs[i].name] = tile[i];
   }
   auto sizes = ComputeSizes(tile_by_name, block, options);
-  if (sizes.first > options.max_output_size() || sizes.second > options.max_input_size()) {
+  if (static_cast<int64_t>(sizes.first) > options.max_output_size() ||
+      static_cast<int64_t>(sizes.second) > options.max_input_size()) {
     return std::numeric_limits<double>::infinity();
   }
   double tot_compute = 1;
