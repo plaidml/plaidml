@@ -500,7 +500,7 @@ cc_library(
         ],
     }),
     deps = [
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
     alwayslink = 1,
 )
