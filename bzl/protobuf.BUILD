@@ -97,7 +97,7 @@ cc_library(
     includes = ["src/"],
     linkopts = LINK_OPTS,
     visibility = ["//visibility:public"],
-    deps = ["@zlib_archive//:zlib"],
+    deps = ["@zlib"],
 )
 
 cc_library(
@@ -167,7 +167,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":protobuf_lite",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 
@@ -423,7 +423,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":protobuf",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 
@@ -641,7 +641,7 @@ cc_test(
         ":protobuf",
         ":protoc_lib",
         "//external:gtest_main",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 

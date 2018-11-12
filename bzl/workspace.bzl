@@ -80,18 +80,18 @@ def plaidml_workspace():
     )
 
     native.new_http_archive(
-        name = "zlib_archive",
+        name = "zlib",
         url = "https://storage.googleapis.com/external_build_repo/zlib-1.2.8.tar.gz",
         sha256 = "36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d",
         build_file = str(Label("//bzl:zlib.BUILD")),
     )
 
     native.new_http_archive(
-        name = "llvm_archive",
+        name = "llvm",
         url = "https://storage.googleapis.com/external_build_repo/llvm-3.8.1.src.tar.gz",
         sha256 = "ad4b83105ce7540c79c36d92ac903c990a665aca54c878a243e1200aab6c756a",
         strip_prefix = "llvm-3.8.1.src",
-        build_file = str(Label("//bzl:llvm.BUILD")),
+        build_file = str(Label("//vendor/llvm:llvm.BUILD")),
     )
 
     native.http_file(

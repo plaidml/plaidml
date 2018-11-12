@@ -11,13 +11,6 @@ exports_files([
 ])
 
 config_setting(
-    name = "android",
-    values = {
-        "android_crosstool_top": "@androidndk//:toolchain-libcpp",
-    },
-)
-
-config_setting(
     name = "with_callgrind",
     define_values = {"with_callgrind": "true"},
 )
