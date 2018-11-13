@@ -96,6 +96,10 @@ struct RefInfo {
   // The size of the ref (when cached).
   std::size_t size;
 
+  // True iff this refinement's been used by the schedule.
+  // Unused refinements are pruned.
+  bool used = false;
+
   // True iff the final write for this RefInfo has been seen
   // (i.e. false initially, and set to true by the first swap-out in
   // scheduling order to write to this ref).  This is used to cover
@@ -586,8 +590,11 @@ void Scheduler::Run() {
     }
   }
 
+  // Clear the existing refs.
+  block_->refs.clear();
+
   // Add a Refinement for each CacheEntry.
-  block_->refs.reserve(block_->refs.size() + cache_entries_.size());
+  block_->refs.reserve(ri_map_.size() + cache_entries_.size());
   for (auto& ent : cache_entries_) {
     auto ref = block_->refs.emplace(block_->refs.end(), ent.source->ref);
     ref->dir = stripe::RefDir::None;
@@ -597,6 +604,13 @@ void Scheduler::Run() {
     ref->location = mem_loc_;
     ref->is_const = false;
     ref->offset = ent.range.offset;
+  }
+
+  // Move used Refinements back into the block.
+  for (auto& name_ri : ri_map_) {
+    if (name_ri.second.used) {
+      block_->refs.emplace_back(std::move(name_ri.second.ref));
+    }
   }
 
   RebuildTransitiveDeps();
@@ -770,6 +784,7 @@ PlacementPlan Scheduler::MakeFallbackPlan(stripe::Statement* stmt) {
 
 stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent) {
   stripe::Block swap_block;
+  ent->source->used = true;
   swap_block.name = "swap_in_" + ent->name;
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
@@ -810,6 +825,7 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
 
 stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* ent) {
   stripe::Block swap_block;
+  ent->source->used = true;
   swap_block.name = "swap_out_" + ent->name;
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
