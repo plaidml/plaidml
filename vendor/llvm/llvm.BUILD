@@ -48,7 +48,8 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python3) \
     -DLLVM_ENABLE_TERMINFO=OFF \
-    -DHAVE_LIBEDIT=0
+    -DHAVE_LIBEDIT=0 \
+    -DHAVE_FUTIMENS=0
 """,
         "//conditions:default": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
@@ -73,6 +74,7 @@ cc_library(
     includes = ["include"],
     linkopts = select({
         "@toolchain//:windows_x86_64": [],
+        "@toolchain//:macos_x86_64": [],
         "//conditions:default": [
             "-pthread",
             "-ldl",
@@ -327,4 +329,35 @@ cc_library(
         ":lib",
         ":targets",
     ],
+)
+
+# This is used for pre-compiled libraries
+cc_library(
+    name = "inc",
+    visibility = ["//visibility:public"],
+    hdrs = glob([
+        "lib/Support/**/*.inc",
+        "lib/Target/**/*.h",
+    ]) + CFG_FILES + [
+        ":gen-attrs",
+        ":gen-intrinsic",
+    ],
+    includes = ["include"],
+    linkopts = select({
+        "@toolchain//:windows_x86_64": [],
+        "@toolchain//:macos_x86_64": [],
+        "//conditions:default": [
+            "-pthread",
+            "-ldl",
+        ],
+    }),
+    deps = ["@zlib"],
+)
+
+# This is a dummy target used for eliciting the static libraries created by ":llvm".
+# See @com_intel_plaidml//vendor/llvm/lib/README.md
+cc_binary(
+    name = "static.so",
+    linkshared = 1,
+    deps = [":llvm"],
 )
