@@ -49,12 +49,16 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python3) \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_LIBEDIT=0 \
-    -DHAVE_FUTIMENS=0
+    -DHAVE_FUTIMENS=0 \
+    -DHAVE_VALGRIND_VALGRIND_H=0 \
+    -DLLVM_TARGETS_TO_BUILD="X86"
 """,
         "//conditions:default": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python3) \
-    -DLLVM_ENABLE_TERMINFO=OFF
+    -DLLVM_ENABLE_TERMINFO=OFF \
+    -DHAVE_VALGRIND_VALGRIND_H=0 \
+    -DLLVM_TARGETS_TO_BUILD="X86"
 """,
     }),
 )
