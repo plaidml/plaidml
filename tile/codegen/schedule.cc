@@ -231,6 +231,7 @@ struct CacheEntry {
   // output, but in that case, we schedule a swap out to main memory,
   // and that swap-out becomes the reader that causes the CacheEntry
   // to exist).
+  stripe::StatementIt first_reader;
   stripe::Statement* writer = nullptr;
   std::unordered_set<stripe::Statement*> readers;
 
@@ -496,11 +497,13 @@ void Scheduler::Run() {
         ent->readers.clear();
         if (IsReadDir(placement.dir)) {
           ent->readers.emplace(si->get());
+          ent->first_reader = si;
         } else {
           ent->writer = si->get();
         }
       } else if (IsReadDir(placement.dir)) {
         ent->readers.emplace(si->get());
+        ent->first_reader = si;
       }
 
       // Determine whether this CacheEntry will need to be swapped
@@ -564,14 +567,22 @@ void Scheduler::Run() {
   }
 
   // Add swap-in writers for every CacheEntry without a writer.
-
-  // TODO: Do something to get the swaps into the right order --
-  //       possibly by keeping an LRU list of the CacheEntries, or
-  //       sorting the swap-ins after the fact (which might be useful
-  //       in the middle of the statement list, too).
+  //
+  // All of the writerless CacheEntries can co-exist at the beginning
+  // of the program, and we guarantee that outputs will not clobber
+  // those entries before they're used.  So we can insert swap-in
+  // blocks for these CacheEntries in any order, at any point in the
+  // schedule before they're first used
+  //
+  // So: we add the swap-in for each CacheEntry just before the kernel
+  // that actually uses it.  On synchronous systems, it doesn't matter
+  // what order we use; on asynchronous systems, the swap-in blocks
+  // have no dependencies, allowing them to execute in any order
+  // anyway, but this will tend to queue them for memory transfer in
+  // an order that enables the compute units to get busy ASAP.
   for (auto* ent : active_entries_) {
     if (!ent->writer) {
-      AddSwapIn(block_->stmts.begin(), ent);
+      AddSwapIn(ent->first_reader, ent);
     }
   }
 
