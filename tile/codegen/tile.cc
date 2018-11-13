@@ -46,13 +46,10 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
     auto& inner_idx = inner->idxs[i];
     inner_idx.from = outer_idx.name;
     // For each index i, if (r_i/t_i) is not integral, add a constraint to the inner block of `o_i * t_i + i_i < r_i`.
-    // TODO: **** THIS IS DISABLED TEMPORARILY ***
-    /*
     int64_t range = outer->idxs[i].range;
     if (range % shape[i]) {
       inner->constraints.emplace_back(Affine(outer_idx.name, -1) + int64_t(outer_idx.range - 1));
     }
-    */
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
     outer_idx.range = (outer_idx.range + shape[i] - 1) / shape[i];

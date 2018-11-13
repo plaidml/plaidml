@@ -384,7 +384,7 @@ BlockPlacer::BlockPlacer(std::size_t alignment) : alignment_{alignment} {}
 
 std::unique_ptr<Placement> BlockPlacer::PlaceSchedule(const tile::proto::Program& program,
                                                       schedule::Schedule* schedule) const {
-  return compat::make_unique<BlockPlacement>(program, schedule, alignment_);
+  return std::make_unique<BlockPlacement>(program, schedule, alignment_);
 }
 
 }  // namespace local_machine

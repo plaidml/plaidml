@@ -78,7 +78,7 @@ std::vector<FactoryParam> SupportedParams() {
       auto hw_config = config.add_hardware_configs();
       hw_config->mutable_sel()->set_value(true);
       hw_config->mutable_settings()->set_vec_size(param.vec_size);
-      return compat::make_unique<local_machine::Platform>(ctx, config);
+      return std::make_unique<local_machine::Platform>(ctx, config);
     };
     params.push_back({factory, param});
   }

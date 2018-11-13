@@ -11,8 +11,8 @@ namespace opencl {
 
 [[gnu::unused]] char reg = []() -> char {
   FactoryRegistrar<hal::Driver>::Instance()->Register(
-      "opencl",                                                                      //
-      [](const context::Context& ctx) { return compat::make_unique<Driver>(ctx); },  //
+      "opencl",                                                                   //
+      [](const context::Context& ctx) { return std::make_unique<Driver>(ctx); },  //
 #ifdef __APPLE__
       FactoryPriority::DEFAULT);
 #else

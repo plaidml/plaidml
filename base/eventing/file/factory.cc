@@ -10,11 +10,11 @@ namespace file {
 
 std::unique_ptr<context::EventLog> EventLogFactory::MakeTypedInstance(const context::Context& ctx,
                                                                       const proto::EventLog& config) {
-  return compat::make_unique<EventLog>(config);
+  return std::make_unique<EventLog>(config);
 }
 
 [[gnu::unused]] char reg = []() -> char {
-  AnyFactoryMap<context::EventLog>::Instance()->Register(compat::make_unique<EventLogFactory>());
+  AnyFactoryMap<context::EventLog>::Instance()->Register(std::make_unique<EventLogFactory>());
   return 0;
 }();
 

@@ -15,8 +15,8 @@ namespace opencl {
 
 Device::Device(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did, proto::DeviceInfo info)
     : device_state_{std::make_shared<DeviceState>(ctx, cl_ctx, did, std::move(info))},
-      compiler_{compat::make_unique<Compiler>(device_state_)},
-      executor_{compat::make_unique<Executor>(device_state_)} {}
+      compiler_{std::make_unique<Compiler>(device_state_)},
+      executor_{std::make_unique<Executor>(device_state_)} {}
 
 void Device::Initialize(const hal::proto::HardwareSettings& settings) { device_state_->Initialize(settings); }
 

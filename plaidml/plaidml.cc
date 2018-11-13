@@ -236,7 +236,7 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
 
   try {
     context::Activity activity{ctx->activity.ctx(), "vertexai::EnumerateDevices"};
-    auto enumerator = vertexai::compat::make_unique<plaidml_device_enumerator>();
+    auto enumerator = std::make_unique<plaidml_device_enumerator>();
     enumerator->config_source = config_source;
     plaidml::proto::Config config;
     try {
@@ -387,7 +387,7 @@ class MapCompletion final {
   }
 
   void OnComplete(const context::Context& ctx, boost::future<std::unique_ptr<tile::View>> f) {
-    auto mapping = vertexai::compat::make_unique<plaidml_mapping>(plaidml_mapping{f.get(), ctx});
+    auto mapping = std::make_unique<plaidml_mapping>(plaidml_mapping{f.get(), ctx});
     if (InvokeCallback(mapping.get())) {
       mapping.release();
     }
@@ -511,7 +511,7 @@ extern "C" plaidml_mapping* plaidml_map_buffer_discard(vai_ctx* ctx, plaidml_buf
   try {
     context::Activity activity(ctx->activity.ctx(), "vertexai::DiscardCurrent");
     auto view = buffer->state->buffer()->MapDiscard(activity.ctx());
-    mapping = vertexai::compat::make_unique<plaidml_mapping>(plaidml_mapping{std::move(view), activity.ctx()});
+    mapping = std::make_unique<plaidml_mapping>(plaidml_mapping{std::move(view), activity.ctx()});
   } catch (...) {
     vertexai::SetLastException(std::current_exception());
     return nullptr;
@@ -642,7 +642,7 @@ extern "C" plaidml_shape* plaidml_alloc_shape(vai_ctx* ctx, plaidml_datatype dat
 
   try {
     context::Activity activity(ctx->activity.ctx(), "vertexai::AllocShape");
-    auto shp = vertexai::compat::make_unique<plaidml_shape>();
+    auto shp = std::make_unique<plaidml_shape>();
     shp->shape.type = dt;
     return shp.release();
   } catch (...) {
@@ -1334,7 +1334,7 @@ void BuildInvokerRunInfo(plaidml_invoker* invoker) {
           }
         }
         applier->SetDone();
-        auto composer = vertexai::compat::make_unique<BoundFunction>();
+        auto composer = std::make_unique<BoundFunction>();
         composer->AddDependency(*applier);
         for (const auto& it : invoker->outputs) {
           auto from = std::dynamic_pointer_cast<TensorValue>(it.second);
@@ -1355,7 +1355,7 @@ extern "C" plaidml_invoker* plaidml_alloc_invoker(vai_ctx* ctx, plaidml_function
     return nullptr;
   }
   try {
-    auto invoker = vertexai::compat::make_unique<plaidml_invoker>();
+    auto invoker = std::make_unique<plaidml_invoker>();
     invoker->func = function->func;
     return invoker.release();
   } catch (...) {
@@ -1418,7 +1418,7 @@ extern "C" plaidml_shape* plaidml_alloc_invoker_output_shape(plaidml_invoker* in
           });
     }
 
-    auto shape = vertexai::compat::make_unique<plaidml_shape>();
+    auto shape = std::make_unique<plaidml_shape>();
     shape->shape = invoker->applier_for_output_shape->GetOutputShape(name);
     return shape.release();
   } catch (...) {
@@ -1532,7 +1532,7 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
   }
   context::Activity activity{ctx->activity.ctx(), "plaidml::invoker::ScheduleInvocation"};
   try {
-    auto invocation = vertexai::compat::make_unique<plaidml_invocation>();
+    auto invocation = std::make_unique<plaidml_invocation>();
     auto rundown = std::make_shared<context::Rundown>();
     rundown->TryEnterGate(activity.ctx().gate());
     BuildInvokerRunInfo(invoker);

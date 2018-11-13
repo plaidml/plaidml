@@ -17,9 +17,9 @@ namespace file {
 EventLog::EventLog(const proto::EventLog& config)
     : config_{config},
       std_file_out_{config.filename(), std::ios::binary},
-      ostr_out_{compat::make_unique<gpi::OstreamOutputStream>(&std_file_out_)},
-      gzip_out_{compat::make_unique<gpi::GzipOutputStream>(ostr_out_.get(), gpi::GzipOutputStream::Options())},
-      coded_out_{compat::make_unique<gpi::CodedOutputStream>(gzip_out_.get())} {
+      ostr_out_{std::make_unique<gpi::OstreamOutputStream>(&std_file_out_)},
+      gzip_out_{std::make_unique<gpi::GzipOutputStream>(ostr_out_.get(), gpi::GzipOutputStream::Options())},
+      coded_out_{std::make_unique<gpi::CodedOutputStream>(gzip_out_.get())} {
   if (!std_file_out_) {
     throw std::runtime_error(std::string("unable to open \"") + config.filename() + "\" for writing");
   }
@@ -64,9 +64,9 @@ void EventLog::LogRecordLocked(proto::Record record) {
 
 Reader::Reader(const std::string& filename)
     : std_file_in_{filename, std::ios::binary},
-      ostr_in_{compat::make_unique<gpi::IstreamInputStream>(&std_file_in_)},
-      gzip_in_{compat::make_unique<gpi::GzipInputStream>(ostr_in_.get())},
-      coded_in_{compat::make_unique<gpi::CodedInputStream>(gzip_in_.get())} {}
+      ostr_in_{std::make_unique<gpi::IstreamInputStream>(&std_file_in_)},
+      gzip_in_{std::make_unique<gpi::GzipInputStream>(ostr_in_.get())},
+      coded_in_{std::make_unique<gpi::CodedInputStream>(gzip_in_.get())} {}
 
 bool Reader::Read(context::proto::Event* event) {
   std::lock_guard<std::mutex> lock{mu_};
