@@ -13,8 +13,8 @@ namespace metal {
 
 [[gnu::unused]] char reg = []() -> char {
   FactoryRegistrar<hal::Driver>::Instance()->Register(
-      "metal",                                                                       //
-      [](const context::Context& ctx) { return compat::make_unique<Driver>(ctx); },  //
+      "metal",                                                                    //
+      [](const context::Context& ctx) { return std::make_unique<Driver>(ctx); },  //
       FactoryPriority::HIGH);
   return 0;
 }();
@@ -180,8 +180,8 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
                                                              const std::vector<lang::KernelInfo>& kernel_infos,
                                                              const hal::proto::HardwareSettings& settings) {
   if (!kernel_infos.size()) {
-    return boost::make_ready_future(std::unique_ptr<hal::Library>{
-        compat::make_unique<Library>(ctx, device_, nullptr, std::vector<KernelContext>{})});
+    return boost::make_ready_future(
+        std::unique_ptr<hal::Library>{std::make_unique<Library>(ctx, device_, nullptr, std::vector<KernelContext>{})});
   }
 
   auto activity = std::make_shared<context::Activity>(ctx, "tile::hal::opencl::Build");
@@ -279,13 +279,13 @@ boost::future<std::unique_ptr<hal::Executable>> Library::Prepare() {
 
     if (kctx.ki.ktype == lang::KernelType::kZero) {
       // kinfo.set_src("// Builtin zero kernel");
-      kernels.emplace_back(boost::make_ready_future(
-          std::unique_ptr<Kernel>(compat::make_unique<ZeroKernel>(device_, kctx.ki, kernel_id))));
+      kernels.emplace_back(
+          boost::make_ready_future(std::unique_ptr<Kernel>(std::make_unique<ZeroKernel>(device_, kctx.ki, kernel_id))));
       continue;
     }
     if (kctx.ki.ktype == lang::KernelType::kCopy) {
-      kernels.emplace_back(boost::make_ready_future(
-          std::unique_ptr<Kernel>(compat::make_unique<CopyKernel>(device_, kctx.ki, kernel_id))));
+      kernels.emplace_back(
+          boost::make_ready_future(std::unique_ptr<Kernel>(std::make_unique<CopyKernel>(device_, kctx.ki, kernel_id))));
       continue;
     }
     // kinfo.set_src(src);
@@ -302,7 +302,7 @@ boost::future<std::unique_ptr<hal::Executable>> Library::Prepare() {
           LOG(ERROR) << "Source code: \n" << kctx.ki.comments << "\n" << kctx.src;
           throw std::runtime_error(desc);
         }
-        std::unique_ptr<Kernel> kernel = compat::make_unique<ComputeKernel>(device, kctx.ki, kernel_id, state);
+        std::unique_ptr<Kernel> kernel = std::make_unique<ComputeKernel>(device, kctx.ki, kernel_id, state);
         promise->set_value(std::move(kernel));
       } catch (...) {
         try {
@@ -324,7 +324,7 @@ boost::future<std::unique_ptr<hal::Executable>> Library::Prepare() {
         for (auto& fut : kernel_futures) {
           kernels.emplace_back(fut.get());
         }
-        return std::unique_ptr<hal::Executable>(compat::make_unique<Executable>(std::move(kernels)));
+        return std::unique_ptr<hal::Executable>(std::make_unique<Executable>(std::move(kernels)));
       });
 }
 

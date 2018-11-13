@@ -116,7 +116,7 @@ boost::future<void> RunRequest::Run(const context::Context& ctx, const Program* 
 
   context::Activity running{ctx, "tile::local_machine::Program::Run"};
   boost::future<void> complete;
-  auto shim = compat::make_unique<Shim>(running.ctx(), program, std::move(inputs), std::move(outputs));
+  auto shim = std::make_unique<Shim>(running.ctx(), program, std::move(inputs), std::move(outputs));
 
   {
     context::Activity queueing{running.ctx(), "tile::local_machine::Program::Enqueue"};

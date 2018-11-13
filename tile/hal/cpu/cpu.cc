@@ -11,8 +11,8 @@ namespace cpu {
 
 [[gnu::unused]] char reg = []() -> char {
   FactoryRegistrar<hal::Driver>::Instance()->Register(
-      "llvm",                                                                        //
-      [](const context::Context& ctx) { return compat::make_unique<Driver>(ctx); },  //
+      "llvm",                                                                     //
+      [](const context::Context& ctx) { return std::make_unique<Driver>(ctx); },  //
       FactoryPriority::LOW);
   return 0;
 }();

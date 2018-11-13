@@ -36,7 +36,7 @@ std::unique_ptr<ResultInfo> MakeResultInfo(const CLObj<cl_event>& event) {
     throw error::NotFound("No associated event information");
   }
 
-  auto info = compat::make_unique<ResultInfo>();
+  auto info = std::make_unique<ResultInfo>();
 
   err = clGetEventInfo(event.get(), CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(info->status), &info->status, nullptr);
   Err::Check(err, "Unable to get command execution status");

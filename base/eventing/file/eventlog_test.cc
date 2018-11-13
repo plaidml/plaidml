@@ -24,7 +24,7 @@ class EventLogTest : public ::testing::Test {
  protected:
   EventLogTest() { config_.set_filename(kTestFilename); }
 
-  void SetUp() override { eventlog_ = compat::make_unique<EventLog>(config_); }
+  void SetUp() override { eventlog_ = std::make_unique<EventLog>(config_); }
 
   proto::EventLog config_;
   std::unique_ptr<EventLog> eventlog_;
