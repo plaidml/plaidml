@@ -287,8 +287,22 @@ void Compiler::Visit(const stripe::Store& store) {
   // use GEP to compute the destination element address
   // use the specified aggregation to store the value
   buffer into = buffers_[store.into];
-  llvm::Value* value = scalars_[store.from].value;
+  scalar from = Cast(scalars_[store.from], into.refinement->shape.type);
+  llvm::Value* value = from.value;
   llvm::Value* element = IndexElement(into);
+  std::string agg_op = into.refinement->agg_op;
+  if ("add" == agg_op) {
+    llvm::Value* prev = builder_.CreateLoad(element);
+    if (is_float(from.type)) {
+      value = builder_.CreateFAdd(value, prev);
+    } else if (is_int(from.type) || is_uint(from.type)) {
+      value = builder_.CreateAdd(value, prev);
+    } else {
+      throw Error("Invalid addition type: " + to_string(from.type));
+    }
+  } else if (!agg_op.empty()) {
+    throw Error("Unimplemented agg_op: " + to_string(agg_op));
+  }
   builder_.CreateStore(value, element);
 }
 
