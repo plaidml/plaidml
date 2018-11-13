@@ -136,6 +136,10 @@ struct MemRange {
   std::size_t size = 0;
 };
 
+std::ostream& operator<<(std::ostream& o, MemRange mr) {
+  return o << "[" << mr.offset << " - " << mr.offset + mr.size << ")";
+}
+
 // Returns true iff the supplied ranges overlap.
 bool RangesOverlap(MemRange a, MemRange b) {
   return ((a.offset < (b.offset + b.size)) && (b.offset < (a.offset + a.size)));
@@ -417,6 +421,9 @@ void Scheduler::Run() {
   //      happens before the condition check).
   for (stripe::StatementIt si = block_->stmts.end(); si != block_->stmts.begin();) {
     --si;
+
+    IVLOG(3, "Scheduling " << si->get());
+
     // First, figure out where we're going to put any newly-created CacheEntries.
     PlacementPlan plan = MakePlacementPlan(si->get());
 
@@ -482,13 +489,16 @@ void Scheduler::Run() {
     // fix it.
 
     for (auto& name_placement : plan) {
+      IVLOG(3, "Applying placement for " << name_placement.first);
       auto& placement = name_placement.second;
       CacheEntry* ent = placement.entry;
       bool is_new_entry = (ent == nullptr);
+      IVLOG(3, "  IsNewEntry: " << is_new_entry);
 
       if (is_new_entry) {
         // This Placement requires a new entry.
         ent = &*cache_entries_.emplace(cache_entries_.end(), CacheEntry{placement.source, placement.range});
+        IVLOG(3, "Created cache entry " << ent->name << " at " << ent->range);
         placement.entry = ent;
         placement.source->cache_entry = ent;
       }
@@ -517,6 +527,10 @@ void Scheduler::Run() {
 
       if (IsWriteDir(placement.dir) && ((IsWriteDir(placement.source->ref.dir) && !placement.source->saw_final_write) ||
                                         !placement.source->swap_in_readers.empty())) {
+        IVLOG(3, "  Adding swap-out for " << ent->name << " at " << ent->range);
+        IVLOG(3, "    IsWriteDir(): " << IsWriteDir(placement.source->ref.dir));
+        IVLOG(3, "    SawFinalWrite(): " << placement.source->saw_final_write);
+        IVLOG(3, "    Swap-in-readers.empty(): " << placement.source->swap_in_readers.empty());
         auto next_si = si;
         ++next_si;
         reuse_dep = AddSwapOut(next_si, ent);
@@ -539,15 +553,20 @@ void Scheduler::Run() {
         }
 
         if (is_new_entry) {
+          IVLOG(3, "New entry " << ent->name << " at " << ent->range << " collides with existing entry "
+                                << future_ent->name << " at " << future_ent->range);
           if (!future_ent->writer) {
             // This will give future_ent a writer.
             auto next_it = reuse_dep;
             ++next_it;
+            IVLOG(3, "  Adding swap-in for " << future_ent->name << " at " << future_ent->range);
             auto swap_in_it = AddSwapIn(next_it, future_ent);
             (*swap_in_it)->deps.emplace_back(reuse_dep);
           }
           SubtractRange(ent->range, &future_ent->uncovered_ranges);
           if (future_ent->uncovered_ranges.empty()) {
+            IVLOG(3, "  Existing entry " << future_ent->name
+                                         << " is now completely covered; removing from active_entries_");
             active_entries_.erase(future_ent->active_iterator);
           }
 
@@ -561,11 +580,22 @@ void Scheduler::Run() {
         future_ent->writer->deps.emplace_back(reuse_dep);
       }
 
-      ent->active_iterator = added_entries.emplace(added_entries.end(), ent);
+      if (is_new_entry) {
+        IVLOG(3, "Adding " << ent->name << " at " << ent->range << " to added_entries");
+        ent->active_iterator = added_entries.emplace(added_entries.end(), ent);
+      }
     }
 
+    IVLOG(3, "Splicing into active_entries_");
     active_entries_.splice(active_entries_.begin(), added_entries);
     active_entries_.sort([](CacheEntry* lhs, CacheEntry* rhs) { return lhs->range.offset < rhs->range.offset; });
+
+    if (VLOG_IS_ON(3)) {
+      IVLOG(3, "active_entries_ now contains:");
+      for (auto* ent : active_entries_) {
+        IVLOG(3, "  " << ent->name << " at " << ent->range);
+      }
+    }
 
     RewriteRefs(si->get(), plan);
   }
@@ -586,6 +616,7 @@ void Scheduler::Run() {
   // an order that enables the compute units to get busy ASAP.
   for (auto* ent : active_entries_) {
     if (!ent->writer) {
+      IVLOG(3, "  Adding final swap-in for " << ent->name);
       AddSwapIn(ent->first_reader, ent);
     }
   }
@@ -675,17 +706,20 @@ PlacementPlan Scheduler::MakePlacementPlan(stripe::Statement* stmt) {
 
   PlacementPlan plan{existing_entry_plan};
   if (TryMakePlanWithNoSwaps(&plan, stmt, todos)) {
+    IVLOG(3, "  Made plan with no swaps");
     return plan;
   }
 
   plan = existing_entry_plan;
   if (TryMakePlanWithSwaps(&plan, stmt, todos)) {
+    IVLOG(3, "  Made plan with swaps");
     return plan;
   }
 
   // Plan from scratch.  This does not pay attention to existing
   // entries, so more swaps will be required, but it is guaranteed to
   // work.
+  IVLOG(3, "  Using fallback plan");
   return MakeFallbackPlan(stmt);
 }
 
@@ -727,9 +761,13 @@ bool Scheduler::TryMakePlanWithNoSwaps(PlacementPlan* plan, stripe::Statement* s
   // going to require a swap-in), and if its RefInfo is not already in
   // the plan (because RefInfos that are in the plan are required by
   // the current statement).
+  IVLOG(3, "    Attempting plan with no swaps");
   std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
-  for (auto ent : active_entries_) {
-    if (!ent->writer && !plan->count(ent->source->ref.into)) {
+  for (auto* ent : active_entries_) {
+    IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " writer=" << ent->writer
+                                << " plan.count=" << plan->count(ent->source->ref.into));
+    if (!(ent->writer && !plan->count(ent->source->ref.into))) {
+      IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
       SubtractRange(ent->range, &ranges);
     }
   }
@@ -744,8 +782,8 @@ bool Scheduler::TryMakePlanWithSwaps(PlacementPlan* plan, stripe::Statement* stm
   // (because RefInfos that are in the plan are required by the
   // current statement).
   std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
-  for (auto ent : active_entries_) {
-    if (!plan->count(ent->source->ref.into)) {
+  for (auto* ent : active_entries_) {
+    if (plan->count(ent->source->ref.into)) {
       SubtractRange(ent->range, &ranges);
     }
   }
