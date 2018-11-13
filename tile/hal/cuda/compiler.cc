@@ -57,7 +57,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
                                                              const hal::proto::HardwareSettings& settings) {
   if (!kernels.size()) {
     return boost::make_ready_future(
-        std::unique_ptr<hal::Library>{compat::make_unique<Library>(std::vector<std::shared_ptr<Kernel>>{})});
+        std::unique_ptr<hal::Library>{std::make_unique<Library>(std::vector<std::shared_ptr<Kernel>>{})});
   }
 
   auto src = EmitCudaC(kernels);

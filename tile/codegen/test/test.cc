@@ -125,12 +125,12 @@ TEST(Codegen, ApplyTile) {
 
   IVLOG(2, "After>\n" << *program);
 
-  // ExecuteProgram(*main, &data);
+  ExecuteProgram(*main, &data);
 
-  // IVLOG(2, "A: " << data["A"]);
-  // IVLOG(2, "B: " << data["B"]);
-  // IVLOG(2, "C: " << data["C"]);
-  // EXPECT_THAT(data["C"], ContainerEq(expected));
+  IVLOG(2, "A: " << data["A"]);
+  IVLOG(2, "B: " << data["B"]);
+  IVLOG(2, "C: " << data["C"]);
+  EXPECT_THAT(data["C"], ContainerEq(expected));
 }
 
 TEST(Codegen, StencilMatchMatMul) {

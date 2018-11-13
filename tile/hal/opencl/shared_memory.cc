@@ -166,7 +166,7 @@ void Executor::InitSharedMemory() {
     }
     VLOG(3) << "Enabling OpenCL fine-grain SVM memory";
 
-    shared_memory_ = compat::make_unique<SharedMemory>(device_state_);
+    shared_memory_ = std::make_unique<SharedMemory>(device_state_);
     break;
   }
 }

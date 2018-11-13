@@ -32,7 +32,7 @@ std::unique_ptr<Placement> NaivePlacer::PlaceSchedule(const tile::proto::Program
   for (const auto& alloc : schedule->allocs) {
     sum += ((alloc.byte_size + alignment_ - 1) / alignment_) * alignment_;
   }
-  return compat::make_unique<NaivePlacement>(sum);
+  return std::make_unique<NaivePlacement>(sum);
 }
 
 }  // namespace local_machine

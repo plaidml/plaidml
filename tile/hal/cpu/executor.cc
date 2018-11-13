@@ -103,7 +103,7 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
 
 boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* library) {
   auto lib = Library::Downcast(library);
-  auto k = compat::make_unique<cpu::Executable>(lib->engines(), lib->kernels(), thread_pool_);
+  auto k = std::make_unique<cpu::Executable>(lib->engines(), lib->kernels(), thread_pool_);
   return boost::make_ready_future(std::unique_ptr<hal::Executable>(std::move(k)));
 }
 

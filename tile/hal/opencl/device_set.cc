@@ -377,7 +377,7 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
   }
 
   if (first_dev) {
-    host_memory_ = compat::make_unique<HostMemory>(first_dev->device_state());
+    host_memory_ = std::make_unique<HostMemory>(first_dev->device_state());
   }
 }
 

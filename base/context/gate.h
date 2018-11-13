@@ -54,7 +54,7 @@ class Rundown final {
   // T must implement the Callable and MoveAssignable concepts, and it must not throw when invoked.
   template <typename CB>
   explicit Rundown(CB callback) : Rundown{} {
-    callback_ = compat::make_unique<TypedCallback<CB>>(std::move(callback));
+    callback_ = std::make_unique<TypedCallback<CB>>(std::move(callback));
   }
 
   Rundown(Rundown&& other) noexcept = default;             // MoveConstructible
