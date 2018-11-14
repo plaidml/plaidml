@@ -84,6 +84,179 @@ TEST(Codegen, JitIntrinsicEQ) {}
 
 TEST(Codegen, JitIntrinsicCOND) {}
 
+TEST(Codegen, JitSimpleLoop) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    location { unit { } }
+    idxs {
+      name: "i"
+      range: 5
+    }
+    refs {
+      location { unit { } }
+      into: "bufA"
+      access {
+        offset: 0
+        terms {key: "i" value: 1}
+      }
+      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+    }
+    refs {
+      location { unit { } }
+      into: "bufB"
+      access {
+        offset: 0
+        terms {key: "i" value: 1}
+      }
+      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+    }
+    stmts { load { from:"bufA" into:"$1" } }
+    stmts { store { from:"$1" into:"bufB"} }
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> bufA = {
+      1, 2, 3, 4, 5,
+  };
+  std::vector<float> bufB = {
+      0, 0, 0, 0, 0,
+  };
+  std::vector<float> expected = {
+      1, 2, 3, 4, 5,
+  };
+
+  std::map<std::string, void*> buffers{{"bufA", bufA.data()}, {"bufB", bufB.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_THAT(bufB, ContainerEq(expected));
+}
+
+TEST(Codegen, JitCopy2D) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    location { unit { } }
+    idxs { name: "i" range: 5 }
+    idxs { name: "j" range: 5 }
+    refs {
+      location { unit { } }
+      into: "bufA"
+      access {
+        offset: 0
+        terms {key:"j" value:1}
+      }
+      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+    }
+    refs {
+      location { unit { } }
+      into: "bufB"
+      access {
+        offset: 0
+        terms {key:"i" value:1}
+      }
+      access {
+        offset: 0
+        terms {key:"j" value:1}
+      }
+      shape {
+        type: FLOAT32
+        dimensions: {size:5 stride:5} 
+        dimensions: {size:5 stride:1}
+      }
+    }
+    stmts { load { from:"bufA" into:"$1" } }
+    stmts { store { from:"$1" into:"bufB"} }
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> bufA = {
+      1, 2, 3, 4, 5,
+  };
+  std::vector<float> bufB = {
+      0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0,  //
+  };
+  std::vector<float> expected = {
+      1, 2, 3, 4, 5,  //
+      1, 2, 3, 4, 5,  //
+      1, 2, 3, 4, 5,  //
+      1, 2, 3, 4, 5,  //
+      1, 2, 3, 4, 5,  //
+  };
+
+  std::map<std::string, void*> buffers{{"bufA", bufA.data()}, {"bufB", bufB.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_THAT(bufB, ContainerEq(expected));
+}
+
+TEST(Codegen, JitAggSum2D) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    location { unit { } }
+    idxs { name: "i" range: 5 }
+    idxs { name: "j" range: 5 }
+    refs {
+      location { unit { } }
+      into: "bufA"
+      access {
+        offset: 0
+        terms {key:"j" value:1}
+      }
+      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+    }
+    refs {
+      location { unit { } }
+      into: "bufB"
+      agg_op: "add"
+      access {
+        offset: 0
+        terms {key:"i" value:1}
+      }
+      access {
+        offset: 0
+        terms {key:"j" value:1}
+      }
+      shape {
+        type: FLOAT32
+        dimensions: {size:5 stride:5}
+        dimensions: {size:5 stride:1}
+      }
+    }
+    stmts { load { from:"bufA" into:"$1" } }
+    stmts { store { from:"$1" into:"bufB"} }
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> bufA = {
+      1, 2, 3, 4, 5,
+  };
+  std::vector<float> bufB = {
+      1,  2,  3,  4,  5,   //
+      6,  7,  8,  9,  10,  //
+      11, 12, 13, 14, 15,  //
+      16, 17, 18, 19, 20,  //
+      21, 22, 23, 24, 25,  //
+  };
+  std::vector<float> expected = {
+      2,  4,  6,  8,  10,  //
+      7,  9,  11, 13, 15,  //
+      12, 14, 16, 18, 20,  //
+      17, 19, 21, 23, 25,  //
+      22, 24, 26, 28, 30   //
+  };
+
+  std::map<std::string, void*> buffers{{"bufA", bufA.data()}, {"bufB", bufB.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_THAT(bufB, ContainerEq(expected));
+}
+
 TEST(Codegen, JitMatMul) {
   std::vector<float> bufA = {
       1, 2, 3, 4, 5,  //
