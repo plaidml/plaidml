@@ -254,6 +254,7 @@ struct Block : Statement {
   std::vector<const Refinement*> ref_ins() const;
   std::vector<const Refinement*> ref_outs() const;
   const Index* idx_by_name(const std::string& name) const;
+  std::set<const Index*> accumulation_idxs() const;
   // Find which refinement has an into called 'name'
   std::vector<Refinement>::iterator ref_by_into(const std::string& name, bool fail = true);
   std::vector<Refinement>::const_iterator ref_by_into(const std::string& name, bool fail = true) const;

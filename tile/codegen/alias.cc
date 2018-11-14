@@ -38,11 +38,11 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
 
 AliasMap::AliasMap() : depth_(0) {}
 
-AliasMap::AliasMap(const AliasMap& outer, const stripe::Block& block) : depth_(outer.depth_ + 1) {
+AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.depth_ + 1) {
   // Make a prefix
   std::string prefix = std::string("d") + std::to_string(depth_) + ":";
   // Make all inner alias data
-  for (const auto& ref : block.refs) {
+  for (auto& ref : block->refs) {
     // Setup the place we are going to write to
     AliasInfo& info = info_[ref.into];
     // Check if it's a refinement or a new buffer
@@ -53,10 +53,14 @@ AliasMap::AliasMap(const AliasMap& outer, const stripe::Block& block) : depth_(o
         throw_with_trace(std::runtime_error("AliasMap::AliasMap: invalid ref.from during aliasing computation"));
       }
       // Copy data across
+      info.base_block = it->second.base_block;
+      info.base_ref = it->second.base_ref;
       info.base_name = it->second.base_name;
       info.access = it->second.access;
     } else {
       // New alloc, initialize from scratch
+      info.base_block = block;
+      info.base_ref = &ref;
       info.base_name = prefix + ref.into;
       info.access.resize(ref.access.size());
     }

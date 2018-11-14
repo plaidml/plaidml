@@ -205,8 +205,8 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
     return true;
   }
   // Make AliasMaps for the two blocks
-  AliasMap a_map(scope, *block_a);
-  AliasMap b_map(scope, *block_b);
+  AliasMap a_map(scope, block_a);
+  AliasMap b_map(scope, block_b);
   // Start by copying A's reference across
   auto r = std::make_shared<Block>();
   r->refs = block_a->refs;
@@ -428,7 +428,7 @@ static void FusionPassRecurse(const AliasMap& map, stripe::Block* block, TagFusi
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
-      AliasMap inner_map(map, *inner);
+      AliasMap inner_map(map, inner.get());
       FusionPassRecurse(inner_map, inner.get(), strategy);
     }
   }
@@ -442,7 +442,7 @@ void FusionPass(stripe::Block* root, const proto::FusionPass& options) {
       FromProto(options.fused_set())     // fused_set
   };
   AliasMap base;
-  AliasMap root_map(base, *root);
+  AliasMap root_map(base, root);
   // Check if we should fuse this block
   TagFusionStrategy strategy(fopts);
   FusionPassRecurse(root_map, root, &strategy);

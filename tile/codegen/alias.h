@@ -22,6 +22,8 @@ enum class AliasType {
 struct AliasInfo {
  public:
   static AliasType Compare(const AliasInfo& a, const AliasInfo& b);
+  stripe::Block* base_block;
+  stripe::Refinement* base_ref;
   std::string base_name;
   std::vector<stripe::Affine> access;
   TensorShape shape;
@@ -29,8 +31,11 @@ struct AliasInfo {
 
 class AliasMap {
  public:
-  AliasMap();                                                   // Constructs a root level alias info
-  AliasMap(const AliasMap& outer, const stripe::Block& block);  // Construct info for an inner block
+  // Constructs a root level alias info
+  AliasMap();
+  // Construct info for an inner block
+  AliasMap(const AliasMap& outer, stripe::Block* block);
+  // Lookup an AliasInfo by name
   const AliasInfo& at(const std::string& name) const { return safe_at(info_, name); }
 
  private:

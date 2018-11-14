@@ -648,6 +648,24 @@ const Index* Block::idx_by_name(const std::string& name) const {
   return &*it;
 }
 
+std::set<const Index*> Block::accumulation_idxs() const {
+  std::set<const Index*> ret;
+  for (const auto& idx : idxs) {
+    bool used = false;
+    for (const auto& ref : ref_outs()) {
+      for (const auto& access : ref->access) {
+        if (access.getMap().count(idx.name)) {
+          used = true;
+        }
+      }
+    }
+    if (!used) {
+      ret.insert(&idx);
+    }
+  }
+  return ret;
+}
+
 std::vector<Refinement>::iterator Block::ref_by_into(const std::string& name, bool fail) {
   auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
   if (fail && it == refs.end()) {

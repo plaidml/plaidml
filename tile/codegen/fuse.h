@@ -56,7 +56,7 @@ class AlwaysFuseRecursive : public FusionStrategy {
   void OnFailed() {}
   void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
     block->location = a.location;
-    AliasMap inner(outer, *block);
+    AliasMap inner(outer, block);
     FusionInner(inner, block, this);
   }
 };
