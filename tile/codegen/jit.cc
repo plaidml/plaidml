@@ -216,6 +216,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
   for (auto& idx : block.idxs) {
     llvm::Value* variable = builder_.CreateAlloca(ssizetype);
+    variable->setName(idx.name);
     indexes_[idx.name] = index{variable};
   }
   // generate the basic blocks for each nested loop's evaluation stages
