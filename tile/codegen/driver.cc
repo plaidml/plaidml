@@ -11,6 +11,7 @@
 #include "tile/codegen/scalarize.h"
 #include "tile/codegen/schedule.h"
 #include "tile/codegen/tile.h"
+#include "tile/codegen/transpose.h"
 
 namespace vertexai {
 namespace tile {
@@ -75,8 +76,8 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
       case proto::Pass::kAutotile:
         AutotilePass(block, pass.autotile());
         break;
-      case proto::Pass::kCustom:
-        // TODO
+      case proto::Pass::kTranspose:
+        TransposePass(block, pass.transpose());
         break;
       default:
         break;

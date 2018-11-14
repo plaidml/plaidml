@@ -114,8 +114,8 @@ TEST(Codegen, FuseComplex) {
   IVLOG(2, "Before>\n" << *program);
 
   AliasMap base;
-  AliasMap prog_map(base, *program);
-  AliasMap main_map(prog_map, *main);
+  AliasMap prog_map(base, program.get());
+  AliasMap main_map(prog_map, main.get());
 
   auto k1 = main->SubBlock(0);
   auto k2 = main->SubBlock(1);
@@ -156,8 +156,8 @@ TEST(Codegen, FuseTiled) {
   // IVLOG(2, "Before>\n" << *program);
 
   AliasMap base;
-  AliasMap prog_map(base, *program);
-  AliasMap main_map(prog_map, *main);
+  AliasMap prog_map(base, program.get());
+  AliasMap main_map(prog_map, main.get());
 
   // Get the convolution
   auto k1 = main->SubBlock(0);
@@ -214,8 +214,8 @@ TEST(Codegen, FuseFancy) {
   IVLOG(2, "Before>\n" << *program);
 
   AliasMap base;
-  AliasMap prog_map(base, *program);
-  AliasMap main_map(prog_map, *main);
+  AliasMap prog_map(base, program.get());
+  AliasMap main_map(prog_map, main.get());
 
   // Get the first convolution
   auto k1 = main->SubBlock(0);
@@ -271,8 +271,8 @@ TEST(Codegen, FuseAuto) {
   IVLOG(2, "Before>\n" << *program);
 
   AliasMap base;
-  AliasMap prog_map(base, *program);
-  AliasMap main_map(prog_map, *main);
+  AliasMap prog_map(base, program.get());
+  AliasMap main_map(prog_map, main.get());
 
   AlwaysFuseRecursive afr;
   FusionInner(main_map, main.get(), &afr);
