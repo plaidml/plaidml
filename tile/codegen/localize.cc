@@ -13,8 +13,8 @@ namespace codegen {
 using namespace stripe;  // NOLINT
 
 void FixupRefs(Block* block, const std::string& var_name) {
-  auto ref_it = block->ref_by_into(var_name, false);
-  if (ref_it == block->refs.end()) {
+  auto it = block->ref_by_into(var_name, false);
+  if (it == block->refs.end()) {
     return;
   }
   for (auto stmt : block->stmts) {
@@ -22,10 +22,10 @@ void FixupRefs(Block* block, const std::string& var_name) {
     if (inner) {
       for (auto& ref : inner->refs) {
         if (ref.from == var_name) {
-          ref.location = ref_it->location;
-          ref.offset = ref_it->offset;
+          ref.location = it->location;
+          ref.offset = it->offset;
           for (size_t i = 0; i < ref.shape.dims.size(); i++) {
-            ref.shape.dims[i].stride = ref_it->shape.dims[i].stride;
+            ref.shape.dims[i].stride = it->shape.dims[i].stride;
           }
           FixupRefs(inner.get(), ref.into);
         }
@@ -97,7 +97,7 @@ void LocalizePass(const AliasMap& scope, Block* block) {
       LocalizeRef(inner.get(), name);
     }
     // Now localize block itself
-    AliasMap inner_map(scope, *inner);
+    AliasMap inner_map(scope, inner.get());
     LocalizePass(inner_map, inner.get());
   }
 }

@@ -216,7 +216,7 @@ std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<s
   AliasMap root_map;
 
   std::stack<ToDo> todo;
-  todo.emplace(ToDo{outermost_block, outermost_block->stmts.begin(), AliasMap{root_map, *outermost_block}});
+  todo.emplace(ToDo{outermost_block, outermost_block->stmts.begin(), AliasMap{root_map, outermost_block}});
   add_block_chunks(outermost_block, todo.top().alias_map);
 
   std::unordered_map<stripe::Statement*, StmtInfo> stmt_infos;
@@ -245,7 +245,7 @@ std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<s
       ++it;
       if (recorder.block()) {
         stripe::Block* sub_block = recorder.block();
-        todo.emplace(ToDo{sub_block, sub_block->stmts.begin(), AliasMap{*alias_map, *sub_block}});
+        todo.emplace(ToDo{sub_block, sub_block->stmts.begin(), AliasMap{*alias_map, sub_block}});
         add_block_chunks(sub_block, todo.top().alias_map);
         break;
       }

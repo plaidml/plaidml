@@ -35,10 +35,10 @@ void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const Tags& r
   if (HasTags(*block, reqs)) {
     func(map, block);
   } else {
-    for (const auto& stmt : block->stmts) {
+    for (auto& stmt : block->stmts) {
       auto inner = stripe::Block::Downcast(stmt);
       if (inner) {
-        AliasMap inner_map(map, *inner);
+        AliasMap inner_map(map, inner.get());
         RunOnBlocksRecurse(inner_map, inner.get(), reqs, func);
       }
     }
@@ -48,7 +48,7 @@ void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const Tags& r
 template <typename F>
 void RunOnBlocks(stripe::Block* root, const Tags& reqs, const F& func) {
   AliasMap base;
-  AliasMap root_map(base, *root);
+  AliasMap root_map(base, root);
   RunOnBlocksRecurse(root_map, root, reqs, func);
 }
 

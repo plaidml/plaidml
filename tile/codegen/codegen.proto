@@ -4,7 +4,6 @@ syntax = "proto2";
 
 package vertexai.tile.codegen.proto;
 
-import "google/protobuf/any.proto";
 import "tile/stripe/stripe.proto";
 
 message Config {
@@ -51,8 +50,8 @@ message Pass {
     GenericPass scalarize = 10;
     StencilPass stencil = 11;
     AutotilePass autotile = 12;
-    google.protobuf.Any custom = 13;
-    SchedulePass schedule = 14;
+    SchedulePass schedule = 13;
+    TransposePass transpose = 14;
   }
 }
 
@@ -124,4 +123,9 @@ message AutotilePass {
   required int64 max_input_size = 9;
   required double output_cost = 10;
   required double input_cost = 11;
+}
+
+message TransposePass {
+  repeated string reqs = 1;
+  repeated string alloc_reqs = 2;
 }
