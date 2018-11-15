@@ -101,7 +101,6 @@ class Compiler : private stripe::ConstStmtVisitor {
  private:
   scalar Cast(scalar, DataType);
   llvm::Type* CType(DataType);
-  llvm::Type* CType(const TensorShape&);
   llvm::Value* IndexElement(const buffer& buf);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
@@ -126,8 +125,8 @@ Compiler::Compiler() : context_(llvm::getGlobalContext()), builder_{context_} {
 }
 
 std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& program) {
-  std::cerr << "Compiler::CompileProgram:" << std::endl;
-  std::cerr << program << std::endl << "----------------" << std::endl;
+  // std::cerr << "Compiler::CompileProgram:" << std::endl;
+  // std::cerr << program << std::endl << "----------------" << std::endl;
   module_ = new llvm::Module("stripe", context_);
   llvm::Function* main = CompileBlock(program);
   GenerateInvoker(program, main);
@@ -135,7 +134,7 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
   for (auto& ref : program.refs) {
     param_names.push_back(ref.into);
   }
-  module_->print(llvm::errs(), nullptr);
+  // module_->print(llvm::errs(), nullptr);
   std::unique_ptr<llvm::Module> xfermod(module_);
   module_ = nullptr;
   return std::make_unique<Executable>(std::move(xfermod), param_names);
@@ -177,7 +176,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
     std::vector<llvm::Value*> idxList{index};
     llvm::Value* elptr = builder_.CreateGEP(argvec, idxList);
     llvm::Value* elval = builder_.CreateLoad(elptr);
-    llvm::Type* eltype = CType(program.refs[i].shape)->getPointerTo();
+    llvm::Type* eltype = CType(program.refs[i].shape.type)->getPointerTo();
     args.push_back(builder_.CreateBitCast(elval, eltype));
   }
   // Having built the argument list, we'll call the actual kernel using the
@@ -192,7 +191,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   // create an array of parameter types, one for each buffer
   std::vector<llvm::Type*> param_types;
   for (const auto& ref : block.refs) {
-    param_types.push_back(CType(ref.shape)->getPointerTo());
+    param_types.push_back(CType(ref.shape.type)->getPointerTo());
   }
   // create a type for the function which will contain the block
   llvm::Type* return_type = builder_.getVoidTy();
@@ -368,7 +367,7 @@ void Compiler::Visit(const stripe::Block& block) {
   for (auto& ref : block.refs) {
     std::string name = ref.from.empty() ? ref.into : ref.from;
     llvm::Value* base = buffers_[name].base;
-    llvm::Type* eltype = CType(ref.shape)->getPointerTo();
+    llvm::Type* eltype = CType(ref.shape.type)->getPointerTo();
     args.push_back(builder_.CreateBitCast(base, eltype));
   }
   // Invoke the function
@@ -671,32 +670,22 @@ llvm::Type* Compiler::CType(DataType type) {
   }
 }
 
-llvm::Type* Compiler::CType(const TensorShape& shape) {
-  llvm::Type* type = CType(shape.type);
-  for (auto bound : shape.dims) {
-    type = llvm::ArrayType::get(type, bound.size);
-  }
-  return type;
-}
-
 llvm::Value* Compiler::IndexElement(const buffer& buf) {
   unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
   llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
-  llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
-  std::vector<llvm::Value*> idxList{zero};
-  // Iterate through the source refinement's "access" elements to find
-  // the names of the element indexes. Load the current value of each
-  // index variable and add it to the GEP index list.
-  if (buf.refinement->access.size()) {
-    for (const auto& access : buf.refinement->access) {
-      std::string indexName = access.toString();
-      llvm::Value* indexVar = indexes_[indexName].variable;
-      idxList.push_back(builder_.CreateLoad(indexVar));
-    }
-  } else {
-    // Special case for a one-dimensional, one-element array
-    idxList.push_back(zero);
+  // Ask the source refinement to generate an access path, in the form of
+  // a sequence of indexes to scale and sum. Load each index value, multiply,
+  // and the result is an offset from the buffer base address.
+  auto access = buf.refinement->FlatAccess();
+  llvm::Value* offset = llvm::ConstantInt::get(ssizetype, 0);
+  for (auto& term : access.getMap()) {
+    llvm::Value* indexVar = indexes_[term.first].variable;
+    llvm::Value* indexVal = builder_.CreateLoad(indexVar);
+    llvm::Value* multiplier = llvm::ConstantInt::get(ssizetype, term.second);
+    indexVal = builder_.CreateMul(indexVal, multiplier);
+    offset = builder_.CreateAdd(offset, indexVal);
   }
+  std::vector<llvm::Value*> idxList{offset};
   return builder_.CreateGEP(buf.base, idxList);
 }
 
