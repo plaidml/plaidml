@@ -74,6 +74,10 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Equal(const stripe::Intrinsic&);
   void Unequal(const stripe::Intrinsic&);
   void Conditional(const stripe::Intrinsic&);
+  void And(const stripe::Intrinsic&);
+  void Or(const stripe::Intrinsic&);
+  void Not(const stripe::Intrinsic&);
+  void Xor(const stripe::Intrinsic&);
   void VisitZERO(const stripe::Special&);
   void VisitCOPY(const stripe::Special&);
 
@@ -100,6 +104,7 @@ class Compiler : private stripe::ConstStmtVisitor {
 
  private:
   scalar Cast(scalar, DataType);
+  scalar CheckBool(scalar);
   llvm::Type* CType(DataType);
   llvm::Value* IndexElement(const buffer& buf);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
@@ -337,22 +342,14 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
   // the wrong structure. There are no constants defined for actual intrinsic names; these have
   // been derived experimentally.
   std::map<std::string, std::function<void(void)>> handlers{
-      {"add", [&]() { Add(intrinsic); }},
-      {"sub", [&]() { Subtract(intrinsic); }},
-      {"neg", [&]() { Negate(intrinsic); }},
-      {"mul", [&]() { Multiply(intrinsic); }},
-      {"div", [&]() { Divide(intrinsic); }},
-      {"mod", [&]() { Mod(intrinsic); }},
-      {"lt", [&]() { LessThan(intrinsic); }},
-      {"lte", [&]() { LessThanOrEqualTo(intrinsic); }},
-      {"gt", [&]() { GreaterThan(intrinsic); }},
-      {"gte", [&]() { GreaterThanOrEqualTo(intrinsic); }},
-      {"eq", [&]() { Equal(intrinsic); }},
-      {"neq", [&]() { Unequal(intrinsic); }},
-      //    {"and", [&](){ And(intrinsic); }},
-      //    {"or", [&](){ Or(intrinsic); }},
-      //    {"not", [&](){ Not(intrinsic); }},
-      //    {"xor", [&](){ Xor(intrinsic); }},
+      {"add", [&]() { Add(intrinsic); }},          {"sub", [&]() { Subtract(intrinsic); }},
+      {"neg", [&]() { Negate(intrinsic); }},       {"mul", [&]() { Multiply(intrinsic); }},
+      {"div", [&]() { Divide(intrinsic); }},       {"mod", [&]() { Mod(intrinsic); }},
+      {"lt", [&]() { LessThan(intrinsic); }},      {"lte", [&]() { LessThanOrEqualTo(intrinsic); }},
+      {"gt", [&]() { GreaterThan(intrinsic); }},   {"gte", [&]() { GreaterThanOrEqualTo(intrinsic); }},
+      {"eq", [&]() { Equal(intrinsic); }},         {"neq", [&]() { Unequal(intrinsic); }},
+      {"and", [&]() { And(intrinsic); }},          {"or", [&]() { Or(intrinsic); }},
+      {"not", [&]() { Not(intrinsic); }},          {"xor", [&]() { Xor(intrinsic); }},
       {"cond", [&]() { Conditional(intrinsic); }},
   };
   handlers[intrinsic.name]();
@@ -366,9 +363,7 @@ void Compiler::Visit(const stripe::Block& block) {
   std::vector<llvm::Value*> args;
   for (auto& ref : block.refs) {
     std::string name = ref.from.empty() ? ref.into : ref.from;
-    llvm::Value* base = buffers_[name].base;
-    llvm::Type* eltype = CType(ref.shape.type)->getPointerTo();
-    args.push_back(builder_.CreateBitCast(base, eltype));
+    args.push_back(IndexElement(buffers_[name]));
   }
   // Invoke the function
   builder_.CreateCall(function, args, "");
@@ -608,16 +603,44 @@ void Compiler::Unequal(const stripe::Intrinsic& neq) {
 void Compiler::Conditional(const stripe::Intrinsic& cond) {
   // Three inputs: C, T, F; C is boolean, T and F are operation type
   assert(3 == cond.inputs.size());
-  scalar c = scalars_[cond.inputs[0]];
-  if (DataType::BOOLEAN != c.type) {
-    throw Error("Condition expression is non-boolean: " + to_string(c.type));
-  }
+  scalar c = CheckBool(scalars_[cond.inputs[0]]);
   scalar t = Cast(scalars_[cond.inputs[1]], cond.type);
   scalar f = Cast(scalars_[cond.inputs[2]], cond.type);
   // Single output will be one of T or F
   // Output type is operation type
   llvm::Value* ret = builder_.CreateSelect(c.value, t.value, f.value);
   OutputType(ret, cond);
+}
+
+void Compiler::And(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
+  scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  llvm::Value* ret = builder_.CreateAnd(lhs.value, rhs.value);
+  OutputBool(ret, stmt);
+}
+
+void Compiler::Or(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
+  scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  llvm::Value* ret = builder_.CreateOr(lhs.value, rhs.value);
+  OutputBool(ret, stmt);
+}
+
+void Compiler::Not(const stripe::Intrinsic& stmt) {
+  assert(1 == stmt.inputs.size());
+  scalar op = CheckBool(scalars_[stmt.inputs[0]]);
+  llvm::Value* ret = builder_.CreateNot(op.value);
+  OutputBool(ret, stmt);
+}
+
+void Compiler::Xor(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
+  scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  llvm::Value* ret = builder_.CreateXor(lhs.value, rhs.value);
+  OutputBool(ret, stmt);
 }
 
 void Compiler::VisitZERO(const stripe::Special& zero) {
@@ -640,6 +663,13 @@ Compiler::scalar Compiler::Cast(scalar v, DataType to_type) {
   auto op = llvm::CastInst::getCastOpcode(v.value, from_signed, to_llvmtype, to_signed);
   llvm::Value* ret = builder_.CreateCast(op, v.value, to_llvmtype);
   return scalar{ret, to_type};
+}
+
+Compiler::scalar Compiler::CheckBool(scalar v) {
+  if (v.type == DataType::BOOLEAN) {
+    return v;
+  }
+  throw Error("Expected boolean, actually found " + to_string(v.type));
 }
 
 llvm::Type* Compiler::CType(DataType type) {
