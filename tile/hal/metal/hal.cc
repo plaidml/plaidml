@@ -50,6 +50,7 @@ hal::proto::HardwareInfo Device::GetHardwareInfo() {
 
   info.set_name(std::string("Metal ") + name());
   info.set_vendor("Metal");
+  info.set_platform("Metal");
 
   hal::proto::HardwareSettings* settings = info.mutable_settings();
   settings->set_threads(1);
