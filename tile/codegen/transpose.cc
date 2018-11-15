@@ -38,13 +38,20 @@ void CollectUsage(BufferUsageMap* usages, const Block& block, const AliasMap& ma
           }
         }
       }
-      IVLOG(3, "block: " << block.name                                  //
-                         << ", ref: " << *ref                           //
-                         << ", base_block: " << alias.base_block->name  //
-                         << ", base: " << alias.base_name);
     }
   }
 }
+
+using SizeStridePair = std::pair<uint64_t, int64_t>;
+
+struct CompareSizeStridePair {
+  bool operator()(const SizeStridePair& lhs, const SizeStridePair& rhs) const {
+    if (lhs.first != rhs.first) {
+      return lhs.first > rhs.first;
+    }
+    return lhs.second < rhs.second;
+  }
+};
 
 }  // namespace
 
@@ -54,19 +61,36 @@ void TransposePass(Block* root, const proto::TransposePass& options) {
   BufferUsageMap usages;
   RunOnBlocks(root, reqs, [&](auto map, auto block) { CollectUsage(&usages, *block, map, alloc_reqs); });
   for (auto& item : usages) {
-    std::multimap<uint64_t, size_t, std::greater<uint64_t>> sorted_idxs;
-    auto base_ref = item.second.base_ref;
+    size_t stride_one_idx = 0;
+    uint64_t stride_one_range = 0;
     for (size_t i = 0; i < item.second.shape.size(); i++) {
       auto dim = item.second.shape[i];
-      sorted_idxs.emplace(dim, i);
+      if (dim > stride_one_range) {
+        stride_one_idx = i;
+        stride_one_range = dim;
+      }
     }
-    IVLOG(3, "base: " << item.first                        //
-                      << ", shape: " << item.second.shape  //
-                      << ", sorted_idxs: " << sorted_idxs);
+    auto base_ref = item.second.base_ref;
+    std::multimap<SizeStridePair, size_t, CompareSizeStridePair> idxs_by_size;
+    for (size_t i = 0; i < base_ref->shape.dims.size(); i++) {
+      if (i != stride_one_idx) {
+        auto dim = base_ref->shape.dims[i];
+        idxs_by_size.emplace(std::make_pair(dim.size, dim.stride), i);
+      }
+    }
+    IVLOG(3, "base: " << item.first                                                              //
+                      << ", shape: " << item.second.shape                                        //
+                      << ", stride_one: (" << stride_one_range << ", " << stride_one_idx << ")"  //
+                      << ", idxs_by_size: " << idxs_by_size);
     IVLOG(3, "    old_ref: " << *base_ref);
     // Adjust strides
     int64_t stride = 1;
-    for (const auto& idx : sorted_idxs) {
+    {
+      auto& dim = base_ref->shape.dims[stride_one_idx];
+      dim.stride = stride;
+      stride *= dim.size;
+    }
+    for (const auto& idx : idxs_by_size) {
       auto& dim = base_ref->shape.dims[idx.second];
       dim.stride = stride;
       stride *= dim.size;
