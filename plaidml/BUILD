@@ -192,8 +192,8 @@ genrule(
     name = "configs",
     srcs = select({
         "@toolchain//:macos_x86_64": [
-            "configs/empty.json",
             "configs/macos.json",
+            "configs/macos_experimental.json",
         ],
         "//conditions:default": [
             "configs/config.json",
