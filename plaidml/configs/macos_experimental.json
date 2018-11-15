@@ -41,7 +41,7 @@
                                 }
                             },
                             {
-                                "platform_regex": "OpenCL.*"
+                                "platform_regex": ".*"
                             }
                         ]
                     }
@@ -96,7 +96,7 @@
                                 }
                             },
                             {
-                                "platform_regex": "OpenCL.*"
+                                "platform_regex": ".*"
                             }
                         ]
                     }
