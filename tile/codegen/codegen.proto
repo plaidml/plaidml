@@ -65,7 +65,7 @@ message SchedulePass {
   required uint64 mem_KiB = 3;
   required uint32 alignment = 4;
   required stripe.proto.Location xfer_loc = 5;
-  optional bool allow_out_of_range_accesses = 6 [default = true];
+  optional bool allow_out_of_range_accesses = 6 [default = false];
 }
 
 message MemoryPlacementPass {
