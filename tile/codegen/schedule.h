@@ -10,7 +10,7 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ScheduleBlock(stripe::Block* block, const proto::SchedulePass& options);
+void ScheduleBlock(const AliasMap& alias_map, stripe::Block* block, const proto::SchedulePass& options);
 
 // Schedules the statements within a block.
 //   Creates new refinements at the block's mem_loc for its statements to access.
@@ -19,7 +19,8 @@ void ScheduleBlock(stripe::Block* block, const proto::SchedulePass& options);
 //   Updates the block's statements' dependencies for correctness.
 inline void SchedulePass(stripe::Block* root, const proto::SchedulePass& options) {
   auto reqs = FromProto(options.reqs());
-  RunOnBlocks(root, reqs, [&options](const AliasMap& map, stripe::Block* block) { ScheduleBlock(block, options); });
+  RunOnBlocks(root, reqs,
+              [&options](const AliasMap& map, stripe::Block* block) { ScheduleBlock(map, block, options); });
 }
 
 }  // namespace codegen

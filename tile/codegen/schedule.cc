@@ -7,6 +7,7 @@
 #include <boost/optional.hpp>
 
 #include "base/util/error.h"
+#include "base/util/throw.h"
 #include "tile/codegen/localize.h"
 
 // This code implements a simple single-linear-pass caching memory
@@ -126,6 +127,12 @@ struct RefInfo {
 
   // The index to use for the next CacheEntry for this refinement.
   std::size_t next_cache_entry = 0;
+
+  // The vector of RefInfos that refine the same base refinement.
+  std::vector<RefInfo*>* aliases = nullptr;
+
+  // The AliasInfo for this refinement.
+  const AliasInfo* alias_info = nullptr;
 };
 
 // A range of memory.
@@ -284,13 +291,13 @@ using PlacementPlan = std::unordered_map<std::string, Placement>;
 // The scheduler class itself.
 class Scheduler {
  public:
-  static void Schedule(stripe::Block* block, const proto::SchedulePass& options) { Scheduler{block, options}.Run(); }
+  static void Schedule(const AliasMap& alias_map, stripe::Block* block, const proto::SchedulePass& options);
 
  private:
   // Builds a map for looking up RefInfos for a given block access.
   static std::unordered_map<std::string, RefInfo> BuildRefInfoMap(stripe::Block* block);
 
-  Scheduler(stripe::Block* block, const proto::SchedulePass& options);
+  Scheduler(const AliasMap* alias_map, stripe::Block* block, const proto::SchedulePass& options);
 
   // Runs the scheduler over its block.
   void Run();
@@ -353,15 +360,15 @@ class Scheduler {
 
   // Schedules a swap-out operation:
   // * Adds a swap-out block just before the supplied iterator,
-  // * Gives the source ref's swap-in readers a dependency on the swap-out block,
-  // * Clears the source ref's swap-in readers,
+  // * Gives the swap-in readers a dependency on the swap-out block,
   // * Sets the saw_final_write flag in the source ref, and
   // * Returns the iterator to the new block, so that it can be added as a
   //   dependency to all previously-scheduled writers of overlapping memory.
   //
   // If the swap-out block should have a dependency on something, it's
   // up to the caller to add it.
-  stripe::StatementIt AddSwapOut(stripe::StatementIt si, CacheEntry* ent);
+  stripe::StatementIt AddSwapOut(stripe::StatementIt si, CacheEntry* ent,
+                                 const std::unordered_set<stripe::Statement*>& swap_in_readers);
 
   // Rewrites the supplied Statement according to the Plan.
   void RewriteRefs(stripe::Statement* stmt, const PlacementPlan& plan);
@@ -370,6 +377,7 @@ class Scheduler {
   // deps computed directly by scheduling are conservative.
   void RebuildTransitiveDeps();
 
+  const AliasMap* alias_map_;
   stripe::Block* block_;
   stripe::Location mem_loc_;
   std::size_t mem_bytes_;
@@ -377,6 +385,7 @@ class Scheduler {
   stripe::Location xfer_loc_;
   bool allow_out_of_range_accesses_;
   std::unordered_map<std::string, RefInfo> ri_map_;
+  std::unordered_map<stripe::Refinement*, std::vector<RefInfo*>> base_ref_aliases_;
 
   // A list of all of the CacheEntries we create during Run().  These
   // will be converted into Refinements at the end of scheduling.
@@ -402,6 +411,10 @@ class Scheduler {
   std::list<CacheEntry*> active_entries_;
 };
 
+void Scheduler::Schedule(const AliasMap& alias_map, stripe::Block* block, const proto::SchedulePass& options) {
+  Scheduler{&alias_map, block, options}.Run();
+}
+
 std::unordered_map<std::string, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block) {
   std::unordered_map<std::string, RefInfo> ri_map;
   for (auto& ref : block->refs) {
@@ -410,14 +423,23 @@ std::unordered_map<std::string, RefInfo> Scheduler::BuildRefInfoMap(stripe::Bloc
   return ri_map;
 }
 
-Scheduler::Scheduler(stripe::Block* block, const proto::SchedulePass& options)
-    : block_{block},
+Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const proto::SchedulePass& options)
+    : alias_map_{alias_map},
+      block_{block},
       mem_loc_(stripe::FromProto(options.mem_loc())),
       mem_bytes_{options.mem_kib() * 1024},
       alignment_{options.alignment() ? options.alignment() : kDefaultAlignment},
       xfer_loc_(stripe::FromProto(options.xfer_loc())),
       allow_out_of_range_accesses_{options.allow_out_of_range_accesses()},
-      ri_map_{BuildRefInfoMap(block)} {}
+      ri_map_{BuildRefInfoMap(block)} {
+  for (auto& name_ref : ri_map_) {
+    RefInfo* ri = &name_ref.second;
+    ri->alias_info = &alias_map_->at(ri->ref.into);
+    std::vector<RefInfo*>* aliases = &base_ref_aliases_[ri->alias_info->base_ref];
+    aliases->emplace_back(ri);
+    ri->aliases = aliases;
+  }
+}
 
 void Scheduler::Run() {
   // The main scheduling loop.
@@ -428,11 +450,47 @@ void Scheduler::Run() {
   //      than in the normal loop continuation statement (which
   //      happens before the condition check).
   for (stripe::StatementIt si = block_->stmts.end(); si != block_->stmts.begin();) {
+    auto si_next = si;
     --si;
 
     IVLOG(3, "Scheduling " << si->get());
 
-    // First, figure out where we're going to put any newly-created CacheEntries.
+    // Add swap-ins for any existing CacheEntries that are invalidated
+    // by scheduling this statement.
+    std::unordered_map<RefInfo*, std::unordered_set<stripe::Statement*>> ri_writer_swap_in_readers;
+    {
+      std::list<RefInfo*> ris_whose_swap_in_readers_should_be_cleared;
+      for (const auto& output : (*si)->buffer_writes()) {
+        RefInfo* ri = &ri_map_.at(output);
+        auto* ri_writer_swap_in_readers_set = &ri_writer_swap_in_readers[ri];
+        for (RefInfo* alias_ri : *ri->aliases) {
+          if ((alias_ri == ri) || AliasInfo::Compare(*ri->alias_info, *alias_ri->alias_info) != AliasType::None) {
+            // All accesses to alias_ri will depend on this write.
+            if ((alias_ri != ri) && alias_ri->cache_entry) {
+              si_next = AddSwapIn(si_next, alias_ri->cache_entry);
+              alias_ri->cache_entry = nullptr;
+            }
+
+            // Copy all current swap-in readers -- note that this
+            // includes the current RefInfo's swap-in-readers.
+            for (stripe::Statement* swap_in_reader : alias_ri->swap_in_readers) {
+              ri_writer_swap_in_readers_set->emplace(swap_in_reader);
+            }
+            // Later, clear the ri's swap-in readers.  Note that we
+            // actually do the clearing after processing all of the
+            // statement's outputs, so that we correctly handle
+            // multiple outputs that happen to address different parts
+            // of an underlying base refinement.
+            ris_whose_swap_in_readers_should_be_cleared.emplace_back(alias_ri);
+          }
+        }
+      }
+      for (auto* ri : ris_whose_swap_in_readers_should_be_cleared) {
+        ri->swap_in_readers.clear();
+      }
+    }
+
+    // Figure out where we're going to put any newly-created CacheEntries.
     PlacementPlan plan = MakePlacementPlan(si->get());
 
     // For each input in the plan:
@@ -500,7 +558,7 @@ void Scheduler::Run() {
       IVLOG(3, "Applying placement for " << name_placement.first);
       auto& placement = name_placement.second;
       if (!allow_out_of_range_accesses_ && mem_bytes_ < placement.range.end) {
-        throw error::ResourceExhausted{"Program requires more memory than is available"};
+        throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available"});
       }
       CacheEntry* ent = placement.entry;
       bool is_new_entry = (ent == nullptr);
@@ -537,14 +595,14 @@ void Scheduler::Run() {
       stripe::StatementIt reuse_dep = si;
 
       if (IsWriteDir(placement.dir) && ((IsWriteDir(placement.source->ref.dir) && !placement.source->saw_final_write) ||
-                                        !placement.source->swap_in_readers.empty())) {
+                                        !ri_writer_swap_in_readers[placement.source].empty())) {
         IVLOG(3, "  Adding swap-out for " << ent->name << " at " << ent->range);
         IVLOG(3, "    IsWriteDir(): " << IsWriteDir(placement.source->ref.dir));
         IVLOG(3, "    SawFinalWrite(): " << placement.source->saw_final_write);
         IVLOG(3, "    Swap-in-readers.empty(): " << placement.source->swap_in_readers.empty());
         auto next_si = si;
         ++next_si;
-        reuse_dep = AddSwapOut(next_si, ent);
+        reuse_dep = AddSwapOut(next_si, ent, ri_writer_swap_in_readers[placement.source]);
         (*reuse_dep)->deps.emplace_back(si);
       }
 
@@ -879,7 +937,8 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
   return swap_in_it;
 }
 
-stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* ent) {
+stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* ent,
+                                          const std::unordered_set<stripe::Statement*>& swap_in_readers) {
   stripe::Block swap_block;
   ent->source->used = true;
   swap_block.name = "swap_out_" + ent->name;
@@ -911,10 +970,9 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
   swap_block.stmts.push_back(std::make_shared<stripe::Store>("$X", "dst"));
 
   stripe::StatementIt swap_out_it = block_->stmts.emplace(si, std::make_shared<stripe::Block>(std::move(swap_block)));
-  for (stripe::Statement* reader : ent->source->swap_in_readers) {
+  for (stripe::Statement* reader : swap_in_readers) {
     reader->deps.emplace_back(swap_out_it);
   }
-  ent->source->swap_in_readers.clear();
   ent->source->saw_final_write = true;
   return swap_out_it;
 }
@@ -959,7 +1017,9 @@ void Scheduler::RebuildTransitiveDeps() {
 
 }  // namespace
 
-void ScheduleBlock(stripe::Block* block, const proto::SchedulePass& options) { Scheduler::Schedule(block, options); }
+void ScheduleBlock(const AliasMap& alias_map, stripe::Block* block, const proto::SchedulePass& options) {
+  Scheduler::Schedule(alias_map, block, options);
+}
 
 }  // namespace codegen
 }  // namespace tile
