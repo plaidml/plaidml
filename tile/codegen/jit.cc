@@ -79,8 +79,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Or(const stripe::Intrinsic&);
   void Not(const stripe::Intrinsic&);
   void Xor(const stripe::Intrinsic&);
-  void VisitZERO(const stripe::Special&);
-  void VisitCOPY(const stripe::Special&);
+  void Zero(const stripe::Special&);
+  void Copy(const stripe::Special&);
 
   struct scalar {
     llvm::Value* value = nullptr;
@@ -209,6 +209,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   // Generate a function implementing the body of this block.
   // Buffers (refinements) will be passed in as function parameters.
+
   // create an array of parameter types, one for each buffer
   std::vector<llvm::Type*> param_types;
   for (const auto& ref : block.refs) {
@@ -224,6 +225,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   // create a basic block; configure the builder to start there
   auto bb = llvm::BasicBlock::Create(context_, "entry", function);
   builder_.SetInsertPoint(bb);
+
   // associate parameter values with buffer names
   for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
     unsigned idx = ai->getArgNo();
@@ -231,6 +233,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     ai->setName(param_name);
     buffers_[param_name] = buffer{&(*ai), &block.refs[idx]};
   }
+
   // allocate storage for each loop index
   unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
   llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
@@ -239,6 +242,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     variable->setName(idx.name);
     indexes_[idx.name] = index{variable};
   }
+
   // generate the basic blocks for each nested loop's evaluation stages
   std::vector<loop> loops;
   for (auto& idx : block.idxs) {
@@ -249,6 +253,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     auto done = llvm::BasicBlock::Create(context_, "done_" + name, function);
     loops.push_back({init, test, body, done});
   }
+
   // initialize each loop index and generate the termination check
   llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
   for (size_t i = 0; i < block.idxs.size(); ++i) {
@@ -282,7 +287,6 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     builder_.SetInsertPoint(loops[i].done);
   }
 
-  // advance the indexes and repeat if necessary
   builder_.CreateRetVoid();
   return function;
 }
@@ -344,11 +348,11 @@ void Compiler::Visit(const stripe::Constant& constant) {
 }
 
 void Compiler::Visit(const stripe::Special& special) {
-  std::map<std::string, std::function<void(void)>> handlers{
-      {"zero", [&]() { VisitZERO(special); }},
-      {"copy", [&]() { VisitCOPY(special); }},
+  static std::map<std::string, std::function<void(Compiler*, const stripe::Special&)>> handlers{
+      {"zero", &Compiler::Zero},
+      {"copy", &Compiler::Copy},
   };
-  handlers[special.name]();
+  handlers[special.name](this, special);
 }
 
 void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
@@ -357,18 +361,18 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
   // they are actually values for stripe::Refinement::agg_op. Not sure why they are located in
   // the wrong structure. There are no constants defined for actual intrinsic names; these have
   // been derived experimentally.
-  std::map<std::string, std::function<void(void)>> handlers{
-      {"add", [&]() { Add(intrinsic); }},          {"sub", [&]() { Subtract(intrinsic); }},
-      {"neg", [&]() { Negate(intrinsic); }},       {"mul", [&]() { Multiply(intrinsic); }},
-      {"div", [&]() { Divide(intrinsic); }},       {"mod", [&]() { Mod(intrinsic); }},
-      {"lt", [&]() { LessThan(intrinsic); }},      {"lte", [&]() { LessThanOrEqualTo(intrinsic); }},
-      {"gt", [&]() { GreaterThan(intrinsic); }},   {"gte", [&]() { GreaterThanOrEqualTo(intrinsic); }},
-      {"eq", [&]() { Equal(intrinsic); }},         {"neq", [&]() { Unequal(intrinsic); }},
-      {"and", [&]() { And(intrinsic); }},          {"or", [&]() { Or(intrinsic); }},
-      {"not", [&]() { Not(intrinsic); }},          {"xor", [&]() { Xor(intrinsic); }},
-      {"cond", [&]() { Conditional(intrinsic); }},
+  static std::map<std::string, std::function<void(Compiler*, const stripe::Intrinsic&)>> handlers{
+      {"add", &Compiler::Add},          {"sub", &Compiler::Subtract},
+      {"neg", &Compiler::Negate},       {"mul", &Compiler::Multiply},
+      {"div", &Compiler::Divide},       {"mod", &Compiler::Mod},
+      {"lt", &Compiler::LessThan},      {"lte", &Compiler::LessThanOrEqualTo},
+      {"gt", &Compiler::GreaterThan},   {"gte", &Compiler::GreaterThanOrEqualTo},
+      {"eq", &Compiler::Equal},         {"neq", &Compiler::Unequal},
+      {"and", &Compiler::And},          {"or", &Compiler::Or},
+      {"not", &Compiler::Not},          {"xor", &Compiler::Xor},
+      {"cond", &Compiler::Conditional},
   };
-  handlers[intrinsic.name]();
+  handlers[intrinsic.name](this, intrinsic);
 }
 
 void Compiler::Visit(const stripe::Block& block) {
@@ -659,12 +663,12 @@ void Compiler::Xor(const stripe::Intrinsic& stmt) {
   OutputBool(ret, stmt);
 }
 
-void Compiler::VisitZERO(const stripe::Special& zero) {
+void Compiler::Zero(const stripe::Special& zero) {
   // present in stripe.proto but not defined in the specification
   throw Error("Special operation ZERO is not yet specified");
 }
 
-void Compiler::VisitCOPY(const stripe::Special& copy) {
+void Compiler::Copy(const stripe::Special& copy) {
   // present in stripe.proto but not defined in the specification
   throw Error("Special operation COPY is not yet specified");
 }
