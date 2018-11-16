@@ -6,6 +6,7 @@
 
 #include <boost/optional.hpp>
 
+#include "base/util/error.h"
 #include "tile/codegen/localize.h"
 
 // This code implements a simple single-linear-pass caching memory
@@ -374,6 +375,7 @@ class Scheduler {
   std::size_t mem_bytes_;
   std::size_t alignment_;
   stripe::Location xfer_loc_;
+  bool allow_out_of_range_accesses_;
   std::unordered_map<std::string, RefInfo> ri_map_;
 
   // A list of all of the CacheEntries we create during Run().  These
@@ -414,6 +416,7 @@ Scheduler::Scheduler(stripe::Block* block, const proto::SchedulePass& options)
       mem_bytes_{options.mem_kib() * 1024},
       alignment_{options.alignment() ? options.alignment() : kDefaultAlignment},
       xfer_loc_(stripe::FromProto(options.xfer_loc())),
+      allow_out_of_range_accesses_{options.allow_out_of_range_accesses()},
       ri_map_{BuildRefInfoMap(block)} {}
 
 void Scheduler::Run() {
@@ -496,6 +499,9 @@ void Scheduler::Run() {
     for (auto& name_placement : plan) {
       IVLOG(3, "Applying placement for " << name_placement.first);
       auto& placement = name_placement.second;
+      if (!allow_out_of_range_accesses_ && mem_bytes_ < placement.range.end) {
+        throw error::ResourceExhausted{"Program requires more memory than is available"};
+      }
       CacheEntry* ent = placement.entry;
       bool is_new_entry = (ent == nullptr);
       IVLOG(3, "  IsNewEntry: " << is_new_entry);
