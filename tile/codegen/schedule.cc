@@ -130,20 +130,18 @@ struct RefInfo {
 // A range of memory.
 struct MemRange {
   MemRange() {}
-  MemRange(std::size_t offset_, std::size_t size_) : offset{offset_}, size{size_} {}
+  MemRange(std::size_t begin_, std::size_t end_) : begin{begin_}, end{end_} {}
 
-  std::size_t offset = 0;
-  std::size_t size = 0;
+  std::size_t begin = 0;
+  std::size_t end = 0;
+
+  std::size_t size() const { return end - begin; }
 };
 
-std::ostream& operator<<(std::ostream& o, MemRange mr) {
-  return o << "[" << mr.offset << " - " << mr.offset + mr.size << ")";
-}
+std::ostream& operator<<(std::ostream& o, MemRange mr) { return o << "[" << mr.begin << " - " << mr.end << ")"; }
 
 // Returns true iff the supplied ranges overlap.
-bool RangesOverlap(MemRange a, MemRange b) {
-  return ((a.offset < (b.offset + b.size)) && (b.offset < (a.offset + a.size)));
-}
+bool RangesOverlap(MemRange a, MemRange b) { return (a.begin < b.end) && (b.begin < a.end); }
 
 // Returns true iff the supplied range overlaps any of the ranges in the range list.
 bool RangesOverlap(MemRange range, const std::list<MemRange>& range_list) {
@@ -161,26 +159,32 @@ void SubtractRange(MemRange sub, std::list<MemRange>* range_list, std::list<MemR
   auto& range = *it;
 
   // So there are four cases here:
-  if (sub.offset <= (range.offset + range.size)) {
-    if (sub.offset + sub.size < range.offset + range.size) {
-      // The range we're subtracting is taking a chunk off the low end of the current range.
-      range.offset = sub.offset + sub.size;
+  if (sub.begin <= range.begin) {
+    // The range we're subtracting begins at or before the begin of the current range.
+    if (sub.end < range.end) {
+      // The range we're subtracting is taking a chunk off the low side of the current range.
+      range.begin = sub.end;
     } else {
       // The range we're subtracting completely covers the current range.
       range_list->erase(it);
     }
-  } else if (range.offset + range.size < sub.offset + sub.size) {
-    // The range we're subtracting is taking a chunk off the high end of the current range.
-    range.size = sub.offset - range.offset;
+  } else if (range.end < sub.end) {
+    // The range we're subtracting ends after the end of the current range.
+    // Since the range we're subtracting begins after the begin of the current range,
+    // we're subtracting a chunk off the high side of the current range.
+    range.end = sub.begin;
   } else {
     // The range we're subtracting splits the current range.
-    range_list->emplace_front(MemRange{range.offset, sub.offset - range.offset});
-    range.offset = sub.offset + sub.size;
+    // We emplace a new entry for the low part of the current range, and adjust
+    // the current range to be the high part of the current range.
+    range_list->emplace_front(MemRange{range.begin, sub.begin});
+    range.begin = sub.end;
   }
 }
 
 // Subtracts a range from a list of ranges.
 void SubtractRange(MemRange sub, std::list<MemRange>* range_list) {
+  IVLOG(3, "        Subtracting range " << sub << " from: " << *range_list);
   for (auto it = range_list->begin(); it != range_list->end();) {
     auto cit = it;
     ++it;
@@ -190,6 +194,7 @@ void SubtractRange(MemRange sub, std::list<MemRange>* range_list) {
 
     SubtractRange(sub, range_list, cit);
   }
+  IVLOG(3, "        Ranges are now " << *range_list);
 }
 
 // CacheEntry represents one particular local instantiation of a
@@ -588,7 +593,7 @@ void Scheduler::Run() {
 
     IVLOG(3, "Splicing into active_entries_");
     active_entries_.splice(active_entries_.begin(), added_entries);
-    active_entries_.sort([](CacheEntry* lhs, CacheEntry* rhs) { return lhs->range.offset < rhs->range.offset; });
+    active_entries_.sort([](CacheEntry* lhs, CacheEntry* rhs) { return lhs->range.begin < rhs->range.begin; });
 
     if (VLOG_IS_ON(3)) {
       IVLOG(3, "active_entries_ now contains:");
@@ -634,7 +639,7 @@ void Scheduler::Run() {
     ref->shape = ent.source->cache_shape;
     ref->location = mem_loc_;
     ref->is_const = false;
-    ref->offset = ent.range.offset;
+    ref->offset = ent.range.begin;
   }
 
   // Move used Refinements back into the block.
@@ -729,24 +734,27 @@ bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, stripe::Statement* stmt,
   // For each todo in largest->smallest size, determine a placement.
   // For each one, we want to pick the smallest free range that is
   // still big enough to hold the todo.
+  IVLOG(3, "    Looking for placements");
   for (auto todo : todos) {
+    IVLOG(3, "      Finding placement for " << todo.first->ref.into << ", size=" << todo.first->size);
     std::list<MemRange>::iterator best_so_far = ranges.end();
     std::size_t best_waste_so_far = mem_bytes_;
     for (auto rit = ranges.begin(); rit != ranges.end(); ++rit) {
-      if (rit->size < todo.first->size) {
+      if (rit->size() < todo.first->size) {
         continue;
       }
-      std::size_t waste = rit->size - todo.first->size;
+      std::size_t waste = rit->size() - todo.first->size;
       if (best_waste_so_far <= waste) {
         continue;
       }
+      IVLOG(3, "        Range " << *rit << " is the best so far");
       best_so_far = rit;
       best_waste_so_far = waste;
     }
     if (best_so_far == ranges.end()) {
       return false;
     }
-    auto assigned_range = MemRange{best_so_far->offset, todo.first->size};
+    auto assigned_range = MemRange{best_so_far->begin, best_so_far->begin + todo.first->size};
     SubtractRange(assigned_range, &ranges, best_so_far);
     plan->emplace(todo.first->ref.into, Placement{todo.first, todo.second, assigned_range, nullptr});
   }
@@ -781,9 +789,13 @@ bool Scheduler::TryMakePlanWithSwaps(PlacementPlan* plan, stripe::Statement* stm
   // is available as long as its RefInfo is not already in the plan
   // (because RefInfos that are in the plan are required by the
   // current statement).
+  IVLOG(3, "    Attempting plan with swaps");
   std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
   for (auto* ent : active_entries_) {
+    IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " writer=" << ent->writer
+                                << " plan.count=" << plan->count(ent->source->ref.into));
     if (plan->count(ent->source->ref.into)) {
+      IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
       SubtractRange(ent->range, &ranges);
     }
   }
@@ -800,8 +812,8 @@ PlacementPlan Scheduler::MakeFallbackPlan(stripe::Statement* stmt) {
     auto it_inserted = plan.emplace(name, Placement{ri, dir});
     if (it_inserted.second) {
       // A new Placement.
-      it_inserted.first->second.range.offset = offset;
-      it_inserted.first->second.range.size = ri->size;
+      it_inserted.first->second.range.begin = offset;
+      it_inserted.first->second.range.end = offset + ri->size;
       offset += RoundUp(ri->size, alignment_);
     } else {
       // An existing Placement.
