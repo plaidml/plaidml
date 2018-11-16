@@ -45,8 +45,10 @@ class StripeGenerator {
           ProcessContraction(main.get(), op);
           break;
         case Op::FUNCTION:
-          if (op.f.is_special() || op.f.fn == "reshape") {
+          if (op.f.is_special()) {
             ProcessSpecial(main.get(), op);
+          } else if (op.f.fn == "reshape") {
+            ProcessReshape(main.get(), op);
           } else {
             ProcessElementwise(main.get(), op);
           }
@@ -366,6 +368,15 @@ class StripeGenerator {
     stmt->name = op.f.fn;
     stmt->params = op.f.params;
     stmt->inputs = op.inputs;
+    stmt->outputs = {op.output};
+    main->stmts.push_back(stmt);
+  }
+
+  void ProcessReshape(Block* main, const Op& op) {
+    auto stmt = std::make_shared<Special>();
+    stmt->name = op.f.fn;
+    stmt->params = op.f.params;
+    stmt->inputs = std::vector<std::string>{op.inputs[0]};
     stmt->outputs = {op.output};
     main->stmts.push_back(stmt);
   }
