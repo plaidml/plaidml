@@ -714,6 +714,13 @@ void Scheduler::Run() {
   }
 
   RebuildTransitiveDeps();
+
+  // Refinement order doesn't matter -- so sort the refinements by
+  // their "into" field (which all refinements have), to simplify
+  // testing.
+  std::sort(block_->refs.begin(), block_->refs.end(), [](const stripe::Refinement& lhs, const stripe::Refinement& rhs) {
+    return std::less<std::string>{}(lhs.into, rhs.into);
+  });
 }
 
 std::tuple<PlacementPlan, std::vector<std::pair<RefInfo*, stripe::RefDir>>> Scheduler::GatherPlacementState(
@@ -755,12 +762,13 @@ std::tuple<PlacementPlan, std::vector<std::pair<RefInfo*, stripe::RefDir>>> Sche
     add(input, stripe::RefDir::In);
   }
 
-  // Organize the placements to be made, largest-first.
+  // Organize the placements to be made, largest-first, using the
+  // underlying refinement 'into' name as the tiebreaker.
   std::vector<std::pair<RefInfo*, stripe::RefDir>> todos;
   todos.insert(todos.end(), todo_map.begin(), todo_map.end());
   std::sort(todos.begin(), todos.end(),
             [](std::pair<RefInfo*, stripe::RefDir> lhs, std::pair<RefInfo*, stripe::RefDir> rhs) {
-              return lhs.first->size >= rhs.first->size;
+              return std::tie(rhs.first->size, rhs.first->ref.into) < std::tie(lhs.first->size, lhs.first->ref.into);
             });
 
   return std::make_tuple(std::move(plan), std::move(todos));
@@ -914,14 +922,14 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
   });
 
   swap_block.refs.push_back(stripe::Refinement{
-      stripe::RefDir::Out,       // dir
-      ent->name,                 // from
-      "dst",                     // into
-      ent->source->swap_access,  // access
-      ent->source->cache_shape,  // shape
-      "",                        // agg_op
-      mem_loc_,                  // location
-      false                      // is_const
+      stripe::RefDir::Out,            // dir
+      ent->name,                      // from
+      "dst",                          // into
+      ent->source->swap_access,       // access
+      ent->source->cache_swap_shape,  // shape
+      "",                             // agg_op
+      mem_loc_,                       // location
+      false                           // is_const
   });
 
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
@@ -945,14 +953,14 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
   swap_block.refs.push_back(stripe::Refinement{
-      stripe::RefDir::In,        // dir
-      ent->name,                 // from
-      "src",                     // into
-      ent->source->swap_access,  // access
-      ent->source->cache_shape,  // shape
-      "",                        // agg_op
-      mem_loc_,                  // location
-      true,                      // is_const
+      stripe::RefDir::In,             // dir
+      ent->name,                      // from
+      "src",                          // into
+      ent->source->swap_access,       // access
+      ent->source->cache_swap_shape,  // shape
+      "",                             // agg_op
+      mem_loc_,                       // location
+      true,                           // is_const
   });
 
   swap_block.refs.push_back(stripe::Refinement{
