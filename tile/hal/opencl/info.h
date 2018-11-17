@@ -104,6 +104,10 @@ struct CLDeviceInfo<Param, std::vector<T>> {
 
 // Specialize to associate IDs to their corresponding type information.
 
+// This pragma is to ignore warnings (treated as errors due to -Werror) on gcc 6
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+
 template <cl_platform_info Param>
 struct CLInfoType;
 
@@ -376,6 +380,8 @@ struct CLInfoType<CL_DEVICE_LOCAL_MEM_SIZE_PER_COMPUTE_UNIT_AMD>
 template <>
 struct CLInfoType<CL_DEVICE_LOCAL_MEM_BANKS_AMD> : CLDeviceInfo<CL_DEVICE_LOCAL_MEM_BANKS_AMD, cl_uint> {};
 #endif
+
+#pragma GCC diagnostic pop
 
 // Define a function to read the CL information.
 
