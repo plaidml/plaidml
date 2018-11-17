@@ -349,16 +349,18 @@ std::vector<const Refinement*> Block::ref_outs() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const Index& idx) {
-  os << idx.name << ":" << idx.range;
-  if (idx.factor != 0) {
-    os << ":" << idx.factor << "*" << idx.from;
+  os << idx.name;
+  if (idx.affine.constant() || !idx.affine.getMap().empty()) {
+    os << " = " << idx.affine.toString();
+  } else {
+    os << ":" << idx.range;
   }
   return os;
 }
 
 bool operator==(const Index& lhs, const Index& rhs) {
-  return std::tie(lhs.name, lhs.range, lhs.factor) ==  //
-         std::tie(rhs.name, rhs.range, rhs.factor);
+  return std::tie(lhs.name, lhs.range, lhs.affine) ==  //
+         std::tie(rhs.name, rhs.range, rhs.affine);
 }
 
 bool operator==(const Location& lhs, const Location& rhs) {
@@ -409,9 +411,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
   for (const auto& pb_idx : block.idxs()) {
     ret->idxs.emplace_back(Index{
         pb_idx.name(),   //
-        pb_idx.from(),   //
         pb_idx.range(),  //
-        pb_idx.factor()  //
     });
   }
   for (const auto& pb_con : block.constraints()) {
@@ -531,7 +531,6 @@ proto::Block IntoProto(const Block& block) {
     auto pb_idx = ret.add_idxs();
     pb_idx->set_name(idx.name);
     pb_idx->set_range(idx.range);
-    pb_idx->set_factor(idx.factor);
   }
   for (const auto& con : block.constraints) {
     *ret.add_constraints() = IntoProto(con);
@@ -702,15 +701,30 @@ std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& na
   return it;
 }
 
-std::string Block::unique_ref_name(const std::string& in) {
-  if (ref_by_into(in, false) == refs.end()) {
-    return in;
+std::string Block::unique_ref_name(const std::string& into) {
+  if (ref_by_into(into, false) == refs.end()) {
+    return into;
   }
   size_t i = 0;
   while (true) {
-    std::string name = in + "_" + std::to_string(i++);
+    auto name = printstring("%s_%zu", into.c_str(), i++);
     if (ref_by_into(name, false) == refs.end()) {
       return name;
+    }
+  }
+  // Unreachable
+  return "";
+}
+
+std::string Block::unique_idx_name(const std::string& name) {
+  if (!idx_by_name(name)) {
+    return name;
+  }
+  size_t i = 0;
+  while (true) {
+    auto new_name = printstring("%s_%zu", name.c_str(), i++);
+    if (!idx_by_name(new_name)) {
+      return new_name;
     }
   }
   // Unreachable

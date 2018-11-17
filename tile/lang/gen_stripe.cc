@@ -186,7 +186,7 @@ class StripeGenerator {
       if (range == 1) {
         continue;
       }
-      kernel->idxs.emplace_back(Index{kvp.first, "", range, 0});
+      kernel->idxs.emplace_back(Index{kvp.first, range});
     }
     for (const auto& constraint : simple_cons) {
       auto lhs = Integerize(constraint.poly, bounds);  // lhs <= rhs;
@@ -269,11 +269,9 @@ class StripeGenerator {
     auto out_shape = GetShape(op.output);
     std::vector<Affine> out_access;
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
-      auto idx = Index{
+      Index idx{
           printstring("i%zu", i + 1),  // name
-          "",                          // from
           out_shape.dims[i].size,      // range
-          0                            // factor
       };
       if (out_shape.dims[i].size > 1) {
         out_access.emplace_back(Affine{idx.name});

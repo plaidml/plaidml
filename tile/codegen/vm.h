@@ -12,14 +12,9 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-using Buffer = std::vector<uint8_t>;
+using Buffer = std::vector<float>;
 
-struct Program {
-  stripe::Block program;
-  std::map<std::string, Buffer> buffers;
-};
-
-void ExecuteProgram(const stripe::Block& program, std::map<std::string, std::vector<float>>* buffers);
+void ExecuteProgram(const stripe::Block& program, std::map<std::string, Buffer>* buffers);
 
 }  // namespace codegen
 }  // namespace tile

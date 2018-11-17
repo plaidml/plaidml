@@ -7,6 +7,7 @@
 #include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
+#include "tile/lib/lib.h"
 #include "tile/stripe/stripe.h"
 
 using ::testing::ContainerEq;
@@ -24,40 +25,6 @@ T ParseProtoJson(const std::string& str) {
   T proto;
   google::protobuf::util::JsonStringToMessage(str, &proto);
   return proto;
-}
-
-lang::RunInfo LoadMatMul(size_t dim) {
-  lang::RunInfo runinfo;
-  runinfo.program_name = "matmul";
-  runinfo.code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
-  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {dim, dim}));
-  runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {dim, dim}));
-  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {dim, dim}));
-  return runinfo;
-}
-
-lang::RunInfo LoadConv1D(size_t n, size_t x, size_t c, size_t k) {
-  lang::RunInfo runinfo;
-  runinfo.program_name = "conv1d";
-  runinfo.code = R"(function (I[N, X, CI], K[KX, CI, CO]) -> (O) {
-    O[n, x, co : N, X - KX + 1, CO] = +(I[n, x + k, ci] * K[k, ci, co]);
-})";
-  runinfo.input_shapes.emplace("I", SimpleShape(DataType::FLOAT32, {n, x, c}));
-  runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {k, c, c}));
-  runinfo.output_shapes.emplace("O", SimpleShape(DataType::FLOAT32, {n, x - k + 1, c}));
-  return runinfo;
-}
-
-lang::RunInfo LoadConv2D(size_t n, size_t x, size_t c, size_t k) {
-  lang::RunInfo runinfo;
-  runinfo.program_name = "conv2d";
-  runinfo.code = R"(function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
-    O[n, x, y, co : N, X - KX + 1, Y - KY + 1, CO] = +(I[n, x + kx, y + ky, ci] * K[kx, ky, ci, co]);
-})";
-  runinfo.input_shapes.emplace("I", SimpleShape(DataType::FLOAT32, {n, x, x, c}));
-  runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {k, k, c, c}));
-  runinfo.output_shapes.emplace("O", SimpleShape(DataType::FLOAT32, {n, x - k + 1, x - k + 1, c}));
-  return runinfo;
 }
 
 }  // namespace
@@ -98,13 +65,16 @@ TEST(Codegen, ApplyTile) {
       9,  18, 27,  9,  18,  //
   };
 
-  auto runinfo = LoadMatMul(sqrt(expected.size()));
+  size_t dim = sqrt(expected.size());
+  auto runinfo = lib::LoadMatMul("matmul",                                    //
+                                 SimpleShape(DataType::FLOAT32, {dim, dim}),  //
+                                 SimpleShape(DataType::FLOAT32, {dim, dim}));
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
 
   IVLOG(2, "Before>\n" << *program);
 
-  ExecuteProgram(*main, &data);
+  ExecuteProgram(*program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -116,16 +86,18 @@ TEST(Codegen, ApplyTile) {
   }
 
   auto kernel = main->SubBlock(0);
-  ApplyTile(kernel.get(), {5, 4, 4});
+  ApplyTile(kernel.get(), {5, 2, 2});
   auto inner = kernel->SubBlock(0);
   inner->name = "inner";
-  ApplyTile(inner.get(), {5, 2, 2});
+  ApplyTile(inner.get(), {5, 3, 2, 1, 1});
   auto innermost = inner->SubBlock(0);
   innermost->name = "innermost";
+  ApplyTile(kernel.get(), {5, 2, 2});
+  kernel->SubBlock(0)->name = "outer";
 
   IVLOG(2, "After>\n" << *program);
 
-  ExecuteProgram(*main, &data);
+  ExecuteProgram(*program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -145,7 +117,10 @@ TEST(Codegen, StencilMatchMatMul) {
     }
   )");
 
-  auto runinfo = LoadMatMul(100);
+  const auto DIM = 100;
+  auto runinfo = lib::LoadMatMul("matmul",                                    //
+                                 SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
+                                 SimpleShape(DataType::FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -153,7 +128,7 @@ TEST(Codegen, StencilMatchMatMul) {
   IVLOG(2, *kernel);
 
   auto match = FindBestStencil({spec}, *kernel);
-  LOG(INFO) << "Best match: " << *match;
+  IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1255968,  // total
       {
@@ -177,7 +152,10 @@ TEST(Codegen, StencilMatchConv1D) {
     }
   )");
 
-  auto runinfo = LoadConv1D(1, 100, 64, 3);
+  auto runinfo = lib::LoadConv1d("conv",                                       //
+                                 SimpleShape(DataType::FLOAT32, {100, 64}),    //
+                                 SimpleShape(DataType::FLOAT32, {3, 64, 64}),  //
+                                 SimpleShape(DataType::FLOAT32, {100, 64}));
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -185,13 +163,13 @@ TEST(Codegen, StencilMatchConv1D) {
   IVLOG(2, *kernel);
 
   auto match = FindBestStencil({spec}, *kernel);
-  LOG(INFO) << "Best match: " << *match;
+  IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1378944,  // total
       {
           {"ci", "c", 64},
           {"co", "x", 16},
-          {"k", "*", 1},
+          {"kx", "*", 1},
           {"x", "k", 16},
       }  // idxs
   };
@@ -236,7 +214,10 @@ TEST(Codegen, StencilMatchConv2D) {
     specs.push_back(stencil);
   }
 
-  auto runinfo = LoadConv2D(1, 100, 56, 3);
+  auto runinfo = lib::LoadConv2d("conv",                                           //
+                                 SimpleShape(DataType::FLOAT32, {100, 100, 56}),   //
+                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),   //
+                                 SimpleShape(DataType::FLOAT32, {100, 100, 56}));  //
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -244,7 +225,7 @@ TEST(Codegen, StencilMatchConv2D) {
   IVLOG(2, "\n" << *kernel);
 
   auto match = FindBestStencil(specs, *kernel);
-  LOG(INFO) << "Best match: " << *match;
+  IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       323280000,  // total
       {
@@ -297,6 +278,7 @@ TEST(Codegen, StencilPass) {
 
   auto options = ParseProtoJson<proto::StencilPass>(R"(
     {
+      "reqs": ["agg_op_add", "comb_op_mul"],
       "startup_cost": 32,
       "idxs": [
         { "name": "k", "size":  2, "outs": [ -1 ], "ins": [ -1,  0 ] },
@@ -306,13 +288,15 @@ TEST(Codegen, StencilPass) {
     }
   )");
 
-  auto runinfo = LoadMatMul(5);
+  const auto DIM = 5;
+  auto runinfo = lib::LoadMatMul("matmul",                                    //
+                                 SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
+                                 SimpleShape(DataType::FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
-  StencilPass(main.get(), options);
-  IVLOG(2, "\n" << *main);
+  StencilPass(program.get(), options);
+  IVLOG(2, "\n" << *program);
 
-  ExecuteProgram(*main, &data);
+  ExecuteProgram(*program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -330,7 +314,7 @@ TEST(Codegen, TilePassBroadcast) {
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
 
-  LOG(INFO) << "\n" << *program;
+  IVLOG(2, "\n" << *program);
 }
 
 }  // namespace test

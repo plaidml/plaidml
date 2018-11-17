@@ -92,14 +92,9 @@ struct Statement {
 };
 
 struct Index {
-  Index() : range(0), factor(0) {}
-  Index(const std::string& name, const std::string& from, uint64_t range, int64_t factor)
-      : name(name), from(from), range(range), factor(factor) {}
-
   std::string name;
-  std::string from;
-  uint64_t range;
-  int64_t factor;
+  uint64_t range = 0;
+  Affine affine;
 };
 
 enum class RefDir {
@@ -262,7 +257,9 @@ struct Block : Statement {
   std::vector<Refinement>::iterator ref_by_from(const std::string& name, bool fail = true);
   std::vector<Refinement>::const_iterator ref_by_from(const std::string& name, bool fail = true) const;
   // Make a unique refinement name for an into (by appending _2, etc, if needed)
-  std::string unique_ref_name(const std::string& in);
+  std::string unique_ref_name(const std::string& into);
+  // Make a unique index name (by appending _2, etc, if needed)
+  std::string unique_idx_name(const std::string& name);
 
   std::shared_ptr<Block> SubBlock(size_t pos) const {
     auto it = stmts.begin();
