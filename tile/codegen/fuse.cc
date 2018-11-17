@@ -101,16 +101,17 @@ void FlattenTrivial(stripe::Block* outer) {
     }
     // Move out inner statements
     for (auto& stmt : inner->stmts) {
-      if (stmt->kind() == StmtKind::Block) {
-        auto deep = Block::Downcast(stmt);
-        // Rewrite any copied down indexes
-        for (auto& idx : deep->idxs) {
-          if (idx.from != "") {
-            idx.factor *= inner->idx_by_name(idx.from)->factor;
-            idx.from = inner->idx_by_name(idx.from)->from;
-          }
-        }
-      }
+      // if (stmt->kind() == StmtKind::Block) {
+      //   auto deep = Block::Downcast(stmt);
+      //   // Rewrite any copied down indexes
+      //   for (auto& idx : deep->idxs) {
+      //     if (idx.from != "") {
+      //       idx.factor *= inner->idx_by_name(idx.from)->factor;
+      //       idx.from = inner->idx_by_name(idx.from)->from;
+      //       idx.affine = inner->affine;
+      //     }
+      //   }
+      // }
       outer->stmts.insert(it, stmt);
     }
     auto it_old = it;
@@ -137,7 +138,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
     if (it == mapping.end()) {
       inner->idxs.push_back(idx);
     } else {
-      inner->idxs.emplace_back(idx.name, it->second, 1, 1);
+      // inner->idxs.emplace_back(idx.name, it->second, 1, 1);
       outer->idxs.push_back(idx);
       outer->idxs.back().name = it->second;
     }

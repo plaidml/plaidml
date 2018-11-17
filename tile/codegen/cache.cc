@@ -18,12 +18,12 @@ void ApplyCache(Block* block,                 //
                 const std::string& var_name,  //
                 const Location& mem_loc,      //
                 const Location& xfer_loc) {
-  auto ref_it = block->ref_by_into(var_name, false);
-  if (ref_it == block->refs.end()) {
+  auto it = block->ref_by_into(var_name, false);
+  if (it == block->refs.end()) {
     throw std::runtime_error("ApplyCache: Invalid var_name");
   }
   // Get the shape
-  TensorShape raw_ts = ref_it->shape;
+  TensorShape raw_ts = it->shape;
   std::vector<size_t> sizes;
   for (const auto& dim : raw_ts.dims) {
     sizes.push_back(dim.size);
@@ -32,7 +32,7 @@ void ApplyCache(Block* block,                 //
   // Make a new name for the raw variable
   std::string raw_name = block->unique_ref_name(var_name + "_raw");
   // Update the old refinement to rename
-  ref_it->into = raw_name;
+  it->into = raw_name;
   // Make a base block for loading/storing
   // Set both from refinements to the cached version, we will replace
   // one of them with the 'raw' version based on transfer direction
@@ -40,8 +40,8 @@ void ApplyCache(Block* block,                 //
   xfer_block.location = xfer_loc;
   std::vector<Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
-    std::string iname = std::string("i") + std::to_string(i);
-    xfer_block.idxs.emplace_back(iname, "", sizes[i], 0);
+    std::string iname = printstring("i%zu", i);
+    xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
     xfer_access.emplace_back(Affine(iname));
   }
   TensorShape raw_xfer_shape = raw_ts;
@@ -57,8 +57,8 @@ void ApplyCache(Block* block,                 //
       xfer_access,        // access
       cached_xfer_shape,  // shape
       "",                 // agg_op
-      ref_it->location,   // location
-      ref_it->is_const    // is_const
+      it->location,       // location
+      it->is_const        // is_const
   });
   xfer_block.refs.push_back(Refinement{
       RefDir::Out,        // dir
@@ -67,13 +67,13 @@ void ApplyCache(Block* block,                 //
       xfer_access,        // access
       cached_xfer_shape,  // shape
       "",                 // agg_op
-      ref_it->location,   // location
-      ref_it->is_const    // is_const
+      it->location,       // location
+      it->is_const        // is_const
   });
   xfer_block.stmts.push_back(std::make_shared<Load>("src", "$X"));
   xfer_block.stmts.push_back(std::make_shared<Store>("$X", "dst"));
   // If original refinement was input, load into cache
-  if (IsReadDir(ref_it->dir)) {
+  if (IsReadDir(it->dir)) {
     auto cache_load = std::make_shared<Block>(xfer_block);
     cache_load->name = printstring("load_%s", var_name.c_str());
     cache_load->refs[0].from = raw_name;
@@ -82,7 +82,7 @@ void ApplyCache(Block* block,                 //
     block->stmts.push_front(cache_load);
   }
   // If original refinement was output, flush from cache
-  if (IsWriteDir(ref_it->dir)) {
+  if (IsWriteDir(it->dir)) {
     auto cache_store = std::make_shared<Block>(xfer_block);
     cache_store->name = printstring("store_%s", var_name.c_str());
     cache_store->refs[1].from = raw_name;

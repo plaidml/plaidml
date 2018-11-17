@@ -9,6 +9,7 @@
 #include "tile/codegen/localize.h"
 #include "tile/codegen/scalarize.h"
 #include "tile/codegen/tile.h"
+#include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/stripe/stripe.h"
@@ -95,23 +96,73 @@ TEST(Codegen, FuseSimple) {
 }
 
 TEST(Codegen, FuseComplex) {
+  std::map<std::string, std::vector<float>> data = {
+      {"In",
+       {
+           1, 2, 3, 4,  //
+           5, 4, 5, 6,  //
+           7, 8, 7, 8,  //
+           9, 7, 8, 7,  //
+           8, 9, 7, 8,  //
+       }},
+      {"K",
+       {
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
+       }},
+      {"B",
+       {
+           5, 6, 7, 8,  //
+       }},
+      {"R",
+       {
+           0, 0, 0, 0,  //
+           0, 0, 0, 0,  //
+           0, 0, 0, 0,  //
+           0, 0, 0, 0,  //
+           0, 0, 0, 0,  //
+       }},
+  };
+
+  std::vector<float> expected = {
+      5,  6,  7,   8,   //
+      15, 26, 37,  18,  //
+      25, 46, 67,  28,  //
+      35, 66, 97,  38,  //
+      36, 68, 100, 39,  //
+  };
+
   lang::RunInfo runinfo;
   runinfo.program_name = "complex_fuse";
   runinfo.code = R"***(
-    function (In[N, X, Y, CI], K[I, J, CI, CO], B[CO]) -> (R) { 
-      [[pid(conv)]]     O[n, x, y, co : N, X, Y, CO] = +(In[n, x+i-1, y+j-1, ci] * K[i, j, ci, co]);
+    function (In[X, CI], K[I, CI, CO], B[CO]) -> (R) {
+      [[pid(conv)]]     O[x, co : X, CO] = +(In[x+i-1, ci] * K[i, ci, co]);
       [[pid(bias_add)]] BO = O + B;
       [[pid(relu)]]     R = relu(BO);
     }
   )***";
-  runinfo.input_shapes.emplace("In", SimpleShape(DataType::FLOAT32, {16, 100, 100, 64}));
-  runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {3, 3, 64, 128}));
-  runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {128}));
-  runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
+  // const size_t X = 5;
+  // const size_t K = 1;
+  // const size_t CI = 4;
+  // const size_t CO = 4;
+  const size_t X = 100;
+  const size_t K = 3;
+  const size_t CI = 16;
+  const size_t CO = 128;
+  runinfo.input_shapes.emplace("In", SimpleShape(DataType::FLOAT32, {X, CI}));
+  runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {K, CI, CO}));
+  runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {CO}));
+  runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {X, CO}));
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
 
   IVLOG(2, "Before>\n" << *program);
+
+  // ExecuteProgram(*program, &data);
+  // IVLOG(2, "R: " << data["R"]);
+  // EXPECT_THAT(data["R"], ContainerEq(expected));
 
   AliasMap base;
   AliasMap prog_map(base, program.get());
@@ -121,6 +172,7 @@ TEST(Codegen, FuseComplex) {
   auto k2 = main->SubBlock(1);
   auto plan = ComputeFusionPlan(*k1, *k2, "O");
   ASSERT_TRUE(static_cast<bool>(plan));
+
   auto r1 = FusionRefactor(*k1, plan->remap_a, plan->tile_a);
   auto r2 = FusionRefactor(*k2, plan->remap_b, plan->tile_b);
   IVLOG(2, "r1\n" << *r1);
@@ -131,9 +183,13 @@ TEST(Codegen, FuseComplex) {
   ASSERT_TRUE(r);
 
   // Tile it just for fun!
-  ApplyTile(r1.get(), {16, 16, 1, 1});
+  ApplyTile(r1.get(), {16, 1});
 
   IVLOG(2, "Tiled\n" << *program);
+
+  // ExecuteProgram(*program, &data);
+  // IVLOG(2, "R: " << data["R"]);
+  // EXPECT_THAT(data["R"], ContainerEq(expected));
 }
 
 TEST(Codegen, FuseTiled) {
