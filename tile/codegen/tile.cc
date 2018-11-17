@@ -15,6 +15,33 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
+namespace {
+
+bool HasConstraints(const Block& block, const Index& idx) {  //
+  for (const auto& constraint : block.constraints) {
+    if (constraint.get(idx.name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool HasAffines(const Block& block, const Index& idx) {
+  for (auto stmt : block.stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      for (auto& inner_idx : inner->idxs) {
+        if (inner_idx.affine.get(idx.name)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
 bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   // Verify tile shape is correct
   if (outer->idxs.size() != shape.size()) {
@@ -41,26 +68,56 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   std::swap(inner->constraints, outer->constraints);
   // Add indicies to the inner block
   inner->idxs = outer->idxs;
+  std::vector<Index> passthru_idxs;
   for (size_t i = 0; i < outer->idxs.size(); i++) {
     auto& outer_idx = outer->idxs[i];
     auto& inner_idx = inner->idxs[i];
-    inner_idx.from = outer_idx.name;
-    // For each index i, if (r_i/t_i) is not integral, add a constraint to the inner block of `o_i * t_i + i_i < r_i`.
-    int64_t range = outer->idxs[i].range;
-    if (range % shape[i]) {
-      inner->constraints.emplace_back(Affine(outer_idx.name, -1) + int64_t(outer_idx.range - 1));
+    if (outer_idx.range == 1) {
+      // For indexes without a range, just make a passthru for the inner block
+      inner_idx.affine = Affine(outer_idx.name);
+      continue;
+    }
+    // Needs passthru:
+    // 1. tiling is uneven on this index
+    // 2. constraints on outer that use this index
+    // 3. affines on interior blocks that refer to this index
+    if ((outer_idx.range % shape[i]) || HasConstraints(*inner, outer_idx) || HasAffines(*inner, outer_idx)) {
+      Index passthru_idx{
+          inner->unique_idx_name(outer_idx.name),           // name
+          1,                                                // range
+          {outer_idx.name, static_cast<int64_t>(shape[i])}  // affine
+      };
+      // Update any inner constraints that refer to this index
+      for (auto& constraint : inner->constraints) {
+        constraint.substitute(outer_idx.name, Affine(outer_idx.name) + Affine(passthru_idx.name));
+      }
+      // Update any interior idxs that refer to this index
+      for (auto stmt : inner->stmts) {
+        auto interior = Block::Downcast(stmt);
+        if (interior) {
+          for (auto& idx : interior->idxs) {
+            idx.affine.substitute(outer_idx.name, Affine(outer_idx.name) + Affine(passthru_idx.name));
+          }
+        }
+      }
+      if (outer_idx.range % shape[i]) {
+        // For each index i, if (r_i/t_i) is not integral, add a constraint to the inner block of `o_i * t_i + i_i <
+        // r_i`. Or solving to make it in the form poly >= 0, ((r_i - 1) - p_i - i_i >= 0).
+        inner->constraints.emplace_back(Affine(passthru_idx.name, -1) +  //
+                                        Affine(inner_idx.name, -1) +     //
+                                        int64_t(outer_idx.range - 1));
+      }
+      // Finally add the passthru_idx
+      passthru_idxs.emplace_back(passthru_idx);
     }
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
     outer_idx.range = (outer_idx.range + shape[i] - 1) / shape[i];
     // Make ranges of the inner blocks: [ti, tk, tk]
     inner_idx.range = shape[i];
-    inner_idx.factor = shape[i];
-    if (outer_idx.factor > 0 && outer_idx.factor % shape[i] != 0) {
-      throw_with_trace(std::runtime_error("ApplyTile: unhandled uneven subtiling"));
-    }
-    outer_idx.factor /= shape[i];
   }
+  // Append all passthru_idxs, we defer this since this may cause inner->idxs to realloc
+  std::copy(passthru_idxs.begin(), passthru_idxs.end(), std::back_inserter(inner->idxs));
   // Copy all refinements from outer to inner block
   inner->refs = outer->refs;
   // Fix the sizes on the outer blocks

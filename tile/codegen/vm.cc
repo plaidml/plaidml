@@ -4,164 +4,209 @@
 
 #include <algorithm>
 
+#include "base/util/lookup.h"
 #include "base/util/printstring.h"
 #include "base/util/stream_container.h"
+#include "base/util/throw.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
-namespace {
 
 using namespace stripe;  // NOLINT
 
-struct Scope {
-  std::map<std::string, int64_t> global_idxs;
-  std::map<std::string, int64_t> idxs;
+namespace {
+
+std::map<std::string, std::function<float(float, float)>> BINARY_OPS = {
+    {"add", [](float a, float b) { return a + b; }},
+    {"mul", [](float a, float b) { return a * b; }},
+    {"cmp_lt", [](float a, float b) { return a < b; }},
 };
 
-class VirtualMachine {
- public:
-  explicit VirtualMachine(std::map<std::string, std::vector<float>>* buffers)
-      : buffers_(*buffers)  //
-  {}
+std::map<std::string, std::function<float(float, float, float)>> TERNARY_OPS = {
+    {"cond", [](float c, float t, float f) { return c ? t : f; }},
+};
 
-  void ExecuteBlock(const Block& block, const Scope& outer) {
-    IVLOG(4, "ExecuteBlock: " << block.name);
-    Scope scope;
-    for (size_t i = 0; i < block.idxs.size(); i++) {
-      const auto& idx = block.idxs[i];
-      auto global_idx = 0;
-      auto it = outer.idxs.find(idx.from);
-      if (it != outer.idxs.end()) {
-        global_idx = idx.factor * it->second;
-      }
-      scope.global_idxs.insert(std::make_pair(idx.name, global_idx));
+class Scope {
+ public:
+  Scope() {}
+  explicit Scope(Scope* outer) : outer_(outer), depth_(outer->depth_ + 1) {}
+
+  void ExecuteProgram(const Block& block, std::map<std::string, Buffer>* buffers) {
+    Scope outer;
+    outer_ = &outer;
+    for (const auto& ref : block.refs) {
+      assert(ref.from.empty());
+      refs_[ref.into] = &safe_at(buffers, ref.into);
     }
-    if (block.idxs.size()) {
-      Loop(&scope, block, 0);
-    } else {
-      ExecuteStatements(&scope, block);
-    }
+    ExecuteStatements(block);
   }
 
  private:
-  void Loop(Scope* scope, const Block& block, size_t idx) {
-    for (size_t i = 0; i < block.idxs[idx].range; i++) {
-      auto idx_name = block.idxs[idx].name;
-      scope->idxs[idx_name] = scope->global_idxs[idx_name] + i;
-      if (idx < block.idxs.size() - 1) {
-        Loop(scope, block, idx + 1);
-      } else if (CheckConstraints(*scope, block)) {
-        ExecuteStatements(scope, block);
+  void ExecuteBlock(const Block& block) {
+    IVLOG(4, Tab() << "ExecuteBlock: " << block.name);
+    std::map<std::string, Buffer> buffers;
+    for (const auto& ref : block.refs) {
+      if (ref.from.empty()) {
+        Buffer buf(ref.shape.elem_size());
+        buffers.emplace(ref.into, buf);
+        refs_[ref.into] = &safe_at(&buffers, ref.into);
+      } else {
+        refs_[ref.into] = safe_at(outer_->refs_, ref.from);
+      }
+    }
+    if (block.idxs.size()) {
+      Loop(block, 0);
+    } else {
+      ExecuteStatements(block);
+    }
+  }
+
+  void Loop(const Block& block, size_t depth) {
+    const auto& idx = block.idxs[depth];
+    auto base = idx.affine.eval(outer_->idxs_);
+    for (size_t i = 0; i < idx.range; i++) {
+      idxs_[idx.name] = base + i;
+      if (depth < block.idxs.size() - 1) {
+        Loop(block, depth + 1);
+      } else {
+        ExecuteStatements(block);
       }
     }
   }
 
-  bool CheckConstraints(const Scope& scope, const Block& block) {
+  bool CheckConstraints(const Block& block) {
     for (const auto& constraint : block.constraints) {
-      auto result = constraint.eval(scope.idxs);
-      if (result < 0) {
+      if (constraint.eval(idxs_) < 0) {
         return false;
       }
     }
     return true;
   }
 
-  size_t ComputeOffsetFor(const Scope& scope, const Block& block, const Refinement& ref) {
+  size_t ComputeOffsetFor(const Block& block, const Refinement& ref) {
     int offset = 0;
+    if (!ref.from.empty()) {
+      offset = safe_at(outer_->offsets_, ref.from);
+    }
     std::stringstream ss;
-    ss << "ref: " << ref.into << ", offset = ";
+    ss << "ref: " << ref.into << ", offset = " << offset;
     assert(ref.shape.dims.size() == ref.access.size());
     for (size_t i = 0; i < ref.shape.dims.size(); i++) {
-      auto access = ref.access[i].eval(scope.idxs);
+      auto access = ref.access[i].eval(idxs_);
       auto stride = ref.shape.dims[i].stride;
       offset += access * stride;
-      if (i > 0) {
-        ss << " + ";
-      }
-      ss << "(" << access << " * " << stride << ")";
+      ss << " + (" << access << " * " << stride << ")";
     }
     ss << " = " << offset;
-    IVLOG(5, ss.str());
+    IVLOG(5, Tab() << ss.str());
     return offset;
   }
 
   float DoLoad(const std::string& name, size_t offset) {
-    auto it = buffers_.find(name);
-    if (it == buffers_.end()) {
-      throw std::runtime_error("Unknown buffer");
+    auto it = refs_.find(name);
+    if (it == refs_.end()) {
+      throw_with_trace(std::runtime_error("Unknown buffer"));
     }
-    if (offset >= it->second.size()) {
-      throw std::runtime_error(printstring("LOAD: Out of bounds access on '%s', offset: %zu, size: %zu",  //
-                                           name.c_str(), offset, it->second.size()));
+    if (offset >= it->second->size()) {
+      throw_with_trace(std::runtime_error(printstring("LOAD: Out of bounds access on '%s', offset: %zu, size: %zu",  //
+                                                      name.c_str(), offset, it->second->size())));
     }
-    return it->second[offset];
+    return (*it->second)[offset];
   }
 
   void DoStore(const std::string& name, size_t offset, float value, const std::string& agg_op) {
-    auto it = buffers_.find(name);
-    if (it == buffers_.end()) {
-      throw std::runtime_error("Unknown buffer");
+    auto it = refs_.find(name);
+    if (it == refs_.end()) {
+      throw_with_trace(std::runtime_error("Unknown buffer"));
     }
-    if (offset >= it->second.size()) {
-      throw std::runtime_error(printstring("STORE: Out of bounds access"));
+    if (offset >= it->second->size()) {
+      throw_with_trace(std::runtime_error(printstring("STORE: Out of bounds access on '%s', offset: %zu, size: %zu",  //
+                                                      name.c_str(), offset, it->second->size())));
     }
     if (agg_op == Intrinsic::SUM) {
-      it->second[offset] += value;
+      (*it->second)[offset] += value;
     } else {
-      it->second[offset] = value;
+      (*it->second)[offset] = value;
     }
   }
 
-  void ExecuteStatements(Scope* scope, const Block& block) {
-    std::map<std::string, float> vars;
-    std::map<std::string, size_t> offsets;
-    IVLOG(5, "idxs: " << StreamContainer(scope->idxs));
-    for (const auto& ref : block.refs) {
-      offsets[ref.into] = ComputeOffsetFor(*scope, block, ref);
+  void ExecuteStatements(const Block& block) {
+    if (!CheckConstraints(block)) {
+      return;
     }
+    std::map<std::string, float> vars;
+    for (const auto& ref : block.refs) {
+      offsets_[ref.into] = ComputeOffsetFor(block, ref);
+    }
+    IVLOG(5, Tab() << "idxs: " << StreamContainer(idxs_));
+    IVLOG(5, Tab() << "offsets: " << StreamContainer(offsets_));
     for (const auto& stmt : block.stmts) {
       switch (stmt->kind()) {
         case StmtKind::Load: {
           const auto& op = Load::Downcast(stmt);
-          vars[op->into] = DoLoad(op->from, offsets[op->from]);
+          vars[op->into] = DoLoad(op->from, offsets_[op->from]);
         } break;
         case StmtKind::Store: {
           const auto& op = Store::Downcast(stmt);
           auto it = block.ref_by_into(op->into, false);
           if (it == block.refs.end()) {
-            throw std::runtime_error("Missing agg_op");
+            throw_with_trace(std::runtime_error("Missing agg_op"));
           }
-          DoStore(op->into, offsets[op->into], vars[op->from], it->agg_op);
+          DoStore(op->into, offsets_[op->into], vars[op->from], it->agg_op);
         } break;
         case StmtKind::Intrinsic: {
           const auto& op = Intrinsic::Downcast(stmt);
-          if (op->name == Intrinsic::MUL) {
-            vars[op->outputs[0]] = vars[op->inputs[0]] * vars[op->inputs[1]];
+          switch (op->inputs.size()) {
+            case 2: {
+              auto it = BINARY_OPS.find(op->name);
+              if (it == BINARY_OPS.end()) {
+                throw_with_trace(std::runtime_error(printstring("Unsupported binary intrinsic: %s", op->name.c_str())));
+              }
+              vars[op->outputs[0]] = it->second(vars[op->inputs[0]], vars[op->inputs[1]]);
+            } break;
+            case 3: {
+              auto it = TERNARY_OPS.find(op->name);
+              if (it == TERNARY_OPS.end()) {
+                throw_with_trace(
+                    std::runtime_error(printstring("Unsupported ternary intrinsic: %s", op->name.c_str())));
+              }
+              vars[op->outputs[0]] = it->second(vars[op->inputs[0]], vars[op->inputs[1]], vars[op->inputs[2]]);
+            } break;
+            default:
+              throw_with_trace(std::runtime_error(
+                  printstring("Unsupported number of operands for intrinsic: %s", op->name.c_str())));
+              break;
           }
         } break;
         case StmtKind::Constant:
           break;
-        case StmtKind::Block:
-          ExecuteBlock(*Block::Downcast(stmt), *scope);
-          break;
+        case StmtKind::Block: {
+          Scope scope(this);
+          scope.ExecuteBlock(*Block::Downcast(stmt));
+        } break;
         default:
           break;
       }
     }
   }
 
+  std::string Tab() const { return std::string(depth_ * 2, ' '); }
+
  private:
-  std::map<std::string, std::vector<float>>& buffers_;
+  Scope* outer_ = nullptr;
+  size_t depth_ = 0;
+  std::map<std::string, int64_t> idxs_;
+  std::map<std::string, Buffer*> refs_;
+  std::map<std::string, size_t> offsets_;
 };
 
 }  // namespace
 
-void ExecuteProgram(const Block& program, std::map<std::string, std::vector<float>>* buffers) {
+void ExecuteProgram(const Block& program, std::map<std::string, Buffer>* buffers) {
   Scope scope;
-  VirtualMachine vm(buffers);
-  vm.ExecuteBlock(program, scope);
+  scope.ExecuteProgram(program, buffers);
 }
 
 }  // namespace codegen

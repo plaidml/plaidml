@@ -7,5 +7,6 @@ plaidml_cc_test(
         "//testing:matchers",
         "//tile/codegen",
         "//tile/lang",
+        "//tile/lib",
     ],
 )

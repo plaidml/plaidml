@@ -63,7 +63,7 @@ struct RefInfo {
 
     for (size_t i = 0; i < sizes.size(); i++) {
       std::string iname = std::string("i") + std::to_string(i);
-      swap_idxs.emplace_back(iname, "", sizes[i], 0);
+      swap_idxs.emplace_back(stripe::Index{iname, sizes[i]});
       swap_access.emplace_back(stripe::Affine(iname));
     }
 
