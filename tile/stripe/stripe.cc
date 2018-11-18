@@ -409,10 +409,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
   ret->comments = block.comments();
   ret->location = FromProto(block.location());
   for (const auto& pb_idx : block.idxs()) {
-    ret->idxs.emplace_back(Index{
-        pb_idx.name(),   //
-        pb_idx.range(),  //
-    });
+    ret->idxs.emplace_back(Index{pb_idx.name(), pb_idx.range(), FromProto(pb_idx.affine())});
   }
   for (const auto& pb_con : block.constraints()) {
     ret->constraints.emplace_back(FromProto(pb_con));
@@ -531,6 +528,7 @@ proto::Block IntoProto(const Block& block) {
     auto pb_idx = ret.add_idxs();
     pb_idx->set_name(idx.name);
     pb_idx->set_range(idx.range);
+    *pb_idx->mutable_affine() = IntoProto(idx.affine);
   }
   for (const auto& con : block.constraints) {
     *ret.add_constraints() = IntoProto(con);

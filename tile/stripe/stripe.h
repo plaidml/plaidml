@@ -337,6 +337,16 @@ inline std::string to_string(const Block& block) {
 }
 
 }  // namespace stripe
+
+namespace math {
+
+inline std::ostream& operator<<(std::ostream& os, const stripe::Affine& affine) {
+  os << affine.toString();
+  return os;
+}
+
+}  // namespace math
+
 }  // namespace tile
 }  // namespace vertexai
 

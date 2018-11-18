@@ -23,9 +23,8 @@ message Block {
 
 message Index {
   string name = 1;
-  string from = 2;
-  uint64 range = 3;
-  int64 factor = 4;
+  uint64 range = 2;
+  Affine affine = 3;
 }
 
 message Refinement {
