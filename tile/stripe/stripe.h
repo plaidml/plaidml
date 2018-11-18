@@ -93,7 +93,7 @@ struct Statement {
 
 struct Index {
   std::string name;
-  uint64_t range = 0;
+  uint64_t range;
   Affine affine;
 };
 
