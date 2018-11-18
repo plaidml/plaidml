@@ -2,6 +2,7 @@
 
 #include "tile/codegen/fuse.h"
 
+#include "base/util/stream_container.h"
 #include "base/util/throw.h"
 #include "tile/codegen/localize.h"
 #include "tile/codegen/tile.h"
@@ -13,6 +14,7 @@ namespace codegen {
 using namespace stripe;  // NOLINT
 
 boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, const std::string& buf_name) {
+  IVLOG(3, "ComputeFusionPlan for " << buf_name << " between " << a.name << " and " << b.name);
   FusionPlan plan;
   plan.tile_a = TileShape(a.idxs.size(), 1);
   plan.tile_b = TileShape(b.idxs.size(), 1);
@@ -62,20 +64,39 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
     plan.remap_a.emplace(idx_a, idx_a);
     plan.remap_b.emplace(idx_b, idx_a);
   }
+  if (a.constraints != b.constraints) {
+    IVLOG(3, "ComputeFusionPlan: incompatible constraints");
+    IVLOG(4, "    a: " << StreamContainer(a.constraints));
+    IVLOG(4, "    b: " << StreamContainer(b.constraints));
+    return boost::none;
+  }
+  for (const auto& constraint : a.constraints) {
+    for (const auto& term : constraint.getMap()) {
+      auto it = plan.remap_a.find(term.first);
+      if (it == plan.remap_a.end()) {
+        plan.remap_a.emplace(term.first, term.first);
+      }
+    }
+  }
+  for (const auto& constraint : b.constraints) {
+    for (const auto& term : constraint.getMap()) {
+      auto it = plan.remap_b.find(term.first);
+      if (it == plan.remap_b.end()) {
+        plan.remap_b.emplace(term.first, term.first);
+      }
+    }
+  }
   return plan;
 }
 
 void FlattenTrivial(stripe::Block* outer) {
+  IVLOG(4, "FlattenTrivial before:\n" << *outer);
   auto it = outer->stmts.begin();
   while (it != outer->stmts.end()) {
-    // Skip non blocks
-    if ((*it)->kind() != StmtKind::Block) {
-      ++it;
-      continue;
-    }
     auto inner = Block::Downcast(*it);
-    // Skip non-trival blocks
-    if (inner->constraints.size()) {
+    // Skip non blocks
+    if (!inner) {
+      IVLOG(4, "FlattenTrivial: skip> non-block");
       ++it;
       continue;
     }
@@ -84,6 +105,7 @@ void FlattenTrivial(stripe::Block* outer) {
       range *= idx.range;
     }
     if (range != 1) {
+      IVLOG(4, "FlattenTrivial: skip> range != 1");
       ++it;
       continue;
     }
@@ -96,39 +118,48 @@ void FlattenTrivial(stripe::Block* outer) {
     // TODO: renames technically can be applied to inner statements,
     // but it's really annoying!
     if (renames) {
+      IVLOG(4, "FlattenTrivial: skip> renames");
       ++it;
       continue;
     }
     // Move out inner statements
     for (auto& stmt : inner->stmts) {
-      // if (stmt->kind() == StmtKind::Block) {
-      //   auto deep = Block::Downcast(stmt);
-      //   // Rewrite any copied down indexes
-      //   for (auto& idx : deep->idxs) {
-      //     if (idx.from != "") {
-      //       idx.factor *= inner->idx_by_name(idx.from)->factor;
-      //       idx.from = inner->idx_by_name(idx.from)->from;
-      //       idx.affine = inner->affine;
-      //     }
-      //   }
-      // }
+      auto deep = Block::Downcast(stmt);
+      if (deep) {
+        // Rewrite any copied down indexes
+        for (auto& idx : deep->idxs) {
+          std::vector<std::string> names;
+          for (const auto& item : idx.affine.getMap()) {
+            names.push_back(item.first);
+          }
+          for (const auto& name : names) {
+            idx.affine.substitute(name, inner->idx_by_name(name)->affine);
+          }
+        }
+      }
       outer->stmts.insert(it, stmt);
     }
     auto it_old = it;
     ++it;
     outer->stmts.erase(it_old);
   }
+
+  IVLOG(4, "FlattenTrivial after:\n" << *outer);
 }
 
 std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                          //
                                       const std::map<std::string, std::string>& mapping,  //
                                       const TileShape& tile) {
+  IVLOG(3, "FusionRefactor:\n" << orig);
+  IVLOG(3, "mapping: " << StreamContainer(mapping) << ", tile: " << tile);
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
   ApplyTile(tiled.get(), tile);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
   outer->name = tiled->name;
+  // This is safe to do because we check whether constraints are equivalent in ComputeFusionPlan
+  outer->constraints = tiled->constraints;
   auto inner = std::make_shared<Block>();
   inner->name = tiled->name;
   outer->stmts.push_back(inner);
@@ -136,9 +167,11 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   for (const auto& idx : tiled->idxs) {
     auto it = mapping.find(idx.name);
     if (it == mapping.end()) {
+      IVLOG(3, "New idx: " << idx.name);
       inner->idxs.push_back(idx);
     } else {
-      // inner->idxs.emplace_back(idx.name, it->second, 1, 1);
+      IVLOG(3, "Existing idx: " << idx.name);
+      inner->idxs.emplace_back(Index{idx.name, 1, it->second});
       outer->idxs.push_back(idx);
       outer->idxs.back().name = it->second;
     }
@@ -158,7 +191,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& acc = ref.access[i];
       int64_t max_val = ref.shape.dims[i].size - 1;
-      Affine r = acc.constant();
+      Affine affine = acc.constant();
       for (const auto& kvp : acc.getMap()) {
         auto it = mapping.find(kvp.first);
         if (it == mapping.end()) {
@@ -170,22 +203,22 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
           }
           continue;
         }
-        r += Affine(it->second, kvp.second);
+        affine += Affine(it->second, kvp.second);
       }
       ref.shape.dims[i].size = max_val + 1;
-      acc = r;
+      acc = affine;
     }
   }
   // Remove mapped access elements from inner refinements
   for (auto& ref : inner->refs) {
     for (auto& acc : ref.access) {
-      Affine r;
+      Affine affine;
       for (const auto& kvp : acc.getMap()) {
         if (kvp.first != "" && !mapping.count(kvp.first)) {
-          r += Affine(kvp.first, kvp.second);
+          affine += Affine(kvp.first, kvp.second);
         }
       }
-      acc = r;
+      acc = affine;
     }
   }
   // Remove any trivial loops remaining
@@ -196,12 +229,12 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
 
 bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   // If indexes don't match, fail
-  if (!(block_a->idxs == block_b->idxs)) {
+  if (block_a->idxs != block_b->idxs) {
     IVLOG(3, "Fuse failed due to mismatched indexes");
     return false;
   }
   // If constraints don't match, fail
-  if (!(block_a->constraints == block_b->constraints)) {
+  if (block_a->constraints != block_b->constraints) {
     IVLOG(3, "Fuse failed due to mismatched constraints");
     return true;
   }

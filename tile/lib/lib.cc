@@ -82,7 +82,7 @@ function (I[X, Y, CI], K[KX, KY, CI, CO], B[CO], S[CO]) -> (R) {
   [[pid(res2a_branch2a)]] O[x, y, co : X, Y, CO] = +(I[x + kx - %1%, y + ky - %1%, ci] * K[kx, ky, ci, co]);
   [[pid(bias_add)]] BO = O + B;
   [[pid(scale)]] BS = BO * S;
-  R = zelu(BS);
+  [[pid(relu)]] R = zelu(BS);
 })***";
   lang::RunInfo runinfo;
   runinfo.program_name = name;
