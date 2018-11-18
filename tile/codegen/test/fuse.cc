@@ -111,6 +111,16 @@ TEST(Codegen, FuseComplex) {
            1, 2, 3, 1,  //
            1, 2, 3, 1,  //
            1, 2, 3, 1,  //
+                        //
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
+                        //
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
+           1, 2, 3, 1,  //
        }},
       {"B",
        {
@@ -127,11 +137,11 @@ TEST(Codegen, FuseComplex) {
   };
 
   std::vector<float> expected = {
-      5,  6,  7,   8,   //
-      15, 26, 37,  18,  //
-      25, 46, 67,  28,  //
-      35, 66, 97,  38,  //
-      36, 68, 100, 39,  //
+      35, 66,  97,  38,   //
+      65, 126, 187, 68,   //
+      86, 168, 250, 89,   //
+      98, 192, 286, 101,  //
+      68, 132, 196, 71,   //
   };
 
   lang::RunInfo runinfo;
@@ -143,14 +153,10 @@ TEST(Codegen, FuseComplex) {
       [[pid(relu)]]     R = relu(BO);
     }
   )***";
-  // const size_t X = 5;
-  // const size_t K = 1;
-  // const size_t CI = 4;
-  // const size_t CO = 4;
-  const size_t X = 100;
+  const size_t X = 5;
   const size_t K = 3;
-  const size_t CI = 16;
-  const size_t CO = 128;
+  const size_t CI = 4;
+  const size_t CO = 4;
   runinfo.input_shapes.emplace("In", SimpleShape(DataType::FLOAT32, {X, CI}));
   runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {K, CI, CO}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {CO}));
@@ -159,37 +165,23 @@ TEST(Codegen, FuseComplex) {
   auto main = program->SubBlock(0);
 
   IVLOG(2, "Before>\n" << *program);
-
-  // ExecuteProgram(*program, &data);
-  // IVLOG(2, "R: " << data["R"]);
-  // EXPECT_THAT(data["R"], ContainerEq(expected));
+  ExecuteProgram(*program, &data);
+  IVLOG(2, "R: " << data["R"]);
+  EXPECT_THAT(data["R"], ContainerEq(expected));
 
   AliasMap base;
   AliasMap prog_map(base, program.get());
   AliasMap main_map(prog_map, main.get());
 
-  auto k1 = main->SubBlock(0);
-  auto k2 = main->SubBlock(1);
-  auto plan = ComputeFusionPlan(*k1, *k2, "O");
-  ASSERT_TRUE(static_cast<bool>(plan));
+  AlwaysFuseRecursive afr;
+  FusionInner(main_map, main.get(), &afr);
+  // LocalizePass(main_map, main.get());
+  Scalarize(main.get(), true);
 
-  auto r1 = FusionRefactor(*k1, plan->remap_a, plan->tile_a);
-  auto r2 = FusionRefactor(*k2, plan->remap_b, plan->tile_b);
-  IVLOG(2, "r1\n" << *r1);
-  IVLOG(2, "r2\n" << *r2);
-  bool r = FuseBlocks(main_map, r1.get(), r2.get());
-
-  IVLOG(2, "Fused\n" << *r1);
-  ASSERT_TRUE(r);
-
-  // Tile it just for fun!
-  ApplyTile(r1.get(), {16, 1});
-
-  IVLOG(2, "Tiled\n" << *program);
-
-  // ExecuteProgram(*program, &data);
-  // IVLOG(2, "R: " << data["R"]);
-  // EXPECT_THAT(data["R"], ContainerEq(expected));
+  IVLOG(2, "After>\n" << *program);
+  ExecuteProgram(*program, &data);
+  IVLOG(2, "R: " << data["R"]);
+  EXPECT_THAT(data["R"], ContainerEq(expected));
 }
 
 TEST(Codegen, FuseTiled) {

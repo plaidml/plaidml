@@ -180,8 +180,17 @@ class Scope {
               break;
           }
         } break;
-        case StmtKind::Constant:
-          break;
+        case StmtKind::Constant: {
+          const auto& op = Constant::Downcast(stmt);
+          switch (op->type) {
+            case ConstType::Integer:
+              vars[op->name] = op->iconst;
+              break;
+            case ConstType::Float:
+              vars[op->name] = op->fconst;
+              break;
+          }
+        } break;
         case StmtKind::Block: {
           Scope scope(this);
           scope.ExecuteBlock(*Block::Downcast(stmt));

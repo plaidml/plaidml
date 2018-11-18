@@ -36,7 +36,12 @@ std::map<std::string, Program> InlineDefines = {
     {"abs", idef("function (X1) -> (Y) { Y = (X1 < 0 ? -X1 : X1); }")},
     {"max", idef("function (X1, X2) -> (Y) { Y = (X1 < X2 ? X2 : X1); }")},
     {"min", idef("function (X1, X2) -> (Y) { Y = (X1 < X2 ? X1 : X2); }")},
-    {"relu", idef("function (X1) -> (Y) { Y = (X1 < 0.0 ? 0.0 : X1); }")},
+    {"relu", idef(R"(
+      function (X1) -> (Y) {
+        [[pid(relu_0)]] C = X1 < 0.0;
+        [[pid(relu_1)]] Y = C ? 0.0 : X1;
+      }
+    )")},
     {"sigmoid", idef("function (X1) -> (Y) { Y = (1.0 / (1.0 + exp(-X1))); }")},
     {"builtin_softmax", idef(R"***(
       function (X1, X2, X3) -> (Y) {
