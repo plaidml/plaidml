@@ -34,6 +34,18 @@ T Polynomial<T>::eval(const std::map<std::string, T>& values) const {
 }
 
 template <typename T>
+Polynomial<T> Polynomial<T>::partial_eval(const std::map<std::string, T>& values) const {
+  Polynomial<T> r = *this;
+  T off = 0;
+  for (const auto& kvp : values) {
+    off += get(kvp.first) * kvp.second;
+    r.map_.erase(kvp.first);
+  }
+  r += off;
+  return r;
+}
+
+template <typename T>
 T Polynomial<T>::operator[](const std::string& var) const {
   auto it = map_.find(var);
   if (it == map_.end()) {
@@ -108,7 +120,11 @@ T Polynomial<T>::constant() const {
 
 template <typename T>
 void Polynomial<T>::setConstant(T value) {
-  map_[""] = value;
+  if (value == T(0)) {
+    map_.erase("");
+  } else {
+    map_[""] = value;
+  }
 }
 
 template <typename T>
