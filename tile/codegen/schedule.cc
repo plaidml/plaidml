@@ -296,6 +296,74 @@ struct Placement {
 // Represents a placement plan for a particular Statement.
 using PlacementPlan = std::unordered_map<std::string, Placement>;
 
+// Rewrites a Statement to apply the supplied Plan.
+class RefRewriter final : private stripe::MutableStmtVisitor {
+ public:
+  static void Rewrite(stripe::Statement* stmt, const PlacementPlan& plan, const stripe::Location& loc) {
+    RefRewriter rewriter{plan, loc};
+    stmt->Accept(&rewriter);
+  }
+
+ private:
+  RefRewriter(const PlacementPlan& plan, const stripe::Location& loc) : plan_{&plan}, loc_{&loc} {}
+
+  void Visit(stripe::Load*) final;
+  void Visit(stripe::Store*) final;
+  void Visit(stripe::Constant*) final {}
+  void Visit(stripe::Special*) final;
+  void Visit(stripe::Intrinsic*) final {}
+  void Visit(stripe::Block*) final;
+
+  const PlacementPlan* plan_;
+  const stripe::Location* loc_;
+};
+
+void RefRewriter::Visit(stripe::Load* load) {
+  auto it = plan_->find(load->from);
+  if (it == plan_->end()) {
+    return;
+  }
+  load->from = it->second.entry->name;
+}
+
+void RefRewriter::Visit(stripe::Store* store) {
+  auto it = plan_->find(store->into);
+  if (it == plan_->end()) {
+    return;
+  }
+  store->into = it->second.entry->name;
+}
+
+void RefRewriter::Visit(stripe::Special* special) {
+  for (auto nit = special->inputs.begin(); nit != special->inputs.end(); ++nit) {
+    auto pit = plan_->find(*nit);
+    if (pit != plan_->end()) {
+      *nit = pit->second.entry->name;
+    }
+  }
+  for (auto nit = special->outputs.begin(); nit != special->outputs.end(); ++nit) {
+    auto pit = plan_->find(*nit);
+    if (pit != plan_->end()) {
+      *nit = pit->second.entry->name;
+    }
+  }
+}
+
+void RefRewriter::Visit(stripe::Block* block) {
+  for (auto& ref : block->refs) {
+    auto it = plan_->find(ref.from);
+    if (it == plan_->end()) {
+      continue;
+    }
+    ref.from = it->second.entry->name;
+    ref.location = *loc_;
+    for (size_t i = 0; i < ref.shape.dims.size(); i++) {
+      ref.shape.dims[i].stride = it->second.entry->source->cache_shape.dims[i].stride;
+    }
+    FixupRefs(block, ref.into);
+  }
+}
+
 // The scheduler class itself.
 class Scheduler {
  public:
@@ -377,9 +445,6 @@ class Scheduler {
   // up to the caller to add it.
   stripe::StatementIt AddSwapOut(stripe::StatementIt si, CacheEntry* ent,
                                  const std::unordered_set<stripe::Statement*>& swap_in_readers);
-
-  // Rewrites the supplied Statement according to the Plan.
-  void RewriteRefs(stripe::Statement* stmt, const PlacementPlan& plan);
 
   // Rebuilds the scheduler's block's transitive dependencies -- the
   // deps computed directly by scheduling are conservative.
@@ -676,7 +741,7 @@ void Scheduler::Run() {
       }
     }
 
-    RewriteRefs(si->get(), plan);
+    RefRewriter::Rewrite(si->get(), plan, mem_loc_);
   }
 
   // Add swap-in writers for every CacheEntry without a writer.
@@ -993,25 +1058,6 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
   }
   ent->source->saw_final_write = true;
   return swap_out_it;
-}
-
-void Scheduler::RewriteRefs(stripe::Statement* stmt, const PlacementPlan& plan) {
-  stripe::Block* sb = dynamic_cast<stripe::Block*>(stmt);
-  if (!sb) {
-    return;  // TODO: Handle non-block substatements.
-  }
-  for (auto& ref : sb->refs) {
-    auto it = plan.find(ref.from);
-    if (it == plan.end()) {
-      continue;
-    }
-    ref.from = it->second.entry->name;
-    ref.location = mem_loc_;
-    for (size_t i = 0; i < ref.shape.dims.size(); i++) {
-      ref.shape.dims[i].stride = it->second.entry->source->cache_shape.dims[i].stride;
-    }
-    FixupRefs(sb, ref.into);
-  }
 }
 
 void Scheduler::RebuildTransitiveDeps() {
