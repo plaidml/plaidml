@@ -108,8 +108,10 @@ class Compiler : private stripe::ConstStmtVisitor {
   scalar CheckBool(scalar);
   llvm::Type* CType(DataType);
   llvm::Value* IndexElement(const buffer& buf);
+  llvm::Value* Eval(const stripe::Affine& access);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
+  llvm::Type* IndexType();
 
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
@@ -235,8 +237,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   }
 
   // allocate storage for each loop index
-  unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
-  llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
+  llvm::Type* ssizetype = IndexType();
   for (auto& idx : block.idxs) {
     llvm::Value* variable = builder_.CreateAlloca(ssizetype);
     variable->setName(idx.name);
@@ -722,12 +723,16 @@ llvm::Type* Compiler::CType(DataType type) {
 }
 
 llvm::Value* Compiler::IndexElement(const buffer& buf) {
-  unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
-  llvm::Type* ssizetype = llvm::IntegerType::get(context_, archbits);
   // Ask the source refinement to generate an access path, in the form of
   // a sequence of indexes to scale and sum. Load each index value, multiply,
   // and the result is an offset from the buffer base address.
-  auto access = buf.refinement->FlatAccess();
+  llvm::Value* offset = Eval(buf.refinement->FlatAccess());
+  std::vector<llvm::Value*> idxList{offset};
+  return builder_.CreateGEP(buf.base, idxList);
+}
+
+llvm::Value* Compiler::Eval(const stripe::Affine& access) {
+  llvm::Type* ssizetype = IndexType();
   llvm::Value* offset = llvm::ConstantInt::get(ssizetype, 0);
   for (auto& term : access.getMap()) {
     llvm::Value* indexVar = indexes_[term.first].variable;
@@ -736,8 +741,7 @@ llvm::Value* Compiler::IndexElement(const buffer& buf) {
     indexVal = builder_.CreateMul(indexVal, multiplier);
     offset = builder_.CreateAdd(offset, indexVal);
   }
-  std::vector<llvm::Value*> idxList{offset};
-  return builder_.CreateGEP(buf.base, idxList);
+  return offset;
 }
 
 void Compiler::OutputType(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
@@ -748,6 +752,11 @@ void Compiler::OutputType(llvm::Value* ret, const stripe::Intrinsic& intrinsic) 
 void Compiler::OutputBool(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
   assert(1 == intrinsic.outputs.size());
   scalars_[intrinsic.outputs[0]] = scalar{ret, DataType::BOOLEAN};
+}
+
+llvm::Type* Compiler::IndexType() {
+  unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
+  return llvm::IntegerType::get(context_, archbits);
 }
 
 Executable::Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters)
