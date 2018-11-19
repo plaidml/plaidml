@@ -88,12 +88,14 @@ class Compiler : private stripe::ConstStmtVisitor {
   };
 
   struct buffer {
-    llvm::Value* base = nullptr;
     const stripe::Refinement* refinement = nullptr;
+    llvm::Value* base = nullptr;
   };
 
   struct index {
+    const stripe::Index* index = nullptr;
     llvm::Value* variable = nullptr;
+    llvm::Value* init = nullptr;
   };
 
   struct loop {
@@ -107,11 +109,12 @@ class Compiler : private stripe::ConstStmtVisitor {
   scalar Cast(scalar, DataType);
   scalar CheckBool(scalar);
   llvm::Type* CType(DataType);
-  llvm::Value* IndexElement(const buffer& buf);
+  llvm::Value* ElementPtr(const buffer& buf);
   llvm::Value* Eval(const stripe::Affine& access);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
   llvm::Type* IndexType();
+  llvm::Value* IndexConst(ssize_t val);
 
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
@@ -191,7 +194,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   size_t param_count = program.refs.size();
   auto ai = invoker->arg_begin();
   llvm::Value* argvec = &(*ai);
-  // The body of the invoker will simply compute the element pointer for each
+  // The body of the invoker will compute the element pointer for each
   // argument value in order, then load the value.
   std::vector<llvm::Value*> args;
   for (unsigned i = 0; i < param_count; ++i) {
@@ -202,6 +205,11 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
     llvm::Type* eltype = CType(program.refs[i].shape.type)->getPointerTo();
     args.push_back(builder_.CreateBitCast(elval, eltype));
   }
+  // After passing in buffer pointers, we also provide an initial value for
+  // each index; since this is the outermost block, all indexes begin at zero.
+  for (unsigned i = 0; i < program.idxs.size(); ++i) {
+    args.push_back(IndexConst(0));
+  }
   // Having built the argument list, we'll call the actual kernel using the
   // parameter signature it expects.
   builder_.CreateCall(main, args, "");
@@ -210,16 +218,28 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
 
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   // Generate a function implementing the body of this block.
-  // Buffers (refinements) will be passed in as function parameters.
+  // Buffers (refinements) will be passed in as function parameters, as will
+  // the initial value for each index.
 
-  // create an array of parameter types, one for each buffer
+  for (const auto& ref : block.refs) {
+    buffers_[ref.into] = buffer{&ref};
+  }
+  for (const auto& idx : block.idxs) {
+    indexes_[idx.name] = index{&idx};
+  }
+
+  // create an array of parameter types, one for each buffer and index
   std::vector<llvm::Type*> param_types;
   for (const auto& ref : block.refs) {
     param_types.push_back(CType(ref.shape.type)->getPointerTo());
   }
-  // create a type for the function which will contain the block
+  for (size_t i = 0; i < block.idxs.size(); ++i) {
+    param_types.push_back(IndexType());
+  }
+  // use the parameter type list to create a type for the function
   llvm::Type* return_type = builder_.getVoidTy();
   auto func_type = llvm::FunctionType::get(return_type, param_types, false);
+
   // create the LLVM function which will implement the Stripe block
   auto linkage = llvm::Function::ExternalLinkage;
   auto name = block.name;
@@ -228,20 +248,29 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   auto bb = llvm::BasicBlock::Create(context_, "entry", function);
   builder_.SetInsertPoint(bb);
 
-  // associate parameter values with buffer names
+  // associate parameter values with buffers and indexes
   for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
     unsigned idx = ai->getArgNo();
-    std::string param_name = block.refs[idx].into;
-    ai->setName(param_name);
-    buffers_[param_name] = buffer{&(*ai), &block.refs[idx]};
+    if (idx < block.refs.size()) {
+      std::string param_name = block.refs[idx].into;
+      ai->setName(param_name);
+      assert(nullptr == buffers_[param_name].base);
+      buffers_[param_name].base = &(*ai);
+    } else {
+      idx -= block.refs.size();
+      std::string param_name = block.idxs[idx].name;
+      ai->setName(param_name);
+      assert(nullptr == indexes_[param_name].init);
+      indexes_[param_name].init = &(*ai);
+    }
   }
 
   // allocate storage for each loop index
-  llvm::Type* ssizetype = IndexType();
   for (auto& idx : block.idxs) {
-    llvm::Value* variable = builder_.CreateAlloca(ssizetype);
+    llvm::Value* variable = builder_.CreateAlloca(IndexType());
     variable->setName(idx.name);
-    indexes_[idx.name] = index{variable};
+    assert(nullptr == indexes_[idx.name].variable);
+    indexes_[idx.name].variable = variable;
   }
 
   // generate the basic blocks for each nested loop's evaluation stages
@@ -256,17 +285,18 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   }
 
   // initialize each loop index and generate the termination check
-  llvm::Value* zero = llvm::ConstantInt::get(ssizetype, 0);
   for (size_t i = 0; i < block.idxs.size(); ++i) {
     builder_.CreateBr(loops[i].init);
     builder_.SetInsertPoint(loops[i].init);
     llvm::Value* variable = indexes_[block.idxs[i].name].variable;
-    builder_.CreateStore(zero, variable);
+    llvm::Value* init = indexes_[block.idxs[i].name].init;
+    builder_.CreateStore(init, variable);
     builder_.CreateBr(loops[i].test);
     builder_.SetInsertPoint(loops[i].test);
     llvm::Value* index = builder_.CreateLoad(variable);
-    llvm::Value* range = llvm::ConstantInt::get(ssizetype, block.idxs[i].range);
-    llvm::Value* go = builder_.CreateICmpULT(index, range);
+    llvm::Value* range = IndexConst(block.idxs[i].range);
+    llvm::Value* limit = builder_.CreateAdd(init, range);
+    llvm::Value* go = builder_.CreateICmpULT(index, limit);
     builder_.CreateCondBr(go, loops[i].body, loops[i].done);
     builder_.SetInsertPoint(loops[i].body);
   }
@@ -277,11 +307,11 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     stmt->Accept(this);
   }
 
-  // increment each index, from innermost to outermost, then jump back to the test
+  // increment each index, from innermost to outermost, then jump back to test
   for (size_t i = block.idxs.size(); i-- > 0;) {
     llvm::Value* variable = indexes_[block.idxs[i].name].variable;
     llvm::Value* index = builder_.CreateLoad(variable);
-    llvm::Value* increment = llvm::ConstantInt::get(ssizetype, 1);
+    llvm::Value* increment = IndexConst(1);
     index = builder_.CreateAdd(index, increment);
     builder_.CreateStore(index, variable);
     builder_.CreateBr(loops[i].test);
@@ -299,7 +329,7 @@ void Compiler::Visit(const stripe::Load& load) {
   // Look up the address of the target element.
   // Load the value from that address and use it to redefine the
   // destination scalar.
-  llvm::Value* element = IndexElement(from);
+  llvm::Value* element = ElementPtr(from);
   llvm::Value* value = builder_.CreateLoad(element);
   scalars_[load.into] = scalar{value, from.refinement->shape.type};
 }
@@ -315,7 +345,7 @@ void Compiler::Visit(const stripe::Store& store) {
   buffer into = buffers_[store.into];
   scalar from = Cast(scalars_[store.from], into.refinement->shape.type);
   llvm::Value* value = from.value;
-  llvm::Value* element = IndexElement(into);
+  llvm::Value* element = ElementPtr(into);
   std::string agg_op = into.refinement->agg_op;
   if ("add" == agg_op) {
     llvm::Value* prev = builder_.CreateLoad(element);
@@ -380,11 +410,15 @@ void Compiler::Visit(const stripe::Block& block) {
   // Compile a nested block as a function in the same module
   Compiler nested(module_);
   auto function = nested.CompileBlock(block);
-  // Generate a list of args which are the buffers the block expects to receive.
+  // Generate a list of args. We must pass in all the buffers the block expects
+  // to receive, then the list of initial values for its indexes.
   std::vector<llvm::Value*> args;
   for (auto& ref : block.refs) {
     std::string name = ref.from.empty() ? ref.into : ref.from;
-    args.push_back(IndexElement(buffers_[name]));
+    args.push_back(ElementPtr(buffers_[name]));
+  }
+  for (auto& idx : block.idxs) {
+    args.push_back(Eval(idx.affine));
   }
   // Invoke the function
   builder_.CreateCall(function, args, "");
@@ -722,7 +756,7 @@ llvm::Type* Compiler::CType(DataType type) {
   return builder_.getVoidTy();
 }
 
-llvm::Value* Compiler::IndexElement(const buffer& buf) {
+llvm::Value* Compiler::ElementPtr(const buffer& buf) {
   // Ask the source refinement to generate an access path, in the form of
   // a sequence of indexes to scale and sum. Load each index value, multiply,
   // and the result is an offset from the buffer base address.
@@ -732,12 +766,11 @@ llvm::Value* Compiler::IndexElement(const buffer& buf) {
 }
 
 llvm::Value* Compiler::Eval(const stripe::Affine& access) {
-  llvm::Type* ssizetype = IndexType();
-  llvm::Value* offset = llvm::ConstantInt::get(ssizetype, 0);
+  llvm::Value* offset = IndexConst(0);
   for (auto& term : access.getMap()) {
     llvm::Value* indexVar = indexes_[term.first].variable;
     llvm::Value* indexVal = builder_.CreateLoad(indexVar);
-    llvm::Value* multiplier = llvm::ConstantInt::get(ssizetype, term.second);
+    llvm::Value* multiplier = IndexConst(term.second);
     indexVal = builder_.CreateMul(indexVal, multiplier);
     offset = builder_.CreateAdd(offset, indexVal);
   }
@@ -757,6 +790,11 @@ void Compiler::OutputBool(llvm::Value* ret, const stripe::Intrinsic& intrinsic) 
 llvm::Type* Compiler::IndexType() {
   unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
   return llvm::IntegerType::get(context_, archbits);
+}
+
+llvm::Value* Compiler::IndexConst(ssize_t val) {
+  llvm::Type* ssizetype = IndexType();
+  return llvm::ConstantInt::get(ssizetype, val);
 }
 
 Executable::Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters)
