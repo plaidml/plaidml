@@ -85,12 +85,17 @@ inline constexpr std::size_t RoundUp(std::size_t count, std::size_t alignment) {
 }
 
 struct Chunk {
-  Chunk(stripe::Refinement* ref_, std::size_t alignment, std::size_t stmt_limit)
-      : ref{ref_},
-        size{RoundUp(ref_->shape.byte_size(), alignment)},
-        accessors{stmt_limit},
-        transitive_accessor_deps{stmt_limit},
-        subsequent_accessor_deps{stmt_limit} {}
+  Chunk(stripe::Refinement* ref_, std::size_t alignment, std::size_t stmt_limit, uint64_t num_banks)
+      : ref{ref_}, accessors{stmt_limit}, transitive_accessor_deps{stmt_limit}, subsequent_accessor_deps{stmt_limit} {
+    size_t buf_size = ref->shape.byte_size();
+    if (ref->bank_dim) {
+      uint64_t orig_size = ref->shape.dims[*ref->bank_dim].size;
+      uint64_t new_size = (orig_size + num_banks - 1) / num_banks;
+      buf_size /= orig_size;
+      buf_size *= new_size;
+    }
+    size = RoundUp(buf_size, alignment);
+  }
 
   stripe::Refinement* ref;
   std::size_t size;
@@ -183,7 +188,7 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
 };
 
 std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<stripe::Location>& locations,
-                                std::size_t alignment, std::size_t stmt_limit) {
+                                std::size_t alignment, std::size_t stmt_limit, uint64_t num_banks) {
   // This function:
   //
   // * Logically numbers each statement within the block
@@ -207,7 +212,7 @@ std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<s
   auto add_block_chunks = [&](stripe::Block* block, const AliasMap& alias_map) {
     for (stripe::Refinement& ref : block->refs) {
       if (ref.dir == stripe::RefDir::None && locations.count(ref.location)) {
-        auto chunk_it = result.emplace(result.end(), Chunk{&ref, alignment, stmt_limit});
+        auto chunk_it = result.emplace(result.end(), Chunk{&ref, alignment, stmt_limit, num_banks});
         chunks[alias_map.at(ref.into).base_name] = &*chunk_it;
       }
     }
@@ -286,8 +291,9 @@ void PlaceRefinements(stripe::Block* outermost_block, const proto::MemoryPlaceme
 
   std::size_t stmt_limit = CountStatements(outermost_block);
 
-  std::list<Chunk> chunks = BuildChunkList(outermost_block, locations,
-                                           options.alignment() ? options.alignment() : kDefaultAlignment, stmt_limit);
+  std::list<Chunk> chunks =
+      BuildChunkList(outermost_block, locations, options.alignment() ? options.alignment() : kDefaultAlignment,
+                     stmt_limit, options.num_banks());
 
   // Edge case: no chunks means nothing to do.  And then after this,
   // we can assume there's at least one chunk.
