@@ -52,6 +52,9 @@ message Pass {
     AutotilePass autotile = 12;
     SchedulePass schedule = 13;
     TransposePass transpose = 14;
+    PartitionPass partition = 15;
+    PruneIndexesPass prune_indexes = 16;
+    UnrollPass unroll = 17;
   }
 }
 
@@ -66,6 +69,7 @@ message SchedulePass {
   required uint32 alignment = 4;
   required stripe.proto.Location xfer_loc = 5;
   optional bool allow_out_of_range_accesses = 6 [default = false];
+  optional uint64 num_banks = 7 [default = 1];
 }
 
 message MemoryPlacementPass {
@@ -129,4 +133,20 @@ message AutotilePass {
 message TransposePass {
   repeated string reqs = 1;
   repeated string alloc_reqs = 2;
+}
+
+message PartitionPass {
+  repeated string reqs = 1;
+  repeated string outer_set = 2;
+  repeated string inner_set = 3;
+  required int64 num_parts = 4;
+}
+
+message PruneIndexesPass {
+  repeated string reqs = 1;
+}
+
+message UnrollPass {
+  repeated string reqs = 1;
+  required int64 loc_mul = 2;
 }

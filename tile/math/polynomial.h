@@ -46,6 +46,7 @@ class Polynomial : boost::additive<Polynomial<T>>,
   T constant() const;         // Get the constant part of the Polynomial<T>
   void setConstant(T value);  // Set the constant part of the Polynomial<T> to value
   T eval(const std::map<std::string, T>& values) const;
+  Polynomial partial_eval(const std::map<std::string, T>& values) const;
   // If this/p has no remainder, return this/p, otherwise return 0
   // This works even if p == 0
   T tryDivide(const Polynomial& p, bool ignoreConst = false) const;
