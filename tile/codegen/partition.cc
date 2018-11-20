@@ -40,9 +40,10 @@ void PartitionPass(Block* root, const proto::PartitionPass& options) {
       IVLOG(1, "Skipped partition due to no inputs");
       return;  // No inputs?  Skip this block
     }
-    // Find the largest index that has a non-zero stride both on the large
+    // Find the evenest index that has a non-zero stride both on the large
     // input and on the output refinment
-    size_t best_range = 0;
+    double best_ratio = 0;
+    size_t best_tile = 0;
     size_t idx_id = 0;
     TileShape tile;
     for (size_t i = 0; i < block->idxs.size(); i++) {
@@ -54,12 +55,17 @@ void PartitionPass(Block* root, const proto::PartitionPass& options) {
       if (out_ref->FlatAccess().get(idx.name) == 0) {
         continue;
       }
-      if (idx.range > best_range) {
-        best_range = idx.range;
+      size_t tile_size = (idx.range + options.num_parts() - 1) / options.num_parts();
+      size_t tile_count = (idx.range + tile_size - 1) / tile_size;
+      size_t rounded_size = tile_size * tile_count;
+      double ratio = static_cast<double>(idx.range) / static_cast<double>(rounded_size);
+      if (ratio > best_ratio) {
+        best_ratio = idx.range;
+        best_tile = tile_size;
         idx_id = i;
       }
     }
-    if (best_range == 0) {
+    if (best_tile == 0) {
       IVLOG(1, "Skipped partition due to no valid indexes");
       return;  // No valid indexes?  Skip this block
     }
@@ -78,10 +84,8 @@ void PartitionPass(Block* root, const proto::PartitionPass& options) {
     const auto& ai = map.at(big_ref->into);
     ai.base_ref->bank_dim = bank_dim;
     FixupRefs(ai.base_block, ai.base_ref->into);
-    // Now, tile on that index such that we end up with num_parts parts
-    size_t count = (best_range + options.num_parts() - 1) / options.num_parts();
-    // Round up to the nearest multiple of 4
-    tile[idx_id] = (count + 3) / 4 * 4;
+    // Now, tile on that index
+    tile[idx_id] = best_tile;
     // Do the tiling
     ApplyTile(block, tile, false);
     // Add the new tags
