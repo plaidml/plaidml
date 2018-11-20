@@ -221,6 +221,9 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
   if (ref.from.empty()) {
     os << " new@0x";
     os << std::hex << std::setw(8) << std::setfill('0') << ref.offset << std::dec;
+    if (ref.bank_dim) {
+      os << "," << *ref.bank_dim;
+    }
   }
   os << "<" << ref.location << "> ";
   os << ref.into;
@@ -427,6 +430,9 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     ref.location = FromProto(pb_ref.location());
     ref.is_const = pb_ref.is_const();
     ref.offset = pb_ref.offset();
+    if (pb_ref.has_bank_dim()) {
+      ref.bank_dim = pb_ref.bank_dim().value();
+    }
     ret->refs.emplace_back(ref);
   }
   std::vector<StatementIt> stmts;
@@ -559,6 +565,9 @@ proto::Block IntoProto(const Block& block) {
     *pb_ref->mutable_location() = IntoProto(ref.location);
     pb_ref->set_is_const(ref.is_const);
     pb_ref->set_offset(ref.offset);
+    if (ref.bank_dim) {
+      pb_ref->mutable_bank_dim()->set_value(*ref.bank_dim);
+    }
   }
   std::unordered_map<Statement*, std::size_t> dep_idxs;
   std::size_t stmt_idx = 0;

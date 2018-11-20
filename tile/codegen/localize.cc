@@ -24,6 +24,7 @@ void FixupRefs(Block* block, const std::string& var_name) {
         if (ref.from == var_name) {
           ref.location = it->location;
           ref.offset = it->offset;
+          ref.bank_dim = it->bank_dim;
           for (size_t i = 0; i < ref.shape.dims.size(); i++) {
             ref.shape.dims[i].stride = it->shape.dims[i].stride;
           }

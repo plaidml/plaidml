@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/optional.hpp>
+
 #include "tile/base/shape.h"
 #include "tile/math/polynomial.h"
 #include "tile/stripe/stripe.pb.h"
@@ -130,7 +132,8 @@ struct Refinement {
   std::string agg_op;
   Location location;
   bool is_const;
-  std::size_t offset;  // Offset within the location's arena.
+  std::size_t offset;                  // Offset within the location's arena.
+  boost::optional<uint32_t> bank_dim;  // Which dimension should we bank on
 
   Affine FlatAccess() const;
 };

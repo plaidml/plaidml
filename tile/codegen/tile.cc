@@ -47,6 +47,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   if (outer->idxs.size() != shape.size()) {
     throw_with_trace(std::runtime_error("Invalid tile specified"));
   }
+  // IVLOG(3, "Doing tiling " << shape << ":\n" << *outer);
   // Make a 'by-name' version of tile and check for trivality
   bool trivial = true;
   std::map<std::string, size_t> tile_by_name;
@@ -122,6 +123,10 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   inner->refs = outer->refs;
   // Fix the sizes on the outer blocks
   // TODO: How to handle 'skips'
+  // Remove allocs on the outer refs
+  outer->refs.erase(
+      std::remove_if(outer->refs.begin(), outer->refs.end(), [&](const auto& ref) { return ref.dir == RefDir::None; }),
+      outer->refs.end());
   for (auto& ref : outer->refs) {
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& aff = ref.access[i];
@@ -137,7 +142,9 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
           low += kvp.second * (tile_by_name[kvp.first] - 1);
         }
       }
+      high += (ref.shape.dims[i].size - 1);
       ref.shape.dims[i].size = high - low + 1;
+      ref.access[i].setConstant(0);
     }
   }
   // Multiply each stride in the outer block refinements by the appropriate tile size
@@ -150,6 +157,18 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
       }
     }
   }
+  /*
+  // Zero out unused outer indexes
+  for (auto& ref : outer->refs) {
+    for (auto& aff : ref.access) {
+      for (const auto& idx : outer->idxs) {
+        if (idx.range == 1) {
+          aff.mutateMap().erase(idx.name);
+        }
+      }
+    }
+  }
+  */
 
   // Make the inner block the sole stmt of the outer block
   outer->stmts = {inner};

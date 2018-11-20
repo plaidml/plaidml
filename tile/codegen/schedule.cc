@@ -53,14 +53,22 @@ struct CacheEntry;
 // RefInfo contains information around the usage of one particular
 // backing ref during the scan.
 struct RefInfo {
-  explicit RefInfo(stripe::Refinement* ref_) : ref(*ref_) {
+  explicit RefInfo(stripe::Refinement* ref_, uint64_t num_banks) : ref(*ref_) {
     TensorShape raw_ts = ref.shape;
     std::vector<std::size_t> sizes;
     for (const auto& dim : raw_ts.dims) {
       sizes.push_back(dim.size);
     }
-    cache_shape = SimpleShape(ref.shape.type, sizes);
+    // cache_shape = SimpleShape(ref.shape.type, sizes);
+    // TODO: consider a better way to retain index order
+    cache_shape = raw_ts;
     size = cache_shape.byte_size();
+    if (ref.bank_dim) {
+      uint64_t orig_size = ref.shape.dims[*ref.bank_dim].size;
+      uint64_t new_size = (orig_size + num_banks - 1) / num_banks;
+      size /= orig_size;
+      size *= new_size;
+    }
 
     for (size_t i = 0; i < sizes.size(); i++) {
       std::string iname = std::string("i") + std::to_string(i);
@@ -295,7 +303,7 @@ class Scheduler {
 
  private:
   // Builds a map for looking up RefInfos for a given block access.
-  static std::unordered_map<std::string, RefInfo> BuildRefInfoMap(stripe::Block* block);
+  static std::unordered_map<std::string, RefInfo> BuildRefInfoMap(stripe::Block* block, uint64_t num_banks);
 
   Scheduler(const AliasMap* alias_map, stripe::Block* block, const proto::SchedulePass& options);
 
@@ -384,6 +392,7 @@ class Scheduler {
   std::size_t alignment_;
   stripe::Location xfer_loc_;
   bool allow_out_of_range_accesses_;
+  uint64_t num_banks_;
   std::unordered_map<std::string, RefInfo> ri_map_;
   std::unordered_map<stripe::Refinement*, std::vector<RefInfo*>> base_ref_aliases_;
 
@@ -415,10 +424,10 @@ void Scheduler::Schedule(const AliasMap& alias_map, stripe::Block* block, const 
   Scheduler{&alias_map, block, options}.Run();
 }
 
-std::unordered_map<std::string, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block) {
+std::unordered_map<std::string, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, uint64_t num_banks) {
   std::unordered_map<std::string, RefInfo> ri_map;
   for (auto& ref : block->refs) {
-    ri_map.emplace(ref.into, RefInfo{&ref});
+    ri_map.emplace(ref.into, RefInfo{&ref, num_banks});
   }
   return ri_map;
 }
@@ -431,7 +440,8 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
       alignment_{options.alignment() ? options.alignment() : kDefaultAlignment},
       xfer_loc_(stripe::FromProto(options.xfer_loc())),
       allow_out_of_range_accesses_{options.allow_out_of_range_accesses()},
-      ri_map_{BuildRefInfoMap(block)} {
+      num_banks_{options.num_banks()},
+      ri_map_{BuildRefInfoMap(block, num_banks_)} {
   for (auto& name_ref : ri_map_) {
     RefInfo* ri = &name_ref.second;
     ri->alias_info = &alias_map_->at(ri->ref.into);

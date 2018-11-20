@@ -7,11 +7,14 @@
 #include "tile/codegen/deps.h"
 #include "tile/codegen/fuse.h"
 #include "tile/codegen/localize.h"
+#include "tile/codegen/partition.h"
 #include "tile/codegen/placer.h"
 #include "tile/codegen/scalarize.h"
 #include "tile/codegen/schedule.h"
+#include "tile/codegen/tidy.h"
 #include "tile/codegen/tile.h"
 #include "tile/codegen/transpose.h"
+#include "tile/codegen/unroll.h"
 
 namespace vertexai {
 namespace tile {
@@ -78,6 +81,15 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
         break;
       case proto::Pass::kTranspose:
         TransposePass(block, pass.transpose());
+        break;
+      case proto::Pass::kPartition:
+        PartitionPass(block, pass.partition());
+        break;
+      case proto::Pass::kPruneIndexes:
+        PruneIndexesPass(block, pass.prune_indexes());
+        break;
+      case proto::Pass::kUnroll:
+        UnrollPass(block, pass.unroll());
         break;
       default:
         break;
