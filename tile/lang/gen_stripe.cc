@@ -63,16 +63,16 @@ class StripeGenerator {
         if (binding.tag == Binding::TENSOR) {
           std::vector<Affine> access(binding.shape.dims.size());
           main->refs.emplace_back(Refinement{
-              RefDir::None,             // dir
-              "",                       // from
-              item.first,               // into
-              access,                   // access
-              binding.shape,            // shape
-              "",                       // agg_op
-              {},                       // location
-              IsConst(item.first),      // is_const
-              0,                        // offset
-              boost::optional::none_t,  // bank_dim
+              RefDir::None,         // dir
+              "",                   // from
+              item.first,           // into
+              access,               // access
+              binding.shape,        // shape
+              "",                   // agg_op
+              {},                   // location
+              IsConst(item.first),  // is_const
+              0,                    // offset
+              boost::none,          // bank_dim
           });
         }
       }
@@ -87,29 +87,29 @@ class StripeGenerator {
       externals_.insert(item.first);
       std::vector<Affine> access(item.second.dims.size());
       program->refs.emplace_back(Refinement{
-          RefDir::None,             // dir
-          "",                       // from
-          item.first,               // into
-          access,                   // access
-          item.second,              // shape
-          "",                       // agg_op
-          {},                       // location
-          IsConst(item.first),      // is_const
-          0,                        // offset
-          boost::optional::none_t,  // bank_dim
+          RefDir::None,         // dir
+          "",                   // from
+          item.first,           // into
+          access,               // access
+          item.second,          // shape
+          "",                   // agg_op
+          {},                   // location
+          IsConst(item.first),  // is_const
+          0,                    // offset
+          boost::none,          // bank_dim
       });
       if (is_input) {
         main->refs.emplace_back(Refinement{
-            RefDir::In,               // dir
-            item.first,               // from
-            item.first,               // into
-            access,                   // access
-            item.second,              // shape
-            "",                       // agg_op
-            {},                       // location
-            IsConst(item.first),      // is_const
-            0,                        // offset
-            boost::optional::none_t,  // bank_dim
+            RefDir::In,           // dir
+            item.first,           // from
+            item.first,           // into
+            access,               // access
+            item.second,          // shape
+            "",                   // agg_op
+            {},                   // location
+            IsConst(item.first),  // is_const
+            0,                    // offset
+            boost::none,          // bank_dim
         });
       } else {
         main->refs.emplace_back(Refinement{
@@ -173,16 +173,16 @@ class StripeGenerator {
         auto scalar_name = ScalarName(spec.id);
         scalar_inputs.push_back(scalar_name);
         kernel->refs.emplace_back(Refinement{
-            RefDir::In,               // dir
-            spec.id,                  // from
-            spec.id,                  // into
-            access,                   // access
-            shape,                    // shape
-            "",                       // agg_op
-            {},                       // location
-            IsConst(spec.id),         // is_const
-            0,                        // offset
-            boost::optional::none_t,  // bank_dim
+            RefDir::In,        // dir
+            spec.id,           // from
+            spec.id,           // into
+            access,            // access
+            shape,             // shape
+            "",                // agg_op
+            {},                // location
+            IsConst(spec.id),  // is_const
+            0,                 // offset
+            boost::none,       // bank_dim
         });
         // LOAD
         kernel->stmts.push_back(std::make_shared<Load>(spec.id, scalar_name));
@@ -308,16 +308,16 @@ class StripeGenerator {
             }
           }
           kernel->refs.emplace_back(Refinement{
-              RefDir::In,               // dir
-              input,                    // from
-              input,                    // into
-              access,                   // access
-              ScalarShape(input),       // shape
-              "",                       // agg_op
-              {},                       // location
-              IsConst(input),           // is_const
-              0,                        // offset
-              boost::optional::none_t,  // bank_dim
+              RefDir::In,          // dir
+              input,               // from
+              input,               // into
+              access,              // access
+              ScalarShape(input),  // shape
+              "",                  // agg_op
+              {},                  // location
+              IsConst(input),      // is_const
+              0,                   // offset
+              boost::none,         // bank_dim
           });
           // LOAD
           kernel->stmts.push_back(std::make_shared<Load>(input, ScalarName(input)));
