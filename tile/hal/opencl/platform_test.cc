@@ -65,8 +65,10 @@ Param supported_params[] = {
     {DataType::FLOAT32, 8},   //
     {DataType::FLOAT32, 16},  //
 
-    {DataType::FLOAT64, 1},  //
-    {DataType::FLOAT64, 2},  //
+    // TODO: enable these tests by querying the target device for
+    // support of 64-bit floating point types
+    // {DataType::FLOAT64, 1},  //
+    // {DataType::FLOAT64, 2},  //
 };
 
 std::vector<FactoryParam> SupportedParams() {
