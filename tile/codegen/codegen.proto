@@ -76,6 +76,7 @@ message MemoryPlacementPass {
   repeated string reqs = 1;
   required uint32 alignment = 2;
   repeated stripe.proto.Location locs = 3;
+  optional uint64 num_banks = 4 [default = 1];
 }
 
 message CachePass {
