@@ -115,6 +115,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
+  llvm::FunctionType* BlockType(const stripe::Block&);
 
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
@@ -228,21 +229,10 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     indexes_[idx.name] = index{&idx};
   }
 
-  // create an array of parameter types, one for each buffer and index
-  std::vector<llvm::Type*> param_types;
-  for (const auto& ref : block.refs) {
-    param_types.push_back(CType(ref.shape.type)->getPointerTo());
-  }
-  for (size_t i = 0; i < block.idxs.size(); ++i) {
-    param_types.push_back(IndexType());
-  }
-  // use the parameter type list to create a type for the function
-  llvm::Type* return_type = builder_.getVoidTy();
-  auto func_type = llvm::FunctionType::get(return_type, param_types, false);
-
   // create the LLVM function which will implement the Stripe block
   auto linkage = llvm::Function::ExternalLinkage;
   auto name = block.name;
+  auto func_type = BlockType(block);
   auto function = llvm::Function::Create(func_type, linkage, name, module_);
   // create a basic block; configure the builder to start there
   auto bb = llvm::BasicBlock::Create(context_, "entry", function);
@@ -301,11 +291,28 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     builder_.SetInsertPoint(loops[i].body);
   }
 
+  // check the constraints against the current index values and decide whether
+  // to execute the block body for this iteration
+  llvm::Value* go = builder_.getTrue();
+  for (auto& constraint : block.constraints) {
+    llvm::Value* gateval = Eval(constraint);
+    llvm::Value* check = builder_.CreateICmpSGE(gateval, IndexConst(0));
+    go = builder_.CreateAnd(check, go);
+  }
+  auto block_body = llvm::BasicBlock::Create(context_, "block", function);
+  auto block_done = llvm::BasicBlock::Create(context_, "next", function);
+  builder_.CreateCondBr(go, block_body, block_done);
+  builder_.SetInsertPoint(block_body);
+
   // process each statement in the block body, generating code to modify the
   // parameter buffer contents
   for (const auto& stmt : block.stmts) {
     stmt->Accept(this);
   }
+
+  // rejoin instruction flow after the constraint check
+  builder_.CreateBr(block_done);
+  builder_.SetInsertPoint(block_done);
 
   // increment each index, from innermost to outermost, then jump back to test
   for (size_t i = block.idxs.size(); i-- > 0;) {
@@ -795,6 +802,23 @@ llvm::Type* Compiler::IndexType() {
 llvm::Value* Compiler::IndexConst(ssize_t val) {
   llvm::Type* ssizetype = IndexType();
   return llvm::ConstantInt::get(ssizetype, val);
+}
+
+llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
+  // Generate a type for the function which will implement this block.
+  std::vector<llvm::Type*> param_types;
+  // Each buffer base address will be provided as a parameter.
+  for (const auto& ref : block.refs) {
+    param_types.push_back(CType(ref.shape.type)->getPointerTo());
+  }
+  // Following the buffers, a parameter will provide the initial value for
+  // each of the block's indexes.
+  for (size_t i = 0; i < block.idxs.size(); ++i) {
+    param_types.push_back(IndexType());
+  }
+  // Blocks never return a value.
+  llvm::Type* return_type = builder_.getVoidTy();
+  return llvm::FunctionType::get(return_type, param_types, false);
 }
 
 Executable::Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters)
