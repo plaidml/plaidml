@@ -22,6 +22,8 @@ class LiteralPolynomial : public SymbolicPolynomial {
   SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override { return MakeLiteral(value_); }
   Polynomial<Rational> Evaluate(const Bindings& bindings) const override { return Polynomial<Rational>(value_); }
   std::string ToString() const override { return std::to_string(value_); }
+  std::shared_ptr<Value> value() const override { return std::shared_ptr<Value>{}; }
+  SymbolicSpec subspec() const override { return SymbolicSpec{}; }
 
  private:
   int64_t value_;
@@ -53,6 +55,8 @@ class LookupPolynomial : public SymbolicPolynomial {
     return Polynomial<Rational>(it->second.iconst);
   }
   std::string ToString() const override { return name_; }
+  std::shared_ptr<Value> value() const override { return std::shared_ptr<Value>{}; }
+  SymbolicSpec subspec() const override { return SymbolicSpec{}; }
 
  private:
   std::string name_;
@@ -75,6 +79,8 @@ class ValuePolynomial : public SymbolicPolynomial {
     throw std::runtime_error("Evaluate not implemented for ValuePolynomial");
   }
   std::string ToString() const override { throw std::runtime_error("ToString not implemented for ValuePolynomial"); }
+  std::shared_ptr<Value> value() const override { return std::shared_ptr<Value>{value_}; }
+  SymbolicSpec subspec() const override { return SymbolicSpec{}; }
 
  private:
   std::shared_ptr<Value> value_;
@@ -97,6 +103,8 @@ class IndexPolynomial : public SymbolicPolynomial {
   SymbolicPolynomialPtr Decompose(BoundFunction* bf) const override { return MakeIndex(index_); }
   Polynomial<Rational> Evaluate(const Bindings& bindings) const override { return Polynomial<Rational>(index_); }
   std::string ToString() const override { return index_; }
+  std::shared_ptr<Value> value() const override { return std::shared_ptr<Value>{}; }
+  SymbolicSpec subspec() const override { return SymbolicSpec{}; }
 
  private:
   std::string index_;
@@ -118,6 +126,8 @@ class UnaryOpPolynomial : public SymbolicPolynomial {
     return -val_->Evaluate(bindings);
   }
   std::string ToString() const override { return "(-" + val_->ToString() + ")"; }
+  std::shared_ptr<Value> value() const override { return std::shared_ptr<Value>{}; }
+  SymbolicSpec subspec() const override { return SymbolicSpec{val_}; }
 
  private:
   std::string op_;
@@ -165,6 +175,8 @@ class BinaryOpPolynomial : public SymbolicPolynomial {
     throw std::runtime_error("Unknown binary polynomial op");
   }
   std::string ToString() const override { return "(" + lhs_->ToString() + " " + op_ + " " + rhs_->ToString() + ")"; }
+  std::shared_ptr<Value> value() const override { return std::shared_ptr<Value>{}; }
+  SymbolicSpec subspec() const override { return SymbolicSpec{lhs_, rhs_}; }
 
  private:
   std::string op_;

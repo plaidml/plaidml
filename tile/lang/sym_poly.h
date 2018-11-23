@@ -13,6 +13,7 @@ namespace lang {
 
 class BoundFunction;
 class FunctionApplication;
+class Value;
 
 class SymbolicPolynomial {
  public:
@@ -30,6 +31,8 @@ class SymbolicPolynomial {
   virtual SymbolicPolynomialPtr Decompose(BoundFunction* bf) const = 0;
   virtual math::Polynomial<math::Rational> Evaluate(const Bindings& bindings) const = 0;
   virtual std::string ToString() const = 0;
+  virtual std::shared_ptr<Value> value() const = 0;
+  virtual SymbolicSpec subspec() const = 0;
 };
 
 class ValuePolynomial;

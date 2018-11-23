@@ -61,7 +61,7 @@ struct Value {
   google::protobuf::RepeatedPtrField<std::string> attr_param_list;
 };
 
-#define YYSTYPE Value
+#define YYSTYPE ::Value
 
 typedef void* yyscan_t;
 
