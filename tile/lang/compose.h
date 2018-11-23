@@ -133,7 +133,7 @@ struct FunctionValue final : public Value {
   FunctionValue(std::string fn, std::vector<std::shared_ptr<Value>> inputs);
 
   const std::string& fn() const { return fn_; }
-  const std::vector<std::shared_ptr<Value>> inputs() const { return inputs_; }
+  const std::vector<std::shared_ptr<Value>>& inputs() const { return inputs_; }
   Value::Type type() const final { return Value::Type::FUNCTION; }
   size_t num_dims() const final { return dims_.size(); }
   std::shared_ptr<Value> dim_value(size_t i) const final { return dims_[i]; }
@@ -277,6 +277,7 @@ class BoundFunction final : public ValueVisitor<std::string> {
  private:
   // Called during construction
   std::string NewTmp() { return std::string("_T") + std::to_string(prog_.next_tmp++); }
+  std::string LocalNameOf(const std::shared_ptr<Value>& val);
   std::string Apply(const std::shared_ptr<Value>& val) final;
   std::string Visit(const std::shared_ptr<TensorValue>& val) final;
   std::string Visit(const std::shared_ptr<PlaceholderValue>& val) final;
