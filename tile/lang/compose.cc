@@ -393,6 +393,145 @@ void BoundFunction::AddInput(const std::string& name, const std::shared_ptr<Plac
   prog_.inputs.push_back(in);
 }
 
+std::string BoundFunction::LocalNameOf(const std::shared_ptr<Value>& val) {
+  // See whether we already have a name for this Value.
+  auto it = bindings_.find(val);
+  if (it != bindings_.end()) {
+    return it->second;
+  }
+
+  // Otherwise, we need to bind a name for this Value.  Binding a name
+  // requires adding an Op to generate that name; creating an Op
+  // requires having names for the Op's inputs.  Real-world evidence
+  // suggests that it's possible to run out of thread stack space if
+  // we do this recursively, so instead, we do it iteratively.  :-(
+  //
+  // We handle this with a simple depth-first scan, maintaining a
+  // stack of Values that need to be named.  To process the Value on
+  // top of the stack, we look at its input values: if all inputs are
+  // named, we reduce the value to an Op and bind its name in
+  // bindings_; otherwise, we shift all unnamed inputs onto the stack.
+
+  enum BindProcessingState {
+    // This is a new Value; its inputs have not been examined.
+    kNewValue,
+
+    // This Value's inputs have been examined and shifted onto the
+    // stack; once they have been processed, the Value can be reduced.
+    kShiftedInputs
+  };
+
+  std::stack<std::pair<std::shared_ptr<Value>, BindProcessingState>> todo;
+
+  auto found = [&](const std::shared_ptr<Value>& val) {
+    IVLOG(4, "LocalNameOf: Found value " << val.get());
+    auto it = bindings_.find(val);
+    if (it != bindings_.end()) {
+      IVLOG(4, "LocalNameOf: Value " << val.get() << " is already named " << it->second);
+      return;
+    }
+    switch (val->type()) {
+      case Value::Type::TENSOR:
+      case Value::Type::PLACEHOLDER:
+      case Value::Type::FCONST:
+      case Value::Type::ICONST:
+        // These can be evaluated immediately -- they have no Value inputs.
+        IVLOG(4, "LocalNameOf: Binding value " << val.get() << " immediately");
+        Apply(val);
+        break;
+      case Value::Type::FUNCTION:
+      case Value::Type::CONTRACTION:
+        // Process these later, depth-first.
+        IVLOG(4, "LocalNameOf: Queuing value " << val.get() << " for later");
+        todo.push(std::make_pair(val, kNewValue));
+        break;
+    }
+  };
+
+  IVLOG(4, "LocalNameOf: Starting from value " << val.get());
+  found(val);
+
+  while (!todo.empty()) {
+    auto& top = todo.top();
+    if (top.second == kNewValue) {
+      IVLOG(4, "LocalNameOf: TOS is new value " << top.first.get());
+      // Mark this Value as having been shifted, so that when it comes
+      // up again, we'll know that we've seen all of its inputs.
+      top.second = kShiftedInputs;
+      switch (top.first->type()) {
+        case Value::Type::FUNCTION: {
+          std::shared_ptr<FunctionValue> val = std::dynamic_pointer_cast<FunctionValue>(top.first);
+          IVLOG(4, "LocalNameOf: TOS is function value " << val.get());
+          // N.B. For functions, we're careful to push parameters in
+          // reverse, so that they're popped off the processing stack
+          // in left-to-right order.
+          for (auto input_it = val->inputs().rbegin(); input_it != val->inputs().rend(); ++input_it) {
+            found(*input_it);
+          }
+          break;
+        }
+        case Value::Type::CONTRACTION: {
+          std::shared_ptr<ContractionValue> val = std::dynamic_pointer_cast<ContractionValue>(top.first);
+          IVLOG(4, "LocalNameOf: TOS is contraction value " << val.get());
+          std::stack<SymbolicPolynomialPtr> polys;
+
+          for (size_t i = 0; i < val->num_dims(); ++i) {
+            found(val->dim_value(i));
+          }
+
+          for (auto& spec : val->specs()[0]) {
+            polys.push(spec);
+          }
+
+          for (size_t i = 0; i < val->logical_input_size(); ++i) {
+            found(val->inputs()[i]);
+            for (auto& poly : val->specs()[i + 1]) {
+              polys.push(poly);
+            }
+          }
+
+          for (auto& constraint : val->constraints()) {
+            polys.push(constraint.poly);
+            if (constraint.range) {
+              found(constraint.range);
+            }
+          }
+
+          if (val->use_default()) {
+            found(val->inputs().back());
+          }
+
+          while (!polys.empty()) {
+            SymbolicPolynomialPtr poly = polys.top();
+            polys.pop();
+            for (const auto& subspec_poly : poly->subspec()) {
+              polys.push(subspec_poly);
+            }
+            auto subval = poly->value();
+            if (subval) {
+              found(subval);
+            }
+          }
+
+          break;
+        }
+        default:
+          throw std::runtime_error("Found a non-function or contraction while processing a binding stack.");
+      }
+    } else {
+      IVLOG(4, "LocalNameOf: TOS is existing value " << top.first.get());
+      Apply(top.first);
+      todo.pop();
+    }
+  }
+
+  IVLOG(4, "LocalNameOf: Binding complete; root name is " << bindings_.at(val));
+
+  // At this point, the Value (and all Values reachable from the
+  // Value) has been bound to a name.
+  return bindings_.at(val);
+}
+
 void BoundFunction::AddOutput(const std::string& name, const std::shared_ptr<Value>& val) {
   if (updated_.size()) {
     throw std::runtime_error("Cannot add outputs after updates: " + name);
@@ -401,7 +540,7 @@ void BoundFunction::AddOutput(const std::string& name, const std::shared_ptr<Val
     throw std::runtime_error("Duplicate output name: " + name);
   }
   out_pos_[name] = out_pos_.size();
-  std::string oname = Apply(val);
+  std::string oname = LocalNameOf(val);
   // TODO: Should I do this as a replacement?  An issue with this is a direct return of an input
   Op op = {Op::FUNCTION, name, {oname}, {}, {"ident"}};
   prog_.ops.push_back(op);
@@ -422,7 +561,7 @@ void BoundFunction::AddUpdate(const std::shared_ptr<TensorValue>& lhs, const std
     // TODO: Make new updates override old updates
     throw std::runtime_error("Duplicate updates");
   }
-  std::string oname = Apply(rhs);
+  std::string oname = LocalNameOf(rhs);
 
   // We have a couple of interesting cases in which we need to insert an identity function (because we can't use the
   // exising name):
@@ -621,6 +760,7 @@ std::string BoundFunction::Apply(const std::shared_ptr<Value>& val) {
 }
 
 std::string BoundFunction::Visit(const std::shared_ptr<TensorValue>& val) {
+  IVLOG(4, "BoundFunction: Visiting tensor value " << val.get());
   std::string tname = "_I_" + std::to_string(in_bound_.size());
   Input in = {Input::FIXED, tname};
   for (size_t i = 0; i < val->num_dims(); i++) {
@@ -634,10 +774,12 @@ std::string BoundFunction::Visit(const std::shared_ptr<TensorValue>& val) {
 }
 
 std::string BoundFunction::Visit(const std::shared_ptr<PlaceholderValue>& val) {
+  IVLOG(4, "BoundFunction: Visiting placeholder value " << val.get());
   throw std::runtime_error("Binding missing placeholder");
 }
 
 std::string BoundFunction::Visit(const std::shared_ptr<FConstValue>& val) {
+  IVLOG(4, "BoundFunction: Visiting fconst value " << val.get());
   std::string str = DoubleToString(val->value());
   if (str.find_first_of(".e") == std::string::npos) {
     str.append(".0");
@@ -648,6 +790,7 @@ std::string BoundFunction::Visit(const std::shared_ptr<FConstValue>& val) {
 }
 
 std::string BoundFunction::Visit(const std::shared_ptr<IConstValue>& val) {
+  IVLOG(4, "BoundFunction: Visiting iconst value " << val.get());
   Op op = {Op::CONSTANT, NewTmp(), {std::to_string(val->value())}, {}, {"iconst"}};
   IVLOG(4, "Allocating iconst " << op.output);
   prog_.ops.push_back(op);
@@ -655,9 +798,10 @@ std::string BoundFunction::Visit(const std::shared_ptr<IConstValue>& val) {
 }
 
 std::string BoundFunction::Visit(const std::shared_ptr<FunctionValue>& val) {
+  IVLOG(4, "BoundFunction: Visiting function value " << val.get());
   std::vector<std::string> inputs;
   for (size_t i = 0; i < val->inputs().size(); i++) {
-    inputs.push_back(Apply(val->inputs()[i]));
+    inputs.push_back(bindings_.at(val->inputs()[i]));
   }
   Op op = {Op::FUNCTION, NewTmp(), inputs, {}, {val->fn()}};
   IVLOG(4, "Allocated function " << op);
@@ -674,6 +818,7 @@ static SymbolicSpec DecomposeSpecs(const SymbolicSpec& orig, BoundFunction* bf) 
 }
 
 std::string BoundFunction::Visit(const std::shared_ptr<ContractionValue>& val) {
+  IVLOG(4, "BoundFunction: Visiting contraction value " << val.get());
   Op op = {Op::CONTRACTION, NewTmp()};
   auto& inputs = op.inputs;
   auto& c = op.c;
@@ -681,23 +826,23 @@ std::string BoundFunction::Visit(const std::shared_ptr<ContractionValue>& val) {
   c.agg_op = val->agg_op();
   IVLOG(4, "Building op to produce " << op.output);
   for (size_t i = 0; i < val->num_dims(); i++) {
-    std::string dsize = Apply(val->dim_value(i));
+    std::string dsize = bindings_.at(val->dim_value(i));
     IVLOG(4, "  Pushing dsize=" << dsize);
     c.output_size.push_back(dsize);
   }
   c.specs.push_back(TensorSpec{op.output, DecomposeSpecs(val->specs()[0], this)});
   for (size_t i = 0; i < val->logical_input_size(); i++) {
-    std::string vname = Apply(val->inputs()[i]);
+    std::string vname = bindings_.at(val->inputs()[i]);
     inputs.push_back(vname);
     c.specs.push_back(TensorSpec{vname, DecomposeSpecs(val->specs()[i + 1], this)});
   }
   for (const auto& vc : val->constraints()) {
-    std::string rname = Apply(vc.range);
+    std::string rname = bindings_.at(vc.range);
     SymbolicConstraint rc(vc.poly->Decompose(this), rname);
     c.constraints.push_back(rc);
   }
   if (val->use_default()) {
-    std::string default_name = Apply(val->inputs().back());
+    std::string default_name = bindings_.at(val->inputs().back());
     c.use_default = default_name;
   }
   c.no_defract = val->no_defract();
