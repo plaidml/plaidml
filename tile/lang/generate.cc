@@ -264,17 +264,26 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
   if (it != flat_cache->end()) {
     IVLOG(2, "Cache key: " << flat_key << ", Hit!");
     r.kernels.emplace_back(it->second);
-    auto& ki = r.kernels.back();
-    ki.outputs = flat.kernel_outputs;
-    ki.inputs.clear();
-    for (const auto& input : inputs) {
-      if (vars.at(input).tag == Binding::TENSOR) {
-        ki.inputs.emplace_back(var_rewrites.Lookup(input));
+
+    auto update_kernel_info = [&](KernelInfo& ki) {
+      ki.outputs = flat.kernel_outputs;
+      ki.inputs.clear();
+      for (const auto& input : inputs) {
+        if (vars.at(input).tag == Binding::TENSOR) {
+          ki.inputs.emplace_back(var_rewrites.Lookup(input));
+        }
       }
+      for (const auto& op_input : flat.post_op_inputs) {
+        ki.inputs.emplace_back(var_rewrites.Lookup(op_input.name));
+      }
+    };
+
+    auto& ki = r.kernels.back();
+    update_kernel_info(ki);
+    for (KernelInfo& candidate : ki.candidates) {
+      update_kernel_info(candidate);
     }
-    for (const auto& op_input : flat.post_op_inputs) {
-      ki.inputs.emplace_back(var_rewrites.Lookup(op_input.name));
-    }
+
     return;
   }
   IVLOG(2, "Cache key: " << flat_key << ", Miss!");
