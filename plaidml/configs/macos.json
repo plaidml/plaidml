@@ -60,13 +60,14 @@
                 },
                 
                 "settings": {
-                    "threads": 64,
-                    "vec_size": 2,
+                    "threads": 128,
+                    "vec_size": 4,
                     "mem_width": 256,
-                    "max_mem": 7300,
-                    "max_regs": 4000,
-                    "goal_groups": 1,
-                    "goal_flops_per_byte": 50
+                    "max_mem": 16000,
+                    "max_regs": 16000,
+                    "goal_groups": 6,
+                    "goal_flops_per_byte": 50,
+                    "use_global": "true"
                 }
             }
         ]
