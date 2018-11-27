@@ -16,6 +16,23 @@ lang::RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const T
   return runinfo;
 }
 
+lang::RunInfo LoadConstCalc(const std::string& name, const TensorShape& output) {
+  lang::RunInfo runinfo;
+  runinfo.program_name = name;
+  runinfo.code = R"***(
+function () -> (O) {
+  N = 1;
+  F = 0.0;
+  F2 = 3.7;
+  Simple[i : N] = =(F[]);
+  DoubleN[i : N] = =(N[]);
+  Partial = Simple + DoubleN;
+  O = Partial + F2;
+})***";
+  runinfo.output_shapes.emplace("O", output);
+  return runinfo;
+}
+
 lang::RunInfo LoadConv1d(const std::string& name,    //
                          const TensorShape& input,   //
                          const TensorShape& kernel,  //
