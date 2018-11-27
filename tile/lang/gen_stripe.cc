@@ -54,7 +54,7 @@ class StripeGenerator {
           }
           break;
         case Op::CONSTANT:
-          // LOG(WARNING) << "CONSTANT: " << op;
+          // Do nothing -- these are handed by constant propagation
           break;
       }
     }
@@ -174,6 +174,18 @@ class StripeGenerator {
       } else {
         auto scalar_name = ScalarName(spec.id);
         scalar_inputs.push_back(scalar_name);
+        // if this is a constant, propagate it into the load statement
+        const auto& src = vars_.find(spec.id);  // TODO: Better name
+        if (src != vars_.end()) {
+          if (src->second.tag == Binding::FCONST) {
+            kernel->stmts.push_back(std::make_shared<Constant>(scalar_name, src->second.fconst));
+            continue;
+          } else if (src->second.tag == Binding::ICONST) {
+            kernel->stmts.push_back(std::make_shared<Constant>(scalar_name, src->second.iconst));
+            continue;
+          }
+        }
+        // otherwise fall through and do a normal load
         kernel->refs.emplace_back(Refinement{
             RefDir::In,        // dir
             spec.id,           // from

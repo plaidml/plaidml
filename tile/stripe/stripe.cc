@@ -159,10 +159,10 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
   os << op.name << " = ";
   switch (op.type) {
     case ConstType::Integer:
-      os << op.iconst;
+      os << op.iconst << " (int)";
       break;
     case ConstType::Float:
-      os << op.fconst;
+      os << op.fconst << " (float)";
       break;
     default:
       break;

@@ -12,6 +12,9 @@ lang::RunInfo LoadMatMul(const std::string& name,    //
                          const TensorShape& input1,  //
                          const TensorShape& input2);
 
+lang::RunInfo LoadConstCalc(const std::string& name,  //
+                            const TensorShape& output);
+
 lang::RunInfo LoadConv1d(const std::string& name,    //
                          const TensorShape& input,   //
                          const TensorShape& kernel,  //
