@@ -66,8 +66,7 @@
                     "max_mem": 16000,
                     "max_regs": 16000,
                     "goal_groups": 6,
-                    "goal_flops_per_byte": 50,
-                    "use_global": "true"
+                    "goal_flops_per_byte": 50
                 }
             }
         ]
