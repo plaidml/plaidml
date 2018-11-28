@@ -2,6 +2,8 @@
 
 #include "tile/codegen/fuse.h"
 
+#include <boost/format.hpp>
+
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
 #include "tile/codegen/localize.h"
@@ -278,7 +280,7 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   // We are now safe (cannot fail), move new reference over A's
   std::swap(block_a->refs, r->refs);
   if (!block_a->name.empty()) {
-    block_a->name = printstring("%s+%s", block_a->name.c_str(), block_b->name.c_str());
+    block_a->name = str(boost::format("%s+%s") % block_a->name % block_b->name);
   } else if (!block_b->name.empty()) {
     block_a->name = block_b->name;
   }

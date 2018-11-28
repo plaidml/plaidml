@@ -2,6 +2,8 @@
 
 #include "tile/codegen/driver.h"
 
+#include <boost/format.hpp>
+
 #include "tile/codegen/autotile.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/deps.h"
@@ -28,7 +30,7 @@ void DumpProgram(const stripe::Block& program,    //
                  size_t counter) {
   if (options.dump_passes) {
     boost::filesystem::create_directory(options.dbg_dir);
-    auto filename = printstring("%02zu_%s.txt", counter, name.c_str());
+    auto filename = str(boost::format("%02zu_%s.txt") % counter % name);
     auto path = (options.dbg_dir / filename).string();
     std::ofstream fout(path);
     fout << program << std::endl;

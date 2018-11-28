@@ -5,7 +5,6 @@
 #include <string>
 
 #include "base/util/logging.h"
-#include "base/util/printstring.h"
 #include "tile/lang/compile.h"
 #include "tile/lang/ops.h"
 #include "tile/math/basis.h"

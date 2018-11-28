@@ -1,5 +1,7 @@
 #include "tile/math/polynomial.h"
 
+#include <boost/format.hpp>
+
 namespace vertexai {
 namespace tile {
 namespace math {
@@ -27,7 +29,7 @@ T Polynomial<T>::eval(const std::map<std::string, T>& values) const {
       res += kvp.second * values.at(kvp.first);
     } else {
       throw std::runtime_error(
-          printstring("Failed to find value for %s, when evaluating %s", kvp.first.c_str(), this->toString().c_str()));
+          str(boost::format("Failed to find value for %s, when evaluating %s") % kvp.first % toString()));
     }
   }
   return res;

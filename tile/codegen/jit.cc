@@ -15,7 +15,6 @@
 
 #include <half.hpp>
 
-#include "base/util/printstring.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {

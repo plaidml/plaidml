@@ -11,14 +11,14 @@
 #include <utility>
 #include <vector>
 
-#include "base/util/printstring.h"
+#include <boost/format.hpp>
 
 namespace vertexai {
 
 class deserialization_error : public std::runtime_error {
  public:
   explicit deserialization_error(const std::string& err)
-      : std::runtime_error(printstring("deserialization: %s", err.c_str())) {}
+      : std::runtime_error(str(boost::format("deserialization: %s") % err)) {}
 };
 
 class transfer_flags {
@@ -225,7 +225,7 @@ void transfer_field(Context& ctx, const std::string& name, int tag, Object& obj,
   } else {
     if (!ctx.has_field(name, tag)) {
       if (flags & TF_STRICT) {
-        throw deserialization_error(printstring("Field '%s' is missing and strict is set", name.c_str()));
+        throw deserialization_error(str(boost::format("Field '%s' is missing and strict is set") % name));
       }
       if (flags & TF_NO_DEFAULT) {
         return;

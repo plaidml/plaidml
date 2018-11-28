@@ -3,7 +3,6 @@
 #include "tile/codegen/autotile.h"
 
 #include "base/util/logging.h"
-#include "base/util/printstring.h"
 #include "base/util/stream_container.h"
 #include "tile/stripe/stripe.h"
 

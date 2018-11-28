@@ -1,10 +1,13 @@
 #include "tile/lang/bound.h"
+
 #include <algorithm>
 #include <map>
 #include <set>
 #include <sstream>
 #include <string>
 #include <utility>
+
+#include <boost/format.hpp>
 
 namespace vertexai {
 namespace tile {
@@ -54,15 +57,15 @@ std::vector<RangeConstraint> GatherConstraints(const Contraction& c, const std::
   // Sanity check the shapes
   if (shapes.size() != c.specs.size()) {
     throw std::runtime_error(
-        printstring("Shape mismatch during contraint gathering: %zu vs %zu", shapes.size(), c.specs.size()));
+        str(boost::format("Shape mismatch during contraint gathering: %zu vs %zu") % shapes.size() % c.specs.size()));
   }
   // For each shape...
   for (size_t i = 0; i < c.specs.size(); i++) {
     const IndexSpec& spec = c.specs[i].spec;
     // Sanity check the dimensions
     if (spec.size() != shapes[i].dims.size()) {
-      throw std::runtime_error(printstring("More indexes than dimensions for tensor: %zu:%s %zu > %zu", i,
-                                           c.specs[i].id.c_str(), spec.size(), shapes[i].dims.size()));
+      throw std::runtime_error(str(boost::format("More indexes than dimensions for tensor: %zu:%s %zu > %zu") %  //
+                                   i % c.specs[i].id % spec.size() % shapes[i].dims.size()));
     }
     // For each dimension...
     for (size_t j = 0; j < spec.size(); j++) {
