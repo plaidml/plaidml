@@ -6,6 +6,8 @@
 #include <set>
 #include <utility>
 
+#include <boost/format.hpp>
+
 #include "tile/lang/exprtype.h"
 #include "tile/lang/fpconv.h"
 #include "tile/lang/scope.h"
@@ -218,13 +220,14 @@ class Emitter : public sem::Visitor {
     const char* dims[] = {"x", "y", "z"};
     switch (node.type) {
       case sem::IndexExpr::GLOBAL:
-        emit(printstring("blockIdx.%s * blockDim.%s + threadIdx.%s", dims[node.dim], dims[node.dim], dims[node.dim]));
+        emit(str(boost::format("blockIdx.%s * blockDim.%s + threadIdx.%s") %  //
+                 dims[node.dim] % dims[node.dim] % dims[node.dim]));
         break;
       case sem::IndexExpr::GROUP:
-        emit(printstring("blockIdx.%s", dims[node.dim]));
+        emit(str(boost::format("blockIdx.%s") % dims[node.dim]));
         break;
       case sem::IndexExpr::LOCAL:
-        emit(printstring("threadIdx.%s", dims[node.dim]));
+        emit(str(boost::format("threadIdx.%s") % dims[node.dim]));
         break;
       default:
         throw std::runtime_error("Invalid IndexExpr type");

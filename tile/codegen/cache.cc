@@ -4,6 +4,8 @@
 
 #include <algorithm>
 
+#include <boost/format.hpp>
+
 #include "base/util/stream_container.h"
 #include "tile/codegen/localize.h"
 #include "tile/stripe/stripe.h"
@@ -40,7 +42,7 @@ void ApplyCache(Block* block,                 //
   xfer_block.location = xfer_loc;
   std::vector<Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
-    std::string iname = printstring("i%zu", i);
+    std::string iname = str(boost::format("i%zu") % i);
     xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
     xfer_access.emplace_back(Affine(iname));
   }
@@ -75,7 +77,7 @@ void ApplyCache(Block* block,                 //
   // If original refinement was input, load into cache
   if (IsReadDir(it->dir)) {
     auto cache_load = std::make_shared<Block>(xfer_block);
-    cache_load->name = printstring("load_%s", var_name.c_str());
+    cache_load->name = str(boost::format("load_%s") % var_name);
     cache_load->refs[0].from = raw_name;
     cache_load->refs[0].shape = raw_xfer_shape;
     cache_load->refs[1].location = mem_loc;
@@ -84,7 +86,7 @@ void ApplyCache(Block* block,                 //
   // If original refinement was output, flush from cache
   if (IsWriteDir(it->dir)) {
     auto cache_store = std::make_shared<Block>(xfer_block);
-    cache_store->name = printstring("store_%s", var_name.c_str());
+    cache_store->name = str(boost::format("store_%s") % var_name);
     cache_store->refs[1].from = raw_name;
     cache_store->refs[1].shape = raw_xfer_shape;
     cache_store->refs[0].location = mem_loc;

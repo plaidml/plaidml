@@ -3,7 +3,6 @@
 #include <string>
 
 #include "base/util/logging.h"
-#include "base/util/printstring.h"
 #include "tile/lang/type.h"
 #include "tile/math/polynomial.h"
 

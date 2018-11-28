@@ -4,7 +4,6 @@
 
 #include "base/util/logging.h"
 #include "base/util/lookup.h"
-#include "base/util/printstring.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
 #include "tile/stripe/stripe.h"

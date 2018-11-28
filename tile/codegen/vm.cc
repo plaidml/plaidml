@@ -4,8 +4,9 @@
 
 #include <algorithm>
 
+#include <boost/format.hpp>
+
 #include "base/util/lookup.h"
-#include "base/util/printstring.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
 #include "tile/stripe/stripe.h"
@@ -110,8 +111,9 @@ class Scope {
       throw_with_trace(std::runtime_error("Unknown buffer"));
     }
     if (offset >= it->second->size()) {
-      throw_with_trace(std::runtime_error(printstring("LOAD: Out of bounds access on '%s', offset: %zu, size: %zu",  //
-                                                      name.c_str(), offset, it->second->size())));
+      throw_with_trace(
+          std::runtime_error(str(boost::format("LOAD: Out of bounds access on '%s', offset: %zu, size: %zu") %  //
+                                 name % offset % it->second->size())));
     }
     return (*it->second)[offset];
   }
@@ -122,8 +124,9 @@ class Scope {
       throw_with_trace(std::runtime_error("Unknown buffer"));
     }
     if (offset >= it->second->size()) {
-      throw_with_trace(std::runtime_error(printstring("STORE: Out of bounds access on '%s', offset: %zu, size: %zu",  //
-                                                      name.c_str(), offset, it->second->size())));
+      throw_with_trace(
+          std::runtime_error(str(boost::format("STORE: Out of bounds access on '%s', offset: %zu, size: %zu") %  //
+                                 name % offset % it->second->size())));
     }
     if (agg_op == Intrinsic::SUM) {
       (*it->second)[offset] += value;
@@ -162,7 +165,7 @@ class Scope {
             case 2: {
               auto it = BINARY_OPS.find(op->name);
               if (it == BINARY_OPS.end()) {
-                throw_with_trace(std::runtime_error(printstring("Unsupported binary intrinsic: %s", op->name.c_str())));
+                throw_with_trace(std::runtime_error(str(boost::format("Unsupported binary intrinsic: %s") % op->name)));
               }
               vars[op->outputs[0]] = it->second(vars[op->inputs[0]], vars[op->inputs[1]]);
             } break;
@@ -170,13 +173,13 @@ class Scope {
               auto it = TERNARY_OPS.find(op->name);
               if (it == TERNARY_OPS.end()) {
                 throw_with_trace(
-                    std::runtime_error(printstring("Unsupported ternary intrinsic: %s", op->name.c_str())));
+                    std::runtime_error(str(boost::format("Unsupported ternary intrinsic: %s") % op->name)));
               }
               vars[op->outputs[0]] = it->second(vars[op->inputs[0]], vars[op->inputs[1]], vars[op->inputs[2]]);
             } break;
             default:
               throw_with_trace(std::runtime_error(
-                  printstring("Unsupported number of operands for intrinsic: %s", op->name.c_str())));
+                  str(boost::format("Unsupported number of operands for intrinsic: %s") % op->name)));
               break;
           }
         } break;

@@ -4,7 +4,8 @@
 
 #include <sstream>
 
-#include "base/util/printstring.h"
+#include <boost/format.hpp>
+
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
 #include "tile/base/shape.h"
@@ -89,7 +90,7 @@ std::shared_ptr<Block> Block::Downcast(const std::shared_ptr<Statement>& stmt) {
 }
 
 std::string to_string(const Location& loc) {  //
-  return printstring("%s[%s]", loc.name.c_str(), loc.unit.toString().c_str());
+  return str(boost::format("%s[%s]") % loc.name % loc.unit.toString());
 }
 
 std::ostream& operator<<(std::ostream& os, const Location& loc) {
@@ -675,8 +676,8 @@ std::set<const Index*> Block::accumulation_idxs() const {
 std::vector<Refinement>::iterator Block::ref_by_into(const std::string& name, bool fail) {
   auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
   if (fail && it == refs.end()) {
-    throw_with_trace(std::runtime_error(
-        printstring("Refinement not found on block '%s' via into: %s", this->name.c_str(), name.c_str())));
+    throw_with_trace(
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % this->name % name)));
   }
   return it;
 }
@@ -684,8 +685,8 @@ std::vector<Refinement>::iterator Block::ref_by_into(const std::string& name, bo
 std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& name, bool fail) const {
   auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
   if (fail && it == refs.end()) {
-    throw_with_trace(std::runtime_error(
-        printstring("Refinement not found on block '%s' via into: %s", this->name.c_str(), name.c_str())));
+    throw_with_trace(
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % this->name % name)));
   }
   return it;
 }
@@ -693,8 +694,8 @@ std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& na
 std::vector<Refinement>::iterator Block::ref_by_from(const std::string& name, bool fail) {
   auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
   if (fail && it == refs.end()) {
-    throw_with_trace(std::runtime_error(
-        printstring("Refinement not found on block '%s' via from: %s", this->name.c_str(), name.c_str())));
+    throw_with_trace(
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via from: %s") % this->name % name)));
   }
   return it;
 }
@@ -702,8 +703,8 @@ std::vector<Refinement>::iterator Block::ref_by_from(const std::string& name, bo
 std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& name, bool fail) const {
   auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
   if (fail && it == refs.end()) {
-    throw_with_trace(std::runtime_error(
-        printstring("Refinement not found on block '%s' via from: %s", this->name.c_str(), name.c_str())));
+    throw_with_trace(
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via from: %s") % this->name % name)));
   }
   return it;
 }
@@ -714,7 +715,7 @@ std::string Block::unique_ref_name(const std::string& into) {
   }
   size_t i = 0;
   while (true) {
-    auto name = printstring("%s_%zu", into.c_str(), i++);
+    auto name = str(boost::format("%s_%zu") % into % i++);
     if (ref_by_into(name, false) == refs.end()) {
       return name;
     }
@@ -729,7 +730,7 @@ std::string Block::unique_idx_name(const std::string& name) {
   }
   size_t i = 0;
   while (true) {
-    auto new_name = printstring("%s_%zu", name.c_str(), i++);
+    auto new_name = str(boost::format("%s_%zu") % name % i++);
     if (!idx_by_name(new_name)) {
       return new_name;
     }

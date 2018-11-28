@@ -8,6 +8,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include <boost/format.hpp>
+
 #include "base/util/throw.h"
 #include "tile/stripe/stripe.h"
 
@@ -45,15 +47,15 @@ struct Tracker {
     auto it_inserted = scalars.insert(std::make_pair(name, it));
     if (!it_inserted.second) {
       throw_with_trace(
-          std::logic_error(printstring("Scalar %s written multiple times in %s", name.c_str(), block.name.c_str())));
+          std::logic_error(str(boost::format("Scalar %s written multiple times in %s") % name % block.name)));
     }
   }
 
   void ReadScalar(const Block& block, const std::string& name) {
     auto it = scalars.find(name);
     if (it == scalars.end()) {
-      throw_with_trace(std::logic_error(
-          printstring("Scalar %s read before it was written in %s", name.c_str(), block.name.c_str())));
+      throw_with_trace(
+          std::logic_error(str(boost::format("Scalar %s read before it was written in %s") % name % block.name)));
     }
     dataflow_deps.insert(it->second);
   }

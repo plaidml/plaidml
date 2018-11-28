@@ -1,5 +1,7 @@
 #include "tile/lang/gen_stripe.h"
 
+#include <boost/format.hpp>
+
 #include "tile/lang/bound.h"
 #include "tile/lang/defract.h"
 #include "tile/lang/reduce.h"
@@ -294,8 +296,8 @@ class StripeGenerator {
     std::vector<Affine> out_access;
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
       Index idx{
-          printstring("i%zu", i + 1),  // name
-          out_shape.dims[i].size,      // range
+          str(boost::format("i%zu") % (i + 1)),  // name
+          out_shape.dims[i].size,                // range
       };
       if (out_shape.dims[i].size > 1) {
         out_access.emplace_back(Affine{idx.name});
@@ -397,7 +399,7 @@ class StripeGenerator {
 
   std::shared_ptr<Block> AddKernel(Block* parent, const Op& op, const char* prefix = "") {
     auto block = std::make_shared<Block>();
-    block->name = printstring("%skernel_%zu", prefix, parent->stmts.size());
+    block->name = str(boost::format("%skernel_%zu") % prefix % parent->stmts.size());
     block->comments = to_string(op);
     block->set_tag("kernel");
     for (const auto& attr : op.attributes) {
@@ -429,13 +431,13 @@ class StripeGenerator {
   }
 
   inline std::string ScalarName(const std::string& name) {  //
-    return printstring("$%s", name.c_str());
+    return str(boost::format("$%s") % name);
   }
 
   TensorShape GetShape(const std::string& name) const {
     auto it = vars_.find(name);
     if (it == vars_.end()) {
-      throw std::runtime_error(printstring("Unknown shape: %s", name.c_str()));
+      throw std::runtime_error(str(boost::format("Unknown shape: %s") % name));
     }
     return it->second.shape;
   }
@@ -443,7 +445,7 @@ class StripeGenerator {
   TensorShape ScalarShape(const std::string& name) const {
     auto it = vars_.find(name);
     if (it == vars_.end()) {
-      throw std::runtime_error(printstring("Unknown shape: %s", name.c_str()));
+      throw std::runtime_error(str(boost::format("Unknown shape: %s") % name));
     }
     TensorShape shape(it->second.shape.type, {});
     for (const auto& dim : it->second.shape.dims) {
@@ -465,7 +467,7 @@ class StripeGenerator {
         const auto& bound = bounds.at(term.first);
         result += int_value * bound.min;
         if (bound.min != bound.max) {
-          result += Polynomial<int64_t>(term.first, int_value);
+          result += Affine(term.first, int_value);
         }
       }
     }

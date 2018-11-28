@@ -5,7 +5,6 @@
 #include <string>
 
 #include "base/util/logging.h"
-#include "base/util/printstring.h"
 #include "tile/math/matrix.h"
 
 namespace vertexai {

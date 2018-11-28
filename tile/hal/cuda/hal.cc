@@ -2,6 +2,8 @@
 
 #include "tile/hal/cuda/hal.h"
 
+#include <boost/format.hpp>
+
 #include "base/util/error.h"
 #include "base/util/factory.h"
 #include "tile/hal/cuda/error.h"
@@ -99,7 +101,7 @@ std::string Device::description() {
   char name[128];
   Error err = cuDeviceGetName(name, sizeof(name), device_);
   Error::Check(err, "cuDeviceGetName() failed");
-  return printstring("NVIDIA %s (CUDA)", name);
+  return str(boost::format("NVIDIA %s (CUDA)") % name);
 }
 
 void Device::SetCurrentContext() {
