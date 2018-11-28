@@ -79,36 +79,34 @@
                 }
             },
             {
-                "description": "Intel GPU config",
+                "description": "Intel *HD Graphics GPU config",
                 "sel": {
-                    "and": {
-                        "sel":[
-                            {        
-                                "or": {
-                                    "sel": [
-                                        {
-                                            "name_regex": ".*Iris.*"
-                                        },
-                                        {
-                                            "name_regex": ".*HD Graphics.*"
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "platform_regex": ".*"
-                            }
-                        ]
-                    }
+                    "name_regex": ".*HD Graphics.*"
                 },
                 "settings": {
-                    "threads":128,
+                    "threads": 128,
                     "vec_size": 4,
                     "mem_width": 256,
                     "max_mem": 16000,
                     "max_regs": 16000,
                     "goal_groups": 6,
                     "goal_flops_per_byte": 50
+                }
+            },
+            {
+                "description": "Intel Iris GPU config",
+                "sel": {
+                    "name_regex": ".*Iris.*"
+                },
+                "settings": {
+                    "threads": 128,
+                    "vec_size": 4,
+                    "mem_width": 256,
+                    "max_mem": 16000,
+                    "max_regs": 16000,
+                    "goal_groups": 6,
+                    "goal_flops_per_byte": 50,
+                    "use_global": true
                 }
             },
             {
