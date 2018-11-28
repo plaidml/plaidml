@@ -3,7 +3,6 @@
 #include "tile/codegen/partition.h"
 
 #include "base/util/logging.h"
-#include "base/util/printstring.h"
 #include "base/util/stream_container.h"
 #include "tile/codegen/localize.h"
 #include "tile/codegen/tags.h"

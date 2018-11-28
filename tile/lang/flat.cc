@@ -4,6 +4,7 @@
 #include <set>
 #include <stdexcept>
 
+#include <boost/format.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
@@ -147,7 +148,8 @@ std::string FlatContraction::toString() const {
 
 FlatContraction Flatten(const Contraction& c, const std::vector<TensorShape>& shapes) {
   if (shapes.size() != c.specs.size()) {
-    throw std::runtime_error(printstring("Shape mismatch during flatten: %zu vs %zu", shapes.size(), c.specs.size()));
+    throw std::runtime_error(
+        str(boost::format("Shape mismatch during flatten: %zu vs %zu") % shapes.size() % c.specs.size()));
   }
   // Copy the basic ops across
   FlatContraction out(c);

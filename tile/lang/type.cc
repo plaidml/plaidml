@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include <boost/format.hpp>
+
 #include "base/util/error.h"
 #include "tile/lang/builtins.h"
 #include "tile/lang/fpconv.h"
@@ -251,8 +253,8 @@ void TypeCheck(Program* prog, Bindings* vars) {
     // Extract it's shape and make sure dimensions match
     const TensorShape& shape = it->second.shape;
     if (in.dims.size() != shape.dims.size()) {
-      throw std::runtime_error(printstring("Mismatch number of dimensions, %lu vs %lu for %s", in.dims.size(),
-                                           shape.dims.size(), in.name.c_str()));
+      throw std::runtime_error(str(boost::format("Mismatch number of dimensions, %lu vs %lu for %s") %  //
+                                   in.dims.size() % shape.dims.size() % in.name));
     }
     // Now, go over each dimension and extract constants
     for (size_t i = 0; i < in.dims.size(); i++) {
@@ -271,7 +273,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
         }
         size_t othersize = static_cast<size_t>(it2->second.iconst);
         if (othersize != size) {
-          throw std::runtime_error(printstring("Mismatched sizes for %s, %lu vs %lu", var.c_str(), othersize, size));
+          throw std::runtime_error(str(boost::format("Mismatched sizes for %s, %lu vs %lu") % var % othersize % size));
         }
       }
     }
