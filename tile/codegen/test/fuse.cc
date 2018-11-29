@@ -80,11 +80,11 @@ TEST(Codegen, FuseSimple) {
       2: $T = add($A, $B)
       3: T = store($T)
       4: $T_0 = load(T)
-      5: $_T1 = 0
+      5: $_T1 = (int)0
       6: $X = cmp_lt($T_0, $_T1)
       7: X = store($X)
       8: $X_0 = load(X)
-      9: $_T3 = 0
+      9: $_T3 = (int)0
       10: $T_1 = load(T)
       11: $C = cond($X_0, $_T3, $T_1)
       12: C = store($C)
