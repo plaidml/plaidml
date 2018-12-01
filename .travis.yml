@@ -15,10 +15,10 @@ matrix:
 
 before_install:
   - sudo apt-get install openjdk-8-jdk bison g++ wget -y
+  - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.2_x64_rh_6.4.0.37.tgz
   - wget https://github.com/bazelbuild/bazel/releases/download/0.17.2/bazel-0.17.2-installer-linux-x86_64.sh
   - chmod +x ./bazel-0.17.2-installer-linux-x86_64.sh
   - sudo ./bazel-0.17.2-installer-linux-x86_64.sh
-  - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.2_x64_rh_6.4.0.37.tgz
   # Conda
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
@@ -31,8 +31,8 @@ before_install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   # OpenCL
-  - tar xzvf opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25.tgz
-  - pushd opencl_runtime_16.1.1_x64_ubuntu_6.4.0.25
+  - tar xzvf opencl_runtime_16.1.2_x64_rh_6.4.0.37.tgz
+  - pushd opencl_runtime_16.1.2_x64_rh_6.4.0.37
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
   - pip install tensorflow theano setuptools h5py click
