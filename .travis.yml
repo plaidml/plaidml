@@ -1,5 +1,8 @@
 language: python
 dist: xenial
+cache:
+    directories:
+     - /home/travis/
 
 matrix:
   include:
@@ -40,7 +43,7 @@ before_install:
   - git clone http://github.com/plaidml/plaidbench  
 
 install:
-  - bazel build --config=linux_x86_64 --force_python=$BZL_PY_VER plaidml:wheel plaidml/keras:wheel
+  - bazel build --config=linux_x86_64 --build_tag_filters=-llvm --force_python=$BZL_PY_VER plaidml:wheel plaidml/keras:wheel 
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
