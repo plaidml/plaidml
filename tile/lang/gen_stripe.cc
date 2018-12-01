@@ -238,6 +238,8 @@ class StripeGenerator {
       }
     } else {
       AddIntrinsic(kernel.get(), "assign", scalar_inputs, {ScalarName(op.output)});
+      // Mark including the agg_op
+      kernel->set_tag("agg_op_" + GetAggOp(cion.agg_op) + "_no_comb_op");
     }
 
     // STORE
