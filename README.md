@@ -153,7 +153,7 @@ print("Ran in {} seconds".format(time.time() - start))
 
 ## License
 
-PlaidML is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.txt). 
+PlaidML is licensed under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0). 
 
 Our open source goals include 1) helping students get started with deep learning as easily as possible and 2) helping researchers develop new methods more quickly than is possible with other tools. PlaidML is unique in being fully open source and free of dependence on libraries like cuDNN that carry revocable and redistribution-prohibiting licenses. For situations where an alternate license is preferable please contact [solutions@vertex.ai](mailto:solutions@vertex.ai).
 
