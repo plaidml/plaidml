@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/opencl/executor.h"
 
@@ -29,7 +29,7 @@ Executor::Executor(const std::shared_ptr<DeviceState>& device_state)
 
   if (!device_state_->info().host_unified_memory()) {
     VLOG(3) << "Enabling OpenCL device-local memory";
-    device_memory_ = compat::make_unique<DeviceMemory>(device_state_);
+    device_memory_ = std::make_unique<DeviceMemory>(device_state_);
   }
 }
 
@@ -155,7 +155,7 @@ boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* 
     auto kid = exe->kernel_ids()[kidx];
 
     if (kinfo.ktype == lang::KernelType::kZero) {
-      kernels.emplace_back(compat::make_unique<ZeroKernel>(device_state_, kinfo, kid));
+      kernels.emplace_back(std::make_unique<ZeroKernel>(device_state_, kinfo, kid));
       continue;
     }
 
@@ -167,11 +167,10 @@ boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* 
     }
 
     kernels.emplace_back(
-        compat::make_unique<ComputeKernel>(device_state_, std::move(kernel), exe->kernel_info()[kidx], kid));
+        std::make_unique<ComputeKernel>(device_state_, std::move(kernel), exe->kernel_info()[kidx], kid));
   }
 
-  return boost::make_ready_future(
-      std::unique_ptr<hal::Executable>(compat::make_unique<Executable>(std::move(kernels))));
+  return boost::make_ready_future(std::unique_ptr<hal::Executable>(std::make_unique<Executable>(std::move(kernels))));
 }
 
 void Executor::Flush() { device_state_->FlushCommandQueue(); }

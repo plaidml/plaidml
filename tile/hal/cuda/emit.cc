@@ -1,4 +1,4 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 
 #include "tile/hal/cuda/emit.h"
 
@@ -15,63 +15,63 @@ namespace tile {
 namespace hal {
 namespace cuda {
 
-inline std::string c_dtype(const lang::DataType& dt) {
+inline std::string c_dtype(const DataType& dt) {
   switch (dt) {
-    case lang::DataType::BOOLEAN:
+    case DataType::BOOLEAN:
       return "bool";
-    case lang::DataType::INT8:
+    case DataType::INT8:
       return "char";
-    case lang::DataType::INT16:
+    case DataType::INT16:
       return "short";
-    case lang::DataType::INT32:
+    case DataType::INT32:
       return "int";
-    case lang::DataType::INT64:
+    case DataType::INT64:
       return "long long";
-    case lang::DataType::UINT8:
+    case DataType::UINT8:
       return "unsigned char";
-    case lang::DataType::UINT16:
+    case DataType::UINT16:
       return "unsigned short";
-    case lang::DataType::UINT32:
+    case DataType::UINT32:
       return "unsigned int";
-    case lang::DataType::FLOAT16:
+    case DataType::FLOAT16:
       return "half";
-    case lang::DataType::FLOAT32:
+    case DataType::FLOAT32:
       return "float";
-    case lang::DataType::UINT64:
+    case DataType::UINT64:
       return "unsigned long long";
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT64:
       return "double";
     default:
       throw std::runtime_error("Invalid tile type");
   }
 }
 
-static std::map<std::pair<lang::DataType, sem::LimitConst::Which>, std::string> LimitConstLookup = {
-    {{lang::DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::INT8, sem::LimitConst::MIN}, "-127"},
-    {{lang::DataType::INT16, sem::LimitConst::MIN}, "-32767"},
-    {{lang::DataType::INT32, sem::LimitConst::MIN}, "-2147483647"},
-    {{lang::DataType::INT64, sem::LimitConst::MIN}, "-4611686018427387902"},  // FIXME
-    {{lang::DataType::UINT8, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::UINT16, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::UINT32, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::UINT64, sem::LimitConst::MIN}, "0"},
-    {{lang::DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
-    {{lang::DataType::FLOAT32, sem::LimitConst::MIN}, "-3.402823466e+38"},
-    {{lang::DataType::FLOAT64, sem::LimitConst::MIN}, "-1.7976931348623158e+308"},
+static std::map<std::pair<DataType, sem::LimitConst::Which>, std::string> LimitConstLookup = {
+    {{DataType::BOOLEAN, sem::LimitConst::MIN}, "0"},
+    {{DataType::INT8, sem::LimitConst::MIN}, "-127"},
+    {{DataType::INT16, sem::LimitConst::MIN}, "-32767"},
+    {{DataType::INT32, sem::LimitConst::MIN}, "-2147483647"},
+    {{DataType::INT64, sem::LimitConst::MIN}, "-4611686018427387902"},  // FIXME
+    {{DataType::UINT8, sem::LimitConst::MIN}, "0"},
+    {{DataType::UINT16, sem::LimitConst::MIN}, "0"},
+    {{DataType::UINT32, sem::LimitConst::MIN}, "0"},
+    {{DataType::UINT64, sem::LimitConst::MIN}, "0"},
+    {{DataType::FLOAT16, sem::LimitConst::MIN}, "-65504"},
+    {{DataType::FLOAT32, sem::LimitConst::MIN}, "-3.402823466e+38"},
+    {{DataType::FLOAT64, sem::LimitConst::MIN}, "-1.7976931348623158e+308"},
 
-    {{lang::DataType::BOOLEAN, sem::LimitConst::MAX}, "1"},
-    {{lang::DataType::INT8, sem::LimitConst::MAX}, "127"},
-    {{lang::DataType::INT16, sem::LimitConst::MAX}, "32767"},
-    {{lang::DataType::INT32, sem::LimitConst::MAX}, "2147483647"},
-    {{lang::DataType::INT64, sem::LimitConst::MAX}, "4611686018427387902"},  // FIXME
-    {{lang::DataType::UINT8, sem::LimitConst::MAX}, "255"},
-    {{lang::DataType::UINT16, sem::LimitConst::MAX}, "65535"},
-    {{lang::DataType::UINT32, sem::LimitConst::MAX}, "4294967295"},
-    {{lang::DataType::UINT64, sem::LimitConst::MAX}, "4611686018427387902"},  // FIXME
-    {{lang::DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
-    {{lang::DataType::FLOAT32, sem::LimitConst::MAX}, "3.402823466e+38"},
-    {{lang::DataType::FLOAT64, sem::LimitConst::MAX}, "1.7976931348623158e+308"},
+    {{DataType::BOOLEAN, sem::LimitConst::MAX}, "1"},
+    {{DataType::INT8, sem::LimitConst::MAX}, "127"},
+    {{DataType::INT16, sem::LimitConst::MAX}, "32767"},
+    {{DataType::INT32, sem::LimitConst::MAX}, "2147483647"},
+    {{DataType::INT64, sem::LimitConst::MAX}, "4611686018427387902"},  // FIXME
+    {{DataType::UINT8, sem::LimitConst::MAX}, "255"},
+    {{DataType::UINT16, sem::LimitConst::MAX}, "65535"},
+    {{DataType::UINT32, sem::LimitConst::MAX}, "4294967295"},
+    {{DataType::UINT64, sem::LimitConst::MAX}, "4611686018427387902"},  // FIXME
+    {{DataType::FLOAT16, sem::LimitConst::MAX}, "65504"},
+    {{DataType::FLOAT32, sem::LimitConst::MAX}, "3.402823466e+38"},
+    {{DataType::FLOAT64, sem::LimitConst::MAX}, "1.7976931348623158e+308"},
 };
 
 class Emitter : public sem::Visitor {

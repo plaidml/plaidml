@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/opencl/compiler.h"
 
@@ -65,8 +65,8 @@ boost::future<std::unique_ptr<hal::Library>> Build::Start(context::Activity acti
                                                           const std::vector<lang::KernelInfo>& kernel_info,
                                                           proto::BuildInfo binfo,
                                                           std::vector<context::proto::ActivityID> kernel_ids) {
-  auto build = compat::make_unique<Build>(std::move(activity), device_state, std::move(program), kernel_info,
-                                          std::move(binfo), std::move(kernel_ids));
+  auto build = std::make_unique<Build>(std::move(activity), device_state, std::move(program), kernel_info,
+                                       std::move(binfo), std::move(kernel_ids));
   auto result = build->prom_.get_future();
   cl_device_id device_id = device_state->did();
   cl_program prog = build->library_->program().get();
@@ -86,7 +86,7 @@ Build::Build(context::Activity activity, const std::shared_ptr<DeviceState>& dev
              std::vector<context::proto::ActivityID> kernel_ids)
     : activity_{std::move(activity)},
       device_state_{device_state},
-      library_{compat::make_unique<Library>(device_state, std::move(program), kernel_info, std::move(kernel_ids))},
+      library_{std::make_unique<Library>(device_state, std::move(program), kernel_info, std::move(kernel_ids))},
       binfo_{std::move(binfo)} {}
 
 void Build::OnBuildComplete(cl_program program, void* handle) noexcept {
@@ -172,6 +172,11 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
                                                              const hal::proto::HardwareSettings& settings) {
   std::vector<context::proto::ActivityID> kernel_ids;
   std::ostringstream code;
+
+  if (!kernel_info.size()) {
+    return boost::make_ready_future(std::unique_ptr<hal::Library>{
+        std::make_unique<Library>(device_state_, nullptr, kernel_info, std::vector<context::proto::ActivityID>{})});
+  }
 
   context::Activity activity{ctx, "tile::hal::opencl::Build"};
 

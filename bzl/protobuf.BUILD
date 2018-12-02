@@ -56,10 +56,10 @@ LINK_OPTS = select({
 load(
     ":protobuf.bzl",
     "cc_proto_library",
-    "py_proto_library",
     "internal_copied_filegroup",
     "internal_gen_well_known_protos_java",
     "internal_protobuf_py_tests",
+    "py_proto_library",
 )
 
 cc_library(
@@ -97,7 +97,7 @@ cc_library(
     includes = ["src/"],
     linkopts = LINK_OPTS,
     visibility = ["//visibility:public"],
-    deps = ["@zlib_archive//:zlib"],
+    deps = ["@zlib"],
 )
 
 cc_library(
@@ -167,7 +167,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":protobuf_lite",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 
@@ -423,7 +423,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":protobuf",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 
@@ -641,7 +641,7 @@ cc_test(
         ":protobuf",
         ":protoc_lib",
         "//external:gtest_main",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 

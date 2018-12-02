@@ -26,6 +26,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 static bool NeedsZero(const FlatContraction& flat, const TensorShape& ts) {
   std::vector<std::pair<size_t, size_t>> out_pattern;
   if (flat.access[0].offset != 0) {
@@ -262,17 +264,26 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
   if (it != flat_cache->end()) {
     IVLOG(2, "Cache key: " << flat_key << ", Hit!");
     r.kernels.emplace_back(it->second);
-    auto& ki = r.kernels.back();
-    ki.outputs = flat.kernel_outputs;
-    ki.inputs.clear();
-    for (const auto& input : inputs) {
-      if (vars.at(input).tag == Binding::TENSOR) {
-        ki.inputs.emplace_back(var_rewrites.Lookup(input));
+
+    auto update_kernel_info = [&](KernelInfo& ki) {
+      ki.outputs = flat.kernel_outputs;
+      ki.inputs.clear();
+      for (const auto& input : inputs) {
+        if (vars.at(input).tag == Binding::TENSOR) {
+          ki.inputs.emplace_back(var_rewrites.Lookup(input));
+        }
       }
+      for (const auto& op_input : flat.post_op_inputs) {
+        ki.inputs.emplace_back(var_rewrites.Lookup(op_input.name));
+      }
+    };
+
+    auto& ki = r.kernels.back();
+    update_kernel_info(ki);
+    for (KernelInfo& candidate : ki.candidates) {
+      update_kernel_info(candidate);
     }
-    for (const auto& op_input : flat.post_op_inputs) {
-      ki.inputs.emplace_back(var_rewrites.Lookup(op_input.name));
-    }
+
     return;
   }
   IVLOG(2, "Cache key: " << flat_key << ", Miss!");
@@ -487,8 +498,8 @@ static std::set<size_t> ConnectedComponents(const Program& prog, const Bindings&
 
 static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed, VarRewrites* var_rewrites,
                           const Program& prog, std::size_t opidx, const UseDef& ud, const Bindings& vars,
-                          const ShapeMap& inputs, const ShapeMap& outputs, const std::vector<Polynomial>& out_poly,
-                          const HardwareSettings& settings) {
+                          const ShapeMap& inputs, const ShapeMap& outputs,
+                          const std::vector<Polynomial<Rational>>& out_poly, const HardwareSettings& settings) {
   // Unify the contraction with downstream elementwise operations.
   //
   // Here's the idea: during a contraction's output phase, we
@@ -533,6 +544,11 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   // The map of outputs that are allowed to alias inputs.
   std::map<std::string, std::set<std::string>> aliases;
 
+  // The set of operation inputs that have been used to elide program
+  // outputs.  N.B. An input cannot be used to elide multiple program
+  // outputs, since each program output must be independently written.
+  std::set<std::string> inputs_unified_with_prog_outputs;
+
   for (auto unified_opidx : unified_opidxs) {
     auto& unified_op = prog.ops[unified_opidx];
 
@@ -576,9 +592,19 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
 
       std::string input;
       input = var_rewrites->Lookup(unified_op.inputs[0]);
-      if (!outputs.count(unified_op.output) || (!outputs.count(input) && !inputs.count(input))) {
+      if (!outputs.count(unified_op.output)  // The op output is not a program output; always elide it.
+          || (!outputs.count(input)  // The op input is not itself a program output (if it were, it couldn't be used to
+                                     // elide another program output)
+              && !inputs.count(input)  // And the op input is not a program input (if it were, it couldn't be used to
+                                       // elide a program output)
+              && !inputs_unified_with_prog_outputs.count(
+                     input))  // And the op input hasn't been used to elide another program output
+      ) {
         IVLOG(4, "  Eliding op:" << unified_op << "; replacing " << unified_op.output << " with " << input);
         var_rewrites->Insert(unified_op.output, input);
+        if (outputs.count(unified_op.output)) {
+          inputs_unified_with_prog_outputs.emplace(input);
+        }
         local_var_rewrites.emplace(unified_op.output, std::move(input));
         continue;
       } else {
@@ -600,7 +626,7 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
       if (shape->elem_size() == out_shape.elem_size()) {
         shape = &out_shape;
       }
-      std::vector<Polynomial> indexes;
+      std::vector<Polynomial<Rational>> indexes;
       size_t off = out_poly.size() - shape->dims.size();
       for (size_t i = 0; i < shape->dims.size(); i++, off++) {
         indexes.push_back(out_poly[off]);
@@ -717,7 +743,7 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
     }
     FlatTensorAccess access;
     access.global_index_limit = shape->elem_size();
-    Polynomial p;
+    Polynomial<Rational> p;
     size_t off = out_poly.size() - shape->dims.size();
     for (size_t i = 0; i < shape->dims.size(); i++, off++) {
       // We add things if they are not broadcast, we treat 1, 1 as non broadcast in this case
@@ -776,7 +802,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
         continue;
       }
       std::vector<TensorShape> tshapes = MakeTShapes(op.c, vars);
-      std::vector<Polynomial> out_poly;
+      std::vector<Polynomial<Rational>> out_poly;
       FlatContraction flat = Compile(op.c, tshapes, &out_poly);
       flat.output = op.output;
 
@@ -863,7 +889,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
     flat.comb_op = CombinationOp::NONE;
     flat.agg_op = AggregationOp::NONE;
 
-    std::vector<Polynomial> out_poly;
+    std::vector<Polynomial<Rational>> out_poly;
     {
       // The initial elementwise operation's output is used to
       // determine the shape of the overall kernel -- which is
@@ -879,7 +905,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
       for (std::size_t idx = 0; idx < shape.dims.size(); ++idx) {
         std::string idx_name = std::string("i") + std::to_string(idx + 1);
         flat.names.push_back(idx_name);
-        out_poly.push_back(Polynomial(idx_name));
+        out_poly.push_back(Polynomial<Rational>(idx_name));
         flat.ranges.push_back(shape.dims[idx].size);
       }
 

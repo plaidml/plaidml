@@ -15,13 +15,14 @@ message EventLog {
 message Magic {
   enum Value {
     Unknown = 0;
-    Eventlog = 0x4C747645;  // 'EvtL', little-endian 
+    Eventlog = 0x4C747645;  // 'EvtL', little-endian
   }
 
   Value value = 1;
 }
 
-// An event log consists of a sequence of Record messages, each prefixed with a varint byte length.
+// An event log consists of a sequence of Record messages, each prefixed with a
+// varint byte length.
 message Record {
   // If present, the value must be equal to Magic.Eventlog.
   Magic magic = 1;

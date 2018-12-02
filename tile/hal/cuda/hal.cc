@@ -1,4 +1,4 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 
 #include "tile/hal/cuda/hal.h"
 
@@ -13,8 +13,8 @@ namespace cuda {
 
 [[gnu::unused]] char reg = []() -> char {
   FactoryRegistrar<hal::Driver>::Instance()->Register(
-      "cuda",                                                                        //
-      [](const context::Context& ctx) { return compat::make_unique<Driver>(ctx); },  //
+      "cuda",                                                                     //
+      [](const context::Context& ctx) { return std::make_unique<Driver>(ctx); },  //
       FactoryPriority::LOW);
   return 0;
 }();
@@ -313,7 +313,7 @@ Library* Library::Downcast(hal::Library* library) {  //
 }
 
 boost::future<std::unique_ptr<hal::Executable>> Library::Prepare() {
-  return boost::make_ready_future<std::unique_ptr<hal::Executable>>(compat::make_unique<Executable>(kernels_));
+  return boost::make_ready_future<std::unique_ptr<hal::Executable>>(std::make_unique<Executable>(kernels_));
 }
 
 Event::Event(std::shared_ptr<hal::Result> result)  //

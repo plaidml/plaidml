@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/cpu/compiler.h"
 
@@ -29,6 +29,11 @@ Compiler::Compiler() {}
 boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Context& ctx,
                                                              const std::vector<lang::KernelInfo>& kernel_info,
                                                              const hal::proto::HardwareSettings&) {
+  if (!kernel_info.size()) {
+    return boost::make_ready_future(std::unique_ptr<hal::Library>{
+        std::make_unique<cpu::Library>(std::vector<std::shared_ptr<llvm::ExecutionEngine>>{}, kernel_info)});
+  }
+
   static std::once_flag init_once;
   std::call_once(init_once, []() {
     LLVMInitializeNativeTarget();

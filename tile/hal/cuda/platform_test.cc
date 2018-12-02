@@ -1,4 +1,4 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 
 #include <gtest/gtest.h>
 
@@ -11,17 +11,17 @@ namespace testing {
 namespace {
 
 Param supported_params[] = {
-    {lang::DataType::INT8, 1},    //
-    {lang::DataType::INT16, 1},   //
-    {lang::DataType::INT32, 1},   //
-    {lang::DataType::INT64, 1},   //
-    {lang::DataType::UINT8, 1},   //
-    {lang::DataType::UINT16, 1},  //
-    {lang::DataType::UINT32, 1},  //
-    {lang::DataType::UINT64, 1},  //
-    // {lang::DataType::FLOAT16, 1},  //
-    {lang::DataType::FLOAT32, 1},  //
-    {lang::DataType::FLOAT64, 1},  //
+    {DataType::INT8, 1},    //
+    {DataType::INT16, 1},   //
+    {DataType::INT32, 1},   //
+    {DataType::INT64, 1},   //
+    {DataType::UINT8, 1},   //
+    {DataType::UINT16, 1},  //
+    {DataType::UINT32, 1},  //
+    {DataType::UINT64, 1},  //
+    // {DataType::FLOAT16, 1},  //
+    {DataType::FLOAT32, 1},  //
+    {DataType::FLOAT64, 1},  //
 };
 
 std::vector<FactoryParam> SupportedParams() {
@@ -33,7 +33,7 @@ std::vector<FactoryParam> SupportedParams() {
       auto hw_config = config.add_hardware_configs();
       hw_config->mutable_sel()->set_value(true);
       hw_config->mutable_settings()->set_vec_size(param.vec_size);
-      return compat::make_unique<local_machine::Platform>(ctx, config);
+      return std::make_unique<local_machine::Platform>(ctx, config);
     };
     params.push_back({factory, param});
   }

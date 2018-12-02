@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 """
 The TILE standard operation library.
 
@@ -67,6 +67,16 @@ class ConvIndex(Enum):
     k = 6  # spatial location (kernel)
     n = 7  # batch
     x = 8  # spatial location (data)
+
+
+class PoolDataFormat(Enum):
+    NXC = 1
+    NCX = 2
+
+
+class PoolMode(Enum):
+    MAX = 1
+    AVG = 2
 
 
 def _extend_pads(pads, rank):
@@ -523,8 +533,8 @@ class _ConvolutionStringFormatter:
         if self.grouping == ConvolutionGrouping.EXPLICIT:
             if not isinstance(self.groups, six.integer_types):
                 raise ValueError(
-                    'Must provide integer number of groups when using explicit convolution grouping (received {})'.
-                    format(self.groups))
+                    'Must provide integer number of groups when using explicit convolution grouping (received {})'
+                    .format(self.groups))
             if self.groups == 1:
                 self.grouping = ConvolutionGrouping.NONE
             else:
@@ -968,69 +978,46 @@ class _ConvolutionStringFormatter:
 class ArgMax(tile.Operation):
     """Maximum of elements along an axis.
 
-    Builds a tensor whose elements are the maximum value on some axis of an input tensor.
+    Builds a tensor (uint64) whose elements are the maximum value on some axis of an input tensor.
     """
 
     def __init__(self, value, axis=-1):
         self.axis = axis
         self.value = value
-        super(ArgMax, self).__init__(None, [('I', value)], [('O', value.shape)])
+        shape, axes, subs = tile.compute_aggregation_axes(value.shape.dims, [axis], False)
+
+        code = """
+        function (I[{src_ranges}], One[]) -> (O) {{
+            Max[{dest_indices}{dest_sep}{dest_ranges}] = >(I[{src_indices}]);
+            IndexT[{reduce_indices} : {reduce_ranges}] = =(One[]);
+            Index = index(IndexT, 0);
+            AM[{dest_indices}{dest_sep}{dest_ranges}] = >(I[{src_indices}] == Max[{dest_indices}] ? Index[{reduce_indices}]);
+            O = as_uint(AM, 32);
+        }}""".format(**subs)
+        super(ArgMax, self).__init__(code, [('I', value),
+                                            ('One', tile.Value.from_var(1., tuple()))],
+                                     [('O', tile.Shape(plaidml.DType.INT64, shape))])
 
 
 argmax = ArgMax.function
 
 
-class AveragePool(tile.Operation):
-    """
-    A standard ML average pooling operator.
-    """
-
-    def __init__(self, data, kernel_shape, pads, strides, padding=AutoPadding.EXPLICIT):
-        rank = data.shape.ndims - 2
-        pads = _extend_pads(pads, rank)
-        if not strides:
-            strides = tuple(1 for _ in range(rank))
-        elif len(strides) != rank:
-            raise ValueError(
-                'Pool strides length inconsistent with input shape: ' +
-                '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.shape, rank))
-        out_dims = ['N', 'C']
-        num_out_shape = list()
-        in_idxs = list()
-        for i in range(rank):
-            sym_out, sym_pad, num_out = pad_compute('L{}'.format(i), data.shape.dims[i + 2],
-                                                    kernel_shape[i], strides[i], padding,
-                                                    (pads[i], pads[i + rank]) if pads else None)
-            out_dims.append(sym_out)
-            num_out_shape.append(num_out)
-            in_idxs.append('{stride}*x{idx} + a{idx} - {pad}'.format(
-                stride=strides[i], idx=i, pad=sym_pad))
-        out_idxs = ['n', 'c'] + ['x{}'.format(i) for i in range(rank)]
-
-        code = """
-        function (I[N, C, {in_dims}], One[]) -> (O) {{
-            Ones[{one_idxs} : {in_dims}] = =(One[]);
-            Count[{cout_idxs}{cout_sep}{cout_dims}] = +(Ones[{in_idxs}]), {pool_bounds};
-            S[{out_idxs} : {out_dims}] = +(I[n, c, {in_idxs}]), {pool_bounds};
-            O = S / Count;
-        }}""".format(
-            out_idxs=', '.join(out_idxs),
-            out_dims=', '.join(out_dims),
-            cout_idxs=', '.join(out_idxs[2:]),
-            cout_dims=', '.join(out_dims[2:]),
-            cout_sep=' : ' if len(out_idxs) > 2 else '',
-            one_idxs=', '.join(['o{}'.format(i) for i in range(rank)]),
-            in_idxs=', '.join(in_idxs),
-            in_dims=', '.join(['L{}'.format(i) for i in range(rank)]),
-            pool_bounds=', '.join(['a{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
-
-        outshape = tile.Shape(data.shape.dtype, list(data.shape.dims[0:2]) + num_out_shape)
-
-        super(AveragePool, self).__init__(
-            code, [('I', data), ('One', tile.Value.from_var(1., tuple()))], [('O', outshape)])
-
-
-average_pool = AveragePool.function
+def average_pool(data,
+                 kernel_shape,
+                 strides,
+                 pads=None,
+                 padding=AutoPadding.EXPLICIT,
+                 data_format=PoolDataFormat.NCX,
+                 name=None):
+    return pool(
+        data=data,
+        mode=PoolMode.AVG,
+        kernel_shape=kernel_shape,
+        pads=pads,
+        strides=strides,
+        padding=padding,
+        data_format=data_format,
+        name=name)
 
 
 class BinaryCrossentropy(tile.Operation):
@@ -1214,8 +1201,12 @@ class Convolution(tile.Operation):
             dilation_rate=None,
             grouping=ConvolutionGrouping.NONE,
             group_format=None,
+            winograd_allowed=True,
+            name=None,
     ):
         rank = data.shape.ndims - 2
+        if name is None:
+            name = 'Convolution{}d'.format(rank)
         if strides is None:
             strides = tuple(1 for _ in range(rank))
         if dilation_rate is None:
@@ -1237,13 +1228,13 @@ class Convolution(tile.Operation):
                 raise ValueError('Invalid dilation_rate: {}'.format(dilation_rate))
         if len(kernel_shape) != rank + 2:
             raise ValueError('Convolution kernel shape inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(
-                                 kernel_shape,
-                                 len(kernel_shape) - 2, data.shape, data.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(kernel_shape,
+                                                                  len(kernel_shape) - 2, data.
+                                                                  shape, data.shape.ndims - 2))
         if len(strides) != rank:
             raise ValueError('Convolution strides length inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(strides, len(
-                                 strides), data.shape, data.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.
+                                                                  shape, data.shape.ndims - 2))
         if len(dilation_rate) != rank:
             raise ValueError('Convolution dilation_rate length inconsistent with input shape: ' +
                              '{} (rank {}) v {} (rank {})'.format(dilation_rate, len(
@@ -1252,7 +1243,7 @@ class Convolution(tile.Operation):
         use_winograd = (rank == 2 and data_format == ConvolutionDataFormat.CHANNELS_LAST and
                         kernel_shape[0] == 3 and kernel_shape[1] == 3 and strides == (1, 1) and
                         dilation_rate == (1, 1) and kernel_shape[2] > 4 and kernel_shape[3] > 4 and
-                        grouping == ConvolutionGrouping.NONE)
+                        grouping == ConvolutionGrouping.NONE and winograd_allowed)
         if use_winograd:
             conv_strs = self._winograd_conv_strs(data.shape.dims, kernel_shape, padding)
             code = self._winograd_code_template().format(**conv_strs)
@@ -1302,8 +1293,7 @@ class Convolution(tile.Operation):
             input_list = [('I', data), ('K', kernel)]
             outshape = tile.Shape(data.shape.dtype, csf.O_shape_tuple_numeric())
 
-        super(Convolution, self).__init__(
-            code, input_list, [('O', outshape)], name='Convolution-{}d'.format(rank))
+        super(Convolution, self).__init__(code, input_list, [('O', outshape)], name=name)
 
     def _winograd_code_template(self):
         f = """
@@ -1338,8 +1328,8 @@ class Convolution(tile.Operation):
         out = block - conv + 1
         if (out == 2 and conv == 3):
             A = np.array([[1, 0], [1, 1], [1, -1], [0, -1]], dtype='float32')
-            B = np.array(
-                [[1, 0, 0, 0], [0, 1, -1, 1], [-1, 1, 1, 0], [0, 0, 0, -1]], dtype='float32')
+            B = np.array([[1, 0, 0, 0], [0, 1, -1, 1], [-1, 1, 1, 0], [0, 0, 0, -1]],
+                         dtype='float32')
             G = np.array([[1, 0, 0], [.5, .5, .5], [.5, -.5, .5], [0, 0, 1]], dtype='float32')
         elif (out == 4 and conv == 3):
             #s2 = np.sqrt(2.0)
@@ -1453,7 +1443,7 @@ class ConvolutionTranspose(tile.Operation):
         super(ConvolutionTranspose, self).__init__(
             code,
             input_tensors, [('I', tile.Shape(x.shape.dtype, tuple(output_shape)))],
-            name='ConvolutionTranspose-{}d'.format(rank))
+            name='ConvolutionTranspose{}d'.format(rank))
 
 
 convolution_transpose = ConvolutionTranspose.function
@@ -1487,7 +1477,7 @@ cumulative_sum = CumulativeSum.function
 class Dot(tile.Operation):
     """Dot-product of two tensors."""
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, name=None):
         if x.shape.dtype != y.shape.dtype:
             raise ValueError(
                 'Invalid dtype in multiplication: x.dtype=\'{}\', y.dtype=\'{}\''.format(
@@ -1518,7 +1508,7 @@ class Dot(tile.Operation):
             raise NotImplementedError('Implement dot when x.dims={} and y.dims={}'.format(
                 x.shape.dims, y.shape.dims))
 
-        super(Dot, self).__init__(f, [('X', x), ('Y', y)], [('R', shape)])
+        super(Dot, self).__init__(f, [('X', x), ('Y', y)], [('R', shape)], name=name)
 
 
 dot = Dot.function
@@ -1561,28 +1551,13 @@ class Equal(tile.Operation):
         if isinstance(rhs, tile.Value):
             shape = tile.Shape(plaidml.DType.BOOLEAN,
                                tile.broadcast_dims(lhs.shape.dims, rhs.shape.dims))
-            super(Equal, self).__init__('function (L, R) -> (O) { O = (L == R); }',
-                                        [('L', lhs), ('R', rhs)], [('O', shape)])
+            super(Equal, self).__init__('function (L, R) -> (O) { O = (L == R); }', [('L', lhs),
+                                                                                     ('R', rhs)],
+                                        [('O', shape)])
         else:
             shape = tile.Shape(plaidml.DType.BOOLEAN, lhs.shape.dims)
             super(Equal, self).__init__('function (L) -> (O) {{ O = (L == {}); }}'.format(rhs),
                                         [('L', lhs)], [('O', shape)])
-
-
-class Equal_ArgMax(tile.Operation):
-
-    def __init__(self, lhs, rhs):
-        lmax = ismax(lhs.source.op.value, axes=(lhs.source.op.axis,))
-        rmax = ismax(rhs.source.op.value, axes=(rhs.source.op.axis,))
-
-        and_shape = tile.Shape(plaidml.DType.INT32,
-                               tile.broadcast_dims(lmax.shape.dims, rmax.shape.dims))
-        and_op = tile.Operation('function (L, R) -> (O) { O = L ? (R ? 1 : 0) : 0; }',
-                                [('L', lmax), ('R', rmax)], [('O', and_shape)])
-        sum_val = summation(and_op.output_tuple[0], axes=(lhs.source.op.axis,), keepdims=True)
-        eq_shape = tile.Shape(plaidml.DType.BOOLEAN, sum_val.shape.dims)
-        super(Equal_ArgMax, self).__init__('function (I) -> (O) { O = 0 < I; }', [('I', sum_val)],
-                                           [('O', eq_shape)])
 
 
 def equal(lhs, rhs):
@@ -1598,15 +1573,6 @@ def equal(lhs, rhs):
     Returns:
         tile.Value: The output value
     """
-    # TODO: Separate function builders from optimization/composition logic.
-    #
-    # Putting the composition logic in functions like this makes it a little hard for
-    # higher-layer modules to add their own compositions -- think eq(MySpecialOp, MySpecialOp),
-    # when some completely unrelated module is invoking the eq.  It would be better to have
-    # something like a rewriter registry that could be consulted to match patterns during binding.
-    if (lhs.source and isinstance(lhs.source.op, ArgMax) and rhs.source and
-            isinstance(rhs.source.op, ArgMax)):
-        return Equal_ArgMax.function(lhs, rhs)
     return Equal.function(lhs, rhs)
 
 
@@ -1663,8 +1629,8 @@ class Gemm(tile.Operation):
     def __init__(self, a, b, c, alpha=None, beta=None, broadcast=True, transA=False, transB=False):
         if not broadcast and c.shape.ndims != 2:
             raise NotImplementedError(
-                'Gemm without multiplier broadcast requires a two-dimensional scalar multiplier; multiplier rank={}'.
-                format(c.shape.ndims))
+                'Gemm without multiplier broadcast requires a two-dimensional scalar multiplier; multiplier rank={}'
+                .format(c.shape.ndims))
 
         def gemm_reshape(value):
             if value.shape.ndims < 2:
@@ -1980,47 +1946,22 @@ def max_reduce(x, axes=None, keepdims=False):
 maximum = tile.maximum
 
 
-class MaxPool(tile.Operation):
-    """
-    A standard ML max pooling operator.
-    """
-
-    def __init__(self, data, padding, kernel_shape, pads, strides):
-        rank = data.shape.ndims - 2
-        pads = _extend_pads(pads, rank)
-        if not strides:
-            strides = tuple(1 for _ in range(rank))
-        elif len(strides) != rank:
-            raise ValueError(
-                'Pool strides length inconsistent with input shape: ' +
-                '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.shape, rank))
-        sym_out_shape = list()
-        num_out_shape = list()
-        in_idxs = list()
-        for i in range(rank):
-            sym_out, sym_pad, num_out = pad_compute('L{}'.format(i), data.shape.dims[i + 2],
-                                                    kernel_shape[i], strides[i], padding,
-                                                    (pads[i], pads[i + rank]) if pads else None)
-            sym_out_shape.append(sym_out)
-            num_out_shape.append(num_out)
-            in_idxs.append('{stride}*x{idx} + k{idx} - {pad}'.format(
-                stride=strides[i], idx=i, pad=sym_pad))
-        code = """
-        function (I[N, C, {in_dims}]) -> (O) {{
-            O[n, c, {out_idxs} : N, C, {out_dims}] = >(I[n, c, {in_idxs}]), {pool_bounds};
-        }}""".format(
-            out_idxs=', '.join(['x{}'.format(i) for i in range(rank)]),
-            out_dims=', '.join(sym_out_shape),
-            in_idxs=', '.join(in_idxs),
-            in_dims=', '.join(['L{}'.format(i) for i in range(rank)]),
-            pool_bounds=', '.join(['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
-
-        outshape = tile.Shape(data.shape.dtype, list(data.shape.dims[0:2]) + num_out_shape)
-
-        super(MaxPool, self).__init__(code, [('I', data)], [('O', outshape)])
-
-
-max_pool = MaxPool.function
+def max_pool(data,
+             kernel_shape,
+             strides,
+             pads=None,
+             padding=AutoPadding.EXPLICIT,
+             data_format=PoolDataFormat.NCX,
+             name=None):
+    return pool(
+        data=data,
+        mode=PoolMode.MAX,
+        kernel_shape=kernel_shape,
+        pads=pads,
+        strides=strides,
+        padding=padding,
+        data_format=data_format,
+        name=name)
 
 
 class Mean(tile.Operation):
@@ -2112,6 +2053,126 @@ class NotEqual(tile.Operation):
 
 
 not_equal = NotEqual.function
+
+
+class Pool(tile.Operation):
+    """
+    A standard ML pooling operator. Handles both MAX & AVG
+    """
+
+    def __init__(self,
+                 data,
+                 mode,
+                 kernel_shape,
+                 strides,
+                 pads=None,
+                 padding=AutoPadding.EXPLICIT,
+                 data_format=PoolDataFormat.NCX,
+                 name=None):
+        rank = data.shape.ndims - 2
+        pads = _extend_pads(pads, rank)
+        if not strides:
+            strides = tuple(1 for _ in range(rank))
+        elif len(strides) != rank:
+            raise ValueError(
+                'Pool strides length inconsistent with input shape: ' +
+                '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.shape, rank))
+        in_spatial_dims = ['L{}'.format(i) for i in range(rank)]
+        in_spatial_idxs = list()
+        out_spatial_dims = []
+        if data_format == PoolDataFormat.NCX:
+            data_spatial_dims = data.shape.dims[2:rank + 2]
+        elif data_format == PoolDataFormat.NXC:
+            data_spatial_dims = data.shape.dims[1:rank + 1]
+        else:
+            raise ValueError('Invalid data_format')
+        num_out_spatial_shape = list()
+        pad_amount = list()
+        for i in range(rank):
+            sym_out, sym_pad, num_out = pad_compute('L{}'.format(i), data_spatial_dims[i],
+                                                    kernel_shape[i], strides[i], padding,
+                                                    (pads[i], pads[i + rank]) if pads else None)
+            out_spatial_dims.append(sym_out)
+            num_out_spatial_shape.append(num_out)
+            pad_amount.append(sym_pad)
+            in_spatial_idxs.append('{stride}*x{idx} + k{idx} - Pad{idx}'.format(
+                stride=strides[i], idx=i))
+        out_spatial_idxs = ['x{}'.format(i) for i in range(rank)]
+        padding_list = ['Pad{} = {};'.format(i, pad_amount[i]) for i in range(rank)]
+        padding_str = '\n            '.join(padding_list)
+        if data_format == PoolDataFormat.NCX:
+            in_dims = ['N', 'C'] + in_spatial_dims
+            in_idxs = ['n', 'c'] + in_spatial_idxs
+            out_dims = ['N', 'C'] + out_spatial_dims
+            out_idxs = ['n', 'c'] + out_spatial_idxs
+            ones_write_idxs = ['n', 'c'] + ['o{}'.format(i) for i in range(rank)]
+            num_out_shape = list(data.shape.dims[0:2]) + num_out_spatial_shape
+        elif data_format == PoolDataFormat.NXC:
+            in_dims = ['N'] + in_spatial_dims + ['C']
+            in_idxs = ['n'] + in_spatial_idxs + ['c']
+            out_dims = ['N'] + out_spatial_dims + ['C']
+            out_idxs = ['n'] + out_spatial_idxs + ['c']
+            ones_write_idxs = ['n'] + ['o{}'.format(i) for i in range(rank)] + ['c']
+            num_out_shape = list(data.shape.dims[0:1]) + num_out_spatial_shape + list(
+                data.shape.dims[rank + 1:rank + 2])
+        else:
+            raise ValueError('Invalid data_format')
+
+        if mode == PoolMode.AVG:
+            pool_contraction_op = "+"
+            pool_contraction_out_name = "S"
+            # Want average pooling not sum pooling, so divide by number of elements in a pool
+            # However, the number of elements in the pool should only count true elements,
+            # not zero padding. Thus, we build a tensor that is 1 everywhere the original
+            # tensor is defined, and we sum that tensor over the pool area to find the
+            # number of elements in the pool for the corresponding output entry.
+            denom_gen_code = """
+            Ones[{ones_write_idxs} : {ones_dims}] = =(One[]);
+            Count[{cout_idxs} : {cout_dims}] = +(Ones[{ones_read_idxs}]), {pool_bounds};""".format(
+                ones_write_idxs=', '.join(ones_write_idxs),
+                ones_dims=', '.join(in_dims),
+                ones_read_idxs=', '.join(in_idxs),
+                cout_idxs=', '.join(out_idxs),
+                cout_dims=', '.join(out_dims),
+                pool_bounds=', '.join(
+                    ['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]),
+            )
+            denom_divide_code = """
+            O = S / Count;"""
+            extra_input = ", One[]"
+            input_tensors = [('I', data), ('One', tile.Value.from_var(1., tuple()))]
+        elif mode == PoolMode.MAX:
+            pool_contraction_op = ">"
+            pool_contraction_out_name = "O"
+            denom_gen_code = ""
+            denom_divide_code = ""
+            extra_input = ""
+            input_tensors = [('I', data)]
+        else:
+            raise ValueError('Invalid mode for Pool operation')
+        code = """
+        function (I[{in_dims}]{extra_input}) -> (O) {{
+            {padding_str}{denom_gen}
+            {out_name}[{out_idxs} : {out_dims}] = {op}(I[{in_idxs}]), {pool_bounds}; {denom_divide}
+        }}""".format(
+            op=pool_contraction_op,
+            extra_input=extra_input,
+            denom_gen=denom_gen_code,
+            denom_divide=denom_divide_code,
+            padding_str=padding_str,
+            out_idxs=', '.join(out_idxs),
+            out_dims=', '.join(out_dims),
+            in_idxs=', '.join(in_idxs),
+            in_dims=', '.join(in_dims),
+            out_name=pool_contraction_out_name,
+            pool_bounds=', '.join(['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
+
+        outshape = tile.Shape(data.shape.dtype, num_out_shape)
+
+        super(Pool, self).__init__(code, input_tensors, [('O', outshape)], name=name)
+
+
+pool = Pool.function
 
 
 class Pow(tile.Operation):
@@ -2366,7 +2427,7 @@ class Softmax(tile.Operation):
     Implements a standard ML softmax.
     """
 
-    def __init__(self, data):
+    def __init__(self, data, name=None):
         if data.shape.ndims != 2:
             raise NotImplementedError(
                 'Softmax with a non-two-dimensional tensor is not currently implemented')
@@ -2376,10 +2437,10 @@ class Softmax(tile.Operation):
             O = builtin_softmax(I, X, Y);
         }"""
 
-        super(Softmax, self).__init__(code, [('I', data)], [('O', data.shape)])
+        super(Softmax, self).__init__(code, [('I', data)], [('O', data.shape)], name=name)
 
 
-def softmax(x, axis=None):
+def softmax(x, axis=None, name=None):
     if x.shape.ndims == 2:
         return Softmax.function(x)
     if axis is None:
@@ -2394,7 +2455,7 @@ def softmax(x, axis=None):
     else:
         values = functools.reduce(lambda x, y: x * y, x.shape.dims[axis:])
     flat_x = reshape(x, (group, values))
-    result = Softmax.function(flat_x)
+    result = Softmax.function(flat_x, name=name)
     return reshape(result, full_dims)
 
 

@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/opencl/device_state.h"
 
@@ -50,8 +50,8 @@ DeviceState::DeviceState(const context::Context& ctx, const CLObj<cl_context>& c
     : did_{did}, info_{std::move(info)}, cl_ctx_{cl_ctx}, clock_{}, id_{ctx.activity_id()} {}
 
 void DeviceState::Initialize(const hal::proto::HardwareSettings& settings) {
-  cl_normal_queue_ = compat::make_unique<Queue>(MakeQueue(did_, cl_ctx_, settings));
-  cl_profiling_queue_ = compat::make_unique<Queue>(MakeQueue(did_, cl_ctx_, settings, CL_QUEUE_PROFILING_ENABLE));
+  cl_normal_queue_ = std::make_unique<Queue>(MakeQueue(did_, cl_ctx_, settings));
+  cl_profiling_queue_ = std::make_unique<Queue>(MakeQueue(did_, cl_ctx_, settings, CL_QUEUE_PROFILING_ENABLE));
 }
 
 void DeviceState::FlushCommandQueue() {

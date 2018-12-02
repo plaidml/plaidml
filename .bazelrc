@@ -1,0 +1,2 @@
+import %workspace%/tools/bazel.rc
+try-import %workspace%/user.bazelrc

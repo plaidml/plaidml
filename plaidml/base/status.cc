@@ -1,4 +1,4 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 
 #include "plaidml/base/status.h"
 
@@ -14,10 +14,10 @@ namespace {
 #if TARGET_OS_IPHONE == 1
 vai_status last_status = VAI_STATUS_OK;
 std::string last_status_str;  // NOLINT
-#else  // TARGET_OS_IPHONE == 1
+#else                         // TARGET_OS_IPHONE == 1
 thread_local vai_status last_status = VAI_STATUS_OK;
 thread_local std::string last_status_str;
-#endif  // TARGET_OS_IPHONE == 1 ... else
+#endif                        // TARGET_OS_IPHONE == 1 ... else
 
 }  // namespace
 

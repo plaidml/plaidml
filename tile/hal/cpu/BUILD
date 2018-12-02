@@ -1,4 +1,4 @@
-# Copyright 2017, Vertex.AI. CONFIDENTIAL
+# Copyright 2017-2018 Intel Corporation.
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
@@ -39,22 +39,18 @@ plaidml_cc_library(
         "-D__STDC_LIMIT_MACROS",
         "-D__STDC_CONSTANT_MACROS",
     ],
-    linkopts = select({
-        "@toolchain//:windows_x86_64": [],
-        "//conditions:default": ["-ldl"],
-    }),
     tags = ["llvm"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
-        "//lib:llvm",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
         "//tile/lang",
         "//tile/proto:proto_cc",
         "//tile/proto:support",
-        "@half_repo//:half",
+        "//vendor/llvm",
+        "@half",
     ],
     alwayslink = 1,
 )

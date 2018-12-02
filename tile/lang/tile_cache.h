@@ -3,6 +3,8 @@
 
 #include <fstream>
 #include <limits>
+#include <map>
+#include <string>
 #include <vector>
 
 #include "base/util/transfer_object.h"
@@ -15,7 +17,7 @@ namespace lang {
 class TileCache {
  public:
   // Construct a cache, if given a filename, use that for storage
-  TileCache(const std::string& filename = "", bool use_env = false);
+  explicit TileCache(const std::string& filename = "", bool use_env = false);
   // Get the 'singlton' instance, loads for PLAIDML_TILE_CACHE if set
   static TileCache* Instance();
   // Add a new entry with a duration

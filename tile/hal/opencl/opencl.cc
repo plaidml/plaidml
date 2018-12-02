@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "base/util/compat.h"
 #include "base/util/factory.h"
@@ -11,8 +11,8 @@ namespace opencl {
 
 [[gnu::unused]] char reg = []() -> char {
   FactoryRegistrar<hal::Driver>::Instance()->Register(
-      "opencl",                                                                      //
-      [](const context::Context& ctx) { return compat::make_unique<Driver>(ctx); },  //
+      "opencl",                                                                   //
+      [](const context::Context& ctx) { return std::make_unique<Driver>(ctx); },  //
 #ifdef __APPLE__
       FactoryPriority::DEFAULT);
 #else

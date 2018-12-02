@@ -1,12 +1,12 @@
-// Copyright 2018, Vertex.AI.
+// Copyright 2018, Intel Corporation.
 #include <gmock/gmock.h>
 
 #include "tile/platform/local_machine/fifo_scheduler.h"
 #include "tile/platform/local_machine/scheduler_test.h"
 
 using ::testing::AnyOf;
-using ::testing::Eq;
 using ::testing::Combine;
+using ::testing::Eq;
 using ::testing::UnorderedElementsAre;
 using ::testing::Values;
 using ::testing::ValuesIn;

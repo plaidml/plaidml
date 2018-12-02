@@ -1,5 +1,3 @@
-%output "parser.y.cc"
-%defines "parser.y.h"
 %define api.pure full
 %error-verbose
  
@@ -12,8 +10,8 @@
 #include "tile/lang/sym_poly.h"
 #include "base/util/logging.h"
 
-using vertexai::tile::lang::Integer;
-using vertexai::tile::lang::Rational;
+using vertexai::tile::math::Integer;
+using vertexai::tile::math::Rational;
 
 struct Context {
   std::string id;
@@ -63,7 +61,7 @@ struct Value {
   google::protobuf::RepeatedPtrField<std::string> attr_param_list;
 };
 
-#define YYSTYPE Value
+#define YYSTYPE ::Value
 
 typedef void* yyscan_t;
 
@@ -167,12 +165,13 @@ attribute_parameter_list
   | attribute_parameter_list "," attribute_parameter { $1.Add(std::move($3)); $$ = std::move($1); }
 ;
 
-attribute_parameter:
-  IDXID
+attribute_parameter
+  : ID
+  | IDXID
 ;
 
 body
-  : attributed_stmt ";" { context.finish_stmt(); }
+  : /* empty */
   | body attributed_stmt ";" {  context.finish_stmt(); }
 ;
 

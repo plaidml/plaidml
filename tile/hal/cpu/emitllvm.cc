@@ -1,8 +1,9 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/cpu/emitllvm.h"
 
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Scalar.h>
 
 #include <algorithm>
@@ -20,7 +21,6 @@ namespace tile {
 namespace hal {
 namespace cpu {
 
-
 class Error : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
@@ -30,7 +30,7 @@ Emit::Emit()
     : context_(llvm::getGlobalContext()),
       builder_{context_},
       module_{new llvm::Module("tile", context_)},
-      funcopt_{new llvm::legacy::FunctionPassManager(module_.get())},
+      funcopt_{module_.get()},
       int32type_{llvm::IntegerType::get(context_, 32)},
       booltype_{llvm::IntegerType::get(context_, 1)},
       blocks_{1} {
@@ -49,29 +49,27 @@ Emit::Emit()
 
   // Configure the function pass manager for specific optimization passes which
   // might be relevant for Tile code.
-  funcopt_->add(llvm::createEarlyCSEPass());
-  funcopt_->add(llvm::createLICMPass());
-  funcopt_->add(llvm::createLoopInstSimplifyPass());
-  funcopt_->add(llvm::createGVNPass());
-  funcopt_->add(llvm::createDeadStoreEliminationPass());
-  funcopt_->add(llvm::createSCCPPass());
-  funcopt_->add(llvm::createReassociatePass());
-  funcopt_->add(llvm::createInstructionCombiningPass());
-  funcopt_->add(llvm::createInstructionSimplifierPass());
-  funcopt_->add(llvm::createAggressiveDCEPass());
-  funcopt_->add(llvm::createCFGSimplificationPass());
-  funcopt_->doInitialization();
+  llvm::PassManagerBuilder pmb;
+  pmb.OptLevel = 3;
+  pmb.SizeLevel = 0;
+  pmb.BBVectorize = true;
+  pmb.SLPVectorize = true;
+  pmb.LoopVectorize = true;
+  pmb.MergeFunctions = true;
+  pmb.populateFunctionPassManager(funcopt_);
+  pmb.populateModulePassManager(modopt_);
+  funcopt_.doInitialization();
 }
 
 void Emit::Visit(const sem::IntConst& n) {
   llvm::Value* ret = llvm::ConstantInt::get(int32type_, n.value);
-  Resolve(value{ret, {sem::Type::VALUE, lang::DataType::INT32}});
+  Resolve(value{ret, {sem::Type::VALUE, DataType::INT32}});
 }
 
 void Emit::Visit(const sem::FloatConst& n) {
   llvm::Type* ty = llvm::Type::getFloatTy(context_);
   llvm::Value* ret = llvm::ConstantFP::get(ty, n.value);
-  Resolve(value{ret, {sem::Type::VALUE, lang::DataType::FLOAT32}});
+  Resolve(value{ret, {sem::Type::VALUE, DataType::FLOAT32}});
 }
 
 void Emit::Visit(const sem::LookupLVal& n) {
@@ -115,7 +113,7 @@ void Emit::Visit(const sem::SubscriptLVal& n) {
   // a pointer to the element value, which just happens to be the same thing
   // GetElementPtr wants to return.
   value offset = Eval(n.offset);
-  indexes.push_back(CastTo(offset, {sem::Type::VALUE, lang::DataType::INT32}));
+  indexes.push_back(CastTo(offset, {sem::Type::VALUE, DataType::INT32}));
   llvm::Value* resptr = builder_.CreateGEP(ptr.v, indexes);
   sem::Type restype = ptr.t;
   restype.base = sem::Type::VALUE;
@@ -175,7 +173,7 @@ void Emit::Visit(const sem::BinaryExpr& n) {
   if (n.op == "+" && PointerAddition(lhs, rhs)) return;
 
   sem::Type comtype = ConvergeOperands(&lhs, &rhs);
-  sem::Type booltype{sem::Type::VALUE, lang::DataType::BOOLEAN};
+  sem::Type booltype{sem::Type::VALUE, DataType::BOOLEAN};
 
   // Create the instruction that represents this operator, which depends on
   // whether our operands are floats, signed ints, or unsigned ints.
@@ -341,7 +339,7 @@ void Emit::Visit(const sem::CondExpr& n) {
   llvm::Type* condtype = cond.v->getType();
   if (condtype->isVectorTy()) {
     // Vector of booleans: operands must also be vectors of equal size.
-    llvm::Value *selexpr = ToBool(cond.v);
+    llvm::Value* selexpr = ToBool(cond.v);
     value tcase = Eval(n.tcase);
     value fcase = Eval(n.fcase);
     sem::Type comtype = ConvergeOperands(&tcase, &fcase);
@@ -439,7 +437,7 @@ void Emit::Visit(const sem::CallExpr& n) {
   // have the same type, which is 'double' by default, and the result will have
   // the same type. If one or more of the arguments are vectors, we will convert
   // non-vector arguments up to the vector size.
-  sem::Type gentype{sem::Type::VALUE, lang::DataType::FLOAT64};
+  sem::Type gentype{sem::Type::VALUE, DataType::FLOAT64};
   std::string typefix = ".";
   std::vector<value> vals;
   for (auto& expr : n.vals) {
@@ -466,6 +464,7 @@ void Emit::Visit(const sem::CallExpr& n) {
     case sem::CallExpr::Function::FLOOR:
     case sem::CallExpr::Function::LOG:
     case sem::CallExpr::Function::POW:
+    case sem::CallExpr::Function::SIN:
     case sem::CallExpr::Function::SQRT:
       linkName = "llvm." + n.name + typefix;
       break;
@@ -473,8 +472,14 @@ void Emit::Visit(const sem::CallExpr& n) {
       linkName = "llvm.fma" + typefix;
       break;
     case sem::CallExpr::Function::ROUND:
-      linkName = (gentype.vec_width > 1)? ("llvm.rint" + typefix): "round";
+      linkName = (gentype.vec_width > 1) ? ("llvm.rint" + typefix) : "round";
       break;
+    case sem::CallExpr::Function::ACOS:
+    case sem::CallExpr::Function::ASIN:
+    case sem::CallExpr::Function::ATAN:
+    case sem::CallExpr::Function::COSH:
+    case sem::CallExpr::Function::SINH:
+    case sem::CallExpr::Function::TAN:
     case sem::CallExpr::Function::TANH:
       linkName = n.name;
       devectorize = true;
@@ -489,9 +494,9 @@ void Emit::Visit(const sem::CallExpr& n) {
   } else {
     sem::Type restype = gentype;
     if (devectorize) {
-     restype.vec_width = 1;
+      restype.vec_width = 1;
     }
-    llvm::Type *ltype = CType(restype);
+    llvm::Type* ltype = CType(restype);
     std::vector<llvm::Type*> paramTypes(args.size(), ltype);
     auto funcType = llvm::FunctionType::get(ltype, paramTypes, false);
     auto link = llvm::Function::ExternalLinkage;
@@ -508,12 +513,12 @@ void Emit::Visit(const sem::CallExpr& n) {
     auto zero = llvm::ConstantFP::get(context_, apzero);
     auto ltype = CType(gentype);
     auto op = llvm::CastInst::getCastOpcode(zero, true, ltype, true);
-    llvm::Value *outvec = builder_.CreateCast(op, zero, ltype);
+    llvm::Value* outvec = builder_.CreateCast(op, zero, ltype);
     for (unsigned i = 0; i < gentype.vec_width; ++i) {
       llvm::Value* index = llvm::ConstantInt::get(int32type_, i);
-      llvm::Value *inelement = builder_.CreateExtractElement(args[0], index);
+      llvm::Value* inelement = builder_.CreateExtractElement(args[0], index);
       std::vector<llvm::Value*> callarg(1, inelement);
-      llvm::Value *outelement = builder_.CreateCall(func, callarg, "");
+      llvm::Value* outelement = builder_.CreateCall(func, callarg, "");
       outvec = builder_.CreateInsertElement(outvec, outelement, index);
     }
     Resolve(value{outvec, gentype});
@@ -539,13 +544,13 @@ void Emit::LimitConstSInt(unsigned bits, sem::LimitConst::Which which) {
   llvm::IntegerType* ty = llvm::IntegerType::get(context_, bits);
   sem::Type comtype{sem::Type::VALUE};
   if (bits <= 8) {
-    comtype.dtype = lang::DataType::INT8;
+    comtype.dtype = DataType::INT8;
   } else if (bits <= 16) {
-    comtype.dtype = lang::DataType::INT16;
+    comtype.dtype = DataType::INT16;
   } else if (bits <= 32) {
-    comtype.dtype = lang::DataType::INT32;
+    comtype.dtype = DataType::INT32;
   } else {
-    comtype.dtype = lang::DataType::INT64;
+    comtype.dtype = DataType::INT64;
   }
   Resolve(value{llvm::ConstantInt::get(ty, apval), comtype});
 }
@@ -569,15 +574,15 @@ void Emit::LimitConstUInt(unsigned bits, sem::LimitConst::Which which) {
   llvm::IntegerType* ty = llvm::IntegerType::get(context_, bits);
   sem::Type comtype{sem::Type::VALUE};
   if (bits == 1) {
-    comtype.dtype = lang::DataType::BOOLEAN;
+    comtype.dtype = DataType::BOOLEAN;
   } else if (bits <= 8) {
-    comtype.dtype = lang::DataType::UINT8;
+    comtype.dtype = DataType::UINT8;
   } else if (bits <= 16) {
-    comtype.dtype = lang::DataType::UINT16;
+    comtype.dtype = DataType::UINT16;
   } else if (bits <= 32) {
-    comtype.dtype = lang::DataType::UINT32;
+    comtype.dtype = DataType::UINT32;
   } else {
-    comtype.dtype = lang::DataType::UINT64;
+    comtype.dtype = DataType::UINT64;
   }
   Resolve(value{llvm::ConstantInt::get(ty, apval), comtype});
 }
@@ -598,50 +603,50 @@ void Emit::LimitConstFP(const llvm::fltSemantics& sem, sem::LimitConst::Which wh
       apval = llvm::APFloat::getLargest(sem, /*Negative*/ false);
       break;
   }
-  sem::Type comtype{sem::Type::VALUE, lang::DataType::FLOAT64};
+  sem::Type comtype{sem::Type::VALUE, DataType::FLOAT64};
   Resolve(value{llvm::ConstantFP::get(context_, apval), comtype});
 }
 
 void Emit::Visit(const sem::LimitConst& n) {
   switch (n.type) {
-    case lang::DataType::BOOLEAN:
+    case DataType::BOOLEAN:
       LimitConstUInt(1, n.which);
       break;
-    case lang::DataType::INT8:
+    case DataType::INT8:
       LimitConstSInt(8, n.which);
       break;
-    case lang::DataType::INT16:
+    case DataType::INT16:
       LimitConstSInt(16, n.which);
       break;
-    case lang::DataType::INT32:
+    case DataType::INT32:
       LimitConstSInt(32, n.which);
       break;
-    case lang::DataType::INT64:
+    case DataType::INT64:
       LimitConstSInt(64, n.which);
       break;
-    case lang::DataType::UINT8:
+    case DataType::UINT8:
       LimitConstUInt(8, n.which);
       break;
-    case lang::DataType::UINT16:
+    case DataType::UINT16:
       LimitConstUInt(16, n.which);
       break;
-    case lang::DataType::UINT32:
+    case DataType::UINT32:
       LimitConstUInt(32, n.which);
       break;
-    case lang::DataType::UINT64:
+    case DataType::UINT64:
       LimitConstUInt(64, n.which);
       break;
-    case lang::DataType::FLOAT16:
+    case DataType::FLOAT16:
       LimitConstFP(llvm::APFloat::IEEEhalf, n.which);
       break;
-    case lang::DataType::FLOAT32:
+    case DataType::FLOAT32:
       LimitConstFP(llvm::APFloat::IEEEsingle, n.which);
       break;
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT64:
       LimitConstFP(llvm::APFloat::IEEEdouble, n.which);
       break;
-    case lang::DataType::INVALID:
-    case lang::DataType::PRNG:
+    case DataType::INVALID:
+    case DataType::PRNG:
       throw Error("Unknown type has no constants");
   }
 }
@@ -841,7 +846,7 @@ void Emit::Visit(const sem::Function& n) {
   Leave();
   returntype_.base = sem::Type::TVOID;
 
-  funcopt_->run(*function_);
+  funcopt_.run(*function_);
 }
 
 std::string Emit::str() const {
@@ -850,6 +855,11 @@ std::string Emit::str() const {
   os << *module_;
   os.flush();
   return r;
+}
+
+std::unique_ptr<llvm::Module>&& Emit::result() {
+  modopt_.run(*module_);
+  return std::move(module_);
 }
 
 Emit::value Emit::Process(const sem::Node& n) {
@@ -894,13 +904,13 @@ llvm::Type* Emit::CType(const sem::Type& type) {
   }
   llvm::Type* t = nullptr;
   switch (type.dtype) {
-    case lang::DataType::FLOAT16:
+    case DataType::FLOAT16:
       t = llvm::Type::getHalfTy(context_);
       break;
-    case lang::DataType::FLOAT32:
+    case DataType::FLOAT32:
       t = llvm::Type::getFloatTy(context_);
       break;
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT64:
       t = llvm::Type::getDoubleTy(context_);
       break;
     default:
@@ -981,11 +991,11 @@ bool Emit::IsUnsignedIntegerType(const sem::Type& t) {
   if (t.base != sem::Type::VALUE) return false;
   if (t.array > 0) return false;
   switch (t.dtype) {
-    case lang::DataType::BOOLEAN:
-    case lang::DataType::UINT8:
-    case lang::DataType::UINT16:
-    case lang::DataType::UINT32:
-    case lang::DataType::UINT64:
+    case DataType::BOOLEAN:
+    case DataType::UINT8:
+    case DataType::UINT16:
+    case DataType::UINT32:
+    case DataType::UINT64:
       return true;
     default:
       return false;
@@ -996,9 +1006,9 @@ bool Emit::IsFloatingPointType(const sem::Type& t) {
   if (t.base != sem::Type::VALUE) return false;
   if (t.array > 0) return false;
   switch (t.dtype) {
-    case lang::DataType::FLOAT16:
-    case lang::DataType::FLOAT32:
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT16:
+    case DataType::FLOAT32:
+    case DataType::FLOAT64:
       return true;
     default:
       return false;

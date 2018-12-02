@@ -19,6 +19,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 namespace {
 DataType g_floatx = DataType::FLOAT32;
 }  // namespace
@@ -70,15 +72,15 @@ static double ConstantPropagate(const std::string& op, const std::vector<double>
   }
   if (op == "broadcast") {
     if (x[0] != x[1] && x[0] != 1 && x[1] != 1) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
-                               std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
+                               " != " + std::to_string(x[1]));
     }
     return x[0] == 1 ? x[1] : x[0];
   }
   if (op == "match") {
     if (x[0] != x[1]) {
-      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) + " != " +
-                               std::to_string(x[1]));
+      throw std::runtime_error("Type check failed due to mismatched tensor sizes: " + std::to_string(x[0]) +
+                               " != " + std::to_string(x[1]));
     }
     return x[0];
   }
@@ -430,7 +432,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
         // Bind the range
         int64_t range = ExtractInteger(*vars, cc.range);
         // Bind the polynomial
-        Polynomial poly = cc.poly->Evaluate(*vars);
+        Polynomial<Rational> poly = cc.poly->Evaluate(*vars);
         // Update the concrete range
         cc.bound = RangeConstraint(poly, range);
         cc.poly = SymbolicPolynomialPtr();
@@ -513,29 +515,29 @@ void TypeCheck(Program* prog, Bindings* vars) {
       }
       if (op.f.fn == "element") {
         if (op.inputs.size() != 2) {
-          throw new std::runtime_error("Element requires exactly two inputs.");
+          throw std::runtime_error("Element requires exactly two inputs.");
         }
         const Binding& it = vars->at(op.inputs[0]);
         if (it.tag != Binding::TUPLE) {
-          throw new std::runtime_error("Element requires it's first input to be a tuple");
+          throw std::runtime_error("Element requires it's first input to be a tuple");
         }
         if (vars->at(op.inputs[1]).tag != Binding::ICONST) {
-          throw new std::runtime_error("Element requires it's second input to be an integer");
+          throw std::runtime_error("Element requires it's second input to be an integer");
         }
         int64_t elem = vars->at(op.inputs[1]).iconst;
         if (elem < 0 || elem >= it.tuple.size()) {
-          throw new std::runtime_error("Element requires it's tuple position to be in bound");
+          throw std::runtime_error("Element requires it's tuple position to be in bound");
         }
         vars->emplace(op.output, it.tuple[elem]);
         continue;
       }
       if (op.f.fn == "shape") {
         if (op.inputs.size() != 1) {
-          throw new std::runtime_error("Shape requires exactly one input.");
+          throw std::runtime_error("Shape requires exactly one input.");
         }
         Binding it = vars->at(op.inputs[0]);
         if (it.tag != Binding::TENSOR) {
-          throw new std::runtime_error("Shape requires one input that is a tensor");
+          throw std::runtime_error("Shape requires one input that is a tensor");
         }
         out_type = DataType::INT32;
         std::vector<size_t> out_shape;
@@ -545,11 +547,11 @@ void TypeCheck(Program* prog, Bindings* vars) {
       }
       if (op.f.fn == "reshape") {
         if (op.inputs.size() < 1) {
-          throw new std::runtime_error("Reshape requires at least one input.");
+          throw std::runtime_error("Reshape requires at least one input.");
         }
         const Binding& it = vars->at(op.inputs[0]);
         if (it.tag != Binding::TENSOR) {
-          throw new std::runtime_error("Reshape requires one input that is a tensor");
+          throw std::runtime_error("Reshape requires one input that is a tensor");
         }
         std::vector<size_t> sizes;
         for (size_t i = 1; i < op.inputs.size(); i++) {
@@ -770,6 +772,10 @@ void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std:
   std::queue<std::string> to_proc;
   std::set<std::string> keep;
   for (const auto& s : outputs) {
+    if (vars.at(s).tag == Binding::TENSOR && !vars.at(s).shape.elem_size()) {
+      // This is a zero-sized tensor; we don't need to generate it.
+      continue;
+    }
     keep.insert(s);
     to_proc.push(s);
   }
@@ -788,6 +794,10 @@ void OptimizeProgram(Program* p, const std::set<std::string>& inputs, const std:
     for (std::string& i : op.inputs) {
       deident(i);
       if (keep.count(i) || inputs.count(i)) {
+        continue;
+      }
+      if (vars.at(i).tag == Binding::TENSOR && !vars.at(i).shape.elem_size()) {
+        // This is a zero-sized tensor; we don't need to generate it.
         continue;
       }
       keep.insert(i);
@@ -833,14 +843,20 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
     input_vars.insert(kvp.first);
   }
   for (const auto& kvp : outputs) {
+    if (!kvp.second.elem_size()) {
+      continue;
+    }
     output_vars.insert(kvp.first);
   }
   // Do typing
   TypeCheck(p, &vars);
-  IVLOG(2, "After typecheck: " << p->ops);
-  IVLOG(2, "Types:: " << vars);
+  IVLOG(3, "After typecheck: " << p->ops);
+  IVLOG(3, "Types:: " << vars);
   // Verify outputs match
   for (const auto& kvp : outputs) {
+    if (!kvp.second.elem_size()) {
+      continue;
+    }
     auto it = vars.find(kvp.first);
     if (it == vars.end()) {
       throw std::runtime_error("No type deduced for output " + kvp.first);
@@ -855,7 +871,7 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
   }
   // Finally, run program 'optimization' pass
   OptimizeProgram(p, input_vars, output_vars, vars);
-  IVLOG(2, "After optimize: " << p->ops);
+  IVLOG(3, "After optimize: " << p->ops);
 
   return vars;
 }

@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "base/util/transfer_object.h"
+#include "tile/base/shape.h"
 #include "tile/lang/ops.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/type.h"
 
 namespace vertexai {
@@ -76,7 +76,7 @@ struct FlatContraction {
   std::vector<Op> post_ops;
   std::vector<FlatPostOpInput> post_op_inputs;  // Additional inputs for the post_ops
   std::vector<std::string> kernel_outputs;      // Outputs written by the kernel.
-  std::map<std::string, std::vector<Polynomial>> index_mapping;
+  std::map<std::string, std::vector<math::Polynomial<math::Rational>>> index_mapping;
 
   std::string CacheKeyString(const Bindings& vars) const;
 

@@ -1,13 +1,13 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #pragma once
-
-#include <boost/thread/future.hpp>
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
+
+#include <boost/thread/future.hpp>
 
 #include "base/context/context.h"
 

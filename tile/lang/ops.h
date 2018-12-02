@@ -1,7 +1,5 @@
 #pragma once
 
-#include <boost/operators.hpp>
-
 #include <array>
 #include <map>
 #include <memory>
@@ -11,11 +9,13 @@
 #include <tuple>
 #include <vector>
 
+#include <boost/operators.hpp>
+
 #include "base/util/logging.h"
 #include "base/util/printstring.h"
 #include "base/util/transfer_object.h"
 #include "tile/lang/lang.pb.h"
-#include "tile/lang/polynomial.h"
+#include "tile/math/polynomial.h"
 
 namespace vertexai {
 namespace tile {
@@ -28,17 +28,17 @@ enum class CombinationOp : char { MULTIPLY = '*', PLUS = '+', EQ = '=', COND = '
 std::string to_string(const AggregationOp& c);
 std::string to_string(const CombinationOp& c);
 
-typedef std::vector<Polynomial> IndexSpec;
+typedef std::vector<math::Polynomial<math::Rational>> IndexSpec;
 
 class SymbolicPolynomial;
 typedef std::shared_ptr<SymbolicPolynomial> SymbolicPolynomialPtr;
 
 struct SymbolicConstraint {
   SymbolicConstraint(const SymbolicPolynomialPtr& _poly, const std::string& _range) : poly(_poly), range(_range) {}
-  explicit SymbolicConstraint(const RangeConstraint& _bound) : bound(_bound) {}
-  SymbolicPolynomialPtr poly;  // A symbolic representation of the polynominal
-  std::string range;           // A symbolic representation of the range
-  RangeConstraint bound;       // A concrete final version of the bound
+  explicit SymbolicConstraint(const math::RangeConstraint& _bound) : bound(_bound) {}
+  SymbolicPolynomialPtr poly;   // A symbolic representation of the polynominal
+  std::string range;            // A symbolic representation of the range
+  math::RangeConstraint bound;  // A concrete final version of the bound
 };
 
 std::string to_string(const SymbolicConstraint& c);

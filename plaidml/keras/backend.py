@@ -1,4 +1,4 @@
-# Copyright Vertex.AI.
+# Copyright 2018 Intel Corporation.
 """Implements a Keras backend using PlaidML.
 
 This module implements the Keras backend interface, using PlaidML for computation.
@@ -26,6 +26,7 @@ import numpy as np
 import os
 import plaidml
 import plaidml.op as op
+import plaidml.settings
 import plaidml.tile as ptile
 import scipy.stats
 import six
@@ -110,6 +111,16 @@ _AUTO_PAD = {
 _CONV_DATA_FORMAT = {
     'channels_first': op.ConvolutionDataFormat.CHANNELS_FIRST,
     'channels_last': op.ConvolutionDataFormat.CHANNELS_LAST,
+}
+
+_POOL_DATA_FORMAT = {
+    'channels_first': op.PoolDataFormat.NCX,
+    'channels_last': op.PoolDataFormat.NXC,
+}
+
+_POOL_MODE = {
+    'max': op.PoolMode.MAX,
+    'avg': op.PoolMode.AVG,
 }
 
 
@@ -458,6 +469,7 @@ def conv(x,
         grouping=grouping,
         kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
         group_format=op.GroupedChannelFormat.GroupGroupOut,
+        winograd_allowed=not plaidml.settings.prohibit_winograd,
     )
 
 
@@ -947,16 +959,19 @@ def ones_like(x, dtype=None, name=None):
 
 
 def permute_dimensions(x, pattern):
-    return ptile.Operation("""function (X[{src_ranges}]) -> (R) {{
+    return ptile.Operation(
+        """function (X[{src_ranges}]) -> (R) {{
                R[{dest_indices} : {dest_ranges}] = =(X[{src_indices}]);
            }}""".format(
-        src_ranges=', '.join(['X{}'.format(i) for i in range(x.shape.ndims)]),
-        src_indices=', '.join(['x{}'.format(i) for i in range(x.shape.ndims)]),
-        dest_ranges=', '.join(['X{}'.format(pattern[i]) for i in range(x.shape.ndims)]),
-        dest_indices=', '.join(['x{}'.format(
-            pattern[i]) for i in range(x.shape.ndims)])), [('X', x)], [('R', ptile.Shape(
-                x.shape.dtype, tuple(x.shape.dims[pattern[idx]] for idx in range(x.shape.ndims))))
-                                                                      ]).sole_output()
+            src_ranges=', '.join(['X{}'.format(i) for i in range(x.shape.ndims)]),
+            src_indices=', '.join(['x{}'.format(i) for i in range(x.shape.ndims)]),
+            dest_ranges=', '.join(['X{}'.format(pattern[i]) for i in range(x.shape.ndims)]),
+            dest_indices=', '.join(['x{}'.format(pattern[i]) for i in range(x.shape.ndims)])),
+        [('X', x)], [
+            ('R',
+             ptile.Shape(x.shape.dtype,
+                         tuple(x.shape.dims[pattern[idx]] for idx in range(x.shape.ndims))))
+        ]).sole_output()
 
 
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
@@ -970,134 +985,30 @@ def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
         raise PlaidMLKerasException('Specify either a shape or ndim value for placeholder.')
 
 
-class Pool(ptile.Operation):
-
-    def __init__(self,
-                 x,
-                 pool_size,
-                 strides=None,
-                 padding='valid',
-                 data_format=None,
-                 pool_mode='max'):
-        try:
-            padding = _AUTO_PAD[padding]
-        except KeyError:
-            six.raise_from(ValueError('Unrecognized padding: {}'.format(padding)), None)
-
-        # TODO: There are major similarities between pool and conv. I think keeping
-        # them separate makes sense, but we could consider merging them.
-        rank = x.shape.ndims - 2
-        if strides is None:
-            strides = tuple(1 for _ in range(rank))
-        if data_format is None:
-            data_format = image_data_format()
-
-        if len(pool_size) != rank:
-            raise ValueError(
-                'Pool size inconsistent with input shape: ' + '{} (rank {}) v {} (rank {})'.format(
-                    pool_size, len(pool_size), x.shape, x.shape.ndims - 2))
-        if len(strides) != rank:
-            raise ValueError('Pool strides length inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(
-                                 strides, len(strides), x.shape.dims, x.shape.ndims - 2))
-
-        if data_format == 'channels_first':
-            n = 0
-            c = 1
-            l = [i + 2 for i in range(rank)]
-        elif data_format == 'channels_last':
-            n = 0
-            l = [i + 1 for i in range(rank)]
-            c = rank + 1
-        else:
-            raise ValueError('Unrecognized data format \'{}\''.format(data_format))
-
-        out_size = list()
-        pad_amount = list()
-        num_out_size = list()
-        for i in range(rank):
-            sym_out, sym_pad, num_out = op.pad_compute('L{}'.format(i), x.shape.dims[l[i]],
-                                                       pool_size[i], strides[i], padding)
-            out_size.append(sym_out)
-            pad_amount.append(sym_pad)
-            num_out_size.append(num_out)
-        padding_list = ['  Pad{} = {};'.format(i, pad_amount[i]) for i in range(rank)]
-        padding_str = '\n'.join(padding_list)
-        input_idx_list = [
-            '{}*{} + {} - {}'.format(strides[i], 'x{}'.format(i), 'k{}'.format(i),
-                                     'Pad{}'.format(i)) for i in range(rank)
-        ]
-        pool_bounds = ', ' + ', '.join(['k{} < {}'.format(i, pool_size[i]) for i in range(rank)])
-        if data_format == 'channels_first':
-            input_dims_str = 'N, C, ' + ', '.join(['L{}'.format(i) for i in range(rank)])
-            out_idx_str = 'n, c, ' + ', '.join(['x{}'.format(i) for i in range(rank)])
-            out_dims_str = 'N, C, ' + ', '.join(['{}'.format(out_size[i]) for i in range(rank)])
-            input_idx_str = 'n, c, ' + ', '.join(input_idx_list)
-            outshape = list(x.shape.dims[:2]) + num_out_size
-        elif data_format == 'channels_last':
-            input_dims_str = 'N, ' + ', '.join(['L{}'.format(i) for i in range(rank)]) + ', C'
-            out_idx_str = 'n, ' + ', '.join(['x{}'.format(i) for i in range(rank)]) + ', c'
-            out_dims_str = 'N, ' + ', '.join(['{}'.format(out_size[i])
-                                              for i in range(rank)]) + ', C'
-            input_idx_str = 'n, ' + ', '.join(input_idx_list) + ', c'
-            outshape = [x.shape.dims[0]] + num_out_size + [x.shape.dims[-1]]
-        else:
-            raise ValueError('Unrecognized data format \'{}\''.format(data_format))
-        if pool_mode == 'max':
-            pool_sym = '>'
-            internal_name = 'O'
-            scale_expr = ''
-            extra_input = ''
-        elif pool_mode == 'avg':
-            pool_sym = '+'
-            internal_name = 'OT'
-            # Want average pooling not sum pooling, so divide by number of elements in a pool
-            # However, the number of elements in the pool should only count true elements,
-            # not zero padding. Thus, we build a tensor that is 1 everywhere the original
-            # tensor is defined, and we sum that tensor over the pool area to find the
-            # number of elements in the pool for the corresponding output entry.
-            ones = ones_like(x)
-            scale_expr = (
-                '  C[{out_idx_str}: {out_dims_str}] = +(Ones[{input_idx_str}]){pool_bounds};\n' +
-                '  O = OT / C;').format(**{
-                    'out_idx_str': out_idx_str,
-                    'out_dims_str': out_dims_str,
-                    'input_idx_str': input_idx_str,
-                    'pool_bounds': pool_bounds
-                })
-            extra_input = ', Ones[{}]'.format(input_dims_str)
-        else:
-            raise ValueError('Unrecognized pool mode \'{}\''.format(pool_mode))
-
-        f = ('function (I[{input_dims_str}]{extra_input}) -> (O) {{\n' + '{padding_str}\n' +
-             '  {internal_name}[{out_idx_str}: {out_dims_str}]' +
-             '= {pool_sym}(I[{input_idx_str}]){pool_bounds};\n'
-             '{scale_expr}\n}}').format(**{
-                 'input_dims_str': input_dims_str,
-                 'out_idx_str': out_idx_str,
-                 'out_dims_str': out_dims_str,
-                 'pool_sym': pool_sym,
-                 'input_idx_str': input_idx_str,
-                 'pool_bounds': pool_bounds,
-                 'scale_expr': scale_expr,
-                 'internal_name': internal_name,
-                 'padding_str': padding_str,
-                 'extra_input': extra_input
-             })
-
-        name = 'pool{}d'.format(rank)
-        if pool_mode == 'max':
-            inputs = [('I', x)]
-        elif pool_mode == 'avg':
-            inputs = [('I', x), ('Ones', ones)]
-        else:
-            raise ValueError('Unrecognized pool mode \'{}\''.format(pool_mode))
-
-        super(Pool, self).__init__(
-            f, inputs, [('O', ptile.Shape(x.shape.dtype, outshape))], name=name)
-
-
-pool = Pool.function
+def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mode='max'):
+    if strides is None:
+        strides = tuple(1 for _ in range(rank))
+    if data_format is None:
+        data_format = image_data_format()
+    try:
+        data_format = _POOL_DATA_FORMAT[data_format]
+    except KeyError:
+        six.raise_from(ValueError('Unrecognized data format: {}'.format(data_format)), None)
+    try:
+        pool_mode = _POOL_MODE[pool_mode]
+    except KeyError:
+        six.raise_from(ValueError('Unrecognized pool mode: {}'.format(pool_mode)), None)
+    try:
+        padding = _AUTO_PAD[padding]
+    except KeyError:
+        six.raise_from(ValueError('Unrecognized padding: {}'.format(padding)), None)
+    return op.pool(
+        data=x,
+        mode=pool_mode,
+        kernel_shape=pool_size,
+        strides=strides,
+        padding=padding,
+        data_format=data_format)
 
 
 def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool_mode='max'):
@@ -1231,8 +1142,7 @@ def repeat_elements(x, rep, axis):
         '{}*N{}'.format(rep, i) if i == axis else 'N{}'.format(i) for i in range(x.shape.ndims)
     ]
     oidx_list = [
-        '{}*n{} + k'.format(rep, i) if i == axis else 'n{}'.format(i)
-        for i in range(x.shape.ndims)
+        '{}*n{} + k'.format(rep, i) if i == axis else 'n{}'.format(i) for i in range(x.shape.ndims)
     ]
 
     # Example
@@ -1293,8 +1203,8 @@ def reverse(x, axes):
     for axis in axes:
         if not isinstance(axis, int):
             raise ValueError(
-                'The axes parameter of reverse only accepts an integer or a list of integers, received {}'.
-                format(type(axis)))
+                'The axes parameter of reverse only accepts an integer or a list of integers, received {}'
+                .format(type(axis)))
         if axis >= x.shape.ndims or axis < -x.shape.ndims:
             raise ValueError('Invalid axis {} in reverse: target {} too short (ndim={})'.format(
                 axis, x, x.shape.ndims))
@@ -1381,7 +1291,8 @@ def separable_conv(x,
                    dilation_rate=None):
     if data_format is None:
         data_format = image_data_format()
-    if pointwise_kernel.shape.dims[-2] != depthwise_kernel.shape.dims[-1] * depthwise_kernel.shape.dims[-2]:
+    if pointwise_kernel.shape.dims[
+            -2] != depthwise_kernel.shape.dims[-1] * depthwise_kernel.shape.dims[-2]:
         raise ValueError(
             ('Shape mismatch in separable convolution. Depthwise kernel input ' +
              'channel count must match pointwise kernel channel count times channel ' +
@@ -1444,8 +1355,8 @@ def set_value(x, value):
         if x.shape.dims != () and x.shape.dims != (1,):
             raise NotImplementedError(
                 'The PlaidML backend for Keras does not support changing tensor shapes with set_value.\n'
-                + 'existing.shape = ' + str(
-                    x.shape) + ', value is a non-array object of type: ' + str(type(value)))
+                + 'existing.shape = ' + str(x.shape) + ', value is a non-array object of type: ' +
+                str(type(value)))
     with x.var.mmap_discard(_ctx) as view:
         view.copy_from_ndarray(np.asarray(value))
         view.writeback()
@@ -1658,16 +1569,15 @@ def variable(value, dtype=None, name=None, constraint=None):
     if constraint:
         raise PlaidMLKerasException('Unsupported variable constraint')
     if isinstance(value, float) or isinstance(value, six.integer_types):
-        tensor = plaidml.Tensor(_device(),
-                                plaidml.Shape(_ctx, ptile.convert_np_dtype_to_pml(dtype)))
+        tensor = plaidml.Tensor(_device(), plaidml.Shape(_ctx,
+                                                         ptile.convert_np_dtype_to_pml(dtype)))
         with tensor.mmap_discard(_ctx) as view:
             view.copy_from_ndarray(np.array(value))
             view.writeback()
-        return ptile.Value.from_var(tensor,
-                                    tuple(),
-                                    ptile.convert_np_dtype_to_pml(dtype),
-                                    _prepend_name_scope(name, 'float_variable' if isinstance(
-                                        value, float) else 'int_variable'))
+        return ptile.Value.from_var(
+            tensor, tuple(), ptile.convert_np_dtype_to_pml(dtype),
+            _prepend_name_scope(name,
+                                'float_variable' if isinstance(value, float) else 'int_variable'))
     elif isinstance(value, ptile.Value):
         func = ptile.compose(_ctx, _device(), [], [('out', value)], name='variable')
         invoker = plaidml.Invoker(_ctx, func)
@@ -1681,14 +1591,12 @@ def variable(value, dtype=None, name=None, constraint=None):
         value = np.array(value)
         # Fallthrough
     # Default to treating the value as an ndarray.
-    tensor = plaidml.Tensor(_device(),
-                            plaidml.Shape(_ctx, ptile.convert_np_dtype_to_pml(dtype),
-                                          *value.shape))
+    tensor = plaidml.Tensor(
+        _device(), plaidml.Shape(_ctx, ptile.convert_np_dtype_to_pml(dtype), *value.shape))
     with tensor.mmap_discard(_ctx) as view:
         view.copy_from_ndarray(value)
         view.writeback()
-    return ptile.Value.from_var(tensor, value.shape,
-                                ptile.convert_np_dtype_to_pml(dtype),
+    return ptile.Value.from_var(tensor, value.shape, ptile.convert_np_dtype_to_pml(dtype),
                                 _prepend_name_scope(name, 'tensor_variable'))
 
 

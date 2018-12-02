@@ -2,8 +2,8 @@
 
 #include <gtest/gtest.h>
 
-#include "tile/lang/semprinter.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/lang/semprinter.h"
 
 namespace vertexai {
 namespace tile {
@@ -53,7 +53,7 @@ TestParam Basic() {
   auto LB = _("LB");
   auto LC = _("LC");
 
-  sem::Type short_type{sem::Type::VALUE, lang::DataType::INT16};
+  sem::Type short_type{sem::Type::VALUE, DataType::INT16};
   sem::Type index_type{sem::Type::INDEX};
 
   // void kernel__0(short* C, const short* A, const short* B) {
@@ -104,7 +104,7 @@ TestParam Basic() {
 TestParam Contraction() {
   using namespace sem::builder;  // NOLINT
 
-  sem::Type short_type{sem::Type::VALUE, lang::DataType::INT16};
+  sem::Type short_type{sem::Type::VALUE, DataType::INT16};
   sem::Type index_type{sem::Type::INDEX};
 
   // void kernel__0(short* C, const short* in1, const short* in2)
@@ -164,12 +164,12 @@ TestParam Contraction() {
     auto in2 = _("in2");
     before->append(_Declare(index_type, "tid", _Index(sem::IndexExpr::LOCAL, 0)));
     auto tid = _("tid");
-    before->append(_Declare({sem::Type::VALUE, lang::DataType::INT16, 1, 1}, "agg",
-                            _LimitConst(sem::LimitConst::ZERO, lang::DataType::INT16)));
+    before->append(_Declare({sem::Type::VALUE, DataType::INT16, 1, 1}, "agg",
+                            _LimitConst(sem::LimitConst::ZERO, DataType::INT16)));
     auto agg = _("agg");
-    before->append(_Declare({sem::Type::VALUE, lang::DataType::INT16, 1, 16}, "in1_shared", nullptr));
+    before->append(_Declare({sem::Type::VALUE, DataType::INT16, 1, 16}, "in1_shared", nullptr));
     auto in1_shared = _("in1_shared");
-    before->append(_Declare({sem::Type::VALUE, lang::DataType::INT16, 1, 16}, "in2_shared", nullptr));
+    before->append(_Declare({sem::Type::VALUE, DataType::INT16, 1, 16}, "in2_shared", nullptr));
     auto in2_shared = _("in2_shared");
     before->append(_DeclareConst(index_type, "y_gid", 0));
     auto y_gid = _("y_gid");
@@ -290,12 +290,12 @@ TestParam Contraction() {
     auto in2 = _("in2");
     after->append(_Declare(index_type, "tid", _Index(sem::IndexExpr::LOCAL, 0)));
     auto tid = _("tid");
-    after->append(_Declare({sem::Type::VALUE, lang::DataType::INT16, 1, 1}, "agg",
-                           _LimitConst(sem::LimitConst::ZERO, lang::DataType::INT16)));
+    after->append(_Declare({sem::Type::VALUE, DataType::INT16, 1, 1}, "agg",
+                           _LimitConst(sem::LimitConst::ZERO, DataType::INT16)));
     auto agg = _("agg");
-    after->append(_Declare({sem::Type::VALUE, lang::DataType::INT16, 1, 16}, "in1_shared", nullptr));
+    after->append(_Declare({sem::Type::VALUE, DataType::INT16, 1, 16}, "in1_shared", nullptr));
     auto in1_shared = _("in1_shared");
-    after->append(_Declare({sem::Type::VALUE, lang::DataType::INT16, 1, 16}, "in2_shared", nullptr));
+    after->append(_Declare({sem::Type::VALUE, DataType::INT16, 1, 16}, "in2_shared", nullptr));
     auto in2_shared = _("in2_shared");
     {
       auto after_b1 = _Block({});

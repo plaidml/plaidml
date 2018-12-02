@@ -17,10 +17,12 @@
                     }
                 },
                 "settings": {
-                    "vec_size": 16,
-                    "mem_width": 64,
-                    "use_global": false,
-                    "max_regs": 8192
+                    "vec_size": 32,
+                    "mem_width": 4096,
+                    "use_global": true,
+                    "max_regs": 8192,
+                    "max_mem": 8192,
+                    "goal_flops_per_byte": 20
                 }
             },
             {
@@ -130,7 +132,7 @@
                 },
                 "settings": {
                     "threads": 32,
-                    "vec_size": 1,
+                    "vec_size": 16,
                     "mem_width": 64,
                     "max_mem": 32768,
                     "max_regs": 32768

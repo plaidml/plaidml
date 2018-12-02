@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/platform/local_machine/scheduler_test.h"
 
@@ -39,7 +39,7 @@ tile::proto::Program MakeProgram(const std::string& filename) {
 }  // namespace
 
 std::vector<tile::proto::Program> SchedulerTest::GetTestPrograms() {
-  RunfilesDB rdb{"vertexai_plaidml/tile/platform/local_machine/testdata"};
+  RunfilesDB rdb{"com_intel_plaidml/tile/platform/local_machine/testdata"};
   std::vector<tile::proto::Program> result;
   result.emplace_back(MakeProgram(rdb["concat.tpb"]));
   result.emplace_back(MakeProgram(rdb["prng.tpb"]));
@@ -78,8 +78,8 @@ TEST_P(SchedulerTest, Schedule) {
   lang::Parser parser;
   lang::TileOptimizer optimizer;
   auto parsed = parser.Parse(program.code());
-  auto inputs = to_poco(program.inputs());
-  auto outputs = to_poco(program.outputs());
+  auto inputs = FromProto(program.inputs());
+  auto outputs = FromProto(program.outputs());
   auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, GetSettings(), optimizer, program.id(), 1);
 
   auto schedule = GetScheduler()->BuildSchedule(program, kernel_list);

@@ -36,7 +36,12 @@ std::map<std::string, Program> InlineDefines = {
     {"abs", idef("function (X1) -> (Y) { Y = (X1 < 0 ? -X1 : X1); }")},
     {"max", idef("function (X1, X2) -> (Y) { Y = (X1 < X2 ? X2 : X1); }")},
     {"min", idef("function (X1, X2) -> (Y) { Y = (X1 < X2 ? X1 : X2); }")},
-    {"relu", idef("function (X1) -> (Y) { Y = (X1 < 0.0 ? 0.0 : X1); }")},
+    {"relu", idef(R"(
+      function (X1) -> (Y) {
+        [[pid(relu_0)]] C = X1 < 0.0;
+        [[pid(relu_1)]] Y = C ? 0.0 : X1;
+      }
+    )")},
     {"sigmoid", idef("function (X1) -> (Y) { Y = (1.0 / (1.0 + exp(-X1))); }")},
     {"builtin_softmax", idef(R"***(
       function (X1, X2, X3) -> (Y) {
@@ -63,6 +68,9 @@ std::map<std::string, Program> InlineDefines = {
 std::map<std::string, std::shared_ptr<BoundFunction>> DerivDefines = {
     {"abs", ddef({"(X1 < 0 ? -DY : DY)"})},
     {"add", ddef({"DY", "DY"})},
+    {"acos", ddef({"-DY/sqrt(1 - X1*X1)"})},
+    {"asin", ddef({"DY/sqrt(1 - X1*X1)"})},
+    {"atan", ddef({"DY/(1 + X1*X1)"})},
     {"as_float", ddef({"0", "0"})},
     {"as_int", ddef({"0", "0"})},
     {"as_uint", ddef({"0", "0"})},
@@ -88,6 +96,11 @@ std::map<std::string, std::shared_ptr<BoundFunction>> DerivDefines = {
     {"exp", ddef({"exp(X1)*DY"})},
     {"log", ddef({"DY/X1"})},
     {"pow", ddef({"DY * X2 * pow(X1, X2 - 1)", "log(X1)*Y*DY"})},
+    {"cos", ddef({"-sin(X1) * DY"})},
+    {"cosh", ddef({"sinh(X1) * DY"})},
+    {"sin", ddef({"cos(X1) * DY"})},
+    {"sinh", ddef({"cosh(X1) * DY"})},
+    {"tan", ddef({"(1 + Y*Y) * DY"})},
     {"tanh", ddef({"DY*(1 - Y*Y)"})},
     {"max", ddef({"X1 < X2 ? 0 : DY", "X1 < X2 ? DY : 0"})},
     {"min", ddef({"X1 < X2 ? DY : 0", "X1 < X2 ? 0 : DY"})},

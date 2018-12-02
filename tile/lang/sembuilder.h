@@ -55,7 +55,7 @@ class LValueHolder {
 
 inline LValueHolder _(const std::string& name) { return LValueHolder(std::make_shared<LookupLVal>(name)); }
 
-inline std::shared_ptr<LimitConst> _LimitConst(const LimitConst::Which& which, const lang::DataType& type) {
+inline std::shared_ptr<LimitConst> _LimitConst(const LimitConst::Which& which, const DataType& type) {
   return std::make_shared<LimitConst>(which, type);
 }
 
@@ -224,7 +224,7 @@ DEF_BINARY_OP(>=)
 DEF_BINARY_OP(<=)
 DEF_BINARY_OP(&)
 DEF_BINARY_OP(|)
-DEF_BINARY_OP (^)  // NOLINT
+DEF_BINARY_OP(^)  // NOLINT
 DEF_BINARY_OP(>>)
 DEF_BINARY_OP(<<)
 }  // End namespace std

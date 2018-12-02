@@ -10,6 +10,8 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
+using namespace math;  // NOLINT
+
 Contraction ConstrainIndexVarsToInts(const Contraction& c) {
   Contraction c_new = c;
 
@@ -19,8 +21,8 @@ Contraction ConstrainIndexVarsToInts(const Contraction& c) {
   for (const auto& variable : varsUsed) {
     if (!variable.empty()) {  // Constant components not used
       const int32_t constraintBoundWidth = 1000000000;
-      c_new.constraints.push_back(
-          SymbolicConstraint(RangeConstraint(Polynomial(variable) + constraintBoundWidth / 2, constraintBoundWidth)));
+      c_new.constraints.push_back(SymbolicConstraint(
+          RangeConstraint(Polynomial<Rational>(variable) + constraintBoundWidth / 2, constraintBoundWidth)));
     }
   }
 
@@ -75,7 +77,7 @@ std::vector<RangeConstraint> GatherConstraints(const Contraction& c, const std::
 }
 
 bool IsImplied(const SimpleConstraint& c, const IndexBounds& b) {
-  const Polynomial& p = c.poly;
+  const Polynomial<Rational>& p = c.poly;
   Rational worst = p.constant();
   for (const auto& kvp : p.getMap()) {
     if (kvp.first == "") {
@@ -144,10 +146,10 @@ Rational UnifiedOffset(const Rational& c1, const Rational& c2, const Integer& n1
     throw std::out_of_range("Cannot unify offset when relative quotient exceeds size_t.");
   }
   for (size_t i = 0; i < Abs(n1); ++i) {
-    offsets.insert(std::end(offsets), FracPart((c1 + i)/n1));
+    offsets.insert(std::end(offsets), FracPart((c1 + i) / n1));
   }
   for (size_t j = 0; j < Abs(n2); ++j) {
-    Rational offset = FracPart((c2 + j)/n2);
+    Rational offset = FracPart((c2 + j) / n2);
     if (offsets.count(offset)) {
       return offset;
     }
@@ -174,23 +176,23 @@ RangeConstraint IntersectParallelConstraintPair(const RangeConstraint& constrain
   // Range unification requires solving the following equations for q:
   //    n1*q + c1 = 0           n2*q + c2 = 0
   //    n1*q + c1 = r1 - 1      n2*q + c2 = r2 - 1
-  Rational q1_low = Min(-c1/n1, (constraint1.range - 1 - c1)/n1);
-  Rational q1_hi = Max(-c1/n1, (constraint1.range - 1 - c1)/n1);
-  Rational q2_low = Min(-c2/n2, (constraint2.range - 1 - c2)/n2);
-  Rational q2_hi = Max(-c2/n2, (constraint2.range - 1 - c2)/n2);
+  Rational q1_low = Min(-c1 / n1, (constraint1.range - 1 - c1) / n1);
+  Rational q1_hi = Max(-c1 / n1, (constraint1.range - 1 - c1) / n1);
+  Rational q2_low = Min(-c2 / n2, (constraint2.range - 1 - c2) / n2);
+  Rational q2_hi = Max(-c2 / n2, (constraint2.range - 1 - c2) / n2);
   Integer lower_bound = Max(Ceil(q1_low + d), Ceil(q2_low + d));
   Integer upper_bound = Min(Floor(q1_hi + d), Floor(q2_hi + d));
   Rational merged_offset = -lower_bound + d;
   Integer range = upper_bound - lower_bound + 1;
   if (range <= 0) {
-    throw std::runtime_error("Merging constraints with empty intersection: "
-        + to_string(constraint1) + ", " + to_string(constraint2));
+    throw std::runtime_error("Merging constraints with empty intersection: " + to_string(constraint1) + ", " +
+                             to_string(constraint2));
   }
   if (range > INT64_MAX) {
     throw std::out_of_range("Bound range in IntersectParallelConstraintPair overflows int64.");
   }
   int64_t r = (int64_t)range;
-  Polynomial p(constraint1.poly / n1);
+  Polynomial<Rational> p(constraint1.poly / n1);
   p.setConstant(merged_offset);
   return RangeConstraint(p, r);
 }
@@ -218,12 +220,12 @@ std::tuple<IndexBounds, std::vector<SimpleConstraint>> ComputeBounds(const std::
   // Run the solver for each variable min + max
   bilp::ILPSolver solver;
   IndexBounds out;
-  std::vector<Polynomial> objectives;
+  std::vector<Polynomial<Rational>> objectives;
   for (const std::string& var : variableNames) {
     objectives.emplace_back(var);
     objectives.emplace_back(var, -1);
   }
-  std::map<Polynomial, bilp::ILPResult> result = solver.batch_solve(constraints, objectives);
+  std::map<Polynomial<Rational>, bilp::ILPResult> result = solver.batch_solve(constraints, objectives);
   for (const auto& kvp : result) {
     // ILPResult lists the objective for each requested optimization. Since we
     // used a monomial for each objective, GetNonzeroIndex returns the name of

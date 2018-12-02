@@ -1,10 +1,4 @@
-# Copyright Vertex.AI
-#
-# Licensed under the GNU Affero General Public License V3 (the License) ;
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    https://www.gnu.org/licenses/agpl-3.0.en.html
+# Copyright 2018 Intel Corporation
 """
 PlaidML
 =======
@@ -56,7 +50,6 @@ import plaidml.library
 import plaidml.settings
 import platform
 import pkg_resources
-import requests
 import sys
 import threading
 import traceback
@@ -639,6 +632,16 @@ class _Library(plaidml.library.Library):
             ctypes.POINTER(_C_Invoker)  # plaidml_invoker* invoker
         ]
 
+        # bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filename, plaidml_file_format format)
+        self.plaidml_save_invoker = lib.plaidml_save_invoker
+        self.plaidml_save_invoker.argtypes = [
+            ctypes.POINTER(_C_Invoker),  # plaidml_function* func
+            ctypes.c_char_p,  # const char* file
+            ctypes.c_int,  # plaidml_file_format format
+        ]
+        self.plaidml_save_invoker.restype = ctypes.c_bool
+        self.plaidml_save_invoker.errcheck = self._check_err
+
         # PLAIDML_API bool plaidml_set_invoker_input(plaidml_invoker* invoker, const char* name, plaidml_var* var);
         self.plaidml_set_invoker_input = lib.plaidml_set_invoker_input
         self.plaidml_set_invoker_input.argtypes = [
@@ -837,21 +840,21 @@ class _Function(object):
             self._free(self)
 
     def save(self, filename):
-        _lib().plaidml_save_function(self._as_parameter_, filename.encode())
+        _lib().plaidml_save_function(self, filename.encode())
 
 
 class Function(_Function):
 
-    def __init__(self, code, backtrace=None):
+    def __init__(self, code, backtrace=None, fid=''):
         global _backtraces
-        fid = ""
         if is_backtrace_enabled():
             if backtrace == None:
-                backtrace = "".join(traceback.format_stack()[:-1])
-            fid = "id_" + hashlib.md5(backtrace + code).hexdigest()[0:12]
+                backtrace = ''.join(traceback.format_stack()[:-1])
+            content = (backtrace + code).encode()
+            fid = 'id_' + hashlib.md5(content).hexdigest()[0:12]
             if fid not in _backtraces:
                 _backtraces[fid] = backtrace
-                logging.getLogger(__name__).info("Adding function ID: " + fid)
+                logging.getLogger(__name__).info('Adding function ID: ' + fid)
                 logging.getLogger(__name__).info(code)
                 logging.getLogger(__name__).info(backtrace)
 
@@ -951,54 +954,6 @@ def open_first_device(ctx):
     dev.close()
 
 
-def _record_usage(device_id, config_source, valid_devices, invalid_devices, status, sync=False):
-    # Collects basic information about the GPUs being used.
-    if not plaidml.settings.telemetry:
-        return
-    table = 'usage_v1'
-    version = _lib().plaidml_get_version().decode()
-    record = {
-        'version':
-            version,
-        'session':
-            plaidml.settings.session,
-        'machine':
-            str(uuid.uuid1())[14:],
-        'device_id':
-            str(device_id),
-        'status':
-            status,
-        'hal':
-            'OpenCL',  # TODO(T1191): plumb from hal
-        'platform':
-            "|".join([platform.system(), platform.release(),
-                      platform.machine()]),
-        'config_source':
-            os.path.basename(config_source).decode(),  # ensure only the filename is included
-        'devices': [{
-            'id': d.id.decode(),
-            'config': d.config.decode(),
-            'details': d.details.decode(),
-            'valid': True
-        } for d in valid_devices] + [{
-            'id': d.id.decode(),
-            'config': d.config.decode(),
-            'details': d.details.decode(),
-            'valid': False
-        } for d in invalid_devices],
-    }
-    body = {'table': table, 'data': record}
-    ex = lambda: requests.post("https://us-central1-vertexai-release.cloudfunctions.net/record_usage",
-        data=json.dumps(body),
-        headers={'content-type': 'application/json'})
-    thread = threading.Thread(target=ex)
-    thread.daemon = True
-    if sync:
-        thread.run()
-    else:
-        thread.start()
-
-
 class _Enumerator(object):
 
     def __init__(self, ctx):
@@ -1024,7 +979,8 @@ class _Enumerator(object):
             self._valid_devs = []
             for i in range(0, _lib().plaidml_get_devconf_count(self._ctx, self, True)):
                 self._valid_devs += [
-                    _DeviceConfig(self._ctx, self, _lib().plaidml_get_devconf(self._ctx, self, i))
+                    _DeviceConfig(self._ctx, self,
+                                  _lib().plaidml_get_devconf(self._ctx, self, i))
                 ]
         return self._valid_devs
 
@@ -1060,16 +1016,10 @@ def devices(ctx, limit=1, return_all=False):
         return enumerator.valid_devs, enumerator.invalid_devs
     else:
         if len(enumerator.valid_devs) == 0:
-            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
-                          "ERR_NO_DEVICES", True)
             _setup_fail("No devices found.", enumerator.invalid_devs)
         if limit and len(enumerator.valid_devs) > limit:
-            _record_usage(None, config_source, enumerator.valid_devs, enumerator.invalid_devs,
-                          "ERR_TOO_MANY_DEVICES", True)
             _setup_fail("Too many devices configured (limit={})".format(limit),
                         enumerator.valid_devs)
-            _record_usage(enumerator.valid_devs[0].id, config_source, enumerator.valid_devs,
-                          enumerator.invalid_devs, "OK")
         return enumerator.valid_devs
 
 
@@ -1077,7 +1027,8 @@ class _Buffer(object):
 
     def __init__(self, ctx, dev, shape):
         self._as_parameter_ = _lib().plaidml_alloc_buffer(
-            ctx, dev, _lib().plaidml_get_shape_buffer_size(shape))
+            ctx, dev,
+            _lib().plaidml_get_shape_buffer_size(shape))
         self._ctx = ctx
         dev._register_buffer(self)
 
@@ -1430,6 +1381,9 @@ class Invoker(object):
 
     def invoke(self):
         return Invocation(self._ctx, self)
+
+    def save(self, filename):
+        _lib().plaidml_save_invoker(self, filename.encode(), 1)
 
 
 class Invocation(object):

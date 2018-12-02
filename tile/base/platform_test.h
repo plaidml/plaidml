@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #pragma once
 
@@ -18,7 +18,7 @@ namespace testing {
 typedef std::function<std::unique_ptr<tile::Platform>()> PlatformFactory;
 
 struct Param {
-  lang::DataType dtype;
+  DataType dtype;
   std::size_t vec_size;
 };
 
@@ -34,8 +34,8 @@ struct FactoryParam {
 // tests with factories producing Platform instances -- e.g.
 //
 //    Param supported_params[] = {
-//        {lang::DataType::FLOAT32, 1},  //
-//        {lang::DataType::FLOAT32, 2},  //
+//        {DataType::FLOAT32, 1},  //
+//        {DataType::FLOAT32, 2},  //
 //    };
 //
 //    std::vector<FactoryParam> SupportedParams() {
@@ -47,7 +47,7 @@ struct FactoryParam {
 //          auto hw_config = config.add_hardware_configs();
 //          hw_config->mutable_sel()->set_value(true);
 //          hw_config->mutable_settings()->set_vec_size(param.vec_size);
-//          return compat::make_unique<local_machine::Platform>(ctx, config);
+//          return std::make_unique<local_machine::Platform>(ctx, config);
 //        };
 //        params.push_back({factory, param});
 //      }
@@ -59,11 +59,11 @@ class PlatformTest : public ::testing::TestWithParam<FactoryParam> {
 
   std::unique_ptr<Program> MakeProgram(proto::TileScanningParameters* params,  //
                                        const char* code,                       //
-                                       const lang::TensorShape& shape);
-  std::shared_ptr<Buffer> MakeInput(const lang::TensorShape& shape,  //
+                                       const TensorShape& shape);
+  std::shared_ptr<Buffer> MakeInput(const TensorShape& shape,  //
                                     const std::vector<int>& data);
-  std::shared_ptr<Buffer> MakeOutput(const lang::TensorShape& shape);
-  void CheckExpected(const lang::TensorShape& shape,      //
+  std::shared_ptr<Buffer> MakeOutput(const TensorShape& shape);
+  void CheckExpected(const TensorShape& shape,            //
                      const std::shared_ptr<Buffer>& buf,  //
                      const std::vector<int>& expected);
 

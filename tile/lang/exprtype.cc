@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/lang/exprtype.h"
 
@@ -14,32 +14,32 @@ unsigned Rank(sem::Type ty) {
   }
   auto dtype = ty.dtype;
   if (ty.base == sem::Type::INDEX) {
-    dtype = lang::DataType::INT32;
+    dtype = DataType::INT32;
   }
   switch (dtype) {
-    case lang::DataType::BOOLEAN:
+    case DataType::BOOLEAN:
       return 2;
-    case lang::DataType::INT8:
+    case DataType::INT8:
       return 3;
-    case lang::DataType::UINT8:
+    case DataType::UINT8:
       return 4;
-    case lang::DataType::INT16:
+    case DataType::INT16:
       return 5;
-    case lang::DataType::UINT16:
+    case DataType::UINT16:
       return 6;
-    case lang::DataType::INT32:
+    case DataType::INT32:
       return 7;
-    case lang::DataType::UINT32:
+    case DataType::UINT32:
       return 8;
-    case lang::DataType::INT64:
+    case DataType::INT64:
       return 9;
-    case lang::DataType::UINT64:
+    case DataType::UINT64:
       return 10;
-    case lang::DataType::FLOAT16:
+    case DataType::FLOAT16:
       return 11;
-    case lang::DataType::FLOAT32:
+    case DataType::FLOAT32:
       return 12;
-    case lang::DataType::FLOAT64:
+    case DataType::FLOAT64:
       return 13;
     default:
       throw std::logic_error{"Invalid type found in typecheck"};
@@ -48,14 +48,16 @@ unsigned Rank(sem::Type ty) {
 
 }  // namespace
 
-sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, const sem::ExprPtr& expr) {
-  ExprType et{scope, enable_fp16};
+sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic,
+                           const sem::ExprPtr& expr) {
+  ExprType et{scope, enable_fp16, use_int_for_logic};
   expr->Accept(et);
   return et.ty_;
 }
 
-sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, const sem::LValPtr& lvalue) {
-  ExprType et{scope, enable_fp16};
+sem::Type ExprType::TypeOf(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic,
+                           const sem::LValPtr& lvalue) {
+  ExprType et{scope, enable_fp16, use_int_for_logic};
   lvalue->Accept(et);
   return et.ty_;
 }
@@ -91,7 +93,7 @@ sem::Type Promote(const std::vector<sem::Type>& types) {
 }
 
 void ExprType::Visit(const sem::IntConst& n) {
-  lang::DataType dtype;
+  DataType dtype;
 
   // This isn't quite correct; when we see an integer constant, we
   // ought to propagate its type lazily, so that it doesn't impose
@@ -100,23 +102,23 @@ void ExprType::Visit(const sem::IntConst& n) {
   // advantage of being simple.
   if (n.value < 0) {
     if ((-127 - 1) /* OpenCL SCHAR_MIN */ <= n.value) {
-      dtype = lang::DataType::INT8;
+      dtype = DataType::INT8;
     } else if ((-32767 - 1) /* OpenCL SHRT_MIN */ <= n.value) {
-      dtype = lang::DataType::INT16;
+      dtype = DataType::INT16;
     } else if ((-2147483647 - 1) /* OpenCL INT_MIN */ <= n.value) {
-      dtype = lang::DataType::INT32;
+      dtype = DataType::INT32;
     } else {
-      dtype = lang::DataType::INT64;
+      dtype = DataType::INT64;
     }
   } else {
     if (n.value <= 127 /* OpenCL SCHAR_MAX */) {
-      dtype = lang::DataType::INT8;
+      dtype = DataType::INT8;
     } else if (n.value <= 32767 /* OpenCL SHRT_MAX */) {
-      dtype = lang::DataType::INT16;
+      dtype = DataType::INT16;
     } else if (n.value <= 2147483647 /* OpenCL INT_MAX */) {
-      dtype = lang::DataType::INT32;
+      dtype = DataType::INT32;
     } else {
-      dtype = lang::DataType::INT64;
+      dtype = DataType::INT64;
     }
   }
 
@@ -128,7 +130,7 @@ void ExprType::Visit(const sem::FloatConst& n) {
   // This definitely isn't correct; when we see a float constant, we
   // ought to propagate its type lazily, so that it doesn't impose
   // contraints on expressions that use it (ala Go).
-  ty_ = sem::Type{sem::Type::VALUE, lang::DataType::FLOAT32};
+  ty_ = sem::Type{sem::Type::VALUE, DataType::FLOAT32};
   IVLOG(5, "ExprType(FloatConst): " << ty_);
 }
 
@@ -143,9 +145,9 @@ void ExprType::Visit(const sem::LookupLVal& n) {
 
 void ExprType::Visit(const sem::LoadExpr& n) {
   n.inner->Accept(*this);
-  if (ty_.dtype == lang::DataType::FLOAT16 && !enable_fp16_) {
+  if (ty_.dtype == DataType::FLOAT16 && !enable_fp16_) {
     // No fp16 support => automatically promote loads to 32-bit.
-    ty_.dtype = lang::DataType::FLOAT32;
+    ty_.dtype = DataType::FLOAT32;
   }
   IVLOG(5, "ExprType(LoadExpr): " << ty_);
 }
@@ -252,40 +254,45 @@ void ExprType::Visit(const sem::ReturnStmt&) { throw std::logic_error{"Unexpecte
 
 void ExprType::Visit(const sem::Function&) { throw std::logic_error{"Unexpected expression component"}; }
 
-ExprType::ExprType(const lang::Scope<sem::Type>* scope, bool enable_fp16) : scope_{scope}, enable_fp16_{enable_fp16} {}
+ExprType::ExprType(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic)
+    : scope_{scope}, enable_fp16_{enable_fp16}, use_int_for_logic_{use_int_for_logic} {}
 
 sem::Type ExprType::TypeOf(const sem::ExprPtr& expr) {
-  ExprType et{scope_, enable_fp16_};
+  ExprType et{scope_, enable_fp16_, use_int_for_logic_};
   expr->Accept(et);
   return et.ty_;
 }
 
 void ExprType::AdjustLogicOpResult() {
   ty_.base = sem::Type::VALUE;
+  if (!use_int_for_logic_) {
+    ty_.dtype = DataType::BOOLEAN;
+    return;
+  }
   if (ty_.vec_width == 1) {
-    ty_.dtype = lang::DataType::INT32;
+    ty_.dtype = DataType::INT32;
   } else {
     switch (ty_.dtype) {
-      case lang::DataType::BOOLEAN:
+      case DataType::BOOLEAN:
         throw std::logic_error{"Invalid boolean vector type found in typecheck"};
-      case lang::DataType::INT8:
-      case lang::DataType::UINT8:
-        ty_.dtype = lang::DataType::INT8;
+      case DataType::INT8:
+      case DataType::UINT8:
+        ty_.dtype = DataType::INT8;
         break;
-      case lang::DataType::INT16:
-      case lang::DataType::UINT16:
-      case lang::DataType::FLOAT16:
-        ty_.dtype = lang::DataType::INT16;
+      case DataType::INT16:
+      case DataType::UINT16:
+      case DataType::FLOAT16:
+        ty_.dtype = DataType::INT16;
         break;
-      case lang::DataType::INT32:
-      case lang::DataType::UINT32:
-      case lang::DataType::FLOAT32:
-        ty_.dtype = lang::DataType::INT32;
+      case DataType::INT32:
+      case DataType::UINT32:
+      case DataType::FLOAT32:
+        ty_.dtype = DataType::INT32;
         break;
-      case lang::DataType::INT64:
-      case lang::DataType::UINT64:
-      case lang::DataType::FLOAT64:
-        ty_.dtype = lang::DataType::INT64;
+      case DataType::INT64:
+      case DataType::UINT64:
+      case DataType::FLOAT64:
+        ty_.dtype = DataType::INT64;
         break;
       default:
         throw std::logic_error{"Invalid vector type found in typecheck"};

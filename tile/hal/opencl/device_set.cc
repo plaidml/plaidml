@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/opencl/device_set.h"
 
@@ -27,7 +27,7 @@ proto::PlatformInfo GetPlatformInfo(cl_platform_id pid) {
 
   info.set_profile(CLInfo<CL_PLATFORM_PROFILE>(pid));
   info.set_version(CLInfo<CL_PLATFORM_VERSION>(pid));
-  info.set_name(CLInfo<CL_PLATFORM_NAME>(pid));
+  info.set_name("OpenCL: " + CLInfo<CL_PLATFORM_NAME>(pid));
   info.set_vendor(CLInfo<CL_PLATFORM_VENDOR>(pid));
   ForEachElt(CLInfo<CL_PLATFORM_EXTENSIONS>(pid), [&info](std::string ext) { info.add_extension(ext); });
 #ifndef __APPLE__
@@ -377,7 +377,7 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
   }
 
   if (first_dev) {
-    host_memory_ = compat::make_unique<HostMemory>(first_dev->device_state());
+    host_memory_ = std::make_unique<HostMemory>(first_dev->device_state());
   }
 }
 

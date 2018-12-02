@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/platform/local_machine/buffer.h"
 
@@ -23,10 +23,12 @@ std::shared_ptr<Buffer> Buffer::Downcast(const std::shared_ptr<tile::Buffer>& bu
   return result;
 }
 
-Buffer::Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy, std::shared_ptr<MemChunk> chunk)
+Buffer::Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy,
+               std::shared_ptr<MemChunk> chunk)
     : devinfo_{devinfo}, mem_strategy_{mem_strategy}, size_{chunk->size()}, chunk_{std::move(chunk)} {}
 
-Buffer::Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy, std::uint64_t size)
+Buffer::Buffer(const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<MemStrategy>& mem_strategy,
+               std::uint64_t size)
     : devinfo_{devinfo}, mem_strategy_{mem_strategy}, size_{size} {}
 
 boost::future<std::unique_ptr<View>> Buffer::MapCurrent(const context::Context& ctx) {

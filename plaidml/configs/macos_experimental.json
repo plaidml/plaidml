@@ -1,0 +1,139 @@
+{
+    "platform": {
+        "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+        "hardware_configs": [
+            {
+                "description": "CPU (via LLVM) settings",
+                "sel": {
+                    "and": {
+                        "sel": [
+                            {
+                                "name_regex": "LLVM CPU"
+                            },
+                            {
+                                "vendor_regex": "LLVM"
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "vec_size": 16,
+                    "mem_width": 64,
+                    "use_global": false,
+                    "max_regs": 8192
+                }
+            },
+            {
+                "description": "AMD config",
+                "sel": {
+                    "and": {
+                        "sel":[
+                            {        
+                                "or": {
+                                    "sel": [
+                                        {
+                                            "name_regex": ".*AMD.*"
+                                        },
+                                        {
+                                            "name_regex": ".*Advanced Micro Devices.*"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "platform_regex": ".*"
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "threads": 256,
+                    "vec_size": 1,
+                    "mem_width": 128,
+                    "max_mem": 32768,
+                    "max_regs": 16384,
+                    "goal_groups": 1,
+                    "goal_flops_per_byte": 50
+                }
+            },
+            {
+                "description": "Intel CPU config",
+                "sel": {
+                    "and": {
+                        "sel": [
+                            {
+                                "vendor_regex": "Intel.*"
+                            },
+                            {
+                                "name_regex": ".*CPU.*"
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "threads": 1,
+                    "vec_size": 1,
+                    "mem_width": 64,
+                    "max_mem": 32768,
+                    "max_regs": 32768
+                }
+            },
+            {
+                "description": "Intel *HD Graphics GPU config",
+                "sel": {
+                    "name_regex": ".*HD Graphics.*"
+                },
+                "settings": {
+                    "threads": 128,
+                    "vec_size": 4,
+                    "mem_width": 256,
+                    "max_mem": 16000,
+                    "max_regs": 16000,
+                    "goal_groups": 6,
+                    "goal_flops_per_byte": 50
+                }
+            },
+            {
+                "description": "Intel Iris GPU config",
+                "sel": {
+                    "name_regex": ".*Iris.*"
+                },
+                "settings": {
+                    "threads": 128,
+                    "vec_size": 4,
+                    "mem_width": 256,
+                    "max_mem": 16000,
+                    "max_regs": 16000,
+                    "goal_groups": 6,
+                    "goal_flops_per_byte": 50,
+                    "use_global": true
+                }
+            },
+            {
+                "description": "NVIDIA config",
+                "sel": {
+                    "or": {
+                        "sel": [
+                            {
+                                "name_regex": ".*NVIDIA.*"
+                            },
+                            {
+                                "vendor_regex": ".*NVIDIA.*"
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "threads": 256,
+                    "vec_size": 1,
+                    "mem_width": 64,
+                    "max_mem": 15360,
+                    "max_regs": 32768,
+                    "goal_groups": 7,
+                    "goal_flops_per_byte": 46,
+                    "disable_io_aliasing": true
+                }
+            }
+        ]
+    }
+}

@@ -1,13 +1,13 @@
 def _get_main(ctx):
     if ctx.file.main:
-        return ctx.workspace_name + '/' + ctx.file.main.path
-    main = ctx.label.name + '.py'
+        return ctx.workspace_name + "/" + ctx.file.main.path
+    main = ctx.label.name + ".py"
     for src in ctx.files.srcs:
         if src.basename == main:
-            return ctx.workspace_name + '/' + src.path
+            return ctx.workspace_name + "/" + src.path
     fail(
         "corresponding default '{}' does not appear in srcs. ".format(main) +
-        "Add it or override default file name with a 'main' attribute"
+        "Add it or override default file name with a 'main' attribute",
     )
 
 def _conda_impl(ctx):
@@ -15,23 +15,23 @@ def _conda_impl(ctx):
     script = ctx.actions.declare_file(ctx.label.name)
     main = _get_main(ctx)
     ctx.actions.expand_template(
-        template=ctx.file._template,
-        output=script,
-        substitutions={
-            '%imports%': '',
-            '%import_all%': 'True',
-            '%main%': main,
-            '%workspace_name%': ctx.workspace_name,
+        template = ctx.file._template,
+        output = script,
+        substitutions = {
+            "%imports%": "",
+            "%import_all%": "True",
+            "%main%": main,
+            "%workspace_name%": ctx.workspace_name,
         },
-        is_executable=True,
+        is_executable = True,
     )
     runfiles = ctx.runfiles(
         collect_data = True,
         collect_default = True,
         files = ctx.files.srcs,
-        root_symlinks = {".cenv" : env.files.to_list()[0]},
+        root_symlinks = {".cenv": env.files.to_list()[0]},
     )
-    return [DefaultInfo(executable=script, runfiles=runfiles)]
+    return [DefaultInfo(executable = script, runfiles = runfiles)]
 
 _conda_attrs = {
     "srcs": attr.label_list(allow_files = [".py"]),

@@ -1,14 +1,14 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 
 #pragma once
-
-#include <boost/thread/future.hpp>
 
 #include <condition_variable>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <utility>
+
+#include <boost/thread/future.hpp>
 
 #include "base/util/compat.h"
 
@@ -54,7 +54,7 @@ class Rundown final {
   // T must implement the Callable and MoveAssignable concepts, and it must not throw when invoked.
   template <typename CB>
   explicit Rundown(CB callback) : Rundown{} {
-    callback_ = compat::make_unique<TypedCallback<CB>>(std::move(callback));
+    callback_ = std::make_unique<TypedCallback<CB>>(std::move(callback));
   }
 
   Rundown(Rundown&& other) noexcept = default;             // MoveConstructible

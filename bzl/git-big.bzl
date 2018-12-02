@@ -25,7 +25,7 @@ def _git_big_impl(ctx):
         use_default_shell_env = True,
         command = "cd $(cat $1); git big pull --hard $2 --extra $3",
     )
-    return DefaultInfo(files=depset([out]))
+    return DefaultInfo(files = depset([out]))
 
 git_big_rule = rule(
     attrs = {
@@ -39,10 +39,10 @@ git_big_rule = rule(
     implementation = _git_big_impl,
 )
 
-def git_big(name, src=None, **kwargs):
+def git_big(name, src = None, **kwargs):
     if src == None:
-        reldir, name = name.split(':')
-        src = '/'.join([reldir, name])
+        reldir, name = name.split(":")
+        src = "/".join([reldir, name])
     rule_name = name + ".gitbig"
     git_big_rule(
         name = rule_name,

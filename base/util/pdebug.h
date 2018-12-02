@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 // This is an overly-simplistic utility for doing some simple printf
 // timing debugging.  It's not useful for extremely short time periods

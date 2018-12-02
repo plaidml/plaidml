@@ -10,9 +10,9 @@
 #include <vector>
 
 #include "base/util/intern.h"
+#include "tile/base/shape.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
-#include "tile/lang/shape.h"
 #include "tile/lang/type.h"
 
 namespace vertexai {
@@ -80,14 +80,21 @@ class IConstValue final : public Value {
 // Tensor values represent mutable tensors
 class TensorValue final : public Value {
  public:
-  static std::shared_ptr<TensorValue> make(const std::shared_ptr<BufferBase>& _buffer, const TensorShape& _shape) {
-    return Interned<TensorValue>::make(_buffer, _shape);
+  static std::shared_ptr<TensorValue> make(const std::shared_ptr<BufferBase>& buffer,  //
+                                           const TensorShape& shape,                   //
+                                           bool is_const = false) {
+    return Interned<TensorValue>::make(buffer, shape, is_const);
   }
 
-  TensorValue(const std::shared_ptr<BufferBase>& buffer, const TensorShape& shape) : buffer_{buffer}, shape_{shape} {}
+  TensorValue(const std::shared_ptr<BufferBase>& buffer, const TensorShape& shape, bool is_const)
+      : buffer_{buffer},     //
+        shape_{shape},       //
+        is_const_(is_const)  //
+  {}
 
   const std::shared_ptr<BufferBase>& buffer() const { return buffer_; }
   const TensorShape& shape() const { return shape_; }
+  bool is_const() const { return is_const_; }
   Value::Type type() const final { return Value::Type::TENSOR; }
   size_t num_dims() const final { return shape_.dims.size(); }
   std::shared_ptr<Value> dim_value(size_t i) const final {
@@ -97,6 +104,7 @@ class TensorValue final : public Value {
  private:
   std::shared_ptr<BufferBase> buffer_;
   TensorShape shape_;
+  bool is_const_;
 };
 
 // Placeholders represent 'variables' to be filled in latter
@@ -125,7 +133,7 @@ struct FunctionValue final : public Value {
   FunctionValue(std::string fn, std::vector<std::shared_ptr<Value>> inputs);
 
   const std::string& fn() const { return fn_; }
-  const std::vector<std::shared_ptr<Value>> inputs() const { return inputs_; }
+  const std::vector<std::shared_ptr<Value>>& inputs() const { return inputs_; }
   Value::Type type() const final { return Value::Type::FUNCTION; }
   size_t num_dims() const final { return dims_.size(); }
   std::shared_ptr<Value> dim_value(size_t i) const final { return dims_[i]; }
@@ -149,14 +157,12 @@ class ContractionValue final : public Value {
                                      const std::vector<SymbolicSpec>& specs,
                                      const std::vector<ValueConstraint>& constraints,
                                      const std::vector<std::shared_ptr<Value>>& inputs,
-                                     const std::vector<std::shared_ptr<Value>>& dims,
-                                     bool use_default,
+                                     const std::vector<std::shared_ptr<Value>>& dims, bool use_default,
                                      bool no_defract);
 
   ContractionValue(CombinationOp comb_op, AggregationOp agg_op, const std::vector<SymbolicSpec>& specs,
                    const std::vector<ValueConstraint>& constraints, const std::vector<std::shared_ptr<Value>>& inputs,
-                   const std::vector<std::shared_ptr<Value>>& dims, bool use_default,
-                   bool no_defract)
+                   const std::vector<std::shared_ptr<Value>>& dims, bool use_default, bool no_defract)
       : comb_op_{comb_op},
         agg_op_{agg_op},
         specs_{specs},
@@ -221,11 +227,13 @@ class ValueVisitor {
 };
 
 struct RunInfo {
+  std::string program_name;
   std::string code;
   ShapeMap input_shapes;
   ShapeMap output_shapes;
   std::map<std::string, std::shared_ptr<BufferBase>> input_buffers;
   std::map<std::string, std::shared_ptr<BufferBase>> output_buffers;
+  std::set<std::string> const_inputs;
 };
 
 class FunctionApplication;
@@ -269,6 +277,7 @@ class BoundFunction final : public ValueVisitor<std::string> {
  private:
   // Called during construction
   std::string NewTmp() { return std::string("_T") + std::to_string(prog_.next_tmp++); }
+  std::string LocalNameOf(const std::shared_ptr<Value>& val);
   std::string Apply(const std::shared_ptr<Value>& val) final;
   std::string Visit(const std::shared_ptr<TensorValue>& val) final;
   std::string Visit(const std::shared_ptr<PlaceholderValue>& val) final;

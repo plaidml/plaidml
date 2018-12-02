@@ -2,164 +2,35 @@
 
 #include <algorithm>
 #include <iterator>
+#include <map>
 #include <string>
 #include <utility>
 
-#include "base/util/logging.h"
-#include "tile/lang/shape.h"
+#include "tile/base/shape.h"
 #include "tile/proto/tile.pb.h"
 
 namespace vertexai {
 namespace tile {
-namespace proto {
 
-inline lang::DataType to_poco(const TensorShape_DataType& dt) {
-  switch (dt) {
-    case TensorShape_DataType_BOOLEAN:
-      return lang::DataType::BOOLEAN;
-    case TensorShape_DataType_INT8:
-      return lang::DataType::INT8;
-    case TensorShape_DataType_INT16:
-      return lang::DataType::INT16;
-    case TensorShape_DataType_INT32:
-      return lang::DataType::INT32;
-    case TensorShape_DataType_INT64:
-      return lang::DataType::INT64;
-    case TensorShape_DataType_UINT8:
-      return lang::DataType::UINT8;
-    case TensorShape_DataType_UINT16:
-      return lang::DataType::UINT16;
-    case TensorShape_DataType_UINT32:
-      return lang::DataType::UINT32;
-    case TensorShape_DataType_UINT64:
-      return lang::DataType::UINT64;
-    case TensorShape_DataType_FLOAT16:
-      return lang::DataType::FLOAT16;
-    case TensorShape_DataType_FLOAT32:
-      return lang::DataType::FLOAT32;
-    case TensorShape_DataType_FLOAT64:
-      return lang::DataType::FLOAT64;
-    default:
-      throw std::runtime_error("Unknown DataType");
-  }
-}
-
-inline TensorShape_DataType to_proto(const lang::DataType& dt) {
-  switch (dt) {
-    case lang::DataType::BOOLEAN:
-      return TensorShape_DataType_BOOLEAN;
-    case lang::DataType::INT8:
-      return TensorShape_DataType_INT8;
-    case lang::DataType::INT16:
-      return TensorShape_DataType_INT16;
-    case lang::DataType::INT32:
-      return TensorShape_DataType_INT32;
-    case lang::DataType::INT64:
-      return TensorShape_DataType_INT64;
-    case lang::DataType::UINT8:
-      return TensorShape_DataType_UINT8;
-    case lang::DataType::UINT16:
-      return TensorShape_DataType_UINT16;
-    case lang::DataType::UINT32:
-      return TensorShape_DataType_UINT32;
-    case lang::DataType::UINT64:
-      return TensorShape_DataType_UINT64;
-    case lang::DataType::FLOAT16:
-      return TensorShape_DataType_FLOAT16;
-    case lang::DataType::FLOAT32:
-      return TensorShape_DataType_FLOAT32;
-    case lang::DataType::FLOAT64:
-      return TensorShape_DataType_FLOAT64;
-    default:
-      throw std::runtime_error("Unknown DataType");
-  }
-}
-
-inline int size_in_bytes(const TensorShape_DataType& dt) {
-  switch (dt) {
-    case TensorShape_DataType_BOOLEAN:
-    case TensorShape_DataType_INT8:
-    case TensorShape_DataType_UINT8:
-      return 1;
-    case TensorShape_DataType_INT16:
-    case TensorShape_DataType_UINT16:
-    case TensorShape_DataType_FLOAT16:
-      return 2;
-    case TensorShape_DataType_INT32:
-    case TensorShape_DataType_UINT32:
-    case TensorShape_DataType_FLOAT32:
-      return 4;
-    case TensorShape_DataType_INT64:
-    case TensorShape_DataType_UINT64:
-    case TensorShape_DataType_FLOAT64:
-      return 8;
-    default:
-      throw std::runtime_error("Unknown DataType");
-  }
-}
-
-inline lang::TensorDimension to_poco(const TensorShape::Dimension& dim) {
-  lang::TensorDimension ret = {dim.stride(), dim.size()};
+inline ShapeMap FromProto(const google::protobuf::Map<std::string, proto::ProgramInput>& pb_map) {
+  std::map<std::string, TensorShape> ret;
+  std::for_each(pb_map.cbegin(), pb_map.cend(), [&ret](const std::pair<std::string, proto::ProgramInput>& item) {
+    ret[item.first] = FromProto(item.second.shape());
+  });
   return ret;
 }
 
-inline TensorShape::Dimension to_proto(const lang::TensorDimension& dim) {
-  TensorShape::Dimension ret;
-  ret.set_size(dim.size);
-  ret.set_stride(dim.stride);
+inline ShapeMap FromProto(const google::protobuf::Map<std::string, proto::ProgramOutput>& pb_map) {
+  std::map<std::string, TensorShape> ret;
+  std::for_each(pb_map.cbegin(), pb_map.cend(), [&ret](const std::pair<std::string, proto::ProgramOutput>& item) {
+    ret[item.first] = FromProto(item.second.shape());
+  });
   return ret;
 }
 
-inline lang::TensorShape to_poco(const TensorShape& shape) {
-  lang::TensorShape ret = {to_poco(shape.type()), {}};
-  std::transform(shape.dimensions().cbegin(), shape.dimensions().cend(), std::back_inserter(ret.dims),
-                 [](const TensorShape::Dimension& d) { return to_poco(d); });
-  return ret;
-}
+inline int size_in_bytes(const proto::ProgramInput& input) { return size_in_bytes(input.shape()); }
 
-inline TensorShape to_proto(const lang::TensorShape& shape) {
-  TensorShape ret;
-  ret.set_type(to_proto(shape.type));
-  for (const auto& dim : shape.dims) {
-    *(ret.mutable_dimensions()->Add()) = to_proto(dim);
-  }
-  return ret;
-}
+inline int size_in_bytes(const proto::ProgramOutput& output) { return size_in_bytes(output.shape()); }
 
-inline lang::ShapeMap to_poco(const google::protobuf::Map<std::string, ProgramInput> m) {
-  std::map<std::string, lang::TensorShape> ret;
-  std::for_each(m.cbegin(), m.cend(),
-                [&ret](const std::pair<std::string, ProgramInput>& p) { ret[p.first] = to_poco(p.second.shape()); });
-  return ret;
-};
-
-inline lang::ShapeMap to_poco(const google::protobuf::Map<std::string, ProgramOutput> m) {
-  std::map<std::string, lang::TensorShape> ret;
-  std::for_each(m.cbegin(), m.cend(),
-                [&ret](const std::pair<std::string, ProgramOutput>& p) { ret[p.first] = to_poco(p.second.shape()); });
-  return ret;
-};
-
-inline const bool cmp(const TensorShape::Dimension& a, const TensorShape::Dimension& b) {
-  return (a.stride() * a.size()) < (b.stride() * b.size());
-}
-
-inline int size_in_bytes(const TensorShape& shape) {
-  if (shape.dimensions().size() == 0) {
-    return size_in_bytes(shape.type());
-  }
-  TensorShape::Dimension d = *std::max_element(shape.dimensions().cbegin(), shape.dimensions().cend(), cmp);
-  return d.size() * d.stride() * size_in_bytes(shape.type());
-}
-
-inline int size_in_bytes(const ProgramInput& input) {
-  return size_in_bytes(input.shape());
-}
-
-inline int size_in_bytes(const ProgramOutput& output) {
-  return size_in_bytes(output.shape());
-}
-
-}  // namespace proto
 }  // namespace tile
 }  // namespace vertexai

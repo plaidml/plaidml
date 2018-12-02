@@ -10,8 +10,6 @@ namespace vertexai {
 namespace tile {
 namespace sem {
 
-using lang::DataType;
-
 inline std::string c_dtype(const DataType& dt) {
   std::string base;
   switch (dt) {

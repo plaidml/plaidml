@@ -4,6 +4,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -60,8 +61,6 @@ enum class KernelType {
   kZero,      // A zeroing kernel.
   kCopy,      // A direct memcpy kernel.
 };
-
-typedef std::vector<uint64_t> TileShape;
 
 struct TileOption {
   TileOption()

@@ -1,4 +1,4 @@
-// Copyright 2017, Vertex.AI.
+// Copyright 2017-2018 Intel Corporation.
 
 #include "base/util/any_factory_map.h"
 #include "base/util/compat.h"
@@ -11,11 +11,11 @@ namespace local_machine {
 
 std::unique_ptr<tile::Platform> PlatformFactory::MakeTypedInstance(const context::Context& ctx,
                                                                    const proto::Platform& config) {
-  return compat::make_unique<Platform>(ctx, config);
+  return std::make_unique<Platform>(ctx, config);
 }
 
 [[gnu::unused]] char reg = []() -> char {
-  AnyFactoryMap<tile::Platform>::Instance()->Register(compat::make_unique<PlatformFactory>());
+  AnyFactoryMap<tile::Platform>::Instance()->Register(std::make_unique<PlatformFactory>());
   return 0;
 }();
 

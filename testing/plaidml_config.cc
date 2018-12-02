@@ -1,4 +1,4 @@
-// Copyright Vertex.AI.
+// Copyright 2018 Intel Corporation.
 
 #include <fstream>
 #include <string>
@@ -13,7 +13,7 @@ namespace testing {
 namespace {
 
 std::string GetConfigFile() {
-  RunfilesDB rdb("vertexai_plaidml", nullptr);
+  RunfilesDB rdb("com_intel_plaidml", nullptr);
   auto filename = env::Get("PLAIDML_CONFIG_FILE");
   if (!filename.size()) {
     filename = "plaidml/experimental.json";

@@ -1,0 +1,153 @@
+// Copyright 2018, Intel Corporation
+
+syntax = "proto2";
+
+package vertexai.tile.codegen.proto;
+
+import "tile/stripe/stripe.proto";
+
+message Config {
+  required uint32 clock_mhz = 1;
+  map<string, ExecutionUnit> exec_units = 2;
+  map<string, MemoryUnit> mem_units = 3;
+  map<string, TransferUnit> tx_units = 4;
+  repeated Bus buses = 5;
+  repeated Pass passes = 6;
+}
+
+message ExecutionUnit {
+  optional uint32 count = 1 [default = 1];
+  required uint32 ops_per_cycle = 2;
+  repeated Stencil stencils = 3;
+}
+
+message MemoryUnit {
+  optional uint32 count = 1 [default = 1];
+  required uint32 size_KiB = 2;
+}
+
+message TransferUnit {
+  optional uint32 count = 1 [default = 1];
+}
+
+message Bus {
+  repeated string sources = 1;
+  repeated string sinks = 2;
+  required double bytes_per_cycle = 3;
+}
+
+message Pass {
+  required string name = 1;
+  oneof pass {
+    CachePass cache = 2;
+    GenericPass compute_deps = 3;
+    FusionPass fusion = 4;
+    GenericPass localize = 5;
+    LocateMemoryPass locate_block = 6;
+    LocateMemoryPass locate_inner_block = 7;
+    LocateMemoryPass locate_memory = 8;
+    MemoryPlacementPass memory_placement = 9;
+    GenericPass scalarize = 10;
+    StencilPass stencil = 11;
+    AutotilePass autotile = 12;
+    SchedulePass schedule = 13;
+    TransposePass transpose = 14;
+    PartitionPass partition = 15;
+    PruneIndexesPass prune_indexes = 16;
+    UnrollPass unroll = 17;
+  }
+}
+
+message GenericPass {
+  repeated string reqs = 1;
+}
+
+message SchedulePass {
+  repeated string reqs = 1;
+  required stripe.proto.Location mem_loc = 2;
+  required uint64 mem_KiB = 3;
+  required uint32 alignment = 4;
+  required stripe.proto.Location xfer_loc = 5;
+  optional bool allow_out_of_range_accesses = 6 [default = false];
+  optional uint64 num_banks = 7 [default = 1];
+}
+
+message MemoryPlacementPass {
+  repeated string reqs = 1;
+  required uint32 alignment = 2;
+  repeated stripe.proto.Location locs = 3;
+  optional uint64 num_banks = 4 [default = 1];
+}
+
+message CachePass {
+  repeated string reqs = 1;
+  repeated stripe.proto.Refinement.Dir dirs = 2;
+  required stripe.proto.Location mem_loc = 3;
+  required stripe.proto.Location xfer_loc = 4;
+}
+
+message FusionPass {
+  repeated string parent_reqs = 1;
+  repeated string a_reqs = 2;
+  repeated string b_reqs = 3;
+  repeated string fused_set = 4;
+}
+
+message LocateMemoryPass {
+  repeated string reqs = 1;
+  required stripe.proto.Location loc = 2;
+}
+
+message StencilPass {
+  repeated string reqs = 1;
+  repeated Stencil stencils = 2;
+  repeated string outer_set = 3;
+  repeated string inner_set = 4;
+}
+
+message Stencil {
+  required uint64 startup_cost = 1;
+  repeated StencilIndex idxs = 2;
+}
+
+message StencilIndex {
+  required string name = 1;
+  required int32 size = 2;
+  repeated int32 outs = 3;
+  repeated int32 ins = 4;
+}
+
+message AutotilePass {
+  repeated string reqs = 1;
+  repeated string outer_set = 2;
+  repeated string inner_set = 3;
+  required bool only_po2 = 4;
+  required bool fast = 5;
+  required bool use_bytes = 6;
+  required bool skip_1d = 7;
+  required int64 max_output_size = 8;
+  required int64 max_input_size = 9;
+  required double output_cost = 10;
+  required double input_cost = 11;
+}
+
+message TransposePass {
+  repeated string reqs = 1;
+  repeated string alloc_reqs = 2;
+}
+
+message PartitionPass {
+  repeated string reqs = 1;
+  repeated string outer_set = 2;
+  repeated string inner_set = 3;
+  required int64 num_parts = 4;
+}
+
+message PruneIndexesPass {
+  repeated string reqs = 1;
+}
+
+message UnrollPass {
+  repeated string reqs = 1;
+  required int64 loc_mul = 2;
+}

@@ -1,12 +1,17 @@
-// Copyright 2017, Vertex.AI. CONFIDENTIAL
+// Copyright 2017-2018 Intel Corporation.
 
 #include "tile/hal/cpu/executable.h"
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 
 #include <algorithm>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 #include <utility>
+
+#include <boost/asio.hpp>
+#include <boost/asio/thread_pool.hpp>
 
 #include "base/util/error.h"
 #include "tile/hal/cpu/buffer.h"
@@ -21,10 +26,18 @@ namespace {
 
 const char invoker_prefix_[] = "__invoke_";
 
+// std::thread::hardware_concurrency reports the number of cores including
+// hyperthreaded cores, but hyperthreading does not help our performance and
+// the overhead of additional threads harms it; we will therefore use only the
+// physical number of cores when dividing up our workloads. This function takes
+// a long time, so we'll perform the count only once at startup.
+const size_t physical_cores_ = boost::thread::physical_concurrency();
+
 }  // namespace
 
-Executable::Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis)
-    : engines_{engines}, kis_(kis) {}
+Executable::Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis,
+                       std::shared_ptr<boost::asio::thread_pool> thread_pool)
+    : engines_{engines}, kis_(kis), thread_pool_(thread_pool) {}
 
 std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::size_t kidx,
                                             const std::vector<std::shared_ptr<hal::Buffer>>& params,
@@ -34,7 +47,7 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
   std::vector<std::shared_ptr<hal::Buffer>> param_refs{params};
   auto deps = Event::WaitFor(dependencies);
   auto evt = deps.then([params = std::move(param_refs), act = std::move(activity), engine = engines_[kidx],
-                        invoker_name = InvokerName(kis_[kidx].kname),
+                        invoker_name = InvokerName(kis_[kidx].kname), thread_pool = thread_pool_,
                         gwork = kis_[kidx].gwork](decltype(deps) future) -> std::shared_ptr<hal::Result> {
     future.get();
     auto start = std::chrono::high_resolution_clock::now();
@@ -51,24 +64,37 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
     // run one loop in each thread, staggering kernel invocations accordingly.
     size_t iterations = gwork[0] * gwork[1] * gwork[2];
     lang::GridSize denom = {{gwork[2] * gwork[1], gwork[2], 1}};
-    size_t cores = std::thread::hardware_concurrency();
-    size_t threads = std::min(iterations, cores);
-    auto runLoop = [=](size_t offset) {
-      for (size_t i = offset; i < iterations; i += threads) {
-        lang::GridSize index;
-        index[0] = i / denom[0] % gwork[0];
-        index[1] = i / denom[1] % gwork[1];
-        index[2] = i / denom[2] % gwork[2];
-        ((void (*)(void*, lang::GridSize*))entrypoint)(argvec, &index);
-      }
-    };
-    std::vector<std::thread> workers;
-    for (size_t i = 0; i < threads; ++i) {
-      workers.emplace_back(runLoop, i);
+    size_t threads = std::min(iterations, physical_cores_);
+
+    // The condition variable will guard the completion count. Each worker
+    // will increment the completion count, and we'll wait until it reaches
+    // the number of threads before returning.
+    std::mutex mutex;
+    std::condition_variable cv;
+    size_t completed = 0;
+
+    for (size_t offset = 0; offset < threads; ++offset) {
+      boost::asio::post(*thread_pool, [=, &mutex, &cv, &completed]() {
+        for (size_t i = offset; i < iterations; i += threads) {
+          lang::GridSize index;
+          index[0] = i / denom[0] % gwork[0];
+          index[1] = i / denom[1] % gwork[1];
+          index[2] = i / denom[2] % gwork[2];
+          ((void (*)(void*, lang::GridSize*))entrypoint)(argvec, &index);
+        }
+        {
+          std::unique_lock<std::mutex> lock{mutex};
+          if (++completed == threads) {
+            cv.notify_all();
+          }
+        }
+      });
     }
-    for (auto& worker : workers) {
-      worker.join();
+    {
+      std::unique_lock<std::mutex> lock{mutex};
+      cv.wait(lock, [&]() { return threads <= completed; });
     }
+
     return std::make_shared<Result>(act.ctx(), "tile::hal::cpu::Executing", start,
                                     std::chrono::high_resolution_clock::now());
   });

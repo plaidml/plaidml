@@ -11,7 +11,7 @@
 #include "testing/matchers.h"
 
 using ::testing::Eq;
-using ::testing::EqualsProto;
+using ::testing::EqualsProtoText;
 
 namespace vertexai {
 namespace eventing {
@@ -24,7 +24,7 @@ class EventLogTest : public ::testing::Test {
  protected:
   EventLogTest() { config_.set_filename(kTestFilename); }
 
-  void SetUp() override { eventlog_ = compat::make_unique<EventLog>(config_); }
+  void SetUp() override { eventlog_ = std::make_unique<EventLog>(config_); }
 
   proto::EventLog config_;
   std::unique_ptr<EventLog> eventlog_;
@@ -44,7 +44,7 @@ TEST_F(EventLogTest, CanReport) {
     EXPECT_THAT(reader.Read(&event), Eq(true));
     EXPECT_THAT(event.activity_id().stream_uuid().length(), Eq(16));
     event.clear_activity_id();
-    EXPECT_THAT(event, EqualsProto(R"(verb: "Hello, World!")"));
+    EXPECT_THAT(event, EqualsProtoText(R"(verb: "Hello, World!")"));
     EXPECT_THAT(reader.Read(&event), Eq(false));
   }
 }

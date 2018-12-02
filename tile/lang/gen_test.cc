@@ -56,7 +56,7 @@ TEST(GenContractTest, PiecewiseMultiply) {
   sem::Type index_type{sem::Type::INDEX};
   sem::Type in_float_type{sem::Type::POINTER_CONST, DataType::FLOAT32};
   sem::Type out_float_type{sem::Type::POINTER_MUT, DataType::FLOAT32};
-  sem::Type float_type{sem::Type::VALUE, lang::DataType::FLOAT32};
+  sem::Type float_type{sem::Type::VALUE, DataType::FLOAT32};
   RunTest(TestParam{
       TestGPU(),  // settings
       R"(
@@ -84,10 +84,10 @@ TEST(GenContractTest, PiecewiseMultiply) {
           },
           {
               _Declare(index_type, "tid", _Index(sem::IndexExpr::LOCAL, 0)),
-              _Declare({sem::Type::VALUE, lang::DataType::FLOAT32, 1, 1}, "agg",
-                       _LimitConst(sem::LimitConst::ZERO, lang::DataType::FLOAT32)),
-              _Declare({sem::Type::VALUE, lang::DataType::FLOAT32, 1, 16}, "in1_shared", nullptr),
-              _Declare({sem::Type::VALUE, lang::DataType::FLOAT32, 1, 16}, "in2_shared", nullptr),  // EOL
+              _Declare({sem::Type::VALUE, DataType::FLOAT32, 1, 1}, "agg",
+                       _LimitConst(sem::LimitConst::ZERO, DataType::FLOAT32)),
+              _Declare({sem::Type::VALUE, DataType::FLOAT32, 1, 16}, "in1_shared", nullptr),
+              _Declare({sem::Type::VALUE, DataType::FLOAT32, 1, 16}, "in2_shared", nullptr),  // EOL
               _Block({
                   _Block({
                       _Declare(index_type, "y_x_tid", (_("tid") % 16)),
@@ -120,7 +120,7 @@ TEST(GenContractTest, SmallMatMul) {
   sem::Type index_type{sem::Type::INDEX};
   sem::Type in_float_type{sem::Type::POINTER_CONST, DataType::FLOAT32};
   sem::Type out_float_type{sem::Type::POINTER_MUT, DataType::FLOAT32};
-  sem::Type float_type{sem::Type::VALUE, lang::DataType::FLOAT32};
+  sem::Type float_type{sem::Type::VALUE, DataType::FLOAT32};
   RunTest(TestParam{
       TestGPU(),  // settings
       R"(
@@ -148,10 +148,10 @@ TEST(GenContractTest, SmallMatMul) {
           },
           {
               _Declare(index_type, "tid", _Index(sem::IndexExpr::LOCAL, 0)),
-              _Declare({sem::Type::VALUE, lang::DataType::FLOAT32, 1, 1}, "agg",
-                       _LimitConst(sem::LimitConst::ZERO, lang::DataType::FLOAT32)),
-              _Declare({sem::Type::VALUE, lang::DataType::FLOAT32, 1, 7}, "in1_shared", nullptr),
-              _Declare({sem::Type::VALUE, lang::DataType::FLOAT32, 1, 7}, "in2_shared", nullptr),  // EOL
+              _Declare({sem::Type::VALUE, DataType::FLOAT32, 1, 1}, "agg",
+                       _LimitConst(sem::LimitConst::ZERO, DataType::FLOAT32)),
+              _Declare({sem::Type::VALUE, DataType::FLOAT32, 1, 7}, "in1_shared", nullptr),
+              _Declare({sem::Type::VALUE, DataType::FLOAT32, 1, 7}, "in2_shared", nullptr),  // EOL
               _For("k_gid", 1, 4,
                    _Block({
                        _Block({
@@ -192,7 +192,7 @@ TEST(GenContractTest, SmallMatMul) {
                        _("agg")[_Const(0)] = (_("agg")[_Const(0)] + _("pre_agg")),                   // EOL
                        _Barrier(),                                                                   // EOL
                    })),
-              _Declare({sem::Type::VALUE, lang::DataType::FLOAT32, 1, 64}, "merge_shared", nullptr),  // EOL
+              _Declare({sem::Type::VALUE, DataType::FLOAT32, 1, 64}, "merge_shared", nullptr),  // EOL
               _Block({
                   _("merge_shared")[_("tid")] = _("agg")[_Const(0)],
                   _Barrier(),  // EOL

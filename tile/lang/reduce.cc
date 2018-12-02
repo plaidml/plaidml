@@ -6,17 +6,20 @@
 
 #include "base/util/logging.h"
 #include "base/util/printstring.h"
-#include "tile/lang/basis.h"
 #include "tile/lang/compile.h"
-#include "tile/lang/matrix.h"
 #include "tile/lang/ops.h"
+#include "tile/math/basis.h"
+#include "tile/math/matrix.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
 
-static Polynomial ConvertVariables(Polynomial in, std::vector<std::string> vars, std::vector<Polynomial> polys) {
-  Polynomial out;
+using namespace math;  // NOLINT
+
+static Polynomial<Rational> ConvertVariables(Polynomial<Rational> in, std::vector<std::string> vars,
+                                             std::vector<Polynomial<Rational>> polys) {
+  Polynomial<Rational> out;
   for (size_t i = 0; i < vars.size(); i++) {
     out += in[vars[i]] * polys[i];
   }
@@ -32,9 +35,9 @@ Contraction ReduceOutputPolynomials(const Contraction& op, const std::vector<Ran
   std::tie(index_variables, output_variables) = op.getIndexAndOutputVars();
 
   // Now we construct a set of 'rewrite' variables
-  // for each linearly independent output Polynomial
+  // for each linearly independent output Polynomial<Rational>
   BasisBuilder basis;
-  for (const Polynomial& p : op.specs[0].spec) {
+  for (const Polynomial<Rational>& p : op.specs[0].spec) {
     // Maybe add it to the equation list
     basis.addEquation(p);
   }
@@ -46,7 +49,7 @@ Contraction ReduceOutputPolynomials(const Contraction& op, const std::vector<Ran
     }
     basis.addEquation(con.poly);
   }
-  const std::vector<Polynomial>& forms = basis.basis();
+  const std::vector<Polynomial<Rational>>& forms = basis.basis();
   if (forms.size() < index_variables.size()) {
     throw std::runtime_error("Underspecified set of equations in index variables");
   }
@@ -68,11 +71,11 @@ Contraction ReduceOutputPolynomials(const Contraction& op, const std::vector<Ran
   }
 
   // Now convert back to equations
-  std::vector<Polynomial> inverses;
+  std::vector<Polynomial<Rational>> inverses;
   for (size_t i = 0; i < size; i++) {
-    Polynomial p;
+    Polynomial<Rational> p;
     for (size_t j = 0; j < size; j++) {
-      p += m(i, j) * Polynomial(std::string("v") + std::to_string(j));
+      p += m(i, j) * Polynomial<Rational>(std::string("v") + std::to_string(j));
     }
     inverses.push_back(p);
   }

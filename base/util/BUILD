@@ -1,4 +1,4 @@
-# Copyright 2017, Vertex.AI.
+# Copyright 2017-2018 Intel Corporation.
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_py_library")
 
 plaidml_py_library(
@@ -34,10 +34,13 @@ plaidml_cc_library(
         "iterator_util.h",
         "json_transfer.h",
         "logging.h",
+        "lookup.h",
         "pdebug.h",
         "perf_counter.h",
         "printstring.h",
+        "stream_container.h",
         "sync.h",
+        "throw.h",
         "transfer_object.h",
         "type_url.h",
         "uuid.h",
@@ -45,11 +48,12 @@ plaidml_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@boost_archive//:boost",
-        "@com_github_gflags_gflags//:gflags",
-        "@easylogging_repo//:easylogging",
-        "@jsoncpp_git//:jsoncpp",
-        "@minizip_repo//:minizip",
+        "@boost",
+        "@boost//:stacktrace",
+        "@easylogging",
+        "@gflags",
+        "@jsoncpp",
+        "@minizip",
     ],
 )
 
