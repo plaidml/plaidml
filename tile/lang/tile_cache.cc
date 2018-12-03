@@ -21,6 +21,7 @@ TileCache::TileCache(const std::string& filename, bool use_env) {
   }
   file_.exceptions(std::fstream::failbit | std::fstream::badbit);
   file_.open(openname, std::fstream::in | std::fstream::out | std::fstream::app);
+  file_.seekp(0);
   std::string line;
   file_.exceptions(std::fstream::badbit);
   while (std::getline(file_, line)) {
