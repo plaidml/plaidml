@@ -307,12 +307,24 @@ pkg_deb(
     version = "0.0.1",
 )
 
+genrule(
+    name="licenses",
+    srcs=[
+        "@boost//:license",
+    ],
+    outs=[
+        "boost-LICENSE",
+    ],
+    cmd="cp $(SRCS) $(@D)/"
+)
+
 plaidml_py_wheel(
     name = "wheel",
     package_name = "plaidml",
     srcs = [
         ":py",
         ":configs",
+        ":licenses"
     ] + select({
         "@toolchain//:windows_x86_64": ["//plaidml:plaidml.dll"],
         "//conditions:default": ["//plaidml:libplaidml.so"],
@@ -360,6 +372,7 @@ pkg_tar(
     # TODO: Build package_dir from the --define=version= config setting.
     package_dir = "plaidml-0.5.0",
     deps = [
+        ":licenses",
         ":sdk_configs",
         ":sdk_includes",
         ":sdk_libs",
