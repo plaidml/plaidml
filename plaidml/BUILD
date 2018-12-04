@@ -310,19 +310,18 @@ pkg_deb(
 genrule(
     name="licenses",
     srcs=[
-        "@boost//:license",
-        "@easylogging//:license",
-        "@gmock//:license",
-        "@half//:license",
-        "@minizip//:license",
+        "@boost//:LICENSE_1_0.txt",
+        "@easylogging//:LICENCE.txt",
+        "@half//:LICENSE.txt",
+        "@minizip//:LICENSE",
 
     ],
     outs=[
         "boost-LICENSE",
         "easylogging-LICENSE",
-        "gmock-LICENSE",
         "half-LICENSE",
         "minizip-LICENSE",
+
     ],
     cmd="cp $(SRCS) $(@D)/"
 )

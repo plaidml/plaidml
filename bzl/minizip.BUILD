@@ -42,3 +42,5 @@ cc_library(
     includes = ["."],
     deps = ["@zlib"],
 )
+
+exports_files(["LICENSE"])
