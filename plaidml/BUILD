@@ -376,7 +376,7 @@ pkg_tar(
 
 pkg_tar(
     name = "sdk",
-    srcs = ["plaidml-config.cmake"],
+    srcs = ["plaidml-config.cmake", ":licenses"],
     # TODO: Build package_dir from the --define=version= config setting.
     package_dir = "plaidml-0.5.0",
     deps = [
@@ -385,6 +385,6 @@ pkg_tar(
         ":sdk_libs",
         "//plaidml/base:sdk_includes",
         "@half//:sdk_includes",
-        ":licenses",
+        
     ],
 )
