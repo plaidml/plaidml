@@ -7,4 +7,9 @@ py_library(
     visibility = ["//visibility:public"],
 )
 
-exports_files(["LICENSE"])
+genrule(
+    name = "license",
+    srcs = ["LICENSE"],
+    outs = ["six-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)

@@ -1,4 +1,5 @@
 licenses(["notice"])  # MIT
+package(default_visibility = ["@//visibility:public"])
 
 JSON_HEADERS = [
     "include/json/assertions.h",
@@ -31,4 +32,11 @@ cc_library(
     includes = ["include"],
     textual_hdrs = INLINE_SOURCES,
     visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "license",
+    srcs = ["LICENSE"],
+    outs = ["jsoncpp-LICENSE"],
+    cmd = "cp $(SRCS) $@",
 )
