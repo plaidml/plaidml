@@ -1,3 +1,7 @@
+includes = ["."]
+
+package(default_visibility = ["@//visibility:public"])
+
 cc_library(
     name = "easylogging",
     srcs = ["easylogging++.cc"],
@@ -16,3 +20,5 @@ cc_library(
     includes = ["."],
     visibility = ["//visibility:public"],
 )
+
+exports_files(["LICENCE.txt"])
