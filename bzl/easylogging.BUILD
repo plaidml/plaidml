@@ -21,4 +21,9 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-exports_files(["LICENCE.txt"])
+genrule(
+    name = "license",
+    srcs = ["LICENCE.txt"],
+    outs = ["easylogging-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)

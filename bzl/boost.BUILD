@@ -97,4 +97,9 @@ cc_library(
     ],
 )
 
-exports_files(["LICENSE_1_0.txt"])
+genrule(
+    name = "license",
+    srcs = ["LICENSE_1_0.txt"],
+    outs = ["boost-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)
