@@ -310,10 +310,10 @@ pkg_deb(
 genrule(
     name="licenses",
     srcs=[
-        "@boost//:LICENSE_1_0.txt",
-        "@easylogging//:LICENCE.txt",
-        "@half//:LICENSE.txt",
-        "@minizip//:LICENSE",
+        "@boost//:license",
+        "@easylogging//:license",
+        "@half//:license",
+        "@minizip//:license",
 
     ],
     outs=[

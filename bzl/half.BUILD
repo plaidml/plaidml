@@ -16,4 +16,9 @@ pkg_tar(
     visibility = ["//visibility:public"],
 )
 
-exports_files(["LICENSE.txt"])
+genrule(
+    name = "license",
+    srcs = ["LICENSE.txt"],
+    outs = ["half-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)

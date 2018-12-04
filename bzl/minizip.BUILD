@@ -43,4 +43,9 @@ cc_library(
     deps = ["@zlib"],
 )
 
-exports_files(["LICENSE"])
+genrule(
+    name = "license",
+    srcs = ["LICENSE"],
+    outs = ["minizip-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)
