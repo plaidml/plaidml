@@ -314,6 +314,10 @@ genrule(
         "@easylogging//:license",
         "@half//:license",
         "@minizip//:license",
+        "@gmock//:license",
+        "@jsoncpp//:license",
+        "@com_google_protobuf//:license",
+        "@six_archive//:license",
 
     ],
     outs=[
@@ -321,6 +325,10 @@ genrule(
         "easylogging-LICENSE",
         "half-LICENSE",
         "minizip-LICENSE",
+        "gmock-LICENSE",
+        "jsoncpp-LICENSE",
+        "protobuf-LICENSE",
+        "six-LICENSE",
 
     ],
     cmd="cp $(SRCS) $(@D)/"

@@ -37,4 +37,9 @@ cc_library(
     deps = [":gtest"],
 )
 
-exports_files = (["googlemock/LICENSE"])
+genrule(
+    name = "license",
+    srcs = ["googlemock/LICENSE"],
+    outs = ["gmock-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)
