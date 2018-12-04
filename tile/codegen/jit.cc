@@ -78,6 +78,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Or(const stripe::Intrinsic&);
   void Not(const stripe::Intrinsic&);
   void Xor(const stripe::Intrinsic&);
+  void Assign(const stripe::Intrinsic&);
   void Zero(const stripe::Special&);
   void Copy(const stripe::Special&);
 
@@ -365,6 +366,8 @@ void Compiler::Visit(const stripe::Store& store) {
     } else {
       throw Error("Invalid addition type: " + to_string(from.type));
     }
+  } else if ("assign" == agg_op) {
+    // fall through to assignment
   } else if (!agg_op.empty()) {
     throw Error("Unimplemented agg_op: " + to_string(agg_op));
   }
@@ -410,7 +413,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"eq", &Compiler::Equal},         {"neq", &Compiler::Unequal},
       {"and", &Compiler::And},          {"or", &Compiler::Or},
       {"not", &Compiler::Not},          {"xor", &Compiler::Xor},
-      {"cond", &Compiler::Conditional},
+      {"cond", &Compiler::Conditional}, {"assign", &Compiler::Assign},
   };
   handlers[intrinsic.name](this, intrinsic);
 }
@@ -735,6 +738,13 @@ void Compiler::Xor(const stripe::Intrinsic& stmt) {
   scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateXor(lhs.value, rhs.value);
   OutputBool(ret, stmt);
+}
+
+void Compiler::Assign(const stripe::Intrinsic& stmt) {
+  assert(1 == stmt.inputs.size());
+  scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  llvm::Value* ret = op.value;
+  OutputType(ret, stmt);
 }
 
 void Compiler::Zero(const stripe::Special& zero) {
