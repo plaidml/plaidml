@@ -311,9 +311,18 @@ genrule(
     name="licenses",
     srcs=[
         "@boost//:license",
+        "@easylogging//:license",
+        "@gmock//:license",
+        "@half//:license",
+        "@minizip//:license",
+
     ],
     outs=[
         "boost-LICENSE",
+        "easylogging-LICENSE",
+        "gmock-LICENSE",
+        "half-LICENSE",
+        "minizip-LICENSE",
     ],
     cmd="cp $(SRCS) $(@D)/"
 )
@@ -372,11 +381,11 @@ pkg_tar(
     # TODO: Build package_dir from the --define=version= config setting.
     package_dir = "plaidml-0.5.0",
     deps = [
-        ":licenses",
         ":sdk_configs",
         ":sdk_includes",
         ":sdk_libs",
         "//plaidml/base:sdk_includes",
         "@half//:sdk_includes",
+        ":licenses",
     ],
 )
