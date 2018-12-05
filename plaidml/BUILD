@@ -307,12 +307,42 @@ pkg_deb(
     version = "0.0.1",
 )
 
+genrule(
+    name="licenses",
+    srcs=[
+        "@boost//:license",
+        "@easylogging//:license",
+        "@half//:license",
+        "@minizip//:license",
+        "@gmock//:license",
+        "@jsoncpp//:license",
+        "@com_google_protobuf//:license",
+        "@six_archive//:license",
+        "@llvm//:license",
+
+    ],
+    outs=[
+        "boost-LICENSE",
+        "easylogging-LICENSE",
+        "half-LICENSE",
+        "minizip-LICENSE",
+        "gmock-LICENSE",
+        "jsoncpp-LICENSE",
+        "protobuf-LICENSE",
+        "six-LICENSE",
+        "llvm-LICENSE",
+
+    ],
+    cmd="cp $(SRCS) $(@D)/"
+)
+
 plaidml_py_wheel(
     name = "wheel",
     package_name = "plaidml",
     srcs = [
         ":py",
         ":configs",
+        ":licenses"
     ] + select({
         "@toolchain//:windows_x86_64": ["//plaidml:plaidml.dll"],
         "//conditions:default": ["//plaidml:libplaidml.so"],
@@ -356,7 +386,7 @@ pkg_tar(
 
 pkg_tar(
     name = "sdk",
-    srcs = ["plaidml-config.cmake"],
+    srcs = ["plaidml-config.cmake", ":licenses"],
     # TODO: Build package_dir from the --define=version= config setting.
     package_dir = "plaidml-0.5.0",
     deps = [
@@ -365,5 +395,6 @@ pkg_tar(
         ":sdk_libs",
         "//plaidml/base:sdk_includes",
         "@half//:sdk_includes",
+        
     ],
 )

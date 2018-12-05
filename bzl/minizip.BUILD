@@ -42,3 +42,10 @@ cc_library(
     includes = ["."],
     deps = ["@zlib"],
 )
+
+genrule(
+    name = "license",
+    srcs = ["LICENSE"],
+    outs = ["minizip-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)

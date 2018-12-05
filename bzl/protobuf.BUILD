@@ -1,4 +1,5 @@
 # Bazel (http://bazel.io/) BUILD file for Protobuf.
+package(default_visibility = ["@//visibility:public"])
 
 licenses(["notice"])
 
@@ -952,4 +953,10 @@ objc_library(
     ],
     non_arc_srcs = OBJC_SRCS,
     visibility = ["//visibility:public"],
+)
+genrule(
+    name = "license",
+    srcs = ["LICENSE"],
+    outs = ["protobuf-LICENSE"],
+    cmd = "cp $(SRCS) $@",
 )
