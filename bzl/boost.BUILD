@@ -96,3 +96,10 @@ cc_library(
         ":system",
     ],
 )
+
+genrule(
+    name = "license",
+    srcs = ["LICENSE_1_0.txt"],
+    outs = ["boost-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)

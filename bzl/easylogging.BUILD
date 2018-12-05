@@ -1,3 +1,7 @@
+includes = ["."]
+
+package(default_visibility = ["@//visibility:public"])
+
 cc_library(
     name = "easylogging",
     srcs = ["easylogging++.cc"],
@@ -15,4 +19,11 @@ cc_library(
     ],
     includes = ["."],
     visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "license",
+    srcs = ["LICENCE.txt"],
+    outs = ["easylogging-LICENSE"],
+    cmd = "cp $(SRCS) $@",
 )
