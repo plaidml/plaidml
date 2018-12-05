@@ -573,15 +573,20 @@ class TestBackendOps(unittest.TestCase):
 
     # T1031: This doesn't match TF/Theano on corner
     @opTest([
-        [m(3, 3) - 0.0001, 0.5, 3],
-        [m(3, 4) + 0.0001, 0.1, 5],
+        [m(3, 3) - 0.0001, 0.5, 3, 0.0],
+        [m(3, 4) + 0.0001, 0.1, 5, 0.0],
+        [m(3, 4) + 0.0001, 0.1, 5, 2.5],
     ])
-    def testRelu(self, b, x, a=0.0, m=None):
+    def testRelu(self, b, x, a=0.0, m=None, threshold=0.0):
         return [
             b.relu(x),
             b.relu(x, alpha=a),
             b.relu(x, max_value=m),
-            b.relu(x, alpha=a, max_value=m)
+            b.relu(x, alpha=a, max_value=m),
+            b.relu(x, threshold=threshold),
+            b.relu(x, alpha=a, threshold=threshold),
+            b.relu(x, max_value=m, threshold=threshold),
+            b.relu(x, alpha=a, max_value=m, threshold=threshold),
         ]
 
     @compareForwardExact()
@@ -821,31 +826,33 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @opTest(
-        [
-            [m(1, 1, 3, 1),
-             m(1, 4, 1, 1), (1, 1, 9, 1), (1, 4), 'same', 'channels_last'],
-            [m(1, 3, 3, 1),
-             m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'same', 'channels_last'],
-            [m(1, 2, 2, 1),
-             m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'valid', 'channels_last'],
-            [m(1, 5, 3, 7),
-             m(5, 5, 4, 7), (1, 9, 10, 4), (1, 2), 'valid', 'channels_last'],
-            [m(1, 5, 3, 7),
-             m(5, 5, 4, 7), (1, 9, 9, 4), (1, 2), 'valid', 'channels_last'],
-            [m(4, 8, 5, 5),
-             m(3, 3, 2, 8), (4, 2, 9, 9), (2, 2), 'same', 'channels_first'],
-            [m(4, 3, 5, 8),
-             m(3, 3, 2, 8), (4, 9, 9, 2), (3, 2), 'same', 'channels_last'],
-            [m(1, 1, 6, 1),
-             m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'same', 'channels_first'],
-            [m(1, 1, 4, 1),
-             m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'valid', 'channels_first'],
-        ],
+        [[m(1, 1, 3, 1),
+          m(1, 4, 1, 1), (1, 1, 9, 1), (1, 4), 'same', 'channels_last', (1, 1)],
+         [m(1, 3, 3, 1),
+          m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'same', 'channels_last', (1, 1)],
+         [m(1, 2, 2, 1),
+          m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'valid', 'channels_last', (1, 1)],
+         [m(1, 5, 3, 7),
+          m(5, 5, 4, 7), (1, 9, 10, 4), (1, 2), 'valid', 'channels_last', (1, 1)],
+         [m(1, 5, 3, 7),
+          m(5, 5, 4, 7), (1, 9, 9, 4), (1, 2), 'valid', 'channels_last', (1, 1)],
+         [m(4, 8, 5, 5),
+          m(3, 3, 2, 8), (4, 2, 9, 9), (2, 2), 'same', 'channels_first', (1, 1)],
+         [m(4, 3, 5, 8),
+          m(3, 3, 2, 8), (4, 9, 9, 2), (3, 2), 'same', 'channels_last', (1, 1)],
+         [m(1, 1, 6, 1),
+          m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'same', 'channels_first', (1, 1)],
+         [m(1, 1, 4, 1),
+          m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'valid', 'channels_first', (1, 1)],
+         [m(1, 8, 9, 3),
+          m(3, 2, 3, 3), (1, 8, 9, 3), (1, 1), 'same', 'channels_last', (2, 2)]],
         verbose=False,
         skip_theano=True,
     )
-    def testConv2dTranspose(self, b, x, k, os, st, pd, df):
-        return [b.conv2d_transpose(x, k, os, strides=st, padding=pd, data_format=df)]
+    def testConv2dTranspose(self, b, x, k, os, st, pd, df, dr):
+        return [
+            b.conv2d_transpose(x, k, os, strides=st, padding=pd, data_format=df, dilation_rate=dr)
+        ]
 
     @opTest([[m(1, 3, 3, 1), m(1, 3, 3, 1) - 2]], skip_tensorflow=True, skip_theano=True)
     def testDefractLong(self, b, x, k):
@@ -1199,6 +1206,27 @@ class TestBackendOps(unittest.TestCase):
     ])
     def testResizeImages(self, b, x, h, w, df):
         return [b.resize_images(x, h, w, df)]
+
+    @opTest([
+        [m(3, 2, 5, 11), 3, 1, 'channels_last'],
+        [m(1, 3, 7, 5), 2, 3, 'channels_first'],
+        [m(1, 1, 2, 3), 3, 4, 'channels_first'],
+    ])
+    def testResizeImagesBilinear(self, b, x, h, w, df):
+        # Tested without ends b/c of different padding behavior from TF
+        if df == 'channels_first':
+            return [
+                b.resize_images(x, h, w, df, interpolation='bilinear')[:, :, :h * x.shape.dims[2] -
+                                                                       h, :w * x.shape.dims[3] - w]
+            ]
+        elif df == 'channels_last':
+            return [
+                b.resize_images(x, h, w, df,
+                                interpolation='bilinear')[:, :h * x.shape.dims[1] -
+                                                          h, :w * x.shape.dims[2] - w, :]
+            ]
+        else:
+            raise ValueError('Bad data format requested for test')
 
     @opTest([
         [m(4, 6, 5, 2, 3), 3, 1, 2, 'channels_last'],
