@@ -318,6 +318,7 @@ genrule(
         "@jsoncpp//:license",
         "@com_google_protobuf//:license",
         "@six_archive//:license",
+        "@llvm//:license",
 
     ],
     outs=[
@@ -329,6 +330,7 @@ genrule(
         "jsoncpp-LICENSE",
         "protobuf-LICENSE",
         "six-LICENSE",
+        "llvm-LICENSE",
 
     ],
     cmd="cp $(SRCS) $(@D)/"
