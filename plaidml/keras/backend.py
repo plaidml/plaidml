@@ -473,7 +473,7 @@ def conv(x,
     )
 
 
-def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
+def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate):
     try:
         padding = _AUTO_PAD[padding]
     except KeyError:
@@ -495,6 +495,7 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format):
         padding,
         data_format,
         kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
+        dilation_rate=dilation_rate,
     )
 
 
@@ -512,8 +513,14 @@ def conv2d(x, kernel, strides=(1, 1), padding='valid', dilation_rate=(1, 1), dat
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
-def conv2d_transpose(x, kernel, output_shape, strides=(1, 1), padding='valid', data_format=None):
-    return conv_transpose(x, kernel, output_shape, strides, padding, data_format)
+def conv2d_transpose(x,
+                     kernel,
+                     output_shape,
+                     strides=(1, 1),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1, 1)):
+    return conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate)
 
 
 def conv3d(x,
@@ -525,9 +532,14 @@ def conv3d(x,
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
-def conv3d_transpose(x, kernel, output_shape, strides=(1, 1, 1), padding='valid',
-                     data_format=None):
-    return conv_transpose(x, kernel, output_shape, strides, padding, data_format)
+def conv3d_transpose(x,
+                     kernel,
+                     output_shape,
+                     strides=(1, 1, 1),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1, 1, 1)):
+    return conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate)
 
 
 def count_params(x):
@@ -1171,15 +1183,67 @@ def reset_uids():
 reshape = op.reshape
 
 
-def resize_images(x, height_factor, width_factor, data_format):
-    if data_format == 'channels_first':
-        ret = repeat_elements(x, height_factor, axis=2)
-        ret = repeat_elements(ret, width_factor, axis=3)
-    elif data_format == 'channels_last':
-        ret = repeat_elements(x, height_factor, axis=1)
-        ret = repeat_elements(ret, width_factor, axis=2)
+def resize_images(x, height_factor, width_factor, data_format, interpolation='nearest'):
+    if not isinstance(height_factor, int) or not isinstance(width_factor, int):
+        raise ValueError(
+            'height_factor and width_factor must be integers, received types {} and {}'.format(
+                type(height_factor), type(width_factor)))
+    if height_factor <= 0 or width_factor <= 0:
+        raise ValueError(
+            'height_factor and width_factor must be positive, received {} and {}'.format(
+                height_factor, width_factor))
+    if interpolation == 'nearest':
+        if data_format == 'channels_first':
+            ret = repeat_elements(x, height_factor, axis=2)
+            ret = repeat_elements(ret, width_factor, axis=3)
+        elif data_format == 'channels_last':
+            ret = repeat_elements(x, height_factor, axis=1)
+            ret = repeat_elements(ret, width_factor, axis=2)
+        else:
+            raise ValueError('Invalid data_format {}'.format(data_format))
+    elif interpolation == 'bilinear':
+        # This aligns the corners to (0, 0) and ({hf}*(H-1),{wf}*(H-1)), and assumes zero-padding beyond the top,
+        # which is a bit weird, but it's easy to code and the weirdness is probably mostly irrelevant for ML.
+        # Could eke out a tiny bit more perf by precomputing K instead of doing it in Tile
+        if data_format == 'channels_first':
+            idims = 'N, C, H, W'
+            odims = 'N, C, HFactor*H, WFactor*W'
+            iidxs = 'n, c, h, w'
+            oidxs = 'n, c, HFactor*h + j - HFactor + 1, WFactor*w + i - WFactor + 1'
+            outshape = ptile.Shape(x.shape.dtype, [
+                x.shape.dims[0], x.shape.dims[1], height_factor * x.shape.dims[2],
+                width_factor * x.shape.dims[3]
+            ])
+        elif data_format == 'channels_last':
+            idims = 'N, H, W, C'
+            odims = 'N, HFactor*H, WFactor*W, C'
+            iidxs = 'n, h, w, c'
+            oidxs = 'n, HFactor*h + j - HFactor + 1, WFactor*w + i - WFactor + 1, c'
+            outshape = ptile.Shape(x.shape.dtype, [
+                x.shape.dims[0], height_factor * x.shape.dims[1], width_factor * x.shape.dims[2],
+                x.shape.dims[3]
+            ])
+        else:
+            raise ValueError('Invalid data_format {}'.format(data_format))
+        HBase = constant(1. / height_factor, shape=(height_factor,))
+        WBase = constant(1. / width_factor, shape=(width_factor,))
+        code = '''
+        function (I[{idims}], HBase[HFactor], WBase[WFactor]) -> (O) {{
+            HK[y : 2*HFactor - 1] = +(HBase[y + j - HFactor + 1]), j < HFactor;
+            WK[x : 2*WFactor - 1] = +(WBase[x + i - WFactor + 1]), i < WFactor;
+            K[y, x: 2*HFactor - 1, 2*WFactor - 1] = =(HK[y] * WK[x]);
+            O[{oidxs} : {odims}] = +(I[{iidxs}] * K[j, i]);
+        }}
+        '''.format(
+            idims=idims,
+            odims=odims,
+            iidxs=iidxs,
+            oidxs=oidxs,
+        )
+        ret = ptile.Operation(code, [('I', x), ('HBase', HBase), ('WBase', WBase)],
+                              [('O', outshape)]).sole_output()
     else:
-        raise ValueError('Invalid data_format {}'.format(data_format))
+        raise ValueError('Invalid interpolation mode {}'.format(interpolation))
     return ret
 
 
