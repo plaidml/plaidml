@@ -12,7 +12,7 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void PruneIndexesPass(Block* root, const proto::PruneIndexesPass& options) {
+void PruneIndexesPass(Block* root, const proto::GenericPass& options) {
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [](const AliasMap& map, Block* block) {
     // Find all the indexes to remove

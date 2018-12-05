@@ -26,10 +26,7 @@ void ApplyCache(Block* block,                 //
   }
   // Get the shape
   TensorShape raw_ts = it->shape;
-  std::vector<size_t> sizes;
-  for (const auto& dim : raw_ts.dims) {
-    sizes.push_back(dim.size);
-  }
+  std::vector<size_t> sizes = raw_ts.sizes();
   TensorShape cached_ts = SimpleShape(raw_ts.type, sizes);
   // Make a new name for the raw variable
   std::string raw_name = block->unique_ref_name(var_name + "_raw");
@@ -46,6 +43,13 @@ void ApplyCache(Block* block,                 //
     xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
     xfer_access.emplace_back(Affine(iname));
   }
+  if (!it->location.unit.isConstant()) {
+    auto bank_idx_name = it->location.unit.getMap().begin()->first;
+    auto base_bank_idx = block->idx_by_name(bank_idx_name);
+    auto bank_idx = Index{bank_idx_name, 1, Affine{bank_idx_name}};
+    bank_idx.tags = base_bank_idx->tags;
+    xfer_block.idxs.emplace_back(bank_idx);
+  }
   TensorShape raw_xfer_shape = raw_ts;
   TensorShape cached_xfer_shape = cached_ts;
   for (size_t i = 0; i < sizes.size(); i++) {
@@ -60,7 +64,9 @@ void ApplyCache(Block* block,                 //
       cached_xfer_shape,  // shape
       "",                 // agg_op
       it->location,       // location
-      it->is_const        // is_const
+      it->is_const,       // is_const
+      it->offset,         // offset
+      it->bank_dim,       // bank_dim
   });
   xfer_block.refs.push_back(Refinement{
       RefDir::Out,        // dir
@@ -70,7 +76,9 @@ void ApplyCache(Block* block,                 //
       cached_xfer_shape,  // shape
       "",                 // agg_op
       it->location,       // location
-      it->is_const        // is_const
+      it->is_const,       // is_const
+      it->offset,         // offset
+      it->bank_dim,       // bank_dim
   });
   xfer_block.stmts.push_back(std::make_shared<Load>("src", "$X"));
   xfer_block.stmts.push_back(std::make_shared<Store>("$X", "dst"));
@@ -100,7 +108,7 @@ void ApplyCache(Block* block,                 //
       {},            // access
       cached_ts,     // shape
       "",            // agg_op
-      mem_loc        // location
+      mem_loc,       // location
   });
   block->refs.back().access.resize(cached_ts.dims.size());
   // Update inner blocks strides + locations

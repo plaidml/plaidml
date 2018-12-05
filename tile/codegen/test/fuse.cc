@@ -56,24 +56,27 @@ TEST(Codegen, FuseSimple) {
 
   IVLOG(2, "After>\n" << *program);
 
-  auto expected = R"**(0: #program block [] ( // simple_fuse
-    none new@0x00000000<[0]> A[0, 0] fp32(100:20, 20:1)
-    none new@0x00000000<[0]> B[0] fp32(20:1)
-    none new@0x00000000<[0]> C[0, 0] fp32(100:20, 20:1)
+  auto expected = R"**(0: #program 
+block []:1 ( // simple_fuse
+    none new@0x00000000 A[0, 0] fp32(100, 20):(20, 1):7.8125 KiB
+    none new@0x00000000 B[0] fp32(20):(1):80 B
+    none new@0x00000000 C[0, 0] fp32(100, 20):(20, 1):7.8125 KiB
 ) {
-  0: #main block [] ( // main
-      in<[0]> A[0, 0] fp32(100:20, 20:1)
-      in<[0]> B[0] fp32(20:1)
-      out<[0]> C[0, 0]:assign fp32(100:20, 20:1)
-      none new@0x00000000<[0]> T[0, 0] fp32(100:20, 20:1)
-      none new@0x00000000<[0]> X[0, 0] bool(100:20, 20:1)
+  0: #main 
+  block []:1 ( // main
+      in A[0, 0] fp32(100, 20):(20, 1):7.8125 KiB
+      in B[0] fp32(20):(1):80 B
+      out C[0, 0]:assign fp32(100, 20):(20, 1):7.8125 KiB
+      none new@0x00000000 T[0, 0] fp32(100, 20):(20, 1):7.8125 KiB
+      none new@0x00000000 X[0, 0] bool(100, 20):(20, 1):1.95312 KiB
   ) {
-    0: #fused block [i1:100, i2:20] ( // add+cmp_lt+cond
-        in<[0]> A[i1, i2] fp32(1:20, 1:1)
-        in<[0]> B[i2] fp32(1:1)
-        out<[0]> T[i1, i2] fp32(1:20, 1:1)
-        out<[0]> X[i1, i2] bool(1:20, 1:1)
-        out<[0]> C[i1, i2] fp32(1:20, 1:1)
+    0: #fused 
+    block [i1:100, i2:20]:2000 ( // add+cmp_lt+cond
+        in A[i1, i2] fp32(1, 1):(20, 1):4 B
+        in B[i2] fp32(1):(1):4 B
+        out C[i1, i2] fp32(1, 1):(20, 1):4 B
+        out T[i1, i2] fp32(1, 1):(20, 1):4 B
+        out X[i1, i2] bool(1, 1):(20, 1):1 B
     ) {
       0: $A = load(A)
       1: $B = load(B)

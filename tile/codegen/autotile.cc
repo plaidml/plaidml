@@ -3,7 +3,9 @@
 #include "tile/codegen/autotile.h"
 
 #include "base/util/logging.h"
-#include "base/util/stream_container.h"
+#include "base/util/throw.h"
+#include "tile/codegen/tags.h"
+#include "tile/codegen/tile.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -12,8 +14,11 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-static size_t ComputeSize(const std::map<std::string, size_t>& tile_by_name, const Refinement& ref,
-                          const proto::AutotilePass& options) {
+namespace {
+
+size_t ComputeSize(const std::map<std::string, size_t>& tile_by_name,  //
+                   const Refinement& ref,                              //
+                   const proto::AutotilePass& options) {
   if (options.skip_1d() && ref.shape.dims.size() == 1) {
     return 0;
   }
@@ -29,11 +34,13 @@ static size_t ComputeSize(const std::map<std::string, size_t>& tile_by_name, con
       total_size *= tile_by_name.at(kvp.first);
     }
   }
+  IVLOG(4, "    ComputeSize> ref: " << ref.into << ", total_size: " << total_size);
   return total_size;
 }
 
-static std::pair<size_t, size_t> ComputeSizes(const std::map<std::string, size_t>& tile_by_name, const Block& block,
-                                              const proto::AutotilePass& options) {
+std::pair<size_t, size_t> ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
+                                       const Block& block,                                 //
+                                       const proto::AutotilePass& options) {
   std::pair<size_t, size_t> out;
   for (const auto& ref : block.refs) {
     if (ref.dir == RefDir::None) {
@@ -48,12 +55,13 @@ static std::pair<size_t, size_t> ComputeSizes(const std::map<std::string, size_t
   return out;
 }
 
-static double TileCost(const Block& block, const proto::AutotilePass& options, const TileShape& tile) {
+double TileCost(const Block& block, const proto::AutotilePass& options, const TileShape& tile) {
   std::map<std::string, size_t> tile_by_name;
   for (size_t i = 0; i < block.idxs.size(); i++) {
     tile_by_name[block.idxs[i].name] = tile[i];
   }
   auto sizes = ComputeSizes(tile_by_name, block, options);
+  IVLOG(4, "    TileCost> tile_by_name: " << tile_by_name << ", sizes: " << sizes);
   if (static_cast<int64_t>(sizes.first) > options.max_output_size() ||
       static_cast<int64_t>(sizes.second) > options.max_input_size()) {
     return std::numeric_limits<double>::infinity();
@@ -66,10 +74,12 @@ static double TileCost(const Block& block, const proto::AutotilePass& options, c
     tile_expand *= static_cast<double>(padded_size) / static_cast<double>(block.idxs[i].range);
   }
   double cost = tile_expand * (options.output_cost() * sizes.first + options.input_cost() * sizes.second) / tot_compute;
+  IVLOG(4, "        cost: " << cost);
   return cost;
 }
 
-static TileShape PickBestShape(const Block& block, const proto::AutotilePass& options) {
+TileShape PickBestShape(const Block& block, const proto::AutotilePass& options) {
+  IVLOG(2, "Autotile> block: " << block.name);
   size_t sz = block.idxs.size();
   std::multimap<double, TileShape> by_cost;
   std::map<TileShape, double> by_tile;
@@ -89,6 +99,9 @@ static TileShape PickBestShape(const Block& block, const proto::AutotilePass& op
     tile = it->second;
     to_do.erase(*it);
     for (size_t i = 0; i < sz; i++) {
+      if (block.idxs[i].has_tag("bank")) {
+        continue;
+      }
       uint64_t prev = tile[i];
       if (options.only_po2()) {
         tile[i] = std::min(2 * tile[i], block.idxs[i].range);
@@ -106,18 +119,32 @@ static TileShape PickBestShape(const Block& block, const proto::AutotilePass& op
       tile[i] = prev;
     }
   }
-  IVLOG(2, "Autotile Result: " << by_cost.begin()->second << ", Cost: " << by_cost.begin()->first / base_cost);
+  IVLOG(2, "    result: " << by_cost.begin()->second << ", cost: " << by_cost.begin()->first / base_cost);
   return by_cost.begin()->second;
 }
+
+bool TileViaStrategy(Block* block, const TileShape& tile, const proto::AutotilePass& options) {
+  switch (options.strategy()) {
+    case proto::TileStrategy::TileInteriorBlock:
+      return ApplyTile(block, tile);
+    case proto::TileStrategy::TileExteriorBlock:
+      return ExtractTile(block, tile, options.into_idx());
+    case proto::TileStrategy::TileSplitIndex:
+      break;
+  }
+  throw_with_trace(std::runtime_error("Unsupported tiling strategy"));
+}
+
+}  // namespace
 
 void AutotilePass(Block* root, const proto::AutotilePass& options) {
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [&options](const AliasMap& map, Block* block) {
     TileShape tile = PickBestShape(*block, options);
-    if (ApplyTile(block, tile)) {
-      AddTags(block, FromProto(options.outer_set()));
-      auto inner = Block::Downcast(*block->stmts.begin());
-      AddTags(inner.get(), FromProto(options.inner_set()));
+    if (TileViaStrategy(block, tile, options)) {
+      block->add_tags(FromProto(options.outer_set()));
+      auto inner = block->SubBlock(0);
+      inner->add_tags(FromProto(options.inner_set()));
     }
   });
 }

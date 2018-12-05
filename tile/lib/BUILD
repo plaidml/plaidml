@@ -10,5 +10,6 @@ plaidml_cc_library(
     ]),
     deps = [
         "@com_intel_plaidml//tile/lang",
+        "@com_intel_plaidml//tile/util",
     ],
 )

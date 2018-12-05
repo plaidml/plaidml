@@ -43,6 +43,11 @@ lang::RunInfo LoadConv2d3Deep(const std::string& name,     //
                               const TensorShape& kernel3,  //
                               const TensorShape& output);
 
+lang::RunInfo LoadDilatedConv2d(const std::string& name,    //
+                                const TensorShape& input,   //
+                                const TensorShape& kernel,  //
+                                const TensorShape& output);
+
 }  // namespace lib
 }  // namespace tile
 }  // namespace vertexai

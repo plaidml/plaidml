@@ -4,6 +4,7 @@
 
 #include <boost/format.hpp>
 
+#include "base/util/throw.h"
 #include "tile/codegen/autotile.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/deps.h"
@@ -43,7 +44,7 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
   size_t counter = 0;
   DumpProgram(*block, options, "initial", counter++);
   for (const auto& pass : cfg.passes()) {
-    IVLOG(2, "Optimization Pass " << pass.name());
+    IVLOG(1, "Optimization Pass " << pass.name());
     switch (pass.pass_case()) {
       case proto::Pass::kCache:
         CachePass(block, pass.cache());
@@ -87,14 +88,20 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
       case proto::Pass::kPartition:
         PartitionPass(block, pass.partition());
         break;
-      case proto::Pass::kPruneIndexes:
-        PruneIndexesPass(block, pass.prune_indexes());
+      case proto::Pass::kPruneIdxs:
+        PruneIndexesPass(block, pass.prune_idxs());
         break;
       case proto::Pass::kUnroll:
         UnrollPass(block, pass.unroll());
         break;
-      default:
+      case proto::Pass::kDebank:
+        DebankPass(block, pass.debank());
         break;
+      case proto::Pass::kUnrollIdx:
+        UnrollIndexPass(block, pass.unroll_idx());
+        break;
+      default:
+        throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
     }
     DumpProgram(*block, options, pass.name(), counter++);
   }
