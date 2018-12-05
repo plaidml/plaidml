@@ -6,6 +6,8 @@
 #include "base/util/lookup.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
+#include "tile/codegen/math.h"
+#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -112,7 +114,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
     }
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
-    outer_idx.range = (outer_idx.range + shape[i] - 1) / shape[i];
+    outer_idx.range = IntDivCeil(outer_idx.range, shape[i]);
     // Make ranges of the inner blocks: [ti, tk, tk]
     inner_idx.range = shape[i];
   }
@@ -143,7 +145,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
       }
       high += (ref.shape.dims[i].size - 1);
       ref.shape.dims[i].size = high - low + 1;
-      ref.access[i].setConstant(0);
+      aff.setConstant(0);
     }
   }
   // Multiply each stride in the outer block refinements by the appropriate tile size
@@ -170,6 +172,80 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   */
 
   // Make the inner block the sole stmt of the outer block
+  outer->stmts = {inner};
+  return true;
+}
+
+bool ExtractTile(stripe::Block* outer, const TileShape& shape, const std::string& into_idx_name) {
+  // Verify tile shape is correct
+  if (outer->idxs.size() != shape.size()) {
+    throw_with_trace(std::runtime_error("Invalid tile specified"));
+  }
+
+  auto inner = std::make_shared<Block>();
+  inner->name = outer->name;
+  inner->comments = outer->comments;
+  std::swap(inner->idxs, outer->idxs);
+  std::swap(inner->constraints, outer->constraints);
+  inner->refs = outer->refs;
+  std::swap(inner->stmts, outer->stmts);
+  inner->location = outer->location;
+  std::swap(inner->tags, outer->tags);
+
+  std::vector<Index> factor_idxs;
+  for (size_t i = 0; i < inner->idxs.size(); i++) {
+    if (shape[i] > 1) {
+      auto& inner_idx = inner->idxs[i];
+      auto inner_range = IntDivCeil(inner_idx.range, shape[i]);
+      Index outer_idx{
+          inner_idx.name,  // name
+          shape[i],        // range
+      };
+      outer_idx.set_tag(into_idx_name);
+      Index factor_idx{
+          inner->unique_idx_name(inner_idx.name),              // name
+          1,                                                   // range
+          {outer_idx.name, static_cast<int64_t>(inner_range)}  // affine
+      };
+      auto combo = Affine(inner_idx.name) + Affine(factor_idx.name);
+      // Update any inner constraints that refer to this index
+      for (auto& constraint : inner->constraints) {
+        constraint.substitute(inner_idx.name, combo);
+      }
+      // Update any inner ref accesses that refer to this index
+      for (auto& ref : inner->refs) {
+        for (auto& aff : ref.access) {
+          aff.substitute(inner_idx.name, combo);
+        }
+      }
+      // Update any interior idxs that refer to this index
+      for (auto stmt : inner->stmts) {
+        auto interior = Block::Downcast(stmt);
+        if (interior) {
+          for (auto& idx : interior->idxs) {
+            idx.affine.substitute(inner_idx.name, combo);
+          }
+        }
+      }
+      if (inner_idx.range % shape[i]) {
+        inner->constraints.emplace_back(int64_t(inner_idx.range - 1) -  //
+                                        Affine(factor_idx.name) -       //
+                                        Affine(inner_idx.name));
+      }
+      inner_idx.range = inner_range;
+      outer->idxs.emplace_back(outer_idx);
+      factor_idxs.emplace_back(factor_idx);
+    }
+  }
+  // Append all factor_idxs, we defer this since this may cause inner->idxs to realloc
+  std::copy(factor_idxs.begin(), factor_idxs.end(), std::back_inserter(inner->idxs));
+
+  for (auto& ref : outer->refs) {
+    for (auto& aff : ref.access) {
+      aff = Affine{};
+    }
+  }
+
   outer->stmts = {inner};
   return true;
 }
@@ -283,7 +359,7 @@ void StencilPassRecurse(stripe::Block* block, const StencilPassOptions& options)
       StencilPassRecurse(inner.get(), options);
     }
   }
-  if (HasTags(*block, options.reqs)) {
+  if (block->has_tags(options.reqs)) {
     auto match = FindBestStencil(options.specs, *block);
     if (!match) {
       return;
@@ -293,9 +369,9 @@ void StencilPassRecurse(stripe::Block* block, const StencilPassOptions& options)
       tile.push_back(idx.value);
     }
     ApplyTile(block, tile, false);
-    AddTags(block, options.set_outer);
-    auto inner = Block::Downcast(*block->stmts.begin());
-    AddTags(inner.get(), options.set_inner);
+    block->add_tags(options.set_outer);
+    auto inner = block->SubBlock(0);
+    inner->add_tags(options.set_inner);
   }
 }
 

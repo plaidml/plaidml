@@ -2,9 +2,21 @@
 
 #include <boost/format.hpp>
 
+#include "tile/util/tile_file.h"
+
 namespace vertexai {
 namespace tile {
 namespace lib {
+
+namespace {
+
+std::shared_ptr<lang::BufferBase> MakeBuffer(const TensorShape& shape) {
+  auto buffer = std::make_shared<util::SimpleBuffer>();
+  buffer->bytes.resize(shape.byte_size());
+  return buffer;
+}
+
+}  // namespace
 
 lang::RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
   lang::RunInfo runinfo;
@@ -48,6 +60,8 @@ function (I[X, CI], K[KX, CI, CO]) -> (O) {
   runinfo.input_shapes.insert(std::make_pair("I", input));
   runinfo.input_shapes.insert(std::make_pair("K", kernel));
   runinfo.output_shapes.insert(std::make_pair("O", output));
+  runinfo.const_inputs = {"K"};
+  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
   return runinfo;
 }
 
@@ -57,8 +71,8 @@ lang::RunInfo LoadConv2d(const std::string& name,    //
                          const TensorShape& output) {
   auto center = kernel.dims[0].size / 2;
   auto code = R"***(
-function (I[X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
-  [[pid(res2a_branch2a)]] O[x, y, co : X, Y, CO] = +(I[x + kx - %1%, y + ky - %1%, ci] * K[kx, ky, ci, co]);
+function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
+  [[pid(res2a_branch2a)]] O[n, x0, x1, co : N, X, Y, CO] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K[kx, ky, ci, co]);
 })***";
   lang::RunInfo runinfo;
   runinfo.program_name = name;
@@ -66,6 +80,8 @@ function (I[X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
   runinfo.input_shapes.insert(std::make_pair("I", input));
   runinfo.input_shapes.insert(std::make_pair("K", kernel));
   runinfo.output_shapes.insert(std::make_pair("O", output));
+  runinfo.const_inputs = {"K"};
+  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
   return runinfo;
 }
 
@@ -75,8 +91,8 @@ lang::RunInfo LoadConv2dRelu(const std::string& name,    //
                              const TensorShape& output) {
   auto center = kernel.dims[0].size / 2;
   auto code = R"***(
-function (I[X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
-  [[pid(res2a_branch2a)]] O[x, y, co : X, Y, CO] = +(I[x + kx - %1%, y + ky - %1%, ci] * K[i, ky, ci, co]);
+function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
+  [[pid(res2a_branch2a)]] O[n, x0, x1, co : N, X, Y, CO] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K[i, ky, ci, co]);
   [[pid(relu)]] R = zelu(O);
 })***";
   lang::RunInfo runinfo;
@@ -85,6 +101,8 @@ function (I[X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
   runinfo.input_shapes.insert(std::make_pair("I", input));
   runinfo.input_shapes.insert(std::make_pair("K", kernel));
   runinfo.output_shapes.insert(std::make_pair("R", output));
+  runinfo.const_inputs = {"K"};
+  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
   return runinfo;
 }
 
@@ -95,8 +113,8 @@ lang::RunInfo LoadConv2dBnRelu(const std::string& name,      //
                                const TensorShape& output) {
   auto center = kernel.dims[0].size / 2;
   auto code = R"***(
-function (I[X, Y, CI], K[KX, KY, CI, CO], B[CO], S[CO]) -> (R) {
-  [[pid(res2a_branch2a)]] O[x, y, co : X, Y, CO] = +(I[x + kx - %1%, y + ky - %1%, ci] * K[kx, ky, ci, co]);
+function (I[N, X, Y, CI], K[KX, KY, CI, CO], B[CO], S[CO]) -> (R) {
+  [[pid(res2a_branch2a)]] O[n, x0, x1, co : N, X, Y, CO] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K[kx, ky, ci, co]);
   [[pid(bias_add)]] BO = O + B;
   [[pid(scale)]] BS = BO * S;
   [[pid(relu)]] R = zelu(BS);
@@ -109,6 +127,12 @@ function (I[X, Y, CI], K[KX, KY, CI, CO], B[CO], S[CO]) -> (R) {
   runinfo.input_shapes.insert(std::make_pair("B", channels));
   runinfo.input_shapes.insert(std::make_pair("S", channels));
   runinfo.output_shapes.insert(std::make_pair("R", output));
+  runinfo.const_inputs = {"K", "B", "S"};
+  runinfo.input_buffers = {
+      {"K", MakeBuffer(kernel)},
+      {"B", MakeBuffer(channels)},
+      {"S", MakeBuffer(channels)},
+  };
   return runinfo;
 }
 
@@ -122,10 +146,10 @@ lang::RunInfo LoadConv2d3Deep(const std::string& name,     //
   auto center2 = kernel2.dims[0].size / 2;
   auto center3 = kernel3.dims[0].size / 2;
   auto code = R"***(
-function (I[X, Y, CI], K1[KX, KY, C1, C2], K2[KX, KY, C2, C3], K3[KX, KY, C3, C4]) -> (O3) {
-  O1[x, y, co : X, Y, C2] = +(I[x + kx - %1%, y + ky - %1%, ci] * K1[kx, ky, ci, co]);
-  O2[x, y, co : X, Y, C3] = +(O1[x + kx - %2%, y + ky - %2%, ci] * K2[kx, ky, ci, co]);
-  O3[x, y, co : X, Y, C4] = +(O2[x + kx - %3%, y + ky - %3%, ci] * K3[kx, ky, ci, co]);
+function (I[N, X, Y, CI], K1[KX, KY, C1, C2], K2[KX, KY, C2, C3], K3[KX, KY, C3, C4]) -> (O3) {
+  O1[n, x0, x1, co : N, X, Y, C2] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K1[kx, ky, ci, co]);
+  O2[n, x0, x1, co : N, X, Y, C3] = +(O1[n, x0 + kx - %2%, x1 + ky - %2%, ci] * K2[kx, ky, ci, co]);
+  O3[n, x0, x1, co : N, X, Y, C4] = +(O2[n, x0 + kx - %3%, x1 + ky - %3%, ci] * K3[kx, ky, ci, co]);
 })***";
   lang::RunInfo runinfo;
   runinfo.program_name = name;
@@ -135,6 +159,33 @@ function (I[X, Y, CI], K1[KX, KY, C1, C2], K2[KX, KY, C2, C3], K3[KX, KY, C3, C4
   runinfo.input_shapes.insert(std::make_pair("K2", kernel2));
   runinfo.input_shapes.insert(std::make_pair("K3", kernel3));
   runinfo.output_shapes.insert(std::make_pair("O3", output));
+  runinfo.const_inputs = {"K1", "K2", "K3"};
+  runinfo.input_buffers = {
+      {"K1", MakeBuffer(kernel1)},
+      {"K2", MakeBuffer(kernel2)},
+      {"K3", MakeBuffer(kernel3)},
+  };
+  return runinfo;
+}
+
+lang::RunInfo LoadDilatedConv2d(const std::string& name,    //
+                                const TensorShape& input,   //
+                                const TensorShape& kernel,  //
+                                const TensorShape& output) {
+  auto code = R"***(
+function (I[N, Lx, Ly, CI], K[LKx, LKy, CI, CO]) -> (O) {
+    O[n, x, y, co: N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO] = +(I[n, x + 2 * kx, y + 3 * ky, ci] * K[kx, ky, ci, co]);
+})***";
+  lang::RunInfo runinfo;
+  runinfo.program_name = name;
+  runinfo.code = code;
+  runinfo.input_shapes.insert(std::make_pair("I", input));
+  runinfo.input_shapes.insert(std::make_pair("K", kernel));
+  runinfo.output_shapes.insert(std::make_pair("O", output));
+  runinfo.const_inputs = {"K"};
+  runinfo.input_buffers = {
+      {"K", MakeBuffer(kernel)},
+  };
   return runinfo;
 }
 

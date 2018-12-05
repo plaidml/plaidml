@@ -2,14 +2,14 @@
 
 #pragma once
 
-#include "tile/codegen/codegen.pb.h"
-#include "tile/stripe/stripe.h"
-
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void AutotilePass(stripe::Block* block, const proto::AutotilePass& options);
+template <typename X, typename Y>
+inline auto IntDivCeil(X x, Y y) -> decltype((x + y - 1) / y) {
+  return (x + y - 1) / y;
+}
 
 }  // namespace codegen
 }  // namespace tile

@@ -3,6 +3,7 @@
 #include "tile/codegen/unroll.h"
 
 #include "base/util/logging.h"
+#include "base/util/throw.h"
 #include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
@@ -12,81 +13,210 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-static void DeepUnroll(StatementList* list, StatementIt it, const Block& base, std::map<std::string, int64_t>* fixed,
-                       size_t idx_num, int64_t mul) {
-  if (idx_num == base.idxs.size()) {
-    auto clone = CloneBlock(base);
-    for (auto& ref : clone->refs) {
-      for (auto& aff : ref.access) {
-        aff = aff.eval(*fixed);
-      }
-    }
-    int64_t loc = 0;
-    for (const auto& idx : base.idxs) {
-      loc *= idx.range;
-      loc += fixed->at(idx.name);
-    }
-    loc *= mul;
-    // Copy across inner statements
-    for (const auto& stmt : clone->stmts) {
-      auto inner = Block::Downcast(stmt);
-      if (!inner) {
-        throw std::runtime_error("Unhandled statment type in DeepUnroll");
-      }
-      inner->location.unit += loc;
-      for (auto& idx : inner->idxs) {
-        idx.affine = idx.affine.eval(*fixed);
-      }
-      for (auto& ref : inner->refs) {
-        if (ref.dir == RefDir::None) {
-          continue;
-        }
-        const auto& oref = clone->ref_by_into(ref.from);
-        ref.from = oref->from;
-        for (size_t i = 0; i < ref.access.size(); i++) {
-          ref.access[i] += oref->access[i];
-        }
-      }
-      list->insert(it, inner);
-    }
+namespace {
+
+struct IndexValue {
+  const Index* idx;
+  size_t value;
+};
+
+using EnumerateFunc = std::function<void(const std::vector<IndexValue>& idxs)>;
+
+void EnumerateIndexes(const std::vector<IndexValue>& idxs, size_t idx_num, const EnumerateFunc& func) {
+  if (idx_num == idxs.size()) {
+    func(idxs);
   } else {
-    for (int64_t i = 0; i < static_cast<int64_t>(base.idxs[idx_num].range); i++) {
-      (*fixed)[base.idxs[idx_num].name] = i;
-      DeepUnroll(list, it, base, fixed, idx_num + 1, mul);
+    for (size_t i = 0; i < idxs[idx_num].idx->range; i++) {
+      auto next = idxs;
+      next[idx_num].value = i;
+      EnumerateIndexes(next, idx_num + 1, func);
     }
   }
 }
 
-static void UnrollTags(StatementList* list, StatementIt it, stripe::Block* block, const Tags& reqs, int64_t mul) {
-  if (HasTags(*block, reqs)) {
-    std::map<std::string, int64_t> fixed;
-    DeepUnroll(list, it, *block, &fixed, 0, mul);
-    list->erase(it);
-  } else {
-    auto iit = block->stmts.begin();
-    while (iit != block->stmts.end()) {
-      auto next = iit;
-      ++next;
-      auto inner = stripe::Block::Downcast(*iit);
-      if (inner) {
-        UnrollTags(&block->stmts, iit, inner.get(), reqs, mul);
+void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
+  IVLOG(3, "EvalWithValues> block: " << block->name << ", fixed: " << fixed);
+  block->location.unit = block->location.unit.partial_eval(fixed);
+  for (auto& ref : block->refs) {
+    ref.location.unit = ref.location.unit.partial_eval(fixed);
+    for (auto& aff : ref.access) {
+      aff = aff.partial_eval(fixed);
+    }
+  }
+  for (auto& constraint : block->constraints) {
+    constraint = constraint.partial_eval(fixed);
+  }
+  for (const auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      for (auto& idx : inner->idxs) {
+        idx.affine = idx.affine.partial_eval(fixed);
       }
-      iit = next;
+      std::map<std::string, int64_t> next;
+      for (const auto& item : fixed) {
+        if (item.first[0] == '#') {
+          next.emplace(item.first, item.second);
+        }
+      }
+      std::vector<std::string> prune_idxs;
+      for (const auto& idx : inner->idxs) {
+        if (idx.range == 1 && idx.affine.isConstant()) {
+          prune_idxs.push_back(idx.name);
+          next.emplace(idx.name, idx.affine.constant());
+        }
+      }
+      EvalWithValues(inner.get(), next);
+      for (const auto& idx_name : prune_idxs) {
+        auto it = std::find_if(inner->idxs.begin(), inner->idxs.end(),
+                               [&idx_name](const Index& idx) { return idx.name == idx_name; });
+        inner->idxs.erase(it);
+      }
     }
   }
 }
+
+void EvalInner(Block* block, const std::vector<IndexValue>& idxs, const std::string& expand_idx) {
+  std::map<std::string, int64_t> fixed;
+  size_t last_stride = 1;
+  size_t complete_value = 0;
+  for (const auto& item : idxs) {
+    fixed.emplace(item.idx->name, item.value);
+    complete_value += last_stride * item.value;
+    last_stride *= item.idx->range;
+  }
+  fixed.emplace(expand_idx, complete_value);
+  EvalWithValues(block, fixed);
+}
+
+void PreIterate(Block* block, std::function<void(const StatementIt& it)> func) {
+  auto it = block->stmts.begin();
+  while (it != block->stmts.end()) {
+    auto next = it;
+    ++next;
+    func(it);
+    it = next;
+  }
+}
+
+void UnrollBlock(Block* outer, Block* block,  //
+                 const StatementIt& it_stmt,  //
+                 const Tags& reqs,            //
+                 const std::string& expand_idx) {
+  if (block->has_tags(reqs)) {
+    std::vector<IndexValue> idxs;
+    for (const auto& idx : block->idxs) {
+      idxs.emplace_back(IndexValue{&idx, 0});
+    }
+    EnumerateIndexes(idxs, 0, [&](const std::vector<IndexValue>& idxs) {
+      auto clone = CloneBlock(*block);
+      EvalInner(clone.get(), idxs, expand_idx);
+      for (const auto& stmt : clone->stmts) {
+        outer->stmts.insert(it_stmt, stmt);
+      }
+    });
+    outer->stmts.erase(it_stmt);
+  } else {
+    PreIterate(block, [&](const StatementIt& it) {
+      auto inner = Block::Downcast(*it);
+      if (inner) {
+        UnrollBlock(block, inner.get(), it, reqs, expand_idx);
+      }
+    });
+  }
+}
+
+std::vector<Index>::const_iterator GetIndexWithTag(const Block& block, const std::string& tag) {
+  auto it_end = block.idxs.end();
+  for (auto it = block.idxs.begin(); it != it_end; it++) {
+    if (it->tags.count(tag)) {
+      return it;
+    }
+  }
+  return it_end;
+}
+
+void EvalIndex(Block* block, const std::string& tag, int64_t value) {
+  auto tagged_name = str(boost::format("#%1%") % tag);
+  std::map<std::string, int64_t> fixed = {
+      {tagged_name, value},
+  };
+
+  auto it_idx = GetIndexWithTag(*block, tag);
+  if (it_idx != block->idxs.end()) {
+    fixed.emplace(it_idx->name, value);
+  }
+
+  block->location.unit = block->location.unit.partial_eval(fixed);
+  for (auto& ref : block->refs) {
+    ref.location.unit = ref.location.unit.partial_eval(fixed);
+    for (auto& aff : ref.access) {
+      aff = aff.partial_eval(fixed);
+    }
+  }
+  for (auto& constraint : block->constraints) {
+    constraint = constraint.partial_eval(fixed);
+  }
+  for (const auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      EvalIndex(inner.get(), tag, value);
+      for (auto& idx : inner->idxs) {
+        idx.affine = idx.affine.partial_eval(fixed);
+      }
+    }
+  }
+
+  if (it_idx != block->idxs.end()) {
+    block->idxs.erase(it_idx);
+  }
+}
+
+bool UnrollIndexInner(Block* outer, Block* inner, StatementIt it_stmt, const std::string& tag) {
+  auto it_idx = GetIndexWithTag(*inner, tag);
+  if (it_idx != inner->idxs.end()) {
+    for (size_t i = 0; i < it_idx->range; i++) {
+      auto clone = CloneBlock(*inner);
+      EvalIndex(clone.get(), tag, i);
+      for (auto& ref : clone->refs) {
+        if (ref.bank_dim && tag == "bank") {  // HACK: can we make this configurable somehow?
+          ref.from = str(boost::format("%1%%%%2%") % ref.from % i);
+        }
+      }
+      outer->stmts.insert(it_stmt, clone);
+    }
+    outer->stmts.erase(it_stmt);
+    return true;
+  }
+  return false;
+}
+
+void UnrollIndex(Block* block, const std::string& tag) {
+  PreIterate(block, [&](const StatementIt& it) {
+    auto inner = Block::Downcast(*it);
+    if (inner) {
+      if (!UnrollIndexInner(block, inner.get(), it, tag)) {
+        UnrollIndex(inner.get(), tag);
+      }
+    }
+  });
+}
+
+}  // namespace
 
 void UnrollPass(Block* root, const proto::UnrollPass& options) {
   auto reqs = FromProto(options.reqs());
-  auto it = root->stmts.begin();
-  while (it != root->stmts.end()) {
-    auto next = it;
-    ++next;
-    auto inner = stripe::Block::Downcast(*it);
+  PreIterate(root, [&](const StatementIt& it) {
+    auto inner = Block::Downcast(*it);
     if (inner) {
-      UnrollTags(&root->stmts, it, inner.get(), reqs, options.loc_mul());
+      UnrollBlock(root, inner.get(), it, reqs, options.expand_idx());
     }
-    it = next;
+  });
+}
+
+void UnrollIndexPass(Block* root, const proto::GenericPass& options) {
+  auto tags = FromProto(options.reqs());
+  for (const auto& tag : tags) {
+    UnrollIndex(root, tag);
   }
 }
 

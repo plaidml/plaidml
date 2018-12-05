@@ -53,22 +53,13 @@ struct CacheEntry;
 // RefInfo contains information around the usage of one particular
 // backing ref during the scan.
 struct RefInfo {
-  explicit RefInfo(stripe::Refinement* ref_, uint64_t num_banks) : ref(*ref_) {
+  explicit RefInfo(stripe::Refinement* ref_) : ref(*ref_) {
     TensorShape raw_ts = ref.shape;
-    std::vector<std::size_t> sizes;
-    for (const auto& dim : raw_ts.dims) {
-      sizes.push_back(dim.size);
-    }
+    auto sizes = raw_ts.sizes();
     // cache_shape = SimpleShape(ref.shape.type, sizes);
     // TODO: consider a better way to retain index order
     cache_shape = raw_ts;
     size = cache_shape.byte_size();
-    if (ref.bank_dim) {
-      uint64_t orig_size = ref.shape.dims[*ref.bank_dim].size;
-      uint64_t new_size = (orig_size + num_banks - 1) / num_banks;
-      size /= orig_size;
-      size *= new_size;
-    }
 
     for (size_t i = 0; i < sizes.size(); i++) {
       std::string iname = std::string("i") + std::to_string(i);
@@ -357,6 +348,7 @@ void RefRewriter::Visit(stripe::Block* block) {
     }
     ref.from = it->second.entry->name;
     ref.location = *loc_;
+    ref.location.unit = it->second.entry->source->ref.location.unit;
     for (size_t i = 0; i < ref.shape.dims.size(); i++) {
       ref.shape.dims[i].stride = it->second.entry->source->cache_shape.dims[i].stride;
     }
@@ -371,7 +363,7 @@ class Scheduler {
 
  private:
   // Builds a map for looking up RefInfos for a given block access.
-  static std::unordered_map<std::string, RefInfo> BuildRefInfoMap(stripe::Block* block, uint64_t num_banks);
+  static std::unordered_map<std::string, RefInfo> BuildRefInfoMap(stripe::Block* block);
 
   Scheduler(const AliasMap* alias_map, stripe::Block* block, const proto::SchedulePass& options);
 
@@ -457,7 +449,6 @@ class Scheduler {
   std::size_t alignment_;
   stripe::Location xfer_loc_;
   bool allow_out_of_range_accesses_;
-  uint64_t num_banks_;
   std::unordered_map<std::string, RefInfo> ri_map_;
   std::unordered_map<stripe::Refinement*, std::vector<RefInfo*>> base_ref_aliases_;
 
@@ -489,10 +480,10 @@ void Scheduler::Schedule(const AliasMap& alias_map, stripe::Block* block, const 
   Scheduler{&alias_map, block, options}.Run();
 }
 
-std::unordered_map<std::string, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, uint64_t num_banks) {
+std::unordered_map<std::string, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block) {
   std::unordered_map<std::string, RefInfo> ri_map;
   for (auto& ref : block->refs) {
-    ri_map.emplace(ref.into, RefInfo{&ref, num_banks});
+    ri_map.emplace(ref.into, RefInfo{&ref});
   }
   return ri_map;
 }
@@ -505,8 +496,7 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
       alignment_{options.alignment() ? options.alignment() : kDefaultAlignment},
       xfer_loc_(stripe::FromProto(options.xfer_loc())),
       allow_out_of_range_accesses_{options.allow_out_of_range_accesses()},
-      num_banks_{options.num_banks()},
-      ri_map_{BuildRefInfoMap(block, num_banks_)} {
+      ri_map_{BuildRefInfoMap(block)} {
   for (auto& name_ref : ri_map_) {
     RefInfo* ri = &name_ref.second;
     ri->alias_info = &alias_map_->at(ri->ref.into);
@@ -765,11 +755,8 @@ void Scheduler::Run() {
     }
   }
 
-  // Clear the existing refs.
-  block_->refs.clear();
-
   // Add a Refinement for each CacheEntry.
-  block_->refs.reserve(ri_map_.size() + cache_entries_.size());
+  block_->refs.reserve(block_->refs.size() + ri_map_.size() + cache_entries_.size());
   for (auto& ent : cache_entries_) {
     auto ref = block_->refs.emplace(block_->refs.end(), ent.source->ref);
     ref->dir = stripe::RefDir::None;
@@ -777,6 +764,7 @@ void Scheduler::Run() {
     ref->into = ent.name;
     ref->shape = ent.source->cache_shape;
     ref->location = mem_loc_;
+    ref->location.unit = ent.source->ref.location.unit;
     ref->is_const = false;
     ref->offset = ent.range.begin;
   }
@@ -994,8 +982,12 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
       "",                           // agg_op
       ent->source->ref.location,    // location
       true,                         // is_const
+      0,                            // offset
+      ent->source->ref.bank_dim,    // bank_dim
   });
 
+  auto banked_mem_loc = mem_loc_;
+  banked_mem_loc.unit = ent->source->ref.location.unit;
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::Out,            // dir
       ent->name,                      // from
@@ -1003,8 +995,10 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
       ent->source->swap_access,       // access
       ent->source->cache_swap_shape,  // shape
       "",                             // agg_op
-      mem_loc_,                       // location
-      false                           // is_const
+      banked_mem_loc,                 // location
+      false,                          // is_const
+      0,                              // offset
+      ent->source->ref.bank_dim,      // bank_dim
   });
 
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
@@ -1036,6 +1030,8 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
       "",                             // agg_op
       mem_loc_,                       // location
       true,                           // is_const
+      0,                              // offset
+      ent->source->ref.bank_dim,      // bank_dim
   });
 
   swap_block.refs.push_back(stripe::Refinement{
@@ -1046,7 +1042,9 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
       ent->source->ref_swap_shape,  // shape
       "",                           // agg_op
       ent->source->ref.location,    // location
-      false                         // is_const
+      false,                        // is_const
+      0,                            // offset
+      ent->source->ref.bank_dim,    // bank_dim
   });
 
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));

@@ -19,13 +19,18 @@ enum class AliasType {
   Exact,    // Buffers are indentical for every index state
 };
 
+struct Extent {
+  int64_t min;
+  int64_t max;
+};
+
 struct AliasInfo {
- public:
   static AliasType Compare(const AliasInfo& a, const AliasInfo& b);
   stripe::Block* base_block;
   stripe::Refinement* base_ref;
   std::string base_name;
   std::vector<stripe::Affine> access;
+  std::vector<Extent> extents;
   TensorShape shape;
 };
 
@@ -42,6 +47,10 @@ class AliasMap {
   size_t depth_;                           // How deep is this AliasInfo
   std::map<std::string, AliasInfo> info_;  // Per buffer data
 };
+
+bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);
+
+std::ostream& operator<<(std::ostream& os, const Extent& extent);
 
 }  // namespace codegen
 }  // namespace tile

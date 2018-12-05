@@ -3,7 +3,6 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"

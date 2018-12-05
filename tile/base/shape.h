@@ -180,6 +180,14 @@ struct TensorShape {
     return max_elem + 1;
   }
 
+  std::vector<size_t> sizes() const {
+    std::vector<size_t> ret;
+    for (const auto& dim : dims) {
+      ret.push_back(dim.size);
+    }
+    return ret;
+  }
+
   inline bool operator==(const TensorShape& rhs) const {
     return std::tie(type, dims) ==  //
            std::tie(rhs.type, rhs.dims);
@@ -189,19 +197,12 @@ struct TensorShape {
     return std::tie(type, dims) <  //
            std::tie(rhs.type, rhs.dims);
   }
+
+  void resize_dim(size_t pos, uint64_t size);
 };
 
-inline std::ostream& operator<<(std::ostream& os, const TensorShape& shape) {
-  os << to_string(shape.type) << "(";
-  for (size_t i = 0; i < shape.dims.size(); i++) {
-    if (i > 0) {
-      os << ", ";
-    }
-    os << shape.dims[i].size << ":" << shape.dims[i].stride;
-  }
-  os << ")";
-  return os;
-}
+std::ostream& operator<<(std::ostream& os, const TensorShape& shape);
+std::ostream& operator<<(std::ostream& os, const TensorDimension& dim);
 
 inline TensorShape SimpleShape(DataType type, const std::vector<size_t>& sizes) {
   int64_t stride = 1;

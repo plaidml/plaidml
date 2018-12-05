@@ -8,7 +8,6 @@
 #include <boost/optional.hpp>
 
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -32,7 +31,8 @@ bool operator<(const StencilMatch& lhs, const StencilMatch& rhs);
 
 boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const stripe::Block& block);
 
-bool ApplyTile(stripe::Block* inner, const TileShape& shape, bool elide_trivial = true);
+bool ApplyTile(stripe::Block* outer, const TileShape& shape, bool elide_trivial = true);
+bool ExtractTile(stripe::Block* inner, const TileShape& shape, const std::string& into_idx);
 
 void StencilPass(stripe::Block* block, const proto::StencilPass& options);
 
