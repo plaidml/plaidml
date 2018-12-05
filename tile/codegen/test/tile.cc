@@ -27,9 +27,7 @@ T ParseProtoJson(const std::string& str) {
   return proto;
 }
 
-}  // namespace
-
-TEST(Codegen, ApplyTile) {
+std::map<std::string, std::vector<float>> MakeMatMulTestData() {
   std::map<std::string, std::vector<float>> data = {
       {"A",
        {
@@ -56,21 +54,35 @@ TEST(Codegen, ApplyTile) {
            0, 0, 0, 0, 0,  //
        }},
   };
+  return data;
+}
 
-  std::vector<float> expected = {
-      15, 30, 45,  15, 30,  //
-      30, 60, 90,  30, 60,  //
-      39, 78, 117, 39, 78,  //
-      9,  18, 27,  9,  18,  //
-      9,  18, 27,  9,  18,  //
-  };
+std::vector<float> kMatMulExpected = {
+    15, 30, 45,  15, 30,  //
+    30, 60, 90,  30, 60,  //
+    39, 78, 117, 39, 78,  //
+    9,  18, 27,  9,  18,  //
+    9,  18, 27,  9,  18,  //
+};
 
-  size_t dim = sqrt(expected.size());
+std::vector<float> kConv1dExpected = {
+    45, 90,  135, 45, 90,   //
+    84, 168, 252, 84, 168,  //
+    78, 156, 234, 78, 156,  //
+    57, 114, 171, 57, 114,  //
+    18, 36,  54,  18, 36,   //
+};
+
+}  // namespace
+
+TEST(Codegen, ApplyTile) {
+  size_t dim = sqrt(kMatMulExpected.size());
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}),  //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}));
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
+  auto data = MakeMatMulTestData();
 
   IVLOG(2, "Before>\n" << *program);
 
@@ -79,11 +91,7 @@ TEST(Codegen, ApplyTile) {
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
   IVLOG(2, "C: " << data["C"]);
-  EXPECT_THAT(data["C"], ContainerEq(expected));
-
-  for (size_t i = 0; i < data["C"].size(); i++) {
-    data["C"][i] = 0;
-  }
+  EXPECT_THAT(data["C"], ContainerEq(kMatMulExpected));
 
   auto kernel = main->SubBlock(0);
   ApplyTile(kernel.get(), {5, 2, 2});
@@ -97,12 +105,13 @@ TEST(Codegen, ApplyTile) {
 
   IVLOG(2, "After>\n" << *program);
 
+  std::fill(data["C"].begin(), data["C"].end(), 0);
   ExecuteProgram(*program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
   IVLOG(2, "C: " << data["C"]);
-  EXPECT_THAT(data["C"], ContainerEq(expected));
+  EXPECT_THAT(data["C"], ContainerEq(kMatMulExpected));
 }
 
 TEST(Codegen, StencilMatchMatMul) {
@@ -214,10 +223,10 @@ TEST(Codegen, StencilMatchConv2D) {
     specs.push_back(stencil);
   }
 
-  auto runinfo = lib::LoadConv2d("conv",                                           //
-                                 SimpleShape(DataType::FLOAT32, {100, 100, 56}),   //
-                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),   //
-                                 SimpleShape(DataType::FLOAT32, {100, 100, 56}));  //
+  auto runinfo = lib::LoadConv2d("conv",                                              //
+                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),   //
+                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),      //
+                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}));  //
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -233,49 +242,14 @@ TEST(Codegen, StencilMatchConv2D) {
           {"co", "k", 16},
           {"kx", "*", 1},
           {"ky", "*", 1},
-          {"x", "x", 4},
-          {"y", "y", 4},
+          {"x0", "x", 4},
+          {"x1", "y", 4},
       }  // idxs
   };
   EXPECT_THAT(*match, Eq(expected));
 }
 
 TEST(Codegen, StencilPass) {
-  std::map<std::string, std::vector<float>> data = {
-      {"A",
-       {
-           1, 2, 3, 4, 5,  //
-           4, 5, 6, 7, 8,  //
-           7, 8, 9, 7, 8,  //
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-       }},
-      {"B",
-       {
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-           1, 2, 3, 1, 2,  //
-       }},
-      {"C",
-       {
-           0, 0, 0, 0, 0,  //
-           0, 0, 0, 0, 0,  //
-           0, 0, 0, 0, 0,  //
-           0, 0, 0, 0, 0,  //
-           0, 0, 0, 0, 0,  //
-       }},
-  };
-
-  std::vector<float> expected = {
-      15, 30, 45,  15, 30,  //
-      30, 60, 90,  30, 60,  //
-      39, 78, 117, 39, 78,  //
-      9,  18, 27,  9,  18,  //
-      9,  18, 27,  9,  18,  //
-  };
-
   auto options = ParseProtoJson<proto::StencilPass>(R"(
     {
       "reqs": ["agg_op_add", "comb_op_mul"],
@@ -296,12 +270,13 @@ TEST(Codegen, StencilPass) {
   StencilPass(program.get(), options);
   IVLOG(2, "\n" << *program);
 
+  auto data = MakeMatMulTestData();
   ExecuteProgram(*program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
   IVLOG(2, "C: " << data["C"]);
-  EXPECT_THAT(data["C"], ContainerEq(expected));
+  EXPECT_THAT(data["C"], ContainerEq(kMatMulExpected));
 }
 
 TEST(Codegen, TilePassBroadcast) {

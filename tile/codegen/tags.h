@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include <set>
 #include <string>
 
 #include "tile/codegen/alias.h"
@@ -13,26 +12,9 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-using Tags = std::set<std::string>;
-
-inline bool HasTags(const stripe::Statement& stmt, const Tags& tags) {
-  for (const auto& tag : tags) {
-    if (stmt.tags.count(tag) == 0) {
-      return false;
-    }
-  }
-  return true;
-}
-
-inline void AddTags(stripe::Statement* stmt, const Tags& tags) {
-  for (const auto& tag : tags) {
-    stmt->tags.emplace(tag);
-  }
-}
-
 template <typename F>
-void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const Tags& reqs, const F& func) {
-  if (HasTags(*block, reqs)) {
+void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const stripe::Tags& reqs, const F& func) {
+  if (block->has_tags(reqs)) {
     func(map, block);
   } else {
     for (auto& stmt : block->stmts) {
@@ -46,14 +28,14 @@ void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const Tags& r
 }
 
 template <typename F>
-void RunOnBlocks(stripe::Block* root, const Tags& reqs, const F& func) {
+void RunOnBlocks(stripe::Block* root, const stripe::Tags& reqs, const F& func) {
   AliasMap base;
   AliasMap root_map(base, root);
   RunOnBlocksRecurse(root_map, root, reqs, func);
 }
 
-inline Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags) {
-  Tags tags;
+inline stripe::Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags) {
+  stripe::Tags tags;
   for (const auto& tag : pb_tags) {
     tags.emplace(tag);
   }

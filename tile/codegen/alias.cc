@@ -2,6 +2,9 @@
 
 #include "tile/codegen/alias.h"
 
+#include <boost/format.hpp>
+
+#include "base/util/stream_container.h"
 #include "base/util/throw.h"
 
 namespace vertexai {
@@ -9,6 +12,11 @@ namespace tile {
 namespace codegen {
 
 using namespace stripe;  // NOLINT
+
+std::ostream& operator<<(std::ostream& os, const Extent& extent) {
+  os << "(" << extent.min << ", " << extent.max << ")";
+  return os;
+}
 
 static Affine UniqifyAffine(const Affine& orig, const std::string& prefix) {
   Affine r;
@@ -22,12 +30,32 @@ static Affine UniqifyAffine(const Affine& orig, const std::string& prefix) {
   return r;
 }
 
+bool CheckOverlap(const std::vector<Extent>& ae, const std::vector<Extent>& be) {
+  IVLOG(3, boost::format("CheckOverlap: a: '%1%', b: '%2%'") % StreamContainer(ae) % StreamContainer(be));
+  if (ae.size() != be.size()) {
+    throw std::runtime_error("Incompatible extents");
+  }
+  bool ret = true;
+  for (size_t i = 0; i < ae.size(); i++) {
+    ret &= be[i].min <= ae[i].max;
+    ret &= ae[i].min <= be[i].max;
+  }
+  return ret;
+}
+
 AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
+  IVLOG(3, "Compare: " << ai.base_name << ", " << bi.base_name);
   if (ai.base_name != bi.base_name) {
     return AliasType::None;
   }
-  if (ai.access == bi.access && ai.shape == bi.shape) {
-    return AliasType::Exact;
+  if (ai.shape == bi.shape) {
+    if (ai.access == bi.access) {
+      return AliasType::Exact;
+    }
+    if (!CheckOverlap(ai.extents, bi.extents)) {
+      IVLOG(3, "CheckOverlap: None");
+      return AliasType::None;
+    }
   }
   // TODO: We could compute the convex box enclosing each refinement and then check each
   // dimension to see if there is a splitting plane, and if so, safely declare alias None,
@@ -40,7 +68,7 @@ AliasMap::AliasMap() : depth_(0) {}
 
 AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.depth_ + 1) {
   // Make a prefix
-  std::string prefix = std::string("d") + std::to_string(depth_) + ":";
+  std::string prefix = str(boost::format("d%1%:") % depth_);
   // Make all inner alias data
   for (auto& ref : block->refs) {
     // Setup the place we are going to write to
@@ -50,7 +78,9 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
       // Get the state from the outer context, fail if not found
       auto it = outer.info_.find(ref.from);
       if (it == outer.info_.end()) {
-        throw_with_trace(std::runtime_error("AliasMap::AliasMap: invalid ref.from during aliasing computation"));
+        throw_with_trace(std::runtime_error(
+            str(boost::format("AliasMap::AliasMap: invalid ref.from during aliasing computation: '%1%' (ref: '%2%')") %
+                ref.from % ref)));
       }
       // Copy data across
       info.base_block = it->second.base_block;
@@ -65,13 +95,28 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
       info.access.resize(ref.access.size());
     }
     if (info.access.size() != ref.access.size()) {
-      throw_with_trace(
-          std::runtime_error("AliasMap::AliasMap: Mismatched sizes on refinement: " + info.base_name + " " + ref.into));
+      throw_with_trace(std::runtime_error(str(
+          boost::format("AliasMap::AliasMap: Mismatched sizes on refinement: %1% %2%") % info.base_name % ref.into)));
     }
     // Add in indexes from this block
+    std::map<std::string, int64_t> min_idxs;
+    std::map<std::string, int64_t> max_idxs;
+    for (const auto& idx : block->idxs) {
+      if (idx.affine.constant()) {
+        min_idxs[idx.name] = idx.affine.constant();
+        max_idxs[idx.name] = idx.affine.constant();
+      } else {
+        min_idxs[idx.name] = 0;
+        max_idxs[idx.name] = idx.range - 1;
+      }
+    }
+    info.extents.resize(ref.access.size());
     for (size_t i = 0; i < ref.access.size(); i++) {
       info.access[i] += UniqifyAffine(ref.access[i], prefix);
+      info.extents[i] = Extent{ref.access[i].eval(min_idxs), ref.access[i].eval(max_idxs)};
     }
+    IVLOG(5, boost::format("Extents for '%1%' in '%2%': %3%") % ref.into % block->name % StreamContainer(info.extents));
+
     // Set shape
     info.shape = ref.shape;
   }

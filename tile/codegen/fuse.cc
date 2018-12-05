@@ -447,12 +447,13 @@ class TagFusionStrategy : public FusionStrategy {
  public:
   explicit TagFusionStrategy(const FusionPassOptions& options) : options_(options) {}
   bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
-    return HasTags(parent, options_.parent_reqs) && HasTags(a, options_.a_block_reqs) &&
-           HasTags(b, options_.b_block_reqs);
+    return parent.has_tags(options_.parent_reqs) &&  //
+           a.has_tags(options_.a_block_reqs) &&      //
+           b.has_tags(options_.b_block_reqs);
   }
   void OnFailed() {}
   void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
-    AddTags(block, options_.fused_set);
+    block->add_tags(options_.fused_set);
   }
 
  private:

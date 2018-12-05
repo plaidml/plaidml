@@ -2,12 +2,7 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
-#include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -15,6 +10,7 @@ namespace tile {
 namespace codegen {
 
 void UnrollPass(stripe::Block* root, const proto::UnrollPass& options);
+void UnrollIndexPass(stripe::Block* root, const proto::GenericPass& options);
 
 }  // namespace codegen
 }  // namespace tile

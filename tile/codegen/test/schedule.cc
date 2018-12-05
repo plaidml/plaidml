@@ -84,12 +84,15 @@ TEST_F(ScheduleTest, EmptyMain) {
     stmts [{
       tags: ["main"] block {
         name: "main" location {unit {}}
+        refs [{dir: In from: "i1" into: "i1" location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
+              {dir: In from: "i2" into: "i2" location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
+              {dir: Out from: "o1" into: "o1" location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}}]
       }
     }]
   )"));
 }
 
-TEST_F(ScheduleTest, CachesIO) {
+TEST_F(ScheduleTest, DISABLED_CachesIO) {
   main_->stmts.emplace_back(stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
     name: "sub_block_1" location {unit {}}
     refs [{from: "i1" into: "i1" dir: In location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
@@ -151,7 +154,7 @@ TEST_F(ScheduleTest, CachesIO) {
   )"));
 }
 
-TEST_F(ScheduleTest, UsesTmps) {
+TEST_F(ScheduleTest, DISABLED_UsesTmps) {
   main_->stmts.emplace_back(stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
     name: "sub_block_1" location {unit {}}
     refs [{from: "i1" into: "i1" dir: In location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},

@@ -53,8 +53,10 @@ message Pass {
     SchedulePass schedule = 13;
     TransposePass transpose = 14;
     PartitionPass partition = 15;
-    PruneIndexesPass prune_indexes = 16;
+    GenericPass prune_idxs = 16;
     UnrollPass unroll = 17;
+    DebankPass debank = 18;
+    GenericPass unroll_idx = 19;
   }
 }
 
@@ -69,14 +71,12 @@ message SchedulePass {
   required uint32 alignment = 4;
   required stripe.proto.Location xfer_loc = 5;
   optional bool allow_out_of_range_accesses = 6 [default = false];
-  optional uint64 num_banks = 7 [default = 1];
 }
 
 message MemoryPlacementPass {
   repeated string reqs = 1;
   required uint32 alignment = 2;
   repeated stripe.proto.Location locs = 3;
-  optional uint64 num_banks = 4 [default = 1];
 }
 
 message CachePass {
@@ -117,18 +117,26 @@ message StencilIndex {
   repeated int32 ins = 4;
 }
 
+enum TileStrategy {
+  TileInteriorBlock = 0;
+  TileExteriorBlock = 1;
+  TileSplitIndex = 2;
+}
+
 message AutotilePass {
   repeated string reqs = 1;
   repeated string outer_set = 2;
   repeated string inner_set = 3;
-  required bool only_po2 = 4;
-  required bool fast = 5;
-  required bool use_bytes = 6;
-  required bool skip_1d = 7;
+  optional bool only_po2 = 4 [default = false];
+  optional bool fast = 5 [default = false];
+  optional bool use_bytes = 6 [default = false];
+  optional bool skip_1d = 7 [default = false];
   required int64 max_output_size = 8;
   required int64 max_input_size = 9;
-  required double output_cost = 10;
-  required double input_cost = 11;
+  optional double output_cost = 10 [default = 0.0];
+  optional double input_cost = 11 [default = 1.0];
+  optional TileStrategy strategy = 12 [default = TileInteriorBlock];
+  optional string into_idx = 13;
 }
 
 message TransposePass {
@@ -143,11 +151,16 @@ message PartitionPass {
   required int64 num_parts = 4;
 }
 
-message PruneIndexesPass {
-  repeated string reqs = 1;
-}
+message DebankPass {
+  required stripe.proto.Location loc = 1;
+};
 
 message UnrollPass {
   repeated string reqs = 1;
-  required int64 loc_mul = 2;
+  optional string expand_idx = 2;
+}
+
+message UnrollIndexPass {
+  repeated string reqs = 1;
+  required string idx_reqs = 2;
 }

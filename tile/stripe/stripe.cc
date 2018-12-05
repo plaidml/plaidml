@@ -28,16 +28,30 @@ const char* Intrinsic::ADD = "add";
 const char* Intrinsic::EQ = "cmp_eq";
 const char* Intrinsic::COND = "cond";
 
-static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_t block_idx,
-                       const std::unordered_map<const Statement*, size_t>& block_deps);
+using DepsMap = std::unordered_map<const Statement*, size_t>;
+
+static void PrintStmt(std::ostream& os,       //
+                      const Statement& stmt,  //
+                      size_t depth,           //
+                      size_t idx,             //
+                      const DepsMap& deps);
+
+static void PrintBlock(std::ostream& os,    //
+                       const Block& block,  //
+                       size_t depth,        //
+                       size_t block_idx,    //
+                       const DepsMap& block_deps);
 
 static void PrintTab(std::ostream& os, size_t depth) {  //
   os << std::string(depth * 2, ' ');
 }
 
-static void PrintPreStmt(std::ostream& os, size_t depth, const Statement* stmt, size_t idx,
-                         const std::unordered_map<const Statement*, size_t>& deps) {  //
-  os << std::string(depth * 2, ' ');
+static void PrintPreStmt(std::ostream& os,       //
+                         size_t depth,           //
+                         const Statement* stmt,  //
+                         size_t idx,             //
+                         const DepsMap& deps) {
+  PrintTab(os, depth);
   os << idx;
   if (stmt->deps.size()) {
     os << "[";
@@ -62,6 +76,8 @@ static void PrintPreStmt(std::ostream& os, size_t depth, const Statement* stmt, 
     for (const auto& tag : stmt->tags) {
       os << "#" << tag << " ";
     }
+    os << std::endl;
+    PrintTab(os, depth);
   }
 }
 
@@ -171,30 +187,30 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
   return os;
 }
 
-static void PrintStatement(std::ostream& os, const std::shared_ptr<Statement>& stmt, size_t depth, size_t idx,
-                           const std::unordered_map<const Statement*, size_t>& deps) {
-  if (stmt->kind() != StmtKind::Block) {
-    // Block handles it's own pre-statement setup
-    PrintPreStmt(os, depth, stmt.get(), idx, deps);
-  }
-  switch (stmt->kind()) {
+static void PrintStmt(std::ostream& os,       //
+                      const Statement& stmt,  //
+                      size_t depth,           //
+                      size_t idx,             //
+                      const DepsMap& deps) {
+  PrintPreStmt(os, depth, &stmt, idx, deps);
+  switch (stmt.kind()) {
     case StmtKind::Load:
-      os << *Load::Downcast(stmt) << std::endl;
+      os << *dynamic_cast<const Load*>(&stmt) << std::endl;
       break;
     case StmtKind::Store:
-      os << *Store::Downcast(stmt) << std::endl;
+      os << *dynamic_cast<const Store*>(&stmt) << std::endl;
       break;
     case StmtKind::Intrinsic:
-      os << *Intrinsic::Downcast(stmt) << std::endl;
+      os << *dynamic_cast<const Intrinsic*>(&stmt) << std::endl;
       break;
     case StmtKind::Special:
-      os << *Special::Downcast(stmt) << std::endl;
+      os << *dynamic_cast<const Special*>(&stmt) << std::endl;
       break;
     case StmtKind::Constant:
-      os << *Constant::Downcast(stmt) << std::endl;
+      os << *dynamic_cast<const Constant*>(&stmt) << std::endl;
       break;
     case StmtKind::Block:
-      PrintBlock(os, *Block::Downcast(stmt), depth, idx, deps);
+      PrintBlock(os, *dynamic_cast<const Block*>(&stmt), depth, idx, deps);
       break;
     default:
       break;
@@ -222,31 +238,59 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
   if (ref.from.empty()) {
     os << " new@0x";
     os << std::hex << std::setw(8) << std::setfill('0') << ref.offset << std::dec;
-    if (ref.bank_dim) {
-      os << "," << *ref.bank_dim;
-    }
   }
-  os << "<" << ref.location << "> ";
-  os << ref.into;
+  os << " " << ref.into;
   if (ref.into != ref.from) {
     if (!ref.from.empty()) {
       os << " = " << ref.from;
     }
   }
-  bool first = true;
+  if (!ref.location.name.empty()) {
+    os << "<" << ref.location << ">";
+  }
   os << "[";
-  for (const auto& acc : ref.access) {
-    if (!first) {
+  for (size_t i = 0; i < ref.access.size(); i++) {
+    const auto& access = ref.access[i];
+    if (i > 0) {
       os << ", ";
     }
-    os << acc.toString();
-    first = false;
+    os << access.toString();
   }
   os << "]";
   if (!ref.agg_op.empty()) {
     os << ":" << ref.agg_op;
   }
-  os << " " << ref.shape;
+  os << " " << to_string(ref.shape.type) << "(";
+  for (size_t i = 0; i < ref.shape.dims.size(); i++) {
+    if (i > 0) {
+      os << ", ";
+    }
+    if (ref.bank_dim && ref.bank_dim->dim_pos == i) {
+      os << "{" << ref.shape.dims[i].size << "}";
+    } else {
+      os << ref.shape.dims[i].size;
+    }
+  }
+  os << "):(";
+  for (size_t i = 0; i < ref.shape.dims.size(); i++) {
+    if (i > 0) {
+      os << ", ";
+    }
+    if (ref.bank_dim && ref.bank_dim->dim_pos == i) {
+      os << "{" << ref.shape.dims[i].stride << "}";
+    } else {
+      os << ref.shape.dims[i].stride;
+    }
+  }
+  os << "):";
+  if (ref.shape.byte_size() < 1024) {
+    os << ref.shape.byte_size() << " B";
+  } else {
+    os << ref.shape.byte_size() / 1024.0 << " KiB";
+  }
+  if (ref.bank_dim) {
+    os << ", orig_name: " << ref.bank_dim->orig_name;
+  }
   if (!ref.from.empty() && ref.into != ref.from) {
     os << " // alias";
   }
@@ -254,16 +298,28 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
 }
 
 static void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
-  for (const auto& ref : block.refs) {
-    PrintTab(os, depth + 2);
-    os << ref;
-    os << std::endl;
+  if (block.refs.size() > 2) {
+    std::map<std::string, const Refinement*> sorted;
+    for (const auto& ref : block.refs) {
+      sorted.emplace(ref.into, &ref);
+    }
+    for (const auto& kvp : sorted) {
+      PrintTab(os, depth + 2);
+      os << *kvp.second << std::endl;
+    }
+  } else {
+    for (const auto& ref : block.refs) {
+      PrintTab(os, depth + 2);
+      os << ref << std::endl;
+    }
   }
 }
 
-static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_t block_idx,
-                       const std::unordered_map<const Statement*, size_t>& block_deps) {
-  PrintPreStmt(os, depth, &block, block_idx, block_deps);
+static void PrintBlock(std::ostream& os,    //
+                       const Block& block,  //
+                       size_t depth,        //
+                       size_t block_idx,    //
+                       const DepsMap& block_deps) {
   os << "block";
   if (!block.location.name.empty()) {
     os << "<" << block.location << ">";
@@ -275,7 +331,7 @@ static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_
     }
     os << block.idxs[i];
   }
-  os << "] (";
+  os << "]:" << block.idxs_product() << " (";
   if (!block.name.empty()) {
     os << " // " << block.name;
   }
@@ -297,9 +353,9 @@ static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_
   PrintTab(os, depth);
   os << ") {" << std::endl;
   std::size_t idx = 0;
-  std::unordered_map<const Statement*, size_t> deps;
+  DepsMap deps;
   for (const auto& stmt : block.stmts) {
-    PrintStatement(os, stmt, depth + 1, idx, deps);
+    PrintStmt(os, *stmt, depth + 1, idx, deps);
     deps[stmt.get()] = idx++;
   }
   PrintTab(os, depth);
@@ -307,8 +363,8 @@ static void PrintBlock(std::ostream& os, const Block& block, size_t depth, size_
 }
 
 std::ostream& operator<<(std::ostream& os, const Block& block) {
-  std::unordered_map<const Statement*, size_t> deps;
-  PrintBlock(os, block, 0, 0, deps);
+  DepsMap deps;
+  PrintStmt(os, block, 0, 0, deps);
   return os;
 }
 
@@ -353,13 +409,27 @@ std::vector<const Refinement*> Block::ref_outs() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const Index& idx) {
+  if (!idx.tags.empty()) {
+    os << "(";
+    for (const auto& tag : idx.tags) {
+      os << "#" << tag << " ";
+    }
+  }
   os << idx.name;
   if (idx.affine.constant() || !idx.affine.getMap().empty()) {
     os << " = " << idx.affine.toString();
   } else {
     os << ":" << idx.range;
   }
+  if (!idx.tags.empty()) {
+    os << ")";
+  }
   return os;
+}
+
+bool operator==(const BankDimension& lhs, const BankDimension& rhs) {
+  return std::tie(lhs.dim_pos, lhs.orig_shape) ==  //
+         std::tie(rhs.dim_pos, rhs.orig_shape);
 }
 
 bool operator==(const Index& lhs, const Index& rhs) {
@@ -368,8 +438,7 @@ bool operator==(const Index& lhs, const Index& rhs) {
 }
 
 bool operator==(const Location& lhs, const Location& rhs) {
-  return std::tie(lhs.name, lhs.unit) ==  //
-         std::tie(rhs.name, rhs.unit);
+  return std::tie(lhs.name, lhs.unit) == std::tie(rhs.name, rhs.unit);
 }
 
 bool operator!=(const Location& lhs, const Location& rhs) {
@@ -378,6 +447,36 @@ bool operator!=(const Location& lhs, const Location& rhs) {
 
 bool operator<(const Location& lhs, const Location& rhs) {
   return std::tie(lhs.name, lhs.unit) < std::tie(rhs.name, rhs.unit);
+}
+
+class CloneVisitor : RewriteStmtVisitor {
+ public:
+  explicit CloneVisitor(int depth) : depth_(depth) {}
+  Load* Visit(const Load& x) { return new Load(x); }
+  Store* Visit(const Store& x) { return new Store(x); }
+  Constant* Visit(const Constant& x) { return new Constant(x); }
+  Special* Visit(const Special& x) { return new Special(x); }
+  Intrinsic* Visit(const Intrinsic& x) { return new Intrinsic(x); }
+  Block* Visit(const Block& x) {
+    auto ret = new Block(x);
+    if (depth_ == 0) {
+      return ret;
+    }
+    depth_--;
+    for (auto& stmt : ret->stmts) {
+      stmt.reset(stmt->Accept(this));
+    }
+    depth_++;
+    return ret;
+  }
+
+ private:
+  int depth_;
+};
+
+std::shared_ptr<Block> CloneBlock(const Block& orig, int depth) {
+  CloneVisitor visitor(depth);
+  return std::shared_ptr<Block>(visitor.Visit(orig));
 }
 
 Affine FromProto(const proto::Affine& affine) {
@@ -431,9 +530,9 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     ref.location = FromProto(pb_ref.location());
     ref.is_const = pb_ref.is_const();
     ref.offset = pb_ref.offset();
-    if (pb_ref.has_bank_dim()) {
-      ref.bank_dim = pb_ref.bank_dim().value();
-    }
+    // if (pb_ref.has_bank_dim()) {
+    //   ref.bank_dim = pb_ref.bank_dim().value();
+    // }
     ret->refs.emplace_back(ref);
   }
   std::vector<StatementIt> stmts;
@@ -566,9 +665,9 @@ proto::Block IntoProto(const Block& block) {
     *pb_ref->mutable_location() = IntoProto(ref.location);
     pb_ref->set_is_const(ref.is_const);
     pb_ref->set_offset(ref.offset);
-    if (ref.bank_dim) {
-      pb_ref->mutable_bank_dim()->set_value(*ref.bank_dim);
-    }
+    // if (ref.bank_dim) {
+    //   pb_ref->mutable_bank_dim()->set_value(*ref.bank_dim);
+    // }
   }
   std::unordered_map<Statement*, std::size_t> dep_idxs;
   std::size_t stmt_idx = 0;
@@ -653,6 +752,22 @@ const Index* Block::idx_by_name(const std::string& name) const {
     return nullptr;
   }
   return &*it;
+}
+
+Index* Block::idx_by_name(const std::string& name) {
+  auto it = std::find_if(idxs.begin(), idxs.end(), [&name](const Index& idx) { return idx.name == name; });
+  if (it == idxs.end()) {
+    return nullptr;
+  }
+  return &*it;
+}
+
+size_t Block::idxs_product() const {
+  size_t product = 1;
+  for (const auto& idx : idxs) {
+    product *= idx.range;
+  }
+  return product;
 }
 
 std::set<const Index*> Block::accumulation_idxs() const {
