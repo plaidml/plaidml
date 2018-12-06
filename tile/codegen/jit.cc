@@ -158,7 +158,9 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
   llvm::legacy::PassManager modopt;
   pmb.populateModulePassManager(modopt);
   modopt.run(*module_);
-  module_->print(llvm::errs(), nullptr);
+  if (VLOG_IS_ON(2)) {
+    module_->print(llvm::errs(), nullptr);
+  }
   // Wrap the finished module and the buffer names into an Executable instance.
   std::vector<std::string> param_names;
   for (auto& ref : program.refs) {
