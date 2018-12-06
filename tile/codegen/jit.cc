@@ -116,8 +116,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
-  llvm::Function* MallocFunction();
-  llvm::Function* FreeFunction();
+  llvm::Value* MallocFunction();
+  llvm::Value* FreeFunction();
 
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
@@ -863,23 +863,21 @@ llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   return llvm::FunctionType::get(return_type, param_types, false);
 }
 
-llvm::Function* Compiler::MallocFunction(void) {
+llvm::Value* Compiler::MallocFunction(void) {
   std::vector<llvm::Type*> argtypes{IndexType()};
   llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
-  auto linkage = llvm::Function::ExternalLinkage;
   const char* funcname = "malloc";
-  return llvm::Function::Create(functype, linkage, funcname, module_);
+  return module_->getOrInsertFunction(funcname, functype);
 }
 
-llvm::Function* Compiler::FreeFunction(void) {
+llvm::Value* Compiler::FreeFunction(void) {
   llvm::Type* ptrtype = builder_.getInt8PtrTy();
   std::vector<llvm::Type*> argtypes{ptrtype};
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
-  auto linkage = llvm::Function::ExternalLinkage;
   const char* funcname = "free";
-  return llvm::Function::Create(functype, linkage, funcname, module_);
+  return module_->getOrInsertFunction(funcname, functype);
 }
 
 Executable::Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters)
