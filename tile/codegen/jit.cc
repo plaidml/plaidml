@@ -440,6 +440,8 @@ void Compiler::Visit(const stripe::Block& block) {
       auto malloc_func = MallocFunction();
       buffer = builder_.CreateCall(malloc_func, malloc_args, "");
       allocs.push_back(buffer);
+      llvm::Type* buftype = CType(ref.shape.type)->getPointerTo();
+      buffer = builder_.CreateBitCast(buffer, buftype);
     } else {
       // Pass in the current element address from the source buffer.
       // If a "from" name is specified, use that buffer; if not, that means
