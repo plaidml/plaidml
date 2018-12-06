@@ -865,7 +865,7 @@ llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
 
 llvm::Function* Compiler::MallocFunction(void) {
   std::vector<llvm::Type*> argtypes{IndexType()};
-  llvm::Type* rettype = builder_.getInt8PtrTy()->getPointerTo();
+  llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   auto linkage = llvm::Function::ExternalLinkage;
   const char* funcname = "malloc";
@@ -873,7 +873,7 @@ llvm::Function* Compiler::MallocFunction(void) {
 }
 
 llvm::Function* Compiler::FreeFunction(void) {
-  llvm::Type* ptrtype = builder_.getInt8PtrTy()->getPointerTo();
+  llvm::Type* ptrtype = builder_.getInt8PtrTy();
   std::vector<llvm::Type*> argtypes{ptrtype};
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
