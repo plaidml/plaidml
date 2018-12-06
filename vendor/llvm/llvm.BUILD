@@ -369,7 +369,7 @@ cc_binary(
 genrule(
     name = "license",
     visibility = ["//visibility:public"],
-    srcs = ["LICENSE.txt"],
+    srcs = ["LICENSE.TXT"],
     outs = ["llvm-LICENSE"],
     cmd = "cp $(SRCS) $@",
 )
