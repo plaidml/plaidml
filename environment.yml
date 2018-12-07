@@ -1,0 +1,6 @@
+dependencies:
+  - bazel
+  - bison
+  - cmake
+  - flex
+  - python=3.6
