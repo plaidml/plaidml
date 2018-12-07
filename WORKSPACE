@@ -4,7 +4,7 @@ workspace(name = "com_intel_plaidml")
 git_repository(
     name = "toolchain",
     remote = "https://github.com/plaidml/toolchain",
-    tag = "0.1.1",
+    tag = "0.1.2",
 )
 
 load(

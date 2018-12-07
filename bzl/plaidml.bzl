@@ -98,10 +98,7 @@ def plaidml_bison(name, src, out, defines, visibility = None):
         srcs = [src],
         outs = [out, defines],
         visibility = visibility,
-        cmd = select({
-            "@toolchain//:macos_x86_64": "/usr/local/opt/bison/bin/bison --verbose " + COMMON_ARGS,
-            "//conditions:default": "bison --verbose " + COMMON_ARGS,
-        }),
+        cmd = "bison --verbose " + COMMON_ARGS,
     )
 
 def plaidml_flex(name, src, out, hdr, visibility = None):
@@ -112,7 +109,6 @@ def plaidml_flex(name, src, out, hdr, visibility = None):
         outs = [out, hdr],
         visibility = visibility,
         cmd = select({
-            "@toolchain//:macos_x86_64": "/usr/local/opt/flex/bin/flex " + COMMON_ARGS,
             "@toolchain//:windows_x86_64": "flex --nounistd " + COMMON_ARGS,
             "//conditions:default": "flex " + COMMON_ARGS,
         }),
