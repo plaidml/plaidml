@@ -49,6 +49,19 @@ TEST(Codegen, AliasCheckOverlap) {
           {0, 10},
           {1, 1},
       }));
+  EXPECT_FALSE(CheckOverlap(
+      {
+          {0, 0},
+          {0, 4 * 6},
+          {0, 28 * 1},
+          {128, 128},
+      },
+      {
+          {0, 0},
+          {28, 28 + 4 * 6},
+          {0, 28 * 1},
+          {128, 128},
+      }));
 }
 
 }  // namespace test

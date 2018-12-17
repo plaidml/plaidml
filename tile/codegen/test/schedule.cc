@@ -64,6 +64,7 @@ class ScheduleTest : public ::testing::Test {
     ref.shape.type = DataType::FLOAT32;
     ref.shape.dims.emplace_back(std::move(dim));
     ref.location.name = "RAM";
+    ref.offset = 0;
     main_->refs.emplace_back(std::move(ref));
   }
 
@@ -92,7 +93,7 @@ TEST_F(ScheduleTest, EmptyMain) {
   )"));
 }
 
-TEST_F(ScheduleTest, DISABLED_CachesIO) {
+TEST_F(ScheduleTest, CachesIO) {
   main_->stmts.emplace_back(stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
     name: "sub_block_1" location {unit {}}
     refs [{from: "i1" into: "i1" dir: In location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
@@ -154,7 +155,7 @@ TEST_F(ScheduleTest, DISABLED_CachesIO) {
   )"));
 }
 
-TEST_F(ScheduleTest, DISABLED_UsesTmps) {
+TEST_F(ScheduleTest, UsesTmps) {
   main_->stmts.emplace_back(stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
     name: "sub_block_1" location {unit {}}
     refs [{from: "i1" into: "i1" dir: In location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
@@ -188,6 +189,7 @@ TEST_F(ScheduleTest, DISABLED_UsesTmps) {
               {into: "i2_0" offset: 128 location {name: "CACHE" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
               {from: "o1" into: "o1" dir: Out location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
               {into: "o1_0" offset: 64 location {name: "CACHE" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
+              {into: "t1" location {name: "RAM" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}},
               {into: "t1_0" location {name: "CACHE" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}}}]
         stmts [{
           block {
