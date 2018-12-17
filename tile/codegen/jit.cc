@@ -79,8 +79,11 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Not(const stripe::Intrinsic&);
   void Xor(const stripe::Intrinsic&);
   void Assign(const stripe::Intrinsic&);
+  void BitLeft(const stripe::Intrinsic&);
+  void BitRight(const stripe::Intrinsic&);
   void Zero(const stripe::Special&);
   void Copy(const stripe::Special&);
+  void Reshape(const stripe::Special&);
 
   struct scalar {
     llvm::Value* value = nullptr;
@@ -396,7 +399,11 @@ void Compiler::Visit(const stripe::Special& special) {
   static std::map<std::string, std::function<void(Compiler*, const stripe::Special&)>> handlers{
       {"zero", &Compiler::Zero},
       {"copy", &Compiler::Copy},
+      {"reshape", &Compiler::Reshape},
   };
+  if (handlers.find(special.name) == handlers.end()) {
+    throw Error("Unknown special \"" + special.name + "\"");
+  }
   handlers[special.name](this, special);
 }
 
@@ -407,16 +414,30 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
   // sure why they are located in the wrong structure. There are no constants
   // defined for actual intrinsic names; these have been derived experimentally.
   static std::map<std::string, std::function<void(Compiler*, const stripe::Intrinsic&)>> handlers{
-      {"add", &Compiler::Add},          {"sub", &Compiler::Subtract},
-      {"neg", &Compiler::Negate},       {"mul", &Compiler::Multiply},
-      {"div", &Compiler::Divide},       {"mod", &Compiler::Mod},
-      {"lt", &Compiler::LessThan},      {"lte", &Compiler::LessThanOrEqualTo},
-      {"gt", &Compiler::GreaterThan},   {"gte", &Compiler::GreaterThanOrEqualTo},
-      {"eq", &Compiler::Equal},         {"neq", &Compiler::Unequal},
-      {"and", &Compiler::And},          {"or", &Compiler::Or},
-      {"not", &Compiler::Not},          {"xor", &Compiler::Xor},
-      {"cond", &Compiler::Conditional}, {"assign", &Compiler::Assign},
+      {"add", &Compiler::Add},
+      {"sub", &Compiler::Subtract},
+      {"neg", &Compiler::Negate},
+      {"mul", &Compiler::Multiply},
+      {"div", &Compiler::Divide},
+      {"mod", &Compiler::Mod},
+      {"lt", &Compiler::LessThan},
+      {"lte", &Compiler::LessThanOrEqualTo},
+      {"gt", &Compiler::GreaterThan},
+      {"gte", &Compiler::GreaterThanOrEqualTo},
+      {"eq", &Compiler::Equal},
+      {"neq", &Compiler::Unequal},
+      {"and", &Compiler::And},
+      {"or", &Compiler::Or},
+      {"not", &Compiler::Not},
+      {"xor", &Compiler::Xor},
+      {"cond", &Compiler::Conditional},
+      {"assign", &Compiler::Assign},
+      {"bit_right", &Compiler::BitRight},
+      {"bit_left", &Compiler::BitLeft},
   };
+  if (handlers.find(intrinsic.name) == handlers.end()) {
+    throw Error("Unknown intrinsic \"" + intrinsic.name + "\"");
+  }
   handlers[intrinsic.name](this, intrinsic);
 }
 
@@ -751,6 +772,29 @@ void Compiler::Assign(const stripe::Intrinsic& stmt) {
   OutputType(ret, stmt);
 }
 
+void Compiler::BitLeft(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
+  llvm::Value* ret = builder_.CreateShl(lhs.value, rhs.value);
+  OutputType(ret, stmt);
+}
+
+void Compiler::BitRight(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
+  llvm::Value* ret = nullptr;
+  if (is_int(stmt.type)) {
+    ret = builder_.CreateAShr(lhs.value, rhs.value);
+  } else if (is_uint(stmt.type)) {
+    ret = builder_.CreateLShr(lhs.value, rhs.value);
+  } else {
+    throw Error("Invalid bitshift type: " + to_string(stmt.type));
+  }
+  OutputType(ret, stmt);
+}
+
 void Compiler::Zero(const stripe::Special& zero) {
   // present in stripe.proto but not defined in the specification
   throw Error("Special operation ZERO is not yet specified");
@@ -759,6 +803,10 @@ void Compiler::Zero(const stripe::Special& zero) {
 void Compiler::Copy(const stripe::Special& copy) {
   // present in stripe.proto but not defined in the specification
   throw Error("Special operation COPY is not yet specified");
+}
+
+void Compiler::Reshape(const stripe::Special& reshape) {
+  throw Error("Special operation RESHAPE is not yet specified");
 }
 
 Compiler::scalar Compiler::Cast(scalar v, DataType to_type) {
