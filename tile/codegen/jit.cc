@@ -821,10 +821,15 @@ llvm::Value* Compiler::ElementPtr(const buffer& buf) {
 llvm::Value* Compiler::Eval(const stripe::Affine& access) {
   llvm::Value* offset = IndexConst(0);
   for (auto& term : access.getMap()) {
-    llvm::Value* indexVar = indexes_[term.first].variable;
-    llvm::Value* indexVal = builder_.CreateLoad(indexVar);
-    llvm::Value* multiplier = IndexConst(term.second);
-    indexVal = builder_.CreateMul(indexVal, multiplier);
+    llvm::Value* indexVal = nullptr;
+    if (!term.first.empty()) {
+      llvm::Value* indexVar = indexes_[term.first].variable;
+      indexVal = builder_.CreateLoad(indexVar);
+      llvm::Value* multiplier = IndexConst(term.second);
+      indexVal = builder_.CreateMul(indexVal, multiplier);
+    } else {
+      indexVal = IndexConst(term.second);
+    }
     offset = builder_.CreateAdd(offset, indexVal);
   }
   return offset;
