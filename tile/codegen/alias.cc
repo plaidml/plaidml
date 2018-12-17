@@ -13,21 +13,25 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
+namespace {
+
+Affine UniqifyAffine(const Affine& orig, const std::string& prefix) {
+  Affine ret;
+  for (const auto& kvp : orig.getMap()) {
+    if (kvp.first.empty()) {
+      ret += kvp.second;
+    } else {
+      ret += Affine(prefix + kvp.first, kvp.second);
+    }
+  }
+  return ret;
+}
+
+}  // namespace
+
 std::ostream& operator<<(std::ostream& os, const Extent& extent) {
   os << "(" << extent.min << ", " << extent.max << ")";
   return os;
-}
-
-static Affine UniqifyAffine(const Affine& orig, const std::string& prefix) {
-  Affine r;
-  for (const auto& kvp : orig.getMap()) {
-    if (kvp.first.empty()) {
-      r += kvp.second;
-    } else {
-      r += Affine(prefix + kvp.first, kvp.second);
-    }
-  }
-  return r;
 }
 
 bool CheckOverlap(const std::vector<Extent>& ae, const std::vector<Extent>& be) {
@@ -49,7 +53,12 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
     return AliasType::None;
   }
   if (ai.shape == bi.shape) {
+    if (ai.location.unit.isConstant() && bi.location.unit.isConstant() && ai.location != bi.location) {
+      IVLOG(3, boost::format("Different banks, a: %1%, b: %2%") % ai.location % bi.location);
+      return AliasType::None;
+    }
     if (ai.access == bi.access) {
+      IVLOG(3, boost::format("Exact access, a: %1%, b: %2%") % StreamContainer(ai.access) % StreamContainer(bi.access));
       return AliasType::Exact;
     }
     if (!CheckOverlap(ai.extents, bi.extents)) {
@@ -95,8 +104,9 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
       info.access.resize(ref.access.size());
     }
     if (info.access.size() != ref.access.size()) {
-      throw_with_trace(std::runtime_error(str(
-          boost::format("AliasMap::AliasMap: Mismatched sizes on refinement: %1% %2%") % info.base_name % ref.into)));
+      throw_with_trace(std::runtime_error(
+          str(boost::format("AliasMap::AliasMap: Mismatched access dimensions on refinement: %1% %2%") %
+              info.base_name % ref.into)));
     }
     // Add in indexes from this block
     std::map<std::string, int64_t> min_idxs;
@@ -110,6 +120,7 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
         max_idxs[idx.name] = idx.range - 1;
       }
     }
+    info.location = ref.location;
     info.extents.resize(ref.access.size());
     for (size_t i = 0; i < ref.access.size(); i++) {
       info.access[i] += UniqifyAffine(ref.access[i], prefix);

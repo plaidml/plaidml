@@ -758,7 +758,10 @@ void Scheduler::Run() {
   // Add a Refinement for each CacheEntry.
   block_->refs.reserve(block_->refs.size() + ri_map_.size() + cache_entries_.size());
   for (auto& ent : cache_entries_) {
-    auto ref = block_->refs.emplace(block_->refs.end(), ent.source->ref);
+    auto ref = block_->ref_by_into(ent.name, false);
+    if (ref == block_->refs.end()) {
+      ref = block_->refs.emplace(block_->refs.end(), ent.source->ref);
+    }
     ref->dir = stripe::RefDir::None;
     ref->from.clear();
     ref->into = ent.name;
@@ -772,7 +775,12 @@ void Scheduler::Run() {
   // Move used Refinements back into the block.
   for (auto& name_ri : ri_map_) {
     if (name_ri.second.used) {
-      block_->refs.emplace_back(std::move(name_ri.second.ref));
+      auto ref = block_->ref_by_into(name_ri.second.ref.into, false);
+      if (ref == block_->refs.end()) {
+        block_->refs.emplace_back(std::move(name_ri.second.ref));
+      } else {
+        *ref = name_ri.second.ref;
+      }
     }
   }
 

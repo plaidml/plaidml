@@ -32,6 +32,7 @@ struct AliasInfo {
   std::vector<stripe::Affine> access;
   std::vector<Extent> extents;
   TensorShape shape;
+  stripe::Location location;
 };
 
 class AliasMap {
