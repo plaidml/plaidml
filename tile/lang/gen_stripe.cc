@@ -52,7 +52,7 @@ class StripeGenerator {
           } else if (op.f.fn == "reshape") {
             ProcessReshape(main.get(), op);
           } else {
-            ProcessElementwise(main.get(), op);
+            ProcessElementwise(program.get(), main.get(), op);
           }
           break;
         case Op::CONSTANT:
@@ -188,7 +188,7 @@ class StripeGenerator {
           }
         }
         // otherwise fall through and do a normal load
-        kernel->refs.emplace_back(Refinement{
+        Refinement ref{
             RefDir::In,        // dir
             spec.id,           // from
             spec.id,           // into
@@ -199,7 +199,9 @@ class StripeGenerator {
             IsConst(spec.id),  // is_const
             0,                 // offset
             boost::none,       // bank_dim
-        });
+        };
+        ref.set_tag("contraction");
+        kernel->refs.emplace_back(ref);
         // LOAD
         kernel->stmts.push_back(std::make_shared<Load>(spec.id, scalar_name));
       }
@@ -287,7 +289,7 @@ class StripeGenerator {
     return false;  // Looks good!
   }
 
-  void ProcessElementwise(Block* main, const Op& op) {
+  void ProcessElementwise(Block* program, Block* main, const Op& op) {
     auto kernel = AddKernel(main, op);
     kernel->set_tag("eltwise");
     kernel->set_tag("eltwise_" + op.f.fn);
@@ -325,7 +327,7 @@ class StripeGenerator {
               }
             }
           }
-          kernel->refs.emplace_back(Refinement{
+          Refinement ref{
               RefDir::In,          // dir
               input,               // from
               input,               // into
@@ -336,7 +338,9 @@ class StripeGenerator {
               IsConst(input),      // is_const
               0,                   // offset
               boost::none,         // bank_dim
-          });
+          };
+          ref.set_tag("eltwise_" + op.f.fn);
+          kernel->refs.emplace_back(ref);
           // LOAD
           kernel->stmts.push_back(std::make_shared<Load>(input, ScalarName(input)));
         } break;

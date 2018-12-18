@@ -176,7 +176,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   return true;
 }
 
-bool ExtractTile(stripe::Block* outer, const TileShape& shape, const std::string& into_idx_name) {
+bool ExtractTile(Block* outer, const TileShape& shape, const std::string& into_idx_name) {
   // Verify tile shape is correct
   if (outer->idxs.size() != shape.size()) {
     throw_with_trace(std::runtime_error("Invalid tile specified"));
@@ -291,7 +291,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
     size_t total_tiles = 1;
     for (const auto& idx : block.idxs) {
       auto tile = safe_at(idx_matches, idx.name);
-      size_t num_tiles = (idx.range + tile.value - 1) / tile.value;
+      size_t num_tiles = IntDivCeil(idx.range, tile.value);
       total_tiles *= num_tiles;
       match.cost *= num_tiles * tile.value;
       match.idxs.push_back(tile);
@@ -352,7 +352,19 @@ struct StencilPassOptions {
   Tags set_inner;
 };
 
-void StencilPassRecurse(stripe::Block* block, const StencilPassOptions& options) {
+void ApplyIndexTags(Block* block, const StencilMatch& match) {
+  for (const auto& idx_match : match.idxs) {
+    if (idx_match.stencil_idx_name == "*") {
+      continue;
+    }
+    auto idx = block->idx_by_name(idx_match.block_idx_name);
+    if (idx) {
+      idx->set_tag(str(boost::format("stencil_%1%") % idx_match.stencil_idx_name));
+    }
+  }
+}
+
+void StencilPassRecurse(Block* block, const StencilPassOptions& options) {
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
@@ -369,13 +381,15 @@ void StencilPassRecurse(stripe::Block* block, const StencilPassOptions& options)
       tile.push_back(idx.value);
     }
     ApplyTile(block, tile, false);
+    ApplyIndexTags(block, *match);
     block->add_tags(options.set_outer);
     auto inner = block->SubBlock(0);
+    ApplyIndexTags(inner.get(), *match);
     inner->add_tags(options.set_inner);
   }
 }
 
-void StencilPass(stripe::Block* block, const proto::StencilPass& options) {
+void StencilPass(Block* block, const proto::StencilPass& options) {
   StencilPassOptions sopts = {
       FromProto(options.reqs()),       // reqs
       {},                              // specs

@@ -72,8 +72,8 @@ block []:1 ( // simple_fuse
   ) {
     0: #fused 
     block [i1:100, i2:20]:2000 ( // add+cmp_lt+cond
-        in A[i1, i2] fp32(1, 1):(20, 1):4 B
-        in B[i2] fp32(1):(1):4 B
+        #eltwise_add in A[i1, i2] fp32(1, 1):(20, 1):4 B
+        #eltwise_add in B[i2] fp32(1):(1):4 B
         out C[i1, i2] fp32(1, 1):(20, 1):4 B
         out T[i1, i2] fp32(1, 1):(20, 1):4 B
         out X[i1, i2] bool(1, 1):(20, 1):1 B
