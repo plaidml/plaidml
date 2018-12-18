@@ -28,29 +28,25 @@ const char* Intrinsic::ADD = "add";
 const char* Intrinsic::EQ = "cmp_eq";
 const char* Intrinsic::COND = "cond";
 
+namespace {
+
 using DepsMap = std::unordered_map<const Statement*, size_t>;
 
-static void PrintStmt(std::ostream& os,       //
-                      const Statement& stmt,  //
-                      size_t depth,           //
-                      size_t idx,             //
-                      const DepsMap& deps);
+void PrintStmt(std::ostream& os,       //
+               const Statement& stmt,  //
+               size_t depth,           //
+               size_t idx,             //
+               const DepsMap& deps);
 
-static void PrintBlock(std::ostream& os,    //
-                       const Block& block,  //
-                       size_t depth,        //
-                       size_t block_idx,    //
-                       const DepsMap& block_deps);
-
-static void PrintTab(std::ostream& os, size_t depth) {  //
+void PrintTab(std::ostream& os, size_t depth) {  //
   os << std::string(depth * 2, ' ');
 }
 
-static void PrintPreStmt(std::ostream& os,       //
-                         size_t depth,           //
-                         const Statement* stmt,  //
-                         size_t idx,             //
-                         const DepsMap& deps) {
+void PrintPreStmt(std::ostream& os,       //
+                  size_t depth,           //
+                  const Statement* stmt,  //
+                  size_t idx,             //
+                  const DepsMap& deps) {
   PrintTab(os, depth);
   os << idx;
   if (stmt->deps.size()) {
@@ -80,6 +76,103 @@ static void PrintPreStmt(std::ostream& os,       //
     PrintTab(os, depth);
   }
 }
+
+void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
+  if (block.refs.size() > 2) {
+    std::map<std::string, const Refinement*> sorted;
+    for (const auto& ref : block.refs) {
+      sorted.emplace(ref.into, &ref);
+    }
+    for (const auto& kvp : sorted) {
+      PrintTab(os, depth + 2);
+      os << *kvp.second << std::endl;
+    }
+  } else {
+    for (const auto& ref : block.refs) {
+      PrintTab(os, depth + 2);
+      os << ref << std::endl;
+    }
+  }
+}
+
+void PrintBlock(std::ostream& os,    //
+                const Block& block,  //
+                size_t depth,        //
+                size_t block_idx,    //
+                const DepsMap& block_deps) {
+  os << "block";
+  if (!block.location.name.empty()) {
+    os << "<" << block.location << ">";
+  }
+  os << " [";
+  for (size_t i = 0; i < block.idxs.size(); i++) {
+    if (i > 0) {
+      os << ", ";
+    }
+    os << block.idxs[i];
+  }
+  os << "]:" << block.idxs_product() << " (";
+  if (!block.name.empty()) {
+    os << " // " << block.name;
+  }
+  os << std::endl;
+
+  if (!block.comments.empty()) {
+    std::stringstream ss(block.comments);
+    for (std::string line; std::getline(ss, line, '\n');) {
+      PrintTab(os, depth + 2);
+      os << "// " << line << std::endl;
+    }
+  }
+  for (const auto& constraint : block.constraints) {
+    PrintTab(os, depth + 2);
+    os << constraint.toString() << " >= 0";
+    os << std::endl;
+  }
+  PrintRefinements(os, block, depth);
+  PrintTab(os, depth);
+  os << ") {" << std::endl;
+  std::size_t idx = 0;
+  DepsMap deps;
+  for (const auto& stmt : block.stmts) {
+    PrintStmt(os, *stmt, depth + 1, idx, deps);
+    deps[stmt.get()] = idx++;
+  }
+  PrintTab(os, depth);
+  os << "}" << std::endl;
+}
+
+void PrintStmt(std::ostream& os,       //
+               const Statement& stmt,  //
+               size_t depth,           //
+               size_t idx,             //
+               const DepsMap& deps) {
+  PrintPreStmt(os, depth, &stmt, idx, deps);
+  switch (stmt.kind()) {
+    case StmtKind::Load:
+      os << *dynamic_cast<const Load*>(&stmt) << std::endl;
+      break;
+    case StmtKind::Store:
+      os << *dynamic_cast<const Store*>(&stmt) << std::endl;
+      break;
+    case StmtKind::Intrinsic:
+      os << *dynamic_cast<const Intrinsic*>(&stmt) << std::endl;
+      break;
+    case StmtKind::Special:
+      os << *dynamic_cast<const Special*>(&stmt) << std::endl;
+      break;
+    case StmtKind::Constant:
+      os << *dynamic_cast<const Constant*>(&stmt) << std::endl;
+      break;
+    case StmtKind::Block:
+      PrintBlock(os, *dynamic_cast<const Block*>(&stmt), depth, idx, deps);
+      break;
+    default:
+      break;
+  }
+}
+
+}  // namespace
 
 std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
   return std::dynamic_pointer_cast<Load>(stmt);
@@ -187,37 +280,12 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
   return os;
 }
 
-static void PrintStmt(std::ostream& os,       //
-                      const Statement& stmt,  //
-                      size_t depth,           //
-                      size_t idx,             //
-                      const DepsMap& deps) {
-  PrintPreStmt(os, depth, &stmt, idx, deps);
-  switch (stmt.kind()) {
-    case StmtKind::Load:
-      os << *dynamic_cast<const Load*>(&stmt) << std::endl;
-      break;
-    case StmtKind::Store:
-      os << *dynamic_cast<const Store*>(&stmt) << std::endl;
-      break;
-    case StmtKind::Intrinsic:
-      os << *dynamic_cast<const Intrinsic*>(&stmt) << std::endl;
-      break;
-    case StmtKind::Special:
-      os << *dynamic_cast<const Special*>(&stmt) << std::endl;
-      break;
-    case StmtKind::Constant:
-      os << *dynamic_cast<const Constant*>(&stmt) << std::endl;
-      break;
-    case StmtKind::Block:
-      PrintBlock(os, *dynamic_cast<const Block*>(&stmt), depth, idx, deps);
-      break;
-    default:
-      break;
-  }
-}
-
 std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
+  if (ref.tags.size()) {
+    for (const auto& tag : ref.tags) {
+      os << "#" << tag << " ";
+    }
+  }
   switch (ref.dir) {
     case RefDir::None:
       os << "none";
@@ -295,71 +363,6 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
     os << " // alias";
   }
   return os;
-}
-
-static void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
-  if (block.refs.size() > 2) {
-    std::map<std::string, const Refinement*> sorted;
-    for (const auto& ref : block.refs) {
-      sorted.emplace(ref.into, &ref);
-    }
-    for (const auto& kvp : sorted) {
-      PrintTab(os, depth + 2);
-      os << *kvp.second << std::endl;
-    }
-  } else {
-    for (const auto& ref : block.refs) {
-      PrintTab(os, depth + 2);
-      os << ref << std::endl;
-    }
-  }
-}
-
-static void PrintBlock(std::ostream& os,    //
-                       const Block& block,  //
-                       size_t depth,        //
-                       size_t block_idx,    //
-                       const DepsMap& block_deps) {
-  os << "block";
-  if (!block.location.name.empty()) {
-    os << "<" << block.location << ">";
-  }
-  os << " [";
-  for (size_t i = 0; i < block.idxs.size(); i++) {
-    if (i > 0) {
-      os << ", ";
-    }
-    os << block.idxs[i];
-  }
-  os << "]:" << block.idxs_product() << " (";
-  if (!block.name.empty()) {
-    os << " // " << block.name;
-  }
-  os << std::endl;
-
-  if (!block.comments.empty()) {
-    std::stringstream ss(block.comments);
-    for (std::string line; std::getline(ss, line, '\n');) {
-      PrintTab(os, depth + 2);
-      os << "// " << line << std::endl;
-    }
-  }
-  for (const auto& constraint : block.constraints) {
-    PrintTab(os, depth + 2);
-    os << constraint.toString() << " >= 0";
-    os << std::endl;
-  }
-  PrintRefinements(os, block, depth);
-  PrintTab(os, depth);
-  os << ") {" << std::endl;
-  std::size_t idx = 0;
-  DepsMap deps;
-  for (const auto& stmt : block.stmts) {
-    PrintStmt(os, *stmt, depth + 1, idx, deps);
-    deps[stmt.get()] = idx++;
-  }
-  PrintTab(os, depth);
-  os << "}" << std::endl;
 }
 
 std::ostream& operator<<(std::ostream& os, const Block& block) {

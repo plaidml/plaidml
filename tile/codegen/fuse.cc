@@ -164,6 +164,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   outer->constraints = tiled->constraints;
   auto inner = std::make_shared<Block>();
   inner->name = tiled->name;
+  inner->tags = tiled->tags;
   outer->stmts.push_back(inner);
   // Move / rename each index to the appropriate block
   for (const auto& idx : tiled->idxs) {
