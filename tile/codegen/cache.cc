@@ -43,20 +43,13 @@ void ApplyCache(Block* block,                 //
     xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
     xfer_access.emplace_back(Affine(iname));
   }
-  if (!it->location.unit.isConstant()) {
-    auto bank_idx_name = it->location.unit.getMap().begin()->first;
-    auto base_bank_idx = block->idx_by_name(bank_idx_name);
-    auto bank_idx = Index{bank_idx_name, 1, Affine{bank_idx_name}};
-    bank_idx.tags = base_bank_idx->tags;
-    xfer_block.idxs.emplace_back(bank_idx);
-  }
   TensorShape raw_xfer_shape = raw_ts;
   TensorShape cached_xfer_shape = cached_ts;
   for (size_t i = 0; i < sizes.size(); i++) {
     raw_xfer_shape.dims[i].size = 1;
     cached_xfer_shape.dims[i].size = 1;
   }
-  xfer_block.refs.push_back(Refinement{
+  xfer_block.refs.emplace_back(Refinement{
       RefDir::In,         // dir
       var_name,           // from
       "src",              // into
@@ -68,7 +61,7 @@ void ApplyCache(Block* block,                 //
       it->offset,         // offset
       it->bank_dim,       // bank_dim
   });
-  xfer_block.refs.push_back(Refinement{
+  xfer_block.refs.emplace_back(Refinement{
       RefDir::Out,        // dir
       var_name,           // from
       "dst",              // into
@@ -80,8 +73,8 @@ void ApplyCache(Block* block,                 //
       it->offset,         // offset
       it->bank_dim,       // bank_dim
   });
-  xfer_block.stmts.push_back(std::make_shared<Load>("src", "$X"));
-  xfer_block.stmts.push_back(std::make_shared<Store>("$X", "dst"));
+  xfer_block.stmts.emplace_back(std::make_shared<Load>("src", "$X"));
+  xfer_block.stmts.emplace_back(std::make_shared<Store>("$X", "dst"));
   // If original refinement was input, load into cache
   if (IsReadDir(it->dir)) {
     auto cache_load = std::make_shared<Block>(xfer_block);
@@ -89,7 +82,7 @@ void ApplyCache(Block* block,                 //
     cache_load->refs[0].from = raw_name;
     cache_load->refs[0].shape = raw_xfer_shape;
     cache_load->refs[1].location = mem_loc;
-    block->stmts.push_front(cache_load);
+    block->stmts.emplace_front(cache_load);
   }
   // If original refinement was output, flush from cache
   if (IsWriteDir(it->dir)) {
@@ -98,10 +91,10 @@ void ApplyCache(Block* block,                 //
     cache_store->refs[1].from = raw_name;
     cache_store->refs[1].shape = raw_xfer_shape;
     cache_store->refs[0].location = mem_loc;
-    block->stmts.push_back(cache_store);
+    block->stmts.emplace_back(cache_store);
   }
   // Add the new declaration (replacing the original)
-  block->refs.push_back(Refinement{
+  block->refs.emplace_back(Refinement{
       RefDir::None,  // dir
       "",            // from
       var_name,      // into
@@ -122,6 +115,19 @@ void CacheBlock(Block* block, const std::set<RefDir>& dirs, const Location& mem_
       codegen::ApplyCache(block, ref.into, mem_loc, xfer_loc);
     }
   }
+}
+
+void CachePass(Block* root, const proto::CachePass& options) {
+  auto reqs = FromProto(options.reqs());
+  std::set<RefDir> dirs;
+  for (const auto& dir : options.dirs()) {
+    dirs.emplace(stripe::FromProto(static_cast<stripe::proto::Refinement::Dir>(dir)));
+  }
+  auto mem_loc = stripe::FromProto(options.mem_loc());
+  auto xfer_loc = stripe::FromProto(options.xfer_loc());
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
+    CacheBlock(block, dirs, mem_loc, xfer_loc);
+  });
 }
 
 }  // namespace codegen
