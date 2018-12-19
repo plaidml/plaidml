@@ -357,7 +357,8 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
     os << ref.shape.byte_size() / 1024.0 << " KiB";
   }
   if (ref.bank_dim) {
-    os << ", orig_name: " << ref.bank_dim->orig_name;
+    os << ", banking " << ref.bank_dim->orig_name << " " << ref.bank_dim->orig_shape
+       << " on didx=" << ref.bank_dim->dim_pos;
   }
   if (!ref.from.empty() && ref.into != ref.from) {
     os << " // alias";
