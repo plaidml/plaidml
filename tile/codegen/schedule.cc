@@ -255,7 +255,7 @@ struct CacheEntry {
   stripe::Statement* writer = nullptr;
   std::unordered_set<stripe::Statement*> readers;
 
-  // The CacheEntry's position in the active cache entry list.
+  // The CacheEntry's position in its active cache entry list.
   std::list<CacheEntry*>::iterator active_iterator;
 
   // The CacheEntry's uncovered ranges.  When this list is empty, the
@@ -283,6 +283,10 @@ struct Placement {
   // case it will be filled in when the plan is accepted.
   CacheEntry* entry = nullptr;
 };
+
+std::ostream& operator<<(std::ostream& o, const Placement& p) {
+  return o << p.range << " affine=" << p.source->ref.location.unit;
+}
 
 // Represents a placement plan for a particular Statement.
 using PlacementPlan = std::unordered_map<std::string, Placement>;
@@ -375,28 +379,28 @@ class Scheduler {
   //   that's already been established by a runtime-future Statement,
   // * A vector of RefInfos that need to be placed for the current
   //   Statement.
-  std::tuple<PlacementPlan, std::vector<std::pair<RefInfo*, stripe::RefDir>>> GatherPlacementState(
-      stripe::Statement* stmt);
+  std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>>
+  GatherPlacementState(stripe::Statement* stmt);
 
   // Makes a placement plan, trying several strategies.
   PlacementPlan MakePlacementPlan(stripe::Statement* stmt);
 
-  // Attempts to make a placement plan using the supplied ranges.
-  bool TryPlaceInRanges(PlacementPlan* plan, stripe::Statement* stmt,
-                        const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos, std::list<MemRange> ranges);
+  // Attempts to augment a placement plan using the supplied ranges.
+  bool TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos,
+                        std::list<MemRange> ranges);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, and does not collide
   // with any previously-scheduled CacheEntry unless that CacheEntry
   // has a writer (i.e. does not require swap-in).
-  bool TryMakePlanWithNoSwaps(PlacementPlan* plan, stripe::Statement* stmt,
-                              const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos);
+  bool TryMakePlanWithNoSwaps(PlacementPlan* plan,
+                              const std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>& todos);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, but allows collisions
   // with previously-scheduled CacheEntries (producing swap-ins).
-  bool TryMakePlanWithSwaps(PlacementPlan* plan, stripe::Statement* stmt,
-                            const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos);
+  bool TryMakePlanWithSwaps(PlacementPlan* plan,
+                            const std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>& todos);
 
   // Makes a worst-possible-case placement plan; guaranteed to always
   // work (as long as every Statement can fit into memory), but not
@@ -456,14 +460,15 @@ class Scheduler {
   // will be converted into Refinements at the end of scheduling.
   std::list<CacheEntry> cache_entries_;
 
-  // The currently-active CacheEntries, ordered by starting offset --
-  // i.e. the list of CacheEntries that the runtime-future is
-  // expecting to have available to it.  This is used for finding
-  // holes for new CacheEntries.  Note that there may be overlaps, and
-  // there may be duplicated (multiple CacheEntry objects for the same
-  // backing refinement), and that these CacheEntries may not be valid
-  // for the current statement to use -- valid CacheEntries must be
-  // found via ri_map_.
+  // The currently-active CacheEntries, grouped by affine, and ordered
+  // by starting offset -- i.e. for each affine, the list of
+  // CacheEntries that the runtime-future is expecting to have
+  // available to it.  This is used for finding holes for new
+  // CacheEntries.  Note that there may be overlaps, and there may be
+  // duplicates (multiple CacheEntry objects for the same backing
+  // refinement), and that these CacheEntries may not be valid for the
+  // current statement to use -- valid CacheEntries must be found via
+  // ri_map_.
   //
   // Entries are removed from this list when their memory is
   // completely covered by subsequently-created CacheEntries -- i.e. a
@@ -473,7 +478,7 @@ class Scheduler {
   // runtime-future CacheEntry; the CacheEntries in that covering set
   // will have already added dependencies to the accessors of the
   // runtime-future CacheEntry.
-  std::list<CacheEntry*> active_entries_;
+  std::map<stripe::Affine, std::list<CacheEntry*>> active_affine_entries_;
 };
 
 void Scheduler::Schedule(const AliasMap& alias_map, stripe::Block* block, const proto::SchedulePass& options) {
@@ -573,15 +578,15 @@ void Scheduler::Run() {
     //
     //   If we're creating a CacheEntry, we may be using memory that
     //   will be overwritten by runtime-future CacheEntries (which we
-    //   can observe via the active_entries list).  So there's a
-    //   little more processing to do.
+    //   can observe via the per-affine active entries list).  So
+    //   there's a little more processing to do.
     //
     //   For each runtime-future CacheEntry that is going to overwrite
     //   our newly-created CacheEntry:
     //
     //     * We subtract our current CacheEntry from the future
-    //       CacheEntry's range (possibly removing it from
-    //       active_entries)
+    //       CacheEntry's range (possibly removing it from its
+    //       affine's active entries)
     //
     //     * If the future CacheEntry doesn't have a writer, we give
     //       it one, by adding a swap-in.
@@ -609,15 +614,15 @@ void Scheduler::Run() {
     //   not going to be used by a runtime-future Statement within the
     //   current Block.
 
-    std::list<CacheEntry*> added_entries;
+    std::map<stripe::Affine, std::list<CacheEntry*>> added_affine_entries;
 
     // TODO: There's a straightforward way of walking the plan's
-    // placements and the existing active_entries_ at the same time,
-    // saving a lot of comparisons.  We don't bother for now, but only
-    // because it's a little complicated to get right and premature
-    // optimization is the root of all evil, but if we observe a lot
-    // of comparisons being done via RangesOverlap(), we have a way to
-    // fix it.
+    // placements and the existing active_affine_entries_ at the same
+    // time, saving a lot of comparisons.  We don't bother for now,
+    // but only because it's a little complicated to get right and
+    // premature optimization is the root of all evil, but if we
+    // observe a lot of comparisons being done via RangesOverlap(), we
+    // have a way to fix it.
 
     for (auto& name_placement : plan) {
       IVLOG(3, "Applying placement for " << name_placement.first);
@@ -632,7 +637,8 @@ void Scheduler::Run() {
       if (is_new_entry) {
         // This Placement requires a new entry.
         ent = &*cache_entries_.emplace(cache_entries_.end(), CacheEntry{placement.source, placement.range});
-        IVLOG(3, "Created cache entry " << ent->name << " at " << ent->range);
+        IVLOG(3, "Created cache entry " << ent->name << " at " << ent->range
+                                        << " with affine=" << ent->source->ref.location.unit);
         placement.entry = ent;
         placement.source->cache_entry = ent;
       }
@@ -676,10 +682,11 @@ void Scheduler::Run() {
       // current CacheEntry.
       //
       // N.B. After the SubtractRange() call, we may remove future_ent
-      // from the active_entries_ list.  To ensure that our iteration
+      // from its active_affine_entries_ list.  To ensure that our iteration
       // is safe, we explicitly manage it, and make sure to advance
       // the iterator prior to the post-SubtractRange() removal.
-      for (auto fit = active_entries_.begin(); fit != active_entries_.end();) {
+      auto& active_entlist = active_affine_entries_[ent->source->ref.location.unit];
+      for (auto fit = active_entlist.begin(); fit != active_entlist.end();) {
         CacheEntry* future_ent = *fit;
         ++fit;
         if (future_ent == ent || !RangesOverlap(ent->range, future_ent->uncovered_ranges)) {
@@ -700,8 +707,15 @@ void Scheduler::Run() {
           SubtractRange(ent->range, &future_ent->uncovered_ranges);
           if (future_ent->uncovered_ranges.empty()) {
             IVLOG(3, "  Existing entry " << future_ent->name
-                                         << " is now completely covered; removing from active_entries_");
-            active_entries_.erase(future_ent->active_iterator);
+                                         << " is now completely covered; removing from active entries");
+            IVLOG(3, "    Active iterator is " << &*future_ent->active_iterator << " active_entlist is at "
+                                               << &active_entlist << ", contains:");
+            if (VLOG_IS_ON(3)) {
+              for (auto entp = active_entlist.begin(); entp != active_entlist.end(); ++entp) {
+                IVLOG(3, "    " << &*entp << ": " << (*entp)->name << " at " << (*entp)->range);
+              }
+            }
+            active_entlist.erase(future_ent->active_iterator);
           }
 
           // Make sure we don't use this entry for accessing this ref
@@ -715,19 +729,28 @@ void Scheduler::Run() {
       }
 
       if (is_new_entry) {
-        IVLOG(3, "Adding " << ent->name << " at " << ent->range << " to added_entries");
-        ent->active_iterator = added_entries.emplace(added_entries.end(), ent);
+        IVLOG(3, "Adding " << ent->name << " at " << ent->range << " to added_affine_entries");
+        auto& active_entlist = added_affine_entries[ent->source->ref.location.unit];
+        ent->active_iterator = active_entlist.emplace(active_entlist.end(), ent);
+        IVLOG(3, "  Active iterator was " << &*ent->active_iterator << "; list at " << &active_entlist
+                                          << ", size=" << active_entlist.size());
       }
     }
 
-    IVLOG(3, "Splicing into active_entries_");
-    active_entries_.splice(active_entries_.begin(), added_entries);
-    active_entries_.sort([](CacheEntry* lhs, CacheEntry* rhs) { return lhs->range.begin < rhs->range.begin; });
+    IVLOG(3, "Splicing into active_affine_entries_");
+    for (auto& added_affine_entlist : added_affine_entries) {
+      auto& active_entlist = active_affine_entries_[added_affine_entlist.first];
+      active_entlist.splice(active_entlist.begin(), added_affine_entlist.second);
+      active_entlist.sort([](CacheEntry* lhs, CacheEntry* rhs) { return lhs->range.begin < rhs->range.begin; });
+    }
 
     if (VLOG_IS_ON(3)) {
-      IVLOG(3, "active_entries_ now contains:");
-      for (auto* ent : active_entries_) {
-        IVLOG(3, "  " << ent->name << " at " << ent->range);
+      IVLOG(3, "active_affine_entries_ now contains:");
+      for (auto& affine_entlist : active_affine_entries_) {
+        IVLOG(3, "  Affine: " << affine_entlist.first);
+        for (auto* ent : affine_entlist.second) {
+          IVLOG(3, "    " << ent->name << " at " << ent->range);
+        }
       }
     }
 
@@ -748,10 +771,12 @@ void Scheduler::Run() {
   // have no dependencies, allowing them to execute in any order
   // anyway, but this will tend to queue them for memory transfer in
   // an order that enables the compute units to get busy ASAP.
-  for (auto* ent : active_entries_) {
-    if (!ent->writer) {
-      IVLOG(3, "  Adding final swap-in for " << ent->name);
-      AddSwapIn(ent->first_reader, ent);
+  for (auto& affine_entlist : active_affine_entries_) {
+    for (auto* ent : affine_entlist.second) {
+      if (!ent->writer) {
+        IVLOG(3, "  Adding final swap-in for " << ent->name);
+        AddSwapIn(ent->first_reader, ent);
+      }
     }
   }
 
@@ -794,8 +819,8 @@ void Scheduler::Run() {
   });
 }
 
-std::tuple<PlacementPlan, std::vector<std::pair<RefInfo*, stripe::RefDir>>> Scheduler::GatherPlacementState(
-    stripe::Statement* stmt) {
+std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>>
+Scheduler::GatherPlacementState(stripe::Statement* stmt) {
   PlacementPlan plan;
   std::unordered_map<RefInfo*, stripe::RefDir> todo_map;
 
@@ -833,14 +858,18 @@ std::tuple<PlacementPlan, std::vector<std::pair<RefInfo*, stripe::RefDir>>> Sche
     add(input, stripe::RefDir::In);
   }
 
-  // Organize the placements to be made, largest-first, using the
+  // Organize the placements to be made per-affine, largest-first, using the
   // underlying refinement 'into' name as the tiebreaker.
-  std::vector<std::pair<RefInfo*, stripe::RefDir>> todos;
-  todos.insert(todos.end(), todo_map.begin(), todo_map.end());
-  std::sort(todos.begin(), todos.end(),
-            [](std::pair<RefInfo*, stripe::RefDir> lhs, std::pair<RefInfo*, stripe::RefDir> rhs) {
-              return std::tie(rhs.first->size, rhs.first->ref.into) < std::tie(lhs.first->size, lhs.first->ref.into);
-            });
+  std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>> todos;
+  for (auto& refinfo_refdir : todo_map) {
+    todos[refinfo_refdir.first->ref.location.unit].emplace_back(refinfo_refdir);
+  }
+  for (auto& affine_refvec : todos) {
+    std::sort(affine_refvec.second.begin(), affine_refvec.second.end(),
+              [](std::pair<RefInfo*, stripe::RefDir> lhs, std::pair<RefInfo*, stripe::RefDir> rhs) {
+                return std::tie(rhs.first->size, rhs.first->ref.into) < std::tie(lhs.first->size, lhs.first->ref.into);
+              });
+  }
 
   return std::make_tuple(std::move(plan), std::move(todos));
 }
@@ -848,18 +877,32 @@ std::tuple<PlacementPlan, std::vector<std::pair<RefInfo*, stripe::RefDir>>> Sche
 PlacementPlan Scheduler::MakePlacementPlan(stripe::Statement* stmt) {
   // Initialize useful planning inputs.
   PlacementPlan existing_entry_plan;
-  std::vector<std::pair<RefInfo*, stripe::RefDir>> todos;
+  std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>> todos;
 
   std::tie(existing_entry_plan, todos) = GatherPlacementState(stmt);
 
+  if (VLOG_IS_ON(3)) {
+    IVLOG(3, "  Existing entries in plan:");
+    for (auto& name_placement : existing_entry_plan) {
+      IVLOG(3, "    " << name_placement.first << " -> " << name_placement.second);
+    }
+    IVLOG(3, "  ToDos:");
+    for (auto& affine_refvec : todos) {
+      IVLOG(3, "    Affine=" << affine_refvec.first);
+      for (auto& ri_dir : affine_refvec.second) {
+        IVLOG(3, "      Ref=" << ri_dir.first->ref.into << " size=" << ri_dir.first->size);
+      }
+    }
+  }
+
   PlacementPlan plan{existing_entry_plan};
-  if (TryMakePlanWithNoSwaps(&plan, stmt, todos)) {
+  if (TryMakePlanWithNoSwaps(&plan, todos)) {
     IVLOG(3, "  Made plan with no swaps");
     return plan;
   }
 
   plan = existing_entry_plan;
-  if (TryMakePlanWithSwaps(&plan, stmt, todos)) {
+  if (TryMakePlanWithSwaps(&plan, todos)) {
     IVLOG(3, "  Made plan with swaps");
     return plan;
   }
@@ -871,15 +914,14 @@ PlacementPlan Scheduler::MakePlacementPlan(stripe::Statement* stmt) {
   return MakeFallbackPlan(stmt);
 }
 
-bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, stripe::Statement* stmt,
-                                 const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos,
+bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos,
                                  std::list<MemRange> ranges) {
   // For each todo in largest->smallest size, determine a placement.
   // For each one, we want to pick the smallest free range that is
   // still big enough to hold the todo.
-  IVLOG(3, "    Looking for placements");
+  IVLOG(3, "      Looking for placements");
   for (auto todo : todos) {
-    IVLOG(3, "      Finding placement for " << todo.first->ref.into << ", size=" << todo.first->size);
+    IVLOG(3, "        Finding placement for " << todo.first->ref.into << ", size=" << todo.first->size);
     std::list<MemRange>::iterator best_so_far = ranges.end();
     std::size_t best_waste_so_far = mem_bytes_;
     for (auto rit = ranges.begin(); rit != ranges.end(); ++rit) {
@@ -890,7 +932,7 @@ bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, stripe::Statement* stmt,
       if (best_waste_so_far <= waste) {
         continue;
       }
-      IVLOG(3, "        Range " << *rit << " is the best so far");
+      IVLOG(3, "          Range " << *rit << " is the best so far");
       best_so_far = rit;
       best_waste_so_far = waste;
     }
@@ -905,45 +947,60 @@ bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, stripe::Statement* stmt,
   return true;
 }
 
-bool Scheduler::TryMakePlanWithNoSwaps(PlacementPlan* plan, stripe::Statement* stmt,
-                                       const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos) {
-  // Build a list of the available ranges.  For our purposes, a range
-  // is available if it already has an initial writer (=> it is not
-  // going to require a swap-in), and if its RefInfo is not already in
-  // the plan (because RefInfos that are in the plan are required by
-  // the current statement).
+bool Scheduler::TryMakePlanWithNoSwaps(
+    PlacementPlan* plan, const std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>& todos) {
   IVLOG(3, "    Attempting plan with no swaps");
-  std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
-  for (auto* ent : active_entries_) {
-    IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " writer=" << ent->writer
-                                << " plan.count=" << plan->count(ent->source->ref.into));
-    if (!(ent->writer && !plan->count(ent->source->ref.into))) {
-      IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
-      SubtractRange(ent->range, &ranges);
+
+  for (auto& affine_refvec : todos) {
+    // Build a list of the available ranges.  For our purposes, a range
+    // is available if it already has an initial writer (=> it is not
+    // going to require a swap-in), and if its RefInfo is not already in
+    // the plan (because RefInfos that are in the plan are required by
+    // the current statement).
+    IVLOG(3, "      Planning memory affine=" << affine_refvec.first);
+    std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
+    for (auto* ent : active_affine_entries_[affine_refvec.first]) {
+      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " writer=" << ent->writer
+                                  << " plan.count=" << plan->count(ent->source->ref.into));
+      if (!(ent->writer && !plan->count(ent->source->ref.into))) {
+        IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
+        SubtractRange(ent->range, &ranges);
+      }
+    }
+
+    if (!TryPlaceInRanges(plan, affine_refvec.second, std::move(ranges))) {
+      return false;
     }
   }
 
-  return TryPlaceInRanges(plan, stmt, todos, std::move(ranges));
+  return true;
 }
 
-bool Scheduler::TryMakePlanWithSwaps(PlacementPlan* plan, stripe::Statement* stmt,
-                                     const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos) {
-  // Build a list of the available ranges.  For our purposes, a range
-  // is available as long as its RefInfo is not already in the plan
-  // (because RefInfos that are in the plan are required by the
-  // current statement).
+bool Scheduler::TryMakePlanWithSwaps(
+    PlacementPlan* plan, const std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>& todos) {
   IVLOG(3, "    Attempting plan with swaps");
-  std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
-  for (auto* ent : active_entries_) {
-    IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " writer=" << ent->writer
-                                << " plan.count=" << plan->count(ent->source->ref.into));
-    if (plan->count(ent->source->ref.into)) {
-      IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
-      SubtractRange(ent->range, &ranges);
+
+  for (auto& affine_refvec : todos) {
+    // Build a list of the available ranges.  For our purposes, a range
+    // is available as long as its RefInfo is not already in the plan
+    // (because RefInfos that are in the plan are required by the
+    // current statement).
+    std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
+    for (auto* ent : active_affine_entries_[affine_refvec.first]) {
+      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " writer=" << ent->writer
+                                  << " plan.count=" << plan->count(ent->source->ref.into));
+      if (plan->count(ent->source->ref.into)) {
+        IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
+        SubtractRange(ent->range, &ranges);
+      }
+    }
+
+    if (!TryPlaceInRanges(plan, affine_refvec.second, std::move(ranges))) {
+      return false;
     }
   }
 
-  return TryPlaceInRanges(plan, stmt, todos, std::move(ranges));
+  return true;
 }
 
 PlacementPlan Scheduler::MakeFallbackPlan(stripe::Statement* stmt) {
