@@ -164,7 +164,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   outer->constraints = tiled->constraints;
   auto inner = std::make_shared<Block>();
   inner->name = tiled->name;
-  inner->tags = tiled->tags;
+  outer->tags = tiled->tags;
   outer->stmts.push_back(inner);
   // Move / rename each index to the appropriate block
   for (const auto& idx : tiled->idxs) {
@@ -324,11 +324,11 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
       } break;
       case StmtKind::Special: {
         auto op = Special::Downcast(stmt);
-        for (auto& s : op->inputs) {
-          s = remap_b.at(s);
+        for (auto& in : op->inputs) {
+          in = remap_b.at(in);
         }
-        for (auto& s : op->outputs) {
-          s = remap_b.at(s);
+        for (auto& out : op->outputs) {
+          out = remap_b.at(out);
         }
       } break;
       case StmtKind::Block: {
@@ -369,7 +369,7 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
     while (true) {
       // Get block everytime in case it's updated
       auto block1 = Block::Downcast(*it);
-      IVLOG(3, "Attempting fusion on block:\n" << *block1);
+      IVLOG(3, "Attempting fusion on block:\n" << block1->name);
       // Get the next statement
       auto it_next = it;
       it_next++;
@@ -417,21 +417,21 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
         break;
       }
       // Do the appropriate refactors
-      auto ref1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a);
-      auto ref2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b);
-      // IVLOG(3, "Fusion refactor 1:\n" << *ref1);
-      // IVLOG(3, "Fusion refactor 2:\n" << *ref2);
+      auto refactor1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a);
+      auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b);
+      // IVLOG(3, "Fusion refactor 1:\n" << *refactor1);
+      // IVLOG(3, "Fusion refactor 2:\n" << *refactor2);
       // Try the actual fusion
-      if (!FuseBlocks(scope, ref1.get(), ref2.get())) {
+      if (!FuseBlocks(scope, refactor1.get(), refactor2.get())) {
         strategy->OnFailed();
         IVLOG(3, "Actual fusion failed");
         break;
       }
-      IVLOG(3, "Fused block:\n" << *ref1);
+      IVLOG(3, "Fused block:\n" << *refactor1);
       // If it worked, update
-      *it = ref1;
+      *it = refactor1;
       block->stmts.erase(it_next);
-      strategy->OnFused(scope, ref1.get(), *block1, *block2);
+      strategy->OnFused(scope, refactor1.get(), *block1, *block2);
     }
     it++;
   }
