@@ -34,7 +34,7 @@ void EnumerateIndexes(const std::vector<IndexValue>& idxs, size_t idx_num, const
   }
 }
 
-void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
+void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed, bool top) {
   IVLOG(3, "EvalWithValues> block: " << block->name << ", fixed: " << fixed);
   block->location.unit = block->location.unit.partial_eval(fixed);
   for (auto& ref : block->refs) {
@@ -52,6 +52,20 @@ void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
       for (auto& idx : inner->idxs) {
         idx.affine = idx.affine.partial_eval(fixed);
       }
+      if (top) {
+        for (auto& ref : inner->refs) {
+          if (!ref.from.empty()) {
+            auto from = ref.from;
+            if (ref.bank_dim) {  // HACK: can we make this configurable somehow?
+              from = ref.bank_dim->orig_name;
+            }
+            auto outer_ref = block->ref_by_into(from);
+            for (size_t i = 0; i < ref.access.size(); i++) {
+              ref.access[i] += outer_ref->access[i];
+            }
+          }
+        }
+      }
       std::map<std::string, int64_t> next;
       for (const auto& item : fixed) {
         if (item.first[0] == '#') {
@@ -65,7 +79,7 @@ void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
           next.emplace(idx.name, idx.affine.constant());
         }
       }
-      EvalWithValues(inner.get(), next);
+      EvalWithValues(inner.get(), next, false);
       for (const auto& idx_name : prune_idxs) {
         auto it = std::find_if(inner->idxs.begin(), inner->idxs.end(),
                                [&idx_name](const Index& idx) { return idx.name == idx_name; });
@@ -84,8 +98,10 @@ void EvalInner(Block* block, const std::vector<IndexValue>& idxs, const std::str
     complete_value += last_stride * item.value;
     last_stride *= item.idx->range;
   }
-  fixed.emplace(expand_idx, complete_value);
-  EvalWithValues(block, fixed);
+  if (!expand_idx.empty()) {
+    fixed.emplace(expand_idx, complete_value);
+  }
+  EvalWithValues(block, fixed, true);
 }
 
 void PreIterate(Block* block, std::function<void(const StatementIt& it)> func) {
@@ -213,11 +229,14 @@ void UnrollPass(Block* root, const proto::UnrollPass& options) {
   });
 }
 
-void UnrollIndexPass(Block* root, const proto::GenericPass& options) {
-  auto tags = FromProto(options.reqs());
-  for (const auto& tag : tags) {
-    UnrollIndex(root, tag);
-  }
+void UnrollIndexPass(Block* root, const proto::UnrollIndexPass& options) {
+  auto reqs = FromProto(options.reqs());
+  auto idx_reqs = FromProto(options.idx_reqs());
+  RunOnBlocks(root, reqs, [&idx_reqs](const AliasMap& map, Block* block) {
+    for (const auto& tag : idx_reqs) {
+      UnrollIndex(block, tag);
+    }
+  });
 }
 
 }  // namespace codegen

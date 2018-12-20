@@ -867,6 +867,27 @@ Affine Refinement::FlatAccess() const {
   return ret;
 }
 
+void Refinement::ApplyTile(const std::map<std::string, size_t>& tile_by_name) {
+  for (size_t i = 0; i < access.size(); i++) {
+    auto& aff = access[i];
+    int64_t low = 0;
+    int64_t high = 0;
+    for (const auto& kvp : aff.getMap()) {
+      if (kvp.first.empty()) {
+        continue;
+      }
+      if (kvp.second > 0) {
+        high += kvp.second * (tile_by_name.at(kvp.first) - 1);
+      } else {
+        low += kvp.second * (tile_by_name.at(kvp.first) - 1);
+      }
+    }
+    high += (shape.dims[i].size - 1);
+    shape.dims[i].size = high - low + 1;
+    aff.setConstant(0);
+  }
+}
+
 }  // namespace stripe
 }  // namespace tile
 }  // namespace vertexai
