@@ -129,24 +129,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
       std::remove_if(outer->refs.begin(), outer->refs.end(), [&](const auto& ref) { return ref.dir == RefDir::None; }),
       outer->refs.end());
   for (auto& ref : outer->refs) {
-    for (size_t i = 0; i < ref.access.size(); i++) {
-      auto& aff = ref.access[i];
-      int64_t low = 0;
-      int64_t high = 0;
-      for (const auto& kvp : aff.getMap()) {
-        if (kvp.first.empty()) {
-          continue;
-        }
-        if (kvp.second > 0) {
-          high += kvp.second * (tile_by_name[kvp.first] - 1);
-        } else {
-          low += kvp.second * (tile_by_name[kvp.first] - 1);
-        }
-      }
-      high += (ref.shape.dims[i].size - 1);
-      ref.shape.dims[i].size = high - low + 1;
-      aff.setConstant(0);
-    }
+    ref.ApplyTile(tile_by_name);
   }
   // Multiply each stride in the outer block refinements by the appropriate tile size
   for (auto& ref : outer->refs) {
@@ -172,80 +155,6 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
   */
 
   // Make the inner block the sole stmt of the outer block
-  outer->stmts = {inner};
-  return true;
-}
-
-bool ExtractTile(Block* outer, const TileShape& shape, const std::string& into_idx_name) {
-  // Verify tile shape is correct
-  if (outer->idxs.size() != shape.size()) {
-    throw_with_trace(std::runtime_error("Invalid tile specified"));
-  }
-
-  auto inner = std::make_shared<Block>();
-  inner->name = outer->name;
-  inner->comments = outer->comments;
-  std::swap(inner->idxs, outer->idxs);
-  std::swap(inner->constraints, outer->constraints);
-  inner->refs = outer->refs;
-  std::swap(inner->stmts, outer->stmts);
-  inner->location = outer->location;
-  std::swap(inner->tags, outer->tags);
-
-  std::vector<Index> factor_idxs;
-  for (size_t i = 0; i < inner->idxs.size(); i++) {
-    if (shape[i] > 1) {
-      auto& inner_idx = inner->idxs[i];
-      auto inner_range = IntDivCeil(inner_idx.range, shape[i]);
-      Index outer_idx{
-          inner_idx.name,  // name
-          shape[i],        // range
-      };
-      outer_idx.set_tag(into_idx_name);
-      Index factor_idx{
-          inner->unique_idx_name(inner_idx.name),              // name
-          1,                                                   // range
-          {outer_idx.name, static_cast<int64_t>(inner_range)}  // affine
-      };
-      auto combo = Affine(inner_idx.name) + Affine(factor_idx.name);
-      // Update any inner constraints that refer to this index
-      for (auto& constraint : inner->constraints) {
-        constraint.substitute(inner_idx.name, combo);
-      }
-      // Update any inner ref accesses that refer to this index
-      for (auto& ref : inner->refs) {
-        for (auto& aff : ref.access) {
-          aff.substitute(inner_idx.name, combo);
-        }
-      }
-      // Update any interior idxs that refer to this index
-      for (auto stmt : inner->stmts) {
-        auto interior = Block::Downcast(stmt);
-        if (interior) {
-          for (auto& idx : interior->idxs) {
-            idx.affine.substitute(inner_idx.name, combo);
-          }
-        }
-      }
-      if (inner_idx.range % shape[i]) {
-        inner->constraints.emplace_back(int64_t(inner_idx.range - 1) -  //
-                                        Affine(factor_idx.name) -       //
-                                        Affine(inner_idx.name));
-      }
-      inner_idx.range = inner_range;
-      outer->idxs.emplace_back(outer_idx);
-      factor_idxs.emplace_back(factor_idx);
-    }
-  }
-  // Append all factor_idxs, we defer this since this may cause inner->idxs to realloc
-  std::copy(factor_idxs.begin(), factor_idxs.end(), std::back_inserter(inner->idxs));
-
-  for (auto& ref : outer->refs) {
-    for (auto& aff : ref.access) {
-      aff = Affine{};
-    }
-  }
-
   outer->stmts = {inner};
   return true;
 }

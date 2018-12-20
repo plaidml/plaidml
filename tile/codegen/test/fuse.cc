@@ -70,7 +70,7 @@ block []:1 ( // simple_fuse
       none new@0x00000000 T[0, 0] fp32(100, 20):(20, 1):7.8125 KiB
       none new@0x00000000 X[0, 0] bool(100, 20):(20, 1):1.95312 KiB
   ) {
-    0: #fused 
+    0: #eltwise #eltwise_add #fused #kernel 
     block [i1:100, i2:20]:2000 ( // add+cmp_lt+cond
         #eltwise_add in A[i1, i2] fp32(1, 1):(20, 1):4 B
         #eltwise_add in B[i2] fp32(1):(1):4 B

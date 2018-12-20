@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <list>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -181,6 +182,7 @@ struct Refinement : Taggable {
   boost::optional<BankDimension> bank_dim;  // Which dimension should we bank on
 
   Affine FlatAccess() const;
+  void ApplyTile(const std::map<std::string, size_t>& tile_by_name);
 };
 
 struct Load : Statement {

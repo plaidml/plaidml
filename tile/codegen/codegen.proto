@@ -56,7 +56,7 @@ message Pass {
     GenericPass prune_idxs = 16;
     UnrollPass unroll = 17;
     DebankPass debank = 18;
-    GenericPass unroll_idx = 19;
+    UnrollIndexPass unroll_idx = 19;
   }
 }
 
@@ -118,8 +118,8 @@ message StencilIndex {
 }
 
 enum TileStrategy {
-  TileInteriorBlock = 0;
-  TileExteriorBlock = 1;
+  TileRanges = 0;
+  TileSizes = 1;
   TileSplitIndex = 2;
 }
 
@@ -131,12 +131,15 @@ message AutotilePass {
   optional bool fast = 5 [default = false];
   optional bool use_bytes = 6 [default = false];
   optional bool skip_1d = 7 [default = false];
-  required int64 max_output_size = 8;
-  required int64 max_input_size = 9;
-  optional double output_cost = 10 [default = 0.0];
-  optional double input_cost = 11 [default = 1.0];
-  optional TileStrategy strategy = 12 [default = TileInteriorBlock];
-  optional string into_idx = 13;
+  optional int64 max_output_size = 8 [default = 0];
+  optional int64 max_input_size = 9 [default = 0];
+  optional int64 max_total_size = 10 [default = 0];
+  optional double output_cost = 11 [default = 0.0];
+  optional double input_cost = 12 [default = 1.0];
+  optional TileStrategy strategy = 13 [default = TileRanges];
+  optional string idx_tag = 14;
+  optional bool copy_tags = 15 [default = false];
+  optional bool drop_outer_tags = 16 [default = false];
 }
 
 message TransposePass {
@@ -146,9 +149,8 @@ message TransposePass {
 
 message PartitionPass {
   repeated string reqs = 1;
-  repeated string outer_set = 2;
-  repeated string inner_set = 3;
-  required int64 num_parts = 4;
+  repeated string set_tags = 2;
+  required int64 num_parts = 3;
 }
 
 message DebankPass {
@@ -162,5 +164,5 @@ message UnrollPass {
 
 message UnrollIndexPass {
   repeated string reqs = 1;
-  required string idx_reqs = 2;
+  repeated string idx_reqs = 2;
 }

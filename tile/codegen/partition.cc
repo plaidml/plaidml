@@ -57,7 +57,7 @@ void SplitRefinement(Refinement* ref, const BankInfo& bank_info, const std::stri
   ref->location.unit = Affine{bank_name};
 }
 
-void SplayRefinement(Block* block, Refinement ref, const BankInfo& bank_info) {
+void SplayRefinement(Block* block, const Refinement& ref, const BankInfo& bank_info) {
   for (size_t i = 0; i < bank_info.num_banks; i++) {
     auto name = str(boost::format("%1%%%%2%") % ref.into % i);
     Location loc{ref.location.name, Affine(i)};
@@ -276,7 +276,7 @@ void SplitIndex(Block* block,                 //
   FixupJumps(block, ref, bank_info.num_banks, bank_name, is_primary);
 }
 
-void PartitionBuffer(Block* block, const std::string& ref_name, const BankInfo& bank_info) {
+void PartitionBuffer(Block* block, const std::string& ref_name, const BankInfo& bank_info, const Tags& set_tags) {
   auto ref = &*block->ref_by_into(ref_name);
   ref->bank_dim = BankDimension{bank_info.dim_pos, ref->shape, ref->into};
   for (auto stmt : block->stmts) {
@@ -290,7 +290,7 @@ void PartitionBuffer(Block* block, const std::string& ref_name, const BankInfo& 
       const auto& bank_access = inner_ref->access[bank_info.dim_pos];
       if (bank_access.isConstant()) {
         IVLOG(2, boost::format("Passthru of %1% on %2%") % inner_ref->into % inner->name);
-        PartitionBuffer(inner.get(), inner_ref->into, bank_info);
+        PartitionBuffer(inner.get(), inner_ref->into, bank_info, set_tags);
       } else {
         std::string idx_name;
         bool is_primary;
@@ -313,6 +313,7 @@ void PartitionBuffer(Block* block, const std::string& ref_name, const BankInfo& 
         }
         IVLOG(2, boost::format("Split dim of %1% on %2% via %3%") % inner_ref->into % inner->name % idx_name);
         SplitIndex(inner.get(), &*inner_ref, idx_name, bank_info, is_primary);
+        inner->add_tags(set_tags);
       }
     }
   }
@@ -356,6 +357,7 @@ void DebankBlocks(Block* block, const Location& loc) {
 void PartitionPass(Block* root, const proto::PartitionPass& options) {
   std::map<std::string, BankInfo> buf_banks;
   auto reqs = FromProto(options.reqs());
+  auto set_tags = FromProto(options.set_tags());
   RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {
     IVLOG(2, "Partition> block: " << block->name);
     if (block->ref_outs().size() != 1) {
@@ -453,7 +455,7 @@ void PartitionPass(Block* root, const proto::PartitionPass& options) {
     for (const auto& use : bank_info.uses) {
       IVLOG(2, "           block: " << use.first->name << ", idx_name: " << use.second.idx_name);
     }
-    PartitionBuffer(bank_info.base_block, bank_info.base_ref, bank_info);
+    PartitionBuffer(bank_info.base_block, bank_info.base_ref, bank_info, set_tags);
   }
 }
 
