@@ -132,6 +132,10 @@ struct RefInfo {
 
   // The AliasInfo for this refinement.
   const AliasInfo* alias_info = nullptr;
+
+  // The earliest (runtime-past) sub-statement of the main block that
+  // writes to this refinement.
+  stripe::Statement* earliest_writer = nullptr;
 };
 
 // A range of memory.
@@ -228,32 +232,41 @@ struct CacheEntry {
   //
   // At each point in scheduling where the CacheEntry's backing memory
   // is read, the reader is added to the readers set of the CacheEntry
-  // it's actually reading, and any existing writer of any CacheEntry
-  // covering the memory (which are all the runtime-future of the
-  // reader) picks up a dependency on the reader (since those writers
+  // it's actually reading, and all existing writers of any CacheEntry
+  // covering the memory (which are in the runtime-future of the
+  // reader) pick up a dependency on the reader (since those writers
   // can't reuse the memory until all readers of that memory have
   // completed).
   //
   // At each point in scheduling where the CacheEntry's backing memory
-  // is written, existing readers pick up a dependency on the current
-  // statement, the readers set is cleared, and:
+  // is written:
+  //
+  //   * Existing overlapping readers pick up a dependency on the
+  //     current statement,
+  //
+  //   * The writer is added to the writers map,
   //
   //   * If CacheEntry is also an input to the writing Statement
-  //     (i.e. the writer is also a reader), the writing Statement
-  //     becomes the sole reader (i.e. a swap-in or original writer is
-  //     needed before this CacheEntry can exist).
-  //
-  //   * If the CacheEntry is not an input to the writing Statement,
-  //     the writing statement becomes the writer.
+  //     (i.e. the writer is also a reader), the writing Statement is
+  //     also added to readers.
   //
   // N.B. At write-time, the CacheEntry will always already exist
   // (edge case: it might not, if what we're writing is a program
   // output, but in that case, we schedule a swap out to main memory,
   // and that swap-out becomes the reader that causes the CacheEntry
   // to exist).
-  stripe::StatementIt first_reader;
-  stripe::Statement* writer = nullptr;
-  std::unordered_set<stripe::Statement*> readers;
+  stripe::StatementIt first_accessor;  // In runtime order
+  std::unordered_map<stripe::Statement*, boost::optional<AliasInfo>> writers;
+  std::unordered_map<stripe::Statement*, boost::optional<AliasInfo>> readers;
+
+  // True iff we've seen this entry written by the first statement (in
+  // runtime order) that writes to it.  This is used to determine
+  // swap-in necessity: if we've seen that first statement write to
+  // this CacheEntry, then there's no need for a swap-in; otherwise,
+  // the first statement to write to this CacheEntry is in the
+  // runtime-past, and so if we're covering it up with another entry,
+  // we need to schedule a swap-in.
+  bool saw_earliest_writer = false;
 
   // The CacheEntry's position in its active cache entry list.
   std::list<CacheEntry*>::iterator active_iterator;
@@ -490,6 +503,14 @@ std::unordered_map<std::string, RefInfo> Scheduler::BuildRefInfoMap(stripe::Bloc
   for (auto& ref : block->refs) {
     ri_map.emplace(ref.into, RefInfo{&ref});
   }
+  for (auto& stmt : block->stmts) {
+    for (const auto& written_ref_name : stmt->buffer_writes()) {
+      auto& ri = ri_map.at(written_ref_name);
+      if (!ri.earliest_writer) {
+        ri.earliest_writer = stmt.get();
+      }
+    }
+  }
   return ri_map;
 }
 
@@ -562,6 +583,14 @@ void Scheduler::Run() {
 
     // Figure out where we're going to put any newly-created CacheEntries.
     PlacementPlan plan = MakePlacementPlan(si->get());
+
+    // Generate the AliasMap for this statement, which we'll use for
+    // keeping track of accessors.
+    boost::optional<AliasMap> current_alias_map;
+    stripe::Block* current_block = dynamic_cast<stripe::Block*>(si->get());
+    if (current_block) {
+      current_alias_map = AliasMap{*alias_map_, current_block};
+    }
 
     // For each input in the plan:
     //
@@ -643,22 +672,37 @@ void Scheduler::Run() {
         placement.source->cache_entry = ent;
       }
 
+      // Get the substatement's alias info for this refinement, if any.
+      boost::optional<AliasInfo> alias_info = boost::none;
+      if (current_alias_map) {
+        for (auto& ref : current_block->refs) {
+          if (ref.from == ent->source->ref.into) {
+            alias_info = boost::make_optional(current_alias_map->at(ref.into));
+            break;
+          }
+        }
+      }
+
       // Add dependency tracking information for this CacheEntry.
       if (IsWriteDir(placement.dir)) {
-        for (auto* reader : ent->readers) {
-          reader->deps.emplace_back(si);
+        for (auto& reader_aliasinfo : ent->readers) {
+          if (reader_aliasinfo.second == boost::none || alias_info == boost::none ||
+              AliasInfo::Compare(*alias_info, *reader_aliasinfo.second) != AliasType::None) {
+            reader_aliasinfo.first->deps.emplace_back(si);
+          }
         }
-        ent->readers.clear();
-        if (IsReadDir(placement.dir)) {
-          ent->readers.emplace(si->get());
-          ent->first_reader = si;
-        } else {
-          ent->writer = si->get();
+
+        ent->writers.emplace(si->get(), alias_info);
+        if (si->get() == ent->source->earliest_writer) {
+          ent->saw_earliest_writer = true;
         }
-      } else if (IsReadDir(placement.dir)) {
-        ent->readers.emplace(si->get());
-        ent->first_reader = si;
       }
+
+      if (IsReadDir(placement.dir)) {
+        ent->readers.emplace(si->get(), alias_info);
+      }
+
+      ent->first_accessor = si;
 
       // Determine whether this CacheEntry will need to be swapped
       // out, setting up reuse_dep to be the dependency that
@@ -696,8 +740,7 @@ void Scheduler::Run() {
         if (is_new_entry) {
           IVLOG(3, "New entry " << ent->name << " at " << ent->range << " collides with existing entry "
                                 << future_ent->name << " at " << future_ent->range);
-          if (!future_ent->writer) {
-            // This will give future_ent a writer.
+          if (!future_ent->saw_earliest_writer) {
             auto next_it = reuse_dep;
             ++next_it;
             IVLOG(3, "  Adding swap-in for " << future_ent->name << " at " << future_ent->range);
@@ -725,7 +768,9 @@ void Scheduler::Run() {
           }
         }
 
-        future_ent->writer->deps.emplace_back(reuse_dep);
+        for (auto& writer_aliasinfo : future_ent->writers) {
+          writer_aliasinfo.first->deps.emplace_back(reuse_dep);
+        }
       }
 
       if (is_new_entry) {
@@ -773,9 +818,9 @@ void Scheduler::Run() {
   // an order that enables the compute units to get busy ASAP.
   for (auto& affine_entlist : active_affine_entries_) {
     for (auto* ent : affine_entlist.second) {
-      if (!ent->writer) {
+      if (!ent->source->earliest_writer) {
         IVLOG(3, "  Adding final swap-in for " << ent->name);
-        AddSwapIn(ent->first_reader, ent);
+        AddSwapIn(ent->first_accessor, ent);
       }
     }
   }
@@ -960,9 +1005,9 @@ bool Scheduler::TryMakePlanWithNoSwaps(
     IVLOG(3, "      Planning memory affine=" << affine_refvec.first);
     std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
     for (auto* ent : active_affine_entries_[affine_refvec.first]) {
-      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " writer=" << ent->writer
-                                  << " plan.count=" << plan->count(ent->source->ref.into));
-      if (!(ent->writer && !plan->count(ent->source->ref.into))) {
+      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " saw_earliest_writer="
+                                  << ent->saw_earliest_writer << " plan.count=" << plan->count(ent->source->ref.into));
+      if (!(ent->saw_earliest_writer && !plan->count(ent->source->ref.into))) {
         IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
         SubtractRange(ent->range, &ranges);
       }
@@ -987,8 +1032,8 @@ bool Scheduler::TryMakePlanWithSwaps(
     // current statement).
     std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
     for (auto* ent : active_affine_entries_[affine_refvec.first]) {
-      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " writer=" << ent->writer
-                                  << " plan.count=" << plan->count(ent->source->ref.into));
+      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " saw_earliest_writer="
+                                  << ent->saw_earliest_writer << " plan.count=" << plan->count(ent->source->ref.into));
       if (plan->count(ent->source->ref.into)) {
         IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
         SubtractRange(ent->range, &ranges);
@@ -1071,10 +1116,10 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
 
   stripe::StatementIt swap_in_it = block_->stmts.emplace(si, std::make_shared<stripe::Block>(std::move(swap_block)));
   stripe::Statement* swap_in = swap_in_it->get();
-  ent->writer = swap_in;
+  ent->writers.emplace(swap_in, boost::none);
   ent->source->swap_in_readers.emplace(swap_in);
-  for (stripe::Statement* reader : ent->readers) {
-    reader->deps.emplace_back(swap_in_it);
+  for (auto& reader_aliasinfo : ent->readers) {
+    reader_aliasinfo.first->deps.emplace_back(swap_in_it);
   }
   return swap_in_it;
 }
