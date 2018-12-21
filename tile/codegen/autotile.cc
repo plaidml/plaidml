@@ -18,7 +18,7 @@ using namespace stripe;  // NOLINT
 
 namespace {
 
-struct TileSizes {
+struct TileMetrics {
   int64_t inputs = 0;
   int64_t outputs = 0;
   int64_t total = 0;
@@ -37,6 +37,7 @@ struct Tile {
   }
 
   std::vector<TileDimension> dims;
+  TileMetrics metrics;
 
   void set(size_t i, size_t value, size_t range) {
     value = std::min(value, range);
@@ -67,6 +68,12 @@ struct Tile {
     }
     return ret;
   }
+
+  bool IsValid(const proto::AutotilePass& options) const {
+    return !((options.max_output_size() && metrics.outputs > options.max_output_size()) ||
+             (options.max_input_size() && metrics.inputs > options.max_input_size()) ||
+             (options.max_total_size() && metrics.total > options.max_total_size()));
+  }
 };
 
 bool operator<(const TileDimension& lhs, const TileDimension& rhs) {
@@ -77,8 +84,8 @@ bool operator<(const Tile& lhs, const Tile& rhs) {  //
   return lhs.dims < rhs.dims;
 }
 
-std::ostream& operator<<(std::ostream& os, const TileSizes& sizes) {
-  os << "(" << sizes.inputs << ", " << sizes.outputs << ", " << sizes.total << ")";
+std::ostream& operator<<(std::ostream& os, const TileMetrics& metrics) {
+  os << "(" << metrics.inputs << ", " << metrics.outputs << ", " << metrics.total << ")";
   return os;
 }
 
@@ -116,10 +123,10 @@ size_t ComputeBytes(const std::map<std::string, size_t>& tile_by_name,  //
   return bytes;
 }
 
-TileSizes ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
-                       const Block& block,                                 //
-                       const proto::AutotilePass& options) {
-  TileSizes ret;
+TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
+                         const Block& block,                                 //
+                         const proto::AutotilePass& options) {
+  TileMetrics ret;
   for (const auto& ref : block.refs) {
     if (ref.dir == RefDir::None) {
       continue;
@@ -139,41 +146,40 @@ TileSizes ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
   return ret;
 }
 
-double TileCost(const Block& block, const proto::AutotilePass& options, const Tile& tile) {
+double TileCost(const Block& block, const proto::AutotilePass& options, Tile* tile) {
   std::map<std::string, size_t> tile_by_name;
   for (size_t i = 0; i < block.idxs.size(); i++) {
-    tile_by_name[block.idxs[i].name] = options.use_bytes() ? tile.dims[i].size : tile.dims[i].range;
+    tile_by_name[block.idxs[i].name] = options.use_bytes() ? tile->dims[i].size : tile->dims[i].range;
   }
-  auto sizes = ComputeSizes(tile_by_name, block, options);
-  IVLOG(3, "    TileCost> tile_by_name: " << tile_by_name << ", sizes: " << sizes);
-  if ((options.max_output_size() && sizes.outputs > options.max_output_size()) ||
-      (options.max_input_size() && sizes.inputs > options.max_input_size()) ||
-      (options.max_total_size() && sizes.total > options.max_total_size())) {
+  tile->metrics = ComputeSizes(tile_by_name, block, options);
+  IVLOG(3, "    TileCost> tile_by_name: " << tile_by_name << ", metrics: " << tile->metrics);
+  if (!tile->IsValid(options)) {
     return std::numeric_limits<double>::infinity();
   }
   double total_compute = 1;
   double tile_expand = 1;
   for (size_t i = 0; i < block.idxs.size(); i++) {
-    const auto& tile_dim = tile.dims[i];
+    const auto& tile_dim = tile->dims[i];
     total_compute *= tile_by_name[block.idxs[i].name];
     size_t padded_size = tile_dim.range * tile_dim.size;
     tile_expand *= static_cast<double>(padded_size) / static_cast<double>(block.idxs[i].range);
   }
-  auto input_cost = options.input_cost() * sizes.inputs;
-  auto output_cost = options.output_cost() * sizes.outputs;
+  auto input_cost = options.input_cost() * tile->metrics.inputs;
+  auto output_cost = options.output_cost() * tile->metrics.outputs;
   double cost = tile_expand * (output_cost + input_cost) / total_compute;
   IVLOG(3, "        cost: " << cost);
   return cost;
 }
 
 Tile PickBestTile(const Block& block, const proto::AutotilePass& options) {
-  IVLOG(2, "Autotile> block: " << block.name);
+  IVLOG(3, "Autotile> PickBestTile> block: " << block.name);
   std::multimap<double, Tile> by_cost;
   std::map<Tile, double> by_tile;
   std::set<std::pair<double, Tile>> to_do;
   Tile tile(block);
-  double cost = TileCost(block, options, tile);
+  double cost = TileCost(block, options, &tile);
   double base_cost = cost;
+  bool any_valid = tile.IsValid(options);
   by_tile.emplace(tile, cost);
   by_cost.emplace(cost, tile);
   to_do.emplace(cost, tile);
@@ -196,10 +202,11 @@ Tile PickBestTile(const Block& block, const proto::AutotilePass& options) {
         tile.set(i, tile.dims[i].range + 1, block.idxs[i].range);
       }
       if (!by_tile.count(tile)) {
-        cost = TileCost(block, options, tile);
+        cost = TileCost(block, options, &tile);
+        any_valid |= tile.IsValid(options);
         by_tile.emplace(tile, cost);
         by_cost.emplace(cost, tile);
-        if (!std::isinf(cost)) {
+        if (!any_valid || !std::isinf(cost)) {
           to_do.emplace(cost, tile);
         }
       }
@@ -211,17 +218,18 @@ Tile PickBestTile(const Block& block, const proto::AutotilePass& options) {
   for (const auto& kvp : by_cost) {
     IVLOG(4, "    " << kvp.first << ": " << kvp.second);
   }
-  IVLOG(2, "    best: " << winner->second << ", cost: " << winner->first / base_cost);
+  IVLOG(3, "    best: " << winner->second << ", cost: " << winner->first / base_cost);
   return winner->second;
 }
 
 bool TileViaStrategy(Block* block, const Tile& tile, const proto::AutotilePass& options) {
-  IVLOG(2, "    TileViaStrategy: " << tile);
+  IVLOG(2, "Autotile> block: " << block->name         //
+                               << ", tile: " << tile  //
+                               << ", metrics: " << tile.metrics);
   switch (options.strategy()) {
     case proto::TileStrategy::TileRanges:
       return ApplyTile(block, tile.ranges());
     case proto::TileStrategy::TileSizes:
-      // return ExtractTile(block, tile, options.into_idx());
       return ApplyTile(block, tile.sizes());
     case proto::TileStrategy::TileSplitIndex:
       // TODO
@@ -255,6 +263,8 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
           idx.tags.erase("bank");
         }
       }
+    } else if (!tile.IsValid(options)) {
+      LOG(WARNING) << "Autotile> block: " << block->name << " was NOT split: " << tile.metrics;
     }
   });
 }
