@@ -234,14 +234,15 @@ class StripeGenerator {
     }
 
     // Combination Op
+    auto output_type = GetShape(op.output).type;
     if (scalar_inputs.size() > 1) {
       auto combo_op = GetComboOp(cion.comb_op);
       if (!combo_op.empty()) {
-        AddIntrinsic(kernel.get(), combo_op, scalar_inputs, {ScalarName(op.output)});
+        AddIntrinsic(kernel.get(), combo_op, output_type, scalar_inputs, {ScalarName(op.output)});
         kernel->set_tag("comb_op_" + combo_op);
       }
     } else {
-      AddIntrinsic(kernel.get(), "assign", scalar_inputs, {ScalarName(op.output)});
+      AddIntrinsic(kernel.get(), "assign", output_type, scalar_inputs, {ScalarName(op.output)});
       // Mark including the agg_op
       kernel->set_tag("agg_op_" + GetAggOp(cion.agg_op) + "_no_comb_op");
     }
@@ -377,7 +378,7 @@ class StripeGenerator {
     for (const auto& input : op.inputs) {
       scalar_inputs.push_back(ScalarName(input));
     }
-    AddIntrinsic(kernel.get(), op.f.fn, scalar_inputs, {ScalarName(op.output)});
+    AddIntrinsic(kernel.get(), op.f.fn, GetShape(op.output).type, scalar_inputs, {ScalarName(op.output)});
 
     // STORE
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));
@@ -423,14 +424,16 @@ class StripeGenerator {
     return shapes;
   }
 
-  void AddIntrinsic(Block* block,                            //
-                    const std::string& name,                 //
+  void AddIntrinsic(Block* block,             //
+                    const std::string& name,  //
+                    const DataType& type,
                     const std::vector<std::string>& inputs,  //
                     const std::vector<std::string>& outputs) {
     auto stmt = std::make_shared<Intrinsic>();
     stmt->name = name;
     stmt->inputs = inputs;
     stmt->outputs = outputs;
+    stmt->type = type;
     block->stmts.push_back(stmt);
   }
 
