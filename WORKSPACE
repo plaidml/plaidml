@@ -6,7 +6,7 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 git_repository(
     name = "toolchain",
     remote = "https://github.com/plaidml/toolchain",
-    tag = "0.1.2",
+    commit = "a487bf9f2cc4edc47d376606abaaf29d85fffcd8",
 )
 
 load(
