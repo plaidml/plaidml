@@ -1,6 +1,6 @@
 load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("//bzl:conda_repo.bzl", "conda_repo")
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
 def plaidml_workspace():
     http_archive(
@@ -95,9 +95,9 @@ def plaidml_workspace():
         build_file = str(Label("//vendor/llvm:llvm.BUILD")),
     )
 
-    native.http_file(
+    http_file(
         name = "plantuml_jar",
-        url = "https://storage.googleapis.com/vertexai-depot/plantuml.jar",
+        urls = ["https://storage.googleapis.com/vertexai-depot/plantuml.jar"],
         sha256 = "26d60e43c14106a3d220e33c2b2e073b2bce40b433ad3e5fa13c747f58e67ab6",
     )
 
