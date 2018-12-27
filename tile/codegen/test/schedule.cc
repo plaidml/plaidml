@@ -66,6 +66,7 @@ class ScheduleTest : public ::testing::Test {
     ref.access.emplace_back(0);
     ref.location.name = "RAM";
     ref.offset = 0;
+    ref.is_const = false;
     main_->refs.emplace_back(std::move(ref));
   }
 
@@ -121,7 +122,7 @@ TEST_F(ScheduleTest, CachesIO) {
           block {
             name: "swap_in_i2_whole_0" location {name: "DMA" unit {}}
             idxs [{name: "i0" range: 16 affine {}}]
-            refs [{from: "i2" into: "src" dir: In is_const: true access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
+            refs [{from: "i2" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
                   {from: "i2_whole_0" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] location {name: "CACHE" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}}]
             stmts [{load: {from: "src" into: "$X"}}, {store: {from: "$X" into: "dst"}}]
           }
@@ -129,7 +130,7 @@ TEST_F(ScheduleTest, CachesIO) {
           block {
             name: "swap_in_i1_whole_0" location {name: "DMA" unit {}}
             idxs [{name: "i0" range: 16 affine {}}]
-            refs [{from: "i1" into: "src" dir: In is_const: true access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
+            refs [{from: "i1" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
                   {from: "i1_whole_0" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] location {name: "CACHE" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}}]
             stmts [{load: {from: "src" into: "$X"}}, {store: {from: "$X" into: "dst"}}]
           }
@@ -145,7 +146,7 @@ TEST_F(ScheduleTest, CachesIO) {
           block {
             name: "swap_out_o1_whole_0" location {name: "DMA" unit {}}
             idxs [{name: "i0" range: 16 affine {}}]
-            refs [{from: "o1_whole_0" into: "src" dir: In is_const: true access [{terms [{key: "i0" value: 1}]}] location {name: "CACHE" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
+            refs [{from: "o1_whole_0" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] location {name: "CACHE" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
                   {from: "o1" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}}]
             stmts [{load: {from: "src" into: "$X"}}, {store: {from: "$X" into: "dst"}}]
           }
@@ -196,7 +197,7 @@ TEST_F(ScheduleTest, UsesTmps) {
           block {
             name: "swap_in_i1_whole_0" location {name: "DMA" unit {}}
             idxs [{name: "i0" range: 16 affine {}}]
-            refs [{from: "i1" into: "src" dir: In is_const: true access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
+            refs [{from: "i1" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
                   {from: "i1_whole_0" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] location {name: "CACHE" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}}]
             stmts [{load: {from: "src" into: "$X"}}, {store: {from: "$X" into: "dst"}}]
           }
@@ -204,7 +205,7 @@ TEST_F(ScheduleTest, UsesTmps) {
           block {
             name: "swap_in_i2_whole_0" location {name: "DMA" unit {}}
             idxs [{name: "i0" range: 16 affine {}}]
-            refs [{from: "i2" into: "src" dir: In is_const: true access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
+            refs [{from: "i2" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
                   {from: "i2_whole_0" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] location {name: "CACHE" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}}]
             stmts [{load: {from: "src" into: "$X"}}, {store: {from: "$X" into: "dst"}}]
           }
@@ -228,7 +229,7 @@ TEST_F(ScheduleTest, UsesTmps) {
           block {
             name: "swap_out_o1_whole_0" location {name: "DMA" unit {}}
             idxs [{name: "i0" range: 16 affine {}}]
-            refs [{from: "o1_whole_0" into: "src" dir: In is_const: true access [{terms [{key: "i0" value: 1}]}] location {name: "CACHE" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
+            refs [{from: "o1_whole_0" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] location {name: "CACHE" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}},
                   {from: "o1" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:1 stride:1}}}]
             stmts [{load: {from: "src" into: "$X"}}, {store: {from: "$X" into: "dst"}}]
           }
