@@ -997,7 +997,7 @@ void Scheduler::Run() {
     ref->shape = ent.source->cache_shape;
     ref->location = mem_loc_;
     ref->location.unit = ent.source->ref.location.unit;
-    ref->is_const = false;
+    ref->is_const = ent.source->ref.is_const;
     ref->offset = ent.range.begin;
   }
 
@@ -1237,7 +1237,7 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
       ent->source->ref_swap_shape,   // shape
       "",                            // agg_op
       ent->source->ref.location,     // location
-      true,                          // is_const
+      ent->source->ref.is_const,     // is_const
       0,                             // offset
       ent->source->ref.bank_dim,     // bank_dim
   });
@@ -1252,7 +1252,7 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
       ent->source->cache_swap_shape,   // shape
       "",                              // agg_op
       banked_mem_loc,                  // location
-      false,                           // is_const
+      ent->source->ref.is_const,       // is_const
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim
   });
@@ -1286,7 +1286,7 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
       ent->source->cache_swap_shape,   // shape
       "",                              // agg_op
       mem_loc_,                        // location
-      true,                            // is_const
+      ent->source->ref.is_const,       // is_const
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim
   });
@@ -1299,7 +1299,7 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
       ent->source->ref_swap_shape,   // shape
       "",                            // agg_op
       ent->source->ref.location,     // location
-      false,                         // is_const
+      ent->source->ref.is_const,     // is_const
       0,                             // offset
       ent->source->ref.bank_dim,     // bank_dim
   });
