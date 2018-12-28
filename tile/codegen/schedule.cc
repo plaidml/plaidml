@@ -60,7 +60,7 @@ struct RefInfo {
     for (size_t i = 0; i < sizes.size(); i++) {
       std::string iname = std::string("i") + std::to_string(i);
       swap_idxs.emplace_back(stripe::Index{iname, sizes[i]});
-      ref_swap_access.emplace_back(stripe::Affine(iname) + alias_info.access.at(i));
+      ref_swap_access.emplace_back(stripe::Affine(iname) + alias_info.access.at(i).constant());
       cache_swap_access.emplace_back(stripe::Affine(iname));
     }
 
@@ -355,6 +355,46 @@ void StatementBinder::ApplyBindings() {
   }
 }
 
+// Computes an AliasInfo for a subblock refinement corresponding to
+// the union of all of the subtensors described by that refinement
+// across the entire index space of the subblock.
+AliasInfo UnionSubblockAliasInfo(stripe::Block* subblock, const stripe::Refinement& ref, const AliasMap& alias_map) {
+  AliasInfo ai = alias_map.at(ref.from);
+  ai.shape = ref.shape;
+  ai.access = ref.access;
+  std::map<std::string, std::int64_t> tile_by_name;
+  for (auto& idx : subblock->idxs) {
+    tile_by_name.emplace(idx.name, idx.range);
+  }
+  for (size_t i = 0; i < ai.access.size(); i++) {
+    auto& aff = ai.access.at(i);
+    int64_t low = 0;
+    int64_t high = 0;
+    std::map<std::string, std::int64_t> access_offset_by_name;
+    for (const auto& kvp : aff.getMap()) {
+      if (kvp.first.empty()) {
+        continue;
+      }
+      if (!tile_by_name.count(kvp.first)) {
+        continue;
+      }
+      if (kvp.second > 0) {
+        high += kvp.second * (tile_by_name.at(kvp.first) - 1);
+        access_offset_by_name[kvp.first] = 0;
+      } else {
+        low += kvp.second * (tile_by_name.at(kvp.first) - 1);
+        access_offset_by_name[kvp.first] = -kvp.second;
+      }
+    }
+    high += (ai.shape.dims[i].size - 1);
+    ai.shape.dims[i].size = high - low + 1;
+    aff = aff.partial_eval(access_offset_by_name);
+  }
+  // TODO: Verify that our AliasInfo is correct in the multi-memory world.
+  // TODO: Rebuild the extent information in the AliasInfo.
+  return ai;
+}
+
 // Gathers a Statement's IO information.
 class IOGatherer final : private stripe::MutableStmtVisitor {
  public:
@@ -428,12 +468,11 @@ void IOGatherer::Visit(stripe::Special* special) {
 void IOGatherer::Visit(stripe::Block* block) {
   std::vector<std::pair<stripe::Refinement*, RefInfo*>> updates;
   std::unordered_map<RefInfo*, stripe::RefDir> accesses;
-  AliasMap subblock_alias_map{*alias_map_, block};
   for (auto& ref : block->refs) {
     if (ref.dir == stripe::RefDir::None) {
       continue;  // This isn't an IO ref.
     }
-    const AliasInfo& ai = subblock_alias_map.at(ref.into);
+    AliasInfo ai = UnionSubblockAliasInfo(block, ref, *alias_map_);
     auto* ri = &ri_map_->at(std::forward_as_tuple(ref.from, ai.access, ai.shape));
     auto it_inserted = accesses.emplace(ri, ref.dir);
     if (!it_inserted.second) {
@@ -597,12 +636,11 @@ std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefI
       }
       continue;
     }
-    AliasMap subblock_alias_map{*alias_map, subblock};
     for (const auto& ref : subblock->refs) {
       if (ref.dir == stripe::RefDir::None) {
         continue;  // This isn't an IO ref.
       }
-      const AliasInfo& ai = subblock_alias_map.at(ref.into);
+      AliasInfo ai = UnionSubblockAliasInfo(subblock, ref, *alias_map);
       auto key = std::forward_as_tuple(ref.from, ai.access, ai.shape);
       if (ri_map.find(key) == ri_map.end()) {
         ri_map.emplace(key, RefInfo{&*block->ref_by_into(ref.from), ai});
