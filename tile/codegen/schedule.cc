@@ -874,8 +874,10 @@ void Scheduler::Run() {
             auto next_it = reuse_dep;
             ++next_it;
             IVLOG(3, "  Adding swap-in for " << future_ent->name << " at " << future_ent->range);
-            auto swap_in_it = AddSwapIn(next_it, future_ent);
-            (*swap_in_it)->deps.emplace_back(reuse_dep);
+            AddSwapIn(next_it, future_ent);
+          }
+          for (auto& writer_aliasinfo : future_ent->writers) {
+            writer_aliasinfo.first->deps.emplace_back(reuse_dep);
           }
           SubtractRange(ent->range, &future_ent->uncovered_ranges);
           if (future_ent->uncovered_ranges.empty()) {
@@ -1011,7 +1013,7 @@ Scheduler::GatherPlacementState(const std::vector<std::pair<RefInfo*, stripe::Re
     }
 
     // See whether we already have an active CacheEntry for this IO.
-    if (ri->cache_entry) {
+    if (ri->cache_entry && !ri->cache_entry->saw_earliest_writer) {
       // We do -- create a Placement describing it.
       plan.emplace(ri, Placement{dir, ri->cache_entry->range, ri->cache_entry});
       continue;
@@ -1237,6 +1239,7 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
   for (auto& reader_aliasinfo : ent->readers) {
     reader_aliasinfo.first->deps.emplace_back(swap_in_it);
   }
+  ent->saw_earliest_writer = true;
   return swap_in_it;
 }
 
