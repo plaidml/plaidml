@@ -51,10 +51,21 @@ struct CacheEntry;
 // RefInfo contains information around the usage of one particular
 // backing ref during the scan.
 struct RefInfo {
-  RefInfo(stripe::Refinement* ref_, const AliasInfo& ai) : ref(*ref_), alias_info{ai} {
+  RefInfo(stripe::Refinement* ref_, AliasInfo alias_info_, std::string suffix_)
+      : ref(*ref_), alias_info{std::move(alias_info_)}, name{ref.into + std::move(suffix_)} {
+    IVLOG(3, "Creating RefInfo " << name << " access=" << alias_info.access << " shape=" << alias_info.shape);
     TensorShape raw_ts = ref.shape;
-    auto sizes = raw_ts.sizes();
     cache_shape = alias_info.shape;
+
+    // Convert the cached shape to use natural striding.
+    std::uint64_t stride = 1;
+    for (auto idx = 0; idx < cache_shape.dims.size(); ++idx) {
+      auto& dim = cache_shape.dims.at(cache_shape.dims.size() - idx - 1);
+      dim.stride = stride;
+      stride *= dim.size;
+    }
+
+    auto sizes = cache_shape.sizes();
     size = cache_shape.byte_size();
 
     for (size_t i = 0; i < sizes.size(); i++) {
@@ -137,6 +148,9 @@ struct RefInfo {
   // The earliest (runtime-past) sub-statement of the main block that
   // writes to this refinement.
   stripe::Statement* earliest_writer = nullptr;
+
+  // The local name of this ref.
+  std::string name;
 };
 
 // A range of memory.
@@ -214,7 +228,7 @@ void SubtractRange(MemRange sub, std::list<MemRange>* range_list) {
 // in a new CacheEntry).
 struct CacheEntry {
   CacheEntry(RefInfo* source_, MemRange range_)
-      : source{source_}, name{source->ref.into + "_" + std::to_string(source->next_cache_entry++)}, range{range_} {
+      : source{source_}, name{source->name + "_" + std::to_string(source->next_cache_entry++)}, range{range_} {
     uncovered_ranges.push_back(range);
   }
 
@@ -620,8 +634,9 @@ std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefI
     // Block substatement that accesses an entire tensor from the
     // current Block.
     const AliasInfo& ai = alias_map->at(ref.into);
-    ri_map.emplace(std::forward_as_tuple(ref.into, ai.access, ai.shape), RefInfo{&ref, ai});
+    ri_map.emplace(std::forward_as_tuple(ref.into, ai.access, ai.shape), RefInfo{&ref, ai, "_whole"});
   }
+  std::unordered_map<std::string, std::uint32_t> slice_count;
   for (auto& stmt : block->stmts) {
     stripe::Block* subblock = dynamic_cast<stripe::Block*>(stmt.get());
     if (!subblock) {
@@ -636,14 +651,21 @@ std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefI
       }
       continue;
     }
+    IVLOG(3, "Considering subblock; idxs=" << subblock->idxs);
     for (const auto& ref : subblock->refs) {
       if (ref.dir == stripe::RefDir::None) {
         continue;  // This isn't an IO ref.
       }
+      IVLOG(3, "  Considering refinement: " << ref);
       AliasInfo ai = UnionSubblockAliasInfo(subblock, ref, *alias_map);
       auto key = std::forward_as_tuple(ref.from, ai.access, ai.shape);
       if (ri_map.find(key) == ri_map.end()) {
-        ri_map.emplace(key, RefInfo{&*block->ref_by_into(ref.from), ai});
+        auto it_inserted = slice_count.emplace(ref.from, 0);
+        if (!it_inserted.second) {
+          it_inserted.first->second++;
+        }
+        ri_map.emplace(
+            key, RefInfo{&*block->ref_by_into(ref.from), ai, "_slice_" + std::to_string(it_inserted.first->second)});
       }
       if (IsWriteDir(ref.dir)) {
         auto& ri = ri_map.at(key);
@@ -799,7 +821,8 @@ void Scheduler::Run() {
       RefInfo* ri = ri_placement.first;
       auto& placement = ri_placement.second;
       if (!allow_out_of_range_accesses_ && mem_bytes_ < placement.range.end) {
-        throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available"});
+        throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available (placing " +
+                                                  ri_placement.first->name + ")"});
       }
       CacheEntry* ent = placement.entry;
       bool is_new_entry = (ent == nullptr);
@@ -1004,6 +1027,7 @@ Scheduler::GatherPlacementState(const std::vector<std::pair<RefInfo*, stripe::Re
   for (const auto& ri_dir : ios) {
     RefInfo* ri = ri_dir.first;
     stripe::RefDir dir = ri_dir.second;
+    VLOG(3) << "  Planning IO for RefInfo " << ri << " " << ri->name;
     // See whether we've already created a Placement for this ref.
     auto it = plan.find(ri);
     if (it != plan.end()) {
@@ -1029,7 +1053,7 @@ Scheduler::GatherPlacementState(const std::vector<std::pair<RefInfo*, stripe::Re
   }
 
   // Organize the placements to be made, largest-first, using the
-  // underlying refinement 'into' name as the tiebreaker.
+  // underlying refinement name as the tiebreaker.
   std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>> todos;
   for (auto& refinfo_refdir : todo_map) {
     todos[refinfo_refdir.first->ref.location.unit].emplace_back(refinfo_refdir);
@@ -1037,7 +1061,7 @@ Scheduler::GatherPlacementState(const std::vector<std::pair<RefInfo*, stripe::Re
   for (auto& affine_refvec : todos) {
     std::sort(affine_refvec.second.begin(), affine_refvec.second.end(),
               [](std::pair<RefInfo*, stripe::RefDir> lhs, std::pair<RefInfo*, stripe::RefDir> rhs) {
-                return std::tie(rhs.first->size, rhs.first->ref.into) < std::tie(lhs.first->size, lhs.first->ref.into);
+                return std::tie(rhs.first->size, rhs.first->name) < std::tie(lhs.first->size, lhs.first->name);
               });
   }
 
@@ -1060,7 +1084,7 @@ PlacementPlan Scheduler::MakePlacementPlan(const std::vector<std::pair<RefInfo*,
     for (auto& affine_refvec : todos) {
       IVLOG(3, "    Affine=" << affine_refvec.first);
       for (auto& ri_dir : affine_refvec.second) {
-        IVLOG(3, "      Ref=" << ri_dir.first->ref.into << " size=" << ri_dir.first->size);
+        IVLOG(3, "      Ref=" << ri_dir.first->name << " size=" << ri_dir.first->size);
       }
     }
   }
@@ -1091,7 +1115,7 @@ bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pai
   // still big enough to hold the todo.
   IVLOG(3, "      Looking for placements");
   for (auto todo : todos) {
-    IVLOG(3, "        Finding placement for " << todo.first->ref.into << ", size=" << todo.first->size);
+    IVLOG(3, "        Finding placement for " << todo.first->name << ", size=" << todo.first->size);
     std::list<MemRange>::iterator best_so_far = ranges.end();
     std::size_t best_waste_so_far = mem_bytes_;
     for (auto rit = ranges.begin(); rit != ranges.end(); ++rit) {
