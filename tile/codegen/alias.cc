@@ -124,7 +124,8 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
     info.extents.resize(ref.access.size());
     for (size_t i = 0; i < ref.access.size(); i++) {
       info.access[i] += UniqifyAffine(ref.access[i], prefix);
-      info.extents[i] = Extent{ref.access[i].eval(min_idxs), ref.access[i].eval(max_idxs)};
+      info.extents[i] = Extent{ref.access[i].eval(min_idxs),
+                               static_cast<std::int64_t>(ref.access[i].eval(max_idxs) + ref.shape.dims[i].size - 1)};
     }
     IVLOG(5, boost::format("Extents for '%1%' in '%2%': %3%") % ref.into % block->name % StreamContainer(info.extents));
 
