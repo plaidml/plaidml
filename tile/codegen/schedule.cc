@@ -53,7 +53,8 @@ struct CacheEntry;
 struct RefInfo {
   RefInfo(stripe::Refinement* ref_, AliasInfo alias_info_, std::string suffix_)
       : ref(*ref_), alias_info{std::move(alias_info_)}, name{ref.into + std::move(suffix_)} {
-    IVLOG(3, "Creating RefInfo " << name << " access=" << alias_info.access << " shape=" << alias_info.shape);
+    IVLOG(3, "Creating RefInfo " << name << " access=" << alias_info.access << " shape=" << alias_info.shape
+                                 << " extents=" << alias_info.extents);
     TensorShape raw_ts = ref.shape;
     cache_shape = alias_info.shape;
 
@@ -376,10 +377,21 @@ AliasInfo UnionSubblockAliasInfo(stripe::Block* subblock, const stripe::Refineme
   AliasInfo ai = alias_map.at(ref.from);
   ai.shape = ref.shape;
   ai.access = ref.access;
-  std::map<std::string, std::int64_t> tile_by_name;
-  for (auto& idx : subblock->idxs) {
-    tile_by_name.emplace(idx.name, idx.range);
+
+  std::map<std::string, int64_t> min_idxs;
+  std::map<std::string, int64_t> max_idxs;
+  for (const auto& idx : subblock->idxs) {
+    if (idx.affine.constant()) {
+      min_idxs[idx.name] = idx.affine.constant();
+      max_idxs[idx.name] = idx.affine.constant();
+    } else {
+      min_idxs[idx.name] = 0;
+      max_idxs[idx.name] = idx.range - 1;
+    }
   }
+
+  ai.extents.resize(ai.access.size());
+
   for (size_t i = 0; i < ai.access.size(); i++) {
     auto& aff = ai.access.at(i);
     int64_t low = 0;
@@ -389,23 +401,25 @@ AliasInfo UnionSubblockAliasInfo(stripe::Block* subblock, const stripe::Refineme
       if (kvp.first.empty()) {
         continue;
       }
-      if (!tile_by_name.count(kvp.first)) {
+      if (!max_idxs.count(kvp.first)) {
         continue;
       }
       if (kvp.second > 0) {
-        high += kvp.second * (tile_by_name.at(kvp.first) - 1);
+        high += kvp.second * max_idxs.at(kvp.first);
         access_offset_by_name[kvp.first] = 0;
       } else {
-        low += kvp.second * (tile_by_name.at(kvp.first) - 1);
+        low += kvp.second * max_idxs.at(kvp.first);
         access_offset_by_name[kvp.first] = -kvp.second;
       }
     }
     high += (ai.shape.dims[i].size - 1);
     ai.shape.dims[i].size = high - low + 1;
+    ai.extents[i] = Extent{aff.eval(min_idxs), aff.eval(max_idxs)};
     aff = aff.partial_eval(access_offset_by_name);
   }
-  // TODO: Verify that our AliasInfo is correct in the multi-memory world.
-  // TODO: Rebuild the extent information in the AliasInfo.
+
+  // TODO: Verify that AliasInfo is correct in the multi-memory world.
+
   return ai;
 }
 
