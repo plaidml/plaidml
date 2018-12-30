@@ -718,7 +718,6 @@ void Scheduler::Run() {
     // by scheduling this statement.
     std::unordered_map<RefInfo*, std::unordered_set<stripe::Statement*>> ri_writer_swap_in_readers;
     {
-      std::list<RefInfo*> ris_whose_swap_in_readers_should_be_cleared;
       for (const auto& ri_dir : ios) {
         if (!IsWriteDir(ri_dir.second)) {
           continue;
@@ -738,17 +737,8 @@ void Scheduler::Run() {
             for (stripe::Statement* swap_in_reader : alias_ri->swap_in_readers) {
               ri_writer_swap_in_readers_set->emplace(swap_in_reader);
             }
-            // Later, clear the ri's swap-in readers.  Note that we
-            // actually do the clearing after processing all of the
-            // statement's outputs, so that we correctly handle
-            // multiple outputs that happen to address different parts
-            // of an underlying base refinement.
-            ris_whose_swap_in_readers_should_be_cleared.emplace_back(alias_ri);
           }
         }
-      }
-      for (auto* ri : ris_whose_swap_in_readers_should_be_cleared) {
-        ri->swap_in_readers.clear();
       }
     }
 
