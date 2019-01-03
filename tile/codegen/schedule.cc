@@ -60,7 +60,7 @@ struct RefInfo {
 
     // Convert the cached shape to use natural striding.
     std::uint64_t stride = 1;
-    for (auto idx = 0; idx < cache_shape.dims.size(); ++idx) {
+    for (std::size_t idx = 0; idx < cache_shape.dims.size(); ++idx) {
       auto& dim = cache_shape.dims.at(cache_shape.dims.size() - idx - 1);
       dim.stride = stride;
       stride *= dim.size;
