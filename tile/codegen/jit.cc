@@ -371,6 +371,17 @@ void Compiler::Visit(const stripe::Store& store) {
     } else {
       throw Error("Invalid addition type: " + to_string(from.type));
     }
+  } else if ("max" == agg_op) {
+    llvm::Value* prev = builder_.CreateLoad(element);
+    llvm::Value* flag = nullptr;
+    if (is_float(from.type)) {
+      flag = builder_.CreateFCmpUGT(prev, value);
+    } else if (is_int(from.type)) {
+      flag = builder_.CreateICmpSGT(prev, value);
+    } else if (is_uint(from.type)) {
+      flag = builder_.CreateICmpUGT(prev, value);
+    }
+    value = builder_.CreateSelect(flag, prev, value);
   } else if ("assign" == agg_op) {
     // fall through to assignment
   } else if (!agg_op.empty()) {
