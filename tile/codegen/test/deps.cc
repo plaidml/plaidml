@@ -96,19 +96,19 @@ TEST(DepsTest, Subregion) {
         refs {
           from: "buf" into: "b1" dir: In
           access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dimensions: { size:2 stride:10 } dimensions: { size:10 stride:1 } }
+          shape { type: FLOAT32 dimensions: { size:1 stride:1 } dimensions: { size:1 stride:1 } }
           location { unit { } }
         }
         refs {
           from: "buf" into: "b2" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dimensions: { size:2 stride:10 } dimensions: { size:10 stride:1 } }
+          shape { type: FLOAT32 dimensions: { size:1 stride:1 } dimensions: { size:1 stride:1 } }
           location { unit { } }
         }
         refs {
           from: "buf" into: "b3" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dimensions: { size:2 stride:10 } dimensions: { size:10 stride:1 } }
+          shape { type: FLOAT32 dimensions: { size:1 stride:1 } dimensions: { size:1 stride:1 } }
           location { unit { offset: 1 } }
         }
         stmts { constant { name:"$1" iconst: 0 } }
@@ -142,24 +142,24 @@ TEST(DepsTest, Subregion) {
         refs {
           from: "buf" into: "b1" dir: In
           access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dimensions: { size:2 stride:10 } dimensions: { size:10 stride:1 } }
+          shape { type: FLOAT32 dimensions: { size:1 stride:1 } dimensions: { size:1 stride:1 } }
           location { unit { } }
         }
         refs {
           from: "buf" into: "b2" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dimensions: { size:2 stride:10 } dimensions: { size:10 stride:1 } }
+          shape { type: FLOAT32 dimensions: { size:1 stride:1 } dimensions: { size:1 stride:1 } }
           location { unit { } }
         }
         refs {
           from: "buf" into: "b3" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dimensions: { size:2 stride:10 } dimensions: { size:10 stride:1 } }
+          shape { type: FLOAT32 dimensions: { size:1 stride:1 } dimensions: { size:1 stride:1 } }
           location { unit { offset: 1 } }
         }
         stmts { constant { name:"$1" iconst: 0 } }
         stmts { store { from:"$1" into:"b1" } deps: 0 }
-        stmts { store { from:"$1" into:"b2" } deps: 1 }
+        stmts { store { from:"$1" into:"b2" } deps: 0 }
         stmts { store { from:"$1" into:"b3" } deps: 0 }
       }
     }
