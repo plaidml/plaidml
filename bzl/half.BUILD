@@ -9,13 +9,6 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-pkg_tar(
-    name = "sdk_includes",
-    srcs = ["include/half.hpp"],
-    package_dir = "include",
-    visibility = ["//visibility:public"],
-)
-
 genrule(
     name = "license",
     srcs = ["LICENSE.txt"],
