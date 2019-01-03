@@ -125,18 +125,16 @@ def plaidml_cp(name, files):
 def _plaidml_py_wheel_impl(ctx):
     tpl = ctx.file._setup_py_tpl
     setup_py = ctx.new_file(ctx.label.name + ".pkg/setup.py")
-    pkg_inputs = depset([setup_py])
+    wheel_inputs = depset([setup_py])
     version = ctx.var.get("version", default = "unknown")
     if ctx.file.config:
         cfg = ctx.new_file(setup_py, "setup.cfg")
-        ctx.actions.run_shell(
-            outputs = [cfg],
-            inputs = [ctx.file.config],
-            command = "cp $1 $2",
-            arguments = [ctx.file.config.path, cfg.path],
-            mnemonic = "CopySetupCfg",
+        ctx.actions.expand_template(
+            template = ctx.file.config,
+            output = cfg,
+            substitutions = ctx.attr.config_substitutions,
         )
-        pkg_inputs += [cfg]
+        wheel_inputs += [cfg]
     build_src_base = ctx.build_file_path.rsplit("/", 1)[0] + "/"
     pkg_prefix = ctx.attr.package_prefix
     if pkg_prefix != "":
@@ -151,7 +149,21 @@ def _plaidml_py_wheel_impl(ctx):
                 arguments = [src.path, dest.path],
                 mnemonic = "CopyPackageFile",
             )
-            pkg_inputs += [dest]
+            wheel_inputs += [dest]
+    for tgt in ctx.attr.data:
+        for src in tgt.files + tgt.data_runfiles.files:
+            basename = src.basename
+            if basename in ctx.attr.data_renames:
+                basename = ctx.attr.data_renames[basename]
+            dest = ctx.new_file(setup_py, "data/" + basename)
+            ctx.actions.run_shell(
+                outputs = [dest],
+                inputs = [src],
+                command = "cp $1 $2",
+                arguments = [src.path, dest.path],
+                mnemonic = "CopyDataFile",
+            )
+            wheel_inputs += [dest]
     ctx.actions.expand_template(
         template = tpl,
         output = setup_py,
@@ -175,7 +187,7 @@ def _plaidml_py_wheel_impl(ctx):
         bdist_wheel_args.append(ctx.attr.platform)
     ctx.actions.run(
         outputs = [wheel],
-        inputs = pkg_inputs.to_list(),
+        inputs = wheel_inputs.to_list(),
         executable = "python",
         arguments = bdist_wheel_args,
         mnemonic = "BuildWheel",
@@ -197,7 +209,13 @@ plaidml_py_wheel = rule(
             mandatory = True,
             allow_files = True,
         ),
+        "data": attr.label_list(
+            allow_empty = True,
+            allow_files = True,
+        ),
+        "data_renames": attr.string_dict(),
         "config": attr.label(allow_single_file = [".cfg"]),
+        "config_substitutions": attr.string_dict(),
         "package_name": attr.string(mandatory = True),
         "package_prefix": attr.string(default = ""),
         "python": attr.string(mandatory = True),
@@ -235,20 +253,22 @@ plaidml_cc_version = rule(
     implementation = _plaidml_version_impl,
 )
 
-def plaidml_macos_dylib(name, lib, src, tags):
+def plaidml_macos_dylib(name, lib, src, tags, internal_libname = ""):
     # Builds an output .dylib with the runtime path set to @rpath/{name}.
     # The output is a single file, ${lib}, which should end with ".dylib".
+    if not internal_libname:
+        internal_libname = lib
     native.genrule(
         name = name,
         tags = tags,
         srcs = [src],
         outs = [lib],
         message = "Setting rpath for " + lib,
-        cmd = "lib=\"" + lib + "\"" + """
+        cmd = "lib=\"" + lib + "\"; internal_libname=\"" + internal_libname + "\"" + """
             cp $< $@
             original_mode=$$(stat -f%#p $@)
             chmod u+w $@
-            install_name_tool -id @rpath/$${lib} $@
+            install_name_tool -id @rpath/$${internal_libname} $@
             chmod $${original_mode} $@
         """,
     )

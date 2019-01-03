@@ -45,12 +45,3 @@ plaidml_cc_test(
         ":base",
     ],
 )
-
-pkg_tar(
-    name = "sdk_includes",
-    srcs = [
-        "base.h",
-        "base_cpp.h",
-    ],
-    package_dir = "include/plaidml/base",
-)
