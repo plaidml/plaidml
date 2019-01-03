@@ -159,7 +159,7 @@ TEST(DepsTest, Subregion) {
         }
         stmts { constant { name:"$1" iconst: 0 } }
         stmts { store { from:"$1" into:"b1" } deps: 0 }
-        stmts { store { from:"$1" into:"b2" } deps: 0 }
+        stmts { store { from:"$1" into:"b2" } deps: 1 }
         stmts { store { from:"$1" into:"b3" } deps: 0 }
       }
     }
