@@ -1,6 +1,6 @@
 # Copyright 2018 Intel Corporation.
 
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = ["//visibility:private"])
 
 load("//bzl:conda.bzl", "conda_binary", "conda_test")
 load(
@@ -19,9 +19,11 @@ load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
 
 exports_files(["requirements.txt"])
 
+# The PlaidML configuration protobuf definition.
 plaidml_proto_library(
     name = "proto",
     srcs = ["plaidml.proto"],
+    visibility = ["//visibility:public"],
 )
 
 plaidml_cc_version(
@@ -29,57 +31,65 @@ plaidml_cc_version(
     prefix = "PLAIDML",
 )
 
+PLAIDML_CPP_SOURCES = [
+    "plaidml.cc",
+    "config.h",
+    ":version",
+]
+
+PLAIDML_CPP_HEADERS = [
+    "plaidml.h",
+    "plaidml++.h",
+]
+
+PLAIDML_CPP_DEPS = [
+    ":proto_cc",
+    "//base/config",
+    "//base/eventing/file",
+    "//base/util:runfiles_db",
+    "//plaidml/base",
+    "//tile/base",
+    "//tile/base:program_cache",
+    "//tile/stripe",
+    "//tile/platform/local_machine",
+    "//tile/proto:metadata_cc",
+    "@boost//:filesystem",
+    "@half",
+    "@minizip",
+] + select({
+    "@toolchain//:linux_arm_32v7": [
+        "//tile/hal/opencl",
+    ],
+    "@toolchain//:linux_arm_64v8": [
+        "//tile/hal/opencl",
+    ],
+    "@toolchain//:macos_x86_64": [
+        "//tile/hal/cpu",
+        "//tile/hal/metal",
+        "//tile/hal/opencl",
+    ],
+    "@toolchain//:windows_x86_64": [
+        "//tile/hal/opencl",
+    ],
+    "//conditions:default": [
+        "//tile/hal/cpu",
+        "//tile/hal/opencl",
+    ],
+}) + if_cuda_is_configured([
+    "//tile/hal/cuda",
+])
+
+# The PlaidML C++ library, as used by Bazel targets.
 plaidml_cc_library(
     name = "api",
-    srcs = [
-        "plaidml.cc",
-        ":version",
-    ],
-    hdrs = [
-        "plaidml.h",
-        "plaidml++.h",
-    ],
-    deps = [
-        ":proto_cc",
-        "//base/config",
-        "//base/eventing/file",
-        "//base/util:runfiles_db",
-        "//plaidml/base",
-        "//tile/base",
-        "//tile/base:program_cache",
-        "//tile/stripe",
-        "//tile/platform/local_machine",
-        "//tile/proto:metadata_cc",
-        "@boost//:filesystem",
-        "@half",
-        "@minizip",
-    ] + select({
-        "@toolchain//:linux_arm_32v7": [
-            "//tile/hal/opencl",
-        ],
-        "@toolchain//:linux_arm_64v8": [
-            "//tile/hal/opencl",
-        ],
-        "@toolchain//:macos_x86_64": [
-            "//tile/hal/cpu",
-            "//tile/hal/metal",
-            "//tile/hal/opencl",
-        ],
-        "@toolchain//:windows_x86_64": [
-            "//tile/hal/opencl",
-        ],
-        "//conditions:default": [
-            "//tile/hal/cpu",
-            "//tile/hal/opencl",
-        ],
-    }) + if_cuda_is_configured([
-        "//tile/hal/cuda",
-    ]),
+    srcs = PLAIDML_CPP_SOURCES + ["config-bazel.cc"],
+    hdrs = PLAIDML_CPP_HEADERS,
+    deps = PLAIDML_CPP_DEPS,
+    data = [":configs"],
+    visibility = ["//visibility:public"],
     alwayslink = 1,
 )
 
-# The PLAIDML C library, defined as a Bazel dynamically-loaded library.
-# This allows the library to be used as a data dependency in Bazel rules.
 plaidml_cc_binary(
     name = "libplaidml.so",
     srcs = select({
@@ -90,6 +100,7 @@ plaidml_cc_binary(
     deps = [
         ":api",
     ],
+    tags = ["linux"],
 )
 
 plaidml_cc_binary(
@@ -102,6 +113,7 @@ plaidml_cc_binary(
     deps = [
         ":api",
     ],
+    tags = ["msvc"],
 )
 
 apple_binary(
@@ -121,7 +133,6 @@ plaidml_macos_dylib(
 
 plaidml_cc_library(
     name = "api_cc_deps",
-    visibility = ["//visibility:private"],
     deps = [
         ":proto_cc",
         "//tile/base",
@@ -188,6 +199,7 @@ plaidml_cc_test(
     ],
 )
 
+# These are the PlaidML configuration files.
 genrule(
     name = "configs",
     srcs = select({
@@ -210,6 +222,7 @@ genrule(
     cp $${srcs[0]} $${outs[0]}
     cp $${srcs[1]} $${outs[1]}
 """,
+    visibility = ["//visibility:public"],
 )
 
 conda_binary(
@@ -227,22 +240,27 @@ conda_binary(
     deps = [":py"],
 )
 
+PYTHON_SRCS = [
+    "__init__.py",
+    "context.py",
+    "exceptions.py",
+    "library.py",
+    "op.py",
+    "plaidml_setup.py",
+    "settings.py",
+    "tile.py",
+]
+
+# The PlaidML Python library, as used by Bazel targets.
 plaidml_py_library(
     name = "py",
-    srcs = [
-        "__init__.py",
-        "context.py",
-        "exceptions.py",
-        "library.py",
-        "op.py",
-        "plaidml_setup.py",
-        "settings.py",
-        "tile.py",
-    ],
+    srcs = PYTHON_SRCS,
     data = [":configs"] + select({
         "@toolchain//:windows_x86_64": [":plaidml.dll"],
+        "@toolchain//:macos_x86_64": [":libplaidml.dylib"],
         "//conditions:default": [":libplaidml.so"],
     }),
+    visibility = ["//visibility:public"],
 )
 
 conda_test(
@@ -276,6 +294,7 @@ conda_test(
     ],
 )
 
+# The PlaidML sources, as a tar package.
 pkg_tar(
     name = "pkg",
     srcs = glob([
@@ -283,6 +302,7 @@ pkg_tar(
     ]),
     package_dir = "plaidml",
     strip_prefix = ".",
+    visibility = ["//visibility:public"],
 )
 
 pkg_tar(
@@ -336,18 +356,44 @@ genrule(
     cmd="cp $(SRCS) $(@D)/"
 )
 
+# The PlaidML Wheel definition.
 plaidml_py_wheel(
     name = "wheel",
     package_name = "plaidml",
-    srcs = [
-        ":py",
-        ":configs",
-        ":licenses"
+    srcs = PYTHON_SRCS + [":licenses"],
+    data = [
+      "plaidml.h",
+      "plaidml++.h",
+      ":configs",
+      "//plaidml/base:base.h",
+      "//plaidml/base:base_cpp.h",
+      "@half//:include/half.hpp",
+      "plaidml-config.cmake",
     ] + select({
-        "@toolchain//:windows_x86_64": ["//plaidml:plaidml.dll"],
-        "//conditions:default": ["//plaidml:libplaidml.so"],
+      "@toolchain//:windows_x86_64": [":plaidml_pub.dll"],
+      "@toolchain//:macos_x86_64": [":libplaidml_macos_pub"],
+      "//conditions:default": ["libplaidml_pub.so"],
+    }),
+    data_renames = select({
+      "@toolchain//:windows_x86_64": {"plaidml_pub.dll": "plaidml.dll"},
+      "@toolchain//:macos_x86_64": {"libplaidml_pub.dylib": "libplaidml.dylib"},
+      "//conditions:default": {"libplaidml_pub.so": "libplaidml.so"},
     }),
     config = ":setup.cfg",
+    config_substitutions = select({
+        "@toolchain//:windows_x86_64": {
+            "{PLAIDML_NATIVE_LIBRARY}": "plaidml.dll",
+            "{LIBDIR}": "Library/bin",
+        },
+        "@toolchain//:macos_x86_64": {
+            "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.dylib",
+            "{LIBDIR}": "lib",
+        },
+        "//conditions:default": {
+            "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.so",
+            "{LIBDIR}": "lib",
+        },
+    }),
     package_prefix = "plaidml",
     platform = select({
         "@toolchain//:linux_arm_32v7": "linux_armv7l",
@@ -357,44 +403,45 @@ plaidml_py_wheel(
         "//conditions:default": "manylinux1_x86_64",
     }),
     python = "py2.py3",
+    visibility = ["//visibility:public"],
 )
 
-pkg_tar(
-    name = "sdk_configs",
-    srcs = [":configs"],
-    package_dir = "share/plaidml",
+plaidml_cc_binary(
+    name = "libplaidml_pub.so",
+    srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-unix.cc"],
+    linkshared = 1,
+    deps = PLAIDML_CPP_DEPS,
+    tags = ["linux"],
 )
 
-pkg_tar(
-    name = "sdk_includes",
-    srcs = [
-        "plaidml.h",
-        "plaidml++.h",
-    ],
-    package_dir = "include/plaidml",
+plaidml_cc_binary(
+    name = "plaidml_pub.dll",
+    srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-windows.cc"],
+    linkshared = 1,
+    deps = PLAIDML_CPP_DEPS,
+    tags = ["msvc"],
 )
 
-pkg_tar(
-    name = "sdk_libs",
-    srcs = select({
-        "@toolchain//:windows_x86_64": [":plaidml.dll"],
-        "@toolchain//:macos_x86_64": [":libplaidml_macos"],
-        "//conditions:default": ["libplaidml.so"],
-    }),
-    package_dir = "lib",
+plaidml_cc_library(
+    name = "apple_lib_pub",
+    srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-unix.cc"],
+    deps = PLAIDML_CPP_DEPS,
+    tags = ["darwin"],
+    alwayslink = 1,
 )
 
-pkg_tar(
-    name = "sdk",
-    srcs = ["plaidml-config.cmake", ":licenses"],
-    # TODO: Build package_dir from the --define=version= config setting.
-    package_dir = "plaidml-0.5.0",
-    deps = [
-        ":sdk_configs",
-        ":sdk_includes",
-        ":sdk_libs",
-        "//plaidml/base:sdk_includes",
-        "@half//:sdk_includes",
-        
-    ],
+apple_binary(
+    name = "libplaidml_raw_pub.dylib",
+    platform_type = "macos",
+    binary_type = "dylib",
+    deps = [":apple_lib_pub"],
+    tags = ["darwin"],
+)
+
+plaidml_macos_dylib(
+    name = "libplaidml_macos_pub",
+    lib = "libplaidml_pub.dylib",
+    src = ":libplaidml_raw_pub.dylib",
+    internal_libname = "libplaidml.dylib",
+    tags = ["darwin"],
 )

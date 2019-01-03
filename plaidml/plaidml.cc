@@ -33,7 +33,6 @@
 #include "base/util/env.h"
 #include "base/util/error.h"
 #include "base/util/logging.h"
-#include "base/util/runfiles_db.h"
 #include "base/util/sync.h"
 #include "base/util/type_url.h"
 #include "base/util/zipfile.h"
@@ -41,6 +40,7 @@
 #include "plaidml/base/context.h"
 #include "plaidml/base/status.h"
 #include "plaidml/base/status_strings.h"
+#include "plaidml/config.h"
 #include "plaidml/plaidml.pb.h"
 #include "tile/base/buffer.h"
 #include "tile/base/lru_cache.h"
@@ -57,9 +57,6 @@
 namespace {
 constexpr std::size_t kApplierForShapeCacheSize = 8;
 constexpr std::size_t kRuninfoCacheSize = 8;
-const char* PLAIDML_EXPERIMENTAL = "PLAIDML_EXPERIMENTAL";
-const char* PLAIDML_DEFAULT_CONFIG = "PLAIDML_DEFAULT_CONFIG";
-const char* PLAIDML_EXPERIMENTAL_CONFIG = "PLAIDML_EXPERIMENTAL_CONFIG";
 const char* PLAIDML_DEVICE_IDS = "PLAIDML_DEVICE_IDS";
 }  // namespace
 
@@ -276,20 +273,8 @@ plaidml_device_enumerator* _plaidml_alloc_device_enumerator(
 
 extern "C" plaidml_device_enumerator* plaidml_alloc_device_enumerator(
     vai_ctx* ctx, void (*callback)(void* arg, plaidml_device_enumerator* device_enumerator), void* arg) {
-  static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
-
-  std::string config_file;
-  std::string exp = vertexai::env::Get(PLAIDML_EXPERIMENTAL);
-  if (!exp.empty() && exp != "0") {
-    config_file = vertexai::env::Get(PLAIDML_EXPERIMENTAL_CONFIG);
-  } else {
-    config_file = vertexai::env::Get(PLAIDML_DEFAULT_CONFIG);
-  }
-  std::string translated = runfiles_db[config_file.c_str()];
-  std::ifstream cfs(runfiles_db[config_file.c_str()]);
-  std::string config;
-  config.assign(std::istreambuf_iterator<char>(cfs), std::istreambuf_iterator<char>());
-  return _plaidml_alloc_device_enumerator(ctx, config.c_str(), config_file, callback, arg);
+  auto cfg = plaidml::config::Get();
+  return _plaidml_alloc_device_enumerator(ctx, cfg.data.c_str(), cfg.source, callback, arg);
 }
 
 extern "C" plaidml_device_enumerator* plaidml_alloc_device_enumerator_with_config(
