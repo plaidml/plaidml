@@ -190,7 +190,7 @@ TEST_F(ScheduleTest, UsesTmps) {
               {into: "i2_whole_0" offset: 128 location {name: "CACHE" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}} access {}},
               {from: "o1" into: "o1" dir: Out location {name: "RAM" unit{}} shape {type: FLOAT32 dimensions: {size:16 stride:1}} access {}},
               {into: "o1_whole_0" offset: 64 location {name: "CACHE" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}} access {}},
-              {into: "t1" location {name: "RAM" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}} access {} is_const: true},
+              {into: "t1" location {name: "RAM" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}} access {}},
               {into: "t1_whole_0" location {name: "CACHE" unit {}} shape {type: FLOAT32 dimensions: {size:16 stride:1}} access {}}]
         stmts [{
           block {
