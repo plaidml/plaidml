@@ -156,7 +156,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   IVLOG(3, "mapping: " << StreamContainer(mapping) << ", tile: " << tile);
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
-  ApplyTile(tiled.get(), tile);
+  ApplyTile(tiled.get(), tile, true, true);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
   outer->name = tiled->name;
@@ -245,8 +245,8 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   AliasMap a_map(scope, block_a);
   AliasMap b_map(scope, block_b);
   // Start by copying A's reference across
-  auto r = std::make_shared<Block>();
-  r->refs = block_a->refs;
+  auto tmp = std::make_shared<Block>();
+  tmp->refs = block_a->refs;
   // Walk over refinements in B and move them across
   // Rename duplicate refinements in B to their name in A
   // Otherwise make a new unique name (keeping original if possible)
@@ -272,14 +272,14 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
     }
     if (!merged) {
       // Copy across as a new ref
-      std::string new_name = r->unique_ref_name(new_ref.into);
+      std::string new_name = tmp->unique_ref_name(new_ref.into);
       remap_b[new_ref.into] = new_name;
-      auto ref_it = r->refs.insert(r->refs.end(), new_ref);
+      auto ref_it = tmp->refs.insert(tmp->refs.end(), new_ref);
       ref_it->into = new_name;
     }
   }
   // We are now safe (cannot fail), move new reference over A's
-  std::swap(block_a->refs, r->refs);
+  std::swap(block_a->refs, tmp->refs);
   if (!block_a->name.empty()) {
     block_a->name = str(boost::format("%s+%s") % block_a->name % block_b->name);
   } else if (!block_b->name.empty()) {
