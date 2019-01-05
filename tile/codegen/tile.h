@@ -31,7 +31,7 @@ bool operator<(const StencilMatch& lhs, const StencilMatch& rhs);
 
 boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const stripe::Block& block);
 
-bool ApplyTile(stripe::Block* outer, const TileShape& shape, bool elide_trivial = true);
+bool ApplyTile(stripe::Block* outer, const TileShape& shape, bool elide_trivial = true, bool copy_tags = false);
 
 void StencilPass(stripe::Block* block, const proto::StencilPass& options);
 
