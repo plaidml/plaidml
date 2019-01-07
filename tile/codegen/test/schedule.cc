@@ -7,26 +7,25 @@
 #include "tile/stripe/stripe.h"
 #include "tile/stripe/stripe.pb.h"
 
-namespace gp = google::protobuf;
-
 using ::testing::EqualsProtoText;
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
+namespace test {
 
 class ScheduleTest : public ::testing::Test {
  public:
   void SetUp() override {
     SetUpBlock();
     SetUpOptions();
-    main_ = std::dynamic_pointer_cast<stripe::Block>(block_->stmts.front());
+    main_ = block_->SubBlock(0);
   }
 
   template <typename P>
   P ParseProtoText(const char* txt) {
     P proto;
-    gp::TextFormat::ParseFromString(txt, &proto);
+    google::protobuf::TextFormat::ParseFromString(txt, &proto);
     return proto;
   }
 
@@ -57,17 +56,16 @@ class ScheduleTest : public ::testing::Test {
     )");
   }
 
-  void AddTmpRefinement(const char* name, TensorDimension dim) {
-    stripe::Refinement ref;
-    ref.dir = stripe::RefDir::None;
-    ref.into = name;
-    ref.shape.type = DataType::FLOAT32;
-    ref.shape.dims.emplace_back(std::move(dim));
-    ref.access.emplace_back(0);
-    ref.location.name = "RAM";
-    ref.offset = 0;
-    ref.is_const = false;
-    main_->refs.emplace_back(std::move(ref));
+  void AddTmpRefinement(const char* name, const TensorDimension& dim) {
+    main_->refs.emplace_back(stripe::Refinement{
+        stripe::RefDir::None,                   // dir
+        "",                                     // from
+        name,                                   // into
+        {stripe::Affine{}},                     // access
+        TensorShape(DataType::FLOAT32, {dim}),  // shape
+        "",                                     // agg_op
+        stripe::Location{"RAM"},                // location
+    });
   }
 
  protected:
@@ -240,6 +238,7 @@ TEST_F(ScheduleTest, UsesTmps) {
   )"));
 }
 
+}  // namespace test
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

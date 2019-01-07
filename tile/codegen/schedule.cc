@@ -55,7 +55,7 @@ struct RefInfo {
       : ref(*ref_), alias_info{std::move(alias_info_)}, name{ref.into + std::move(suffix_)} {
     IVLOG(3, "Creating RefInfo " << name << " access=" << alias_info.access << " shape=" << alias_info.shape
                                  << " extents=" << alias_info.extents);
-    TensorShape raw_ts = ref.shape;
+    TensorShape raw_ts = ref.interior_shape;
     cache_shape = alias_info.shape;
 
     // Convert the cached shape to use natural striding.
@@ -76,7 +76,7 @@ struct RefInfo {
       cache_swap_access.emplace_back(stripe::Affine(iname));
     }
 
-    ref_swap_shape = ref.shape;
+    ref_swap_shape = ref.interior_shape;
     cache_swap_shape = cache_shape;
     for (size_t i = 0; i < sizes.size(); i++) {
       ref_swap_shape.dims[i].size = 1;
@@ -153,6 +153,8 @@ struct RefInfo {
   // The local name of this ref.
   std::string name;
 };
+
+using RefInfoKey = std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>;
 
 // A range of memory.
 struct MemRange {
@@ -363,8 +365,8 @@ void StatementBinder::ApplyBindings() {
     ref->from = ri->cache_entry->name;
     ref->location = *mem_loc_;
     ref->location.unit = ri->ref.location.unit;
-    for (size_t i = 0; i < ref->shape.dims.size(); i++) {
-      ref->shape.dims[i].stride = ri->cache_shape.dims[i].stride;
+    for (size_t i = 0; i < ref->interior_shape.dims.size(); i++) {
+      ref->interior_shape.dims[i].stride = ri->cache_shape.dims[i].stride;
     }
     FixupRefs(block_, ref->into);
   }
@@ -375,7 +377,7 @@ void StatementBinder::ApplyBindings() {
 // across the entire index space of the subblock.
 AliasInfo UnionSubblockAliasInfo(stripe::Block* subblock, const stripe::Refinement& ref, const AliasMap& alias_map) {
   AliasInfo ai = alias_map.at(ref.from);
-  ai.shape = ref.shape;
+  ai.shape = ref.interior_shape;
   ai.access = ref.access;
 
   std::map<std::string, int64_t> min_idxs;
@@ -428,15 +430,14 @@ class IOGatherer final : private stripe::MutableStmtVisitor {
  public:
   static std::pair<std::vector<std::pair<RefInfo*, stripe::RefDir>>, StatementBinder> Gather(
       stripe::Statement* stmt, const stripe::Location& loc, const AliasMap& alias_map,
-      std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefInfo>* ri_map) {
+      std::map<RefInfoKey, RefInfo>* ri_map) {
     IOGatherer visitor{loc, alias_map, ri_map};
     stmt->Accept(&visitor);
     return std::make_pair(std::move(visitor.ios_), std::move(visitor.binder_));
   }
 
  private:
-  IOGatherer(const stripe::Location& loc, const AliasMap& alias_map,
-             std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefInfo>* ri_map)
+  IOGatherer(const stripe::Location& loc, const AliasMap& alias_map, std::map<RefInfoKey, RefInfo>* ri_map)
       : loc_{&loc}, alias_map_{&alias_map}, ri_map_{ri_map} {}
 
   RefInfo* FindDirectRefInfo(const std::string& name);
@@ -450,7 +451,7 @@ class IOGatherer final : private stripe::MutableStmtVisitor {
 
   const stripe::Location* loc_;
   const AliasMap* alias_map_;
-  std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefInfo>* ri_map_;
+  std::map<RefInfoKey, RefInfo>* ri_map_;
   std::vector<std::pair<RefInfo*, stripe::RefDir>> ios_;
   StatementBinder binder_;
 };
@@ -519,8 +520,7 @@ class Scheduler {
 
  private:
   // Builds a map for looking up RefInfos for a given block access.
-  static std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefInfo> BuildRefInfoMap(
-      stripe::Block* block, const AliasMap* alias_map);
+  static std::map<RefInfoKey, RefInfo> BuildRefInfoMap(stripe::Block* block, const AliasMap* alias_map);
 
   Scheduler(const AliasMap* alias_map, stripe::Block* block, const proto::SchedulePass& options);
 
@@ -607,7 +607,7 @@ class Scheduler {
   std::size_t alignment_;
   stripe::Location xfer_loc_;
   bool allow_out_of_range_accesses_;
-  std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefInfo> ri_map_;
+  std::map<RefInfoKey, RefInfo> ri_map_;
   std::unordered_map<stripe::Refinement*, std::vector<RefInfo*>> base_ref_aliases_;
 
   // A list of all of the CacheEntries we create during Run().  These
@@ -639,9 +639,8 @@ void Scheduler::Schedule(const AliasMap& alias_map, stripe::Block* block, const 
   Scheduler{&alias_map, block, options}.Run();
 }
 
-std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefInfo> Scheduler::BuildRefInfoMap(
-    stripe::Block* block, const AliasMap* alias_map) {
-  std::map<std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>, RefInfo> ri_map;
+std::map<RefInfoKey, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, const AliasMap* alias_map) {
+  std::map<RefInfoKey, RefInfo> ri_map;
   for (auto& ref : block->refs) {
     // First, we add the current block's refs.  This account for any
     // refinement accessed by a non-Block substatement, and for any
@@ -994,7 +993,7 @@ void Scheduler::Run() {
     ref->dir = stripe::RefDir::None;
     ref->from.clear();
     ref->into = ent.name;
-    ref->shape = ent.source->cache_shape;
+    ref->interior_shape = ent.source->cache_shape;
     ref->location = mem_loc_;
     ref->location.unit = ent.source->ref.location.unit;
     ref->is_const = ent.source->ref.is_const;
