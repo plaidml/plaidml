@@ -170,15 +170,15 @@ struct Refinement : Taggable {
         offset(offset),
         bank_dim(bank_dim) {}
 
-  RefDir dir;
+  RefDir dir = RefDir::None;
   std::string from;
   std::string into;
   std::vector<Affine> access;
   TensorShape interior_shape;
   std::string agg_op;
   Location location;
-  bool is_const;
-  std::size_t offset;                       // Offset within the location's arena.
+  bool is_const = false;
+  std::size_t offset = 0;                   // Offset within the location's arena.
   boost::optional<BankDimension> bank_dim;  // Which dimension should we bank on
 
   Affine FlatAccess() const;
