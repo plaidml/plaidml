@@ -193,7 +193,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   for (auto& ref : outer->refs) {
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& acc = ref.access[i];
-      int64_t max_val = ref.shape.dims[i].size - 1;
+      int64_t max_val = ref.interior_shape.dims[i].size - 1;
       Affine affine = acc.constant();
       for (const auto& kvp : acc.getMap()) {
         auto it = mapping.find(kvp.first);
@@ -208,7 +208,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
         }
         affine += Affine(it->second, kvp.second);
       }
-      ref.shape.dims[i].size = max_val + 1;
+      ref.interior_shape.dims[i].size = max_val + 1;
       acc = affine;
     }
   }

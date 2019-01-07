@@ -328,33 +328,33 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
   if (!ref.agg_op.empty()) {
     os << ":" << ref.agg_op;
   }
-  os << " " << to_string(ref.shape.type) << "(";
-  for (size_t i = 0; i < ref.shape.dims.size(); i++) {
+  os << " " << to_string(ref.interior_shape.type) << "(";
+  for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
     if (i > 0) {
       os << ", ";
     }
     if (ref.bank_dim && ref.bank_dim->dim_pos == i) {
-      os << "{" << ref.shape.dims[i].size << "}";
+      os << "{" << ref.interior_shape.dims[i].size << "}";
     } else {
-      os << ref.shape.dims[i].size;
+      os << ref.interior_shape.dims[i].size;
     }
   }
   os << "):(";
-  for (size_t i = 0; i < ref.shape.dims.size(); i++) {
+  for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
     if (i > 0) {
       os << ", ";
     }
     if (ref.bank_dim && ref.bank_dim->dim_pos == i) {
-      os << "{" << ref.shape.dims[i].stride << "}";
+      os << "{" << ref.interior_shape.dims[i].stride << "}";
     } else {
-      os << ref.shape.dims[i].stride;
+      os << ref.interior_shape.dims[i].stride;
     }
   }
   os << "):";
-  if (ref.shape.byte_size() < 1024) {
-    os << ref.shape.byte_size() << " B";
+  if (ref.interior_shape.byte_size() < 1024) {
+    os << ref.interior_shape.byte_size() << " B";
   } else {
-    os << ref.shape.byte_size() / 1024.0 << " KiB";
+    os << ref.interior_shape.byte_size() / 1024.0 << " KiB";
   }
   if (ref.bank_dim) {
     os << ", banking " << ref.bank_dim->orig_name << " " << ref.bank_dim->orig_shape
@@ -529,7 +529,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     for (const auto& pb_off : pb_ref.access()) {
       ref.access.emplace_back(FromProto(pb_off));
     }
-    ref.shape = tile::FromProto(pb_ref.shape());
+    ref.interior_shape = tile::FromProto(pb_ref.shape());
     ref.agg_op = pb_ref.agg_op();
     ref.location = FromProto(pb_ref.location());
     ref.is_const = pb_ref.is_const();
@@ -664,7 +664,7 @@ proto::Block IntoProto(const Block& block) {
     for (const auto& access : ref.access) {
       *pb_ref->add_access() = IntoProto(access);
     }
-    *pb_ref->mutable_shape() = IntoProto(ref.shape);
+    *pb_ref->mutable_shape() = IntoProto(ref.interior_shape);
     pb_ref->set_agg_op(ref.agg_op);
     *pb_ref->mutable_location() = IntoProto(ref.location);
     pb_ref->set_is_const(ref.is_const);
@@ -828,7 +828,7 @@ std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& na
   return it;
 }
 
-std::string Block::unique_ref_name(const std::string& into) {
+std::string Block::unique_ref_name(const std::string& into) const {
   if (ref_by_into(into, false) == refs.end()) {
     return into;
   }
@@ -843,7 +843,7 @@ std::string Block::unique_ref_name(const std::string& into) {
   return "";
 }
 
-std::string Block::unique_idx_name(const std::string& name) {
+std::string Block::unique_idx_name(const std::string& name) const {
   if (!idx_by_name(name)) {
     return name;
   }
@@ -858,34 +858,45 @@ std::string Block::unique_idx_name(const std::string& name) {
   return "";
 }
 
+TensorShape Block::exterior_shape(const std::string& name) const {
+  auto it = ref_by_into(name);
+  std::map<std::string, size_t> idx_ranges;
+  for (const auto& idx : idxs) {
+    idx_ranges.emplace(idx.name, idx.range);
+  }
+  return it->ApplyTile(idx_ranges);
+}
+
 Affine Refinement::FlatAccess() const {
-  assert(access.size() == shape.dims.size());
+  assert(access.size() == interior_shape.dims.size());
   Affine ret;
   for (size_t i = 0; i < access.size(); i++) {
-    ret += shape.dims[i].stride * access[i];
+    ret += interior_shape.dims[i].stride * access[i];
   }
   return ret;
 }
 
-void Refinement::ApplyTile(const std::map<std::string, size_t>& tile_by_name) {
+TensorShape Refinement::ApplyTile(const std::map<std::string, size_t>& tile_by_name) const {
+  TensorShape shape = interior_shape;
   for (size_t i = 0; i < access.size(); i++) {
-    auto& aff = access[i];
-    int64_t low = 0;
-    int64_t high = 0;
+    const auto& aff = access[i];
+    int64_t neg = 0;
+    int64_t pos = 0;
     for (const auto& kvp : aff.getMap()) {
       if (kvp.first.empty()) {
         continue;
       }
       if (kvp.second > 0) {
-        high += kvp.second * (tile_by_name.at(kvp.first) - 1);
+        pos += kvp.second * (tile_by_name.at(kvp.first) - 1);
       } else {
-        low += kvp.second * (tile_by_name.at(kvp.first) - 1);
+        neg += kvp.second * (tile_by_name.at(kvp.first) - 1);
       }
     }
-    high += (shape.dims[i].size - 1);
-    shape.dims[i].size = high - low + 1;
-    aff.setConstant(0);
+    auto& dim = shape.dims[i];
+    pos += (dim.size - 1);
+    dim.size = pos - neg + 1;
   }
+  return shape;
 }
 
 }  // namespace stripe

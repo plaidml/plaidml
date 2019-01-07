@@ -50,9 +50,9 @@ const Index* BiggestIndexForDim(const Block& block, const Refinement& ref, int d
 }
 
 void SplitRefinement(Refinement* ref, const BankInfo& bank_info, const std::string& bank_name) {
-  ref->bank_dim = BankDimension{bank_info.dim_pos, ref->shape, ref->into};
-  for (size_t i = 0; i < ref->shape.dims.size(); i++) {
-    ref->shape.dims[i].stride = bank_info.banked_shape.dims[i].stride;
+  ref->bank_dim = BankDimension{bank_info.dim_pos, ref->interior_shape, ref->into};
+  for (size_t i = 0; i < ref->interior_shape.dims.size(); i++) {
+    ref->interior_shape.dims[i].stride = bank_info.banked_shape.dims[i].stride;
   }
   ref->location.unit = Affine{bank_name};
 }
@@ -205,8 +205,8 @@ void FixupJumps(Block* block, Refinement* ref, size_t num_banks, const std::stri
           }
           inner->idxs.emplace_back(bank_idx);
           // extend dim of refinement
-          for (size_t i = 0; i < ref->shape.dims.size() - 1; i++) {
-            inner_ref->shape.dims[i].stride = ref->shape.dims[i].stride;
+          for (size_t i = 0; i < ref->interior_shape.dims.size() - 1; i++) {
+            inner_ref->interior_shape.dims[i].stride = ref->interior_shape.dims[i].stride;
           }
           inner_ref->location.unit = Affine{new_bank_name};
           inner_ref->bank_dim = ref->bank_dim;
@@ -278,7 +278,7 @@ void SplitIndex(Block* block,                 //
 
 void PartitionBuffer(Block* block, const std::string& ref_name, const BankInfo& bank_info, const Tags& set_tags) {
   auto ref = &*block->ref_by_into(ref_name);
-  ref->bank_dim = BankDimension{bank_info.dim_pos, ref->shape, ref->into};
+  ref->bank_dim = BankDimension{bank_info.dim_pos, ref->interior_shape, ref->into};
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
@@ -328,14 +328,14 @@ void DebankBlocks(Block* block, const Location& loc) {
       continue;
     }
     if (ref.location.name == loc.name && ref.bank_dim) {
-      const auto& banked_dim = ref.shape.dims[ref.bank_dim->dim_pos];
+      const auto& banked_dim = ref.interior_shape.dims[ref.bank_dim->dim_pos];
       ref.access[ref.bank_dim->dim_pos] += ref.location.unit * banked_dim.stride;
       ref.location.unit = 0;  // TODO: make unit optional?
       if (ref.dir != RefDir::None) {
         ref.from = ref.bank_dim->orig_name;
       }
-      for (size_t i = 0; i < ref.shape.dims.size(); i++) {
-        ref.shape.dims[i].stride = ref.bank_dim->orig_shape.dims[i].stride;
+      for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
+        ref.interior_shape.dims[i].stride = ref.bank_dim->orig_shape.dims[i].stride;
       }
       ref.bank_dim = boost::none;
     }
@@ -373,7 +373,7 @@ void PartitionPass(Block* root, const proto::PartitionPass& options) {
     for (const auto& ref : block->ref_ins()) {
       // Get the source buffer size
       const auto& alias_info = map.at(ref->into);
-      size_t src_size = alias_info.base_ref->shape.elem_size();
+      size_t src_size = alias_info.base_ref->interior_shape.elem_size();
       if (src_size > biggest) {
         biggest = src_size;
         big_ref = ref;
@@ -442,7 +442,7 @@ void PartitionPass(Block* root, const proto::PartitionPass& options) {
     bank_info.base_ref = big_alias.base_ref->into;
     bank_info.dim_pos = *dim_pos;
     bank_info.uses[block].idx_name = idx_name;
-    bank_info.banked_shape = big_alias.base_ref->shape;
+    bank_info.banked_shape = big_alias.base_ref->interior_shape;
     auto part_size = IntDivCeil(bank_info.banked_shape.dims[*dim_pos].size, options.num_parts());
     bank_info.banked_shape.resize_dim(*dim_pos, part_size);
     bank_info.num_banks = options.num_parts();

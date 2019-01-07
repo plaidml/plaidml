@@ -87,7 +87,7 @@ inline constexpr std::size_t RoundUp(std::size_t count, std::size_t alignment) {
 struct Chunk {
   Chunk(stripe::Refinement* ref_, std::size_t alignment, std::size_t stmt_limit)
       : ref{ref_},
-        size{RoundUp(ref_->shape.byte_size(), alignment)},
+        size{RoundUp(ref_->interior_shape.byte_size(), alignment)},
         accessors{stmt_limit},
         transitive_accessor_deps{stmt_limit},
         subsequent_accessor_deps{stmt_limit} {}

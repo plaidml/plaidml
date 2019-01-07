@@ -54,15 +54,16 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
   }
   if (ai.shape == bi.shape) {
     if (ai.location.unit.isConstant() && bi.location.unit.isConstant() && ai.location != bi.location) {
-      IVLOG(3, boost::format("Different banks, a: %1%, b: %2%") % ai.location % bi.location);
+      IVLOG(3, boost::format("  Different banks, a: %1%, b: %2%") % ai.location % bi.location);
       return AliasType::None;
     }
     if (ai.access == bi.access) {
-      IVLOG(3, boost::format("Exact access, a: %1%, b: %2%") % StreamContainer(ai.access) % StreamContainer(bi.access));
+      IVLOG(3,
+            boost::format("  Exact access, a: %1%, b: %2%") % StreamContainer(ai.access) % StreamContainer(bi.access));
       return AliasType::Exact;
     }
     if (!CheckOverlap(ai.extents, bi.extents)) {
-      IVLOG(3, "CheckOverlap: None");
+      IVLOG(3, "  CheckOverlap: None");
       return AliasType::None;
     }
   }
@@ -124,13 +125,13 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
     info.extents.resize(ref.access.size());
     for (size_t i = 0; i < ref.access.size(); i++) {
       info.access[i] += UniqifyAffine(ref.access[i], prefix);
-      info.extents[i] = Extent{ref.access[i].eval(min_idxs),
-                               static_cast<std::int64_t>(ref.access[i].eval(max_idxs) + ref.shape.dims[i].size - 1)};
+      int64_t min_extent = ref.access[i].eval(min_idxs);
+      int64_t max_extent = ref.access[i].eval(max_idxs) + ref.interior_shape.dims[i].size - 1;
+      info.extents[i] = Extent{min_extent, max_extent};
     }
     IVLOG(5, boost::format("Extents for '%1%' in '%2%': %3%") % ref.into % block->name % StreamContainer(info.extents));
-
     // Set shape
-    info.shape = ref.shape;
+    info.shape = ref.interior_shape;
   }
 }
 

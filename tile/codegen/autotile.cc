@@ -114,9 +114,8 @@ size_t ComputeSize(const std::map<std::string, size_t>& tile_by_name,  //
 
 size_t ComputeBytes(const std::map<std::string, size_t>& tile_by_name,  //
                     const Refinement& ref) {
-  auto tiled = ref;  // make a mutable copy
-  tiled.ApplyTile(tile_by_name);
-  auto bytes = tiled.shape.byte_size();
+  auto tiled = ref.ApplyTile(tile_by_name);
+  auto bytes = tiled.byte_size();
   IVLOG(4, "    ComputeBytes> ref: " << ref);
   IVLOG(4, "                tiled: " << tiled);
   IVLOG(4, "                bytes: " << bytes);
@@ -131,7 +130,7 @@ TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
     if (ref.dir == RefDir::None) {
       continue;
     }
-    if (options.skip_1d() && ref.shape.dims.size() == 1) {
+    if (options.skip_1d() && ref.interior_shape.dims.size() == 1) {
       continue;
     }
     auto size = options.use_bytes() ? ComputeBytes(tile_by_name, ref)  //
