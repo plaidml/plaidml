@@ -123,20 +123,18 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   }
   // Append all passthru_idxs, we defer this since this may cause inner->idxs to realloc
   std::copy(passthru_idxs.begin(), passthru_idxs.end(), std::back_inserter(inner->idxs));
-  // Copy all refinements from outer to inner block
+  // Copy all in/out refinements from outer to inner block
   inner->refs = outer->refs;
-  // Fix the sizes on the outer blocks
-  // TODO: How to handle 'skips'
   // Remove allocs on the outer refs
   outer->refs.erase(
       std::remove_if(outer->refs.begin(), outer->refs.end(), [&](const auto& ref) { return ref.dir == RefDir::None; }),
       outer->refs.end());
   for (auto& ref : outer->refs) {
-    ref.ApplyTile(tile_by_name);
-  }
-  // Multiply each stride in the outer block refinements by the appropriate tile size
-  for (auto& ref : outer->refs) {
+    // Fix the sizes on the outer blocks
+    ref.interior_shape = inner->exterior_shape(ref.into);
+    // Multiply each stride in the outer block refinements by the appropriate tile size
     for (auto& aff : ref.access) {
+      aff.setConstant(0);
       for (auto& kvp : aff.mutateMap()) {
         if (!kvp.first.empty()) {
           kvp.second *= tile_by_name[kvp.first];
@@ -144,19 +142,6 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
       }
     }
   }
-  /*
-  // Zero out unused outer indexes
-  for (auto& ref : outer->refs) {
-    for (auto& aff : ref.access) {
-      for (const auto& idx : outer->idxs) {
-        if (idx.range == 1) {
-          aff.mutateMap().erase(idx.name);
-        }
-      }
-    }
-  }
-  */
-
   // Make the inner block the sole stmt of the outer block
   outer->stmts = {inner};
   return true;

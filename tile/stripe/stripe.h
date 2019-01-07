@@ -163,7 +163,7 @@ struct Refinement : Taggable {
         from(from),
         into(into),
         access(access),
-        shape(shape),
+        interior_shape(shape),
         agg_op(agg_op),
         location(location),
         is_const(is_const),
@@ -174,7 +174,7 @@ struct Refinement : Taggable {
   std::string from;
   std::string into;
   std::vector<Affine> access;
-  TensorShape shape;
+  TensorShape interior_shape;
   std::string agg_op;
   Location location;
   bool is_const;
@@ -182,7 +182,7 @@ struct Refinement : Taggable {
   boost::optional<BankDimension> bank_dim;  // Which dimension should we bank on
 
   Affine FlatAccess() const;
-  void ApplyTile(const std::map<std::string, size_t>& tile_by_name);
+  TensorShape ApplyTile(const std::map<std::string, size_t>& tile_by_name) const;
 };
 
 struct Load : Statement {
@@ -309,9 +309,10 @@ struct Block : Statement {
   std::vector<Refinement>::iterator ref_by_from(const std::string& name, bool fail = true);
   std::vector<Refinement>::const_iterator ref_by_from(const std::string& name, bool fail = true) const;
   // Make a unique refinement name for an into (by appending _2, etc, if needed)
-  std::string unique_ref_name(const std::string& into);
+  std::string unique_ref_name(const std::string& into) const;
   // Make a unique index name (by appending _2, etc, if needed)
-  std::string unique_idx_name(const std::string& name);
+  std::string unique_idx_name(const std::string& name) const;
+  TensorShape exterior_shape(const std::string& name) const;
 
   std::shared_ptr<Block> SubBlock(size_t pos) const {
     auto it = stmts.begin();

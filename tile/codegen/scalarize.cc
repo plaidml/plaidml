@@ -17,7 +17,7 @@ void Scalarize(Block* block, bool recursive) {
   std::set<std::string> sbufs;
   for (const auto& ref : block->refs) {
     // Add all locally allocated size one buffers
-    if (ref.dir == RefDir::None && ref.shape.elem_size() == 1) {
+    if (ref.dir == RefDir::None && ref.interior_shape.elem_size() == 1) {
       sbufs.emplace(ref.into);
     }
   }

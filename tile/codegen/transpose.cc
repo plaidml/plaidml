@@ -75,9 +75,9 @@ void TransposePass(Block* root, const proto::TransposePass& options) {
     }
     auto base_ref = usage.base_ref;
     std::multimap<TensorDimension, size_t, DimCompare> idxs_by_size;
-    for (size_t i = 0; i < base_ref->shape.dims.size(); i++) {
+    for (size_t i = 0; i < base_ref->interior_shape.dims.size(); i++) {
       if (i != stride_one_idx) {
-        auto dim = base_ref->shape.dims[i];
+        auto dim = base_ref->interior_shape.dims[i];
         idxs_by_size.emplace(dim, i);
       }
     }
@@ -89,16 +89,16 @@ void TransposePass(Block* root, const proto::TransposePass& options) {
     // Adjust strides
     int64_t stride = 1;
     {
-      auto& dim = base_ref->shape.dims[stride_one_idx];
+      auto& dim = base_ref->interior_shape.dims[stride_one_idx];
       dim.stride = stride;
       stride *= dim.size;
     }
     for (const auto& idx : idxs_by_size) {
-      auto& dim = base_ref->shape.dims[idx.second];
+      auto& dim = base_ref->interior_shape.dims[idx.second];
       dim.stride = stride;
       stride *= dim.size;
     }
-    if (!(old_ref.shape == base_ref->shape)) {
+    if (!(old_ref.interior_shape == base_ref->interior_shape)) {
       IVLOG(3, "    old_ref: " << old_ref);
       IVLOG(3, "    new_ref: " << *base_ref);
       // Propagate the changes

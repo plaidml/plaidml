@@ -211,7 +211,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
     std::vector<llvm::Value*> idxList{index};
     llvm::Value* elptr = builder_.CreateGEP(argvec, idxList);
     llvm::Value* elval = builder_.CreateLoad(elptr);
-    llvm::Type* eltype = CType(program.refs[i].shape.type)->getPointerTo();
+    llvm::Type* eltype = CType(program.refs[i].interior_shape.type)->getPointerTo();
     args.push_back(builder_.CreateBitCast(elval, eltype));
   }
   // After passing in buffer pointers, we also provide an initial value for
@@ -346,7 +346,7 @@ void Compiler::Visit(const stripe::Load& load) {
   // destination scalar.
   llvm::Value* element = ElementPtr(from);
   llvm::Value* value = builder_.CreateLoad(element);
-  scalars_[load.into] = scalar{value, from.refinement->shape.type};
+  scalars_[load.into] = scalar{value, from.refinement->interior_shape.type};
 }
 
 void Compiler::Visit(const stripe::Store& store) {
@@ -358,7 +358,7 @@ void Compiler::Visit(const stripe::Store& store) {
   // use GEP to compute the destination element address
   // use the specified aggregation to store the value
   buffer into = buffers_[store.into];
-  scalar from = Cast(scalars_[store.from], into.refinement->shape.type);
+  scalar from = Cast(scalars_[store.from], into.refinement->interior_shape.type);
   llvm::Value* value = from.value;
   llvm::Value* element = ElementPtr(into);
   std::string agg_op = into.refinement->agg_op;
@@ -468,13 +468,13 @@ void Compiler::Visit(const stripe::Block& block) {
     // name, it represents a local allocation.
     if (ref.dir == stripe::RefDir::None && ref.from.empty()) {
       // Allocate new storage for the buffer.
-      size_t size = ref.shape.byte_size();
+      size_t size = ref.interior_shape.byte_size();
       std::vector<llvm::Value*> malloc_args;
       malloc_args.push_back(IndexConst(size));
       auto malloc_func = MallocFunction();
       buffer = builder_.CreateCall(malloc_func, malloc_args, "");
       allocs.push_back(buffer);
-      llvm::Type* buftype = CType(ref.shape.type)->getPointerTo();
+      llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
       buffer = builder_.CreateBitCast(buffer, buftype);
     } else {
       // Pass in the current element address from the source buffer.
@@ -919,7 +919,7 @@ llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   std::vector<llvm::Type*> param_types;
   // Each buffer base address will be provided as a parameter.
   for (const auto& ref : block.refs) {
-    param_types.push_back(CType(ref.shape.type)->getPointerTo());
+    param_types.push_back(CType(ref.interior_shape.type)->getPointerTo());
   }
   // Following the buffers, a parameter will provide the initial value for
   // each of the block's indexes.

@@ -27,8 +27,8 @@ void FixupRefs(Block* block, const std::string& var_name) {
         if (ref.from == var_name) {
           ref.location = it->location;
           ref.offset = it->offset;
-          for (size_t i = 0; i < ref.shape.dims.size(); i++) {
-            ref.shape.dims[i].stride = it->shape.dims[i].stride;
+          for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
+            ref.interior_shape.dims[i].stride = it->interior_shape.dims[i].stride;
           }
           FixupRefs(inner.get(), ref.into);
         }
@@ -43,11 +43,11 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   auto it_ref = block->ref_by_into(var_name);
   // Get the sizes
   std::vector<size_t> sizes;
-  for (const auto& dim : it_ref->shape.dims) {
+  for (const auto& dim : it_ref->interior_shape.dims) {
     sizes.push_back(dim.size);
   }
   // Change the shape
-  it_ref->shape = SimpleShape(it_ref->shape.type, sizes);
+  it_ref->interior_shape = SimpleShape(it_ref->interior_shape.type, sizes);
   // Change dir + from
   it_ref->dir = RefDir::None;
   it_ref->from = "";

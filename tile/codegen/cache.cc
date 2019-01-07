@@ -25,7 +25,7 @@ void ApplyCache(Block* block,                 //
     throw std::runtime_error("ApplyCache: Invalid var_name");
   }
   // Get the shape
-  TensorShape raw_ts = it->shape;
+  TensorShape raw_ts = it->interior_shape;
   std::vector<size_t> sizes = raw_ts.sizes();
   TensorShape cached_ts = SimpleShape(raw_ts.type, sizes);
   // Make a new name for the raw variable
@@ -80,7 +80,7 @@ void ApplyCache(Block* block,                 //
     auto cache_load = std::make_shared<Block>(xfer_block);
     cache_load->name = str(boost::format("load_%s") % var_name);
     cache_load->refs[0].from = raw_name;
-    cache_load->refs[0].shape = raw_xfer_shape;
+    cache_load->refs[0].interior_shape = raw_xfer_shape;
     cache_load->refs[1].location = mem_loc;
     block->stmts.emplace_front(cache_load);
   }
@@ -89,7 +89,7 @@ void ApplyCache(Block* block,                 //
     auto cache_store = std::make_shared<Block>(xfer_block);
     cache_store->name = str(boost::format("store_%s") % var_name);
     cache_store->refs[1].from = raw_name;
-    cache_store->refs[1].shape = raw_xfer_shape;
+    cache_store->refs[1].interior_shape = raw_xfer_shape;
     cache_store->refs[0].location = mem_loc;
     block->stmts.emplace_back(cache_store);
   }

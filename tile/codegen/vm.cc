@@ -50,7 +50,7 @@ class Scope {
     std::map<std::string, Buffer> buffers;
     for (const auto& ref : block.refs) {
       if (ref.from.empty()) {
-        Buffer buf(ref.shape.elem_size());
+        Buffer buf(ref.interior_shape.elem_size());
         buffers.emplace(ref.into, buf);
         refs_[ref.into] = &safe_at(&buffers, ref.into);
       } else {
@@ -93,10 +93,10 @@ class Scope {
     }
     std::stringstream ss;
     ss << "ref: " << ref.into << ", offset = " << offset;
-    assert(ref.shape.dims.size() == ref.access.size());
-    for (size_t i = 0; i < ref.shape.dims.size(); i++) {
+    assert(ref.interior_shape.dims.size() == ref.access.size());
+    for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
       auto access = ref.access[i].eval(idxs_);
-      auto stride = ref.shape.dims[i].stride;
+      auto stride = ref.interior_shape.dims[i].stride;
       offset += access * stride;
       ss << " + (" << access << " * " << stride << ")";
     }
