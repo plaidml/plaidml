@@ -91,3 +91,4 @@ Indices and tables
 .. _Open a ticket on GitHub: https://github.com/plaidml/plaidml/issues
 .. _post to plaidml-dev: https://groups.google.com/forum/#!forum/plaidml-dev
 .. _Apache2: https://raw.githubusercontent.com/plaidml/plaidml/master/LICENSE
+.. _Keras: https://keras.io/
