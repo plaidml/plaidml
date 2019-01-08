@@ -21,8 +21,8 @@ deep learning work
 
 As a component under `Keras`_ PlaidML can accelerate training workloads with 
 customized or automatically-generated Tile code. It works especially well on 
-GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia* hardware, which many 
-people appreciate for licensing reasons. 
+GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia* hardware, while 
+achieving comparable performance.
 
 It works on all major operating systems: Linux, `macOS`_, and `Windows`_. 
 
