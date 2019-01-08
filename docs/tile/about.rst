@@ -12,10 +12,9 @@ simple format.
 About Stripe
 ------------
 
-Written in the Tile language, ``Stripe`` is a polyhedral 
-:abbr:`Intermediate Representation (IR)`, or *IR*, that is highly 
-amenable to optimization. Stripe is currently a work-in-progress, 
-and features are under development include:   
+``Stripe`` is a polyhedral :abbr:`Intermediate Representation (IR)`, 
+or *IR*, that is highly amenable to optimization. Stripe is currently 
+a work-in-progress, and features are under development include:   
 
 * Arbitrary tensorization
 
