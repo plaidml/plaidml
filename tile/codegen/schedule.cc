@@ -154,7 +154,7 @@ struct RefInfo {
   std::string name;
 };
 
-using RefInfoKey = std::tuple<std::string, std::vector<stripe::Affine>, TensorShape>;
+using RefInfoKey = std::string;
 
 // A range of memory.
 struct MemRange {
@@ -372,73 +372,18 @@ void StatementBinder::ApplyBindings() {
   }
 }
 
-// Computes an AliasInfo for a subblock refinement corresponding to
-// the union of all of the subtensors described by that refinement
-// across the entire index space of the subblock.
-AliasInfo UnionSubblockAliasInfo(stripe::Block* subblock, const stripe::Refinement& ref, const AliasMap& alias_map) {
-  AliasInfo ai = alias_map.at(ref.from);
-  ai.shape = ref.interior_shape;
-  ai.access = ref.access;
-
-  std::map<std::string, int64_t> min_idxs;
-  std::map<std::string, int64_t> max_idxs;
-  for (const auto& idx : subblock->idxs) {
-    if (idx.affine.constant()) {
-      min_idxs[idx.name] = idx.affine.constant();
-      max_idxs[idx.name] = idx.affine.constant();
-    } else {
-      min_idxs[idx.name] = 0;
-      max_idxs[idx.name] = idx.range - 1;
-    }
-  }
-
-  ai.extents.resize(ai.access.size());
-
-  for (size_t i = 0; i < ai.access.size(); i++) {
-    auto& aff = ai.access.at(i);
-    int64_t low = 0;
-    int64_t high = 0;
-    std::map<std::string, std::int64_t> access_offset_by_name;
-    for (const auto& kvp : aff.getMap()) {
-      if (kvp.first.empty()) {
-        continue;
-      }
-      if (!max_idxs.count(kvp.first)) {
-        continue;
-      }
-      if (kvp.second > 0) {
-        high += kvp.second * max_idxs.at(kvp.first);
-        access_offset_by_name[kvp.first] = 0;
-      } else {
-        low += kvp.second * max_idxs.at(kvp.first);
-        access_offset_by_name[kvp.first] = -kvp.second;
-      }
-    }
-    high += (ai.shape.dims[i].size - 1);
-    ai.shape.dims[i].size = high - low + 1;
-    ai.extents[i] = Extent{aff.eval(min_idxs), aff.eval(max_idxs)};
-    aff = aff.partial_eval(access_offset_by_name);
-  }
-
-  // TODO: Verify that AliasInfo is correct in the multi-memory world.
-
-  return ai;
-}
-
 // Gathers a Statement's IO information.
 class IOGatherer final : private stripe::MutableStmtVisitor {
  public:
   static std::pair<std::vector<std::pair<RefInfo*, stripe::RefDir>>, StatementBinder> Gather(
-      stripe::Statement* stmt, const stripe::Location& loc, const AliasMap& alias_map,
-      std::map<RefInfoKey, RefInfo>* ri_map) {
-    IOGatherer visitor{loc, alias_map, ri_map};
+      stripe::Statement* stmt, const stripe::Location& loc, std::map<RefInfoKey, RefInfo>* ri_map) {
+    IOGatherer visitor{loc, ri_map};
     stmt->Accept(&visitor);
     return std::make_pair(std::move(visitor.ios_), std::move(visitor.binder_));
   }
 
  private:
-  IOGatherer(const stripe::Location& loc, const AliasMap& alias_map, std::map<RefInfoKey, RefInfo>* ri_map)
-      : loc_{&loc}, alias_map_{&alias_map}, ri_map_{ri_map} {}
+  IOGatherer(const stripe::Location& loc, std::map<RefInfoKey, RefInfo>* ri_map) : loc_{&loc}, ri_map_{ri_map} {}
 
   RefInfo* FindDirectRefInfo(const std::string& name);
 
@@ -450,16 +395,12 @@ class IOGatherer final : private stripe::MutableStmtVisitor {
   void Visit(stripe::Block*) final;
 
   const stripe::Location* loc_;
-  const AliasMap* alias_map_;
   std::map<RefInfoKey, RefInfo>* ri_map_;
   std::vector<std::pair<RefInfo*, stripe::RefDir>> ios_;
   StatementBinder binder_;
 };
 
-RefInfo* IOGatherer::FindDirectRefInfo(const std::string& name) {
-  const AliasInfo& ai = alias_map_->at(name);
-  return &ri_map_->at(std::forward_as_tuple(name, ai.access, ai.shape));
-}
+RefInfo* IOGatherer::FindDirectRefInfo(const std::string& name) { return &ri_map_->at(name); }
 
 void IOGatherer::Visit(stripe::Load* load) {
   auto* ri = FindDirectRefInfo(load->from);
@@ -501,8 +442,7 @@ void IOGatherer::Visit(stripe::Block* block) {
     if (ref.dir == stripe::RefDir::None) {
       continue;  // This isn't an IO ref.
     }
-    AliasInfo ai = UnionSubblockAliasInfo(block, ref, *alias_map_);
-    auto* ri = &ri_map_->at(std::forward_as_tuple(ref.from, ai.access, ai.shape));
+    auto* ri = &ri_map_->at(ref.from);
     auto it_inserted = accesses.emplace(ri, ref.dir);
     if (!it_inserted.second) {
       it_inserted.first->second = UnionDir(it_inserted.first->second, ref.dir);
@@ -600,7 +540,6 @@ class Scheduler {
   // deps computed directly by scheduling are conservative.
   void RebuildTransitiveDeps();
 
-  const AliasMap* alias_map_;
   stripe::Block* block_;
   stripe::Location mem_loc_;
   std::size_t mem_bytes_;
@@ -641,50 +580,18 @@ void Scheduler::Schedule(const AliasMap& alias_map, stripe::Block* block, const 
 
 std::map<RefInfoKey, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, const AliasMap* alias_map) {
   std::map<RefInfoKey, RefInfo> ri_map;
+  // Add the current block's refs.
   for (auto& ref : block->refs) {
-    // First, we add the current block's refs.  This account for any
-    // refinement accessed by a non-Block substatement, and for any
-    // Block substatement that accesses an entire tensor from the
-    // current Block.
     const AliasInfo& ai = alias_map->at(ref.into);
-    ri_map.emplace(std::forward_as_tuple(ref.into, ai.access, ai.shape), RefInfo{&ref, ai, "_whole"});
+    ri_map.emplace(ref.into, RefInfo{&ref, ai, "_whole"});
   }
-  std::unordered_map<std::string, std::uint32_t> slice_count;
+
+  // Update earliest-writer entries.
   for (auto& stmt : block->stmts) {
-    stripe::Block* subblock = dynamic_cast<stripe::Block*>(stmt.get());
-    if (!subblock) {
-      // RefInfos for non-Blocks are already accounted for, but we do
-      // need to run bookkeeping on their writes.
-      for (const auto& written_ref_name : stmt->buffer_writes()) {
-        const AliasInfo& ai = alias_map->at(written_ref_name);
-        auto& ri = ri_map.at(std::forward_as_tuple(written_ref_name, ai.access, ai.shape));
-        if (!ri.earliest_writer) {
-          ri.earliest_writer = stmt.get();
-        }
-      }
-      continue;
-    }
-    IVLOG(3, "Considering subblock; idxs=" << subblock->idxs);
-    for (const auto& ref : subblock->refs) {
-      if (ref.dir == stripe::RefDir::None) {
-        continue;  // This isn't an IO ref.
-      }
-      IVLOG(3, "  Considering refinement: " << ref);
-      AliasInfo ai = UnionSubblockAliasInfo(subblock, ref, *alias_map);
-      auto key = std::forward_as_tuple(ref.from, ai.access, ai.shape);
-      if (ri_map.find(key) == ri_map.end()) {
-        auto it_inserted = slice_count.emplace(ref.from, 0);
-        if (!it_inserted.second) {
-          it_inserted.first->second++;
-        }
-        ri_map.emplace(
-            key, RefInfo{&*block->ref_by_into(ref.from), ai, "_slice_" + std::to_string(it_inserted.first->second)});
-      }
-      if (IsWriteDir(ref.dir)) {
-        auto& ri = ri_map.at(key);
-        if (!ri.earliest_writer) {
-          ri.earliest_writer = stmt.get();
-        }
+    for (const auto& written_ref_name : stmt->buffer_writes()) {
+      auto& ri = ri_map.at(written_ref_name);
+      if (!ri.earliest_writer) {
+        ri.earliest_writer = stmt.get();
       }
     }
   }
@@ -692,8 +599,7 @@ std::map<RefInfoKey, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, c
 }
 
 Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const proto::SchedulePass& options)
-    : alias_map_{alias_map},
-      block_{block},
+    : block_{block},
       mem_loc_(stripe::FromProto(options.mem_loc())),
       mem_bytes_{options.mem_kib() * 1024},
       alignment_{options.alignment() ? options.alignment() : kDefaultAlignment},
@@ -725,7 +631,7 @@ void Scheduler::Run() {
     // Build the vector of IOs performed by this statement.
     std::vector<std::pair<RefInfo*, stripe::RefDir>> ios;
     StatementBinder binder;
-    std::tie(ios, binder) = IOGatherer::Gather(si->get(), mem_loc_, *alias_map_, &ri_map_);
+    std::tie(ios, binder) = IOGatherer::Gather(si->get(), mem_loc_, &ri_map_);
 
     // Add swap-ins for any existing CacheEntries that are invalidated
     // by scheduling this statement.
