@@ -188,6 +188,18 @@ struct TensorShape {
     return ret;
   }
 
+  size_t sizes_product() const {
+    size_t ret = 1;
+    for (const auto& size : sizes()) {
+      ret *= size;
+    }
+    return ret;
+  }
+
+  size_t sizes_product_bytes() const {  //
+    return sizes_product() * byte_width(type);
+  }
+
   inline bool operator==(const TensorShape& rhs) const {
     return std::tie(type, dims) ==  //
            std::tie(rhs.type, rhs.dims);

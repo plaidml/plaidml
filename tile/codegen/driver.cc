@@ -85,17 +85,20 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
       case proto::Pass::kTranspose:
         TransposePass(block, pass.transpose());
         break;
-      case proto::Pass::kPartition:
-        PartitionPass(block, pass.partition());
+      case proto::Pass::kPartitionCompute:
+        PartitionComputePass(block, pass.partition_compute());
+        break;
+      case proto::Pass::kPartitionMemory:
+        PartitionMemoryPass(block, pass.partition_memory());
+        break;
+      case proto::Pass::kDebank:
+        DebankPass(block, pass.debank());
         break;
       case proto::Pass::kPruneIdxs:
         PruneIndexesPass(block, pass.prune_idxs());
         break;
       case proto::Pass::kUnroll:
         UnrollPass(block, pass.unroll());
-        break;
-      case proto::Pass::kDebank:
-        DebankPass(block, pass.debank());
         break;
       case proto::Pass::kUnrollIdx:
         UnrollIndexPass(block, pass.unroll_idx());
