@@ -354,7 +354,7 @@ void DebankBlocks(Block* block, const Location& loc) {
 
 }  // namespace
 
-void PartitionPass(Block* root, const proto::PartitionPass& options) {
+void PartitionMemoryPass(Block* root, const proto::PartitionMemoryPass& options) {
   std::map<std::string, BankInfo> buf_banks;
   auto reqs = FromProto(options.reqs());
   auto set_tags = FromProto(options.set_tags());

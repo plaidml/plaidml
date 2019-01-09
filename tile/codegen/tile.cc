@@ -50,15 +50,19 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   }
   // IVLOG(3, "Doing tiling " << shape << ":\n" << *outer);
   // Make a 'by-name' version of tile and check for trivality
-  bool trivial = true;
+  bool all_min = true;
+  bool all_max = true;
   std::map<std::string, size_t> tile_by_name;
   for (size_t i = 0; i < outer->idxs.size(); i++) {
     tile_by_name[outer->idxs[i].name] = shape[i];
     if (shape[i] != 1) {
-      trivial = false;
+      all_min = false;
+    }
+    if (shape[i] != outer->idxs[i].range) {
+      all_max = false;
     }
   }
-  if (elide_trivial && trivial) {
+  if (elide_trivial && (all_min || all_max)) {
     return false;
   }
   // Create a new inner block
@@ -132,9 +136,12 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   for (auto& ref : outer->refs) {
     // Fix the sizes on the outer blocks
     ref.interior_shape = inner->exterior_shape(ref.into);
-    // Multiply each stride in the outer block refinements by the appropriate tile size
     for (auto& aff : ref.access) {
+      // Since we're taking a single block and turning it into two (e.g. outer and inner),
+      // arrange for only one of the blocks to do the constant pointer bumping.
+      // It probably doesn't matter whether the outer or the inner does the bumping.
       aff.setConstant(0);
+      // Multiply each stride in the outer block refinements by the appropriate tile size
       for (auto& kvp : aff.mutateMap()) {
         if (!kvp.first.empty()) {
           kvp.second *= tile_by_name[kvp.first];
