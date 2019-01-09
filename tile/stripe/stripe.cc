@@ -28,6 +28,8 @@ const char* Intrinsic::ADD = "add";
 const char* Intrinsic::EQ = "cmp_eq";
 const char* Intrinsic::COND = "cond";
 
+static void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block = nullptr);
+
 namespace {
 
 using DepsMap = std::unordered_map<const Statement*, size_t>;
@@ -85,12 +87,14 @@ void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
     }
     for (const auto& kvp : sorted) {
       PrintTab(os, depth + 2);
-      os << *kvp.second << std::endl;
+      PrintRefinement(os, *kvp.second, &block);
+      os << std::endl;
     }
   } else {
     for (const auto& ref : block.refs) {
       PrintTab(os, depth + 2);
-      os << ref << std::endl;
+      PrintRefinement(os, ref, &block);
+      os << std::endl;
     }
   }
 }
@@ -281,6 +285,11 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
+  PrintRefinement(os, ref);
+  return os;
+}
+
+void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block) {
   if (ref.tags.size()) {
     for (const auto& tag : ref.tags) {
       os << "#" << tag << " ";
@@ -350,20 +359,28 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
       os << ref.interior_shape.dims[i].stride;
     }
   }
-  os << "):";
-  if (ref.interior_shape.byte_size() < 1024) {
-    os << ref.interior_shape.byte_size() << " B";
+  os << "): I ";
+  auto interior_bytes = ref.interior_shape.sizes_product_bytes();
+  if (interior_bytes < 1024) {
+    os << interior_bytes << " B";
   } else {
-    os << ref.interior_shape.byte_size() / 1024.0 << " KiB";
+    os << interior_bytes / 1024.0 << " KiB";
+  }
+  if (block) {
+    os << ", E ";
+    auto exterior_bytes = block->exterior_shape(ref.into).sizes_product_bytes();
+    if (exterior_bytes < 1024) {
+      os << exterior_bytes << " B";
+    } else {
+      os << exterior_bytes / 1024.0 << " KiB";
+    }
   }
   if (ref.bank_dim) {
-    os << ", banking " << ref.bank_dim->orig_name << " " << ref.bank_dim->orig_shape
-       << " on didx=" << ref.bank_dim->dim_pos;
+    os << ", banking " << ref.bank_dim->orig_name << " " << ref.bank_dim->orig_shape;
   }
   if (!ref.from.empty() && ref.into != ref.from) {
     os << " // alias";
   }
-  return os;
 }
 
 std::ostream& operator<<(std::ostream& os, const Block& block) {

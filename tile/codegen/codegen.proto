@@ -52,11 +52,12 @@ message Pass {
     AutotilePass autotile = 12;
     SchedulePass schedule = 13;
     TransposePass transpose = 14;
-    PartitionPass partition = 15;
-    GenericPass prune_idxs = 16;
-    UnrollPass unroll = 17;
-    DebankPass debank = 18;
-    UnrollIndexPass unroll_idx = 19;
+    PartitionComputePass partition_compute = 15;
+    PartitionMemoryPass partition_memory = 16;
+    DebankPass debank = 17;
+    GenericPass prune_idxs = 18;
+    UnrollPass unroll = 19;
+    UnrollIndexPass unroll_idx = 20;
   }
 }
 
@@ -117,12 +118,6 @@ message StencilIndex {
   repeated int32 ins = 4;
 }
 
-enum TileStrategy {
-  TileRanges = 0;
-  TileSizes = 1;
-  TileSplitIndex = 2;
-}
-
 message AutotilePass {
   repeated string reqs = 1;
   repeated string outer_set = 2;
@@ -136,10 +131,7 @@ message AutotilePass {
   optional int64 max_total_size = 10 [default = 0];
   optional double output_cost = 11 [default = 0.0];
   optional double input_cost = 12 [default = 1.0];
-  optional TileStrategy strategy = 13 [default = TileRanges];
-  optional string idx_tag = 14;
-  optional bool copy_tags = 15 [default = false];
-  optional bool drop_outer_tags = 16 [default = false];
+  optional bool copy_tags = 13 [default = false];
 }
 
 message TransposePass {
@@ -147,7 +139,14 @@ message TransposePass {
   repeated string alloc_reqs = 2;
 }
 
-message PartitionPass {
+message PartitionComputePass {
+  repeated string reqs = 1;
+  repeated string set_tags = 2;
+  required int64 num_parts = 3;
+  optional string idx_tag = 4;
+}
+
+message PartitionMemoryPass {
   repeated string reqs = 1;
   repeated string set_tags = 2;
   required int64 num_parts = 3;
