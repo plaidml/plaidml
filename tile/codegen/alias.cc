@@ -50,6 +50,7 @@ bool CheckOverlap(const std::vector<Extent>& ae, const std::vector<Extent>& be) 
 AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
   IVLOG(3, "Compare: " << ai.base_name << ", " << bi.base_name);
   if (ai.base_name != bi.base_name) {
+    IVLOG(3, "  CheckOverlap: None");
     return AliasType::None;
   }
   if (ai.shape == bi.shape) {
@@ -71,6 +72,7 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
   // dimension to see if there is a splitting plane, and if so, safely declare alias None,
   // but it's unclear that that will happen enough for us to care, so just always return
   // Partial which is conservative.
+  IVLOG(3, "  CheckOverlap: Partial");
   return AliasType::Partial;
 }
 

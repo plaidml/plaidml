@@ -214,6 +214,9 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   }
   // Remove mapped access elements from inner refinements
   for (auto& ref : inner->refs) {
+    // Rename from to match outer into
+    ref.from = ref.into;
+    // Update accesses
     for (auto& acc : ref.access) {
       Affine affine;
       for (const auto& kvp : acc.getMap()) {
@@ -227,6 +230,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   // Remove any trivial loops remaining
   FlattenTrivial(outer.get());
   // Return final result
+  IVLOG(3, "Refactor output:\n" << *outer);
   return outer;
 }
 
