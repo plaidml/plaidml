@@ -39,9 +39,13 @@ void ApplyCache(Block* block,                 //
   xfer_block.location = xfer_loc;
   std::vector<Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
-    std::string iname = str(boost::format("i%zu") % i);
-    xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
-    xfer_access.emplace_back(Affine(iname));
+    if (sizes[i] > 1) {
+      std::string iname = str(boost::format("i%zu") % i);
+      xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
+      xfer_access.emplace_back(Affine(iname));
+    } else {
+      xfer_access.emplace_back(Affine());
+    }
   }
   TensorShape raw_xfer_shape = raw_ts;
   TensorShape cached_xfer_shape = cached_ts;
@@ -79,6 +83,7 @@ void ApplyCache(Block* block,                 //
   if (IsReadDir(it->dir)) {
     auto cache_load = std::make_shared<Block>(xfer_block);
     cache_load->name = str(boost::format("load_%s") % var_name);
+    cache_load->tags = {"cache", "cache_load"};
     cache_load->refs[0].from = raw_name;
     cache_load->refs[0].interior_shape = raw_xfer_shape;
     cache_load->refs[1].location = mem_loc;
@@ -88,6 +93,7 @@ void ApplyCache(Block* block,                 //
   if (IsWriteDir(it->dir)) {
     auto cache_store = std::make_shared<Block>(xfer_block);
     cache_store->name = str(boost::format("store_%s") % var_name);
+    cache_store->tags = {"cache", "cache_store"};
     cache_store->refs[1].from = raw_name;
     cache_store->refs[1].interior_shape = raw_xfer_shape;
     cache_store->refs[0].location = mem_loc;
