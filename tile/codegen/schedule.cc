@@ -730,6 +730,12 @@ void Scheduler::Run() {
       RefInfo* ri = ri_placement.first;
       auto& placement = ri_placement.second;
       if (!allow_out_of_range_accesses_ && mem_bytes_ < placement.range.end) {
+        LOG(WARNING) << "Failed to create placement plan fitting within " << (mem_bytes_ / 1024)
+                     << " KiB memory boundary";
+        LOG(WARNING) << "The program simultaneously requires:";
+        for (const auto& ri_placement : plan) {
+          LOG(WARNING) << "  " << ri_placement.first->ref;
+        }
         throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available (placing " +
                                                   ri_placement.first->name + ")"});
       }
