@@ -13,8 +13,7 @@ About Stripe
 ------------
 
 ``Stripe`` is a polyhedral :abbr:`Intermediate Representation (IR)`, 
-or *IR*, that is highly amenable to optimization. Stripe is currently 
-a work-in-progress, and features are under development include:   
+or *IR*, that is highly amenable to optimization, enabling things like   
 
 * Arbitrary tensorization
 
@@ -24,5 +23,7 @@ a work-in-progress, and features are under development include:
 
 * Heterogenous compute topologies
 
-* Detailed performance and cost estimates
+* Detailed performance and cost estimation
 
+These and other low-level features also make it easier to write code or
+co-design for software-hardware conceptual interfaces, programs, etc. 
