@@ -47,14 +47,18 @@ void Scalarize(Block* block, bool recursive) {
     switch ((*it)->kind()) {
       case StmtKind::Store: {
         auto store = Store::Downcast(*it);
+        // Get from and resolve any alias
+        std::string from = store->from;
+        if (scalar_alias.count(from)) {
+          from = scalar_alias[from];
+        }
         if (sbufs.count(store->into)) {
           // It's a store into a scalarized buffer, record it's effect and erase
-          std::string from = store->from;
-          if (scalar_alias.count(from)) {
-            from = scalar_alias[from];
-          }
           buf_state[store->into] = from;
           keep = false;
+        } else {
+          // If it's not a scalarized buffer, I may still need to update from
+          store->from = from;
         }
       } break;
       case StmtKind::Load: {
