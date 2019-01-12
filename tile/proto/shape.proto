@@ -42,5 +42,5 @@ message TensorShape {
   //
   // A tensor with no dimensions (i.e, rank 0) is valid and is considered a
   // scalar.
-  repeated Dimension dimensions = 3;
+  repeated Dimension dims = 3;
 }

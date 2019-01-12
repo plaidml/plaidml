@@ -175,7 +175,7 @@ void PlatformTest::CheckExpected(const TensorShape& shape,            //
 namespace multiply {
 
 const char* Code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
-// const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
+// const char* Shape = R"(type: FLOAT32 dims: { size: 4 stride: 4 } dims: { size: 4 stride: 1 })";
 const std::vector<int> Input = {
     0, 1, 2, 3,  //
     4, 5, 6, 7,  //
@@ -194,7 +194,7 @@ const std::vector<int> Expected = {
 namespace vector_add {
 
 const char* Code = "function (A, B) -> (C) { C = A + B; }";
-// const char* Shape = R"(type: FLOAT32 dimensions: { size: 4 stride: 4 } dimensions: { size: 4 stride: 1 })";
+// const char* Shape = R"(type: FLOAT32 dims: { size: 4 stride: 4 } dims: { size: 4 stride: 1 })";
 const std::vector<int> A = {
     1, 2, 3, 4,  //
     1, 2, 3, 4,  //

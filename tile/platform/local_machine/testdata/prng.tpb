@@ -5,8 +5,8 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions: { size:3 stride: 2048 }
-      dimensions: { size:2048 stride: 1 }
+      dims: { size:3 stride: 2048 }
+      dims: { size:2048 stride: 1 }
     }
   }
 }
@@ -15,8 +15,8 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions: { size:3 stride: 2048 }
-      dimensions: { size:2048 stride: 1 }
+      dims: { size:3 stride: 2048 }
+      dims: { size:2048 stride: 1 }
     }
   }
 }
@@ -25,10 +25,10 @@ outputs {
   value {
     shape {
       type: FLOAT32
-      dimensions: { size:3 stride: 288 }
-      dimensions: { size:3 stride: 96 }
-      dimensions: { size:3 stride: 32 }
-      dimensions: { size:32 stride: 1 }
+      dims: { size:3 stride: 288 }
+      dims: { size:3 stride: 96 }
+      dims: { size:3 stride: 32 }
+      dims: { size:32 stride: 1 }
     }
   }
 }

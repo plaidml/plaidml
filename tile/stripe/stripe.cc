@@ -531,7 +531,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
   auto ret = std::make_shared<Block>();
   ret->name = block.name();
   ret->comments = block.comments();
-  ret->location = FromProto(block.location());
+  ret->location = FromProto(block.loc());
   for (const auto& pb_idx : block.idxs()) {
     ret->idxs.emplace_back(Index{pb_idx.name(), pb_idx.range(), FromProto(pb_idx.affine())});
   }
@@ -548,7 +548,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     }
     ref.interior_shape = tile::FromProto(pb_ref.shape());
     ref.agg_op = pb_ref.agg_op();
-    ref.location = FromProto(pb_ref.location());
+    ref.location = FromProto(pb_ref.loc());
     ref.is_const = pb_ref.is_const();
     ref.offset = pb_ref.offset();
     // if (pb_ref.has_bank_dim()) {
@@ -650,7 +650,7 @@ proto::Block IntoProto(const Block& block) {
   proto::Block ret;
   ret.set_name(block.name);
   ret.set_comments(block.comments);
-  *ret.mutable_location() = IntoProto(block.location);
+  *ret.mutable_loc() = IntoProto(block.location);
   for (const auto& idx : block.idxs) {
     auto pb_idx = ret.add_idxs();
     pb_idx->set_name(idx.name);
@@ -683,7 +683,7 @@ proto::Block IntoProto(const Block& block) {
     }
     *pb_ref->mutable_shape() = IntoProto(ref.interior_shape);
     pb_ref->set_agg_op(ref.agg_op);
-    *pb_ref->mutable_location() = IntoProto(ref.location);
+    *pb_ref->mutable_loc() = IntoProto(ref.location);
     pb_ref->set_is_const(ref.is_const);
     pb_ref->set_offset(ref.offset);
     // if (ref.bank_dim) {
