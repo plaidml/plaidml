@@ -23,16 +23,16 @@ namespace test {
 TEST(Codegen, JitIntrinsicMUL_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "b1"
-      shape { type: FLOAT32 dimensions: {size:1 stride:1} }
+      shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "b2"
-      shape { type: FLOAT32 dimensions: {size:1 stride:1} }
+      shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { load { from:"b2" into:"$2" } }
@@ -53,16 +53,16 @@ TEST(Codegen, JitIntrinsicMUL_F32) {
 TEST(Codegen, JitIntrinsicADD_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "b1"
-      shape { type: FLOAT32 dimensions: {size:1 stride:1} }
+      shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "b2"
-      shape { type: FLOAT32 dimensions: {size:1 stride:1} }
+      shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { load { from:"b2" into:"$2" } }
@@ -87,28 +87,28 @@ TEST(Codegen, JitIntrinsicCOND) {}
 TEST(Codegen, JitSimpleLoop) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     idxs {
       name: "i"
       range: 5
     }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "bufA"
       access {
         offset: 0
         terms {key: "i" value: 1}
       }
-      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+      shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "bufB"
       access {
         offset: 0
         terms {key: "i" value: 1}
       }
-      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+      shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     stmts { load { from:"bufA" into:"$1" } }
     stmts { store { from:"$1" into:"bufB"} }
@@ -135,20 +135,20 @@ TEST(Codegen, JitSimpleLoop) {
 TEST(Codegen, JitCopy2D) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "bufA"
       access {
         offset: 0
         terms {key:"j" value:1}
       }
-      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+      shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "bufB"
       access {
         offset: 0
@@ -160,8 +160,8 @@ TEST(Codegen, JitCopy2D) {
       }
       shape {
         type: FLOAT32
-        dimensions: {size:5 stride:5} 
-        dimensions: {size:5 stride:1}
+        dims: {size:5 stride:5} 
+        dims: {size:5 stride:1}
       }
     }
     stmts { load { from:"bufA" into:"$1" } }
@@ -197,20 +197,20 @@ TEST(Codegen, JitCopy2D) {
 TEST(Codegen, JitAggSum2D) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "bufA"
       access {
         offset: 0
         terms {key:"j" value:1}
       }
-      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+      shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "bufB"
       agg_op: "add"
       access {
@@ -223,8 +223,8 @@ TEST(Codegen, JitAggSum2D) {
       }
       shape {
         type: FLOAT32
-        dimensions: {size:5 stride:5}
-        dimensions: {size:5 stride:1}
+        dims: {size:5 stride:5}
+        dims: {size:5 stride:1}
       }
     }
     stmts { load { from:"bufA" into:"$1" } }
@@ -318,20 +318,20 @@ TEST(Codegen, JitMatMul) {
 TEST(Codegen, JitNestedAlloc) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "bufA"
       access {
         offset: 0
         terms {key:"j" value:1}
       }
-      shape { type: FLOAT32 dimensions: {size:5 stride:1} }
+      shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
-      location { unit { } }
+      loc { unit { } }
       into: "bufB"
       agg_op: "add"
       access {
@@ -344,28 +344,28 @@ TEST(Codegen, JitNestedAlloc) {
       }
       shape {
         type: FLOAT32
-        dimensions: {size:5 stride:5}
-        dimensions: {size:5 stride:1}
+        dims: {size:5 stride:5}
+        dims: {size:5 stride:1}
       }
     }
     stmts { block {
       refs {
-        location { unit { } }
+        loc { unit { } }
         dir: 3
         into: "bufA"
-        shape { type: FLOAT32 dimensions: {size:1 stride:1} }
+        shape { type: FLOAT32 dims: {size:1 stride:1} }
       }
       refs {
-        location { unit { } }
+        loc { unit { } }
         dir: 3
         into: "bufB"
         agg_op: "add"
-        shape { type: FLOAT32 dimensions: {size:1 stride:1} }
+        shape { type: FLOAT32 dims: {size:1 stride:1} }
       }
       refs {
         dir: 0
         into: "bufTemp"
-        shape { type: INT32 dimensions: {size:5 stride:1} }
+        shape { type: INT32 dims: {size:5 stride:1} }
       }
       stmts { load { from:"bufA" into:"$1" } }
       stmts { store { from:"$1" into:"bufB"} }

@@ -39,8 +39,8 @@ void SerializeShapemap(std::ostringstream* serialized, const M& m) {
     (*serialized) << t.first.length() << ':';
     (*serialized) << t.first;
     (*serialized) << t.second.type() << ':';
-    for (const auto& d : t.second.dimensions()) {
-      (*serialized) << d.size() << '/' << d.stride() << ':';
+    for (const auto& dim : t.second.dims()) {
+      (*serialized) << dim.size() << '/' << dim.stride() << ':';
     }
   }
 }

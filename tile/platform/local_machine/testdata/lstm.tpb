@@ -5,7 +5,7 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
     consumed: true
   }
@@ -15,7 +15,7 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
     consumed: true
   }
@@ -25,7 +25,7 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
     consumed: true
   }
@@ -35,7 +35,7 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
     consumed: true
   }
@@ -45,7 +45,7 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
     consumed: true
   }
@@ -55,7 +55,7 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
     consumed: true
   }
@@ -65,7 +65,7 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
     consumed: true
   }
@@ -75,7 +75,7 @@ inputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
     consumed: true
   }
@@ -85,7 +85,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:20000 stride: 128 } dimensions { size:128 stride:1 }
+      dims { size:20000 stride: 128 } dims { size:128 stride:1 }
     }
     consumed: true
   }
@@ -95,7 +95,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:1 stride:80 } dimensions { size:80 stride:1 }
+      dims { size:1 stride:80 } dims { size:80 stride:1 }
     }
     consumed: true
   }
@@ -105,7 +105,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:128 stride:512 } dimensions { size:512 stride:1 }
+      dims { size:128 stride:512 } dims { size:512 stride:1 }
     }
     consumed: true
   }
@@ -115,7 +115,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:512 stride:1 }
+      dims { size:512 stride:1 }
     }
     consumed: true
   }
@@ -125,7 +125,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:1 stride:1 }
+      dims { size:1 stride:1 }
     }
     consumed: true
   }
@@ -135,7 +135,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:1 stride:1 }
+      dims { size:1 stride:1 }
     }
     consumed: true
   }
@@ -145,7 +145,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:128 stride:512 } dimensions { size:512 stride:1 }
+      dims { size:128 stride:512 } dims { size:512 stride:1 }
     }
     consumed: true
   }
@@ -155,7 +155,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:128 stride:1 } dimensions { size:1 stride:1 }
+      dims { size:128 stride:1 } dims { size:1 stride:1 }
     }
     consumed: true
   }
@@ -165,7 +165,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:1 stride: 1 }
+      dims { size:1 stride: 1 }
     }
     consumed: true
   }
@@ -175,7 +175,7 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
   }
 }
@@ -184,7 +184,7 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
   }
 }
@@ -193,7 +193,7 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
   }
 }
@@ -202,7 +202,7 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
   }
 }
@@ -211,7 +211,7 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
   }
 }
@@ -220,7 +220,7 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
   }
 }
@@ -229,7 +229,7 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
   }
 }
@@ -238,7 +238,7 @@ outputs {
   value {
     shape {
       type: UINT32
-      dimensions { size:3 stride:2048 } dimensions { size:2048 stride:1 }
+      dims { size:3 stride:2048 } dims { size:2048 stride:1 }
     }
   }
 }
@@ -247,7 +247,7 @@ outputs {
   value {
     shape {
       type: FLOAT32
-      dimensions { size:1 stride:1 }
+      dims { size:1 stride:1 }
     }
   }
 }

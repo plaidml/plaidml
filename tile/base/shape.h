@@ -328,7 +328,7 @@ inline proto::TensorShape::Dimension IntoProto(const TensorDimension& dim) {
 inline TensorShape FromProto(const proto::TensorShape& shape) {
   TensorShape ret;
   ret.type = FromProto(shape.type());
-  for (const auto& dim : shape.dimensions()) {
+  for (const auto& dim : shape.dims()) {
     ret.dims.emplace_back(FromProto(dim));
   }
   return ret;
@@ -338,17 +338,17 @@ inline proto::TensorShape IntoProto(const TensorShape& shape) {
   proto::TensorShape ret;
   ret.set_type(IntoProto(shape.type));
   for (const auto& dim : shape.dims) {
-    *(ret.mutable_dimensions()->Add()) = IntoProto(dim);
+    *(ret.mutable_dims()->Add()) = IntoProto(dim);
   }
   return ret;
 }
 
 inline int size_in_bytes(const proto::TensorShape& shape) {
-  if (shape.dimensions().size() == 0) {
+  if (shape.dims().size() == 0) {
     return size_in_bytes(shape.type());
   }
-  auto dim = *std::max_element(shape.dimensions().cbegin(),                    //
-                               shape.dimensions().cend(),                      //
+  auto dim = *std::max_element(shape.dims().cbegin(),                          //
+                               shape.dims().cend(),                            //
                                [](const proto::TensorShape::Dimension& lhs,    //
                                   const proto::TensorShape::Dimension& rhs) {  //
                                  return (lhs.stride() * lhs.size()) < (rhs.stride() * rhs.size());

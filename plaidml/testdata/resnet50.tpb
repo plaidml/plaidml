@@ -3,11 +3,11 @@ inputs {
   key: "X_I_0"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 6
       stride: 4
     }
-    dimensions {
+    dims {
       size: 4
       stride: 1
     }
@@ -17,11 +17,11 @@ inputs {
   key: "X_I_1"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 6
       stride: 6
     }
-    dimensions {
+    dims {
       size: 6
       stride: 1
     }
@@ -31,7 +31,7 @@ inputs {
   key: "X_I_10"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -41,19 +41,19 @@ inputs {
   key: "X_I_100"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 49152
     }
-    dimensions {
+    dims {
       size: 3
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 128
       stride: 128
     }
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -63,7 +63,7 @@ inputs {
   key: "X_I_101"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -73,7 +73,7 @@ inputs {
   key: "X_I_102"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -83,7 +83,7 @@ inputs {
   key: "X_I_103"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -93,7 +93,7 @@ inputs {
   key: "X_I_104"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -103,7 +103,7 @@ inputs {
   key: "X_I_105"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -113,19 +113,19 @@ inputs {
   key: "X_I_106"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 128
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -135,7 +135,7 @@ inputs {
   key: "X_I_107"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -145,7 +145,7 @@ inputs {
   key: "X_I_108"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -155,7 +155,7 @@ inputs {
   key: "X_I_109"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -165,7 +165,7 @@ inputs {
   key: "X_I_11"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -175,7 +175,7 @@ inputs {
   key: "X_I_110"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -185,7 +185,7 @@ inputs {
   key: "X_I_111"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -195,19 +195,19 @@ inputs {
   key: "X_I_112"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 512
       stride: 128
     }
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -217,7 +217,7 @@ inputs {
   key: "X_I_113"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -227,7 +227,7 @@ inputs {
   key: "X_I_114"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -237,7 +237,7 @@ inputs {
   key: "X_I_115"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -247,7 +247,7 @@ inputs {
   key: "X_I_116"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -257,7 +257,7 @@ inputs {
   key: "X_I_117"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -267,19 +267,19 @@ inputs {
   key: "X_I_118"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 49152
     }
-    dimensions {
+    dims {
       size: 3
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 128
       stride: 128
     }
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -289,7 +289,7 @@ inputs {
   key: "X_I_119"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -299,7 +299,7 @@ inputs {
   key: "X_I_12"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -309,7 +309,7 @@ inputs {
   key: "X_I_120"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -319,7 +319,7 @@ inputs {
   key: "X_I_121"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -329,7 +329,7 @@ inputs {
   key: "X_I_122"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -339,7 +339,7 @@ inputs {
   key: "X_I_123"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -349,19 +349,19 @@ inputs {
   key: "X_I_124"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 128
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -371,7 +371,7 @@ inputs {
   key: "X_I_125"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -381,7 +381,7 @@ inputs {
   key: "X_I_126"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -391,7 +391,7 @@ inputs {
   key: "X_I_127"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -401,7 +401,7 @@ inputs {
   key: "X_I_128"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -411,7 +411,7 @@ inputs {
   key: "X_I_129"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -421,7 +421,7 @@ inputs {
   key: "X_I_13"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -431,19 +431,19 @@ inputs {
   key: "X_I_130"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 512
       stride: 128
     }
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -453,7 +453,7 @@ inputs {
   key: "X_I_131"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -463,7 +463,7 @@ inputs {
   key: "X_I_132"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -473,7 +473,7 @@ inputs {
   key: "X_I_133"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -483,7 +483,7 @@ inputs {
   key: "X_I_134"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -493,7 +493,7 @@ inputs {
   key: "X_I_135"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -503,19 +503,19 @@ inputs {
   key: "X_I_136"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 49152
     }
-    dimensions {
+    dims {
       size: 3
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 128
       stride: 128
     }
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -525,7 +525,7 @@ inputs {
   key: "X_I_137"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -535,7 +535,7 @@ inputs {
   key: "X_I_138"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -545,7 +545,7 @@ inputs {
   key: "X_I_139"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -555,7 +555,7 @@ inputs {
   key: "X_I_14"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -565,7 +565,7 @@ inputs {
   key: "X_I_140"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -575,7 +575,7 @@ inputs {
   key: "X_I_141"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -585,19 +585,19 @@ inputs {
   key: "X_I_142"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 128
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -607,7 +607,7 @@ inputs {
   key: "X_I_143"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -617,7 +617,7 @@ inputs {
   key: "X_I_144"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -627,7 +627,7 @@ inputs {
   key: "X_I_145"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -637,7 +637,7 @@ inputs {
   key: "X_I_146"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -647,7 +647,7 @@ inputs {
   key: "X_I_147"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -657,19 +657,19 @@ inputs {
   key: "X_I_148"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 131072
     }
-    dimensions {
+    dims {
       size: 1
       stride: 131072
     }
-    dimensions {
+    dims {
       size: 512
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -679,7 +679,7 @@ inputs {
   key: "X_I_149"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -689,11 +689,11 @@ inputs {
   key: "X_I_15"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 6
       stride: 3
     }
-    dimensions {
+    dims {
       size: 3
       stride: 1
     }
@@ -703,7 +703,7 @@ inputs {
   key: "X_I_150"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -713,7 +713,7 @@ inputs {
   key: "X_I_151"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -723,7 +723,7 @@ inputs {
   key: "X_I_152"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -733,7 +733,7 @@ inputs {
   key: "X_I_153"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -743,19 +743,19 @@ inputs {
   key: "X_I_154"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 196608
     }
-    dimensions {
+    dims {
       size: 3
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 256
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -765,7 +765,7 @@ inputs {
   key: "X_I_155"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -775,7 +775,7 @@ inputs {
   key: "X_I_156"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -785,7 +785,7 @@ inputs {
   key: "X_I_157"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -795,7 +795,7 @@ inputs {
   key: "X_I_158"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -805,7 +805,7 @@ inputs {
   key: "X_I_159"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -815,19 +815,19 @@ inputs {
   key: "X_I_16"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 12288
     }
-    dimensions {
+    dims {
       size: 3
       stride: 4096
     }
-    dimensions {
+    dims {
       size: 64
       stride: 64
     }
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -837,19 +837,19 @@ inputs {
   key: "X_I_160"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1024
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -859,7 +859,7 @@ inputs {
   key: "X_I_161"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -869,7 +869,7 @@ inputs {
   key: "X_I_162"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -879,7 +879,7 @@ inputs {
   key: "X_I_163"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -889,7 +889,7 @@ inputs {
   key: "X_I_164"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -899,7 +899,7 @@ inputs {
   key: "X_I_165"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -909,19 +909,19 @@ inputs {
   key: "X_I_166"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 524288
     }
-    dimensions {
+    dims {
       size: 1
       stride: 524288
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1024
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -931,7 +931,7 @@ inputs {
   key: "X_I_167"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -941,7 +941,7 @@ inputs {
   key: "X_I_168"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -951,7 +951,7 @@ inputs {
   key: "X_I_169"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -961,7 +961,7 @@ inputs {
   key: "X_I_17"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -971,7 +971,7 @@ inputs {
   key: "X_I_170"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -981,7 +981,7 @@ inputs {
   key: "X_I_171"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -991,19 +991,19 @@ inputs {
   key: "X_I_172"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1013,7 +1013,7 @@ inputs {
   key: "X_I_173"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1023,7 +1023,7 @@ inputs {
   key: "X_I_174"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1033,7 +1033,7 @@ inputs {
   key: "X_I_175"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1043,7 +1043,7 @@ inputs {
   key: "X_I_176"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1053,7 +1053,7 @@ inputs {
   key: "X_I_177"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1063,19 +1063,19 @@ inputs {
   key: "X_I_178"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 196608
     }
-    dimensions {
+    dims {
       size: 3
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 256
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1085,7 +1085,7 @@ inputs {
   key: "X_I_179"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1095,7 +1095,7 @@ inputs {
   key: "X_I_18"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -1105,7 +1105,7 @@ inputs {
   key: "X_I_180"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1115,7 +1115,7 @@ inputs {
   key: "X_I_181"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1125,7 +1125,7 @@ inputs {
   key: "X_I_182"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1135,7 +1135,7 @@ inputs {
   key: "X_I_183"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1145,19 +1145,19 @@ inputs {
   key: "X_I_184"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1024
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1167,7 +1167,7 @@ inputs {
   key: "X_I_185"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1177,7 +1177,7 @@ inputs {
   key: "X_I_186"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1187,7 +1187,7 @@ inputs {
   key: "X_I_187"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1197,7 +1197,7 @@ inputs {
   key: "X_I_188"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1207,7 +1207,7 @@ inputs {
   key: "X_I_189"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1217,7 +1217,7 @@ inputs {
   key: "X_I_19"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -1227,19 +1227,19 @@ inputs {
   key: "X_I_190"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1249,7 +1249,7 @@ inputs {
   key: "X_I_191"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1259,7 +1259,7 @@ inputs {
   key: "X_I_192"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1269,7 +1269,7 @@ inputs {
   key: "X_I_193"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1279,7 +1279,7 @@ inputs {
   key: "X_I_194"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1289,7 +1289,7 @@ inputs {
   key: "X_I_195"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1299,19 +1299,19 @@ inputs {
   key: "X_I_196"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 196608
     }
-    dimensions {
+    dims {
       size: 3
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 256
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1321,7 +1321,7 @@ inputs {
   key: "X_I_197"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1331,7 +1331,7 @@ inputs {
   key: "X_I_198"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1341,7 +1341,7 @@ inputs {
   key: "X_I_199"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1351,19 +1351,19 @@ inputs {
   key: "X_I_2"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 150528
     }
-    dimensions {
+    dims {
       size: 224
       stride: 672
     }
-    dimensions {
+    dims {
       size: 224
       stride: 3
     }
-    dimensions {
+    dims {
       size: 3
       stride: 1
     }
@@ -1373,7 +1373,7 @@ inputs {
   key: "X_I_20"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -1383,7 +1383,7 @@ inputs {
   key: "X_I_200"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1393,7 +1393,7 @@ inputs {
   key: "X_I_201"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1403,19 +1403,19 @@ inputs {
   key: "X_I_202"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1024
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1425,7 +1425,7 @@ inputs {
   key: "X_I_203"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1435,7 +1435,7 @@ inputs {
   key: "X_I_204"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1445,7 +1445,7 @@ inputs {
   key: "X_I_205"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1455,7 +1455,7 @@ inputs {
   key: "X_I_206"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1465,7 +1465,7 @@ inputs {
   key: "X_I_207"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1475,19 +1475,19 @@ inputs {
   key: "X_I_208"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1497,7 +1497,7 @@ inputs {
   key: "X_I_209"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1507,7 +1507,7 @@ inputs {
   key: "X_I_21"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -1517,7 +1517,7 @@ inputs {
   key: "X_I_210"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1527,7 +1527,7 @@ inputs {
   key: "X_I_211"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1537,7 +1537,7 @@ inputs {
   key: "X_I_212"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1547,7 +1547,7 @@ inputs {
   key: "X_I_213"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1557,19 +1557,19 @@ inputs {
   key: "X_I_214"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 196608
     }
-    dimensions {
+    dims {
       size: 3
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 256
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1579,7 +1579,7 @@ inputs {
   key: "X_I_215"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1589,7 +1589,7 @@ inputs {
   key: "X_I_216"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1599,7 +1599,7 @@ inputs {
   key: "X_I_217"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1609,7 +1609,7 @@ inputs {
   key: "X_I_218"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1619,7 +1619,7 @@ inputs {
   key: "X_I_219"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1629,19 +1629,19 @@ inputs {
   key: "X_I_22"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 64
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1651,19 +1651,19 @@ inputs {
   key: "X_I_220"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1024
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1673,7 +1673,7 @@ inputs {
   key: "X_I_221"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1683,7 +1683,7 @@ inputs {
   key: "X_I_222"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1693,7 +1693,7 @@ inputs {
   key: "X_I_223"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1703,7 +1703,7 @@ inputs {
   key: "X_I_224"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1713,7 +1713,7 @@ inputs {
   key: "X_I_225"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1723,19 +1723,19 @@ inputs {
   key: "X_I_226"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1745,7 +1745,7 @@ inputs {
   key: "X_I_227"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1755,7 +1755,7 @@ inputs {
   key: "X_I_228"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1765,7 +1765,7 @@ inputs {
   key: "X_I_229"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1775,7 +1775,7 @@ inputs {
   key: "X_I_23"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1785,7 +1785,7 @@ inputs {
   key: "X_I_230"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1795,7 +1795,7 @@ inputs {
   key: "X_I_231"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1805,19 +1805,19 @@ inputs {
   key: "X_I_232"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 196608
     }
-    dimensions {
+    dims {
       size: 3
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 256
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1827,7 +1827,7 @@ inputs {
   key: "X_I_233"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1837,7 +1837,7 @@ inputs {
   key: "X_I_234"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1847,7 +1847,7 @@ inputs {
   key: "X_I_235"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1857,7 +1857,7 @@ inputs {
   key: "X_I_236"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1867,7 +1867,7 @@ inputs {
   key: "X_I_237"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1877,19 +1877,19 @@ inputs {
   key: "X_I_238"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1024
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1899,7 +1899,7 @@ inputs {
   key: "X_I_239"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1909,7 +1909,7 @@ inputs {
   key: "X_I_24"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1919,7 +1919,7 @@ inputs {
   key: "X_I_240"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1929,7 +1929,7 @@ inputs {
   key: "X_I_241"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1939,7 +1939,7 @@ inputs {
   key: "X_I_242"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1949,7 +1949,7 @@ inputs {
   key: "X_I_243"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -1959,19 +1959,19 @@ inputs {
   key: "X_I_244"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1981,7 +1981,7 @@ inputs {
   key: "X_I_245"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -1991,7 +1991,7 @@ inputs {
   key: "X_I_246"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2001,7 +2001,7 @@ inputs {
   key: "X_I_247"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2011,7 +2011,7 @@ inputs {
   key: "X_I_248"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2021,7 +2021,7 @@ inputs {
   key: "X_I_249"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2031,7 +2031,7 @@ inputs {
   key: "X_I_25"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2041,19 +2041,19 @@ inputs {
   key: "X_I_250"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 196608
     }
-    dimensions {
+    dims {
       size: 3
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 256
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2063,7 +2063,7 @@ inputs {
   key: "X_I_251"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2073,7 +2073,7 @@ inputs {
   key: "X_I_252"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2083,7 +2083,7 @@ inputs {
   key: "X_I_253"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2093,7 +2093,7 @@ inputs {
   key: "X_I_254"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2103,7 +2103,7 @@ inputs {
   key: "X_I_255"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2113,19 +2113,19 @@ inputs {
   key: "X_I_256"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 1
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1024
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -2135,7 +2135,7 @@ inputs {
   key: "X_I_257"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -2145,7 +2145,7 @@ inputs {
   key: "X_I_258"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -2155,7 +2155,7 @@ inputs {
   key: "X_I_259"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -2165,7 +2165,7 @@ inputs {
   key: "X_I_26"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2175,7 +2175,7 @@ inputs {
   key: "X_I_260"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -2185,7 +2185,7 @@ inputs {
   key: "X_I_261"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1024
       stride: 1
     }
@@ -2195,19 +2195,19 @@ inputs {
   key: "X_I_262"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 524288
     }
-    dimensions {
+    dims {
       size: 1
       stride: 524288
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2217,7 +2217,7 @@ inputs {
   key: "X_I_263"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2227,7 +2227,7 @@ inputs {
   key: "X_I_264"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2237,7 +2237,7 @@ inputs {
   key: "X_I_265"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2247,7 +2247,7 @@ inputs {
   key: "X_I_266"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2257,7 +2257,7 @@ inputs {
   key: "X_I_267"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2267,19 +2267,19 @@ inputs {
   key: "X_I_268"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 786432
     }
-    dimensions {
+    dims {
       size: 3
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 512
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2289,7 +2289,7 @@ inputs {
   key: "X_I_269"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2299,7 +2299,7 @@ inputs {
   key: "X_I_27"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2309,7 +2309,7 @@ inputs {
   key: "X_I_270"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2319,7 +2319,7 @@ inputs {
   key: "X_I_271"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2329,7 +2329,7 @@ inputs {
   key: "X_I_272"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2339,7 +2339,7 @@ inputs {
   key: "X_I_273"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2349,19 +2349,19 @@ inputs {
   key: "X_I_274"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 512
       stride: 2048
     }
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2371,7 +2371,7 @@ inputs {
   key: "X_I_275"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2381,7 +2381,7 @@ inputs {
   key: "X_I_276"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2391,7 +2391,7 @@ inputs {
   key: "X_I_277"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2401,7 +2401,7 @@ inputs {
   key: "X_I_278"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2411,7 +2411,7 @@ inputs {
   key: "X_I_279"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2421,19 +2421,19 @@ inputs {
   key: "X_I_28"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 64
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2443,19 +2443,19 @@ inputs {
   key: "X_I_280"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 2097152
     }
-    dimensions {
+    dims {
       size: 1
       stride: 2097152
     }
-    dimensions {
+    dims {
       size: 1024
       stride: 2048
     }
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2465,7 +2465,7 @@ inputs {
   key: "X_I_281"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2475,7 +2475,7 @@ inputs {
   key: "X_I_282"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2485,7 +2485,7 @@ inputs {
   key: "X_I_283"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2495,7 +2495,7 @@ inputs {
   key: "X_I_284"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2505,7 +2505,7 @@ inputs {
   key: "X_I_285"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2515,19 +2515,19 @@ inputs {
   key: "X_I_286"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 2048
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2537,7 +2537,7 @@ inputs {
   key: "X_I_287"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2547,7 +2547,7 @@ inputs {
   key: "X_I_288"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2557,7 +2557,7 @@ inputs {
   key: "X_I_289"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2567,7 +2567,7 @@ inputs {
   key: "X_I_29"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2577,7 +2577,7 @@ inputs {
   key: "X_I_290"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2587,7 +2587,7 @@ inputs {
   key: "X_I_291"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2597,19 +2597,19 @@ inputs {
   key: "X_I_292"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 786432
     }
-    dimensions {
+    dims {
       size: 3
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 512
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2619,7 +2619,7 @@ inputs {
   key: "X_I_293"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2629,7 +2629,7 @@ inputs {
   key: "X_I_294"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2639,7 +2639,7 @@ inputs {
   key: "X_I_295"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2649,7 +2649,7 @@ inputs {
   key: "X_I_296"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2659,7 +2659,7 @@ inputs {
   key: "X_I_297"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2669,19 +2669,19 @@ inputs {
   key: "X_I_298"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 512
       stride: 2048
     }
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2691,7 +2691,7 @@ inputs {
   key: "X_I_299"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2701,19 +2701,19 @@ inputs {
   key: "X_I_3"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 7
       stride: 1344
     }
-    dimensions {
+    dims {
       size: 7
       stride: 192
     }
-    dimensions {
+    dims {
       size: 3
       stride: 64
     }
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -2723,7 +2723,7 @@ inputs {
   key: "X_I_30"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2733,7 +2733,7 @@ inputs {
   key: "X_I_300"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2743,7 +2743,7 @@ inputs {
   key: "X_I_301"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2753,7 +2753,7 @@ inputs {
   key: "X_I_302"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2763,7 +2763,7 @@ inputs {
   key: "X_I_303"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2773,19 +2773,19 @@ inputs {
   key: "X_I_304"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 2048
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2795,7 +2795,7 @@ inputs {
   key: "X_I_305"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2805,7 +2805,7 @@ inputs {
   key: "X_I_306"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2815,7 +2815,7 @@ inputs {
   key: "X_I_307"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2825,7 +2825,7 @@ inputs {
   key: "X_I_308"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2835,7 +2835,7 @@ inputs {
   key: "X_I_309"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2845,7 +2845,7 @@ inputs {
   key: "X_I_31"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2855,19 +2855,19 @@ inputs {
   key: "X_I_310"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 786432
     }
-    dimensions {
+    dims {
       size: 3
       stride: 262144
     }
-    dimensions {
+    dims {
       size: 512
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2877,7 +2877,7 @@ inputs {
   key: "X_I_311"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2887,7 +2887,7 @@ inputs {
   key: "X_I_312"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2897,7 +2897,7 @@ inputs {
   key: "X_I_313"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2907,7 +2907,7 @@ inputs {
   key: "X_I_314"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2917,7 +2917,7 @@ inputs {
   key: "X_I_315"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -2927,19 +2927,19 @@ inputs {
   key: "X_I_316"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 1
       stride: 1048576
     }
-    dimensions {
+    dims {
       size: 512
       stride: 2048
     }
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2949,7 +2949,7 @@ inputs {
   key: "X_I_317"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2959,7 +2959,7 @@ inputs {
   key: "X_I_318"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2969,7 +2969,7 @@ inputs {
   key: "X_I_319"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2979,7 +2979,7 @@ inputs {
   key: "X_I_32"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -2989,7 +2989,7 @@ inputs {
   key: "X_I_320"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -2999,7 +2999,7 @@ inputs {
   key: "X_I_321"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1
     }
@@ -3009,7 +3009,7 @@ inputs {
   key: "X_I_322"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 1
     }
@@ -3019,11 +3019,11 @@ inputs {
   key: "X_I_323"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 2048
       stride: 1000
     }
-    dimensions {
+    dims {
       size: 1000
       stride: 1
     }
@@ -3033,7 +3033,7 @@ inputs {
   key: "X_I_324"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1000
       stride: 1
     }
@@ -3043,7 +3043,7 @@ inputs {
   key: "X_I_33"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3053,19 +3053,19 @@ inputs {
   key: "X_I_34"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 256
       stride: 64
     }
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3075,7 +3075,7 @@ inputs {
   key: "X_I_35"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3085,7 +3085,7 @@ inputs {
   key: "X_I_36"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3095,7 +3095,7 @@ inputs {
   key: "X_I_37"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3105,7 +3105,7 @@ inputs {
   key: "X_I_38"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3115,7 +3115,7 @@ inputs {
   key: "X_I_39"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3125,7 +3125,7 @@ inputs {
   key: "X_I_4"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3135,19 +3135,19 @@ inputs {
   key: "X_I_40"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 12288
     }
-    dimensions {
+    dims {
       size: 3
       stride: 4096
     }
-    dimensions {
+    dims {
       size: 64
       stride: 64
     }
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3157,7 +3157,7 @@ inputs {
   key: "X_I_41"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3167,7 +3167,7 @@ inputs {
   key: "X_I_42"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3177,7 +3177,7 @@ inputs {
   key: "X_I_43"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3187,7 +3187,7 @@ inputs {
   key: "X_I_44"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3197,7 +3197,7 @@ inputs {
   key: "X_I_45"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3207,19 +3207,19 @@ inputs {
   key: "X_I_46"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 64
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3229,7 +3229,7 @@ inputs {
   key: "X_I_47"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3239,7 +3239,7 @@ inputs {
   key: "X_I_48"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3249,7 +3249,7 @@ inputs {
   key: "X_I_49"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3259,7 +3259,7 @@ inputs {
   key: "X_I_5"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3269,7 +3269,7 @@ inputs {
   key: "X_I_50"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3279,7 +3279,7 @@ inputs {
   key: "X_I_51"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3289,19 +3289,19 @@ inputs {
   key: "X_I_52"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 256
       stride: 64
     }
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3311,7 +3311,7 @@ inputs {
   key: "X_I_53"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3321,7 +3321,7 @@ inputs {
   key: "X_I_54"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3331,7 +3331,7 @@ inputs {
   key: "X_I_55"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3341,7 +3341,7 @@ inputs {
   key: "X_I_56"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3351,7 +3351,7 @@ inputs {
   key: "X_I_57"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3361,19 +3361,19 @@ inputs {
   key: "X_I_58"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 12288
     }
-    dimensions {
+    dims {
       size: 3
       stride: 4096
     }
-    dimensions {
+    dims {
       size: 64
       stride: 64
     }
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3383,7 +3383,7 @@ inputs {
   key: "X_I_59"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3393,7 +3393,7 @@ inputs {
   key: "X_I_6"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3403,7 +3403,7 @@ inputs {
   key: "X_I_60"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3413,7 +3413,7 @@ inputs {
   key: "X_I_61"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3423,7 +3423,7 @@ inputs {
   key: "X_I_62"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3433,7 +3433,7 @@ inputs {
   key: "X_I_63"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3443,19 +3443,19 @@ inputs {
   key: "X_I_64"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 1
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 64
       stride: 256
     }
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3465,7 +3465,7 @@ inputs {
   key: "X_I_65"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3475,7 +3475,7 @@ inputs {
   key: "X_I_66"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3485,7 +3485,7 @@ inputs {
   key: "X_I_67"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3495,7 +3495,7 @@ inputs {
   key: "X_I_68"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3505,7 +3505,7 @@ inputs {
   key: "X_I_69"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 256
       stride: 1
     }
@@ -3515,7 +3515,7 @@ inputs {
   key: "X_I_7"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3525,19 +3525,19 @@ inputs {
   key: "X_I_70"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 32768
     }
-    dimensions {
+    dims {
       size: 1
       stride: 32768
     }
-    dimensions {
+    dims {
       size: 256
       stride: 128
     }
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3547,7 +3547,7 @@ inputs {
   key: "X_I_71"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3557,7 +3557,7 @@ inputs {
   key: "X_I_72"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3567,7 +3567,7 @@ inputs {
   key: "X_I_73"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3577,7 +3577,7 @@ inputs {
   key: "X_I_74"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3587,7 +3587,7 @@ inputs {
   key: "X_I_75"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3597,19 +3597,19 @@ inputs {
   key: "X_I_76"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 3
       stride: 49152
     }
-    dimensions {
+    dims {
       size: 3
       stride: 16384
     }
-    dimensions {
+    dims {
       size: 128
       stride: 128
     }
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3619,7 +3619,7 @@ inputs {
   key: "X_I_77"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3629,7 +3629,7 @@ inputs {
   key: "X_I_78"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3639,7 +3639,7 @@ inputs {
   key: "X_I_79"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3649,7 +3649,7 @@ inputs {
   key: "X_I_8"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3659,7 +3659,7 @@ inputs {
   key: "X_I_80"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3669,7 +3669,7 @@ inputs {
   key: "X_I_81"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3679,19 +3679,19 @@ inputs {
   key: "X_I_82"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 128
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3701,7 +3701,7 @@ inputs {
   key: "X_I_83"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3711,7 +3711,7 @@ inputs {
   key: "X_I_84"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3721,7 +3721,7 @@ inputs {
   key: "X_I_85"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3731,7 +3731,7 @@ inputs {
   key: "X_I_86"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3741,7 +3741,7 @@ inputs {
   key: "X_I_87"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3751,19 +3751,19 @@ inputs {
   key: "X_I_88"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 131072
     }
-    dimensions {
+    dims {
       size: 1
       stride: 131072
     }
-    dimensions {
+    dims {
       size: 256
       stride: 512
     }
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3773,7 +3773,7 @@ inputs {
   key: "X_I_89"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3783,19 +3783,19 @@ inputs {
   key: "X_I_9"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 4096
     }
-    dimensions {
+    dims {
       size: 1
       stride: 4096
     }
-    dimensions {
+    dims {
       size: 64
       stride: 64
     }
-    dimensions {
+    dims {
       size: 64
       stride: 1
     }
@@ -3805,7 +3805,7 @@ inputs {
   key: "X_I_90"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3815,7 +3815,7 @@ inputs {
   key: "X_I_91"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3825,7 +3825,7 @@ inputs {
   key: "X_I_92"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3835,7 +3835,7 @@ inputs {
   key: "X_I_93"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 512
       stride: 1
     }
@@ -3845,19 +3845,19 @@ inputs {
   key: "X_I_94"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 1
       stride: 65536
     }
-    dimensions {
+    dims {
       size: 512
       stride: 128
     }
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3867,7 +3867,7 @@ inputs {
   key: "X_I_95"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3877,7 +3877,7 @@ inputs {
   key: "X_I_96"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3887,7 +3887,7 @@ inputs {
   key: "X_I_97"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3897,7 +3897,7 @@ inputs {
   key: "X_I_98"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3907,7 +3907,7 @@ inputs {
   key: "X_I_99"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 128
       stride: 1
     }
@@ -3917,11 +3917,11 @@ outputs {
   key: "X_T1288"
   value {
     type: FLOAT32
-    dimensions {
+    dims {
       size: 64
       stride: 1000
     }
-    dimensions {
+    dims {
       size: 1000
       stride: 1
     }

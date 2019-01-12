@@ -19,7 +19,7 @@ message Block {
   repeated Affine constraints = 4;
   repeated Refinement refs = 5;
   repeated Statement stmts = 6;
-  Location location = 8;
+  Location loc = 8;
 }
 
 message Index {
@@ -42,7 +42,7 @@ message Refinement {
   repeated Affine access = 4;
   tile.proto.TensorShape shape = 5;
   string agg_op = 6;
-  Location location = 7;
+  Location loc = 7;
   bool is_const = 8;
   uint64 offset = 9;
   google.protobuf.UInt32Value bank_dim = 10;

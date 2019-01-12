@@ -1,243 +1,243 @@
 id: "xception"
 code: "function (X_I_0[X_I_0_0, X_I_0_1], X_I_1[X_I_1_0, X_I_1_1], X_I_2[X_I_2_0, X_I_2_1, X_I_2_2, X_I_2_3], X_I_3[X_I_3_0, X_I_3_1, X_I_3_2, X_I_3_3], X_I_4[X_I_4_0], X_I_5[X_I_5_0], X_I_6[X_I_6_0], X_I_7[X_I_7_0], X_I_8[X_I_8_0, X_I_8_1], X_I_9[X_I_9_0, X_I_9_1, X_I_9_2, X_I_9_3], X_I_10[X_I_10_0], X_I_11[X_I_11_0], X_I_12[X_I_12_0], X_I_13[X_I_13_0], X_I_14[X_I_14_0, X_I_14_1, X_I_14_2, X_I_14_3], X_I_15[X_I_15_0, X_I_15_1, X_I_15_2, X_I_15_3], X_I_16[X_I_16_0], X_I_17[X_I_17_0], X_I_18[X_I_18_0], X_I_19[X_I_19_0], X_I_20[X_I_20_0, X_I_20_1, X_I_20_2, X_I_20_3], X_I_21[X_I_21_0, X_I_21_1, X_I_21_2, X_I_21_3], X_I_22[X_I_22_0], X_I_23[X_I_23_0], X_I_24[X_I_24_0], X_I_25[X_I_25_0], X_I_26[X_I_26_0, X_I_26_1, X_I_26_2, X_I_26_3], X_I_27[X_I_27_0], X_I_28[X_I_28_0], X_I_29[X_I_29_0], X_I_30[X_I_30_0], X_I_31[X_I_31_0, X_I_31_1, X_I_31_2, X_I_31_3], X_I_32[X_I_32_0, X_I_32_1, X_I_32_2, X_I_32_3], X_I_33[X_I_33_0], X_I_34[X_I_34_0], X_I_35[X_I_35_0], X_I_36[X_I_36_0], X_I_37[X_I_37_0, X_I_37_1, X_I_37_2, X_I_37_3], X_I_38[X_I_38_0, X_I_38_1, X_I_38_2, X_I_38_3], X_I_39[X_I_39_0], X_I_40[X_I_40_0], X_I_41[X_I_41_0], X_I_42[X_I_42_0], X_I_43[X_I_43_0, X_I_43_1, X_I_43_2, X_I_43_3], X_I_44[X_I_44_0], X_I_45[X_I_45_0], X_I_46[X_I_46_0], X_I_47[X_I_47_0], X_I_48[X_I_48_0, X_I_48_1, X_I_48_2, X_I_48_3], X_I_49[X_I_49_0, X_I_49_1, X_I_49_2, X_I_49_3], X_I_50[X_I_50_0], X_I_51[X_I_51_0], X_I_52[X_I_52_0], X_I_53[X_I_53_0], X_I_54[X_I_54_0, X_I_54_1, X_I_54_2, X_I_54_3], X_I_55[X_I_55_0, X_I_55_1, X_I_55_2, X_I_55_3], X_I_56[X_I_56_0], X_I_57[X_I_57_0], X_I_58[X_I_58_0], X_I_59[X_I_59_0], X_I_60[X_I_60_0, X_I_60_1, X_I_60_2, X_I_60_3], X_I_61[X_I_61_0], X_I_62[X_I_62_0], X_I_63[X_I_63_0], X_I_64[X_I_64_0], X_I_65[X_I_65_0, X_I_65_1, X_I_65_2, X_I_65_3], X_I_66[X_I_66_0, X_I_66_1, X_I_66_2, X_I_66_3], X_I_67[X_I_67_0], X_I_68[X_I_68_0], X_I_69[X_I_69_0], X_I_70[X_I_70_0], X_I_71[X_I_71_0, X_I_71_1, X_I_71_2, X_I_71_3], X_I_72[X_I_72_0, X_I_72_1, X_I_72_2, X_I_72_3], X_I_73[X_I_73_0], X_I_74[X_I_74_0], X_I_75[X_I_75_0], X_I_76[X_I_76_0], X_I_77[X_I_77_0, X_I_77_1, X_I_77_2, X_I_77_3], X_I_78[X_I_78_0, X_I_78_1, X_I_78_2, X_I_78_3], X_I_79[X_I_79_0], X_I_80[X_I_80_0], X_I_81[X_I_81_0], X_I_82[X_I_82_0], X_I_83[X_I_83_0, X_I_83_1, X_I_83_2, X_I_83_3], X_I_84[X_I_84_0, X_I_84_1, X_I_84_2, X_I_84_3], X_I_85[X_I_85_0], X_I_86[X_I_86_0], X_I_87[X_I_87_0], X_I_88[X_I_88_0], X_I_89[X_I_89_0, X_I_89_1, X_I_89_2, X_I_89_3], X_I_90[X_I_90_0, X_I_90_1, X_I_90_2, X_I_90_3], X_I_91[X_I_91_0], X_I_92[X_I_92_0], X_I_93[X_I_93_0], X_I_94[X_I_94_0], X_I_95[X_I_95_0, X_I_95_1, X_I_95_2, X_I_95_3], X_I_96[X_I_96_0, X_I_96_1, X_I_96_2, X_I_96_3], X_I_97[X_I_97_0], X_I_98[X_I_98_0], X_I_99[X_I_99_0], X_I_100[X_I_100_0], X_I_101[X_I_101_0, X_I_101_1, X_I_101_2, X_I_101_3], X_I_102[X_I_102_0, X_I_102_1, X_I_102_2, X_I_102_3], X_I_103[X_I_103_0], X_I_104[X_I_104_0], X_I_105[X_I_105_0], X_I_106[X_I_106_0], X_I_107[X_I_107_0, X_I_107_1, X_I_107_2, X_I_107_3], X_I_108[X_I_108_0, X_I_108_1, X_I_108_2, X_I_108_3], X_I_109[X_I_109_0], X_I_110[X_I_110_0], X_I_111[X_I_111_0], X_I_112[X_I_112_0], X_I_113[X_I_113_0, X_I_113_1, X_I_113_2, X_I_113_3], X_I_114[X_I_114_0, X_I_114_1, X_I_114_2, X_I_114_3], X_I_115[X_I_115_0], X_I_116[X_I_116_0], X_I_117[X_I_117_0], X_I_118[X_I_118_0], X_I_119[X_I_119_0, X_I_119_1, X_I_119_2, X_I_119_3], X_I_120[X_I_120_0, X_I_120_1, X_I_120_2, X_I_120_3], X_I_121[X_I_121_0], X_I_122[X_I_122_0], X_I_123[X_I_123_0], X_I_124[X_I_124_0], X_I_125[X_I_125_0, X_I_125_1, X_I_125_2, X_I_125_3], X_I_126[X_I_126_0, X_I_126_1, X_I_126_2, X_I_126_3], X_I_127[X_I_127_0], X_I_128[X_I_128_0], X_I_129[X_I_129_0], X_I_130[X_I_130_0], X_I_131[X_I_131_0, X_I_131_1, X_I_131_2, X_I_131_3], X_I_132[X_I_132_0, X_I_132_1, X_I_132_2, X_I_132_3], X_I_133[X_I_133_0], X_I_134[X_I_134_0], X_I_135[X_I_135_0], X_I_136[X_I_136_0], X_I_137[X_I_137_0, X_I_137_1, X_I_137_2, X_I_137_3], X_I_138[X_I_138_0, X_I_138_1, X_I_138_2, X_I_138_3], X_I_139[X_I_139_0], X_I_140[X_I_140_0], X_I_141[X_I_141_0], X_I_142[X_I_142_0], X_I_143[X_I_143_0, X_I_143_1, X_I_143_2, X_I_143_3], X_I_144[X_I_144_0, X_I_144_1, X_I_144_2, X_I_144_3], X_I_145[X_I_145_0], X_I_146[X_I_146_0], X_I_147[X_I_147_0], X_I_148[X_I_148_0], X_I_149[X_I_149_0, X_I_149_1, X_I_149_2, X_I_149_3], X_I_150[X_I_150_0, X_I_150_1, X_I_150_2, X_I_150_3], X_I_151[X_I_151_0], X_I_152[X_I_152_0], X_I_153[X_I_153_0], X_I_154[X_I_154_0], X_I_155[X_I_155_0, X_I_155_1, X_I_155_2, X_I_155_3], X_I_156[X_I_156_0, X_I_156_1, X_I_156_2, X_I_156_3], X_I_157[X_I_157_0], X_I_158[X_I_158_0], X_I_159[X_I_159_0], X_I_160[X_I_160_0], X_I_161[X_I_161_0, X_I_161_1, X_I_161_2, X_I_161_3], X_I_162[X_I_162_0, X_I_162_1, X_I_162_2, X_I_162_3], X_I_163[X_I_163_0], X_I_164[X_I_164_0], X_I_165[X_I_165_0], X_I_166[X_I_166_0], X_I_167[X_I_167_0, X_I_167_1, X_I_167_2, X_I_167_3], X_I_168[X_I_168_0, X_I_168_1, X_I_168_2, X_I_168_3], X_I_169[X_I_169_0], X_I_170[X_I_170_0], X_I_171[X_I_171_0], X_I_172[X_I_172_0], X_I_173[X_I_173_0, X_I_173_1, X_I_173_2, X_I_173_3], X_I_174[X_I_174_0, X_I_174_1, X_I_174_2, X_I_174_3], X_I_175[X_I_175_0], X_I_176[X_I_176_0], X_I_177[X_I_177_0], X_I_178[X_I_178_0], X_I_179[X_I_179_0, X_I_179_1, X_I_179_2, X_I_179_3], X_I_180[X_I_180_0, X_I_180_1, X_I_180_2, X_I_180_3], X_I_181[X_I_181_0], X_I_182[X_I_182_0], X_I_183[X_I_183_0], X_I_184[X_I_184_0], X_I_185[X_I_185_0, X_I_185_1, X_I_185_2, X_I_185_3], X_I_186[X_I_186_0, X_I_186_1, X_I_186_2, X_I_186_3], X_I_187[X_I_187_0], X_I_188[X_I_188_0], X_I_189[X_I_189_0], X_I_190[X_I_190_0], X_I_191[X_I_191_0, X_I_191_1, X_I_191_2, X_I_191_3], X_I_192[X_I_192_0, X_I_192_1, X_I_192_2, X_I_192_3], X_I_193[X_I_193_0], X_I_194[X_I_194_0], X_I_195[X_I_195_0], X_I_196[X_I_196_0], X_I_197[X_I_197_0, X_I_197_1, X_I_197_2, X_I_197_3], X_I_198[X_I_198_0, X_I_198_1, X_I_198_2, X_I_198_3], X_I_199[X_I_199_0], X_I_200[X_I_200_0], X_I_201[X_I_201_0], X_I_202[X_I_202_0], X_I_203[X_I_203_0, X_I_203_1, X_I_203_2, X_I_203_3], X_I_204[X_I_204_0, X_I_204_1, X_I_204_2, X_I_204_3], X_I_205[X_I_205_0], X_I_206[X_I_206_0], X_I_207[X_I_207_0], X_I_208[X_I_208_0], X_I_209[X_I_209_0, X_I_209_1, X_I_209_2, X_I_209_3], X_I_210[X_I_210_0, X_I_210_1, X_I_210_2, X_I_210_3], X_I_211[X_I_211_0], X_I_212[X_I_212_0], X_I_213[X_I_213_0], X_I_214[X_I_214_0], X_I_215[X_I_215_0, X_I_215_1, X_I_215_2, X_I_215_3], X_I_216[X_I_216_0, X_I_216_1, X_I_216_2, X_I_216_3], X_I_217[X_I_217_0], X_I_218[X_I_218_0], X_I_219[X_I_219_0], X_I_220[X_I_220_0], X_I_221[X_I_221_0, X_I_221_1, X_I_221_2, X_I_221_3], X_I_222[X_I_222_0], X_I_223[X_I_223_0], X_I_224[X_I_224_0], X_I_225[X_I_225_0], X_I_226[X_I_226_0, X_I_226_1, X_I_226_2, X_I_226_3], X_I_227[X_I_227_0, X_I_227_1, X_I_227_2, X_I_227_3], X_I_228[X_I_228_0], X_I_229[X_I_229_0], X_I_230[X_I_230_0], X_I_231[X_I_231_0], X_I_232[X_I_232_0, X_I_232_1, X_I_232_2, X_I_232_3], X_I_233[X_I_233_0, X_I_233_1, X_I_233_2, X_I_233_3], X_I_234[X_I_234_0], X_I_235[X_I_235_0], X_I_236[X_I_236_0], X_I_237[X_I_237_0], X_I_238[X_I_238_0, X_I_238_1], X_I_239[X_I_239_0]) -> ( X_T581) { X_T108 = 0; X_T107[n, x0, x1, co : 1, 149, 149, 32] = +(X_I_2[n, k0 + 2*x0, k1 + 2*x1, ci] * X_I_3[k0, k1, ci, co]); X_T109 = sub(X_T107, X_I_4); X_T110 = mul(X_T109, X_I_5); X_T111 = 0.001; X_T112 = add(X_T111, X_I_6); X_T113 = cmp_lt(X_T112, X_T108); X_T114 = cond(X_T113, X_T108, X_T112); X_T115 = sqrt(X_T114); X_T116 = div(X_T110, X_T115); X_T117 = add(X_T116, X_I_7); X_T118 = cmp_lt(X_T117, X_T108); X_T119 = 0.0; X_T120 = cond(X_T118, X_T119, X_T117); X_T106[n, i, j, x, y, ci : 1, 6, 6, 37, 37, 32] = +(X_I_1[k, i] * X_T120[n, k + 4*x, j + 4*y, ci]); X_T104[n, i, j, x, y, ci : 1, 6, 6, 37, 37, 32] = +(X_T106[n, i, k, x, y, ci] * X_I_1[k, j]); X_T122[i, j, ci, co : 6, 3, 32, 64] = +(X_I_8[i, k] * X_I_9[k, j, ci, co]); X_T121[i, j, ci, co : 6, 6, 32, 64] = +(X_T122[i, k, ci, co] * X_I_8[j, k]); X_T103[n, i, j, x, y, co : 1, 6, 6, 37, 37, 64] = +(X_T104[n, i, j, x, y, ci] * X_T121[i, j, ci, co]); X_T99[n, i, j, x, y, co : 1, 4, 6, 37, 37, 64] = +(X_I_0[k, i] * X_T103[n, k, j, x, y, co]); X_T97[n, i + 4*x, j + 4*y, co : 1, 147, 147, 64] = +(X_T99[n, i, k, x, y, co] * X_I_0[k, j]) no_defract; X_T123 = sub(X_T97, X_I_10); X_T124 = mul(X_T123, X_I_11); X_T125 = add(X_T111, X_I_12); X_T126 = cmp_lt(X_T125, X_T108); X_T127 = cond(X_T126, X_T108, X_T125); X_T128 = sqrt(X_T127); X_T129 = div(X_T124, X_T128); X_T130 = add(X_T129, X_I_13); X_T131 = cmp_lt(X_T130, X_T108); X_T132 = cond(X_T131, X_T119, X_T130); X_T95[n, x0, x1, c + m : 1, 147, 147, 64] = +(X_T132[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_14[k0, k1, c, m]); X_T94[n, x0, x1, co : 1, 147, 147, 128] = +(X_T95[n, k0 + x0, k1 + x1, ci] * X_I_15[k0, k1, ci, co]); X_T136 = sub(X_T94, X_I_16); X_T137 = mul(X_T136, X_I_17); X_T138 = add(X_T111, X_I_18); X_T139 = cmp_lt(X_T138, X_T108); X_T140 = cond(X_T139, X_T108, X_T138); X_T141 = sqrt(X_T140); X_T142 = div(X_T137, X_T141); X_T143 = add(X_T142, X_I_19); X_T144 = cmp_lt(X_T143, X_T108); X_T145 = cond(X_T144, X_T119, X_T143); X_T93[n, x0, x1, c + m : 1, 147, 147, 128] = +(X_T145[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_20[k0, k1, c, m]); X_T90[n, x0, x1, co : 1, 147, 147, 128] = +(X_T93[n, k0 + x0, k1 + x1, ci] * X_I_21[k0, k1, ci, co]); X_T146 = sub(X_T90, X_I_22); X_T147 = mul(X_T146, X_I_23); X_T148 = add(X_T111, X_I_24); X_T149 = cmp_lt(X_T148, X_T108); X_T150 = cond(X_T149, X_T108, X_T148); X_T151 = sqrt(X_T150); X_T152 = div(X_T147, X_T151); X_T153 = add(X_T152, X_I_25); X_T89[n, x0, x1, c : 1, 74, 74, 128] = >(X_T153[n, -1 + k0 + 2*x0, -1 + k1 + 2*x1, c]), k0 < 3, k1 < 3; X_T160[n, x0, x1, co : 1, 74, 74, 128] = +(X_T132[n, k0 + 2*x0, k1 + 2*x1, ci] * X_I_26[k0, k1, ci, co]); X_T165 = sub(X_T160, X_I_27); X_T166 = mul(X_T165, X_I_28); X_T167 = add(X_T111, X_I_29); X_T168 = cmp_lt(X_T167, X_T108); X_T169 = cond(X_T168, X_T108, X_T167); X_T170 = sqrt(X_T169); X_T171 = div(X_T166, X_T170); X_T172 = add(X_T171, X_I_30); X_T173 = add(X_T89, X_T172); X_T174 = cmp_lt(X_T173, X_T108); X_T175 = cond(X_T174, X_T119, X_T173); X_T87[n, x0, x1, c + m : 1, 74, 74, 128] = +(X_T175[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_31[k0, k1, c, m]); X_T86[n, x0, x1, co : 1, 74, 74, 256] = +(X_T87[n, k0 + x0, k1 + x1, ci] * X_I_32[k0, k1, ci, co]); X_T180 = sub(X_T86, X_I_33); X_T181 = mul(X_T180, X_I_34); X_T182 = add(X_T111, X_I_35); X_T183 = cmp_lt(X_T182, X_T108); X_T184 = cond(X_T183, X_T108, X_T182); X_T185 = sqrt(X_T184); X_T186 = div(X_T181, X_T185); X_T187 = add(X_T186, X_I_36); X_T188 = cmp_lt(X_T187, X_T108); X_T189 = cond(X_T188, X_T119, X_T187); X_T85[n, x0, x1, c + m : 1, 74, 74, 256] = +(X_T189[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_37[k0, k1, c, m]); X_T84[n, x0, x1, co : 1, 74, 74, 256] = +(X_T85[n, k0 + x0, k1 + x1, ci] * X_I_38[k0, k1, ci, co]); X_T190 = sub(X_T84, X_I_39); X_T191 = mul(X_T190, X_I_40); X_T192 = add(X_T111, X_I_41); X_T193 = cmp_lt(X_T192, X_T108); X_T194 = cond(X_T193, X_T108, X_T192); X_T195 = sqrt(X_T194); X_T196 = div(X_T191, X_T195); X_T197 = add(X_T196, X_I_42); X_T83[n, x0, x1, c : 1, 37, 37, 256] = >(X_T197[n, k0 + 2*x0, k1 + 2*x1, c]), k0 < 3, k1 < 3; X_T204[n, x0, x1, co : 1, 37, 37, 256] = +(X_T173[n, k0 + 2*x0, k1 + 2*x1, ci] * X_I_43[k0, k1, ci, co]); X_T209 = sub(X_T204, X_I_44); X_T210 = mul(X_T209, X_I_45); X_T211 = add(X_T111, X_I_46); X_T212 = cmp_lt(X_T211, X_T108); X_T213 = cond(X_T212, X_T108, X_T211); X_T214 = sqrt(X_T213); X_T215 = div(X_T210, X_T214); X_T216 = add(X_T215, X_I_47); X_T217 = add(X_T83, X_T216); X_T218 = cmp_lt(X_T217, X_T108); X_T219 = cond(X_T218, X_T119, X_T217); X_T81[n, x0, x1, c + m : 1, 37, 37, 256] = +(X_T219[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_48[k0, k1, c, m]); X_T80[n, x0, x1, co : 1, 37, 37, 728] = +(X_T81[n, k0 + x0, k1 + x1, ci] * X_I_49[k0, k1, ci, co]); X_T224 = sub(X_T80, X_I_50); X_T225 = mul(X_T224, X_I_51); X_T226 = add(X_T111, X_I_52); X_T227 = cmp_lt(X_T226, X_T108); X_T228 = cond(X_T227, X_T108, X_T226); X_T229 = sqrt(X_T228); X_T230 = div(X_T225, X_T229); X_T231 = add(X_T230, X_I_53); X_T232 = cmp_lt(X_T231, X_T108); X_T233 = cond(X_T232, X_T119, X_T231); X_T79[n, x0, x1, c + m : 1, 37, 37, 728] = +(X_T233[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_54[k0, k1, c, m]); X_T78[n, x0, x1, co : 1, 37, 37, 728] = +(X_T79[n, k0 + x0, k1 + x1, ci] * X_I_55[k0, k1, ci, co]); X_T234 = sub(X_T78, X_I_56); X_T235 = mul(X_T234, X_I_57); X_T236 = add(X_T111, X_I_58); X_T237 = cmp_lt(X_T236, X_T108); X_T238 = cond(X_T237, X_T108, X_T236); X_T239 = sqrt(X_T238); X_T240 = div(X_T235, X_T239); X_T241 = add(X_T240, X_I_59); X_T77[n, x0, x1, c : 1, 19, 19, 728] = >(X_T241[n, -1 + k0 + 2*x0, -1 + k1 + 2*x1, c]), k0 < 3, k1 < 3; X_T248[n, x0, x1, co : 1, 19, 19, 728] = +(X_T217[n, k0 + 2*x0, k1 + 2*x1, ci] * X_I_60[k0, k1, ci, co]); X_T253 = sub(X_T248, X_I_61); X_T254 = mul(X_T253, X_I_62); X_T255 = add(X_T111, X_I_63); X_T256 = cmp_lt(X_T255, X_T108); X_T257 = cond(X_T256, X_T108, X_T255); X_T258 = sqrt(X_T257); X_T259 = div(X_T254, X_T258); X_T260 = add(X_T259, X_I_64); X_T261 = add(X_T77, X_T260); X_T262 = cmp_lt(X_T261, X_T108); X_T263 = cond(X_T262, X_T119, X_T261); X_T76[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T263[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_65[k0, k1, c, m]); X_T75[n, x0, x1, co : 1, 19, 19, 728] = +(X_T76[n, k0 + x0, k1 + x1, ci] * X_I_66[k0, k1, ci, co]); X_T268 = sub(X_T75, X_I_67); X_T269 = mul(X_T268, X_I_68); X_T270 = add(X_T111, X_I_69); X_T271 = cmp_lt(X_T270, X_T108); X_T272 = cond(X_T271, X_T108, X_T270); X_T273 = sqrt(X_T272); X_T274 = div(X_T269, X_T273); X_T275 = add(X_T274, X_I_70); X_T276 = cmp_lt(X_T275, X_T108); X_T277 = cond(X_T276, X_T119, X_T275); X_T74[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T277[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_71[k0, k1, c, m]); X_T73[n, x0, x1, co : 1, 19, 19, 728] = +(X_T74[n, k0 + x0, k1 + x1, ci] * X_I_72[k0, k1, ci, co]); X_T278 = sub(X_T73, X_I_73); X_T279 = mul(X_T278, X_I_74); X_T280 = add(X_T111, X_I_75); X_T281 = cmp_lt(X_T280, X_T108); X_T282 = cond(X_T281, X_T108, X_T280); X_T283 = sqrt(X_T282); X_T284 = div(X_T279, X_T283); X_T285 = add(X_T284, X_I_76); X_T286 = cmp_lt(X_T285, X_T108); X_T287 = cond(X_T286, X_T119, X_T285); X_T72[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T287[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_77[k0, k1, c, m]); X_T71[n, x0, x1, co : 1, 19, 19, 728] = +(X_T72[n, k0 + x0, k1 + x1, ci] * X_I_78[k0, k1, ci, co]); X_T288 = sub(X_T71, X_I_79); X_T289 = mul(X_T288, X_I_80); X_T290 = add(X_T111, X_I_81); X_T291 = cmp_lt(X_T290, X_T108); X_T292 = cond(X_T291, X_T108, X_T290); X_T293 = sqrt(X_T292); X_T294 = div(X_T289, X_T293); X_T295 = add(X_T294, X_I_82); X_T296 = add(X_T295, X_T261); X_T297 = cmp_lt(X_T296, X_T108); X_T298 = cond(X_T297, X_T119, X_T296); X_T70[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T298[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_83[k0, k1, c, m]); X_T69[n, x0, x1, co : 1, 19, 19, 728] = +(X_T70[n, k0 + x0, k1 + x1, ci] * X_I_84[k0, k1, ci, co]); X_T299 = sub(X_T69, X_I_85); X_T300 = mul(X_T299, X_I_86); X_T301 = add(X_T111, X_I_87); X_T302 = cmp_lt(X_T301, X_T108); X_T303 = cond(X_T302, X_T108, X_T301); X_T304 = sqrt(X_T303); X_T305 = div(X_T300, X_T304); X_T306 = add(X_T305, X_I_88); X_T307 = cmp_lt(X_T306, X_T108); X_T308 = cond(X_T307, X_T119, X_T306); X_T68[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T308[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_89[k0, k1, c, m]); X_T67[n, x0, x1, co : 1, 19, 19, 728] = +(X_T68[n, k0 + x0, k1 + x1, ci] * X_I_90[k0, k1, ci, co]); X_T309 = sub(X_T67, X_I_91); X_T310 = mul(X_T309, X_I_92); X_T311 = add(X_T111, X_I_93); X_T312 = cmp_lt(X_T311, X_T108); X_T313 = cond(X_T312, X_T108, X_T311); X_T314 = sqrt(X_T313); X_T315 = div(X_T310, X_T314); X_T316 = add(X_T315, X_I_94); X_T317 = cmp_lt(X_T316, X_T108); X_T318 = cond(X_T317, X_T119, X_T316); X_T66[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T318[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_95[k0, k1, c, m]); X_T65[n, x0, x1, co : 1, 19, 19, 728] = +(X_T66[n, k0 + x0, k1 + x1, ci] * X_I_96[k0, k1, ci, co]); X_T319 = sub(X_T65, X_I_97); X_T320 = mul(X_T319, X_I_98); X_T321 = add(X_T111, X_I_99); X_T322 = cmp_lt(X_T321, X_T108); X_T323 = cond(X_T322, X_T108, X_T321); X_T324 = sqrt(X_T323); X_T325 = div(X_T320, X_T324); X_T326 = add(X_T325, X_I_100); X_T327 = add(X_T326, X_T296); X_T328 = cmp_lt(X_T327, X_T108); X_T329 = cond(X_T328, X_T119, X_T327); X_T64[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T329[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_101[k0, k1, c, m]); X_T63[n, x0, x1, co : 1, 19, 19, 728] = +(X_T64[n, k0 + x0, k1 + x1, ci] * X_I_102[k0, k1, ci, co]); X_T330 = sub(X_T63, X_I_103); X_T331 = mul(X_T330, X_I_104); X_T332 = add(X_T111, X_I_105); X_T333 = cmp_lt(X_T332, X_T108); X_T334 = cond(X_T333, X_T108, X_T332); X_T335 = sqrt(X_T334); X_T336 = div(X_T331, X_T335); X_T337 = add(X_T336, X_I_106); X_T338 = cmp_lt(X_T337, X_T108); X_T339 = cond(X_T338, X_T119, X_T337); X_T62[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T339[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_107[k0, k1, c, m]); X_T61[n, x0, x1, co : 1, 19, 19, 728] = +(X_T62[n, k0 + x0, k1 + x1, ci] * X_I_108[k0, k1, ci, co]); X_T340 = sub(X_T61, X_I_109); X_T341 = mul(X_T340, X_I_110); X_T342 = add(X_T111, X_I_111); X_T343 = cmp_lt(X_T342, X_T108); X_T344 = cond(X_T343, X_T108, X_T342); X_T345 = sqrt(X_T344); X_T346 = div(X_T341, X_T345); X_T347 = add(X_T346, X_I_112); X_T348 = cmp_lt(X_T347, X_T108); X_T349 = cond(X_T348, X_T119, X_T347); X_T60[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T349[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_113[k0, k1, c, m]); X_T59[n, x0, x1, co : 1, 19, 19, 728] = +(X_T60[n, k0 + x0, k1 + x1, ci] * X_I_114[k0, k1, ci, co]); X_T350 = sub(X_T59, X_I_115); X_T351 = mul(X_T350, X_I_116); X_T352 = add(X_T111, X_I_117); X_T353 = cmp_lt(X_T352, X_T108); X_T354 = cond(X_T353, X_T108, X_T352); X_T355 = sqrt(X_T354); X_T356 = div(X_T351, X_T355); X_T357 = add(X_T356, X_I_118); X_T358 = add(X_T357, X_T327); X_T359 = cmp_lt(X_T358, X_T108); X_T360 = cond(X_T359, X_T119, X_T358); X_T58[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T360[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_119[k0, k1, c, m]); X_T57[n, x0, x1, co : 1, 19, 19, 728] = +(X_T58[n, k0 + x0, k1 + x1, ci] * X_I_120[k0, k1, ci, co]); X_T361 = sub(X_T57, X_I_121); X_T362 = mul(X_T361, X_I_122); X_T363 = add(X_T111, X_I_123); X_T364 = cmp_lt(X_T363, X_T108); X_T365 = cond(X_T364, X_T108, X_T363); X_T366 = sqrt(X_T365); X_T367 = div(X_T362, X_T366); X_T368 = add(X_T367, X_I_124); X_T369 = cmp_lt(X_T368, X_T108); X_T370 = cond(X_T369, X_T119, X_T368); X_T56[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T370[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_125[k0, k1, c, m]); X_T55[n, x0, x1, co : 1, 19, 19, 728] = +(X_T56[n, k0 + x0, k1 + x1, ci] * X_I_126[k0, k1, ci, co]); X_T371 = sub(X_T55, X_I_127); X_T372 = mul(X_T371, X_I_128); X_T373 = add(X_T111, X_I_129); X_T374 = cmp_lt(X_T373, X_T108); X_T375 = cond(X_T374, X_T108, X_T373); X_T376 = sqrt(X_T375); X_T377 = div(X_T372, X_T376); X_T378 = add(X_T377, X_I_130); X_T379 = cmp_lt(X_T378, X_T108); X_T380 = cond(X_T379, X_T119, X_T378); X_T54[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T380[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_131[k0, k1, c, m]); X_T53[n, x0, x1, co : 1, 19, 19, 728] = +(X_T54[n, k0 + x0, k1 + x1, ci] * X_I_132[k0, k1, ci, co]); X_T381 = sub(X_T53, X_I_133); X_T382 = mul(X_T381, X_I_134); X_T383 = add(X_T111, X_I_135); X_T384 = cmp_lt(X_T383, X_T108); X_T385 = cond(X_T384, X_T108, X_T383); X_T386 = sqrt(X_T385); X_T387 = div(X_T382, X_T386); X_T388 = add(X_T387, X_I_136); X_T389 = add(X_T388, X_T358); X_T390 = cmp_lt(X_T389, X_T108); X_T391 = cond(X_T390, X_T119, X_T389); X_T52[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T391[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_137[k0, k1, c, m]); X_T51[n, x0, x1, co : 1, 19, 19, 728] = +(X_T52[n, k0 + x0, k1 + x1, ci] * X_I_138[k0, k1, ci, co]); X_T392 = sub(X_T51, X_I_139); X_T393 = mul(X_T392, X_I_140); X_T394 = add(X_T111, X_I_141); X_T395 = cmp_lt(X_T394, X_T108); X_T396 = cond(X_T395, X_T108, X_T394); X_T397 = sqrt(X_T396); X_T398 = div(X_T393, X_T397); X_T399 = add(X_T398, X_I_142); X_T400 = cmp_lt(X_T399, X_T108); X_T401 = cond(X_T400, X_T119, X_T399); X_T50[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T401[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_143[k0, k1, c, m]); X_T49[n, x0, x1, co : 1, 19, 19, 728] = +(X_T50[n, k0 + x0, k1 + x1, ci] * X_I_144[k0, k1, ci, co]); X_T402 = sub(X_T49, X_I_145); X_T403 = mul(X_T402, X_I_146); X_T404 = add(X_T111, X_I_147); X_T405 = cmp_lt(X_T404, X_T108); X_T406 = cond(X_T405, X_T108, X_T404); X_T407 = sqrt(X_T406); X_T408 = div(X_T403, X_T407); X_T409 = add(X_T408, X_I_148); X_T410 = cmp_lt(X_T409, X_T108); X_T411 = cond(X_T410, X_T119, X_T409); X_T48[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T411[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_149[k0, k1, c, m]); X_T47[n, x0, x1, co : 1, 19, 19, 728] = +(X_T48[n, k0 + x0, k1 + x1, ci] * X_I_150[k0, k1, ci, co]); X_T412 = sub(X_T47, X_I_151); X_T413 = mul(X_T412, X_I_152); X_T414 = add(X_T111, X_I_153); X_T415 = cmp_lt(X_T414, X_T108); X_T416 = cond(X_T415, X_T108, X_T414); X_T417 = sqrt(X_T416); X_T418 = div(X_T413, X_T417); X_T419 = add(X_T418, X_I_154); X_T420 = add(X_T419, X_T389); X_T421 = cmp_lt(X_T420, X_T108); X_T422 = cond(X_T421, X_T119, X_T420); X_T46[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T422[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_155[k0, k1, c, m]); X_T45[n, x0, x1, co : 1, 19, 19, 728] = +(X_T46[n, k0 + x0, k1 + x1, ci] * X_I_156[k0, k1, ci, co]); X_T423 = sub(X_T45, X_I_157); X_T424 = mul(X_T423, X_I_158); X_T425 = add(X_T111, X_I_159); X_T426 = cmp_lt(X_T425, X_T108); X_T427 = cond(X_T426, X_T108, X_T425); X_T428 = sqrt(X_T427); X_T429 = div(X_T424, X_T428); X_T430 = add(X_T429, X_I_160); X_T431 = cmp_lt(X_T430, X_T108); X_T432 = cond(X_T431, X_T119, X_T430); X_T44[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T432[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_161[k0, k1, c, m]); X_T43[n, x0, x1, co : 1, 19, 19, 728] = +(X_T44[n, k0 + x0, k1 + x1, ci] * X_I_162[k0, k1, ci, co]); X_T433 = sub(X_T43, X_I_163); X_T434 = mul(X_T433, X_I_164); X_T435 = add(X_T111, X_I_165); X_T436 = cmp_lt(X_T435, X_T108); X_T437 = cond(X_T436, X_T108, X_T435); X_T438 = sqrt(X_T437); X_T439 = div(X_T434, X_T438); X_T440 = add(X_T439, X_I_166); X_T441 = cmp_lt(X_T440, X_T108); X_T442 = cond(X_T441, X_T119, X_T440); X_T42[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T442[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_167[k0, k1, c, m]); X_T41[n, x0, x1, co : 1, 19, 19, 728] = +(X_T42[n, k0 + x0, k1 + x1, ci] * X_I_168[k0, k1, ci, co]); X_T443 = sub(X_T41, X_I_169); X_T444 = mul(X_T443, X_I_170); X_T445 = add(X_T111, X_I_171); X_T446 = cmp_lt(X_T445, X_T108); X_T447 = cond(X_T446, X_T108, X_T445); X_T448 = sqrt(X_T447); X_T449 = div(X_T444, X_T448); X_T450 = add(X_T449, X_I_172); X_T451 = add(X_T450, X_T420); X_T452 = cmp_lt(X_T451, X_T108); X_T453 = cond(X_T452, X_T119, X_T451); X_T40[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T453[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_173[k0, k1, c, m]); X_T39[n, x0, x1, co : 1, 19, 19, 728] = +(X_T40[n, k0 + x0, k1 + x1, ci] * X_I_174[k0, k1, ci, co]); X_T454 = sub(X_T39, X_I_175); X_T455 = mul(X_T454, X_I_176); X_T456 = add(X_T111, X_I_177); X_T457 = cmp_lt(X_T456, X_T108); X_T458 = cond(X_T457, X_T108, X_T456); X_T459 = sqrt(X_T458); X_T460 = div(X_T455, X_T459); X_T461 = add(X_T460, X_I_178); X_T462 = cmp_lt(X_T461, X_T108); X_T463 = cond(X_T462, X_T119, X_T461); X_T38[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T463[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_179[k0, k1, c, m]); X_T37[n, x0, x1, co : 1, 19, 19, 728] = +(X_T38[n, k0 + x0, k1 + x1, ci] * X_I_180[k0, k1, ci, co]); X_T464 = sub(X_T37, X_I_181); X_T465 = mul(X_T464, X_I_182); X_T466 = add(X_T111, X_I_183); X_T467 = cmp_lt(X_T466, X_T108); X_T468 = cond(X_T467, X_T108, X_T466); X_T469 = sqrt(X_T468); X_T470 = div(X_T465, X_T469); X_T471 = add(X_T470, X_I_184); X_T472 = cmp_lt(X_T471, X_T108); X_T473 = cond(X_T472, X_T119, X_T471); X_T36[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T473[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_185[k0, k1, c, m]); X_T35[n, x0, x1, co : 1, 19, 19, 728] = +(X_T36[n, k0 + x0, k1 + x1, ci] * X_I_186[k0, k1, ci, co]); X_T474 = sub(X_T35, X_I_187); X_T475 = mul(X_T474, X_I_188); X_T476 = add(X_T111, X_I_189); X_T477 = cmp_lt(X_T476, X_T108); X_T478 = cond(X_T477, X_T108, X_T476); X_T479 = sqrt(X_T478); X_T480 = div(X_T475, X_T479); X_T481 = add(X_T480, X_I_190); X_T482 = add(X_T481, X_T451); X_T483 = cmp_lt(X_T482, X_T108); X_T484 = cond(X_T483, X_T119, X_T482); X_T34[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T484[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_191[k0, k1, c, m]); X_T33[n, x0, x1, co : 1, 19, 19, 728] = +(X_T34[n, k0 + x0, k1 + x1, ci] * X_I_192[k0, k1, ci, co]); X_T485 = sub(X_T33, X_I_193); X_T486 = mul(X_T485, X_I_194); X_T487 = add(X_T111, X_I_195); X_T488 = cmp_lt(X_T487, X_T108); X_T489 = cond(X_T488, X_T108, X_T487); X_T490 = sqrt(X_T489); X_T491 = div(X_T486, X_T490); X_T492 = add(X_T491, X_I_196); X_T493 = cmp_lt(X_T492, X_T108); X_T494 = cond(X_T493, X_T119, X_T492); X_T32[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T494[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_197[k0, k1, c, m]); X_T31[n, x0, x1, co : 1, 19, 19, 728] = +(X_T32[n, k0 + x0, k1 + x1, ci] * X_I_198[k0, k1, ci, co]); X_T495 = sub(X_T31, X_I_199); X_T496 = mul(X_T495, X_I_200); X_T497 = add(X_T111, X_I_201); X_T498 = cmp_lt(X_T497, X_T108); X_T499 = cond(X_T498, X_T108, X_T497); X_T500 = sqrt(X_T499); X_T501 = div(X_T496, X_T500); X_T502 = add(X_T501, X_I_202); X_T503 = cmp_lt(X_T502, X_T108); X_T504 = cond(X_T503, X_T119, X_T502); X_T30[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T504[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_203[k0, k1, c, m]); X_T29[n, x0, x1, co : 1, 19, 19, 728] = +(X_T30[n, k0 + x0, k1 + x1, ci] * X_I_204[k0, k1, ci, co]); X_T505 = sub(X_T29, X_I_205); X_T506 = mul(X_T505, X_I_206); X_T507 = add(X_T111, X_I_207); X_T508 = cmp_lt(X_T507, X_T108); X_T509 = cond(X_T508, X_T108, X_T507); X_T510 = sqrt(X_T509); X_T511 = div(X_T506, X_T510); X_T512 = add(X_T511, X_I_208); X_T513 = add(X_T512, X_T482); X_T514 = cmp_lt(X_T513, X_T108); X_T515 = cond(X_T514, X_T119, X_T513); X_T28[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T515[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_209[k0, k1, c, m]); X_T27[n, x0, x1, co : 1, 19, 19, 728] = +(X_T28[n, k0 + x0, k1 + x1, ci] * X_I_210[k0, k1, ci, co]); X_T516 = sub(X_T27, X_I_211); X_T517 = mul(X_T516, X_I_212); X_T518 = add(X_T111, X_I_213); X_T519 = cmp_lt(X_T518, X_T108); X_T520 = cond(X_T519, X_T108, X_T518); X_T521 = sqrt(X_T520); X_T522 = div(X_T517, X_T521); X_T523 = add(X_T522, X_I_214); X_T524 = cmp_lt(X_T523, X_T108); X_T525 = cond(X_T524, X_T119, X_T523); X_T25[n, x0, x1, c + m : 1, 19, 19, 728] = +(X_T525[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_215[k0, k1, c, m]); X_T24[n, x0, x1, co : 1, 19, 19, 1024] = +(X_T25[n, k0 + x0, k1 + x1, ci] * X_I_216[k0, k1, ci, co]); X_T526 = sub(X_T24, X_I_217); X_T527 = mul(X_T526, X_I_218); X_T528 = add(X_T111, X_I_219); X_T529 = cmp_lt(X_T528, X_T108); X_T530 = cond(X_T529, X_T108, X_T528); X_T531 = sqrt(X_T530); X_T532 = div(X_T527, X_T531); X_T533 = add(X_T532, X_I_220); X_T23[n, x0, x1, c : 1, 10, 10, 1024] = >(X_T533[n, -1 + k0 + 2*x0, -1 + k1 + 2*x1, c]), k0 < 3, k1 < 3; X_T540[n, x0, x1, co : 1, 10, 10, 1024] = +(X_T513[n, k0 + 2*x0, k1 + 2*x1, ci] * X_I_221[k0, k1, ci, co]); X_T545 = sub(X_T540, X_I_222); X_T546 = mul(X_T545, X_I_223); X_T547 = add(X_T111, X_I_224); X_T548 = cmp_lt(X_T547, X_T108); X_T549 = cond(X_T548, X_T108, X_T547); X_T550 = sqrt(X_T549); X_T551 = div(X_T546, X_T550); X_T552 = add(X_T551, X_I_225); X_T553 = add(X_T23, X_T552); X_T21[n, x0, x1, c + m : 1, 10, 10, 1024] = +(X_T553[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_226[k0, k1, c, m]); X_T20[n, x0, x1, co : 1, 10, 10, 1536] = +(X_T21[n, k0 + x0, k1 + x1, ci] * X_I_227[k0, k1, ci, co]); X_T558 = sub(X_T20, X_I_228); X_T559 = mul(X_T558, X_I_229); X_T560 = add(X_T111, X_I_230); X_T561 = cmp_lt(X_T560, X_T108); X_T562 = cond(X_T561, X_T108, X_T560); X_T563 = sqrt(X_T562); X_T564 = div(X_T559, X_T563); X_T565 = add(X_T564, X_I_231); X_T566 = cmp_lt(X_T565, X_T108); X_T567 = cond(X_T566, X_T119, X_T565); X_T18[n, x0, x1, c + m : 1, 10, 10, 1536] = +(X_T567[n, -1 + k0 + x0, -1 + k1 + x1, c] * X_I_232[k0, k1, c, m]); X_T5[n, x0, x1, co : 1, 10, 10, 2048] = +(X_T18[n, k0 + x0, k1 + x1, ci] * X_I_233[k0, k1, ci, co]); X_T568 = sub(X_T5, X_I_234); X_T569 = mul(X_T568, X_I_235); X_T570 = add(X_T111, X_I_236); X_T571 = cmp_lt(X_T570, X_T108); X_T572 = cond(X_T571, X_T108, X_T570); X_T573 = sqrt(X_T572); X_T574 = div(X_T569, X_T573); X_T575 = add(X_T574, X_I_237); X_T576 = cmp_lt(X_T575, X_T108); X_T577 = cond(X_T576, X_T119, X_T575); X_T3[x0, x3 : 1, 2048] = +(X_T577[x0, x1, x2, x3]); X_T578 = 100; X_T579 = div(X_T3, X_T578); X_T0[x0, y1 : 1, 1000] = +(X_T579[x0, z] * X_I_238[z, y1]); X_T580 = add(X_T0, X_I_239); X_T609[i, 0 : 1, 1] = >(X_T580[i, j]); X_T610 = sub(X_T580, X_T609); X_T611 = exp(X_T610); X_T613[i, 0 : 1, 1] = +(X_T611[i, j]); X_T581 = div(X_T611, X_T613);}"
-inputs {key:"X_I_0" value {shape {type:FLOAT32 dimensions {size:6 stride:4} dimensions {size:4 stride:1}} consumed:true}}
-inputs {key:"X_I_1" value {shape {type:FLOAT32 dimensions {size:6 stride:6} dimensions {size:6 stride:1}} consumed:true}}
-inputs {key:"X_I_10" value {shape {type:FLOAT32 dimensions {size:64 stride:1}} consumed:true}}
-inputs {key:"X_I_100" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_101" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_102" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_103" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_104" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_105" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_106" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_107" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_108" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_109" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_11" value {shape {type:FLOAT32 dimensions {size:64 stride:1}} consumed:true}}
-inputs {key:"X_I_110" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_111" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_112" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_113" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_114" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_115" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_116" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_117" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_118" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_119" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_12" value {shape {type:FLOAT32 dimensions {size:64 stride:1}} consumed:true}}
-inputs {key:"X_I_120" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_121" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_122" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_123" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_124" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_125" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_126" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_127" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_128" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_129" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_13" value {shape {type:FLOAT32 dimensions {size:64 stride:1}} consumed:true}}
-inputs {key:"X_I_130" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_131" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_132" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_133" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_134" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_135" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_136" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_137" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_138" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_139" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_14" value {shape {type:FLOAT32 dimensions {size:3 stride:192} dimensions {size:3 stride:64} dimensions {size:64 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_140" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_141" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_142" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_143" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_144" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_145" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_146" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_147" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_148" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_149" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_15" value {shape {type:FLOAT32 dimensions {size:1 stride:8192} dimensions {size:1 stride:8192} dimensions {size:64 stride:128} dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_150" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_151" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_152" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_153" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_154" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_155" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_156" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_157" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_158" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_159" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_16" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_160" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_161" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_162" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_163" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_164" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_165" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_166" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_167" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_168" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_169" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_17" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_170" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_171" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_172" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_173" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_174" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_175" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_176" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_177" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_178" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_179" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_18" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_180" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_181" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_182" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_183" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_184" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_185" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_186" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_187" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_188" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_189" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_19" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_190" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_191" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_192" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_193" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_194" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_195" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_196" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_197" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_198" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_199" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_2" value {shape {type:FLOAT32 dimensions {size:1 stride:268203} dimensions {size:299 stride:897} dimensions {size:299 stride:3} dimensions {size:3 stride:1}} consumed:true}}
-inputs {key:"X_I_20" value {shape {type:FLOAT32 dimensions {size:3 stride:384} dimensions {size:3 stride:128} dimensions {size:128 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_200" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_201" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_202" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_203" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_204" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_205" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_206" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_207" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_208" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_209" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_21" value {shape {type:FLOAT32 dimensions {size:1 stride:16384} dimensions {size:1 stride:16384} dimensions {size:128 stride:128} dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_210" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_211" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_212" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_213" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_214" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_215" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_216" value {shape {type:FLOAT32 dimensions {size:1 stride:745472} dimensions {size:1 stride:745472} dimensions {size:728 stride:1024} dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_217" value {shape {type:FLOAT32 dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_218" value {shape {type:FLOAT32 dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_219" value {shape {type:FLOAT32 dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_22" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_220" value {shape {type:FLOAT32 dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_221" value {shape {type:FLOAT32 dimensions {size:1 stride:745472} dimensions {size:1 stride:745472} dimensions {size:728 stride:1024} dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_222" value {shape {type:FLOAT32 dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_223" value {shape {type:FLOAT32 dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_224" value {shape {type:FLOAT32 dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_225" value {shape {type:FLOAT32 dimensions {size:1024 stride:1}} consumed:true}}
-inputs {key:"X_I_226" value {shape {type:FLOAT32 dimensions {size:3 stride:3072} dimensions {size:3 stride:1024} dimensions {size:1024 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_227" value {shape {type:FLOAT32 dimensions {size:1 stride:1572864} dimensions {size:1 stride:1572864} dimensions {size:1024 stride:1536} dimensions {size:1536 stride:1}} consumed:true}}
-inputs {key:"X_I_228" value {shape {type:FLOAT32 dimensions {size:1536 stride:1}} consumed:true}}
-inputs {key:"X_I_229" value {shape {type:FLOAT32 dimensions {size:1536 stride:1}} consumed:true}}
-inputs {key:"X_I_23" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_230" value {shape {type:FLOAT32 dimensions {size:1536 stride:1}} consumed:true}}
-inputs {key:"X_I_231" value {shape {type:FLOAT32 dimensions {size:1536 stride:1}} consumed:true}}
-inputs {key:"X_I_232" value {shape {type:FLOAT32 dimensions {size:3 stride:4608} dimensions {size:3 stride:1536} dimensions {size:1536 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_233" value {shape {type:FLOAT32 dimensions {size:1 stride:3145728} dimensions {size:1 stride:3145728} dimensions {size:1536 stride:2048} dimensions {size:2048 stride:1}} consumed:true}}
-inputs {key:"X_I_234" value {shape {type:FLOAT32 dimensions {size:2048 stride:1}} consumed:true}}
-inputs {key:"X_I_235" value {shape {type:FLOAT32 dimensions {size:2048 stride:1}} consumed:true}}
-inputs {key:"X_I_236" value {shape {type:FLOAT32 dimensions {size:2048 stride:1}} consumed:true}}
-inputs {key:"X_I_237" value {shape {type:FLOAT32 dimensions {size:2048 stride:1}} consumed:true}}
-inputs {key:"X_I_238" value {shape {type:FLOAT32 dimensions {size:2048 stride:1000} dimensions {size:1000 stride:1}} consumed:true}}
-inputs {key:"X_I_239" value {shape {type:FLOAT32 dimensions {size:1000 stride:1}} consumed:true}}
-inputs {key:"X_I_24" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_25" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_26" value {shape {type:FLOAT32 dimensions {size:1 stride:8192} dimensions {size:1 stride:8192} dimensions {size:64 stride:128} dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_27" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_28" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_29" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_3" value {shape {type:FLOAT32 dimensions {size:3 stride:288} dimensions {size:3 stride:96} dimensions {size:3 stride:32} dimensions {size:32 stride:1}} consumed:true}}
-inputs {key:"X_I_30" value {shape {type:FLOAT32 dimensions {size:128 stride:1}} consumed:true}}
-inputs {key:"X_I_31" value {shape {type:FLOAT32 dimensions {size:3 stride:384} dimensions {size:3 stride:128} dimensions {size:128 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_32" value {shape {type:FLOAT32 dimensions {size:1 stride:32768} dimensions {size:1 stride:32768} dimensions {size:128 stride:256} dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_33" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_34" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_35" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_36" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_37" value {shape {type:FLOAT32 dimensions {size:3 stride:768} dimensions {size:3 stride:256} dimensions {size:256 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_38" value {shape {type:FLOAT32 dimensions {size:1 stride:65536} dimensions {size:1 stride:65536} dimensions {size:256 stride:256} dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_39" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_4" value {shape {type:FLOAT32 dimensions {size:32 stride:1}} consumed:true}}
-inputs {key:"X_I_40" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_41" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_42" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_43" value {shape {type:FLOAT32 dimensions {size:1 stride:32768} dimensions {size:1 stride:32768} dimensions {size:128 stride:256} dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_44" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_45" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_46" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_47" value {shape {type:FLOAT32 dimensions {size:256 stride:1}} consumed:true}}
-inputs {key:"X_I_48" value {shape {type:FLOAT32 dimensions {size:3 stride:768} dimensions {size:3 stride:256} dimensions {size:256 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_49" value {shape {type:FLOAT32 dimensions {size:1 stride:186368} dimensions {size:1 stride:186368} dimensions {size:256 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_5" value {shape {type:FLOAT32 dimensions {size:32 stride:1}} consumed:true}}
-inputs {key:"X_I_50" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_51" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_52" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_53" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_54" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_55" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_56" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_57" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_58" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_59" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_6" value {shape {type:FLOAT32 dimensions {size:32 stride:1}} consumed:true}}
-inputs {key:"X_I_60" value {shape {type:FLOAT32 dimensions {size:1 stride:186368} dimensions {size:1 stride:186368} dimensions {size:256 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_61" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_62" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_63" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_64" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_65" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_66" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_67" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_68" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_69" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_7" value {shape {type:FLOAT32 dimensions {size:32 stride:1}} consumed:true}}
-inputs {key:"X_I_70" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_71" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_72" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_73" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_74" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_75" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_76" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_77" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_78" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_79" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_8" value {shape {type:FLOAT32 dimensions {size:6 stride:3} dimensions {size:3 stride:1}} consumed:true}}
-inputs {key:"X_I_80" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_81" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_82" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_83" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_84" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_85" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_86" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_87" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_88" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_89" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_9" value {shape {type:FLOAT32 dimensions {size:3 stride:6144} dimensions {size:3 stride:2048} dimensions {size:32 stride:64} dimensions {size:64 stride:1}} consumed:true}}
-inputs {key:"X_I_90" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_91" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_92" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_93" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_94" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_95" value {shape {type:FLOAT32 dimensions {size:3 stride:2184} dimensions {size:3 stride:728} dimensions {size:728 stride:1} dimensions {size:1 stride:1}} consumed:true}}
-inputs {key:"X_I_96" value {shape {type:FLOAT32 dimensions {size:1 stride:529984} dimensions {size:1 stride:529984} dimensions {size:728 stride:728} dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_97" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_98" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-inputs {key:"X_I_99" value {shape {type:FLOAT32 dimensions {size:728 stride:1}} consumed:true}}
-outputs {key:"X_T581" value {shape {type:FLOAT32 dimensions {size:1 stride:1000} dimensions {size:1000 stride:1}}}}
+inputs {key:"X_I_0" value {shape {type:FLOAT32 dims {size:6 stride:4} dims {size:4 stride:1}} consumed:true}}
+inputs {key:"X_I_1" value {shape {type:FLOAT32 dims {size:6 stride:6} dims {size:6 stride:1}} consumed:true}}
+inputs {key:"X_I_10" value {shape {type:FLOAT32 dims {size:64 stride:1}} consumed:true}}
+inputs {key:"X_I_100" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_101" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_102" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_103" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_104" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_105" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_106" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_107" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_108" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_109" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_11" value {shape {type:FLOAT32 dims {size:64 stride:1}} consumed:true}}
+inputs {key:"X_I_110" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_111" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_112" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_113" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_114" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_115" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_116" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_117" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_118" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_119" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_12" value {shape {type:FLOAT32 dims {size:64 stride:1}} consumed:true}}
+inputs {key:"X_I_120" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_121" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_122" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_123" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_124" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_125" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_126" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_127" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_128" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_129" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_13" value {shape {type:FLOAT32 dims {size:64 stride:1}} consumed:true}}
+inputs {key:"X_I_130" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_131" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_132" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_133" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_134" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_135" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_136" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_137" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_138" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_139" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_14" value {shape {type:FLOAT32 dims {size:3 stride:192} dims {size:3 stride:64} dims {size:64 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_140" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_141" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_142" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_143" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_144" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_145" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_146" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_147" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_148" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_149" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_15" value {shape {type:FLOAT32 dims {size:1 stride:8192} dims {size:1 stride:8192} dims {size:64 stride:128} dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_150" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_151" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_152" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_153" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_154" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_155" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_156" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_157" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_158" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_159" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_16" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_160" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_161" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_162" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_163" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_164" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_165" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_166" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_167" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_168" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_169" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_17" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_170" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_171" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_172" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_173" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_174" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_175" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_176" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_177" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_178" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_179" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_18" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_180" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_181" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_182" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_183" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_184" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_185" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_186" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_187" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_188" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_189" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_19" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_190" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_191" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_192" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_193" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_194" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_195" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_196" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_197" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_198" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_199" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_2" value {shape {type:FLOAT32 dims {size:1 stride:268203} dims {size:299 stride:897} dims {size:299 stride:3} dims {size:3 stride:1}} consumed:true}}
+inputs {key:"X_I_20" value {shape {type:FLOAT32 dims {size:3 stride:384} dims {size:3 stride:128} dims {size:128 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_200" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_201" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_202" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_203" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_204" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_205" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_206" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_207" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_208" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_209" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_21" value {shape {type:FLOAT32 dims {size:1 stride:16384} dims {size:1 stride:16384} dims {size:128 stride:128} dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_210" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_211" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_212" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_213" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_214" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_215" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_216" value {shape {type:FLOAT32 dims {size:1 stride:745472} dims {size:1 stride:745472} dims {size:728 stride:1024} dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_217" value {shape {type:FLOAT32 dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_218" value {shape {type:FLOAT32 dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_219" value {shape {type:FLOAT32 dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_22" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_220" value {shape {type:FLOAT32 dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_221" value {shape {type:FLOAT32 dims {size:1 stride:745472} dims {size:1 stride:745472} dims {size:728 stride:1024} dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_222" value {shape {type:FLOAT32 dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_223" value {shape {type:FLOAT32 dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_224" value {shape {type:FLOAT32 dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_225" value {shape {type:FLOAT32 dims {size:1024 stride:1}} consumed:true}}
+inputs {key:"X_I_226" value {shape {type:FLOAT32 dims {size:3 stride:3072} dims {size:3 stride:1024} dims {size:1024 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_227" value {shape {type:FLOAT32 dims {size:1 stride:1572864} dims {size:1 stride:1572864} dims {size:1024 stride:1536} dims {size:1536 stride:1}} consumed:true}}
+inputs {key:"X_I_228" value {shape {type:FLOAT32 dims {size:1536 stride:1}} consumed:true}}
+inputs {key:"X_I_229" value {shape {type:FLOAT32 dims {size:1536 stride:1}} consumed:true}}
+inputs {key:"X_I_23" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_230" value {shape {type:FLOAT32 dims {size:1536 stride:1}} consumed:true}}
+inputs {key:"X_I_231" value {shape {type:FLOAT32 dims {size:1536 stride:1}} consumed:true}}
+inputs {key:"X_I_232" value {shape {type:FLOAT32 dims {size:3 stride:4608} dims {size:3 stride:1536} dims {size:1536 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_233" value {shape {type:FLOAT32 dims {size:1 stride:3145728} dims {size:1 stride:3145728} dims {size:1536 stride:2048} dims {size:2048 stride:1}} consumed:true}}
+inputs {key:"X_I_234" value {shape {type:FLOAT32 dims {size:2048 stride:1}} consumed:true}}
+inputs {key:"X_I_235" value {shape {type:FLOAT32 dims {size:2048 stride:1}} consumed:true}}
+inputs {key:"X_I_236" value {shape {type:FLOAT32 dims {size:2048 stride:1}} consumed:true}}
+inputs {key:"X_I_237" value {shape {type:FLOAT32 dims {size:2048 stride:1}} consumed:true}}
+inputs {key:"X_I_238" value {shape {type:FLOAT32 dims {size:2048 stride:1000} dims {size:1000 stride:1}} consumed:true}}
+inputs {key:"X_I_239" value {shape {type:FLOAT32 dims {size:1000 stride:1}} consumed:true}}
+inputs {key:"X_I_24" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_25" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_26" value {shape {type:FLOAT32 dims {size:1 stride:8192} dims {size:1 stride:8192} dims {size:64 stride:128} dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_27" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_28" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_29" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_3" value {shape {type:FLOAT32 dims {size:3 stride:288} dims {size:3 stride:96} dims {size:3 stride:32} dims {size:32 stride:1}} consumed:true}}
+inputs {key:"X_I_30" value {shape {type:FLOAT32 dims {size:128 stride:1}} consumed:true}}
+inputs {key:"X_I_31" value {shape {type:FLOAT32 dims {size:3 stride:384} dims {size:3 stride:128} dims {size:128 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_32" value {shape {type:FLOAT32 dims {size:1 stride:32768} dims {size:1 stride:32768} dims {size:128 stride:256} dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_33" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_34" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_35" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_36" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_37" value {shape {type:FLOAT32 dims {size:3 stride:768} dims {size:3 stride:256} dims {size:256 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_38" value {shape {type:FLOAT32 dims {size:1 stride:65536} dims {size:1 stride:65536} dims {size:256 stride:256} dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_39" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_4" value {shape {type:FLOAT32 dims {size:32 stride:1}} consumed:true}}
+inputs {key:"X_I_40" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_41" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_42" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_43" value {shape {type:FLOAT32 dims {size:1 stride:32768} dims {size:1 stride:32768} dims {size:128 stride:256} dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_44" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_45" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_46" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_47" value {shape {type:FLOAT32 dims {size:256 stride:1}} consumed:true}}
+inputs {key:"X_I_48" value {shape {type:FLOAT32 dims {size:3 stride:768} dims {size:3 stride:256} dims {size:256 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_49" value {shape {type:FLOAT32 dims {size:1 stride:186368} dims {size:1 stride:186368} dims {size:256 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_5" value {shape {type:FLOAT32 dims {size:32 stride:1}} consumed:true}}
+inputs {key:"X_I_50" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_51" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_52" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_53" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_54" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_55" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_56" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_57" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_58" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_59" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_6" value {shape {type:FLOAT32 dims {size:32 stride:1}} consumed:true}}
+inputs {key:"X_I_60" value {shape {type:FLOAT32 dims {size:1 stride:186368} dims {size:1 stride:186368} dims {size:256 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_61" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_62" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_63" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_64" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_65" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_66" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_67" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_68" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_69" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_7" value {shape {type:FLOAT32 dims {size:32 stride:1}} consumed:true}}
+inputs {key:"X_I_70" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_71" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_72" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_73" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_74" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_75" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_76" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_77" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_78" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_79" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_8" value {shape {type:FLOAT32 dims {size:6 stride:3} dims {size:3 stride:1}} consumed:true}}
+inputs {key:"X_I_80" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_81" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_82" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_83" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_84" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_85" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_86" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_87" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_88" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_89" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_9" value {shape {type:FLOAT32 dims {size:3 stride:6144} dims {size:3 stride:2048} dims {size:32 stride:64} dims {size:64 stride:1}} consumed:true}}
+inputs {key:"X_I_90" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_91" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_92" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_93" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_94" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_95" value {shape {type:FLOAT32 dims {size:3 stride:2184} dims {size:3 stride:728} dims {size:728 stride:1} dims {size:1 stride:1}} consumed:true}}
+inputs {key:"X_I_96" value {shape {type:FLOAT32 dims {size:1 stride:529984} dims {size:1 stride:529984} dims {size:728 stride:728} dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_97" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_98" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+inputs {key:"X_I_99" value {shape {type:FLOAT32 dims {size:728 stride:1}} consumed:true}}
+outputs {key:"X_T581" value {shape {type:FLOAT32 dims {size:1 stride:1000} dims {size:1000 stride:1}}}}

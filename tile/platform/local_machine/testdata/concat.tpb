@@ -5,7 +5,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions: { size:128 stride: 1 }
+      dims: { size:128 stride: 1 }
     }
   }
 }
@@ -14,7 +14,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions: { size:128 stride: 1 }
+      dims: { size:128 stride: 1 }
     }
   }
 }
@@ -23,7 +23,7 @@ inputs {
   value {
     shape {
       type: FLOAT32
-      dimensions: { size:256 stride: 1 }
+      dims: { size:256 stride: 1 }
     }
   }
 }
@@ -32,7 +32,7 @@ outputs {
   value {
     shape {
       type: FLOAT32
-      dimensions: { size:512 stride: 1 }
+      dims: { size:512 stride: 1 }
     }
   }
 }
