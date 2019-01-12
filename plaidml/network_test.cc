@@ -58,7 +58,7 @@ class NetworkTest : public ::testing::TestWithParam<const char*> {
 
   tensor<float> AllocTensor(const tile::proto::TensorShape& shape_proto) {
     shape<float> shp{ctx_};
-    for (const auto& dim : shape_proto.dimensions()) {
+    for (const auto& dim : shape_proto.dims()) {
       shp.add_dimension(dim.size(), dim.stride());
     }
     return dev_.allocate(shp);

@@ -130,7 +130,7 @@ std::vector<float> TileFile::GetTensorFloatData(const metadata::proto::Tensor& t
   if (tensor.filename().empty()) {
     throw std::runtime_error{"No internal data or data filename found in tensor"};
   }
-  const auto& d0 = tensor.shape().dimensions()[0];
+  const auto& d0 = tensor.shape().dims()[0];
   std::size_t size = d0.stride() * d0.size();
   result.resize(size);
 
