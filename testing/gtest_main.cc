@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "base/util/logging.h"
+#include "base/util/throw.h"
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage(argv[0]);
@@ -18,5 +19,17 @@ int main(int argc, char* argv[]) {
   }
 
   el::Loggers::reconfigureAllLoggers(vertexai::LogConfigurationFromFlags("default"));
-  return RUN_ALL_TESTS();
+  try {
+    return RUN_ALL_TESTS();
+  } catch (const std::exception& ex) {
+    std::cerr << "Caught unhandled exception: " << ex.what() << std::endl;
+    auto stacktrace = boost::get_error_info<traced>(ex);
+    if (stacktrace) {
+      std::cerr << *stacktrace << std::endl;
+    }
+    return EXIT_FAILURE;
+  } catch (...) {
+    std::cerr << "Caught unhandled exception" << std::endl;
+    return EXIT_FAILURE;
+  }
 }

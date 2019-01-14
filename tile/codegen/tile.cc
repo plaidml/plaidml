@@ -71,6 +71,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     inner->tags = outer->tags;
   }
   inner->name = outer->name;
+  inner->location = outer->location;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
   // Move all constraints on the outer block into the inner block
@@ -134,10 +135,10 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
       std::remove_if(outer->refs.begin(), outer->refs.end(), [&](const auto& ref) { return ref.dir == RefDir::None; }),
       outer->refs.end());
   for (auto& ref : outer->refs) {
-    // Save any renames till the inner block (ie, only one, inner or outer needs to rename)
-    ref.into = ref.from;
     // Fix the sizes on the outer blocks
     ref.interior_shape = inner->exterior_shape(ref.into);
+    // Save any renames till the inner block (ie, only one, inner or outer needs to rename)
+    ref.into = ref.from;
     for (auto& aff : ref.access) {
       // Since we're taking a single block and turning it into two (e.g. outer and inner),
       // arrange for only one of the blocks to do the constant pointer bumping.

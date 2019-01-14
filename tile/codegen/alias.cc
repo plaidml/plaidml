@@ -29,13 +29,22 @@ Affine UniqifyAffine(const Affine& orig, const std::string& prefix) {
 
 }  // namespace
 
+std::ostream& operator<<(std::ostream& os, const AliasInfo& ai) {
+  os << "(" << ai.base_name;
+  os << ", " << ai.location;
+  os << ", " << StreamContainer(ai.access);
+  os << ", " << ai.shape;
+  os << ")";
+  return os;
+}
+
 std::ostream& operator<<(std::ostream& os, const Extent& extent) {
   os << "(" << extent.min << ", " << extent.max << ")";
   return os;
 }
 
 bool CheckOverlap(const std::vector<Extent>& ae, const std::vector<Extent>& be) {
-  IVLOG(3, boost::format("CheckOverlap: a: '%1%', b: '%2%'") % StreamContainer(ae) % StreamContainer(be));
+  IVLOG(4, boost::format("  CheckOverlap: a: '%1%', b: '%2%'") % StreamContainer(ae) % StreamContainer(be));
   if (ae.size() != be.size()) {
     throw std::runtime_error("Incompatible extents");
   }
@@ -48,9 +57,11 @@ bool CheckOverlap(const std::vector<Extent>& ae, const std::vector<Extent>& be) 
 }
 
 AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
-  IVLOG(3, "Compare: " << ai.base_name << ", " << bi.base_name);
+  IVLOG(3, "AliasInfo::Compare> a: " << ai.base_name << ", b: " << bi.base_name);
+  IVLOG(4, "  a: " << ai);
+  IVLOG(4, "  b: " << bi);
   if (ai.base_name != bi.base_name) {
-    IVLOG(3, "  CheckOverlap: None");
+    IVLOG(3, "  Different base tensors");
     return AliasType::None;
   }
   if (ai.shape == bi.shape) {
@@ -64,7 +75,7 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
       return AliasType::Exact;
     }
     if (!CheckOverlap(ai.extents, bi.extents)) {
-      IVLOG(3, "  CheckOverlap: None");
+      IVLOG(3, "  No overlap");
       return AliasType::None;
     }
   }
@@ -72,9 +83,11 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
   // dimension to see if there is a splitting plane, and if so, safely declare alias None,
   // but it's unclear that that will happen enough for us to care, so just always return
   // Partial which is conservative.
-  IVLOG(3, "  CheckOverlap: Partial");
+  IVLOG(3, "  Partial");
   return AliasType::Partial;
 }
+
+bool AliasInfo::IsBanked() const { return !!base_ref->bank_dim; }
 
 AliasMap::AliasMap() : depth_(0) {}
 
@@ -99,12 +112,15 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
       info.base_ref = it->second.base_ref;
       info.base_name = it->second.base_name;
       info.access = it->second.access;
+      info.location = it->second.location;
+      info.location.unit += ref.location.unit;
     } else {
       // New alloc, initialize from scratch
       info.base_block = block;
       info.base_ref = &ref;
       info.base_name = prefix + ref.into;
       info.access.resize(ref.access.size());
+      info.location = ref.location;
     }
     if (info.access.size() != ref.access.size()) {
       throw_with_trace(std::runtime_error(
@@ -123,7 +139,6 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
         max_idxs[idx.name] = idx.range - 1;
       }
     }
-    info.location = ref.location;
     info.extents.resize(ref.access.size());
     for (size_t i = 0; i < ref.access.size(); i++) {
       info.access[i] += UniqifyAffine(ref.access[i], prefix);

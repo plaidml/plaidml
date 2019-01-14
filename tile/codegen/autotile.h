@@ -11,7 +11,7 @@ namespace codegen {
 
 void AutotilePass(stripe::Block* block, const proto::AutotilePass& options);
 
-void PartitionComputePass(stripe::Block* root, const proto::PartitionComputePass& options);
+void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& options);
 
 }  // namespace codegen
 }  // namespace tile
