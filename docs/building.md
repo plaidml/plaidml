@@ -78,7 +78,7 @@ the PlaidML backend.  From the nGraph source directory, you can run:
 
     mkdir build
     cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=~/ngraph_plaidml_dist -DNGRAPH_CPU_ENABLE=OFF
+    cmake .. -DCMAKE_INSTALL_PREFIX=~/ngraph_plaidml_dist -DNGRAPH_PLAIDML_ENABLE=ON -DNGRAPH_CPU_ENABLE=OFF
     make
     make install
   
@@ -120,7 +120,8 @@ Windows requires that dynamic libraries are on your `PATH`.
     `~/ngraph_plaidml_dist/bin/nbench -b "PlaidML:0" -f ~/test/model_inference_batch1_float32.json`.
 
   This runs the nGraph model specified in the file given by the `-f` option on 
-  experimental device #0.
+  non-experimental device #0. If you want to use an experimental device, set
+  the environment variable `PLAIDML_EXPERIMENTAL=1`.
 
 # PlaidML with Keras\*
 
