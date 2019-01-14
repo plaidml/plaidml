@@ -340,7 +340,28 @@ class StatementBinder final {
       : block_updates_{std::move(updates)}, block_{block}, mem_loc_{mem_loc} {}
 
   // Apply the StatementBinder to the Statement from which it was generated.
-  void ApplyBindings();
+  void ApplyBindings() {
+    if (!block_) {
+      // Non-Blocks are easy.
+      for (auto& update : non_block_updates_) {
+        *update.first = update.second->cache_entry->name;
+      }
+      return;
+    }
+
+    // For Blocks, we need to do a little more work to recursively update the refinements.
+    for (auto& update : block_updates_) {
+      stripe::Refinement* ref = update.first;
+      RefInfo* ri = update.second;
+      ref->from = ri->cache_entry->name;
+      ref->location = *mem_loc_;
+      ref->location.unit = ri->ref.location.unit;
+      for (size_t i = 0; i < ref->interior_shape.dims.size(); i++) {
+        ref->interior_shape.dims[i].stride = ri->cache_shape.dims[i].stride;
+      }
+      FixupRefs(block_, ref->into);
+    }
+  }
 
  private:
   std::vector<std::pair<std::string*, RefInfo*>> non_block_updates_;
@@ -348,29 +369,6 @@ class StatementBinder final {
   stripe::Block* block_ = nullptr;
   const stripe::Location* mem_loc_ = nullptr;
 };
-
-void StatementBinder::ApplyBindings() {
-  if (!block_) {
-    // Non-Blocks are easy.
-    for (auto& update : non_block_updates_) {
-      *update.first = update.second->cache_entry->name;
-    }
-    return;
-  }
-
-  // For Blocks, we need to do a little more work to recursively update the refinements.
-  for (auto& update : block_updates_) {
-    stripe::Refinement* ref = update.first;
-    RefInfo* ri = update.second;
-    ref->from = ri->cache_entry->name;
-    ref->location = *mem_loc_;
-    ref->location.unit = ri->ref.location.unit;
-    for (size_t i = 0; i < ref->interior_shape.dims.size(); i++) {
-      ref->interior_shape.dims[i].stride = ri->cache_shape.dims[i].stride;
-    }
-    FixupRefs(block_, ref->into);
-  }
-}
 
 // Gathers a Statement's IO information.
 class IOGatherer final : private stripe::MutableStmtVisitor {
@@ -385,73 +383,68 @@ class IOGatherer final : private stripe::MutableStmtVisitor {
  private:
   IOGatherer(const stripe::Location& loc, std::map<RefInfoKey, RefInfo>* ri_map) : loc_{&loc}, ri_map_{ri_map} {}
 
-  RefInfo* FindDirectRefInfo(const std::string& name);
+  RefInfo* FindDirectRefInfo(const std::string& name) { return &ri_map_->at(name); }
 
-  void Visit(stripe::Load*) final;
-  void Visit(stripe::Store*) final;
+  void Visit(stripe::Load* load) final {
+    auto* ri = FindDirectRefInfo(load->from);
+    ios_.emplace_back(ri, stripe::RefDir::In);
+    binder_ = StatementBinder{std::vector<std::pair<std::string*, RefInfo*>>{{&load->from, ri}}};
+  }
+
+  void Visit(stripe::Store* store) final {
+    auto* ri = FindDirectRefInfo(store->into);
+    ios_.emplace_back(ri, stripe::RefDir::Out);
+    binder_ = StatementBinder{std::vector<std::pair<std::string*, RefInfo*>>{{&store->into, ri}}};
+  }
+
   void Visit(stripe::Constant*) final {}
-  void Visit(stripe::Special*) final;
+
+  void Visit(stripe::Special* special) final {
+    // TODO: Handle the case where a special accesses a single tensor multiple times.
+    std::vector<std::pair<std::string*, RefInfo*>> updates;
+    std::unordered_map<RefInfo*, stripe::RefDir> accesses;
+    for (auto nit = special->inputs.begin(); nit != special->inputs.end(); ++nit) {
+      auto* ri = FindDirectRefInfo(*nit);
+      accesses[ri] = stripe::RefDir::In;
+      updates.emplace_back(&*nit, ri);
+    }
+    for (auto nit = special->outputs.begin(); nit != special->outputs.end(); ++nit) {
+      auto* ri = FindDirectRefInfo(*nit);
+      updates.emplace_back(&*nit, ri);
+      auto it_inserted = accesses.emplace(ri, stripe::RefDir::Out);
+      if (!it_inserted.second) {
+        it_inserted.first->second = UnionDir(it_inserted.first->second, stripe::RefDir::Out);
+      }
+    }
+    ios_ = std::vector<std::pair<RefInfo*, stripe::RefDir>>{accesses.cbegin(), accesses.cend()};
+    binder_ = StatementBinder{std::move(updates)};
+  }
+
   void Visit(stripe::Intrinsic*) final {}
-  void Visit(stripe::Block*) final;
+
+  void Visit(stripe::Block* block) final {
+    std::vector<std::pair<stripe::Refinement*, RefInfo*>> updates;
+    std::unordered_map<RefInfo*, stripe::RefDir> accesses;
+    for (auto& ref : block->refs) {
+      if (ref.dir == stripe::RefDir::None) {
+        continue;  // This isn't an IO ref.
+      }
+      auto* ri = &ri_map_->at(ref.from);
+      auto it_inserted = accesses.emplace(ri, ref.dir);
+      if (!it_inserted.second) {
+        it_inserted.first->second = UnionDir(it_inserted.first->second, ref.dir);
+      }
+      updates.emplace_back(std::make_pair(&ref, ri));
+    }
+    ios_ = std::vector<std::pair<RefInfo*, stripe::RefDir>>{accesses.cbegin(), accesses.cend()};
+    binder_ = StatementBinder{std::move(updates), block, loc_};
+  }
 
   const stripe::Location* loc_;
   std::map<RefInfoKey, RefInfo>* ri_map_;
   std::vector<std::pair<RefInfo*, stripe::RefDir>> ios_;
   StatementBinder binder_;
 };
-
-RefInfo* IOGatherer::FindDirectRefInfo(const std::string& name) { return &ri_map_->at(name); }
-
-void IOGatherer::Visit(stripe::Load* load) {
-  auto* ri = FindDirectRefInfo(load->from);
-  ios_.emplace_back(ri, stripe::RefDir::In);
-  binder_ = StatementBinder{std::vector<std::pair<std::string*, RefInfo*>>{{&load->from, ri}}};
-}
-
-void IOGatherer::Visit(stripe::Store* store) {
-  auto* ri = FindDirectRefInfo(store->into);
-  ios_.emplace_back(ri, stripe::RefDir::Out);
-  binder_ = StatementBinder{std::vector<std::pair<std::string*, RefInfo*>>{{&store->into, ri}}};
-}
-
-void IOGatherer::Visit(stripe::Special* special) {
-  // TODO: Handle the case where a special accesses a single tensor multiple times.
-  std::vector<std::pair<std::string*, RefInfo*>> updates;
-  std::unordered_map<RefInfo*, stripe::RefDir> accesses;
-  for (auto nit = special->inputs.begin(); nit != special->inputs.end(); ++nit) {
-    auto* ri = FindDirectRefInfo(*nit);
-    accesses[ri] = stripe::RefDir::In;
-    updates.emplace_back(&*nit, ri);
-  }
-  for (auto nit = special->outputs.begin(); nit != special->outputs.end(); ++nit) {
-    auto* ri = FindDirectRefInfo(*nit);
-    updates.emplace_back(&*nit, ri);
-    auto it_inserted = accesses.emplace(ri, stripe::RefDir::Out);
-    if (!it_inserted.second) {
-      it_inserted.first->second = UnionDir(it_inserted.first->second, stripe::RefDir::Out);
-    }
-  }
-  ios_ = std::vector<std::pair<RefInfo*, stripe::RefDir>>{accesses.cbegin(), accesses.cend()};
-  binder_ = StatementBinder{std::move(updates)};
-}
-
-void IOGatherer::Visit(stripe::Block* block) {
-  std::vector<std::pair<stripe::Refinement*, RefInfo*>> updates;
-  std::unordered_map<RefInfo*, stripe::RefDir> accesses;
-  for (auto& ref : block->refs) {
-    if (ref.dir == stripe::RefDir::None) {
-      continue;  // This isn't an IO ref.
-    }
-    auto* ri = &ri_map_->at(ref.from);
-    auto it_inserted = accesses.emplace(ri, ref.dir);
-    if (!it_inserted.second) {
-      it_inserted.first->second = UnionDir(it_inserted.first->second, ref.dir);
-    }
-    updates.emplace_back(std::make_pair(&ref, ri));
-  }
-  ios_ = std::vector<std::pair<RefInfo*, stripe::RefDir>>{accesses.cbegin(), accesses.cend()};
-  binder_ = StatementBinder{std::move(updates), block, loc_};
-}
 
 // The scheduler class itself.
 class Scheduler {

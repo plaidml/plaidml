@@ -37,9 +37,16 @@ class Scope {
   void ExecuteProgram(const Block& block, std::map<std::string, Buffer>* buffers) {
     Scope outer;
     outer_ = &outer;
+    std::map<std::string, Buffer> tmps;
     for (const auto& ref : block.refs) {
       assert(ref.from.empty());
-      refs_[ref.into] = &safe_at(buffers, ref.into);
+      if (ref.has_tag("user")) {
+        refs_[ref.into] = &safe_at(buffers, ref.into);
+      } else {
+        Buffer buf(ref.interior_shape.elem_size());
+        tmps.emplace(ref.into, buf);
+        refs_[ref.into] = &safe_at(&tmps, ref.into);
+      }
     }
     ExecuteStatements(block);
   }

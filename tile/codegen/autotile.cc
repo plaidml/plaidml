@@ -191,7 +191,7 @@ struct PartitionComputeCostModel {
   double ideal_cost;
   std::set<const Index*> acc_idxs;
 
-  PartitionComputeCostModel(const Block& block, const proto::PartitionComputePass& options)
+  PartitionComputeCostModel(const Block& block, const proto::PartitionPass& options)
       : ideal_cost(block.idxs_product() / (1.0 * options.num_parts())),  //
         acc_idxs(block.accumulation_idxs())                              //
   {}
@@ -279,7 +279,7 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
     auto result = PickBestTile(*block, options.only_po2(), options.fast(), model);
     IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result.tile << ", cost: " << result.cost);
     if (!std::isinf(result.cost)) {
-      if (ApplyTile(block, result.tile.sizes())) {
+      if (ApplyTile(block, result.tile.sizes(), false)) {
         auto inner = block->SubBlock(0);
         if (options.copy_tags()) {
           inner->tags = block->tags;
@@ -293,7 +293,7 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
   });
 }
 
-void PartitionComputePass(stripe::Block* root, const proto::PartitionComputePass& options) {
+void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& options) {
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [&options](const AliasMap& map, Block* block) {
     PartitionComputeCostModel model(*block, options);
@@ -303,7 +303,7 @@ void PartitionComputePass(stripe::Block* root, const proto::PartitionComputePass
                                          << ", cost: " << result.cost             //
                                          << ", ideal_cost: " << model.ideal_cost  //
                                          << ", ratio: " << model.ideal_cost / result.cost);
-    if (ApplyTile(block, result.tile.counts())) {
+    if (ApplyTile(block, result.tile.counts(), false)) {
       auto inner = block->SubBlock(0);
       inner->tags = block->tags;
       block->tags.clear();

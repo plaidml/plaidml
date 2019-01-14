@@ -9,6 +9,7 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
+void PruneIndexes(stripe::Block* block);
 void PruneIndexesPass(stripe::Block* root, const proto::GenericPass& options);
 
 }  // namespace codegen

@@ -34,6 +34,17 @@ void RunOnBlocks(stripe::Block* root, const stripe::Tags& reqs, const F& func) {
   RunOnBlocksRecurse(root_map, root, reqs, func);
 }
 
+template <typename F>
+void PreIterate(stripe::Block* block, const F& func) {
+  auto it = block->stmts.begin();
+  while (it != block->stmts.end()) {
+    auto next = it;
+    ++next;
+    func(it);
+    it = next;
+  }
+}
+
 inline stripe::Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags) {
   stripe::Tags tags;
   for (const auto& tag : pb_tags) {
