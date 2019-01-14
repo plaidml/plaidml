@@ -28,6 +28,9 @@ variables unless you've installed tools in unusual locations).
 
 ## Create and activate a Conda environment
 
+Navigate to the root of the PlaidML source directory to execute the following
+commands for setting up a Conda environment.
+
 macOS\* and Linux\*:
 
     conda env create -n plaidml
@@ -79,9 +82,9 @@ the PlaidML backend.  From the nGraph source directory, you can run:
     make
     make install
   
-The above options will install nGraph into `~/ngraph_plaidml_dist`.
-When you do not explicitly use `-DNGRAPH_CPU_ENABLE=FALSE`, the
-default build enables CPU for operations.
+Running the build with the above options will install nGraph into
+`~/ngraph_plaidml_dist`. When you do not explicitly use
+`-DNGRAPH_CPU_ENABLE=FALSE`, the default build enables CPU for operations.
 
 After running `make` and `make install`, be sure to set the environment variables 
 to the correct location where the libraries were built. Continuing the above 
@@ -92,14 +95,14 @@ example, this would be as follows for each respective OS:
 Most Linux distributions support `LD_LIBRARY_PATH`; consult the distribution's
 documentation for specifics. 
 
-    export LD_LIBRARY_PATH=~/ngraph_plaidml_dist/lib
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/ngraph_plaidml_dist/lib
     export NGRAPH_CPP_BUILD_PATH=~/ngraph_plaidml_dist
 
 ## macOS\* 
 
 MacOS usually requires use of `DYLD_LIBRARY_PATH`.
 
-    export DYLD_LIBRARY_PATH=~/ngraph_plaidml_dist/lib
+    export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:~/ngraph_plaidml_dist/lib
     export NGRAPH_CPP_BUILD_PATH=~/ngraph_plaidml_dist
 
 ## Microsoft Windows\* OS 
