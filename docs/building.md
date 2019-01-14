@@ -26,7 +26,6 @@ Note that Conda will take care of the getting you a working Python and
 an msys2 shell (you shouldn't need to set BAZEL_* environment
 variables unless you've installed tools in unusual locations).
 
-<<<<<<< HEAD
 ## Create and activate a Conda environment
 
 macOS\* and Linux\*:
@@ -35,42 +34,22 @@ macOS\* and Linux\*:
     conda activate plaidml
 
 Microsoft Windows\* OS:
-    
-=======
-## Create and Activate a Conda environment
 
-macOS\* and Linux\*:
-```
-conda env create -n plaidml
-conda activate plaidml
-```
-
-Microsoft Windows\* OS:
->>>>>>> edbba01e0f1d67eecfe18324c311584dac24ee9f
     conda env create -n plaidml -f environment-windows.yml
     conda activate plaidml
 
 ## Build the PlaidML Python wheel
 
 macOS\*:
-<<<<<<< HEAD
-      
+
     bazel build --config macos_x86_64 //plaidml:wheel
 
 Linux\*:
-      
+
     bazel build --config linux_x86_64 //plaidml:wheel
 
 Microsoft Windows\* OS:
-      
-=======
-    bazel build --config macos_x86_64 //plaidml:wheel
 
-Linux\*:
-    bazel build --config linux_x86_64 //plaidml:wheel
-
-Microsoft Windows\* OS:
->>>>>>> edbba01e0f1d67eecfe18324c311584dac24ee9f
     bazel build --config windows_x86_64 //plaidml:wheel
 
 ## Install the PlaidML Python wheel
@@ -87,7 +66,6 @@ PlaidML Python wheel.  You can do this by running:
 
     pip install plaidml
     plaidml-setup
-<<<<<<< HEAD
 
 or by following the instructions for building the PlaidML Python
 Wheel, above.
@@ -95,15 +73,6 @@ Wheel, above.
 When the PlaidML wheel is installed, the default nGraph build contains
 the PlaidML backend.  From the nGraph source directory, you can run:
 
-=======
-
-or by following the instructions for building the PlaidML Python
-Wheel, above.
-
-When the PlaidML wheel is installed, the default nGraph build contains
-the PlaidML backend.  From the nGraph source directory, you can run:
-
->>>>>>> edbba01e0f1d67eecfe18324c311584dac24ee9f
     mkdir build
     cd build
     cmake .. -DCMAKE_INSTALL_PREFIX=~/ngraph_plaidml_dist -DNGRAPH_CPU_ENABLE=OFF
@@ -152,33 +121,21 @@ Windows requires that dynamic libraries are on your `PATH`.
 
 # PlaidML with Keras\*
 
-<<<<<<< HEAD
-The PlaidML-Keras Python wheel contains the code needed for
-integration with Keras\*.
-
-You can get the latest release of the PlaidML-Keras Python wheel by
-=======
 The PlaidML-Keras Python Wheel contains the code needed for
 integration with Keras\*.
 
 You can get the latest release of the PlaidML-Keras Python Wheel by
->>>>>>> edbba01e0f1d67eecfe18324c311584dac24ee9f
 running:
 
     pip install plaidml-keras
 
 You can also build and install the wheel from source.
 
-<<<<<<< HEAD
 ## Set up a build environment
-=======
-## Setup a Build Environment
->>>>>>> edbba01e0f1d67eecfe18324c311584dac24ee9f
 
 Follow the setup instructions for building the PlaidML Python Wheel,
 above.
 
-<<<<<<< HEAD
 ## Build the PlaidML-Keras wheel
 
 macOS\*:
@@ -189,18 +146,6 @@ Linux\*:
 
 Microsoft Windows\* OS:
     `bazel build --config windows_x86_64 //plaidml/keras:wheel`
-=======
-## Build the PlaidML-Keras Wheel
-
-macOS\*:
-    bazel build --config macos_x86_64 //plaidml/keras:wheel
-
-Linux\*:
-    bazel build --config linux_x86_64 //plaidml/keras:wheel
-
-Microsoft Windows\* OS:
-    bazel build --config windows_x86_64 //plaidml/keras:wheel
->>>>>>> edbba01e0f1d67eecfe18324c311584dac24ee9f
 
 ## Install the PlaidML-Keras Python wheel
 
