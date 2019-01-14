@@ -25,14 +25,16 @@ struct Extent {
 };
 
 struct AliasInfo {
-  static AliasType Compare(const AliasInfo& a, const AliasInfo& b);
   stripe::Block* base_block;
   stripe::Refinement* base_ref;
   std::string base_name;
   std::vector<stripe::Affine> access;
   std::vector<Extent> extents;
-  TensorShape shape;
   stripe::Location location;
+  TensorShape shape;
+
+  static AliasType Compare(const AliasInfo& a, const AliasInfo& b);
+  bool IsBanked() const;
 };
 
 class AliasMap {
@@ -51,6 +53,7 @@ class AliasMap {
 
 bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);
 
+std::ostream& operator<<(std::ostream& os, const AliasInfo& ai);
 std::ostream& operator<<(std::ostream& os, const Extent& extent);
 
 }  // namespace codegen

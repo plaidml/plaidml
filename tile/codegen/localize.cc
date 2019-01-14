@@ -83,7 +83,11 @@ void LocalizePass(const AliasMap& scope, Block* block) {
     std::set<std::string> refs_to_remove;
     for (const auto& ref : inner->refs) {
       auto it = block->ref_by_into(ref.from, false);
-      if (it == block->refs.end() || it->dir != RefDir::None) {
+      if (it == block->refs.end()) {
+        continue;
+      }
+      // If this wasn't allocated in the outer block and it's not tagged with tmp, skip it for consideration
+      if (it->dir != RefDir::None && !it->has_tag("tmp")) {
         continue;
       }
       // If it's not uniquely located in this block, don't consider

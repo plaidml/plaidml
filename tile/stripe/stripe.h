@@ -143,8 +143,6 @@ struct Location {
 
 struct BankDimension {
   size_t dim_pos;
-  TensorShape orig_shape;
-  std::string orig_name;
 };
 
 struct Refinement : Taggable {

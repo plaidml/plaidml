@@ -66,18 +66,34 @@ class StripeGenerator {
         const auto& binding = item.second;
         if (binding.tag == Binding::TENSOR) {
           std::vector<Affine> access(binding.shape.dims.size());
-          main->refs.emplace_back(Refinement{
-              RefDir::None,         // dir
-              "",                   // from
-              item.first,           // into
-              access,               // access
-              binding.shape,        // shape
-              "",                   // agg_op
-              {},                   // location
-              IsConst(item.first),  // is_const
-              0,                    // offset
-              boost::none,          // bank_dim
-          });
+          Refinement new_ref{
+              RefDir::None,   // dir
+              "",             // from
+              item.first,     // into
+              access,         // access
+              binding.shape,  // shape
+              "",             // agg_op
+              {},             // location
+              false,          // is_const
+              0,              // offset
+              boost::none,    // bank_dim
+          };
+          new_ref.set_tag("tmp");
+          program->refs.emplace_back(new_ref);
+          Refinement tmp_ref{
+              RefDir::InOut,  // dir
+              item.first,     // from
+              item.first,     // into
+              access,         // access
+              binding.shape,  // shape
+              "",             // agg_op
+              {},             // location
+              false,          // is_const
+              0,              // offset
+              boost::none     // bank_dim
+          };
+          tmp_ref.set_tag("tmp");
+          main->refs.emplace_back(tmp_ref);
         }
       }
     }
@@ -90,7 +106,7 @@ class StripeGenerator {
     for (const auto& item : shapes) {
       externals_.insert(item.first);
       std::vector<Affine> access(item.second.dims.size());
-      program->refs.emplace_back(Refinement{
+      Refinement new_ref{
           RefDir::None,         // dir
           "",                   // from
           item.first,           // into
@@ -101,7 +117,9 @@ class StripeGenerator {
           IsConst(item.first),  // is_const
           0,                    // offset
           boost::none,          // bank_dim
-      });
+      };
+      new_ref.set_tag("user");
+      program->refs.emplace_back(new_ref);
       if (is_input) {
         main->refs.emplace_back(Refinement{
             RefDir::In,           // dir

@@ -375,9 +375,6 @@ void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block
       os << exterior_bytes / 1024.0 << " KiB";
     }
   }
-  if (ref.bank_dim) {
-    os << ", banking " << ref.bank_dim->orig_name << " " << ref.bank_dim->orig_shape;
-  }
   if (!ref.from.empty() && ref.into != ref.from) {
     os << " // alias";
   }
@@ -449,8 +446,7 @@ std::ostream& operator<<(std::ostream& os, const Index& idx) {
 }
 
 bool operator==(const BankDimension& lhs, const BankDimension& rhs) {
-  return std::tie(lhs.dim_pos, lhs.orig_shape) ==  //
-         std::tie(rhs.dim_pos, rhs.orig_shape);
+  return std::tie(lhs.dim_pos) == std::tie(rhs.dim_pos);
 }
 
 bool operator==(const Index& lhs, const Index& rhs) {
@@ -809,38 +805,38 @@ std::set<const Index*> Block::accumulation_idxs() const {
   return ret;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_into(const std::string& name, bool fail) {
-  auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+std::vector<Refinement>::iterator Block::ref_by_into(const std::string& ref_name, bool fail) {
+  auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.into == ref_name; });
   if (fail && it == refs.end()) {
     throw_with_trace(
-        std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % this->name % name)));
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % name % ref_name)));
   }
   return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& name, bool fail) const {
-  auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.into == name; });
+std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& ref_name, bool fail) const {
+  auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.into == ref_name; });
   if (fail && it == refs.end()) {
     throw_with_trace(
-        std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % this->name % name)));
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % name % ref_name)));
   }
   return it;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_from(const std::string& name, bool fail) {
-  auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
+std::vector<Refinement>::iterator Block::ref_by_from(const std::string& ref_name, bool fail) {
+  auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.from == ref_name; });
   if (fail && it == refs.end()) {
     throw_with_trace(
-        std::runtime_error(str(boost::format("Refinement not found on block '%s' via from: %s") % this->name % name)));
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via from: %s") % name % ref_name)));
   }
   return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& name, bool fail) const {
-  auto it = std::find_if(refs.begin(), refs.end(), [&name](const Refinement& ref) { return ref.from == name; });
+std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& ref_name, bool fail) const {
+  auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.from == ref_name; });
   if (fail && it == refs.end()) {
     throw_with_trace(
-        std::runtime_error(str(boost::format("Refinement not found on block '%s' via from: %s") % this->name % name)));
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via from: %s") % name % ref_name)));
   }
   return it;
 }

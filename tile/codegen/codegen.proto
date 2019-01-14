@@ -7,7 +7,7 @@ package vertexai.tile.codegen.proto;
 import "tile/stripe/stripe.proto";
 
 message Config {
-  required uint32 clock_mhz = 1;
+  optional uint32 clock_mhz = 1;
   map<string, ExecutionUnit> exec_units = 2;
   map<string, MemoryUnit> mem_units = 3;
   map<string, TransferUnit> tx_units = 4;
@@ -52,17 +52,16 @@ message Pass {
     AutotilePass autotile = 12;
     SchedulePass schedule = 13;
     TransposePass transpose = 14;
-    PartitionComputePass partition_compute = 15;
-    PartitionMemoryPass partition_memory = 16;
-    DebankPass debank = 17;
-    GenericPass prune_idxs = 18;
-    UnrollPass unroll = 19;
-    UnrollIndexPass unroll_idx = 20;
+    PartitionPass partition_compute = 15;
+    PartitionPass partition_memory = 16;
+    GenericPass prune_idxs = 17;
+    UnrollPass unroll = 18;
   }
 }
 
 message GenericPass {
   repeated string reqs = 1;
+  repeated string ref_reqs = 2;
 }
 
 message SchedulePass {
@@ -139,29 +138,16 @@ message TransposePass {
   repeated string alloc_reqs = 2;
 }
 
-message PartitionComputePass {
+message PartitionPass {
   repeated string reqs = 1;
   repeated string set_tags = 2;
   required int64 num_parts = 3;
   optional string idx_tag = 4;
 }
 
-message PartitionMemoryPass {
-  repeated string reqs = 1;
-  repeated string set_tags = 2;
-  required int64 num_parts = 3;
-}
-
-message DebankPass {
-  required stripe.proto.Location loc = 1;
-};
-
 message UnrollPass {
   repeated string reqs = 1;
   optional string expand_idx = 2;
-}
-
-message UnrollIndexPass {
-  repeated string reqs = 1;
-  repeated string idx_reqs = 2;
+  optional bool make_views = 3 [default = false];
+  optional string part_name = 4;
 }

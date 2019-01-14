@@ -120,8 +120,7 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
 
   void Visit(stripe::Store* store) final { RecordUse(store->into); }
 
-  void Visit(stripe::Constant*) final { /* unused */
-  }
+  void Visit(stripe::Constant*) final {}  // unused
 
   void Visit(stripe::Special* special) final {
     for (const std::string& input : special->inputs) {
@@ -132,8 +131,7 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
     }
   }
 
-  void Visit(stripe::Intrinsic* intrinsic) final { /* unused */
-  }
+  void Visit(stripe::Intrinsic* intrinsic) final {}  // unused
 
   void Visit(stripe::Block* block) final {
     block_ = block;

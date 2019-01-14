@@ -9,9 +9,7 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void PartitionMemoryPass(stripe::Block* root, const proto::PartitionMemoryPass& options);
-
-void DebankPass(stripe::Block* root, const proto::DebankPass& options);
+void PartitionMemoryPass(stripe::Block* root, const proto::PartitionPass& options);
 
 }  // namespace codegen
 }  // namespace tile

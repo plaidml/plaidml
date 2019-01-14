@@ -57,7 +57,7 @@ struct Tracker {
   }
 
   void WriteBuffer(StatementIt it, const std::string& name, const AliasMap& alias_map) {
-    IVLOG(4, boost::format("WriterBuffer> name: %1%, it: %2%") % name % *it);
+    IVLOG(4, boost::format("    WriterBuffer> name: %1%, it: %2%") % name % *it);
 
     const AliasInfo& alias_info = alias_map.at(name);
     BufferInfo& buffer_info = buffers[alias_info.base_name];
@@ -65,7 +65,7 @@ struct Tracker {
     for (const auto& item : buffer_info.writers) {
       const auto& writer = item.first;
       if (writer != it && AliasInfo::Compare(alias_info, item.second) != AliasType::None) {
-        IVLOG(4, boost::format("    other writer: %1%") % *writer);
+        IVLOG(4, boost::format("      other writer: %1%") % *writer);
         dataflow_deps.insert(writer);
       }
     }
@@ -75,7 +75,7 @@ struct Tracker {
       // aren't us, but otherwise looks like a normal write of a buffer
       // that something else is reading.
       if (reader != it) {
-        IVLOG(4, boost::format("    other reader: %1%") % *reader);
+        IVLOG(4, boost::format("      other reader: %1%") % *reader);
         dataflow_deps.insert(reader);
       }
     }
@@ -85,7 +85,7 @@ struct Tracker {
   }
 
   void ReadBuffer(StatementIt it, const std::string& name, const AliasMap& alias_map) {
-    IVLOG(4, boost::format("ReadBuffer> name: %1%, it: %2%") % name % *it);
+    IVLOG(4, boost::format("    ReadBuffer> name: %1%, it: %2%") % name % *it);
 
     const AliasInfo& alias_info = alias_map.at(name);
     BufferInfo& buffer_info = buffers[alias_info.base_name];
@@ -106,6 +106,7 @@ struct Tracker {
 }  // namespace
 
 void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
+  IVLOG(3, "ComputeDeps> " << block->name);
   Tracker tracker;
   std::unordered_map<StatementIt, std::set<StatementIt>> transitive_deps;
   for (auto it = block->stmts.begin(); it != block->stmts.end(); it++) {
@@ -113,16 +114,19 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
     switch ((*it)->kind()) {
       case StmtKind::Load: {
         auto load = Load::Downcast(*it);
+        IVLOG(3, "  load: " << load);
         tracker.ReadBuffer(it, load->from, alias_map);
         tracker.WriteScalar(*block, it, load->into);
       } break;
       case StmtKind::Store: {
         auto store = Store::Downcast(*it);
+        IVLOG(3, "  store: " << store);
         tracker.ReadScalar(*block, store->from);
         tracker.WriteBuffer(it, store->into, alias_map);
       } break;
       case StmtKind::Special: {
         auto special = Special::Downcast(*it);
+        IVLOG(3, "  special: " << special);
         for (const auto& in : special->inputs) {
           tracker.ReadBuffer(it, in, alias_map);
         }
@@ -132,6 +136,7 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
       } break;
       case StmtKind::Intrinsic: {
         auto intrinsic = Intrinsic::Downcast(*it);
+        IVLOG(3, "  intrinsic: " << intrinsic);
         for (const auto& in : intrinsic->inputs) {
           tracker.ReadScalar(*block, in);
         }
@@ -141,10 +146,12 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
       } break;
       case StmtKind::Constant: {
         auto constant = Constant::Downcast(*it);
+        IVLOG(3, "  constant: " << constant);
         tracker.WriteScalar(*block, it, constant->name);
       } break;
       case StmtKind::Block: {
         auto inner = Block::Downcast(*it);
+        IVLOG(3, "  block: " << inner->name);
         AliasMap inner_map(alias_map, inner.get());
         for (const auto& ref : inner->refs) {
           // N.B It doesn't matter whether we process IsReadDir or

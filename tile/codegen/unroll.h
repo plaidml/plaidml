@@ -10,7 +10,6 @@ namespace tile {
 namespace codegen {
 
 void UnrollPass(stripe::Block* root, const proto::UnrollPass& options);
-void UnrollIndexPass(stripe::Block* root, const proto::UnrollIndexPass& options);
 
 }  // namespace codegen
 }  // namespace tile

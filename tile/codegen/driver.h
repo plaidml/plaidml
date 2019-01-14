@@ -12,7 +12,7 @@ namespace tile {
 namespace codegen {
 
 struct OptimizeOptions {
-  bool dump_passes;
+  bool dump_passes = false;
   boost::filesystem::path dbg_dir;
 };
 
