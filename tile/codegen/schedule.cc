@@ -52,11 +52,12 @@ struct CacheEntry;
 // backing ref during the scan.
 struct RefInfo {
   RefInfo(stripe::Refinement* ref_, AliasInfo alias_info_)
-      : ref(*ref_), alias_info{std::move(alias_info_)}, name{ref.into} {
+      : ref(*ref_),  //
+        alias_info{std::move(alias_info_)},
+        cache_shape{ref.interior_shape},
+        name{ref.into} {
     IVLOG(3, "Creating RefInfo " << name << " access=" << alias_info.access << " shape=" << alias_info.shape
                                  << " extents=" << alias_info.extents);
-    TensorShape raw_ts = ref.interior_shape;
-    cache_shape = alias_info.shape;
 
     // Convert the cached shape to use natural striding.
     std::uint64_t stride = 1;
