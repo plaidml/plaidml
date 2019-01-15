@@ -42,6 +42,9 @@ void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
     for (auto& aff : ref.access) {
       aff = aff.partial_eval(fixed);
     }
+    if (ref.cache_unit) {
+      ref.cache_unit = ref.cache_unit->partial_eval(fixed);
+    }
   }
   for (auto& constraint : block->constraints) {
     constraint = constraint.partial_eval(fixed);
@@ -115,8 +118,10 @@ void EvalInner(Block* outer,                         //
               view.from = outer_ref->from;
               view.into = block_ref->into + part_suffix;
               IVLOG(3, "  make view: " << view.into << " from: " << view.from << " via: " << block_ref->from);
-              // view.bank_dim = block_ref->bank_dim;
-              view.location.unit += outer_ref->location.unit;
+              if (ref.cache_unit || outer_ref->cache_unit) {
+                IVLOG(3, "  with cache: " << *outer_ref->cache_unit);
+                view.cache_unit = outer_ref->cache_unit;
+              }
               for (size_t i = 0; i < ref.access.size(); i++) {
                 auto const_access = block_ref->access[i].constant();
                 view.access[i] = outer_ref->access[i] + const_access;

@@ -244,8 +244,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
   for (auto& item : banked_refs) {
     auto ref = item.first;
     const auto& banked_ref = item.second;
-    // ref->bank_dim = banked_ref.bank_dim;
-    ref->location.unit = banked_ref.loc_access;
+    ref->cache_unit = banked_ref.loc_access;
   }
   PruneIndexes(block);
   block->tags.clear();
