@@ -12,6 +12,8 @@ namespace codegen {
 void PruneIndexes(stripe::Block* block);
 void PruneIndexesPass(stripe::Block* root, const proto::GenericPass& options);
 
+void PruneRefinementsPass(stripe::Block* root, const proto::GenericPass& options);
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
