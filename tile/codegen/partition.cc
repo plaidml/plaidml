@@ -290,7 +290,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
   double best_ratio = 0;
   for (size_t i = 0; i < block->idxs.size(); i++) {
     const auto& idx = block->idxs[i];
-    if (big_ref->FlatAccess().get(idx.name) == 0 || out_ref->FlatAccess().get(idx.name) == 0) {
+    if (big_ref->FlatAccess().get(idx.name) == 0 || out_ref->FlatAccess().get(idx.name) == 0 || idx.range == 1) {
       continue;
     }
     size_t tile_size = IntDivCeil(idx.range, options.num_parts());
