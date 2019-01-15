@@ -317,6 +317,7 @@ TEST(Schedule, Basic) {
         xfer_loc: { name: "DMA" }
       }
     }
+    passes: { name: "prune_refs" prune_refs: { reqs: ["program"] } }
   )";
   size_t num_banks = 2;
   size_t num_procs = 4;

@@ -152,6 +152,24 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
   }
 }
 
+std::unordered_map<std::string, size_t> AliasMap::RefUseCounts(const Block& block) const {
+  // Compute statement use count of each buffer
+  std::unordered_map<std::string, size_t> use_count;
+  for (const auto& stmt : block.stmts) {
+    std::set<std::string> buf_use;
+    for (const auto& str : stmt->buffer_reads()) {
+      buf_use.emplace(str);
+    }
+    for (const auto& str : stmt->buffer_writes()) {
+      buf_use.emplace(str);
+    }
+    for (const auto& str : buf_use) {
+      use_count[str]++;
+    }
+  }
+  return use_count;
+}
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

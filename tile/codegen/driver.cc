@@ -91,11 +91,14 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
       case proto::Pass::kPartitionMemory:
         PartitionMemoryPass(block, pass.partition_memory());
         break;
+      case proto::Pass::kUnroll:
+        UnrollPass(block, pass.unroll());
+        break;
       case proto::Pass::kPruneIdxs:
         PruneIndexesPass(block, pass.prune_idxs());
         break;
-      case proto::Pass::kUnroll:
-        UnrollPass(block, pass.unroll());
+      case proto::Pass::kPruneRefs:
+        PruneRefinementsPass(block, pass.prune_refs());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
