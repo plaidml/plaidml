@@ -51,8 +51,8 @@ struct CacheEntry;
 // RefInfo contains information around the usage of one particular
 // backing ref during the scan.
 struct RefInfo {
-  RefInfo(stripe::Refinement* ref_, AliasInfo alias_info_, std::string suffix_)
-      : ref(*ref_), alias_info{std::move(alias_info_)}, name{ref.into + std::move(suffix_)} {
+  RefInfo(stripe::Refinement* ref_, AliasInfo alias_info_)
+      : ref(*ref_), alias_info{std::move(alias_info_)}, name{ref.into} {
     IVLOG(3, "Creating RefInfo " << name << " access=" << alias_info.access << " shape=" << alias_info.shape
                                  << " extents=" << alias_info.extents);
     TensorShape raw_ts = ref.interior_shape;
@@ -72,7 +72,7 @@ struct RefInfo {
     for (size_t i = 0; i < sizes.size(); i++) {
       std::string iname = std::string("i") + std::to_string(i);
       swap_idxs.emplace_back(stripe::Index{iname, sizes[i]});
-      ref_swap_access.emplace_back(stripe::Affine(iname) + alias_info.access.at(i).constant());
+      ref_swap_access.emplace_back(stripe::Affine(iname));
       cache_swap_access.emplace_back(stripe::Affine(iname));
     }
 
@@ -355,7 +355,9 @@ class StatementBinder final {
       RefInfo* ri = update.second;
       ref->from = ri->cache_entry->name;
       ref->location = *mem_loc_;
-      ref->location.unit = ri->ref.location.unit;
+      if (ri->ref.cache_unit) {
+        ref->location.unit = *ri->ref.cache_unit;
+      }
       for (size_t i = 0; i < ref->interior_shape.dims.size(); i++) {
         ref->interior_shape.dims[i].stride = ri->cache_shape.dims[i].stride;
       }
@@ -576,7 +578,7 @@ std::map<RefInfoKey, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, c
   // Add the current block's refs.
   for (auto& ref : block->refs) {
     const AliasInfo& ai = alias_map->at(ref.into);
-    ri_map.emplace(ref.into, RefInfo{&ref, ai, "_whole"});
+    ri_map.emplace(ref.into, RefInfo{&ref, ai});
   }
 
   // Update earliest-writer entries.
@@ -900,7 +902,9 @@ void Scheduler::Run() {
     ref->into = ent.name;
     ref->interior_shape = ent.source->cache_shape;
     ref->location = mem_loc_;
-    ref->location.unit = ent.source->ref.location.unit;
+    if (ent.source->ref.cache_unit) {
+      ref->location.unit = *ent.source->ref.cache_unit;
+    }
     ref->is_const = ent.source->ref.is_const;
     ref->offset = ent.range.begin;
   }
@@ -1147,7 +1151,9 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
   });
 
   auto banked_mem_loc = mem_loc_;
-  banked_mem_loc.unit = ent->source->ref.location.unit;
+  if (ent->source->ref.cache_unit) {
+    banked_mem_loc.unit = *ent->source->ref.cache_unit;
+  }
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::Out,             // dir
       ent->name,                       // from
@@ -1182,6 +1188,10 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
   swap_block.name = "swap_out_" + ent->name;
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
+  auto banked_mem_loc = mem_loc_;
+  if (ent->source->ref.cache_unit) {
+    banked_mem_loc.unit = *ent->source->ref.cache_unit;
+  }
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::In,              // dir
       ent->name,                       // from
@@ -1189,7 +1199,7 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
       ent->source->cache_swap_access,  // access
       ent->source->cache_swap_shape,   // shape
       "",                              // agg_op
-      mem_loc_,                        // location
+      banked_mem_loc,                  // location
       ent->source->ref.is_const,       // is_const
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim

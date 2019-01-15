@@ -359,14 +359,17 @@ void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block
       os << ref.interior_shape.dims[i].stride;
     }
   }
-  os << "): I ";
+  os << "):";
+  if (block && !ref.from.empty()) {
+    os << "I ";
+  }
   auto interior_bytes = ref.interior_shape.sizes_product_bytes();
   if (interior_bytes < 1024) {
     os << interior_bytes << " B";
   } else {
     os << interior_bytes / 1024.0 << " KiB";
   }
-  if (block) {
+  if (block && !ref.from.empty()) {
     os << ", E ";
     auto exterior_bytes = block->exterior_shape(ref.into).sizes_product_bytes();
     if (exterior_bytes < 1024) {
@@ -374,6 +377,9 @@ void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block
     } else {
       os << exterior_bytes / 1024.0 << " KiB";
     }
+  }
+  if (ref.cache_unit) {
+    os << ", cache[" << *ref.cache_unit << "]";
   }
   if (!ref.from.empty() && ref.into != ref.from) {
     os << " // alias";

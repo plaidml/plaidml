@@ -156,7 +156,8 @@ struct Refinement : Taggable {
              const Location& location = Location{},  //
              bool is_const = false,                  //
              std::size_t offset = 0,                 //
-             const boost::optional<BankDimension>& bank_dim = boost::none)
+             const boost::optional<BankDimension>& bank_dim = boost::none,
+             const boost::optional<Affine>& cache_unit = boost::none)
       : dir(dir),
         from(from),
         into(into),
@@ -166,7 +167,8 @@ struct Refinement : Taggable {
         location(location),
         is_const(is_const),
         offset(offset),
-        bank_dim(bank_dim) {}
+        bank_dim(bank_dim),
+        cache_unit(cache_unit) {}
 
   RefDir dir = RefDir::None;
   std::string from;
@@ -178,6 +180,7 @@ struct Refinement : Taggable {
   bool is_const = false;
   std::size_t offset = 0;                   // Offset within the location's arena.
   boost::optional<BankDimension> bank_dim;  // Which dimension should we bank on
+  boost::optional<Affine> cache_unit;       // Which cache we should use when encaching this refinement
 
   Affine FlatAccess() const;
   TensorShape ApplyTile(const std::map<std::string, size_t>& tile_by_name) const;
