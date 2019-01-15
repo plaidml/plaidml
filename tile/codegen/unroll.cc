@@ -78,33 +78,60 @@ void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
   }
 }
 
+struct ExpansionRule {
+  std::string rule;
+  std::string idx_name() const { return rule; }
+  std::string tag_name() const { return rule.substr(1); }
+  bool is_valid() const { return !rule.empty(); }
+  bool is_tag() const { return is_valid() && rule.substr(0, 1) == "#"; }
+};
+
+struct ExpansionValue {
+  size_t last_stride = 1;
+  size_t value = 0;
+
+  void operator+=(const IndexValue& idx_val) {
+    value += last_stride * idx_val.value;
+    last_stride *= idx_val.idx->range;
+  }
+};
+
 void EvalInner(Block* outer,                         //
                Block* block,                         //
                const std::vector<IndexValue>& idxs,  //
                const proto::UnrollPass& options) {
   IVLOG(3, "EvalInner> " << outer->name);
   std::map<std::string, int64_t> fixed;
-  size_t last_stride = 1;
-  size_t expand_val = 0;
+  ExpansionRule rule{options.expand_idx()};
+  ExpansionValue expand_val;
+  std::stringstream ss;
+  ss << "%";
+  if (!options.part_name().empty()) {
+    ss << options.part_name();
+  }
   for (const auto& idx_val : idxs) {
     fixed.emplace(idx_val.idx->name, idx_val.value);
-    expand_val += last_stride * idx_val.value;
-    last_stride *= idx_val.idx->range;
+    ss << "_" << idx_val.idx->name << "_" << idx_val.value;
+    if (rule.is_tag()) {
+      // The rule is tagged, like: '#foo'. Accumulate tagged idxs into primary.
+      if (idx_val.idx->has_tag(rule.tag_name())) {
+        expand_val += idx_val;
+      }
+    } else if (rule.is_valid()) {
+      // The rule is not tagged, like: 'foo'. Accumulate specifc idx into primary.
+      if (idx_val.idx->name == rule.idx_name()) {
+        expand_val += idx_val;
+      }
+    }
   }
-  std::string part_suffix;
-  if (!options.part_name().empty()) {
-    part_suffix = str(boost::format("%%%1%_%2%") % options.part_name() % expand_val);
-  }
-  if (!options.expand_idx().empty()) {
-    fixed.emplace(options.expand_idx(), expand_val);
+  if (rule.is_valid()) {
+    fixed.emplace(rule.idx_name(), expand_val.value);
   }
   EvalWithValues(block, fixed);
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
-      if (!part_suffix.empty()) {
-        inner->name += part_suffix;
-      }
+      inner->name += ss.str();
       for (auto& ref : inner->refs) {
         if (!ref.from.empty()) {
           auto block_ref = block->ref_by_into(ref.from);
@@ -116,7 +143,7 @@ void EvalInner(Block* outer,                         //
             if (!(block_ref->interior_shape == outer_ref->interior_shape)) {
               auto view = *block_ref;
               view.from = outer_ref->from;
-              view.into = block_ref->into + part_suffix;
+              view.into = block_ref->into + ss.str();
               IVLOG(3, "  make view: " << view.into << " from: " << view.from << " via: " << block_ref->from);
               if (ref.cache_unit || outer_ref->cache_unit) {
                 IVLOG(3, "  with cache: " << *outer_ref->cache_unit);
@@ -129,7 +156,9 @@ void EvalInner(Block* outer,                         //
               }
               ref.from = view.into;
               IVLOG(2, "view: " << view);
-              outer->refs.emplace_back(view);
+              if (outer->ref_by_into(view.into, false) == outer->refs.end()) {
+                outer->refs.emplace_back(view);
+              }
             }
           }
         }

@@ -35,11 +35,11 @@ struct BankInfo {
   size_t num_banks;
 };
 
-const Index* BiggestIndexForDim(const Block& block, const Refinement& ref, int dim_pos) {
-  const Index* biggest_idx = nullptr;
+Index* BiggestIndexForDim(Block* block, const Refinement& ref, int dim_pos) {
+  Index* biggest_idx = nullptr;
   size_t biggest_range = 0;
   for (const auto& kvp : ref.access[dim_pos].getMap()) {
-    auto idx = block.idx_by_name(kvp.first);
+    auto idx = block->idx_by_name(kvp.first);
     if (idx && idx->range > biggest_range) {
       biggest_range = idx->range;
       biggest_idx = idx;
@@ -191,7 +191,7 @@ const Index* BiggestIndexForDim(const Block& block, const Refinement& ref, int d
 
 struct BankedRef {
   BankDimension bank_dim;
-  Affine loc_access;
+  Affine cache_unit;
 };
 
 void PartitionBuffer(const AliasMap& alias_map,                          //
@@ -202,6 +202,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
   IVLOG(2, "PartitionBuffer> " << block->name);
   std::map<std::string, size_t> tile_by_name;
   std::map<Refinement*, BankedRef> banked_refs;
+  std::set<std::string> primary_idxs;
   // Initialize tile_by_name from the block's index ranges
   for (const auto& idx : block->idxs) {
     tile_by_name[idx.name] = idx.range;
@@ -213,25 +214,31 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
     if (it_bank_info == bank_infos.end()) {
       continue;
     }
-    const Index* idx = nullptr;
+    Index* idx = nullptr;
     const auto& bank_info = it_bank_info->second;
     auto it_usage = bank_info.uses.find(block);
     if (it_usage == bank_info.uses.end()) {
-      idx = BiggestIndexForDim(*block, ref, bank_info.dim_pos);
+      idx = BiggestIndexForDim(block, ref, bank_info.dim_pos);
       if (!idx) {
         throw_with_trace(
             std::runtime_error(str(boost::format("Could not find valid index to bank on ref %1% in block %2%") %  //
                                    ref.into % block->name)));
       }
+      IVLOG(3, "  secondary> ref: " << ref.into << ", idx: " << *idx);
     } else {
       idx = block->idx_by_name(it_usage->second.idx_name);
+      primary_idxs.insert(idx->name);
+      IVLOG(3, "  primary>   ref: " << ref.into << ", idx: " << *idx);
     }
+    // This tag is to prevent idxs from being pruned.
+    // A later unroll pass will need these pinned idxs for expansion so that location affine expressions
+    // can get fully resolved.
+    idx->set_tag("$part");
     // Update the tile size for this index
     tile_by_name[idx->name] = IntDivCeil(idx->range, bank_info.num_banks);
     // Record information used for updating the outer block post-tiling.
     BankedRef banked_ref{BankDimension{bank_info.dim_pos}, Affine{idx->name}};
     banked_refs.emplace(&ref, banked_ref);
-    IVLOG(3, "  ref: " << ref.into << ", idx: " << idx->name);
   }
   // Convert the tile based on index name to a tile based on index position
   TileShape tile(block->idxs.size());
@@ -244,14 +251,19 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
   for (auto& item : banked_refs) {
     auto ref = item.first;
     const auto& banked_ref = item.second;
-    ref->cache_unit = banked_ref.loc_access;
+    ref->cache_unit = banked_ref.cache_unit;
   }
-  PruneIndexes(block);
   block->tags.clear();
   block->add_tags(set_tags);
-  for (auto& idx : block->idxs) {
-    idx.set_tag(idx_tag);
+  for (const auto& idx_name : primary_idxs) {
+    auto idx = block->idx_by_name(idx_name);
+    if (!idx) {
+      throw_with_trace(std::runtime_error(str(boost::format("Could not find primary index %1% on block %2%") %  //
+                                              idx_name % block->name)));
+    }
+    idx->set_tag(idx_tag);
   }
+  PruneIndexes(block, {"$part"});
 }
 
 void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //

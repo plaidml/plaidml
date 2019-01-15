@@ -12,11 +12,11 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void PruneIndexes(Block* block) {
+void PruneIndexes(Block* block, const Tags& exclude_tags) {
   // Find all the indexes to remove
   std::set<const Index*> to_remove;
   for (const auto& idx : block->idxs) {
-    if (idx.range == 1 && idx.affine == 0) {
+    if (!idx.has_tags(exclude_tags) && idx.range == 1 && idx.affine == 0) {
       to_remove.emplace(&idx);
     }
   }
@@ -79,7 +79,7 @@ void PruneRefinements(const AliasMap& alias_map, Block* block) {
 void PruneIndexesPass(Block* root, const proto::GenericPass& options) {
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [](const AliasMap& map, Block* block) {  //
-    PruneIndexes(block);
+    PruneIndexes(block, {});
   });
 }
 
