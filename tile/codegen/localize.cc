@@ -60,20 +60,7 @@ void LocalizeRef(Block* block, const std::string& var_name) {
 }
 
 void LocalizePass(const AliasMap& scope, Block* block) {
-  // Compute statement use count of each buffer
-  std::map<std::string, size_t> use_count;
-  for (const auto& stmt : block->stmts) {
-    std::set<std::string> buf_use;
-    for (const auto& str : stmt->buffer_reads()) {
-      buf_use.emplace(scope.at(str).base_name);
-    }
-    for (const auto& str : stmt->buffer_writes()) {
-      buf_use.emplace(scope.at(str).base_name);
-    }
-    for (const auto& str : buf_use) {
-      use_count[str]++;
-    }
-  }
+  auto use_count = scope.RefUseCounts(*block);
   for (auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
@@ -91,7 +78,7 @@ void LocalizePass(const AliasMap& scope, Block* block) {
         continue;
       }
       // If it's not uniquely located in this block, don't consider
-      if (use_count[scope.at(ref.from).base_name] != 1) {
+      if (use_count[ref.from] != 1) {
         continue;
       }
       refs_to_localize.emplace(ref.into);

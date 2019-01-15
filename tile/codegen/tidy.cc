@@ -12,7 +12,7 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void PruneIndexes(stripe::Block* block) {
+void PruneIndexes(Block* block) {
   // Find all the indexes to remove
   std::set<const Index*> to_remove;
   for (const auto& idx : block->idxs) {
@@ -51,10 +51,42 @@ void PruneIndexes(stripe::Block* block) {
   }
 }
 
+void PruneRefinements(const AliasMap& alias_map, Block* block) {
+  for (const auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      AliasMap inner_map(alias_map, inner.get());
+      PruneRefinements(inner_map, inner.get());
+    }
+  }
+  auto use_count = alias_map.RefUseCounts(*block);
+  IVLOG(2, "PruneRefinements> " << block->name);
+  IVLOG(3, "    use_count: " << use_count);
+  std::set<std::string> to_remove;
+  for (const auto& ref : block->refs) {
+    if (!use_count.count(ref.into)) {
+      to_remove.emplace(ref.into);
+    }
+  }
+  if (!to_remove.empty()) {
+    IVLOG(2, "    to_remove: " << to_remove);
+  }
+  for (const auto& name : to_remove) {
+    block->refs.erase(block->ref_by_into(name));
+  }
+}
+
 void PruneIndexesPass(Block* root, const proto::GenericPass& options) {
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [](const AliasMap& map, Block* block) {  //
     PruneIndexes(block);
+  });
+}
+
+void PruneRefinementsPass(Block* root, const proto::GenericPass& options) {
+  auto reqs = FromProto(options.reqs());
+  RunOnBlocks(root, reqs, [](const AliasMap& alias_map, Block* block) {  //
+    PruneRefinements(alias_map, block);
   });
 }
 

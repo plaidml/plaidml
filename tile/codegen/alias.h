@@ -4,6 +4,7 @@
 
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "base/util/lookup.h"
@@ -45,6 +46,8 @@ class AliasMap {
   AliasMap(const AliasMap& outer, stripe::Block* block);
   // Lookup an AliasInfo by name
   const AliasInfo& at(const std::string& name) const { return safe_at(info_, name); }
+  // Compute statement use count of each buffer
+  std::unordered_map<std::string, size_t> RefUseCounts(const stripe::Block& block) const;
 
  private:
   size_t depth_;                           // How deep is this AliasInfo

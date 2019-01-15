@@ -54,8 +54,9 @@ message Pass {
     TransposePass transpose = 14;
     PartitionPass partition_compute = 15;
     PartitionPass partition_memory = 16;
-    GenericPass prune_idxs = 17;
-    UnrollPass unroll = 18;
+    UnrollPass unroll = 17;
+    GenericPass prune_idxs = 18;
+    GenericPass prune_refs = 19;
   }
 }
 
