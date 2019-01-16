@@ -14,6 +14,5 @@ pkg_tar(
     strip_prefix = ".",
     tags = [
         "deb",
-        "git_big",
     ],
 )
