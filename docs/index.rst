@@ -59,7 +59,9 @@ PlaidML is under active development and should be thought of as alpha quality.
    :caption: Project Metadata
    
    Architecture Overview <overview>
-   Contributing <contributing>   
+   release-notes
+   Contributing <contributing>
+
    
 
 
