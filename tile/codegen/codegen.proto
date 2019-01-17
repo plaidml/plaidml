@@ -132,6 +132,7 @@ message AutotilePass {
   optional double output_cost = 11 [default = 0.0];
   optional double input_cost = 12 [default = 1.0];
   optional bool copy_tags = 13 [default = false];
+  optional bool clear_outer = 14 [default = false];
 }
 
 message TransposePass {
