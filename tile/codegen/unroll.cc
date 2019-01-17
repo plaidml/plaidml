@@ -100,7 +100,7 @@ void EvalInner(Block* outer,                         //
                Block* block,                         //
                const std::vector<IndexValue>& idxs,  //
                const proto::UnrollPass& options) {
-  IVLOG(3, "EvalInner> " << outer->name);
+  IVLOG(3, "EvalInner> " << outer->name << " -> " << block->name);
   std::map<std::string, int64_t> fixed;
   ExpansionRule rule{options.expand_idx()};
   ExpansionValue expand_val;
@@ -130,38 +130,48 @@ void EvalInner(Block* outer,                         //
   EvalWithValues(block, fixed);
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
-    if (inner) {
-      inner->name += ss.str();
-      for (auto& ref : inner->refs) {
-        if (!ref.from.empty()) {
-          auto block_ref = block->ref_by_into(ref.from);
-          for (size_t i = 0; i < ref.access.size(); i++) {
-            ref.access[i] += block_ref->access[i];
-          }
-          if (options.make_views()) {
-            auto outer_ref = outer->ref_by_into(block_ref->from);
-            if (!(block_ref->interior_shape == outer_ref->interior_shape)) {
-              auto view = *block_ref;
-              view.from = outer_ref->from;
-              view.into = block_ref->into + ss.str();
-              IVLOG(3, "  make view: " << view.into << " from: " << view.from << " via: " << block_ref->from);
-              if (ref.cache_unit || outer_ref->cache_unit) {
-                IVLOG(3, "  with cache: " << *outer_ref->cache_unit);
-                view.cache_unit = outer_ref->cache_unit;
-              }
-              for (size_t i = 0; i < ref.access.size(); i++) {
-                auto const_access = block_ref->access[i].constant();
-                view.access[i] = outer_ref->access[i] + const_access;
-                ref.access[i] -= const_access;
-              }
-              ref.from = view.into;
-              IVLOG(2, "view: " << view);
-              if (outer->ref_by_into(view.into, false) == outer->refs.end()) {
-                outer->refs.emplace_back(view);
-              }
-            }
-          }
-        }
+    if (!inner) {
+      continue;
+    }
+    inner->name = block->name + ss.str();
+    for (auto& inner_ref : inner->refs) {
+      if (inner_ref.from.empty()) {
+        continue;
+      }
+      auto block_ref = block->ref_by_into(inner_ref.from);
+      for (size_t i = 0; i < inner_ref.access.size(); i++) {
+        inner_ref.access[i] += block_ref->access[i];
+      }
+      auto outer_ref = outer->ref_by_into(block_ref->from);
+      IVLOG(3, "  outer_ref: " << *outer_ref);
+      IVLOG(3, "  block_ref: " << *block_ref);
+      IVLOG(3, "  inner_ref: " << inner_ref);
+      inner_ref.from = block_ref->from;
+      IVLOG(3, "    from = " << inner_ref.from);
+      if (!options.make_views()) {
+        continue;
+      }
+      if (block_ref->interior_shape == outer_ref->interior_shape) {
+        IVLOG(3, "    no view, same shape");
+        continue;
+      }
+      auto view = *block_ref;
+      view.from = outer_ref->from;
+      view.into = outer_ref->into + ss.str();
+      IVLOG(3, "    make view: " << view.into << " from: " << view.from << " via: " << block_ref->from);
+      if (inner_ref.cache_unit || outer_ref->cache_unit) {
+        IVLOG(3, "    with cache: " << *outer_ref->cache_unit);
+        view.cache_unit = outer_ref->cache_unit;
+      }
+      for (size_t i = 0; i < inner_ref.access.size(); i++) {
+        auto const_access = block_ref->access[i].constant();
+        view.access[i] = outer_ref->access[i] + const_access;
+        inner_ref.access[i] -= const_access;
+      }
+      inner_ref.from = view.into;
+      IVLOG(2, "view: " << view);
+      if (outer->ref_by_into(view.into, false) == outer->refs.end()) {
+        outer->refs.emplace_back(view);
       }
     }
   }
