@@ -1231,12 +1231,12 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
 }
 
 void Scheduler::RebuildTransitiveDeps() {
-  std::unordered_map<stripe::StatementIt, std::set<stripe::StatementIt>> tdeps;
+  std::unordered_map<stripe::StatementIt, std::unordered_set<stripe::StatementIt>> tdeps;
   tdeps.reserve(block_->stmts.size());
 
   for (auto sit = block_->stmts.begin(); sit != block_->stmts.end(); ++sit) {
-    std::set<stripe::StatementIt> stmt_deps;
-    std::set<stripe::StatementIt> stmt_tdeps;
+    std::unordered_set<stripe::StatementIt> stmt_deps;
+    std::unordered_set<stripe::StatementIt> stmt_tdeps;
     for (auto dep : (*sit)->deps) {
       stmt_deps.emplace(dep);
       stmt_tdeps.insert(tdeps[dep].begin(), tdeps[dep].end());
