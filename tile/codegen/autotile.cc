@@ -284,6 +284,9 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
         if (options.copy_tags()) {
           inner->tags = block->tags;
         }
+        if (options.clear_outer()) {
+          block->tags.clear();
+        }
         block->add_tags(FromProto(options.outer_set()));
         inner->add_tags(FromProto(options.inner_set()));
       }
