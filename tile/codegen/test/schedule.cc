@@ -278,7 +278,6 @@ TEST(Schedule, Basic) {
         reqs: ["kernel"]
         outer_set: ["fit_part"]
         skip_1d: true
-        use_bytes: true
         only_po2: true
         max_total_size : %3%
         input_cost: 1.0
