@@ -164,7 +164,7 @@ struct ComputeDensityCostModel {
     if (!metrics.IsValid(options)) {
       return std::numeric_limits<double>::infinity();
     }
-    if (options.max_sizes_product() && tile.sizes_product() > options.max_sizes_product()) {
+    if (options.max_sizes_product() && tile.sizes_product() > size_t(options.max_sizes_product())) {
       return std::numeric_limits<double>::infinity();
     }
 
