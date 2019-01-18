@@ -45,7 +45,6 @@ plaidml_cc_library(
         "gid.h",
         "loop.cc",
         "loop.h",
-        "mutil.h",
         "ops.cc",
         "out_plan.cc",
         "out_plan.h",
