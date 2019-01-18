@@ -17,7 +17,7 @@ namespace {
 
 class StripeGenerator {
  public:
-  explicit StripeGenerator(const RunInfo& runinfo) : runinfo_(runinfo) {
+  explicit StripeGenerator(const RunInfo& runinfo, bool i8_mode) : runinfo_(runinfo), i8_mode_(i8_mode) {
     Parser parser;
     parsed_ = parser.Parse(runinfo_.code);
     vars_ = BindProgram(&parsed_, runinfo_.input_shapes, runinfo_.output_shapes);
@@ -64,19 +64,20 @@ class StripeGenerator {
     for (const auto& item : vars_) {
       if (externals_.count(item.first) == 0) {
         const auto& binding = item.second;
+        auto shape = AdjustShape(binding.shape);
         if (binding.tag == Binding::TENSOR) {
           std::vector<Affine> access(binding.shape.dims.size());
           Refinement new_ref{
-              RefDir::None,   // dir
-              "",             // from
-              item.first,     // into
-              access,         // access
-              binding.shape,  // shape
-              "",             // agg_op
-              {},             // location
-              false,          // is_const
-              0,              // offset
-              boost::none,    // bank_dim
+              RefDir::None,  // dir
+              "",            // from
+              item.first,    // into
+              access,        // access
+              shape,         // shape
+              "",            // agg_op
+              {},            // location
+              false,         // is_const
+              0,             // offset
+              boost::none,   // bank_dim
           };
           new_ref.set_tag("tmp");
           program->refs.emplace_back(new_ref);
@@ -85,7 +86,7 @@ class StripeGenerator {
               item.first,     // from
               item.first,     // into
               access,         // access
-              binding.shape,  // shape
+              shape,          // shape
               "",             // agg_op
               {},             // location
               false,          // is_const
@@ -106,12 +107,13 @@ class StripeGenerator {
     for (const auto& item : shapes) {
       externals_.insert(item.first);
       std::vector<Affine> access(item.second.dims.size());
+      auto shape = AdjustShape(item.second);
       Refinement new_ref{
           RefDir::None,         // dir
           "",                   // from
           item.first,           // into
           access,               // access
-          item.second,          // shape
+          shape,                // shape
           "",                   // agg_op
           {},                   // location
           IsConst(item.first),  // is_const
@@ -126,7 +128,7 @@ class StripeGenerator {
             item.first,           // from
             item.first,           // into
             access,               // access
-            item.second,          // shape
+            shape,                // shape
             "",                   // agg_op
             {},                   // location
             IsConst(item.first),  // is_const
@@ -139,7 +141,7 @@ class StripeGenerator {
             item.first,         // from
             item.first,         // into
             access,             // access
-            item.second,        // shape
+            shape,              // shape
             Intrinsic::ASSIGN,  // agg_op
             {},                 // location
             false               // is_const
@@ -330,15 +332,16 @@ class StripeGenerator {
 
     for (const auto& input : op.inputs) {
       const auto& binding = vars_.at(input);
+      auto shape = AdjustShape(binding.shape);
       IVLOG(2, "  " << input << ": " << binding);
       switch (binding.tag) {
         case Binding::TENSOR: {
           // Be careful to handle broadcasts
           std::vector<Affine> access;
-          int diff = out_shape.dims.size() - binding.shape.dims.size();
+          int diff = out_shape.dims.size() - shape.dims.size();
           for (int i = 0; i < out_shape.dims.size(); i++) {
             if (i >= diff) {
-              const auto& dim = binding.shape.dims[i - diff];
+              const auto& dim = shape.dims[i - diff];
               if (dim.size > 1) {
                 access.emplace_back(Affine{kernel->idxs[i].name});
               } else {
@@ -396,7 +399,8 @@ class StripeGenerator {
     for (const auto& input : op.inputs) {
       scalar_inputs.push_back(ScalarName(input));
     }
-    AddIntrinsic(kernel.get(), op.f.fn, GetShape(op.output).type, scalar_inputs, {ScalarName(op.output)});
+    AddIntrinsic(  //
+        kernel.get(), op.f.fn, GetShape(op.output).type, scalar_inputs, {ScalarName(op.output)});
 
     // STORE
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));
@@ -442,9 +446,7 @@ class StripeGenerator {
     return shapes;
   }
 
-  void AddIntrinsic(Block* block,             //
-                    const std::string& name,  //
-                    const DataType& type,
+  void AddIntrinsic(Block* block, const std::string& name, const DataType& type,
                     const std::vector<std::string>& inputs,  //
                     const std::vector<std::string>& outputs) {
     auto stmt = std::make_shared<Intrinsic>();
@@ -464,7 +466,7 @@ class StripeGenerator {
     if (it == vars_.end()) {
       throw std::runtime_error(str(boost::format("Unknown shape: %s") % name));
     }
-    return it->second.shape;
+    return AdjustShape(it->second.shape);
   }
 
   TensorShape ScalarShape(const std::string& name) const {
@@ -476,7 +478,7 @@ class StripeGenerator {
     for (const auto& dim : it->second.shape.dims) {
       shape.dims.push_back(TensorDimension(dim.stride, 1));
     }
-    return shape;
+    return AdjustShape(shape);
   }
 
   Affine Integerize(const Polynomial<Rational>& poly, const IndexBounds& bounds) {
@@ -577,16 +579,26 @@ class StripeGenerator {
     return runinfo_.const_inputs.count(name);
   }
 
+  TensorShape AdjustShape(TensorShape shape) const {
+    if (i8_mode_) {
+      shape.type = DataType::INT8;
+    }
+    return shape;
+  }
+
  private:
   Program parsed_;
   Bindings vars_;
   const RunInfo& runinfo_;
   std::set<std::string> externals_;
+  bool i8_mode_;
 };
 
 }  // namespace
 
-std::shared_ptr<Block> GenerateStripe(const RunInfo& runinfo) { return StripeGenerator(runinfo).Run(); }
+std::shared_ptr<Block> GenerateStripe(const RunInfo& runinfo, bool i8_mode) {
+  return StripeGenerator(runinfo, i8_mode).Run();
+}
 
 }  // namespace lang
 }  // namespace tile
