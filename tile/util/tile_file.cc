@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <regex>
 #include <vector>
 
 #include "tile/lang/parser.h"
@@ -47,9 +48,7 @@ std::shared_ptr<lang::TensorValue> MakeTensor(TensorShape shape) {
 
 }  // namespace
 
-TileFile::TileFile(const std::string& path)
-    : archive_(path)  //
-{}
+TileFile::TileFile(const std::string& path) : archive_(path) {}
 
 lang::RunInfo TileFile::Load() {
   auto metadata = ReadMetadata();
@@ -116,7 +115,9 @@ lang::RunInfo TileFile::Load() {
 
 metadata::proto::Metadata TileFile::ReadMetadata() {
   auto metadata_file = archive_.OpenFile("metadata");
-  auto metadata_coded = metadata_file.ReadString();
+  // This is a backwards compatiblity hack
+  std::regex dims_re("dimensions");
+  auto metadata_coded = std::regex_replace(metadata_file.ReadString(), dims_re, "dims");
   metadata::proto::Metadata metadata;
   if (!::google::protobuf::util::JsonStringToMessage(metadata_coded, &metadata).ok()) {
     throw std::runtime_error("Unable to parse benchmark metadata");
