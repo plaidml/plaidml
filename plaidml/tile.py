@@ -274,7 +274,8 @@ class Operation(object):
         if not self.code:
             raise NotImplementedError('{} is not directly implemented.'.format(
                 self.__class__.__name__))
-        func = plaidml.Function(self.code, backtrace=self.backtrace, fid=self.name)
+        safe_name = self.name.replace('/', '_')
+        func = plaidml.Function(self.code, backtrace=self.backtrace, fid=safe_name)
         applier = plaidml.Applier(bindings.ctx, func)
         for input_name, input_value in self.inputs.items():
             applier.add_input(input_name, input_value.bind(bindings))
