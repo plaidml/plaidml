@@ -5,9 +5,9 @@
 #include <set>
 #include <utility>
 
-#include "tile/lang/mutil.h"
 #include "tile/lang/out_plan.h"
 #include "tile/lang/read_plan.h"
+#include "tile/math/mutil.h"
 
 namespace vertexai {
 namespace tile {

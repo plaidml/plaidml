@@ -14,6 +14,7 @@
 #include "tile/codegen/placer.h"
 #include "tile/codegen/scalarize.h"
 #include "tile/codegen/schedule.h"
+#include "tile/codegen/thread_inner.h"
 #include "tile/codegen/tidy.h"
 #include "tile/codegen/tile.h"
 #include "tile/codegen/transpose.h"
@@ -99,6 +100,9 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
         break;
       case proto::Pass::kPruneRefs:
         PruneRefinementsPass(block, pass.prune_refs());
+        break;
+      case proto::Pass::kThreadInner:
+        ThreadInnerPass(block, pass.thread_inner());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));

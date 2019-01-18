@@ -27,6 +27,7 @@ plaidml_cc_library(
         "basis.h",
         "bignum.h",
         "matrix.h",
+	"mutil.h",
         "polynomial.h",
     ],
     copts = select({
