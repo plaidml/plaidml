@@ -133,13 +133,10 @@ message AutotilePass {
   optional double output_cost = 11 [default = 1.0];
   optional double input_cost = 12 [default = 1.0];
   optional bool copy_tags = 13 [default = false];
-<<<<<<< HEAD
   optional int64 cache_width = 14 [default = 0];
   optional bool elide_trivial = 15 [default = false];
   optional string loc_name = 16 [default = ""];
-=======
-  optional bool clear_outer = 14 [default = false];
->>>>>>> 804f2b2640ead893280c041ed9a1bedff039ff0d
+  optional bool clear_outer = 17 [default = false];
 }
 
 message TransposePass {
