@@ -442,7 +442,6 @@ def conv(x,
          data_format=None,
          dilation_rate=None,
          channelwise=False):
-
     try:
         padding = _AUTO_PAD[padding]
     except KeyError:
@@ -470,6 +469,7 @@ def conv(x,
         kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
         group_format=op.GroupedChannelFormat.GroupGroupOut,
         winograd_allowed=not plaidml.settings.prohibit_winograd,
+        name=_NAME_SCOPE_STACK[0],
     )
 
 
@@ -496,6 +496,7 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilat
         data_format,
         kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
         dilation_rate=dilation_rate,
+        name=_NAME_SCOPE_STACK[0],
     )
 
 
@@ -1020,7 +1021,8 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mod
         kernel_shape=pool_size,
         strides=strides,
         padding=padding,
-        data_format=data_format)
+        data_format=data_format,
+        name=_NAME_SCOPE_STACK[0])
 
 
 def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool_mode='max'):
