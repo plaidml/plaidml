@@ -196,8 +196,37 @@ struct TensorShape {
     return ret;
   }
 
-  size_t sizes_product_bytes() const {  //
-    return sizes_product() * byte_width(type);
+  size_t sizes_product_bytes() const { return sizes_product() * byte_width(type); }
+
+  // Expected number of cache lines hit given random alignment
+  double memory_io(size_t cache_width) const {
+    double cache_elems = static_cast<double>(cache_width) / byte_width(type);
+    // Sort dims from low stride to high stride
+    std::vector<TensorDimension> sorted_dims = dims;
+    std::sort(sorted_dims.begin(), sorted_dims.end(), [](const TensorDimension& a, const TensorDimension& b) {
+      return std::abs(a.stride) < std::abs(b.stride);
+    });
+    // Start with one cache line
+    double cache_lines = 1.0;
+    // Current accumulated maximum value
+    int64_t max_val = 0;
+    // For each dimension (in sorted order)
+    for (const auto& dim : sorted_dims) {
+      // Compute gap per step
+      int64_t gap = std::abs(dim.stride) - max_val;
+      // Multiply current cache hits by size
+      cache_lines *= static_cast<double>(dim.size);
+      // Compute probability that cache line is shared across gap
+      double prob_shared = 0.0;  // Assume it's never shared
+      if (cache_elems != 0.0 && gap < cache_elems) {
+        prob_shared = 1.0 - (gap / cache_elems);
+      }
+      // Subtract shared elements
+      cache_lines -= prob_shared * static_cast<double>(dim.size - 1);
+      // Update max_val
+      max_val += std::abs(dim.stride) * (dim.size - 1);
+    }
+    return cache_lines;
   }
 
   inline bool operator==(const TensorShape& rhs) const {

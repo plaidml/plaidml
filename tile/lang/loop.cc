@@ -1,8 +1,8 @@
 
 #include "tile/lang/loop.h"
 
-#include "tile/lang/mutil.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/math/mutil.h"
 
 namespace vertexai {
 namespace tile {

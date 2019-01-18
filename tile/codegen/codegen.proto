@@ -57,6 +57,7 @@ message Pass {
     UnrollPass unroll = 17;
     GenericPass prune_idxs = 18;
     GenericPass prune_refs = 19;
+    ThreadInnerPass thread_inner = 20;
   }
 }
 
@@ -124,15 +125,21 @@ message AutotilePass {
   repeated string inner_set = 3;
   optional bool only_po2 = 4 [default = false];
   optional bool fast = 5 [default = false];
-  optional bool use_bytes = 6 [default = false];
-  optional bool skip_1d = 7 [default = false];
-  optional int64 max_output_size = 8 [default = 0];
-  optional int64 max_input_size = 9 [default = 0];
-  optional int64 max_total_size = 10 [default = 0];
-  optional double output_cost = 11 [default = 0.0];
+  optional bool skip_1d = 6 [default = false];
+  optional int64 max_output_size = 7 [default = 0];
+  optional int64 max_input_size = 8 [default = 0];
+  optional int64 max_total_size = 9 [default = 0];
+  optional int64 max_sizes_product = 10 [default = 0];
+  optional double output_cost = 11 [default = 1.0];
   optional double input_cost = 12 [default = 1.0];
   optional bool copy_tags = 13 [default = false];
+<<<<<<< HEAD
+  optional int64 cache_width = 14 [default = 0];
+  optional bool elide_trivial = 15 [default = false];
+  optional string loc_name = 16 [default = ""];
+=======
   optional bool clear_outer = 14 [default = false];
+>>>>>>> 804f2b2640ead893280c041ed9a1bedff039ff0d
 }
 
 message TransposePass {
@@ -152,4 +159,9 @@ message UnrollPass {
   optional string expand_idx = 2;
   optional bool make_views = 3 [default = false];
   optional string part_name = 4;
+}
+
+message ThreadInnerPass {
+  repeated string reqs = 1;
+  required int64 threads = 2;
 }

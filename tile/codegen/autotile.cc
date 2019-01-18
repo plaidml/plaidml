@@ -19,14 +19,17 @@ using namespace stripe;  // NOLINT
 namespace {
 
 struct TileMetrics {
-  int64_t inputs = 0;
-  int64_t outputs = 0;
-  int64_t total = 0;
+  int64_t input_bytes = 0;
+  double input_bandwidth = 0;
+  int64_t output_bytes = 0;
+  double output_bandwidth = 0;
+  int64_t total_bytes = 0;
+  double total_bandwidth = 0;
 
   bool IsValid(const proto::AutotilePass& options) const {
-    return !((options.max_output_size() && outputs > options.max_output_size()) ||
-             (options.max_input_size() && inputs > options.max_input_size()) ||
-             (options.max_total_size() && total > options.max_total_size()));
+    return !((options.max_output_size() && output_bytes > options.max_output_size()) ||
+             (options.max_input_size() && input_bytes > options.max_input_size()) ||
+             (options.max_total_size() && total_bytes > options.max_total_size()));
   }
 };
 
@@ -92,7 +95,8 @@ bool operator<(const Tile& lhs, const Tile& rhs) {  //
 }
 
 std::ostream& operator<<(std::ostream& os, const TileMetrics& metrics) {
-  os << "(" << metrics.inputs << ", " << metrics.outputs << ", " << metrics.total << ")";
+  os << "(" << metrics.input_bytes << ", " << metrics.input_bandwidth << ", " << metrics.output_bytes << ", "
+     << metrics.output_bandwidth << ")";
   return os;
 }
 
@@ -106,29 +110,6 @@ std::ostream& operator<<(std::ostream& os, const Tile& tile) {
   return os;
 }
 
-size_t ComputeSize(const std::map<std::string, size_t>& tile_by_name,  //
-                   const Refinement& ref) {
-  size_t total_size = 1;
-  Affine flat = ref.FlatAccess();
-  for (const auto& kvp : flat.getMap()) {
-    if (!kvp.first.empty()) {
-      total_size *= tile_by_name.at(kvp.first);
-    }
-  }
-  IVLOG(4, "    ComputeSize> ref: " << ref.into << ", total_size: " << total_size);
-  return total_size;
-}
-
-size_t ComputeBytes(const std::map<std::string, size_t>& tile_by_name,  //
-                    const Refinement& ref) {
-  auto tiled = ref.ApplyTile(tile_by_name);
-  auto bytes = tiled.sizes_product_bytes();
-  IVLOG(4, "    ComputeBytes> ref: " << ref);
-  IVLOG(4, "                tiled: " << tiled);
-  IVLOG(4, "                bytes: " << bytes);
-  return bytes;
-}
-
 TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
                          const Block& block,                                 //
                          const proto::AutotilePass& options) {
@@ -140,14 +121,26 @@ TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
     if (options.skip_1d() && ref.interior_shape.dims.size() == 1) {
       continue;
     }
-    auto size = options.use_bytes() ? ComputeBytes(tile_by_name, ref)  //
-                                    : ComputeSize(tile_by_name, ref);
-    ret.total += size;
-    if (ref.dir == RefDir::In) {
-      ret.inputs += size;
-    } else if (ref.dir == RefDir::Out) {
-      ret.outputs += size;
+    if (!options.loc_name().empty() && ref.location.name != options.loc_name()) {
+      continue;
     }
+    auto tiled = ref.ApplyTile(tile_by_name);
+    int64_t bytes = tiled.sizes_product_bytes();
+    double bandwidth = tiled.memory_io(options.cache_width());
+    ret.total_bytes += bytes;
+    ret.total_bandwidth += bandwidth;
+    if (ref.dir == RefDir::In) {
+      ret.input_bytes += bytes;
+      ret.input_bandwidth += bandwidth;
+    } else if (ref.dir == RefDir::Out) {
+      ret.output_bytes += bytes;
+      ret.output_bandwidth += bandwidth;
+    }
+    IVLOG(4, "    ComputeSizes> ref: " << ref);
+    IVLOG(4, "                tiled: " << tiled);
+    IVLOG(4, "                bytes: " << bytes);
+    IVLOG(4, "            bandwidth: " << bandwidth);
+    IVLOG(4, "          cache_width: " << options.cache_width());
   }
   return ret;
 }
@@ -171,6 +164,10 @@ struct ComputeDensityCostModel {
     if (!metrics.IsValid(options)) {
       return std::numeric_limits<double>::infinity();
     }
+    if (options.max_sizes_product() && tile.sizes_product() > options.max_sizes_product()) {
+      return std::numeric_limits<double>::infinity();
+    }
+
     double total_compute = 1;
     double tile_expand = 1;
     for (size_t i = 0; i < block.idxs.size(); i++) {
@@ -179,8 +176,8 @@ struct ComputeDensityCostModel {
       size_t padded_size = tile_dim.size * tile_dim.count;
       tile_expand *= static_cast<double>(padded_size) / static_cast<double>(block.idxs[i].range);
     }
-    auto input_cost = options.input_cost() * metrics.inputs;
-    auto output_cost = options.output_cost() * metrics.outputs;
+    auto input_cost = options.input_cost() * metrics.input_bandwidth;
+    auto output_cost = options.output_cost() * metrics.output_bandwidth;
     double cost = (tile_expand * (output_cost + input_cost) / total_compute) + tile.counts_product();
     IVLOG(4, "        cost: " << cost);
     return cost;

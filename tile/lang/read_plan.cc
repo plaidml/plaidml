@@ -5,9 +5,9 @@
 #include "base/util/logging.h"
 #include "tile/lang/flat.h"
 #include "tile/lang/loop.h"
-#include "tile/lang/mutil.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/math/mutil.h"
 
 using std::map;
 using std::string;
