@@ -330,10 +330,16 @@ class StripeGenerator {
       kernel->idxs.emplace_back(idx);
     }
 
-    for (const auto& input : op.inputs) {
+    kernel->name += "(";
+    for (size_t i = 0; i < op.inputs.size(); i++) {
+      const auto& input = op.inputs[i];
       const auto& binding = vars_.at(input);
-      auto shape = AdjustShape(binding.shape);
       IVLOG(2, "  " << input << ": " << binding);
+      if (i != 0) {
+        kernel->name += ",";
+      }
+      kernel->name += input;
+      auto shape = AdjustShape(binding.shape);
       switch (binding.tag) {
         case Binding::TENSOR: {
           // Be careful to handle broadcasts
@@ -377,6 +383,7 @@ class StripeGenerator {
           break;
       }
     }
+    kernel->name += ")";
 
     // Remove unused indexes
     kernel->idxs.erase(
