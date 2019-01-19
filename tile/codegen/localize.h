@@ -32,9 +32,9 @@ inline void LocalizePass(stripe::Block* root, const proto::GenericPass& options)
   });
 }
 
-void LocateMemoryPass(stripe::Block* root, const proto::LocateMemoryPass& options);
-void LocateBlockPass(stripe::Block* root, const proto::LocateMemoryPass& options);
-void LocateInnerBlockPass(stripe::Block* root, const proto::LocateMemoryPass& options);
+void LocateMemoryPass(stripe::Block* root, const proto::LocatePass& options);
+void LocateBlockPass(stripe::Block* root, const proto::LocatePass& options);
+void LocateInnerBlockPass(stripe::Block* root, const proto::LocatePass& options);
 
 }  // namespace codegen
 }  // namespace tile
