@@ -164,9 +164,11 @@ inline bool IsLegal(int64_t rule, int64_t candidate) {  //
 using StencilMapEntry = std::pair<std::string, std::string>;
 using StencilMap = std::vector<StencilMapEntry>;
 
-void FindStencilMatches(std::set<StencilMatch>* into,  //
-                        const proto::Stencil& spec,    //
-                        const Block& block,            //
+void FindStencilMatches(std::set<StencilMatch>* into,                    //
+                        const proto::Stencil& spec,                      //
+                        const Block& block,                              //
+                        const std::vector<const Refinement*>& ref_ins,   //
+                        const std::vector<const Refinement*>& ref_outs,  //
                         const StencilMap& cur) {
   if (cur.size() == static_cast<size_t>(spec.idxs_size())) {
     // base case
@@ -209,32 +211,38 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
   } else {
     size_t i = cur.size();
     const auto& rule = spec.idxs(i);
-    auto ref_outs = block.ref_outs();
-    auto ref_ins = block.ref_ins();
-    if (ref_outs.size() == static_cast<size_t>(rule.outs_size()) &&  //
-        ref_ins.size() == static_cast<size_t>(rule.ins_size())) {
-      for (const auto& idx : block.idxs) {
-        auto it = std::find_if(                    //
-            cur.cbegin(),                          //
-            cur.cend(),                            //
-            [&idx](const StencilMapEntry& item) {  //
-              return item.first == idx.name;
-            });
-        if (it == cur.end()) {
-          bool is_legal = true;
-          for (size_t k = 0; k < ref_outs.size(); k++) {
-            is_legal &= IsLegal(rule.outs(k), ref_outs[k]->FlatAccess().get(idx.name));
-          }
-          for (size_t k = 0; k < ref_ins.size(); k++) {
-            is_legal &= IsLegal(rule.ins(k), ref_ins[k]->FlatAccess().get(idx.name));
-          }
-          if (is_legal) {
-            // found a match on this index, keep going
-            auto next = cur;
-            next.push_back(std::make_pair(idx.name, rule.name()));
-            FindStencilMatches(into, spec, block, next);
-          }
-        }
+    if (ref_outs.size() != static_cast<size_t>(rule.outs_size()) ||
+        ref_ins.size() != static_cast<size_t>(rule.ins_size())) {
+      return;
+    }
+    std::vector<Index> idxs{block.idxs.cbegin(), block.idxs.cend()};
+    // Add virtual indexes so that we consider inefficent but valid matches.
+    for (int k = idxs.size(); k < spec.idxs_size(); k++) {
+      auto idx_name = block.unique_idx_name(str(boost::format("$%1%") % k));
+      idxs.emplace_back(Index{idx_name, 1});
+    }
+    for (const auto& idx : idxs) {
+      auto it = std::find_if(                    //
+          cur.cbegin(),                          //
+          cur.cend(),                            //
+          [&idx](const StencilMapEntry& item) {  //
+            return item.first == idx.name;
+          });
+      if (it != cur.end()) {
+        continue;
+      }
+      bool is_legal = true;
+      for (size_t k = 0; k < ref_outs.size(); k++) {
+        is_legal &= IsLegal(rule.outs(k), ref_outs[k]->FlatAccess().get(idx.name));
+      }
+      for (size_t k = 0; k < ref_ins.size(); k++) {
+        is_legal &= IsLegal(rule.ins(k), ref_ins[k]->FlatAccess().get(idx.name));
+      }
+      if (is_legal) {
+        // found a match on this index, keep going
+        auto next = cur;
+        next.push_back(std::make_pair(idx.name, rule.name()));
+        FindStencilMatches(into, spec, block, ref_ins, ref_outs, next);
       }
     }
   }
@@ -242,9 +250,10 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
 
 boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs,  //
                                               const Block& block) {
+  IVLOG(3, "FindBestStencil> " << block.name);
   std::set<StencilMatch> matches;
   for (const auto& spec : specs) {
-    FindStencilMatches(&matches, spec, block, {});
+    FindStencilMatches(&matches, spec, block, block.ref_ins(), block.ref_outs(), {});
   }
   if (!matches.empty()) {
     return *matches.begin();
