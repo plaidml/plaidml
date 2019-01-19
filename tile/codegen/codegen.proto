@@ -43,9 +43,9 @@ message Pass {
     GenericPass compute_deps = 3;
     FusionPass fusion = 4;
     GenericPass localize = 5;
-    LocateMemoryPass locate_block = 6;
-    LocateMemoryPass locate_inner_block = 7;
-    LocateMemoryPass locate_memory = 8;
+    LocatePass locate_block = 6;
+    LocatePass locate_inner_block = 7;
+    LocatePass locate_memory = 8;
     MemoryPlacementPass memory_placement = 9;
     GenericPass scalarize = 10;
     StencilPass stencil = 11;
@@ -95,9 +95,10 @@ message FusionPass {
   repeated string fused_set = 4;
 }
 
-message LocateMemoryPass {
+message LocatePass {
   repeated string reqs = 1;
-  required stripe.proto.Location loc = 2;
+  repeated string inner_reqs = 2;
+  required stripe.proto.Location loc = 3;
 }
 
 message StencilPass {

@@ -96,18 +96,20 @@ void LocalizePass(const AliasMap& scope, Block* block) {
   }
 }
 
-void RecursiveLocate(Block* block, Location location) {
+void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc) {
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
       continue;
     }
-    inner->location = location;
-    RecursiveLocate(inner.get(), location);
+    if (inner->has_tags(inner_tags)) {
+      inner->location = loc;
+    }
+    LocateInnerBlock(inner.get(), inner_tags, loc);
   }
 }
 
-void LocateMemoryPass(Block* root, const proto::LocateMemoryPass& options) {
+void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
   auto loc = stripe::FromProto(options.loc());
   RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {
@@ -120,7 +122,7 @@ void LocateMemoryPass(Block* root, const proto::LocateMemoryPass& options) {
   });
 }
 
-void LocateBlockPass(Block* root, const proto::LocateMemoryPass& options) {
+void LocateBlockPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
   auto loc = stripe::FromProto(options.loc());
   RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {  //
@@ -128,11 +130,12 @@ void LocateBlockPass(Block* root, const proto::LocateMemoryPass& options) {
   });
 }
 
-void LocateInnerBlockPass(Block* root, const proto::LocateMemoryPass& options) {
+void LocateInnerBlockPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
+  auto inner_reqs = FromProto(options.inner_reqs());
   auto loc = stripe::FromProto(options.loc());
-  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {  //
-    RecursiveLocate(block, loc);
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
+    LocateInnerBlock(block, inner_reqs, loc);
   });
 }
 
