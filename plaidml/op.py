@@ -1379,18 +1379,19 @@ class ConvolutionTranspose(tile.Operation):
     A transposed convolution operator.
     """
 
-    def __init__(
-            self,
-            x,
-            kernel,
-            output_shape,
-            strides,
-            padding,
-            data_format,
-            kernel_format,
-            dilation_rate=None,
-    ):
+    def __init__(self,
+                 x,
+                 kernel,
+                 output_shape,
+                 strides,
+                 padding,
+                 data_format,
+                 kernel_format,
+                 dilation_rate=None,
+                 name=None):
         rank = x.shape.ndims - 2
+        if name is None:
+            name = 'ConvolutionTranspose{}d'.format(rank)
 
         if kernel.shape.ndims != rank + 2:
             raise ValueError('Transpose convolution kernel shape inconsistent with input shape: ' +
@@ -1450,7 +1451,7 @@ class ConvolutionTranspose(tile.Operation):
         super(ConvolutionTranspose, self).__init__(
             code,
             input_tensors, [('I', tile.Shape(x.shape.dtype, tuple(output_shape)))],
-            name='ConvolutionTranspose{}d'.format(rank))
+            name=name)
 
 
 convolution_transpose = ConvolutionTranspose.function
