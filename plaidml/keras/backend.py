@@ -469,7 +469,7 @@ def conv(x,
         kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
         group_format=op.GroupedChannelFormat.GroupGroupOut,
         winograd_allowed=not plaidml.settings.prohibit_winograd,
-        name=_NAME_SCOPE_STACK[0],
+        name=cur_name(),
     )
 
 
@@ -496,7 +496,7 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilat
         data_format,
         kernel_format=op.ConvolutionKernelFormat.CHANNELS_LAST,
         dilation_rate=dilation_rate,
-        name=_NAME_SCOPE_STACK[0],
+        name=cur_name(),
     )
 
 
@@ -881,6 +881,12 @@ def name_scope(name):
     _NAME_SCOPE_STACK.pop()
 
 
+def cur_name():
+    if len(_NAME_SCOPE_STACK):
+        return _NAME_SCOPE_STACK[0]
+    return ''
+
+
 def ndim(x):
     return len(x._keras_shape)
 
@@ -1022,7 +1028,7 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mod
         strides=strides,
         padding=padding,
         data_format=data_format,
-        name=_NAME_SCOPE_STACK[0])
+        name=cur_name())
 
 
 def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool_mode='max'):
