@@ -73,7 +73,7 @@ block []:1 ( // simple_fuse
       #tmp inout X[0, 0] bool(100, 20):(20, 1):I 1.95312 KiB, E 1.95312 KiB
   ) {
     0: #eltwise #eltwise_add #fused #kernel 
-    block [i1:100, i2:20]:2000 ( // add+cmp_lt+cond
+    block [i1:100, i2:20]:2000 ( // add(A,B)+cmp_lt(T,_T1)+cond(X,_T3,T)
         #eltwise_add in A[i1, i2] fp32(1, 1):(20, 1):I 4 B, E 7.8125 KiB
         #eltwise_add in B[i2] fp32(1):(1):I 4 B, E 80 B
         out C[i1, i2] fp32(1, 1):(20, 1):I 4 B, E 7.8125 KiB
