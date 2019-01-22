@@ -30,6 +30,7 @@ enum class DataType : int {
   INT16 = 0x11,
   INT32 = 0x12,
   INT64 = 0x13,
+  INT128 = 0x14,
   UINT8 = 0x20,
   UINT16 = 0x21,
   UINT32 = 0x22,
@@ -37,7 +38,7 @@ enum class DataType : int {
   FLOAT16 = 0x31,
   FLOAT32 = 0x32,
   FLOAT64 = 0x33,
-  PRNG = 0x40,
+  OPAQUE = 0x40,
 };
 
 inline bool is_int(const DataType& dt) {
@@ -46,6 +47,7 @@ inline bool is_int(const DataType& dt) {
     case DataType::INT16:
     case DataType::INT32:
     case DataType::INT64:
+    case DataType::INT128:
       return true;
     default:
       return false;
@@ -101,6 +103,8 @@ inline size_t bit_width(const DataType& dt) {
       return 32;
     case DataType::FLOAT64:
       return 64;
+    case DataType::INT128:
+      return 128;
     default:
       return 0;
   }
@@ -118,6 +122,8 @@ inline std::string to_string(const DataType& dt) {
       return "i32";
     case DataType::INT64:
       return "i64";
+    case DataType::INT128:
+      return "i128";
     case DataType::UINT8:
       return "u8";
     case DataType::UINT16:
@@ -132,8 +138,8 @@ inline std::string to_string(const DataType& dt) {
       return "fp32";
     case DataType::FLOAT64:
       return "fp64";
-    case DataType::PRNG:
-      return "prng";
+    case DataType::OPAQUE:
+      return "opaque";
     default:
       return "!!invalid data type: " + std::to_string(static_cast<int>(dt));
   }
@@ -270,6 +276,8 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::INT32;
     case proto::TensorShape_DataType_INT64:
       return DataType::INT64;
+    case proto::TensorShape_DataType_INT128:
+      return DataType::INT128;
     case proto::TensorShape_DataType_UINT8:
       return DataType::UINT8;
     case proto::TensorShape_DataType_UINT16:
@@ -284,6 +292,8 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::FLOAT32;
     case proto::TensorShape_DataType_FLOAT64:
       return DataType::FLOAT64;
+    case proto::TensorShape_DataType_OPAQUE:
+      return DataType::OPAQUE;
     default:
       throw std::runtime_error("Unknown DataType");
   }
@@ -301,6 +311,8 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_INT32;
     case DataType::INT64:
       return proto::TensorShape_DataType_INT64;
+    case DataType::INT128:
+      return proto::TensorShape_DataType_INT128;
     case DataType::UINT8:
       return proto::TensorShape_DataType_UINT8;
     case DataType::UINT16:
@@ -315,29 +327,8 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_FLOAT32;
     case DataType::FLOAT64:
       return proto::TensorShape_DataType_FLOAT64;
-    default:
-      throw std::runtime_error("Unknown DataType");
-  }
-}
-
-inline int size_in_bytes(const proto::TensorShape_DataType& dt) {
-  switch (dt) {
-    case proto::TensorShape_DataType_BOOLEAN:
-    case proto::TensorShape_DataType_INT8:
-    case proto::TensorShape_DataType_UINT8:
-      return 1;
-    case proto::TensorShape_DataType_INT16:
-    case proto::TensorShape_DataType_UINT16:
-    case proto::TensorShape_DataType_FLOAT16:
-      return 2;
-    case proto::TensorShape_DataType_INT32:
-    case proto::TensorShape_DataType_UINT32:
-    case proto::TensorShape_DataType_FLOAT32:
-      return 4;
-    case proto::TensorShape_DataType_INT64:
-    case proto::TensorShape_DataType_UINT64:
-    case proto::TensorShape_DataType_FLOAT64:
-      return 8;
+    case DataType::OPAQUE:
+      return proto::TensorShape_DataType_OPAQUE;
     default:
       throw std::runtime_error("Unknown DataType");
   }
@@ -370,19 +361,6 @@ inline proto::TensorShape IntoProto(const TensorShape& shape) {
     *(ret.mutable_dims()->Add()) = IntoProto(dim);
   }
   return ret;
-}
-
-inline int size_in_bytes(const proto::TensorShape& shape) {
-  if (shape.dims().size() == 0) {
-    return size_in_bytes(shape.type());
-  }
-  auto dim = *std::max_element(shape.dims().cbegin(),                          //
-                               shape.dims().cend(),                            //
-                               [](const proto::TensorShape::Dimension& lhs,    //
-                                  const proto::TensorShape::Dimension& rhs) {  //
-                                 return (lhs.stride() * lhs.size()) < (rhs.stride() * rhs.size());
-                               });
-  return dim.size() * dim.stride() * size_in_bytes(shape.type());
 }
 
 }  // namespace tile

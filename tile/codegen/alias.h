@@ -26,8 +26,8 @@ struct Extent {
 };
 
 struct AliasInfo {
-  stripe::Block* base_block;
-  stripe::Refinement* base_ref;
+  stripe::Block* base_block = nullptr;
+  stripe::Refinement* base_ref = nullptr;
   std::string base_name;
   std::vector<stripe::Affine> access;
   std::vector<Extent> extents;
