@@ -216,6 +216,9 @@ message LocatePass {
   required stripe.proto.Location loc = 3;
 }
 
+// The stencil pass attempt to rewrite block to contain an inner block that
+// exactly matches a fixed hardware 'Stencil' or set of stencils.
+// TODO: Document stencil pass in detail
 message StencilPass {
   repeated string reqs = 1;
   repeated Stencil stencils = 2;
