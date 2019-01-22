@@ -7,10 +7,10 @@
 
 #include "base/util/logging.h"
 #include "base/util/throw.h"
-#include "tile/codegen/math.h"
 #include "tile/codegen/tags.h"
 #include "tile/codegen/tidy.h"
 #include "tile/codegen/tile.h"
+#include "tile/math/util.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -235,7 +235,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
     // can get fully resolved.
     idx->set_tag("$part");
     // Update the tile size for this index
-    tile_by_name[idx->name] = IntDivCeil(idx->range, bank_info.num_banks);
+    tile_by_name[idx->name] = math::RoundUp(idx->range, bank_info.num_banks);
     // Record information used for updating the outer block post-tiling.
     BankedRef banked_ref{BankDimension{bank_info.dim_pos}, Affine{idx->name}};
     banked_refs.emplace(&ref, banked_ref);
@@ -305,7 +305,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
     if (big_ref->FlatAccess().get(idx.name) == 0 || out_ref->FlatAccess().get(idx.name) == 0 || idx.range == 1) {
       continue;
     }
-    size_t tile_size = IntDivCeil(idx.range, options.num_parts());
+    size_t tile_size = math::RoundUp(idx.range, options.num_parts());
     size_t rounded_size = tile_size * options.num_parts();
     double ratio = static_cast<double>(idx.range) / static_cast<double>(rounded_size);
     IVLOG(3, "           "
@@ -351,7 +351,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
   bank_info.dim_pos = *dim_pos;
   bank_info.uses[block].idx_name = idx_name;
   bank_info.banked_shape = base_ref->interior_shape;
-  auto part_size = IntDivCeil(bank_info.banked_shape.dims[*dim_pos].size, options.num_parts());
+  auto part_size = math::RoundUp(bank_info.banked_shape.dims[*dim_pos].size, options.num_parts());
   bank_info.banked_shape.resize_dim(*dim_pos, part_size);
   bank_info.num_banks = options.num_parts();
   base_ref->bank_dim = BankDimension{bank_info.dim_pos};

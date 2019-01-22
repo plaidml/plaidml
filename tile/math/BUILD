@@ -27,17 +27,12 @@ plaidml_cc_library(
         "basis.h",
         "bignum.h",
         "matrix.h",
-	"mutil.h",
         "polynomial.h",
+        "util.h",
     ],
-    copts = select({
-        "@toolchain//:windows_x86_64": [],
-        "//conditions:default": ["-Wno-error"],
-    }),
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
         "@boost",
     ],
 )
-

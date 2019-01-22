@@ -13,7 +13,7 @@
 #include "tile/lang/read_plan.h"
 #include "tile/lang/sembuilder.h"
 #include "tile/lang/semtree.h"
-#include "tile/math/mutil.h"
+#include "tile/math/util.h"
 
 using std::map;
 using std::string;

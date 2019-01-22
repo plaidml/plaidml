@@ -7,15 +7,14 @@
 #include "tile/lang/loop.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/sembuilder.h"
-#include "tile/math/mutil.h"
-
-using std::map;
-using std::string;
-using std::vector;
+#include "tile/math/util.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+using math::NearestPo2;
+using math::Sign;
 
 ReadPlan::ReadPlan(const std::vector<std::string>& names, const std::vector<int64_t>& strides,
                    const std::vector<uint64_t>& ranges, uint64_t mem_width)
@@ -47,7 +46,7 @@ ReadPlan::ReadPlan(const std::vector<std::string>& names, const std::vector<int6
       // If it's mergeable, adjust the index in question and break
       if (div.rem == 0 && mi.range >= div.quot) {
         mi.range += div.quot * (oi.range - 1);
-        mi.name += string("_") + oi.name;
+        mi.name += std::string("_") + oi.name;
         oi.merge_scale = div.quot * Sign(oi.stride);
         break;
       }

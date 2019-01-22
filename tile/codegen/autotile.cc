@@ -5,9 +5,9 @@
 #include "base/util/logging.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
-#include "tile/codegen/math.h"
 #include "tile/codegen/tags.h"
 #include "tile/codegen/tile.h"
+#include "tile/math/util.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -50,7 +50,7 @@ struct Tile {
   void set(size_t i, size_t size, size_t range) {
     size = std::min(size, range);
     dims[i].size = size;
-    dims[i].count = IntDivCeil(range, size);
+    dims[i].count = math::RoundUp(range, size);
   }
 
   size_t counts_product() const {
