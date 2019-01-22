@@ -7,6 +7,7 @@
 #include "base/util/error.h"
 #include "base/util/throw.h"
 #include "tile/codegen/localize.h"
+#include "tile/math/util.h"
 
 // This code implements a simple single-linear-pass caching memory
 // scheduler for a single Stripe Block.  It builds up information
@@ -41,10 +42,6 @@ namespace codegen {
 namespace {
 
 constexpr std::size_t kDefaultAlignment = 4;
-
-inline constexpr std::size_t RoundUp(std::size_t count, std::size_t alignment) {
-  return ((count + alignment - 1) / alignment) * alignment;
-}
 
 struct CacheEntry;
 
@@ -1122,7 +1119,7 @@ PlacementPlan Scheduler::MakeFallbackPlan(const std::vector<std::pair<RefInfo*, 
       // A new Placement.
       it_inserted.first->second.range.begin = offset;
       it_inserted.first->second.range.end = offset + ri->size;
-      offset += RoundUp(ri->size, alignment_);
+      offset += math::Align(ri->size, alignment_);
     } else {
       // An existing Placement.
       it_inserted.first->second.dir = UnionDir(it_inserted.first->second.dir, dir);
