@@ -575,6 +575,8 @@ tile::DataType MakeTileDataType(plaidml_datatype datatype) {
       return tile::DataType::INT32;
     case PLAIDML_DATA_INT64:
       return tile::DataType::INT64;
+    case PLAIDML_DATA_INT128:
+      return tile::DataType::INT128;
     case PLAIDML_DATA_UINT8:
       return tile::DataType::UINT8;
     case PLAIDML_DATA_UINT16:
@@ -589,6 +591,8 @@ tile::DataType MakeTileDataType(plaidml_datatype datatype) {
       return tile::DataType::FLOAT32;
     case PLAIDML_DATA_FLOAT64:
       return tile::DataType::FLOAT64;
+    case PLAIDML_DATA_OPAQUE:
+      return tile::DataType::OPAQUE;
     default:
       return tile::DataType::INVALID;
   }
@@ -679,6 +683,8 @@ extern "C" plaidml_datatype plaidml_get_shape_type(plaidml_shape* shape) {
       return PLAIDML_DATA_INT32;
     case tile::DataType::INT64:
       return PLAIDML_DATA_INT64;
+    case tile::DataType::INT128:
+      return PLAIDML_DATA_INT128;
     case tile::DataType::UINT8:
       return PLAIDML_DATA_UINT8;
     case tile::DataType::UINT16:
@@ -693,6 +699,8 @@ extern "C" plaidml_datatype plaidml_get_shape_type(plaidml_shape* shape) {
       return PLAIDML_DATA_FLOAT32;
     case tile::DataType::FLOAT64:
       return PLAIDML_DATA_FLOAT64;
+    case tile::DataType::OPAQUE:
+      return PLAIDML_DATA_OPAQUE;
     default:
       return PLAIDML_DATA_INVALID;
   }

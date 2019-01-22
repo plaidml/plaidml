@@ -861,8 +861,9 @@ llvm::Type* Compiler::CType(DataType type) {
       return builder_.getFloatTy();
     case DataType::FLOAT64:
       return builder_.getDoubleTy();
+    case DataType::INT128:
+    case DataType::OPAQUE:
     case DataType::INVALID:
-    case DataType::PRNG:
       throw Error("Invalid type: " + to_string(type));
   }
   return builder_.getVoidTy();

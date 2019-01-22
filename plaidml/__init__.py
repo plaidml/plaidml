@@ -776,6 +776,7 @@ class DType(enum.IntEnum):
     INT16 = 0x11
     INT32 = 0x12
     INT64 = 0x13
+    INT128 = 0x14
     UINT8 = 0x20
     UINT16 = 0x21
     UINT32 = 0x22
@@ -783,6 +784,7 @@ class DType(enum.IntEnum):
     FLOAT16 = 0x31
     FLOAT32 = 0x32
     FLOAT64 = 0x33
+    OPAQUE = 0x40
 
 
 _CTYPES = {
@@ -1247,11 +1249,14 @@ Dimension = namedtuple('Dimension', ['size', 'stride'])
 
 class _Shape(object):
 
-    def __init__(self, ctx, shape):
+    def __init__(self, ctx, shape, ctype=None):
         self._as_parameter_ = shape
         self._free = _lib().plaidml_free_shape
         self._dtype = _lib().plaidml_get_shape_type(self)
-        self._ctype = _CTYPES[self._dtype]
+        if ctype is None:
+            self._ctype = _CTYPES[self._dtype]
+        else:
+            self._ctype = ctype
         self._ctx = ctx
 
     def __del__(self):
@@ -1298,6 +1303,19 @@ class Shape(_Shape):
             if arg != 0:
                 stride //= arg
             _lib().plaidml_add_dimension(ctx, self, arg, stride)
+
+
+class CustomShape(_Shape):
+
+    def __init__(self, ctx, dtype, ctype, dims):
+        super(CustomShape, self).__init__(ctx, _lib().plaidml_alloc_shape(ctx, dtype), ctype=ctype)
+        stride = 1
+        for dim in dims:
+            stride *= dim
+        for dim in dims:
+            if dim != 0:
+                stride //= dim
+            _lib().plaidml_add_dimension(ctx, self, dim, stride)
 
 
 class Placeholder(Var):
