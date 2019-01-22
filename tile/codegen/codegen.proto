@@ -6,6 +6,10 @@ package vertexai.tile.codegen.proto;
 
 import "tile/stripe/stripe.proto";
 
+// The Config messgage is the main message for the PMLSim config file. It
+// contains the definition of the hardware being modeled as well as the set of
+// optimization passes to run during compilation.  For use of stipe outside of
+// PMLSim, a repeated list of passes is suffient.
 message Config {
   optional uint32 clock_mhz = 1;
   map<string, ExecutionUnit> exec_units = 2;
@@ -15,86 +19,197 @@ message Config {
   repeated Pass passes = 6;
 }
 
+// An execution unit represents a simulated computing device.
 message ExecutionUnit {
   optional uint32 count = 1 [default = 1];
   required uint32 ops_per_cycle = 2;
   repeated Stencil stencils = 3;
 }
 
+// A memory unit represents a bank of simulated memory.
 message MemoryUnit {
   optional uint32 count = 1 [default = 1];
   required uint32 size_KiB = 2;
 }
 
+// A transfer unit represents a processing element that moves memory between
+// two memory regions such as a DMA controller
 message TransferUnit {
   optional uint32 count = 1 [default = 1];
 }
 
+// A bus represents a link between memory and an execution unit, or memory and
+// a transfer unit.
 message Bus {
   repeated string sources = 1;
   repeated string sinks = 2;
   required double bytes_per_cycle = 3;
 }
 
+// The optimization of stripe is done via a series of passes, each which
+// perform various modifications.  To help determine which blocks a given pass
+// will operate on, stipe statements, refinements, and indexes can be given
+// 'tags', which can be used by later passes as a matching critera.  Any object
+// can be given any number of tags (i.e. they act as a set of symbol).  Tags
+// are purely used for managing inter-pass interactions or for other operations
+// such as lowering and have no semantic effect on the meaning of the stipe
+// code that is tagged.  Each pass acts on some set of blocks, typically those
+// which match the associated tags requirements, as well as any additional pass
+// specific criteral.  The pass typically will transform the matching block in
+// some way, and possibly add additional tags.
 message Pass {
+  // The name of the pass is programmer convience used in various debugging
+  // messages but it otherwise has no semantic meaning.
   required string name = 1;
+  // The pass itself.  Many passes have their own set of parameters, but simple
+  // passes which only have a tag selector use GenericPass as their
+  // configuration.  All passes with their own configs are described in greater
+  // detail near their configs.
   oneof pass {
+    // Puts specific memory transfers (DMA's etc) on the boundary of matching
+    // blocks, details in config section below.
     CachePass cache = 2;
+    // The compute_deps pass determines which statements within a block depend
+    // on which others via data-flow and sets the deps field on the statments.
     GenericPass compute_deps = 3;
+    // Fuses multiple blocks which operate over similar loop ranges.
     FusionPass fusion = 4;
+    // A localize pass detects allocations (refinements with dir = None) which
+    // are only used in a single inner block, and moves the allocation into the
+    // inner block, shrinking it if possible, since often only a portion of the
+    // buffer is used for each index position.  Repeated recursively.
     GenericPass localize = 5;
+    // The locate passes attach hardware locations to various Stripe objects.
+    // Locate block sets the location on all matching blocks.
     LocatePass locate_block = 6;
+    // Locate inner block set the location of all children blocks of a block.
     LocatePass locate_inner_block = 7;
+    // Locate memory sets a location on the memory declared in matching blocks.
     LocatePass locate_memory = 8;
+    // Determines the physical location in memory for each refinement within
+    // a program.
     MemoryPlacementPass memory_placement = 9;
+    // The scalarize pass looks for refinements which (usually due to
+    // localization) now hold only a single element, and replaces loads/stores
+    // to the buffers with scalars, inducing temporaries as needed to acheive
+    // SSA form.  Also remove the unused buffers.
     GenericPass scalarize = 10;
+    // The stencil pass attempt to rewrite block to contain an inner block that
+    // exactly matches a fixed hardware 'Stencil' or set of stencils.
     StencilPass stencil = 11;
+    // An autotile pass breaks a block into an 'outer' and 'inner' block, such
+    // that the total amount of memory used by the inner block fits within
+    // some limits, which maximimize compute density.
     AutotilePass autotile = 12;
+    // The schedule pass determine how to order a large list of blocks,
+    // including allowing block to run concurrently where possible, while
+    // limiting the total amount of memory used by all simultanous active
+    // blocks and allocations which are still live.  Basically the hetrogenous
+    // verison of autotile.
     SchedulePass schedule = 13;
+    // The transpose pass reorders the layout of temporaries to maximize
+    // performance.  Details in the config section below.
     TransposePass transpose = 14;
+    // The partition passes aim to split work of a single block up among N
+    // identical units.  Paritition compute is used when multiple compute units
+    // exist on a shared memory bus, while Partiition memory is used when each
+    // compute unit has it's own local memory.
     PartitionPass partition_compute = 15;
     PartitionPass partition_memory = 16;
+    // The unroll pass transforms an outer block loop into a series of blocks.
     UnrollPass unroll = 17;
+    // Prune idxs removes unused indexes
     GenericPass prune_idxs = 18;
+    // Prune idxs removes unused references
     GenericPass prune_refs = 19;
+    // The threading pass assigns elements of a dense computational block to
+    // 'threads' for use in flexible semi-SIMD architectures such as a GPU,
+    // where a single instruction decoder is shared across multiple threads.
     ThreadInnerPass thread_inner = 20;
   }
 }
 
+// Generic passes are applied to all block / refinement whose tags contain all
+// the required tags.  An empty set of requirements means the pass is applied
+// to all blocks.
 message GenericPass {
   repeated string reqs = 1;
   repeated string ref_reqs = 2;
 }
 
+// The schedule pass begins on any blocks whose tags match the tags in reqs.
+// It then attempts to schedule and place the statements in that block (which
+// must be blocks or specials) with the assumption that only mem_KiB killobytes
+// may be resident at any given time.  It may introduce synthetic dependencies
+// to the statment list to enforce this.  It also adds all the required local
+// memory buffers, and arranges for loading and spilling to/from the local
+// buffers.
 message SchedulePass {
+  // Do scheduling to the blocks that match this these tags
   repeated string reqs = 1;
+  // The location to specify for the local memory buffers generated during the
+  // scheduling process.
   required stripe.proto.Location mem_loc = 2;
+  // The size of the local memory available to scheduling.
   required uint64 mem_KiB = 3;
+  // The mimimal buffer aligment requirement.
   required uint32 alignment = 4;
+  // The location to assign to the blocks used to do transfer between local
+  // memory and exterior memory, i.e. the DMA device used to load / spill.
   required stripe.proto.Location xfer_loc = 5;
+  // Allow single statement which take more memory than allowed.
   optional bool allow_out_of_range_accesses = 6 [default = false];
 }
 
+// Provide a specific address for all the allocation refinement such that no
+// refinement that can be used simultanously (based on statement dependencies)
+// can ever overlap.  There is an implied assumption used by this place not
+// present elsewhere that the interior of a block is sequentially executed
+// across each index.
 message MemoryPlacementPass {
+  // Do memory placement for blocks that match there tags
   repeated string reqs = 1;
+  // The mimimal buffer aligment requirement.
   required uint32 alignment = 2;
+  // Only place buffers assigned to this hardware location.
   repeated stripe.proto.Location locs = 3;
 }
 
+// For each refinement going into or out of a given block (as per dirs), add a
+// newly allocated local refinement in a 'closer' memory, and transfer into /
+// out of that block before / after the rest of the block interior, and move
+// any accesses to the outer reference to point at the newly allocated buffer.
+// In other words: Load the working set into a smaller local cache.
 message CachePass {
+  // Do the caching pass on blocks that match there tags
   repeated string reqs = 1;
+  // Cache only inputs, only outputs, or both
   repeated stripe.proto.Refinement.Dir dirs = 2;
+  // The location to assign to the 'cache' memory allocated
   required stripe.proto.Location mem_loc = 3;
+  // The unit to assign to transfer (DMA) data into / out of the cache
   required stripe.proto.Location xfer_loc = 4;
 }
 
+// The fusion pass attempt to combine compatible block into a single block that
+// walks over and outer index space and then multiple inner blocks that do each
+// part of the original computation.  By doing so, it means the the working set
+// for each portion of the computation may not need to be sent to further away
+// and larger memory, and large temporary buffers may be reduced (via localize)
+// or even eliminated (via scalarize).  The fusion pass may perform non-trivial
+// modification to the indexing of the blocks to make them match.
 message FusionPass {
+  // Only consider fusing blocks whose parents match this tag
   repeated string parent_reqs = 1;
+  // Require the first (a) block to match these tags
   repeated string a_reqs = 2;
+  // Require the second (b) block to match these tags
   repeated string b_reqs = 3;
+  // Set additional tags on the resulting fused block
   repeated string fused_set = 4;
 }
 
+// Edit the location of blocks and/or refinement to match 'loc'
 message LocatePass {
   repeated string reqs = 1;
   repeated string inner_reqs = 2;
@@ -120,46 +235,111 @@ message StencilIndex {
   repeated int32 ins = 4;
 }
 
+// The autotile pass attempts to split (tile) a block into an outer block and
+// an innner block, such that the working set of the inner block fits within a
+// limited memory size, which maximizing the computational density of the inner
+// block (the ratio of compute to memory I/O).  The goal of this pass is to
+// allow all memory use within the inner block to be from a faster local
+// memory.  If the system in question has a cache hierarchy, the autotile pass
+// itself is sufficient.  If the memory mangement is explicit, DMA transfers
+// may be inserted by performing a cache pass on the inner tile.  Memory I/O is
+// measured in 'cache line misses' via a model which assumes a specific cache
+// width, so that contigous access is perfered over disjoint access.
 message AutotilePass {
+  // Autotile blocks whose tags contain reqs
   repeated string reqs = 1;
+  // Set the following tags on the outer block post tiling
   repeated string outer_set = 2;
+  // Set the following tags on the inner block post tiling
   repeated string inner_set = 3;
+  // Only consider tilings whose sizes are powers of two.  This is much faster
+  // and for many usecases the only reasonable options
   optional bool only_po2 = 4 [default = false];
+  // Do a hill climbing search rather than a complete search.
   optional bool fast = 5 [default = false];
+  // Ignore 1-dimensional tensors when considering memory IO.
   optional bool skip_1d = 6 [default = false];
+  // The maximum amount of memory use (in bytes) for all the outputs written by
+  // the inner block.  0 means no limit.
   optional int64 max_output_size = 7 [default = 0];
+  // The maximum amount of memory use (in bytes) for all the inputs read by
+  // the inner block.  0 means no limit.
   optional int64 max_input_size = 8 [default = 0];
+  // The total size of all data used by the inner block.  Note, this is
+  // generally the place to put a memory limit, but in some architectures
+  // inputs are held in one memory and outputs are held in accumulation
+  // registers in a seperate memory.  0 means no limit.
   optional int64 max_total_size = 9 [default = 0];
+  // The maximal  number of inner loops allowed by the inner block.  0 means no
+  // limit.
   optional int64 max_sizes_product = 10 [default = 0];
+  // The multiplier for output I/O cost (in case input + output are not
+  // symmetric)
   optional double output_cost = 11 [default = 1.0];
+  // The multiplier for input I/O cost (in case input + output are not
+  // symmetric)
   optional double input_cost = 12 [default = 1.0];
+  // Should we copy the tags of the original block to the inner block
   optional bool copy_tags = 13 [default = false];
+  // When considering memory I/O, what is the size (in byte) of the cache line
   optional int64 cache_width = 14 [default = 0];
+  // When the result of autotile is trivial (either whole loops fits into inner
+  // memory or only 1 element fits), should we skip the transform?
   optional bool elide_trivial = 15 [default = false];
+  // Only consider refinement from this memory location when computing memory
+  // I/O
   optional string loc_name = 16 [default = ""];
+  // Clear the tags of the original / outer block before adding outer_set
   optional bool clear_outer = 17 [default = false];
 }
 
+// A pass that attempts to transpose intermediate buffers such that any
+// 'accumulation indexs', which are defined as indexes which are not used on
+// the output of a contraction, are moved to be 'stride-1'.  TODO: Make this
+// pass transpose based on a wider variety of cost functions.  Currently it is
+// only really useful on one architecture.
 message TransposePass {
+  // Transpose only refinements in blocks whose tags contain reqs
   repeated string reqs = 1;
+  // Require the following tags in the allocating refinement.
   repeated string alloc_reqs = 2;
 }
 
+// The partition pass splits a single block into an 'outer' and inner block so
+// that it can be distributed across multiple symetric hardware slices.  There
+// are two type of partition passes, based on whether the compute elements
+// shared memory or not.
 message PartitionPass {
+  // Partition blocks whose tags match reqs
   repeated string reqs = 1;
+  // Set additional tags on the partitioned blocks
   repeated string set_tags = 2;
+  // How many parts should be partition each block into
   required int64 num_parts = 3;
+  // Apply tags to any indexes split by partitioning
   optional string idx_tag = 4;
 }
 
+// Unroll a given block, similar to a loop unrolling in a traditional compiler.
 message UnrollPass {
+  // Unroll blocks whose tags match reqs
   repeated string reqs = 1;
+  // Expand (unroll) only specific indexes
   optional string expand_idx = 2;
+  // During unrolling, should we add additional refinements (views) for each
+  // refinement region used by the unrolled statements?
   optional bool make_views = 3 [default = false];
+  // A string to append to each unrolled block's name for debugging purposes
   optional string part_name = 4;
 }
 
+// The threading pass assigns elements of a dense computational block to
+// 'threads' for use in flexible semi-SIMD architectures such as a GPU, where a
+// single instruction decoder is shared across multiple threads.  Currently
+// this pass is somewhat GPU specific.
 message ThreadInnerPass {
+  // Thread blocks whose tags match reqs
   repeated string reqs = 1;
+  // How many threads should be introduce during threading
   required int64 threads = 2;
 }
