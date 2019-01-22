@@ -312,6 +312,7 @@ message AutotilePass {
   optional string loc_name = 16 [default = ""];
   // Clear the tags of the original / outer block before adding outer_set
   optional bool clear_outer = 17 [default = false];
+  optional bool acc_idxs = 18 [default = true];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any
