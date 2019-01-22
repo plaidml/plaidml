@@ -8,7 +8,7 @@
 
 #include "base/util/throw.h"
 #include "tile/codegen/tile.h"
-#include "tile/math/mutil.h"
+#include "tile/math/util.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -16,7 +16,7 @@ namespace tile {
 namespace codegen {
 
 using namespace stripe;  // NOLINT
-using lang::NearestPo2;
+using math::NearestPo2;
 
 void ThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
   if (block->ref_outs().size() != 1) {

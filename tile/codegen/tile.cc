@@ -6,8 +6,8 @@
 #include "base/util/lookup.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
-#include "tile/codegen/math.h"
 #include "tile/codegen/tags.h"
+#include "tile/math/util.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -122,7 +122,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     }
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
-    outer_idx.range = IntDivCeil(outer_idx.range, shape[i]);
+    outer_idx.range = math::RoundUp(outer_idx.range, shape[i]);
     // Make ranges of the inner blocks: [ti, tk, tk]
     inner_idx.range = shape[i];
   }
@@ -200,7 +200,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,                    //
     size_t total_tiles = 1;
     for (const auto& idx : block.idxs) {
       auto tile = safe_at(idx_matches, idx.name);
-      size_t num_tiles = IntDivCeil(idx.range, tile.value);
+      size_t num_tiles = math::RoundUp(idx.range, tile.value);
       total_tiles *= num_tiles;
       match.cost *= num_tiles * tile.value;
       match.idxs.push_back(tile);
