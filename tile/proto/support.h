@@ -28,9 +28,5 @@ inline ShapeMap FromProto(const google::protobuf::Map<std::string, proto::Progra
   return ret;
 }
 
-inline int size_in_bytes(const proto::ProgramInput& input) { return size_in_bytes(input.shape()); }
-
-inline int size_in_bytes(const proto::ProgramOutput& output) { return size_in_bytes(output.shape()); }
-
 }  // namespace tile
 }  // namespace vertexai
