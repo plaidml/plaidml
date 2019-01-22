@@ -147,11 +147,14 @@ TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
 
 struct ComputeDensityCostModel {
   const proto::AutotilePass& options;
+  std::set<const Index*> acc_idxs;
 
-  explicit ComputeDensityCostModel(const proto::AutotilePass& options) : options(options) {}
+  explicit ComputeDensityCostModel(const Block& block, const proto::AutotilePass& options)
+      : options(options),  //
+        acc_idxs(block.accumulation_idxs()) {}
 
   bool IndexFilter(const Block& block, const Index& idx) const {  //
-    return !idx.has_tag("bank");
+    return options.acc_idxs() || !acc_idxs.count(&idx);
   }
 
   double ComputeCost(const Block& block, const Tile& tile) const {
@@ -190,11 +193,10 @@ struct PartitionComputeCostModel {
 
   PartitionComputeCostModel(const Block& block, const proto::PartitionPass& options)
       : ideal_cost(block.idxs_product() / (1.0 * options.num_parts())),  //
-        acc_idxs(block.accumulation_idxs())                              //
-  {}
+        acc_idxs(block.accumulation_idxs()) {}
 
   bool IndexFilter(const Block& block, const Index& idx) const {  //
-    return !idx.has_tag("bank") && !acc_idxs.count(&idx);
+    return !acc_idxs.count(&idx);
   }
 
   double ComputeCost(const Block& block, const Tile& tile) const {
@@ -230,6 +232,12 @@ TileResult PickBestTile(const Block& block, bool only_po2, bool is_fast, const C
   IVLOG(3, "Autotile> PickBestTile> block: " << block.name);
   TileSearchState state;
   Tile tile(block);
+  for (size_t i = 0; i < block.idxs.size(); i++) {
+    if (!model.IndexFilter(block, block.idxs[i])) {
+      tile.dims[i].size = block.idxs[i].range;
+      tile.dims[i].count = 1;
+    }
+  }
   double cost = model.ComputeCost(block, tile);
   double base_cost = cost;
   state.insert(tile, base_cost);
@@ -272,7 +280,7 @@ TileResult PickBestTile(const Block& block, bool only_po2, bool is_fast, const C
 void AutotilePass(Block* root, const proto::AutotilePass& options) {
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [&options](const AliasMap& map, Block* block) {
-    ComputeDensityCostModel model(options);
+    ComputeDensityCostModel model(*block, options);
     auto result = PickBestTile(*block, options.only_po2(), options.fast(), model);
     IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result.tile << ", cost: " << result.cost);
     if (!std::isinf(result.cost)) {
