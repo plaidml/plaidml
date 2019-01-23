@@ -237,5 +237,5 @@ if __name__ == '__main__':
     args, remainder = parser.parse_known_args()
 
     plaidml._internal_set_vlog(args.verbose)
-    np.set_printoptions(threshold=np.nan)
+    np.set_printoptions(threshold=np.inf)
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
