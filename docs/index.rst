@@ -17,7 +17,7 @@ to be able to overcome the many limitations of fussy, brittle and tightly-couple
 GPU-based software architectures. By bridging the gap between the universal 
 mathematical descriptions of deep learning operations, such as convolution, and 
 the platform and chip-specific operations that enable acceleration, PlaidML makes 
-deep learning work 
+deep learning work everywhere.
 
 As a component under `Keras`_ PlaidML can accelerate training workloads with 
 customized or automatically-generated Tile code. It works especially well on 
