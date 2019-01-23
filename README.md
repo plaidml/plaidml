@@ -157,6 +157,6 @@ Either open a ticket on [GitHub] or post to [plaidml-dev].
 [nGraph Compiler stack]: https://ngraph.nervanasys.com/docs/latest/
 [Keras]: https://keras.io/
 [blog post]: https://ai.intel.com/reintroducing-plaidml/
-[here]: docs/installing.md
+[here]: docs/install.rst
 [GitHub]: https://github.com/plaidml/plaidml/issues
 [plaidml-dev]: https://groups.google.com/forum/#!forum/plaidml-dev
