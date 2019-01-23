@@ -216,25 +216,43 @@ message LocatePass {
   required stripe.proto.Location loc = 3;
 }
 
-// The stencil pass attempt to rewrite block to contain an inner block that
-// exactly matches a fixed hardware 'Stencil' or set of stencils.
-// TODO: Document stencil pass in detail
+// The stencil pass attempts to rewrite block to contain an inner block that
+// matches a fixed hardware 'Stencil' or set of stencils.  Basically, we presume
+// that the hardware has one or more build in 'indexes' (which may exist over
+// time or actual be parallel hardare).  We then try to match indexes or regions
+// of indexes of a block to the various hardware indexes, and rewrite the block
+// into an outer block that make multiple calls to a fixed, hardware
+// appropriate, inner block.
 message StencilPass {
+  // Only stencil blocks that make these tags
   repeated string reqs = 1;
+  // Attempt to match the list of stencils below, picking the lowest cost
+  // stencil
   repeated Stencil stencils = 2;
+  // Set the following tags on the outer loop
   repeated string outer_set = 3;
+  // Set the following tags on the inner set (the stencil match)
   repeated string inner_set = 4;
 }
 
 message Stencil {
+  // An initial cost of the stencil
   required uint64 startup_cost = 1;
+  // The set of required index matches
   repeated StencilIndex idxs = 2;
 }
 
 message StencilIndex {
+  // The name of the stencil
   required string name = 1;
+  // The size of the HW unit, or -1 if the HW is flexible for this dimension
   required int32 size = 2;
+  // For each output, the rquired stride, typically there are:
+  // 0 for 'index not used on output'
+  // 1 for 'index must be stride 1 in memory (contigious)
+  // -1 for 'index may be any stride'
   repeated int32 outs = 3;
+  // For each input, the required stride, same as above
   repeated int32 ins = 4;
 }
 
