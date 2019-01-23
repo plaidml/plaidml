@@ -22,9 +22,9 @@ message Affine {
 // then operated on by a set of statements.  The ordering of the execution of
 // the interior statements is not defined, and may be done in parallel (with
 // respect to the indexes), however within each index positions, statements
-// logically execute serially.  That is, the result must be equivlent to serial
-// execution, although statement which are not dependent may be reorderd or
-// scheduled simulaniously.
+// logically execute serially.  That is, the result must be equivalent to serial
+// execution, although statement which are not dependent may be reordered or
+// scheduled simultaneously.
 message Block {
   // The name of the block (for debugging, not semantically meaningful).
   string name = 1;
@@ -32,7 +32,7 @@ message Block {
   string comments = 2;
   // The set of indexes this block operates over.
   repeated Index idxs = 3;
-  // Only execute the block interior when the contraints below are all true.
+  // Only execute the block interior when the constraints below are all true.
   // A constraint is true when the Affine applied to the indexes (which must
   // be indexed declared in this block only) results in a number >= 0.
   repeated Affine constraints = 4;
@@ -68,7 +68,7 @@ message Index {
 // specifically refined further).  It can be loaded/stored to/from via load or
 // store statements within the block.  Each refinement is either a new
 // allocation on the block or a subregion of a refinement in the parent block.
-// Additionally, stores to the refinement may have special aggreation behavior,
+// Additionally, stores to the refinement may have special aggregation behavior,
 // such as accumulation.
 message Refinement {
   // The direction define how the refinement relates to the 'from' refinement
@@ -138,9 +138,9 @@ message Statement {
     Special special = 6;
   }
 
-  // Indices of intra-block dependencies.  That is, this statment depends on
+  // Indices of intra-block dependencies.  That is, this statement depends on
   // prior statements listed in deps.  Can be used to determine which
-  // statements can be simultaniously scheduled.
+  // statements can be simultaneously scheduled.
   repeated uint32 deps = 7;
   // A set of user defined 'tags' that are attached to a statement.  They do
   // not have any specific semantic meaning, but are often used to pass
@@ -198,7 +198,7 @@ message Special {
   repeated string outputs = 4;
 }
 
-// A constant.  Constants are alwasy 'maximal precision', but are reduced to
+// A constant.  Constants are always 'maximal precision', but are reduced to
 // the relevant working precision by any intrinsics which use them.
 message Constant {
   string name = 1;
