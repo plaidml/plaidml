@@ -16,7 +16,7 @@
 
 
 PlaidML is an advanced and portable tensor compiler for enabling deep learning 
-on laptops, embedded devices, or other kinds of workstations where the available 
+on laptops, embedded devices, or other devices where the available 
 computing hardware is not well supported or the available software stack contains 
 unpalatable license restrictions.
 
@@ -27,13 +27,6 @@ As a component within the [nGraph Compiler stack], PlaidML further extends the
 capabilities of specialized deep-learning hardware (especially GPUs,) and makes 
 it both easier and faster to access or make use of subgraph-level optimizations 
 that would otherwise be bounded by the compute limitations of the device. 
-
-The latest version of PlaidML includes initial support for **PlaidML**'s 
-``Stripe``. Tile was specifically created to be able to overcome the many 
-limitations of fussy, brittle and tightly-coupled GPU-based software architectures. 
-By bridging the gap between the universal mathematical descriptions of deep 
-learning operations, such as convolution, and the platform and chip-specific 
-operations that enable acceleration, PlaidML makes deep learning work everywhere.
 
 As a component under [Keras], PlaidML can accelerate training workloads with 
 customized or automatically-generated Tile code. It works especially well on 
