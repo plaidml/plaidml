@@ -4,6 +4,8 @@
 
 #include <forward_list>
 
+#include <boost/optional.hpp>
+
 #include "base/util/error.h"
 #include "base/util/throw.h"
 #include "tile/codegen/localize.h"
@@ -51,31 +53,31 @@ struct RefInfo {
   RefInfo(stripe::Refinement* ref_, AliasInfo alias_info_)
       : ref(*ref_),  //
         alias_info{std::move(alias_info_)},
-        cache_shape{ref.interior_shape},
+        exterior_cache_shape{ref.interior_shape},
         name{ref.into} {
     IVLOG(3, "Creating RefInfo " << name << " access=" << alias_info.access << " shape=" << alias_info.shape
                                  << " extents=" << alias_info.extents);
 
     // Convert the cached shape to use natural striding.
     std::uint64_t stride = 1;
-    for (std::size_t idx = 0; idx < cache_shape.dims.size(); ++idx) {
-      auto& dim = cache_shape.dims.at(cache_shape.dims.size() - idx - 1);
+    for (std::size_t idx = 0; idx < exterior_cache_shape.dims.size(); ++idx) {
+      auto& dim = exterior_cache_shape.dims.at(exterior_cache_shape.dims.size() - idx - 1);
       dim.stride = stride;
       stride *= dim.size;
     }
 
-    auto sizes = cache_shape.sizes();
-    size = cache_shape.byte_size();
+    auto sizes = exterior_cache_shape.sizes();
+    size = exterior_cache_shape.byte_size();
 
     for (size_t i = 0; i < sizes.size(); i++) {
-      std::string iname = std::string("i") + std::to_string(i);
+      std::string iname = "i" + std::to_string(i);
       swap_idxs.emplace_back(stripe::Index{iname, sizes[i]});
       ref_swap_access.emplace_back(stripe::Affine(iname));
       cache_swap_access.emplace_back(stripe::Affine(iname));
     }
 
     ref_swap_shape = ref.interior_shape;
-    cache_swap_shape = cache_shape;
+    cache_swap_shape = exterior_cache_shape;
     for (size_t i = 0; i < sizes.size(); i++) {
       ref_swap_shape.dims[i].size = 1;
       cache_swap_shape.dims[i].size = 1;
@@ -93,9 +95,11 @@ struct RefInfo {
   // resulted in this alias.
   AliasInfo alias_info;
 
-  // The shape of the ref's data when it's in the local cache.
-  // Note that this may differ from the ref's shape.
-  TensorShape cache_shape;
+  // The shape of the ref's data when it's in the local cache, when
+  // the data is exterior to the sub-statements (i.e. eligible to be
+  // reused across sub-blocks).  Note that this may differ from the
+  // ref's shape.
+  TensorShape exterior_cache_shape;
 
   // The shapes to use for swap block refinements.
   TensorShape ref_swap_shape;
@@ -224,12 +228,69 @@ void SubtractRange(MemRange sub, std::list<MemRange>* range_list) {
   IVLOG(3, "        Ranges are now " << *range_list);
 }
 
+// Represents a single proposed placement of a statement input or output.
+struct Placement {
+  Placement() {}
+  Placement(stripe::RefDir dir_, std::size_t size_, bool is_internal_, const std::string& interior_name_)
+      : dir{dir_}, size{size_}, is_internal{is_internal_}, interior_name{interior_name_} {}
+  Placement(stripe::RefDir dir_, MemRange range_, CacheEntry* entry_)
+      : dir{dir_}, size{range_.end - range_.begin}, range{range_}, entry{entry_} {}
+
+  // What the Statement is doing with this placement.
+  stripe::RefDir dir = stripe::RefDir::None;
+
+  // The size of the placement (equal to range.end-range.begin, once
+  // range has been established).
+  std::size_t size;
+
+  // Where the entry should go.
+  MemRange range;
+
+  // The entry for this Placement.  N.B. This may be nullptr, in which
+  // case it will be filled in when the plan is accepted.
+  CacheEntry* entry = nullptr;
+
+  // Indicates whether this is an internal placement (caching a
+  // partial refinement swapped within the sub-statement block being
+  // scheduled) or an external placement (which can be reused between
+  // sub-statements).
+  bool is_internal = false;
+
+  // For internal placements, the interior name used to refer to
+  // the entry within the block.
+  std::string interior_name;
+
+  // The internal access affines for this placement (used for adding
+  // subblock-local swaps; only used if is_internal==true).
+  std::vector<stripe::Affine> access;
+};
+
+std::ostream& operator<<(std::ostream& o, const Placement& p) { return o << p.range; }
+
+struct PlacementKey {
+  RefInfo* ri;
+  TensorShape cache_shape;
+  std::vector<stripe::Affine> access;
+};
+
+bool operator<(const PlacementKey& lhs, const PlacementKey& rhs) {
+  return std::tie(lhs.ri, lhs.cache_shape, lhs.access) < std::tie(rhs.ri, rhs.cache_shape, rhs.access);
+}
+
+// Represents a placement plan for a particular Statement.
+using PlacementPlan = std::map<PlacementKey, Placement>;
+
 // CacheEntry represents one particular local instantiation of a
 // value.  (i.e. swapping out a value and swapping it back in results
 // in a new CacheEntry).
 struct CacheEntry {
-  CacheEntry(RefInfo* source_, MemRange range_)
-      : source{source_}, name{source->name + "_" + std::to_string(source->next_cache_entry++)}, range{range_} {
+  explicit CacheEntry(std::pair<PlacementKey, Placement> pkey_placement)
+      : source{pkey_placement.first.ri},
+        name{source->name + "^" + std::to_string(source->next_cache_entry++)},
+        range{pkey_placement.second.range},
+        shape{pkey_placement.first.cache_shape},
+        is_internal{pkey_placement.second.is_internal},
+        interior_name{pkey_placement.second.interior_name} {
     uncovered_ranges.push_back(range);
   }
 
@@ -242,6 +303,19 @@ struct CacheEntry {
 
   // The CacheEntry's memory range when it's being used.
   MemRange range;
+
+  // The data shape for this CacheEntry.  For internal cache entries,
+  // this is the shape of the entry interior to the sub-statement
+  // that's accessing it; otherwise, it is the shape of the cache
+  // entry exterior to any particular sub-statement.
+  TensorShape shape;
+
+  // Whether this CacheEntry is internal-only.
+  bool is_internal;
+
+  // When this CacheEntry is internal to a sub-statement (a Block),
+  // the interior name used for it within the block.
+  std::string interior_name;
 
   // CacheEntry usage tracking.  These track the runtime-future use of
   // the CacheEntry's memory range.
@@ -292,27 +366,32 @@ struct CacheEntry {
   std::list<MemRange> uncovered_ranges;
 };
 
-// Represents a single proposed placement of a statement input or output.
-struct Placement {
-  Placement() {}
-  explicit Placement(stripe::RefDir dir_) : dir{dir_} {}
-  Placement(stripe::RefDir dir_, MemRange range_, CacheEntry* entry_) : dir{dir_}, range{range_}, entry{entry_} {}
+// Represents a unit of IO performed by a sub-statement.
+struct IO {
+  IO(RefInfo* ri_, stripe::RefDir dir_) : ri{ri_}, dir{dir_}, interior_shape{ri_->exterior_cache_shape} {}
+  explicit IO(std::pair<RefInfo*, stripe::RefDir> p) : IO{p.first, p.second} {}
 
-  // What the Statement is doing with this placement.
-  stripe::RefDir dir = stripe::RefDir::None;
+  IO(RefInfo* ri_, const stripe::Refinement& interior_ref)
+      : ri{ri_},
+        dir{interior_ref.dir},
+        interior_shape{interior_ref.interior_shape},
+        interior_name{interior_ref.into},
+        access{interior_ref.access} {
+    // Restride the interior shape - if it's used, it needs to be in
+    // compact form.
+    std::size_t stride = 1;
+    for (std::size_t i = interior_shape.dims.size(); i; --i) {
+      interior_shape.dims[i - 1].stride = stride;
+      stride *= interior_shape.dims[i - 1].size;
+    }
+  }
 
-  // Where the entry should go.
-  MemRange range;
-
-  // The entry for this Placement.  N.B. This may be nullptr, in which
-  // case it will be filled in when the plan is accepted.
-  CacheEntry* entry = nullptr;
+  RefInfo* ri;
+  stripe::RefDir dir;
+  TensorShape interior_shape;
+  std::string interior_name;
+  std::vector<stripe::Affine> access;  // N.B. Only valid for block statements
 };
-
-std::ostream& operator<<(std::ostream& o, const Placement& p) { return o << p.range; }
-
-// Represents a placement plan for a particular Statement.
-using PlacementPlan = std::unordered_map<RefInfo*, Placement>;
 
 // Encapsulates the notion of a post-scheduling update to a Statement,
 // rewriting its refinement references (recursively, in the case of
@@ -356,8 +435,15 @@ class StatementBinder final {
       if (ri->ref.cache_unit) {
         ref->location.unit = *ri->ref.cache_unit;
       }
-      for (size_t i = 0; i < ref->interior_shape.dims.size(); i++) {
-        ref->interior_shape.dims[i].stride = ri->cache_shape.dims[i].stride;
+      if (ri->cache_entry->is_internal) {
+        ref->interior_shape = ri->cache_entry->shape;
+        for (auto& access : ref->access) {
+          access = 0;
+        }
+      } else {
+        for (size_t i = 0; i < ref->interior_shape.dims.size(); i++) {
+          ref->interior_shape.dims[i].stride = ri->exterior_cache_shape.dims[i].stride;
+        }
       }
       FixupRefs(block_, ref->into);
     }
@@ -373,8 +459,8 @@ class StatementBinder final {
 // Gathers a Statement's IO information.
 class IOGatherer final : private stripe::MutableStmtVisitor {
  public:
-  static std::pair<std::vector<std::pair<RefInfo*, stripe::RefDir>>, StatementBinder> Gather(
-      stripe::Statement* stmt, const stripe::Location& loc, std::map<RefInfoKey, RefInfo>* ri_map) {
+  static std::pair<std::vector<IO>, StatementBinder> Gather(stripe::Statement* stmt, const stripe::Location& loc,
+                                                            std::map<RefInfoKey, RefInfo>* ri_map) {
     IOGatherer visitor{loc, ri_map};
     stmt->Accept(&visitor);
     return std::make_pair(std::move(visitor.ios_), std::move(visitor.binder_));
@@ -416,7 +502,7 @@ class IOGatherer final : private stripe::MutableStmtVisitor {
         it_inserted.first->second = UnionDir(it_inserted.first->second, stripe::RefDir::Out);
       }
     }
-    ios_ = std::vector<std::pair<RefInfo*, stripe::RefDir>>{accesses.cbegin(), accesses.cend()};
+    ios_ = std::vector<IO>{accesses.cbegin(), accesses.cend()};
     binder_ = StatementBinder{std::move(updates)};
   }
 
@@ -424,25 +510,20 @@ class IOGatherer final : private stripe::MutableStmtVisitor {
 
   void Visit(stripe::Block* block) final {
     std::vector<std::pair<stripe::Refinement*, RefInfo*>> updates;
-    std::unordered_map<RefInfo*, stripe::RefDir> accesses;
     for (auto& ref : block->refs) {
       if (ref.dir == stripe::RefDir::None) {
         continue;  // This isn't an IO ref.
       }
       auto* ri = &ri_map_->at(ref.from);
-      auto it_inserted = accesses.emplace(ri, ref.dir);
-      if (!it_inserted.second) {
-        it_inserted.first->second = UnionDir(it_inserted.first->second, ref.dir);
-      }
       updates.emplace_back(std::make_pair(&ref, ri));
+      ios_.emplace_back(ri, ref);
     }
-    ios_ = std::vector<std::pair<RefInfo*, stripe::RefDir>>{accesses.cbegin(), accesses.cend()};
     binder_ = StatementBinder{std::move(updates), block, loc_};
   }
 
   const stripe::Location* loc_;
   std::map<RefInfoKey, RefInfo>* ri_map_;
-  std::vector<std::pair<RefInfo*, stripe::RefDir>> ios_;
+  std::vector<IO> ios_;
   StatementBinder binder_;
 };
 
@@ -465,34 +546,35 @@ class Scheduler {
   //   that's already been established by a runtime-future Statement,
   // * A map from memory localities (specified via Affines) of vectors
   //   of RefInfos that need to be placed for the current Statement.
-  std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>>
-  GatherPlacementState(const std::vector<std::pair<RefInfo*, stripe::RefDir>>& ios);
+  std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<IO>>> GatherPlacementState(const std::vector<IO>& ios);
 
   // Makes a placement plan, trying several strategies.
-  PlacementPlan MakePlacementPlan(const std::vector<std::pair<RefInfo*, stripe::RefDir>>& ios);
+  boost::optional<PlacementPlan> TryMakePlan(stripe::Block* current_block, const std::vector<IO>& ios);
 
   // Attempts to augment a placement plan using the supplied ranges.
-  bool TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos,
+  bool TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<PlacementKey, Placement>>& placements,
                         std::list<MemRange> ranges);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, and does not collide
   // with any previously-scheduled CacheEntry unless that CacheEntry
   // has a writer (i.e. does not require swap-in).
-  bool TryMakePlanWithNoSwaps(PlacementPlan* plan,
-                              const std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>& todos);
+  boost::optional<PlacementPlan> TryMakePlanWithNoSwaps(
+      const PlacementPlan& existing_entry_plan,
+      const std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>>& todos);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, but allows collisions
   // with previously-scheduled CacheEntries (producing swap-ins).
-  bool TryMakePlanWithSwaps(PlacementPlan* plan,
-                            const std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>& todos);
+  boost::optional<PlacementPlan> TryMakePlanWithSwaps(
+      const PlacementPlan& existing_entry_plan,
+      const std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>>& todos);
 
-  // Makes a worst-possible-case placement plan; guaranteed to always
-  // work (as long as every IO required by the statement can
-  // simultaneously fit into memory), but not guaranteed to be optimal
-  // at all.
-  PlacementPlan MakeFallbackPlan(const std::vector<std::pair<RefInfo*, stripe::RefDir>>& ios);
+  // Makes an worst-possible-case placement plan, by scheduling
+  // without regard to existing entries.  This is guaranteed to work
+  // iff the shape of every refinement can simultaneously fit into
+  // memory, but isn't guaranteed to be optimal at all.
+  boost::optional<PlacementPlan> TryMakeFallbackPlan(const std::vector<std::pair<PlacementKey, Placement>>& placements);
 
   // Schedules a swap-in operation:
   // * Adds a swap-in block just before the supplied iterator,
@@ -515,7 +597,7 @@ class Scheduler {
   // we add the SwapIn, there will be no subsequently-added writers of
   // the target; other accessors of the same underlying value will
   // access it via a different (newly created) CacheEntry.
-  stripe::StatementIt AddSwapIn(stripe::StatementIt si, CacheEntry* ent);
+  stripe::StatementIt ScheduleSwapIn(stripe::StatementIt si, CacheEntry* ent);
 
   // Schedules a swap-out operation:
   // * Adds a swap-out block just before the supplied iterator,
@@ -526,8 +608,16 @@ class Scheduler {
   //
   // If the swap-out block should have a dependency on something, it's
   // up to the caller to add it.
-  stripe::StatementIt AddSwapOut(stripe::StatementIt si, CacheEntry* ent,
-                                 const std::unordered_set<stripe::Statement*>& swap_in_readers);
+  stripe::StatementIt ScheduleSwapOut(stripe::StatementIt si, CacheEntry* ent,
+                                      const std::unordered_set<stripe::Statement*>* swap_in_readers);
+
+  // Schedules a swap-in operation at the beginning of a sub-block.
+  void AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const std::string& backing_ref_name,
+                         const std::vector<stripe::Affine>& access);
+
+  // Schedules a swap-out operation at the end of a sub-block.
+  void AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const std::string& backing_ref_name,
+                          const std::vector<stripe::Affine>& access);
 
   // Rebuilds the scheduler's block's transitive dependencies -- the
   // deps computed directly by scheduling are conservative.
@@ -538,7 +628,6 @@ class Scheduler {
   std::size_t mem_bytes_;
   std::size_t alignment_;
   stripe::Location xfer_loc_;
-  bool allow_out_of_range_accesses_;
   std::map<RefInfoKey, RefInfo> ri_map_;
   std::unordered_map<stripe::Refinement*, std::vector<RefInfo*>> base_ref_aliases_;
 
@@ -597,7 +686,6 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
       mem_bytes_{options.mem_kib() * 1024},
       alignment_{options.alignment() ? options.alignment() : kDefaultAlignment},
       xfer_loc_(stripe::FromProto(options.xfer_loc())),
-      allow_out_of_range_accesses_{options.allow_out_of_range_accesses()},
       ri_map_{BuildRefInfoMap(block, alias_map)} {
   for (auto& rikey_ri : ri_map_) {
     RefInfo* ri = &rikey_ri.second;
@@ -619,10 +707,18 @@ void Scheduler::Run() {
     auto si_next = si;
     --si;
 
-    IVLOG(3, "Scheduling " << si->get());
+    stripe::Block* current_block = dynamic_cast<stripe::Block*>(si->get());
+
+    if (VLOG_IS_ON(3)) {
+      if (current_block) {
+        VLOG(3) << "Scheduling " << current_block->name;
+      } else {
+        VLOG(3) << "Scheduling " << si->get();
+      }
+    }
 
     // Build the vector of IOs performed by this statement.
-    std::vector<std::pair<RefInfo*, stripe::RefDir>> ios;
+    std::vector<IO> ios;
     StatementBinder binder;
     std::tie(ios, binder) = IOGatherer::Gather(si->get(), mem_loc_, &ri_map_);
 
@@ -630,17 +726,17 @@ void Scheduler::Run() {
     // by scheduling this statement.
     std::unordered_map<RefInfo*, std::unordered_set<stripe::Statement*>> ri_writer_swap_in_readers;
     {
-      for (const auto& ri_dir : ios) {
-        if (!IsWriteDir(ri_dir.second)) {
+      for (const auto& io : ios) {
+        if (!IsWriteDir(io.dir)) {
           continue;
         }
-        RefInfo* ri = ri_dir.first;
+        RefInfo* ri = io.ri;
         auto* ri_writer_swap_in_readers_set = &ri_writer_swap_in_readers[ri];
         for (RefInfo* alias_ri : *ri->aliases) {
           if ((alias_ri == ri) || AliasInfo::Compare(ri->alias_info, alias_ri->alias_info) != AliasType::None) {
             // All accesses to alias_ri will depend on this write.
             if ((alias_ri != ri) && alias_ri->cache_entry) {
-              si_next = AddSwapIn(si_next, alias_ri->cache_entry);
+              si_next = ScheduleSwapIn(si_next, alias_ri->cache_entry);
               alias_ri->cache_entry = nullptr;
             }
 
@@ -655,7 +751,22 @@ void Scheduler::Run() {
     }
 
     // Figure out where we're going to put any newly-created CacheEntries.
-    PlacementPlan plan = MakePlacementPlan(ios);
+    boost::optional<PlacementPlan> plan_option = TryMakePlan(current_block, ios);
+    if (!plan_option) {
+      LOG(WARNING) << "Failed to create placement plan fitting within " << (mem_bytes_ / 1024)
+                   << " KiB memory boundary";
+      if (current_block) {
+        LOG(WARNING) << "Block " << current_block->name << " simultaneously requires:";
+      } else {
+        LOG(WARNING) << "The program simultaneously requires:";
+      }
+      for (const auto& io : ios) {
+        LOG(WARNING) << "  " << io.ri->ref;
+      }
+      throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available"});
+    }
+
+    PlacementPlan plan = std::move(plan_option).value();
 
     // For each input in the plan:
     //
@@ -710,6 +821,9 @@ void Scheduler::Run() {
 
     std::map<stripe::Affine, std::list<CacheEntry*>> added_affine_entries;
 
+    std::vector<stripe::Refinement> added_refs;
+    std::unordered_map<RefInfo*, std::string> internal_swap_backing_ref_names;
+
     // TODO: There's a straightforward way of walking the plan's
     // placements and the existing active_affine_entries_ at the same
     // time, saving a lot of comparisons.  We don't bother for now,
@@ -718,68 +832,99 @@ void Scheduler::Run() {
     // observe a lot of comparisons being done via RangesOverlap(), we
     // have a way to fix it.
 
-    for (auto& ri_placement : plan) {
-      IVLOG(3, "Applying placement for " << ri_placement.first);
-      RefInfo* ri = ri_placement.first;
-      auto& placement = ri_placement.second;
-      if (!allow_out_of_range_accesses_ && mem_bytes_ < placement.range.end) {
-        LOG(WARNING) << "Failed to create placement plan fitting within " << (mem_bytes_ / 1024)
-                     << " KiB memory boundary";
-        LOG(WARNING) << "The program simultaneously requires:";
-        for (const auto& ri_placement : plan) {
-          LOG(WARNING) << "  " << ri_placement.first->ref;
-        }
-        throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available (placing " +
-                                                  ri_placement.first->name + ")"});
-      }
+    for (auto& pkey_placement : plan) {
+      RefInfo* ri = pkey_placement.first.ri;
+      IVLOG(3, "Applying placement for " << ri->name);
+      auto& placement = pkey_placement.second;
+
       CacheEntry* ent = placement.entry;
       bool is_new_entry = (ent == nullptr);
-      IVLOG(3, "  IsNewEntry: " << is_new_entry);
 
       if (is_new_entry) {
         // This Placement requires a new entry.
-        ent = &*cache_entries_.emplace(cache_entries_.end(), CacheEntry{ri, placement.range});
+        ent = &*cache_entries_.emplace(cache_entries_.end(), CacheEntry{pkey_placement});
         IVLOG(3, "Created cache entry " << ent->name << " at " << ent->range
-                                        << " with affine=" << ent->source->ref.location.unit);
+                                        << " with affine=" << ent->source->ref.location.unit << " shape=" << ent->shape
+                                        << " is_internal=" << ent->is_internal);
         placement.entry = ent;
         ri->cache_entry = ent;
       }
 
-      // Add dependency tracking information for this CacheEntry.
-      if (IsWriteDir(placement.dir)) {
-        for (auto& reader_aliasinfo : ent->readers) {
-          if (AliasInfo::Compare(ri->alias_info, reader_aliasinfo.second) != AliasType::None) {
-            reader_aliasinfo.first->deps.emplace_back(si);
+      stripe::StatementIt reuse_dep = si;
+
+      if (placement.is_internal) {
+        // This CacheEntry reserves temporary cache space within a
+        // serialized sub-statement (which must be a Block).  So we
+        // need to insert swap-in and swap-out instructions into the
+        // block.
+        //
+        // TODO: Once we have Block serialization flag support, make
+        // sure to set current_block->is_serialized = true
+
+        // We need to make sure the inner block can access the backing refinement.
+        std::string internal_swap_backing_ref_name;
+        auto it = internal_swap_backing_ref_names.find(ri);
+        if (it != internal_swap_backing_ref_names.end()) {
+          internal_swap_backing_ref_name = it->second;
+        } else {
+          internal_swap_backing_ref_name = current_block->unique_ref_name(ri->name + "_storage");
+          internal_swap_backing_ref_names[ri] = internal_swap_backing_ref_name;
+          added_refs.push_back(stripe::Refinement{
+              placement.dir,                   // dir
+              ent->source->ref.into,           // from
+              internal_swap_backing_ref_name,  // into
+              ent->source->alias_info.access,  // access
+              ent->source->alias_info.shape,   // shape
+              "",                              // agg_op
+              ent->source->ref.location,       // location
+              ent->source->ref.is_const,       // is_const
+              0,                               // offset
+              ent->source->ref.bank_dim,       // bank_dim
+          });
+        }
+        if (stripe::IsReadDir(placement.dir)) {
+          AddSubblockSwapIn(current_block, ent, internal_swap_backing_ref_name, pkey_placement.first.access);
+        }
+        if (stripe::IsWriteDir(placement.dir)) {
+          AddSubblockSwapOut(current_block, ent, internal_swap_backing_ref_name, pkey_placement.first.access);
+        }
+      } else {
+        // This CacheEntry may be reused between multiple sub-statements.
+        // Add dependency tracking information and swaps as needed.
+        if (IsWriteDir(placement.dir)) {
+          for (auto& reader_aliasinfo : ent->readers) {
+            if (AliasInfo::Compare(ri->alias_info, reader_aliasinfo.second) != AliasType::None) {
+              reader_aliasinfo.first->deps.emplace_back(si);
+            }
+          }
+
+          ent->writers.emplace(si->get(), ri->alias_info);
+          if (si->get() == ent->source->earliest_writer) {
+            ent->saw_earliest_writer = true;
           }
         }
 
-        ent->writers.emplace(si->get(), ri->alias_info);
-        if (si->get() == ent->source->earliest_writer) {
-          ent->saw_earliest_writer = true;
+        if (IsReadDir(placement.dir)) {
+          ent->readers.emplace(si->get(), ri->alias_info);
         }
-      }
 
-      if (IsReadDir(placement.dir)) {
-        ent->readers.emplace(si->get(), ri->alias_info);
-      }
+        ent->first_accessor = si;
 
-      ent->first_accessor = si;
+        // Determine whether this CacheEntry will need to be swapped
+        // out, setting up reuse_dep to be the dependency that
+        // overlapping CacheEntry objects will use.
 
-      // Determine whether this CacheEntry will need to be swapped
-      // out, setting up reuse_dep to be the dependency that
-      // overlapping CacheEntry objects will use.
-      stripe::StatementIt reuse_dep = si;
-
-      if (IsWriteDir(placement.dir) &&
-          ((IsWriteDir(ri->ref.dir) && !ri->saw_final_write) || !ri_writer_swap_in_readers[ri].empty())) {
-        IVLOG(3, "  Adding swap-out for " << ent->name << " at " << ent->range);
-        IVLOG(3, "    IsWriteDir(): " << IsWriteDir(ri->ref.dir));
-        IVLOG(3, "    SawFinalWrite(): " << ri->saw_final_write);
-        IVLOG(3, "    Swap-in-readers.empty(): " << ri->swap_in_readers.empty());
-        auto next_si = si;
-        ++next_si;
-        reuse_dep = AddSwapOut(next_si, ent, ri_writer_swap_in_readers[ri]);
-        (*reuse_dep)->deps.emplace_back(si);
+        if (IsWriteDir(placement.dir) &&
+            ((IsWriteDir(ri->ref.dir) && !ri->saw_final_write) || !ri_writer_swap_in_readers[ri].empty())) {
+          IVLOG(3, "  Adding swap-out for " << ent->name << " at " << ent->range);
+          IVLOG(3, "    IsWriteDir(): " << IsWriteDir(ri->ref.dir));
+          IVLOG(3, "    SawFinalWrite(): " << ri->saw_final_write);
+          IVLOG(3, "    Swap-in-readers.empty(): " << ri->swap_in_readers.empty());
+          auto next_si = si;
+          ++next_si;
+          reuse_dep = ScheduleSwapOut(next_si, ent, &ri_writer_swap_in_readers[ri]);
+          (*reuse_dep)->deps.emplace_back(si);
+        }
       }
 
       // Add dependency tracking information for all
@@ -805,7 +950,7 @@ void Scheduler::Run() {
             auto next_it = reuse_dep;
             ++next_it;
             IVLOG(3, "  Adding swap-in for " << future_ent->name << " at " << future_ent->range);
-            AddSwapIn(next_it, future_ent);
+            ScheduleSwapIn(next_it, future_ent);
           }
           for (auto& writer_aliasinfo : future_ent->writers) {
             writer_aliasinfo.first->deps.emplace_back(reuse_dep);
@@ -836,14 +981,14 @@ void Scheduler::Run() {
         }
       }
 
-      if (is_new_entry) {
+      if (is_new_entry && !placement.is_internal) {
         IVLOG(3, "Adding " << ent->name << " at " << ent->range << " to added_affine_entries");
         auto& active_entlist = added_affine_entries[ent->source->ref.location.unit];
         ent->active_iterator = active_entlist.emplace(active_entlist.end(), ent);
         IVLOG(3, "  Active iterator was " << &*ent->active_iterator << "; list at " << &active_entlist
                                           << ", size=" << active_entlist.size());
       }
-    }
+    }  // Plan-application loop
 
     IVLOG(3, "Splicing into active_affine_entries_");
     for (auto& added_affine_entlist : added_affine_entries) {
@@ -863,9 +1008,22 @@ void Scheduler::Run() {
     }
 
     binder.ApplyBindings();
+    if (current_block && added_refs.size()) {
+      current_block->refs.insert(current_block->refs.end(), added_refs.begin(), added_refs.end());
+    }
+
+    // Remove all RefInfo pointers to internal-only CacheEntries used
+    // by the plan, so that they're not eligible for reuse by
+    // subsequent statements.
+    for (auto& pkey_placement : plan) {
+      RefInfo* ri = pkey_placement.first.ri;
+      if (ri->cache_entry && ri->cache_entry->is_internal) {
+        ri->cache_entry = nullptr;
+      }
+    }
   }
 
-  // Add swap-in writers for every CacheEntry without a writer.
+  // Add swap-in writers for every active CacheEntry without a writer.
   //
   // All of the writerless CacheEntries can co-exist at the beginning
   // of the program, and we guarantee that outputs will not clobber
@@ -883,7 +1041,7 @@ void Scheduler::Run() {
     for (auto* ent : affine_entlist.second) {
       if (!ent->source->earliest_writer) {
         IVLOG(3, "  Adding final swap-in for " << ent->name);
-        AddSwapIn(ent->first_accessor, ent);
+        ScheduleSwapIn(ent->first_accessor, ent);
       }
     }
   }
@@ -898,7 +1056,7 @@ void Scheduler::Run() {
     ref->dir = stripe::RefDir::None;
     ref->from.clear();
     ref->into = ent.name;
-    ref->interior_shape = ent.source->cache_shape;
+    ref->interior_shape = ent.shape;
     ref->location = mem_loc_;
     if (ent.source->ref.cache_unit) {
       ref->location.unit = *ent.source->ref.cache_unit;
@@ -929,207 +1087,295 @@ void Scheduler::Run() {
   });
 }
 
-std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>>
-Scheduler::GatherPlacementState(const std::vector<std::pair<RefInfo*, stripe::RefDir>>& ios) {
+std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<IO>>> Scheduler::GatherPlacementState(
+    const std::vector<IO>& ios) {
   PlacementPlan plan;
   std::unordered_map<RefInfo*, stripe::RefDir> todo_map;
 
-  for (const auto& ri_dir : ios) {
-    RefInfo* ri = ri_dir.first;
-    stripe::RefDir dir = ri_dir.second;
-    VLOG(3) << "  Planning IO for RefInfo " << ri << " " << ri->name;
+  for (const auto& io : ios) {
+    VLOG(3) << "  Planning IO for RefInfo " << io.ri << " " << io.ri->name;
     // See whether we've already created a Placement for this ref.
-    auto it = plan.find(ri);
+    PlacementKey pkey{io.ri, io.ri->exterior_cache_shape, {}};
+    auto it = plan.find(pkey);
     if (it != plan.end()) {
       // We've already made a Placement; add in our direction, and we're done.
-      it->second.dir = UnionDir(it->second.dir, dir);
+      it->second.dir = UnionDir(it->second.dir, io.dir);
       continue;
     }
 
     // See whether we already have an active CacheEntry for this IO.
-    if (ri->cache_entry && !ri->cache_entry->saw_earliest_writer) {
+    if (io.ri->cache_entry && !io.ri->cache_entry->saw_earliest_writer) {
       // We do -- create a Placement describing it.
-      plan.emplace(ri, Placement{dir, ri->cache_entry->range, ri->cache_entry});
+      plan.emplace(pkey, Placement{io.dir, io.ri->cache_entry->range, io.ri->cache_entry});
       continue;
     }
 
     // Otherwise, we're going to need to allocate a Placement.  We'll
     // do it after processing all inputs, so that we can do placement
     // in size order with correct directions.
-    auto it_inserted = todo_map.emplace(ri, dir);
+    auto it_inserted = todo_map.emplace(io.ri, io.dir);
     if (!it_inserted.second) {
-      it_inserted.first->second = UnionDir(it_inserted.first->second, dir);
+      it_inserted.first->second = UnionDir(it_inserted.first->second, io.dir);
     }
   }
 
   // Organize the placements to be made, largest-first, using the
   // underlying refinement name as the tiebreaker.
-  std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>> todos;
+  std::map<stripe::Affine, std::vector<IO>> todos;
   for (auto& refinfo_refdir : todo_map) {
-    todos[refinfo_refdir.first->ref.location.unit].emplace_back(refinfo_refdir);
+    todos[refinfo_refdir.first->ref.location.unit].emplace_back(refinfo_refdir.first, refinfo_refdir.second);
   }
-  for (auto& affine_refvec : todos) {
-    std::sort(affine_refvec.second.begin(), affine_refvec.second.end(),
-              [](std::pair<RefInfo*, stripe::RefDir> lhs, std::pair<RefInfo*, stripe::RefDir> rhs) {
-                return std::tie(rhs.first->size, rhs.first->name) < std::tie(lhs.first->size, lhs.first->name);
-              });
+  for (auto& affine_ios : todos) {
+    std::sort(affine_ios.second.begin(), affine_ios.second.end(), [](IO lhs, IO rhs) {
+      return std::tie(rhs.ri->size, rhs.ri->name) < std::tie(lhs.ri->size, lhs.ri->name);
+    });
   }
 
   return std::make_tuple(std::move(plan), std::move(todos));
 }
 
-PlacementPlan Scheduler::MakePlacementPlan(const std::vector<std::pair<RefInfo*, stripe::RefDir>>& ios) {
+std::vector<std::pair<PlacementKey, Placement>> MakeFullPlacements(const std::vector<IO>& ios) {
+  std::vector<std::pair<PlacementKey, Placement>> result;
+  for (const auto& io : ios) {
+    result.emplace_back(PlacementKey{io.ri, io.ri->exterior_cache_shape, {}},
+                        Placement{io.dir, io.ri->size, false, ""});
+  }
+  return result;
+}
+
+std::vector<std::pair<PlacementKey, Placement>> MakePartialPlacements(const std::vector<IO>& ios) {
+  std::vector<std::pair<PlacementKey, Placement>> result;
+  for (const auto& io : ios) {
+    std::size_t interior_size = io.interior_shape.byte_size();
+    bool is_internal = interior_size != io.ri->size;
+    IVLOG(3, "      " << io.ri->name << " shape=" << io.interior_shape << " interior_size=" << interior_size
+                      << " external_size=" << io.ri->size << " is_internal=" << is_internal);
+    std::vector<stripe::Affine> access;
+    if (is_internal) {
+      access = io.access;
+    }
+    result.emplace_back(PlacementKey{io.ri, io.interior_shape, access},
+                        Placement{io.dir, interior_size, is_internal, io.interior_name});
+  }
+  return result;
+}
+
+boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_block, const std::vector<IO>& ios) {
   // Initialize useful planning inputs.
   PlacementPlan existing_entry_plan;
-  std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>> todos;
+  std::map<stripe::Affine, std::vector<IO>> todos;
+  std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>> todo_fulls;
+  std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>> todo_partials;
 
   std::tie(existing_entry_plan, todos) = GatherPlacementState(ios);
 
   if (VLOG_IS_ON(3)) {
     IVLOG(3, "  Existing entries in plan:");
-    for (auto& ri_placement : existing_entry_plan) {
-      IVLOG(3, "    " << ri_placement.first << " -> " << ri_placement.second);
+    for (auto& pkey_placement : existing_entry_plan) {
+      IVLOG(3, "    " << pkey_placement.first.ri->name << " -> " << pkey_placement.second);
     }
     IVLOG(3, "  ToDos:");
-    for (auto& affine_refvec : todos) {
-      IVLOG(3, "    Affine=" << affine_refvec.first);
-      for (auto& ri_dir : affine_refvec.second) {
-        IVLOG(3, "      Ref=" << ri_dir.first->name << " size=" << ri_dir.first->size);
+    for (auto& unit_ios : todos) {
+      IVLOG(3, "    Affine=" << unit_ios.first);
+      for (const auto& io : unit_ios.second) {
+        IVLOG(3, "      Ref=" << io.ri->name << " size=" << io.ri->size << " isize=" << io.interior_shape.byte_size());
       }
     }
   }
 
-  PlacementPlan plan{existing_entry_plan};
-  if (TryMakePlanWithNoSwaps(&plan, todos)) {
-    IVLOG(3, "  Made plan with no swaps");
+  for (const auto& unit_ios : todos) {
+    todo_fulls[unit_ios.first] = MakeFullPlacements(unit_ios.second);
+    todo_partials[unit_ios.first] = MakePartialPlacements(unit_ios.second);
+  }
+
+  boost::optional<PlacementPlan> plan;
+
+  plan = TryMakePlanWithNoSwaps(existing_entry_plan, todo_fulls);
+  if (plan) {
+    IVLOG(3, "  Made plan with full IO and no swaps");
+    return *plan;
+  }
+
+  plan = TryMakePlanWithNoSwaps(existing_entry_plan, todo_partials);
+  if (plan) {
+    IVLOG(3, "  Made plan with loop IO and no swaps");
+    return *plan;
+  }
+
+  plan = TryMakePlanWithSwaps(existing_entry_plan, todo_fulls);
+  if (plan) {
+    IVLOG(3, "  Made plan with full IO and swaps");
     return plan;
   }
 
-  plan = existing_entry_plan;
-  if (TryMakePlanWithSwaps(&plan, todos)) {
-    IVLOG(3, "  Made plan with swaps");
+  plan = TryMakePlanWithSwaps(existing_entry_plan, todo_partials);
+  if (plan) {
+    IVLOG(3, "  Made plan with loop IO and swaps");
     return plan;
   }
 
-  // Plan from scratch.  This does not pay attention to existing
-  // entries, so more swaps will be required, but it is guaranteed to
-  // work.
-  IVLOG(3, "  Using fallback plan");
-  return MakeFallbackPlan(ios);
+  plan = TryMakeFallbackPlan(MakeFullPlacements(ios));
+  if (plan) {
+    IVLOG(3, "  Made no-loop plan ignoring existing entries");
+    return plan;
+  }
+
+  if (current_block) {
+    plan = TryMakeFallbackPlan(MakePartialPlacements(ios));
+    if (plan) {
+      IVLOG(3, "  Made looping plan ignoring existing entries");
+      return plan;
+    }
+  }
+
+  IVLOG(3, "  Failed to make plan");
+  return boost::none;
 }
 
-bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<RefInfo*, stripe::RefDir>>& todos,
+bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<PlacementKey, Placement>>& placements,
                                  std::list<MemRange> ranges) {
-  // For each todo in largest->smallest size, determine a placement.
+  // For each IO in largest->smallest size, determine a placement.
   // For each one, we want to pick the smallest free range that is
-  // still big enough to hold the todo.
+  // still big enough to hold the IO.
   IVLOG(3, "      Looking for placements");
-  for (auto todo : todos) {
-    IVLOG(3, "        Finding placement for " << todo.first->name << ", size=" << todo.first->size);
-    std::list<MemRange>::iterator best_so_far = ranges.end();
-    std::size_t best_waste_so_far = mem_bytes_;
-    for (auto rit = ranges.begin(); rit != ranges.end(); ++rit) {
-      if (rit->size() < todo.first->size) {
-        continue;
+  for (const auto& pkey_placement : placements) {
+    auto it_inserted = plan->emplace(pkey_placement.first, pkey_placement.second);
+    if (it_inserted.second) {
+      // A new Placement.
+      std::size_t size = pkey_placement.second.size;
+      IVLOG(3, "        Finding placement for " << pkey_placement.first.ri->name << ", size=" << size);
+      std::list<MemRange>::iterator best_so_far = ranges.end();
+      std::size_t best_waste_so_far = mem_bytes_;
+      for (auto rit = ranges.begin(); rit != ranges.end(); ++rit) {
+        if (rit->size() < size) {
+          continue;
+        }
+        std::size_t waste = rit->size() - size;
+        if (best_waste_so_far <= waste) {
+          continue;
+        }
+        IVLOG(3, "          Range " << *rit << " is the best so far");
+        best_so_far = rit;
+        best_waste_so_far = waste;
       }
-      std::size_t waste = rit->size() - todo.first->size;
-      if (best_waste_so_far <= waste) {
-        continue;
+      if (best_so_far == ranges.end()) {
+        return false;
       }
-      IVLOG(3, "          Range " << *rit << " is the best so far");
-      best_so_far = rit;
-      best_waste_so_far = waste;
+      auto assigned_range = MemRange{best_so_far->begin, best_so_far->begin + size};
+      SubtractRange(assigned_range, &ranges, best_so_far);
+      it_inserted.first->second.range = assigned_range;
+    } else {
+      // An existing Placement.
+      it_inserted.first->second.dir = UnionDir(it_inserted.first->second.dir, pkey_placement.second.dir);
     }
-    if (best_so_far == ranges.end()) {
-      return false;
-    }
-    auto assigned_range = MemRange{best_so_far->begin, best_so_far->begin + todo.first->size};
-    SubtractRange(assigned_range, &ranges, best_so_far);
-    plan->emplace(todo.first, Placement{todo.second, assigned_range, nullptr});
   }
 
   return true;
 }
 
-bool Scheduler::TryMakePlanWithNoSwaps(
-    PlacementPlan* plan, const std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>& todos) {
-  IVLOG(3, "    Attempting plan with no swaps");
+boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
+    const PlacementPlan& existing_entry_plan,
+    const std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>>& todos) {
+  PlacementPlan plan{existing_entry_plan};
 
-  for (auto& affine_refvec : todos) {
+  for (auto& unit_placements : todos) {
     // Build a list of the available ranges.  For our purposes, a range
     // is available if it already has an initial writer (=> it is not
     // going to require a swap-in), and if its RefInfo is not already in
     // the plan (because RefInfos that are in the plan are required by
     // the current statement).
-    IVLOG(3, "      Planning memory affine=" << affine_refvec.first);
+    IVLOG(3, "      Planning memory affine=" << unit_placements.first);
     std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
-    for (auto* ent : active_affine_entries_[affine_refvec.first]) {
+    for (auto* ent : active_affine_entries_[unit_placements.first]) {
+      PlacementKey pkey{ent->source, ent->source->exterior_cache_shape, {}};
       IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " saw_earliest_writer="
-                                  << ent->saw_earliest_writer << " plan.count=" << plan->count(ent->source));
-      if (!(ent->saw_earliest_writer && !plan->count(ent->source))) {
+                                  << ent->saw_earliest_writer << " plan.count=" << plan.count(pkey));
+      if (!(ent->saw_earliest_writer && !plan.count(pkey))) {
         IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
         SubtractRange(ent->range, &ranges);
       }
     }
 
-    if (!TryPlaceInRanges(plan, affine_refvec.second, std::move(ranges))) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool Scheduler::TryMakePlanWithSwaps(
-    PlacementPlan* plan, const std::map<stripe::Affine, std::vector<std::pair<RefInfo*, stripe::RefDir>>>& todos) {
-  IVLOG(3, "    Attempting plan with swaps");
-
-  for (auto& affine_refvec : todos) {
-    // Build a list of the available ranges.  For our purposes, a range
-    // is available as long as its RefInfo is not already in the plan
-    // (because RefInfos that are in the plan are required by the
-    // current statement).
-    std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
-    for (auto* ent : active_affine_entries_[affine_refvec.first]) {
-      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " saw_earliest_writer="
-                                  << ent->saw_earliest_writer << " plan.count=" << plan->count(ent->source));
-      if (plan->count(ent->source)) {
-        IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
-        SubtractRange(ent->range, &ranges);
-      }
-    }
-
-    if (!TryPlaceInRanges(plan, affine_refvec.second, std::move(ranges))) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-PlacementPlan Scheduler::MakeFallbackPlan(const std::vector<std::pair<RefInfo*, stripe::RefDir>>& ios) {
-  PlacementPlan plan;
-  std::size_t offset = 0;
-
-  for (const auto& ri_dir : ios) {
-    RefInfo* ri = ri_dir.first;
-    stripe::RefDir dir = ri_dir.second;
-    auto it_inserted = plan.emplace(ri, Placement{dir});
-    if (it_inserted.second) {
-      // A new Placement.
-      it_inserted.first->second.range.begin = offset;
-      it_inserted.first->second.range.end = offset + ri->size;
-      offset += math::Align(ri->size, alignment_);
-    } else {
-      // An existing Placement.
-      it_inserted.first->second.dir = UnionDir(it_inserted.first->second.dir, dir);
+    if (!TryPlaceInRanges(&plan, unit_placements.second, std::move(ranges))) {
+      return boost::none;
     }
   }
 
   return plan;
 }
 
-stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent) {
+boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
+    const PlacementPlan& existing_entry_plan,
+    const std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>>& todos) {
+  PlacementPlan plan{existing_entry_plan};
+
+  for (auto& unit_placements : todos) {
+    // Build a list of the available ranges.  For our purposes, a range
+    // is available as long as its RefInfo is not already in the plan
+    // (because RefInfos that are in the plan are required by the
+    // current statement).
+    std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
+    for (auto* ent : active_affine_entries_[unit_placements.first]) {
+      PlacementKey pkey{ent->source, ent->source->exterior_cache_shape, {}};
+      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " saw_earliest_writer="
+                                  << ent->saw_earliest_writer << " plan.count=" << plan.count(pkey));
+      if (plan.count(pkey)) {
+        IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
+        SubtractRange(ent->range, &ranges);
+      }
+    }
+
+    if (!TryPlaceInRanges(&plan, unit_placements.second, std::move(ranges))) {
+      return boost::none;
+    }
+  }
+
+  return plan;
+}
+
+boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
+    const std::vector<std::pair<PlacementKey, Placement>>& placements) {
+  // TODO: Consider pipelining and small-group parallel processing.
+  //       There's an interesting tradeoff here: increased parallelism
+  //       means we have less memory to hold cross-substatement data,
+  //       which may then require additional swapping.  So we may want
+  //       to schedule parallelism as part of the overall scheduling
+  //       pass, rather than as a separate pass.
+
+  PlacementPlan plan;
+  std::map<stripe::Affine, std::size_t> offsets;
+
+  for (const auto& pkey_placement : placements) {
+    offsets[pkey_placement.first.ri->ref.location.unit] = 0;
+  }
+
+  for (const auto& pkey_placement : placements) {
+    auto it_inserted = plan.emplace(pkey_placement.first, pkey_placement.second);
+    if (it_inserted.second) {
+      std::size_t& offset = offsets.at(pkey_placement.first.ri->ref.location.unit);
+      // A new Placement.
+      std::size_t size = pkey_placement.second.size;
+      it_inserted.first->second.range.begin = offset;
+      it_inserted.first->second.range.end = offset + size;
+      offset += math::Align(size, alignment_);
+      IVLOG(3, "      Placed " << pkey_placement.first.ri->name << " at " << it_inserted.first->second.range
+                               << ", next=" << offset);
+    } else {
+      // An existing Placement.
+      it_inserted.first->second.dir = UnionDir(it_inserted.first->second.dir, pkey_placement.second.dir);
+    }
+  }
+
+  for (const auto& unit_offset : offsets) {
+    if (mem_bytes_ < unit_offset.second) {
+      return boost::none;
+    }
+  }
+
+  return plan;
+}
+
+stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry* ent) {
   stripe::Block swap_block;
   ent->source->used = true;
   swap_block.name = "swap_in_" + ent->name;
@@ -1179,8 +1425,8 @@ stripe::StatementIt Scheduler::AddSwapIn(stripe::StatementIt si, CacheEntry* ent
   return swap_in_it;
 }
 
-stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* ent,
-                                          const std::unordered_set<stripe::Statement*>& swap_in_readers) {
+stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntry* ent,
+                                               const std::unordered_set<stripe::Statement*>* swap_in_readers) {
   stripe::Block swap_block;
   ent->source->used = true;
   swap_block.name = "swap_out_" + ent->name;
@@ -1220,11 +1466,141 @@ stripe::StatementIt Scheduler::AddSwapOut(stripe::StatementIt si, CacheEntry* en
   swap_block.stmts.push_back(std::make_shared<stripe::Store>("$X", "dst"));
 
   stripe::StatementIt swap_out_it = block_->stmts.emplace(si, std::make_shared<stripe::Block>(std::move(swap_block)));
-  for (stripe::Statement* reader : swap_in_readers) {
-    reader->deps.emplace_back(swap_out_it);
+  if (swap_in_readers) {
+    for (stripe::Statement* reader : *swap_in_readers) {
+      reader->deps.emplace_back(swap_out_it);
+    }
   }
   ent->source->saw_final_write = true;
   return swap_out_it;
+}
+
+void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const std::string& backing_ref_name,
+                                  const std::vector<stripe::Affine>& access) {
+  stripe::Block swap_block;
+  swap_block.name = "read_slice_of_" + ent->source->name;
+  swap_block.location = xfer_loc_;
+
+  // Add indicies used by the backing storage access offset affines to
+  // the swap statement.
+  std::unordered_set<std::string> idxs;
+  for (const auto& acc : access) {
+    for (const auto& idx_val : acc.getMap()) {
+      auto it_inserted = idxs.emplace(idx_val.first);
+      if (it_inserted.second) {
+        swap_block.idxs.emplace_back(stripe::Index{idx_val.first, 1, stripe::Affine(idx_val.first)});
+      }
+    }
+  }
+
+  // Build indices to describe ranging over the block.
+  std::vector<stripe::Affine> local_src_access;
+  std::vector<stripe::Affine> local_dst_access;
+  for (std::size_t i = 0; i < access.size(); ++i) {
+    std::string iname = swap_block.unique_idx_name("i" + std::to_string(i));
+    swap_block.idxs.emplace_back(stripe::Index{iname, ent->shape.dims[i].size});
+    local_src_access.emplace_back(stripe::Affine(iname) + access[i]);
+    local_dst_access.emplace_back(stripe::Affine(iname));
+  }
+
+  swap_block.refs.push_back(stripe::Refinement{
+      stripe::RefDir::In,           // dir
+      backing_ref_name,             // from
+      "src",                        // into
+      local_src_access,             // access
+      ent->source->ref_swap_shape,  // shape
+      "",                           // agg_op
+      ent->source->ref.location,    // location
+      ent->source->ref.is_const,    // is_const
+      0,                            // offset
+      ent->source->ref.bank_dim,    // bank_dim
+  });
+
+  auto banked_mem_loc = mem_loc_;
+  if (ent->source->ref.cache_unit) {
+    banked_mem_loc.unit = *ent->source->ref.cache_unit;
+  }
+  swap_block.refs.push_back(stripe::Refinement{
+      stripe::RefDir::Out,            // dir
+      ent->interior_name,             // from
+      "dst",                          // into
+      local_dst_access,               // access
+      ent->source->cache_swap_shape,  // shape
+      "",                             // agg_op
+      banked_mem_loc,                 // location
+      ent->source->ref.is_const,      // is_const
+      0,                              // offset
+      ent->source->ref.bank_dim,      // bank_dim
+  });
+
+  swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
+  swap_block.stmts.push_back(std::make_shared<stripe::Store>("$X", "dst"));
+
+  block->stmts.emplace(block->stmts.begin(), std::make_shared<stripe::Block>(std::move(swap_block)));
+}
+
+void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const std::string& backing_ref_name,
+                                   const std::vector<stripe::Affine>& access) {
+  stripe::Block swap_block;
+  swap_block.name = "write_slice_of_" + ent->source->name;
+  swap_block.location = xfer_loc_;
+
+  // Add indicies used by the backing storage access offset affines to
+  // the swap statement.
+  std::unordered_set<std::string> idxs;
+  for (const auto& acc : access) {
+    for (const auto& idx_val : acc.getMap()) {
+      auto it_inserted = idxs.emplace(idx_val.first);
+      if (it_inserted.second) {
+        swap_block.idxs.emplace_back(stripe::Index{idx_val.first, 1, stripe::Affine(idx_val.first)});
+      }
+    }
+  }
+
+  // Build indices to describe ranging over the block.
+  std::vector<stripe::Affine> local_src_access;
+  std::vector<stripe::Affine> local_dst_access;
+  for (std::size_t i = 0; i < access.size(); ++i) {
+    std::string iname = swap_block.unique_idx_name("i" + std::to_string(i));
+    swap_block.idxs.emplace_back(stripe::Index{iname, ent->shape.dims[i].size});
+    local_src_access.emplace_back(stripe::Affine(iname));
+    local_dst_access.emplace_back(stripe::Affine(iname) + access[i]);
+  }
+
+  auto banked_mem_loc = mem_loc_;
+  if (ent->source->ref.cache_unit) {
+    banked_mem_loc.unit = *ent->source->ref.cache_unit;
+  }
+  swap_block.refs.push_back(stripe::Refinement{
+      stripe::RefDir::In,             // dir
+      ent->interior_name,             // from
+      "src",                          // into
+      local_src_access,               // access
+      ent->source->cache_swap_shape,  // shape
+      "",                             // agg_op
+      banked_mem_loc,                 // location
+      ent->source->ref.is_const,      // is_const
+      0,                              // offset
+      ent->source->ref.bank_dim,      // bank_dim
+  });
+
+  swap_block.refs.push_back(stripe::Refinement{
+      stripe::RefDir::Out,          // dir
+      backing_ref_name,             // from
+      "dst",                        // into
+      local_dst_access,             // access
+      ent->source->ref_swap_shape,  // shape
+      "",                           // agg_op
+      ent->source->ref.location,    // location
+      ent->source->ref.is_const,    // is_const
+      0,                            // offset
+      ent->source->ref.bank_dim,    // bank_dim
+  });
+
+  swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
+  swap_block.stmts.push_back(std::make_shared<stripe::Store>("$X", "dst"));
+
+  block->stmts.emplace(block->stmts.end(), std::make_shared<stripe::Block>(std::move(swap_block)));
 }
 
 void Scheduler::RebuildTransitiveDeps() {
