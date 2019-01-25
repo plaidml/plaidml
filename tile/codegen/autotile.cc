@@ -284,7 +284,7 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
     auto result = PickBestTile(*block, options.only_po2(), options.fast(), model);
     IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result.tile << ", cost: " << result.cost);
     if (!std::isinf(result.cost)) {
-      if (ApplyTile(block, result.tile.sizes(), false)) {
+      if (ApplyTile(block, result.tile.sizes())) {
         auto inner = block->SubBlock(0);
         if (options.copy_tags()) {
           inner->tags = block->tags;
@@ -294,6 +294,9 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
         }
         block->add_tags(FromProto(options.outer_set()));
         inner->add_tags(FromProto(options.inner_set()));
+        if (options.clear_location()) {
+          block->location = Location{};
+        }
       }
     } else {
       LOG(WARNING) << "Autotile> block: " << block->name << " was NOT split: " << result.tile;

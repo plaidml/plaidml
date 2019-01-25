@@ -157,8 +157,6 @@ message SchedulePass {
   // The location to assign to the blocks used to do transfer between local
   // memory and exterior memory, i.e. the DMA device used to load / spill.
   required stripe.proto.Location xfer_loc = 5;
-  // Allow single statement which take more memory than allowed.
-  optional bool allow_out_of_range_accesses = 6 [default = false];
 }
 
 // Provide a specific address for all the allocation refinement such that no
@@ -313,6 +311,8 @@ message AutotilePass {
   // Clear the tags of the original / outer block before adding outer_set
   optional bool clear_outer = 17 [default = false];
   optional bool acc_idxs = 18 [default = true];
+  // Clear the location the original / outer block
+  optional bool clear_location = 19 [default = false];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any
