@@ -15,6 +15,12 @@ std::map<std::string, lang::RunInfo> InternalTests() {
                           SimpleShape(DataType::FLOAT32, {100, 100}))  //
       },                                                               //
       {
+          "$matmul_big",
+          lib::LoadMatMul("matmul_big",                                  //
+                          SimpleShape(DataType::FLOAT32, {1000, 1000}),  //
+                          SimpleShape(DataType::FLOAT32, {1000, 1000}))  //
+      },                                                                 //
+      {
           "$const_test",
           lib::LoadConstCalc("const_test",                         //
                              SimpleShape(DataType::FLOAT32, {1}))  //
