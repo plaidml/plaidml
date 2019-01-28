@@ -4,7 +4,6 @@
 
 #include "base/util/logging.h"
 #include "base/util/throw.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {

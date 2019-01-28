@@ -3,7 +3,7 @@
 #include "tile/codegen/tidy.h"
 
 #include "base/util/logging.h"
-#include "tile/codegen/tags.h"
+#include "tile/codegen/alias.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
