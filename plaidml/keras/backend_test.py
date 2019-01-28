@@ -1377,6 +1377,6 @@ class TestBackendOps(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    np.set_printoptions(threshold=np.nan)
+    np.set_printoptions(threshold=np.inf)
     #plaidml._internal_set_vlog(5)
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
