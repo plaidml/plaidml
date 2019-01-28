@@ -121,9 +121,9 @@ def plaidml_workspace():
 def configure_protobuf():
     http_archive(
         name = "com_google_protobuf",
-        url = "https://github.com/google/protobuf/archive/v3.5.1.zip",
-        sha256 = "1f8b9b202e9a4e467ff0b0f25facb1642727cdf5e69092038f15b37c75b99e45",
-        strip_prefix = "protobuf-3.5.1",
+        url = "https://github.com/protocolbuffers/protobuf/archive/v3.6.1.2.tar.gz",
+        sha256 = "2244b0308846bb22b4ff0bcc675e99290ff9f1115553ae9671eba1030af31bc0",
+        strip_prefix = "protobuf-3.6.1.2",
         build_file = str(Label("//bzl:protobuf.BUILD")),
     )
 
