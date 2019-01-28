@@ -84,9 +84,9 @@ plaidml_cc_library(
     name = "api",
     srcs = PLAIDML_CPP_SOURCES + ["config-bazel.cc"],
     hdrs = PLAIDML_CPP_HEADERS,
-    deps = PLAIDML_CPP_DEPS,
     data = [":configs"],
     visibility = ["//visibility:public"],
+    deps = PLAIDML_CPP_DEPS,
     alwayslink = 1,
 )
 
@@ -97,10 +97,10 @@ plaidml_cc_binary(
         "//conditions:default": [],
     }),
     linkshared = 1,
+    tags = ["linux"],
     deps = [
         ":api",
     ],
-    tags = ["linux"],
 )
 
 plaidml_cc_binary(
@@ -110,24 +110,24 @@ plaidml_cc_binary(
         "//conditions:default": [],
     }),
     linkshared = 1,
+    tags = ["msvc"],
     deps = [
         ":api",
     ],
-    tags = ["msvc"],
 )
 
 apple_binary(
     name = "libplaidml_raw.dylib",
-    platform_type = "macos",
     binary_type = "dylib",
-    deps = [":api"],
+    platform_type = "macos",
     tags = ["darwin"],
+    deps = [":api"],
 )
 
 plaidml_macos_dylib(
     name = "libplaidml_macos",
-    lib = "libplaidml.dylib",
     src = ":libplaidml_raw.dylib",
+    lib = "libplaidml.dylib",
     tags = ["darwin"],
 )
 
@@ -328,8 +328,8 @@ pkg_deb(
 )
 
 genrule(
-    name="licenses",
-    srcs=[
+    name = "licenses",
+    srcs = [
         "@boost//:license",
         "@easylogging//:license",
         "@half//:license",
@@ -339,9 +339,8 @@ genrule(
         "@com_google_protobuf//:license",
         "@six_archive//:license",
         "@llvm//:license",
-
     ],
-    outs=[
+    outs = [
         "boost-LICENSE",
         "easylogging-LICENSE",
         "half-LICENSE",
@@ -351,9 +350,8 @@ genrule(
         "protobuf-LICENSE",
         "six-LICENSE",
         "llvm-LICENSE",
-
     ],
-    cmd="cp $(SRCS) $(@D)/"
+    cmd = "cp $(SRCS) $(@D)/",
 )
 
 # The PlaidML Wheel definition.
@@ -361,24 +359,6 @@ plaidml_py_wheel(
     name = "wheel",
     package_name = "plaidml",
     srcs = PYTHON_SRCS + [":licenses"],
-    data = [
-      "plaidml.h",
-      "plaidml++.h",
-      ":configs",
-      "//plaidml/base:base.h",
-      "//plaidml/base:base_cpp.h",
-      "@half//:include/half.hpp",
-      "plaidml-config.cmake",
-    ] + select({
-      "@toolchain//:windows_x86_64": [":plaidml_pub.dll"],
-      "@toolchain//:macos_x86_64": [":libplaidml_macos_pub"],
-      "//conditions:default": ["libplaidml_pub.so"],
-    }),
-    data_renames = select({
-      "@toolchain//:windows_x86_64": {"plaidml_pub.dll": "plaidml.dll"},
-      "@toolchain//:macos_x86_64": {"libplaidml_pub.dylib": "libplaidml.dylib"},
-      "//conditions:default": {"libplaidml_pub.so": "libplaidml.so"},
-    }),
     config = ":setup.cfg",
     config_substitutions = select({
         "@toolchain//:windows_x86_64": {
@@ -393,6 +373,24 @@ plaidml_py_wheel(
             "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.so",
             "{LIBDIR}": "lib",
         },
+    }),
+    data = [
+        "plaidml.h",
+        "plaidml++.h",
+        ":configs",
+        "//plaidml/base:base.h",
+        "//plaidml/base:base_cpp.h",
+        "@half//:include/half.hpp",
+        "plaidml-config.cmake",
+    ] + select({
+        "@toolchain//:windows_x86_64": [":plaidml_pub.dll"],
+        "@toolchain//:macos_x86_64": [":libplaidml_macos_pub"],
+        "//conditions:default": ["libplaidml_pub.so"],
+    }),
+    data_renames = select({
+        "@toolchain//:windows_x86_64": {"plaidml_pub.dll": "plaidml.dll"},
+        "@toolchain//:macos_x86_64": {"libplaidml_pub.dylib": "libplaidml.dylib"},
+        "//conditions:default": {"libplaidml_pub.so": "libplaidml.so"},
     }),
     package_prefix = "plaidml",
     platform = select({
@@ -410,38 +408,38 @@ plaidml_cc_binary(
     name = "libplaidml_pub.so",
     srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-unix.cc"],
     linkshared = 1,
-    deps = PLAIDML_CPP_DEPS,
     tags = ["linux"],
+    deps = PLAIDML_CPP_DEPS,
 )
 
 plaidml_cc_binary(
     name = "plaidml_pub.dll",
     srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-windows.cc"],
     linkshared = 1,
-    deps = PLAIDML_CPP_DEPS,
     tags = ["msvc"],
+    deps = PLAIDML_CPP_DEPS,
 )
 
 plaidml_cc_library(
     name = "apple_lib_pub",
     srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-unix.cc"],
-    deps = PLAIDML_CPP_DEPS,
     tags = ["darwin"],
+    deps = PLAIDML_CPP_DEPS,
     alwayslink = 1,
 )
 
 apple_binary(
     name = "libplaidml_raw_pub.dylib",
-    platform_type = "macos",
     binary_type = "dylib",
-    deps = [":apple_lib_pub"],
+    platform_type = "macos",
     tags = ["darwin"],
+    deps = [":apple_lib_pub"],
 )
 
 plaidml_macos_dylib(
     name = "libplaidml_macos_pub",
-    lib = "libplaidml_pub.dylib",
     src = ":libplaidml_raw_pub.dylib",
     internal_libname = "libplaidml.dylib",
+    lib = "libplaidml_pub.dylib",
     tags = ["darwin"],
 )
