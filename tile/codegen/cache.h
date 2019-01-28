@@ -6,7 +6,6 @@
 #include <string>
 
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {

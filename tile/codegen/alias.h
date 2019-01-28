@@ -56,6 +56,28 @@ class AliasMap {
 
 bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);
 
+template <typename F>
+void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const stripe::Tags& reqs, const F& func) {
+  if (block->has_tags(reqs)) {
+    func(map, block);
+  } else {
+    for (auto& stmt : block->stmts) {
+      auto inner = stripe::Block::Downcast(stmt);
+      if (inner) {
+        AliasMap inner_map(map, inner.get());
+        RunOnBlocksRecurse(inner_map, inner.get(), reqs, func);
+      }
+    }
+  }
+}
+
+template <typename F>
+void RunOnBlocks(stripe::Block* root, const stripe::Tags& reqs, const F& func) {
+  AliasMap base;
+  AliasMap root_map(base, root);
+  RunOnBlocksRecurse(root_map, root, reqs, func);
+}
+
 std::ostream& operator<<(std::ostream& os, const AliasInfo& ai);
 std::ostream& operator<<(std::ostream& os, const Extent& extent);
 

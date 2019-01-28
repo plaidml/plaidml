@@ -7,7 +7,7 @@
 
 #include "base/util/logging.h"
 #include "base/util/throw.h"
-#include "tile/codegen/tags.h"
+#include "tile/codegen/alias.h"
 #include "tile/codegen/tidy.h"
 #include "tile/codegen/tile.h"
 #include "tile/math/util.h"

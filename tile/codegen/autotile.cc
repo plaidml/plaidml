@@ -5,7 +5,7 @@
 #include "base/util/logging.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
-#include "tile/codegen/tags.h"
+#include "tile/codegen/alias.h"
 #include "tile/codegen/tile.h"
 #include "tile/math/util.h"
 #include "tile/stripe/stripe.h"
