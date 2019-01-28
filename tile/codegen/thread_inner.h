@@ -6,7 +6,6 @@
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -18,7 +17,7 @@ void ThreadInnerPass(const AliasMap& scope, stripe::Block* block, int64_t thread
 
 // Localize starting from root for things that match reqs
 inline void ThreadInnerPass(stripe::Block* root, const proto::ThreadInnerPass& options) {
-  auto reqs = FromProto(options.reqs());
+  auto reqs = stripe::FromProto(options.reqs());
   RunOnBlocks(root, reqs, [&options](const AliasMap& map, stripe::Block* block) {  //
     ThreadInnerPass(map, block, options.threads());
   });

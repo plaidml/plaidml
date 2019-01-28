@@ -204,20 +204,24 @@ struct TensorShape {
 
   size_t sizes_product_bytes() const { return sizes_product() * byte_width(type); }
 
+  // Sort dims from low stride to high stride
+  std::vector<TensorDimension> natural_dims() const {
+    std::vector<TensorDimension> ret = dims;
+    std::sort(ret.begin(), ret.end(), [](const TensorDimension& a, const TensorDimension& b) {
+      return std::abs(a.stride) < std::abs(b.stride);
+    });
+    return ret;
+  }
+
   // Expected number of cache lines hit given random alignment
   double memory_io(size_t cache_width) const {
     double cache_elems = static_cast<double>(cache_width) / byte_width(type);
-    // Sort dims from low stride to high stride
-    std::vector<TensorDimension> sorted_dims = dims;
-    std::sort(sorted_dims.begin(), sorted_dims.end(), [](const TensorDimension& a, const TensorDimension& b) {
-      return std::abs(a.stride) < std::abs(b.stride);
-    });
     // Start with one cache line
     double cache_lines = 1.0;
     // Current accumulated maximum value
     int64_t max_val = 0;
     // For each dimension (in sorted order)
-    for (const auto& dim : sorted_dims) {
+    for (const auto& dim : natural_dims()) {
       // Compute gap per step
       int64_t gap = std::abs(dim.stride) - max_val;
       // Multiply current cache hits by size

@@ -6,7 +6,6 @@
 #include "base/util/lookup.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
-#include "tile/codegen/tags.h"
 #include "tile/math/util.h"
 #include "tile/stripe/stripe.h"
 

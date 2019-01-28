@@ -2,8 +2,8 @@
 
 #pragma once
 
+#include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -13,7 +13,7 @@ namespace codegen {
 void Scalarize(stripe::Block* block, bool recursive = false);
 
 inline void ScalarizePass(stripe::Block* root, const proto::GenericPass& options) {
-  auto reqs = FromProto(options.reqs());
+  auto reqs = stripe::FromProto(options.reqs());
   RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
     Scalarize(block, true);
   });

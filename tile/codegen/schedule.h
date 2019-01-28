@@ -2,8 +2,8 @@
 
 #pragma once
 
+#include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -18,9 +18,10 @@ void ScheduleBlock(const AliasMap& alias_map, stripe::Block* block, const proto:
 //   Inserts IO sub-block statements as needed.
 //   Updates the block's statements' dependencies for correctness.
 inline void SchedulePass(stripe::Block* root, const proto::SchedulePass& options) {
-  auto reqs = FromProto(options.reqs());
-  RunOnBlocks(root, reqs,
-              [&options](const AliasMap& map, stripe::Block* block) { ScheduleBlock(map, block, options); });
+  auto reqs = stripe::FromProto(options.reqs());
+  RunOnBlocks(root, reqs, [&options](const AliasMap& map, stripe::Block* block) {  //
+    ScheduleBlock(map, block, options);
+  });
 }
 
 }  // namespace codegen

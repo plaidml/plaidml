@@ -155,7 +155,7 @@ struct Refinement : Taggable {
              const std::string& agg_op = "",         //
              const Location& location = Location{},  //
              bool is_const = false,                  //
-             std::size_t offset = 0,                 //
+             uint64_t offset = 0,                    //
              const boost::optional<BankDimension>& bank_dim = boost::none,
              const boost::optional<Affine>& cache_unit = boost::none)
       : dir(dir),
@@ -178,7 +178,7 @@ struct Refinement : Taggable {
   std::string agg_op;
   Location location;
   bool is_const = false;
-  std::size_t offset = 0;                   // Offset within the location's arena.
+  uint64_t offset = 0;                      // Offset within the location's arena.
   boost::optional<BankDimension> bank_dim;  // Which dimension should we bank on
   boost::optional<Affine> cache_unit;       // Which cache we should use when encaching this refinement
 
@@ -350,12 +350,26 @@ std::shared_ptr<Block> FromProto(const proto::Block& block);
 Affine FromProto(const proto::Affine& affine);
 Location FromProto(const proto::Location& loc);
 RefDir FromProto(const proto::Refinement::Dir& dir);
+Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags);
 
 proto::Block IntoProto(const Block& block);
 proto::Affine IntoProto(const Affine& affine);
 proto::Location IntoProto(const Location& loc);
 
 std::shared_ptr<Block> CloneBlock(const Block& orig, int depth = -1);
+const Block* FindBlockByTag(const Block& block, const std::string& tag);
+const Index* FindIndexByTag(const Block& block, const std::string& tag);
+
+template <typename F>
+void PreIterate(Block* block, const F& func) {
+  auto it = block->stmts.begin();
+  while (it != block->stmts.end()) {
+    auto next = it;
+    ++next;
+    func(it);
+    it = next;
+  }
+}
 
 inline std::string to_string(const Block& block) {
   std::stringstream ss;

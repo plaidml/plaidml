@@ -529,6 +529,14 @@ RefDir FromProto(const proto::Refinement::Dir& dir) {
   }
 }
 
+Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags) {
+  Tags tags;
+  for (const auto& tag : pb_tags) {
+    tags.emplace(tag);
+  }
+  return tags;
+}
+
 std::shared_ptr<Block> FromProto(const proto::Block& block) {
   auto ret = std::make_shared<Block>();
   ret->name = block.name();
@@ -916,6 +924,31 @@ TensorShape Refinement::ApplyTile(const std::map<std::string, size_t>& tile_by_n
     dim.size = pos - neg + 1;
   }
   return shape;
+}
+
+const Block* FindBlockByTag(const Block& block, const std::string& tag) {
+  if (block.tags.count(tag)) {
+    return &block;
+  }
+  for (const auto& stmt : block.stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      const Block* out = FindBlockByTag(*inner, tag);
+      if (out) {
+        return out;
+      }
+    }
+  }
+  return nullptr;
+}
+
+const Index* FindIndexByTag(const Block& block, const std::string& tag) {
+  for (const auto& idx : block.idxs) {
+    if (idx.has_tag(tag)) {
+      return &idx;
+    }
+  }
+  return nullptr;
 }
 
 }  // namespace stripe
