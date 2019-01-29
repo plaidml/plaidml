@@ -784,7 +784,7 @@ class DType(enum.IntEnum):
     FLOAT16 = 0x31
     FLOAT32 = 0x32
     FLOAT64 = 0x33
-    OPAQUE = 0x40
+    PRNG = 0x40
 
 
 _CTYPES = {
