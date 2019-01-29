@@ -192,39 +192,40 @@ T Polynomial<T>::get(const std::string& name) const {
   return it->second;
 }
 
-using std::to_string;
+int64_t abs_value(int64_t value) { return std::llabs(value); }
+
+Rational abs_value(Rational value) { return abs(value); }
 
 template <typename T>
 std::string Polynomial<T>::toString() const {
-  std::string r;
+  std::stringstream ss;
   if (map_.size() == 0) {
     return "0";
   }
+  bool first = true;
   for (const auto& kvp : map_) {
-    if (r != "") {
+    if (first) {
+      if (kvp.second < 0) {
+        ss << "-";
+      }
+      first = false;
+    } else {
       if (kvp.second > 0) {
-        r += " + ";
+        ss << " + ";
       } else {
-        r += " - ";
+        ss << " - ";
       }
-    } else if (r == "" && kvp.second < 0) {
-      r += "-";
     }
-    if (abs(kvp.second) != 1 || kvp.first == "") {
-      /*
-      r += to_string(abs(numerator(kvp.second)));
-      if (denominator(kvp.second) != 1) {
-        r += "/" + to_string(denominator(kvp.second));
-      }
-      */
-      r += to_string(abs(kvp.second));
+    auto value = abs_value(kvp.second);
+    if (value != 1 || kvp.first == "") {
+      ss << value;
       if (kvp.first != "") {
-        r += "*";
+        ss << "*";
       }
     }
-    r += kvp.first;
+    ss << kvp.first;
   }
-  return r;
+  return ss.str();
 }
 
 template class Polynomial<Rational>;
