@@ -20,7 +20,7 @@ message TensorShape {
     FLOAT16 = 49;
     FLOAT32 = 50;
     FLOAT64 = 51;
-    OPAQUE = 64;
+    PRNG = 64;
   }
 
   message Dimension {

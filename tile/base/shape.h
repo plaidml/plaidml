@@ -38,7 +38,7 @@ enum class DataType : int {
   FLOAT16 = 0x31,
   FLOAT32 = 0x32,
   FLOAT64 = 0x33,
-  OPAQUE = 0x40,
+  PRNG = 0x40,
 };
 
 inline bool is_int(const DataType& dt) {
@@ -138,8 +138,8 @@ inline std::string to_string(const DataType& dt) {
       return "fp32";
     case DataType::FLOAT64:
       return "fp64";
-    case DataType::OPAQUE:
-      return "opaque";
+    case DataType::PRNG:
+      return "prng";
     default:
       return "!!invalid data type: " + std::to_string(static_cast<int>(dt));
   }
@@ -296,8 +296,8 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::FLOAT32;
     case proto::TensorShape_DataType_FLOAT64:
       return DataType::FLOAT64;
-    case proto::TensorShape_DataType_OPAQUE:
-      return DataType::OPAQUE;
+    case proto::TensorShape_DataType_PRNG:
+      return DataType::PRNG;
     default:
       throw std::runtime_error("Unknown DataType");
   }
@@ -331,8 +331,8 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_FLOAT32;
     case DataType::FLOAT64:
       return proto::TensorShape_DataType_FLOAT64;
-    case DataType::OPAQUE:
-      return proto::TensorShape_DataType_OPAQUE;
+    case DataType::PRNG:
+      return proto::TensorShape_DataType_PRNG;
     default:
       throw std::runtime_error("Unknown DataType");
   }
