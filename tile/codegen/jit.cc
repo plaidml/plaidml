@@ -862,7 +862,7 @@ llvm::Type* Compiler::CType(DataType type) {
     case DataType::FLOAT64:
       return builder_.getDoubleTy();
     case DataType::INT128:
-    case DataType::OPAQUE:
+    case DataType::PRNG:
     case DataType::INVALID:
       throw Error("Invalid type: " + to_string(type));
   }

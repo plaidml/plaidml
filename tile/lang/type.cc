@@ -371,7 +371,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
     // Compute result type by 'upcasting' to the highest type in the hierarchy
     DataType out_type = DataType::INVALID;
     if (op.tag == Op::FUNCTION && op.f.fn == "prng_step") {
-      out_type = DataType::OPAQUE;
+      out_type = DataType::PRNG;
     } else if (op.tag == Op::FUNCTION && op.f.fn == "prng_state") {
       out_type = DataType::UINT32;
     } else if (op.tag == Op::FUNCTION && op.f.fn == "prng_value") {
@@ -584,7 +584,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
           }
           sizes.push_back(vars->at(op.inputs[i]).iconst);
         }
-        vars->emplace(op.output, Binding(SimpleShape(DataType::OPAQUE, sizes)));
+        vars->emplace(op.output, Binding(SimpleShape(DataType::PRNG, sizes)));
         continue;
       }
       if (op.f.fn == "prng_state" || op.f.fn == "prng_value") {
@@ -592,7 +592,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
           throw std::runtime_error("prng_state must have exactly one parameter");
         }
         TensorShape prng_shape = vars->at(op.inputs[0]).shape;
-        if (prng_shape.type != DataType::OPAQUE) {
+        if (prng_shape.type != DataType::PRNG) {
           throw std::runtime_error("prng_state must have a prng_step output as input");
         }
         if (op.f.fn == "prng_state") {
