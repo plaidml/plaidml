@@ -26,13 +26,17 @@ TEST(Codegen, JitIntrinsicMUL_F32) {
     loc { unit { } }
     refs {
       loc { unit { } }
+      dir: 3
       into: "b1"
       shape { type: FLOAT32 dims: {size:1 stride:1} }
+      access { }
     }
     refs {
       loc { unit { } }
+      dir: 3
       into: "b2"
       shape { type: FLOAT32 dims: {size:1 stride:1} }
+      access { }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { load { from:"b2" into:"$2" } }
@@ -56,13 +60,17 @@ TEST(Codegen, JitIntrinsicADD_F32) {
     loc { unit { } }
     refs {
       loc { unit { } }
+      dir: 3
       into: "b1"
       shape { type: FLOAT32 dims: {size:1 stride:1} }
+      access { }
     }
     refs {
       loc { unit { } }
+      dir: 3
       into: "b2"
       shape { type: FLOAT32 dims: {size:1 stride:1} }
+      access { }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { load { from:"b2" into:"$2" } }
@@ -94,6 +102,7 @@ TEST(Codegen, JitSimpleLoop) {
     }
     refs {
       loc { unit { } }
+      dir: 3
       into: "bufA"
       access {
         offset: 0
@@ -103,6 +112,7 @@ TEST(Codegen, JitSimpleLoop) {
     }
     refs {
       loc { unit { } }
+      dir: 3
       into: "bufB"
       access {
         offset: 0
@@ -140,6 +150,7 @@ TEST(Codegen, JitCopy2D) {
     idxs { name: "j" range: 5 }
     refs {
       loc { unit { } }
+      dir: 3
       into: "bufA"
       access {
         offset: 0
@@ -149,6 +160,7 @@ TEST(Codegen, JitCopy2D) {
     }
     refs {
       loc { unit { } }
+      dir: 3
       into: "bufB"
       access {
         offset: 0
@@ -202,6 +214,7 @@ TEST(Codegen, JitAggSum2D) {
     idxs { name: "j" range: 5 }
     refs {
       loc { unit { } }
+      dir: 3
       into: "bufA"
       access {
         offset: 0
@@ -211,6 +224,7 @@ TEST(Codegen, JitAggSum2D) {
     }
     refs {
       loc { unit { } }
+      dir: 3
       into: "bufB"
       agg_op: "add"
       access {
@@ -323,6 +337,7 @@ TEST(Codegen, JitNestedAlloc) {
     idxs { name: "j" range: 5 }
     refs {
       loc { unit { } }
+      dir: 3
       into: "bufA"
       access {
         offset: 0
@@ -332,6 +347,7 @@ TEST(Codegen, JitNestedAlloc) {
     }
     refs {
       loc { unit { } }
+      dir: 3
       into: "bufB"
       agg_op: "add"
       access {
@@ -354,6 +370,7 @@ TEST(Codegen, JitNestedAlloc) {
         dir: 3
         into: "bufA"
         shape { type: FLOAT32 dims: {size:1 stride:1} }
+        access { }
       }
       refs {
         loc { unit { } }
@@ -361,11 +378,13 @@ TEST(Codegen, JitNestedAlloc) {
         into: "bufB"
         agg_op: "add"
         shape { type: FLOAT32 dims: {size:1 stride:1} }
+        access { }
       }
       refs {
         dir: 0
         into: "bufTemp"
         shape { type: INT32 dims: {size:5 stride:1} }
+        access { }
       }
       stmts { load { from:"bufA" into:"$1" } }
       stmts { store { from:"$1" into:"bufB"} }
