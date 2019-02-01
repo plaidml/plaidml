@@ -147,11 +147,8 @@ print("Ran in {} seconds".format(time.time() - start))
 
 ```
 
-
 ## Reporting Issues
 Either open a ticket on [GitHub] or post to [plaidml-dev].
-
-
 
 
 [nGraph Compiler stack]: https://ngraph.nervanasys.com/docs/latest/
