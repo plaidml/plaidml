@@ -3,8 +3,15 @@
 Release Notes
 #############
 
-The current release is:  |release|
-
+PlaidML 0.5.0
+  - Support Keras 2.2.4
+  - Several fixes to Metal backend
+  - Preliminary release of Stripe
+    - New polyhedral IR designed to support modern accelerators
+    - Specification, documentation, and paper in progress
+    - GPU / OpenCL backend and tutorial coming soon
+  - nGraph support (wheels coming soon)
+    - Supports tensorflow via tensorflow nGraph bridge.
 
 
 
