@@ -35,10 +35,6 @@ achieving comparable performance.
 
 It works on all major operating systems: Linux, macOS, and Windows. 
 
-For background and early benchmarks, see our [blog post].
-
-PlaidML is under active development and should be thought of as alpha quality.
-
 
 ## Getting started
 
@@ -153,7 +149,6 @@ Either open a ticket on [GitHub] or post to [plaidml-dev].
 
 [nGraph Compiler stack]: https://ngraph.nervanasys.com/docs/latest/
 [Keras]: https://keras.io/
-[blog post]: https://ai.intel.com/reintroducing-plaidml/
 [here]: docs/install.rst
 [GitHub]: https://github.com/plaidml/plaidml/issues
 [plaidml-dev]: https://groups.google.com/forum/#!forum/plaidml-dev
