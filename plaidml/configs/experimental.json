@@ -144,10 +144,10 @@
                     "and": {
                         "sel": [
                             {
-                                "vendor_regex": "ARM"
+                                "vendor_regex": ".*ARM.*"
                             },
                             {
-                                "name_regex": "Mali-T760"
+                                "name_regex": ".*Mali-T760.*"
                             }
                         ]
                     }
@@ -168,10 +168,10 @@
                     "and": {
                         "sel": [
                             {
-                                "vendor_regex": "ARM"
+                                "vendor_regex": ".*ARM.*"
                             },
                             {
-                                "name_regex": "Mali-T628"
+                                "name_regex": ".*Mali-T628.*"
                             }
                         ]
                     }
