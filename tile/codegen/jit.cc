@@ -15,7 +15,6 @@
 
 #include <half.hpp>
 
-#include "base/util/printstring.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -79,8 +78,12 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Or(const stripe::Intrinsic&);
   void Not(const stripe::Intrinsic&);
   void Xor(const stripe::Intrinsic&);
+  void Assign(const stripe::Intrinsic&);
+  void BitLeft(const stripe::Intrinsic&);
+  void BitRight(const stripe::Intrinsic&);
   void Zero(const stripe::Special&);
   void Copy(const stripe::Special&);
+  void Reshape(const stripe::Special&);
 
   struct scalar {
     llvm::Value* value = nullptr;
@@ -116,8 +119,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
-  llvm::Function* MallocFunction();
-  llvm::Function* FreeFunction();
+  llvm::Value* MallocFunction();
+  llvm::Value* FreeFunction();
 
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
@@ -158,7 +161,9 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
   llvm::legacy::PassManager modopt;
   pmb.populateModulePassManager(modopt);
   modopt.run(*module_);
-  module_->print(llvm::errs(), nullptr);
+  if (VLOG_IS_ON(2)) {
+    module_->print(llvm::errs(), nullptr);
+  }
   // Wrap the finished module and the buffer names into an Executable instance.
   std::vector<std::string> param_names;
   for (auto& ref : program.refs) {
@@ -206,7 +211,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
     std::vector<llvm::Value*> idxList{index};
     llvm::Value* elptr = builder_.CreateGEP(argvec, idxList);
     llvm::Value* elval = builder_.CreateLoad(elptr);
-    llvm::Type* eltype = CType(program.refs[i].shape.type)->getPointerTo();
+    llvm::Type* eltype = CType(program.refs[i].interior_shape.type)->getPointerTo();
     args.push_back(builder_.CreateBitCast(elval, eltype));
   }
   // After passing in buffer pointers, we also provide an initial value for
@@ -341,7 +346,7 @@ void Compiler::Visit(const stripe::Load& load) {
   // destination scalar.
   llvm::Value* element = ElementPtr(from);
   llvm::Value* value = builder_.CreateLoad(element);
-  scalars_[load.into] = scalar{value, from.refinement->shape.type};
+  scalars_[load.into] = scalar{value, from.refinement->interior_shape.type};
 }
 
 void Compiler::Visit(const stripe::Store& store) {
@@ -353,7 +358,7 @@ void Compiler::Visit(const stripe::Store& store) {
   // use GEP to compute the destination element address
   // use the specified aggregation to store the value
   buffer into = buffers_[store.into];
-  scalar from = Cast(scalars_[store.from], into.refinement->shape.type);
+  scalar from = Cast(scalars_[store.from], into.refinement->interior_shape.type);
   llvm::Value* value = from.value;
   llvm::Value* element = ElementPtr(into);
   std::string agg_op = into.refinement->agg_op;
@@ -366,6 +371,19 @@ void Compiler::Visit(const stripe::Store& store) {
     } else {
       throw Error("Invalid addition type: " + to_string(from.type));
     }
+  } else if ("max" == agg_op) {
+    llvm::Value* prev = builder_.CreateLoad(element);
+    llvm::Value* flag = nullptr;
+    if (is_float(from.type)) {
+      flag = builder_.CreateFCmpUGT(prev, value);
+    } else if (is_int(from.type)) {
+      flag = builder_.CreateICmpSGT(prev, value);
+    } else if (is_uint(from.type)) {
+      flag = builder_.CreateICmpUGT(prev, value);
+    }
+    value = builder_.CreateSelect(flag, prev, value);
+  } else if ("assign" == agg_op) {
+    // fall through to assignment
   } else if (!agg_op.empty()) {
     throw Error("Unimplemented agg_op: " + to_string(agg_op));
   }
@@ -392,7 +410,11 @@ void Compiler::Visit(const stripe::Special& special) {
   static std::map<std::string, std::function<void(Compiler*, const stripe::Special&)>> handlers{
       {"zero", &Compiler::Zero},
       {"copy", &Compiler::Copy},
+      {"reshape", &Compiler::Reshape},
   };
+  if (handlers.find(special.name) == handlers.end()) {
+    throw Error("Unknown special \"" + special.name + "\"");
+  }
   handlers[special.name](this, special);
 }
 
@@ -403,16 +425,30 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
   // sure why they are located in the wrong structure. There are no constants
   // defined for actual intrinsic names; these have been derived experimentally.
   static std::map<std::string, std::function<void(Compiler*, const stripe::Intrinsic&)>> handlers{
-      {"add", &Compiler::Add},          {"sub", &Compiler::Subtract},
-      {"neg", &Compiler::Negate},       {"mul", &Compiler::Multiply},
-      {"div", &Compiler::Divide},       {"mod", &Compiler::Mod},
-      {"lt", &Compiler::LessThan},      {"lte", &Compiler::LessThanOrEqualTo},
-      {"gt", &Compiler::GreaterThan},   {"gte", &Compiler::GreaterThanOrEqualTo},
-      {"eq", &Compiler::Equal},         {"neq", &Compiler::Unequal},
-      {"and", &Compiler::And},          {"or", &Compiler::Or},
-      {"not", &Compiler::Not},          {"xor", &Compiler::Xor},
+      {"add", &Compiler::Add},
+      {"sub", &Compiler::Subtract},
+      {"neg", &Compiler::Negate},
+      {"mul", &Compiler::Multiply},
+      {"div", &Compiler::Divide},
+      {"mod", &Compiler::Mod},
+      {"lt", &Compiler::LessThan},
+      {"lte", &Compiler::LessThanOrEqualTo},
+      {"gt", &Compiler::GreaterThan},
+      {"gte", &Compiler::GreaterThanOrEqualTo},
+      {"eq", &Compiler::Equal},
+      {"neq", &Compiler::Unequal},
+      {"and", &Compiler::And},
+      {"or", &Compiler::Or},
+      {"not", &Compiler::Not},
+      {"xor", &Compiler::Xor},
       {"cond", &Compiler::Conditional},
+      {"assign", &Compiler::Assign},
+      {"bit_right", &Compiler::BitRight},
+      {"bit_left", &Compiler::BitLeft},
   };
+  if (handlers.find(intrinsic.name) == handlers.end()) {
+    throw Error("Unknown intrinsic \"" + intrinsic.name + "\"");
+  }
   handlers[intrinsic.name](this, intrinsic);
 }
 
@@ -432,12 +468,14 @@ void Compiler::Visit(const stripe::Block& block) {
     // name, it represents a local allocation.
     if (ref.dir == stripe::RefDir::None && ref.from.empty()) {
       // Allocate new storage for the buffer.
-      size_t size = ref.shape.byte_size();
+      size_t size = ref.interior_shape.byte_size();
       std::vector<llvm::Value*> malloc_args;
       malloc_args.push_back(IndexConst(size));
       auto malloc_func = MallocFunction();
       buffer = builder_.CreateCall(malloc_func, malloc_args, "");
       allocs.push_back(buffer);
+      llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
+      buffer = builder_.CreateBitCast(buffer, buftype);
     } else {
       // Pass in the current element address from the source buffer.
       // If a "from" name is specified, use that buffer; if not, that means
@@ -738,6 +776,36 @@ void Compiler::Xor(const stripe::Intrinsic& stmt) {
   OutputBool(ret, stmt);
 }
 
+void Compiler::Assign(const stripe::Intrinsic& stmt) {
+  assert(1 == stmt.inputs.size());
+  scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  llvm::Value* ret = op.value;
+  OutputType(ret, stmt);
+}
+
+void Compiler::BitLeft(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
+  llvm::Value* ret = builder_.CreateShl(lhs.value, rhs.value);
+  OutputType(ret, stmt);
+}
+
+void Compiler::BitRight(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
+  llvm::Value* ret = nullptr;
+  if (is_int(stmt.type)) {
+    ret = builder_.CreateAShr(lhs.value, rhs.value);
+  } else if (is_uint(stmt.type)) {
+    ret = builder_.CreateLShr(lhs.value, rhs.value);
+  } else {
+    throw Error("Invalid bitshift type: " + to_string(stmt.type));
+  }
+  OutputType(ret, stmt);
+}
+
 void Compiler::Zero(const stripe::Special& zero) {
   // present in stripe.proto but not defined in the specification
   throw Error("Special operation ZERO is not yet specified");
@@ -746,6 +814,10 @@ void Compiler::Zero(const stripe::Special& zero) {
 void Compiler::Copy(const stripe::Special& copy) {
   // present in stripe.proto but not defined in the specification
   throw Error("Special operation COPY is not yet specified");
+}
+
+void Compiler::Reshape(const stripe::Special& reshape) {
+  throw Error("Special operation RESHAPE is not yet specified");
 }
 
 Compiler::scalar Compiler::Cast(scalar v, DataType to_type) {
@@ -789,8 +861,9 @@ llvm::Type* Compiler::CType(DataType type) {
       return builder_.getFloatTy();
     case DataType::FLOAT64:
       return builder_.getDoubleTy();
-    case DataType::INVALID:
+    case DataType::INT128:
     case DataType::PRNG:
+    case DataType::INVALID:
       throw Error("Invalid type: " + to_string(type));
   }
   return builder_.getVoidTy();
@@ -808,10 +881,15 @@ llvm::Value* Compiler::ElementPtr(const buffer& buf) {
 llvm::Value* Compiler::Eval(const stripe::Affine& access) {
   llvm::Value* offset = IndexConst(0);
   for (auto& term : access.getMap()) {
-    llvm::Value* indexVar = indexes_[term.first].variable;
-    llvm::Value* indexVal = builder_.CreateLoad(indexVar);
-    llvm::Value* multiplier = IndexConst(term.second);
-    indexVal = builder_.CreateMul(indexVal, multiplier);
+    llvm::Value* indexVal = nullptr;
+    if (!term.first.empty()) {
+      llvm::Value* indexVar = indexes_[term.first].variable;
+      indexVal = builder_.CreateLoad(indexVar);
+      llvm::Value* multiplier = IndexConst(term.second);
+      indexVal = builder_.CreateMul(indexVal, multiplier);
+    } else {
+      indexVal = IndexConst(term.second);
+    }
     offset = builder_.CreateAdd(offset, indexVal);
   }
   return offset;
@@ -842,7 +920,7 @@ llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   std::vector<llvm::Type*> param_types;
   // Each buffer base address will be provided as a parameter.
   for (const auto& ref : block.refs) {
-    param_types.push_back(CType(ref.shape.type)->getPointerTo());
+    param_types.push_back(CType(ref.interior_shape.type)->getPointerTo());
   }
   // Following the buffers, a parameter will provide the initial value for
   // each of the block's indexes.
@@ -854,23 +932,21 @@ llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   return llvm::FunctionType::get(return_type, param_types, false);
 }
 
-llvm::Function* Compiler::MallocFunction(void) {
+llvm::Value* Compiler::MallocFunction(void) {
   std::vector<llvm::Type*> argtypes{IndexType()};
-  llvm::Type* rettype = builder_.getInt8PtrTy()->getPointerTo();
+  llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
-  auto linkage = llvm::Function::ExternalLinkage;
   const char* funcname = "malloc";
-  return llvm::Function::Create(functype, linkage, funcname, module_);
+  return module_->getOrInsertFunction(funcname, functype);
 }
 
-llvm::Function* Compiler::FreeFunction(void) {
-  llvm::Type* ptrtype = builder_.getInt8PtrTy()->getPointerTo();
+llvm::Value* Compiler::FreeFunction(void) {
+  llvm::Type* ptrtype = builder_.getInt8PtrTy();
   std::vector<llvm::Type*> argtypes{ptrtype};
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
-  auto linkage = llvm::Function::ExternalLinkage;
   const char* funcname = "free";
-  return llvm::Function::Create(functype, linkage, funcname, module_);
+  return module_->getOrInsertFunction(funcname, functype);
 }
 
 Executable::Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters)

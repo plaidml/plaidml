@@ -252,6 +252,7 @@ typedef enum {
   PLAIDML_DATA_INT16 = 0x11,
   PLAIDML_DATA_INT32 = 0x12,
   PLAIDML_DATA_INT64 = 0x13,
+  PLAIDML_DATA_INT128 = 0x14,
   PLAIDML_DATA_UINT8 = 0x20,
   PLAIDML_DATA_UINT16 = 0x21,
   PLAIDML_DATA_UINT32 = 0x22,
@@ -259,6 +260,7 @@ typedef enum {
   PLAIDML_DATA_FLOAT16 = 0x31,
   PLAIDML_DATA_FLOAT32 = 0x32,
   PLAIDML_DATA_FLOAT64 = 0x33,
+  PLAIDML_DATA_PRNG = 0x40,
 } plaidml_datatype;
 
 // Set the default datatype for floating-point computations.

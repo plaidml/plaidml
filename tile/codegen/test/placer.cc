@@ -18,21 +18,21 @@ namespace codegen {
 TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b1"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b2"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -50,21 +50,21 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b1"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b2"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -77,21 +77,21 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
 TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b1"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b2"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -111,21 +111,21 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b1"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b2"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
       offset: 16
     }
@@ -137,24 +137,24 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   EXPECT_THAT(output_proto, EqualsProtoText(expected));
 }
 
-TEST(PlacerTest, DistinctLocationCausesSpacialReuse) {
+TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b1"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_2" unit { } }
+      loc { name: "loc_2" unit { } }
       into: "b2"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -174,21 +174,21 @@ TEST(PlacerTest, DistinctLocationCausesSpacialReuse) {
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b1"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_2" unit { } }
+      loc { name: "loc_2" unit { } }
       into: "b2"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -202,29 +202,29 @@ TEST(PlacerTest, DistinctLocationCausesSpacialReuse) {
 TEST(PlacerTest, LocationSubsetCanBePlaced) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b1"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_2" unit { } }
+      loc { name: "loc_2" unit { } }
       into: "b2"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_2" unit { } }
+      loc { name: "loc_2" unit { } }
       into: "b3"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -244,29 +244,29 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    location { unit { } }
+    loc { unit { } }
     refs {
-      location { name: "loc_1" unit { } }
+      loc { name: "loc_1" unit { } }
       into: "b1"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_2" unit { } }
+      loc { name: "loc_2" unit { } }
       into: "b2"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     refs {
-      location { name: "loc_2" unit { } }
+      loc { name: "loc_2" unit { } }
       into: "b3"
       shape {
         type: FLOAT32
-        dimensions: {size:1 stride:1}
+        dims: {size:1 stride:1}
       }
     }
     stmts { load { from:"b1" into:"$1" } }

@@ -4,6 +4,9 @@
 
 #include <algorithm>
 
+#include <boost/format.hpp>
+
+#include "base/util/throw.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -24,9 +27,8 @@ void FixupRefs(Block* block, const std::string& var_name) {
         if (ref.from == var_name) {
           ref.location = it->location;
           ref.offset = it->offset;
-          ref.bank_dim = it->bank_dim;
-          for (size_t i = 0; i < ref.shape.dims.size(); i++) {
-            ref.shape.dims[i].stride = it->shape.dims[i].stride;
+          for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
+            ref.interior_shape.dims[i].stride = it->interior_shape.dims[i].stride;
           }
           FixupRefs(inner.get(), ref.into);
         }
@@ -41,11 +43,11 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   auto it_ref = block->ref_by_into(var_name);
   // Get the sizes
   std::vector<size_t> sizes;
-  for (const auto& dim : it_ref->shape.dims) {
+  for (const auto& dim : it_ref->interior_shape.dims) {
     sizes.push_back(dim.size);
   }
   // Change the shape
-  it_ref->shape = SimpleShape(it_ref->shape.type, sizes);
+  it_ref->interior_shape = SimpleShape(it_ref->interior_shape.type, sizes);
   // Change dir + from
   it_ref->dir = RefDir::None;
   it_ref->from = "";
@@ -58,20 +60,7 @@ void LocalizeRef(Block* block, const std::string& var_name) {
 }
 
 void LocalizePass(const AliasMap& scope, Block* block) {
-  // Compute statement use count of each buffer
-  std::map<std::string, size_t> use_count;
-  for (const auto& stmt : block->stmts) {
-    std::set<std::string> buf_use;
-    for (const auto& str : stmt->buffer_reads()) {
-      buf_use.emplace(scope.at(str).base_name);
-    }
-    for (const auto& str : stmt->buffer_writes()) {
-      buf_use.emplace(scope.at(str).base_name);
-    }
-    for (const auto& str : buf_use) {
-      use_count[str]++;
-    }
-  }
+  auto use_count = scope.RefUseCounts(*block);
   for (auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
@@ -81,11 +70,15 @@ void LocalizePass(const AliasMap& scope, Block* block) {
     std::set<std::string> refs_to_remove;
     for (const auto& ref : inner->refs) {
       auto it = block->ref_by_into(ref.from, false);
-      if (it == block->refs.end() || it->dir != RefDir::None) {
+      if (it == block->refs.end()) {
+        continue;
+      }
+      // If this wasn't allocated in the outer block and it's not tagged with tmp, skip it for consideration
+      if (it->dir != RefDir::None && !it->has_tag("tmp")) {
         continue;
       }
       // If it's not uniquely located in this block, don't consider
-      if (use_count[scope.at(ref.from).base_name] != 1) {
+      if (use_count[ref.from] != 1) {
         continue;
       }
       refs_to_localize.emplace(ref.into);
@@ -103,18 +96,20 @@ void LocalizePass(const AliasMap& scope, Block* block) {
   }
 }
 
-void RecursiveLocate(Block* block, Location location) {
+void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc) {
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
       continue;
     }
-    inner->location = location;
-    RecursiveLocate(inner.get(), location);
+    if (inner->has_tags(inner_tags)) {
+      inner->location = loc;
+    }
+    LocateInnerBlock(inner.get(), inner_tags, loc);
   }
 }
 
-void LocateMemoryPass(Block* root, const proto::LocateMemoryPass& options) {
+void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
   auto loc = stripe::FromProto(options.loc());
   RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {
@@ -127,7 +122,7 @@ void LocateMemoryPass(Block* root, const proto::LocateMemoryPass& options) {
   });
 }
 
-void LocateBlockPass(Block* root, const proto::LocateMemoryPass& options) {
+void LocateBlockPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
   auto loc = stripe::FromProto(options.loc());
   RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {  //
@@ -135,11 +130,12 @@ void LocateBlockPass(Block* root, const proto::LocateMemoryPass& options) {
   });
 }
 
-void LocateInnerBlockPass(Block* root, const proto::LocateMemoryPass& options) {
+void LocateInnerBlockPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
+  auto inner_reqs = FromProto(options.inner_reqs());
   auto loc = stripe::FromProto(options.loc());
-  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {  //
-    RecursiveLocate(block, loc);
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
+    LocateInnerBlock(block, inner_reqs, loc);
   });
 }
 

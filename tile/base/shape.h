@@ -30,6 +30,7 @@ enum class DataType : int {
   INT16 = 0x11,
   INT32 = 0x12,
   INT64 = 0x13,
+  INT128 = 0x14,
   UINT8 = 0x20,
   UINT16 = 0x21,
   UINT32 = 0x22,
@@ -46,6 +47,7 @@ inline bool is_int(const DataType& dt) {
     case DataType::INT16:
     case DataType::INT32:
     case DataType::INT64:
+    case DataType::INT128:
       return true;
     default:
       return false;
@@ -101,6 +103,8 @@ inline size_t bit_width(const DataType& dt) {
       return 32;
     case DataType::FLOAT64:
       return 64;
+    case DataType::INT128:
+      return 128;
     default:
       return 0;
   }
@@ -118,6 +122,8 @@ inline std::string to_string(const DataType& dt) {
       return "i32";
     case DataType::INT64:
       return "i64";
+    case DataType::INT128:
+      return "i128";
     case DataType::UINT8:
       return "u8";
     case DataType::UINT16:
@@ -180,6 +186,59 @@ struct TensorShape {
     return max_elem + 1;
   }
 
+  std::vector<size_t> sizes() const {
+    std::vector<size_t> ret;
+    for (const auto& dim : dims) {
+      ret.push_back(dim.size);
+    }
+    return ret;
+  }
+
+  size_t sizes_product() const {
+    size_t ret = 1;
+    for (const auto& size : sizes()) {
+      ret *= size;
+    }
+    return ret;
+  }
+
+  size_t sizes_product_bytes() const { return sizes_product() * byte_width(type); }
+
+  // Sort dims from low stride to high stride
+  std::vector<TensorDimension> natural_dims() const {
+    std::vector<TensorDimension> ret = dims;
+    std::sort(ret.begin(), ret.end(), [](const TensorDimension& a, const TensorDimension& b) {
+      return std::abs(a.stride) < std::abs(b.stride);
+    });
+    return ret;
+  }
+
+  // Expected number of cache lines hit given random alignment
+  double memory_io(size_t cache_width) const {
+    double cache_elems = static_cast<double>(cache_width) / byte_width(type);
+    // Start with one cache line
+    double cache_lines = 1.0;
+    // Current accumulated maximum value
+    int64_t max_val = 0;
+    // For each dimension (in sorted order)
+    for (const auto& dim : natural_dims()) {
+      // Compute gap per step
+      int64_t gap = std::abs(dim.stride) - max_val;
+      // Multiply current cache hits by size
+      cache_lines *= static_cast<double>(dim.size);
+      // Compute probability that cache line is shared across gap
+      double prob_shared = 0.0;  // Assume it's never shared
+      if (cache_elems != 0.0 && gap < cache_elems) {
+        prob_shared = 1.0 - (gap / cache_elems);
+      }
+      // Subtract shared elements
+      cache_lines -= prob_shared * static_cast<double>(dim.size - 1);
+      // Update max_val
+      max_val += std::abs(dim.stride) * (dim.size - 1);
+    }
+    return cache_lines;
+  }
+
   inline bool operator==(const TensorShape& rhs) const {
     return std::tie(type, dims) ==  //
            std::tie(rhs.type, rhs.dims);
@@ -189,19 +248,12 @@ struct TensorShape {
     return std::tie(type, dims) <  //
            std::tie(rhs.type, rhs.dims);
   }
+
+  void resize_dim(size_t pos, uint64_t size);
 };
 
-inline std::ostream& operator<<(std::ostream& os, const TensorShape& shape) {
-  os << to_string(shape.type) << "(";
-  for (size_t i = 0; i < shape.dims.size(); i++) {
-    if (i > 0) {
-      os << ", ";
-    }
-    os << shape.dims[i].size << ":" << shape.dims[i].stride;
-  }
-  os << ")";
-  return os;
-}
+std::ostream& operator<<(std::ostream& os, const TensorShape& shape);
+std::ostream& operator<<(std::ostream& os, const TensorDimension& dim);
 
 inline TensorShape SimpleShape(DataType type, const std::vector<size_t>& sizes) {
   int64_t stride = 1;
@@ -228,6 +280,8 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::INT32;
     case proto::TensorShape_DataType_INT64:
       return DataType::INT64;
+    case proto::TensorShape_DataType_INT128:
+      return DataType::INT128;
     case proto::TensorShape_DataType_UINT8:
       return DataType::UINT8;
     case proto::TensorShape_DataType_UINT16:
@@ -242,6 +296,8 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::FLOAT32;
     case proto::TensorShape_DataType_FLOAT64:
       return DataType::FLOAT64;
+    case proto::TensorShape_DataType_PRNG:
+      return DataType::PRNG;
     default:
       throw std::runtime_error("Unknown DataType");
   }
@@ -259,6 +315,8 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_INT32;
     case DataType::INT64:
       return proto::TensorShape_DataType_INT64;
+    case DataType::INT128:
+      return proto::TensorShape_DataType_INT128;
     case DataType::UINT8:
       return proto::TensorShape_DataType_UINT8;
     case DataType::UINT16:
@@ -273,29 +331,8 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_FLOAT32;
     case DataType::FLOAT64:
       return proto::TensorShape_DataType_FLOAT64;
-    default:
-      throw std::runtime_error("Unknown DataType");
-  }
-}
-
-inline int size_in_bytes(const proto::TensorShape_DataType& dt) {
-  switch (dt) {
-    case proto::TensorShape_DataType_BOOLEAN:
-    case proto::TensorShape_DataType_INT8:
-    case proto::TensorShape_DataType_UINT8:
-      return 1;
-    case proto::TensorShape_DataType_INT16:
-    case proto::TensorShape_DataType_UINT16:
-    case proto::TensorShape_DataType_FLOAT16:
-      return 2;
-    case proto::TensorShape_DataType_INT32:
-    case proto::TensorShape_DataType_UINT32:
-    case proto::TensorShape_DataType_FLOAT32:
-      return 4;
-    case proto::TensorShape_DataType_INT64:
-    case proto::TensorShape_DataType_UINT64:
-    case proto::TensorShape_DataType_FLOAT64:
-      return 8;
+    case DataType::PRNG:
+      return proto::TensorShape_DataType_PRNG;
     default:
       throw std::runtime_error("Unknown DataType");
   }
@@ -315,7 +352,7 @@ inline proto::TensorShape::Dimension IntoProto(const TensorDimension& dim) {
 inline TensorShape FromProto(const proto::TensorShape& shape) {
   TensorShape ret;
   ret.type = FromProto(shape.type());
-  for (const auto& dim : shape.dimensions()) {
+  for (const auto& dim : shape.dims()) {
     ret.dims.emplace_back(FromProto(dim));
   }
   return ret;
@@ -325,22 +362,9 @@ inline proto::TensorShape IntoProto(const TensorShape& shape) {
   proto::TensorShape ret;
   ret.set_type(IntoProto(shape.type));
   for (const auto& dim : shape.dims) {
-    *(ret.mutable_dimensions()->Add()) = IntoProto(dim);
+    *(ret.mutable_dims()->Add()) = IntoProto(dim);
   }
   return ret;
-}
-
-inline int size_in_bytes(const proto::TensorShape& shape) {
-  if (shape.dimensions().size() == 0) {
-    return size_in_bytes(shape.type());
-  }
-  auto dim = *std::max_element(shape.dimensions().cbegin(),                    //
-                               shape.dimensions().cend(),                      //
-                               [](const proto::TensorShape::Dimension& lhs,    //
-                                  const proto::TensorShape::Dimension& rhs) {  //
-                                 return (lhs.stride() * lhs.size()) < (rhs.stride() * rhs.size());
-                               });
-  return dim.size() * dim.stride() * size_in_bytes(shape.type());
 }
 
 }  // namespace tile

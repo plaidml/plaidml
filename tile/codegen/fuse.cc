@@ -2,6 +2,8 @@
 
 #include "tile/codegen/fuse.h"
 
+#include <boost/format.hpp>
+
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
 #include "tile/codegen/localize.h"
@@ -154,7 +156,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   IVLOG(3, "mapping: " << StreamContainer(mapping) << ", tile: " << tile);
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
-  ApplyTile(tiled.get(), tile);
+  ApplyTile(tiled.get(), tile, true, true);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
   outer->name = tiled->name;
@@ -162,6 +164,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   outer->constraints = tiled->constraints;
   auto inner = std::make_shared<Block>();
   inner->name = tiled->name;
+  outer->tags = tiled->tags;
   outer->stmts.push_back(inner);
   // Move / rename each index to the appropriate block
   for (const auto& idx : tiled->idxs) {
@@ -190,7 +193,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   for (auto& ref : outer->refs) {
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& acc = ref.access[i];
-      int64_t max_val = ref.shape.dims[i].size - 1;
+      int64_t max_val = ref.interior_shape.dims[i].size - 1;
       Affine affine = acc.constant();
       for (const auto& kvp : acc.getMap()) {
         auto it = mapping.find(kvp.first);
@@ -205,12 +208,15 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
         }
         affine += Affine(it->second, kvp.second);
       }
-      ref.shape.dims[i].size = max_val + 1;
+      ref.interior_shape.dims[i].size = max_val + 1;
       acc = affine;
     }
   }
   // Remove mapped access elements from inner refinements
   for (auto& ref : inner->refs) {
+    // Rename from to match outer into
+    ref.from = ref.into;
+    // Update accesses
     for (auto& acc : ref.access) {
       Affine affine;
       for (const auto& kvp : acc.getMap()) {
@@ -224,6 +230,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   // Remove any trivial loops remaining
   FlattenTrivial(outer.get());
   // Return final result
+  IVLOG(3, "Refactor output:\n" << *outer);
   return outer;
 }
 
@@ -242,8 +249,8 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   AliasMap a_map(scope, block_a);
   AliasMap b_map(scope, block_b);
   // Start by copying A's reference across
-  auto r = std::make_shared<Block>();
-  r->refs = block_a->refs;
+  auto tmp = std::make_shared<Block>();
+  tmp->refs = block_a->refs;
   // Walk over refinements in B and move them across
   // Rename duplicate refinements in B to their name in A
   // Otherwise make a new unique name (keeping original if possible)
@@ -269,16 +276,16 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
     }
     if (!merged) {
       // Copy across as a new ref
-      std::string new_name = r->unique_ref_name(new_ref.into);
+      std::string new_name = tmp->unique_ref_name(new_ref.into);
       remap_b[new_ref.into] = new_name;
-      auto ref_it = r->refs.insert(r->refs.end(), new_ref);
+      auto ref_it = tmp->refs.insert(tmp->refs.end(), new_ref);
       ref_it->into = new_name;
     }
   }
   // We are now safe (cannot fail), move new reference over A's
-  std::swap(block_a->refs, r->refs);
+  std::swap(block_a->refs, tmp->refs);
   if (!block_a->name.empty()) {
-    block_a->name = printstring("%s+%s", block_a->name.c_str(), block_b->name.c_str());
+    block_a->name = str(boost::format("%s+%s") % block_a->name % block_b->name);
   } else if (!block_b->name.empty()) {
     block_a->name = block_b->name;
   }
@@ -321,11 +328,11 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
       } break;
       case StmtKind::Special: {
         auto op = Special::Downcast(stmt);
-        for (auto& s : op->inputs) {
-          s = remap_b.at(s);
+        for (auto& in : op->inputs) {
+          in = remap_b.at(in);
         }
-        for (auto& s : op->outputs) {
-          s = remap_b.at(s);
+        for (auto& out : op->outputs) {
+          out = remap_b.at(out);
         }
       } break;
       case StmtKind::Block: {
@@ -366,7 +373,7 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
     while (true) {
       // Get block everytime in case it's updated
       auto block1 = Block::Downcast(*it);
-      IVLOG(3, "Attempting fusion on block:\n" << *block1);
+      IVLOG(3, "Attempting fusion on block:\n" << block1->name);
       // Get the next statement
       auto it_next = it;
       it_next++;
@@ -414,21 +421,21 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
         break;
       }
       // Do the appropriate refactors
-      auto ref1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a);
-      auto ref2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b);
-      // IVLOG(3, "Fusion refactor 1:\n" << *ref1);
-      // IVLOG(3, "Fusion refactor 2:\n" << *ref2);
+      auto refactor1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a);
+      auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b);
+      // IVLOG(3, "Fusion refactor 1:\n" << *refactor1);
+      // IVLOG(3, "Fusion refactor 2:\n" << *refactor2);
       // Try the actual fusion
-      if (!FuseBlocks(scope, ref1.get(), ref2.get())) {
+      if (!FuseBlocks(scope, refactor1.get(), refactor2.get())) {
         strategy->OnFailed();
         IVLOG(3, "Actual fusion failed");
         break;
       }
-      IVLOG(3, "Fused block:\n" << *ref1);
+      IVLOG(3, "Fused block:\n" << *refactor1);
       // If it worked, update
-      *it = ref1;
+      *it = refactor1;
       block->stmts.erase(it_next);
-      strategy->OnFused(scope, ref1.get(), *block1, *block2);
+      strategy->OnFused(scope, refactor1.get(), *block1, *block2);
     }
     it++;
   }
@@ -445,12 +452,13 @@ class TagFusionStrategy : public FusionStrategy {
  public:
   explicit TagFusionStrategy(const FusionPassOptions& options) : options_(options) {}
   bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
-    return HasTags(parent, options_.parent_reqs) && HasTags(a, options_.a_block_reqs) &&
-           HasTags(b, options_.b_block_reqs);
+    return parent.has_tags(options_.parent_reqs) &&  //
+           a.has_tags(options_.a_block_reqs) &&      //
+           b.has_tags(options_.b_block_reqs);
   }
   void OnFailed() {}
   void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
-    AddTags(block, options_.fused_set);
+    block->add_tags(options_.fused_set);
   }
 
  private:

@@ -5,13 +5,15 @@
 #include <set>
 #include <utility>
 
-#include "tile/lang/mutil.h"
 #include "tile/lang/out_plan.h"
 #include "tile/lang/read_plan.h"
+#include "tile/math/util.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+using math::RoundUp;
 
 FlatContraction Vectorize(const FlatContraction& iop, uint64_t vec_size) {  // NOLINT(runtime/references)
   size_t sz = iop.ranges.size();

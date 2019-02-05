@@ -1,3 +1,5 @@
+.. tile/life-function-hal.rst:
+
 ==============================
 Through the Hardware Interface
 ==============================
@@ -9,7 +11,7 @@ HAL Interface
 
 PlaidML currently offers two implementations of the HAL interface. The OpenCL module connects to the system's OpenCL driver and provides access to all available OpenCL devices, such as GPUs; the OpenCL driver may also offer execution on the CPU. The LLVM module needs no driver; it provides a single device representing the system CPU.
 
-The PlaidML core loads both hardware modules at startup so they can query the system for available hardware. You can call :doc:`plaidml <plaidml>`\ ``.devices`` to get the list of devices. Once you've chosen a device, you can use the :doc:`api/plaidml.Device` object to create :doc:`api/plaidml.Tensor` instances; running a function bound to these tensors will associate its execution with the corresponding device.
+The PlaidML core loads both hardware modules at startup so they can query the system for available hardware. You can call :doc:`plaidml <../plaidml>`\ ``.devices`` to get the list of devices. Once you've chosen a device, you can use the :doc:`../api/plaidml.Device` object to create :doc:`../api/plaidml.Tensor` instances; running a function bound to these tensors will associate its execution with the corresponding device.
 
 Each hardware module provides a compiler backend, which is an implementation of ``hal::Compiler``. The ``hal::Compiler::Build`` function accepts a ``KernelList`` produced by the Tile compiler frontend as its input, and as output it produces an instance of some device-specific implementation of ``hal::Library``. A ``Library`` is an abstract representation of executable code, in whatever form it is that the target device expects. Each implementation of ``Compiler`` is therefore free to implement code generation in whatever way suits the target architecture.
 
@@ -151,7 +153,7 @@ After the ``KernelList`` representing the original function has been compiled in
 
 The ``Executor::Prepare`` function readies one kernel from a ``hal::Library``, in whatever way is meaningful for the target device. The kernel is specified by index, and the function returns a ``hal::Kernel`` instance.
 
-The ``Executor::Copy`` function handles dependency-sensitive dataflow, moving buffer contents back and forth between device and shared memory regions. This is the core mechanism which implements the ``mmap_current`` and ``mmap_discard`` functions provided in the :doc:`PlaidML API <plaidml>`.
+The ``Executor::Copy`` function handles dependency-sensitive dataflow, moving buffer contents back and forth between device and shared memory regions. This is the core mechanism which implements the ``mmap_current`` and ``mmap_discard`` functions provided in the :doc:`PlaidML API <../plaidml>`.
 
 The copy operation begins by waiting for a list of events to complete. These events may represent the completion of other copy operations, presumably because those copies are moving data into the source buffer, or they may represent the completion of kernel execution; in any case the copy will not proceed until the completion of all dependency events signals that the source data is complete. The result of the copy is another event, which signals readiness of the output data.
 
@@ -163,6 +165,6 @@ In the OpenCL module, the mechanism used is ``clEnqueueNDRangeKernel``. This fun
 
 In the LLVM module, kernel instances are executed in a thread pool. Using one thread for each CPU core, each thread invokes the kernel function, computing a unique ID in the same fashion as OpenCL's range kernel system, dividing the work group stride pattern evenly among available threads. The originating thread then blocks until all workers have completed.
 
-After execution completes, each ``Run`` method signals the completion of the corresponding event. Since the act of binding the function to its output tensor instances will attach the execution completion event to their dependency lists, the ``Executor::Copy`` call resulting from an ``mmap_current`` or ``mmap_discard`` on those :doc:`api/plaidml.Tensor` instances will therefore block until kernel execution completes, allowing synchronization back up the stack to the original client.
+After execution completes, each ``Run`` method signals the completion of the corresponding event. Since the act of binding the function to its output tensor instances will attach the execution completion event to their dependency lists, the ``Executor::Copy`` call resulting from an ``mmap_current`` or ``mmap_discard`` on those :doc:`../api/plaidml.Tensor` instances will therefore block until kernel execution completes, allowing synchronization back up the stack to the original client.
 
 

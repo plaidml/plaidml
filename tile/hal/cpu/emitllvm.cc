@@ -645,8 +645,9 @@ void Emit::Visit(const sem::LimitConst& n) {
     case DataType::FLOAT64:
       LimitConstFP(llvm::APFloat::IEEEdouble, n.which);
       break;
-    case DataType::INVALID:
+    case DataType::INT128:
     case DataType::PRNG:
+    case DataType::INVALID:
       throw Error("Unknown type has no constants");
   }
 }

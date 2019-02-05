@@ -141,13 +141,40 @@ class _Library(plaidml.library.Library):
             plog.addHandler(DEFAULT_LOG_HANDLER)
             logger = plog.log
 
-        if platform.system() == 'Windows':
-            libname = 'plaidml.dll'
+        def load_library(libname, libdirs):
+            # When running under Bazel with an uninstalled native
+            # library, we'll be able to find correct native library to
+            # use in this script's directory -- if it exists, we
+            # should use it.  Note that when installed, the native
+            # library will never be in the script's directory, so this
+            # shouldn't find anything.
+            self_path = os.path.abspath(__file__)
+            self_dir = os.path.dirname(self_path)
+            libpath = os.path.join(self_dir, libname)
+            try:
+                return ctypes.cdll.LoadLibrary(libpath)
+            except:
+                # If we're unable to load the PlaidML library from the
+                # script's directory, we fall back on the system
+                # installed version.  Note that if the system
+                # installed version is missing (e.g. if PlaidML is
+                # mis-installed), this will fail, and report the
+                # correct path for diagnosis.
+                libdirs.append(libname)
+                libpath = os.path.join(sys.exec_prefix, *libdirs)
+                return ctypes.cdll.LoadLibrary(libpath)
+
+        if 'PLAIDML_NATIVE_PATH' in os.environ:
+            # If we have an environment var pointing to our native
+            # library, we unconditionally use it and fail if we don't
+            # find it.
+            lib = ctypes.cdll.LoadLibrary(os.environ['PLAIDML_NATIVE_PATH'])
+        elif platform.system() == 'Windows':
+            lib = load_library('plaidml.dll', ['Library', 'bin'])
+        elif platform.system() == 'Darwin':
+            lib = load_library('libplaidml.dylib', ['lib'])
         else:
-            libname = 'libplaidml.so'
-        libpath = pkg_resources.resource_filename(__name__, libname)
-        libpath = os.getenv('PLAIDML_NATIVE_PATH', libpath)
-        lib = ctypes.cdll.LoadLibrary(libpath)
+            lib = load_library('libplaidml.so', ['lib'])
 
         super(_Library, self).__init__(lib, logger=logger)
 
@@ -749,6 +776,7 @@ class DType(enum.IntEnum):
     INT16 = 0x11
     INT32 = 0x12
     INT64 = 0x13
+    INT128 = 0x14
     UINT8 = 0x20
     UINT16 = 0x21
     UINT32 = 0x22
@@ -756,6 +784,7 @@ class DType(enum.IntEnum):
     FLOAT16 = 0x31
     FLOAT32 = 0x32
     FLOAT64 = 0x33
+    PRNG = 0x40
 
 
 _CTYPES = {
@@ -1220,11 +1249,14 @@ Dimension = namedtuple('Dimension', ['size', 'stride'])
 
 class _Shape(object):
 
-    def __init__(self, ctx, shape):
+    def __init__(self, ctx, shape, ctype=None):
         self._as_parameter_ = shape
         self._free = _lib().plaidml_free_shape
         self._dtype = _lib().plaidml_get_shape_type(self)
-        self._ctype = _CTYPES[self._dtype]
+        if ctype is None:
+            self._ctype = _CTYPES[self._dtype]
+        else:
+            self._ctype = ctype
         self._ctx = ctx
 
     def __del__(self):
@@ -1271,6 +1303,19 @@ class Shape(_Shape):
             if arg != 0:
                 stride //= arg
             _lib().plaidml_add_dimension(ctx, self, arg, stride)
+
+
+class CustomShape(_Shape):
+
+    def __init__(self, ctx, dtype, ctype, dims):
+        super(CustomShape, self).__init__(ctx, _lib().plaidml_alloc_shape(ctx, dtype), ctype=ctype)
+        stride = 1
+        for dim in dims:
+            stride *= dim
+        for dim in dims:
+            if dim != 0:
+                stride //= dim
+            _lib().plaidml_add_dimension(ctx, self, dim, stride)
 
 
 class Placeholder(Var):

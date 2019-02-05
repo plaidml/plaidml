@@ -12,6 +12,7 @@ message TensorShape {
     INT16 = 17;
     INT32 = 18;
     INT64 = 19;
+    INT128 = 20;
     UINT8 = 32;
     UINT16 = 33;
     UINT32 = 34;
@@ -19,6 +20,7 @@ message TensorShape {
     FLOAT16 = 49;
     FLOAT32 = 50;
     FLOAT64 = 51;
+    PRNG = 64;
   }
 
   message Dimension {
@@ -42,5 +44,5 @@ message TensorShape {
   //
   // A tensor with no dimensions (i.e, rank 0) is valid and is considered a
   // scalar.
-  repeated Dimension dimensions = 3;
+  repeated Dimension dims = 3;
 }

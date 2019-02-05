@@ -8,8 +8,8 @@
 #include <boost/range/adaptor/reversed.hpp>
 
 #include "base/util/logging.h"
-#include "tile/lang/mutil.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/math/util.h"
 
 using std::map;
 using std::string;
@@ -18,6 +18,10 @@ using std::vector;
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+using math::IsPo2;
+using math::NearestPo2;
+using math::RoundUp;
 
 OutPlan::OutPlan(const FlatContraction& op, const std::vector<uint64_t>& tile, uint64_t threads, uint64_t mem_elems)
     : op_(op), threads_(threads), local_size_(1), outputs_(1), group_dims_({{1, 1, 1}}) {

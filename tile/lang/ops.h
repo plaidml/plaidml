@@ -12,7 +12,6 @@
 #include <boost/operators.hpp>
 
 #include "base/util/logging.h"
-#include "base/util/printstring.h"
 #include "base/util/transfer_object.h"
 #include "tile/lang/lang.pb.h"
 #include "tile/math/polynomial.h"

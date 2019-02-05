@@ -2,12 +2,7 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
-#include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {

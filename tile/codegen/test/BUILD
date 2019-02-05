@@ -1,4 +1,4 @@
-load("@com_intel_plaidml//bzl:plaidml.bzl", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_test")
 
 plaidml_cc_test(
     name = "test",
@@ -8,5 +8,6 @@ plaidml_cc_test(
         "//tile/codegen",
         "//tile/lang",
         "//tile/lib",
+        "@boost//:filesystem",
     ],
 )

@@ -3,10 +3,10 @@
 #include "tile/codegen/deps.h"
 
 #include <set>
-#include <sstream>
-#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+
+#include <boost/format.hpp>
 
 #include "base/util/throw.h"
 #include "tile/stripe/stripe.h"
@@ -22,12 +22,10 @@ namespace {
 struct Tracker {
   // Tracks the state of a buffer as it's operated on by the Block's Statements.
   struct BufferInfo {
-    // TODO: Instead of tracking the latest writer, keep track of a
-    // list of all currently active writers, removing writers from the
-    // list when all written memory has been overwritten by subsequent writers.
-    bool has_latest_writer = false;
-    StatementIt latest_writer;
-    std::unordered_set<StatementIt> current_readers;
+    // Keep track of a list of all currently active writers.
+    // TODO: remove writers from the list when all written memory has been overwritten by subsequent writers.
+    std::unordered_map<StatementIt, AliasInfo> writers;
+    std::unordered_set<StatementIt> readers;
   };
 
   // For each scalar: the Statement that wrote the scalar.
@@ -45,63 +43,70 @@ struct Tracker {
     auto it_inserted = scalars.insert(std::make_pair(name, it));
     if (!it_inserted.second) {
       throw_with_trace(
-          std::logic_error(printstring("Scalar %s written multiple times in %s", name.c_str(), block.name.c_str())));
+          std::logic_error(str(boost::format("Scalar %s written multiple times in %s") % name % block.name)));
     }
   }
 
   void ReadScalar(const Block& block, const std::string& name) {
     auto it = scalars.find(name);
     if (it == scalars.end()) {
-      throw_with_trace(std::logic_error(
-          printstring("Scalar %s read before it was written in %s", name.c_str(), block.name.c_str())));
+      throw_with_trace(
+          std::logic_error(str(boost::format("Scalar %s read before it was written in %s") % name % block.name)));
     }
     dataflow_deps.insert(it->second);
   }
 
   void WriteBuffer(StatementIt it, const std::string& name, const AliasMap& alias_map) {
+    IVLOG(4, boost::format("    WriterBuffer> name: %1%, it: %2%") % name % *it);
+
     const AliasInfo& alias_info = alias_map.at(name);
     BufferInfo& buffer_info = buffers[alias_info.base_name];
 
-    // For now, we assume that each writing statement writes the entire
-    // buffer.  TODO: Track child blocks as sub-buffer writes.
-    if (buffer_info.has_latest_writer && buffer_info.latest_writer != it) {
-      dataflow_deps.insert(buffer_info.latest_writer);
+    for (const auto& item : buffer_info.writers) {
+      const auto& writer = item.first;
+      if (writer != it && AliasInfo::Compare(alias_info, item.second) != AliasType::None) {
+        IVLOG(4, boost::format("      other writer: %1%") % *writer);
+        dataflow_deps.insert(writer);
+      }
     }
 
-    for (StatementIt reader : buffer_info.current_readers) {
+    for (StatementIt reader : buffer_info.readers) {
       // Writing a buffer we're also reading blocks on all readers that
       // aren't us, but otherwise looks like a normal write of a buffer
       // that something else is reading.
       if (reader != it) {
+        IVLOG(4, boost::format("      other reader: %1%") % *reader);
         dataflow_deps.insert(reader);
       }
     }
 
-    buffer_info.has_latest_writer = true;
-    buffer_info.latest_writer = it;
-    buffer_info.current_readers.clear();
+    buffer_info.writers.emplace(it, alias_info);
+    buffer_info.readers.clear();
   }
 
   void ReadBuffer(StatementIt it, const std::string& name, const AliasMap& alias_map) {
+    IVLOG(4, boost::format("    ReadBuffer> name: %1%, it: %2%") % name % *it);
+
     const AliasInfo& alias_info = alias_map.at(name);
     BufferInfo& buffer_info = buffers[alias_info.base_name];
 
-    if (buffer_info.has_latest_writer && buffer_info.latest_writer == it) {
+    if (buffer_info.writers.count(it)) {
       // Reading a buffer we're also writing doesn't do anything; we just track the write.
       return;
     }
 
-    if (buffer_info.has_latest_writer) {
-      dataflow_deps.insert(buffer_info.latest_writer);
+    for (const auto& item : buffer_info.writers) {
+      dataflow_deps.insert(item.first);
     }
 
-    buffer_info.current_readers.insert(it);
+    buffer_info.readers.insert(it);
   }
 };
 
 }  // namespace
 
-void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {  //
+void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
+  IVLOG(3, "ComputeDeps> " << block->name);
   Tracker tracker;
   std::unordered_map<StatementIt, std::set<StatementIt>> transitive_deps;
   for (auto it = block->stmts.begin(); it != block->stmts.end(); it++) {
@@ -109,16 +114,19 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {  //
     switch ((*it)->kind()) {
       case StmtKind::Load: {
         auto load = Load::Downcast(*it);
+        IVLOG(3, "  load: " << load);
         tracker.ReadBuffer(it, load->from, alias_map);
         tracker.WriteScalar(*block, it, load->into);
       } break;
       case StmtKind::Store: {
         auto store = Store::Downcast(*it);
+        IVLOG(3, "  store: " << store);
         tracker.ReadScalar(*block, store->from);
         tracker.WriteBuffer(it, store->into, alias_map);
       } break;
       case StmtKind::Special: {
         auto special = Special::Downcast(*it);
+        IVLOG(3, "  special: " << special);
         for (const auto& in : special->inputs) {
           tracker.ReadBuffer(it, in, alias_map);
         }
@@ -128,6 +136,7 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {  //
       } break;
       case StmtKind::Intrinsic: {
         auto intrinsic = Intrinsic::Downcast(*it);
+        IVLOG(3, "  intrinsic: " << intrinsic);
         for (const auto& in : intrinsic->inputs) {
           tracker.ReadScalar(*block, in);
         }
@@ -137,20 +146,23 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {  //
       } break;
       case StmtKind::Constant: {
         auto constant = Constant::Downcast(*it);
+        IVLOG(3, "  constant: " << constant);
         tracker.WriteScalar(*block, it, constant->name);
       } break;
       case StmtKind::Block: {
         auto inner = Block::Downcast(*it);
+        IVLOG(3, "  block: " << inner->name);
+        AliasMap inner_map(alias_map, inner.get());
         for (const auto& ref : inner->refs) {
           // N.B It doesn't matter whether we process IsReadDir or
           // IsWriteDir first, since a subsequent refinement might access
           // the same underlying physical buffer; we handle these cases in
           // ReadBuffer() and WriteBuffer().
           if (IsReadDir(ref.dir)) {
-            tracker.ReadBuffer(it, ref.from, alias_map);
+            tracker.ReadBuffer(it, ref.into, inner_map);
           }
           if (IsWriteDir(ref.dir)) {
-            tracker.WriteBuffer(it, ref.from, alias_map);
+            tracker.WriteBuffer(it, ref.into, inner_map);
           }
         }
       } break;

@@ -4,9 +4,9 @@
 
 #include "base/util/logging.h"
 #include "base/util/lookup.h"
-#include "base/util/printstring.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
+#include "tile/math/util.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -42,27 +42,35 @@ bool HasAffines(const Block& block, const Index& idx) {
 
 }  // namespace
 
-bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
+bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool copy_tags) {
   // Verify tile shape is correct
   if (outer->idxs.size() != shape.size()) {
     throw_with_trace(std::runtime_error("Invalid tile specified"));
   }
   // IVLOG(3, "Doing tiling " << shape << ":\n" << *outer);
   // Make a 'by-name' version of tile and check for trivality
-  bool trivial = true;
+  bool all_min = true;
+  bool all_max = true;
   std::map<std::string, size_t> tile_by_name;
   for (size_t i = 0; i < outer->idxs.size(); i++) {
     tile_by_name[outer->idxs[i].name] = shape[i];
     if (shape[i] != 1) {
-      trivial = false;
+      all_min = false;
+    }
+    if (shape[i] != outer->idxs[i].range) {
+      all_max = false;
     }
   }
-  if (elide_trivial && trivial) {
+  if (elide_trivial && (all_min || all_max)) {
     return false;
   }
   // Create a new inner block
   auto inner = std::make_shared<Block>();
+  if (copy_tags) {
+    inner->tags = outer->tags;
+  }
   inner->name = outer->name;
+  inner->location = outer->location;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
   // Move all constraints on the outer block into the inner block
@@ -113,43 +121,29 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
     }
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
-    outer_idx.range = (outer_idx.range + shape[i] - 1) / shape[i];
+    outer_idx.range = math::RoundUp(outer_idx.range, shape[i]);
     // Make ranges of the inner blocks: [ti, tk, tk]
     inner_idx.range = shape[i];
   }
   // Append all passthru_idxs, we defer this since this may cause inner->idxs to realloc
   std::copy(passthru_idxs.begin(), passthru_idxs.end(), std::back_inserter(inner->idxs));
-  // Copy all refinements from outer to inner block
+  // Copy all in/out refinements from outer to inner block
   inner->refs = outer->refs;
-  // Fix the sizes on the outer blocks
-  // TODO: How to handle 'skips'
   // Remove allocs on the outer refs
   outer->refs.erase(
       std::remove_if(outer->refs.begin(), outer->refs.end(), [&](const auto& ref) { return ref.dir == RefDir::None; }),
       outer->refs.end());
   for (auto& ref : outer->refs) {
-    for (size_t i = 0; i < ref.access.size(); i++) {
-      auto& aff = ref.access[i];
-      int64_t low = 0;
-      int64_t high = 0;
-      for (const auto& kvp : aff.getMap()) {
-        if (kvp.first.empty()) {
-          continue;
-        }
-        if (kvp.second > 0) {
-          high += kvp.second * (tile_by_name[kvp.first] - 1);
-        } else {
-          low += kvp.second * (tile_by_name[kvp.first] - 1);
-        }
-      }
-      high += (ref.shape.dims[i].size - 1);
-      ref.shape.dims[i].size = high - low + 1;
-      ref.access[i].setConstant(0);
-    }
-  }
-  // Multiply each stride in the outer block refinements by the appropriate tile size
-  for (auto& ref : outer->refs) {
+    // Fix the sizes on the outer blocks
+    ref.interior_shape = inner->exterior_shape(ref.into);
+    // Save any renames till the inner block (ie, only one, inner or outer needs to rename)
+    ref.into = ref.from;
     for (auto& aff : ref.access) {
+      // Since we're taking a single block and turning it into two (e.g. outer and inner),
+      // arrange for only one of the blocks to do the constant pointer bumping.
+      // It probably doesn't matter whether the outer or the inner does the bumping.
+      aff.setConstant(0);
+      // Multiply each stride in the outer block refinements by the appropriate tile size
       for (auto& kvp : aff.mutateMap()) {
         if (!kvp.first.empty()) {
           kvp.second *= tile_by_name[kvp.first];
@@ -157,19 +151,6 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial) {
       }
     }
   }
-  /*
-  // Zero out unused outer indexes
-  for (auto& ref : outer->refs) {
-    for (auto& aff : ref.access) {
-      for (const auto& idx : outer->idxs) {
-        if (idx.range == 1) {
-          aff.mutateMap().erase(idx.name);
-        }
-      }
-    }
-  }
-  */
-
   // Make the inner block the sole stmt of the outer block
   outer->stmts = {inner};
   return true;
@@ -182,9 +163,11 @@ inline bool IsLegal(int64_t rule, int64_t candidate) {  //
 using StencilMapEntry = std::pair<std::string, std::string>;
 using StencilMap = std::vector<StencilMapEntry>;
 
-void FindStencilMatches(std::set<StencilMatch>* into,  //
-                        const proto::Stencil& spec,    //
-                        const Block& block,            //
+void FindStencilMatches(std::set<StencilMatch>* into,                    //
+                        const proto::Stencil& spec,                      //
+                        const Block& block,                              //
+                        const std::vector<const Refinement*>& ref_ins,   //
+                        const std::vector<const Refinement*>& ref_outs,  //
                         const StencilMap& cur) {
   if (cur.size() == static_cast<size_t>(spec.idxs_size())) {
     // base case
@@ -216,7 +199,7 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
     size_t total_tiles = 1;
     for (const auto& idx : block.idxs) {
       auto tile = safe_at(idx_matches, idx.name);
-      size_t num_tiles = (idx.range + tile.value - 1) / tile.value;
+      size_t num_tiles = math::RoundUp(idx.range, tile.value);
       total_tiles *= num_tiles;
       match.cost *= num_tiles * tile.value;
       match.idxs.push_back(tile);
@@ -227,32 +210,38 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
   } else {
     size_t i = cur.size();
     const auto& rule = spec.idxs(i);
-    auto ref_outs = block.ref_outs();
-    auto ref_ins = block.ref_ins();
-    if (ref_outs.size() == static_cast<size_t>(rule.outs_size()) &&  //
-        ref_ins.size() == static_cast<size_t>(rule.ins_size())) {
-      for (const auto& idx : block.idxs) {
-        auto it = std::find_if(                    //
-            cur.cbegin(),                          //
-            cur.cend(),                            //
-            [&idx](const StencilMapEntry& item) {  //
-              return item.first == idx.name;
-            });
-        if (it == cur.end()) {
-          bool is_legal = true;
-          for (size_t k = 0; k < ref_outs.size(); k++) {
-            is_legal &= IsLegal(rule.outs(k), ref_outs[k]->FlatAccess().get(idx.name));
-          }
-          for (size_t k = 0; k < ref_ins.size(); k++) {
-            is_legal &= IsLegal(rule.ins(k), ref_ins[k]->FlatAccess().get(idx.name));
-          }
-          if (is_legal) {
-            // found a match on this index, keep going
-            auto next = cur;
-            next.push_back(std::make_pair(idx.name, rule.name()));
-            FindStencilMatches(into, spec, block, next);
-          }
-        }
+    if (ref_outs.size() != static_cast<size_t>(rule.outs_size()) ||
+        ref_ins.size() != static_cast<size_t>(rule.ins_size())) {
+      return;
+    }
+    std::vector<Index> idxs{block.idxs.cbegin(), block.idxs.cend()};
+    // Add virtual indexes so that we consider inefficent but valid matches.
+    for (int k = idxs.size(); k < spec.idxs_size(); k++) {
+      auto idx_name = block.unique_idx_name(str(boost::format("$%1%") % k));
+      idxs.emplace_back(Index{idx_name, 1});
+    }
+    for (const auto& idx : idxs) {
+      auto it = std::find_if(                    //
+          cur.cbegin(),                          //
+          cur.cend(),                            //
+          [&idx](const StencilMapEntry& item) {  //
+            return item.first == idx.name;
+          });
+      if (it != cur.end()) {
+        continue;
+      }
+      bool is_legal = true;
+      for (size_t k = 0; k < ref_outs.size(); k++) {
+        is_legal &= IsLegal(rule.outs(k), ref_outs[k]->FlatAccess().get(idx.name));
+      }
+      for (size_t k = 0; k < ref_ins.size(); k++) {
+        is_legal &= IsLegal(rule.ins(k), ref_ins[k]->FlatAccess().get(idx.name));
+      }
+      if (is_legal) {
+        // found a match on this index, keep going
+        auto next = cur;
+        next.push_back(std::make_pair(idx.name, rule.name()));
+        FindStencilMatches(into, spec, block, ref_ins, ref_outs, next);
       }
     }
   }
@@ -260,9 +249,10 @@ void FindStencilMatches(std::set<StencilMatch>* into,  //
 
 boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs,  //
                                               const Block& block) {
+  IVLOG(3, "FindBestStencil> " << block.name);
   std::set<StencilMatch> matches;
   for (const auto& spec : specs) {
-    FindStencilMatches(&matches, spec, block, {});
+    FindStencilMatches(&matches, spec, block, block.ref_ins(), block.ref_outs(), {});
   }
   if (!matches.empty()) {
     return *matches.begin();
@@ -277,14 +267,26 @@ struct StencilPassOptions {
   Tags set_inner;
 };
 
-void StencilPassRecurse(stripe::Block* block, const StencilPassOptions& options) {
+void ApplyIndexTags(Block* block, const StencilMatch& match) {
+  for (const auto& idx_match : match.idxs) {
+    if (idx_match.stencil_idx_name == "*") {
+      continue;
+    }
+    auto idx = block->idx_by_name(idx_match.block_idx_name);
+    if (idx) {
+      idx->set_tag(str(boost::format("stencil_%1%") % idx_match.stencil_idx_name));
+    }
+  }
+}
+
+void StencilPassRecurse(Block* block, const StencilPassOptions& options) {
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
       StencilPassRecurse(inner.get(), options);
     }
   }
-  if (HasTags(*block, options.reqs)) {
+  if (block->has_tags(options.reqs)) {
     auto match = FindBestStencil(options.specs, *block);
     if (!match) {
       return;
@@ -294,13 +296,15 @@ void StencilPassRecurse(stripe::Block* block, const StencilPassOptions& options)
       tile.push_back(idx.value);
     }
     ApplyTile(block, tile, false);
-    AddTags(block, options.set_outer);
-    auto inner = Block::Downcast(*block->stmts.begin());
-    AddTags(inner.get(), options.set_inner);
+    ApplyIndexTags(block, *match);
+    block->add_tags(options.set_outer);
+    auto inner = block->SubBlock(0);
+    ApplyIndexTags(inner.get(), *match);
+    inner->add_tags(options.set_inner);
   }
 }
 
-void StencilPass(stripe::Block* block, const proto::StencilPass& options) {
+void StencilPass(Block* block, const proto::StencilPass& options) {
   StencilPassOptions sopts = {
       FromProto(options.reqs()),       // reqs
       {},                              // specs

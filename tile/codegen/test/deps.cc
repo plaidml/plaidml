@@ -17,20 +17,20 @@ namespace codegen {
 
 TEST(DepsTest, SmallDepMix) {
   auto input_text = R"(
-    location: { unit { } }
+    loc: { unit { } }
     stmts {
       tags: "main"
       block {
-        location: { unit { } }
+        loc: { unit { } }
         refs {
           into: "b1"
-          location: { unit { } }
-          shape { type: FLOAT32 dimensions: {size:1 stride:1} } 
+          loc: { unit { } }
+          shape { type: FLOAT32 dims: {size:1 stride:1} } 
         }
         refs {
           into: "b2"
-          location: { unit { } }
-          shape { type: FLOAT32 dimensions: {size:1 stride:1} }
+          loc: { unit { } }
+          shape { type: FLOAT32 dims: {size:1 stride:1} }
         }
         stmts { load { from:"b1" into:"$1" } }
         stmts { store { from:"$1" into:"b2" } }
@@ -51,20 +51,20 @@ TEST(DepsTest, SmallDepMix) {
   ComputeDepsPass(block.get(), options);
 
   const char* expected = R"(
-    location: { unit { } }
+    loc: { unit { } }
     stmts {
       tags: "main"
       block {
-        location: { unit { } }
+        loc: { unit { } }
         refs {
           into: "b1"
-          location: { unit { } }
-          shape { type: FLOAT32 dimensions: {size:1 stride:1} } 
+          loc: { unit { } }
+          shape { type: FLOAT32 dims: {size:1 stride:1} } 
         }
         refs {
           into: "b2"
-          location: { unit { } }
-          shape { type: FLOAT32 dimensions: {size:1 stride:1} }
+          loc: { unit { } }
+          shape { type: FLOAT32 dims: {size:1 stride:1} }
         }
         stmts { load { from:"b1" into:"$1" } }
         stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -73,6 +73,94 @@ TEST(DepsTest, SmallDepMix) {
         stmts { intrinsic { name:"ADD" type:FLOAT32 inputs:"$2" inputs:"$3" outputs:"$4"} deps: 2 deps: 3}
         stmts { special { name:"COPY" inputs:"b1" outputs:"b2"} deps: 2}
         stmts { store { from:"$4" into:"b2"} deps: 4 deps: 5}
+      }
+    }
+  )";
+
+  auto output_proto = IntoProto(*block);
+  EXPECT_THAT(output_proto, EqualsProtoText(expected));
+}
+
+TEST(DepsTest, Subregion) {
+  auto input_text = R"(
+    refs {
+      into: "buf"
+      access [ { offset: 0 }, { offset: 0 } ]
+      shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
+      loc { unit { } }
+    }
+    stmts {
+      tags: "main"
+      block {
+        idxs { name: "i" range: 10 affine { } }
+        refs {
+          from: "buf" into: "b1" dir: In
+          access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
+          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          loc { unit { } }
+        }
+        refs {
+          from: "buf" into: "b2" dir: In
+          access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
+          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          loc { unit { } }
+        }
+        refs {
+          from: "buf" into: "b3" dir: In
+          access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
+          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          loc { unit { offset: 1 } }
+        }
+        stmts { constant { name:"$1" iconst: 0 } }
+        stmts { store { from:"$1" into:"b1" } }
+        stmts { store { from:"$1" into:"b2" } }
+        stmts { store { from:"$1" into:"b3" } }
+      }
+    }
+  )";
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(input_text, &input_proto);
+
+  auto block = stripe::FromProto(input_proto);
+  proto::GenericPass options;
+  options.add_reqs("main");
+  ComputeDepsPass(block.get(), options);
+
+  const char* expected = R"(
+    loc { unit { } }
+    refs {
+      into: "buf"
+      access [ { offset: 0 }, { offset: 0 } ]
+      shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
+      loc { unit { } }
+    }
+    stmts {
+      tags: "main"
+      block {
+        loc { unit { } }
+        idxs { name: "i" range: 10 affine { } }
+        refs {
+          from: "buf" into: "b1" dir: In
+          access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
+          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          loc { unit { } }
+        }
+        refs {
+          from: "buf" into: "b2" dir: In
+          access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
+          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          loc { unit { } }
+        }
+        refs {
+          from: "buf" into: "b3" dir: In
+          access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
+          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          loc { unit { offset: 1 } }
+        }
+        stmts { constant { name:"$1" iconst: 0 } }
+        stmts { store { from:"$1" into:"b1" } deps: 0 }
+        stmts { store { from:"$1" into:"b2" } deps: 0 }
+        stmts { store { from:"$1" into:"b3" } deps: 0 }
       }
     }
   )";

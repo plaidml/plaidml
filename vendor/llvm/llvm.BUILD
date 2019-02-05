@@ -365,3 +365,11 @@ cc_binary(
     linkshared = 1,
     deps = [":llvm"],
 )
+
+genrule(
+    name = "license",
+    visibility = ["//visibility:public"],
+    srcs = ["LICENSE.TXT"],
+    outs = ["llvm-LICENSE"],
+    cmd = "cp $(SRCS) $@",
+)

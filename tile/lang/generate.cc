@@ -8,6 +8,8 @@
 #include <string>
 #include <utility>
 
+#include <boost/format.hpp>
+
 #include "base/util/logging.h"
 #include "tile/lang/compile.h"
 #include "tile/lang/flat.h"
@@ -146,7 +148,7 @@ static std::vector<TensorShape> MakeTShapes(const Contraction& c, const Bindings
     auto it = vars.find(spec.id);
     if (it == vars.end()) {
       IVLOG(1, "About to barf: " << vars);
-      throw std::runtime_error(printstring("Unable to find tensor shape for id %s, ug", spec.id.c_str()));
+      throw std::runtime_error(str(boost::format("Unable to find tensor shape for id %s, ug") % spec.id));
     }
     tshapes.push_back(it->second.shape);
   }
@@ -244,7 +246,7 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
       auto it = vars.find(spec.id);
       if (it == vars.end()) {
         IVLOG(1, "About to barf: " << vars);
-        throw std::runtime_error(printstring("Unable to find tensor shape for id %s, ug", spec.id.c_str()));
+        throw std::runtime_error(str(boost::format("Unable to find tensor shape for id %s, ug") % spec.id));
       }
       if (!first) {
         inputs.push_back(it->first);
@@ -785,7 +787,7 @@ static KernelList Compile(const Program& orig_prog, const ShapeMap& inputs, cons
   // Now, go over all of the program operations; make a convolution kernel for each convolution, and a function kernel
   // for each group of connected functions.
   size_t knum = 0;
-  auto next_kname = [&knum, kid] { return printstring("%s_%zu", kid.c_str(), knum++); };
+  auto next_kname = [&knum, kid] { return str(boost::format("%s_%zu") % kid % knum++); };
   time_t last_update = time(nullptr);
   std::map<std::string, KernelInfo> flat_cache;
   for (size_t i = 0; i < prog.ops.size(); i++) {

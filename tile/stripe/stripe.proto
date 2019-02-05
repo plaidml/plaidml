@@ -7,103 +7,199 @@ package vertexai.tile.stripe.proto;
 import "tile/proto/shape.proto";
 import "google/protobuf/wrappers.proto";
 
+// An affine represents a set of multipliers, one for each index, as well as a
+// constant, which in combination project a (possibly multidimensional) index
+// space onto a single dimension.  For example 5*i + j - 2 is an affine which
+// projects i = 3, j = 1 onto the 5*3 + 1 - 2 = 14.
 message Affine {
-  int64 offset = 1;
-  map<string, int64> terms = 2;
+  int64 offset = 1;              // The fixed offset of the affine
+  map<string, int64> terms = 2;  // The multiplier for various indexes (by name)
 }
 
+// A block in stripe represents computation happening over some N-dimensional
+// polyhedral index space.  For each index position (as determined by idxs),
+// such that the constraints hold true, new refinements are constructed and
+// then operated on by a set of statements.  The ordering of the execution of
+// the interior statements is not defined, and may be done in parallel (with
+// respect to the indexes), however within each index positions, statements
+// logically execute serially.  That is, the result must be equivalent to serial
+// execution, although statement which are not dependent may be reordered or
+// scheduled simultaneously.
 message Block {
+  // The name of the block (for debugging, not semantically meaningful).
   string name = 1;
+  // Long form comments for the block (also not semantically meaningful).
   string comments = 2;
+  // The set of indexes this block operates over.
   repeated Index idxs = 3;
+  // Only execute the block interior when the constraints below are all true.
+  // A constraint is true when the Affine applied to the indexes (which must
+  // be indexed declared in this block only) results in a number >= 0.
   repeated Affine constraints = 4;
+  // A set of refinements which create subviews of outer blocks and/or allocate
+  // new buffers whose scope is the execution of a single index position of
+  // this block.
   repeated Refinement refs = 5;
+  // The list of statements to run for each valid (satisfies constraints) index
+  // position of this block.
   repeated Statement stmts = 6;
-  Location location = 8;
+  // The compute or transfer element this block is assigned to run on.
+  Location loc = 8;
 }
 
+// Each index has a name (used in Affines), a range over which it iterates, and
+// an affine that defines it's initial offset in term of outer blocks.  The
+// scope of each index is block local (not including interior blocks even).  On
+// entry to the block, the indexes Affine is evaluated to set it's starting
+// value and then the index ranges over the half closed interval [start, start +
+// range). Additionally, each index may have user defined 'tags' on it, which
+// have no specific semantic meaning to Stripe but are used to decorate indexes
+// for various optimization passes.
 message Index {
   string name = 1;
   uint64 range = 2;
   Affine affine = 3;
+  repeated string tags = 11;
 }
 
+// A refinement represents a dimensional buffer (Tensor) or a region thereof.
+// The refinement has a well defined shape, and it's scope exists only for the
+// block it is defined in (not including the interior blocks unless
+// specifically refined further).  It can be loaded/stored to/from via load or
+// store statements within the block.  Each refinement is either a new
+// allocation on the block or a subregion of a refinement in the parent block.
+// Additionally, stores to the refinement may have special aggregation behavior,
+// such as accumulation.
 message Refinement {
+  // The direction define how the refinement relates to the 'from' refinement
+  // in it's parent block.
   enum Dir {
-    None = 0;
-    In = 1;
-    Out = 2;
-    InOut = 3;
+    None = 0;   // The refinement is newly allocated in this block
+    In = 1;     // The refinement only reads from it's parent
+    Out = 2;    // The refinement only writes to it's parent
+    InOut = 3;  // The refinement both reads + writes it's parent.
   }
 
+  // The direction enum declared above
   Dir dir = 1;
+  // The name of the parent refinement in the parent block, must be an empty
+  // string if the refinement does not have a parent (i.e., newly allocated).
   string from = 2;
+  // The name of the refinement within the local block
   string into = 3;
+  // How to move the start of the inner refinement relative to the outer
+  // refinement in terms of the indexes of the block
   repeated Affine access = 4;
+  // The shape of the refinement for the 'interior' of the block, that is
+  // it's shape relative to a single index state during the evaluation of
+  // the statements
   tile.proto.TensorShape shape = 5;
+  // How to aggregate any writes to this refinement
   string agg_op = 6;
-  Location location = 7;
+  // The hardware memory bank the refinement exists in
+  Location loc = 7;
+  // Is this refinement a constant buffer (never written in any block)
   bool is_const = 8;
+  // The offset of the start of the buffer holding the block in the memory
+  // the block is in.  Only valid after a schedule/placement pass.
   uint64 offset = 9;
+  // Which bank this refinement is in, or none for non-banked memory
   google.protobuf.UInt32Value bank_dim = 10;
+  // A set of user defined 'tags' that are attached to the refinement.  They do
+  // not have any specific semantic meaning, but are often used to pass
+  // membership information between optimization passes
+  repeated string tags = 11;
 }
 
+// For each index position of a block, the block executes multiple 'Statement'
+// which can be various type of operations, including additional blocks.
+// Statements operate over both refinements (buffers) and scalars (values).
+// Scalars must be used in SSA (Single static assignment) form, that is, each
+// scalar name must be computed exactly once and never changed.  Refinements
+// however act as memory locations and may be read + written, even multiple
+// times within a block.
 message Statement {
   oneof op {
+    // A load from a refinement into a scalar value
     Load load = 1;
+    // A store from scalar value into a refinement
     Store store = 2;
+    // Perform an intrinsic (primitive) operation on one or more scalars and
+    // produce one or more scalars as output.
     Intrinsic intrinsic = 3;
+    // Declare a constant scalar value
     Constant constant = 4;
+    // Execute an entire sub-block
     Block block = 5;
+    // Perform a 'special' operation.  Specials operate on refinements, and may
+    // arbitrarily read/write data to those refinements, but unlike a block the
+    // semantic effect is not described in Stripe, but is simple a function of
+    // the name of the special.
     Special special = 6;
   }
 
-  // Indices of intra-block dependencies.
+  // Indices of intra-block dependencies.  That is, this statement depends on
+  // prior statements listed in deps.  Can be used to determine which
+  // statements can be simultaneously scheduled.
   repeated uint32 deps = 7;
+  // A set of user defined 'tags' that are attached to a statement.  They do
+  // not have any specific semantic meaning, but are often used to pass
+  // membership information between optimization passes
   repeated string tags = 8;
 }
 
+// A load statement
 message Load {
+  // The refinement to load from
   string from = 1;
+  // The scalar value to define as the result of the load
   string into = 2;
 }
 
+// A store statement
 message Store {
+  // The scalar value to 'write' to a refinement.
   string from = 1;
+  // The refinement being written to.  Note, the scalar in from is actually
+  // accumulated into the refinement based on it's agg_op.
   string into = 2;
 }
 
+// An intrinsic that operates on scalars and defines additional scalars
 message Intrinsic {
+  // The name of the intrinsic, i.e. the operation to perform.  For example,
+  // "add" for addition, "mul" for multiplication.  The full set of intrinsics
+  // is specified in the Stripe specification.
   string name = 1;
+  // The datatype for the intrinsic.  Generally this is the type all inputs are
+  // cast to before executing, as well as the result type, but the
+  // interpretation is specific to the operation.  For example cmp_lt always
+  // returns a bool, but type determines how the inputs are interpreted for
+  // comparison.
   tile.proto.TensorShape.DataType type = 4;
+  // The input scalars
   repeated string inputs = 2;
+  // The output scalars
   repeated string outputs = 3;
-
-  enum Std {
-    MUL = 0;
-    ADD = 1;
-    EQ = 2;
-    COND = 3;
-    SUM = 4;
-    MAX = 5;
-    MIN = 6;
-    PROD = 7;
-    ASSIGN = 8;
-  }
 }
 
+// A special operates directly on buffers and represents operations that are
+// not well suited for implementation in stripe or which are opaque for other
+// reasons.  For example 'sort' or 'gather'.
 message Special {
+  // The name of the special, i.e. the operation to perform.
   string name = 1;
+  // Additional per-operation parameters that define behavior, opaque to stripe
   repeated string params = 2;
+  // The set of refinements which are read by the special.
   repeated string inputs = 3;
+  // The set of refinement which are written by the special.  Note: refinement
+  // that are both read + written be be in both lists.
   repeated string outputs = 4;
-
-  enum Std {
-    ZERO = 0;
-    COPY = 1;
-  }
 }
 
+// A constant.  Constants are always 'maximal precision', but are reduced to
+// the relevant working precision by any intrinsics which use them.
 message Constant {
   string name = 1;
   oneof value {
@@ -112,7 +208,8 @@ message Constant {
   }
 }
 
+// A location represent a hardware unit (i.e. compute, transfer, memory etc).
 message Location {
-  string name = 1;
-  Affine unit = 2;
+  string name = 1;  // The name of the unit
+  Affine unit = 2;  // A unit number (which specific unit)
 }

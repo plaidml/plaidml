@@ -1,5 +1,5 @@
 load(
-    "@com_intel_plaidml//bzl:plaidml.bzl",
+    "//bzl:plaidml.bzl",
     "plaidml_cc_library",
     "plaidml_cc_test",
 )

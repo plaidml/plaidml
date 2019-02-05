@@ -4,6 +4,8 @@
 
 #include <algorithm>
 
+#include <boost/format.hpp>
+
 #include "base/util/stream_container.h"
 #include "tile/codegen/localize.h"
 #include "tile/stripe/stripe.h"
@@ -23,11 +25,8 @@ void ApplyCache(Block* block,                 //
     throw std::runtime_error("ApplyCache: Invalid var_name");
   }
   // Get the shape
-  TensorShape raw_ts = it->shape;
-  std::vector<size_t> sizes;
-  for (const auto& dim : raw_ts.dims) {
-    sizes.push_back(dim.size);
-  }
+  TensorShape raw_ts = it->interior_shape;
+  std::vector<size_t> sizes = raw_ts.sizes();
   TensorShape cached_ts = SimpleShape(raw_ts.type, sizes);
   // Make a new name for the raw variable
   std::string raw_name = block->unique_ref_name(var_name + "_raw");
@@ -40,9 +39,13 @@ void ApplyCache(Block* block,                 //
   xfer_block.location = xfer_loc;
   std::vector<Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
-    std::string iname = printstring("i%zu", i);
-    xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
-    xfer_access.emplace_back(Affine(iname));
+    if (sizes[i] > 1) {
+      std::string iname = str(boost::format("i%zu") % i);
+      xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
+      xfer_access.emplace_back(Affine(iname));
+    } else {
+      xfer_access.emplace_back(Affine());
+    }
   }
   TensorShape raw_xfer_shape = raw_ts;
   TensorShape cached_xfer_shape = cached_ts;
@@ -50,7 +53,7 @@ void ApplyCache(Block* block,                 //
     raw_xfer_shape.dims[i].size = 1;
     cached_xfer_shape.dims[i].size = 1;
   }
-  xfer_block.refs.push_back(Refinement{
+  xfer_block.refs.emplace_back(Refinement{
       RefDir::In,         // dir
       var_name,           // from
       "src",              // into
@@ -58,9 +61,11 @@ void ApplyCache(Block* block,                 //
       cached_xfer_shape,  // shape
       "",                 // agg_op
       it->location,       // location
-      it->is_const        // is_const
+      it->is_const,       // is_const
+      it->offset,         // offset
+      it->bank_dim,       // bank_dim
   });
-  xfer_block.refs.push_back(Refinement{
+  xfer_block.refs.emplace_back(Refinement{
       RefDir::Out,        // dir
       var_name,           // from
       "dst",              // into
@@ -68,37 +73,41 @@ void ApplyCache(Block* block,                 //
       cached_xfer_shape,  // shape
       "",                 // agg_op
       it->location,       // location
-      it->is_const        // is_const
+      it->is_const,       // is_const
+      it->offset,         // offset
+      it->bank_dim,       // bank_dim
   });
-  xfer_block.stmts.push_back(std::make_shared<Load>("src", "$X"));
-  xfer_block.stmts.push_back(std::make_shared<Store>("$X", "dst"));
+  xfer_block.stmts.emplace_back(std::make_shared<Load>("src", "$X"));
+  xfer_block.stmts.emplace_back(std::make_shared<Store>("$X", "dst"));
   // If original refinement was input, load into cache
   if (IsReadDir(it->dir)) {
     auto cache_load = std::make_shared<Block>(xfer_block);
-    cache_load->name = printstring("load_%s", var_name.c_str());
+    cache_load->name = str(boost::format("load_%s") % var_name);
+    cache_load->tags = {"cache", "cache_load"};
     cache_load->refs[0].from = raw_name;
-    cache_load->refs[0].shape = raw_xfer_shape;
+    cache_load->refs[0].interior_shape = raw_xfer_shape;
     cache_load->refs[1].location = mem_loc;
-    block->stmts.push_front(cache_load);
+    block->stmts.emplace_front(cache_load);
   }
   // If original refinement was output, flush from cache
   if (IsWriteDir(it->dir)) {
     auto cache_store = std::make_shared<Block>(xfer_block);
-    cache_store->name = printstring("store_%s", var_name.c_str());
+    cache_store->name = str(boost::format("store_%s") % var_name);
+    cache_store->tags = {"cache", "cache_store"};
     cache_store->refs[1].from = raw_name;
-    cache_store->refs[1].shape = raw_xfer_shape;
+    cache_store->refs[1].interior_shape = raw_xfer_shape;
     cache_store->refs[0].location = mem_loc;
-    block->stmts.push_back(cache_store);
+    block->stmts.emplace_back(cache_store);
   }
   // Add the new declaration (replacing the original)
-  block->refs.push_back(Refinement{
+  block->refs.emplace_back(Refinement{
       RefDir::None,  // dir
       "",            // from
       var_name,      // into
       {},            // access
       cached_ts,     // shape
       "",            // agg_op
-      mem_loc        // location
+      mem_loc,       // location
   });
   block->refs.back().access.resize(cached_ts.dims.size());
   // Update inner blocks strides + locations
@@ -112,6 +121,19 @@ void CacheBlock(Block* block, const std::set<RefDir>& dirs, const Location& mem_
       codegen::ApplyCache(block, ref.into, mem_loc, xfer_loc);
     }
   }
+}
+
+void CachePass(Block* root, const proto::CachePass& options) {
+  auto reqs = FromProto(options.reqs());
+  std::set<RefDir> dirs;
+  for (const auto& dir : options.dirs()) {
+    dirs.emplace(stripe::FromProto(static_cast<stripe::proto::Refinement::Dir>(dir)));
+  }
+  auto mem_loc = stripe::FromProto(options.mem_loc());
+  auto xfer_loc = stripe::FromProto(options.xfer_loc());
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
+    CacheBlock(block, dirs, mem_loc, xfer_loc);
+  });
 }
 
 }  // namespace codegen

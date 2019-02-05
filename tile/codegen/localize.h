@@ -3,11 +3,9 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/tags.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -27,15 +25,15 @@ void LocalizePass(const AliasMap& scope, stripe::Block* block);
 
 // Localize starting from root for things that match reqs
 inline void LocalizePass(stripe::Block* root, const proto::GenericPass& options) {
-  auto reqs = FromProto(options.reqs());
+  auto reqs = stripe::FromProto(options.reqs());
   RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
     LocalizePass(map, block);
   });
 }
 
-void LocateMemoryPass(stripe::Block* root, const proto::LocateMemoryPass& options);
-void LocateBlockPass(stripe::Block* root, const proto::LocateMemoryPass& options);
-void LocateInnerBlockPass(stripe::Block* root, const proto::LocateMemoryPass& options);
+void LocateMemoryPass(stripe::Block* root, const proto::LocatePass& options);
+void LocateBlockPass(stripe::Block* root, const proto::LocatePass& options);
+void LocateInnerBlockPass(stripe::Block* root, const proto::LocatePass& options);
 
 }  // namespace codegen
 }  // namespace tile

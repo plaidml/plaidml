@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <list>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -37,8 +38,7 @@ struct Special;
 struct Intrinsic;
 struct Block;
 
-class ConstStmtVisitor {
- public:
+struct ConstStmtVisitor {
   virtual void Visit(const Load&) = 0;
   virtual void Visit(const Store&) = 0;
   virtual void Visit(const Constant&) = 0;
@@ -47,8 +47,7 @@ class ConstStmtVisitor {
   virtual void Visit(const Block&) = 0;
 };
 
-class MutableStmtVisitor {
- public:
+struct MutableStmtVisitor {
   virtual void Visit(Load*) = 0;
   virtual void Visit(Store*) = 0;
   virtual void Visit(Constant*) = 0;
@@ -57,8 +56,7 @@ class MutableStmtVisitor {
   virtual void Visit(Block*) = 0;
 };
 
-class RewriteStmtVisitor {
- public:
+struct RewriteStmtVisitor {
   virtual Load* Visit(const Load&) = 0;
   virtual Store* Visit(const Store&) = 0;
   virtual Constant* Visit(const Constant&) = 0;
@@ -71,8 +69,27 @@ struct Statement;
 
 using StatementList = std::list<std::shared_ptr<Statement>>;
 using StatementIt = StatementList::iterator;
+using Tags = std::set<std::string>;
 
-struct Statement {
+struct Taggable {
+  // Generic properties used by optimization passes
+  Tags tags;
+
+  void set_tag(const std::string& tag) { tags.emplace(tag); }
+  void add_tags(const Tags& to_add) { tags.insert(to_add.begin(), to_add.end()); }
+
+  bool has_tag(const std::string& tag) const { return tags.count(tag) != 0; }
+  bool has_tags(const Tags& to_find) const {
+    for (const auto& tag : to_find) {
+      if (tags.count(tag) == 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
+struct Statement : Taggable {
   virtual ~Statement() = default;
   virtual StmtKind kind() const = 0;
   virtual std::vector<std::string> buffer_reads() const { return {}; }
@@ -86,14 +103,15 @@ struct Statement {
   // The set of statements within the same Block that must complete
   // before this statement is evaluated.
   std::list<StatementIt> deps;
-  // Generic properties on the statement used by optimization passes
-  std::set<std::string> tags;
-
-  bool has_tag(const std::string& tag) const { return tags.count(tag) != 0; }
-  void set_tag(const std::string& tag) { tags.emplace(tag); }
 };
 
-struct Index {
+struct Index : Taggable {
+  Index(const std::string& name,  //
+        uint64_t range,           //
+        const Affine& affine = Affine{})
+      : name(name),  //
+        range(range),
+        affine(affine) {}
   std::string name;
   uint64_t range;
   Affine affine;
@@ -123,19 +141,49 @@ struct Location {
   Affine unit;
 };
 
-struct Refinement {
-  RefDir dir;
+struct BankDimension {
+  size_t dim_pos;
+};
+
+struct Refinement : Taggable {
+  Refinement() {}
+  Refinement(RefDir dir,                             //
+             const std::string& from,                //
+             const std::string& into,                //
+             const std::vector<Affine>& access,      //
+             const TensorShape& shape,               //
+             const std::string& agg_op = "",         //
+             const Location& location = Location{},  //
+             bool is_const = false,                  //
+             uint64_t offset = 0,                    //
+             const boost::optional<BankDimension>& bank_dim = boost::none,
+             const boost::optional<Affine>& cache_unit = boost::none)
+      : dir(dir),
+        from(from),
+        into(into),
+        access(access),
+        interior_shape(shape),
+        agg_op(agg_op),
+        location(location),
+        is_const(is_const),
+        offset(offset),
+        bank_dim(bank_dim),
+        cache_unit(cache_unit) {}
+
+  RefDir dir = RefDir::None;
   std::string from;
   std::string into;
   std::vector<Affine> access;
-  TensorShape shape;
+  TensorShape interior_shape;
   std::string agg_op;
   Location location;
-  bool is_const;
-  std::size_t offset;                  // Offset within the location's arena.
-  boost::optional<uint32_t> bank_dim;  // Which dimension should we bank on
+  bool is_const = false;
+  uint64_t offset = 0;                      // Offset within the location's arena.
+  boost::optional<BankDimension> bank_dim;  // Which dimension should we bank on
+  boost::optional<Affine> cache_unit;       // Which cache we should use when encaching this refinement
 
   Affine FlatAccess() const;
+  TensorShape ApplyTile(const std::map<std::string, size_t>& tile_by_name) const;
 };
 
 struct Load : Statement {
@@ -251,8 +299,10 @@ struct Block : Statement {
   // Helper methods
   std::vector<const Refinement*> ref_ins() const;
   std::vector<const Refinement*> ref_outs() const;
+  Index* idx_by_name(const std::string& name);
   const Index* idx_by_name(const std::string& name) const;
   std::set<const Index*> accumulation_idxs() const;
+  size_t idxs_product() const;
   // Find which refinement has an into called 'name'
   std::vector<Refinement>::iterator ref_by_into(const std::string& name, bool fail = true);
   std::vector<Refinement>::const_iterator ref_by_into(const std::string& name, bool fail = true) const;
@@ -260,9 +310,10 @@ struct Block : Statement {
   std::vector<Refinement>::iterator ref_by_from(const std::string& name, bool fail = true);
   std::vector<Refinement>::const_iterator ref_by_from(const std::string& name, bool fail = true) const;
   // Make a unique refinement name for an into (by appending _2, etc, if needed)
-  std::string unique_ref_name(const std::string& into);
+  std::string unique_ref_name(const std::string& into) const;
   // Make a unique index name (by appending _2, etc, if needed)
-  std::string unique_idx_name(const std::string& name);
+  std::string unique_idx_name(const std::string& name) const;
+  TensorShape exterior_shape(const std::string& name) const;
 
   std::shared_ptr<Block> SubBlock(size_t pos) const {
     auto it = stmts.begin();
@@ -277,6 +328,7 @@ inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) {  //
   return lhs->get() < rhs->get();
 }
 
+bool operator==(const BankDimension& lhs, const BankDimension& rhs);
 bool operator==(const Index& lhs, const Index& rhs);
 bool operator==(const Location& lhs, const Location& rhs);
 bool operator!=(const Location& lhs, const Location& rhs);
@@ -298,39 +350,25 @@ std::shared_ptr<Block> FromProto(const proto::Block& block);
 Affine FromProto(const proto::Affine& affine);
 Location FromProto(const proto::Location& loc);
 RefDir FromProto(const proto::Refinement::Dir& dir);
+Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags);
 
 proto::Block IntoProto(const Block& block);
 proto::Affine IntoProto(const Affine& affine);
 proto::Location IntoProto(const Location& loc);
 
-class CloneVisitor : RewriteStmtVisitor {
- public:
-  explicit CloneVisitor(size_t depth) : depth_(depth) {}
-  Load* Visit(const Load& x) { return new Load(x); }
-  Store* Visit(const Store& x) { return new Store(x); }
-  Constant* Visit(const Constant& x) { return new Constant(x); }
-  Special* Visit(const Special& x) { return new Special(x); }
-  Intrinsic* Visit(const Intrinsic& x) { return new Intrinsic(x); }
-  Block* Visit(const Block& x) {
-    auto ret = new Block(x);
-    if (depth_ == 0) {
-      return ret;
-    }
-    depth_--;
-    for (auto& stmt_ptr : ret->stmts) {
-      stmt_ptr = std::shared_ptr<Statement>(stmt_ptr->Accept(this));
-    }
-    depth_++;
-    return ret;
+std::shared_ptr<Block> CloneBlock(const Block& orig, int depth = -1);
+const Block* FindBlockByTag(const Block& block, const std::string& tag);
+const Index* FindIndexByTag(const Block& block, const std::string& tag);
+
+template <typename F>
+void PreIterate(Block* block, const F& func) {
+  auto it = block->stmts.begin();
+  while (it != block->stmts.end()) {
+    auto next = it;
+    ++next;
+    func(it);
+    it = next;
   }
-
- private:
-  size_t depth_;
-};
-
-inline std::shared_ptr<Block> CloneBlock(const Block& orig, size_t depth = -1) {
-  CloneVisitor visitor(depth);
-  return std::shared_ptr<Block>(visitor.Visit(orig));
 }
 
 inline std::string to_string(const Block& block) {

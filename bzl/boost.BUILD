@@ -39,7 +39,7 @@ cc_library(
 cc_library(
     name = "stacktrace",
     defines = select({
-        "@toolchain//:macos_x86_64": ["_GNU_SOURCE"],
+        "@toolchain//:macos_x86_64": ["BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED"],
         "//conditions:default": [],
     }),
     linkopts = select({
@@ -95,4 +95,11 @@ cc_library(
         ":boost",
         ":system",
     ],
+)
+
+genrule(
+    name = "license",
+    srcs = ["LICENSE_1_0.txt"],
+    outs = ["boost-LICENSE"],
+    cmd = "cp $(SRCS) $@",
 )

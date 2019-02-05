@@ -1,7 +1,11 @@
+.. building_a_frontend.rst:
+
 ===================
 Building a Frontend
 ===================
-PlaidML currently supports Keras and ONNX as frontends. This document explains how to add PlaidML as a backend to other machine learning frontends.
+
+PlaidML currently supports Keras and ONNX as frontends. This document explains 
+how to add PlaidML as a backend to other machine learning frontends.
 
 .. _frontend_docs:
 
@@ -75,37 +79,57 @@ This may be handled somewhat automatically by your frontend. For example, the Ke
 .. _dtypes:
 
 DTypes
-______
+------
+
 Note that :doc:`api/plaidml.tile.Value`\s have an associated data type, which sometimes must be manually specified. The PlaidML datatypes are specified in :doc:`api/plaidml.DType`; you will probably need to create a correspondence between these and the frontend's data types.
 
 .. _individual_operations:
 
 Individual Operations
 =====================
-PlaidML operations that are common to multiple frontends can be found in the :doc:`api/plaidml.op` module (a few, such as the Python numeric type operations, instead appear in :doc:`api/plaidml.tile`). Some operations can be used directly from the common ops library, e.g. for Keras the function ``tanh`` is defined as ::
+
+PlaidML operations that are common to multiple frontends can be found in the 
+:doc:`api/plaidml.op` module (a few, such as the Python numeric type operations, 
+instead appear in :doc:`api/plaidml.tile`). Some operations can be used directly 
+from the common ops library, e.g. for Keras the function ``tanh`` is defined as 
+
+::
 
   tanh = op.tanh
 
-and for ONNX ::
+and for ONNX 
+
+::
 
   @staticmethod
   @opset_op('Tanh')
   def tanh(value):
       return (op.tanh(value),)
 
-Others might need a thin wrapper to translate the API, e.g. for Keras ``sum`` is defined as ::
+Others might need a thin wrapper to translate the API. For example with Keras, 
+``sum`` is defined as 
+
+::
 
   def sum(x, axis=None, keepdims=False):
       return op.summation(
           x, axes=axis, keepdims=keepdims, floatx=ptile.NUMPY_DTYPE_TO_PLAIDML[floatx()])
 
-and for ONNX ::
+and for ONNX 
+
+::
 
   @staticmethod
   @opset_op('Sum')
   def sum(*args):
       return (functools.reduce(lambda x, y: x + y, args),)
 
-(note that the ``+`` in the reduce comes from :doc:`api/plaidml.tile` as ``Value.__add__``).
+(Note that the ``+`` in the reduce comes from :doc:`api/plaidml.tile` as '
+``Value.__add__``).
 
-Yet other operations might not exist in the common op library, and will need to be defined in whole or in part in a frontend-specific op library; e.g. the operations ``switch`` and ``tile`` for Keras and the operations ``flatten`` and ``split`` for ONNX. If the operation you wish to implement does not yet exist, you will need to write Tile code for it (see :doc:`writing_tile_code`) and wrap that code with a PlaidML :doc:`api/plaidml.tile.Operation` (see :doc:`adding_ops`).
+Other operations might not exist in the common op library, and will need to be 
+defined in whole or in part in a frontend-specific op library; e.g. the operations 
+``switch`` and ``tile`` for Keras and the operations ``flatten`` and ``split`` 
+for ONNX. If the operation you wish to implement does not yet exist, you will 
+need to write Tile code for it (see :doc:`writing_tile_code`) and wrap that code 
+with a PlaidML :doc:`api/plaidml.tile.Operation` (see :doc:`adding_ops`).

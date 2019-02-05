@@ -36,13 +36,19 @@ RunfilesDB::RunfilesDB(const char* prefix, const char* environ_override_var) {
       std::string manifest_filename = runfiles_dir;
       manifest_filename += "/MANIFEST";
       std::ifstream manifest{manifest_filename};
-      while (manifest) {
-        std::string logical_name;
-        std::string physical_name;
-        manifest >> logical_name >> physical_name;
-        if (manifest) {
-          logical_to_physical_[logical_name] = physical_name;
+      for (;;) {
+        std::string line;
+        std::getline(manifest, line);
+        if (!manifest) {
+          break;
         }
+        auto split_pos = line.find(' ');
+        if (split_pos == std::string::npos) {
+          continue;
+        }
+        std::string logical_name = line.substr(0, split_pos);
+        std::string physical_name = line.substr(split_pos + 1);
+        logical_to_physical_[logical_name] = physical_name;
       }
     }
   }

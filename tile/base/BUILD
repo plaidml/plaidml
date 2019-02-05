@@ -6,6 +6,7 @@ plaidml_cc_library(
     name = "base",
     srcs = [
         "dbgsync.cc",
+        "shape.cc",
         "validate.cc",
     ],
     hdrs = [
@@ -22,6 +23,7 @@ plaidml_cc_library(
     deps = [
         "//base/context",
         "//base/util",
+        "//tile/proto:shape_cc",
         "@boost",
         "@boost//:thread",
         "@easylogging",

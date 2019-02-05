@@ -1379,17 +1379,19 @@ class ConvolutionTranspose(tile.Operation):
     A transposed convolution operator.
     """
 
-    def __init__(
-            self,
-            x,
-            kernel,
-            output_shape,
-            strides,
-            padding,
-            data_format,
-            kernel_format,
-    ):
+    def __init__(self,
+                 x,
+                 kernel,
+                 output_shape,
+                 strides,
+                 padding,
+                 data_format,
+                 kernel_format,
+                 dilation_rate=None,
+                 name=None):
         rank = x.shape.ndims - 2
+        if name is None:
+            name = 'ConvolutionTranspose{}d'.format(rank)
 
         if kernel.shape.ndims != rank + 2:
             raise ValueError('Transpose convolution kernel shape inconsistent with input shape: ' +
@@ -1409,6 +1411,12 @@ class ConvolutionTranspose(tile.Operation):
                 isinstance(output_shape[0], six.integer_types)):
             raise ValueError('Transpose convolution batch size inconsistent between input ' +
                              'and output: {} v {}'.format(x.shape.dims[0], output_shape[0]))
+        if dilation_rate is None:
+            dilation_rate = (1,) * rank
+        if len(dilation_rate) != rank:
+            raise ValueError('Transpose convolution dilations inconsistent with input shape: ' +
+                             '{} (rank {}) v {} (rank {})'.format(strides, len(strides), x.shape,
+                                                                  x.shape.ndims - 2))
 
         csf = _ConvolutionStringFormatter(
             rank,
@@ -1416,7 +1424,7 @@ class ConvolutionTranspose(tile.Operation):
             kernel.shape.dims,
             strides,
             padding,
-            (1,) * rank,
+            dilation_rate,
             data_format,
             kernel_format,
             transposed=True,
@@ -1443,7 +1451,7 @@ class ConvolutionTranspose(tile.Operation):
         super(ConvolutionTranspose, self).__init__(
             code,
             input_tensors, [('I', tile.Shape(x.shape.dtype, tuple(output_shape)))],
-            name='ConvolutionTranspose{}d'.format(rank))
+            name=name)
 
 
 convolution_transpose = ConvolutionTranspose.function
@@ -2220,35 +2228,39 @@ def prod(value, axes=None, keepdims=False, floatx=plaidml.DType.FLOAT32):
 class Relu(tile.Operation):
     """A Rectified Linear Unit."""
 
-    def __init__(self, x, alpha=None, max_value=None):
-        if (alpha is not None) and (max_value is not None):
-            # Alpha with a max_value; cap a hand-coded relu.
-            code = """
-                   function (X, Alpha, MaxValue) -> (Y) {
-                       M = (X < 0.0 ? Alpha*X : X);
-                       Y = (M < MaxValue ? M : MaxValue);
-                   }"""
-        elif alpha is not None:
-            # Alpha with no max_value; use a hand-coded relu.
-            code = 'function (X, Alpha) -> (Y) { Y = (X < 0 ? Alpha*X : X); }'
-        elif max_value is not None:
-            # No alpha, but a max_value; cap the builtin relu.
-            code = """
-                   function (X, MaxValue) -> (Y) {
-                       M = (X < 0.0 ? 0.0 : X);
-                       Y = (M < MaxValue ? M : MaxValue);
-                   }"""
-        else:
-            # Neither alpha nor max_value; use the builtin relu.
-            code = 'function (X) -> (Y) { Y = relu(X); }'
-
+    def __init__(self, x, alpha=None, max_value=None, threshold=0.):
         inputs = [('X', x)]
-
         if alpha is not None:
             inputs.append(('Alpha', alpha))
-
+            low_branch = 'Alpha*{X}'
+        else:
+            low_branch = '0.0'
         if max_value is not None:
             inputs.append(('MaxValue', max_value))
+            max_clip_fcn = '\n    Y = (M < MaxValue ? M : MaxValue);'
+            main_out_var = 'M'
+        else:
+            main_out_var = 'Y'
+            max_clip_fcn = ''
+        if threshold != 0.:
+            inputs.append(('Thresh', threshold))
+            low_branch = low_branch.format(X='(X - Thresh)')
+            main_fcn = '\n    {main_out_var} = (X < Thresh ? {low_branch} : X);'.format(
+                main_out_var=main_out_var, low_branch=low_branch)
+        else:
+            low_branch = low_branch.format(X='X')
+            low_branch = low_branch.format(X='X')
+            main_fcn = '\n    {main_out_var} = (X < 0.0 ? {low_branch} : X);'.format(
+                main_out_var=main_out_var, low_branch=low_branch)
+
+        if alpha is None and max_value is None and threshold == 0.:
+            # Nothing messy; use the builtin relu.
+            code = 'function (X) -> (Y) { Y = relu(X); }'
+        else:
+            # Put together the pieces
+            input_str = ', '.join(inp[0] for inp in inputs)
+            code = 'function ({ins}) -> (Y) {{ {main_fcn}{max_clip_fcn}\n}}'.format(
+                ins=input_str, main_fcn=main_fcn, max_clip_fcn=max_clip_fcn)
 
         super(Relu, self).__init__(code, inputs, [('Y', x.shape)])
 

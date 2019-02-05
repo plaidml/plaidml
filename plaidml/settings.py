@@ -5,17 +5,15 @@ import os
 import sys
 import uuid
 
-import pkg_resources
-
 import plaidml.exceptions
 
 if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
-    os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(
-        pkg_resources.resource_filename('plaidml', 'experimental.json'))
+    os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(sys.prefix, 'share', 'plaidml',
+                                                             'experimental.json')
 
 if 'PLAIDML_DEFAULT_CONFIG' not in os.environ:
-    os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(
-        pkg_resources.resource_filename('plaidml', 'config.json'))
+    os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(sys.prefix, 'share', 'plaidml',
+                                                        'config.json')
 
 CONFIG = 'PLAIDML_CONFIG'
 CONFIG_FILE = 'PLAIDML_CONFIG_FILE'

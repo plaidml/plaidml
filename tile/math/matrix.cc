@@ -5,8 +5,9 @@
 #include <string>
 #include <utility>
 
+#include <boost/format.hpp>
+
 #include "base/util/compat.h"
-#include "base/util/printstring.h"
 
 namespace vertexai {
 namespace tile {
@@ -36,11 +37,11 @@ struct DualMatrix {
     std::string r = "";
     for (size_t i = 0; i < size_; i++) {
       for (size_t j = 0; j < size_; j++) {
-        r += printstring("%4s, ", to_string(lhs_(i, j)).c_str());
+        r += str(boost::format("%4s, ") % to_string(lhs_(i, j)));
       }
       r += "      ";
       for (size_t j = 0; j < size_; j++) {
-        r += printstring("%4s, ", to_string(rhs_(i, j)).c_str());
+        r += str(boost::format("%4s, ") % to_string(rhs_(i, j)));
       }
       r += "\n";
     }
@@ -315,7 +316,7 @@ struct HermiteCompute {
     std::string r;
     for (size_t i = 0; i < rows_; i++) {
       for (size_t j = 0; j < columns_; j++) {
-        r += printstring("%*s ", static_cast<int>(maxlen), lhs_(i, j).str().c_str());
+        r += str(boost::format("%*s ") % static_cast<int>(maxlen) % lhs_(i, j).str());
       }
     }
     return r;

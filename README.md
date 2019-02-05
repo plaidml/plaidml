@@ -2,96 +2,87 @@
 
 *A platform for making deep learning work everywhere.*
 
-**Vertex.AI (the creators of PlaidML) is excited to join Intel's Artificial Intelligence Products Group. PlaidML will soon be re-licensed under Apache 2. Read the announcement [here!](http://vertex.ai)**
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/plaidml/plaidml/blob/master/LICENSE)  
 
 [![Build Status](https://travis-ci.org/plaidml/plaidml.svg?branch=master)](https://travis-ci.org/plaidml/plaidml)
 
-PlaidML is the *easiest, fastest* way to learn and deploy deep learning on any device, especially those running macOS or Windows:
-  * **Fastest:** PlaidML is often 10x faster (or more) than popular platforms (like TensorFlow CPU) because it supports all GPUs, *independent of make and model*. 
-    * PlaidML accelerates deep learning on AMD, Intel, NVIDIA, ARM, and embedded GPUs.
-  * **Easiest:** PlaidML is simple to [install](docs/installing.md) and supports multiple frontends (Keras and ONNX currently)
-  * **Free:** PlaidML is completely open source and doesn't rely on any vendor libraries with proprietary and restrictive licenses.
-
-For most platforms, getting started with accelerated deep learning is as easy as running a few commands (assuming you have Python (v2 or v3) installed (if this doesn't work, see the [installation instructions](docs/installing.md)):
-```
-virtualenv plaidml
-source plaidml/bin/activate
-pip install plaidml-keras plaidbench
-```
-Choose which accelerator you'd like to use (many computers, especially laptops, have multiple):
-```
-plaidml-setup
-```
-
-Next, try benchmarking MobileNet inference performance:
-```
-plaidbench keras mobilenet
-```
-Or, try training MobileNet:
-```
-plaidbench --batch-size 16 keras --train mobilenet
-```
-
-
-# About PlaidML
-
-PlaidML is a multi-language acceleration platform that: 
-  
-  * Enables practitioners to deploy high-performance neural nets on any device
-  * Allows hardware developers to quickly integrate with high-level frameworks
-  * Allows framework developers to easily add support for many kinds of hardware
-  * Works on all major platforms — Linux, [macOS](http://vertex.ai/blog/plaidml-mac-preview), [Windows](http://vertex.ai/blog/deep-learning-for-everyone-plaidml-for-windows)
-  * Allows developers to create hardware accelerated, novel, performance portable research kernels.
-
-For examples and benchmarks, see our [blog](http://vertex.ai/blog).
 
 - [Documentation](https://vertexai-plaidml.readthedocs-hosted.com/)
-- [Installation Instructions](docs/installing.md)
+- [Installation Instructions](docs/install.rst)
 - [Building PlaidML](docs/building.md)
 - [Contributing](docs/contributing.rst)
 - [Reporting Issues](#reporting-issues)
 
-### Recent Release Notes
-* PlaidML 0.3.3 - 0.3.5
-  * Support Keras 2.2.0 - 2.2.2
-  * Support ONNX 1.2.1
-  * Upgrade kernel scheduling
-  * Revise documentation
-  * Add HALs for CUDA and Metal
-  * Various bugfixes and improvements
-* PlaidML 0.3.2
-  * Now supports ONNX 1.1.0 as a backend through [onnx-plaidml](https://github.com/plaidml/onnx-plaidml)
-  * Preliminary support for LLVM. Currently only supports CPUs, and only on Linux and macOS. More soon.
-  * Support for LSTMs & RNNs with static loop sizes, such as examples/imdb_lstm.py (from Keras)
-    * Training networks with embeddings is especially slow (#96)
-    * RNNs are only staticly sized if the input's sequence length is explicitly specified (#97)
-    * Fixes bug related to embeddings (#92)
-  * Adds a shared generic op library in python to make creating frontends easier
-     * plaidml-keras now uses this library
-  * Uses [plaidml/toolchain](https://github.com/plaidml/toolchain) for builds
-     * Building for ARM is now simple (–-config=linux_arm_32v7)
-  * Various fixes for bugs (#89)
+
+PlaidML is an advanced and portable tensor compiler for enabling deep learning 
+on laptops, embedded devices, or other devices where the available 
+computing hardware is not well supported or the available software stack contains 
+unpalatable license restrictions.
+
+PlaidML sits underneath common machine learning frameworks, enabling users to 
+access any hardware supported by PlaidML. PlaidML supports Keras, ONNX, and nGraph.
+
+As a component within the [nGraph Compiler stack], PlaidML further extends the 
+capabilities of specialized deep-learning hardware (especially GPUs,) and makes 
+it both easier and faster to access or make use of subgraph-level optimizations 
+that would otherwise be bounded by the compute limitations of the device. 
+
+As a component under [Keras], PlaidML can accelerate training workloads with 
+customized or automatically-generated Tile code. It works especially well on 
+GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia* hardware, while 
+achieving comparable performance.
+
+It works on all major operating systems: Linux, macOS, and Windows. 
+
+
+## Getting started
+
+For most platforms, getting started with accelerated deep learning is as easy as
+running a few commands (assuming you have Python (v2 or v3) installed. If this 
+doesn't work, see the [installation instructions]:
+
+    virtualenv plaidml
+    source plaidml/bin/activate
+    pip install plaidml-keras plaidbench
+
+Choose which accelerator you'd like to use (many computers, especially laptops, have multiple):
+
+    plaidml-setup
+
+Next, try benchmarking MobileNet inference performance:
+
+    plaidbench keras mobilenet
+
+Or, try training MobileNet:
+
+    plaidbench --batch-size 16 keras --train mobilenet
 
 
 ### Validated Hardware
 
 Vertex.AI runs a comprehensive set of tests for each release against these hardware targets:
-  * AMD
+
+* AMD
     * R9 Nano
     * RX 480
     * Vega 10
-  * NVIDIA
-    * K80, GTX 780, GT 640M
-    * GTX 1070, 1050
-  * Intel
+
+* Intel
     * HD4000
     * HD Graphics 505
 
-### Validated Networks
-We support all of the Keras application networks from current versions of 2.x. Validated networks are tested for performance and 
-correctness as part of our continuous integration system.
+* NVIDIA
+    * K80, GTX 780, GT 640M
+    * GTX 1070, 1050
 
- * CNNs
+### Validated Networks
+
+We support all of the Keras application networks from current versions of 2.x.
+Validated networks are tested for performance and correctness as part of our 
+continuous integration system.
+
+* CNNs
    * Inception v3
    * ResNet50
    * VGG19
@@ -100,12 +91,12 @@ correctness as part of our continuous integration system.
    * DenseNet
    * ShuffleNet
 
- * LSTM
+* LSTM
    * examples/imdb_lstm.py (from keras)
 
 ## Installation Instructions
 
-See detailed per platform instructions [here](docs/installing.md).
+See detailed per-platform instructions [here].
 
 ### Plaidvision and Plaidbench
 
@@ -119,6 +110,7 @@ We've developed two open source projects:
 ### Hello VGG
 One of the great things about Keras is how easy it is to play with state of the art networks. Here's all the code you
 need to run VGG-19:
+
 ```python
 #!/usr/bin/env python
 import numpy as np
@@ -151,11 +143,12 @@ print("Ran in {} seconds".format(time.time() - start))
 
 ```
 
-## License
-
-PlaidML is licensed under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0). 
-
-Our open source goals include 1) helping students get started with deep learning as easily as possible and 2) helping researchers develop new methods more quickly than is possible with other tools. PlaidML is unique in being fully open source and free of dependence on libraries like cuDNN that carry revocable and redistribution-prohibiting licenses. For situations where an alternate license is preferable please contact [solutions@vertex.ai](mailto:solutions@vertex.ai).
-
 ## Reporting Issues
-Either open a ticket on [GitHub](https://github.com/plaidml/plaidml/issues) or post to [plaidml-dev](https://groups.google.com/forum/#!forum/plaidml-dev).
+Either open a ticket on [GitHub] or post to [plaidml-dev].
+
+
+[nGraph Compiler stack]: https://ngraph.nervanasys.com/docs/latest/
+[Keras]: https://keras.io/
+[here]: docs/install.rst
+[GitHub]: https://github.com/plaidml/plaidml/issues
+[plaidml-dev]: https://groups.google.com/forum/#!forum/plaidml-dev

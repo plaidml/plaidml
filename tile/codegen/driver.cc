@@ -2,6 +2,9 @@
 
 #include "tile/codegen/driver.h"
 
+#include <boost/format.hpp>
+
+#include "base/util/throw.h"
 #include "tile/codegen/autotile.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/deps.h"
@@ -11,6 +14,7 @@
 #include "tile/codegen/placer.h"
 #include "tile/codegen/scalarize.h"
 #include "tile/codegen/schedule.h"
+#include "tile/codegen/thread_inner.h"
 #include "tile/codegen/tidy.h"
 #include "tile/codegen/tile.h"
 #include "tile/codegen/transpose.h"
@@ -28,7 +32,7 @@ void DumpProgram(const stripe::Block& program,    //
                  size_t counter) {
   if (options.dump_passes) {
     boost::filesystem::create_directory(options.dbg_dir);
-    auto filename = printstring("%02zu_%s.txt", counter, name.c_str());
+    auto filename = str(boost::format("%02zu_%s.txt") % counter % name);
     auto path = (options.dbg_dir / filename).string();
     std::ofstream fout(path);
     fout << program << std::endl;
@@ -41,7 +45,7 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
   size_t counter = 0;
   DumpProgram(*block, options, "initial", counter++);
   for (const auto& pass : cfg.passes()) {
-    IVLOG(2, "Optimization Pass " << pass.name());
+    IVLOG(1, "Optimization Pass " << pass.name());
     switch (pass.pass_case()) {
       case proto::Pass::kCache:
         CachePass(block, pass.cache());
@@ -82,17 +86,26 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
       case proto::Pass::kTranspose:
         TransposePass(block, pass.transpose());
         break;
-      case proto::Pass::kPartition:
-        PartitionPass(block, pass.partition());
+      case proto::Pass::kPartitionCompute:
+        PartitionComputePass(block, pass.partition_compute());
         break;
-      case proto::Pass::kPruneIndexes:
-        PruneIndexesPass(block, pass.prune_indexes());
+      case proto::Pass::kPartitionMemory:
+        PartitionMemoryPass(block, pass.partition_memory());
         break;
       case proto::Pass::kUnroll:
         UnrollPass(block, pass.unroll());
         break;
-      default:
+      case proto::Pass::kPruneIdxs:
+        PruneIndexesPass(block, pass.prune_idxs());
         break;
+      case proto::Pass::kPruneRefs:
+        PruneRefinementsPass(block, pass.prune_refs());
+        break;
+      case proto::Pass::kThreadInner:
+        ThreadInnerPass(block, pass.thread_inner());
+        break;
+      default:
+        throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
     }
     DumpProgram(*block, options, pass.name(), counter++);
   }

@@ -1,12 +1,15 @@
 
 #include "tile/lang/loop.h"
 
-#include "tile/lang/mutil.h"
 #include "tile/lang/sembuilder.h"
+#include "tile/math/util.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+using math::NearestPo2;
+using math::RoundUp;
 
 int IndexInfo::score() const {
   if (total % tile == 0 && tile % thread == 0) {
