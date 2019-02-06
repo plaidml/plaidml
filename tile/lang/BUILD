@@ -163,3 +163,12 @@ plaidml_cc_test(
     srcs = ["exprtype_test.cc"],
     deps = [":lang"],
 )
+
+
+plaidml_cc_test(
+    name = "gen_stripe_test",
+    srcs = ["gen_stripe_test.cc"],
+    deps = [":lang",
+                "//testing:matchers",
+],
+)
