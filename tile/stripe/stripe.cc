@@ -670,7 +670,9 @@ proto::Block IntoProto(const Block& block) {
   for (const auto& con : block.constraints) {
     *ret.add_constraints() = IntoProto(con);
   }
-  for (const auto& ref : block.refs) {
+  std::vector<Refinement> refs = block.refs;
+  std::sort(refs.begin(), refs.end(), [](const Refinement& lhs, const Refinement& rhs) { return lhs.into < rhs.into; });
+  for (const auto& ref : refs) {
     auto pb_ref = ret.add_refs();
     switch (ref.dir) {
       case RefDir::None:
