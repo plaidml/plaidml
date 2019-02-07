@@ -8,6 +8,7 @@
 #include "tile/codegen/autotile.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/deps.h"
+#include "tile/codegen/emitc.h"
 #include "tile/codegen/fuse.h"
 #include "tile/codegen/localize.h"
 #include "tile/codegen/partition.h"
@@ -30,12 +31,20 @@ void DumpProgram(const stripe::Block& program,    //
                  const OptimizeOptions& options,  //
                  const std::string& name,         //
                  size_t counter) {
-  if (options.dump_passes) {
+  if (options.dump_passes || options.dump_code) {
     boost::filesystem::create_directory(options.dbg_dir);
-    auto filename = str(boost::format("%02zu_%s.txt") % counter % name);
-    auto path = (options.dbg_dir / filename).string();
-    std::ofstream fout(path);
-    fout << program << std::endl;
+    if (options.dump_passes) {
+      auto filename = str(boost::format("%02zu_%s.txt") % counter % name);
+      auto path = (options.dbg_dir / filename).string();
+      std::ofstream fout(path);
+      fout << program << std::endl;
+    }
+    if (options.dump_code) {
+      auto filename = str(boost::format("%02zu_%s.c") % counter % name);
+      auto path = (options.dbg_dir / filename).string();
+      std::ofstream fout(path);
+      fout << EmitC(program);
+    }
   }
 }
 
