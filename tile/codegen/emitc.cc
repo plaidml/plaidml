@@ -225,6 +225,8 @@ float softmax(float x) {
         return "int32_t";
       case DataType::INT64:
         return "int64_t";
+      case DataType::INT128:
+        return "int128_t";
       case DataType::UINT8:
         return "uint8_t";
       case DataType::UINT16:

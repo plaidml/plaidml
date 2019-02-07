@@ -13,6 +13,7 @@ namespace codegen {
 
 struct OptimizeOptions {
   bool dump_passes = false;
+  bool dump_code = false;
   boost::filesystem::path dbg_dir;
 };
 
