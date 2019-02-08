@@ -14,9 +14,6 @@ namespace vertexai {
 namespace tile {
 namespace stripe {
 
-const char* Special::ZERO = "zero";
-const char* Special::COPY = "copy";
-
 const char* Intrinsic::ASSIGN = "assign";
 const char* Intrinsic::SUM = "add";
 const char* Intrinsic::MIN = "min";

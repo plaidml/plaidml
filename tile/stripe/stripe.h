@@ -253,9 +253,6 @@ struct Special : Statement {
   std::vector<std::string> params;
   std::vector<std::string> inputs;
   std::vector<std::string> outputs;
-
-  static const char* ZERO;
-  static const char* COPY;
 };
 
 enum class ConstType {
