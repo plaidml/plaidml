@@ -12,11 +12,12 @@ import "tile/stripe/stripe.proto";
 // PMLSim, a repeated list of passes is sufficient.
 message Config {
   optional uint32 clock_mhz = 1;
-  map<string, ExecutionUnit> exec_units = 2;
-  map<string, MemoryUnit> mem_units = 3;
-  map<string, TransferUnit> tx_units = 4;
-  repeated Bus buses = 5;
-  repeated Pass passes = 6;
+  map<string, uint64> params = 2;
+  map<string, ExecutionUnit> exec_units = 3;
+  map<string, MemoryUnit> mem_units = 4;
+  map<string, TransferUnit> tx_units = 5;
+  repeated Bus buses = 6;
+  repeated Pass passes = 7;
 }
 
 // An execution unit represents a simulated computing device.
