@@ -242,14 +242,52 @@ class StripeGenerator {
     }
 
     if (NeedsInitialize(*kernel, shapes[0])) {
-      auto stmt = std::make_shared<Special>();
-      stmt->outputs = {op.output};
-      if (op.c.use_default.empty()) {
-        stmt->name = Special::ZERO;
-      } else {
-        stmt->name = Special::COPY;
-        stmt->inputs.push_back(op.c.use_default);
+      auto stmt = std::make_shared<Block>();
+      stmt->set_tag("kernel");
+      TensorShape interior_shape{shapes[0].type,
+                                 std::vector<TensorDimension>(shapes[0].dims.size(), TensorDimension{1, 1})};
+      std::vector<Affine> dst_access;
+      for (std::size_t idx = 0; idx < shapes[0].dims.size(); ++idx) {
+        if (shapes[0].dims[idx].size == 1) {
+          dst_access.push_back(1);
+        } else {
+          auto var = "d" + std::to_string(idx);
+          dst_access.push_back(Affine{var});
+          stmt->idxs.push_back(Index{var, shapes[0].dims[idx].size});
+        }
       }
+      stmt->refs.emplace_back(Refinement{
+          RefDir::Out,    // dir
+          op.output,      // from
+          "dst",          // into
+          dst_access,     // access
+          interior_shape  // shape
+      });
+
+      if (op.c.use_default.empty()) {
+        stmt->set_tag("zero");
+        stmt->name = op.output + " = Zero()";
+        stmt->comments = "Zero " + op.output;
+        stmt->stmts.emplace_back(std::make_shared<Constant>("$ZERO", INT64_C(0)));
+        stmt->stmts.emplace_back(std::make_shared<Store>("$ZERO", "dst"));
+      } else {
+        stmt->set_tag("copy");
+        stmt->name = op.output + " = " + op.c.use_default;
+        stmt->comments = "Pre-Initialize " + op.output;
+        stmt->refs.emplace_back(Refinement{
+            RefDir::In,        // dir
+            op.c.use_default,  // from
+            "src",             // into
+            dst_access,        // access
+            interior_shape,    // shape
+            "",                // agg_op
+            {},                // location
+            true               // is_const
+        });
+        stmt->stmts.emplace_back(std::make_shared<Load>("src", "$X"));
+        stmt->stmts.emplace_back(std::make_shared<Store>("$X", "dst"));
+      }
+
       main->stmts.insert(std::prev(main->stmts.end()), stmt);
     }
 
