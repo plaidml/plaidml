@@ -61,7 +61,6 @@ void ApplyCache(Block* block,                 //
       cached_xfer_shape,  // shape
       "",                 // agg_op
       it->location,       // location
-      it->is_const,       // is_const
       it->offset,         // offset
       it->bank_dim,       // bank_dim
   });
@@ -73,7 +72,6 @@ void ApplyCache(Block* block,                 //
       cached_xfer_shape,  // shape
       "",                 // agg_op
       it->location,       // location
-      it->is_const,       // is_const
       it->offset,         // offset
       it->bank_dim,       // bank_dim
   });

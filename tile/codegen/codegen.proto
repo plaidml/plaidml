@@ -121,12 +121,13 @@ message Pass {
     UnrollPass unroll = 17;
     // Prune idxs removes unused indexes
     GenericPass prune_idxs = 18;
-    // Prune idxs removes unused references
+    // Prune refs removes unused references
     GenericPass prune_refs = 19;
     // The threading pass assigns elements of a dense computational block to
     // 'threads' for use in flexible semi-SIMD architectures such as a GPU,
     // where a single instruction decoder is shared across multiple threads.
     ThreadInnerPass thread_inner = 20;
+    ApplyCodecPass apply_codec = 21;
   }
 }
 
@@ -365,4 +366,9 @@ message ThreadInnerPass {
   repeated string reqs = 1;
   // How many threads should be introduce during threading
   required int64 threads = 2;
+}
+
+message ApplyCodecPass {
+  repeated string datatypes = 1;
+  required string codec = 2;
 }

@@ -55,8 +55,7 @@ struct RefInfo {
         alias_info{std::move(alias_info_)},
         exterior_cache_shape{ref.interior_shape},
         name{ref.into} {
-    IVLOG(3, "Creating RefInfo " << name << " access=" << alias_info.access << " shape=" << alias_info.shape
-                                 << " extents=" << alias_info.extents);
+    IVLOG(3, "Creating RefInfo " << ref << " extents=" << alias_info.extents);
 
     // Convert the cached shape to use natural striding.
     std::uint64_t stride = 1;
@@ -67,7 +66,7 @@ struct RefInfo {
     }
 
     auto sizes = exterior_cache_shape.sizes();
-    size = exterior_cache_shape.byte_size();
+    size = stripe::Codec::Resolve(exterior_cache_shape)->byte_size();
 
     for (size_t i = 0; i < sizes.size(); i++) {
       std::string iname = "i" + std::to_string(i);
@@ -709,11 +708,11 @@ void Scheduler::Run() {
 
     stripe::Block* current_block = dynamic_cast<stripe::Block*>(si->get());
 
-    if (VLOG_IS_ON(3)) {
+    if (VLOG_IS_ON(2)) {
       if (current_block) {
-        VLOG(3) << "Scheduling " << current_block->name;
+        VLOG(2) << "Scheduling " << current_block->name;
       } else {
-        VLOG(3) << "Scheduling " << si->get();
+        VLOG(2) << "Scheduling " << si->get();
       }
     }
 
@@ -725,26 +724,24 @@ void Scheduler::Run() {
     // Add swap-ins for any existing CacheEntries that are invalidated
     // by scheduling this statement.
     std::unordered_map<RefInfo*, std::unordered_set<stripe::Statement*>> ri_writer_swap_in_readers;
-    {
-      for (const auto& io : ios) {
-        if (!IsWriteDir(io.dir)) {
-          continue;
-        }
-        RefInfo* ri = io.ri;
-        auto* ri_writer_swap_in_readers_set = &ri_writer_swap_in_readers[ri];
-        for (RefInfo* alias_ri : *ri->aliases) {
-          if ((alias_ri == ri) || AliasInfo::Compare(ri->alias_info, alias_ri->alias_info) != AliasType::None) {
-            // All accesses to alias_ri will depend on this write.
-            if ((alias_ri != ri) && alias_ri->cache_entry) {
-              si_next = ScheduleSwapIn(si_next, alias_ri->cache_entry);
-              alias_ri->cache_entry = nullptr;
-            }
+    for (const auto& io : ios) {
+      if (!IsWriteDir(io.dir)) {
+        continue;
+      }
+      RefInfo* ri = io.ri;
+      auto* ri_writer_swap_in_readers_set = &ri_writer_swap_in_readers[ri];
+      for (RefInfo* alias_ri : *ri->aliases) {
+        if ((alias_ri == ri) || AliasInfo::Compare(ri->alias_info, alias_ri->alias_info) != AliasType::None) {
+          // All accesses to alias_ri will depend on this write.
+          if ((alias_ri != ri) && alias_ri->cache_entry) {
+            si_next = ScheduleSwapIn(si_next, alias_ri->cache_entry);
+            alias_ri->cache_entry = nullptr;
+          }
 
-            // Copy all current swap-in readers -- note that this
-            // includes the current RefInfo's swap-in-readers.
-            for (stripe::Statement* swap_in_reader : alias_ri->swap_in_readers) {
-              ri_writer_swap_in_readers_set->emplace(swap_in_reader);
-            }
+          // Copy all current swap-in readers -- note that this
+          // includes the current RefInfo's swap-in-readers.
+          for (stripe::Statement* swap_in_reader : alias_ri->swap_in_readers) {
+            ri_writer_swap_in_readers_set->emplace(swap_in_reader);
           }
         }
       }
@@ -761,7 +758,7 @@ void Scheduler::Run() {
         LOG(WARNING) << "The program simultaneously requires:";
       }
       for (const auto& io : ios) {
-        LOG(WARNING) << "  " << io.ri->ref;
+        LOG(WARNING) << "  " << stripe::PrintRefinement{io.ri->ref, current_block};
       }
       throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available"});
     }
@@ -877,7 +874,6 @@ void Scheduler::Run() {
               ent->source->alias_info.shape,   // shape
               "",                              // agg_op
               ent->source->ref.location,       // location
-              ent->source->ref.is_const,       // is_const
               0,                               // offset
               ent->source->ref.bank_dim,       // bank_dim
           });
@@ -1061,7 +1057,6 @@ void Scheduler::Run() {
     if (ent.source->ref.cache_unit) {
       ref->location.unit = *ent.source->ref.cache_unit;
     }
-    ref->is_const = ent.source->ref.is_const;
     ref->offset = ent.range.begin;
   }
 
@@ -1144,9 +1139,10 @@ std::vector<std::pair<PlacementKey, Placement>> MakeFullPlacements(const std::ve
 }
 
 std::vector<std::pair<PlacementKey, Placement>> MakePartialPlacements(const std::vector<IO>& ios) {
+  IVLOG(3, "  MakePartialPlacements>");
   std::vector<std::pair<PlacementKey, Placement>> result;
   for (const auto& io : ios) {
-    std::size_t interior_size = io.interior_shape.byte_size();
+    std::size_t interior_size = stripe::Codec::Resolve(io.interior_shape)->byte_size();
     bool is_internal = interior_size != io.ri->size;
     IVLOG(3, "      " << io.ri->name << " shape=" << io.interior_shape << " interior_size=" << interior_size
                       << " external_size=" << io.ri->size << " is_internal=" << is_internal);
@@ -1178,7 +1174,8 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
     for (auto& unit_ios : todos) {
       IVLOG(3, "    Affine=" << unit_ios.first);
       for (const auto& io : unit_ios.second) {
-        IVLOG(3, "      Ref=" << io.ri->name << " size=" << io.ri->size << " isize=" << io.interior_shape.byte_size());
+        auto isize = stripe::Codec::Resolve(io.interior_shape)->byte_size();
+        IVLOG(3, "      Ref=" << io.ri->name << " size=" << io.ri->size << " isize=" << isize);
       }
     }
   }
@@ -1192,43 +1189,43 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
 
   plan = TryMakePlanWithNoSwaps(existing_entry_plan, todo_fulls);
   if (plan) {
-    IVLOG(3, "  Made plan with full IO and no swaps");
+    IVLOG(2, "  Made plan with full IO and no swaps");
     return *plan;
   }
 
   plan = TryMakePlanWithNoSwaps(existing_entry_plan, todo_partials);
   if (plan) {
-    IVLOG(3, "  Made plan with loop IO and no swaps");
+    IVLOG(2, "  Made plan with loop IO and no swaps");
     return *plan;
   }
 
   plan = TryMakePlanWithSwaps(existing_entry_plan, todo_fulls);
   if (plan) {
-    IVLOG(3, "  Made plan with full IO and swaps");
+    IVLOG(2, "  Made plan with full IO and swaps");
     return plan;
   }
 
   plan = TryMakePlanWithSwaps(existing_entry_plan, todo_partials);
   if (plan) {
-    IVLOG(3, "  Made plan with loop IO and swaps");
+    IVLOG(2, "  Made plan with loop IO and swaps");
     return plan;
   }
 
   plan = TryMakeFallbackPlan(MakeFullPlacements(ios));
   if (plan) {
-    IVLOG(3, "  Made no-loop plan ignoring existing entries");
+    IVLOG(2, "  Made no-loop plan ignoring existing entries");
     return plan;
   }
 
   if (current_block) {
     plan = TryMakeFallbackPlan(MakePartialPlacements(ios));
     if (plan) {
-      IVLOG(3, "  Made looping plan ignoring existing entries");
+      IVLOG(2, "  Made looping plan ignoring existing entries");
       return plan;
     }
   }
 
-  IVLOG(3, "  Failed to make plan");
+  IVLOG(2, "  Failed to make plan");
   return boost::none;
 }
 
@@ -1389,7 +1386,6 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       ent->source->ref_swap_shape,   // shape
       "",                            // agg_op
       ent->source->ref.location,     // location
-      ent->source->ref.is_const,     // is_const
       0,                             // offset
       ent->source->ref.bank_dim,     // bank_dim
   });
@@ -1406,7 +1402,6 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       ent->source->cache_swap_shape,   // shape
       "",                              // agg_op
       banked_mem_loc,                  // location
-      ent->source->ref.is_const,       // is_const
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim
   });
@@ -1444,7 +1439,6 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       ent->source->cache_swap_shape,   // shape
       "",                              // agg_op
       banked_mem_loc,                  // location
-      ent->source->ref.is_const,       // is_const
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim
   });
@@ -1457,7 +1451,6 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       ent->source->ref_swap_shape,   // shape
       "",                            // agg_op
       ent->source->ref.location,     // location
-      ent->source->ref.is_const,     // is_const
       0,                             // offset
       ent->source->ref.bank_dim,     // bank_dim
   });
@@ -1511,7 +1504,6 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       ent->source->ref_swap_shape,  // shape
       "",                           // agg_op
       ent->source->ref.location,    // location
-      ent->source->ref.is_const,    // is_const
       0,                            // offset
       ent->source->ref.bank_dim,    // bank_dim
   });
@@ -1528,7 +1520,6 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       ent->source->cache_swap_shape,  // shape
       "",                             // agg_op
       banked_mem_loc,                 // location
-      ent->source->ref.is_const,      // is_const
       0,                              // offset
       ent->source->ref.bank_dim,      // bank_dim
   });
@@ -1579,7 +1570,6 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       ent->source->cache_swap_shape,  // shape
       "",                             // agg_op
       banked_mem_loc,                 // location
-      ent->source->ref.is_const,      // is_const
       0,                              // offset
       ent->source->ref.bank_dim,      // bank_dim
   });
@@ -1592,7 +1582,6 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       ent->source->ref_swap_shape,  // shape
       "",                           // agg_op
       ent->source->ref.location,    // location
-      ent->source->ref.is_const,    // is_const
       0,                            // offset
       ent->source->ref.bank_dim,    // bank_dim
   });

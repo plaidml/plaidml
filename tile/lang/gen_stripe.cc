@@ -75,7 +75,6 @@ class StripeGenerator {
               shape,         // shape
               "",            // agg_op
               {},            // location
-              false,         // is_const
               0,             // offset
               boost::none,   // bank_dim
           };
@@ -89,7 +88,6 @@ class StripeGenerator {
               shape,          // shape
               "",             // agg_op
               {},             // location
-              false,          // is_const
               0,              // offset
               boost::none     // bank_dim
           };
@@ -108,32 +106,31 @@ class StripeGenerator {
       externals_.insert(item.first);
       std::vector<Affine> access(item.second.dims.size());
       auto shape = AdjustShape(item.second);
+      shape.is_const = IsConst(item.first);
       Refinement new_ref{
-          RefDir::None,         // dir
-          "",                   // from
-          item.first,           // into
-          access,               // access
-          shape,                // shape
-          "",                   // agg_op
-          {},                   // location
-          IsConst(item.first),  // is_const
-          0,                    // offset
-          boost::none,          // bank_dim
+          RefDir::None,  // dir
+          "",            // from
+          item.first,    // into
+          access,        // access
+          shape,         // shape
+          "",            // agg_op
+          {},            // location
+          0,             // offset
+          boost::none,   // bank_dim
       };
       new_ref.set_tag("user");
       program->refs.emplace_back(new_ref);
       if (is_input) {
         main->refs.emplace_back(Refinement{
-            RefDir::In,           // dir
-            item.first,           // from
-            item.first,           // into
-            access,               // access
-            shape,                // shape
-            "",                   // agg_op
-            {},                   // location
-            IsConst(item.first),  // is_const
-            0,                    // offset
-            boost::none,          // bank_dim
+            RefDir::In,   // dir
+            item.first,   // from
+            item.first,   // into
+            access,       // access
+            shape,        // shape
+            "",           // agg_op
+            {},           // location
+            0,            // offset
+            boost::none,  // bank_dim
         });
       } else {
         main->refs.emplace_back(Refinement{
@@ -144,7 +141,6 @@ class StripeGenerator {
             shape,              // shape
             Intrinsic::ASSIGN,  // agg_op
             {},                 // location
-            false               // is_const
         });
       }
     }
@@ -177,7 +173,7 @@ class StripeGenerator {
     std::vector<std::string> scalar_inputs;
     for (size_t i = 0; i < cion.specs.size(); i++) {
       const auto& spec = cion.specs[i];
-      auto shape = ScalarShape(cion.specs[i].id);
+      auto shape = ScalarShape(spec.id);
       std::vector<Affine> access;
       for (const auto& poly : spec.spec) {
         access.emplace_back(Integerize(poly, bounds));
@@ -191,7 +187,6 @@ class StripeGenerator {
             shape,                  // shape
             GetAggOp(cion.agg_op),  // agg_op
             {},                     // location
-            false                   // is_const
         });
       } else {
         auto scalar_name = ScalarName(spec.id);
@@ -209,16 +204,15 @@ class StripeGenerator {
         }
         // otherwise fall through and do a normal load
         Refinement ref{
-            RefDir::In,        // dir
-            spec.id,           // from
-            spec.id,           // into
-            access,            // access
-            shape,             // shape
-            "",                // agg_op
-            {},                // location
-            IsConst(spec.id),  // is_const
-            0,                 // offset
-            boost::none,       // bank_dim
+            RefDir::In,   // dir
+            spec.id,      // from
+            spec.id,      // into
+            access,       // access
+            shape,        // shape
+            "",           // agg_op
+            {},           // location
+            0,            // offset
+            boost::none,  // bank_dim
         };
         ref.set_tag("contraction");
         kernel->refs.emplace_back(ref);
@@ -401,7 +395,6 @@ class StripeGenerator {
               ScalarShape(input),  // shape
               "",                  // agg_op
               {},                  // location
-              IsConst(input),      // is_const
               0,                   // offset
               boost::none,         // bank_dim
           };
@@ -436,7 +429,6 @@ class StripeGenerator {
         ScalarShape(op.output),  // shape
         "",                      // agg_op
         {},                      // location
-        false                    // is_const
     });
 
     // INTRINSIC
@@ -523,6 +515,7 @@ class StripeGenerator {
     for (const auto& dim : it->second.shape.dims) {
       shape.dims.push_back(TensorDimension(dim.stride, 1));
     }
+    shape.is_const = IsConst(name);
     return AdjustShape(shape);
   }
 

@@ -59,7 +59,7 @@ message Index {
   string name = 1;
   uint64 range = 2;
   Affine affine = 3;
-  repeated string tags = 11;
+  repeated string tags = 4;
 }
 
 // A refinement represents a dimensional buffer (Tensor) or a region thereof.
@@ -98,17 +98,15 @@ message Refinement {
   string agg_op = 6;
   // The hardware memory bank the refinement exists in
   Location loc = 7;
-  // Is this refinement a constant buffer (never written in any block)
-  bool is_const = 8;
   // The offset of the start of the buffer holding the block in the memory
   // the block is in.  Only valid after a schedule/placement pass.
-  uint64 offset = 9;
+  uint64 offset = 8;
   // Which bank this refinement is in, or none for non-banked memory
-  google.protobuf.UInt32Value bank_dim = 10;
+  google.protobuf.UInt32Value bank_dim = 9;
   // A set of user defined 'tags' that are attached to the refinement.  They do
   // not have any specific semantic meaning, but are often used to pass
   // membership information between optimization passes
-  repeated string tags = 11;
+  repeated string tags = 10;
 }
 
 // For each index position of a block, the block executes multiple 'Statement'

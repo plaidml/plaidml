@@ -25,8 +25,6 @@ const char* Intrinsic::ADD = "add";
 const char* Intrinsic::EQ = "cmp_eq";
 const char* Intrinsic::COND = "cond";
 
-static void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block = nullptr);
-
 namespace {
 
 using DepsMap = std::unordered_map<const Statement*, size_t>;
@@ -84,14 +82,12 @@ void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
     }
     for (const auto& kvp : sorted) {
       PrintTab(os, depth + 2);
-      PrintRefinement(os, *kvp.second, &block);
-      os << std::endl;
+      os << PrintRefinement{*kvp.second, &block} << std::endl;
     }
   } else {
     for (const auto& ref : block.refs) {
       PrintTab(os, depth + 2);
-      PrintRefinement(os, ref, &block);
-      os << std::endl;
+      os << PrintRefinement{ref, &block} << std::endl;
     }
   }
 }
@@ -282,11 +278,20 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
-  PrintRefinement(os, ref);
+  os << PrintRefinement{ref};
   return os;
 }
 
-void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block) {
+void PrintBytes(std::ostream& os, size_t bytes) {
+  if (bytes < 1024) {
+    os << bytes << " B";
+  } else {
+    os << bytes / 1024.0 << " KiB";
+  }
+}
+
+std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
+  const auto& ref = printer.ref;
   if (ref.tags.size()) {
     for (const auto& tag : ref.tags) {
       os << "#" << tag << " ";
@@ -306,7 +311,7 @@ void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block
       os << "inout";
       break;
   }
-  if (ref.is_const) {
+  if (ref.interior_shape.is_const) {
     os << " const";
   }
   if (ref.from.empty()) {
@@ -357,30 +362,29 @@ void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block
     }
   }
   os << "):";
-  if (block && !ref.from.empty()) {
+  if (printer.block && !ref.from.empty()) {
     os << "I ";
   }
-  auto interior_bytes = ref.interior_shape.sizes_product_bytes();
-  if (interior_bytes < 1024) {
-    os << interior_bytes << " B";
-  } else {
-    os << interior_bytes / 1024.0 << " KiB";
+  PrintBytes(os, ref.interior_shape.sizes_product_bytes());
+  if (!ref.interior_shape.codec.empty()) {
+    os << "(";
+    PrintBytes(os, Codec::Resolve(ref.interior_shape)->byte_size());
+    os << ")";
   }
-  if (block && !ref.from.empty()) {
+  if (printer.block && !ref.from.empty()) {
     os << ", E ";
-    auto exterior_bytes = block->exterior_shape(ref.into).sizes_product_bytes();
-    if (exterior_bytes < 1024) {
-      os << exterior_bytes << " B";
-    } else {
-      os << exterior_bytes / 1024.0 << " KiB";
+    auto exterior_shape = printer.block->exterior_shape(ref.into);
+    PrintBytes(os, exterior_shape.sizes_product_bytes());
+    if (!exterior_shape.codec.empty()) {
+      os << "(";
+      PrintBytes(os, Codec::Resolve(exterior_shape)->byte_size());
+      os << ")";
     }
   }
   if (ref.cache_unit) {
     os << ", cache[" << *ref.cache_unit << "]";
   }
-  if (!ref.from.empty() && ref.into != ref.from) {
-    os << " // alias";
-  }
+  return os;
 }
 
 std::ostream& operator<<(std::ostream& os, const Block& block) {
@@ -556,7 +560,6 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     ref.interior_shape = tile::FromProto(pb_ref.shape());
     ref.agg_op = pb_ref.agg_op();
     ref.location = FromProto(pb_ref.loc());
-    ref.is_const = pb_ref.is_const();
     ref.offset = pb_ref.offset();
     // if (pb_ref.has_bank_dim()) {
     //   ref.bank_dim = pb_ref.bank_dim().value();
@@ -693,7 +696,6 @@ proto::Block IntoProto(const Block& block) {
     *pb_ref->mutable_shape() = IntoProto(ref.interior_shape);
     pb_ref->set_agg_op(ref.agg_op);
     *pb_ref->mutable_loc() = IntoProto(ref.location);
-    pb_ref->set_is_const(ref.is_const);
     pb_ref->set_offset(ref.offset);
     // if (ref.bank_dim) {
     //   pb_ref->mutable_bank_dim()->set_value(*ref.bank_dim);
@@ -919,8 +921,7 @@ TensorShape Refinement::ApplyTile(const std::map<std::string, size_t>& tile_by_n
       }
     }
     auto& dim = shape.dims[i];
-    pos += (dim.size - 1);
-    dim.size = pos - neg + 1;
+    dim.size = (dim.size - 1) + pos - neg + 1;
   }
   return shape;
 }
@@ -948,6 +949,30 @@ const Index* FindIndexByTag(const Block& block, const std::string& tag) {
     }
   }
   return nullptr;
+}
+
+std::unordered_map<std::string, Codec::Factory> Codec::registry_;
+
+Codec::Codec(const TensorShape* shape) : shape_(shape) {  //
+}
+
+void Codec::Register(const std::string& name, const Codec::Factory& factory) {  //
+  registry_[name] = factory;
+}
+
+std::unique_ptr<Codec> Codec::Resolve(const TensorShape& shape) {  //
+  return registry_.at(shape.codec)(&shape);
+}
+
+DefaultCodec::DefaultCodec(const TensorShape* shape) : Codec(shape) {  //
+}
+
+int64_t DefaultCodec::byte_size() const {  //
+  return shape_->sizes_product_bytes();
+}
+
+boost::optional<size_t> DefaultCodec::sparse_dim() const {  //
+  return boost::none;
 }
 
 }  // namespace stripe

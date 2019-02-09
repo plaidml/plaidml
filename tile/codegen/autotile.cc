@@ -95,8 +95,12 @@ bool operator<(const Tile& lhs, const Tile& rhs) {  //
 }
 
 std::ostream& operator<<(std::ostream& os, const TileMetrics& metrics) {
-  os << "(" << metrics.input_bytes << ", " << metrics.input_bandwidth << ", " << metrics.output_bytes << ", "
-     << metrics.output_bandwidth << ")";
+  os << "(" << metrics.input_bytes        //
+     << ", " << metrics.input_bandwidth   //
+     << ", " << metrics.output_bytes      //
+     << ", " << metrics.output_bandwidth  //
+     << ", " << metrics.total_bytes       //
+     << ", " << metrics.total_bandwidth << ")";
   return os;
 }
 
@@ -125,7 +129,7 @@ TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
       continue;
     }
     auto tiled = ref.ApplyTile(tile_by_name);
-    int64_t bytes = tiled.sizes_product_bytes();
+    auto bytes = Codec::Resolve(tiled)->byte_size();
     double bandwidth = tiled.memory_io(options.cache_width());
     ret.total_bytes += bytes;
     ret.total_bandwidth += bandwidth;
