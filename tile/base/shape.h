@@ -171,6 +171,8 @@ struct TensorShape {
 
   DataType type = DataType::INVALID;
   std::vector<TensorDimension> dims;
+  bool is_const = false;
+  std::string codec;
 
   uint64_t byte_size() const { return elem_size() * byte_width(type); }
   uint64_t elem_size() const {
@@ -352,6 +354,7 @@ inline proto::TensorShape::Dimension IntoProto(const TensorDimension& dim) {
 inline TensorShape FromProto(const proto::TensorShape& shape) {
   TensorShape ret;
   ret.type = FromProto(shape.type());
+  ret.codec = shape.codec();
   for (const auto& dim : shape.dims()) {
     ret.dims.emplace_back(FromProto(dim));
   }
@@ -361,6 +364,7 @@ inline TensorShape FromProto(const proto::TensorShape& shape) {
 inline proto::TensorShape IntoProto(const TensorShape& shape) {
   proto::TensorShape ret;
   ret.set_type(IntoProto(shape.type));
+  ret.set_codec(shape.codec);
   for (const auto& dim : shape.dims) {
     *(ret.mutable_dims()->Add()) = IntoProto(dim);
   }

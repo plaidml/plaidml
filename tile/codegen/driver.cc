@@ -7,6 +7,7 @@
 #include "base/util/throw.h"
 #include "tile/codegen/autotile.h"
 #include "tile/codegen/cache.h"
+#include "tile/codegen/codec.h"
 #include "tile/codegen/deps.h"
 #include "tile/codegen/emitc.h"
 #include "tile/codegen/fuse.h"
@@ -112,6 +113,9 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
         break;
       case proto::Pass::kThreadInner:
         ThreadInnerPass(block, pass.thread_inner());
+        break;
+      case proto::Pass::kApplyCodec:
+        ApplyCodecPass(block, pass.apply_codec());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));

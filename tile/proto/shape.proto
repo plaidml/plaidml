@@ -33,7 +33,7 @@ message TensorShape {
   }
 
   DataType type = 1;
-  bool big_endian = 4;
+  string codec = 2;
 
   // Specifications of the dimensions, starting with the outermost dimension.
   // (ordinal 0 is the outermost, ordinal N-1 is the innermost)

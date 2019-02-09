@@ -8,6 +8,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -89,6 +90,31 @@ struct Taggable {
   }
 };
 
+class Codec {
+ public:
+  using Factory = std::function<std::unique_ptr<Codec>(const TensorShape* shape)>;
+
+  static void Register(const std::string& name, const Factory& factory);
+  static std::unique_ptr<Codec> Resolve(const TensorShape& shape);
+
+  virtual ~Codec() = default;
+  virtual int64_t byte_size() const = 0;
+  virtual boost::optional<size_t> sparse_dim() const = 0;
+
+ protected:
+  explicit Codec(const TensorShape* shape);
+  const TensorShape* shape_;
+
+ private:
+  static std::unordered_map<std::string, Factory> registry_;
+};
+
+struct DefaultCodec : Codec {
+  explicit DefaultCodec(const TensorShape* shape);
+  int64_t byte_size() const final;
+  boost::optional<size_t> sparse_dim() const final;
+};
+
 struct Statement : Taggable {
   virtual ~Statement() = default;
   virtual StmtKind kind() const = 0;
@@ -154,7 +180,6 @@ struct Refinement : Taggable {
              const TensorShape& shape,               //
              const std::string& agg_op = "",         //
              const Location& location = Location{},  //
-             bool is_const = false,                  //
              uint64_t offset = 0,                    //
              const boost::optional<BankDimension>& bank_dim = boost::none,
              const boost::optional<Affine>& cache_unit = boost::none)
@@ -165,7 +190,6 @@ struct Refinement : Taggable {
         interior_shape(shape),
         agg_op(agg_op),
         location(location),
-        is_const(is_const),
         offset(offset),
         bank_dim(bank_dim),
         cache_unit(cache_unit) {}
@@ -177,7 +201,6 @@ struct Refinement : Taggable {
   TensorShape interior_shape;
   std::string agg_op;
   Location location;
-  bool is_const = false;
   uint64_t offset = 0;                      // Offset within the location's arena.
   boost::optional<BankDimension> bank_dim;  // Which dimension should we bank on
   boost::optional<Affine> cache_unit;       // Which cache we should use when encaching this refinement
@@ -333,6 +356,11 @@ bool operator<(const Location& lhs, const Location& rhs);
 
 std::string to_string(const Location& loc);
 
+struct PrintRefinement {
+  const Refinement& ref;
+  const Block* block = nullptr;
+};
+
 std::ostream& operator<<(std::ostream& os, const Location& loc);
 std::ostream& operator<<(std::ostream& os, const Index& idx);
 std::ostream& operator<<(std::ostream& os, const Load& op);
@@ -341,6 +369,7 @@ std::ostream& operator<<(std::ostream& os, const Intrinsic& op);
 std::ostream& operator<<(std::ostream& os, const Special& op);
 std::ostream& operator<<(std::ostream& os, const Constant& op);
 std::ostream& operator<<(std::ostream& os, const Refinement& ref);
+std::ostream& operator<<(std::ostream& os, const PrintRefinement& ref);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 
 std::shared_ptr<Block> FromProto(const proto::Block& block);
