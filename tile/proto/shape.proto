@@ -32,7 +32,10 @@ message TensorShape {
     int64 stride = 2;
   }
 
+  // The data type of each element in the shape.
   DataType type = 1;
+
+  // An optional codec used for computing the physical size of a tensor.
   string codec = 2;
 
   // Specifications of the dimensions, starting with the outermost dimension.
@@ -45,4 +48,8 @@ message TensorShape {
   // A tensor with no dimensions (i.e, rank 0) is valid and is considered a
   // scalar.
   repeated Dimension dims = 3;
+
+  // Declares whether a tensor is ever written to or updated.
+  // An example of an is_const tensor is the weights of a NN during inference.
+  bool is_const = 4;
 }

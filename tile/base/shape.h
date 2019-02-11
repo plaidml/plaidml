@@ -355,6 +355,7 @@ inline TensorShape FromProto(const proto::TensorShape& shape) {
   TensorShape ret;
   ret.type = FromProto(shape.type());
   ret.codec = shape.codec();
+  ret.is_const = shape.is_const();
   for (const auto& dim : shape.dims()) {
     ret.dims.emplace_back(FromProto(dim));
   }
@@ -365,6 +366,7 @@ inline proto::TensorShape IntoProto(const TensorShape& shape) {
   proto::TensorShape ret;
   ret.set_type(IntoProto(shape.type));
   ret.set_codec(shape.codec);
+  ret.set_is_const(shape.is_const);
   for (const auto& dim : shape.dims) {
     *(ret.mutable_dims()->Add()) = IntoProto(dim);
   }
