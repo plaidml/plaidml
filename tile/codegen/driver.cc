@@ -114,8 +114,8 @@ void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOpti
       case proto::Pass::kThreadInner:
         ThreadInnerPass(block, pass.thread_inner());
         break;
-      case proto::Pass::kApplyCodec:
-        ApplyCodecPass(block, pass.apply_codec());
+      case proto::Pass::kAssignCodec:
+        AssignCodecPass(block, pass.assign_codec());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));

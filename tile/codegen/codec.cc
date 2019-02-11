@@ -12,7 +12,7 @@ using namespace stripe;  // NOLINT
 
 namespace {
 
-void ApplyCodec(Block* block, const Tags& datatypes, const std::string& codec) {
+void AssignCodec(Block* block, const Tags& datatypes, const std::string& codec) {
   IVLOG(2, "  block: " << block->name);
   for (auto& ref : block->refs) {
     auto ref_type = to_string(ref.interior_shape.type);
@@ -24,17 +24,17 @@ void ApplyCodec(Block* block, const Tags& datatypes, const std::string& codec) {
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
-      ApplyCodec(inner.get(), datatypes, codec);
+      AssignCodec(inner.get(), datatypes, codec);
     }
   }
 }
 
 }  // namespace
 
-void ApplyCodecPass(stripe::Block* root, const proto::ApplyCodecPass& options) {
+void AssignCodecPass(stripe::Block* root, const proto::AssignCodecPass& options) {
   auto datatypes = FromProto(options.datatypes());
-  IVLOG(2, "ApplyCodecPass> codec: " << options.codec());
-  ApplyCodec(root, datatypes, options.codec());
+  IVLOG(2, "AssignCodecPass> codec: " << options.codec());
+  AssignCodec(root, datatypes, options.codec());
 }
 
 }  // namespace codegen

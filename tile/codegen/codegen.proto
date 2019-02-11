@@ -127,7 +127,9 @@ message Pass {
     // 'threads' for use in flexible semi-SIMD architectures such as a GPU,
     // where a single instruction decoder is shared across multiple threads.
     ThreadInnerPass thread_inner = 20;
-    ApplyCodecPass apply_codec = 21;
+    // Assign a codec to matching refinements. A codec defines the physical
+    // layout of a tensor on a particular hardware device.
+    AssignCodecPass assign_codec = 21;
   }
 }
 
@@ -368,7 +370,11 @@ message ThreadInnerPass {
   required int64 threads = 2;
 }
 
-message ApplyCodecPass {
+// Assign a codec to matching refinements. A codec defines the physical layout
+// of a tensor on a particular hardware device.
+message AssignCodecPass {
+  // Only assign this codec to the following data types.
   repeated string datatypes = 1;
+  // The specified codec name.
   required string codec = 2;
 }
