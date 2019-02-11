@@ -285,13 +285,6 @@ TEST(Schedule, Basic) {
         copy_tags: true
       }
     }
-    passes: { name: "unroll_fit_parts"
-      unroll: {
-        reqs: ["fit_part"]
-        part_name: "part"
-        make_views: true
-      }
-    }
     passes: { name: "partition_compute"
       partition_compute: {
         reqs: ["kernel"]
