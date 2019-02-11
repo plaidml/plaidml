@@ -104,15 +104,6 @@ class Codec {
  protected:
   explicit Codec(const TensorShape* shape);
   const TensorShape* shape_;
-
- private:
-  static std::unordered_map<std::string, Factory> registry_;
-};
-
-struct DefaultCodec : Codec {
-  explicit DefaultCodec(const TensorShape* shape);
-  int64_t byte_size() const final;
-  boost::optional<size_t> sparse_dim() const final;
 };
 
 struct Statement : Taggable {

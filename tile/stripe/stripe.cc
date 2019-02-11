@@ -169,6 +169,36 @@ void PrintStmt(std::ostream& os,       //
   }
 }
 
+struct DefaultCodec : Codec {
+  explicit DefaultCodec(const TensorShape* shape) : Codec(shape) {}
+  int64_t byte_size() const final { return shape_->sizes_product_bytes(); }
+  boost::optional<size_t> sparse_dim() const final { return boost::none; }
+};
+
+class CodecRegistry {
+ public:
+  static CodecRegistry* Instance() {
+    static CodecRegistry registry;
+    return &registry;
+  }
+
+  void Register(const std::string& name, const Codec::Factory& factory) {  //
+    registry_[name] = factory;
+  }
+
+  std::unique_ptr<Codec> Resolve(const TensorShape& shape) {  //
+    return registry_.at(shape.codec)(&shape);
+  }
+
+ private:
+  CodecRegistry() {
+    registry_[""] = [](auto shape) { return std::make_unique<stripe::DefaultCodec>(shape); };
+  }
+
+ private:
+  std::unordered_map<std::string, Codec::Factory> registry_;
+};
+
 }  // namespace
 
 std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
@@ -951,28 +981,15 @@ const Index* FindIndexByTag(const Block& block, const std::string& tag) {
   return nullptr;
 }
 
-std::unordered_map<std::string, Codec::Factory> Codec::registry_;
-
 Codec::Codec(const TensorShape* shape) : shape_(shape) {  //
 }
 
 void Codec::Register(const std::string& name, const Codec::Factory& factory) {  //
-  registry_[name] = factory;
+  CodecRegistry::Instance()->Register(name, factory);
 }
 
 std::unique_ptr<Codec> Codec::Resolve(const TensorShape& shape) {  //
-  return registry_.at(shape.codec)(&shape);
-}
-
-DefaultCodec::DefaultCodec(const TensorShape* shape) : Codec(shape) {  //
-}
-
-int64_t DefaultCodec::byte_size() const {  //
-  return shape_->sizes_product_bytes();
-}
-
-boost::optional<size_t> DefaultCodec::sparse_dim() const {  //
-  return boost::none;
+  return CodecRegistry::Instance()->Resolve(shape);
 }
 
 }  // namespace stripe
