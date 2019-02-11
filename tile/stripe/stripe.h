@@ -348,6 +348,8 @@ bool operator<(const Location& lhs, const Location& rhs);
 std::string to_string(const Location& loc);
 
 struct PrintRefinement {
+  explicit PrintRefinement(const Refinement& ref, const Block* block = nullptr) : ref(ref), block(block) {}
+
   const Refinement& ref;
   const Block* block = nullptr;
 };
