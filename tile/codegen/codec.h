@@ -9,7 +9,7 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ApplyCodecPass(stripe::Block* root, const proto::ApplyCodecPass& options);
+void AssignCodecPass(stripe::Block* root, const proto::AssignCodecPass& options);
 
 }  // namespace codegen
 }  // namespace tile
