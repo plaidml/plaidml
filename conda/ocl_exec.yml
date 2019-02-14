@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+dependencies:
+  - h5py
+  - numpy
+  - python=3.6
+  - scipy
+  - pip:
+    - jinja2

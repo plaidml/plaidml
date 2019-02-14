@@ -112,6 +112,13 @@ def plaidml_workspace():
     )
 
     conda_repo(
+        name = "com_intel_plaidml_conda_ocl_exec",
+        specs = {
+            "env": str(Label("//conda:ocl_exec.yml")),
+        },
+    )
+
+    conda_repo(
         name = "com_intel_plaidml_conda_sphinx",
         specs = {
             "env": str(Label("//conda:sphinx.yml")),

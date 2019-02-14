@@ -317,6 +317,7 @@ message AutotilePass {
   optional bool acc_idxs = 18 [default = true];
   // Clear the location the original / outer block
   optional bool clear_location = 19 [default = false];
+  optional bool flip = 20 [default = false];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any

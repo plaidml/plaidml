@@ -42,7 +42,7 @@ bool HasAffines(const Block& block, const Index& idx) {
 
 }  // namespace
 
-bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool copy_tags) {
+bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool copy_tags, bool interleave) {
   // Verify tile shape is correct
   if (outer->idxs.size() != shape.size()) {
     throw_with_trace(std::runtime_error("Invalid tile specified"));
@@ -52,6 +52,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   bool all_min = true;
   bool all_max = true;
   std::map<std::string, size_t> tile_by_name;
+  std::map<std::string, size_t> range_by_name;
   for (size_t i = 0; i < outer->idxs.size(); i++) {
     tile_by_name[outer->idxs[i].name] = shape[i];
     if (shape[i] != 1) {
@@ -92,28 +93,30 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     // 3. affines on interior blocks that refer to this index
     if ((outer_idx.range % shape[i]) || HasConstraints(*inner, outer_idx) || HasAffines(*inner, outer_idx)) {
       Index passthru_idx{
-          inner->unique_idx_name(outer_idx.name),           // name
-          1,                                                // range
-          {outer_idx.name, static_cast<int64_t>(shape[i])}  // affine
+          inner->unique_idx_name(outer_idx.name),                            // name
+          1,                                                                 // range
+          {outer_idx.name, interleave ? 1 : static_cast<int64_t>(shape[i])}  // affine
       };
+      int64_t local_mul = interleave ? math::RoundUp(outer_idx.range, shape[i]) : 1;
+      Affine replacement = Affine(outer_idx.name) * local_mul + Affine(passthru_idx.name);
       // Update any inner constraints that refer to this index
       for (auto& constraint : inner->constraints) {
-        constraint.substitute(outer_idx.name, Affine(outer_idx.name) + Affine(passthru_idx.name));
+        constraint.substitute(outer_idx.name, replacement);
       }
       // Update any interior idxs that refer to this index
       for (auto stmt : inner->stmts) {
         auto interior = Block::Downcast(stmt);
         if (interior) {
           for (auto& idx : interior->idxs) {
-            idx.affine.substitute(outer_idx.name, Affine(outer_idx.name) + Affine(passthru_idx.name));
+            idx.affine.substitute(outer_idx.name, replacement);
           }
         }
       }
       if (outer_idx.range % shape[i]) {
         // For each index i, if (r_i/t_i) is not integral, add a constraint to the inner block of `o_i * t_i + i_i <
         // r_i`. Or solving to make it in the form poly >= 0, ((r_i - 1) - p_i - i_i >= 0).
-        inner->constraints.emplace_back(Affine(passthru_idx.name, -1) +  //
-                                        Affine(inner_idx.name, -1) +     //
+        inner->constraints.emplace_back(Affine(passthru_idx.name, -1) +       //
+                                        Affine(inner_idx.name, -local_mul) +  //
                                         int64_t(outer_idx.range - 1));
       }
       // Finally add the passthru_idx
@@ -122,6 +125,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     // Replace the indices on the outer block with 'outer indicies'
     // Make ranges of the outer blocks: [ceil(ri / ti), ceil(rj / tj), ceil(rk / tk), ...]
     outer_idx.range = math::RoundUp(outer_idx.range, shape[i]);
+    range_by_name[outer_idx.name] = outer_idx.range;
     // Make ranges of the inner blocks: [ti, tk, tk]
     inner_idx.range = shape[i];
   }
@@ -133,20 +137,35 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   outer->refs.erase(
       std::remove_if(outer->refs.begin(), outer->refs.end(), [&](const auto& ref) { return ref.dir == RefDir::None; }),
       outer->refs.end());
+  // Adjust inner references
+  for (auto& ref : inner->refs) {
+    for (auto& aff : ref.access) {
+      // Since we're taking a single block and turning it into two (e.g. outer and inner),
+      // arrange for only one of the blocks to do the constant pointer bumping.
+      // We pick to make the outer block do the bumping so it only happens once
+      aff.setConstant(0);
+      if (interleave) {
+        // Multiply each stride in the inner block refinements by the appropriate range
+        for (auto& kvp : aff.mutateMap()) {
+          if (!kvp.first.empty()) {
+            kvp.second *= range_by_name[kvp.first];
+          }
+        }
+      }
+    }
+  }
   for (auto& ref : outer->refs) {
     // Fix the sizes on the outer blocks
     ref.interior_shape = inner->exterior_shape(ref.into);
     // Save any renames till the inner block (ie, only one, inner or outer needs to rename)
     ref.into = ref.from;
     for (auto& aff : ref.access) {
-      // Since we're taking a single block and turning it into two (e.g. outer and inner),
-      // arrange for only one of the blocks to do the constant pointer bumping.
-      // It probably doesn't matter whether the outer or the inner does the bumping.
-      aff.setConstant(0);
-      // Multiply each stride in the outer block refinements by the appropriate tile size
-      for (auto& kvp : aff.mutateMap()) {
-        if (!kvp.first.empty()) {
-          kvp.second *= tile_by_name[kvp.first];
+      if (!interleave) {
+        // Multiply each stride in the outer block refinements by the appropriate tile size
+        for (auto& kvp : aff.mutateMap()) {
+          if (!kvp.first.empty()) {
+            kvp.second *= tile_by_name[kvp.first];
+          }
         }
       }
     }
