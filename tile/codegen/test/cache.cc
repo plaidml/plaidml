@@ -63,12 +63,13 @@ TEST(Codegen, Cache) {
   auto program = GenerateStripe(runinfo);
   auto main = program->SubBlock(0);
   auto kernel = main->SubBlock(0);
+  AliasMap am(AliasMap(AliasMap(AliasMap(), program.get()), main.get()), kernel.get());
   IVLOG(2, "Original>\n" << *program);
 
   ApplyTile(kernel.get(), {2, 2, 2});
   IVLOG(2, "Tiled>\n" << *program);
 
-  ApplyCache(kernel.get(), "A", {"CACHE"}, {"TX"});
+  ApplyCache(am, kernel.get(), "A", {"CACHE"}, {"TX"});
   IVLOG(2, "Cached\n" << *program);
 
   // ExecuteProgram(*program, &data);

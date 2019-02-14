@@ -236,15 +236,16 @@ TEST(Codegen, FuseTiled) {
   IVLOG(2, "Fused\n" << *r1);
 
   // Now cache output for fun
-  ApplyCache(r1.get(), "B", {"CMX"}, {"DMA"});
-  ApplyCache(r1.get(), "O", {"CMX"}, {"DMA"});
-  ApplyCache(r1.get(), "BO", {"CMX"}, {"DMA"});
+  ApplyCache(main_map, r1.get(), "B", {"CMX"}, {"DMA"});
+  ApplyCache(main_map, r1.get(), "O", {"CMX"}, {"DMA"});
+  ApplyCache(main_map, r1.get(), "BO", {"CMX"}, {"DMA"});
   IVLOG(1, "Cached\n" << *program);
 
   auto inner = r1->SubBlock(1);
   IVLOG(1, "Inner\n" << *inner);
-  ApplyCache(inner.get(), "In", {"CMX"}, {"DMA"});
-  ApplyCache(inner.get(), "K", {"CMX"}, {"DMA"});
+  AliasMap inner_map(main_map, inner.get());
+  ApplyCache(inner_map, inner.get(), "In", {"CMX"}, {"DMA"});
+  ApplyCache(inner_map, inner.get(), "K", {"CMX"}, {"DMA"});
   IVLOG(2, "Fused + Cached\n" << *r1);
 }
 
@@ -294,7 +295,7 @@ TEST(Codegen, FuseFancy) {
   bool r = FuseBlocks(main_map, r1.get(), r2.get());
   IVLOG(2, "Fused\n" << *r1);
   // Do some caching
-  ApplyCache(r1.get(), "O1", {"CMX"}, {"DMA"});
+  ApplyCache(main_map, r1.get(), "O1", {"CMX"}, {"DMA"});
   IVLOG(2, "Cached\n" << *r1);
 
   ASSERT_TRUE(r);

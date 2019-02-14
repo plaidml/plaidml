@@ -16,11 +16,11 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-static void ApplyCache(const AliasMap& map,          //
-                       Block* block,                 //
-                       const std::string& var_name,  //
-                       const Location& mem_loc,      //
-                       const Location& xfer_loc) {
+void ApplyCache(const AliasMap& map,          //
+                Block* block,                 //
+                const std::string& var_name,  //
+                const Location& mem_loc,      //
+                const Location& xfer_loc) {
   auto it = block->ref_by_into(var_name, false);
   if (it == block->refs.end()) {
     throw std::runtime_error("ApplyCache: Invalid var_name");
