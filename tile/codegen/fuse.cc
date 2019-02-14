@@ -157,11 +157,10 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
   ApplyTile(tiled.get(), tile, true, true);
+  // IVLOG(3, "Tiled:\n" << *tiled);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
   outer->name = tiled->name;
-  // This is safe to do because we check whether constraints are equivalent in ComputeFusionPlan
-  outer->constraints = tiled->constraints;
   auto inner = std::make_shared<Block>();
   inner->name = tiled->name;
   outer->tags = tiled->tags;
@@ -216,6 +215,10 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   for (auto& ref : inner->refs) {
     // Rename from to match outer into
     ref.from = ref.into;
+    // If original was an allocation, make R/W.
+    if (ref.dir == RefDir::None) {
+      ref.dir = RefDir::InOut;
+    }
     // Update accesses
     for (auto& acc : ref.access) {
       Affine affine;

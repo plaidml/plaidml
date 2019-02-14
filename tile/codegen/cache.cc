@@ -16,14 +16,17 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyCache(Block* block,                 //
-                const std::string& var_name,  //
-                const Location& mem_loc,      //
-                const Location& xfer_loc) {
+static void ApplyCache(const AliasMap& map,          //
+                       Block* block,                 //
+                       const std::string& var_name,  //
+                       const Location& mem_loc,      //
+                       const Location& xfer_loc) {
   auto it = block->ref_by_into(var_name, false);
   if (it == block->refs.end()) {
     throw std::runtime_error("ApplyCache: Invalid var_name");
   }
+  // Get the alias info
+  const auto& ai = map.at(var_name);
   // Get the shape
   TensorShape raw_ts = it->interior_shape;
   std::vector<size_t> sizes = raw_ts.sizes();
@@ -43,6 +46,19 @@ void ApplyCache(Block* block,                 //
       std::string iname = str(boost::format("i%zu") % i);
       xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
       xfer_access.emplace_back(Affine(iname));
+      int64_t top_index = ai.base_ref->interior_shape.dims[i].size - 1;
+      bool underflow = ai.extents[i].min < 0;
+      bool overflow = ai.extents[i].max > top_index;
+      if (underflow || overflow) {
+        std::string bname = xfer_block.unique_idx_name(iname);
+        xfer_block.idxs.emplace_back(Index{bname, 1, map.translate(ai.access[i])});
+        if (underflow) {
+          xfer_block.constraints.push_back(Affine(iname) + Affine(bname));
+        }
+        if (overflow) {
+          xfer_block.constraints.push_back(Affine(top_index) - Affine(iname) - Affine(bname));
+        }
+      }
     } else {
       xfer_access.emplace_back(Affine());
     }
@@ -112,11 +128,12 @@ void ApplyCache(Block* block,                 //
   FixupRefs(block, var_name);
 }
 
-void CacheBlock(Block* block, const std::set<RefDir>& dirs, const Location& mem_loc, const Location& xfer_loc) {
+static void CacheBlock(const AliasMap& map, Block* block, const std::set<RefDir>& dirs, const Location& mem_loc,
+                       const Location& xfer_loc) {
   auto refs = block->refs;
   for (const auto& ref : refs) {
     if (dirs.count(ref.dir)) {
-      codegen::ApplyCache(block, ref.into, mem_loc, xfer_loc);
+      codegen::ApplyCache(map, block, ref.into, mem_loc, xfer_loc);
     }
   }
 }
@@ -130,7 +147,7 @@ void CachePass(Block* root, const proto::CachePass& options) {
   auto mem_loc = stripe::FromProto(options.mem_loc());
   auto xfer_loc = stripe::FromProto(options.xfer_loc());
   RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
-    CacheBlock(block, dirs, mem_loc, xfer_loc);
+    CacheBlock(map, block, dirs, mem_loc, xfer_loc);
   });
 }
 

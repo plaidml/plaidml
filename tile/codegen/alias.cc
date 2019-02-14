@@ -92,8 +92,40 @@ bool AliasInfo::IsBanked() const { return !!base_ref->bank_dim; }
 AliasMap::AliasMap() : depth_(0) {}
 
 AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.depth_ + 1) {
+  indexes_ = outer.indexes_;
   // Make a prefix
   std::string prefix = str(boost::format("d%1%:") % depth_);
+  // Update any old indexes
+  for (auto& kvp : indexes_) {  // For each old index
+    // See if any new index is a copy of it
+    if (kvp.second.cur_name.empty()) {
+      continue;  // If we've already lost it, it's still gone
+    }
+    // Otherwise, try to tack it down
+    bool had_cur_name = false;
+    // Make an affine to search for
+    Affine simple_copy(kvp.second.cur_name);
+    for (const auto& idx : block->idxs) {
+      if (idx.affine == simple_copy) {
+        // Found it
+        kvp.second.cur_name = idx.name;
+        had_cur_name = true;
+        break;
+      }
+    }
+    if (!had_cur_name) {
+      // Lost it
+      kvp.second.cur_name = "";
+    }
+  }
+  // Get all the index data for new indexes
+  for (const auto& idx : block->idxs) {
+    if (idx.affine == stripe::Affine()) {
+      // If it's a normal index, add it's information
+      indexes_[prefix + idx.name].range = idx.range;
+      indexes_[prefix + idx.name].cur_name = idx.name;
+    }
+  }
   // Make all inner alias data
   for (auto& ref : block->refs) {
     // Setup the place we are going to write to
@@ -168,6 +200,25 @@ std::unordered_map<std::string, size_t> AliasMap::RefUseCounts(const Block& bloc
     }
   }
   return use_count;
+}
+
+stripe::Affine AliasMap::translate(const stripe::Affine& in) const {
+  Affine out;
+  for (const auto& kvp : in.getMap()) {
+    if (kvp.first == "") {
+      out += kvp.second;
+    } else {
+      const auto it = indexes_.find(kvp.first);
+      if (it == indexes_.end()) {
+        throw std::runtime_error("Invalid affine index in translate: " + kvp.first);
+      }
+      if (it->second.cur_name.empty()) {
+        throw std::runtime_error("Lost track of affine index in translate: " + kvp.first);
+      }
+      out += Affine(it->second.cur_name, kvp.second);
+    }
+  }
+  return out;
 }
 
 }  // namespace codegen
