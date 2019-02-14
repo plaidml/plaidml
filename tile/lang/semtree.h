@@ -219,6 +219,7 @@ struct Block : public Statement {
   Block() {}
   explicit Block(const std::vector<StmtPtr>& s) : statements(s) {}
   bool isBlock() const final { return true; }
+  void push_front(StmtPtr p) { statements.insert(statements.begin(), p); }
   void push_back(StmtPtr p) { statements.push_back(p); }
   void merge(std::shared_ptr<Block> other);
   void append(StmtPtr p);

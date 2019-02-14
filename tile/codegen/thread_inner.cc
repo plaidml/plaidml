@@ -17,6 +17,7 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 using math::NearestPo2;
+using math::RoundUp;
 
 void ThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
   if (block->ref_outs().size() != 1) {
@@ -55,7 +56,10 @@ void ThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
     threads /= split;
     cur++;
   }
-  ApplyTile(block, tile, false);
+  for (size_t i = 0; i < tile.size(); i++) {
+    tile[i] = RoundUp(block->idxs[i].range, tile[i]);
+  }
+  ApplyTile(block, tile, false, false, true);
 }
 
 }  // namespace codegen

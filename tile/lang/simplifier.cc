@@ -450,6 +450,12 @@ class Simplifier : public Visitor {
 }  // namespace sem
 
 namespace lang {
+void Simplify(sem::StmtPtr stmt) {
+  lang::Scope<sem::Symbol> scope;
+  sem::Simplifier simplifier{&scope};
+  stmt->Accept(simplifier);
+}
+
 void Simplify(const std::vector<KernelInfo>& kernels) {
   for (const auto& ki : kernels) {
     if (VLOG_IS_ON(4)) {

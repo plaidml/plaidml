@@ -1,0 +1,118 @@
+{
+    ## Set a clock rate
+    "clock_mhz": 700,
+    ## There are two memories layers of note in a GPU, the global memory and
+    ## the per-multiprocessor local memory.  We model this a just a single
+    ## instance of local memory (even though on a real GPU there is 1 per
+    ## multiprocessor) since we are not concerned with the accurary of
+    ## simulation yet.  We also ignore the L2 cache currently for similar
+    ## reasons.
+    "mem_units": {
+        "GLOBAL": { "count": 1, "size_KiB": 3932160 }, {## max DDR: 3840 MiB ##}
+        "LOCAL":  { "count": 1, "size_KiB": {{ LOCAL_MEM_KIB }} }
+    },
+    ## We add a transfer unit to move data to/from shared memory
+    "tx_units": {
+        "DMA": { "count": 1 }
+    },
+    ## We make only 1 execution unit for simplicity (again there is probably 1
+    ## per multi-process in reality)
+    "exec_units": {
+        "GPU": { "count": 1, "ops_per_cycle": 512 }
+    },
+    ## We connect the various busses up, bytes_per_cycle is just a placeholder
+    ## here since we are not focused on the simulation aspect right now
+    "buses": [
+        { "sources": ["GLOBAL[0]"], "sinks": ["DMA[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["DMA[0]"], "sinks": ["GLOBAL[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["LOCAL[0]"], "sinks": ["DMA[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["DMA[0]"], "sinks": ["LOCAL[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["LOCAL[0]"], "sinks": ["GPU[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["GPU[0]"], "sinks": ["LOCAL[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["GLOBAL[0]"], "sinks": ["GPU[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["GPU[0]"], "sinks": ["GLOBAL[0]"], "bytes_per_cycle": 64 }
+    ],
+    ## Define the stripe passes
+    "passes": [
+        ## First, we place all the initial buffer in global memory (DRAM)
+        { "name": "loc_program", "locate_memory": { "reqs": ["program"], "loc": { "name": "GLOBAL" } } },
+        { "name": "loc_main", "locate_memory": { "reqs": ["main"], "loc": { "name": "GLOBAL" } } },
+
+	## Next, we find all the dense contraction blocks, and split them up
+	## into groups such that the inputs for the innermost loops fit into
+	## shared memory and the outputs fit into the register set of the each
+	## multiprocessor.
+        {
+            "name": "tile_contract",
+            "autotile": {
+                "reqs": ["contraction"],  ## Apply to only dense operations
+                "outer_set": ["contract_outer"],
+                "inner_set": ["contract_inner"],
+                "only_po2": true,  ## Only consider PO2 sizes for speed
+                "max_input_size": {{ LOCAL_MEM_KIB * 1024 }},  ## All inputs must fit in local memory
+                "max_output_size": {{ REGS_MEM_KIB * 1024 }},  ## All outputs must fit in registers
+                ## Since all loads to/from global memory are across a wide bus, use that as the
+                ## cache_width to optimize for contigous regions of DRAM for each inner block
+                "cache_width": {{ CACHE_WIDTH }}
+            }
+        },
+
+        ## Now we add explicit code to load inputs from DRAM to shared memory for each inner block
+        ## Note, we don't cache outputs yet, since the next fusion step will split the outer loop into
+        ## accumulation indexes and non-accumulation indexes
+        { "name": "cache_input", "cache": { "reqs": ["contraction"], "dirs": [ "In" ], "mem_loc": { "name": "LOCAL" }, "xfer_loc": { "name": "DMA" } } },
+
+        ## Next we fuse in any element-wise operations which operate on the output of contraction block
+        { "name": "fuse_elemwise", "fusion": { "a_reqs": ["contract_outer"], "b_reqs": ["eltwise"]  } },
+
+        ## Then we 'localize' buffers, which moves any temporaries the only are needed to hold the output
+        ## of dense computations before they are used on elementwise operations into the interior of the fused blocks
+        { "name": "localize_main", "localize": { "reqs": ["main"] } },
+ 
+        ## Now we add the output caching, which will now have the same loop structure as the element-wise ops
+        { "name": "cache_output", "cache": { "reqs": ["contract_outer"], "dirs": [ "Out" ], "mem_loc": { "name": "LOCAL" }, "xfer_loc": { "name": "DMA" } } },
+
+        ## We do an inner 'fusion' to move all 'per-output' operations into a single loop
+        { "name": "fuse_inner", "fusion": { "parent_reqs": ["contract_outer"], "fused_set": ["cache"] } },
+ 
+        ## We now move any temporaries even further down (into the per-output loop)
+        { "name": "localize_main", "localize": { "reqs": ["main"] } },
+
+        ## Scalarize, which should fully remove any remaining temporaries and convert them to scalars
+        { "name": "scalarize_main", "scalarize": { "reqs": ["main"] } },
+
+        ## We now relabel any remaining buffer inside the contractions as local memory
+        { "name": "make_local", "locate_memory": { "reqs": ["contract_outer"], "loc": { "name": "LOCAL"} } },
+
+        ## Next, we thread all of the code that moves data between global and local memory so
+        ## that multiple GPU threads can cooperatively do the work
+        {
+            "name": "thread_cache",
+            "autotile": {
+                "reqs": ["cache"],
+                "outer_set": ["cache_outer", "gpu_thread"],
+                "inner_set": ["cache_threads"],
+                "only_po2": true,
+                "max_sizes_product": {{ NUM_THREADS }},
+                "cache_width": {{ 2 }},
+                "loc_name": "GLOBAL",
+                "flip": true
+            }
+        },
+  
+        ## Finally we run the GPU specific thread_inner pass to thread the primary computation loop
+        { "name": "thread_inner", "thread_inner" : { "reqs": ["contract_inner"], "threads": {{ NUM_THREADS }} } },
+
+        ## We now locate the kernels onto the GPU compute device
+        { "name": "loc_gpu", "locate_inner_block": { "reqs": ["kernel"], "loc": { "name": "GPU" } } },
+
+        ## We now locate the kernels onto the GPU compute device
+        { "name": "cleanup", "prune_refs": { "reqs": ["program"] } },
+
+        ## Compute the inter-kernel dependencies
+        { "name": "compute_deps", "compute_deps": { } }, 
+
+        ## Assign global memory addresses
+        { "name": "place_program", "memory_placement": { "reqs": ["program"], "locs": [{ "name": "GLOBAL" }], "alignment": 4 } }
+    ]
+}

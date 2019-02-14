@@ -62,6 +62,14 @@ std::map<std::string, lang::RunInfo> InternalTests() {
                                 SimpleShape(DataType::INT8, {1, 56, 56, 64}))  //
       },
       {
+          "$layer_test4_float",
+          lib::LoadConv2dBnRelu("layer_test4",                                    //
+                                SimpleShape(DataType::FLOAT32, {1, 56, 56, 64}),  //
+                                SimpleShape(DataType::FLOAT32, {3, 3, 64, 64}),   //
+                                SimpleShape(DataType::FLOAT32, {64}),             //
+                                SimpleShape(DataType::FLOAT32, {1, 56, 56, 64}))  //
+      },
+      {
           "$layer_test5",
           lib::LoadConv2d("layer_test5",                                   //
                           SimpleShape(DataType::INT8, {1, 7, 7, 2048}),    //
