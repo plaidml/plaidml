@@ -38,6 +38,11 @@ struct AliasInfo {
   bool IsBanked() const;
 };
 
+struct IndexInfo {
+  uint64_t range;
+  std::string cur_name;
+};
+
 class AliasMap {
  public:
   // Constructs a root level alias info
@@ -48,10 +53,13 @@ class AliasMap {
   const AliasInfo& at(const std::string& name) const { return safe_at(info_, name); }
   // Compute statement use count of each buffer
   std::unordered_map<std::string, size_t> RefUseCounts(const stripe::Block& block) const;
+  // Attempt to translate an affine into local indexes
+  stripe::Affine translate(const stripe::Affine& in) const;
 
  private:
-  size_t depth_;                           // How deep is this AliasInfo
-  std::map<std::string, AliasInfo> info_;  // Per buffer data
+  size_t depth_;                              // How deep is this AliasInfo
+  std::map<std::string, AliasInfo> info_;     // Per buffer data
+  std::map<std::string, IndexInfo> indexes_;  // Per index information
 };
 
 bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);

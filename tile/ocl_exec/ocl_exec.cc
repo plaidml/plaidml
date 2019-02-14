@@ -50,7 +50,7 @@ extern "C" void vai_internal_set_vlog(size_t);
 
 int main(int argc, char* argv[]) {
   START_EASYLOGGINGPP(argc, argv);
-  // el::Loggers::setVerboseLevel(1);
+  el::Loggers::setVerboseLevel(1);
   if (argc != 3 && argc != 4) {
     throw std::runtime_error("usage: ocl_exec <config> <tile_file> [<out_dir>]");
   }
