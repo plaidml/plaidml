@@ -67,6 +67,8 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
     plan.remap_b.emplace(idx_b, idx_a);
   }
   if (a.constraints != b.constraints) {
+    IVLOG(3, "Remap a: " << plan.remap_a);
+    IVLOG(3, "Remap b: " << plan.remap_b);
     IVLOG(3, "ComputeFusionPlan: incompatible constraints");
     IVLOG(4, "    a: " << StreamContainer(a.constraints));
     IVLOG(4, "    b: " << StreamContainer(b.constraints));
@@ -165,6 +167,8 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   inner->name = tiled->name;
   outer->tags = tiled->tags;
   outer->stmts.push_back(inner);
+  // Put constraints on outer block
+  outer->constraints = tiled->constraints;
   // Move / rename each index to the appropriate block
   for (const auto& idx : tiled->idxs) {
     auto it = mapping.find(idx.name);
@@ -180,8 +184,6 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   }
   // Sort outer indexes by names
   std::sort(outer->idxs.begin(), outer->idxs.end(), [](const Index& a, const Index& b) { return a.name < b.name; });
-  // Copy constraints to inner block
-  inner->constraints = tiled->constraints;
   // Copy statements to the inner block
   inner->stmts = tiled->stmts;
   // Copy refinements to both blocks
