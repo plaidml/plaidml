@@ -4,6 +4,7 @@ load("//bzl:conda.bzl", "conda_binary")
 load("//bzl:plaidml.bzl", "plaidml_cc_binary")
 
 plaidml_cc_binary(
+    tags = ["manual"],
     name = "ocl_exec",
     srcs = glob([
         "*.cc",
@@ -21,6 +22,7 @@ plaidml_cc_binary(
 )
 
 conda_binary(
+    tags = ["manual"],
     name = "test",
     srcs = ["ocl_exec_test.py"],
     data = ["gpu.json.j2"],
