@@ -68,7 +68,7 @@ void Compiler::BuildKernel(const lang::KernelInfo& ki, std::vector<std::shared_p
   }
   // Compile the IR into executable code.
   std::string errStr;
-  std::unique_ptr<llvm::RuntimeDyld::SymbolResolver> rez(new Runtime);
+  std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime);
   llvm::ExecutionEngine* ee = llvm::EngineBuilder(std::move(emit.result()))
                                   .setErrorStr(&errStr)
                                   .setEngineKind(llvm::EngineKind::JIT)
@@ -90,7 +90,7 @@ void Compiler::GenerateInvoker(const lang::KernelInfo& ki, llvm::Module* module)
   // using each element of the array as an argument. Following the array of
   // buffer pointers, it will pass along the GridSize value for the current
   // work index.
-  llvm::LLVMContext& context(llvm::getGlobalContext());
+  llvm::LLVMContext context;
   llvm::IRBuilder<> builder(context);
   // LLVM doesn't have the notion of a void pointer, so we'll pretend all of
   // these buffers are arrays of int32.

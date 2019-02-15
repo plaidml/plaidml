@@ -38,7 +38,7 @@ static llvm::ExecutionEngine* JIT(const sem::Node& n) {
   tile::hal::cpu::Emit emit;
   n.Accept(emit);
   std::string errStr;
-  std::unique_ptr<llvm::RuntimeDyld::SymbolResolver> rez(new tile::hal::cpu::Runtime);
+  std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new tile::hal::cpu::Runtime);
   LLVMInitializeNativeTarget();
   LLVMLinkInMCJIT();
   LLVMInitializeNativeAsmPrinter();

@@ -79,7 +79,7 @@ class Emit : public sem::Visitor {
   void Leave();
   void LimitConstSInt(unsigned bits, sem::LimitConst::Which);
   void LimitConstUInt(unsigned bits, sem::LimitConst::Which);
-  void LimitConstFP(const llvm::fltSemantics&, sem::LimitConst::Which);
+  void LimitConstFP(llvm::Type*, sem::LimitConst::Which);
   bool CurrentBlockIsTerminated();
   static bool IsUnsignedIntegerType(const sem::Type&);
   static bool IsFloatingPointType(const sem::Type&);
@@ -88,7 +88,7 @@ class Emit : public sem::Visitor {
   sem::Type ConvergeOperands(value* left, value* right);
   static std::string print(const llvm::Type*);
 
-  llvm::LLVMContext& context_;
+  llvm::LLVMContext context_;
   llvm::IRBuilder<> builder_;
   std::unique_ptr<llvm::Module> module_;
   llvm::legacy::FunctionPassManager funcopt_;
