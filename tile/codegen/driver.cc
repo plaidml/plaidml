@@ -51,10 +51,10 @@ void DumpProgram(const stripe::Block& program,    //
 
 }  // namespace
 
-void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOptions& options) {
+void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions& options) {
   size_t counter = 0;
   DumpProgram(*block, options, "initial", counter++);
-  for (const auto& pass : cfg.passes()) {
+  for (const auto& pass : passes) {
     IVLOG(1, "Optimization Pass " << pass.name());
     switch (pass.pass_case()) {
       case proto::Pass::kCache:
