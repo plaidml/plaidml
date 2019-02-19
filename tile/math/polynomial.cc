@@ -173,6 +173,19 @@ void Polynomial<T>::substitute(const std::string& var, const T& replacement) {
 }
 
 template <typename T>
+Polynomial<T> Polynomial<T>::sym_eval(const std::map<std::string, Polynomial> values) const {
+  Polynomial<T> out;
+  for (const auto& kvp : map_) {
+    if (kvp.first.empty()) {
+      out += Polynomial<T>(kvp.second);
+    } else {
+      out += values.at(kvp.first) * kvp.second;
+    }
+  }
+  return out;
+}
+
+template <typename T>
 std::string Polynomial<T>::GetNonzeroIndex() const {
   // Returns a nonconstant nonzero index, if one exists; otherwise returns empty string
   for (const auto& kvp : map_) {

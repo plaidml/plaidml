@@ -219,7 +219,7 @@ TEST(Codegen, FuseTiled) {
   // Get the bias add
   auto k2 = main->SubBlock(1);
   // Try to fuse it
-  auto plan = ComputeFusionPlan(*k1, *k2, "O");
+  auto plan = ComputeFusionPlan(main_map, *k1, *k2, "O");
   IVLOG(2, "Plan as bool: " << static_cast<bool>(plan));
   IVLOG(2, "Remap a: " << StreamContainer(plan->remap_a));
   IVLOG(2, "Remap b: " << StreamContainer(plan->remap_b));
@@ -243,7 +243,8 @@ TEST(Codegen, FuseTiled) {
 
   auto inner = r1->SubBlock(1);
   IVLOG(1, "Inner\n" << *inner);
-  AliasMap inner_map(main_map, inner.get());
+  AliasMap r1_map(main_map, r1.get());
+  AliasMap inner_map(r1_map, inner.get());
   ApplyCache(inner_map, inner.get(), "In", {"CMX"}, {"DMA"});
   ApplyCache(inner_map, inner.get(), "K", {"CMX"}, {"DMA"});
   IVLOG(2, "Fused + Cached\n" << *r1);
@@ -280,7 +281,7 @@ TEST(Codegen, FuseFancy) {
   // Tile it as well
   ApplyTile(k2.get(), {16, 16, 16, 1, 1});
   // Try to fuse it
-  auto plan = ComputeFusionPlan(*k1, *k2, "O1");
+  auto plan = ComputeFusionPlan(main_map, *k1, *k2, "O1");
   IVLOG(2, "Plan as bool: " << static_cast<bool>(plan));
   IVLOG(2, "Remap a: " << StreamContainer(plan->remap_a));
   IVLOG(2, "Remap b: " << StreamContainer(plan->remap_b));

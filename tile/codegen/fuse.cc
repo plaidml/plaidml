@@ -15,7 +15,30 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, const std::string& buf_name) {
+static std::vector<Affine> TranslatedContraints(const AliasMap& map, std::map<std::string, std::string> remap,
+                                                const Block& in) {
+  std::vector<Affine> out;
+  AliasMap inner = AliasMap(map, const_cast<Block*>(&in));
+  std::map<std::string, stripe::Affine> remapped;
+  for (const auto& kvp : inner.idx_sources()) {
+    auto it = remap.find(kvp.first);
+    if (it == remap.end()) {
+      remapped.emplace(kvp);
+    } else {
+      remapped.emplace(kvp.first, Affine(it->second));
+    }
+  }
+  for (const auto& aff : in.constraints) {
+    IVLOG(4, "Remap = " << remap);
+    IVLOG(4, "Translating " << aff << " to " << aff.sym_eval(remapped));
+    out.push_back(aff.sym_eval(remapped));
+  }
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block& a, const Block& b,
+                                              const std::string& buf_name) {
   IVLOG(3, "ComputeFusionPlan for " << buf_name << " between " << a.name << " and " << b.name);
   FusionPlan plan;
   plan.tile_a = TileShape(a.idxs.size(), 1);
@@ -66,7 +89,8 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
     plan.remap_a.emplace(idx_a, idx_a);
     plan.remap_b.emplace(idx_b, idx_a);
   }
-  if (a.constraints != b.constraints) {
+  // Translate the constraints
+  if (TranslatedContraints(scope, plan.remap_a, a) != TranslatedContraints(scope, plan.remap_b, b)) {
     IVLOG(3, "Remap a: " << plan.remap_a);
     IVLOG(3, "Remap b: " << plan.remap_b);
     IVLOG(3, "ComputeFusionPlan: incompatible constraints");
@@ -74,14 +98,17 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
     IVLOG(4, "    b: " << StreamContainer(b.constraints));
     return boost::none;
   }
-  for (const auto& constraint : a.constraints) {
-    for (const auto& term : constraint.getMap()) {
-      auto it = plan.remap_a.find(term.first);
-      if (it == plan.remap_a.end()) {
-        plan.remap_a.emplace(term.first, term.first);
+  // Compute induced remappings
+  for (const auto& idx_b : b.idxs) {
+    if (idx_b.affine != Affine()) {
+      for (const auto& idx_a : a.idxs) {
+        if (idx_b.affine == idx_a.affine) {
+          plan.remap_b.emplace(idx_b.name, idx_a.name);
+        }
       }
     }
   }
+  // Translate constraints
   for (const auto& constraint : b.constraints) {
     for (const auto& term : constraint.getMap()) {
       auto it = plan.remap_b.find(term.first);
@@ -173,8 +200,14 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   for (const auto& idx : tiled->idxs) {
     auto it = mapping.find(idx.name);
     if (it == mapping.end()) {
-      IVLOG(3, "New idx: " << idx.name);
-      inner->idxs.push_back(idx);
+      if (idx.affine != Affine()) {
+        IVLOG(3, "Affine idx: " << idx.name);
+        outer->idxs.push_back(idx);
+        inner->idxs.emplace_back(Index{idx.name, 1, idx.name});
+      } else {
+        IVLOG(3, "New idx: " << idx.name);
+        inner->idxs.push_back(idx);
+      }
     } else {
       IVLOG(3, "Existing idx: " << idx.name);
       inner->idxs.emplace_back(Index{idx.name, 1, it->second});
@@ -415,7 +448,7 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
       }
       IVLOG(3, "Fuse on = " << fuse_on);
       // Compute a fusion plan for the two blocks, if fails, give up
-      auto plan = ComputeFusionPlan(*block1, *block2, fuse_on);
+      auto plan = ComputeFusionPlan(scope, *block1, *block2, fuse_on);
       if (!plan) {
         IVLOG(3, "Fusion plan failed");
         break;

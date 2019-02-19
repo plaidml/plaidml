@@ -23,7 +23,7 @@ struct FusionPlan {
 };
 
 // Given a shared buffer between two blocks, compute a possible fusion
-boost::optional<FusionPlan> ComputeFusionPlan(const stripe::Block& a, const stripe::Block& b,
+boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const stripe::Block& a, const stripe::Block& b,
                                               const std::string& buf_name);
 
 // A transform that flattens trivial indexes.  TODO: move to a utility header

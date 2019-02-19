@@ -82,8 +82,8 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   for (size_t i = 0; i < outer->idxs.size(); i++) {
     auto& outer_idx = outer->idxs[i];
     auto& inner_idx = inner->idxs[i];
-    if (outer_idx.range == 1) {
-      // For indexes without a range, just make a passthru for the inner block
+    if (outer_idx.affine != Affine()) {
+      // For indexes which are calculated, just make a passthru for the inner block
       inner_idx.affine = Affine(outer_idx.name);
       continue;
     }
