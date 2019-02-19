@@ -41,7 +41,7 @@ std::shared_ptr<lang::TensorValue> ReadTensor(UnZipArchive* zip_file, const std:
 // In this case, we have no need for allocating actual buffers.
 struct NullBuffer : lang::BufferBase {};
 
-std::shared_ptr<lang::TensorValue> MakeTensor(TensorShape shape) {
+std::shared_ptr<lang::TensorValue> MakeTensor(const TensorShape& shape) {
   auto null_buffer = std::make_shared<NullBuffer>();
   return lang::TensorValue::make(null_buffer, shape, false);
 }
@@ -70,7 +70,12 @@ lang::RunInfo TileFile::Load() {
   std::vector<std::shared_ptr<lang::TensorValue>> bound_inputs;
   for (const auto& input : dexified.inputs) {
     if (input.name[0] == '_') {
-      bound_inputs.push_back(ReadTensor(&archive_, "data_" + input.name));
+      auto tensor = ReadTensor(&archive_, "data_" + input.name);
+      auto qparams_name = "qparams_" + input.name;
+      if (archive_.Exist(qparams_name)) {
+        tensor->attach_qparams(ReadTensor(&archive_, qparams_name));
+      }
+      bound_inputs.push_back(tensor);
     }
   }
 

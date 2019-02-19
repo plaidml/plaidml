@@ -169,6 +169,29 @@ void PrintStmt(std::ostream& os,       //
   }
 }
 
+void PrintBytes(std::ostream& os, size_t bytes) {
+  if (bytes < 1024) {
+    os << bytes << " B";
+  } else {
+    os << bytes / 1024.0 << " KiB";
+  }
+}
+
+void PrintShapeDims(std::ostream& os, const std::vector<size_t>& dims, boost::optional<BankDimension> bank_dim) {
+  os << "(";
+  for (size_t i = 0; i < dims.size(); i++) {
+    if (i > 0) {
+      os << ", ";
+    }
+    if (bank_dim && bank_dim->dim_pos == i) {
+      os << "{" << dims[i] << "}";
+    } else {
+      os << dims[i];
+    }
+  }
+  os << ")";
+}
+
 struct DefaultCodec : Codec {
   explicit DefaultCodec(const TensorShape* shape) : Codec(shape) {}
   int64_t byte_size() const final { return shape_->sizes_product_bytes(); }
@@ -312,14 +335,6 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
   return os;
 }
 
-void PrintBytes(std::ostream& os, size_t bytes) {
-  if (bytes < 1024) {
-    os << bytes << " B";
-  } else {
-    os << bytes / 1024.0 << " KiB";
-  }
-}
-
 std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
   const auto& ref = printer.ref;
   if (ref.tags.size()) {
@@ -369,32 +384,11 @@ std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
   if (!ref.agg_op.empty()) {
     os << ":" << ref.agg_op;
   }
-  os << " " << to_string(ref.interior_shape.type) << "(";
-  for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
-    if (i > 0) {
-      os << ", ";
-    }
-    if (ref.bank_dim && ref.bank_dim->dim_pos == i) {
-      os << "{" << ref.interior_shape.dims[i].size << "}";
-    } else {
-      os << ref.interior_shape.dims[i].size;
-    }
-  }
-  os << "):(";
-  for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
-    if (i > 0) {
-      os << ", ";
-    }
-    if (ref.bank_dim && ref.bank_dim->dim_pos == i) {
-      os << "{" << ref.interior_shape.dims[i].stride << "}";
-    } else {
-      os << ref.interior_shape.dims[i].stride;
-    }
-  }
-  os << "):";
-  if (printer.block && !ref.from.empty()) {
-    os << "I ";
-  }
+  os << " " << to_string(ref.interior_shape.type) << ":I";
+  PrintShapeDims(os, ref.interior_shape.sizes(), ref.bank_dim);
+  os << ":";
+  PrintShapeDims(os, ref.interior_shape.strides(), ref.bank_dim);
+  os << ":";
   PrintBytes(os, ref.interior_shape.sizes_product_bytes());
   if (!ref.interior_shape.codec.empty()) {
     os << "(";
@@ -402,8 +396,10 @@ std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
     os << ")";
   }
   if (printer.block && !ref.from.empty()) {
-    os << ", E ";
+    os << ", E";
     auto exterior_shape = printer.block->exterior_shape(ref.into);
+    PrintShapeDims(os, exterior_shape.sizes(), ref.bank_dim);
+    os << ":";
     PrintBytes(os, exterior_shape.sizes_product_bytes());
     if (!exterior_shape.codec.empty()) {
       os << "(";

@@ -132,7 +132,7 @@ void EvalInner(Block* outer,                         //
     if (!inner) {
       continue;
     }
-    inner->name = block->name + ss.str();
+    inner->name += ss.str();
     for (auto& inner_ref : inner->refs) {
       if (inner_ref.from.empty()) {
         continue;

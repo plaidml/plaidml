@@ -17,6 +17,10 @@ UnZipArchive::UnZipArchive(const std::string& path) : zip_file_(unzOpen64(path.c
 
 UnZipArchive::~UnZipArchive() { unzClose(zip_file_); }
 
+bool UnZipArchive::Exist(const std::string& filename) {
+  return unzLocateFile(zip_file_, filename.c_str(), nullptr) == UNZ_OK;
+}
+
 UnZipFile UnZipArchive::OpenFile(const std::string& filename) { return UnZipFile(zip_file_, filename); }
 
 UnZipFile::UnZipFile(unzFile zip_file, const std::string& filename) : zip_file_(zip_file) {

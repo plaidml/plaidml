@@ -196,6 +196,14 @@ struct TensorShape {
     return ret;
   }
 
+  std::vector<size_t> strides() const {
+    std::vector<size_t> ret;
+    for (const auto& dim : dims) {
+      ret.push_back(dim.stride);
+    }
+    return ret;
+  }
+
   size_t sizes_product() const {
     size_t ret = 1;
     for (const auto& size : sizes()) {

@@ -364,6 +364,9 @@ PLAIDML_API plaidml_var* plaidml_alloc_real(double value);
 // Allocates a var representing a tensor, bound to the given shape and buffer.
 PLAIDML_API plaidml_var* plaidml_alloc_tensor(vai_ctx* ctx, plaidml_buffer* buffer, plaidml_shape* shape);
 
+// Attaches quantization parameters to a weights tensor
+PLAIDML_API bool plaidml_tensor_attach_qparams(plaidml_var* tensor, plaidml_var* qparams);
+
 // Builds a function from the supplied code written in the PlaidML operation
 // description language.  If 'id' is not NULL, attach the id to the function
 // for tracking purposes.

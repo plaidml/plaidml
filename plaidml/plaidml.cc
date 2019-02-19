@@ -847,6 +847,10 @@ void WriteFunction(zipFile f, const BoundFunction& func) {
   WriteString(f, "code", xo);
   for (const auto& kvp : func.in_bound()) {
     WriteTensor(f, "data_" + kvp.first, *kvp.second);
+    auto qparams = kvp.second->qparams();
+    if (qparams) {
+      WriteTensor(f, "qparams_" + kvp.first, *qparams);
+    }
   }
 }
 
@@ -1020,6 +1024,28 @@ extern "C" plaidml_var* plaidml_alloc_tensor(vai_ctx* ctx, plaidml_buffer* buffe
     vertexai::SetLastOOM();
     return nullptr;
   }
+}
+
+extern "C" bool plaidml_tensor_attach_qparams(plaidml_var* tensor, plaidml_var* qparams) {
+  if (!tensor || !qparams) {
+    vertexai::SetLastOOM();
+    return false;
+  }
+  try {
+    auto tensor_value = std::dynamic_pointer_cast<TensorValue>(tensor->value);
+    if (!tensor_value) {
+      throw vertexai::error::InvalidArgument{"Invalid tensor"};
+    }
+    auto qparams_value = std::dynamic_pointer_cast<TensorValue>(qparams->value);
+    if (!qparams_value) {
+      throw vertexai::error::InvalidArgument{"Invalid qparams"};
+    }
+    tensor_value->attach_qparams(qparams_value);
+  } catch (...) {
+    vertexai::SetLastException(std::current_exception());
+    return false;
+  }
+  return true;
 }
 
 // plaidml_composer

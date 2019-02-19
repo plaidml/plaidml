@@ -171,6 +171,7 @@ class StripeGenerator {
     kernel->set_tag("agg_op_" + GetAggOp(cion.agg_op));
 
     std::vector<std::string> scalar_inputs;
+    kernel->name += "(";
     for (size_t i = 0; i < cion.specs.size(); i++) {
       const auto& spec = cion.specs[i];
       auto shape = ScalarShape(spec.id);
@@ -189,6 +190,10 @@ class StripeGenerator {
             {},                     // location
         });
       } else {
+        if (i != 1) {
+          kernel->name += ",";
+        }
+        kernel->name += spec.id;
         auto scalar_name = ScalarName(spec.id);
         scalar_inputs.push_back(scalar_name);
         // if this is a constant, propagate it into the load statement
@@ -220,6 +225,7 @@ class StripeGenerator {
         kernel->stmts.push_back(std::make_shared<Load>(spec.id, scalar_name));
       }
     }
+    kernel->name += ")";
 
     for (const auto& kvp : bounds) {
       uint64_t range = kvp.second.max - kvp.second.min + 1;

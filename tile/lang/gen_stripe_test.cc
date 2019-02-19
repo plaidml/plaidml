@@ -80,7 +80,7 @@ TEST_F(GenStripeTest, ContractPlusElementwise) {
         ]
         stmts [{
           tags:["agg_op_add", "comb_op_mul", "contraction", "kernel"] block {
-            name:"kernel_0" loc {unit {}}
+            name:"kernel_0(X_I_0,X_I_1)" loc {unit {}}
             comments:"X_T1[m, n : _T0, _T1] = +(X_I_0[m, k] * X_I_1[k, n])"
             idxs [{name:"k" range:10 affine {}}, {name:"m" range:10 affine {}}, {name:"n", range: 10, affine {}}]
             refs [
