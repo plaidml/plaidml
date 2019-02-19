@@ -26,7 +26,7 @@ void ApplyCache(const AliasMap& map,          //
     throw std::runtime_error("ApplyCache: Invalid var_name");
   }
   // Get the alias info
-  // const auto& ai = map.at(var_name);
+  const auto& ai = map.at(var_name);
   // Get the shape
   TensorShape raw_ts = it->interior_shape;
   std::vector<size_t> sizes = raw_ts.sizes();
@@ -46,12 +46,14 @@ void ApplyCache(const AliasMap& map,          //
       std::string iname = str(boost::format("i%zu") % i);
       xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
       xfer_access.emplace_back(Affine(iname));
-      /*
       int64_t top_index = ai.base_ref->interior_shape.dims[i].size - 1;
       bool underflow = ai.extents[i].min < 0;
       bool overflow = ai.extents[i].max > top_index;
       if (underflow || overflow) {
         std::string bname = xfer_block.unique_idx_name(iname);
+        IVLOG(3, "ApplyCache: var_name = " << var_name);
+        IVLOG(4, "extents = " << ai.extents[i] << ", top_index = " << top_index);
+        IVLOG(4, *block);
         xfer_block.idxs.emplace_back(Index{bname, 1, map.translate(ai.access[i])});
         if (underflow) {
           xfer_block.constraints.push_back(Affine(iname) + Affine(bname));
@@ -60,7 +62,6 @@ void ApplyCache(const AliasMap& map,          //
           xfer_block.constraints.push_back(Affine(top_index) - Affine(iname) - Affine(bname));
         }
       }
-      */
     } else {
       xfer_access.emplace_back(Affine());
     }

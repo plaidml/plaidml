@@ -52,6 +52,8 @@ class Polynomial : boost::additive<Polynomial<T>>,
   // Substitute replacement in for var in this polynomial
   void substitute(const std::string& var, const Polynomial<T>& replacement);
   void substitute(const std::string& var, const T& replacement);
+  // Symbolically evaluate a polynomial
+  Polynomial sym_eval(const std::map<std::string, Polynomial<T>> values) const;
   // If the string has a nonzero coefficient for at least one of its nonconstant
   // indices, it will return the index name of one such index. No promises about
   // which index you'll get. Returns empty string if no index w/ nonconst coeff

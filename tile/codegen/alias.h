@@ -55,11 +55,15 @@ class AliasMap {
   std::unordered_map<std::string, size_t> RefUseCounts(const stripe::Block& block) const;
   // Attempt to translate an affine into local indexes
   stripe::Affine translate(const stripe::Affine& in) const;
+  // Get access to the sources
+  const std::map<std::string, stripe::Affine>& idx_sources() const { return idx_sources_; }
 
  private:
-  size_t depth_;                              // How deep is this AliasInfo
-  std::map<std::string, AliasInfo> info_;     // Per buffer data
-  std::map<std::string, IndexInfo> indexes_;  // Per index information
+  size_t depth_;                                // How deep is this AliasInfo
+  std::map<std::string, AliasInfo> info_;       // Per buffer data
+  std::map<std::string, uint64_t> idx_ranges_;  // For each depth-prefixed index, what is it's range?
+  std::map<std::string, stripe::Affine>
+      idx_sources_;  // For each current index, how is it built from depth-prefixed indexes
 };
 
 bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);
