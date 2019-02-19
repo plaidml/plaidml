@@ -328,7 +328,7 @@ TEST(Schedule, Basic) {
   auto tests = lib::InternalTests();
   const auto runinfo = tests.at("$layer_test2");
   auto program = GenerateStripe(runinfo);
-  Optimize(program.get(), cfg, options);
+  Optimize(program.get(), cfg.passes(), options);
 }
 
 }  // namespace test

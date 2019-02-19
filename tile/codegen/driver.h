@@ -17,7 +17,9 @@ struct OptimizeOptions {
   boost::filesystem::path dbg_dir;
 };
 
-void Optimize(stripe::Block* block, const proto::Config& cfg, const OptimizeOptions& options);
+using Passes = google::protobuf::RepeatedPtrField<proto::Pass>;
+
+void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions& options);
 
 }  // namespace codegen
 }  // namespace tile

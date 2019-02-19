@@ -18,6 +18,7 @@ message Config {
   map<string, TransferUnit> tx_units = 5;
   repeated Bus buses = 6;
   repeated Pass passes = 7;
+  repeated Pass lowering = 8;
 }
 
 // An execution unit represents a simulated computing device.
