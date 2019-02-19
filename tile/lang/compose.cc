@@ -692,6 +692,9 @@ RunInfo BoundFunction::PrepareToRun() const {
     if (kvp.second->is_const()) {
       r.const_inputs.insert(n);
     }
+    if (kvp.second->qparams()) {
+      r.qparams_buffers[n] = kvp.second->qparams()->buffer();
+    }
   }
   for (const auto& kvp : out_bound_) {
     std::string n = "X" + kvp.first;

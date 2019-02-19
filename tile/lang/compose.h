@@ -100,9 +100,12 @@ class TensorValue final : public Value {
   std::shared_ptr<Value> dim_value(size_t i) const final {
     return IConstValue::make(static_cast<int64_t>(shape_.dims[i].size));
   }
+  const std::shared_ptr<TensorValue>& qparams() const { return qparams_; }
+  void attach_qparams(const std::shared_ptr<TensorValue>& qparams) { qparams_ = qparams; }
 
  private:
   std::shared_ptr<BufferBase> buffer_;
+  std::shared_ptr<TensorValue> qparams_;
   TensorShape shape_;
   bool is_const_;
 };
@@ -233,6 +236,7 @@ struct RunInfo {
   ShapeMap output_shapes;
   std::map<std::string, std::shared_ptr<BufferBase>> input_buffers;
   std::map<std::string, std::shared_ptr<BufferBase>> output_buffers;
+  std::map<std::string, std::shared_ptr<BufferBase>> qparams_buffers;
   std::set<std::string> const_inputs;
 };
 

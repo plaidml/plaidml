@@ -511,6 +511,15 @@ class _Library(plaidml.library.Library):
         self.plaidml_alloc_tensor.restype = ctypes.POINTER(_C_Var)
         self.plaidml_alloc_tensor.errcheck = self._check_err
 
+        # PLAIDML_API bool plaidml_tensor_attach_qparams(plaidml_var* tensor, plaidml_var* qparams);
+        self.plaidml_tensor_attach_qparams = lib.plaidml_tensor_attach_qparams
+        self.plaidml_tensor_attach_qparams.argtypes = [
+            ctypes.POINTER(_C_Var),  # plaidml_var* tensor
+            ctypes.POINTER(_C_Var)  # plaidml_var* qparams
+        ]
+        self.plaidml_tensor_attach_qparams.restype = ctypes.c_bool
+        self.plaidml_tensor_attach_qparams.errcheck = self._check_err
+
         # PLAIDML_API plaidml_function* plaidml_build_coded_function(const char* code);
         self.plaidml_build_coded_function = lib.plaidml_build_coded_function
         self.plaidml_build_coded_function.argtypes = [
@@ -1192,6 +1201,7 @@ class Tensor(Var):
     def __init__(self, dev, shape, copy_buffer=False):
         self._shape = shape
         self._ndarray = None
+        self._qparams = None
         if copy_buffer:
             self._buffer = copy_buffer
         else:
@@ -1230,6 +1240,10 @@ class Tensor(Var):
         with self.mmap_current() as view:
             view.copy_to_ndarray(self._ndarray)
         return self._ndarray
+
+    def attach_qparams(self, qparams):
+        self._qparams = qparams
+        _lib().plaidml_tensor_attach_qparams(self, self._qparams)
 
 
 class Integer(Var):
@@ -1303,19 +1317,6 @@ class Shape(_Shape):
             if arg != 0:
                 stride //= arg
             _lib().plaidml_add_dimension(ctx, self, arg, stride)
-
-
-class CustomShape(_Shape):
-
-    def __init__(self, ctx, dtype, ctype, dims):
-        super(CustomShape, self).__init__(ctx, _lib().plaidml_alloc_shape(ctx, dtype), ctype=ctype)
-        stride = 1
-        for dim in dims:
-            stride *= dim
-        for dim in dims:
-            if dim != 0:
-                stride //= dim
-            _lib().plaidml_add_dimension(ctx, self, dim, stride)
 
 
 class Placeholder(Var):
