@@ -2,6 +2,8 @@
 
 #include <boost/format.hpp>
 
+#include "base/util/lookup.h"
+
 namespace vertexai {
 namespace tile {
 namespace math {
@@ -26,7 +28,7 @@ T Polynomial<T>::eval(const std::map<std::string, T>& values) const {
     if (kvp.first == "") {
       res += kvp.second;
     } else if (values.find(kvp.first) != values.end()) {
-      res += kvp.second * values.at(kvp.first);
+      res += kvp.second * safe_at(values, kvp.first);
     } else {
       throw std::runtime_error(
           str(boost::format("Failed to find value for %s, when evaluating %s") % kvp.first % toString()));
@@ -162,7 +164,7 @@ void Polynomial<T>::substitute(const std::string& var, const Polynomial<T>& repl
     // If var isn't in this polynomial, nothing needs to be done
     return;
   }
-  T coeff = map_.at(var);
+  T coeff = safe_at(map_, var);
   map_.erase(var);
   (*this) += coeff * replacement;
 }
@@ -179,7 +181,7 @@ Polynomial<T> Polynomial<T>::sym_eval(const std::map<std::string, Polynomial> va
     if (kvp.first.empty()) {
       out += Polynomial<T>(kvp.second);
     } else {
-      out += values.at(kvp.first) * kvp.second;
+      out += safe_at(values, kvp.first) * kvp.second;
     }
   }
   return out;

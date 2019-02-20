@@ -15,24 +15,22 @@ using namespace stripe;  // NOLINT
 void PruneIndexes(Block* block, const Tags& exclude_tags) {
   // Find all the indexes to remove
   std::set<const Index*> to_remove;
+  std::map<std::string, int64_t> idx_values;
   for (const auto& idx : block->idxs) {
     if (!idx.has_tags(exclude_tags) && idx.range == 1 && idx.affine == 0) {
       to_remove.emplace(&idx);
+      idx_values.emplace(idx.name, 0);
     }
   }
   // Remove from refinements
   for (auto& refs : block->refs) {
     for (auto& aff : refs.access) {
-      for (const auto& idx : to_remove) {
-        aff.mutateMap().erase(idx->name);
-      }
+      aff = aff.partial_eval(idx_values);
     }
   }
   // Remove from constraints
   for (auto& con : block->constraints) {
-    for (const auto& idx : to_remove) {
-      con.mutateMap().erase(idx->name);
-    }
+    con = con.partial_eval(idx_values);
   }
   // Remove from index list
   block->idxs.erase(std::remove_if(block->idxs.begin(), block->idxs.end(),
@@ -42,10 +40,8 @@ void PruneIndexes(Block* block, const Tags& exclude_tags) {
   for (auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
-      for (auto& oidx : inner->idxs) {
-        for (const auto& idx : to_remove) {
-          oidx.affine.mutateMap().erase(idx->name);
-        }
+      for (auto& inner_idx : inner->idxs) {
+        inner_idx.affine = inner_idx.affine.partial_eval(idx_values);
       }
     }
   }
