@@ -33,6 +33,13 @@ std::map<std::string, lang::RunInfo> InternalTests() {
                                  SimpleShape(DataType::INT8, {1, 52, 50, 64}))  //
       },
       {
+          "$i8x8x256_o8x8x64_k1x1s1",
+          lib::LoadConv2d("i8x8x256_o8x8x64_k1x1s1",                     //
+                          SimpleShape(DataType::INT8, {1, 8, 8, 256}),   //
+                          SimpleShape(DataType::INT8, {1, 1, 256, 64}),  //
+                          SimpleShape(DataType::INT8, {1, 8, 8, 64}))    //
+      },
+      {
           "$layer_test1",
           lib::LoadConv2d("layer_test1",                                 //
                           SimpleShape(DataType::INT8, {1, 56, 56, 64}),  //
