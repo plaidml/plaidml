@@ -68,9 +68,9 @@ int main(int argc, char* argv[]) {
       false,                // dump_code
       out_dir + "/passes",  // dbg_dir
   };
-  codegen::Optimize(program.get(), cfg, options);
+  codegen::Optimize(program.get(), cfg.passes(), options);
   std::cout << *program;
-  codegen::SemtreeEmitter emit(codegen::AliasMap{});
+  codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
   emit.Visit(*program);
   lang::Simplify(emit.kernels_.kernels);
   for (const auto& ki : emit.kernels_.kernels) {

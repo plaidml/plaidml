@@ -13,7 +13,7 @@ namespace codegen {
 #define _C(x) _(vname(x, depth_))
 #define _P(x) _(vname(x, depth_ - 1))
 
-SemtreeEmitter::SemtreeEmitter(const AliasMap& am) {
+SemtreeEmitter::SemtreeEmitter(const AliasMap& am, size_t threads) : threads_(threads) {
   scopes_.emplace_back(am);
   scope_ = &scopes_.back();
 }
@@ -44,7 +44,18 @@ void SemtreeEmitter::Visit(const stripe::Load& stmt) {
   cur_->push_back(_Declare({sem::Type::VALUE, type}, vname(stmt.into, depth_), _C(stmt.from)[_Const(0)]));
 }
 
-void SemtreeEmitter::Visit(const stripe::Store& stmt) { cur_->push_back(_C(stmt.into)[_Const(0)] = _C(stmt.from)); }
+void SemtreeEmitter::Visit(const stripe::Store& stmt) {
+  std::string agg_op = scope_->at(stmt.into).base_ref->agg_op;
+  if (agg_op == "") {
+    cur_->push_back(_C(stmt.into)[_Const(0)] = _C(stmt.from));
+    return;
+  }
+  if (agg_op == "add") {
+    cur_->push_back(_C(stmt.into)[_Const(0)] = _C(stmt.into)[_Const(0)] + _C(stmt.from));
+    return;
+  }
+  throw std::runtime_error("Unknown agg-op");
+}
 
 void SemtreeEmitter::Visit(const stripe::Constant& stmt) {
   sem::Type type(sem::Type::VALUE);
@@ -122,13 +133,18 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   for (const auto& ref : block.ref_outs()) {
     sem::Type type = {sem::Type::POINTER_MUT, ref->interior_shape.type, 1, 0, sem::Type::GLOBAL};
     params.push_back(std::make_pair(type, vname(ref->from, depth_ - 1)));
+    ki.outputs.push_back(ref->from);
   }
   for (const auto& ref : block.ref_ins()) {
     sem::Type type = {sem::Type::POINTER_CONST, ref->interior_shape.type, 1, 0, sem::Type::GLOBAL};
     params.push_back(std::make_pair(type, vname(ref->from, depth_ - 1)));
+    ki.inputs.push_back(ref->from);
   }
   ki.kfunc = std::make_shared<sem::Function>(ki.kname, sem::Type(), params, cur_);
-  printf("Woot\n");
+  ki.gwork = {map.gid_sizes[0] * threads_, map.gid_sizes[1], map.gid_sizes[2]};
+  ki.lwork = {threads_, 1, 1};
+  IVLOG(1, "gwork = " << ki.gwork);
+  IVLOG(1, "lwork = " << ki.lwork);
 }
 
 void SemtreeEmitter::do_lids(const stripe::Block& block) {
@@ -162,12 +178,13 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   scope_ = &scopes_.back();
   // Now, add the refinement bumps to cur_
   for (const auto& ref : block.refs) {
-    sem::Type ptype = {ref.dir == stripe::RefDir::In ? sem::Type::POINTER_CONST : sem::Type::POINTER_MUT,
-                       ref.interior_shape.type};
     if (ref.dir == stripe::RefDir::None) {
-      // ptype.array = ref.interior_shape.elem_size();
-      cur_->push_front(_Declare(ptype, vname(ref.into, depth_), _Const(0)));
+      sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, ref.interior_shape.elem_size(),
+                         sem::Type::LOCAL};
+      cur_->push_front(_Declare(ptype, vname(ref.into, depth_), sem::ExprPtr()));
     } else {
+      sem::Type ptype = {ref.dir == stripe::RefDir::In ? sem::Type::POINTER_CONST : sem::Type::POINTER_MUT,
+                         ref.interior_shape.type};
       cur_->push_front(_Declare(ptype, vname(ref.into, depth_),
                                 _(vname(ref.from, depth_ - 1)) + convert_affine(ref.FlatAccess(), depth_)));
     }

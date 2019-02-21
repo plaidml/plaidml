@@ -49,8 +49,7 @@
                 "outer_set": ["contract_outer"],
                 "inner_set": ["contract_inner"],
                 "only_po2": true,  ## Only consider PO2 sizes for speed
-                "max_input_size": {{ LOCAL_MEM_KIB * 1024 }},  ## All inputs must fit in local memory
-                "max_output_size": {{ REGS_MEM_KIB * 1024 }},  ## All outputs must fit in registers
+                "max_total_size": {{ LOCAL_MEM_KIB * 1024 }},  ## All inputs must fit in local memory
                 ## Since all loads to/from global memory are across a wide bus, use that as the
                 ## cache_width to optimize for contigous regions of DRAM for each inner block
                 "cache_width": {{ CACHE_WIDTH }}
@@ -94,7 +93,7 @@
                 "inner_set": ["cache_threads"],
                 "only_po2": true,
                 "max_sizes_product": {{ NUM_THREADS }},
-                "cache_width": {{ 2 }},
+                "cache_width": {{ CACHE_WIDTH }},
                 "loc_name": "GLOBAL",
                 "flip": true
             }
