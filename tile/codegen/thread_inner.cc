@@ -60,6 +60,7 @@ void ThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
     tile[i] = RoundUp(block->idxs[i].range, tile[i]);
   }
   ApplyTile(block, tile, false, false, true);
+  block->set_tag("gpu_thread");
 }
 
 }  // namespace codegen

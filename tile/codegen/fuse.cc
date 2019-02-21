@@ -194,8 +194,19 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   inner->name = tiled->name;
   outer->tags = tiled->tags;
   outer->stmts.push_back(inner);
-  // Put constraints on outer block
-  outer->constraints = tiled->constraints;
+  // Put constraints on outer block and rewrite
+  for (const auto& aff : tiled->constraints) {
+    Affine out;
+    for (const auto& kvp : aff.getMap()) {
+      auto it = mapping.find(kvp.first);
+      if (it != mapping.end()) {
+        out += Affine(it->second, kvp.second);
+      } else {
+        out += Affine(kvp.first, kvp.second);
+      }
+    }
+    outer->constraints.push_back(out);
+  }
   // Move / rename each index to the appropriate block
   for (const auto& idx : tiled->idxs) {
     auto it = mapping.find(idx.name);
@@ -281,7 +292,7 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   // If constraints don't match, fail
   if (block_a->constraints != block_b->constraints) {
     IVLOG(3, "Fuse failed due to mismatched constraints");
-    return true;
+    return false;
   }
   // Make AliasMaps for the two blocks
   AliasMap a_map(scope, block_a);

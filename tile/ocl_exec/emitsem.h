@@ -16,7 +16,7 @@ namespace codegen {
 
 class SemtreeEmitter : public stripe::ConstStmtVisitor {
  public:
-  explicit SemtreeEmitter(const AliasMap& am);
+  explicit SemtreeEmitter(const AliasMap& am, size_t threads);
   void Visit(const stripe::Load&);
   void Visit(const stripe::Store&);
   void Visit(const stripe::Constant&);
@@ -30,6 +30,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void do_gids(const stripe::Block&);
   void do_lids(const stripe::Block&);
 
+  size_t threads_;
   size_t depth_;
   std::shared_ptr<sem::Block> cur_;
   std::vector<AliasMap> scopes_;
