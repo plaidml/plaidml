@@ -392,6 +392,16 @@ class _Library(plaidml.library.Library):
         self.plaidml_set_shape_offset.restype = ctypes.c_bool
         self.plaidml_set_shape_offset.errcheck = self._check_err
 
+        # PLAIDML_API bool plaidml_shape_set_layout(vai_ctx* ctx, plaidml_shape* shape, const char* layout);
+        self.plaidml_shape_set_layout = lib.plaidml_shape_set_layout
+        self.plaidml_shape_set_layout.argtypes = [
+            ctypes.POINTER(plaidml.library._C_Context),  # vai_ctx* ctx
+            ctypes.POINTER(_C_Shape),  # plaidml_shape* shape
+            ctypes.c_char_p,  # const char* layout
+        ]
+        self.plaidml_shape_set_layout.restype = ctypes.c_bool
+        self.plaidml_shape_set_layout.errcheck = self._check_err
+
         # PLAIDML_API bool plaidml_add_dimension(
         #   vai_ctx* ctx,
         #   plaidml_shape* shape,
@@ -1308,7 +1318,7 @@ class _Shape(object):
 
 class Shape(_Shape):
 
-    def __init__(self, ctx, dtype, *args):
+    def __init__(self, ctx, dtype, *args, layout=None):
         super(Shape, self).__init__(ctx, _lib().plaidml_alloc_shape(ctx, dtype))
         stride = 1
         for arg in args:
@@ -1317,6 +1327,8 @@ class Shape(_Shape):
             if arg != 0:
                 stride //= arg
             _lib().plaidml_add_dimension(ctx, self, arg, stride)
+        if layout:
+            _lib().plaidml_shape_set_layout(ctx, self, layout.encode())
 
 
 class Placeholder(Var):

@@ -92,7 +92,7 @@ lang::RunInfo LoadConv2dRelu(const std::string& name,    //
   auto center = kernel.dims[0].size / 2;
   auto code = R"***(
 function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
-  [[pid(res2a_branch2a)]] O[n, x0, x1, co : N, X, Y, CO] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K[i, ky, ci, co]);
+  [[pid(res2a_branch2a)]] O[n, x0, x1, co : N, X, Y, CO] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K[kx, ky, ci, co]);
   [[pid(relu)]] R = zelu(O);
 })***";
   lang::RunInfo runinfo;
@@ -127,7 +127,7 @@ function (I[N, X, Y, CI], K[KX, KY, CI, CO], B[CO], S[CO]) -> (R) {
   runinfo.input_shapes.insert(std::make_pair("B", channels));
   runinfo.input_shapes.insert(std::make_pair("S", channels));
   runinfo.output_shapes.insert(std::make_pair("R", output));
-  runinfo.const_inputs = {"K", "B", "S"};
+  runinfo.const_inputs = {"K"};
   runinfo.input_buffers = {
       {"K", MakeBuffer(kernel)},
       {"B", MakeBuffer(channels)},

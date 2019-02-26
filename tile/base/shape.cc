@@ -6,7 +6,11 @@ namespace vertexai {
 namespace tile {
 
 std::ostream& operator<<(std::ostream& os, const TensorShape& shape) {
-  os << to_string(shape.type) << "(";
+  os << to_string(shape.type);
+  if (!shape.layout.empty()) {
+    os << "[" << shape.layout << "]";
+  }
+  os << "(";
   for (size_t i = 0; i < shape.dims.size(); i++) {
     if (i > 0) {
       os << ", ";

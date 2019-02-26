@@ -522,6 +522,7 @@ class StripeGenerator {
       shape.dims.push_back(TensorDimension(dim.stride, 1));
     }
     shape.is_const = IsConst(name);
+    shape.layout = it->second.shape.layout;
     return AdjustShape(shape);
   }
 

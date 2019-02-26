@@ -52,4 +52,7 @@ message TensorShape {
   // Declares whether a tensor is ever written to or updated.
   // An example of an is_const tensor is the weights of a NN during inference.
   bool is_const = 4;
+
+  // An optional layout for the tensor. If not specified, it is inferred.
+  string layout = 5;
 }

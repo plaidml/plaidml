@@ -384,7 +384,11 @@ std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
   if (!ref.agg_op.empty()) {
     os << ":" << ref.agg_op;
   }
-  os << " " << to_string(ref.interior_shape.type) << ":I";
+  os << " " << to_string(ref.interior_shape.type);
+  if (!ref.interior_shape.layout.empty()) {
+    os << "[" << ref.interior_shape.layout << "]";
+  }
+  os << ":I";
   PrintShapeDims(os, ref.interior_shape.sizes(), ref.bank_dim);
   os << ":";
   PrintShapeDims(os, ref.interior_shape.strides(), ref.bank_dim);

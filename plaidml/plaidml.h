@@ -277,6 +277,9 @@ PLAIDML_API void plaidml_free_shape(plaidml_shape* shape);
 // Sets a shape's offset, in elements, from the beginning of the data.
 PLAIDML_API bool plaidml_set_shape_offset(vai_ctx* ctx, plaidml_shape* shape, uint64_t offset_in_elements);
 
+// Set a shape's layout
+PLAIDML_API bool plaidml_shape_set_layout(vai_ctx* ctx, plaidml_shape* shape, const char* layout);
+
 // Adds a dimension to a shape.  Dimension sizes and strides are measured in
 // elements of the shape's datatype, not by local buffer byte counts.
 PLAIDML_API bool plaidml_add_dimension(vai_ctx* ctx, plaidml_shape* shape, uint64_t size_in_elements,
