@@ -667,6 +667,21 @@ extern "C" bool plaidml_add_dimension(vai_ctx* ctx, plaidml_shape* shape, uint64
   return true;
 }
 
+extern "C" bool plaidml_shape_set_layout(vai_ctx* ctx, plaidml_shape* shape, const char* layout) {
+  if (!shape) {
+    vertexai::SetLastOOM();
+    return false;
+  }
+  try {
+    shape->shape.layout = layout;
+  } catch (...) {
+    vertexai::SetLastException(std::current_exception());
+    shape->valid = false;
+    return false;
+  }
+  return true;
+}
+
 extern "C" plaidml_datatype plaidml_get_shape_type(plaidml_shape* shape) {
   if (!shape) {
     vertexai::SetLastOOM();
