@@ -201,7 +201,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
                      const std::string& idx_tag) {
   IVLOG(2, "PartitionBuffer> " << block->name);
   std::map<std::string, size_t> tile_by_name;
-  std::map<Refinement*, BankedRef> banked_refs;
+  std::map<std::string, BankedRef> banked_refs;
   std::set<std::string> primary_idxs;
   // Initialize tile_by_name from the block's index ranges
   for (const auto& idx : block->idxs) {
@@ -237,8 +237,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
     // Update the tile size for this index
     tile_by_name[idx->name] = math::RoundUp(idx->range, bank_info.num_banks);
     // Record information used for updating the outer block post-tiling.
-    BankedRef banked_ref{BankDimension{bank_info.dim_pos}, Affine{idx->name}};
-    banked_refs.emplace(&ref, banked_ref);
+    banked_refs[ref.into] = BankedRef{BankDimension{bank_info.dim_pos}, Affine{idx->name}};
   }
   // Convert the tile based on index name to a tile based on index position
   TileShape tile(block->idxs.size());
@@ -248,10 +247,9 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
   IVLOG(2, "  tile: " << tile_by_name << " " << tile);
   ApplyTile(block, tile, false, true);
   // Update refinements, do this after tiling so that only the outer block gets these updates.
-  for (auto& item : banked_refs) {
-    auto ref = item.first;
-    const auto& banked_ref = item.second;
-    ref->cache_unit = banked_ref.cache_unit;
+  for (const auto& item : banked_refs) {
+    // Use ref_by_into because ApplyTile might cause Refinement pointers to become invalid
+    block->ref_by_into(item.first)->cache_unit = item.second.cache_unit;
   }
   block->tags.clear();
   block->add_tags(set_tags);

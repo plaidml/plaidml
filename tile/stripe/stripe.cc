@@ -41,15 +41,15 @@ void PrintTab(std::ostream& os, size_t depth) {  //
 
 void PrintPreStmt(std::ostream& os,       //
                   size_t depth,           //
-                  const Statement* stmt,  //
+                  const Statement& stmt,  //
                   size_t idx,             //
                   const DepsMap& deps) {
   PrintTab(os, depth);
   os << idx;
-  if (stmt->deps.size()) {
+  if (stmt.deps.size()) {
     os << "[";
     bool first = true;
-    for (const auto& it : stmt->deps) {
+    for (const auto& it : stmt.deps) {
       if (first) {
         first = false;
       } else {
@@ -65,8 +65,8 @@ void PrintPreStmt(std::ostream& os,       //
     os << "]";
   }
   os << ": ";
-  if (stmt->tags.size()) {
-    for (const auto& tag : stmt->tags) {
+  if (stmt.tags.size()) {
+    for (const auto& tag : stmt.tags) {
       os << "#" << tag << " ";
     }
     os << std::endl;
@@ -144,7 +144,7 @@ void PrintStmt(std::ostream& os,       //
                size_t depth,           //
                size_t idx,             //
                const DepsMap& deps) {
-  PrintPreStmt(os, depth, &stmt, idx, deps);
+  PrintPreStmt(os, depth, stmt, idx, deps);
   switch (stmt.kind()) {
     case StmtKind::Load:
       os << *dynamic_cast<const Load*>(&stmt) << std::endl;
