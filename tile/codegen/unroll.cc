@@ -195,6 +195,10 @@ void UnrollBlock(Block* outer,                //
       }
     });
     outer->stmts.erase(it_stmt);
+    // Dependencies become invalid after a stmt is removed
+    for (auto& stmt : outer->stmts) {
+      stmt->deps.clear();
+    }
   } else {
     PreIterate(block, [&](const StatementIt& it) {
       auto inner = Block::Downcast(*it);

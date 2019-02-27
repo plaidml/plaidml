@@ -163,7 +163,7 @@ struct BankDimension {
 };
 
 struct Refinement : Taggable {
-  Refinement() {}
+  Refinement() = default;
   Refinement(RefDir dir,                             //
              const std::string& from,                //
              const std::string& into,                //

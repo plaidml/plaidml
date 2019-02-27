@@ -327,8 +327,8 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
       // Copy across as a new ref
       std::string new_name = tmp->unique_ref_name(new_ref.into);
       remap_b[new_ref.into] = new_name;
-      auto ref_it = tmp->refs.insert(tmp->refs.end(), new_ref);
-      ref_it->into = new_name;
+      tmp->refs.push_back(new_ref);
+      tmp->refs.back().into = new_name;
     }
   }
   // We are now safe (cannot fail), move new reference over A's
