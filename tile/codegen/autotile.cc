@@ -192,11 +192,11 @@ struct ComputeDensityCostModel {
 };
 
 struct PartitionComputeCostModel {
-  double ideal_cost;
+  size_t num_parts;
   std::set<const Index*> acc_idxs;
 
   PartitionComputeCostModel(const Block& block, const proto::PartitionPass& options)
-      : ideal_cost(block.idxs_product() / (1.0 * options.num_parts())),  //
+      : num_parts(options.num_parts()),  //
         acc_idxs(block.accumulation_idxs()) {}
 
   bool IndexFilter(const Block& block, const Index& idx) const {  //
@@ -204,11 +204,11 @@ struct PartitionComputeCostModel {
   }
 
   double ComputeCost(const Block& block, const Tile& tile) const {
-    double cost = tile.counts_product();
-    if (cost < ideal_cost) {
-      return std::numeric_limits<double>::infinity();
+    auto count = tile.counts_product();
+    if (count > num_parts) {
+      return (num_parts + 1) * (count - num_parts);
     }
-    return cost;
+    return num_parts - count;
   }
 };
 
@@ -314,12 +314,10 @@ void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& optio
   RunOnBlocks(root, reqs, [&options](const AliasMap& map, Block* block) {
     PartitionComputeCostModel model(*block, options);
     auto result = PickBestTile(*block, false, false, model);
-    IVLOG(2, "PartitionCompute> block: " << block->name                           //
-                                         << ", tile: " << result.tile             //
-                                         << ", cost: " << result.cost             //
-                                         << ", ideal_cost: " << model.ideal_cost  //
-                                         << ", ratio: " << model.ideal_cost / result.cost);
-    if (ApplyTile(block, result.tile.counts(), false)) {
+    IVLOG(2, "PartitionCompute> block: " << block->name                //
+                                         << ", tile: " << result.tile  //
+                                         << ", cost: " << result.cost);
+    if (ApplyTile(block, result.tile.sizes(), false)) {
       auto inner = block->SubBlock(0);
       inner->tags = block->tags;
       block->tags.clear();
