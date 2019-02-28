@@ -97,7 +97,10 @@ class StripeGenerator {
       }
     }
     IVLOG(2, "Done");
-    return Stripe{program, total_macs_};
+    Stripe stripe;
+    stripe.program = program;
+    stripe.total_macs = total_macs_;
+    return stripe;
   }
 
  private:
