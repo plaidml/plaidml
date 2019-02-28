@@ -60,19 +60,19 @@ TEST(Codegen, Cache) {
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}),  //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}));
-  auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto stripe = GenerateStripe(runinfo);
+  auto main = stripe.program->SubBlock(0);
   auto kernel = main->SubBlock(0);
-  AliasMap am(AliasMap(AliasMap(AliasMap(), program.get()), main.get()), kernel.get());
-  IVLOG(2, "Original>\n" << *program);
+  AliasMap am(AliasMap(AliasMap(AliasMap(), stripe.program.get()), main.get()), kernel.get());
+  IVLOG(2, "Original>\n" << *stripe.program);
 
   ApplyTile(kernel.get(), {2, 2, 2});
-  IVLOG(2, "Tiled>\n" << *program);
+  IVLOG(2, "Tiled>\n" << *stripe.program);
 
   ApplyCache(am, kernel.get(), "A", {"CACHE"}, {"TX"});
-  IVLOG(2, "Cached\n" << *program);
+  IVLOG(2, "Cached\n" << *stripe.program);
 
-  // ExecuteProgram(*program, &data);
+  // ExecuteProgram(*stripe.program, &data);
 
   // IVLOG(2, "A: " << data["A"]);
   // IVLOG(2, "B: " << data["B"]);

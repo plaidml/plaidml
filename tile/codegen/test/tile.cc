@@ -80,13 +80,13 @@ TEST(Codegen, ApplyTile) {
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}),  //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}));
-  auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto stripe = GenerateStripe(runinfo);
+  auto main = stripe.program->SubBlock(0);
   auto data = MakeMatMulTestData();
 
-  IVLOG(2, "Before>\n" << *program);
+  IVLOG(2, "Before>\n" << *stripe.program);
 
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*stripe.program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -103,10 +103,10 @@ TEST(Codegen, ApplyTile) {
   ApplyTile(kernel.get(), {5, 2, 2});
   kernel->SubBlock(0)->name = "outer";
 
-  IVLOG(2, "After>\n" << *program);
+  IVLOG(2, "After>\n" << *stripe.program);
 
   std::fill(data["C"].begin(), data["C"].end(), 0);
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*stripe.program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -130,8 +130,8 @@ TEST(Codegen, StencilMatchMatMul) {
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}));
-  auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto stripe = GenerateStripe(runinfo);
+  auto main = stripe.program->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, *kernel);
@@ -165,8 +165,8 @@ TEST(Codegen, StencilMatchConv1D) {
                                  SimpleShape(DataType::FLOAT32, {100, 64}),    //
                                  SimpleShape(DataType::FLOAT32, {3, 64, 64}),  //
                                  SimpleShape(DataType::FLOAT32, {100, 64}));
-  auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto stripe = GenerateStripe(runinfo);
+  auto main = stripe.program->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, *kernel);
@@ -227,8 +227,8 @@ TEST(Codegen, StencilMatchConv2D) {
                                  SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),   //
                                  SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),      //
                                  SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}));  //
-  auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto stripe = GenerateStripe(runinfo);
+  auto main = stripe.program->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, "\n" << *kernel);
@@ -266,12 +266,12 @@ TEST(Codegen, StencilPass) {
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}));
-  auto program = GenerateStripe(runinfo);
-  StencilPass(program.get(), options);
-  IVLOG(2, "\n" << *program);
+  auto stripe = GenerateStripe(runinfo);
+  StencilPass(stripe.program.get(), options);
+  IVLOG(2, "\n" << *stripe.program);
 
   auto data = MakeMatMulTestData();
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*stripe.program, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -286,10 +286,10 @@ TEST(Codegen, TilePassBroadcast) {
   runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {32}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
-  auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto stripe = GenerateStripe(runinfo);
+  auto main = stripe.program->SubBlock(0);
 
-  IVLOG(2, "\n" << *program);
+  IVLOG(2, "\n" << *stripe.program);
 }
 
 }  // namespace test

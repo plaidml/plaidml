@@ -1518,23 +1518,23 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
     // At this point, we're saving a Stripe file format.
     BuildInvokerRunInfo(invoker);
     invoker->runinfo->program_name = path.stem().string();
-    auto program = GenerateStripe(*invoker->runinfo);
+    auto stripe = GenerateStripe(*invoker->runinfo);
 
     std::ofstream file{path.string()};
 
     switch (format) {
       case PLAIDML_FILE_FORMAT_STRIPE_HUMAN:
-        file << *program;
+        file << *stripe.program;
         break;
 
       case PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT: {
-        auto pb_program = tile::stripe::IntoProto(*program);
+        auto pb_program = tile::stripe::IntoProto(*stripe.program);
         gpi::OstreamOutputStream out{&file};
         gp::TextFormat::Print(pb_program, &out);
       } break;
 
       case PLAIDML_FILE_FORMAT_STRIPE_BINARY: {
-        auto pb_program = tile::stripe::IntoProto(*program);
+        auto pb_program = tile::stripe::IntoProto(*stripe.program);
         pb_program.SerializeToOstream(&file);
       } break;
 

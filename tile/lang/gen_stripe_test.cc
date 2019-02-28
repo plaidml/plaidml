@@ -43,7 +43,7 @@ class GenStripeTest : public ::testing::Test {
     }
 
     RunInfo r = f.PrepareToRun();
-    return GenerateStripe(r);
+    return GenerateStripe(r).program;
   }
 };
 
