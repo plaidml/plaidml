@@ -23,7 +23,7 @@ class StripeGenerator {
     vars_ = BindProgram(&parsed_, runinfo_.input_shapes, runinfo_.output_shapes);
   }
 
-  std::shared_ptr<Block> Run() {
+  Stripe Run() {
     auto program = std::make_shared<Block>();
     program->set_tag("program");
     program->name = runinfo_.program_name;
@@ -97,7 +97,7 @@ class StripeGenerator {
       }
     }
     IVLOG(2, "Done");
-    return program;
+    return Stripe{program, total_macs_};
   }
 
  private:
@@ -298,6 +298,9 @@ class StripeGenerator {
       if (!combo_op.empty()) {
         AddIntrinsic(kernel.get(), combo_op, output_type, scalar_inputs, {ScalarName(op.output)});
         kernel->set_tag("comb_op_" + combo_op);
+        if (combo_op == Intrinsic::MUL) {
+          total_macs_ += kernel->idxs_product();
+        }
       }
     } else {
       AddIntrinsic(kernel.get(), "assign", output_type, scalar_inputs, {ScalarName(op.output)});
@@ -637,11 +640,12 @@ class StripeGenerator {
   const RunInfo& runinfo_;
   std::set<std::string> externals_;
   bool i8_mode_;
+  uint64_t total_macs_ = 0;
 };
 
 }  // namespace
 
-std::shared_ptr<Block> GenerateStripe(const RunInfo& runinfo, bool i8_mode) {
+Stripe GenerateStripe(const RunInfo& runinfo, bool i8_mode) {  //
   return StripeGenerator(runinfo, i8_mode).Run();
 }
 

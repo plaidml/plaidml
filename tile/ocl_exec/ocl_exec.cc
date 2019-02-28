@@ -62,16 +62,16 @@ int main(int argc, char* argv[]) {
   }
   auto cfg = ParseConfig<codegen::proto::Config>(ReadFile(config));
   auto runinfo = LoadTile(tile_file);
-  auto program = GenerateStripe(runinfo);
+  auto stripe = GenerateStripe(runinfo);
   codegen::OptimizeOptions options = {
       !out_dir.empty(),     // dump_passes
       false,                // dump_code
       out_dir + "/passes",  // dbg_dir
   };
-  codegen::Optimize(program.get(), cfg.passes(), options);
-  std::cout << *program;
+  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
+  std::cout << *stripe.program;
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
-  emit.Visit(*program);
+  emit.Visit(*stripe.program);
   lang::Simplify(emit.kernels_.kernels);
   for (const auto& ki : emit.kernels_.kernels) {
     sem::Print p(*ki.kfunc);

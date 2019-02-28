@@ -312,7 +312,8 @@ TEST(Codegen, JitMatMul) {
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {dim, dim}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {dim, dim}));
 
-  auto main = stripe::Block::Downcast(GenerateStripe(runinfo)->stmts.front());
+  auto stripe = GenerateStripe(runinfo);
+  auto main = stripe.program->SubBlock(0);
 
   IVLOG(2, "Before>\n" << *main);
 
