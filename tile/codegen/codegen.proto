@@ -19,6 +19,7 @@ message Config {
   repeated Bus buses = 6;
   repeated Pass passes = 7;
   repeated Pass lowering = 8;
+  optional uint32 i8_mac_ops_per_cycle = 9;
 }
 
 // An execution unit represents a simulated computing device.
@@ -32,6 +33,7 @@ message ExecutionUnit {
 message MemoryUnit {
   optional uint32 count = 1 [default = 1];
   required uint32 size_KiB = 2;
+  optional bool is_host = 3 [default = false];
 }
 
 // A transfer unit represents a processing element that moves memory between
