@@ -17,7 +17,7 @@ void PruneIndexes(Block* block, const Tags& exclude_tags) {
   std::set<const Index*> to_remove;
   std::map<std::string, int64_t> idx_values;
   for (const auto& idx : block->idxs) {
-    if (!idx.has_tags(exclude_tags) && idx.range == 1 && idx.affine == 0) {
+    if (!idx.has_any_tags(exclude_tags) && idx.range == 1 && idx.affine == 0) {
       to_remove.emplace(&idx);
       idx_values.emplace(idx.name, 0);
     }
@@ -45,6 +45,13 @@ void PruneIndexes(Block* block, const Tags& exclude_tags) {
       }
     }
   }
+  // Recurse
+  for (auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      PruneIndexes(inner.get(), exclude_tags);
+    }
+  }
 }
 
 void PruneRefinements(const AliasMap& alias_map, Block* block) {
@@ -69,6 +76,14 @@ void PruneRefinements(const AliasMap& alias_map, Block* block) {
   }
   for (const auto& name : to_remove) {
     block->refs.erase(block->ref_by_into(name));
+  }
+  // Recurse
+  for (auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      AliasMap inner_map(alias_map, inner.get());
+      PruneRefinements(inner_map, inner.get());
+    }
   }
 }
 

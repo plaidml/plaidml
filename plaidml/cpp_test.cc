@@ -8,6 +8,7 @@
 #include "plaidml/plaidml++.h"
 #include "testing/plaidml_config.h"
 
+using ::testing::Eq;
 using ::testing::Ne;
 
 namespace {
@@ -78,6 +79,56 @@ TEST(PlaidML_CPP_API, Composition) {
   {
     auto _E = E.map(map_for_read);
     std::cout << _E() << std::endl;
+  }
+}
+
+TEST(PlaidML_CPP_API, Matmul) {
+  const std::size_t N = 16;
+
+  vai_clear_status();
+  auto ctx = std::make_shared<vertexai::ctx>();
+
+  auto devices = enumerate_devices(ctx, vertexai::testing::PlaidMLConfig());
+  device dev = devices[0].open();
+  function matmul(R"(
+    function (A[I, K], B[K, J]) -> (O) {
+      O[i, j : I, J] = +(A[i, k] * B[k, j]);
+    }
+  )");
+
+  tensor<float> in = dev.allocate(shape<float>(ctx, {N, N}));
+  {
+    mapping<float> view = in.map(map_for_write);
+    for (size_t i = 0; i < N; i++) {
+      for (size_t j = 0; j < N; j++) {
+        view(i, j) = N * i + j;
+      }
+    }
+  }
+  tensor<float> out = dev.allocate(shape<float>(ctx, {N, N}));
+
+  invoker(ctx, matmul)  //
+      .set_input("A", in)
+      .set_input("B", in)
+      .set_output("O", out)
+      .invoke();
+
+  {
+    mapping<float> view = out.map(map_for_read);
+    for (size_t i = 0; i < N; i++) {
+      for (size_t j = 0; j < N; j++) {
+        float expected = 0.0;
+        for (size_t k = 0; k < N; k++) {
+          expected += (N * i + k) * (N * k + j);
+        }
+        EXPECT_THAT(view(i, j), Eq(expected));
+        if (view(i, j) != expected) {
+          return;
+        }
+        // std::cout << view(i, j) << ":" << expected << " ";
+      }
+      // std::cout << "\n";
+    }
   }
 }
 

@@ -12,7 +12,6 @@
 #include "tile/lang/simplifier.h"
 #include "tile/lib/tests.h"
 #include "tile/ocl_exec/emitsem.h"
-#include "tile/ocl_exec/kern_info.h"
 #include "tile/util/tile_file.h"
 
 using namespace vertexai;                // NOLINT

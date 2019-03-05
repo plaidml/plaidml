@@ -48,7 +48,8 @@ struct Map {
 };
 
 // MakeMap builds a Map from the provided GID space suggestions and logical dimension sizes.
-Map MakeMap(const std::vector<std::size_t>& lid_limits, const std::vector<std::size_t>& logical_dims);
+Map MakeMap(const std::vector<std::size_t>& lid_limits, const std::vector<std::size_t>& logical_dims,
+            bool do_early_exit = true);
 
 // Builds the expression computing a logical index.
 std::shared_ptr<sem::Expression> LogicalIndex(const std::vector<std::shared_ptr<sem::Expression>>& gids,

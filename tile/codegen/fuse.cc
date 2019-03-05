@@ -161,7 +161,9 @@ void FlattenTrivial(stripe::Block* outer) {
         for (auto& idx : deep->idxs) {
           std::vector<std::string> names;
           for (const auto& item : idx.affine.getMap()) {
-            names.push_back(item.first);
+            if (item.first != "") {
+              names.push_back(item.first);
+            }
           }
           for (const auto& name : names) {
             idx.affine.substitute(name, inner->idx_by_name(name)->affine);
@@ -495,6 +497,8 @@ struct FusionPassOptions {
   Tags a_block_reqs;
   Tags b_block_reqs;
   Tags fused_set;
+  Tags exclude;
+  bool perfect;
 };
 
 class TagFusionStrategy : public FusionStrategy {
@@ -503,7 +507,9 @@ class TagFusionStrategy : public FusionStrategy {
   bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
     return parent.has_tags(options_.parent_reqs) &&  //
            a.has_tags(options_.a_block_reqs) &&      //
-           b.has_tags(options_.b_block_reqs);
+           b.has_tags(options_.b_block_reqs) &&      //
+           !a.has_any_tags(options_.exclude) &&      //
+           !b.has_any_tags(options_.exclude);
   }
   void OnFailed() {}
   void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
@@ -530,7 +536,9 @@ void FusionPass(stripe::Block* root, const proto::FusionPass& options) {
       FromProto(options.parent_reqs()),  // parent_reqs
       FromProto(options.a_reqs()),       // a_block_reqs
       FromProto(options.b_reqs()),       // b_block_reqs
-      FromProto(options.fused_set())     // fused_set
+      FromProto(options.fused_set()),    // fused_set
+      FromProto(options.exclude()),      // exclude
+      options.perfect()                  // perfect
   };
   AliasMap base;
   AliasMap root_map(base, root);

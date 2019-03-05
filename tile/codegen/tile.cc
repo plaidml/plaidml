@@ -142,8 +142,6 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     for (auto& aff : ref.access) {
       // Since we're taking a single block and turning it into two (e.g. outer and inner),
       // arrange for only one of the blocks to do the constant pointer bumping.
-      // We pick to make the outer block do the bumping so it only happens once
-      aff.setConstant(0);
       if (interleave) {
         // Multiply each stride in the inner block refinements by the appropriate range
         for (auto& kvp : aff.mutateMap()) {
@@ -160,6 +158,8 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     // Save any renames till the inner block (ie, only one, inner or outer needs to rename)
     ref.into = ref.from;
     for (auto& aff : ref.access) {
+      // We pick to make the inner block do the bumping so it only happens once
+      aff.setConstant(0);
       if (!interleave) {
         // Multiply each stride in the outer block refinements by the appropriate tile size
         for (auto& kvp : aff.mutateMap()) {

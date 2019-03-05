@@ -89,6 +89,14 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
 
 bool AliasInfo::IsBanked() const { return !!base_ref->bank_dim; }
 
+Affine AliasInfo::flat() const {
+  Affine flat;
+  for (size_t i = 0; i < shape.dims.size(); i++) {
+    flat += access[i] * shape.dims[i].stride;
+  }
+  return flat;
+}
+
 AliasMap::AliasMap() : depth_(0) {}
 
 AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.depth_ + 1) {

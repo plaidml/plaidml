@@ -8,11 +8,29 @@ plaidml_proto_library(
 )
 
 plaidml_cc_library(
-    name = "codegen",
+    name = "codegen_base",
     srcs = glob([
         "*.cc",
         "*.h",
-    ]),
+    ], exclude=["jit.h", "jit.cc"]),
+    copts = [
+        "-D__STDC_LIMIT_MACROS",
+        "-D__STDC_CONSTANT_MACROS",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":proto_cc",
+        "//base/util",
+        "//tile/stripe",
+    ],
+)
+
+plaidml_cc_library(
+    name = "codegen",
+    srcs = [
+        "jit.cc",
+        "jit.h",
+    ],
     copts = [
         "-D__STDC_LIMIT_MACROS",
         "-D__STDC_CONSTANT_MACROS",
@@ -20,10 +38,9 @@ plaidml_cc_library(
     tags = ["llvm"],
     visibility = ["//visibility:public"],
     deps = [
-        ":proto_cc",
-        "//base/util",
+        ":codegen_base",
         "//vendor/llvm",
-        "//tile/stripe",
         "@half",
     ],
 )
+

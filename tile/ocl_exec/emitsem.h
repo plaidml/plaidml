@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -24,18 +25,23 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void Visit(const stripe::Intrinsic&);
   void Visit(const stripe::Block&);
 
-  std::string vname(const std::string in, size_t depth);
-  sem::ExprPtr convert_affine(const stripe::Affine& aff, size_t depth);
+  std::string safe_name(const std::string& in) const;
+  std::string ref_name(const std::string& in) const;
+  std::string scalar_name(const std::string& in) const;
+  std::string idx_name(const std::string& in) const;
+  sem::ExprPtr convert_affine(const stripe::Affine& aff) const;
   sem::StmtPtr add_loops(const stripe::Block&);
   void do_gids(const stripe::Block&);
-  void do_lids(const stripe::Block&);
+  sem::StmtPtr do_lids(const stripe::Block&);
 
   size_t threads_;
-  size_t depth_;
+  std::vector<size_t> lid_limits_;
+  size_t depth_ = 0;
   std::shared_ptr<sem::Block> cur_;
   std::vector<AliasMap> scopes_;
   const AliasMap* scope_;
   size_t in_kernel_ = 0;
+  size_t in_threads_ = 0;
   lang::KernelList kernels_;
 };
 

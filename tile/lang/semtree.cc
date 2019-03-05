@@ -99,7 +99,11 @@ CallExpr::CallExpr(ExprPtr f, const std::vector<ExprPtr>& v) : vals(v) {
       {"sin", Function::SIN},   {"sinh", Function::SINH}, {"sqrt", Function::SQRT}, {"tan", Function::TAN},
       {"tanh", Function::TANH},
   };
-  function = functions.at(name);
+  auto it = functions.find(name);
+  if (it == functions.end()) {
+    throw std::runtime_error("Unable to find function mapping for: " + name);
+  }
+  function = it->second;
 }
 
 void CallExpr::Accept(Visitor& v) const { v.Visit(*this); }

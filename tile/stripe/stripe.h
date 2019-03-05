@@ -88,6 +88,14 @@ struct Taggable {
     }
     return true;
   }
+  bool has_any_tags(const Tags& to_find) const {
+    for (const auto& tag : to_find) {
+      if (tags.count(tag) == 1) {
+        return true;
+      }
+    }
+    return false;
+  }
 };
 
 class Codec {
@@ -264,9 +272,10 @@ struct Special : Statement {
   Special* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
 
   std::string name;
-  std::vector<std::string> params;
   std::vector<std::string> inputs;
   std::vector<std::string> outputs;
+  std::map<std::string, int64_t> int_params;
+  std::map<std::string, std::string> str_params;
 };
 
 enum class ConstType {

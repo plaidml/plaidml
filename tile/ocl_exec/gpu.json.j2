@@ -72,7 +72,7 @@
         { "name": "cache_output", "cache": { "reqs": ["contract_outer"], "dirs": [ "Out" ], "mem_loc": { "name": "LOCAL" }, "xfer_loc": { "name": "DMA" } } },
 
         ## We do an inner 'fusion' to move all 'per-output' operations into a single loop
-        { "name": "fuse_inner", "fusion": { "parent_reqs": ["contract_outer"], "fused_set": ["cache"] } },
+        { "name": "fuse_inner", "fusion": { "parent_reqs": ["contract_outer"], "fused_set": ["cache"], "exclude": ["contract_inner"] } },
  
         ## We now move any temporaries even further down (into the per-output loop)
         { "name": "localize_main", "localize": { "reqs": ["main"] } },
@@ -102,11 +102,17 @@
         ## Finally we run the GPU specific thread_inner pass to thread the primary computation loop
         { "name": "thread_inner", "thread_inner" : { "reqs": ["contract_inner"], "threads": {{ NUM_THREADS }} } },
 
+        ## One last attempt to fuse across gpu_threads 
+        ## { "name": "fuse_inner", "fusion": { "a_reqs": ["gpu_thread"], "b_reqs": ["gpu_thread"], "perfect": true } },
+
         ## We now locate the kernels onto the GPU compute device
         { "name": "loc_gpu", "locate_inner_block": { "reqs": ["kernel"], "loc": { "name": "GPU" } } },
 
-        ## We now locate the kernels onto the GPU compute device
-        { "name": "cleanup", "prune_refs": { "reqs": ["program"] } },
+        ## Final cleanup 
+        { "name": "localize_main_2", "localize": { "reqs": ["main"] } },
+        { "name": "scalarize_main_2", "scalarize": { "reqs": ["main"] } },
+        { "name": "cleanup1", "prune_refs": { "reqs": ["main"] } },
+        { "name": "cleanup2", "prune_idxs": { "reqs": ["main"] } },
 
         ## Compute the inter-kernel dependencies
         { "name": "compute_deps", "compute_deps": { } }, 
