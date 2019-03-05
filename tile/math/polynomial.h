@@ -74,6 +74,7 @@ extern template class Polynomial<int64_t>;
 
 // Friendly utility to play nice with std::to_string
 inline std::string to_string(const Polynomial<Rational>& p) { return p.toString(); }
+inline std::string to_string(const Polynomial<int64_t>& p) { return p.toString(); }
 
 // Simple Constraint object, mean poly <= rhs
 struct SimpleConstraint {
