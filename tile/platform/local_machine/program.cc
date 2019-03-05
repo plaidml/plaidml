@@ -11,9 +11,11 @@
 
 #include "base/util/error.h"
 #include "base/util/perf_counter.h"
+#include "base/util/runfiles_db.h"
 #include "tile/hal/util/settings.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/tile_cache.h"
+#include "tile/ocl_exec/stripe_gen.h"
 #include "tile/platform/local_machine/buffer.h"
 #include "tile/platform/local_machine/run_request.h"
 #include "tile/proto/support.h"
@@ -87,9 +89,19 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
   auto inputs = FromProto(program.inputs());
   auto outputs = FromProto(program.outputs());
   auto settings = hal::settings::ToHardwareSettings(devinfo.settings);
-  auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, optimizer, program.id(), tile_trials);
 
-  if (tile_trials == 1) {
+  static bool use_stripe = (getenv("USE_STRIPE") != NULL);
+  lang::KernelList kernel_list;
+  if (use_stripe) {
+    static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
+    std::string translated = runfiles_db["tile/ocl_exec/gpu.json"];
+    std::string out_path = getenv("STRIPE_OUTPUT") ? "" : getenv("STRIPE_OUTPUT");
+    kernel_list = codegen::GenerateProgram(parsed, inputs, outputs, translated, out_path);
+  } else {
+    kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, optimizer, program.id(), tile_trials);
+  }
+
+  if (use_stripe || tile_trials == 1) {
     return kernel_list;
   }
 

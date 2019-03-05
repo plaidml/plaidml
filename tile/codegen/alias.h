@@ -36,11 +36,7 @@ struct AliasInfo {
 
   static AliasType Compare(const AliasInfo& a, const AliasInfo& b);
   bool IsBanked() const;
-};
-
-struct IndexInfo {
-  uint64_t range;
-  std::string cur_name;
+  stripe::Affine flat() const;
 };
 
 class AliasMap {

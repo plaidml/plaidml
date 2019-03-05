@@ -1,7 +1,10 @@
 // Copyright 2018, Intel Corporation
 
 #include "tile/ocl_exec/emitsem.h"
+#include "tile/lang/gen_special.h"
+#include "tile/lang/gen_trivial.h"
 #include "tile/lang/gid.h"
+#include "tile/lang/ops.h"
 #include "tile/lang/sembuilder.h"
 
 using namespace vertexai::tile::sem::builder;  // NOLINT
@@ -10,51 +13,72 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-#define _C(x) _(vname(x, depth_))
-#define _P(x) _(vname(x, depth_ - 1))
-
-SemtreeEmitter::SemtreeEmitter(const AliasMap& am, size_t threads) : threads_(threads) {
+SemtreeEmitter::SemtreeEmitter(const AliasMap& am, size_t threads)
+    : threads_(threads), lid_limits_({1024 * 1024, 1024 * 1024, 1024 * 1024}) {
   scopes_.emplace_back(am);
   scope_ = &scopes_.back();
 }
 
-std::string SemtreeEmitter::vname(const std::string in, size_t depth) {
-  // Replace $ with _, add depth
-  std::string out = "d" + std::to_string(depth) + "_" + in;
+std::string SemtreeEmitter::safe_name(const std::string& in) const {
+  std::string out = in;
   for (size_t i = 0; i < out.size(); i++) {
-    if (out[i] == '$') {
+    if (out[i] == ':') {
       out[i] = '_';
     }
   }
   return out;
 }
 
-sem::ExprPtr SemtreeEmitter::convert_affine(const stripe::Affine& aff, size_t depth) {
+std::string SemtreeEmitter::ref_name(const std::string& in) const { return safe_name(scope_->at(in).base_name); }
+
+std::string SemtreeEmitter::scalar_name(const std::string& in) const {
+  if (in.size() < 1 || in[0] != '$') {
+    throw std::runtime_error("SemtreeEmitter, invalid scalar name");
+  }
+  return "s_" + std::to_string(depth_) + "_" + in.substr(1, in.size() - 1);
+}
+
+std::string SemtreeEmitter::idx_name(const std::string& in) const {
+  return safe_name(scope_->idx_sources().at(in).getMap().begin()->first);
+}
+
+sem::ExprPtr SemtreeEmitter::convert_affine(const stripe::Affine& aff) const {
   sem::ExprPtr r;
   for (const auto& kvp : aff.getMap()) {
     sem::ExprPtr term = kvp.first.empty() ? sem::ExprPtr(_Const(kvp.second))
-                                          : sem::ExprPtr(_Const(kvp.second) * _(vname(kvp.first, depth)));
+                                          : sem::ExprPtr(_Const(kvp.second) * _(safe_name(kvp.first)));
     r = r ? r + term : term;
   }
   return r ? r : _Const(0);
 }
 
 void SemtreeEmitter::Visit(const stripe::Load& stmt) {
-  auto type = scope_->at(stmt.from).shape.type;
-  cur_->push_back(_Declare({sem::Type::VALUE, type}, vname(stmt.into, depth_), _C(stmt.from)[_Const(0)]));
+  auto ai = scope_->at(stmt.from);
+  auto lval = _(ref_name(stmt.from))[convert_affine(ai.flat())];
+  auto type = ai.shape.type;
+  cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
 }
 
 void SemtreeEmitter::Visit(const stripe::Store& stmt) {
-  std::string agg_op = scope_->at(stmt.into).base_ref->agg_op;
-  if (agg_op == "") {
-    cur_->push_back(_C(stmt.into)[_Const(0)] = _C(stmt.from));
-    return;
+  auto ai = scope_->at(stmt.into);
+  auto lval = _(ref_name(stmt.into))[convert_affine(ai.flat())];
+  std::string agg_op = ai.base_ref->agg_op;
+  auto rval = _(scalar_name(stmt.from));
+  sem::ExprPtr agg;
+  if (agg_op == "" || agg_op == "assign") {
+    agg = rval;
+  } else if (agg_op == "add") {
+    agg = lval + rval;
+  } else if (agg_op == "max") {
+    agg = _Cond(lval > rval, lval, rval);
+  } else if (agg_op == "min") {
+    agg = _Cond(lval < rval, lval, rval);
+  } else if (agg_op == "mul") {
+    agg = lval * rval;
+  } else {
+    throw std::runtime_error("Unknown agg-op:" + agg_op);
   }
-  if (agg_op == "add") {
-    cur_->push_back(_C(stmt.into)[_Const(0)] = _C(stmt.into)[_Const(0)] + _C(stmt.from));
-    return;
-  }
-  throw std::runtime_error("Unknown agg-op");
+  cur_->push_back(lval = agg);
 }
 
 void SemtreeEmitter::Visit(const stripe::Constant& stmt) {
@@ -64,47 +88,75 @@ void SemtreeEmitter::Visit(const stripe::Constant& stmt) {
     type.dtype = DataType::INT64;
     expr = std::make_shared<sem::IntConst>(stmt.iconst);
   } else {
-    type.dtype = DataType::FLOAT64;
+    type.dtype = DataType::FLOAT32;
     expr = std::make_shared<sem::FloatConst>(stmt.fconst);
   }
-  cur_->push_back(_Declare(type, vname(stmt.name, depth_), expr));
+  cur_->push_back(_Declare(type, scalar_name(stmt.name), expr));
 }
 
-void SemtreeEmitter::Visit(const stripe::Special&) {
-  // TODO: Something here
+void SemtreeEmitter::Visit(const stripe::Special& spec) {
+  std::string kname = "kernel_" + std::to_string(kernels_.kernels.size() + 1);
+  if (spec.name == "reshape") {
+    kernels_.kernels.push_back(lang::GenCopy(scope_->at(spec.inputs[0]).shape, spec.outputs[0], spec.inputs[0], kname));
+    return;
+  }
+  // Try to call GenSpecial as a fallback by making a fake 'op'
+  lang::Op op;
+  op.tag = lang::Op::FUNCTION;
+  op.f.fn = spec.name;
+  op.inputs = spec.inputs;
+  if (spec.outputs.size() > 1) {
+    op.f.params = spec.outputs;
+  } else {
+    op.output = spec.outputs[0];
+  }
+  lang::HardwareSettings hw;
+  hw.threads = threads_;
+  hw.goal_dimension_sizes = lid_limits_;
+  lang::Bindings vars;
+  for (const auto& s : spec.inputs) {
+    vars.emplace(s, lang::Binding(scope_->at(s).shape));
+  }
+  for (const auto& s : spec.outputs) {
+    vars.emplace(s, lang::Binding(scope_->at(s).shape));
+  }
+  lang::GenSpecial(kernels_, op, vars, kname, hw);
 }
-
-static std::map<std::string, std::string> bin_ops = {
-    {"add", "+"},
-    {"mul", "*"},
-};
-
-static std::map<std::string, std::string> simple_ops = {
-    {"zelu", "relu"},
-};
 
 void SemtreeEmitter::Visit(const stripe::Intrinsic& in) {
-  auto in_cast = [this, &in](size_t i) { return _Cast({sem::Type::VALUE, in.type}, _(vname(in.inputs[i], depth_))); };
+  static auto bin_ops = lang::BinaryOpMap();
+  auto in_val = [this, &in](size_t i) { return _(scalar_name(in.inputs[i])); };
+  auto in_cast = [this, &in](size_t i) { return _Cast({sem::Type::VALUE, in.type}, _(scalar_name(in.inputs[i]))); };
+  sem::ExprPtr opexpr;
   if (in.inputs.size() == 2 && in.outputs.size() == 1 && bin_ops.count(in.name)) {
-    std::string bname = bin_ops.at(in.name);
-    cur_->push_back(_Declare({sem::Type::VALUE, in.type}, vname(in.outputs[0], 0),
-                             std::make_shared<sem::BinaryExpr>(bname, in_cast(0), in_cast(1))));
-    return;
+    opexpr = std::make_shared<sem::BinaryExpr>(bin_ops.at(in.name), in_cast(0), in_cast(1));
+  } else if (in.name == "assign" || in.name == "ident" || in.name == "reshape" || in.name == "as_float" ||
+             in.name == "as_int" || in.name == "as_uint") {
+    opexpr = in_cast(0);
+  } else if (in.name == "cond") {
+    opexpr = _Cond(in_val(0), in_cast(1), in_cast(2));
+  } else if (in.name == "neg") {
+    opexpr = -in_cast(0);
+  } else if (in.name == "bit_not") {
+    opexpr = std::make_shared<sem::UnaryExpr>("~", in_val(0));
+  } else if (in.name == "index") {
+    throw std::runtime_error("index intrinsic goo is hard");
+  } else {
+    std::vector<sem::ExprPtr> inputs;
+    for (const auto& str : in.inputs) {
+      inputs.push_back(_(scalar_name(str)));
+    }
+    opexpr = std::make_shared<sem::CallExpr>(_(in.name), inputs);
   }
-  if (in.inputs.size() == 1 && in.outputs.size() == 1 && simple_ops.count(in.name)) {
-    std::string sname = simple_ops.at(in.name);
-    return;
-  }
-  throw std::runtime_error("Unknown intrinsic: " + in.name);
+  IVLOG(1, "Pushing back on " << in.outputs[0]);
+  cur_->push_back(_Declare({sem::Type::VALUE, in.type}, scalar_name(in.outputs[0]), opexpr));
 }
 
 sem::StmtPtr SemtreeEmitter::add_loops(const stripe::Block& block) {
   sem::StmtPtr top = cur_;
   for (const auto& idx : block.idxs) {
-    if (idx.range != 1) {
-      top = _For(vname(idx.name, depth_), idx.range, 1, top);
-    } else if (idx.affine != stripe::Affine()) {
-      cur_->push_front(_Declare({sem::Type::INDEX}, vname(idx.name, depth_), convert_affine(idx.affine, depth_ - 1)));
+    if (idx.affine == stripe::Affine()) {
+      top = _For(idx_name(idx.name), idx.range, 1, top);
     }
   }
   return top;
@@ -115,55 +167,69 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   for (const auto& idx : block.idxs) {
     logical.push_back(idx.range);
   }
-  size_t max_dim = 1024 * 1024;
-  auto map = lang::gid::MakeMap({max_dim, max_dim, max_dim}, logical);
+  auto map = lang::gid::MakeMap(lid_limits_, logical, false);
   std::vector<std::shared_ptr<sem::Expression>> gids;
   for (size_t i = 0; i < 3; i++) {
     gids.push_back(_Index(sem::IndexExpr::GROUP, i));
   }
   for (size_t i = 0; i < block.idxs.size(); i++) {
     const auto& idx = block.idxs[i];
-    cur_->push_front(_Declare({sem::Type::INDEX}, vname(idx.name, depth_), LogicalIndex(gids, map.dims[i])));
+    cur_->push_front(_Declare({sem::Type::INDEX}, idx_name(idx.name), LogicalIndex(gids, map.dims[i])));
   }
   kernels_.kernels.emplace_back();
   lang::KernelInfo& ki = kernels_.kernels.back();
   ki.kname = "kernel_" + std::to_string(kernels_.kernels.size());
-  ki.comments = block.name + "\n" + block.comments;
+  ki.comments = "//" + block.name + "\n//" + block.comments + "\n";
   std::vector<sem::Function::param_t> params;
   for (const auto& ref : block.ref_outs()) {
     sem::Type type = {sem::Type::POINTER_MUT, ref->interior_shape.type, 1, 0, sem::Type::GLOBAL};
-    params.push_back(std::make_pair(type, vname(ref->from, depth_ - 1)));
+    params.push_back(std::make_pair(type, ref_name(ref->into)));
     ki.outputs.push_back(ref->from);
   }
+  std::set<std::string> dups;
   for (const auto& ref : block.ref_ins()) {
+    if (dups.count(ref->from)) {
+      continue;
+    }
+    dups.insert(ref->from);
     sem::Type type = {sem::Type::POINTER_CONST, ref->interior_shape.type, 1, 0, sem::Type::GLOBAL};
-    params.push_back(std::make_pair(type, vname(ref->from, depth_ - 1)));
+    params.push_back(std::make_pair(type, ref_name(ref->into)));
     ki.inputs.push_back(ref->from);
   }
   ki.kfunc = std::make_shared<sem::Function>(ki.kname, sem::Type(), params, cur_);
-  ki.gwork = {map.gid_sizes[0] * threads_, map.gid_sizes[1], map.gid_sizes[2]};
-  ki.lwork = {threads_, 1, 1};
-  IVLOG(1, "gwork = " << ki.gwork);
-  IVLOG(1, "lwork = " << ki.lwork);
+  ki.gwork = {{map.gid_sizes[0] * threads_, map.gid_sizes[1], map.gid_sizes[2]}};
+  ki.lwork = {{threads_, 1, 1}};
 }
 
-void SemtreeEmitter::do_lids(const stripe::Block& block) {
+sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
+  sem::StmtPtr top = cur_;
   size_t prev_threads = 1;
+  sem::ExprPtr tid = _Index(sem::IndexExpr::LOCAL, 0);
   for (size_t i = block.idxs.size(); i > 0; i--) {
     const auto& idx = block.idxs[i - 1];
-    auto expr = _Index(sem::IndexExpr::LOCAL, 0) / prev_threads;
+    if (idx.affine != stripe::Affine()) {
+      continue;
+    }
+    auto expr = tid / prev_threads;
     if (i != 1) {
       expr = expr % idx.range;
     }
-    cur_->push_front(_Declare({sem::Type::INDEX}, vname(idx.name, depth_), expr));
+    cur_->push_front(_Declare({sem::Type::INDEX}, idx_name(idx.name), expr));
     prev_threads *= idx.range;
   }
+  if (block.idxs_product() < threads_) {
+    top = sem::builder::_If(tid < sem::ExprPtr(_Const(block.idxs_product())), top);
+  }
+  return top;
 }
 
 void SemtreeEmitter::Visit(const stripe::Block& block) {
   std::shared_ptr<sem::Block> outer = cur_;
-  if (!in_kernel_ && block.has_tag("kernel")) {
-    in_kernel_ = depth_;
+  if (block.has_tag("kernel")) {
+    in_kernel_++;
+  }
+  if (block.has_tag("gpu_thread")) {
+    in_threads_++;
   }
   scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
   scope_ = &scopes_.back();
@@ -173,35 +239,44 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   for (const auto& stmt : block.stmts) {
     stmt->Accept(this);
   }
-  depth_--;
-  scopes_.pop_back();
-  scope_ = &scopes_.back();
-  // Now, add the refinement bumps to cur_
+  // Now, add any new locals
   for (const auto& ref : block.refs) {
     if (ref.dir == stripe::RefDir::None) {
       sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, ref.interior_shape.elem_size(),
-                         sem::Type::LOCAL};
-      cur_->push_front(_Declare(ptype, vname(ref.into, depth_), sem::ExprPtr()));
-    } else {
-      sem::Type ptype = {ref.dir == stripe::RefDir::In ? sem::Type::POINTER_CONST : sem::Type::POINTER_MUT,
-                         ref.interior_shape.type};
-      cur_->push_front(_Declare(ptype, vname(ref.into, depth_),
-                                _(vname(ref.from, depth_ - 1)) + convert_affine(ref.FlatAccess(), depth_)));
+                         (in_threads_ ? sem::Type::NORMAL : sem::Type::LOCAL)};
+      cur_->push_front(_Declare(ptype, ref_name(ref.into), sem::ExprPtr()));
     }
+  }
+  if (block.constraints.size()) {
+    sem::ExprPtr bexpr = _Const(1);
+    for (const auto& con : block.constraints) {
+      auto gcon = con.sym_eval(scope_->idx_sources());
+      bexpr = bexpr & (convert_affine(gcon) >= sem::ExprPtr(_Const(0)));
+    }
+    cur_ = _Block({sem::builder::_If(bexpr, cur_)});
   }
   // Add block loops
   sem::StmtPtr top;
-  if (in_kernel_ && in_kernel_ == depth_) {
+  if (block.has_tag("kernel") && in_kernel_ == 1) {
     do_gids(block);
-    in_kernel_ = false;
   } else if (block.has_tag("main") || block.has_tag("program")) {
     // No-op
-  } else if (block.has_tag("gpu_thread")) {
-    do_lids(block);
-    outer->push_back(cur_);
+  } else if (block.has_tag("gpu_thread") && in_threads_ == 1) {
+    outer->push_back(do_lids(block));
+    outer->push_back(_Barrier());
   } else {
     outer->push_back(add_loops(block));
   }
+  // Unwind depth
+  if (block.has_tag("kernel")) {
+    in_kernel_--;
+  }
+  if (block.has_tag("gpu_thread")) {
+    in_threads_--;
+  }
+  depth_--;
+  scopes_.pop_back();
+  scope_ = &scopes_.back();
   cur_ = outer;
 }
 

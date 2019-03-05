@@ -167,6 +167,7 @@ def compareForwardClose(epsilon=DEFAULT_TOL,
 def opTest(in_data,
            tol=DEFAULT_TOL,
            atol=DEFAULT_ATOL,
+           do_grads=True,
            skip_theano=True,
            skip_tensorflow=False,
            verbose=False):
@@ -184,26 +185,31 @@ def opTest(in_data,
             funcs = test_func(self, b, *(xv + ps + list(run_args)))
             tf_session.run(tensorflow.global_variables_initializer())
             for gf, f in zip(grad_funcs, funcs):
-                df = b.gradients(b.mean(gf), x)
-                gfn = b.function(x, df, updates=[])
                 fr = f.eval()
-                gr = gfn([t for t in data if hasattr(t, 'shape')])
-                try:
-                    values = gr[0].values
-                    dense_shape = gr[0].dense_shape
-                    indices = gr[0].indices
-                    result = np.zeros(dense_shape)
-                    for i in indices:
-                        result[i] += values[i]
-                    gr[0] = result
-                except AttributeError:
-                    # This wasn't an IndexedSlices object, do nothing
-                    pass
+                if do_grads:
+                    df = b.gradients(b.mean(gf), x)
+                    gfn = b.function(x, df, updates=[])
+                    gr = gfn([t for t in data if hasattr(t, 'shape')])
+                    try:
+                        values = gr[0].values
+                        dense_shape = gr[0].dense_shape
+                        indices = gr[0].indices
+                        result = np.zeros(dense_shape)
+                        for i in indices:
+                            result[i] += values[i]
+                        gr[0] = result
+                    except AttributeError:
+                        # This wasn't an IndexedSlices object, do nothing
+                        pass
                 if args.verbose or verbose:
                     print('data: {}'.format(data))
                     print('fr: {}'.format(fr))
-                    print('gr: {}'.format(gr))
-                results.append((fr, gr))
+                    if do_grads:
+                        print('gr: {}'.format(gr))
+                if do_grads:
+                    results.append((fr, gr))
+                else:
+                    results.append((fr,))
         tf_session.close()
         return results
 
@@ -244,14 +250,15 @@ def opTest(in_data,
                             atol=atol,
                             err_msg='ERR: datum={}, test={}, x=plaidml, y=tensorflow'.format(
                                 didx, idx))
-                        for x in range(0, len(pmlr[1])):
-                            npt.assert_allclose(
-                                pmlr[1][x],
-                                tfr[1][x],
-                                rtol=tol,
-                                atol=atol,
-                                err_msg='ERR: datum={}, test={}, grad, x=plaidml, y=tensorflow'.
-                                format(didx, idx))
+                        if do_grads:
+                            for x in range(0, len(pmlr[1])):
+                                npt.assert_allclose(
+                                    pmlr[1][x],
+                                    tfr[1][x],
+                                    rtol=tol,
+                                    atol=atol,
+                                    err_msg='ERR: datum={}, test={}, grad, x=plaidml, y=tensorflow'
+                                    .format(didx, idx))
 
         return output
 
@@ -353,15 +360,14 @@ class TestBackendOps(unittest.TestCase):
         return [b.dot(x, y)]
 
     # TODO(T1046): Once Keras is updated beyond 2.0.8, re-enable TF on batch_dot tests
-    @opTest(
-        [
-            [m(10, 20), m(10, 30, 20), (1, 2)],
-            [m(2, 3, 4, 5), m(2, 3, 5, 2), None],
-            [m(2, 3, 4, 5), m(2, 16, 5, 3), (1, 3)],
-            [m(2, 5), m(2, 5), 1],
-            [m(2, 4, 5), m(2, 5, 2), None],
-        ],
-        skip_tensorflow=True)
+    @opTest([
+        [m(10, 20), m(10, 30, 20), (1, 2)],
+        [m(2, 3, 4, 5), m(2, 3, 5, 2), None],
+        [m(2, 3, 4, 5), m(2, 16, 5, 3), (1, 3)],
+        [m(2, 5), m(2, 5), 1],
+        [m(2, 4, 5), m(2, 5, 2), None],
+    ],
+            skip_tensorflow=True)
     def testBatchDot(self, b, x, y, ax):
         if ax is None:
             return [b.batch_dot(x, y)]
@@ -476,12 +482,11 @@ class TestBackendOps(unittest.TestCase):
             c * x,
         ]
 
-    @opTest(
-        [
-            [m(3, 3), m(3, 3)],
-            [m(2, 1, 1), m(1)],
-            [m(2), m(1)],
-        ], skip_theano=True)
+    @opTest([
+        [m(3, 3), m(3, 3)],
+        [m(2, 1, 1), m(1)],
+        [m(2), m(1)],
+    ], skip_theano=True)
     def testDivElements(self, b, x, y):
         return [x / y]
 
@@ -660,10 +665,9 @@ class TestBackendOps(unittest.TestCase):
         return [b.categorical_crossentropy(x, y)]
 
     #TODO: Merge with general cat xentropy if we can resolve the TF problems
-    @opTest(
-        [[np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]]), (m(3, 3) + 3) / 15.0]],
-        atol=1e-7,
-        skip_tensorflow=True)
+    @opTest([[np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]]), (m(3, 3) + 3) / 15.0]],
+            atol=1e-7,
+            skip_tensorflow=True)
     def testCategoricalCrossentropyLogits(self, b, x, y):
         return [b.categorical_crossentropy(x, y, from_logits=True)]
 
@@ -762,10 +766,9 @@ class TestBackendOps(unittest.TestCase):
         diffs = X - mean
         return b.mean(b.square(diffs))
 
-    @opTest(
-        [
-            _conv_inp(IN=1, IC=16, OC=16, IS=[6, 5], KS=[3, 3]),
-        ], 1e-04, skip_theano=True)
+    @opTest([
+        _conv_inp(IN=1, IC=16, OC=16, IS=[6, 5], KS=[3, 3]),
+    ], 1e-04, skip_theano=True)
     def testWinograd(self, b, im, km, df):
         return [
             b.conv2d(im, km, padding='same') if b == pkb else b.conv2d(im, km, padding='same'),
@@ -812,15 +815,14 @@ class TestBackendOps(unittest.TestCase):
             b.conv1d(im, km, padding='causal', dilation_rate=2, data_format=df),
         ]
 
-    @opTest(
-        [
-            _conv_inp(IN=2, IC=2, OC=4, IS=[4, 7], KS=[3, 3]),
-            _conv_inp(IN=3, IC=3, OC=1, IS=[9, 8], KS=[2, 2], data_format='channels_last'),
-            _conv_inp(IN=1, IC=1, OC=3, IS=[5, 4], KS=[3, 3], data_format='channels_first'),
-            _conv_inp(IN=2, IC=4, OC=2, IS=[5, 5], KS=[2, 2], data_format='channels_first'),
-        ],
-        1e-04,
-        skip_theano=True)
+    @opTest([
+        _conv_inp(IN=2, IC=2, OC=4, IS=[4, 7], KS=[3, 3]),
+        _conv_inp(IN=3, IC=3, OC=1, IS=[9, 8], KS=[2, 2], data_format='channels_last'),
+        _conv_inp(IN=1, IC=1, OC=3, IS=[5, 4], KS=[3, 3], data_format='channels_first'),
+        _conv_inp(IN=2, IC=4, OC=2, IS=[5, 5], KS=[2, 2], data_format='channels_first'),
+    ],
+            1e-04,
+            skip_theano=True)
     def testConv2d(self, b, im, km, df):
         return [
             b.conv2d(im, km, padding='same', data_format=df),
@@ -832,25 +834,25 @@ class TestBackendOps(unittest.TestCase):
 
     @opTest(
         [[m(1, 1, 3, 1),
-          m(1, 4, 1, 1), (1, 1, 9, 1), (1, 4), 'same', 'channels_last', (1, 1)
-         ], [m(1, 3, 3, 1),
-             m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'same', 'channels_last', (1, 1)],
+          m(1, 4, 1, 1), (1, 1, 9, 1), (1, 4), 'same', 'channels_last', (1, 1)],
+         [m(1, 3, 3, 1),
+          m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'same', 'channels_last', (1, 1)],
          [m(1, 2, 2, 1),
           m(3, 3, 1, 1), (1, 5, 5, 1), (2, 2), 'valid', 'channels_last', (1, 1)],
          [m(1, 5, 3, 7),
           m(5, 5, 4, 7), (1, 9, 10, 4), (1, 2), 'valid', 'channels_last', (1, 1)],
          [m(1, 5, 3, 7),
-          m(5, 5, 4, 7), (1, 9, 9, 4), (1, 2), 'valid', 'channels_last', (1, 1)], [
-              m(4, 8, 5, 5),
-              m(3, 3, 2, 8), (4, 2, 9, 9), (2, 2), 'same', 'channels_first', (1, 1)
-          ], [m(4, 3, 5, 8),
-              m(3, 3, 2, 8), (4, 9, 9, 2), (3, 2), 'same', 'channels_last', (1, 1)],
+          m(5, 5, 4, 7), (1, 9, 9, 4), (1, 2), 'valid', 'channels_last', (1, 1)],
+         [m(4, 8, 5, 5),
+          m(3, 3, 2, 8), (4, 2, 9, 9), (2, 2), 'same', 'channels_first', (1, 1)],
+         [m(4, 3, 5, 8),
+          m(3, 3, 2, 8), (4, 9, 9, 2), (3, 2), 'same', 'channels_last', (1, 1)],
          [m(1, 1, 6, 1),
-          m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'same', 'channels_first', (1, 1)], [
-              m(1, 1, 4, 1),
-              m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'valid', 'channels_first', (1, 1)
-          ], [m(1, 8, 9, 3),
-              m(3, 2, 3, 3), (1, 8, 9, 3), (1, 1), 'same', 'channels_last', (2, 2)]],
+          m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'same', 'channels_first', (1, 1)],
+         [m(1, 1, 4, 1),
+          m(7, 1, 1, 1), (1, 1, 22, 1), (4, 1), 'valid', 'channels_first', (1, 1)],
+         [m(1, 8, 9, 3),
+          m(3, 2, 3, 3), (1, 8, 9, 3), (1, 1), 'same', 'channels_last', (2, 2)]],
         verbose=False,
         skip_theano=True,
     )
@@ -904,10 +906,9 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @unittest.skip("TODO(T1046): This case is bugged in Keras 2.0.8 TF")
-    @opTest(
-        [_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
-        1e-04,
-        skip_theano=True)
+    @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
+            1e-04,
+            skip_theano=True)
     def testConv2dSpecial(self, b, im, km, df):
         '''A simplified example highlighting a bug in Keras 2.0.8 TF
 
@@ -915,14 +916,13 @@ class TestBackendOps(unittest.TestCase):
         is fixed.'''
         return [b.conv2d(im, km, padding='same', strides=(2, 3), data_format=df)]
 
-    @opTest(
-        [
-            _conv_inp(IN=3, IC=1, OC=3, IS=[4, 7, 5], KS=[3, 3, 3]),
-            _conv_inp(IN=3, IC=4, OC=2, IS=[3, 6, 3], KS=[2, 1, 2], data_format='channels_last'),
-            _conv_inp(IN=2, IC=3, OC=1, IS=[5, 5, 3], KS=[3, 2, 2], data_format='channels_first'),
-        ],
-        1e-04,
-        skip_theano=True)
+    @opTest([
+        _conv_inp(IN=3, IC=1, OC=3, IS=[4, 7, 5], KS=[3, 3, 3]),
+        _conv_inp(IN=3, IC=4, OC=2, IS=[3, 6, 3], KS=[2, 1, 2], data_format='channels_last'),
+        _conv_inp(IN=2, IC=3, OC=1, IS=[5, 5, 3], KS=[3, 2, 2], data_format='channels_first'),
+    ],
+            1e-04,
+            skip_theano=True)
     def testConv3d(self, b, im, km, df):
         return [
             b.conv3d(im, km, padding='same', data_format=df),
@@ -957,13 +957,13 @@ class TestBackendOps(unittest.TestCase):
             b.pool2d(x, (3, 4), strides=(2, 3), pool_mode='avg', padding='valid'),
         ]
 
-    @opTest(
-        [
-            [m(1, 4, 4, 1)],
-            [m(1, 9, 9, 1)],
-            [m(1, 8, 10, 1)],
-            [m(2, 9, 11, 3)],
-        ], skip_theano=True)
+    @opTest([
+        [m(1, 4, 4, 1)],
+        [m(1, 9, 9, 1)],
+        [m(1, 8, 10, 1)],
+        [m(2, 9, 11, 3)],
+    ],
+            skip_theano=True)
     def testMaxPool(self, b, x):
         return [
             b.pool2d(x, (2, 2), strides=(2, 2), pool_mode='max'),
@@ -973,11 +973,10 @@ class TestBackendOps(unittest.TestCase):
             b.pool2d(x, (3, 3), strides=(2, 2), pool_mode='max', padding='same')
         ]
 
-    @opTest(
-        [
-            [m(3, 3, 4, 5, 2)],
-            [m(1, 5, 4, 7, 1)],
-        ], skip_theano=True)
+    @opTest([
+        [m(3, 3, 4, 5, 2)],
+        [m(1, 5, 4, 7, 1)],
+    ], skip_theano=True)
     def testPool3D(self, b, x):
         return [
             b.pool3d(x, (1, 2, 2), strides=(2, 1, 2), pool_mode='max', padding='valid'),
@@ -1072,20 +1071,18 @@ class TestBackendOps(unittest.TestCase):
         f([])
         return moving_var
 
-    @opTest(
-        [[
-            m(2, 3, 5),
-            m(2, 3, 1) + 3,
-            m(2, 3, 1) + 4,
-        ]], atol=1e-7)
+    @opTest([[
+        m(2, 3, 5),
+        m(2, 3, 1) + 3,
+        m(2, 3, 1) + 4,
+    ]], atol=1e-7)
     def testNormalizeBatchInTrainingSimple(self, b, x, mov_avg, mov_var):
         return [(b.normalize_batch_in_training(x, mov_avg, mov_var, [2]))[0]]
 
-    @opTest(
-        [[n(2, 3), np.array([3., 4., .7]),
-          np.array([1.44, .99, .98])]],
-        skip_theano=True,
-        skip_tensorflow=True)
+    @opTest([[n(2, 3), np.array([3., 4., .7]),
+              np.array([1.44, .99, .98])]],
+            skip_theano=True,
+            skip_tensorflow=True)
     def testNormalizeBatchInTraining(self, b, x, beta, gamma):
         return [b.normalize_batch_in_training(x, gamma, beta, [1])[0]]
 
@@ -1146,23 +1143,21 @@ class TestBackendOps(unittest.TestCase):
             b.variable(n(3, 4, 5)), b.variable(np.array([15])), b.variable(np.array([100])),
             b.variable(np.array([3])), None)
 
-    @opTest(
-        [
-            [m(4, 6)],
-            [m(4, 3, 5)],
-            [m(3, 7), None, True],
-            [m(2, 5, 4, 7, 3), 1],
-        ], atol=1e-7)
+    @opTest([
+        [m(4, 6)],
+        [m(4, 3, 5)],
+        [m(3, 7), None, True],
+        [m(2, 5, 4, 7, 3), 1],
+    ], atol=1e-7)
     def testVarSimple(self, b, x, ax=None, kd=False):
         return [b.var(x, axis=ax, keepdims=kd)]
 
-    @opTest(
-        [
-            [m(3, 4)],
-            [m(1, 5, 2)],
-            [m(7, 2), None, True],
-            [m(2, 1, 5, 7, 3), 4],
-        ], atol=1e-7)
+    @opTest([
+        [m(3, 4)],
+        [m(1, 5, 2)],
+        [m(7, 2), None, True],
+        [m(2, 1, 5, 7, 3), 4],
+    ], atol=1e-7)
     def testStd(self, b, x, ax=None, kd=False):
         return [b.std(x, axis=ax, keepdims=kd)]
 
@@ -1183,11 +1178,13 @@ class TestBackendOps(unittest.TestCase):
     # returning a pre-sparse-to-dense-conversion version?) with the gradient
     # and it doesn't match Theano & us.
     @opTest(
-        [[np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]])], [
-            np.array([[[3., 2., 4.], [1., 0., -1.], [1.4, 2.5, 3.4], [2.4, 3.6, 4.4]], [
-                [-3., 1.1, 4.1], [3.2, -0.4, -4.], [-1.5, 2.2, 3.99], [2.114, -3.2, -4.]
-            ], [[4.1, -1.2, .1234], [4.2, .943, 9.21], [43.4, 47.1, 22.], [0.0, -3434., -2.4]]])
-        ]],
+        [[np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]])],
+         [
+             np.array([[[3., 2., 4.], [1., 0., -1.], [1.4, 2.5, 3.4], [2.4, 3.6, 4.4]],
+                       [[-3., 1.1, 4.1], [3.2, -0.4, -4.], [-1.5, 2.2, 3.99], [2.114, -3.2, -4.]],
+                       [[4.1, -1.2, .1234], [4.2, .943, 9.21], [43.4, 47.1, 22.],
+                        [0.0, -3434., -2.4]]])
+         ]],
         skip_theano=False,
         skip_tensorflow=True)
     def testGather(self, b, v):

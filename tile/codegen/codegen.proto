@@ -224,6 +224,10 @@ message FusionPass {
   repeated string b_reqs = 3;
   // Set additional tags on the resulting fused block
   repeated string fused_set = 4;
+  // Exclude some set of blocks based on tags
+  repeated string exclude = 5;
+  // Only fuse if all block indexes are exactly 1 to 1
+  optional bool perfect = 6 [default = false];
 }
 
 // Edit the location of blocks and/or refinement to match 'loc'

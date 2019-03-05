@@ -9,7 +9,7 @@ import subprocess
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', help='Output root directory', default='out')
-    parser.add_argument('--tile', help='Tile file to load', default='$layer_test4_float')
+    parser.add_argument('--tile', help='Tile file to load', default='$matmul')
     args = parser.parse_args()
 
     src_path = pathlib.Path('../com_intel_plaidml/tile/ocl_exec')
@@ -35,7 +35,7 @@ def main():
     with json_path.open('w') as fp:
         tmpl.stream(config).dump(fp)
 
-    subprocess.run([src_path / 'ocl_exec', str(json_path), args.tile, str(root_path)])
+    subprocess.run([src_path / 'ocl_exec_bin', str(json_path), args.tile, str(root_path)])
 
 
 if __name__ == '__main__':

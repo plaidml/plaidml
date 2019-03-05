@@ -625,14 +625,17 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
       case proto::Statement::kSpecial: {
         auto stmt = std::make_shared<Special>();
         stmt->name = pb_stmt.special().name();
-        for (const auto& item : pb_stmt.special().params()) {
-          stmt->params.push_back(item);
-        }
         for (const auto& item : pb_stmt.special().inputs()) {
           stmt->inputs.push_back(item);
         }
         for (const auto& item : pb_stmt.special().outputs()) {
           stmt->outputs.push_back(item);
+        }
+        for (const auto& item : pb_stmt.special().int_params()) {
+          stmt->int_params.emplace(item);
+        }
+        for (const auto& item : pb_stmt.special().str_params()) {
+          stmt->str_params.emplace(item);
         }
         stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
       } break;
@@ -777,14 +780,17 @@ proto::Block IntoProto(const Block& block) {
         auto special = Special::Downcast(stmt);
         auto pb_special = pb_stmt->mutable_special();
         pb_special->set_name(special->name);
-        for (const auto& param : special->params) {
-          pb_special->add_params(param);
-        }
         for (const auto& input : special->inputs) {
           pb_special->add_inputs(input);
         }
         for (const auto& output : special->outputs) {
           pb_special->add_outputs(output);
+        }
+        for (const auto& param : special->int_params) {
+          (*pb_special->mutable_int_params())[param.first] = param.second;
+        }
+        for (const auto& param : special->str_params) {
+          (*pb_special->mutable_str_params())[param.first] = param.second;
         }
       } break;
       case StmtKind::Intrinsic: {

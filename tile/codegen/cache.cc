@@ -123,7 +123,7 @@ void ApplyCache(const AliasMap& map,          //
       var_name,      // into
       {},            // access
       cached_ts,     // shape
-      "",            // agg_op
+      it->agg_op,    // agg_op
       mem_loc,       // location
   });
   block->refs.back().access.resize(cached_ts.dims.size());
