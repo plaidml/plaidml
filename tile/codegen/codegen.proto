@@ -164,6 +164,18 @@ message SchedulePass {
   // The location to assign to the blocks used to do transfer between local
   // memory and exterior memory, i.e. the DMA device used to load / spill.
   required stripe.proto.Location xfer_loc = 5;
+  // The memory assignment algorithm to use.
+  oneof mem_assignment_algorithm {
+    ColorInputUnique color_input_unique = 6;
+  }
+
+  // ColorInputUnique requires that each input to a sub-statement be
+  // assigned a unique color, where a color indicates a particular
+  // memory.
+  message ColorInputUnique {
+    // The memory units to use for the unique color memory assignment algorithm.
+    repeated uint32 units = 1;
+  }
 }
 
 // Provide a specific address for all the allocation refinement such that no

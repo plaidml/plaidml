@@ -4,9 +4,12 @@
 
 #include <forward_list>
 
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/undirected_graph.hpp>
 #include <boost/optional.hpp>
 
 #include "base/util/error.h"
+#include "base/util/lookup.h"
 #include "base/util/throw.h"
 #include "tile/codegen/localize.h"
 #include "tile/math/util.h"
@@ -44,6 +47,9 @@ namespace codegen {
 namespace {
 
 constexpr std::size_t kDefaultAlignment = 4;
+
+using ColorGraph = boost::undirected_graph<>;
+using ColorVertex = boost::graph_traits<ColorGraph>::vertex_descriptor;
 
 struct CacheEntry;
 
@@ -153,6 +159,9 @@ struct RefInfo {
 
   // The local name of this ref.
   std::string name;
+
+  // The color interference vertex of this ref.
+  ColorVertex color_vertex;
 };
 
 using RefInfoKey = std::string;
@@ -243,6 +252,7 @@ struct Placement {
   std::size_t size;
 
   // Where the entry should go.
+  stripe::Affine unit;
   MemRange range;
 
   // The entry for this Placement.  N.B. This may be nullptr, in which
@@ -273,7 +283,8 @@ struct PlacementKey {
 };
 
 bool operator<(const PlacementKey& lhs, const PlacementKey& rhs) {
-  return std::tie(lhs.ri, lhs.cache_shape, lhs.access) < std::tie(rhs.ri, rhs.cache_shape, rhs.access);
+  return std::tie(lhs.ri->ref.into, lhs.cache_shape, lhs.access) <
+         std::tie(rhs.ri->ref.into, rhs.cache_shape, rhs.access);
 }
 
 // Represents a placement plan for a particular Statement.
@@ -286,6 +297,7 @@ struct CacheEntry {
   explicit CacheEntry(std::pair<PlacementKey, Placement> pkey_placement)
       : source{pkey_placement.first.ri},
         name{source->name + "^" + std::to_string(source->next_cache_entry++)},
+        unit{pkey_placement.second.unit},
         range{pkey_placement.second.range},
         shape{pkey_placement.first.cache_shape},
         is_internal{pkey_placement.second.is_internal},
@@ -301,6 +313,7 @@ struct CacheEntry {
   std::string name;
 
   // The CacheEntry's memory range when it's being used.
+  stripe::Affine unit;
   MemRange range;
 
   // The data shape for this CacheEntry.  For internal cache entries,
@@ -431,9 +444,7 @@ class StatementBinder final {
       RefInfo* ri = update.second;
       ref->from = ri->cache_entry->name;
       ref->location = *mem_loc_;
-      if (ri->ref.cache_unit) {
-        ref->location.unit = *ri->ref.cache_unit;
-      }
+      ref->location.unit = ri->cache_entry->unit;
       if (ri->cache_entry->is_internal) {
         ref->interior_shape = ri->cache_entry->shape;
         for (auto& access : ref->access) {
@@ -543,31 +554,31 @@ class Scheduler {
   // Pre-initializes useful datastructures for placing:
   // * A prototype plan containing placements for every cache entry
   //   that's already been established by a runtime-future Statement,
-  // * A map from memory localities (specified via Affines) of vectors
-  //   of RefInfos that need to be placed for the current Statement.
-  std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<IO>>> GatherPlacementState(const std::vector<IO>& ios);
+  // * A vector of IOs that need to be placed for the current Statement.
+  std::tuple<PlacementPlan, std::vector<IO>> GatherPlacementState(const std::vector<IO>& ios);
 
   // Makes a placement plan, trying several strategies.
   boost::optional<PlacementPlan> TryMakePlan(stripe::Block* current_block, const std::vector<IO>& ios);
 
+  // Determines the memory units on which a tensor is allowed to exist.
+  std::vector<stripe::Affine> GetValidUnits(PlacementPlan* plan, PlacementPlan::iterator it);
+
   // Attempts to augment a placement plan using the supplied ranges.
   bool TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<PlacementKey, Placement>>& placements,
-                        std::list<MemRange> ranges);
+                        std::map<stripe::Affine, std::list<MemRange>> ranges);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, and does not collide
   // with any previously-scheduled CacheEntry unless that CacheEntry
   // has a writer (i.e. does not require swap-in).
-  boost::optional<PlacementPlan> TryMakePlanWithNoSwaps(
-      const PlacementPlan& existing_entry_plan,
-      const std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>>& todos);
+  boost::optional<PlacementPlan> TryMakePlanWithNoSwaps(const PlacementPlan& existing_entry_plan,
+                                                        const std::vector<std::pair<PlacementKey, Placement>>& todos);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, but allows collisions
   // with previously-scheduled CacheEntries (producing swap-ins).
-  boost::optional<PlacementPlan> TryMakePlanWithSwaps(
-      const PlacementPlan& existing_entry_plan,
-      const std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>>& todos);
+  boost::optional<PlacementPlan> TryMakePlanWithSwaps(const PlacementPlan& existing_entry_plan,
+                                                      const std::vector<std::pair<PlacementKey, Placement>>& todos);
 
   // Makes an worst-possible-case placement plan, by scheduling
   // without regard to existing entries.  This is guaranteed to work
@@ -623,6 +634,7 @@ class Scheduler {
   void RebuildTransitiveDeps();
 
   stripe::Block* block_;
+  proto::SchedulePass options_;
   stripe::Location mem_loc_;
   std::size_t mem_bytes_;
   std::size_t alignment_;
@@ -652,7 +664,14 @@ class Scheduler {
   // runtime-future CacheEntry; the CacheEntries in that covering set
   // will have already added dependencies to the accessors of the
   // runtime-future CacheEntry.
-  std::map<stripe::Affine, std::list<CacheEntry*>> active_affine_entries_;
+  std::map<stripe::Affine, std::list<CacheEntry*>> active_entries_;
+
+  // The set of valid units.
+  std::set<stripe::Affine> units_;
+
+  // The color interference graph (used when a coloring algorithm is
+  // enabled).
+  ColorGraph color_graph_;
 };
 
 void Scheduler::Schedule(const AliasMap& alias_map, stripe::Block* block, const proto::SchedulePass& options) {
@@ -670,7 +689,7 @@ std::map<RefInfoKey, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, c
   // Update earliest-writer entries.
   for (auto& stmt : block->stmts) {
     for (const auto& written_ref_name : stmt->buffer_writes()) {
-      auto& ri = ri_map.at(written_ref_name);
+      auto& ri = safe_at(&ri_map, written_ref_name);
       if (!ri.earliest_writer) {
         ri.earliest_writer = stmt.get();
       }
@@ -681,6 +700,7 @@ std::map<RefInfoKey, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, c
 
 Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const proto::SchedulePass& options)
     : block_{block},
+      options_{options},
       mem_loc_(stripe::FromProto(options.mem_loc())),
       mem_bytes_{options.mem_kib() * 1024},
       alignment_{options.alignment() ? options.alignment() : kDefaultAlignment},
@@ -691,6 +711,34 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
     std::vector<RefInfo*>* aliases = &base_ref_aliases_[ri->alias_info.base_ref];
     aliases->emplace_back(ri);
     ri->aliases = aliases;
+  }
+
+  switch (options.mem_assignment_algorithm_case()) {
+    case proto::SchedulePass::kColorInputUnique:
+      for (auto& key_ri : ri_map_) {
+        key_ri.second.color_vertex = color_graph_.add_vertex();
+      }
+      for (auto& ps : block_->stmts) {
+        auto inputs = ps->buffer_reads();
+        for (auto iia = inputs.begin(); iia != inputs.end(); ++iia) {
+          for (auto iib = iia + 1; iib != inputs.end(); ++iib) {
+            color_graph_.add_edge(safe_at(ri_map_, *iia).color_vertex, safe_at(ri_map_, *iib).color_vertex);
+          }
+        }
+      }
+      for (auto unit : options.color_input_unique().units()) {
+        units_.emplace(unit);
+      }
+      break;
+    case proto::SchedulePass::MEM_ASSIGNMENT_ALGORITHM_NOT_SET:
+      for (auto& key_ri : ri_map_) {
+        auto unit = key_ri.second.ref.location.unit;
+        if (key_ri.second.ref.cache_unit) {
+          unit = *key_ri.second.ref.cache_unit;
+        }
+        units_.emplace(unit);
+      }
+      break;
   }
 }
 
@@ -816,13 +864,13 @@ void Scheduler::Run() {
     //   not going to be used by a runtime-future Statement within the
     //   current Block.
 
-    std::map<stripe::Affine, std::list<CacheEntry*>> added_affine_entries;
+    std::map<stripe::Affine, std::list<CacheEntry*>> added_entries;
 
     std::vector<stripe::Refinement> added_refs;
     std::unordered_map<RefInfo*, std::string> internal_swap_backing_ref_names;
 
     // TODO: There's a straightforward way of walking the plan's
-    // placements and the existing active_affine_entries_ at the same
+    // placements and the existing active_entries_ at the same
     // time, saving a lot of comparisons.  We don't bother for now,
     // but only because it's a little complicated to get right and
     // premature optimization is the root of all evil, but if we
@@ -840,9 +888,8 @@ void Scheduler::Run() {
       if (is_new_entry) {
         // This Placement requires a new entry.
         ent = &*cache_entries_.emplace(cache_entries_.end(), CacheEntry{pkey_placement});
-        IVLOG(3, "Created cache entry " << ent->name << " at " << ent->range
-                                        << " with affine=" << ent->source->ref.location.unit << " shape=" << ent->shape
-                                        << " is_internal=" << ent->is_internal);
+        IVLOG(3, "Created cache entry " << ent->name << " at " << ent->range << " with affine=" << ent->unit
+                                        << " shape=" << ent->shape << " is_internal=" << ent->is_internal);
         placement.entry = ent;
         ri->cache_entry = ent;
       }
@@ -928,10 +975,10 @@ void Scheduler::Run() {
       // current CacheEntry.
       //
       // N.B. After the SubtractRange() call, we may remove future_ent
-      // from its active_affine_entries_ list.  To ensure that our iteration
+      // from its active_entries_ list.  To ensure that our iteration
       // is safe, we explicitly manage it, and make sure to advance
       // the iterator prior to the post-SubtractRange() removal.
-      auto& active_entlist = active_affine_entries_[ent->source->ref.location.unit];
+      auto& active_entlist = active_entries_[ent->unit];
       for (auto fit = active_entlist.begin(); fit != active_entlist.end();) {
         CacheEntry* future_ent = *fit;
         ++fit;
@@ -978,24 +1025,24 @@ void Scheduler::Run() {
       }
 
       if (is_new_entry && !placement.is_internal) {
-        IVLOG(3, "Adding " << ent->name << " at " << ent->range << " to added_affine_entries");
-        auto& active_entlist = added_affine_entries[ent->source->ref.location.unit];
+        IVLOG(3, "Adding " << ent->name << " at " << ent->range << " to added_entries");
+        auto& active_entlist = added_entries[ent->unit];
         ent->active_iterator = active_entlist.emplace(active_entlist.end(), ent);
         IVLOG(3, "  Active iterator was " << &*ent->active_iterator << "; list at " << &active_entlist
                                           << ", size=" << active_entlist.size());
       }
     }  // Plan-application loop
 
-    IVLOG(3, "Splicing into active_affine_entries_");
-    for (auto& added_affine_entlist : added_affine_entries) {
-      auto& active_entlist = active_affine_entries_[added_affine_entlist.first];
-      active_entlist.splice(active_entlist.begin(), added_affine_entlist.second);
+    IVLOG(3, "Splicing into active_entries_");
+    for (auto& added_unit_entlist : added_entries) {
+      auto& active_entlist = active_entries_[added_unit_entlist.first];
+      active_entlist.splice(active_entlist.begin(), added_unit_entlist.second);
       active_entlist.sort([](CacheEntry* lhs, CacheEntry* rhs) { return lhs->range.begin < rhs->range.begin; });
     }
 
     if (VLOG_IS_ON(3)) {
-      IVLOG(3, "active_affine_entries_ now contains:");
-      for (auto& affine_entlist : active_affine_entries_) {
+      IVLOG(3, "active_entries_ now contains:");
+      for (auto& affine_entlist : active_entries_) {
         IVLOG(3, "  Affine: " << affine_entlist.first);
         for (auto* ent : affine_entlist.second) {
           IVLOG(3, "    " << ent->name << " at " << ent->range);
@@ -1033,7 +1080,7 @@ void Scheduler::Run() {
   // have no dependencies, allowing them to execute in any order
   // anyway, but this will tend to queue them for memory transfer in
   // an order that enables the compute units to get busy ASAP.
-  for (auto& affine_entlist : active_affine_entries_) {
+  for (auto& affine_entlist : active_entries_) {
     for (auto* ent : affine_entlist.second) {
       if (!ent->source->earliest_writer) {
         IVLOG(3, "  Adding final swap-in for " << ent->name);
@@ -1054,9 +1101,7 @@ void Scheduler::Run() {
     ref->into = ent.name;
     ref->interior_shape = ent.shape;
     ref->location = mem_loc_;
-    if (ent.source->ref.cache_unit) {
-      ref->location.unit = *ent.source->ref.cache_unit;
-    }
+    ref->location.unit = ent.unit;
     ref->offset = ent.range.begin;
   }
 
@@ -1082,8 +1127,7 @@ void Scheduler::Run() {
   });
 }
 
-std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<IO>>> Scheduler::GatherPlacementState(
-    const std::vector<IO>& ios) {
+std::tuple<PlacementPlan, std::vector<IO>> Scheduler::GatherPlacementState(const std::vector<IO>& ios) {
   PlacementPlan plan;
   std::unordered_map<RefInfo*, stripe::RefDir> todo_map;
 
@@ -1116,15 +1160,13 @@ std::tuple<PlacementPlan, std::map<stripe::Affine, std::vector<IO>>> Scheduler::
 
   // Organize the placements to be made, largest-first, using the
   // underlying refinement name as the tiebreaker.
-  std::map<stripe::Affine, std::vector<IO>> todos;
+  std::vector<IO> todos;
   for (auto& refinfo_refdir : todo_map) {
-    todos[refinfo_refdir.first->ref.location.unit].emplace_back(refinfo_refdir.first, refinfo_refdir.second);
+    todos.emplace_back(refinfo_refdir.first, refinfo_refdir.second);
   }
-  for (auto& affine_ios : todos) {
-    std::sort(affine_ios.second.begin(), affine_ios.second.end(), [](IO lhs, IO rhs) {
-      return std::tie(rhs.ri->size, rhs.ri->name) < std::tie(lhs.ri->size, lhs.ri->name);
-    });
-  }
+  std::sort(todos.begin(), todos.end(), [](const IO& lhs, const IO& rhs) {
+    return std::tie(rhs.ri->size, rhs.ri->name) < std::tie(lhs.ri->size, lhs.ri->name);
+  });
 
   return std::make_tuple(std::move(plan), std::move(todos));
 }
@@ -1159,10 +1201,7 @@ std::vector<std::pair<PlacementKey, Placement>> MakePartialPlacements(const std:
 boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_block, const std::vector<IO>& ios) {
   // Initialize useful planning inputs.
   PlacementPlan existing_entry_plan;
-  std::map<stripe::Affine, std::vector<IO>> todos;
-  std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>> todo_fulls;
-  std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>> todo_partials;
-
+  std::vector<IO> todos;
   std::tie(existing_entry_plan, todos) = GatherPlacementState(ios);
 
   if (VLOG_IS_ON(3)) {
@@ -1171,19 +1210,14 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
       IVLOG(3, "    " << pkey_placement.first.ri->name << " -> " << pkey_placement.second);
     }
     IVLOG(3, "  ToDos:");
-    for (auto& unit_ios : todos) {
-      IVLOG(3, "    Affine=" << unit_ios.first);
-      for (const auto& io : unit_ios.second) {
-        auto isize = stripe::Codec::Resolve(io.interior_shape)->byte_size();
-        IVLOG(3, "      Ref=" << io.ri->name << " size=" << io.ri->size << " isize=" << isize);
-      }
+    for (auto& io : todos) {
+      auto isize = stripe::Codec::Resolve(io.interior_shape)->byte_size();
+      IVLOG(3, "      Ref=" << io.ri->name << " size=" << io.ri->size << " isize=" << isize);
     }
   }
 
-  for (const auto& unit_ios : todos) {
-    todo_fulls[unit_ios.first] = MakeFullPlacements(unit_ios.second);
-    todo_partials[unit_ios.first] = MakePartialPlacements(unit_ios.second);
-  }
+  auto todo_fulls = MakeFullPlacements(todos);
+  auto todo_partials = MakePartialPlacements(todos);
 
   boost::optional<PlacementPlan> plan;
 
@@ -1229,8 +1263,48 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
   return boost::none;
 }
 
+std::vector<stripe::Affine> Scheduler::GetValidUnits(PlacementPlan* plan, PlacementPlan::iterator it) {
+  switch (options_.mem_assignment_algorithm_case()) {
+    case proto::SchedulePass::kColorInputUnique: {
+      if (!IsReadDir(it->second.dir)) {
+        // This isn't an input; input coloring allows us to place this anywhere.
+        return std::vector<stripe::Affine>(units_.begin(), units_.end());
+      }
+      std::set<stripe::Affine> used_units;
+      for (auto pit = plan->begin(); pit != plan->end(); ++pit) {
+        if (pit == it) {
+          continue;
+        }
+        used_units.emplace(pit->second.unit);
+      }
+      for (const auto& unit_entlist : active_entries_) {
+        for (CacheEntry* ent : unit_entlist.second) {
+          if (edge(it->first.ri->color_vertex, ent->source->color_vertex, color_graph_).second) {
+            used_units.emplace(ent->unit);
+          }
+        }
+      }
+
+      std::vector<stripe::Affine> result;
+      std::set_difference(units_.begin(), units_.end(), used_units.begin(), used_units.end(),
+                          std::back_inserter(result));
+      return result;
+    }
+    case proto::SchedulePass::MEM_ASSIGNMENT_ALGORITHM_NOT_SET:
+      // For the default algorithm, we use the unit from the original
+      // refinement, which may be explicitly specified.
+      if (it->first.ri->ref.cache_unit) {
+        return std::vector<stripe::Affine>{*it->first.ri->ref.cache_unit};
+      }
+      return std::vector<stripe::Affine>{it->first.ri->ref.location.unit};
+  }
+
+  // Appease awful compilers.
+  return std::vector<stripe::Affine>{};
+}
+
 bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<PlacementKey, Placement>>& placements,
-                                 std::list<MemRange> ranges) {
+                                 std::map<stripe::Affine, std::list<MemRange>> unit_ranges) {
   // For each IO in largest->smallest size, determine a placement.
   // For each one, we want to pick the smallest free range that is
   // still big enough to hold the IO.
@@ -1241,25 +1315,32 @@ bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pai
       // A new Placement.
       std::size_t size = pkey_placement.second.size;
       IVLOG(3, "        Finding placement for " << pkey_placement.first.ri->name << ", size=" << size);
-      std::list<MemRange>::iterator best_so_far = ranges.end();
+      boost::optional<std::pair<stripe::Affine, std::list<MemRange>::iterator>> best_so_far;
       std::size_t best_waste_so_far = mem_bytes_;
-      for (auto rit = ranges.begin(); rit != ranges.end(); ++rit) {
-        if (rit->size() < size) {
-          continue;
+      for (const auto& unit : GetValidUnits(plan, it_inserted.first)) {
+        IVLOG(3, "          Checking free space on unit " << unit);
+        auto& ranges = unit_ranges[unit];
+        for (auto rit = ranges.begin(); rit != ranges.end(); ++rit) {
+          IVLOG(3, "            Considering range " << *rit);
+          if (rit->size() < size) {
+            continue;
+          }
+          std::size_t waste = rit->size() - size;
+          if (best_waste_so_far <= waste) {
+            continue;
+          }
+          IVLOG(3, "          Range " << *rit << " is the best so far");
+          best_so_far = std::make_pair(unit, rit);
+          best_waste_so_far = waste;
         }
-        std::size_t waste = rit->size() - size;
-        if (best_waste_so_far <= waste) {
-          continue;
-        }
-        IVLOG(3, "          Range " << *rit << " is the best so far");
-        best_so_far = rit;
-        best_waste_so_far = waste;
       }
-      if (best_so_far == ranges.end()) {
+      if (!best_so_far) {
+        IVLOG(3, "          No placement available for " << pkey_placement.first.ri->name << ", size=" << size);
         return false;
       }
-      auto assigned_range = MemRange{best_so_far->begin, best_so_far->begin + size};
-      SubtractRange(assigned_range, &ranges, best_so_far);
+      auto assigned_range = MemRange{best_so_far->second->begin, best_so_far->second->begin + size};
+      SubtractRange(assigned_range, &unit_ranges[best_so_far->first], best_so_far->second);
+      it_inserted.first->second.unit = best_so_far->first;
       it_inserted.first->second.range = assigned_range;
     } else {
       // An existing Placement.
@@ -1271,19 +1352,19 @@ bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pai
 }
 
 boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
-    const PlacementPlan& existing_entry_plan,
-    const std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>>& todos) {
+    const PlacementPlan& existing_entry_plan, const std::vector<std::pair<PlacementKey, Placement>>& todos) {
   PlacementPlan plan{existing_entry_plan};
+  std::map<stripe::Affine, std::list<MemRange>> unit_ranges;
 
-  for (auto& unit_placements : todos) {
-    // Build a list of the available ranges.  For our purposes, a range
-    // is available if it already has an initial writer (=> it is not
-    // going to require a swap-in), and if its RefInfo is not already in
-    // the plan (because RefInfos that are in the plan are required by
-    // the current statement).
-    IVLOG(3, "      Planning memory affine=" << unit_placements.first);
-    std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
-    for (auto* ent : active_affine_entries_[unit_placements.first]) {
+  // Build a list of the available ranges.  For our purposes, a range
+  // is available if it already has an initial writer (=> it is not
+  // going to require a swap-in), and if its RefInfo is not already in
+  // the plan (because RefInfos that are in the plan are required by
+  // the current statement).
+  for (const auto& unit : units_) {
+    auto& ranges = unit_ranges[unit];
+    ranges = std::list<MemRange>{MemRange{0, mem_bytes_}};
+    for (auto* ent : active_entries_[unit]) {
       PlacementKey pkey{ent->source, ent->source->exterior_cache_shape, {}};
       IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " saw_earliest_writer="
                                   << ent->saw_earliest_writer << " plan.count=" << plan.count(pkey));
@@ -1292,27 +1373,28 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
         SubtractRange(ent->range, &ranges);
       }
     }
+  }
 
-    if (!TryPlaceInRanges(&plan, unit_placements.second, std::move(ranges))) {
-      return boost::none;
-    }
+  if (!TryPlaceInRanges(&plan, todos, std::move(unit_ranges))) {
+    return boost::none;
   }
 
   return plan;
 }
 
 boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
-    const PlacementPlan& existing_entry_plan,
-    const std::map<stripe::Affine, std::vector<std::pair<PlacementKey, Placement>>>& todos) {
+    const PlacementPlan& existing_entry_plan, const std::vector<std::pair<PlacementKey, Placement>>& todos) {
   PlacementPlan plan{existing_entry_plan};
+  std::map<stripe::Affine, std::list<MemRange>> unit_ranges;
 
-  for (auto& unit_placements : todos) {
-    // Build a list of the available ranges.  For our purposes, a range
-    // is available as long as its RefInfo is not already in the plan
-    // (because RefInfos that are in the plan are required by the
-    // current statement).
-    std::list<MemRange> ranges{MemRange{0, mem_bytes_}};
-    for (auto* ent : active_affine_entries_[unit_placements.first]) {
+  // Build a list of the available ranges.  For our purposes, a range
+  // is available as long as its RefInfo is not already in the plan
+  // (because RefInfos that are in the plan can be used by the current
+  // statement).
+  for (const auto& unit : units_) {
+    auto& ranges = unit_ranges[unit];
+    ranges = std::list<MemRange>{MemRange{0, mem_bytes_}};
+    for (auto* ent : active_entries_[unit]) {
       PlacementKey pkey{ent->source, ent->source->exterior_cache_shape, {}};
       IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " saw_earliest_writer="
                                   << ent->saw_earliest_writer << " plan.count=" << plan.count(pkey));
@@ -1321,10 +1403,10 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
         SubtractRange(ent->range, &ranges);
       }
     }
+  }
 
-    if (!TryPlaceInRanges(&plan, unit_placements.second, std::move(ranges))) {
-      return boost::none;
-    }
+  if (!TryPlaceInRanges(&plan, todos, std::move(unit_ranges))) {
+    return boost::none;
   }
 
   return plan;
@@ -1342,14 +1424,14 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
   PlacementPlan plan;
   std::map<stripe::Affine, std::size_t> offsets;
 
-  for (const auto& pkey_placement : placements) {
-    offsets[pkey_placement.first.ri->ref.location.unit] = 0;
+  for (const auto& unit : units_) {
+    offsets[unit] = 0;
   }
 
-  for (const auto& pkey_placement : placements) {
+  auto assign_placement = [&](const std::pair<PlacementKey, Placement>& pkey_placement, const stripe::Affine& unit) {
     auto it_inserted = plan.emplace(pkey_placement.first, pkey_placement.second);
     if (it_inserted.second) {
-      std::size_t& offset = offsets.at(pkey_placement.first.ri->ref.location.unit);
+      std::size_t& offset = safe_at(&offsets, unit);
       // A new Placement.
       std::size_t size = pkey_placement.second.size;
       it_inserted.first->second.range.begin = offset;
@@ -1361,8 +1443,52 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
       // An existing Placement.
       it_inserted.first->second.dir = UnionDir(it_inserted.first->second.dir, pkey_placement.second.dir);
     }
+  };
+
+  switch (options_.mem_assignment_algorithm_case()) {
+    case proto::SchedulePass::kColorInputUnique: {
+      // Assign all inputs, rotating through the memory units, so that
+      // we guarantee they have unique colors.
+      auto unit_it = units_.begin();
+      for (const auto& pkey_placement : placements) {
+        if (stripe::IsReadDir(pkey_placement.second.dir)) {
+          assign_placement(pkey_placement, *unit_it);
+          ++unit_it;
+        }
+      }
+      for (const auto& pkey_placement : placements) {
+        if (!stripe::IsReadDir(pkey_placement.second.dir)) {
+          // Assign all non-inputs, using the first unit that fits.
+          auto required = math::Align(pkey_placement.second.size, alignment_);
+          bool found_unit = false;
+          for (const auto& unit_offset : offsets) {
+            if (required <= (mem_bytes_ - unit_offset.second)) {
+              assign_placement(pkey_placement, unit_offset.first);
+              found_unit = true;
+              break;
+            }
+          }
+          if (!found_unit) {
+            return boost::none;  // Unable to build a placement plan.
+          }
+        }
+      }
+      break;
+    }
+
+    case proto::SchedulePass::MEM_ASSIGNMENT_ALGORITHM_NOT_SET:
+      // Assign all placements in order.
+      for (const auto& pkey_placement : placements) {
+        auto unit = pkey_placement.first.ri->ref.location.unit;
+        if (pkey_placement.first.ri->ref.cache_unit) {
+          unit = *pkey_placement.first.ri->ref.cache_unit;
+        }
+        assign_placement(pkey_placement, unit);
+      }
+      break;
   }
 
+  // Verify the plan.
   for (const auto& unit_offset : offsets) {
     if (mem_bytes_ < unit_offset.second) {
       return boost::none;
@@ -1391,9 +1517,7 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
   });
 
   auto banked_mem_loc = mem_loc_;
-  if (ent->source->ref.cache_unit) {
-    banked_mem_loc.unit = *ent->source->ref.cache_unit;
-  }
+  banked_mem_loc.unit = ent->unit;
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::Out,             // dir
       ent->name,                       // from
@@ -1428,9 +1552,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
   auto banked_mem_loc = mem_loc_;
-  if (ent->source->ref.cache_unit) {
-    banked_mem_loc.unit = *ent->source->ref.cache_unit;
-  }
+  banked_mem_loc.unit = ent->unit;
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::In,              // dir
       ent->name,                       // from
@@ -1509,9 +1631,7 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
   });
 
   auto banked_mem_loc = mem_loc_;
-  if (ent->source->ref.cache_unit) {
-    banked_mem_loc.unit = *ent->source->ref.cache_unit;
-  }
+  banked_mem_loc.unit = ent->unit;
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::Out,            // dir
       ent->interior_name,             // from
@@ -1559,9 +1679,7 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
   }
 
   auto banked_mem_loc = mem_loc_;
-  if (ent->source->ref.cache_unit) {
-    banked_mem_loc.unit = *ent->source->ref.cache_unit;
-  }
+  banked_mem_loc.unit = ent->unit;
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::In,             // dir
       ent->interior_name,             // from
