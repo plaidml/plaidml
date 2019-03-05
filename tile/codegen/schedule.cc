@@ -813,6 +813,28 @@ void Scheduler::Run() {
 
     PlacementPlan plan = std::move(plan_option).value();
 
+    if (options_.mem_assignment_algorithm_case() == proto::SchedulePass::kColorInputUnique) {
+      // Before we create placements, remove conflicting CacheEntries,
+      // to preserve the invariant that all entries are
+      // non-conflicting.
+      for (const auto& pkey_placement : plan) {
+        // N.B. entry will be nullptr for new entries, but that's fine
+        // here.
+        const CacheEntry* entry = pkey_placement.second.entry;
+        const auto& unit = pkey_placement.second.unit;
+        const auto& color_vertex = pkey_placement.first.ri->color_vertex;
+        auto& entries = active_entries_[unit];
+        auto it = entries.begin();
+        while (it != entries.end()) {
+          if ((entry != *it) && edge(color_vertex, (*it)->source->color_vertex, color_graph_).second) {
+            it = entries.erase(it);
+          } else {
+            ++it;
+          }
+        }
+      }
+    }
+
     // For each input in the plan:
     //
     //   Either there's an existing CacheEntry where we can expect to
