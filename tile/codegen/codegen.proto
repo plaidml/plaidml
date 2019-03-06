@@ -133,6 +133,8 @@ message Pass {
     // Assign a codec to matching refinements. A codec defines the physical
     // layout of a tensor on a particular hardware device.
     AssignCodecPass assign_codec = 21;
+    // Rebases memory allocations.
+    MemRebasePass mem_rebase = 22;
   }
 }
 
@@ -397,4 +399,25 @@ message AssignCodecPass {
   repeated string datatypes = 1;
   // The specified codec name.
   required string codec = 2;
+}
+
+// Rebases memory allocations.
+//
+// Existing memory allocations are matched according to their loc.name.
+// (TODO: Consider using tags for this.)
+//
+// For each allocation, loc's unit's constant portion is extracted,
+// producing an integer bound to "unit", and the loc's offset is bound
+// to "offset".
+//
+// Using these bindings, the pass's loc.unit and offset are partially
+// evaluated, and then the allocation's loc is set to the pass's loc
+// and the allocation's offset is set to the pass's offset.
+message MemRebasePass {
+  // The location name of the memory allocations to rebase.
+  required string name = 1;
+  // The location to use for the rewritten refinement.
+  required stripe.proto.Location loc = 2;
+  // The offset to use for the rewritten refinement.
+  required stripe.proto.Affine offset = 3;
 }
