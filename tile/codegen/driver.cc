@@ -12,6 +12,7 @@
 #include "tile/codegen/emitc.h"
 #include "tile/codegen/fuse.h"
 #include "tile/codegen/localize.h"
+#include "tile/codegen/mem_rebase.h"
 #include "tile/codegen/partition.h"
 #include "tile/codegen/placer.h"
 #include "tile/codegen/scalarize.h"
@@ -116,6 +117,9 @@ void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions&
         break;
       case proto::Pass::kAssignCodec:
         AssignCodecPass(block, pass.assign_codec());
+        break;
+      case proto::Pass::kMemRebase:
+        MemRebasePass(block, pass.mem_rebase());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
