@@ -29,11 +29,6 @@ Compiler::Compiler() {}
 boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Context& ctx,
                                                              const std::vector<lang::KernelInfo>& kernel_info,
                                                              const hal::proto::HardwareSettings&) {
-  if (!kernel_info.size()) {
-    return boost::make_ready_future(std::unique_ptr<hal::Library>{
-        std::make_unique<cpu::Library>(std::vector<std::shared_ptr<llvm::ExecutionEngine>>{}, kernel_info)});
-  }
-
   static std::once_flag init_once;
   std::call_once(init_once, []() {
     LLVMInitializeNativeTarget();
@@ -41,22 +36,29 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
     LLVMInitializeNativeAsmPrinter();
     LLVMInitializeNativeAsmParser();
   });
+
+  auto llvm_ctx = std::make_shared<llvm::LLVMContext>();
+  if (!kernel_info.size()) {
+    return boost::make_ready_future(std::unique_ptr<hal::Library>{
+        std::make_unique<cpu::Library>(llvm_ctx, std::vector<std::shared_ptr<llvm::ExecutionEngine>>{}, kernel_info)});
+  }
   std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines;
   for (const auto& ki : kernel_info) {
-    BuildKernel(ki, &engines);
+    BuildKernel(ki, llvm_ctx.get(), &engines);
   }
-  std::unique_ptr<hal::Library> lib(new cpu::Library(engines, kernel_info));
+  std::unique_ptr<hal::Library> lib(new cpu::Library(llvm_ctx, engines, kernel_info));
   return boost::make_ready_future<>(std::move(lib));
 }
 
-void Compiler::BuildKernel(const lang::KernelInfo& ki, std::vector<std::shared_ptr<llvm::ExecutionEngine>>* engines) {
+void Compiler::BuildKernel(const lang::KernelInfo& ki, llvm::LLVMContext* context,
+                           std::vector<std::shared_ptr<llvm::ExecutionEngine>>* engines) {
   if (VLOG_IS_ON(4)) {
     sem::Print debug_emit(*ki.kfunc);
     VLOG(4) << "Compiling kernel:\n" << debug_emit.str();
   }
 
   // Generate LLVM IR for the kernel.
-  Emit emit;
+  Emit emit(*context);
   assert(ki.kfunc);
   ki.kfunc->Accept(emit);
   // Generate an invoker function wrapping the kernel params: we will pass in
@@ -90,7 +92,7 @@ void Compiler::GenerateInvoker(const lang::KernelInfo& ki, llvm::Module* module)
   // using each element of the array as an argument. Following the array of
   // buffer pointers, it will pass along the GridSize value for the current
   // work index.
-  llvm::LLVMContext context;
+  llvm::LLVMContext& context(module->getContext());
   llvm::IRBuilder<> builder(context);
   // LLVM doesn't have the notion of a void pointer, so we'll pretend all of
   // these buffers are arrays of int32.

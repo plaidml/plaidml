@@ -26,8 +26,8 @@ class Error : public std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 
-Emit::Emit()
-    : context_(),
+Emit::Emit(llvm::LLVMContext& context)
+    : context_(context),
       builder_{context_},
       module_{new llvm::Module("tile", context_)},
       funcopt_{module_.get()},

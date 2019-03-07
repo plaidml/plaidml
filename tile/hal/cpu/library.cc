@@ -17,9 +17,17 @@ Library* Library::Downcast(hal::Library* library) {
   return exe;
 }
 
-Library::Library(const std::vector<std::shared_ptr<llvm::ExecutionEngine>>& engines,
+Library::Library(std::shared_ptr<llvm::LLVMContext> context,
+                 const std::vector<std::shared_ptr<llvm::ExecutionEngine>>& engines,
                  const std::vector<lang::KernelInfo>& kernels)
-    : engines_{engines}, kernels_{kernels} {}
+    : context_{context}, engines_{engines}, kernels_{kernels} {}
+
+Library::~Library() {
+  // release all of the ExecutionEngine instances first, before the LLVMContext,
+  // because each ExecutionEngine is associated with an llvm::Module, and
+  // modules must not outlive their LLVMContext.
+  engines_.clear();
+}
 
 }  // namespace cpu
 }  // namespace hal

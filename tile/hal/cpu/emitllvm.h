@@ -22,7 +22,7 @@ namespace cpu {
 
 class Emit : public sem::Visitor {
  public:
-  Emit();
+  explicit Emit(llvm::LLVMContext& context);  // NOLINT(runtime/references)
   void Visit(const sem::IntConst&) override;
   void Visit(const sem::FloatConst&) override;
   void Visit(const sem::LookupLVal&) override;
@@ -88,7 +88,7 @@ class Emit : public sem::Visitor {
   sem::Type ConvergeOperands(value* left, value* right);
   static std::string print(const llvm::Type*);
 
-  llvm::LLVMContext context_;
+  llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
   std::unique_ptr<llvm::Module> module_;
   llvm::legacy::FunctionPassManager funcopt_;
