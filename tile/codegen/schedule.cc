@@ -714,7 +714,7 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
   }
 
   switch (options.mem_assignment_algorithm_case()) {
-    case proto::SchedulePass::kColorInputUnique:
+    case proto::SchedulePass::kColorIoUnique:
       for (auto& key_ri : ri_map_) {
         key_ri.second.color_vertex = color_graph_.add_vertex();
       }
@@ -725,8 +725,14 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
             color_graph_.add_edge(safe_at(ri_map_, *iia).color_vertex, safe_at(ri_map_, *iib).color_vertex);
           }
         }
+        auto outputs = ps->buffer_writes();
+        for (auto oia = outputs.begin(); oia != outputs.end(); ++oia) {
+          for (auto oib = oia + 1; oib != outputs.end(); ++oib) {
+            color_graph_.add_edge(safe_at(ri_map_, *oia).color_vertex, safe_at(ri_map_, *oib).color_vertex);
+          }
+        }
       }
-      for (auto unit : options.color_input_unique().units()) {
+      for (auto unit : options.color_io_unique().units()) {
         units_.emplace(unit);
       }
       break;
@@ -812,28 +818,6 @@ void Scheduler::Run() {
     }
 
     PlacementPlan plan = std::move(plan_option).value();
-
-    if (options_.mem_assignment_algorithm_case() == proto::SchedulePass::kColorInputUnique) {
-      // Before we create placements, remove conflicting CacheEntries,
-      // to preserve the invariant that all entries are
-      // non-conflicting.
-      for (const auto& pkey_placement : plan) {
-        // N.B. entry will be nullptr for new entries, but that's fine
-        // here.
-        const CacheEntry* entry = pkey_placement.second.entry;
-        const auto& unit = pkey_placement.second.unit;
-        const auto& color_vertex = pkey_placement.first.ri->color_vertex;
-        auto& entries = active_entries_[unit];
-        auto it = entries.begin();
-        while (it != entries.end()) {
-          if ((entry != *it) && edge(color_vertex, (*it)->source->color_vertex, color_graph_).second) {
-            it = entries.erase(it);
-          } else {
-            ++it;
-          }
-        }
-      }
-    }
 
     // For each input in the plan:
     //
@@ -1180,15 +1164,36 @@ std::tuple<PlacementPlan, std::vector<IO>> Scheduler::GatherPlacementState(const
     }
   }
 
-  // Organize the placements to be made, largest-first, using the
-  // underlying refinement name as the tiebreaker.
+  if (options_.mem_assignment_algorithm_case() == proto::SchedulePass::kColorIoUnique) {
+    // Now that we have our directions initialized, perform color
+    // checks on the entries within the plan.  When we detect
+    // conflicting entries, turn them into todos.
+    std::set<stripe::Affine> used_input_units;
+    std::set<stripe::Affine> used_output_units;
+    auto it = plan.begin();
+    while (it != plan.end()) {
+      bool color_valid = true;
+      if (stripe::IsReadDir(it->second.dir)) {
+        color_valid &= used_input_units.emplace(it->first.ri->cache_entry->unit).second;
+      }
+      if (stripe::IsWriteDir(it->second.dir)) {
+        color_valid &= used_output_units.emplace(it->first.ri->cache_entry->unit).second;
+      }
+      if (!color_valid) {
+        // Turn the current placement into a todo.
+        todo_map.emplace(it->first.ri, it->second.dir);
+        it = plan.erase(it);
+        continue;
+      }
+      ++it;
+    }
+  }
+
+  // Return the placements to be made.
   std::vector<IO> todos;
   for (auto& refinfo_refdir : todo_map) {
     todos.emplace_back(refinfo_refdir.first, refinfo_refdir.second);
   }
-  std::sort(todos.begin(), todos.end(), [](const IO& lhs, const IO& rhs) {
-    return std::tie(rhs.ri->size, rhs.ri->name) < std::tie(lhs.ri->size, lhs.ri->name);
-  });
 
   return std::make_tuple(std::move(plan), std::move(todos));
 }
@@ -1199,6 +1204,14 @@ std::vector<std::pair<PlacementKey, Placement>> MakeFullPlacements(const std::ve
     result.emplace_back(PlacementKey{io.ri, io.ri->exterior_cache_shape, {}},
                         Placement{io.dir, io.ri->size, false, ""});
   }
+
+  // Sort the placements, largest-first, using the underlying
+  // refinement name as the tiebreaker.
+  std::sort(result.begin(), result.end(),
+            [](const std::pair<PlacementKey, Placement>& lhs, const std::pair<PlacementKey, Placement>& rhs) {
+              return std::tie(rhs.second.size, rhs.first.ri->name) < std::tie(lhs.second.size, lhs.first.ri->name);
+            });
+
   return result;
 }
 
@@ -1217,6 +1230,14 @@ std::vector<std::pair<PlacementKey, Placement>> MakePartialPlacements(const std:
     result.emplace_back(PlacementKey{io.ri, io.interior_shape, access},
                         Placement{io.dir, interior_size, is_internal, io.interior_name});
   }
+
+  // Sort the placements, largest-first, using the underlying
+  // refinement name as the tiebreaker.
+  std::sort(result.begin(), result.end(),
+            [](const std::pair<PlacementKey, Placement>& lhs, const std::pair<PlacementKey, Placement>& rhs) {
+              return std::tie(rhs.second.size, rhs.first.ri->name) < std::tie(lhs.second.size, lhs.first.ri->name);
+            });
+
   return result;
 }
 
@@ -1287,11 +1308,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
 
 std::vector<stripe::Affine> Scheduler::GetValidUnits(PlacementPlan* plan, PlacementPlan::iterator it) {
   switch (options_.mem_assignment_algorithm_case()) {
-    case proto::SchedulePass::kColorInputUnique: {
-      if (!IsReadDir(it->second.dir)) {
-        // This isn't an input; input coloring allows us to place this anywhere.
-        return std::vector<stripe::Affine>(units_.begin(), units_.end());
-      }
+    case proto::SchedulePass::kColorIoUnique: {
       std::set<stripe::Affine> used_units;
       for (auto pit = plan->begin(); pit != plan->end(); ++pit) {
         if (pit == it) {
@@ -1468,23 +1485,31 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
   };
 
   switch (options_.mem_assignment_algorithm_case()) {
-    case proto::SchedulePass::kColorInputUnique: {
+    case proto::SchedulePass::kColorIoUnique: {
       // Assign all inputs, rotating through the memory units, so that
       // we guarantee they have unique colors.
+      std::set<stripe::Affine> used_output_units;
       auto unit_it = units_.begin();
       for (const auto& pkey_placement : placements) {
         if (stripe::IsReadDir(pkey_placement.second.dir)) {
           assign_placement(pkey_placement, *unit_it);
+          if (stripe::IsWriteDir(pkey_placement.second.dir)) {
+            used_output_units.emplace(*unit_it);
+          }
           ++unit_it;
         }
       }
       for (const auto& pkey_placement : placements) {
         if (!stripe::IsReadDir(pkey_placement.second.dir)) {
-          // Assign all non-inputs, using the first unit that fits.
+          // Assign all non-inputs, rotating through the memory units,
+          // using the first unit unused by earlier outputs that fits.
+          // Note that since the placements are ordered by size
+          // (largest-first), this is guaranteed to succeed if success
+          // is possible.
           auto required = math::Align(pkey_placement.second.size, alignment_);
           bool found_unit = false;
           for (const auto& unit_offset : offsets) {
-            if (required <= (mem_bytes_ - unit_offset.second)) {
+            if (required <= (mem_bytes_ - unit_offset.second) && used_output_units.emplace(unit_offset.first).second) {
               assign_placement(pkey_placement, unit_offset.first);
               found_unit = true;
               break;
