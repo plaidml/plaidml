@@ -20,6 +20,7 @@ message Config {
   repeated Pass passes = 7;
   repeated Pass lowering = 8;
   optional uint32 i8_mac_ops_per_cycle = 9;
+  required string arch = 10;
 }
 
 // An execution unit represents a simulated computing device.
