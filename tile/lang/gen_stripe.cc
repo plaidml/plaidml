@@ -315,12 +315,20 @@ class StripeGenerator {
     // Combination Op
     auto output_type = GetShape(op.output).type;
     if (scalar_inputs.size() > 1) {
-      auto combo_op = GetComboOp(cion.comb_op);
-      if (!combo_op.empty()) {
-        AddIntrinsic(kernel.get(), combo_op, output_type, scalar_inputs, {ScalarName(op.output)});
-        kernel->set_tag("comb_op_" + combo_op);
-        if (combo_op == Intrinsic::MUL) {
-          total_macs_ += kernel->idxs_product();
+      if (cion.comb_op == CombinationOp::COND) {
+        kernel.get()->stmts.push_back(std::make_shared<Constant>("$ZERO", INT64_C(0)));
+        AddIntrinsic(kernel.get(), Intrinsic::EQ, DataType::BOOLEAN, {scalar_inputs[0], scalar_inputs[1]}, {"$IS_EQ"});
+        AddIntrinsic(kernel.get(), Intrinsic::COND, output_type, {"$IS_EQ", scalar_inputs[2], "$ZERO"},
+                     {ScalarName(op.output)});
+        kernel->set_tag("comb_op_cond");
+      } else {
+        auto combo_op = GetComboOp(cion.comb_op);
+        if (!combo_op.empty()) {
+          AddIntrinsic(kernel.get(), combo_op, output_type, scalar_inputs, {ScalarName(op.output)});
+          kernel->set_tag("comb_op_" + combo_op);
+          if (combo_op == Intrinsic::MUL) {
+            total_macs_ += kernel->idxs_product();
+          }
         }
       }
     } else {
@@ -647,8 +655,6 @@ class StripeGenerator {
         return Intrinsic::ADD;
       case CombinationOp::EQ:
         return Intrinsic::EQ;
-      case CombinationOp::COND:
-        return Intrinsic::COND;
       default:
         return "";
     }

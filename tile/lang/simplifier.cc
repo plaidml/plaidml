@@ -68,7 +68,7 @@ class Simplifier : public Visitor {
   }
 
   void Visit(const DeclareStmt& node) override {
-    if (node.init) {
+    if (node.init && !node.type.array) {
       auto init = EvalExpr(node.init);
 
       auto int_const = std::dynamic_pointer_cast<IntConst>(init);

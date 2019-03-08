@@ -240,6 +240,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   for (auto& ref : outer->refs) {
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& acc = ref.access[i];
+      int64_t min_val = 0;
       int64_t max_val = ref.interior_shape.dims[i].size - 1;
       Affine affine = acc.constant();
       for (const auto& kvp : acc.getMap()) {
@@ -247,15 +248,16 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
         if (it == mapping.end()) {
           if (kvp.first != "") {
             if (kvp.second < 0) {
-              throw_with_trace(std::runtime_error("FusionRefactor: Unable to handle negative strides"));
+              min_val += (tiled->idx_by_name(kvp.first)->range - 1) * kvp.second;
+            } else {
+              max_val += (tiled->idx_by_name(kvp.first)->range - 1) * kvp.second;
             }
-            max_val += (tiled->idx_by_name(kvp.first)->range - 1) * kvp.second;
           }
           continue;
         }
         affine += Affine(it->second, kvp.second);
       }
-      ref.interior_shape.dims[i].size = max_val + 1;
+      ref.interior_shape.dims[i].size = max_val - min_val + 1;
       acc = affine;
     }
   }

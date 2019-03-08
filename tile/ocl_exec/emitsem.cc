@@ -59,6 +59,21 @@ void SemtreeEmitter::Visit(const stripe::Load& stmt) {
   cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
 }
 
+static sem::ExprPtr AggInit(DataType type, const std::string agg_op) {
+  if (agg_op == "" || agg_op == "assign") {
+    return sem::ExprPtr();
+  } else if (agg_op == "add") {
+    return _LimitConst(sem::LimitConst::ZERO, type);
+  } else if (agg_op == "max") {
+    return _LimitConst(sem::LimitConst::MIN, type);
+  } else if (agg_op == "min") {
+    return _LimitConst(sem::LimitConst::MAX, type);
+  } else if (agg_op == "mul") {
+    return _LimitConst(sem::LimitConst::ONE, type);
+  }
+  throw std::runtime_error("Unknown agg-op:" + agg_op);
+}
+
 void SemtreeEmitter::Visit(const stripe::Store& stmt) {
   auto ai = scope_->at(stmt.into);
   auto lval = _(ref_name(stmt.into))[convert_affine(ai.flat())];
@@ -226,6 +241,25 @@ sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
 void SemtreeEmitter::Visit(const stripe::Block& block) {
   std::shared_ptr<sem::Block> outer = cur_;
   if (block.has_tag("kernel")) {
+    if (block.has_tag("zero")) {
+      if (block.refs.size() != 1) {
+        throw std::runtime_error("Zero kernels must have a single output");
+      }
+      std::string bname = block.refs[0].from;
+      std::string kname = "kernel_" + std::to_string(kernels_.kernels.size() + 1);
+      kernels_.kernels.push_back(lang::GenZero(scope_->at(bname).shape, bname, kname));
+      return;
+    }
+    if (block.has_tag("copy")) {
+      if (block.ref_outs().size() != 1 || block.ref_ins().size() != 1) {
+        throw std::runtime_error("Copy kernels must have one output + one input");
+      }
+      std::string src_name = block.ref_ins()[0]->from;
+      std::string dst_name = block.ref_outs()[0]->from;
+      std::string kname = "kernel_" + std::to_string(kernels_.kernels.size() + 1);
+      kernels_.kernels.push_back(lang::GenCopy(scope_->at(src_name).shape, dst_name, src_name, kname));
+      return;
+    }
     in_kernel_++;
   }
   if (block.has_tag("gpu_thread")) {
@@ -242,9 +276,23 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   // Now, add any new locals
   for (const auto& ref : block.refs) {
     if (ref.dir == stripe::RefDir::None) {
-      sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, ref.interior_shape.elem_size(),
+      size_t size = ref.interior_shape.elem_size();
+      sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, size,
                          (in_threads_ ? sem::Type::NORMAL : sem::Type::LOCAL)};
-      cur_->push_front(_Declare(ptype, ref_name(ref.into), sem::ExprPtr()));
+      sem::ExprPtr init = AggInit(ref.interior_shape.type, ref.agg_op);
+      if (in_threads_) {
+        cur_->push_front(_Declare(ptype, ref_name(ref.into), init));
+      } else {
+        if (init) {
+          // Threaded initialization of buffers
+          auto while_loop = _Block({});
+          while_loop->push_back(_Declare({sem::Type::INDEX}, "_init_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
+          while_loop->push_back(_While(_("_init_") < _Const(size), _Block({_(ref_name(ref.into))[_("_init_")] = init,
+                                                                           _("_init_") = _("_init_") + threads_})));
+          cur_->push_front(while_loop);
+        }
+        cur_->push_front(_Declare(ptype, ref_name(ref.into), sem::ExprPtr()));
+      }
     }
   }
   if (block.constraints.size()) {

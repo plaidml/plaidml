@@ -137,9 +137,28 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   outer->refs.erase(
       std::remove_if(outer->refs.begin(), outer->refs.end(), [&](const auto& ref) { return ref.dir == RefDir::None; }),
       outer->refs.end());
+  // Compute for each reference / for each dimension / the minimal offset
+  std::map<std::string, std::vector<int64_t>> zero_points;
+  for (auto& ref : inner->refs) {
+    auto& vec = zero_points[ref.into];
+    for (auto& aff : ref.access) {
+      int64_t min = 0;
+      for (auto& kvp : aff.getMap()) {
+        if (kvp.first != "" && kvp.second < 0) {
+          min += kvp.second * (tile_by_name[kvp.first] - 1);
+        }
+      }
+      vec.push_back(min);
+    }
+  }
   // Adjust inner references
   for (auto& ref : inner->refs) {
-    for (auto& aff : ref.access) {
+    const auto& zeros = zero_points[ref.into];
+    for (size_t i = 0; i < ref.access.size(); i++) {
+      auto& aff = ref.access[i];
+      // We pick to make the outer block do the bumping so it only happens once
+      // But we still need to adjust the zero point of the inner block
+      aff.setConstant(-zeros[i]);
       // Since we're taking a single block and turning it into two (e.g. outer and inner),
       // arrange for only one of the blocks to do the constant pointer bumping.
       if (interleave) {
@@ -151,15 +170,16 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
         }
       }
     }
+    // Don't redo any renames on the inner block (ie, only one, inner or outer needs to rename)
+    ref.from = ref.into;
   }
   for (auto& ref : outer->refs) {
     // Fix the sizes on the outer blocks
     ref.interior_shape = inner->exterior_shape(ref.into);
-    // Save any renames till the inner block (ie, only one, inner or outer needs to rename)
-    ref.into = ref.from;
-    for (auto& aff : ref.access) {
-      // We pick to make the inner block do the bumping so it only happens once
-      aff.setConstant(0);
+    const auto& zeros = zero_points[ref.into];
+    for (size_t i = 0; i < ref.access.size(); i++) {
+      auto& aff = ref.access[i];
+      aff += stripe::Affine(zeros[i]);
       if (!interleave) {
         // Multiply each stride in the outer block refinements by the appropriate tile size
         for (auto& kvp : aff.mutateMap()) {
