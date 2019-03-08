@@ -46,8 +46,9 @@
             "name": "tile_contract",
             "autotile": {
                 "reqs": ["contraction"],  ## Apply to only dense operations
-                "outer_set": ["contract_outer"],
+                "outer_set": ["contract_outer", "kernel"],
                 "inner_set": ["contract_inner"],
+                "clear_outer": true,
                 "only_po2": true,  ## Only consider PO2 sizes for speed
                 "max_total_size": {{ LOCAL_MEM_KIB * 1024 }},  ## All inputs must fit in local memory
                 ## Since all loads to/from global memory are across a wide bus, use that as the
@@ -104,6 +105,9 @@
 
         ## One last attempt to fuse across gpu_threads 
         ## { "name": "fuse_inner", "fusion": { "a_reqs": ["gpu_thread"], "b_reqs": ["gpu_thread"], "perfect": true } },
+
+        ## Next, let's fuse any leftover elementwise ops at the main level
+        ## { "name": "fuse_pure_elemwise", "fusion": { "parent_reqs": ["main"], "a_reqs": ["eltwise"], "b_reqs": ["eltwise"] } },
 
         ## We now locate the kernels onto the GPU compute device
         { "name": "loc_gpu", "locate_inner_block": { "reqs": ["kernel"], "loc": { "name": "GPU" } } },

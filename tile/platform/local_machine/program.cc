@@ -95,7 +95,10 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
   if (use_stripe) {
     static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
     std::string translated = runfiles_db["tile/ocl_exec/gpu.json"];
-    std::string out_path = getenv("STRIPE_OUTPUT") ? "" : getenv("STRIPE_OUTPUT");
+    std::string out_path = "";
+    if (getenv("STRIPE_OUTPUT")) {
+      out_path = getenv("STRIPE_OUTPUT");
+    }
     kernel_list = codegen::GenerateProgram(parsed, inputs, outputs, translated, out_path);
   } else {
     kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, optimizer, program.id(), tile_trials);
