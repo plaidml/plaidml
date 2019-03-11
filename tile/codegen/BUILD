@@ -22,6 +22,8 @@ plaidml_cc_library(
         ":proto_cc",
         "//base/util",
         "//tile/stripe",
+        "//tile/bilp",
+        "@gmock//:gtest",
     ],
 )
 

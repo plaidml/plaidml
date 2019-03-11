@@ -8,6 +8,7 @@
 #include "tile/codegen/autotile.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/codec.h"
+#include "tile/codegen/cstr_reduction.h"
 #include "tile/codegen/deps.h"
 #include "tile/codegen/emitc.h"
 #include "tile/codegen/fuse.h"
@@ -120,6 +121,12 @@ void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions&
         break;
       case proto::Pass::kMemRebase:
         MemRebasePass(block, pass.mem_rebase());
+        break;
+      case proto::Pass::kLightCstrReduction:
+        LightCstrReductionPass(block, pass.light_cstr_reduction());
+        break;
+      case proto::Pass::kIlpCstrReduction:
+        IlpCstrReductionPass(block, pass.ilp_cstr_reduction());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
