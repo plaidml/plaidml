@@ -53,9 +53,19 @@ class AliasMap {
   stripe::Affine translate(const stripe::Affine& in) const;
   // Get access to the sources
   const std::map<std::string, stripe::Affine>& idx_sources() const { return idx_sources_; }
+  // Get index ranges
+  const std::map<std::string, uint64_t> idx_ranges() const { return idx_ranges_; }
+  // Get depth
+  size_t depth() const { return depth_; }
+  // Get the current block
+  stripe::Block* this_block() const { return this_block_; }
+  // Get the parent block
+  stripe::Block* parent_block() const { return parent_block_; }
 
  private:
   size_t depth_;                                // How deep is this AliasInfo
+  stripe::Block* this_block_;                   // The current block
+  stripe::Block* parent_block_;                 // Parent block if we want to remove/modify this block
   std::map<std::string, AliasInfo> info_;       // Per buffer data
   std::map<std::string, uint64_t> idx_ranges_;  // For each depth-prefixed index, what is it's range?
   std::map<std::string, stripe::Affine>
@@ -65,25 +75,26 @@ class AliasMap {
 bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);
 
 template <typename F>
-void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const stripe::Tags& reqs, const F& func) {
-  if (block->has_tags(reqs)) {
-    func(map, block);
-  } else {
+void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const stripe::Tags& reqs, const F& func,
+                        bool rec_func) {
+  bool run_func = block->has_tags(reqs) || reqs.count("all") > 0;
+  if (run_func) func(map, block);
+  if (!run_func || rec_func) {
     for (auto& stmt : block->stmts) {
       auto inner = stripe::Block::Downcast(stmt);
       if (inner) {
         AliasMap inner_map(map, inner.get());
-        RunOnBlocksRecurse(inner_map, inner.get(), reqs, func);
+        RunOnBlocksRecurse(inner_map, inner.get(), reqs, func, rec_func);
       }
     }
   }
 }
 
 template <typename F>
-void RunOnBlocks(stripe::Block* root, const stripe::Tags& reqs, const F& func) {
+void RunOnBlocks(stripe::Block* root, const stripe::Tags& reqs, const F& func, bool rec_func = false) {
   AliasMap base;
   AliasMap root_map(base, root);
-  RunOnBlocksRecurse(root_map, root, reqs, func);
+  RunOnBlocksRecurse(root_map, root, reqs, func, rec_func);
 }
 
 std::ostream& operator<<(std::ostream& os, const AliasInfo& ai);

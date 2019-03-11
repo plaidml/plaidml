@@ -35,12 +35,15 @@ class ILPSolver {
       const std::vector<math::RangeConstraint>& constraints,
       const std::vector<math::Polynomial<math::Rational>>& objectives);
 
+  void set_throw_infeasible(bool b) { throw_infeasible = b; }
+
  private:
   FRIEND_TEST(BilpTest, BasicTableauTest);
   FRIEND_TEST(BilpTest, SimpleOptimizeTest);
   FRIEND_TEST(BilpTest, OptimizeTest2D);
   FRIEND_TEST(BilpTest, TrivialILPTest);
   bool feasible_found = false;
+  bool throw_infeasible = true;
   math::Rational best_objective = 0;
   std::vector<math::Rational> best_solution;
   std::vector<std::string> var_names_;

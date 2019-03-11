@@ -101,6 +101,8 @@ AliasMap::AliasMap() : depth_(0) {}
 
 AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.depth_ + 1) {
   idx_ranges_ = outer.idx_ranges_;
+  this_block_ = block;
+  parent_block_ = outer.this_block();
   // Make a prefix
   std::string prefix = str(boost::format("d%1%:") % depth_);
   // Get all the index data for new indexes
