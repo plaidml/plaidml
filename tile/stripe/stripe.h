@@ -27,6 +27,7 @@ enum class StmtKind {
   Load,
   Store,
   Constant,
+  LoadIndex,
   Special,
   Intrinsic,
   Block,
@@ -35,6 +36,7 @@ enum class StmtKind {
 struct Load;
 struct Store;
 struct Constant;
+struct LoadIndex;
 struct Special;
 struct Intrinsic;
 struct Block;
@@ -43,6 +45,7 @@ struct ConstStmtVisitor {
   virtual void Visit(const Load&) = 0;
   virtual void Visit(const Store&) = 0;
   virtual void Visit(const Constant&) = 0;
+  virtual void Visit(const LoadIndex&) = 0;
   virtual void Visit(const Special&) = 0;
   virtual void Visit(const Intrinsic&) = 0;
   virtual void Visit(const Block&) = 0;
@@ -52,6 +55,7 @@ struct MutableStmtVisitor {
   virtual void Visit(Load*) = 0;
   virtual void Visit(Store*) = 0;
   virtual void Visit(Constant*) = 0;
+  virtual void Visit(LoadIndex*) = 0;
   virtual void Visit(Special*) = 0;
   virtual void Visit(Intrinsic*) = 0;
   virtual void Visit(Block*) = 0;
@@ -61,6 +65,7 @@ struct RewriteStmtVisitor {
   virtual Load* Visit(const Load&) = 0;
   virtual Store* Visit(const Store&) = 0;
   virtual Constant* Visit(const Constant&) = 0;
+  virtual LoadIndex* Visit(const LoadIndex&) = 0;
   virtual Special* Visit(const Special&) = 0;
   virtual Intrinsic* Visit(const Intrinsic&) = 0;
   virtual Block* Visit(const Block&) = 0;
@@ -236,6 +241,19 @@ struct Store : Statement {
   std::string into;
 };
 
+struct LoadIndex : Statement {
+  LoadIndex(const Affine& from, const std::string& into) : from(from), into(into) {}
+  static std::shared_ptr<LoadIndex> Downcast(const std::shared_ptr<Statement>& stmt);
+  StmtKind kind() const { return StmtKind::LoadIndex; }
+  std::vector<std::string> scalar_defs() const { return {into}; }
+  void Accept(ConstStmtVisitor* v) const { v->Visit(*this); }
+  void Accept(MutableStmtVisitor* v) { v->Visit(this); }
+  LoadIndex* Accept(RewriteStmtVisitor* v) { return v->Visit(*this); }
+
+  Affine from;
+  std::string into;
+};
+
 struct Intrinsic : Statement {
   static std::shared_ptr<Intrinsic> Downcast(const std::shared_ptr<Statement>& stmt);
   StmtKind kind() const { return StmtKind::Intrinsic; }
@@ -367,6 +385,7 @@ std::ostream& operator<<(std::ostream& os, const Location& loc);
 std::ostream& operator<<(std::ostream& os, const Index& idx);
 std::ostream& operator<<(std::ostream& os, const Load& op);
 std::ostream& operator<<(std::ostream& os, const Store& op);
+std::ostream& operator<<(std::ostream& os, const LoadIndex& op);
 std::ostream& operator<<(std::ostream& os, const Intrinsic& op);
 std::ostream& operator<<(std::ostream& os, const Special& op);
 std::ostream& operator<<(std::ostream& os, const Constant& op);

@@ -68,6 +68,13 @@ float softmax(float x) {
     }
   }
 
+  void EmitLoadIndex(const Block& block, const LoadIndex& load_index) {
+    EmitLine(format("%1% %2% = %3%;")                  //
+             % IntoC(vertexai::tile::DataType::INT64)  //
+             % ScalarName(load_index.into)             //
+             % ParentResolve(load_index.from));
+  }
+
   void EmitIntrinsic(const Block& block, const Intrinsic& intrinsic) {
     if (intrinsic.outputs.size() > 1) {
       throw std::runtime_error("Only a single output is supported for intrinsics");
@@ -179,6 +186,9 @@ float softmax(float x) {
           break;
         case StmtKind::Store:
           EmitStore(block, *Store::Downcast(stmt));
+          break;
+        case StmtKind::LoadIndex:
+          EmitLoadIndex(block, *LoadIndex::Downcast(stmt));
           break;
         case StmtKind::Intrinsic:
           EmitIntrinsic(block, *Intrinsic::Downcast(stmt));

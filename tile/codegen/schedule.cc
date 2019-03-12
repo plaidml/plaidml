@@ -493,6 +493,8 @@ class IOGatherer final : private stripe::MutableStmtVisitor {
     binder_ = StatementBinder{std::vector<std::pair<std::string*, RefInfo*>>{{&store->into, ri}}};
   }
 
+  void Visit(stripe::LoadIndex* load_index) final {}
+
   void Visit(stripe::Constant*) final {}
 
   void Visit(stripe::Special* special) final {

@@ -20,6 +20,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   explicit SemtreeEmitter(const AliasMap& am, size_t threads);
   void Visit(const stripe::Load&);
   void Visit(const stripe::Store&);
+  void Visit(const stripe::LoadIndex&);
   void Visit(const stripe::Constant&);
   void Visit(const stripe::Special&);
   void Visit(const stripe::Intrinsic&);

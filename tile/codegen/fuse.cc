@@ -379,6 +379,11 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
         op->into = remap_b.at(op->into);
         op->from = scalar_rename.at(op->from);
       } break;
+      case StmtKind::LoadIndex: {
+        auto op = Load::Downcast(stmt);
+        op->into = def_scalar(op->into);
+        op->from = remap_b.at(op->from);
+      }
       case StmtKind::Special: {
         auto op = Special::Downcast(stmt);
         for (auto& in : op->inputs) {

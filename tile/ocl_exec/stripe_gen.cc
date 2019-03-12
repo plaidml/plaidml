@@ -37,6 +37,7 @@ KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const Sh
                            const std::string& cfg_file, const std::string& out_dir) {
   IVLOG(1, inputs);
   IVLOG(1, outputs);
+  IVLOG(1, to_string(prog));
   ShapeMap all;
   auto stripe = GenerateStripe(prog, inputs, outputs, &all);
   auto cfg = ParseConfig<codegen::proto::Config>(ReadFile(cfg_file));
@@ -45,6 +46,7 @@ KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const Sh
       false,                // dump_code
       out_dir + "/passes",  // dbg_dir
   };
+  IVLOG(1, *stripe);
   codegen::Optimize(stripe.get(), cfg.passes(), options);
   IVLOG(1, *stripe);
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
