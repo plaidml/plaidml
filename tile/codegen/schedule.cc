@@ -924,7 +924,8 @@ void Scheduler::Run() {
               ent->source->ref.into,           // from
               internal_swap_backing_ref_name,  // into
               ent->source->alias_info.access,  // access
-              ent->source->alias_info.shape,   // shape
+              ent->source->alias_info.shape,   // interior_shape
+              ent->source->alias_info.shape,   // exterior_shape (FIXME)
               "",                              // agg_op
               ent->source->ref.location,       // location
               0,                               // offset
@@ -1556,7 +1557,8 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       ent->source->ref.into,         // from
       "src",                         // into
       ent->source->ref_swap_access,  // access
-      ent->source->ref_swap_shape,   // shape
+      ent->source->ref_swap_shape,   // interior_shape
+      ent->source->ref_swap_shape,   // exterior_shape (FIXME)
       "",                            // agg_op
       ent->source->ref.location,     // location
       0,                             // offset
@@ -1570,7 +1572,8 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       ent->name,                       // from
       "dst",                           // into
       ent->source->cache_swap_access,  // access
-      ent->source->cache_swap_shape,   // shape
+      ent->source->cache_swap_shape,   // interior_shape
+      ent->source->cache_swap_shape,   // exterior_shape (FIXME)
       "",                              // agg_op
       banked_mem_loc,                  // location
       0,                               // offset
@@ -1605,7 +1608,8 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       ent->name,                       // from
       "src",                           // into
       ent->source->cache_swap_access,  // access
-      ent->source->cache_swap_shape,   // shape
+      ent->source->cache_swap_shape,   // interior_shape
+      ent->source->cache_swap_shape,   // exterior_shape (FIXME)
       "",                              // agg_op
       banked_mem_loc,                  // location
       0,                               // offset
@@ -1617,7 +1621,8 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       ent->source->ref.into,         // from
       "dst",                         // into
       ent->source->ref_swap_access,  // access
-      ent->source->ref_swap_shape,   // shape
+      ent->source->ref_swap_shape,   // interior_shape
+      ent->source->ref_swap_shape,   // exterior_shape (FIXME)
       "",                            // agg_op
       ent->source->ref.location,     // location
       0,                             // offset
@@ -1670,7 +1675,8 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       backing_ref_name,             // from
       "src",                        // into
       local_src_access,             // access
-      ent->source->ref_swap_shape,  // shape
+      ent->source->ref_swap_shape,  // interior_shape
+      ent->source->ref_swap_shape,  // exterior_shape (FIXME)
       "",                           // agg_op
       ent->source->ref.location,    // location
       0,                            // offset
@@ -1684,7 +1690,8 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       ent->interior_name,             // from
       "dst",                          // into
       local_dst_access,               // access
-      ent->source->cache_swap_shape,  // shape
+      ent->source->cache_swap_shape,  // interior_shape
+      ent->source->cache_swap_shape,  // exterior_shape (FIXME)
       "",                             // agg_op
       banked_mem_loc,                 // location
       0,                              // offset
@@ -1732,7 +1739,8 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       ent->interior_name,             // from
       "src",                          // into
       local_src_access,               // access
-      ent->source->cache_swap_shape,  // shape
+      ent->source->cache_swap_shape,  // interior_shape
+      ent->source->cache_swap_shape,  // exterior_shape (FIXME)
       "",                             // agg_op
       banked_mem_loc,                 // location
       0,                              // offset
@@ -1744,7 +1752,8 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       backing_ref_name,             // from
       "dst",                        // into
       local_dst_access,             // access
-      ent->source->ref_swap_shape,  // shape
+      ent->source->ref_swap_shape,  // interior_shape
+      ent->source->ref_swap_shape,  // exterior_shape (FIXME)
       "",                           // agg_op
       ent->source->ref.location,    // location
       0,                            // offset

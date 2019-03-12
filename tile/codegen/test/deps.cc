@@ -25,12 +25,14 @@ TEST(DepsTest, SmallDepMix) {
         refs {
           into: "b1"
           loc: { unit { } }
-          shape { type: FLOAT32 dims: {size:1 stride:1} } 
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
+          exterior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
         }
         refs {
           into: "b2"
           loc: { unit { } }
-          shape { type: FLOAT32 dims: {size:1 stride:1} }
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
         }
         stmts { load { from:"b1" into:"$1" } }
         stmts { store { from:"$1" into:"b2" } }
@@ -59,12 +61,14 @@ TEST(DepsTest, SmallDepMix) {
         refs {
           into: "b1"
           loc: { unit { } }
-          shape { type: FLOAT32 dims: {size:1 stride:1} } 
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
+          exterior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
         }
         refs {
           into: "b2"
           loc: { unit { } }
-          shape { type: FLOAT32 dims: {size:1 stride:1} }
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
         }
         stmts { load { from:"b1" into:"$1" } }
         stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -86,7 +90,8 @@ TEST(DepsTest, Subregion) {
     refs {
       into: "buf"
       access [ { offset: 0 }, { offset: 0 } ]
-      shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
+      interior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
+      exterior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
       loc { unit { } }
     }
     stmts {
@@ -96,19 +101,22 @@ TEST(DepsTest, Subregion) {
         refs {
           from: "buf" into: "b1" dir: In
           access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { unit { } }
         }
         refs {
           from: "buf" into: "b2" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { unit { } }
         }
         refs {
           from: "buf" into: "b3" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { unit { offset: 1 } }
         }
         stmts { constant { name:"$1" iconst: 0 } }
@@ -131,7 +139,8 @@ TEST(DepsTest, Subregion) {
     refs {
       into: "buf"
       access [ { offset: 0 }, { offset: 0 } ]
-      shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
+      interior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
+      exterior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
       loc { unit { } }
     }
     stmts {
@@ -142,19 +151,22 @@ TEST(DepsTest, Subregion) {
         refs {
           from: "buf" into: "b1" dir: In
           access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { unit { } }
         }
         refs {
           from: "buf" into: "b2" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { unit { } }
         }
         refs {
           from: "buf" into: "b3" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { unit { offset: 1 } }
         }
         stmts { constant { name:"$1" iconst: 0 } }

@@ -31,7 +31,11 @@ class StripeGenerator {
   const Bindings& vars() { return vars_; }
 
   explicit StripeGenerator(Program prog, const ShapeMap& inputs, const ShapeMap& outputs)
-      : name_("stripe_program"), parsed_(prog), input_shapes_(inputs), output_shapes_(outputs), i8_mode_(false) {
+      : name_("stripe_program"),  //
+        parsed_(prog),
+        input_shapes_(inputs),
+        output_shapes_(outputs),
+        i8_mode_(false) {
     vars_ = BindProgram(&parsed_, input_shapes_, output_shapes_);
   }
 
@@ -51,6 +55,36 @@ class StripeGenerator {
     // Add decls for external inputs/outputs
     AddDecls(program.get(), main.get(), input_shapes_, true);
     AddDecls(program.get(), main.get(), output_shapes_, false);
+    // Add decls for temporaries
+    for (const auto& item : vars_) {
+      if (externals_.count(item.first) == 0) {
+        const auto& binding = item.second;
+        auto shape = AdjustShape(binding.shape);
+        if (binding.tag == Binding::TENSOR) {
+          std::vector<Affine> access(binding.shape.dims.size());
+          Refinement new_ref{
+              RefDir::None,  // dir
+              "",            // from
+              item.first,    // into
+              access,        // access
+              shape,         // interior_shape
+              shape,         // exterior_shape
+          };
+          new_ref.set_tag("tmp");
+          program->refs.emplace_back(new_ref);
+          Refinement tmp_ref{
+              RefDir::InOut,  // dir
+              item.first,     // from
+              item.first,     // into
+              access,         // access
+              shape,          // interior_shape
+              shape,          // exterior_shape
+          };
+          tmp_ref.set_tag("tmp");
+          main->refs.emplace_back(tmp_ref);
+        }
+      }
+    }
     // Add kernels to main
     for (size_t op_idx = 0; op_idx < parsed_.ops.size(); op_idx++) {
       const auto& op = parsed_.ops[op_idx];
@@ -77,42 +111,6 @@ class StripeGenerator {
           break;
       }
     }
-    // Add decls for temporaries
-    for (const auto& item : vars_) {
-      if (externals_.count(item.first) == 0) {
-        const auto& binding = item.second;
-        auto shape = AdjustShape(binding.shape);
-        if (binding.tag == Binding::TENSOR) {
-          std::vector<Affine> access(binding.shape.dims.size());
-          Refinement new_ref{
-              RefDir::None,  // dir
-              "",            // from
-              item.first,    // into
-              access,        // access
-              shape,         // shape
-              "",            // agg_op
-              {},            // location
-              0,             // offset
-              boost::none,   // bank_dim
-          };
-          new_ref.set_tag("tmp");
-          program->refs.emplace_back(new_ref);
-          Refinement tmp_ref{
-              RefDir::InOut,  // dir
-              item.first,     // from
-              item.first,     // into
-              access,         // access
-              shape,          // shape
-              "",             // agg_op
-              {},             // location
-              0,              // offset
-              boost::none     // bank_dim
-          };
-          tmp_ref.set_tag("tmp");
-          main->refs.emplace_back(tmp_ref);
-        }
-      }
-    }
     IVLOG(2, "Done");
     Stripe stripe;
     stripe.program = program;
@@ -132,25 +130,19 @@ class StripeGenerator {
           "",            // from
           item.first,    // into
           access,        // access
-          shape,         // shape
-          "",            // agg_op
-          {},            // location
-          0,             // offset
-          boost::none,   // bank_dim
+          shape,         // interior_shape
+          shape,         // exterior_shape
       };
       new_ref.set_tag("user");
       program->refs.emplace_back(new_ref);
       if (is_input) {
         main->refs.emplace_back(Refinement{
-            RefDir::In,   // dir
-            item.first,   // from
-            item.first,   // into
-            access,       // access
-            shape,        // shape
-            "",           // agg_op
-            {},           // location
-            0,            // offset
-            boost::none,  // bank_dim
+            RefDir::In,  // dir
+            item.first,  // from
+            item.first,  // into
+            access,      // access
+            shape,       // interior_shape
+            shape,       // exterior_shape
         });
       } else {
         main->refs.emplace_back(Refinement{
@@ -158,9 +150,9 @@ class StripeGenerator {
             item.first,         // from
             item.first,         // into
             access,             // access
-            shape,              // shape
+            shape,              // interior_shape
+            shape,              // exterior_shape
             Intrinsic::ASSIGN,  // agg_op
-            {},                 // location
         });
       }
     }
@@ -194,20 +186,21 @@ class StripeGenerator {
     kernel->name += "(";
     for (size_t i = 0; i < cion.specs.size(); i++) {
       const auto& spec = cion.specs[i];
-      auto shape = ScalarShape(spec.id);
+      auto interior_shape = ScalarShape(spec.id);
       std::vector<Affine> access;
       for (const auto& poly : spec.spec) {
         access.emplace_back(Integerize(poly, bounds));
       }
       if (i == 0) {
+        auto exterior_shape = main->ref_by_into(spec.id)->interior_shape;
         kernel->refs.emplace_back(Refinement{
             RefDir::Out,            // dir
             spec.id,                // from
             spec.id,                // into
             access,                 // access
-            shape,                  // shape
+            interior_shape,         // interior_shape
+            exterior_shape,         // exterior_shape
             GetAggOp(cion.agg_op),  // agg_op
-            {},                     // location
         });
       } else {
         if (i != 1) {
@@ -229,16 +222,14 @@ class StripeGenerator {
           }
         }
         // otherwise fall through and do a normal load
+        auto exterior_shape = main->ref_by_into(spec.id)->interior_shape;
         Refinement ref{
-            RefDir::In,   // dir
-            spec.id,      // from
-            sname,        // into
-            access,       // access
-            shape,        // shape
-            "",           // agg_op
-            {},           // location
-            0,            // offset
-            boost::none,  // bank_dim
+            RefDir::In,      // dir
+            spec.id,         // from
+            sname,           // into
+            access,          // access
+            interior_shape,  // interior_shape
+            exterior_shape,  // exterior_shape
         };
         ref.set_tag("contraction");
         kernel->refs.emplace_back(ref);
@@ -265,6 +256,7 @@ class StripeGenerator {
     if (NeedsInitialize(*kernel, shapes[0])) {
       auto stmt = std::make_shared<Block>();
       stmt->set_tag("kernel");
+      auto out_exterior_shape = main->ref_by_into(op.output)->interior_shape;
       TensorShape interior_shape{shapes[0].type,
                                  std::vector<TensorDimension>(shapes[0].dims.size(), TensorDimension{1, 1})};
       std::vector<Affine> dst_access;
@@ -278,11 +270,12 @@ class StripeGenerator {
         }
       }
       stmt->refs.emplace_back(Refinement{
-          RefDir::Out,    // dir
-          op.output,      // from
-          "dst",          // into
-          dst_access,     // access
-          interior_shape  // shape
+          RefDir::Out,         // dir
+          op.output,           // from
+          "dst",               // into
+          dst_access,          // access
+          interior_shape,      // interior_shape
+          out_exterior_shape,  // exterior_shape
       });
 
       if (op.c.use_default.empty()) {
@@ -292,18 +285,20 @@ class StripeGenerator {
         stmt->stmts.emplace_back(std::make_shared<Constant>("$ZERO", INT64_C(0)));
         stmt->stmts.emplace_back(std::make_shared<Store>("$ZERO", "dst"));
       } else {
+        auto src_exterior_shape = main->ref_by_into(op.c.use_default)->interior_shape;
         stmt->set_tag("copy");
         stmt->name = op.output + " = " + op.c.use_default;
         stmt->comments = "Pre-Initialize " + op.output;
         stmt->refs.emplace_back(Refinement{
-            RefDir::In,        // dir
-            op.c.use_default,  // from
-            "src",             // into
-            dst_access,        // access
-            interior_shape,    // shape
-            "",                // agg_op
-            {},                // location
-            true               // is_const
+            RefDir::In,          // dir
+            op.c.use_default,    // from
+            "src",               // into
+            dst_access,          // access
+            interior_shape,      // interior_shape
+            src_exterior_shape,  // exterior_shape
+            "",                  // agg_op
+            {},                  // location
+            true                 // is_const
         });
         stmt->stmts.emplace_back(std::make_shared<Load>("src", "$X"));
         stmt->stmts.emplace_back(std::make_shared<Store>("$X", "dst"));
@@ -430,16 +425,14 @@ class StripeGenerator {
               }
             }
           }
+          auto exterior_shape = main->ref_by_into(input)->interior_shape;
           Refinement ref{
               RefDir::In,          // dir
               input,               // from
               input,               // into
               access,              // access
-              ScalarShape(input),  // shape
-              "",                  // agg_op
-              {},                  // location
-              0,                   // offset
-              boost::none,         // bank_dim
+              ScalarShape(input),  // interior_shape
+              exterior_shape,      // exterior_shape
           };
           ref.set_tag("eltwise_" + op.f.fn);
           kernel->refs.emplace_back(ref);
@@ -464,14 +457,14 @@ class StripeGenerator {
         remove_if(kernel->idxs.begin(), kernel->idxs.end(), [](const Index& idx) { return idx.range == 1; }),
         kernel->idxs.end());
 
+    auto exterior_shape = main->ref_by_into(op.output)->interior_shape;
     kernel->refs.emplace_back(Refinement{
         RefDir::Out,             // dir
         op.output,               // from
         op.output,               // into
         out_access,              // access
-        ScalarShape(op.output),  // shape
-        "",                      // agg_op
-        {},                      // location
+        ScalarShape(op.output),  // interior_shape
+        exterior_shape,          // exterior_shape
     });
 
     // INTRINSIC
@@ -732,16 +725,18 @@ Stripe GenerateStripe(const RunInfo& runinfo, bool i8_mode) {  //
   return StripeGenerator(runinfo, i8_mode).Run();
 }
 
-std::shared_ptr<Block> GenerateStripe(const Program& prog, const ShapeMap& inputs, const ShapeMap& outputs,
+std::shared_ptr<Block> GenerateStripe(const Program& prog,      //
+                                      const ShapeMap& inputs,   //
+                                      const ShapeMap& outputs,  //
                                       ShapeMap* all) {
-  StripeGenerator sg(prog, inputs, outputs);
-  auto r = sg.Run();
-  for (const auto& kvp : sg.vars()) {
+  StripeGenerator generator(prog, inputs, outputs);
+  auto stripe = generator.Run();
+  for (const auto& kvp : generator.vars()) {
     if (kvp.second.tag == Binding::TENSOR) {
       (*all)[kvp.first] = kvp.second.shape;
     }
   }
-  return r.program;
+  return stripe.program;
 }
 
 }  // namespace lang

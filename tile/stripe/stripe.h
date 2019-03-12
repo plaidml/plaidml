@@ -176,7 +176,8 @@ struct Refinement : Taggable {
              const std::string& from,                //
              const std::string& into,                //
              const std::vector<Affine>& access,      //
-             const TensorShape& shape,               //
+             const TensorShape& interior_shape,      //
+             const TensorShape& exterior_shape,      //
              const std::string& agg_op = "",         //
              const Location& location = Location{},  //
              uint64_t offset = 0,                    //
@@ -186,7 +187,8 @@ struct Refinement : Taggable {
         from(from),
         into(into),
         access(access),
-        interior_shape(shape),
+        interior_shape(interior_shape),
+        exterior_shape(exterior_shape),
         agg_op(agg_op),
         location(location),
         offset(offset),
@@ -198,6 +200,7 @@ struct Refinement : Taggable {
   std::string into;
   std::vector<Affine> access;
   TensorShape interior_shape;
+  TensorShape exterior_shape;
   std::string agg_op;
   Location location;
   uint64_t offset = 0;                      // Offset within the location's arena.
@@ -333,7 +336,7 @@ struct Block : Statement {
   std::string unique_ref_name(const std::string& into) const;
   // Make a unique index name (by appending _2, etc, if needed)
   std::string unique_idx_name(const std::string& name) const;
-  TensorShape exterior_shape(const std::string& name) const;
+  TensorShape exterior_shape(const std::string& name, const TensorShape& outer_shape) const;
 
   std::shared_ptr<Block> SubBlock(size_t pos) const {
     auto it = stmts.begin();
