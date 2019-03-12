@@ -152,6 +152,9 @@ void PrintStmt(std::ostream& os,       //
     case StmtKind::Store:
       os << *dynamic_cast<const Store*>(&stmt) << std::endl;
       break;
+    case StmtKind::LoadIndex:
+      os << *dynamic_cast<const LoadIndex*>(&stmt) << std::endl;
+      break;
     case StmtKind::Intrinsic:
       os << *dynamic_cast<const Intrinsic*>(&stmt) << std::endl;
       break;
@@ -232,6 +235,10 @@ std::shared_ptr<Store> Store::Downcast(const std::shared_ptr<Statement>& stmt) {
   return std::dynamic_pointer_cast<Store>(stmt);
 }
 
+std::shared_ptr<LoadIndex> LoadIndex::Downcast(const std::shared_ptr<Statement>& stmt) {  //
+  return std::dynamic_pointer_cast<LoadIndex>(stmt);
+}
+
 std::shared_ptr<Intrinsic> Intrinsic::Downcast(const std::shared_ptr<Statement>& stmt) {  //
   return std::dynamic_pointer_cast<Intrinsic>(stmt);
 }
@@ -264,6 +271,11 @@ std::ostream& operator<<(std::ostream& os, const Load& op) {
 
 std::ostream& operator<<(std::ostream& os, const Store& op) {
   os << op.into << " = store(" << op.from << ")";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const LoadIndex& op) {
+  os << op.into << " = load_index(" << op.from << ")";
   return os;
 }
 
@@ -508,6 +520,7 @@ class CloneVisitor : RewriteStmtVisitor {
   explicit CloneVisitor(int depth) : depth_(depth) {}
   Load* Visit(const Load& x) { return new Load(x); }
   Store* Visit(const Store& x) { return new Store(x); }
+  LoadIndex* Visit(const LoadIndex& x) { return new LoadIndex(x); }
   Constant* Visit(const Constant& x) { return new Constant(x); }
   Special* Visit(const Special& x) { return new Special(x); }
   Intrinsic* Visit(const Intrinsic& x) { return new Intrinsic(x); }
@@ -762,6 +775,12 @@ proto::Block IntoProto(const Block& block) {
         auto pb_store = pb_stmt->mutable_store();
         pb_store->set_from(store->from);
         pb_store->set_into(store->into);
+      } break;
+      case StmtKind::LoadIndex: {
+        auto load_index = LoadIndex::Downcast(stmt);
+        auto pb_load_index = pb_stmt->mutable_load_index();
+        *pb_load_index->mutable_from() = IntoProto(load_index->from);
+        pb_load_index->set_into(load_index->into);
       } break;
       case StmtKind::Constant: {
         auto constant = Constant::Downcast(stmt);

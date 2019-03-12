@@ -122,28 +122,30 @@ message Statement {
     Load load = 1;
     // A store from scalar value into a refinement
     Store store = 2;
+    // A load from an index into a scalar value
+    LoadIndex load_index = 3;
     // Perform an intrinsic (primitive) operation on one or more scalars and
     // produce one or more scalars as output.
-    Intrinsic intrinsic = 3;
+    Intrinsic intrinsic = 4;
     // Declare a constant scalar value
-    Constant constant = 4;
+    Constant constant = 5;
     // Execute an entire sub-block
-    Block block = 5;
+    Block block = 6;
     // Perform a 'special' operation.  Specials operate on refinements, and may
     // arbitrarily read/write data to those refinements, but unlike a block the
     // semantic effect is not described in Stripe, but is simple a function of
     // the name of the special.
-    Special special = 6;
+    Special special = 7;
   }
 
   // Indices of intra-block dependencies.  That is, this statement depends on
   // prior statements listed in deps.  Can be used to determine which
   // statements can be simultaneously scheduled.
-  repeated uint32 deps = 7;
+  repeated uint32 deps = 8;
   // A set of user defined 'tags' that are attached to a statement.  They do
   // not have any specific semantic meaning, but are often used to pass
   // membership information between optimization passes
-  repeated string tags = 8;
+  repeated string tags = 9;
 }
 
 // A load statement
@@ -160,6 +162,14 @@ message Store {
   string from = 1;
   // The refinement being written to.  Note, the scalar in from is actually
   // accumulated into the refinement based on it's agg_op.
+  string into = 2;
+}
+
+// A load_index statement
+message LoadIndex {
+  // The affine to load from
+  Affine from = 1;
+  // The scalar value to define as the result of the load
   string into = 2;
 }
 

@@ -124,6 +124,11 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
         tracker.ReadScalar(*block, store->from);
         tracker.WriteBuffer(it, store->into, alias_map);
       } break;
+      case StmtKind::LoadIndex: {
+        auto load_index = LoadIndex::Downcast(*it);
+        IVLOG(3, "  loadIndex: " << load_index);
+        tracker.WriteScalar(*block, it, load_index->into);
+      } break;
       case StmtKind::Special: {
         auto special = Special::Downcast(*it);
         IVLOG(3, "  special: " << special);

@@ -96,6 +96,12 @@ void SemtreeEmitter::Visit(const stripe::Store& stmt) {
   cur_->push_back(lval = agg);
 }
 
+void SemtreeEmitter::Visit(const stripe::LoadIndex& stmt) {
+  auto lhs_name = scalar_name(stmt.into);
+  auto rhs = convert_affine(stmt.from.sym_eval(scope_->idx_sources()));
+  cur_->push_back(_Declare({sem::Type::VALUE, DataType::INT64}, lhs_name, rhs));
+}
+
 void SemtreeEmitter::Visit(const stripe::Constant& stmt) {
   sem::Type type(sem::Type::VALUE);
   sem::ExprPtr expr;

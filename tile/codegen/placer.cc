@@ -117,6 +117,8 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
 
   void Visit(stripe::Store* store) final { RecordUse(store->into); }
 
+  void Visit(stripe::LoadIndex* load_index) final {}
+
   void Visit(stripe::Constant*) final {}  // unused
 
   void Visit(stripe::Special* special) final {

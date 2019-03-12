@@ -68,6 +68,8 @@ class StripeGenerator {
             ProcessSpecial(main.get(), op_idx);
           } else if (op.f.fn == "reshape") {
             ProcessReshape(main.get(), op);
+          } else if (op.f.fn == "index") {
+            ProcessIndex(program.get(), main.get(), op);
           } else {
             ProcessElementwise(program.get(), main.get(), op);
           }
@@ -500,6 +502,85 @@ class StripeGenerator {
     stmt->inputs = op.inputs;
     stmt->outputs = {op.output};
     main->stmts.push_back(stmt);
+  }
+
+  void ProcessIndex(Block* program, Block* main, const Op& op) {
+    auto kernel = AddKernel(main, op);
+    kernel->set_tag("eltwise");
+    kernel->set_tag("eltwise_" + op.f.fn);
+
+    auto out_shape = GetShape(op.output);
+    std::vector<Affine> out_access;
+    for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
+      Index idx{
+          str(boost::format("i%zu") % (i + 1)),  // name
+          out_shape.dims[i].size,                // range
+      };
+      if (out_shape.dims[i].size > 1) {
+        out_access.emplace_back(Affine{idx.name});
+      } else {
+        out_access.emplace_back(Affine{0});
+      }
+      kernel->idxs.emplace_back(idx);
+    }
+
+    kernel->name += "(";
+    const auto& input = op.inputs[0];
+    const auto& input_binding = vars_.at(input);
+    assert(input_binding.tqg == Binding::TENSOR);
+    kernel->name += input;
+
+    auto shape = AdjustShape(input_binding.shape);
+    std::vector<Affine> access;
+    int diff = out_shape.dims.size() - shape.dims.size();
+    for (int i = 0; i < out_shape.dims.size(); i++) {
+      if (i >= diff) {
+        const auto& dim = shape.dims[i - diff];
+        if (dim.size > 1) {
+          access.emplace_back(Affine{kernel->idxs[i].name});
+        } else {
+          access.emplace_back(Affine{});
+        }
+      }
+    }
+    Refinement ref{
+        RefDir::In,          // dir
+        input,               // from
+        input,               // into
+        access,              // access
+        ScalarShape(input),  // shape
+        "",                  // agg_op
+        {},                  // location
+        0,                   // offset
+        boost::none,         // bank_dim
+    };
+    ref.set_tag("eltwise_" + op.f.fn);
+    kernel->refs.emplace_back(ref);
+
+    const auto& dim_binding = vars_.at(op.inputs[1]);
+    assert(dim_binding.tag == Binding::ICONST);
+    const std::string& load_idx_name = kernel->idxs[dim_binding.iconst].name;
+    kernel->stmts.push_back(std::make_shared<LoadIndex>(Affine(load_idx_name), ScalarName(op.output)));
+    kernel->name += ")";
+
+    // Remove unused indexes
+    kernel->idxs.erase(
+        remove_if(kernel->idxs.begin(), kernel->idxs.end(), [](const Index& idx) { return idx.range == 1; }),
+        kernel->idxs.end());
+
+    // Add the output refinement
+    kernel->refs.emplace_back(Refinement{
+        RefDir::Out,             // dir
+        op.output,               // from
+        op.output,               // into
+        out_access,              // access
+        ScalarShape(op.output),  // shape
+        "",                      // agg_op
+        {},                      // location
+    });
+
+    // STORE
+    kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));
   }
 
   void ProcessPrng(Block* main, size_t op_idx) {
