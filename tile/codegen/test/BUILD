@@ -8,6 +8,7 @@ plaidml_cc_test(
         "//tile/codegen",
         "//tile/lang",
         "//tile/lib",
+        "//tile/ocl_exec",
         "@boost//:filesystem",
     ],
 )
