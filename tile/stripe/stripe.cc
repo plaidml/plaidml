@@ -82,12 +82,12 @@ void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
     }
     for (const auto& kvp : sorted) {
       PrintTab(os, depth + 2);
-      os << PrintRefinement{*kvp.second, &block} << std::endl;
+      os << *kvp.second << std::endl;
     }
   } else {
     for (const auto& ref : block.refs) {
       PrintTab(os, depth + 2);
-      os << PrintRefinement{ref, &block} << std::endl;
+      os << ref << std::endl;
     }
   }
 }
@@ -331,12 +331,6 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
-  os << PrintRefinement{ref};
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
-  const auto& ref = printer.ref;
   if (ref.tags.size()) {
     for (const auto& tag : ref.tags) {
       os << "#" << tag << " ";

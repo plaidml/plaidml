@@ -359,13 +359,6 @@ bool operator<(const Location& lhs, const Location& rhs);
 
 std::string to_string(const Location& loc);
 
-struct PrintRefinement {
-  explicit PrintRefinement(const Refinement& ref, const Block* block = nullptr) : ref(ref), block(block) {}
-
-  const Refinement& ref;
-  const Block* block = nullptr;
-};
-
 std::ostream& operator<<(std::ostream& os, const Location& loc);
 std::ostream& operator<<(std::ostream& os, const Index& idx);
 std::ostream& operator<<(std::ostream& os, const Load& op);
@@ -374,7 +367,6 @@ std::ostream& operator<<(std::ostream& os, const Intrinsic& op);
 std::ostream& operator<<(std::ostream& os, const Special& op);
 std::ostream& operator<<(std::ostream& os, const Constant& op);
 std::ostream& operator<<(std::ostream& os, const Refinement& ref);
-std::ostream& operator<<(std::ostream& os, const PrintRefinement& ref);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 
 std::shared_ptr<Block> FromProto(const proto::Block& block);

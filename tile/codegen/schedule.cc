@@ -812,7 +812,7 @@ void Scheduler::Run() {
         LOG(WARNING) << "The program simultaneously requires:";
       }
       for (const auto& io : ios) {
-        LOG(WARNING) << "  " << stripe::PrintRefinement{io.ri->ref, current_block};
+        LOG(WARNING) << "  " << io.ri->ref;
       }
       throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available"});
     }
