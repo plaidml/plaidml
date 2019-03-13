@@ -38,10 +38,10 @@
         { "name": "loc_program", "locate_memory": { "reqs": ["program"], "loc": { "name": "GLOBAL" } } },
         { "name": "loc_main", "locate_memory": { "reqs": ["main"], "loc": { "name": "GLOBAL" } } },
 
-	## Next, we find all the dense contraction blocks, and split them up
-	## into groups such that the inputs for the innermost loops fit into
-	## shared memory and the outputs fit into the register set of the each
-	## multiprocessor.
+        ## Next, we find all the dense contraction blocks, and split them up
+        ## into groups such that the inputs for the innermost loops fit into
+        ## shared memory and the outputs fit into the register set of the each
+        ## multiprocessor.
         {
             "name": "tile_contract",
             "autotile": {

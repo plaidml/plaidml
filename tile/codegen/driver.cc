@@ -5,6 +5,7 @@
 #include <boost/format.hpp>
 
 #include "base/util/throw.h"
+#include "tile/codegen/alias.h"
 #include "tile/codegen/autotile.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/codec.h"
@@ -28,9 +29,11 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
+using namespace stripe;  // NOLINT
+
 namespace {
 
-void DumpProgram(const stripe::Block& program,    //
+void DumpProgram(const Block& program,            //
                  const OptimizeOptions& options,  //
                  const std::string& name,         //
                  size_t counter) {
@@ -51,9 +54,29 @@ void DumpProgram(const stripe::Block& program,    //
   }
 }
 
+void ValidateBlock(Block* root) {
+  RunOnBlocks(
+      root, {},
+      [&](auto map, auto block) {
+        for (const auto& ref : block->refs) {
+          if (ref.dir == RefDir::None && !ref.from.empty()) {
+            throw_with_trace(std::runtime_error(
+                str(boost::format("ref.dir == RefDir::None && !ref.from.empty(). ref: %1% in block: %2%") % ref.into %
+                    block->name)));
+          }
+          if (ref.from.empty() && ref.dir != RefDir::None) {
+            throw_with_trace(std::runtime_error(
+                str(boost::format("ref.from.empty() && ref.dir != RefDir::None. ref: %1% in block: %2%") % ref.into %
+                    block->name)));
+          }
+        }
+      },
+      true);
+}
+
 }  // namespace
 
-void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions& options) {
+void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options) {
   size_t counter = 0;
   DumpProgram(*block, options, "initial", counter++);
   for (const auto& pass : passes) {
@@ -132,6 +155,7 @@ void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions&
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
     }
     DumpProgram(*block, options, pass.name(), counter++);
+    ValidateBlock(block);
   }
 }
 
