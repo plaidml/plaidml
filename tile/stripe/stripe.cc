@@ -621,6 +621,10 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
         auto stmt = std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into());
         stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
       } break;
+      case proto::Statement::kLoadIndex: {
+        auto stmt = std::make_shared<LoadIndex>(FromProto(pb_stmt.load_index().from()), pb_stmt.load_index().into());
+        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
+      } break;
       case proto::Statement::kConstant:
         switch (pb_stmt.constant().value_case()) {
           case proto::Constant::kIconst: {
