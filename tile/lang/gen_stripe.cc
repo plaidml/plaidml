@@ -527,7 +527,7 @@ class StripeGenerator {
     kernel->name += "(";
     const auto& input = op.inputs[0];
     const auto& input_binding = vars_.at(input);
-    assert(input_binding.tqg == Binding::TENSOR);
+    assert(input_binding.tag == Binding::TENSOR);
     kernel->name += input;
 
     auto shape = AdjustShape(input_binding.shape);

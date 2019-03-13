@@ -57,6 +57,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
   void Visit(const stripe::Store&) override;
+  void Visit(const stripe::LoadIndex&) override;
   void Visit(const stripe::Constant&) override;
   void Visit(const stripe::Special&) override;
   void Visit(const stripe::Intrinsic&) override;
@@ -388,6 +389,14 @@ void Compiler::Visit(const stripe::Store& store) {
     throw Error("Unimplemented agg_op: " + to_string(agg_op));
   }
   builder_.CreateStore(value, element);
+}
+
+void Compiler::Visit(const stripe::LoadIndex& load_index) {
+  // op->from is an affine
+  // op->into is the name of a destination scalar
+  llvm::Value* rval = Eval(load_index.from);
+  llvm::Value* value = builder_.CreateLoad(rval);
+  scalars_[load_index.into] = scalar{value, DataType::INT64};
 }
 
 void Compiler::Visit(const stripe::Constant& constant) {
