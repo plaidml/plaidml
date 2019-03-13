@@ -66,7 +66,7 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
     }
 
     Err err;
-    CLObj<cl_event> event = clCreateUserEvent(device_state_->cl_ctx().get(), err.ptr());
+    CLObj<cl_event> event = ocl::CreateUserEvent(device_state_->cl_ctx().get(), err.ptr());
     Err::Check(err, "Unable to allocate a synchronization event");
 
     Event::WaitFor(dependencies, device_state_)
@@ -75,9 +75,9 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
           try {
             result.get();
             memcpy(static_cast<char*>(to_base) + to_offset, static_cast<char*>(from_base) + from_offset, length);
-            clSetUserEventStatus(event.get(), CL_SUCCESS);
+            ocl::SetUserEventStatus(event.get(), CL_SUCCESS);
           } catch (...) {
-            clSetUserEventStatus(event.get(), CL_OUT_OF_RESOURCES);
+            ocl::SetUserEventStatus(event.get(), CL_OUT_OF_RESOURCES);
           }
         });
 
@@ -87,15 +87,15 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
   if (from_base && to_ptr) {
     // Memory-to-buffer write
     CLObj<cl_event> event;
-    Err err = clEnqueueWriteBuffer(queue.cl_queue.get(),                         // command_queue
-                                   to_ptr,                                       // buffer
-                                   CL_FALSE,                                     // blocking_write
-                                   to_offset,                                    // offset
-                                   length,                                       // size
-                                   static_cast<char*>(from_base) + from_offset,  // ptr
-                                   mdeps.size(),                                 // num_events_in_wait_list
-                                   mdeps.size() ? mdeps.data() : nullptr,        // event_wait_list
-                                   event.LvaluePtr());                           // event
+    Err err = ocl::EnqueueWriteBuffer(queue.cl_queue.get(),                         // command_queue
+                                      to_ptr,                                       // buffer
+                                      CL_FALSE,                                     // blocking_write
+                                      to_offset,                                    // offset
+                                      length,                                       // size
+                                      static_cast<char*>(from_base) + from_offset,  // ptr
+                                      mdeps.size(),                                 // num_events_in_wait_list
+                                      mdeps.size() ? mdeps.data() : nullptr,        // event_wait_list
+                                      event.LvaluePtr());                           // event
     Err::Check(err, "Unable to write to the destination buffer");
     auto result = std::make_shared<Event>(activity.ctx(), device_state_, std::move(event), queue);
     queue.Flush();
@@ -105,15 +105,15 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
   if (from_ptr && to_base) {
     // Buffer-to-memory read
     CLObj<cl_event> event;
-    Err err = clEnqueueReadBuffer(queue.cl_queue.get(),                     // command_queue
-                                  from_ptr,                                 // buffer
-                                  CL_FALSE,                                 // blocking_read
-                                  from_offset,                              // offset
-                                  length,                                   // size
-                                  static_cast<char*>(to_base) + to_offset,  // ptr
-                                  mdeps.size(),                             // num_events_in_wait_list
-                                  mdeps.size() ? mdeps.data() : nullptr,    // event_wait_list
-                                  event.LvaluePtr());                       // event
+    Err err = ocl::EnqueueReadBuffer(queue.cl_queue.get(),                     // command_queue
+                                     from_ptr,                                 // buffer
+                                     CL_FALSE,                                 // blocking_read
+                                     from_offset,                              // offset
+                                     length,                                   // size
+                                     static_cast<char*>(to_base) + to_offset,  // ptr
+                                     mdeps.size(),                             // num_events_in_wait_list
+                                     mdeps.size() ? mdeps.data() : nullptr,    // event_wait_list
+                                     event.LvaluePtr());                       // event
     Err::Check(err, "Unable to read from the source buffer");
     auto result = std::make_shared<Event>(activity.ctx(), device_state_, std::move(event), queue);
     queue.Flush();
@@ -123,15 +123,15 @@ std::shared_ptr<hal::Event> Executor::Copy(const context::Context& ctx, const st
   if (from_ptr && to_ptr) {
     // Buffer-to-buffer copy
     CLObj<cl_event> event;
-    Err err = clEnqueueCopyBuffer(queue.cl_queue.get(),                   // command_queue
-                                  from_ptr,                               // src_buffer
-                                  to_ptr,                                 // dst_buffer
-                                  from_offset,                            // src_offset
-                                  to_offset,                              // dst_offset
-                                  length,                                 // size
-                                  mdeps.size(),                           // num_events_in_wait_list
-                                  mdeps.size() ? mdeps.data() : nullptr,  // event_wait_list
-                                  event.LvaluePtr());                     // event
+    Err err = ocl::EnqueueCopyBuffer(queue.cl_queue.get(),                   // command_queue
+                                     from_ptr,                               // src_buffer
+                                     to_ptr,                                 // dst_buffer
+                                     from_offset,                            // src_offset
+                                     to_offset,                              // dst_offset
+                                     length,                                 // size
+                                     mdeps.size(),                           // num_events_in_wait_list
+                                     mdeps.size() ? mdeps.data() : nullptr,  // event_wait_list
+                                     event.LvaluePtr());                     // event
     Err::Check(err, "Unable to copy data between the provided buffers");
     auto result = std::make_shared<Event>(activity.ctx(), device_state_, std::move(event), queue);
     queue.Flush();
@@ -161,7 +161,7 @@ boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* 
 
     Err err;
     std::string kname = kinfo.kname;
-    CLObj<cl_kernel> kernel = clCreateKernel(exe->program().get(), kname.c_str(), err.ptr());
+    CLObj<cl_kernel> kernel = ocl::CreateKernel(exe->program().get(), kname.c_str(), err.ptr());
     if (!kernel) {
       throw std::runtime_error(std::string("Unable to initialize OpenCL kernel: ") + err.str());
     }

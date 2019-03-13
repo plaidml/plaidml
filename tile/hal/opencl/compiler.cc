@@ -71,8 +71,8 @@ boost::future<std::unique_ptr<hal::Library>> Build::Start(context::Activity acti
   cl_device_id device_id = device_state->did();
   cl_program prog = build->library_->program().get();
   auto handle = Build::pending_.Acquire(std::move(build));
-  Err err = clBuildProgram(prog, 1, &device_id, "-cl-fast-relaxed-math -cl-mad-enable -cl-unsafe-math-optimizations",
-                           &OnBuildComplete, handle);
+  Err err = ocl::BuildProgram(prog, 1, &device_id, "-cl-fast-relaxed-math -cl-mad-enable -cl-unsafe-math-optimizations",
+                              &OnBuildComplete, handle);
   if (err) {
     LOG(WARNING) << "Failed to build program: " << err;
     OnBuildComplete(prog, handle);
@@ -98,8 +98,8 @@ void Build::OnBuildComplete(cl_program program, void* handle) noexcept {
 
   try {
     cl_build_status status;
-    Err::Check(clGetProgramBuildInfo(build->library_->program().get(), build->device_state_->did(),
-                                     CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr),
+    Err::Check(ocl::GetProgramBuildInfo(build->library_->program().get(), build->device_state_->did(),
+                                        CL_PROGRAM_BUILD_STATUS, sizeof(status), &status, nullptr),
                "Unable to construct program build status");
     if (status == CL_BUILD_SUCCESS) {
       build->prom_.set_value(std::move(build->library_));
@@ -128,13 +128,13 @@ std::string WithLineNumbers(const std::string& src) {
 void Build::OnError() {
   size_t len = 0;
   Err bi_err =
-      clGetProgramBuildInfo(library_->program().get(), device_state_->did(), CL_PROGRAM_BUILD_LOG, 0, nullptr, &len);
+      ocl::GetProgramBuildInfo(library_->program().get(), device_state_->did(), CL_PROGRAM_BUILD_LOG, 0, nullptr, &len);
   if (bi_err != CL_SUCCESS) {
     LOG(ERROR) << "Failed to retrieve build log size: " << bi_err;
   } else {
     std::string buffer(len, '\0');
-    bi_err = clGetProgramBuildInfo(library_->program().get(), device_state_->did(), CL_PROGRAM_BUILD_LOG, len,
-                                   const_cast<char*>(buffer.c_str()), nullptr);
+    bi_err = ocl::GetProgramBuildInfo(library_->program().get(), device_state_->did(), CL_PROGRAM_BUILD_LOG, len,
+                                      const_cast<char*>(buffer.c_str()), nullptr);
     if (bi_err) {
       LOG(ERROR) << "Failed to retrieve build log: " << bi_err;
     } else {
@@ -253,7 +253,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   Err err;
 
   VLOG(4) << "Compiling OpenCL:\n" << WithLineNumbers(binfo.src());
-  CLObj<cl_program> program = clCreateProgramWithSource(device_state_->cl_ctx().get(), 1, &src, nullptr, err.ptr());
+  CLObj<cl_program> program = ocl::CreateProgramWithSource(device_state_->cl_ctx().get(), 1, &src, nullptr, err.ptr());
   if (!program) {
     throw std::runtime_error(std::string("creating an OpenCL program object: ") + err.str());
   }

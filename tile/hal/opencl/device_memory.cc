@@ -16,14 +16,14 @@ DeviceMemory::DeviceMemory(const std::shared_ptr<DeviceState>& device_state) : d
 
 std::shared_ptr<hal::Buffer> DeviceMemory::MakeBuffer(std::uint64_t size, BufferAccessMask /* access */) {
   Err err;
-  CLObj<cl_mem> mem = clCreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE, size, nullptr, err.ptr());
+  CLObj<cl_mem> mem = ocl::CreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE, size, nullptr, err.ptr());
   Err::Check(err, "Unable to allocate device-local memory");
   return std::make_shared<CLMemBuffer>(device_state_, size, std::move(mem));
 }
 
 std::shared_ptr<hal::Arena> DeviceMemory::MakeArena(std::uint64_t size, BufferAccessMask /* access */) {
   Err err;
-  CLObj<cl_mem> mem = clCreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE, size, nullptr, err.ptr());
+  CLObj<cl_mem> mem = ocl::CreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE, size, nullptr, err.ptr());
   Err::Check(err, "Unable to allocate device-local memory");
   return std::make_shared<CLMemArena>(device_state_, size, std::move(mem));
 }
