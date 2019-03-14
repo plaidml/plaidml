@@ -30,14 +30,15 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
                                                              const std::vector<lang::KernelInfo>& kernel_info,
                                                              const hal::proto::HardwareSettings&) {
   static std::once_flag init_once;
+  static std::shared_ptr<llvm::LLVMContext> llvm_ctx;
   std::call_once(init_once, []() {
     LLVMInitializeNativeTarget();
     LLVMLinkInMCJIT();
     LLVMInitializeNativeAsmPrinter();
     LLVMInitializeNativeAsmParser();
+    llvm_ctx = std::make_shared<llvm::LLVMContext>();
   });
 
-  auto llvm_ctx = std::make_shared<llvm::LLVMContext>();
   if (!kernel_info.size()) {
     return boost::make_ready_future(std::unique_ptr<hal::Library>{
         std::make_unique<cpu::Library>(llvm_ctx, std::vector<std::shared_ptr<llvm::ExecutionEngine>>{}, kernel_info)});
