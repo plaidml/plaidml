@@ -26,8 +26,8 @@ class Error : public std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 
-Emit::Emit()
-    : context_(llvm::getGlobalContext()),
+Emit::Emit(llvm::LLVMContext& context)
+    : context_(context),
       builder_{context_},
       module_{new llvm::Module("tile", context_)},
       funcopt_{module_.get()},
@@ -52,7 +52,6 @@ Emit::Emit()
   llvm::PassManagerBuilder pmb;
   pmb.OptLevel = 3;
   pmb.SizeLevel = 0;
-  pmb.BBVectorize = true;
   pmb.SLPVectorize = true;
   pmb.LoopVectorize = true;
   pmb.MergeFunctions = true;
@@ -509,8 +508,7 @@ void Emit::Visit(const sem::CallExpr& n) {
   } else {
     assert(1 == args.size());
     // Apply the target function to each vector element.
-    auto apzero = llvm::APFloat::getZero(llvm::APFloat::IEEEdouble);
-    auto zero = llvm::ConstantFP::get(context_, apzero);
+    auto zero = llvm::ConstantFP::get(builder_.getDoubleTy(), 0);
     auto ltype = CType(gentype);
     auto op = llvm::CastInst::getCastOpcode(zero, true, ltype, true);
     llvm::Value* outvec = builder_.CreateCast(op, zero, ltype);
@@ -587,24 +585,24 @@ void Emit::LimitConstUInt(unsigned bits, sem::LimitConst::Which which) {
   Resolve(value{llvm::ConstantInt::get(ty, apval), comtype});
 }
 
-void Emit::LimitConstFP(const llvm::fltSemantics& sem, sem::LimitConst::Which which) {
-  llvm::APFloat apval(llvm::APFloat::Bogus);
+void Emit::LimitConstFP(llvm::Type* ty, sem::LimitConst::Which which) {
+  llvm::Value* v = nullptr;
   switch (which) {
     case sem::LimitConst::ZERO:
-      apval = llvm::APFloat::getZero(sem);
+      v = llvm::ConstantFP::get(ty, 0.0);
       break;
     case sem::LimitConst::ONE:
-      apval = llvm::APFloat(1.0);
+      v = llvm::ConstantFP::get(ty, 1.0);
       break;
     case sem::LimitConst::MIN:
-      apval = llvm::APFloat::getLargest(sem, /*Negative*/ true);
+      v = llvm::ConstantFP::getInfinity(ty, /*Negative*/ true);
       break;
     case sem::LimitConst::MAX:
-      apval = llvm::APFloat::getLargest(sem, /*Negative*/ false);
+      v = llvm::ConstantFP::getInfinity(ty, /*Negative*/ false);
       break;
   }
   sem::Type comtype{sem::Type::VALUE, DataType::FLOAT64};
-  Resolve(value{llvm::ConstantFP::get(context_, apval), comtype});
+  Resolve(value{v, comtype});
 }
 
 void Emit::Visit(const sem::LimitConst& n) {
@@ -637,13 +635,13 @@ void Emit::Visit(const sem::LimitConst& n) {
       LimitConstUInt(64, n.which);
       break;
     case DataType::FLOAT16:
-      LimitConstFP(llvm::APFloat::IEEEhalf, n.which);
+      LimitConstFP(builder_.getHalfTy(), n.which);
       break;
     case DataType::FLOAT32:
-      LimitConstFP(llvm::APFloat::IEEEsingle, n.which);
+      LimitConstFP(builder_.getFloatTy(), n.which);
       break;
     case DataType::FLOAT64:
-      LimitConstFP(llvm::APFloat::IEEEdouble, n.which);
+      LimitConstFP(builder_.getDoubleTy(), n.which);
       break;
     case DataType::INT128:
     case DataType::PRNG:

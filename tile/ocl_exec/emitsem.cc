@@ -160,8 +160,6 @@ void SemtreeEmitter::Visit(const stripe::Intrinsic& in) {
     opexpr = -in_cast(0);
   } else if (in.name == "bit_not") {
     opexpr = std::make_shared<sem::UnaryExpr>("~", in_val(0));
-  } else if (in.name == "index") {
-    throw std::runtime_error("index intrinsic goo is hard");
   } else {
     std::vector<sem::ExprPtr> inputs;
     for (const auto& str : in.inputs) {

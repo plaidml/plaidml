@@ -12,10 +12,10 @@ namespace tile {
 namespace hal {
 namespace cpu {
 
-class Runtime : public llvm::RuntimeDyld::SymbolResolver {
+class Runtime : public llvm::LegacyJITSymbolResolver {
  public:
-  llvm::RuntimeDyld::SymbolInfo findSymbol(const std::string&) override;
-  llvm::RuntimeDyld::SymbolInfo findSymbolInLogicalDylib(const std::string&) override;
+  llvm::JITSymbol findSymbol(const std::string&) override;
+  llvm::JITSymbol findSymbolInLogicalDylib(const std::string&) override;
 };
 
 }  // namespace cpu

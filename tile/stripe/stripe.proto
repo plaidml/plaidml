@@ -93,20 +93,24 @@ message Refinement {
   // The shape of the refinement for the 'interior' of the block, that is
   // it's shape relative to a single index state during the evaluation of
   // the statements
-  tile.proto.TensorShape shape = 5;
+  tile.proto.TensorShape interior_shape = 5;
+  // The shape of the refinement for the 'exterior' of the block.
+  // This shape represents the extents of each dimension that
+  // the iteration domain of this block reaches.
+  tile.proto.TensorShape exterior_shape = 6;
   // How to aggregate any writes to this refinement
-  string agg_op = 6;
+  string agg_op = 7;
   // The hardware memory bank the refinement exists in
-  Location loc = 7;
+  Location loc = 8;
   // The offset of the start of the buffer holding the block in the memory
   // the block is in.  Only valid after a schedule/placement pass.
-  uint64 offset = 8;
+  uint64 offset = 9;
   // Which bank this refinement is in, or none for non-banked memory
-  google.protobuf.UInt32Value bank_dim = 9;
+  google.protobuf.UInt32Value bank_dim = 10;
   // A set of user defined 'tags' that are attached to the refinement.  They do
   // not have any specific semantic meaning, but are often used to pass
   // membership information between optimization passes
-  repeated string tags = 10;
+  repeated string tags = 11;
 }
 
 // For each index position of a block, the block executes multiple 'Statement'

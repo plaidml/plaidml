@@ -1,3 +1,4 @@
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@com_intel_plaidml//vendor/llvm:build_defs.bzl", "tblgen")
 
 OUT_DIR = "include/llvm/"
@@ -6,10 +7,10 @@ CFG_FILES = [
     OUT_DIR + "Config/AsmParsers.def",
     OUT_DIR + "Config/AsmPrinters.def",
     OUT_DIR + "Config/config.h",
+    OUT_DIR + "Config/abi-breaking.h",
     OUT_DIR + "Config/Disassemblers.def",
     OUT_DIR + "Config/llvm-config.h",
     OUT_DIR + "Config/Targets.def",
-    OUT_DIR + "Support/DataTypes.h",
 ]
 
 PLATFORM_COPTS = select({
@@ -69,10 +70,14 @@ cc_library(
         "lib/Support/**/*.cpp",
         "lib/Support/**/*.c",
         "lib/Support/**/*.h",
+        "lib/Demangle/**/*.cpp",
+        "lib/Demangle/**/*.c",
+        "lib/Demangle/**/*.h",
     ]),
     hdrs = glob([
         "lib/Support/**/*.inc",
         "lib/Target/**/*.h",
+        "lib/Demangle/**/*.h",
     ]) + CFG_FILES,
     copts = PLATFORM_COPTS,
     includes = ["include"],
@@ -105,137 +110,178 @@ cc_binary(
 
 tblgen(
     name = "gen-attrs",
-    action = "-gen-attrs",
-    incs = ["include"],
     src = "include/llvm/IR/Attributes.td",
     out = "include/llvm/IR/Attributes.inc",
+    action = "-gen-attrs",
+    incs = ["include"],
 )
 
 tblgen(
     name = "gen-attrs-compat",
-    action = "-gen-attrs",
-    incs = ["include"],
     src = "lib/IR/AttributesCompatFunc.td",
     out = "lib/IR/AttributesCompatFunc.inc",
+    action = "-gen-attrs",
+    incs = ["include"],
 )
 
 tblgen(
-    name = "gen-intrinsic",
-    action = "-gen-intrinsic",
-    incs = ["include"],
+    name = "gen-intrinsic-enums",
     src = "include/llvm/IR/Intrinsics.td",
-    out = "include/llvm/IR/Intrinsics.gen",
+    out = "include/llvm/IR/IntrinsicEnums.inc",
+    action = "-gen-intrinsic-enums",
+    incs = ["include"],
+)
+
+tblgen(
+    name = "gen-intrinsic-impl",
+    src = "include/llvm/IR/Intrinsics.td",
+    out = "include/llvm/IR/IntrinsicImpl.inc",
+    action = "-gen-intrinsic-impl",
+    incs = ["include"],
 )
 
 tblgen(
     name = "gen-disassembler",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenDisassemblerTables.inc",
     action = "-gen-disassembler",
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenDisassemblerTables.inc",
 )
 
 tblgen(
     name = "gen-instr-info",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenInstrInfo.inc",
     action = "-gen-instr-info",
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenInstrInfo.inc",
 )
 
 tblgen(
     name = "gen-register-info",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenRegisterInfo.inc",
     action = "-gen-register-info",
     incs = [
         "include",
         "lib/Target/X86",
     ],
+)
+
+tblgen(
+    name = "gen-register-bank",
     src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenRegisterInfo.inc",
+    out = "lib/Target/X86/X86GenRegisterBank.inc",
+    action = "-gen-register-bank",
+    incs = [
+        "include",
+        "lib/Target/X86",
+    ],
 )
 
 tblgen(
     name = "gen-subtarget",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenSubtargetInfo.inc",
     action = "-gen-subtarget",
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenSubtargetInfo.inc",
 )
 
 tblgen(
     name = "gen-asm-writer",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenAsmWriter.inc",
     action = "-gen-asm-writer",
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenAsmWriter.inc",
 )
 
 tblgen(
     name = "gen-asm-writer-1",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenAsmWriter1.inc",
     action = "-gen-asm-writer",
     flags = ["-asmwriternum=1"],
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenAsmWriter1.inc",
 )
 
 tblgen(
     name = "gen-asm-matcher",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenAsmMatcher.inc",
     action = "-gen-asm-matcher",
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenAsmMatcher.inc",
 )
 
 tblgen(
     name = "gen-dag-isel",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenDAGISel.inc",
     action = "-gen-dag-isel",
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenDAGISel.inc",
 )
 
 tblgen(
     name = "gen-callingconv",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenCallingConv.inc",
     action = "-gen-callingconv",
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenCallingConv.inc",
 )
 
 tblgen(
     name = "gen-fast-isel",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenFastISel.inc",
     action = "-gen-fast-isel",
     incs = [
         "include",
         "lib/Target/X86",
     ],
+)
+
+tblgen(
+    name = "gen-global-isel",
     src = "lib/Target/X86/X86.td",
-    out = "lib/Target/X86/X86GenFastISel.inc",
+    out = "lib/Target/X86/X86GenGlobalISel.inc",
+    action = "-gen-global-isel",
+    incs = [
+        "include",
+        "lib/Target/X86",
+    ],
+)
+
+tblgen(
+    name = "gen-x86-evex2vex-tables",
+    src = "lib/Target/X86/X86.td",
+    out = "lib/Target/X86/X86GenEVEX2VEXTables.inc",
+    action = "-gen-x86-EVEX2VEX-tables",
+    incs = [
+        "include",
+        "lib/Target/X86",
+    ],
 )
 
 cc_library(
@@ -252,16 +298,19 @@ cc_library(
         ":gen-dag-isel",
         ":gen-disassembler",
         ":gen-fast-isel",
+        ":gen-global-isel",
         ":gen-instr-info",
         ":gen-register-info",
+        ":gen-register-bank",
         ":gen-subtarget",
+        ":gen-x86-evex2vex-tables",
     ],
-    hdrs = [
+    hdrs = glob([
+        "lib/Target/X86/**/*.def",
+    ]) + [
         ":gen-attrs",
-        ":gen-intrinsic",
-    ],
-    deps = [
-        ":support",
+        ":gen-intrinsic-impl",
+        ":gen-intrinsic-enums",
     ],
     copts = PLATFORM_COPTS + [
         "-iquote",
@@ -269,18 +318,50 @@ cc_library(
         "-iquote",
         "$(GENDIR)/external/llvm/lib/Target/X86",
     ],
+    deps = [
+        ":support",
+    ],
     alwayslink = 1,
 )
 
 tblgen(
-    name = "gen-opt-parser-defs",
+    name = "gen-lib-opt-parser-defs",
+    src = "lib/ToolDrivers/llvm-lib/Options.td",
+    out = "lib/ToolDrivers/llvm-lib/Options.inc",
     action = "-gen-opt-parser-defs",
     incs = [
         "include",
         "lib/Target/X86",
     ],
-    src = "lib/LibDriver/Options.td",
-    out = "lib/LibDriver/Options.inc",
+)
+
+tblgen(
+    name = "gen-dlltool-opt-parser-defs",
+    src = "lib/ToolDrivers/llvm-dlltool/Options.td",
+    out = "lib/ToolDrivers/llvm-dlltool/Options.inc",
+    action = "-gen-opt-parser-defs",
+    incs = [
+        "include",
+        "lib/Target/X86",
+    ],
+)
+
+tblgen(
+    name = "gen-inst-combine-tables",
+    src = "lib/Transforms/InstCombine/InstCombineTables.td",
+    out = "lib/Transforms/InstCombine/InstCombineTables.inc",
+    action = "-gen-searchable-tables",
+    incs = ["include"],
+)
+
+# A creator of an empty file include/llvm/Support/VCSRevision.h.
+# This would be constructed by the CMake build infrastructure; a few of the
+# source files try to include it. We leave it blank.
+genrule(
+    name = "vcs_revision_gen",
+    srcs = [],
+    outs = ["include/llvm/Support/VCSRevision.h"],
+    cmd = "echo '' > \"$@\"",
 )
 
 cc_library(
@@ -291,9 +372,11 @@ cc_library(
             "lib/**/*.h",
         ],
         exclude = [
-            "lib/Support/*",
+            "lib/Support/**/*",
             "lib/TableGen/*",
             "lib/Target/**/*",
+            "lib/ToolDrivers/**/*",
+            "lib/Demangle/**/*",
         ] + [
             # need to switch on windows in order to get PDBs
             "lib/DebugInfo/PDB/DIA/**/*",
@@ -301,26 +384,35 @@ cc_library(
             # excluded because they don't build cleanly
             "lib/ExecutionEngine/OProfileJIT/**/*",
             "lib/ExecutionEngine/IntelJITEvents/**/*",
+            "lib/ExecutionEngine/PerfJITEvents/**/*",
             "lib/Fuzzer/**/*",
+            "lib/Testing/**/*",
+            "lib/WindowsManifest/**/*",
         ],
     ) + [
         ":gen-attrs-compat",
-        ":gen-opt-parser-defs",
+        ":gen-lib-opt-parser-defs",
+        ":gen-dlltool-opt-parser-defs",
     ],
     hdrs = glob([
         "lib/**/*.def",
+        "include/llvm/**/*.h",
     ]) + [
+        "include/llvm/Support/VCSRevision.h",
+    ] + [
         ":gen-attrs",
-        ":gen-intrinsic",
-    ],
-    deps = [
-        ":support",
+        ":gen-intrinsic-impl",
+        ":gen-intrinsic-enums",
+        ":gen-inst-combine-tables",
     ],
     copts = PLATFORM_COPTS + [
         "-iquote",
-        "$(GENDIR)/external/llvm/lib/LibDriver",
-        "-iquote",
         "$(GENDIR)/external/llvm/lib/IR",
+        "-iquote",
+        "$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
+    ],
+    deps = [
+        ":support",
     ],
     alwayslink = 1,
 )
@@ -329,47 +421,36 @@ cc_library(
     name = "llvm",
     visibility = ["//visibility:public"],
     deps = [
-        ":support",
         ":lib",
+        ":support",
         ":targets",
     ],
 )
 
-# This is used for pre-compiled libraries
-cc_library(
-    name = "inc",
-    visibility = ["//visibility:public"],
-    hdrs = glob([
+pkg_tar(
+    name = "pkg",
+    srcs = glob([
+        "include/**",
         "lib/Support/**/*.inc",
         "lib/Target/**/*.h",
     ]) + CFG_FILES + [
         ":gen-attrs",
-        ":gen-intrinsic",
+        ":gen-intrinsic-impl",
+        ":gen-intrinsic-enums",
+        ":license",
+        ":lib",
+        ":support",
+        ":targets",
     ],
-    includes = ["include"],
-    linkopts = select({
-        "@toolchain//:windows_x86_64": [],
-        "@toolchain//:macos_x86_64": [],
-        "//conditions:default": [
-            "-pthread",
-            "-ldl",
-        ],
-    }),
-    deps = ["@zlib"],
-)
-
-# This is a dummy target used for eliciting the static libraries created by ":llvm".
-# See @com_intel_plaidml//vendor/llvm/lib/README.md
-cc_binary(
-    name = "static.so",
-    linkshared = 1,
-    deps = [":llvm"],
+    extension = "tar.bz2",
+    strip_prefix = ".",
+    visibility = ["//visibility:public"],
 )
 
 genrule(
     name = "license",
-    visibility = ["//visibility:public"],
     srcs = ["LICENSE.TXT"],
     outs = ["llvm-LICENSE"],
     cmd = "cp $(SRCS) $@",
+    visibility = ["//visibility:public"],
 )

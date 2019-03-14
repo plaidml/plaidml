@@ -199,7 +199,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     const auto& zeros = zero_points[ref.into];
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& aff = ref.access[i];
-      // We pick to make the outer block do the bumping so it only happens once
+      // We pick the outer block to do the bumping so it only happens once
       // But we still need to adjust the zero point of the inner block
       aff.setConstant(-zeros[i]);
       // Since we're taking a single block and turning it into two (e.g. outer and inner),
@@ -213,10 +213,12 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
         }
       }
     }
+    // Fix the sizes on the inner block
+    ref.exterior_shape = inner->exterior_shape(ref.into, ref.exterior_shape);
   }
   for (auto& ref : outer->refs) {
-    // Fix the sizes on the outer blocks
-    ref.interior_shape = inner->exterior_shape(ref.into);
+    // Fix the sizes on the outer block
+    ref.interior_shape = inner->exterior_shape(ref.into, ref.exterior_shape);
     const auto& zeros = zero_points[ref.into];
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& aff = ref.access[i];

@@ -11,8 +11,6 @@ namespace tile {
 namespace hal {
 namespace cpu {
 
-using SymbolInfo = llvm::RuntimeDyld::SymbolInfo;
-
 namespace rt {
 // Implementations of support functions the tile backend will link against,
 // that we won't be able to resolve from system libraries.
@@ -22,14 +20,14 @@ half_float::half f2h(float n) { return half_float::half_cast<half_float::half>(n
 }  // namespace rt
 
 template <typename T>
-SymbolInfo symInfo(T ptr) {
+llvm::JITEvaluatedSymbol symInfo(T ptr) {
   auto flags = llvm::JITSymbolFlags::None;
   auto addr = reinterpret_cast<uintptr_t>(ptr);
-  return SymbolInfo(addr, flags);
+  return llvm::JITEvaluatedSymbol(addr, flags);
 }
 
-SymbolInfo Runtime::findSymbol(const std::string& name) {
-  static std::map<std::string, SymbolInfo> symbols{
+llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
+  static std::map<std::string, llvm::JITEvaluatedSymbol> symbols{
       {"Barrier", symInfo(rt::barrier)},   {"__gnu_h2f_ieee", symInfo(rt::h2f)}, {"__gnu_f2h_ieee", symInfo(rt::f2h)},
       {"___truncsfhf2", symInfo(rt::f2h)}, {"___extendhfsf2", symInfo(rt::h2f)},
   };
@@ -55,7 +53,7 @@ SymbolInfo Runtime::findSymbol(const std::string& name) {
   throw(msg);
 }
 
-SymbolInfo Runtime::findSymbolInLogicalDylib(const std::string& name) { return SymbolInfo(nullptr); }
+llvm::JITSymbol Runtime::findSymbolInLogicalDylib(const std::string& name) { return llvm::JITSymbol(nullptr); }
 
 }  // namespace cpu
 }  // namespace hal

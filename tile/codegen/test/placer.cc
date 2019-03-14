@@ -22,18 +22,14 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
     refs {
       loc { name: "loc_1" unit { } }
       into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_1" unit { } }
       into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -54,18 +50,14 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
     refs {
       loc { name: "loc_1" unit { } }
       into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_1" unit { } }
       into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -81,18 +73,14 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
     refs {
       loc { name: "loc_1" unit { } }
       into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_1" unit { } }
       into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -115,18 +103,14 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
     refs {
       loc { name: "loc_1" unit { } }
       into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_1" unit { } }
       into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       offset: 16
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -144,18 +128,14 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
     refs {
       loc { name: "loc_1" unit { } }
       into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_2" unit { } }
       into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -178,18 +158,14 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
     refs {
       loc { name: "loc_1" unit { } }
       into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_2" unit { } }
       into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -206,26 +182,20 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
     refs {
       loc { name: "loc_1" unit { } }
       into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_2" unit { } }
       into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_2" unit { } }
       into: "b3"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -248,26 +218,20 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
     refs {
       loc { name: "loc_1" unit { } }
       into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_2" unit { } }
       into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { name: "loc_2" unit { } }
       into: "b3"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
+      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }

@@ -13,7 +13,8 @@
 
 namespace llvm {
 class ExecutionEngine;
-}
+class LLVMContext;
+}  // namespace llvm
 
 namespace vertexai {
 namespace tile {
@@ -22,8 +23,10 @@ namespace cpu {
 
 class Executable final : public hal::Executable {
  public:
-  Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis,
+  Executable(std::shared_ptr<llvm::LLVMContext> llvm_context,
+             std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis,
              std::shared_ptr<boost::asio::thread_pool> thread_pool);
+  virtual ~Executable();
 
   std::shared_ptr<hal::Event> Run(const context::Context& ctx, std::size_t kidx,
                                   const std::vector<std::shared_ptr<hal::Buffer>>& params,
@@ -33,6 +36,7 @@ class Executable final : public hal::Executable {
   static std::string InvokerName(std::string kname);
 
  private:
+  std::shared_ptr<llvm::LLVMContext> llvm_context_;
   std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines_;
   std::vector<lang::KernelInfo> kis_;
   std::shared_ptr<boost::asio::thread_pool> thread_pool_;
