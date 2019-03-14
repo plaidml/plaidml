@@ -142,6 +142,8 @@ class Scope {
     }
   }
 
+  float DoLoadIndex(const Affine& idx) { return idx.eval(idxs_); }
+
   void ExecuteStatements(const Block& block) {
     if (!CheckConstraints(block)) {
       return;
@@ -165,6 +167,10 @@ class Scope {
             throw_with_trace(std::runtime_error("Missing agg_op"));
           }
           DoStore(op->into, offsets_[op->into], vars[op->from], it->agg_op);
+        } break;
+        case StmtKind::LoadIndex: {
+          const auto& op = LoadIndex::Downcast(stmt);
+          vars[op->into] = DoLoadIndex(op->from);
         } break;
         case StmtKind::Intrinsic: {
           const auto& op = Intrinsic::Downcast(stmt);

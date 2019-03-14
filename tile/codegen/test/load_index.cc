@@ -130,7 +130,7 @@ proto::Config GenerateCFG() {
                 outer_set: ["fit_part"],
                 skip_1d: true,
                 only_po2: true,
-                max_total_size : 4096,
+                max_total_size : 1024,
                 input_cost: 1.0,
                 output_cost: 1.0,
                 copy_tags: true,
@@ -160,8 +160,43 @@ proto::Config GenerateCFG() {
     passes: { name: "place_program", memory_placement: { reqs: ["program"], locs: [{ name: "DRAM" }], alignment: 4 } }
   )";
   auto cfg = ParseProtoText<proto::Config>(cfg_tmpl);
-  // str(boost::format(cfg_tmpl) % num_banks % procs_per_bank % bank_size % bank_size_KiB));
   return cfg;
+}
+
+std::map<std::string, std::vector<float>> GenerateMatrix(const size_t* dim, std::vector<std::string> vars) {
+  size_t size = dim[0] * dim[1] * dim[2] * dim[3];
+  // We don't care the contents in data
+  std::map<std::string, std::vector<float>> data;
+  for (const auto& var : vars) {
+    data[var] = std::vector<float>(size);
+  }
+  return data;
+}
+
+std::vector<float> GenerateExpected(const size_t* dim, size_t load_dim) {
+  size_t size = dim[0] * dim[1] * dim[2] * dim[3];
+  std::vector<float> result(size);
+  size_t idx = 0;
+  for (int w = 0; w < dim[0]; ++w) {
+    for (int x = 0; x < dim[1]; ++x) {
+      for (int y = 0; y < dim[2]; ++y) {
+        for (int z = 0; z < dim[3]; ++z) {
+          if (load_dim == 0) {
+            result[idx++] = w;
+          } else if (load_dim == 1) {
+            result[idx++] = x;
+          } else if (load_dim == 2) {
+            result[idx++] = y;
+          } else if (load_dim == 3) {
+            result[idx++] = z;
+          } else {
+            throw_with_trace(std::runtime_error("Invalid load_dim in GenerateExpected"));
+          }
+        }
+      }
+    }
+  }
+  return result;
 }
 
 TEST(LoadIndexTest, SimpleIndex) {
@@ -223,28 +258,12 @@ TEST(LoadIndexTest, SimpleIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  std::string expected_kernel0 = R"**(void kernel_1(int* d2_B^0)
-    {
-      int d3_i3 = (get_group_id(0) >> 8);
-      int d4_i4 = ((get_group_id(0) >> 6) & 3);
-      int d4_i3 = ((get_group_id(0) >> 4) & 3);
-      int d4_i2 = ((get_group_id(0) >> 2) & 3);
-      int d4_i1 = (get_group_id(0) & 3);
-      long s_4_B = ((4 * d3_i3) + d4_i3);
-      d2_B^0[((((((((256 * d3_i1) + (64 * d3_i2)) + (16 * d3_i3)) + (4 * d3_i4)) + (64 * d4_i1)) + (16 * d4_i2)) + (4 * d4_i3)) + d4_i4)] = s_4_B;
-    }
-  )**";
-  expected_kernel0 = EraseSpace(expected_kernel0);
-
-  codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
-  emit.Visit(*stripe.program);
-  lang::Simplify(emit.kernels_.kernels);
-
-  sem::Print actual_kernel0(*(emit.kernels_.kernels[0].kfunc));
-  auto actual_kernel0_str = actual_kernel0.str();
-  IVLOG(1, actual_kernel0_str);
-  actual_kernel0_str = EraseSpace(actual_kernel0_str);
-  EXPECT_THAT(actual_kernel0_str, LinesEq(expected_kernel0));
+  size_t dim[4] = {4, 4, 4, 4};
+  std::vector<std::string> vars = {"A", "B"};
+  auto data = GenerateMatrix(dim, vars);
+  auto expected_result = GenerateExpected(dim, 2);
+  ExecuteProgram(*stripe.program, &data);
+  EXPECT_THAT(data["B"], Eq(expected_result));
 }
 
 TEST(LoadIndexTest, AffineIndex) {
@@ -260,28 +279,119 @@ TEST(LoadIndexTest, AffineIndex) {
       B = index(A, 2);
     }
   )***";
-  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {16, 16, 1024, 16}));
-  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {16, 16, 1024, 16}));
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {8, 8, 256, 8}));
+  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {8, 8, 256, 8}));
   auto stripe = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *stripe.program);
 
   std::string expected_stripe = R"**(0: #program
     block []:1 ( // load_index_affine
-        #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(16, 16, 1024, 16):(262144, 16384, 16, 1):16384 KiB
-        #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(16, 16, 1024, 16):(262144, 16384, 16, 1):16384 KiB
+        #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB
+        #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB
     ) {
       0: #main 
       block []:1 ( // main
-          in A[0, 0, 0, 0] fp32:I(16, 16, 1024, 16):(262144, 16384, 16, 1):16384 KiB, E(16, 16, 1024, 16):16384 KiB
-          out B[0, 0, 0, 0]:assign fp32:I(16, 16, 1024, 16):(262144, 16384, 16, 1):16384 KiB, E(16, 16, 1024, 16):16384 KiB
+          in A[0, 0, 0, 0] fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB, E(8, 8, 256, 8):512 KiB
+          out B[0, 0, 0, 0]:assign fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB, E(8, 8, 256, 8):512 KiB
       ) {
         0: #eltwise #eltwise_index #kernel 
-        block [i1:16, i2:16, i3:1024, i4:16]:4194304 ( // kernel_0(A)
+        block [i1:8, i2:8, i3:256, i4:8]:131072 ( // kernel_0(A)
             // B = index(A, _T0)
-            out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(262144, 16384, 16, 1):4 B, E(16, 16, 1024, 16):16384 KiB
+            out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(16384, 2048, 8, 1):4 B, E(8, 8, 256, 8):512 KiB
         ) {
           0: $B = load_index(i3)
           1: B = store($B)
+        }
+      }    
+    }
+  )**";
+
+  std::string actual_stripe = to_string(*stripe.program);
+  actual_stripe = EraseSpace(actual_stripe);
+  expected_stripe = EraseSpace(expected_stripe);
+
+  EXPECT_THAT(actual_stripe, LinesEq(expected_stripe));
+
+  auto cfg = GenerateCFG();
+  auto dbg_dir = std::getenv("DBG_DIR");
+  OptimizeOptions options;
+  options.dump_code = false;
+  options.dump_passes = false;
+  if (dbg_dir) {
+    options.dump_passes = true;
+    options.dbg_dir = dbg_dir;
+    IVLOG(1, "Writing passes to: " << dbg_dir);
+  }
+  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
+  IVLOG(1, "After stripe optimization: " << *stripe.program);
+
+  size_t dim[4] = {8, 8, 256, 8};
+  std::vector<std::string> vars = {"A", "B"};
+  auto data = GenerateMatrix(dim, vars);
+  auto expected_result = GenerateExpected(dim, 2);
+  ExecuteProgram(*stripe.program, &data);
+  EXPECT_THAT(data["B"], Eq(expected_result));
+}
+
+TEST(LoadIndexTest, MultiLoadIndex) {
+  auto verbose = std::getenv("VERBOSE");
+  if (verbose && strlen(verbose) > 0) {
+    el::Loggers::setVerboseLevel(std::stoi(verbose));
+  }
+
+  lang::RunInfo runinfo;
+  runinfo.program_name = "load_index_affine";
+  runinfo.code = R"***(
+    function (A[W, X, Y, Z]) -> (B, C, D) {
+      B = index(A, 2);
+      C = index(A, 0);
+      D = index(A, 1);
+    }
+  )***";
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {4, 4, 256, 8}));
+  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {4, 4, 256, 8}));
+  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {4, 4, 256, 8}));
+  runinfo.output_shapes.emplace("D", SimpleShape(DataType::FLOAT32, {4, 4, 256, 8}));
+  auto stripe = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+
+  std::string expected_stripe = R"**(0: #program
+    block []:1 ( // load_index_affine
+        #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB
+        #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB
+        #user none new@0x00000000 C[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB
+        #user none new@0x00000000 D[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB
+    ) {
+      0: #main 
+      block []:1 ( // main
+          in A[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
+          out B[0, 0, 0, 0]:assign fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
+          out C[0, 0, 0, 0]:assign fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
+          out D[0, 0, 0, 0]:assign fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
+      ) {
+        0: #eltwise #eltwise_index #kernel 
+        block [i1:4, i2:4, i3:256, i4:8]:32768 ( // kernel_0(A)
+            // B = index(A, _T0)
+            out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(8192, 2048, 8, 1):4 B, E(4, 4, 256, 8):128 KiB
+        ) {
+          0: $B = load_index(i3)
+          1: B = store($B)
+        }
+        1: #eltwise #eltwise_index #kernel 
+        block [i1:4, i2:4, i3:256, i4:8]:32768 ( // kernel_1(A)
+            // C = index(A, _T2)
+            out C[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(8192, 2048, 8, 1):4 B, E(4, 4, 256, 8):128 KiB
+        ) {
+          0: $C = load_index(i1)
+          1: C = store($C)
+        }
+        2: #eltwise #eltwise_index #kernel 
+        block [i1:4, i2:4, i3:256, i4:8]:32768 ( // kernel_2(A)
+            // D = index(A, _T4)
+            out D[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(8192, 2048, 8, 1):4 B, E(4, 4, 256, 8):128 KiB
+        ) {
+          0: $D = load_index(i2)
+          1: D = store($D)
         }
       }
     }
@@ -306,27 +416,16 @@ TEST(LoadIndexTest, AffineIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  std::string expected_kernel0 = R"**(void kernel_1(int* d2_B^0)
-    {
-      int d3_i3 = (get_group_id(0) >> 10);
-      int d4_i4 = ((get_group_id(0) >> 6) & 15);
-      int d4_i3 = ((get_group_id(0) >> 1) & 31);
-      int d4_i1 = (get_group_id(0) & 1);
-      long s_4_B = ((32 * d3_i3) + d4_i3);
-      d2_B^0[(((512 * d4_i1) + (16 * d4_i3)) + d4_i4)] = s_4_B;
-    }
-  )**";
-  expected_kernel0 = EraseSpace(expected_kernel0);
-
-  codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
-  emit.Visit(*stripe.program);
-  lang::Simplify(emit.kernels_.kernels);
-
-  sem::Print actual_kernel0(*(emit.kernels_.kernels[0].kfunc));
-  auto actual_kernel0_str = actual_kernel0.str();
-  IVLOG(1, actual_kernel0_str);
-  actual_kernel0_str = EraseSpace(actual_kernel0_str);
-  EXPECT_THAT(actual_kernel0_str, LinesEq(expected_kernel0));
+  size_t dim[4] = {4, 4, 256, 8};
+  std::vector<std::string> vars = {"A", "B", "C", "D"};
+  auto data = GenerateMatrix(dim, vars);
+  auto expected_B = GenerateExpected(dim, 2);
+  auto expected_C = GenerateExpected(dim, 0);
+  auto expected_D = GenerateExpected(dim, 1);
+  ExecuteProgram(*stripe.program, &data);
+  EXPECT_THAT(data["B"], Eq(expected_B));
+  EXPECT_THAT(data["C"], Eq(expected_C));
+  EXPECT_THAT(data["D"], Eq(expected_D));
 }
 
 }  // namespace test
