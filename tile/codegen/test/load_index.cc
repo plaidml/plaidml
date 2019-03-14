@@ -142,18 +142,18 @@ proto::Config GenerateCFG() {
     passes: { name: "loc_mpe", locate_inner_block: { reqs: ["dpu"], loc: { name: "MPE" } } }
     passes: { name: "loc_dpu_mem", locate_memory: { reqs: ["dpu"], loc: { name: "ACC" } } }
     passes: { name: "loc_dpu_fusion_mem", locate_memory: { reqs: ["dpu_fusion"], loc: { name: "ACC" } } }
-    passes: { name: "cache_dpu_in", cache: { reqs: ["dpu"], dirs: [ "In" ], mem_loc: { name: "MRM" }, xfer_loc: { name: "IDU" } } }
-    passes: { name: "cache_dpu_out", cache: { reqs: ["dpu"], dirs: [ "Out" ], mem_loc: { name: "ACC" }, xfer_loc: { name: "ODU" } } }
+    passes: { name: "cache_dpu_in", cache: { reqs: ["dpu"], dirs: [ In ], mem_loc: { name: "MRM" }, xfer_loc: { name: "IDU" } } }
+    passes: { name: "cache_dpu_out", cache: { reqs: ["dpu"], dirs: [ Out ], mem_loc: { name: "ACC" }, xfer_loc: { name: "ODU" } } }
     passes: { name: "loc_dpu_fused", locate_block: { reqs: ["eltwise", "dpu_fusion"], loc: { name: "MPE" } } }
     passes: { name: "loc_dpu_eltwise", locate_inner_block: { reqs: ["dpu"], inner_reqs: ["eltwise"], loc: { name: "MPE" } } }
     passes: {
             name: "schedule_main",
             schedule: {
                 reqs: ["main"],
-                mem_loc: { "name": "CMX" },
+                mem_loc: { name: "CMX" },
                 mem_KiB: 128,
                 alignment: 16,
-                xfer_loc: { "name": "DMA" }
+                xfer_loc: { name: "DMA" }
             }
     },
     passes: { name: "prune_refs", prune_refs: { reqs: ["program"] } },
@@ -195,7 +195,6 @@ TEST(LoadIndexTest, SimpleIndex) {
         0: #eltwise #eltwise_index #kernel 
         block [i1:4, i2:4, i3:4, i4:4]:256 ( // kernel_0(A)
             // B = index(A, _T0)
-            #eltwise_index in A[i1, i2, i3, i4] fp32:I(1, 1, 1, 1):(64, 16, 4, 1):4 B, E(4, 4, 4, 4):1 KiB
             out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(64, 16, 4, 1):4 B, E(4, 4, 4, 4):1 KiB
         ) {
           0: $B = load_index(i3)
@@ -224,13 +223,13 @@ TEST(LoadIndexTest, SimpleIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  std::string expected_kernel0 = R"**(void kernel_1(int* d1_B, const float* d1_A)
+  std::string expected_kernel0 = R"**(void kernel_1(int* d2_B^0)
     {
       int d4_i4 = (get_group_id(0) >> 6);
       int d4_i3 = ((get_group_id(0) >> 4) & 3);
       int d4_i2 = ((get_group_id(0) >> 2) & 3);
       int d4_i1 = (get_group_id(0) & 3);
-      d1_B[((((((((256 * d3_i1) + (64 * d3_i2)) + (16 * d3_i3)) + (4 * d3_i4)) + (64 * d4_i1)) + (16 * d4_i2)) + (4 * d4_i3)) + d4_i4)] = d4_i3;
+      d2_B^0[((((((((256 * d3_i1) + (64 * d3_i2)) + (16 * d3_i3)) + (4 * d3_i4)) + (64 * d4_i1)) + (16 * d4_i2)) + (4 * d4_i3)) + d4_i4)] = d4_i3;
     }
   )**";
   expected_kernel0 = EraseSpace(expected_kernel0);
@@ -277,7 +276,6 @@ TEST(LoadIndexTest, AffineIndex) {
         0: #eltwise #eltwise_index #kernel 
         block [i1:64, i2:64, i3:64, i4:1024]:268435456 ( // kernel_0(A)
             // B = index(A, _T0)
-            #eltwise_index in A[i1, i2, i3, i4] fp32:I(1, 1, 1, 1):(4194304, 65536, 1024, 1):4 B, E(64, 64, 64, 1024):1.04858e+06 KiB
             out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(4194304, 65536, 1024, 1):4 B, E(64, 64, 64, 1024):1.04858e+06 KiB
         ) {
           0: $B = load_index(i3)
@@ -306,7 +304,7 @@ TEST(LoadIndexTest, AffineIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  std::string expected_kernel0 = R"**(void kernel_1(int* d1_B, const float* d1_A)
+  std::string expected_kernel0 = R"**(void kernel_1(int* d1_B)
     {
     }
   )**";
