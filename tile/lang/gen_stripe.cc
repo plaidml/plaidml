@@ -55,34 +55,6 @@ class StripeGenerator {
     // Add decls for external inputs/outputs
     AddDecls(program.get(), main.get(), input_shapes_, true);
     AddDecls(program.get(), main.get(), output_shapes_, false);
-    // Add kernels to main
-    for (size_t op_idx = 0; op_idx < parsed_.ops.size(); op_idx++) {
-      const auto& op = parsed_.ops[op_idx];
-      if (to_skip_.count(op_idx)) {
-        IVLOG(2, "Skipping as already handled: " << op);
-        continue;
-      }
-      IVLOG(2, "Processing: " << op);
-      switch (op.tag) {
-        case Op::CONTRACTION:
-          ProcessContraction(main.get(), op);
-          break;
-        case Op::FUNCTION:
-          if (op.f.is_special()) {
-            ProcessSpecial(main.get(), op_idx);
-          } else if (op.f.fn == "reshape") {
-            ProcessReshape(main.get(), op);
-          } else if (op.f.fn == "index") {
-            ProcessIndex(program.get(), main.get(), op);
-          } else {
-            ProcessElementwise(program.get(), main.get(), op);
-          }
-          break;
-        case Op::CONSTANT:
-          // Do nothing -- these are handed by constant propagation
-          break;
-      }
-    }
     // Add decls for temporaries
     for (const auto& item : vars_) {
       if (externals_.count(item.first) == 0) {
@@ -111,6 +83,34 @@ class StripeGenerator {
           tmp_ref.set_tag("tmp");
           main->refs.emplace_back(tmp_ref);
         }
+      }
+    }
+    // Add kernels to main
+    for (size_t op_idx = 0; op_idx < parsed_.ops.size(); op_idx++) {
+      const auto& op = parsed_.ops[op_idx];
+      if (to_skip_.count(op_idx)) {
+        IVLOG(2, "Skipping as already handled: " << op);
+        continue;
+      }
+      IVLOG(2, "Processing: " << op);
+      switch (op.tag) {
+        case Op::CONTRACTION:
+          ProcessContraction(main.get(), op);
+          break;
+        case Op::FUNCTION:
+          if (op.f.is_special()) {
+            ProcessSpecial(main.get(), op_idx);
+          } else if (op.f.fn == "reshape") {
+            ProcessReshape(main.get(), op);
+          } else if (op.f.fn == "index") {
+            ProcessIndex(program.get(), main.get(), op);
+          } else {
+            ProcessElementwise(program.get(), main.get(), op);
+          }
+          break;
+        case Op::CONSTANT:
+          // Do nothing -- these are handed by constant propagation
+          break;
       }
     }
     IVLOG(2, "Done");
