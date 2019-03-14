@@ -530,33 +530,6 @@ class StripeGenerator {
     assert(input_binding.tag == Binding::TENSOR);
     kernel->name += input;
 
-    auto shape = AdjustShape(input_binding.shape);
-    std::vector<Affine> access;
-    int diff = out_shape.dims.size() - shape.dims.size();
-    for (int i = 0; i < out_shape.dims.size(); i++) {
-      if (i >= diff) {
-        const auto& dim = shape.dims[i - diff];
-        if (dim.size > 1) {
-          access.emplace_back(Affine{kernel->idxs[i].name});
-        } else {
-          access.emplace_back(Affine{});
-        }
-      }
-    }
-    Refinement ref{
-        RefDir::In,          // dir
-        input,               // from
-        input,               // into
-        access,              // access
-        ScalarShape(input),  // shape
-        "",                  // agg_op
-        {},                  // location
-        0,                   // offset
-        boost::none,         // bank_dim
-    };
-    ref.set_tag("eltwise_" + op.f.fn);
-    kernel->refs.emplace_back(ref);
-
     const auto& dim_binding = vars_.at(op.inputs[1]);
     assert(dim_binding.tag == Binding::ICONST);
     const std::string& load_idx_name = kernel->idxs[dim_binding.iconst].name;
