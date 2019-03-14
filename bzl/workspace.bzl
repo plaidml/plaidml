@@ -87,14 +87,6 @@ def plaidml_workspace():
         build_file = str(Label("//bzl:zlib.BUILD")),
     )
 
-    http_archive(
-        name = "llvm",
-        url = "http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz",
-        sha256 = "a38dfc4db47102ec79dcc2aa61e93722c5f6f06f0a961073bd84b78fb949419b",
-        strip_prefix = "llvm-7.0.1.src",
-        build_file = str(Label("//vendor/llvm:llvm.BUILD")),
-    )
-
     http_file(
         name = "plantuml_jar",
         urls = ["https://storage.googleapis.com/vertexai-depot/plantuml.jar"],
@@ -145,4 +137,13 @@ def configure_protobuf():
     native.bind(
         name = "six",
         actual = "@six_archive//:six",
+    )
+
+def configure_llvm():
+    http_archive(
+        name = "llvm",
+        url = "http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz",
+        sha256 = "a38dfc4db47102ec79dcc2aa61e93722c5f6f06f0a961073bd84b78fb949419b",
+        strip_prefix = "llvm-7.0.1.src",
+        build_file = str(Label("//vendor/llvm:llvm.BUILD")),
     )
