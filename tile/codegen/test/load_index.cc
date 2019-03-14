@@ -39,9 +39,9 @@ P ParseProtoText(const std::string& txt) {
 
 std::string EraseSpace(const std::string& src) {
   std::string str = src;
-  int i = 0;
+  size_t i = 0;
   while (i < str.size()) {
-    int j = i;
+    size_t j = i;
     while (j < str.size() && str[j] == ' ') {
       ++j;
     }
