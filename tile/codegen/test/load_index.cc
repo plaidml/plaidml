@@ -177,10 +177,10 @@ std::vector<float> GenerateExpected(const size_t* dim, size_t load_dim) {
   size_t size = dim[0] * dim[1] * dim[2] * dim[3];
   std::vector<float> result(size);
   size_t idx = 0;
-  for (int w = 0; w < dim[0]; ++w) {
-    for (int x = 0; x < dim[1]; ++x) {
-      for (int y = 0; y < dim[2]; ++y) {
-        for (int z = 0; z < dim[3]; ++z) {
+  for (size_t w = 0; w < dim[0]; ++w) {
+    for (size_t x = 0; x < dim[1]; ++x) {
+      for (size_t y = 0; y < dim[2]; ++y) {
+        for (size_t z = 0; z < dim[3]; ++z) {
           if (load_dim == 0) {
             result[idx++] = w;
           } else if (load_dim == 1) {
