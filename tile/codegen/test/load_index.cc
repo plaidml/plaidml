@@ -130,7 +130,7 @@ proto::Config GenerateCFG() {
                 outer_set: ["fit_part"],
                 skip_1d: true,
                 only_po2: true,
-                max_total_size : 131072,
+                max_total_size : 4096,
                 input_cost: 1.0,
                 output_cost: 1.0,
                 copy_tags: true,
@@ -225,11 +225,13 @@ TEST(LoadIndexTest, SimpleIndex) {
 
   std::string expected_kernel0 = R"**(void kernel_1(int* d2_B^0)
     {
-      int d4_i4 = (get_group_id(0) >> 6);
+      int d3_i3 = (get_group_id(0) >> 8);
+      int d4_i4 = ((get_group_id(0) >> 6) & 3);
       int d4_i3 = ((get_group_id(0) >> 4) & 3);
       int d4_i2 = ((get_group_id(0) >> 2) & 3);
       int d4_i1 = (get_group_id(0) & 3);
-      d2_B^0[((((((((256 * d3_i1) + (64 * d3_i2)) + (16 * d3_i3)) + (4 * d3_i4)) + (64 * d4_i1)) + (16 * d4_i2)) + (4 * d4_i3)) + d4_i4)] = d4_i3;
+      long s_4_B = ((4 * d3_i3) + d4_i3);
+      d2_B^0[((((((((256 * d3_i1) + (64 * d3_i2)) + (16 * d3_i3)) + (4 * d3_i4)) + (64 * d4_i1)) + (16 * d4_i2)) + (4 * d4_i3)) + d4_i4)] = s_4_B;
     }
   )**";
   expected_kernel0 = EraseSpace(expected_kernel0);
@@ -258,25 +260,25 @@ TEST(LoadIndexTest, AffineIndex) {
       B = index(A, 2);
     }
   )***";
-  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {64, 64, 64, 1024}));
-  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {64, 64, 64, 1024}));
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {16, 16, 1024, 16}));
+  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {16, 16, 1024, 16}));
   auto stripe = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *stripe.program);
 
   std::string expected_stripe = R"**(0: #program
     block []:1 ( // load_index_affine
-        #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(64, 64, 64, 1024):(4194304, 65536, 1024, 1):1.04858e+06 KiB
-        #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(64, 64, 64, 1024):(4194304, 65536, 1024, 1):1.04858e+06 KiB
+        #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(16, 16, 1024, 16):(262144, 16384, 16, 1):16384 KiB
+        #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(16, 16, 1024, 16):(262144, 16384, 16, 1):16384 KiB
     ) {
       0: #main 
       block []:1 ( // main
-          in A[0, 0, 0, 0] fp32:I(64, 64, 64, 1024):(4194304, 65536, 1024, 1):1.04858e+06 KiB, E(64, 64, 64, 1024):1.04858e+06 KiB
-          out B[0, 0, 0, 0]:assign fp32:I(64, 64, 64, 1024):(4194304, 65536, 1024, 1):1.04858e+06 KiB, E(64, 64, 64, 1024):1.04858e+06 KiB
+          in A[0, 0, 0, 0] fp32:I(16, 16, 1024, 16):(262144, 16384, 16, 1):16384 KiB, E(16, 16, 1024, 16):16384 KiB
+          out B[0, 0, 0, 0]:assign fp32:I(16, 16, 1024, 16):(262144, 16384, 16, 1):16384 KiB, E(16, 16, 1024, 16):16384 KiB
       ) {
         0: #eltwise #eltwise_index #kernel 
-        block [i1:64, i2:64, i3:64, i4:1024]:268435456 ( // kernel_0(A)
+        block [i1:16, i2:16, i3:1024, i4:16]:4194304 ( // kernel_0(A)
             // B = index(A, _T0)
-            out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(4194304, 65536, 1024, 1):4 B, E(64, 64, 64, 1024):1.04858e+06 KiB
+            out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(262144, 16384, 16, 1):4 B, E(16, 16, 1024, 16):16384 KiB
         ) {
           0: $B = load_index(i3)
           1: B = store($B)
@@ -304,8 +306,14 @@ TEST(LoadIndexTest, AffineIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  std::string expected_kernel0 = R"**(void kernel_1(int* d1_B)
+  std::string expected_kernel0 = R"**(void kernel_1(int* d2_B^0)
     {
+      int d3_i3 = (get_group_id(0) >> 10);
+      int d4_i4 = ((get_group_id(0) >> 6) & 15);
+      int d4_i3 = ((get_group_id(0) >> 1) & 31);
+      int d4_i1 = (get_group_id(0) & 1);
+      long s_4_B = ((32 * d3_i3) + d4_i3);
+      d2_B^0[(((512 * d4_i1) + (16 * d4_i3)) + d4_i4)] = s_4_B;
     }
   )**";
   expected_kernel0 = EraseSpace(expected_kernel0);
