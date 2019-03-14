@@ -40,19 +40,19 @@ class Error : public std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 
-class Runtime : public llvm::RuntimeDyld::SymbolResolver {
+class Runtime : public llvm::LegacyJITSymbolResolver {
  public:
-  llvm::RuntimeDyld::SymbolInfo findSymbol(const std::string&) override;
-  llvm::RuntimeDyld::SymbolInfo findSymbolInLogicalDylib(const std::string&) override;
+  llvm::JITSymbol findSymbol(const std::string&) override;
+  llvm::JITSymbol findSymbolInLogicalDylib(const std::string&) override;
 };
 
 class Compiler : private stripe::ConstStmtVisitor {
  public:
-  Compiler();
+  explicit Compiler(llvm::LLVMContext* context);
   std::unique_ptr<Executable> CompileProgram(const stripe::Block& program);
 
  protected:
-  explicit Compiler(llvm::Module* module);
+  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module);
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
@@ -132,7 +132,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   std::map<std::string, index> indexes_;
 };
 
-Compiler::Compiler() : context_(llvm::getGlobalContext()), builder_{context_} {
+Compiler::Compiler(llvm::LLVMContext* context) : context_(*context), builder_{context_} {
   static std::once_flag init_once;
   std::call_once(init_once, []() {
     LLVMInitializeNativeTarget();
@@ -155,7 +155,6 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
   llvm::PassManagerBuilder pmb;
   pmb.OptLevel = 3;
   pmb.SizeLevel = 0;
-  pmb.BBVectorize = true;
   pmb.SLPVectorize = true;
   pmb.LoopVectorize = true;
   pmb.MergeFunctions = true;
@@ -176,7 +175,8 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
   return std::make_unique<Executable>(std::move(xfermod), param_names);
 }
 
-Compiler::Compiler(llvm::Module* module) : context_(llvm::getGlobalContext()), builder_{context_}, module_(module) {
+Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module)
+    : context_(*context), builder_{context_}, module_(module) {
   // This private constructor sets up a nested compiler instance which will
   // process a nested block, generating output into the same module as its
   // containing compiler instance.
@@ -463,7 +463,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
 
 void Compiler::Visit(const stripe::Block& block) {
   // Compile a nested block as a function in the same module
-  Compiler nested(module_);
+  Compiler nested(&context_, module_);
   auto function = nested.CompileBlock(block);
   // Generate a list of args.
   // The argument list begins with a pointer to each refinement. We will either
@@ -961,7 +961,7 @@ llvm::Value* Compiler::FreeFunction(void) {
 Executable::Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters)
     : parameters_(parameters) {
   std::string errStr;
-  std::unique_ptr<llvm::RuntimeDyld::SymbolResolver> rez(new Runtime);
+  std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime);
   auto ee = llvm::EngineBuilder(std::move(module))
                 .setErrorStr(&errStr)
                 .setEngineKind(llvm::EngineKind::JIT)
@@ -994,14 +994,14 @@ half_float::half f2h(float n) { return half_float::half_cast<half_float::half>(n
 }  // namespace rt
 
 template <typename T>
-llvm::RuntimeDyld::SymbolInfo symInfo(T ptr) {
+llvm::JITEvaluatedSymbol symInfo(T ptr) {
   auto flags = llvm::JITSymbolFlags::None;
   auto addr = reinterpret_cast<uintptr_t>(ptr);
-  return llvm::RuntimeDyld::SymbolInfo(addr, flags);
+  return llvm::JITEvaluatedSymbol(addr, flags);
 }
 
-llvm::RuntimeDyld::SymbolInfo Runtime::findSymbol(const std::string& name) {
-  static std::map<std::string, llvm::RuntimeDyld::SymbolInfo> symbols{
+llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
+  static std::map<std::string, llvm::JITEvaluatedSymbol> symbols{
       {"__gnu_h2f_ieee", symInfo(rt::h2f)},
       {"__gnu_f2h_ieee", symInfo(rt::f2h)},
       {"___truncsfhf2", symInfo(rt::f2h)},
@@ -1026,12 +1026,11 @@ llvm::RuntimeDyld::SymbolInfo Runtime::findSymbol(const std::string& name) {
   throw Error("failed to resolve external symbol reference: \"" + name + "\"");
 }
 
-llvm::RuntimeDyld::SymbolInfo Runtime::findSymbolInLogicalDylib(const std::string& name) {
-  return llvm::RuntimeDyld::SymbolInfo(nullptr);
-}
+llvm::JITSymbol Runtime::findSymbolInLogicalDylib(const std::string& name) { return llvm::JITSymbol(nullptr); }
 
 void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers) {
-  Compiler compiler;
+  llvm::LLVMContext context;
+  Compiler compiler(&context);
   auto executable = compiler.CompileProgram(program);
   executable->Run(buffers);
 }

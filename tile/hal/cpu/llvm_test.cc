@@ -34,11 +34,11 @@ static const sem::Type fp64Type{sem::Type::VALUE, DataType::FLOAT64};
 static const sem::Type ptrInt32Type{sem::Type::POINTER_MUT, DataType::INT32};
 static const sem::Type ptrFP32Type{sem::Type::POINTER_MUT, DataType::FLOAT32};
 
-static llvm::ExecutionEngine* JIT(const sem::Node& n) {
-  tile::hal::cpu::Emit emit;
+static llvm::ExecutionEngine* JIT(llvm::LLVMContext& context, const sem::Node& n) {  // NOLINT(runtime/references)
+  tile::hal::cpu::Emit emit(context);
   n.Accept(emit);
   std::string errStr;
-  std::unique_ptr<llvm::RuntimeDyld::SymbolResolver> rez(new tile::hal::cpu::Runtime);
+  std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new tile::hal::cpu::Runtime);
   LLVMInitializeNativeTarget();
   LLVMLinkInMCJIT();
   LLVMInitializeNativeAsmPrinter();
@@ -61,7 +61,8 @@ TEST(CpuDevice, LLVM_minimal) {
   using namespace sem::builder;  // NOLINT
   auto i = _("i");
   auto f = _Function("passthrough", idxType, {{idxType, "i"}}, {_Return(i)});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (ssize_t(*)(ssize_t))engine->getFunctionAddress("passthrough");
   EXPECT_THAT(e, NotNull());
@@ -80,8 +81,8 @@ TEST(CpuDevice, LLVM_factorial) {
                           _While(i <= n, _Block({r = r * i, i = i + 1})),
                       }),
                       _Return(r)});
-
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (ssize_t(*)(ssize_t))engine->getFunctionAddress("factorial");
   EXPECT_THAT(e, NotNull());
@@ -93,7 +94,8 @@ TEST(CpuDevice, LLVM_indirect_assign) {
   using namespace sem::builder;  // NOLINT
   auto f = _Function("copybot", voidType, {{ptrInt32Type, "a"}, {ptrInt32Type, "b"}},
                      {_("a")[_Const(0)] = _("b")[_Const(0)]});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (void (*)(int32_t*, int32_t*))engine->getFunctionAddress("copybot");
   int32_t a = 19;
@@ -109,7 +111,8 @@ TEST(CpuDevice, LLVM_forloop) {
   auto r = _("r");
   auto f = _Function("floop", idxType, {{idxType, "z"}},
                      {_Declare(idxType, "r", _Const(1)), _For("i", 10, 1, r = r + i), _Return(r)});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (ssize_t(*)(ssize_t))engine->getFunctionAddress("floop");
   EXPECT_THAT(e, NotNull());
@@ -121,7 +124,8 @@ TEST(CpuDevice, LLVM_cond) {
   auto z = _("z");
   auto r = _("r");
   auto f = _Function("cond", idxType, {{idxType, "z"}, {idxType, "r"}}, {_Return(_Cond(z > _Const(42), z + r, z - r))});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (ssize_t(*)(ssize_t, ssize_t))engine->getFunctionAddress("cond");
   EXPECT_THAT(e, NotNull());
@@ -137,7 +141,8 @@ TEST(CpuDevice, LLVM_select) {
   auto r = _("r");
   auto f =
       _Function("select", idxType, {{idxType, "z"}, {idxType, "r"}}, {_Return(_Select(z > _Const(42), z + r, z - r))});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (ssize_t(*)(ssize_t, ssize_t))engine->getFunctionAddress("select");
   EXPECT_THAT(e, NotNull());
@@ -156,7 +161,8 @@ TEST(CpuDevice, LLVM_arrayset) {
   auto f =
       _Function("arrayset", voidType, {{ptrInt32Type, "buf"}, {idxType, "n"}, {idxType, "step"}},
                 {_Declare(idxType, "i", _Const(0)), _While(i < n, _Block({buf[i] = i * step, i = i + _Const(1)}))});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (void (*)(int32_t*, ssize_t, ssize_t))engine->getFunctionAddress("arrayset");
   EXPECT_THAT(e, NotNull());
@@ -198,7 +204,8 @@ TEST(CpuDevice, LLVM_fp_add) {
                       {ptrFP32Type, "b"},
                       {ptrFP32Type, "out"}},
                      {_For("i", arraylen, 1, out[i] = a[i] + b[i])});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (void (*)(float*, float*, float*))engine->getFunctionAddress("fp_add");
   EXPECT_THAT(e, NotNull());
@@ -226,7 +233,8 @@ TEST(CpuDevice, LLVM_mix_mult) {
                       {ptrInt32Type, "b"},
                       {ptrFP32Type, "out"}},
                      {_For("i", arraylen, 1, out[i] = a[i] * b[i])});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (void (*)(float*, int32_t*, float*))engine->getFunctionAddress("fp_add");
   EXPECT_THAT(e, NotNull());
@@ -249,7 +257,8 @@ TEST(CpuDevice, LLVM_array_init) {
   auto i = _("i");
   auto f = _Function("array_init", voidType, {{fp32Type, "v"}, {ptrFP32Type, "out"}},
                      {_Declare(fp32arr, "a", v), _For("i", arraylen, 1, out[i] = a[i] + out[i])});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (void (*)(float, float*))engine->getFunctionAddress("array_init");
   EXPECT_THAT(e, NotNull());
@@ -269,7 +278,8 @@ TEST(CpuDevice, LLVM_block_scope) {
   auto f = _Function("add3", int32Type, {{int32Type, "in"}},
                      {_Declare(int32Type, "sum", in), _Block({_Declare(int32Type, "var", _Const(1)), sum = sum + var}),
                       _Block({_Declare(int32Type, "var", _Const(2)), sum = sum + var}), _Return(sum)});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (int32_t(*)(int32_t))engine->getFunctionAddress("add3");
   EXPECT_THAT(e, NotNull());
@@ -286,7 +296,8 @@ TEST(CpuDevice, LLVM_assignment_coercion) {
   auto f = _Function("assignthrough", int16Type, {{int16Type, "in16"}},
                      {_Declare(int64Type, "temp64", _Const(0)), temp64 = in16, _Declare(fp32Type, "tempFP", _Const(0)),
                       tempFP = temp64, _Return(tempFP)});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (int16_t(*)(int16_t))engine->getFunctionAddress("assignthrough");
   EXPECT_THAT(e, NotNull());
@@ -301,7 +312,8 @@ TEST(CpuDevice, LLVM_negation) {
   auto buf = _("buf");
   auto i = _("i");
   auto f = _Function("negator", voidType, {{ptrInt32Type, "buf"}}, {_For("i", arraylen, 1, buf[i] = -buf[i])});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (void (*)(int32_t*))engine->getFunctionAddress("negator");
   EXPECT_THAT(e, NotNull());
@@ -318,7 +330,8 @@ TEST(CpuDevice, LLVM_mix_casting) {
   auto in = _("in");
   auto f = _Function("mixcast", fp32Type, {{fp32Type, "in"}},
                      {_Return(_Cast(int32Type, _Cast(int64Type, _Cast(fp64Type, in))))});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto e = (float (*)(float))engine->getFunctionAddress("mixcast");
   EXPECT_THAT(e, NotNull());
@@ -344,10 +357,11 @@ TEST(CpuDevice, LLVM_rounding_builtins) {
   std::map<std::string, std::vector<float>> results{{"round", {2, 1, 1, 1, -0, -1, 0, 2, 1}},
                                                     {"ceil", {2, 1, 1, 1, 0, 0, 0, 2, 1}},
                                                     {"floor", {1, 0, 0, 0, -1, -1, 0, 1, 0}}};
+  llvm::LLVMContext context;
   for (auto builtin : funcs) {
     auto in = _("in");
     auto f = _Function("builtin", fp32Type, {{fp32Type, "in"}}, {_Return(_(builtin)(_("in")))});
-    auto engine = JIT(*f);
+    auto engine = JIT(context, *f);
     EXPECT_THAT(engine, NotNull());
     auto e = (float (*)(float))engine->getFunctionAddress("builtin");
     EXPECT_THAT(e, NotNull());
@@ -362,11 +376,12 @@ TEST(CpuDevice, LLVM_rounding_builtins) {
 TEST(CpuDevice, LLVM_half_float_vec) {
   using namespace sem::builder;  // NOLINT
   typedef half_float::half half;
+  llvm::LLVMContext context;
   for (size_t vecwidth : std::vector<size_t>{1, 2, 4, 8}) {
     sem::Type type{sem::Type::POINTER_MUT, DataType::FLOAT16, vecwidth};
     auto f = _Function("kernel", voidType, {{type, "a"}, {type, "b"}, {type, "out"}},
                        {_("out")[_Const(0)] = _("out")[_Const(0)] + _("a")[_Const(0)] * _("b")[_Const(0)]});
-    auto engine = JIT(*f);
+    auto engine = JIT(context, *f);
     EXPECT_THAT(engine, NotNull());
     auto kernel = (void (*)(half*, half*, half*))engine->getFunctionAddress("kernel");
     EXPECT_THAT(kernel, NotNull());
@@ -392,7 +407,8 @@ TEST(CpuDevice, LLVM_vec_add_loop) {
                     _Declare(float4, "LA", _("A")[_("gout_idx")]), _Declare(float4, "LB", _("B")[_("gout_idx")]),
                     _Declare(float4, "LC", _Cast(float4, _("LA")) + _Cast(float4, _("LB"))),
                     _("C")[_("gout_idx")] = _("LC")}))});
-  auto engine = JIT(*f);
+  llvm::LLVMContext context;
+  auto engine = JIT(context, *f);
   EXPECT_THAT(engine, NotNull());
   auto kernel = (void (*)(int32_t, float*, float*, float*))engine->getFunctionAddress("kernel");
   EXPECT_THAT(kernel, NotNull());

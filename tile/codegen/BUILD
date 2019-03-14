@@ -27,8 +27,8 @@ plaidml_cc_library(
     deps = [
         ":proto_cc",
         "//base/util",
-        "//tile/stripe",
         "//tile/bilp",
+        "//tile/stripe",
         "@gmock//:gtest",
     ],
 )
@@ -47,7 +47,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":base",
-        "//vendor/llvm",
         "@half",
+        "@llvm",
     ],
 )

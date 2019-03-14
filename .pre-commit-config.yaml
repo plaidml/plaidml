@@ -3,8 +3,7 @@ exclude: >
     base/util/catch.h|
     bzl/version.tpl.cc|
     bzl/conda.tpl.py|
-    vendor/opengl/inc/.*|
-    vendor/llvm/lib/macos_x86_64/.*
+    vendor/opengl/inc/.*
   )$
 repos:
   - repo: git://github.com/pre-commit/pre-commit-hooks
