@@ -70,79 +70,97 @@ proto::Config GenerateCFG() {
     arch: "test"
     passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { name: "DRAM" } } }
     passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { name: "DRAM" } } }
-    passes: { name: "loc_proc"
-      locate_block: {
-        reqs: ["kernel"]
-        loc: {
-          name: "PROC"
-          unit: {
-            terms: { key: "#bank" value: %2% }
-            terms: { key: "#proc" value: 1 }
-          }
-        }
-      }
+    passes: { name: "loc_initial", locate_block: { reqs: ["kernel"], loc: { name: "PPE" } } }
+    passes: {
+            name: "stencil_mac",
+            stencil: {
+                reqs: ["agg_op_add", "comb_op_mul"],
+                outer_set: ["dpu"],
+                inner_set: ["dpu_inner"],
+                stencils: [
+                    {
+                        startup_cost: 32,
+                        idxs: [
+                            { name: "k", size: 16, outs: [-1], ins: [-1,  0] },
+                            { name: "x", size: 16, outs: [-1], ins: [ 0, -1] },
+                            { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
+                        ]
+                    },
+                    {
+                        startup_cost: 32,
+                        idxs: [
+                            { name: "k", size: 16, outs: [-1], ins: [ 0, -1] },
+                            { name: "x", size: 16, outs: [-1], ins: [-1,  0] },
+                            { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
+                        ]
+                    },
+                    {
+                        startup_cost: 32,
+                        idxs: [
+                            { name: "k", size: 16, outs: [-1], ins: [-1,  0] },
+                            { name: "x", size:  4, outs: [-1], ins: [ 0, -1] },
+                            { name: "y", size:  4, outs: [-1], ins: [ 0, -1] },
+                            { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
+                        ]
+                    },
+                    {
+                        startup_cost: 32,
+                        idxs: [
+                            { name: "k", size: 16, outs: [-1], ins: [ 0, -1] },
+                            { name: "x", size:  4, outs: [-1], ins: [-1,  0] },
+                            { name: "y", size:  4, outs: [-1], ins: [-1,  0] },
+                            { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
+                        ]
+                    }
+                ]
+            }
     }
-    passes: { name: "partition_memory"
-      partition_memory: {
-        reqs: ["kernel"]
-        num_parts: %1%
-        set_tags: ["bank_part"]
-        idx_tag: "bank"
-      }
+    passes: { name: "fuse_dpu_add", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_add"], fused_set: ["dpu"] } }
+    passes: { name: "fuse_dpu_mul", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_mul"], fused_set: ["dpu"] } }
+    passes: { name: "fuse_dpu_shift", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_bit_right"], fused_set: ["dpu"] } }
+    passes: { name: "fuse_dpu_zelu", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_zelu"], fused_set: ["dpu"] } }
+    passes: { name: "fuse_dpu", fusion: { parent_reqs: ["dpu"], a_reqs: ["eltwise"], fused_set: ["dpu_fusion"] } }
+    passes: { name: "light_cstr_reduction", light_cstr_reduction: { reqs: ["all"] } }
+    passes: { name: "localize_main", localize: { reqs: ["main"] } }
+    passes: { name: "scalarize_main", scalarize: { reqs: ["main"] } }
+    passes: {   
+            name: "fit_into_cmx",
+            autotile: {
+                reqs: ["kernel"],
+                outer_set: ["fit_part"],
+                skip_1d: true,
+                only_po2: true,
+                max_total_size : 131072,
+                input_cost: 1.0,
+                output_cost: 1.0,
+                copy_tags: true,
+                clear_outer: true,
+                acc_idxs: false
+            }
     }
-    passes: { name: "unroll_bank_parts"
-      unroll: {
-        reqs: ["bank_part"]
-        expand_idx: "#bank"
-        part_name: "bank"
-        make_views: true
-      }
-    }
-    passes: { name: "fit_into_mem"
-      autotile: {
-        reqs: ["kernel"]
-        outer_set: ["fit_part"]
-        skip_1d: true
-        only_po2: true
-        max_total_size : %3%
-        input_cost: 1.0
-        output_cost: 1.0
-        copy_tags: true
-      }
-    }
-    passes: { name: "partition_compute"
-      partition_compute: {
-        reqs: ["kernel"]
-        num_parts: %2%
-        set_tags: ["compute_part"]
-        idx_tag: "proc"
-      }
-    }
-    passes: { name: "unroll_compute_parts"
-      unroll: {
-        reqs: ["compute_part"]
-        expand_idx: "#proc"
-        part_name: "proc"
-      }
-    }
-    passes: { name: "schedule"
-      schedule: {
-        reqs: ["main"]
-        mem_loc: { name: "SRAM" }
-        mem_KiB: %4%
-        alignment: 16
-        xfer_loc: { name: "DMA" }
-      }
-    }
-    passes: { name: "prune_refs" prune_refs: { reqs: ["program"] } }
+    passes: { name: "loc_dpu", locate_block: { reqs: ["dpu"], loc: { name: "DPU" } } }
+    passes: { name: "loc_mpe", locate_inner_block: { reqs: ["dpu"], loc: { name: "MPE" } } }
+    passes: { name: "loc_dpu_mem", locate_memory: { reqs: ["dpu"], loc: { name: "ACC" } } }
+    passes: { name: "loc_dpu_fusion_mem", locate_memory: { reqs: ["dpu_fusion"], loc: { name: "ACC" } } }
+    passes: { name: "cache_dpu_in", cache: { reqs: ["dpu"], dirs: [ "In" ], mem_loc: { name: "MRM" }, xfer_loc: { name: "IDU" } } }
+    passes: { name: "cache_dpu_out", cache: { reqs: ["dpu"], dirs: [ "Out" ], mem_loc: { name: "ACC" }, xfer_loc: { name: "ODU" } } }
+    passes: { name: "loc_dpu_fused", locate_block: { reqs: ["eltwise", "dpu_fusion"], loc: { name: "MPE" } } }
+    passes: { name: "loc_dpu_eltwise", locate_inner_block: { reqs: ["dpu"], inner_reqs: ["eltwise"], loc: { name: "MPE" } } }
+    passes: {
+            name: "schedule_main",
+            schedule: {
+                reqs: ["main"],
+                mem_loc: { "name": "CMX" },
+                mem_KiB: 128,
+                alignment: 16,
+                xfer_loc: { "name": "DMA" }
+            }
+    },
+    passes: { name: "prune_refs", prune_refs: { reqs: ["program"] } },
+    passes: { name: "place_program", memory_placement: { reqs: ["program"], locs: [{ name: "DRAM" }], alignment: 4 } }
   )";
-  size_t num_banks = 2;
-  size_t num_procs = 4;
-  size_t procs_per_bank = num_procs / num_banks;
-  size_t bank_size_KiB = 192;
-  size_t bank_size = bank_size_KiB * 1024;
-  auto cfg = ParseProtoText<proto::Config>(
-      str(boost::format(cfg_tmpl) % num_banks % procs_per_bank % bank_size % bank_size_KiB));
+  auto cfg = ParseProtoText<proto::Config>(cfg_tmpl);
+  // str(boost::format(cfg_tmpl) % num_banks % procs_per_bank % bank_size % bank_size_KiB));
   return cfg;
 }
 
@@ -153,38 +171,38 @@ TEST(LoadIndexTest, SimpleIndex) {
   }
 
   lang::RunInfo runinfo;
-  runinfo.program_name = "simple_fuse";
+  runinfo.program_name = "load_index_simple";
   runinfo.code = R"***(
-    function (A[X, Y]) -> (B) {
-      B = index(A, 1);
+    function (A[W, X, Y, Z]) -> (B) {
+      B = index(A, 2);
     }
   )***";
-  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {16, 16}));
-  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {16, 16}));
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {4, 4, 4, 4}));
+  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {4, 4, 4, 4}));
   auto stripe = GenerateStripe(runinfo);
-  IVLOG(1, *stripe.program);
+  IVLOG(1, "Before stripe optimization: " << *stripe.program);
 
   std::string expected_stripe = R"**(0: #program 
-    block []:1 ( // simple_fuse
-      #user none new@0x00000000 A[0, 0] fp32:I(16, 16):(16, 1):1 KiB
-      #user none new@0x00000000 B[0, 0] fp32:I(16, 16):(16, 1):1 KiB
+    block []:1 ( // load_index_simple
+        #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB
+        #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB
     ) {
       0: #main 
-        block []:1 ( // main
-          in A[0, 0] fp32:I(16, 16):(16, 1):1 KiB, E(16, 16):1 KiB
-          out B[0, 0]:assign fp32:I(16, 16):(16, 1):1 KiB, E(16, 16):1 KiB
+      block []:1 ( // main
+          in A[0, 0, 0, 0] fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB, E(4, 4, 4, 4):1 KiB
+          out B[0, 0, 0, 0]:assign fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB, E(4, 4, 4, 4):1 KiB
+      ) {
+        0: #eltwise #eltwise_index #kernel 
+        block [i1:4, i2:4, i3:4, i4:4]:256 ( // kernel_0(A)
+            // B = index(A, _T0)
+            #eltwise_index in A[i1, i2, i3, i4] fp32:I(1, 1, 1, 1):(64, 16, 4, 1):4 B, E(4, 4, 4, 4):1 KiB
+            out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(64, 16, 4, 1):4 B, E(4, 4, 4, 4):1 KiB
         ) {
-            0: #eltwise #eltwise_index #kernel 
-              block [i1:16, i2:16]:256 ( // kernel_0(A)
-                // B = index(A, _T0)
-                #eltwise_index in A[i1, i2] fp32:I(1, 1):(16, 1):4 B, E(16, 16):1 KiB
-                out B[i1, i2] i32:I(1, 1):(16, 1):4 B, E(16, 16):1 KiB
-              ) {
-                0: $B = load_index(i2)
-                1: B = store($B)
-              }
-           }
+          0: $B = load_index(i3)
+          1: B = store($B)
+        }
       }
+    }
   )**";
 
   std::string actual_stripe = to_string(*stripe.program);
@@ -204,33 +222,18 @@ TEST(LoadIndexTest, SimpleIndex) {
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
-  IVLOG(1, *stripe.program);
+  IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  std::string expected_kernel0 = R"**(void kernel_1(int* d2_B%bank_i1_0^0)
-  {
-    for(int d4_i2 = 0; d4_i2 < 16; d4_i2 += 1)
+  std::string expected_kernel0 = R"**(void kernel_1(int* d1_B, const float* d1_A)
     {
-      for(int d4_i1 = 0; d4_i1 < 8; d4_i1 += 1)
-      {
-        d2_B%bank_i1_0^0[((16 * d4_i1) + d4_i2)] = d4_i2;
-      }
+      int d4_i4 = (get_group_id(0) >> 6);
+      int d4_i3 = ((get_group_id(0) >> 4) & 3);
+      int d4_i2 = ((get_group_id(0) >> 2) & 3);
+      int d4_i1 = (get_group_id(0) & 3);
+      d1_B[((((((((256 * d3_i1) + (64 * d3_i2)) + (16 * d3_i3)) + (4 * d3_i4)) + (64 * d4_i1)) + (16 * d4_i2)) + (4 * d4_i3)) + d4_i4)] = d4_i3;
     }
-  }
   )**";
   expected_kernel0 = EraseSpace(expected_kernel0);
-
-  std::string expected_kernel1 = R"**(void kernel_2(int* d2_B%bank_i1_1^0)
-  {
-    for(int d4_i2 = 0; d4_i2 < 16; d4_i2 += 1)
-    {
-      for(int d4_i1 = 0; d4_i1 < 8; d4_i1 += 1)
-      {
-        d2_B%bank_i1_1^0[((128 + (16 * d4_i1)) + d4_i2)] = d4_i2;
-      }
-    }
-  }
-  )**";
-  expected_kernel1 = EraseSpace(expected_kernel1);
 
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
   emit.Visit(*stripe.program);
@@ -238,15 +241,86 @@ TEST(LoadIndexTest, SimpleIndex) {
 
   sem::Print actual_kernel0(*(emit.kernels_.kernels[0].kfunc));
   auto actual_kernel0_str = actual_kernel0.str();
-  IVLOG(4, actual_kernel0_str);
+  IVLOG(1, actual_kernel0_str);
   actual_kernel0_str = EraseSpace(actual_kernel0_str);
   EXPECT_THAT(actual_kernel0_str, LinesEq(expected_kernel0));
+}
 
-  sem::Print actual_kernel1(*(emit.kernels_.kernels[1].kfunc));
-  auto actual_kernel1_str = actual_kernel1.str();
-  IVLOG(4, actual_kernel1_str);
-  actual_kernel1_str = EraseSpace(actual_kernel1_str);
-  EXPECT_THAT(actual_kernel1_str, LinesEq(expected_kernel1));
+TEST(LoadIndexTest, AffineIndex) {
+  auto verbose = std::getenv("VERBOSE");
+  if (verbose && strlen(verbose) > 0) {
+    el::Loggers::setVerboseLevel(std::stoi(verbose));
+  }
+
+  lang::RunInfo runinfo;
+  runinfo.program_name = "load_index_affine";
+  runinfo.code = R"***(
+    function (A[W, X, Y, Z]) -> (B) {
+      B = index(A, 2);
+    }
+  )***";
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {64, 64, 64, 1024}));
+  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {64, 64, 64, 1024}));
+  auto stripe = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+
+  std::string expected_stripe = R"**(0: #program
+    block []:1 ( // load_index_affine
+        #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(64, 64, 64, 1024):(4194304, 65536, 1024, 1):1.04858e+06 KiB
+        #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(64, 64, 64, 1024):(4194304, 65536, 1024, 1):1.04858e+06 KiB
+    ) {
+      0: #main 
+      block []:1 ( // main
+          in A[0, 0, 0, 0] fp32:I(64, 64, 64, 1024):(4194304, 65536, 1024, 1):1.04858e+06 KiB, E(64, 64, 64, 1024):1.04858e+06 KiB
+          out B[0, 0, 0, 0]:assign fp32:I(64, 64, 64, 1024):(4194304, 65536, 1024, 1):1.04858e+06 KiB, E(64, 64, 64, 1024):1.04858e+06 KiB
+      ) {
+        0: #eltwise #eltwise_index #kernel 
+        block [i1:64, i2:64, i3:64, i4:1024]:268435456 ( // kernel_0(A)
+            // B = index(A, _T0)
+            #eltwise_index in A[i1, i2, i3, i4] fp32:I(1, 1, 1, 1):(4194304, 65536, 1024, 1):4 B, E(64, 64, 64, 1024):1.04858e+06 KiB
+            out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(4194304, 65536, 1024, 1):4 B, E(64, 64, 64, 1024):1.04858e+06 KiB
+        ) {
+          0: $B = load_index(i3)
+          1: B = store($B)
+        }
+      }
+    }
+  )**";
+
+  std::string actual_stripe = to_string(*stripe.program);
+  actual_stripe = EraseSpace(actual_stripe);
+  expected_stripe = EraseSpace(expected_stripe);
+
+  EXPECT_THAT(actual_stripe, LinesEq(expected_stripe));
+
+  auto cfg = GenerateCFG();
+  auto dbg_dir = std::getenv("DBG_DIR");
+  OptimizeOptions options;
+  options.dump_code = false;
+  options.dump_passes = false;
+  if (dbg_dir) {
+    options.dump_passes = true;
+    options.dbg_dir = dbg_dir;
+    IVLOG(1, "Writing passes to: " << dbg_dir);
+  }
+  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
+  IVLOG(1, "After stripe optimization: " << *stripe.program);
+
+  std::string expected_kernel0 = R"**(void kernel_1(int* d1_B, const float* d1_A)
+    {
+    }
+  )**";
+  expected_kernel0 = EraseSpace(expected_kernel0);
+
+  codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
+  emit.Visit(*stripe.program);
+  lang::Simplify(emit.kernels_.kernels);
+
+  sem::Print actual_kernel0(*(emit.kernels_.kernels[0].kfunc));
+  auto actual_kernel0_str = actual_kernel0.str();
+  IVLOG(1, actual_kernel0_str);
+  actual_kernel0_str = EraseSpace(actual_kernel0_str);
+  EXPECT_THAT(actual_kernel0_str, LinesEq(expected_kernel0));
 }
 
 }  // namespace test
