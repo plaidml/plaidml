@@ -142,6 +142,8 @@ message Pass {
     // Remove redundant constraints and impossible blocks,
     // and reduce the index range using integer linear programming
     GenericPass ilp_cstr_reduction = 24;
+    // Dead code elimination
+    GenericPass dead_code_elimination = 25;
   }
 }
 

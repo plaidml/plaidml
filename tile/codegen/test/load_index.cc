@@ -37,7 +37,7 @@ P ParseProtoText(const std::string& txt) {
   return proto;
 }
 
-std::string EraseSpace(const std::string& src) {
+static std::string EraseSpace(const std::string& src) {
   std::string str = src;
   size_t i = 0;
   while (i < str.size()) {
@@ -65,7 +65,7 @@ std::string EraseSpace(const std::string& src) {
   return str;
 }
 
-proto::Config GenerateCFG() {
+static proto::Config GenerateCFG() {
   auto cfg_tmpl = R"(
     arch: "test"
     passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { name: "DRAM" } } }
@@ -164,7 +164,7 @@ proto::Config GenerateCFG() {
   return cfg;
 }
 
-std::map<std::string, std::vector<float>> GenerateMatrix(const size_t* dim, std::vector<std::string> vars) {
+static std::map<std::string, std::vector<float>> GenerateMatrix(const size_t* dim, std::vector<std::string> vars) {
   size_t size = dim[0] * dim[1] * dim[2] * dim[3];
   // We don't care the contents in data
   std::map<std::string, std::vector<float>> data;
@@ -174,7 +174,7 @@ std::map<std::string, std::vector<float>> GenerateMatrix(const size_t* dim, std:
   return data;
 }
 
-std::vector<float> GenerateExpected(const size_t* dim, size_t load_dim) {
+static std::vector<float> GenerateExpected(const size_t* dim, size_t load_dim) {
   size_t size = dim[0] * dim[1] * dim[2] * dim[3];
   std::vector<float> result(size);
   size_t idx = 0;
