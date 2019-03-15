@@ -21,6 +21,11 @@ using math::RoundUp;
 
 void ThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
   if (block->ref_outs().size() != 1) {
+    if (block->ref_outs().size() == 0) {
+      // We may remove the output refinements in the contracts during optimizations,
+      // so here is not definitely wrong.
+      return;
+    }
     throw std::runtime_error("Thread inner pass only works with a single output");
   }
   const Refinement* out_ref = block->ref_outs()[0];
