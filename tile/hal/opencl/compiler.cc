@@ -14,6 +14,7 @@
 #include "base/util/callback_map.h"
 #include "base/util/compat.h"
 #include "base/util/env.h"
+#include "base/util/file.h"
 #include "base/util/logging.h"
 #include "base/util/uuid.h"
 #include "tile/hal/opencl/cl_opt.h"
@@ -144,23 +145,6 @@ void Build::OnError() {
     }
   }
   throw std::runtime_error{"Unable to compile Tile program"};
-}
-
-std::string ReadFile(const fs::path& path) {
-  fs::ifstream ifs;
-  ifs.open(path);
-  auto it = std::istreambuf_iterator<char>(ifs);
-  auto it_end = std::istreambuf_iterator<char>();
-  std::string contents(it, it_end);
-  if (ifs.bad()) {
-    throw std::runtime_error("Unable to fully read file: " + path.string());
-  }
-  return contents;
-}
-
-void WriteFile(const fs::path& path, const std::string& contents) {
-  fs::ofstream ofs(path);
-  ofs << contents;
 }
 
 }  // namespace

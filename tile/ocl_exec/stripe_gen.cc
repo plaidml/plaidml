@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #include "base/config/config.h"
-#include "base/util/throw.h"
+#include "base/util/file.h"
 #include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/driver.h"
 #include "tile/lang/gen_stripe.h"
@@ -16,21 +16,6 @@ namespace tile {
 namespace codegen {
 
 using namespace lang;  // NOLINT
-
-static std::string ReadFile(const std::string& filename) {
-  std::ifstream ifs;
-  ifs.open(filename);
-  if (ifs.fail()) {
-    throw_with_trace(std::runtime_error("Unable to open file \"" + filename + "\""));
-  }
-  auto it = std::istreambuf_iterator<char>(ifs);
-  auto it_end = std::istreambuf_iterator<char>();
-  std::string contents(it, it_end);
-  if (ifs.bad()) {
-    throw_with_trace(std::runtime_error("Unable to fully read \"" + filename + "\""));
-  }
-  return contents;
-}
 
 KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const ShapeMap& outputs,
                            const std::string& cfg_file, const std::string& out_dir) {

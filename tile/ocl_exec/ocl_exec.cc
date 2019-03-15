@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "base/config/config.h"
+#include "base/util/file.h"
 #include "base/util/throw.h"
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
@@ -17,21 +18,6 @@
 using namespace vertexai;                // NOLINT
 using namespace vertexai::tile;          // NOLINT
 using namespace vertexai::tile::stripe;  // NOLINT
-
-std::string ReadFile(const std::string& filename) {
-  std::ifstream ifs;
-  ifs.open(filename);
-  if (ifs.fail()) {
-    throw_with_trace(std::runtime_error("Unable to open file \"" + filename + "\""));
-  }
-  auto it = std::istreambuf_iterator<char>(ifs);
-  auto it_end = std::istreambuf_iterator<char>();
-  std::string contents(it, it_end);
-  if (ifs.bad()) {
-    throw_with_trace(std::runtime_error("Unable to fully read \"" + filename + "\""));
-  }
-  return contents;
-}
 
 lang::RunInfo LoadTile(const std::string& filename) {
   auto tests = lib::InternalTests();
