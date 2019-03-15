@@ -3,6 +3,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -78,7 +79,13 @@ template <typename F>
 void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const stripe::Tags& reqs, const F& func,
                         bool rec_func) {
   bool run_func = block->has_tags(reqs) || reqs.count("all") > 0;
-  if (run_func) func(map, block);
+  if (run_func) {
+    func(map, block);
+    // The block may be removed. If so, ignore the following traverse.
+    if (block->has_tag("removed")) {
+      return;
+    }
+  }
   if (!run_func || rec_func) {
     for (auto& stmt : block->stmts) {
       auto inner = stripe::Block::Downcast(stmt);
@@ -86,6 +93,13 @@ void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const stripe:
         AliasMap inner_map(map, inner.get());
         RunOnBlocksRecurse(inner_map, inner.get(), reqs, func, rec_func);
       }
+    }
+    // Remove all statements tagged "removed"
+    if (block->stmts.size() > 0) {
+      block->stmts.erase(
+          std::remove_if(block->stmts.begin(), block->stmts.end(),  //
+                         [](const std::shared_ptr<stripe::Statement>& stmt) { return stmt.get()->has_tag("removed"); }),
+          block->stmts.end());
     }
   }
 }

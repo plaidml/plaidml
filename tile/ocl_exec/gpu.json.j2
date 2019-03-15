@@ -39,6 +39,9 @@
         { "name": "loc_program", "locate_memory": { "reqs": ["program"], "loc": { "name": "GLOBAL" } } },
         { "name": "loc_main", "locate_memory": { "reqs": ["main"], "loc": { "name": "GLOBAL" } } },
 
+        ## Eliminate the dead code first
+        { "name": "dead_code_elimination", "dead_code_elimination": {"reqs": ["all"] } },
+
         ## Next, we find all the dense contraction blocks, and split them up
         ## into groups such that the inputs for the innermost loops fit into
         ## shared memory and the outputs fit into the register set of the each
@@ -84,6 +87,9 @@
 
         ## We now relabel any remaining buffer inside the contractions as local memory
         { "name": "make_local", "locate_memory": { "reqs": ["contract_outer"], "loc": { "name": "LOCAL"} } },
+
+        ## After all fusion, eliminate dead code again
+        { "name": "dead_code_elimination", "dead_code_elimination": {"reqs": ["all"] } },
 
         ## Next, we thread all of the code that moves data between global and local memory so
         ## that multiple GPU threads can cooperatively do the work

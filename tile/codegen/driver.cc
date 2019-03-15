@@ -10,6 +10,7 @@
 #include "tile/codegen/cache.h"
 #include "tile/codegen/codec.h"
 #include "tile/codegen/cstr_reduction.h"
+#include "tile/codegen/dce.h"
 #include "tile/codegen/deps.h"
 #include "tile/codegen/emitc.h"
 #include "tile/codegen/fuse.h"
@@ -55,23 +56,22 @@ void DumpProgram(const Block& program,            //
 }
 
 void ValidateBlock(Block* root) {
-  RunOnBlocks(
-      root, {},
-      [&](auto map, auto block) {
-        for (const auto& ref : block->refs) {
-          if (ref.dir == RefDir::None && !ref.from.empty()) {
-            throw_with_trace(std::runtime_error(
-                str(boost::format("ref.dir == RefDir::None && !ref.from.empty(). ref: %1% in block: %2%") % ref.into %
-                    block->name)));
-          }
-          if (ref.from.empty() && ref.dir != RefDir::None) {
-            throw_with_trace(std::runtime_error(
-                str(boost::format("ref.from.empty() && ref.dir != RefDir::None. ref: %1% in block: %2%") % ref.into %
-                    block->name)));
-          }
-        }
-      },
-      true);
+  RunOnBlocks(root, {},
+              [&](auto map, auto block) {
+                for (const auto& ref : block->refs) {
+                  if (ref.dir == RefDir::None && !ref.from.empty()) {
+                    throw_with_trace(std::runtime_error(
+                        str(boost::format("ref.dir == RefDir::None && !ref.from.empty(). ref: %1% in block: %2%") %
+                            ref.into % block->name)));
+                  }
+                  if (ref.from.empty() && ref.dir != RefDir::None) {
+                    throw_with_trace(std::runtime_error(
+                        str(boost::format("ref.from.empty() && ref.dir != RefDir::None. ref: %1% in block: %2%") %
+                            ref.into % block->name)));
+                  }
+                }
+              },
+              true);
 }
 
 }  // namespace
@@ -150,6 +150,9 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
         break;
       case proto::Pass::kIlpCstrReduction:
         IlpCstrReductionPass(block, pass.ilp_cstr_reduction());
+        break;
+      case proto::Pass::kDeadCodeElimination:
+        DeadCodeEliminationPass(block, pass.dead_code_elimination());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));

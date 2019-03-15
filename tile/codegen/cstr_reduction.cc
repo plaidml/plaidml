@@ -2,6 +2,7 @@
 
 #include "tile/codegen/cstr_reduction.h"
 #include "tile/bilp/ilp_solver.h"
+#include "tile/codegen/dce.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -32,17 +33,6 @@ static void EvaluatePolynomial(const Polynomial<int64_t> orig_poly, const AliasM
   *max_value = max + 1;
 }
 
-inline void RemoveBlock(stripe::Block* parent, stripe::Block* sub) {
-  for (auto it = parent->stmts.begin(); it != parent->stmts.end(); it++) {
-    stripe::Block* b = stripe::Block::Downcast(*it).get();
-    if (b == sub) {
-      // Found the target block, remove it
-      parent->stmts.erase(it);
-      break;
-    }
-  }
-}
-
 bool IsStencilIndex(Index* idx) {
   for (const auto& tag : idx->tags) {
     if (tag.size() > 8 && tag.substr(0, 8) == "stencil_") return true;
@@ -71,7 +61,7 @@ void LightCstrReduction(const AliasMap& alias_map, Block* block) {
     // For constraint >= 0, if constraint's max value <= 0,
     // the constraint is always false. So the block is impossible, remove it.
     if (max_value <= 0) {
-      RemoveBlock(alias_map.parent_block(), block);
+      block->set_tag("removed");
       IVLOG(4, "Block " << block->name << "removed.");
       break;
     }
@@ -182,8 +172,9 @@ void IlpCstrReduction(const AliasMap& alias_map, Block* block) {
 
   if (results.size() == 0) {
     // The block is infeasible
-    RemoveBlock(alias_map.parent_block(), block);
+    block->set_tag("removed");
     IVLOG(4, "Remove redundant block " << block->name);
+    return;
   } else {
     // Check if the idx range can be reduced
     for (const auto& objective : objectives) {
