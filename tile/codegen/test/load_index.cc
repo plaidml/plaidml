@@ -119,6 +119,7 @@ proto::Config GenerateCFG() {
     passes: { name: "fuse_dpu_mul", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_mul"], fused_set: ["dpu"] } }
     passes: { name: "fuse_dpu_shift", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_bit_right"], fused_set: ["dpu"] } }
     passes: { name: "fuse_dpu_zelu", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_zelu"], fused_set: ["dpu"] } }
+    passes: { name: "fuse_eltwise", fusion: { a_reqs: ["eltwise"], b_reqs: ["eltwise"], fused_set: ["dpu"] } }
     passes: { name: "fuse_dpu", fusion: { parent_reqs: ["dpu"], a_reqs: ["eltwise"], fused_set: ["dpu_fusion"] } }
     passes: { name: "light_cstr_reduction", light_cstr_reduction: { reqs: ["all"] } }
     passes: { name: "localize_main", localize: { reqs: ["main"] } }
@@ -426,6 +427,96 @@ TEST(LoadIndexTest, MultiLoadIndex) {
   EXPECT_THAT(data["B"], Eq(expected_B));
   EXPECT_THAT(data["C"], Eq(expected_C));
   EXPECT_THAT(data["D"], Eq(expected_D));
+}
+
+TEST(LoadIndexTest, FuseIndex) {
+  auto verbose = std::getenv("VERBOSE");
+  if (verbose && strlen(verbose) > 0) {
+    el::Loggers::setVerboseLevel(std::stoi(verbose));
+  }
+
+  lang::RunInfo runinfo;
+  runinfo.program_name = "load_index_affine";
+  runinfo.code = R"***(
+    function (A[W, X, Y, Z]) -> (B, C) {
+      B = index(A, 2);
+      C = A + B;
+    }
+  )***";
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {4, 4, 4, 8}));
+  runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {4, 4, 4, 8}));
+  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {4, 4, 4, 8}));
+  auto stripe = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+
+  std::string expected_stripe = R"**(0: #program
+    block []:1 ( // load_index_affine
+        #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB
+        #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB
+        #user none new@0x00000000 C[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB
+    ) {
+      0: #main 
+      block []:1 ( // main
+          in A[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB, E(4, 4, 4, 8):2 KiB
+          out B[0, 0, 0, 0]:assign fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB, E(4, 4, 4, 8):2 KiB
+          out C[0, 0, 0, 0]:assign fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB, E(4, 4, 4, 8):2 KiB
+      ) {
+        0: #eltwise #eltwise_index #kernel 
+        block [i1:4, i2:4, i3:4, i4:8]:512 ( // kernel_0(A)
+            // B = index(A, _T0)
+            out B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(128, 32, 8, 1):4 B, E(4, 4, 4, 8):2 KiB
+        ) {
+          0: $B = load_index(i3)
+          1: B = store($B)
+        }
+        1: #eltwise #eltwise_add #kernel 
+        block [i1:4, i2:4, i3:4, i4:8]:512 ( // kernel_1(A,B)
+            // C = add(A, B)
+            #eltwise_add in A[i1, i2, i3, i4] fp32:I(1, 1, 1, 1):(128, 32, 8, 1):4 B, E(4, 4, 4, 8):2 KiB
+            #eltwise_add in B[i1, i2, i3, i4] i32:I(1, 1, 1, 1):(128, 32, 8, 1):4 B, E(4, 4, 4, 8):2 KiB
+            out C[i1, i2, i3, i4] fp32:I(1, 1, 1, 1):(128, 32, 8, 1):4 B, E(4, 4, 4, 8):2 KiB
+        ) {
+          0: $A = load(A)
+          1: $B = load(B)
+          2: $C = add($A, $B)
+          3: C = store($C)
+        }
+      }
+    }
+  )**";
+
+  std::string actual_stripe = to_string(*stripe.program);
+  actual_stripe = EraseSpace(actual_stripe);
+  expected_stripe = EraseSpace(expected_stripe);
+
+  EXPECT_THAT(actual_stripe, LinesEq(expected_stripe));
+
+  auto cfg = GenerateCFG();
+  auto dbg_dir = std::getenv("DBG_DIR");
+  OptimizeOptions options;
+  options.dump_code = false;
+  options.dump_passes = false;
+  if (dbg_dir) {
+    options.dump_passes = true;
+    options.dbg_dir = dbg_dir;
+    IVLOG(1, "Writing passes to: " << dbg_dir);
+  }
+  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
+  IVLOG(1, "After stripe optimization: " << *stripe.program);
+
+  size_t dim[4] = {4, 4, 4, 8};
+  std::vector<std::string> vars = {"A", "B", "C"};
+  auto data = GenerateMatrix(dim, vars);
+  auto expected_B = GenerateExpected(dim, 2);
+  const auto& data_A = data["A"];
+  size_t size = dim[0] * dim[1] * dim[2] * dim[3];
+  std::vector<float> expected_C(size);
+  for (size_t i = 0; i < data_A.size(); ++i) {
+    expected_C[i] = data_A[i] + expected_B[i];
+  }
+  ExecuteProgram(*stripe.program, &data);
+  EXPECT_THAT(data["B"], Eq(expected_B));
+  EXPECT_THAT(data["C"], Eq(expected_C));
 }
 
 }  // namespace test

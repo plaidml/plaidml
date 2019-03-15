@@ -37,6 +37,22 @@ static std::vector<Affine> TranslatedContraints(const AliasMap& map, std::map<st
   return out;
 }
 
+static Affine TranslateAffine(const Affine& src, const AliasMap& map, std::map<std::string, std::string> remap,
+                              const Block* in) {
+  Affine dest;
+  AliasMap inner = AliasMap(map, const_cast<Block*>(in));
+  std::map<std::string, stripe::Affine> remapped;
+  for (const auto& kvp : inner.idx_sources()) {
+    auto it = remap.find(kvp.first);
+    if (it == remap.end()) {
+      remapped.emplace(kvp);
+    } else {
+      remapped.emplace(kvp.first, Affine(it->second));
+    }
+  }
+  return dest.sym_eval(remapped);
+}
+
 boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block& a, const Block& b,
                                               const std::string& buf_name) {
   IVLOG(3, "ComputeFusionPlan for " << buf_name << " between " << a.name << " and " << b.name);
@@ -380,9 +396,13 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
         op->from = scalar_rename.at(op->from);
       } break;
       case StmtKind::LoadIndex: {
-        auto op = Load::Downcast(stmt);
+        // Currently we can't reach here actually because LoadIndex
+        // takes only index which must not be the output of block_a.
+        // If we get here in the future, the following code need
+        // to be tested.
+        auto op = LoadIndex::Downcast(stmt);
         op->into = def_scalar(op->into);
-        op->from = remap_b.at(op->from);
+        op->from = TranslateAffine(op->from, scope, remap_b, block_b);
       }
       case StmtKind::Special: {
         auto op = Special::Downcast(stmt);
