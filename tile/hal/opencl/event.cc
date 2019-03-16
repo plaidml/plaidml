@@ -55,10 +55,10 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> Event::WaitFor(
   }
   CLObj<cl_event> evt;
   const auto& queue = device_state->cl_normal_queue();
-  Err err = clEnqueueMarkerWithWaitList(queue.cl_queue.get(),  // command_queue
-                                        mdeps.size(),          // num_events_in_wait_list
-                                        mdeps.data(),          // event_wait_list
-                                        evt.LvaluePtr());      // event
+  Err err = ocl::EnqueueMarkerWithWaitList(queue.cl_queue.get(),  // command_queue
+                                           mdeps.size(),          // num_events_in_wait_list
+                                           mdeps.data(),          // event_wait_list
+                                           evt.LvaluePtr());      // event
   Err::Check(err, "Failed to synchronize work queue");
   context::Context ctx{};
   Event event{ctx, device_state, std::move(evt), queue};
@@ -124,7 +124,7 @@ boost::shared_future<std::shared_ptr<hal::Result>> Event::GetFuture() {
     }
 
     try {
-      Err err = clSetEventCallback(cl_event_.get(), CL_COMPLETE, &EventComplete, state_.get());
+      Err err = ocl::SetEventCallback(cl_event_.get(), CL_COMPLETE, &EventComplete, state_.get());
       Err::Check(err, "Unable to register an event callback");
     } catch (...) {
       std::lock_guard<std::mutex> lock{state_->mu};
@@ -153,7 +153,7 @@ void Event::EventComplete(cl_event evt, cl_int status, void* data) {
     if (status < 0) {
       Err err(status);
       cl_command_type type = 0;
-      clGetEventInfo(evt, CL_EVENT_COMMAND_TYPE, sizeof(type), &type, nullptr);
+      ocl::GetEventInfo(evt, CL_EVENT_COMMAND_TYPE, sizeof(type), &type, nullptr);
       LOG(ERROR) << "Event " << EventCommandTypeStr(type) << " failed with: " << err.str();
       Err::Check(err, "Event completed with failure");
     }

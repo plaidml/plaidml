@@ -56,7 +56,6 @@ class SharedBuffer final : public Buffer {
  private:
   std::shared_ptr<SharedArena> arena_;
   void* base_ = nullptr;
-  std::uint64_t size_;
 };
 
 class SharedMemory final : public Memory {
@@ -87,7 +86,7 @@ std::mutex SharedArena::svm_mu;
 SharedArena::SharedArena(const std::shared_ptr<DeviceState>& device_state, std::uint64_t size)
     : device_state_{device_state}, size_{size} {
   std::lock_guard<std::mutex> lock{svm_mu};
-  base_ = clSVMAlloc(device_state_->cl_ctx().get(), CL_MEM_SVM_FINE_GRAIN_BUFFER, size, 0);
+  base_ = ocl::SVMAlloc(device_state_->cl_ctx().get(), CL_MEM_SVM_FINE_GRAIN_BUFFER, size, 0);
   if (!base_) {
     throw error::ResourceExhausted{"Unable to allocate SVM memory"};
   }
@@ -96,7 +95,7 @@ SharedArena::SharedArena(const std::shared_ptr<DeviceState>& device_state, std::
 SharedArena::~SharedArena() {
   if (base_) {
     std::lock_guard<std::mutex> lock{svm_mu};
-    clSVMFree(device_state_->cl_ctx().get(), base_);
+    ocl::SVMFree(device_state_->cl_ctx().get(), base_);
   }
 }
 
@@ -114,7 +113,7 @@ SharedBuffer::SharedBuffer(std::shared_ptr<SharedArena> arena, void* base, std::
     : Buffer{arena->device_state()->cl_ctx(), size}, arena_{std::move(arena)}, base_{base} {}
 
 void SharedBuffer::SetKernelArg(const CLObj<cl_kernel>& kernel, std::size_t index) {
-  Err::Check(clSetKernelArgSVMPointer(kernel.get(), index, base_), "Unable to set a kernel SVM pointer");
+  Err::Check(ocl::SetKernelArgSVMPointer(kernel.get(), index, base_), "Unable to set a kernel SVM pointer");
 }
 
 boost::future<void*> SharedBuffer::MapCurrent(const std::vector<std::shared_ptr<hal::Event>>& deps) {
