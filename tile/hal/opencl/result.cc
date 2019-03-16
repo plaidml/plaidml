@@ -38,23 +38,23 @@ std::unique_ptr<ResultInfo> MakeResultInfo(const CLObj<cl_event>& event) {
 
   auto info = std::make_unique<ResultInfo>();
 
-  err = clGetEventInfo(event.get(), CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(info->status), &info->status, nullptr);
+  err = ocl::GetEventInfo(event.get(), CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(info->status), &info->status, nullptr);
   Err::Check(err, "Unable to get command execution status");
 
-  err = clGetEventProfilingInfo(event.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(info->queued_time), &info->queued_time,
-                                nullptr);
+  err = ocl::GetEventProfilingInfo(event.get(), CL_PROFILING_COMMAND_QUEUED, sizeof(info->queued_time),
+                                   &info->queued_time, nullptr);
   Err::Check(err, "Unable to read profiling info for CL_PROFILING_COMMAND_QUEUED");
 
-  err = clGetEventProfilingInfo(event.get(), CL_PROFILING_COMMAND_SUBMIT, sizeof(info->submit_time), &info->submit_time,
-                                nullptr);
+  err = ocl::GetEventProfilingInfo(event.get(), CL_PROFILING_COMMAND_SUBMIT, sizeof(info->submit_time),
+                                   &info->submit_time, nullptr);
   Err::Check(err, "Unable to read profiling info for CL_PROFILING_COMMAND_SUBMIT");
 
-  err = clGetEventProfilingInfo(event.get(), CL_PROFILING_COMMAND_START, sizeof(info->start_time), &info->start_time,
-                                nullptr);
+  err = ocl::GetEventProfilingInfo(event.get(), CL_PROFILING_COMMAND_START, sizeof(info->start_time), &info->start_time,
+                                   nullptr);
   Err::Check(err, "Unable to read profiling info for CL_PROFILING_COMMAND_START");
 
-  err =
-      clGetEventProfilingInfo(event.get(), CL_PROFILING_COMMAND_END, sizeof(info->end_time), &info->end_time, nullptr);
+  err = ocl::GetEventProfilingInfo(event.get(), CL_PROFILING_COMMAND_END, sizeof(info->end_time), &info->end_time,
+                                   nullptr);
   Err::Check(err, "Unable to read profiling info for CL_PROFILING_COMMAND_END");
 
   info->execution_duration = std::chrono::nanoseconds(info->end_time - info->start_time);
