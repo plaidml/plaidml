@@ -16,9 +16,9 @@ Driver::Driver(const context::Context& ctx) {
   context::Activity enumerating{ctx, "tile::hal::opencl::Enumerating"};
 
   cl_uint platform_count;
-  clGetPlatformIDs(0, nullptr, &platform_count);
+  ocl::GetPlatformIDs(0, nullptr, &platform_count);
   std::vector<cl_platform_id> platforms(platform_count);
-  clGetPlatformIDs(platforms.size(), platforms.data(), nullptr);
+  ocl::GetPlatformIDs(platforms.size(), platforms.data(), nullptr);
 
   for (std::uint32_t pidx = 0; pidx < platforms.size(); ++pidx) {
     auto device_set = std::make_shared<DeviceSet>(enumerating.ctx(), pidx, platforms[pidx]);

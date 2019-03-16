@@ -2,24 +2,17 @@
 
 #pragma once
 
-#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-
-#ifdef __APPLE__
-#include <OpenCL/cl.h>
-#include <OpenCL/cl_ext.h>
-#else
-#include <CL/cl.h>
-#include <CL/cl_ext.h>
-#endif
-
 #include <string>
 
+#include "base/shim/opencl/opencl.h"
 #include "base/util/logging.h"
 
 namespace vertexai {
 namespace tile {
 namespace hal {
 namespace opencl {
+
+namespace ocl = vertexai::shim::opencl;
 
 // A little wrapper class to simplify handling OpenCL errors.
 class Err final {
@@ -68,62 +61,62 @@ inline std::ostream& operator<<(std::ostream& o, const Err& err) { return o << e
 
 // Retain/Release overloads for OpenCL objects.
 inline void Retain(cl_event e) {
-  Err err = clRetainEvent(e);
+  Err err = ocl::RetainEvent(e);
   LOG_IF(err, ERROR) << "clRetainEvent: " << err.str();
 }
 
 inline void Release(cl_event e) {
-  Err err = clReleaseEvent(e);
+  Err err = ocl::ReleaseEvent(e);
   LOG_IF(err, ERROR) << "clReleaseEvent: " << err.str();
 }
 
 inline void Retain(cl_mem m) {
-  Err err = clRetainMemObject(m);
+  Err err = ocl::RetainMemObject(m);
   LOG_IF(err, ERROR) << "clRetainMemObject: " << err.str();
 }
 
 inline void Release(cl_mem m) {
-  Err err = clReleaseMemObject(m);
+  Err err = ocl::ReleaseMemObject(m);
   LOG_IF(err, ERROR) << "clReleaseMemObject: " << err.str();
 }
 
 inline void Retain(cl_kernel k) {
-  Err err = clRetainKernel(k);
+  Err err = ocl::RetainKernel(k);
   LOG_IF(err, ERROR) << "clRetainKernel: " << err.str();
 }
 
 inline void Release(cl_kernel k) {
-  Err err = clReleaseKernel(k);
+  Err err = ocl::ReleaseKernel(k);
   LOG_IF(err, ERROR) << "clReleaseKernel: " << err.str();
 }
 
 inline void Retain(cl_context c) {
-  Err err = clRetainContext(c);
+  Err err = ocl::RetainContext(c);
   LOG_IF(err, ERROR) << "clRetainContext: " << err.str();
 }
 
 inline void Release(cl_context c) {
-  Err err = clReleaseContext(c);
+  Err err = ocl::ReleaseContext(c);
   LOG_IF(err, ERROR) << "clReleaseContext: " << err.str();
 }
 
 inline void Retain(cl_program p) {
-  Err err = clRetainProgram(p);
+  Err err = ocl::RetainProgram(p);
   LOG_IF(err, ERROR) << "clRetainProgram: " << err.str();
 }
 
 inline void Release(cl_program p) {
-  Err err = clReleaseProgram(p);
+  Err err = ocl::ReleaseProgram(p);
   LOG_IF(err, ERROR) << "clReleaseProgram: " << err.str();
 }
 
 inline void Retain(cl_command_queue c) {
-  Err err = clRetainCommandQueue(c);
+  Err err = ocl::RetainCommandQueue(c);
   LOG_IF(err, ERROR) << "clRetainCommandQueue: " << err.str();
 }
 
 inline void Release(cl_command_queue c) {
-  Err err = clReleaseCommandQueue(c);
+  Err err = ocl::ReleaseCommandQueue(c);
   LOG_IF(err, ERROR) << "clReleaseCommandQueue: " << err.str();
 }
 

@@ -50,8 +50,19 @@ std::shared_ptr<hal::Event> ZeroKernel::Run(const context::Context& ctx,
     pattern_size = sizeof(char_pattern);
   }
 
-  CLObj<cl_event> done = FillBufferImpl(queue, buf, pattern, pattern_size, deps);
-
+  CLObj<cl_event> done;
+  Err err;
+  auto event_wait_list = deps.size() ? deps.data() : nullptr;
+  if (buf->mem()) {
+    // OpenCL cl_mem
+    err = ocl::EnqueueFillBuffer(queue.cl_queue.get(), buf->mem(), pattern, pattern_size, 0, buf->size(), deps.size(),
+                                 event_wait_list, done.LvaluePtr());
+  } else {
+    // OpenCL SVM
+    err = ocl::EnqueueSVMMemFill(queue.cl_queue.get(), buf->base(), pattern, pattern_size, buf->size(), deps.size(),
+                                 event_wait_list, done.LvaluePtr());
+  }
+  Err::Check(err, "unable to fill buffer");
   IVLOG(4, "  Produced dep: " << done.get());
 
   return std::make_shared<Event>(activity.ctx(), device_state_, done, queue);

@@ -29,12 +29,12 @@ Library::Library(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_prog
 
 std::string Library::Serialize() {
   std::size_t size;
-  Err::Check(clGetProgramInfo(program_.get(), CL_PROGRAM_BINARY_SIZES, sizeof(size), &size, nullptr),
+  Err::Check(ocl::GetProgramInfo(program_.get(), CL_PROGRAM_BINARY_SIZES, sizeof(size), &size, nullptr),
              "Unable to compute binary size");
   std::string result;
   result.resize(size);
   const char* datum = result.data();
-  Err::Check(clGetProgramInfo(program_.get(), CL_PROGRAM_BINARIES, sizeof(datum), &datum, nullptr),
+  Err::Check(ocl::GetProgramInfo(program_.get(), CL_PROGRAM_BINARIES, sizeof(datum), &datum, nullptr),
              "Unable to serialize binary");
   return result;
 }

@@ -57,8 +57,8 @@ proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx, const prot
   info.set_vendor_id(CLInfo<CL_DEVICE_VENDOR_ID>(did));
   info.set_max_compute_units(CLInfo<CL_DEVICE_MAX_COMPUTE_UNITS>(did));
   std::vector<size_t> sizes(CLInfo<CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS>(did));
-  Err::Check(clGetDeviceInfo(did, CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof(size_t) * sizes.size(),
-                             reinterpret_cast<char*>(sizes.data()), nullptr),
+  Err::Check(ocl::GetDeviceInfo(did, CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof(size_t) * sizes.size(),
+                                reinterpret_cast<char*>(sizes.data()), nullptr),
              "reading OpenCL device info");
   for (size_t size : sizes) {
     info.add_work_item_dimension_size(size);
@@ -348,13 +348,13 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
   platform_activity.AddMetadata(pinfo);
 
   cl_uint device_count;
-  clGetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
+  ocl::GetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
   std::vector<cl_device_id> devices(device_count);
-  clGetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, devices.size(), devices.data(), nullptr);
+  ocl::GetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, devices.size(), devices.data(), nullptr);
 
   cl_context_properties props[3] = {CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties>(pid), 0};
   Err err;
-  CLObj<cl_context> cl_ctx = clCreateContext(props, devices.size(), devices.data(), &OnErr, nullptr, err.ptr());
+  CLObj<cl_context> cl_ctx = ocl::CreateContext(props, devices.size(), devices.data(), &OnErr, nullptr, err.ptr());
   if (!cl_ctx) {
     throw std::runtime_error(std::string("failed to create a context for OpenCL devices on platform ") +
                              CLInfo<CL_PLATFORM_NAME>(pid) + ": " + err.str());

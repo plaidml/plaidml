@@ -20,34 +20,34 @@ ComputeKernel::ComputeKernel(const std::shared_ptr<DeviceState>& device_state, C
     : device_state_{device_state}, kernel_{std::move(kernel)}, ki_(info), kernel_id_(kernel_id) {
   if (VLOG_IS_ON(3)) {
     size_t work_group_size;
-    Err::Check(clGetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_WORK_GROUP_SIZE,
-                                        sizeof(work_group_size), &work_group_size, nullptr),
+    Err::Check(ocl::GetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_WORK_GROUP_SIZE,
+                                           sizeof(work_group_size), &work_group_size, nullptr),
                "reading kernel work group size");
     VLOG(5) << "Kernel \"" << ki_.kname << "\": WorkGroupSize:  " << work_group_size;
 
     size_t sizes[3];
-    Err::Check(clGetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_COMPILE_WORK_GROUP_SIZE,
-                                        sizeof(sizes), &sizes, nullptr),
+    Err::Check(ocl::GetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_COMPILE_WORK_GROUP_SIZE,
+                                           sizeof(sizes), &sizes, nullptr),
                "reading kernel compile work group size");
     VLOG(5) << "Kernel \"" << ki_.kname << "\": CompWorkSize:   [" << sizes[0] << ", " << sizes[1] << ", " << sizes[2]
             << "]";
 
     cl_ulong local_mem_size;
-    Err::Check(clGetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_LOCAL_MEM_SIZE,
-                                        sizeof(local_mem_size), &local_mem_size, nullptr),
+    Err::Check(ocl::GetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_LOCAL_MEM_SIZE,
+                                           sizeof(local_mem_size), &local_mem_size, nullptr),
                "reading kernel local memory size");
     VLOG(5) << "Kernel \"" << ki_.kname << "\": LocalMemSize:   " << local_mem_size;
 
     size_t pref_work_group_size;
     Err::Check(
-        clGetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
-                                 sizeof(pref_work_group_size), &pref_work_group_size, nullptr),
+        ocl::GetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
+                                    sizeof(pref_work_group_size), &pref_work_group_size, nullptr),
         "reading kernel preferred work group size multiple");
     VLOG(5) << "Kernel \"" << ki_.kname << "\": PrefWorkGpMult: " << pref_work_group_size;
 
     cl_ulong priv_mem_size;
-    Err::Check(clGetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_PRIVATE_MEM_SIZE,
-                                        sizeof(priv_mem_size), &priv_mem_size, nullptr),
+    Err::Check(ocl::GetKernelWorkGroupInfo(kernel_.get(), device_state_->did(), CL_KERNEL_PRIVATE_MEM_SIZE,
+                                           sizeof(priv_mem_size), &priv_mem_size, nullptr),
                "reading kernel private memory size");
     VLOG(5) << "Kernel \"" << ki_.kname << "\": PrivateMemSize: " << priv_mem_size;
   }
@@ -84,15 +84,15 @@ std::shared_ptr<hal::Event> ComputeKernel::Run(const context::Context& ctx,
   CLObj<cl_event> done;
   auto local_work_size = ki_.lwork[0] ? ki_.lwork.data() : nullptr;
   auto event_wait_list = deps.size() ? deps.data() : nullptr;
-  Err err = clEnqueueNDRangeKernel(queue.cl_queue.get(),  // command_queue
-                                   kernel_.get(),         // kernel
-                                   3,                     // work_dim
-                                   nullptr,               // global_work_offset
-                                   ki_.gwork.data(),      // global_work_size
-                                   local_work_size,       // local_work_size
-                                   deps.size(),           // num_events_in_wait_list
-                                   event_wait_list,       // event_wait_list
-                                   done.LvaluePtr());     // event
+  Err err = ocl::EnqueueNDRangeKernel(queue.cl_queue.get(),  // command_queue
+                                      kernel_.get(),         // kernel
+                                      3,                     // work_dim
+                                      nullptr,               // global_work_offset
+                                      ki_.gwork.data(),      // global_work_size
+                                      local_work_size,       // local_work_size
+                                      deps.size(),           // num_events_in_wait_list
+                                      event_wait_list,       // event_wait_list
+                                      done.LvaluePtr());     // event
   Err::Check(err, "unable to run OpenCL kernel");
 
   VLOG(4) << "  Produced dep: " << done.get();
