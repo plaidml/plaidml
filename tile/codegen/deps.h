@@ -16,9 +16,11 @@ void ComputeDepsForBlock(stripe::Block* block, const AliasMap& alias_map);
 // Recomputes Statement dependencies within all matching Blocks.
 inline void ComputeDepsPass(stripe::Block* root, const proto::GenericPass& options) {
   auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
-    ComputeDepsForBlock(block, map);
-  });
+  RunOnBlocks(root, reqs,
+              [](const AliasMap& map, stripe::Block* block) {  //
+                ComputeDepsForBlock(block, map);
+              },
+              true);
 }
 
 }  // namespace codegen
