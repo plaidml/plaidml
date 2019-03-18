@@ -3,6 +3,7 @@
 #include <set>
 
 #include "tile/codegen/dce.h"
+#include "tile/codegen/deps.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -172,6 +173,7 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
     }
   }
 
+  ComputeDepsForBlock(block, alias_map);
   // Map a statement to its uses
   std::map<Statement*, std::vector<Statement*>> stmt_uses;
   for (const auto& stmt : block->stmts) {
@@ -179,6 +181,11 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
       Statement* dep_stmt = dep_stmt_it->get();
       stmt_uses[dep_stmt].push_back(stmt.get());
     }
+  }
+
+  // Clean up deps after use
+  for (auto& stmt : block->stmts) {
+    stmt.get()->deps.clear();
   }
 
   // Traverse backward and collect used variables
@@ -211,7 +218,6 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
         return (ref.dir == RefDir::InOut || ref.dir == RefDir::Out) && !ref.has_tag("tmp");
       })) {
     block->set_tag("removed");
-    return;
   }
 }
 
