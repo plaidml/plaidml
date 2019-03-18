@@ -36,6 +36,13 @@ void PruneIndexes(Block* block, const Tags& exclude_tags) {
   block->idxs.erase(std::remove_if(block->idxs.begin(), block->idxs.end(),
                                    [&to_remove](const Index& idx) { return to_remove.count(&idx); }),
                     block->idxs.end());
+  // Remove from load index statements
+  for (auto& stmt : block->stmts) {
+    auto inner = LoadIndex::Downcast(stmt);
+    if (inner) {
+      inner->from = inner->from.partial_eval(idx_values);
+    }
+  }
   // Remove from inner blocks
   for (auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);

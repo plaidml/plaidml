@@ -36,6 +36,10 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   sem::StmtPtr do_lids(const stripe::Block&);
 
   size_t threads_;
+  size_t loop_mul_;
+  size_t tot_ops_;
+  size_t tot_loads_;
+  size_t tot_stores_;
   std::vector<size_t> lid_limits_;
   size_t depth_ = 0;
   std::shared_ptr<sem::Block> cur_;

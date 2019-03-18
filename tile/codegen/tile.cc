@@ -81,15 +81,13 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
 
   // Find all index used by load_index
   // used_idx maps the original index to the passthru index
-  std::map<std::string, std::string> used_idx;
+  std::set<std::string> used_idx;
   for (const auto& stmt : inner->stmts) {
     if (stmt->kind() == StmtKind::LoadIndex) {
       auto load_index = LoadIndex::Downcast(stmt);
       for (const auto& kvp : load_index->from.getMap()) {
         if (kvp.first != "") {
-          // We don't know the corresponding passthru index yet,
-          // leave it blank now.
-          used_idx[kvp.first] = "";
+          used_idx.emplace(kvp.first);
         }
       }
     }
@@ -111,7 +109,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     // 4. the index is used by load_index
     // TODO: We can optimize the passthru index if outer index is always 0
     if ((outer_idx.range % shape[i]) || HasConstraints(*inner, outer_idx) || HasAffines(*inner, outer_idx) ||
-        used_idx.find(outer_idx.name) != used_idx.end()) {
+        used_idx.count(outer_idx.name)) {
       Index passthru_idx{
           inner->unique_idx_name(outer_idx.name),                            // name
           1,                                                                 // range
@@ -122,6 +120,12 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
       // Update any inner constraints that refer to this index
       for (auto& constraint : inner->constraints) {
         constraint.substitute(outer_idx.name, replacement);
+      }
+      // Update any LoadIndexes that use this index
+      for (const auto& stmt : inner->stmts) {
+        if (stmt->kind() == StmtKind::LoadIndex) {
+          LoadIndex::Downcast(stmt)->from.substitute(outer_idx.name, replacement);
+        }
       }
       // Update any interior idxs that refer to this index
       for (auto stmt : inner->stmts) {
@@ -140,10 +144,6 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
                                         int64_t(outer_idx.range - 1));
       }
 
-      if (used_idx.find(outer_idx.name) != used_idx.end()) {
-        used_idx[outer_idx.name] = passthru_idx.name;
-      }
-
       // Finally add the passthru_idx
       passthru_idxs.emplace_back(passthru_idx);
     }
@@ -157,22 +157,6 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   }
   // Append all passthru_idxs, we defer this since this may cause inner->idxs to realloc
   std::copy(passthru_idxs.begin(), passthru_idxs.end(), std::back_inserter(inner->idxs));
-
-  // Replace the index in load_index with the sum of original index and passthru index
-  for (const auto& stmt : inner->stmts) {
-    if (stmt->kind() == StmtKind::LoadIndex) {
-      auto load_index = LoadIndex::Downcast(stmt);
-      Affine new_from = load_index->from;
-      auto& new_map = new_from.mutateMap();
-      for (const auto& kvp : load_index->from.getMap()) {
-        if (kvp.first != "") {
-          auto& new_idx = used_idx[kvp.first];
-          new_map[new_idx] = kvp.second;
-        }
-      }
-      load_index->from = new_from;
-    }
-  }
 
   // Copy all in/out refinements from outer to inner block
   inner->refs = outer->refs;

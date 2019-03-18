@@ -526,17 +526,25 @@ struct FusionPassOptions {
   Tags fused_set;
   Tags exclude;
   bool perfect;
+  bool output_match;
 };
 
 class TagFusionStrategy : public FusionStrategy {
  public:
   explicit TagFusionStrategy(const FusionPassOptions& options) : options_(options) {}
   bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
-    return parent.has_tags(options_.parent_reqs) &&  //
-           a.has_tags(options_.a_block_reqs) &&      //
-           b.has_tags(options_.b_block_reqs) &&      //
-           !a.has_any_tags(options_.exclude) &&      //
-           !b.has_any_tags(options_.exclude);
+    bool tag_match = parent.has_tags(options_.parent_reqs) &&  //
+                     a.has_tags(options_.a_block_reqs) &&      //
+                     b.has_tags(options_.b_block_reqs) &&      //
+                     !a.has_any_tags(options_.exclude) &&      //
+                     !b.has_any_tags(options_.exclude);
+    if (!tag_match) {
+      return false;
+    }
+    if (options_.output_match && a.idxs.size() != b.idxs.size()) {
+      return false;
+    }
+    return true;
   }
   void OnFailed() {}
   void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
@@ -565,7 +573,8 @@ void FusionPass(stripe::Block* root, const proto::FusionPass& options) {
       FromProto(options.b_reqs()),       // b_block_reqs
       FromProto(options.fused_set()),    // fused_set
       FromProto(options.exclude()),      // exclude
-      options.perfect()                  // perfect
+      options.perfect(),                 // perfect
+      options.output_match()             // output_match
   };
   AliasMap base;
   AliasMap root_map(base, root);
