@@ -9,6 +9,7 @@
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/deps.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -54,10 +55,29 @@ void RunOnBlocksBackward(stripe::Block* root, const stripe::Tags& reqs, const F&
 
 void DeadCodeElimination(const AliasMap& alias_map, stripe::Block* block);
 
-inline void DeadCodeEliminationPass(stripe::Block* root, const proto::GenericPass& options) {
+inline void DeadCodeEliminationPass(stripe::Block* root, const proto::GenericPass& options, bool fix_deps) {
   auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocksBackward(
-      root, reqs, [](const AliasMap& alias_map, stripe::Block* block) { DeadCodeElimination(alias_map, block); }, true);
+  RunOnBlocksBackward(root, reqs,
+                      [](const AliasMap& alias_map, stripe::Block* block) {  //
+                        DeadCodeElimination(alias_map, block);
+                      },
+                      true);
+
+  // Rebuild the deps if needed
+  RunOnBlocks(root, reqs,
+              [&](const AliasMap& map, stripe::Block* block) {  //
+                if (fix_deps) {
+                  // Rebuilding deps has unknown bugs currently,
+                  // do not use this branch until the comment is removed.
+                  ComputeDepsForBlock(block, map);
+                } else {
+                  // Clean up deps after use
+                  for (auto& stmt : block->stmts) {
+                    stmt.get()->deps.clear();
+                  }
+                }
+              },
+              true);
 }
 
 }  // namespace codegen

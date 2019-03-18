@@ -152,7 +152,7 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
         IlpCstrReductionPass(block, pass.ilp_cstr_reduction());
         break;
       case proto::Pass::kDeadCodeElimination:
-        DeadCodeEliminationPass(block, pass.dead_code_elimination());
+        DeadCodeEliminationPass(block, pass.dead_code_elimination(), false);
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));

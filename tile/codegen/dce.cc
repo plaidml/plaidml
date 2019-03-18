@@ -13,7 +13,8 @@ namespace codegen {
 using namespace stripe;  // NOLINT
 using namespace math;    // NOLINT
 
-// Remove the inputs that are not used and the outputs that are not defined
+// Remove the inputs that are not used and the outputs that are not defined.
+// Note that the buffer use information in AliasMap may not be correct.
 static void PruneRefinements(Block* block) {
   std::set<std::string> uses;
   std::set<std::string> defs;
@@ -103,6 +104,7 @@ static void PruneRefinements(Block* block) {
                     block->refs.end());
 }
 
+// To determine if the output of the stmt is one of the block outputs.
 bool IsResultBlockOutput(const Statement* stmt, const std::set<std::string>& outputs) {
   switch (stmt->kind()) {
     case StmtKind::Load: {
@@ -183,11 +185,6 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
     }
   }
 
-  // Clean up deps after use
-  for (auto& stmt : block->stmts) {
-    stmt.get()->deps.clear();
-  }
-
   // Traverse backward and collect used variables
   // used_vars contains the used variables after this statements
   for (auto stmt_it = block->stmts.rbegin(); stmt_it != block->stmts.rend(); ++stmt_it) {
@@ -211,6 +208,7 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
                      block->stmts.end());
 
   // Clean up refinements
+  // Do not use AliasMap here, which may not be correct after code elimination
   PruneRefinements(block);
 
   // Check if this block can be removed after cleaning
