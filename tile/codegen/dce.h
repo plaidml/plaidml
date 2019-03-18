@@ -39,10 +39,6 @@ void RunOnBlocksRecurseBackward(const AliasMap& map, stripe::Block* block, const
   }
   if (run_func) {
     func(map, block);
-    // The block may be removed. If so, ignore the following traverse.
-    if (block->has_tag("removed")) {
-      return;
-    }
   }
 }
 
@@ -63,12 +59,10 @@ inline void DeadCodeEliminationPass(stripe::Block* root, const proto::GenericPas
                       },
                       true);
 
-  // Rebuild the deps if needed
   RunOnBlocks(root, reqs,
               [&](const AliasMap& map, stripe::Block* block) {  //
                 if (fix_deps) {
-                  // Rebuilding deps has unknown bugs currently,
-                  // do not use this branch until the comment is removed.
+                  // Rebuild deps
                   ComputeDepsForBlock(block, map);
                 } else {
                   // Clean up deps after use

@@ -185,8 +185,7 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
     }
   }
 
-  // Traverse backward and collect used variables
-  // used_vars contains the used variables after this statements
+  // Traverse backward
   for (auto stmt_it = block->stmts.rbegin(); stmt_it != block->stmts.rend(); ++stmt_it) {
     Statement* stmt = stmt_it->get();
     bool stmt_is_used = IsResultBlockOutput(stmt, outputs);
