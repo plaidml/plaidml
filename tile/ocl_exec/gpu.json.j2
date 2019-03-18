@@ -2,6 +2,7 @@
     "arch": "GPU",
     ## Set a clock rate
     "clock_mhz": 700,
+    "arch": "GPU",
     ## There are two memories layers of note in a GPU, the global memory and
     ## the per-multiprocessor local memory.  We model this a just a single
     ## instance of local memory (even though on a real GPU there is 1 per
@@ -53,31 +54,76 @@
                 "outer_set": ["contract_outer", "kernel"],
                 "inner_set": ["contract_inner"],
                 "clear_outer": true,
+                ## "acc_idxs": false,
                 "only_po2": true,  ## Only consider PO2 sizes for speed
                 "max_total_size": {{ LOCAL_MEM_KIB * 1024 }},  ## All inputs must fit in local memory
+                "min_out_size": {{ NUM_THREADS }},
                 ## Since all loads to/from global memory are across a wide bus, use that as the
                 ## cache_width to optimize for contigous regions of DRAM for each inner block
                 "cache_width": {{ CACHE_WIDTH }}
             }
         },
 
+        ## Since we don't accumulate final outputs, we need to move any tiling over
+        ## accumulation dimensions into an inner loop 
+        {
+            "name": "tile_middle",
+            "autotile": {
+                "reqs": ["contract_outer"],  ## Apply to only dense operations
+                "inner_set": ["contract_middle"],
+                "acc_idxs": false,
+                ## With i/o costs zeroed out, and split factor set high, we basically
+                ## should pick the largest tile that doesn't use accumuation indexes
+                "input_cost": 0.0, 
+                "output_cost": 0.0,
+                "split_factor": -100.0,
+                "only_po2": true,  ## Only consider PO2 sizes for speed
+            }
+        },
+
         ## Now we add explicit code to load inputs from DRAM to shared memory for each inner block
         ## Note, we don't cache outputs yet, since the next fusion step will split the outer loop into
         ## accumulation indexes and non-accumulation indexes
-        { "name": "cache_input", "cache": { "reqs": ["contraction"], "dirs": [ "In" ], "mem_loc": { "name": "LOCAL" }, "xfer_loc": { "name": "DMA" } } },
+        { "name": "cache_input", "cache": { "reqs": ["contract_middle"], "dirs": [ "In" ], "mem_loc": { "name": "LOCAL" }, "xfer_loc": { "name": "DMA" } } },
 
         ## Next we fuse in any element-wise operations which operate on the output of contraction block
-        { "name": "fuse_elemwise", "fusion": { "a_reqs": ["contract_outer"], "b_reqs": ["eltwise"]  } },
+        { "name": "fuse_contract_eltwise", "fusion": { "a_reqs": ["contract_outer"], "b_reqs": ["eltwise"]  } },
+
+        ## Clean up indexes to allow better fusion
+        { "name": "prefuse", "prune_idxs": { "reqs": ["main"] } },
+
+        ## Then we fuse multiple eltwise things
+        { "name": "fuse_eltwise_eltwise", "fusion": { "parent_reqs": ["main"], "a_reqs": ["eltwise"], "b_reqs": ["eltwise"], "output_match": true } },
 
         ## Then we 'localize' buffers, which moves any temporaries the only are needed to hold the output
         ## of dense computations before they are used on elementwise operations into the interior of the fused blocks
         { "name": "localize_main", "localize": { "reqs": ["main"] } },
- 
+
         ## Now we add the output caching, which will now have the same loop structure as the element-wise ops
         { "name": "cache_output", "cache": { "reqs": ["contract_outer"], "dirs": [ "Out" ], "mem_loc": { "name": "LOCAL" }, "xfer_loc": { "name": "DMA" } } },
 
+        ## Clean up indexes to allow better fusion
+        { "name": "prefuse", "prune_idxs": { "reqs": ["main"] } },
+
         ## We do an inner 'fusion' to move all 'per-output' operations into a single loop
-        { "name": "fuse_inner", "fusion": { "parent_reqs": ["contract_outer"], "fused_set": ["cache"], "exclude": ["contract_inner"] } },
+        { "name": "fuse_inner", "fusion": { "parent_reqs": ["contract_outer"], "fused_set": ["cache"], "exclude": ["contract_middle"] } },
+
+	## Now tile any remaining eltwise kernels
+        {
+            "name": "tile_eltwise",
+            "autotile": {
+                "reqs": ["eltwise", "kernel"],  ## Apply to only dense operations
+                "outer_set": ["eltwise_outer", "kernel"],
+                "inner_set": ["eltwise_inner"],
+                "clear_outer": true,
+                "only_po2": true,  ## Only consider PO2 sizes for speed
+                "min_count": {{ NUM_UNITS }},
+                "min_size": {{ NUM_THREADS }},
+                ## Since all loads to/from global memory are across a wide bus, use that as the
+                ## cache_width to optimize for contigous regions of DRAM for each inner block
+                "cache_width": {{ CACHE_WIDTH }}
+            }
+        },
  
         ## We now move any temporaries even further down (into the per-output loop)
         { "name": "localize_main", "localize": { "reqs": ["main"] } },
@@ -108,7 +154,23 @@
         },
   
         ## Finally we run the GPU specific thread_inner pass to thread the primary computation loop
-        { "name": "thread_inner", "thread_inner" : { "reqs": ["contract_inner"], "threads": {{ NUM_THREADS }} } },
+        { "name": "thread_contract", "thread_inner" : { "reqs": ["contract_inner"], "threads": {{ NUM_THREADS }} } },
+        {
+            "name": "thread_eltwise",
+            "autotile": {
+                "reqs": ["eltwise_inner"],
+                "outer_set": ["eltwise_struct", "gpu_thread"],
+                "inner_set": ["eltwise_threads"],
+                "only_po2": true,
+                "max_sizes_product": {{ NUM_THREADS }},
+                "cache_width": {{ CACHE_WIDTH }},
+                "loc_name": "GLOBAL",
+                "flip": true
+            }
+        },
+
+        ## Thread leftover elementwise 
+        { "name": "thread_elemwise", "thread_inner" : { "reqs": ["kernel", "eltwise"], "threads": {{ NUM_THREADS }} } },
 
         ## One last attempt to fuse across gpu_threads 
         ## { "name": "fuse_inner", "fusion": { "a_reqs": ["gpu_thread"], "b_reqs": ["gpu_thread"], "perfect": true } },

@@ -955,9 +955,12 @@ TensorShape Block::exterior_shape(const std::string& into, const TensorShape& ou
   }
   auto shape = it->ApplyTile(idx_ranges);
   // constrain the exterior_shape by the outer_shape
+  // TODO: This currently causes correctness issue on the GPU
+  /*
   for (size_t i = 0; i < shape.dims.size(); i++) {
     shape.dims[i].size = std::min(shape.dims[i].size, outer_shape.dims[i].size);
   }
+  */
   return shape;
 }
 

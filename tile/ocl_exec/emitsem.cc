@@ -15,6 +15,7 @@ namespace codegen {
 
 SemtreeEmitter::SemtreeEmitter(const AliasMap& am, size_t threads)
     : threads_(threads), lid_limits_({1024 * 1024, 1024 * 1024, 1024 * 1024}) {
+  loop_mul_ = 1;
   scopes_.emplace_back(am);
   scope_ = &scopes_.back();
 }
@@ -57,6 +58,7 @@ void SemtreeEmitter::Visit(const stripe::Load& stmt) {
   auto lval = _(ref_name(stmt.from))[convert_affine(ai.flat())];
   auto type = ai.shape.type;
   cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
+  tot_loads_ += loop_mul_;
 }
 
 static sem::ExprPtr AggInit(DataType type, const std::string agg_op) {
@@ -94,6 +96,10 @@ void SemtreeEmitter::Visit(const stripe::Store& stmt) {
     throw std::runtime_error("Unknown agg-op:" + agg_op);
   }
   cur_->push_back(lval = agg);
+  if (agg_op != "" && agg_op != "assign") {
+    tot_ops_ += loop_mul_;
+  }
+  tot_stores_ += loop_mul_;
 }
 
 void SemtreeEmitter::Visit(const stripe::LoadIndex& stmt) {
@@ -168,6 +174,7 @@ void SemtreeEmitter::Visit(const stripe::Intrinsic& in) {
     opexpr = std::make_shared<sem::CallExpr>(_(in.name), inputs);
   }
   IVLOG(1, "Pushing back on " << in.outputs[0]);
+  tot_ops_ += loop_mul_;
   cur_->push_back(_Declare({sem::Type::VALUE, in.type}, scalar_name(in.outputs[0]), opexpr));
 }
 
@@ -182,6 +189,9 @@ sem::StmtPtr SemtreeEmitter::add_loops(const stripe::Block& block) {
 }
 
 void SemtreeEmitter::do_gids(const stripe::Block& block) {
+  if (block.ref_outs().size() == 0) {
+    return;
+  }
   std::vector<size_t> logical;
   for (const auto& idx : block.idxs) {
     logical.push_back(idx.range);
@@ -218,6 +228,11 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   ki.kfunc = std::make_shared<sem::Function>(ki.kname, sem::Type(), params, cur_);
   ki.gwork = {{map.gid_sizes[0] * threads_, map.gid_sizes[1], map.gid_sizes[2]}};
   ki.lwork = {{threads_, 1, 1}};
+  ki.tot_flops = tot_ops_;
+  tot_ops_ = 0;
+  ki.tot_bytes = 4 * (tot_loads_ + tot_stores_);
+  tot_loads_ = 0;
+  tot_stores_ = 0;
 }
 
 sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
@@ -251,7 +266,9 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       }
       std::string bname = block.refs[0].from;
       std::string kname = "kernel_" + std::to_string(kernels_.kernels.size() + 1);
-      kernels_.kernels.push_back(lang::GenZero(scope_->at(bname).shape, bname, kname));
+      auto ki = lang::GenZero(scope_->at(bname).shape, bname, kname);
+      ki.comments = "ZERO";
+      kernels_.kernels.push_back(ki);
       return;
     }
     if (block.has_tag("copy")) {
@@ -261,7 +278,9 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       std::string src_name = block.ref_ins()[0]->from;
       std::string dst_name = block.ref_outs()[0]->from;
       std::string kname = "kernel_" + std::to_string(kernels_.kernels.size() + 1);
-      kernels_.kernels.push_back(lang::GenCopy(scope_->at(src_name).shape, dst_name, src_name, kname));
+      auto ki = lang::GenCopy(scope_->at(src_name).shape, dst_name, src_name, kname);
+      ki.comments = "COPY";
+      kernels_.kernels.push_back(ki);
       return;
     }
     in_kernel_++;
@@ -274,6 +293,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   // New inner block
   cur_ = std::make_shared<sem::Block>();
   depth_++;
+  loop_mul_ *= block.idxs_product();
   for (const auto& stmt : block.stmts) {
     stmt->Accept(this);
   }
@@ -288,6 +308,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
         cur_->push_front(_Declare(ptype, ref_name(ref.into), init));
       } else {
         if (init) {
+          cur_->push_front(_Barrier());
           // Threaded initialization of buffers
           auto while_loop = _Block({});
           while_loop->push_back(_Declare({sem::Type::INDEX}, "_init_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
@@ -326,6 +347,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   if (block.has_tag("gpu_thread")) {
     in_threads_--;
   }
+  loop_mul_ /= block.idxs_product();
   depth_--;
   scopes_.pop_back();
   scope_ = &scopes_.back();

@@ -201,7 +201,7 @@ def opTest(in_data,
                     except AttributeError:
                         # This wasn't an IndexedSlices object, do nothing
                         pass
-                if args.verbose or verbose:
+                if args.verbose > 1 or verbose:
                     print('data: {}'.format(data))
                     print('fr: {}'.format(fr))
                     if do_grads:
@@ -416,7 +416,7 @@ class TestBackendOps(unittest.TestCase):
         gfn = pkb.function(x, df, updates=[])
         fr = f.eval()
         gr = gfn([t for t in data if isinstance(t, np.ndarray)])
-        if args.verbose:
+        if args.verbose > 1:
             print(pkb, fr, gr)
         results.append((fr, gr))
         return results
@@ -1397,8 +1397,24 @@ class TestBackendOps(unittest.TestCase):
     def testSpatial3DPadding(self, b, x, p=((1, 1), (1, 1), (1, 1)), d=None):
         return [b.spatial_3d_padding(x, padding=p, data_format=d)]
 
+    # Big rollup
+    @opTest([[m(1000, 1000)]], do_grads=False)
+    def testBigRollup(self, b, x):
+        return [b.sum(x)]
+
+    # Resnet sized tests
+    @opTest([[m(1, 224, 224, 3), m(7, 7, 3, 64)]], do_grads=False)
+    def resnetLayer1(self, b, x, k):
+        return [b.conv2d(x, k, strides=(2, 2), padding='valid')]
+
+    @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]], do_grads=False)
+    def resnetLayer2(self, b, x, k):
+        c = b.conv2d(x, k, padding='valid')
+        o = b.relu(c)
+        return [o]
+
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
-    #plaidml._internal_set_vlog(5)
+    #plaidml._internal_set_vlog(1)
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

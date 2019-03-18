@@ -240,6 +240,8 @@ message FusionPass {
   repeated string exclude = 5;
   // Only fuse if all block indexes are exactly 1 to 1
   optional bool perfect = 6 [default = false];
+  // Only fuse if output sizes match
+  optional bool output_match = 7 [default = false];
 }
 
 // Edit the location of blocks and/or refinement to match 'loc'
@@ -348,7 +350,20 @@ message AutotilePass {
   optional bool acc_idxs = 18 [default = true];
   // Clear the location the original / outer block
   optional bool clear_location = 19 [default = false];
+  // 'Flip' the resulting tile to interleaved rather than contigous version.
   optional bool flip = 20 [default = false];
+  // Specify the minimum size of tiles to get full utilization
+  optional int64 min_size = 21 [default = 1];
+  // Specify the minimum size of tile outputs to get full utilization
+  optional int64 min_out_size = 22 [default = 1];
+  // Specify the minimum count of tiles to get full utilization
+  optional int64 min_count = 23 [default = 1];
+  // Specify the minimum count of output tiles to get full utilization
+  optional int64 min_out_count = 24 [default = 1];
+  // Specify the 'tie-breaker' multiplier on having more tiles
+  // Note, we do log2(num_tiles) to make this less impactful
+  // Positive means more tiles = bad, negative means more tiles = good
+  optional double split_factor = 25 [default = .001];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any

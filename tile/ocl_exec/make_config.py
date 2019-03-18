@@ -21,6 +21,7 @@ def main():
         'LOCAL_MEM_KIB': 32,
         'REGS_MEM_KIB': 16,
         'NUM_THREADS': 256,
+        'NUM_UNITS': 16,
         'SUBGROUP_SIZE': 32,
         'CACHE_WIDTH': 128,
     }

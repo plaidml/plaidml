@@ -177,15 +177,31 @@ struct ComputeDensityCostModel {
 
     double total_compute = 1;
     double tile_expand = 1;
+    int64_t tot_size = tile.sizes_product();
+    int64_t tot_count = tile.counts_product();
+    int64_t tot_out_size = 1;
+    int64_t tot_out_count = 1;
     for (size_t i = 0; i < block.idxs.size(); i++) {
       const auto& tile_dim = tile.dims[i];
       total_compute *= tile_by_name[block.idxs[i].name];
       size_t padded_size = tile_dim.size * tile_dim.count;
       tile_expand *= static_cast<double>(padded_size) / static_cast<double>(block.idxs[i].range);
+      if (!acc_idxs.count(&block.idxs[i])) {
+        tot_out_size *= tile_dim.size;
+        tot_out_count *= tile_dim.count;
+      }
     }
+    double inv_size_util = static_cast<double>(options.min_size()) / std::min(tot_size, options.min_size());
+    double inv_out_size_util =
+        static_cast<double>(options.min_out_size()) / std::min(tot_out_size, options.min_out_size());
+    double inv_count_util = static_cast<double>(options.min_count()) / std::min(tot_count, options.min_count());
+    double inv_out_count_util =
+        static_cast<double>(options.min_out_count()) / std::min(tot_out_count, options.min_out_count());
+    double ineff = inv_size_util * inv_out_size_util * inv_count_util * inv_out_count_util * tile_expand;
     auto input_cost = options.input_cost() * metrics.input_bandwidth;
     auto output_cost = options.output_cost() * metrics.output_bandwidth;
-    double cost = (tile_expand * (output_cost + input_cost) / total_compute) + tile.counts_product();
+    auto io_cost = 1.0 + input_cost + output_cost;  // Add 1 to make sure ineff still gets counted if in/out cost == 0
+    double cost = (ineff * io_cost / total_compute) + options.split_factor() * log2(tile.counts_product());
     IVLOG(4, "        cost: " << cost);
     return cost;
   }
