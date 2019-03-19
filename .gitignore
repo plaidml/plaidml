@@ -105,3 +105,4 @@ ENV/
 
 # macos
 .DS_Store
+*~
