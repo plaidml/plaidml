@@ -106,7 +106,9 @@ struct CLDeviceInfo<Param, std::vector<T>> {
 
 // This pragma is to ignore warnings (treated as errors due to -Werror) on gcc 6
 #pragma GCC diagnostic push
+#if defined(__GNUC__) && ((__GNUC__ * 100) + __GNUC_MINOR__) >= 600
 #pragma GCC diagnostic ignored "-Wignored-attributes"
+#endif
 
 template <cl_platform_info Param>
 struct CLInfoType;
