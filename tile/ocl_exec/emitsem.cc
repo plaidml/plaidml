@@ -297,9 +297,15 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   for (const auto& stmt : block.stmts) {
     stmt->Accept(this);
   }
+
+  // When two same refinements are used in the same stripe block,
+  // do not emit duplicated local declarations.
+  std::set<std::string> dup_ref;
+
   // Now, add any new locals
   for (const auto& ref : block.refs) {
-    if (ref.dir == stripe::RefDir::None) {
+    if (ref.dir == stripe::RefDir::None && dup_ref.find(ref.into) == dup_ref.end()) {
+      dup_ref.insert(ref.into);
       size_t size = ref.interior_shape.elem_size();
       sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, size,
                          (in_threads_ ? sem::Type::NORMAL : sem::Type::LOCAL)};
