@@ -48,6 +48,6 @@ plaidml_cc_library(
     deps = [
         ":base",
         "@half",
-        "@llvm",
+        "@llvm_shim//:llvm",
     ],
 )
