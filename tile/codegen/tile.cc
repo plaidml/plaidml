@@ -216,8 +216,8 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
         }
       }
     }
-    // Save any renames till the inner block (ie, only one, inner or outer needs to rename)
-    ref.into = ref.from;
+    // Let inner's from be the outer's into
+    inner->ref_by_into(ref.into)->from = ref.into;
   }
   // Make the inner block the sole stmt of the outer block
   outer->stmts = {inner};
