@@ -1,4 +1,3 @@
-
 #include "tile/ocl_exec/stripe_gen.h"
 
 #include <stdio.h>

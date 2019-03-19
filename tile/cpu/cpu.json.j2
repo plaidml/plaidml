@@ -1,0 +1,82 @@
+{
+    "arch": "CPU",
+    #######################################################################################
+    ## {{{ (CAN BE DELETED)
+    ## Set a clock rate
+    "clock_mhz": 700,
+
+    ## There are two memories layers of note in a GPU, the global memory and
+    ## the per-multiprocessor local memory.  We model this a just a single
+    ## instance of local memory (even though on a real GPU there is 1 per
+    ## multiprocessor) since we are not concerned with the accurary of
+    ## simulation yet.  We also ignore the L2 cache currently for similar
+    ## reasons.
+    "mem_units": {
+        "GLOBAL": { "count": 1, "size_KiB": 3932160 }, {## max DDR: 3840 MiB ##}
+        "LOCAL":  { "count": 1, "size_KiB": {{ L1_CACHE_SIZE }} }
+    },
+    ## We add a transfer unit to move data to/from shared memory
+    "tx_units": {
+        "DMA": { "count": 1 }
+    },
+    ## We make only 1 execution unit for simplicity (again there is probably 1
+    ## per multi-process in reality)
+    "exec_units": {
+        "GPU": { "count": 1, "ops_per_cycle": 512 }
+    },
+    ## We connect the various busses up, bytes_per_cycle is just a placeholder
+    ## here since we are not focused on the simulation aspect right now
+    "buses": [
+        { "sources": ["GLOBAL[0]"], "sinks": ["DMA[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["DMA[0]"], "sinks": ["GLOBAL[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["LOCAL[0]"], "sinks": ["DMA[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["DMA[0]"], "sinks": ["LOCAL[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["LOCAL[0]"], "sinks": ["GPU[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["GPU[0]"], "sinks": ["LOCAL[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["GLOBAL[0]"], "sinks": ["GPU[0]"], "bytes_per_cycle": 64 },
+        { "sources": ["GPU[0]"], "sinks": ["GLOBAL[0]"], "bytes_per_cycle": 64 }
+    ],
+    ## }}} (CAN BE DELETED) 
+    #######################################################################################
+
+    ## Define the stripe passes
+    "passes": [
+        {
+            "name": "stencil_mac",
+            "stencil": {
+                "reqs": ["agg_op_add", "comb_op_mul"],
+                "outer_set": ["dpu"],
+                "inner_set": ["dpu_inner"],
+                "stencils": [
+                    {
+                        "startup_cost": 32,
+                        "idxs": [
+                            { "name": "a", "size":  8, "outs": [1], "ins": [1,  0] },
+                        ]
+                    },
+                    {
+                        "startup_cost": 32,
+                        "idxs": [
+                            { "name": "a", "size":  8, "outs": [1], "ins": [0,  1] },
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "tile_contract",
+            "autotile": {
+                "reqs": ["contraction"],  ## Apply to only dense operations
+                "outer_set": ["contract_outer", "kernel"],
+                "inner_set": ["contract_inner"],
+                "clear_outer": true,
+                ## "acc_idxs": false,
+                "only_po2": true,  ## Only consider PO2 sizes for speed
+                "max_total_size": {{ L1_CACHE_SIZE * 1024 }},  ## All inputs must fit in local memory
+                ## Since all loads to/from global memory are across a wide bus, use that as the
+                ## cache_width to optimize for contigous regions of DRAM for each inner block
+                "cache_width": {{ CACHE_WIDTH }}
+            }
+        },
+    ]
+}

@@ -160,8 +160,13 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
   pmb.MergeFunctions = true;
   llvm::legacy::PassManager modopt;
   pmb.populateModulePassManager(modopt);
+  if (VLOG_IS_ON(2)) {
+    IVLOG(2, "\n============================================================\n");
+    module_->print(llvm::errs(), nullptr);
+  }
   modopt.run(*module_);
   if (VLOG_IS_ON(2)) {
+    IVLOG(2, "\n============================================================\n");
     module_->print(llvm::errs(), nullptr);
   }
   // Wrap the finished module and the buffer names into an Executable instance.
@@ -354,7 +359,8 @@ void Compiler::Visit(const stripe::Store& store) {
   // op->from is the name of a source scalar
   // op->into is the name of a destination buffer
   // get the offset into the destination buffer from the scope context
-  // look up the expected aggregation operation for the destination from the context
+  // look up the expected aggregation operation for the destination from the
+  // context
   // load the value to be stored from the source variable
   // use GEP to compute the destination element address
   // use the specified aggregation to store the value
@@ -1012,9 +1018,12 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
     return loc->second;
   }
   auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
-  // If we failed to resolve the symbol, and its first character is an underscore, try again without
-  // the underscore, because the code may have been generated for a system whose loader expects every
-  // symbol to have an underscore prefix, but the DynamicLibrary module expects not to have a prefix.
+  // If we failed to resolve the symbol, and its first character is an
+  // underscore, try again without
+  // the underscore, because the code may have been generated for a system whose
+  // loader expects every
+  // symbol to have an underscore prefix, but the DynamicLibrary module expects
+  // not to have a prefix.
   if (!ptr && name[0] == '_' && name.size() > 1) {
     ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name.substr(1));
   }
@@ -1034,6 +1043,26 @@ void JitExecute(const stripe::Block& program, const std::map<std::string, void*>
   auto executable = compiler.CompileProgram(program);
   executable->Run(buffers);
 }
+
+struct Native::Impl {
+  llvm::LLVMContext context;
+  std::unique_ptr<Executable> executable;
+
+  void compile(const stripe::Block& program);
+  void run(const std::map<std::string, void*>& buffers);
+};
+
+Native::Native() : m_impl(new Native::Impl) {}
+Native::~Native() {}
+
+void Native::Impl::compile(const stripe::Block& program) {
+  Compiler compiler(&context);
+  executable = compiler.CompileProgram(program);
+}
+void Native::Impl::run(const std::map<std::string, void*>& buffers) { executable->Run(buffers); }
+
+void Native::compile(const stripe::Block& program) { m_impl.get()->compile(program); }
+void Native::run(const std::map<std::string, void*>& buffers) { m_impl.get()->run(buffers); }
 
 }  // namespace codegen
 }  // namespace tile
