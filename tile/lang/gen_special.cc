@@ -155,6 +155,11 @@ static void GenScatter(KernelList& r, const Op& op, const Bindings& bindings,  /
     lid_vars.push_back(_(var));
   }
 
+  // Initialize the output buffer
+  auto init_block = _Block({});
+  init_block->append(_("out")[_("out_idx")] = 0);
+  body->append(_For("out_idx", out_shape.sizes_product(), 1, init_block));
+
   // inner is what will be inside the for loops over the index dimensions
   auto inner = _Block({});
   // Generate the expansion offset

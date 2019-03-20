@@ -164,8 +164,12 @@ static proto::Config GenerateCFG() {
   return cfg;
 }
 
-static std::map<std::string, std::vector<float>> GenerateMatrix(const size_t* dim, std::vector<std::string> vars) {
-  size_t size = dim[0] * dim[1] * dim[2] * dim[3];
+static std::map<std::string, std::vector<float>> GenerateMatrix(const std::vector<size_t>& dim,
+                                                                std::vector<std::string> vars) {
+  size_t size = 1;
+  for (int i = 0; i < dim.size(); ++i) {
+    size *= dim[i];
+  }
   // We don't care the contents in data
   std::map<std::string, std::vector<float>> data;
   for (const auto& var : vars) {
@@ -174,8 +178,11 @@ static std::map<std::string, std::vector<float>> GenerateMatrix(const size_t* di
   return data;
 }
 
-static std::vector<float> GenerateExpected(const size_t* dim, size_t load_dim) {
-  size_t size = dim[0] * dim[1] * dim[2] * dim[3];
+static std::vector<float> GenerateExpected(const std::vector<size_t>& dim, size_t load_dim) {
+  size_t size = 1;
+  for (int i = 0; i < dim.size(); ++i) {
+    size *= dim[i];
+  }
   std::vector<float> result(size);
   size_t idx = 0;
   for (size_t w = 0; w < dim[0]; ++w) {
@@ -259,7 +266,7 @@ TEST(LoadIndexTest, SimpleIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  size_t dim[4] = {4, 4, 4, 4};
+  std::vector<size_t> dim = {4, 4, 4, 4};
   std::vector<std::string> vars = {"A", "B"};
   auto data = GenerateMatrix(dim, vars);
   auto expected_result = GenerateExpected(dim, 2);
@@ -326,7 +333,7 @@ TEST(LoadIndexTest, AffineIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  size_t dim[4] = {8, 8, 256, 8};
+  std::vector<size_t> dim = {8, 8, 256, 8};
   std::vector<std::string> vars = {"A", "B"};
   auto data = GenerateMatrix(dim, vars);
   auto expected_result = GenerateExpected(dim, 2);
@@ -417,7 +424,7 @@ TEST(LoadIndexTest, MultiLoadIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  size_t dim[4] = {4, 4, 256, 8};
+  std::vector<size_t> dim = {4, 4, 256, 8};
   std::vector<std::string> vars = {"A", "B", "C", "D"};
   auto data = GenerateMatrix(dim, vars);
   auto expected_B = GenerateExpected(dim, 2);
@@ -504,7 +511,7 @@ TEST(LoadIndexTest, FuseIndex) {
   codegen::Optimize(stripe.program.get(), cfg.passes(), options);
   IVLOG(1, "After stripe optimization: " << *stripe.program);
 
-  size_t dim[4] = {4, 4, 4, 8};
+  std::vector<size_t> dim = {4, 4, 4, 8};
   std::vector<std::string> vars = {"A", "B", "C"};
   auto data = GenerateMatrix(dim, vars);
   auto expected_B = GenerateExpected(dim, 2);
