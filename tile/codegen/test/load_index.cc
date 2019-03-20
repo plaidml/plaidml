@@ -167,7 +167,7 @@ static proto::Config GenerateCFG() {
 static std::map<std::string, std::vector<float>> GenerateMatrix(const std::vector<size_t>& dim,
                                                                 std::vector<std::string> vars) {
   size_t size = 1;
-  for (int i = 0; i < dim.size(); ++i) {
+  for (size_t i = 0; i < dim.size(); ++i) {
     size *= dim[i];
   }
   // We don't care the contents in data
@@ -180,7 +180,7 @@ static std::map<std::string, std::vector<float>> GenerateMatrix(const std::vecto
 
 static std::vector<float> GenerateExpected(const std::vector<size_t>& dim, size_t load_dim) {
   size_t size = 1;
-  for (int i = 0; i < dim.size(); ++i) {
+  for (size_t i = 0; i < dim.size(); ++i) {
     size *= dim[i];
   }
   std::vector<float> result(size);
