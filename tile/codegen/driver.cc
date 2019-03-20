@@ -16,6 +16,7 @@
 #include "tile/codegen/fuse.h"
 #include "tile/codegen/localize.h"
 #include "tile/codegen/mem_rebase.h"
+#include "tile/codegen/package.h"
 #include "tile/codegen/partition.h"
 #include "tile/codegen/placer.h"
 #include "tile/codegen/scalarize.h"
@@ -153,6 +154,9 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
         break;
       case proto::Pass::kDeadCodeElimination:
         DeadCodeEliminationPass(block, pass.dead_code_elimination(), false);
+        break;
+      case proto::Pass::kPackageBlocks:
+        PackagePass(block, pass.package_blocks());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
