@@ -526,8 +526,14 @@ class CloneVisitor : RewriteStmtVisitor {
       return ret;
     }
     depth_--;
-    for (auto& stmt : ret->stmts) {
-      stmt.reset(stmt->Accept(this));
+    std::unordered_map<Statement*, StatementIt> dep_map;  // src-block ptr -> clone-block StatementIt
+    for (StatementIt sit = ret->stmts.begin(); sit != ret->stmts.end(); ++sit) {
+      Statement* clone = (*sit)->Accept(this);
+      for (auto& dit : clone->deps) {
+        dit = dep_map.at(dit->get());
+      }
+      dep_map[sit->get()] = sit;
+      sit->reset(clone);
     }
     depth_++;
     return ret;
