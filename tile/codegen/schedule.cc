@@ -1560,16 +1560,16 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
   swap_block.refs.push_back(stripe::Refinement{
-      stripe::RefDir::In,            // dir
-      ent->source->ref.into,         // from
-      "src",                         // into
-      ent->source->ref_swap_access,  // access
-      ent->source->ref_swap_shape,   // interior_shape
-      ent->source->ref_swap_shape,   // exterior_shape (FIXME)
-      "",                            // agg_op
-      ent->source->ref.location,     // location
-      0,                             // offset
-      ent->source->ref.bank_dim,     // bank_dim
+      stripe::RefDir::In,                 // dir
+      ent->source->ref.into,              // from
+      "src",                              // into
+      ent->source->ref_swap_access,       // access
+      ent->source->ref_swap_shape,        // interior_shape
+      ent->source->exterior_cache_shape,  // exterior_shape
+      "",                                 // agg_op
+      ent->source->ref.location,          // location
+      0,                                  // offset
+      ent->source->ref.bank_dim,          // bank_dim
   });
 
   auto banked_mem_loc = mem_loc_;
@@ -1580,7 +1580,7 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       "dst",                           // into
       ent->source->cache_swap_access,  // access
       ent->source->cache_swap_shape,   // interior_shape
-      ent->source->cache_swap_shape,   // exterior_shape (FIXME)
+      ent->shape,                      // exterior_shape
       "",                              // agg_op
       banked_mem_loc,                  // location
       0,                               // offset
@@ -1616,7 +1616,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       "src",                           // into
       ent->source->cache_swap_access,  // access
       ent->source->cache_swap_shape,   // interior_shape
-      ent->source->cache_swap_shape,   // exterior_shape (FIXME)
+      ent->shape,                      // exterior_shape
       "",                              // agg_op
       banked_mem_loc,                  // location
       0,                               // offset
@@ -1624,16 +1624,16 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
   });
 
   swap_block.refs.push_back(stripe::Refinement{
-      stripe::RefDir::Out,           // dir
-      ent->source->ref.into,         // from
-      "dst",                         // into
-      ent->source->ref_swap_access,  // access
-      ent->source->ref_swap_shape,   // interior_shape
-      ent->source->ref_swap_shape,   // exterior_shape (FIXME)
-      "",                            // agg_op
-      ent->source->ref.location,     // location
-      0,                             // offset
-      ent->source->ref.bank_dim,     // bank_dim
+      stripe::RefDir::Out,                // dir
+      ent->source->ref.into,              // from
+      "dst",                              // into
+      ent->source->ref_swap_access,       // access
+      ent->source->ref_swap_shape,        // interior_shape
+      ent->source->exterior_cache_shape,  // exterior_shape
+      "",                                 // agg_op
+      ent->source->ref.location,          // location
+      0,                                  // offset
+      ent->source->ref.bank_dim,          // bank_dim
   });
 
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
