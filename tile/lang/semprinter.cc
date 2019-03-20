@@ -56,6 +56,11 @@ inline std::string c_dtype(const DataType& dt) {
 }
 
 void Print::emitType(const Type& t) {
+  if (t.region == Type::LOCAL) {
+    emit("__local ");
+  } else if (t.region == Type::GLOBAL) {
+    emit("__global ");
+  }
   if (t.base == Type::TVOID) {
     emit("void");
     return;
