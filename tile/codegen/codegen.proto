@@ -251,9 +251,9 @@ message LocatePass {
   required stripe.proto.Location loc = 3;
 }
 
-// The stencil pass attempts to rewrite block to contain an inner block that
+// The stencil pass attempts to rewrite blocks to contain an inner block that
 // matches a fixed hardware 'Stencil' or set of stencils.  Basically, we presume
-// that the hardware has one or more build in 'indexes' (which may exist over
+// that the hardware has one or more built-in 'indexes' (which may exist over
 // time or actual be parallel hardware).  We then try to match indexes or
 // regions of indexes of a block to the various hardware indexes, and rewrite
 // the block into an outer block that make multiple calls to a fixed, hardware
