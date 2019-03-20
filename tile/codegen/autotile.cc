@@ -2,6 +2,8 @@
 
 #include "tile/codegen/autotile.h"
 
+#include <algorithm>
+
 #include "base/util/logging.h"
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
@@ -20,15 +22,19 @@ namespace {
 
 struct TileMetrics {
   int64_t input_bytes = 0;
+  int64_t max_input_bytes = 0;
   double input_bandwidth = 0;
   int64_t output_bytes = 0;
+  int64_t max_output_bytes = 0;
   double output_bandwidth = 0;
   int64_t total_bytes = 0;
   double total_bandwidth = 0;
 
   bool IsValid(const proto::AutotilePass& options) const {
     return !((options.max_output_size() && output_bytes > options.max_output_size()) ||
+             (options.max_per_output_size() && max_output_bytes > options.max_per_output_size()) ||
              (options.max_input_size() && input_bytes > options.max_input_size()) ||
+             (options.max_per_input_size() && max_input_bytes > options.max_per_input_size()) ||
              (options.max_total_size() && total_bytes > options.max_total_size()));
   }
 };
@@ -96,8 +102,10 @@ bool operator<(const Tile& lhs, const Tile& rhs) {  //
 
 std::ostream& operator<<(std::ostream& os, const TileMetrics& metrics) {
   os << "(" << metrics.input_bytes        //
+     << ", " << metrics.max_input_bytes   //
      << ", " << metrics.input_bandwidth   //
      << ", " << metrics.output_bytes      //
+     << ", " << metrics.max_output_bytes  //
      << ", " << metrics.output_bandwidth  //
      << ", " << metrics.total_bytes       //
      << ", " << metrics.total_bandwidth << ")";
@@ -135,9 +143,11 @@ TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
     ret.total_bandwidth += bandwidth;
     if (ref.dir == RefDir::In) {
       ret.input_bytes += bytes;
+      ret.max_input_bytes = std::max(ret.max_input_bytes, bytes);
       ret.input_bandwidth += bandwidth;
     } else if (ref.dir == RefDir::Out) {
       ret.output_bytes += bytes;
+      ret.max_output_bytes = std::max(ret.max_output_bytes, bytes);
       ret.output_bandwidth += bandwidth;
     }
     IVLOG(4, "    ComputeSizes> ref: " << ref);

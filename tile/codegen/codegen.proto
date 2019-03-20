@@ -321,49 +321,55 @@ message AutotilePass {
   // The maximum amount of memory use (in bytes) for all the inputs read by
   // the inner block.  0 means no limit.
   optional int64 max_input_size = 8 [default = 0];
+  // The maximum amount of memory use (in bytes) for each output written by
+  // the inner block.  0 means no limit.
+  optional int64 max_per_output_size = 9 [default = 0];
+  // The maximum amount of memory use (in bytes) for each input read by
+  // the inner block.  0 means no limit.
+  optional int64 max_per_input_size = 10 [default = 0];
   // The total size of all data used by the inner block.  Note, this is
   // generally the place to put a memory limit, but in some architectures
   // inputs are held in one memory and outputs are held in accumulation
   // registers in a separate memory.  0 means no limit.
-  optional int64 max_total_size = 9 [default = 0];
+  optional int64 max_total_size = 11 [default = 0];
   // The maximal  number of inner loops allowed by the inner block.  0 means no
   // limit.
-  optional int64 max_sizes_product = 10 [default = 0];
+  optional int64 max_sizes_product = 12 [default = 0];
   // The multiplier for output I/O cost (in case input + output are not
   // symmetric)
-  optional double output_cost = 11 [default = 1.0];
+  optional double output_cost = 13 [default = 1.0];
   // The multiplier for input I/O cost (in case input + output are not
   // symmetric)
-  optional double input_cost = 12 [default = 1.0];
+  optional double input_cost = 14 [default = 1.0];
   // Should we copy the tags of the original block to the inner block
-  optional bool copy_tags = 13 [default = false];
+  optional bool copy_tags = 15 [default = false];
   // When considering memory I/O, what is the size (in byte) of the cache line
-  optional int64 cache_width = 14 [default = 0];
+  optional int64 cache_width = 16 [default = 0];
   // When the result of autotile is trivial (either whole loops fits into inner
   // memory or only 1 element fits), should we skip the transform?
-  optional bool elide_trivial = 15 [default = false];
+  optional bool elide_trivial = 17 [default = false];
   // Only consider refinement from this memory location when computing memory
   // I/O
-  optional string loc_name = 16 [default = ""];
+  optional string loc_name = 18 [default = ""];
   // Clear the tags of the original / outer block before adding outer_set
-  optional bool clear_outer = 17 [default = false];
-  optional bool acc_idxs = 18 [default = true];
+  optional bool clear_outer = 19 [default = false];
+  optional bool acc_idxs = 20 [default = true];
   // Clear the location the original / outer block
-  optional bool clear_location = 19 [default = false];
+  optional bool clear_location = 21 [default = false];
   // 'Flip' the resulting tile to interleaved rather than contigous version.
-  optional bool flip = 20 [default = false];
+  optional bool flip = 22 [default = false];
   // Specify the minimum size of tiles to get full utilization
-  optional int64 min_size = 21 [default = 1];
+  optional int64 min_size = 23 [default = 1];
   // Specify the minimum size of tile outputs to get full utilization
-  optional int64 min_out_size = 22 [default = 1];
+  optional int64 min_out_size = 24 [default = 1];
   // Specify the minimum count of tiles to get full utilization
-  optional int64 min_count = 23 [default = 1];
+  optional int64 min_count = 25 [default = 1];
   // Specify the minimum count of output tiles to get full utilization
-  optional int64 min_out_count = 24 [default = 1];
+  optional int64 min_out_count = 26 [default = 1];
   // Specify the 'tie-breaker' multiplier on having more tiles
   // Note, we do log2(num_tiles) to make this less impactful
   // Positive means more tiles = bad, negative means more tiles = good
-  optional double split_factor = 25 [default = .001];
+  optional double split_factor = 27 [default = .001];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any
