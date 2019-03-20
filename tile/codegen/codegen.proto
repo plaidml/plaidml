@@ -144,6 +144,8 @@ message Pass {
     GenericPass ilp_cstr_reduction = 24;
     // Dead code elimination
     GenericPass dead_code_elimination = 25;
+    // Packages blocks into subblocks.
+    PackagePass package_blocks = 26;
   }
 }
 
@@ -451,4 +453,11 @@ message MemRebasePass {
   required stripe.proto.Location loc = 2;
   // The offset to use for the rewritten refinement.
   required stripe.proto.Affine offset = 3;
+}
+
+// Packages blocks into subblocks, propagating refinements.
+message PackagePass {
+  // Indicates the blocks to be packaged.
+  repeated string reqs = 1;
+  repeated string package_set = 2;
 }
