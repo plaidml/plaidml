@@ -1491,6 +1491,11 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
     case proto::SchedulePass::kColorIoUnique: {
       // Assign all inputs, rotating through the memory units, so that
       // we guarantee they have unique colors.
+      if (placements.size() > units_.size()) {
+        // This can't be scheduled with IO coloring -- there are more
+        // placements than units.
+        return boost::none;
+      }
       std::set<stripe::Affine> used_output_units;
       auto unit_it = units_.begin();
       for (const auto& pkey_placement : placements) {
