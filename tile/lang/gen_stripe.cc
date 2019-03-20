@@ -160,6 +160,59 @@ class StripeGenerator {
     }
   }
 
+  std::shared_ptr<Block> InitBuffer(Block* main, const Op& op, const TensorShape& shape) {
+    auto stmt = std::make_shared<Block>();
+    stmt->set_tag("kernel");
+    auto out_exterior_shape = main->ref_by_into(op.output)->interior_shape;
+    TensorShape interior_shape{shape.type, std::vector<TensorDimension>(shape.dims.size(), TensorDimension{1, 1})};
+    std::vector<Affine> dst_access;
+    for (std::size_t idx = 0; idx < shape.dims.size(); ++idx) {
+      if (shape.dims[idx].size == 1) {
+        dst_access.push_back(0);
+      } else {
+        auto var = "d" + std::to_string(idx);
+        dst_access.push_back(Affine{var});
+        stmt->idxs.push_back(Index{var, shape.dims[idx].size});
+      }
+    }
+
+    stmt->refs.emplace_back(Refinement{
+        RefDir::Out,         // dir
+        op.output,           // from
+        "dst",               // into
+        dst_access,          // access
+        interior_shape,      // interior_shape
+        out_exterior_shape,  // exterior_shape
+    });
+
+    if (op.c.use_default.empty()) {
+      stmt->set_tag("zero");
+      stmt->name = op.output + " = Zero()";
+      stmt->comments = "Zero " + op.output;
+      stmt->stmts.emplace_back(std::make_shared<Constant>("$ZERO", INT64_C(0)));
+      stmt->stmts.emplace_back(std::make_shared<Store>("$ZERO", "dst"));
+    } else {
+      auto src_exterior_shape = main->ref_by_into(op.c.use_default)->interior_shape;
+      stmt->set_tag("copy");
+      stmt->name = op.output + " = " + op.c.use_default;
+      stmt->comments = "Pre-Initialize " + op.output;
+      stmt->refs.emplace_back(Refinement{
+          RefDir::In,          // dir
+          op.c.use_default,    // from
+          "src",               // into
+          dst_access,          // access
+          interior_shape,      // interior_shape
+          src_exterior_shape,  // exterior_shape
+          "",                  // agg_op
+          {},                  // location
+          true                 // is_const
+      });
+      stmt->stmts.emplace_back(std::make_shared<Load>("src", "$X"));
+      stmt->stmts.emplace_back(std::make_shared<Store>("$X", "dst"));
+    }
+    return stmt;
+  }
+
   void ProcessContraction(Block* main, const Op& op) {
     if (GetShape(op.output).byte_size() == 0) {
       IVLOG(3, "Contraction output " << op.output << " size==0; skipping");
@@ -256,56 +309,7 @@ class StripeGenerator {
     }
 
     if (NeedsInitialize(*kernel, shapes[0])) {
-      auto stmt = std::make_shared<Block>();
-      stmt->set_tag("kernel");
-      auto out_exterior_shape = main->ref_by_into(op.output)->interior_shape;
-      TensorShape interior_shape{shapes[0].type,
-                                 std::vector<TensorDimension>(shapes[0].dims.size(), TensorDimension{1, 1})};
-      std::vector<Affine> dst_access;
-      for (std::size_t idx = 0; idx < shapes[0].dims.size(); ++idx) {
-        if (shapes[0].dims[idx].size == 1) {
-          dst_access.push_back(0);
-        } else {
-          auto var = "d" + std::to_string(idx);
-          dst_access.push_back(Affine{var});
-          stmt->idxs.push_back(Index{var, shapes[0].dims[idx].size});
-        }
-      }
-      stmt->refs.emplace_back(Refinement{
-          RefDir::Out,         // dir
-          op.output,           // from
-          "dst",               // into
-          dst_access,          // access
-          interior_shape,      // interior_shape
-          out_exterior_shape,  // exterior_shape
-      });
-
-      if (op.c.use_default.empty()) {
-        stmt->set_tag("zero");
-        stmt->name = op.output + " = Zero()";
-        stmt->comments = "Zero " + op.output;
-        stmt->stmts.emplace_back(std::make_shared<Constant>("$ZERO", INT64_C(0)));
-        stmt->stmts.emplace_back(std::make_shared<Store>("$ZERO", "dst"));
-      } else {
-        auto src_exterior_shape = main->ref_by_into(op.c.use_default)->interior_shape;
-        stmt->set_tag("copy");
-        stmt->name = op.output + " = " + op.c.use_default;
-        stmt->comments = "Pre-Initialize " + op.output;
-        stmt->refs.emplace_back(Refinement{
-            RefDir::In,          // dir
-            op.c.use_default,    // from
-            "src",               // into
-            dst_access,          // access
-            interior_shape,      // interior_shape
-            src_exterior_shape,  // exterior_shape
-            "",                  // agg_op
-            {},                  // location
-            true                 // is_const
-        });
-        stmt->stmts.emplace_back(std::make_shared<Load>("src", "$X"));
-        stmt->stmts.emplace_back(std::make_shared<Store>("$X", "dst"));
-      }
-
+      auto stmt = InitBuffer(main, op, shapes[0]);
       main->stmts.insert(std::prev(main->stmts.end()), stmt);
     }
 
@@ -490,6 +494,15 @@ class StripeGenerator {
       ProcessPrng(main, op_idx);
       return;
     }
+    if (op.f.fn == "scatter") {
+      if (op.inputs.size() != 3) {
+        throw std::runtime_error(str(boost::format("scatter needs 3 parameters, actually gets %d") % op.inputs.size()));
+      }
+      // Initialize the output buffer of scatter
+      auto stmt = InitBuffer(main, op, GetShape(op.inputs[2]));
+      main->stmts.push_back(stmt);
+    }
+
     auto stmt = std::make_shared<Special>();
     stmt->name = op.f.fn;
     stmt->inputs = op.inputs;
