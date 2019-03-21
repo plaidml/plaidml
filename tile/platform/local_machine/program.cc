@@ -90,7 +90,9 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
   auto outputs = FromProto(program.outputs());
   auto settings = hal::settings::ToHardwareSettings(devinfo.settings);
 
-  static bool use_stripe = (getenv("USE_STRIPE") != NULL);
+  char* envvar_use_stripe = getenv("USE_STRIPE");
+  bool use_stripe = (envvar_use_stripe != NULL && strcmp(envvar_use_stripe, "0") != 0);
+
   lang::KernelList kernel_list;
   if (use_stripe) {
     static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
