@@ -2,11 +2,6 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])  # BSD/MIT-like license
 
-config_setting(
-    name = "x64_windows",
-    values = {"cpu": "x64_windows"},
-)
-
 cc_library(
     name = "minizip",
     srcs = [
@@ -28,7 +23,7 @@ cc_library(
         "zip.h",
     ],
     copts = select({
-        ":x64_windows": [],
+        "@toolchain//:windows_x86_64": [],
         "//conditions:default": [
             "-Wno-implicit-function-declaration",
             "-Wno-int-conversion",
@@ -40,6 +35,10 @@ cc_library(
         ],
     }),
     includes = ["."],
+    linkopts = select({
+        "@toolchain//:windows_x86_64": ["-DEFAULTLIB:advapi32.lib"],
+        "//conditions:default": [],
+    }),
     deps = ["@zlib"],
 )
 

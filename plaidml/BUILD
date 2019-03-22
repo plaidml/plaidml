@@ -381,22 +381,21 @@ plaidml_py_wheel(
     config = ":setup.cfg",
     config_substitutions = select({
         "@toolchain//:windows_x86_64": {
-            "{PLAIDML_NATIVE_LIBRARY}": "plaidml.dll",
-            "{LIBDIR}": "Library/bin",
-            "{BINDIR}": "Library/bin",
-            "{PMLC_BIN}": "pmlc_bin.exe",
+            "{BIN_DATA_FILES}": """Library/bin =
+  data/plaidml.dll
+  data/pmlc_bin.exe""",
         },
         "@toolchain//:macos_x86_64": {
-            "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.dylib",
-            "{LIBDIR}": "lib",
-            "{BINDIR}": "bin",
-            "{PMLC_BIN}": "pmlc_bin",
+            "{BIN_DATA_FILES}": """lib =
+  data/libplaidml.dylib
+bin =
+  data/pmlc_bin""",
         },
         "//conditions:default": {
-            "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.so",
-            "{LIBDIR}": "lib",
-            "{BINDIR}": "bin",
-            "{PMLC_BIN}": "pmlc_bin",
+            "{BIN_DATA_FILES}": """lib =
+  data/libplaidml.so
+bin =
+  data/pmlc_bin""",
         },
     }),
     data = [
