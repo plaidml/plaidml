@@ -360,11 +360,21 @@ genrule(
     tags = ["llvm"],
 )
 
+genrule(
+    name = "pmlc",
+    srcs = ["//tile/pmlc:pmlc.py"],
+    outs = ["pmlc.py"],
+    cmd = "cp $(SRCS) $(@D)/",
+)
+
 # The PlaidML Wheel definition.
 plaidml_py_wheel(
     name = "wheel",
     package_name = "plaidml",
-    srcs = PYTHON_SRCS + [":licenses"] + select({
+    srcs = PYTHON_SRCS + [
+        ":licenses",
+        ":pmlc",
+    ] + select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": [":llvm_license"],
     }),
@@ -373,14 +383,20 @@ plaidml_py_wheel(
         "@toolchain//:windows_x86_64": {
             "{PLAIDML_NATIVE_LIBRARY}": "plaidml.dll",
             "{LIBDIR}": "Library/bin",
+            "{BINDIR}": "Library/bin",
+            "{PMLC_BIN}": "pmlc_bin.exe",
         },
         "@toolchain//:macos_x86_64": {
             "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.dylib",
             "{LIBDIR}": "lib",
+            "{BINDIR}": "bin",
+            "{PMLC_BIN}": "pmlc_bin",
         },
         "//conditions:default": {
             "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.so",
             "{LIBDIR}": "lib",
+            "{BINDIR}": "bin",
+            "{PMLC_BIN}": "pmlc_bin",
         },
     }),
     data = [
@@ -391,6 +407,7 @@ plaidml_py_wheel(
         "//plaidml/base:base_cpp.h",
         "@half//:include/half.hpp",
         "plaidml-config.cmake",
+        "//tile/pmlc:pmlc_bin",
     ] + select({
         "@toolchain//:windows_x86_64": [":plaidml_pub.dll"],
         "@toolchain//:macos_x86_64": [":libplaidml_macos_pub"],

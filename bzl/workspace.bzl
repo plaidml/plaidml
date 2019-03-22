@@ -5,9 +5,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 def plaidml_workspace():
     http_archive(
         name = "bazel_skylib",
-        url = "https://github.com/bazelbuild/bazel-skylib/archive/0.5.0.tar.gz",
-        sha256 = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f",
-        strip_prefix = "bazel-skylib-0.5.0",
+        url = "https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz",
+        sha256 = "2ea8a5ed2b448baf4a6855d3ce049c4c452a6470b1efd1504fdb7c1c134d220a",
+        strip_prefix = "bazel-skylib-0.8.0",
     )
 
     http_archive(
@@ -112,9 +112,9 @@ def plaidml_workspace():
     )
 
     conda_repo(
-        name = "com_intel_plaidml_conda_ocl_exec",
+        name = "com_intel_plaidml_conda_pmlc",
         specs = {
-            "env": str(Label("//conda:ocl_exec.yml")),
+            "env": str(Label("//conda:pmlc.yml")),
         },
     )
 
