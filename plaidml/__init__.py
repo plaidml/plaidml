@@ -49,7 +49,6 @@ import plaidml.exceptions
 import plaidml.library
 import plaidml.settings
 import platform
-import pkg_resources
 import sys
 import threading
 import traceback

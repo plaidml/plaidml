@@ -67,7 +67,6 @@ static std::string EraseSpace(const std::string& src) {
 
 static proto::Config GenerateCFG() {
   auto cfg_tmpl = R"(
-    arch: "test"
     passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { name: "DRAM" } } }
     passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { name: "DRAM" } } }
     passes: { name: "loc_initial", locate_block: { reqs: ["kernel"], loc: { name: "PPE" } } }

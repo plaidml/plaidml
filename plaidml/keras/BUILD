@@ -43,7 +43,7 @@ conda_test(
     deps = [
         ":keras",
         "//testing:plaidml_py",
-	"//tile/ocl_exec:gpu_config",
+        "//tile/ocl_exec:gpu_config",
     ],
 )
 
@@ -60,7 +60,7 @@ conda_test(
     deps = [
         ":keras",
         "//testing:plaidml_py",
-	"//tile/ocl_exec:gpu_config",
+        "//tile/ocl_exec:gpu_config",
     ],
 )
 

@@ -6,49 +6,11 @@ package vertexai.tile.codegen.proto;
 
 import "tile/stripe/stripe.proto";
 
-// The Config message is the main message for the PMLSim config file. It
-// contains the definition of the hardware being modeled as well as the set of
-// optimization passes to run during compilation.  For use of stripe outside of
-// PMLSim, a repeated list of passes is sufficient.
+// The Config message is the main message for the pmlc config file. It contains
+// the set ofoptimization passes to run during compilation.
 message Config {
-  optional uint32 clock_mhz = 1;
-  map<string, uint64> params = 2;
-  map<string, ExecutionUnit> exec_units = 3;
-  map<string, MemoryUnit> mem_units = 4;
-  map<string, TransferUnit> tx_units = 5;
-  repeated Bus buses = 6;
-  repeated Pass passes = 7;
-  repeated Pass lowering = 8;
-  optional uint32 i8_mac_ops_per_cycle = 9;
-  required string arch = 10;
-}
-
-// An execution unit represents a simulated computing device.
-message ExecutionUnit {
-  optional uint32 count = 1 [default = 1];
-  required uint32 ops_per_cycle = 2;
-  repeated Stencil stencils = 3;
-}
-
-// A memory unit represents a bank of simulated memory.
-message MemoryUnit {
-  optional uint32 count = 1 [default = 1];
-  required uint32 size_KiB = 2;
-  optional bool is_host = 3 [default = false];
-}
-
-// A transfer unit represents a processing element that moves memory between
-// two memory regions such as a DMA controller
-message TransferUnit {
-  optional uint32 count = 1 [default = 1];
-}
-
-// A bus represents a link between memory and an execution unit, or memory and
-// a transfer unit.
-message Bus {
-  repeated string sources = 1;
-  repeated string sinks = 2;
-  required double bytes_per_cycle = 3;
+  repeated Pass passes = 1;
+  repeated Pass lowering = 2;
 }
 
 // The optimization of stripe is done via a series of passes, each which

@@ -482,7 +482,6 @@ TEST_F(ScheduleTest, UsesTmps) {
 
 TEST(Schedule, Basic) {
   auto cfg_tmpl = R"(
-    arch: "test"
     passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { name: "DRAM" } } }
     passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { name: "DRAM" } } }
     passes: { name: "loc_proc"
