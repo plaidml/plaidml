@@ -377,10 +377,8 @@ cc_library(
             "lib/Target/**/*",
             "lib/ToolDrivers/**/*",
             "lib/Demangle/**/*",
-        ] + [
             # need to switch on windows in order to get PDBs
             "lib/DebugInfo/PDB/DIA/**/*",
-        ] + [
             # excluded because they don't build cleanly
             "lib/ExecutionEngine/OProfileJIT/**/*",
             "lib/ExecutionEngine/IntelJITEvents/**/*",
@@ -398,8 +396,7 @@ cc_library(
         "lib/**/*.def",
         "include/llvm/**/*.h",
     ]) + [
-        "include/llvm/Support/VCSRevision.h",
-    ] + [
+        ":vcs_revision_gen",
         ":gen-attrs",
         ":gen-intrinsic-impl",
         ":gen-intrinsic-enums",

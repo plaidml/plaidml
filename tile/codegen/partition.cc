@@ -350,7 +350,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
   bank_info.uses[block].idx_name = idx_name;
   bank_info.banked_shape = base_ref->interior_shape;
   auto part_size = math::RoundUp(bank_info.banked_shape.dims[*dim_pos].size, options.num_parts());
-  bank_info.banked_shape.resize_dim(*dim_pos, part_size);
+  bank_info.banked_shape.resize_dim(bank_info.dim_pos, part_size);
   bank_info.num_banks = options.num_parts();
   base_ref->bank_dim = BankDimension{bank_info.dim_pos};
 }

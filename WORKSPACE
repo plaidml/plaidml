@@ -42,6 +42,8 @@ local_repository(
     path = "vendor/opengl",
 )
 
-load("//bzl:workspace.bzl", "plaidml_workspace")
+load("//bzl:workspace.bzl", "configure_llvm", "plaidml_workspace")
 
 plaidml_workspace()
+
+configure_llvm()

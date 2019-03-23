@@ -65,14 +65,6 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "llvm",
-        url = "http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz",
-        sha256 = "a38dfc4db47102ec79dcc2aa61e93722c5f6f06f0a961073bd84b78fb949419b",
-        strip_prefix = "llvm-7.0.1.src",
-        build_file = str(Label("//vendor/llvm:llvm.BUILD")),
-    )
-
-    http_archive(
         name = "opencl_headers",
         url = "https://github.com/KhronosGroup/OpenCL-Headers/archive/f039db6764d52388658ef15c30b2237bbda49803.zip",
         sha256 = "b2b813dd88a7c39eb396afc153070f8f262504a7f956505b2049e223cfc2229b",
@@ -145,4 +137,13 @@ def configure_protobuf():
     native.bind(
         name = "six",
         actual = "@six_archive//:six",
+    )
+
+def configure_llvm():
+    http_archive(
+        name = "llvm",
+        url = "http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz",
+        sha256 = "a38dfc4db47102ec79dcc2aa61e93722c5f6f06f0a961073bd84b78fb949419b",
+        strip_prefix = "llvm-7.0.1.src",
+        build_file = str(Label("//vendor/llvm:llvm.BUILD")),
     )
