@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -15,6 +16,18 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
+// For (index = init; index < range; index += step)
+struct LoopInfo {
+  std::string index;
+  int init;
+  int range;
+  int step;
+  // stmts to be inserted before the loop
+  std::vector<sem::StmtPtr> init_stmts;
+  // stmts to be inserted at the end of the loop
+  std::vector<sem::StmtPtr> step_stmts;
+};
+
 class SemtreeEmitter : public stripe::ConstStmtVisitor {
  public:
   explicit SemtreeEmitter(const AliasMap& am, size_t threads);
@@ -26,11 +39,13 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void Visit(const stripe::Intrinsic&);
   void Visit(const stripe::Block&);
 
+  std::string generate_name(const std::string& prefix);
   std::string safe_name(const std::string& in) const;
   std::string ref_name(const std::string& in) const;
   std::string scalar_name(const std::string& in) const;
   std::string idx_name(const std::string& in) const;
   sem::ExprPtr convert_affine(const stripe::Affine& aff) const;
+  void process_affine(const std::string idx, const stripe::Affine& aff);
   sem::StmtPtr add_loops(const stripe::Block&);
   void do_gids(const stripe::Block&);
   sem::StmtPtr do_lids(const stripe::Block&);
@@ -47,6 +62,10 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   const AliasMap* scope_;
   size_t in_kernel_ = 0;
   size_t in_threads_ = 0;
+  // current outside loops
+  std::vector<LoopInfo> loop_info_;
+  // the prefix for generated names
+  std::map<std::string, size_t> prefix_;
   lang::KernelList kernels_;
 };
 

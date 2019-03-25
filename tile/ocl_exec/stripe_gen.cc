@@ -35,7 +35,7 @@ KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const Sh
   IVLOG(1, *stripe);
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
   emit.Visit(*stripe);
-  lang::Simplify(emit.kernels_.kernels);
+  // lang::Simplify(emit.kernels_.kernels);
   for (const auto ki : emit.kernels_.kernels) {
     sem::Print p(*ki.kfunc);
     IVLOG(1, p.str());
