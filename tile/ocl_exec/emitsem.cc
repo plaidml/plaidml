@@ -18,11 +18,11 @@ SemtreeEmitter::SemtreeEmitter(const AliasMap& am, size_t threads)
   loop_mul_ = 1;
   scopes_.emplace_back(am);
   scope_ = &scopes_.back();
-  current_tid_ = 0;
+  max_block_id_ = 0;
 }
 
 std::string SemtreeEmitter::generate_name(const std::string& prefix) const {
-  return prefix + "_t" + std::to_string(tid_.back());
+  return prefix + "_t" + std::to_string(block_id_.back());
 }
 
 std::string SemtreeEmitter::safe_name(const std::string& in) const {
@@ -35,25 +35,25 @@ std::string SemtreeEmitter::safe_name(const std::string& in) const {
   return out;
 }
 
-stripe::Affine SemtreeEmitter::replace_idx_name_with_tid(const stripe::Affine& aff) const {
+stripe::Affine SemtreeEmitter::convert_idx_with_block(const stripe::Affine& aff) const {
   stripe::Affine new_aff;
   map<std::string, int64_t>& new_aff_map = new_aff.mutateMap();
   for (const auto& idx : aff.getMap()) {
     if (idx.first == "") {
       new_aff_map.emplace(idx);
     } else {
-      std::string idx_trace_name = idx.first;
+      std::string idx_global_name = idx.first;
       for (int loop_idx = loop_info_.size() - 1; loop_idx >= 0; --loop_idx) {
         const LoopInfo& li = loop_info_[loop_idx];
         if (li.threaded) {
           auto it = li.lid.find(idx.first);
           if (it != li.lid.end()) {
-            idx_trace_name = idx.first + "_t" + std::to_string(it->second);
+            idx_global_name = idx.first + "_t" + std::to_string(it->second);
             break;
           }
         }
       }
-      new_aff_map.emplace(idx_trace_name, idx.second);
+      new_aff_map.emplace(idx_global_name, idx.second);
     }
   }
   return new_aff;
@@ -90,7 +90,7 @@ void SemtreeEmitter::process_affine(const std::string idx, const stripe::Affine&
   defined_idx_.insert(idx);
   if (std::none_of(loop_info_.begin(), loop_info_.end(), [](const LoopInfo& li) { return !li.threaded; })) {
     // There is no outside regular loop
-    cur_->push_back(_Declare({sem::Type::INDEX}, idx, convert_affine(replace_idx_name_with_tid(affine))));
+    cur_->push_back(_Declare({sem::Type::INDEX}, idx, convert_affine(convert_idx_with_block(affine))));
     return;
   }
   // Calculate the initial value of the affine and the loop steps
@@ -119,7 +119,7 @@ void SemtreeEmitter::process_affine(const std::string idx, const stripe::Affine&
     int64_t num_iters = (li.range > li.init) ? ((li.range - 1 - li.init) / li.step + 1) : 0;
     inner_inc = num_iters * step;
   }
-  stripe::Affine affine_init = replace_idx_name_with_tid(affine.partial_eval(values));
+  stripe::Affine affine_init = convert_idx_with_block(affine.partial_eval(values));
   // Put the initialization at the outermost regular loop
   for (size_t loop_idx = 0; loop_idx < loop_info_.size(); ++loop_idx) {
     auto& li = loop_info_[loop_idx];
@@ -187,7 +187,7 @@ void SemtreeEmitter::Visit(const stripe::Store& stmt) {
 
 void SemtreeEmitter::Visit(const stripe::LoadIndex& stmt) {
   auto lhs_name = scalar_name(stmt.into);
-  auto rhs = convert_affine(replace_idx_name_with_tid(stmt.from.sym_eval(scope_->idx_sources())));
+  auto rhs = convert_affine(convert_idx_with_block(stmt.from.sym_eval(scope_->idx_sources())));
   cur_->push_back(_Declare({sem::Type::VALUE, DataType::INT64}, lhs_name, rhs));
 }
 
@@ -359,8 +359,8 @@ sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
       expr = expr % idx.range;
     }
     std::string idx_local_name = idx_name(idx.name);
-    std::string idx_trace_name = generate_name(idx_local_name);
-    kernel_top_->push_front(_Declare({sem::Type::INDEX}, idx_trace_name, expr));
+    std::string idx_global_name = generate_name(idx_local_name);
+    kernel_top_->push_front(_Declare({sem::Type::INDEX}, idx_global_name, expr));
     prev_threads *= idx.range;
   }
   if (block.idxs_product() < threads_) {
@@ -397,7 +397,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     }
     in_kernel_++;
   }
-  tid_.push_back(current_tid_++);
+  block_id_.push_back(max_block_id_++);
   if (block.has_tag("gpu_thread")) {
     in_threads_++;
   }
@@ -414,7 +414,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
         std::string gid = "d" + std::to_string(scope_->depth()) + ":" + it->name;
         LoopInfo li = {threaded, gid, 0, static_cast<int>(it->range), 1};
         if (threaded) {
-          li.lid[gid] = tid_.back();
+          li.lid[gid] = block_id_.back();
         }
         loop_info_.push_back(li);
         ++loop_count;
@@ -464,7 +464,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   if (block.constraints.size()) {
     sem::ExprPtr bexpr = _Const(1);
     for (const auto& con : block.constraints) {
-      auto gcon = replace_idx_name_with_tid(con.sym_eval(scope_->idx_sources()));
+      auto gcon = convert_idx_with_block(con.sym_eval(scope_->idx_sources()));
       bexpr = bexpr & (convert_affine(gcon) >= sem::ExprPtr(_Const(0)));
     }
     cur_ = _Block({sem::builder::_If(bexpr, cur_)});
@@ -492,7 +492,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   for (size_t i = 0; i < loop_count; ++i) {
     loop_info_.pop_back();
   }
-  tid_.pop_back();
+  block_id_.pop_back();
   scopes_.pop_back();
   scope_ = &scopes_.back();
   cur_ = outer;
