@@ -23,9 +23,9 @@ namespace test {
 TEST(Codegen, JitIntrinsicMUL_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -33,7 +33,7 @@ TEST(Codegen, JitIntrinsicMUL_F32) {
       access { }
     }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -59,9 +59,9 @@ TEST(Codegen, JitIntrinsicMUL_F32) {
 TEST(Codegen, JitIntrinsicADD_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -69,7 +69,7 @@ TEST(Codegen, JitIntrinsicADD_F32) {
       access { }
     }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -99,13 +99,13 @@ TEST(Codegen, JitIntrinsicCOND) {}
 TEST(Codegen, JitSimpleLoop) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     idxs {
       name: "i"
       range: 5
     }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "bufA"
       access { offset: 0 terms {key: "i" value: 1} }
@@ -113,7 +113,7 @@ TEST(Codegen, JitSimpleLoop) {
       exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "bufB"
       access { offset: 0 terms {key: "i" value: 1} }
@@ -145,11 +145,11 @@ TEST(Codegen, JitSimpleLoop) {
 TEST(Codegen, JitCopy2D) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "bufA"
       access { offset: 0 terms {key:"j" value:1} }
@@ -157,7 +157,7 @@ TEST(Codegen, JitCopy2D) {
       exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "bufB"
       access { offset: 0 terms {key:"i" value:1} }
@@ -198,11 +198,11 @@ TEST(Codegen, JitCopy2D) {
 TEST(Codegen, JitAggSum2D) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "bufA"
       access { offset: 0 terms {key:"j" value:1} }
@@ -210,7 +210,7 @@ TEST(Codegen, JitAggSum2D) {
       exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "bufB"
       agg_op: "add"
@@ -311,11 +311,11 @@ TEST(Codegen, JitMatMul) {
 TEST(Codegen, JitNestedAlloc) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "bufA"
       access { offset: 0 terms {key:"j" value:1} }
@@ -323,7 +323,7 @@ TEST(Codegen, JitNestedAlloc) {
       exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
-      loc { unit { } }
+      loc {}
       dir: 3
       into: "bufB"
       agg_op: "add"
@@ -334,7 +334,7 @@ TEST(Codegen, JitNestedAlloc) {
     }
     stmts { block {
       refs {
-        loc { unit { } }
+        loc {}
         dir: 3
         into: "bufA"
         interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -342,7 +342,7 @@ TEST(Codegen, JitNestedAlloc) {
         access { }
       }
       refs {
-        loc { unit { } }
+        loc {}
         dir: 3
         into: "bufB"
         agg_op: "add"

@@ -18,15 +18,15 @@ namespace codegen {
 TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -39,22 +39,22 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
   std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
 
   proto::MemoryPlacementPass options;
-  options.add_locs()->set_name("loc_1");
+  options.add_locs()->add_devs()->set_name("loc_1");
 
   PlaceRefinements(block.get(), options);
 
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -69,15 +69,15 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
 TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -91,7 +91,7 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
 
   proto::MemoryPlacementPass options;
-  options.add_locs()->set_name("loc_1");
+  options.add_locs()->add_devs()->set_name("loc_1");
   options.set_alignment(16);
 
   PlaceRefinements(block.get(), options);
@@ -99,15 +99,15 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -124,15 +124,15 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
 TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_2" unit { } }
+      loc { devs: [{name: "loc_2"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -146,23 +146,23 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
   std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
 
   proto::MemoryPlacementPass options;
-  options.add_locs()->set_name("loc_1");
-  options.add_locs()->set_name("loc_2");
+  options.add_locs()->add_devs()->set_name("loc_1");
+  options.add_locs()->add_devs()->set_name("loc_2");
 
   PlaceRefinements(block.get(), options);
 
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_2" unit { } }
+      loc { devs: [{name: "loc_2"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -178,21 +178,21 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
 TEST(PlacerTest, LocationSubsetCanBePlaced) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_2" unit { } }
+      loc { devs: [{name: "loc_2"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_2" unit { } }
+      loc { devs: [{name: "loc_2"}]}
       into: "b3"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
@@ -207,28 +207,28 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
   std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
 
   proto::MemoryPlacementPass options;
-  options.add_locs()->set_name("loc_1");
+  options.add_locs()->add_devs()->set_name("loc_1");
 
   PlaceRefinements(block.get(), options);
 
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    loc { unit { } }
+    loc {}
     refs {
-      loc { name: "loc_1" unit { } }
+      loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_2" unit { } }
+      loc { devs: [{name: "loc_2"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
-      loc { name: "loc_2" unit { } }
+      loc { devs: [{name: "loc_2"}]}
       into: "b3"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }

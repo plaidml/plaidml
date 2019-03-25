@@ -65,7 +65,7 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
     return AliasType::None;
   }
   if (ai.shape == bi.shape) {
-    if (ai.location.unit.isConstant() && bi.location.unit.isConstant() && ai.location != bi.location) {
+    if (ai.location != bi.location) {
       IVLOG(3, boost::format("  Different banks, a: %1%, b: %2%") % ai.location % bi.location);
       return AliasType::None;
     }
@@ -133,8 +133,7 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
       info.base_ref = it->second.base_ref;
       info.base_name = it->second.base_name;
       info.access = it->second.access;
-      info.location = it->second.location;
-      info.location.unit += ref.location.unit;
+      info.location = AddDeviceUnits(it->second.location, ref.location);
     } else {
       // New alloc, initialize from scratch
       info.base_block = block;

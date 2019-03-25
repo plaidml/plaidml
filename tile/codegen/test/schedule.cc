@@ -34,33 +34,33 @@ class ScheduleTest : public ::testing::Test {
 
   virtual void SetUpBlock() {
     block_ = stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
-      name: "program" loc {unit {}}
+      name: "program" loc {}
       refs [{
-              into: "i1" loc {name: "RAM" unit {}} access {}
+              into: "i1" loc {devs: [{name: "RAM"}]} access {}
               interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             }, {
-              into: "i2" loc {name: "RAM" unit {}} access {}
+              into: "i2" loc {devs: [{name: "RAM"}]} access {}
               interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             }, {
-              into: "o1" loc {name: "RAM" unit {}} access {}
+              into: "o1" loc {devs: [{name: "RAM"}]} access {}
               interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             }]
       stmts [{
         tags: ["main"] block {
-          name: "main" loc {unit {}}
+          name: "main" loc {}
           refs [{
-                  from: "i1" into: "i1" dir: In loc {name: "RAM" unit {}} access {}
+                  from: "i1" into: "i1" dir: In loc {devs: [{name: "RAM"}]} access {}
                   interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 }, {
-                  from: "i2" into: "i2" dir: In loc {name: "RAM" unit {}} access {}
+                  from: "i2" into: "i2" dir: In loc {devs: [{name: "RAM"}]} access {}
                   interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 }, {
-                  from: "o1" into: "o1" dir: Out loc {name: "RAM" unit {}} access {}
+                  from: "o1" into: "o1" dir: Out loc {devs: [{name: "RAM"}]} access {}
                   interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 }]
@@ -72,24 +72,24 @@ class ScheduleTest : public ::testing::Test {
   virtual void SetUpOptions() {
     options_ = ParseProtoText<proto::SchedulePass>(R"(
       reqs: ["main"],
-      mem_loc: { name: "CACHE" },
+      mem_loc: { devs: [{name: "CACHE"}] },
       mem_KiB: 1024,
       alignment: 16,
-      xfer_loc: { name: "DMA" }
+      xfer_loc: { devs: [{name: "DMA"}] }
     )");
   }
 
   void AddTmpRefinement(const char* name, const TensorDimension& dim) {
     TensorShape shape(DataType::FLOAT32, {dim});
     main_->refs.emplace_back(stripe::Refinement{
-        stripe::RefDir::None,     // dir
-        "",                       // from
-        name,                     // into
-        {stripe::Affine{}},       // access
-        shape,                    // interior_shape
-        shape,                    // exterior_shape
-        "",                       // agg_op
-        stripe::Location{"RAM"},  // location
+        stripe::RefDir::None,         // dir
+        "",                           // from
+        name,                         // into
+        {stripe::Affine{}},           // access
+        shape,                        // interior_shape
+        shape,                        // exterior_shape
+        "",                           // agg_op
+        stripe::Location{{{"RAM"}}},  // location
     });
   }
 
@@ -103,33 +103,33 @@ TEST_F(ScheduleTest, EmptyMain) {
   SchedulePass(block_.get(), options_);
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
-    loc { unit { } }
+    loc {}
     refs [{
-            into: "i1" loc {name: "RAM" unit{}} access {}
+            into: "i1" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            into: "i2" loc {name: "RAM" unit{}} access {}
+            into: "i2" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            into: "o1" loc {name: "RAM" unit{}} access {}
+            into: "o1" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }]
     stmts [{
       tags: ["main"] block {
-        name: "main" loc {unit {}}
+        name: "main" loc {}
         refs [{
-                dir: In from: "i1" into: "i1" loc {name: "RAM" unit{}} access {}
+                dir: In from: "i1" into: "i1" loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                dir: In from: "i2" into: "i2" loc {name: "RAM" unit{}} access {}
+                dir: In from: "i2" into: "i2" loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                dir: Out from: "o1" into: "o1" loc {name: "RAM" unit{}} access {}
+                dir: Out from: "o1" into: "o1" loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }]
@@ -140,17 +140,17 @@ TEST_F(ScheduleTest, EmptyMain) {
 
 TEST_F(ScheduleTest, CachesIO) {
   main_->stmts.emplace_back(stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
-    name: "sub_block_1" loc {unit {}}
+    name: "sub_block_1" loc {}
     refs [{
-            from: "i1" into: "i1" dir: In loc {name: "RAM" unit{}} access {}
+            from: "i1" into: "i1" dir: In loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            from: "i2" into: "i2" dir: In loc {name: "RAM" unit{}} access {}
+            from: "i2" into: "i2" dir: In loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            from: "o1" into: "o1" dir: Out loc {name: "RAM" unit{}} access {}
+            from: "o1" into: "o1" dir: Out loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }]
@@ -158,60 +158,60 @@ TEST_F(ScheduleTest, CachesIO) {
   SchedulePass(block_.get(), options_);
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
-    loc { unit { } }
+    loc {}
     refs [{
-            into: "i1" loc {name: "RAM" unit{}} access {}
+            into: "i1" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            into: "i2" loc {name: "RAM" unit{}} access {}
+            into: "i2" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            into: "o1" loc {name: "RAM" unit{}} access {}
+            into: "o1" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }]
     stmts [{
       tags: ["main"] block {
-        name: "main" loc {unit {}}
+        name: "main" loc {}
         refs [{
-                from: "i1" into: "i1" dir: In loc {name: "RAM" unit{}} access {}
+                from: "i1" into: "i1" dir: In loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                into: "i1^0" offset: 128 loc {name: "CACHE" unit {}} access {}
+                into: "i1^0" offset: 128 loc {devs: [{name: "CACHE"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                from: "i2" into: "i2" dir: In loc {name: "RAM" unit{}} access {}
+                from: "i2" into: "i2" dir: In loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                into: "i2^0" offset: 64 loc {name: "CACHE" unit {}} access {}
+                into: "i2^0" offset: 64 loc {devs: [{name: "CACHE"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                from: "o1" into: "o1" dir: Out loc {name: "RAM" unit{}} access {}
+                from: "o1" into: "o1" dir: Out loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                into: "o1^0" loc {name: "CACHE" unit {}} access {}
+                into: "o1^0" loc {devs: [{name: "CACHE"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }]
         stmts [{
           block {
-            name: "swap_in_i2^0" loc {name: "DMA" unit {}}
+            name: "swap_in_i2^0" loc {devs: [{name: "DMA"}]}
             idxs [{name: "i0" range: 16 affine {}}]
             refs [{
                     from: "i2^0" into: "dst" dir: Out
-                    access [{terms [{key: "i0" value: 1}]}] loc {name: "CACHE" unit{}}
+                    access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "CACHE"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
                     from: "i2" into: "src" dir: In
-                    access [{terms [{key: "i0" value: 1}]}] loc {name: "RAM" unit{}}
+                    access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "RAM"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -223,16 +223,16 @@ TEST_F(ScheduleTest, CachesIO) {
           }
         }, {
           block {
-            name: "swap_in_i1^0" loc {name: "DMA" unit {}}
+            name: "swap_in_i1^0" loc {devs: [{name: "DMA"}]}
             idxs [{name: "i0" range: 16 affine {}}]
             refs [{
                     from: "i1^0" into: "dst" dir: Out
-                    access [{terms [{key: "i0" value: 1}]}] loc {name: "CACHE" unit{}}
+                    access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "CACHE"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
                     from: "i1" into: "src" dir: In
-                    access [{terms [{key: "i0" value: 1}]}] loc {name: "RAM" unit{}}
+                    access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "RAM"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -244,17 +244,17 @@ TEST_F(ScheduleTest, CachesIO) {
           }
         }, {
           block {
-            name: "sub_block_1" loc {unit {}}
+            name: "sub_block_1" loc {}
             refs [{
-                    from: "i1^0" into: "i1" dir: In loc {name: "CACHE" unit{}} access {}
+                    from: "i1^0" into: "i1" dir: In loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
-                    from: "i2^0" into: "i2" dir: In loc {name: "CACHE" unit{}} access {}
+                    from: "i2^0" into: "i2" dir: In loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
-                    from: "o1^0" into: "o1" dir: Out loc {name: "CACHE" unit{}} access {}
+                    from: "o1^0" into: "o1" dir: Out loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -262,16 +262,16 @@ TEST_F(ScheduleTest, CachesIO) {
           deps: [0, 1]
         }, {
           block {
-            name: "swap_out_o1^0" loc {name: "DMA" unit {}}
+            name: "swap_out_o1^0" loc {devs: [{name: "DMA"}]}
             idxs [{name: "i0" range: 16 affine {}}]
             refs [{
                     from: "o1" into: "dst" dir: Out
-                    access [{terms [{key: "i0" value: 1}]}] loc {name: "RAM" unit{}}
+                    access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "RAM"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
                     from: "o1^0" into: "src" dir: In
-                    access [{terms [{key: "i0" value: 1}]}] loc {name: "CACHE" unit{}}
+                    access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "CACHE"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -290,34 +290,34 @@ TEST_F(ScheduleTest, CachesIO) {
 
 TEST_F(ScheduleTest, UsesTmps) {
   main_->stmts.emplace_back(stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
-    name: "sub_block_1" loc {unit {}}
+    name: "sub_block_1" loc {}
     refs [{
-            from: "i1" into: "i1" dir: In loc {name: "RAM" unit{}} access {}
+            from: "i1" into: "i1" dir: In loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            from: "i2" into: "i2" dir: In loc {name: "RAM" unit{}} access {}
+            from: "i2" into: "i2" dir: In loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            from: "t1" into: "t1" dir: Out loc {name: "RAM" unit{}} access {}
+            from: "t1" into: "t1" dir: Out loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }]
   )")));
 
   main_->stmts.emplace_back(stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
-    name: "sub_block_2" loc {unit {}}
+    name: "sub_block_2" loc {}
     refs [{
-            from: "t1" into: "t1" dir: In loc {name: "RAM" unit{}} access {}
+            from: "t1" into: "t1" dir: In loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            from: "i2" into: "i2" dir: In loc {name: "RAM" unit{}} access {}
+            from: "i2" into: "i2" dir: In loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            from: "o1" into: "o1" dir: Out loc {name: "RAM" unit{}} access {}
+            from: "o1" into: "o1" dir: Out loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }]
@@ -329,66 +329,66 @@ TEST_F(ScheduleTest, UsesTmps) {
 
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
-    loc { unit { } }
+    loc {}
     refs [{
-            into: "i1" loc {name: "RAM" unit{}} access {}
+            into: "i1" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            into: "i2" loc {name: "RAM" unit{}} access {}
+            into: "i2" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }, {
-            into: "o1" loc {name: "RAM" unit{}} access {}
+            into: "o1" loc {devs: [{name: "RAM"}]} access {}
             interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
             exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
           }]
     stmts [{
       tags: ["main"] block {
-        name: "main" loc {unit {}}
+        name: "main" loc {}
         refs [{
-                from: "i1" into: "i1" dir: In loc {name: "RAM" unit{}} access {}
+                from: "i1" into: "i1" dir: In loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                into: "i1^0" offset: 64 loc {name: "CACHE" unit {}} access {}
+                into: "i1^0" offset: 64 loc {devs: [{name: "CACHE"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                from: "i2" into: "i2" dir: In loc {name: "RAM" unit{}} access {}
+                from: "i2" into: "i2" dir: In loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                into: "i2^0" offset: 128 loc {name: "CACHE" unit {}} access {}
+                into: "i2^0" offset: 128 loc {devs: [{name: "CACHE"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                from: "o1" into: "o1" dir: Out loc {name: "RAM" unit{}} access {}
+                from: "o1" into: "o1" dir: Out loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                into: "o1^0" offset: 64 loc {name: "CACHE" unit {}} access {}
+                into: "o1^0" offset: 64 loc {devs: [{name: "CACHE"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                into: "t1" loc {name: "RAM" unit {}} access {}
+                into: "t1" loc {devs: [{name: "RAM"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }, {
-                into: "t1^0" loc {name: "CACHE" unit {}} access {}
+                into: "t1^0" loc {devs: [{name: "CACHE"}]} access {}
                 interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                 exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
               }]
         stmts [{
           block {
-            name: "swap_in_i1^0" loc {name: "DMA" unit {}}
+            name: "swap_in_i1^0" loc {devs: [{name: "DMA"}]}
             idxs [{name: "i0" range: 16 affine {}}]
             refs [{
-                    from: "i1^0" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] loc {name: "CACHE" unit{}}
+                    from: "i1^0" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "CACHE"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
-                    from: "i1" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] loc {name: "RAM" unit{}}
+                    from: "i1" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "RAM"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -400,15 +400,15 @@ TEST_F(ScheduleTest, UsesTmps) {
           }
         }, {
           block {
-            name: "swap_in_i2^0" loc {name: "DMA" unit {}}
+            name: "swap_in_i2^0" loc {devs: [{name: "DMA"}]}
             idxs [{name: "i0" range: 16 affine {}}]
             refs [{
-                    from: "i2^0" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] loc {name: "CACHE" unit{}}
+                    from: "i2^0" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "CACHE"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   },
                   {
-                    from: "i2" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] loc {name: "RAM" unit{}}
+                    from: "i2" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "RAM"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -420,17 +420,17 @@ TEST_F(ScheduleTest, UsesTmps) {
           }
         }, {
           block {
-            name: "sub_block_1" loc {unit {}}
+            name: "sub_block_1" loc {}
             refs [{
-                    from: "i1^0" into: "i1" dir: In loc {name: "CACHE" unit{}} access {}
+                    from: "i1^0" into: "i1" dir: In loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
-                    from: "i2^0" into: "i2" dir: In loc {name: "CACHE" unit{}} access {}
+                    from: "i2^0" into: "i2" dir: In loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
-                    from: "t1^0" into: "t1" dir: Out loc {name: "CACHE" unit{}} access {}
+                    from: "t1^0" into: "t1" dir: Out loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -438,17 +438,17 @@ TEST_F(ScheduleTest, UsesTmps) {
           deps: [0, 1]
         }, {
           block {
-            name: "sub_block_2" loc {unit {}}
+            name: "sub_block_2" loc {}
             refs [{
-                    from: "i2^0" into: "i2" dir: In loc {name: "CACHE" unit{}} access {}
+                    from: "i2^0" into: "i2" dir: In loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
-                    from: "o1^0" into: "o1" dir: Out loc {name: "CACHE" unit{}} access {}
+                    from: "o1^0" into: "o1" dir: Out loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
-                    from: "t1^0" into: "t1" dir: In loc {name: "CACHE" unit{}} access {}
+                    from: "t1^0" into: "t1" dir: In loc {devs: [{name: "CACHE"}]} access {}
                     interior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -456,14 +456,14 @@ TEST_F(ScheduleTest, UsesTmps) {
           deps: [2]
         }, {
           block {
-            name: "swap_out_o1^0" loc {name: "DMA" unit {}}
+            name: "swap_out_o1^0" loc {devs: [{name: "DMA"}]}
             idxs [{name: "i0" range: 16 affine {}}]
             refs [{
-                    from: "o1" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] loc {name: "RAM" unit{}}
+                    from: "o1" into: "dst" dir: Out access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "RAM"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }, {
-                    from: "o1^0" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] loc {name: "CACHE" unit{}}
+                    from: "o1^0" into: "src" dir: In access [{terms [{key: "i0" value: 1}]}] loc {devs: [{name: "CACHE"}]}
                     interior_shape {type: FLOAT32 dims: {size:1 stride:1}}
                     exterior_shape {type: FLOAT32 dims: {size:16 stride:1}}
                   }]
@@ -482,17 +482,19 @@ TEST_F(ScheduleTest, UsesTmps) {
 
 TEST(Schedule, Basic) {
   auto cfg_tmpl = R"(
-    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { name: "DRAM" } } }
-    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { name: "DRAM" } } }
+    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { devs: [{name: "DRAM"}] } } }
+    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { devs: [{name: "DRAM"}] } } }
     passes: { name: "loc_proc"
       locate_block: {
         reqs: ["kernel"]
         loc: {
-          name: "PROC"
-          unit: {
-            terms: { key: "#bank" value: %2% }
-            terms: { key: "#proc" value: 1 }
-          }
+          devs: [{
+            name: "PROC"
+            units: [{
+              terms: { key: "#bank" value: %2% }
+              terms: { key: "#proc" value: 1 }
+            }]
+          }]
         }
       }
     }
@@ -542,10 +544,10 @@ TEST(Schedule, Basic) {
     passes: { name: "schedule"
       schedule: {
         reqs: ["main"]
-        mem_loc: { name: "SRAM" }
+        mem_loc: { devs: [{name: "SRAM"}] }
         mem_KiB: %4%
         alignment: 16
-        xfer_loc: { name: "DMA" }
+        xfer_loc: { devs: [{name: "DMA"}] }
       }
     }
     passes: { name: "prune_refs" prune_refs: { reqs: ["program"] } }

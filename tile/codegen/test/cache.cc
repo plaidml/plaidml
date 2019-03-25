@@ -69,7 +69,7 @@ TEST(Codegen, Cache) {
   ApplyTile(kernel.get(), {2, 2, 2});
   IVLOG(2, "Tiled>\n" << *stripe.program);
 
-  ApplyCache(am, kernel.get(), "A", {"CACHE"}, {"TX"});
+  ApplyCache(am, kernel.get(), "A", {{{"CACHE"}}}, {{{"TX"}}});
   IVLOG(2, "Cached\n" << *stripe.program);
 
   // ExecuteProgram(*stripe.program, &data);

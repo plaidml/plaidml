@@ -98,7 +98,7 @@ void PrintBlock(std::ostream& os,    //
                 size_t block_idx,    //
                 const DepsMap& block_deps) {
   os << "block";
-  if (!block.location.name.empty()) {
+  if (!block.location.empty()) {
     os << "<" << block.location << ">";
   }
   os << " [";
@@ -255,12 +255,44 @@ std::shared_ptr<Block> Block::Downcast(const std::shared_ptr<Statement>& stmt) {
   return std::dynamic_pointer_cast<Block>(stmt);
 }
 
-std::string to_string(const Location& loc) {  //
-  return str(boost::format("%s[%s]") % loc.name % loc.unit.toString());
+std::string to_string(const Device& dev) {
+  std::stringstream ss;
+  ss << dev;
+  return ss.str();
+}
+
+std::ostream& operator<<(std::ostream& os, const Device& dev) {
+  os << dev.name;
+  if (dev.units.size()) {
+    os << '[';
+    bool unit_sep = false;
+    for (const auto& unit : dev.units) {
+      if (unit_sep) {
+        os << ", ";
+      }
+      unit_sep = true;
+      os << to_string(unit);
+    }
+    os << ']';
+  }
+  return os;
+}
+
+std::string to_string(const Location& loc) {
+  std::stringstream ss;
+  ss << loc;
+  return ss.str();
 }
 
 std::ostream& operator<<(std::ostream& os, const Location& loc) {
-  os << to_string(loc);
+  bool dev_sep = false;
+  for (const auto& dev : loc.devs) {
+    if (dev_sep) {
+      os << '/';
+    }
+    dev_sep = true;
+    os << dev;
+  }
   return os;
 }
 
@@ -375,7 +407,7 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
       os << " = " << ref.from;
     }
   }
-  if (!ref.location.name.empty()) {
+  if (!ref.location.empty()) {
     os << "<" << ref.location << ">";
   }
   os << "[";
@@ -499,16 +531,168 @@ bool operator==(const Index& lhs, const Index& rhs) {
          std::tie(rhs.name, rhs.range, rhs.affine);
 }
 
-bool operator==(const Location& lhs, const Location& rhs) {
-  return std::tie(lhs.name, lhs.unit) == std::tie(rhs.name, rhs.unit);
+bool operator==(const Device& lhs, const Device& rhs) {
+  return std::tie(lhs.name, lhs.units) == std::tie(rhs.name, rhs.units);
 }
 
-bool operator!=(const Location& lhs, const Location& rhs) {
-  return std::tie(lhs.name, lhs.unit) != std::tie(rhs.name, rhs.unit);
+bool operator!=(const Device& lhs, const Device& rhs) {
+  return std::tie(lhs.name, lhs.units) != std::tie(rhs.name, rhs.units);
 }
 
-bool operator<(const Location& lhs, const Location& rhs) {
-  return std::tie(lhs.name, lhs.unit) < std::tie(rhs.name, rhs.unit);
+bool operator<(const Device& lhs, const Device& rhs) {
+  return std::tie(lhs.name, lhs.units) < std::tie(rhs.name, rhs.units);
+}
+
+Device PartialEval(const Device& dev, const std::map<std::string, std::int64_t>& values) {
+  Device result;
+  result.name = dev.name;
+  for (const auto& unit : dev.units) {
+    result.units.emplace_back(unit.partial_eval(values));
+  }
+  return result;
+}
+
+bool operator==(const Location& lhs, const Location& rhs) { return lhs.devs == rhs.devs; }
+
+bool operator!=(const Location& lhs, const Location& rhs) { return lhs.devs != rhs.devs; }
+
+bool operator<(const Location& lhs, const Location& rhs) { return lhs.devs < rhs.devs; }
+
+Location AddDeviceUnits(const Location& l1, const Location& l2) {
+  Location result;
+  for (auto d1 = l1.devs.begin(), d2 = l2.devs.begin(); d1 != l1.devs.end() && d2 != l2.devs.end(); ++d1, ++d2) {
+    if (d1 == l1.devs.end() || d2 == l2.devs.end() || d1->name != d2->name || d1->units.size() != d2->units.size()) {
+      throw std::runtime_error{"Incompatible addition of differently-shaped locations: " + to_string(l1) +
+                               " != " + to_string(l2)};
+    }
+    auto rd = result.devs.emplace(result.devs.end(), Device{d1->name});
+    rd->units.reserve(d1->units.size());
+    for (auto u1 = d1->units.begin(), u2 = d2->units.begin(); u1 != d1->units.end(); ++u1, ++u2) {
+      rd->units.emplace_back(*u1 + *u2);
+    }
+  }
+  return result;
+}
+
+bool operator==(const Location& loc, const std::string& pattern) {
+  // N.B. This is definitely not the fastest pattern parser we could
+  // write; we're doing a lot of little memory allocations, since
+  // we're in the pre-C++17 world.
+  //
+  // We're implementing the pattern parser this way because it's
+  // faster to code and much more obviously-correct, and we don't
+  // really need low-level performance here.
+  //
+  // If we're ever tempted to rewrite this code to pre-compile the
+  // pattern, we should perhaps just switch it to use C-string logic
+  // instead; it'll be much faster.
+
+  // Split the pattern by '/'s.
+  std::vector<std::pair<std::string, boost::optional<std::vector<boost::optional<std::int64_t>>>>> devs;
+  std::size_t pos_current = 0;
+  while (pos_current < pattern.size()) {
+    auto pos_next = pattern.find('/', pos_current);
+    if (pos_next == std::string::npos) {
+      devs.emplace_back(pattern.substr(pos_current), boost::none);
+      break;
+    } else {
+      devs.emplace_back(pattern.substr(pos_current, pos_next - pos_current), boost::none);
+      pos_current = pos_next + 1;
+    }
+  }
+
+  // Split the devs into devices and optional affines to be matched.
+  for (auto& dev : devs) {
+    auto units_start = dev.first.find('[');
+    if (units_start == std::string::npos) {
+      continue;
+    }
+    auto units_end = dev.first.size() - 1;  // Always valid, since we have at least a '['
+    if (dev.first[units_end] != ']') {
+      throw std::runtime_error{"Invalid location pattern (missing ']': " + pattern};
+    }
+    // Build the units string by starting just after the leading '['
+    // and ending just before the trailing ']'.
+    std::string units = dev.first.substr(units_start + 1, units_end - units_start - 1);
+    dev.first = dev.first.substr(0, units_start);
+    dev.second = std::vector<boost::optional<std::int64_t>>{};
+    std::size_t unit_current = 0;
+    while (unit_current < units.size()) {
+      if (units[unit_current] == ' ') {
+        ++unit_current;
+        continue;
+      }
+      auto unit_next = units.find(',', unit_current);
+      std::string unit;
+      if (unit_next == std::string::npos) {
+        unit = units.substr(unit_current);
+        unit_current = units.size();
+      } else {
+        unit = units.substr(unit_current, unit_next - unit_current);
+        unit_current = unit_next + 1;
+      }
+
+      // The unit may have trailing whitespace; trim it.
+      while (unit.size() && unit.back() == ' ') {
+        unit.pop_back();
+      }
+
+      if (unit.size() == 0) {
+        throw std::runtime_error{"Invalid location pattern (missing unit): " + pattern};
+      }
+
+      if (unit == "*") {
+        dev.second->emplace_back(boost::none);
+      } else {
+        std::size_t unit_len;
+        dev.second->emplace_back(stoi(unit, &unit_len));
+        if (unit_len != unit.size()) {
+          throw std::runtime_error{"Invalid location pattern (unparseable unit): " + pattern};
+        }
+      }
+    }
+  }
+
+  // Compare against the pattern.
+  if (loc.devs.size() != devs.size()) {
+    return false;
+  }
+
+  auto ldit = loc.devs.begin();
+  auto pdit = devs.begin();
+  for (; ldit != loc.devs.end(); ++ldit, ++pdit) {
+    if (pdit->first != "*" && pdit->first != ldit->name) {
+      return false;
+    }
+    if (!pdit->second) {
+      continue;
+    }
+    if (pdit->second->size() != ldit->units.size()) {
+      return false;
+    }
+    auto luit = ldit->units.begin();
+    auto puit = pdit->second->begin();
+    for (; luit != ldit->units.end(); ++puit, ++luit) {
+      if (!*puit) {
+        continue;
+      }
+      if (!luit->isConstant()) {
+        return false;
+      }
+      if (luit->constant() != **puit) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+Location PartialEval(const Location& loc, const std::map<std::string, std::int64_t>& values) {
+  Location result;
+  for (const auto& dev : loc.devs) {
+    result.devs.emplace_back(PartialEval(dev, values));
+  }
+  return result;
 }
 
 class CloneVisitor : RewriteStmtVisitor {
@@ -556,8 +740,21 @@ Affine FromProto(const proto::Affine& affine) {
   return ret;
 }
 
-Location FromProto(const proto::Location& loc) {  //
-  return Location{loc.name(), FromProto(loc.unit())};
+Device FromProto(const proto::Device& dev) {
+  Device result;
+  result.name = dev.name();
+  for (const auto& unit : dev.units()) {
+    result.units.emplace_back(FromProto(unit));
+  }
+  return result;
+}
+
+Location FromProto(const proto::Location& loc) {
+  Location result;
+  for (const auto& dev : loc.devs()) {
+    result.devs.emplace_back(FromProto(dev));
+  }
+  return result;
 }
 
 RefDir FromProto(const proto::Refinement::Dir& dir) {
@@ -702,10 +899,20 @@ proto::Affine IntoProto(const Affine& affine) {
   return ret;
 }
 
+proto::Device IntoProto(const Device& dev) {
+  proto::Device ret;
+  ret.set_name(dev.name);
+  for (const auto& unit : dev.units) {
+    *ret.add_units() = IntoProto(unit);
+  }
+  return ret;
+}
+
 proto::Location IntoProto(const Location& loc) {
   proto::Location ret;
-  ret.set_name(loc.name);
-  *ret.mutable_unit() = IntoProto(loc.unit);
+  for (const auto& dev : loc.devs) {
+    *ret.add_devs() = IntoProto(dev);
+  }
   return ret;
 }
 

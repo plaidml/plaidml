@@ -37,9 +37,9 @@ P ParseProtoText(const std::string& txt) {
 
 static proto::Config GenerateCFG() {
   auto cfg_tmpl = R"(
-    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { name: "DRAM" } } }
-    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { name: "DRAM" } } }
-    passes: { name: "loc_initial", locate_block: { reqs: ["kernel"], loc: { name: "PPE" } } }
+    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { devs: [{name: "DRAM"}] } } }
+    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { devs: [{name: "DRAM"}] } } }
+    passes: { name: "loc_initial", locate_block: { reqs: ["kernel"], loc: { devs: [{name: "PPE"}] } } }
     passes: { name: "compute_deps", compute_deps: { reqs: ["all"] } }
     passes: { name: "dead_code_elimination", dead_code_elimination: { reqs: ["all"] } }
   )";
