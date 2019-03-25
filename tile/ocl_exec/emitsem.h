@@ -49,7 +49,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   std::string ref_name(const std::string& in) const;
   std::string scalar_name(const std::string& in) const;
   std::string idx_name(const std::string& in) const;
-  stripe::Affine replace_idx_name_with_tid(const stripe::Affine& aff) const;
+  stripe::Affine convert_idx_with_block(const stripe::Affine& aff) const;
   sem::ExprPtr convert_affine(const stripe::Affine& aff) const;
   void process_affine(const std::string idx, const stripe::Affine& aff);
   sem::StmtPtr add_loops(const stripe::Block&);
@@ -69,9 +69,10 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   const AliasMap* scope_;
   size_t in_kernel_ = 0;
   size_t in_threads_ = 0;
-  // The traverse ID for blocks
-  size_t current_tid_;
-  std::vector<size_t> tid_;
+  // The max block ID during traverse
+  size_t max_block_id_;
+  // Block IDs for the traverse stack
+  std::vector<size_t> block_id_;
   // Defined index names to prevent re-definition
   std::set<std::string> defined_idx_;
   // current outside loops
