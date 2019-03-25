@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   std::cout << *stripe.program;
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
   emit.Visit(*stripe.program);
-  lang::Simplify(emit.kernels_.kernels);
+  // lang::Simplify(emit.kernels_.kernels);
   for (const auto& ki : emit.kernels_.kernels) {
     sem::Print p(*ki.kfunc);
     std::cout << p.str();
