@@ -4,6 +4,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -16,16 +17,20 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-// For (index = init; index < range; index += step)
+// Regular loop: for (index = init; index < range; index += step)
+// Threaded loop:
 struct LoopInfo {
+  bool threaded;
   std::string index;
-  int init;
-  int range;
-  int step;
-  // stmts to be inserted before the loop
+  int init;   // for only regular loop
+  int range;  // for only regular loop
+  int step;   // for only regular loop
+  // stmts to be inserted before the loop, for only regular loop
   std::vector<sem::StmtPtr> init_stmts;
-  // stmts to be inserted at the end of the loop
+  // stmts to be inserted at the end of the loop, for only regular loop
   std::vector<sem::StmtPtr> step_stmts;
+  // map local lid to its trace id, for only threaded loop
+  std::map<std::string, size_t> lid;
 };
 
 class SemtreeEmitter : public stripe::ConstStmtVisitor {
@@ -39,11 +44,12 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void Visit(const stripe::Intrinsic&);
   void Visit(const stripe::Block&);
 
-  std::string generate_name(const std::string& prefix);
+  std::string generate_name(const std::string& prefix) const;
   std::string safe_name(const std::string& in) const;
   std::string ref_name(const std::string& in) const;
   std::string scalar_name(const std::string& in) const;
   std::string idx_name(const std::string& in) const;
+  stripe::Affine replace_idx_name_with_tid(const stripe::Affine& aff) const;
   sem::ExprPtr convert_affine(const stripe::Affine& aff) const;
   void process_affine(const std::string idx, const stripe::Affine& aff);
   sem::StmtPtr add_loops(const stripe::Block&);
@@ -58,14 +64,18 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   std::vector<size_t> lid_limits_;
   size_t depth_ = 0;
   std::shared_ptr<sem::Block> cur_;
+  std::shared_ptr<sem::Block> kernel_top_;
   std::vector<AliasMap> scopes_;
   const AliasMap* scope_;
   size_t in_kernel_ = 0;
   size_t in_threads_ = 0;
+  // The traverse ID for blocks
+  size_t current_tid_;
+  std::vector<size_t> tid_;
+  // Defined index names to prevent re-definition
+  std::set<std::string> defined_idx_;
   // current outside loops
   std::vector<LoopInfo> loop_info_;
-  // the prefix for generated names
-  std::map<std::string, size_t> prefix_;
   lang::KernelList kernels_;
 };
 
