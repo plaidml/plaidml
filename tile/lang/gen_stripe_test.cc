@@ -62,74 +62,74 @@ TEST_F(GenStripeTest, ContractPlusElementwise) {
   LOG(INFO) << "Block: " << *block;
 
   EXPECT_THAT(IntoProto(*block), EqualsProtoText(R"***(
-    loc { unit { } }
+    loc {}
     refs [
       {
-        into:"X_I_0" access [{}, {}] loc {unit {}}
+        into:"X_I_0" access [{}, {}] loc {}
         interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
         exterior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
       },
       {
-        into:"X_I_1" access [{}, {}] loc {unit {}}
+        into:"X_I_1" access [{}, {}] loc {}
         interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
         exterior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
       },
       {
-        into:"X_T1" access [{}, {}] loc {unit {}}
+        into:"X_T1" access [{}, {}] loc {}
         interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
         exterior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
       },
       {
-        into:"X_T2" access [{}, {}] loc {unit {}}
+        into:"X_T2" access [{}, {}] loc {}
         interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
         exterior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
       }
     ]
     stmts [{
       tags:["main"] block {
-        name:"main" loc {unit {}}
+        name:"main" loc {}
         refs [
           {
-            from:"X_I_0" into:"X_I_0" dir:In access [{}, {}] loc {unit {}}
+            from:"X_I_0" into:"X_I_0" dir:In access [{}, {}] loc {}
             interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
           },
           {
-            from:"X_I_1" into:"X_I_1" dir:In access [{}, {}] loc {unit {}}
+            from:"X_I_1" into:"X_I_1" dir:In access [{}, {}] loc {}
             interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
           },
           {
-            from:"X_T1" into:"X_T1" dir:InOut access [{}, {}] loc {unit {}}
+            from:"X_T1" into:"X_T1" dir:InOut access [{}, {}] loc {}
             interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
           },
           {
-            from:"X_T2" into:"X_T2" dir:Out access [{}, {}] loc {unit {}} agg_op:"assign"
+            from:"X_T2" into:"X_T2" dir:Out access [{}, {}] loc {} agg_op:"assign"
             interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
           }
         ]
         stmts [{
           tags:["agg_op_add", "comb_op_mul", "contraction", "kernel"] block {
-            name:"kernel_0(X_I_0,X_I_1)" loc {unit {}}
+            name:"kernel_0(X_I_0,X_I_1)" loc {}
             comments:"X_T1[m, n : _T0, _T1] = +(X_I_0[m, k] * X_I_1[k, n])"
             idxs [{name:"k" range:10 affine {}}, {name:"m" range:10 affine {}}, {name:"n", range: 10, affine {}}]
             refs [
               {
-                from:"X_I_0" into:"X_I_0" dir:In loc {unit {}}
+                from:"X_I_0" into:"X_I_0" dir:In loc {}
                 interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                 exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
                 access [{terms:{key:"m" value:1}}, {terms:{key:"k" value:1}}]
               },
               {
-                from:"X_I_1" into:"X_I_1" dir:In loc {unit {}}
+                from:"X_I_1" into:"X_I_1" dir:In loc {}
                 interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                 exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
                 access [{terms:{key:"k" value:1}}, {terms:{key:"n" value:1}}]
               },
               {
-                from:"X_T1" into:"X_T1" dir:Out loc {unit {}} agg_op:"add"
+                from:"X_T1" into:"X_T1" dir:Out loc {} agg_op:"add"
                 interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                 exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
                 access [{terms:{key:"m" value:1}}, {terms:{key:"n" value:1}}]
@@ -144,18 +144,18 @@ TEST_F(GenStripeTest, ContractPlusElementwise) {
           }
         }, {
           tags:["eltwise", "eltwise_tanh", "kernel"] block {
-            name:"kernel_1(X_T1)" loc {unit {}}
+            name:"kernel_1(X_T1)" loc {}
             comments:"X_T2 = tanh(X_T1)"
             idxs [{name:"i1" range:10 affine {}}, {name:"i2", range:10 affine {}}]
             refs [
               {
-                from:"X_T1" into:"X_T1" dir:In loc {unit {}}
+                from:"X_T1" into:"X_T1" dir:In loc {}
                 interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                 exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
                 access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]
               },
               {
-                from:"X_T2" into:"X_T2" dir:Out loc {unit {}}
+                from:"X_T2" into:"X_T2" dir:Out loc {}
                 interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                 exterior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
                 access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]

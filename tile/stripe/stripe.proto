@@ -221,8 +221,15 @@ message Constant {
   }
 }
 
-// A location represent a hardware unit (i.e. compute, transfer, memory etc).
+// A device represents a hardware unit (e.g. compute, transfer, memory etc).
+message Device {
+  string name = 1;  // The name of the device
+  repeated Affine units =
+      2;  // The unit numbers (which specific unit in an N-dimensional matrix)
+}
+
+// A location represent a nested hardware unit (e.g. a particular processing
+// element on a particular device on a particular host).
 message Location {
-  string name = 1;  // The name of the unit
-  Affine unit = 2;  // A unit number (which specific unit)
+  repeated Device devs = 1;
 }

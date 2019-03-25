@@ -35,9 +35,9 @@ void EnumerateIndexes(const std::vector<IndexValue>& idxs, size_t idx_num, const
 
 void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
   IVLOG(3, "EvalWithValues> block: " << block->name << ", fixed: " << fixed);
-  block->location.unit = block->location.unit.partial_eval(fixed);
+  block->location = PartialEval(block->location, fixed);
   for (auto& ref : block->refs) {
-    ref.location.unit = ref.location.unit.partial_eval(fixed);
+    ref.location = PartialEval(ref.location, fixed);
     for (auto& aff : ref.access) {
       aff = aff.partial_eval(fixed);
     }

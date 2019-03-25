@@ -166,9 +166,15 @@ inline RefDir UnionDir(const RefDir& a, const RefDir& b) {  //
   return RefDir(static_cast<int>(a) | static_cast<int>(b));
 }
 
-struct Location {
+struct Device {
   std::string name;
-  Affine unit;
+  std::vector<Affine> units;
+};
+
+struct Location {
+  std::vector<Device> devs;
+
+  bool empty() const { return devs.size() == 0; }
 };
 
 struct BankDimension {
@@ -371,12 +377,48 @@ inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) {  //
 
 bool operator==(const BankDimension& lhs, const BankDimension& rhs);
 bool operator==(const Index& lhs, const Index& rhs);
+
+bool operator==(const Device& lhs, const Device& rhs);
+bool operator!=(const Device& lhs, const Device& rhs);
+bool operator<(const Device& lhs, const Device& rhs);
+
+std::string to_string(const Device& dev);
+
+// Applies the supplied parameter map to the device's units.
+Device PartialEval(const Device& dev, const std::map<std::string, std::int64_t>& values);
+
 bool operator==(const Location& lhs, const Location& rhs);
 bool operator!=(const Location& lhs, const Location& rhs);
 bool operator<(const Location& lhs, const Location& rhs);
 
+// Adds the location's units, returning the result.  The locations
+// should have the same shape (device names and unit dimensionality).
+Location AddDeviceUnits(const Location& l1, const Location& r2);
+
 std::string to_string(const Location& loc);
 
+// Returns a match if the location matches the indicated pattern,
+// which looks like a slash-separated string of device names with unit
+// vectors.
+//
+// '*' matches any device or unit; otherwise, matches must be exact.
+// When '*' is used to match a device, a unit may not be specified.
+//
+// If the unit vector is omitted, any number of units matches.
+//
+// For example: "d1/*/d3[1,*]" would match "d1[4]/d2[1,2]/d3[1,6]",
+// since the names and wildcards match up.
+//
+// Note that this function does not return the matched parameters (the
+// names or affines); it's akin to a typecheck, in that the caller may
+// subsequently safely depend on the contents of the location.
+bool operator==(const Location& loc, const std::string& pattern);
+inline bool operator!=(const Location& loc, const std::string& pattern) { return !(loc == pattern); }
+
+// Applies the supplied parameter map to the location's units.
+Location PartialEval(const Location& loc, const std::map<std::string, std::int64_t>& values);
+
+std::ostream& operator<<(std::ostream& os, const Device& dev);
 std::ostream& operator<<(std::ostream& os, const Location& loc);
 std::ostream& operator<<(std::ostream& os, const Index& idx);
 std::ostream& operator<<(std::ostream& os, const Load& op);
@@ -390,12 +432,14 @@ std::ostream& operator<<(std::ostream& os, const Block& block);
 
 std::shared_ptr<Block> FromProto(const proto::Block& block);
 Affine FromProto(const proto::Affine& affine);
+Device FromProto(const proto::Device& dev);
 Location FromProto(const proto::Location& loc);
 RefDir FromProto(const proto::Refinement::Dir& dir);
 Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags);
 
 proto::Block IntoProto(const Block& block);
 proto::Affine IntoProto(const Affine& affine);
+proto::Device IntoProto(const Device& dev);
 proto::Location IntoProto(const Location& loc);
 
 std::shared_ptr<Block> CloneBlock(const Block& orig, int depth = -1);

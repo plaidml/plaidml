@@ -67,9 +67,9 @@ static std::string EraseSpace(const std::string& src) {
 
 static proto::Config GenerateCFG() {
   auto cfg_tmpl = R"(
-    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { name: "DRAM" } } }
-    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { name: "DRAM" } } }
-    passes: { name: "loc_initial", locate_block: { reqs: ["kernel"], loc: { name: "PPE" } } }
+    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { devs: [{name: "DRAM"}] } } }
+    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { devs: [{name: "DRAM"}] } } }
+    passes: { name: "loc_initial", locate_block: { reqs: ["kernel"], loc: { devs: [{name: "PPE"}] } } }
     passes: {
             name: "stencil_mac",
             stencil: {
@@ -138,26 +138,26 @@ static proto::Config GenerateCFG() {
                 acc_idxs: false
             }
     }
-    passes: { name: "loc_dpu", locate_block: { reqs: ["dpu"], loc: { name: "DPU" } } }
-    passes: { name: "loc_mpe", locate_inner_block: { reqs: ["dpu"], loc: { name: "MPE" } } }
-    passes: { name: "loc_dpu_mem", locate_memory: { reqs: ["dpu"], loc: { name: "ACC" } } }
-    passes: { name: "loc_dpu_fusion_mem", locate_memory: { reqs: ["dpu_fusion"], loc: { name: "ACC" } } }
-    passes: { name: "cache_dpu_in", cache: { reqs: ["dpu"], dirs: [ In ], mem_loc: { name: "MRM" }, xfer_loc: { name: "IDU" } } }
-    passes: { name: "cache_dpu_out", cache: { reqs: ["dpu"], dirs: [ Out ], mem_loc: { name: "ACC" }, xfer_loc: { name: "ODU" } } }
-    passes: { name: "loc_dpu_fused", locate_block: { reqs: ["eltwise", "dpu_fusion"], loc: { name: "MPE" } } }
-    passes: { name: "loc_dpu_eltwise", locate_inner_block: { reqs: ["dpu"], inner_reqs: ["eltwise"], loc: { name: "MPE" } } }
+    passes: { name: "loc_dpu", locate_block: { reqs: ["dpu"], loc: { devs: [{name: "DPU"}] } } }
+    passes: { name: "loc_mpe", locate_inner_block: { reqs: ["dpu"], loc: { devs: [{name: "MPE"}] } } }
+    passes: { name: "loc_dpu_mem", locate_memory: { reqs: ["dpu"], loc: { devs: [{name: "ACC"}] } } }
+    passes: { name: "loc_dpu_fusion_mem", locate_memory: { reqs: ["dpu_fusion"], loc: { devs: [{name: "ACC"}] } } }
+    passes: { name: "cache_dpu_in", cache: { reqs: ["dpu"], dirs: [ In ], mem_loc: { devs: [{name: "MRM"}] }, xfer_loc: { devs: [{name: "IDU"}] } } }
+    passes: { name: "cache_dpu_out", cache: { reqs: ["dpu"], dirs: [ Out ], mem_loc: { devs: [{name: "ACC"}] }, xfer_loc: { devs: [{name: "ODU"}] } } }
+    passes: { name: "loc_dpu_fused", locate_block: { reqs: ["eltwise", "dpu_fusion"], loc: { devs: [{name: "MPE"}] } } }
+    passes: { name: "loc_dpu_eltwise", locate_inner_block: { reqs: ["dpu"], inner_reqs: ["eltwise"], loc: { devs: [{name: "MPE"}] } } }
     passes: {
             name: "schedule_main",
             schedule: {
                 reqs: ["main"],
-                mem_loc: { name: "CMX" },
+                mem_loc: { devs: [{name: "CMX"}] },
                 mem_KiB: 128,
                 alignment: 16,
-                xfer_loc: { name: "DMA" }
+                xfer_loc: { devs: [{name: "DMA"}] }
             }
     },
     passes: { name: "prune_refs", prune_refs: { reqs: ["program"] } },
-    passes: { name: "place_program", memory_placement: { reqs: ["program"], locs: [{ name: "DRAM" }], alignment: 4 } }
+    passes: { name: "place_program", memory_placement: { reqs: ["program"], locs: [{ devs: [{name: "DRAM"}] }], alignment: 4 } }
   )";
   auto cfg = ParseProtoText<proto::Config>(cfg_tmpl);
   return cfg;

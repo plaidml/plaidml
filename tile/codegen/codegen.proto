@@ -129,8 +129,10 @@ message GenericPass {
 message SchedulePass {
   // Do scheduling to the blocks that match this these tags
   repeated string reqs = 1;
-  // The location to specify for the local memory buffers generated during the
-  // scheduling process.
+  // The location to specify for the local memory buffers generated
+  // during the scheduling process.  During assignment, the location
+  // will be partially evaluated with the variable "unit" set to be
+  // the assigned memory unit.
   required stripe.proto.Location mem_loc = 2;
   // The size of the local memory available to scheduling.
   required uint64 mem_KiB = 3;
@@ -398,21 +400,19 @@ message AssignCodecPass {
 
 // Rebases memory allocations.
 //
-// Existing memory allocations are matched according to their loc.name.
-// (TODO: Consider using tags for this.)
+// Existing memory allocations are matched according to the supplied
+// pattern.
 //
-// For each allocation, loc's unit's constant portion is extracted,
-// producing an integer bound to "unit", and the loc's offset is bound
-// to "offset".
+// For each matching allocation, the pass runs through the
+// allocation's location: for each device, it binds dev.0, dev.1,
+// dev.2, &c to the constant portion of the corresponding unit.
+// Additionally, it binds the allocation's current offset as "offset".
 //
-// Using these bindings, the pass's loc.unit and offset are partially
-// evaluated, and then the allocation's loc is set to the pass's loc
-// and the allocation's offset is set to the pass's offset.
+// Using these bindings, the supplied "offset" affine is partially
+// evaluated, and the allocation's offset is set to the result.
 message MemRebasePass {
   // The location name of the memory allocations to rebase.
-  required string name = 1;
-  // The location to use for the rewritten refinement.
-  required stripe.proto.Location loc = 2;
+  required string pattern = 1;
   // The offset to use for the rewritten refinement.
   required stripe.proto.Affine offset = 3;
 }

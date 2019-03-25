@@ -443,8 +443,7 @@ class StatementBinder final {
       stripe::Refinement* ref = update.first;
       RefInfo* ri = update.second;
       ref->from = ri->cache_entry->name;
-      ref->location = *mem_loc_;
-      ref->location.unit = ri->cache_entry->unit;
+      ref->location = PartialEval(*mem_loc_, {{"unit", ri->cache_entry->unit.constant()}});
       if (ri->cache_entry->is_internal) {
         ref->interior_shape = ri->cache_entry->shape;
         for (auto& access : ref->access) {
@@ -740,7 +739,7 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
       break;
     case proto::SchedulePass::MEM_ASSIGNMENT_ALGORITHM_NOT_SET:
       for (auto& key_ri : ri_map_) {
-        auto unit = key_ri.second.ref.location.unit;
+        stripe::Affine unit = 0;
         if (key_ri.second.ref.cache_unit) {
           unit = *key_ri.second.ref.cache_unit;
         }
@@ -1109,8 +1108,7 @@ void Scheduler::Run() {
     ref->from.clear();
     ref->into = ent.name;
     ref->interior_shape = ent.shape;
-    ref->location = mem_loc_;
-    ref->location.unit = ent.unit;
+    ref->location = PartialEval(mem_loc_, {{"unit", ent.unit.constant()}});
     ref->offset = ent.range.begin;
   }
 
@@ -1338,7 +1336,7 @@ std::vector<stripe::Affine> Scheduler::GetValidUnits(PlacementPlan* plan, Placem
       if (it->first.ri->ref.cache_unit) {
         return std::vector<stripe::Affine>{*it->first.ri->ref.cache_unit};
       }
-      return std::vector<stripe::Affine>{it->first.ri->ref.location.unit};
+      return std::vector<stripe::Affine>{0};
   }
 
   // Appease awful compilers.
@@ -1534,7 +1532,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
     case proto::SchedulePass::MEM_ASSIGNMENT_ALGORITHM_NOT_SET:
       // Assign all placements in order.
       for (const auto& pkey_placement : placements) {
-        auto unit = pkey_placement.first.ri->ref.location.unit;
+        stripe::Affine unit = 0;
         if (pkey_placement.first.ri->ref.cache_unit) {
           unit = *pkey_placement.first.ri->ref.cache_unit;
         }
@@ -1572,8 +1570,7 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       ent->source->ref.bank_dim,          // bank_dim
   });
 
-  auto banked_mem_loc = mem_loc_;
-  banked_mem_loc.unit = ent->unit;
+  auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::Out,             // dir
       ent->name,                       // from
@@ -1608,8 +1605,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
   swap_block.name = "swap_out_" + ent->name;
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
-  auto banked_mem_loc = mem_loc_;
-  banked_mem_loc.unit = ent->unit;
+  auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::In,              // dir
       ent->name,                       // from
@@ -1690,8 +1686,7 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       ent->source->ref.bank_dim,    // bank_dim
   });
 
-  auto banked_mem_loc = mem_loc_;
-  banked_mem_loc.unit = ent->unit;
+  auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::Out,            // dir
       ent->interior_name,             // from
@@ -1739,8 +1734,7 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
     local_dst_access.emplace_back(stripe::Affine(iname) + access[i]);
   }
 
-  auto banked_mem_loc = mem_loc_;
-  banked_mem_loc.unit = ent->unit;
+  auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
   swap_block.refs.push_back(stripe::Refinement{
       stripe::RefDir::In,             // dir
       ent->interior_name,             // from

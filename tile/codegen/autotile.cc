@@ -133,7 +133,7 @@ TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
     if (options.skip_1d() && ref.interior_shape.dims.size() == 1) {
       continue;
     }
-    if (!options.loc_name().empty() && ref.location.name != options.loc_name()) {
+    if (!options.loc_name().empty() && ref.location != options.loc_name()) {
       continue;
     }
     auto tiled = ref.ApplyTile(tile_by_name);
