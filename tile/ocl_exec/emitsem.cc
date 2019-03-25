@@ -121,7 +121,7 @@ void SemtreeEmitter::process_affine(const std::string idx, const stripe::Affine&
   }
   stripe::Affine affine_init = replace_idx_name_with_tid(affine.partial_eval(values));
   // Put the initialization at the outermost regular loop
-  for (int loop_idx = 0; loop_idx < loop_info_.size(); ++loop_idx) {
+  for (size_t loop_idx = 0; loop_idx < loop_info_.size(); ++loop_idx) {
     auto& li = loop_info_[loop_idx];
     if (!li.threaded) {
       li.init_stmts.push_back(_Declare({sem::Type::INDEX}, idx, convert_affine(affine_init)));
@@ -424,7 +424,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
 
   // New inner block
   cur_ = std::make_shared<sem::Block>();
-  if (block.has_tag("kernel")) {
+  if (block.has_tag("kernel") && in_kernel_ == 1) {
     kernel_top_ = cur_;
   }
   depth_++;
