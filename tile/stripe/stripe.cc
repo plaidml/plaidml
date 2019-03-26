@@ -2,6 +2,7 @@
 
 #include "tile/stripe/stripe.h"
 
+#include <regex>
 #include <sstream>
 
 #include <boost/format.hpp>
@@ -558,96 +559,58 @@ bool operator!=(const Location& lhs, const Location& rhs) { return lhs.devs != r
 
 bool operator<(const Location& lhs, const Location& rhs) { return lhs.devs < rhs.devs; }
 
-Location AddDeviceUnits(const Location& l1, const Location& l2) {
+Location AddDeviceUnits(const Location& loc1, const Location& loc2) {
   Location result;
-  for (auto d1 = l1.devs.begin(), d2 = l2.devs.begin(); d1 != l1.devs.end() && d2 != l2.devs.end(); ++d1, ++d2) {
-    if (d1 == l1.devs.end() || d2 == l2.devs.end() || d1->name != d2->name || d1->units.size() != d2->units.size()) {
-      throw std::runtime_error{"Incompatible addition of differently-shaped locations: " + to_string(l1) +
-                               " != " + to_string(l2)};
+  for (auto dev1 = loc1.devs.begin(), dev2 = loc2.devs.begin(); dev1 != loc1.devs.end() && dev2 != loc2.devs.end();
+       ++dev1, ++dev2) {
+    if (dev1 == loc1.devs.end() || dev2 == loc2.devs.end() || dev1->name != dev2->name ||
+        dev1->units.size() != dev2->units.size()) {
+      throw std::runtime_error{"Incompatible addition of differently-shaped locations: " + to_string(loc1) +
+                               " != " + to_string(loc2)};
     }
-    auto rd = result.devs.emplace(result.devs.end(), Device{d1->name});
-    rd->units.reserve(d1->units.size());
-    for (auto u1 = d1->units.begin(), u2 = d2->units.begin(); u1 != d1->units.end(); ++u1, ++u2) {
-      rd->units.emplace_back(*u1 + *u2);
+    auto rd = result.devs.emplace(result.devs.end(), Device{dev1->name});
+    rd->units.reserve(dev1->units.size());
+    for (auto unit1 = dev1->units.begin(), unit2 = dev2->units.begin(); unit1 != dev1->units.end(); ++unit1, ++unit2) {
+      rd->units.emplace_back(*unit1 + *unit2);
     }
   }
   return result;
 }
 
 bool operator==(const Location& loc, const std::string& pattern) {
+  static const std::regex valid_re{R"(((^|/)(\w+|\*)(\[\s*((\d+|\*)(\s*,\s*(\d+|\*))*)?\s*\])?)*)"};
+  static const std::regex devs_re{R"((?:^|/)(\w+|\*)(\[([^\[\]/]*)\])?)"};
+  static const std::regex units_re{R"((?:^|,)\s*(\d+|\*)\s*)"};
+
   // N.B. This is definitely not the fastest pattern parser we could
-  // write; we're doing a lot of little memory allocations, since
-  // we're in the pre-C++17 world.
+  // write; the parsing here is simple enough that we could do it with
+  // C-string logic.
   //
   // We're implementing the pattern parser this way because it's
   // faster to code and much more obviously-correct, and we don't
   // really need low-level performance here.
-  //
-  // If we're ever tempted to rewrite this code to pre-compile the
-  // pattern, we should perhaps just switch it to use C-string logic
-  // instead; it'll be much faster.
 
-  // Split the pattern by '/'s.
-  std::vector<std::pair<std::string, boost::optional<std::vector<boost::optional<std::int64_t>>>>> devs;
-  std::size_t pos_current = 0;
-  while (pos_current < pattern.size()) {
-    auto pos_next = pattern.find('/', pos_current);
-    if (pos_next == std::string::npos) {
-      devs.emplace_back(pattern.substr(pos_current), boost::none);
-      break;
-    } else {
-      devs.emplace_back(pattern.substr(pos_current, pos_next - pos_current), boost::none);
-      pos_current = pos_next + 1;
-    }
+  if (!std::regex_match(pattern, valid_re)) {
+    throw std::runtime_error{"Invalid location pattern: " + pattern};
   }
 
-  // Split the devs into devices and optional affines to be matched.
-  for (auto& dev : devs) {
-    auto units_start = dev.first.find('[');
-    if (units_start == std::string::npos) {
-      continue;
-    }
-    auto units_end = dev.first.size() - 1;  // Always valid, since we have at least a '['
-    if (dev.first[units_end] != ']') {
-      throw std::runtime_error{"Invalid location pattern (missing ']': " + pattern};
-    }
-    // Build the units string by starting just after the leading '['
-    // and ending just before the trailing ']'.
-    std::string units = dev.first.substr(units_start + 1, units_end - units_start - 1);
-    dev.first = dev.first.substr(0, units_start);
-    dev.second = std::vector<boost::optional<std::int64_t>>{};
-    std::size_t unit_current = 0;
-    while (unit_current < units.size()) {
-      if (units[unit_current] == ' ') {
-        ++unit_current;
-        continue;
-      }
-      auto unit_next = units.find(',', unit_current);
-      std::string unit;
-      if (unit_next == std::string::npos) {
-        unit = units.substr(unit_current);
-        unit_current = units.size();
-      } else {
-        unit = units.substr(unit_current, unit_next - unit_current);
-        unit_current = unit_next + 1;
-      }
+  std::vector<std::pair<std::string, boost::optional<std::vector<boost::optional<std::int64_t>>>>> devs;
 
-      // The unit may have trailing whitespace; trim it.
-      while (unit.size() && unit.back() == ' ') {
-        unit.pop_back();
-      }
+  auto devs_begin = std::sregex_iterator{pattern.begin(), pattern.end(), devs_re};
+  auto re_end = std::sregex_iterator{};
 
-      if (unit.size() == 0) {
-        throw std::runtime_error{"Invalid location pattern (missing unit): " + pattern};
-      }
-
-      if (unit == "*") {
-        dev.second->emplace_back(boost::none);
-      } else {
-        std::size_t unit_len;
-        dev.second->emplace_back(stoi(unit, &unit_len));
-        if (unit_len != unit.size()) {
-          throw std::runtime_error{"Invalid location pattern (unparseable unit): " + pattern};
+  for (auto dit = devs_begin; dit != re_end; ++dit) {
+    std::smatch dev_match = *dit;
+    auto dev_units_it = devs.emplace(devs.end(), dev_match[1], boost::none);
+    if (dev_match[2].first != dev_match[2].second) {
+      dev_units_it->second.emplace();
+      auto units_begin = std::sregex_iterator{dev_match[3].first, dev_match[3].second, units_re};
+      for (auto uit = units_begin; uit != re_end; ++uit) {
+        std::smatch unit_match = *uit;
+        if (unit_match[1] == "*") {
+          dev_units_it->second->emplace_back(boost::none);
+        } else {
+          dev_units_it->second->emplace_back(std::stoi(unit_match[1]));
         }
       }
     }
