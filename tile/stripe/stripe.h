@@ -393,7 +393,7 @@ bool operator<(const Location& lhs, const Location& rhs);
 
 // Adds the location's units, returning the result.  The locations
 // should have the same shape (device names and unit dimensionality).
-Location AddDeviceUnits(const Location& l1, const Location& r2);
+Location AddDeviceUnits(const Location& loc1, const Location& loc2);
 
 std::string to_string(const Location& loc);
 

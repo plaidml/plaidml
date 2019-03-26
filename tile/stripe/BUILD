@@ -1,6 +1,6 @@
 # Copyright 2018, Intel Corporation
 
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_proto_library")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_proto_library")
 
 plaidml_proto_library(
     name = "proto",
@@ -26,5 +26,14 @@ plaidml_cc_library(
         "//base/util",
         "//tile/base",
         "//tile/math",
+    ],
+)
+
+plaidml_cc_test(
+    name = "stripe_test",
+    srcs = ["stripe_test.cc"],
+    deps = [
+        ":stripe",
+        "//base/util",
     ],
 )
