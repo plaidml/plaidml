@@ -23,7 +23,10 @@ cc_library(
         "BOOST_THREAD_VERSION=4",
         "BOOST_THREAD_PROVIDES_EXECUTORS",
         "BOOST_ALL_NO_LIB",
-    ],
+    ] + select({
+        "@toolchain//:macos_x86_64": ["BOOST_ASIO_HAS_STD_STRING_VIEW"],
+        "//conditions:default": [],
+    }),
     includes = ["."],
 )
 
