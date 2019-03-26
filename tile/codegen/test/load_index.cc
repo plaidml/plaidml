@@ -2,22 +2,14 @@
 
 #include <gmock/gmock.h>
 
-#include "base/util/stream_container.h"
+#include "base/util/throw.h"
 #include "testing/matchers.h"
-#include "tile/codegen/cache.h"
+#include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/driver.h"
-#include "tile/codegen/fuse.h"
-#include "tile/codegen/localize.h"
-#include "tile/codegen/scalarize.h"
-#include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
-#include "tile/lang/semprinter.h"
-#include "tile/lang/simplifier.h"
-#include "tile/ocl_exec/emitsem.h"
 #include "tile/stripe/stripe.h"
-#include "tile/stripe/stripe.pb.h"
 
 using ::testing::ContainerEq;
 using ::testing::Eq;
