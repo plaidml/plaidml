@@ -17,12 +17,19 @@ plaidml_cc_binary(
         "*.h",
         "*.cc",
     ]),
+    defines = select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["ENABLE_LLVM_BITCODE"],
+    }),
     deps = [
         "//base/config",
         "//tile/base",
-        "//tile/codegen:base",
+        "//tile/codegen",
         "//tile/lang",
         "//tile/lib",
         "//tile/util",
-    ],
+    ] + select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["//tile/targets/cpu"],
+    }),
 )

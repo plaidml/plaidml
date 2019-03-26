@@ -21,11 +21,12 @@ plaidml_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@boost//:filesystem",
         ":proto_cc",
         "//base/util",
         "//tile/base",
         "//tile/math",
+        "@boost",
+        "@boost//:filesystem",
     ],
 )
 

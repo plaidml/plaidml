@@ -1,12 +1,14 @@
 // Copyright 2018, Intel Corp.
 
-#include "tile/codegen/jit.h"
+#include "tile/targets/cpu/jit.h"
 
+#include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
 #include <algorithm>
@@ -19,16 +21,23 @@
 
 namespace vertexai {
 namespace tile {
-namespace codegen {
+namespace targets {
+namespace cpu {
 
 namespace {
 const char invoker_name_[] = "__invoke_";
 }
 
+struct ProgramModule {
+  std::unique_ptr<llvm::Module> module;
+  std::vector<std::string> parameters;
+};
+
 class Executable {
  public:
-  Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters);
+  explicit Executable(ProgramModule&& module);
   void Run(const std::map<std::string, void*>& buffers);
+  void Save(const std::string& filename);
 
  private:
   std::unique_ptr<llvm::ExecutionEngine> engine_;
@@ -49,7 +58,7 @@ class Runtime : public llvm::LegacyJITSymbolResolver {
 class Compiler : private stripe::ConstStmtVisitor {
  public:
   explicit Compiler(llvm::LLVMContext* context);
-  std::unique_ptr<Executable> CompileProgram(const stripe::Block& program);
+  ProgramModule CompileProgram(const stripe::Block& program);
 
  protected:
   explicit Compiler(llvm::LLVMContext* context, llvm::Module* module);
@@ -142,9 +151,11 @@ Compiler::Compiler(llvm::LLVMContext* context) : context_(*context), builder_{co
   });
 }
 
-std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& program) {
+ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   // Compile each block in this program into a function within an LLVM module.
-  module_ = new llvm::Module("stripe", context_);
+  ProgramModule ret;
+  ret.module = std::make_unique<llvm::Module>("stripe", context_);
+  module_ = ret.module.get();
   llvm::Function* main = CompileBlock(program);
   // Generate a stub function we can invoke from the outside, passing buffers
   // as an array of generic pointers.
@@ -170,14 +181,12 @@ std::unique_ptr<Executable> Compiler::CompileProgram(const stripe::Block& progra
     module_->print(llvm::errs(), nullptr);
   }
   // Wrap the finished module and the buffer names into an Executable instance.
-  std::vector<std::string> param_names;
   for (auto& ref : program.refs) {
     assert(ref.dir != stripe::RefDir::None);
-    param_names.push_back(ref.into);
+    ret.parameters.push_back(ref.into);
   }
-  std::unique_ptr<llvm::Module> xfermod(module_);
   module_ = nullptr;
-  return std::make_unique<Executable>(std::move(xfermod), param_names);
+  return ret;
 }
 
 Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module)
@@ -427,10 +436,11 @@ void Compiler::Visit(const stripe::Special& special) {
       {"copy", &Compiler::Copy},
       {"reshape", &Compiler::Reshape},
   };
-  if (handlers.find(special.name) == handlers.end()) {
+  auto it = handlers.find(special.name);
+  if (it == handlers.end()) {
     throw Error("Unknown special \"" + special.name + "\"");
   }
-  handlers[special.name](this, special);
+  it->second(this, special);
 }
 
 void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
@@ -461,10 +471,11 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"bit_right", &Compiler::BitRight},
       {"bit_left", &Compiler::BitLeft},
   };
-  if (handlers.find(intrinsic.name) == handlers.end()) {
+  auto it = handlers.find(intrinsic.name);
+  if (it == handlers.end()) {
     throw Error("Unknown intrinsic \"" + intrinsic.name + "\"");
   }
-  handlers[intrinsic.name](this, intrinsic);
+  it->second(this, intrinsic);
 }
 
 void Compiler::Visit(const stripe::Block& block) {
@@ -964,11 +975,10 @@ llvm::Value* Compiler::FreeFunction(void) {
   return module_->getOrInsertFunction(funcname, functype);
 }
 
-Executable::Executable(std::unique_ptr<llvm::Module>&& module, const std::vector<std::string>& parameters)
-    : parameters_(parameters) {
+Executable::Executable(ProgramModule&& module) : parameters_(module.parameters) {
   std::string errStr;
   std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime);
-  auto ee = llvm::EngineBuilder(std::move(module))
+  auto ee = llvm::EngineBuilder(std::move(module.module))
                 .setErrorStr(&errStr)
                 .setEngineKind(llvm::EngineKind::JIT)
                 .setVerifyModules(true)
@@ -1040,30 +1050,40 @@ llvm::JITSymbol Runtime::findSymbolInLogicalDylib(const std::string& name) { ret
 void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers) {
   llvm::LLVMContext context;
   Compiler compiler(&context);
-  auto executable = compiler.CompileProgram(program);
-  executable->Run(buffers);
+  auto module = compiler.CompileProgram(program);
+  Executable executable(std::move(module));
+  executable.Run(buffers);
 }
 
 struct Native::Impl {
   llvm::LLVMContext context;
-  std::unique_ptr<Executable> executable;
+  ProgramModule module;
 
-  void compile(const stripe::Block& program);
-  void run(const std::map<std::string, void*>& buffers);
+  void compile(const stripe::Block& program) {
+    Compiler compiler(&context);
+    module = compiler.CompileProgram(program);
+  }
+
+  void run(const std::map<std::string, void*>& buffers) {
+    Executable executable(std::move(module));
+    executable.Run(buffers);
+  }
+
+  void save(const std::string& filename) {
+    std::error_code ec;
+    llvm::ToolOutputFile result(filename, ec, llvm::sys::fs::F_None);
+    WriteBitcodeToFile(*module.module, result.os());
+    result.keep();
+  }
 };
 
 Native::Native() : m_impl(new Native::Impl) {}
 Native::~Native() {}
+void Native::compile(const stripe::Block& program) { m_impl->compile(program); }
+void Native::run(const std::map<std::string, void*>& buffers) { m_impl->run(buffers); }
+void Native::save(const std::string& filename) { m_impl->save(filename); }
 
-void Native::Impl::compile(const stripe::Block& program) {
-  Compiler compiler(&context);
-  executable = compiler.CompileProgram(program);
-}
-void Native::Impl::run(const std::map<std::string, void*>& buffers) { executable->Run(buffers); }
-
-void Native::compile(const stripe::Block& program) { m_impl.get()->compile(program); }
-void Native::run(const std::map<std::string, void*>& buffers) { m_impl.get()->run(buffers); }
-
-}  // namespace codegen
+}  // namespace cpu
+}  // namespace targets
 }  // namespace tile
 }  // namespace vertexai

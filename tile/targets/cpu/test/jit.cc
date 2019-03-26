@@ -3,12 +3,12 @@
 #include <gmock/gmock.h>
 #include <google/protobuf/text_format.h>
 
-#include "tile/codegen/jit.h"
 #include "tile/codegen/tile.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/stripe/stripe.h"
 #include "tile/stripe/stripe.pb.h"
+#include "tile/targets/cpu/jit.h"
 
 namespace gp = google::protobuf;
 
@@ -17,10 +17,11 @@ using ::testing::Eq;
 
 namespace vertexai {
 namespace tile {
-namespace codegen {
+namespace targets {
+namespace cpu {
 namespace test {
 
-TEST(Codegen, JitIntrinsicMUL_F32) {
+TEST(Jit, JitIntrinsicMUL_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
@@ -56,7 +57,7 @@ TEST(Codegen, JitIntrinsicMUL_F32) {
   EXPECT_THAT(b2[0], Eq(6.0));
 }
 
-TEST(Codegen, JitIntrinsicADD_F32) {
+TEST(Jit, JitIntrinsicADD_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
@@ -92,11 +93,11 @@ TEST(Codegen, JitIntrinsicADD_F32) {
   EXPECT_THAT(b2[0], Eq(3.0));
 }
 
-TEST(Codegen, JitIntrinsicEQ) {}
+TEST(Jit, JitIntrinsicEQ) {}
 
-TEST(Codegen, JitIntrinsicCOND) {}
+TEST(Jit, JitIntrinsicCOND) {}
 
-TEST(Codegen, JitSimpleLoop) {
+TEST(Jit, JitSimpleLoop) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
@@ -142,7 +143,7 @@ TEST(Codegen, JitSimpleLoop) {
   EXPECT_THAT(bufB, ContainerEq(expected));
 }
 
-TEST(Codegen, JitCopy2D) {
+TEST(Jit, JitCopy2D) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
@@ -195,7 +196,7 @@ TEST(Codegen, JitCopy2D) {
   EXPECT_THAT(bufB, ContainerEq(expected));
 }
 
-TEST(Codegen, JitAggSum2D) {
+TEST(Jit, JitAggSum2D) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
@@ -249,7 +250,7 @@ TEST(Codegen, JitAggSum2D) {
   EXPECT_THAT(bufB, ContainerEq(expected));
 }
 
-TEST(Codegen, JitMatMul) {
+TEST(Jit, JitMatMul) {
   std::vector<float> bufA = {
       1, 2, 3, 4, 5,  //
       4, 5, 6, 7, 8,  //
@@ -308,7 +309,7 @@ TEST(Codegen, JitMatMul) {
   EXPECT_THAT(bufC, ContainerEq(expected));
 }
 
-TEST(Codegen, JitNestedAlloc) {
+TEST(Jit, JitNestedAlloc) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
@@ -389,6 +390,7 @@ TEST(Codegen, JitNestedAlloc) {
 }
 
 }  // namespace test
-}  // namespace codegen
+}  // namespace cpu
+}  // namespace targets
 }  // namespace tile
 }  // namespace vertexai

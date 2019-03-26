@@ -10,7 +10,8 @@
 
 namespace vertexai {
 namespace tile {
-namespace codegen {
+namespace targets {
+namespace cpu {
 
 class Native {
   struct Impl;
@@ -19,12 +20,15 @@ class Native {
  public:
   Native();
   ~Native();
+
   void compile(const stripe::Block& program);
   void run(const std::map<std::string, void*>& buffers);
+  void save(const std::string& filename);
 };
 
 void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers);
 
-}  // namespace codegen
+}  // namespace cpu
+}  // namespace targets
 }  // namespace tile
 }  // namespace vertexai

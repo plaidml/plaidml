@@ -9,6 +9,9 @@
 #include "tile/codegen/driver.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lib/tests.h"
+#ifdef ENABLE_LLVM_BITCODE
+#include "tile/targets/cpu/jit.h"
+#endif
 #include "tile/util/tile_file.h"
 
 DEFINE_string(config, "", "configuration file");
@@ -62,7 +65,11 @@ int Main(const std::string& filename) {
     auto proto = IntoProto(*stripe.program);
     proto.SerializeToOstream(&fout);
   });
-
+#ifdef ENABLE_LLVM_BITCODE
+  targets::cpu::Native native;
+  native.compile(*stripe.program);
+  native.save((outdir / "stripe.bc").string());
+#endif
   return 0;
 }
 

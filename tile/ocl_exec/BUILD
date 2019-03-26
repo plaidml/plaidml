@@ -30,7 +30,7 @@ plaidml_cc_library(
     deps = [
         "//base/config",
         "//tile/base",
-        "//tile/codegen:base",
+        "//tile/codegen",
         "//tile/lang",
         "//tile/lib",
         "//tile/util",
@@ -49,7 +49,7 @@ plaidml_cc_binary(
     deps = [
         "//base/config",
         "//tile/base",
-        "//tile/codegen:base",
+        "//tile/codegen",
         "//tile/lang",
         "//tile/lib",
         "//tile/util",

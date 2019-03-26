@@ -2,8 +2,8 @@
     ## Define the stripe passes
     "passes": [
         ## First, we place all the initial buffer in global memory (DRAM)
-        { "name": "loc_program", "locate_memory": { "reqs": ["program"], "loc": { "name": "GLOBAL" } } },
-        { "name": "loc_main", "locate_memory": { "reqs": ["main"], "loc": { "name": "GLOBAL" } } },
+        { "name": "loc_program", "locate_memory": { "reqs": ["program"], "loc": { "devs": [{"name": "GLOBAL", "units": [{"offset": 0}]}] } } },
+        { "name": "loc_main", "locate_memory": { "reqs": ["main"], "loc": { "devs": [{"name": "GLOBAL", "units": [{"offset": 0}]}] } } },
 
         ## Eliminate the dead code first
         { "name": "dead_code_elimination", "dead_code_elimination": {"reqs": ["all"] } },
@@ -49,7 +49,7 @@
         ## Now we add explicit code to load inputs from DRAM to shared memory for each inner block
         ## Note, we don't cache outputs yet, since the next fusion step will split the outer loop into
         ## accumulation indexes and non-accumulation indexes
-        { "name": "cache_input", "cache": { "reqs": ["contract_middle"], "dirs": [ "In" ], "mem_loc": { "name": "LOCAL" }, "xfer_loc": { "name": "DMA" } } },
+        { "name": "cache_input", "cache": { "reqs": ["contract_middle"], "dirs": [ "In" ], "mem_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] }, "xfer_loc": { "devs": [{"name": "DMA", "units": [{"offset": 0}]}] } } },
 
         ## Next we fuse in any element-wise operations which operate on the output of contraction block
         { "name": "fuse_contract_eltwise", "fusion": { "a_reqs": ["contract_outer"], "b_reqs": ["eltwise"]  } },
@@ -65,7 +65,7 @@
         { "name": "localize_main", "localize": { "reqs": ["main"] } },
 
         ## Now we add the output caching, which will now have the same loop structure as the element-wise ops
-        { "name": "cache_output", "cache": { "reqs": ["contract_outer"], "dirs": [ "Out" ], "mem_loc": { "name": "LOCAL" }, "xfer_loc": { "name": "DMA" } } },
+        { "name": "cache_output", "cache": { "reqs": ["contract_outer"], "dirs": [ "Out" ], "mem_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] }, "xfer_loc": { "devs": [{"name": "DMA", "units": [{"offset": 0}]}] } } },
 
         ## Clean up indexes to allow better fusion
         { "name": "prefuse", "prune_idxs": { "reqs": ["main"] } },
@@ -73,7 +73,7 @@
         ## We do an inner 'fusion' to move all 'per-output' operations into a single loop
         { "name": "fuse_inner", "fusion": { "parent_reqs": ["contract_outer"], "fused_set": ["cache"], "exclude": ["contract_middle"] } },
 
-	## Now tile any remaining eltwise kernels
+        ## Now tile any remaining eltwise kernels
         {
             "name": "tile_eltwise",
             "autotile": {
@@ -97,7 +97,7 @@
         { "name": "scalarize_main", "scalarize": { "reqs": ["main"] } },
 
         ## We now relabel any remaining buffer inside the contractions as local memory
-        { "name": "make_local", "locate_memory": { "reqs": ["contract_outer"], "loc": { "name": "LOCAL"} } },
+        { "name": "make_local", "locate_memory": { "reqs": ["contract_outer"], "loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] } } },
 
         ## After all fusion, eliminate dead code again
         { "name": "dead_code_elimination", "dead_code_elimination": {"reqs": ["all"] } },
@@ -144,7 +144,7 @@
         ## { "name": "fuse_pure_elemwise", "fusion": { "parent_reqs": ["main"], "a_reqs": ["eltwise"], "b_reqs": ["eltwise"] } },
 
         ## We now locate the kernels onto the GPU compute device
-        { "name": "loc_gpu", "locate_inner_block": { "reqs": ["kernel"], "loc": { "name": "GPU" } } },
+        { "name": "loc_gpu", "locate_inner_block": { "reqs": ["kernel"], "loc": { "devs": [{"name": "GPU", "units": [{"offset": 0}]}] } } },
 
         ## Final cleanup 
         { "name": "localize_main_2", "localize": { "reqs": ["main"] } },
@@ -156,6 +156,6 @@
         { "name": "compute_deps", "compute_deps": { } }, 
 
         ## Assign global memory addresses
-        { "name": "place_program", "memory_placement": { "reqs": ["program"], "locs": [{ "name": "GLOBAL" }], "alignment": 4 } }
+        { "name": "place_program", "memory_placement": { "reqs": ["program"], "locs": [{ "devs": [{"name": "GLOBAL", "units": [{"offset": 0}]}] }], "alignment": 4 } }
     ]
 }

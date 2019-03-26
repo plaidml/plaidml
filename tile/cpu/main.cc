@@ -3,10 +3,10 @@
 #include "base/config/config.h"
 #include "base/util/runfiles_db.h"
 #include "tile/codegen/driver.h"
-#include "tile/codegen/jit.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lib/lib.h"
 #include "tile/stripe/stripe.h"
+#include "tile/targets/cpu/jit.h"
 
 static std::string ReadFile(const std::string& filename) {
   std::ifstream ifs;
@@ -73,12 +73,16 @@ int main(int argc, char* argv[]) {
   io["B"] = b_data.data();
   io["C"] = c_data.data();
 
-  codegen::Native n;
-  n.compile(*s);
+  targets::cpu::Native native;
+  native.compile(*s);
 
   for (int i = 0; i < 10; i++) {
-    for (auto&& f : c_data) f = 0.f;
-    with_profile([&]() { n.run(io); });
+    for (auto& f : c_data) {
+      f = 0.f;
+    }
+    with_profile([&]() {  //
+      native.run(io);
+    });
   }
 
   std::cout << c_data[0] << std::endl;

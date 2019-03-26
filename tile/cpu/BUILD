@@ -29,6 +29,7 @@ plaidml_cc_binary(
         "-D__STDC_CONSTANT_MACROS",
     ],
     data = [":cpu_config"],
+    tags = ["llvm"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/config",
@@ -38,5 +39,6 @@ plaidml_cc_binary(
         "//tile/lang",
         "//tile/lib",
         "//tile/stripe",
+        "//tile/targets/cpu",
     ],
 )

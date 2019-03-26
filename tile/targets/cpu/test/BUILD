@@ -3,11 +3,10 @@ load("//bzl:plaidml.bzl", "plaidml_cc_test")
 plaidml_cc_test(
     name = "test",
     srcs = glob(["*.cc"]),
+    tags = ["llvm"],
     deps = [
-        "//testing:matchers",
         "//tile/codegen",
         "//tile/lang",
-        "//tile/lib",
-        "@boost//:filesystem",
+        "//tile/targets/cpu",
     ],
 )
