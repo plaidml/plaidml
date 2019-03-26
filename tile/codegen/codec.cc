@@ -19,7 +19,6 @@ void AssignCodec(Block* block, const Tags& datatypes, const std::string& codec) 
     if (datatypes.count(ref_type)) {
       IVLOG(2, "    ref: " << ref.into);
       ref.interior_shape.codec = codec;
-      ref.exterior_shape.codec = codec;
     }
   }
   for (auto stmt : block->stmts) {

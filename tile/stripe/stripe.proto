@@ -18,11 +18,11 @@ message Affine {
 
 // A block in stripe represents computation happening over some N-dimensional
 // polyhedral index space.  For each index position (as determined by idxs),
-// such that the constraints hold true, new refinements are constructed and
-// then operated on by a set of statements.  The ordering of the execution of
-// the interior statements is not defined, and may be done in parallel (with
-// respect to the indexes), however within each index positions, statements
-// logically execute serially.  That is, the result must be equivalent to serial
+// such that the constraints hold true, new refinements are constructed and then
+// operated on by a set of statements.  The ordering of the execution of the
+// interior statements is not defined, and may be done in parallel (with respect
+// to the indexes), however within each index positions, statements logically
+// execute serially.  That is, the result must be equivalent to serial
 // execution, although statement which are not dependent may be reordered or
 // scheduled simultaneously.
 message Block {
@@ -32,13 +32,13 @@ message Block {
   string comments = 2;
   // The set of indexes this block operates over.
   repeated Index idxs = 3;
-  // Only execute the block interior when the constraints below are all true.
-  // A constraint is true when the Affine applied to the indexes (which must
-  // be indexed declared in this block only) results in a number >= 0.
+  // Only execute the block interior when the constraints below are all true. A
+  // constraint is true when the Affine applied to the indexes (which must be
+  // indexed declared in this block only) results in a number >= 0.
   repeated Affine constraints = 4;
   // A set of refinements which create subviews of outer blocks and/or allocate
-  // new buffers whose scope is the execution of a single index position of
-  // this block.
+  // new buffers whose scope is the execution of a single index position of this
+  // block.
   repeated Refinement refs = 5;
   // The list of statements to run for each valid (satisfies constraints) index
   // position of this block.
@@ -64,15 +64,15 @@ message Index {
 
 // A refinement represents a dimensional buffer (Tensor) or a region thereof.
 // The refinement has a well defined shape, and it's scope exists only for the
-// block it is defined in (not including the interior blocks unless
-// specifically refined further).  It can be loaded/stored to/from via load or
-// store statements within the block.  Each refinement is either a new
-// allocation on the block or a subregion of a refinement in the parent block.
-// Additionally, stores to the refinement may have special aggregation behavior,
-// such as accumulation.
+// block it is defined in (not including the interior blocks unless specifically
+// refined further).  It can be loaded/stored to/from via load or store
+// statements within the block.  Each refinement is either a new allocation on
+// the block or a subregion of a refinement in the parent block. Additionally,
+// stores to the refinement may have special aggregation behavior, such as
+// accumulation.
 message Refinement {
-  // The direction define how the refinement relates to the 'from' refinement
-  // in it's parent block.
+  // The direction define how the refinement relates to the 'from' refinement in
+  // it's parent block.
   enum Dir {
     None = 0;   // The refinement is newly allocated in this block
     In = 1;     // The refinement only reads from it's parent
@@ -90,27 +90,23 @@ message Refinement {
   // How to move the start of the inner refinement relative to the outer
   // refinement in terms of the indexes of the block
   repeated Affine access = 4;
-  // The shape of the refinement for the 'interior' of the block, that is
-  // it's shape relative to a single index state during the evaluation of
-  // the statements
+  // The shape of the refinement for the 'interior' of the block, that is it's
+  // shape relative to a single index state during the evaluation of the
+  // statements
   tile.proto.TensorShape interior_shape = 5;
-  // The shape of the refinement for the 'exterior' of the block.
-  // This shape represents the extents of each dimension that
-  // the iteration domain of this block reaches.
-  tile.proto.TensorShape exterior_shape = 6;
   // How to aggregate any writes to this refinement
-  string agg_op = 7;
+  string agg_op = 6;
   // The hardware memory bank the refinement exists in
-  Location loc = 8;
-  // The offset of the start of the buffer holding the block in the memory
-  // the block is in.  Only valid after a schedule/placement pass.
-  uint64 offset = 9;
+  Location loc = 7;
+  // The offset of the start of the buffer holding the block in the memory the
+  // block is in.  Only valid after a schedule/placement pass.
+  uint64 offset = 8;
   // Which bank this refinement is in, or none for non-banked memory
-  google.protobuf.UInt32Value bank_dim = 10;
+  google.protobuf.UInt32Value bank_dim = 9;
   // A set of user defined 'tags' that are attached to the refinement.  They do
   // not have any specific semantic meaning, but are often used to pass
   // membership information between optimization passes
-  repeated string tags = 11;
+  repeated string tags = 10;
 }
 
 // For each index position of a block, the block executes multiple 'Statement'
@@ -143,12 +139,12 @@ message Statement {
   }
 
   // Indices of intra-block dependencies.  That is, this statement depends on
-  // prior statements listed in deps.  Can be used to determine which
-  // statements can be simultaneously scheduled.
+  // prior statements listed in deps.  Can be used to determine which statements
+  // can be simultaneously scheduled.
   repeated uint32 deps = 8;
-  // A set of user defined 'tags' that are attached to a statement.  They do
-  // not have any specific semantic meaning, but are often used to pass
-  // membership information between optimization passes
+  // A set of user defined 'tags' that are attached to a statement.  They do not
+  // have any specific semantic meaning, but are often used to pass membership
+  // information between optimization passes
   repeated string tags = 9;
 }
 
@@ -195,8 +191,8 @@ message Intrinsic {
   repeated string outputs = 3;
 }
 
-// A special operates directly on buffers and represents operations that are
-// not well suited for implementation in stripe or which are opaque for other
+// A special operates directly on buffers and represents operations that are not
+// well suited for implementation in stripe or which are opaque for other
 // reasons.  For example 'sort' or 'gather'.
 message Special {
   // The name of the special, i.e. the operation to perform.
@@ -211,8 +207,8 @@ message Special {
   map<string, string> str_params = 5;
 }
 
-// A constant.  Constants are always 'maximal precision', but are reduced to
-// the relevant working precision by any intrinsics which use them.
+// A constant.  Constants are always 'maximal precision', but are reduced to the
+// relevant working precision by any intrinsics which use them.
 message Constant {
   string name = 1;
   oneof value {
@@ -224,8 +220,8 @@ message Constant {
 // A device represents a hardware unit (e.g. compute, transfer, memory etc).
 message Device {
   string name = 1;  // The name of the device
-  repeated Affine units =
-      2;  // The unit numbers (which specific unit in an N-dimensional matrix)
+  // The unit numbers (which specific unit in an N-dimensional matrix)
+  repeated Affine units = 2;
 }
 
 // A location represent a nested hardware unit (e.g. a particular processing

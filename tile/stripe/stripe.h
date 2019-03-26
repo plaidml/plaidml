@@ -188,7 +188,6 @@ struct Refinement : Taggable {
              const std::string& into,                //
              const std::vector<Affine>& access,      //
              const TensorShape& interior_shape,      //
-             const TensorShape& exterior_shape,      //
              const std::string& agg_op = "",         //
              const Location& location = Location{},  //
              uint64_t offset = 0,                    //
@@ -199,7 +198,6 @@ struct Refinement : Taggable {
         into(into),
         access(access),
         interior_shape(interior_shape),
-        exterior_shape(exterior_shape),
         agg_op(agg_op),
         location(location),
         offset(offset),
@@ -211,7 +209,6 @@ struct Refinement : Taggable {
   std::string into;
   std::vector<Affine> access;
   TensorShape interior_shape;
-  TensorShape exterior_shape;
   std::string agg_op;
   Location location;
   uint64_t offset = 0;                      // Offset within the location's arena.
@@ -360,7 +357,7 @@ struct Block : Statement {
   std::string unique_ref_name(const std::string& into) const;
   // Make a unique index name (by appending _2, etc, if needed)
   std::string unique_idx_name(const std::string& name) const;
-  TensorShape exterior_shape(const std::string& name, const TensorShape& outer_shape) const;
+  TensorShape exterior_shape(const std::string& name) const;
 
   std::shared_ptr<Block> SubBlock(size_t pos) const {
     auto it = stmts.begin();
@@ -418,6 +415,13 @@ inline bool operator!=(const Location& loc, const std::string& pattern) { return
 // Applies the supplied parameter map to the location's units.
 Location PartialEval(const Location& loc, const std::map<std::string, std::int64_t>& values);
 
+struct PrintRefinement {
+  explicit PrintRefinement(const Refinement& ref, const Block* block = nullptr) : ref(ref), block(block) {}
+
+  const Refinement& ref;
+  const Block* block = nullptr;
+};
+
 std::ostream& operator<<(std::ostream& os, const Device& dev);
 std::ostream& operator<<(std::ostream& os, const Location& loc);
 std::ostream& operator<<(std::ostream& os, const Index& idx);
@@ -428,6 +432,7 @@ std::ostream& operator<<(std::ostream& os, const Intrinsic& op);
 std::ostream& operator<<(std::ostream& os, const Special& op);
 std::ostream& operator<<(std::ostream& os, const Constant& op);
 std::ostream& operator<<(std::ostream& os, const Refinement& ref);
+std::ostream& operator<<(std::ostream& os, const PrintRefinement& ref);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 
 std::shared_ptr<Block> FromProto(const proto::Block& block);

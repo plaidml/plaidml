@@ -83,12 +83,12 @@ void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
     }
     for (const auto& kvp : sorted) {
       PrintTab(os, depth + 2);
-      os << *kvp.second << std::endl;
+      os << PrintRefinement{*kvp.second, &block} << std::endl;
     }
   } else {
     for (const auto& ref : block.refs) {
       PrintTab(os, depth + 2);
-      os << ref << std::endl;
+      os << PrintRefinement{ref, &block} << std::endl;
     }
   }
 }
@@ -376,6 +376,12 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
+  os << PrintRefinement{ref};
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
+  const auto& ref = printer.ref;
   if (ref.tags.size()) {
     for (const auto& tag : ref.tags) {
       os << "#" << tag << " ";
@@ -441,14 +447,15 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
     PrintBytes(os, Codec::Resolve(ref.interior_shape)->byte_size());
     os << ")";
   }
-  if (!ref.from.empty()) {
+  if (printer.block && !ref.from.empty()) {
     os << ", E";
-    PrintShapeDims(os, ref.exterior_shape.sizes(), ref.bank_dim);
+    auto exterior_shape = printer.block->exterior_shape(ref.into);
+    PrintShapeDims(os, exterior_shape.sizes(), ref.bank_dim);
     os << ":";
-    PrintBytes(os, ref.exterior_shape.sizes_product_bytes());
-    if (!ref.exterior_shape.codec.empty()) {
+    PrintBytes(os, exterior_shape.sizes_product_bytes());
+    if (!exterior_shape.codec.empty()) {
       os << "(";
-      PrintBytes(os, Codec::Resolve(ref.exterior_shape)->byte_size());
+      PrintBytes(os, Codec::Resolve(exterior_shape)->byte_size());
       os << ")";
     }
   }
@@ -763,7 +770,6 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
       ref.access.emplace_back(FromProto(pb_off));
     }
     ref.interior_shape = tile::FromProto(pb_ref.interior_shape());
-    ref.exterior_shape = tile::FromProto(pb_ref.exterior_shape());
     ref.agg_op = pb_ref.agg_op();
     ref.location = FromProto(pb_ref.loc());
     ref.offset = pb_ref.offset();
@@ -917,7 +923,6 @@ proto::Block IntoProto(const Block& block) {
       *pb_ref->add_access() = IntoProto(access);
     }
     *pb_ref->mutable_interior_shape() = IntoProto(ref.interior_shape);
-    *pb_ref->mutable_exterior_shape() = IntoProto(ref.exterior_shape);
     pb_ref->set_agg_op(ref.agg_op);
     *pb_ref->mutable_loc() = IntoProto(ref.location);
     pb_ref->set_offset(ref.offset);
@@ -1119,25 +1124,13 @@ std::string Block::unique_idx_name(const std::string& name) const {
   return "";
 }
 
-TensorShape Block::exterior_shape(const std::string& into, const TensorShape& outer_shape) const {
+TensorShape Block::exterior_shape(const std::string& into) const {
   auto it = ref_by_into(into);
-  if (it->interior_shape.dims.size() != outer_shape.dims.size()) {
-    throw_with_trace(std::runtime_error(str(
-        boost::format("outer_shape.dims.size() != interior_shape.dims.size() on block '%s', ref: %s") % name % into)));
-  }
   std::map<std::string, size_t> idx_ranges;
   for (const auto& idx : idxs) {
     idx_ranges.emplace(idx.name, idx.range);
   }
-  auto shape = it->ApplyTile(idx_ranges);
-  // constrain the exterior_shape by the outer_shape
-  // TODO: This currently causes correctness issue on the GPU
-  /*
-  for (size_t i = 0; i < shape.dims.size(); i++) {
-    shape.dims[i].size = std::min(shape.dims[i].size, outer_shape.dims[i].size);
-  }
-  */
-  return shape;
+  return it->ApplyTile(idx_ranges);
 }
 
 Affine Refinement::FlatAccess() const {

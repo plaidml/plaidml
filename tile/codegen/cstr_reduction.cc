@@ -22,12 +22,15 @@ static void EvaluatePolynomial(const Polynomial<int64_t> orig_poly, const AliasM
   const std::map<std::string, uint64_t>& idx_ranges = alias_map.idx_ranges();
 
   for (const auto& kvp : var_map) {
-    if (kvp.first == "") continue;
+    if (kvp.first == "") {
+      continue;
+    }
     uint64_t range = idx_ranges.at(kvp.first);
-    if (kvp.second >= 0)
+    if (kvp.second >= 0) {
       max += kvp.second * (range - 1);
-    else
+    } else {
       min += kvp.second * (range - 1);
+    }
   }
   *min_value = min;
   *max_value = max + 1;
@@ -35,7 +38,9 @@ static void EvaluatePolynomial(const Polynomial<int64_t> orig_poly, const AliasM
 
 bool IsStencilIndex(Index* idx) {
   for (const auto& tag : idx->tags) {
-    if (tag.size() > 8 && tag.substr(0, 8) == "stencil_") return true;
+    if (tag.rfind("stencil_", 0) == 0) {
+      return true;
+    }
   }
   return false;
 }
@@ -43,7 +48,9 @@ bool IsStencilIndex(Index* idx) {
 void LightCstrReduction(const AliasMap& alias_map, Block* block) {
   IVLOG(4, "Start light-weight constraint reduction.");
 
-  if (block->constraints.empty()) return;
+  if (block->constraints.empty()) {
+    return;
+  }
 
   IVLOG(4, "Index: " << block->idxs);
   IVLOG(4, "AliasMap.idx_ranges_: " << alias_map.idx_ranges());
@@ -80,9 +87,13 @@ void LightCstrReduction(const AliasMap& alias_map, Block* block) {
     // So x <= rest / c <= max_value / c
     // If max_value / c + 1 < x's current range, we can reduce the range
     for (const auto& kvp : constraint.getMap()) {
-      if (kvp.first == "") continue;
+      if (kvp.first == "") {
+        continue;
+      }
       Index* idx = block->idx_by_name(kvp.first);
-      if (IsStencilIndex(idx)) continue;
+      if (IsStencilIndex(idx)) {
+        continue;
+      }
       int64_t coeff = -kvp.second;
       if (idx->affine.getMap().empty() && coeff > 0) {
         uint64_t range = idx->range;
@@ -110,7 +121,9 @@ static Polynomial<Rational> PolynomialIntToRational(const Polynomial<int64_t>& s
   Polynomial<Rational> dest;
   const std::map<std::string, int64_t>& src_map = src.getMap();
   std::map<std::string, Rational>& dest_map = dest.mutateMap();
-  for (const auto& element : src_map) dest_map.emplace(element.first, Rational(element.second));
+  for (const auto& element : src_map) {
+    dest_map.emplace(element.first, Rational(element.second));
+  }
   return dest;
 }
 
@@ -121,18 +134,24 @@ static RangeConstraint ConstraintToRangeConstraint(const Polynomial<int64_t>& or
 
 static inline size_t BlockDepth(std::string idx) {
   size_t pos = idx.find(':');
-  if (pos == std::string::npos) return (size_t)-1;
+  if (pos == std::string::npos) {
+    return (size_t)-1;
+  }
   return std::stoi(idx.substr(1, pos - 1));
 }
 
 static inline std::string IdxPostfix(std::string idx) {
   size_t pos = idx.find(':');
-  if (pos == std::string::npos) return "";
+  if (pos == std::string::npos) {
+    return "";
+  }
   return idx.substr(pos + 1);
 }
 
 void IlpCstrReduction(const AliasMap& alias_map, Block* block) {
-  if (block->constraints.empty()) return;
+  if (block->constraints.empty()) {
+    return;
+  }
 
   IVLOG(4, "Start constraint reduction using ILP.");
 
@@ -143,7 +162,9 @@ void IlpCstrReduction(const AliasMap& alias_map, Block* block) {
   for (const auto& constraint : block->constraints) {
     Polynomial<int64_t> new_cstr = constraint.sym_eval(alias_map.idx_sources());
     for (const auto& idx : new_cstr.getMap())
-      if (idx.first != "") used_idx.insert(idx.first);
+      if (idx.first != "") {
+        used_idx.insert(idx.first);
+      }
     IVLOG(4, "Constraint: " << new_cstr << " >= 0");
     constraints.emplace_back(ConstraintToRangeConstraint(new_cstr));
   }
@@ -180,7 +201,9 @@ void IlpCstrReduction(const AliasMap& alias_map, Block* block) {
     for (const auto& objective : objectives) {
       const std::string& idx_name = objective.getMap().begin()->first;
       Index* idx = block->idx_by_name(IdxPostfix(idx_name));
-      if (IsStencilIndex(idx)) continue;
+      if (IsStencilIndex(idx)) {
+        continue;
+      }
       uint64_t new_range = static_cast<uint64_t>(Floor(-results[objective].obj_val)) + 1;
       if (new_range < idx->range) {
         IVLOG(4, "Reduce range of " << idx_name << " from " << idx->range << " to " << new_range);
