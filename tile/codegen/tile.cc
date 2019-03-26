@@ -197,12 +197,10 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
         }
       }
     }
-    // Fix the sizes on the inner block
-    ref.exterior_shape = inner->exterior_shape(ref.into, ref.exterior_shape);
   }
   for (auto& ref : outer->refs) {
     // Fix the sizes on the outer block
-    ref.interior_shape = inner->exterior_shape(ref.into, ref.exterior_shape);
+    ref.interior_shape = inner->exterior_shape(ref.into);
     const auto& zeros = zero_points[ref.into];
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& aff = ref.access[i];

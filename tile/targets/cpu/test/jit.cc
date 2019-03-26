@@ -30,7 +30,6 @@ TEST(Jit, JitIntrinsicMUL_F32) {
       dir: 3
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       access { }
     }
     refs {
@@ -38,7 +37,6 @@ TEST(Jit, JitIntrinsicMUL_F32) {
       dir: 3
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       access { }
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -66,7 +64,6 @@ TEST(Jit, JitIntrinsicADD_F32) {
       dir: 3
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       access { }
     }
     refs {
@@ -74,7 +71,6 @@ TEST(Jit, JitIntrinsicADD_F32) {
       dir: 3
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       access { }
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -111,7 +107,6 @@ TEST(Jit, JitSimpleLoop) {
       into: "bufA"
       access { offset: 0 terms {key: "i" value: 1} }
       interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
       loc {}
@@ -119,7 +114,6 @@ TEST(Jit, JitSimpleLoop) {
       into: "bufB"
       access { offset: 0 terms {key: "i" value: 1} }
       interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     stmts { load { from:"bufA" into:"$1" } }
     stmts { store { from:"$1" into:"bufB"} }
@@ -155,7 +149,6 @@ TEST(Jit, JitCopy2D) {
       into: "bufA"
       access { offset: 0 terms {key:"j" value:1} }
       interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
       loc {}
@@ -164,7 +157,6 @@ TEST(Jit, JitCopy2D) {
       access { offset: 0 terms {key:"i" value:1} }
       access { offset: 0 terms {key:"j" value:1} }
       interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
     }
     stmts { load { from:"bufA" into:"$1" } }
     stmts { store { from:"$1" into:"bufB"} }
@@ -208,7 +200,6 @@ TEST(Jit, JitAggSum2D) {
       into: "bufA"
       access { offset: 0 terms {key:"j" value:1} }
       interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
       loc {}
@@ -218,7 +209,6 @@ TEST(Jit, JitAggSum2D) {
       access { offset: 0 terms {key:"i" value:1} }
       access { offset: 0 terms {key:"j" value:1} }
       interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
     }
     stmts { load { from:"bufA" into:"$1" } }
     stmts { store { from:"$1" into:"bufB"} }
@@ -321,7 +311,6 @@ TEST(Jit, JitNestedAlloc) {
       into: "bufA"
       access { offset: 0 terms {key:"j" value:1} }
       interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:5 stride:1} }
     }
     refs {
       loc {}
@@ -331,7 +320,6 @@ TEST(Jit, JitNestedAlloc) {
       access { offset: 0 terms {key:"i" value:1} }
       access { offset: 0 terms {key:"j" value:1} }
       interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
     }
     stmts { block {
       refs {
@@ -339,7 +327,6 @@ TEST(Jit, JitNestedAlloc) {
         dir: 3
         into: "bufA"
         interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-        exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
         access { }
       }
       refs {
@@ -348,14 +335,12 @@ TEST(Jit, JitNestedAlloc) {
         into: "bufB"
         agg_op: "add"
         interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-        exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
         access { }
       }
       refs {
         dir: 0
         into: "bufTemp"
         interior_shape { type: INT32 dims: {size:5 stride:1} }
-        exterior_shape { type: INT32 dims: {size:5 stride:1} }
         access { }
       }
       stmts { load { from:"bufA" into:"$1" } }

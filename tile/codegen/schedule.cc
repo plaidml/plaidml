@@ -815,7 +815,7 @@ void Scheduler::Run() {
         LOG(WARNING) << "The program simultaneously requires:";
       }
       for (const auto& io : ios) {
-        LOG(WARNING) << "  " << io.ri->ref;
+        LOG(WARNING) << "  " << stripe::PrintRefinement{io.ri->ref, current_block};
       }
       throw_with_trace(error::ResourceExhausted{"Program requires more memory than is available"});
     }
@@ -928,7 +928,6 @@ void Scheduler::Run() {
               internal_swap_backing_ref_name,  // into
               ent->source->alias_info.access,  // access
               ent->source->alias_info.shape,   // interior_shape
-              ent->source->alias_info.shape,   // exterior_shape (FIXME)
               "",                              // agg_op
               ent->source->ref.location,       // location
               0,                               // offset
@@ -1560,16 +1559,15 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
   swap_block.refs.push_back(stripe::Refinement{
-      stripe::RefDir::In,                 // dir
-      ent->source->ref.into,              // from
-      "src",                              // into
-      ent->source->ref_swap_access,       // access
-      ent->source->ref_swap_shape,        // interior_shape
-      ent->source->exterior_cache_shape,  // exterior_shape
-      "",                                 // agg_op
-      ent->source->ref.location,          // location
-      0,                                  // offset
-      ent->source->ref.bank_dim,          // bank_dim
+      stripe::RefDir::In,            // dir
+      ent->source->ref.into,         // from
+      "src",                         // into
+      ent->source->ref_swap_access,  // access
+      ent->source->ref_swap_shape,   // interior_shape
+      "",                            // agg_op
+      ent->source->ref.location,     // location
+      0,                             // offset
+      ent->source->ref.bank_dim,     // bank_dim
   });
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
@@ -1579,7 +1577,6 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       "dst",                           // into
       ent->source->cache_swap_access,  // access
       ent->source->cache_swap_shape,   // interior_shape
-      ent->shape,                      // exterior_shape
       "",                              // agg_op
       banked_mem_loc,                  // location
       0,                               // offset
@@ -1618,7 +1615,6 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       "src",                           // into
       ent->source->cache_swap_access,  // access
       ent->source->cache_swap_shape,   // interior_shape
-      ent->shape,                      // exterior_shape
       "",                              // agg_op
       banked_mem_loc,                  // location
       0,                               // offset
@@ -1626,16 +1622,15 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
   });
 
   swap_block.refs.push_back(stripe::Refinement{
-      stripe::RefDir::Out,                // dir
-      ent->source->ref.into,              // from
-      "dst",                              // into
-      ent->source->ref_swap_access,       // access
-      ent->source->ref_swap_shape,        // interior_shape
-      ent->source->exterior_cache_shape,  // exterior_shape
-      "",                                 // agg_op
-      ent->source->ref.location,          // location
-      0,                                  // offset
-      ent->source->ref.bank_dim,          // bank_dim
+      stripe::RefDir::Out,           // dir
+      ent->source->ref.into,         // from
+      "dst",                         // into
+      ent->source->ref_swap_access,  // access
+      ent->source->ref_swap_shape,   // interior_shape
+      "",                            // agg_op
+      ent->source->ref.location,     // location
+      0,                             // offset
+      ent->source->ref.bank_dim,     // bank_dim
   });
 
   for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
@@ -1690,7 +1685,6 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       "src",                        // into
       local_src_access,             // access
       ent->source->ref_swap_shape,  // interior_shape
-      ent->source->ref_swap_shape,  // exterior_shape (FIXME)
       "",                           // agg_op
       ent->source->ref.location,    // location
       0,                            // offset
@@ -1704,7 +1698,6 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       "dst",                          // into
       local_dst_access,               // access
       ent->source->cache_swap_shape,  // interior_shape
-      ent->source->cache_swap_shape,  // exterior_shape (FIXME)
       "",                             // agg_op
       banked_mem_loc,                 // location
       0,                              // offset
@@ -1753,7 +1746,6 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       "src",                          // into
       local_src_access,               // access
       ent->source->cache_swap_shape,  // interior_shape
-      ent->source->cache_swap_shape,  // exterior_shape (FIXME)
       "",                             // agg_op
       banked_mem_loc,                 // location
       0,                              // offset
@@ -1766,7 +1758,6 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       "dst",                        // into
       local_dst_access,             // access
       ent->source->ref_swap_shape,  // interior_shape
-      ent->source->ref_swap_shape,  // exterior_shape (FIXME)
       "",                           // agg_op
       ent->source->ref.location,    // location
       0,                            // offset

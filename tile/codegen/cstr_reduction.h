@@ -18,16 +18,24 @@ void LightCstrReduction(const AliasMap& alias_map, stripe::Block* block);
 
 inline void LightCstrReductionPass(stripe::Block* root, const proto::GenericPass& options) {
   auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocks(root, reqs, [](const AliasMap& alias_map, stripe::Block* block) { LightCstrReduction(alias_map, block); },
-              true);
+  RunOnBlocks(
+      root, reqs,
+      [](const AliasMap& alias_map, stripe::Block* block) {  //
+        LightCstrReduction(alias_map, block);
+      },
+      true);
 }
 
 void IlpCstrReduction(const AliasMap& alias_map, stripe::Block* block);
 
 inline void IlpCstrReductionPass(stripe::Block* root, const proto::GenericPass& options) {
   auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocks(root, reqs, [](const AliasMap& alias_map, stripe::Block* block) { IlpCstrReduction(alias_map, block); },
-              true);
+  RunOnBlocks(
+      root, reqs,
+      [](const AliasMap& alias_map, stripe::Block* block) {  //
+        IlpCstrReduction(alias_map, block);
+      },
+      true);
 }
 
 }  // namespace codegen

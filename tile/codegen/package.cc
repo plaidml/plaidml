@@ -53,8 +53,12 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
           continue;
         }
         auto outer_ref = outer->ref_by_into(inner_ref.from);
-        pkg->refs.emplace(pkg->refs.end(), inner_ref.dir, inner_ref.from, inner_ref.from, outer_ref->access,
-                          outer_ref->interior_shape, outer_ref->interior_shape);
+        pkg->refs.emplace(pkg->refs.end(),
+                          stripe::Refinement{inner_ref.dir,                // dir
+                                             inner_ref.from,               // from
+                                             inner_ref.from,               // into
+                                             outer_ref->access,            // access
+                                             outer_ref->interior_shape});  // interior_shape
       }
       stmt = std::move(pkg);
     }

@@ -26,13 +26,11 @@ TEST(DepsTest, SmallDepMix) {
           into: "b1"
           loc {}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
-          exterior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
         }
         refs {
           into: "b2"
           loc {}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-          exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
         }
         stmts { load { from:"b1" into:"$1" } }
         stmts { store { from:"$1" into:"b2" } }
@@ -62,13 +60,11 @@ TEST(DepsTest, SmallDepMix) {
           into: "b1"
           loc {}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
-          exterior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
         }
         refs {
           into: "b2"
           loc {}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-          exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
         }
         stmts { load { from:"b1" into:"$1" } }
         stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -91,7 +87,6 @@ TEST(DepsTest, Subregion) {
       into: "buf"
       access [ { offset: 0 }, { offset: 0 } ]
       interior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
-      exterior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
       loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
     }
     stmts {
@@ -102,21 +97,18 @@ TEST(DepsTest, Subregion) {
           from: "buf" into: "b1" dir: In
           access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
           interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
         }
         refs {
           from: "buf" into: "b2" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
           interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
         }
         refs {
           from: "buf" into: "b3" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
           interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { devs: [{name: "RAM", units: [{offset: 1}]}] }
         }
         stmts { constant { name:"$1" iconst: 0 } }
@@ -140,7 +132,6 @@ TEST(DepsTest, Subregion) {
       into: "buf"
       access [ { offset: 0 }, { offset: 0 } ]
       interior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
-      exterior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
       loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
     }
     stmts {
@@ -152,21 +143,18 @@ TEST(DepsTest, Subregion) {
           from: "buf" into: "b1" dir: In
           access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
           interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
         }
         refs {
           from: "buf" into: "b2" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
           interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
         }
         refs {
           from: "buf" into: "b3" dir: In
           access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
           interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          exterior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
           loc { devs: [{name: "RAM", units: [{offset: 1}]}] }
         }
         stmts { constant { name:"$1" iconst: 0 } }

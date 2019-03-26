@@ -63,7 +63,6 @@ void ApplyCache(const AliasMap& map,          //
       "src",              // into
       xfer_access,        // access
       cached_xfer_shape,  // interior_shape
-      cached_ts,          // exterior_shape
       "",                 // agg_op
       it->location,       // location
       it->offset,         // offset
@@ -75,7 +74,6 @@ void ApplyCache(const AliasMap& map,          //
       "dst",              // into
       xfer_access,        // access
       cached_xfer_shape,  // interior_shape
-      cached_ts,          // exterior_shape
       "",                 // agg_op
       it->location,       // location
       it->offset,         // offset
@@ -90,7 +88,6 @@ void ApplyCache(const AliasMap& map,          //
     cache_load->tags = {"cache", "cache_load"};
     cache_load->refs[0].from = raw_name;
     cache_load->refs[0].interior_shape = raw_xfer_shape;
-    cache_load->refs[0].exterior_shape = raw_ts;
     cache_load->refs[1].location = mem_loc;
     block->stmts.emplace_front(cache_load);
   }
@@ -101,7 +98,6 @@ void ApplyCache(const AliasMap& map,          //
     cache_store->tags = {"cache", "cache_store"};
     cache_store->refs[1].from = raw_name;
     cache_store->refs[1].interior_shape = raw_xfer_shape;
-    cache_store->refs[1].exterior_shape = raw_ts;
     cache_store->refs[0].location = mem_loc;
     block->stmts.emplace_back(cache_store);
   }
@@ -112,7 +108,6 @@ void ApplyCache(const AliasMap& map,          //
       var_name,      // into
       {},            // access
       cached_ts,     // interior_shape
-      cached_ts,     // exterior_shape
       it->agg_op,    // agg_op
       mem_loc,       // location
   });

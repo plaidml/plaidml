@@ -23,13 +23,11 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
       loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_1"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -51,13 +49,11 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
       loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_1"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -74,13 +70,11 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
       loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_1"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -104,13 +98,11 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
       loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_1"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
       offset: 16
     }
     stmts { load { from:"b1" into:"$1" } }
@@ -129,13 +121,11 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
       loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_2"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -159,13 +149,11 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
       loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_2"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -183,19 +171,16 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
       loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_2"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_2"}]}
       into: "b3"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
@@ -219,19 +204,16 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
       loc { devs: [{name: "loc_1"}]}
       into: "b1"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_2"}]}
       into: "b2"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     refs {
       loc { devs: [{name: "loc_2"}]}
       into: "b3"
       interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      exterior_shape { type: FLOAT32 dims: {size:1 stride:1} }
     }
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
