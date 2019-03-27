@@ -12,6 +12,11 @@ namespace tile {
 namespace sem {
 namespace builder {
 
+template <typename T>
+inline std::shared_ptr<IntConst> _Const(T x) {
+  return std::make_shared<IntConst>(x);
+}
+
 // A DSL for building semantic trees
 
 class LValueHolder {
@@ -92,11 +97,6 @@ inline std::shared_ptr<Function> _Function(const std::string& name, const Type& 
                                            std::initializer_list<StmtPtr> body) {
   return std::make_shared<Function>(name, ret, std::vector<Function::param_t>(params),
                                     std::make_shared<Block>(std::vector<StmtPtr>(body)));
-}
-
-template <typename T>
-inline std::shared_ptr<IntConst> _Const(T x) {
-  return std::make_shared<IntConst>(x);
 }
 
 inline std::shared_ptr<FloatConst> _Const(double x) { return std::make_shared<FloatConst>(x); }

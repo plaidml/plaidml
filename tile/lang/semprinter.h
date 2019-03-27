@@ -19,6 +19,7 @@ class Print : public Visitor {
   void Visit(const LookupLVal&) override;
   void Visit(const LoadExpr&) override;
   void Visit(const StoreStmt&) override;
+  void Visit(const CallStmt&) override;
   void Visit(const SubscriptLVal&) override;
   void Visit(const DeclareStmt&) override;
   void Visit(const UnaryExpr&) override;

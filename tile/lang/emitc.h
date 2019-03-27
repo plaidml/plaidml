@@ -16,6 +16,7 @@ class EmitC : public sem::Visitor {
   void Visit(const sem::LookupLVal&) override;
   void Visit(const sem::LoadExpr&) override;
   void Visit(const sem::StoreStmt&) override;
+  void Visit(const sem::CallStmt&) override;
   void Visit(const sem::SubscriptLVal&) override;
   void Visit(const sem::DeclareStmt&) override;
   void Visit(const sem::UnaryExpr&) override;

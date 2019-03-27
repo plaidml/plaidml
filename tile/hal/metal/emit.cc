@@ -107,6 +107,12 @@ class Emitter : public sem::Visitor {
     emit(";\n");
   }
 
+  void Visit(const sem::CallStmt& node) {
+    emitTab();
+    node.call_expr->Accept(*this);
+    emit(";\n");
+  }
+
   void Visit(const sem::SubscriptLVal& node) {
     node.ptr->Accept(*this);
     emit("[");

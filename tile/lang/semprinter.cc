@@ -99,6 +99,12 @@ void Print::Visit(const StoreStmt& n) {
   emit(";\n");
 }
 
+void Print::Visit(const CallStmt& n) {
+  emitTab();
+  n.call_expr->Accept(*this);
+  emit(";\n");
+}
+
 void Print::Visit(const SubscriptLVal& n) {
   n.ptr->Accept(*this);
   emit("[");

@@ -50,6 +50,8 @@ void LoadExpr::Accept(Visitor& v) const { v.Visit(*this); }
 
 void StoreStmt::Accept(Visitor& v) const { v.Visit(*this); }
 
+void CallStmt::Accept(Visitor& v) const { v.Visit(*this); }
+
 void SubscriptLVal::Accept(Visitor& v) const { v.Visit(*this); }
 
 void DeclareStmt::Accept(Visitor& v) const { v.Visit(*this); }
@@ -101,7 +103,9 @@ CallExpr::CallExpr(ExprPtr f, const std::vector<ExprPtr>& v) : vals(v) {
   };
   auto it = functions.find(name);
   if (it == functions.end()) {
-    throw std::runtime_error("Unable to find function mapping for: " + name);
+    function = Function::OTHER;
+    return;
+    // throw std::runtime_error("Unable to find function mapping for: " + name);
   }
   function = it->second;
 }
