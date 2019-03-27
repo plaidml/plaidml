@@ -13,12 +13,41 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-SemtreeEmitter::SemtreeEmitter(const AliasMap& am, size_t threads)
+sem::ExprPtr SemtreeEmitter::default_intrinsic_emitter(const stripe::Intrinsic& in) {
+  static auto bin_ops = lang::BinaryOpMap();
+  auto in_val = [this, in](size_t i) { return _(scalar_name(in.inputs[i])); };
+  auto in_cast = [this, in](size_t i) { return _Cast({sem::Type::VALUE, in.type}, _(scalar_name(in.inputs[i]))); };
+  sem::ExprPtr opexpr;
+  if (in.inputs.size() == 2 && in.outputs.size() == 1 && bin_ops.count(in.name)) {
+    opexpr = std::make_shared<sem::BinaryExpr>(bin_ops.at(in.name), in_cast(0), in_cast(1));
+  } else if (in.name == "assign" || in.name == "ident" || in.name == "reshape" || in.name == "as_float" ||
+             in.name == "as_int" || in.name == "as_uint") {
+    opexpr = in_cast(0);
+  } else if (in.name == "cond") {
+    opexpr = _Cond(in_val(0), in_cast(1), in_cast(2));
+  } else if (in.name == "neg") {
+    opexpr = -in_cast(0);
+  } else if (in.name == "bit_not") {
+    opexpr = std::make_shared<sem::UnaryExpr>("~", in_val(0));
+  } else {
+    std::vector<sem::ExprPtr> inputs;
+    for (const auto& str : in.inputs) {
+      inputs.push_back(_(scalar_name(str)));
+    }
+    opexpr = std::make_shared<sem::CallExpr>(_(in.name), inputs);
+  }
+  return opexpr;
+}
+
+SemtreeEmitter::SemtreeEmitter(const AliasMap& am, size_t threads)  //
     : threads_(threads), lid_limits_({1024 * 1024, 1024 * 1024, 1024 * 1024}) {
   loop_mul_ = 1;
   scopes_.emplace_back(am);
   scope_ = &scopes_.back();
   max_block_id_ = 0;
+  for (const auto& spec : hal::opencl::ocl_intrinsics) {
+    intrinsics_.add(spec);
+  }
 }
 
 std::string SemtreeEmitter::generate_name(const std::string& prefix) const {
@@ -234,29 +263,12 @@ void SemtreeEmitter::Visit(const stripe::Special& spec) {
 }
 
 void SemtreeEmitter::Visit(const stripe::Intrinsic& in) {
-  static auto bin_ops = lang::BinaryOpMap();
-  auto in_val = [this, &in](size_t i) { return _(scalar_name(in.inputs[i])); };
-  auto in_cast = [this, &in](size_t i) { return _Cast({sem::Type::VALUE, in.type}, _(scalar_name(in.inputs[i]))); };
   sem::ExprPtr opexpr;
-  if (in.inputs.size() == 2 && in.outputs.size() == 1 && bin_ops.count(in.name)) {
-    opexpr = std::make_shared<sem::BinaryExpr>(bin_ops.at(in.name), in_cast(0), in_cast(1));
-  } else if (in.name == "assign" || in.name == "ident" || in.name == "reshape" || in.name == "as_float" ||
-             in.name == "as_int" || in.name == "as_uint") {
-    opexpr = in_cast(0);
-  } else if (in.name == "cond") {
-    opexpr = _Cond(in_val(0), in_cast(1), in_cast(2));
-  } else if (in.name == "neg") {
-    opexpr = -in_cast(0);
-  } else if (in.name == "bit_not") {
-    opexpr = std::make_shared<sem::UnaryExpr>("~", in_val(0));
+  if (intrinsics_.exist(in.name)) {
+    opexpr = intrinsics_.emit(in);
   } else {
-    std::vector<sem::ExprPtr> inputs;
-    for (const auto& str : in.inputs) {
-      inputs.push_back(_(scalar_name(str)));
-    }
-    opexpr = std::make_shared<sem::CallExpr>(_(in.name), inputs);
+    opexpr = default_intrinsic_emitter(in);
   }
-  IVLOG(1, "Pushing back on " << in.outputs[0]);
   tot_ops_ += loop_mul_;
   cur_->push_back(_Declare({sem::Type::VALUE, in.type}, scalar_name(in.outputs[0]), opexpr));
 }
@@ -369,6 +381,76 @@ sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
   return top;
 }
 
+void SemtreeEmitter::init_loop(const std::string& buf, DataType type,  //
+                               size_t size, const sem::ExprPtr& init) {
+  if (size < threads_ * 2) {
+    auto while_loop = _Block({});
+    while_loop->push_back(_Declare({sem::Type::INDEX}, "_init_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
+    while_loop->push_back(_While(_("_init_") < _Const(size),
+                                 _Block({_(ref_name(buf))[_("_init_")] = init, _("_init_") = _("_init_") + threads_})));
+    cur_->push_front(while_loop);
+  } else {
+    size_t vec_size = size / threads_;
+    if (vec_size > 8) {
+      vec_size = 16;
+    } else if (vec_size > 4) {
+      vec_size = 8;
+    } else if (vec_size > 2) {
+      vec_size = 4;
+    }  // else vec_size is 2
+
+    size_t align_size = (size / vec_size) * vec_size;
+    // We process buf[0..align_size-1] using vectors first
+    auto inner = _Block({});
+    LValueHolder fname = _("vstore" + std::to_string(vec_size));
+    auto outer = _Block({});
+    sem::Type ptype = {sem::Type::POINTER_MUT, type, 1, 0, sem::Type::NORMAL};
+    sem::Type vptype = {sem::Type::POINTER_MUT, type, vec_size, 0, sem::Type::NORMAL};
+    sem::Type vtype = {sem::Type::VALUE, type, vec_size, 0, sem::Type::NORMAL};
+    outer->push_back(_Declare({sem::Type::INDEX}, "_thread_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
+    outer->push_back(_Declare(vtype, "_init_", init));
+    for (size_t i = 0; i < align_size / vec_size / threads_; i++) {
+      sem::StmtPtr call;
+      if (i > 0) {
+        call =
+            std::make_shared<sem::CallStmt>(fname(_("_init_"), _("_thread_") + _Const(i * threads_), _(ref_name(buf))));
+      } else {
+        call = std::make_shared<sem::CallStmt>(fname(_("_init_"), _("_thread_"), _(ref_name(buf))));
+      }
+      outer->push_back(call);
+    }
+
+    size_t last = align_size / vec_size / threads_;
+    if (align_size > last * vec_size * threads_) {
+      if (last > 0) {
+        outer->push_back(_Declare({sem::Type::INDEX}, "_next_", _("_thread_") + (last * threads_)));
+        sem::StmtPtr call = std::make_shared<sem::CallStmt>(fname(_("_init_"), _("_next_"), _(ref_name(buf))));
+        auto iftrue = _Block({call});
+        auto ifstmt = sem::builder::_If(_("_next_") < _Const(align_size / vec_size), iftrue);
+        outer->push_back(ifstmt);
+      } else {
+        sem::StmtPtr call = std::make_shared<sem::CallStmt>(fname(_("_init_"), _("_thread_"), _(ref_name(buf))));
+        auto iftrue = _Block({call});
+        auto ifstmt = sem::builder::_If(_("_thread_") < _Const(align_size / vec_size), iftrue);
+        outer->push_back(ifstmt);
+      }
+    }
+
+    // Then initialize buf[align_size..size-1]
+    // size - align_size < threads, so we do it in element-wise
+    // Use the last threads first because they may be not full
+    if (align_size < size) {
+      // for thread idx, it initializes buf[idx + size - threads_]
+      auto ifstmt = _Block({_Declare({sem::Type::INDEX}, "_buf_idx_", _("_thread_") + (size - threads_))});
+      auto iftrue = _Block({_(ref_name(buf))[_("_buf_idx_")] = init});
+      ifstmt->push_back(sem::builder::_If(_("_buf_idx_") >= _Const(align_size), iftrue));
+      outer->push_back(ifstmt);
+    }
+
+    cur_->push_front(outer);
+  }
+}
+
 void SemtreeEmitter::Visit(const stripe::Block& block) {
   std::shared_ptr<sem::Block> outer = cur_;
   if (block.has_tag("kernel")) {
@@ -450,12 +532,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       } else {
         if (init) {
           cur_->push_front(_Barrier());
-          // Threaded initialization of buffers
-          auto while_loop = _Block({});
-          while_loop->push_back(_Declare({sem::Type::INDEX}, "_init_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
-          while_loop->push_back(_While(_("_init_") < _Const(size), _Block({_(ref_name(ref.into))[_("_init_")] = init,
-                                                                           _("_init_") = _("_init_") + threads_})));
-          cur_->push_front(while_loop);
+          init_loop(ref.into, ref.interior_shape.type, size, init);
         }
         cur_->push_front(_Declare(ptype, ref_name(ref.into), sem::ExprPtr()));
       }

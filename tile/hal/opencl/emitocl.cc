@@ -185,6 +185,12 @@ void Emit::Visit(const sem::ClampExpr& n) {
   emit(")");
 }
 
+void Emit::Visit(const sem::CallStmt& n) {
+  emitTab();
+  n.call_expr->Accept(*this);
+  emit(";\n");
+}
+
 void Emit::Visit(const sem::CastExpr& n) { n.val->Accept(*this); }
 
 void Emit::Visit(const sem::CallExpr& n) {

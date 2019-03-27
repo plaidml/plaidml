@@ -4,6 +4,7 @@
 // provided to CG backends (LLVM, OpenCL, etc.)
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -95,6 +96,13 @@ struct StoreStmt : public Statement {
   void Accept(Visitor&) const final;
 };
 
+// A call statement return void type
+struct CallStmt : public Statement {
+  ExprPtr call_expr;
+  explicit CallStmt(const ExprPtr expr) : call_expr(expr) {}
+  void Accept(Visitor&) const final;
+};
+
 // Create LVAL reference to an array element
 struct SubscriptLVal : public LValue {
   LValPtr ptr;
@@ -183,7 +191,8 @@ struct CallExpr : public Expression {
     SINH,
     SQRT,
     TAN,
-    TANH
+    TANH,
+    OTHER
   };
   Function function;
   std::string name;
@@ -289,6 +298,7 @@ class Visitor {
   virtual void Visit(const LookupLVal&) = 0;
   virtual void Visit(const LoadExpr&) = 0;
   virtual void Visit(const StoreStmt&) = 0;
+  virtual void Visit(const CallStmt&) = 0;
   virtual void Visit(const SubscriptLVal&) = 0;
   virtual void Visit(const DeclareStmt&) = 0;
   virtual void Visit(const UnaryExpr&) = 0;

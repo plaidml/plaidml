@@ -62,6 +62,8 @@ class Simplifier : public Visitor {
     const_cast<StoreStmt&>(node).rhs = EvalExpr(node.rhs);
   }
 
+  void Visit(const CallStmt& node) override {}
+
   void Visit(const SubscriptLVal& node) override {
     ref_ = Resolve(node.ptr);
     const_cast<SubscriptLVal&>(node).offset = EvalExpr(node.offset);

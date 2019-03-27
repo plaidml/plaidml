@@ -91,6 +91,12 @@ void EmitC::Visit(const sem::StoreStmt& n) {
   emit(";\n");
 }
 
+void EmitC::Visit(const sem::CallStmt& n) {
+  emitTab();
+  n.call_expr->Accept(*this);
+  emit(";\n");
+}
+
 void EmitC::Visit(const sem::SubscriptLVal& n) {
   n.ptr->Accept(*this);
   emit("[");

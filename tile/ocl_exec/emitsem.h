@@ -10,7 +10,9 @@
 
 #include "tile/codegen/alias.h"
 #include "tile/lang/generate.h"
+#include "tile/lang/intrinsic.h"
 #include "tile/lang/semtree.h"
+#include "tile/ocl_exec/intrinsic.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -44,6 +46,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void Visit(const stripe::Intrinsic&);
   void Visit(const stripe::Block&);
 
+  sem::ExprPtr default_intrinsic_emitter(const stripe::Intrinsic& in);
   std::string generate_name(const std::string& prefix) const;
   std::string safe_name(const std::string& in) const;
   std::string ref_name(const std::string& in) const;
@@ -55,6 +58,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   sem::StmtPtr add_loops(const stripe::Block&);
   void do_gids(const stripe::Block&);
   sem::StmtPtr do_lids(const stripe::Block&);
+  void init_loop(const std::string& buf, DataType type, size_t size, const sem::ExprPtr& init);
 
   size_t threads_;
   size_t loop_mul_;
@@ -77,6 +81,8 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   std::set<std::string> defined_idx_;
   // current outside loops
   std::vector<LoopInfo> loop_info_;
+  // Intrinsic list and emitters
+  lang::IntrinsicList intrinsics_;
   lang::KernelList kernels_;
 };
 

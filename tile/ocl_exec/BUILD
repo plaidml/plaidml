@@ -23,6 +23,8 @@ plaidml_cc_library(
     srcs = [
         "emitsem.cc",
         "emitsem.h",
+        "intrinsic.cc",
+        "intrinsic.h",
         "stripe_gen.cc",
         "stripe_gen.h",
     ],

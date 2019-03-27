@@ -154,6 +154,8 @@ void ExprType::Visit(const sem::LoadExpr& n) {
 
 void ExprType::Visit(const sem::StoreStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
+void ExprType::Visit(const sem::CallStmt&) { throw std::logic_error{"Unexpected expression component"}; }
+
 void ExprType::Visit(const sem::SubscriptLVal& n) {
   n.ptr->Accept(*this);
   ty_.base = sem::Type::VALUE;
