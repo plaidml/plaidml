@@ -3,9 +3,10 @@
 #include <google/protobuf/util/json_util.h>
 
 #include <algorithm>
-#include <memory>
 #include <regex>
 #include <vector>
+
+#include <boost/format.hpp>
 
 #include "tile/lang/parser.h"
 #include "tile/proto/tile.pb.h"
@@ -50,7 +51,7 @@ std::shared_ptr<lang::TensorValue> MakeTensor(const TensorShape& shape) {
 
 TileFile::TileFile(const std::string& path) : archive_(path) {}
 
-lang::RunInfo TileFile::Load() {
+lang::RunInfo TileFile::Load(const std::vector<std::shared_ptr<SimpleBuffer>>& inputs) {
   auto metadata = ReadMetadata();
   auto code = archive_.OpenFile("code").ReadString();
 
@@ -100,7 +101,17 @@ lang::RunInfo TileFile::Load() {
         dim.size = 1;
       }
     }
-    applier.SetInput(input_name, MakeTensor(shape));
+    if (i < inputs.size()) {
+      const auto& buf = inputs.at(i);
+      if (buf->bytes.size() != shape.byte_size()) {
+        throw std::runtime_error(str(boost::format("Input buffer mismatch. Name: %s, Shape: %s, Size: %d") %
+                                     input_name % shape % buf->bytes.size()));
+      }
+      auto tensor = lang::TensorValue::make(buf, shape, false);
+      applier.SetInput(input_name, tensor);
+    } else {
+      applier.SetInput(input_name, MakeTensor(shape));
+    }
   }
 
   applier.SetDone();
