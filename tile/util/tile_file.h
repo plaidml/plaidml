@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -19,7 +20,7 @@ class TileFile {
  public:
   explicit TileFile(const std::string& path);
 
-  lang::RunInfo Load();
+  lang::RunInfo Load(const std::vector<std::shared_ptr<SimpleBuffer>>& inputs = {});
   metadata::proto::Metadata ReadMetadata();
   std::vector<float> GetTensorFloatData(const metadata::proto::Tensor& tensor);
 
