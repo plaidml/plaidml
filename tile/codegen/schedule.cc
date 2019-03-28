@@ -642,6 +642,7 @@ class Scheduler {
   stripe::Location xfer_loc_;
   std::map<RefInfoKey, RefInfo> ri_map_;
   std::unordered_map<stripe::Refinement*, std::vector<RefInfo*>> base_ref_aliases_;
+  const AliasMap* alias_map_;
 
   // A list of all of the CacheEntries we create during Run().  These
   // will be converted into Refinements at the end of scheduling.
@@ -706,7 +707,8 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
       mem_bytes_{options.mem_kib() * 1024},
       alignment_{options.alignment() ? options.alignment() : kDefaultAlignment},
       xfer_loc_(stripe::FromProto(options.xfer_loc())),
-      ri_map_{BuildRefInfoMap(block, alias_map)} {
+      ri_map_{BuildRefInfoMap(block, alias_map)},
+      alias_map_(alias_map) {
   for (auto& rikey_ri : ri_map_) {
     RefInfo* ri = &rikey_ri.second;
     std::vector<RefInfo*>* aliases = &base_ref_aliases_[ri->alias_info.base_ref];
@@ -1584,6 +1586,10 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       ent->source->ref.bank_dim,       // bank_dim
   });
 
+  for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
+    alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, ent->source->swap_idxs[i].name);
+  }
+
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
   swap_block.stmts.push_back(std::make_shared<stripe::Store>("$X", "dst"));
 
@@ -1632,6 +1638,10 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       ent->source->ref.bank_dim,          // bank_dim
   });
 
+  for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
+    alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, ent->source->swap_idxs[i].name);
+  }
+
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
   swap_block.stmts.push_back(std::make_shared<stripe::Store>("$X", "dst"));
 
@@ -1671,6 +1681,7 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
     swap_block.idxs.emplace_back(stripe::Index{iname, ent->shape.dims[i].size});
     local_src_access.emplace_back(stripe::Affine(iname) + access[i]);
     local_dst_access.emplace_back(stripe::Affine(iname));
+    alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, iname);
   }
 
   swap_block.refs.push_back(stripe::Refinement{
@@ -1732,6 +1743,7 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
     swap_block.idxs.emplace_back(stripe::Index{iname, ent->shape.dims[i].size});
     local_src_access.emplace_back(stripe::Affine(iname));
     local_dst_access.emplace_back(stripe::Affine(iname) + access[i]);
+    alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, iname);
   }
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});

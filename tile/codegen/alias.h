@@ -62,15 +62,25 @@ class AliasMap {
   stripe::Block* this_block() const { return this_block_; }
   // Get the parent block
   stripe::Block* parent_block() const { return parent_block_; }
+  // Add constraints to a block based on apparent iteration domain of extents
+  void AddConstraintForIndex(stripe::Block* block,         //
+                             const AliasInfo& alias_info,  //
+                             size_t idx,                   //
+                             const std::string& idx_name) const;
 
  private:
-  size_t depth_;                                // How deep is this AliasInfo
-  stripe::Block* this_block_;                   // The current block
-  stripe::Block* parent_block_;                 // Parent block if we want to remove/modify this block
-  std::map<std::string, AliasInfo> info_;       // Per buffer data
-  std::map<std::string, uint64_t> idx_ranges_;  // For each depth-prefixed index, what is it's range?
-  std::map<std::string, stripe::Affine>
-      idx_sources_;  // For each current index, how is it built from depth-prefixed indexes
+  // How deep is this AliasInfo
+  size_t depth_;
+  // The current block
+  stripe::Block* this_block_;
+  // Parent block if we want to remove/modify this block
+  stripe::Block* parent_block_;
+  // Per buffer data
+  std::map<std::string, AliasInfo> info_;
+  // For each depth-prefixed index, what is it's range?
+  std::map<std::string, uint64_t> idx_ranges_;
+  // For each current index, how is it built from depth-prefixed indexes
+  std::map<std::string, stripe::Affine> idx_sources_;
 };
 
 bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);
