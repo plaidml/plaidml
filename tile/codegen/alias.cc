@@ -221,6 +221,28 @@ stripe::Affine AliasMap::translate(const stripe::Affine& in) const {
   return out;
 }
 
+void AliasMap::AddConstraintForIndex(stripe::Block* block,         //
+                                     const AliasInfo& alias_info,  //
+                                     size_t idx,                   //
+                                     const std::string& idx_name) const {
+  int64_t top_index = alias_info.base_ref->interior_shape.dims[idx].size - 1;
+  bool underflow = alias_info.extents[idx].min < 0;
+  bool overflow = alias_info.extents[idx].max > top_index;
+  if (underflow || overflow) {
+    IVLOG(3, "AddConstraintForIndex: " << alias_info.base_name << ", " << idx_name);
+    IVLOG(4, "extents = " << alias_info.extents[idx] << ", top_index = " << top_index);
+    IVLOG(4, *block);
+    std::string global_idx_name = block->unique_idx_name(idx_name);
+    block->idxs.emplace_back(Index{global_idx_name, 1, translate(alias_info.access[idx])});
+    if (underflow) {
+      block->constraints.push_back(Affine(idx_name) + Affine(global_idx_name));
+    }
+    if (overflow) {
+      block->constraints.push_back(Affine(top_index) - Affine(idx_name) - Affine(global_idx_name));
+    }
+  }
+}
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
