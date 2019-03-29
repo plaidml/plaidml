@@ -65,20 +65,32 @@ TEST_F(GenStripeTest, ContractPlusElementwise) {
     loc {}
     refs [
       {
-        into:"X_I_0" access [{}, {}] loc {}
-        interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+        key:"X_I_0"
+        value: {
+          access [{}, {}] loc {}
+          interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+        }
       },
       {
-        into:"X_I_1" access [{}, {}] loc {}
-        interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+        key:"X_I_1"
+        value: {
+          access [{}, {}] loc {}
+          interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+        }
       },
       {
-        into:"X_T1" access [{}, {}] loc {}
-        interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+        key:"X_T1"
+        value: {
+          access [{}, {}] loc {}
+          interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+        }
       },
       {
-        into:"X_T2" access [{}, {}] loc {}
-        interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+        key:"X_T2"
+        value: {
+          access [{}, {}] loc {}
+          interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+        }
       }
     ]
     stmts [{
@@ -86,20 +98,32 @@ TEST_F(GenStripeTest, ContractPlusElementwise) {
         name:"main" loc {}
         refs [
           {
-            from:"X_I_0" into:"X_I_0" dir:In access [{}, {}] loc {}
-            interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+            key:"X_I_0"
+            value: {
+              from:"X_I_0" dir:In access [{}, {}] loc {}
+              interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+            }
           },
           {
-            from:"X_I_1" into:"X_I_1" dir:In access [{}, {}] loc {}
-            interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+            key:"X_I_1"
+            value: {
+              from:"X_I_1" dir:In access [{}, {}] loc {}
+              interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+            }
           },
           {
-            from:"X_T1" into:"X_T1" dir:InOut access [{}, {}] loc {}
-            interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+            key:"X_T1"
+            value: {
+              from:"X_T1" dir:InOut access [{}, {}] loc {}
+              interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+            }
           },
           {
-            from:"X_T2" into:"X_T2" dir:Out access [{}, {}] loc {} agg_op:"assign"
-            interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+            key:"X_T2"
+            value: {
+              from:"X_T2" dir:Out access [{}, {}] loc {} agg_op:"assign"
+              interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+            }
           }
         ]
         stmts [{
@@ -109,19 +133,28 @@ TEST_F(GenStripeTest, ContractPlusElementwise) {
             idxs [{name:"k" range:10 affine {}}, {name:"m" range:10 affine {}}, {name:"n", range: 10, affine {}}]
             refs [
               {
-                from:"X_I_0" into:"X_I_0" dir:In loc {}
-                interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
-                access [{terms:{key:"m" value:1}}, {terms:{key:"k" value:1}}]
+                key:"X_I_0"
+                value: {
+                  from:"X_I_0" dir:In loc {}
+                  interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
+                  access [{terms:{key:"m" value:1}}, {terms:{key:"k" value:1}}]
+                }
               },
               {
-                from:"X_I_1" into:"X_I_1" dir:In loc {}
-                interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
-                access [{terms:{key:"k" value:1}}, {terms:{key:"n" value:1}}]
+                key:"X_I_1"
+                value: {
+                  from:"X_I_1" dir:In loc {}
+                  interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
+                  access [{terms:{key:"k" value:1}}, {terms:{key:"n" value:1}}]
+                }
               },
               {
-                from:"X_T1" into:"X_T1" dir:Out loc {} agg_op:"add"
-                interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
-                access [{terms:{key:"m" value:1}}, {terms:{key:"n" value:1}}]
+                key:"X_T1"
+                value: {
+                  from:"X_T1" dir:Out loc {} agg_op:"add"
+                  interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
+                  access [{terms:{key:"m" value:1}}, {terms:{key:"n" value:1}}]
+                }
               }
             ]
             stmts [
@@ -138,14 +171,20 @@ TEST_F(GenStripeTest, ContractPlusElementwise) {
             idxs [{name:"i1" range:10 affine {}}, {name:"i2", range:10 affine {}}]
             refs [
               {
-                from:"X_T1" into:"X_T1" dir:In loc {}
-                interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
-                access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]
+                key:"X_T1"
+                value: {
+                  from:"X_T1" dir:In loc {}
+                  interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
+                  access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]
+                }
               },
               {
-                from:"X_T2" into:"X_T2" dir:Out loc {}
-                interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
-                access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]
+                key:"X_T2"
+                value: {
+                  from:"X_T2" dir:Out loc {}
+                  interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
+                  access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]
+                }
               }
             ]
             stmts [

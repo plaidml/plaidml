@@ -25,20 +25,26 @@ TEST(Jit, JitIntrinsicMUL_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
-    refs {
-      loc {}
-      dir: 3
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      access { }
-    }
-    refs {
-      loc {}
-      dir: 3
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      access { }
-    }
+    refs [
+      {
+        key: "b1"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          access { }
+        }
+      },
+      {
+        key: "b2"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          access { }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { load { from:"b2" into:"$2" } }
     stmts { intrinsic { name:"mul" type:FLOAT32 inputs:"$1" inputs:"$2" outputs:"$3"} }
@@ -59,20 +65,26 @@ TEST(Jit, JitIntrinsicADD_F32) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
-    refs {
-      loc {}
-      dir: 3
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      access { }
-    }
-    refs {
-      loc {}
-      dir: 3
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      access { }
-    }
+    refs [
+      {
+        key: "b1"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          access { }
+        }
+      },
+      {
+        key: "b2"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          access { }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { load { from:"b2" into:"$2" } }
     stmts { intrinsic { name:"add" type:FLOAT32 inputs:"$1" inputs:"$2" outputs:"$3"} }
@@ -100,21 +112,27 @@ TEST(Jit, JitSimpleLoop) {
     idxs {
       name: "i"
       range: 5
-    }
-    refs {
-      loc {}
-      dir: 3
-      into: "bufA"
-      access { offset: 0 terms {key: "i" value: 1} }
-      interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-    }
-    refs {
-      loc {}
-      dir: 3
-      into: "bufB"
-      access { offset: 0 terms {key: "i" value: 1} }
-      interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-    }
+      },
+    refs [
+      {
+        key: "bufA"
+        value {
+          loc {}
+          dir: 3
+          access { offset: 0 terms {key: "i" value: 1} }
+          interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
+        }
+      },
+      {
+        key: "bufB"
+        value {
+          loc {}
+          dir: 3
+          access { offset: 0 terms {key: "i" value: 1} }
+          interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"bufA" into:"$1" } }
     stmts { store { from:"$1" into:"bufB"} }
   )",
@@ -143,21 +161,27 @@ TEST(Jit, JitCopy2D) {
     loc {}
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
-    refs {
-      loc {}
-      dir: 3
-      into: "bufA"
-      access { offset: 0 terms {key:"j" value:1} }
-      interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-    }
-    refs {
-      loc {}
-      dir: 3
-      into: "bufB"
-      access { offset: 0 terms {key:"i" value:1} }
-      access { offset: 0 terms {key:"j" value:1} }
-      interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
-    }
+    refs [
+      {
+        key: "bufA"
+        value {
+          loc {}
+          dir: 3
+          access { offset: 0 terms {key:"j" value:1} }
+          interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
+        }
+      },
+      {
+        key: "bufB"
+        value {
+          loc {}
+          dir: 3
+          access { offset: 0 terms {key:"i" value:1} }
+          access { offset: 0 terms {key:"j" value:1} }
+          interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"bufA" into:"$1" } }
     stmts { store { from:"$1" into:"bufB"} }
   )",
@@ -194,22 +218,28 @@ TEST(Jit, JitAggSum2D) {
     loc {}
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
-    refs {
-      loc {}
-      dir: 3
-      into: "bufA"
-      access { offset: 0 terms {key:"j" value:1} }
-      interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-    }
-    refs {
-      loc {}
-      dir: 3
-      into: "bufB"
-      agg_op: "add"
-      access { offset: 0 terms {key:"i" value:1} }
-      access { offset: 0 terms {key:"j" value:1} }
-      interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
-    }
+    refs [
+      {
+        key: "bufA"
+        value {
+          loc {}
+          dir: 3
+          access { offset: 0 terms {key:"j" value:1} }
+          interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
+        }
+      },
+      {
+        key: "bufB"
+        value {
+          loc {}
+          dir: 3
+          agg_op: "add"
+          access { offset: 0 terms {key:"i" value:1} }
+          access { offset: 0 terms {key:"j" value:1} }
+          interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"bufA" into:"$1" } }
     stmts { store { from:"$1" into:"bufB"} }
   )",
@@ -305,44 +335,58 @@ TEST(Jit, JitNestedAlloc) {
     loc {}
     idxs { name: "i" range: 5 }
     idxs { name: "j" range: 5 }
-    refs {
-      loc {}
-      dir: 3
-      into: "bufA"
-      access { offset: 0 terms {key:"j" value:1} }
-      interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
-    }
-    refs {
-      loc {}
-      dir: 3
-      into: "bufB"
-      agg_op: "add"
-      access { offset: 0 terms {key:"i" value:1} }
-      access { offset: 0 terms {key:"j" value:1} }
-      interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
-    }
+    refs [
+      {
+        key: "bufA"
+        value {
+          loc {}
+          dir: 3
+          access { offset: 0 terms {key:"j" value:1} }
+          interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
+        }
+      },
+      {
+        key: "bufB"
+        value {
+          loc {}
+          dir: 3
+          agg_op: "add"
+          access { offset: 0 terms {key:"i" value:1} }
+          access { offset: 0 terms {key:"j" value:1} }
+          interior_shape { type: FLOAT32 dims: {size:5 stride:5} dims: {size:5 stride:1} }
+        }
+      }
+    ]
     stmts { block {
-      refs {
-        loc {}
-        dir: 3
-        into: "bufA"
-        interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-        access { }
-      }
-      refs {
-        loc {}
-        dir: 3
-        into: "bufB"
-        agg_op: "add"
-        interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-        access { }
-      }
-      refs {
-        dir: 0
-        into: "bufTemp"
-        interior_shape { type: INT32 dims: {size:5 stride:1} }
-        access { }
-      }
+      refs [
+        {
+          key: "bufA"
+          value {
+            loc {}
+            dir: 3
+            interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "bufB"
+          value {
+            loc {}
+            dir: 3
+            agg_op: "add"
+            interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "bufTemp"
+          value {
+            dir: 0
+            interior_shape { type: INT32 dims: {size:5 stride:1} }
+            access { }
+          }
+        }
+      ]
       stmts { load { from:"bufA" into:"$1" } }
       stmts { store { from:"$1" into:"bufB"} }
     } }

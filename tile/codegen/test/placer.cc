@@ -19,16 +19,22 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
   )",
@@ -45,16 +51,22 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
 
   const char* expected = R"(
     loc {}
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+         loc { devs: [{name: "loc_1"}]}
+         interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
   )";
@@ -66,16 +78,22 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -94,17 +112,23 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
 
   const char* expected = R"(
     loc {}
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-      offset: 16
-    }
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          offset: 16
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -117,16 +141,22 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_2"}]}
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -145,16 +175,22 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
 
   const char* expected = R"(
     loc {}
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_2"}]}
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -167,21 +203,29 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
     loc {}
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_2"}]}
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_2"}]}
-      into: "b3"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b3"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -200,21 +244,29 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
 
   const char* expected = R"(
     loc {}
-    refs {
-      loc { devs: [{name: "loc_1"}]}
-      into: "b1"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_2"}]}
-      into: "b2"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
-    refs {
-      loc { devs: [{name: "loc_2"}]}
-      into: "b3"
-      interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
-    }
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b3"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
