@@ -201,7 +201,8 @@ def _plaidml_py_wheel_impl(ctx):
         arguments = [wheel.path, output.path],
         mnemonic = "CopyWheel",
     )
-    return DefaultInfo(files = depset([output]))
+    runfiles = ctx.runfiles(files = [output])
+    return DefaultInfo(files = depset([output]), runfiles = runfiles)
 
 plaidml_py_wheel = rule(
     attrs = {
