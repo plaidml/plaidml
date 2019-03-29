@@ -95,8 +95,11 @@ struct ExpansionValue {
   }
 };
 
+using RefMap = std::map<std::tuple<std::string, std::vector<stripe::Affine>>, std::string>;
+
 void EvalInner(Block* outer,                         //
                Block* block,                         //
+               RefMap* ref_map,                      //
                const std::vector<IndexValue>& idxs,  //
                const proto::UnrollPass& options) {
   IVLOG(3, "EvalInner> " << outer->name << " -> " << block->name);
@@ -156,7 +159,12 @@ void EvalInner(Block* outer,                         //
       }
       auto view = *block_ref;
       view.from = outer_ref->from;
-      view.into = outer_ref->into + ss.str();
+      auto key = std::make_tuple(view.from, inner_ref.access);
+      auto it_inserted = ref_map->emplace(key, outer_ref->into);
+      if (it_inserted.second) {
+        it_inserted.first->second = outer->unique_ref_name(outer_ref->into);
+      }
+      view.into = it_inserted.first->second;
       IVLOG(3, "    make view: " << view.into << " from: " << view.from << " via: " << block_ref->from);
       if (inner_ref.cache_unit || outer_ref->cache_unit) {
         IVLOG(3, "    with cache: " << *outer_ref->cache_unit);
@@ -182,6 +190,7 @@ void UnrollBlock(Block* outer,                //
                  const Tags& reqs,            //
                  const proto::UnrollPass& options) {
   if (block->has_tags(reqs)) {
+    RefMap ref_map;
     std::vector<IndexValue> idxs;
     idxs.reserve(block->idxs.size());
     for (const auto& idx : block->idxs) {
@@ -189,7 +198,7 @@ void UnrollBlock(Block* outer,                //
     }
     EnumerateIndexes(idxs, 0, [&](const std::vector<IndexValue>& idxs) {
       auto clone = CloneBlock(*block);
-      EvalInner(outer, clone.get(), idxs, options);
+      EvalInner(outer, clone.get(), &ref_map, idxs, options);
       for (const auto& stmt : clone->stmts) {
         outer->stmts.insert(it_stmt, stmt);
       }
