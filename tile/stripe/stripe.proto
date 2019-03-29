@@ -39,7 +39,7 @@ message Block {
   // A set of refinements which create subviews of outer blocks and/or allocate
   // new buffers whose scope is the execution of a single index position of this
   // block.
-  repeated Refinement refs = 5;
+  map<string, Refinement> refs = 5;
   // The list of statements to run for each valid (satisfies constraints) index
   // position of this block.
   repeated Statement stmts = 6;
@@ -85,8 +85,6 @@ message Refinement {
   // The name of the parent refinement in the parent block, must be an empty
   // string if the refinement does not have a parent (i.e., newly allocated).
   string from = 2;
-  // The name of the refinement within the local block
-  string into = 3;
   // How to move the start of the inner refinement relative to the outer
   // refinement in terms of the indexes of the block
   repeated Affine access = 4;

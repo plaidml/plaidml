@@ -761,20 +761,20 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
   for (const auto& pb_con : block.constraints()) {
     ret->constraints.emplace_back(FromProto(pb_con));
   }
-  for (const auto& pb_ref : block.refs()) {
+  for (const auto& pb_into_ref : block.refs()) {
     Refinement ref;
-    ref.dir = FromProto(pb_ref.dir());
-    ref.from = pb_ref.from();
-    ref.into = pb_ref.into();
-    for (const auto& pb_off : pb_ref.access()) {
+    ref.dir = FromProto(pb_into_ref.second.dir());
+    ref.from = pb_into_ref.second.from();
+    ref.into = pb_into_ref.first;
+    for (const auto& pb_off : pb_into_ref.second.access()) {
       ref.access.emplace_back(FromProto(pb_off));
     }
-    ref.interior_shape = tile::FromProto(pb_ref.interior_shape());
-    ref.agg_op = pb_ref.agg_op();
-    ref.location = FromProto(pb_ref.loc());
-    ref.offset = pb_ref.offset();
-    // if (pb_ref.has_bank_dim()) {
-    //   ref.bank_dim = pb_ref.bank_dim().value();
+    ref.interior_shape = tile::FromProto(pb_into_ref.second.interior_shape());
+    ref.agg_op = pb_into_ref.second.agg_op();
+    ref.location = FromProto(pb_into_ref.second.loc());
+    ref.offset = pb_into_ref.second.offset();
+    // if (pb_into_ref.second.has_bank_dim()) {
+    //   ref.bank_dim = pb_into_ref.second.bank_dim().value();
     // }
     ret->refs.emplace_back(ref);
   }
@@ -902,32 +902,31 @@ proto::Block IntoProto(const Block& block) {
   std::vector<Refinement> refs = block.refs;
   std::sort(refs.begin(), refs.end(), [](const Refinement& lhs, const Refinement& rhs) { return lhs.into < rhs.into; });
   for (const auto& ref : refs) {
-    auto pb_ref = ret.add_refs();
+    auto& pb_ref = (*ret.mutable_refs())[ref.into];
     switch (ref.dir) {
       case RefDir::None:
-        pb_ref->set_dir(proto::Refinement::None);
+        pb_ref.set_dir(proto::Refinement::None);
         break;
       case RefDir::In:
-        pb_ref->set_dir(proto::Refinement::In);
+        pb_ref.set_dir(proto::Refinement::In);
         break;
       case RefDir::Out:
-        pb_ref->set_dir(proto::Refinement::Out);
+        pb_ref.set_dir(proto::Refinement::Out);
         break;
       case RefDir::InOut:
-        pb_ref->set_dir(proto::Refinement::InOut);
+        pb_ref.set_dir(proto::Refinement::InOut);
         break;
     }
-    pb_ref->set_from(ref.from);
-    pb_ref->set_into(ref.into);
+    pb_ref.set_from(ref.from);
     for (const auto& access : ref.access) {
-      *pb_ref->add_access() = IntoProto(access);
+      *pb_ref.add_access() = IntoProto(access);
     }
-    *pb_ref->mutable_interior_shape() = IntoProto(ref.interior_shape);
-    pb_ref->set_agg_op(ref.agg_op);
-    *pb_ref->mutable_loc() = IntoProto(ref.location);
-    pb_ref->set_offset(ref.offset);
+    *pb_ref.mutable_interior_shape() = IntoProto(ref.interior_shape);
+    pb_ref.set_agg_op(ref.agg_op);
+    *pb_ref.mutable_loc() = IntoProto(ref.location);
+    pb_ref.set_offset(ref.offset);
     // if (ref.bank_dim) {
-    //   pb_ref->mutable_bank_dim()->set_value(*ref.bank_dim);
+    //   pb_ref.mutable_bank_dim()->set_value(*ref.bank_dim);
     // }
   }
   std::unordered_map<Statement*, std::size_t> dep_idxs;
