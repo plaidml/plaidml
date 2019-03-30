@@ -336,6 +336,8 @@ message AutotilePass {
   // Note, we do log2(num_tiles) to make this less impactful
   // Positive means more tiles = bad, negative means more tiles = good
   optional double split_factor = 27 [default = .001];
+  // Specify if the unaligned tiles are split
+  optional bool split_unaligned = 28 [default = false];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any

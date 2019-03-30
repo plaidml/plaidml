@@ -314,8 +314,8 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
     auto result = PickBestTile(*block, options.only_po2(), options.fast(), model);
     IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result.tile << ", cost: " << result.cost);
     if (!std::isinf(result.cost)) {
-      if (ApplyTile(block, (options.flip() ? result.tile.counts() : result.tile.sizes()), false, false,
-                    options.flip())) {
+      if (ApplyTile(block, (options.flip() ? result.tile.counts() : result.tile.sizes()), false, false, options.flip(),
+                    options.split_unaligned())) {
         auto inner = block->SubBlock(0);
         if (options.copy_tags()) {
           inner->tags = block->tags;

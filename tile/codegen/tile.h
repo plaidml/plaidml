@@ -35,7 +35,8 @@ bool ApplyTile(stripe::Block* outer,       //
                const TileShape& shape,     //
                bool elide_trivial = true,  //
                bool copy_tags = false,     //
-               bool interleave = false);
+               bool interleave = false,    //
+               bool split_unaligned = false);
 
 void StencilPass(stripe::Block* block, const proto::StencilPass& options);
 
