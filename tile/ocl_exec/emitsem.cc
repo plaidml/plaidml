@@ -538,6 +538,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       }
     }
   }
+
   if (block.constraints.size()) {
     sem::ExprPtr bexpr = _Const(1);
     for (const auto& con : block.constraints) {

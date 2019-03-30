@@ -1,5 +1,7 @@
 // Copyright 2018, Intel Corporation
 
+#include <set>
+
 #include "tile/codegen/tile.h"
 
 #include "base/util/logging.h"
@@ -42,7 +44,89 @@ bool HasAffines(const Block& block, const Index& idx) {
 
 }  // namespace
 
-bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool copy_tags, bool interleave) {
+void PromoteCondition(Block* outer, std::shared_ptr<Block> inner,  //
+                      const std::set<std::string>& passthru, bool insert_back) {
+  // Wrap a block containing the conditions out of inner
+  auto wrapper = std::make_shared<Block>();
+  wrapper->refs = outer->refs;
+
+  // Copy all passthru index from inner to wrapper
+  for (auto& idx : inner->idxs) {
+    if (passthru.find(idx.name) != passthru.end()) {
+      wrapper->idxs.push_back(idx);
+      idx.affine = Affine(idx.name);
+    }
+  }
+
+  for (auto& cons : inner->constraints) {
+    // If all variables are passthru affines, cons can be promoted
+    bool selected = true;
+    for (const auto& mvp : cons.getMap()) {
+      if (mvp.first != "" && passthru.find(mvp.first) == passthru.end()) {
+        selected = false;
+        break;
+      }
+    }
+    if (selected) {
+      wrapper->constraints.push_back(cons);
+      cons.mutateMap().clear();
+    }
+  }
+
+  // accesses in passthru ref should be zero
+  for (auto& ref : wrapper->refs) {
+    for (auto& aff : ref.access) {
+      aff.mutateMap().clear();
+    }
+  }
+
+  inner->constraints.erase(std::remove(inner->constraints.begin(),  //
+                                       inner->constraints.end(), Affine()),
+                           inner->constraints.end());
+
+  // Collect all used passthru index for inner, and remove the ununsed passthru index
+  std::set<std::string> used_idx;
+  for (const auto& cons : inner->constraints) {
+    auto& cons_map = cons.getMap();
+    for (const auto& mvp : cons_map) {
+      if (mvp.first != "") {
+        used_idx.insert(mvp.first);
+      }
+    }
+  }
+  for (const auto& ref : inner->refs) {
+    for (const auto& aff : ref.access) {
+      auto& aff_map = aff.getMap();
+      for (const auto& mvp : aff_map) {
+        if (mvp.first != "") {
+          used_idx.insert(mvp.first);
+        }
+      }
+    }
+  }
+  inner->idxs.erase(
+      std::remove_if(inner->idxs.begin(), inner->idxs.end(),                                                       //
+                     [used_idx](const Index& idx) -> bool { return used_idx.find(idx.name) == used_idx.end(); }),  //
+      inner->idxs.end());
+
+  wrapper->stmts = {inner};
+  if (insert_back) {
+    outer->stmts.push_back(wrapper);
+  } else {
+    outer->stmts.insert(outer->stmts.begin(), wrapper);
+  }
+}
+
+bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool copy_tags, bool interleave,
+               bool split_unaligned) {
+  // A block is split by value on index
+  struct DimSplitPoint {
+    std::string index;
+    size_t value;
+    size_t step;
+  };
+  std::vector<DimSplitPoint> split_points;
+
   // Verify tile shape is correct
   if (outer->idxs.size() != shape.size()) {
     throw_with_trace(std::runtime_error("Invalid tile specified"));
@@ -144,6 +228,10 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
                                         int64_t(outer_idx.range - 1));
       }
 
+      if (split_unaligned && (outer_idx.range % shape[i] > 0)) {
+        split_points.push_back({passthru_idx.name, outer_idx.range / shape[i], shape[i]});
+      }
+
       // Finally add the passthru_idx
       passthru_idxs.emplace_back(passthru_idx);
     }
@@ -217,8 +305,62 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     // Let inner's from be the outer's into
     inner->ref_by_into(ref.into)->from = ref.into;
   }
-  // Make the inner block the sole stmt of the outer block
-  outer->stmts = {inner};
+
+  if (split_unaligned && split_points.size() > 0) {
+    outer->stmts = {};
+    std::set<std::string> passthru;
+    for (const auto& sp : split_points) {
+      passthru.insert(sp.index);
+    }
+
+    size_t n_points = split_points.size();
+    for (size_t i = 0; i < n_points; ++i) {
+      auto unaligned = stripe::CloneBlock(*inner);
+      for (size_t j = 0; j < i; ++j) {
+        const auto& sp = split_points[j];
+        // Find the corresponding constraints and replace it
+        for (auto& cons : unaligned->constraints) {
+          auto& cons_map = cons.mutateMap();
+          if (cons_map.size() == 3 && cons_map.find(sp.index) != cons_map.end()) {
+            cons_map.clear();
+            cons_map.emplace(sp.index, -1);
+            cons_map.emplace("", (sp.value - 1) * sp.step);
+          }
+        }
+      }
+      const auto& sp = split_points[i];
+      Affine unaligned_cons(-sp.value * sp.step);
+      auto& aff_map = unaligned_cons.mutateMap();
+      aff_map.emplace(sp.index, 1);
+      unaligned->constraints.push_back(unaligned_cons);
+      if (i > 0) {
+        PromoteCondition(outer, unaligned, passthru, true);
+      } else {
+        outer->stmts.push_back(unaligned);
+      }
+    }
+
+    // Remove all original constraints in inner
+    for (const auto& sp : split_points) {
+      for (auto& cons : inner->constraints) {
+        auto& cons_map = cons.mutateMap();
+        if (cons_map.find(sp.index) != cons_map.end()) {
+          cons_map.clear();
+        }
+      }
+    }
+    inner->constraints.erase(std::remove(inner->constraints.begin(),  //
+                                         inner->constraints.end(), Affine()),
+                             inner->constraints.end());
+    for (const auto& sp : split_points) {
+      Affine aff(sp.index, -1);
+      aff.setConstant((sp.value - 1) * sp.step);
+      inner->constraints.push_back(aff);
+    }
+    PromoteCondition(outer, inner, passthru, false);
+  } else {
+    outer->stmts = {inner};
+  }
   return true;
 }
 

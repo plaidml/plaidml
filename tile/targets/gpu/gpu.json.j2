@@ -25,7 +25,8 @@
                 "min_out_size": {{ NUM_THREADS }},
                 ## Since all loads to/from global memory are across a wide bus, use that as the
                 ## cache_width to optimize for contigous regions of DRAM for each inner block
-                "cache_width": {{ CACHE_WIDTH }}
+                "cache_width": {{ CACHE_WIDTH }},
+                "split_unaligned": true
             }
         },
 
@@ -43,6 +44,7 @@
                 "output_cost": 0.0,
                 "split_factor": -100.0,
                 "only_po2": true,  ## Only consider PO2 sizes for speed
+                "split_unaligned": true
             }
         },
 
@@ -86,7 +88,8 @@
                 "min_size": {{ NUM_THREADS }},
                 ## Since all loads to/from global memory are across a wide bus, use that as the
                 ## cache_width to optimize for contigous regions of DRAM for each inner block
-                "cache_width": {{ CACHE_WIDTH }}
+                "cache_width": {{ CACHE_WIDTH }},
+                "split_unaligned": true
             }
         },
  
