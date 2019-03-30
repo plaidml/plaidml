@@ -28,6 +28,16 @@ lang::RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const T
   return runinfo;
 }
 
+lang::RunInfo LoadEWAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+  lang::RunInfo runinfo;
+  runinfo.program_name = name;
+  runinfo.code = "function (A, B) -> (C) { C = A + B; }";
+  runinfo.input_shapes.emplace("A", i1);
+  runinfo.input_shapes.emplace("B", i2);
+  runinfo.output_shapes.emplace("C", SimpleShape(i1.type, {i1.dims[0].size, i2.dims[1].size}));
+  return runinfo;
+}
+
 lang::RunInfo LoadConstCalc(const std::string& name, const TensorShape& output) {
   lang::RunInfo runinfo;
   runinfo.program_name = name;

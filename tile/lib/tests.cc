@@ -21,6 +21,12 @@ std::map<std::string, lang::RunInfo> InternalTests() {
                           SimpleShape(DataType::FLOAT32, {1000, 1000}))  //
       },                                                                 //
       {
+          "$ew_add",
+          lib::LoadEWAdd("ew_add",                                      //
+                         SimpleShape(DataType::FLOAT32, {1024, 1024}),  //
+                         SimpleShape(DataType::FLOAT32, {1024, 1024}))  //
+      },
+      {
           "$const_test",
           lib::LoadConstCalc("const_test",                         //
                              SimpleShape(DataType::FLOAT32, {1}))  //

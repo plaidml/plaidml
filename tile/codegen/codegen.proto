@@ -424,4 +424,5 @@ message PackagePass {
   // Indicates the blocks to be packaged.
   repeated string reqs = 1;
   repeated string package_set = 2;
+  repeated string subblock_set = 3;
 }
