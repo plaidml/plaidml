@@ -13,6 +13,7 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
   todo.push(root);
 
   auto pkg_tags = stripe::FromProto(options.package_set());
+  auto subblock_tags = stripe::FromProto(options.subblock_set());
 
   while (todo.size()) {
     stripe::Block* outer = todo.front();
@@ -60,6 +61,11 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
                                              outer_ref->access,            // access
                                              outer_ref->interior_shape});  // interior_shape
       }
+
+      // Set subblock tags.
+      inner->add_tags(subblock_tags);
+
+      // Replace the subblock with the package.
       stmt = std::move(pkg);
     }
   }
