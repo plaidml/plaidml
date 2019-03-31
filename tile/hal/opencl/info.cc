@@ -5,6 +5,7 @@
 #include <google/protobuf/text_format.h>
 
 #include <algorithm>
+#include <boost/format.hpp>
 #include <boost/regex.hpp>
 
 #include "base/util/logging.h"
@@ -32,7 +33,13 @@ hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
   if (info.name() == "CPU") {
     result.set_name(std::string("OpenCL ") + info.name());
   } else {
-    result.set_name(std::string("OpenCL ") + vendor + " " + info.name());
+    auto name = info.name();
+    if (name.find("Intel(R) ") == 0) {
+      name = name.substr(9);
+    } else if (name.find("AMD ") == 0) {
+      name = name.substr(4);
+    }
+    result.set_name(str(boost::format("OpenCL %1% %2%") % vendor % name));
   }
   result.set_vendor(info.vendor());
   result.set_vendor_id(info.vendor_id());

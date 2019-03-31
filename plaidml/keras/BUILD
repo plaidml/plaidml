@@ -43,7 +43,6 @@ conda_test(
     deps = [
         ":keras",
         "//testing:plaidml_py",
-        "//tile/ocl_exec:gpu_config",
     ],
 )
 
@@ -60,7 +59,6 @@ conda_test(
     deps = [
         ":keras",
         "//testing:plaidml_py",
-        "//tile/ocl_exec:gpu_config",
     ],
 )
 
@@ -135,7 +133,7 @@ plaidml_py_wheel(
         "__init__.py",
         "backend.py",
     ],
-    config = ":setup.cfg",
+    config = ":not_setup.cfg",
     package_prefix = "plaidml/keras",
     python = "py2.py3",
 )

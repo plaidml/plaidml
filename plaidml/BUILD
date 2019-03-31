@@ -378,7 +378,7 @@ plaidml_py_wheel(
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": [":llvm_license"],
     }),
-    config = ":setup.cfg",
+    config = ":not_setup.cfg",
     config_substitutions = select({
         "@toolchain//:windows_x86_64": {
             "{BIN_DATA_FILES}": """Library/bin =

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <boost/filesystem.hpp>
 
 #include "tile/codegen/codegen.pb.h"
@@ -20,6 +22,12 @@ struct OptimizeOptions {
 using Passes = google::protobuf::RepeatedPtrField<proto::Pass>;
 
 void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions& options);
+
+class Configs {
+ public:
+  static void Register(const std::string& name, const std::string& pb_bytes);
+  static proto::Config Resolve(const std::string& name);
+};
 
 }  // namespace codegen
 }  // namespace tile

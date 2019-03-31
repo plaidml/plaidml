@@ -16,9 +16,10 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":proto_cc",
+        "//base/config",
         "//base/util",
         "//tile/bilp",
         "//tile/stripe",
-        "@gmock//:gtest",
+        "@boost//:filesystem",
     ],
 )
