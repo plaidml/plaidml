@@ -50,9 +50,9 @@ void PromoteCondition(Block* outer, std::shared_ptr<Block> inner,  //
   auto wrapper = std::make_shared<Block>();
   wrapper->refs = outer->refs;
 
-  // Copy all passthru index from inner to wrapper
+  // Copy all affine index from inner to wrapper
   for (auto& idx : inner->idxs) {
-    if (passthru.find(idx.name) != passthru.end()) {
+    if (idx.affine != Affine()) {
       wrapper->idxs.push_back(idx);
       idx.affine = Affine(idx.name);
     }
