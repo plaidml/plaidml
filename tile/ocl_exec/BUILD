@@ -12,11 +12,13 @@ plaidml_cc_library(
         "//tile/base",
         "//tile/codegen",
         "//tile/lang",
-        "//tile/targets/gpu",
         "//tile/util",
         "@boost//:filesystem",
     ] + select({
         "@toolchain//:windows_x86_64": [],
-        "//conditions:default": ["//tile/targets/cpu"],
+        "//conditions:default": [
+            "//tile/targets/cpu",
+            "//tile/targets/gpu",
+        ],
     }),
 )
