@@ -9,9 +9,9 @@
 #include <unordered_set>
 #include <utility>
 
+#include "base/util/env.h"
 #include "base/util/error.h"
 #include "base/util/perf_counter.h"
-#include "base/util/runfiles_db.h"
 #include "tile/hal/util/settings.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/tile_cache.h"
@@ -88,25 +88,20 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
   auto parsed = parser.Parse(program.code());
   auto inputs = FromProto(program.inputs());
   auto outputs = FromProto(program.outputs());
-  auto settings = hal::settings::ToHardwareSettings(devinfo.settings);
 
-  char* envvar_use_stripe = getenv("USE_STRIPE");
-  bool use_stripe = (envvar_use_stripe != NULL && strcmp(envvar_use_stripe, "0") != 0);
-
-  lang::KernelList kernel_list;
+  auto use_stripe = env::Get("USE_STRIPE") == "1";
   if (use_stripe) {
-    static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
-    std::string translated = runfiles_db["tile/ocl_exec/gpu.json"];
-    std::string out_path = "";
-    if (getenv("STRIPE_OUTPUT")) {
-      out_path = getenv("STRIPE_OUTPUT");
+    auto stripe_cfg = devinfo.settings.stripe_config();
+    if (stripe_cfg.empty()) {
+      throw std::runtime_error("Selected device must have a stripe_config when USE_STRIPE is enabled");
     }
-    kernel_list = codegen::GenerateProgram(parsed, inputs, outputs, translated, out_path);
-  } else {
-    kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, optimizer, program.id(), tile_trials);
+    auto out_path = env::Get("STRIPE_OUTPUT");
+    return codegen::GenerateProgram(parsed, inputs, outputs, stripe_cfg, out_path);
   }
 
-  if (use_stripe || tile_trials == 1) {
+  auto settings = hal::settings::ToHardwareSettings(devinfo.settings);
+  auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, optimizer, program.id(), tile_trials);
+  if (tile_trials == 1) {
     return kernel_list;
   }
 

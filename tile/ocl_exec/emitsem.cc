@@ -20,8 +20,12 @@ sem::ExprPtr SemtreeEmitter::default_intrinsic_emitter(const stripe::Intrinsic& 
   sem::ExprPtr opexpr;
   if (in.inputs.size() == 2 && in.outputs.size() == 1 && bin_ops.count(in.name)) {
     opexpr = std::make_shared<sem::BinaryExpr>(bin_ops.at(in.name), in_cast(0), in_cast(1));
-  } else if (in.name == "assign" || in.name == "ident" || in.name == "reshape" || in.name == "as_float" ||
-             in.name == "as_int" || in.name == "as_uint") {
+  } else if (in.name == "assign" ||    //
+             in.name == "ident" ||     //
+             in.name == "reshape" ||   //
+             in.name == "as_float" ||  //
+             in.name == "as_int" ||    //
+             in.name == "as_uint") {
     opexpr = in_cast(0);
   } else if (in.name == "cond") {
     opexpr = _Cond(in_val(0), in_cast(1), in_cast(2));

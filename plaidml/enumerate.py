@@ -12,9 +12,9 @@ def print_devices(heading, flag):
     plaidml.settings.experimental = flag
     matched, unmatched = plaidml.devices(ctx, limit=100, return_all=True)
     for dev in matched:
-        print('{0}   {1: >40} : {2}'.format('*', dev.id.decode(), dev.description.decode()))
+        print('{0}   {1: >50} : {2}'.format('*', dev.id.decode(), dev.description.decode()))
     for dev in unmatched:
-        print('{0}   {1: >40} : {2}'.format(' ', dev.id.decode(), dev.description.decode()))
+        print('{0}   {1: >50} : {2}'.format(' ', dev.id.decode(), dev.description.decode()))
 
 
 def main():

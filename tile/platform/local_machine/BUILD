@@ -1,4 +1,4 @@
-load("//bzl:plaidml.bzl", "plaidml_proto_library", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_proto_library")
 
 plaidml_proto_library(
     name = "proto",
@@ -48,14 +48,13 @@ plaidml_cc_library(
         ":loose_scheduler",
         ":proto_cc",
         ":tdep_scheduler",
-        "//base/util:runfiles_db",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
         "//tile/hal/util:settings",
+        "//tile/ocl_exec",
         "//tile/proto:hal_cc",
         "//tile/proto:support",
-        "//tile/ocl_exec",
     ],
     alwayslink = 1,
 )

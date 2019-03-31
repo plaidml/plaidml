@@ -54,6 +54,7 @@ message HardwareSettings {
   bool is_synchronous = 11;
   bool disable_mad = 12;
   bool disable_io_aliasing = 13;
+  string stripe_config = 14;
 }
 
 message HardwareConfig {

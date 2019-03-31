@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 
-#include "base/config/config.h"
 #include "base/util/file.h"
 #include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/driver.h"
@@ -17,20 +16,23 @@ namespace codegen {
 
 using namespace lang;  // NOLINT
 
-KernelList GenerateProgram(const Program& prog, const ShapeMap& inputs, const ShapeMap& outputs,
-                           const std::string& cfg_file, const std::string& out_dir) {
+KernelList GenerateProgram(const Program& prog,          //
+                           const ShapeMap& inputs,       //
+                           const ShapeMap& outputs,      //
+                           const std::string& cfg_name,  //
+                           const std::string& out_dir) {
   IVLOG(1, inputs);
   IVLOG(1, outputs);
   IVLOG(1, to_string(prog));
   ShapeMap all;
   auto stripe = GenerateStripe(prog, inputs, outputs, &all);
-  auto cfg = ParseConfig<codegen::proto::Config>(ReadFile(cfg_file));
   codegen::OptimizeOptions options = {
       !out_dir.empty(),     // dump_passes
       false,                // dump_code
       out_dir + "/passes",  // dbg_dir
   };
   IVLOG(1, *stripe);
+  auto cfg = Configs::Resolve(cfg_name);
   codegen::Optimize(stripe.get(), cfg.passes(), options);
   IVLOG(1, *stripe);
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);

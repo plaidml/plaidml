@@ -4,6 +4,7 @@
 
 #include <boost/format.hpp>
 
+#include "base/config/config.h"
 #include "base/util/throw.h"
 #include "tile/codegen/alias.h"
 #include "tile/codegen/autotile.h"
@@ -57,23 +58,47 @@ void DumpProgram(const Block& program,            //
 }
 
 void ValidateBlock(Block* root) {
-  RunOnBlocks(root, {},
-              [&](auto map, auto block) {
-                for (const auto& ref : block->refs) {
-                  if (ref.dir == RefDir::None && !ref.from.empty()) {
-                    throw_with_trace(std::runtime_error(
-                        str(boost::format("ref.dir == RefDir::None && !ref.from.empty(). ref: %1% in block: %2%") %
-                            ref.into % block->name)));
-                  }
-                  if (ref.from.empty() && ref.dir != RefDir::None) {
-                    throw_with_trace(std::runtime_error(
-                        str(boost::format("ref.from.empty() && ref.dir != RefDir::None. ref: %1% in block: %2%") %
-                            ref.into % block->name)));
-                  }
-                }
-              },
-              true);
+  RunOnBlocks(  //
+      root, {},
+      [&](auto map, auto block) {
+        for (const auto& ref : block->refs) {
+          if (ref.dir == RefDir::None && !ref.from.empty()) {
+            throw_with_trace(std::runtime_error(
+                str(boost::format("ref.dir == RefDir::None && !ref.from.empty(). ref: %1% in block: %2%") % ref.into %
+                    block->name)));
+          }
+          if (ref.from.empty() && ref.dir != RefDir::None) {
+            throw_with_trace(std::runtime_error(
+                str(boost::format("ref.from.empty() && ref.dir != RefDir::None. ref: %1% in block: %2%") % ref.into %
+                    block->name)));
+          }
+        }
+      },
+      true);
 }
+
+class ConfigsRegistry {
+ public:
+  static ConfigsRegistry* Instance() {
+    static ConfigsRegistry registry;
+    return &registry;
+  }
+
+  void Register(const std::string& name, const std::string& cfg_bytes) {  //
+    registry_[name] = cfg_bytes;
+  }
+
+  proto::Config Resolve(const std::string& name) {
+    auto it = registry_.find(name);
+    if (it == registry_.end()) {
+      throw_with_trace(std::runtime_error(str(boost::format("Could not find config: %s") % name)));
+    }
+    return ParseConfig<proto::Config>(it->second);
+  }
+
+ private:
+  std::unordered_map<std::string, std::string> registry_;
+};
 
 }  // namespace
 
@@ -164,6 +189,14 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
     DumpProgram(*block, options, pass.name(), counter++);
     ValidateBlock(block);
   }
+}
+
+void Configs::Register(const std::string& name, const std::string& pb_bytes) {
+  ConfigsRegistry::Instance()->Register(name, pb_bytes);
+}
+
+proto::Config Configs::Resolve(const std::string& name) {  //
+  return ConfigsRegistry::Instance()->Resolve(name);
 }
 
 }  // namespace codegen
