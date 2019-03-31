@@ -11,16 +11,17 @@ def _gencfg_output(format):
 
 def _gencfg_impl(ctx):
     args = ctx.actions.args()
+    args.add(ctx.executable._tool)
     args.add(ctx.file.tmpl)
     args.add("-y", ctx.file.yml)
     args.add("-t", ctx.attr.target)
     args.add("-f", ctx.attr.format)
     args.add("-o", ctx.outputs.out)
     ctx.actions.run(
-        inputs = [ctx.file.tmpl, ctx.file.yml],
+        inputs = [ctx.executable._tool, ctx.file.tmpl, ctx.file.yml],
         outputs = [ctx.outputs.out],
         arguments = [args],
-        executable = ctx.executable._tool,
+        executable = "python",
         use_default_shell_env = True,
         mnemonic = "gencfg",
     )

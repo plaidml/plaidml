@@ -2,15 +2,16 @@
 
 def _bin2h_impl(ctx):
     args = ctx.actions.args()
+    args.add(ctx.executable._tool)
     for target, symbol in ctx.attr.srcs.items():
         for src in target.files:
             args.add("--input", "{}={}".format(symbol, src.path))
     args.add("--output", ctx.outputs.out)
     ctx.actions.run(
-        inputs = ctx.files.srcs,
+        inputs = [ctx.executable._tool] + ctx.files.srcs,
         outputs = [ctx.outputs.out],
         arguments = [args],
-        executable = ctx.executable._tool,
+        executable = "python",
         use_default_shell_env = True,
         mnemonic = "bin2h",
     )

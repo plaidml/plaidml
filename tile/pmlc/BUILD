@@ -28,9 +28,11 @@ plaidml_cc_binary(
         "//tile/lang",
         "//tile/lib",
         "//tile/util",
-        "//tile/targets/gpu",
     ] + select({
         "@toolchain//:windows_x86_64": [],
-        "//conditions:default": ["//tile/targets/cpu"],
+        "//conditions:default": [
+            "//tile/targets/cpu",
+            "//tile/targets/gpu",
+        ],
     }),
 )
