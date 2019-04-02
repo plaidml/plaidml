@@ -147,24 +147,25 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
           str(boost::format("AliasMap::AliasMap: Mismatched access dimensions on refinement: %1% %2%") %
               info.base_name % ref.into)));
     }
-    // Add in indexes from this block
-    std::map<std::string, int64_t> min_idxs;
-    std::map<std::string, int64_t> max_idxs;
-    for (const auto& idx : block->idxs) {
-      if (idx.affine.constant()) {
-        min_idxs[idx.name] = idx.affine.constant();
-        max_idxs[idx.name] = idx.affine.constant();
-      } else {
-        min_idxs[idx.name] = 0;
-        max_idxs[idx.name] = idx.range - 1;
-      }
-    }
     info.extents.resize(ref.access.size());
     for (size_t i = 0; i < ref.access.size(); i++) {
       info.access[i] += UniqifyAffine(ref.access[i], prefix);
-      int64_t min_extent = ref.access[i].eval(min_idxs);
-      int64_t max_extent = ref.access[i].eval(max_idxs) + ref.interior_shape.dims[i].size - 1;
-      info.extents[i] = Extent{min_extent, max_extent};
+      Extent& ext = info.extents[i];
+      ext.min = 0;
+      ext.max = 0;
+      for (const auto& kvp : info.access[i].getMap()) {
+        if (kvp.first == "") {
+          ext.min += kvp.second;
+          ext.max += kvp.second;
+        } else {
+          if (kvp.second > 0) {
+            ext.max += (idx_ranges_[kvp.first] - 1) * kvp.second;
+          } else {
+            ext.min += (idx_ranges_[kvp.first] - 1) * kvp.second;
+          }
+        }
+      }
+      ext.max += ref.interior_shape.dims[i].size - 1;
     }
     IVLOG(5, boost::format("Extents for '%1%' in '%2%': %3%") % ref.into % block->name % StreamContainer(info.extents));
     // Set shape

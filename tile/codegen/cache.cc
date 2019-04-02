@@ -16,11 +16,14 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyCache(const AliasMap& map,          //
-                Block* block,                 //
-                const std::string& var_name,  //
-                const Location& mem_loc,      //
-                const Location& xfer_loc) {
+void ApplyCache(const AliasMap& map,                     //
+                Block* block,                            //
+                const std::string& var_name,             //
+                const Location& mem_loc,                 //
+                const Location& xfer_loc,                //
+                const std::set<std::string> load_tags,   //
+                const std::set<std::string> store_tags,  //
+                bool add_constraints) {
   auto it = block->ref_by_into(var_name, false);
   if (it == block->refs.end()) {
     throw std::runtime_error("ApplyCache: Invalid var_name");
@@ -46,7 +49,9 @@ void ApplyCache(const AliasMap& map,          //
       std::string iname = str(boost::format("i%zu") % i);
       xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
       xfer_access.emplace_back(Affine(iname));
-      map.AddConstraintForIndex(&xfer_block, ai, i, iname);
+      if (add_constraints) {
+        map.AddConstraintForIndex(&xfer_block, ai, i, iname);
+      }
     } else {
       xfer_access.emplace_back(Affine());
     }
@@ -85,7 +90,7 @@ void ApplyCache(const AliasMap& map,          //
   if (IsReadDir(it->dir)) {
     auto cache_load = std::make_shared<Block>(xfer_block);
     cache_load->name = str(boost::format("load_%s") % var_name);
-    cache_load->tags = {"cache", "cache_load"};
+    cache_load->tags = load_tags;
     cache_load->refs[0].from = raw_name;
     cache_load->refs[0].interior_shape = raw_xfer_shape;
     cache_load->refs[1].location = mem_loc;
@@ -95,7 +100,7 @@ void ApplyCache(const AliasMap& map,          //
   if (IsWriteDir(it->dir)) {
     auto cache_store = std::make_shared<Block>(xfer_block);
     cache_store->name = str(boost::format("store_%s") % var_name);
-    cache_store->tags = {"cache", "cache_store"};
+    cache_store->tags = store_tags;
     cache_store->refs[1].from = raw_name;
     cache_store->refs[1].interior_shape = raw_xfer_shape;
     cache_store->refs[0].location = mem_loc;
@@ -117,11 +122,12 @@ void ApplyCache(const AliasMap& map,          //
 }
 
 static void CacheBlock(const AliasMap& map, Block* block, const std::set<RefDir>& dirs, const Location& mem_loc,
-                       const Location& xfer_loc) {
+                       const Location& xfer_loc, bool add_constraints) {
   auto refs = block->refs;
   for (const auto& ref : refs) {
     if (dirs.count(ref.dir)) {
-      codegen::ApplyCache(map, block, ref.into, mem_loc, xfer_loc);
+      codegen::ApplyCache(map, block, ref.into, mem_loc, xfer_loc, {"cache", "cache_load"}, {"cache", "cache_store"},
+                          add_constraints);
     }
   }
 }
@@ -135,7 +141,7 @@ void CachePass(Block* root, const proto::CachePass& options) {
   auto mem_loc = stripe::FromProto(options.mem_loc());
   auto xfer_loc = stripe::FromProto(options.xfer_loc());
   RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
-    CacheBlock(map, block, dirs, mem_loc, xfer_loc);
+    CacheBlock(map, block, dirs, mem_loc, xfer_loc, options.add_constraints());
   });
 }
 

@@ -243,6 +243,10 @@ void SemtreeEmitter::Visit(const stripe::Special& spec) {
     kernels_.kernels.push_back(lang::GenCopy(scope_->at(spec.inputs[0]).shape, spec.outputs[0], spec.inputs[0], kname));
     return;
   }
+  if (spec.name == "zero") {
+    kernels_.kernels.push_back(lang::GenZero(scope_->at(spec.outputs[0]).shape, spec.outputs[0], kname));
+    return;
+  }
   // Try to call GenSpecial as a fallback by making a fake 'op'
   lang::Op op;
   op.tag = lang::Op::FUNCTION;

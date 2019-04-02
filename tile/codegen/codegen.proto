@@ -108,6 +108,8 @@ message Pass {
     GenericPass dead_code_elimination = 25;
     // Packages blocks into subblocks.
     PackagePass package_blocks = 26;
+    // Expand the size of buffers to reduce constraints required.
+    GenericPass pad = 27;
   }
 }
 
@@ -145,6 +147,8 @@ message SchedulePass {
   oneof mem_assignment_algorithm {
     ColorIOUnique color_io_unique = 6;
   }
+  // Add constraints during load/store to prevent OOB access
+  optional bool add_constraints = 7 [default = true];
 
   // ColorIOUnique requires that each input to a sub-statement be
   // assigned a unique color, and that each output to a sub-statement
@@ -184,6 +188,8 @@ message CachePass {
   required stripe.proto.Location mem_loc = 3;
   // The unit to assign to transfer (DMA) data into / out of the cache
   required stripe.proto.Location xfer_loc = 4;
+  // Add constraints during load/store to prevent OOB access
+  optional bool add_constraints = 5 [default = true];
 }
 
 // The fusion pass attempt to combine compatible block into a single block that
