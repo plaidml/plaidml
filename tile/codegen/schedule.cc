@@ -1583,8 +1583,10 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       ent->source->ref.bank_dim,       // bank_dim
   });
 
-  for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
-    alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, ent->source->swap_idxs[i].name);
+  if (options_.add_constraints()) {
+    for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
+      alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, ent->source->swap_idxs[i].name);
+    }
   }
 
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
@@ -1633,8 +1635,10 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       ent->source->ref.bank_dim,     // bank_dim
   });
 
-  for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
-    alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, ent->source->swap_idxs[i].name);
+  if (options_.add_constraints()) {
+    for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
+      alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, ent->source->swap_idxs[i].name);
+    }
   }
 
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
@@ -1676,7 +1680,9 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
     swap_block.idxs.emplace_back(stripe::Index{iname, ent->shape.dims[i].size});
     local_src_access.emplace_back(stripe::Affine(iname) + access[i]);
     local_dst_access.emplace_back(stripe::Affine(iname));
-    alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, iname);
+    if (options_.add_constraints()) {
+      alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, iname);
+    }
   }
 
   swap_block.refs.push_back(stripe::Refinement{
@@ -1736,7 +1742,9 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
     swap_block.idxs.emplace_back(stripe::Index{iname, ent->shape.dims[i].size});
     local_src_access.emplace_back(stripe::Affine(iname));
     local_dst_access.emplace_back(stripe::Affine(iname) + access[i]);
-    alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, iname);
+    if (options_.add_constraints()) {
+      alias_map_->AddConstraintForIndex(&swap_block, ent->source->alias_info, i, iname);
+    }
   }
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});

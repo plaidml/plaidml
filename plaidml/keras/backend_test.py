@@ -1409,7 +1409,7 @@ class TestBackendOps(unittest.TestCase):
 
     @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]], do_grads=False)
     def resnetLayer2(self, b, x, k):
-        c = b.conv2d(x, k, padding='valid')
+        c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
 

@@ -59,7 +59,7 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   FixupRefs(block, var_name);
 }
 
-void LocalizePass(const AliasMap& scope, Block* block) {
+void LocalizePass(const AliasMap& scope, Block* block, const std::set<std::string>& ref_reqs) {
   auto use_count = scope.RefUseCounts(*block);
   for (auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
@@ -77,6 +77,10 @@ void LocalizePass(const AliasMap& scope, Block* block) {
       if (it->dir != RefDir::None && !it->has_tag("tmp")) {
         continue;
       }
+      // If we have a ref_req and we don't have the right tags, skip
+      if (ref_reqs.size() != 0 && !ref.has_tags(ref_reqs)) {
+        continue;
+      }
       // If it's not uniquely located in this block, don't consider
       if (use_count[ref.from] != 1) {
         continue;
@@ -92,7 +96,7 @@ void LocalizePass(const AliasMap& scope, Block* block) {
     }
     // Now localize block itself
     AliasMap inner_map(scope, inner.get());
-    LocalizePass(inner_map, inner.get());
+    LocalizePass(inner_map, inner.get(), ref_reqs);
   }
 }
 

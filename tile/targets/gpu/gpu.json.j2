@@ -8,6 +8,12 @@
         ## Eliminate the dead code first
         { "name": "dead_code_elimination", "dead_code_elimination": {"reqs": ["all"] } },
 
+        ## Lower temps
+        { "name": "localize_tmps", "localize" : {"reqs": ["program"], "ref_reqs": ["tmp"] } },
+
+        ## Padding, disabled for now due ot issues with gradiants
+        ## { "name": "pad", "pad": {"reqs": ["main"] } },
+
         ## Next, we find all the dense contraction blocks, and split them up
         ## into groups such that the inputs for the innermost loops fit into
         ## shared memory and the outputs fit into the register set of the each
@@ -25,8 +31,8 @@
                 "min_out_size": {{ NUM_THREADS }},
                 ## Since all loads to/from global memory are across a wide bus, use that as the
                 ## cache_width to optimize for contigous regions of DRAM for each inner block
-                "cache_width": {{ CACHE_WIDTH }},
-                "split_unaligned": true
+                "cache_width": {{ CACHE_WIDTH }}
+                ## "split_unaligned": true
             }
         },
 
@@ -43,8 +49,8 @@
                 "input_cost": 0.0, 
                 "output_cost": 0.0,
                 "split_factor": -100.0,
-                "only_po2": true,  ## Only consider PO2 sizes for speed
-                "split_unaligned": true
+                "only_po2": true  ## Only consider PO2 sizes for speed
+                ## "split_unaligned": true
             }
         },
 
@@ -88,8 +94,8 @@
                 "min_size": {{ NUM_THREADS }},
                 ## Since all loads to/from global memory are across a wide bus, use that as the
                 ## cache_width to optimize for contigous regions of DRAM for each inner block
-                "cache_width": {{ CACHE_WIDTH }},
-                "split_unaligned": true
+                "cache_width": {{ CACHE_WIDTH }}
+                ## "split_unaligned": true
             }
         },
  
