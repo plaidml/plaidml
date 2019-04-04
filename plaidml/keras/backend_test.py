@@ -345,6 +345,27 @@ class TestBackendOps(unittest.TestCase):
         y = b.variable(np.array([[2, 4], [5, -1], [3, 0]]))
         return b.equal(b.argmin(x, axis=0), b.argmin(y, axis=0))
 
+    def testDropoutManual(self):
+        # Note: Due to the probabilistic nature of dropout, and since we can't
+        # just use seeds as different backends have different PRNGs, this tests
+        # that we stay within expected tolerances.
+        shape = (17, 22, 13, 13)
+        noise_shape = (17, 22, 13, 1)
+        level = 0.8
+        x = pkb.variable(np.ones(shape))
+        result = pkb.dropout(x, level, noise_shape).eval()
+        mean = np.mean(result)
+        if mean < 0.9 or mean > 1.1:
+            raise RuntimeError("Unexpectedly large deviation from expected dropout level")
+        for i in range(shape[0]):
+            for j in range(shape[1]):
+                for k in range(shape[2]):
+                    if np.any(result[i, j, k]):
+                        if not np.all(result[i, j, k]):
+                            raise RuntimeError("Noise incorrectly shaped")
+                        if abs(result[i, j, k, 0] - 1. / (1. - level)) > 0.0001:
+                            raise RuntimeError("Bad normalization")
+
     @opTest([
         [m(3, 3), m(3, 3)],
         [m(2, 3, 4, 5), m(2, 3, 5, 2)],
