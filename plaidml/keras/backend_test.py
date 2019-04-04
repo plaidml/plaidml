@@ -397,30 +397,6 @@ class TestBackendOps(unittest.TestCase):
     def testFlatten(self, b, x):
         return [b.flatten(x)]
 
-    #TODO: Does not need to exist longterm
-    @unittest.skip("Helper test for debugging testAddElements, not standalone")
-    def testMicroAddElementsFail(self):
-        data = [m(3, 3), m(3, 3)]
-        test_func = self.testAddElements
-        args = list()
-        ###############
-        x = [pkb.placeholder(shape=t.shape) for t in data if isinstance(t, np.ndarray)]
-        xv = [pkb.variable(t, dtype=floatx()) for t in data if isinstance(t, np.ndarray)]
-        par = [t for t in data if not isinstance(t, np.ndarray)]
-        grad_funcs = test_func(pkb, *(x + par + list(args)))
-        funcs = test_func(pkb, *(xv + par + list(args)))
-        #for gf, f in zip(grad_funcs, funcs):
-        gf = grad_funcs[0]
-        f = funcs[0]
-        df = pkb.gradients(pkb.mean(gf), x)
-        gfn = pkb.function(x, df, updates=[])
-        fr = f.eval()
-        gr = gfn([t for t in data if isinstance(t, np.ndarray)])
-        if args.verbose > 1:
-            print(pkb, fr, gr)
-        results.append((fr, gr))
-        return results
-
     def testTileIdentity(self):
         x = pkb.variable(m(3))
         op = tile.Operation('function (I[N]) -> (O) { O = I; }', [('I', x)],
@@ -436,7 +412,6 @@ class TestBackendOps(unittest.TestCase):
         output = op.outputs['O2'].eval()
         return 0
 
-    @unittest.skip("TODO(T1028): This test is known to fail")
     @opTest([[m(3, 3), m(3, 3)]])
     def testAddElements(self, b, x, y):
         return [x + y]
@@ -451,7 +426,7 @@ class TestBackendOps(unittest.TestCase):
             c + x,
         ]
 
-    @opTest([[m(3, 3), m(3, 3)]])
+    @opTest([[m(3, 3), m(3, 3)], [m(2, 3), m(3)]])
     def testSubElements(self, b, x, y):
         return [x - y]
 
@@ -905,15 +880,13 @@ class TestBackendOps(unittest.TestCase):
                 name='this-is-not an identifier').sole_output()
         ]
 
-    @unittest.skip("TODO(T1046): This case is bugged in Keras 2.0.8 TF")
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
             1e-04,
             skip_theano=True)
     def testConv2dSpecial(self, b, im, km, df):
         '''A simplified example highlighting a bug in Keras 2.0.8 TF
 
-        Probably doesn't need to be retained once the corresponding case in conv3d
-        is fixed.'''
+        If we're not concerned with Keras 2.0.8 we probably don't need to retain this.'''
         return [b.conv2d(im, km, padding='same', strides=(2, 3), data_format=df)]
 
     @opTest([
@@ -926,8 +899,7 @@ class TestBackendOps(unittest.TestCase):
     def testConv3d(self, b, im, km, df):
         return [
             b.conv3d(im, km, padding='same', data_format=df),
-            # TODO(T1046): TF broken in Keras 2.0.8 on this; see testConv2dSpecial
-            #b.conv3d(im, km, padding='same', strides=(2,3,3), data_format=df),
+            b.conv3d(im, km, padding='same', strides=(2, 3, 3), data_format=df),
             b.conv3d(im, km, padding='valid', strides=(2, 1, 2), data_format=df),
             b.conv3d(im, km, padding='valid', dilation_rate=(1, 3, 2), data_format=df),
         ]
