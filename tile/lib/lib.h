@@ -50,6 +50,20 @@ lang::RunInfo LoadDilatedConv2d(const std::string& name,    //
                                 const TensorShape& kernel,  //
                                 const TensorShape& output);
 
+lang::RunInfo LoadLarsMomentum4d(const std::string& name,     //
+                                 const TensorShape& x_shape,  //
+                                 const TensorShape& lr_shape);
+
+lang::RunInfo LoadPow(const std::string& name,  //
+                      const TensorShape& i1,    //
+                      const TensorShape& i2,    //
+                      const TensorShape& output);
+
+lang::RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
+                                 const TensorShape& input);
+
+lang::RunInfo LoadPolygonBoxTransform(const std::string& name,  //
+                                      const TensorShape& input);
 }  // namespace lib
 }  // namespace tile
 }  // namespace vertexai

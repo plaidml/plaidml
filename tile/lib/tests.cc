@@ -115,6 +115,29 @@ std::map<std::string, lang::RunInfo> InternalTests() {
                                 SimpleShape(DataType::INT8, {63}),                    //
                                 SimpleShape(DataType::INT8, {1, 55, 55, 63}))         //
       },
+      {
+          "$lars_momentum_test",
+          lib::LoadLarsMomentum4d("lars_momentum_test",                          //
+                                  SimpleShape(DataType::FLOAT32, {4, 7, 3, 9}),  //
+                                  SimpleShape(DataType::FLOAT32, {}))            //
+      },
+      {
+          "$pow_test",
+          lib::LoadPow("pow_test",                                 //
+                       SimpleShape(DataType::FLOAT32, {3, 2, 3}),  //
+                       SimpleShape(DataType::FLOAT32, {2, 1}),     //
+                       SimpleShape(DataType::FLOAT32, {3, 2, 3}))  //
+      },
+      {
+          "$layer_norm_test",
+          lib::LoadLayerNorm4dAx2("layer_norm_test",                             //
+                                  SimpleShape(DataType::FLOAT32, {4, 7, 5, 3}))  //
+      },
+      {
+          "$polygon_box_transform_test",
+          lib::LoadPolygonBoxTransform("polygon_box_transform_test",                  //
+                                       SimpleShape(DataType::FLOAT32, {4, 5, 7, 3}))  //
+      },
   };
   return tests;
 }
