@@ -32,8 +32,8 @@ plaidml_cc_version(
 )
 
 PLAIDML_CPP_SOURCES = [
-    "plaidml.cc",
     "config.h",
+    "plaidml.cc",
     ":version",
 ]
 
@@ -131,16 +131,6 @@ plaidml_macos_dylib(
     tags = ["darwin"],
 )
 
-plaidml_cc_library(
-    name = "api_cc_deps",
-    deps = [
-        ":proto_cc",
-        "//tile/base",
-        "//tile/base:program_cache",
-        "//tile/stripe",
-    ],
-)
-
 plaidml_cc_test(
     name = "plaidml_test",
     srcs = ["plaidml_test.cc"],
@@ -174,6 +164,19 @@ plaidml_cc_test(
 plaidml_cc_test(
     name = "cpp_test",
     srcs = ["cpp_test.cc"],
+    deps = [
+        ":api",
+        "//testing:plaidml_config",
+    ],
+)
+
+plaidml_cc_test(
+    name = "tile_cc_test",
+    srcs = [
+        "tile_cc.cc",
+        "tile_cc.h",
+        "tile_cc_test.cc",
+    ],
     deps = [
         ":api",
         "//testing:plaidml_config",
@@ -294,17 +297,6 @@ conda_test(
     ],
 )
 
-# The PlaidML sources, as a tar package.
-pkg_tar(
-    name = "pkg",
-    srcs = glob([
-        "**/*",
-    ]),
-    package_dir = "plaidml",
-    strip_prefix = ".",
-    visibility = ["//visibility:public"],
-)
-
 pkg_tar(
     name = "py_deb_data",
     srcs = [":py"],
@@ -398,9 +390,7 @@ bin =
   data/pmlc_bin""",
         },
     }),
-    data = [
-        "plaidml.h",
-        "plaidml++.h",
+    data = PLAIDML_CPP_HEADERS + [
         ":configs",
         "//plaidml/base:base.h",
         "//plaidml/base:base_cpp.h",

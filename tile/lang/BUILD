@@ -75,6 +75,7 @@ plaidml_cc_library(
         ":parser",
     ],
     hdrs = [
+        "ast.h",
         "compile.h",
         "compose.h",
         "emitc.h",
@@ -166,11 +167,11 @@ plaidml_cc_test(
     deps = [":lang"],
 )
 
-
 plaidml_cc_test(
     name = "gen_stripe_test",
     srcs = ["gen_stripe_test.cc"],
-    deps = [":lang",
-                "//testing:matchers",
-],
+    deps = [
+        ":lang",
+        "//testing:matchers",
+    ],
 )

@@ -21,9 +21,10 @@ plaidml_py_library(
 
 pkg_tar(
     name = "pkg",
-    srcs = glob([
-        "**/*",
-    ]),
+    srcs = glob(
+        ["**/*"],
+        exclude = ["__pycache__/*"],
+    ),
     package_dir = "plaidml/keras",
     strip_prefix = ".",
 )
