@@ -58,7 +58,10 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   sem::StmtPtr add_loops(const stripe::Block&);
   void do_gids(const stripe::Block&);
   sem::StmtPtr do_lids(const stripe::Block&);
-  void init_loop(const std::string& buf, DataType type, size_t size, const sem::ExprPtr& init);
+  void init_loop_local(const std::string& buf, DataType type,  //
+                       size_t size, const sem::ExprPtr& init);
+  void init_loop_register(const std::string& buf, DataType type,  //
+                          size_t size, const sem::ExprPtr& init);
 
   size_t threads_;
   size_t loop_mul_;
