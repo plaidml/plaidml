@@ -21,6 +21,7 @@
 #include "tile/codegen/pad.h"
 #include "tile/codegen/partition.h"
 #include "tile/codegen/placer.h"
+#include "tile/codegen/reg_cache.h"
 #include "tile/codegen/scalarize.h"
 #include "tile/codegen/schedule.h"
 #include "tile/codegen/thread_inner.h"
@@ -186,6 +187,9 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
         break;
       case proto::Pass::kPad:
         PadPass(block, pass.pad());
+        break;
+      case proto::Pass::kRegisterCache:
+        RegisterCachePass(block, pass.register_cache());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));

@@ -17,6 +17,13 @@ Integer Floor(const Rational& x) {
 
 Integer Ceil(const Rational& x) { return Floor(Rational(numerator(x) - 1, denominator(x))) + 1; }
 
+int ToInteger(const Rational& x) {
+  if (Floor(x) != Ceil(x)) {
+    throw std::runtime_error("Non-integer rational.");
+  }
+  return static_cast<int>(Floor(x));
+}
+
 Rational FracPart(const Rational& x) { return x - Floor(x); }
 
 Integer Abs(const Integer& x) {

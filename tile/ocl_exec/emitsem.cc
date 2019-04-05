@@ -374,7 +374,9 @@ sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
     if (idx.affine != stripe::Affine()) {
       continue;
     }
-    auto expr = tid / prev_threads;
+    auto expr = block.has_tag("reg_cache") ?  //
+                    ((tid % block.idxs_product()) / prev_threads)
+                                           : (tid / prev_threads);
     if (i != 1) {
       expr = expr % idx.range;
     }
@@ -383,14 +385,14 @@ sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
     kernel_top_->push_front(_Declare({sem::Type::INDEX}, idx_global_name, expr));
     prev_threads *= idx.range;
   }
-  if (block.idxs_product() < threads_) {
+  if (!block.has_tag("reg_cache") && block.idxs_product() < threads_) {
     top = sem::builder::_If(tid < sem::ExprPtr(_Const(block.idxs_product())), top);
   }
   return top;
 }
 
-void SemtreeEmitter::init_loop(const std::string& buf, DataType type,  //
-                               size_t size, const sem::ExprPtr& init) {
+void SemtreeEmitter::init_loop_local(const std::string& buf, DataType type,  //
+                                     size_t size, const sem::ExprPtr& init) {
   if (size < threads_ * 2) {
     auto while_loop = _Block({});
     while_loop->push_back(_Declare({sem::Type::INDEX}, "_init_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
@@ -531,16 +533,17 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   for (const auto& ref : block.refs) {
     if (ref.dir == stripe::RefDir::None && dup_ref.find(ref.into) == dup_ref.end()) {
       dup_ref.insert(ref.into);
+      bool use_register = ref.location.devs.size() == 1 && ref.location.devs[0].name == "REGISTER";
       size_t size = ref.interior_shape.elem_size();
       sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, size,
-                         (in_threads_ ? sem::Type::NORMAL : sem::Type::LOCAL)};
+                         ((in_threads_ || use_register) ? sem::Type::NORMAL : sem::Type::LOCAL)};
       sem::ExprPtr init = AggInit(ref.interior_shape.type, ref.agg_op);
-      if (in_threads_) {
+      if (use_register || in_threads_) {
         cur_->push_front(_Declare(ptype, ref_name(ref.into), init));
       } else {
         if (init) {
           cur_->push_front(_Barrier());
-          init_loop(ref.into, ref.interior_shape.type, size, init);
+          init_loop_local(ref.into, ref.interior_shape.type, size, init);
         }
         cur_->push_front(_Declare(ptype, ref_name(ref.into), sem::ExprPtr()));
       }

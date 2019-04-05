@@ -146,6 +146,20 @@
         ## Thread leftover elementwise 
         { "name": "thread_elemwise", "thread_inner" : { "reqs": ["kernel", "eltwise"], "threads": {{ NUM_THREADS }} } },
 
+        ## Load cache into registers
+        {
+            "name": "register_cache",
+            "register_cache": {
+                "reqs": ["cache_load", "gpu_thread"],
+                "local_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] },
+                "register_loc": { "devs": [{"name": "REGISTER", "units": [{"offset": 0}]}] },
+                "register_size": {{ REGS_MEM_KIB * 1024 }},
+                "global_memory_latency": {{ GLOBAL_MEM_LAT }},
+                "local_memory_latency": {{ LOCAL_MEM_LAT }},
+                "register_latency": {{ REG_MEM_LAT }}
+            }
+        },
+
         ## One last attempt to fuse across gpu_threads 
         ## { "name": "fuse_inner", "fusion": { "a_reqs": ["gpu_thread"], "b_reqs": ["gpu_thread"], "perfect": true } },
 
@@ -158,6 +172,7 @@
         ## Final cleanup 
         { "name": "localize_main_2", "localize": { "reqs": ["main"] } },
         { "name": "scalarize_main_2", "scalarize": { "reqs": ["main"] } },
+
         { "name": "cleanup1", "prune_refs": { "reqs": ["main"] } },
         { "name": "cleanup2", "prune_idxs": { "reqs": ["main"] } },
 

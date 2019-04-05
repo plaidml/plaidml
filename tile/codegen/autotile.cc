@@ -310,6 +310,14 @@ TileResult PickBestTile(const Block& block, bool only_po2, bool is_fast, const C
 void AutotilePass(Block* root, const proto::AutotilePass& options) {
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [&options](const AliasMap& map, Block* block) {
+    if (block->has_tag("cache")) {
+      for (const auto& ref : block->refs) {
+        if (IsWriteDir(ref.dir) && ref.location.devs[0].name == "REGISTER") {
+          // This is cached buffer to register, can't be threaded.
+          return;
+        }
+      }
+    }
     ComputeDensityCostModel model(*block, options);
     auto result = PickBestTile(*block, options.only_po2(), options.fast(), model);
     IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result.tile << ", cost: " << result.cost);
