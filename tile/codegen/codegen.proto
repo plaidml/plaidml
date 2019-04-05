@@ -269,6 +269,10 @@ message StencilPass {
   repeated string outer_set = 3;
   // Set the following tags on the inner set (the stencil match)
   repeated string inner_set = 4;
+  // Set the following tags on input refinements (in stencil index ins order)
+  repeated StencilTagList inputs_set = 5;
+  // Set the following tags on output refinements (in stencil index outs order)
+  repeated StencilTagList outputs_set = 6;
 }
 
 message Stencil {
@@ -290,6 +294,10 @@ message StencilIndex {
   repeated int32 outs = 3;
   // For each input, the required stride, same as above
   repeated int32 ins = 4;
+}
+
+message StencilTagList {
+  repeated string tag = 1;
 }
 
 // The autotile pass attempts to split (tile) a block into an outer block and

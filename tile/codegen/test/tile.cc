@@ -177,9 +177,9 @@ TEST(Codegen, StencilMatchConv1D) {
       1378944,  // total
       {
           {"ci", "c", 64},
-          {"co", "x", 16},
+          {"co", "k", 16},
           {"kx", "*", 1},
-          {"x", "k", 16},
+          {"x", "x", 16},
       }  // idxs
   };
   EXPECT_THAT(*match, Eq(expected));
@@ -203,15 +203,6 @@ TEST(Codegen, StencilMatchConv2D) {
             { "name": "k", "size": 16, "outs": [ -1 ], "ins": [ -1,  0 ] },
             { "name": "x", "size":  4, "outs": [ -1 ], "ins": [  0, -1 ] },
             { "name": "y", "size":  4, "outs": [ -1 ], "ins": [  0, -1 ] },
-            { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
-          ]
-        },
-        {
-          "startup_cost": 32,
-          "idxs": [
-            { "name": "k", "size": 16, "outs": [ -1 ], "ins": [  0, -1 ] },
-            { "name": "x", "size":  4, "outs": [ -1 ], "ins": [ -1,  0 ] },
-            { "name": "y", "size":  4, "outs": [ -1 ], "ins": [ -1,  0 ] },
             { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
           ]
         }
