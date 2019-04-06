@@ -1112,18 +1112,26 @@ class Concatenate(tile.Operation):
                 if i != axis
             ]
 
+        merge_axis_dim = None
         shape_template = __clear_axis(tensors[0].shape.dims)
         for t in tensors:
             if __clear_axis(t.shape.dims) != shape_template:
                 raise ValueError(
                     'Incompatible shapes: cannot concatenate along axis {}\n{} v {}'.format(
                         axis, tensors[0].shape, t.shape))
+            if isinstance(t.shape.dims[axis], tile.Value):
+                merge_axis_dim = t.shape.dims[axis]
 
         offsets = [0]
-        for i in range(len(tensors)):
-            offsets.append("+".join("A{}".format(j) for j in range(i+1)))
+        if merge_axis_dim:
+            for i in range(len(tensors)):
+                offsets.append("+".join("A{}".format(j) for j in range(i+1)))
+        else:
+            for i in range(len(tensors)):
+                offsets.append(offsets[i] + tensors[i].shape.dims[axis])
+            merge_axis_dim = offsets[len(tensors)]
         out_dims = tuple(
-            tensors[0].shape.dims[i] if i != axis else offsets[len(tensors)] for i in range(rank))
+            tensors[0].shape.dims[i] if i != axis else merge_axis_dim for i in range(rank))
 
         output_dims_list = ['N{}'.format(i) for i in range(rank)]
         output_dims_list[axis] = offsets[len(tensors)]
