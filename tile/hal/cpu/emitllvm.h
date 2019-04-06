@@ -28,7 +28,6 @@ class Emit : public sem::Visitor {
   void Visit(const sem::LookupLVal&) override;
   void Visit(const sem::LoadExpr&) override;
   void Visit(const sem::StoreStmt&) override;
-  void Visit(const sem::CallStmt&) override;
   void Visit(const sem::SubscriptLVal&) override;
   void Visit(const sem::DeclareStmt&) override;
   void Visit(const sem::UnaryExpr&) override;
@@ -46,6 +45,7 @@ class Emit : public sem::Visitor {
   void Visit(const sem::WhileStmt&) override;
   void Visit(const sem::BarrierStmt&) override;
   void Visit(const sem::ReturnStmt&) override;
+  void Visit(const sem::SpecialStmt&) override;
   void Visit(const sem::Function&) override;
   std::string str() const;
   std::unique_ptr<llvm::Module>&& result();

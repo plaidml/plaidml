@@ -90,8 +90,6 @@ void Emit::Visit(const sem::StoreStmt& n) {
   builder_.CreateStore(rval, lhs.v);
 }
 
-void Emit::Visit(const sem::CallStmt& n) { n.call_expr->Accept(*this); }
-
 void Emit::Visit(const sem::SubscriptLVal& n) {
   // Compute the address of an array element, given the array's base address
   // and the element offset number.
@@ -485,8 +483,6 @@ void Emit::Visit(const sem::CallExpr& n) {
       linkName = n.name;
       devectorize = true;
       break;
-    case sem::CallExpr::Function::OTHER:
-      throw std::runtime_error("Invalid intrinsic.");
   }
   // Find a reference to that builtin function, or generate a reference if this
   // is the first time we've called it.
@@ -800,6 +796,8 @@ void Emit::Visit(const sem::ReturnStmt& n) {
     builder_.CreateRet(nullptr);
   }
 }
+
+void Emit::Visit(const sem::SpecialStmt& n) { throw std::runtime_error("Invalid Special Statement in CPU codegen"); }
 
 void Emit::Visit(const sem::Function& n) {
   // Convert parameter and return types. In addition to the formal parameters,

@@ -184,6 +184,15 @@ struct ComputeDensityCostModel {
     if (options.max_sizes_product() && tile.sizes_product() > size_t(options.max_sizes_product())) {
       return std::numeric_limits<double>::infinity();
     }
+    if (options.max_po2_product()) {
+      size_t tot_po2 = 1;
+      for (const auto& d : tile.dims) {
+        tot_po2 *= math::NearestPo2(d.size);
+      }
+      if (tot_po2 > static_cast<size_t>(options.max_po2_product())) {
+        return std::numeric_limits<double>::infinity();
+      }
+    }
 
     double total_compute = 1;
     double tile_expand = 1;

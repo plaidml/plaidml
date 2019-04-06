@@ -365,6 +365,10 @@ message AutotilePass {
   optional double split_factor = 27 [default = .001];
   // Specify if the unaligned tiles are split
   optional bool split_unaligned = 28 [default = false];
+  // The maximal  number of inner loops allowed by the inner block,
+  // where each index is rounded up to the nearest power of 2
+  // 0 means no limit.
+  optional int64 max_po2_product = 29 [default = 0];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any

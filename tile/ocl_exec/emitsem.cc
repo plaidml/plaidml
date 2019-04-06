@@ -44,7 +44,7 @@ sem::ExprPtr SemtreeEmitter::default_intrinsic_emitter(const stripe::Intrinsic& 
 }
 
 SemtreeEmitter::SemtreeEmitter(const AliasMap& am, size_t threads)  //
-    : threads_(threads), lid_limits_({1024 * 1024, 1024 * 1024, 1024 * 1024}) {
+    : hw_threads_(threads), threads_(threads), lid_limits_({1024 * 1024, 1024 * 1024, 1024 * 1024}) {
   loop_mul_ = 1;
   scopes_.emplace_back(am);
   scope_ = &scopes_.back();
@@ -258,7 +258,7 @@ void SemtreeEmitter::Visit(const stripe::Special& spec) {
     op.output = spec.outputs[0];
   }
   lang::HardwareSettings hw;
-  hw.threads = threads_;
+  hw.threads = hw_threads_;
   hw.goal_dimension_sizes = lid_limits_;
   lang::Bindings vars;
   for (const auto& s : spec.inputs) {
@@ -365,6 +365,42 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   tot_stores_ = 0;
 }
 
+sem::StmtPtr SemtreeEmitter::make_special(const std::string& name, const stripe::Block& block,
+                                          std::vector<const stripe::Refinement*> args) {
+  std::vector<sem::ExprPtr> params;
+  for (const stripe::Refinement* ref : args) {
+    int64_t lda = 0;
+    for (const auto d : block.exterior_shape(ref->into).dims) {
+      if (d.size > 1 && d.stride > 1) {
+        lda = d.stride / 4;
+      }
+    }
+    params.push_back(_(ref_name(ref->from)));
+    std::string idx = generate_name(ref->from);
+    process_affine(idx, scope_->at(ref->from).flat());
+    params.push_back(_(idx));
+    params.push_back(_Const(lda));
+  }
+  return std::make_shared<sem::SpecialStmt>(name, params);
+}
+
+void SemtreeEmitter::compute_thread_count(const stripe::Block& block) {
+  if (block.has_tag("gpu_thread")) {
+    size_t prod = 1;
+    for (const auto& idx : block.idxs) {
+      prod *= idx.range;
+    }
+    threads_ = std::max(threads_, prod);
+  } else {
+    for (auto stmt : block.stmts) {
+      auto inner = stripe::Block::Downcast(stmt);
+      if (inner) {
+        compute_thread_count(*inner);
+      }
+    }
+  }
+}
+
 sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
   sem::StmtPtr top = cur_;
   size_t prev_threads = 1;
@@ -412,7 +448,7 @@ void SemtreeEmitter::init_loop_local(const std::string& buf, DataType type,  //
     size_t align_size = (size / vec_size) * vec_size;
     // We process buf[0..align_size-1] using vectors first
     auto inner = _Block({});
-    LValueHolder fname = _("vstore" + std::to_string(vec_size));
+    std::string fname = "vstore" + std::to_string(vec_size);
     auto outer = _Block({});
     sem::Type ptype = {sem::Type::POINTER_MUT, type, 1, 0, sem::Type::NORMAL};
     sem::Type vptype = {sem::Type::POINTER_MUT, type, vec_size, 0, sem::Type::NORMAL};
@@ -422,10 +458,9 @@ void SemtreeEmitter::init_loop_local(const std::string& buf, DataType type,  //
     for (size_t i = 0; i < align_size / vec_size / threads_; i++) {
       sem::StmtPtr call;
       if (i > 0) {
-        call =
-            std::make_shared<sem::CallStmt>(fname(_("_init_"), _("_thread_") + _Const(i * threads_), _(ref_name(buf))));
+        call = _Special(fname, {_("_init_"), _("_thread_") + _Const(i * threads_), _(ref_name(buf))});
       } else {
-        call = std::make_shared<sem::CallStmt>(fname(_("_init_"), _("_thread_"), _(ref_name(buf))));
+        call = _Special(fname, {_("_init_"), _("_thread_"), _(ref_name(buf))});
       }
       outer->push_back(call);
     }
@@ -434,12 +469,12 @@ void SemtreeEmitter::init_loop_local(const std::string& buf, DataType type,  //
     if (align_size > last * vec_size * threads_) {
       if (last > 0) {
         outer->push_back(_Declare({sem::Type::INDEX}, "_next_", _("_thread_") + (last * threads_)));
-        sem::StmtPtr call = std::make_shared<sem::CallStmt>(fname(_("_init_"), _("_next_"), _(ref_name(buf))));
+        sem::StmtPtr call = _Special(fname, {_("_init_"), _("_next_"), _(ref_name(buf))});
         auto iftrue = _Block({call});
         auto ifstmt = sem::builder::_If(_("_next_") < _Const(align_size / vec_size), iftrue);
         outer->push_back(ifstmt);
       } else {
-        sem::StmtPtr call = std::make_shared<sem::CallStmt>(fname(_("_init_"), _("_thread_"), _(ref_name(buf))));
+        sem::StmtPtr call = _Special(fname, {_("_init_"), _("_thread_"), _(ref_name(buf))});
         auto iftrue = _Block({call});
         auto ifstmt = sem::builder::_If(_("_thread_") < _Const(align_size / vec_size), iftrue);
         outer->push_back(ifstmt);
@@ -463,6 +498,11 @@ void SemtreeEmitter::init_loop_local(const std::string& buf, DataType type,  //
 
 void SemtreeEmitter::Visit(const stripe::Block& block) {
   std::shared_ptr<sem::Block> outer = cur_;
+  if (block.has_tag("mac_inner")) {
+    std::vector<const stripe::Refinement*> args = {block.ref_ins()[0], block.ref_ins()[1]};
+    cur_->push_back(make_special("MAC_INNER", block, args));
+    return;
+  }
   if (block.has_tag("kernel")) {
     if (block.has_tag("zero")) {
       if (block.refs.size() != 1) {
@@ -487,6 +527,9 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       kernels_.kernels.push_back(ki);
       return;
     }
+    // TODO: Enabling this cause a bug with softmax, why?
+    // threads_ = 1;
+    // compute_thread_count(block);
     in_kernel_++;
   }
   block_id_.push_back(max_block_id_++);
@@ -567,7 +610,20 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     outer->push_back(do_lids(block));
     outer->push_back(_Barrier());
   } else {
-    outer->push_back(add_loops(block));
+    auto wrapped = add_loops(block);
+    if (block.has_tag("mac_middle")) {
+      std::shared_ptr<sem::Block> sblock;
+      if (wrapped->isBlock()) {
+        sblock = std::dynamic_pointer_cast<sem::Block>(wrapped);
+      } else {
+        sblock = std::make_shared<sem::Block>();
+        sblock->push_back(wrapped);
+      }
+      sblock->push_front(make_special("MAC_INIT", block, {}));
+      sblock->push_back(make_special("MAC_FINISH", block, {block.ref_outs()[0]}));
+      wrapped = sblock;
+    }
+    outer->push_back(wrapped);
   }
   // Unwind depth
   if (block.has_tag("kernel")) {

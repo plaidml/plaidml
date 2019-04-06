@@ -20,7 +20,6 @@ class Emit : public lang::EmitC {
 
   void Visit(const sem::LoadExpr&) final;
   void Visit(const sem::StoreStmt&) final;
-  void Visit(const sem::CallStmt&) final;
   void Visit(const sem::DeclareStmt&) final;
   void Visit(const sem::BinaryExpr&) final;
   void Visit(const sem::CondExpr& n) final;

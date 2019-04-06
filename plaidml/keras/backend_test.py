@@ -1385,6 +1385,10 @@ class TestBackendOps(unittest.TestCase):
         o = b.relu(c)
         return [o]
 
+    @opTest([[m(1024, 1024), m(1024, 1024)]], do_grads=False)
+    def bigMatMul(self, b, A, B):
+        return [b.dot(A, B)]
+
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)

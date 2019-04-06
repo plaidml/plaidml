@@ -91,12 +91,6 @@ void EmitC::Visit(const sem::StoreStmt& n) {
   emit(";\n");
 }
 
-void EmitC::Visit(const sem::CallStmt& n) {
-  emitTab();
-  n.call_expr->Accept(*this);
-  emit(";\n");
-}
-
 void EmitC::Visit(const sem::SubscriptLVal& n) {
   n.ptr->Accept(*this);
   emit("[");
@@ -301,6 +295,19 @@ void EmitC::Visit(const sem::ReturnStmt& n) {
     emit(")");
   }
   emit(";\n");
+}
+
+void EmitC::Visit(const sem::SpecialStmt& n) {
+  emitTab();
+  emit(n.name);
+  emit("(");
+  for (size_t i = 0; i < n.params.size(); i++) {
+    n.params[i]->Accept(*this);
+    if (i != n.params.size() - 1) {
+      emit(", ");
+    }
+  }
+  emit(");\n");
 }
 
 void EmitC::Visit(const sem::Function& n) {

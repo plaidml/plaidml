@@ -107,12 +107,6 @@ class Emitter : public sem::Visitor {
     emit(";\n");
   }
 
-  void Visit(const sem::CallStmt& node) {
-    emitTab();
-    node.call_expr->Accept(*this);
-    emit(";\n");
-  }
-
   void Visit(const sem::SubscriptLVal& node) {
     node.ptr->Accept(*this);
     emit("[");
@@ -314,6 +308,10 @@ class Emitter : public sem::Visitor {
       emit(")");
     }
     emit(";\n");
+  }
+
+  void Visit(const sem::SpecialStmt& node) {
+    throw std::runtime_error("Metal code emitter special statement not defined!");
   }
 
   void Visit(const sem::Function& node) {
