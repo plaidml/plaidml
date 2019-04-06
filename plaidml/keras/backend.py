@@ -708,7 +708,8 @@ def get_value(x):
     tensor = plaidml.Tensor(_device(), shape)
     invoker.set_output('out', tensor)
     invoker.invoke()
-    array = np.ndarray(x.shape.dims, dtype=ptile.convert_pml_dtype_to_np(x.shape.dtype))
+    out_shape = tuple(x.size for x in shape.dimensions)
+    array = np.ndarray(out_shape, dtype=ptile.convert_pml_dtype_to_np(x.shape.dtype))
     with tensor.mmap_current() as view:
         view.copy_to_ndarray(array)
     return array
