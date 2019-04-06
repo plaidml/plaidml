@@ -171,8 +171,8 @@ class _Settings(object):
 
     @property
     def prohibit_winograd(self):
-        return os.environ.get(PROHIBIT_WINOGRAD, '0') is not '0' or os.environ.get(
-            USE_STRIPE, '0') is not '0'
+        return os.environ.get(PROHIBIT_WINOGRAD, '0') is not '0'
+        #or os.environ.get( USE_STRIPE, '0') is not '0'
 
     @prohibit_winograd.setter
     def prohibit_winograd(self, val):

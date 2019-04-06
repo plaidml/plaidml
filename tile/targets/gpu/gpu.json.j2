@@ -153,7 +153,7 @@
                 "reqs": ["cache_load", "gpu_thread"],
                 "local_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] },
                 "register_loc": { "devs": [{"name": "REGISTER", "units": [{"offset": 0}]}] },
-                "register_size": {{ REGS_MEM_KIB * 1024 }},
+                "register_size": {{ REGS_MEM_B }},
                 "global_memory_latency": {{ GLOBAL_MEM_LAT }},
                 "local_memory_latency": {{ LOCAL_MEM_LAT }},
                 "register_latency": {{ REG_MEM_LAT }}
