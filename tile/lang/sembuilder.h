@@ -92,6 +92,10 @@ inline std::shared_ptr<BarrierStmt> _Barrier() { return std::make_shared<Barrier
 
 inline std::shared_ptr<ReturnStmt> _Return(ExprPtr value = ExprPtr()) { return std::make_shared<ReturnStmt>(value); }
 
+inline std::shared_ptr<SpecialStmt> _Special(const std::string& name, std::initializer_list<ExprPtr> args) {
+  return std::make_shared<SpecialStmt>(name, std::vector<ExprPtr>(args));
+}
+
 inline std::shared_ptr<Function> _Function(const std::string& name, const Type& ret,
                                            std::initializer_list<Function::param_t> params,
                                            std::initializer_list<StmtPtr> body) {
@@ -224,7 +228,7 @@ DEF_BINARY_OP(>=)
 DEF_BINARY_OP(<=)
 DEF_BINARY_OP(&)
 DEF_BINARY_OP(|)
-DEF_BINARY_OP(^)  // NOLINT
+DEF_BINARY_OP (^)  // NOLINT
 DEF_BINARY_OP(>>)
 DEF_BINARY_OP(<<)
 }  // End namespace std

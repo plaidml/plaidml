@@ -27,8 +27,6 @@ class InsnOptimizer : public sem::Visitor {
 
   void Visit(const sem::StoreStmt& node) override {}
 
-  void Visit(const sem::CallStmt& node) override {}
-
   void Visit(const sem::SubscriptLVal& node) override {}
 
   void Visit(const sem::DeclareStmt& node) override {
@@ -101,6 +99,8 @@ class InsnOptimizer : public sem::Visitor {
   void Visit(const sem::BarrierStmt& node) override {}
 
   void Visit(const sem::ReturnStmt& node) override {}
+
+  void Visit(const sem::SpecialStmt& node) override {}
 
   void Visit(const sem::Function& node) override {
     lang::Scope<sem::Type> scope;

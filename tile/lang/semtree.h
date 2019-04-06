@@ -96,13 +96,6 @@ struct StoreStmt : public Statement {
   void Accept(Visitor&) const final;
 };
 
-// A call statement return void type
-struct CallStmt : public Statement {
-  ExprPtr call_expr;
-  explicit CallStmt(const ExprPtr expr) : call_expr(expr) {}
-  void Accept(Visitor&) const final;
-};
-
 // Create LVAL reference to an array element
 struct SubscriptLVal : public LValue {
   LValPtr ptr;
@@ -192,7 +185,6 @@ struct CallExpr : public Expression {
     SQRT,
     TAN,
     TANH,
-    OTHER
   };
   Function function;
   std::string name;
@@ -277,6 +269,14 @@ struct ReturnStmt : public Statement {
   void Accept(Visitor&) const final;
 };
 
+// A 'special' statement
+struct SpecialStmt : public Statement {
+  std::string name;
+  std::vector<ExprPtr> params;
+  explicit SpecialStmt(const std::string& n, std::vector<ExprPtr> p) : name(n), params(p) {}
+  void Accept(Visitor&) const final;
+};
+
 // A function, note: this isn't a statement or an expression
 // This is also the entry point into code generation.
 struct Function : public Node {
@@ -298,7 +298,6 @@ class Visitor {
   virtual void Visit(const LookupLVal&) = 0;
   virtual void Visit(const LoadExpr&) = 0;
   virtual void Visit(const StoreStmt&) = 0;
-  virtual void Visit(const CallStmt&) = 0;
   virtual void Visit(const SubscriptLVal&) = 0;
   virtual void Visit(const DeclareStmt&) = 0;
   virtual void Visit(const UnaryExpr&) = 0;
@@ -316,6 +315,7 @@ class Visitor {
   virtual void Visit(const WhileStmt&) = 0;
   virtual void Visit(const BarrierStmt&) = 0;
   virtual void Visit(const ReturnStmt&) = 0;
+  virtual void Visit(const SpecialStmt&) = 0;
   virtual void Visit(const Function&) = 0;
 };
 

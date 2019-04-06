@@ -28,7 +28,6 @@ class ExprType : public sem::Visitor {
   void Visit(const sem::LookupLVal&) final;
   void Visit(const sem::LoadExpr&) final;
   void Visit(const sem::StoreStmt&) final;
-  void Visit(const sem::CallStmt&) final;
   void Visit(const sem::SubscriptLVal&) final;
   void Visit(const sem::DeclareStmt&) final;
   void Visit(const sem::UnaryExpr&) final;
@@ -46,6 +45,7 @@ class ExprType : public sem::Visitor {
   void Visit(const sem::WhileStmt&) final;
   void Visit(const sem::BarrierStmt&) final;
   void Visit(const sem::ReturnStmt&) final;
+  void Visit(const sem::SpecialStmt&) final;
   void Visit(const sem::Function&) final;
 
  private:

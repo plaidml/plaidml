@@ -62,8 +62,6 @@ class Simplifier : public Visitor {
     const_cast<StoreStmt&>(node).rhs = EvalExpr(node.rhs);
   }
 
-  void Visit(const CallStmt& node) override {}
-
   void Visit(const SubscriptLVal& node) override {
     ref_ = Resolve(node.ptr);
     const_cast<SubscriptLVal&>(node).offset = EvalExpr(node.offset);
@@ -360,6 +358,12 @@ class Simplifier : public Visitor {
   void Visit(const ReturnStmt& node) override {
     if (node.value) {
       const_cast<ReturnStmt&>(node).value = EvalExpr(node.value);
+    }
+  }
+
+  void Visit(const SpecialStmt& node) override {
+    for (const auto& expr : node.params) {
+      const_cast<ExprPtr&>(expr) = EvalExpr(expr);
     }
   }
 
