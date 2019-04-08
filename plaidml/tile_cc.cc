@@ -8,27 +8,25 @@
 #include "base/util/logging.h"
 #include "base/util/stream_container.h"
 #include "tile/lang/ast.h"
+#include "tile/lang/gen_special.h"
 #include "tile/lang/ops.h"
 #include "tile/math/polynomial.h"
-
-// TODO:
-// - Typed tensors (ndims)
-// - Complete all eltwise operations
-// - Complete all contraction operations
-// - TypeCheck
 
 namespace vertexai {
 namespace plaidml {
 namespace tile_cc {
 
+using tile::DataType;
 using tile::TensorShape;
 using Polynomial = tile::math::Polynomial<tile::math::Rational>;
 using namespace tile::lang;  // NOLINT
 
+TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr);
+
 struct Index::Impl {
   std::shared_ptr<PolyExpr> expr;
   std::vector<std::shared_ptr<ConstraintExpr>> constraints;
-  Index MakePolyOp(const std::string& op, const Index& rhs);
+  Index MakePolyOp(const std::string& op, const std::vector<Index>& args);
 };
 
 struct Access::Impl {
@@ -40,7 +38,6 @@ struct Access::Impl {
 
 struct Tensor::Impl {
   std::shared_ptr<Expr> expr;
-  tile::TensorShape shape;
 };
 
 Index::Index() : impl_(std::make_shared<Impl>()) { impl_->expr = std::make_shared<PolyIndex>(impl_.get()); }
@@ -51,17 +48,21 @@ Index::Index(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 
 Index::~Index() = default;
 
-Index Index::Impl::MakePolyOp(const std::string& op, const Index& rhs) {
+Index Index::Impl::MakePolyOp(const std::string& op, const std::vector<Index>& args) {
   auto impl = std::make_unique<Impl>();
-  std::vector<std::shared_ptr<PolyExpr>> operands = {expr, rhs.impl_->expr};
+  std::vector<std::shared_ptr<PolyExpr>> operands;
+  for (const auto& arg : args) {
+    operands.push_back(arg.impl_->expr);
+  }
   impl->expr = std::make_shared<PolyOp>(op, operands);
   return Index{std::move(impl)};
 }
 
-Index Index::operator+(const Index& rhs) const { return impl_->MakePolyOp("add", rhs); }
-Index Index::operator-(const Index& rhs) const { return impl_->MakePolyOp("sub", rhs); }
-Index Index::operator*(const Index& rhs) const { return impl_->MakePolyOp("mul", rhs); }
-Index Index::operator/(const Index& rhs) const { return impl_->MakePolyOp("div", rhs); }
+Index Index::operator-() const { return impl_->MakePolyOp("neg", {*this}); }
+Index Index::operator+(const Index& rhs) const { return impl_->MakePolyOp("add", {*this, rhs}); }
+Index Index::operator-(const Index& rhs) const { return impl_->MakePolyOp("sub", {*this, rhs}); }
+Index Index::operator*(const Index& rhs) const { return impl_->MakePolyOp("mul", {*this, rhs}); }
+Index Index::operator/(const Index& rhs) const { return impl_->MakePolyOp("div", {*this, rhs}); }
 
 Constraint Index::operator<(size_t rhs) const {
   auto constraint = std::make_shared<ConstraintExpr>(impl_->expr, rhs);
@@ -71,14 +72,9 @@ Constraint Index::operator<(size_t rhs) const {
 
 const Tensor::Impl* Tensor::impl() const { return impl_.get(); }
 
-const tile::TensorShape& Tensor::shape() const { return impl_->shape; }
+Tensor::Tensor() : impl_(new Impl) { impl_->expr = std::make_shared<ParamExpr>(TensorShape{}, ""); }
 
-Tensor::Tensor() : impl_(new Impl) { impl_->expr = std::make_shared<ParamExpr>(0, ""); }
-
-Tensor::Tensor(const TensorShape& shape) : impl_(new Impl) {
-  impl_->shape = shape;
-  impl_->expr = std::make_shared<ParamExpr>(shape.dims.size(), "");
-}
+Tensor::Tensor(const TensorShape& shape) : impl_(new Impl) { impl_->expr = std::make_shared<ParamExpr>(shape, ""); }
 
 Tensor::Tensor(int value) : impl_(new Impl) { impl_->expr = std::make_shared<IntConst>(value); }
 
@@ -105,7 +101,8 @@ Tensor& Tensor::operator=(const Tensor& rhs) {
 Access Tensor::operator()(const std::vector<Index>& idxs, const std::vector<size_t>& sizes) {
   if (idxs.size() != sizes.size()) {
     throw std::runtime_error(
-        str(boost::format("OutSpec: idxs and sizes mismatch: %1% != %2%") % idxs.size() % sizes.size()));
+        str(boost::format("Dimensions and sizes mismatch in contraction output. Indexes: %1%, Sizes: %2%") %
+            idxs.size() % sizes.size()));
   }
   std::vector<std::shared_ptr<PolyExpr>> idx_exprs;
   for (const auto& idx : idxs) {
@@ -113,15 +110,16 @@ Access Tensor::operator()(const std::vector<Index>& idxs, const std::vector<size
   }
   auto impl = std::make_unique<Access::Impl>();
   impl->src = impl_.get();
-  impl->src->shape = tile::SimpleShape(tile::DataType::FLOAT32, sizes);  // FIXME: type promotion
   impl->expr = std::make_shared<TensorSpecExpr>(impl_->expr, idx_exprs, sizes);
   return Access{std::move(impl)};
 }
 
 Access Tensor::operator()(const std::vector<Index>& idxs) const {
-  if (idxs.size() != impl_->shape.dims.size()) {
+  auto this_shape = shape();
+  if (idxs.size() != this_shape.dims.size()) {
     throw std::runtime_error(
-        str(boost::format("TensorSpec: wrong number of idxs: %1% != %2%") % idxs.size() % impl_->shape.dims.size()));
+        str(boost::format("Unexpected number of dimensions in contraction input. Expected: %1%, Actual: %2%") %
+            this_shape.dims.size() % idxs.size()));
   }
   std::vector<std::shared_ptr<PolyExpr>> idx_exprs;
   for (const auto& idx : idxs) {
@@ -135,20 +133,30 @@ Access Tensor::operator()(const std::vector<Index>& idxs) const {
 }
 
 size_t Tensor::operator[](const size_t dim) const {
-  if (impl_->shape.dims.size() <= dim) {
-    throw std::runtime_error("oops: dim out of bounds");
+  auto this_shape = shape();
+  if (this_shape.dims.size() <= dim) {
+    throw std::runtime_error("Requested dimension number higher than number of tensor dimensions");
   }
-  return impl_->shape.dims[dim].size;
+  return this_shape.dims[dim].size;
 }
 
+Tensor Tensor::operator-() const { return Call("neg", {*this}); }
+Tensor Tensor::operator~() const { return Call("bit_not", {*this}); }
 Tensor Tensor::operator+(const Tensor& rhs) const { return Call("add", {*this, rhs}); }
 Tensor Tensor::operator-(const Tensor& rhs) const { return Call("sub", {*this, rhs}); }
 Tensor Tensor::operator*(const Tensor& rhs) const { return Call("mul", {*this, rhs}); }
 Tensor Tensor::operator/(const Tensor& rhs) const { return Call("div", {*this, rhs}); }
+Tensor Tensor::operator==(const Tensor& rhs) const { return Call("cmp_eq", {*this, rhs}); }
+Tensor Tensor::operator!=(const Tensor& rhs) const { return Call("cmp_ne", {*this, rhs}); }
 Tensor Tensor::operator<(const Tensor& rhs) const { return Call("cmp_lt", {*this, rhs}); }
 Tensor Tensor::operator>(const Tensor& rhs) const { return Call("cmp_gt", {*this, rhs}); }
 Tensor Tensor::operator<=(const Tensor& rhs) const { return Call("cmp_le", {*this, rhs}); }
 Tensor Tensor::operator>=(const Tensor& rhs) const { return Call("cmp_ge", {*this, rhs}); }
+Tensor Tensor::operator<<(const Tensor& rhs) const { return Call("bit_left", {*this, rhs}); }
+Tensor Tensor::operator>>(const Tensor& rhs) const { return Call("bit_right", {*this, rhs}); }
+Tensor Tensor::operator&(const Tensor& rhs) const { return Call("bit_and", {*this, rhs}); }
+Tensor Tensor::operator|(const Tensor& rhs) const { return Call("bit_or", {*this, rhs}); }
+Tensor Tensor::operator^(const Tensor& rhs) const { return Call("bit_xor", {*this, rhs}); }
 
 Tensor& Tensor::no_defract() {
   auto cion_expr = std::dynamic_pointer_cast<ContractionExpr>(impl_->expr);
@@ -167,6 +175,8 @@ Tensor& Tensor::use_default(const Tensor& rhs) {
   cion_expr->use_default = rhs.impl_->expr;
   return *this;
 }
+
+TensorShape Tensor::shape() const { return EvaluateShape(impl_->expr); }
 
 Access::~Access() = default;
 
@@ -363,8 +373,8 @@ class Evaluator : public AstVisitor<std::string> {
       if (name.empty()) {
         name = NewTmp();
       }
-      tile::lang::Input input{tile::lang::Input::FIXED, name};
-      for (size_t i = 0; i < expr.ndims; i++) {
+      Input input{Input::FIXED, name};
+      for (size_t i = 0; i < expr.shape.dims.size(); i++) {
         auto dim_name = str(boost::format("%1%_%2%") % name % i);
         input.dims.emplace_back(dim_name);
       }
@@ -378,8 +388,8 @@ class Evaluator : public AstVisitor<std::string> {
     auto it = seen_.find(&expr);
     if (it == seen_.end()) {
       auto name = NewTmp();
-      tile::lang::Op op{
-          tile::lang::Op::CONSTANT,      // tag
+      Op op{
+          Op::CONSTANT,                  // tag
           name,                          // output
           {std::to_string(expr.value)},  // inputs
           {},                            // Contraction
@@ -395,8 +405,8 @@ class Evaluator : public AstVisitor<std::string> {
     auto it = seen_.find(&expr);
     if (it == seen_.end()) {
       auto name = NewTmp();
-      tile::lang::Op op{
-          tile::lang::Op::CONSTANT,      // tag
+      Op op{
+          Op::CONSTANT,                  // tag
           name,                          // output
           {std::to_string(expr.value)},  // inputs
           {},                            // Contraction
@@ -412,17 +422,17 @@ class Evaluator : public AstVisitor<std::string> {
     auto it = seen_.find(&expr);
     if (it == seen_.end()) {
       PolyEvaluator poly_eval;
-      tile::lang::Contraction cion;
+      Contraction cion;
       cion.agg_op = expr.agg_op;
       cion.comb_op = expr.combo_op;
       cion.no_defract = expr.no_defract;
       if (expr.use_default) {
         cion.use_default = expr.use_default->Accept(this);
       }
-      cion.specs.emplace_back(tile::lang::TensorSpec{});
+      cion.specs.emplace_back(TensorSpec{});
       std::vector<std::string> inputs;
       for (const auto& input : expr.inputs) {
-        tile::lang::TensorSpec tensor_spec;
+        TensorSpec tensor_spec;
         tensor_spec.id = input->ref->Accept(this);
         inputs.push_back(tensor_spec.id);
         for (const auto& idx : input->index_spec) {
@@ -446,11 +456,11 @@ class Evaluator : public AstVisitor<std::string> {
         tile::math::RangeConstraint bound(poly, range);
         cion.constraints.emplace_back(bound);
       }
-      tile::lang::Op op{
-          tile::lang::Op::CONTRACTION,  // tag
-          name,                         // output
-          inputs,                       // inputs
-          cion,                         // Contraction
+      Op op{
+          Op::CONTRACTION,  // tag
+          name,             // output
+          inputs,           // inputs
+          cion,             // Contraction
       };
       program_.ops.emplace_back(op);
       std::tie(it, std::ignore) = seen_.emplace(&expr, name);
@@ -466,12 +476,12 @@ class Evaluator : public AstVisitor<std::string> {
         args.emplace_back(arg->Accept(this));
       }
       auto name = NewTmp();
-      tile::lang::Op op{
-          tile::lang::Op::FUNCTION,  // tag
-          name,                      // output
-          args,                      // inputs
-          {},                        // Contraction
-          {expr.fn},                 // Function
+      Op op{
+          Op::FUNCTION,  // tag
+          name,          // output
+          args,          // inputs
+          {},            // Contraction
+          {expr.fn},     // Function
       };
       program_.ops.emplace_back(op);
       std::tie(it, std::ignore) = seen_.emplace(&expr, name);
@@ -543,11 +553,47 @@ bool MergeShapes(TensorShape* into, const TensorShape& shape) {
   return false;
 }
 
-TensorShape ComputeOutputShape(const std::vector<TensorShape>& inputs) {
+DataType ComputeOutputType(const std::vector<TensorShape>& shapes) {
+  DataType ret = DataType::INVALID;
+  for (const auto& shape : shapes) {
+    DataType cur = shape.type;
+    if (is_float(cur) != is_float(ret)) {
+      if (is_float(cur)) {
+        ret = cur;
+      }
+    } else {
+      // TODO: This is a bit primitive; for example, it will pick
+      // the first of "int32" or "float32".  We may want to make it
+      // a bit more sophisticated.
+      if (bit_width(cur) > bit_width(ret)) {
+        ret = cur;
+      }
+    }
+  }
+  return ret;
+}
+
+TensorShape ComputeOutputShape(const std::vector<Binding>& inputs) {
   TensorShape ret;
   bool did_broadcast = false;
+  std::vector<TensorShape> shapes;
   for (const auto& input : inputs) {
-    did_broadcast = MergeShapes(&ret, input) || did_broadcast;
+    TensorShape shape;
+    switch (input.tag) {
+      case Binding::TENSOR:
+        shape = input.shape;
+        break;
+      case Binding::ICONST:
+        shape = TensorShape(DataType::INT32, {});
+        break;
+      case Binding::FCONST:
+        shape = TensorShape(DataType::FLOAT32, {});
+        break;
+      default:
+        throw std::runtime_error("Unknown binding tag");
+    }
+    did_broadcast = MergeShapes(&ret, shape) || did_broadcast;
+    shapes.emplace_back(shape);
   }
   if (did_broadcast) {
     // Recompute strides in dims.
@@ -557,34 +603,393 @@ TensorShape ComputeOutputShape(const std::vector<TensorShape>& inputs) {
       stride *= it->size;
     }
   }
+  ret.type = ComputeOutputType(shapes);
   return ret;
+}
+
+struct SpecialOp {
+  virtual ~SpecialOp() = default;
+  virtual TensorShape ComputeShape(const std::vector<Binding>& args) const = 0;
+};
+
+class SpecialOpRegistry {
+ public:
+  static SpecialOpRegistry* Instance() {
+    static SpecialOpRegistry registry;
+    return &registry;
+  }
+
+  void Register(const std::string& name, std::unique_ptr<SpecialOp> op) {  //
+    registry_[name] = std::move(op);
+  }
+
+  const SpecialOp* Resolve(const std::string& name) {
+    auto it = registry_.find(name);
+    if (it == registry_.end()) {
+      return nullptr;
+    }
+    return it->second.get();
+  }
+
+ private:
+  std::unordered_map<std::string, std::unique_ptr<SpecialOp>> registry_;
+};
+
+class ShapeEvaluator : public AstVisitor<Binding> {
+  Binding Visit(const ParamExpr& expr) { return Binding(expr.shape); }
+
+  Binding Visit(const CallExpr& expr) {
+    std::vector<Binding> args;
+    for (const auto& arg : expr.args) {
+      args.emplace_back(arg->Accept(this));
+    }
+    auto op = SpecialOpRegistry::Instance()->Resolve(expr.fn);
+    if (op) {
+      return Binding(op->ComputeShape(args));
+    }
+    return Binding(ComputeOutputShape(args));
+  }
+
+  Binding Visit(const ConstraintExpr&) { throw std::runtime_error("Not implemented"); }
+
+  Binding Visit(const ContractionExpr& expr) {
+    DataType type;
+    if (expr.combo_op == CombinationOp::COND) {
+      type = DataType::BOOLEAN;
+    } else {
+      std::vector<TensorShape> shapes;
+      for (const auto& input : expr.inputs) {
+        auto binding = input->Accept(this);
+        if (binding.tag != Binding::TENSOR) {
+          throw std::runtime_error("Unexpected TensorSpecExpr in ContractionExpr.");
+        }
+        shapes.emplace_back(binding.shape);
+      }
+      type = ComputeOutputType(shapes);
+    }
+    return Binding(tile::SimpleShape(type, expr.output->output_sizes));
+  }
+
+  Binding Visit(const FloatConst& expr) { return Binding(expr.value, DataType::FLOAT32); }
+
+  Binding Visit(const IntConst& expr) { return Binding(expr.value); }
+
+  Binding Visit(const TensorSpecExpr& expr) { return expr.ref->Accept(this); }
+};
+
+TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr) {
+  ShapeEvaluator evaluator;
+  return expr->Accept(&evaluator).shape;
 }
 
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {
   auto impl = std::make_unique<Tensor::Impl>();
   std::vector<std::shared_ptr<Expr>> exprs;
-  std::vector<TensorShape> shapes;
   for (const auto& tensor : args) {
     exprs.push_back(tensor.impl_->expr);
-    shapes.push_back(tensor.impl_->shape);
   }
-  impl->shape = ComputeOutputShape(shapes);
-  impl->shape.type = tile::DataType::FLOAT32;  // FIXME: type promotion
   impl->expr = std::make_shared<CallExpr>(fn, exprs);
   return Tensor{std::move(impl)};
 }
 
-Tensor Tensor::reshape(const tile::TensorShape& shape) const {
-  std::vector<Tensor> args = {*this};
-  for (const auto& dim : shape.dims) {
-    args.emplace_back(static_cast<int64_t>(dim.size));
-  }
-  auto ret = Call("reshape", args);
-  ret.impl_->shape = shape;
-  return ret;
-}
-
 Program Evaluate(const std::vector<Tensor>& vars) { return Evaluator().Evaluate(vars); }
+
+struct ReshapeOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() < 1) {
+      throw std::runtime_error("'reshape' requires at least one argument.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'reshape' requires the first argument to be a tensor.");
+    }
+    std::vector<size_t> sizes;
+    for (size_t i = 1; i < args.size(); i++) {
+      if (args[i].tag != Binding::ICONST) {
+        throw std::runtime_error("Additional parameters to 'reshape' must be integers.");
+      }
+      sizes.push_back(args[i].iconst);
+    }
+    return tile::SimpleShape(args[0].shape.type, sizes);
+  }
+};
+
+struct BooleanOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    auto ret = ComputeOutputShape(args);
+    ret.type = DataType::BOOLEAN;
+    return ret;
+  }
+};
+
+struct FloatCastOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 2) {
+      throw std::runtime_error("'as_float' requires 2 arguments.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'as_float' requires the first argument to be a tensor.");
+    }
+    if (args[1].tag != Binding::ICONST) {
+      throw std::runtime_error("'as_float' requires the second argument to be a integer.");
+    }
+    TensorShape ret = args[0].shape;
+    switch (args[1].iconst) {
+      case 16:
+        ret.type = DataType::FLOAT16;
+        break;
+      case 32:
+        ret.type = DataType::FLOAT32;
+        break;
+      case 64:
+        ret.type = DataType::FLOAT64;
+        break;
+      default:
+        throw std::runtime_error("'as_float' requires the width to be one of: (16, 32, 64)");
+    }
+    return ret;
+  }
+};
+
+struct IntCastOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 2) {
+      throw std::runtime_error("'as_int' requires 2 arguments.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'as_int' requires the first argument to be a tensor.");
+    }
+    if (args[1].tag != Binding::ICONST) {
+      throw std::runtime_error("'as_int' requires the second argument to be a integer.");
+    }
+    TensorShape ret = args[0].shape;
+    switch (args[1].iconst) {
+      case 16:
+        ret.type = DataType::INT16;
+        break;
+      case 32:
+        ret.type = DataType::INT32;
+        break;
+      case 64:
+        ret.type = DataType::INT64;
+        break;
+      default:
+        throw std::runtime_error("'as_int' requires the width to be one of: (16, 32, 64)");
+    }
+    return ret;
+  }
+};
+
+struct UintCastOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 2) {
+      throw std::runtime_error("'as_uint' requires 2 arguments.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'as_uint' requires the first argument to be a tensor.");
+    }
+    if (args[1].tag != Binding::ICONST) {
+      throw std::runtime_error("'as_uint' requires the second argument to be a integer.");
+    }
+    TensorShape ret = args[0].shape;
+    switch (args[1].iconst) {
+      case 16:
+        ret.type = DataType::UINT16;
+        break;
+      case 32:
+        ret.type = DataType::UINT32;
+        break;
+      case 64:
+        ret.type = DataType::UINT64;
+        break;
+      default:
+        throw std::runtime_error("'as_uint' requires the width to be one of: (16, 32, 64)");
+    }
+    return ret;
+  }
+};
+
+struct IndexOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 2) {
+      throw std::runtime_error("'index' requires 2 arguments.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'index' requires the first argument to be a tensor.");
+    }
+    if (args[1].tag != Binding::ICONST) {
+      throw std::runtime_error("'index' requires the second argument to be an integer.");
+    }
+    TensorShape ret = args[0].shape;
+    ret.type = DataType::INT32;
+    return ret;
+  }
+};
+
+struct ElementOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 2) {
+      throw std::runtime_error("'element' requires 2 arguments.");
+    }
+    if (args[0].tag != Binding::TUPLE) {
+      throw std::runtime_error("'element' requires the first argument to be a tuple.");
+    }
+    if (args[1].tag != Binding::ICONST) {
+      throw std::runtime_error("'element' requires the second arguement to be an integer.");
+    }
+    auto elt = args[1].iconst;
+    if (elt < 0 || elt >= static_cast<int64_t>(args[0].tuple.size())) {
+      throw std::runtime_error(
+          "'element' requires the second argument to be within the bounds of the specified tuple.");
+    }
+    if (args[0].tuple[elt].tag != Binding::TENSOR) {
+      throw std::runtime_error("'element' requires the resulting binding to be a tensor.");
+    }
+    return args[0].tuple[elt].shape;
+  }
+};
+
+struct GatherOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 2) {
+      throw std::runtime_error("'gather' requires 2 arguments.");
+    }
+    auto data = args[0];
+    auto index = args[1];
+    if (data.tag != Binding::TENSOR || index.tag != Binding::TENSOR) {
+      throw std::runtime_error("'gather' requires both arguments to be tensors.");
+    }
+    if (data.shape.dims.empty()) {
+      throw std::runtime_error("'gather' requires first argument to have at least one dimension.");
+    }
+    if (index.shape.type != DataType::INT32) {
+      // TODO: Handle other integer types?  Floor floats?
+      throw std::runtime_error("'gather' requires the data type for the second argument to be INT32.");
+    }
+    std::vector<size_t> dims;
+    for (size_t i = 0; i < index.shape.dims.size(); i++) {
+      dims.push_back(index.shape.dims[i].size);
+    }
+    for (size_t i = 1; i < data.shape.dims.size(); i++) {
+      dims.push_back(data.shape.dims[i].size);
+    }
+    return tile::SimpleShape(data.shape.type, dims);
+  }
+};
+
+struct ScatterOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 3) {
+      throw std::runtime_error("'scatter' requires 3 arguments.");
+    }
+    if (args[0].tag != Binding::TENSOR || args[1].tag != Binding::TENSOR || args[2].tag != Binding::TENSOR) {
+      throw std::runtime_error("'scatter' requires all arguments to be tensors.");
+    }
+    if (args[0].shape.dims.empty()) {
+      throw std::runtime_error("'scatter' requires first argument to have at least one dimension.");
+    }
+    if (args[1].shape.type != DataType::INT32) {
+      // TODO: Handle other integer types?  Floor floats?
+      throw std::runtime_error("'scatter' requires the data type for the second argument to be INT32.");
+    }
+    std::vector<size_t> dims = {args[2].shape.dims[0].size};
+    for (size_t i = args[1].shape.dims.size(); i < args[0].shape.dims.size(); i++) {
+      dims.push_back(args[0].shape.dims[i].size);
+    }
+    return tile::SimpleShape(args[0].shape.type, dims);
+  }
+};
+
+struct ShapeOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 1) {
+      throw std::runtime_error("'shape' requires exactly one argument.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'shape' requires one argument that is a tensor.");
+    }
+    return tile::SimpleShape(DataType::INT32, {args[0].shape.dims.size()});
+  }
+};
+
+struct PrngStateOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 1) {
+      throw std::runtime_error("'prng_state' requires exactly one argument.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'prng_state' requires one argument that is a tensor.");
+    }
+    auto shape = args[0].shape;
+    if (shape.type != DataType::PRNG) {
+      throw std::runtime_error("'prng_state' requires one argument that is the result of 'prng_step'");
+    }
+    return tile::SimpleShape(DataType::UINT32, {3, k_rng_size});
+  }
+};
+
+struct PrngValueOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() != 1) {
+      throw std::runtime_error("'prng_value' requires exactly one argument.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'prng_value' requires one argument that is a tensor.");
+    }
+    auto shape = args[0].shape;
+    if (shape.type != DataType::PRNG) {
+      throw std::runtime_error("'prng_value' requires one argument that is the result of 'prng_step'");
+    }
+    return TensorShape(DataType::FLOAT32, shape.dims);
+  }
+};
+
+struct PrngStepOp : SpecialOp {
+  TensorShape ComputeShape(const std::vector<Binding>& args) const {
+    if (args.size() < 1) {
+      throw std::runtime_error("'prng_step' must have at least one argument.");
+    }
+    if (args[0].tag != Binding::TENSOR) {
+      throw std::runtime_error("'prng_step' requires first argument to be a tensor.");
+    }
+    // Valididate PRNG state size
+    auto shape = args[0].shape;
+    if (!(shape == tile::SimpleShape(DataType::UINT32, {3, k_rng_size}))) {
+      throw std::runtime_error("'prng_step' requires a valid PRNG state tensor.");
+    }
+    // Get the output shape sizes
+    std::vector<size_t> dims;
+    for (size_t i = 1; i < args.size(); i++) {
+      if (args[i].tag != Binding::ICONST) {
+        throw std::runtime_error("'prng_step' requires additional arguments to be integers.");
+      }
+      dims.push_back(args[i].iconst);
+    }
+    return tile::SimpleShape(DataType::PRNG, dims);
+  }
+};
+
+[[gnu::unused]] auto init = []() {
+  auto registry = SpecialOpRegistry::Instance();
+  registry->Register("as_float", std::make_unique<FloatCastOp>());
+  registry->Register("as_int", std::make_unique<IntCastOp>());
+  registry->Register("as_uint", std::make_unique<UintCastOp>());
+  registry->Register("cmp_eq", std::make_unique<BooleanOp>());
+  registry->Register("cmp_ge", std::make_unique<BooleanOp>());
+  registry->Register("cmp_gt", std::make_unique<BooleanOp>());
+  registry->Register("cmp_le", std::make_unique<BooleanOp>());
+  registry->Register("cmp_lt", std::make_unique<BooleanOp>());
+  registry->Register("cmp_ne", std::make_unique<BooleanOp>());
+  registry->Register("element", std::make_unique<ElementOp>());
+  registry->Register("gather", std::make_unique<GatherOp>());
+  registry->Register("index", std::make_unique<IndexOp>());
+  registry->Register("prng_state", std::make_unique<PrngStateOp>());
+  registry->Register("prng_step", std::make_unique<PrngStepOp>());
+  registry->Register("prng_value", std::make_unique<PrngValueOp>());
+  registry->Register("reshape", std::make_unique<ReshapeOp>());
+  registry->Register("scatter", std::make_unique<ScatterOp>());
+  registry->Register("shape", std::make_unique<ShapeOp>());
+  return 0;
+}();
 
 }  // namespace tile_cc
 }  // namespace plaidml
