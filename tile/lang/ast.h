@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "tile/base/shape.h"
+#include "tile/lang/type.h"
 #include "tile/math/polynomial.h"
 
 namespace vertexai {
@@ -41,14 +43,16 @@ struct AstVisitor {
 struct Expr {
   virtual ~Expr() = default;
   virtual std::string Accept(AstVisitor<std::string>*) = 0;
+  virtual Binding Accept(AstVisitor<Binding>*) = 0;
 };
 
 struct ParamExpr : Expr {
-  size_t ndims;
+  TensorShape shape;
   std::string name;
 
-  explicit ParamExpr(size_t ndims, const std::string& name) : ndims(ndims), name(name) {}
+  explicit ParamExpr(const TensorShape& shape, const std::string& name) : shape(shape), name(name) {}
   std::string Accept(AstVisitor<std::string>* visitor) { return visitor->Visit(*this); }
+  Binding Accept(AstVisitor<Binding>* visitor) { return visitor->Visit(*this); }
 };
 
 struct IntConst : Expr {
@@ -56,6 +60,7 @@ struct IntConst : Expr {
 
   explicit IntConst(int64_t value) : value(value) {}
   std::string Accept(AstVisitor<std::string>* visitor) { return visitor->Visit(*this); }
+  Binding Accept(AstVisitor<Binding>* visitor) { return visitor->Visit(*this); }
 };
 
 struct FloatConst : Expr {
@@ -63,6 +68,7 @@ struct FloatConst : Expr {
 
   explicit FloatConst(double value) : value(value) {}
   std::string Accept(AstVisitor<std::string>* visitor) { return visitor->Visit(*this); }
+  Binding Accept(AstVisitor<Binding>* visitor) { return visitor->Visit(*this); }
 };
 
 struct CallExpr : Expr {
@@ -72,6 +78,7 @@ struct CallExpr : Expr {
   CallExpr(const std::string& fn, const std::vector<std::shared_ptr<Expr>>& args) : fn(fn), args(args) {}
 
   std::string Accept(AstVisitor<std::string>* visitor) { return visitor->Visit(*this); }
+  Binding Accept(AstVisitor<Binding>* visitor) { return visitor->Visit(*this); }
 };
 
 struct TensorSpecExpr : Expr {
@@ -88,6 +95,7 @@ struct TensorSpecExpr : Expr {
         output_sizes(output_sizes) {}
 
   std::string Accept(AstVisitor<std::string>* visitor) { return visitor->Visit(*this); }
+  Binding Accept(AstVisitor<Binding>* visitor) { return visitor->Visit(*this); }
 };
 
 struct ConstraintExpr : Expr {
@@ -96,6 +104,7 @@ struct ConstraintExpr : Expr {
 
   ConstraintExpr(const std::shared_ptr<PolyExpr>& lhs, size_t rhs) : lhs(lhs), rhs(rhs) {}
   std::string Accept(AstVisitor<std::string>* visitor) { return visitor->Visit(*this); }
+  Binding Accept(AstVisitor<Binding>* visitor) { return visitor->Visit(*this); }
 };
 
 struct ContractionExpr : Expr {
@@ -108,6 +117,7 @@ struct ContractionExpr : Expr {
   std::shared_ptr<Expr> use_default;
 
   std::string Accept(AstVisitor<std::string>* visitor) { return visitor->Visit(*this); }
+  Binding Accept(AstVisitor<Binding>* visitor) { return visitor->Visit(*this); }
 };
 
 struct PolyVisitor {

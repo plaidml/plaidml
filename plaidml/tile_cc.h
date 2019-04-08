@@ -59,6 +59,7 @@ class Index {
   IndexIterator begin() { return IndexIterator(this); }
   IndexIterator end() { return IndexIterator{}; }
 
+  Index operator-() const;
   Index operator+(const Index& rhs) const;
   Index operator-(const Index& rhs) const;
   Index operator*(const Index& rhs) const;
@@ -158,6 +159,12 @@ class Tensor {
   Access operator()(const std::vector<Index>& idxs) const;
   size_t operator[](const size_t dim) const;
 
+  // Represents an eltwise negation
+  Tensor operator-() const;
+
+  // Represents an eltwise bit_not
+  Tensor operator~() const;
+
   // Represents an eltwise addition
   Tensor operator+(const Tensor& rhs) const;
 
@@ -169,6 +176,12 @@ class Tensor {
 
   // Represents an eltwise division
   Tensor operator/(const Tensor& rhs) const;
+
+  // Represents an eltwise cmp_eq
+  Tensor operator==(const Tensor& rhs) const;
+
+  // Represents an eltwise cmp_ne
+  Tensor operator!=(const Tensor& rhs) const;
 
   // Represents an eltwise cmp_lt
   Tensor operator<(const Tensor& rhs) const;
@@ -182,17 +195,29 @@ class Tensor {
   // Represents an eltwise cmp_ge
   Tensor operator>=(const Tensor& rhs) const;
 
+  // Represents an eltwise bit_left
+  Tensor operator<<(const Tensor& rhs) const;
+
+  // Represents an eltwise bit_right
+  Tensor operator>>(const Tensor& rhs) const;
+
+  // Represents an eltwise bit_and
+  Tensor operator&(const Tensor& rhs) const;
+
+  // Represents an eltwise bit_or
+  Tensor operator|(const Tensor& rhs) const;
+
+  // Represents an eltwise bit_xor
+  Tensor operator^(const Tensor& rhs) const;
+
   // Enable no_defract on a contraction
   Tensor& no_defract();
 
   // Set use_default on a contraction
   Tensor& use_default(const Tensor& rhs);
 
-  // Reshape a tensor to the specified shape
-  Tensor reshape(const tile::TensorShape& shape) const;
-
   const Impl* impl() const;
-  const tile::TensorShape& shape() const;
+  tile::TensorShape shape() const;
 
  private:
   explicit Tensor(std::unique_ptr<Impl> impl);
@@ -213,16 +238,51 @@ Tensor operator*(T lhs, const Tensor& rhs) {
 
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
 
+inline Tensor as_float(const Tensor& x, size_t bit_size) {
+  return Call("as_float", {x, static_cast<int64_t>(bit_size)});
+}
+
+inline Tensor as_int(const Tensor& x, size_t bit_size) { return Call("as_int", {x, static_cast<int64_t>(bit_size)}); }
+
+inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint", {x, static_cast<int64_t>(bit_size)}); }
+
+// inline Tensor element(const Tensor& x) { return Call("element", {x}); } // TODO: tuple
+
+inline Tensor exp(const Tensor& x) { return Call("exp", {x}); }
+
+inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", {x, y}); }
+
+inline Tensor index(const Tensor& x, size_t axis) { return Call("index", {x, static_cast<int64_t>(axis)}); }
+
+inline Tensor prng_state(const Tensor& x) { return Call("prng_state", {x}); }
+
+inline Tensor prng_step(const Tensor& x, const std::vector<size_t>& sizes) {
+  std::vector<Tensor> args = {x};
+  for (const auto& size : sizes) {
+    args.emplace_back(static_cast<int64_t>(size));
+  }
+  return Call("prng_step", args);
+}
+
+inline Tensor prng_value(const Tensor& x) { return Call("prng_value", {x}); }
+
+inline Tensor reshape(const Tensor& x, const tile::TensorShape& shape) {
+  std::vector<Tensor> args = {x};
+  for (const auto& dim : shape.dims) {
+    args.emplace_back(static_cast<int64_t>(dim.size));
+  }
+  return Call("reshape", args);
+}
+
+inline Tensor scatter(const Tensor& x, const Tensor& y, const Tensor& z) { return Call("scatter", {x, y, z}); }
+
 inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& false_case) {
   return Call("cond", {cond, true_case, false_case});
 }
 
-inline Tensor exp(const Tensor& x) { return Call("exp", {x}); }
+inline Tensor shape(const Tensor& x) { return Call("shape", {x}); }
+
 inline Tensor sqrt(const Tensor& x) { return Call("sqrt", {x}); }
-inline Tensor reshape(const Tensor& x, const tile::TensorShape& shape) { return x.reshape(shape); }
-inline Tensor index(const Tensor& x, size_t axis) { return Call("index", {x, static_cast<int64_t>(axis)}); }
-inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", {x, y}); }
-inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint", {x, static_cast<int64_t>(bit_size)}); }
 
 tile::lang::Program Evaluate(const std::vector<Tensor>& vars);
 

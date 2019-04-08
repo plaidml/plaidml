@@ -148,7 +148,7 @@ Tensor Flatten(const Tensor& X) {
     product *= X.shape().dims[i].size;
   }
   auto shape = tile::SimpleShape(X.shape().type, {1, product});
-  return X.reshape(shape);
+  return reshape(X, shape);
 }
 
 TEST(TileCC, MnistCnn) {
@@ -165,6 +165,7 @@ TEST(TileCC, MnistCnn) {
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
+  EXPECT_THAT(flat.shape(), Eq(tile::SimpleShape(tile::DataType::FLOAT32, {1, 12100})));
   Tensor kernel3(tile::SimpleShape(tile::DataType::FLOAT32, {64, 128}));
   Tensor bias3(tile::SimpleShape(tile::DataType::FLOAT32, {128}));
   // model.add(Dense(128, activation='relu'))
@@ -376,6 +377,7 @@ TEST(TileCC, ArgMax) {
   auto X = ArgMax(I);
   auto program = to_string(Evaluate({X}));
   IVLOG(1, program);
+  EXPECT_THAT(X.shape(), Eq(tile::SimpleShape(tile::DataType::UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"(function (
   X0[X0_0, X0_1, X0_2],
   X2[]
