@@ -210,6 +210,14 @@ message RegisterPass {
   required uint32 local_memory_latency = 6;
   // The latency of register access
   required uint32 register_latency = 7;
+  // The direction of the target refinement
+  required stripe.proto.Refinement.Dir dir = 8;
+  // The tag of the parent of the computational block
+  required string comp_parent_tag = 9;
+  // The index order base block
+  required string index_order = 10;
+  // The aligned size for the arch
+  required uint32 align_size = 11;
 }
 
 // The fusion pass attempt to combine compatible block into a single block that
