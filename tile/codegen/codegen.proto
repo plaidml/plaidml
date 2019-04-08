@@ -369,6 +369,9 @@ message AutotilePass {
   // where each index is rounded up to the nearest power of 2
   // 0 means no limit.
   optional int64 max_po2_product = 29 [default = 0];
+  // Only consider tilings whose sizes are multiples of 32.
+  // This is primarily required for some arch.
+  optional bool only_multiple_of_32 = 30 [default = false];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any
@@ -396,6 +399,9 @@ message PartitionPass {
   required int64 num_parts = 3;
   // Apply tags to any indexes split by partitioning
   optional string idx_tag = 4;
+  // Only consider tilings whose sizes are multiples of 32.
+  // This is primarily required for some arch.
+  optional bool only_multiple_of_32 = 5 [default = false];
 }
 
 // Unroll a given block, similar to a loop unrolling in a traditional compiler.
