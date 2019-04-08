@@ -148,15 +148,37 @@
 
         ## Load cache into registers
         {
-            "name": "register_cache",
+            "name": "register_cache_load",
             "register_cache": {
                 "reqs": ["cache_load", "gpu_thread"],
+                "dir": "In",
                 "local_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] },
                 "register_loc": { "devs": [{"name": "REGISTER", "units": [{"offset": 0}]}] },
                 "register_size": {{ REGS_MEM_B }},
                 "global_memory_latency": {{ GLOBAL_MEM_LAT }},
                 "local_memory_latency": {{ LOCAL_MEM_LAT }},
-                "register_latency": {{ REG_MEM_LAT }}
+                "register_latency": {{ REG_MEM_LAT }},
+                "comp_parent_tag": "contract_middle",
+                "index_order": "cache",
+                "align_size": {{ ALIGN_SIZE_B }}
+            }
+        },
+
+        ## Store cache into registers
+        {
+            "name": "register_cache_store",
+            "register_cache": {
+                "reqs": ["cache_store", "gpu_thread"],
+                "dir": "Out",
+                "local_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] },
+                "register_loc": { "devs": [{"name": "REGISTER", "units": [{"offset": 0}]}] },
+                "register_size": {{ REGS_MEM_B }},
+                "global_memory_latency": {{ GLOBAL_MEM_LAT }},
+                "local_memory_latency": {{ LOCAL_MEM_LAT }},
+                "register_latency": {{ REG_MEM_LAT }},
+                "comp_parent_tag": "contract_middle",
+                "index_order": "comp",
+                "align_size": {{ ALIGN_SIZE_B }}
             }
         },
 

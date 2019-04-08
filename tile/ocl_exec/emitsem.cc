@@ -410,9 +410,7 @@ sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
     if (idx.affine != stripe::Affine()) {
       continue;
     }
-    auto expr = block.has_tag("reg_cache") ?  //
-                    ((tid % block.idxs_product()) / prev_threads)
-                                           : (tid / prev_threads);
+    auto expr = block.has_tag("reg_cache") ? ((tid % block.idxs_product()) / prev_threads) : (tid / prev_threads);
     if (i != 1) {
       expr = expr % idx.range;
     }
