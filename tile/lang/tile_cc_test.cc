@@ -18,7 +18,7 @@ Tensor Dot(const Tensor& X, const Tensor& Y) {
   for (auto x0 : Index()) {
     for (auto y1 : Index()) {
       for (auto z : Index()) {
-        R({x0, y1}, {X[0], Y[1]}) += X({x0, z}) * Y({z, y1});
+        R({x0, y1}, {X.dims(0), Y.dims(1)}) += X({x0, z}) * Y({z, y1});
       }
     }
   }
@@ -31,14 +31,14 @@ Tensor Softmax(const Tensor& X) {
   Tensor M;
   for (auto i : Index()) {
     for (auto j : Index()) {
-      M({i, 0}, {X[0], 1}) >= X({i, j});
+      M({i, 0}, {X.dims(0), 1}) >= X({i, j});
     }
   }
   auto E = exp(X - M);
   Tensor N;
   for (auto i : Index()) {
     for (auto j : Index()) {
-      N({i, 0}, {X[0], 1}) += E({i, j});
+      N({i, 0}, {X.dims(0), 1}) += E({i, j});
     }
   }
   return E / N;
@@ -96,8 +96,8 @@ TEST(TileCC, MnistMlp) {
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
   Tensor R;
-  auto N = I[0], H = I[1], W = I[2];
-  auto KH = K[0], KW = K[1], CO = K[3];
+  auto N = I.dims(0), H = I.dims(1), W = I.dims(2);
+  auto KH = K.dims(0), KW = K.dims(1), CO = K.dims(3);
   auto kc0 = K.shape().dims[0].size / 2;
   auto kc1 = K.shape().dims[1].size / 2;
   for (auto n : Index()) {
@@ -121,7 +121,7 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 
 Tensor MaxPooling2(const Tensor& I) {
   Tensor R;
-  auto N = I[0], H = I[1], W = I[2], C = I[3];
+  auto N = I.dims(0), H = I.dims(1), W = I.dims(2), C = I.dims(3);
   for (auto n : Index()) {
     for (auto h : Index()) {
       for (auto w : Index()) {
@@ -291,7 +291,7 @@ TEST(TileCC, LarsMomentum4d) {
 
 TEST(TileCC, RepeatElements) {
   Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {10, 10, 10}));
-  auto N0 = I[0], N1 = I[1], N2 = I[2];
+  auto N0 = I.dims(0), N1 = I.dims(1), N2 = I.dims(2);
   Tensor O;
   for (auto n0 : Index()) {
     for (auto n1 : Index()) {
@@ -320,7 +320,7 @@ TEST(TileCC, RepeatElements) {
 TEST(TileCC, UseDefault) {
   Tensor P(tile::SimpleShape(tile::DataType::FLOAT32, {1, 7, 10, 10}));
   Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {1, 10, 10}));
-  auto B = I[0], N1 = I[1], N2 = I[2];
+  auto B = I.dims(0), N1 = I.dims(1), N2 = I.dims(2);
   Tensor O;
   for (auto b : Index()) {
     for (auto i1 : Index()) {
@@ -344,7 +344,7 @@ TEST(TileCC, UseDefault) {
 }
 
 Tensor ArgMax(const Tensor& I) {
-  auto X0 = I[0], X1 = I[1], X2 = I[2];
+  auto X0 = I.dims(0), X1 = I.dims(1), X2 = I.dims(2);
   Tensor Max;
   for (const auto x0 : Index()) {
     for (const auto x1 : Index()) {
@@ -394,9 +394,9 @@ TEST(TileCC, ArgMax) {
 }
 
 Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor& B, const Tensor& G) {
-  auto N = I[0], X = I[1], Y = I[2], CI = I[3];
-  auto S = K[0], CO = K[3];
-  auto BI = A[0], BO = A[1];
+  auto N = I.dims(0), X = I.dims(1), Y = I.dims(2), CI = I.dims(3);
+  auto S = K.dims(0), CO = K.dims(3);
+  auto BI = A.dims(0), BO = A.dims(1);
   auto XO = (X - S + 1) / 1;
   auto YO = (Y - S + 1) / 1;
   auto XB = (XO + BO - 1) / BO;

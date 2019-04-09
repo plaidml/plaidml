@@ -84,8 +84,6 @@ Constraint Index::operator<(size_t rhs) const {
   return Constraint();
 }
 
-const Tensor::Impl* Tensor::impl() const { return impl_.get(); }
-
 Tensor::Tensor(const std::string& name) : impl_(new Impl) {
   impl_->expr = std::make_shared<ParamExpr>(TensorShape{}, name);
 }
@@ -150,7 +148,7 @@ Access Tensor::operator()(const std::vector<Index>& idxs) const {
   return Access{std::move(impl)};
 }
 
-size_t Tensor::operator[](const size_t dim) const {
+size_t Tensor::dims(const size_t dim) const {
   auto this_shape = shape();
   if (this_shape.dims.size() <= dim) {
     throw std::runtime_error("Requested dimension number higher than number of tensor dimensions");
@@ -317,8 +315,6 @@ Access cond(const Access& lhs, const Access& rhs, const Access& true_case) {
   impl->expr = std::make_shared<CallExpr>("cond", args);
   return Access{std::move(impl)};
 }
-
-const Access::Impl* Access::impl() const { return impl_.get(); }
 
 class PolyEvaluator : public PolyVisitor {
  private:
@@ -647,7 +643,7 @@ class Evaluator : public AstVisitor {
   RunInfo Evaluate(const std::vector<Tensor>& vars) {
     std::vector<std::shared_ptr<Expr>> exprs;
     for (const auto& var : vars) {
-      exprs.push_back(var.impl()->expr);
+      exprs.push_back(var.impl_->expr);
     }
     AstTraversal traversal(exprs);
     // Traverse the entire graph in least-dependent to most-dependent order.

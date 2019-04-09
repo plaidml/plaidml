@@ -20,7 +20,7 @@ std::shared_ptr<BufferBase> MakeBuffer(const TensorShape& shape) {
 }
 
 Tensor MatMul(const Tensor& A, const Tensor& B) {
-  auto M = A[0], N = B[1];
+  auto M = A.dims(0), N = B.dims(1);
   Index k("k"), m("m"), n("n");
   Tensor C("C");
   C({m, n}, {M, N}) += A({m, k}) * B({k, n});
@@ -28,7 +28,7 @@ Tensor MatMul(const Tensor& A, const Tensor& B) {
 }
 
 Tensor Convolution1(const Tensor& I, const Tensor& K) {
-  auto X = I[0], CO = K[2];
+  auto X = I.dims(0), CO = K.dims(2);
   auto kc = K.shape().dims[0].size / 2;
   Index x("x"), kx("kx"), co("co"), ci("ci");
   Tensor O("O");
@@ -37,8 +37,8 @@ Tensor Convolution1(const Tensor& I, const Tensor& K) {
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
-  auto N = I[0], H = I[1], W = I[2];
-  auto KH = K[0], KW = K[1], CO = K[3];
+  auto N = I.dims(0), H = I.dims(1), W = I.dims(2);
+  auto KH = K.dims(0), KW = K.dims(1), CO = K.dims(3);
   auto kc0 = K.shape().dims[0].size / 2;
   auto kc1 = K.shape().dims[1].size / 2;
   Index n("n"), x0("x0"), x1("x1"), kx("kx"), ky("ky"), co("co"), ci("ci");
@@ -49,7 +49,7 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 }
 
 Tensor DilatedConvolution2(const Tensor& I, const Tensor& K) {
-  auto N = I[0], Lx = I[1], Ly = I[2], LKx = K[0], LKy = K[1], CO = K[3];
+  auto N = I.dims(0), Lx = I.dims(1), Ly = I.dims(2), LKx = K.dims(0), LKy = K.dims(1), CO = K.dims(3);
   Tensor O("O");
   Index n, x, y, kx, ky, ci, co;
   O({n, x, y, co}, {N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO}) +=
@@ -225,15 +225,15 @@ RunInfo LoadPow(const std::string& name,  //
 }
 
 Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor& Epsilon) {
-  int64_t H = I[2] * I[3];
+  int64_t H = I.dims(2) * I.dims(3);
   Tensor Sum;
   Index i0, i1, i2, i3;
-  Sum({i0, i1, 0, 0}, {I[0], I[1], 1, 1}) += I({i0, i1, i2, i3});
+  Sum({i0, i1, 0, 0}, {I.dims(0), I.dims(1), 1, 1}) += I({i0, i1, i2, i3});
   auto Mu = Sum / H;
   auto Diff = I - Mu;
   auto SqDiff = Diff * Diff;
   Tensor SumSqDiff;
-  SumSqDiff({i0, i1, 0, 0}, {I[0], I[1], 1, 1}) += SqDiff({i0, i1, i2, i3});
+  SumSqDiff({i0, i1, 0, 0}, {I.dims(0), I.dims(1), 1, 1}) += SqDiff({i0, i1, i2, i3});
   auto Stdev = sqrt(SumSqDiff + Epsilon) / H;
   return (G / Stdev) * (I - Mu) + B;
 }
@@ -251,7 +251,7 @@ RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
 Tensor PolygonBoxTransform(const Tensor& I) {
   Tensor TEpartial;
   Tensor TOpartial;
-  auto N = I[0], C = I[1], H = I[2], W = I[3];
+  auto N = I.dims(0), C = I.dims(1), H = I.dims(2), W = I.dims(3);
   Index n, c, h, w;
   auto Widx = index(I, 3);
   TEpartial({2 * n, c, h, w}, {N, C, H, W}) = I({2 * n, c, h, w});
