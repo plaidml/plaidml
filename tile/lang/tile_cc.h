@@ -7,11 +7,12 @@
 #include <vector>
 
 #include "tile/base/shape.h"
+#include "tile/lang/compose.h"
 #include "tile/lang/ops.h"
 
 namespace vertexai {
-namespace plaidml {
-namespace tile_cc {
+namespace tile {
+namespace lang {
 
 class Access;
 class Index;
@@ -55,6 +56,7 @@ class Index {
   ~Index();
 
   Index(size_t value);  // NOLINT
+  explicit Index(const std::string& name);
 
   IndexIterator begin() { return IndexIterator(this); }
   IndexIterator end() { return IndexIterator{}; }
@@ -143,13 +145,13 @@ class Tensor {
   struct Impl;
 
  public:
-  Tensor();
+  explicit Tensor(const std::string& name = "");
   ~Tensor();
 
   Tensor(int value);      // NOLINT
   Tensor(int64_t value);  // NOLINT
   Tensor(double value);   // NOLINT
-  explicit Tensor(const tile::TensorShape& shape);
+  explicit Tensor(const tile::TensorShape& shape, const std::string& name = "");
 
   // Copyable
   Tensor(const Tensor& rhs);
@@ -254,6 +256,8 @@ inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", {
 
 inline Tensor index(const Tensor& x, size_t axis) { return Call("index", {x, static_cast<int64_t>(axis)}); }
 
+inline Tensor pow(const Tensor& x, const Tensor& y) { return Call("pow", {x, y}); }
+
 inline Tensor prng_state(const Tensor& x) { return Call("prng_state", {x}); }
 
 inline Tensor prng_step(const Tensor& x, const std::vector<size_t>& sizes) {
@@ -284,8 +288,8 @@ inline Tensor shape(const Tensor& x) { return Call("shape", {x}); }
 
 inline Tensor sqrt(const Tensor& x) { return Call("sqrt", {x}); }
 
-tile::lang::Program Evaluate(const std::vector<Tensor>& vars);
+tile::lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars);
 
-}  // namespace tile_cc
-}  // namespace plaidml
+}  // namespace lang
+}  // namespace tile
 }  // namespace vertexai

@@ -1,4 +1,4 @@
-#include "plaidml/tile_cc.h"
+#include "tile/lang/tile_cc.h"
 
 #include <algorithm>
 #include <iterator>
@@ -6,6 +6,7 @@
 #include <boost/format.hpp>
 
 #include "base/util/logging.h"
+#include "base/util/lookup.h"
 #include "base/util/stream_container.h"
 #include "tile/lang/ast.h"
 #include "tile/lang/gen_special.h"
@@ -13,15 +14,24 @@
 #include "tile/math/polynomial.h"
 
 namespace vertexai {
-namespace plaidml {
-namespace tile_cc {
+namespace tile {
+namespace lang {
 
-using tile::DataType;
-using tile::TensorShape;
-using Polynomial = tile::math::Polynomial<tile::math::Rational>;
-using namespace tile::lang;  // NOLINT
+using Polynomial = math::Polynomial<math::Rational>;
+using AstVector = std::vector<std::shared_ptr<Expr>>;
 
 TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr);
+
+std::ostream& operator<<(std::ostream& os, const Expr* expr) {
+  os << expr->str() << ": " << static_cast<const void*>(expr);
+  return os;
+}
+
+std::string to_string(const Expr* expr) {
+  std::stringstream ss;
+  ss << expr;
+  return ss.str();
+}
 
 struct Index::Impl {
   std::shared_ptr<PolyExpr> expr;
@@ -43,6 +53,10 @@ struct Tensor::Impl {
 Index::Index() : impl_(std::make_shared<Impl>()) { impl_->expr = std::make_shared<PolyIndex>(impl_.get()); }
 
 Index::Index(size_t value) : impl_(std::make_shared<Impl>()) { impl_->expr = std::make_shared<PolyLiteral>(value); }
+
+Index::Index(const std::string& name) : impl_(std::make_shared<Impl>()) {
+  impl_->expr = std::make_shared<PolyIndex>(impl_.get(), name);
+}
 
 Index::Index(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 
@@ -72,9 +86,13 @@ Constraint Index::operator<(size_t rhs) const {
 
 const Tensor::Impl* Tensor::impl() const { return impl_.get(); }
 
-Tensor::Tensor() : impl_(new Impl) { impl_->expr = std::make_shared<ParamExpr>(TensorShape{}, ""); }
+Tensor::Tensor(const std::string& name) : impl_(new Impl) {
+  impl_->expr = std::make_shared<ParamExpr>(TensorShape{}, name);
+}
 
-Tensor::Tensor(const TensorShape& shape) : impl_(new Impl) { impl_->expr = std::make_shared<ParamExpr>(shape, ""); }
+Tensor::Tensor(const TensorShape& shape, const std::string& name) : impl_(new Impl) {
+  impl_->expr = std::make_shared<ParamExpr>(shape, name);
+}
 
 Tensor::Tensor(int value) : impl_(new Impl) { impl_->expr = std::make_shared<IntConst>(value); }
 
@@ -88,7 +106,7 @@ Tensor::~Tensor() = default;
 Tensor::Tensor(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 
 // Copy Constructor
-Tensor::Tensor(const Tensor& rhs) : impl_(new Impl(*rhs.impl_)) {}
+Tensor::Tensor(const Tensor& rhs) { *this = rhs; }
 
 // Copy Assignment
 Tensor& Tensor::operator=(const Tensor& rhs) {
@@ -248,6 +266,12 @@ void Access::Impl::MakeContraction(AggregationOp agg_op, const Access& rhs) {
   }
   cion_expr->constraints = cc.constraints;
 
+  // If the lhs has been optionally named, use it
+  auto param = std::dynamic_pointer_cast<ParamExpr>(src->expr);
+  std::string name;
+  if (param) {
+    cion_expr->name = param->name;
+  }
   src->expr = cion_expr;
 }
 
@@ -301,7 +325,11 @@ class PolyEvaluator : public PolyVisitor {
   Polynomial Visit(const PolyIndex& expr) {
     auto it = seen_.find(expr.ptr);
     if (it == seen_.end()) {
-      std::tie(it, std::ignore) = seen_.emplace(expr.ptr, NewIdx());
+      auto name = expr.name;
+      if (name.empty()) {
+        name = NewIdx();
+      }
+      std::tie(it, std::ignore) = seen_.emplace(expr.ptr, name);
     }
     return Polynomial(it->second);
   }
@@ -350,154 +378,94 @@ class PolyEvaluator : public PolyVisitor {
   size_t next_ = 0;
 };
 
-class Evaluator : public AstVisitor<std::string> {
+class AstTraversal : public AstVisitor {
  public:
-  Program Evaluate(const std::vector<Tensor>& vars) {
-    for (const auto& var : vars) {
-      auto expr = var.impl()->expr;
-      auto it = seen_.find(expr.get());
-      if (it == seen_.end()) {
-        auto name = expr->Accept(this);
-        std::tie(it, std::ignore) = seen_.emplace(expr.get(), name);
-      }
-      program_.outputs.push_back(it->second);
+  explicit AstTraversal(const std::vector<std::shared_ptr<Expr>>& exprs) {
+    for (const auto& expr : exprs) {
+      Push(expr);
     }
-    return program_;
+    while (stack_.size()) {
+      auto entry = stack_.top();
+      stack_.pop();
+      if (entry.second) {
+        flat_.push_back(entry.first);
+      } else if (!seen_.count(entry.first.get())) {
+        seen_.insert(entry.first.get());
+        stack_.push(std::make_pair(entry.first, true));
+        entry.first->Accept(this);
+      }
+    }
+    IVLOG(4, "AstTraversal: " << StreamContainer(flat_));
+  }
+
+  const AstVector& flat() const { return flat_; }
+
+ private:
+  void Visit(const CallExpr& expr) {
+    // push arguments from right-to-left so they eventually get processed in left-to-right order
+    for (auto it = expr.args.rbegin(); it != expr.args.rend(); ++it) {
+      Push(*it);
+    }
+  }
+
+  void Visit(const ConstraintExpr& expr) { throw std::runtime_error("Not implemented"); }
+
+  void Visit(const ContractionExpr& expr) {
+    // push inputs from right-to-left so they eventually get processed in left-to-right order
+    for (auto it = expr.inputs.rbegin(); it != expr.inputs.rend(); ++it) {
+      Push((*it)->ref);
+    }
+    if (expr.use_default) {
+      Push(expr.use_default);
+    }
+  }
+
+  void Visit(const FloatConst& expr) {}
+
+  void Visit(const IntConst& expr) {}
+
+  void Visit(const ParamExpr& expr) {}
+
+  void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("Not implemented"); }
+
+ private:
+  void Push(const std::shared_ptr<Expr>& expr) {
+    IVLOG(4, "AstTraversal::Push> " << expr.get());
+    stack_.push(std::make_pair(expr, false));
   }
 
  private:
-  std::string Visit(const ParamExpr& expr) {
-    auto it = seen_.find(&expr);
-    if (it == seen_.end()) {
-      auto name = expr.name;
-      if (name.empty()) {
-        name = NewTmp();
-      }
-      Input input{Input::FIXED, name};
-      for (size_t i = 0; i < expr.shape.dims.size(); i++) {
-        auto dim_name = str(boost::format("%1%_%2%") % name % i);
-        input.dims.emplace_back(dim_name);
-      }
-      program_.inputs.push_back(input);
-      std::tie(it, std::ignore) = seen_.emplace(&expr, name);
-    }
-    return it->second;
+  std::stack<std::pair<std::shared_ptr<Expr>, bool>> stack_;
+  AstVector flat_;
+  std::unordered_set<const Expr*> seen_;
+};
+
+struct SpecialOp {
+  virtual ~SpecialOp() = default;
+  virtual TensorShape ComputeShape(const std::vector<Binding>& args) const = 0;
+};
+
+class SpecialOpRegistry {
+ public:
+  static SpecialOpRegistry* Instance() {
+    static SpecialOpRegistry registry;
+    return &registry;
   }
 
-  std::string Visit(const FloatConst& expr) {
-    auto it = seen_.find(&expr);
-    if (it == seen_.end()) {
-      auto name = NewTmp();
-      Op op{
-          Op::CONSTANT,                  // tag
-          name,                          // output
-          {std::to_string(expr.value)},  // inputs
-          {},                            // Contraction
-          {"fconst"},                    // Function
-      };
-      program_.ops.emplace_back(op);
-      std::tie(it, std::ignore) = seen_.emplace(&expr, name);
-    }
-    return it->second;
+  void Register(const std::string& name, std::unique_ptr<SpecialOp> op) {  //
+    registry_[name] = std::move(op);
   }
 
-  std::string Visit(const IntConst& expr) {
-    auto it = seen_.find(&expr);
-    if (it == seen_.end()) {
-      auto name = NewTmp();
-      Op op{
-          Op::CONSTANT,                  // tag
-          name,                          // output
-          {std::to_string(expr.value)},  // inputs
-          {},                            // Contraction
-          {"iconst"},                    // Function
-      };
-      program_.ops.emplace_back(op);
-      std::tie(it, std::ignore) = seen_.emplace(&expr, name);
+  const SpecialOp* Resolve(const std::string& name) {
+    auto it = registry_.find(name);
+    if (it == registry_.end()) {
+      return nullptr;
     }
-    return it->second;
+    return it->second.get();
   }
-
-  std::string Visit(const ContractionExpr& expr) {
-    auto it = seen_.find(&expr);
-    if (it == seen_.end()) {
-      PolyEvaluator poly_eval;
-      Contraction cion;
-      cion.agg_op = expr.agg_op;
-      cion.comb_op = expr.combo_op;
-      cion.no_defract = expr.no_defract;
-      if (expr.use_default) {
-        cion.use_default = expr.use_default->Accept(this);
-      }
-      cion.specs.emplace_back(TensorSpec{});
-      std::vector<std::string> inputs;
-      for (const auto& input : expr.inputs) {
-        TensorSpec tensor_spec;
-        tensor_spec.id = input->ref->Accept(this);
-        inputs.push_back(tensor_spec.id);
-        for (const auto& idx : input->index_spec) {
-          auto poly = idx->Accept(&poly_eval);
-          tensor_spec.spec.push_back(poly);
-        }
-        cion.specs.emplace_back(tensor_spec);
-      }
-      auto name = NewTmp();
-      cion.specs[0].id = name;
-      for (const auto& idx : expr.output->index_spec) {
-        auto poly = idx->Accept(&poly_eval);
-        cion.specs[0].spec.push_back(poly);
-      }
-      for (const auto& size : expr.output->output_sizes) {
-        cion.output_size.push_back(std::to_string(size));
-      }
-      for (const auto& constraint : expr.constraints) {
-        auto poly = constraint->lhs->Accept(&poly_eval);
-        auto range = constraint->rhs;
-        tile::math::RangeConstraint bound(poly, range);
-        cion.constraints.emplace_back(bound);
-      }
-      Op op{
-          Op::CONTRACTION,  // tag
-          name,             // output
-          inputs,           // inputs
-          cion,             // Contraction
-      };
-      program_.ops.emplace_back(op);
-      std::tie(it, std::ignore) = seen_.emplace(&expr, name);
-    }
-    return it->second;
-  }
-
-  std::string Visit(const CallExpr& expr) {
-    auto it = seen_.find(&expr);
-    if (it == seen_.end()) {
-      std::vector<std::string> args;
-      for (const auto& arg : expr.args) {
-        args.emplace_back(arg->Accept(this));
-      }
-      auto name = NewTmp();
-      Op op{
-          Op::FUNCTION,  // tag
-          name,          // output
-          args,          // inputs
-          {},            // Contraction
-          {expr.fn},     // Function
-      };
-      program_.ops.emplace_back(op);
-      std::tie(it, std::ignore) = seen_.emplace(&expr, name);
-    }
-    return it->second;
-  }
-
-  std::string Visit(const TensorSpecExpr& expr) { throw std::runtime_error("Not implemented"); }
-  std::string Visit(const ConstraintExpr& expr) { throw std::runtime_error("Not implemented"); }
 
  private:
-  std::string NewTmp() { return str(boost::format("X%1%") % program_.next_tmp++); }
-
- private:
-  std::unordered_map<const Expr*, std::string> seen_;
-  Program program_;
+  std::unordered_map<std::string, std::unique_ptr<SpecialOp>> registry_;
 };
 
 bool MergeShapes(TensorShape* into, const TensorShape& shape) {
@@ -607,59 +575,45 @@ TensorShape ComputeOutputShape(const std::vector<Binding>& inputs) {
   return ret;
 }
 
-struct SpecialOp {
-  virtual ~SpecialOp() = default;
-  virtual TensorShape ComputeShape(const std::vector<Binding>& args) const = 0;
-};
-
-class SpecialOpRegistry {
+class ShapeEvaluator : AstVisitor {
  public:
-  static SpecialOpRegistry* Instance() {
-    static SpecialOpRegistry registry;
-    return &registry;
-  }
-
-  void Register(const std::string& name, std::unique_ptr<SpecialOp> op) {  //
-    registry_[name] = std::move(op);
-  }
-
-  const SpecialOp* Resolve(const std::string& name) {
-    auto it = registry_.find(name);
-    if (it == registry_.end()) {
-      return nullptr;
+  ShapeEvaluator(const AstVector& flat, std::unordered_map<const Expr*, Binding>* bindings) : bindings_(bindings) {
+    for (const auto& expr : flat) {
+      expr->Accept(this);
     }
-    return it->second.get();
   }
 
  private:
-  std::unordered_map<std::string, std::unique_ptr<SpecialOp>> registry_;
-};
+  void Visit(const ParamExpr& expr) {
+    IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
+    bindings_->emplace(&expr, expr.shape);
+  }
 
-class ShapeEvaluator : public AstVisitor<Binding> {
-  Binding Visit(const ParamExpr& expr) { return Binding(expr.shape); }
-
-  Binding Visit(const CallExpr& expr) {
+  void Visit(const CallExpr& expr) {
+    IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
     std::vector<Binding> args;
     for (const auto& arg : expr.args) {
-      args.emplace_back(arg->Accept(this));
+      args.emplace_back(safe_at(bindings_, arg.get()));
     }
     auto op = SpecialOpRegistry::Instance()->Resolve(expr.fn);
     if (op) {
-      return Binding(op->ComputeShape(args));
+      bindings_->emplace(&expr, Binding(op->ComputeShape(args)));
+    } else {
+      bindings_->emplace(&expr, Binding(ComputeOutputShape(args)));
     }
-    return Binding(ComputeOutputShape(args));
   }
 
-  Binding Visit(const ConstraintExpr&) { throw std::runtime_error("Not implemented"); }
+  void Visit(const ConstraintExpr&) { throw std::runtime_error("Not implemented"); }
 
-  Binding Visit(const ContractionExpr& expr) {
+  void Visit(const ContractionExpr& expr) {
+    IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
     DataType type;
     if (expr.combo_op == CombinationOp::COND) {
       type = DataType::BOOLEAN;
     } else {
       std::vector<TensorShape> shapes;
       for (const auto& input : expr.inputs) {
-        auto binding = input->Accept(this);
+        auto binding = safe_at(bindings_, input->ref.get());
         if (binding.tag != Binding::TENSOR) {
           throw std::runtime_error("Unexpected TensorSpecExpr in ContractionExpr.");
         }
@@ -667,19 +621,189 @@ class ShapeEvaluator : public AstVisitor<Binding> {
       }
       type = ComputeOutputType(shapes);
     }
-    return Binding(tile::SimpleShape(type, expr.output->output_sizes));
+    bindings_->emplace(&expr, Binding(tile::SimpleShape(type, expr.output->output_sizes)));
   }
 
-  Binding Visit(const FloatConst& expr) { return Binding(expr.value, DataType::FLOAT32); }
+  void Visit(const FloatConst& expr) {
+    IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
+    bindings_->emplace(&expr, Binding(expr.value, DataType::FLOAT32));
+  }
 
-  Binding Visit(const IntConst& expr) { return Binding(expr.value); }
+  void Visit(const IntConst& expr) {
+    IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
+    bindings_->emplace(&expr, expr.value);
+  }
 
-  Binding Visit(const TensorSpecExpr& expr) { return expr.ref->Accept(this); }
+  void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("Not implemented"); }
+
+ private:
+  std::unordered_map<const Expr*, Binding>* bindings_;
+};
+
+class Evaluator : public AstVisitor {
+ public:
+  explicit Evaluator(const std::string& name) { runinfo_.program_name = name; }
+
+  RunInfo Evaluate(const std::vector<Tensor>& vars) {
+    std::vector<std::shared_ptr<Expr>> exprs;
+    for (const auto& var : vars) {
+      exprs.push_back(var.impl()->expr);
+    }
+    AstTraversal traversal(exprs);
+    // Traverse the entire graph in least-dependent to most-dependent order.
+    ShapeEvaluator evaluator(traversal.flat(), &bindings_);
+    for (const auto& expr : traversal.flat()) {
+      expr->Accept(this);
+    }
+    for (const auto& expr : exprs) {
+      // At this point, it should be gauranteed that the output expressions have been visited.
+      auto name = safe_at(&names_, expr.get());
+      auto shape = safe_at(&bindings_, expr.get()).shape;
+      IVLOG(2, "Output> " << name << ": " << shape);
+      runinfo_.output_shapes.emplace(name, shape);
+      runinfo_.program.outputs.push_back(name);
+    }
+    for (const auto& kvp : names_) {
+      auto name = kvp.second;
+      auto binding = safe_at(&bindings_, kvp.first);
+      runinfo_.vars.emplace(name, binding);
+    }
+    runinfo_.code = to_string(runinfo_.program);
+    runinfo_.from_edsl = true;
+    IVLOG(4, "Evaluator::Evaluate> " << runinfo_.code);
+    return runinfo_;
+  }
+
+ private:
+  void Visit(const ParamExpr& expr) {
+    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+    auto name = NewTmp(expr);
+    Input input{Input::FIXED, name};
+    for (size_t i = 0; i < expr.shape.dims.size(); i++) {
+      auto dim_name = str(boost::format("%1%_%2%") % name % i);
+      input.dims.emplace_back(dim_name);
+    }
+    runinfo_.program.inputs.push_back(input);
+    runinfo_.input_shapes.emplace(name, expr.shape);
+    names_.emplace(&expr, name);
+  }
+
+  void Visit(const FloatConst& expr) {
+    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+    auto name = NewTmp(expr);
+    Op op{
+        Op::CONSTANT,                  // tag
+        name,                          // output
+        {std::to_string(expr.value)},  // inputs
+        {},                            // Contraction
+        {"fconst"},                    // Function
+    };
+    runinfo_.program.ops.emplace_back(op);
+    names_.emplace(&expr, name);
+  }
+
+  void Visit(const IntConst& expr) {
+    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+    auto name = NewTmp(expr);
+    Op op{
+        Op::CONSTANT,                  // tag
+        name,                          // output
+        {std::to_string(expr.value)},  // inputs
+        {},                            // Contraction
+        {"iconst"},                    // Function
+    };
+    runinfo_.program.ops.emplace_back(op);
+    names_.emplace(&expr, name);
+  }
+
+  void Visit(const CallExpr& expr) {
+    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+    std::vector<std::string> args;
+    for (const auto& arg : expr.args) {
+      args.emplace_back(safe_at(&names_, arg.get()));
+    }
+    auto name = NewTmp(expr);
+    Op op{
+        Op::FUNCTION,  // tag
+        name,          // output
+        args,          // inputs
+        {},            // Contraction
+        {expr.fn},     // Function
+    };
+    runinfo_.program.ops.emplace_back(op);
+    names_.emplace(&expr, name);
+  }
+
+  void Visit(const ConstraintExpr& expr) { throw std::runtime_error("Not implemented"); }
+
+  void Visit(const ContractionExpr& expr) {
+    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+    PolyEvaluator poly_eval;
+    Contraction cion;
+    cion.agg_op = expr.agg_op;
+    cion.comb_op = expr.combo_op;
+    cion.no_defract = expr.no_defract;
+    if (expr.use_default) {
+      cion.use_default = safe_at(&names_, expr.use_default.get());
+    }
+    cion.specs.emplace_back(TensorSpec{});
+    std::vector<std::string> inputs;
+    for (const auto& input : expr.inputs) {
+      TensorSpec tensor_spec;
+      tensor_spec.id = safe_at(&names_, input->ref.get());
+      inputs.push_back(tensor_spec.id);
+      for (const auto& idx : input->index_spec) {
+        auto poly = idx->Accept(&poly_eval);
+        tensor_spec.spec.push_back(poly);
+      }
+      cion.specs.emplace_back(tensor_spec);
+    }
+    auto name = NewTmp(expr);
+    cion.specs[0].id = name;
+    for (const auto& idx : expr.output->index_spec) {
+      auto poly = idx->Accept(&poly_eval);
+      cion.specs[0].spec.push_back(poly);
+    }
+    for (const auto& size : expr.output->output_sizes) {
+      cion.output_size.push_back(std::to_string(size));
+    }
+    for (const auto& constraint : expr.constraints) {
+      auto poly = constraint->lhs->Accept(&poly_eval);
+      auto range = constraint->rhs;
+      tile::math::RangeConstraint bound(poly, range);
+      cion.constraints.emplace_back(bound);
+    }
+    Op op{
+        Op::CONTRACTION,  // tag
+        name,             // output
+        inputs,           // inputs
+        cion,             // Contraction
+    };
+    runinfo_.program.ops.emplace_back(op);
+    names_.emplace(&expr, name);
+  }
+
+  void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("Not implemented"); }
+
+ private:
+  std::string NewTmp(const Expr& expr) {
+    if (expr.name.size()) {
+      return expr.name;
+    }
+    return str(boost::format("X%1%") % runinfo_.program.next_tmp++);
+  }
+
+ private:
+  std::unordered_map<const Expr*, std::string> names_;
+  std::unordered_map<const Expr*, Binding> bindings_;
+  RunInfo runinfo_;
 };
 
 TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr) {
-  ShapeEvaluator evaluator;
-  return expr->Accept(&evaluator).shape;
+  AstTraversal traversal({expr});
+  std::unordered_map<const Expr*, Binding> bindings;
+  ShapeEvaluator evaluator(traversal.flat(), &bindings);
+  return safe_at(&bindings, expr.get()).shape;
 }
 
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {
@@ -692,7 +816,7 @@ Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {
   return Tensor{std::move(impl)};
 }
 
-Program Evaluate(const std::vector<Tensor>& vars) { return Evaluator().Evaluate(vars); }
+RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) { return Evaluator(name).Evaluate(vars); }
 
 struct ReshapeOp : SpecialOp {
   TensorShape ComputeShape(const std::vector<Binding>& args) const {
@@ -991,6 +1115,6 @@ struct PrngStepOp : SpecialOp {
   return 0;
 }();
 
-}  // namespace tile_cc
-}  // namespace plaidml
+}  // namespace lang
+}  // namespace tile
 }  // namespace vertexai

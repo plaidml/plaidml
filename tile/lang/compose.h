@@ -232,12 +232,15 @@ class ValueVisitor {
 struct RunInfo {
   std::string program_name;
   std::string code;
+  Program program;
   ShapeMap input_shapes;
   ShapeMap output_shapes;
   std::map<std::string, std::shared_ptr<BufferBase>> input_buffers;
   std::map<std::string, std::shared_ptr<BufferBase>> output_buffers;
   std::map<std::string, std::shared_ptr<BufferBase>> qparams_buffers;
   std::set<std::string> const_inputs;
+  bool from_edsl = false;
+  Bindings vars;
 };
 
 class FunctionApplication;
@@ -276,7 +279,7 @@ class BoundFunction final : public ValueVisitor<std::string> {
   const std::string& output_name(size_t i) const { return prog_.outputs[i]; }
 
   // Prepare to run a function, this is only valid if num_inputs() == 0 and num_outputs() == 0
-  RunInfo PrepareToRun() const;
+  RunInfo PrepareToRun(const std::string& name) const;
 
  private:
   // Called during construction

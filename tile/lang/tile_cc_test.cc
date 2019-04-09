@@ -4,15 +4,13 @@
 #include <gtest/gtest.h>
 
 #include "base/util/logging.h"
-#include "plaidml/plaidml++.h"
-#include "plaidml/tile_cc.h"
-#include "testing/plaidml_config.h"
+#include "tile/lang/tile_cc.h"
 
 using ::testing::Eq;
 
 namespace vertexai {
-namespace plaidml {
-namespace tile_cc {
+namespace tile {
+namespace lang {
 namespace {
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
@@ -60,7 +58,7 @@ TEST(TileCC, MnistMlp) {
   Tensor kernel3(tile::SimpleShape(tile::DataType::FLOAT32, {784, 10}));
   Tensor bias3(tile::SimpleShape(tile::DataType::FLOAT32, {10}));
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
-  auto program = to_string(Evaluate({dense3}));
+  auto program = to_string(Evaluate("mnist_mlp", {dense3}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   X0[X0_0, X0_1],
@@ -175,7 +173,7 @@ TEST(TileCC, MnistCnn) {
   Tensor bias4(tile::SimpleShape(tile::DataType::FLOAT32, {kNumClasses}));
   // model.add(Dense(num_classes, activation='softmax'))
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
-  auto program = to_string(Evaluate({dense2}));
+  auto program = to_string(Evaluate("mnist_cnn", {dense2}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   X0[X0_0, X0_1, X0_2, X0_3],
@@ -255,25 +253,25 @@ TEST(TileCC, LarsMomentum4d) {
   Tensor Veloc(X_shape);
   Tensor LR(LR_shape);
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
-  auto program = to_string(Evaluate({std::get<0>(R), std::get<1>(R)}));
+  auto program = to_string(Evaluate("lars_momentum4d", {std::get<0>(R), std::get<1>(R)}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   X0[X0_0, X0_1, X0_2, X0_3],
-  X1[X1_0, X1_1, X1_2, X1_3],
-  X4[],
+  X3[],
+  X6[X6_0, X6_1, X6_2, X6_3],
   X11[X11_0, X11_1, X11_2, X11_3]
 ) -> (
   X24,
   X23
 ) {
-  X2 = 0.125000;
-  X3 = mul(X1, X2);
-  X5 = 0.000977;
-  X6 = mul(X4, X5);
-  X7 = mul(X0, X0);
+  X1 = 0.125000;
+  X2 = mul(X0, X1);
+  X4 = 0.000977;
+  X5 = mul(X3, X4);
+  X7 = mul(X6, X6);
   X8[] = +(X7[x0, x1, x2, x3]);
   X9 = sqrt(X8);
-  X10 = mul(X6, X9);
+  X10 = mul(X5, X9);
   X12 = mul(X11, X11);
   X13[] = +(X12[x0, x1, x2, x3]);
   X14 = sqrt(X13);
@@ -282,11 +280,11 @@ TEST(TileCC, LarsMomentum4d) {
   X17 = add(X14, X16);
   X18 = div(X10, X17);
   X19 = 0.000488;
-  X20 = mul(X0, X19);
+  X20 = mul(X6, X19);
   X21 = add(X11, X20);
   X22 = mul(X18, X21);
-  X23 = add(X3, X22);
-  X24 = sub(X0, X23);
+  X23 = add(X2, X22);
+  X24 = sub(X6, X23);
 }
 )"));
 }
@@ -307,7 +305,7 @@ TEST(TileCC, RepeatElements) {
       }
     }
   }
-  auto program = to_string(Evaluate({O}));
+  auto program = to_string(Evaluate("repeat_elts", {O}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   X0[X0_0, X0_1, X0_2]
@@ -332,7 +330,7 @@ TEST(TileCC, UseDefault) {
       }
     }
   }
-  auto program = to_string(Evaluate({O}));
+  auto program = to_string(Evaluate("use_default", {O}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   X0[X0_0, X0_1, X0_2, X0_3],
@@ -375,7 +373,7 @@ Tensor ArgMax(const Tensor& I) {
 TEST(TileCC, ArgMax) {
   Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {1, 10, 10}));
   auto X = ArgMax(I);
-  auto program = to_string(Evaluate({X}));
+  auto program = to_string(Evaluate("arg_max", {X}).program);
   IVLOG(1, program);
   EXPECT_THAT(X.shape(), Eq(tile::SimpleShape(tile::DataType::UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"(function (
@@ -418,7 +416,7 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
   return O;
 }
 
-TEST(TileCC, Wingrad) {
+TEST(TileCC, Winograd) {
   const size_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {N, X, Y, CI}));
   Tensor K(tile::SimpleShape(tile::DataType::FLOAT32, {S, S, CI, CO}));
@@ -426,7 +424,7 @@ TEST(TileCC, Wingrad) {
   Tensor B(tile::SimpleShape(tile::DataType::FLOAT32, {BI, BI}));
   Tensor G(tile::SimpleShape(tile::DataType::FLOAT32, {BI, S}));
   auto W = Winograd(I, K, A, B, G);
-  auto program = to_string(Evaluate({W}));
+  auto program = to_string(Evaluate("winograd", {W}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   X0[X0_0, X0_1],
@@ -449,6 +447,6 @@ TEST(TileCC, Wingrad) {
 }
 
 }  // namespace
-}  // namespace tile_cc
-}  // namespace plaidml
+}  // namespace lang
+}  // namespace tile
 }  // namespace vertexai
