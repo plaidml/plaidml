@@ -136,7 +136,7 @@ TEST(Codegen, StencilMatchMatMul) {
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({spec}, *kernel);
+  auto match = FindBestStencil({spec}, kernel.get());
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1255968,  // total
@@ -170,7 +170,7 @@ TEST(Codegen, StencilMatchConv1D) {
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({spec}, *kernel);
+  auto match = FindBestStencil({spec}, kernel.get());
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1378944,  // total
@@ -222,7 +222,7 @@ TEST(Codegen, StencilMatchConv2D) {
 
   IVLOG(2, "\n" << *kernel);
 
-  auto match = FindBestStencil(specs, *kernel);
+  auto match = FindBestStencil(specs, kernel.get());
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       323280000,  // total

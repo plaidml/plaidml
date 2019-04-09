@@ -397,18 +397,18 @@ void swap(Orderer<V>& v1, Orderer<V>& v2) {
   std::swap(*v1, *v2);
 }
 
-boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const stripe::Block& block) {
+boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, stripe::Block* block) {
   boost::optional<StencilMatch> lowest_cost_match;
 
-  std::vector<Orderer<const Refinement*>> ref_ins;
+  std::vector<Orderer<Refinement*>> ref_ins;
   std::size_t ord = 0;
-  for (const auto* ref : block.ref_ins()) {
+  for (auto* ref : block->ref_ins()) {
     ref_ins.emplace_back(ord++, ref);
   }
 
-  std::vector<Orderer<const Refinement*>> ref_outs;
+  std::vector<Orderer<Refinement*>> ref_outs;
   ord = 0;
-  for (const auto* ref : block.ref_outs()) {
+  for (auto* ref : block->ref_outs()) {
     ref_outs.emplace_back(ord++, ref);
   }
 
@@ -432,14 +432,14 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
 
     std::vector<Orderer<const Index*>> idxs;
     ord = 0;
-    for (auto& idx : block.idxs) {
+    for (auto& idx : block->idxs) {
       idxs.emplace_back(ord++, &idx);
     }
 
     // Add virtual indexes for this spec so that we consider inefficent but valid matches.
     std::vector<Index> virtual_idxs;
     for (int k = idxs.size(); k < spec.idxs_size(); k++) {
-      auto idx_name = block.unique_idx_name("$" + std::to_string(k));
+      auto idx_name = block->unique_idx_name("$" + std::to_string(k));
       virtual_idxs.emplace_back(Index{idx_name, 1});
     }
     for (auto& idx : virtual_idxs) {
@@ -454,7 +454,7 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
     auto build_stencil_match = [&]() {
       StencilMatch match{1, {}};
       std::map<std::string, StencilIndexMatch> idx_matches;
-      for (const auto& idx : block.idxs) {
+      for (const auto& idx : block->idxs) {
         idx_matches[idx.name] = StencilIndexMatch{idx.name, "*", 1};
       }
       auto idx_it = idxs.begin();
@@ -464,7 +464,7 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
         if (rule_it->size() != -1) {
           idx_match = StencilIndexMatch{(*idx_it)->name, rule_it->name(), static_cast<uint64_t>(rule_it->size())};
         } else {
-          auto block_idx = block.idx_by_name((*idx_it)->name);
+          auto block_idx = block->idx_by_name((*idx_it)->name);
           idx_match = StencilIndexMatch{(*idx_it)->name, rule_it->name(), block_idx->range};
         }
         idx_matches[idx_match.block_idx_name] = idx_match;
@@ -473,12 +473,18 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
         ++idx_it;
       }
       size_t total_tiles = 1;
-      for (const auto& idx : block.idxs) {
+      for (const auto& idx : block->idxs) {
         auto tile = safe_at(idx_matches, idx.name);
         size_t num_tiles = math::RoundUp(idx.range, tile.value);
         total_tiles *= num_tiles;
         match.cost *= num_tiles * tile.value;
         match.idxs.push_back(tile);
+      }
+      for (const auto& ref_in : ref_ins) {
+        match.ref_ins.emplace_back(*ref_in);
+      }
+      for (const auto& ref_out : ref_outs) {
+        match.ref_outs.emplace_back(*ref_out);
       }
       match.cost += spec.startup_cost() * total_tiles;
       IVLOG(4, "Candidate: " << match);
@@ -540,6 +546,8 @@ struct StencilPassOptions {
   std::vector<proto::Stencil> specs;
   Tags set_outer;
   Tags set_inner;
+  std::vector<Tags> set_inputs;
+  std::vector<Tags> set_outputs;
 };
 
 void ApplyIndexTags(Block* block, const StencilMatch& match) {
@@ -554,6 +562,24 @@ void ApplyIndexTags(Block* block, const StencilMatch& match) {
   }
 }
 
+void ApplyRefTags(Block* block, const StencilMatch& match, const StencilPassOptions& options) {
+  auto ref_it = match.ref_ins.begin();
+  for (const auto& tags : options.set_inputs) {
+    if (ref_it == match.ref_ins.end()) {
+      break;
+    }
+    (*ref_it++)->add_tags(tags);
+  }
+
+  ref_it = match.ref_outs.begin();
+  for (const auto& tags : options.set_outputs) {
+    if (ref_it == match.ref_outs.end()) {
+      break;
+    }
+    (*ref_it++)->add_tags(tags);
+  }
+}
+
 void StencilPassRecurse(Block* block, const StencilPassOptions& options) {
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
@@ -562,10 +588,11 @@ void StencilPassRecurse(Block* block, const StencilPassOptions& options) {
     }
   }
   if (block->has_tags(options.reqs)) {
-    auto match = FindBestStencil(options.specs, *block);
+    auto match = FindBestStencil(options.specs, block);
     if (!match) {
       return;
     }
+    ApplyRefTags(block, *match, options);
     TileShape tile;
     for (const auto& idx : match->idxs) {
       tile.push_back(idx.value);
@@ -588,6 +615,12 @@ void StencilPass(Block* block, const proto::StencilPass& options) {
   };
   for (const auto& stencil : options.stencils()) {
     sopts.specs.push_back(stencil);
+  }
+  for (const auto& input_set : options.inputs_set()) {
+    sopts.set_inputs.emplace_back(FromProto(input_set.tags()));
+  }
+  for (const auto& output_set : options.outputs_set()) {
+    sopts.set_outputs.emplace_back(FromProto(output_set.tags()));
   }
   StencilPassRecurse(block, sopts);
 }

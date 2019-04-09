@@ -511,6 +511,26 @@ std::vector<const Refinement*> Block::ref_outs() const {
   return results;
 }
 
+std::vector<Refinement*> Block::ref_ins() {
+  std::vector<Refinement*> results;
+  for (auto& ref : refs) {
+    if (ref.dir == RefDir::In) {
+      results.push_back(&ref);
+    }
+  }
+  return results;
+}
+
+std::vector<Refinement*> Block::ref_outs() {
+  std::vector<Refinement*> results;
+  for (auto& ref : refs) {
+    if (ref.dir == RefDir::Out) {
+      results.push_back(&ref);
+    }
+  }
+  return results;
+}
+
 std::ostream& operator<<(std::ostream& os, const Index& idx) {
   if (!idx.tags.empty()) {
     os << "(";
@@ -1089,6 +1109,26 @@ std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& re
   if (fail && it == refs.end()) {
     throw_with_trace(
         std::runtime_error(str(boost::format("Refinement not found on block '%s' via from: %s") % name % ref_name)));
+  }
+  return it;
+}
+
+std::vector<Refinement>::iterator Block::ref_by_tag(const std::string& tag_name, bool fail) {
+  auto it =
+      std::find_if(refs.begin(), refs.end(), [&tag_name](const Refinement& ref) { return ref.has_tag(tag_name); });
+  if (fail && it == refs.end()) {
+    throw_with_trace(
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via tag: %s") % name % tag_name)));
+  }
+  return it;
+}
+
+std::vector<Refinement>::const_iterator Block::ref_by_tag(const std::string& tag_name, bool fail) const {
+  auto it =
+      std::find_if(refs.begin(), refs.end(), [&tag_name](const Refinement& ref) { return ref.has_tag(tag_name); });
+  if (fail && it == refs.end()) {
+    throw_with_trace(
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via tag: %s") % name % tag_name)));
   }
   return it;
 }
