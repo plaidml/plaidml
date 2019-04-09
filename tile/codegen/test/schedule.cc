@@ -691,7 +691,7 @@ TEST(Schedule, Basic) {
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
   auto tests = lib::InternalTests();
-  const auto runinfo = tests.at("$layer_test2");
+  auto runinfo = tests.at("$layer_test2")();
   auto stripe = GenerateStripe(runinfo);
   Optimize(stripe.program.get(), cfg.passes(), options);
 }

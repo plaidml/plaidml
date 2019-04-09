@@ -2,141 +2,135 @@
 
 #include <boost/format.hpp>
 
+#include "tile/lang/tile_cc.h"
 #include "tile/util/tile_file.h"
 
 namespace vertexai {
 namespace tile {
 namespace lib {
 
+using namespace lang;  // NOLINT
+
 namespace {
 
-std::shared_ptr<lang::BufferBase> MakeBuffer(const TensorShape& shape) {
+std::shared_ptr<BufferBase> MakeBuffer(const TensorShape& shape) {
   auto buffer = std::make_shared<util::SimpleBuffer>();
   buffer->bytes.resize(shape.byte_size());
   return buffer;
 }
 
+Tensor MatMul(const Tensor& A, const Tensor& B) {
+  auto M = A[0], N = B[1];
+  Index k("k"), m("m"), n("n");
+  Tensor C("C");
+  C({m, n}, {M, N}) += A({m, k}) * B({k, n});
+  return C;
+}
+
+Tensor Convolution1(const Tensor& I, const Tensor& K) {
+  auto X = I[0], CO = K[2];
+  auto kc = K.shape().dims[0].size / 2;
+  Index x("x"), kx("kx"), co("co"), ci("ci");
+  Tensor O("O");
+  O({x, co}, {X, CO}) += I({x + kx - kc, ci}) * K({kx, ci, co});
+  return O;
+}
+
+Tensor Convolution2(const Tensor& I, const Tensor& K) {
+  auto N = I[0], H = I[1], W = I[2];
+  auto KH = K[0], KW = K[1], CO = K[3];
+  auto kc0 = K.shape().dims[0].size / 2;
+  auto kc1 = K.shape().dims[1].size / 2;
+  Index n("n"), x0("x0"), x1("x1"), kx("kx"), ky("ky"), co("co"), ci("ci");
+  Tensor O("O");
+  O({n, x0, x1, co}, {N, H - (KH - 1), W - (KW - 1), CO}) +=
+      I({n, x0 + kx - kc0, x1 + ky - kc1, ci}) * K({kx, ky, ci, co});
+  return O;
+}
+
+Tensor DilatedConvolution2(const Tensor& I, const Tensor& K) {
+  auto N = I[0], Lx = I[1], Ly = I[2], LKx = K[0], LKy = K[1], CO = K[3];
+  Tensor O("O");
+  Index n, x, y, kx, ky, ci, co;
+  O({n, x, y, co}, {N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO}) +=
+      I({n, x + 2 * kx, y + 3 * ky, ci}) * K({kx, ky, ci, co});
+  return O;
+}
+
+Tensor Relu(const Tensor& X) { return Call("relu", {X}); }
+
 }  // namespace
 
-lang::RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = "function (A[M, K], B[K, N]) -> (C) { C[m, n : M, N] = +(A[m, k] * B[k, n]); }";
-  runinfo.input_shapes.emplace("A", i1);
-  runinfo.input_shapes.emplace("B", i2);
-  runinfo.output_shapes.emplace("C", SimpleShape(i1.type, {i1.dims[0].size, i2.dims[1].size}));
+RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  return Evaluate(name, {MatMul(A, B)});
+}
+
+RunInfo LoadEltwiseAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  return Evaluate(name, {A + B});
+}
+
+RunInfo LoadConstCalc(const std::string& name) {
+  Tensor N(1);
+  Tensor F(0.0);
+  Tensor F2(3.7);
+  Index i;
+  Tensor Simple;
+  Simple({i}, {1}) = F({});
+  Tensor DoubleN;
+  DoubleN({i}, {1}) = N({});
+  Tensor Partial = Simple + DoubleN;
+  Tensor O = Partial + F2;
+  return Evaluate(name, {O});
+}
+
+RunInfo LoadConv1d(const std::string& name,   //
+                   const TensorShape& input,  //
+                   const TensorShape& kernel) {
+  Tensor I(input, "I");
+  Tensor K(kernel, "K");
+  auto runinfo = Evaluate(name, {Convolution1(I, K)});
+  runinfo.const_inputs = {"K"};
+  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
   return runinfo;
 }
 
-lang::RunInfo LoadEWAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = "function (A, B) -> (C) { C = A + B; }";
-  runinfo.input_shapes.emplace("A", i1);
-  runinfo.input_shapes.emplace("B", i2);
-  runinfo.output_shapes.emplace("C", SimpleShape(i1.type, {i1.dims[0].size, i2.dims[1].size}));
+RunInfo LoadConv2d(const std::string& name,   //
+                   const TensorShape& input,  //
+                   const TensorShape& kernel) {
+  Tensor I(input, "I");
+  Tensor K(kernel, "K");
+  auto runinfo = Evaluate(name, {Convolution2(I, K)});
+  runinfo.const_inputs = {"K"};
+  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
   return runinfo;
 }
 
-lang::RunInfo LoadConstCalc(const std::string& name, const TensorShape& output) {
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = R"***(
-function () -> (O) {
-  N = 1;
-  F = 0.0;
-  F2 = 3.7;
-  Simple[i : N] = =(F[]);
-  DoubleN[i : N] = =(N[]);
-  Partial = Simple + DoubleN;
-  O = Partial + F2;
-})***";
-  runinfo.output_shapes.emplace("O", output);
+RunInfo LoadConv2dRelu(const std::string& name,   //
+                       const TensorShape& input,  //
+                       const TensorShape& kernel) {
+  Tensor I(input, "I");
+  Tensor K(kernel, "K");
+  auto runinfo = Evaluate(name, {Relu(Convolution2(I, K))});
+  runinfo.const_inputs = {"K"};
+  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
   return runinfo;
 }
 
-lang::RunInfo LoadConv1d(const std::string& name,    //
+RunInfo LoadConv2dBnRelu(const std::string& name,    //
                          const TensorShape& input,   //
                          const TensorShape& kernel,  //
-                         const TensorShape& output) {
-  auto center = kernel.dims[0].size / 2;
-  auto code = R"***(
-function (I[X, CI], K[KX, CI, CO]) -> (O) {
-  [[pid(res2a_branch2a)]] O[x, co : X, CO] = +(I[x + kx - %1%, ci] * K[kx, ci, co]);
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = str(boost::format(code) % center);
-  runinfo.input_shapes.insert(std::make_pair("I", input));
-  runinfo.input_shapes.insert(std::make_pair("K", kernel));
-  runinfo.output_shapes.insert(std::make_pair("O", output));
-  runinfo.const_inputs = {"K"};
-  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  return runinfo;
-}
-
-lang::RunInfo LoadConv2d(const std::string& name,    //
-                         const TensorShape& input,   //
-                         const TensorShape& kernel,  //
-                         const TensorShape& output) {
-  auto center = kernel.dims[0].size / 2;
-  auto code = R"***(
-function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
-  [[pid(res2a_branch2a)]] O[n, x0, x1, co : N, X, Y, CO] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K[kx, ky, ci, co]);
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = str(boost::format(code) % center);
-  runinfo.input_shapes.insert(std::make_pair("I", input));
-  runinfo.input_shapes.insert(std::make_pair("K", kernel));
-  runinfo.output_shapes.insert(std::make_pair("O", output));
-  runinfo.const_inputs = {"K"};
-  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  return runinfo;
-}
-
-lang::RunInfo LoadConv2dRelu(const std::string& name,    //
-                             const TensorShape& input,   //
-                             const TensorShape& kernel,  //
-                             const TensorShape& output) {
-  auto center = kernel.dims[0].size / 2;
-  auto code = R"***(
-function (I[N, X, Y, CI], K[KX, KY, CI, CO]) -> (O) {
-  [[pid(res2a_branch2a)]] O[n, x0, x1, co : N, X, Y, CO] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K[kx, ky, ci, co]);
-  [[pid(relu)]] R = zelu(O);
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = str(boost::format(code) % center);
-  runinfo.input_shapes.insert(std::make_pair("I", input));
-  runinfo.input_shapes.insert(std::make_pair("K", kernel));
-  runinfo.output_shapes.insert(std::make_pair("R", output));
-  runinfo.const_inputs = {"K"};
-  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  return runinfo;
-}
-
-lang::RunInfo LoadConv2dBnRelu(const std::string& name,      //
-                               const TensorShape& input,     //
-                               const TensorShape& kernel,    //
-                               const TensorShape& channels,  //
-                               const TensorShape& output) {
-  auto center = kernel.dims[0].size / 2;
-  auto code = R"***(
-function (I[N, X, Y, CI], K[KX, KY, CI, CO], B[CO], S[CO]) -> (R) {
-  [[pid(res2a_branch2a)]] O[n, x0, x1, co : N, X, Y, CO] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K[kx, ky, ci, co]);
-  [[pid(bias_add)]] BO = O + B;
-  [[pid(scale)]] BS = BO * S;
-  [[pid(relu)]] R = zelu(BS);
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = str(boost::format(code) % center);
-  runinfo.input_shapes.insert(std::make_pair("I", input));
-  runinfo.input_shapes.insert(std::make_pair("K", kernel));
-  runinfo.input_shapes.insert(std::make_pair("B", channels));
-  runinfo.input_shapes.insert(std::make_pair("S", channels));
-  runinfo.output_shapes.insert(std::make_pair("R", output));
+                         const TensorShape& channels) {
+  Tensor I(input, "I");
+  Tensor K(kernel, "K");
+  Tensor B(channels, "B");
+  Tensor S(channels, "S");
+  auto O = Convolution2(I, K);
+  auto R = Relu((O + B) * S);
+  auto runinfo = Evaluate(name, {R});
   runinfo.const_inputs = {"K"};
   runinfo.input_buffers = {
       {"K", MakeBuffer(kernel)},
@@ -146,29 +140,19 @@ function (I[N, X, Y, CI], K[KX, KY, CI, CO], B[CO], S[CO]) -> (R) {
   return runinfo;
 }
 
-lang::RunInfo LoadConv2d3Deep(const std::string& name,     //
-                              const TensorShape& input,    //
-                              const TensorShape& kernel1,  //
-                              const TensorShape& kernel2,  //
-                              const TensorShape& kernel3,  //
-                              const TensorShape& output) {
-  auto center1 = kernel1.dims[0].size / 2;
-  auto center2 = kernel2.dims[0].size / 2;
-  auto center3 = kernel3.dims[0].size / 2;
-  auto code = R"***(
-function (I[N, X, Y, CI], K1[KX, KY, C1, C2], K2[KX, KY, C2, C3], K3[KX, KY, C3, C4]) -> (O3) {
-  O1[n, x0, x1, co : N, X, Y, C2] = +(I[n, x0 + kx - %1%, x1 + ky - %1%, ci] * K1[kx, ky, ci, co]);
-  O2[n, x0, x1, co : N, X, Y, C3] = +(O1[n, x0 + kx - %2%, x1 + ky - %2%, ci] * K2[kx, ky, ci, co]);
-  O3[n, x0, x1, co : N, X, Y, C4] = +(O2[n, x0 + kx - %3%, x1 + ky - %3%, ci] * K3[kx, ky, ci, co]);
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = str(boost::format(code) % center1 % center2 % center3);
-  runinfo.input_shapes.insert(std::make_pair("I", input));
-  runinfo.input_shapes.insert(std::make_pair("K1", kernel1));
-  runinfo.input_shapes.insert(std::make_pair("K2", kernel2));
-  runinfo.input_shapes.insert(std::make_pair("K3", kernel3));
-  runinfo.output_shapes.insert(std::make_pair("O3", output));
+RunInfo LoadConv2d3Deep(const std::string& name,     //
+                        const TensorShape& input,    //
+                        const TensorShape& kernel1,  //
+                        const TensorShape& kernel2,  //
+                        const TensorShape& kernel3) {
+  Tensor I(input, "I");
+  Tensor K1(input, "K1");
+  Tensor K2(input, "K2");
+  Tensor K3(input, "K3");
+  auto O1 = Convolution2(I, K1);
+  auto O2 = Convolution2(O1, K2);
+  auto O3 = Convolution2(O2, K3);
+  auto runinfo = Evaluate(name, {O3});
   runinfo.const_inputs = {"K1", "K2", "K3"};
   runinfo.input_buffers = {
       {"K1", MakeBuffer(kernel1)},
@@ -178,80 +162,61 @@ function (I[N, X, Y, CI], K1[KX, KY, C1, C2], K2[KX, KY, C2, C3], K3[KX, KY, C3,
   return runinfo;
 }
 
-lang::RunInfo LoadDilatedConv2d(const std::string& name,    //
-                                const TensorShape& input,   //
-                                const TensorShape& kernel,  //
-                                const TensorShape& output) {
-  auto code = R"***(
-function (I[N, Lx, Ly, CI], K[LKx, LKy, CI, CO]) -> (O) {
-    O[n, x, y, co: N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO] = +(I[n, x + 2 * kx, y + 3 * ky, ci] * K[kx, ky, ci, co]);
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = code;
-  runinfo.input_shapes.insert(std::make_pair("I", input));
-  runinfo.input_shapes.insert(std::make_pair("K", kernel));
-  runinfo.output_shapes.insert(std::make_pair("O", output));
-  runinfo.const_inputs = {"K"};
-  runinfo.input_buffers = {
-      {"K", MakeBuffer(kernel)},
-  };
-  return runinfo;
+RunInfo LoadDilatedConv2d(const std::string& name,   //
+                          const TensorShape& input,  //
+                          const TensorShape& kernel) {
+  Tensor I(input);
+  Tensor K(kernel);
+  return Evaluate(name, {DilatedConvolution2(I, K)});
 }
 
-lang::RunInfo LoadLarsMomentum4d(const std::string& name,     //
-                                 const TensorShape& x_shape,  //
-                                 const TensorShape& lr_shape) {
+Tensor Normalize(const Tensor& X) {
+  auto XSqr = X * X;
+  Tensor X_MS;
+  {
+    std::vector<Index> idxs(X.shape().dims.size());
+    X_MS({}) += XSqr(idxs);
+  }
+  return sqrt(X_MS);
+}
+
+std::tuple<Tensor, Tensor> LarsMomentum(const Tensor& X,           //
+                                        const Tensor& Grad,        //
+                                        const Tensor& Veloc,       //
+                                        const Tensor& LR,          //
+                                        double lars_coeff,         //
+                                        double lars_weight_decay,  //
+                                        double momentum) {
+  auto XNorm = Normalize(X);
+  auto GradNorm = Normalize(Grad);
+  auto LocLR = LR * lars_coeff * XNorm / (GradNorm + lars_weight_decay * XNorm);
+  auto NewVeloc = momentum * Veloc + LocLR * (Grad + lars_weight_decay * X);
+  return std::make_tuple(X - NewVeloc, NewVeloc);
+}
+
+RunInfo LoadLarsMomentum4d(const std::string& name,     //
+                           const TensorShape& x_shape,  //
+                           const TensorShape& lr_shape) {
   // Note: X/Grad/Veloc/NewX/NewVeloc should all have the same shape for the
   // semantics of this operation to be correct, so we only pass in 1 shape for
   // all of them.
   double lars_coeff = 1. / 1024.;
   double lars_weight_decay = 1. / 2048.;
   double momentum = 1. / 8.;
-  auto code = R"***(
-function (X[X0, X1, X2, X3], Grad[Grad0, Grad1, Grad2, Grad3], Veloc[Veloc0, Veloc1, Veloc2, Veloc3], LR[]) -> (NewX, NewVeloc) {
-    XSqr = X * X;
-    X_MS[] = +(XSqr[x0, x1, x2, x3]);
-    XNorm = sqrt(X_MS);
-    GradSqr = Grad * Grad;
-    Grad_MS[] = +(GradSqr[g0, g1, g2, g3]);
-    GradNorm = sqrt(Grad_MS);
-    LocLR = LR * %1% * XNorm / (GradNorm + %2% * XNorm);
-    NewVeloc = %3% * Veloc + LocLR * (Grad + %2% * X);
-    NewX = X - NewVeloc;
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = str(boost::format(code) % lars_coeff % lars_weight_decay % momentum);
-  runinfo.input_shapes.insert(std::make_pair("X", x_shape));
-  runinfo.input_shapes.insert(std::make_pair("Grad", x_shape));
-  runinfo.input_shapes.insert(std::make_pair("Veloc", x_shape));
-  runinfo.input_shapes.insert(std::make_pair("LR", lr_shape));
-  runinfo.output_shapes.insert(std::make_pair("NewX", x_shape));
-  runinfo.output_shapes.insert(std::make_pair("NewVeloc", x_shape));
-  runinfo.input_buffers = {
-      {"X", MakeBuffer(x_shape)},
-      {"Grad", MakeBuffer(x_shape)},
-      {"Veloc", MakeBuffer(x_shape)},
-      {"LR", MakeBuffer(lr_shape)},
-  };
-  return runinfo;
+  Tensor X(x_shape);
+  Tensor Grad(x_shape);
+  Tensor Veloc(x_shape);
+  Tensor LR(lr_shape);
+  auto R = LarsMomentum(X, Grad, Veloc, LR, lars_coeff, lars_weight_decay, momentum);
+  return Evaluate("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
 }
 
-lang::RunInfo LoadPow(const std::string& name,  //
-                      const TensorShape& i1,    //
-                      const TensorShape& i2,    //
-                      const TensorShape& output) {
-  auto code = R"***(
-function (X, Y) -> (O) {
-    O = pow(X, Y);
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = code;
-  runinfo.input_shapes.insert(std::make_pair("X", i1));
-  runinfo.input_shapes.insert(std::make_pair("Y", i2));
-  runinfo.output_shapes.insert(std::make_pair("O", output));
+RunInfo LoadPow(const std::string& name,  //
+                const TensorShape& i1,    //
+                const TensorShape& i2) {
+  Tensor X(i1, "X");
+  Tensor Y(i2, "Y");
+  auto runinfo = Evaluate(name, {pow(X, Y)});
   runinfo.input_buffers = {
       {"X", MakeBuffer(i1)},
       {"Y", MakeBuffer(i2)},
@@ -259,60 +224,49 @@ function (X, Y) -> (O) {
   return runinfo;
 }
 
-lang::RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
-                                 const TensorShape& input) {
-  // Note: I/G/B/O should all have the same shape, so pass in one shape to share
-  const TensorShape epsilon_shape = SimpleShape(DataType::FLOAT32, {});
-  auto code = R"***(
-function (I[I0, I1, I2, I3], G[I0, I1, I2, I3], B[I0, I1, I2, I3], Epsilon[]) -> (O) {
-    H = I2 * I3;
-    Sum[i0, i1, 0, 0: I0, I1, 1, 1] = +(I[i0, i1, i2, i3]);
-    Mu = Sum / H;
-    Diff = I - Mu;
-    SqDiff = Diff * Diff;
-    SumSqDiff[i0, i1, 0, 0: I0, I1, 1, 1] = +(SqDiff[i0, i1, i2, i3]);
-    Stdev = sqrt(SumSqDiff + Epsilon) / H;
-    O = (G / Stdev) * (I - Mu) + B;
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = code;
-  runinfo.input_shapes.insert(std::make_pair("I", input));
-  runinfo.input_shapes.insert(std::make_pair("G", input));
-  runinfo.input_shapes.insert(std::make_pair("B", input));
-  runinfo.input_shapes.insert(std::make_pair("Epsilon", epsilon_shape));
-  runinfo.output_shapes.insert(std::make_pair("O", input));
-  runinfo.input_buffers = {
-      {"I", MakeBuffer(input)},
-      {"G", MakeBuffer(input)},
-      {"B", MakeBuffer(input)},
-      {"Epsilon", MakeBuffer(epsilon_shape)},
-  };
-  return runinfo;
+Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor& Epsilon) {
+  int64_t H = I[2] * I[3];
+  Tensor Sum;
+  Index i0, i1, i2, i3;
+  Sum({i0, i1, 0, 0}, {I[0], I[1], 1, 1}) += I({i0, i1, i2, i3});
+  auto Mu = Sum / H;
+  auto Diff = I - Mu;
+  auto SqDiff = Diff * Diff;
+  Tensor SumSqDiff;
+  SumSqDiff({i0, i1, 0, 0}, {I[0], I[1], 1, 1}) += SqDiff({i0, i1, i2, i3});
+  auto Stdev = sqrt(SumSqDiff + Epsilon) / H;
+  return (G / Stdev) * (I - Mu) + B;
 }
 
-lang::RunInfo LoadPolygonBoxTransform(const std::string& name,  //
-                                      const TensorShape& input) {
+RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
+                           const TensorShape& input) {
+  // Note: I/G/B/O should all have the same shape, so pass in one shape to share
+  Tensor I(input);
+  Tensor G(input);
+  Tensor B(input);
+  Tensor Epsilon(SimpleShape(DataType::FLOAT32, {}));
+  return Evaluate(name, {Norm4dAx2(I, G, B, Epsilon)});
+}
+
+Tensor PolygonBoxTransform(const Tensor& I) {
+  Tensor TEpartial;
+  Tensor TOpartial;
+  auto N = I[0], C = I[1], H = I[2], W = I[3];
+  Index n, c, h, w;
+  auto Widx = index(I, 3);
+  TEpartial({2 * n, c, h, w}, {N, C, H, W}) = I({2 * n, c, h, w});
+  auto TE = 4 * Widx - TEpartial;
+  TOpartial({2 * n + 1, c, h, w}, {N, C, H, W}) = I({2 * n + 1, c, h, w});
+  auto Hidx = index(I, 2);
+  auto TO = 4 * Hidx - TOpartial;
+  return TE + TO;
+}
+
+RunInfo LoadPolygonBoxTransform(const std::string& name,  //
+                                const TensorShape& input) {
   // Note: I and O have the same shape
-  auto code = R"***(
-function (I[N, C, H, W]) -> (O) {
-    Widx = index(I, 3);
-    TEpartial[2*n, c, h, w: N,C,H,W] = =(I[2*n, c, h, w]);
-    TE = 4 * Widx - TEpartial;
-    Hidx = index(I, 2);
-    TOpartial[2*n + 1, c, h, w: N,C,H,W] = =(I[2*n+1, c, h, w]);
-    TO = 4 * Hidx - TOpartial;
-    O = TE + TO;
-})***";
-  lang::RunInfo runinfo;
-  runinfo.program_name = name;
-  runinfo.code = code;
-  runinfo.input_shapes.insert(std::make_pair("I", input));
-  runinfo.output_shapes.insert(std::make_pair("O", input));
-  runinfo.input_buffers = {
-      {"I", MakeBuffer(input)},
-  };
-  return runinfo;
+  Tensor I(input);
+  return Evaluate(name, {PolygonBoxTransform(I)});
 }
 
 }  // namespace lib

@@ -31,7 +31,7 @@ lang::RunInfo LoadTile(const std::string& filename) {
   auto tests = lib::InternalTests();
   auto it = tests.find(filename);
   if (it != tests.end()) {
-    return it->second;
+    return it->second();
   }
   auto runinfo = util::TileFile(filename).Load();
   auto input_path = fs::path(filename);

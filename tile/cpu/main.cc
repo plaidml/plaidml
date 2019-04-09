@@ -37,14 +37,13 @@ int main(int argc, char* argv[]) {
 
   using namespace vertexai::tile;  // NOLINT
   std::cout << "Hey!" << std::endl;
-  //    system("find .");
 
   // Express
   auto in1 = SimpleShape(DataType::FLOAT32, {1024, 1024});
   auto in2 = SimpleShape(DataType::FLOAT32, {1024, 1024});
-  auto ri = lib::LoadMatMul("test", in1, in2);
-  auto s = lang::GenerateStripe(ri).program;
-  std::cout << *s << std::endl;
+  auto runinfo = lib::LoadMatMul("test", in1, in2);
+  auto block = lang::GenerateStripe(runinfo).program;
+  std::cout << *block << std::endl;
 
   // static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
   //    std::string cfg_file = runfiles_db["tile/cpu/cpu.json"];
@@ -56,9 +55,9 @@ int main(int argc, char* argv[]) {
       false,                     // dump_code
       "/tmp/stripe_cpu/passes",  // dbg_dir
   };
-  codegen::Optimize(s.get(), cfg.passes(), options);
+  codegen::Optimize(block.get(), cfg.passes(), options);
 
-  std::cout << "============================================================\n" << *s << std::endl;
+  std::cout << "============================================================\n" << *block << std::endl;
 
   // Run
   std::vector<float> a_data(1024 * 1024);
@@ -74,7 +73,7 @@ int main(int argc, char* argv[]) {
   io["C"] = c_data.data();
 
   targets::cpu::Native native;
-  native.compile(*s);
+  native.compile(*block);
 
   for (int i = 0; i < 10; i++) {
     for (auto& f : c_data) {

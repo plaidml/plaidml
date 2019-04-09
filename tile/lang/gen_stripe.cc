@@ -18,32 +18,22 @@ namespace {
 class StripeGenerator {
  public:
   explicit StripeGenerator(const RunInfo& runinfo, bool i8_mode)
-      : name_(runinfo.program_name),
-        input_shapes_(runinfo.input_shapes),
-        output_shapes_(runinfo.output_shapes),
-        const_inputs_(runinfo.const_inputs),
+      : runinfo_(runinfo),  //
         i8_mode_(i8_mode) {
-    Parser parser;
-    parsed_ = parser.Parse(runinfo.code);
-    vars_ = BindProgram(&parsed_, input_shapes_, output_shapes_);
-  }
-
-  const Bindings& vars() { return vars_; }
-
-  explicit StripeGenerator(Program prog, const ShapeMap& inputs, const ShapeMap& outputs)
-      : name_("stripe_program"),  //
-        parsed_(prog),
-        input_shapes_(inputs),
-        output_shapes_(outputs),
-        i8_mode_(false) {
-    vars_ = BindProgram(&parsed_, input_shapes_, output_shapes_);
+    if (!runinfo.from_edsl) {
+      if (runinfo_.program.ops.empty()) {
+        Parser parser;
+        runinfo_.program = parser.Parse(runinfo_.code);
+      }
+      runinfo_.vars = BindProgram(&runinfo_.program, runinfo_.input_shapes, runinfo_.output_shapes);
+    }
   }
 
   Stripe Run() {
     auto program = std::make_shared<Block>();
     program->set_tag("program");
-    program->name = name_;
-    IVLOG(1, "Compiling " << parsed_.ops.size() << " ops");
+    program->name = runinfo_.program_name;
+    IVLOG(1, "Compiling " << runinfo_.program.ops.size() << " ops");
     // The top level block is a 'main' function.
     // In/Out/InOut refinements made on main relate to user supplied inputs and outputs.
     // None refinements made on main relate to temporaries needed for communication between kernels.
@@ -53,10 +43,10 @@ class StripeGenerator {
     program->stmts.push_back(main);
     main->name = "main";
     // Add decls for external inputs/outputs
-    AddDecls(program.get(), main.get(), input_shapes_, true);
-    AddDecls(program.get(), main.get(), output_shapes_, false);
+    AddDecls(program.get(), main.get(), runinfo_.input_shapes, true);
+    AddDecls(program.get(), main.get(), runinfo_.output_shapes, false);
     // Add decls for temporaries
-    for (const auto& item : vars_) {
+    for (const auto& item : runinfo_.vars) {
       if (externals_.count(item.first) == 0) {
         const auto& binding = item.second;
         auto shape = AdjustShape(binding.shape);
@@ -84,8 +74,8 @@ class StripeGenerator {
       }
     }
     // Add kernels to main
-    for (size_t op_idx = 0; op_idx < parsed_.ops.size(); op_idx++) {
-      const auto& op = parsed_.ops[op_idx];
+    for (size_t op_idx = 0; op_idx < runinfo_.program.ops.size(); op_idx++) {
+      const auto& op = runinfo_.program.ops[op_idx];
       if (to_skip_.count(op_idx)) {
         IVLOG(2, "Skipping as already handled: " << op);
         continue;
@@ -255,8 +245,8 @@ class StripeGenerator {
         auto scalar_name = ScalarName(sname);
         scalar_inputs.push_back(scalar_name);
         // if this is a constant, propagate it into the load statement
-        const auto& src = vars_.find(spec.id);  // TODO: Better name
-        if (src != vars_.end()) {
+        const auto& src = runinfo_.vars.find(spec.id);  // TODO: Better name
+        if (src != runinfo_.vars.end()) {
           if (src->second.tag == Binding::FCONST) {
             kernel->stmts.push_back(std::make_shared<Constant>(scalar_name, src->second.fconst));
             continue;
@@ -392,7 +382,7 @@ class StripeGenerator {
     std::set<std::string> loaded;
     for (size_t i = 0; i < op.inputs.size(); i++) {
       const auto& input = op.inputs[i];
-      const auto& binding = vars_.at(input);
+      const auto& binding = runinfo_.vars.at(input);
       IVLOG(2, "  " << input << ": " << binding);
       if (i != 0) {
         kernel->name += ",";
@@ -469,7 +459,7 @@ class StripeGenerator {
   }
 
   void ProcessSpecial(Block* main, size_t op_idx) {
-    const auto& op = parsed_.ops[op_idx];
+    const auto& op = runinfo_.program.ops[op_idx];
     if (op.f.fn == "prng_state" || op.f.fn == "prng_value") {
       throw std::runtime_error("prng functions must come in threes");
     }
@@ -515,11 +505,11 @@ class StripeGenerator {
 
     kernel->name += "(";
     const auto& input = op.inputs[0];
-    const auto& input_binding = vars_.at(input);
+    const auto& input_binding = runinfo_.vars.at(input);
     assert(input_binding.tag == Binding::TENSOR);
     kernel->name += input;
 
-    const auto& dim_binding = vars_.at(op.inputs[1]);
+    const auto& dim_binding = runinfo_.vars.at(op.inputs[1]);
     assert(dim_binding.tag == Binding::ICONST);
     const std::string& load_idx_name = kernel->idxs[dim_binding.iconst].name;
     kernel->stmts.push_back(std::make_shared<LoadIndex>(Affine(load_idx_name), ScalarName(op.output)));
@@ -546,7 +536,7 @@ class StripeGenerator {
   }
 
   void ProcessPrng(Block* main, size_t op_idx) {
-    const auto& op = parsed_.ops[op_idx];
+    const auto& op = runinfo_.program.ops[op_idx];
     auto stmt = std::make_shared<Special>();
     stmt->name = "prng_step";
     stmt->inputs = {op.inputs[0]};
@@ -556,8 +546,8 @@ class StripeGenerator {
     std::string vout;
     size_t sout_pos = 0;
     // Find the other parts
-    for (size_t j = op_idx + 1; j < parsed_.ops.size(); j++) {
-      const Op& nop = parsed_.ops[j];
+    for (size_t j = op_idx + 1; j < runinfo_.program.ops.size(); j++) {
+      const Op& nop = runinfo_.program.ops[j];
       if (nop.f.fn == "prng_state" && nop.inputs.size() == 1 && nop.inputs[0] == tup) {
         sout = nop.output;
         sout_pos = j;
@@ -572,7 +562,7 @@ class StripeGenerator {
     }
     if (vout == "") {
       // Convert state output to identity
-      Op& xop = parsed_.ops[sout_pos];
+      Op& xop = runinfo_.program.ops[sout_pos];
       xop.f.fn = "ident";
       xop.inputs[0] = op.inputs[0];
       to_skip_.erase(sout_pos);
@@ -632,16 +622,16 @@ class StripeGenerator {
   }
 
   TensorShape GetShape(const std::string& name) const {
-    auto it = vars_.find(name);
-    if (it == vars_.end()) {
+    auto it = runinfo_.vars.find(name);
+    if (it == runinfo_.vars.end()) {
       throw std::runtime_error(str(boost::format("Unknown shape: %s") % name));
     }
     return AdjustShape(it->second.shape);
   }
 
   TensorShape ScalarShape(const std::string& name) const {
-    auto it = vars_.find(name);
-    if (it == vars_.end()) {
+    auto it = runinfo_.vars.find(name);
+    if (it == runinfo_.vars.end()) {
       throw std::runtime_error(str(boost::format("Unknown shape: %s") % name));
     }
     TensorShape shape(it->second.shape.type, {});
@@ -746,7 +736,7 @@ class StripeGenerator {
 
   bool IsConst(const std::string& name) const {
     // Returns whether the specified tensor input is constant
-    return const_inputs_.count(name);
+    return runinfo_.const_inputs.count(name);
   }
 
   TensorShape AdjustShape(TensorShape shape) const {
@@ -757,12 +747,7 @@ class StripeGenerator {
   }
 
  private:
-  std::string name_;
-  Program parsed_;
-  ShapeMap input_shapes_;
-  ShapeMap output_shapes_;
-  std::set<std::string> const_inputs_;
-  Bindings vars_;
+  RunInfo runinfo_;
   std::set<std::string> externals_;
   std::set<size_t> to_skip_;
   bool i8_mode_;
@@ -773,20 +758,6 @@ class StripeGenerator {
 
 Stripe GenerateStripe(const RunInfo& runinfo, bool i8_mode) {  //
   return StripeGenerator(runinfo, i8_mode).Run();
-}
-
-std::shared_ptr<Block> GenerateStripe(const Program& prog,      //
-                                      const ShapeMap& inputs,   //
-                                      const ShapeMap& outputs,  //
-                                      ShapeMap* all) {
-  StripeGenerator generator(prog, inputs, outputs);
-  auto stripe = generator.Run();
-  for (const auto& kvp : generator.vars()) {
-    if (kvp.second.tag == Binding::TENSOR) {
-      (*all)[kvp.first] = kvp.second.shape;
-    }
-  }
-  return stripe.program;
 }
 
 }  // namespace lang

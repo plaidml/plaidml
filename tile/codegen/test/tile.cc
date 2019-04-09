@@ -161,10 +161,9 @@ TEST(Codegen, StencilMatchConv1D) {
     }
   )");
 
-  auto runinfo = lib::LoadConv1d("conv",                                       //
-                                 SimpleShape(DataType::FLOAT32, {100, 64}),    //
-                                 SimpleShape(DataType::FLOAT32, {3, 64, 64}),  //
-                                 SimpleShape(DataType::FLOAT32, {100, 64}));
+  auto runinfo = lib::LoadConv1d("conv",                                     //
+                                 SimpleShape(DataType::FLOAT32, {100, 64}),  //
+                                 SimpleShape(DataType::FLOAT32, {3, 64, 64}));
   auto stripe = GenerateStripe(runinfo);
   auto main = stripe.program->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -214,10 +213,9 @@ TEST(Codegen, StencilMatchConv2D) {
     specs.push_back(stencil);
   }
 
-  auto runinfo = lib::LoadConv2d("conv",                                              //
-                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),   //
-                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),      //
-                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}));  //
+  auto runinfo = lib::LoadConv2d("conv",                                             //
+                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),  //
+                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}));    //
   auto stripe = GenerateStripe(runinfo);
   auto main = stripe.program->SubBlock(0);
   auto kernel = main->SubBlock(0);

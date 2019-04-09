@@ -9,7 +9,7 @@ namespace vertexai {
 namespace tile {
 namespace lib {
 
-std::map<std::string, lang::RunInfo> InternalTests();
+std::map<std::string, std::function<lang::RunInfo()>> InternalTests();
 
 }  // namespace lib
 }  // namespace tile

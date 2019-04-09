@@ -16,16 +16,13 @@ namespace codegen {
 
 using namespace lang;  // NOLINT
 
-KernelList GenerateProgram(const Program& prog,          //
-                           const ShapeMap& inputs,       //
-                           const ShapeMap& outputs,      //
+KernelList GenerateProgram(const RunInfo& runinfo,       //
                            const std::string& cfg_name,  //
                            const std::string& out_dir) {
-  IVLOG(1, inputs);
-  IVLOG(1, outputs);
-  IVLOG(1, to_string(prog));
-  ShapeMap all;
-  auto stripe = GenerateStripe(prog, inputs, outputs, &all);
+  IVLOG(1, runinfo.input_shapes);
+  IVLOG(1, runinfo.output_shapes);
+  IVLOG(1, to_string(runinfo.program));
+  auto stripe = GenerateStripe(runinfo).program;
   codegen::OptimizeOptions options = {
       !out_dir.empty(),     // dump_passes
       false,                // dump_code
