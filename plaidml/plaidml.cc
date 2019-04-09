@@ -1349,13 +1349,13 @@ struct plaidml_invoker {
 
 namespace {
 
-void BuildInvokerRunInfo(plaidml_invoker* invoker) {
+void BuildInvokerRunInfo(plaidml_invoker* invoker, const std::string& name) {
   if (invoker->runinfo) {
     return;
   }
   invoker->runinfo = invoker->runinfo_cache.Lookup(
       std::make_pair(ToApplierParameterShapes(invoker->inputs), ToApplierParameterShapes(invoker->outputs)),
-      [invoker]() {
+      [invoker, &name]() {
         auto applier = std::make_shared<FunctionApplication>(invoker->func);
         for (const auto& it : invoker->inputs) {
           if (it.second->type() == Value::TENSOR) {
@@ -1377,7 +1377,7 @@ void BuildInvokerRunInfo(plaidml_invoker* invoker) {
           composer->AddUpdate(value, applier->GetOutput(it.first));
         }
         composer->Done();
-        return std::make_shared<RunInfo>(composer->PrepareToRun());
+        return std::make_shared<RunInfo>(composer->PrepareToRun(name));
       });
 }
 
@@ -1516,8 +1516,7 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
     }
 
     // At this point, we're saving a Stripe file format.
-    BuildInvokerRunInfo(invoker);
-    invoker->runinfo->program_name = path.stem().string();
+    BuildInvokerRunInfo(invoker, path.stem().string());
     auto stripe = GenerateStripe(*invoker->runinfo);
 
     std::ofstream file{path.string()};
@@ -1569,7 +1568,7 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     auto invocation = std::make_unique<plaidml_invocation>();
     auto rundown = std::make_shared<context::Rundown>();
     rundown->TryEnterGate(activity.ctx().gate());
-    BuildInvokerRunInfo(invoker);
+    BuildInvokerRunInfo(invoker, "invoker_program");
 
     // Gather up the appropriate buffers
     std::shared_ptr<Evaluator> evaluator;

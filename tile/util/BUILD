@@ -16,5 +16,6 @@ plaidml_cc_library(
         "//tile/proto:metadata_cc",
         "//tile/proto:proto_cc",
         "@boost",
+        "@boost//:filesystem",
     ],
 )

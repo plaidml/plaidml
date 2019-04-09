@@ -49,7 +49,7 @@ std::shared_ptr<lang::TensorValue> MakeTensor(const TensorShape& shape) {
 
 }  // namespace
 
-TileFile::TileFile(const std::string& path) : archive_(path) {}
+TileFile::TileFile(const boost::filesystem::path& path) : archive_(path.string()), path_(path) {}
 
 lang::RunInfo TileFile::Load(const std::vector<std::shared_ptr<SimpleBuffer>>& inputs) {
   auto metadata = ReadMetadata();
@@ -126,7 +126,7 @@ lang::RunInfo TileFile::Load(const std::vector<std::shared_ptr<SimpleBuffer>>& i
     composer.AddUpdate(MakeTensor(shape), applier.GetOutput(name));
   }
   composer.Done();
-  return composer.PrepareToRun();
+  return composer.PrepareToRun(path_.stem().string());
 }
 
 metadata::proto::Metadata TileFile::ReadMetadata() {

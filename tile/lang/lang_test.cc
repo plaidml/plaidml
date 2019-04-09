@@ -575,7 +575,7 @@ TEST_CASE("Softmax Deriv", "[deriv]") {
   fo.SetInput("Y", TensorValue::make(std::make_shared<BufferBase>(), ss));
   rfunc.AddUpdate(TensorValue::make(std::make_shared<BufferBase>(), ss), fo.GetOutput("DX"));
   rfunc.Done();
-  auto ri = rfunc.PrepareToRun();
+  auto ri = rfunc.PrepareToRun("test");
 
   Parser parse;
   Program prog = parse.Parse(ri.code);
@@ -762,7 +762,7 @@ TEST_CASE("Check for switch optimization", "[switch]") {
   f.AddDependency(a);
   f.AddUpdate(O, OO);
 
-  RunInfo r = f.PrepareToRun();
+  RunInfo r = f.PrepareToRun("test");
   IVLOG(1, "New Code:\n" << r.code);
   Parser parser;
   Program prog = parser.Parse(r.code);

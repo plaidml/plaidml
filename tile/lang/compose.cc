@@ -672,7 +672,7 @@ Program DeXify(const Program& orig) {
   return r;
 }
 
-RunInfo BoundFunction::PrepareToRun() const {
+RunInfo BoundFunction::PrepareToRun(const std::string& name) const {
   if (num_inputs() != 0) {
     throw std::runtime_error("Unable to run function with unbound inputs");
   }
@@ -680,29 +680,30 @@ RunInfo BoundFunction::PrepareToRun() const {
     throw std::runtime_error("Unable to run function with unbound outputs");
   }
 
-  RunInfo r;
+  RunInfo runinfo;
+  runinfo.program_name = name;
   Program inlined = prog_;
   ApplyDefines(&inlined, InlineDefines);
   Program xp = Xify(inlined);
 
   for (const auto& kvp : in_bound_) {
     std::string n = "X" + kvp.first;
-    r.input_shapes[n] = kvp.second->shape();
-    r.input_buffers[n] = kvp.second->buffer();
+    runinfo.input_shapes[n] = kvp.second->shape();
+    runinfo.input_buffers[n] = kvp.second->buffer();
     if (kvp.second->is_const()) {
-      r.const_inputs.insert(n);
+      runinfo.const_inputs.insert(n);
     }
     if (kvp.second->qparams()) {
-      r.qparams_buffers[n] = kvp.second->qparams()->buffer();
+      runinfo.qparams_buffers[n] = kvp.second->qparams()->buffer();
     }
   }
   for (const auto& kvp : out_bound_) {
     std::string n = "X" + kvp.first;
-    r.output_shapes[n] = kvp.second->shape();
-    r.output_buffers[n] = kvp.second->buffer();
+    runinfo.output_shapes[n] = kvp.second->shape();
+    runinfo.output_buffers[n] = kvp.second->buffer();
   }
 
-  auto bindings = BindProgram(&xp, r.input_shapes, r.output_shapes);
+  auto bindings = BindProgram(&xp, runinfo.input_shapes, runinfo.output_shapes);
   for (auto& op : xp.ops) {
     if (op.tag != Op::CONTRACTION) {
       continue;
@@ -716,9 +717,8 @@ RunInfo BoundFunction::PrepareToRun() const {
       c.range = "";
     }
   }
-  r.code = to_string(xp);
-
-  return r;
+  runinfo.code = to_string(xp);
+  return runinfo;
 }
 
 std::string BoundFunction::Apply(const std::shared_ptr<Value>& val) {

@@ -66,6 +66,7 @@ plaidml_cc_library(
         "symbolic.cc",
         "tile_cache.cc",
         "tile_cache.h",
+        "tile_cc.cc",
         "tile_opt.cc",
         "tile_opt.h",
         "type.cc",
@@ -87,6 +88,7 @@ plaidml_cc_library(
         "semtree.h",
         "simplifier.h",
         "symbolic.h",
+        "tile_cc.h",
         "type.h",
     ],
     copts = select({
@@ -174,4 +176,10 @@ plaidml_cc_test(
         ":lang",
         "//testing:matchers",
     ],
+)
+
+plaidml_cc_test(
+    name = "tile_cc_test",
+    srcs = ["tile_cc_test.cc"],
+    deps = [":lang"],
 )

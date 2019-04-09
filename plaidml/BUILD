@@ -171,19 +171,6 @@ plaidml_cc_test(
 )
 
 plaidml_cc_test(
-    name = "tile_cc_test",
-    srcs = [
-        "tile_cc.cc",
-        "tile_cc.h",
-        "tile_cc_test.cc",
-    ],
-    deps = [
-        ":api",
-        "//testing:plaidml_config",
-    ],
-)
-
-plaidml_cc_test(
     name = "network_test",
     size = "large",
     srcs = ["network_test.cc"],

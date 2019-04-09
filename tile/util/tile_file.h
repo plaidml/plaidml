@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/filesystem.hpp>
+
 #include "base/util/zipfile.h"
 #include "tile/lang/compose.h"
 #include "tile/proto/metadata.pb.h"
@@ -18,7 +20,7 @@ struct SimpleBuffer : lang::BufferBase {
 
 class TileFile {
  public:
-  explicit TileFile(const std::string& path);
+  explicit TileFile(const boost::filesystem::path& path);
 
   lang::RunInfo Load(const std::vector<std::shared_ptr<SimpleBuffer>>& inputs = {});
   metadata::proto::Metadata ReadMetadata();
@@ -26,6 +28,7 @@ class TileFile {
 
  private:
   UnZipArchive archive_;
+  boost::filesystem::path path_;
 };
 
 }  // namespace util
