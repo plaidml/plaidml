@@ -119,8 +119,6 @@ class Access {
   // Represents a combo_op of EQ in a contraction
   Access operator==(const Access& rhs) const;
 
-  const Impl* impl() const;
-
  private:
   std::unique_ptr<Impl> impl_;
   explicit Access(std::unique_ptr<Impl> impl);
@@ -141,6 +139,7 @@ Access cond(const Access& cond_lhs, const Access& cond_rhs, const Access& true_c
 
 class Tensor {
   friend class Access;
+  friend class Evaluator;
   friend Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
   struct Impl;
 
@@ -159,7 +158,6 @@ class Tensor {
 
   Access operator()(const std::vector<Index>& idxs, const std::vector<size_t>& sizes);
   Access operator()(const std::vector<Index>& idxs) const;
-  size_t operator[](const size_t dim) const;
 
   // Represents an eltwise negation
   Tensor operator-() const;
@@ -218,8 +216,11 @@ class Tensor {
   // Set use_default on a contraction
   Tensor& use_default(const Tensor& rhs);
 
-  const Impl* impl() const;
+  // Return the tensor's shape
   tile::TensorShape shape() const;
+
+  // Return the size of the tensor's shape at the specified dimension.
+  size_t dims(const size_t dim) const;
 
  private:
   explicit Tensor(std::unique_ptr<Impl> impl);

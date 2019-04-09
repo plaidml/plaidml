@@ -16,7 +16,7 @@ namespace {
 
 Tensor ContractPlusElementwise(const Tensor& A, const Tensor& B) {
   Tensor C;
-  auto M = A[0], N = B[1];
+  auto M = A.dims(0), N = B.dims(1);
   Index k, m, n;
   C({m, n}, {M, N}) += A({m, k}) * B({k, n});
   return Call("tanh", {C});
