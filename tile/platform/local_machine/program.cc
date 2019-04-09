@@ -96,7 +96,12 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
       throw std::runtime_error("Selected device must have a stripe_config when USE_STRIPE is enabled");
     }
     auto out_path = env::Get("STRIPE_OUTPUT");
-    return codegen::GenerateProgram(parsed, inputs, outputs, stripe_cfg, out_path);
+    lang::RunInfo runinfo;
+    runinfo.program = parsed;
+    runinfo.input_shapes = inputs;
+    runinfo.output_shapes = outputs;
+    runinfo.program_name = "stripe_program";
+    return codegen::GenerateProgram(runinfo, stripe_cfg, out_path);
   }
 
   auto settings = hal::settings::ToHardwareSettings(devinfo.settings);

@@ -415,7 +415,9 @@ void TypeCheck(Program* prog, Bindings* vars) {
       }
       // Check we have proper output sizes
       if (op.c.output_size.size() != op.c.specs[0].sspec.size()) {
-        throw std::runtime_error("Mismatched output indices and output size");
+        throw std::runtime_error(
+            str(boost::format("Mismatched output indices and output size. Indicies: %1%, Sizes: %2%") %
+                op.c.specs[0].sspec.size() % op.c.output_size.size()));
       }
       // Get each size
       std::vector<size_t> dims;
