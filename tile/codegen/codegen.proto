@@ -297,7 +297,7 @@ message StencilIndex {
 }
 
 message StencilTagList {
-  repeated string tag = 1;
+  repeated string tags = 1;
 }
 
 // The autotile pass attempts to split (tile) a block into an outer block and

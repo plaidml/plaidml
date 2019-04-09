@@ -343,16 +343,21 @@ struct Block : Statement {
   // Helper methods
   std::vector<const Refinement*> ref_ins() const;
   std::vector<const Refinement*> ref_outs() const;
+  std::vector<Refinement*> ref_ins();
+  std::vector<Refinement*> ref_outs();
   Index* idx_by_name(const std::string& name);
   const Index* idx_by_name(const std::string& name) const;
   std::set<const Index*> accumulation_idxs() const;
   size_t idxs_product() const;
-  // Find which refinement has an into called 'name'
-  std::vector<Refinement>::iterator ref_by_into(const std::string& name, bool fail = true);
-  std::vector<Refinement>::const_iterator ref_by_into(const std::string& name, bool fail = true) const;
-  // Find which refinement has a from called 'name'
-  std::vector<Refinement>::iterator ref_by_from(const std::string& name, bool fail = true);
-  std::vector<Refinement>::const_iterator ref_by_from(const std::string& name, bool fail = true) const;
+  // Find which refinement has an into called 'ref_name'
+  std::vector<Refinement>::iterator ref_by_into(const std::string& ref_name, bool fail = true);
+  std::vector<Refinement>::const_iterator ref_by_into(const std::string& ref_name, bool fail = true) const;
+  // Find which refinement has a from called 'ref_name'
+  std::vector<Refinement>::iterator ref_by_from(const std::string& ref_name, bool fail = true);
+  std::vector<Refinement>::const_iterator ref_by_from(const std::string& ref_name, bool fail = true) const;
+  // Find which refinement has a tag called 'tag_name'
+  std::vector<Refinement>::iterator ref_by_tag(const std::string& tag_name, bool fail = true);
+  std::vector<Refinement>::const_iterator ref_by_tag(const std::string& tag_name, bool fail = true) const;
   // Make a unique refinement name for an into (by appending _2, etc, if needed)
   std::string unique_ref_name(const std::string& into) const;
   // Make a unique index name (by appending _2, etc, if needed)
