@@ -60,7 +60,7 @@ class StripeGenerator {
               shape,         // interior_shape
           };
           new_ref.set_tag("tmp");
-          program->refs.emplace_back(new_ref);
+          program->refs.emplace(std::move(new_ref));
           Refinement tmp_ref{
               RefDir::InOut,  // dir
               item.first,     // from
@@ -69,7 +69,7 @@ class StripeGenerator {
               shape,          // interior_shape
           };
           tmp_ref.set_tag("tmp");
-          main->refs.emplace_back(tmp_ref);
+          main->refs.emplace(std::move(tmp_ref));
         }
       }
     }
@@ -123,9 +123,9 @@ class StripeGenerator {
           shape,         // interior_shape
       };
       new_ref.set_tag("user");
-      program->refs.emplace_back(new_ref);
+      program->refs.emplace(std::move(new_ref));
       if (is_input) {
-        main->refs.emplace_back(Refinement{
+        main->refs.emplace(Refinement{
             RefDir::In,  // dir
             item.first,  // from
             item.first,  // into
@@ -133,7 +133,7 @@ class StripeGenerator {
             shape,       // interior_shape
         });
       } else {
-        main->refs.emplace_back(Refinement{
+        main->refs.emplace(Refinement{
             RefDir::Out,        // dir
             item.first,         // from
             item.first,         // into
@@ -160,7 +160,7 @@ class StripeGenerator {
       }
     }
 
-    stmt->refs.emplace_back(Refinement{
+    stmt->refs.emplace(Refinement{
         RefDir::Out,     // dir
         op.output,       // from
         "dst",           // into
@@ -178,7 +178,7 @@ class StripeGenerator {
       stmt->set_tag("copy");
       stmt->name = op.output + " = " + op.c.use_default;
       stmt->comments = "Pre-Initialize " + op.output;
-      stmt->refs.emplace_back(Refinement{
+      stmt->refs.emplace(Refinement{
           RefDir::In,        // dir
           op.c.use_default,  // from
           "src",             // into
@@ -220,6 +220,7 @@ class StripeGenerator {
 
     std::vector<std::string> scalar_inputs;
     kernel->name += "(";
+    std::string out_ref_name = "";
     for (size_t i = 0; i < cion.specs.size(); i++) {
       const auto& spec = cion.specs[i];
       auto interior_shape = ScalarShape(spec.id);
@@ -228,7 +229,7 @@ class StripeGenerator {
         access.emplace_back(Integerize(poly, bounds));
       }
       if (i == 0) {
-        kernel->refs.emplace_back(Refinement{
+        kernel->refs.emplace(Refinement{
             RefDir::Out,            // dir
             spec.id,                // from
             spec.id,                // into
@@ -236,6 +237,7 @@ class StripeGenerator {
             interior_shape,         // interior_shape
             GetAggOp(cion.agg_op),  // agg_op
         });
+        out_ref_name = spec.id;
       } else {
         if (i != 1) {
           kernel->name += ",";
@@ -264,7 +266,7 @@ class StripeGenerator {
             interior_shape,  // interior_shape
         };
         ref.set_tag("contraction");
-        kernel->refs.emplace_back(ref);
+        kernel->refs.emplace(std::move(ref));
         // LOAD
         kernel->stmts.push_back(std::make_shared<Load>(sname, scalar_name));
       }
@@ -285,7 +287,7 @@ class StripeGenerator {
       kernel->constraints.emplace_back(lhs);
     }
 
-    if (NeedsInitialize(*kernel, shapes[0])) {
+    if (NeedsInitialize(*kernel, out_ref_name, shapes[0])) {
       auto stmt = InitBuffer(main, op, shapes[0]);
       main->stmts.insert(std::prev(main->stmts.end()), stmt);
     }
@@ -319,13 +321,13 @@ class StripeGenerator {
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));
   }
 
-  bool NeedsInitialize(const Block& block, const TensorShape& out_shape) {
+  bool NeedsInitialize(const Block& block, const std::string& out_ref_name, const TensorShape& out_shape) {
     // Check if have a simple output: 1 unique index per dimension, each full range
     // If not, presume we need initialization for safety
     // We assume here that the 0'th refinement is the output refinement
     std::set<std::string> out_idxs;
     for (size_t i = 0; i < out_shape.dims.size(); i++) {
-      Affine affine = block.refs.front().access[i];
+      Affine affine = block.refs.find(out_ref_name)->access[i];
       if (affine == 0 && out_shape.dims[i].size == 1) {
         continue;
       }
@@ -416,7 +418,7 @@ class StripeGenerator {
               ScalarShape(input),  // interior_shape
           };
           ref.set_tag("eltwise_" + op.f.fn);
-          kernel->refs.emplace_back(ref);
+          kernel->refs.emplace(std::move(ref));
           // LOAD
           kernel->stmts.push_back(std::make_shared<Load>(input, ScalarName(input)));
         } break;
@@ -438,7 +440,7 @@ class StripeGenerator {
         remove_if(kernel->idxs.begin(), kernel->idxs.end(), [](const Index& idx) { return idx.range == 1; }),
         kernel->idxs.end());
 
-    kernel->refs.emplace_back(Refinement{
+    kernel->refs.emplace(Refinement{
         RefDir::Out,             // dir
         op.output,               // from
         op.output,               // into
@@ -521,7 +523,7 @@ class StripeGenerator {
         kernel->idxs.end());
 
     // Add the output refinement
-    kernel->refs.emplace_back(Refinement{
+    kernel->refs.emplace(Refinement{
         RefDir::Out,             // dir
         op.output,               // from
         op.output,               // into

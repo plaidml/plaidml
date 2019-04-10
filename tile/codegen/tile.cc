@@ -75,7 +75,7 @@ void PromoteCondition(Block* outer, std::shared_ptr<Block> inner,  //
 
   // accesses in passthru ref should be zero
   for (auto& ref : wrapper->refs) {
-    for (auto& aff : ref.access) {
+    for (auto& aff : ref.mut().access) {
       aff.mutateMap().clear();
     }
   }
@@ -248,10 +248,16 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
 
   // Copy all in/out refinements from outer to inner block
   inner->refs = outer->refs;
+
   // Remove allocs on the outer refs
-  outer->refs.erase(
-      std::remove_if(outer->refs.begin(), outer->refs.end(), [&](const auto& ref) { return ref.dir == RefDir::None; }),
-      outer->refs.end());
+  for (auto it = outer->refs.begin(), limit = outer->refs.end(); it != limit;) {
+    if (it->dir == RefDir::None) {
+      it = outer->refs.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   // Compute for each reference / for each dimension / the minimal offset
   std::map<std::string, std::vector<int64_t>> zero_points;
   for (auto& ref : inner->refs) {
@@ -270,7 +276,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   for (auto& ref : inner->refs) {
     const auto& zeros = zero_points[ref.into];
     for (size_t i = 0; i < ref.access.size(); i++) {
-      auto& aff = ref.access[i];
+      auto& aff = ref.mut().access[i];
       // We pick the outer block to do the bumping so it only happens once
       // But we still need to adjust the zero point of the inner block
       aff.setConstant(-zeros[i]);
@@ -288,10 +294,10 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   }
   for (auto& ref : outer->refs) {
     // Fix the sizes on the outer block
-    ref.interior_shape = inner->exterior_shape(ref.into);
+    ref.mut().interior_shape = inner->exterior_shape(ref.into);
     const auto& zeros = zero_points[ref.into];
     for (size_t i = 0; i < ref.access.size(); i++) {
-      auto& aff = ref.access[i];
+      auto& aff = ref.mut().access[i];
       aff += stripe::Affine(zeros[i]);
       if (!interleave) {
         // Multiply each stride in the outer block refinements by the appropriate tile size
@@ -303,7 +309,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
       }
     }
     // Let inner's from be the outer's into
-    inner->ref_by_into(ref.into)->from = ref.into;
+    inner->ref_by_into(ref.into)->mut().from = ref.into;
   }
 
   if (split_unaligned && split_points.size() > 0) {

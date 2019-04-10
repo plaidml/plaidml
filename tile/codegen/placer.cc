@@ -145,7 +145,7 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
     // parallel instances of the block executing in any order) happen
     // before all writes to that same offset, which often occurs for
     // elementwise operations.
-    for (stripe::Refinement& ref : block->refs) {
+    for (auto& ref : block->refs) {
       if (IsReadDir(ref.dir) || IsWriteDir(ref.dir)) {
         RecordUse(ref.from);
       }
@@ -202,9 +202,9 @@ std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<s
   std::unordered_map<std::string, Chunk*> chunks;
 
   auto add_block_chunks = [&](stripe::Block* block, const AliasMap& alias_map) {
-    for (stripe::Refinement& ref : block->refs) {
+    for (auto& ref : block->refs) {
       if (ref.dir == stripe::RefDir::None && locations.count(ref.location)) {
-        auto chunk_it = result.emplace(result.end(), Chunk{&ref, alignment, stmt_limit});
+        auto chunk_it = result.emplace(result.end(), Chunk{&ref.mut(), alignment, stmt_limit});
         chunks[alias_map.at(ref.into).base_name] = &*chunk_it;
       }
     }

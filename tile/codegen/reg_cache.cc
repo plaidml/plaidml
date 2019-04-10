@@ -41,10 +41,10 @@ static void PropagateRefLoc(Block* block, const Refinement& outer_ref) {
     if (inner) {
       for (auto& ref : inner->refs) {
         if (ref.from == outer_ref.into) {
-          ref.location = outer_ref.location;
-          ref.offset = outer_ref.offset;
+          ref.mut().location = outer_ref.location;
+          ref.mut().offset = outer_ref.offset;
           for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
-            ref.interior_shape.dims[i].stride = outer_ref.interior_shape.dims[i].stride;
+            ref.mut().interior_shape.dims[i].stride = outer_ref.interior_shape.dims[i].stride;
           }
           PropagateRefLoc(inner.get(), ref);
         }
@@ -74,7 +74,7 @@ static void AdjustRefAccessHelper(Block* outer, Refinement* outer_ref,  //
   // same as the outer index range
   for (auto& inner_ref : inner->refs) {
     if (adjust_all || inner_ref.from == outer_ref->into) {
-      for (auto& aff : inner_ref.access) {
+      for (auto& aff : inner_ref.mut().access) {
         auto& aff_map = aff.mutateMap();
         if (aff_map.size() == 1) {
           auto it = aff_map.begin();
@@ -90,7 +90,7 @@ static void AdjustRefAccessHelper(Block* outer, Refinement* outer_ref,  //
   }
   // Adjust the refinement in outer
   // Clear the accesses in block index to zero
-  for (auto& aff : outer_ref->access) {
+  for (auto& aff : outer_ref->mut().access) {
     auto& aff_map = aff.mutateMap();
     if (aff_map.size() == 1) {
       auto aff_it = aff_map.begin();
@@ -109,7 +109,7 @@ static void AdjustRefAccess(Block* outer, const std::string& ref_name, bool adju
   for (auto stmt : outer->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
-      AdjustRefAccessHelper(outer, &(*it), inner.get(), adjust_all);
+      AdjustRefAccessHelper(outer, &it->mut(), inner.get(), adjust_all);
     }
   }
 }
@@ -301,7 +301,7 @@ static void PartialCacheInRegister(Block* parent, Block* comp_parent, Block* cac
   // Stride changed. So need to fix all ref's interior size
   for (auto& cache_ref : cache->refs) {
     const auto& inner_ref = cache_inner->ref_by_from(cache_ref.into);
-    cache_ref.interior_shape = cache_inner->exterior_shape(inner_ref->into);
+    cache_ref.mut().interior_shape = cache_inner->exterior_shape(inner_ref->into);
     // For the cached refinement, we should change both interior
     // and exterior shapes. So we need to change the stripe as well.
     // For other refinement, we just change the interior shape.
@@ -311,7 +311,7 @@ static void PartialCacheInRegister(Block* parent, Block* comp_parent, Block* cac
       for (size_t i = 0; i < n_dims; ++i) {
         sizes[i] = cache_ref.interior_shape.dims[i].size;
       }
-      parent_ref_it->interior_shape =                      //
+      parent_ref_it->mut().interior_shape =                //
           SimpleShape(parent_ref_it->interior_shape.type,  //
                       sizes, parent_ref_it->interior_shape.layout);
     }
@@ -321,22 +321,22 @@ static void PartialCacheInRegister(Block* parent, Block* comp_parent, Block* cac
     auto comp_inner = comp->SubBlock(0);
     auto comp_ref_it = comp->ref_by_from(ref_name);
     const auto& inner_ref = comp_inner->ref_by_from(comp_ref_it->into);
-    comp_ref_it->interior_shape = comp_inner->exterior_shape(inner_ref->into);
+    comp_ref_it->mut().interior_shape = comp_inner->exterior_shape(inner_ref->into);
     if (first_comp && comp_parent != parent) {
       first_comp = false;
       auto comp_parent_ref_it = comp_parent->ref_by_into(ref_name);
-      comp_parent_ref_it->interior_shape = comp->exterior_shape(comp_ref_it->into);
+      comp_parent_ref_it->mut().interior_shape = comp->exterior_shape(comp_ref_it->into);
     }
   }
 
-  parent_ref_it->location.devs[0].name = "REGISTER";
+  parent_ref_it->mut().location.devs[0].name = "REGISTER";
   PropagateRefLoc(parent, *parent_ref_it);
 }
 
 // Try to decide if we should load the ref in cache into registers
 static bool CacheRefInRegister(Block* parent, Block* comp_parent, Block* cache,  //
                                const std::vector<Block*>& comps, const RegisterPassOptions& opt) {
-  std::vector<Refinement>::const_iterator cache_ref_it;
+  std::set<Refinement>::const_iterator cache_ref_it;
   // Determine the refinement in cache block
   if (opt.dir == RefDir::In) {
     cache_ref_it = cache->ref_by_into("dst");
@@ -477,7 +477,7 @@ static bool CacheRefInRegister(Block* parent, Block* comp_parent, Block* cache, 
 
 static void CacheWholeRefInRegister(Block* parent, Block* cache, const std::vector<Block*>& comps,  //
                                     const RegisterPassOptions& opt) {
-  std::vector<Refinement>::const_iterator cache_ref_it;
+  std::set<Refinement>::const_iterator cache_ref_it;
   // Determine the refinement in cache block
   if (opt.dir == RefDir::In) {
     cache_ref_it = cache->ref_by_into("dst");
@@ -532,7 +532,7 @@ static void CacheWholeRefInRegister(Block* parent, Block* cache, const std::vect
     // Load the whole buffer into register
     cache->tags.erase("gpu_thread");
     auto parent_ref_it = parent->ref_by_into(cache_ref_it->from);
-    parent_ref_it->location.devs[0].name = "REGISTER";
+    parent_ref_it->mut().location.devs[0].name = "REGISTER";
     PropagateRefLoc(parent, *parent_ref_it);
   }
 }

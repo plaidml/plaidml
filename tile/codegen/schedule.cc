@@ -526,7 +526,7 @@ class IOGatherer final : private stripe::MutableStmtVisitor {
         continue;  // This isn't an IO ref.
       }
       auto* ri = &ri_map_->at(ref.from);
-      updates.emplace_back(std::make_pair(&ref, ri));
+      updates.emplace_back(std::make_pair(&ref.mut(), ri));
       ios_.emplace_back(ri, ref);
     }
     binder_ = StatementBinder{std::move(updates), block, loc_};
@@ -685,7 +685,7 @@ std::map<RefInfoKey, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, c
   // Add the current block's refs.
   for (auto& ref : block->refs) {
     const AliasInfo& ai = alias_map->at(ref.into);
-    ri_map.emplace(ref.into, RefInfo{&ref, ai});
+    ri_map.emplace(ref.into, RefInfo{&ref.mut(), ai});
   }
 
   // Update earliest-writer entries.
@@ -1061,7 +1061,7 @@ void Scheduler::Run() {
 
     binder.ApplyBindings();
     if (current_block && added_refs.size()) {
-      current_block->refs.insert(current_block->refs.end(), added_refs.begin(), added_refs.end());
+      current_block->refs.insert(added_refs.begin(), added_refs.end());
     }
 
     // Remove all RefInfo pointers to internal-only CacheEntries used
@@ -1099,40 +1099,35 @@ void Scheduler::Run() {
   }
 
   // Add a Refinement for each CacheEntry.
-  block_->refs.reserve(block_->refs.size() + ri_map_.size() + cache_entries_.size());
   for (auto& ent : cache_entries_) {
-    auto ref = block_->ref_by_into(ent.name, false);
-    if (ref == block_->refs.end()) {
-      ref = block_->refs.emplace(block_->refs.end(), ent.source->ref);
+    stripe::Refinement ref;
+    auto ri = block_->ref_by_into(ent.name, false);
+    if (ri != block_->refs.end()) {
+      ref = *ri;
+    } else {
+      ref = ent.source->ref;
     }
-    ref->dir = stripe::RefDir::None;
-    ref->from.clear();
-    ref->into = ent.name;
-    ref->interior_shape = ent.shape;
-    ref->location = PartialEval(mem_loc_, {{"unit", ent.unit.constant()}});
-    ref->offset = ent.range.begin;
+    ref.dir = stripe::RefDir::None;
+    ref.from.clear();
+    ref.into = ent.name;
+    ref.interior_shape = ent.shape;
+    ref.location = PartialEval(mem_loc_, {{"unit", ent.unit.constant()}});
+    ref.offset = ent.range.begin;
+    block_->refs.emplace(std::move(ref));
   }
 
   // Move used Refinements back into the block.
   for (auto& rikey_ri : ri_map_) {
     if (rikey_ri.second.used) {
-      auto ref = block_->ref_by_into(rikey_ri.second.ref.into, false);
-      if (ref == block_->refs.end()) {
-        block_->refs.emplace_back(std::move(rikey_ri.second.ref));
-      } else {
-        *ref = rikey_ri.second.ref;
+      auto ri = block_->refs.find(rikey_ri.second.ref.into);
+      if (ri != block_->refs.end()) {
+        block_->refs.erase(ri);
       }
+      block_->refs.emplace(rikey_ri.second.ref);
     }
   }
 
   RebuildTransitiveDeps();
-
-  // Refinement order doesn't matter -- so sort the refinements by
-  // their "into" field (which all refinements have), to simplify
-  // testing.
-  std::sort(block_->refs.begin(), block_->refs.end(), [](const stripe::Refinement& lhs, const stripe::Refinement& rhs) {
-    return std::less<std::string>{}(lhs.into, rhs.into);
-  });
 }
 
 std::tuple<PlacementPlan, std::vector<IO>> Scheduler::GatherPlacementState(const std::vector<IO>& ios) {
@@ -1558,7 +1553,7 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
   swap_block.name = "swap_in_" + ent->name;
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
-  swap_block.refs.push_back(stripe::Refinement{
+  swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::In,            // dir
       ent->source->ref.into,         // from
       "src",                         // into
@@ -1571,7 +1566,7 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
   });
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
-  swap_block.refs.push_back(stripe::Refinement{
+  swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::Out,             // dir
       ent->name,                       // from
       "dst",                           // into
@@ -1611,7 +1606,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
-  swap_block.refs.push_back(stripe::Refinement{
+  swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::In,              // dir
       ent->name,                       // from
       "src",                           // into
@@ -1623,7 +1618,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       ent->source->ref.bank_dim,       // bank_dim
   });
 
-  swap_block.refs.push_back(stripe::Refinement{
+  swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::Out,           // dir
       ent->source->ref.into,         // from
       "dst",                         // into
@@ -1685,7 +1680,7 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
     }
   }
 
-  swap_block.refs.push_back(stripe::Refinement{
+  swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::In,           // dir
       backing_ref_name,             // from
       "src",                        // into
@@ -1698,7 +1693,7 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
   });
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
-  swap_block.refs.push_back(stripe::Refinement{
+  swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::Out,            // dir
       ent->interior_name,             // from
       "dst",                          // into
@@ -1748,7 +1743,7 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
   }
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
-  swap_block.refs.push_back(stripe::Refinement{
+  swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::In,             // dir
       ent->interior_name,             // from
       "src",                          // into
@@ -1760,7 +1755,7 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       ent->source->ref.bank_dim,      // bank_dim
   });
 
-  swap_block.refs.push_back(stripe::Refinement{
+  swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::Out,          // dir
       backing_ref_name,             // from
       "dst",                        // into

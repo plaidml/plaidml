@@ -93,7 +93,7 @@ class ScheduleTest : public ::testing::Test {
 
   void AddTmpRefinement(const char* name, const TensorDimension& dim) {
     TensorShape shape(DataType::FLOAT32, {dim});
-    main_->refs.emplace_back(stripe::Refinement{
+    main_->refs.emplace(stripe::Refinement{
         stripe::RefDir::None,         // dir
         "",                           // from
         name,                         // into

@@ -515,7 +515,7 @@ std::vector<Refinement*> Block::ref_ins() {
   std::vector<Refinement*> results;
   for (auto& ref : refs) {
     if (ref.dir == RefDir::In) {
-      results.push_back(&ref);
+      results.push_back(&ref.mut());
     }
   }
   return results;
@@ -525,7 +525,7 @@ std::vector<Refinement*> Block::ref_outs() {
   std::vector<Refinement*> results;
   for (auto& ref : refs) {
     if (ref.dir == RefDir::Out) {
-      results.push_back(&ref);
+      results.push_back(&ref.mut());
     }
   }
   return results;
@@ -796,7 +796,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     // if (pb_into_ref.second.has_bank_dim()) {
     //   ref.bank_dim = pb_into_ref.second.bank_dim().value();
     // }
-    ret->refs.emplace_back(ref);
+    ret->refs.emplace(std::move(ref));
   }
   std::vector<StatementIt> stmts;
   stmts.reserve(block.stmts_size());
@@ -919,9 +919,7 @@ proto::Block IntoProto(const Block& block) {
   for (const auto& con : block.constraints) {
     *ret.add_constraints() = IntoProto(con);
   }
-  std::vector<Refinement> refs = block.refs;
-  std::sort(refs.begin(), refs.end(), [](const Refinement& lhs, const Refinement& rhs) { return lhs.into < rhs.into; });
-  for (const auto& ref : refs) {
+  for (const auto& ref : block.refs) {
     auto& pb_ref = (*ret.mutable_refs())[ref.into];
     switch (ref.dir) {
       case RefDir::None:
@@ -1077,8 +1075,8 @@ std::set<const Index*> Block::accumulation_idxs() const {
   return ret;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_into(const std::string& ref_name, bool fail) {
-  auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.into == ref_name; });
+std::set<Refinement>::iterator Block::ref_by_into(const std::string& ref_name, bool fail) {
+  auto it = refs.find(ref_name);
   if (fail && it == refs.end()) {
     throw_with_trace(
         std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % name % ref_name)));
@@ -1086,8 +1084,8 @@ std::vector<Refinement>::iterator Block::ref_by_into(const std::string& ref_name
   return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& ref_name, bool fail) const {
-  auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.into == ref_name; });
+std::set<Refinement>::const_iterator Block::ref_by_into(const std::string& ref_name, bool fail) const {
+  auto it = refs.find(ref_name);
   if (fail && it == refs.end()) {
     throw_with_trace(
         std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % name % ref_name)));
@@ -1095,7 +1093,7 @@ std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& re
   return it;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_from(const std::string& ref_name, bool fail) {
+std::set<Refinement>::iterator Block::ref_by_from(const std::string& ref_name, bool fail) {
   auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.from == ref_name; });
   if (fail && it == refs.end()) {
     throw_with_trace(
@@ -1104,7 +1102,7 @@ std::vector<Refinement>::iterator Block::ref_by_from(const std::string& ref_name
   return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& ref_name, bool fail) const {
+std::set<Refinement>::const_iterator Block::ref_by_from(const std::string& ref_name, bool fail) const {
   auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.from == ref_name; });
   if (fail && it == refs.end()) {
     throw_with_trace(
@@ -1113,7 +1111,7 @@ std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& re
   return it;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_tag(const std::string& tag_name, bool fail) {
+std::set<Refinement>::iterator Block::ref_by_tag(const std::string& tag_name, bool fail) {
   auto it =
       std::find_if(refs.begin(), refs.end(), [&tag_name](const Refinement& ref) { return ref.has_tag(tag_name); });
   if (fail && it == refs.end()) {
@@ -1123,7 +1121,7 @@ std::vector<Refinement>::iterator Block::ref_by_tag(const std::string& tag_name,
   return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_tag(const std::string& tag_name, bool fail) const {
+std::set<Refinement>::const_iterator Block::ref_by_tag(const std::string& tag_name, bool fail) const {
   auto it =
       std::find_if(refs.begin(), refs.end(), [&tag_name](const Refinement& ref) { return ref.has_tag(tag_name); });
   if (fail && it == refs.end()) {
@@ -1138,14 +1136,12 @@ std::string Block::unique_ref_name(const std::string& into) const {
     return into;
   }
   size_t i = 0;
-  while (true) {
+  for (;;) {
     auto name = str(boost::format("%s_%zu") % into % i++);
     if (ref_by_into(name, false) == refs.end()) {
       return name;
     }
   }
-  // Unreachable
-  return "";
 }
 
 std::string Block::unique_idx_name(const std::string& name) const {
@@ -1153,14 +1149,12 @@ std::string Block::unique_idx_name(const std::string& name) const {
     return name;
   }
   size_t i = 0;
-  while (true) {
+  for (;;) {
     auto new_name = str(boost::format("%s_%zu") % name % i++);
     if (!idx_by_name(new_name)) {
       return new_name;
     }
   }
-  // Unreachable
-  return "";
 }
 
 TensorShape Block::exterior_shape(const std::string& into) const {
