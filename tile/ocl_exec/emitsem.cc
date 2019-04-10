@@ -506,7 +506,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       if (block.refs.size() != 1) {
         throw std::runtime_error("Zero kernels must have a single output");
       }
-      std::string bname = block.refs[0].from;
+      std::string bname = block.ref_outs()[0]->from;
       std::string kname = "kernel_" + std::to_string(kernels_.kernels.size() + 1);
       auto ki = lang::GenZero(scope_->at(bname).shape, bname, kname);
       ki.comments = "ZERO";

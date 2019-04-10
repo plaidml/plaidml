@@ -215,19 +215,21 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   // We'll look up the kernel by name and implicitly bitcast it so we can call
   // it using our int32-pointers in place of whatever it actually expects;
   // LLVM will tolerate this mismatch when we use getOrInsertFunction.
-  size_t param_count = program.refs.size();
   auto ai = invoker->arg_begin();
   llvm::Value* argvec = &(*ai);
   // The body of the invoker will compute the element pointer for each
   // argument value in order, then load the value.
   std::vector<llvm::Value*> args;
-  for (unsigned i = 0; i < param_count; ++i) {
-    llvm::Value* index = builder_.getInt32(i);
-    std::vector<llvm::Value*> idxList{index};
-    llvm::Value* elptr = builder_.CreateGEP(argvec, idxList);
-    llvm::Value* elval = builder_.CreateLoad(elptr);
-    llvm::Type* eltype = CType(program.refs[i].interior_shape.type)->getPointerTo();
-    args.push_back(builder_.CreateBitCast(elval, eltype));
+  {
+    unsigned i = 0;
+    for (auto& ref : program.refs) {
+      llvm::Value* index = builder_.getInt32(i++);
+      std::vector<llvm::Value*> idxList{index};
+      llvm::Value* elptr = builder_.CreateGEP(argvec, idxList);
+      llvm::Value* elval = builder_.CreateLoad(elptr);
+      llvm::Type* eltype = CType(ref.interior_shape.type)->getPointerTo();
+      args.push_back(builder_.CreateBitCast(elval, eltype));
+    }
   }
   // After passing in buffer pointers, we also provide an initial value for
   // each index; since this is the outermost block, all indexes begin at zero.
@@ -265,7 +267,9 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
     unsigned idx = ai->getArgNo();
     if (idx < block.refs.size()) {
-      std::string param_name = block.refs[idx].into;
+      auto it = block.refs.begin();
+      std::advance(it, idx);
+      std::string param_name = it->into;
       ai->setName(param_name);
       assert(nullptr == buffers_[param_name].base);
       buffers_[param_name].base = &(*ai);

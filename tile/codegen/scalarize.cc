@@ -33,9 +33,13 @@ void Scalarize(Block* block, bool recursive) {
     }
   }
   // Remove allocations of sbufs
-  auto rem_it = std::remove_if(block->refs.begin(), block->refs.end(),
-                               [&](const Refinement& ref) { return sbufs.count(ref.into); });
-  block->refs.erase(rem_it, block->refs.end());
+  for (auto rem_it = block->refs.begin(), rem_last = block->refs.end(); rem_it != rem_last;) {
+    if (sbufs.count(rem_it->into)) {
+      rem_it = block->refs.erase(rem_it);
+    } else {
+      ++rem_it;
+    }
+  }
   // Now, all we need to do is remove the pointless reads + writes
   // To do so, we track for each 'buffer', which scalar value it currently
   // has, and then for each scalar loaded, what scalar it originally came from

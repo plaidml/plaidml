@@ -144,12 +144,12 @@ void Pad(Block* block, const AliasMap& map) {
     const auto& exts = extents.at(bname);
     int64_t stride = 1;
     for (int i = exts.size() - 1; i >= 0; i--) {
-      ref.interior_shape.dims[i].stride = stride;
+      ref.mut().interior_shape.dims[i].stride = stride;
       uint64_t new_size = exts[i].load.max + 1 - exts[i].load.min;
       new_size = std::max(new_size, ref.interior_shape.dims[i].size);
-      ref.interior_shape.dims[i].size = new_size;
+      ref.mut().interior_shape.dims[i].size = new_size;
       stride *= new_size;
-      ref.access[i] += -exts[i].load.min;
+      ref.mut().access[i] += -exts[i].load.min;
     }
     FixupRefs(block, ref.into);
   }

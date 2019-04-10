@@ -217,7 +217,54 @@ struct Refinement : Taggable {
 
   Affine FlatAccess() const;
   TensorShape ApplyTile(const std::map<std::string, size_t>& tile_by_name) const;
+
+  // Returns a mutable Refinement from a const Refinement.  This is
+  // useful when processing a set<Refinement, RefinementIntoCompare>,
+  // since for safety reasons, the normal accessors only return access
+  // to const Refinements.
+  //
+  // Don't use this to mutate the "into" field of a Refinement that's
+  // in a set<Refinement>, or you'll break the set's invariants and
+  // anything could happen (most likely, subsequent code will be
+  // unable to find some portion of the set's Refinements).
+  Refinement& mut() const { return const_cast<Refinement&>(*this); }
 };
+
+}  // namespace stripe
+}  // namespace tile
+}  // namespace vertexai
+
+// The default comparator for Refinements is to compare the "into"
+// field.  We do this by specializing std::less<Refinement> so that we
+// can add comparators for strings.
+namespace std {
+
+template <>
+struct less<::vertexai::tile::stripe::Refinement> {
+  using is_transparent = void;  // Allows string comparators
+  const bool operator()(const ::vertexai::tile::stripe::Refinement& lhs,
+                        const ::vertexai::tile::stripe::Refinement& rhs) const {
+    return std::less<std::string>{}(lhs.into, rhs.into);
+  }
+  const bool operator()(const ::vertexai::tile::stripe::Refinement& lhs, const std::string& rhs) const {
+    return std::less<std::string>{}(lhs.into, rhs);
+  }
+  const bool operator()(const ::vertexai::tile::stripe::Refinement& lhs, const char* rhs) const {
+    return std::less<std::string>{}(lhs.into, rhs);
+  }
+  const bool operator()(const std::string& lhs, const ::vertexai::tile::stripe::Refinement& rhs) const {
+    return std::less<std::string>{}(lhs, rhs.into);
+  }
+  const bool operator()(const char* lhs, const ::vertexai::tile::stripe::Refinement& rhs) const {
+    return std::less<std::string>{}(lhs, rhs.into);
+  }
+};
+
+}  // namespace std
+
+namespace vertexai {
+namespace tile {
+namespace stripe {
 
 struct Load : Statement {
   Load(const std::string& from, const std::string& into) : from(from), into(into) {}
@@ -336,7 +383,7 @@ struct Block : Statement {
   std::string comments;
   std::vector<Index> idxs;
   std::vector<Affine> constraints;
-  std::vector<Refinement> refs;
+  std::set<Refinement> refs;
   StatementList stmts;
   Location location;
 
@@ -350,14 +397,14 @@ struct Block : Statement {
   std::set<const Index*> accumulation_idxs() const;
   size_t idxs_product() const;
   // Find which refinement has an into called 'ref_name'
-  std::vector<Refinement>::iterator ref_by_into(const std::string& ref_name, bool fail = true);
-  std::vector<Refinement>::const_iterator ref_by_into(const std::string& ref_name, bool fail = true) const;
+  std::set<Refinement>::iterator ref_by_into(const std::string& ref_name, bool fail = true);
+  std::set<Refinement>::const_iterator ref_by_into(const std::string& ref_name, bool fail = true) const;
   // Find which refinement has a from called 'ref_name'
-  std::vector<Refinement>::iterator ref_by_from(const std::string& ref_name, bool fail = true);
-  std::vector<Refinement>::const_iterator ref_by_from(const std::string& ref_name, bool fail = true) const;
+  std::set<Refinement>::iterator ref_by_from(const std::string& ref_name, bool fail = true);
+  std::set<Refinement>::const_iterator ref_by_from(const std::string& ref_name, bool fail = true) const;
   // Find which refinement has a tag called 'tag_name'
-  std::vector<Refinement>::iterator ref_by_tag(const std::string& tag_name, bool fail = true);
-  std::vector<Refinement>::const_iterator ref_by_tag(const std::string& tag_name, bool fail = true) const;
+  std::set<Refinement>::iterator ref_by_tag(const std::string& tag_name, bool fail = true);
+  std::set<Refinement>::const_iterator ref_by_tag(const std::string& tag_name, bool fail = true) const;
   // Make a unique refinement name for an into (by appending _2, etc, if needed)
   std::string unique_ref_name(const std::string& into) const;
   // Make a unique index name (by appending _2, etc, if needed)

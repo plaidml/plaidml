@@ -37,12 +37,12 @@ void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
   IVLOG(3, "EvalWithValues> block: " << block->name << ", fixed: " << fixed);
   block->location = PartialEval(block->location, fixed);
   for (auto& ref : block->refs) {
-    ref.location = PartialEval(ref.location, fixed);
-    for (auto& aff : ref.access) {
+    ref.mut().location = PartialEval(ref.location, fixed);
+    for (auto& aff : ref.mut().access) {
       aff = aff.partial_eval(fixed);
     }
     if (ref.cache_unit) {
-      ref.cache_unit = ref.cache_unit->partial_eval(fixed);
+      ref.mut().cache_unit = ref.cache_unit->partial_eval(fixed);
     }
   }
   for (auto& constraint : block->constraints) {
@@ -142,13 +142,13 @@ void EvalInner(Block* outer,                         //
       }
       auto block_ref = block->ref_by_into(inner_ref.from);
       for (size_t i = 0; i < inner_ref.access.size(); i++) {
-        inner_ref.access[i] += block_ref->access[i];
+        inner_ref.mut().access[i] += block_ref->access[i];
       }
       auto outer_ref = outer->ref_by_into(block_ref->from);
       IVLOG(3, "  outer_ref: " << *outer_ref);
       IVLOG(3, "  block_ref: " << *block_ref);
       IVLOG(3, "  inner_ref: " << inner_ref);
-      inner_ref.from = block_ref->from;
+      inner_ref.mut().from = block_ref->from;
       IVLOG(3, "    from = " << inner_ref.from);
       if (!options.make_views()) {
         continue;
@@ -173,12 +173,12 @@ void EvalInner(Block* outer,                         //
       for (size_t i = 0; i < inner_ref.access.size(); i++) {
         auto const_access = block_ref->access[i].constant();
         view.access[i] = outer_ref->access[i] + const_access;
-        inner_ref.access[i] -= const_access;
+        inner_ref.mut().access[i] -= const_access;
       }
-      inner_ref.from = view.into;
+      inner_ref.mut().from = view.into;
       IVLOG(2, "view: " << view);
       if (outer->ref_by_into(view.into, false) == outer->refs.end()) {
-        outer->refs.emplace_back(view);
+        outer->refs.emplace(std::move(view));
       }
     }
   }

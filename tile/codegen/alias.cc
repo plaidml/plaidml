@@ -137,7 +137,7 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
     } else {
       // New alloc, initialize from scratch
       info.base_block = block;
-      info.base_ref = &ref;
+      info.base_ref = &ref.mut();
       info.base_name = prefix + ref.into;
       info.access.resize(ref.access.size());
       info.location = ref.location;

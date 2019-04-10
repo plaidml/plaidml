@@ -25,10 +25,10 @@ void FixupRefs(Block* block, const std::string& var_name) {
     if (inner) {
       for (auto& ref : inner->refs) {
         if (ref.from == var_name) {
-          ref.location = it->location;
-          ref.offset = it->offset;
+          ref.mut().location = it->location;
+          ref.mut().offset = it->offset;
           for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
-            ref.interior_shape.dims[i].stride = it->interior_shape.dims[i].stride;
+            ref.mut().interior_shape.dims[i].stride = it->interior_shape.dims[i].stride;
           }
           FixupRefs(inner.get(), ref.into);
         }
@@ -47,12 +47,12 @@ void LocalizeRef(Block* block, const std::string& var_name) {
     sizes.push_back(dim.size);
   }
   // Change the shape
-  it_ref->interior_shape = SimpleShape(it_ref->interior_shape.type, sizes);
+  it_ref->mut().interior_shape = SimpleShape(it_ref->interior_shape.type, sizes);
   // Change dir + from
-  it_ref->dir = RefDir::None;
-  it_ref->from = "";
+  it_ref->mut().dir = RefDir::None;
+  it_ref->mut().from = "";
   // Clear its affines
-  for (auto& aff : it_ref->access) {
+  for (Affine& aff : it_ref->mut().access) {
     aff = 0;
   }
   // Propagate the changes
@@ -119,7 +119,7 @@ void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
   RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {
     for (auto& ref : block->refs) {
       if (ref.dir == RefDir::None) {
-        ref.location = loc;
+        ref.mut().location = loc;
         FixupRefs(block, ref.into);
       }
     }

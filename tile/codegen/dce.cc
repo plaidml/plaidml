@@ -69,39 +69,43 @@ static void PruneRefinements(Block* block) {
       case RefDir::In: {
         // If the In refinement is not used, remove it.
         if (uses.find(ref.into) == uses.end()) {
-          ref.set_tag("removed");
+          ref.mut().set_tag("removed");
         }
       } break;
       case RefDir::Out: {
         // If the Out refinement is not defined, remove it.
         if (defs.find(ref.into) == defs.end()) {
-          ref.set_tag("removed");
+          ref.mut().set_tag("removed");
         }
       } break;
       case RefDir::InOut: {
         // If the InOut refinement is not either used or defined, remove it.
         if (uses.find(ref.into) == uses.end() && defs.find(ref.into) == defs.end()) {
-          ref.set_tag("removed");
+          ref.mut().set_tag("removed");
         }
         if (uses.find(ref.into) == uses.end()) {
           // never used, set as Out
-          ref.dir = RefDir::Out;
+          ref.mut().dir = RefDir::Out;
         } else if (defs.find(ref.into) == defs.end()) {
           // never defined, set as In
-          ref.dir = RefDir::In;
+          ref.mut().dir = RefDir::In;
         }
       } break;
       case RefDir::None: {
         // If the None refinement is not either used or defined, remove it.
         if (uses.find(ref.into) == uses.end() && defs.find(ref.into) == defs.end()) {
-          ref.set_tag("removed");
+          ref.mut().set_tag("removed");
         }
       } break;
     }
   }
-  block->refs.erase(std::remove_if(block->refs.begin(), block->refs.end(),                   //
-                                   [](Refinement& ref) { return ref.has_tag("removed"); }),  //
-                    block->refs.end());
+  for (auto it = block->refs.begin(), limit = block->refs.end(); it != limit;) {
+    if (it->has_tag("removed")) {
+      it = block->refs.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 // To determine if the output of the stmt is one of the block outputs.

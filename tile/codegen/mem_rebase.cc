@@ -18,7 +18,7 @@ void MemRebasePass(stripe::Block* root, const proto::MemRebasePass& options) {
     stripe::Block* block = todo.front();
     todo.pop();
 
-    for (stripe::Refinement& ref : block->refs) {
+    for (auto& ref : block->refs) {
       if (ref.location != options.pattern()) {
         continue;
       }
@@ -28,7 +28,7 @@ void MemRebasePass(stripe::Block* root, const proto::MemRebasePass& options) {
           vars[dev.name + '.' + std::to_string(idx)] = dev.units[idx].constant();
         }
       }
-      ref.offset = offset.eval(vars);
+      ref.mut().offset = offset.eval(vars);
     }
 
     for (auto& stmt : block->stmts) {

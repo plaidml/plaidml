@@ -255,7 +255,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   // Also expand sizes base on inner indexes that have been removed.
   for (auto& ref : outer->refs) {
     for (size_t i = 0; i < ref.access.size(); i++) {
-      auto& acc = ref.access[i];
+      auto& acc = ref.mut().access[i];
       int64_t min_val = 0;
       int64_t max_val = ref.interior_shape.dims[i].size - 1;
       Affine affine = acc.constant();
@@ -273,20 +273,20 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
         }
         affine += Affine(it->second, kvp.second);
       }
-      ref.interior_shape.dims[i].size = max_val - min_val + 1;
+      ref.mut().interior_shape.dims[i].size = max_val - min_val + 1;
       acc = affine;
     }
   }
   // Remove mapped access elements from inner refinements
   for (auto& ref : inner->refs) {
     // Rename from to match outer into
-    ref.from = ref.into;
+    ref.mut().from = ref.into;
     // If original was an allocation, make R/W.
     if (ref.dir == RefDir::None) {
-      ref.dir = RefDir::InOut;
+      ref.mut().dir = RefDir::InOut;
     }
     // Update accesses
-    for (auto& acc : ref.access) {
+    for (auto& acc : ref.mut().access) {
       Affine affine;
       for (const auto& kvp : acc.getMap()) {
         if (kvp.first != "" && !mapping.count(kvp.first)) {
@@ -338,7 +338,7 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
         }
       } else if (atype == AliasType::Exact) {
         remap_b[new_ref.into] = old_ref.into;
-        old_ref.dir = UnionDir(old_ref.dir, new_ref.dir);
+        old_ref.mut().dir = UnionDir(old_ref.dir, new_ref.dir);
         merged = true;
         break;
       }
@@ -347,8 +347,8 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
       // Copy across as a new ref
       std::string new_name = tmp->unique_ref_name(new_ref.into);
       remap_b[new_ref.into] = new_name;
-      tmp->refs.push_back(new_ref);
-      tmp->refs.back().into = new_name;
+      new_ref.mut().into = std::move(new_name);
+      tmp->refs.emplace(new_ref);
     }
   }
   // We are now safe (cannot fail), move new reference over A's
@@ -416,7 +416,7 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
       case StmtKind::Block: {
         auto op = Block::Downcast(stmt);
         for (auto& ref : op->refs) {
-          ref.from = remap_b.at(ref.from);
+          ref.mut().from = remap_b.at(ref.from);
         }
       } break;
       case StmtKind::Constant: {

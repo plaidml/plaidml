@@ -36,8 +36,11 @@ void ApplyCache(const AliasMap& map,                     //
   TensorShape cached_ts = SimpleShape(raw_ts.type, sizes);
   // Make a new name for the raw variable
   std::string raw_name = block->unique_ref_name(var_name + "_raw");
-  // Update the old refinement to rename
-  it->into = raw_name;
+  // Replace the old refinement to rename it.
+  Refinement replacement_ref{*it};
+  replacement_ref.into = raw_name;
+  block->refs.erase(it);
+  it = block->refs.emplace(std::move(replacement_ref)).first;
   // Make a base block for loading/storing
   // Set both from refinements to the cached version, we will replace
   // one of them with the 'raw' version based on transfer direction
@@ -62,7 +65,7 @@ void ApplyCache(const AliasMap& map,                     //
     raw_xfer_shape.dims[i].size = 1;
     cached_xfer_shape.dims[i].size = 1;
   }
-  xfer_block.refs.emplace_back(Refinement{
+  xfer_block.refs.emplace(Refinement{
       RefDir::In,         // dir
       var_name,           // from
       "src",              // into
@@ -73,7 +76,7 @@ void ApplyCache(const AliasMap& map,                     //
       it->offset,         // offset
       it->bank_dim,       // bank_dim
   });
-  xfer_block.refs.emplace_back(Refinement{
+  xfer_block.refs.emplace(Refinement{
       RefDir::Out,        // dir
       var_name,           // from
       "dst",              // into
@@ -91,9 +94,11 @@ void ApplyCache(const AliasMap& map,                     //
     auto cache_load = std::make_shared<Block>(xfer_block);
     cache_load->name = str(boost::format("load_%s") % var_name);
     cache_load->tags = load_tags;
-    cache_load->refs[0].from = raw_name;
-    cache_load->refs[0].interior_shape = raw_xfer_shape;
-    cache_load->refs[1].location = mem_loc;
+    auto& src = cache_load->refs.find("src")->mut();
+    auto& dst = cache_load->refs.find("dst")->mut();
+    src.from = raw_name;
+    src.interior_shape = raw_xfer_shape;
+    dst.location = mem_loc;
     block->stmts.emplace_front(cache_load);
   }
   // If original refinement was output, flush from cache
@@ -101,22 +106,26 @@ void ApplyCache(const AliasMap& map,                     //
     auto cache_store = std::make_shared<Block>(xfer_block);
     cache_store->name = str(boost::format("store_%s") % var_name);
     cache_store->tags = store_tags;
-    cache_store->refs[1].from = raw_name;
-    cache_store->refs[1].interior_shape = raw_xfer_shape;
-    cache_store->refs[0].location = mem_loc;
+    auto& src = cache_store->refs.find("src")->mut();
+    auto& dst = cache_store->refs.find("dst")->mut();
+    dst.from = raw_name;
+    dst.interior_shape = raw_xfer_shape;
+    src.location = mem_loc;
     block->stmts.emplace_back(cache_store);
   }
   // Add the new declaration (replacing the original)
-  block->refs.emplace_back(Refinement{
-      RefDir::None,  // dir
-      "",            // from
-      var_name,      // into
-      {},            // access
-      cached_ts,     // interior_shape
-      it->agg_op,    // agg_op
-      mem_loc,       // location
-  });
-  block->refs.back().access.resize(cached_ts.dims.size());
+  auto decl = block->refs
+                  .emplace(Refinement{
+                      RefDir::None,  // dir
+                      "",            // from
+                      var_name,      // into
+                      {},            // access
+                      cached_ts,     // interior_shape
+                      it->agg_op,    // agg_op
+                      mem_loc,       // location
+                  })
+                  .first;
+  decl->mut().access.resize(cached_ts.dims.size());
   // Update inner blocks strides + locations
   FixupRefs(block, var_name);
 }

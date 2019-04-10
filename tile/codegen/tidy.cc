@@ -24,7 +24,7 @@ void PruneIndexes(Block* block, const Tags& exclude_tags) {
   }
   // Remove from refinements
   for (auto& refs : block->refs) {
-    for (auto& aff : refs.access) {
+    for (auto& aff : refs.mut().access) {
       aff = aff.partial_eval(idx_values);
     }
   }

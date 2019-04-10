@@ -49,13 +49,12 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
       }
 
       // Propagate refinements used by the inner block to the package block.
-      for (stripe::Refinement& inner_ref : inner->refs) {
+      for (auto& inner_ref : inner->refs) {
         if (inner_ref.dir == stripe::RefDir::None) {
           continue;
         }
         auto outer_ref = outer->ref_by_into(inner_ref.from);
-        pkg->refs.emplace(pkg->refs.end(),
-                          stripe::Refinement{inner_ref.dir,                // dir
+        pkg->refs.emplace(stripe::Refinement{inner_ref.dir,                // dir
                                              inner_ref.from,               // from
                                              inner_ref.from,               // into
                                              outer_ref->access,            // access

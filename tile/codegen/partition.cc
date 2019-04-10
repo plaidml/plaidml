@@ -249,7 +249,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
   // Update refinements, do this after tiling so that only the outer block gets these updates.
   for (const auto& item : banked_refs) {
     // Use ref_by_into because ApplyTile might cause Refinement pointers to become invalid
-    block->ref_by_into(item.first)->cache_unit = item.second.cache_unit;
+    block->ref_by_into(item.first)->mut().cache_unit = item.second.cache_unit;
   }
   block->tags.clear();
   block->add_tags(set_tags);
