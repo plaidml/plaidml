@@ -158,7 +158,7 @@ void FlattenTrivial(stripe::Block* outer) {
     }
     bool renames = false;
     for (const auto& ref : inner->refs) {
-      if (ref.from != "" && ref.into != ref.from) {
+      if (ref.from != "" && ref.into() != ref.from) {
         renames = true;
       }
     }
@@ -280,7 +280,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   // Remove mapped access elements from inner refinements
   for (auto& ref : inner->refs) {
     // Rename from to match outer into
-    ref.mut().from = ref.into;
+    ref.mut().from = ref.into();
     // If original was an allocation, make R/W.
     if (ref.dir == RefDir::None) {
       ref.mut().dir = RefDir::InOut;
@@ -329,15 +329,15 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
     // Check if b matches something in the existing block
     bool merged = false;
     for (auto& old_ref : block_a->refs) {
-      auto atype = AliasInfo::Compare(a_map.at(old_ref.into), b_map.at(new_ref.into));
+      auto atype = AliasInfo::Compare(a_map.at(old_ref.into()), b_map.at(new_ref.into()));
       if (atype == AliasType::Partial) {
         // Conflict, if either do any writing, we have a problem
         if (IsWriteDir(new_ref.dir) || IsWriteDir(old_ref.dir)) {
-          IVLOG(3, "Fuse failed due to mismatched aliases: " << old_ref.into << " vs " << new_ref.into);
+          IVLOG(3, "Fuse failed due to mismatched aliases: " << old_ref.into() << " vs " << new_ref.into());
           return false;  // Fuse will not work, bail
         }
       } else if (atype == AliasType::Exact) {
-        remap_b[new_ref.into] = old_ref.into;
+        remap_b[new_ref.into()] = old_ref.into();
         old_ref.mut().dir = UnionDir(old_ref.dir, new_ref.dir);
         merged = true;
         break;
@@ -345,10 +345,9 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
     }
     if (!merged) {
       // Copy across as a new ref
-      std::string new_name = tmp->unique_ref_name(new_ref.into);
-      remap_b[new_ref.into] = new_name;
-      new_ref.mut().into = std::move(new_name);
-      tmp->refs.emplace(new_ref);
+      std::string new_name = tmp->unique_ref_name(new_ref.into());
+      remap_b[new_ref.into()] = new_name;
+      tmp->refs.emplace(new_ref.WithInto(std::move(new_name)));
     }
   }
   // We are now safe (cannot fail), move new reference over A's

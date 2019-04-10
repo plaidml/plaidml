@@ -76,7 +76,7 @@ void Pad(Block* block, const AliasMap& map) {
   std::set<std::string> to_pad;
   std::set<std::string> to_cache;
   for (auto& ref : block->refs) {
-    std::string bname = self.at(ref.into).base_name;
+    std::string bname = self.at(ref.into()).base_name;
     auto it = extents.find(bname);
     if (it == extents.end()) {
       continue;
@@ -84,9 +84,9 @@ void Pad(Block* block, const AliasMap& map) {
     const auto& exts = it->second;
     for (size_t i = 0; i < exts.size(); i++) {
       if (exts[i].load.min < 0 || exts[i].load.max >= static_cast<int64_t>(ref.interior_shape.dims[i].size)) {
-        to_pad.insert(ref.into);
+        to_pad.insert(ref.into());
         if (ref.dir != RefDir::None) {
-          to_cache.insert(ref.into);
+          to_cache.insert(ref.into());
         }
       }
     }
@@ -137,10 +137,10 @@ void Pad(Block* block, const AliasMap& map) {
 
   // Update the buffer shapes
   for (auto& ref : block->refs) {
-    if (!to_pad.count(ref.into)) {
+    if (!to_pad.count(ref.into())) {
       continue;
     }
-    std::string bname = self.at(ref.into).base_name;
+    std::string bname = self.at(ref.into()).base_name;
     const auto& exts = extents.at(bname);
     int64_t stride = 1;
     for (int i = exts.size() - 1; i >= 0; i--) {
@@ -151,7 +151,7 @@ void Pad(Block* block, const AliasMap& map) {
       stride *= new_size;
       ref.mut().access[i] += -exts[i].load.min;
     }
-    FixupRefs(block, ref.into);
+    FixupRefs(block, ref.into());
   }
 
   // Add the zeros

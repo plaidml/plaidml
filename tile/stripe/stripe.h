@@ -195,18 +195,31 @@ struct Refinement : Taggable {
              const boost::optional<Affine>& cache_unit = boost::none)
       : dir(dir),
         from(from),
-        into(into),
         access(access),
         interior_shape(interior_shape),
         agg_op(agg_op),
         location(location),
         offset(offset),
         bank_dim(bank_dim),
-        cache_unit(cache_unit) {}
+        cache_unit(cache_unit),
+        into_{into} {}
+
+  Refinement WithInto(const std::string& into) const {
+    Refinement result = *this;
+    result.into_ = into;
+    return result;
+  }
+
+  static Refinement FromInto(const std::string& into) {
+    Refinement result;
+    result.into_ = into;
+    return result;
+  }
+
+  const std::string& into() const { return into_; }
 
   RefDir dir = RefDir::None;
   std::string from;
-  std::string into;
   std::vector<Affine> access;
   TensorShape interior_shape;
   std::string agg_op;
@@ -219,15 +232,13 @@ struct Refinement : Taggable {
   TensorShape ApplyTile(const std::map<std::string, size_t>& tile_by_name) const;
 
   // Returns a mutable Refinement from a const Refinement.  This is
-  // useful when processing a set<Refinement, RefinementIntoCompare>,
-  // since for safety reasons, the normal accessors only return access
-  // to const Refinements.
-  //
-  // Don't use this to mutate the "into" field of a Refinement that's
-  // in a set<Refinement>, or you'll break the set's invariants and
-  // anything could happen (most likely, subsequent code will be
-  // unable to find some portion of the set's Refinements).
+  // useful when processing a set<Refinement>, since for safety
+  // reasons, the normal accessors only return access to const
+  // Refinements.
   Refinement& mut() const { return const_cast<Refinement&>(*this); }
+
+ private:
+  std::string into_;
 };
 
 }  // namespace stripe
@@ -244,19 +255,19 @@ struct less<::vertexai::tile::stripe::Refinement> {
   using is_transparent = void;  // Allows string comparators
   const bool operator()(const ::vertexai::tile::stripe::Refinement& lhs,
                         const ::vertexai::tile::stripe::Refinement& rhs) const {
-    return std::less<std::string>{}(lhs.into, rhs.into);
+    return std::less<std::string>{}(lhs.into(), rhs.into());
   }
   const bool operator()(const ::vertexai::tile::stripe::Refinement& lhs, const std::string& rhs) const {
-    return std::less<std::string>{}(lhs.into, rhs);
+    return std::less<std::string>{}(lhs.into(), rhs);
   }
   const bool operator()(const ::vertexai::tile::stripe::Refinement& lhs, const char* rhs) const {
-    return std::less<std::string>{}(lhs.into, rhs);
+    return std::less<std::string>{}(lhs.into(), rhs);
   }
   const bool operator()(const std::string& lhs, const ::vertexai::tile::stripe::Refinement& rhs) const {
-    return std::less<std::string>{}(lhs, rhs.into);
+    return std::less<std::string>{}(lhs, rhs.into());
   }
   const bool operator()(const char* lhs, const ::vertexai::tile::stripe::Refinement& rhs) const {
-    return std::less<std::string>{}(lhs, rhs.into);
+    return std::less<std::string>{}(lhs, rhs.into());
   }
 };
 

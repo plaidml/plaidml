@@ -164,10 +164,10 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
           // the same underlying physical buffer; we handle these cases in
           // ReadBuffer() and WriteBuffer().
           if (IsReadDir(ref.dir)) {
-            tracker.ReadBuffer(it, ref.into, inner_map);
+            tracker.ReadBuffer(it, ref.into(), inner_map);
           }
           if (IsWriteDir(ref.dir)) {
-            tracker.WriteBuffer(it, ref.into, inner_map);
+            tracker.WriteBuffer(it, ref.into(), inner_map);
           }
         }
       } break;

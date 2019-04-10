@@ -40,7 +40,7 @@ static void PropagateRefLoc(Block* block, const Refinement& outer_ref) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
       for (auto& ref : inner->refs) {
-        if (ref.from == outer_ref.into) {
+        if (ref.from == outer_ref.into()) {
           ref.mut().location = outer_ref.location;
           ref.mut().offset = outer_ref.offset;
           for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
@@ -73,14 +73,14 @@ static void AdjustRefAccessHelper(Block* outer, Refinement* outer_ref,  //
   // In this case, the access are the corresponding index with the coefficient
   // same as the outer index range
   for (auto& inner_ref : inner->refs) {
-    if (adjust_all || inner_ref.from == outer_ref->into) {
+    if (adjust_all || inner_ref.from == outer_ref->into()) {
       for (auto& aff : inner_ref.mut().access) {
         auto& aff_map = aff.mutateMap();
         if (aff_map.size() == 1) {
           auto it = aff_map.begin();
           for (const auto& idx : outer->idxs) {
             if (idx.name == it->first) {
-              it->second = (inner_ref.from == outer_ref->into) ? 1 : idx.range;
+              it->second = (inner_ref.from == outer_ref->into()) ? 1 : idx.range;
               break;
             }
           }
@@ -300,8 +300,8 @@ static void PartialCacheInRegister(Block* parent, Block* comp_parent, Block* cac
 
   // Stride changed. So need to fix all ref's interior size
   for (auto& cache_ref : cache->refs) {
-    const auto& inner_ref = cache_inner->ref_by_from(cache_ref.into);
-    cache_ref.mut().interior_shape = cache_inner->exterior_shape(inner_ref->into);
+    const auto& inner_ref = cache_inner->ref_by_from(cache_ref.into());
+    cache_ref.mut().interior_shape = cache_inner->exterior_shape(inner_ref->into());
     // For the cached refinement, we should change both interior
     // and exterior shapes. So we need to change the stripe as well.
     // For other refinement, we just change the interior shape.
@@ -320,12 +320,12 @@ static void PartialCacheInRegister(Block* parent, Block* comp_parent, Block* cac
   for (auto& comp : comps) {
     auto comp_inner = comp->SubBlock(0);
     auto comp_ref_it = comp->ref_by_from(ref_name);
-    const auto& inner_ref = comp_inner->ref_by_from(comp_ref_it->into);
-    comp_ref_it->mut().interior_shape = comp_inner->exterior_shape(inner_ref->into);
+    const auto& inner_ref = comp_inner->ref_by_from(comp_ref_it->into());
+    comp_ref_it->mut().interior_shape = comp_inner->exterior_shape(inner_ref->into());
     if (first_comp && comp_parent != parent) {
       first_comp = false;
       auto comp_parent_ref_it = comp_parent->ref_by_into(ref_name);
-      comp_parent_ref_it->mut().interior_shape = comp->exterior_shape(comp_ref_it->into);
+      comp_parent_ref_it->mut().interior_shape = comp->exterior_shape(comp_ref_it->into());
     }
   }
 
@@ -396,7 +396,7 @@ static bool CacheRefInRegister(Block* parent, Block* comp_parent, Block* cache, 
   std::map<std::string, Rational> multiple;
   // mul_prod is the product of multiple
   double mul_prod = 1.0;
-  const auto& cache_inner_ref_it = cache_inner->ref_by_from(cache_ref_it->into);
+  const auto& cache_inner_ref_it = cache_inner->ref_by_from(cache_ref_it->into());
   for (size_t i = 0; i < cache_ref_it->access.size(); ++i) {
     const auto& cache_ref_aff = cache_ref_it->access[i];
     const auto& comp0_ref_aff = comp0_ref_it->access[i];

@@ -66,12 +66,12 @@ void ValidateBlock(Block* root) {
         for (const auto& ref : block->refs) {
           if (ref.dir == RefDir::None && !ref.from.empty()) {
             throw_with_trace(std::runtime_error(
-                str(boost::format("ref.dir == RefDir::None && !ref.from.empty(). ref: %1% in block: %2%") % ref.into %
+                str(boost::format("ref.dir == RefDir::None && !ref.from.empty(). ref: %1% in block: %2%") % ref.into() %
                     block->name)));
           }
           if (ref.from.empty() && ref.dir != RefDir::None) {
             throw_with_trace(std::runtime_error(
-                str(boost::format("ref.from.empty() && ref.dir != RefDir::None. ref: %1% in block: %2%") % ref.into %
+                str(boost::format("ref.from.empty() && ref.dir != RefDir::None. ref: %1% in block: %2%") % ref.into() %
                     block->name)));
           }
         }

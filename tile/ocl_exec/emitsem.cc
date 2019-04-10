@@ -342,7 +342,7 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   std::vector<sem::Function::param_t> params;
   for (const auto& ref : block.ref_outs()) {
     sem::Type type = {sem::Type::POINTER_MUT, ref->interior_shape.type, 1, 0, sem::Type::GLOBAL};
-    params.push_back(std::make_pair(type, ref_name(ref->into)));
+    params.push_back(std::make_pair(type, ref_name(ref->into())));
     ki.outputs.push_back(ref->from);
   }
   std::set<std::string> dups;
@@ -352,7 +352,7 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
     }
     dups.insert(ref->from);
     sem::Type type = {sem::Type::POINTER_CONST, ref->interior_shape.type, 1, 0, sem::Type::GLOBAL};
-    params.push_back(std::make_pair(type, ref_name(ref->into)));
+    params.push_back(std::make_pair(type, ref_name(ref->into())));
     ki.inputs.push_back(ref->from);
   }
   ki.kfunc = std::make_shared<sem::Function>(ki.kname, sem::Type(), params, cur_);
@@ -370,7 +370,7 @@ sem::StmtPtr SemtreeEmitter::make_special(const std::string& name, const stripe:
   std::vector<sem::ExprPtr> params;
   for (const stripe::Refinement* ref : args) {
     int64_t lda = 0;
-    for (const auto d : block.exterior_shape(ref->into).dims) {
+    for (const auto d : block.exterior_shape(ref->into()).dims) {
       if (d.size > 1 && d.stride > 1) {
         lda = d.stride / 4;
       }
@@ -572,21 +572,21 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
 
   // Now, add any new locals
   for (const auto& ref : block.refs) {
-    if (ref.dir == stripe::RefDir::None && dup_ref.find(ref.into) == dup_ref.end()) {
-      dup_ref.insert(ref.into);
+    if (ref.dir == stripe::RefDir::None && dup_ref.find(ref.into()) == dup_ref.end()) {
+      dup_ref.insert(ref.into());
       bool use_register = ref.location.devs.size() == 1 && ref.location.devs[0].name == "REGISTER";
       size_t size = ref.interior_shape.elem_size();
       sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, size,
                          ((in_threads_ || use_register) ? sem::Type::NORMAL : sem::Type::LOCAL)};
       sem::ExprPtr init = AggInit(ref.interior_shape.type, ref.agg_op);
       if (use_register || in_threads_) {
-        cur_->push_front(_Declare(ptype, ref_name(ref.into), init));
+        cur_->push_front(_Declare(ptype, ref_name(ref.into()), init));
       } else {
         if (init) {
           cur_->push_front(_Barrier());
-          init_loop_local(ref.into, ref.interior_shape.type, size, init);
+          init_loop_local(ref.into(), ref.interior_shape.type, size, init);
         }
-        cur_->push_front(_Declare(ptype, ref_name(ref.into), sem::ExprPtr()));
+        cur_->push_front(_Declare(ptype, ref_name(ref.into()), sem::ExprPtr()));
       }
     }
   }

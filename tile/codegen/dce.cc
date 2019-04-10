@@ -68,32 +68,32 @@ static void PruneRefinements(Block* block) {
     switch (ref.dir) {
       case RefDir::In: {
         // If the In refinement is not used, remove it.
-        if (uses.find(ref.into) == uses.end()) {
+        if (uses.find(ref.into()) == uses.end()) {
           ref.mut().set_tag("removed");
         }
       } break;
       case RefDir::Out: {
         // If the Out refinement is not defined, remove it.
-        if (defs.find(ref.into) == defs.end()) {
+        if (defs.find(ref.into()) == defs.end()) {
           ref.mut().set_tag("removed");
         }
       } break;
       case RefDir::InOut: {
         // If the InOut refinement is not either used or defined, remove it.
-        if (uses.find(ref.into) == uses.end() && defs.find(ref.into) == defs.end()) {
+        if (uses.find(ref.into()) == uses.end() && defs.find(ref.into()) == defs.end()) {
           ref.mut().set_tag("removed");
         }
-        if (uses.find(ref.into) == uses.end()) {
+        if (uses.find(ref.into()) == uses.end()) {
           // never used, set as Out
           ref.mut().dir = RefDir::Out;
-        } else if (defs.find(ref.into) == defs.end()) {
+        } else if (defs.find(ref.into()) == defs.end()) {
           // never defined, set as In
           ref.mut().dir = RefDir::In;
         }
       } break;
       case RefDir::None: {
         // If the None refinement is not either used or defined, remove it.
-        if (uses.find(ref.into) == uses.end() && defs.find(ref.into) == defs.end()) {
+        if (uses.find(ref.into()) == uses.end() && defs.find(ref.into()) == defs.end()) {
           ref.mut().set_tag("removed");
         }
       } break;
@@ -175,7 +175,7 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
   std::set<std::string> outputs;
   for (const auto& ref : block->refs) {
     if ((ref.dir == RefDir::Out || ref.dir == RefDir::InOut) && !ref.has_tag("tmp")) {
-      outputs.insert(ref.into);
+      outputs.insert(ref.into());
     }
   }
 

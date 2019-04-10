@@ -60,7 +60,7 @@ struct RefInfo {
       : ref(*ref_),  //
         alias_info{std::move(alias_info_)},
         exterior_cache_shape{ref.interior_shape},
-        name{ref.into} {
+        name{ref.into()} {
     IVLOG(3, "Creating RefInfo " << ref << " extents=" << alias_info.extents);
 
     // Convert the cached shape to use natural striding.
@@ -283,8 +283,8 @@ struct PlacementKey {
 };
 
 bool operator<(const PlacementKey& lhs, const PlacementKey& rhs) {
-  return std::tie(lhs.ri->ref.into, lhs.cache_shape, lhs.access) <
-         std::tie(rhs.ri->ref.into, rhs.cache_shape, rhs.access);
+  return std::tie(lhs.ri->ref.into(), lhs.cache_shape, lhs.access) <
+         std::tie(rhs.ri->ref.into(), rhs.cache_shape, rhs.access);
 }
 
 // Represents a placement plan for a particular Statement.
@@ -387,7 +387,7 @@ struct IO {
       : ri{ri_},
         dir{interior_ref.dir},
         interior_shape{interior_ref.interior_shape},
-        interior_name{interior_ref.into},
+        interior_name{interior_ref.into()},
         access{interior_ref.access} {
     // Restride the interior shape - if it's used, it needs to be in
     // compact form.
@@ -454,7 +454,7 @@ class StatementBinder final {
           ref->interior_shape.dims[i].stride = ri->exterior_cache_shape.dims[i].stride;
         }
       }
-      FixupRefs(block_, ref->into);
+      FixupRefs(block_, ref->into());
     }
   }
 
@@ -684,8 +684,8 @@ std::map<RefInfoKey, RefInfo> Scheduler::BuildRefInfoMap(stripe::Block* block, c
   std::map<RefInfoKey, RefInfo> ri_map;
   // Add the current block's refs.
   for (auto& ref : block->refs) {
-    const AliasInfo& ai = alias_map->at(ref.into);
-    ri_map.emplace(ref.into, RefInfo{&ref.mut(), ai});
+    const AliasInfo& ai = alias_map->at(ref.into());
+    ri_map.emplace(ref.into(), RefInfo{&ref.mut(), ai});
   }
 
   // Update earliest-writer entries.
@@ -924,7 +924,7 @@ void Scheduler::Run() {
           internal_swap_backing_ref_names[ri] = internal_swap_backing_ref_name;
           added_refs.push_back(stripe::Refinement{
               placement.dir,                   // dir
-              ent->source->ref.into,           // from
+              ent->source->ref.into(),         // from
               internal_swap_backing_ref_name,  // into
               ent->source->alias_info.access,  // access
               ent->source->alias_info.shape,   // interior_shape
@@ -1100,16 +1100,15 @@ void Scheduler::Run() {
 
   // Add a Refinement for each CacheEntry.
   for (auto& ent : cache_entries_) {
-    stripe::Refinement ref;
+    auto ref = stripe::Refinement::FromInto(ent.name);
     auto ri = block_->ref_by_into(ent.name, false);
     if (ri != block_->refs.end()) {
-      ref = *ri;
+      ref = ri->WithInto(ent.name);
     } else {
-      ref = ent.source->ref;
+      ref = ent.source->ref.WithInto(ent.name);
     }
     ref.dir = stripe::RefDir::None;
     ref.from.clear();
-    ref.into = ent.name;
     ref.interior_shape = ent.shape;
     ref.location = PartialEval(mem_loc_, {{"unit", ent.unit.constant()}});
     ref.offset = ent.range.begin;
@@ -1119,7 +1118,7 @@ void Scheduler::Run() {
   // Move used Refinements back into the block.
   for (auto& rikey_ri : ri_map_) {
     if (rikey_ri.second.used) {
-      auto ri = block_->refs.find(rikey_ri.second.ref.into);
+      auto ri = block_->refs.find(rikey_ri.second.ref.into());
       if (ri != block_->refs.end()) {
         block_->refs.erase(ri);
       }
@@ -1555,7 +1554,7 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
   swap_block.idxs = ent->source->swap_idxs;
   swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::In,            // dir
-      ent->source->ref.into,         // from
+      ent->source->ref.into(),       // from
       "src",                         // into
       ent->source->ref_swap_access,  // access
       ent->source->ref_swap_shape,   // interior_shape
@@ -1620,7 +1619,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
 
   swap_block.refs.emplace(stripe::Refinement{
       stripe::RefDir::Out,           // dir
-      ent->source->ref.into,         // from
+      ent->source->ref.into(),       // from
       "dst",                         // into
       ent->source->ref_swap_access,  // access
       ent->source->ref_swap_shape,   // interior_shape

@@ -18,7 +18,7 @@ void Scalarize(Block* block, bool recursive) {
   for (const auto& ref : block->refs) {
     // Add all locally allocated size one buffers
     if (ref.dir == RefDir::None && ref.interior_shape.elem_size() == 1) {
-      sbufs.emplace(ref.into);
+      sbufs.emplace(ref.into());
     }
   }
   // Remove buffers that are used by inner blocks or primitives
@@ -34,7 +34,7 @@ void Scalarize(Block* block, bool recursive) {
   }
   // Remove allocations of sbufs
   for (auto rem_it = block->refs.begin(), rem_last = block->refs.end(); rem_it != rem_last;) {
-    if (sbufs.count(rem_it->into)) {
+    if (sbufs.count(rem_it->into())) {
       rem_it = block->refs.erase(rem_it);
     } else {
       ++rem_it;

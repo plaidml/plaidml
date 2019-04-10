@@ -74,8 +74,8 @@ void PruneRefinements(const AliasMap& alias_map, Block* block) {
   IVLOG(3, "    use_count: " << use_count);
   std::set<std::string> to_remove;
   for (const auto& ref : block->refs) {
-    if (!use_count.count(ref.into)) {
-      to_remove.emplace(ref.into);
+    if (!use_count.count(ref.into())) {
+      to_remove.emplace(ref.into());
     }
   }
   if (!to_remove.empty()) {
