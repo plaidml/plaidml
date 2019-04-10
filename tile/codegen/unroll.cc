@@ -4,6 +4,7 @@
 
 #include "base/util/logging.h"
 #include "base/util/throw.h"
+#include "tile/codegen/alias.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -101,6 +102,8 @@ void EvalInner(Block* outer,                         //
                Block* block,                         //
                RefMap* ref_map,                      //
                const std::vector<IndexValue>& idxs,  //
+               const AliasMap& outer_alias_map,
+               std::map<std::string, std::vector<std::vector<Extent>>>* ref_write_extents,
                const proto::UnrollPass& options) {
   IVLOG(3, "EvalInner> " << outer->name << " -> " << block->name);
   std::map<std::string, int64_t> fixed;
@@ -130,6 +133,48 @@ void EvalInner(Block* outer,                         //
     fixed.emplace(rule.idx_name(), expand_val.value);
   }
   EvalWithValues(block, fixed);
+
+  AliasMap block_alias_map{outer_alias_map, block};
+  std::map<std::string, std::vector<std::vector<Extent>>> current_ref_write_extents;
+  for (const auto& block_ref : block->refs) {
+    if (!IsWriteDir(block_ref.dir)) {
+      continue;
+    }
+
+    const auto& ai = block_alias_map.at(block_ref.into());
+
+    if (block_ref.agg_op.size() && !IsReadDir(block_ref.dir)) {
+      // We're aggregating into this refinement, so as we unroll, we
+      // need to add in the read direction if the underlying memory
+      // overlaps with any refinement previously written by an
+      // unrolled step.
+      auto name_extents = ref_write_extents->find(ai.base_name);
+      if (name_extents != ref_write_extents->end()) {
+        bool found_overlap = false;
+        for (const auto& extents : name_extents->second) {
+          if (CheckOverlap(ai.extents, extents)) {
+            found_overlap = true;
+            break;
+          }
+        }
+        if (found_overlap) {
+          block_ref.mut().dir = RefDir::InOut;
+        }
+      }
+    }
+
+    // Keep track of the fact that we're writing to this ref, so
+    // that we can add the read direction to affected subsequent
+    // blocks as needed.
+    current_ref_write_extents[ai.base_name].emplace_back(ai.extents);
+  }
+
+  // Accumulate the extents written by the current block into the extents tracked over the unrolling.
+  for (auto& ref_extents : current_ref_write_extents) {
+    auto& extents = (*ref_write_extents)[ref_extents.first];
+    extents.insert(extents.end(), ref_extents.second.begin(), ref_extents.second.end());
+  }
+
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
@@ -144,6 +189,7 @@ void EvalInner(Block* outer,                         //
       for (size_t i = 0; i < inner_ref.access.size(); i++) {
         inner_ref.mut().access[i] += block_ref->access[i];
       }
+      inner_ref.mut().dir = UnionDir(inner_ref.dir, block_ref->dir);
       auto outer_ref = outer->ref_by_into(block_ref->from);
       IVLOG(3, "  outer_ref: " << *outer_ref);
       IVLOG(3, "  block_ref: " << *block_ref);
@@ -183,10 +229,11 @@ void EvalInner(Block* outer,                         //
   }
 }
 
-void UnrollBlock(Block* outer,                //
-                 Block* block,                //
-                 const StatementIt& it_stmt,  //
-                 const Tags& reqs,            //
+void UnrollBlock(Block* outer,                     //
+                 Block* block,                     //
+                 const AliasMap& outer_alias_map,  //
+                 const StatementIt& it_stmt,       //
+                 const Tags& reqs,                 //
                  const proto::UnrollPass& options) {
   if (block->has_tags(reqs)) {
     RefMap ref_map;
@@ -195,9 +242,10 @@ void UnrollBlock(Block* outer,                //
     for (const auto& idx : block->idxs) {
       idxs.emplace_back(IndexValue{&idx, 0});
     }
+    std::map<std::string, std::vector<std::vector<Extent>>> ref_write_extents;
     EnumerateIndexes(idxs, 0, [&](const std::vector<IndexValue>& idxs) {
       auto clone = CloneBlock(*block);
-      EvalInner(outer, clone.get(), &ref_map, idxs, options);
+      EvalInner(outer, clone.get(), &ref_map, idxs, outer_alias_map, &ref_write_extents, options);
       for (const auto& stmt : clone->stmts) {
         outer->stmts.insert(it_stmt, stmt);
       }
@@ -208,10 +256,11 @@ void UnrollBlock(Block* outer,                //
       stmt->deps.clear();
     }
   } else {
+    AliasMap alias_map{outer_alias_map, block};
     PreIterate(block, [&](const StatementIt& it) {
       auto inner = Block::Downcast(*it);
       if (inner) {
-        UnrollBlock(block, inner.get(), it, reqs, options);
+        UnrollBlock(block, inner.get(), alias_map, it, reqs, options);
       }
     });
   }
@@ -221,10 +270,12 @@ void UnrollBlock(Block* outer,                //
 
 void UnrollPass(Block* root, const proto::UnrollPass& options) {
   auto reqs = FromProto(options.reqs());
+  AliasMap base_alias_map;
+  AliasMap alias_map{base_alias_map, root};
   PreIterate(root, [&](const StatementIt& it) {
     auto inner = Block::Downcast(*it);
     if (inner) {
-      UnrollBlock(root, inner.get(), it, reqs, options);
+      UnrollBlock(root, inner.get(), alias_map, it, reqs, options);
     }
   });
 }
