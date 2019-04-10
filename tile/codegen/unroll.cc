@@ -157,15 +157,14 @@ void EvalInner(Block* outer,                         //
         IVLOG(3, "    no view, same shape");
         continue;
       }
-      auto view = *block_ref;
-      view.from = outer_ref->from;
-      auto key = std::make_tuple(view.from, inner_ref.access);
-      auto it_inserted = ref_map->emplace(key, outer_ref->into);
+      auto key = std::make_tuple(outer_ref->from, inner_ref.access);
+      auto it_inserted = ref_map->emplace(key, outer_ref->into());
       if (it_inserted.second) {
-        it_inserted.first->second = outer->unique_ref_name(outer_ref->into);
+        it_inserted.first->second = outer->unique_ref_name(outer_ref->into());
       }
-      view.into = it_inserted.first->second;
-      IVLOG(3, "    make view: " << view.into << " from: " << view.from << " via: " << block_ref->from);
+      auto view = block_ref->WithInto(it_inserted.first->second);
+      view.from = outer_ref->from;
+      IVLOG(3, "    make view: " << view.into() << " from: " << view.from << " via: " << block_ref->from);
       if (inner_ref.cache_unit || outer_ref->cache_unit) {
         IVLOG(3, "    with cache: " << *outer_ref->cache_unit);
         view.cache_unit = outer_ref->cache_unit;
@@ -175,9 +174,9 @@ void EvalInner(Block* outer,                         //
         view.access[i] = outer_ref->access[i] + const_access;
         inner_ref.mut().access[i] -= const_access;
       }
-      inner_ref.mut().from = view.into;
+      inner_ref.mut().from = view.into();
       IVLOG(2, "view: " << view);
-      if (outer->ref_by_into(view.into, false) == outer->refs.end()) {
+      if (outer->ref_by_into(view.into(), false) == outer->refs.end()) {
         outer->refs.emplace(std::move(view));
       }
     }

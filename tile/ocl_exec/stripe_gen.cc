@@ -49,17 +49,17 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
     if (ref.dir != stripe::RefDir::None) {
       emit.kernels_.types[ref.from] = ref.interior_shape;
     } else {
-      emit.kernels_.types["local_" + ref.into] = ref.interior_shape;
+      emit.kernels_.types["local_" + ref.into()] = ref.interior_shape;
     }
   }
   for (auto& ki : emit.kernels_.kernels) {
     for (auto& name : ki.inputs) {
       const auto& ai = main_map.at(name);
-      name = ai.base_block == stripe.get() ? ai.base_ref->into : ("local_" + name);
+      name = ai.base_block == stripe.get() ? ai.base_ref->into() : ("local_" + name);
     }
     for (auto& name : ki.outputs) {
       const auto& ai = main_map.at(name);
-      name = ai.base_block == stripe.get() ? ai.base_ref->into : ("local_" + name);
+      name = ai.base_block == stripe.get() ? ai.base_ref->into() : ("local_" + name);
     }
   }
   return emit.kernels_;

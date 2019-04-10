@@ -30,7 +30,7 @@ void FixupRefs(Block* block, const std::string& var_name) {
           for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
             ref.mut().interior_shape.dims[i].stride = it->interior_shape.dims[i].stride;
           }
-          FixupRefs(inner.get(), ref.into);
+          FixupRefs(inner.get(), ref.into());
         }
       }
     }
@@ -85,7 +85,7 @@ void LocalizePass(const AliasMap& scope, Block* block, const std::set<std::strin
       if (use_count[ref.from] != 1) {
         continue;
       }
-      refs_to_localize.emplace(ref.into);
+      refs_to_localize.emplace(ref.into());
       refs_to_remove.emplace(ref.from);
     }
     for (const auto& name : refs_to_remove) {
@@ -120,7 +120,7 @@ void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
     for (auto& ref : block->refs) {
       if (ref.dir == RefDir::None) {
         ref.mut().location = loc;
-        FixupRefs(block, ref.into);
+        FixupRefs(block, ref.into());
       }
     }
   });

@@ -37,8 +37,7 @@ void ApplyCache(const AliasMap& map,                     //
   // Make a new name for the raw variable
   std::string raw_name = block->unique_ref_name(var_name + "_raw");
   // Replace the old refinement to rename it.
-  Refinement replacement_ref{*it};
-  replacement_ref.into = raw_name;
+  Refinement replacement_ref = it->WithInto(raw_name);
   block->refs.erase(it);
   it = block->refs.emplace(std::move(replacement_ref)).first;
   // Make a base block for loading/storing
@@ -135,7 +134,7 @@ static void CacheBlock(const AliasMap& map, Block* block, const std::set<RefDir>
   auto refs = block->refs;
   for (const auto& ref : refs) {
     if (dirs.count(ref.dir)) {
-      codegen::ApplyCache(map, block, ref.into, mem_loc, xfer_loc, {"cache", "cache_load"}, {"cache", "cache_store"},
+      codegen::ApplyCache(map, block, ref.into(), mem_loc, xfer_loc, {"cache", "cache_load"}, {"cache", "cache_store"},
                           add_constraints);
     }
   }

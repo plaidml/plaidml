@@ -183,7 +183,7 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   // Wrap the finished module and the buffer names into an Executable instance.
   for (auto& ref : program.refs) {
     assert(ref.dir != stripe::RefDir::None);
-    ret.parameters.push_back(ref.into);
+    ret.parameters.push_back(ref.into());
   }
   module_ = nullptr;
   return ret;
@@ -248,7 +248,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   // the initial value for each index.
 
   for (const auto& ref : block.refs) {
-    buffers_[ref.into] = buffer{&ref};
+    buffers_[ref.into()] = buffer{&ref};
   }
   for (const auto& idx : block.idxs) {
     indexes_[idx.name] = index{&idx};
@@ -269,7 +269,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     if (idx < block.refs.size()) {
       auto it = block.refs.begin();
       std::advance(it, idx);
-      std::string param_name = it->into;
+      std::string param_name = it->into();
       ai->setName(param_name);
       assert(nullptr == buffers_[param_name].base);
       buffers_[param_name].base = &(*ai);
@@ -510,7 +510,7 @@ void Compiler::Visit(const stripe::Block& block) {
       // Pass in the current element address from the source buffer.
       // If a "from" name is specified, use that buffer; if not, that means
       // that both blocks use the same name, so use "into".
-      std::string name = ref.from.empty() ? ref.into : ref.from;
+      std::string name = ref.from.empty() ? ref.into() : ref.from;
       buffer = ElementPtr(buffers_[name]);
     }
     args.push_back(buffer);

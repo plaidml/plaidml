@@ -53,7 +53,7 @@ float softmax(float x) {
 
   void EmitStore(const Block& block, const Store& store) {
     auto ref = block.ref_by_into(store.into);
-    auto into = UniqueName(ref->into);
+    auto into = UniqueName(ref->into());
     auto access = UniqueResolve(ref->FlatAccess());
     if (ref->agg_op == Intrinsic::SUM) {
       EmitLine(format("%1%[%2%] += %3%;") % into % access % ScalarName(store.from));
@@ -170,7 +170,7 @@ float softmax(float x) {
 
     for (const auto& ref : block.refs) {
       auto type = IntoC(ref.interior_shape.type);
-      auto into = UniqueName(ref.into);
+      auto into = UniqueName(ref.into());
       if (ref.from.empty()) {
         EmitLine(format("%1%* %2% = malloc(%3% * sizeof(%1%));") % type % into % ref.interior_shape.elem_size());
       } else {
@@ -206,7 +206,7 @@ float softmax(float x) {
     }
     for (const auto& ref : block.refs) {
       if (ref.from.empty()) {
-        EmitLine(format("free(%1%);") % UniqueName(ref.into));
+        EmitLine(format("free(%1%);") % UniqueName(ref.into()));
       }
     }
 

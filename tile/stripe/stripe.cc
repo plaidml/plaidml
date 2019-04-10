@@ -79,7 +79,7 @@ void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
   if (block.refs.size() > 2) {
     std::map<std::string, const Refinement*> sorted;
     for (const auto& ref : block.refs) {
-      sorted.emplace(ref.into, &ref);
+      sorted.emplace(ref.into(), &ref);
     }
     for (const auto& kvp : sorted) {
       PrintTab(os, depth + 2);
@@ -408,8 +408,8 @@ std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
     os << " new@0x";
     os << std::hex << std::setw(8) << std::setfill('0') << ref.offset << std::dec;
   }
-  os << " " << ref.into;
-  if (ref.into != ref.from) {
+  os << " " << ref.into();
+  if (ref.into() != ref.from) {
     if (!ref.from.empty()) {
       os << " = " << ref.from;
     }
@@ -449,7 +449,7 @@ std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
   }
   if (printer.block && !ref.from.empty()) {
     os << ", E";
-    auto exterior_shape = printer.block->exterior_shape(ref.into);
+    auto exterior_shape = printer.block->exterior_shape(ref.into());
     PrintShapeDims(os, exterior_shape.sizes(), ref.bank_dim);
     os << ":";
     PrintBytes(os, exterior_shape.sizes_product_bytes());
@@ -782,10 +782,9 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
     ret->constraints.emplace_back(FromProto(pb_con));
   }
   for (const auto& pb_into_ref : block.refs()) {
-    Refinement ref;
+    auto ref = Refinement::FromInto(pb_into_ref.first);
     ref.dir = FromProto(pb_into_ref.second.dir());
     ref.from = pb_into_ref.second.from();
-    ref.into = pb_into_ref.first;
     for (const auto& pb_off : pb_into_ref.second.access()) {
       ref.access.emplace_back(FromProto(pb_off));
     }
@@ -920,7 +919,7 @@ proto::Block IntoProto(const Block& block) {
     *ret.add_constraints() = IntoProto(con);
   }
   for (const auto& ref : block.refs) {
-    auto& pb_ref = (*ret.mutable_refs())[ref.into];
+    auto& pb_ref = (*ret.mutable_refs())[ref.into()];
     switch (ref.dir) {
       case RefDir::None:
         pb_ref.set_dir(proto::Refinement::None);

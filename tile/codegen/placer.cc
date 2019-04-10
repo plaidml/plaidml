@@ -205,7 +205,7 @@ std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<s
     for (auto& ref : block->refs) {
       if (ref.dir == stripe::RefDir::None && locations.count(ref.location)) {
         auto chunk_it = result.emplace(result.end(), Chunk{&ref.mut(), alignment, stmt_limit});
-        chunks[alias_map.at(ref.into).base_name] = &*chunk_it;
+        chunks[alias_map.at(ref.into()).base_name] = &*chunk_it;
       }
     }
   };

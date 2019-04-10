@@ -118,7 +118,7 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
   // Make all inner alias data
   for (auto& ref : block->refs) {
     // Setup the place we are going to write to
-    AliasInfo& info = info_[ref.into];
+    AliasInfo& info = info_[ref.into()];
     // Check if it's a refinement or a new buffer
     if (ref.dir != RefDir::None) {
       // Get the state from the outer context, fail if not found
@@ -138,14 +138,14 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
       // New alloc, initialize from scratch
       info.base_block = block;
       info.base_ref = &ref.mut();
-      info.base_name = prefix + ref.into;
+      info.base_name = prefix + ref.into();
       info.access.resize(ref.access.size());
       info.location = ref.location;
     }
     if (info.access.size() != ref.access.size()) {
       throw_with_trace(std::runtime_error(
           str(boost::format("AliasMap::AliasMap: Mismatched access dimensions on refinement: %1% %2%") %
-              info.base_name % ref.into)));
+              info.base_name % ref.into())));
     }
     info.extents.resize(ref.access.size());
     for (size_t i = 0; i < ref.access.size(); i++) {
@@ -167,7 +167,8 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
       }
       ext.max += ref.interior_shape.dims[i].size - 1;
     }
-    IVLOG(5, boost::format("Extents for '%1%' in '%2%': %3%") % ref.into % block->name % StreamContainer(info.extents));
+    IVLOG(5,
+          boost::format("Extents for '%1%' in '%2%': %3%") % ref.into() % block->name % StreamContainer(info.extents));
     // Set shape
     info.shape = ref.interior_shape;
   }

@@ -41,11 +41,11 @@ class Scope {
     for (const auto& ref : block.refs) {
       assert(ref.from.empty());
       if (ref.has_tag("user")) {
-        refs_[ref.into] = &safe_at(buffers, ref.into);
+        refs_[ref.into()] = &safe_at(buffers, ref.into());
       } else {
         Buffer buf(ref.interior_shape.elem_size());
-        tmps.emplace(ref.into, buf);
-        refs_[ref.into] = &safe_at(&tmps, ref.into);
+        tmps.emplace(ref.into(), buf);
+        refs_[ref.into()] = &safe_at(&tmps, ref.into());
       }
     }
     ExecuteStatements(block);
@@ -58,10 +58,10 @@ class Scope {
     for (const auto& ref : block.refs) {
       if (ref.from.empty()) {
         Buffer buf(ref.interior_shape.elem_size());
-        buffers.emplace(ref.into, buf);
-        refs_[ref.into] = &safe_at(&buffers, ref.into);
+        buffers.emplace(ref.into(), buf);
+        refs_[ref.into()] = &safe_at(&buffers, ref.into());
       } else {
-        refs_[ref.into] = safe_at(outer_->refs_, ref.from);
+        refs_[ref.into()] = safe_at(outer_->refs_, ref.from);
       }
     }
     if (block.idxs.size()) {
@@ -99,7 +99,7 @@ class Scope {
       offset = safe_at(outer_->offsets_, ref.from);
     }
     std::stringstream ss;
-    ss << "ref: " << ref.into << ", offset = " << offset;
+    ss << "ref: " << ref.into() << ", offset = " << offset;
     assert(ref.interior_shape.dims.size() == ref.access.size());
     for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
       auto access = ref.access[i].eval(idxs_);
@@ -150,7 +150,7 @@ class Scope {
     }
     std::map<std::string, float> vars;
     for (const auto& ref : block.refs) {
-      offsets_[ref.into] = ComputeOffsetFor(block, ref);
+      offsets_[ref.into()] = ComputeOffsetFor(block, ref);
     }
     IVLOG(5, Tab() << "idxs: " << StreamContainer(idxs_));
     IVLOG(5, Tab() << "offsets: " << StreamContainer(offsets_));

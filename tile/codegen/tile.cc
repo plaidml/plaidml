@@ -261,7 +261,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   // Compute for each reference / for each dimension / the minimal offset
   std::map<std::string, std::vector<int64_t>> zero_points;
   for (auto& ref : inner->refs) {
-    auto& vec = zero_points[ref.into];
+    auto& vec = zero_points[ref.into()];
     for (auto& aff : ref.access) {
       int64_t min = 0;
       for (auto& kvp : aff.getMap()) {
@@ -274,7 +274,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   }
   // Adjust inner references
   for (auto& ref : inner->refs) {
-    const auto& zeros = zero_points[ref.into];
+    const auto& zeros = zero_points[ref.into()];
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& aff = ref.mut().access[i];
       // We pick the outer block to do the bumping so it only happens once
@@ -294,8 +294,8 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   }
   for (auto& ref : outer->refs) {
     // Fix the sizes on the outer block
-    ref.mut().interior_shape = inner->exterior_shape(ref.into);
-    const auto& zeros = zero_points[ref.into];
+    ref.mut().interior_shape = inner->exterior_shape(ref.into());
+    const auto& zeros = zero_points[ref.into()];
     for (size_t i = 0; i < ref.access.size(); i++) {
       auto& aff = ref.mut().access[i];
       aff += stripe::Affine(zeros[i]);
@@ -309,7 +309,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
       }
     }
     // Let inner's from be the outer's into
-    inner->ref_by_into(ref.into)->mut().from = ref.into;
+    inner->ref_by_into(ref.into())->mut().from = ref.into();
   }
 
   if (split_unaligned && split_points.size() > 0) {
