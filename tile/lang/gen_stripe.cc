@@ -453,8 +453,7 @@ class StripeGenerator {
     for (const auto& input : op.inputs) {
       scalar_inputs.push_back(ScalarName(input));
     }
-    AddIntrinsic(  //
-        kernel.get(), op.f.fn, GetShape(op.output).type, scalar_inputs, {ScalarName(op.output)});
+    AddIntrinsic(kernel.get(), op.f.fn, GetShape(op.output).type, scalar_inputs, {ScalarName(op.output)});
 
     // STORE
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));

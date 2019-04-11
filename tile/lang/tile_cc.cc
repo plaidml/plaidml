@@ -666,7 +666,7 @@ class Evaluator : public AstVisitor {
     }
     runinfo_.code = to_string(runinfo_.program);
     runinfo_.from_edsl = true;
-    IVLOG(4, "Evaluator::Evaluate> " << runinfo_.code);
+    IVLOG(2, "Evaluator::Evaluate> " << runinfo_.code);
     return runinfo_;
   }
 
