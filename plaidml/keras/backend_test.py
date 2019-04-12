@@ -167,6 +167,19 @@ def compareForwardClose(epsilon=DEFAULT_TOL,
     return decorator
 
 
+def compareMultiple(arguments):
+
+    def decorator(test_func):
+
+        def compare(*args):
+            for test_arguments in arguments:
+                test_func(*(args + tuple(test_arguments)))
+
+        return compare
+
+    return decorator
+
+
 def opTest(in_data,
            tol=DEFAULT_TOL,
            atol=DEFAULT_ATOL,
@@ -397,6 +410,11 @@ class TestBackendOps(unittest.TestCase):
                         if abs(result[i, j, k, 0] - 1. / (1. - level)) > 0.0001:
                             raise RuntimeError("Bad normalization")
 
+    @compareMultiple([[10], [-2, 5, 2, 'float32']])
+    @compareForwardExact()
+    def testArange(self, b, *args):
+        return b.arange(*args)
+
     @opTest([
         [m(3, 3), m(3, 3)],
         [m(2, 3, 4, 5), m(2, 3, 5, 2)],
@@ -447,6 +465,11 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(2, 4, 7)]])
     def testFlatten(self, b, x):
         return [b.flatten(x)]
+
+    @compareMultiple([[10], [3, 'int8']])
+    @compareForwardExact()
+    def testEye(self, b, *args):
+        return b.eye(*args)
 
     def testTileIdentity(self):
         x = pkb.variable(m(3))
@@ -779,6 +802,14 @@ class TestBackendOps(unittest.TestCase):
         mean = b.mean(rand)
         diffs = rand - mean
         return b.mean(b.square(diffs))
+
+    @compareMultiple([
+        [[100, 100], 5, 2],
+        [[50, 50], 5, 2, 'float16'],
+    ])
+    @compareForwardClose(epsilon=0.2)
+    def testRandomeNormalVariableMean(self, b, *args):
+        return b.mean(b.random_normal_variable(*args))
 
     @compareForwardClose(.1)
     def testTruncatedNormalMean(self, b):
