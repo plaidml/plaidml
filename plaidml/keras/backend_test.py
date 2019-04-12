@@ -629,6 +629,10 @@ class TestBackendOps(unittest.TestCase):
     def testSoftmax(self, b, x):
         return [-b.log(b.softmax(x))]
 
+    @opTest([[m(10, 10)]])
+    def testSign(self, b, x):
+        return [b.sign(x)]
+
     @opTest([[m(10, 10)]], skip_theano=True)
     def testSigmoid(self, b, x):
         return [b.sigmoid(x)]
@@ -985,6 +989,13 @@ class TestBackendOps(unittest.TestCase):
     ])
     def testSqueeze(self, b, x, ax):
         return [b.squeeze(x, ax)]
+
+    @opTest([
+        [m(10, 10), n(10,10), 0],
+        [m(10, 10), n(10,10), -1]
+    ])
+    def testStack(self, b, *args):
+        return [b.stack(args[:-1])]
 
     @compareForwardExact()
     def testZeros(self, b):
@@ -1360,6 +1371,12 @@ class TestBackendOps(unittest.TestCase):
     ])
     def testCumSum(self, b, t, a):
         return [b.cumsum(t, a)]
+
+    # TODO(T1026): Switch to opTest once PROD AggregationOp supports derivatives
+    @compareForwardExact()
+    def testCumProd(self, b):
+        t = b.constant(m(5,3))
+        return b.cumprod(t, 1)
 
     @opTest([[m(4, 7, 1)], [m(2, 8, 3), (1, 3)], [m(2, 5, 7), (0, 0)]])
     def testTemporalPadding(self, b, x, p=(1, 1)):
