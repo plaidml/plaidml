@@ -206,7 +206,9 @@ def any(x, axis=None, keepdims=False):
 
 
 def arange(start, stop=None, step=1, dtype='int32'):
-    _report_unimplemented('arange')
+    if isinstance(dtype, plaidml.DType):
+        dtype = ptile.convert_pml_dtype_to_np(dtype)
+    return variable(np.arange(start, stop, step, dtype), dtype=dtype)
 
 
 argmax = op.argmax
@@ -690,7 +692,11 @@ exp = op.exp
 
 
 def eye(size, dtype=None, name=None):
-    _report_unimplemented('eye')
+    if dtype is None:
+        dtype = floatx()
+    elif isinstance(dtype, plaidml.DType):
+        dtype = ptile.convert_pml_dtype_to_np(dtype)
+    return variable(np.eye(size, dtype=dtype), name=name, dtype=dtype)
 
 
 class ExpandDims(ptile.Operation):
@@ -1144,7 +1150,12 @@ def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
 
 
 def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None):
-    _report_unimplemented('random_normal_variable')
+    if dtype is None:
+        dtype = floatx()
+    elif isinstance(dtype, plaidml.DType):
+        dtype = ptile.convert_pml_dtype_to_np(dtype)
+    data = np.random.normal(mean, scale, shape).astype(dtype)
+    return variable(data, dtype=dtype)
 
 
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
