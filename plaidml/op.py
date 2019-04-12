@@ -1494,6 +1494,28 @@ class CumulativeSum(tile.Operation):
 cumulative_sum = CumulativeSum.function
 
 
+class CumulativeProd(tile.Operation):
+    """Cumulative product of a tensor"""
+
+    def __init__(self, x, axis=0):
+        ranges = ', '.join(['N{}'.format(n) for n in range(x.shape.ndims)])
+        dest_idxs = ', '.join(['i{}'.format(n) for n in range(x.shape.ndims)])
+        src_idxs = ['i{}'.format(n) for n in range(x.shape.ndims)]
+        src_idxs[axis] += ' - k'
+        src_idxs = ', '.join(src_idxs)
+        f = """
+            function (I[{src_ranges}]) -> (O) {{
+                O[{dest_idxs}: {dest_ranges}] = *(I[{src_idxs}]), k < N{ax};
+            }}""".format(
+            src_ranges=ranges, dest_idxs=dest_idxs, dest_ranges=ranges, src_idxs=src_idxs, ax=axis)
+        super(CumulativeProd, self).__init__(f, [('I', x)], [('O', x.shape)])
+
+
+cumulative_prod = CumulativeProd.function
+
+
+
+
 class Dot(tile.Operation):
     """Dot-product of two tensors."""
 
