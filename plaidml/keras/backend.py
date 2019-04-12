@@ -615,8 +615,7 @@ def ctc_label_dense_to_sparse(labels, label_lengths):
     _report_unimplemented('ctc_label_dense_to_sparse')
 
 
-def cumprod(x, axis=0):
-    _report_unimplemented('cumprod')
+cumprod = op.cumulative_prod
 
 
 cumsum = op.cumulative_sum
@@ -1500,7 +1499,10 @@ sigmoid = op.sigmoid
 
 
 def sign(x):
-    _report_unimplemented('sign')
+    x = clip(x, -1, 1)
+    if x.shape.dtype < plaidml.DType.INT8 or x.shape.dtype > plaidml.DType.INT128:
+        x = cast(x, 'int32')
+    return x
 
 
 sin = op.sin
@@ -1609,7 +1611,14 @@ sqrt = op.sqrt
 
 
 def stack(x, axis=0):
-    _report_unimplemented('stack')
+    tshape = x[0].shape
+    for item in x:
+        if tshape != item.shape:
+            raise ValueError("All inputs must have the same shape and type")
+    nshape = list(tshape.dims)
+    nshape.insert(axis if axis >= 0 else len(nshape), 1)
+    return concatenate([reshape(item, nshape) for item in x], axis=axis)
+
 
 
 def std(x, axis=None, keepdims=False):
