@@ -1693,57 +1693,6 @@ def zeros_like(x, dtype=floatx(), name=None):
                 .sole_output()
 
 
-class ImagePatches(ptile.Operation):
-    def __init__(self, images, ksizes, strides, rates=(1,1,1,1), padding="VALID", name=None):
-        """
-        Compatible to tensorflow.extract_image_patches. 
-        Extract patches from images and put them in the "depth" output dimension.
-        Args:
-            images: A tensor with a shape of [batch, rows, cols, depth]
-            ksizes: The size of the patches with a shape of [1, patch_rows, patch_cols, 1]
-            strides: How far the center of two patches are in the image with a shape of [1, stride_rows, stride_cols, 1]
-            rates: How far two consecutive pixel are in the input. Equivalent to dilation. Expect shape of [1, rate_rows, rate_cols, 1]
-            padding: A string of "VALID" or "SAME" defining padding.
-        """
-        i_shape = images.shape.dims
-        patch_row_eff = ksizes[1] + ((ksizes[1] - 1) * (rates[1] -1))
-        patch_col_eff = ksizes[2] + ((ksizes[2] - 1) * (rates[2] -1))
-
-        if padding.upper() == "VALID":
-            out_rows = math.ceil((i_shape[1] - patch_row_eff + 1.) / float(strides[1]))
-            out_cols = math.ceil((i_shape[2] - patch_col_eff + 1.) / float(strides[2]))
-        else:
-            out_rows = math.ceil( i_shape[1] / float(strides[1]) )
-            out_cols = math.ceil( i_shape[2] / float(strides[2]) )
-            pad_top = max(0, ( (out_rows - 1) * strides[1] + patch_row_eff - i_shape[1] ) // 2)
-            pad_left = max(0, ( (out_cols - 1) * strides[2] + patch_col_eff - i_shape[2] ) // 2)
-            # we simply assume padding right == padding left + 1 (same for top/down).
-            # This might lead to us padding more as we would need but that won't matter.
-            # TF splits padding between both sides so left_pad +1 should keep us on the safe side.
-            images = spatial_2d_padding(images, ((pad_top, pad_top+1), (pad_left, pad_left+1)))
-
-        o_shape = (i_shape[0], out_rows, out_cols, ksizes[1]*ksizes[2]*i_shape[-1])
-        code = """function (I[B,Y,X,D]) -> (O) {{
-                    TMP[b, ny, nx, y, x, d: B, {NY}, {NX}, {KY}, {KX}, D] =
-                        =(I[b, ny * {SY} + y * {RY}, nx * {SX} + x * {RX}, d]);
-                    O = reshape(TMP, B, {NY}, {NX}, {KY} * {KX} * D);
-                }}
-        """.format(
-            NY=out_rows, NX=out_cols,
-            KY=ksizes[1], KX=ksizes[2],
-            SY=strides[1], SX=strides[2],
-            RY=rates[1], RX=rates[2]
-        )
-        super(ImagePatches, self).__init__(code,
-                [('I', images),],
-                [('O', plaidml.tile.Shape(images.shape.dtype, o_shape))],
-                name=name
-        )
-        
-
-extract_image_patches = ImagePatches.function
-
-
 # Dynamically add Keras functionality to the underlying tile.Value class.
 # This allows us to transparently use Value as the tensor type exposed by
 # the Keras backend; it's a little squirrelly in this one place, but it
