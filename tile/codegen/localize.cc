@@ -100,26 +100,36 @@ void LocalizePass(const AliasMap& scope, Block* block, const std::set<std::strin
   }
 }
 
-void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc) {
+void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc, const proto::LocatePass& options) {
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
       continue;
     }
     if (inner->has_tags(inner_tags)) {
-      inner->location = loc;
+      auto* inner_loc = &inner->location;
+      if (options.append_devs()) {
+        inner_loc->devs.insert(inner_loc->devs.end(), loc.devs.begin(), loc.devs.end());
+      } else {
+        *inner_loc = loc;
+      }
     }
-    LocateInnerBlock(inner.get(), inner_tags, loc);
+    LocateInnerBlock(inner.get(), inner_tags, loc, options);
   }
 }
 
 void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
   auto loc = stripe::FromProto(options.loc());
-  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {
+  RunOnBlocks(root, reqs, [&loc, &options](const AliasMap& map, Block* block) {
     for (auto& ref : block->refs) {
       if (ref.dir == RefDir::None) {
-        ref.mut().location = loc;
+        auto* ref_loc = &ref.mut().location;
+        if (options.append_devs()) {
+          ref_loc->devs.insert(ref_loc->devs.end(), loc.devs.begin(), loc.devs.end());
+        } else {
+          *ref_loc = loc;
+        }
         FixupRefs(block, ref.into());
       }
     }
@@ -129,8 +139,13 @@ void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
 void LocateBlockPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
   auto loc = stripe::FromProto(options.loc());
-  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {  //
-    block->location = loc;
+  RunOnBlocks(root, reqs, [&loc, &options](const AliasMap& map, Block* block) {  //
+    auto* block_loc = &block->location;
+    if (options.append_devs()) {
+      block_loc->devs.insert(block_loc->devs.end(), loc.devs.begin(), loc.devs.end());
+    } else {
+      *block_loc = loc;
+    }
   });
 }
 
@@ -139,7 +154,7 @@ void LocateInnerBlockPass(Block* root, const proto::LocatePass& options) {
   auto inner_reqs = FromProto(options.inner_reqs());
   auto loc = stripe::FromProto(options.loc());
   RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
-    LocateInnerBlock(block, inner_reqs, loc);
+    LocateInnerBlock(block, inner_reqs, loc, options);
   });
 }
 

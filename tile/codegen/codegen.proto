@@ -252,6 +252,7 @@ message LocatePass {
   repeated string inner_reqs = 2;
   required stripe.proto.Location loc = 3;
   optional uint32 reg_size = 4;
+  optional bool append_devs = 5 [default = false];
 }
 
 // The stencil pass attempts to rewrite blocks to contain an inner block that
