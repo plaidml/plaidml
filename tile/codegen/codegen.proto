@@ -112,6 +112,8 @@ message Pass {
     GenericPass pad = 27;
     // Use registers as cache
     RegisterPass register_cache = 28;
+    // Rewrite locations
+    RewriteLocationsPass rewrite_locations = 29;
   }
 }
 
@@ -478,4 +480,19 @@ message PackagePass {
   repeated string reqs = 1;
   repeated string package_set = 2;
   repeated string subblock_set = 3;
+}
+
+// Rewrites refinement and block locations.
+//
+// For each location matching a rewrite prefix, the matched prefix is
+// replaced with the target device list.
+message RewriteLocationsPass {
+  message Rewrite {
+    // The prefix of the locations to rewrite.
+    repeated stripe.proto.Device prefix = 1;
+
+    // The new device list to replace the prefix with.
+    repeated stripe.proto.Device target = 2;
+  }
+  repeated Rewrite rewrites = 1;
 }
