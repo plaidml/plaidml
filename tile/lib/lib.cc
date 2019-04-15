@@ -77,6 +77,18 @@ RunInfo LoadEltwiseAdd(const std::string& name, const TensorShape& i1, const Ten
   return Evaluate(name, {A + B});
 }
 
+RunInfo LoadEltwiseDiv(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  return Evaluate(name, {A / B});
+}
+
+RunInfo LoadEltwiseMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  return Evaluate(name, {A * B});
+}
+
 RunInfo LoadSin(const std::string& name, const TensorShape& i1) {
   Tensor A(i1, "A");
   return Evaluate(name, {Sin(A)});
