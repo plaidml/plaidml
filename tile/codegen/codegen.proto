@@ -378,26 +378,28 @@ message AutotilePass {
   optional int64 min_out_size = 24 [default = 1];
   // Specify the minimum count of tiles to get full utilization
   optional int64 min_count = 25 [default = 1];
+  // Reject tilings with more than this number of tiles
+  optional int64 max_count = 26 [default = 0];
   // Specify the minimum count of output tiles to get full utilization
-  optional int64 min_out_count = 26 [default = 1];
+  optional int64 min_out_count = 27 [default = 1];
   // Specify the 'tie-breaker' multiplier on having more tiles
   // Note, we do log2(num_tiles) to make this less impactful
   // Positive means more tiles = bad, negative means more tiles = good
-  optional double split_factor = 27 [default = .001];
+  optional double split_factor = 28 [default = .001];
   // Specify if the unaligned tiles are split
-  optional bool split_unaligned = 28 [default = false];
+  optional bool split_unaligned = 29 [default = false];
   // The maximal  number of inner loops allowed by the inner block,
   // where each index is rounded up to the nearest power of 2
   // 0 means no limit.
-  optional int64 max_po2_product = 29 [default = 0];
+  optional int64 max_po2_product = 30 [default = 0];
   // Only consider tilings whose sizes are multiples of 32.
   // This is primarily required for some arch.
-  optional bool only_multiple_of_32 = 30 [default = false];
+  optional bool only_multiple_of_32 = 31 [default = false];
   // If set, build a tile index affine (an affine of the tiled indices
   // that will expand to [0..tile_count)), and use it to evaluate the
   // block's location, expanding the supplied tag as the tile index
   // affine.
-  optional string location_idx_tag = 31;
+  optional string location_idx_tag = 32;
 }
 
 // A pass that attempts to transpose intermediate buffers such that any
