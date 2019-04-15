@@ -604,6 +604,12 @@ Location AddDeviceUnits(const Location& loc1, const Location& loc2) {
   return result;
 }
 
+Location AppendLocations(const Location& loc1, const Location& loc2) {
+  Location result{loc1};
+  result.devs.insert(result.devs.end(), loc2.devs.begin(), loc2.devs.end());
+  return result;
+}
+
 bool operator==(const Location& loc, const std::string& pattern) {
   static const std::regex valid_re{R"(((^|/)(\w+|\*)(\[\s*((\d+|\*)(\s*,\s*(\d+|\*))*)?\s*\])?)*)"};
   static const std::regex devs_re{R"((?:^|/)(\w+|\*)(\[([^\[\]/]*)\])?)"};
