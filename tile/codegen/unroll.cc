@@ -98,12 +98,13 @@ struct ExpansionValue {
 
 using RefMap = std::map<std::tuple<std::string, std::vector<stripe::Affine>>, std::string>;
 
-void EvalInner(Block* outer,                         //
-               Block* block,                         //
-               RefMap* ref_map,                      //
-               const std::vector<IndexValue>& idxs,  //
-               const AliasMap& outer_alias_map,
-               std::map<std::string, std::vector<std::vector<Extent>>>* ref_write_extents,
+void EvalInner(Block* outer,                                                                //
+               Block* block,                                                                //
+               RefMap* ref_map,                                                             //
+               const std::vector<IndexValue>& idxs,                                         //
+               const AliasMap& outer_alias_map,                                             //
+               std::map<std::string, std::vector<std::vector<Extent>>>* ref_write_extents,  //
+               const std::map<std::string, Affine>& aff_idxs,                               //
                const proto::UnrollPass& options) {
   IVLOG(3, "EvalInner> " << outer->name << " -> " << block->name);
   std::map<std::string, int64_t> fixed;
@@ -226,6 +227,13 @@ void EvalInner(Block* outer,                         //
         outer->refs.emplace(std::move(view));
       }
     }
+    // Rewrite the inner affine indices in terms of the parent block
+    // (where they're going to be inserted).
+    for (auto& idx : inner->idxs) {
+      if (idx.affine != Affine{}) {
+        idx.affine.substitute(aff_idxs);
+      }
+    }
   }
 }
 
@@ -239,13 +247,18 @@ void UnrollBlock(Block* outer,                     //
     RefMap ref_map;
     std::vector<IndexValue> idxs;
     idxs.reserve(block->idxs.size());
+    std::map<std::string, Affine> aff_idxs;
     for (const auto& idx : block->idxs) {
-      idxs.emplace_back(IndexValue{&idx, 0});
+      if (idx.affine == Affine{}) {
+        idxs.emplace_back(IndexValue{&idx, 0});
+      } else {
+        aff_idxs[idx.name] = idx.affine;
+      }
     }
     std::map<std::string, std::vector<std::vector<Extent>>> ref_write_extents;
     EnumerateIndexes(idxs, 0, [&](const std::vector<IndexValue>& idxs) {
       auto clone = CloneBlock(*block);
-      EvalInner(outer, clone.get(), &ref_map, idxs, outer_alias_map, &ref_write_extents, options);
+      EvalInner(outer, clone.get(), &ref_map, idxs, outer_alias_map, &ref_write_extents, aff_idxs, options);
       for (const auto& stmt : clone->stmts) {
         outer->stmts.insert(it_stmt, stmt);
       }
