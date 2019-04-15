@@ -59,6 +59,10 @@ Tensor DilatedConvolution2(const Tensor& I, const Tensor& K) {
 
 Tensor Relu(const Tensor& X) { return Call("relu", {X}); }
 
+Tensor Sin(const Tensor& X) { return Call("sin", {X}); }
+
+Tensor Tanh(const Tensor& X) { return Call("tanh", {X}); }
+
 }  // namespace
 
 RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
@@ -71,6 +75,16 @@ RunInfo LoadEltwiseAdd(const std::string& name, const TensorShape& i1, const Ten
   Tensor A(i1, "A");
   Tensor B(i2, "B");
   return Evaluate(name, {A + B});
+}
+
+RunInfo LoadSin(const std::string& name, const TensorShape& i1) {
+  Tensor A(i1, "A");
+  return Evaluate(name, {Sin(A)});
+}
+
+RunInfo LoadTanh(const std::string& name, const TensorShape& i1) {
+  Tensor A(i1, "A");
+  return Evaluate(name, {Tanh(A)});
 }
 
 RunInfo LoadConstCalc(const std::string& name) {
