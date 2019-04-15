@@ -251,8 +251,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
     // Use ref_by_into because ApplyTile might cause Refinement pointers to become invalid
     block->ref_by_into(item.first)->mut().cache_unit = item.second.cache_unit;
   }
-  block->tags.clear();
-  block->add_tags(set_tags);
+  block->set_tags(set_tags);
   for (const auto& idx_name : primary_idxs) {
     auto idx = block->idx_by_name(idx_name);
     if (!idx) {

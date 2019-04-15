@@ -370,10 +370,10 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
                     options.location_idx_tag())) {
         auto inner = block->SubBlock(0);
         if (options.copy_tags()) {
-          inner->tags = block->tags;
+          inner->set_attrs(*block);
         }
         if (options.clear_outer()) {
-          block->tags.clear();
+          block->clear_tags();
         }
         block->add_tags(FromProto(options.outer_set()));
         inner->add_tags(FromProto(options.inner_set()));
@@ -398,8 +398,8 @@ void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& optio
                                            << ", cost: " << result->cost);
       if (ApplyTile(block, result->tile.sizes(), false)) {
         auto inner = block->SubBlock(0);
-        inner->tags = block->tags;
-        block->tags.clear();
+        inner->set_attrs(*block);
+        block->clear_tags();
         block->add_tags(FromProto(options.set_tags()));
         if (!options.idx_tag().empty()) {
           for (auto& idx : block->idxs) {
@@ -407,7 +407,7 @@ void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& optio
               idx.set_tag(options.idx_tag());
             }
             // HACK: remove this somehow
-            idx.tags.erase("bank");
+            idx.remove_tag("bank");
           }
         }
       }

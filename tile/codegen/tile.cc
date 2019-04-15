@@ -159,7 +159,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   // Create a new inner block
   auto inner = std::make_shared<Block>();
   if (copy_tags) {
-    inner->tags = outer->tags;
+    inner->set_attrs(*outer);
   }
   inner->name = outer->name;
   // Move all statements from the outer block into the inner block
@@ -610,6 +610,7 @@ void ApplyIndexTags(Block* block, const StencilMatch& match) {
     }
     auto idx = block->idx_by_name(idx_match.block_idx_name);
     if (idx) {
+      idx->set_tag("stencil");
       idx->set_tag(str(boost::format("stencil_%1%") % idx_match.stencil_idx_name));
     }
   }

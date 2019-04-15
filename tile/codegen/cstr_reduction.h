@@ -14,26 +14,26 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void LightCstrReduction(const AliasMap& alias_map, stripe::Block* block);
+void LightCstrReduction(const AliasMap& alias_map, stripe::Block* block, const proto::ConstraintReductionPass& options);
 
-inline void LightCstrReductionPass(stripe::Block* root, const proto::GenericPass& options) {
+inline void LightCstrReductionPass(stripe::Block* root, const proto::ConstraintReductionPass& options) {
   auto reqs = stripe::FromProto(options.reqs());
   RunOnBlocks(
       root, reqs,
-      [](const AliasMap& alias_map, stripe::Block* block) {  //
-        LightCstrReduction(alias_map, block);
+      [options](const AliasMap& alias_map, stripe::Block* block) {  //
+        LightCstrReduction(alias_map, block, options);
       },
       true);
 }
 
-void IlpCstrReduction(const AliasMap& alias_map, stripe::Block* block);
+void IlpCstrReduction(const AliasMap& alias_map, stripe::Block* block, const proto::ConstraintReductionPass& options);
 
-inline void IlpCstrReductionPass(stripe::Block* root, const proto::GenericPass& options) {
+inline void IlpCstrReductionPass(stripe::Block* root, const proto::ConstraintReductionPass& options) {
   auto reqs = stripe::FromProto(options.reqs());
   RunOnBlocks(
       root, reqs,
-      [](const AliasMap& alias_map, stripe::Block* block) {  //
-        IlpCstrReduction(alias_map, block);
+      [options](const AliasMap& alias_map, stripe::Block* block) {  //
+        IlpCstrReduction(alias_map, block, options);
       },
       true);
 }

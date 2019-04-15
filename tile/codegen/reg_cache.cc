@@ -530,7 +530,7 @@ static void CacheWholeRefInRegister(Block* parent, Block* cache, const std::vect
 
   if (benefit > cost) {
     // Load the whole buffer into register
-    cache->tags.erase("gpu_thread");
+    cache->remove_tag("gpu_thread");
     auto parent_ref_it = parent->ref_by_into(cache_ref_it->from);
     parent_ref_it->mut().location.devs[0].name = "REGISTER";
     PropagateRefLoc(parent, *parent_ref_it);
