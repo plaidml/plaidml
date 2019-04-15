@@ -162,6 +162,8 @@ message SchedulePass {
     // The memory units to use for the unique color memory assignment algorithm.
     repeated uint32 units = 1;
   }
+
+  optional bool append_devs = 8 [default = false];
 }
 
 // Provide a specific address for all the allocation refinement such that no
