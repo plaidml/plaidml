@@ -173,6 +173,22 @@ struct Cost {
   double value;
 };
 
+std::ostream& operator<<(std::ostream& os, Cost cost) {
+  switch (cost.outcome) {
+    case Cost::Stop:
+      os << "Stop";
+      break;
+    case Cost::Continue:
+      os << "Continue";
+      break;
+    default:
+    case Cost::Valid:
+      os << cost.value;
+      break;
+  }
+  return os;
+}
+
 struct ComputeDensityCostModel {
   const proto::AutotilePass& options;
   std::set<const Index*> acc_idxs;
@@ -275,6 +291,7 @@ struct TileSearchState {
   std::set<std::pair<double, Tile>> todo;
 
   void AddTile(const Tile& tile, Cost cost) {
+    IVLOG(4, "    Found " << cost << ": " << tile);
     found_tiles.emplace(tile);
     if (cost.outcome == Cost::Valid && (!best_so_far || cost.value < best_so_far->cost)) {
       best_so_far = TileResult{tile, cost.value};
