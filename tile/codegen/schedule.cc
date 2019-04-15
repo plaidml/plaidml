@@ -479,6 +479,10 @@ class StatementBinder final {
         for (auto& access : ref->access) {
           access = 0;
         }
+        // Since the cache entry refinement is being passed in solely
+        // to provide storage, there's no need for it to have an
+        // aggregation.
+        ref->agg_op = "";
       } else {
         for (size_t i = 0; i < ref->interior_shape.dims.size(); i++) {
           ref->interior_shape.dims[i].stride = ri->exterior_cache_shape.dims[i].stride;
