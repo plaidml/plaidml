@@ -40,6 +40,10 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
       pkg->stmts.emplace_back(std::move(stmt));
       pkg->tags = pkg_tags;
 
+      // The location comes from the outer block -- the inner block
+      // can be iterating over a sequence of locations.
+      pkg->location = outer->location;
+
       // Propagate the current outer indices to the package block,
       // since the inner block and refinements might use them.
       for (const auto& outer_idx : outer->idxs) {
