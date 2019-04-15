@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include <boost/format.hpp>
+#include <boost/variant.hpp>
 
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
@@ -25,6 +26,23 @@ const char* Intrinsic::MUL = "mul";
 const char* Intrinsic::ADD = "add";
 const char* Intrinsic::EQ = "cmp_eq";
 const char* Intrinsic::COND = "cond";
+
+struct Void {};
+
+std::ostream& operator<<(std::ostream& os, const Void& value) {
+  os << "{}";
+  return os;
+}
+
+using AttrValue = boost::variant<Void, bool, int64_t, double, std::string>;
+
+struct Taggable::Impl {
+  std::map<std::string, AttrValue> attrs;
+};
+
+struct Accessor {
+  static const Taggable::Impl* impl(const Taggable& taggable) { return taggable.impl_.get(); }
+};
 
 namespace {
 
@@ -66,9 +84,10 @@ void PrintPreStmt(std::ostream& os,       //
     os << "]";
   }
   os << ": ";
-  if (stmt.tags.size()) {
-    for (const auto& tag : stmt.tags) {
-      os << "#" << tag << " ";
+  auto impl = Accessor::impl(stmt);
+  if (impl->attrs.size()) {
+    for (const auto& attr : impl->attrs) {
+      os << "#" << attr.first << " ";
     }
     os << std::endl;
     PrintTab(os, depth);
@@ -228,6 +247,82 @@ class CodecRegistry {
 
 }  // namespace
 
+Taggable::Taggable() : impl_(new Impl()) {}
+
+Taggable::~Taggable() = default;
+
+Taggable::Taggable(const Taggable& rhs) { set_attrs(rhs); }
+
+Taggable& Taggable::operator=(const Taggable& rhs) {
+  set_attrs(rhs);
+  return *this;
+}
+
+void Taggable::set_tag(const std::string& tag) { impl_->attrs.emplace(tag, Void{}); }
+
+void Taggable::add_tags(const Tags& to_add) {
+  for (const auto& tag : to_add) {
+    impl_->attrs.emplace(tag, Void{});
+  }
+}
+
+void Taggable::clear_tags() { impl_->attrs.clear(); }
+
+void Taggable::remove_tag(const std::string& tag) { impl_->attrs.erase(tag); }
+
+void Taggable::set_tags(const Tags& tags) {
+  impl_->attrs.clear();
+  add_tags(tags);
+}
+
+bool Taggable::has_tag(const std::string& tag) const { return impl_->attrs.count(tag); }
+
+bool Taggable::has_tags(const Tags& to_find) const {
+  for (const auto& tag : to_find) {
+    if (impl_->attrs.count(tag) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool Taggable::has_any_tags(const Tags& to_find) const {
+  for (const auto& tag : to_find) {
+    if (impl_->attrs.count(tag) == 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void Taggable::set_attr(const std::string& name) { impl_->attrs.emplace(name, Void{}); }
+
+void Taggable::set_attr(const std::string& name, bool value) { impl_->attrs.emplace(name, value); }
+
+void Taggable::set_attr(const std::string& name, int64_t value) { impl_->attrs.emplace(name, value); }
+
+void Taggable::set_attr(const std::string& name, double value) { impl_->attrs.emplace(name, value); }
+
+void Taggable::set_attr(const std::string& name, const std::string& value) { impl_->attrs.emplace(name, value); }
+
+bool Taggable::has_attr(const std::string& name) const { return impl_->attrs.count(name); }
+
+void Taggable::set_attrs(const Taggable& rhs) {
+  if (this != &rhs) {
+    impl_.reset(new Impl(*rhs.impl_));
+  }
+}
+
+bool Taggable::get_attr_bool(const std::string& name) const { return boost::get<bool>(impl_->attrs[name]); }
+
+int64_t Taggable::get_attr_int(const std::string& name) const { return boost::get<int64_t>(impl_->attrs[name]); }
+
+double Taggable::get_attr_float(const std::string& name) const { return boost::get<double>(impl_->attrs[name]); }
+
+std::string Taggable::get_attr_str(const std::string& name) const {
+  return boost::get<std::string>(impl_->attrs[name]);
+}
+
 std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
   return std::dynamic_pointer_cast<Load>(stmt);
 }
@@ -382,9 +477,10 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
 
 std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
   const auto& ref = printer.ref;
-  if (ref.tags.size()) {
-    for (const auto& tag : ref.tags) {
-      os << "#" << tag << " ";
+  auto impl = Accessor::impl(ref);
+  if (impl->attrs.size()) {
+    for (const auto& attr : impl->attrs) {
+      os << "#" << attr.first << " ";
     }
   }
   switch (ref.dir) {
@@ -532,10 +628,11 @@ std::vector<Refinement*> Block::ref_outs() {
 }
 
 std::ostream& operator<<(std::ostream& os, const Index& idx) {
-  if (!idx.tags.empty()) {
+  auto impl = Accessor::impl(idx);
+  if (impl->attrs.size()) {
     os << "(";
-    for (const auto& tag : idx.tags) {
-      os << "#" << tag << " ";
+    for (const auto& attr : impl->attrs) {
+      os << "#" << attr.first << " ";
     }
   }
   os << idx.name;
@@ -544,7 +641,7 @@ std::ostream& operator<<(std::ostream& os, const Index& idx) {
   } else {
     os << ":" << idx.range;
   }
-  if (!idx.tags.empty()) {
+  if (impl->attrs.size()) {
     os << ")";
   }
   return os;
@@ -880,7 +977,7 @@ std::shared_ptr<Block> FromProto(const proto::Block& block) {
       stmt->deps.push_back(stmts[dep_idx]);
     }
     for (const auto& tag : pb_stmt.tags()) {
-      stmt->tags.emplace(tag);
+      stmt->set_tag(tag);
     }
   }
   return ret;
@@ -971,8 +1068,9 @@ proto::Block IntoProto(const Block& block) {
     for (std::size_t dep : deps) {
       pb_stmt->add_deps(dep);
     }
-    for (const auto& tag : stmt->tags) {
-      pb_stmt->add_tags(tag);
+    auto impl = Accessor::impl(*stmt);
+    for (const auto& attr : impl->attrs) {
+      pb_stmt->add_tags(attr.first);
     }
     switch (stmt->kind()) {
       case StmtKind::Load: {
@@ -1209,7 +1307,7 @@ TensorShape Refinement::ApplyTile(const std::map<std::string, size_t>& tile_by_n
 }
 
 const Block* FindBlockByTag(const Block& block, const std::string& tag) {
-  if (block.tags.count(tag)) {
+  if (block.has_tag(tag)) {
     return &block;
   }
   for (const auto& stmt : block.stmts) {
@@ -1222,6 +1320,18 @@ const Block* FindBlockByTag(const Block& block, const std::string& tag) {
     }
   }
   return nullptr;
+}
+
+void FindBlocksByTag(std::vector<const Block*>* into, const Block& block, const std::string& tag) {
+  if (block.has_tag(tag)) {
+    into->push_back(&block);
+  }
+  for (const auto& stmt : block.stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      FindBlocksByTag(into, *inner, tag);
+    }
+  }
 }
 
 const Index* FindIndexByTag(const Block& block, const std::string& tag) {

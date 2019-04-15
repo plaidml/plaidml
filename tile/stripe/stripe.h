@@ -75,32 +75,51 @@ struct Statement;
 
 using StatementList = std::list<std::shared_ptr<Statement>>;
 using StatementIt = StatementList::iterator;
+
 using Tags = std::set<std::string>;
 
-struct Taggable {
-  // Generic properties used by optimization passes
-  Tags tags;
+// Generic properties used by optimization passes
+class Taggable {
+  friend struct Accessor;
 
-  void set_tag(const std::string& tag) { tags.emplace(tag); }
-  void add_tags(const Tags& to_add) { tags.insert(to_add.begin(), to_add.end()); }
+ protected:
+  Taggable();
 
-  bool has_tag(const std::string& tag) const { return tags.count(tag) != 0; }
-  bool has_tags(const Tags& to_find) const {
-    for (const auto& tag : to_find) {
-      if (tags.count(tag) == 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-  bool has_any_tags(const Tags& to_find) const {
-    for (const auto& tag : to_find) {
-      if (tags.count(tag) == 1) {
-        return true;
-      }
-    }
-    return false;
-  }
+ public:
+  // Copy constructor
+  Taggable(const Taggable& rhs);
+
+  // Copy assignment
+  Taggable& operator=(const Taggable& rhs);
+
+  ~Taggable();
+
+  void set_tag(const std::string& tag);
+  void set_tags(const Tags& tags);
+  void add_tags(const Tags& to_add);
+  void clear_tags();
+  void remove_tag(const std::string& tag);
+
+  bool has_tag(const std::string& tag) const;
+  bool has_tags(const Tags& to_find) const;
+  bool has_any_tags(const Tags& to_find) const;
+
+  void set_attr(const std::string& name);
+  void set_attr(const std::string& name, bool value);
+  void set_attr(const std::string& name, int64_t value);
+  void set_attr(const std::string& name, double value);
+  void set_attr(const std::string& name, const std::string& value);
+  void set_attrs(const Taggable& rhs);
+
+  bool has_attr(const std::string& name) const;
+  bool get_attr_bool(const std::string& name) const;
+  int64_t get_attr_int(const std::string& name) const;
+  double get_attr_float(const std::string& name) const;
+  std::string get_attr_str(const std::string& name) const;
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
 };
 
 class Codec {
@@ -516,6 +535,7 @@ proto::Location IntoProto(const Location& loc);
 
 std::shared_ptr<Block> CloneBlock(const Block& orig, int depth = -1);
 const Block* FindBlockByTag(const Block& block, const std::string& tag);
+void FindBlocksByTag(std::vector<const Block*>* into, const Block& block, const std::string& tag);
 const Index* FindIndexByTag(const Block& block, const std::string& tag);
 
 template <typename F>

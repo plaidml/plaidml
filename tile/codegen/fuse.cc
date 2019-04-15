@@ -210,7 +210,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   outer->name = tiled->name;
   auto inner = std::make_shared<Block>();
   inner->name = tiled->name;
-  outer->tags = tiled->tags;
+  outer->set_attrs(*tiled);
   outer->stmts.push_back(inner);
   // Put constraints on outer block and rewrite
   for (const auto& aff : tiled->constraints) {

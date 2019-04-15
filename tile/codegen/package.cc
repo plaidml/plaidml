@@ -38,7 +38,7 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
       pkg->name = inner->name;
       pkg->comments = inner->comments;
       pkg->stmts.emplace_back(std::move(stmt));
-      pkg->tags = pkg_tags;
+      pkg->set_tags(pkg_tags);
 
       // The location comes from the outer block -- the inner block
       // can be iterating over a sequence of locations.
@@ -48,7 +48,7 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
       // since the inner block and refinements might use them.
       for (const auto& outer_idx : outer->idxs) {
         stripe::Index pkg_idx{outer_idx.name, 1, stripe::Affine{outer_idx.name}};
-        pkg_idx.tags = outer_idx.tags;
+        pkg_idx.set_attrs(outer_idx);
         pkg->idxs.emplace_back(std::move(pkg_idx));
       }
 

@@ -100,10 +100,10 @@ message Pass {
     MemRebasePass mem_rebase = 22;
     // Remove redundant constraints and impossible blocks,
     // and reduce the index range (light-weight).
-    GenericPass light_cstr_reduction = 23;
+    ConstraintReductionPass light_cstr_reduction = 23;
     // Remove redundant constraints and impossible blocks,
     // and reduce the index range using integer linear programming
-    GenericPass ilp_cstr_reduction = 24;
+    ConstraintReductionPass ilp_cstr_reduction = 24;
     // Dead code elimination
     GenericPass dead_code_elimination = 25;
     // Packages blocks into subblocks.
@@ -517,4 +517,11 @@ message RewriteLocationsPass {
     repeated stripe.proto.Device target = 2;
   }
   repeated Rewrite rewrites = 1;
+}
+
+// Remove redundant constraints, impossible blocks, and reduce the index
+// range.
+message ConstraintReductionPass {
+  repeated string reqs = 1;
+  repeated string skip_idxs = 2;
 }

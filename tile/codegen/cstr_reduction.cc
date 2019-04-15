@@ -36,18 +36,8 @@ static void EvaluatePolynomial(const Polynomial<int64_t> orig_poly, const AliasM
   *max_value = max + 1;
 }
 
-bool IsStencilIndex(Index* idx) {
-  for (const auto& tag : idx->tags) {
-    if (tag.rfind("stencil_", 0) == 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void LightCstrReduction(const AliasMap& alias_map, Block* block) {
+void LightCstrReduction(const AliasMap& alias_map, Block* block, const proto::ConstraintReductionPass& options) {
   IVLOG(4, "Start light-weight constraint reduction.");
-
   if (block->constraints.empty()) {
     return;
   }
@@ -58,6 +48,7 @@ void LightCstrReduction(const AliasMap& alias_map, Block* block) {
   // The index of constraints need to be removed
   std::vector<int> remove_list;
   int cstr_idx = 0;
+  auto skip_idxs = stripe::FromProto(options.skip_idxs());
 
   for (const auto& constraint : block->constraints) {
     // Evaluate the constraints and compute the min and max values
@@ -91,7 +82,7 @@ void LightCstrReduction(const AliasMap& alias_map, Block* block) {
         continue;
       }
       Index* idx = block->idx_by_name(kvp.first);
-      if (IsStencilIndex(idx)) {
+      if (idx->has_tags(skip_idxs)) {
         continue;
       }
       int64_t coeff = -kvp.second;
@@ -148,7 +139,7 @@ static inline std::string IdxPostfix(std::string idx) {
   return idx.substr(pos + 1);
 }
 
-void IlpCstrReduction(const AliasMap& alias_map, Block* block) {
+void IlpCstrReduction(const AliasMap& alias_map, Block* block, const proto::ConstraintReductionPass& options) {
   if (block->constraints.empty()) {
     return;
   }
@@ -157,6 +148,7 @@ void IlpCstrReduction(const AliasMap& alias_map, Block* block) {
 
   std::vector<RangeConstraint> constraints;
   std::set<std::string> used_idx;
+  auto skip_idxs = stripe::FromProto(options.skip_idxs());
 
   // Use all original constraints for new range constraints.
   for (const auto& constraint : block->constraints) {
@@ -201,7 +193,7 @@ void IlpCstrReduction(const AliasMap& alias_map, Block* block) {
     for (const auto& objective : objectives) {
       const std::string& idx_name = objective.getMap().begin()->first;
       Index* idx = block->idx_by_name(IdxPostfix(idx_name));
-      if (IsStencilIndex(idx)) {
+      if (idx->has_tags(skip_idxs)) {
         continue;
       }
       uint64_t new_range = static_cast<uint64_t>(Floor(-results[objective].obj_val)) + 1;

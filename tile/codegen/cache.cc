@@ -16,13 +16,13 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-void ApplyCache(const AliasMap& map,                     //
-                Block* block,                            //
-                const std::string& var_name,             //
-                const Location& mem_loc,                 //
-                const Location& xfer_loc,                //
-                const std::set<std::string> load_tags,   //
-                const std::set<std::string> store_tags,  //
+void ApplyCache(const AliasMap& map,          //
+                Block* block,                 //
+                const std::string& var_name,  //
+                const Location& mem_loc,      //
+                const Location& xfer_loc,     //
+                const Tags load_tags,         //
+                const Tags store_tags,        //
                 bool add_constraints) {
   auto it = block->ref_by_into(var_name, false);
   if (it == block->refs.end()) {
@@ -92,7 +92,7 @@ void ApplyCache(const AliasMap& map,                     //
   if (IsReadDir(it->dir)) {
     auto cache_load = std::make_shared<Block>(xfer_block);
     cache_load->name = str(boost::format("load_%s") % var_name);
-    cache_load->tags = load_tags;
+    cache_load->set_tags(load_tags);
     auto& src = cache_load->refs.find("src")->mut();
     auto& dst = cache_load->refs.find("dst")->mut();
     src.from = raw_name;
@@ -104,7 +104,7 @@ void ApplyCache(const AliasMap& map,                     //
   if (IsWriteDir(it->dir)) {
     auto cache_store = std::make_shared<Block>(xfer_block);
     cache_store->name = str(boost::format("store_%s") % var_name);
-    cache_store->tags = store_tags;
+    cache_store->set_tags(store_tags);
     auto& src = cache_store->refs.find("src")->mut();
     auto& dst = cache_store->refs.find("dst")->mut();
     dst.from = raw_name;
