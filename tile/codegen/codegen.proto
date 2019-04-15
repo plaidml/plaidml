@@ -393,6 +393,11 @@ message AutotilePass {
   // Only consider tilings whose sizes are multiples of 32.
   // This is primarily required for some arch.
   optional bool only_multiple_of_32 = 30 [default = false];
+  // If set, build a tile index affine (an affine of the tiled indices
+  // that will expand to [0..tile_count)), and use it to evaluate the
+  // block's location, expanding the supplied tag as the tile index
+  // affine.
+  optional string location_idx_tag = 31;
 }
 
 // A pass that attempts to transpose intermediate buffers such that any

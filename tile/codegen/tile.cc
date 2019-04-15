@@ -39,6 +39,13 @@ bool HasAffines(const Block& block, const Index& idx) {
       }
     }
   }
+  for (const auto& dev : block.location.devs) {
+    for (const auto& unit : dev.units) {
+      if (unit.get(idx.name)) {
+        return true;
+      }
+    }
+  }
   return false;
 }
 
@@ -118,7 +125,7 @@ void PromoteCondition(Block* outer, std::shared_ptr<Block> inner,  //
 }
 
 bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool copy_tags, bool interleave,
-               bool split_unaligned) {
+               bool split_unaligned, const std::string& location_idx_tag) {
   // A block is split by value on index
   struct DimSplitPoint {
     std::string index;
@@ -155,7 +162,6 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     inner->tags = outer->tags;
   }
   inner->name = outer->name;
-  inner->location = outer->location;
   // Move all statements from the outer block into the inner block
   std::swap(inner->stmts, outer->stmts);
   // Move all constraints on the outer block into the inner block
@@ -245,6 +251,47 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
   }
   // Append all passthru_idxs, we defer this since this may cause inner->idxs to realloc
   std::copy(passthru_idxs.begin(), passthru_idxs.end(), std::back_inserter(inner->idxs));
+
+  // Copy the location to the inner block.
+  inner->location = outer->location;
+
+  if (location_idx_tag.size()) {
+    // Rewrite the outer block's location, replacing instances of the
+    // tag with an affine of the loop indices.
+    std::string tag = "#" + location_idx_tag;
+    Affine tile_unit;
+    std::int64_t scale = 1;
+    // N.B. We walk the indices in reverse order just to match the
+    // unrolling order; it doesn't actually matter, but it makes the
+    // generated code look a little nicer.
+    for (auto idx_it = outer->idxs.rbegin(); idx_it != outer->idxs.rend(); ++idx_it) {
+      if (idx_it->range > 1) {
+        tile_unit.mutateMap()[idx_it->name] = scale;
+        scale *= idx_it->range;
+      }
+    }
+    for (auto& dev : outer->location.devs) {
+      for (auto& unit : dev.units) {
+        unit.substitute(tag, tile_unit);
+      }
+    }
+
+    // Create an index for the inner block, and update the inner
+    // location to use it.
+    std::string inner_idx_name = inner->unique_idx_name(location_idx_tag);
+    inner->idxs.emplace_back(Index{inner_idx_name, 1, tile_unit});
+    // inner->idxs.back().set_tag(location_idx_tag);
+    for (auto& dev : inner->location.devs) {
+      for (auto& unit : dev.units) {
+        auto& umap = unit.mutateMap();
+        auto it = umap.find(tag);
+        if (it != umap.end()) {
+          umap[inner_idx_name] = it->second;
+          umap.erase(it);
+        }
+      }
+    }
+  }
 
   // Copy all in/out refinements from outer to inner block
   inner->refs = outer->refs;
