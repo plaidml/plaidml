@@ -31,6 +31,16 @@ std::map<std::string, std::function<lang::RunInfo()>> InternalTests() {
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}),   //
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
                 }),
+      MakeEntry("sin",
+                [](const std::string& name) {
+                  return LoadSin(name,                                           //
+                                 SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
+                }),
+      MakeEntry("tanh",
+                [](const std::string& name) {
+                  return LoadTanh(name,                                           //
+                                  SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
+                }),
       MakeEntry("const_test", [](const std::string& name) { return LoadConstCalc(name); }),
       MakeEntry("dilated_conv2d",
                 [](const std::string& name) {
