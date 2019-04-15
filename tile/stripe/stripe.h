@@ -501,6 +501,7 @@ std::ostream& operator<<(std::ostream& os, const Block& block);
 std::shared_ptr<Block> FromProto(const proto::Block& block);
 Affine FromProto(const proto::Affine& affine);
 Device FromProto(const proto::Device& dev);
+std::vector<Device> FromProto(const google::protobuf::RepeatedPtrField<proto::Device>& devs);
 Location FromProto(const proto::Location& loc);
 RefDir FromProto(const proto::Refinement::Dir& dir);
 Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags);

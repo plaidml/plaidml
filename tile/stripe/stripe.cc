@@ -739,11 +739,17 @@ Device FromProto(const proto::Device& dev) {
   return result;
 }
 
+std::vector<Device> FromProto(const google::protobuf::RepeatedPtrField<proto::Device>& devs) {
+  std::vector<Device> result;
+  for (const auto& dev : devs) {
+    result.emplace_back(FromProto(dev));
+  }
+  return result;
+}
+
 Location FromProto(const proto::Location& loc) {
   Location result;
-  for (const auto& dev : loc.devs()) {
-    result.devs.emplace_back(FromProto(dev));
-  }
+  result.devs = FromProto(loc.devs());
   return result;
 }
 
