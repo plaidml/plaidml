@@ -455,6 +455,9 @@ bool operator<(const Location& lhs, const Location& rhs);
 // should have the same shape (device names and unit dimensionality).
 Location AddDeviceUnits(const Location& loc1, const Location& loc2);
 
+// Appends two locations, returning the result.
+Location AppendLocations(const Location& loc1, const Location& loc2);
+
 std::string to_string(const Location& loc);
 
 // Returns a match if the location matches the indicated pattern,
