@@ -51,6 +51,7 @@ class Polynomial : boost::additive<Polynomial<T>>,
   T tryDivide(const Polynomial& p, bool ignoreConst = false) const;
   // Substitute replacement in for var in this polynomial
   void substitute(const std::string& var, const Polynomial<T>& replacement);
+  void substitute(const std::map<std::string, Polynomial<T>>& replacements);
   void substitute(const std::string& var, const T& replacement);
   // Symbolically evaluate a polynomial
   Polynomial sym_eval(const std::map<std::string, Polynomial<T>> values) const;

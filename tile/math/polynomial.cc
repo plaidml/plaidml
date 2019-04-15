@@ -170,6 +170,20 @@ void Polynomial<T>::substitute(const std::string& var, const Polynomial<T>& repl
 }
 
 template <typename T>
+void Polynomial<T>::substitute(const std::map<std::string, Polynomial<T>>& replacements) {
+  Polynomial result;
+  for (const auto& name_value : map_) {
+    auto replacement = replacements.find(name_value.first);
+    if (replacement == replacements.end()) {
+      result += Polynomial{name_value.first, name_value.second};
+      continue;
+    }
+    result += replacement->second * name_value.second;
+  }
+  map_.swap(result.map_);
+}
+
+template <typename T>
 void Polynomial<T>::substitute(const std::string& var, const T& replacement) {
   substitute(var, Polynomial<T>(replacement));
 }
