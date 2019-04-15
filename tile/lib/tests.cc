@@ -31,6 +31,18 @@ std::map<std::string, std::function<lang::RunInfo()>> InternalTests() {
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}),   //
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
                 }),
+      MakeEntry("eltwise_mul",
+                [](const std::string& name) {
+                  return LoadEltwiseAdd(name,                                           //
+                                        SimpleShape(DataType::FLOAT32, {1024, 1024}),   //
+                                        SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
+                }),
+      MakeEntry("eltwise_div",
+                [](const std::string& name) {
+                  return LoadEltwiseAdd(name,                                           //
+                                        SimpleShape(DataType::FLOAT32, {1024, 1024}),   //
+                                        SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
+                }),
       MakeEntry("sin",
                 [](const std::string& name) {
                   return LoadSin(name,                                           //

@@ -16,6 +16,14 @@ lang::RunInfo LoadEltwiseAdd(const std::string& name,  //
                              const TensorShape& i1,    //
                              const TensorShape& i2);
 
+lang::RunInfo LoadEltwiseDiv(const std::string& name,  //
+                             const TensorShape& i1,    //
+                             const TensorShape& i2);
+
+lang::RunInfo LoadEltwiseMul(const std::string& name,  //
+                             const TensorShape& i1,    //
+                             const TensorShape& i2);
+
 lang::RunInfo LoadSin(const std::string& name, const TensorShape& i1);
 
 lang::RunInfo LoadTanh(const std::string& name, const TensorShape& i1);
