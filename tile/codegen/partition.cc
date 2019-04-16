@@ -292,6 +292,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
     IVLOG(1, "Partition> skipped due to no inputs");
     return;  // No inputs?  Skip this block
   }
+  IVLOG(2, "  big_ref: " << PrintRefinement(*big_ref, block));
   // Find the evenest index that has a non-zero stride both on the large
   // input and on the output refinement
   std::string idx_name;
@@ -305,7 +306,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
     size_t tile_size = math::RoundUp(idx.range, options.num_parts());
     size_t rounded_size = tile_size * options.num_parts();
     double ratio = static_cast<double>(idx.range) / static_cast<double>(rounded_size);
-    IVLOG(3, "           "
+    IVLOG(3, "    "
                  << "idx: " << idx                          //
                  << ", num_parts: " << options.num_parts()  //
                  << ", tile_size: " << tile_size            //
@@ -324,6 +325,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
   // Determine the bank_dim for the split memory
   boost::optional<size_t> dim_pos;
   for (size_t i = 0; i < big_ref->access.size(); i++) {
+    // Determine the dimension that is associated with the index we want to split on
     if (big_ref->access[i].get(idx_name)) {
       if (dim_pos) {
         IVLOG(1, "Partition> skipped due to complex banking");
@@ -332,7 +334,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
       dim_pos = i;
     }
   }
-  IVLOG(2, "           dim_pos: " << dim_pos << ", base_ref: " << *big_alias.base_ref);
+  IVLOG(2, "    dim_pos: " << dim_pos << ", base_ref: " << *big_alias.base_ref);
   if (!dim_pos) {
     IVLOG(1, "Could not find dimension to bank on for block: " << block->name << ", ref: " << *big_alias.base_ref);
     return;
