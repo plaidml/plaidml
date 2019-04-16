@@ -590,36 +590,42 @@ class Scheduler {
   // * A prototype plan containing placements for every cache entry
   //   that's already been established by a runtime-future Statement,
   // * A vector of IOs that need to be placed for the current Statement.
-  std::tuple<PlacementPlan, std::vector<IO>> GatherPlacementState(const std::vector<IO>& ios);
+  std::tuple<PlacementPlan, std::vector<IO>> GatherPlacementState(stripe::Block* current_block,
+                                                                  const std::vector<IO>& ios);
 
   // Makes a placement plan, trying several strategies.
   boost::optional<PlacementPlan> TryMakePlan(stripe::Block* current_block, const std::vector<IO>& ios);
 
   // Determines the memory units on which a tensor is allowed to exist.
-  std::vector<stripe::Affine> GetValidUnits(PlacementPlan* plan, PlacementPlan::iterator it);
+  std::vector<stripe::Affine> GetValidUnits(stripe::Block* current_block, PlacementPlan* plan,
+                                            PlacementPlan::iterator it);
 
   // Attempts to augment a placement plan using the supplied ranges.
-  bool TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<PlacementKey, Placement>>& placements,
+  bool TryPlaceInRanges(stripe::Block* current_block, PlacementPlan* plan,
+                        const std::vector<std::pair<PlacementKey, Placement>>& placements,
                         std::map<stripe::Affine, std::list<MemRange>> ranges);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, and does not collide
   // with any previously-scheduled CacheEntry unless that CacheEntry
   // has a writer (i.e. does not require swap-in).
-  boost::optional<PlacementPlan> TryMakePlanWithNoSwaps(const PlacementPlan& existing_entry_plan,
+  boost::optional<PlacementPlan> TryMakePlanWithNoSwaps(stripe::Block* current_block,
+                                                        const PlacementPlan& existing_entry_plan,
                                                         const std::vector<std::pair<PlacementKey, Placement>>& todos);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, but allows collisions
   // with previously-scheduled CacheEntries (producing swap-ins).
-  boost::optional<PlacementPlan> TryMakePlanWithSwaps(const PlacementPlan& existing_entry_plan,
+  boost::optional<PlacementPlan> TryMakePlanWithSwaps(stripe::Block* current_block,
+                                                      const PlacementPlan& existing_entry_plan,
                                                       const std::vector<std::pair<PlacementKey, Placement>>& todos);
 
   // Makes an worst-possible-case placement plan, by scheduling
   // without regard to existing entries.  This is guaranteed to work
   // iff the shape of every refinement can simultaneously fit into
   // memory, but isn't guaranteed to be optimal at all.
-  boost::optional<PlacementPlan> TryMakeFallbackPlan(const std::vector<std::pair<PlacementKey, Placement>>& placements);
+  boost::optional<PlacementPlan> TryMakeFallbackPlan(stripe::Block* current_block,
+                                                     const std::vector<std::pair<PlacementKey, Placement>>& placements);
 
   // Schedules a swap-in operation:
   // * Adds a swap-in block just before the supplied iterator,
@@ -775,6 +781,13 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
       }
       for (auto unit : options.color_io_unique().units()) {
         units_.emplace(unit);
+      }
+      break;
+    case proto::SchedulePass::kNumaMap:
+      for (const auto& node : options.numa_map().nodes()) {
+        for (auto unit : node.units()) {
+          units_.emplace(unit);
+        }
       }
       break;
     case proto::SchedulePass::MEM_ASSIGNMENT_ALGORITHM_NOT_SET:
@@ -1167,7 +1180,8 @@ void Scheduler::Run() {
   RebuildTransitiveDeps();
 }
 
-std::tuple<PlacementPlan, std::vector<IO>> Scheduler::GatherPlacementState(const std::vector<IO>& ios) {
+std::tuple<PlacementPlan, std::vector<IO>> Scheduler::GatherPlacementState(stripe::Block* current_block,
+                                                                           const std::vector<IO>& ios) {
   PlacementPlan plan;
   std::unordered_map<RefInfo*, stripe::RefDir> todo_map;
 
@@ -1198,29 +1212,64 @@ std::tuple<PlacementPlan, std::vector<IO>> Scheduler::GatherPlacementState(const
     }
   }
 
-  if (options_.mem_assignment_algorithm_case() == proto::SchedulePass::kColorIoUnique) {
-    // Now that we have our directions initialized, perform color
-    // checks on the entries within the plan.  When we detect
-    // conflicting entries, turn them into todos.
-    std::set<stripe::Affine> used_input_units;
-    std::set<stripe::Affine> used_output_units;
-    auto it = plan.begin();
-    while (it != plan.end()) {
-      bool color_valid = true;
-      if (stripe::IsReadDir(it->second.dir)) {
-        color_valid &= used_input_units.emplace(it->first.ri->cache_entry->unit).second;
+  switch (options_.mem_assignment_algorithm_case()) {
+    case proto::SchedulePass::kColorIoUnique: {
+      // Now that we have our directions initialized, perform color
+      // checks on the entries within the plan.  When we detect
+      // conflicting entries, turn them into todos.
+      std::set<stripe::Affine> used_input_units;
+      std::set<stripe::Affine> used_output_units;
+      auto it = plan.begin();
+      while (it != plan.end()) {
+        bool color_valid = true;
+        if (stripe::IsReadDir(it->second.dir)) {
+          color_valid &= used_input_units.emplace(it->first.ri->cache_entry->unit).second;
+        }
+        if (stripe::IsWriteDir(it->second.dir)) {
+          color_valid &= used_output_units.emplace(it->first.ri->cache_entry->unit).second;
+        }
+        if (!color_valid) {
+          // Turn the current placement into a todo.
+          todo_map.emplace(it->first.ri, it->second.dir);
+          it = plan.erase(it);
+          continue;
+        }
+        ++it;
       }
-      if (stripe::IsWriteDir(it->second.dir)) {
-        color_valid &= used_output_units.emplace(it->first.ri->cache_entry->unit).second;
-      }
-      if (!color_valid) {
-        // Turn the current placement into a todo.
-        todo_map.emplace(it->first.ri, it->second.dir);
-        it = plan.erase(it);
-        continue;
-      }
-      ++it;
+      break;
     }
+    case proto::SchedulePass::kNumaMap: {
+      // For the NUMA algorithm, we gather the valid units for this block, and turn
+      // any entry that's not on a valid unit into a todo.
+      std::set<stripe::Affine> valid_units;
+      bool found_node = false;
+      for (const auto& node : options_.numa_map().nodes()) {
+        if (current_block->location == node.pattern()) {
+          for (auto unit : node.units()) {
+            valid_units.emplace(unit);
+          }
+          found_node = true;
+          break;
+        }
+      }
+      if (!found_node) {
+        throw error::OutOfRange{"Unable to map NUMA node at location " + to_string(current_block->location)};
+      }
+      auto it = plan.begin();
+      while (it != plan.end()) {
+        if (!valid_units.count(it->first.ri->cache_entry->unit)) {
+          todo_map.emplace(it->first.ri, it->second.dir);
+          it = plan.erase(it);
+          continue;
+        }
+        ++it;
+      }
+      break;
+    }
+    case proto::SchedulePass::MEM_ASSIGNMENT_ALGORITHM_NOT_SET:
+      // If there's no memory assignment algorithm in place, we don't
+      // need to do any post-processing.
+      break;
   }
 
   // Return the placements to be made.
@@ -1279,7 +1328,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
   // Initialize useful planning inputs.
   PlacementPlan existing_entry_plan;
   std::vector<IO> todos;
-  std::tie(existing_entry_plan, todos) = GatherPlacementState(ios);
+  std::tie(existing_entry_plan, todos) = GatherPlacementState(current_block, ios);
 
   if (VLOG_IS_ON(3)) {
     IVLOG(3, "  Existing entries in plan:");
@@ -1298,38 +1347,38 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
 
   boost::optional<PlacementPlan> plan;
 
-  plan = TryMakePlanWithNoSwaps(existing_entry_plan, todo_fulls);
+  plan = TryMakePlanWithNoSwaps(current_block, existing_entry_plan, todo_fulls);
   if (plan) {
     IVLOG(2, "  Made plan with full IO and no swaps");
     return *plan;
   }
 
-  plan = TryMakePlanWithNoSwaps(existing_entry_plan, todo_partials);
+  plan = TryMakePlanWithNoSwaps(current_block, existing_entry_plan, todo_partials);
   if (plan) {
     IVLOG(2, "  Made plan with loop IO and no swaps");
     return *plan;
   }
 
-  plan = TryMakePlanWithSwaps(existing_entry_plan, todo_fulls);
+  plan = TryMakePlanWithSwaps(current_block, existing_entry_plan, todo_fulls);
   if (plan) {
     IVLOG(2, "  Made plan with full IO and swaps");
     return plan;
   }
 
-  plan = TryMakePlanWithSwaps(existing_entry_plan, todo_partials);
+  plan = TryMakePlanWithSwaps(current_block, existing_entry_plan, todo_partials);
   if (plan) {
     IVLOG(2, "  Made plan with loop IO and swaps");
     return plan;
   }
 
-  plan = TryMakeFallbackPlan(MakeFullPlacements(ios));
+  plan = TryMakeFallbackPlan(current_block, MakeFullPlacements(ios));
   if (plan) {
     IVLOG(2, "  Made no-loop plan ignoring existing entries");
     return plan;
   }
 
   if (current_block) {
-    plan = TryMakeFallbackPlan(MakePartialPlacements(ios));
+    plan = TryMakeFallbackPlan(current_block, MakePartialPlacements(ios));
     if (plan) {
       IVLOG(2, "  Made looping plan ignoring existing entries");
       return plan;
@@ -1340,7 +1389,8 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
   return boost::none;
 }
 
-std::vector<stripe::Affine> Scheduler::GetValidUnits(PlacementPlan* plan, PlacementPlan::iterator it) {
+std::vector<stripe::Affine> Scheduler::GetValidUnits(stripe::Block* current_block, PlacementPlan* plan,
+                                                     PlacementPlan::iterator it) {
   switch (options_.mem_assignment_algorithm_case()) {
     case proto::SchedulePass::kColorIoUnique: {
       std::set<stripe::Affine> used_units;
@@ -1363,6 +1413,23 @@ std::vector<stripe::Affine> Scheduler::GetValidUnits(PlacementPlan* plan, Placem
                           std::back_inserter(result));
       return result;
     }
+    case proto::SchedulePass::kNumaMap: {
+      bool found_node = false;
+      std::vector<stripe::Affine> result;
+      for (const auto& node : options_.numa_map().nodes()) {
+        if (current_block->location == node.pattern()) {
+          for (auto unit : node.units()) {
+            result.emplace_back(unit);
+          }
+          found_node = true;
+          break;
+        }
+      }
+      if (!found_node) {
+        throw error::OutOfRange{"Unable to map NUMA node at location " + to_string(current_block->location)};
+      }
+      return result;
+    }
     case proto::SchedulePass::MEM_ASSIGNMENT_ALGORITHM_NOT_SET:
       // For the default algorithm, we use the unit from the original
       // refinement, which may be explicitly specified.
@@ -1376,7 +1443,8 @@ std::vector<stripe::Affine> Scheduler::GetValidUnits(PlacementPlan* plan, Placem
   return std::vector<stripe::Affine>{};
 }
 
-bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pair<PlacementKey, Placement>>& placements,
+bool Scheduler::TryPlaceInRanges(stripe::Block* current_block, PlacementPlan* plan,
+                                 const std::vector<std::pair<PlacementKey, Placement>>& placements,
                                  std::map<stripe::Affine, std::list<MemRange>> unit_ranges) {
   // For each IO in largest->smallest size, determine a placement.
   // For each one, we want to pick the smallest free range that is
@@ -1390,7 +1458,7 @@ bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pai
       IVLOG(3, "        Finding placement for " << pkey_placement.first.ri->name << ", size=" << size);
       boost::optional<std::pair<stripe::Affine, std::list<MemRange>::iterator>> best_so_far;
       std::size_t best_waste_so_far = mem_bytes_;
-      for (const auto& unit : GetValidUnits(plan, it_inserted.first)) {
+      for (const auto& unit : GetValidUnits(current_block, plan, it_inserted.first)) {
         IVLOG(3, "          Checking free space on unit " << unit);
         auto& ranges = unit_ranges[unit];
         for (auto rit = ranges.begin(); rit != ranges.end(); ++rit) {
@@ -1425,7 +1493,8 @@ bool Scheduler::TryPlaceInRanges(PlacementPlan* plan, const std::vector<std::pai
 }
 
 boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
-    const PlacementPlan& existing_entry_plan, const std::vector<std::pair<PlacementKey, Placement>>& todos) {
+    stripe::Block* current_block, const PlacementPlan& existing_entry_plan,
+    const std::vector<std::pair<PlacementKey, Placement>>& todos) {
   PlacementPlan plan{existing_entry_plan};
   std::map<stripe::Affine, std::list<MemRange>> unit_ranges;
 
@@ -1448,7 +1517,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
     }
   }
 
-  if (!TryPlaceInRanges(&plan, todos, std::move(unit_ranges))) {
+  if (!TryPlaceInRanges(current_block, &plan, todos, std::move(unit_ranges))) {
     return boost::none;
   }
 
@@ -1456,7 +1525,8 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
 }
 
 boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
-    const PlacementPlan& existing_entry_plan, const std::vector<std::pair<PlacementKey, Placement>>& todos) {
+    stripe::Block* current_block, const PlacementPlan& existing_entry_plan,
+    const std::vector<std::pair<PlacementKey, Placement>>& todos) {
   PlacementPlan plan{existing_entry_plan};
   std::map<stripe::Affine, std::list<MemRange>> unit_ranges;
 
@@ -1478,7 +1548,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
     }
   }
 
-  if (!TryPlaceInRanges(&plan, todos, std::move(unit_ranges))) {
+  if (!TryPlaceInRanges(current_block, &plan, todos, std::move(unit_ranges))) {
     return boost::none;
   }
 
@@ -1486,7 +1556,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
 }
 
 boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
-    const std::vector<std::pair<PlacementKey, Placement>>& placements) {
+    stripe::Block* current_block, const std::vector<std::pair<PlacementKey, Placement>>& placements) {
   // TODO: Consider pipelining and small-group parallel processing.
   //       There's an interesting tradeoff here: increased parallelism
   //       means we have less memory to hold cross-substatement data,
@@ -1557,6 +1627,25 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
           if (!found_unit) {
             return boost::none;  // Unable to build a placement plan.
           }
+        }
+      }
+      break;
+    }
+
+    case proto::SchedulePass::kNumaMap: {
+      // Assign all placements in order, using the first unit that fits.
+      for (const auto& pkey_placement : placements) {
+        auto required = math::Align(pkey_placement.second.size, alignment_);
+        bool found_unit = false;
+        for (const auto& unit_offset : offsets) {
+          if (required <= (mem_bytes_ - unit_offset.second)) {
+            assign_placement(pkey_placement, unit_offset.first);
+            found_unit = true;
+            break;
+          }
+        }
+        if (!found_unit) {
+          return boost::none;  // Unable to build a placement plan.
         }
       }
       break;

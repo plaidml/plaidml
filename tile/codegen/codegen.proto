@@ -150,9 +150,10 @@ message SchedulePass {
   // The memory assignment algorithm to use.
   oneof mem_assignment_algorithm {
     ColorIOUnique color_io_unique = 6;
+    NumaMap numa_map = 7;
   }
   // Add constraints during load/store to prevent OOB access
-  optional bool add_constraints = 7 [default = true];
+  optional bool add_constraints = 8 [default = true];
 
   // ColorIOUnique requires that each input to a sub-statement be
   // assigned a unique color, and that each output to a sub-statement
@@ -163,7 +164,18 @@ message SchedulePass {
     repeated uint32 units = 1;
   }
 
-  optional bool append_devs = 8 [default = false];
+  // NumaMap maps the location of a block accessing outer memory to
+  // the cache units that the block can access.
+  message NumaMap {
+    message Node {
+      required string pattern = 1;
+      repeated uint32 units = 2;
+    }
+
+    repeated Node nodes = 1;
+  }
+
+  optional bool append_devs = 9 [default = false];
 }
 
 // Provide a specific address for all the allocation refinement such that no
