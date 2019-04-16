@@ -71,10 +71,40 @@ RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const TensorS
   return Evaluate(name, {MatMul(A, B)});
 }
 
+RunInfo LoadMatMulIntermediate(const std::string& name, const TensorShape& i1, const TensorShape& i2,
+                               const TensorShape& i3) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  Tensor C(i2, "C");
+  Tensor D = MatMul(A, B);
+  Tensor E = D + C;
+  return Evaluate(name, {D, E});
+}
+
+RunInfo LoadMatMulAmongEltwise(const std::string& name, const TensorShape& i1, const TensorShape& i2,
+                               const TensorShape& i3) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  Tensor C(i3, "C");
+  Tensor NegA = -A;
+  Tensor NegB = -B;
+  Tensor P = MatMul(A, B);
+  return Evaluate(name, {P + C});
+}
+
 RunInfo LoadEltwiseAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
   Tensor A(i1, "A");
   Tensor B(i2, "B");
   return Evaluate(name, {A + B});
+}
+
+RunInfo LoadEltwiseMultiAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2,
+                            const TensorShape& i3, const TensorShape& i4) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  Tensor C(i3, "C");
+  Tensor D(i4, "D");
+  return Evaluate(name, {A + B + C + D});
 }
 
 RunInfo LoadEltwiseDiv(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
@@ -89,6 +119,15 @@ RunInfo LoadEltwiseMul(const std::string& name, const TensorShape& i1, const Ten
   return Evaluate(name, {A * B});
 }
 
+RunInfo LoadEltwiseMultiMul(const std::string& name, const TensorShape& i1, const TensorShape& i2,
+                            const TensorShape& i3, const TensorShape& i4) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  Tensor C(i3, "C");
+  Tensor D(i4, "D");
+  return Evaluate(name, {A * B * C * D});
+}
+
 RunInfo LoadSin(const std::string& name, const TensorShape& i1) {
   Tensor A(i1, "A");
   return Evaluate(name, {Sin(A)});
@@ -97,6 +136,21 @@ RunInfo LoadSin(const std::string& name, const TensorShape& i1) {
 RunInfo LoadTanh(const std::string& name, const TensorShape& i1) {
   Tensor A(i1, "A");
   return Evaluate(name, {Tanh(A)});
+}
+
+RunInfo LoadMulThenNeg(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  Tensor C = A * B;
+  return Evaluate(name, {-C});
+}
+
+RunInfo LoadNegThenMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+  Tensor A(i1, "A");
+  Tensor B(i2, "B");
+  Tensor NegA = -A;
+  Tensor NegB = -B;
+  return Evaluate(name, {A * B});
 }
 
 RunInfo LoadConstCalc(const std::string& name) {
