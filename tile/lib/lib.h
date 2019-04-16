@@ -12,9 +12,25 @@ lang::RunInfo LoadMatMul(const std::string& name,    //
                          const TensorShape& input1,  //
                          const TensorShape& input2);
 
+lang::RunInfo LoadMatMulIntermediate(const std::string& name,  //
+                                     const TensorShape& i1,    //
+                                     const TensorShape& i2,    //
+                                     const TensorShape& i3);
+
+lang::RunInfo LoadMatMulAmongEltwise(const std::string& name,  //
+                                     const TensorShape& i1,    //
+                                     const TensorShape& i2,    //
+                                     const TensorShape& i3);
+
 lang::RunInfo LoadEltwiseAdd(const std::string& name,  //
                              const TensorShape& i1,    //
                              const TensorShape& i2);
+
+lang::RunInfo LoadEltwiseMultiAdd(const std::string& name,  //
+                                  const TensorShape& i1,    //
+                                  const TensorShape& i2,    //
+                                  const TensorShape& i3,    //
+                                  const TensorShape& i4);
 
 lang::RunInfo LoadEltwiseDiv(const std::string& name,  //
                              const TensorShape& i1,    //
@@ -24,9 +40,23 @@ lang::RunInfo LoadEltwiseMul(const std::string& name,  //
                              const TensorShape& i1,    //
                              const TensorShape& i2);
 
+lang::RunInfo LoadEltwiseMultiMul(const std::string& name,  //
+                                  const TensorShape& i1,    //
+                                  const TensorShape& i2,    //
+                                  const TensorShape& i3,    //
+                                  const TensorShape& i4);
+
 lang::RunInfo LoadSin(const std::string& name, const TensorShape& i1);
 
 lang::RunInfo LoadTanh(const std::string& name, const TensorShape& i1);
+
+lang::RunInfo LoadMulThenNeg(const std::string& name,  //
+                             const TensorShape& i1,    //
+                             const TensorShape& i2);
+
+lang::RunInfo LoadNegThenMul(const std::string& name,  //
+                             const TensorShape& i1,    //
+                             const TensorShape& i2);
 
 lang::RunInfo LoadConstCalc(const std::string& name);
 
