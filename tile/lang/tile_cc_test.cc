@@ -61,35 +61,35 @@ TEST(TileCC, MnistMlp) {
   auto program = to_string(Evaluate("mnist_mlp", {dense3}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
-  X0[X0_0, X0_1],
-  X1[X1_0, X1_1],
-  X3[X3_0],
-  X9[X9_0, X9_1],
-  X11[X11_0],
-  X17[X17_0, X17_1],
-  X19[X19_0]
+  _X0[_X0_0, _X0_1],
+  _X1[_X1_0, _X1_1],
+  _X3[_X3_0],
+  _X9[_X9_0, _X9_1],
+  _X11[_X11_0],
+  _X17[_X17_0, _X17_1],
+  _X19[_X19_0]
 ) -> (
-  X25
+  _X25
 ) {
-  X2[x0, x2 : 1, 512] = +(X0[x0, x1] * X1[x1, x2]);
-  X4 = add(X2, X3);
-  X5 = 0.000000;
-  X6 = cmp_lt(X4, X5);
-  X7 = 0.000000;
-  X8 = cond(X6, X7, X4);
-  X10[x0, x2 : 1, 512] = +(X8[x0, x1] * X9[x1, x2]);
-  X12 = add(X10, X11);
-  X13 = 0.000000;
-  X14 = cmp_lt(X12, X13);
-  X15 = 0.000000;
-  X16 = cond(X14, X15, X12);
-  X18[x0, x2 : 1, 10] = +(X16[x0, x1] * X17[x1, x2]);
-  X20 = add(X18, X19);
-  X21[x0, 0 : 1, 1] = >(X20[x0, x1]);
-  X22 = sub(X20, X21);
-  X23 = exp(X22);
-  X24[x0, 0 : 1, 1] = +(X23[x0, x1]);
-  X25 = div(X23, X24);
+  _X2[x0, x2 : 1, 512] = +(_X0[x0, x1] * _X1[x1, x2]);
+  _X4 = add(_X2, _X3);
+  _X5 = 0.000000;
+  _X6 = cmp_lt(_X4, _X5);
+  _X7 = 0.000000;
+  _X8 = cond(_X6, _X7, _X4);
+  _X10[x0, x2 : 1, 512] = +(_X8[x0, x1] * _X9[x1, x2]);
+  _X12 = add(_X10, _X11);
+  _X13 = 0.000000;
+  _X14 = cmp_lt(_X12, _X13);
+  _X15 = 0.000000;
+  _X16 = cond(_X14, _X15, _X12);
+  _X18[x0, x2 : 1, 10] = +(_X16[x0, x1] * _X17[x1, x2]);
+  _X20 = add(_X18, _X19);
+  _X21[x0, 0 : 1, 1] = >(_X20[x0, x1]);
+  _X22 = sub(_X20, _X21);
+  _X23 = exp(_X22);
+  _X24[x0, 0 : 1, 1] = +(_X23[x0, x1]);
+  _X25 = div(_X23, _X24);
 }
 )"));
 }
@@ -176,47 +176,47 @@ TEST(TileCC, MnistCnn) {
   auto program = to_string(Evaluate("mnist_cnn", {dense2}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
-  X0[X0_0, X0_1, X0_2, X0_3],
-  X1[X1_0, X1_1, X1_2, X1_3],
-  X3[X3_0],
-  X9[X9_0, X9_1, X9_2, X9_3],
-  X11[X11_0],
-  X21[X21_0, X21_1],
-  X23[X23_0],
-  X29[X29_0, X29_1],
-  X31[X31_0]
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
+  _X3[_X3_0],
+  _X9[_X9_0, _X9_1, _X9_2, _X9_3],
+  _X11[_X11_0],
+  _X21[_X21_0, _X21_1],
+  _X23[_X23_0],
+  _X29[_X29_0, _X29_1],
+  _X31[_X31_0]
 ) -> (
-  X37
+  _X37
 ) {
-  X2[x0, x1, x3, x6 : 1, 222, 222, 32] = +(X0[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * X1[x2, x4, x5, x6]);
-  X4 = add(X2, X3);
-  X5 = 0.000000;
-  X6 = cmp_lt(X4, X5);
-  X7 = 0.000000;
-  X8 = cond(X6, X7, X4);
-  X10[x0, x1, x3, x6 : 1, 220, 220, 64] = +(X8[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * X9[x2, x4, x5, x6]);
-  X12 = add(X10, X11);
-  X13 = 0.000000;
-  X14 = cmp_lt(X12, X13);
-  X15 = 0.000000;
-  X16 = cond(X14, X15, X12);
-  X17[x0, x1, x3, x5 : 1, 110, 110, 64] = >(X16[x0, 2*x1 + x2, 2*x3 + x4, x5]), x2 < 2, x4 < 2;
-  X18 = 1;
-  X19 = 12100;
-  X20 = reshape(X17, X18, X19);
-  X22[x0, x2 : 1, 128] = +(X20[x0, x1] * X21[x1, x2]);
-  X24 = add(X22, X23);
-  X25 = 0.000000;
-  X26 = cmp_lt(X24, X25);
-  X27 = 0.000000;
-  X28 = cond(X26, X27, X24);
-  X30[x0, x2 : 1, 100] = +(X28[x0, x1] * X29[x1, x2]);
-  X32 = add(X30, X31);
-  X33[x0, 0 : 1, 1] = >(X32[x0, x1]);
-  X34 = sub(X32, X33);
-  X35 = exp(X34);
-  X36[x0, 0 : 1, 1] = +(X35[x0, x1]);
-  X37 = div(X35, X36);
+  _X2[x0, x1, x3, x6 : 1, 222, 222, 32] = +(_X0[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X1[x2, x4, x5, x6]);
+  _X4 = add(_X2, _X3);
+  _X5 = 0.000000;
+  _X6 = cmp_lt(_X4, _X5);
+  _X7 = 0.000000;
+  _X8 = cond(_X6, _X7, _X4);
+  _X10[x0, x1, x3, x6 : 1, 220, 220, 64] = +(_X8[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X9[x2, x4, x5, x6]);
+  _X12 = add(_X10, _X11);
+  _X13 = 0.000000;
+  _X14 = cmp_lt(_X12, _X13);
+  _X15 = 0.000000;
+  _X16 = cond(_X14, _X15, _X12);
+  _X17[x0, x1, x3, x5 : 1, 110, 110, 64] = >(_X16[x0, 2*x1 + x2, 2*x3 + x4, x5]), x2 < 2, x4 < 2;
+  _X18 = 1;
+  _X19 = 12100;
+  _X20 = reshape(_X17, _X18, _X19);
+  _X22[x0, x2 : 1, 128] = +(_X20[x0, x1] * _X21[x1, x2]);
+  _X24 = add(_X22, _X23);
+  _X25 = 0.000000;
+  _X26 = cmp_lt(_X24, _X25);
+  _X27 = 0.000000;
+  _X28 = cond(_X26, _X27, _X24);
+  _X30[x0, x2 : 1, 100] = +(_X28[x0, x1] * _X29[x1, x2]);
+  _X32 = add(_X30, _X31);
+  _X33[x0, 0 : 1, 1] = >(_X32[x0, x1]);
+  _X34 = sub(_X32, _X33);
+  _X35 = exp(_X34);
+  _X36[x0, 0 : 1, 1] = +(_X35[x0, x1]);
+  _X37 = div(_X35, _X36);
 }
 )"));
 }
@@ -256,35 +256,35 @@ TEST(TileCC, LarsMomentum4d) {
   auto program = to_string(Evaluate("lars_momentum4d", {std::get<0>(R), std::get<1>(R)}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
-  X0[X0_0, X0_1, X0_2, X0_3],
-  X3[],
-  X6[X6_0, X6_1, X6_2, X6_3],
-  X11[X11_0, X11_1, X11_2, X11_3]
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X3[],
+  _X6[_X6_0, _X6_1, _X6_2, _X6_3],
+  _X11[_X11_0, _X11_1, _X11_2, _X11_3]
 ) -> (
-  X24,
-  X23
+  _X24,
+  _X23
 ) {
-  X1 = 0.125000;
-  X2 = mul(X0, X1);
-  X4 = 0.000977;
-  X5 = mul(X3, X4);
-  X7 = mul(X6, X6);
-  X8[] = +(X7[x0, x1, x2, x3]);
-  X9 = sqrt(X8);
-  X10 = mul(X5, X9);
-  X12 = mul(X11, X11);
-  X13[] = +(X12[x0, x1, x2, x3]);
-  X14 = sqrt(X13);
-  X15 = 0.000488;
-  X16 = mul(X9, X15);
-  X17 = add(X14, X16);
-  X18 = div(X10, X17);
-  X19 = 0.000488;
-  X20 = mul(X6, X19);
-  X21 = add(X11, X20);
-  X22 = mul(X18, X21);
-  X23 = add(X2, X22);
-  X24 = sub(X6, X23);
+  _X1 = 0.125000;
+  _X2 = mul(_X0, _X1);
+  _X4 = 0.000977;
+  _X5 = mul(_X3, _X4);
+  _X7 = mul(_X6, _X6);
+  _X8[] = +(_X7[x0, x1, x2, x3]);
+  _X9 = sqrt(_X8);
+  _X10 = mul(_X5, _X9);
+  _X12 = mul(_X11, _X11);
+  _X13[] = +(_X12[x0, x1, x2, x3]);
+  _X14 = sqrt(_X13);
+  _X15 = 0.000488;
+  _X16 = mul(_X9, _X15);
+  _X17 = add(_X14, _X16);
+  _X18 = div(_X10, _X17);
+  _X19 = 0.000488;
+  _X20 = mul(_X6, _X19);
+  _X21 = add(_X11, _X20);
+  _X22 = mul(_X18, _X21);
+  _X23 = add(_X2, _X22);
+  _X24 = sub(_X6, _X23);
 }
 )"));
 }
@@ -308,11 +308,11 @@ TEST(TileCC, RepeatElements) {
   auto program = to_string(Evaluate("repeat_elts", {O}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
-  X0[X0_0, X0_1, X0_2]
+  _X0[_X0_0, _X0_1, _X0_2]
 ) -> (
-  X1
+  _X1
 ) {
-  X1[x0, 3*x1 + x3, x2 : 10, 30, 10] = =(X0[x0, x1, x2]), x3 < 3 no_defract;
+  _X1[x0, 3*x1 + x3, x2 : 10, 30, 10] = =(_X0[x0, x1, x2]), x3 < 3 no_defract;
 }
 )"));
 }
@@ -333,12 +333,12 @@ TEST(TileCC, UseDefault) {
   auto program = to_string(Evaluate("use_default", {O}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
-  X0[X0_0, X0_1, X0_2, X0_3],
-  X1[X1_0, X1_1, X1_2]
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2]
 ) -> (
-  X2
+  _X2
 ) {
-  X2[x0, 3, x1, x2 : 1, 7, 10, 10] = =(X1[x0, x1, x2]) default X0;
+  _X2[x0, 3, x1, x2 : 1, 7, 10, 10] = =(_X1[x0, x1, x2]) default _X0;
 }
 )"));
 }
@@ -377,18 +377,18 @@ TEST(TileCC, ArgMax) {
   IVLOG(1, program);
   EXPECT_THAT(X.shape(), Eq(tile::SimpleShape(tile::DataType::UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"(function (
-  X0[X0_0, X0_1, X0_2],
-  X2[]
+  _X0[_X0_0, _X0_1, _X0_2],
+  _X2[]
 ) -> (
-  X8
+  _X8
 ) {
-  X1[x0, x2 : 1, 10] = >(X0[x0, x1, x2]);
-  X3[x0 : 10] = =(X2[]);
-  X4 = 0;
-  X5 = index(X3, X4);
-  X6[x0, x2 : 1, 10] = >(X0[x0, x1, x2] == X1[x0, x2] ? X5[x1]);
-  X7 = 32;
-  X8 = as_uint(X6, X7);
+  _X1[x0, x2 : 1, 10] = >(_X0[x0, x1, x2]);
+  _X3[x0 : 10] = =(_X2[]);
+  _X4 = 0;
+  _X5 = index(_X3, _X4);
+  _X6[x0, x2 : 1, 10] = >(_X0[x0, x1, x2] == _X1[x0, x2] ? _X5[x1]);
+  _X7 = 32;
+  _X8 = as_uint(_X6, _X7);
 }
 )"));
 }
@@ -427,21 +427,43 @@ TEST(TileCC, Winograd) {
   auto program = to_string(Evaluate("winograd", {W}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
-  X0[X0_0, X0_1],
-  X1[X1_0, X1_1],
-  X2[X2_0, X2_1, X2_2, X2_3],
-  X5[X5_0, X5_1],
-  X6[X6_0, X6_1, X6_2, X6_3]
+  _X0[_X0_0, _X0_1],
+  _X1[_X1_0, _X1_1],
+  _X2[_X2_0, _X2_1, _X2_2, _X2_3],
+  _X5[_X5_0, _X5_1],
+  _X6[_X6_0, _X6_1, _X6_2, _X6_3]
 ) -> (
-  X11
+  _X11
 ) {
-  X3[x2, x1, x5, x3, x4, x6 : 1, 32, 32, 8, 8, 3] = +(X1[x0, x1] * X2[x2, x0 + 30*x3, 30*x4 + x5, x6]);
-  X4[x0, x1, x6, x3, x4, x5 : 1, 32, 32, 8, 8, 3] = +(X3[x0, x1, x2, x3, x4, x5] * X1[x2, x6]);
-  X7[x0, x2, x3, x4 : 32, 3, 3, 32] = +(X5[x0, x1] * X6[x1, x2, x3, x4]);
-  X8[x0, x4, x2, x3 : 32, 32, 3, 32] = +(X7[x0, x1, x2, x3] * X5[x4, x1]);
-  X9[x0, x1, x2, x3, x4, x6 : 1, 32, 32, 8, 8, 32] = +(X4[x0, x1, x2, x3, x4, x5] * X8[x1, x2, x5, x6]);
-  X10[x2, x1, x3, x4, x5, x6 : 1, 30, 32, 8, 8, 32] = +(X0[x0, x1] * X9[x2, x0, x3, x4, x5, x6]);
-  X11[x0, x1 + 30*x3, 30*x4 + x6, x5 : 1, 222, 222, 32] = +(X10[x0, x1, x2, x3, x4, x5] * X0[x2, x6]) no_defract;
+  _X3[x2, x1, x5, x3, x4, x6 : 1, 32, 32, 8, 8, 3] = +(_X1[x0, x1] * _X2[x2, x0 + 30*x3, 30*x4 + x5, x6]);
+  _X4[x0, x1, x6, x3, x4, x5 : 1, 32, 32, 8, 8, 3] = +(_X3[x0, x1, x2, x3, x4, x5] * _X1[x2, x6]);
+  _X7[x0, x2, x3, x4 : 32, 3, 3, 32] = +(_X5[x0, x1] * _X6[x1, x2, x3, x4]);
+  _X8[x0, x4, x2, x3 : 32, 32, 3, 32] = +(_X7[x0, x1, x2, x3] * _X5[x4, x1]);
+  _X9[x0, x1, x2, x3, x4, x6 : 1, 32, 32, 8, 8, 32] = +(_X4[x0, x1, x2, x3, x4, x5] * _X8[x1, x2, x5, x6]);
+  _X10[x2, x1, x3, x4, x5, x6 : 1, 30, 32, 8, 8, 32] = +(_X0[x0, x1] * _X9[x2, x0, x3, x4, x5, x6]);
+  _X11[x0, x1 + 30*x3, 30*x4 + x6, x5 : 1, 222, 222, 32] = +(_X10[x0, x1, x2, x3, x4, x5] * _X0[x2, x6]) no_defract;
+}
+)"));
+}
+
+TEST(TileCC, UniqueNames) {
+  Tensor A("A");
+  Tensor B("B");
+  Tensor C0("C");
+  Tensor C1("C");
+  auto program = to_string(Evaluate("unique_names", {A + B + C0 + C1}).program);
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[],
+  B[],
+  C[],
+  C0[]
+) -> (
+  _X2
+) {
+  _X0 = add(A, B);
+  _X1 = add(_X0, C);
+  _X2 = add(_X1, C0);
 }
 )"));
 }
