@@ -25,6 +25,7 @@
 #include "tile/codegen/rewrite_locs.h"
 #include "tile/codegen/scalarize.h"
 #include "tile/codegen/schedule.h"
+#include "tile/codegen/subgroup.h"
 #include "tile/codegen/thread_inner.h"
 #include "tile/codegen/tidy.h"
 #include "tile/codegen/tile.h"
@@ -194,6 +195,9 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
         break;
       case proto::Pass::kRewriteLocations:
         RewriteLocationsPass(block, pass.rewrite_locations());
+        break;
+      case proto::Pass::kSubgroup:
+        SubgroupPass(block, pass.subgroup());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));

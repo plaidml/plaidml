@@ -46,8 +46,18 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   for (const auto& dim : it_ref->interior_shape.dims) {
     sizes.push_back(dim.size);
   }
+  // Set the size of the bank-dim to be 1 for simple shape purposes
+  size_t orig_size = 1;
+  if (it_ref->bank_dim) {
+    std::swap(sizes[it_ref->bank_dim->dim_pos], orig_size);
+  }
   // Change the shape
   it_ref->mut().interior_shape = SimpleShape(it_ref->interior_shape.type, sizes);
+  // Fix the bankdim back up
+  if (it_ref->bank_dim) {
+    it_ref->mut().interior_shape.dims[it_ref->bank_dim->dim_pos].size = orig_size;
+    it_ref->mut().interior_shape.dims[it_ref->bank_dim->dim_pos].stride = 0;
+  }
   // Change dir + from
   it_ref->mut().dir = RefDir::None;
   it_ref->mut().from = "";
@@ -55,6 +65,8 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   for (Affine& aff : it_ref->mut().access) {
     aff = 0;
   }
+  // Remove any tmp tags
+  it_ref->mut().remove_tag("tmp");
   // Propagate the changes
   FixupRefs(block, var_name);
 }

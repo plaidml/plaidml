@@ -303,8 +303,8 @@ struct TileSearchState {
 };
 
 template <typename CostModel>
-boost::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool only_multiple_of_32, bool is_fast,
-                                         const CostModel& model) {
+boost::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool only_even, bool only_multiple_of_32,
+                                         bool is_fast, const CostModel& model) {
   IVLOG(3, "Autotile> PickBestTile> block: " << block.name);
   TileSearchState state;
   Tile tile(block, only_multiple_of_32 ? 32 : 1);
@@ -331,8 +331,19 @@ boost::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool
         continue;
       }
       auto prev = tile.dims[i];
+      if (prev.size == block.idxs[i].range) {
+        continue;  // Already at max size
+      }
       if (only_po2) {
         tile.set(i, 2 * prev.size, block.idxs[i].range);
+      } else if (only_even) {
+        // Find the next even divisor of range
+        for (size_t j = prev.size + 1; j < block.idxs[i].range; j++) {
+          if (block.idxs[i].range % j == 0) {
+            tile.set(i, j, block.idxs[i].range);
+            break;
+          }
+        }
       } else if (only_multiple_of_32) {
         tile.set(i, 32 + prev.size, block.idxs[i].range);
       } else {
@@ -362,7 +373,8 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
       }
     }
     ComputeDensityCostModel model(*block, options);
-    auto result = PickBestTile(*block, options.only_po2(), options.only_multiple_of_32(), options.fast(), model);
+    auto result = PickBestTile(*block, options.only_po2(), options.only_even(), options.only_multiple_of_32(),
+                               options.fast(), model);
     if (result) {
       IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result->tile << ", cost: " << result->cost);
       const TileShape& tiling_shape = options.flip() ? result->tile.counts() : result->tile.sizes();
@@ -391,7 +403,7 @@ void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& optio
   auto reqs = FromProto(options.reqs());
   RunOnBlocks(root, reqs, [&options](const AliasMap& map, Block* block) {
     PartitionComputeCostModel model(*block, options);
-    auto result = PickBestTile(*block, false, options.only_multiple_of_32(), false, model);
+    auto result = PickBestTile(*block, false, false, options.only_multiple_of_32(), false, model);
     if (result) {
       IVLOG(2, "PartitionCompute> block: " << block->name                 //
                                            << ", tile: " << result->tile  //

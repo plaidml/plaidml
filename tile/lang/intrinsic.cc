@@ -14,7 +14,7 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-sem::ExprPtr IntrinsicList::emit(const stripe::Intrinsic& in) {
+sem::ExprPtr IntrinsicList::emit(const stripe::Intrinsic& in) const {
   auto it = map_.find(in.name);
   if (it == map_.end()) {
     if (default_emitter_ == nullptr) {
@@ -22,7 +22,7 @@ sem::ExprPtr IntrinsicList::emit(const stripe::Intrinsic& in) {
     }
     return default_emitter_(in);
   }
-  IntrinsicSpec& spec = it->second;
+  const IntrinsicSpec& spec = it->second;
   return spec.emit(in);
 }
 

@@ -149,7 +149,17 @@ void Pad(Block* block, const AliasMap& map) {
       new_size = std::max(new_size, ref.interior_shape.dims[i].size);
       ref.mut().interior_shape.dims[i].size = new_size;
       stride *= new_size;
-      ref.mut().access[i] += -exts[i].load.min;
+      // Bump all the interior pointers!
+      for (auto stmt : block->stmts) {
+        auto inner = stripe::Block::Downcast(stmt);
+        if (!inner) continue;
+        for (auto& refi : inner->refs) {
+          if (refi.from == ref.into()) {
+            refi.mut().access[i] += -exts[i].load.min;
+          }
+        }
+      }
+      // ref.mut().access[i] += -exts[i].load.min;
     }
     FixupRefs(block, ref.into());
   }

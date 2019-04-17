@@ -1,5 +1,9 @@
 # Copyright 2018 Intel Corporation.
 
+# Make sure we win the race with TF to load libstdc++...
+import plaidml
+plaidml._internal_set_vlog(0)
+
 import argparse
 import functools
 import operator
@@ -18,7 +22,6 @@ from keras.backend import tensorflow_backend as tf
 from keras.backend import theano_backend as th
 from keras.backend import floatx
 
-import plaidml
 import plaidml.exceptions
 from plaidml.keras import backend as pkb
 from plaidml import tile
@@ -201,7 +204,8 @@ def opTest(in_data,
                     except AttributeError:
                         # This wasn't an IndexedSlices object, do nothing
                         pass
-                if args.verbose > 1 or verbose:
+                if args.verbose > 2 or verbose:
+                    print('backend: ', b)
                     print('data: {}'.format(data))
                     print('fr: {}'.format(fr))
                     if do_grads:
@@ -1372,7 +1376,7 @@ class TestBackendOps(unittest.TestCase):
     # Big rollup
     @opTest([[m(1000, 1000)]], do_grads=False)
     def testBigRollup(self, b, x):
-        return [b.sum(x)]
+        return [b.sum(x, axis=1)]
 
     # Resnet sized tests
     @opTest([[m(1, 224, 224, 3), m(7, 7, 3, 64)]], do_grads=False)
@@ -1384,6 +1388,18 @@ class TestBackendOps(unittest.TestCase):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
+
+    @opTest([[m(1, 56, 56, 256), m(3, 3, 256, 128)]], do_grads=False)
+    def res3a_branch2a(self, b, x, k):
+        return [b.conv2d(x, k, strides=(2, 2), padding='same')]
+
+    @opTest([[m(1, 56, 56, 64), m(1, 1, 64, 64)]], do_grads=False)
+    def res2a_branch2a(self, b, x, k):
+        return [b.conv2d(x, k, strides=(1, 1), padding='same')]
+
+    @opTest([[m(1, 2048), m(2048, 1000)]], do_grads=False)
+    def fc_1000(self, b, x, k):
+        return [b.dot(x, k)]
 
     @opTest([[m(1024, 1024), m(1024, 1024)]], do_grads=False)
     def bigMatMul(self, b, A, B):

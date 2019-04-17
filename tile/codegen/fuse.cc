@@ -58,7 +58,9 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
   IVLOG(3, "ComputeFusionPlan for " << buf_name << " between " << a.name << " and " << b.name);
   FusionPlan plan;
   plan.tile_a = TileShape(a.idxs.size(), 1);
+  plan.a_interleave = false;
   plan.tile_b = TileShape(b.idxs.size(), 1);
+  plan.b_interleave = false;
   // This is quite hueristic right now, but still beats our prior implementation
   auto it_a = a.ref_by_from(buf_name, false);
   if (it_a == a.refs.end()) {
@@ -99,7 +101,15 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
     }
     for (size_t i = 0; i < b.idxs.size(); i++) {
       if (b.idxs[i].name == idx_b) {
-        plan.tile_b[i] = mul_a / mul_b;
+        int64_t mul = mul_a / mul_b;
+        size_t a_range = a.idx_by_name(idx_a)->range;
+        size_t b_range = b.idx_by_name(idx_b)->range;
+        if (mul > 1) {
+          plan.tile_b[i] = mul_a / mul_b;
+        } else if (a_range != b_range) {
+          plan.tile_b[i] = b_range / a_range;
+          plan.b_interleave = true;
+        }
       }
     }
     plan.remap_a.emplace(idx_a, idx_a);
@@ -198,12 +208,13 @@ void FlattenTrivial(stripe::Block* outer) {
 
 std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                          //
                                       const std::map<std::string, std::string>& mapping,  //
-                                      const TileShape& tile) {
+                                      const TileShape& tile,                              //
+                                      bool interleave) {
   IVLOG(3, "FusionRefactor:\n" << orig);
   IVLOG(3, "mapping: " << StreamContainer(mapping) << ", tile: " << tile);
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
-  ApplyTile(tiled.get(), tile, true, true);
+  ApplyTile(tiled.get(), tile, true, true, interleave);
   // IVLOG(3, "Tiled:\n" << *tiled);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
@@ -307,6 +318,8 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   // If indexes don't match, fail
   if (block_a->idxs != block_b->idxs) {
     IVLOG(3, "Fuse failed due to mismatched indexes");
+    IVLOG(3, "A: " << block_a->idxs);
+    IVLOG(3, "B: " << block_b->idxs);
     return false;
   }
   // If constraints don't match, fail
@@ -498,8 +511,24 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
         break;
       }
       // Do the appropriate refactors
-      auto refactor1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a);
-      auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b);
+      auto refactor1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a, plan->a_interleave);
+      auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b, plan->b_interleave);
+      // Now copy computed indexes if it's safe
+      for (const auto& idx : refactor1->idxs) {
+        if (idx.affine != stripe::Affine() && !refactor2->idx_by_name(idx.name)) {
+          refactor2->idxs.push_back(idx);
+        }
+      }
+      for (const auto& idx : refactor2->idxs) {
+        if (idx.affine != stripe::Affine() && !refactor1->idx_by_name(idx.name)) {
+          refactor1->idxs.push_back(idx);
+        }
+      }
+      // Sort one more time
+      std::sort(refactor1->idxs.begin(), refactor1->idxs.end(),
+                [](const Index& a, const Index& b) { return a.name < b.name; });
+      std::sort(refactor2->idxs.begin(), refactor2->idxs.end(),
+                [](const Index& a, const Index& b) { return a.name < b.name; });
       // IVLOG(3, "Fusion refactor 1:\n" << *refactor1);
       // IVLOG(3, "Fusion refactor 2:\n" << *refactor2);
       // Try the actual fusion
