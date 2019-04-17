@@ -16,7 +16,8 @@ namespace vertexai {
 namespace tile {
 namespace sem {
 
-// Simple typing.  Every type is either a TILE value type, a TILE pointer type, or an index
+// Simple typing.  Every type is either a TILE value type, a TILE pointer type,
+// or an index
 // TILE value types consist of the underlying type and a vector width
 struct Type : public el::Loggable {
   enum BaseType { TVOID, INDEX, VALUE, POINTER_MUT, POINTER_CONST };
@@ -258,7 +259,8 @@ struct WhileStmt : public Statement {
 
 // A statement representing an inter-thread barrier
 struct BarrierStmt : public Statement {
-  BarrierStmt() {}
+  bool subgroup;
+  explicit BarrierStmt(bool _subgroup = false) : subgroup(_subgroup) {}
   void Accept(Visitor&) const final;
 };
 
@@ -286,7 +288,8 @@ struct Function : public Node {
   Type ret;
   params_t params;
   StmtPtr body;
-  Function() {}
+  bool is_subgroup;
+  Function() : is_subgroup(false) {}
   Function(const std::string n, const Type& r, const params_t& p, StmtPtr b);
   void Accept(Visitor&) const final;
 };

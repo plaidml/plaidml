@@ -12,37 +12,19 @@
         { "name": "localize_tmps", "localize" : {"reqs": ["program"], "ref_reqs": ["tmp"] } },
 
         ## Padding, disabled for now due ot issues with gradiants
-        ## { "name": "pad", "pad": {"reqs": ["main"] } },
+        { "name": "pad", "pad": {"reqs": ["main"] } },
 
-        ## Next, we find all the dense contraction blocks, and split them up
-        ## into groups such that the inputs for the innermost loops fit into
-        ## shared memory and the outputs fit into the register set of the each
-        ## multiprocessor.
+        ## Do subgroup pass
+        { "name": "subgroup", "subgroup": { "reqs": ["contraction"], "max_mem": 3000, "cache_width": 256 } },
+
+        ## Do a backup codegen on any remaining contractions 
         {
-            "name": "tile_contract",
+            "name": "tile_fallback",
             "autotile": {
                 "reqs": ["contraction"],  ## Apply to only dense operations
-                "outer_set": ["contract_outer", "kernel"],
-                "inner_set": ["contract_inner"],
+                "outer_set": ["fallback_outer", "kernel", "no_threads"],
+                "inner_set": ["fallback_inner"],
                 "clear_outer": true,
-                ## "acc_idxs": false,
-                "only_po2": true,  ## Only consider PO2 sizes for speed
-                "max_total_size": {{ LOCAL_MEM_KIB * 1024 }},  ## All inputs must fit in local memory
-                "min_out_size": {{ NUM_THREADS }},
-                ## Since all loads to/from global memory are across a wide bus, use that as the
-                ## cache_width to optimize for contigous regions of DRAM for each inner block
-                "cache_width": {{ CACHE_WIDTH }}
-                ## "split_unaligned": true
-            }
-        },
-
-        ## Since we don't accumulate final outputs, we need to move any tiling over
-        ## accumulation dimensions into an inner loop 
-        {
-            "name": "tile_middle",
-            "autotile": {
-                "reqs": ["contract_outer"],  ## Apply to only dense operations
-                "inner_set": ["contract_middle"],
                 "acc_idxs": false,
                 ## With i/o costs zeroed out, and split factor set high, we basically
                 ## should pick the largest tile that doesn't use accumuation indexes
@@ -50,20 +32,30 @@
                 "output_cost": 0.0,
                 "split_factor": -100.0,
                 "only_po2": true  ## Only consider PO2 sizes for speed
-                ## "split_unaligned": true
+            }
+        },
+        {
+            "name": "cache_backup", 
+            "cache": {
+                "reqs" : ["fallback_outer"], 
+                "dirs" : ["Out"],
+                "mem_loc" : { "devs" : [ { "name": "LOCAL" } ] },
+                "xfer_loc" : { "devs" : [ { "name": "DMA" } ] }
             }
         },
 
-        ## Now we add explicit code to load inputs from DRAM to shared memory for each inner block
-        ## Note, we don't cache outputs yet, since the next fusion step will split the outer loop into
-        ## accumulation indexes and non-accumulation indexes
-        { "name": "cache_input", "cache": { "reqs": ["contract_middle"], "dirs": [ "In" ], "mem_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] }, "xfer_loc": { "devs": [{"name": "DMA", "units": [{"offset": 0}]}] } } },
+        ## Clean up extra indexes
+        ## { "name": "subgroup_prune", "prune_idxs": { "reqs": ["main"] } },
 
         ## Next we fuse in any element-wise operations which operate on the output of contraction block
-        { "name": "fuse_contract_eltwise", "fusion": { "a_reqs": ["contract_outer"], "b_reqs": ["eltwise"]  } },
+        ## We need to fuse through multiple levels of the hierarchy
+        { "name": "fuse_contract_eltwise_1", "fusion": { "a_reqs": ["subgroup_outer"], "b_reqs": ["eltwise"]  } },
+        { "name": "fuse_contract_eltwise_2", "fusion": { "a_reqs": ["subgroup_thread"], "b_reqs": ["eltwise"]  } },
+        { "name": "fuse_contract_eltwise_3", "fusion": { "a_reqs": ["subgroup_write"], "b_reqs": ["eltwise"]  } },
 
-        ## Clean up indexes to allow better fusion
-        { "name": "prefuse", "prune_idxs": { "reqs": ["main"] } },
+        ## Clean things up to allow further optimizations
+        { "name": "fuse_clean_1", "prune_idxs": { "reqs": ["main"] } },
+        { "name": "fuse_clean_2", "prune_refs": { "reqs": ["main"] } },
 
         ## Then we fuse multiple eltwise things
         { "name": "fuse_eltwise_eltwise", "fusion": { "parent_reqs": ["main"], "a_reqs": ["eltwise"], "b_reqs": ["eltwise"], "output_match": true } },
@@ -71,137 +63,47 @@
         ## Then we 'localize' buffers, which moves any temporaries the only are needed to hold the output
         ## of dense computations before they are used on elementwise operations into the interior of the fused blocks
         { "name": "localize_main", "localize": { "reqs": ["main"] } },
-
-        ## Now we add the output caching, which will now have the same loop structure as the element-wise ops
-        { "name": "cache_output", "cache": { "reqs": ["contract_outer"], "dirs": [ "Out" ], "mem_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] }, "xfer_loc": { "devs": [{"name": "DMA", "units": [{"offset": 0}]}] } } },
-
-        ## Clean up indexes to allow better fusion
-        { "name": "prefuse", "prune_idxs": { "reqs": ["main"] } },
-
-        ## We do an inner 'fusion' to move all 'per-output' operations into a single loop
-        { "name": "fuse_inner", "fusion": { "parent_reqs": ["contract_outer"], "fused_set": ["cache"], "exclude": ["contract_middle"] } },
-
-        ## Now tile any remaining eltwise kernels
-        {
-            "name": "tile_eltwise",
-            "autotile": {
-                "reqs": ["eltwise", "kernel"],  ## Apply to only dense operations
-                "outer_set": ["eltwise_outer", "kernel"],
-                "inner_set": ["eltwise_inner"],
-                "clear_outer": true,
-                "only_po2": true,  ## Only consider PO2 sizes for speed
-                "min_count": {{ NUM_UNITS }},
-                "min_size": {{ NUM_THREADS }},
-                ## Since all loads to/from global memory are across a wide bus, use that as the
-                ## cache_width to optimize for contigous regions of DRAM for each inner block
-                "cache_width": {{ CACHE_WIDTH }}
-                ## "split_unaligned": true
-            }
-        },
- 
-        ## We now move any temporaries even further down (into the per-output loop)
-        { "name": "localize_main", "localize": { "reqs": ["main"] } },
-
-        ## Scalarize, which should fully remove any remaining temporaries and convert them to scalars
         { "name": "scalarize_main", "scalarize": { "reqs": ["main"] } },
 
-        ## We now relabel any remaining buffer inside the contractions as local memory
-        { "name": "make_local", "locate_memory": { "reqs": ["contract_outer"], "loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] } } },
+        ## Let's do some additional threading
+        {
+            "name": "tile_subgroups",
+            "autotile": {
+                "reqs": ["subgroup_outer"],  ## Apply to only dense operations
+                "outer_set": ["subgroup_outer", "kernel"],
+                "inner_set": ["gpu_thread", "subgroup_othreads"],
+                "clear_outer": true,
+                "only_even": true,
+                "min_size": {{ 8 }},
+                "max_sizes_product": {{ 8 }}
+            }
+        },
+
+        ## Do a backup codegen on eltwise stuff
+        {
+            "name": "tile_elt_fallback",
+            "autotile": {
+                "reqs": ["eltwise", "kernel"],  ## Apply to eltwise ops
+                "outer_set": ["fallback_elt_outer", "kernel", "no_threads"],
+                "inner_set": ["fallback_elt_inner"],
+                "clear_outer": true,
+                "acc_idxs": false,
+                ## With i/o costs zeroed out, and split factor set high, we basically
+                ## should pick the largest tile that doesn't use accumuation indexes
+                "input_cost": 0.0, 
+                "output_cost": 0.0,
+                "split_factor": -100.0,
+                "only_po2": true  ## Only consider PO2 sizes for speed
+            }
+        },
 
         ## After all fusion, eliminate dead code again
         { "name": "dead_code_elimination", "dead_code_elimination": {"reqs": ["all"] } },
 
-        ## Next, we thread all of the code that moves data between global and local memory so
-        ## that multiple GPU threads can cooperatively do the work
-        {
-            "name": "thread_cache",
-            "autotile": {
-                "reqs": ["cache"],
-                "outer_set": ["cache_outer", "gpu_thread"],
-                "inner_set": ["cache_threads"],
-                "only_po2": true,
-                "max_sizes_product": {{ NUM_THREADS }},
-                "cache_width": {{ CACHE_WIDTH }},
-                "loc_name": "GLOBAL",
-                "flip": true
-            }
-        },
-  
-        ## Finally we run the GPU specific thread_inner pass to thread the primary computation loop
-        { "name": "thread_contract", "thread_inner" : { "reqs": ["contract_inner"], "threads": {{ NUM_THREADS }} } },
-        {
-            "name": "thread_eltwise",
-            "autotile": {
-                "reqs": ["eltwise_inner"],
-                "outer_set": ["eltwise_struct", "gpu_thread"],
-                "inner_set": ["eltwise_threads"],
-                "only_po2": true,
-                "max_sizes_product": {{ NUM_THREADS }},
-                "cache_width": {{ CACHE_WIDTH }},
-                "loc_name": "GLOBAL",
-                "flip": true
-            }
-        },
-
-        ## Thread leftover elementwise 
-        { "name": "thread_elemwise", "thread_inner" : { "reqs": ["kernel", "eltwise"], "threads": {{ NUM_THREADS }} } },
-
-        ## Load cache into registers
-        {
-            "name": "register_cache_load",
-            "register_cache": {
-                "reqs": ["cache_load", "gpu_thread"],
-                "dir": "In",
-                "local_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] },
-                "register_loc": { "devs": [{"name": "REGISTER", "units": [{"offset": 0}]}] },
-                "register_size": {{ REGS_MEM_B }},
-                "global_memory_latency": {{ GLOBAL_MEM_LAT }},
-                "local_memory_latency": {{ LOCAL_MEM_LAT }},
-                "register_latency": {{ REG_MEM_LAT }},
-                "comp_parent_tag": "contract_middle",
-                "index_order": "cache",
-                "align_size": {{ ALIGN_SIZE_B }}
-            }
-        },
-
-        ## Store cache into registers
-        {
-            "name": "register_cache_store",
-            "register_cache": {
-                "reqs": ["cache_store", "gpu_thread"],
-                "dir": "Out",
-                "local_loc": { "devs": [{"name": "LOCAL", "units": [{"offset": 0}]}] },
-                "register_loc": { "devs": [{"name": "REGISTER", "units": [{"offset": 0}]}] },
-                "register_size": {{ REGS_MEM_B }},
-                "global_memory_latency": {{ GLOBAL_MEM_LAT }},
-                "local_memory_latency": {{ LOCAL_MEM_LAT }},
-                "register_latency": {{ REG_MEM_LAT }},
-                "comp_parent_tag": "contract_middle",
-                "index_order": "comp",
-                "align_size": {{ ALIGN_SIZE_B }}
-            }
-        },
-
-        ## One last attempt to fuse across gpu_threads 
-        ## { "name": "fuse_inner", "fusion": { "a_reqs": ["gpu_thread"], "b_reqs": ["gpu_thread"], "perfect": true } },
-
-        ## Next, let's fuse any leftover elementwise ops at the main level
-        ## { "name": "fuse_pure_elemwise", "fusion": { "parent_reqs": ["main"], "a_reqs": ["eltwise"], "b_reqs": ["eltwise"] } },
-
-        ## We now locate the kernels onto the GPU compute device
-        { "name": "loc_gpu", "locate_inner_block": { "reqs": ["kernel"], "loc": { "devs": [{"name": "GPU", "units": [{"offset": 0}]}] } } },
-
-        ## Final cleanup 
-        { "name": "localize_main_2", "localize": { "reqs": ["main"] } },
-        { "name": "scalarize_main_2", "scalarize": { "reqs": ["main"] } },
-
         { "name": "cleanup1", "prune_refs": { "reqs": ["main"] } },
         { "name": "cleanup2", "prune_idxs": { "reqs": ["main"] } },
 
-        ## Compute the inter-kernel dependencies
-        { "name": "compute_deps", "compute_deps": { } }, 
-
-        ## Assign global memory addresses
-        { "name": "place_program", "memory_placement": { "reqs": ["program"], "locs": [{ "devs": [{"name": "GLOBAL", "units": [{"offset": 0}]}] }], "alignment": 4 } }
+        { "name": "localize_main", "localize": { "reqs": ["main"] } },
+        { "name": "scalarize_main", "scalarize": { "reqs": ["main"] } }
     ]
 }

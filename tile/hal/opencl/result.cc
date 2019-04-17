@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/util/compat.h"
+#include "base/util/env.h"
 #include "base/util/error.h"
 #include "tile/lang/semprinter.h"
 
@@ -111,15 +112,21 @@ void KernelResult::LogStatistics() const {
       // Prevent division by 0
       duration = 1;
     }
-    /*
-    std::string rcom = ki_.comments;
-    if (rcom.size() > 2 && rcom[0] == '/' && rcom[1] == '/') { rcom = rcom.substr(2, rcom.size() - 2); }
-    if (rcom.size() > 1 && rcom[rcom.size() - 1] == '\n') { rcom = rcom.substr(0, rcom.size() - 1); }
-    for (size_t i = 0; i < rcom.size(); i++) { if (rcom[i] == '\n') rcom[i] = '\t'; }
-    std::cout << duration << "\t" <<  ki_.kname << "\t" << rcom << "\n";
-    */
+    if (env::Get("PLAIDML_DUMP_TIMES") == "1") {
+      std::string rcom = ki_.comments;
+      if (rcom.size() > 2 && rcom[0] == '/' && rcom[1] == '/') {
+        rcom = rcom.substr(2, rcom.size() - 2);
+      }
+      if (rcom.size() > 1 && rcom[rcom.size() - 1] == '\n') {
+        rcom = rcom.substr(0, rcom.size() - 1);
+      }
+      for (size_t i = 0; i < rcom.size(); i++) {
+        if (rcom[i] == '\n') rcom[i] = '\t';
+      }
+      std::cout << duration << "\t" << ki_.kname << "\t" << rcom << "\n";
+    }
     VLOG(3) << ki_.comments;
-    VLOG(2) << "Ran " << ki_.kname << ": dur=" << duration << " GFL/s=" << ki_.tot_flops / duration
+    VLOG(1) << "Ran " << ki_.kname << ": dur=" << duration << " GFL/s=" << ki_.tot_flops / duration
             << " GBP/s=" << ki_.tot_bytes / duration;
     LogActivity(ctx_, device_state_, *info_);
   }

@@ -19,24 +19,17 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-// Regular loop: for (index = init; index < range; index += step)
-// Threaded loop:
-struct LoopInfo {
-  bool threaded;
-  std::string index;
-  int init;   // for only regular loop
-  int range;  // for only regular loop
-  int step;   // for only regular loop
-  // stmts to be inserted before the loop, for only regular loop
-  std::vector<sem::StmtPtr> init_stmts;
-  // stmts to be inserted at the end of the loop, for only regular loop
-  std::vector<sem::StmtPtr> step_stmts;
-  // map local lid to its trace id, for only threaded loop
-  std::map<std::string, size_t> lid;
-};
-
 class SemtreeEmitter : public stripe::ConstStmtVisitor {
  public:
+  sem::ExprPtr default_intrinsic_emitter(const stripe::Intrinsic& in,
+                                         const std::map<std::string, sem::ExprPtr>& exprs = {}) const;
+  std::string safe_name(const std::string& in) const;
+  std::string ref_buf(const std::string& in) const;
+  std::string ref_idx(const std::string& in, int delta = 0) const;
+  std::string idx_name(const std::string& in) const;
+  std::string scalar_name(const std::string& in) const;
+  sem::ExprPtr convert_affine(const stripe::Affine& aff) const;
+
   explicit SemtreeEmitter(const AliasMap& am, size_t threads);
   void Visit(const stripe::Load&);
   void Visit(const stripe::Store&);
@@ -46,15 +39,6 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void Visit(const stripe::Intrinsic&);
   void Visit(const stripe::Block&);
 
-  sem::ExprPtr default_intrinsic_emitter(const stripe::Intrinsic& in);
-  std::string generate_name(const std::string& prefix) const;
-  std::string safe_name(const std::string& in) const;
-  std::string ref_name(const std::string& in) const;
-  std::string scalar_name(const std::string& in) const;
-  std::string idx_name(const std::string& in) const;
-  stripe::Affine convert_idx_with_block(const stripe::Affine& aff) const;
-  sem::ExprPtr convert_affine(const stripe::Affine& aff) const;
-  void process_affine(const std::string idx, const stripe::Affine& aff);
   sem::StmtPtr add_loops(const stripe::Block&);
   void do_gids(const stripe::Block&);
   sem::StmtPtr make_special(const std::string& name, const stripe::Block& block,
@@ -68,6 +52,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
 
   size_t hw_threads_;
   size_t threads_;
+  size_t used_threads_;
   size_t loop_mul_;
   size_t tot_ops_;
   size_t tot_loads_;
@@ -75,19 +60,10 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   std::vector<size_t> lid_limits_;
   size_t depth_ = 0;
   std::shared_ptr<sem::Block> cur_;
-  std::shared_ptr<sem::Block> kernel_top_;
   std::vector<AliasMap> scopes_;
   const AliasMap* scope_;
   size_t in_kernel_ = 0;
   size_t in_threads_ = 0;
-  // The max block ID during traverse
-  size_t max_block_id_;
-  // Block IDs for the traverse stack
-  std::vector<size_t> block_id_;
-  // Defined index names to prevent re-definition
-  std::set<std::string> defined_idx_;
-  // current outside loops
-  std::vector<LoopInfo> loop_info_;
   // Intrinsic list and emitters
   lang::IntrinsicList intrinsics_;
   lang::KernelList kernels_;

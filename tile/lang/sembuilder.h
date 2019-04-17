@@ -88,7 +88,7 @@ inline std::shared_ptr<ForStmt> _For(const std::string& var, uint64_t n, uint64_
   return std::make_shared<ForStmt>(var, n, s, inner);
 }
 
-inline std::shared_ptr<BarrierStmt> _Barrier() { return std::make_shared<BarrierStmt>(); }
+inline std::shared_ptr<BarrierStmt> _Barrier(bool subgroup = false) { return std::make_shared<BarrierStmt>(subgroup); }
 
 inline std::shared_ptr<ReturnStmt> _Return(ExprPtr value = ExprPtr()) { return std::make_shared<ReturnStmt>(value); }
 
@@ -228,7 +228,7 @@ DEF_BINARY_OP(>=)
 DEF_BINARY_OP(<=)
 DEF_BINARY_OP(&)
 DEF_BINARY_OP(|)
-DEF_BINARY_OP (^)  // NOLINT
+DEF_BINARY_OP(^)  // NOLINT
 DEF_BINARY_OP(>>)
 DEF_BINARY_OP(<<)
 }  // End namespace std

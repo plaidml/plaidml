@@ -16,7 +16,7 @@ namespace lang {
 typedef sem::ExprPtr (*IntrinsicEmitter)(const stripe::Intrinsic&);
 
 struct IntrinsicSpec {
-  sem::ExprPtr emit(const stripe::Intrinsic& stmt) { return emitter_(stmt); }
+  sem::ExprPtr emit(const stripe::Intrinsic& stmt) const { return emitter_(stmt); }
 
   std::string name_;
   IntrinsicEmitter emitter_;
@@ -27,8 +27,8 @@ class IntrinsicList {
   IntrinsicList() : default_emitter_(nullptr) {}
   explicit IntrinsicList(const IntrinsicEmitter& emitter) : default_emitter_(emitter) {}
   void add(const IntrinsicSpec& spec) { map_.emplace(spec.name_, spec); }
-  bool exist(const std::string& name) { return map_.find(name) != map_.end(); }
-  sem::ExprPtr emit(const stripe::Intrinsic& in);
+  bool exist(const std::string& name) const { return map_.find(name) != map_.end(); }
+  sem::ExprPtr emit(const stripe::Intrinsic& in) const;
 
  private:
   std::map<std::string, IntrinsicSpec> map_;
