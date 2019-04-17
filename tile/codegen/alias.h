@@ -66,7 +66,8 @@ class AliasMap {
   void AddConstraintForIndex(stripe::Block* block,         //
                              const AliasInfo& alias_info,  //
                              size_t idx,                   //
-                             const std::string& idx_name) const;
+                             const std::string& idx_name,  //
+                             bool idx_passthru = false) const;
 
  private:
   // How deep is this AliasInfo
