@@ -47,15 +47,15 @@ void ApplyCache(const AliasMap& map,          //
   xfer_block.location = xfer_loc;
   std::vector<Affine> xfer_access;
   for (size_t i = 0; i < sizes.size(); i++) {
+    std::string iname = str(boost::format("i%zu") % i);
     if (sizes[i] > 1) {
-      std::string iname = str(boost::format("i%zu") % i);
       xfer_block.idxs.emplace_back(Index{iname, sizes[i]});
       xfer_access.emplace_back(Affine(iname));
-      if (add_constraints) {
-        map.AddConstraintForIndex(&xfer_block, ai, i, iname);
-      }
     } else {
       xfer_access.emplace_back(Affine());
+    }
+    if (add_constraints) {
+      map.AddConstraintForIndex(&xfer_block, ai, i, iname, sizes[i] <= 1);
     }
   }
   TensorShape raw_xfer_shape = raw_ts;
