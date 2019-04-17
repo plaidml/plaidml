@@ -573,7 +573,8 @@ TensorShape ComputeOutputShape(const std::vector<Binding>& inputs) {
 
 class ShapeEvaluator : AstVisitor {
  public:
-  ShapeEvaluator(const AstVector& flat, std::unordered_map<const Expr*, Binding>* bindings) : bindings_(bindings) {
+  ShapeEvaluator(const AstVector& flat, std::unordered_map<const Expr*, Binding>* bindings)
+      : bindings_by_expr_(bindings) {
     for (const auto& expr : flat) {
       expr->Accept(this);
     }
@@ -582,20 +583,20 @@ class ShapeEvaluator : AstVisitor {
  private:
   void Visit(const ParamExpr& expr) {
     IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
-    bindings_->emplace(&expr, expr.shape);
+    bindings_by_expr_->emplace(&expr, expr.shape);
   }
 
   void Visit(const CallExpr& expr) {
     IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
     std::vector<Binding> args;
     for (const auto& arg : expr.args) {
-      args.emplace_back(safe_at(bindings_, arg.get()));
+      args.emplace_back(safe_at(bindings_by_expr_, arg.get()));
     }
     auto op = SpecialOpRegistry::Instance()->Resolve(expr.fn);
     if (op) {
-      bindings_->emplace(&expr, Binding(op->ComputeShape(args)));
+      bindings_by_expr_->emplace(&expr, Binding(op->ComputeShape(args)));
     } else {
-      bindings_->emplace(&expr, Binding(ComputeOutputShape(args)));
+      bindings_by_expr_->emplace(&expr, Binding(ComputeOutputShape(args)));
     }
   }
 
@@ -609,7 +610,7 @@ class ShapeEvaluator : AstVisitor {
     } else {
       std::vector<TensorShape> shapes;
       for (const auto& input : expr.inputs) {
-        auto binding = safe_at(bindings_, input->ref.get());
+        auto binding = safe_at(bindings_by_expr_, input->ref.get());
         if (binding.tag != Binding::TENSOR) {
           throw std::runtime_error("Unexpected TensorSpecExpr in ContractionExpr.");
         }
@@ -617,23 +618,23 @@ class ShapeEvaluator : AstVisitor {
       }
       type = ComputeOutputType(shapes);
     }
-    bindings_->emplace(&expr, Binding(tile::SimpleShape(type, expr.output->output_sizes)));
+    bindings_by_expr_->emplace(&expr, Binding(tile::SimpleShape(type, expr.output->output_sizes)));
   }
 
   void Visit(const FloatConst& expr) {
     IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
-    bindings_->emplace(&expr, Binding(expr.value, DataType::FLOAT32));
+    bindings_by_expr_->emplace(&expr, Binding(expr.value, DataType::FLOAT32));
   }
 
   void Visit(const IntConst& expr) {
     IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
-    bindings_->emplace(&expr, expr.value);
+    bindings_by_expr_->emplace(&expr, expr.value);
   }
 
   void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("Not implemented"); }
 
  private:
-  std::unordered_map<const Expr*, Binding>* bindings_;
+  std::unordered_map<const Expr*, Binding>* bindings_by_expr_;
 };
 
 class Evaluator : public AstVisitor {
@@ -647,21 +648,21 @@ class Evaluator : public AstVisitor {
     }
     AstTraversal traversal(exprs);
     // Traverse the entire graph in least-dependent to most-dependent order.
-    ShapeEvaluator evaluator(traversal.flat(), &bindings_);
+    ShapeEvaluator evaluator(traversal.flat(), &bindings_by_expr_);
     for (const auto& expr : traversal.flat()) {
       expr->Accept(this);
     }
     for (const auto& expr : exprs) {
       // At this point, it should be gauranteed that the output expressions have been visited.
-      auto name = safe_at(&names_, expr.get());
-      auto shape = safe_at(&bindings_, expr.get()).shape;
+      auto name = safe_at(&names_by_expr_, expr.get());
+      auto shape = safe_at(&bindings_by_expr_, expr.get()).shape;
       IVLOG(2, "Output> " << name << ": " << shape);
       runinfo_.output_shapes.emplace(name, shape);
       runinfo_.program.outputs.push_back(name);
     }
-    for (const auto& kvp : names_) {
+    for (const auto& kvp : names_by_expr_) {
       auto name = kvp.second;
-      auto binding = safe_at(&bindings_, kvp.first);
+      auto binding = safe_at(&bindings_by_expr_, kvp.first);
       runinfo_.vars.emplace(name, binding);
     }
     runinfo_.code = to_string(runinfo_.program);
@@ -681,7 +682,7 @@ class Evaluator : public AstVisitor {
     }
     runinfo_.program.inputs.push_back(input);
     runinfo_.input_shapes.emplace(name, expr.shape);
-    names_.emplace(&expr, name);
+    names_by_expr_.emplace(&expr, name);
   }
 
   void Visit(const FloatConst& expr) {
@@ -695,7 +696,7 @@ class Evaluator : public AstVisitor {
         {"fconst"},                    // Function
     };
     runinfo_.program.ops.emplace_back(op);
-    names_.emplace(&expr, name);
+    names_by_expr_.emplace(&expr, name);
   }
 
   void Visit(const IntConst& expr) {
@@ -709,14 +710,14 @@ class Evaluator : public AstVisitor {
         {"iconst"},                    // Function
     };
     runinfo_.program.ops.emplace_back(op);
-    names_.emplace(&expr, name);
+    names_by_expr_.emplace(&expr, name);
   }
 
   void Visit(const CallExpr& expr) {
     IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
     std::vector<std::string> args;
     for (const auto& arg : expr.args) {
-      args.emplace_back(safe_at(&names_, arg.get()));
+      args.emplace_back(safe_at(&names_by_expr_, arg.get()));
     }
     auto name = NewTmp(expr);
     Op op{
@@ -727,7 +728,7 @@ class Evaluator : public AstVisitor {
         {expr.fn},     // Function
     };
     runinfo_.program.ops.emplace_back(op);
-    names_.emplace(&expr, name);
+    names_by_expr_.emplace(&expr, name);
   }
 
   void Visit(const ConstraintExpr& expr) { throw std::runtime_error("Not implemented"); }
@@ -740,13 +741,13 @@ class Evaluator : public AstVisitor {
     cion.comb_op = expr.combo_op;
     cion.no_defract = expr.no_defract;
     if (expr.use_default) {
-      cion.use_default = safe_at(&names_, expr.use_default.get());
+      cion.use_default = safe_at(&names_by_expr_, expr.use_default.get());
     }
     cion.specs.emplace_back(TensorSpec{});
     std::vector<std::string> inputs;
     for (const auto& input : expr.inputs) {
       TensorSpec tensor_spec;
-      tensor_spec.id = safe_at(&names_, input->ref.get());
+      tensor_spec.id = safe_at(&names_by_expr_, input->ref.get());
       inputs.push_back(tensor_spec.id);
       for (const auto& idx : input->index_spec) {
         auto poly = idx->Accept(&poly_eval);
@@ -776,22 +777,37 @@ class Evaluator : public AstVisitor {
         cion,             // Contraction
     };
     runinfo_.program.ops.emplace_back(op);
-    names_.emplace(&expr, name);
+    names_by_expr_.emplace(&expr, name);
   }
 
   void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("Not implemented"); }
 
  private:
+  // The current algorithm works by making all unnamed nodes automatically
+  // generated so that they are unique but only if names that begin with
+  // underscore ("_") are reserved by the system.
   std::string NewTmp(const Expr& expr) {
-    if (expr.name.size()) {
-      return expr.name;
+    if (expr.name.empty()) {
+      return str(boost::format("_X%1%") % runinfo_.program.next_tmp++);
     }
-    return str(boost::format("X%1%") % runinfo_.program.next_tmp++);
+    return MakeUniqueName(expr.name);
+  }
+
+  std::string MakeUniqueName(const std::string& prefix) {
+    bool is_new;
+    auto name = prefix;
+    std::tie(std::ignore, is_new) = names_.insert(name);
+    for (size_t i = 0; !is_new; i++) {
+      name = str(boost::format("%1%%2%") % prefix % i);
+      std::tie(std::ignore, is_new) = names_.insert(name);
+    }
+    return name;
   }
 
  private:
-  std::unordered_map<const Expr*, std::string> names_;
-  std::unordered_map<const Expr*, Binding> bindings_;
+  std::set<std::string> names_;
+  std::unordered_map<const Expr*, std::string> names_by_expr_;
+  std::unordered_map<const Expr*, Binding> bindings_by_expr_;
   RunInfo runinfo_;
 };
 

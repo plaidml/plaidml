@@ -33,28 +33,28 @@ TEST(GenStripeTest, ContractPlusElementwise) {
     loc {}
     refs [
       {
-        key:"X0"
+        key:"_X0"
         value: {
           access [{}, {}] loc {}
           interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
         }
       },
       {
-        key:"X1"
+        key:"_X1"
         value: {
           access [{}, {}] loc {}
           interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
         }
       },
       {
-        key:"X2"
+        key:"_X2"
         value: {
           access [{}, {}] loc {}
           interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
         }
       },
       {
-        key:"X3"
+        key:"_X3"
         value: {
           access [{}, {}] loc {}
           interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
@@ -66,99 +66,99 @@ TEST(GenStripeTest, ContractPlusElementwise) {
         name:"main" loc {}
         refs [
           {
-            key:"X0"
+            key:"_X0"
             value: {
-              from:"X0" dir:In access [{}, {}] loc {}
+              from:"_X0" dir:In access [{}, {}] loc {}
               interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             }
           },
           {
-            key:"X1"
+            key:"_X1"
             value: {
-              from:"X1" dir:In access [{}, {}] loc {}
+              from:"_X1" dir:In access [{}, {}] loc {}
               interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             }
           },
           {
-            key:"X2"
+            key:"_X2"
             value: {
-              from:"X2" dir:InOut access [{}, {}] loc {}
+              from:"_X2" dir:InOut access [{}, {}] loc {}
               interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             }
           },
           {
-            key:"X3"
+            key:"_X3"
             value: {
-              from:"X3" dir:Out access [{}, {}] loc {} agg_op:"assign"
+              from:"_X3" dir:Out access [{}, {}] loc {} agg_op:"assign"
               interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             }
           }
         ]
         stmts [{
           tags:["agg_op_add", "comb_op_mul", "contraction", "kernel"] block {
-            name:"kernel_0(X0,X1)" loc {}
-            comments:"X2[x0, x2 : 10, 10] = +(X0[x0, x1] * X1[x1, x2])"
+            name:"kernel_0(_X0,_X1)" loc {}
+            comments:"_X2[x0, x2 : 10, 10] = +(_X0[x0, x1] * _X1[x1, x2])"
             idxs [{name:"x0" range:10 affine {}}, {name:"x1" range:10 affine {}}, {name:"x2", range: 10, affine {}}]
             refs [
               {
-                key:"X0"
+                key:"_X0"
                 value: {
-                  from:"X0" dir:In loc {}
+                  from:"_X0" dir:In loc {}
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                   access [{terms:{key:"x0" value:1}}, {terms:{key:"x1" value:1}}]
                 }
               },
               {
-                key:"X1"
+                key:"_X1"
                 value: {
-                  from:"X1" dir:In loc {}
+                  from:"_X1" dir:In loc {}
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                   access [{terms:{key:"x1" value:1}}, {terms:{key:"x2" value:1}}]
                 }
               },
               {
-                key:"X2"
+                key:"_X2"
                 value: {
-                  from:"X2" dir:Out loc {} agg_op:"add"
+                  from:"_X2" dir:Out loc {} agg_op:"add"
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                   access [{terms:{key:"x0" value:1}}, {terms:{key:"x2" value:1}}]
                 }
               }
             ]
             stmts [
-              {load {from:"X0" into:"$X0"}},
-              {load {from:"X1" into:"$X1"}},
-              {intrinsic {name:"mul" inputs:["$X0", "$X1"] outputs:"$X2" type:FLOAT32}},
-              {store {from:"$X2" into:"X2"}}
+              {load {from:"_X0" into:"$_X0"}},
+              {load {from:"_X1" into:"$_X1"}},
+              {intrinsic {name:"mul" inputs:["$_X0", "$_X1"] outputs:"$_X2" type:FLOAT32}},
+              {store {from:"$_X2" into:"_X2"}}
             ]
           }
         }, {
           tags:["eltwise", "eltwise_tanh", "kernel"] block {
-            name:"kernel_1(X2)" loc {}
-            comments:"X3 = tanh(X2)"
+            name:"kernel_1(_X2)" loc {}
+            comments:"_X3 = tanh(_X2)"
             idxs [{name:"i1" range:10 affine {}}, {name:"i2", range:10 affine {}}]
             refs [
               {
-                key:"X2"
+                key:"_X2"
                 value: {
-                  from:"X2" dir:In loc {}
+                  from:"_X2" dir:In loc {}
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                   access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]
                 }
               },
               {
-                key:"X3"
+                key:"_X3"
                 value: {
-                  from:"X3" dir:Out loc {}
+                  from:"_X3" dir:Out loc {}
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                   access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]
                 }
               }
             ]
             stmts [
-              {load {from:"X2" into:"$X2"}},
-              {intrinsic {name:"tanh" inputs:"$X2" outputs:"$X3" type:FLOAT32}},
-              {store {from:"$X3" into:"X3"}}
+              {load {from:"_X2" into:"$_X2"}},
+              {intrinsic {name:"tanh" inputs:"$_X2" outputs:"$_X3" type:FLOAT32}},
+              {store {from:"$_X3" into:"_X3"}}
             ]
           }
         }]
