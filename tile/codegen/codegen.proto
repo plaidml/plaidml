@@ -178,6 +178,8 @@ message SchedulePass {
   }
 
   optional bool append_devs = 9 [default = false];
+
+  optional uint32 parallelism_window = 10;
 }
 
 // Provide a specific address for all the allocation refinement such that no
