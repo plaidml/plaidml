@@ -119,8 +119,11 @@ def pad_compute(sym, input_size, filter_size, stride, padding, pads=None):
     """
     if pads:
         num_out_size = (input_size + pads[0] + pads[1] - filter_size + stride) // stride
-        sym_output_size = '({sym} + {pre} + {post} - {fs} + {s}) / {s}'.format(
-            sym=sym, pre=pads[0], post=pads[1], fs=filter_size, s=stride)
+        sym_output_size = '({sym} + {pre} + {post} - {fs} + {s}) / {s}'.format(sym=sym,
+                                                                               pre=pads[0],
+                                                                               post=pads[1],
+                                                                               fs=filter_size,
+                                                                               s=stride)
         sym_padding_before = pads[0]
     elif padding == AutoPadding.VALID:
         num_out_size = (input_size - filter_size + stride) // stride
@@ -134,8 +137,10 @@ def pad_compute(sym, input_size, filter_size, stride, padding, pads=None):
             expr = '(max(0, ({symout} - 1) * {s} + {fs} - {syminp})) / 2'
         else:
             expr = '((max(0, ({symout} - 1) * {s} + {fs} - {syminp})) + 1) / 2'
-        sym_padding_before = expr.format(
-            symout=sym_output_size, s=stride, fs=filter_size, syminp=sym)
+        sym_padding_before = expr.format(symout=sym_output_size,
+                                         s=stride,
+                                         fs=filter_size,
+                                         syminp=sym)
     else:
         raise Exception('Invalid padding: ' + str(padding))
     if not isinstance(num_out_size, tile.Value) and num_out_size < 0:
@@ -1010,15 +1015,14 @@ def average_pool(data,
                  padding=AutoPadding.EXPLICIT,
                  data_format=PoolDataFormat.NCX,
                  name=None):
-    return pool(
-        data=data,
-        mode=PoolMode.AVG,
-        kernel_shape=kernel_shape,
-        pads=pads,
-        strides=strides,
-        padding=padding,
-        data_format=data_format,
-        name=name)
+    return pool(data=data,
+                mode=PoolMode.AVG,
+                kernel_shape=kernel_shape,
+                pads=pads,
+                strides=strides,
+                padding=padding,
+                data_format=data_format,
+                name=name)
 
 
 class BinaryCrossentropy(tile.Operation):
@@ -1037,8 +1041,7 @@ class BinaryCrossentropy(tile.Operation):
         f = """
             function (O[{dims}], T[{dims}]) -> (R) {{
                 R = builtin_binary_crossentropy(O,T,{prod});
-            }}""".format(
-            dims=input_sizes, prod=input_sizes_prod)
+            }}""".format(dims=input_sizes, prod=input_sizes_prod)
         super(BinaryCrossentropy, self).__init__(f, [('O', output), ('T', target)],
                                                  [('R', output.shape)])
 
@@ -1126,7 +1129,7 @@ class Concatenate(tile.Operation):
         offsets = [0]
         if merge_axis_dim:
             for i in range(len(tensors)):
-                offsets.append("+".join("A{}".format(j) for j in range(i+1)))
+                offsets.append("+".join("A{}".format(j) for j in range(i + 1)))
         else:
             for i in range(len(tensors)):
                 offsets.append(offsets[i] + tensors[i].shape.dims[axis])
@@ -1236,12 +1239,13 @@ class Convolution(tile.Operation):
         if len(kernel_shape) != rank + 2:
             raise ValueError('Convolution kernel shape inconsistent with input shape: ' +
                              '{} (rank {}) v {} (rank {})'.format(kernel_shape,
-                                                                  len(kernel_shape) - 2, data.
-                                                                  shape, data.shape.ndims - 2))
+                                                                  len(kernel_shape) -
+                                                                  2, data.shape, data.shape.ndims -
+                                                                  2))
         if len(strides) != rank:
             raise ValueError('Convolution strides length inconsistent with input shape: ' +
-                             '{} (rank {}) v {} (rank {})'.format(strides, len(strides), data.
-                                                                  shape, data.shape.ndims - 2))
+                             '{} (rank {}) v {} (rank {})'.format(strides, len(
+                                 strides), data.shape, data.shape.ndims - 2))
         if len(dilation_rate) != rank:
             raise ValueError('Convolution dilation_rate length inconsistent with input shape: ' +
                              '{} (rank {}) v {} (rank {})'.format(dilation_rate, len(
@@ -1258,19 +1262,18 @@ class Convolution(tile.Operation):
             input_list = [('I', data), ('K', kernel), ('A', A), ('B', B), ('G', G)]
             outshape = tile.Shape(data.shape.dtype, conv_strs['outshape_tuple'])
         else:
-            csf = _ConvolutionStringFormatter(
-                rank,
-                data.shape.dims,
-                kernel_shape,
-                strides,
-                padding,
-                dilation_rate,
-                data_format,
-                kernel_format,
-                pads=pads,
-                grouping=grouping,
-                groups=group,
-                group_format=group_format)
+            csf = _ConvolutionStringFormatter(rank,
+                                              data.shape.dims,
+                                              kernel_shape,
+                                              strides,
+                                              padding,
+                                              dilation_rate,
+                                              data_format,
+                                              kernel_format,
+                                              pads=pads,
+                                              grouping=grouping,
+                                              groups=group,
+                                              group_format=group_format)
             if csf.kernel_needs_reshape():
                 ker_reshape_str = '{Kitrn} = reshape(K, {Ki_dims});\n    '.format(
                     Kitrn=csf.Kitrn(), Ki_dims=csf.Ki_dims())
@@ -1284,19 +1287,18 @@ class Convolution(tile.Operation):
             code = """function (I[{I_dims}], K[{K_dims}]) -> (O) {{\n""" \
                    """    {assertion}{padding_str}{ker_reshape_str}{Oitrn}[{Oi_idxs}: {Oi_dims}] = +(I[{I_idxs}]*{Kitrn}[{Ki_idxs}]);{out_reshape_str}\n""" \
                    """}}"""
-            code = code.format(
-                I_dims=csf.I_dims(),
-                K_dims=csf.K_dims(),
-                assertion=csf.assertion(),
-                padding_str=csf.padding_str(),
-                ker_reshape_str=ker_reshape_str,
-                Oitrn=csf.Oitrn(),
-                Oi_idxs=csf.Oi_idxs(),
-                Oi_dims=csf.Oi_dims(),
-                I_idxs=csf.I_idxs(),
-                Kitrn=csf.Kitrn(),
-                Ki_idxs=csf.Ki_idxs(),
-                out_reshape_str=out_reshape_str)
+            code = code.format(I_dims=csf.I_dims(),
+                               K_dims=csf.K_dims(),
+                               assertion=csf.assertion(),
+                               padding_str=csf.padding_str(),
+                               ker_reshape_str=ker_reshape_str,
+                               Oitrn=csf.Oitrn(),
+                               Oi_idxs=csf.Oi_idxs(),
+                               Oi_dims=csf.Oi_dims(),
+                               I_idxs=csf.I_idxs(),
+                               Kitrn=csf.Kitrn(),
+                               Ki_idxs=csf.Ki_idxs(),
+                               out_reshape_str=out_reshape_str)
             input_list = [('I', data), ('K', kernel)]
             outshape = tile.Shape(data.shape.dtype, csf.O_shape_tuple_numeric())
 
@@ -1440,25 +1442,25 @@ class ConvolutionTranspose(tile.Operation):
         code = """function (O[{O_dims}], K[{K_dims}]{dim_input}) -> (I) {{\n""" \
                """    {padding_str}I[{I_idxs}: {I_dims}] = +(O[{Oi_idxs}]*K[{Ki_idxs}]);\n""" \
                """}}"""
-        code = code.format(
-            O_dims=csf.O_dims(),
-            K_dims=csf.K_dims(),
-            dim_input=', ' + ', '.join(['D{}'.format(i) for i in range(rank)]),
-            padding_str=csf.padding_str(),
-            I_idxs=csf.I_idxs(),
-            I_dims=csf.I_dims(),
-            Oi_idxs=csf.Oi_idxs(),
-            Ki_idxs=csf.Ki_idxs())
+        code = code.format(O_dims=csf.O_dims(),
+                           K_dims=csf.K_dims(),
+                           dim_input=', ' + ', '.join(['D{}'.format(i) for i in range(rank)]),
+                           padding_str=csf.padding_str(),
+                           I_idxs=csf.I_idxs(),
+                           I_dims=csf.I_dims(),
+                           Oi_idxs=csf.Oi_idxs(),
+                           Ki_idxs=csf.Ki_idxs())
 
         # Output shape may be dynamic, so pass its sizes as inputs to Tile
         l = csf.get_O_axis(ConvIndex.x)
         input_tensors = [('O', x), ('K', kernel)] + \
                         [('D{}'.format(i), output_shape[l[i]]) for i in range(rank)]
 
-        super(ConvolutionTranspose, self).__init__(
-            code,
-            input_tensors, [('I', tile.Shape(x.shape.dtype, tuple(output_shape)))],
-            name=name)
+        super(ConvolutionTranspose,
+              self).__init__(code,
+                             input_tensors,
+                             [('I', tile.Shape(x.shape.dtype, tuple(output_shape)))],
+                             name=name)
 
 
 convolution_transpose = ConvolutionTranspose.function
@@ -1481,8 +1483,11 @@ class CumulativeSum(tile.Operation):
         f = """
             function (I[{src_ranges}]) -> (O) {{
                 O[{dest_idxs}: {dest_ranges}] = +(I[{src_idxs}]), k < N{ax};
-            }}""".format(
-            src_ranges=ranges, dest_idxs=dest_idxs, dest_ranges=ranges, src_idxs=src_idxs, ax=axis)
+            }}""".format(src_ranges=ranges,
+                         dest_idxs=dest_idxs,
+                         dest_ranges=ranges,
+                         src_idxs=src_idxs,
+                         ax=axis)
         super(CumulativeSum, self).__init__(f, [('I', x)], [('O', x.shape)])
 
 
@@ -1915,13 +1920,12 @@ class MatMul(tile.Operation):
 
         func = """function(A[{a_ranges}], B[{b_ranges}]) -> (C) {{
                         C[{c_indicies} : {c_ranges}] = +(A[{a_indicies}] * B[{b_indicies}]);
-                    }}""".format(
-            a_ranges=', '.join(a_ranges),
-            a_indicies=', '.join(a_indicies),
-            b_ranges=', '.join(b_ranges),
-            b_indicies=', '.join(b_indicies),
-            c_ranges=', '.join(c_ranges),
-            c_indicies=', '.join(c_indicies))
+                    }}""".format(a_ranges=', '.join(a_ranges),
+                                 a_indicies=', '.join(a_indicies),
+                                 b_ranges=', '.join(b_ranges),
+                                 b_indicies=', '.join(b_indicies),
+                                 c_ranges=', '.join(c_ranges),
+                                 c_indicies=', '.join(c_indicies))
 
         c_shape = tile.Shape(tile.common_dtype(a.shape.dtype, b.shape.dtype), c_dims)
 
@@ -1968,15 +1972,14 @@ def max_pool(data,
              padding=AutoPadding.EXPLICIT,
              data_format=PoolDataFormat.NCX,
              name=None):
-    return pool(
-        data=data,
-        mode=PoolMode.MAX,
-        kernel_shape=kernel_shape,
-        pads=pads,
-        strides=strides,
-        padding=padding,
-        data_format=data_format,
-        name=name)
+    return pool(data=data,
+                mode=PoolMode.MAX,
+                kernel_shape=kernel_shape,
+                pads=pads,
+                strides=strides,
+                padding=padding,
+                data_format=data_format,
+                name=name)
 
 
 class Mean(tile.Operation):
@@ -2110,8 +2113,8 @@ class Pool(tile.Operation):
             out_spatial_dims.append(sym_out)
             num_out_spatial_shape.append(num_out)
             pad_amount.append(sym_pad)
-            in_spatial_idxs.append('{stride}*x{idx} + k{idx} - Pad{idx}'.format(
-                stride=strides[i], idx=i))
+            in_spatial_idxs.append('{stride}*x{idx} + k{idx} - Pad{idx}'.format(stride=strides[i],
+                                                                                idx=i))
         out_spatial_idxs = ['x{}'.format(i) for i in range(rank)]
         padding_list = ['Pad{} = {};'.format(i, pad_amount[i]) for i in range(rank)]
         padding_str = '\n            '.join(padding_list)
@@ -2149,8 +2152,8 @@ class Pool(tile.Operation):
                 ones_read_idxs=', '.join(in_idxs),
                 cout_idxs=', '.join(out_idxs),
                 cout_dims=', '.join(out_dims),
-                pool_bounds=', '.join(
-                    ['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]),
+                pool_bounds=', '.join(['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)
+                                      ]),
             )
             denom_divide_code = """
             O = S / Count;"""
@@ -2169,18 +2172,18 @@ class Pool(tile.Operation):
         function (I[{in_dims}]{extra_input}) -> (O) {{
             {padding_str}{denom_gen}
             {out_name}[{out_idxs} : {out_dims}] = {op}(I[{in_idxs}]), {pool_bounds}; {denom_divide}
-        }}""".format(
-            op=pool_contraction_op,
-            extra_input=extra_input,
-            denom_gen=denom_gen_code,
-            denom_divide=denom_divide_code,
-            padding_str=padding_str,
-            out_idxs=', '.join(out_idxs),
-            out_dims=', '.join(out_dims),
-            in_idxs=', '.join(in_idxs),
-            in_dims=', '.join(in_dims),
-            out_name=pool_contraction_out_name,
-            pool_bounds=', '.join(['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
+        }}""".format(op=pool_contraction_op,
+                     extra_input=extra_input,
+                     denom_gen=denom_gen_code,
+                     denom_divide=denom_divide_code,
+                     padding_str=padding_str,
+                     out_idxs=', '.join(out_idxs),
+                     out_dims=', '.join(out_dims),
+                     in_idxs=', '.join(in_idxs),
+                     in_dims=', '.join(in_dims),
+                     out_name=pool_contraction_out_name,
+                     pool_bounds=', '.join(
+                         ['k{} < {}'.format(i, kernel_shape[i]) for i in range(rank)]))
 
         outshape = tile.Shape(data.shape.dtype, num_out_shape)
 
@@ -2427,11 +2430,10 @@ class SliceTensor(tile.Operation):
         code = """
         function (I[{in_dims}]) -> (O) {{
             O[{out_idxs} : {out_dims}] = =(I[{in_idxs}]);
-        }}""".format(
-            in_dims=', '.join(in_dims),
-            out_dims=', '.join(out_dims),
-            in_idxs=', '.join(in_idxs),
-            out_idxs=', '.join(out_idxs))
+        }}""".format(in_dims=', '.join(in_dims),
+                     out_dims=', '.join(out_dims),
+                     in_idxs=', '.join(in_idxs),
+                     out_idxs=', '.join(out_idxs))
 
         outshape = tile.Shape(data.shape.dtype, shape_dims)
 
@@ -2587,7 +2589,8 @@ variance = Variance.function
 
 
 class ImagePatches(plaidml.tile.Operation):
-    def __init__(self, images, ksizes, strides, rates=(1,1,1,1), padding="VALID"):
+
+    def __init__(self, images, ksizes, strides, rates=(1, 1, 1, 1), padding="VALID"):
         """
         Compatible to tensorflow.extract_image_patches. 
         Extract patches from images and put them in the "depth" output dimension.
@@ -2601,42 +2604,132 @@ class ImagePatches(plaidml.tile.Operation):
         Does not work with symbolic height and width.
         """
         i_shape = images.shape.dims
-        patch_row_eff = ksizes[1] + ((ksizes[1] - 1) * (rates[1] -1))
-        patch_col_eff = ksizes[2] + ((ksizes[2] - 1) * (rates[2] -1))
+        patch_row_eff = ksizes[1] + ((ksizes[1] - 1) * (rates[1] - 1))
+        patch_col_eff = ksizes[2] + ((ksizes[2] - 1) * (rates[2] - 1))
 
         if padding.upper() == "VALID":
             out_rows = math.ceil((i_shape[1] - patch_row_eff + 1.) / float(strides[1]))
             out_cols = math.ceil((i_shape[2] - patch_col_eff + 1.) / float(strides[2]))
             pad_str = "PAD = I;"
         else:
-            out_rows = math.ceil( i_shape[1] / float(strides[1]) )
-            out_cols = math.ceil( i_shape[2] / float(strides[2]) )
+            out_rows = math.ceil(i_shape[1] / float(strides[1]))
+            out_cols = math.ceil(i_shape[2] / float(strides[2]))
             dim_calc = "NY={NY}; NX={NX};".format(NY=out_rows, NX=out_cols)
-            pad_top = max(0, ( (out_rows - 1) * strides[1] + patch_row_eff - i_shape[1] ) // 2)
-            pad_left = max(0, ( (out_cols - 1) * strides[2] + patch_col_eff - i_shape[2] ) // 2)
+            pad_top = max(0, ((out_rows - 1) * strides[1] + patch_row_eff - i_shape[1]) // 2)
+            pad_left = max(0, ((out_cols - 1) * strides[2] + patch_col_eff - i_shape[2]) // 2)
             # we simply assume padding right == padding left + 1 (same for top/down).
             # This might lead to us padding more as we would need but that won't matter.
             # TF splits padding between both sides so left_pad +1 should keep us on the safe side.
             pad_str = """PAD[b, y, x, d : B, Y + {PT} * 2 + 1, X + {PL} * 2 + 1, D] = 
                         =(I[b, y - {PT}, x - {PL}, d]);""".format(PT=pad_top, PL=pad_left)
 
-        o_shape = (i_shape[0], out_rows, out_cols, ksizes[1]*ksizes[2]*i_shape[-1])
+        o_shape = (i_shape[0], out_rows, out_cols, ksizes[1] * ksizes[2] * i_shape[-1])
         code = """function (I[B,Y,X,D]) -> (O) {{
                     {PAD}
                     TMP[b, ny, nx, y, x, d: B, {NY}, {NX}, {KY}, {KX}, D] =
                         =(PAD[b, ny * {SY} + y * {RY}, nx * {SX} + x * {RX}, d]);
                     O = reshape(TMP, B, {NY}, {NX}, {KY} * {KX} * D);
                 }}
-        """.format(
-            PAD=pad_str,
-            NY=out_rows, NX=out_cols,
-            KY=ksizes[1], KX=ksizes[2],
-            SY=strides[1], SX=strides[2],
-            RY=rates[1], RX=rates[2]
-        )
-        super(ImagePatches, self).__init__(code,
-                [('I', images),],
-                [('O', plaidml.tile.Shape(images.shape.dtype, o_shape))])
+        """.format(PAD=pad_str,
+                   NY=out_rows,
+                   NX=out_cols,
+                   KY=ksizes[1],
+                   KX=ksizes[2],
+                   SY=strides[1],
+                   SX=strides[2],
+                   RY=rates[1],
+                   RX=rates[2])
+        super(ImagePatches, self).__init__(code, [
+            ('I', images),
+        ], [('O', plaidml.tile.Shape(images.shape.dtype, o_shape))])
 
 
 extract_image_patches = ImagePatches.function
+
+
+class ReflectionPadding(tile.Operation):
+
+    def __init__(self, inp, paddings):
+        paddings = [(x, x) if isinstance(x, int) else x for x in paddings]
+        ndims = inp.shape.ndims
+        out_shape = list(inp.shape.dims)
+        if ndims != len(paddings):
+            raise ValueError('Padding dims != input dims')
+        for ax, pads in enumerate(paddings):
+            if isinstance(out_shape[ax], tile.Value):
+                # We can't tell if padding size is supported for symbolic axis.
+                continue
+            for pad in pads:
+                if pad >= out_shape[ax]:
+                    raise plaidml.exceptions.InvalidArgument(
+                        'Paddings must be less than the dimension size: {} not less than {}.'.
+                        format(pad, out_shape[ax]))
+        out_sizes = [
+            'N{}'.format(i) if isinstance(x, tile.Value) else x for i, x in enumerate(out_shape)
+        ]
+        in_sizes = list(out_sizes)
+        code_body = []
+        src_arr = "I"
+        idx = ["n{}".format(i) for i in range(ndims)]
+
+        for axis, pads in ((i, x) for i, x in enumerate(paddings) if x[0] + x[1] != 0):
+            pad_pre, pad_post = pads
+            if isinstance(out_shape[axis], tile.Value):
+                out_sizes[axis] += ' + {}'.format(pad_pre + pad_post)
+            else:
+                out_shape[axis] += pad_pre + pad_post
+                out_sizes[axis] += pad_pre + pad_post
+            concats = "TA{}".format(axis)
+
+            if pad_pre:
+                src_idx = list(idx)
+                src_idx[axis] = "{} - n{}".format(pad_pre, axis)
+                code_body.append(
+                    'TS{ax}[{idx} : {dims}] = =({src_arr}[{src_idx}]), n{ax} < {pad};'.format(
+                        ax=axis,
+                        idx=','.join(idx),
+                        dims=','.join(map(str, out_sizes)),
+                        src_arr=src_arr,
+                        src_idx=','.join(src_idx),
+                        pad=pad_pre))
+                concats += ' + TS{}'.format(axis)
+
+            if pad_post:
+                src_idx = list(idx)
+                dst_idx = list(idx)
+                src_idx[axis] = "{} - n{} - 2".format(in_sizes[axis], axis)
+                dst_idx[axis] = "n{} + {} - {}".format(axis, out_sizes[axis], pad_post)
+                code_body.append(
+                    'TE{ax}[{idx} : {dims}] = =({src_arr}[{src_idx}]), n{ax} < {pad};'.format(
+                        ax=axis,
+                        idx=','.join(map(str, dst_idx)),
+                        dims=','.join(map(str, out_sizes)),
+                        src_arr=src_arr,
+                        src_idx=','.join(src_idx),
+                        pad=pad_post,
+                    ))
+                concats += ' + TE{}'.format(axis)
+
+            dst_idx = list(idx)
+            dst_idx[axis] = "{} + n{}".format(pad_pre, axis)
+            code_body.append(
+                'TA{ax}[{idx} : {dims}] = =({src_arr}[{src_idx}]), n{ax} < {cond};'.format(
+                    ax=axis,
+                    idx=",".join(dst_idx),
+                    dims=','.join(map(str, out_sizes)),
+                    src_arr=src_arr,
+                    src_idx=",".join(idx),
+                    cond="{} - {}".format(out_sizes[axis], pad_post)))
+            code_body.append("TC{} = {};".format(axis, concats))
+            src_arr = 'TC{}'.format(axis)
+            in_sizes = list(out_sizes)
+
+        code_body.append('O = {};'.format(src_arr))
+        code = 'function (I[{idim}]) -> (O) {{\n\t{body}\n}}'.format(idim=",".join(
+            "N{}".format(i) for i in range(ndims)),
+                                                                     body="\n\t".join(code_body))
+        super(ReflectionPadding, self).__init__(code, [('I', inp)],
+                                                [('O', tile.Shape(inp.shape.dtype, out_shape))])
+
+
+reflection_padding = ReflectionPadding.function

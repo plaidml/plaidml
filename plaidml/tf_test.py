@@ -11,7 +11,6 @@ import numpy as np
 import numpy.testing as npt
 # Tensorflow needs some code called directly
 import tensorflow
- 
 # Hack to avoid using the plaidml.keras submodule when trying to load keras
 sys.path = sys.path[1:] + [sys.path[0]]
 from keras.backend import tensorflow_backend as tf
@@ -20,7 +19,6 @@ sys.path = [sys.path[-1]] + sys.path[:-1]
 
 import plaidml
 from plaidml.keras import backend as pkb
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -43,15 +41,19 @@ def opTest(in_data,
            tol=DEFAULT_TOL,
            atol=DEFAULT_ATOL,
            skip_tensorflow=False,
-           verbose=False):
+           verbose=False,
+           input_shapes=None):
     # If using with non-tensor parameters, all tensor params must appear before
     # all non-tensor params
-    def run_one_backend(self, data, test_func, b, *run_args):
+    def run_one_backend(self, data, test_func, b, shapes=None, *run_args):
         tf_session = tensorflow.Session()
         tf.set_session(tf_session)
         results = []
         with tf_session.as_default():
-            x = [b.placeholder(shape=t.shape) for t in data if hasattr(t, 'shape')]
+            if shapes:
+                x = [b.placeholder(shape=t) for t in shapes]
+            else:
+                x = [b.placeholder(shape=t.shape) for t in data if hasattr(t, 'shape')]
             xv = [b.variable(t, dtype=floatx()) for t in data if hasattr(t, 'shape')]
             ps = [t for t in data if not hasattr(t, 'shape')]
             grad_funcs = test_func(self, b, *(x + ps + list(run_args)))
@@ -85,9 +87,17 @@ def opTest(in_data,
 
         def output(self, *args):
             for didx, data in enumerate(in_data):
+                shapes = None
+                if input_shapes:
+                    shapes = input_shapes[didx]
                 if not skip_tensorflow:
-                    tensorflow_results = run_one_backend(self, data, test_func, tf, *args)
-                plaidml_results = run_one_backend(self, data, test_func, pkb, *args)
+                    tensorflow_results = run_one_backend(self,
+                                                         data,
+                                                         test_func,
+                                                         tf,
+                                                         *args,
+                                                         shapes=shapes)
+                plaidml_results = run_one_backend(self, data, test_func, pkb, *args, shapes=shapes)
                 if not skip_tensorflow:
                     for idx, (pmlr, tfr) in enumerate(zip(plaidml_results, tensorflow_results)):
                         idx = idx + 1
@@ -116,14 +126,28 @@ class TestTF(unittest.TestCase):
     """Tensorflow like operation tests."""
 
     @opTest([
-        [np.random.random((5, 60, 10, 3)), [1,3,4,1], [1,3,3,1], [1,1,1,1], "SAME"],
-        [np.random.random((5, 60, 10, 3)), [1,3,4,1], [1,3,3,1], [1,1,1,1], "VALID"],
-        [np.random.random((5, 60, 10, 3)), [1,4,3,1], [1,1,1,1], [1,1,1,1], "SAME"],
-        [np.random.random((5, 60, 10, 3)), [1,4,3,1], [1,1,1,1], [1,6,5,1], "SAME"],
-    ])
-    def testExtractImagePatches(self, b, images, ksizes, strides, rates=(1,1,1,1), padding="VALID"):
-        func = tensorflow.extract_image_patches if b == tf else plaidml.op.extract_image_patches
-        return [func(images, ksizes, strides, rates, padding)]
+        [np.random.random((5, 60, 10, 3)), [[0, 0], [5, 2], [5, 3], [0, 0]]],
+        [np.random.random((5, 60, 10, 3)), [[4, 0], [0, 2], [5, 3], [0, 1]]],
+        [np.random.random((60, 10)), [[0, 0], [0, 0]]],
+    ],
+            input_shapes=[
+                [[
+                    None,
+                ] * 4],
+                [[
+                    None,
+                ] * 4],
+                [[
+                    None,
+                ] * 2],
+            ])
+    def testReflectionPadding(self, b, *args):
+        if b == tf:
+            args = list(args) + ['REFLECT']
+            func = tensorflow.pad
+        else:
+            func = plaidml.op.reflection_padding
+        return [func(*args)]
 
 
 if __name__ == '__main__':
