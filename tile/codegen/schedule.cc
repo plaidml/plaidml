@@ -405,6 +405,13 @@ struct CacheEntry {
   // The CacheEntry's uncovered ranges.  When this list is empty, the
   // CacheEntry is removed from the active cache entry list.
   std::list<MemRange> uncovered_ranges;
+
+  // The scheduling step number where this cache entry was last used
+  // -- this is used in order to attempt to avoid unneeded
+  // dependencies within the parallelism window (which might otherwise
+  // cause computations that could be parallelized to execute
+  // sequentially).
+  std::size_t last_use_step;
 };
 
 // Represents a unit of IO performed by a sub-statement.
@@ -594,7 +601,8 @@ class Scheduler {
                                                                   const std::vector<IO>& ios);
 
   // Makes a placement plan, trying several strategies.
-  boost::optional<PlacementPlan> TryMakePlan(stripe::Block* current_block, const std::vector<IO>& ios);
+  boost::optional<PlacementPlan> TryMakePlan(stripe::Block* current_block, std::size_t current_step,
+                                             const std::vector<IO>& ios);
 
   // Determines the memory units on which a tensor is allowed to exist.
   std::vector<stripe::Affine> GetValidUnits(stripe::Block* current_block, PlacementPlan* plan,
@@ -609,7 +617,7 @@ class Scheduler {
   // Statement's existing inputs and outputs, and does not collide
   // with any previously-scheduled CacheEntry unless that CacheEntry
   // has a writer (i.e. does not require swap-in).
-  boost::optional<PlacementPlan> TryMakePlanWithNoSwaps(stripe::Block* current_block,
+  boost::optional<PlacementPlan> TryMakePlanWithNoSwaps(stripe::Block* current_block, std::size_t current_step,
                                                         const PlacementPlan& existing_entry_plan,
                                                         const std::vector<std::pair<PlacementKey, Placement>>& todos);
 
@@ -810,7 +818,9 @@ void Scheduler::Run() {
   //      at the top of the loop (after the condition check) rather
   //      than in the normal loop continuation statement (which
   //      happens before the condition check).
+  std::size_t current_step = 0;
   for (stripe::StatementIt si = block_->stmts.end(); si != block_->stmts.begin();) {
+    ++current_step;
     auto si_next = si;
     --si;
 
@@ -856,7 +866,7 @@ void Scheduler::Run() {
     }
 
     // Figure out where we're going to put any newly-created CacheEntries.
-    boost::optional<PlacementPlan> plan_option = TryMakePlan(current_block, ios);
+    boost::optional<PlacementPlan> plan_option = TryMakePlan(current_block, current_step, ios);
     if (!plan_option) {
       LOG(WARNING) << "Failed to create placement plan fitting within " << (mem_bytes_ / 1024)
                    << " KiB memory boundary";
@@ -953,6 +963,8 @@ void Scheduler::Run() {
         placement.entry = ent;
         ri->cache_entry = ent;
       }
+
+      ent->last_use_step = current_step;
 
       stripe::StatementIt reuse_dep = si;
 
@@ -1324,7 +1336,8 @@ std::vector<std::pair<PlacementKey, Placement>> MakePartialPlacements(const std:
   return result;
 }
 
-boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_block, const std::vector<IO>& ios) {
+boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_block, std::size_t current_step,
+                                                      const std::vector<IO>& ios) {
   // Initialize useful planning inputs.
   PlacementPlan existing_entry_plan;
   std::vector<IO> todos;
@@ -1347,13 +1360,13 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
 
   boost::optional<PlacementPlan> plan;
 
-  plan = TryMakePlanWithNoSwaps(current_block, existing_entry_plan, todo_fulls);
+  plan = TryMakePlanWithNoSwaps(current_block, current_step, existing_entry_plan, todo_fulls);
   if (plan) {
     IVLOG(2, "  Made plan with full IO and no swaps");
     return *plan;
   }
 
-  plan = TryMakePlanWithNoSwaps(current_block, existing_entry_plan, todo_partials);
+  plan = TryMakePlanWithNoSwaps(current_block, current_step, existing_entry_plan, todo_partials);
   if (plan) {
     IVLOG(2, "  Made plan with loop IO and no swaps");
     return *plan;
@@ -1493,42 +1506,74 @@ bool Scheduler::TryPlaceInRanges(stripe::Block* current_block, PlacementPlan* pl
 }
 
 boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
-    stripe::Block* current_block, const PlacementPlan& existing_entry_plan,
+    stripe::Block* current_block, std::size_t current_step, const PlacementPlan& existing_entry_plan,
     const std::vector<std::pair<PlacementKey, Placement>>& todos) {
-  PlacementPlan plan{existing_entry_plan};
   std::map<stripe::Affine, std::list<MemRange>> unit_ranges;
 
-  // Build a list of the available ranges.  For our purposes, a range
-  // is available if it already has an initial writer (=> it is not
-  // going to require a swap-in), and if its RefInfo is not already in
-  // the plan (because RefInfos that are in the plan are required by
-  // the current statement).
-  for (const auto& unit : units_) {
-    auto& ranges = unit_ranges[unit];
-    ranges = std::list<MemRange>{MemRange{0, mem_bytes_}};
-    for (auto* ent : active_entries_[unit]) {
-      PlacementKey pkey{ent->source, ent->source->exterior_cache_shape, {}};
-      IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name << " saw_earliest_writer="
-                                  << ent->saw_earliest_writer << " plan.count=" << plan.count(pkey));
-      if (!(ent->saw_earliest_writer && !plan.count(pkey))) {
-        IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
-        SubtractRange(ent->range, &ranges);
+  // This function attempts to spread out memory accesses to improve
+  // parallelism.  It does so by using options_.parallelism_window(),
+  // which hints at how much parallelism we have available.  (TODO:
+  // Consider determining this from the number of unique hardware
+  // locations we see compute blocks being run on.)
+  //
+  // The general idea: we maintain a value, limit_use_step.  Entries are
+  // marked as in-use if any of these conditions are true:
+  //    * We haven't seen their earliest writer (no swaps here)
+  //    * They're used by the current step
+  //    * limit_use_step is <= the entry's last_use_step (too young)
+  //
+  // We use the current step number and the parallelism window to
+  // determine the initial limit_use_step, and try to increase it
+  // until it's equal to current_step -- which is guaranteed to be
+  // greater than any existing entry's last_use_step; if we still
+  // can't make a placement plan, we have to give up.
+
+  // With a parallelism_window == 2:
+  // If current_step == 1: limit_use_step is 1, and we're done.
+  // If current_step == 2: limit_use_step is 1; we're attempt to use clean memory.
+  // If current_step == 3: limit_use_step is 2; we're okay with using step==1 entries.
+
+  // So we want: min(clamp(current_step - parallelism_window() + 1, 0), current_step)
+
+  std::size_t limit_use_step =
+      1 + (options_.parallelism_window() < current_step ? current_step - options_.parallelism_window() : 0);
+  do {
+    IVLOG(3, "Attempting no-swap plan at step=" << current_step << " with limit_use_step=" << limit_use_step);
+    PlacementPlan plan{existing_entry_plan};
+    // Build a list of the available ranges.  For our purposes, a range
+    // is available if it already has an initial writer (=> it is not
+    // going to require a swap-in), and if its RefInfo is not already in
+    // the plan (because RefInfos that are in the plan are required by
+    // the current statement).
+    for (const auto& unit : units_) {
+      auto& ranges = unit_ranges[unit];
+      ranges = std::list<MemRange>{MemRange{0, mem_bytes_}};
+      for (auto* ent : active_entries_[unit]) {
+        PlacementKey pkey{ent->source, ent->source->exterior_cache_shape, {}};
+        IVLOG(3, "      Saw range " << ent->range << " used by " << ent->name
+                                    << " saw_earliest_writer=" << ent->saw_earliest_writer
+                                    << " existing_entry_plan.count=" << existing_entry_plan.count(pkey)
+                                    << " last_use_step=" << ent->last_use_step);
+        if (!ent->saw_earliest_writer || existing_entry_plan.count(pkey) || limit_use_step <= ent->last_use_step) {
+          IVLOG(3, "      Subtracting range " << ent->range << " used by " << ent->name);
+          SubtractRange(ent->range, &ranges);
+        }
       }
     }
-  }
 
-  if (!TryPlaceInRanges(current_block, &plan, todos, std::move(unit_ranges))) {
-    return boost::none;
-  }
+    if (TryPlaceInRanges(current_block, &plan, todos, std::move(unit_ranges))) {
+      return plan;
+    }
+  } while (++limit_use_step < current_step);
 
-  return plan;
+  return boost::none;
 }
 
 boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
     stripe::Block* current_block, const PlacementPlan& existing_entry_plan,
     const std::vector<std::pair<PlacementKey, Placement>>& todos) {
-  PlacementPlan plan{existing_entry_plan};
   std::map<stripe::Affine, std::list<MemRange>> unit_ranges;
+  PlacementPlan plan{existing_entry_plan};
 
   // Build a list of the available ranges.  For our purposes, a range
   // is available as long as its RefInfo is not already in the plan
