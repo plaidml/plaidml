@@ -256,13 +256,23 @@ void UnrollBlock(Block* outer,                     //
       }
     }
     std::map<std::string, std::vector<std::vector<Extent>>> ref_write_extents;
+    std::list<StatementList> cloned_statements;
     EnumerateIndexes(idxs, 0, [&](const std::vector<IndexValue>& idxs) {
       auto clone = CloneBlock(*block);
       EvalInner(outer, clone.get(), &ref_map, idxs, outer_alias_map, &ref_write_extents, aff_idxs, options);
-      for (const auto& stmt : clone->stmts) {
-        outer->stmts.insert(it_stmt, stmt);
-      }
+      cloned_statements.emplace_back(std::move(clone->stmts));
     });
+    while (cloned_statements.size()) {
+      for (auto cs_it = cloned_statements.begin(); cs_it != cloned_statements.end();) {
+        if (cs_it->size()) {
+          outer->stmts.emplace(it_stmt, std::move(cs_it->front()));
+          cs_it->pop_front();
+          ++cs_it;
+        } else {
+          cs_it = cloned_statements.erase(cs_it);
+        }
+      }
+    }
     outer->stmts.erase(it_stmt);
     // Dependencies become invalid after a stmt is removed
     for (auto& stmt : outer->stmts) {
