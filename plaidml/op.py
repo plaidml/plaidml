@@ -2577,3 +2577,92 @@ class Variance(tile.Operation):
 
 
 variance = Variance.function
+
+
+class ReflectionPadding(tile.Operation):
+    def __init__(self, inp, paddings):
+        paddings = [(x, x) if isinstance(x, int) else x for x in paddings]
+        ndims = inp.shape.ndims
+        out_shape = list(inp.shape.dims)
+        if ndims != len(paddings):
+            raise ValueError('Padding dims != input dims')
+        for ax, pads in enumerate(paddings):
+            if isinstance(out_shape[ax], tile.Value):
+                # We can't tell if padding size is supported for symbolic axis.
+                continue
+            for pad in pads:
+                if pad >= out_shape[ax]:
+                    raise plaidml.exceptions.InvalidArgument(
+                        'Paddings must be less than the dimension size: {} not less than {}.'.format(
+                        pad, out_shape[ax])
+                    )
+        out_sizes = ['N{}'.format(i) if isinstance(x, tile.Value) else x for i, x in enumerate(out_shape)]
+        in_sizes = list(out_sizes)
+        code_body = []
+        src_arr = "I"
+        idx = ["n{}".format(i) for i in range(ndims)]
+
+        for axis, pads in ((i, x) for i, x in enumerate(paddings) if x[0]+x[1] != 0):
+            pad_pre, pad_post = pads
+            if isinstance(out_shape[axis], tile.Value):
+                out_sizes[axis] += ' + {}'.format(pad_pre + pad_post)
+            else:
+                out_shape[axis] += pad_pre + pad_post
+                out_sizes[axis] += pad_pre + pad_post
+            concats = "TA{}".format(axis)
+
+            if pad_pre:
+                src_idx = list(idx)
+                src_idx[axis] = "{} - n{}".format(pad_pre, axis)
+                code_body.append('TS{ax}[{idx} : {dims}] = =({src_arr}[{src_idx}]), n{ax} < {pad};'.format(
+                    ax=axis,
+                    idx=','.join(idx),
+                    dims=','.join(map(str, out_sizes)),
+                    src_arr=src_arr,
+                    src_idx=','.join(src_idx),
+                    pad=pad_pre
+                ))
+                concats += ' + TS{}'.format(axis)
+
+            if pad_post:
+                src_idx = list(idx)
+                dst_idx = list(idx)
+                src_idx[axis] = "{} - n{} - 2".format(in_sizes[axis], axis)
+                dst_idx[axis] = "n{} + {} - {}".format(axis, out_sizes[axis], pad_post)
+                code_body.append('TE{ax}[{idx} : {dims}] = =({src_arr}[{src_idx}]), n{ax} < {pad};'.format(
+                    ax=axis,
+                    idx=','.join(map(str, dst_idx)),
+                    dims=','.join(map(str, out_sizes)),
+                    src_arr=src_arr,
+                    src_idx=','.join(src_idx),
+                    pad=pad_post,
+                ))
+                concats += ' + TE{}'.format(axis)
+
+            dst_idx = list(idx)
+            dst_idx[axis] = "{} + n{}".format(pad_pre, axis)
+            code_body.append('TA{ax}[{idx} : {dims}] = =({src_arr}[{src_idx}]), n{ax} < {cond};'.format(
+                ax=axis,
+                idx=",".join(dst_idx),
+                dims=','.join(map(str, out_sizes)),
+                src_arr=src_arr,
+                src_idx=",".join(idx),
+                cond="{} - {}".format(out_sizes[axis], pad_post)
+            ))
+            code_body.append("TC{} = {};".format(axis, concats))
+            src_arr = 'TC{}'.format(axis)
+            in_sizes = list(out_sizes)
+
+        code_body.append('O = {};'.format(src_arr))
+        code = 'function (I[{idim}]) -> (O) {{\n\t{body}\n}}'.format(
+            idim = ",".join("N{}".format(i) for i in range(ndims)),
+            body="\n\t".join(code_body)
+        )
+        super(ReflectionPadding, self).__init__(
+            code,
+            [('I', inp)],
+            [('O', tile.Shape(inp.shape.dtype, out_shape))]
+        )
+
+
+reflection_padding = ReflectionPadding.function
