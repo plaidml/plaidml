@@ -16,7 +16,59 @@ struct ExtentIO {
   Extent store;
 };
 
+typedef std::map<std::string, std::vector<uint64_t>> RefSize;
+typedef std::map<std::string, Refinement> RefMap;
 typedef std::map<std::string, std::vector<ExtentIO>> Extents;
+
+static std::set<std::string> special_set = {"reshape"};
+
+void CollectRefDefine(stripe::Block* block, RefDefineMap* ref_def_map) {
+  for (auto it = block->stmts.begin(); it != block->stmts.end(); ++it) {
+    auto& stmt = *it;
+    if (stmt->kind() == StmtKind::Special) {
+      auto special = Special::Downcast(stmt);
+      if (special_set.find(special->name) != special_set.end()) {
+        auto ref_it = block->ref_by_into(special->outputs[0]);
+        ref_it->mut().set_tag(special->name);
+        ref_it->mut().set_tag("rewrite");
+        RefDefine ref_def = {ref_it->into(), block, it};
+        ref_def_map->emplace(ref_it->into(), ref_def);
+      }
+    }
+  }
+}
+
+static void CopyRefinement(const RefDefineMap& ref_def_map,  //
+                           const Refinement& old_ref,        //
+                           const Refinement& new_ref,        //
+                           const std::vector<uint64_t>& pad_size) {
+  auto block = std::make_shared<Block>();
+  size_t n_dim = new_ref.interior_shape.dims.size();
+  Refinement src_ref(RefDir::In, old_ref.into(), "src", old_ref.access, old_ref.interior_shape, "", old_ref.location,
+                     old_ref.offset, old_ref.bank_dim, old_ref.cache_unit);
+  Refinement dst_ref(RefDir::Out, new_ref.into(), "dst", new_ref.access, new_ref.interior_shape, "", new_ref.location,
+                     new_ref.offset, new_ref.bank_dim, new_ref.cache_unit);
+
+  for (size_t i = 0; i < n_dim; ++i) {
+    std::string idx_name = "i" + std::to_string(i);
+    block->idxs.push_back({idx_name, old_ref.interior_shape.dims[i].size, Affine()});
+    src_ref.access[i] = Affine(idx_name);
+    dst_ref.access[i] = Affine(idx_name) + Affine(pad_size[i]);
+  }
+  block->refs.insert(src_ref);
+  block->refs.insert(dst_ref);
+
+  auto load = std::make_shared<Load>("src", "$X");
+  block->stmts.push_back(load);
+  auto store = std::make_shared<Store>("$X", "dst");
+  block->stmts.push_back(store);
+
+  const RefDefine& ref_def = ref_def_map.at(new_ref.into());
+  auto after = ref_def.stmt_iter;
+  block->set_tag("kernel");
+  block->name = "kernel_" + std::to_string(ref_def.block->stmts.size()) + "(" + old_ref.into() + ")";
+  ref_def.block->stmts.insert(++after, block);
+}
 
 void ComputeExtents(Block* block, const AliasMap& map, Extents* extents) {
   AliasMap new_map(map, block);
@@ -28,7 +80,7 @@ void ComputeExtents(Block* block, const AliasMap& map, Extents* extents) {
         if (it != extents->end()) {
           for (size_t i = 0; i < ai.extents.size(); i++) {
             it->second[i].load.min = std::min(it->second[i].load.min, ai.extents[i].min);
-            it->second[i].load.max = std::max(it->second[i].load.min, ai.extents[i].max);
+            it->second[i].load.max = std::max(it->second[i].load.max, ai.extents[i].max);
           }
         }
       } break;
@@ -38,7 +90,7 @@ void ComputeExtents(Block* block, const AliasMap& map, Extents* extents) {
         if (it != extents->end()) {
           for (size_t i = 0; i < ai.extents.size(); i++) {
             it->second[i].store.min = std::min(it->second[i].store.min, ai.extents[i].min);
-            it->second[i].store.max = std::max(it->second[i].store.min, ai.extents[i].max);
+            it->second[i].store.max = std::max(it->second[i].store.max, ai.extents[i].max);
           }
         }
       } break;
@@ -51,7 +103,7 @@ void ComputeExtents(Block* block, const AliasMap& map, Extents* extents) {
   }
 }
 
-void Pad(Block* block, const AliasMap& map) {
+void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   AliasMap self(map, block);
   // Generate a map extents for possible padding candidates
   Extents extents;
@@ -131,20 +183,27 @@ void Pad(Block* block, const AliasMap& map) {
   // Do the caching
   for (const auto& name : to_cache) {
     // IVLOG(1, "Cacheing: " << name);
-    ApplyCache(self, block, name, block->ref_by_into(name)->location, Location(),
-               {"kernel", "eltwise", "eltwise_padding"}, {"kernel", "eltwise", "eltwise_padding"});
+    Location loc = block->ref_by_into(name)->location;
+    ApplyCache(self, block, name, loc, Location(), {"kernel", "eltwise", "eltwise_padding"},
+               {"kernel", "eltwise", "eltwise_padding"});
   }
+
+  RefSize pad_sizes;
+  RefMap old_refs;
 
   // Update the buffer shapes
   for (auto& ref : block->refs) {
     if (!to_pad.count(ref.into())) {
       continue;
     }
+    std::vector<uint64_t> pad_size;
+    old_refs.emplace(ref.into(), ref);
     std::string bname = self.at(ref.into()).base_name;
     const auto& exts = extents.at(bname);
     int64_t stride = 1;
     for (int i = exts.size() - 1; i >= 0; i--) {
       ref.mut().interior_shape.dims[i].stride = stride;
+      pad_size.push_back(-exts[i].load.min);
       uint64_t new_size = exts[i].load.max + 1 - exts[i].load.min;
       new_size = std::max(new_size, ref.interior_shape.dims[i].size);
       ref.mut().interior_shape.dims[i].size = new_size;
@@ -161,7 +220,34 @@ void Pad(Block* block, const AliasMap& map) {
       }
       // ref.mut().access[i] += -exts[i].load.min;
     }
+    std::reverse(pad_size.begin(), pad_size.end());
+    pad_sizes.emplace(ref.into(), pad_size);
     FixupRefs(block, ref.into());
+  }
+
+  for (const auto& name : to_pad) {
+    auto ref_it = block->ref_by_into(name);
+    auto& ref = *ref_it;
+    if (ref.has_tag("rewrite")) {
+      auto& ref_def = ref_def_map.at(name);
+      auto& stmt = *(ref_def.stmt_iter);
+      auto special = Special::Downcast(stmt);
+      std::string tmp_ref_name;
+      if (special->has_tag("replica")) {
+        tmp_ref_name = special->outputs[0];
+      } else {
+        tmp_ref_name = block->unique_ref_name(name);
+        special->outputs[0] = tmp_ref_name;
+        special->set_tag("replica");
+        auto& old_ref = old_refs.at(name);
+        Refinement tmp_ref(old_ref.dir, "", tmp_ref_name, old_ref.access, old_ref.interior_shape, "", old_ref.location,
+                           old_ref.offset, old_ref.bank_dim, old_ref.cache_unit);
+        tmp_ref.set_tag("rewrite");
+        ref_def.block->refs.insert(tmp_ref);
+      }
+      auto old_ref_it = ref_def.block->ref_by_into(tmp_ref_name);
+      CopyRefinement(ref_def_map, *old_ref_it, *ref_it, pad_sizes.at(name));
+    }
   }
 
   // Add the zeros
