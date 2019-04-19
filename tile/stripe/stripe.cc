@@ -323,6 +323,22 @@ std::string Taggable::get_attr_str(const std::string& name) const {
   return boost::get<std::string>(impl_->attrs[name]);
 }
 
+bool Taggable::get_attr_bool(const std::string& name, bool def) const {
+  return has_attr(name) ? get_attr_bool(name) : def;
+}
+
+int64_t Taggable::get_attr_int(const std::string& name, int64_t def) const {
+  return has_attr(name) ? get_attr_int(name) : def;
+}
+
+double Taggable::get_attr_float(const std::string& name, double def) const {
+  return has_attr(name) ? get_attr_float(name) : def;
+}
+
+std::string Taggable::get_attr_str(const std::string& name, const std::string& def) const {
+  return has_attr(name) ? get_attr_str(name) : def;
+}
+
 std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
   return std::dynamic_pointer_cast<Load>(stmt);
 }
