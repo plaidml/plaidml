@@ -126,7 +126,7 @@ double BestCostRecursive(stripe::Block* block, SubgroupPlan* plan, const proto::
       // IVLOG(1, prefix << "Idx " << idx << ": " << do_subgroup << ", " << ts);
       double attempt = BestCostRecursive(block, plan, options, idx_num + 1);
       // IVLOG(1, prefix << "Best cost " << attempt);
-      if (isinf(attempt)) {
+      if (std::isinf(attempt)) {
         break;
       }
       if (attempt < best) {
@@ -135,7 +135,7 @@ double BestCostRecursive(stripe::Block* block, SubgroupPlan* plan, const proto::
       }
     }
   }
-  if (!isinf(best)) {
+  if (!std::isinf(best)) {
     *plan = best_plan;
   }
   return best;
@@ -164,7 +164,7 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   double cost = BestCostRecursive(block, &plan, options, 0);
   IVLOG(1, "Cost = " << cost);
   // If it's not valid, forget it
-  if (isinf(cost)) {
+  if (std::isinf(cost)) {
     return;
   }
   // Tell everyone about it
