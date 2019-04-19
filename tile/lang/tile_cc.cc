@@ -583,7 +583,7 @@ class ShapeEvaluator : AstVisitor {
  private:
   void Visit(const ParamExpr& expr) {
     IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
-    bindings_by_expr_->emplace(&expr, expr.shape);
+    bindings_by_expr_->emplace(&expr, Binding{expr.shape});
   }
 
   void Visit(const CallExpr& expr) {
@@ -628,7 +628,7 @@ class ShapeEvaluator : AstVisitor {
 
   void Visit(const IntConst& expr) {
     IVLOG(4, "ShapeEvaluator::Visit> " << to_string(&expr));
-    bindings_by_expr_->emplace(&expr, expr.value);
+    bindings_by_expr_->emplace(&expr, Binding{expr.value});
   }
 
   void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("Not implemented"); }
