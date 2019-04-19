@@ -288,8 +288,8 @@ struct Function : public Node {
   Type ret;
   params_t params;
   StmtPtr body;
-  bool is_subgroup;
-  Function() : is_subgroup(false) {}
+  size_t subgroup_size;
+  Function() : subgroup_size(0) {}
   Function(const std::string n, const Type& r, const params_t& p, StmtPtr b);
   void Accept(Visitor&) const final;
 };

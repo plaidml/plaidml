@@ -249,8 +249,8 @@ void Emit::Visit(const sem::BarrierStmt& n) {
 }
 
 void Emit::Visit(const sem::Function& n) {
-  if (n.is_subgroup) {
-    emit("__attribute__((intel_reqd_sub_group_size(8))) ");
+  if (n.subgroup_size) {
+    emit("__attribute__((intel_reqd_sub_group_size(" + std::to_string(n.subgroup_size) + ")))");
   }
   emit("__kernel ");
 

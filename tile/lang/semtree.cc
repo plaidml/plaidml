@@ -164,7 +164,7 @@ void ReturnStmt::Accept(Visitor& v) const { v.Visit(*this); }
 void SpecialStmt::Accept(Visitor& v) const { v.Visit(*this); }
 
 Function::Function(const std::string n, const Type& r, const params_t& p, StmtPtr b)
-    : name(n), ret(r), params(p), body(b), is_subgroup(false) {
+    : name(n), ret(r), params(p), body(b), subgroup_size(0) {
   if (!body->isBlock()) {
     body = std::make_shared<Block>(std::vector<StmtPtr>{body});
   }

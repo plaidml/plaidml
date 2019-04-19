@@ -117,6 +117,11 @@ class Taggable {
   double get_attr_float(const std::string& name) const;
   std::string get_attr_str(const std::string& name) const;
 
+  bool get_attr_bool(const std::string& name, bool def) const;
+  int64_t get_attr_int(const std::string& name, int64_t def) const;
+  double get_attr_float(const std::string& name, double def) const;
+  std::string get_attr_str(const std::string& name, const std::string& def) const;
+
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

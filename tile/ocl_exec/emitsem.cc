@@ -307,8 +307,8 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
     ki.inputs.push_back(ref->from);
   }
   ki.kfunc = std::make_shared<sem::Function>(ki.kname, sem::Type(), params, cur_);
-  if (block.has_tag("subgroup_outer")) {
-    ki.kfunc->is_subgroup = true;
+  if (block.has_attr("subgroup_size")) {
+    ki.kfunc->subgroup_size = static_cast<size_t>(block.get_attr_int("subgroup_size"));
   }
   ki.gwork = {{map.gid_sizes[0] * used_threads_, map.gid_sizes[1], map.gid_sizes[2]}};
   if (used_threads_ == 1) {

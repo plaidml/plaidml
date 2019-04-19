@@ -359,6 +359,7 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   // Add some tags!
   outer->remove_tag("contraction");
   outer->set_tag("subgroup_outer");
+  outer->set_attr("subgroup_size", options.subgroup_size());
   thread->set_tag("subgroup_thread");
   thread->set_tag("gpu_thread");
   accum->set_tag("subgroup_accum");
