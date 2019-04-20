@@ -286,6 +286,8 @@ class TestBackendOps(unittest.TestCase):
         [m(4, 7, 3), n(4, 3), m(3, 3), n(3, 3), False],
         [m(4, 7, 3), n(4, 3), m(3, 3), n(3, 3), True],
     ])
+
+    @unittest.skipIf(os.environ.get("USE_STRIPE", "0") == "1", "Stripe does not work for RNNs")
     def testRNN(self, b, inp, init_state, ker, r_ker, go_back):
 
         def step_function(inputs, states):
@@ -1295,6 +1297,7 @@ class TestBackendOps(unittest.TestCase):
         with self.assertRaises(ValueError):
             pkb.conv(A, B, dilation_rate=(1, 1))
 
+    @unittest.skipIf(os.environ.get("USE_STRIPE", "0") == "1", "Stripe does not correctly validate assignment ops")
     def testAssignmentExceptions(self):
         A = pkb.variable(m(5, 1))
         B = pkb.variable(m(1, 5))
