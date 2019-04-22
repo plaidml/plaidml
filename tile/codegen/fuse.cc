@@ -255,6 +255,7 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
       outer->idxs.back().name = it->second;
     }
   }
+  outer->location = tiled->location;
   // Sort outer indexes by names
   std::sort(outer->idxs.begin(), outer->idxs.end(), [](const Index& a, const Index& b) { return a.name < b.name; });
   // Copy statements to the inner block
