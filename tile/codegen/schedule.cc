@@ -1827,6 +1827,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
     }
   }
   ent->source->saw_final_write = true;
+  ent->readers.emplace(swap_out_it->get(), ent->source->alias_info);
   return swap_out_it;
 }
 
