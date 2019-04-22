@@ -328,6 +328,11 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
     IVLOG(3, "Fuse failed due to mismatched constraints");
     return false;
   }
+  // If locations don't match, fail
+  if (block_a->location != block_b->location) {
+    IVLOG(3, "Fuse failed due to mismatched locations");
+    return false;
+  }
   // Make AliasMaps for the two blocks
   AliasMap a_map(scope, block_a);
   AliasMap b_map(scope, block_b);
