@@ -276,18 +276,26 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
       }
     }
 
-    // Create an index for the inner block, and update the inner
-    // location to use it.
-    std::string inner_idx_name = inner->unique_idx_name(location_idx_tag);
-    inner->idxs.emplace_back(Index{inner_idx_name, 1, tile_unit});
-    // inner->idxs.back().set_tag(location_idx_tag);
-    for (auto& dev : inner->location.devs) {
-      for (auto& unit : dev.units) {
-        auto& umap = unit.mutateMap();
-        auto it = umap.find(tag);
-        if (it != umap.end()) {
-          umap[inner_idx_name] = it->second;
-          umap.erase(it);
+    if (tile_unit.isConstant()) {
+      // Replace the tag on the inner location with the constant.
+      for (auto& dev : inner->location.devs) {
+        for (auto& unit : dev.units) {
+          unit.substitute(tag, tile_unit);
+        }
+      }
+    } else {
+      // Create an index for the inner block, and update the inner
+      // location to use it.
+      std::string inner_idx_name = inner->unique_idx_name(location_idx_tag);
+      inner->idxs.emplace_back(Index{inner_idx_name, 1, tile_unit});
+      for (auto& dev : inner->location.devs) {
+        for (auto& unit : dev.units) {
+          auto& umap = unit.mutateMap();
+          auto it = umap.find(tag);
+          if (it != umap.end()) {
+            umap[inner_idx_name] = it->second;
+            umap.erase(it);
+          }
         }
       }
     }
