@@ -723,6 +723,28 @@ Location AppendLocations(const Location& loc1, const Location& loc2) {
   return result;
 }
 
+Location RealizeLocation(const Location& loc, const Block& block) {
+  Location result{loc};
+  for (auto& dev : result.devs) {
+    for (auto& unit : dev.units) {
+      std::map<std::string, Affine> tag_map;
+      for (const auto& name_coeff : unit.getMap()) {
+        if (name_coeff.first.size() && name_coeff.first[0] == '#') {
+          auto tag = name_coeff.first.substr(1);
+          for (const auto& idx : block.idxs) {
+            if (idx.has_tag(tag)) {
+              tag_map[name_coeff.first] = idx.name;
+              break;
+            }
+          }
+        }
+      }
+      unit.substitute(tag_map);
+    }
+  }
+  return result;
+}
+
 bool operator==(const Location& loc, const std::string& pattern) {
   static const std::regex valid_re{R"(((^|/)(\w+|\*)(\[\s*((\d+|\*)(\s*,\s*(\d+|\*))*)?\s*\])?)*)"};
   static const std::regex devs_re{R"((?:^|/)(\w+|\*)(\[([^\[\]/]*)\])?)"};

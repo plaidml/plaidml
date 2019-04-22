@@ -758,8 +758,8 @@ Scheduler::Scheduler(const AliasMap* alias_map, stripe::Block* block, const prot
       ri_map_{BuildRefInfoMap(block, alias_map)},
       alias_map_(alias_map) {
   if (options.append_devs()) {
-    mem_loc_ = AppendLocations(block_->location, mem_loc_);
-    xfer_loc_ = AppendLocations(block_->location, xfer_loc_);
+    mem_loc_ = RealizeLocation(AppendLocations(block_->location, mem_loc_), *block_);
+    xfer_loc_ = RealizeLocation(AppendLocations(block_->location, xfer_loc_), *block_);
   }
   for (auto& rikey_ri : ri_map_) {
     RefInfo* ri = &rikey_ri.second;

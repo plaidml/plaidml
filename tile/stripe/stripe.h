@@ -482,6 +482,10 @@ Location AddDeviceUnits(const Location& loc1, const Location& loc2);
 // Appends two locations, returning the result.
 Location AppendLocations(const Location& loc1, const Location& loc2);
 
+// Replaces tags in a location with concrete index references (using
+// the first matching index).
+Location RealizeLocation(const Location& loc, const Block& block);
+
 std::string to_string(const Location& loc);
 
 // Returns a match if the location matches the indicated pattern,
