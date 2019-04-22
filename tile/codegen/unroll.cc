@@ -176,6 +176,18 @@ void EvalInner(Block* outer,                                                    
     extents.insert(extents.end(), ref_extents.second.begin(), ref_extents.second.end());
   }
 
+  std::unordered_map<std::string, std::string> block_alloc_map;  // block.into -> outer.into
+  for (const auto& ref : block->refs) {
+    if (ref.dir != RefDir::None) {
+      continue;
+    }
+    // This refinement is an alloc; in order for the inner blocks to
+    // access it, we need to push it to the outer block.
+    auto alloc = ref.WithInto(outer->unique_ref_name(ref.into()));
+    block_alloc_map[ref.into()] = alloc.into();
+    outer->refs.emplace(std::move(alloc));
+  }
+
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
@@ -187,6 +199,10 @@ void EvalInner(Block* outer,                                                    
         continue;
       }
       auto block_ref = block->ref_by_into(inner_ref.from);
+      if (block_ref->dir == RefDir::None) {
+        inner_ref.mut().from = block_alloc_map[block_ref->into()];
+        continue;
+      }
       for (size_t i = 0; i < inner_ref.access.size(); i++) {
         inner_ref.mut().access[i] += block_ref->access[i];
       }
