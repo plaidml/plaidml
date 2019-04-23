@@ -1,27 +1,13 @@
 #include <iostream>
 
 #include "base/config/config.h"
+#include "base/util/file.h"
 #include "base/util/runfiles_db.h"
 #include "tile/codegen/driver.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lib/lib.h"
 #include "tile/stripe/stripe.h"
 #include "tile/targets/cpu/jit.h"
-
-static std::string ReadFile(const std::string& filename) {
-  std::ifstream ifs;
-  ifs.open(filename);
-  if (ifs.fail()) {
-    throw(std::runtime_error("Unable to open file \"" + filename + "\""));
-  }
-  auto it = std::istreambuf_iterator<char>(ifs);
-  auto it_end = std::istreambuf_iterator<char>();
-  std::string contents(it, it_end);
-  if (ifs.bad()) {
-    throw(std::runtime_error("Unable to fully read \"" + filename + "\""));
-  }
-  return contents;
-}
 
 template <typename F>
 void with_profile(F f) {

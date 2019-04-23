@@ -10,7 +10,7 @@
 
 namespace vertexai {
 
-std::string ReadFile(const boost::filesystem::path& path);
+std::string ReadFile(const boost::filesystem::path& path, bool binary = false);
 
 void WriteFile(const boost::filesystem::path& path,  //
                const std::string& contents,          //

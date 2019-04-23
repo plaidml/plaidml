@@ -2,21 +2,26 @@
 
 #include "base/util/file.h"
 
+#include <boost/format.hpp>
+
 #include "base/util/throw.h"
 
 namespace vertexai {
 
-std::string ReadFile(const boost::filesystem::path& path) {
-  std::ifstream ifs;
-  ifs.open(path.string());
+std::string ReadFile(const boost::filesystem::path& path, bool binary) {
+  std::ios_base::openmode mode = std::ios_base::in;
+  if (binary) {
+    mode |= std::ios::binary;
+  }
+  std::ifstream ifs(path.string(), mode);
   if (ifs.fail()) {
-    throw_with_trace(std::runtime_error("Unable to open file \"" + path.string() + "\""));
+    throw_with_trace(std::runtime_error(str(boost::format("Unable to open file \"%1%\"") % path)));
   }
   auto it = std::istreambuf_iterator<char>(ifs);
   auto it_end = std::istreambuf_iterator<char>();
   std::string contents(it, it_end);
   if (ifs.bad()) {
-    throw_with_trace(std::runtime_error("Unable to fully read \"" + path.string() + "\""));
+    throw_with_trace(std::runtime_error(str(boost::format("Unable to fully read file \"%1%\"") % path)));
   }
   return contents;
 }
