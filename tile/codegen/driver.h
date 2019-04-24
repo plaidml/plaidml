@@ -14,8 +14,8 @@ namespace tile {
 namespace codegen {
 
 struct OptimizeOptions {
-  bool dump_passes;
-  bool dump_code;
+  bool dump_passes = false;
+  bool dump_code = false;
   boost::filesystem::path dbg_dir;
 };
 
@@ -23,8 +23,7 @@ using Passes = google::protobuf::RepeatedPtrField<proto::Pass>;
 
 void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions& options);
 
-class Configs {
- public:
+struct Configs {
   static void Register(const std::string& name, const std::string& pb_bytes);
   static proto::Config Resolve(const std::string& name);
 };

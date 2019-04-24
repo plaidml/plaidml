@@ -45,17 +45,17 @@ TEST(Codegen, Unaligned) {
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}),  //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
-  AliasMap am(AliasMap(AliasMap(AliasMap(), stripe.program.get()), main.get()), kernel.get());
-  IVLOG(2, "Original>\n" << *stripe.program);
+  AliasMap am(AliasMap(AliasMap(AliasMap(), program->entry.get()), main.get()), kernel.get());
+  IVLOG(2, "Original>\n" << *program->entry);
 
   ApplyTile(kernel.get(), {32, 32, 32}, true, false, false, true);
-  IVLOG(2, "Tiled>\n" << *stripe.program);
+  IVLOG(2, "Tiled>\n" << *program->entry);
 
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
-  emit.Visit(*stripe.program);
+  emit.Visit(*program->entry);
   for (const auto ki : emit.kernels_.kernels) {
     sem::Print p(*ki.kfunc);
     IVLOG(2, p.str());

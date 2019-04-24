@@ -80,13 +80,13 @@ TEST(Codegen, ApplyTile) {
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}),  //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
   auto data = MakeMatMulTestData();
 
-  IVLOG(2, "Before>\n" << *stripe.program);
+  IVLOG(2, "Before>\n" << *program->entry);
 
-  ExecuteProgram(*stripe.program, &data);
+  ExecuteProgram(*program->entry, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -103,10 +103,10 @@ TEST(Codegen, ApplyTile) {
   ApplyTile(kernel.get(), {5, 2, 2});
   kernel->SubBlock(0)->name = "outer";
 
-  IVLOG(2, "After>\n" << *stripe.program);
+  IVLOG(2, "After>\n" << *program->entry);
 
   std::fill(data["C"].begin(), data["C"].end(), 0);
-  ExecuteProgram(*stripe.program, &data);
+  ExecuteProgram(*program->entry, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -130,8 +130,8 @@ TEST(Codegen, StencilMatchMatMul) {
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, *kernel);
@@ -164,8 +164,8 @@ TEST(Codegen, StencilMatchConv1D) {
   auto runinfo = lib::LoadConv1d("conv",                                     //
                                  SimpleShape(DataType::FLOAT32, {100, 64}),  //
                                  SimpleShape(DataType::FLOAT32, {3, 64, 64}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, *kernel);
@@ -216,8 +216,8 @@ TEST(Codegen, StencilMatchConv2D) {
   auto runinfo = lib::LoadConv2d("conv",                                             //
                                  SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),  //
                                  SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}));    //
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, "\n" << *kernel);
@@ -255,12 +255,12 @@ TEST(Codegen, StencilPass) {
   auto runinfo = lib::LoadMatMul("matmul",                                    //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}));
-  auto stripe = GenerateStripe(runinfo);
-  StencilPass(stripe.program.get(), options);
-  IVLOG(2, "\n" << *stripe.program);
+  auto program = GenerateStripe(runinfo);
+  StencilPass(program->entry.get(), options);
+  IVLOG(2, "\n" << *program->entry);
 
   auto data = MakeMatMulTestData();
-  ExecuteProgram(*stripe.program, &data);
+  ExecuteProgram(*program->entry, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -275,10 +275,10 @@ TEST(Codegen, TilePassBroadcast) {
   runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {32}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
 
-  IVLOG(2, "\n" << *stripe.program);
+  IVLOG(2, "\n" << *program->entry);
 }
 
 }  // namespace test

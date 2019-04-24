@@ -22,18 +22,18 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   IVLOG(1, runinfo.input_shapes);
   IVLOG(1, runinfo.output_shapes);
   IVLOG(1, to_string(runinfo.program));
-  auto stripe = GenerateStripe(runinfo).program;
+  auto stripe = GenerateStripe(runinfo);
   codegen::OptimizeOptions options = {
       !out_dir.empty(),     // dump_passes
       false,                // dump_code
       out_dir + "/passes",  // dbg_dir
   };
-  IVLOG(1, *stripe);
+  IVLOG(1, *stripe->entry);
   auto cfg = Configs::Resolve(cfg_name);
-  codegen::Optimize(stripe.get(), cfg.passes(), options);
-  IVLOG(1, *stripe);
+  codegen::Optimize(stripe->entry.get(), cfg.passes(), options);
+  IVLOG(1, *stripe->entry);
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
-  emit.Visit(*stripe);
+  emit.Visit(*stripe->entry);
   // lang::Simplify(emit.kernels_.kernels);
   for (const auto ki : emit.kernels_.kernels) {
     sem::Print p(*ki.kfunc);
@@ -43,9 +43,9 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   }
   IVLOG(1, "RETURNING THOSE KERNELS");
   AliasMap init_map;
-  AliasMap prog_map(init_map, stripe.get());
-  AliasMap main_map(prog_map, stripe->SubBlock(0).get());
-  for (const auto& ref : stripe->SubBlock(0)->refs) {
+  AliasMap prog_map(init_map, stripe->entry.get());
+  AliasMap main_map(prog_map, stripe->entry->SubBlock(0).get());
+  for (const auto& ref : stripe->entry->SubBlock(0)->refs) {
     if (ref.dir != stripe::RefDir::None) {
       emit.kernels_.types[ref.from] = ref.interior_shape;
     } else {
@@ -55,11 +55,11 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   for (auto& ki : emit.kernels_.kernels) {
     for (auto& name : ki.inputs) {
       const auto& ai = main_map.at(name);
-      name = ai.base_block == stripe.get() ? ai.base_ref->into() : ("local_" + name);
+      name = ai.base_block == stripe->entry.get() ? ai.base_ref->into() : ("local_" + name);
     }
     for (auto& name : ki.outputs) {
       const auto& ai = main_map.at(name);
-      name = ai.base_block == stripe.get() ? ai.base_ref->into() : ("local_" + name);
+      name = ai.base_block == stripe->entry.get() ? ai.base_ref->into() : ("local_" + name);
     }
   }
   return emit.kernels_;

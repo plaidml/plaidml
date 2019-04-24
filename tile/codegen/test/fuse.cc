@@ -38,25 +38,25 @@ TEST(Codegen, FuseSimple) {
   runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {100, 20}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {20}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {100, 20}));
-  auto stripe = GenerateStripe(runinfo);
+  auto program = GenerateStripe(runinfo);
 
-  IVLOG(2, "Before>\n" << *stripe.program);
+  IVLOG(2, "Before>\n" << *program->entry);
 
   proto::FusionPass pass1;
   pass1.add_a_reqs("eltwise_add");
   pass1.add_b_reqs("eltwise_cmp_lt");
   pass1.add_fused_set("fused");
-  FusionPass(stripe.program.get(), pass1);
+  FusionPass(program->entry.get(), pass1);
 
   proto::FusionPass pass2;
   pass2.add_a_reqs("fused");
   pass2.add_b_reqs("eltwise_cond");
   pass2.add_fused_set("fused");
-  FusionPass(stripe.program.get(), pass2);
+  FusionPass(program->entry.get(), pass2);
 
-  IVLOG(2, "After>\n" << *stripe.program);
+  IVLOG(2, "After>\n" << *program->entry);
 
-  auto expected = R"**(0: #program 
+  auto expected = R"**(0: #program #total_macs 
 block []:1 ( // simple_fuse
     #user none new@0x00000000 A[0, 0] fp32:I(100, 20):(20, 1):7.8125 KiB
     #user none new@0x00000000 B[0] fp32:I(20):(1):80 B
@@ -97,7 +97,7 @@ block []:1 ( // simple_fuse
   }
 }
 )**";
-  EXPECT_THAT(to_string(*stripe.program), LinesEq(expected));
+  EXPECT_THAT(to_string(*program->entry), LinesEq(expected));
 }
 
 TEST(Codegen, FuseComplex) {
@@ -166,16 +166,16 @@ TEST(Codegen, FuseComplex) {
   runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {K, CI, CO}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {CO}));
   runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {X, CO}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
 
-  IVLOG(2, "Before>\n" << *stripe.program);
-  ExecuteProgram(*stripe.program, &data);
+  IVLOG(2, "Before>\n" << *program->entry);
+  ExecuteProgram(*program->entry, &data);
   IVLOG(2, "R: " << data["R"]);
   EXPECT_THAT(data["R"], ContainerEq(expected));
 
   AliasMap base;
-  AliasMap prog_map(base, stripe.program.get());
+  AliasMap prog_map(base, program->entry.get());
   AliasMap main_map(prog_map, main.get());
 
   AlwaysFuseRecursive afr;
@@ -183,8 +183,8 @@ TEST(Codegen, FuseComplex) {
   // LocalizePass(main_map, main.get());
   Scalarize(main.get(), true);
 
-  IVLOG(2, "After>\n" << *stripe.program);
-  ExecuteProgram(*stripe.program, &data);
+  IVLOG(2, "After>\n" << *program->entry);
+  ExecuteProgram(*program->entry, &data);
   IVLOG(2, "R: " << data["R"]);
   EXPECT_THAT(data["R"], ContainerEq(expected));
 }
@@ -203,13 +203,13 @@ TEST(Codegen, FuseTiled) {
   runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {3, 3, 64, 128}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {128}));
   runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
 
-  // IVLOG(2, "Before>\n" << *stripe.program);
+  // IVLOG(2, "Before>\n" << *program->entry);
 
   AliasMap base;
-  AliasMap prog_map(base, stripe.program.get());
+  AliasMap prog_map(base, program->entry.get());
   AliasMap main_map(prog_map, main.get());
 
   // Get the convolution
@@ -239,7 +239,7 @@ TEST(Codegen, FuseTiled) {
   ApplyCache(main_map, r1.get(), "B", {{{"CMX"}}}, {{{"DMA"}}});
   ApplyCache(main_map, r1.get(), "O", {{{"CMX"}}}, {{{"DMA"}}});
   ApplyCache(main_map, r1.get(), "BO", {{{"CMX"}}}, {{{"DMA"}}});
-  IVLOG(1, "Cached\n" << *stripe.program);
+  IVLOG(1, "Cached\n" << *program->entry);
 
   auto inner = r1->SubBlock(1);
   IVLOG(1, "Inner\n" << *inner);
@@ -263,13 +263,13 @@ TEST(Codegen, FuseFancy) {
   runinfo.input_shapes.emplace("K1", SimpleShape(DataType::FLOAT32, {3, 3, 64, 128}));
   runinfo.input_shapes.emplace("K2", SimpleShape(DataType::FLOAT32, {1, 1, 128, 128}));
   runinfo.output_shapes.emplace("O2", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
 
-  IVLOG(2, "Before>\n" << *stripe.program);
+  IVLOG(2, "Before>\n" << *program->entry);
 
   AliasMap base;
-  AliasMap prog_map(base, stripe.program.get());
+  AliasMap prog_map(base, program->entry.get());
   AliasMap main_map(prog_map, main.get());
 
   // Get the first convolution
@@ -316,17 +316,17 @@ TEST(Codegen, FuseAuto) {
   runinfo.input_shapes.emplace("K", SimpleShape(DataType::FLOAT32, {3, 3, 64, 128}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {128}));
   runinfo.output_shapes.emplace("R", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
 
   // Get the convolution + tile it
   auto k1 = main->SubBlock(0);
   ApplyTile(k1.get(), {16, 16, 1, 1, 16, 1, 1});
 
-  IVLOG(2, "Before>\n" << *stripe.program);
+  IVLOG(2, "Before>\n" << *program->entry);
 
   AliasMap base;
-  AliasMap prog_map(base, stripe.program.get());
+  AliasMap prog_map(base, program->entry.get());
   AliasMap main_map(prog_map, main.get());
 
   AlwaysFuseRecursive afr;
@@ -334,7 +334,7 @@ TEST(Codegen, FuseAuto) {
   LocalizePass(main_map, main.get());
   Scalarize(main.get(), true);
 
-  IVLOG(2, "After>\n" << *stripe.program);
+  IVLOG(2, "After>\n" << *program->entry);
 }
 
 }  // namespace test

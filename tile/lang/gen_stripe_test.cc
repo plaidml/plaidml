@@ -26,9 +26,9 @@ TEST(GenStripeTest, ContractPlusElementwise) {
   auto shape = SimpleShape(DataType::FLOAT32, {10, 10});
   Tensor A(shape), B(shape);
   auto runinfo = Evaluate("ContractPlusElementwise", {ContractPlusElementwise(A, B)});
-  auto block = GenerateStripe(runinfo).program;
-  LOG(INFO) << "Block: " << *block;
-  EXPECT_THAT(IntoProto(*block), EqualsProtoText(R"***(
+  auto program = GenerateStripe(runinfo);
+  LOG(INFO) << "Block: " << *program->entry;
+  EXPECT_THAT(IntoProto(*program->entry), EqualsProtoText(R"***(
     name: "ContractPlusElementwise"
     loc {}
     refs [

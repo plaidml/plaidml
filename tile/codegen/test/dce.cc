@@ -66,8 +66,8 @@ TEST(DCETest, RemoveBlock) {
   )***";
   runinfo.input_shapes.emplace("XA", SimpleShape(DataType::FLOAT32, {4, 4, 4, 4}));
   runinfo.output_shapes.emplace("XB", SimpleShape(DataType::FLOAT32, {4, 4, 4, 4}));
-  auto stripe = GenerateStripe(runinfo);
-  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+  auto program = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *program->entry);
 
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
@@ -79,9 +79,9 @@ TEST(DCETest, RemoveBlock) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), cfg.passes(), options);
   // Expected result should not contain XA or XC
-  std::string actual_after = RemoveComments(to_string(*stripe.program));
+  std::string actual_after = RemoveComments(to_string(*program->entry));
   IVLOG(1, "After stripe optimization: " << actual_after);
 
   EXPECT_THAT(actual_after.find("XA"), Eq(std::string::npos));
@@ -103,8 +103,8 @@ TEST(DCETest, SimpleTest) {
   )***";
   runinfo.input_shapes.emplace("X_T0", SimpleShape(DataType::FLOAT32, {3, 3}));
   runinfo.output_shapes.emplace("X_T5", SimpleShape(DataType::FLOAT32, {3, 3}));
-  auto stripe = GenerateStripe(runinfo);
-  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+  auto program = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *program->entry);
 
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
@@ -116,10 +116,10 @@ TEST(DCETest, SimpleTest) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), cfg.passes(), options);
 
   // Expected result should not contain X_T1, X_T2, X_T3, X_T4
-  std::string actual_after = RemoveComments(to_string(*stripe.program));
+  std::string actual_after = RemoveComments(to_string(*program->entry));
   IVLOG(1, "After stripe optimization: " << actual_after);
 
   EXPECT_THAT(actual_after.find("X_T1"), Eq(std::string::npos));
@@ -145,8 +145,8 @@ TEST(DCETest, MultiUseTest) {
   runinfo.input_shapes.emplace("X_T0", SimpleShape(DataType::FLOAT32, {3, 3}));
   runinfo.output_shapes.emplace("X_T3", SimpleShape(DataType::FLOAT32, {3, 3}));
   runinfo.output_shapes.emplace("X_T5", SimpleShape(DataType::FLOAT32, {3, 3}));
-  auto stripe = GenerateStripe(runinfo);
-  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+  auto program = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *program->entry);
 
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
@@ -158,10 +158,10 @@ TEST(DCETest, MultiUseTest) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), cfg.passes(), options);
 
   // Expected result should not contain X_T4
-  std::string actual_after = RemoveComments(to_string(*stripe.program));
+  std::string actual_after = RemoveComments(to_string(*program->entry));
   IVLOG(1, "After stripe optimization: " << actual_after);
 
   EXPECT_THAT(actual_after.find("X_T1"), Ne(std::string::npos));

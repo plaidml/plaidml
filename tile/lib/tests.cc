@@ -9,10 +9,10 @@ namespace lib {
 std::pair<std::string, std::function<lang::RunInfo()>> MakeEntry(
     const std::string& name,  //
     std::function<lang::RunInfo(const std::string& name)> fn) {
-  return std::make_pair("$" + name, std::bind(fn, name));
+  return std::make_pair(name, std::bind(fn, name));
 }
 
-std::map<std::string, std::function<lang::RunInfo()>> InternalTests() {
+std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
   static std::map<std::string, std::function<lang::RunInfo()>> tests = {
       MakeEntry("matmul",
                 [](const std::string& name) {
@@ -186,8 +186,22 @@ std::map<std::string, std::function<lang::RunInfo()>> InternalTests() {
                                                  SimpleShape(DataType::FLOAT32, {4, 5, 7, 3}));  //
                 }),
   };
-  return tests;
+  return &tests;
 }  // namespace lib
+
+void RegisterTest(const std::string& name, std::function<lang::RunInfo()> factory) {
+  auto tests = InternalTests();
+  tests->emplace(name, factory);
+}
+
+boost::optional<lang::RunInfo> CreateTest(const std::string& name) {
+  auto tests = InternalTests();
+  auto it = tests->find(name);
+  if (it == tests->end()) {
+    return boost::none;
+  }
+  return it->second();
+}
 
 }  // namespace lib
 }  // namespace tile

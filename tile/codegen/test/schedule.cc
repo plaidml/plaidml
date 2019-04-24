@@ -694,10 +694,9 @@ TEST(Schedule, Basic) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  auto tests = lib::InternalTests();
-  auto runinfo = tests.at("$layer_test2")();
-  auto stripe = GenerateStripe(runinfo);
-  Optimize(stripe.program.get(), cfg.passes(), options);
+  auto runinfo = lib::CreateTest("layer_test2");
+  auto program = GenerateStripe(*runinfo);
+  Optimize(program->entry.get(), cfg.passes(), options);
 }
 
 }  // namespace test
