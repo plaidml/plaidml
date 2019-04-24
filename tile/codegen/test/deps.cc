@@ -19,7 +19,7 @@ TEST(DepsTest, SmallDepMix) {
   auto input_text = R"(
     loc {}
     stmts {
-      tags: "main"
+      attrs: { key: "main" value {} }
       block {
         loc {}
         refs: [{
@@ -56,7 +56,7 @@ TEST(DepsTest, SmallDepMix) {
   const char* expected = R"(
     loc {}
     stmts {
-      tags: "main"
+      attrs: { key: "main" value {} }
       block {
         loc {}
         refs [{
@@ -98,7 +98,7 @@ TEST(DepsTest, Subregion) {
       }
     }]
     stmts {
-      tags: "main"
+      attrs: { key: "main" value {} }
       block {
         idxs { name: "i" range: 10 affine { } }
         refs [{
@@ -152,7 +152,7 @@ TEST(DepsTest, Subregion) {
       }
     }]
     stmts {
-      tags: "main"
+      attrs: { key: "main" value {} }
       block {
         loc {}
         idxs { name: "i" range: 10 affine { } }
