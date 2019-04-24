@@ -11,12 +11,18 @@ conda_binary(
     deps = [":pmlc_bin"],
 )
 
-plaidml_cc_binary(
-    name = "pmlc_bin",
-    srcs = glob([
-        "*.h",
-        "*.cc",
-    ]),
+py_binary(
+    name = "pmlc_py",
+    srcs = ["pmlc.py"],
+    data = [":pmlc_bin"],
+    legacy_create_init = False,
+    main = "pmlc.py",
+)
+
+plaidml_cc_library(
+    name = "lib",
+    srcs = ["pmlc.cc"],
+    hdrs = ["pmlc.h"],
     defines = select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": ["ENABLE_LLVM_BITCODE"],
@@ -35,4 +41,10 @@ plaidml_cc_binary(
             "//tile/targets/gpu",
         ],
     }),
+)
+
+plaidml_cc_binary(
+    name = "pmlc_bin",
+    srcs = ["main.cc"],
+    deps = [":lib"],
 )

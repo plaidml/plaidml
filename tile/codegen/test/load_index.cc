@@ -199,11 +199,6 @@ static std::vector<float> GenerateExpected(const std::vector<size_t>& dim, size_
 }
 
 TEST(LoadIndexTest, SimpleIndex) {
-  auto verbose = std::getenv("VERBOSE");
-  if (verbose && strlen(verbose) > 0) {
-    el::Loggers::setVerboseLevel(std::stoi(verbose));
-  }
-
   lang::RunInfo runinfo;
   runinfo.program_name = "load_index_simple";
   runinfo.code = R"***(
@@ -213,10 +208,10 @@ TEST(LoadIndexTest, SimpleIndex) {
   )***";
   runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {4, 4, 4, 4}));
   runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {4, 4, 4, 4}));
-  auto stripe = GenerateStripe(runinfo);
-  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+  auto program = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  std::string expected_stripe = R"**(0: #program 
+  std::string expected_stripe = R"**(0: #program #total_macs
     block []:1 ( // load_index_simple
         #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB
         #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB
@@ -238,7 +233,7 @@ TEST(LoadIndexTest, SimpleIndex) {
     }
   )**";
 
-  std::string actual_stripe = to_string(*stripe.program);
+  std::string actual_stripe = to_string(*program->entry);
   actual_stripe = EraseSpace(actual_stripe);
   expected_stripe = EraseSpace(expected_stripe);
 
@@ -254,23 +249,18 @@ TEST(LoadIndexTest, SimpleIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
-  IVLOG(1, "After stripe optimization: " << *stripe.program);
+  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 4, 4};
   std::vector<std::string> vars = {"A", "B"};
   auto data = GenerateMatrix(dim, vars);
   auto expected_result = GenerateExpected(dim, 2);
-  ExecuteProgram(*stripe.program, &data);
+  ExecuteProgram(*program->entry, &data);
   EXPECT_THAT(data["B"], Eq(expected_result));
 }
 
 TEST(LoadIndexTest, AffineIndex) {
-  auto verbose = std::getenv("VERBOSE");
-  if (verbose && strlen(verbose) > 0) {
-    el::Loggers::setVerboseLevel(std::stoi(verbose));
-  }
-
   lang::RunInfo runinfo;
   runinfo.program_name = "load_index_affine";
   runinfo.code = R"***(
@@ -280,10 +270,10 @@ TEST(LoadIndexTest, AffineIndex) {
   )***";
   runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {8, 8, 256, 8}));
   runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {8, 8, 256, 8}));
-  auto stripe = GenerateStripe(runinfo);
-  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+  auto program = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  std::string expected_stripe = R"**(0: #program
+  std::string expected_stripe = R"**(0: #program #total_macs
     block []:1 ( // load_index_affine
         #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB
         #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB
@@ -305,7 +295,7 @@ TEST(LoadIndexTest, AffineIndex) {
     }
   )**";
 
-  std::string actual_stripe = to_string(*stripe.program);
+  std::string actual_stripe = to_string(*program->entry);
   actual_stripe = EraseSpace(actual_stripe);
   expected_stripe = EraseSpace(expected_stripe);
 
@@ -321,23 +311,18 @@ TEST(LoadIndexTest, AffineIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
-  IVLOG(1, "After stripe optimization: " << *stripe.program);
+  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {8, 8, 256, 8};
   std::vector<std::string> vars = {"A", "B"};
   auto data = GenerateMatrix(dim, vars);
   auto expected_result = GenerateExpected(dim, 2);
-  ExecuteProgram(*stripe.program, &data);
+  ExecuteProgram(*program->entry, &data);
   EXPECT_THAT(data["B"], Eq(expected_result));
 }
 
 TEST(LoadIndexTest, MultiLoadIndex) {
-  auto verbose = std::getenv("VERBOSE");
-  if (verbose && strlen(verbose) > 0) {
-    el::Loggers::setVerboseLevel(std::stoi(verbose));
-  }
-
   lang::RunInfo runinfo;
   runinfo.program_name = "load_index_affine";
   runinfo.code = R"***(
@@ -351,10 +336,10 @@ TEST(LoadIndexTest, MultiLoadIndex) {
   runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {4, 4, 256, 8}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {4, 4, 256, 8}));
   runinfo.output_shapes.emplace("D", SimpleShape(DataType::FLOAT32, {4, 4, 256, 8}));
-  auto stripe = GenerateStripe(runinfo);
-  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+  auto program = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  std::string expected_stripe = R"**(0: #program
+  std::string expected_stripe = R"**(0: #program #total_macs
     block []:1 ( // load_index_affine
         #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB
         #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB
@@ -396,7 +381,7 @@ TEST(LoadIndexTest, MultiLoadIndex) {
     }
   )**";
 
-  std::string actual_stripe = to_string(*stripe.program);
+  std::string actual_stripe = to_string(*program->entry);
   actual_stripe = EraseSpace(actual_stripe);
   expected_stripe = EraseSpace(expected_stripe);
 
@@ -412,8 +397,8 @@ TEST(LoadIndexTest, MultiLoadIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
-  IVLOG(1, "After stripe optimization: " << *stripe.program);
+  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 256, 8};
   std::vector<std::string> vars = {"A", "B", "C", "D"};
@@ -421,18 +406,13 @@ TEST(LoadIndexTest, MultiLoadIndex) {
   auto expected_B = GenerateExpected(dim, 2);
   auto expected_C = GenerateExpected(dim, 0);
   auto expected_D = GenerateExpected(dim, 1);
-  ExecuteProgram(*stripe.program, &data);
+  ExecuteProgram(*program->entry, &data);
   EXPECT_THAT(data["B"], Eq(expected_B));
   EXPECT_THAT(data["C"], Eq(expected_C));
   EXPECT_THAT(data["D"], Eq(expected_D));
 }
 
 TEST(LoadIndexTest, FuseIndex) {
-  auto verbose = std::getenv("VERBOSE");
-  if (verbose && strlen(verbose) > 0) {
-    el::Loggers::setVerboseLevel(std::stoi(verbose));
-  }
-
   lang::RunInfo runinfo;
   runinfo.program_name = "load_index_affine";
   runinfo.code = R"***(
@@ -444,10 +424,10 @@ TEST(LoadIndexTest, FuseIndex) {
   runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {4, 4, 4, 8}));
   runinfo.output_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {4, 4, 4, 8}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {4, 4, 4, 8}));
-  auto stripe = GenerateStripe(runinfo);
-  IVLOG(1, "Before stripe optimization: " << *stripe.program);
+  auto program = GenerateStripe(runinfo);
+  IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  std::string expected_stripe = R"**(0: #program
+  std::string expected_stripe = R"**(0: #program #total_macs
     block []:1 ( // load_index_affine
         #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB
         #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB
@@ -483,7 +463,7 @@ TEST(LoadIndexTest, FuseIndex) {
     }
   )**";
 
-  std::string actual_stripe = to_string(*stripe.program);
+  std::string actual_stripe = to_string(*program->entry);
   actual_stripe = EraseSpace(actual_stripe);
   expected_stripe = EraseSpace(expected_stripe);
 
@@ -499,8 +479,8 @@ TEST(LoadIndexTest, FuseIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(stripe.program.get(), cfg.passes(), options);
-  IVLOG(1, "After stripe optimization: " << *stripe.program);
+  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 4, 8};
   std::vector<std::string> vars = {"A", "B", "C"};
@@ -512,7 +492,7 @@ TEST(LoadIndexTest, FuseIndex) {
   for (size_t i = 0; i < data_A.size(); ++i) {
     expected_C[i] = data_A[i] + expected_B[i];
   }
-  ExecuteProgram(*stripe.program, &data);
+  ExecuteProgram(*program->entry, &data);
   EXPECT_THAT(data["B"], Eq(expected_B));
   EXPECT_THAT(data["C"], Eq(expected_C));
 }

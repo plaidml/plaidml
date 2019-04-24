@@ -311,8 +311,8 @@ TEST(Jit, JitMatMul) {
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {dim, dim}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {dim, dim}));
 
-  auto stripe = GenerateStripe(runinfo);
-  auto main = stripe.program->SubBlock(0);
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
 
   IVLOG(2, "Before>\n" << *main);
 

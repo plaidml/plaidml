@@ -28,22 +28,22 @@ int main(int argc, char* argv[]) {
   auto in1 = SimpleShape(DataType::FLOAT32, {1024, 1024});
   auto in2 = SimpleShape(DataType::FLOAT32, {1024, 1024});
   auto runinfo = lib::LoadMatMul("test", in1, in2);
-  auto block = lang::GenerateStripe(runinfo).program;
-  std::cout << *block << std::endl;
+  auto program = lang::GenerateStripe(runinfo);
+  std::cout << *program->entry << std::endl;
 
   // static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
   //    std::string cfg_file = runfiles_db["tile/cpu/cpu.json"];
   std::string cfg_file = "external/com_intel_plaidml/tile/cpu/cpu.json";
 
-  auto cfg = vertexai::ParseConfig<codegen::proto::Config>(ReadFile(cfg_file));
+  auto cfg = vertexai::ParseConfig<codegen::proto::Config>(vertexai::ReadFile(cfg_file));
   codegen::OptimizeOptions options = {
       true,                      // dump_passes
       false,                     // dump_code
       "/tmp/stripe_cpu/passes",  // dbg_dir
   };
-  codegen::Optimize(block.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), cfg.passes(), options);
 
-  std::cout << "============================================================\n" << *block << std::endl;
+  std::cout << "============================================================\n" << *program->entry << std::endl;
 
   // Run
   std::vector<float> a_data(1024 * 1024);
@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
   io["C"] = c_data.data();
 
   targets::cpu::Native native;
-  native.compile(*block);
+  native.compile(*program->entry);
 
   for (int i = 0; i < 10; i++) {
     for (auto& f : c_data) {

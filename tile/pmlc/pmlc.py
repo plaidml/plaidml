@@ -23,17 +23,20 @@ class ParamsAction(argparse.Action):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog='pmlc')
     parser.add_argument('-v', '--verbose', help='Logging verbosity level', type=int, default=0)
+    parser.add_argument('--pmlc', help='Path to pmlc binary', default='pmlc_bin')
     parser.add_argument(
         '-c',
         '--config',
+        type=pathlib.Path,
         help='The configuration file to use for compilation.',
         required=True,
     )
     parser.add_argument(
         '-y',
         '--yaml',
+        type=pathlib.Path,
         help='The parameters file to use for compilation.',
     )
     parser.add_argument(
@@ -42,19 +45,15 @@ def main():
         help='The target name to use within the specified --yaml file.',
     )
     parser.add_argument(
-        '-o',
-        '--output',
-        help='The output path. If not specified, outputs to stdout.',
-    )
-    parser.add_argument(
         '-D',
         '--outdir',
         help='The output directory.',
+        type=pathlib.Path,
     )
     parser.add_argument(
         '--dump-passes',
         action='store_true',
-        help='Enable dumping of passes',
+        help='Enable dump passes.',
     )
     parser.add_argument(
         '-p',
@@ -66,20 +65,21 @@ def main():
         help=
         'Parameters used for compilation. These values will override any parameters specified in a --yaml file.',
     )
+    parser.add_argument('-r', '--run_under', help='Run pmlsim in a debugger')
     parser.add_argument(
         'tile',
+        type=pathlib.Path,
         help='.tile source file to compile.',
     )
-    args = parser.parse_args()
+    args, remainder = parser.parse_known_args()
 
-    cfg_path = pathlib.Path(args.config)
     env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(str(cfg_path.parent)),
+        loader=jinja2.FileSystemLoader(str(args.config.parent)),
         lstrip_blocks=True,
         trim_blocks=True,
         line_comment_prefix='##',
     )
-    tmpl = env.get_template(cfg_path.name)
+    tmpl = env.get_template(args.config.name)
     if args.yaml:
         if not args.target:
             sys.exit('--target is required when using --yaml')
@@ -89,31 +89,28 @@ def main():
         params = {}
     params.update(args.params)
 
-    bin = shutil.which('pmlc_bin')
+    bin = shutil.which(args.pmlc)
     if not bin:
         bin = '../com_intel_plaidml/tile/pmlc/pmlc_bin'
     with tempfile.TemporaryDirectory() as tmp_dir:
         cfg_path = pathlib.Path(tmp_dir) / 'config.json'
         with cfg_path.open('w') as fp:
             tmpl.stream(params).dump(fp)
-        cmd = [bin, args.tile, '-config', cfg_path]
-        if args.output:
-            cmd += ['-out', args.output]
+        cmd = []
+        if args.run_under:
+            cmd += [args.run_under, '--']
+        cmd += [bin, args.tile]
+        cmd += ['--config', cfg_path]
         if args.outdir:
-            outdir_path = pathlib.Path(args.outdir)
-            shutil.rmtree(outdir_path, ignore_errors=True)
-            outdir_path.mkdir(parents=True, exist_ok=True)
-            shutil.copy(cfg_path, outdir_path / 'config.json')
-            cmd += ['-outdir', args.outdir]
+            shutil.copy(cfg_path, args.outdir / 'config.json')
+            cmd += ['--outdir', args.outdir]
         if args.dump_passes:
-            cmd += ['-dump-passes']
+            cmd += ['--dump-passes']
         if args.verbose > 0:
             cmd += ['-v', str(args.verbose)]
-        subprocess.check_call(cmd)
+        cmd += remainder
+        subprocess.run(cmd, check=True)
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as ex:
-        print(ex, file=sys.stderr)
+    main()

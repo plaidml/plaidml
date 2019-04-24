@@ -29,10 +29,11 @@ class StripeGenerator {
     }
   }
 
-  Stripe Run() {
-    auto program = std::make_shared<Block>();
-    program->set_tag("program");
-    program->name = runinfo_.program_name;
+  std::shared_ptr<stripe::Program> Run() {
+    auto program = std::make_shared<stripe::Program>();
+    auto entry = program->entry = std::make_shared<stripe::Block>();
+    entry->set_tag("program");
+    entry->name = runinfo_.program_name;
     IVLOG(1, "Compiling " << runinfo_.program.ops.size() << " ops");
     // The top level block is a 'main' function.
     // In/Out/InOut refinements made on main relate to user supplied inputs and outputs.
@@ -40,11 +41,11 @@ class StripeGenerator {
     // The list of kernels to execute are the list of blocks defined within main.
     auto main = std::make_shared<Block>();
     main->set_tag("main");
-    program->stmts.push_back(main);
+    entry->stmts.push_back(main);
     main->name = "main";
     // Add decls for external inputs/outputs
-    AddDecls(program.get(), main.get(), runinfo_.input_shapes, true);
-    AddDecls(program.get(), main.get(), runinfo_.output_shapes, false);
+    AddDecls(entry.get(), main.get(), runinfo_.input_shapes, true);
+    AddDecls(entry.get(), main.get(), runinfo_.output_shapes, false);
     // Add decls for temporaries
     for (const auto& item : runinfo_.vars) {
       if (externals_.count(item.first) == 0) {
@@ -60,7 +61,7 @@ class StripeGenerator {
               shape,         // interior_shape
           };
           new_ref.set_tag("tmp");
-          program->refs.emplace(std::move(new_ref));
+          entry->refs.emplace(std::move(new_ref));
           Refinement tmp_ref{
               RefDir::InOut,  // dir
               item.first,     // from
@@ -91,9 +92,9 @@ class StripeGenerator {
           } else if (op.f.fn == "reshape") {
             ProcessReshape(main.get(), op);
           } else if (op.f.fn == "index") {
-            ProcessIndex(program.get(), main.get(), op);
+            ProcessIndex(entry.get(), main.get(), op);
           } else {
-            ProcessElementwise(program.get(), main.get(), op);
+            ProcessElementwise(entry.get(), main.get(), op);
           }
           break;
         case Op::CONSTANT:
@@ -102,10 +103,8 @@ class StripeGenerator {
       }
     }
     IVLOG(2, "Done");
-    Stripe stripe;
-    stripe.program = program;
-    stripe.total_macs = total_macs_;
-    return stripe;
+    entry->set_attr("total_macs", total_macs_);
+    return program;
   }
 
  private:
@@ -215,8 +214,9 @@ class StripeGenerator {
     }
 
     auto kernel = AddKernel(main, op);
+    auto agg_op = GetAggOp(cion.agg_op);
     kernel->set_tag("contraction");
-    kernel->set_tag("agg_op_" + GetAggOp(cion.agg_op));
+    kernel->set_tag("agg_op_" + agg_op);
 
     std::vector<std::string> scalar_inputs;
     kernel->name += "(";
@@ -230,12 +230,12 @@ class StripeGenerator {
       }
       if (i == 0) {
         kernel->refs.emplace(Refinement{
-            RefDir::Out,            // dir
-            spec.id,                // from
-            spec.id,                // into
-            access,                 // access
-            interior_shape,         // interior_shape
-            GetAggOp(cion.agg_op),  // agg_op
+            RefDir::Out,     // dir
+            spec.id,         // from
+            spec.id,         // into
+            access,          // access
+            interior_shape,  // interior_shape
+            agg_op,          // agg_op
         });
         out_ref_name = spec.id;
       } else {
@@ -306,7 +306,7 @@ class StripeGenerator {
         if (!combo_op.empty()) {
           AddIntrinsic(kernel.get(), combo_op, output_type, scalar_inputs, {ScalarName(op.output)});
           kernel->set_tag("comb_op_" + combo_op);
-          if (combo_op == Intrinsic::MUL) {
+          if (agg_op == Intrinsic::SUM && combo_op == Intrinsic::MUL) {
             total_macs_ += kernel->idxs_product();
           }
         }
@@ -314,7 +314,7 @@ class StripeGenerator {
     } else {
       AddIntrinsic(kernel.get(), "assign", output_type, scalar_inputs, {ScalarName(op.output)});
       // Mark including the agg_op
-      kernel->set_tag("agg_op_" + GetAggOp(cion.agg_op) + "_no_comb_op");
+      kernel->set_tag("agg_op_" + agg_op + "_no_comb_op");
     }
 
     // STORE
@@ -752,12 +752,12 @@ class StripeGenerator {
   std::set<std::string> externals_;
   std::set<size_t> to_skip_;
   bool i8_mode_;
-  uint64_t total_macs_ = 0;
+  int64_t total_macs_ = 0;
 };
 
 }  // namespace
 
-Stripe GenerateStripe(const RunInfo& runinfo, bool i8_mode) {  //
+std::shared_ptr<stripe::Program> GenerateStripe(const RunInfo& runinfo, bool i8_mode) {  //
   return StripeGenerator(runinfo, i8_mode).Run();
 }
 
