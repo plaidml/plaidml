@@ -23,11 +23,10 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   IVLOG(1, runinfo.output_shapes);
   IVLOG(1, to_string(runinfo.program));
   auto stripe = GenerateStripe(runinfo);
-  codegen::OptimizeOptions options = {
-      !out_dir.empty(),     // dump_passes
-      false,                // dump_code
-      out_dir + "/passes",  // dbg_dir
-  };
+
+  codegen::OptimizeOptions options;
+  options.dump_passes = !out_dir.empty();
+  options.dbg_dir = out_dir + "/passes";
   IVLOG(1, *stripe->entry);
   auto cfg = Configs::Resolve(cfg_name);
   codegen::Optimize(stripe->entry.get(), cfg.passes(), options);

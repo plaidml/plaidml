@@ -72,8 +72,6 @@ TEST(DCETest, RemoveBlock) {
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
-  options.dump_code = false;
-  options.dump_passes = false;
   if (dbg_dir) {
     options.dump_passes = true;
     options.dbg_dir = dbg_dir;
@@ -109,8 +107,6 @@ TEST(DCETest, SimpleTest) {
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
-  options.dump_code = false;
-  options.dump_passes = false;
   if (dbg_dir) {
     options.dump_passes = true;
     options.dbg_dir = dbg_dir;
@@ -151,8 +147,6 @@ TEST(DCETest, MultiUseTest) {
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
-  options.dump_code = false;
-  options.dump_passes = false;
   if (dbg_dir) {
     options.dump_passes = true;
     options.dbg_dir = dbg_dir;

@@ -242,8 +242,6 @@ TEST(LoadIndexTest, SimpleIndex) {
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
-  options.dump_code = false;
-  options.dump_passes = false;
   if (dbg_dir) {
     options.dump_passes = true;
     options.dbg_dir = dbg_dir;
@@ -304,8 +302,6 @@ TEST(LoadIndexTest, AffineIndex) {
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
-  options.dump_code = false;
-  options.dump_passes = false;
   if (dbg_dir) {
     options.dump_passes = true;
     options.dbg_dir = dbg_dir;
@@ -390,8 +386,6 @@ TEST(LoadIndexTest, MultiLoadIndex) {
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
-  options.dump_code = false;
-  options.dump_passes = false;
   if (dbg_dir) {
     options.dump_passes = true;
     options.dbg_dir = dbg_dir;
@@ -472,8 +466,6 @@ TEST(LoadIndexTest, FuseIndex) {
   auto cfg = GenerateCFG();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
-  options.dump_code = false;
-  options.dump_passes = false;
   if (dbg_dir) {
     options.dump_passes = true;
     options.dbg_dir = dbg_dir;

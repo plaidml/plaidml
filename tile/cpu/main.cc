@@ -36,11 +36,9 @@ int main(int argc, char* argv[]) {
   std::string cfg_file = "external/com_intel_plaidml/tile/cpu/cpu.json";
 
   auto cfg = vertexai::ParseConfig<codegen::proto::Config>(vertexai::ReadFile(cfg_file));
-  codegen::OptimizeOptions options = {
-      true,                      // dump_passes
-      false,                     // dump_code
-      "/tmp/stripe_cpu/passes",  // dbg_dir
-  };
+  codegen::OptimizeOptions options;
+  options.dump_passes = true;
+  options.dbg_dir = "/tmp/stripe_cpu/passes";
   codegen::Optimize(program->entry.get(), cfg.passes(), options);
 
   std::cout << "============================================================\n" << *program->entry << std::endl;

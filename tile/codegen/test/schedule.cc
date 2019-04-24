@@ -687,8 +687,6 @@ TEST(Schedule, Basic) {
       str(boost::format(cfg_tmpl) % num_banks % procs_per_bank % bank_size % bank_size_KiB));
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
-  options.dump_code = false;
-  options.dump_passes = false;
   if (dbg_dir) {
     options.dump_passes = true;
     options.dbg_dir = dbg_dir;
