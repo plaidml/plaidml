@@ -88,7 +88,7 @@ RunInfo LoadMatMulAmongEltwise(const std::string& name, const TensorShape& i1, c
   Tensor C(i3, "C");
   Tensor NegA = -A;
   Tensor NegB = -B;
-  Tensor P = MatMul(A, B);
+  Tensor P = MatMul(NegA, NegB);
   return Evaluate(name, {P + C});
 }
 
