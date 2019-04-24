@@ -6,15 +6,16 @@
 #include <sstream>
 
 #include <boost/format.hpp>
-#include <boost/variant.hpp>
 
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
-#include "tile/base/shape.h"
+#include "tile/stripe/impl.h"
 
 namespace vertexai {
 namespace tile {
 namespace stripe {
+
+using google::protobuf::Any;
 
 const char* Intrinsic::ASSIGN = "assign";
 const char* Intrinsic::SUM = "add";
@@ -27,22 +28,7 @@ const char* Intrinsic::ADD = "add";
 const char* Intrinsic::EQ = "cmp_eq";
 const char* Intrinsic::COND = "cond";
 
-struct Void {};
-
-std::ostream& operator<<(std::ostream& os, const Void& value) {
-  os << "{}";
-  return os;
-}
-
-using AttrValue = boost::variant<Void, bool, int64_t, double, std::string>;
-
-struct Taggable::Impl {
-  std::map<std::string, AttrValue> attrs;
-};
-
-struct Accessor {
-  static const Taggable::Impl* impl(const Taggable& taggable) { return taggable.impl_.get(); }
-};
+const Taggable::Impl* Accessor::impl(const Taggable& taggable) { return taggable.impl_.get(); }
 
 namespace {
 
@@ -305,6 +291,8 @@ void Taggable::set_attr(const std::string& name, double value) { impl_->attrs.em
 
 void Taggable::set_attr(const std::string& name, const std::string& value) { impl_->attrs.emplace(name, value); }
 
+void Taggable::set_attr(const std::string& name, const Any& value) { impl_->attrs.emplace(name, value); }
+
 bool Taggable::has_attr(const std::string& name) const { return impl_->attrs.count(name); }
 
 void Taggable::set_attrs(const Taggable& rhs) {
@@ -322,6 +310,8 @@ double Taggable::get_attr_float(const std::string& name) const { return boost::g
 std::string Taggable::get_attr_str(const std::string& name) const {
   return boost::get<std::string>(impl_->attrs[name]);
 }
+
+Any Taggable::get_attr_any(const std::string& name) const { return boost::get<Any>(impl_->attrs[name]); }
 
 bool Taggable::get_attr_bool(const std::string& name, bool def) const {
   return has_attr(name) ? get_attr_bool(name) : def;
@@ -861,323 +851,6 @@ class CloneVisitor : RewriteStmtVisitor {
 std::shared_ptr<Block> CloneBlock(const Block& orig, int depth) {
   CloneVisitor visitor(depth);
   return std::shared_ptr<Block>(visitor.Visit(orig));
-}
-
-Affine FromProto(const proto::Affine& affine) {
-  Affine ret = affine.offset();
-  for (const auto& kvp : affine.terms()) {
-    ret += Affine(kvp.first, kvp.second);
-  }
-  return ret;
-}
-
-Device FromProto(const proto::Device& dev) {
-  Device result;
-  result.name = dev.name();
-  for (const auto& unit : dev.units()) {
-    result.units.emplace_back(FromProto(unit));
-  }
-  return result;
-}
-
-std::vector<Device> FromProto(const google::protobuf::RepeatedPtrField<proto::Device>& devs) {
-  std::vector<Device> result;
-  for (const auto& dev : devs) {
-    result.emplace_back(FromProto(dev));
-  }
-  return result;
-}
-
-Location FromProto(const proto::Location& loc) {
-  Location result;
-  result.devs = FromProto(loc.devs());
-  return result;
-}
-
-RefDir FromProto(const proto::Refinement::Dir& dir) {
-  switch (dir) {
-    case proto::Refinement::None:
-      return RefDir::None;
-    case proto::Refinement::In:
-      return RefDir::In;
-    case proto::Refinement::Out:
-      return RefDir::Out;
-    case proto::Refinement::InOut:
-      return RefDir::InOut;
-    default:
-      throw std::runtime_error("Invalid RefDir");
-  }
-}
-
-Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags) {
-  Tags tags;
-  for (const auto& tag : pb_tags) {
-    tags.emplace(tag);
-  }
-  return tags;
-}
-
-std::shared_ptr<Block> FromProto(const proto::Block& block) {
-  auto ret = std::make_shared<Block>();
-  ret->name = block.name();
-  ret->comments = block.comments();
-  ret->location = FromProto(block.loc());
-  for (const auto& pb_idx : block.idxs()) {
-    ret->idxs.emplace_back(Index{pb_idx.name(), pb_idx.range(), FromProto(pb_idx.affine())});
-  }
-  for (const auto& pb_con : block.constraints()) {
-    ret->constraints.emplace_back(FromProto(pb_con));
-  }
-  for (const auto& pb_into_ref : block.refs()) {
-    auto ref = Refinement::FromInto(pb_into_ref.first);
-    ref.dir = FromProto(pb_into_ref.second.dir());
-    ref.from = pb_into_ref.second.from();
-    for (const auto& pb_off : pb_into_ref.second.access()) {
-      ref.access.emplace_back(FromProto(pb_off));
-    }
-    ref.interior_shape = tile::FromProto(pb_into_ref.second.interior_shape());
-    ref.agg_op = pb_into_ref.second.agg_op();
-    ref.location = FromProto(pb_into_ref.second.loc());
-    ref.offset = pb_into_ref.second.offset();
-    // if (pb_into_ref.second.has_bank_dim()) {
-    //   ref.bank_dim = pb_into_ref.second.bank_dim().value();
-    // }
-    ret->refs.emplace(std::move(ref));
-  }
-  std::vector<StatementIt> stmts;
-  stmts.reserve(block.stmts_size());
-  for (const auto& pb_stmt : block.stmts()) {
-    switch (pb_stmt.op_case()) {
-      case proto::Statement::kLoad: {
-        auto stmt = std::make_shared<Load>(pb_stmt.load().from(), pb_stmt.load().into());
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kStore: {
-        auto stmt = std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into());
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kLoadIndex: {
-        auto stmt = std::make_shared<LoadIndex>(FromProto(pb_stmt.load_index().from()), pb_stmt.load_index().into());
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kConstant:
-        switch (pb_stmt.constant().value_case()) {
-          case proto::Constant::kIconst: {
-            auto stmt = std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().iconst());
-            stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-          } break;
-          case proto::Constant::kFconst: {
-            auto stmt = std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().fconst());
-            stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-          } break;
-          default:
-            break;
-        }
-        break;
-      case proto::Statement::kSpecial: {
-        auto stmt = std::make_shared<Special>();
-        stmt->name = pb_stmt.special().name();
-        for (const auto& item : pb_stmt.special().inputs()) {
-          stmt->inputs.push_back(item);
-        }
-        for (const auto& item : pb_stmt.special().outputs()) {
-          stmt->outputs.push_back(item);
-        }
-        for (const auto& item : pb_stmt.special().int_params()) {
-          stmt->int_params.emplace(item);
-        }
-        for (const auto& item : pb_stmt.special().str_params()) {
-          stmt->str_params.emplace(item);
-        }
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kIntrinsic: {
-        auto stmt = std::make_shared<Intrinsic>();
-        stmt->name = pb_stmt.intrinsic().name();
-        stmt->type = tile::FromProto(pb_stmt.intrinsic().type());
-        for (const auto& item : pb_stmt.intrinsic().inputs()) {
-          stmt->inputs.push_back(item);
-        }
-        for (const auto& item : pb_stmt.intrinsic().outputs()) {
-          stmt->outputs.push_back(item);
-        }
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kBlock: {
-        auto stmt = FromProto(pb_stmt.block());
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      default:
-        break;
-    }
-    std::shared_ptr<Statement> stmt = *stmts.back();
-    for (std::size_t dep_idx : pb_stmt.deps()) {
-      stmt->deps.push_back(stmts[dep_idx]);
-    }
-    for (const auto& tag : pb_stmt.tags()) {
-      stmt->set_tag(tag);
-    }
-  }
-  return ret;
-}
-
-proto::Affine IntoProto(const Affine& affine) {
-  proto::Affine ret;
-  for (const auto& kvp : affine.getMap()) {
-    if (kvp.first.empty()) {
-      ret.set_offset(kvp.second);
-    } else {
-      std::string str = kvp.first;
-      (*ret.mutable_terms())[str] = kvp.second;
-    }
-  }
-  return ret;
-}
-
-proto::Device IntoProto(const Device& dev) {
-  proto::Device ret;
-  ret.set_name(dev.name);
-  for (const auto& unit : dev.units) {
-    *ret.add_units() = IntoProto(unit);
-  }
-  return ret;
-}
-
-proto::Location IntoProto(const Location& loc) {
-  proto::Location ret;
-  for (const auto& dev : loc.devs) {
-    *ret.add_devs() = IntoProto(dev);
-  }
-  return ret;
-}
-
-proto::Block IntoProto(const Block& block) {
-  proto::Block ret;
-  ret.set_name(block.name);
-  ret.set_comments(block.comments);
-  *ret.mutable_loc() = IntoProto(block.location);
-  for (const auto& idx : block.idxs) {
-    auto pb_idx = ret.add_idxs();
-    pb_idx->set_name(idx.name);
-    pb_idx->set_range(idx.range);
-    *pb_idx->mutable_affine() = IntoProto(idx.affine);
-  }
-  for (const auto& con : block.constraints) {
-    *ret.add_constraints() = IntoProto(con);
-  }
-  for (const auto& ref : block.refs) {
-    auto& pb_ref = (*ret.mutable_refs())[ref.into()];
-    switch (ref.dir) {
-      case RefDir::None:
-        pb_ref.set_dir(proto::Refinement::None);
-        break;
-      case RefDir::In:
-        pb_ref.set_dir(proto::Refinement::In);
-        break;
-      case RefDir::Out:
-        pb_ref.set_dir(proto::Refinement::Out);
-        break;
-      case RefDir::InOut:
-        pb_ref.set_dir(proto::Refinement::InOut);
-        break;
-    }
-    pb_ref.set_from(ref.from);
-    for (const auto& access : ref.access) {
-      *pb_ref.add_access() = IntoProto(access);
-    }
-    *pb_ref.mutable_interior_shape() = IntoProto(ref.interior_shape);
-    pb_ref.set_agg_op(ref.agg_op);
-    *pb_ref.mutable_loc() = IntoProto(ref.location);
-    pb_ref.set_offset(ref.offset);
-    // if (ref.bank_dim) {
-    //   pb_ref.mutable_bank_dim()->set_value(*ref.bank_dim);
-    // }
-  }
-  std::unordered_map<Statement*, std::size_t> dep_idxs;
-  std::size_t stmt_idx = 0;
-  for (const auto& stmt : block.stmts) {
-    dep_idxs[stmt.get()] = stmt_idx++;
-    auto pb_stmt = ret.add_stmts();
-    std::vector<std::size_t> deps;
-    for (StatementIt dep : stmt->deps) {
-      deps.push_back(dep_idxs[dep->get()]);
-    }
-    std::sort(deps.begin(), deps.end());  // Provide stable output ordering
-    for (std::size_t dep : deps) {
-      pb_stmt->add_deps(dep);
-    }
-    auto impl = Accessor::impl(*stmt);
-    for (const auto& attr : impl->attrs) {
-      pb_stmt->add_tags(attr.first);
-    }
-    switch (stmt->kind()) {
-      case StmtKind::Load: {
-        auto load = Load::Downcast(stmt);
-        auto pb_load = pb_stmt->mutable_load();
-        pb_load->set_from(load->from);
-        pb_load->set_into(load->into);
-      } break;
-      case StmtKind::Store: {
-        auto store = Store::Downcast(stmt);
-        auto pb_store = pb_stmt->mutable_store();
-        pb_store->set_from(store->from);
-        pb_store->set_into(store->into);
-      } break;
-      case StmtKind::LoadIndex: {
-        auto load_index = LoadIndex::Downcast(stmt);
-        auto pb_load_index = pb_stmt->mutable_load_index();
-        *pb_load_index->mutable_from() = IntoProto(load_index->from);
-        pb_load_index->set_into(load_index->into);
-      } break;
-      case StmtKind::Constant: {
-        auto constant = Constant::Downcast(stmt);
-        auto pb_const = pb_stmt->mutable_constant();
-        pb_const->set_name(constant->name);
-        switch (constant->type) {
-          case ConstType::Integer:
-            pb_const->set_iconst(constant->iconst);
-            break;
-          case ConstType::Float:
-            pb_const->set_fconst(constant->fconst);
-            break;
-        }
-      } break;
-      case StmtKind::Special: {
-        auto special = Special::Downcast(stmt);
-        auto pb_special = pb_stmt->mutable_special();
-        pb_special->set_name(special->name);
-        for (const auto& input : special->inputs) {
-          pb_special->add_inputs(input);
-        }
-        for (const auto& output : special->outputs) {
-          pb_special->add_outputs(output);
-        }
-        for (const auto& param : special->int_params) {
-          (*pb_special->mutable_int_params())[param.first] = param.second;
-        }
-        for (const auto& param : special->str_params) {
-          (*pb_special->mutable_str_params())[param.first] = param.second;
-        }
-      } break;
-      case StmtKind::Intrinsic: {
-        auto intrinsic = Intrinsic::Downcast(stmt);
-        auto pb_intrinsic = pb_stmt->mutable_intrinsic();
-        pb_intrinsic->set_name(intrinsic->name);
-        pb_intrinsic->set_type(tile::IntoProto(intrinsic->type));
-        for (const auto& input : intrinsic->inputs) {
-          pb_intrinsic->add_inputs(input);
-        }
-        for (const auto& output : intrinsic->outputs) {
-          pb_intrinsic->add_outputs(output);
-        }
-      } break;
-      case StmtKind::Block: {
-        auto inner = Block::Downcast(stmt);
-        *pb_stmt->mutable_block() = IntoProto(*inner);
-      } break;
-    }
-  }
-  return ret;
 }
 
 const Index* Block::idx_by_name(const std::string& name) const {

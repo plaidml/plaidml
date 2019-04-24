@@ -55,7 +55,8 @@ class ScheduleTest : public ::testing::Test {
               }
             }]
       stmts [{
-        tags: ["main"] block {
+        attrs: { key: "main" value {} }
+        block {
           name: "main" loc {}
           refs [{
               key: "i1"
@@ -135,7 +136,8 @@ TEST_F(ScheduleTest, EmptyMain) {
             }
           }]
     stmts [{
-      tags: ["main"] block {
+      attrs: { key: "main" value {} }
+      block {
         name: "main" loc {}
         refs [{
             key: "i1"
@@ -208,7 +210,8 @@ TEST_F(ScheduleTest, CachesIO) {
             }
           }]
     stmts [{
-      tags: ["main"] block {
+      attrs: { key: "main" value {} }
+      block {
         name: "main" loc {}
         refs [{
             key: "i1"
@@ -427,7 +430,8 @@ TEST_F(ScheduleTest, UsesTmps) {
             }
           }]
     stmts [{
-      tags: ["main"] block {
+      attrs: { key: "main" value {} }
+      block {
         name: "main" loc {}
         refs [{
             key: "i1"

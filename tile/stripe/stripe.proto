@@ -5,7 +5,18 @@ syntax = "proto3";
 package vertexai.tile.stripe.proto;
 
 import "tile/proto/shape.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
+
+message Attribute {
+  oneof attr {
+    bool bval = 1;
+    int64 ival = 2;
+    double fval = 3;
+    string sval = 4;
+    google.protobuf.Any any = 5;
+  }
+}
 
 // An affine represents a set of multipliers, one for each index, as well as a
 // constant, which in combination project a (possibly multidimensional) index
@@ -59,7 +70,7 @@ message Index {
   string name = 1;
   uint64 range = 2;
   Affine affine = 3;
-  repeated string tags = 4;
+  map<string, Attribute> attrs = 4;
 }
 
 // A refinement represents a dimensional buffer (Tensor) or a region thereof.
@@ -104,7 +115,7 @@ message Refinement {
   // A set of user defined 'tags' that are attached to the refinement.  They do
   // not have any specific semantic meaning, but are often used to pass
   // membership information between optimization passes
-  repeated string tags = 10;
+  map<string, Attribute> attrs = 10;
 }
 
 // For each index position of a block, the block executes multiple 'Statement'
@@ -143,7 +154,7 @@ message Statement {
   // A set of user defined 'tags' that are attached to a statement.  They do not
   // have any specific semantic meaning, but are often used to pass membership
   // information between optimization passes
-  repeated string tags = 9;
+  map<string, Attribute> attrs = 9;
 }
 
 // A load statement
@@ -226,4 +237,14 @@ message Device {
 // element on a particular device on a particular host).
 message Location {
   repeated Device devs = 1;
+}
+
+message Buffer {
+  map<string, bytes> sections = 1;
+}
+
+message Program {
+  // Must be a block
+  Statement entry = 1;
+  map<string, Buffer> buffers = 2;
 }

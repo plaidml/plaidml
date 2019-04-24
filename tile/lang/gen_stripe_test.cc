@@ -33,36 +33,41 @@ TEST(GenStripeTest, ContractPlusElementwise) {
     loc {}
     refs [
       {
-        key:"_X0"
+        key: "_X0"
         value: {
           access [{}, {}] loc {}
           interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+          attrs: { key: "user" value {} }
         }
       },
       {
-        key:"_X1"
+        key: "_X1"
         value: {
           access [{}, {}] loc {}
           interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+          attrs: { key: "user" value {} }
         }
       },
       {
-        key:"_X2"
+        key: "_X2"
         value: {
           access [{}, {}] loc {}
           interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+          attrs: { key: "tmp" value {} }
         }
       },
       {
-        key:"_X3"
+        key: "_X3"
         value: {
           access [{}, {}] loc {}
           interior_shape {type:FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+          attrs: { key: "user" value {} }
         }
       }
     ]
     stmts [{
-      tags:["main"] block {
+      attrs: { key: "main" value {} }
+      block {
         name:"main" loc {}
         refs [
           {
@@ -84,6 +89,7 @@ TEST(GenStripeTest, ContractPlusElementwise) {
             value: {
               from:"_X2" dir:InOut access [{}, {}] loc {}
               interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
+              attrs: { key: "tmp" value {} }
             }
           },
           {
@@ -95,29 +101,35 @@ TEST(GenStripeTest, ContractPlusElementwise) {
           }
         ]
         stmts [{
-          tags:["agg_op_add", "comb_op_mul", "contraction", "kernel"] block {
-            name:"kernel_0(_X0,_X1)" loc {}
-            comments:"_X2[x0, x2 : 10, 10] = +(_X0[x0, x1] * _X1[x1, x2])"
+          attrs: { key: "agg_op_add" value {} }
+          attrs: { key: "comb_op_mul" value {} }
+          attrs: { key: "contraction" value {} }
+          attrs: { key: "kernel" value {} }
+          block {
+            name: "kernel_0(_X0,_X1)" loc {}
+            comments: "_X2[x0, x2 : 10, 10] = +(_X0[x0, x1] * _X1[x1, x2])"
             idxs [{name:"x0" range:10 affine {}}, {name:"x1" range:10 affine {}}, {name:"x2", range: 10, affine {}}]
             refs [
               {
-                key:"_X0"
+                key: "_X0"
                 value: {
                   from:"_X0" dir:In loc {}
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                   access [{terms:{key:"x0" value:1}}, {terms:{key:"x1" value:1}}]
+                  attrs: { key: "contraction" value {} }
                 }
               },
               {
-                key:"_X1"
+                key: "_X1"
                 value: {
                   from:"_X1" dir:In loc {}
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                   access [{terms:{key:"x1" value:1}}, {terms:{key:"x2" value:1}}]
+                  attrs: { key: "contraction" value {} }
                 }
               },
               {
-                key:"_X2"
+                key: "_X2"
                 value: {
                   from:"_X2" dir:Out loc {} agg_op:"add"
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
@@ -133,9 +145,12 @@ TEST(GenStripeTest, ContractPlusElementwise) {
             ]
           }
         }, {
-          tags:["eltwise", "eltwise_tanh", "kernel"] block {
-            name:"kernel_1(_X2)" loc {}
-            comments:"_X3 = tanh(_X2)"
+          attrs: { key: "eltwise" value {} }
+          attrs: { key: "eltwise_tanh" value {} }
+          attrs: { key: "kernel" value {} }
+          block {
+            name: "kernel_1(_X2)" loc {}
+            comments: "_X3 = tanh(_X2)"
             idxs [{name:"i1" range:10 affine {}}, {name:"i2", range:10 affine {}}]
             refs [
               {
@@ -144,6 +159,7 @@ TEST(GenStripeTest, ContractPlusElementwise) {
                   from:"_X2" dir:In loc {}
                   interior_shape {type: FLOAT32 dims [{size:1 stride:10}, {size:1 stride:1}]}
                   access [{terms:{key:"i1" value:1}}, {terms:{key:"i2" value:1}}]
+                  attrs: { key: "eltwise_tanh" value {} }
                 }
               },
               {

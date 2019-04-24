@@ -13,12 +13,14 @@ plaidml_proto_library(
 
 plaidml_cc_library(
     name = "stripe",
-    srcs = [
-        "stripe.cc",
+    srcs = glob(
+        [
+            "*.cc",
+            "impl.h",
     ],
-    hdrs = [
-        "stripe.h",
-    ],
+        exclude = glob(["*_test.cc"]),
+    ),
+    hdrs = ["stripe.h"],
     visibility = ["//visibility:public"],
     deps = [
         ":proto_cc",

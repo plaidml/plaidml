@@ -109,6 +109,7 @@ class Taggable {
   void set_attr(const std::string& name, int64_t value);
   void set_attr(const std::string& name, double value);
   void set_attr(const std::string& name, const std::string& value);
+  void set_attr(const std::string& name, const google::protobuf::Any& value);
   void set_attrs(const Taggable& rhs);
 
   bool has_attr(const std::string& name) const;
@@ -116,6 +117,7 @@ class Taggable {
   int64_t get_attr_int(const std::string& name) const;
   double get_attr_float(const std::string& name) const;
   std::string get_attr_str(const std::string& name) const;
+  google::protobuf::Any get_attr_any(const std::string& name) const;
 
   bool get_attr_bool(const std::string& name, bool def) const;
   int64_t get_attr_int(const std::string& name, int64_t def) const;
@@ -455,6 +457,15 @@ struct Block : Statement {
   }
 };
 
+struct Buffer {
+  std::map<std::string, std::string> sections;
+};
+
+struct Program {
+  std::map<std::string, Buffer> buffers;
+  std::shared_ptr<Block> entry;
+};
+
 inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) {  //
   return lhs->get() < rhs->get();
 }
@@ -529,6 +540,7 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref);
 std::ostream& operator<<(std::ostream& os, const PrintRefinement& ref);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 
+std::shared_ptr<Program> FromProto(const proto::Program& program);
 std::shared_ptr<Block> FromProto(const proto::Block& block);
 Affine FromProto(const proto::Affine& affine);
 Device FromProto(const proto::Device& dev);
@@ -538,9 +550,8 @@ RefDir FromProto(const proto::Refinement::Dir& dir);
 Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags);
 
 proto::Block IntoProto(const Block& block);
-proto::Affine IntoProto(const Affine& affine);
-proto::Device IntoProto(const Device& dev);
-proto::Location IntoProto(const Location& loc);
+proto::Program IntoProto(const Program& program);
+
 
 std::shared_ptr<Block> CloneBlock(const Block& orig, int depth = -1);
 const Block* FindBlockByTag(const Block& block, const std::string& tag);
