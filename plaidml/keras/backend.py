@@ -1153,8 +1153,10 @@ def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None)
         dtype = floatx()
     elif isinstance(dtype, plaidml.DType):
         dtype = ptile.convert_pml_dtype_to_np(dtype)
+    if seed:
+        np.random.seed(seed)
     data = np.random.normal(mean, scale, shape).astype(dtype)
-    return variable(data, dtype=dtype)
+    return variable(data, dtype=dtype, name=name)
 
 
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
