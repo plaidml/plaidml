@@ -195,7 +195,7 @@ RunInfo LoadNegThenMul(const std::string& name, const TensorShape& i1, const Ten
   Tensor B(i2, "B");
   Tensor NegA = -A;
   Tensor NegB = -B;
-  return Evaluate(name, {A * B});
+  return Evaluate(name, {NegA * NegB});
 }
 
 RunInfo LoadConstCalc(const std::string& name) {

@@ -51,6 +51,14 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}),   //
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
                 }),
+      MakeEntry("eltwise_multi_add_32",
+                [](const std::string& name) {
+                  return LoadEltwiseMultiAdd(name,                                       //
+                                             SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                             SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                             SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                             SimpleShape(DataType::FLOAT32, {32, 32}));  //
+                }),
       MakeEntry("eltwise_multi_add",
                 [](const std::string& name) {
                   return LoadEltwiseMultiAdd(name,                                           //
@@ -64,6 +72,14 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                   return LoadEltwiseAdd(name,                                           //
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}),   //
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
+                }),
+      MakeEntry("eltwise_multi_mul_32",
+                [](const std::string& name) {
+                  return LoadEltwiseMultiMul(name,                                       //
+                                             SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                             SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                             SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                             SimpleShape(DataType::FLOAT32, {32, 32}));  //
                 }),
       MakeEntry("eltwise_multi_mul",
                 [](const std::string& name) {
@@ -89,11 +105,23 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                   return LoadTanh(name,                                           //
                                   SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
                 }),
+      MakeEntry("mulneg_32",
+                [](const std::string& name) {
+                  return LoadMulThenNeg(name,                                       //
+                                        SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                        SimpleShape(DataType::FLOAT32, {32, 32}));  //
+                }),
       MakeEntry("mulneg",
                 [](const std::string& name) {
                   return LoadMulThenNeg(name,                                           //
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}),   //
                                         SimpleShape(DataType::FLOAT32, {1024, 1024}));  //
+                }),
+      MakeEntry("negmul_32",
+                [](const std::string& name) {
+                  return LoadNegThenMul(name,                                       //
+                                        SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                        SimpleShape(DataType::FLOAT32, {32, 32}));  //
                 }),
       MakeEntry("negmul",
                 [](const std::string& name) {
