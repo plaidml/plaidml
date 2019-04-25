@@ -5,6 +5,7 @@
 #include "base/util/error.h"
 #include "base/util/factory.h"
 #include "tile/hal/opencl/opencl.pb.h"
+#include "tile/math/util.h"
 
 namespace vertexai {
 namespace tile {
@@ -210,6 +211,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
 
   auto options = [[MTLCompileOptions alloc] init];
   options.fastMathEnabled = true;
+  options.languageVersion = MTLLanguageVersion2_0;
   auto promise = std::make_shared<boost::promise<std::unique_ptr<hal::Library>>>();
   auto handler = [activity,          //
                   device = device_,  //
@@ -377,7 +379,32 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
 
 ComputeKernel::ComputeKernel(Device* device, const lang::KernelInfo& ki, context::proto::ActivityID kernel_id,
                              id<MTLComputePipelineState> state)
-    : device_(device), ki_(ki), kernel_id_(kernel_id), state_(state) {}
+    : device_(device), ki_(ki), kernel_id_(kernel_id), state_(state) {
+  if (ki_.lwork[0] == 0) {
+    size_t tot_threads = 1;
+    size_t goal_threads = 256;
+    std::vector<std::vector<size_t>> factors;
+    for (size_t i = 0; i < 3; i++) {
+      ki_.lwork[i] = 1;
+      factors.push_back(math::Factor(ki_.gwork[i]));
+    }
+    while (tot_threads < goal_threads) {
+      bool got_it = false;
+      for (size_t i = 0; i < 3; i++) {
+        if (factors[i].size() && tot_threads * factors[i][0] <= goal_threads) {
+          ki_.lwork[i] *= factors[i][0];
+          tot_threads *= factors[i][0];
+          factors[i].erase(factors[i].begin());
+          got_it = true;
+          break;
+        }
+      }
+      if (!got_it) {
+        break;
+      }
+    }
+  }
+}
 
 std::shared_ptr<hal::Event> ComputeKernel::Run(const context::Context& ctx,
                                                const std::vector<std::shared_ptr<hal::Buffer>>& params,

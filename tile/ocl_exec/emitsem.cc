@@ -577,7 +577,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       std::string bname = block.ref_outs()[0]->from;
       std::string kname = "kernel_" + std::to_string(kernels_.kernels.size() + 1);
       auto ki = lang::GenZero(scope_->at(bname).shape, bname, kname);
-      ki.comments = "ZERO";
+      ki.comments = "// ZERO\n";
       kernels_.kernels.push_back(ki);
       return;
     }
@@ -589,7 +589,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       std::string dst_name = block.ref_outs()[0]->from;
       std::string kname = "kernel_" + std::to_string(kernels_.kernels.size() + 1);
       auto ki = lang::GenCopy(scope_->at(src_name).shape, dst_name, src_name, kname);
-      ki.comments = "COPY";
+      ki.comments = "// COPY\n";
       kernels_.kernels.push_back(ki);
       return;
     }
