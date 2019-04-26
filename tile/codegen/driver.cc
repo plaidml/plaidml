@@ -22,6 +22,7 @@
 #include "tile/codegen/partition.h"
 #include "tile/codegen/placer.h"
 #include "tile/codegen/reg_cache.h"
+#include "tile/codegen/reorder.h"
 #include "tile/codegen/rewrite_locs.h"
 #include "tile/codegen/scalarize.h"
 #include "tile/codegen/schedule.h"
@@ -198,6 +199,9 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
         break;
       case proto::Pass::kSubgroup:
         SubgroupPass(block, pass.subgroup());
+        break;
+      case proto::Pass::kReorderBlocks:
+        ReorderBlocksPass(block, pass.reorder_blocks());
         break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));

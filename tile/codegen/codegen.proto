@@ -116,6 +116,8 @@ message Pass {
     RewriteLocationsPass rewrite_locations = 29;
     // Divide the work into subgroups
     SubgroupPass subgroup = 30;
+    // Reorder blocks
+    GenericPass reorder_blocks = 31;
   }
 }
 
