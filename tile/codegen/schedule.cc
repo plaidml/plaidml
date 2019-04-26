@@ -1725,7 +1725,7 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
   swap_block.location = xfer_loc_;
   swap_block.idxs = ent->source->swap_idxs;
   TranslateLocation(&swap_block, &swap_block.location);
-  swap_block.refs.emplace(stripe::Refinement{
+  auto src = stripe::Refinement{
       stripe::RefDir::In,            // dir
       ent->source->ref.into(),       // from
       "src",                         // into
@@ -1735,10 +1735,13 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       ent->source->ref.location,     // location
       0,                             // offset
       ent->source->ref.bank_dim,     // bank_dim
-  });
+  };
+  src.set_tag("in");
+  TranslateLocation(&swap_block, &src.location);
+  swap_block.refs.emplace(std::move(src));
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
-  swap_block.refs.emplace(stripe::Refinement{
+  auto dst = stripe::Refinement{
       stripe::RefDir::Out,             // dir
       ent->name,                       // from
       "dst",                           // into
@@ -1748,11 +1751,10 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       banked_mem_loc,                  // location
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim
-  });
-
-  for (auto& ref : swap_block.refs) {
-    TranslateLocation(&swap_block, &ref.mut().location);
-  }
+  };
+  dst.set_tag("out");
+  TranslateLocation(&swap_block, &dst.location);
+  swap_block.refs.emplace(std::move(dst));
 
   if (options_.add_constraints()) {
     for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
@@ -1783,7 +1785,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
   swap_block.idxs = ent->source->swap_idxs;
   TranslateLocation(&swap_block, &swap_block.location);
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
-  swap_block.refs.emplace(stripe::Refinement{
+  auto src = stripe::Refinement{
       stripe::RefDir::In,              // dir
       ent->name,                       // from
       "src",                           // into
@@ -1793,9 +1795,12 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       banked_mem_loc,                  // location
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim
-  });
+  };
+  src.set_tag("in");
+  TranslateLocation(&swap_block, &src.location);
+  swap_block.refs.emplace(std::move(src));
 
-  swap_block.refs.emplace(stripe::Refinement{
+  auto dst = stripe::Refinement{
       stripe::RefDir::Out,           // dir
       ent->source->ref.into(),       // from
       "dst",                         // into
@@ -1805,11 +1810,10 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       ent->source->ref.location,     // location
       0,                             // offset
       ent->source->ref.bank_dim,     // bank_dim
-  });
-
-  for (auto& ref : swap_block.refs) {
-    TranslateLocation(&swap_block, &ref.mut().location);
-  }
+  };
+  dst.set_tag("out");
+  TranslateLocation(&swap_block, &dst.location);
+  swap_block.refs.emplace(std::move(dst));
 
   if (options_.add_constraints()) {
     for (size_t i = 0; i < ent->source->swap_idxs.size(); i++) {
@@ -1864,7 +1868,7 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
 
   TranslateLocation(&swap_block, &swap_block.location);
 
-  swap_block.refs.emplace(stripe::Refinement{
+  auto src = stripe::Refinement{
       stripe::RefDir::In,           // dir
       backing_ref_name,             // from
       "src",                        // into
@@ -1874,10 +1878,13 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       ent->source->ref.location,    // location
       0,                            // offset
       ent->source->ref.bank_dim,    // bank_dim
-  });
+  };
+  src.set_tag("in");
+  TranslateLocation(&swap_block, &src.location);
+  swap_block.refs.emplace(std::move(src));
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
-  swap_block.refs.emplace(stripe::Refinement{
+  auto dst = stripe::Refinement{
       stripe::RefDir::Out,            // dir
       ent->interior_name,             // from
       "dst",                          // into
@@ -1887,11 +1894,10 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       banked_mem_loc,                 // location
       0,                              // offset
       ent->source->ref.bank_dim,      // bank_dim
-  });
-
-  for (auto& ref : swap_block.refs) {
-    TranslateLocation(&swap_block, &ref.mut().location);
-  }
+  };
+  dst.set_tag("out");
+  TranslateLocation(&swap_block, &dst.location);
+  swap_block.refs.emplace(std::move(dst));
 
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
   swap_block.stmts.push_back(std::make_shared<stripe::Store>("$X", "dst"));
@@ -1933,7 +1939,7 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
   TranslateLocation(&swap_block, &swap_block.location);
 
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});
-  swap_block.refs.emplace(stripe::Refinement{
+  auto src = stripe::Refinement{
       stripe::RefDir::In,             // dir
       ent->interior_name,             // from
       "src",                          // into
@@ -1943,9 +1949,12 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       banked_mem_loc,                 // location
       0,                              // offset
       ent->source->ref.bank_dim,      // bank_dim
-  });
+  };
+  src.set_tag("in");
+  TranslateLocation(&swap_block, &src.location);
+  swap_block.refs.emplace(std::move(src));
 
-  swap_block.refs.emplace(stripe::Refinement{
+  auto dst = stripe::Refinement{
       stripe::RefDir::Out,          // dir
       backing_ref_name,             // from
       "dst",                        // into
@@ -1955,11 +1964,10 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       ent->source->ref.location,    // location
       0,                            // offset
       ent->source->ref.bank_dim,    // bank_dim
-  });
-
-  for (auto& ref : swap_block.refs) {
-    TranslateLocation(&swap_block, &ref.mut().location);
-  }
+  };
+  dst.set_tag("out");
+  TranslateLocation(&swap_block, &dst.location);
+  swap_block.refs.emplace(std::move(dst));
 
   swap_block.stmts.push_back(std::make_shared<stripe::Load>("src", "$X"));
   swap_block.stmts.push_back(std::make_shared<stripe::Store>("$X", "dst"));
