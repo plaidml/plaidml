@@ -497,7 +497,7 @@ class Unroller : public stripe::ConstStmtVisitor {
     auto idx_expr = idx_base + emitter_.convert_affine(aff);
     sem::ExprPtr val = _(emitter_.ref_buf(load.from))[idx_expr];
     if (load.has_tags({"vector_tx"})) {
-      val = _("sub_group_read")(val);
+      val = _("vector_load")(val);
     }
     if (load.has_tags({"subgroup_broadcast"})) {
       std::string subgroup_idx = ref->access[ref->bank_dim->dim_pos].getMap().begin()->first;
@@ -518,7 +518,7 @@ class Unroller : public stripe::ConstStmtVisitor {
     std::string agg_op = emitter_.scope_->at(store.into).base_ref->agg_op;
     auto agg = DoAgg(agg_op, lval, rval);
     if (store.has_tags({"vector_tx"})) {
-      out_->push_back(_Special("sub_group_write", {lval, agg}));
+      out_->push_back(_Special("vector_store", {lval, agg}));
     } else {
       out_->push_back(lval = agg);
     }

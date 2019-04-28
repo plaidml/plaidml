@@ -104,7 +104,7 @@
         { "name": "cleanup2", "prune_idxs": { "reqs": ["main"] } },
 
         ## Add subgroup loads/stores
-        ## { "name": "subgroup_vec_tx", "vectorize_tx": { "reqs": ["subgroup_thread"] } },
+        { "name": "subgroup_vec_tx", "vectorize_tx": { "reqs": ["subgroup_thread"] } },
 
         { "name": "localize_main", "localize": { "reqs": ["main"] } },
         { "name": "scalarize_main", "scalarize": { "reqs": ["main"] } }
