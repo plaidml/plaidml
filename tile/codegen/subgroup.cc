@@ -367,6 +367,64 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   inner->set_tag("subgroup_inline");
 }
 
+static void TagTx(stripe::Block* block, const std::set<std::string>& elems) {
+  IVLOG(1, "TagTX: " << elems);
+  for (auto& stmt : block->stmts) {
+    switch (stmt->kind()) {
+      case stripe::StmtKind::Load: {
+        auto load = stripe::Load::Downcast(stmt);
+        if (elems.count(load->from)) {
+          load->set_tag("vector_tx");
+        }
+      } break;
+      case stripe::StmtKind::Store: {
+        auto store = stripe::Store::Downcast(stmt);
+        if (elems.count(store->into)) {
+          store->set_tag("vector_tx");
+        }
+      } break;
+      case stripe::StmtKind::Block: {
+        auto inner = stripe::Block::Downcast(stmt);
+        std::set<std::string> inner_elems;
+        for (const auto& ref : inner->refs) {
+          if (elems.count(ref.from)) {
+            inner_elems.insert(ref.into());
+          }
+        }
+        TagTx(inner.get(), inner_elems);
+      } break;
+      default:
+        break;
+    }
+  }
+}
+
+void VectorizeTx(stripe::Block* block, const AliasMap& map) {
+  std::string the_idx;
+  for (const auto& idx : block->idxs) {
+    if (idx.affine == stripe::Affine() && idx.range != 1) {
+      if (!the_idx.empty()) {
+        IVLOG(1, *block);
+        throw std::runtime_error("Multiple indexes for vectorize_tx, " + the_idx + " vs " + idx.name);
+      }
+      the_idx = idx.name;
+    }
+  }
+  if (the_idx.empty()) {
+    throw std::runtime_error("No real indexes for vectorize_tx, invalid");
+  }
+  std::set<std::string> elems;
+  for (auto& ref : block->refs) {
+    if (ref.FlatAccess()[the_idx] == 1) {
+      elems.insert(ref.into());
+      for (auto& aff : ref.mut().access) {
+        aff.mutateMap().erase(the_idx);
+      }
+    }
+  }
+  TagTx(block, elems);
+}
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

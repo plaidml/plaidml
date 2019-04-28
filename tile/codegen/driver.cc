@@ -199,6 +199,9 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
       case proto::Pass::kSubgroup:
         SubgroupPass(block, pass.subgroup());
         break;
+      case proto::Pass::kVectorizeTx:
+        VectorizeTxPass(block, pass.vectorize_tx());
+        break;
       default:
         throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
     }
