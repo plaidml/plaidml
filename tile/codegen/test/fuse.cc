@@ -8,6 +8,7 @@
 #include "tile/codegen/fuse.h"
 #include "tile/codegen/localize.h"
 #include "tile/codegen/scalarize.h"
+#include "tile/codegen/tidy.h"
 #include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
@@ -221,12 +222,12 @@ TEST(Codegen, FuseTiled) {
   // Try to fuse it
   auto plan = ComputeFusionPlan(main_map, *k1, *k2, "O");
   IVLOG(2, "Plan as bool: " << static_cast<bool>(plan));
+  ASSERT_TRUE(plan);
   IVLOG(2, "Remap a: " << StreamContainer(plan->remap_a));
   IVLOG(2, "Remap b: " << StreamContainer(plan->remap_b));
   IVLOG(2, "Tile a: " << StreamContainer(plan->tile_a));
   IVLOG(2, "Tile b: " << StreamContainer(plan->tile_b));
   // Refactor a, tile and refactor b, fuse
-  ASSERT_TRUE(static_cast<bool>(plan));
   auto r1 = FusionRefactor(*k1, plan->remap_a, plan->tile_a);
   auto r2 = FusionRefactor(*k2, plan->remap_b, plan->tile_b);
   IVLOG(2, "r1\n" << *r1);
@@ -266,6 +267,9 @@ TEST(Codegen, FuseFancy) {
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
 
+  proto::GenericPass generic_pass;
+  PruneIndexesPass(program->entry.get(), generic_pass);
+
   IVLOG(2, "Before>\n" << *program->entry);
 
   AliasMap base;
@@ -283,12 +287,12 @@ TEST(Codegen, FuseFancy) {
   // Try to fuse it
   auto plan = ComputeFusionPlan(main_map, *k1, *k2, "O1");
   IVLOG(2, "Plan as bool: " << static_cast<bool>(plan));
+  ASSERT_TRUE(plan);
   IVLOG(2, "Remap a: " << StreamContainer(plan->remap_a));
   IVLOG(2, "Remap b: " << StreamContainer(plan->remap_b));
   IVLOG(2, "Tile a: " << StreamContainer(plan->tile_a));
   IVLOG(2, "Tile b: " << StreamContainer(plan->tile_b));
   // Refactor a, tile and refactor b, fuse
-  ASSERT_TRUE(static_cast<bool>(plan));
   auto r1 = FusionRefactor(*k1, plan->remap_a, plan->tile_a);
   auto r2 = FusionRefactor(*k2, plan->remap_b, plan->tile_b);
   IVLOG(2, "r1\n" << *r1);

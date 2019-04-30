@@ -275,9 +275,6 @@ class StripeGenerator {
 
     for (const auto& kvp : bounds) {
       uint64_t range = kvp.second.max - kvp.second.min + 1;
-      if (range == 1) {
-        continue;
-      }
       kernel->idxs.emplace_back(Index{kvp.first, range});
     }
     for (const auto& constraint : simple_cons) {
@@ -656,9 +653,7 @@ class StripeGenerator {
       } else {
         const auto& bound = bounds.at(term.first);
         result += int_value * bound.min;
-        if (bound.min != bound.max) {
-          result += Affine(term.first, int_value);
-        }
+        result += Affine(term.first, int_value);
       }
     }
     return result;

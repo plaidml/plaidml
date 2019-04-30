@@ -1,12 +1,27 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "tile/lang/compose.h"
+#include "tile/lang/tile_cc.h"
 
 namespace vertexai {
 namespace tile {
 namespace lib {
+
+enum class ConvolutionFormat {
+  ChannelsFirst,
+  ChannelsLast,
+};
+
+// TODO: add support for AutoPadding
+lang::Tensor Convolution(const lang::Tensor& I,                                         //
+                         const lang::Tensor& K,                                         //
+                         const std::vector<size_t>& O_dims,                             //
+                         std::vector<size_t> strides = {},                              //
+                         ConvolutionFormat I_format = ConvolutionFormat::ChannelsLast,  //
+                         ConvolutionFormat K_format = ConvolutionFormat::ChannelsLast);
 
 lang::RunInfo LoadMatMul(const std::string& name,    //
                          const TensorShape& input1,  //
@@ -60,22 +75,26 @@ lang::RunInfo LoadNegThenMul(const std::string& name,  //
 
 lang::RunInfo LoadConstCalc(const std::string& name);
 
-lang::RunInfo LoadConv1d(const std::string& name,   //
-                         const TensorShape& input,  //
-                         const TensorShape& kernel);
+lang::RunInfo LoadConv1d(const std::string& name,    //
+                         const TensorShape& input,   //
+                         const TensorShape& kernel,  //
+                         const std::vector<size_t>& output);
 
-lang::RunInfo LoadConv2d(const std::string& name,   //
-                         const TensorShape& input,  //
-                         const TensorShape& kernel);
+lang::RunInfo LoadConv2d(const std::string& name,    //
+                         const TensorShape& input,   //
+                         const TensorShape& kernel,  //
+                         const std::vector<size_t>& output);
 
-lang::RunInfo LoadConv2dRelu(const std::string& name,   //
-                             const TensorShape& input,  //
-                             const TensorShape& kernel);
+lang::RunInfo LoadConv2dRelu(const std::string& name,    //
+                             const TensorShape& input,   //
+                             const TensorShape& kernel,  //
+                             const std::vector<size_t>& output);
 
-lang::RunInfo LoadConv2dBnRelu(const std::string& name,    //
-                               const TensorShape& input,   //
-                               const TensorShape& kernel,  //
-                               const TensorShape& channels);
+lang::RunInfo LoadConv2dBnRelu(const std::string& name,      //
+                               const TensorShape& input,     //
+                               const TensorShape& kernel,    //
+                               const TensorShape& channels,  //
+                               const std::vector<size_t>& output);
 
 lang::RunInfo LoadConv2d3Deep(const std::string& name,     //
                               const TensorShape& input,    //

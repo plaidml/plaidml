@@ -5,6 +5,9 @@
         { "name": "loc_program", "locate_memory": { "reqs": ["program"], "loc": { "devs": [{"name": "GLOBAL", "units": [{"offset": 0}]}] } } },
         { "name": "loc_main", "locate_memory": { "reqs": ["main"], "loc": { "devs": [{"name": "GLOBAL", "units": [{"offset": 0}]}] } } },
 
+        ## Prune indexes
+        { "name": "prune_idxs", "prune_idxs": { "reqs": ["all"] } },
+
         ## Eliminate the dead code first
         { "name": "dead_code_elimination", "dead_code_elimination": {"reqs": ["all"] } },
 

@@ -104,41 +104,47 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                 }),
       MakeEntry("layer_test1",
                 [](const std::string& name) {
-                  return LoadConv2d(name,                                                  //
-                                    SimpleShape(DataType::INT8, {1, 56, 56, 64}),          //
-                                    SimpleShape(DataType::INT8, {1, 1, 64, 64}, "HWCK"));  //
+                  return LoadConv2d(name,                                                 //
+                                    SimpleShape(DataType::INT8, {1, 56, 56, 64}),         //
+                                    SimpleShape(DataType::INT8, {1, 1, 64, 64}, "HWCK"),  //
+                                    {1, 56, 56, 64});                                     //
                 }),
       MakeEntry("layer_test2",
                 [](const std::string& name) {
-                  return LoadConv2d(name,                                                  //
-                                    SimpleShape(DataType::INT8, {1, 56, 56, 64}),          //
-                                    SimpleShape(DataType::INT8, {3, 3, 64, 64}, "HWCK"));  //
+                  return LoadConv2d(name,                                                 //
+                                    SimpleShape(DataType::INT8, {1, 56, 56, 64}),         //
+                                    SimpleShape(DataType::INT8, {3, 3, 64, 64}, "HWCK"),  //
+                                    {1, 56, 56, 64});                                     //
                 }),
       MakeEntry("layer_test3",
                 [](const std::string& name) {
-                  return LoadConv2dRelu(name,                                                  //
-                                        SimpleShape(DataType::INT8, {1, 56, 56, 64}),          //
-                                        SimpleShape(DataType::INT8, {3, 3, 64, 64}, "HWCK"));  //
+                  return LoadConv2dRelu(name,                                                 //
+                                        SimpleShape(DataType::INT8, {1, 56, 56, 64}),         //
+                                        SimpleShape(DataType::INT8, {3, 3, 64, 64}, "HWCK"),  //
+                                        {1, 56, 56, 64});                                     //
                 }),
       MakeEntry("layer_test4",
                 [](const std::string& name) {
                   return LoadConv2dBnRelu(name,                                                 //
                                           SimpleShape(DataType::INT8, {1, 56, 56, 64}),         //
                                           SimpleShape(DataType::INT8, {3, 3, 64, 64}, "HWCK"),  //
-                                          SimpleShape(DataType::INT8, {64}));                   //
+                                          SimpleShape(DataType::INT8, {64}),                    //
+                                          {1, 56, 56, 64});                                     //
                 }),
       MakeEntry("layer_test4",
                 [](const std::string& name) {
                   return LoadConv2dBnRelu(name,                                             //
                                           SimpleShape(DataType::FLOAT32, {1, 56, 56, 64}),  //
                                           SimpleShape(DataType::FLOAT32, {3, 3, 64, 64}),   //
-                                          SimpleShape(DataType::FLOAT32, {64}));            //
+                                          SimpleShape(DataType::FLOAT32, {64}),             //
+                                          {1, 56, 56, 64});                                 //
                 }),
       MakeEntry("layer_test5",
                 [](const std::string& name) {
-                  return LoadConv2d(name,                                                     //
-                                    SimpleShape(DataType::INT8, {1, 7, 7, 2048}),             //
-                                    SimpleShape(DataType::INT8, {1, 1, 2048, 512}, "HWCK"));  //
+                  return LoadConv2d(name,                                                    //
+                                    SimpleShape(DataType::INT8, {1, 7, 7, 2048}),            //
+                                    SimpleShape(DataType::INT8, {1, 1, 2048, 512}, "HWCK"),  //
+                                    {1, 7, 7, 512});                                         //
                 }),
       MakeEntry("layer_test6",
                 [](const std::string& name) {
@@ -161,7 +167,8 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                   return LoadConv2dBnRelu(name,                                                 //
                                           SimpleShape(DataType::INT8, {1, 55, 55, 63}),         //
                                           SimpleShape(DataType::INT8, {3, 3, 63, 63}, "HWCK"),  //
-                                          SimpleShape(DataType::INT8, {63}));                   //
+                                          SimpleShape(DataType::INT8, {63}),                    //
+                                          {1, 55, 55, 63});                                     //
                 }),
       MakeEntry("lars_momentum_test",
                 [](const std::string& name) {
