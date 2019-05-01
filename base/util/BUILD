@@ -12,6 +12,7 @@ plaidml_cc_library(
     srcs = [
         "env.cc",
         "error.cc",
+        "file.cc",
         "hexdump.cc",
         "json_transfer.cc",
         "logging.cc",
@@ -28,6 +29,7 @@ plaidml_cc_library(
         "env.h",
         "error.h",
         "factory.h",
+        "file.h",
         "hexdump.h",
         "intern.h",
         "iterator_util.h",
@@ -47,6 +49,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@boost",
+        "@boost//:filesystem",
         "@boost//:stacktrace",
         "@easylogging",
         "@gflags",

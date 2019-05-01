@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <set>
 #include <string>
 
 #include "tile/codegen/alias.h"
@@ -21,13 +22,14 @@ void FixupRefs(stripe::Block* block, const std::string& var_name);
 void LocalizeRef(stripe::Block* block, const std::string& var_name);
 
 // Localize everything I can, don't update location (for now)
-void LocalizePass(const AliasMap& scope, stripe::Block* block);
+void LocalizePass(const AliasMap& scope, stripe::Block* block, const std::set<std::string>& ref_reqs = {});
 
 // Localize starting from root for things that match reqs
 inline void LocalizePass(stripe::Block* root, const proto::GenericPass& options) {
   auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
-    LocalizePass(map, block);
+  auto ref_reqs = stripe::FromProto(options.ref_reqs());
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+    LocalizePass(map, block, ref_reqs);
   });
 }
 

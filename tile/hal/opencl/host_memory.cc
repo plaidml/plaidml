@@ -16,16 +16,16 @@ HostMemory::HostMemory(const std::shared_ptr<DeviceState>& device_state) : devic
 
 std::shared_ptr<hal::Buffer> HostMemory::MakeBuffer(std::uint64_t size, BufferAccessMask /* access */) {
   Err err;
-  CLObj<cl_mem> mem = clCreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, size,
-                                     nullptr, err.ptr());
+  CLObj<cl_mem> mem = ocl::CreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, size,
+                                        nullptr, err.ptr());
   Err::Check(err, "Unable to allocate host-local memory");
   return std::make_shared<CLMemBuffer>(device_state_, size, std::move(mem));
 }
 
 std::shared_ptr<hal::Arena> HostMemory::MakeArena(std::uint64_t size, BufferAccessMask /* access */) {
   Err err;
-  CLObj<cl_mem> mem = clCreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, size,
-                                     nullptr, err.ptr());
+  CLObj<cl_mem> mem = ocl::CreateBuffer(device_state_->cl_ctx().get(), CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, size,
+                                        nullptr, err.ptr());
   Err::Check(err, "Unable to allocate host-local memory");
   return std::make_shared<CLMemArena>(device_state_, size, std::move(mem));
 }

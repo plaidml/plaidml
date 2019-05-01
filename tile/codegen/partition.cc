@@ -69,7 +69,7 @@ Index* BiggestIndexForDim(Block* block, const Refinement& ref, int dim_pos) {
 //   std::map<std::string, SplitRefInfo> related_map;
 //   for (auto& ref : block->refs) {
 //     if (IsRefRelatedToIdx(ref, idx_name)) {
-//       std::string orig_name(ref.into);
+//       std::string orig_name(ref.into());
 //       auto raw_name = block->unique_ref_name(orig_name + "_raw");
 //       std::vector<size_t> sizes(ref.shape.dims.size(), 1);
 //       TensorShape scalar_shape = SimpleShape(ref.shape.type, sizes);
@@ -133,7 +133,7 @@ Index* BiggestIndexForDim(Block* block, const Refinement& ref, int dim_pos) {
 //     if (store) {
 //       auto ref = block->ref_by_into(store->into);
 //       if (IsRefRelatedToIdx(*ref, idx_name)) {
-//         LOG(INFO) << "store: ref " << ref->into << " is related to " << idx_name;
+//         LOG(INFO) << "store: ref " << ref->into() << " is related to " << idx_name;
 //       }
 //     }
 //   }
@@ -153,19 +153,19 @@ Index* BiggestIndexForDim(Block* block, const Refinement& ref, int dim_pos) {
 //     switch ((*it)->kind()) {
 //       case StmtKind::Load: {
 //         auto load = Load::Downcast(*it);
-//         if (load->from == ref->into) {
+//         if (load->from == ref->into()) {
 //           IVLOG(2, "Load needs fixup: " << *load);
 //         }
 //       } break;
 //       case StmtKind::Store: {
 //         auto store = Store::Downcast(*it);
-//         if (store->into == ref->into) {
+//         if (store->into == ref->into()) {
 //           IVLOG(2, "Store needs fixup: " << *store);
 //         }
 //       } break;
 //       case StmtKind::Block: {
 //         auto inner = Block::Downcast(*it);
-//         auto inner_ref = inner->ref_by_from(ref->into, false);
+//         auto inner_ref = inner->ref_by_from(ref->into(), false);
 //         if (inner_ref != inner->refs.end()) {
 //           // add passthru for bank idx
 //           auto new_bank_name = inner->unique_idx_name(bank_name);
@@ -201,7 +201,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
                      const std::string& idx_tag) {
   IVLOG(2, "PartitionBuffer> " << block->name);
   std::map<std::string, size_t> tile_by_name;
-  std::map<Refinement*, BankedRef> banked_refs;
+  std::map<std::string, BankedRef> banked_refs;
   std::set<std::string> primary_idxs;
   // Initialize tile_by_name from the block's index ranges
   for (const auto& idx : block->idxs) {
@@ -209,7 +209,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
   }
   // Look for refinements that need to be banked
   for (auto& ref : block->refs) {
-    const auto& alias_info = alias_map.at(ref.into);
+    const auto& alias_info = alias_map.at(ref.into());
     auto it_bank_info = bank_infos.find(alias_info.base_name);
     if (it_bank_info == bank_infos.end()) {
       continue;
@@ -222,13 +222,13 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
       if (!idx) {
         throw_with_trace(
             std::runtime_error(str(boost::format("Could not find valid index to bank on ref %1% in block %2%") %  //
-                                   ref.into % block->name)));
+                                   ref.into() % block->name)));
       }
-      IVLOG(3, "  secondary> ref: " << ref.into << ", idx: " << *idx);
+      IVLOG(3, "  secondary> ref: " << ref.into() << ", idx: " << *idx);
     } else {
       idx = block->idx_by_name(it_usage->second.idx_name);
       primary_idxs.insert(idx->name);
-      IVLOG(3, "  primary>   ref: " << ref.into << ", idx: " << *idx);
+      IVLOG(3, "  primary>   ref: " << ref.into() << ", idx: " << *idx);
     }
     // This tag is to prevent idxs from being pruned.
     // A later unroll pass will need these pinned idxs for expansion so that location affine expressions
@@ -237,8 +237,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
     // Update the tile size for this index
     tile_by_name[idx->name] = math::RoundUp(idx->range, bank_info.num_banks);
     // Record information used for updating the outer block post-tiling.
-    BankedRef banked_ref{BankDimension{bank_info.dim_pos}, Affine{idx->name}};
-    banked_refs.emplace(&ref, banked_ref);
+    banked_refs[ref.into()] = BankedRef{BankDimension{bank_info.dim_pos}, Affine{idx->name}};
   }
   // Convert the tile based on index name to a tile based on index position
   TileShape tile(block->idxs.size());
@@ -248,13 +247,11 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
   IVLOG(2, "  tile: " << tile_by_name << " " << tile);
   ApplyTile(block, tile, false, true);
   // Update refinements, do this after tiling so that only the outer block gets these updates.
-  for (auto& item : banked_refs) {
-    auto ref = item.first;
-    const auto& banked_ref = item.second;
-    ref->cache_unit = banked_ref.cache_unit;
+  for (const auto& item : banked_refs) {
+    // Use ref_by_into because ApplyTile might cause Refinement pointers to become invalid
+    block->ref_by_into(item.first)->mut().cache_unit = item.second.cache_unit;
   }
-  block->tags.clear();
-  block->add_tags(set_tags);
+  block->set_tags(set_tags);
   for (const auto& idx_name : primary_idxs) {
     auto idx = block->idx_by_name(idx_name);
     if (!idx) {
@@ -283,7 +280,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
   const Refinement* big_ref = nullptr;
   for (const auto& ref : block->ref_ins()) {
     // Get the source buffer size
-    const auto& alias_info = alias_map.at(ref->into);
+    const auto& alias_info = alias_map.at(ref->into());
     size_t src_size = alias_info.base_ref->interior_shape.elem_size();
     if (src_size > biggest) {
       biggest = src_size;
@@ -295,6 +292,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
     IVLOG(1, "Partition> skipped due to no inputs");
     return;  // No inputs?  Skip this block
   }
+  IVLOG(2, "  big_ref: " << PrintRefinement(*big_ref, block));
   // Find the evenest index that has a non-zero stride both on the large
   // input and on the output refinement
   std::string idx_name;
@@ -308,7 +306,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
     size_t tile_size = math::RoundUp(idx.range, options.num_parts());
     size_t rounded_size = tile_size * options.num_parts();
     double ratio = static_cast<double>(idx.range) / static_cast<double>(rounded_size);
-    IVLOG(3, "           "
+    IVLOG(3, "    "
                  << "idx: " << idx                          //
                  << ", num_parts: " << options.num_parts()  //
                  << ", tile_size: " << tile_size            //
@@ -327,6 +325,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
   // Determine the bank_dim for the split memory
   boost::optional<size_t> dim_pos;
   for (size_t i = 0; i < big_ref->access.size(); i++) {
+    // Determine the dimension that is associated with the index we want to split on
     if (big_ref->access[i].get(idx_name)) {
       if (dim_pos) {
         IVLOG(1, "Partition> skipped due to complex banking");
@@ -335,7 +334,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
       dim_pos = i;
     }
   }
-  IVLOG(2, "           dim_pos: " << dim_pos << ", base_ref: " << *big_alias.base_ref);
+  IVLOG(2, "    dim_pos: " << dim_pos << ", base_ref: " << *big_alias.base_ref);
   if (!dim_pos) {
     IVLOG(1, "Could not find dimension to bank on for block: " << block->name << ", ref: " << *big_alias.base_ref);
     return;
@@ -347,12 +346,12 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
         std::runtime_error(str(boost::format("Multiple uses differ about dim_pos on %1%") % big_alias.base_name)));
   }
   auto base_ref = big_alias.base_ref;
-  bank_info.base_ref = base_ref->into;
+  bank_info.base_ref = base_ref->into();
   bank_info.dim_pos = *dim_pos;
   bank_info.uses[block].idx_name = idx_name;
   bank_info.banked_shape = base_ref->interior_shape;
   auto part_size = math::RoundUp(bank_info.banked_shape.dims[*dim_pos].size, options.num_parts());
-  bank_info.banked_shape.resize_dim(*dim_pos, part_size);
+  bank_info.banked_shape.resize_dim(bank_info.dim_pos, part_size);
   bank_info.num_banks = options.num_parts();
   base_ref->bank_dim = BankDimension{bank_info.dim_pos};
 }

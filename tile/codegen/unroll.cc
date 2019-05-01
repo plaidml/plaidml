@@ -4,6 +4,7 @@
 
 #include "base/util/logging.h"
 #include "base/util/throw.h"
+#include "tile/codegen/alias.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -35,14 +36,14 @@ void EnumerateIndexes(const std::vector<IndexValue>& idxs, size_t idx_num, const
 
 void EvalWithValues(Block* block, const std::map<std::string, int64_t>& fixed) {
   IVLOG(3, "EvalWithValues> block: " << block->name << ", fixed: " << fixed);
-  block->location.unit = block->location.unit.partial_eval(fixed);
+  block->location = PartialEval(block->location, fixed);
   for (auto& ref : block->refs) {
-    ref.location.unit = ref.location.unit.partial_eval(fixed);
-    for (auto& aff : ref.access) {
+    ref.mut().location = PartialEval(ref.location, fixed);
+    for (auto& aff : ref.mut().access) {
       aff = aff.partial_eval(fixed);
     }
     if (ref.cache_unit) {
-      ref.cache_unit = ref.cache_unit->partial_eval(fixed);
+      ref.mut().cache_unit = ref.cache_unit->partial_eval(fixed);
     }
   }
   for (auto& constraint : block->constraints) {
@@ -95,9 +96,15 @@ struct ExpansionValue {
   }
 };
 
-void EvalInner(Block* outer,                         //
-               Block* block,                         //
-               const std::vector<IndexValue>& idxs,  //
+using RefMap = std::map<std::tuple<std::string, std::vector<stripe::Affine>>, std::string>;
+
+void EvalInner(Block* outer,                                                                //
+               Block* block,                                                                //
+               RefMap* ref_map,                                                             //
+               const std::vector<IndexValue>& idxs,                                         //
+               const AliasMap& outer_alias_map,                                             //
+               std::map<std::string, std::vector<std::vector<Extent>>>* ref_write_extents,  //
+               const std::map<std::string, Affine>& aff_idxs,                               //
                const proto::UnrollPass& options) {
   IVLOG(3, "EvalInner> " << outer->name << " -> " << block->name);
   std::map<std::string, int64_t> fixed;
@@ -127,25 +134,84 @@ void EvalInner(Block* outer,                         //
     fixed.emplace(rule.idx_name(), expand_val.value);
   }
   EvalWithValues(block, fixed);
+
+  AliasMap block_alias_map{outer_alias_map, block};
+  std::map<std::string, std::vector<std::vector<Extent>>> current_ref_write_extents;
+  for (const auto& block_ref : block->refs) {
+    if (!IsWriteDir(block_ref.dir)) {
+      continue;
+    }
+
+    const auto& ai = block_alias_map.at(block_ref.into());
+
+    if (block_ref.agg_op.size() && !IsReadDir(block_ref.dir)) {
+      // We're aggregating into this refinement, so as we unroll, we
+      // need to add in the read direction if the underlying memory
+      // overlaps with any refinement previously written by an
+      // unrolled step.
+      auto name_extents = ref_write_extents->find(ai.base_name);
+      if (name_extents != ref_write_extents->end()) {
+        bool found_overlap = false;
+        for (const auto& extents : name_extents->second) {
+          if (CheckOverlap(ai.extents, extents)) {
+            found_overlap = true;
+            break;
+          }
+        }
+        if (found_overlap) {
+          block_ref.mut().dir = RefDir::InOut;
+        }
+      }
+    }
+
+    // Keep track of the fact that we're writing to this ref, so
+    // that we can add the read direction to affected subsequent
+    // blocks as needed.
+    current_ref_write_extents[ai.base_name].emplace_back(ai.extents);
+  }
+
+  // Accumulate the extents written by the current block into the extents tracked over the unrolling.
+  for (auto& ref_extents : current_ref_write_extents) {
+    auto& extents = (*ref_write_extents)[ref_extents.first];
+    extents.insert(extents.end(), ref_extents.second.begin(), ref_extents.second.end());
+  }
+
+  std::unordered_map<std::string, std::string> block_alloc_map;  // block.into -> outer.into
+  for (const auto& ref : block->refs) {
+    if (ref.dir != RefDir::None) {
+      continue;
+    }
+    // This refinement is an alloc; in order for the inner blocks to
+    // access it, we need to push it to the outer block.
+    auto alloc = ref.WithInto(outer->unique_ref_name(ref.into()));
+    block_alloc_map[ref.into()] = alloc.into();
+    outer->refs.emplace(std::move(alloc));
+  }
+
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
       continue;
     }
-    inner->name = block->name + ss.str();
+    inner->name += ss.str();
     for (auto& inner_ref : inner->refs) {
       if (inner_ref.from.empty()) {
         continue;
       }
       auto block_ref = block->ref_by_into(inner_ref.from);
-      for (size_t i = 0; i < inner_ref.access.size(); i++) {
-        inner_ref.access[i] += block_ref->access[i];
+      if (block_ref->dir == RefDir::None) {
+        inner_ref.mut().from = block_alloc_map[block_ref->into()];
+        continue;
       }
+      for (size_t i = 0; i < inner_ref.access.size(); i++) {
+        inner_ref.mut().access[i] += block_ref->access[i];
+      }
+      inner_ref.mut().dir = UnionDir(inner_ref.dir, block_ref->dir);
       auto outer_ref = outer->ref_by_into(block_ref->from);
       IVLOG(3, "  outer_ref: " << *outer_ref);
       IVLOG(3, "  block_ref: " << *block_ref);
       IVLOG(3, "  inner_ref: " << inner_ref);
-      inner_ref.from = block_ref->from;
+      inner_ref.mut().from = block_ref->from;
       IVLOG(3, "    from = " << inner_ref.from);
       if (!options.make_views()) {
         continue;
@@ -154,10 +220,14 @@ void EvalInner(Block* outer,                         //
         IVLOG(3, "    no view, same shape");
         continue;
       }
-      auto view = *block_ref;
+      auto key = std::make_tuple(outer_ref->from, inner_ref.access);
+      auto it_inserted = ref_map->emplace(key, outer_ref->into());
+      if (it_inserted.second) {
+        it_inserted.first->second = outer->unique_ref_name(outer_ref->into());
+      }
+      auto view = block_ref->WithInto(it_inserted.first->second);
       view.from = outer_ref->from;
-      view.into = outer_ref->into + ss.str();
-      IVLOG(3, "    make view: " << view.into << " from: " << view.from << " via: " << block_ref->from);
+      IVLOG(3, "    make view: " << view.into() << " from: " << view.from << " via: " << block_ref->from);
       if (inner_ref.cache_unit || outer_ref->cache_unit) {
         IVLOG(3, "    with cache: " << *outer_ref->cache_unit);
         view.cache_unit = outer_ref->cache_unit;
@@ -165,41 +235,71 @@ void EvalInner(Block* outer,                         //
       for (size_t i = 0; i < inner_ref.access.size(); i++) {
         auto const_access = block_ref->access[i].constant();
         view.access[i] = outer_ref->access[i] + const_access;
-        inner_ref.access[i] -= const_access;
+        inner_ref.mut().access[i] -= const_access;
       }
-      inner_ref.from = view.into;
+      inner_ref.mut().from = view.into();
       IVLOG(2, "view: " << view);
-      if (outer->ref_by_into(view.into, false) == outer->refs.end()) {
-        outer->refs.emplace_back(view);
+      if (outer->ref_by_into(view.into(), false) == outer->refs.end()) {
+        outer->refs.emplace(std::move(view));
+      }
+    }
+    // Rewrite the inner affine indices in terms of the parent block
+    // (where they're going to be inserted).
+    for (auto& idx : inner->idxs) {
+      if (idx.affine != Affine{}) {
+        idx.affine.substitute(aff_idxs);
       }
     }
   }
 }
 
-void UnrollBlock(Block* outer,                //
-                 Block* block,                //
-                 const StatementIt& it_stmt,  //
-                 const Tags& reqs,            //
+void UnrollBlock(Block* outer,                     //
+                 Block* block,                     //
+                 const AliasMap& outer_alias_map,  //
+                 const StatementIt& it_stmt,       //
+                 const Tags& reqs,                 //
                  const proto::UnrollPass& options) {
   if (block->has_tags(reqs)) {
+    RefMap ref_map;
     std::vector<IndexValue> idxs;
     idxs.reserve(block->idxs.size());
+    std::map<std::string, Affine> aff_idxs;
     for (const auto& idx : block->idxs) {
-      idxs.emplace_back(IndexValue{&idx, 0});
+      if (idx.affine == Affine{}) {
+        idxs.emplace_back(IndexValue{&idx, 0});
+      } else {
+        aff_idxs[idx.name] = idx.affine;
+      }
     }
+    std::map<std::string, std::vector<std::vector<Extent>>> ref_write_extents;
+    std::list<StatementList> cloned_statements;
     EnumerateIndexes(idxs, 0, [&](const std::vector<IndexValue>& idxs) {
       auto clone = CloneBlock(*block);
-      EvalInner(outer, clone.get(), idxs, options);
-      for (const auto& stmt : clone->stmts) {
-        outer->stmts.insert(it_stmt, stmt);
-      }
+      EvalInner(outer, clone.get(), &ref_map, idxs, outer_alias_map, &ref_write_extents, aff_idxs, options);
+      cloned_statements.emplace_back(std::move(clone->stmts));
     });
+    while (cloned_statements.size()) {
+      for (auto cs_it = cloned_statements.begin(); cs_it != cloned_statements.end();) {
+        if (cs_it->size()) {
+          outer->stmts.emplace(it_stmt, std::move(cs_it->front()));
+          cs_it->pop_front();
+          ++cs_it;
+        } else {
+          cs_it = cloned_statements.erase(cs_it);
+        }
+      }
+    }
     outer->stmts.erase(it_stmt);
+    // Dependencies become invalid after a stmt is removed
+    for (auto& stmt : outer->stmts) {
+      stmt->deps.clear();
+    }
   } else {
+    AliasMap alias_map{outer_alias_map, block};
     PreIterate(block, [&](const StatementIt& it) {
       auto inner = Block::Downcast(*it);
       if (inner) {
-        UnrollBlock(block, inner.get(), it, reqs, options);
+        UnrollBlock(block, inner.get(), alias_map, it, reqs, options);
       }
     });
   }
@@ -209,10 +309,12 @@ void UnrollBlock(Block* outer,                //
 
 void UnrollPass(Block* root, const proto::UnrollPass& options) {
   auto reqs = FromProto(options.reqs());
+  AliasMap base_alias_map;
+  AliasMap alias_map{base_alias_map, root};
   PreIterate(root, [&](const StatementIt& it) {
     auto inner = Block::Downcast(*it);
     if (inner) {
-      UnrollBlock(root, inner.get(), it, reqs, options);
+      UnrollBlock(root, inner.get(), alias_map, it, reqs, options);
     }
   });
 }

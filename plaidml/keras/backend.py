@@ -332,7 +332,7 @@ def bias_add(x, bias, data_format=None):
         if data_format == 'channels_first':
             x += reshape(bias, (1, bias_dims[0]) + (1,) * (ndim(x) - 2))
         elif data_format == 'channels_last':
-            x += reshape(bias, (1,) * (ndim(x) - 1) + (bias_dims[0],))
+            x += bias
     else:
         x += bias
     return x

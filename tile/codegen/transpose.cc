@@ -24,7 +24,7 @@ void CollectUsage(BufferUsageMap* usages, const Block& block, const AliasMap& ma
   auto acc_idxs = block.accumulation_idxs();
   IVLOG(3, "CollectUsage> block: " << block.name);
   for (const auto& ref : block.ref_ins()) {
-    auto alias = map.at(ref->into);
+    auto alias = map.at(ref->into());
     if (alias.base_block->has_tags(alloc_reqs)) {
       auto it = usages->find(alias.base_name);
       if (it == usages->end()) {
@@ -102,7 +102,7 @@ void TransposePass(Block* root, const proto::TransposePass& options) {
       IVLOG(3, "    old_ref: " << old_ref);
       IVLOG(3, "    new_ref: " << *base_ref);
       // Propagate the changes
-      FixupRefs(usage.base_block, base_ref->into);
+      FixupRefs(usage.base_block, base_ref->into());
     }
   }
 }

@@ -13,10 +13,11 @@ namespace tile {
 namespace lang {
 
 struct Binding {
-  explicit Binding(const TensorShape& _shape) : tag(TENSOR), shape(_shape) {}
-  explicit Binding(int64_t _iconst) : tag(ICONST), iconst(_iconst) { shape.type = DataType::INT32; }
-  explicit Binding(double _fconst, DataType dtype) : tag(FCONST), fconst(_fconst) { shape.type = dtype; }
-  explicit Binding(const std::vector<Binding>& _tuple) : tag(TUPLE), tuple(_tuple) {}
+  explicit Binding(const TensorShape& shape) : tag(TENSOR), shape(shape) {}
+  explicit Binding(int64_t iconst) : tag(ICONST), iconst(iconst) { shape.type = DataType::INT32; }
+  explicit Binding(double fconst, DataType dtype) : tag(FCONST), fconst(fconst) { shape.type = dtype; }
+  explicit Binding(const std::vector<Binding>& tuple) : tag(TUPLE), tuple(tuple) {}
+
   enum { TENSOR, ICONST, FCONST, TUPLE } tag;
   TensorShape shape;
   int64_t iconst;
@@ -59,6 +60,9 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
 
 // Set the default data type for floating-point computations
 void SetFloatX(DataType dtype);
+
+// Compute result type by 'upcasting' to the highest type in the hierarchy
+DataType CommonSupertype(DataType left, DataType right);
 
 }  // namespace lang
 }  // namespace tile

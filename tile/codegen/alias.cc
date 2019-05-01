@@ -65,7 +65,7 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
     return AliasType::None;
   }
   if (ai.shape == bi.shape) {
-    if (ai.location.unit.isConstant() && bi.location.unit.isConstant() && ai.location != bi.location) {
+    if (ai.location != bi.location) {
       IVLOG(3, boost::format("  Different banks, a: %1%, b: %2%") % ai.location % bi.location);
       return AliasType::None;
     }
@@ -89,15 +89,36 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
 
 bool AliasInfo::IsBanked() const { return !!base_ref->bank_dim; }
 
-AliasMap::AliasMap() : depth_(0) {}
+Affine AliasInfo::flat() const {
+  Affine flat;
+  for (size_t i = 0; i < shape.dims.size(); i++) {
+    flat += access[i] * shape.dims[i].stride;
+  }
+  return flat;
+}
+
+AliasMap::AliasMap() : depth_(0), this_block_(nullptr), parent_block_(nullptr) {}
 
 AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.depth_ + 1) {
+  idx_ranges_ = outer.idx_ranges_;
+  this_block_ = block;
+  parent_block_ = outer.this_block();
   // Make a prefix
   std::string prefix = str(boost::format("d%1%:") % depth_);
+  // Get all the index data for new indexes
+  for (const auto& idx : block->idxs) {
+    if (idx.affine == stripe::Affine()) {
+      // If it's a normal index, add it's information
+      idx_ranges_[prefix + idx.name] = idx.range;
+      idx_sources_[idx.name] = Affine(prefix + idx.name);
+    } else {
+      idx_sources_[idx.name] = idx.affine.sym_eval(outer.idx_sources_);
+    }
+  }
   // Make all inner alias data
   for (auto& ref : block->refs) {
     // Setup the place we are going to write to
-    AliasInfo& info = info_[ref.into];
+    AliasInfo& info = info_[ref.into()];
     // Check if it's a refinement or a new buffer
     if (ref.dir != RefDir::None) {
       // Get the state from the outer context, fail if not found
@@ -112,41 +133,42 @@ AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.d
       info.base_ref = it->second.base_ref;
       info.base_name = it->second.base_name;
       info.access = it->second.access;
-      info.location = it->second.location;
-      info.location.unit += ref.location.unit;
+      info.location = AddDeviceUnits(it->second.location, ref.location);
     } else {
       // New alloc, initialize from scratch
       info.base_block = block;
-      info.base_ref = &ref;
-      info.base_name = prefix + ref.into;
+      info.base_ref = &ref.mut();
+      info.base_name = prefix + ref.into();
       info.access.resize(ref.access.size());
       info.location = ref.location;
     }
     if (info.access.size() != ref.access.size()) {
       throw_with_trace(std::runtime_error(
           str(boost::format("AliasMap::AliasMap: Mismatched access dimensions on refinement: %1% %2%") %
-              info.base_name % ref.into)));
-    }
-    // Add in indexes from this block
-    std::map<std::string, int64_t> min_idxs;
-    std::map<std::string, int64_t> max_idxs;
-    for (const auto& idx : block->idxs) {
-      if (idx.affine.constant()) {
-        min_idxs[idx.name] = idx.affine.constant();
-        max_idxs[idx.name] = idx.affine.constant();
-      } else {
-        min_idxs[idx.name] = 0;
-        max_idxs[idx.name] = idx.range - 1;
-      }
+              info.base_name % ref.into())));
     }
     info.extents.resize(ref.access.size());
     for (size_t i = 0; i < ref.access.size(); i++) {
       info.access[i] += UniqifyAffine(ref.access[i], prefix);
-      int64_t min_extent = ref.access[i].eval(min_idxs);
-      int64_t max_extent = ref.access[i].eval(max_idxs) + ref.interior_shape.dims[i].size - 1;
-      info.extents[i] = Extent{min_extent, max_extent};
+      Extent& ext = info.extents[i];
+      ext.min = 0;
+      ext.max = 0;
+      for (const auto& kvp : info.access[i].getMap()) {
+        if (kvp.first == "") {
+          ext.min += kvp.second;
+          ext.max += kvp.second;
+        } else {
+          if (kvp.second > 0) {
+            ext.max += (idx_ranges_[kvp.first] - 1) * kvp.second;
+          } else {
+            ext.min += (idx_ranges_[kvp.first] - 1) * kvp.second;
+          }
+        }
+      }
+      ext.max += ref.interior_shape.dims[i].size - 1;
     }
-    IVLOG(5, boost::format("Extents for '%1%' in '%2%': %3%") % ref.into % block->name % StreamContainer(info.extents));
+    IVLOG(5,
+          boost::format("Extents for '%1%' in '%2%': %3%") % ref.into() % block->name % StreamContainer(info.extents));
     // Set shape
     info.shape = ref.interior_shape;
   }
@@ -168,6 +190,62 @@ std::unordered_map<std::string, size_t> AliasMap::RefUseCounts(const Block& bloc
     }
   }
   return use_count;
+}
+
+stripe::Affine AliasMap::translate(const stripe::Affine& in) const {
+  IVLOG(3, "AliasMap::translate in = " << in);
+  Affine cur = in;
+  for (const auto& kvp : idx_ranges_) {
+    if (kvp.second == 1) {
+      cur.mutateMap().erase(kvp.first);
+    }
+  }
+  IVLOG(3, "AliasMap::after removing 'irrelevant' indexes = " << cur);
+  Affine out;
+  for (const auto& kvp : idx_sources_) {
+    IVLOG(4, "  " << kvp.first << " = " << kvp.second);
+    int64_t mul = 0;
+    for (const auto& kvp2 : kvp.second.getMap()) {
+      if (mul == 0 && cur.getMap().count(kvp2.first)) {
+        mul = cur.getMap().at(kvp2.first) / kvp2.second;
+        break;
+      }
+    }
+    out += Affine(kvp.first, mul);
+    cur -= kvp.second * mul;
+    IVLOG(4, "  mul = " << mul << ", cur = " << cur);
+  }
+  if (!cur.isConstant()) {
+    throw std::runtime_error("AliasMap::translate, unable to translate " + in.toString());
+  }
+  out += cur.constant();
+  IVLOG(3, "  out = " << out);
+  return out;
+}
+
+void AliasMap::AddConstraintForIndex(stripe::Block* block,         //
+                                     const AliasInfo& alias_info,  //
+                                     size_t idx,                   //
+                                     const std::string& idx_name,  //
+                                     bool idx_passthru) const {
+  int64_t top_index = alias_info.base_ref->interior_shape.dims[idx].size - 1;
+  bool underflow = alias_info.extents[idx].min < 0;
+  bool overflow = alias_info.extents[idx].max > top_index;
+  if (underflow || overflow) {
+    IVLOG(3, "AddConstraintForIndex: " << alias_info.base_name << ", " << idx_name);
+    IVLOG(4, "extents = " << alias_info.extents[idx] << ", top_index = " << top_index);
+    IVLOG(4, *block);
+    std::string global_idx_name = block->unique_idx_name(idx_name);
+    block->idxs.emplace_back(Index{global_idx_name, 1, translate(alias_info.access[idx])});
+    if (underflow) {
+      block->constraints.push_back(idx_passthru ? Affine(global_idx_name)
+                                                : (Affine(global_idx_name) + Affine(idx_name)));
+    }
+    if (overflow) {
+      block->constraints.push_back(idx_passthru ? (Affine(top_index) - Affine(global_idx_name))
+                                                : (Affine(top_index) - Affine(global_idx_name) - Affine(idx_name)));
+    }
+  }
 }
 
 }  // namespace codegen

@@ -9,6 +9,7 @@
 
 namespace llvm {
 class ExecutionEngine;
+class LLVMContext;
 class Module;
 }  // namespace llvm
 
@@ -26,7 +27,8 @@ class Compiler final : public hal::Compiler {
                                                      const hal::proto::HardwareSettings& /* settings */) final;
 
  private:
-  void BuildKernel(const lang::KernelInfo&, std::vector<std::shared_ptr<llvm::ExecutionEngine>>* engines);
+  void BuildKernel(const lang::KernelInfo&, llvm::LLVMContext* llvm_ctx,
+                   std::vector<std::shared_ptr<llvm::ExecutionEngine>>* engines);
   void GenerateInvoker(const lang::KernelInfo&, llvm::Module*);
 };
 

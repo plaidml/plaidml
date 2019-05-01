@@ -15,38 +15,48 @@ using namespace stripe;  // NOLINT
 void PruneIndexes(Block* block, const Tags& exclude_tags) {
   // Find all the indexes to remove
   std::set<const Index*> to_remove;
+  std::map<std::string, int64_t> idx_values;
   for (const auto& idx : block->idxs) {
-    if (!idx.has_tags(exclude_tags) && idx.range == 1 && idx.affine == 0) {
+    if (!idx.has_any_tags(exclude_tags) && idx.range == 1 && idx.affine == 0) {
       to_remove.emplace(&idx);
+      idx_values.emplace(idx.name, 0);
     }
   }
   // Remove from refinements
   for (auto& refs : block->refs) {
-    for (auto& aff : refs.access) {
-      for (const auto& idx : to_remove) {
-        aff.mutateMap().erase(idx->name);
-      }
+    for (auto& aff : refs.mut().access) {
+      aff = aff.partial_eval(idx_values);
     }
   }
   // Remove from constraints
   for (auto& con : block->constraints) {
-    for (const auto& idx : to_remove) {
-      con.mutateMap().erase(idx->name);
-    }
+    con = con.partial_eval(idx_values);
   }
   // Remove from index list
   block->idxs.erase(std::remove_if(block->idxs.begin(), block->idxs.end(),
                                    [&to_remove](const Index& idx) { return to_remove.count(&idx); }),
                     block->idxs.end());
+  // Remove from load index statements
+  for (auto& stmt : block->stmts) {
+    auto inner = LoadIndex::Downcast(stmt);
+    if (inner) {
+      inner->from = inner->from.partial_eval(idx_values);
+    }
+  }
   // Remove from inner blocks
   for (auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
-      for (auto& oidx : inner->idxs) {
-        for (const auto& idx : to_remove) {
-          oidx.affine.mutateMap().erase(idx->name);
-        }
+      for (auto& inner_idx : inner->idxs) {
+        inner_idx.affine = inner_idx.affine.partial_eval(idx_values);
       }
+    }
+  }
+  // Recurse
+  for (auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      PruneIndexes(inner.get(), exclude_tags);
     }
   }
 }
@@ -64,8 +74,8 @@ void PruneRefinements(const AliasMap& alias_map, Block* block) {
   IVLOG(3, "    use_count: " << use_count);
   std::set<std::string> to_remove;
   for (const auto& ref : block->refs) {
-    if (!use_count.count(ref.into)) {
-      to_remove.emplace(ref.into);
+    if (!use_count.count(ref.into())) {
+      to_remove.emplace(ref.into());
     }
   }
   if (!to_remove.empty()) {
@@ -73,6 +83,14 @@ void PruneRefinements(const AliasMap& alias_map, Block* block) {
   }
   for (const auto& name : to_remove) {
     block->refs.erase(block->ref_by_into(name));
+  }
+  // Recurse
+  for (auto& stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      AliasMap inner_map(alias_map, inner.get());
+      PruneRefinements(inner_map, inner.get());
+    }
   }
 }
 

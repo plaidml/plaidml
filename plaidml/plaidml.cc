@@ -667,6 +667,21 @@ extern "C" bool plaidml_add_dimension(vai_ctx* ctx, plaidml_shape* shape, uint64
   return true;
 }
 
+extern "C" bool plaidml_shape_set_layout(vai_ctx* ctx, plaidml_shape* shape, const char* layout) {
+  if (!shape) {
+    vertexai::SetLastOOM();
+    return false;
+  }
+  try {
+    shape->shape.layout = layout;
+  } catch (...) {
+    vertexai::SetLastException(std::current_exception());
+    shape->valid = false;
+    return false;
+  }
+  return true;
+}
+
 extern "C" plaidml_datatype plaidml_get_shape_type(plaidml_shape* shape) {
   if (!shape) {
     vertexai::SetLastOOM();
@@ -847,6 +862,10 @@ void WriteFunction(zipFile f, const BoundFunction& func) {
   WriteString(f, "code", xo);
   for (const auto& kvp : func.in_bound()) {
     WriteTensor(f, "data_" + kvp.first, *kvp.second);
+    auto qparams = kvp.second->qparams();
+    if (qparams) {
+      WriteTensor(f, "qparams_" + kvp.first, *qparams);
+    }
   }
 }
 
@@ -1020,6 +1039,28 @@ extern "C" plaidml_var* plaidml_alloc_tensor(vai_ctx* ctx, plaidml_buffer* buffe
     vertexai::SetLastOOM();
     return nullptr;
   }
+}
+
+extern "C" bool plaidml_tensor_attach_qparams(plaidml_var* tensor, plaidml_var* qparams) {
+  if (!tensor || !qparams) {
+    vertexai::SetLastOOM();
+    return false;
+  }
+  try {
+    auto tensor_value = std::dynamic_pointer_cast<TensorValue>(tensor->value);
+    if (!tensor_value) {
+      throw vertexai::error::InvalidArgument{"Invalid tensor"};
+    }
+    auto qparams_value = std::dynamic_pointer_cast<TensorValue>(qparams->value);
+    if (!qparams_value) {
+      throw vertexai::error::InvalidArgument{"Invalid qparams"};
+    }
+    tensor_value->attach_qparams(qparams_value);
+  } catch (...) {
+    vertexai::SetLastException(std::current_exception());
+    return false;
+  }
+  return true;
 }
 
 // plaidml_composer
@@ -1308,13 +1349,13 @@ struct plaidml_invoker {
 
 namespace {
 
-void BuildInvokerRunInfo(plaidml_invoker* invoker) {
+void BuildInvokerRunInfo(plaidml_invoker* invoker, const std::string& name) {
   if (invoker->runinfo) {
     return;
   }
   invoker->runinfo = invoker->runinfo_cache.Lookup(
       std::make_pair(ToApplierParameterShapes(invoker->inputs), ToApplierParameterShapes(invoker->outputs)),
-      [invoker]() {
+      [invoker, &name]() {
         auto applier = std::make_shared<FunctionApplication>(invoker->func);
         for (const auto& it : invoker->inputs) {
           if (it.second->type() == Value::TENSOR) {
@@ -1336,7 +1377,7 @@ void BuildInvokerRunInfo(plaidml_invoker* invoker) {
           composer->AddUpdate(value, applier->GetOutput(it.first));
         }
         composer->Done();
-        return std::make_shared<RunInfo>(composer->PrepareToRun());
+        return std::make_shared<RunInfo>(composer->PrepareToRun(name));
       });
 }
 
@@ -1475,25 +1516,24 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
     }
 
     // At this point, we're saving a Stripe file format.
-    BuildInvokerRunInfo(invoker);
-    invoker->runinfo->program_name = path.stem().string();
-    auto program = GenerateStripe(*invoker->runinfo);
+    BuildInvokerRunInfo(invoker, path.stem().string());
+    auto stripe = GenerateStripe(*invoker->runinfo);
 
     std::ofstream file{path.string()};
 
     switch (format) {
       case PLAIDML_FILE_FORMAT_STRIPE_HUMAN:
-        file << *program;
+        file << *stripe->entry;
         break;
 
       case PLAIDML_FILE_FORMAT_STRIPE_PROTOTXT: {
-        auto pb_program = tile::stripe::IntoProto(*program);
+        auto pb_program = tile::stripe::IntoProto(*stripe);
         gpi::OstreamOutputStream out{&file};
         gp::TextFormat::Print(pb_program, &out);
       } break;
 
       case PLAIDML_FILE_FORMAT_STRIPE_BINARY: {
-        auto pb_program = tile::stripe::IntoProto(*program);
+        auto pb_program = tile::stripe::IntoProto(*stripe);
         pb_program.SerializeToOstream(&file);
       } break;
 
@@ -1528,7 +1568,7 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     auto invocation = std::make_unique<plaidml_invocation>();
     auto rundown = std::make_shared<context::Rundown>();
     rundown->TryEnterGate(activity.ctx().gate());
-    BuildInvokerRunInfo(invoker);
+    BuildInvokerRunInfo(invoker, "invoker_program");
 
     // Gather up the appropriate buffers
     std::shared_ptr<Evaluator> evaluator;

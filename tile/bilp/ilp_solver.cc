@@ -78,7 +78,10 @@ ILPResult ILPSolver::solve(Tableau& tableau, bool already_canonical) {
   IVLOG(5, "Starting ILPSolver with tableau " << tableau.mat().toString());
   solve_step(tableau, already_canonical);
   if (!feasible_found) {
-    throw std::runtime_error("No feasible solution");
+    if (throw_infeasible)
+      throw std::runtime_error("No feasible solution");
+    else
+      return ILPResult();
   }
   return ILPResult(reportObjective(), reportSolution());
 }

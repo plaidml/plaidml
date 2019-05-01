@@ -3,6 +3,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include <boost/optional.hpp>
@@ -17,13 +18,15 @@ namespace codegen {
 
 struct FusionPlan {
   TileShape tile_a;
+  bool a_interleave;
   std::map<std::string, std::string> remap_a;
   TileShape tile_b;
+  bool b_interleave;
   std::map<std::string, std::string> remap_b;
 };
 
 // Given a shared buffer between two blocks, compute a possible fusion
-boost::optional<FusionPlan> ComputeFusionPlan(const stripe::Block& a, const stripe::Block& b,
+boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const stripe::Block& a, const stripe::Block& b,
                                               const std::string& buf_name);
 
 // A transform that flattens trivial indexes.  TODO: move to a utility header
@@ -32,7 +35,8 @@ void FlattenTrivial(stripe::Block* block);
 // Prepare each block for fusion by renaming / moving indexes
 std::shared_ptr<stripe::Block> FusionRefactor(const stripe::Block& block,                         //
                                               const std::map<std::string, std::string>& mapping,  //
-                                              const TileShape& tile);
+                                              const TileShape& tile,                              //
+                                              bool interleave = false);
 
 // Attempt to fuse b into a.  Return true on success, in which case blocks have been
 // destructively modified.  Otherwise returns false and leave blocks unaltered.

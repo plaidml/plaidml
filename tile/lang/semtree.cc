@@ -99,7 +99,13 @@ CallExpr::CallExpr(ExprPtr f, const std::vector<ExprPtr>& v) : vals(v) {
       {"sin", Function::SIN},   {"sinh", Function::SINH}, {"sqrt", Function::SQRT}, {"tan", Function::TAN},
       {"tanh", Function::TANH},
   };
-  function = functions.at(name);
+  auto it = functions.find(name);
+  if (it == functions.end()) {
+    return;
+    // throw std::runtime_error("Unable to find function mapping for: " + name);
+  }
+
+  function = it->second;
 }
 
 void CallExpr::Accept(Visitor& v) const { v.Visit(*this); }
@@ -155,8 +161,10 @@ void BarrierStmt::Accept(Visitor& v) const { v.Visit(*this); }
 
 void ReturnStmt::Accept(Visitor& v) const { v.Visit(*this); }
 
+void SpecialStmt::Accept(Visitor& v) const { v.Visit(*this); }
+
 Function::Function(const std::string n, const Type& r, const params_t& p, StmtPtr b)
-    : name(n), ret(r), params(p), body(b) {
+    : name(n), ret(r), params(p), body(b), subgroup_size(0) {
   if (!body->isBlock()) {
     body = std::make_shared<Block>(std::vector<StmtPtr>{body});
   }

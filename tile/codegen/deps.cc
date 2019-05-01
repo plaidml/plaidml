@@ -19,6 +19,18 @@ using namespace stripe;  // NOLINT
 
 namespace {
 
+static bool ZeroBlock(const StatementIt& it) {
+  auto block = Block::Downcast(*it);
+  if (block && block->has_tag("zero")) {
+    return true;
+  }
+  auto special = Special::Downcast(*it);
+  if (special && special->name == "zero") {
+    return true;
+  }
+  return false;
+}
+
 struct Tracker {
   // Tracks the state of a buffer as it's operated on by the Block's Statements.
   struct BufferInfo {
@@ -66,7 +78,10 @@ struct Tracker {
       const auto& writer = item.first;
       if (writer != it && AliasInfo::Compare(alias_info, item.second) != AliasType::None) {
         IVLOG(4, boost::format("      other writer: %1%") % *writer);
-        dataflow_deps.insert(writer);
+        // For two zero blocks, the order does not matter
+        if (!ZeroBlock(it) || !ZeroBlock(writer)) {
+          dataflow_deps.insert(writer);
+        }
       }
     }
 
@@ -77,6 +92,19 @@ struct Tracker {
       if (reader != it) {
         IVLOG(4, boost::format("      other reader: %1%") % *reader);
         dataflow_deps.insert(reader);
+      }
+    }
+
+    if (ZeroBlock(it)) {
+      // Remove the previous zero blocks for the same buffer
+      // Alias info sometimes not accurate. As zero block is
+      // always whole block rewritten, so we just need the same base name.
+      for (auto wit : buffer_info.writers) {
+        if (ZeroBlock(wit.first) && (alias_info.base_name == wit.second.base_name ||
+                                     AliasInfo::Compare(alias_info, wit.second) == AliasType::Exact)) {
+          buffer_info.writers.erase(wit.first);
+          break;
+        }
       }
     }
 
@@ -124,6 +152,11 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
         tracker.ReadScalar(*block, store->from);
         tracker.WriteBuffer(it, store->into, alias_map);
       } break;
+      case StmtKind::LoadIndex: {
+        auto load_index = LoadIndex::Downcast(*it);
+        IVLOG(3, "  loadIndex: " << load_index);
+        tracker.WriteScalar(*block, it, load_index->into);
+      } break;
       case StmtKind::Special: {
         auto special = Special::Downcast(*it);
         IVLOG(3, "  special: " << special);
@@ -159,10 +192,10 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
           // the same underlying physical buffer; we handle these cases in
           // ReadBuffer() and WriteBuffer().
           if (IsReadDir(ref.dir)) {
-            tracker.ReadBuffer(it, ref.into, inner_map);
+            tracker.ReadBuffer(it, ref.into(), inner_map);
           }
           if (IsWriteDir(ref.dir)) {
-            tracker.WriteBuffer(it, ref.into, inner_map);
+            tracker.WriteBuffer(it, ref.into(), inner_map);
           }
         }
       } break;

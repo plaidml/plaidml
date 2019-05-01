@@ -21,9 +21,10 @@ plaidml_py_library(
 
 pkg_tar(
     name = "pkg",
-    srcs = glob([
-        "**/*",
-    ]),
+    srcs = glob(
+        ["**/*"],
+        exclude = ["__pycache__/*"],
+    ),
     package_dir = "plaidml/keras",
     strip_prefix = ".",
 )
@@ -133,7 +134,7 @@ plaidml_py_wheel(
         "__init__.py",
         "backend.py",
     ],
-    config = ":setup.cfg",
+    config = ":not_setup.cfg",
     package_prefix = "plaidml/keras",
     python = "py2.py3",
 )

@@ -12,6 +12,11 @@ namespace tile {
 namespace sem {
 namespace builder {
 
+template <typename T>
+inline std::shared_ptr<IntConst> _Const(T x) {
+  return std::make_shared<IntConst>(x);
+}
+
 // A DSL for building semantic trees
 
 class LValueHolder {
@@ -83,20 +88,19 @@ inline std::shared_ptr<ForStmt> _For(const std::string& var, uint64_t n, uint64_
   return std::make_shared<ForStmt>(var, n, s, inner);
 }
 
-inline std::shared_ptr<BarrierStmt> _Barrier() { return std::make_shared<BarrierStmt>(); }
+inline std::shared_ptr<BarrierStmt> _Barrier(bool subgroup = false) { return std::make_shared<BarrierStmt>(subgroup); }
 
 inline std::shared_ptr<ReturnStmt> _Return(ExprPtr value = ExprPtr()) { return std::make_shared<ReturnStmt>(value); }
+
+inline std::shared_ptr<SpecialStmt> _Special(const std::string& name, std::initializer_list<ExprPtr> args) {
+  return std::make_shared<SpecialStmt>(name, std::vector<ExprPtr>(args));
+}
 
 inline std::shared_ptr<Function> _Function(const std::string& name, const Type& ret,
                                            std::initializer_list<Function::param_t> params,
                                            std::initializer_list<StmtPtr> body) {
   return std::make_shared<Function>(name, ret, std::vector<Function::param_t>(params),
                                     std::make_shared<Block>(std::vector<StmtPtr>(body)));
-}
-
-template <typename T>
-inline std::shared_ptr<IntConst> _Const(T x) {
-  return std::make_shared<IntConst>(x);
 }
 
 inline std::shared_ptr<FloatConst> _Const(double x) { return std::make_shared<FloatConst>(x); }

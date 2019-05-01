@@ -388,18 +388,7 @@ void TypeCheck(Program* prog, Bindings* vars) {
         // Move types up the hierarchy
         DataType cur = vars->at(s).shape.type;
         IVLOG(4, "  Adding type " << to_string(cur));
-        if (is_float(cur) != is_float(out_type)) {
-          if (is_float(cur)) {
-            out_type = cur;
-          }
-        } else {
-          // TODO: This is a bit primitive; for example, it will pick
-          // the first of "int32" or "float32".  We may want to make it
-          // a bit more sophisticated.
-          if (bit_width(cur) > bit_width(out_type)) {
-            out_type = cur;
-          }
-        }
+        out_type = CommonSupertype(out_type, cur);
       }
     }
     if (out_type == DataType::INVALID) {
@@ -415,7 +404,9 @@ void TypeCheck(Program* prog, Bindings* vars) {
       }
       // Check we have proper output sizes
       if (op.c.output_size.size() != op.c.specs[0].sspec.size()) {
-        throw std::runtime_error("Mismatched output indices and output size");
+        throw std::runtime_error(
+            str(boost::format("Mismatched output indices and output size. Indicies: %1%, Sizes: %2%") %
+                op.c.specs[0].sspec.size() % op.c.output_size.size()));
       }
       // Get each size
       std::vector<size_t> dims;
@@ -878,6 +869,23 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
   IVLOG(3, "After optimize: " << p->ops);
 
   return vars;
+}
+
+DataType CommonSupertype(DataType left, DataType right) {
+  DataType out = left;
+  if (is_float(right) != is_float(left)) {
+    if (is_float(right)) {
+      out = right;
+    }
+  } else {
+    // TODO: This is a bit primitive; for example, it will pick
+    // the first of "int32" or "float32".  We may want to make it
+    // a bit more sophisticated.
+    if (bit_width(right) > bit_width(left)) {
+      out = right;
+    }
+  }
+  return out;
 }
 
 }  // namespace lang

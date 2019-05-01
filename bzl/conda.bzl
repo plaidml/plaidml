@@ -35,10 +35,7 @@ def _conda_impl(ctx):
 
 _conda_attrs = {
     "srcs": attr.label_list(allow_files = [".py"]),
-    "data": attr.label_list(
-        allow_files = True,
-        cfg = "data",
-    ),
+    "data": attr.label_list(allow_files = True),
     "deps": attr.label_list(),
     "env": attr.label(
         mandatory = True,

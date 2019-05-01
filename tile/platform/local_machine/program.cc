@@ -9,11 +9,13 @@
 #include <unordered_set>
 #include <utility>
 
+#include "base/util/env.h"
 #include "base/util/error.h"
 #include "base/util/perf_counter.h"
 #include "tile/hal/util/settings.h"
 #include "tile/lang/parser.h"
 #include "tile/lang/tile_cache.h"
+#include "tile/ocl_exec/stripe_gen.h"
 #include "tile/platform/local_machine/buffer.h"
 #include "tile/platform/local_machine/run_request.h"
 #include "tile/proto/support.h"
@@ -86,9 +88,24 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
   auto parsed = parser.Parse(program.code());
   auto inputs = FromProto(program.inputs());
   auto outputs = FromProto(program.outputs());
+
+  auto use_stripe = env::Get("USE_STRIPE") == "1";
+  if (use_stripe) {
+    auto stripe_cfg = devinfo.settings.stripe_config();
+    if (stripe_cfg.empty()) {
+      throw std::runtime_error("Selected device must have a stripe_config when USE_STRIPE is enabled");
+    }
+    auto out_path = env::Get("STRIPE_OUTPUT");
+    lang::RunInfo runinfo;
+    runinfo.program = parsed;
+    runinfo.input_shapes = inputs;
+    runinfo.output_shapes = outputs;
+    runinfo.program_name = "stripe_program";
+    return codegen::GenerateProgram(runinfo, stripe_cfg, out_path);
+  }
+
   auto settings = hal::settings::ToHardwareSettings(devinfo.settings);
   auto kernel_list = lang::GenerateProgram(parsed, inputs, outputs, settings, optimizer, program.id(), tile_trials);
-
   if (tile_trials == 1) {
     return kernel_list;
   }

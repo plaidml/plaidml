@@ -68,7 +68,7 @@ class Simplifier : public Visitor {
   }
 
   void Visit(const DeclareStmt& node) override {
-    if (node.init) {
+    if (node.init && !node.type.array) {
       auto init = EvalExpr(node.init);
 
       auto int_const = std::dynamic_pointer_cast<IntConst>(init);
@@ -361,6 +361,12 @@ class Simplifier : public Visitor {
     }
   }
 
+  void Visit(const SpecialStmt& node) override {
+    for (const auto& expr : node.params) {
+      const_cast<ExprPtr&>(expr) = EvalExpr(expr);
+    }
+  }
+
   void Visit(const Function& node) override { const_cast<Function&>(node).body = EvalStmt(node.body); }
 
  private:
@@ -450,6 +456,12 @@ class Simplifier : public Visitor {
 }  // namespace sem
 
 namespace lang {
+void Simplify(sem::StmtPtr stmt) {
+  lang::Scope<sem::Symbol> scope;
+  sem::Simplifier simplifier{&scope};
+  stmt->Accept(simplifier);
+}
+
 void Simplify(const std::vector<KernelInfo>& kernels) {
   for (const auto& ki : kernels) {
     if (VLOG_IS_ON(4)) {

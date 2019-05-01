@@ -185,7 +185,11 @@ class Emitter : public sem::Visitor {
   }
 
   void Visit(const sem::CallExpr& node) {
-    emit(node.name);
+    if (node.name == "sub_group_broadcast") {
+      emit("simd_broadcast");
+    } else {
+      emit(node.name);
+    }
     emit("(");
     for (size_t i = 0; i < node.vals.size(); i++) {
       if (i) {
@@ -296,7 +300,11 @@ class Emitter : public sem::Visitor {
 
   void Visit(const sem::BarrierStmt& node) {
     emitTab();
-    emit("threadgroup_barrier(mem_flags::mem_threadgroup);\n");
+    if (node.subgroup) {
+      emit("simdgroup_barrier(mem_flags::mem_threadgroup);\n");
+    } else {
+      emit("threadgroup_barrier(mem_flags::mem_threadgroup);\n");
+    }
   }
 
   void Visit(const sem::ReturnStmt& node) {
@@ -308,6 +316,10 @@ class Emitter : public sem::Visitor {
       emit(")");
     }
     emit(";\n");
+  }
+
+  void Visit(const sem::SpecialStmt& node) {
+    throw std::runtime_error("Metal code emitter special statement not defined!");
   }
 
   void Visit(const sem::Function& node) {

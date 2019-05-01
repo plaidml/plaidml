@@ -11,6 +11,7 @@
 
 #include "tile/base/shape.h"
 #include "tile/codegen/alias.h"
+#include "tile/math/util.h"
 
 // Some terminology: we refer to each Refinement that describes a
 // newly-created block of memory (i.e. !IsReadDir(r) &&
@@ -80,14 +81,10 @@ struct InterferenceVertex {
 
 typedef boost::adjacency_list<boost::listS, boost::listS, boost::undirectedS, InterferenceVertex> InterferenceGraph;
 
-inline constexpr std::size_t RoundUp(std::size_t count, std::size_t alignment) {
-  return ((count + alignment - 1) / alignment) * alignment;
-}
-
 struct Chunk {
   Chunk(stripe::Refinement* ref_, std::size_t alignment, std::size_t stmt_limit)
       : ref{ref_},
-        size{RoundUp(ref_->interior_shape.byte_size(), alignment)},
+        size{math::Align(stripe::Codec::Resolve(ref_->interior_shape)->byte_size(), alignment)},
         accessors{stmt_limit},
         transitive_accessor_deps{stmt_limit},
         subsequent_accessor_deps{stmt_limit} {}
@@ -120,6 +117,8 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
 
   void Visit(stripe::Store* store) final { RecordUse(store->into); }
 
+  void Visit(stripe::LoadIndex* load_index) final {}
+
   void Visit(stripe::Constant*) final {}  // unused
 
   void Visit(stripe::Special* special) final {
@@ -146,7 +145,7 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
     // parallel instances of the block executing in any order) happen
     // before all writes to that same offset, which often occurs for
     // elementwise operations.
-    for (stripe::Refinement& ref : block->refs) {
+    for (auto& ref : block->refs) {
       if (IsReadDir(ref.dir) || IsWriteDir(ref.dir)) {
         RecordUse(ref.from);
       }
@@ -203,10 +202,10 @@ std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<s
   std::unordered_map<std::string, Chunk*> chunks;
 
   auto add_block_chunks = [&](stripe::Block* block, const AliasMap& alias_map) {
-    for (stripe::Refinement& ref : block->refs) {
+    for (auto& ref : block->refs) {
       if (ref.dir == stripe::RefDir::None && locations.count(ref.location)) {
-        auto chunk_it = result.emplace(result.end(), Chunk{&ref, alignment, stmt_limit});
-        chunks[alias_map.at(ref.into).base_name] = &*chunk_it;
+        auto chunk_it = result.emplace(result.end(), Chunk{&ref.mut(), alignment, stmt_limit});
+        chunks[alias_map.at(ref.into()).base_name] = &*chunk_it;
       }
     }
   };

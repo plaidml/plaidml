@@ -43,6 +43,8 @@ plaidml_cc_library(
         "generate.cc",
         "gid.cc",
         "gid.h",
+        "intrinsic.cc",
+        "intrinsic.h",
         "loop.cc",
         "loop.h",
         "ops.cc",
@@ -64,6 +66,7 @@ plaidml_cc_library(
         "symbolic.cc",
         "tile_cache.cc",
         "tile_cache.h",
+        "tile_cc.cc",
         "tile_opt.cc",
         "tile_opt.h",
         "type.cc",
@@ -73,6 +76,7 @@ plaidml_cc_library(
         ":parser",
     ],
     hdrs = [
+        "ast.h",
         "compile.h",
         "compose.h",
         "emitc.h",
@@ -84,6 +88,7 @@ plaidml_cc_library(
         "semtree.h",
         "simplifier.h",
         "symbolic.h",
+        "tile_cc.h",
         "type.h",
     ],
     copts = select({
@@ -161,5 +166,20 @@ plaidml_cc_test(
 plaidml_cc_test(
     name = "exprtype_test",
     srcs = ["exprtype_test.cc"],
+    deps = [":lang"],
+)
+
+plaidml_cc_test(
+    name = "gen_stripe_test",
+    srcs = ["gen_stripe_test.cc"],
+    deps = [
+        ":lang",
+        "//testing:matchers",
+    ],
+)
+
+plaidml_cc_test(
+    name = "tile_cc_test",
+    srcs = ["tile_cc_test.cc"],
     deps = [":lang"],
 )

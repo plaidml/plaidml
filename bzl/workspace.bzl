@@ -5,9 +5,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 def plaidml_workspace():
     http_archive(
         name = "bazel_skylib",
-        url = "https://github.com/bazelbuild/bazel-skylib/archive/0.5.0.tar.gz",
-        sha256 = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f",
-        strip_prefix = "bazel-skylib-0.5.0",
+        url = "https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz",
+        sha256 = "2ea8a5ed2b448baf4a6855d3ce049c4c452a6470b1efd1504fdb7c1c134d220a",
+        strip_prefix = "bazel-skylib-0.8.0",
     )
 
     http_archive(
@@ -87,14 +87,6 @@ def plaidml_workspace():
         build_file = str(Label("//bzl:zlib.BUILD")),
     )
 
-    http_archive(
-        name = "llvm",
-        url = "https://storage.googleapis.com/external_build_repo/llvm-3.8.1.src.tar.gz",
-        sha256 = "ad4b83105ce7540c79c36d92ac903c990a665aca54c878a243e1200aab6c756a",
-        strip_prefix = "llvm-3.8.1.src",
-        build_file = str(Label("//vendor/llvm:llvm.BUILD")),
-    )
-
     http_file(
         name = "plantuml_jar",
         urls = ["https://storage.googleapis.com/vertexai-depot/plantuml.jar"],
@@ -108,6 +100,13 @@ def plaidml_workspace():
         name = "com_intel_plaidml_conda",
         specs = {
             "env": str(Label("//conda:plaidml.yml")),
+        },
+    )
+
+    conda_repo(
+        name = "com_intel_plaidml_conda_pmlc",
+        specs = {
+            "env": str(Label("//conda:pmlc.yml")),
         },
     )
 
@@ -138,4 +137,13 @@ def configure_protobuf():
     native.bind(
         name = "six",
         actual = "@six_archive//:six",
+    )
+
+def configure_llvm():
+    http_archive(
+        name = "llvm",
+        url = "http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz",
+        sha256 = "a38dfc4db47102ec79dcc2aa61e93722c5f6f06f0a961073bd84b78fb949419b",
+        strip_prefix = "llvm-7.0.1.src",
+        build_file = str(Label("//vendor/llvm:llvm.BUILD")),
     )

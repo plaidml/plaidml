@@ -36,6 +36,7 @@ class Print : public Visitor {
   void Visit(const WhileStmt&) override;
   void Visit(const BarrierStmt&) override;
   void Visit(const ReturnStmt&) override;
+  void Visit(const SpecialStmt&) override;
   void Visit(const Function&) override;
   std::string str() const { return result_.str(); }
 

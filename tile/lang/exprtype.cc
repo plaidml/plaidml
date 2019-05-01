@@ -252,6 +252,8 @@ void ExprType::Visit(const sem::BarrierStmt&) { throw std::logic_error{"Unexpect
 
 void ExprType::Visit(const sem::ReturnStmt&) { throw std::logic_error{"Unexpected expression component"}; }
 
+void ExprType::Visit(const sem::SpecialStmt&) { throw std::logic_error{"Unexpected expression component"}; }
+
 void ExprType::Visit(const sem::Function&) { throw std::logic_error{"Unexpected expression component"}; }
 
 ExprType::ExprType(const lang::Scope<sem::Type>* scope, bool enable_fp16, bool use_int_for_logic)

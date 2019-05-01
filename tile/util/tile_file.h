@@ -1,7 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
+
+#include <boost/filesystem.hpp>
 
 #include "base/util/zipfile.h"
 #include "tile/lang/compose.h"
@@ -17,14 +20,15 @@ struct SimpleBuffer : lang::BufferBase {
 
 class TileFile {
  public:
-  explicit TileFile(const std::string& path);
+  explicit TileFile(const boost::filesystem::path& path);
 
-  lang::RunInfo Load();
+  lang::RunInfo Load(const std::vector<std::shared_ptr<SimpleBuffer>>& inputs = {});
   metadata::proto::Metadata ReadMetadata();
   std::vector<float> GetTensorFloatData(const metadata::proto::Tensor& tensor);
 
  private:
   UnZipArchive archive_;
+  boost::filesystem::path path_;
 };
 
 }  // namespace util

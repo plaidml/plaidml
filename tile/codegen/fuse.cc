@@ -15,11 +15,52 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, const std::string& buf_name) {
+static std::vector<Affine> TranslatedContraints(const AliasMap& map, std::map<std::string, std::string> remap,
+                                                const Block& in) {
+  std::vector<Affine> out;
+  AliasMap inner = AliasMap(map, const_cast<Block*>(&in));
+  std::map<std::string, stripe::Affine> remapped;
+  for (const auto& kvp : inner.idx_sources()) {
+    auto it = remap.find(kvp.first);
+    if (it == remap.end()) {
+      remapped.emplace(kvp);
+    } else {
+      remapped.emplace(kvp.first, Affine(it->second));
+    }
+  }
+  for (const auto& aff : in.constraints) {
+    IVLOG(4, "Remap = " << remap);
+    IVLOG(4, "Translating " << aff << " to " << aff.sym_eval(remapped));
+    out.push_back(aff.sym_eval(remapped));
+  }
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+static Affine TranslateAffine(const Affine& src, const AliasMap& map, std::map<std::string, std::string> remap,
+                              const Block* in) {
+  Affine dest;
+  AliasMap inner = AliasMap(map, const_cast<Block*>(in));
+  std::map<std::string, stripe::Affine> remapped;
+  for (const auto& kvp : inner.idx_sources()) {
+    auto it = remap.find(kvp.first);
+    if (it == remap.end()) {
+      remapped.emplace(kvp);
+    } else {
+      remapped.emplace(kvp.first, Affine(it->second));
+    }
+  }
+  return dest.sym_eval(remapped);
+}
+
+boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block& a, const Block& b,
+                                              const std::string& buf_name) {
   IVLOG(3, "ComputeFusionPlan for " << buf_name << " between " << a.name << " and " << b.name);
   FusionPlan plan;
   plan.tile_a = TileShape(a.idxs.size(), 1);
+  plan.a_interleave = false;
   plan.tile_b = TileShape(b.idxs.size(), 1);
+  plan.b_interleave = false;
   // This is quite hueristic right now, but still beats our prior implementation
   auto it_a = a.ref_by_from(buf_name, false);
   if (it_a == a.refs.end()) {
@@ -43,7 +84,7 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
       return boost::none;
     }
     if (poly_b.getMap().size() != 1 || poly_b.getMap().begin()->first.empty()) {
-      IVLOG(3, "ComputeFusionPlan: complex access in b" << poly_b.toString());
+      IVLOG(3, "ComputeFusionPlan: complex access in b: " << poly_b.toString());
       return boost::none;
     }
     std::string idx_a = poly_a.getMap().begin()->first;
@@ -60,26 +101,40 @@ boost::optional<FusionPlan> ComputeFusionPlan(const Block& a, const Block& b, co
     }
     for (size_t i = 0; i < b.idxs.size(); i++) {
       if (b.idxs[i].name == idx_b) {
-        plan.tile_b[i] = mul_a / mul_b;
+        int64_t mul = mul_a / mul_b;
+        size_t a_range = a.idx_by_name(idx_a)->range;
+        size_t b_range = b.idx_by_name(idx_b)->range;
+        if (mul > 1) {
+          plan.tile_b[i] = mul_a / mul_b;
+        } else if (a_range != b_range) {
+          plan.tile_b[i] = b_range / a_range;
+          plan.b_interleave = true;
+        }
       }
     }
     plan.remap_a.emplace(idx_a, idx_a);
     plan.remap_b.emplace(idx_b, idx_a);
   }
-  if (a.constraints != b.constraints) {
+  // Translate the constraints
+  if (TranslatedContraints(scope, plan.remap_a, a) != TranslatedContraints(scope, plan.remap_b, b)) {
+    IVLOG(3, "Remap a: " << plan.remap_a);
+    IVLOG(3, "Remap b: " << plan.remap_b);
     IVLOG(3, "ComputeFusionPlan: incompatible constraints");
     IVLOG(4, "    a: " << StreamContainer(a.constraints));
     IVLOG(4, "    b: " << StreamContainer(b.constraints));
     return boost::none;
   }
-  for (const auto& constraint : a.constraints) {
-    for (const auto& term : constraint.getMap()) {
-      auto it = plan.remap_a.find(term.first);
-      if (it == plan.remap_a.end()) {
-        plan.remap_a.emplace(term.first, term.first);
+  // Compute induced remappings
+  for (const auto& idx_b : b.idxs) {
+    if (idx_b.affine != Affine()) {
+      for (const auto& idx_a : a.idxs) {
+        if (idx_b.affine == idx_a.affine) {
+          plan.remap_b.emplace(idx_b.name, idx_a.name);
+        }
       }
     }
   }
+  // Translate constraints
   for (const auto& constraint : b.constraints) {
     for (const auto& term : constraint.getMap()) {
       auto it = plan.remap_b.find(term.first);
@@ -113,7 +168,7 @@ void FlattenTrivial(stripe::Block* outer) {
     }
     bool renames = false;
     for (const auto& ref : inner->refs) {
-      if (ref.from != "" && ref.into != ref.from) {
+      if (ref.from != "" && ref.into() != ref.from) {
         renames = true;
       }
     }
@@ -132,7 +187,9 @@ void FlattenTrivial(stripe::Block* outer) {
         for (auto& idx : deep->idxs) {
           std::vector<std::string> names;
           for (const auto& item : idx.affine.getMap()) {
-            names.push_back(item.first);
+            if (item.first != "") {
+              names.push_back(item.first);
+            }
           }
           for (const auto& name : names) {
             idx.affine.substitute(name, inner->idx_by_name(name)->affine);
@@ -151,27 +208,46 @@ void FlattenTrivial(stripe::Block* outer) {
 
 std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                          //
                                       const std::map<std::string, std::string>& mapping,  //
-                                      const TileShape& tile) {
+                                      const TileShape& tile,                              //
+                                      bool interleave) {
   IVLOG(3, "FusionRefactor:\n" << orig);
   IVLOG(3, "mapping: " << StreamContainer(mapping) << ", tile: " << tile);
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
-  ApplyTile(tiled.get(), tile, true, true);
+  ApplyTile(tiled.get(), tile, true, true, interleave);
+  // IVLOG(3, "Tiled:\n" << *tiled);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
   outer->name = tiled->name;
-  // This is safe to do because we check whether constraints are equivalent in ComputeFusionPlan
-  outer->constraints = tiled->constraints;
   auto inner = std::make_shared<Block>();
   inner->name = tiled->name;
-  outer->tags = tiled->tags;
+  outer->set_attrs(*tiled);
   outer->stmts.push_back(inner);
+  // Put constraints on outer block and rewrite
+  for (const auto& aff : tiled->constraints) {
+    Affine out;
+    for (const auto& kvp : aff.getMap()) {
+      auto it = mapping.find(kvp.first);
+      if (it != mapping.end()) {
+        out += Affine(it->second, kvp.second);
+      } else {
+        out += Affine(kvp.first, kvp.second);
+      }
+    }
+    outer->constraints.push_back(out);
+  }
   // Move / rename each index to the appropriate block
   for (const auto& idx : tiled->idxs) {
     auto it = mapping.find(idx.name);
     if (it == mapping.end()) {
-      IVLOG(3, "New idx: " << idx.name);
-      inner->idxs.push_back(idx);
+      if (idx.affine != Affine()) {
+        IVLOG(3, "Affine idx: " << idx.name);
+        outer->idxs.push_back(idx);
+        inner->idxs.emplace_back(Index{idx.name, 1, idx.name});
+      } else {
+        IVLOG(3, "New idx: " << idx.name);
+        inner->idxs.push_back(idx);
+      }
     } else {
       IVLOG(3, "Existing idx: " << idx.name);
       inner->idxs.emplace_back(Index{idx.name, 1, it->second});
@@ -179,10 +255,9 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
       outer->idxs.back().name = it->second;
     }
   }
+  outer->location = tiled->location;
   // Sort outer indexes by names
   std::sort(outer->idxs.begin(), outer->idxs.end(), [](const Index& a, const Index& b) { return a.name < b.name; });
-  // Copy constraints to inner block
-  inner->constraints = tiled->constraints;
   // Copy statements to the inner block
   inner->stmts = tiled->stmts;
   // Copy refinements to both blocks
@@ -192,7 +267,8 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
   // Also expand sizes base on inner indexes that have been removed.
   for (auto& ref : outer->refs) {
     for (size_t i = 0; i < ref.access.size(); i++) {
-      auto& acc = ref.access[i];
+      auto& acc = ref.mut().access[i];
+      int64_t min_val = 0;
       int64_t max_val = ref.interior_shape.dims[i].size - 1;
       Affine affine = acc.constant();
       for (const auto& kvp : acc.getMap()) {
@@ -200,24 +276,29 @@ std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                
         if (it == mapping.end()) {
           if (kvp.first != "") {
             if (kvp.second < 0) {
-              throw_with_trace(std::runtime_error("FusionRefactor: Unable to handle negative strides"));
+              min_val += (tiled->idx_by_name(kvp.first)->range - 1) * kvp.second;
+            } else {
+              max_val += (tiled->idx_by_name(kvp.first)->range - 1) * kvp.second;
             }
-            max_val += (tiled->idx_by_name(kvp.first)->range - 1) * kvp.second;
           }
           continue;
         }
         affine += Affine(it->second, kvp.second);
       }
-      ref.interior_shape.dims[i].size = max_val + 1;
+      ref.mut().interior_shape.dims[i].size = max_val - min_val + 1;
       acc = affine;
     }
   }
   // Remove mapped access elements from inner refinements
   for (auto& ref : inner->refs) {
     // Rename from to match outer into
-    ref.from = ref.into;
+    ref.mut().from = ref.into();
+    // If original was an allocation, make R/W.
+    if (ref.dir == RefDir::None) {
+      ref.mut().dir = RefDir::InOut;
+    }
     // Update accesses
-    for (auto& acc : ref.access) {
+    for (auto& acc : ref.mut().access) {
       Affine affine;
       for (const auto& kvp : acc.getMap()) {
         if (kvp.first != "" && !mapping.count(kvp.first)) {
@@ -238,12 +319,19 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   // If indexes don't match, fail
   if (block_a->idxs != block_b->idxs) {
     IVLOG(3, "Fuse failed due to mismatched indexes");
+    IVLOG(3, "A: " << block_a->idxs);
+    IVLOG(3, "B: " << block_b->idxs);
     return false;
   }
   // If constraints don't match, fail
   if (block_a->constraints != block_b->constraints) {
     IVLOG(3, "Fuse failed due to mismatched constraints");
-    return true;
+    return false;
+  }
+  // If locations don't match, fail
+  if (block_a->location != block_b->location) {
+    IVLOG(3, "Fuse failed due to mismatched locations");
+    return false;
   }
   // Make AliasMaps for the two blocks
   AliasMap a_map(scope, block_a);
@@ -260,26 +348,25 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
     // Check if b matches something in the existing block
     bool merged = false;
     for (auto& old_ref : block_a->refs) {
-      auto atype = AliasInfo::Compare(a_map.at(old_ref.into), b_map.at(new_ref.into));
+      auto atype = AliasInfo::Compare(a_map.at(old_ref.into()), b_map.at(new_ref.into()));
       if (atype == AliasType::Partial) {
         // Conflict, if either do any writing, we have a problem
         if (IsWriteDir(new_ref.dir) || IsWriteDir(old_ref.dir)) {
-          IVLOG(3, "Fuse failed due to mismatched aliases: " << old_ref.into << " vs " << new_ref.into);
+          IVLOG(3, "Fuse failed due to mismatched aliases: " << old_ref.into() << " vs " << new_ref.into());
           return false;  // Fuse will not work, bail
         }
       } else if (atype == AliasType::Exact) {
-        remap_b[new_ref.into] = old_ref.into;
-        old_ref.dir = UnionDir(old_ref.dir, new_ref.dir);
+        remap_b[new_ref.into()] = old_ref.into();
+        old_ref.mut().dir = UnionDir(old_ref.dir, new_ref.dir);
         merged = true;
         break;
       }
     }
     if (!merged) {
       // Copy across as a new ref
-      std::string new_name = tmp->unique_ref_name(new_ref.into);
-      remap_b[new_ref.into] = new_name;
-      auto ref_it = tmp->refs.insert(tmp->refs.end(), new_ref);
-      ref_it->into = new_name;
+      std::string new_name = tmp->unique_ref_name(new_ref.into());
+      remap_b[new_ref.into()] = new_name;
+      tmp->refs.emplace(new_ref.WithInto(std::move(new_name)));
     }
   }
   // We are now safe (cannot fail), move new reference over A's
@@ -326,6 +413,15 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
         op->into = remap_b.at(op->into);
         op->from = scalar_rename.at(op->from);
       } break;
+      case StmtKind::LoadIndex: {
+        // Currently we can't reach here actually because LoadIndex
+        // takes only index which must not be the output of block_a.
+        // If we get here in the future, the following code need
+        // to be tested.
+        auto op = LoadIndex::Downcast(stmt);
+        op->into = def_scalar(op->into);
+        op->from = TranslateAffine(op->from, scope, remap_b, block_b);
+      }
       case StmtKind::Special: {
         auto op = Special::Downcast(stmt);
         for (auto& in : op->inputs) {
@@ -338,7 +434,7 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
       case StmtKind::Block: {
         auto op = Block::Downcast(stmt);
         for (auto& ref : op->refs) {
-          ref.from = remap_b.at(ref.from);
+          ref.mut().from = remap_b.at(ref.from);
         }
       } break;
       case StmtKind::Constant: {
@@ -410,7 +506,7 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
       }
       IVLOG(3, "Fuse on = " << fuse_on);
       // Compute a fusion plan for the two blocks, if fails, give up
-      auto plan = ComputeFusionPlan(*block1, *block2, fuse_on);
+      auto plan = ComputeFusionPlan(scope, *block1, *block2, fuse_on);
       if (!plan) {
         IVLOG(3, "Fusion plan failed");
         break;
@@ -421,8 +517,24 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy) 
         break;
       }
       // Do the appropriate refactors
-      auto refactor1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a);
-      auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b);
+      auto refactor1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a, plan->a_interleave);
+      auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b, plan->b_interleave);
+      // Now copy computed indexes if it's safe
+      for (const auto& idx : refactor1->idxs) {
+        if (idx.affine != stripe::Affine() && !refactor2->idx_by_name(idx.name)) {
+          refactor2->idxs.push_back(idx);
+        }
+      }
+      for (const auto& idx : refactor2->idxs) {
+        if (idx.affine != stripe::Affine() && !refactor1->idx_by_name(idx.name)) {
+          refactor1->idxs.push_back(idx);
+        }
+      }
+      // Sort one more time
+      std::sort(refactor1->idxs.begin(), refactor1->idxs.end(),
+                [](const Index& a, const Index& b) { return a.name < b.name; });
+      std::sort(refactor2->idxs.begin(), refactor2->idxs.end(),
+                [](const Index& a, const Index& b) { return a.name < b.name; });
       // IVLOG(3, "Fusion refactor 1:\n" << *refactor1);
       // IVLOG(3, "Fusion refactor 2:\n" << *refactor2);
       // Try the actual fusion
@@ -446,15 +558,27 @@ struct FusionPassOptions {
   Tags a_block_reqs;
   Tags b_block_reqs;
   Tags fused_set;
+  Tags exclude;
+  bool perfect;
+  bool output_match;
 };
 
 class TagFusionStrategy : public FusionStrategy {
  public:
   explicit TagFusionStrategy(const FusionPassOptions& options) : options_(options) {}
   bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
-    return parent.has_tags(options_.parent_reqs) &&  //
-           a.has_tags(options_.a_block_reqs) &&      //
-           b.has_tags(options_.b_block_reqs);
+    bool tag_match = parent.has_tags(options_.parent_reqs) &&  //
+                     a.has_tags(options_.a_block_reqs) &&      //
+                     b.has_tags(options_.b_block_reqs) &&      //
+                     !a.has_any_tags(options_.exclude) &&      //
+                     !b.has_any_tags(options_.exclude);
+    if (!tag_match) {
+      return false;
+    }
+    if (options_.output_match && a.idxs.size() != b.idxs.size()) {
+      return false;
+    }
+    return true;
   }
   void OnFailed() {}
   void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
@@ -481,7 +605,10 @@ void FusionPass(stripe::Block* root, const proto::FusionPass& options) {
       FromProto(options.parent_reqs()),  // parent_reqs
       FromProto(options.a_reqs()),       // a_block_reqs
       FromProto(options.b_reqs()),       // b_block_reqs
-      FromProto(options.fused_set())     // fused_set
+      FromProto(options.fused_set()),    // fused_set
+      FromProto(options.exclude()),      // exclude
+      options.perfect(),                 // perfect
+      options.output_match()             // output_match
   };
   AliasMap base;
   AliasMap root_map(base, root);

@@ -18,23 +18,23 @@ namespace codegen {
 TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
       }
-    }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
   )",
@@ -43,30 +43,30 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
   std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
 
   proto::MemoryPlacementPass options;
-  options.add_locs()->set_name("loc_1");
+  options.add_locs()->add_devs()->set_name("loc_1");
 
   PlaceRefinements(block.get(), options);
 
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    loc { unit { } }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+         loc { devs: [{name: "loc_1"}]}
+         interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
       }
-    }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
   )";
@@ -77,23 +77,23 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
 TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
       }
-    }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -103,7 +103,7 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
 
   proto::MemoryPlacementPass options;
-  options.add_locs()->set_name("loc_1");
+  options.add_locs()->add_devs()->set_name("loc_1");
   options.set_alignment(16);
 
   PlaceRefinements(block.get(), options);
@@ -111,24 +111,24 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    loc { unit { } }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          offset: 16
+        }
       }
-    }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-      offset: 16
-    }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -140,23 +140,23 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
 TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
       }
-    }
-    refs {
-      loc { name: "loc_2" unit { } }
-      into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -166,31 +166,31 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
   std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
 
   proto::MemoryPlacementPass options;
-  options.add_locs()->set_name("loc_1");
-  options.add_locs()->set_name("loc_2");
+  options.add_locs()->add_devs()->set_name("loc_1");
+  options.add_locs()->add_devs()->set_name("loc_2");
 
   PlaceRefinements(block.get(), options);
 
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    loc { unit { } }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
       }
-    }
-    refs {
-      loc { name: "loc_2" unit { } }
-      into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -202,31 +202,30 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
 TEST(PlacerTest, LocationSubsetCanBePlaced) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(R"(
-    loc { unit { } }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b3"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
       }
-    }
-    refs {
-      loc { name: "loc_2" unit { } }
-      into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
-    refs {
-      loc { name: "loc_2" unit { } }
-      into: "b3"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}
@@ -237,38 +236,37 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
   std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
 
   proto::MemoryPlacementPass options;
-  options.add_locs()->set_name("loc_1");
+  options.add_locs()->add_devs()->set_name("loc_1");
 
   PlaceRefinements(block.get(), options);
 
   stripe::proto::Block output_proto{IntoProto(*block)};
 
   const char* expected = R"(
-    loc { unit { } }
-    refs {
-      loc { name: "loc_1" unit { } }
-      into: "b1"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value: {
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b2"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
+      },
+      {
+        key: "b3"
+        value: {
+          loc { devs: [{name: "loc_2"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+        }
       }
-    }
-    refs {
-      loc { name: "loc_2" unit { } }
-      into: "b2"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
-    refs {
-      loc { name: "loc_2" unit { } }
-      into: "b3"
-      shape {
-        type: FLOAT32
-        dims: {size:1 stride:1}
-      }
-    }
+    ]
     stmts { load { from:"b1" into:"$1" } }
     stmts { store { from:"$1" into:"b2" } deps: 0 }
     stmts { special { name:"COPY" inputs:"b2" outputs:"b1"} deps: 1}

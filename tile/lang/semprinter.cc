@@ -56,6 +56,11 @@ inline std::string c_dtype(const DataType& dt) {
 }
 
 void Print::emitType(const Type& t) {
+  if (t.region == Type::LOCAL) {
+    emit("__local ");
+  } else if (t.region == Type::GLOBAL) {
+    emit("__global ");
+  }
   if (t.base == Type::TVOID) {
     emit("void");
     return;
@@ -313,6 +318,19 @@ void Print::Visit(const ReturnStmt& n) {
     emit(")");
   }
   emit(";\n");
+}
+
+void Print::Visit(const SpecialStmt& n) {
+  emitTab();
+  emit(n.name);
+  emit("(");
+  for (size_t i = 0; i < n.params.size(); i++) {
+    n.params[i]->Accept(*this);
+    if (i != n.params.size() - 1) {
+      emit(", ");
+    }
+  }
+  emit(");\n");
 }
 
 void Print::Visit(const Function& n) {

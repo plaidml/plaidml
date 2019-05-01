@@ -9,8 +9,8 @@ plaidml_cc_library(
         "*.h",
     ]),
     deps = [
-        "@boost//:boost",
         "//tile/lang",
         "//tile/util",
+        "@boost",
     ],
 )

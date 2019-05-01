@@ -22,7 +22,7 @@ template <cl_device_info Param, typename T>
 struct CLDeviceInfo {
   static T Read(cl_device_id did) {
     T value = 0;
-    Err err = clGetDeviceInfo(did, Param, sizeof(value), reinterpret_cast<char*>(&value), nullptr);
+    Err err = ocl::GetDeviceInfo(did, Param, sizeof(value), reinterpret_cast<char*>(&value), nullptr);
     if (err && err.code() != CL_INVALID_VALUE) {
       Err::Check(err, "reading OpenCL device info");
     }
@@ -34,7 +34,7 @@ template <cl_platform_info Param, typename T>
 struct CLPlatformInfo {
   static T Read(cl_platform_id pid) {
     T value = 0;
-    Err err = clGetPlatformInfo(pid, Param, sizeof(value), reinterpret_cast<char*>(&value), nullptr);
+    Err err = ocl::GetPlatformInfo(pid, Param, sizeof(value), reinterpret_cast<char*>(&value), nullptr);
     if (err && err.code() != CL_INVALID_VALUE && err.code() != CL_INVALID_DEVICE) {
       Err::Check(err, "reading OpenCL platform info");
     }
@@ -46,7 +46,7 @@ template <cl_device_info Param>
 struct CLDeviceInfo<Param, std::string> {
   static std::string Read(cl_device_id did) {
     std::size_t value_size;
-    Err err = clGetDeviceInfo(did, Param, 0, nullptr, &value_size);
+    Err err = ocl::GetDeviceInfo(did, Param, 0, nullptr, &value_size);
     if (err) {
       if (err.code() != CL_INVALID_VALUE) {
         Err::Check(err, "reading OpenCL device info size");
@@ -54,7 +54,7 @@ struct CLDeviceInfo<Param, std::string> {
       return std::string();
     }
     std::string value(value_size, '\0');
-    Err::Check(clGetDeviceInfo(did, Param, value.size(), const_cast<char*>(value.c_str()), nullptr),
+    Err::Check(ocl::GetDeviceInfo(did, Param, value.size(), const_cast<char*>(value.c_str()), nullptr),
                "reading OpenCL device info char[] data");
     if (value.size() && value[value.size() - 1] == '\0') {
       value.pop_back();
@@ -67,7 +67,7 @@ template <cl_platform_info Param>
 struct CLPlatformInfo<Param, std::string> {
   static std::string Read(cl_platform_id pid) {
     std::size_t value_size;
-    Err err = clGetPlatformInfo(pid, Param, 0, nullptr, &value_size);
+    Err err = ocl::GetPlatformInfo(pid, Param, 0, nullptr, &value_size);
     if (err) {
       if (err.code() != CL_INVALID_VALUE) {
         Err::Check(err, "reading OpenCL platform info size");
@@ -75,7 +75,7 @@ struct CLPlatformInfo<Param, std::string> {
       return std::string();
     }
     std::string value(value_size, '\0');
-    Err::Check(clGetPlatformInfo(pid, Param, value.size(), const_cast<char*>(value.c_str()), nullptr),
+    Err::Check(ocl::GetPlatformInfo(pid, Param, value.size(), const_cast<char*>(value.c_str()), nullptr),
                "reading OpenCL platform info char[] data");
     if (value.size() && value[value.size() - 1] == '\0') {
       value.pop_back();
@@ -88,7 +88,7 @@ template <cl_device_info Param, typename T>
 struct CLDeviceInfo<Param, std::vector<T>> {
   static std::vector<T> Read(cl_device_id did) {
     std::size_t value_size;
-    Err err = clGetDeviceInfo(did, Param, 0, nullptr, &value_size);
+    Err err = ocl::GetDeviceInfo(did, Param, 0, nullptr, &value_size);
     if (err) {
       if (err.code() != CL_INVALID_VALUE) {
         Err::Check(err, "reading OpenCL device info size");
@@ -96,7 +96,7 @@ struct CLDeviceInfo<Param, std::vector<T>> {
       return std::vector<T>();
     }
     std::vector<T> value(value_size / sizeof(T));
-    Err::Check(clGetDeviceInfo(did, Param, value.size() * sizeof(T), value.data(), nullptr),
+    Err::Check(ocl::GetDeviceInfo(did, Param, value.size() * sizeof(T), value.data(), nullptr),
                "reading OpenCL device info array data");
     return value;
   }
@@ -106,7 +106,9 @@ struct CLDeviceInfo<Param, std::vector<T>> {
 
 // This pragma is to ignore warnings (treated as errors due to -Werror) on gcc 6
 #pragma GCC diagnostic push
+#if defined(__GNUC__) && ((__GNUC__ * 100) + __GNUC_MINOR__) >= 600
 #pragma GCC diagnostic ignored "-Wignored-attributes"
+#endif
 
 template <cl_platform_info Param>
 struct CLInfoType;

@@ -19,7 +19,8 @@ namespace gid {
 // among the global index dimensions.  If a logical dimension's size is a power of two, we instead use the low bits of a
 // global dimension to track where a thread is in that logical dimension with some simple bit-wise operations, while
 // continuing to use the high bits for other dimensions.
-Map MakeMap(const std::vector<std::size_t>& lid_limits, const std::vector<std::size_t>& logical_dims) {
+Map MakeMap(const std::vector<std::size_t>& lid_limits, const std::vector<std::size_t>& logical_dims,
+            bool do_early_exit) {
   // Early exit: if all of the logical dimensions are size 1, return an empty map.
   bool early_exit = true;
   for (auto size : logical_dims) {
@@ -28,7 +29,7 @@ Map MakeMap(const std::vector<std::size_t>& lid_limits, const std::vector<std::s
       break;
     }
   }
-  if (early_exit) {
+  if (do_early_exit && early_exit) {
     return Map{};
   }
 

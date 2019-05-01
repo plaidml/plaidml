@@ -4,6 +4,7 @@
 // provided to CG backends (LLVM, OpenCL, etc.)
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,7 +16,8 @@ namespace vertexai {
 namespace tile {
 namespace sem {
 
-// Simple typing.  Every type is either a TILE value type, a TILE pointer type, or an index
+// Simple typing.  Every type is either a TILE value type, a TILE pointer type,
+// or an index
 // TILE value types consist of the underlying type and a vector width
 struct Type : public el::Loggable {
   enum BaseType { TVOID, INDEX, VALUE, POINTER_MUT, POINTER_CONST };
@@ -183,7 +185,7 @@ struct CallExpr : public Expression {
     SINH,
     SQRT,
     TAN,
-    TANH
+    TANH,
   };
   Function function;
   std::string name;
@@ -219,6 +221,7 @@ struct Block : public Statement {
   Block() {}
   explicit Block(const std::vector<StmtPtr>& s) : statements(s) {}
   bool isBlock() const final { return true; }
+  void push_front(StmtPtr p) { statements.insert(statements.begin(), p); }
   void push_back(StmtPtr p) { statements.push_back(p); }
   void merge(std::shared_ptr<Block> other);
   void append(StmtPtr p);
@@ -256,7 +259,8 @@ struct WhileStmt : public Statement {
 
 // A statement representing an inter-thread barrier
 struct BarrierStmt : public Statement {
-  BarrierStmt() {}
+  bool subgroup;
+  explicit BarrierStmt(bool _subgroup = false) : subgroup(_subgroup) {}
   void Accept(Visitor&) const final;
 };
 
@@ -264,6 +268,14 @@ struct BarrierStmt : public Statement {
 struct ReturnStmt : public Statement {
   ExprPtr value;
   explicit ReturnStmt(ExprPtr v) : value(v) {}
+  void Accept(Visitor&) const final;
+};
+
+// A 'special' statement
+struct SpecialStmt : public Statement {
+  std::string name;
+  std::vector<ExprPtr> params;
+  explicit SpecialStmt(const std::string& n, std::vector<ExprPtr> p) : name(n), params(p) {}
   void Accept(Visitor&) const final;
 };
 
@@ -276,7 +288,8 @@ struct Function : public Node {
   Type ret;
   params_t params;
   StmtPtr body;
-  Function() {}
+  size_t subgroup_size;
+  Function() : subgroup_size(0) {}
   Function(const std::string n, const Type& r, const params_t& p, StmtPtr b);
   void Accept(Visitor&) const final;
 };
@@ -305,6 +318,7 @@ class Visitor {
   virtual void Visit(const WhileStmt&) = 0;
   virtual void Visit(const BarrierStmt&) = 0;
   virtual void Visit(const ReturnStmt&) = 0;
+  virtual void Visit(const SpecialStmt&) = 0;
   virtual void Visit(const Function&) = 0;
 };
 

@@ -2,6 +2,8 @@
 
 #include <boost/format.hpp>
 
+#include "base/util/lookup.h"
+
 namespace vertexai {
 namespace tile {
 namespace math {
@@ -26,7 +28,7 @@ T Polynomial<T>::eval(const std::map<std::string, T>& values) const {
     if (kvp.first == "") {
       res += kvp.second;
     } else if (values.find(kvp.first) != values.end()) {
-      res += kvp.second * values.at(kvp.first);
+      res += kvp.second * safe_at(values, kvp.first);
     } else {
       throw std::runtime_error(
           str(boost::format("Failed to find value for %s, when evaluating %s") % kvp.first % toString()));
@@ -162,14 +164,41 @@ void Polynomial<T>::substitute(const std::string& var, const Polynomial<T>& repl
     // If var isn't in this polynomial, nothing needs to be done
     return;
   }
-  T coeff = map_.at(var);
+  T coeff = safe_at(map_, var);
   map_.erase(var);
   (*this) += coeff * replacement;
 }
 
 template <typename T>
+void Polynomial<T>::substitute(const std::map<std::string, Polynomial<T>>& replacements) {
+  Polynomial result;
+  for (const auto& name_value : map_) {
+    auto replacement = replacements.find(name_value.first);
+    if (replacement == replacements.end()) {
+      result += Polynomial{name_value.first, name_value.second};
+      continue;
+    }
+    result += replacement->second * name_value.second;
+  }
+  map_.swap(result.map_);
+}
+
+template <typename T>
 void Polynomial<T>::substitute(const std::string& var, const T& replacement) {
   substitute(var, Polynomial<T>(replacement));
+}
+
+template <typename T>
+Polynomial<T> Polynomial<T>::sym_eval(const std::map<std::string, Polynomial> values) const {
+  Polynomial<T> out;
+  for (const auto& kvp : map_) {
+    if (kvp.first.empty()) {
+      out += Polynomial<T>(kvp.second);
+    } else {
+      out += safe_at(values, kvp.first) * kvp.second;
+    }
+  }
+  return out;
 }
 
 template <typename T>

@@ -33,6 +33,7 @@ class EmitC : public sem::Visitor {
   void Visit(const sem::WhileStmt&) override;
   void Visit(const sem::BarrierStmt&) override;
   void Visit(const sem::ReturnStmt&) override;
+  void Visit(const sem::SpecialStmt&) override;
   void Visit(const sem::Function&) override;
   std::string str() const { return result_.str(); }
 

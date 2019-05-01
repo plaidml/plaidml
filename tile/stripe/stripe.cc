@@ -2,20 +2,20 @@
 
 #include "tile/stripe/stripe.h"
 
+#include <regex>
 #include <sstream>
 
 #include <boost/format.hpp>
 
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
-#include "tile/base/shape.h"
+#include "tile/stripe/impl.h"
 
 namespace vertexai {
 namespace tile {
 namespace stripe {
 
-const char* Special::ZERO = "zero";
-const char* Special::COPY = "copy";
+using google::protobuf::Any;
 
 const char* Intrinsic::ASSIGN = "assign";
 const char* Intrinsic::SUM = "add";
@@ -28,7 +28,7 @@ const char* Intrinsic::ADD = "add";
 const char* Intrinsic::EQ = "cmp_eq";
 const char* Intrinsic::COND = "cond";
 
-static void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block = nullptr);
+const Taggable::Impl* Accessor::impl(const Taggable& taggable) { return taggable.impl_.get(); }
 
 namespace {
 
@@ -46,15 +46,15 @@ void PrintTab(std::ostream& os, size_t depth) {  //
 
 void PrintPreStmt(std::ostream& os,       //
                   size_t depth,           //
-                  const Statement* stmt,  //
+                  const Statement& stmt,  //
                   size_t idx,             //
                   const DepsMap& deps) {
   PrintTab(os, depth);
   os << idx;
-  if (stmt->deps.size()) {
+  if (stmt.deps.size()) {
     os << "[";
     bool first = true;
-    for (const auto& it : stmt->deps) {
+    for (const auto& it : stmt.deps) {
       if (first) {
         first = false;
       } else {
@@ -70,9 +70,10 @@ void PrintPreStmt(std::ostream& os,       //
     os << "]";
   }
   os << ": ";
-  if (stmt->tags.size()) {
-    for (const auto& tag : stmt->tags) {
-      os << "#" << tag << " ";
+  auto impl = Accessor::impl(stmt);
+  if (impl->attrs.size()) {
+    for (const auto& attr : impl->attrs) {
+      os << "#" << attr.first << " ";
     }
     os << std::endl;
     PrintTab(os, depth);
@@ -83,18 +84,16 @@ void PrintRefinements(std::ostream& os, const Block& block, size_t depth) {
   if (block.refs.size() > 2) {
     std::map<std::string, const Refinement*> sorted;
     for (const auto& ref : block.refs) {
-      sorted.emplace(ref.into, &ref);
+      sorted.emplace(ref.into(), &ref);
     }
     for (const auto& kvp : sorted) {
       PrintTab(os, depth + 2);
-      PrintRefinement(os, *kvp.second, &block);
-      os << std::endl;
+      os << PrintRefinement{*kvp.second, &block} << std::endl;
     }
   } else {
     for (const auto& ref : block.refs) {
       PrintTab(os, depth + 2);
-      PrintRefinement(os, ref, &block);
-      os << std::endl;
+      os << PrintRefinement{ref, &block} << std::endl;
     }
   }
 }
@@ -105,7 +104,7 @@ void PrintBlock(std::ostream& os,    //
                 size_t block_idx,    //
                 const DepsMap& block_deps) {
   os << "block";
-  if (!block.location.name.empty()) {
+  if (!block.location.empty()) {
     os << "<" << block.location << ">";
   }
   os << " [";
@@ -151,13 +150,16 @@ void PrintStmt(std::ostream& os,       //
                size_t depth,           //
                size_t idx,             //
                const DepsMap& deps) {
-  PrintPreStmt(os, depth, &stmt, idx, deps);
+  PrintPreStmt(os, depth, stmt, idx, deps);
   switch (stmt.kind()) {
     case StmtKind::Load:
       os << *dynamic_cast<const Load*>(&stmt) << std::endl;
       break;
     case StmtKind::Store:
       os << *dynamic_cast<const Store*>(&stmt) << std::endl;
+      break;
+    case StmtKind::LoadIndex:
+      os << *dynamic_cast<const LoadIndex*>(&stmt) << std::endl;
       break;
     case StmtKind::Intrinsic:
       os << *dynamic_cast<const Intrinsic*>(&stmt) << std::endl;
@@ -176,7 +178,156 @@ void PrintStmt(std::ostream& os,       //
   }
 }
 
+void PrintBytes(std::ostream& os, size_t bytes) {
+  if (bytes < 1024) {
+    os << bytes << " B";
+  } else {
+    os << bytes / 1024.0 << " KiB";
+  }
+}
+
+void PrintShapeDims(std::ostream& os, const std::vector<size_t>& dims, boost::optional<BankDimension> bank_dim) {
+  os << "(";
+  for (size_t i = 0; i < dims.size(); i++) {
+    if (i > 0) {
+      os << ", ";
+    }
+    if (bank_dim && bank_dim->dim_pos == i) {
+      os << "{" << dims[i] << "}";
+    } else {
+      os << dims[i];
+    }
+  }
+  os << ")";
+}
+
+struct DefaultCodec : Codec {
+  explicit DefaultCodec(const TensorShape* shape) : Codec(shape) {}
+  int64_t byte_size() const final { return shape_->sizes_product_bytes(); }
+  boost::optional<size_t> sparse_dim() const final { return boost::none; }
+};
+
+class CodecRegistry {
+ public:
+  static CodecRegistry* Instance() {
+    static CodecRegistry registry;
+    return &registry;
+  }
+
+  void Register(const std::string& name, const Codec::Factory& factory) {  //
+    registry_[name] = factory;
+  }
+
+  std::unique_ptr<Codec> Resolve(const TensorShape& shape) {  //
+    return registry_.at(shape.codec)(&shape);
+  }
+
+ private:
+  CodecRegistry() {
+    registry_[""] = [](auto shape) { return std::make_unique<stripe::DefaultCodec>(shape); };
+  }
+
+ private:
+  std::unordered_map<std::string, Codec::Factory> registry_;
+};
+
 }  // namespace
+
+Taggable::Taggable() : impl_(new Impl()) {}
+
+Taggable::~Taggable() = default;
+
+Taggable::Taggable(const Taggable& rhs) { set_attrs(rhs); }
+
+Taggable& Taggable::operator=(const Taggable& rhs) {
+  set_attrs(rhs);
+  return *this;
+}
+
+void Taggable::set_tag(const std::string& tag) { impl_->attrs.emplace(tag, Void{}); }
+
+void Taggable::add_tags(const Tags& to_add) {
+  for (const auto& tag : to_add) {
+    impl_->attrs.emplace(tag, Void{});
+  }
+}
+
+void Taggable::clear_tags() { impl_->attrs.clear(); }
+
+void Taggable::remove_tag(const std::string& tag) { impl_->attrs.erase(tag); }
+
+void Taggable::set_tags(const Tags& tags) {
+  impl_->attrs.clear();
+  add_tags(tags);
+}
+
+bool Taggable::has_tag(const std::string& tag) const { return impl_->attrs.count(tag); }
+
+bool Taggable::has_tags(const Tags& to_find) const {
+  for (const auto& tag : to_find) {
+    if (impl_->attrs.count(tag) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool Taggable::has_any_tags(const Tags& to_find) const {
+  for (const auto& tag : to_find) {
+    if (impl_->attrs.count(tag) == 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void Taggable::set_attr(const std::string& name) { impl_->attrs.emplace(name, Void{}); }
+
+void Taggable::set_attr(const std::string& name, bool value) { impl_->attrs.emplace(name, value); }
+
+void Taggable::set_attr(const std::string& name, int64_t value) { impl_->attrs.emplace(name, value); }
+
+void Taggable::set_attr(const std::string& name, double value) { impl_->attrs.emplace(name, value); }
+
+void Taggable::set_attr(const std::string& name, const std::string& value) { impl_->attrs.emplace(name, value); }
+
+void Taggable::set_attr(const std::string& name, const Any& value) { impl_->attrs.emplace(name, value); }
+
+bool Taggable::has_attr(const std::string& name) const { return impl_->attrs.count(name); }
+
+void Taggable::set_attrs(const Taggable& rhs) {
+  if (this != &rhs) {
+    impl_.reset(new Impl(*rhs.impl_));
+  }
+}
+
+bool Taggable::get_attr_bool(const std::string& name) const { return boost::get<bool>(impl_->attrs[name]); }
+
+int64_t Taggable::get_attr_int(const std::string& name) const { return boost::get<int64_t>(impl_->attrs[name]); }
+
+double Taggable::get_attr_float(const std::string& name) const { return boost::get<double>(impl_->attrs[name]); }
+
+std::string Taggable::get_attr_str(const std::string& name) const {
+  return boost::get<std::string>(impl_->attrs[name]);
+}
+
+Any Taggable::get_attr_any(const std::string& name) const { return boost::get<Any>(impl_->attrs[name]); }
+
+bool Taggable::get_attr_bool(const std::string& name, bool def) const {
+  return has_attr(name) ? get_attr_bool(name) : def;
+}
+
+int64_t Taggable::get_attr_int(const std::string& name, int64_t def) const {
+  return has_attr(name) ? get_attr_int(name) : def;
+}
+
+double Taggable::get_attr_float(const std::string& name, double def) const {
+  return has_attr(name) ? get_attr_float(name) : def;
+}
+
+std::string Taggable::get_attr_str(const std::string& name, const std::string& def) const {
+  return has_attr(name) ? get_attr_str(name) : def;
+}
 
 std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  //
   return std::dynamic_pointer_cast<Load>(stmt);
@@ -184,6 +335,10 @@ std::shared_ptr<Load> Load::Downcast(const std::shared_ptr<Statement>& stmt) {  
 
 std::shared_ptr<Store> Store::Downcast(const std::shared_ptr<Statement>& stmt) {  //
   return std::dynamic_pointer_cast<Store>(stmt);
+}
+
+std::shared_ptr<LoadIndex> LoadIndex::Downcast(const std::shared_ptr<Statement>& stmt) {  //
+  return std::dynamic_pointer_cast<LoadIndex>(stmt);
 }
 
 std::shared_ptr<Intrinsic> Intrinsic::Downcast(const std::shared_ptr<Statement>& stmt) {  //
@@ -202,12 +357,44 @@ std::shared_ptr<Block> Block::Downcast(const std::shared_ptr<Statement>& stmt) {
   return std::dynamic_pointer_cast<Block>(stmt);
 }
 
-std::string to_string(const Location& loc) {  //
-  return str(boost::format("%s[%s]") % loc.name % loc.unit.toString());
+std::string to_string(const Device& dev) {
+  std::stringstream ss;
+  ss << dev;
+  return ss.str();
+}
+
+std::ostream& operator<<(std::ostream& os, const Device& dev) {
+  os << dev.name;
+  if (dev.units.size()) {
+    os << '[';
+    bool unit_sep = false;
+    for (const auto& unit : dev.units) {
+      if (unit_sep) {
+        os << ", ";
+      }
+      unit_sep = true;
+      os << to_string(unit);
+    }
+    os << ']';
+  }
+  return os;
+}
+
+std::string to_string(const Location& loc) {
+  std::stringstream ss;
+  ss << loc;
+  return ss.str();
 }
 
 std::ostream& operator<<(std::ostream& os, const Location& loc) {
-  os << to_string(loc);
+  bool dev_sep = false;
+  for (const auto& dev : loc.devs) {
+    if (dev_sep) {
+      os << '/';
+    }
+    dev_sep = true;
+    os << dev;
+  }
   return os;
 }
 
@@ -218,6 +405,11 @@ std::ostream& operator<<(std::ostream& os, const Load& op) {
 
 std::ostream& operator<<(std::ostream& os, const Store& op) {
   os << op.into << " = store(" << op.from << ")";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const LoadIndex& op) {
+  os << op.into << " = load_index(" << op.from << ")";
   return os;
 }
 
@@ -285,14 +477,16 @@ std::ostream& operator<<(std::ostream& os, const Constant& op) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Refinement& ref) {
-  PrintRefinement(os, ref);
+  os << PrintRefinement{ref};
   return os;
 }
 
-void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block) {
-  if (ref.tags.size()) {
-    for (const auto& tag : ref.tags) {
-      os << "#" << tag << " ";
+std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
+  const auto& ref = printer.ref;
+  auto impl = Accessor::impl(ref);
+  if (impl->attrs.size()) {
+    for (const auto& attr : impl->attrs) {
+      os << "#" << attr.first << " ";
     }
   }
   switch (ref.dir) {
@@ -309,20 +503,20 @@ void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block
       os << "inout";
       break;
   }
-  if (ref.is_const) {
+  if (ref.interior_shape.is_const) {
     os << " const";
   }
   if (ref.from.empty()) {
     os << " new@0x";
     os << std::hex << std::setw(8) << std::setfill('0') << ref.offset << std::dec;
   }
-  os << " " << ref.into;
-  if (ref.into != ref.from) {
+  os << " " << ref.into();
+  if (ref.into() != ref.from) {
     if (!ref.from.empty()) {
       os << " = " << ref.from;
     }
   }
-  if (!ref.location.name.empty()) {
+  if (!ref.location.empty()) {
     os << "<" << ref.location << ">";
   }
   os << "[";
@@ -337,53 +531,40 @@ void PrintRefinement(std::ostream& os, const Refinement& ref, const Block* block
   if (!ref.agg_op.empty()) {
     os << ":" << ref.agg_op;
   }
-  os << " " << to_string(ref.interior_shape.type) << "(";
-  for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
-    if (i > 0) {
-      os << ", ";
-    }
-    if (ref.bank_dim && ref.bank_dim->dim_pos == i) {
-      os << "{" << ref.interior_shape.dims[i].size << "}";
-    } else {
-      os << ref.interior_shape.dims[i].size;
-    }
+  os << " " << to_string(ref.interior_shape.type);
+  if (!ref.interior_shape.layout.empty()) {
+    os << "[" << ref.interior_shape.layout << "]";
   }
-  os << "):(";
-  for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
-    if (i > 0) {
-      os << ", ";
-    }
-    if (ref.bank_dim && ref.bank_dim->dim_pos == i) {
-      os << "{" << ref.interior_shape.dims[i].stride << "}";
-    } else {
-      os << ref.interior_shape.dims[i].stride;
-    }
+  if (!ref.interior_shape.codec.empty()) {
+    os << "[" << ref.interior_shape.codec << "]";
   }
-  os << "):";
-  if (block && !ref.from.empty()) {
-    os << "I ";
+  os << ":I";
+  PrintShapeDims(os, ref.interior_shape.sizes(), ref.bank_dim);
+  os << ":";
+  PrintShapeDims(os, ref.interior_shape.strides(), ref.bank_dim);
+  os << ":";
+  PrintBytes(os, ref.interior_shape.sizes_product_bytes());
+  if (!ref.interior_shape.codec.empty()) {
+    os << "(";
+    PrintBytes(os, Codec::Resolve(ref.interior_shape)->byte_size());
+    os << ")";
   }
-  auto interior_bytes = ref.interior_shape.sizes_product_bytes();
-  if (interior_bytes < 1024) {
-    os << interior_bytes << " B";
-  } else {
-    os << interior_bytes / 1024.0 << " KiB";
-  }
-  if (block && !ref.from.empty()) {
-    os << ", E ";
-    auto exterior_bytes = block->exterior_shape(ref.into).sizes_product_bytes();
-    if (exterior_bytes < 1024) {
-      os << exterior_bytes << " B";
-    } else {
-      os << exterior_bytes / 1024.0 << " KiB";
+  if (printer.block && !ref.from.empty()) {
+    os << ", E";
+    auto exterior_shape = printer.block->exterior_shape(ref.into());
+    PrintShapeDims(os, exterior_shape.sizes(), ref.bank_dim);
+    os << ":";
+    PrintBytes(os, exterior_shape.sizes_product_bytes());
+    if (!exterior_shape.codec.empty()) {
+      os << "(";
+      PrintBytes(os, Codec::Resolve(exterior_shape)->byte_size());
+      os << ")";
     }
   }
   if (ref.cache_unit) {
     os << ", cache[" << *ref.cache_unit << "]";
   }
-  if (!ref.from.empty() && ref.into != ref.from) {
-    os << " // alias";
-  }
+  return os;
 }
 
 std::ostream& operator<<(std::ostream& os, const Block& block) {
@@ -432,11 +613,32 @@ std::vector<const Refinement*> Block::ref_outs() const {
   return results;
 }
 
+std::vector<Refinement*> Block::ref_ins() {
+  std::vector<Refinement*> results;
+  for (auto& ref : refs) {
+    if (ref.dir == RefDir::In) {
+      results.push_back(&ref.mut());
+    }
+  }
+  return results;
+}
+
+std::vector<Refinement*> Block::ref_outs() {
+  std::vector<Refinement*> results;
+  for (auto& ref : refs) {
+    if (ref.dir == RefDir::Out) {
+      results.push_back(&ref.mut());
+    }
+  }
+  return results;
+}
+
 std::ostream& operator<<(std::ostream& os, const Index& idx) {
-  if (!idx.tags.empty()) {
+  auto impl = Accessor::impl(idx);
+  if (impl->attrs.size()) {
     os << "(";
-    for (const auto& tag : idx.tags) {
-      os << "#" << tag << " ";
+    for (const auto& attr : impl->attrs) {
+      os << "#" << attr.first << " ";
     }
   }
   os << idx.name;
@@ -445,7 +647,7 @@ std::ostream& operator<<(std::ostream& os, const Index& idx) {
   } else {
     os << ":" << idx.range;
   }
-  if (!idx.tags.empty()) {
+  if (impl->attrs.size()) {
     os << ")";
   }
   return os;
@@ -460,16 +662,158 @@ bool operator==(const Index& lhs, const Index& rhs) {
          std::tie(rhs.name, rhs.range, rhs.affine);
 }
 
-bool operator==(const Location& lhs, const Location& rhs) {
-  return std::tie(lhs.name, lhs.unit) == std::tie(rhs.name, rhs.unit);
+bool operator==(const Device& lhs, const Device& rhs) {
+  return std::tie(lhs.name, lhs.units) == std::tie(rhs.name, rhs.units);
 }
 
-bool operator!=(const Location& lhs, const Location& rhs) {
-  return std::tie(lhs.name, lhs.unit) != std::tie(rhs.name, rhs.unit);
+bool operator!=(const Device& lhs, const Device& rhs) {
+  return std::tie(lhs.name, lhs.units) != std::tie(rhs.name, rhs.units);
 }
 
-bool operator<(const Location& lhs, const Location& rhs) {
-  return std::tie(lhs.name, lhs.unit) < std::tie(rhs.name, rhs.unit);
+bool operator<(const Device& lhs, const Device& rhs) {
+  return std::tie(lhs.name, lhs.units) < std::tie(rhs.name, rhs.units);
+}
+
+Device PartialEval(const Device& dev, const std::map<std::string, std::int64_t>& values) {
+  Device result;
+  result.name = dev.name;
+  for (const auto& unit : dev.units) {
+    result.units.emplace_back(unit.partial_eval(values));
+  }
+  return result;
+}
+
+bool operator==(const Location& lhs, const Location& rhs) { return lhs.devs == rhs.devs; }
+
+bool operator!=(const Location& lhs, const Location& rhs) { return lhs.devs != rhs.devs; }
+
+bool operator<(const Location& lhs, const Location& rhs) { return lhs.devs < rhs.devs; }
+
+Location AddDeviceUnits(const Location& loc1, const Location& loc2) {
+  Location result;
+  for (auto dev1 = loc1.devs.begin(), dev2 = loc2.devs.begin(); dev1 != loc1.devs.end() && dev2 != loc2.devs.end();
+       ++dev1, ++dev2) {
+    if (dev1 == loc1.devs.end() || dev2 == loc2.devs.end() || dev1->name != dev2->name ||
+        dev1->units.size() != dev2->units.size()) {
+      throw std::runtime_error{"Incompatible addition of differently-shaped locations: " + to_string(loc1) +
+                               " != " + to_string(loc2)};
+    }
+    auto rd = result.devs.emplace(result.devs.end(), Device{dev1->name});
+    rd->units.reserve(dev1->units.size());
+    for (auto unit1 = dev1->units.begin(), unit2 = dev2->units.begin(); unit1 != dev1->units.end(); ++unit1, ++unit2) {
+      rd->units.emplace_back(*unit1 + *unit2);
+    }
+  }
+  return result;
+}
+
+Location AppendLocations(const Location& loc1, const Location& loc2) {
+  Location result{loc1};
+  result.devs.insert(result.devs.end(), loc2.devs.begin(), loc2.devs.end());
+  return result;
+}
+
+Location RealizeLocation(const Location& loc, const Block& block) {
+  Location result{loc};
+  for (auto& dev : result.devs) {
+    for (auto& unit : dev.units) {
+      std::map<std::string, Affine> tag_map;
+      for (const auto& name_coeff : unit.getMap()) {
+        if (name_coeff.first.size() && name_coeff.first[0] == '#') {
+          auto tag = name_coeff.first.substr(1);
+          for (const auto& idx : block.idxs) {
+            if (idx.has_tag(tag)) {
+              tag_map[name_coeff.first] = idx.name;
+              break;
+            }
+          }
+        }
+      }
+      unit.substitute(tag_map);
+    }
+  }
+  return result;
+}
+
+bool operator==(const Location& loc, const std::string& pattern) {
+  static const std::regex valid_re{R"(((^|/)(\w+|\*)(\[\s*((\d+|\*)(\s*,\s*(\d+|\*))*)?\s*\])?)*)"};
+  static const std::regex devs_re{R"((?:^|/)(\w+|\*)(\[([^\[\]/]*)\])?)"};
+  static const std::regex units_re{R"((?:^|,)\s*(\d+|\*)\s*)"};
+
+  // N.B. This is definitely not the fastest pattern parser we could
+  // write; the parsing here is simple enough that we could do it with
+  // C-string logic.
+  //
+  // We're implementing the pattern parser this way because it's
+  // faster to code and much more obviously-correct, and we don't
+  // really need low-level performance here.
+
+  if (!std::regex_match(pattern, valid_re)) {
+    throw std::runtime_error{"Invalid location pattern: " + pattern};
+  }
+
+  std::vector<std::pair<std::string, boost::optional<std::vector<boost::optional<std::int64_t>>>>> devs;
+
+  auto devs_begin = std::sregex_iterator{pattern.begin(), pattern.end(), devs_re};
+  auto re_end = std::sregex_iterator{};
+
+  for (auto dit = devs_begin; dit != re_end; ++dit) {
+    std::smatch dev_match = *dit;
+    auto dev_units_it = devs.emplace(devs.end(), dev_match[1], boost::none);
+    if (dev_match[2].first != dev_match[2].second) {
+      dev_units_it->second.emplace();
+      auto units_begin = std::sregex_iterator{dev_match[3].first, dev_match[3].second, units_re};
+      for (auto uit = units_begin; uit != re_end; ++uit) {
+        std::smatch unit_match = *uit;
+        if (unit_match[1] == "*") {
+          dev_units_it->second->emplace_back(boost::none);
+        } else {
+          dev_units_it->second->emplace_back(std::stoi(unit_match[1]));
+        }
+      }
+    }
+  }
+
+  // Compare against the pattern.
+  if (loc.devs.size() != devs.size()) {
+    return false;
+  }
+
+  auto ldit = loc.devs.begin();
+  auto pdit = devs.begin();
+  for (; ldit != loc.devs.end(); ++ldit, ++pdit) {
+    if (pdit->first != "*" && pdit->first != ldit->name) {
+      return false;
+    }
+    if (!pdit->second) {
+      continue;
+    }
+    if (pdit->second->size() != ldit->units.size()) {
+      return false;
+    }
+    auto luit = ldit->units.begin();
+    auto puit = pdit->second->begin();
+    for (; luit != ldit->units.end(); ++puit, ++luit) {
+      if (!*puit) {
+        continue;
+      }
+      if (!luit->isConstant()) {
+        return false;
+      }
+      if (luit->constant() != **puit) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+Location PartialEval(const Location& loc, const std::map<std::string, std::int64_t>& values) {
+  Location result;
+  for (const auto& dev : loc.devs) {
+    result.devs.emplace_back(PartialEval(dev, values));
+  }
+  return result;
 }
 
 class CloneVisitor : RewriteStmtVisitor {
@@ -477,6 +821,7 @@ class CloneVisitor : RewriteStmtVisitor {
   explicit CloneVisitor(int depth) : depth_(depth) {}
   Load* Visit(const Load& x) { return new Load(x); }
   Store* Visit(const Store& x) { return new Store(x); }
+  LoadIndex* Visit(const LoadIndex& x) { return new LoadIndex(x); }
   Constant* Visit(const Constant& x) { return new Constant(x); }
   Special* Visit(const Special& x) { return new Special(x); }
   Intrinsic* Visit(const Intrinsic& x) { return new Intrinsic(x); }
@@ -486,8 +831,14 @@ class CloneVisitor : RewriteStmtVisitor {
       return ret;
     }
     depth_--;
-    for (auto& stmt : ret->stmts) {
-      stmt.reset(stmt->Accept(this));
+    std::unordered_map<Statement*, StatementIt> dep_map;  // src-block ptr -> clone-block StatementIt
+    for (StatementIt sit = ret->stmts.begin(); sit != ret->stmts.end(); ++sit) {
+      Statement* clone = (*sit)->Accept(this);
+      for (auto& dit : clone->deps) {
+        dit = dep_map.at(dit->get());
+      }
+      dep_map[sit->get()] = sit;
+      sit->reset(clone);
     }
     depth_++;
     return ret;
@@ -500,281 +851,6 @@ class CloneVisitor : RewriteStmtVisitor {
 std::shared_ptr<Block> CloneBlock(const Block& orig, int depth) {
   CloneVisitor visitor(depth);
   return std::shared_ptr<Block>(visitor.Visit(orig));
-}
-
-Affine FromProto(const proto::Affine& affine) {
-  Affine ret = affine.offset();
-  for (const auto& kvp : affine.terms()) {
-    ret += Affine(kvp.first, kvp.second);
-  }
-  return ret;
-}
-
-Location FromProto(const proto::Location& loc) {  //
-  return Location{loc.name(), FromProto(loc.unit())};
-}
-
-RefDir FromProto(const proto::Refinement::Dir& dir) {
-  switch (dir) {
-    case proto::Refinement::None:
-      return RefDir::None;
-    case proto::Refinement::In:
-      return RefDir::In;
-    case proto::Refinement::Out:
-      return RefDir::Out;
-    case proto::Refinement::InOut:
-      return RefDir::InOut;
-    default:
-      throw std::runtime_error("Invalid RefDir");
-  }
-}
-
-Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags) {
-  Tags tags;
-  for (const auto& tag : pb_tags) {
-    tags.emplace(tag);
-  }
-  return tags;
-}
-
-std::shared_ptr<Block> FromProto(const proto::Block& block) {
-  auto ret = std::make_shared<Block>();
-  ret->name = block.name();
-  ret->comments = block.comments();
-  ret->location = FromProto(block.loc());
-  for (const auto& pb_idx : block.idxs()) {
-    ret->idxs.emplace_back(Index{pb_idx.name(), pb_idx.range(), FromProto(pb_idx.affine())});
-  }
-  for (const auto& pb_con : block.constraints()) {
-    ret->constraints.emplace_back(FromProto(pb_con));
-  }
-  for (const auto& pb_ref : block.refs()) {
-    Refinement ref;
-    ref.dir = FromProto(pb_ref.dir());
-    ref.from = pb_ref.from();
-    ref.into = pb_ref.into();
-    for (const auto& pb_off : pb_ref.access()) {
-      ref.access.emplace_back(FromProto(pb_off));
-    }
-    ref.interior_shape = tile::FromProto(pb_ref.shape());
-    ref.agg_op = pb_ref.agg_op();
-    ref.location = FromProto(pb_ref.loc());
-    ref.is_const = pb_ref.is_const();
-    ref.offset = pb_ref.offset();
-    // if (pb_ref.has_bank_dim()) {
-    //   ref.bank_dim = pb_ref.bank_dim().value();
-    // }
-    ret->refs.emplace_back(ref);
-  }
-  std::vector<StatementIt> stmts;
-  stmts.reserve(block.stmts_size());
-  for (const auto& pb_stmt : block.stmts()) {
-    switch (pb_stmt.op_case()) {
-      case proto::Statement::kLoad: {
-        auto stmt = std::make_shared<Load>(pb_stmt.load().from(), pb_stmt.load().into());
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kStore: {
-        auto stmt = std::make_shared<Store>(pb_stmt.store().from(), pb_stmt.store().into());
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kConstant:
-        switch (pb_stmt.constant().value_case()) {
-          case proto::Constant::kIconst: {
-            auto stmt = std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().iconst());
-            stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-          } break;
-          case proto::Constant::kFconst: {
-            auto stmt = std::make_shared<Constant>(pb_stmt.constant().name(), pb_stmt.constant().fconst());
-            stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-          } break;
-          default:
-            break;
-        }
-        break;
-      case proto::Statement::kSpecial: {
-        auto stmt = std::make_shared<Special>();
-        stmt->name = pb_stmt.special().name();
-        for (const auto& item : pb_stmt.special().params()) {
-          stmt->params.push_back(item);
-        }
-        for (const auto& item : pb_stmt.special().inputs()) {
-          stmt->inputs.push_back(item);
-        }
-        for (const auto& item : pb_stmt.special().outputs()) {
-          stmt->outputs.push_back(item);
-        }
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kIntrinsic: {
-        auto stmt = std::make_shared<Intrinsic>();
-        stmt->name = pb_stmt.intrinsic().name();
-        stmt->type = tile::FromProto(pb_stmt.intrinsic().type());
-        for (const auto& item : pb_stmt.intrinsic().inputs()) {
-          stmt->inputs.push_back(item);
-        }
-        for (const auto& item : pb_stmt.intrinsic().outputs()) {
-          stmt->outputs.push_back(item);
-        }
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      case proto::Statement::kBlock: {
-        auto stmt = FromProto(pb_stmt.block());
-        stmts.push_back(ret->stmts.emplace(ret->stmts.end(), std::move(stmt)));
-      } break;
-      default:
-        break;
-    }
-    std::shared_ptr<Statement> stmt = *stmts.back();
-    for (std::size_t dep_idx : pb_stmt.deps()) {
-      stmt->deps.push_back(stmts[dep_idx]);
-    }
-    for (const auto& tag : pb_stmt.tags()) {
-      stmt->tags.emplace(tag);
-    }
-  }
-  return ret;
-}
-
-proto::Affine IntoProto(const Affine& affine) {
-  proto::Affine ret;
-  for (const auto& kvp : affine.getMap()) {
-    if (kvp.first.empty()) {
-      ret.set_offset(kvp.second);
-    } else {
-      std::string str = kvp.first;
-      (*ret.mutable_terms())[str] = kvp.second;
-    }
-  }
-  return ret;
-}
-
-proto::Location IntoProto(const Location& loc) {
-  proto::Location ret;
-  ret.set_name(loc.name);
-  *ret.mutable_unit() = IntoProto(loc.unit);
-  return ret;
-}
-
-proto::Block IntoProto(const Block& block) {
-  proto::Block ret;
-  ret.set_name(block.name);
-  ret.set_comments(block.comments);
-  *ret.mutable_loc() = IntoProto(block.location);
-  for (const auto& idx : block.idxs) {
-    auto pb_idx = ret.add_idxs();
-    pb_idx->set_name(idx.name);
-    pb_idx->set_range(idx.range);
-    *pb_idx->mutable_affine() = IntoProto(idx.affine);
-  }
-  for (const auto& con : block.constraints) {
-    *ret.add_constraints() = IntoProto(con);
-  }
-  for (const auto& ref : block.refs) {
-    auto pb_ref = ret.add_refs();
-    switch (ref.dir) {
-      case RefDir::None:
-        pb_ref->set_dir(proto::Refinement::None);
-        break;
-      case RefDir::In:
-        pb_ref->set_dir(proto::Refinement::In);
-        break;
-      case RefDir::Out:
-        pb_ref->set_dir(proto::Refinement::Out);
-        break;
-      case RefDir::InOut:
-        pb_ref->set_dir(proto::Refinement::InOut);
-        break;
-    }
-    pb_ref->set_from(ref.from);
-    pb_ref->set_into(ref.into);
-    for (const auto& access : ref.access) {
-      *pb_ref->add_access() = IntoProto(access);
-    }
-    *pb_ref->mutable_shape() = IntoProto(ref.interior_shape);
-    pb_ref->set_agg_op(ref.agg_op);
-    *pb_ref->mutable_loc() = IntoProto(ref.location);
-    pb_ref->set_is_const(ref.is_const);
-    pb_ref->set_offset(ref.offset);
-    // if (ref.bank_dim) {
-    //   pb_ref->mutable_bank_dim()->set_value(*ref.bank_dim);
-    // }
-  }
-  std::unordered_map<Statement*, std::size_t> dep_idxs;
-  std::size_t stmt_idx = 0;
-  for (const auto& stmt : block.stmts) {
-    dep_idxs[stmt.get()] = stmt_idx++;
-    auto pb_stmt = ret.add_stmts();
-    std::vector<std::size_t> deps;
-    for (StatementIt dep : stmt->deps) {
-      deps.push_back(dep_idxs[dep->get()]);
-    }
-    std::sort(deps.begin(), deps.end());  // Provide stable output ordering
-    for (std::size_t dep : deps) {
-      pb_stmt->add_deps(dep);
-    }
-    for (const auto& tag : stmt->tags) {
-      pb_stmt->add_tags(tag);
-    }
-    switch (stmt->kind()) {
-      case StmtKind::Load: {
-        auto load = Load::Downcast(stmt);
-        auto pb_load = pb_stmt->mutable_load();
-        pb_load->set_from(load->from);
-        pb_load->set_into(load->into);
-      } break;
-      case StmtKind::Store: {
-        auto store = Store::Downcast(stmt);
-        auto pb_store = pb_stmt->mutable_store();
-        pb_store->set_from(store->from);
-        pb_store->set_into(store->into);
-      } break;
-      case StmtKind::Constant: {
-        auto constant = Constant::Downcast(stmt);
-        auto pb_const = pb_stmt->mutable_constant();
-        pb_const->set_name(constant->name);
-        switch (constant->type) {
-          case ConstType::Integer:
-            pb_const->set_iconst(constant->iconst);
-            break;
-          case ConstType::Float:
-            pb_const->set_fconst(constant->fconst);
-            break;
-        }
-      } break;
-      case StmtKind::Special: {
-        auto special = Special::Downcast(stmt);
-        auto pb_special = pb_stmt->mutable_special();
-        pb_special->set_name(special->name);
-        for (const auto& param : special->params) {
-          pb_special->add_params(param);
-        }
-        for (const auto& input : special->inputs) {
-          pb_special->add_inputs(input);
-        }
-        for (const auto& output : special->outputs) {
-          pb_special->add_outputs(output);
-        }
-      } break;
-      case StmtKind::Intrinsic: {
-        auto intrinsic = Intrinsic::Downcast(stmt);
-        auto pb_intrinsic = pb_stmt->mutable_intrinsic();
-        pb_intrinsic->set_name(intrinsic->name);
-        pb_intrinsic->set_type(tile::IntoProto(intrinsic->type));
-        for (const auto& input : intrinsic->inputs) {
-          pb_intrinsic->add_inputs(input);
-        }
-        for (const auto& output : intrinsic->outputs) {
-          pb_intrinsic->add_outputs(output);
-        }
-      } break;
-      case StmtKind::Block: {
-        auto inner = Block::Downcast(stmt);
-        *pb_stmt->mutable_block() = IntoProto(*inner);
-      } break;
-    }
-  }
-  return ret;
 }
 
 const Index* Block::idx_by_name(const std::string& name) const {
@@ -819,8 +895,8 @@ std::set<const Index*> Block::accumulation_idxs() const {
   return ret;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_into(const std::string& ref_name, bool fail) {
-  auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.into == ref_name; });
+std::set<Refinement>::iterator Block::ref_by_into(const std::string& ref_name, bool fail) {
+  auto it = refs.find(ref_name);
   if (fail && it == refs.end()) {
     throw_with_trace(
         std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % name % ref_name)));
@@ -828,8 +904,8 @@ std::vector<Refinement>::iterator Block::ref_by_into(const std::string& ref_name
   return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& ref_name, bool fail) const {
-  auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.into == ref_name; });
+std::set<Refinement>::const_iterator Block::ref_by_into(const std::string& ref_name, bool fail) const {
+  auto it = refs.find(ref_name);
   if (fail && it == refs.end()) {
     throw_with_trace(
         std::runtime_error(str(boost::format("Refinement not found on block '%s' via into: %s") % name % ref_name)));
@@ -837,7 +913,7 @@ std::vector<Refinement>::const_iterator Block::ref_by_into(const std::string& re
   return it;
 }
 
-std::vector<Refinement>::iterator Block::ref_by_from(const std::string& ref_name, bool fail) {
+std::set<Refinement>::iterator Block::ref_by_from(const std::string& ref_name, bool fail) {
   auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.from == ref_name; });
   if (fail && it == refs.end()) {
     throw_with_trace(
@@ -846,11 +922,31 @@ std::vector<Refinement>::iterator Block::ref_by_from(const std::string& ref_name
   return it;
 }
 
-std::vector<Refinement>::const_iterator Block::ref_by_from(const std::string& ref_name, bool fail) const {
+std::set<Refinement>::const_iterator Block::ref_by_from(const std::string& ref_name, bool fail) const {
   auto it = std::find_if(refs.begin(), refs.end(), [&ref_name](const Refinement& ref) { return ref.from == ref_name; });
   if (fail && it == refs.end()) {
     throw_with_trace(
         std::runtime_error(str(boost::format("Refinement not found on block '%s' via from: %s") % name % ref_name)));
+  }
+  return it;
+}
+
+std::set<Refinement>::iterator Block::ref_by_tag(const std::string& tag_name, bool fail) {
+  auto it =
+      std::find_if(refs.begin(), refs.end(), [&tag_name](const Refinement& ref) { return ref.has_tag(tag_name); });
+  if (fail && it == refs.end()) {
+    throw_with_trace(
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via tag: %s") % name % tag_name)));
+  }
+  return it;
+}
+
+std::set<Refinement>::const_iterator Block::ref_by_tag(const std::string& tag_name, bool fail) const {
+  auto it =
+      std::find_if(refs.begin(), refs.end(), [&tag_name](const Refinement& ref) { return ref.has_tag(tag_name); });
+  if (fail && it == refs.end()) {
+    throw_with_trace(
+        std::runtime_error(str(boost::format("Refinement not found on block '%s' via tag: %s") % name % tag_name)));
   }
   return it;
 }
@@ -860,14 +956,12 @@ std::string Block::unique_ref_name(const std::string& into) const {
     return into;
   }
   size_t i = 0;
-  while (true) {
+  for (;;) {
     auto name = str(boost::format("%s_%zu") % into % i++);
     if (ref_by_into(name, false) == refs.end()) {
       return name;
     }
   }
-  // Unreachable
-  return "";
 }
 
 std::string Block::unique_idx_name(const std::string& name) const {
@@ -875,18 +969,16 @@ std::string Block::unique_idx_name(const std::string& name) const {
     return name;
   }
   size_t i = 0;
-  while (true) {
+  for (;;) {
     auto new_name = str(boost::format("%s_%zu") % name % i++);
     if (!idx_by_name(new_name)) {
       return new_name;
     }
   }
-  // Unreachable
-  return "";
 }
 
-TensorShape Block::exterior_shape(const std::string& name) const {
-  auto it = ref_by_into(name);
+TensorShape Block::exterior_shape(const std::string& into) const {
+  auto it = ref_by_into(into);
   std::map<std::string, size_t> idx_ranges;
   for (const auto& idx : idxs) {
     idx_ranges.emplace(idx.name, idx.range);
@@ -920,14 +1012,13 @@ TensorShape Refinement::ApplyTile(const std::map<std::string, size_t>& tile_by_n
       }
     }
     auto& dim = shape.dims[i];
-    pos += (dim.size - 1);
-    dim.size = pos - neg + 1;
+    dim.size = (dim.size - 1) + pos - neg + 1;
   }
   return shape;
 }
 
 const Block* FindBlockByTag(const Block& block, const std::string& tag) {
-  if (block.tags.count(tag)) {
+  if (block.has_tag(tag)) {
     return &block;
   }
   for (const auto& stmt : block.stmts) {
@@ -942,6 +1033,18 @@ const Block* FindBlockByTag(const Block& block, const std::string& tag) {
   return nullptr;
 }
 
+void FindBlocksByTag(std::vector<const Block*>* into, const Block& block, const std::string& tag) {
+  if (block.has_tag(tag)) {
+    into->push_back(&block);
+  }
+  for (const auto& stmt : block.stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      FindBlocksByTag(into, *inner, tag);
+    }
+  }
+}
+
 const Index* FindIndexByTag(const Block& block, const std::string& tag) {
   for (const auto& idx : block.idxs) {
     if (idx.has_tag(tag)) {
@@ -949,6 +1052,17 @@ const Index* FindIndexByTag(const Block& block, const std::string& tag) {
     }
   }
   return nullptr;
+}
+
+Codec::Codec(const TensorShape* shape) : shape_(shape) {  //
+}
+
+void Codec::Register(const std::string& name, const Codec::Factory& factory) {  //
+  CodecRegistry::Instance()->Register(name, factory);
+}
+
+std::unique_ptr<Codec> Codec::Resolve(const TensorShape& shape) {  //
+  return CodecRegistry::Instance()->Resolve(shape);
 }
 
 }  // namespace stripe

@@ -13,17 +13,13 @@ plaidml_cc_library(
         "*.cc",
         "*.h",
     ]),
-    copts = [
-        "-D__STDC_LIMIT_MACROS",
-        "-D__STDC_CONSTANT_MACROS",
-    ],
-    tags = ["llvm"],
     visibility = ["//visibility:public"],
     deps = [
         ":proto_cc",
+        "//base/config",
         "//base/util",
-        "//vendor/llvm",
+        "//tile/bilp",
         "//tile/stripe",
-        "@half",
+        "@boost//:filesystem",
     ],
 )

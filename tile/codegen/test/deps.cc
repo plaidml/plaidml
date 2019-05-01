@@ -17,21 +17,24 @@ namespace codegen {
 
 TEST(DepsTest, SmallDepMix) {
   auto input_text = R"(
-    loc: { unit { } }
+    loc {}
     stmts {
-      tags: "main"
+      attrs: { key: "main" value {} }
       block {
-        loc: { unit { } }
-        refs {
-          into: "b1"
-          loc: { unit { } }
-          shape { type: FLOAT32 dims: {size:1 stride:1} } 
-        }
-        refs {
-          into: "b2"
-          loc: { unit { } }
-          shape { type: FLOAT32 dims: {size:1 stride:1} }
-        }
+        loc {}
+        refs: [{
+          key: "b1"
+          value: {
+            loc {}
+            interior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
+          }
+        }, {
+          key: "b2"
+          value: {
+            loc {}
+            interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          }
+        }]
         stmts { load { from:"b1" into:"$1" } }
         stmts { store { from:"$1" into:"b2" } }
         stmts { load { from:"b2" into:"$2" } deps: 0}
@@ -51,21 +54,24 @@ TEST(DepsTest, SmallDepMix) {
   ComputeDepsPass(block.get(), options);
 
   const char* expected = R"(
-    loc: { unit { } }
+    loc {}
     stmts {
-      tags: "main"
+      attrs: { key: "main" value {} }
       block {
-        loc: { unit { } }
-        refs {
-          into: "b1"
-          loc: { unit { } }
-          shape { type: FLOAT32 dims: {size:1 stride:1} } 
-        }
-        refs {
-          into: "b2"
-          loc: { unit { } }
-          shape { type: FLOAT32 dims: {size:1 stride:1} }
-        }
+        loc {}
+        refs [{
+          key: "b1"
+          value: {
+            loc {}
+            interior_shape { type: FLOAT32 dims: {size:1 stride:1} } 
+          }
+        }, {
+          key: "b2"
+          value: {
+            loc {}
+            interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          }
+        }]
         stmts { load { from:"b1" into:"$1" } }
         stmts { store { from:"$1" into:"b2" } deps: 0 }
         stmts { load { from:"b2" into:"$2" } deps: 1}
@@ -83,34 +89,43 @@ TEST(DepsTest, SmallDepMix) {
 
 TEST(DepsTest, Subregion) {
   auto input_text = R"(
-    refs {
-      into: "buf"
-      access [ { offset: 0 }, { offset: 0 } ]
-      shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
-      loc { unit { } }
-    }
+    refs [{
+      key: "buf"
+      value: {
+        access [ { offset: 0 }, { offset: 0 } ]
+        interior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
+        loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
+      }
+    }]
     stmts {
-      tags: "main"
+      attrs: { key: "main" value {} }
       block {
         idxs { name: "i" range: 10 affine { } }
-        refs {
-          from: "buf" into: "b1" dir: In
-          access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          loc { unit { } }
-        }
-        refs {
-          from: "buf" into: "b2" dir: In
-          access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          loc { unit { } }
-        }
-        refs {
-          from: "buf" into: "b3" dir: In
-          access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          loc { unit { offset: 1 } }
-        }
+        refs [{
+          key: "b1"
+          value: {
+            from: "buf" dir: In
+            access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
+            interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+            loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
+          }
+        }, {
+          key: "b2",
+          value: {
+            from: "buf" dir: In
+            access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
+            interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+            loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
+          }
+        }, {
+          key: "b3",
+          value: {
+            from: "buf" dir: In
+            access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
+            interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+            loc { devs: [{name: "RAM", units: [{offset: 1}]}] }
+          }
+        }]
         stmts { constant { name:"$1" iconst: 0 } }
         stmts { store { from:"$1" into:"b1" } }
         stmts { store { from:"$1" into:"b2" } }
@@ -127,36 +142,45 @@ TEST(DepsTest, Subregion) {
   ComputeDepsPass(block.get(), options);
 
   const char* expected = R"(
-    loc { unit { } }
-    refs {
-      into: "buf"
-      access [ { offset: 0 }, { offset: 0 } ]
-      shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
-      loc { unit { } }
-    }
+    loc {}
+    refs [{
+      key: "buf"
+      value: {
+        access [ { offset: 0 }, { offset: 0 } ]
+        interior_shape { type: FLOAT32 dims: { size:2 stride:10 } dims: { size:10 stride:1 } }
+        loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
+      }
+    }]
     stmts {
-      tags: "main"
+      attrs: { key: "main" value {} }
       block {
-        loc { unit { } }
+        loc {}
         idxs { name: "i" range: 10 affine { } }
-        refs {
-          from: "buf" into: "b1" dir: In
-          access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          loc { unit { } }
-        }
-        refs {
-          from: "buf" into: "b2" dir: In
-          access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          loc { unit { } }
-        }
-        refs {
-          from: "buf" into: "b3" dir: In
-          access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
-          shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
-          loc { unit { offset: 1 } }
-        }
+        refs [{
+          key: "b1"
+          value: {
+            from: "buf" dir: In
+            access [ { offset: 0 }, { terms [ { key: "i" value: 1 } ] } ]
+            interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+            loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
+          }
+        }, {
+          key: "b2"
+          value: {
+            from: "buf" dir: In
+            access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
+            interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+            loc { devs: [{name: "RAM", units: [{offset: 0}]}] }
+          }
+        }, {
+          key: "b3"
+          value: {
+            from: "buf" dir: In
+            access [ { offset: 1 }, { terms [ { key: "i" value: 1 } ] } ]
+            interior_shape { type: FLOAT32 dims: { size:1 stride:1 } dims: { size:1 stride:1 } }
+            loc { devs: [{name: "RAM", units: [{offset: 1}]}] }
+          }
+        }]
         stmts { constant { name:"$1" iconst: 0 } }
         stmts { store { from:"$1" into:"b1" } deps: 0 }
         stmts { store { from:"$1" into:"b2" } deps: 0 }

@@ -109,7 +109,15 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
           } while (devs_.find(id) != devs_.end());
 
           bool found_hardware_config = MatchConfig(config, info, &settings);
-          dev->Initialize(settings);
+          try {
+            dev->Initialize(settings);
+          } catch (const std::exception& e) {
+            VLOG(1) << "Failed to initialize device " << info.name() << ": " << e.what();
+            continue;
+          } catch (...) {
+            VLOG(1) << "Failed to initialize device " << info.name();
+            continue;
+          }
           auto devinfo = std::make_shared<DevInfo>(DevInfo{devset, dev, settings});
           PlatformDev pd{id, devinfo};
           if (!found_hardware_config) {

@@ -3,9 +3,10 @@
 #include <google/protobuf/util/json_util.h>
 
 #include <algorithm>
-#include <memory>
 #include <regex>
 #include <vector>
+
+#include <boost/format.hpp>
 
 #include "tile/lang/parser.h"
 #include "tile/proto/tile.pb.h"
@@ -41,16 +42,16 @@ std::shared_ptr<lang::TensorValue> ReadTensor(UnZipArchive* zip_file, const std:
 // In this case, we have no need for allocating actual buffers.
 struct NullBuffer : lang::BufferBase {};
 
-std::shared_ptr<lang::TensorValue> MakeTensor(TensorShape shape) {
+std::shared_ptr<lang::TensorValue> MakeTensor(const TensorShape& shape) {
   auto null_buffer = std::make_shared<NullBuffer>();
   return lang::TensorValue::make(null_buffer, shape, false);
 }
 
 }  // namespace
 
-TileFile::TileFile(const std::string& path) : archive_(path) {}
+TileFile::TileFile(const boost::filesystem::path& path) : archive_(path.string()), path_(path) {}
 
-lang::RunInfo TileFile::Load() {
+lang::RunInfo TileFile::Load(const std::vector<std::shared_ptr<SimpleBuffer>>& inputs) {
   auto metadata = ReadMetadata();
   auto code = archive_.OpenFile("code").ReadString();
 
@@ -70,7 +71,12 @@ lang::RunInfo TileFile::Load() {
   std::vector<std::shared_ptr<lang::TensorValue>> bound_inputs;
   for (const auto& input : dexified.inputs) {
     if (input.name[0] == '_') {
-      bound_inputs.push_back(ReadTensor(&archive_, "data_" + input.name));
+      auto tensor = ReadTensor(&archive_, "data_" + input.name);
+      auto qparams_name = "qparams_" + input.name;
+      if (archive_.Exist(qparams_name)) {
+        tensor->attach_qparams(ReadTensor(&archive_, qparams_name));
+      }
+      bound_inputs.push_back(tensor);
     }
   }
 
@@ -95,7 +101,17 @@ lang::RunInfo TileFile::Load() {
         dim.size = 1;
       }
     }
-    applier.SetInput(input_name, MakeTensor(shape));
+    if (i < inputs.size()) {
+      const auto& buf = inputs.at(i);
+      if (buf->bytes.size() != shape.byte_size()) {
+        throw std::runtime_error(str(boost::format("Input buffer mismatch. Name: %s, Shape: %s, Size: %d") %
+                                     input_name % shape % buf->bytes.size()));
+      }
+      auto tensor = lang::TensorValue::make(buf, shape, false);
+      applier.SetInput(input_name, tensor);
+    } else {
+      applier.SetInput(input_name, MakeTensor(shape));
+    }
   }
 
   applier.SetDone();
@@ -110,7 +126,7 @@ lang::RunInfo TileFile::Load() {
     composer.AddUpdate(MakeTensor(shape), applier.GetOutput(name));
   }
   composer.Done();
-  return composer.PrepareToRun();
+  return composer.PrepareToRun(path_.stem().string());
 }
 
 metadata::proto::Metadata TileFile::ReadMetadata() {

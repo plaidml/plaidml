@@ -35,9 +35,10 @@ const size_t physical_cores_ = boost::thread::physical_concurrency();
 
 }  // namespace
 
-Executable::Executable(std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis,
+Executable::Executable(std::shared_ptr<llvm::LLVMContext> llvm_ctx,
+                       std::vector<std::shared_ptr<llvm::ExecutionEngine>> engines, std::vector<lang::KernelInfo> kis,
                        std::shared_ptr<boost::asio::thread_pool> thread_pool)
-    : engines_{engines}, kis_(kis), thread_pool_(thread_pool) {}
+    : llvm_context_{llvm_ctx}, engines_{engines}, kis_(kis), thread_pool_(thread_pool) {}
 
 std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::size_t kidx,
                                             const std::vector<std::shared_ptr<hal::Buffer>>& params,
@@ -100,6 +101,8 @@ std::shared_ptr<hal::Event> Executable::Run(const context::Context& ctx, std::si
   });
   return std::make_shared<cpu::Event>(std::move(evt));
 }
+
+Executable::~Executable() { engines_.clear(); }
 
 std::string Executable::InvokerName(std::string kname) { return invoker_prefix_ + kname; }
 

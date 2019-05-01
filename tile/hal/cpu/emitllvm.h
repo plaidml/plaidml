@@ -22,7 +22,7 @@ namespace cpu {
 
 class Emit : public sem::Visitor {
  public:
-  Emit();
+  explicit Emit(llvm::LLVMContext& context);  // NOLINT(runtime/references)
   void Visit(const sem::IntConst&) override;
   void Visit(const sem::FloatConst&) override;
   void Visit(const sem::LookupLVal&) override;
@@ -45,6 +45,7 @@ class Emit : public sem::Visitor {
   void Visit(const sem::WhileStmt&) override;
   void Visit(const sem::BarrierStmt&) override;
   void Visit(const sem::ReturnStmt&) override;
+  void Visit(const sem::SpecialStmt&) override;
   void Visit(const sem::Function&) override;
   std::string str() const;
   std::unique_ptr<llvm::Module>&& result();
@@ -79,7 +80,7 @@ class Emit : public sem::Visitor {
   void Leave();
   void LimitConstSInt(unsigned bits, sem::LimitConst::Which);
   void LimitConstUInt(unsigned bits, sem::LimitConst::Which);
-  void LimitConstFP(const llvm::fltSemantics&, sem::LimitConst::Which);
+  void LimitConstFP(llvm::Type*, sem::LimitConst::Which);
   bool CurrentBlockIsTerminated();
   static bool IsUnsignedIntegerType(const sem::Type&);
   static bool IsFloatingPointType(const sem::Type&);

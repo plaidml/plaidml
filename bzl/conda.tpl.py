@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import re
@@ -33,9 +33,9 @@ if IsWindows():
 
 def GetWindowsPathWithUNCPrefix(path):
     """
-  Adding UNC prefix after getting a normalized absolute Windows path,
-  it's no-op for non-Windows platforms or if running under python2.
-  """
+    Adding UNC prefix after getting a normalized absolute Windows path,
+    it's no-op for non-Windows platforms or if running under python2.
+    """
     path = path.strip()
 
     # No need to add prefix for non-Windows platforms.
@@ -60,16 +60,26 @@ def CreatePythonPathEntries(python_imports, module_space):
 # Find the runfiles tree
 def FindModuleSpace():
     stub_filename = os.path.abspath(sys.argv[0])
-    module_space = stub_filename + '.runfiles'
-    if os.path.isdir(module_space):
-        return module_space
+    while True:
+        module_space = stub_filename + '.runfiles'
+        if os.path.isdir(module_space):
+            return module_space
 
-    runfiles_pattern = "(.*\.runfiles)/.*"
-    if IsWindows():
-        runfiles_pattern = "(.*\.runfiles)\\.*"
-    matchobj = re.match(runfiles_pattern, os.path.abspath(sys.argv[0]))
-    if matchobj:
-        return matchobj.group(1)
+        if IsWindows():
+            runfiles_pattern = "(.*\.runfiles)\\.*"
+        else:
+            runfiles_pattern = "(.*\.runfiles)/.*"
+        matchobj = re.match(runfiles_pattern, stub_filename)
+        if matchobj:
+            return matchobj.group(1)
+
+        if not os.path.islink(stub_filename):
+            break
+        target = os.readlink(stub_filename)
+        if os.path.isabs(target):
+            stub_filename = target
+        else:
+            stub_filename = os.path.join(os.path.dirname(stub_filename), target)
 
     raise AssertionError('Cannot find .runfiles directory for %s' % sys.argv[0])
 
@@ -92,6 +102,11 @@ def RunfilesEnvvar(module_space):
     runfiles = os.path.dirname(os.path.join(module_space, 'MANIFEST'))
     if os.path.exists(runfiles):
         return ('RUNFILES_DIR', runfiles)
+
+    # If running in a sandbox and no environment variables are set, then
+    # Look for the runfiles  next to the binary.
+    if module_space.endswith('.runfiles') and os.path.isdir(module_space):
+        return ('RUNFILES_DIR', module_space)
 
     return (None, None)
 
@@ -121,9 +136,10 @@ def Main():
     runfiles_envkey, runfiles_envvalue = RunfilesEnvvar(module_space)
     if runfiles_envkey:
         new_env[runfiles_envkey] = runfiles_envvalue
-        new_env['RUNFILES_ENTRY'] = os.path.join(runfiles_envvalue, "%workspace_name%")
 
     # Now look for my main python source file.
+    # The magic string percent-main-percent is replaced with the filename of the
+    # main file of the Python binary in BazelPythonSemantics.java.
     rel_path = os.path.normpath('%main%')
 
     manifest = {}
@@ -137,15 +153,14 @@ def Main():
                     os.unlink(local)
                 dir_name = os.path.dirname(local)
                 if not os.path.isdir(dir_name):
-                    os.makedirs(dir_name)
-                os.symlink(os.path.normpath(physical.rstrip()), local)
+                    os.makedirs(GetWindowsPathWithUNCPrefix(dir_name))
+                src = GetWindowsPathWithUNCPrefix(os.path.normpath(physical.rstrip()))
+                os.symlink(src, GetWindowsPathWithUNCPrefix(local))
 
     main_filename = os.path.join(module_space, rel_path)
     main_filename = GetWindowsPathWithUNCPrefix(main_filename)
-    assert os.path.exists(main_filename), \
-           'Cannot exec() %r: file not found.' % main_filename
-    assert os.access(main_filename, os.R_OK), \
-           'Cannot exec() %r: file not readable.' % main_filename
+    assert os.path.exists(main_filename), 'Cannot exec() %r: file not found.' % main_filename
+    assert os.access(main_filename, os.R_OK), 'Cannot exec() %r: file not readable.' % main_filename
 
     cenv_dir = os.path.join(module_space, '.cenv')
     path = os.environ['PATH'].split(os.pathsep)
@@ -167,6 +182,8 @@ def Main():
     try:
         sys.stdout.flush()
         if IsWindows():
+            # On Windows, os.execv doesn't handle arguments with spaces correctly,
+            # and it actually starts a subprocess just like subprocess.call.
             sys.exit(subprocess.call(args))
         else:
             os.execv(args[0], args)

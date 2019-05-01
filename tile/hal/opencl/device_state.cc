@@ -34,7 +34,7 @@ DeviceState::Queue MakeQueue(cl_device_id did, const CLObj<cl_context>& cl_ctx,
   DeviceState::Queue result;
   result.props = props | extra_properties;
 
-  result.cl_queue = clCreateCommandQueue(cl_ctx.get(), did, result.props, err.ptr());
+  result.cl_queue = ocl::CreateCommandQueue(cl_ctx.get(), did, result.props, err.ptr());
   if (!result.cl_queue) {
     throw std::runtime_error(std::string("creating a command queue for an OpenCL device: ") + err.str());
   }
@@ -43,7 +43,7 @@ DeviceState::Queue MakeQueue(cl_device_id did, const CLObj<cl_context>& cl_ctx,
 
 }  // namespace
 
-void DeviceState::Queue::Flush() const { Err::Check(clFlush(cl_queue.get()), "Unable to flush command queue"); }
+void DeviceState::Queue::Flush() const { Err::Check(ocl::Flush(cl_queue.get()), "Unable to flush command queue"); }
 
 DeviceState::DeviceState(const context::Context& ctx, const CLObj<cl_context>& cl_ctx, cl_device_id did,
                          proto::DeviceInfo info)

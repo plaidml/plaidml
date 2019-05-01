@@ -25,12 +25,12 @@ void FixupRefs(Block* block, const std::string& var_name) {
     if (inner) {
       for (auto& ref : inner->refs) {
         if (ref.from == var_name) {
-          ref.location = it->location;
-          ref.offset = it->offset;
+          ref.mut().location = it->location;
+          ref.mut().offset = it->offset;
           for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
-            ref.interior_shape.dims[i].stride = it->interior_shape.dims[i].stride;
+            ref.mut().interior_shape.dims[i].stride = it->interior_shape.dims[i].stride;
           }
-          FixupRefs(inner.get(), ref.into);
+          FixupRefs(inner.get(), ref.into());
         }
       }
     }
@@ -46,20 +46,32 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   for (const auto& dim : it_ref->interior_shape.dims) {
     sizes.push_back(dim.size);
   }
+  // Set the size of the bank-dim to be 1 for simple shape purposes
+  size_t orig_size = 1;
+  if (it_ref->bank_dim) {
+    std::swap(sizes[it_ref->bank_dim->dim_pos], orig_size);
+  }
   // Change the shape
-  it_ref->interior_shape = SimpleShape(it_ref->interior_shape.type, sizes);
+  it_ref->mut().interior_shape = SimpleShape(it_ref->interior_shape.type, sizes);
+  // Fix the bankdim back up
+  if (it_ref->bank_dim) {
+    it_ref->mut().interior_shape.dims[it_ref->bank_dim->dim_pos].size = orig_size;
+    it_ref->mut().interior_shape.dims[it_ref->bank_dim->dim_pos].stride = 0;
+  }
   // Change dir + from
-  it_ref->dir = RefDir::None;
-  it_ref->from = "";
+  it_ref->mut().dir = RefDir::None;
+  it_ref->mut().from = "";
   // Clear its affines
-  for (auto& aff : it_ref->access) {
+  for (Affine& aff : it_ref->mut().access) {
     aff = 0;
   }
+  // Remove any tmp tags
+  it_ref->mut().remove_tag("tmp");
   // Propagate the changes
   FixupRefs(block, var_name);
 }
 
-void LocalizePass(const AliasMap& scope, Block* block) {
+void LocalizePass(const AliasMap& scope, Block* block, const std::set<std::string>& ref_reqs) {
   auto use_count = scope.RefUseCounts(*block);
   for (auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
@@ -77,11 +89,15 @@ void LocalizePass(const AliasMap& scope, Block* block) {
       if (it->dir != RefDir::None && !it->has_tag("tmp")) {
         continue;
       }
+      // If we have a ref_req and we don't have the right tags, skip
+      if (ref_reqs.size() != 0 && !ref.has_tags(ref_reqs)) {
+        continue;
+      }
       // If it's not uniquely located in this block, don't consider
       if (use_count[ref.from] != 1) {
         continue;
       }
-      refs_to_localize.emplace(ref.into);
+      refs_to_localize.emplace(ref.into());
       refs_to_remove.emplace(ref.from);
     }
     for (const auto& name : refs_to_remove) {
@@ -92,31 +108,41 @@ void LocalizePass(const AliasMap& scope, Block* block) {
     }
     // Now localize block itself
     AliasMap inner_map(scope, inner.get());
-    LocalizePass(inner_map, inner.get());
+    LocalizePass(inner_map, inner.get(), ref_reqs);
   }
 }
 
-void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc) {
+void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc, const proto::LocatePass& options) {
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
       continue;
     }
     if (inner->has_tags(inner_tags)) {
-      inner->location = loc;
+      auto* inner_loc = &inner->location;
+      if (options.append_devs()) {
+        inner_loc->devs.insert(inner_loc->devs.end(), loc.devs.begin(), loc.devs.end());
+      } else {
+        *inner_loc = loc;
+      }
     }
-    LocateInnerBlock(inner.get(), inner_tags, loc);
+    LocateInnerBlock(inner.get(), inner_tags, loc, options);
   }
 }
 
 void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
   auto loc = stripe::FromProto(options.loc());
-  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {
+  RunOnBlocks(root, reqs, [&loc, &options](const AliasMap& map, Block* block) {
     for (auto& ref : block->refs) {
       if (ref.dir == RefDir::None) {
-        ref.location = loc;
-        FixupRefs(block, ref.into);
+        auto* ref_loc = &ref.mut().location;
+        if (options.append_devs()) {
+          ref_loc->devs.insert(ref_loc->devs.end(), loc.devs.begin(), loc.devs.end());
+        } else {
+          *ref_loc = loc;
+        }
+        FixupRefs(block, ref.into());
       }
     }
   });
@@ -125,8 +151,13 @@ void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
 void LocateBlockPass(Block* root, const proto::LocatePass& options) {
   auto reqs = FromProto(options.reqs());
   auto loc = stripe::FromProto(options.loc());
-  RunOnBlocks(root, reqs, [&loc](const AliasMap& map, Block* block) {  //
-    block->location = loc;
+  RunOnBlocks(root, reqs, [&loc, &options](const AliasMap& map, Block* block) {  //
+    auto* block_loc = &block->location;
+    if (options.append_devs()) {
+      block_loc->devs.insert(block_loc->devs.end(), loc.devs.begin(), loc.devs.end());
+    } else {
+      *block_loc = loc;
+    }
   });
 }
 
@@ -135,7 +166,7 @@ void LocateInnerBlockPass(Block* root, const proto::LocatePass& options) {
   auto inner_reqs = FromProto(options.inner_reqs());
   auto loc = stripe::FromProto(options.loc());
   RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
-    LocateInnerBlock(block, inner_reqs, loc);
+    LocateInnerBlock(block, inner_reqs, loc, options);
   });
 }
 

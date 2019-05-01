@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "tile/lang/compose.h"
@@ -9,7 +10,7 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-std::shared_ptr<stripe::Block> GenerateStripe(const RunInfo& runinfo, bool i8_mode = false);
+std::shared_ptr<stripe::Program> GenerateStripe(const RunInfo& runinfo, bool i8_mode = false);
 
 }  // namespace lang
 }  // namespace tile

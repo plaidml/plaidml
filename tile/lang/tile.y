@@ -41,7 +41,18 @@ struct Context {
     if (id != "") {
       vertexai::tile::lang::proto::Attribute attr;
       attr.set_name("pid");
-      attr.add_params(id);
+      // Attribute syntax requires that values must be ID or IDXID tokens.
+      // We'll replace any invalid chars the id string contains with '_'.
+      // This works because the pid attribute is just a debugging comment
+      // meant to guide a human reader back to the origin of the function.
+      std::stringstream attrval;
+      if (!std::isalpha(id.front())) {
+        attrval << '$';
+      }
+      for (char c: id) {
+        attrval << (std::isalnum(c)? c: '_');
+      }
+      attr.add_params(attrval.str());
       program.ops.back().attributes.emplace_back(std::move(attr));
     }
   }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace vertexai {
 namespace tile {
@@ -27,6 +28,22 @@ inline constexpr size_t Align(size_t count, size_t alignment) {
 }
 
 inline int64_t Sign(int64_t a) { return (a == 0 ? 0 : (a < 0 ? -1 : 1)); }
+
+inline std::vector<size_t> Factor(size_t in) {
+  size_t p = 2;
+  size_t cur = in;
+  std::vector<size_t> out;
+  while (p * p <= cur) {
+    if (cur % p == 0) {
+      out.push_back(p);
+      cur /= p;
+    } else {
+      p = (p == 2) ? 3 : p + 2;
+    }
+  }
+  out.push_back(cur);
+  return out;
+}
 
 }  // namespace math
 }  // namespace tile

@@ -1,4 +1,4 @@
-load("//bzl:plaidml.bzl", "plaidml_proto_library", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_proto_library")
 
 plaidml_proto_library(
     name = "proto",
@@ -37,7 +37,12 @@ plaidml_cc_library(
         "shim.h",
         "tmp_mem_strategy.cc",
         "tmp_mem_strategy.h",
-    ],
+    ] + select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": [
+          "factory_jit.cc",
+	]
+    }),
     hdrs = [
         "local_machine.h",
     ],
@@ -52,9 +57,15 @@ plaidml_cc_library(
         "//tile/base:hal",
         "//tile/hal/util:selector",
         "//tile/hal/util:settings",
+        "//tile/ocl_exec",
         "//tile/proto:hal_cc",
         "//tile/proto:support",
-    ],
+    ] + select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": [
+          "//tile/platform/stripejit",
+	]
+    }),
     alwayslink = 1,
 )
 

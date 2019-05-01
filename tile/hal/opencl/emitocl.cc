@@ -241,11 +241,19 @@ void Emit::Visit(const sem::ForStmt& n) {
 
 void Emit::Visit(const sem::BarrierStmt& n) {
   emitTab();
-  emit("barrier(CLK_LOCAL_MEM_FENCE);\n");
+  if (n.subgroup) {
+    emit("sub_group_barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);\n");
+  } else {
+    emit("barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);\n");
+  }
 }
 
 void Emit::Visit(const sem::Function& n) {
+  if (n.subgroup_size) {
+    emit("__attribute__((intel_reqd_sub_group_size(" + std::to_string(n.subgroup_size) + ")))");
+  }
   emit("__kernel ");
+
   lang::Scope<sem::Type> scope;
   scope_ = &scope;
 
@@ -272,10 +280,14 @@ void Emit::Visit(const sem::Function& n) {
     }
     auto ty = p.first;
     if (!cl_khr_fp16_ && ty.dtype == DataType::FLOAT16) {
-      // The device can only use half-width floats as a pointer type, not as a value
-      // or a vector element type.  We'll use vloada_half and vstorea_half to access
-      // the memory, but the parameter must be declared with a vector width of 1.
-      // Note that what's stored in the scope must have the original vector width,
+      // The device can only use half-width floats as a pointer type, not as a
+      // value
+      // or a vector element type.  We'll use vloada_half and vstorea_half to
+      // access
+      // the memory, but the parameter must be declared with a vector width of
+      // 1.
+      // Note that what's stored in the scope must have the original vector
+      // width,
       // which is why we set up the scope using a separate loop.
       ty.vec_width = 1;
     } else if (ty.dtype == DataType::BOOLEAN) {

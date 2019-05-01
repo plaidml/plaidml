@@ -6,44 +6,11 @@ package vertexai.tile.codegen.proto;
 
 import "tile/stripe/stripe.proto";
 
-// The Config message is the main message for the PMLSim config file. It
-// contains the definition of the hardware being modeled as well as the set of
-// optimization passes to run during compilation.  For use of stripe outside of
-// PMLSim, a repeated list of passes is sufficient.
+// The Config message is the main message for the pmlc config file. It contains
+// the set ofoptimization passes to run during compilation.
 message Config {
-  optional uint32 clock_mhz = 1;
-  map<string, ExecutionUnit> exec_units = 2;
-  map<string, MemoryUnit> mem_units = 3;
-  map<string, TransferUnit> tx_units = 4;
-  repeated Bus buses = 5;
-  repeated Pass passes = 6;
-}
-
-// An execution unit represents a simulated computing device.
-message ExecutionUnit {
-  optional uint32 count = 1 [default = 1];
-  required uint32 ops_per_cycle = 2;
-  repeated Stencil stencils = 3;
-}
-
-// A memory unit represents a bank of simulated memory.
-message MemoryUnit {
-  optional uint32 count = 1 [default = 1];
-  required uint32 size_KiB = 2;
-}
-
-// A transfer unit represents a processing element that moves memory between
-// two memory regions such as a DMA controller
-message TransferUnit {
-  optional uint32 count = 1 [default = 1];
-}
-
-// A bus represents a link between memory and an execution unit, or memory and
-// a transfer unit.
-message Bus {
-  repeated string sources = 1;
-  repeated string sinks = 2;
-  required double bytes_per_cycle = 3;
+  repeated Pass passes = 1;
+  repeated Pass lowering = 2;
 }
 
 // The optimization of stripe is done via a series of passes, each which
@@ -120,12 +87,37 @@ message Pass {
     UnrollPass unroll = 17;
     // Prune idxs removes unused indexes
     GenericPass prune_idxs = 18;
-    // Prune idxs removes unused references
+    // Prune refs removes unused references
     GenericPass prune_refs = 19;
     // The threading pass assigns elements of a dense computational block to
     // 'threads' for use in flexible semi-SIMD architectures such as a GPU,
     // where a single instruction decoder is shared across multiple threads.
     ThreadInnerPass thread_inner = 20;
+    // Assign a codec to matching refinements. A codec defines the physical
+    // layout of a tensor on a particular hardware device.
+    AssignCodecPass assign_codec = 21;
+    // Rebases memory allocations.
+    MemRebasePass mem_rebase = 22;
+    // Remove redundant constraints and impossible blocks,
+    // and reduce the index range (light-weight).
+    ConstraintReductionPass light_cstr_reduction = 23;
+    // Remove redundant constraints and impossible blocks,
+    // and reduce the index range using integer linear programming
+    ConstraintReductionPass ilp_cstr_reduction = 24;
+    // Dead code elimination
+    GenericPass dead_code_elimination = 25;
+    // Packages blocks into subblocks.
+    PackagePass package_blocks = 26;
+    // Expand the size of buffers to reduce constraints required.
+    GenericPass pad = 27;
+    // Use registers as cache
+    RegisterPass register_cache = 28;
+    // Rewrite locations
+    RewriteLocationsPass rewrite_locations = 29;
+    // Divide the work into subgroups
+    SubgroupPass subgroup = 30;
+    // Reorder blocks
+    GenericPass reorder_blocks = 31;
   }
 }
 
@@ -147,8 +139,10 @@ message GenericPass {
 message SchedulePass {
   // Do scheduling to the blocks that match this these tags
   repeated string reqs = 1;
-  // The location to specify for the local memory buffers generated during the
-  // scheduling process.
+  // The location to specify for the local memory buffers generated
+  // during the scheduling process.  During assignment, the location
+  // will be partially evaluated with the variable "unit" set to be
+  // the assigned memory unit.
   required stripe.proto.Location mem_loc = 2;
   // The size of the local memory available to scheduling.
   required uint64 mem_KiB = 3;
@@ -157,6 +151,37 @@ message SchedulePass {
   // The location to assign to the blocks used to do transfer between local
   // memory and exterior memory, i.e. the DMA device used to load / spill.
   required stripe.proto.Location xfer_loc = 5;
+  // The memory assignment algorithm to use.
+  oneof mem_assignment_algorithm {
+    ColorIOUnique color_io_unique = 6;
+    NumaMap numa_map = 7;
+  }
+  // Add constraints during load/store to prevent OOB access
+  optional bool add_constraints = 8 [default = true];
+
+  // ColorIOUnique requires that each input to a sub-statement be
+  // assigned a unique color, and that each output to a sub-statement
+  // be assigned a unique color, where a color indicates a particular
+  // memory.
+  message ColorIOUnique {
+    // The memory units to use for the unique color memory assignment algorithm.
+    repeated uint32 units = 1;
+  }
+
+  // NumaMap maps the location of a block accessing outer memory to
+  // the cache units that the block can access.
+  message NumaMap {
+    message Node {
+      required string pattern = 1;
+      repeated uint32 units = 2;
+    }
+
+    repeated Node nodes = 1;
+  }
+
+  optional bool append_devs = 9 [default = false];
+
+  optional uint32 parallelism_window = 10;
 }
 
 // Provide a specific address for all the allocation refinement such that no
@@ -187,6 +212,34 @@ message CachePass {
   required stripe.proto.Location mem_loc = 3;
   // The unit to assign to transfer (DMA) data into / out of the cache
   required stripe.proto.Location xfer_loc = 4;
+  // Add constraints during load/store to prevent OOB access
+  optional bool add_constraints = 5 [default = true];
+}
+
+// Use registers instead of local memory as cache.
+message RegisterPass {
+  // Do the register pass on blocks that match there tags
+  repeated string reqs = 1;
+  // The candidate refinement's location should be local_loc
+  required stripe.proto.Location local_loc = 2;
+  // The candidate may be load into regsiter_loc
+  required stripe.proto.Location register_loc = 3;
+  // The size of register file in bytes
+  required uint32 register_size = 4;
+  // The latency of global memory access
+  required uint32 global_memory_latency = 5;
+  // The latency of local memory access
+  required uint32 local_memory_latency = 6;
+  // The latency of register access
+  required uint32 register_latency = 7;
+  // The direction of the target refinement
+  required stripe.proto.Refinement.Dir dir = 8;
+  // The tag of the parent of the computational block
+  required string comp_parent_tag = 9;
+  // The index order base block
+  required string index_order = 10;
+  // The aligned size for the arch
+  required uint32 align_size = 11;
 }
 
 // The fusion pass attempt to combine compatible block into a single block that
@@ -205,6 +258,12 @@ message FusionPass {
   repeated string b_reqs = 3;
   // Set additional tags on the resulting fused block
   repeated string fused_set = 4;
+  // Exclude some set of blocks based on tags
+  repeated string exclude = 5;
+  // Only fuse if all block indexes are exactly 1 to 1
+  optional bool perfect = 6 [default = false];
+  // Only fuse if output sizes match
+  optional bool output_match = 7 [default = false];
 }
 
 // Edit the location of blocks and/or refinement to match 'loc'
@@ -212,11 +271,13 @@ message LocatePass {
   repeated string reqs = 1;
   repeated string inner_reqs = 2;
   required stripe.proto.Location loc = 3;
+  optional uint32 reg_size = 4;
+  optional bool append_devs = 5 [default = false];
 }
 
-// The stencil pass attempts to rewrite block to contain an inner block that
+// The stencil pass attempts to rewrite blocks to contain an inner block that
 // matches a fixed hardware 'Stencil' or set of stencils.  Basically, we presume
-// that the hardware has one or more build in 'indexes' (which may exist over
+// that the hardware has one or more built-in 'indexes' (which may exist over
 // time or actual be parallel hardware).  We then try to match indexes or
 // regions of indexes of a block to the various hardware indexes, and rewrite
 // the block into an outer block that make multiple calls to a fixed, hardware
@@ -231,6 +292,10 @@ message StencilPass {
   repeated string outer_set = 3;
   // Set the following tags on the inner set (the stencil match)
   repeated string inner_set = 4;
+  // Set the following tags on input refinements (in stencil index ins order)
+  repeated StencilTagList inputs_set = 5;
+  // Set the following tags on output refinements (in stencil index outs order)
+  repeated StencilTagList outputs_set = 6;
 }
 
 message Stencil {
@@ -254,6 +319,10 @@ message StencilIndex {
   repeated int32 ins = 4;
 }
 
+message StencilTagList {
+  repeated string tags = 1;
+}
+
 // The autotile pass attempts to split (tile) a block into an outer block and
 // an inner block, such that the working set of the inner block fits within a
 // limited memory size, which maximizing the computational density of the inner
@@ -274,45 +343,83 @@ message AutotilePass {
   // Only consider tilings whose sizes are powers of two.  This is much faster
   // and for many use cases the only reasonable options
   optional bool only_po2 = 4 [default = false];
+  // Only consider even tilings
+  optional bool only_even = 5 [default = false];
   // Do a hill climbing search rather than a complete search.
-  optional bool fast = 5 [default = false];
+  optional bool fast = 6 [default = false];
   // Ignore 1-dimensional tensors when considering memory IO.
-  optional bool skip_1d = 6 [default = false];
+  optional bool skip_1d = 7 [default = false];
   // The maximum amount of memory use (in bytes) for all the outputs written by
   // the inner block.  0 means no limit.
-  optional int64 max_output_size = 7 [default = 0];
+  optional int64 max_output_size = 8 [default = 0];
   // The maximum amount of memory use (in bytes) for all the inputs read by
   // the inner block.  0 means no limit.
-  optional int64 max_input_size = 8 [default = 0];
+  optional int64 max_input_size = 9 [default = 0];
+  // The maximum amount of memory use (in bytes) for each output written by
+  // the inner block.  0 means no limit.
+  optional int64 max_per_output_size = 10 [default = 0];
+  // The maximum amount of memory use (in bytes) for each input read by
+  // the inner block.  0 means no limit.
+  optional int64 max_per_input_size = 11 [default = 0];
   // The total size of all data used by the inner block.  Note, this is
   // generally the place to put a memory limit, but in some architectures
   // inputs are held in one memory and outputs are held in accumulation
   // registers in a separate memory.  0 means no limit.
-  optional int64 max_total_size = 9 [default = 0];
+  optional int64 max_total_size = 12 [default = 0];
   // The maximal  number of inner loops allowed by the inner block.  0 means no
   // limit.
-  optional int64 max_sizes_product = 10 [default = 0];
+  optional int64 max_sizes_product = 13 [default = 0];
   // The multiplier for output I/O cost (in case input + output are not
   // symmetric)
-  optional double output_cost = 11 [default = 1.0];
+  optional double output_cost = 14 [default = 1.0];
   // The multiplier for input I/O cost (in case input + output are not
   // symmetric)
-  optional double input_cost = 12 [default = 1.0];
+  optional double input_cost = 15 [default = 1.0];
   // Should we copy the tags of the original block to the inner block
-  optional bool copy_tags = 13 [default = false];
+  optional bool copy_tags = 16 [default = false];
   // When considering memory I/O, what is the size (in byte) of the cache line
-  optional int64 cache_width = 14 [default = 0];
+  optional int64 cache_width = 17 [default = 0];
   // When the result of autotile is trivial (either whole loops fits into inner
   // memory or only 1 element fits), should we skip the transform?
-  optional bool elide_trivial = 15 [default = false];
+  optional bool elide_trivial = 18 [default = false];
   // Only consider refinement from this memory location when computing memory
   // I/O
-  optional string loc_name = 16 [default = ""];
+  optional string loc_name = 19 [default = ""];
   // Clear the tags of the original / outer block before adding outer_set
-  optional bool clear_outer = 17 [default = false];
-  optional bool acc_idxs = 18 [default = true];
+  optional bool clear_outer = 20 [default = false];
+  optional bool acc_idxs = 21 [default = true];
   // Clear the location the original / outer block
-  optional bool clear_location = 19 [default = false];
+  optional bool clear_location = 22 [default = false];
+  // 'Flip' the resulting tile to interleaved rather than contigous version.
+  optional bool flip = 23 [default = false];
+  // Specify the minimum size of tiles to get full utilization
+  optional int64 min_size = 24 [default = 1];
+  // Specify the minimum size of tile outputs to get full utilization
+  optional int64 min_out_size = 25 [default = 1];
+  // Specify the minimum count of tiles to get full utilization
+  optional int64 min_count = 26 [default = 1];
+  // Reject tilings with more than this number of tiles
+  optional int64 max_count = 27 [default = 0];
+  // Specify the minimum count of output tiles to get full utilization
+  optional int64 min_out_count = 28 [default = 1];
+  // Specify the 'tie-breaker' multiplier on having more tiles
+  // Note, we do log2(num_tiles) to make this less impactful
+  // Positive means more tiles = bad, negative means more tiles = good
+  optional double split_factor = 29 [default = .001];
+  // Specify if the unaligned tiles are split
+  optional bool split_unaligned = 30 [default = false];
+  // The maximal  number of inner loops allowed by the inner block,
+  // where each index is rounded up to the nearest power of 2
+  // 0 means no limit.
+  optional int64 max_po2_product = 31 [default = 0];
+  // Only consider tilings whose sizes are multiples of 32.
+  // This is primarily required for some arch.
+  optional bool only_multiple_of_32 = 32 [default = false];
+  // If set, build a tile index affine (an affine of the tiled indices
+  // that will expand to [0..tile_count)), and use it to evaluate the
+  // block's location, expanding the supplied tag as the tile index
+  // affine.
+  optional string location_idx_tag = 33;
 }
 
 // A pass that attempts to transpose intermediate buffers such that any
@@ -340,6 +447,9 @@ message PartitionPass {
   required int64 num_parts = 3;
   // Apply tags to any indexes split by partitioning
   optional string idx_tag = 4;
+  // Only consider tilings whose sizes are multiples of 32.
+  // This is primarily required for some arch.
+  optional bool only_multiple_of_32 = 5 [default = false];
 }
 
 // Unroll a given block, similar to a loop unrolling in a traditional compiler.
@@ -364,4 +474,73 @@ message ThreadInnerPass {
   repeated string reqs = 1;
   // How many threads should be introduce during threading
   required int64 threads = 2;
+}
+
+// Assign a codec to matching refinements. A codec defines the physical layout
+// of a tensor on a particular hardware device.
+message AssignCodecPass {
+  // Only assign this codec to the following data types.
+  repeated string datatypes = 1;
+  // The specified codec name.
+  required string codec = 2;
+}
+
+// Rebases memory allocations.
+//
+// Existing memory allocations are matched according to the supplied
+// pattern.
+//
+// For each matching allocation, the pass runs through the
+// allocation's location: for each device, it binds dev.0, dev.1,
+// dev.2, &c to the constant portion of the corresponding unit.
+// Additionally, it binds the allocation's current offset as "offset".
+//
+// Using these bindings, the supplied "offset" affine is partially
+// evaluated, and the allocation's offset is set to the result.
+message MemRebasePass {
+  // The location name of the memory allocations to rebase.
+  required string pattern = 1;
+  // The offset to use for the rewritten refinement.
+  required stripe.proto.Affine offset = 3;
+}
+
+// Packages blocks into subblocks, propagating refinements.
+message PackagePass {
+  // Indicates the blocks to be packaged.
+  repeated string reqs = 1;
+  repeated string package_set = 2;
+  repeated string subblock_set = 3;
+}
+
+message SubgroupPass {
+  // Which blocks to do subgroup blocking on
+  repeated string reqs = 1;
+  // Maximum memory (for entire group)
+  required int64 max_mem = 2;
+  // Size of each subgroup
+  optional int64 subgroup_size = 3 [default = 8];
+  // Cache width
+  optional int64 cache_width = 4 [default = 0];
+}
+
+// Rewrites refinement and block locations.
+//
+// For each location matching a rewrite prefix, the matched prefix is
+// replaced with the target device list.
+message RewriteLocationsPass {
+  message Rewrite {
+    // The prefix of the locations to rewrite.
+    repeated stripe.proto.Device prefix = 1;
+
+    // The new device list to replace the prefix with.
+    repeated stripe.proto.Device target = 2;
+  }
+  repeated Rewrite rewrites = 1;
+}
+
+// Remove redundant constraints, impossible blocks, and reduce the index
+// range.
+message ConstraintReductionPass {
+  repeated string reqs = 1;
+  repeated string skip_idxs = 2;
 }

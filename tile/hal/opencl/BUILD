@@ -14,16 +14,6 @@ plaidml_proto_library(
     ],
 )
 
-OPENCL_1_0_IMPL = [
-    "shared_memory_disabled.cc",
-    "zero_kernel_svm_disabled.cc",
-]
-
-OPENCL_2_0_IMPL = [
-    "shared_memory.cc",
-    "zero_kernel_svm.cc",
-]
-
 plaidml_cc_library(
     name = "opencl",
     srcs = [
@@ -67,27 +57,18 @@ plaidml_cc_library(
         "opencl.cc",
         "result.cc",
         "result.h",
+        "shared_memory.cc",
         "zero_kernel.cc",
         "zero_kernel.h",
-    ] + select({
-        "@toolchain//:macos_x86_64": OPENCL_1_0_IMPL,
-        "//conditions:default": OPENCL_2_0_IMPL,
-    }),
-    copts = select({
-        "@toolchain//:macos_x86_64": ["-DCL_SILENCE_DEPRECATION"],
-        "//conditions:default": [],
-    }),
+    ],
     hdrs = [
         "emitocl.h",
         "info.h",
     ],
-    linkopts = select({
-        "@toolchain//:macos_x86_64": ["-framework OpenCL"],
-        "//conditions:default": [],
-    }),
     visibility = ["//visibility:public"],
     deps = [
         ":proto_cc",
+        "//base/shim/opencl",
         "//base/util",
         "@boost//:filesystem",
         "@boost//:regex",
@@ -97,10 +78,7 @@ plaidml_cc_library(
         "//tile/lang",
         "//tile/proto:proto_cc",
         "//tile/proto:support",
-    ] + select({
-        "@toolchain//:macos_x86_64": [],
-        "//conditions:default": ["@opencl_icd_loader//:lib"],
-    }),
+    ],
     alwayslink = 1,
 )
 

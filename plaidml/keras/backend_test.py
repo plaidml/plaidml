@@ -1,5 +1,9 @@
 # Copyright 2018 Intel Corporation.
 
+# Make sure we win the race with TF to load libstdc++...
+import plaidml
+plaidml._internal_set_vlog(0)
+
 import argparse
 import functools
 import operator
@@ -18,7 +22,6 @@ from keras.backend import tensorflow_backend as tf
 from keras.backend import theano_backend as th
 from keras.backend import floatx
 
-import plaidml
 import plaidml.exceptions
 from plaidml.keras import backend as pkb
 from plaidml import tile
@@ -167,6 +170,7 @@ def compareForwardClose(epsilon=DEFAULT_TOL,
 def opTest(in_data,
            tol=DEFAULT_TOL,
            atol=DEFAULT_ATOL,
+           do_grads=True,
            skip_theano=True,
            skip_tensorflow=False,
            verbose=False):
@@ -184,26 +188,32 @@ def opTest(in_data,
             funcs = test_func(self, b, *(xv + ps + list(run_args)))
             tf_session.run(tensorflow.global_variables_initializer())
             for gf, f in zip(grad_funcs, funcs):
-                df = b.gradients(b.mean(gf), x)
-                gfn = b.function(x, df, updates=[])
                 fr = f.eval()
-                gr = gfn([t for t in data if hasattr(t, 'shape')])
-                try:
-                    values = gr[0].values
-                    dense_shape = gr[0].dense_shape
-                    indices = gr[0].indices
-                    result = np.zeros(dense_shape)
-                    for i in indices:
-                        result[i] += values[i]
-                    gr[0] = result
-                except AttributeError:
-                    # This wasn't an IndexedSlices object, do nothing
-                    pass
-                if args.verbose or verbose:
+                if do_grads:
+                    df = b.gradients(b.mean(gf), x)
+                    gfn = b.function(x, df, updates=[])
+                    gr = gfn([t for t in data if hasattr(t, 'shape')])
+                    try:
+                        values = gr[0].values
+                        dense_shape = gr[0].dense_shape
+                        indices = gr[0].indices
+                        result = np.zeros(dense_shape)
+                        for i in indices:
+                            result[i] += values[i]
+                        gr[0] = result
+                    except AttributeError:
+                        # This wasn't an IndexedSlices object, do nothing
+                        pass
+                if args.verbose > 2 or verbose:
+                    print('backend: ', b)
                     print('data: {}'.format(data))
                     print('fr: {}'.format(fr))
-                    print('gr: {}'.format(gr))
-                results.append((fr, gr))
+                    if do_grads:
+                        print('gr: {}'.format(gr))
+                if do_grads:
+                    results.append((fr, gr))
+                else:
+                    results.append((fr,))
         tf_session.close()
         return results
 
@@ -244,14 +254,15 @@ def opTest(in_data,
                             atol=atol,
                             err_msg='ERR: datum={}, test={}, x=plaidml, y=tensorflow'.format(
                                 didx, idx))
-                        for x in range(0, len(pmlr[1])):
-                            npt.assert_allclose(
-                                pmlr[1][x],
-                                tfr[1][x],
-                                rtol=tol,
-                                atol=atol,
-                                err_msg='ERR: datum={}, test={}, grad, x=plaidml, y=tensorflow'.
-                                format(didx, idx))
+                        if do_grads:
+                            for x in range(0, len(pmlr[1])):
+                                npt.assert_allclose(
+                                    pmlr[1][x],
+                                    tfr[1][x],
+                                    rtol=tol,
+                                    atol=atol,
+                                    err_msg='ERR: datum={}, test={}, grad, x=plaidml, y=tensorflow'
+                                    .format(didx, idx))
 
         return output
 
@@ -275,6 +286,8 @@ class TestBackendOps(unittest.TestCase):
         [m(4, 7, 3), n(4, 3), m(3, 3), n(3, 3), False],
         [m(4, 7, 3), n(4, 3), m(3, 3), n(3, 3), True],
     ])
+
+    @unittest.skipIf(os.environ.get("USE_STRIPE", "0") == "1", "Stripe does not work for RNNs")
     def testRNN(self, b, inp, init_state, ker, r_ker, go_back):
 
         def step_function(inputs, states):
@@ -390,30 +403,6 @@ class TestBackendOps(unittest.TestCase):
     def testFlatten(self, b, x):
         return [b.flatten(x)]
 
-    #TODO: Does not need to exist longterm
-    @unittest.skip("Helper test for debugging testAddElements, not standalone")
-    def testMicroAddElementsFail(self):
-        data = [m(3, 3), m(3, 3)]
-        test_func = self.testAddElements
-        args = list()
-        ###############
-        x = [pkb.placeholder(shape=t.shape) for t in data if isinstance(t, np.ndarray)]
-        xv = [pkb.variable(t, dtype=floatx()) for t in data if isinstance(t, np.ndarray)]
-        par = [t for t in data if not isinstance(t, np.ndarray)]
-        grad_funcs = test_func(pkb, *(x + par + list(args)))
-        funcs = test_func(pkb, *(xv + par + list(args)))
-        #for gf, f in zip(grad_funcs, funcs):
-        gf = grad_funcs[0]
-        f = funcs[0]
-        df = pkb.gradients(pkb.mean(gf), x)
-        gfn = pkb.function(x, df, updates=[])
-        fr = f.eval()
-        gr = gfn([t for t in data if isinstance(t, np.ndarray)])
-        if args.verbose:
-            print(pkb, fr, gr)
-        results.append((fr, gr))
-        return results
-
     def testTileIdentity(self):
         x = pkb.variable(m(3))
         op = tile.Operation('function (I[N]) -> (O) { O = I; }', [('I', x)],
@@ -429,7 +418,6 @@ class TestBackendOps(unittest.TestCase):
         output = op.outputs['O2'].eval()
         return 0
 
-    @unittest.skip("TODO(T1028): This test is known to fail")
     @opTest([[m(3, 3), m(3, 3)]])
     def testAddElements(self, b, x, y):
         return [x + y]
@@ -444,7 +432,7 @@ class TestBackendOps(unittest.TestCase):
             c + x,
         ]
 
-    @opTest([[m(3, 3), m(3, 3)]])
+    @opTest([[m(3, 3), m(3, 3)], [m(2, 3), m(3)]])
     def testSubElements(self, b, x, y):
         return [x - y]
 
@@ -883,15 +871,28 @@ class TestBackendOps(unittest.TestCase):
                 name='DefractTest').sole_output()
         ]
 
-    @unittest.skip("TODO(T1046): This case is bugged in Keras 2.0.8 TF")
+    @opTest([[m(3), m(3) + 1]], skip_tensorflow=True, skip_theano=True)
+    def testFunkyLayerNames(self, b, x, k):
+        '''Exercises fix for plaidml bug #241
+
+        Now that we emit keras layer names as 'pid' attribute values, in order
+        to help link tile code back to its origin while debugging, we must
+        reformat those names as valid tile identifiers. If we are doing that,
+        this test will pass, otherwise we'll get a syntax error.'''
+        f = 'function(I[N], K[M]) -> (O) {\n  O[x: 5] = +(I[(x - k + 1)/2] * K[k]);\n}'
+        return [
+            tile.Operation(
+                f, [('I', x), ('K', k)], [('O', tile.Shape(x.shape.dtype, (5,)))],
+                name='this-is-not an identifier').sole_output()
+        ]
+
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
             1e-04,
             skip_theano=True)
     def testConv2dSpecial(self, b, im, km, df):
         '''A simplified example highlighting a bug in Keras 2.0.8 TF
 
-        Probably doesn't need to be retained once the corresponding case in conv3d
-        is fixed.'''
+        If we're not concerned with Keras 2.0.8 we probably don't need to retain this.'''
         return [b.conv2d(im, km, padding='same', strides=(2, 3), data_format=df)]
 
     @opTest([
@@ -904,8 +905,7 @@ class TestBackendOps(unittest.TestCase):
     def testConv3d(self, b, im, km, df):
         return [
             b.conv3d(im, km, padding='same', data_format=df),
-            # TODO(T1046): TF broken in Keras 2.0.8 on this; see testConv2dSpecial
-            #b.conv3d(im, km, padding='same', strides=(2,3,3), data_format=df),
+            b.conv3d(im, km, padding='same', strides=(2, 3, 3), data_format=df),
             b.conv3d(im, km, padding='valid', strides=(2, 1, 2), data_format=df),
             b.conv3d(im, km, padding='valid', dilation_rate=(1, 3, 2), data_format=df),
         ]
@@ -1297,6 +1297,7 @@ class TestBackendOps(unittest.TestCase):
         with self.assertRaises(ValueError):
             pkb.conv(A, B, dilation_rate=(1, 1))
 
+    @unittest.skipIf(os.environ.get("USE_STRIPE", "0") == "1", "Stripe does not correctly validate assignment ops")
     def testAssignmentExceptions(self):
         A = pkb.variable(m(5, 1))
         B = pkb.variable(m(1, 5))
@@ -1375,8 +1376,40 @@ class TestBackendOps(unittest.TestCase):
     def testSpatial3DPadding(self, b, x, p=((1, 1), (1, 1), (1, 1)), d=None):
         return [b.spatial_3d_padding(x, padding=p, data_format=d)]
 
+    # Big rollup
+    @opTest([[m(1000, 1000)]], do_grads=False)
+    def testBigRollup(self, b, x):
+        return [b.sum(x, axis=1)]
+
+    # Resnet sized tests
+    @opTest([[m(1, 224, 224, 3), m(7, 7, 3, 64)]], do_grads=False)
+    def resnetLayer1(self, b, x, k):
+        return [b.conv2d(x, k, strides=(2, 2), padding='valid')]
+
+    @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]], do_grads=False)
+    def resnetLayer2(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 56, 56, 256), m(3, 3, 256, 128)]], do_grads=False)
+    def res3a_branch2a(self, b, x, k):
+        return [b.conv2d(x, k, strides=(2, 2), padding='same')]
+
+    @opTest([[m(1, 56, 56, 64), m(1, 1, 64, 64)]], do_grads=False)
+    def res2a_branch2a(self, b, x, k):
+        return [b.conv2d(x, k, strides=(1, 1), padding='same')]
+
+    @opTest([[m(1, 2048), m(2048, 1000)]], do_grads=False)
+    def fc_1000(self, b, x, k):
+        return [b.dot(x, k)]
+
+    @opTest([[m(1024, 1024), m(1024, 1024)]], do_grads=False)
+    def bigMatMul(self, b, A, B):
+        return [b.dot(A, B)]
+
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
-    #plaidml._internal_set_vlog(5)
+    #plaidml._internal_set_vlog(1)
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

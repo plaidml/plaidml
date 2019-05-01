@@ -81,12 +81,12 @@ TEST(Codegen, ApplyTile) {
                                  SimpleShape(DataType::FLOAT32, {dim, dim}),  //
                                  SimpleShape(DataType::FLOAT32, {dim, dim}));
   auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto main = program->entry->SubBlock(0);
   auto data = MakeMatMulTestData();
 
-  IVLOG(2, "Before>\n" << *program);
+  IVLOG(2, "Before>\n" << *program->entry);
 
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*program->entry, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -103,10 +103,10 @@ TEST(Codegen, ApplyTile) {
   ApplyTile(kernel.get(), {5, 2, 2});
   kernel->SubBlock(0)->name = "outer";
 
-  IVLOG(2, "After>\n" << *program);
+  IVLOG(2, "After>\n" << *program->entry);
 
   std::fill(data["C"].begin(), data["C"].end(), 0);
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*program->entry, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -131,12 +131,12 @@ TEST(Codegen, StencilMatchMatMul) {
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({spec}, *kernel);
+  auto match = FindBestStencil({spec}, kernel.get());
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1255968,  // total
@@ -161,25 +161,26 @@ TEST(Codegen, StencilMatchConv1D) {
     }
   )");
 
-  auto runinfo = lib::LoadConv1d("conv",                                       //
-                                 SimpleShape(DataType::FLOAT32, {100, 64}),    //
-                                 SimpleShape(DataType::FLOAT32, {3, 64, 64}),  //
-                                 SimpleShape(DataType::FLOAT32, {100, 64}));
+  auto runinfo = lib::LoadConv1d("conv",                                        //
+                                 SimpleShape(DataType::FLOAT32, {1, 100, 64}),  //
+                                 SimpleShape(DataType::FLOAT32, {3, 64, 64}),   //
+                                 {1, 100, 64});
   auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({spec}, *kernel);
+  auto match = FindBestStencil({spec}, kernel.get());
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1378944,  // total
       {
           {"ci", "c", 64},
-          {"co", "x", 16},
-          {"kx", "*", 1},
-          {"x", "k", 16},
+          {"co", "k", 16},
+          {"k0", "*", 1},
+          {"n", "*", 1},
+          {"x0", "x", 16},
       }  // idxs
   };
   EXPECT_THAT(*match, Eq(expected));
@@ -205,15 +206,6 @@ TEST(Codegen, StencilMatchConv2D) {
             { "name": "y", "size":  4, "outs": [ -1 ], "ins": [  0, -1 ] },
             { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
           ]
-        },
-        {
-          "startup_cost": 32,
-          "idxs": [
-            { "name": "k", "size": 16, "outs": [ -1 ], "ins": [  0, -1 ] },
-            { "name": "x", "size":  4, "outs": [ -1 ], "ins": [ -1,  0 ] },
-            { "name": "y", "size":  4, "outs": [ -1 ], "ins": [ -1,  0 ] },
-            { "name": "c", "size": -1, "outs": [  0 ], "ins": [ -1, -1 ] },
-          ]
         }
       ]
     }
@@ -223,25 +215,26 @@ TEST(Codegen, StencilMatchConv2D) {
     specs.push_back(stencil);
   }
 
-  auto runinfo = lib::LoadConv2d("conv",                                              //
-                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),   //
-                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),      //
-                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}));  //
+  auto runinfo = lib::LoadConv2d("conv",                                             //
+                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),  //
+                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),     //
+                                 {1, 100, 100, 56});                                 //
   auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
   IVLOG(2, "\n" << *kernel);
 
-  auto match = FindBestStencil(specs, *kernel);
+  auto match = FindBestStencil(specs, kernel.get());
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       323280000,  // total
       {
           {"ci", "c", 56},
           {"co", "k", 16},
-          {"kx", "*", 1},
-          {"ky", "*", 1},
+          {"k0", "*", 1},
+          {"k1", "*", 1},
+          {"n", "*", 1},
           {"x0", "x", 4},
           {"x1", "y", 4},
       }  // idxs
@@ -267,11 +260,11 @@ TEST(Codegen, StencilPass) {
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
-  StencilPass(program.get(), options);
-  IVLOG(2, "\n" << *program);
+  StencilPass(program->entry.get(), options);
+  IVLOG(2, "\n" << *program->entry);
 
   auto data = MakeMatMulTestData();
-  ExecuteProgram(*program, &data);
+  ExecuteProgram(*program->entry, &data);
 
   IVLOG(2, "A: " << data["A"]);
   IVLOG(2, "B: " << data["B"]);
@@ -287,9 +280,9 @@ TEST(Codegen, TilePassBroadcast) {
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {32}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
   auto program = GenerateStripe(runinfo);
-  auto main = program->SubBlock(0);
+  auto main = program->entry->SubBlock(0);
 
-  IVLOG(2, "\n" << *program);
+  IVLOG(2, "\n" << *program->entry);
 }
 
 }  // namespace test

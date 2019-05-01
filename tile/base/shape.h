@@ -167,10 +167,14 @@ struct TensorDimension {
 
 struct TensorShape {
   TensorShape() = default;
-  TensorShape(DataType type, const std::vector<TensorDimension>& dims) : type(type), dims(dims) {}
+  TensorShape(DataType type, const std::vector<TensorDimension>& dims, const std::string& layout = "")
+      : type(type), dims(dims), layout(layout) {}
 
   DataType type = DataType::INVALID;
   std::vector<TensorDimension> dims;
+  bool is_const = false;
+  std::string codec;
+  std::string layout;
 
   uint64_t byte_size() const { return elem_size() * byte_width(type); }
   uint64_t elem_size() const {
@@ -190,6 +194,14 @@ struct TensorShape {
     std::vector<size_t> ret;
     for (const auto& dim : dims) {
       ret.push_back(dim.size);
+    }
+    return ret;
+  }
+
+  std::vector<size_t> strides() const {
+    std::vector<size_t> ret;
+    for (const auto& dim : dims) {
+      ret.push_back(dim.stride);
     }
     return ret;
   }
@@ -255,7 +267,7 @@ struct TensorShape {
 std::ostream& operator<<(std::ostream& os, const TensorShape& shape);
 std::ostream& operator<<(std::ostream& os, const TensorDimension& dim);
 
-inline TensorShape SimpleShape(DataType type, const std::vector<size_t>& sizes) {
+inline TensorShape SimpleShape(DataType type, const std::vector<size_t>& sizes, const std::string& layout = "") {
   int64_t stride = 1;
   std::vector<TensorDimension> dims(sizes.size());
   for (int i = sizes.size() - 1; i >= 0; i--) {
@@ -263,7 +275,7 @@ inline TensorShape SimpleShape(DataType type, const std::vector<size_t>& sizes) 
     dims[i].size = sizes[i];
     stride *= sizes[i];
   }
-  return TensorShape(type, dims);
+  return TensorShape(type, dims, layout);
 }
 
 typedef std::map<std::string, TensorShape> ShapeMap;
@@ -352,6 +364,9 @@ inline proto::TensorShape::Dimension IntoProto(const TensorDimension& dim) {
 inline TensorShape FromProto(const proto::TensorShape& shape) {
   TensorShape ret;
   ret.type = FromProto(shape.type());
+  ret.codec = shape.codec();
+  ret.is_const = shape.is_const();
+  ret.layout = shape.layout();
   for (const auto& dim : shape.dims()) {
     ret.dims.emplace_back(FromProto(dim));
   }
@@ -361,6 +376,11 @@ inline TensorShape FromProto(const proto::TensorShape& shape) {
 inline proto::TensorShape IntoProto(const TensorShape& shape) {
   proto::TensorShape ret;
   ret.set_type(IntoProto(shape.type));
+  ret.set_codec(shape.codec);
+  ret.set_is_const(shape.is_const);
+  if (!shape.layout.empty()) {
+    ret.set_layout(shape.layout);
+  }
   for (const auto& dim : shape.dims) {
     *(ret.mutable_dims()->Add()) = IntoProto(dim);
   }

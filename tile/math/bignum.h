@@ -20,6 +20,8 @@ inline std::string to_string(const Rational& x) { return x.str(); }
 Integer Floor(const Rational& x);
 // Finds smallest int that is >= x
 Integer Ceil(const Rational& x);
+// If the rational is integer, return the integer. Otherwise, throw error
+int ToInteger(const Rational& x);
 // Computes the fractional part of x
 Rational FracPart(const Rational& x);
 // Compute the absolute value

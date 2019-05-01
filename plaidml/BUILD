@@ -32,8 +32,8 @@ plaidml_cc_version(
 )
 
 PLAIDML_CPP_SOURCES = [
-    "plaidml.cc",
     "config.h",
+    "plaidml.cc",
     ":version",
 ]
 
@@ -129,16 +129,6 @@ plaidml_macos_dylib(
     src = ":libplaidml_raw.dylib",
     lib = "libplaidml.dylib",
     tags = ["darwin"],
-)
-
-plaidml_cc_library(
-    name = "api_cc_deps",
-    deps = [
-        ":proto_cc",
-        "//tile/base",
-        "//tile/base:program_cache",
-        "//tile/stripe",
-    ],
 )
 
 plaidml_cc_test(
@@ -294,17 +284,6 @@ conda_test(
     ],
 )
 
-# The PlaidML sources, as a tar package.
-pkg_tar(
-    name = "pkg",
-    srcs = glob([
-        "**/*",
-    ]),
-    package_dir = "plaidml",
-    strip_prefix = ".",
-    visibility = ["//visibility:public"],
-)
-
 pkg_tar(
     name = "py_deb_data",
     srcs = [":py"],
@@ -338,7 +317,6 @@ genrule(
         "@jsoncpp//:license",
         "@com_google_protobuf//:license",
         "@six_archive//:license",
-        "@llvm//:license",
     ],
     outs = [
         "boost-LICENSE",
@@ -349,8 +327,22 @@ genrule(
         "jsoncpp-LICENSE",
         "protobuf-LICENSE",
         "six-LICENSE",
-        "llvm-LICENSE",
     ],
+    cmd = "cp $(SRCS) $(@D)/",
+)
+
+genrule(
+    name = "llvm_license",
+    srcs = ["@llvm_shim//:license"],
+    outs = ["llvm-LICENSE"],
+    cmd = "cp $(SRCS) $(@D)/",
+    tags = ["llvm"],
+)
+
+genrule(
+    name = "pmlc",
+    srcs = ["//tile/pmlc:pmlc.py"],
+    outs = ["pmlc.py"],
     cmd = "cp $(SRCS) $(@D)/",
 )
 
@@ -358,30 +350,40 @@ genrule(
 plaidml_py_wheel(
     name = "wheel",
     package_name = "plaidml",
-    srcs = PYTHON_SRCS + [":licenses"],
-    config = ":setup.cfg",
+    srcs = PYTHON_SRCS + [
+        ":licenses",
+        ":pmlc",
+    ] + select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": [":llvm_license"],
+    }),
+    config = ":not_setup.cfg",
     config_substitutions = select({
         "@toolchain//:windows_x86_64": {
-            "{PLAIDML_NATIVE_LIBRARY}": "plaidml.dll",
-            "{LIBDIR}": "Library/bin",
+            "{BIN_DATA_FILES}": """Library/bin =
+  data/plaidml.dll
+  data/pmlc_bin.exe""",
         },
         "@toolchain//:macos_x86_64": {
-            "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.dylib",
-            "{LIBDIR}": "lib",
+            "{BIN_DATA_FILES}": """lib =
+  data/libplaidml.dylib
+bin =
+  data/pmlc_bin""",
         },
         "//conditions:default": {
-            "{PLAIDML_NATIVE_LIBRARY}": "libplaidml.so",
-            "{LIBDIR}": "lib",
+            "{BIN_DATA_FILES}": """lib =
+  data/libplaidml.so
+bin =
+  data/pmlc_bin""",
         },
     }),
-    data = [
-        "plaidml.h",
-        "plaidml++.h",
+    data = PLAIDML_CPP_HEADERS + [
         ":configs",
         "//plaidml/base:base.h",
         "//plaidml/base:base_cpp.h",
         "@half//:include/half.hpp",
         "plaidml-config.cmake",
+        "//tile/pmlc:pmlc_bin",
     ] + select({
         "@toolchain//:windows_x86_64": [":plaidml_pub.dll"],
         "@toolchain//:macos_x86_64": [":libplaidml_macos_pub"],

@@ -277,6 +277,9 @@ PLAIDML_API void plaidml_free_shape(plaidml_shape* shape);
 // Sets a shape's offset, in elements, from the beginning of the data.
 PLAIDML_API bool plaidml_set_shape_offset(vai_ctx* ctx, plaidml_shape* shape, uint64_t offset_in_elements);
 
+// Set a shape's layout
+PLAIDML_API bool plaidml_shape_set_layout(vai_ctx* ctx, plaidml_shape* shape, const char* layout);
+
 // Adds a dimension to a shape.  Dimension sizes and strides are measured in
 // elements of the shape's datatype, not by local buffer byte counts.
 PLAIDML_API bool plaidml_add_dimension(vai_ctx* ctx, plaidml_shape* shape, uint64_t size_in_elements,
@@ -363,6 +366,9 @@ PLAIDML_API plaidml_var* plaidml_alloc_real(double value);
 
 // Allocates a var representing a tensor, bound to the given shape and buffer.
 PLAIDML_API plaidml_var* plaidml_alloc_tensor(vai_ctx* ctx, plaidml_buffer* buffer, plaidml_shape* shape);
+
+// Attaches quantization parameters to a weights tensor
+PLAIDML_API bool plaidml_tensor_attach_qparams(plaidml_var* tensor, plaidml_var* qparams);
 
 // Builds a function from the supplied code written in the PlaidML operation
 // description language.  If 'id' is not NULL, attach the id to the function

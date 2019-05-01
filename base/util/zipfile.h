@@ -30,6 +30,7 @@ class UnZipArchive {
   explicit UnZipArchive(const std::string& path);
   ~UnZipArchive();
 
+  bool Exist(const std::string& filename);
   UnZipFile OpenFile(const std::string& filename);
 
  private:

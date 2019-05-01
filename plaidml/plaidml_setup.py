@@ -34,7 +34,7 @@ Some Notes:
   * Bugs and other issues: https://github.com/plaidml/plaidml
   * Questions: https://stackoverflow.com/questions/tagged/plaidml
   * Say hello: https://groups.google.com/forum/#!forum/plaidml-dev
-  * PlaidML is licensed under the GNU AGPLv3
+  * PlaidML is licensed under the Apache License 2.0
  """.format(plaidml.__version__))
 
     # Operate as if nothing is set

@@ -24,7 +24,7 @@ std::shared_ptr<hal::Buffer> CLMemArena::MakeBuffer(std::uint64_t offset, std::u
   cl_buffer_region region;
   region.origin = offset;
   region.size = size;
-  CLObj<cl_mem> mem = clCreateSubBuffer(mem_.get(), 0, CL_BUFFER_CREATE_TYPE_REGION, &region, err.ptr());
+  CLObj<cl_mem> mem = ocl::CreateSubBuffer(mem_.get(), 0, CL_BUFFER_CREATE_TYPE_REGION, &region, err.ptr());
   Err::Check(err, "Unable to allocate memory");
   return std::make_shared<CLMemBuffer>(device_state_, size, std::move(mem));
 }
