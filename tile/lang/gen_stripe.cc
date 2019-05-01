@@ -447,10 +447,14 @@ class StripeGenerator {
 
     // INTRINSIC
     std::vector<std::string> scalar_inputs;
+    tile::DataType output_type = tile::DataType::INVALID;
     for (const auto& input : op.inputs) {
       scalar_inputs.push_back(ScalarName(input));
+      auto input_type = GetShape(input).type;
+      output_type = CommonSupertype(input_type, output_type);
     }
-    AddIntrinsic(kernel.get(), op.f.fn, GetShape(op.output).type, scalar_inputs, {ScalarName(op.output)});
+    AddIntrinsic(  //
+        kernel.get(), op.f.fn, output_type, scalar_inputs, {ScalarName(op.output)});
 
     // STORE
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));

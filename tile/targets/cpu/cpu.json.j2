@@ -1,6 +1,9 @@
 {
     ## Define the stripe passes
     "passes": [
+        ## Lower temps
+        { "name": "localize_tmps", "localize" : {"reqs": ["program"], "ref_reqs": ["tmp"] } },
+
         {
             "name": "stencil_mac",
             "stencil": {
