@@ -20,6 +20,12 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                                     SimpleShape(DataType::FLOAT32, {100, 100}),   //
                                     SimpleShape(DataType::FLOAT32, {100, 100}));  //
                 }),
+      MakeEntry("matmul_small",
+                [](const std::string& name) {
+                  return LoadMatMul(name,                                       //
+                                    SimpleShape(DataType::FLOAT32, {32, 32}),   //
+                                    SimpleShape(DataType::FLOAT32, {32, 32}));  //
+                }),
       MakeEntry("matmul_big",
                 [](const std::string& name) {
                   return LoadMatMul(name, SimpleShape(DataType::FLOAT32, {1000, 1000}),  //
