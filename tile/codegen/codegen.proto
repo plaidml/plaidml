@@ -517,10 +517,18 @@ message SubgroupPass {
   repeated string reqs = 1;
   // Maximum memory (for entire group)
   required int64 max_mem = 2;
+  // Memory latency
+  required int64 mem_latency = 3;
+  // Cache latency
+  required int64 cache_latency = 4;
   // Size of each subgroup
-  optional int64 subgroup_size = 3 [default = 8];
+  optional int64 subgroup_size = 5 [default = 8];
+  // Minimum size of each subgroup
+  optional int64 min_subgroup_size = 6 [default = 8];
+  // Maximum size of each subgroup
+  optional int64 max_subgroup_size = 7 [default = 32];
   // Cache width
-  optional int64 cache_width = 4 [default = 0];
+  optional int64 cache_width = 8 [default = 0];
 }
 
 // Rewrites refinement and block locations.

@@ -21,7 +21,18 @@
         { "name": "pad", "pad": {"reqs": ["main"] } },
 
         ## Do subgroup pass
-        { "name": "subgroup", "subgroup": { "reqs": ["contraction"], "max_mem": 2800, "subgroup_size": 16, "cache_width": 256 } },
+        {
+            "name": "subgroup", 
+            "subgroup": { 
+                "reqs": ["contraction"], 
+                "max_mem": 3000, 
+                "mem_latency": {{GLOBAL_MEM_LAT}},
+                "cache_latency": {{LOCAL_MEM_LAT}},
+                "min_subgroup_size": 16,
+                "max_subgroup_size": 32,
+                "cache_width": 64
+            }
+        },
 
         ## Do a backup codegen on any remaining contractions 
         {
