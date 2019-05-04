@@ -9,7 +9,7 @@ load("//tools/gencfg:build_defs.bzl", "gencfg")
 gencfg(
     name = "amd",
     target = "amd",
-    tmpl = "gpu.json.j2",
+    tmpl = "amd.json.j2",
     yml = "gpu.yml",
 )
 

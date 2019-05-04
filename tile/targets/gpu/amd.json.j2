@@ -21,18 +21,7 @@
         { "name": "pad", "pad": {"reqs": ["main"] } },
 
         ## Do subgroup pass
-        {
-            "name": "subgroup", 
-            "subgroup": { 
-                "reqs": ["contraction"], 
-                "max_mem": 3000, 
-                "mem_latency": {{GLOBAL_MEM_LAT}},
-                "cache_latency": {{LOCAL_MEM_LAT}},
-                "min_subgroup_size": 16,
-                "max_subgroup_size": 32,
-                "cache_width": 64
-            }
-        },
+        { "name": "subgroup", "subgroup": { "reqs": ["contraction"], "max_mem": 10000, "subgroup_size": 64, "cache_width": 1024 } },
 
         ## Do a backup codegen on any remaining contractions 
         {
@@ -91,8 +80,8 @@
                 "inner_set": ["gpu_thread", "subgroup_othreads"],
                 "clear_outer": true,
                 "only_even": true,
-                "min_size": {{ 8 }},
-                "max_sizes_product": {{ 8 }}
+                "min_size": {{ 4 }},
+                "max_sizes_product": {{ 4 }}
             }
         },
 
@@ -119,9 +108,6 @@
 
         { "name": "cleanup1", "prune_refs": { "reqs": ["main"] } },
         { "name": "cleanup2", "prune_idxs": { "reqs": ["main"] } },
-
-        ## Add subgroup loads/stores
-        { "name": "subgroup_vec_tx", "vectorize_tx": { "reqs": ["subgroup_thread"] } },
 
         { "name": "localize_main", "localize": { "reqs": ["main"] } },
         { "name": "scalarize_main", "scalarize": { "reqs": ["main"] } }

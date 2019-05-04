@@ -2,6 +2,7 @@
 
 #include "base/util/any_factory_map.h"
 #include "base/util/compat.h"
+#include "base/util/env.h"
 #include "tile/platform/local_machine/local_machine.h"
 #include "tile/platform/local_machine/platform.h"
 
@@ -15,7 +16,9 @@ std::unique_ptr<tile::Platform> PlatformFactory::MakeTypedInstance(const context
 }
 
 [[gnu::unused]] char reg = []() -> char {
-  AnyFactoryMap<tile::Platform>::Instance()->Register(std::make_unique<PlatformFactory>());
+  if (!(env::Get("STRIPE_JIT") == "1")) {
+    AnyFactoryMap<tile::Platform>::Instance()->Register(std::make_unique<PlatformFactory>());
+  }
   return 0;
 }();
 

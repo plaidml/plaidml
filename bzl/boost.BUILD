@@ -61,6 +61,15 @@ cc_library(
 )
 
 cc_library(
+    name = "graph",
+    srcs = glob(["libs/graph/src/*.cpp"]),
+    deps = [
+        ":boost",
+        ":regex",
+    ],
+)
+
+cc_library(
     name = "regex",
     srcs = glob([
         "libs/regex/src/*.cpp",

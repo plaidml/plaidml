@@ -10,6 +10,7 @@
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 #include <algorithm>
 #include <deque>
@@ -17,6 +18,7 @@
 
 #include <half.hpp>
 
+#include "base/util/lookup.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -35,7 +37,7 @@ struct ProgramModule {
 
 class Executable {
  public:
-  explicit Executable(ProgramModule&& module);
+  explicit Executable(const ProgramModule& module);
   void Run(const std::map<std::string, void*>& buffers);
   void Save(const std::string& filename);
 
@@ -91,6 +93,11 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Assign(const stripe::Intrinsic&);
   void BitLeft(const stripe::Intrinsic&);
   void BitRight(const stripe::Intrinsic&);
+  void Sqrt(const stripe::Intrinsic&);
+  void Exp(const stripe::Intrinsic&);
+  void Log(const stripe::Intrinsic&);
+  void Pow(const stripe::Intrinsic&);
+  void Tanh(const stripe::Intrinsic&);
   void Zero(const stripe::Special&);
   void Copy(const stripe::Special&);
   void Reshape(const stripe::Special&);
@@ -126,6 +133,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Value* Eval(const stripe::Affine& access);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
+  void CallIntrinsicFunc(const stripe::Intrinsic&, const char* name);
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
@@ -180,12 +188,13 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
     IVLOG(2, "\n============================================================\n");
     module_->print(llvm::errs(), nullptr);
   }
-  // Wrap the finished module and the buffer names into an Executable instance.
+  // Wrap the finished module and the parameter names into a ProgramModule.
   for (auto& ref : program.refs) {
     assert(ref.dir != stripe::RefDir::None);
     ret.parameters.push_back(ref.into());
   }
   module_ = nullptr;
+  assert(ret.module);
   return ret;
 }
 
@@ -391,6 +400,15 @@ void Compiler::Visit(const stripe::Store& store) {
     } else {
       throw Error("Invalid addition type: " + to_string(from.type));
     }
+  } else if ("mul" == agg_op) {
+    llvm::Value* prev = builder_.CreateLoad(element);
+    if (is_float(from.type)) {
+      value = builder_.CreateFMul(value, prev);
+    } else if (is_int(from.type) || is_uint(from.type)) {
+      value = builder_.CreateMul(value, prev);
+    } else {
+      throw Error("Invalid multiplication type: " + to_string(from.type));
+    }
   } else if ("max" == agg_op) {
     llvm::Value* prev = builder_.CreateLoad(element);
     llvm::Value* flag = nullptr;
@@ -472,8 +490,24 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"xor", &Compiler::Xor},
       {"cond", &Compiler::Conditional},
       {"assign", &Compiler::Assign},
+      {"ident", &Compiler::Assign},
+      // Extra operations defined in tile/lang/ops.cc, which are apparently
+      // passed along directly into Stripe
+      {"cmp_eq", &Compiler::Equal},
+      {"cmp_ne", &Compiler::Unequal},
+      {"cmp_lt", &Compiler::LessThan},
+      {"cmp_gt", &Compiler::GreaterThan},
+      {"cmp_le", &Compiler::LessThanOrEqualTo},
+      {"cmp_ge", &Compiler::GreaterThanOrEqualTo},
       {"bit_right", &Compiler::BitRight},
       {"bit_left", &Compiler::BitLeft},
+      // Other undocumented intrinsics, which are apparently necessary in order
+      // to successfully run the backend_test:
+      {"sqrt", &Compiler::Sqrt},
+      {"exp", &Compiler::Exp},
+      {"log", &Compiler::Log},
+      {"pow", &Compiler::Pow},
+      {"tanh", &Compiler::Tanh},
   };
   auto it = handlers.find(intrinsic.name);
   if (it == handlers.end()) {
@@ -657,7 +691,7 @@ void Compiler::LessThan(const stripe::Intrinsic& lt) {
   } else if (is_uint(lt.type)) {
     ret = builder_.CreateICmpULT(lhs.value, rhs.value);
   } else {
-    throw Error("Invalid comparison type: " + to_string(lt.type));
+    throw Error("Invalid comparison type (LT): " + to_string(lt.type));
   }
   OutputBool(ret, lt);
 }
@@ -678,7 +712,7 @@ void Compiler::LessThanOrEqualTo(const stripe::Intrinsic& lte) {
   } else if (is_uint(lte.type)) {
     ret = builder_.CreateICmpULE(lhs.value, rhs.value);
   } else {
-    throw Error("Invalid comparison type: " + to_string(lte.type));
+    throw Error("Invalid comparison type (LE): " + to_string(lte.type));
   }
   OutputBool(ret, lte);
 }
@@ -699,7 +733,7 @@ void Compiler::GreaterThan(const stripe::Intrinsic& gt) {
   } else if (is_uint(gt.type)) {
     ret = builder_.CreateICmpUGT(lhs.value, rhs.value);
   } else {
-    throw Error("Invalid comparison type: " + to_string(gt.type));
+    throw Error("Invalid comparison type (GT): " + to_string(gt.type));
   }
   OutputBool(ret, gt);
 }
@@ -720,7 +754,7 @@ void Compiler::GreaterThanOrEqualTo(const stripe::Intrinsic& gte) {
   } else if (is_uint(gte.type)) {
     ret = builder_.CreateICmpUGE(lhs.value, rhs.value);
   } else {
-    throw Error("Invalid comparison type: " + to_string(gte.type));
+    throw Error("Invalid comparison type (GE): " + to_string(gte.type));
   }
   OutputBool(ret, gte);
 }
@@ -739,7 +773,7 @@ void Compiler::Equal(const stripe::Intrinsic& eq) {
   } else if (is_int(eq.type) || is_uint(eq.type)) {
     ret = builder_.CreateICmpEQ(lhs.value, rhs.value);
   } else {
-    throw Error("Invalid comparison type: " + to_string(eq.type));
+    throw Error("Invalid comparison type (EQ): " + to_string(eq.type));
   }
   OutputBool(ret, eq);
 }
@@ -758,7 +792,7 @@ void Compiler::Unequal(const stripe::Intrinsic& neq) {
   } else if (is_int(neq.type) || is_uint(neq.type)) {
     ret = builder_.CreateICmpNE(lhs.value, rhs.value);
   } else {
-    throw Error("Invalid comparison type: " + to_string(neq.type));
+    throw Error("Invalid comparison type (NE): " + to_string(neq.type));
   }
   OutputBool(ret, neq);
 }
@@ -836,6 +870,16 @@ void Compiler::BitRight(const stripe::Intrinsic& stmt) {
   OutputType(ret, stmt);
 }
 
+void Compiler::Sqrt(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "sqrt"); }
+
+void Compiler::Exp(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "exp"); }
+
+void Compiler::Log(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "log"); }
+
+void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "pow"); }
+
+void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanh"); }
+
 void Compiler::Zero(const stripe::Special& zero) {
   // present in stripe.proto but not defined in the specification
   throw Error("Special operation ZERO is not yet specified");
@@ -847,7 +891,12 @@ void Compiler::Copy(const stripe::Special& copy) {
 }
 
 void Compiler::Reshape(const stripe::Special& reshape) {
-  throw Error("Special operation RESHAPE is not yet specified");
+  assert(1 == reshape.inputs.size());
+  buffer src = buffers_[reshape.inputs[0]];
+  assert(1 == reshape.outputs.size());
+  buffer dst = buffers_[reshape.outputs[0]];
+  auto size = IndexConst(dst.refinement->interior_shape.byte_size());
+  builder_.CreateMemCpy(dst.base, 0, src.base, 0, size);
 }
 
 Compiler::scalar Compiler::Cast(scalar v, DataType to_type) {
@@ -935,6 +984,18 @@ void Compiler::OutputBool(llvm::Value* ret, const stripe::Intrinsic& intrinsic) 
   scalars_[intrinsic.outputs[0]] = scalar{ret, DataType::BOOLEAN};
 }
 
+void Compiler::CallIntrinsicFunc(const stripe::Intrinsic& stmt, const char* name) {
+  assert(1 == stmt.inputs.size());
+  scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  std::vector<llvm::Value*> argvals{op.value};
+  auto ctype = CType(stmt.type);
+  std::vector<llvm::Type*> argtypes{ctype};
+  auto functype = llvm::FunctionType::get(ctype, argtypes, false);
+  auto func = module_->getOrInsertFunction(name, functype);
+  llvm::Value* ret = builder_.CreateCall(func, argvals, "");
+  OutputType(ret, stmt);
+}
+
 llvm::Type* Compiler::IndexType() {
   unsigned archbits = module_->getDataLayout().getPointerSizeInBits();
   return llvm::IntegerType::get(context_, archbits);
@@ -979,10 +1040,12 @@ llvm::Value* Compiler::FreeFunction(void) {
   return module_->getOrInsertFunction(funcname, functype);
 }
 
-Executable::Executable(ProgramModule&& module) : parameters_(module.parameters) {
+Executable::Executable(const ProgramModule& module) : parameters_(module.parameters) {
   std::string errStr;
   std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime);
-  auto ee = llvm::EngineBuilder(std::move(module.module))
+  assert(module.module);
+  std::unique_ptr<llvm::Module> clone(llvm::CloneModule(*module.module));
+  auto ee = llvm::EngineBuilder(std::move(clone))
                 .setErrorStr(&errStr)
                 .setEngineKind(llvm::EngineKind::JIT)
                 .setVerifyModules(true)
@@ -999,7 +1062,7 @@ Executable::Executable(ProgramModule&& module) : parameters_(module.parameters) 
 void Executable::Run(const std::map<std::string, void*>& buffers) {
   std::vector<void*> args(parameters_.size());
   for (size_t i = 0; i < args.size(); ++i) {
-    args[i] = buffers.at(parameters_[i]);
+    args[i] = safe_at(buffers, parameters_[i]);
   }
   void* argvec = args.data();
   uint64_t entrypoint = engine_->getFunctionAddress(invoker_name_);
@@ -1062,16 +1125,16 @@ void JitExecute(const stripe::Block& program, const std::map<std::string, void*>
 struct Native::Impl {
   llvm::LLVMContext context;
   ProgramModule module;
+  std::unique_ptr<Executable> executable;
 
   void compile(const stripe::Block& program) {
     Compiler compiler(&context);
     module = compiler.CompileProgram(program);
+    assert(module.module);
+    executable.reset(new Executable(module));
   }
 
-  void run(const std::map<std::string, void*>& buffers) {
-    Executable executable(std::move(module));
-    executable.Run(buffers);
-  }
+  void run(const std::map<std::string, void*>& buffers) { executable->Run(buffers); }
 
   void save(const std::string& filename) {
     std::error_code ec;

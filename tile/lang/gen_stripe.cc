@@ -275,9 +275,6 @@ class StripeGenerator {
 
     for (const auto& kvp : bounds) {
       uint64_t range = kvp.second.max - kvp.second.min + 1;
-      if (range == 1) {
-        continue;
-      }
       kernel->idxs.emplace_back(Index{kvp.first, range});
     }
     for (const auto& constraint : simple_cons) {
@@ -450,10 +447,14 @@ class StripeGenerator {
 
     // INTRINSIC
     std::vector<std::string> scalar_inputs;
+    tile::DataType output_type = tile::DataType::INVALID;
     for (const auto& input : op.inputs) {
       scalar_inputs.push_back(ScalarName(input));
+      auto input_type = GetShape(input).type;
+      output_type = CommonSupertype(input_type, output_type);
     }
-    AddIntrinsic(kernel.get(), op.f.fn, GetShape(op.output).type, scalar_inputs, {ScalarName(op.output)});
+    AddIntrinsic(  //
+        kernel.get(), op.f.fn, output_type, scalar_inputs, {ScalarName(op.output)});
 
     // STORE
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));
@@ -656,9 +657,7 @@ class StripeGenerator {
       } else {
         const auto& bound = bounds.at(term.first);
         result += int_value * bound.min;
-        if (bound.min != bound.max) {
-          result += Affine(term.first, int_value);
-        }
+        result += Affine(term.first, int_value);
       }
     }
     return result;
