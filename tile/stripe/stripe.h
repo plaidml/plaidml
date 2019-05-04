@@ -466,6 +466,8 @@ struct Program {
   std::shared_ptr<Block> entry;
 };
 
+std::string to_string(RefDir dir);
+
 inline bool operator<(const StatementIt& lhs, const StatementIt& rhs) {  //
   return lhs->get() < rhs->get();
 }
@@ -551,7 +553,6 @@ Tags FromProto(const google::protobuf::RepeatedPtrField<std::string>& pb_tags);
 
 proto::Block IntoProto(const Block& block);
 proto::Program IntoProto(const Program& program);
-
 
 std::shared_ptr<Block> CloneBlock(const Block& orig, int depth = -1);
 const Block* FindBlockByTag(const Block& block, const std::string& tag);

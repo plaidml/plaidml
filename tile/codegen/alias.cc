@@ -27,6 +27,71 @@ Affine UniqifyAffine(const Affine& orig, const std::string& prefix) {
   return ret;
 }
 
+// Determines whether two accesses overlap (assuming base refinement
+// and location checks have been performed).  This is used to
+// determine the overlap of the internal ranges of two AliasInfos --
+// i.e. whether they might overlap for any given instantiation of
+// indices.  The implementation currently doesn't check all
+// possibilities; it conservatively indicates an overlap in edge
+// cases.
+bool CheckRelativeOverlap(const AliasInfo& ai, const AliasInfo& bi) {
+  IVLOG(4, boost::format("  CheckRelativeOverlap: a: '%1%', b: '%2%'") % ai % bi);
+  if (ai.access.size() != bi.access.size()) {
+    throw std::runtime_error{"Incompatible accesses"};
+  }
+  if ((ai.access.size() != ai.shape.dims.size()) || (bi.access.size() != bi.shape.dims.size())) {
+    // N.B. This check might as well be an assert; there's no way this
+    // should be inconsistent after the AliasInfo's been constructed.
+    // But it's good to be careful.
+    throw std::runtime_error{"Incompatible access shapes"};
+  }
+  bool ret = true;
+  for (size_t i = 0; ret && i < ai.access.size(); ++i) {
+    auto a_affine = ai.access[i];
+    auto b_affine = bi.access[i];
+    IVLOG(4, "    CheckRelativeOverlap[" << i << "]: Comparing " << a_affine << " with " << b_affine);
+    auto& a_map = a_affine.mutateMap();
+    auto& b_map = b_affine.mutateMap();
+    for (auto a_it = a_map.begin(); a_it != a_map.end();) {
+      auto b_it = b_map.find(a_it->first);
+      if (b_it == b_map.end()) {
+        ++a_it;
+        continue;
+      }
+      auto min_factor = std::min(a_it->second, b_it->second);
+      if (b_it->second == min_factor) {
+        b_map.erase(b_it);
+      } else {
+        b_it->second -= min_factor;
+      }
+      if (a_it->second == min_factor) {
+        a_it = a_map.erase(a_it);
+      } else {
+        a_it->second -= min_factor;
+        ++a_it;
+      }
+    }
+    IVLOG(4, "    CheckRelativeOverlap[" << i << "]: Simplified to " << a_affine << " and " << b_affine);
+    if (!a_affine.isConstant() || !b_affine.isConstant()) {
+      // TODO: Figure out how to compute the correct answer when the
+      // resulting affines aren't constant.  In this situation, the
+      // refinements are moving relative to each other across
+      // different instantiations; we'd need to tell whether this ever
+      // ends up with the refinements' colliding.
+      return true;
+    }
+    IVLOG(4, "    CheckRelativeOverlap[" << i << "]: Simplified to " << a_affine << " and " << b_affine);
+    std::int64_t a_first = a_affine.constant();
+    std::int64_t a_limit = a_first + ai.shape.dims.at(i).size;
+    std::int64_t b_first = b_affine.constant();
+    std::int64_t b_limit = b_first + bi.shape.dims.at(i).size;
+    ret &= b_first < a_limit;
+    ret &= a_first < b_limit;
+  }
+  IVLOG(4, boost::format("  CheckRelativeOverlap: a: '%1%', b: '%2%' => %3%") % ai % bi % ret);
+  return ret;
+}
+
 }  // namespace
 
 std::ostream& operator<<(std::ostream& os, const AliasInfo& ai) {
@@ -64,20 +129,18 @@ AliasType AliasInfo::Compare(const AliasInfo& ai, const AliasInfo& bi) {
     IVLOG(3, "  Different base tensors");
     return AliasType::None;
   }
-  if (ai.shape == bi.shape) {
-    if (ai.location != bi.location) {
-      IVLOG(3, boost::format("  Different banks, a: %1%, b: %2%") % ai.location % bi.location);
-      return AliasType::None;
-    }
-    if (ai.access == bi.access) {
-      IVLOG(3,
-            boost::format("  Exact access, a: %1%, b: %2%") % StreamContainer(ai.access) % StreamContainer(bi.access));
-      return AliasType::Exact;
-    }
-    if (!CheckOverlap(ai.extents, bi.extents)) {
-      IVLOG(3, "  No overlap");
-      return AliasType::None;
-    }
+
+  if (ai.location != bi.location) {
+    IVLOG(3, boost::format("  Different banks, a: %1%, b: %2%") % ai.location % bi.location);
+    return AliasType::None;
+  }
+  if (ai.access == bi.access) {
+    IVLOG(3, boost::format("  Exact access, a: %1%, b: %2%") % StreamContainer(ai.access) % StreamContainer(bi.access));
+    return AliasType::Exact;
+  }
+  if (!CheckRelativeOverlap(ai, bi)) {
+    IVLOG(3, "  No overlap");
+    return AliasType::None;
   }
   // TODO: We could compute the convex box enclosing each refinement and then check each
   // dimension to see if there is a splitting plane, and if so, safely declare alias None,

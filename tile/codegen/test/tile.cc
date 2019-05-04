@@ -161,9 +161,10 @@ TEST(Codegen, StencilMatchConv1D) {
     }
   )");
 
-  auto runinfo = lib::LoadConv1d("conv",                                     //
-                                 SimpleShape(DataType::FLOAT32, {100, 64}),  //
-                                 SimpleShape(DataType::FLOAT32, {3, 64, 64}));
+  auto runinfo = lib::LoadConv1d("conv",                                        //
+                                 SimpleShape(DataType::FLOAT32, {1, 100, 64}),  //
+                                 SimpleShape(DataType::FLOAT32, {3, 64, 64}),   //
+                                 {1, 100, 64});
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -177,8 +178,9 @@ TEST(Codegen, StencilMatchConv1D) {
       {
           {"ci", "c", 64},
           {"co", "k", 16},
-          {"kx", "*", 1},
-          {"x", "x", 16},
+          {"k0", "*", 1},
+          {"n", "*", 1},
+          {"x0", "x", 16},
       }  // idxs
   };
   EXPECT_THAT(*match, Eq(expected));
@@ -215,7 +217,8 @@ TEST(Codegen, StencilMatchConv2D) {
 
   auto runinfo = lib::LoadConv2d("conv",                                             //
                                  SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),  //
-                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}));    //
+                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),     //
+                                 {1, 100, 100, 56});                                 //
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -229,8 +232,9 @@ TEST(Codegen, StencilMatchConv2D) {
       {
           {"ci", "c", 56},
           {"co", "k", 16},
-          {"kx", "*", 1},
-          {"ky", "*", 1},
+          {"k0", "*", 1},
+          {"k1", "*", 1},
+          {"n", "*", 1},
           {"x0", "x", 4},
           {"x1", "y", 4},
       }  // idxs

@@ -84,7 +84,7 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
       return boost::none;
     }
     if (poly_b.getMap().size() != 1 || poly_b.getMap().begin()->first.empty()) {
-      IVLOG(3, "ComputeFusionPlan: complex access in b" << poly_b.toString());
+      IVLOG(3, "ComputeFusionPlan: complex access in b: " << poly_b.toString());
       return boost::none;
     }
     std::string idx_a = poly_a.getMap().begin()->first;

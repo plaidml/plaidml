@@ -37,4 +37,5 @@ plaidml_cc_library(
         "@half",
         "@llvm_shim//:llvm",
     ],
+    alwayslink = 1,
 )

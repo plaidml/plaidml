@@ -357,6 +357,21 @@ std::shared_ptr<Block> Block::Downcast(const std::shared_ptr<Statement>& stmt) {
   return std::dynamic_pointer_cast<Block>(stmt);
 }
 
+std::string to_string(RefDir dir) {
+  switch (dir) {
+    case RefDir::None:
+      return "none";
+    case RefDir::In:
+      return "in";
+    case RefDir::Out:
+      return "out";
+    case RefDir::InOut:
+      return "inout";
+    default:
+      return "<invalid dir>";
+  }
+}
+
 std::string to_string(const Device& dev) {
   std::stringstream ss;
   ss << dev;
@@ -489,20 +504,7 @@ std::ostream& operator<<(std::ostream& os, const PrintRefinement& printer) {
       os << "#" << attr.first << " ";
     }
   }
-  switch (ref.dir) {
-    case RefDir::None:
-      os << "none";
-      break;
-    case RefDir::In:
-      os << "in";
-      break;
-    case RefDir::Out:
-      os << "out";
-      break;
-    case RefDir::InOut:
-      os << "inout";
-      break;
-  }
+  os << to_string(ref.dir);
   if (ref.interior_shape.is_const) {
     os << " const";
   }
