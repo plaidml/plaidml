@@ -2,12 +2,16 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("//bzl:conda.bzl", "conda_binary")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary")
 
-conda_binary(
+plaidml_cc_binary(
     name = "gencfg",
-    srcs = ["gencfg.py"],
-    env = "@com_intel_plaidml_conda_pmlc//:env",
-    main = "gencfg.py",
-    deps = ["//tile/codegen:proto_py"],
+    srcs = ["gencfg.cc"],
+    deps = [
+        "//base/config",
+        "//base/util",
+        "//tile/codegen:proto_cc",
+        "@boost//:program_options",
+        "@jsonnet//cpp:libjsonnet++",
+    ],
 )

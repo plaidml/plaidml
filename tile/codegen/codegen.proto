@@ -6,11 +6,20 @@ package vertexai.tile.codegen.proto;
 
 import "tile/stripe/stripe.proto";
 
-// The Config message is the main message for the pmlc config file. It contains
-// the set ofoptimization passes to run during compilation.
+// The Configs message is the main message for the pmlc config file.
+// A collection of named configs are defined.
+message Configs {
+  map<string, Config> configs = 1;
+}
+
+// A Config contains a collection of stages.
 message Config {
+  map<string, Stage> stages = 1;
+}
+
+// A stage contains a collection of optimization passes.
+message Stage {
   repeated Pass passes = 1;
-  repeated Pass lowering = 2;
 }
 
 // The optimization of stripe is done via a series of passes, each which

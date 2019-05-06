@@ -20,7 +20,7 @@ plaidml_cc_library(
         "//tile/hal/util:selector",
         "//tile/hal/util:settings",
         "//tile/proto:support",
-        "//tile/targets/cpu",
+        "//tile/targets",
     ],
     alwayslink = 1,
 )

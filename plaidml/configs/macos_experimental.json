@@ -21,7 +21,7 @@
           "mem_width": 64,
           "use_global": false,
           "max_regs": 8192,
-          "stripe_config": "cpu/cpu"
+          "stripe_config": "cpu"
         }
       },
       {
@@ -55,7 +55,7 @@
           "max_regs": 16384,
           "goal_groups": 1,
           "goal_flops_per_byte": 50,
-          "stripe_config": "gpu/amd"
+          "stripe_config": "amd"
         }
       },
       {
@@ -78,7 +78,7 @@
           "mem_width": 64,
           "max_mem": 32768,
           "max_regs": 32768,
-          "stripe_config": "cpu/cpu"
+          "stripe_config": "cpu"
         }
       },
       {
@@ -94,7 +94,7 @@
           "max_regs": 16000,
           "goal_groups": 6,
           "goal_flops_per_byte": 50,
-          "stripe_config": "gpu/intel_gen9"
+          "stripe_config": "intel_gen9"
         }
       },
       {
@@ -136,7 +136,7 @@
           "goal_groups": 7,
           "goal_flops_per_byte": 46,
           "disable_io_aliasing": true,
-          "stripe_config": "gpu/nvidia"
+          "stripe_config": "nvidia"
         }
       }
     ]

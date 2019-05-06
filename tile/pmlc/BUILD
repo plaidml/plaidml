@@ -1,23 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//bzl:conda.bzl", "conda_binary")
 load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
-
-conda_binary(
-    name = "pmlc",
-    srcs = ["pmlc.py"],
-    env = "@com_intel_plaidml_conda_pmlc//:env",
-    main = "pmlc.py",
-    deps = [":pmlc_bin"],
-)
-
-py_binary(
-    name = "pmlc_py",
-    srcs = ["pmlc.py"],
-    data = [":pmlc_bin"],
-    legacy_create_init = False,
-    main = "pmlc.py",
-)
 
 plaidml_cc_library(
     name = "lib",
@@ -34,17 +17,18 @@ plaidml_cc_library(
         "//tile/lang",
         "//tile/lib",
         "//tile/util",
+        "@boost//:program_options",
+        "@jsonnet//cpp:libjsonnet++",
     ] + select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": [
             "//tile/targets/cpu",
-            "//tile/targets/gpu",
         ],
     }),
 )
 
 plaidml_cc_binary(
-    name = "pmlc_bin",
+    name = "pmlc",
     srcs = ["main.cc"],
     deps = [":lib"],
 )

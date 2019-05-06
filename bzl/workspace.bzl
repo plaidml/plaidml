@@ -57,6 +57,13 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "jsonnet",
+        url = "https://github.com/google/jsonnet/archive/v0.12.1.tar.gz",
+        sha256 = "257c6de988f746cc90486d9d0fbd49826832b7a2f0dbdb60a515cc8a2596c950",
+        strip_prefix = "jsonnet-0.12.1",
+    )
+
+    http_archive(
         name = "minizip",
         url = "https://github.com/nmoinvaz/minizip/archive/36089398a362a117105ebfcb3751a269c70ab3b7.zip",
         sha256 = "c47b06ad7ef10d01a8d415b1b8dfb3691dad6ed41b38756fbf8fd6c074480d0f",
@@ -100,13 +107,6 @@ def plaidml_workspace():
         name = "com_intel_plaidml_conda",
         specs = {
             "env": str(Label("//conda:plaidml.yml")),
-        },
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_pmlc",
-        specs = {
-            "env": str(Label("//conda:pmlc.yml")),
         },
     )
 
