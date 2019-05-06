@@ -851,7 +851,8 @@ void Scheduler::Run() {
       for (RefInfo* alias_ri : *ri->aliases) {
         if ((alias_ri == ri) || AliasInfo::Compare(ri->alias_info, alias_ri->alias_info) != AliasType::None) {
           // All accesses to alias_ri will depend on this write.
-          if ((alias_ri != ri) && alias_ri->cache_entry) {
+          if ((alias_ri != ri) && alias_ri->cache_entry && !alias_ri->cache_entry->saw_earliest_writer) {
+            IVLOG(3, "  Write to " << ri->alias_info << " invalidates " << alias_ri->alias_info);
             si_next = ScheduleSwapIn(si_next, alias_ri->cache_entry);
             alias_ri->cache_entry = nullptr;
           }
@@ -1736,7 +1737,6 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       0,                             // offset
       ent->source->ref.bank_dim,     // bank_dim
   };
-  src.set_tag("in");
   TranslateLocation(&swap_block, &src.location);
   swap_block.refs.emplace(std::move(src));
 
@@ -1752,7 +1752,6 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim
   };
-  dst.set_tag("out");
   TranslateLocation(&swap_block, &dst.location);
   swap_block.refs.emplace(std::move(dst));
 
@@ -1796,7 +1795,6 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       0,                               // offset
       ent->source->ref.bank_dim,       // bank_dim
   };
-  src.set_tag("in");
   TranslateLocation(&swap_block, &src.location);
   swap_block.refs.emplace(std::move(src));
 
@@ -1811,7 +1809,6 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
       0,                             // offset
       ent->source->ref.bank_dim,     // bank_dim
   };
-  dst.set_tag("out");
   TranslateLocation(&swap_block, &dst.location);
   swap_block.refs.emplace(std::move(dst));
 
@@ -1879,7 +1876,6 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       0,                            // offset
       ent->source->ref.bank_dim,    // bank_dim
   };
-  src.set_tag("in");
   TranslateLocation(&swap_block, &src.location);
   swap_block.refs.emplace(std::move(src));
 
@@ -1895,7 +1891,6 @@ void Scheduler::AddSubblockSwapIn(stripe::Block* block, CacheEntry* ent, const s
       0,                              // offset
       ent->source->ref.bank_dim,      // bank_dim
   };
-  dst.set_tag("out");
   TranslateLocation(&swap_block, &dst.location);
   swap_block.refs.emplace(std::move(dst));
 
@@ -1950,7 +1945,6 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       0,                              // offset
       ent->source->ref.bank_dim,      // bank_dim
   };
-  src.set_tag("in");
   TranslateLocation(&swap_block, &src.location);
   swap_block.refs.emplace(std::move(src));
 
@@ -1965,7 +1959,6 @@ void Scheduler::AddSubblockSwapOut(stripe::Block* block, CacheEntry* ent, const 
       0,                            // offset
       ent->source->ref.bank_dim,    // bank_dim
   };
-  dst.set_tag("out");
   TranslateLocation(&swap_block, &dst.location);
   swap_block.refs.emplace(std::move(dst));
 

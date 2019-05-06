@@ -58,10 +58,10 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
           continue;
         }
         auto outer_ref = outer->ref_by_into(inner_ref.from);
-        pkg->refs.emplace(stripe::Refinement{inner_ref.dir,                // dir
-                                             inner_ref.from,               // from
-                                             inner_ref.from,               // into
-                                             outer_ref->access,            // access
+        pkg->refs.emplace(stripe::Refinement{inner_ref.dir,                                             // dir
+                                             inner_ref.from,                                            // from
+                                             inner_ref.from,                                            // into
+                                             std::vector<stripe::Affine>(outer_ref->access.size(), 0),  // access
                                              outer_ref->interior_shape});  // interior_shape
       }
 

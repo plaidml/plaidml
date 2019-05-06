@@ -84,6 +84,10 @@ class AliasMap {
   std::map<std::string, stripe::Affine> idx_sources_;
 };
 
+// Determines whether two extent vectors overlap.  This is used to
+// determine the overlap of the exterior ranges of two AliasInfos,
+// across the entire range over which the underlying refinement will
+// be instantiated.
 bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);
 
 template <typename F>
