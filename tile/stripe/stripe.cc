@@ -73,7 +73,13 @@ void PrintPreStmt(std::ostream& os,       //
   auto impl = Accessor::impl(stmt);
   if (impl->attrs.size()) {
     for (const auto& attr : impl->attrs) {
-      os << "#" << attr.first << " ";
+      os << "#";
+      if (attr.second.type() == typeid(Void)) {
+        os << attr.first;
+      } else {
+        os << attr.first << "=" << attr.second;
+      }
+      os << " ";
     }
     os << std::endl;
     PrintTab(os, depth);

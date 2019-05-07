@@ -28,6 +28,23 @@ using AttrValue = boost::variant<  //
     std::string,                   //
     google::protobuf::Any>;
 
+class AttrValueToStringVisitor : public boost::static_visitor<std::string> {
+ public:
+  std::string operator()(const Void& v) const { return "{}"; }
+  std::string operator()(const bool& v) const { return std::to_string(v); }
+  std::string operator()(const int64_t& v) const { return std::to_string(v); }
+  std::string operator()(const double& v) const { return std::to_string(v); }
+  std::string operator()(const std::string& v) const { return v; }
+  std::string operator()(const google::protobuf::Any& v) const { return "<protobuf::Any object>"; }
+};
+
+inline std::string to_string(AttrValue val) { return boost::apply_visitor(AttrValueToStringVisitor(), val); }
+
+inline std::ostream& operator<<(std::ostream& os, const AttrValue& value) {
+  os << to_string(value);
+  return os;
+}
+
 struct Taggable::Impl {
   std::map<std::string, AttrValue> attrs;
 };
