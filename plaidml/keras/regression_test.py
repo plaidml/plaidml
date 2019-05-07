@@ -48,6 +48,76 @@ class RegressionTests(unittest.TestCase):
         model.add(Conv2D(filters=3, kernel_size=(5, 5), padding='same', activation='relu'))
         model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_first'))
 
+    def testRecompileWithChangingProgramCacheSize(self):
+        # This test is thanks to iperov,
+        # who reported https://github.com/plaidml/plaidml/issues/274,
+        # demonstrating a case where exceeding certain number of ops
+        # causes recompiling of kernels (the encoder is slightly modified from
+        # his example for reproduciblilty)
+
+        shape = (64, 64, 3)
+        LeakyReLU = keras.layers.LeakyReLU
+
+        def encflow(x):
+            x = LeakyReLU()(keras.layers.Conv2D(128, 5, strides=2, padding="same")(x))
+            x = keras.layers.Conv2D(128, 5, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(256, 5, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(256, 5, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(256, 5, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(512, 5, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(512, 5, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(1024, 5, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(1024, 5, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(1024, 5, strides=2, padding="same")(x)
+            x = keras.layers.Dense(64)(keras.layers.Flatten()(x))
+            x = keras.layers.Dense(4 * 4 * 1024)(x)
+            x = keras.layers.Reshape((4, 4, 1024))(x)
+            x = keras.layers.Conv2DTranspose(512, 3, strides=2, padding="same")(x)
+            return x
+
+        def decflow(x):
+            x = x[0]
+            x = LeakyReLU()(keras.layers.Conv2DTranspose(512, 3, strides=2, padding="same")(x))
+            x = keras.layers.Conv2DTranspose(256, 3, strides=2, padding="same")(x)
+            x = keras.layers.Conv2DTranspose(128, 3, strides=2, padding="same")(x)
+            x = keras.layers.Conv2D(3, 5, strides=1, padding="same")(x)
+            return x
+
+        def modelify(model_functor):
+
+            def func(tensor):
+                return keras.models.Model(tensor, model_functor(tensor))
+
+            return func
+
+        encoder = modelify(encflow)(keras.Input(shape))
+        decoder1 = modelify(decflow)([keras.Input(pkb.int_shape(x)[1:]) for x in encoder.outputs])
+        decoder2 = modelify(decflow)([keras.Input(pkb.int_shape(x)[1:]) for x in encoder.outputs])
+
+        inp = x = keras.Input(shape)
+        code = encoder(x)
+        x1 = decoder1(code)
+        x2 = decoder2(code)
+
+        loss = pkb.mean(pkb.square(inp - x1)) + pkb.mean(pkb.square(inp - x2))
+        train_func = pkb.function([inp], [loss],
+                                  keras.optimizers.Adam().get_updates(
+                                      loss, encoder.trainable_weights + decoder1.trainable_weights
+                                      + decoder2.trainable_weights))
+        view_func1 = pkb.function([inp], [x1])
+        view_func2 = pkb.function([inp], [x2])
+
+        for i in range(5):
+            print("Loop %i" % i, flush=True)
+            data = np.zeros((1, 64, 64, 3))
+            train_func([data])
+            view_func1([data])
+            view_func2([data])
+            print("Saving weights", flush=True)
+            encoder.save_weights(r"testweights.h5")
+            decoder1.save_weights(r"testweights1.h5")
+            decoder2.save_weights(r"testweights2.h5")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
