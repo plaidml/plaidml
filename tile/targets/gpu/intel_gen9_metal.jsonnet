@@ -1,8 +1,8 @@
 local PARAMS = {
-  intel_gen9: {
+  intel_gen9_metal: {
     CACHE_WIDTH: 64,
-    MAX_MEM: [1000, 3200],
-    SUBGROUP_SIZES: [8, 16],
+    MAX_MEM: [3000],
+    SUBGROUP_SIZES: [16],
     GLOBAL_MEM_LAT: 420,
     LOCAL_MEM_LAT: 125,
   },
@@ -66,6 +66,7 @@ local PARAMS = {
             //   name: 'reorder_blocks',
             //   pass : {
             //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
+            //     reqs: ['program']
             //   }
             // },
 
@@ -257,16 +258,6 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
                 reqs: ['main']
-              }
-            },
-
-            {
-              name: 'subgroup_vec_tx',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.VectorizePass',
-                reqs: ['subgroup_thread'],
-                read_align_bytes: 4,
-                write_align_bytes: 16
               }
             },
 

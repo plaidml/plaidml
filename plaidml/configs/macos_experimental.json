@@ -94,7 +94,7 @@
           "max_regs": 16000,
           "goal_groups": 6,
           "goal_flops_per_byte": 50,
-          "stripe_config": "metal"
+          "stripe_config": "intel_gen9_metal"
         }
       },
       {
@@ -110,7 +110,7 @@
           "max_regs": 16000,
           "goal_groups": 6,
           "goal_flops_per_byte": 50,
-          "stripe_config": "intel_gen9"
+          "stripe_config": "intel_gen9_opencl"
         }
       },
       {

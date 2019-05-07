@@ -18,7 +18,6 @@ plaidml_cc_library(
         "//tile/lib",
         "//tile/util",
         "@boost//:program_options",
-        "@jsonnet//cpp:libjsonnet++",
     ] + select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": [

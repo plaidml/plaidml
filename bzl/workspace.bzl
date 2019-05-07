@@ -64,6 +64,13 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "io_bazel_rules_jsonnet",
+        sha256 = "5e2bf166593134d2b07dc6756598e9af6413e9aa8084eed7e87e9823c21792b2",
+        strip_prefix = "rules_jsonnet-ad2b4204157ddcf7919e8bd210f607f8a801aa7f",
+        url = "https://github.com/bazelbuild/rules_jsonnet/archive/ad2b4204157ddcf7919e8bd210f607f8a801aa7f.zip",
+    )
+
+    http_archive(
         name = "minizip",
         url = "https://github.com/nmoinvaz/minizip/archive/36089398a362a117105ebfcb3751a269c70ab3b7.zip",
         sha256 = "c47b06ad7ef10d01a8d415b1b8dfb3691dad6ed41b38756fbf8fd6c074480d0f",
