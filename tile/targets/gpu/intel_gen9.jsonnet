@@ -150,6 +150,8 @@ local PARAMS = {
             // After all fusion, eliminate dead code again
             { name: 'dead_code_elimination', dead_code_elimination: { reqs: ['all'] } },
 
+            { "name": "subgroup_vec_tx", "vectorize_tx": { "reqs": ["subgroup_thread"], "read_align_bytes": 4, "write_align_bytes": 16 } },
+
             { name: 'cleanup1', prune_refs: { reqs: ['main'] } },
             { name: 'cleanup2', prune_idxs: { reqs: ['main'] } },
 
