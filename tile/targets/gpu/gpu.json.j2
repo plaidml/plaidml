@@ -25,11 +25,10 @@
             "name": "subgroup", 
             "subgroup": { 
                 "reqs": ["contraction"], 
-                "max_mem": 3000, 
                 "mem_latency": {{GLOBAL_MEM_LAT}},
                 "cache_latency": {{LOCAL_MEM_LAT}},
-                "min_subgroup_size": 16,
-                "max_subgroup_size": 32,
+                "max_mem": [1000, 3000, 3000],
+                "subgroup_sizes": [8, 16, 32],
                 "cache_width": 64
             }
         },
@@ -89,7 +88,7 @@
                 "reqs": ["subgroup_outer"],  ## Apply to only dense operations
                 "outer_set": ["subgroup_outer", "kernel"],
                 "inner_set": ["gpu_thread", "subgroup_othreads"],
-                "clear_outer": true,
+                "clear_outer": false,
                 "only_even": true,
                 "min_size": {{ 8 }},
                 "max_sizes_product": {{ 8 }}
@@ -121,7 +120,7 @@
         { "name": "cleanup2", "prune_idxs": { "reqs": ["main"] } },
 
         ## Add subgroup loads/stores
-        { "name": "subgroup_vec_tx", "vectorize_tx": { "reqs": ["subgroup_thread"] } },
+        { "name": "subgroup_vec_tx", "vectorize_tx": { "reqs": ["subgroup_thread"], "read_align_bytes": 4, "write_align_bytes": 16 } },
 
         { "name": "localize_main", "localize": { "reqs": ["main"] } },
         { "name": "scalarize_main", "scalarize": { "reqs": ["main"] } }

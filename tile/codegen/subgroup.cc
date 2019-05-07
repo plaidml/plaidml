@@ -10,6 +10,7 @@ namespace codegen {
 
 struct SubgroupPlan {
   size_t subgroup_size;
+  size_t max_mem;
   std::vector<std::string> idxs;
   std::map<std::string, size_t> subgroup_tile;
   std::map<std::string, size_t> extra_tile;
@@ -91,7 +92,7 @@ public:
       }
     }
     // Fail if we go over memory
-    if (tot_mem > static_cast<size_t>(options_.max_mem())) {
+    if (tot_mem > static_cast<size_t>(plan_.max_mem)) {
       IVLOG(2, "subgroup: " << plan_.subgroup_tile << ", extra: " << plan_.extra_tile << ", mem: " << tot_mem
                             << ", mem_io: " << tot_mem_io << ", cost: INF");
       return;
@@ -145,11 +146,10 @@ public:
 
   double BestCost(SubgroupPlan *best_plan) {
     best_cost_ = std::numeric_limits<double>::infinity();
-    int subgroup_size = options_.min_subgroup_size();
-    while (subgroup_size <= options_.max_subgroup_size()) {
-      plan_.subgroup_size = subgroup_size;
+    for (int i = 0; i < options_.subgroup_sizes().size(); ++i) {
+      plan_.subgroup_size = options_.subgroup_sizes()[i];
+      plan_.max_mem = options_.max_mem()[i];
       BestCostRecursive(0);
-      subgroup_size <<= 1;
     }
     *best_plan = best_plan_;
     return best_cost_;
@@ -435,12 +435,11 @@ static void TagTx(stripe::Block* block, const std::set<std::string>& elems) {
   }
 }
 
-void VectorizeTx(stripe::Block* block, const AliasMap& map) {
+void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_bytes, size_t write_align_bytes) {
   std::string the_idx;
   for (const auto& idx : block->idxs) {
     if (idx.affine == stripe::Affine() && idx.range != 1) {
       if (!the_idx.empty()) {
-        IVLOG(1, *block);
         throw std::runtime_error("Multiple indexes for vectorize_tx, " + the_idx + " vs " + idx.name);
       }
       the_idx = idx.name;
@@ -451,10 +450,26 @@ void VectorizeTx(stripe::Block* block, const AliasMap& map) {
   }
   std::set<std::string> elems;
   for (auto& ref : block->refs) {
-    if (ref.FlatAccess()[the_idx] == 1) {
-      elems.insert(ref.into());
-      for (auto& aff : ref.mut().access) {
-        aff.mutateMap().erase(the_idx);
+    auto ai = map.at(ref.into());
+    auto access = ai.flat();
+    if (access[the_idx] == 1) {
+      bool aligned = true;
+      access.mutateMap().erase(the_idx);
+      for (const auto& kvp : access.getMap()) {
+        if (IsReadDir(ref.dir) && (kvp.second % read_align_bytes > 0)) {
+          aligned = false;
+          break;
+        }
+        if (IsWriteDir(ref.dir) && (kvp.second % write_align_bytes > 0)) {
+          aligned = false;
+          break;
+        }
+      }
+      if (aligned) {
+        elems.insert(ref.into());
+        for (auto& aff : ref.mut().access) {
+          aff.mutateMap().erase(the_idx);
+        }
       }
     }
   }

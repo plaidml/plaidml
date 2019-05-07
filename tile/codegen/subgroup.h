@@ -12,7 +12,7 @@ namespace codegen {
 
 void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPass& options);
 
-void VectorizeTx(stripe::Block* block, const AliasMap& map);
+void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_bytes, size_t write_align_bytes);
 
 inline void SubgroupPass(stripe::Block* root, const proto::SubgroupPass& options) {
   auto reqs = stripe::FromProto(options.reqs());
@@ -21,10 +21,10 @@ inline void SubgroupPass(stripe::Block* root, const proto::SubgroupPass& options
   });
 }
 
-inline void VectorizeTxPass(stripe::Block* root, const proto::GenericPass& options) {
+inline void VectorizeTxPass(stripe::Block* root, const proto::VectorizePass& options) {
   auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
-    VectorizeTx(block, map);
+  RunOnBlocks(root, reqs, [options](const AliasMap& map, stripe::Block* block) {  //
+    VectorizeTx(block, map, options.read_align_bytes(), options.write_align_bytes());
   });
 }
 
