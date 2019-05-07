@@ -452,9 +452,10 @@ void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_by
   for (auto& ref : block->refs) {
     auto ai = map.at(ref.into());
     auto access = ai.flat();
-    if (access[the_idx] == 1) {
+    auto global_idx = "d" + std::to_string(map.depth()) + ":" + the_idx;
+    if (access[global_idx] == 1) {
       bool aligned = true;
-      access.mutateMap().erase(the_idx);
+      access.mutateMap().erase(global_idx);
       for (const auto& kvp : access.getMap()) {
         if (IsReadDir(ref.dir) && (kvp.second % read_align_bytes > 0)) {
           aligned = false;
