@@ -85,7 +85,7 @@
           "goal_groups": 1,
           "goal_flops_per_byte": 50,
           "disable_mad": true,
-          "stripe_config": "intel_gen9"
+          "stripe_config": "intel_gen9_opencl"
         }
       },
       {

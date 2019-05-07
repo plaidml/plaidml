@@ -6,11 +6,13 @@ load("//tools/gencfg:build_defs.bzl", "gencfg")
 gencfg(
     name = "configs",
     srcs = [
-        "//tile/targets/gpu:configs",
+        "//tile/targets/gpu:amd.json",
+        "//tile/targets/gpu:intel_gen9_metal.json",
+        "//tile/targets/gpu:intel_gen9_opencl.json",
     ] + select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": [
-            "//tile/targets/cpu:configs",
+            "//tile/targets/cpu:cpu.json",
         ],
     }),
     identifier = "vertexai::tile::targets::kConfigs",

@@ -2,8 +2,6 @@
 
 #include "tile/pmlc/pmlc.h"
 
-#include <libjsonnet++.h>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 
@@ -62,8 +60,6 @@ bool App::parse(int argc, char* argv[]) {
       ("target,t", po::value<std::string>()->required(), "name of target within config")  //
       ("stage,s", po::value<std::string>()->required(), "name of stage within config")    //
       ("outdir,D", po::value<fs::path>()->default_value("."), "output directory")         //
-      ("import,I", po::value<std::vector<fs::path>>(), "add an import path")              //
-      ("var", po::value<std::vector<std::string>>(), "specify a jsonnet extVar")          //
       ("int8", "treat all datatypes as int8")                                             //
       ("internal", "input specifies an internally defined network")                       //
       ("dump-passes", "dump passes")                                                      //
@@ -129,50 +125,7 @@ std::shared_ptr<Program> DefaultStage(const App& app,                      //
 codegen::proto::Configs LoadConfigs() {
   auto app = App::Instance();
   auto config_path = app->args["config"].as<fs::path>();
-
-  jsonnet::Jsonnet jsonnet;
-  if (!jsonnet.init()) {
-    throw std::runtime_error("jsonnet failed to initialize");
-  }
-
-  if (config_path.empty()) {
-    throw std::runtime_error("--config must be specified");
-  }
-  if (!fs::exists(config_path)) {
-    throw std::runtime_error("Invalid --config specified");
-  }
-
-  const auto& import_args = app->args["import"];
-  if (!import_args.empty()) {
-    const auto& import_paths = import_args.as<std::vector<fs::path>>();
-    for (const auto& import_path : import_paths) {
-      if (!import_path.empty()) {
-        if (!fs::exists(import_path)) {
-          throw std::runtime_error("Invalid --import specified");
-        }
-        jsonnet.addImportPath(import_path.string());
-      }
-    }
-  }
-
-  const auto& var_args = app->args["var"];
-  if (!var_args.empty()) {
-    const auto& vars = var_args.as<std::vector<std::string>>();
-    for (const auto& var : vars) {
-      std::vector<std::string> parts;
-      boost::split(parts, var, boost::is_any_of("="));
-      if (parts.size() != 2) {
-        throw std::runtime_error("Invalid --var specified, must be in the form KEY=VALUE");
-      }
-      jsonnet.bindExtVar(parts[0], parts[1]);
-    }
-  }
-
-  std::string json;
-  if (!jsonnet.evaluateFile(config_path.string(), &json)) {
-    throw std::runtime_error(str(boost::format("jsonnet error: %1%") % jsonnet.lastError()));
-  }
-
+  auto json = ReadFile(config_path);
   return ParseConfig<codegen::proto::Configs>(json);
 }
 
