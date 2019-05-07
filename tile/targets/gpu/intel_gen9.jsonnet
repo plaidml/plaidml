@@ -1,8 +1,8 @@
 local PARAMS = {
   intel_gen9: {
     CACHE_WIDTH: 64,
-    MIN_SUBGROUP_SIZE: 16,
-    MAX_SUBGROUP_SIZE: 32,
+    MAX_MEM: [1000, 3000, 3000],
+    SUBGROUP_SIZES: [8, 16, 32],
     GLOBAL_MEM_LAT: 420,
     LOCAL_MEM_LAT: 125,
   },
@@ -51,11 +51,10 @@ local PARAMS = {
               name: 'subgroup',
               subgroup: {
                 reqs: ['contraction'],
-                max_mem: 3000,
                 mem_latency: PARAMS[cfg].GLOBAL_MEM_LAT,
                 cache_latency: PARAMS[cfg].LOCAL_MEM_LAT,
-                min_subgroup_size: PARAMS[cfg].MIN_SUBGROUP_SIZE,
-                max_subgroup_size: PARAMS[cfg].MAX_SUBGROUP_SIZE,
+                max_mem: PARAMS[cfg].MAX_MEM,
+                subgroup_sizes: PARAMS[cfg].SUBGROUP_SIZES,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
               },
             },
