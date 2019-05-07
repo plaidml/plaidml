@@ -119,7 +119,7 @@ message Pass {
     // Reorder blocks
     GenericPass reorder_blocks = 31;
     // Vectorize subgroup transfers
-    GenericPass vectorize_tx = 32;
+    VectorizePass vectorize_tx = 32;
   }
 }
 
@@ -242,6 +242,14 @@ message RegisterPass {
   required string index_order = 10;
   // The aligned size for the arch
   required uint32 align_size = 11;
+}
+
+// Vectorization pass using intrinsic block read/write
+message VectorizePass {
+  repeated string reqs = 1;
+  repeated string ref_reqs = 2;
+  optional uint32 read_align_bytes = 3;
+  optional uint32 write_align_bytes = 4;
 }
 
 // The fusion pass attempt to combine compatible block into a single block that
@@ -517,20 +525,18 @@ message PackagePass {
 message SubgroupPass {
   // Which blocks to do subgroup blocking on
   repeated string reqs = 1;
-  // Maximum memory (for entire group)
-  required int64 max_mem = 2;
   // Memory latency
-  required int64 mem_latency = 3;
+  required int64 mem_latency = 2;
   // Cache latency
-  required int64 cache_latency = 4;
-  // Size of each subgroup
-  optional int64 subgroup_size = 5 [default = 8];
-  // Minimum size of each subgroup
-  optional int64 min_subgroup_size = 6 [default = 8];
+  required int64 cache_latency = 3;
+  // Maximum memory (for entire group)
+  repeated int64 max_mem = 4;
   // Maximum size of each subgroup
-  optional int64 max_subgroup_size = 7 [default = 32];
+  repeated int64 subgroup_sizes = 5;
+  // Size of each subgroup
+  optional int64 subgroup_size = 6 [default = 8];
   // Cache width
-  optional int64 cache_width = 8 [default = 0];
+  optional int64 cache_width = 7 [default = 0];
 }
 
 // Rewrites refinement and block locations.
