@@ -456,12 +456,50 @@ void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_by
     if (access[global_idx] == 1) {
       bool aligned = true;
       access.mutateMap().erase(global_idx);
+      size_t data_size = byte_width(ref.interior_shape.type);
+      if (data_size == 0) {
+        throw std::runtime_error("Refinement has data type with zero size");
+      }
+      size_t read_align;
+      if (read_align_bytes >= data_size) {
+        if (read_align_bytes % data_size == 0) {
+          read_align = read_align_bytes / data_size;
+        }
+        else {
+          continue;
+        }
+      }
+      else {
+        if (data_size % read_align_bytes == 0) {
+          read_align = 1;
+        }
+        else {
+          continue;
+        }
+      }
+      size_t write_align;
+      if (write_align_bytes >= data_size) {
+        if (write_align_bytes % data_size == 0) {
+          write_align = write_align_bytes / data_size;
+        }
+        else {
+          continue;
+        }
+      }
+      else {
+        if (data_size % write_align_bytes == 0) {
+          write_align = 1;
+        }
+        else {
+          continue;
+        }
+      }
       for (const auto& kvp : access.getMap()) {
-        if (IsReadDir(ref.dir) && (kvp.second % read_align_bytes > 0)) {
+        if (IsReadDir(ref.dir) && (kvp.second % read_align > 0)) {
           aligned = false;
           break;
         }
-        if (IsWriteDir(ref.dir) && (kvp.second % write_align_bytes > 0)) {
+        if (IsWriteDir(ref.dir) && (kvp.second % write_align > 0)) {
           aligned = false;
           break;
         }
