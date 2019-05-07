@@ -12,6 +12,5 @@ plaidml_cc_binary(
         "//base/util",
         "//tile/codegen:proto_cc",
         "@boost//:program_options",
-        "@jsonnet//cpp:libjsonnet++",
     ],
 )

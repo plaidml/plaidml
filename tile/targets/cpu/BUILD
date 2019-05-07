@@ -2,11 +2,13 @@
 
 package(default_visibility = ["//visibility:public"])
 
+load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
-filegroup(
-    name = "configs",
-    srcs = glob(["*.jsonnet"]),
+jsonnet_to_json(
+    name = "cpu_jsonnet",
+    src = "cpu.jsonnet",
+    outs = ["cpu.json"],
 )
 
 plaidml_cc_library(
