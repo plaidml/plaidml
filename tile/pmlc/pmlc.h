@@ -2,23 +2,32 @@
 
 #pragma once
 
-#include <gflags/gflags.h>
-
 #include <memory>
 
-#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
 
+#include "tile/codegen/codegen.pb.h"
 #include "tile/stripe/stripe.h"
-
-DECLARE_string(config);
-DECLARE_bool(dump_passes);
-DECLARE_string(outdir);
 
 namespace vertexai {
 namespace tile {
 namespace pmlc {
 
-std::shared_ptr<stripe::Program> Main(const boost::filesystem::path& filename);
+class App {
+ public:
+  boost::program_options::positional_options_description pos_opts;
+  boost::program_options::options_description opts;
+  boost::program_options::variables_map args;
+
+  static App* Instance();
+  bool parse(int argc, char* argv[]);
+
+ private:
+  App();
+};
+
+std::shared_ptr<stripe::Program> Main();
+codegen::proto::Configs LoadConfigs();
 
 }  // namespace pmlc
 }  // namespace tile

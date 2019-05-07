@@ -25,7 +25,7 @@ P ParseProtoText(const std::string& txt) {
   return proto;
 }
 
-static proto::Config GenerateCFG() {
+static proto::Stage GenerateStage() {
   auto cfg_tmpl = R"(
     passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { devs: [{name: "DRAM"}] } } }
     passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { devs: [{name: "DRAM"}] } } }
@@ -33,8 +33,7 @@ static proto::Config GenerateCFG() {
     passes: { name: "compute_deps", compute_deps: { reqs: ["all"] } }
     passes: { name: "dead_code_elimination", dead_code_elimination: { reqs: ["all"] } }
   )";
-  auto cfg = ParseProtoText<proto::Config>(cfg_tmpl);
-  return cfg;
+  return ParseProtoText<proto::Stage>(cfg_tmpl);
 }
 
 static std::string RemoveComments(std::string src) {
@@ -69,7 +68,7 @@ TEST(DCETest, RemoveBlock) {
   auto program = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  auto cfg = GenerateCFG();
+  auto stage = GenerateStage();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
   if (dbg_dir) {
@@ -77,7 +76,7 @@ TEST(DCETest, RemoveBlock) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), stage.passes(), options);
   // Expected result should not contain XA or XC
   std::string actual_after = RemoveComments(to_string(*program->entry));
   IVLOG(1, "After stripe optimization: " << actual_after);
@@ -104,7 +103,7 @@ TEST(DCETest, SimpleTest) {
   auto program = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  auto cfg = GenerateCFG();
+  auto stage = GenerateStage();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
   if (dbg_dir) {
@@ -112,7 +111,7 @@ TEST(DCETest, SimpleTest) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), stage.passes(), options);
 
   // Expected result should not contain X_T1, X_T2, X_T3, X_T4
   std::string actual_after = RemoveComments(to_string(*program->entry));
@@ -144,7 +143,7 @@ TEST(DCETest, MultiUseTest) {
   auto program = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  auto cfg = GenerateCFG();
+  auto stage = GenerateStage();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
   if (dbg_dir) {
@@ -152,7 +151,7 @@ TEST(DCETest, MultiUseTest) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), stage.passes(), options);
 
   // Expected result should not contain X_T4
   std::string actual_after = RemoveComments(to_string(*program->entry));

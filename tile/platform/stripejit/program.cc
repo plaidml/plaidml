@@ -10,6 +10,7 @@
 #include "tile/lang/parser.h"
 #include "tile/proto/support.h"
 #include "tile/targets/cpu/jit.h"
+#include "tile/targets/targets.h"
 
 namespace vertexai {
 namespace tile {
@@ -24,14 +25,16 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   runinfo.output_shapes = FromProto(program.outputs());
   runinfo.program_name = "stripe_program";
   auto stripe = GenerateStripe(runinfo);
-  auto out_dir = env::Get("STRIPE_OUTPUT");
+  auto out_dir = boost::filesystem::path(env::Get("STRIPE_OUTPUT"));
   codegen::OptimizeOptions options = {
-      !out_dir.empty(),     // dump_passes
-      false,                // dump_code
-      out_dir + "/passes",  // dbg_dir
+      !out_dir.empty(),    // dump_passes
+      false,               // dump_code
+      out_dir / "passes",  // dbg_dir
   };
-  auto cfg = codegen::Configs::Resolve("cpu/cpu");
-  codegen::Optimize(stripe->entry.get(), cfg.passes(), options);
+  const auto& cfgs = targets::GetConfigs();
+  const auto& cfg = cfgs.configs().at("cpu");
+  const auto& stage = cfg.stages().at("default");
+  codegen::Optimize(stripe->entry.get(), stage.passes(), options);
   executable_->compile(*stripe->entry);
 }
 
