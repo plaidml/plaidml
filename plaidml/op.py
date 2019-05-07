@@ -26,6 +26,7 @@ import numpy as np
 import plaidml
 from plaidml import tile
 import six
+import math
 
 
 class AutoPadding(Enum):
@@ -2577,3 +2578,59 @@ class Variance(tile.Operation):
 
 
 variance = Variance.function
+
+
+class ImagePatches(plaidml.tile.Operation):
+    def __init__(self, images, ksizes, strides, rates=(1,1,1,1), padding="VALID"):
+        """
+        Compatible to tensorflow.extract_image_patches. 
+        Extract patches from images and put them in the "depth" output dimension.
+        Args:
+            images: A tensor with a shape of [batch, rows, cols, depth]
+            ksizes: The size of the oatches with a shape of [1, patch_rows, patch_cols, 1]
+            strides: How far the center of two patches are in the image with a shape of [1, stride_rows, stride_cols, 1]
+            rates: How far two consecutive pixel are in the input. Equivalent to dilation. Expect shape of [1, rate_rows, rate_cols, 1]
+            padding: A string of "VALID" or "SAME" defining padding.
+            
+        Does not work with symbolic height and width.
+        """
+        i_shape = images.shape.dims
+        patch_row_eff = ksizes[1] + ((ksizes[1] - 1) * (rates[1] -1))
+        patch_col_eff = ksizes[2] + ((ksizes[2] - 1) * (rates[2] -1))
+
+        if padding.upper() == "VALID":
+            out_rows = math.ceil((i_shape[1] - patch_row_eff + 1.) / float(strides[1]))
+            out_cols = math.ceil((i_shape[2] - patch_col_eff + 1.) / float(strides[2]))
+            pad_str = "PAD = I;"
+        else:
+            out_rows = math.ceil( i_shape[1] / float(strides[1]) )
+            out_cols = math.ceil( i_shape[2] / float(strides[2]) )
+            dim_calc = "NY={NY}; NX={NX};".format(NY=out_rows, NX=out_cols)
+            pad_top = max(0, ( (out_rows - 1) * strides[1] + patch_row_eff - i_shape[1] ) // 2)
+            pad_left = max(0, ( (out_cols - 1) * strides[2] + patch_col_eff - i_shape[2] ) // 2)
+            # we simply assume padding right == padding left + 1 (same for top/down).
+            # This might lead to us padding more as we would need but that won't matter.
+            # TF splits padding between both sides so left_pad +1 should keep us on the safe side.
+            pad_str = """PAD[b, y, x, d : B, Y + {PT} * 2 + 1, X + {PL} * 2 + 1, D] = 
+                        =(I[b, y - {PT}, x - {PL}, d]);""".format(PT=pad_top, PL=pad_left)
+
+        o_shape = (i_shape[0], out_rows, out_cols, ksizes[1]*ksizes[2]*i_shape[-1])
+        code = """function (I[B,Y,X,D]) -> (O) {{
+                    {PAD}
+                    TMP[b, ny, nx, y, x, d: B, {NY}, {NX}, {KY}, {KX}, D] =
+                        =(PAD[b, ny * {SY} + y * {RY}, nx * {SX} + x * {RX}, d]);
+                    O = reshape(TMP, B, {NY}, {NX}, {KY} * {KX} * D);
+                }}
+        """.format(
+            PAD=pad_str,
+            NY=out_rows, NX=out_cols,
+            KY=ksizes[1], KX=ksizes[2],
+            SY=strides[1], SX=strides[2],
+            RY=rates[1], RX=rates[2]
+        )
+        super(ImagePatches, self).__init__(code,
+                [('I', images),],
+                [('O', plaidml.tile.Shape(images.shape.dtype, o_shape))])
+
+
+extract_image_patches = ImagePatches.function

@@ -9,6 +9,7 @@
 #include "tile/lang/semprinter.h"
 #include "tile/lang/simplifier.h"
 #include "tile/ocl_exec/emitsem.h"
+#include "tile/targets/targets.h"
 
 namespace vertexai {
 namespace tile {
@@ -28,8 +29,10 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   options.dump_passes = !out_dir.empty();
   options.dbg_dir = out_dir + "/passes";
   IVLOG(1, *stripe->entry);
-  auto cfg = Configs::Resolve(cfg_name);
-  codegen::Optimize(stripe->entry.get(), cfg.passes(), options);
+  const auto& cfgs = targets::GetConfigs();
+  const auto& cfg = cfgs.configs().at(cfg_name);
+  const auto& stage = cfg.stages().at("default");
+  codegen::Optimize(stripe->entry.get(), stage.passes(), options);
   IVLOG(1, *stripe->entry);
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
   emit.Visit(*stripe->entry);

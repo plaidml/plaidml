@@ -683,7 +683,7 @@ TEST(Schedule, Basic) {
   size_t procs_per_bank = num_procs / num_banks;
   size_t bank_size_KiB = 192;
   size_t bank_size = bank_size_KiB * 1024;
-  auto cfg = ParseProtoText<proto::Config>(
+  auto stage = ParseProtoText<proto::Stage>(
       str(boost::format(cfg_tmpl) % num_banks % procs_per_bank % bank_size % bank_size_KiB));
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
@@ -694,7 +694,7 @@ TEST(Schedule, Basic) {
   }
   auto runinfo = lib::CreateTest("layer_test2");
   auto program = GenerateStripe(*runinfo);
-  Optimize(program->entry.get(), cfg.passes(), options);
+  Optimize(program->entry.get(), stage.passes(), options);
 }
 
 }  // namespace test
