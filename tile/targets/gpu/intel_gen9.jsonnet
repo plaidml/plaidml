@@ -122,7 +122,7 @@ local PARAMS = {
                 reqs: ['subgroup_outer'],  // Apply to only dense operations
                 outer_set: ['subgroup_outer', 'kernel'],
                 inner_set: ['gpu_thread', 'subgroup_othreads'],
-                clear_outer: true,
+                clear_outer: false,
                 only_even: true,
                 min_size: 8,
                 max_sizes_product: 8,
