@@ -62,6 +62,8 @@ class AliasMap {
   stripe::Block* this_block() const { return this_block_; }
   // Get the parent block
   stripe::Block* parent_block() const { return parent_block_; }
+  // Get the parent AliasMap
+  const AliasMap* parent_alias_map() const { return parent_alias_map_; }
   // Add constraints to a block based on apparent iteration domain of extents
   void AddConstraintForIndex(stripe::Block* block,         //
                              const AliasInfo& alias_info,  //
@@ -76,6 +78,8 @@ class AliasMap {
   stripe::Block* this_block_;
   // Parent block if we want to remove/modify this block
   stripe::Block* parent_block_;
+  // Parent AliasMap if we want to walk up the stack
+  const AliasMap* parent_alias_map_;
   // Per buffer data
   std::map<std::string, AliasInfo> info_;
   // For each depth-prefixed index, what is it's range?

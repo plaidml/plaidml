@@ -1724,6 +1724,7 @@ stripe::StatementIt Scheduler::ScheduleSwapIn(stripe::StatementIt si, CacheEntry
   ent->source->used = true;
   swap_block.name = "swap_in_" + ent->name;
   swap_block.location = xfer_loc_;
+  swap_block.add_tags(stripe::FromProto(options_.swap_in_tags()));
   swap_block.idxs = ent->source->swap_idxs;
   TranslateLocation(&swap_block, &swap_block.location);
   auto src = stripe::Refinement{
@@ -1781,6 +1782,7 @@ stripe::StatementIt Scheduler::ScheduleSwapOut(stripe::StatementIt si, CacheEntr
   ent->source->used = true;
   swap_block.name = "swap_out_" + ent->name;
   swap_block.location = xfer_loc_;
+  swap_block.add_tags(stripe::FromProto(options_.swap_out_tags()));
   swap_block.idxs = ent->source->swap_idxs;
   TranslateLocation(&swap_block, &swap_block.location);
   auto banked_mem_loc = PartialEval(mem_loc_, {{"unit", ent->unit.constant()}});

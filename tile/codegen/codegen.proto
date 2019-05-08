@@ -161,6 +161,7 @@ message SchedulePass {
   required uint32 alignment = 4;
   // The location to assign to the blocks used to do transfer between local
   // memory and exterior memory, i.e. the DMA device used to load / spill.
+  // See also swap_in_tags and swap_out_tags below
   required stripe.proto.Location xfer_loc = 5;
   // The memory assignment algorithm to use.
   oneof mem_assignment_algorithm {
@@ -193,6 +194,9 @@ message SchedulePass {
   optional bool append_devs = 9 [default = false];
 
   optional uint32 parallelism_window = 10;
+  // Tags to add to the transfer blocks
+  repeated string swap_in_tags = 11;
+  repeated string swap_out_tags = 12;
 }
 
 // Provide a specific address for all the allocation refinement such that no
