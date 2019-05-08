@@ -1,8 +1,8 @@
 local PARAMS = {
   metal: {
     CACHE_WIDTH: 64,
-    MAX_MEM: [1000, 3200],
-    SUBGROUP_SIZES: [8, 16],
+    MAX_MEM: [3000],
+    SUBGROUP_SIZES: [16],
     GLOBAL_MEM_LAT: 420,
     LOCAL_MEM_LAT: 125,
   },
