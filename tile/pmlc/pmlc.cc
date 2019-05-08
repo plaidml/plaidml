@@ -10,8 +10,6 @@
 #include "base/config/config.h"
 #include "base/util/file.h"
 #include "base/util/throw.h"
-#include "tile/codegen/driver.h"
-#include "tile/lang/gen_stripe.h"
 #include "tile/lib/tests.h"
 #ifdef ENABLE_LLVM_BITCODE
 #include "tile/targets/cpu/jit.h"
