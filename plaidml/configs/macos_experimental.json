@@ -82,6 +82,22 @@
         }
       },
       {
+        "description": "Metal config",
+        "sel": {
+          "name_regex": ".*Metal.*"
+        },
+        "settings": {
+          "threads": 128,
+          "vec_size": 4,
+          "mem_width": 256,
+          "max_mem": 16000,
+          "max_regs": 16000,
+          "goal_groups": 6,
+          "goal_flops_per_byte": 50,
+          "stripe_config": "metal"
+        }
+      },
+      {
         "description": "Intel *HD Graphics GPU config",
         "sel": {
           "name_regex": ".*HD Graphics.*"
