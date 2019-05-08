@@ -122,6 +122,9 @@ sem::ExprPtr SemtreeEmitter::convert_affine(const stripe::Affine& aff) const {
 void SemtreeEmitter::Visit(const stripe::Load& stmt) {
   auto lval = _(ref_buf(stmt.from))[_(ref_idx(stmt.from))];
   auto type = scope_->at(stmt.from).shape.type;
+  if (stmt.has_tag("vector_tx")) {
+      lval = _("vector_load")(lval);
+  }
   cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
   tot_loads_ += loop_mul_;
 }
@@ -149,7 +152,11 @@ void SemtreeEmitter::Visit(const stripe::Store& stmt) {
   std::string agg_op = scope_->at(stmt.into).base_ref->agg_op;
   auto rval = _(scalar_name(stmt.from));
   sem::ExprPtr agg = DoAgg(agg_op, lval, rval);
-  cur_->push_back(lval = agg);
+  if (stmt.has_tag("vector_tx")) {
+    cur_->push_back(_Special("vector_store", {lval, agg}));
+  } else {
+    cur_->push_back(lval = agg);
+  }
   if (agg_op != "" && agg_op != "assign") {
     tot_ops_ += loop_mul_;
   }
