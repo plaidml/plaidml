@@ -1,3 +1,0 @@
-cpu:
-  CACHE_WIDTH: 64
-  L1_CACHE_SIZE: 32

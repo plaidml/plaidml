@@ -57,7 +57,7 @@ static std::string EraseSpace(const std::string& src) {
   return str;
 }
 
-static proto::Config GenerateCFG() {
+static proto::Stage GenerateStage() {
   auto cfg_tmpl = R"(
     passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { devs: [{name: "DRAM"}] } } }
     passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { devs: [{name: "DRAM"}] } } }
@@ -151,8 +151,7 @@ static proto::Config GenerateCFG() {
     passes: { name: "prune_refs", prune_refs: { reqs: ["program"] } },
     passes: { name: "place_program", memory_placement: { reqs: ["program"], locs: [{ devs: [{name: "DRAM"}] }], alignment: 4 } }
   )";
-  auto cfg = ParseProtoText<proto::Config>(cfg_tmpl);
-  return cfg;
+  return ParseProtoText<proto::Stage>(cfg_tmpl);
 }
 
 static std::map<std::string, std::vector<float>> GenerateMatrix(const std::vector<size_t>& dim,
@@ -239,7 +238,7 @@ TEST(LoadIndexTest, SimpleIndex) {
 
   EXPECT_THAT(actual_stripe, LinesEq(expected_stripe));
 
-  auto cfg = GenerateCFG();
+  auto stage = GenerateStage();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
   if (dbg_dir) {
@@ -247,7 +246,7 @@ TEST(LoadIndexTest, SimpleIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), stage.passes(), options);
   IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 4, 4};
@@ -299,7 +298,7 @@ TEST(LoadIndexTest, AffineIndex) {
 
   EXPECT_THAT(actual_stripe, LinesEq(expected_stripe));
 
-  auto cfg = GenerateCFG();
+  auto stage = GenerateStage();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
   if (dbg_dir) {
@@ -307,7 +306,7 @@ TEST(LoadIndexTest, AffineIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), stage.passes(), options);
   IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {8, 8, 256, 8};
@@ -383,7 +382,7 @@ TEST(LoadIndexTest, MultiLoadIndex) {
 
   EXPECT_THAT(actual_stripe, LinesEq(expected_stripe));
 
-  auto cfg = GenerateCFG();
+  auto stage = GenerateStage();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
   if (dbg_dir) {
@@ -391,7 +390,7 @@ TEST(LoadIndexTest, MultiLoadIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), stage.passes(), options);
   IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 256, 8};
@@ -463,7 +462,7 @@ TEST(LoadIndexTest, FuseIndex) {
 
   EXPECT_THAT(actual_stripe, LinesEq(expected_stripe));
 
-  auto cfg = GenerateCFG();
+  auto stage = GenerateStage();
   auto dbg_dir = std::getenv("DBG_DIR");
   OptimizeOptions options;
   if (dbg_dir) {
@@ -471,7 +470,7 @@ TEST(LoadIndexTest, FuseIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), stage.passes(), options);
   IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 4, 8};

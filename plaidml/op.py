@@ -1113,18 +1113,26 @@ class Concatenate(tile.Operation):
                 if i != axis
             ]
 
+        merge_axis_dim = None
         shape_template = __clear_axis(tensors[0].shape.dims)
         for t in tensors:
             if __clear_axis(t.shape.dims) != shape_template:
                 raise ValueError(
                     'Incompatible shapes: cannot concatenate along axis {}\n{} v {}'.format(
                         axis, tensors[0].shape, t.shape))
+            if isinstance(t.shape.dims[axis], tile.Value):
+                merge_axis_dim = t.shape.dims[axis]
 
         offsets = [0]
-        for i in range(len(tensors)):
-            offsets.append(offsets[i] + tensors[i].shape.dims[axis])
+        if merge_axis_dim:
+            for i in range(len(tensors)):
+                offsets.append("+".join("A{}".format(j) for j in range(i+1)))
+        else:
+            for i in range(len(tensors)):
+                offsets.append(offsets[i] + tensors[i].shape.dims[axis])
+            merge_axis_dim = offsets[len(tensors)]
         out_dims = tuple(
-            tensors[0].shape.dims[i] if i != axis else offsets[len(tensors)] for i in range(rank))
+            tensors[0].shape.dims[i] if i != axis else merge_axis_dim for i in range(rank))
 
         output_dims_list = ['N{}'.format(i) for i in range(rank)]
         output_dims_list[axis] = offsets[len(tensors)]
@@ -1150,8 +1158,6 @@ class Concatenate(tile.Operation):
         body_str = ''
         line_subs = {'beg': indices_begin, 'end': indices_end, 'odims': output_dims_str}
         for i in range(len(tensors)):
-            # TODO: If offsets[i] is symbolic, add it to the function
-            # inputs and use it symbolically.
             line_subs['off'] = '+{}'.format(offsets[i])
             line_subs['i'] = i
             curr_line = '  T{i}[{beg}{off}{end}: {odims}] = =(I{i}[{beg}{end}]);\n'.format(
@@ -1163,9 +1169,9 @@ class Concatenate(tile.Operation):
 
         # Example 'code' (concatenating (4,3,2), (4,5,2), (4,1,2)):
         #   function (I0[N0, A0, N2], I1[N0, A1, N2], I2[N0, A2, N2]) -> (O) {
-        #     T0[n0, a, n2: N0, 9, N2] = =(I0[n0, a, n2]);
-        #     T1[n0, a+3, n2: N0, 9, N2] = =(I1[n0, a, n2]);
-        #     T2[n0, a+8, n2: N0, 9, N2] = =(I2[n0, a, n2]);
+        #     T0[n0, a, n2: N0, A0+A1+A2, N2] = =(I0[n0, a, n2]);
+        #     T1[n0, a+A0, n2: N0, A0+A1+A2, N2] = =(I1[n0, a, n2]);
+        #     T2[n0, a+A0+A1, n2: N0, A0+A1+A2, N2] = =(I2[n0, a, n2]);
         #     O = T0 + T1 + T2;
         #   }
         code = ('function ({inputs}) -> (O) {{\n{body}\n}}').format(

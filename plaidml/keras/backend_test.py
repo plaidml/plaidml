@@ -173,15 +173,22 @@ def opTest(in_data,
            do_grads=True,
            skip_theano=True,
            skip_tensorflow=False,
-           verbose=False):
+           verbose=False,
+           input_shapes=None):
     # If using with non-tensor parameters, all tensor params must appear before
     # all non-tensor params
-    def run_one_backend(self, data, test_func, b, *run_args):
+    # input_shapes should be None or an iterable containing tuples
+    # defining the shape for each input.
+    # Use this to define symbolic shapes (None).
+    def run_one_backend(self, data, test_func, b, shapes=None, *run_args):
         tf_session = tensorflow.Session()
         tf.set_session(tf_session)
         results = []
         with tf_session.as_default():
-            x = [b.placeholder(shape=t.shape) for t in data if hasattr(t, 'shape')]
+            if shapes:
+                x = [b.placeholder(shape=t) for t in shapes]
+            else:
+                x = [b.placeholder(shape=t.shape) for t in data if hasattr(t, 'shape')]
             xv = [b.variable(t, dtype=floatx()) for t in data if hasattr(t, 'shape')]
             ps = [t for t in data if not hasattr(t, 'shape')]
             grad_funcs = test_func(self, b, *(x + ps + list(run_args)))
@@ -221,11 +228,14 @@ def opTest(in_data,
 
         def output(self, *args):
             for didx, data in enumerate(in_data):
+                shapes = None
+                if input_shapes:
+                    shapes = input_shapes[didx]
                 if not skip_theano:
-                    theano_results = run_one_backend(self, data, test_func, th, *args)
+                    theano_results = run_one_backend(self, data, test_func, th, *args, shapes=shapes)
                 if not skip_tensorflow:
-                    tensorflow_results = run_one_backend(self, data, test_func, tf, *args)
-                plaidml_results = run_one_backend(self, data, test_func, pkb, *args)
+                    tensorflow_results = run_one_backend(self, data, test_func, tf, *args, shapes=shapes)
+                plaidml_results = run_one_backend(self, data, test_func, pkb, *args, shapes=shapes)
                 if not skip_theano:
                     for idx, (pmlr, thr) in enumerate(zip(plaidml_results, theano_results)):
                         idx = idx + 1
@@ -267,7 +277,6 @@ def opTest(in_data,
         return output
 
     return apply
-
 
 class TestBackendOps(unittest.TestCase):
     """Tests PlaidML Keras operation definitions"""
@@ -357,6 +366,27 @@ class TestBackendOps(unittest.TestCase):
         x = b.variable(m(3, 2))
         y = b.variable(np.array([[2, 4], [5, -1], [3, 0]]))
         return b.equal(b.argmin(x, axis=0), b.argmin(y, axis=0))
+
+    def testDropoutManual(self):
+        # Note: Due to the probabilistic nature of dropout, and since we can't
+        # just use seeds as different backends have different PRNGs, this tests
+        # that we stay within expected tolerances.
+        shape = (17, 22, 13, 13)
+        noise_shape = (17, 22, 13, 1)
+        level = 0.8
+        x = pkb.variable(np.ones(shape))
+        result = pkb.dropout(x, level, noise_shape).eval()
+        mean = np.mean(result)
+        if mean < 0.9 or mean > 1.1:
+            raise RuntimeError("Unexpectedly large deviation from expected dropout level")
+        for i in range(shape[0]):
+            for j in range(shape[1]):
+                for k in range(shape[2]):
+                    if np.any(result[i, j, k]):
+                        if not np.all(result[i, j, k]):
+                            raise RuntimeError("Noise incorrectly shaped")
+                        if abs(result[i, j, k, 0] - 1. / (1. - level)) > 0.0001:
+                            raise RuntimeError("Bad normalization")
 
     @opTest([
         [m(3, 3), m(3, 3)],
@@ -1244,6 +1274,16 @@ class TestBackendOps(unittest.TestCase):
         [m(3, 2, 4), m(3, 1, 4), m(3, 3, 4), 1],
     ])
     def testConcatenate(self, b, x, y, z, ax=-1):
+        return [b.concatenate([x, y, z], axis=ax)]
+
+    @opTest([
+        [m(2, 3, 4), m(2, 3, 3), m(2, 3, 1)],
+        [m(3, 2, 4), m(3, 1, 4), m(3, 3, 4), 1],
+    ], input_shapes=[
+        ((2, 3, None), (2, 3, None), (2, 3, None)),
+        ((3, None, 4), (3, None, 4), (3, None, 4))
+    ], verbose=False)
+    def testConcatenateSymbolic(self, b, x, y, z, ax=-1):
         return [b.concatenate([x, y, z], axis=ax)]
 
     @compareForwardExact()

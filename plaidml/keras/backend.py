@@ -584,13 +584,18 @@ dot = op.dot
 
 
 def dropout(x, level, noise_shape=None, seed=None):
-    if noise_shape is not None:
-        raise PlaidMLKerasException('Unimplemented noise shape in dropout')
+    if noise_shape is not None and len(noise_shape) != x.shape.ndims:
+        raise ValueError("Length of noise_shape doesn't match input ndims")
 
     rng_state = _make_rng_state(seed)
-
     szs = ', '.join(['S' + str(i) for i in range(x.shape.ndims)])
-    args = ', '.join(['I'] + ['S' + str(i) for i in range(x.shape.ndims)])
+    if noise_shape is None:
+        args = 'I, ' + szs
+    else:
+        ishape = x.shape.dims
+        args = ', '.join(['I'] + [
+            "S{}".format(i) if v == ishape[i] or v in (None, -1) else "1" for i, v in enumerate(noise_shape)
+        ])        
     rng_step = 'function (I, X[{szs}]) -> (O) {{ O = prng_step({args}); }}'.format(
         szs=szs, args=args)
     rng_value = """function (I, X, L) -> (O) {
@@ -708,7 +713,8 @@ def get_value(x):
     tensor = plaidml.Tensor(_device(), shape)
     invoker.set_output('out', tensor)
     invoker.invoke()
-    array = np.ndarray(x.shape.dims, dtype=ptile.convert_pml_dtype_to_np(x.shape.dtype))
+    out_shape = tuple(x.size for x in shape.dimensions)
+    array = np.ndarray(out_shape, dtype=ptile.convert_pml_dtype_to_np(x.shape.dtype))
     with tensor.mmap_current() as view:
         view.copy_to_ndarray(array)
     return array

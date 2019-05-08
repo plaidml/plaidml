@@ -2,12 +2,12 @@
 
 #include "base/config/config.h"
 #include "base/util/file.h"
-#include "base/util/runfiles_db.h"
 #include "tile/codegen/driver.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lib/lib.h"
 #include "tile/stripe/stripe.h"
 #include "tile/targets/cpu/jit.h"
+#include "tile/targets/targets.h"
 
 template <typename F>
 void with_profile(F f) {
@@ -31,15 +31,13 @@ int main(int argc, char* argv[]) {
   auto program = lang::GenerateStripe(runinfo);
   std::cout << *program->entry << std::endl;
 
-  // static vertexai::RunfilesDB runfiles_db{"com_intel_plaidml"};
-  //    std::string cfg_file = runfiles_db["tile/cpu/cpu.json"];
-  std::string cfg_file = "external/com_intel_plaidml/tile/cpu/cpu.json";
-
-  auto cfg = vertexai::ParseConfig<codegen::proto::Config>(vertexai::ReadFile(cfg_file));
+  const auto& cfgs = targets::GetConfigs();
+  const auto& cfg = cfgs.configs().at("cpu");
+  const auto& stage = cfg.stages().at("default");
   codegen::OptimizeOptions options;
   options.dump_passes = true;
   options.dbg_dir = "/tmp/stripe_cpu/passes";
-  codegen::Optimize(program->entry.get(), cfg.passes(), options);
+  codegen::Optimize(program->entry.get(), stage.passes(), options);
 
   std::cout << "============================================================\n" << *program->entry << std::endl;
 

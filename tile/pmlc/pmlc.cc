@@ -2,10 +2,14 @@
 
 #include "tile/pmlc/pmlc.h"
 
+#include <libjsonnet++.h>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/program_options.hpp>
+
 #include "base/config/config.h"
 #include "base/util/file.h"
 #include "base/util/throw.h"
-#include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/driver.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lib/tests.h"
@@ -14,16 +18,8 @@
 #endif
 #include "tile/util/tile_file.h"
 
-DEFINE_string(config, "", "configuration file");
-DEFINE_bool(internal, false, "input specifies an internally defined network");
-DEFINE_bool(dump_passes, false, "dump passes");
-DEFINE_bool(i8_mode, false, "treat all datatypes as i8");
-DEFINE_string(outdir, ".", "output directory");
-#ifdef ENABLE_LLVM_BITCODE
-DEFINE_bool(llvm, false, "enable LLVM bitcode");
-#endif
-
 namespace fs = boost::filesystem;
+namespace po = boost::program_options;
 
 namespace vertexai {
 namespace tile {
@@ -32,8 +28,54 @@ namespace pmlc {
 using namespace codegen;  // NOLINT
 using namespace stripe;   // NOLINT
 
-lang::RunInfo LoadTile(const fs::path& filename) {
-  if (FLAGS_internal) {
+App::App() : opts{"Allowed options"} {
+  opts.add_options()                      //
+      ("help,h", "produce help message")  //
+      ("verbose,v", po::value<int>()->default_value(0), "increase verbosity");
+}
+
+App* App::Instance() {
+  static App app;
+  return &app;
+}
+
+bool App::parse(int argc, char* argv[]) {
+  auto parser = po::command_line_parser(argc, argv).options(opts).positional(pos_opts);
+  po::store(parser.run(), args);
+  if (args.count("help")) {
+    std::cout << opts << std::endl;
+    return false;
+  }
+  if (args.count("verbose")) {
+    el::Loggers::setVerboseLevel(args["verbose"].as<int>());
+  }
+  args.notify();
+  return true;
+}
+
+[[gnu::unused]] auto init = []() {
+  auto app = App::Instance();
+  app->pos_opts.add("input", 1);
+  app->opts.add_options()                                                                 //
+      ("input", po::value<fs::path>()->required(), "input file path")                     //
+      ("config,c", po::value<fs::path>()->required(), "config file path")                 //
+      ("target,t", po::value<std::string>()->required(), "name of target within config")  //
+      ("stage,s", po::value<std::string>()->required(), "name of stage within config")    //
+      ("outdir,D", po::value<fs::path>()->default_value("."), "output directory")         //
+      ("import,I", po::value<std::vector<fs::path>>(), "add an import path")              //
+      ("var", po::value<std::vector<std::string>>(), "specify a jsonnet extVar")          //
+      ("int8", "treat all datatypes as int8")                                             //
+      ("internal", "input specifies an internally defined network")                       //
+      ("dump-passes", "dump passes")                                                      //
+#ifdef ENABLE_LLVM_BITCODE
+      ("llvm", "enable LLVM bitcode output")  //
+#endif
+      ;  // NOLINT
+  return 0;
+}();
+
+lang::RunInfo LoadTile(const fs::path& filename, bool is_internal) {
+  if (is_internal) {
     auto test = lib::CreateTest(filename.string());
     if (!test) {
       throw std::runtime_error(str(boost::format("Internal test not found: %1%") % filename));
@@ -43,12 +85,15 @@ lang::RunInfo LoadTile(const fs::path& filename) {
   return util::TileFile(filename).Load();
 }
 
-std::shared_ptr<Program> DefaultStage(const fs::path& input_path,         //
-                                      const codegen::proto::Config& cfg,  //
+std::shared_ptr<Program> DefaultStage(const App& app,                      //
+                                      const fs::path& input_path,          //
+                                      const fs::path& out_dir,             //
+                                      const codegen::proto::Stage& stage,  //
                                       const codegen::OptimizeOptions& options) {
-  fs::path out_dir(FLAGS_outdir);
-  auto runinfo = LoadTile(input_path);
-  auto program = GenerateStripe(runinfo, FLAGS_i8_mode);
+  bool is_internal = app.args.count("internal");
+  bool enable_int8_mode = app.args.count("int8");
+  auto runinfo = LoadTile(input_path, is_internal);
+  auto program = GenerateStripe(runinfo, enable_int8_mode);
   for (const auto& kvp : runinfo.input_buffers) {
     auto buf = std::dynamic_pointer_cast<util::SimpleBuffer>(kvp.second);
     if (buf) {
@@ -63,7 +108,7 @@ std::shared_ptr<Program> DefaultStage(const fs::path& input_path,         //
       program->buffers[kvp.first].sections.emplace("qparams", str);
     }
   }
-  Optimize(program->entry.get(), cfg.passes(), options);
+  Optimize(program->entry.get(), stage.passes(), options);
   WriteFile(out_dir / "stripe.txt", false, [&program](std::ofstream& fout) {  //
     fout << *program->entry << std::endl;
   });
@@ -72,7 +117,7 @@ std::shared_ptr<Program> DefaultStage(const fs::path& input_path,         //
     proto.SerializeToOstream(&fout);
   });
 #ifdef ENABLE_LLVM_BITCODE
-  if (FLAGS_llvm) {
+  if (app.args.count("llvm")) {
     targets::cpu::Native native;
     native.compile(*program->entry);
     native.save((out_dir / "stripe.bc").string());
@@ -81,22 +126,69 @@ std::shared_ptr<Program> DefaultStage(const fs::path& input_path,         //
   return program;
 }
 
-std::shared_ptr<Program> Main(const fs::path& filename) {
-  auto cfg_path = fs::path(FLAGS_config);
-  if (cfg_path.empty()) {
+codegen::proto::Configs LoadConfigs() {
+  auto app = App::Instance();
+  auto config_path = app->args["config"].as<fs::path>();
+
+  jsonnet::Jsonnet jsonnet;
+  if (!jsonnet.init()) {
+    throw std::runtime_error("jsonnet failed to initialize");
+  }
+
+  if (config_path.empty()) {
     throw std::runtime_error("--config must be specified");
   }
-  if (!fs::exists(cfg_path)) {
+  if (!fs::exists(config_path)) {
     throw std::runtime_error("Invalid --config specified");
   }
-  auto cfg = ParseConfig<codegen::proto::Config>(ReadFile(cfg_path));
+
+  const auto& import_args = app->args["import"];
+  if (!import_args.empty()) {
+    const auto& import_paths = import_args.as<std::vector<fs::path>>();
+    for (const auto& import_path : import_paths) {
+      if (!import_path.empty()) {
+        if (!fs::exists(import_path)) {
+          throw std::runtime_error("Invalid --import specified");
+        }
+        jsonnet.addImportPath(import_path.string());
+      }
+    }
+  }
+
+  const auto& var_args = app->args["var"];
+  if (!var_args.empty()) {
+    const auto& vars = var_args.as<std::vector<std::string>>();
+    for (const auto& var : vars) {
+      std::vector<std::string> parts;
+      boost::split(parts, var, boost::is_any_of("="));
+      if (parts.size() != 2) {
+        throw std::runtime_error("Invalid --var specified, must be in the form KEY=VALUE");
+      }
+      jsonnet.bindExtVar(parts[0], parts[1]);
+    }
+  }
+
+  std::string json;
+  if (!jsonnet.evaluateFile(config_path.string(), &json)) {
+    throw std::runtime_error(str(boost::format("jsonnet error: %1%") % jsonnet.lastError()));
+  }
+
+  return ParseConfig<codegen::proto::Configs>(json);
+}
+
+std::shared_ptr<Program> Main() {
+  auto app = App::Instance();
+  auto input_path = app->args["input"].as<fs::path>();
+  auto out_dir = app->args["outdir"].as<fs::path>();
+  auto configs = LoadConfigs();
+  auto target = configs.configs().at(app->args["target"].as<std::string>());
+  auto stage = target.stages().at(app->args["stage"].as<std::string>());
   OptimizeOptions options;
-  if (FLAGS_dump_passes) {
-    fs::path out_dir(FLAGS_outdir);
+  if (app->args.count("dump-passes")) {
     options.dump_passes = true;
     options.dbg_dir = out_dir / "passes";
   }
-  return DefaultStage(filename, cfg, options);
+  return DefaultStage(*app, input_path, out_dir, stage, options);
 }
 
 }  // namespace pmlc
