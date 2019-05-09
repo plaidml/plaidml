@@ -148,7 +148,7 @@ class Evaluator final {
   explicit Evaluator(plaidml_devconf* devconf)
       : platform_{devconf->platform},
         id_{devconf->device.dev_id()},
-        program_cache_{std::make_shared<tile::ProgramCache>(platform_, 20 /* TODO: Make this configurable */)} {}
+        program_cache_{std::make_shared<tile::ProgramCache>(platform_, 500 /* TODO: Make this configurable */)} {}
 
   const std::shared_ptr<tile::Platform>& get_platform() const { return platform_; }
   const std::string& get_id() const { return id_; }
