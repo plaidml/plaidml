@@ -8,11 +8,8 @@
 #include <boost/program_options.hpp>
 
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/driver.h"
-#include "tile/lang/gen_stripe.h"
+#include "tile/lang/compose.h"
 #include "tile/stripe/stripe.h"
-
-namespace fs = boost::filesystem;
 
 namespace vertexai {
 namespace tile {
@@ -31,7 +28,7 @@ class App {
   App();
 };
 
-vertexai::tile::lang::RunInfo LoadTile(const fs::path& filename, bool is_internal);
+vertexai::tile::lang::RunInfo LoadTile(const boost::filesystem::path& filename, bool is_internal);
 std::shared_ptr<stripe::Program> Main();
 codegen::proto::Configs LoadConfigs();
 
