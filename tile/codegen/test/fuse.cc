@@ -57,7 +57,7 @@ TEST(Codegen, FuseSimple) {
 
   IVLOG(2, "After>\n" << *program->entry);
 
-  auto expected = R"**(0: #program #total_macs 
+  auto expected = R"**(0: #program #total_macs=0 
 block []:1 ( // simple_fuse
     #user none new@0x00000000 A[0, 0] fp32:I(100, 20):(20, 1):7.8125 KiB
     #user none new@0x00000000 B[0] fp32:I(20):(1):80 B
