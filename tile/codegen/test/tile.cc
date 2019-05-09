@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 #include <google/protobuf/util/json_util.h>
 
+#include "tile/codegen/stencil.h"
 #include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
 #include "tile/lang/compose.h"
@@ -114,7 +115,7 @@ TEST(Codegen, ApplyTile) {
   EXPECT_THAT(data["C"], ContainerEq(kMatMulExpected));
 }
 
-TEST(Codegen, StencilMatchMatMul) {
+TEST(Stencil, MatchMatMul) {
   auto spec = ParseProtoJson<proto::Stencil>(R"(
     {
       "startup_cost": 32,
@@ -149,7 +150,7 @@ TEST(Codegen, StencilMatchMatMul) {
   EXPECT_THAT(*match, Eq(expected));
 }
 
-TEST(Codegen, StencilMatchConv1D) {
+TEST(Stencil, MatchConv1D) {
   auto spec = ParseProtoJson<proto::Stencil>(R"(
     {
       "startup_cost": 32,
@@ -186,7 +187,7 @@ TEST(Codegen, StencilMatchConv1D) {
   EXPECT_THAT(*match, Eq(expected));
 }
 
-TEST(Codegen, StencilMatchConv2D) {
+TEST(Stencil, MatchConv2D) {
   auto options = ParseProtoJson<proto::StencilPass>(R"(
     {
       "stencils": [
@@ -242,7 +243,7 @@ TEST(Codegen, StencilMatchConv2D) {
   EXPECT_THAT(*match, Eq(expected));
 }
 
-TEST(Codegen, StencilPass) {
+TEST(Stencil, Pass) {
   auto options = ParseProtoJson<proto::StencilPass>(R"(
     {
       "reqs": ["agg_op_add", "comb_op_mul"],
