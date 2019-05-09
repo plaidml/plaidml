@@ -210,7 +210,7 @@ TEST(LoadIndexTest, SimpleIndex) {
   auto program = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  std::string expected_stripe = R"**(0: #program #total_macs
+  std::string expected_stripe = R"**(0: #program #total_macs=0
     block []:1 ( // load_index_simple
         #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB
         #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB
@@ -270,7 +270,7 @@ TEST(LoadIndexTest, AffineIndex) {
   auto program = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  std::string expected_stripe = R"**(0: #program #total_macs
+  std::string expected_stripe = R"**(0: #program #total_macs=0
     block []:1 ( // load_index_affine
         #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB
         #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB
@@ -334,7 +334,7 @@ TEST(LoadIndexTest, MultiLoadIndex) {
   auto program = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  std::string expected_stripe = R"**(0: #program #total_macs
+  std::string expected_stripe = R"**(0: #program #total_macs=0
     block []:1 ( // load_index_affine
         #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB
         #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB
@@ -420,7 +420,7 @@ TEST(LoadIndexTest, FuseIndex) {
   auto program = GenerateStripe(runinfo);
   IVLOG(1, "Before stripe optimization: " << *program->entry);
 
-  std::string expected_stripe = R"**(0: #program #total_macs
+  std::string expected_stripe = R"**(0: #program #total_macs=0
     block []:1 ( // load_index_affine
         #user none new@0x00000000 A[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB
         #user none new@0x00000000 B[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB
