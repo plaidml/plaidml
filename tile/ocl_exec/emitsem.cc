@@ -123,9 +123,11 @@ void SemtreeEmitter::Visit(const stripe::Load& stmt) {
   auto lval = _(ref_buf(stmt.from))[_(ref_idx(stmt.from))];
   auto type = scope_->at(stmt.from).shape.type;
   if (stmt.has_tag("vector_tx")) {
-      lval = _("vector_load")(lval);
+    cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), _("vector_load")(lval)));
   }
-  cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
+  else {
+    cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
+  }
   tot_loads_ += loop_mul_;
 }
 
