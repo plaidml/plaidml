@@ -126,6 +126,11 @@ RunInfo LoadMatMulIntermediate(const std::string& name, const TensorShape& i1, c
   return Evaluate(name, {D, E});
 }
 
+RunInfo LoadEltwiseMulFlip(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+  Tensor A{i1, "A"}, B{i2, "B"};
+  return Evaluate(name, {~(A * B)});
+}
+
 RunInfo LoadMatMulAmongEltwise(const std::string& name, const TensorShape& i1, const TensorShape& i2,
                                const TensorShape& i3) {
   Tensor A(i1, "A");
