@@ -47,6 +47,8 @@ lang::RunInfo LoadEltwiseMultiAdd(const std::string& name,  //
                                   const TensorShape& i3,    //
                                   const TensorShape& i4);
 
+lang::RunInfo LoadEltwiseMulFlip(const std::string& name, const TensorShape& i1, const TensorShape& i2);
+
 lang::RunInfo LoadEltwiseDiv(const std::string& name,  //
                              const TensorShape& i1,    //
                              const TensorShape& i2);
