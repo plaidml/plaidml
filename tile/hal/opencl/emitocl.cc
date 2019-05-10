@@ -242,9 +242,9 @@ void Emit::Visit(const sem::ForStmt& n) {
 void Emit::Visit(const sem::BarrierStmt& n) {
   emitTab();
   if (n.subgroup) {
-    emit("sub_group_barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);\n");
+    //emit("sub_group_barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);\n");
   } else {
-    emit("barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);\n");
+    emit("barrier(CLK_LOCAL_MEM_FENCE);\n");
   }
 }
 
