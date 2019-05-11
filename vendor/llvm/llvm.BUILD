@@ -93,12 +93,9 @@ cc_library(
     alwayslink = 1,
 )
 
-cc_binary(
-    name = "tblgen",
+cc_library(
+    name = "tblgen-lib",
     srcs = glob([
-        "utils/TableGen/**/*.cpp",
-        "utils/TableGen/**/*.c",
-        "utils/TableGen/**/*.h",
         "lib/TableGen/**/*.cpp",
         "lib/TableGen/**/*.c",
         "lib/TableGen/**/*.h",
@@ -106,6 +103,19 @@ cc_binary(
     copts = PLATFORM_COPTS,
     linkopts = ["-lm"],
     deps = [":support"],
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "tblgen",
+    srcs = glob([
+        "utils/TableGen/**/*.cpp",
+        "utils/TableGen/**/*.c",
+        "utils/TableGen/**/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    linkopts = ["-lm"],
+    deps = [":tblgen-lib"],
 )
 
 tblgen(
@@ -430,12 +440,14 @@ pkg_tar(
         "include/**",
         "lib/Support/**/*.inc",
         "lib/Target/**/*.h",
+        "lib/TableGen/**/*.h",
     ]) + CFG_FILES + [
         ":gen-attrs",
         ":gen-intrinsic-impl",
         ":gen-intrinsic-enums",
         ":license",
         ":lib",
+        ":tblgen-lib",
         ":support",
         ":targets",
     ],
