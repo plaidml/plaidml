@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include <set>
 #include <string>
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -22,7 +22,14 @@ void ApplyCache(const AliasMap& map,                                       //
                 const stripe::Tags store_tags = {"cache", "cache_store"},  //
                 bool add_constraints = true);
 
-void CachePass(stripe::Block* root, const proto::CachePass& options);
+class CachePass final : public CompilePass {
+ public:
+  explicit CachePass(const proto::CachePass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::CachePass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

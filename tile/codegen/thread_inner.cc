@@ -19,7 +19,7 @@ using namespace stripe;  // NOLINT
 using math::NearestPo2;
 using math::RoundUp;
 
-void ThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
+void DoThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
   if (block->ref_outs().size() != 1) {
     if (block->ref_outs().size() == 0) {
       // We may remove the output refinements in the contracts during optimizations,
@@ -73,6 +73,20 @@ void ThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
   block->set_tag("gpu_thread");
 }
 
+// Localize starting from root for things that match reqs
+void ThreadInnerPass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [this](const AliasMap& map, stripe::Block* block) {  //
+    DoThreadInnerPass(map, block, options_.threads());
+  });
+}
+
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<ThreadInnerPass, proto::ThreadInnerPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

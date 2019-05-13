@@ -423,6 +423,19 @@ void PlaceRefinements(stripe::Block* outermost_block, const proto::MemoryPlaceme
   }
 }
 
+void MemoryPlacementPass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+    PlaceRefinements(block, options_);
+  });
+}
+
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<MemoryPlacementPass, proto::MemoryPlacementPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

@@ -2,28 +2,22 @@
 
 #pragma once
 
-#include <map>
-#include <memory>
-#include <set>
-#include <vector>
-
-#include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/deps.h"
-#include "tile/stripe/stripe.h"
+#include "tile/codegen/compile_pass.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void DoReorderBlocks(stripe::Block *root);
+class ReorderBlocksPass final : public CompilePass {
+ public:
+  explicit ReorderBlocksPass(const proto::ReorderBlocksPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
 
-// Kernel-level block reordering
-inline void ReorderBlocksPass(stripe::Block *root,
-                              const proto::GenericPass &options) {
-  DoReorderBlocks(root);
-}
+ private:
+  proto::ReorderBlocksPass options_;
+};
 
-} // namespace codegen
-} // namespace tile
-} // namespace vertexai
+}  // namespace codegen
+}  // namespace tile
+}  // namespace vertexai

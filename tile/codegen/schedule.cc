@@ -1991,10 +1991,37 @@ void Scheduler::RebuildTransitiveDeps() {
 
 }  // namespace
 
-void ScheduleBlock(const AliasMap& alias_map, stripe::Block* block, const proto::SchedulePass& options) {
-  Scheduler::Schedule(alias_map, block, options);
+// Schedules the statements within a block.
+//   Creates new refinements at the block's mem_loc for its statements to access.
+//     Assigns the new refinements offsets within the mem_loc.
+//   Inserts IO sub-block statements as needed.
+//   Updates the block's statements' dependencies for correctness.
+void SchedulePass::Apply(stripe::Block* root) const {
+  // SchedulePass assumes stmt->deps is empty here.
+  // However, it may not be true due to the previous passes.
+  // So we need to enforce it here.
+  stripe::Tags reqs_all;
+  reqs_all.insert("all");
+  RunOnBlocks(root, reqs_all,
+              [](const AliasMap& map, stripe::Block* block) {
+                for (auto& stmt : block->stmts) {
+                  stmt.get()->deps.clear();
+                }
+              },
+              true);
+
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [this](const AliasMap& alias_map, stripe::Block* block) {
+    Scheduler::Schedule(alias_map, block, options_);
+  });
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<SchedulePass, proto::SchedulePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

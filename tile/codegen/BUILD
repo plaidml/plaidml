@@ -14,6 +14,7 @@ plaidml_cc_library(
         "*.h",
     ]),
     visibility = ["//visibility:public"],
+    alwayslink = 1,
     deps = [
         ":proto_cc",
         "//base/config",

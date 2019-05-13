@@ -2,6 +2,7 @@
 
 #include <gmock/gmock.h>
 
+#include "base/proto/proto.h"
 #include "base/util/throw.h"
 #include "testing/matchers.h"
 #include "tile/codegen/codegen.pb.h"
@@ -21,13 +22,6 @@ namespace codegen {
 namespace test {
 
 using namespace stripe;  // NOLINT
-
-template <typename P>
-P ParseProtoText(const std::string& txt) {
-  P proto;
-  google::protobuf::TextFormat::ParseFromString(txt, &proto);
-  return proto;
-}
 
 static std::string EraseSpace(const std::string& src) {
   std::string str = src;
@@ -59,97 +53,263 @@ static std::string EraseSpace(const std::string& src) {
 
 static proto::Stage GenerateStage() {
   auto cfg_tmpl = R"(
-    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { devs: [{name: "DRAM"}] } } }
-    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { devs: [{name: "DRAM"}] } } }
-    passes: { name: "loc_initial", locate_block: { reqs: ["kernel"], loc: { devs: [{name: "PPE"}] } } }
-    passes: {
-            name: "stencil_mac",
-            stencil: {
-                reqs: ["agg_op_add", "comb_op_mul"],
-                outer_set: ["dpu"],
-                inner_set: ["dpu_inner"],
-                stencils: [
-                    {
-                        startup_cost: 32,
-                        idxs: [
-                            { name: "k", size: 16, outs: [-1], ins: [-1,  0] },
-                            { name: "x", size: 16, outs: [-1], ins: [ 0, -1] },
-                            { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
-                        ]
-                    },
-                    {
-                        startup_cost: 32,
-                        idxs: [
-                            { name: "k", size: 16, outs: [-1], ins: [ 0, -1] },
-                            { name: "x", size: 16, outs: [-1], ins: [-1,  0] },
-                            { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
-                        ]
-                    },
-                    {
-                        startup_cost: 32,
-                        idxs: [
-                            { name: "k", size: 16, outs: [-1], ins: [-1,  0] },
-                            { name: "x", size:  4, outs: [-1], ins: [ 0, -1] },
-                            { name: "y", size:  4, outs: [-1], ins: [ 0, -1] },
-                            { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
-                        ]
-                    },
-                    {
-                        startup_cost: 32,
-                        idxs: [
-                            { name: "k", size: 16, outs: [-1], ins: [ 0, -1] },
-                            { name: "x", size:  4, outs: [-1], ins: [-1,  0] },
-                            { name: "y", size:  4, outs: [-1], ins: [-1,  0] },
-                            { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
-                        ]
-                    }
-                ]
-            }
+    passes: [
+      {
+        name: "loc_prog"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass] {
+            reqs: ["program"]
+            loc: { devs: [{name: "DRAM"}] }
+          }
+        }
+      }, {
+        name: "loc_main"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass] {
+            reqs: ["main"]
+            loc: { devs: [{name: "DRAM"}] }
+          }
+        }
+      }, {
+        name: "loc_initial",
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateBlockPass] {
+            reqs: ["kernel"]
+            loc: { devs: [{name: "PPE"}] }
+          }
+        }
+      }, {
+        name: "stencil_mac",
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.StencilPass] {
+            reqs: ["agg_op_add", "comb_op_mul"],
+            outer_set: ["dpu"],
+            inner_set: ["dpu_inner"],
+            stencils: [
+                {
+                    startup_cost: 32,
+                    idxs: [
+                        { name: "k", size: 16, outs: [-1], ins: [-1,  0] },
+                        { name: "x", size: 16, outs: [-1], ins: [ 0, -1] },
+                        { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
+                    ]
+                },
+                {
+                    startup_cost: 32,
+                    idxs: [
+                        { name: "k", size: 16, outs: [-1], ins: [ 0, -1] },
+                        { name: "x", size: 16, outs: [-1], ins: [-1,  0] },
+                        { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
+                    ]
+                },
+                {
+                    startup_cost: 32,
+                    idxs: [
+                        { name: "k", size: 16, outs: [-1], ins: [-1,  0] },
+                        { name: "x", size:  4, outs: [-1], ins: [ 0, -1] },
+                        { name: "y", size:  4, outs: [-1], ins: [ 0, -1] },
+                        { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
+                    ]
+                },
+                {
+                    startup_cost: 32,
+                    idxs: [
+                        { name: "k", size: 16, outs: [-1], ins: [ 0, -1] },
+                        { name: "x", size:  4, outs: [-1], ins: [-1,  0] },
+                        { name: "y", size:  4, outs: [-1], ins: [-1,  0] },
+                        { name: "c", size: -1, outs: [ 0], ins: [-1, -1] }
+                    ]
+                }
+            ]
+        }
+      }
+    }, {
+      name: "fuse_dpu_add"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.FusionPass] {
+          a_reqs: ["dpu"]
+          b_reqs: ["eltwise_add"]
+          fused_set: ["dpu"]
+        }
+      }
+    }, {
+      name: "fuse_dpu_mul"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.FusionPass] {
+          a_reqs: ["dpu"]
+          b_reqs: ["eltwise_mul"]
+          fused_set: ["dpu"]
+        }
+      }
+    }, {
+      name: "fuse_dpu_shift"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.FusionPass] {
+          a_reqs: ["dpu"]
+          b_reqs: ["eltwise_bit_right"]
+          fused_set: ["dpu"]
+        }
+      }
+    }, {
+      name: "fuse_dpu_zelu"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.FusionPass] {
+          a_reqs: ["dpu"]
+          b_reqs: ["eltwise_zelu"]
+          fused_set: ["dpu"]
+        }
+      }
+    }, {
+      name: "fuse_eltwise"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.FusionPass] {
+          a_reqs: ["eltwise"]
+          b_reqs: ["eltwise"]
+          fused_set: ["dpu"]
+        }
+      }
+    }, {
+      name: "fuse_dpu"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.FusionPass] {
+          parent_reqs: ["dpu"]
+          a_reqs: ["eltwise"]
+          fused_set: ["dpu_fusion"]
+        }
+      }
+    }, {
+      name: "light_cstr_reduction"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.LightConstraintReductionPass] {
+          reqs: ["all"]
+        }
+      }
+    }, {
+      name: "localize_main"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass] {
+          reqs: ["main"]
+        }
+      }
+    }, {
+      name: "scalarize_main"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.ScalarizePass] {
+          reqs: ["main"]
+        }
+      }
+    }, {
+      name: "fit_into_cmx",
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass] {
+          reqs: ["kernel"],
+          outer_set: ["fit_part"],
+          skip_1d: true,
+          only_po2: true,
+          max_total_size : 1024,
+          input_cost: 1.0,
+          output_cost: 1.0,
+          copy_tags: true,
+          clear_outer: true,
+          acc_idxs: false
+        }
+      }
+    }, {
+      name: "loc_dpu"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.LocateBlockPass] {
+          reqs: ["dpu"]
+          loc: { devs: [{name: "DPU"}] }
+        }
+      }
+    }, {
+      name: "loc_mpe"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.LocateInnerBlockPass] {
+          reqs: ["dpu"]
+          loc: { devs: [{name: "MPE"}] }
+        }
+      }
+    }, {
+      name: "loc_dpu_mem"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass] {
+          reqs: ["dpu"]
+          loc: { devs: [{name: "ACC"}] }
+        }
+      }
+    }, {
+      name: "loc_dpu_fusion_mem"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass] {
+          reqs: ["dpu_fusion"], loc: { devs: [{name: "ACC"}] }
+        }
+      }
+    }, {
+      name: "cache_dpu_in"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.CachePass] {
+          reqs: ["dpu"]
+          dirs: [ In ]
+          mem_loc: { devs: [{name: "MRM"}] }
+          xfer_loc: { devs: [{name: "IDU"}] }
+        }
+      }
+    }, {
+      name: "cache_dpu_out"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.CachePass] {
+          reqs: ["dpu"]
+          dirs: [ Out ]
+          mem_loc: { devs: [{name: "ACC"}] }
+          xfer_loc: { devs: [{name: "ODU"}] }
+        }
+      }
+    }, {
+      name: "loc_dpu_fused"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.LocateBlockPass] {
+          reqs: ["eltwise", "dpu_fusion"]
+          loc: { devs: [{name: "MPE"}] }
+        }
+      }
+    }, {
+      name: "loc_dpu_eltwise"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.LocateInnerBlockPass] {
+          reqs: ["dpu"]
+          inner_reqs: ["eltwise"], loc: { devs: [{name: "MPE"}] }
+        }
+      }
+    }, {
+      name: "schedule_main",
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.SchedulePass] {
+          reqs: ["main"],
+          mem_loc: { devs: [{name: "CMX"}] },
+          mem_KiB: 128,
+          alignment: 16,
+          xfer_loc: { devs: [{name: "DMA"}] }
+        }
+      }
+    }, {
+      name: "prune_refs"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.PruneRefinementsPass] {
+          reqs: ["program"]
+        }
+      }
+    }, {
+      name: "place_program"
+      pass: {
+        [type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass] {
+          reqs: ["program"]
+          locs: [{ devs: [{name: "DRAM"}] }]
+          alignment: 4
+        }
+      }
     }
-    passes: { name: "fuse_dpu_add", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_add"], fused_set: ["dpu"] } }
-    passes: { name: "fuse_dpu_mul", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_mul"], fused_set: ["dpu"] } }
-    passes: { name: "fuse_dpu_shift", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_bit_right"], fused_set: ["dpu"] } }
-    passes: { name: "fuse_dpu_zelu", fusion: { a_reqs: ["dpu"], b_reqs: ["eltwise_zelu"], fused_set: ["dpu"] } }
-    passes: { name: "fuse_eltwise", fusion: { a_reqs: ["eltwise"], b_reqs: ["eltwise"], fused_set: ["dpu"] } }
-    passes: { name: "fuse_dpu", fusion: { parent_reqs: ["dpu"], a_reqs: ["eltwise"], fused_set: ["dpu_fusion"] } }
-    passes: { name: "light_cstr_reduction", light_cstr_reduction: { reqs: ["all"] } }
-    passes: { name: "localize_main", localize: { reqs: ["main"] } }
-    passes: { name: "scalarize_main", scalarize: { reqs: ["main"] } }
-    passes: {   
-            name: "fit_into_cmx",
-            autotile: {
-                reqs: ["kernel"],
-                outer_set: ["fit_part"],
-                skip_1d: true,
-                only_po2: true,
-                max_total_size : 1024,
-                input_cost: 1.0,
-                output_cost: 1.0,
-                copy_tags: true,
-                clear_outer: true,
-                acc_idxs: false
-            }
-    }
-    passes: { name: "loc_dpu", locate_block: { reqs: ["dpu"], loc: { devs: [{name: "DPU"}] } } }
-    passes: { name: "loc_mpe", locate_inner_block: { reqs: ["dpu"], loc: { devs: [{name: "MPE"}] } } }
-    passes: { name: "loc_dpu_mem", locate_memory: { reqs: ["dpu"], loc: { devs: [{name: "ACC"}] } } }
-    passes: { name: "loc_dpu_fusion_mem", locate_memory: { reqs: ["dpu_fusion"], loc: { devs: [{name: "ACC"}] } } }
-    passes: { name: "cache_dpu_in", cache: { reqs: ["dpu"], dirs: [ In ], mem_loc: { devs: [{name: "MRM"}] }, xfer_loc: { devs: [{name: "IDU"}] } } }
-    passes: { name: "cache_dpu_out", cache: { reqs: ["dpu"], dirs: [ Out ], mem_loc: { devs: [{name: "ACC"}] }, xfer_loc: { devs: [{name: "ODU"}] } } }
-    passes: { name: "loc_dpu_fused", locate_block: { reqs: ["eltwise", "dpu_fusion"], loc: { devs: [{name: "MPE"}] } } }
-    passes: { name: "loc_dpu_eltwise", locate_inner_block: { reqs: ["dpu"], inner_reqs: ["eltwise"], loc: { devs: [{name: "MPE"}] } } }
-    passes: {
-            name: "schedule_main",
-            schedule: {
-                reqs: ["main"],
-                mem_loc: { devs: [{name: "CMX"}] },
-                mem_KiB: 128,
-                alignment: 16,
-                xfer_loc: { devs: [{name: "DMA"}] }
-            }
-    },
-    passes: { name: "prune_refs", prune_refs: { reqs: ["program"] } },
-    passes: { name: "place_program", memory_placement: { reqs: ["program"], locs: [{ devs: [{name: "DRAM"}] }], alignment: 4 } }
+  ]
   )";
   return ParseProtoText<proto::Stage>(cfg_tmpl);
 }

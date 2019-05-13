@@ -2,14 +2,12 @@
 
 #pragma once
 
-#include <map>
 #include <memory>
 #include <set>
-#include <vector>
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/codegen/deps.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -51,28 +49,14 @@ void RunOnBlocksBackward(stripe::Block* root, const stripe::Tags& reqs, const F&
 
 void DeadCodeElimination(const AliasMap& alias_map, stripe::Block* block);
 
-inline void DeadCodeEliminationPass(stripe::Block* root, const proto::GenericPass& options, bool fix_deps) {
-  auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocksBackward(root, reqs,
-                      [](const AliasMap& alias_map, stripe::Block* block) {  //
-                        DeadCodeElimination(alias_map, block);
-                      },
-                      true);
+class DeadCodeEliminationPass final : public CompilePass {
+ public:
+  explicit DeadCodeEliminationPass(const proto::DeadCodeEliminationPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
 
-  RunOnBlocks(root, reqs,
-              [&](const AliasMap& map, stripe::Block* block) {  //
-                if (fix_deps) {
-                  // Rebuild deps
-                  ComputeDepsForBlock(block, map);
-                } else {
-                  // Clean up deps after use
-                  for (auto& stmt : block->stmts) {
-                    stmt.get()->deps.clear();
-                  }
-                }
-              },
-              true);
-}
+ private:
+  proto::DeadCodeEliminationPass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

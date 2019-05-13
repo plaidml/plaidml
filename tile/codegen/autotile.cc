@@ -263,7 +263,7 @@ struct PartitionComputeCostModel {
   size_t num_parts;
   std::set<const Index*> acc_idxs;
 
-  PartitionComputeCostModel(const Block& block, const proto::PartitionPass& options)
+  PartitionComputeCostModel(const Block& block, const proto::PartitionComputePass& options)
       : num_parts(options.num_parts()),  //
         acc_idxs(block.accumulation_idxs()) {}
 
@@ -361,9 +361,9 @@ boost::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool
 
 }  // namespace
 
-void AutotilePass(Block* root, const proto::AutotilePass& options) {
-  auto reqs = FromProto(options.reqs());
-  RunOnBlocks(root, reqs, [&options](const AliasMap& map, Block* block) {
+void AutotilePass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [this](const AliasMap& map, Block* block) {
     if (block->has_tag("cache")) {
       for (const auto& ref : block->refs) {
         if (IsWriteDir(ref.dir) && ref.location.devs[0].name == "REGISTER") {
@@ -372,24 +372,24 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
         }
       }
     }
-    ComputeDensityCostModel model(*block, options);
-    auto result = PickBestTile(*block, options.only_po2(), options.only_even(), options.only_multiple_of_32(),
-                               options.fast(), model);
+    ComputeDensityCostModel model(*block, options_);
+    auto result = PickBestTile(*block, options_.only_po2(), options_.only_even(), options_.only_multiple_of_32(),
+                               options_.fast(), model);
     if (result) {
       IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result->tile << ", cost: " << result->cost);
-      const TileShape& tiling_shape = options.flip() ? result->tile.counts() : result->tile.sizes();
-      if (ApplyTile(block, tiling_shape, false, false, options.flip(), options.split_unaligned(),
-                    options.location_idx_tag())) {
+      const TileShape& tiling_shape = options_.flip() ? result->tile.counts() : result->tile.sizes();
+      if (ApplyTile(block, tiling_shape, false, false, options_.flip(), options_.split_unaligned(),
+                    options_.location_idx_tag())) {
         auto inner = block->SubBlock(0);
-        if (options.copy_tags()) {
+        if (options_.copy_tags()) {
           inner->set_attrs(*block);
         }
-        if (options.clear_outer()) {
+        if (options_.clear_outer()) {
           block->clear_tags();
         }
-        block->add_tags(FromProto(options.outer_set()));
-        inner->add_tags(FromProto(options.inner_set()));
-        if (options.clear_location()) {
+        block->add_tags(FromProto(options_.outer_set()));
+        inner->add_tags(FromProto(options_.inner_set()));
+        if (options_.clear_location()) {
           block->location = Location{};
         }
       }
@@ -399,11 +399,11 @@ void AutotilePass(Block* root, const proto::AutotilePass& options) {
   });
 }
 
-void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& options) {
-  auto reqs = FromProto(options.reqs());
-  RunOnBlocks(root, reqs, [&options](const AliasMap& map, Block* block) {
-    PartitionComputeCostModel model(*block, options);
-    auto result = PickBestTile(*block, false, false, options.only_multiple_of_32(), false, model);
+void PartitionComputePass::Apply(stripe::Block* root) const {
+  auto reqs = FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [this](const AliasMap& map, Block* block) {
+    PartitionComputeCostModel model(*block, options_);
+    auto result = PickBestTile(*block, false, false, options_.only_multiple_of_32(), false, model);
     if (result) {
       IVLOG(2, "PartitionCompute> block: " << block->name                 //
                                            << ", tile: " << result->tile  //
@@ -412,11 +412,11 @@ void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& optio
         auto inner = block->SubBlock(0);
         inner->set_attrs(*block);
         block->clear_tags();
-        block->add_tags(FromProto(options.set_tags()));
-        if (!options.idx_tag().empty()) {
+        block->add_tags(FromProto(options_.set_tags()));
+        if (!options_.idx_tag().empty()) {
           for (auto& idx : block->idxs) {
             if (idx.range > 1) {
-              idx.set_tag(options.idx_tag());
+              idx.set_tag(options_.idx_tag());
             }
             // HACK: remove this somehow
             idx.remove_tag("bank");
@@ -427,6 +427,13 @@ void PartitionComputePass(stripe::Block* root, const proto::PartitionPass& optio
   });
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<AutotilePass, proto::AutotilePass>::Register();
+  CompilePassFactory<PartitionComputePass, proto::PartitionComputePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
