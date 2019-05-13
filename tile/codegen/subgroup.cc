@@ -19,10 +19,8 @@ struct SubgroupPlan {
 };
 
 class SubgroupCostModel {
-
-public:
-  SubgroupCostModel(stripe::Block *block, const SubgroupPlan &plan,
-                    const proto::SubgroupPass &options)
+ public:
+  SubgroupCostModel(stripe::Block* block, const SubgroupPlan& plan, const proto::SubgroupPass& options)
       : block_(block), plan_(plan), options_(options) {}
 
   void ComputeCost() {
@@ -123,7 +121,7 @@ public:
       // Get the range of this index
       size_t range = block_->idx_by_name(idx)->range;
       if (range % plan_.subgroup_size != 0 && do_subgroup == 1) {
-        continue; // Skip the subgroup if not even divison by subgroup size
+        continue;  // Skip the subgroup if not even divison by subgroup size
       }
       if (do_subgroup) {
         // If we are doing subgrouping, set + reduce range
@@ -144,7 +142,7 @@ public:
     return;
   }
 
-  double BestCost(SubgroupPlan *best_plan) {
+  double BestCost(SubgroupPlan* best_plan) {
     best_cost_ = std::numeric_limits<double>::infinity();
     for (int i = 0; i < options_.subgroup_sizes().size(); ++i) {
       plan_.subgroup_size = options_.subgroup_sizes()[i];
@@ -155,16 +153,15 @@ public:
     return best_cost_;
   }
 
-private:
-  stripe::Block *block_;
+ private:
+  stripe::Block* block_;
   SubgroupPlan plan_;
   double best_cost_;
   SubgroupPlan best_plan_;
   proto::SubgroupPass options_;
 };
 
-void Subgroup(stripe::Block *block, const AliasMap &map,
-              const proto::SubgroupPass &options) {
+void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPass& options) {
   if (block->constraints.size()) {
     IVLOG(1, "Failed due to constraints");
     return;
@@ -175,12 +172,12 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
   }
   // Setup an empty plan
   SubgroupPlan plan;
-  for (const auto &idx : block->idxs) {
+  for (const auto& idx : block->idxs) {
     if (idx.affine == stripe::Affine()) {
       plan.idxs.push_back(idx.name);
     } else {
       IVLOG(1, "Failed due to passthrus");
-      return; // Right now we don't handle this case
+      return;  // Right now we don't handle this case
     }
   }
   // Compute optimal plan
@@ -203,29 +200,26 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
   std::map<std::string, size_t> inner_tile;
   std::map<std::string, stripe::Affine> replace;
   std::vector<stripe::Index> inner_idxs;
-  for (const auto &idx : plan.idxs) {
+  for (const auto& idx : plan.idxs) {
     inner_tile[idx] = plan.subgroup_tile[idx] * plan.extra_tile[idx];
     inner_idxs.emplace_back(idx + "_e", plan.extra_tile[idx]);
     if (plan.subgroup_tile[idx] == size_t(plan.subgroup_size)) {
       inner_idxs.emplace_back(idx + "_i", plan.subgroup_tile[idx]);
-      replace[idx] = stripe::Affine(idx + "_e") * plan.subgroup_tile[idx] +
-                     stripe::Affine(idx + "_i");
+      replace[idx] = stripe::Affine(idx + "_e") * plan.subgroup_tile[idx] + stripe::Affine(idx + "_i");
     } else {
       replace[idx] = stripe::Affine(idx + "_e");
     }
   }
   // Compute all the refinements for the various blocks
-  std::set<stripe::Refinement> reg_allocs;    // Allocations of register caches
-  std::set<stripe::Refinement> reg_passthrus; // Passthru's for register caches
-  std::set<stripe::Refinement> reg_inners;    // Passthru's for register caches
-  std::map<std::string, stripe::Refinement>
-      orig_by_name; // Passthru's for register caches
-  std::map<std::string, stripe::Refinement>
-      inner_by_name; // Passthru's for register caches
-  for (const auto &oref : block->refs) {
+  std::set<stripe::Refinement> reg_allocs;                  // Allocations of register caches
+  std::set<stripe::Refinement> reg_passthrus;               // Passthru's for register caches
+  std::set<stripe::Refinement> reg_inners;                  // Passthru's for register caches
+  std::map<std::string, stripe::Refinement> orig_by_name;   // Passthru's for register caches
+  std::map<std::string, stripe::Refinement> inner_by_name;  // Passthru's for register caches
+  for (const auto& oref : block->refs) {
     // Modify original reference to remove constants
     stripe::Refinement ref = oref;
-    for (auto &aff : ref.access) {
+    for (auto& aff : ref.access) {
       aff.setConstant(0);
     }
     // Start with the normal interior tiling
@@ -244,8 +238,7 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
     // Build the actual allocation
     std::vector<stripe::Affine> reg_access(reg_shape.dims.size());
     stripe::Refinement reg_ref =
-        stripe::Refinement(stripe::RefDir::None, "", ref.into() + "_reg",
-                           reg_access, reg_shape, ref.agg_op);
+        stripe::Refinement(stripe::RefDir::None, "", ref.into() + "_reg", reg_access, reg_shape, ref.agg_op);
     if (ridx.size()) {
       reg_ref.bank_dim = stripe::BankDimension{sizes.size()};
     }
@@ -276,7 +269,7 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
   // Now, prepare to tile the block
   TileShape threaded_ts, accum_ts, inner_ts;
   stripe::Affine out_flat = block->ref_outs()[0]->FlatAccess();
-  for (const auto &idx : plan.idxs) {
+  for (const auto& idx : plan.idxs) {
     size_t prod = 1;
     prod *= (idx == plan.thread_idx ? 1 : plan.subgroup_tile[idx]);
     prod *= plan.extra_tile[idx];
@@ -292,13 +285,13 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
   }
 
   // Do the tiling and name each block
-  stripe::Block *outer = block;
+  stripe::Block* outer = block;
   ApplyTile(outer, threaded_ts, false);
-  stripe::Block *thread = block->SubBlock(0).get();
+  stripe::Block* thread = block->SubBlock(0).get();
   ApplyTile(thread, accum_ts, false, false, true);
-  stripe::Block *accum = thread->SubBlock(0).get();
+  stripe::Block* accum = thread->SubBlock(0).get();
   ApplyTile(accum, inner_ts, false);
-  stripe::Block *inner = accum->SubBlock(0).get();
+  stripe::Block* inner = accum->SubBlock(0).get();
 
   // Change up the inner indexes
   inner->idxs = inner_idxs;
@@ -312,25 +305,23 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
   // Pass the thread_id through
   accum->idxs.emplace_back("thread_idx", 1, stripe::Affine(plan.thread_idx));
   inner->idx_by_name(plan.thread_idx + "_i")->range = 1;
-  inner->idx_by_name(plan.thread_idx + "_i")->affine =
-      stripe::Affine("thread_idx");
+  inner->idx_by_name(plan.thread_idx + "_i")->affine = stripe::Affine("thread_idx");
 
   // Adjust offset of other subgroup refinement
-  for (auto &ref : thread->refs) {
-    if (plan.ref_idx[ref.into()] != "" &&
-        plan.ref_idx[ref.into()] != plan.thread_idx) {
+  for (auto& ref : thread->refs) {
+    if (plan.ref_idx[ref.into()] != "" && plan.ref_idx[ref.into()] != plan.thread_idx) {
       ref.mut().access[ref.access.size() - 1] = stripe::Affine(plan.thread_idx);
     }
   }
 
   // Make the base transfer blocks
   std::map<std::string, std::shared_ptr<stripe::Block>> xfer_blocks;
-  for (const auto &kvp : orig_by_name) {
+  for (const auto& kvp : orig_by_name) {
     std::string ri = kvp.first;
     stripe::Refinement orig = kvp.second;
     auto xfer = std::make_shared<stripe::Block>();
 
-    for (const auto &idx : inner_idxs) {
+    for (const auto& idx : inner_idxs) {
       if (orig.FlatAccess()[idx.name.substr(0, idx.name.size() - 2)]) {
         xfer->idxs.push_back(idx);
       }
@@ -338,10 +329,9 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
     std::string ref_idx = plan.ref_idx[ri];
     auto repl = replace;
     if (ref_idx.size()) {
-      repl[ref_idx] =
-          stripe::Affine(ref_idx + "_e", plan.subgroup_tile[ref_idx]);
+      repl[ref_idx] = stripe::Affine(ref_idx + "_e", plan.subgroup_tile[ref_idx]);
     }
-    for (auto &poly : orig.access) {
+    for (auto& poly : orig.access) {
       poly = poly.sym_eval(repl);
     }
     xfer->refs.emplace(orig);
@@ -350,8 +340,8 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
       xfer->idx_by_name(ref_idx + "_i")->range = 1;
       xfer->idx_by_name(ref_idx + "_i")->affine = stripe::Affine("thread_idx");
     }
-    for (auto &xref : xfer->refs) {
-      for (auto &dim : xref.mut().interior_shape.dims) {
+    for (auto& xref : xfer->refs) {
+      for (auto& dim : xref.mut().interior_shape.dims) {
         dim.size = 1;
       }
     }
@@ -359,29 +349,26 @@ void Subgroup(stripe::Block *block, const AliasMap &map,
   }
 
   // Add them in the appropriate places and add the load/stores as required
-  for (const stripe::Refinement *ref : block->ref_ins()) {
+  for (const stripe::Refinement* ref : block->ref_ins()) {
     auto load = xfer_blocks[ref->into()];
     load->stmts.push_back(std::make_shared<stripe::Load>(ref->into(), "$x"));
-    load->stmts.push_back(
-        std::make_shared<stripe::Store>("$x", ref->into() + "_reg"));
+    load->stmts.push_back(std::make_shared<stripe::Store>("$x", ref->into() + "_reg"));
     load->ref_by_into(ref->into() + "_reg")->mut().dir = stripe::RefDir::Out;
     load->set_tag("subgroup_read");
     load->set_tag("subgroup_inline");
     accum->stmts.push_front(load);
   }
-  for (const stripe::Refinement *ref : block->ref_outs()) {
+  for (const stripe::Refinement* ref : block->ref_outs()) {
     auto store = xfer_blocks[ref->into()];
-    store->stmts.push_back(
-        std::make_shared<stripe::Load>(ref->into() + "_reg", "$x"));
+    store->stmts.push_back(std::make_shared<stripe::Load>(ref->into() + "_reg", "$x"));
     store->stmts.push_back(std::make_shared<stripe::Store>("$x", ref->into()));
     store->ref_by_into(ref->into() + "_reg")->mut().dir = stripe::RefDir::In;
-    store->idx_by_name(plan.thread_idx + "_i")->affine =
-        stripe::Affine(plan.thread_idx);
+    store->idx_by_name(plan.thread_idx + "_i")->affine = stripe::Affine(plan.thread_idx);
     store->set_tag("subgroup_write");
     store->set_tag("subgroup_inline");
     thread->stmts.push_back(store);
   }
-  for (auto &stmt : inner->stmts) {
+  for (auto& stmt : inner->stmts) {
     auto load = stripe::Load::Downcast(stmt);
     if (!load) {
       continue;
@@ -464,16 +451,13 @@ void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_by
       if (read_align_bytes >= data_size) {
         if (read_align_bytes % data_size == 0) {
           read_align = read_align_bytes / data_size;
-        }
-        else {
+        } else {
           continue;
         }
-      }
-      else {
+      } else {
         if (data_size % read_align_bytes == 0) {
           read_align = 1;
-        }
-        else {
+        } else {
           continue;
         }
       }
@@ -481,16 +465,13 @@ void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_by
       if (write_align_bytes >= data_size) {
         if (write_align_bytes % data_size == 0) {
           write_align = write_align_bytes / data_size;
-        }
-        else {
+        } else {
           continue;
         }
-      }
-      else {
+      } else {
         if (data_size % write_align_bytes == 0) {
           write_align = 1;
-        }
-        else {
+        } else {
           continue;
         }
       }
@@ -515,6 +496,27 @@ void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_by
   TagTx(block, elems);
 }
 
+void SubgroupPass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+    Subgroup(block, map, options_);
+  });
+}
+
+void VectorizePass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [this](const AliasMap& map, stripe::Block* block) {  //
+    VectorizeTx(block, map, options_.read_align_bytes(), options_.write_align_bytes());
+  });
+}
+
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<SubgroupPass, proto::SubgroupPass>::Register();
+  CompilePassFactory<VectorizePass, proto::VectorizePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

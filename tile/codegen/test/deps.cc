@@ -49,9 +49,9 @@ TEST(DepsTest, SmallDepMix) {
   gp::TextFormat::ParseFromString(input_text, &input_proto);
 
   auto block = stripe::FromProto(input_proto);
-  proto::GenericPass options;
+  proto::ComputeDepsPass options;
   options.add_reqs("main");
-  ComputeDepsPass(block.get(), options);
+  ComputeDepsPass(options).Apply(block.get());
 
   const char* expected = R"(
     loc {}
@@ -137,9 +137,9 @@ TEST(DepsTest, Subregion) {
   gp::TextFormat::ParseFromString(input_text, &input_proto);
 
   auto block = stripe::FromProto(input_proto);
-  proto::GenericPass options;
+  proto::ComputeDepsPass options;
   options.add_reqs("main");
-  ComputeDepsPass(block.get(), options);
+  ComputeDepsPass(options).Apply(block.get());
 
   const char* expected = R"(
     loc {}

@@ -18,38 +18,72 @@ local PARAMS = {
             // First, we place all the initial buffer in global memory (DRAM)
             {
               name: 'loc_program',
-              locate_memory: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
                 reqs: ['program'],
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
             {
               name: 'loc_main',
-              locate_memory: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
                 reqs: ['main'],
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
 
             // Prune indexes
-            { name: 'prune_idxs', prune_idxs: { reqs: ['all'] } },
+            {
+              name: 'prune_idxs',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
+                reqs: ['all']
+              }
+            },
 
             // Eliminate the dead code first
-            { name: 'dead_code_elimination', dead_code_elimination: { reqs: ['all'] } },
+            {
+              name: 'dead_code_elimination',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.DeadCodeEliminationPass',
+                reqs: ['all']
+              }
+            },
 
             // Lower temps
-            { name: 'localize_tmps', localize: { reqs: ['program'], ref_reqs: ['tmp'] } },
+            {
+              name: 'localize_tmps',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
+                reqs: ['program'],
+                ref_reqs: ['tmp']
+              }
+            },
 
             // Reorder Blocks
-            //{ "name": "reorder_blocks", "reorder_blocks" : {"reqs": ["program"] } },
+            // {
+            //   name: 'reorder_blocks',
+            //   pass : {
+            //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
+            //     reqs: ['program']
+            //   }
+            // },
 
             // Padding, disabled for now due ot issues with gradiants
-            { name: 'pad', pad: { reqs: ['main'] } },
+            {
+              name: 'pad',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PadPass',
+                reqs: ['main']
+              }
+            },
 
             // Do subgroup pass
             {
               name: 'subgroup',
-              subgroup: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.SubgroupPass',
                 reqs: ['contraction'],
                 mem_latency: PARAMS[cfg].GLOBAL_MEM_LAT,
                 cache_latency: PARAMS[cfg].LOCAL_MEM_LAT,
@@ -62,7 +96,8 @@ local PARAMS = {
             // Do a backup codegen on any remaining contractions
             {
               name: 'tile_fallback',
-              autotile: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['contraction'],  // Apply to only dense operations
                 outer_set: ['fallback_outer', 'kernel', 'no_threads'],
                 inner_set: ['fallback_inner'],
@@ -78,7 +113,8 @@ local PARAMS = {
             },
             {
               name: 'cache_backup',
-              cache: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.CachePass',
                 reqs: ['fallback_outer'],
                 dirs: ['Out'],
                 mem_loc: { devs: [{ name: 'LOCAL' }] },
@@ -87,22 +123,62 @@ local PARAMS = {
             },
 
             // Clean up extra indexes
-            // { "name": "subgroup_prune", "prune_idxs": { "reqs": ["main"] } },
+            // {
+            //   name: 'subgroup_prune',
+            //   pass: {
+            //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
+            //     reqs: ['main']
+            //   }
+            // },
 
             // Next we fuse in any element-wise operations which operate on the output of contraction block
             // We need to fuse through multiple levels of the hierarchy
-            { name: 'fuse_contract_eltwise_1', fusion: { a_reqs: ['subgroup_outer'], b_reqs: ['eltwise'] } },
-            { name: 'fuse_contract_eltwise_2', fusion: { a_reqs: ['subgroup_thread'], b_reqs: ['eltwise'] } },
-            { name: 'fuse_contract_eltwise_3', fusion: { a_reqs: ['subgroup_write'], b_reqs: ['eltwise'] } },
+            {
+              name: 'fuse_contract_eltwise_1',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['subgroup_outer'],
+                b_reqs: ['eltwise']
+              }
+            },
+            {
+              name: 'fuse_contract_eltwise_2',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['subgroup_thread'],
+                b_reqs: ['eltwise']
+              }
+            },
+            {
+              name: 'fuse_contract_eltwise_3',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['subgroup_write'],
+                b_reqs: ['eltwise']
+              }
+            },
 
             // Clean things up to allow further optimizations
-            { name: 'fuse_clean_1', prune_idxs: { reqs: ['main'] } },
-            { name: 'fuse_clean_2', prune_refs: { reqs: ['main'] } },
+            {
+              name: 'fuse_clean_1',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
+                reqs: ['main']
+              }
+            },
+            {
+              name: 'fuse_clean_2',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneRefinementsPass',
+                reqs: ['main']
+              }
+            },
 
             // Then we fuse multiple eltwise things
             {
               name: 'fuse_eltwise_eltwise',
-              fusion: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 parent_reqs: ['main'],
                 a_reqs: ['eltwise'],
                 b_reqs: ['eltwise'],
@@ -112,13 +188,26 @@ local PARAMS = {
 
             // Then we 'localize' buffers, which moves any temporaries the only are needed to hold the output
             // of dense computations before they are used on elementwise operations into the interior of the fused blocks
-            { name: 'localize_main', localize: { reqs: ['main'] } },
-            { name: 'scalarize_main', scalarize: { reqs: ['main'] } },
+            {
+              name: 'localize_main',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
+                reqs: ['main']
+              }
+            },
+            {
+              name: 'scalarize_main',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ScalarizePass',
+                reqs: ['main']
+              }
+            },
 
             // Let's do some additional threading
             {
               name: 'tile_subgroups',
-              autotile: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['subgroup_outer'],  // Apply to only dense operations
                 outer_set: ['subgroup_outer', 'kernel'],
                 inner_set: ['gpu_thread', 'subgroup_othreads'],
@@ -132,7 +221,8 @@ local PARAMS = {
             // Do a backup codegen on eltwise stuff
             {
               name: 'tile_elt_fallback',
-              autotile: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['eltwise', 'kernel'],  // Apply to eltwise ops
                 outer_set: ['fallback_elt_outer', 'kernel', 'no_threads'],
                 inner_set: ['fallback_elt_inner'],
@@ -148,13 +238,43 @@ local PARAMS = {
             },
 
             // After all fusion, eliminate dead code again
-            { name: 'dead_code_elimination', dead_code_elimination: { reqs: ['all'] } },
+            {
+              name: 'dead_code_elimination',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.DeadCodeEliminationPass',
+                reqs: ['all']
+              }
+            },
 
-            { name: 'cleanup1', prune_refs: { reqs: ['main'] } },
-            { name: 'cleanup2', prune_idxs: { reqs: ['main'] } },
+            {
+              name: 'cleanup1',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneRefinementsPass',
+                reqs: ['main']
+              }
+            },
+            {
+              name: 'cleanup2',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
+                reqs: ['main']
+              }
+            },
 
-            { name: 'localize_main', localize: { reqs: ['main'] } },
-            { name: 'scalarize_main', scalarize: { reqs: ['main'] } },
+            {
+              name: 'localize_main',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
+                reqs: ['main']
+              }
+            },
+            {
+              name: 'scalarize_main',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ScalarizePass',
+                reqs: ['main']
+              }
+            },
           ],
         },
       },

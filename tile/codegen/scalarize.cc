@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "tile/codegen/alias.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -105,6 +106,19 @@ void Scalarize(Block* block, bool recursive) {
   }
 }
 
+void ScalarizePass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
+    Scalarize(block, true);
+  });
+}
+
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<ScalarizePass, proto::ScalarizePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

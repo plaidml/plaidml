@@ -3,6 +3,7 @@
 #pragma once
 
 #include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -10,9 +11,24 @@ namespace tile {
 namespace codegen {
 
 void PruneIndexes(stripe::Block* block, const stripe::Tags& exclude_tags);
-void PruneIndexesPass(stripe::Block* root, const proto::GenericPass& options);
 
-void PruneRefinementsPass(stripe::Block* root, const proto::GenericPass& options);
+class PruneIndexesPass final : public CompilePass {
+ public:
+  explicit PruneIndexesPass(const proto::PruneIndexesPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::PruneIndexesPass options_;
+};
+
+class PruneRefinementsPass final : public CompilePass {
+ public:
+  explicit PruneRefinementsPass(const proto::PruneRefinementsPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::PruneRefinementsPass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

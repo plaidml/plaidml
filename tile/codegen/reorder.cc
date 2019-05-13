@@ -12,30 +12,30 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-using namespace stripe; // NOLINT
-using namespace math;   // NOLINT
+using namespace stripe;  // NOLINT
+using namespace math;    // NOLINT
 
 typedef std::shared_ptr<Statement> StmtPtr;
 
 struct StmtList {
-  bool eltwise; // If all stmts in the list are element-wise blocks
-  std::vector<StmtPtr> stmts;    // Statements in order
-  std::vector<size_t> shape;     // The block shape
-  std::set<std::string> inputs;  // input refinements
-  std::set<std::string> outputs; // output refinements;
-  std::set<StmtPtr> deps;        // The stmts that this list depends on
+  bool eltwise;                   // If all stmts in the list are element-wise blocks
+  std::vector<StmtPtr> stmts;     // Statements in order
+  std::vector<size_t> shape;      // The block shape
+  std::set<std::string> inputs;   // input refinements
+  std::set<std::string> outputs;  // output refinements;
+  std::set<StmtPtr> deps;         // The stmts that this list depends on
 };
 
-static bool RefMatchIdx(const Refinement &ref, Block *block) {
+static bool RefMatchIdx(const Refinement& ref, Block* block) {
   std::set<std::string> idx_set;
-  for (const auto &idx : block->idxs) {
+  for (const auto& idx : block->idxs) {
     idx_set.insert(idx.name);
   }
-  for (const auto &acc : ref.access) {
+  for (const auto& acc : ref.access) {
     if (acc == Affine()) {
       continue;
     }
-    const auto &acc_map = acc.getMap();
+    const auto& acc_map = acc.getMap();
     if (acc_map.size() > 1) {
       return false;
     }
@@ -47,9 +47,8 @@ static bool RefMatchIdx(const Refinement &ref, Block *block) {
   return true;
 }
 
-static bool Depends(std::shared_ptr<StmtList> sl0,
-                    std::shared_ptr<StmtList> sl1) {
-  for (const auto &stmt : sl0->stmts) {
+static bool Depends(std::shared_ptr<StmtList> sl0, std::shared_ptr<StmtList> sl1) {
+  for (const auto& stmt : sl0->stmts) {
     if (sl1->deps.find(stmt) != sl1->deps.end()) {
       return true;
     }
@@ -61,12 +60,11 @@ static bool Depends(std::shared_ptr<StmtList> sl0,
 // 1) be blocks with same shape
 // 2) be element-wise
 // 3) s0's output is s1's input
-static bool MayFuse(std::shared_ptr<StmtList> s0,
-                    std::shared_ptr<StmtList> s1) {
+static bool MayFuse(std::shared_ptr<StmtList> s0, std::shared_ptr<StmtList> s1) {
   if (!s0->eltwise || !s1->eltwise || s0->shape != s1->shape) {
     return false;
   }
-  for (const auto &out : s0->outputs) {
+  for (const auto& out : s0->outputs) {
     if (s1->inputs.find(out) != s1->inputs.end()) {
       return true;
     }
@@ -74,7 +72,7 @@ static bool MayFuse(std::shared_ptr<StmtList> s0,
   return false;
 }
 
-void DoReorderBlocks(Block *root) {
+void ReorderBlocksPass::Apply(Block* root) const {
   auto main_block = root->SubBlock(0);
   if (!main_block->has_tag("main")) {
     throw std::runtime_error("Input non-root block for block reordering pass.");
@@ -88,16 +86,16 @@ void DoReorderBlocks(Block *root) {
 
   std::vector<std::shared_ptr<StmtList>> stmt_list;
 
-  for (const auto &stmt : main_block->stmts) {
+  for (const auto& stmt : main_block->stmts) {
     auto block = Block::Downcast(stmt);
     auto sl = std::make_shared<StmtList>();
     sl->stmts.push_back(stmt);
-    for (const auto &dep_stmt_it : stmt->deps) {
+    for (const auto& dep_stmt_it : stmt->deps) {
       sl->deps.insert(*dep_stmt_it);
     }
     if (block && block->has_tag("eltwise")) {
       sl->eltwise = true;
-      for (const auto &ref : block->refs) {
+      for (const auto& ref : block->refs) {
         if (!RefMatchIdx(ref, block.get())) {
           sl->eltwise = false;
         }
@@ -124,29 +122,28 @@ void DoReorderBlocks(Block *root) {
     bool fused = false;
     // Decide if sl0 can be fused by any following stmt
     for (auto it = stmt_list.begin(); it != stmt_list.end(); ++it) {
-      auto &sl1 = *it;
+      auto& sl1 = *it;
       if (MayFuse(sl0, sl1)) {
         IVLOG(1, "Fuse: ");
-        for (const auto &s : sl0->stmts) {
+        for (const auto& s : sl0->stmts) {
           auto block = Block::Downcast(s);
           IVLOG(1, "    " << block->name);
         }
-        for (const auto &s : sl1->stmts) {
+        for (const auto& s : sl1->stmts) {
           auto block = Block::Downcast(s);
           IVLOG(1, "    " << block->name);
         }
         // merge stmts
-        sl1->stmts.insert(sl1->stmts.begin(), sl0->stmts.begin(),
-                          sl0->stmts.end());
+        sl1->stmts.insert(sl1->stmts.begin(), sl0->stmts.begin(), sl0->stmts.end());
         // merge deps
-        for (auto &s : sl0->stmts) {
+        for (auto& s : sl0->stmts) {
           if (sl1->deps.find(s) != sl1->deps.end()) {
             sl1->deps.erase(s);
           }
         }
         // merge inputs and outputs
         sl1->deps.insert(sl0->deps.begin(), sl0->deps.end());
-        for (auto &out : sl0->outputs) {
+        for (auto& out : sl0->outputs) {
           if (sl1->inputs.find(out) != sl1->inputs.end()) {
             sl1->inputs.erase(out);
           }
@@ -168,6 +165,12 @@ void DoReorderBlocks(Block *root) {
   main_block->stmts = done;
 }
 
-} // namespace codegen
-} // namespace tile
-} // namespace vertexai
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<ReorderBlocksPass, proto::ReorderBlocksPass>::Register();
+  return 0;
+}();
+}  // namespace
+}  // namespace codegen
+}  // namespace tile
+}  // namespace vertexai

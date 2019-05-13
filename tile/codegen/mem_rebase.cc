@@ -8,8 +8,8 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void MemRebasePass(stripe::Block* root, const proto::MemRebasePass& options) {
-  auto offset = stripe::FromProto(options.offset());
+void MemRebasePass::Apply(stripe::Block* root) const {
+  auto offset = stripe::FromProto(options_.offset());
 
   std::queue<stripe::Block*> todo;
   todo.push(root);
@@ -19,7 +19,7 @@ void MemRebasePass(stripe::Block* root, const proto::MemRebasePass& options) {
     todo.pop();
 
     for (auto& ref : block->refs) {
-      if (ref.location != options.pattern()) {
+      if (ref.location != options_.pattern()) {
         continue;
       }
       std::map<std::string, std::int64_t> vars{{"offset", ref.offset}};
@@ -40,6 +40,12 @@ void MemRebasePass(stripe::Block* root, const proto::MemRebasePass& options) {
   }
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<MemRebasePass, proto::MemRebasePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

@@ -668,20 +668,20 @@ void StencilPassRecurse(Block* block, const StencilPassOptions& options) {
   }
 }
 
-void StencilPass(Block* block, const proto::StencilPass& options) {
+void StencilPass::Apply(Block* block) const {
   StencilPassOptions sopts = {
-      FromProto(options.reqs()),       // reqs
-      {},                              // specs
-      FromProto(options.outer_set()),  // set_outer
-      FromProto(options.inner_set())   // set_inner
+      FromProto(options_.reqs()),       // reqs
+      {},                               // specs
+      FromProto(options_.outer_set()),  // set_outer
+      FromProto(options_.inner_set())   // set_inner
   };
-  for (const auto& stencil : options.stencils()) {
+  for (const auto& stencil : options_.stencils()) {
     sopts.specs.push_back(stencil);
   }
-  for (const auto& input_set : options.inputs_set()) {
+  for (const auto& input_set : options_.inputs_set()) {
     sopts.set_inputs.emplace_back(FromProto(input_set.tags()));
   }
-  for (const auto& output_set : options.outputs_set()) {
+  for (const auto& output_set : options_.outputs_set()) {
     sopts.set_outputs.emplace_back(FromProto(output_set.tags()));
   }
   StencilPassRecurse(block, sopts);
@@ -717,6 +717,12 @@ bool operator<(const StencilMatch& lhs, const StencilMatch& rhs) {
          std::tie(rhs.cost, rhs.idxs);
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<StencilPass, proto::StencilPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
