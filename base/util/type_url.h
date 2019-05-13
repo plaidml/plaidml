@@ -1,3 +1,5 @@
+// Copyright 2019, Intel Corp.
+
 #pragma once
 
 namespace vertexai {

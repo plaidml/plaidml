@@ -6,14 +6,14 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
-  auto reqs = stripe::FromProto(options.reqs());
+void PackagePass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
 
   std::queue<stripe::Block*> todo;
   todo.push(root);
 
-  auto pkg_tags = stripe::FromProto(options.package_set());
-  auto subblock_tags = stripe::FromProto(options.subblock_set());
+  auto pkg_tags = stripe::FromProto(options_.package_set());
+  auto subblock_tags = stripe::FromProto(options_.subblock_set());
 
   while (todo.size()) {
     stripe::Block* outer = todo.front();
@@ -74,6 +74,12 @@ void PackagePass(stripe::Block* root, const proto::PackagePass& options) {
   }
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<PackagePass, proto::PackagePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

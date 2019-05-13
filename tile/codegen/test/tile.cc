@@ -260,7 +260,7 @@ TEST(Codegen, StencilPass) {
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
-  StencilPass(program->entry.get(), options);
+  StencilPass(options).Apply(program->entry.get());
   IVLOG(2, "\n" << *program->entry);
 
   auto data = MakeMatMulTestData();

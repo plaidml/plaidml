@@ -33,9 +33,9 @@ void RewriteLocation(stripe::Location* loc, const std::vector<Rewrite>& rewrites
 
 }  // namespace
 
-void RewriteLocationsPass(stripe::Block* root, const proto::RewriteLocationsPass& options) {
+void RewriteLocationsPass::Apply(stripe::Block* root) const {
   std::vector<Rewrite> rewrites;
-  for (const auto& rewrite : options.rewrites()) {
+  for (const auto& rewrite : options_.rewrites()) {
     rewrites.emplace_back(Rewrite{stripe::FromProto(rewrite.prefix()), stripe::FromProto(rewrite.target())});
   }
 
@@ -61,6 +61,12 @@ void RewriteLocationsPass(stripe::Block* root, const proto::RewriteLocationsPass
   }
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<RewriteLocationsPass, proto::RewriteLocationsPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

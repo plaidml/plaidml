@@ -8,6 +8,7 @@
 #include <boost/optional.hpp>
 
 #include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -41,7 +42,14 @@ bool ApplyTile(stripe::Block* outer,          //
                bool split_unaligned = false,  //
                const std::string& location_idx_tag = std::string{});
 
-void StencilPass(stripe::Block* block, const proto::StencilPass& options);
+class StencilPass final : public CompilePass {
+ public:
+  explicit StencilPass(const proto::StencilPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::StencilPass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

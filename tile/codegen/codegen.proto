@@ -4,6 +4,7 @@ syntax = "proto2";
 
 package vertexai.tile.codegen.proto;
 
+import "google/protobuf/any.proto";
 import "tile/stripe/stripe.proto";
 
 // The Configs message is the main message for the pmlc config file.
@@ -37,107 +38,48 @@ message Pass {
   // The name of the pass is programmer convenience used in various debugging
   // messages but it otherwise has no semantic meaning.
   required string name = 1;
-  // The pass itself.  Many passes have their own set of parameters, but simple
-  // passes which only have a tag selector use GenericPass as their
-  // configuration.  All passes with their own configs are described in greater
-  // detail near their configs.
-  oneof pass {
-    // Puts specific memory transfers (DMA's etc) on the boundary of matching
-    // blocks, details in config section below.
-    CachePass cache = 2;
-    // The compute_deps pass determines which statements within a block depend
-    // on which others via data-flow and sets the deps field on the statements.
-    GenericPass compute_deps = 3;
-    // Fuses multiple blocks which operate over similar loop ranges.
-    FusionPass fusion = 4;
-    // A localize pass detects allocations (refinements with dir = None) which
-    // are only used in a single inner block, and moves the allocation into the
-    // inner block, shrinking it if possible, since often only a portion of the
-    // buffer is used for each index position.  Repeated recursively.
-    GenericPass localize = 5;
-    // The locate passes attach hardware locations to various Stripe objects.
-    // Locate block sets the location on all matching blocks.
-    LocatePass locate_block = 6;
-    // Locate inner block set the location of all children blocks of a block.
-    LocatePass locate_inner_block = 7;
-    // Locate memory sets a location on the memory declared in matching blocks.
-    LocatePass locate_memory = 8;
-    // Determines the physical location in memory for each refinement within
-    // a program.
-    MemoryPlacementPass memory_placement = 9;
-    // The scalarize pass looks for refinements which (usually due to
-    // localization) now hold only a single element, and replaces loads/stores
-    // to the buffers with scalars, inducing temporaries as needed to achieve
-    // SSA form.  Also remove the unused buffers.
-    GenericPass scalarize = 10;
-    // The stencil pass attempt to rewrite block to contain an inner block that
-    // exactly matches a fixed hardware 'Stencil' or set of stencils.
-    StencilPass stencil = 11;
-    // An autotile pass breaks a block into an 'outer' and 'inner' block, such
-    // that the total amount of memory used by the inner block fits within
-    // some limits, which maximize compute density.
-    AutotilePass autotile = 12;
-    // The schedule pass determine how to order a large list of blocks,
-    // including allowing block to run concurrently where possible, while
-    // limiting the total amount of memory used by all simultaneously active
-    // blocks and allocations which are still live.  Basically the heterogeneous
-    // verison of autotile.
-    SchedulePass schedule = 13;
-    // The transpose pass reorders the layout of temporaries to maximize
-    // performance.  Details in the config section below.
-    TransposePass transpose = 14;
-    // The partition passes aim to split work of a single block up among N
-    // identical units.  Partition compute is used when multiple compute units
-    // exist on a shared memory bus, while Partition memory is used when each
-    // compute unit has it's own local memory.
-    PartitionPass partition_compute = 15;
-    PartitionPass partition_memory = 16;
-    // The unroll pass transforms an outer block loop into a series of blocks.
-    UnrollPass unroll = 17;
-    // Prune idxs removes unused indexes
-    GenericPass prune_idxs = 18;
-    // Prune refs removes unused references
-    GenericPass prune_refs = 19;
-    // The threading pass assigns elements of a dense computational block to
-    // 'threads' for use in flexible semi-SIMD architectures such as a GPU,
-    // where a single instruction decoder is shared across multiple threads.
-    ThreadInnerPass thread_inner = 20;
-    // Assign a codec to matching refinements. A codec defines the physical
-    // layout of a tensor on a particular hardware device.
-    AssignCodecPass assign_codec = 21;
-    // Rebases memory allocations.
-    MemRebasePass mem_rebase = 22;
-    // Remove redundant constraints and impossible blocks,
-    // and reduce the index range (light-weight).
-    ConstraintReductionPass light_cstr_reduction = 23;
-    // Remove redundant constraints and impossible blocks,
-    // and reduce the index range using integer linear programming
-    ConstraintReductionPass ilp_cstr_reduction = 24;
-    // Dead code elimination
-    GenericPass dead_code_elimination = 25;
-    // Packages blocks into subblocks.
-    PackagePass package_blocks = 26;
-    // Expand the size of buffers to reduce constraints required.
-    GenericPass pad = 27;
-    // Use registers as cache
-    RegisterPass register_cache = 28;
-    // Rewrite locations
-    RewriteLocationsPass rewrite_locations = 29;
-    // Divide the work into subgroups
-    SubgroupPass subgroup = 30;
-    // Reorder blocks
-    GenericPass reorder_blocks = 31;
-    // Vectorize subgroup transfers
-    VectorizePass vectorize_tx = 32;
-  }
+
+  // The pass itself.
+  required google.protobuf.Any pass = 2;
 }
 
-// Generic passes are applied to all block / refinement whose tags contain all
-// the required tags.  An empty set of requirements means the pass is applied
-// to all blocks.
-message GenericPass {
+// Dead code elimination
+message DeadCodeEliminationPass {
   repeated string reqs = 1;
-  repeated string ref_reqs = 2;
+  optional bool fix_deps = 2;
+}
+
+// The compute_deps pass determines which statements within a block
+// depend on which others via data-flow and sets the deps field on the
+// statements.
+message ComputeDepsPass {
+  repeated string reqs = 1;
+}
+
+// Expand the size of buffers to reduce constraints required.
+message PadPass {
+  repeated string reqs = 1;
+}
+
+// Reorder blocks
+message ReorderBlocksPass {}
+
+// The scalarize pass looks for refinements which (usually due to
+// localization) now hold only a single element, and replaces
+// loads/stores to the buffers with scalars, inducing temporaries as
+// needed to achieve SSA form.  Also remove the unused buffers.
+message ScalarizePass {
+  repeated string reqs = 1;
+}
+
+// PruneIndexes removes unused indexes
+message PruneIndexesPass {
+  repeated string reqs = 1;
+}
+
+// PruneRefinements removes unused references
+message PruneRefinementsPass {
+  repeated string reqs = 1;
 }
 
 // The schedule pass begins on any blocks whose tags match the tags in reqs.
@@ -232,7 +174,7 @@ message CachePass {
 }
 
 // Use registers instead of local memory as cache.
-message RegisterPass {
+message RegisterCachePass {
   // Do the register pass on blocks that match there tags
   repeated string reqs = 1;
   // The candidate refinement's location should be local_loc
@@ -289,13 +231,36 @@ message FusionPass {
   optional bool output_match = 7 [default = false];
 }
 
-// Edit the location of blocks and/or refinement to match 'loc'
-message LocatePass {
+// A localize pass detects allocations (refinements with dir = None)
+// which are only used in a single inner block, and moves the
+// allocation into the inner block, shrinking it if possible, since
+// often only a portion of the buffer is used for each index position.
+// Repeated recursively.
+message LocalizePass {
+  repeated string reqs = 1;
+  repeated string ref_reqs = 2;
+}
+
+// Edit the location of refinements to match 'loc'
+message LocateMemoryPass {
+  repeated string reqs = 1;
+  required stripe.proto.Location loc = 2;
+  optional bool append_devs = 3 [default = false];
+}
+
+// Edit the location of blocks to match 'loc'
+message LocateBlockPass {
+  repeated string reqs = 1;
+  required stripe.proto.Location loc = 2;
+  optional bool append_devs = 3 [default = false];
+}
+
+// Edit the location of blocks within some tagged blocks to match 'loc'
+message LocateInnerBlockPass {
   repeated string reqs = 1;
   repeated string inner_reqs = 2;
   required stripe.proto.Location loc = 3;
-  optional uint32 reg_size = 4;
-  optional bool append_devs = 5 [default = false];
+  optional bool append_devs = 4 [default = false];
 }
 
 // The stencil pass attempts to rewrite blocks to contain an inner block that
@@ -457,11 +422,29 @@ message TransposePass {
   repeated string alloc_reqs = 2;
 }
 
+// The partition compute pass splits a single block into an 'outer'
+// and inner block so that it can be distributed across multiple
+// symmetric hardware slices, with the compute elements sharing
+// memory.
+message PartitionComputePass {
+  // Partition blocks whose tags match reqs
+  repeated string reqs = 1;
+  // Set additional tags on the partitioned blocks
+  repeated string set_tags = 2;
+  // How many parts should be partition each block into
+  required int64 num_parts = 3;
+  // Apply tags to any indexes split by partitioning
+  optional string idx_tag = 4;
+  // Only consider tilings whose sizes are multiples of 32.
+  // This is primarily required for some arch.
+  optional bool only_multiple_of_32 = 5 [default = false];
+}
+
 // The partition pass splits a single block into an 'outer' and inner block so
 // that it can be distributed across multiple symmetric hardware slices.  There
 // are two type of partition passes, based on whether the compute elements
 // shared memory or not.
-message PartitionPass {
+message PartitionMemoryPass {
   // Partition blocks whose tags match reqs
   repeated string reqs = 1;
   // Set additional tags on the partitioned blocks
@@ -568,8 +551,15 @@ message RewriteLocationsPass {
 }
 
 // Remove redundant constraints, impossible blocks, and reduce the index
-// range.
-message ConstraintReductionPass {
+// range  (light-weight).
+message LightConstraintReductionPass {
+  repeated string reqs = 1;
+  repeated string skip_idxs = 2;
+}
+
+// Remove redundant constraints, impossible blocks, and reduce the index
+// range using integer linear programming.
+message IlpConstraintReductionPass {
   repeated string reqs = 1;
   repeated string skip_idxs = 2;
 }

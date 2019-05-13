@@ -2,15 +2,21 @@
 
 #pragma once
 
-#include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/stripe/stripe.h"
+#include "tile/codegen/compile_pass.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void MemRebasePass(stripe::Block* root, const proto::MemRebasePass& options);
+class MemRebasePass final : public CompilePass {
+ public:
+  explicit MemRebasePass(const proto::MemRebasePass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::MemRebasePass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

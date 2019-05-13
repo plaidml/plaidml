@@ -2,6 +2,7 @@
 
 #include "tile/codegen/pad.h"
 
+#include "base/util/any_factory_map.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/localize.h"
 
@@ -259,6 +260,21 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   }
 }
 
+void PadPass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RefDefineMap ref_def_map;
+  CollectRefDefine(root->SubBlock(0).get(), &ref_def_map);
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+    Pad(block, map, ref_def_map);
+  });
+}
+
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<PadPass, proto::PadPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

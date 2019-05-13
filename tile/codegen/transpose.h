@@ -3,13 +3,20 @@
 #pragma once
 
 #include "tile/codegen/codegen.pb.h"
-#include "tile/stripe/stripe.h"
+#include "tile/codegen/compile_pass.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void TransposePass(stripe::Block* root, const proto::TransposePass& options);
+class TransposePass final : public CompilePass {
+ public:
+  explicit TransposePass(const proto::TransposePass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::TransposePass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile
