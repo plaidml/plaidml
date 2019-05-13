@@ -47,13 +47,13 @@ TEST(Codegen, FuseSimple) {
   pass1.add_a_reqs("eltwise_add");
   pass1.add_b_reqs("eltwise_cmp_lt");
   pass1.add_fused_set("fused");
-  FusionPass(program->entry.get(), pass1);
+  FusionPass(pass1).Apply(program->entry.get());
 
   proto::FusionPass pass2;
   pass2.add_a_reqs("fused");
   pass2.add_b_reqs("eltwise_cond");
   pass2.add_fused_set("fused");
-  FusionPass(program->entry.get(), pass2);
+  FusionPass(pass2).Apply(program->entry.get());
 
   IVLOG(2, "After>\n" << *program->entry);
 
@@ -267,8 +267,7 @@ TEST(Codegen, FuseFancy) {
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
 
-  proto::GenericPass generic_pass;
-  PruneIndexesPass(program->entry.get(), generic_pass);
+  PruneIndexesPass(proto::PruneIndexesPass{}).Apply(program->entry.get());
 
   IVLOG(2, "Before>\n" << *program->entry);
 
@@ -335,7 +334,7 @@ TEST(Codegen, FuseAuto) {
 
   AlwaysFuseRecursive afr;
   FusionInner(main_map, main.get(), &afr);
-  LocalizePass(main_map, main.get());
+  LocalizeBlockPass(main_map, main.get());
   Scalarize(main.get(), true);
 
   IVLOG(2, "After>\n" << *program->entry);

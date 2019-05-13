@@ -3,13 +3,20 @@
 #pragma once
 
 #include "tile/codegen/codegen.pb.h"
-#include "tile/stripe/stripe.h"
+#include "tile/codegen/compile_pass.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void PartitionMemoryPass(stripe::Block* root, const proto::PartitionPass& options);
+class PartitionMemoryPass final : public CompilePass {
+ public:
+  explicit PartitionMemoryPass(const proto::PartitionMemoryPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::PartitionMemoryPass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

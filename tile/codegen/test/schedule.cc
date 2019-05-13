@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "base/proto/proto.h"
 #include "testing/matchers.h"
 #include "tile/codegen/driver.h"
 #include "tile/codegen/schedule.h"
@@ -16,13 +17,6 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 namespace test {
-
-template <typename P>
-P ParseProtoText(const std::string& txt) {
-  P proto;
-  google::protobuf::TextFormat::ParseFromString(txt, &proto);
-  return proto;
-}
 
 class ScheduleTest : public ::testing::Test {
  public:
@@ -112,7 +106,7 @@ class ScheduleTest : public ::testing::Test {
 };
 
 TEST_F(ScheduleTest, EmptyMain) {
-  SchedulePass(block_.get(), options_);
+  SchedulePass(options_).Apply(block_.get());
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
     loc {}
@@ -186,7 +180,7 @@ TEST_F(ScheduleTest, CachesIO) {
             }
           }]
   )")));
-  SchedulePass(block_.get(), options_);
+  SchedulePass(options_).Apply(block_.get());
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
     loc {}
@@ -405,7 +399,7 @@ TEST_F(ScheduleTest, UsesTmps) {
 
   AddTmpRefinement("t1", TensorDimension{1, 16});
 
-  SchedulePass(block_.get(), options_);
+  SchedulePass(options_).Apply(block_.get());
 
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
@@ -608,75 +602,111 @@ TEST_F(ScheduleTest, UsesTmps) {
 
 TEST(Schedule, Basic) {
   auto cfg_tmpl = R"(
-    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { devs: [{name: "DRAM"}] } } }
-    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { devs: [{name: "DRAM"}] } } }
-    passes: { name: "loc_proc"
-      locate_block: {
-        reqs: ["kernel"]
-        loc: {
-          devs: [{
-            name: "PROC"
-            units: [{
-              terms: { key: "#bank" value: %2% }
-              terms: { key: "#proc" value: 1 }
-            }]
-          }]
+    passes: [
+      {
+        name: "loc_prog"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass] {
+            reqs: ["program"] loc: { devs: [{name: "DRAM"}] }
+          }
+        }
+      }, {
+        name: "loc_main"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass] {
+            reqs: ["main"]
+            loc: { devs: [{name: "DRAM"}] }
+          }
+        }
+      }, {
+        name: "loc_proc"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateBlockPass] {
+            reqs: ["kernel"]
+            loc: {
+              devs: [{
+                name: "PROC"
+                units: [{
+                  terms: { key: "#bank" value: %2% }
+                  terms: { key: "#proc" value: 1 }
+                }]
+              }]
+            }
+          }
+        }
+      }, {
+        name: "partition_memory"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.PartitionMemoryPass] {
+            reqs: ["kernel"]
+            num_parts: %1%
+            set_tags: ["bank_part"]
+            idx_tag: "bank"
+          }
+        }
+      }, {
+        name: "unroll_bank_parts"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.UnrollPass] {
+            reqs: ["bank_part"]
+            expand_idx: "#bank"
+            part_name: "bank"
+            make_views: true
+          }
+        }
+      }, {
+        name: "fit_into_mem"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass] {
+            reqs: ["kernel"]
+            outer_set: ["fit_part"]
+            skip_1d: true
+            only_po2: true
+            max_total_size : %3%
+            input_cost: 1.0
+            output_cost: 1.0
+            copy_tags: true
+          }
+        }
+      }, {
+        name: "partition_compute"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.PartitionComputePass] {
+            reqs: ["kernel"]
+            num_parts: %2%
+            set_tags: ["compute_part"]
+            idx_tag: "proc"
+          }
+        }
+      }, {
+        name: "unroll_compute_parts"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.UnrollPass] {
+            reqs: ["compute_part"]
+            expand_idx: "#proc"
+            part_name: "proc"
+          }
+        }
+      }, {
+        name: "schedule"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.SchedulePass] {
+            reqs: ["main"]
+            mem_loc: { devs: [{name: "SRAM"}] }
+            mem_KiB: %4%
+            alignment: 16
+            xfer_loc: { devs: [{name: "DMA"}] }
+          }
+        }
+      }, {
+        name: "prune_refs"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.PruneRefinementsPass] {
+            reqs: ["program"]
+          }
         }
       }
-    }
-    passes: { name: "partition_memory"
-      partition_memory: {
-        reqs: ["kernel"]
-        num_parts: %1%
-        set_tags: ["bank_part"]
-        idx_tag: "bank"
-      }
-    }
-    passes: { name: "unroll_bank_parts"
-      unroll: {
-        reqs: ["bank_part"]
-        expand_idx: "#bank"
-        part_name: "bank"
-        make_views: true
-      }
-    }
-    passes: { name: "fit_into_mem"
-      autotile: {
-        reqs: ["kernel"]
-        outer_set: ["fit_part"]
-        skip_1d: true
-        only_po2: true
-        max_total_size : %3%
-        input_cost: 1.0
-        output_cost: 1.0
-        copy_tags: true
-      }
-    }
-    passes: { name: "partition_compute"
-      partition_compute: {
-        reqs: ["kernel"]
-        num_parts: %2%
-        set_tags: ["compute_part"]
-        idx_tag: "proc"
-      }
-    }
-    passes: { name: "unroll_compute_parts"
-      unroll: {
-        reqs: ["compute_part"]
-        expand_idx: "#proc"
-        part_name: "proc"
-      }
-    }
-    passes: { name: "schedule"
-      schedule: {
-        reqs: ["main"]
-        mem_loc: { devs: [{name: "SRAM"}] }
-        mem_KiB: %4%
-        alignment: 16
-        xfer_loc: { devs: [{name: "DMA"}] }
-      }
-    }
-    passes: { name: "prune_refs" prune_refs: { reqs: ["program"] } }
+    ]
   )";
   size_t num_banks = 2;
   size_t num_procs = 4;

@@ -266,7 +266,7 @@ void PartitionBuffer(const AliasMap& alias_map,                          //
 void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
                      const AliasMap& alias_map,                    //
                      Block* block,                                 //
-                     const proto::PartitionPass& options) {
+                     const proto::PartitionMemoryPass& options) {
   IVLOG(2, "Partition> block: " << block->name);
   if (block->ref_outs().size() != 1) {
     IVLOG(1, boost::format("Partition> skipped '%1%' due to multiple outputs") % block->name);
@@ -358,19 +358,25 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
 
 }  // namespace
 
-void PartitionMemoryPass(Block* root, const proto::PartitionPass& options) {
+void PartitionMemoryPass::Apply(Block* root) const {
   std::map<std::string, BankInfo> bank_infos;
-  auto reqs = FromProto(options.reqs());
+  auto reqs = FromProto(options_.reqs());
   RunOnBlocks(root, reqs, [&](const AliasMap& alias_map, Block* block) {  //
-    CollectBankInfo(&bank_infos, alias_map, block, options);
+    CollectBankInfo(&bank_infos, alias_map, block, options_);
   });
 
-  auto set_tags = FromProto(options.set_tags());
+  auto set_tags = FromProto(options_.set_tags());
   RunOnBlocks(root, reqs, [&](const AliasMap& alias_map, Block* block) {  //
-    PartitionBuffer(alias_map, block, bank_infos, set_tags, options.idx_tag());
+    PartitionBuffer(alias_map, block, bank_infos, set_tags, options_.idx_tag());
   });
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<PartitionMemoryPass, proto::PartitionMemoryPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

@@ -8,35 +8,39 @@
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void LightCstrReduction(const AliasMap& alias_map, stripe::Block* block, const proto::ConstraintReductionPass& options);
+void LightCstrReduction(const AliasMap& alias_map, stripe::Block* block,
+                        const proto::LightConstraintReductionPass& options);
 
-inline void LightCstrReductionPass(stripe::Block* root, const proto::ConstraintReductionPass& options) {
-  auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocks(
-      root, reqs,
-      [options](const AliasMap& alias_map, stripe::Block* block) {  //
-        LightCstrReduction(alias_map, block, options);
-      },
-      true);
-}
+void IlpCstrReduction(const AliasMap& alias_map, stripe::Block* block,
+                      const proto::IlpConstraintReductionPass& options);
 
-void IlpCstrReduction(const AliasMap& alias_map, stripe::Block* block, const proto::ConstraintReductionPass& options);
+class LightCstrReductionPass final : public CompilePass {
+ public:
+  explicit LightCstrReductionPass(const proto::LightConstraintReductionPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
 
-inline void IlpCstrReductionPass(stripe::Block* root, const proto::ConstraintReductionPass& options) {
-  auto reqs = stripe::FromProto(options.reqs());
-  RunOnBlocks(
-      root, reqs,
-      [options](const AliasMap& alias_map, stripe::Block* block) {  //
-        IlpCstrReduction(alias_map, block, options);
-      },
-      true);
-}
+ private:
+  proto::LightConstraintReductionPass options_;
+};
+
+void IlpCstrReduction(const AliasMap& alias_map, stripe::Block* block,
+                      const proto::IlpConstraintReductionPass& options);
+
+class IlpCstrReductionPass final : public CompilePass {
+ public:
+  explicit IlpCstrReductionPass(const proto::IlpConstraintReductionPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::IlpConstraintReductionPass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

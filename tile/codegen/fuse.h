@@ -10,6 +10,7 @@
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/codegen/tile.h"
 
 namespace vertexai {
@@ -65,7 +66,14 @@ class AlwaysFuseRecursive : public FusionStrategy {
   }
 };
 
-void FusionPass(stripe::Block* block, const proto::FusionPass& options);
+class FusionPass final : public CompilePass {
+ public:
+  explicit FusionPass(const proto::FusionPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::FusionPass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

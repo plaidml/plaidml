@@ -600,15 +600,15 @@ static void FusionPassRecurse(const AliasMap& map, stripe::Block* block, TagFusi
   }
 }
 
-void FusionPass(stripe::Block* root, const proto::FusionPass& options) {
+void FusionPass::Apply(stripe::Block* root) const {
   FusionPassOptions fopts = {
-      FromProto(options.parent_reqs()),  // parent_reqs
-      FromProto(options.a_reqs()),       // a_block_reqs
-      FromProto(options.b_reqs()),       // b_block_reqs
-      FromProto(options.fused_set()),    // fused_set
-      FromProto(options.exclude()),      // exclude
-      options.perfect(),                 // perfect
-      options.output_match()             // output_match
+      FromProto(options_.parent_reqs()),  // parent_reqs
+      FromProto(options_.a_reqs()),       // a_block_reqs
+      FromProto(options_.b_reqs()),       // b_block_reqs
+      FromProto(options_.fused_set()),    // fused_set
+      FromProto(options_.exclude()),      // exclude
+      options_.perfect(),                 // perfect
+      options_.output_match()             // output_match
   };
   AliasMap base;
   AliasMap root_map(base, root);
@@ -617,6 +617,12 @@ void FusionPass(stripe::Block* root, const proto::FusionPass& options) {
   FusionPassRecurse(root_map, root, &strategy);
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<FusionPass, proto::FusionPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

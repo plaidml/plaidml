@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 #include <google/protobuf/text_format.h>
 
+#include "base/proto/proto.h"
 #include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/driver.h"
 #include "tile/lang/compose.h"
@@ -18,20 +19,49 @@ using namespace stripe;  // NOLINT
 using ::testing::Eq;
 using ::testing::Ne;
 
-template <typename P>
-P ParseProtoText(const std::string& txt) {
-  P proto;
-  google::protobuf::TextFormat::ParseFromString(txt, &proto);
-  return proto;
-}
-
 static proto::Stage GenerateStage() {
   auto cfg_tmpl = R"(
-    passes: { name: "loc_prog" locate_memory: { reqs: ["program"] loc: { devs: [{name: "DRAM"}] } } }
-    passes: { name: "loc_main" locate_memory: { reqs: ["main"] loc: { devs: [{name: "DRAM"}] } } }
-    passes: { name: "loc_initial", locate_block: { reqs: ["kernel"], loc: { devs: [{name: "PPE"}] } } }
-    passes: { name: "compute_deps", compute_deps: { reqs: ["all"] } }
-    passes: { name: "dead_code_elimination", dead_code_elimination: { reqs: ["all"] } }
+    passes: [
+      {
+        name: "loc_prog"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass] {
+            reqs: ["program"]
+            loc: { devs: [{name: "DRAM"}] }
+          }
+        }
+      }, {
+        name: "loc_main"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass] {
+            reqs: ["main"]
+            loc: { devs: [{name: "DRAM"}] }
+          }
+        }
+      }, {
+        name: "loc_initial"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.LocateBlockPass] {
+            reqs: ["kernel"]
+            loc: { devs: [{name: "PPE"}] }
+          }
+        }
+      }, {
+        name: "compute_deps"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.ComputeDepsPass] {
+            reqs: ["all"]
+          }
+        }
+      }, {
+        name: "dead_code_elimination"
+        pass: {
+          [type.vertex.ai/vertexai.tile.codegen.proto.DeadCodeEliminationPass] {
+            reqs: ["all"]
+          }
+        }
+      }
+    ]
   )";
   return ParseProtoText<proto::Stage>(cfg_tmpl);
 }

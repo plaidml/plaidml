@@ -307,18 +307,24 @@ void UnrollBlock(Block* outer,                     //
 
 }  // namespace
 
-void UnrollPass(Block* root, const proto::UnrollPass& options) {
-  auto reqs = FromProto(options.reqs());
+void UnrollPass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
   AliasMap base_alias_map;
   AliasMap alias_map{base_alias_map, root};
   PreIterate(root, [&](const StatementIt& it) {
     auto inner = Block::Downcast(*it);
     if (inner) {
-      UnrollBlock(root, inner.get(), alias_map, it, reqs, options);
+      UnrollBlock(root, inner.get(), alias_map, it, reqs, options_);
     }
   });
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<UnrollPass, proto::UnrollPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
