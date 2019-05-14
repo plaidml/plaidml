@@ -8,14 +8,16 @@
 #include <boost/format.hpp>
 
 #include "base/util/stream_container.h"
+#include "tile/codegen/alias.h"
 #include "tile/codegen/pattern.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
-namespace pattern {
 
 using namespace stripe;  // NOLINT
+
+namespace pattern {
 
 enum class TokenType {
   None,
@@ -401,6 +403,33 @@ std::vector<std::string> to_string(const std::list<MatchResult>& results) {
 }
 
 }  // namespace pattern
+
+void PatternPass::Apply(Block* block) const {
+  auto reqs = FromProto(options_.reqs());
+  auto pattern = pattern::Parse(options_.pattern());
+  RunOnBlocks(block, reqs, [&](const AliasMap& map, Block* block) {
+    auto term = pattern::IntoTerm(*block);
+    auto match = pattern::MatchFirst(pattern, term);
+    if (match) {
+      IVLOG(2, "PatternPass> block: " << block->name);
+      for (const auto& kvp : options_.set_vars()) {
+        auto value = boost::get<pattern::Number>(safe_at(match->vars, kvp.second));
+        IVLOG(2, "  " << kvp.first << " = " << value);
+        block->set_attr(kvp.first, value);
+      }
+    }
+  });
+}
+
+namespace {
+
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<PatternPass, proto::PatternPass>::Register();
+  return 0;
+}();
+
+}  // namespace
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
