@@ -12,6 +12,8 @@
 #include <boost/optional.hpp>
 #include <boost/variant.hpp>
 
+#include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -99,6 +101,16 @@ std::string to_string(const MatchResult& result);
 std::vector<std::string> to_string(const std::list<MatchResult>& results);
 
 }  // namespace pattern
+
+class PatternPass final : public CompilePass {
+ public:
+  explicit PatternPass(const proto::PatternPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::PatternPass options_;
+};
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
