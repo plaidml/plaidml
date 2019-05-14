@@ -18,8 +18,8 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
                 reqs: ['program'],
-                  ref_reqs: ['tmp']
-              }
+                ref_reqs: ['tmp'],
+              },
             },
             {
               name: 'stencil_mac',
