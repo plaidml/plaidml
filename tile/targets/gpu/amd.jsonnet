@@ -32,8 +32,8 @@ local PARAMS = {
               name: 'prune_idxs',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-                reqs: ['all']
-              }
+                reqs: ['all'],
+              },
             },
 
             // Eliminate the dead code first
@@ -41,8 +41,8 @@ local PARAMS = {
               name: 'dead_code_elimination',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.DeadCodeEliminationPass',
-                reqs: ['all']
-              }
+                reqs: ['all'],
+              },
             },
 
             // Lower temps
@@ -51,8 +51,8 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
                 reqs: ['program'],
-                ref_reqs: ['tmp']
-              }
+                ref_reqs: ['tmp'],
+              },
             },
 
             // Reorder Blocks
@@ -69,8 +69,8 @@ local PARAMS = {
               name: 'pad',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PadPass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
 
             // Do subgroup pass
@@ -131,24 +131,24 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 a_reqs: ['subgroup_outer'],
-                b_reqs: ['eltwise']
-              }
+                b_reqs: ['eltwise'],
+              },
             },
             {
               name: 'fuse_contract_eltwise_2',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 a_reqs: ['subgroup_thread'],
-                b_reqs: ['eltwise']
-              }
+                b_reqs: ['eltwise'],
+              },
             },
             {
               name: 'fuse_contract_eltwise_3',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 a_reqs: ['subgroup_write'],
-                b_reqs: ['eltwise']
-              }
+                b_reqs: ['eltwise'],
+              },
             },
 
             // Clean things up to allow further optimizations
@@ -156,15 +156,15 @@ local PARAMS = {
               name: 'fuse_clean_1',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
             {
               name: 'fuse_clean_2',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneRefinementsPass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
 
             // Then we fuse multiple eltwise things
@@ -185,15 +185,15 @@ local PARAMS = {
               name: 'localize_main',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
             {
               name: 'scalarize_main',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ScalarizePass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
 
             // Let's do some additional threading
@@ -235,38 +235,38 @@ local PARAMS = {
               name: 'dead_code_elimination',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.DeadCodeEliminationPass',
-                reqs: ['all']
-              }
+                reqs: ['all'],
+              },
             },
 
             {
               name: 'cleanup1',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneRefinementsPass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
             {
               name: 'cleanup2',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
 
             {
               name: 'localize_main',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
             {
               name: 'scalarize_main',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ScalarizePass',
-                reqs: ['main']
-              }
+                reqs: ['main'],
+              },
             },
           ],
         },
