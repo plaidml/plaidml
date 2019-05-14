@@ -563,3 +563,15 @@ message IlpConstraintReductionPass {
   repeated string reqs = 1;
   repeated string skip_idxs = 2;
 }
+
+// Detect and extract properties from blocks and store the results onto the
+// specified attrs.
+message PatternPass {
+  // Run the pattern pass over blocks that have these tags.
+  repeated string reqs = 1;
+  // The pattern to be matched is specified using a prolog-like DSL.
+  required string pattern = 2;
+  // A mapping where the value specifies which matched variable to extract and
+  // the key specifies the attribute name to place the extacted value.
+  map<string, string> set_vars = 3;
+}
