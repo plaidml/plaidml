@@ -513,7 +513,34 @@ class Unroller : public stripe::ConstStmtVisitor {
       auto subgroup = _Const(idxs_[subgroup_idx].constant());
       val = _("sub_group_broadcast")(val, subgroup);
     }
-
+    // zero_skip=var: if var is zero, skip the load
+    if (load.has_attr("zero_skip")) {
+      std::string var = emitter_.scalar_name(load.get_attr_str("zero_skip"));
+      double error = load.get_attr_float("zero_error");
+      auto cond =  std::make_shared<vertexai::tile::sem::BinaryExpr>("<=", _(var) * _(var), _Const(error * error));
+      auto result = emitter_.scalar_name(load.into);
+      if (declared_.find(result) == declared_.end()) {
+        out_->push_back(_Declare({sem::Type::VALUE, ref->interior_shape.type}, result, _Const(0)));
+        declared_.insert(result);
+      }
+      out_->push_back(sem::builder::_If(cond, _(result) = 0, _(result) = val));
+      scalars_[load.into] = _(result);
+      return;
+    }
+    // Sometimes we use the result of a load multiple times. 
+    // With temp_var tag, we explicitly generate the temp variable for the result of a load
+    if (load.has_tag("temp_var")) {
+      auto var_name = emitter_.scalar_name(load.into);
+      if (declared_.find(var_name) == declared_.end()) {
+        out_->push_back(_Declare({sem::Type::VALUE, ref->interior_shape.type}, var_name, val));
+        declared_.insert(var_name);
+      }
+      else {
+        out_->push_back(_(var_name) = val);
+      }
+      scalars_[load.into] = _(var_name);
+      return;
+    }
     scalars_[load.into] = val;
   }
 
@@ -566,6 +593,7 @@ class Unroller : public stripe::ConstStmtVisitor {
   std::shared_ptr<sem::Block> out_;
   std::map<std::string, stripe::Affine> idxs_;
   std::map<std::string, sem::ExprPtr> scalars_;
+  std::set<std::string> declared_;
 };
 
 void SemtreeEmitter::Visit(const stripe::Block& block) {
