@@ -78,6 +78,18 @@ local PARAMS = {
               },
             },
 
+            // Process large fully connected
+            {
+              name: 'large_fc',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FullyConnectedPass',
+                reqs: ['contraction', 'agg_op_add', 'comb_op_mul'],
+                subgroup_sizes: [8, 16],
+                threshold: 1024 * 2048,
+                zero_error: 0.00001
+              }
+            },
+
             // Do subgroup pass
             {
               name: 'subgroup',

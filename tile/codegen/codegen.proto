@@ -207,6 +207,18 @@ message VectorizePass {
   optional uint32 write_align_bytes = 4;
 }
 
+// Process large fully connected layer
+message FullyConnectedPass {
+  // Only the fully connected blocks match this tag
+  repeated string reqs = 1;
+  // Process only the refinements larger than threshold
+  required uint64 threshold = 2;
+  // The error for treating a value as zero
+  required double zero_error = 3;
+  // The possible subgroup sizes in ascending order
+  repeated uint32 subgroup_sizes = 4;
+}
+
 // The fusion pass attempt to combine compatible block into a single block that
 // walks over and outer index space and then multiple inner blocks that do each
 // part of the original computation.  By doing so, it means that the working set
