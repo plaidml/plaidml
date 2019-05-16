@@ -880,7 +880,9 @@ Index* Block::idx_by_name(const std::string& name) {
 size_t Block::idxs_product() const {
   size_t product = 1;
   for (const auto& idx : idxs) {
-    product *= idx.range;
+    if (idx.affine == Affine()) {
+      product *= idx.range;
+    }
   }
   return product;
 }
