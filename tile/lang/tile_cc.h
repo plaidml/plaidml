@@ -8,35 +8,37 @@
 
 #include "tile/base/shape.h"
 #include "tile/lang/compose.h"
-#include "tile/lang/ops.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
 
-class Access;
-class Index;
+class IndexedTensor;
 class Tensor;
+class TensorDim;
+class TensorFriend;
+class TensorIndex;
 
-class IndexIterator {
+class TensorIndexIterator {
  public:
-  IndexIterator() = default;
-  explicit IndexIterator(Index* index) : index_(index) {}
+  TensorIndexIterator() = default;
+  explicit TensorIndexIterator(TensorIndex* index) : index_(index) {}
 
-  IndexIterator& operator++() {
+  TensorIndexIterator& operator++() {
     index_ = nullptr;
     return *this;
   }
 
-  bool operator!=(const IndexIterator& other) { return index_ != other.index_; }
-  Index& operator*() { return *index_; }
+  bool operator!=(const TensorIndexIterator& other) { return index_ != other.index_; }
+  TensorIndex& operator*() { return *index_; }
 
  private:
-  Index* index_ = nullptr;
+  TensorIndex* index_ = nullptr;
 };
 
 class Constraint {
-  friend class Index;
+  friend class TensorFriend;
+  friend class TensorIndex;
 
  public:
   Constraint operator&&(const Constraint& rhs) const { return Constraint(); }
@@ -46,169 +48,177 @@ class Constraint {
   Constraint() = default;
 };
 
-class Index {
+class TensorDim {
   friend class Tensor;
-  friend struct ConstraintCollector;
+  friend class TensorFriend;
+  friend class TensorIndex;
   struct Impl;
 
  public:
-  Index();
-  ~Index();
+  TensorDim();
+  explicit TensorDim(size_t value);
 
-  Index(size_t value);  // NOLINT
-  explicit Index(const std::string& name);
-
-  IndexIterator begin() { return IndexIterator(this); }
-  IndexIterator end() { return IndexIterator{}; }
-
-  Index operator-() const;
-  Index operator+(const Index& rhs) const;
-  Index operator-(const Index& rhs) const;
-  Index operator*(const Index& rhs) const;
-  Index operator/(const Index& rhs) const;
-
-  Constraint operator<(size_t rhs) const;
+  TensorDim operator-() const;
 
  private:
   std::shared_ptr<Impl> impl_;
-  explicit Index(std::unique_ptr<Impl> impl);
 };
 
-template <typename T>
-Index operator+(T lhs, const Index& rhs) {
-  return rhs + lhs;
-}
-
-template <typename T>
-Index operator*(T lhs, const Index& rhs) {
-  return rhs * lhs;
-}
-
-class Access {
+class TensorIndex {
   friend class Tensor;
-  friend Access cond(const Access&, const Access&, const Access&);
+  friend class TensorFriend;
   struct Impl;
 
  public:
-  ~Access();
+  TensorIndex();
+
+  explicit TensorIndex(size_t value);
+  explicit TensorIndex(const std::string& name);
+
+  TensorIndexIterator begin() { return TensorIndexIterator(this); }
+  TensorIndexIterator end() { return TensorIndexIterator{}; }
+
+  TensorIndex operator-() const;
+
+  Constraint operator<(size_t rhs) const;
+  Constraint operator<(const TensorDim& rhs) const;
+
+ private:
+  std::shared_ptr<Impl> impl_;
+  explicit TensorIndex(std::unique_ptr<Impl> impl);
+};
+
+#define TILE_CC_DECLARE_TENSOR_IDXDIM_BINARY_OPS(_op_)                       \
+  TensorDim operator _op_(const TensorDim& lhs, const TensorDim& rhs);       \
+  TensorDim operator _op_(const TensorDim& lhs, size_t rhs);                 \
+  TensorDim operator _op_(size_t lhs, const TensorDim& rhs);                 \
+  TensorIndex operator _op_(const TensorIndex& lhs, const TensorIndex& rhs); \
+  TensorIndex operator _op_(const TensorIndex& lhs, size_t rhs);             \
+  TensorIndex operator _op_(size_t lhs, const TensorIndex& rhs);             \
+  TensorIndex operator _op_(const TensorDim& lhs, const TensorIndex& rhs);   \
+  TensorIndex operator _op_(const TensorIndex& lhs, const TensorDim& rhs);
+
+TILE_CC_DECLARE_TENSOR_IDXDIM_BINARY_OPS(+);
+TILE_CC_DECLARE_TENSOR_IDXDIM_BINARY_OPS(-);
+TILE_CC_DECLARE_TENSOR_IDXDIM_BINARY_OPS(*);
+TILE_CC_DECLARE_TENSOR_IDXDIM_BINARY_OPS(/);
+
+class IndexedTensor {
+  friend class Tensor;
+  friend class TensorFriend;
+  struct Impl;
+
+ public:
+  ~IndexedTensor();
 
   // Movable constructor
-  Access(Access&& rhs) noexcept;
+  IndexedTensor(IndexedTensor&& rhs) noexcept;
 
   // Represents an aggregation_op of SUM in a contraction
-  Access& operator+=(const Access& rhs);
+  IndexedTensor& operator+=(const IndexedTensor& rhs);
 
   // Represents an aggregation_op of PROD in a contraction
-  Access& operator*=(const Access& rhs);
+  IndexedTensor& operator*=(const IndexedTensor& rhs);
 
   // Represents an aggregation_op of MAX in a contraction
-  Access& operator>=(const Access& rhs);
+  IndexedTensor& operator>=(const IndexedTensor& rhs);
 
   // Represents an aggregation_op of MIN in a contraction
-  Access& operator<=(const Access& rhs);
+  IndexedTensor& operator<=(const IndexedTensor& rhs);
 
   // Represents an aggregation_op of ASSIGN in a contraction
-  Access& operator=(const Access& rhs);
+  IndexedTensor& operator=(const IndexedTensor& rhs);
 
   // Represents a combo_op of PLUS in a contraction
-  Access operator+(const Access& rhs) const;
+  IndexedTensor operator+(const IndexedTensor& rhs) const;
 
   // Represents a combo_op of MULTIPLY in a contraction
-  Access operator*(const Access& rhs) const;
+  IndexedTensor operator*(const IndexedTensor& rhs) const;
 
   // Represents a combo_op of EQ in a contraction
-  Access operator==(const Access& rhs) const;
+  IndexedTensor operator==(const IndexedTensor& rhs) const;
 
  private:
   std::unique_ptr<Impl> impl_;
-  explicit Access(std::unique_ptr<Impl> impl);
+  explicit IndexedTensor(std::unique_ptr<Impl> impl);
 };
 
-inline Access sum(Access lhs, const Access& rhs) { return std::move(lhs += rhs); }
+inline IndexedTensor sum(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs += rhs); }
 
-inline Access product(Access lhs, const Access& rhs) { return std::move(lhs *= rhs); }
+inline IndexedTensor product(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs *= rhs); }
 
-inline Access max(Access lhs, const Access& rhs) { return std::move(lhs >= rhs); }
+inline IndexedTensor max(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs >= rhs); }
 
-inline Access min(Access lhs, const Access& rhs) { return std::move(lhs <= rhs); }
+inline IndexedTensor min(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs <= rhs); }
 
-inline Access assign(Access lhs, const Access& rhs) { return std::move(lhs = rhs); }
+inline IndexedTensor assign(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs = rhs); }
 
 // Represents a combo_op of COND in a contraction
-Access cond(const Access& cond_lhs, const Access& cond_rhs, const Access& true_case);
+IndexedTensor cond(const IndexedTensor& cond_lhs, const IndexedTensor& cond_rhs, const IndexedTensor& true_case);
+
+template <typename T>
+void IntoVector(std::vector<T>*) {}
+
+template <typename T, typename Head, typename... Tail>
+void IntoVector(std::vector<T>* into, Head&& head, Tail&&... tail) {
+  into->emplace_back(std::forward<Head>(head));
+  IntoVector(into, std::forward<Tail>(tail)...);
+}
+
+template <typename... Ts>
+std::vector<TensorDim> MakeTensorDims(Ts... dims) {
+  std::vector<TensorDim> vec;
+  IntoVector(&vec, std::forward<Ts>(dims)...);
+  return vec;
+}
 
 class Tensor {
-  friend class Access;
-  friend class Evaluator;
-  friend Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
+  friend class IndexedTensor;
+  friend class TensorFriend;
   struct Impl;
 
  public:
-  explicit Tensor(const std::string& name = "");
+  Tensor();
   ~Tensor();
 
-  Tensor(int value);      // NOLINT
-  Tensor(int64_t value);  // NOLINT
-  Tensor(double value);   // NOLINT
-  explicit Tensor(const tile::TensorShape& shape, const std::string& name = "");
+  explicit Tensor(int value);
+  explicit Tensor(int64_t value);
+  explicit Tensor(double value);
+
+  explicit Tensor(const tile::TensorShape& shape);
+  explicit Tensor(const std::vector<TensorDim>& dims);
+  explicit Tensor(const std::initializer_list<TensorDim>& dims);
+
+  explicit Tensor(const std::string& name);
+  Tensor(const std::string& name, const tile::TensorShape& shape);
+  Tensor(const std::string& name, const std::vector<TensorDim>& dims);
+  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims);
+
+  template <typename... Ts>
+  Tensor(const std::string& name, Ts... dims) : Tensor(name, MakeTensorDims(dims...)) {}
 
   // Copyable
   Tensor(const Tensor& rhs);
   Tensor& operator=(const Tensor& rhs);
 
-  Access operator()(const std::vector<Index>& idxs, const std::vector<size_t>& sizes);
-  Access operator()(const std::vector<Index>& idxs) const;
+  IndexedTensor operator()(const std::vector<TensorIndex>& idxs) const;
+
+  IndexedTensor operator()(const std::initializer_list<TensorIndex>& idxs) const {
+    return operator()(std::vector<TensorIndex>{idxs});
+  }
+
+  template <typename... Ts>
+  IndexedTensor operator()(Ts... idxs) const {
+    std::vector<TensorIndex> vec;
+    IntoVector(&vec, std::forward<Ts>(idxs)...);
+    return operator()(vec);
+  }
 
   // Represents an eltwise negation
   Tensor operator-() const;
 
   // Represents an eltwise bit_not
   Tensor operator~() const;
-
-  // Represents an eltwise addition
-  Tensor operator+(const Tensor& rhs) const;
-
-  // Represents an eltwise subtraction
-  Tensor operator-(const Tensor& rhs) const;
-
-  // Represents an eltwise multiplication
-  Tensor operator*(const Tensor& rhs) const;
-
-  // Represents an eltwise division
-  Tensor operator/(const Tensor& rhs) const;
-
-  // Represents an eltwise cmp_eq
-  Tensor operator==(const Tensor& rhs) const;
-
-  // Represents an eltwise cmp_ne
-  Tensor operator!=(const Tensor& rhs) const;
-
-  // Represents an eltwise cmp_lt
-  Tensor operator<(const Tensor& rhs) const;
-
-  // Represents an eltwise cmp_gt
-  Tensor operator>(const Tensor& rhs) const;
-
-  // Represents an eltwise cmp_le
-  Tensor operator<=(const Tensor& rhs) const;
-
-  // Represents an eltwise cmp_ge
-  Tensor operator>=(const Tensor& rhs) const;
-
-  // Represents an eltwise bit_left
-  Tensor operator<<(const Tensor& rhs) const;
-
-  // Represents an eltwise bit_right
-  Tensor operator>>(const Tensor& rhs) const;
-
-  // Represents an eltwise bit_and
-  Tensor operator&(const Tensor& rhs) const;
-
-  // Represents an eltwise bit_or
-  Tensor operator|(const Tensor& rhs) const;
-
-  // Represents an eltwise bit_xor
-  Tensor operator^(const Tensor& rhs) const;
 
   // Enable no_defract on a contraction
   Tensor& no_defract();
@@ -222,6 +232,16 @@ class Tensor {
   // Return the size of the tensor's shape at the specified dimension.
   size_t dims(const size_t dim) const;
 
+  // Verify that the specified dims match the dims of this tensor.
+  void match_dims(const std::vector<TensorDim>& dims) const;
+
+  template <typename... Ts>
+  void match_dims(Ts... dims) const {
+    std::vector<TensorDim> vec;
+    IntoVector(&vec, std::forward<Ts>(dims)...);
+    match_dims(vec);
+  }
+
  private:
   explicit Tensor(std::unique_ptr<Impl> impl);
 
@@ -229,37 +249,93 @@ class Tensor {
   std::unique_ptr<Impl> impl_;
 };
 
-template <typename T>
-Tensor operator+(T lhs, const Tensor& rhs) {
-  return rhs + lhs;
+template <typename... Ts>
+Tensor TensorOutput(Ts... dims) {
+  std::vector<TensorDim> vec;
+  IntoVector(&vec, dims...);
+  return Tensor{vec};
 }
 
-template <typename T>
-Tensor operator*(T lhs, const Tensor& rhs) {
-  return rhs * lhs;
-}
+#define TILE_CC_DECLARE_TENSOR_BINARY_OPS(_op_)               \
+  Tensor operator _op_(const Tensor& lhs, const Tensor& rhs); \
+  Tensor operator _op_(const Tensor& lhs, int rhs);           \
+  Tensor operator _op_(const Tensor& lhs, int64_t rhs);       \
+  Tensor operator _op_(const Tensor& lhs, double rhs);        \
+  Tensor operator _op_(int lhs, const Tensor& rhs);           \
+  Tensor operator _op_(int64_t lhs, const Tensor& rhs);       \
+  Tensor operator _op_(double lhs, const Tensor& rhs);
+
+// Represents an eltwise addition
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(+);
+
+// Represents an eltwise subtraction
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(-);
+
+// Represents an eltwise multiplication
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(*);
+
+// Represents an eltwise division
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(/);
+
+// Represents an eltwise cmp_eq
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(==);
+
+// Represents an eltwise cmp_ne
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(!=);
+
+// Represents an eltwise cmp_lt
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(<);  // NOLINT
+
+// Represents an eltwise cmp_gt
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(>);  // NOLINT
+
+// Represents an eltwise cmp_le
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(<=);
+
+// Represents an eltwise cmp_ge
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(>=);
+
+// Represents an eltwise bit_left
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(<<);
+
+// Represents an eltwise bit_right
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(>>);
+
+// Represents an eltwise bit_and
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(&);
+
+// Represents an eltwise bit_or
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(|);
+
+// Represents an eltwise bit_xor
+TILE_CC_DECLARE_TENSOR_BINARY_OPS(^);
 
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
 
-inline Tensor as_float(const Tensor& x, size_t bit_size) {
-  return Call("as_float", {x, static_cast<int64_t>(bit_size)});
+template <typename... Ts>
+Tensor Call(const std::string& fn, Ts... args) {
+  std::vector<Tensor> vec;
+  IntoVector(&vec, std::forward<Ts>(args)...);
+  return Call(fn, vec);
 }
 
-inline Tensor as_int(const Tensor& x, size_t bit_size) { return Call("as_int", {x, static_cast<int64_t>(bit_size)}); }
+inline Tensor as_float(const Tensor& x, size_t bit_size) { return Call("as_float", x, static_cast<int64_t>(bit_size)); }
 
-inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint", {x, static_cast<int64_t>(bit_size)}); }
+inline Tensor as_int(const Tensor& x, size_t bit_size) { return Call("as_int", x, static_cast<int64_t>(bit_size)); }
+
+inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint", x, static_cast<int64_t>(bit_size)); }
 
 // inline Tensor element(const Tensor& x) { return Call("element", {x}); } // TODO: tuple
 
-inline Tensor exp(const Tensor& x) { return Call("exp", {x}); }
+inline Tensor exp(const Tensor& x) { return Call("exp", x); }
 
-inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", {x, y}); }
+inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x, y); }
 
-inline Tensor index(const Tensor& x, size_t axis) { return Call("index", {x, static_cast<int64_t>(axis)}); }
+inline Tensor index(const Tensor& x, size_t axis) { return Call("index", x, static_cast<int64_t>(axis)); }
 
-inline Tensor pow(const Tensor& x, const Tensor& y) { return Call("pow", {x, y}); }
+inline Tensor pow(const Tensor& x, const Tensor& y) { return Call("pow", x, y); }
 
-inline Tensor prng_state(const Tensor& x) { return Call("prng_state", {x}); }
+inline Tensor prng_state(const Tensor& x) { return Call("prng_state", x); }
 
 inline Tensor prng_step(const Tensor& x, const std::vector<size_t>& sizes) {
   std::vector<Tensor> args = {x};
@@ -269,7 +345,7 @@ inline Tensor prng_step(const Tensor& x, const std::vector<size_t>& sizes) {
   return Call("prng_step", args);
 }
 
-inline Tensor prng_value(const Tensor& x) { return Call("prng_value", {x}); }
+inline Tensor prng_value(const Tensor& x) { return Call("prng_value", x); }
 
 inline Tensor reshape(const Tensor& x, const tile::TensorShape& shape) {
   std::vector<Tensor> args = {x};
@@ -279,15 +355,15 @@ inline Tensor reshape(const Tensor& x, const tile::TensorShape& shape) {
   return Call("reshape", args);
 }
 
-inline Tensor scatter(const Tensor& x, const Tensor& y, const Tensor& z) { return Call("scatter", {x, y, z}); }
+inline Tensor scatter(const Tensor& x, const Tensor& y, const Tensor& z) { return Call("scatter", x, y, z); }
 
 inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& false_case) {
-  return Call("cond", {cond, true_case, false_case});
+  return Call("cond", cond, true_case, false_case);
 }
 
-inline Tensor shape(const Tensor& x) { return Call("shape", {x}); }
+inline Tensor shape(const Tensor& x) { return Call("shape", x); }
 
-inline Tensor sqrt(const Tensor& x) { return Call("sqrt", {x}); }
+inline Tensor sqrt(const Tensor& x) { return Call("sqrt", x); }
 
 tile::lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars);
 

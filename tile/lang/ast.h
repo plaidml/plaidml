@@ -28,7 +28,7 @@ struct TensorSpecExpr;
 struct PolyExpr;
 struct PolyIndex;
 struct PolyLiteral;
-struct PolyOp;
+struct PolyOpExpr;
 
 struct AstVisitor {
   virtual ~AstVisitor() = default;
@@ -127,12 +127,13 @@ struct PolyVisitor {
   virtual ~PolyVisitor() = default;
   virtual Polynomial Visit(const PolyIndex&) = 0;
   virtual Polynomial Visit(const PolyLiteral&) = 0;
-  virtual Polynomial Visit(const PolyOp&) = 0;
+  virtual Polynomial Visit(const PolyOpExpr&) = 0;
 };
 
 struct PolyExpr {
   virtual ~PolyExpr() = default;
   virtual Polynomial Accept(PolyVisitor*) = 0;
+  virtual std::string str() const = 0;
 };
 
 struct PolyIndex : PolyExpr {
@@ -141,6 +142,13 @@ struct PolyIndex : PolyExpr {
 
   explicit PolyIndex(const void* ptr, const std::string& name = "") : ptr(ptr), name(name) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
+
+  std::string str() const {
+    if (name.size()) {
+      return name;
+    }
+    return "PolyIndex";
+  }
 };
 
 struct PolyLiteral : PolyExpr {
@@ -148,14 +156,54 @@ struct PolyLiteral : PolyExpr {
 
   explicit PolyLiteral(int64_t value) : value(value) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
+
+  std::string str() const { return std::to_string(value); }
 };
 
-struct PolyOp : PolyExpr {
-  std::string op;
+enum class PolyOp {
+  Neg,
+  Add,
+  Sub,
+  Mul,
+  Div,
+};
+
+struct PolyOpExpr : PolyExpr {
+  PolyOp op;
   std::vector<std::shared_ptr<PolyExpr>> operands;
 
-  PolyOp(const std::string& op, const std::vector<std::shared_ptr<PolyExpr>>& operands) : op(op), operands(operands) {}
+  PolyOpExpr(PolyOp op, const std::vector<std::shared_ptr<PolyExpr>>& operands) : op(op), operands(operands) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
+
+  std::string str() const {
+    std::stringstream ss;
+    switch (op) {
+      case PolyOp::Neg:
+        ss << "Neg";
+        break;
+      case PolyOp::Add:
+        ss << "Add";
+        break;
+      case PolyOp::Sub:
+        ss << "Sub";
+        break;
+      case PolyOp::Mul:
+        ss << "Mul";
+        break;
+      case PolyOp::Div:
+        ss << "Div";
+        break;
+    }
+    ss << "(";
+    for (size_t i = 0; i < operands.size(); i++) {
+      if (i) {
+        ss << ", ";
+      }
+      ss << operands[i]->str();
+    }
+    ss << ")";
+    return ss.str();
+  }
 };
 
 }  // namespace lang
