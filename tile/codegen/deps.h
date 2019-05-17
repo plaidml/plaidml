@@ -11,6 +11,19 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
+// Determine if the stmt is a zero block
+inline bool ZeroBlock(const std::shared_ptr<stripe::Statement>& stmt) {
+  auto block = stripe::Block::Downcast(stmt);
+  if (block && block->has_tag("zero")) {
+    return true;
+  }
+  auto special = stripe::Special::Downcast(stmt);
+  if (special && special->name == "zero") {
+    return true;
+  }
+  return false;
+}
+
 // Recomputes Statement dependencies within a single Block.
 void ComputeDepsForBlock(stripe::Block* block, const AliasMap& alias_map);
 

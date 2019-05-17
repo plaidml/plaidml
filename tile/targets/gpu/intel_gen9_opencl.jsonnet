@@ -24,12 +24,22 @@ local PARAMS = {
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
+
             {
               name: 'loc_main',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
                 reqs: ['main'],
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
+              },
+            },
+
+            // Change tags before optimizations
+            {
+              name: 'kernel_tag',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.KernelTagPass',
+                reqs: ['kernel']
               },
             },
 
@@ -62,12 +72,12 @@ local PARAMS = {
             },
 
             // Reorder Blocks
-            // {
-            //   name: 'reorder_blocks',
-            //   pass : {
-            //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
-            //   }
-            // },
+            {
+              name: 'reorder_blocks',
+              pass : {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
+              }
+            },
 
             // Padding, disabled for now due ot issues with gradiants
             {
