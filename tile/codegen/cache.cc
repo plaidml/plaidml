@@ -140,19 +140,25 @@ static void CacheBlock(const AliasMap& map, Block* block, const std::set<RefDir>
   }
 }
 
-void CachePass(Block* root, const proto::CachePass& options) {
-  auto reqs = FromProto(options.reqs());
+void CachePass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
   std::set<RefDir> dirs;
-  for (const auto& dir : options.dirs()) {
+  for (const auto& dir : options_.dirs()) {
     dirs.emplace(stripe::FromProto(static_cast<stripe::proto::Refinement::Dir>(dir)));
   }
-  auto mem_loc = stripe::FromProto(options.mem_loc());
-  auto xfer_loc = stripe::FromProto(options.xfer_loc());
+  auto mem_loc = stripe::FromProto(options_.mem_loc());
+  auto xfer_loc = stripe::FromProto(options_.xfer_loc());
   RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
-    CacheBlock(map, block, dirs, mem_loc, xfer_loc, options.add_constraints());
+    CacheBlock(map, block, dirs, mem_loc, xfer_loc, options_.add_constraints());
   });
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<CachePass, proto::CachePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

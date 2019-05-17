@@ -2,18 +2,21 @@
 
 #pragma once
 
-#include <set>
-#include <string>
-
-#include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
-#include "tile/stripe/stripe.h"
+#include "tile/codegen/compile_pass.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void RegisterCachePass(stripe::Block* root, const proto::RegisterPass& options);
+class RegisterCachePass final : public CompilePass {
+ public:
+  explicit RegisterCachePass(const proto::RegisterCachePass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::RegisterCachePass options_;
+};
 
 }  // namespace codegen
 }  // namespace tile

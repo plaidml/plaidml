@@ -122,7 +122,12 @@ sem::ExprPtr SemtreeEmitter::convert_affine(const stripe::Affine& aff) const {
 void SemtreeEmitter::Visit(const stripe::Load& stmt) {
   auto lval = _(ref_buf(stmt.from))[_(ref_idx(stmt.from))];
   auto type = scope_->at(stmt.from).shape.type;
-  cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
+  if (stmt.has_tag("vector_tx")) {
+    cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), _("vector_load")(lval)));
+  }
+  else {
+    cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
+  }
   tot_loads_ += loop_mul_;
 }
 
@@ -149,7 +154,11 @@ void SemtreeEmitter::Visit(const stripe::Store& stmt) {
   std::string agg_op = scope_->at(stmt.into).base_ref->agg_op;
   auto rval = _(scalar_name(stmt.from));
   sem::ExprPtr agg = DoAgg(agg_op, lval, rval);
-  cur_->push_back(lval = agg);
+  if (stmt.has_tag("vector_tx")) {
+    cur_->push_back(_Special("vector_store", {lval, agg}));
+  } else {
+    cur_->push_back(lval = agg);
+  }
   if (agg_op != "" && agg_op != "assign") {
     tot_ops_ += loop_mul_;
   }
@@ -496,10 +505,41 @@ class Unroller : public stripe::ConstStmtVisitor {
     auto idx_base = _(emitter_.ref_idx(ref->from, -1));
     auto idx_expr = idx_base + emitter_.convert_affine(aff);
     sem::ExprPtr val = _(emitter_.ref_buf(load.from))[idx_expr];
+    if (load.has_tags({"vector_tx"})) {
+      val = _("vector_load")(val);
+    }
     if (load.has_tags({"subgroup_broadcast"})) {
       std::string subgroup_idx = ref->access[ref->bank_dim->dim_pos].getMap().begin()->first;
       auto subgroup = _Const(idxs_[subgroup_idx].constant());
       val = _("sub_group_broadcast")(val, subgroup);
+    }
+    // zero_skip=var: if var is zero, skip the load
+    if (load.has_attr("zero_skip")) {
+      std::string var = emitter_.scalar_name(load.get_attr_str("zero_skip"));
+      double error = load.get_attr_float("zero_error");
+      auto cond =  std::make_shared<vertexai::tile::sem::BinaryExpr>("<=", _(var) * _(var), _Const(error * error));
+      auto result = emitter_.scalar_name(load.into);
+      if (declared_.find(result) == declared_.end()) {
+        out_->push_back(_Declare({sem::Type::VALUE, ref->interior_shape.type}, result, _Const(0)));
+        declared_.insert(result);
+      }
+      out_->push_back(sem::builder::_If(cond, _(result) = 0, _(result) = val));
+      scalars_[load.into] = _(result);
+      return;
+    }
+    // Sometimes we use the result of a load multiple times. 
+    // With temp_var tag, we explicitly generate the temp variable for the result of a load
+    if (load.has_tag("temp_var")) {
+      auto var_name = emitter_.scalar_name(load.into);
+      if (declared_.find(var_name) == declared_.end()) {
+        out_->push_back(_Declare({sem::Type::VALUE, ref->interior_shape.type}, var_name, val));
+        declared_.insert(var_name);
+      }
+      else {
+        out_->push_back(_(var_name) = val);
+      }
+      scalars_[load.into] = _(var_name);
+      return;
     }
     scalars_[load.into] = val;
   }
@@ -513,7 +553,11 @@ class Unroller : public stripe::ConstStmtVisitor {
     auto lval = _(emitter_.ref_buf(store.into))[idx_expr];
     std::string agg_op = emitter_.scope_->at(store.into).base_ref->agg_op;
     auto agg = DoAgg(agg_op, lval, rval);
-    out_->push_back(lval = agg);
+    if (store.has_tags({"vector_tx"})) {
+      out_->push_back(_Special("vector_store", {lval, agg}));
+    } else {
+      out_->push_back(lval = agg);
+    }
   }
 
   void Visit(const stripe::Constant& stmt) {
@@ -549,6 +593,7 @@ class Unroller : public stripe::ConstStmtVisitor {
   std::shared_ptr<sem::Block> out_;
   std::map<std::string, stripe::Affine> idxs_;
   std::map<std::string, sem::ExprPtr> scalars_;
+  std::set<std::string> declared_;
 };
 
 void SemtreeEmitter::Visit(const stripe::Block& block) {

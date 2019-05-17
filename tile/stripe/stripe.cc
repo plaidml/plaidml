@@ -73,7 +73,13 @@ void PrintPreStmt(std::ostream& os,       //
   auto impl = Accessor::impl(stmt);
   if (impl->attrs.size()) {
     for (const auto& attr : impl->attrs) {
-      os << "#" << attr.first << " ";
+      os << "#";
+      if (attr.second.type() == typeid(Void)) {
+        os << attr.first;
+      } else {
+        os << attr.first << "=" << attr.second;
+      }
+      os << " ";
     }
     os << std::endl;
     PrintTab(os, depth);
@@ -874,7 +880,9 @@ Index* Block::idx_by_name(const std::string& name) {
 size_t Block::idxs_product() const {
   size_t product = 1;
   for (const auto& idx : idxs) {
-    product *= idx.range;
+    if (idx.affine == Affine()) {
+      product *= idx.range;
+    }
   }
   return product;
 }

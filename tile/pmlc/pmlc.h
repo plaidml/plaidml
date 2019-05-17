@@ -4,9 +4,11 @@
 
 #include <memory>
 
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
 #include "tile/codegen/codegen.pb.h"
+#include "tile/lang/compose.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -26,6 +28,7 @@ class App {
   App();
 };
 
+vertexai::tile::lang::RunInfo LoadTile(const boost::filesystem::path& filename, bool is_internal);
 std::shared_ptr<stripe::Program> Main();
 codegen::proto::Configs LoadConfigs();
 

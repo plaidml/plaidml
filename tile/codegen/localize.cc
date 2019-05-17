@@ -71,7 +71,7 @@ void LocalizeRef(Block* block, const std::string& var_name) {
   FixupRefs(block, var_name);
 }
 
-void LocalizePass(const AliasMap& scope, Block* block, const std::set<std::string>& ref_reqs) {
+void LocalizeBlockPass(const AliasMap& scope, Block* block, const std::set<std::string>& ref_reqs) {
   auto use_count = scope.RefUseCounts(*block);
   for (auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
@@ -108,11 +108,20 @@ void LocalizePass(const AliasMap& scope, Block* block, const std::set<std::strin
     }
     // Now localize block itself
     AliasMap inner_map(scope, inner.get());
-    LocalizePass(inner_map, inner.get(), ref_reqs);
+    LocalizeBlockPass(inner_map, inner.get(), ref_reqs);
   }
 }
 
-void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc, const proto::LocatePass& options) {
+void LocalizePass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  auto ref_reqs = stripe::FromProto(options_.ref_reqs());
+  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+    LocalizeBlockPass(map, block, ref_reqs);
+  });
+}
+
+void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc,
+                      const proto::LocateInnerBlockPass& options) {
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (!inner) {
@@ -130,14 +139,14 @@ void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc,
   }
 }
 
-void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
-  auto reqs = FromProto(options.reqs());
-  auto loc = stripe::FromProto(options.loc());
-  RunOnBlocks(root, reqs, [&loc, &options](const AliasMap& map, Block* block) {
+void LocateMemoryPass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
+  auto loc = stripe::FromProto(options_.loc());
+  RunOnBlocks(root, reqs, [&loc, this](const AliasMap& map, Block* block) {
     for (auto& ref : block->refs) {
       if (ref.dir == RefDir::None) {
         auto* ref_loc = &ref.mut().location;
-        if (options.append_devs()) {
+        if (options_.append_devs()) {
           ref_loc->devs.insert(ref_loc->devs.end(), loc.devs.begin(), loc.devs.end());
         } else {
           *ref_loc = loc;
@@ -148,12 +157,12 @@ void LocateMemoryPass(Block* root, const proto::LocatePass& options) {
   });
 }
 
-void LocateBlockPass(Block* root, const proto::LocatePass& options) {
-  auto reqs = FromProto(options.reqs());
-  auto loc = stripe::FromProto(options.loc());
-  RunOnBlocks(root, reqs, [&loc, &options](const AliasMap& map, Block* block) {  //
+void LocateBlockPass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
+  auto loc = stripe::FromProto(options_.loc());
+  RunOnBlocks(root, reqs, [&loc, this](const AliasMap& map, Block* block) {  //
     auto* block_loc = &block->location;
-    if (options.append_devs()) {
+    if (options_.append_devs()) {
       block_loc->devs.insert(block_loc->devs.end(), loc.devs.begin(), loc.devs.end());
     } else {
       *block_loc = loc;
@@ -161,15 +170,24 @@ void LocateBlockPass(Block* root, const proto::LocatePass& options) {
   });
 }
 
-void LocateInnerBlockPass(Block* root, const proto::LocatePass& options) {
-  auto reqs = FromProto(options.reqs());
-  auto inner_reqs = FromProto(options.inner_reqs());
-  auto loc = stripe::FromProto(options.loc());
+void LocateInnerBlockPass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
+  auto inner_reqs = FromProto(options_.inner_reqs());
+  auto loc = stripe::FromProto(options_.loc());
   RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
-    LocateInnerBlock(block, inner_reqs, loc, options);
+    LocateInnerBlock(block, inner_reqs, loc, options_);
   });
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<LocalizePass, proto::LocalizePass>::Register();
+  CompilePassFactory<LocateMemoryPass, proto::LocateMemoryPass>::Register();
+  CompilePassFactory<LocateBlockPass, proto::LocateBlockPass>::Register();
+  CompilePassFactory<LocateInnerBlockPass, proto::LocateInnerBlockPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

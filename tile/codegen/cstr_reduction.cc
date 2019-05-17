@@ -1,6 +1,7 @@
 // Copyright 2018, Intel Corporation
 
 #include "tile/codegen/cstr_reduction.h"
+#include "base/util/any_factory_map.h"
 #include "tile/bilp/ilp_solver.h"
 #include "tile/codegen/dce.h"
 #include "tile/stripe/stripe.h"
@@ -36,7 +37,7 @@ static void EvaluatePolynomial(const Polynomial<int64_t> orig_poly, const AliasM
   *max_value = max + 1;
 }
 
-void LightCstrReduction(const AliasMap& alias_map, Block* block, const proto::ConstraintReductionPass& options) {
+void LightCstrReduction(const AliasMap& alias_map, Block* block, const proto::LightConstraintReductionPass& options) {
   IVLOG(4, "Start light-weight constraint reduction.");
   if (block->constraints.empty()) {
     return;
@@ -139,7 +140,7 @@ static inline std::string IdxPostfix(std::string idx) {
   return idx.substr(pos + 1);
 }
 
-void IlpCstrReduction(const AliasMap& alias_map, Block* block, const proto::ConstraintReductionPass& options) {
+void IlpCstrReduction(const AliasMap& alias_map, Block* block, const proto::IlpConstraintReductionPass& options) {
   if (block->constraints.empty()) {
     return;
   }
@@ -242,6 +243,31 @@ void IlpCstrReduction(const AliasMap& alias_map, Block* block, const proto::Cons
   IVLOG(4, "End constraint reduction using ILP.");
 }
 
+void LightCstrReductionPass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs,
+              [this](const AliasMap& alias_map, stripe::Block* block) {  //
+                LightCstrReduction(alias_map, block, options_);
+              },
+              true);
+}
+
+void IlpCstrReductionPass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs,
+              [this](const AliasMap& alias_map, stripe::Block* block) {  //
+                IlpCstrReduction(alias_map, block, options_);
+              },
+              true);
+}
+
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<LightCstrReductionPass, proto::LightConstraintReductionPass>::Register();
+  CompilePassFactory<IlpCstrReductionPass, proto::IlpConstraintReductionPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

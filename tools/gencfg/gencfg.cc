@@ -1,7 +1,5 @@
 // Copyright 2019, Intel Corporation
 
-#include <libjsonnet++.h>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
@@ -29,34 +27,13 @@ std::string %2%{"%3%", %4%};
 )"};
 
 void gencfg(const po::variables_map& args) {
-  jsonnet::Jsonnet jsonnet;
-  if (!jsonnet.init()) {
-    throw std::runtime_error("jsonnet failed to initialize");
-  }
-
-  const auto& import_args = args["import"];
-  if (!import_args.empty()) {
-    const auto& import_paths = import_args.as<std::vector<fs::path>>();
-    for (const auto& import_path : import_paths) {
-      if (!import_path.empty()) {
-        if (!fs::exists(import_path)) {
-          throw std::runtime_error("Invalid --import specified");
-        }
-        jsonnet.addImportPath(import_path.string());
-      }
-    }
-  }
-
   tile::codegen::proto::Configs master;
 
   const auto& srcs_args = args["srcs"];
   if (!srcs_args.empty()) {
     const auto& srcs = srcs_args.as<std::vector<fs::path>>();
     for (const auto& src : srcs) {
-      std::string json;
-      if (!jsonnet.evaluateFile(src.string(), &json)) {
-        throw std::runtime_error(str(boost::format("jsonnet error in %1%: %2%") % src % jsonnet.lastError()));
-      }
+      auto json = ReadFile(src);
       IVLOG(1, src << ": " << json);
       auto configs = ParseConfig<tile::codegen::proto::Configs>(json);
       for (const auto& config : configs.configs()) {
@@ -106,14 +83,13 @@ int main(int argc, char* argv[]) {
     pos_opts.add("srcs", -1);
 
     po::options_description opts{"Allowed options"};
-    opts.add_options()                                                                 //
-        ("help,h", "produce help message")                                             //
-        ("verbose,v", po::value<int>()->default_value(0), "increase verbosity")        //
-        ("srcs", po::value<std::vector<fs::path>>(), ".jsonnet input paths")           //
-        ("import,I", po::value<std::vector<fs::path>>(), "add a jsonnet import path")  //
-        ("identifier",                                                                 //
-         po::value<std::string>()->required(),                                         //
-         "specify the identifier (can include namespace)")                             //
+    opts.add_options()                                                           //
+        ("help,h", "produce help message")                                       //
+        ("verbose,v", po::value<int>()->default_value(0), "increase verbosity")  //
+        ("srcs", po::value<std::vector<fs::path>>(), ".json input paths")        //
+        ("identifier",                                                           //
+         po::value<std::string>()->required(),                                   //
+         "specify the identifier (can include namespace)")                       //
         ("out", po::value<fs::path>()->required(), "output path");
 
     auto parser = po::command_line_parser(argc, argv).options(opts).positional(pos_opts);

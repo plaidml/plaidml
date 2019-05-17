@@ -55,9 +55,9 @@ struct DimCompare {
 
 }  // namespace
 
-void TransposePass(Block* root, const proto::TransposePass& options) {
-  auto reqs = FromProto(options.reqs());
-  auto alloc_reqs = FromProto(options.alloc_reqs());
+void TransposePass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
+  auto alloc_reqs = FromProto(options_.alloc_reqs());
   BufferUsageMap usages;
   RunOnBlocks(root, reqs, [&](auto map, auto block) {  //
     CollectUsage(&usages, *block, map, alloc_reqs);
@@ -107,6 +107,12 @@ void TransposePass(Block* root, const proto::TransposePass& options) {
   }
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<TransposePass, proto::TransposePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

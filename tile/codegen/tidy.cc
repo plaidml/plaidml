@@ -94,20 +94,27 @@ void PruneRefinements(const AliasMap& alias_map, Block* block) {
   }
 }
 
-void PruneIndexesPass(Block* root, const proto::GenericPass& options) {
-  auto reqs = FromProto(options.reqs());
+void PruneIndexesPass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
   RunOnBlocks(root, reqs, [](const AliasMap& map, Block* block) {  //
     PruneIndexes(block, {});
   });
 }
 
-void PruneRefinementsPass(Block* root, const proto::GenericPass& options) {
-  auto reqs = FromProto(options.reqs());
+void PruneRefinementsPass::Apply(Block* root) const {
+  auto reqs = FromProto(options_.reqs());
   RunOnBlocks(root, reqs, [](const AliasMap& alias_map, Block* block) {  //
     PruneRefinements(alias_map, block);
   });
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<PruneIndexesPass, proto::PruneIndexesPass>::Register();
+  CompilePassFactory<PruneRefinementsPass, proto::PruneRefinementsPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

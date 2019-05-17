@@ -2,14 +2,18 @@
 
 #pragma once
 
+#include <list>
 #include <map>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include <boost/optional.hpp>
 #include <boost/variant.hpp>
 
+#include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -25,21 +29,21 @@ struct Variable {
   std::string name;
 };
 
-struct Predicate;
+struct Struct;
 struct List;
 struct Set;
 
-using Term = boost::variant<    //
-    Atom,                       //
-    Number,                     //
-    Variable,                   //
-    std::shared_ptr<List>,      //
-    std::shared_ptr<Set>,       //
-    std::shared_ptr<Predicate>  //
+using Term = boost::variant<  //
+    Atom,                     //
+    Number,                   //
+    Variable,                 //
+    std::shared_ptr<List>,    //
+    std::shared_ptr<Set>,     //
+    std::shared_ptr<Struct>   //
     >;
 
-struct Predicate {
-  explicit Predicate(const Atom& functor) : functor(functor) {}
+struct Struct {
+  explicit Struct(const Atom& functor) : functor(functor) {}
   Atom functor;
   std::vector<Term> args;
 };
@@ -49,18 +53,20 @@ struct List {
   std::vector<Term> elts;
 };
 
-// An unordered list of terms.
+// A permutable list of terms.
 struct Set {
   std::vector<Term> elts;
 };
 
 struct MatchResult {
-  bool matched = false;
   std::map<std::string, Term> vars;
 };
 
 // Attempts to find the first permutation of 'value' that matches the supplied 'pattern'.
-MatchResult Match(const Term& pattern, const Term& value);
+boost::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value);
+
+// Attempts to find all permutations of 'value' that matches the supplied 'pattern'.
+std::list<MatchResult> MatchAll(const Term& pattern, const Term& value);
 
 // For testing the lexer
 std::vector<std::string> GetTokens(const std::string& code);
@@ -91,7 +97,20 @@ inline std::string to_string(const Term& term) {
   return ss.str();
 }
 
+std::string to_string(const MatchResult& result);
+std::vector<std::string> to_string(const std::list<MatchResult>& results);
+
 }  // namespace pattern
+
+class PatternPass final : public CompilePass {
+ public:
+  explicit PatternPass(const proto::PatternPass& options) : options_{options} {}
+  void Apply(stripe::Block* root) const final;
+
+ private:
+  proto::PatternPass options_;
+};
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

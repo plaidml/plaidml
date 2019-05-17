@@ -229,6 +229,20 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
   }
 }
 
+// Recomputes Statement dependencies within all matching Blocks.
+void ComputeDepsPass::Apply(stripe::Block* root) const {
+  auto reqs = stripe::FromProto(options_.reqs());
+  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
+    ComputeDepsForBlock(block, map);
+  });
+}
+
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<ComputeDepsPass, proto::ComputeDepsPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

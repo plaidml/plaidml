@@ -5,33 +5,11 @@
 #include <boost/format.hpp>
 
 #include "base/config/config.h"
+#include "base/util/any_factory_map.h"
 #include "base/util/throw.h"
 #include "tile/codegen/alias.h"
-#include "tile/codegen/autotile.h"
-#include "tile/codegen/cache.h"
-#include "tile/codegen/codec.h"
-#include "tile/codegen/cstr_reduction.h"
-#include "tile/codegen/dce.h"
-#include "tile/codegen/deps.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/codegen/emitc.h"
-#include "tile/codegen/fuse.h"
-#include "tile/codegen/localize.h"
-#include "tile/codegen/mem_rebase.h"
-#include "tile/codegen/package.h"
-#include "tile/codegen/pad.h"
-#include "tile/codegen/partition.h"
-#include "tile/codegen/placer.h"
-#include "tile/codegen/reg_cache.h"
-#include "tile/codegen/reorder.h"
-#include "tile/codegen/rewrite_locs.h"
-#include "tile/codegen/scalarize.h"
-#include "tile/codegen/schedule.h"
-#include "tile/codegen/subgroup.h"
-#include "tile/codegen/thread_inner.h"
-#include "tile/codegen/tidy.h"
-#include "tile/codegen/tile.h"
-#include "tile/codegen/transpose.h"
-#include "tile/codegen/unroll.h"
 
 namespace vertexai {
 namespace tile {
@@ -112,100 +90,13 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
   DumpProgram(*block, options, "initial", counter++);
   for (const auto& pass : passes) {
     IVLOG(1, "Optimization Pass " << pass.name());
-    switch (pass.pass_case()) {
-      case proto::Pass::kCache:
-        CachePass(block, pass.cache());
-        break;
-      case proto::Pass::kComputeDeps:
-        ComputeDepsPass(block, pass.compute_deps());
-        break;
-      case proto::Pass::kFusion:
-        FusionPass(block, pass.fusion());
-        break;
-      case proto::Pass::kLocalize:
-        LocalizePass(block, pass.localize());
-        break;
-      case proto::Pass::kLocateBlock:
-        LocateBlockPass(block, pass.locate_block());
-        break;
-      case proto::Pass::kLocateInnerBlock:
-        LocateInnerBlockPass(block, pass.locate_inner_block());
-        break;
-      case proto::Pass::kLocateMemory:
-        LocateMemoryPass(block, pass.locate_memory());
-        break;
-      case proto::Pass::kMemoryPlacement:
-        MemPlacementPass(block, pass.memory_placement());
-        break;
-      case proto::Pass::kScalarize:
-        ScalarizePass(block, pass.scalarize());
-        break;
-      case proto::Pass::kSchedule:
-        SchedulePass(block, pass.schedule());
-        break;
-      case proto::Pass::kStencil:
-        StencilPass(block, pass.stencil());
-        break;
-      case proto::Pass::kAutotile:
-        AutotilePass(block, pass.autotile());
-        break;
-      case proto::Pass::kTranspose:
-        TransposePass(block, pass.transpose());
-        break;
-      case proto::Pass::kPartitionCompute:
-        PartitionComputePass(block, pass.partition_compute());
-        break;
-      case proto::Pass::kPartitionMemory:
-        PartitionMemoryPass(block, pass.partition_memory());
-        break;
-      case proto::Pass::kUnroll:
-        UnrollPass(block, pass.unroll());
-        break;
-      case proto::Pass::kPruneIdxs:
-        PruneIndexesPass(block, pass.prune_idxs());
-        break;
-      case proto::Pass::kPruneRefs:
-        PruneRefinementsPass(block, pass.prune_refs());
-        break;
-      case proto::Pass::kThreadInner:
-        ThreadInnerPass(block, pass.thread_inner());
-        break;
-      case proto::Pass::kAssignCodec:
-        AssignCodecPass(block, pass.assign_codec());
-        break;
-      case proto::Pass::kMemRebase:
-        MemRebasePass(block, pass.mem_rebase());
-        break;
-      case proto::Pass::kLightCstrReduction:
-        LightCstrReductionPass(block, pass.light_cstr_reduction());
-        break;
-      case proto::Pass::kIlpCstrReduction:
-        IlpCstrReductionPass(block, pass.ilp_cstr_reduction());
-        break;
-      case proto::Pass::kDeadCodeElimination:
-        DeadCodeEliminationPass(block, pass.dead_code_elimination(), false);
-        break;
-      case proto::Pass::kPackageBlocks:
-        PackagePass(block, pass.package_blocks());
-        break;
-      case proto::Pass::kPad:
-        PadPass(block, pass.pad());
-        break;
-      case proto::Pass::kRegisterCache:
-        RegisterCachePass(block, pass.register_cache());
-        break;
-      case proto::Pass::kRewriteLocations:
-        RewriteLocationsPass(block, pass.rewrite_locations());
-        break;
-      case proto::Pass::kSubgroup:
-        SubgroupPass(block, pass.subgroup());
-        break;
-      case proto::Pass::kReorderBlocks:
-        ReorderBlocksPass(block, pass.reorder_blocks());
-        break;
-      default:
-        throw_with_trace(std::runtime_error(str(boost::format("Unsupported pass: %1%") % pass.name())));
+    std::unique_ptr<CompilePass> compile_pass =
+        AnyFactoryMap<CompilePass>::Instance()->MakeInstanceIfSupported(context::Context{}, pass.pass());
+    if (!compile_pass) {
+      throw_with_trace(std::runtime_error(
+          str(boost::format("Unsupported pass: %1% -> %2%") % pass.name() % pass.pass().type_url())));
     }
+    compile_pass->Apply(block);
     DumpProgram(*block, options, pass.name(), counter++);
     ValidateBlock(block);
   }

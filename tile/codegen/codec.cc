@@ -31,12 +31,18 @@ void AssignCodec(Block* block, const Tags& datatypes, const std::string& codec) 
 
 }  // namespace
 
-void AssignCodecPass(stripe::Block* root, const proto::AssignCodecPass& options) {
-  auto datatypes = FromProto(options.datatypes());
-  IVLOG(2, "AssignCodecPass> codec: " << options.codec());
-  AssignCodec(root, datatypes, options.codec());
+void AssignCodecPass::Apply(stripe::Block* root) const {
+  auto datatypes = FromProto(options_.datatypes());
+  IVLOG(2, "AssignCodecPass> codec: " << options_.codec());
+  AssignCodec(root, datatypes, options_.codec());
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<AssignCodecPass, proto::AssignCodecPass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

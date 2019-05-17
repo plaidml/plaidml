@@ -64,6 +64,13 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "io_bazel_rules_jsonnet",
+        sha256 = "5e2bf166593134d2b07dc6756598e9af6413e9aa8084eed7e87e9823c21792b2",
+        strip_prefix = "rules_jsonnet-ad2b4204157ddcf7919e8bd210f607f8a801aa7f",
+        url = "https://github.com/bazelbuild/rules_jsonnet/archive/ad2b4204157ddcf7919e8bd210f607f8a801aa7f.zip",
+    )
+
+    http_archive(
         name = "minizip",
         url = "https://github.com/nmoinvaz/minizip/archive/36089398a362a117105ebfcb3751a269c70ab3b7.zip",
         sha256 = "c47b06ad7ef10d01a8d415b1b8dfb3691dad6ed41b38756fbf8fd6c074480d0f",
@@ -117,6 +124,14 @@ def plaidml_workspace():
         },
     )
 
+    http_archive(
+        name = "mlir",
+        url = "https://github.com/tensorflow/mlir/archive/2f17f4dfe8daf10789bcd7cf16e4112bd6bd2244.zip",
+        sha256 = "fdf46ba9e43403731144db3fc0037905d01a3045e2f9da40dea9c44c7eb93fc2",
+        strip_prefix = "mlir-2f17f4dfe8daf10789bcd7cf16e4112bd6bd2244",
+        build_file = str(Label("//bzl:mlir.BUILD")),
+    )
+
 def configure_protobuf():
     http_archive(
         name = "com_google_protobuf",
@@ -142,8 +157,8 @@ def configure_protobuf():
 def configure_llvm():
     http_archive(
         name = "llvm",
-        url = "http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz",
-        sha256 = "a38dfc4db47102ec79dcc2aa61e93722c5f6f06f0a961073bd84b78fb949419b",
-        strip_prefix = "llvm-7.0.1.src",
+        url = "http://releases.llvm.org/8.0.8/llvm-8.0.0.src.tar.xz",
+        sha256 = "8872be1b12c61450cacc82b3d153eab02be2546ef34fa3580ed14137bb26224c",
+        strip_prefix = "llvm-8.0.0.src",
         build_file = str(Label("//vendor/llvm:llvm.BUILD")),
     )

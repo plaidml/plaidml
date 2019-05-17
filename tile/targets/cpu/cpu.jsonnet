@@ -13,11 +13,18 @@ local PARAMS = {
           // Define the stripe passes
           passes: [
             // Lower temps
-            { name: 'localize_tmps', localize: { reqs: ['program'], ref_reqs: ['tmp'] } },
-
+            {
+              name: 'localize_tmps',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
+                reqs: ['program'],
+                ref_reqs: ['tmp'],
+              },
+            },
             {
               name: 'stencil_mac',
-              stencil: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.StencilPass',
                 reqs: ['agg_op_add', 'comb_op_mul'],
                 outer_set: ['mac'],
                 inner_set: ['mac_inner'],
@@ -39,7 +46,8 @@ local PARAMS = {
             },
             {
               name: 'tile_contract',
-              autotile: {
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 // Apply to only dense operations
                 reqs: ['contraction'],
                 outer_set: ['contract_outer', 'kernel'],

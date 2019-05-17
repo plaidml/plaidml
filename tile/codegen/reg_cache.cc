@@ -603,22 +603,28 @@ static void RegisterCacheRecurse(Block* parent, Block* block,  //
   }
 }
 
-void RegisterCachePass(Block* root, const proto::RegisterPass& options) {
+void RegisterCachePass::Apply(Block* root) const {
   RegisterPassOptions opt;
-  auto reqs = FromProto(options.reqs());
-  opt.local_loc = stripe::FromProto(options.local_loc());
-  opt.reg_loc = stripe::FromProto(options.register_loc());
-  opt.reg_size = options.register_size();
-  opt.gmem_lat = options.global_memory_latency();
-  opt.lmem_lat = options.local_memory_latency();
-  opt.reg_lat = options.register_latency();
-  opt.dir = stripe::FromProto(static_cast<stripe::proto::Refinement::Dir>(options.dir()));
-  opt.comp_parent_tag = options.comp_parent_tag();
-  opt.cache_index_order = options.index_order() == "cache";
-  opt.align_size = options.align_size();
+  auto reqs = FromProto(options_.reqs());
+  opt.local_loc = stripe::FromProto(options_.local_loc());
+  opt.reg_loc = stripe::FromProto(options_.register_loc());
+  opt.reg_size = options_.register_size();
+  opt.gmem_lat = options_.global_memory_latency();
+  opt.lmem_lat = options_.local_memory_latency();
+  opt.reg_lat = options_.register_latency();
+  opt.dir = stripe::FromProto(static_cast<stripe::proto::Refinement::Dir>(options_.dir()));
+  opt.comp_parent_tag = options_.comp_parent_tag();
+  opt.cache_index_order = options_.index_order() == "cache";
+  opt.align_size = options_.align_size();
   RegisterCacheRecurse(nullptr, root, reqs, opt);
 }
 
+namespace {
+[[gnu::unused]] char reg = []() -> char {
+  CompilePassFactory<RegisterCachePass, proto::RegisterCachePass>::Register();
+  return 0;
+}();
+}  // namespace
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

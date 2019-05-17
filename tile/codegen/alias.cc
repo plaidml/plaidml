@@ -160,9 +160,9 @@ Affine AliasInfo::flat() const {
   return flat;
 }
 
-AliasMap::AliasMap() : depth_(0), this_block_(nullptr), parent_block_(nullptr) {}
+AliasMap::AliasMap() : depth_(0), this_block_(nullptr), parent_block_(nullptr), parent_alias_map_(nullptr) {}
 
-AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.depth_ + 1) {
+AliasMap::AliasMap(const AliasMap& outer, stripe::Block* block) : depth_(outer.depth_ + 1), parent_alias_map_(&outer) {
   idx_ranges_ = outer.idx_ranges_;
   this_block_ = block;
   parent_block_ = outer.this_block();
