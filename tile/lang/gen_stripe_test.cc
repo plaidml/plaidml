@@ -15,11 +15,13 @@ namespace lang {
 namespace {
 
 Tensor ContractPlusElementwise(const Tensor& A, const Tensor& B) {
-  Tensor C;
-  auto M = A.dims(0), N = B.dims(1);
-  Index k, m, n;
-  C({m, n}, {M, N}) += A({m, k}) * B({k, n});
-  return Call("tanh", {C});
+  TensorDim M, N, K;
+  A.match_dims(M, K);
+  B.match_dims(K, N);
+  auto C = TensorOutput(M, N);
+  TensorIndex k, m, n;
+  C(m, n) += A(m, k) * B(k, n);
+  return Call("tanh", C);
 }
 
 TEST(GenStripeTest, ContractPlusElementwise) {
