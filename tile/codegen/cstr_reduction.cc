@@ -243,18 +243,18 @@ void IlpCstrReduction(const AliasMap& alias_map, Block* block, const proto::IlpC
   IVLOG(4, "End constraint reduction using ILP.");
 }
 
-void LightCstrReductionPass::Apply(stripe::Block* root) const {
+void LightCstrReductionPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs,
+  RunOnBlocks(state->entry(), reqs,
               [this](const AliasMap& alias_map, stripe::Block* block) {  //
                 LightCstrReduction(alias_map, block, options_);
               },
               true);
 }
 
-void IlpCstrReductionPass::Apply(stripe::Block* root) const {
+void IlpCstrReductionPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs,
+  RunOnBlocks(state->entry(), reqs,
               [this](const AliasMap& alias_map, stripe::Block* block) {  //
                 IlpCstrReduction(alias_map, block, options_);
               },

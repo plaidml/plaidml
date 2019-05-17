@@ -32,7 +32,8 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   const auto& cfgs = targets::GetConfigs();
   const auto& cfg = cfgs.configs().at(cfg_name);
   const auto& stage = cfg.stages().at("default");
-  codegen::Optimize(stripe->entry.get(), stage.passes(), options);
+  codegen::CompilerState state(stripe);
+  codegen::Optimize(&state, stage.passes(), options);
   IVLOG(1, *stripe->entry);
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
   emit.Visit(*stripe->entry);

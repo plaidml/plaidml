@@ -15,7 +15,7 @@ void PruneIndexes(stripe::Block* block, const stripe::Tags& exclude_tags);
 class PruneIndexesPass final : public CompilePass {
  public:
   explicit PruneIndexesPass(const proto::PruneIndexesPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::PruneIndexesPass options_;
@@ -24,7 +24,7 @@ class PruneIndexesPass final : public CompilePass {
 class PruneRefinementsPass final : public CompilePass {
  public:
   explicit PruneRefinementsPass(const proto::PruneRefinementsPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::PruneRefinementsPass options_;

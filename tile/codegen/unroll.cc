@@ -307,8 +307,9 @@ void UnrollBlock(Block* outer,                     //
 
 }  // namespace
 
-void UnrollPass::Apply(Block* root) const {
+void UnrollPass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
+  Block* root = state->entry();
   AliasMap base_alias_map;
   AliasMap alias_map{base_alias_map, root};
   PreIterate(root, [&](const StatementIt& it) {

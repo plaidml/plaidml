@@ -24,7 +24,7 @@ void IlpCstrReduction(const AliasMap& alias_map, stripe::Block* block,
 class LightCstrReductionPass final : public CompilePass {
  public:
   explicit LightCstrReductionPass(const proto::LightConstraintReductionPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::LightConstraintReductionPass options_;
@@ -36,7 +36,7 @@ void IlpCstrReduction(const AliasMap& alias_map, stripe::Block* block,
 class IlpCstrReductionPass final : public CompilePass {
  public:
   explicit IlpCstrReductionPass(const proto::IlpConstraintReductionPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::IlpConstraintReductionPass options_;

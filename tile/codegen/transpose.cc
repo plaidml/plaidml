@@ -55,11 +55,11 @@ struct DimCompare {
 
 }  // namespace
 
-void TransposePass::Apply(Block* root) const {
+void TransposePass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
   auto alloc_reqs = FromProto(options_.alloc_reqs());
   BufferUsageMap usages;
-  RunOnBlocks(root, reqs, [&](auto map, auto block) {  //
+  RunOnBlocks(state->entry(), reqs, [&](auto map, auto block) {  //
     CollectUsage(&usages, *block, map, alloc_reqs);
   });
   for (auto& item : usages) {

@@ -260,11 +260,12 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   }
 }
 
-void PadPass::Apply(stripe::Block* root) const {
+void PadPass::Apply(CompilerState* state) const {
+  stripe::Block* root = state->entry();
   auto reqs = stripe::FromProto(options_.reqs());
   RefDefineMap ref_def_map;
   CollectRefDefine(root->SubBlock(0).get(), &ref_def_map);
-  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, stripe::Block* block) {  //
     Pad(block, map, ref_def_map);
   });
 }

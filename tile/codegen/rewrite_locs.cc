@@ -33,14 +33,14 @@ void RewriteLocation(stripe::Location* loc, const std::vector<Rewrite>& rewrites
 
 }  // namespace
 
-void RewriteLocationsPass::Apply(stripe::Block* root) const {
+void RewriteLocationsPass::Apply(CompilerState* state) const {
   std::vector<Rewrite> rewrites;
   for (const auto& rewrite : options_.rewrites()) {
     rewrites.emplace_back(Rewrite{stripe::FromProto(rewrite.prefix()), stripe::FromProto(rewrite.target())});
   }
 
   std::queue<stripe::Block*> todo;
-  todo.push(root);
+  todo.push(state->entry());
 
   while (todo.size()) {
     stripe::Block* block = todo.front();

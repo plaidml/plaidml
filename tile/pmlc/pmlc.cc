@@ -104,7 +104,8 @@ std::shared_ptr<Program> DefaultStage(const App& app,                      //
       program->buffers[kvp.first].sections.emplace("qparams", str);
     }
   }
-  Optimize(program->entry.get(), stage.passes(), options);
+  CompilerState state(program);
+  Optimize(&state, stage.passes(), options);
   WriteFile(out_dir / "stripe.txt", false, [&program](std::ofstream& fout) {  //
     fout << *program->entry << std::endl;
   });

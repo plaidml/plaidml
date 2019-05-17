@@ -1996,13 +1996,13 @@ void Scheduler::RebuildTransitiveDeps() {
 //     Assigns the new refinements offsets within the mem_loc.
 //   Inserts IO sub-block statements as needed.
 //   Updates the block's statements' dependencies for correctness.
-void SchedulePass::Apply(stripe::Block* root) const {
+void SchedulePass::Apply(CompilerState* state) const {
   // SchedulePass assumes stmt->deps is empty here.
   // However, it may not be true due to the previous passes.
   // So we need to enforce it here.
   stripe::Tags reqs_all;
   reqs_all.insert("all");
-  RunOnBlocks(root, reqs_all,
+  RunOnBlocks(state->entry(), reqs_all,
               [](const AliasMap& map, stripe::Block* block) {
                 for (auto& stmt : block->stmts) {
                   stmt.get()->deps.clear();
@@ -2011,7 +2011,7 @@ void SchedulePass::Apply(stripe::Block* root) const {
               true);
 
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [this](const AliasMap& alias_map, stripe::Block* block) {
+  RunOnBlocks(state->entry(), reqs, [this](const AliasMap& alias_map, stripe::Block* block) {
     Scheduler::Schedule(alias_map, block, options_);
   });
 }

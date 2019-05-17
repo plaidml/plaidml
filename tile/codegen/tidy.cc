@@ -94,16 +94,16 @@ void PruneRefinements(const AliasMap& alias_map, Block* block) {
   }
 }
 
-void PruneIndexesPass::Apply(Block* root) const {
+void PruneIndexesPass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [](const AliasMap& map, Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [](const AliasMap& map, Block* block) {  //
     PruneIndexes(block, {});
   });
 }
 
-void PruneRefinementsPass::Apply(Block* root) const {
+void PruneRefinementsPass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [](const AliasMap& alias_map, Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [](const AliasMap& alias_map, Block* block) {  //
     PruneRefinements(alias_map, block);
   });
 }

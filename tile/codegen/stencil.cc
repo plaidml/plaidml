@@ -259,7 +259,7 @@ void StencilPassRecurse(Block* block, const StencilPassOptions& options) {
   }
 }
 
-void StencilPass::Apply(Block* block) const {
+void StencilPass::Apply(CompilerState* state) const {
   StencilPassOptions sopts = {
       FromProto(options_.reqs()),       // reqs
       {},                               // specs
@@ -275,7 +275,7 @@ void StencilPass::Apply(Block* block) const {
   for (const auto& output_set : options_.outputs_set()) {
     sopts.set_outputs.emplace_back(FromProto(output_set.tags()));
   }
-  StencilPassRecurse(block, sopts);
+  StencilPassRecurse(state->entry(), sopts);
 }
 
 std::ostream& operator<<(std::ostream& os, const StencilIndexMatch& idx) {

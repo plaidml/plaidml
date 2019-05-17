@@ -29,7 +29,7 @@ void LocalizeBlockPass(const AliasMap& scope, stripe::Block* block, const std::s
 class LocalizePass final : public CompilePass {
  public:
   explicit LocalizePass(const proto::LocalizePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::LocalizePass options_;
@@ -38,7 +38,7 @@ class LocalizePass final : public CompilePass {
 class LocateMemoryPass final : public CompilePass {
  public:
   explicit LocateMemoryPass(const proto::LocateMemoryPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::LocateMemoryPass options_;
@@ -47,7 +47,7 @@ class LocateMemoryPass final : public CompilePass {
 class LocateBlockPass final : public CompilePass {
  public:
   explicit LocateBlockPass(const proto::LocateBlockPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::LocateBlockPass options_;
@@ -56,7 +56,7 @@ class LocateBlockPass final : public CompilePass {
 class LocateInnerBlockPass final : public CompilePass {
  public:
   explicit LocateInnerBlockPass(const proto::LocateInnerBlockPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::LocateInnerBlockPass options_;

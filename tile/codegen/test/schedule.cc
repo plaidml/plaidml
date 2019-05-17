@@ -24,6 +24,9 @@ class ScheduleTest : public ::testing::Test {
     SetUpBlock();
     SetUpOptions();
     main_ = block_->SubBlock(0);
+    prog_ = std::make_shared<stripe::Program>();
+    prog_->entry = block_;
+    state_ = std::make_shared<CompilerState>(prog_);
   }
 
   virtual void SetUpBlock() {
@@ -100,13 +103,15 @@ class ScheduleTest : public ::testing::Test {
   }
 
  protected:
+  std::shared_ptr<CompilerState> state_;
+  std::shared_ptr<stripe::Program> prog_;
   std::shared_ptr<stripe::Block> block_;
   std::shared_ptr<stripe::Block> main_;
   proto::SchedulePass options_;
 };
 
 TEST_F(ScheduleTest, EmptyMain) {
-  SchedulePass(options_).Apply(block_.get());
+  SchedulePass(options_).Apply(state_.get());
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
     loc {}
@@ -180,7 +185,7 @@ TEST_F(ScheduleTest, CachesIO) {
             }
           }]
   )")));
-  SchedulePass(options_).Apply(block_.get());
+  SchedulePass(options_).Apply(state_.get());
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
     loc {}
@@ -399,7 +404,7 @@ TEST_F(ScheduleTest, UsesTmps) {
 
   AddTmpRefinement("t1", TensorDimension{1, 16});
 
-  SchedulePass(options_).Apply(block_.get());
+  SchedulePass(options_).Apply(state_.get());
 
   EXPECT_THAT(IntoProto(*block_), EqualsProtoText(R"(
     name: "program"
@@ -724,7 +729,8 @@ TEST(Schedule, Basic) {
   }
   auto runinfo = lib::CreateTest("layer_test2");
   auto program = GenerateStripe(*runinfo);
-  Optimize(program->entry.get(), stage.passes(), options);
+  CompilerState state(program);
+  Optimize(&state, stage.passes(), options);
 }
 
 }  // namespace test

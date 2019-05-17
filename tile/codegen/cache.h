@@ -25,7 +25,7 @@ void ApplyCache(const AliasMap& map,                                       //
 class CachePass final : public CompilePass {
  public:
   explicit CachePass(const proto::CachePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::CachePass options_;

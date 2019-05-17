@@ -261,7 +261,8 @@ TEST(Stencil, Pass) {
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
                                  SimpleShape(DataType::FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
-  StencilPass(options).Apply(program->entry.get());
+  CompilerState state(program);
+  StencilPass(options).Apply(&state);
   IVLOG(2, "\n" << *program->entry);
 
   auto data = MakeMatMulTestData();

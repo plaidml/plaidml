@@ -18,7 +18,7 @@ void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_by
 class SubgroupPass final : public CompilePass {
  public:
   explicit SubgroupPass(const proto::SubgroupPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::SubgroupPass options_;
@@ -27,7 +27,7 @@ class SubgroupPass final : public CompilePass {
 class VectorizePass final : public CompilePass {
  public:
   explicit VectorizePass(const proto::VectorizePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::VectorizePass options_;

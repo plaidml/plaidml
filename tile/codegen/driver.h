@@ -7,6 +7,7 @@
 #include <boost/filesystem.hpp>
 
 #include "tile/codegen/codegen.pb.h"
+#include "tile/codegen/compile_pass.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -21,7 +22,7 @@ struct OptimizeOptions {
 
 using Passes = google::protobuf::RepeatedPtrField<proto::Pass>;
 
-void Optimize(stripe::Block* block, const Passes& passes, const OptimizeOptions& options);
+void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions& options);
 
 struct Configs {
   static void Register(const std::string& name, const std::string& pb_bytes);

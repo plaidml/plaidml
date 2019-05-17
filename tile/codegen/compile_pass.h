@@ -12,12 +12,21 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
+class CompilerState {
+ public:
+  explicit CompilerState(std::shared_ptr<stripe::Program> prog) : prog_(prog) {}
+  stripe::Block* entry() { return prog_->entry.get(); }
+
+ private:
+  std::shared_ptr<stripe::Program> prog_;
+};
+
 // A CompilePass applies an arbitrary transformation to a Stripe
 // program, rewriting it in place.
 class CompilePass {
  public:
   virtual ~CompilePass() {}
-  virtual void Apply(stripe::Block* root) const = 0;
+  virtual void Apply(CompilerState* root) const = 0;
 };
 
 // CompilePassFactory implements the TypedAnyFactory abstraction by
