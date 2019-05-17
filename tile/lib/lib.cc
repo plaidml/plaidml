@@ -21,36 +21,40 @@ std::shared_ptr<BufferBase> MakeBuffer(const TensorShape& shape) {
 }
 
 Tensor MatMul(const Tensor& A, const Tensor& B) {
-  auto M = A.dims(0), N = B.dims(1);
-  Index k("k"), m("m"), n("n");
-  Tensor C("C");
-  C({m, n}, {M, N}) += A({m, k}) * B({k, n});
+  TensorDim M, N, K;
+  A.match_dims(M, K);
+  B.match_dims(K, N);
+  TensorIndex k("k"), m("m"), n("n");
+  Tensor C("C", M, N);
+  C(m, n) += A(m, k) * B(k, n);
   return C;
 }
 
 Tensor DilatedConvolution2(const Tensor& I, const Tensor& K) {
-  auto N = I.dims(0), Lx = I.dims(1), Ly = I.dims(2), LKx = K.dims(0), LKy = K.dims(1), CO = K.dims(3);
-  Tensor O("O");
-  Index n, x, y, kx, ky, ci, co;
-  O({n, x, y, co}, {N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO}) +=
-      I({n, x + 2 * kx, y + 3 * ky, ci}) * K({kx, ky, ci, co});
+  TensorDim N, Lx, Ly, LKx, LKy, CI, CO;
+  I.match_dims(N, Lx, Ly, CI);
+  K.match_dims(LKx, LKy, CI, CO);
+  Tensor O("O", N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO);
+  TensorIndex n, x, y, kx, ky, ci, co;
+  O(n, x, y, co) += I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co);
   return O;
 }
 
-Tensor Relu(const Tensor& X) { return Call("relu", {X}); }
+Tensor Relu(const Tensor& X) { return Call("relu", X); }
 
-Tensor Sin(const Tensor& X) { return Call("sin", {X}); }
+Tensor Sin(const Tensor& X) { return Call("sin", X); }
 
-Tensor Tanh(const Tensor& X) { return Call("tanh", {X}); }
+Tensor Tanh(const Tensor& X) { return Call("tanh", X); }
 
 }  // namespace
 
-Tensor Convolution(const Tensor& I,                    //
-                   const Tensor& K,                    //
-                   const std::vector<size_t>& O_dims,  //
-                   std::vector<size_t> strides,        //
-                   ConvolutionFormat I_format,         //
+Tensor Convolution(const Tensor& I,                     //
+                   const Tensor& K,                     //
+                   const std::vector<size_t>& O_sizes,  //
+                   std::vector<size_t> strides,         //
+                   ConvolutionFormat I_format,          //
                    ConvolutionFormat K_format) {
+  TensorDim N, CI, CO;
   auto I_shape = I.shape();
   auto K_shape = K.shape();
   auto rank = I_shape.dims.size() - 2;
@@ -63,79 +67,85 @@ Tensor Convolution(const Tensor& I,                    //
         str(boost::format("Convolution strides length inconsistent with input shape: %1% (rank %2%) v %3% (rank %4%)") %
             StreamContainer(strides) % strides.size() % I_shape % rank));
   }
-  // auto N = I_shape.dims[0].size;
-  Index n("n"), co("co"), ci("ci");
-  Tensor O("O");
-  std::vector<Index> K_idxs;
-  std::vector<Index> I_idxs = {n};
-  std::vector<Index> O_idxs = {n};
-  // std::vector<size_t> O_sizes = {N};
+  TensorIndex n("n"), co("co"), ci("ci");
+  std::vector<TensorDim> I_dims = {N};
+  std::vector<TensorDim> I_spatial_dims(rank);
+  std::vector<TensorDim> K_dims;
+  std::vector<TensorDim> K_spatial_dims(rank);
+  std::vector<TensorDim> O_dims;
+  for (const auto& size : O_sizes) {
+    O_dims.emplace_back(size);
+  }
+  std::vector<TensorIndex> K_idxs;
+  std::vector<TensorIndex> I_idxs = {n};
+  std::vector<TensorIndex> O_idxs = {n};
   size_t K_spatial_dims_offset = 0;
-  // size_t I_spatial_dims_offset = 1;
-  // size_t CO;
   if (K_format == ConvolutionFormat::ChannelsFirst) {
     K_spatial_dims_offset = 2;
     K_idxs.push_back(co);
     K_idxs.push_back(ci);
-    // CO = K_shape.dims[0].size;
-  } else {
-    // CO = K_shape.dims[rank + 1].size;
+    K_dims.push_back(CO);
+    K_dims.push_back(CI);
   }
   if (I_format == ConvolutionFormat::ChannelsFirst) {
-    // I_spatial_dims_offset = 2;
     I_idxs.push_back(ci);
     O_idxs.push_back(co);
-    // O_sizes.push_back(CO);
+    I_dims.push_back(CI);
   }
+  K_dims.insert(std::end(K_dims), std::begin(K_spatial_dims), std::end(K_spatial_dims));
+  I_dims.insert(std::end(I_dims), std::begin(I_spatial_dims), std::end(I_spatial_dims));
   for (size_t i = 0; i < rank; i++) {
-    Index x(str(boost::format("x%1%") % i));
-    Index k(str(boost::format("k%1%") % i));
-    // auto I_dim = I_shape.dims[I_spatial_dims_offset + i].size;
+    TensorIndex x(str(boost::format("x%1%") % i));
+    TensorIndex k(str(boost::format("k%1%") % i));
     auto K_dim = K_shape.dims[K_spatial_dims_offset + i].size;
     I_idxs.emplace_back(strides[i] * x + k - K_dim / 2);
     K_idxs.push_back(k);
     O_idxs.push_back(x);
-    // O_sizes.push_back(I_dim - (K_dim - 1));
   }
   if (I_format == ConvolutionFormat::ChannelsLast) {
     I_idxs.push_back(ci);
+    I_dims.push_back(CI);
     O_idxs.push_back(co);
-    // O_sizes.push_back(CO);
   }
   if (K_format == ConvolutionFormat::ChannelsLast) {
     K_idxs.push_back(ci);
     K_idxs.push_back(co);
+    K_dims.push_back(CI);
+    K_dims.push_back(CO);
   }
-  O(O_idxs, O_dims) += I(I_idxs) * K(K_idxs);
+  I.match_dims(I_dims);
+  K.match_dims(K_dims);
+  Tensor O("O", O_dims);
+  O(O_idxs) += I(I_idxs) * K(K_idxs);
   return O;
 }
 
 RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
   return Evaluate(name, {MatMul(A, B)});
 }
 
 RunInfo LoadMatMulIntermediate(const std::string& name, const TensorShape& i1, const TensorShape& i2,
                                const TensorShape& i3) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
-  Tensor C(i2, "C");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
+  Tensor C("C", i2);
   Tensor D = MatMul(A, B);
   Tensor E = D + C;
   return Evaluate(name, {D, E});
 }
 
 RunInfo LoadEltwiseMulFlip(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  Tensor A{i1, "A"}, B{i2, "B"};
+  Tensor A{"A", i1}, B{"B", i2};
   return Evaluate(name, {~(A * B)});
 }
 
 RunInfo LoadMatMulAmongEltwise(const std::string& name, const TensorShape& i1, const TensorShape& i2,
                                const TensorShape& i3) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
-  Tensor C(i3, "C");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
+  Tensor C("C", i3);
   Tensor NegA = -A;
   Tensor NegB = -B;
   Tensor P = MatMul(NegA, NegB);
@@ -143,61 +153,61 @@ RunInfo LoadMatMulAmongEltwise(const std::string& name, const TensorShape& i1, c
 }
 
 RunInfo LoadEltwiseAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
   return Evaluate(name, {A + B});
 }
 
 RunInfo LoadEltwiseMultiAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2,
                             const TensorShape& i3, const TensorShape& i4) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
-  Tensor C(i3, "C");
-  Tensor D(i4, "D");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
+  Tensor C("C", i3);
+  Tensor D("D", i4);
   return Evaluate(name, {A + B + C + D});
 }
 
 RunInfo LoadEltwiseDiv(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
   return Evaluate(name, {A / B});
 }
 
 RunInfo LoadEltwiseMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
   return Evaluate(name, {A * B});
 }
 
 RunInfo LoadEltwiseMultiMul(const std::string& name, const TensorShape& i1, const TensorShape& i2,
                             const TensorShape& i3, const TensorShape& i4) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
-  Tensor C(i3, "C");
-  Tensor D(i4, "D");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
+  Tensor C("C", i3);
+  Tensor D("D", i4);
   return Evaluate(name, {A * B * C * D});
 }
 
 RunInfo LoadSin(const std::string& name, const TensorShape& i1) {
-  Tensor A(i1, "A");
+  Tensor A("A", i1);
   return Evaluate(name, {Sin(A)});
 }
 
 RunInfo LoadTanh(const std::string& name, const TensorShape& i1) {
-  Tensor A(i1, "A");
+  Tensor A("A", i1);
   return Evaluate(name, {Tanh(A)});
 }
 
 RunInfo LoadMulThenNeg(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
   Tensor C = A * B;
   return Evaluate(name, {-C});
 }
 
 RunInfo LoadNegThenMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
-  Tensor A(i1, "A");
-  Tensor B(i2, "B");
+  Tensor A("A", i1);
+  Tensor B("B", i2);
   Tensor NegA = -A;
   Tensor NegB = -B;
   return Evaluate(name, {NegA * NegB});
@@ -207,11 +217,11 @@ RunInfo LoadConstCalc(const std::string& name) {
   Tensor N(1);
   Tensor F(0.0);
   Tensor F2(3.7);
-  Index i;
-  Tensor Simple;
-  Simple({i}, {1}) = F({});
-  Tensor DoubleN;
-  DoubleN({i}, {1}) = N({});
+  TensorIndex i;
+  auto Simple = TensorOutput(1);
+  Simple(i) = F();
+  auto DoubleN = TensorOutput(1);
+  DoubleN(i) = N();
   Tensor Partial = Simple + DoubleN;
   Tensor O = Partial + F2;
   return Evaluate(name, {O});
@@ -221,8 +231,8 @@ RunInfo LoadConv1d(const std::string& name,    //
                    const TensorShape& input,   //
                    const TensorShape& kernel,  //
                    const std::vector<size_t>& output) {
-  Tensor I(input, "I");
-  Tensor K(kernel, "K");
+  Tensor I("I", input);
+  Tensor K("K", kernel);
   auto runinfo = Evaluate(name, {Convolution(I, K, output)});
   runinfo.const_inputs = {"K"};
   runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
@@ -233,8 +243,8 @@ RunInfo LoadConv2d(const std::string& name,    //
                    const TensorShape& input,   //
                    const TensorShape& kernel,  //
                    const std::vector<size_t>& output) {
-  Tensor I(input, "I");
-  Tensor K(kernel, "K");
+  Tensor I("I", input);
+  Tensor K("K", kernel);
   auto runinfo = Evaluate(name, {Convolution(I, K, output)});
   runinfo.const_inputs = {"K"};
   runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
@@ -245,8 +255,8 @@ RunInfo LoadConv2dRelu(const std::string& name,    //
                        const TensorShape& input,   //
                        const TensorShape& kernel,  //
                        const std::vector<size_t>& output) {
-  Tensor I(input, "I");
-  Tensor K(kernel, "K");
+  Tensor I("I", input);
+  Tensor K("K", kernel);
   auto runinfo = Evaluate(name, {Relu(Convolution(I, K, output))});
   runinfo.const_inputs = {"K"};
   runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
@@ -258,10 +268,10 @@ RunInfo LoadConv2dBnRelu(const std::string& name,      //
                          const TensorShape& kernel,    //
                          const TensorShape& channels,  //
                          const std::vector<size_t>& output) {
-  Tensor I(input, "I");
-  Tensor K(kernel, "K");
-  Tensor B(channels, "B");
-  Tensor S(channels, "S");
+  Tensor I("I", input);
+  Tensor K("K", kernel);
+  Tensor B("B", channels);
+  Tensor S("S", channels);
   auto O = Convolution(I, K, output);
   auto R = Relu((O + B) * S);
   auto runinfo = Evaluate(name, {R});
@@ -279,10 +289,10 @@ RunInfo LoadConv2d3Deep(const std::string& name,     //
                         const TensorShape& kernel1,  //
                         const TensorShape& kernel2,  //
                         const TensorShape& kernel3) {
-  Tensor I(input, "I");
-  Tensor K1(input, "K1");
-  Tensor K2(input, "K2");
-  Tensor K3(input, "K3");
+  Tensor I("I", input);
+  Tensor K1("K1", input);
+  Tensor K2("K2", input);
+  Tensor K3("K3", input);
   auto I_dims = input.sizes();
   auto O1 = Convolution(I, K1, {I_dims[0], I_dims[1], I_dims[2], kernel1.dims[3].size});
   auto O2 = Convolution(O1, K2, {I_dims[0], I_dims[1], I_dims[2], kernel2.dims[3].size});
@@ -309,8 +319,8 @@ Tensor Normalize(const Tensor& X) {
   auto XSqr = X * X;
   Tensor X_MS;
   {
-    std::vector<Index> idxs(X.shape().dims.size());
-    X_MS({}) += XSqr(idxs);
+    std::vector<TensorIndex> idxs(X.shape().dims.size());
+    X_MS() += XSqr(idxs);
   }
   return sqrt(X_MS);
 }
@@ -349,8 +359,8 @@ RunInfo LoadLarsMomentum4d(const std::string& name,     //
 RunInfo LoadPow(const std::string& name,  //
                 const TensorShape& i1,    //
                 const TensorShape& i2) {
-  Tensor X(i1, "X");
-  Tensor Y(i2, "Y");
+  Tensor X("X", i1);
+  Tensor Y("Y", i2);
   auto runinfo = Evaluate(name, {pow(X, Y)});
   runinfo.input_buffers = {
       {"X", MakeBuffer(i1)},
@@ -360,15 +370,17 @@ RunInfo LoadPow(const std::string& name,  //
 }
 
 Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor& Epsilon) {
+  TensorDim I0, I1, I2, I3;
+  I.match_dims(I0, I1, I2, I3);
   int64_t H = I.dims(2) * I.dims(3);
-  Tensor Sum;
-  Index i0, i1, i2, i3;
-  Sum({i0, i1, 0, 0}, {I.dims(0), I.dims(1), 1, 1}) += I({i0, i1, i2, i3});
+  auto Sum = TensorOutput(I0, I1, 1, 1);
+  TensorIndex i0, i1, i2, i3;
+  Sum(i0, i1, 0, 0) += I(i0, i1, i2, i3);
   auto Mu = Sum / H;
   auto Diff = I - Mu;
   auto SqDiff = Diff * Diff;
-  Tensor SumSqDiff;
-  SumSqDiff({i0, i1, 0, 0}, {I.dims(0), I.dims(1), 1, 1}) += SqDiff({i0, i1, i2, i3});
+  auto SumSqDiff = TensorOutput(I0, I1, 1, 1);
+  SumSqDiff(i0, i1, 0, 0) += SqDiff(i0, i1, i2, i3);
   auto Stdev = sqrt(SumSqDiff + Epsilon) / H;
   return (G / Stdev) * (I - Mu) + B;
 }
@@ -384,14 +396,15 @@ RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
 }
 
 Tensor PolygonBoxTransform(const Tensor& I) {
-  Tensor TEpartial;
-  Tensor TOpartial;
-  auto N = I.dims(0), C = I.dims(1), H = I.dims(2), W = I.dims(3);
-  Index n, c, h, w;
+  TensorDim N, C, H, W;
+  I.match_dims(N, C, H, W);
+  auto TEpartial = TensorOutput(N, C, H, W);
+  auto TOpartial = TensorOutput(N, C, H, W);
+  TensorIndex n, c, h, w;
   auto Widx = index(I, 3);
-  TEpartial({2 * n, c, h, w}, {N, C, H, W}) = I({2 * n, c, h, w});
+  TEpartial(2 * n, c, h, w) = I(2 * n, c, h, w);
   auto TE = 4 * Widx - TEpartial;
-  TOpartial({2 * n + 1, c, h, w}, {N, C, H, W}) = I({2 * n + 1, c, h, w});
+  TOpartial(2 * n + 1, c, h, w) = I(2 * n + 1, c, h, w);
   auto Hidx = index(I, 2);
   auto TO = 4 * Hidx - TOpartial;
   return TE + TO;

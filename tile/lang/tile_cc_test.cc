@@ -14,48 +14,53 @@ namespace lang {
 namespace {
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
-  Tensor R;
-  for (auto x0 : Index()) {
-    for (auto y1 : Index()) {
-      for (auto z : Index()) {
-        R({x0, y1}, {X.dims(0), Y.dims(1)}) += X({x0, z}) * Y({z, y1});
+  TensorDim I, J, K;
+  X.match_dims(I, K);
+  Y.match_dims(K, J);
+  auto R = TensorOutput(I, J);
+  for (auto i : TensorIndex()) {
+    for (auto j : TensorIndex()) {
+      for (auto k : TensorIndex()) {
+        R(i, j) += X(i, k) * Y(k, j);
       }
     }
   }
   return R;
 }
 
-Tensor Relu(const Tensor& I) { return select(I < 0.0, 0.0, I); }
+Tensor Relu(const Tensor& I) { return select(I < 0.0, Tensor{0.0}, I); }
 
 Tensor Softmax(const Tensor& X) {
-  Tensor M;
-  for (auto i : Index()) {
-    for (auto j : Index()) {
-      M({i, 0}, {X.dims(0), 1}) >= X({i, j});
+  TensorDim I, J;
+  X.match_dims(I, J);
+  auto M = TensorOutput(I, 1);
+  for (auto i : TensorIndex()) {
+    for (auto j : TensorIndex()) {
+      M(i, 0) >= X(i, j);
     }
   }
   auto E = exp(X - M);
-  Tensor N;
-  for (auto i : Index()) {
-    for (auto j : Index()) {
-      N({i, 0}, {X.dims(0), 1}) += E({i, j});
+  auto N = TensorOutput(I, 1);
+  for (auto i : TensorIndex()) {
+    for (auto j : TensorIndex()) {
+      N(i, 0) += E(i, j);
     }
   }
   return E / N;
 }
 
 TEST(TileCC, MnistMlp) {
-  Tensor input(tile::SimpleShape(tile::DataType::FLOAT32, {1, 512}));
+  // model.add(Dense(512, activation='relu', input_shape=(784,)))
+  Tensor input(tile::SimpleShape(tile::DataType::FLOAT32, {1, 784}));
   Tensor kernel1(tile::SimpleShape(tile::DataType::FLOAT32, {784, 512}));
   Tensor bias1(tile::SimpleShape(tile::DataType::FLOAT32, {512}));
-  // model.add(Dense(512, activation='relu', input_shape=(784,)))
   auto dense1 = Relu(Dot(input, kernel1) + bias1);
-  Tensor kernel2(tile::SimpleShape(tile::DataType::FLOAT32, {784, 512}));
-  Tensor bias2(tile::SimpleShape(tile::DataType::FLOAT32, {512}));
   // model.add(Dense(512, activation='relu'))
+  Tensor kernel2(tile::SimpleShape(tile::DataType::FLOAT32, {512, 512}));
+  Tensor bias2(tile::SimpleShape(tile::DataType::FLOAT32, {512}));
   auto dense2 = Relu(Dot(dense1, kernel2) + bias2);
   // model.add(Dense(10, activation='softmax'))
-  Tensor kernel3(tile::SimpleShape(tile::DataType::FLOAT32, {784, 10}));
+  Tensor kernel3(tile::SimpleShape(tile::DataType::FLOAT32, {512, 10}));
   Tensor bias3(tile::SimpleShape(tile::DataType::FLOAT32, {10}));
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   auto program = to_string(Evaluate("mnist_mlp", {dense3}).program);
@@ -95,20 +100,18 @@ TEST(TileCC, MnistMlp) {
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
-  Tensor R;
-  auto N = I.dims(0), H = I.dims(1), W = I.dims(2);
-  auto KH = K.dims(0), KW = K.dims(1), CO = K.dims(3);
-  auto kc0 = K.shape().dims[0].size / 2;
-  auto kc1 = K.shape().dims[1].size / 2;
-  for (auto n : Index()) {
-    for (auto x0 : Index()) {
-      for (auto x1 : Index()) {
-        for (auto co : Index()) {
-          for (auto ci : Index()) {
-            for (auto k0 : Index()) {
-              for (auto k1 : Index()) {
-                R({n, x0, x1, co}, {N, H - (KH - 1), W - (KW - 1), CO}) +=
-                    I({n, x0 + k0 - kc0, x1 + k1 - kc1, ci}) * K({k0, k1, ci, co});
+  TensorDim CI, CO, K0, K1, N, X0, X1;
+  I.match_dims(N, X0, X1, CI);
+  K.match_dims(K0, K1, CI, CO);
+  auto R = TensorOutput(N, X0 - (K0 - 1), X1 - (K1 - 1), CO);
+  for (auto n : TensorIndex()) {
+    for (auto x0 : TensorIndex()) {
+      for (auto x1 : TensorIndex()) {
+        for (auto co : TensorIndex()) {
+          for (auto ci : TensorIndex()) {
+            for (auto k0 : TensorIndex()) {
+              for (auto k1 : TensorIndex()) {
+                R(n, x0, x1, co) += I(n, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2), ci) * K(k0, k1, ci, co);
               }
             }
           }
@@ -120,16 +123,17 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 }
 
 Tensor MaxPooling2(const Tensor& I) {
-  Tensor R;
-  auto N = I.dims(0), H = I.dims(1), W = I.dims(2), C = I.dims(3);
-  for (auto n : Index()) {
-    for (auto h : Index()) {
-      for (auto w : Index()) {
-        for (auto i : Index()) {
-          for (auto j : Index()) {
-            for (auto c : Index()) {
+  TensorDim N, X0, X1, C;
+  I.match_dims(N, X0, X1, C);
+  auto R = TensorOutput(N, (X0 + 1) / 2, (X1 + 1) / 2, C);
+  for (auto n : TensorIndex()) {
+    for (auto x0 : TensorIndex()) {
+      for (auto x1 : TensorIndex()) {
+        for (auto i : TensorIndex()) {
+          for (auto j : TensorIndex()) {
+            for (auto c : TensorIndex()) {
               if (i < 2 && j < 2) {
-                R({n, h, w, c}, {N, (H + 1) / 2, (W + 1) / 2, C}) >= I({n, 2 * h + i, 2 * w + j, c});
+                R(n, x0, x1, c) >= I(n, 2 * x0 + i, 2 * x1 + j, c);
               }
             }
           }
@@ -142,36 +146,37 @@ Tensor MaxPooling2(const Tensor& I) {
 
 Tensor Flatten(const Tensor& X) {
   size_t product = 1;
-  for (size_t i = 1; i < X.shape().dims.size() - 1; i++) {
-    product *= X.shape().dims[i].size;
+  auto X_shape = X.shape();
+  for (size_t i = 1; i < X_shape.dims.size() - 1; i++) {
+    product *= X_shape.dims[i].size;
   }
-  auto shape = tile::SimpleShape(X.shape().type, {1, product});
+  auto shape = tile::SimpleShape(X_shape.type, {1, product});
   return reshape(X, shape);
 }
 
 TEST(TileCC, MnistCnn) {
+  // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
   Tensor input(tile::SimpleShape(tile::DataType::FLOAT32, {1, 224, 224, 1}));
   Tensor kernel1(tile::SimpleShape(tile::DataType::FLOAT32, {3, 3, 1, 32}));
   Tensor bias1(tile::SimpleShape(tile::DataType::FLOAT32, {32}));
-  // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
   auto conv1 = Relu(Convolution2(input, kernel1) + bias1);
+  // model.add(Conv2D(64, (3, 3), activation='relu'))
   Tensor kernel2(tile::SimpleShape(tile::DataType::FLOAT32, {3, 3, 32, 64}));
   Tensor bias2(tile::SimpleShape(tile::DataType::FLOAT32, {64}));
-  // model.add(Conv2D(64, (3, 3), activation='relu'))
   auto conv2 = Relu(Convolution2(conv1, kernel2) + bias2);
   // model.add(MaxPooling2D(pool_size=(2, 2)))
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
   EXPECT_THAT(flat.shape(), Eq(tile::SimpleShape(tile::DataType::FLOAT32, {1, 12100})));
-  Tensor kernel3(tile::SimpleShape(tile::DataType::FLOAT32, {64, 128}));
-  Tensor bias3(tile::SimpleShape(tile::DataType::FLOAT32, {128}));
   // model.add(Dense(128, activation='relu'))
+  Tensor kernel3(tile::SimpleShape(tile::DataType::FLOAT32, {12100, 128}));
+  Tensor bias3(tile::SimpleShape(tile::DataType::FLOAT32, {128}));
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
   const size_t kNumClasses = 100;
+  // model.add(Dense(num_classes, activation='softmax'))
   Tensor kernel4(tile::SimpleShape(tile::DataType::FLOAT32, {128, kNumClasses}));
   Tensor bias4(tile::SimpleShape(tile::DataType::FLOAT32, {kNumClasses}));
-  // model.add(Dense(num_classes, activation='softmax'))
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   auto program = to_string(Evaluate("mnist_cnn", {dense2}).program);
   IVLOG(1, program);
@@ -225,8 +230,8 @@ Tensor Normalize(const Tensor& X) {
   auto XSqr = X * X;
   Tensor X_MS;
   {
-    std::vector<Index> idxs(X.shape().dims.size());
-    X_MS({}) += XSqr(idxs);
+    std::vector<TensorIndex> idxs(X.shape().dims.size());
+    X_MS() += XSqr(idxs);
   }
   return sqrt(X_MS);
 }
@@ -256,7 +261,7 @@ TEST(TileCC, LarsMomentum4d) {
   auto program = to_string(Evaluate("lars_momentum4d", {std::get<0>(R), std::get<1>(R)}).program);
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
-  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
   _X3[],
   _X6[_X6_0, _X6_1, _X6_2, _X6_3],
   _X11[_X11_0, _X11_1, _X11_2, _X11_3]
@@ -264,7 +269,7 @@ TEST(TileCC, LarsMomentum4d) {
   _X24,
   _X23
 ) {
-  _X1 = 0.125000;
+  _X0 = 0.125000;
   _X2 = mul(_X0, _X1);
   _X4 = 0.000977;
   _X5 = mul(_X3, _X4);
@@ -276,11 +281,11 @@ TEST(TileCC, LarsMomentum4d) {
   _X13[] = +(_X12[x0, x1, x2, x3]);
   _X14 = sqrt(_X13);
   _X15 = 0.000488;
-  _X16 = mul(_X9, _X15);
+  _X16 = mul(_X15, _X9);
   _X17 = add(_X14, _X16);
   _X18 = div(_X10, _X17);
   _X19 = 0.000488;
-  _X20 = mul(_X6, _X19);
+  _X20 = mul(_X19, _X6);
   _X21 = add(_X11, _X20);
   _X22 = mul(_X18, _X21);
   _X23 = add(_X2, _X22);
@@ -291,14 +296,15 @@ TEST(TileCC, LarsMomentum4d) {
 
 TEST(TileCC, RepeatElements) {
   Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {10, 10, 10}));
-  auto N0 = I.dims(0), N1 = I.dims(1), N2 = I.dims(2);
-  Tensor O;
-  for (auto n0 : Index()) {
-    for (auto n1 : Index()) {
-      for (auto n2 : Index()) {
-        for (auto k : Index()) {
+  TensorDim N0, N1, N2;
+  I.match_dims(N0, N1, N2);
+  auto O = TensorOutput(N0, 3 * N1, N2);
+  for (auto n0 : TensorIndex()) {
+    for (auto n1 : TensorIndex()) {
+      for (auto n2 : TensorIndex()) {
+        for (auto k : TensorIndex()) {
           if (k < 3) {
-            O({n0, 3 * n1 + k, n2}, {N0, 3 * N1, N2}) = I({n0, n1, n2});
+            O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
             O.no_defract();
           }
         }
@@ -320,12 +326,13 @@ TEST(TileCC, RepeatElements) {
 TEST(TileCC, UseDefault) {
   Tensor P(tile::SimpleShape(tile::DataType::FLOAT32, {1, 7, 10, 10}));
   Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {1, 10, 10}));
-  auto B = I.dims(0), N1 = I.dims(1), N2 = I.dims(2);
-  Tensor O;
-  for (auto b : Index()) {
-    for (auto i1 : Index()) {
-      for (auto i2 : Index()) {
-        O({b, 3, i1, i2}, {B, 7, N1, N2}) = I({b, i1, i2});
+  TensorDim B, N1, N2;
+  I.match_dims(B, N1, N2);
+  auto O = TensorOutput(B, 7, N1, N2);
+  for (auto b : TensorIndex()) {
+    for (auto i1 : TensorIndex()) {
+      for (auto i2 : TensorIndex()) {
+        O(b, 3, i1, i2) = I(b, i1, i2);
         O.use_default(P);
       }
     }
@@ -344,26 +351,27 @@ TEST(TileCC, UseDefault) {
 }
 
 Tensor ArgMax(const Tensor& I) {
-  auto X0 = I.dims(0), X1 = I.dims(1), X2 = I.dims(2);
-  Tensor Max;
-  for (const auto x0 : Index()) {
-    for (const auto x1 : Index()) {
-      for (const auto x2 : Index()) {
-        Max({x0, x2}, {X0, X2}) >= I({x0, x1, x2});
+  TensorDim X0, X1, X2;
+  I.match_dims(X0, X1, X2);
+  auto Max = TensorOutput(X0, X2);
+  for (const auto x0 : TensorIndex()) {
+    for (const auto x1 : TensorIndex()) {
+      for (const auto x2 : TensorIndex()) {
+        Max(x0, x2) >= I(x0, x1, x2);
       }
     }
   }
   Tensor One(tile::SimpleShape(tile::DataType::FLOAT32, {}));
-  Tensor T;
-  for (const auto x1 : Index()) {
-    T({x1}, {X1}) = One({});
+  auto T = TensorOutput(X1);
+  for (const auto x1 : TensorIndex()) {
+    T(x1) = One();
   }
   Tensor IX = index(T, 0);
-  Tensor O;
-  for (const auto x0 : Index()) {
-    for (const auto x1 : Index()) {
-      for (const auto x2 : Index()) {
-        O({x0, x2}, {X0, X2}) >= cond(I({x0, x1, x2}), Max({x0, x2}), IX({x1}));
+  auto O = TensorOutput(X0, X2);
+  for (const auto x0 : TensorIndex()) {
+    for (const auto x1 : TensorIndex()) {
+      for (const auto x2 : TensorIndex()) {
+        O(x0, x2) >= cond(I(x0, x1, x2), Max(x0, x2), IX(x1));
       }
     }
   }
@@ -394,24 +402,33 @@ TEST(TileCC, ArgMax) {
 }
 
 Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor& B, const Tensor& G) {
-  auto N = I.dims(0), X = I.dims(1), Y = I.dims(2), CI = I.dims(3);
-  auto S = K.dims(0), CO = K.dims(3);
-  auto BI = A.dims(0), BO = A.dims(1);
+  TensorDim N, S, X, Y, CI, CO, BI, BO;
+  I.match_dims(N, X, Y, CI);
+  K.match_dims(S, S, CI, CO);
+  A.match_dims(BI, BO);
+  B.match_dims(BI, BI);
+  G.match_dims(BI, S);
   auto XO = (X - S + 1) / 1;
   auto YO = (Y - S + 1) / 1;
   auto XB = (XO + BO - 1) / BO;
   auto YB = (YO + BO - 1) / BO;
   auto XP = 0, YP = 0;
-  assert(BI - CI + 1 == BO);
-  Tensor U1, U, V1, V, M, O1, O;
-  Index n, i, j, k, x, y, ci, co;
-  U1({i, j, ci, co}, {BI, S, CI, CO}) += G({i, k}) * K({k, j, ci, co});
-  U({i, j, ci, co}, {BI, BI, CI, CO}) += U1({i, k, ci, co}) * G({j, k});
-  V1({n, i, j, x, y, ci}, {N, BI, BI, XB, YB, CI}) += B({k, i}) * I({n, BO * x + k - XP, BO * y + j - YP, ci});
-  V({n, i, j, x, y, ci}, {N, BI, BI, XB, YB, CI}) += V1({n, i, k, x, y, ci}) * B({k, j});
-  M({n, i, j, x, y, co}, {N, BI, BI, XB, YB, CO}) += V({n, i, j, x, y, ci}) * U({i, j, ci, co});
-  O1({n, i, j, x, y, co}, {N, BO, BI, XB, YB, CO}) += A({k, i}) * M({n, k, j, x, y, co});
-  O({n, BO * x + i, BO * y + j, co}, {N, XO, YO, CO}) += O1({n, i, k, x, y, co}) * A({k, j});
+  // assert(BI - CI + 1 == BO);
+  auto U1 = TensorOutput(BI, S, CI, CO);
+  auto U = TensorOutput(BI, BI, CI, CO);
+  auto V1 = TensorOutput(N, BI, BI, XB, YB, CI);
+  auto V = TensorOutput(N, BI, BI, XB, YB, CI);
+  auto M = TensorOutput(N, BI, BI, XB, YB, CO);
+  auto O1 = TensorOutput(N, BO, BI, XB, YB, CO);
+  auto O = TensorOutput(N, XO, YO, CO);
+  TensorIndex n, i, j, k, x, y, ci, co;
+  U1(i, j, ci, co) += G(i, k) * K(k, j, ci, co);
+  U(i, j, ci, co) += U1(i, k, ci, co) * G(j, k);
+  V1(n, i, j, x, y, ci) += B(k, i) * I(n, BO * x + k - XP, BO * y + j - YP, ci);
+  V(n, i, j, x, y, ci) += V1(n, i, k, x, y, ci) * B(k, j);
+  M(n, i, j, x, y, co) += V(n, i, j, x, y, ci) * U(i, j, ci, co);
+  O1(n, i, j, x, y, co) += A(k, i) * M(n, k, j, x, y, co);
+  O(n, BO * x + i, BO * y + j, co) += O1(n, i, k, x, y, co) * A(k, j);
   O.no_defract();
   return O;
 }
