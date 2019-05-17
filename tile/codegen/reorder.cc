@@ -85,8 +85,13 @@ void ReorderBlocksPass::Apply(Block* root) const {
   ComputeDepsForBlock(main_block.get(), alias_map);
 
   std::vector<std::shared_ptr<StmtList>> stmt_list;
+  StatementList done;
 
   for (const auto& stmt : main_block->stmts) {
+    if (ZeroBlock(stmt)) {
+      done.push_back(stmt);
+      continue;
+    }
     auto block = Block::Downcast(stmt);
     auto sl = std::make_shared<StmtList>();
     sl->stmts.push_back(stmt);
@@ -115,7 +120,6 @@ void ReorderBlocksPass::Apply(Block* root) const {
     stmt_list.push_back(sl);
   }
 
-  StatementList done;
   while (stmt_list.size() > 0) {
     std::shared_ptr<StmtList> sl0 = stmt_list.front();
     stmt_list.erase(stmt_list.begin());
