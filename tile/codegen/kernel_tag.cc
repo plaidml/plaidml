@@ -25,7 +25,7 @@ static bool IsEltwiseRef(const Refinement& ref, Block* block) {
     if (acc == Affine()) {
       continue;
     }
-    const auto& acc_map = acc.getMap(); 
+    const auto& acc_map = acc.getMap();
     if (acc_map.size() != 1 || acc_map.begin()->second != 1) {
       return false;
     }
@@ -38,7 +38,7 @@ static bool IsEltwiseRef(const Refinement& ref, Block* block) {
     }
     idx_set.erase(acc_idx);
   }
-  return idx_set.empty(); 
+  return idx_set.empty();
 }
 
 void EltwiseTag(const AliasMap& alias_map, Block* block) {
@@ -69,11 +69,11 @@ void KernelTag(const AliasMap& alias_map, Block* block) {
   // We can change more tags...
 }
 
-void KernelTagPass::Apply(stripe::Block* root) const {
+void KernelTagPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs,
+  RunOnBlocks(state->entry(), reqs,
               [](const AliasMap& alias_map, stripe::Block* block) {  //
-                 KernelTag(alias_map, block);
+                KernelTag(alias_map, block);
               },
               false);
 }

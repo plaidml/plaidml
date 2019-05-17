@@ -72,7 +72,8 @@ static bool MayFuse(std::shared_ptr<StmtList> s0, std::shared_ptr<StmtList> s1) 
   return false;
 }
 
-void ReorderBlocksPass::Apply(Block* root) const {
+void ReorderBlocksPass::Apply(CompilerState* state) const {
+  stripe::Block* root = state->entry();
   auto main_block = root->SubBlock(0);
   if (!main_block->has_tag("main")) {
     throw std::runtime_error("Input non-root block for block reordering pass.");

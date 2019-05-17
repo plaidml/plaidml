@@ -14,7 +14,7 @@ namespace codegen {
 class PackagePass final : public CompilePass {
  public:
   explicit PackagePass(const proto::PackagePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::PackagePass options_;

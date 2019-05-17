@@ -112,10 +112,10 @@ void LocalizeBlockPass(const AliasMap& scope, Block* block, const std::set<std::
   }
 }
 
-void LocalizePass::Apply(stripe::Block* root) const {
+void LocalizePass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
   auto ref_reqs = stripe::FromProto(options_.ref_reqs());
-  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, stripe::Block* block) {  //
     LocalizeBlockPass(map, block, ref_reqs);
   });
 }
@@ -139,10 +139,10 @@ void LocateInnerBlock(Block* block, const Tags& inner_tags, const Location& loc,
   }
 }
 
-void LocateMemoryPass::Apply(Block* root) const {
+void LocateMemoryPass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
   auto loc = stripe::FromProto(options_.loc());
-  RunOnBlocks(root, reqs, [&loc, this](const AliasMap& map, Block* block) {
+  RunOnBlocks(state->entry(), reqs, [&loc, this](const AliasMap& map, Block* block) {
     for (auto& ref : block->refs) {
       if (ref.dir == RefDir::None) {
         auto* ref_loc = &ref.mut().location;
@@ -157,10 +157,10 @@ void LocateMemoryPass::Apply(Block* root) const {
   });
 }
 
-void LocateBlockPass::Apply(Block* root) const {
+void LocateBlockPass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
   auto loc = stripe::FromProto(options_.loc());
-  RunOnBlocks(root, reqs, [&loc, this](const AliasMap& map, Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [&loc, this](const AliasMap& map, Block* block) {  //
     auto* block_loc = &block->location;
     if (options_.append_devs()) {
       block_loc->devs.insert(block_loc->devs.end(), loc.devs.begin(), loc.devs.end());
@@ -170,11 +170,11 @@ void LocateBlockPass::Apply(Block* root) const {
   });
 }
 
-void LocateInnerBlockPass::Apply(Block* root) const {
+void LocateInnerBlockPass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
   auto inner_reqs = FromProto(options_.inner_reqs());
   auto loc = stripe::FromProto(options_.loc());
-  RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, Block* block) {  //
     LocateInnerBlock(block, inner_reqs, loc, options_);
   });
 }

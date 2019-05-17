@@ -600,7 +600,8 @@ static void FusionPassRecurse(const AliasMap& map, stripe::Block* block, TagFusi
   }
 }
 
-void FusionPass::Apply(stripe::Block* root) const {
+void FusionPass::Apply(CompilerState* state) const {
+  stripe::Block* root = state->entry();
   FusionPassOptions fopts = {
       FromProto(options_.parent_reqs()),  // parent_reqs
       FromProto(options_.a_reqs()),       // a_block_reqs

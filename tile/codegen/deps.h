@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/compile_pass.h"
@@ -30,7 +32,7 @@ void ComputeDepsForBlock(stripe::Block* block, const AliasMap& alias_map);
 class ComputeDepsPass final : public CompilePass {
  public:
   explicit ComputeDepsPass(const proto::ComputeDepsPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::ComputeDepsPass options_;

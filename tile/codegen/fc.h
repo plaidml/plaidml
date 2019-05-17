@@ -11,13 +11,12 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void FullyConnected(const AliasMap& alias_map, stripe::Block* block,
-                    const proto::IlpConstraintReductionPass& options);
+void FullyConnected(const AliasMap& alias_map, stripe::Block* block, const proto::IlpConstraintReductionPass& options);
 
-class FullyConnectedPass final : public CompilePass { 
+class FullyConnectedPass final : public CompilePass {
  public:
   explicit FullyConnectedPass(const proto::FullyConnectedPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::FullyConnectedPass options_;

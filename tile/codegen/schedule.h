@@ -13,7 +13,7 @@ namespace codegen {
 class SchedulePass final : public CompilePass {
  public:
   explicit SchedulePass(const proto::SchedulePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::SchedulePass options_;

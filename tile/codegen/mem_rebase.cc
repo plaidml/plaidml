@@ -8,11 +8,11 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void MemRebasePass::Apply(stripe::Block* root) const {
+void MemRebasePass::Apply(CompilerState* state) const {
   auto offset = stripe::FromProto(options_.offset());
 
   std::queue<stripe::Block*> todo;
-  todo.push(root);
+  todo.push(state->entry());
 
   while (todo.size()) {
     stripe::Block* block = todo.front();

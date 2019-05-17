@@ -12,7 +12,7 @@ namespace codegen {
 class AssignCodecPass final : public CompilePass {
  public:
   explicit AssignCodecPass(const proto::AssignCodecPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::AssignCodecPass options_;

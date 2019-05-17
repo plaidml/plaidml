@@ -361,9 +361,9 @@ boost::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool
 
 }  // namespace
 
-void AutotilePass::Apply(Block* root) const {
+void AutotilePass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [this](const AliasMap& map, Block* block) {
+  RunOnBlocks(state->entry(), reqs, [this](const AliasMap& map, Block* block) {
     if (block->has_tag("cache")) {
       for (const auto& ref : block->refs) {
         if (IsWriteDir(ref.dir) && ref.location.devs[0].name == "REGISTER") {
@@ -399,9 +399,9 @@ void AutotilePass::Apply(Block* root) const {
   });
 }
 
-void PartitionComputePass::Apply(stripe::Block* root) const {
+void PartitionComputePass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [this](const AliasMap& map, Block* block) {
+  RunOnBlocks(state->entry(), reqs, [this](const AliasMap& map, Block* block) {
     PartitionComputeCostModel model(*block, options_);
     auto result = PickBestTile(*block, false, false, options_.only_multiple_of_32(), false, model);
     if (result) {

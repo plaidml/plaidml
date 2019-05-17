@@ -12,7 +12,7 @@ namespace codegen {
 class AutotilePass final : public CompilePass {
  public:
   explicit AutotilePass(const proto::AutotilePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::AutotilePass options_;
@@ -21,7 +21,7 @@ class AutotilePass final : public CompilePass {
 class PartitionComputePass final : public CompilePass {
  public:
   explicit PartitionComputePass(const proto::PartitionComputePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::PartitionComputePass options_;

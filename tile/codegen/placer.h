@@ -18,7 +18,7 @@ void PlaceRefinements(stripe::Block* outermost_block, const proto::MemoryPlaceme
 class MemoryPlacementPass final : public CompilePass {
  public:
   explicit MemoryPlacementPass(const proto::MemoryPlacementPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::MemoryPlacementPass options_;

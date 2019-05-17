@@ -12,7 +12,7 @@ namespace codegen {
 class PartitionMemoryPass final : public CompilePass {
  public:
   explicit PartitionMemoryPass(const proto::PartitionMemoryPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::PartitionMemoryPass options_;

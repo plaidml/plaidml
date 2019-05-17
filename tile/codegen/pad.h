@@ -27,7 +27,7 @@ void CollectRefDefine(stripe::Block* block, RefDefineMap* ref_def_map);
 class PadPass final : public CompilePass {
  public:
   explicit PadPass(const proto::PadPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::PadPass options_;

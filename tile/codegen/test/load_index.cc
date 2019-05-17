@@ -406,7 +406,8 @@ TEST(LoadIndexTest, SimpleIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), stage.passes(), options);
+  codegen::CompilerState state(program);
+  codegen::Optimize(&state, stage.passes(), options);
   IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 4, 4};
@@ -466,7 +467,8 @@ TEST(LoadIndexTest, AffineIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), stage.passes(), options);
+  codegen::CompilerState state(program);
+  codegen::Optimize(&state, stage.passes(), options);
   IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {8, 8, 256, 8};
@@ -550,7 +552,8 @@ TEST(LoadIndexTest, MultiLoadIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), stage.passes(), options);
+  codegen::CompilerState state(program);
+  codegen::Optimize(&state, stage.passes(), options);
   IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 256, 8};
@@ -630,7 +633,8 @@ TEST(LoadIndexTest, FuseIndex) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), stage.passes(), options);
+  codegen::CompilerState state(program);
+  codegen::Optimize(&state, stage.passes(), options);
   IVLOG(1, "After stripe optimization: " << *program->entry);
 
   std::vector<size_t> dim = {4, 4, 4, 8};

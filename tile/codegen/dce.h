@@ -52,7 +52,7 @@ void DeadCodeElimination(const AliasMap& alias_map, stripe::Block* block);
 class DeadCodeEliminationPass final : public CompilePass {
  public:
   explicit DeadCodeEliminationPass(const proto::DeadCodeEliminationPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::DeadCodeEliminationPass options_;

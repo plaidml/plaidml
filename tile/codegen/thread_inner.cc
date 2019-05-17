@@ -74,9 +74,9 @@ void DoThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
 }
 
 // Localize starting from root for things that match reqs
-void ThreadInnerPass::Apply(stripe::Block* root) const {
+void ThreadInnerPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [this](const AliasMap& map, stripe::Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [this](const AliasMap& map, stripe::Block* block) {  //
     DoThreadInnerPass(map, block, options_.threads());
   });
 }

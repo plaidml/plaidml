@@ -40,6 +40,7 @@ TEST(Codegen, FuseSimple) {
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {20}));
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {100, 20}));
   auto program = GenerateStripe(runinfo);
+  CompilerState state(program);
 
   IVLOG(2, "Before>\n" << *program->entry);
 
@@ -47,13 +48,13 @@ TEST(Codegen, FuseSimple) {
   pass1.add_a_reqs("eltwise_add");
   pass1.add_b_reqs("eltwise_cmp_lt");
   pass1.add_fused_set("fused");
-  FusionPass(pass1).Apply(program->entry.get());
+  FusionPass(pass1).Apply(&state);
 
   proto::FusionPass pass2;
   pass2.add_a_reqs("fused");
   pass2.add_b_reqs("eltwise_cond");
   pass2.add_fused_set("fused");
-  FusionPass(pass2).Apply(program->entry.get());
+  FusionPass(pass2).Apply(&state);
 
   IVLOG(2, "After>\n" << *program->entry);
 
@@ -265,9 +266,10 @@ TEST(Codegen, FuseFancy) {
   runinfo.input_shapes.emplace("K2", SimpleShape(DataType::FLOAT32, {1, 1, 128, 128}));
   runinfo.output_shapes.emplace("O2", SimpleShape(DataType::FLOAT32, {16, 100, 100, 128}));
   auto program = GenerateStripe(runinfo);
+  CompilerState state(program);
   auto main = program->entry->SubBlock(0);
 
-  PruneIndexesPass(proto::PruneIndexesPass{}).Apply(program->entry.get());
+  PruneIndexesPass(proto::PruneIndexesPass{}).Apply(&state);
 
   IVLOG(2, "Before>\n" << *program->entry);
 

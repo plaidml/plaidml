@@ -105,7 +105,7 @@ std::vector<std::string> to_string(const std::list<MatchResult>& results);
 class PatternPass final : public CompilePass {
  public:
   explicit PatternPass(const proto::PatternPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::PatternPass options_;

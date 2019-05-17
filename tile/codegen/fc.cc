@@ -2,8 +2,8 @@
 
 #include "tile/codegen/fc.h"
 #include "base/util/any_factory_map.h"
-#include "tile/stripe/stripe.h"
 #include "tile/codegen/tile.h"
+#include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
@@ -12,7 +12,7 @@ namespace codegen {
 using namespace stripe;  // NOLINT
 using namespace math;    // NOLINT
 
-// Check if 
+// Check if
 // 1) access 0..(n-last-1) are zero
 // 2) access (n-last)..(n-1) are single index
 bool ZeroAccesses(const Refinement& ref, size_t last) {
@@ -25,7 +25,7 @@ bool ZeroAccesses(const Refinement& ref, size_t last) {
       return false;
     }
   }
-  for (size_t i =  n_acc - last; i < n_acc; ++i) {
+  for (size_t i = n_acc - last; i < n_acc; ++i) {
     const auto& acc_map = ref.access[i].getMap();
     if (acc_map.size() != 1) {
       return false;
@@ -53,16 +53,14 @@ void FullyConnected(const AliasMap& alias_map, Block* block, const proto::FullyC
         const auto& acc_map = ref.access[n_acc - 1].getMap();
         buf1d_idx = acc_map.begin()->first;
         buf1d_name = ref.into();
-      }
-      else if (ZeroAccesses(ref, 2)) {
+      } else if (ZeroAccesses(ref, 2)) {
         const auto& acc_map0 = ref.access[n_acc - 2].getMap();
         buf2d_first_idx = acc_map0.begin()->first;
         const auto& acc_map1 = ref.access[n_acc - 1].getMap();
         buf2d_last_idx = acc_map1.begin()->first;
         buf2d_name = ref.into();
       }
-    }
-    else if (IsWriteDir(ref.dir)) {
+    } else if (IsWriteDir(ref.dir)) {
       if (ZeroAccesses(ref, 1)) {
         const auto& acc_map = ref.access[n_acc - 1].getMap();
         sbuf_idx = acc_map.begin()->first;
@@ -77,7 +75,7 @@ void FullyConnected(const AliasMap& alias_map, Block* block, const proto::FullyC
   if (block->exterior_shape(buf2d_name).sizes_product() < options.threshold()) {
     return;
   }
-  // Determine the largest subgroup size. 
+  // Determine the largest subgroup size.
   // The ranges of the index must be divisible by it.
   size_t subgroup_size = 0;
   auto idx0 = block->idx_by_name(buf1d_idx);
@@ -97,21 +95,21 @@ void FullyConnected(const AliasMap& alias_map, Block* block, const proto::FullyC
   TileShape tile(block->idxs.size());
   for (size_t i = 0; i < block->idxs.size(); ++i) {
     const auto& idx = block->idxs[i];
-    tile[i] = (idx.name == buf2d_last_idx)? subgroup_size : idx.range;
+    tile[i] = (idx.name == buf2d_last_idx) ? subgroup_size : idx.range;
   }
   ApplyTile(block, tile, false);
 
   auto inner = block->SubBlock(0);
   for (size_t i = 0; i < inner->idxs.size(); ++i) {
     const auto& idx = inner->idxs[i];
-    tile[i] = (idx.name == buf2d_last_idx)? (idx.range / subgroup_size) : idx.range;
+    tile[i] = (idx.name == buf2d_last_idx) ? (idx.range / subgroup_size) : idx.range;
   }
   ApplyTile(inner.get(), tile, false);
 
   auto accum = inner.get()->SubBlock(0);
   for (size_t i = 0; i < accum->idxs.size(); ++i) {
     const auto& idx = accum->idxs[i];
-    tile[i] = (idx.name == buf1d_idx)? subgroup_size : idx.range;
+    tile[i] = (idx.name == buf1d_idx) ? subgroup_size : idx.range;
   }
   ApplyTile(accum.get(), tile, false);
   accum->idxs.push_back({"thread_idx", 0, Affine(sbuf_idx)});
@@ -127,18 +125,18 @@ void FullyConnected(const AliasMap& alias_map, Block* block, const proto::FullyC
   auto reg_shape_accum = SimpleShape(buf1d->interior_shape.type, sizes);
   reg_shape_accum.dims.emplace_back(0, subgroup_size);
   std::vector<stripe::Affine> reg_access_zero(reg_shape_accum.dims.size());
-  Refinement reg_ref_accum(RefDir::None, "", reg_ref_name, reg_access_zero, reg_shape_accum,
-     buf1d->agg_op, Location(), buf1d->offset, stripe::BankDimension{reg_shape_accum.dims.size() - 1}, buf1d->cache_unit);
+  Refinement reg_ref_accum(RefDir::None, "", reg_ref_name, reg_access_zero, reg_shape_accum, buf1d->agg_op, Location(),
+                           buf1d->offset, stripe::BankDimension{reg_shape_accum.dims.size() - 1}, buf1d->cache_unit);
   accum->refs.insert(reg_ref_accum);
 
   // New store refinement
   std::string sreg_name = sbuf_name + "_reg";
   std::vector<stripe::Affine> sreg_access_zero(sbuf->access.size());
-  Refinement sreg_ref_inner(RefDir::None, "", sreg_name, sreg_access_zero, sbuf->interior_shape,
-     sbuf->agg_op, Location(), sbuf->offset, sbuf->bank_dim, sbuf->cache_unit);
+  Refinement sreg_ref_inner(RefDir::None, "", sreg_name, sreg_access_zero, sbuf->interior_shape, sbuf->agg_op,
+                            Location(), sbuf->offset, sbuf->bank_dim, sbuf->cache_unit);
   inner->refs.insert(sreg_ref_inner);
-  Refinement sreg_ref_accum(RefDir::Out, sreg_name, sreg_name, sreg_access_zero, sbuf->interior_shape,
-     sbuf->agg_op, Location(), sbuf->offset, sbuf->bank_dim, sbuf->cache_unit);
+  Refinement sreg_ref_accum(RefDir::Out, sreg_name, sreg_name, sreg_access_zero, sbuf->interior_shape, sbuf->agg_op,
+                            Location(), sbuf->offset, sbuf->bank_dim, sbuf->cache_unit);
   accum->refs.insert(sreg_ref_accum);
 
   // New load block
@@ -155,10 +153,9 @@ void FullyConnected(const AliasMap& alias_map, Block* block, const proto::FullyC
   // new access with subgroup dim
   std::vector<stripe::Affine> reg_access_load = reg_access_zero;
   reg_access_load.back() = Affine(buf1d_idx);
-  Refinement reg_ref_load(RefDir::Out, reg_ref_name, reg_ref_name,
-                          reg_access_load, reg_shape_load, reg_ref_accum.agg_op,
-                          Location(), reg_ref_accum.offset,
-                          reg_ref_accum.bank_dim, reg_ref_accum.cache_unit);
+  Refinement reg_ref_load(RefDir::Out, reg_ref_name, reg_ref_name, reg_access_load, reg_shape_load,
+                          reg_ref_accum.agg_op, Location(), reg_ref_accum.offset, reg_ref_accum.bank_dim,
+                          reg_ref_accum.cache_unit);
   Refinement orig_ref_load = *buf1d;
   orig_ref_load.access.back() = Affine(thread_idx);
   load_block->refs.insert(reg_ref_load);
@@ -180,18 +177,15 @@ void FullyConnected(const AliasMap& alias_map, Block* block, const proto::FullyC
   compute->refs.erase(*buf1d);
   std::vector<stripe::Affine> reg_access = reg_access_zero;
   reg_access.back().mutateMap().emplace(buf1d_idx, 1);
-  Refinement reg_ref_compute(RefDir::In, reg_ref_name, buf1d_name, reg_access,
-                             reg_shape_accum, reg_ref_accum.agg_op, Location(),
-                             reg_ref_accum.offset, reg_ref_accum.bank_dim,
-                             reg_ref_accum.cache_unit);
+  Refinement reg_ref_compute(RefDir::In, reg_ref_name, buf1d_name, reg_access, reg_shape_accum, reg_ref_accum.agg_op,
+                             Location(), reg_ref_accum.offset, reg_ref_accum.bank_dim, reg_ref_accum.cache_unit);
   compute->refs.insert(reg_ref_compute);
   // Replace store refinement
   compute->refs.erase(*sbuf);
   std::vector<stripe::Affine> sreg_access = sreg_access_zero;
   sreg_access.back().mutateMap().emplace(sbuf_idx, 1);
-  Refinement sreg_ref_compute(RefDir::Out, sreg_name, sbuf_name, sreg_access,
-                              sbuf->interior_shape, sbuf->agg_op, Location(),
-                              sbuf->offset, sbuf->bank_dim, sbuf->cache_unit);
+  Refinement sreg_ref_compute(RefDir::Out, sreg_name, sbuf_name, sreg_access, sbuf->interior_shape, sbuf->agg_op,
+                              Location(), sbuf->offset, sbuf->bank_dim, sbuf->cache_unit);
   compute->refs.insert(sreg_ref_compute);
   // Tag load stmts
   for (auto stmt : compute->stmts) {
@@ -216,9 +210,9 @@ void FullyConnected(const AliasMap& alias_map, Block* block, const proto::FullyC
   block->set_tag("subgroup_outer");
 }
 
-void FullyConnectedPass::Apply(stripe::Block* root) const {
+void FullyConnectedPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs,
+  RunOnBlocks(state->entry(), reqs,
               [this](const AliasMap& alias_map, stripe::Block* block) {  //
                 FullyConnected(alias_map, block, options_);
               },

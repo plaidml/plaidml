@@ -6,11 +6,11 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void PackagePass::Apply(stripe::Block* root) const {
+void PackagePass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
 
   std::queue<stripe::Block*> todo;
-  todo.push(root);
+  todo.push(state->entry());
 
   auto pkg_tags = stripe::FromProto(options_.package_set());
   auto subblock_tags = stripe::FromProto(options_.subblock_set());

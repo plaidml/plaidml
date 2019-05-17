@@ -48,10 +48,12 @@ TEST(DepsTest, SmallDepMix) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(input_text, &input_proto);
 
-  auto block = stripe::FromProto(input_proto);
+  auto prog = std::make_shared<stripe::Program>();
+  prog->entry = stripe::FromProto(input_proto);
+  CompilerState state(prog);
   proto::ComputeDepsPass options;
   options.add_reqs("main");
-  ComputeDepsPass(options).Apply(block.get());
+  ComputeDepsPass(options).Apply(&state);
 
   const char* expected = R"(
     loc {}
@@ -83,7 +85,7 @@ TEST(DepsTest, SmallDepMix) {
     }
   )";
 
-  auto output_proto = IntoProto(*block);
+  auto output_proto = IntoProto(*prog->entry);
   EXPECT_THAT(output_proto, EqualsProtoText(expected));
 }
 
@@ -136,10 +138,12 @@ TEST(DepsTest, Subregion) {
   stripe::proto::Block input_proto;
   gp::TextFormat::ParseFromString(input_text, &input_proto);
 
-  auto block = stripe::FromProto(input_proto);
+  auto prog = std::make_shared<stripe::Program>();
+  prog->entry = stripe::FromProto(input_proto);
+  CompilerState state(prog);
   proto::ComputeDepsPass options;
   options.add_reqs("main");
-  ComputeDepsPass(options).Apply(block.get());
+  ComputeDepsPass(options).Apply(&state);
 
   const char* expected = R"(
     loc {}
@@ -189,7 +193,7 @@ TEST(DepsTest, Subregion) {
     }
   )";
 
-  auto output_proto = IntoProto(*block);
+  auto output_proto = IntoProto(*prog->entry);
   EXPECT_THAT(output_proto, EqualsProtoText(expected));
 }
 

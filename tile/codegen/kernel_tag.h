@@ -16,7 +16,7 @@ void KernelTag(const AliasMap& alias_map, stripe::Block* block);
 class KernelTagPass final : public CompilePass {
  public:
   explicit KernelTagPass(const proto::KernelTagPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::KernelTagPass options_;

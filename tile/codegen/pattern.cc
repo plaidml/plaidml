@@ -404,10 +404,10 @@ std::vector<std::string> to_string(const std::list<MatchResult>& results) {
 
 }  // namespace pattern
 
-void PatternPass::Apply(Block* block) const {
+void PatternPass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
   auto pattern = pattern::Parse(options_.pattern());
-  RunOnBlocks(block, reqs, [&](const AliasMap& map, Block* block) {
+  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, Block* block) {
     auto term = pattern::IntoTerm(*block);
     auto match = pattern::MatchFirst(pattern, term);
     if (match) {
