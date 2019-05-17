@@ -19,18 +19,6 @@ using namespace stripe;  // NOLINT
 
 namespace {
 
-static bool ZeroBlock(const StatementIt& it) {
-  auto block = Block::Downcast(*it);
-  if (block && block->has_tag("zero")) {
-    return true;
-  }
-  auto special = Special::Downcast(*it);
-  if (special && special->name == "zero") {
-    return true;
-  }
-  return false;
-}
-
 struct Tracker {
   // Tracks the state of a buffer as it's operated on by the Block's Statements.
   struct BufferInfo {
@@ -79,7 +67,7 @@ struct Tracker {
       if (writer != it && AliasInfo::Compare(alias_info, item.second) != AliasType::None) {
         IVLOG(4, boost::format("      other writer: %1%") % *writer);
         // For two zero blocks, the order does not matter
-        if (!ZeroBlock(it) || !ZeroBlock(writer)) {
+        if (!ZeroBlock(*it) || !ZeroBlock(*writer)) {
           dataflow_deps.insert(writer);
         }
       }
@@ -95,12 +83,12 @@ struct Tracker {
       }
     }
 
-    if (ZeroBlock(it)) {
+    if (ZeroBlock(*it)) {
       // Remove the previous zero blocks for the same buffer
       // Alias info sometimes not accurate. As zero block is
       // always whole block rewritten, so we just need the same base name.
       for (auto wit : buffer_info.writers) {
-        if (ZeroBlock(wit.first) && (alias_info.base_name == wit.second.base_name ||
+        if (ZeroBlock(*wit.first) && (alias_info.base_name == wit.second.base_name ||
                                      AliasInfo::Compare(alias_info, wit.second) == AliasType::Exact)) {
           buffer_info.writers.erase(wit.first);
           break;

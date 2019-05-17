@@ -587,3 +587,8 @@ message PatternPass {
   // the key specifies the attribute name to place the extacted value.
   map<string, string> set_vars = 3;
 }
+
+// Change the kernels' tags for the following optimizations.
+message KernelTagPass {
+  repeated string reqs = 1;
+}
