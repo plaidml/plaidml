@@ -19,7 +19,7 @@ void DoThreadInnerPass(const AliasMap& scope, stripe::Block* block, int64_t thre
 class ThreadInnerPass final : public CompilePass {
  public:
   explicit ThreadInnerPass(const proto::ThreadInnerPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::ThreadInnerPass options_;

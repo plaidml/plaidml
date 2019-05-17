@@ -496,16 +496,16 @@ void VectorizeTx(stripe::Block* block, const AliasMap& map, size_t read_align_by
   TagTx(block, elems);
 }
 
-void SubgroupPass::Apply(stripe::Block* root) const {
+void SubgroupPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [&](const AliasMap& map, stripe::Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, stripe::Block* block) {  //
     Subgroup(block, map, options_);
   });
 }
 
-void VectorizePass::Apply(stripe::Block* root) const {
+void VectorizePass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [this](const AliasMap& map, stripe::Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [this](const AliasMap& map, stripe::Block* block) {  //
     VectorizeTx(block, map, options_.read_align_bytes(), options_.write_align_bytes());
   });
 }

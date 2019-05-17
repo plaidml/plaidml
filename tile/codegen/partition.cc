@@ -358,15 +358,15 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
 
 }  // namespace
 
-void PartitionMemoryPass::Apply(Block* root) const {
+void PartitionMemoryPass::Apply(CompilerState* state) const {
   std::map<std::string, BankInfo> bank_infos;
   auto reqs = FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [&](const AliasMap& alias_map, Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& alias_map, Block* block) {  //
     CollectBankInfo(&bank_infos, alias_map, block, options_);
   });
 
   auto set_tags = FromProto(options_.set_tags());
-  RunOnBlocks(root, reqs, [&](const AliasMap& alias_map, Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& alias_map, Block* block) {  //
     PartitionBuffer(alias_map, block, bank_infos, set_tags, options_.idx_tag());
   });
 }

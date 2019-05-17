@@ -15,7 +15,7 @@ void Scalarize(stripe::Block* block, bool recursive = false);
 class ScalarizePass final : public CompilePass {
  public:
   explicit ScalarizePass(const proto::ScalarizePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::ScalarizePass options_;

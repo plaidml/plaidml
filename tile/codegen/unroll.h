@@ -12,7 +12,7 @@ namespace codegen {
 class UnrollPass final : public CompilePass {
  public:
   explicit UnrollPass(const proto::UnrollPass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::UnrollPass options_;

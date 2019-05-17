@@ -106,7 +106,8 @@ TEST(DCETest, RemoveBlock) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), stage.passes(), options);
+  codegen::CompilerState state(program);
+  codegen::Optimize(&state, stage.passes(), options);
   // Expected result should not contain XA or XC
   std::string actual_after = RemoveComments(to_string(*program->entry));
   IVLOG(1, "After stripe optimization: " << actual_after);
@@ -141,7 +142,8 @@ TEST(DCETest, SimpleTest) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), stage.passes(), options);
+  codegen::CompilerState state(program);
+  codegen::Optimize(&state, stage.passes(), options);
 
   // Expected result should not contain X_T1, X_T2, X_T3, X_T4
   std::string actual_after = RemoveComments(to_string(*program->entry));
@@ -181,7 +183,8 @@ TEST(DCETest, MultiUseTest) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  codegen::Optimize(program->entry.get(), stage.passes(), options);
+  codegen::CompilerState state(program);
+  codegen::Optimize(&state, stage.passes(), options);
 
   // Expected result should not contain X_T4
   std::string actual_after = RemoveComments(to_string(*program->entry));

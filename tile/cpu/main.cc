@@ -34,10 +34,11 @@ int main(int argc, char* argv[]) {
   const auto& cfgs = targets::GetConfigs();
   const auto& cfg = cfgs.configs().at("cpu");
   const auto& stage = cfg.stages().at("default");
+  codegen::CompilerState state(program);
   codegen::OptimizeOptions options;
   options.dump_passes = true;
   options.dbg_dir = "/tmp/stripe_cpu/passes";
-  codegen::Optimize(program->entry.get(), stage.passes(), options);
+  codegen::Optimize(&state, stage.passes(), options);
 
   std::cout << "============================================================\n" << *program->entry << std::endl;
 

@@ -603,7 +603,7 @@ static void RegisterCacheRecurse(Block* parent, Block* block,  //
   }
 }
 
-void RegisterCachePass::Apply(Block* root) const {
+void RegisterCachePass::Apply(CompilerState* state) const {
   RegisterPassOptions opt;
   auto reqs = FromProto(options_.reqs());
   opt.local_loc = stripe::FromProto(options_.local_loc());
@@ -616,7 +616,7 @@ void RegisterCachePass::Apply(Block* root) const {
   opt.comp_parent_tag = options_.comp_parent_tag();
   opt.cache_index_order = options_.index_order() == "cache";
   opt.align_size = options_.align_size();
-  RegisterCacheRecurse(nullptr, root, reqs, opt);
+  RegisterCacheRecurse(nullptr, state->entry(), reqs, opt);
 }
 
 namespace {

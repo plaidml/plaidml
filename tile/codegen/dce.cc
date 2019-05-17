@@ -222,15 +222,15 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
   }
 }
 
-void DeadCodeEliminationPass::Apply(stripe::Block* root) const {
+void DeadCodeEliminationPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocksBackward(root, reqs,
+  RunOnBlocksBackward(state->entry(), reqs,
                       [](const AliasMap& alias_map, stripe::Block* block) {  //
                         DeadCodeElimination(alias_map, block);
                       },
                       true);
 
-  RunOnBlocks(root, reqs,
+  RunOnBlocks(state->entry(), reqs,
               [&](const AliasMap& map, stripe::Block* block) {  //
                 if (options_.fix_deps()) {
                   // Rebuild deps

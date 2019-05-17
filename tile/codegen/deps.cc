@@ -89,7 +89,7 @@ struct Tracker {
       // always whole block rewritten, so we just need the same base name.
       for (auto wit : buffer_info.writers) {
         if (ZeroBlock(*wit.first) && (alias_info.base_name == wit.second.base_name ||
-                                     AliasInfo::Compare(alias_info, wit.second) == AliasType::Exact)) {
+                                      AliasInfo::Compare(alias_info, wit.second) == AliasType::Exact)) {
           buffer_info.writers.erase(wit.first);
           break;
         }
@@ -218,9 +218,9 @@ void ComputeDepsForBlock(Block* block, const AliasMap& alias_map) {
 }
 
 // Recomputes Statement dependencies within all matching Blocks.
-void ComputeDepsPass::Apply(stripe::Block* root) const {
+void ComputeDepsPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(root, reqs, [](const AliasMap& map, stripe::Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [](const AliasMap& map, stripe::Block* block) {  //
     ComputeDepsForBlock(block, map);
   });
 }

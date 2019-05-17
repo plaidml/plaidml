@@ -140,7 +140,7 @@ static void CacheBlock(const AliasMap& map, Block* block, const std::set<RefDir>
   }
 }
 
-void CachePass::Apply(Block* root) const {
+void CachePass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
   std::set<RefDir> dirs;
   for (const auto& dir : options_.dirs()) {
@@ -148,7 +148,7 @@ void CachePass::Apply(Block* root) const {
   }
   auto mem_loc = stripe::FromProto(options_.mem_loc());
   auto xfer_loc = stripe::FromProto(options_.xfer_loc());
-  RunOnBlocks(root, reqs, [&](const AliasMap& map, Block* block) {  //
+  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, Block* block) {  //
     CacheBlock(map, block, dirs, mem_loc, xfer_loc, options_.add_constraints());
   });
 }

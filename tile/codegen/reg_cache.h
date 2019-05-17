@@ -12,7 +12,7 @@ namespace codegen {
 class RegisterCachePass final : public CompilePass {
  public:
   explicit RegisterCachePass(const proto::RegisterCachePass& options) : options_{options} {}
-  void Apply(stripe::Block* root) const final;
+  void Apply(CompilerState* state) const final;
 
  private:
   proto::RegisterCachePass options_;

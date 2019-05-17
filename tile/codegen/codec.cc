@@ -31,10 +31,10 @@ void AssignCodec(Block* block, const Tags& datatypes, const std::string& codec) 
 
 }  // namespace
 
-void AssignCodecPass::Apply(stripe::Block* root) const {
+void AssignCodecPass::Apply(CompilerState* state) const {
   auto datatypes = FromProto(options_.datatypes());
   IVLOG(2, "AssignCodecPass> codec: " << options_.codec());
-  AssignCodec(root, datatypes, options_.codec());
+  AssignCodec(state->entry(), datatypes, options_.codec());
 }
 
 namespace {

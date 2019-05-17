@@ -85,9 +85,9 @@ class ConfigsRegistry {
 
 }  // namespace
 
-void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options) {
+void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions& options) {
   size_t counter = 0;
-  DumpProgram(*block, options, "initial", counter++);
+  DumpProgram(*state->entry(), options, "initial", counter++);
   for (const auto& pass : passes) {
     IVLOG(1, "Optimization Pass " << pass.name());
     std::unique_ptr<CompilePass> compile_pass =
@@ -96,9 +96,9 @@ void Optimize(Block* block, const Passes& passes, const OptimizeOptions& options
       throw_with_trace(std::runtime_error(
           str(boost::format("Unsupported pass: %1% -> %2%") % pass.name() % pass.pass().type_url())));
     }
-    compile_pass->Apply(block);
-    DumpProgram(*block, options, pass.name(), counter++);
-    ValidateBlock(block);
+    compile_pass->Apply(state);
+    DumpProgram(*state->entry(), options, pass.name(), counter++);
+    ValidateBlock(state->entry());
   }
 }
 
