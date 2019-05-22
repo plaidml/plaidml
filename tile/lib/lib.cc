@@ -417,6 +417,20 @@ RunInfo LoadPolygonBoxTransform(const std::string& name,  //
   return Evaluate(name, {PolygonBoxTransform(I)});
 }
 
+lang::RunInfo LoadSoftmax(const std::string& name,     //
+                          const TensorShape& input) {  //
+  Tensor X1(input);
+  TensorDim I, J;
+  X1.match_dims(I, J);
+  TensorIndex i("i"), j("j");
+  Tensor M("M", I, 1);
+  M(i, 0) >= X1(i, j);
+  auto E = exp(X1 - M);
+  Tensor N("N", I, 1);
+  N(i, 0) += E(i, j);
+  return Evaluate(name, {E / N});
+}
+
 }  // namespace lib
 }  // namespace tile
 }  // namespace vertexai
