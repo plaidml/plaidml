@@ -314,6 +314,11 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                   return LoadPolygonBoxTransform(name,                                           //
                                                  SimpleShape(DataType::FLOAT32, {4, 5, 7, 3}));  //
                 }),
+      MakeEntry("softmax",
+                [](const std::string& name) {
+                  return LoadSoftmax(name,                                     //
+                                     SimpleShape(DataType::FLOAT32, {4, 5}));  //
+                }),
   };
   return &tests;
 }  // namespace lib

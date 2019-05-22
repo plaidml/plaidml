@@ -121,6 +121,10 @@ lang::RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
 
 lang::RunInfo LoadPolygonBoxTransform(const std::string& name,  //
                                       const TensorShape& input);
+
+lang::RunInfo LoadSoftmax(const std::string& name,  //
+                          const TensorShape& input);
+
 }  // namespace lib
 }  // namespace tile
 }  // namespace vertexai
