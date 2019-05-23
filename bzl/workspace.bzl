@@ -157,7 +157,7 @@ def configure_protobuf():
 def configure_llvm():
     http_archive(
         name = "llvm",
-        url = "http://releases.llvm.org/8.0.8/llvm-8.0.0.src.tar.xz",
+        url = "http://releases.llvm.org/8.0.0/llvm-8.0.0.src.tar.xz",
         sha256 = "8872be1b12c61450cacc82b3d153eab02be2546ef34fa3580ed14137bb26224c",
         strip_prefix = "llvm-8.0.0.src",
         build_file = str(Label("//vendor/llvm:llvm.BUILD")),
