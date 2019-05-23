@@ -8,6 +8,8 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
+using namespace stripe; // NOLINT
+
 struct SubgroupPlan {
   size_t subgroup_size;
   size_t max_mem;
@@ -22,6 +24,35 @@ class SubgroupCostModel {
  public:
   SubgroupCostModel(stripe::Block* block, const SubgroupPlan& plan, const proto::SubgroupPass& options)
       : block_(block), plan_(plan), options_(options) {}
+
+  size_t num_accesses(const std::map<std::string, size_t>& tot_tile, const Refinement& ref) {
+    auto flat = ref.FlatAccess();
+    const auto& acc_map = flat.getMap();
+    size_t num = 1;
+    for (const auto& it : tot_tile) {
+      if (acc_map.find(it.first) != acc_map.end()) {
+        num *= it.second;
+      }
+    }
+    return num;
+  }
+
+  size_t num_work_items(const std::map<std::string, size_t>& tot_tile) {
+    stripe::Affine out_flat = block_->ref_outs()[0]->FlatAccess();
+    size_t num = 1;
+    for (const auto& idx : block_->idxs) {
+      size_t prod = 1;
+      if (out_flat[idx.name] == 0) {
+        prod = idx.range;
+      }
+      else {
+        prod = (idx.name == plan_.thread_idx ? 1 : plan_.subgroup_tile[idx.name]);
+        prod *= plan_.extra_tile[idx.name];
+      }
+      num *= (idx.range / prod);
+    }
+    return num;
+  }
 
   void ComputeCost() {
     // Compute total tile size for each index
@@ -40,7 +71,7 @@ class SubgroupCostModel {
       int subgroup = 0;
       size_t mem = tile_shape.sizes_product_bytes();
       double cache_miss = tile_shape.memory_io(options_.cache_width());
-      double cache_hit = mem - cache_miss;
+      double cache_hit = num_accesses(tot_tile, ref) - cache_miss;
       double mem_io = cache_miss * options_.mem_latency() + cache_hit * options_.cache_latency();
       // Figure out if we have a single unique stride 1 subgroup block
       for (size_t i = 0; i < ref.access.size(); i++) {
@@ -64,9 +95,8 @@ class SubgroupCostModel {
         if (ref.dir == stripe::RefDir::Out) {
           plan_.thread_idx = plan_.ref_idx[ref.into()];
         }
-      } else {
-        mem *= plan_.subgroup_size;
-        mem_io *= plan_.subgroup_size;
+        mem /= plan_.subgroup_size;
+        mem_io /= plan_.subgroup_size;
       }
       // More than one subgroup index per refinment = madness
       if (subgroup > 1) {
@@ -100,13 +130,24 @@ class SubgroupCostModel {
     for (const auto& kvp : tot_tile) {
       tot_ops *= kvp.second;
     }
+
+    size_t num_wis = num_work_items(tot_tile);
+    bool is_mem_bounded = (tot_mem * num_wis > options_.cache_size()) || (static_cast<double>(tot_ops) / static_cast<double>(tot_mem) <= options_.mem_bounded_threshold());
     // Cost = mem / compute
     IVLOG(2, "subgroup: " << plan_.subgroup_tile << ", extra: " << plan_.extra_tile << ", mem: " << tot_mem
                           << ", mem_io: " << tot_mem_io << ", cost: " << tot_mem_io / static_cast<double>(tot_ops));
     double cost = tot_mem_io / static_cast<double>(tot_ops);
-    if (cost < best_cost_) {
+
+    bool replace = !is_mem_bounded && best_is_mem_bounded_;
+    if (is_mem_bounded == best_is_mem_bounded_) {
+      replace = is_mem_bounded ? (cost < best_cost_) : (num_wis / tot_mem_io > best_work_items_ / best_tot_mem_io_);
+    }
+    if (replace) {
       best_cost_ = cost;
       best_plan_ = plan_;
+      best_is_mem_bounded_ = is_mem_bounded;
+      best_work_items_ = num_wis;
+      best_tot_mem_io_ = tot_mem_io;
     }
   }
 
@@ -144,6 +185,9 @@ class SubgroupCostModel {
 
   double BestCost(SubgroupPlan* best_plan) {
     best_cost_ = std::numeric_limits<double>::infinity();
+    best_is_mem_bounded_ = true;
+    best_work_items_ = 0;
+    best_tot_mem_io_ = 1.0;
     for (int i = 0; i < options_.subgroup_sizes().size(); ++i) {
       plan_.subgroup_size = options_.subgroup_sizes()[i];
       plan_.max_mem = options_.max_mem()[i];
@@ -157,6 +201,9 @@ class SubgroupCostModel {
   stripe::Block* block_;
   SubgroupPlan plan_;
   double best_cost_;
+  size_t best_work_items_;
+  double best_tot_mem_io_;
+  bool best_is_mem_bounded_;
   SubgroupPlan best_plan_;
   proto::SubgroupPass options_;
 };

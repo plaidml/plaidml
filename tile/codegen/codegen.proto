@@ -541,10 +541,14 @@ message SubgroupPass {
   repeated int64 max_mem = 4;
   // Maximum size of each subgroup
   repeated int64 subgroup_sizes = 5;
+  // The threshold of computations/memory_accesses
+  required double mem_bounded_threshold = 6;
   // Size of each subgroup
-  optional int64 subgroup_size = 6 [default = 8];
+  optional int64 subgroup_size = 7 [default = 8];
   // Cache width
-  optional int64 cache_width = 7 [default = 0];
+  optional int64 cache_width = 8 [default = 0];
+  // Cache size
+  required uint64 cache_size = 9;
 }
 
 // Rewrites refinement and block locations.
@@ -590,5 +594,10 @@ message PatternPass {
 
 // Change the kernels' tags for the following optimizations.
 message KernelTagPass {
+  repeated string reqs = 1;
+}
+
+// Mark #temp_var for the multiple used variables
+message TempVarPass {
   repeated string reqs = 1;
 }
