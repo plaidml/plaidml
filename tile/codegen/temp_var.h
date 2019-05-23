@@ -11,15 +11,15 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void FullyConnected(const AliasMap& alias_map, stripe::Block* block, const proto::FullyConnectedPass& options);
+void TempVar(const AliasMap& alias_map, stripe::Block* block, const proto::TempVarPass& options);
 
-class FullyConnectedPass final : public CompilePass {
+class TempVarPass final : public CompilePass {
  public:
-  explicit FullyConnectedPass(const proto::FullyConnectedPass& options) : options_{options} {}
+  explicit TempVarPass(const proto::TempVarPass& options) : options_{options} {}
   void Apply(CompilerState* state) const final;
 
  private:
-  proto::FullyConnectedPass options_;
+  proto::TempVarPass options_;
 };
 
 }  // namespace codegen

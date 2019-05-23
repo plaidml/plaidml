@@ -113,7 +113,7 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
         }
       }
       if (sl->eltwise) {
-        IVLOG(1, "Block: " << block->name);
+        IVLOG(3, "Block: " << block->name);
       }
     } else {
       sl->eltwise = false;
@@ -129,14 +129,14 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
     for (auto it = stmt_list.begin(); it != stmt_list.end(); ++it) {
       auto& sl1 = *it;
       if (MayFuse(sl0, sl1)) {
-        IVLOG(1, "Fuse: ");
+        IVLOG(3, "Fuse: ");
         for (const auto& s : sl0->stmts) {
           auto block = Block::Downcast(s);
-          IVLOG(1, "    " << block->name);
+          IVLOG(3, "    " << block->name);
         }
         for (const auto& s : sl1->stmts) {
           auto block = Block::Downcast(s);
-          IVLOG(1, "    " << block->name);
+          IVLOG(3, "    " << block->name);
         }
         // merge stmts
         sl1->stmts.insert(sl1->stmts.begin(), sl0->stmts.begin(), sl0->stmts.end());
