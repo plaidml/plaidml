@@ -4,7 +4,7 @@ dependencies:
   - h5py
   - numpy
   - python=3.6
-  - scipy
+  - scipy=1.2.1
   - pip:
     - click
     - keras==2.2.4
