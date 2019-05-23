@@ -1,10 +1,12 @@
 local PARAMS = {
   intel_gen9_opencl: {
     CACHE_WIDTH: 64,
-    MAX_MEM: [1000, 3200],
+    MAX_MEM: [280, 280],
     SUBGROUP_SIZES: [8, 16],
     GLOBAL_MEM_LAT: 420,
     LOCAL_MEM_LAT: 125,
+    MEM_BOUNDED_THRESHOLD: 14,
+    CACHE_SIZE: 3 * 768 * 1024,
   },
 };
 
@@ -111,6 +113,8 @@ local PARAMS = {
                 max_mem: PARAMS[cfg].MAX_MEM,
                 subgroup_sizes: PARAMS[cfg].SUBGROUP_SIZES,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
+                cache_size: PARAMS[cfg].CACHE_SIZE,
+                mem_bounded_threshold: PARAMS[cfg].MEM_BOUNDED_THRESHOLD,
               },
             },
 
@@ -306,6 +310,13 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+            {
+              name: 'temp_var',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.TempVarPass',
+                reqs: ['all'],
+              },
+            }
           ],
         },
       },
