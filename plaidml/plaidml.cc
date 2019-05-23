@@ -48,6 +48,7 @@
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lang/parser.h"
+#include "tile/lang/sym_poly.h"
 #include "tile/lang/symbolic.h"
 #include "tile/proto/metadata.pb.h"
 #include "tile/proto/support.h"
@@ -1656,7 +1657,20 @@ extern "C" plaidml_gradient* plaidml_alloc_gradient(plaidml_var* var) {
     return nullptr;
   }
   try {
-    auto ptr = std::make_shared<Gradient>(var->value);
+    auto val = var->value;
+    if (val->num_dims() != 0) {
+      std::vector<vertexai::tile::lang::SymbolicSpec> ss_vec;
+      vertexai::tile::lang::SymbolicSpec ss;
+      for (size_t i = 0; i < val->num_dims(); i++) {
+        ss.push_back(vertexai::tile::lang::SymbolicPolynomial::MakeIndex("i" + std::to_string(i)));
+      }
+      ss_vec.push_back(vertexai::tile::lang::SymbolicSpec());
+      ss_vec.push_back(ss);
+      val = vertexai::tile::lang::ContractionValue::make(vertexai::tile::lang::CombinationOp::NONE,
+                                                         vertexai::tile::lang::AggregationOp::SUM, ss_vec, {}, {val},
+                                                         {}, false, false);
+    }
+    auto ptr = std::make_shared<Gradient>(val);
     return new plaidml_gradient{ptr};
   } catch (...) {
     vertexai::SetLastException(std::current_exception());
