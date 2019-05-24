@@ -71,7 +71,7 @@ Areas for Contribution
 * HALs for Backend Targets (OpenCL, Vulkan, SPIR-V, HVX, etc)
 
   * There is no documentation for the HAL currently. The interface is fairly 
-    straightforward and the `OpenCL HAL <tile/hal/opencl>`_ provides a good 
+    straightforward and the `OpenCL HAL <../tile/hal/opencl>`_ provides a good 
     example of a complete HAL.
 
 Please follow the process above before embarking on anything major (like 
