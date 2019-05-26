@@ -327,11 +327,15 @@ inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint",
 
 // inline Tensor element(const Tensor& x) { return Call("element", {x}); } // TODO: tuple
 
+inline Tensor cos(const Tensor& x) { return Call("cos", x); }
+
 inline Tensor exp(const Tensor& x) { return Call("exp", x); }
 
 inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x, y); }
 
 inline Tensor index(const Tensor& x, size_t axis) { return Call("index", x, static_cast<int64_t>(axis)); }
+
+inline Tensor log(const Tensor& x) { return Call("log", x); }
 
 inline Tensor pow(const Tensor& x, const Tensor& y) { return Call("pow", x, y); }
 
@@ -363,7 +367,15 @@ inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& 
 
 inline Tensor shape(const Tensor& x) { return Call("shape", x); }
 
+inline Tensor sigmoid(const Tensor& x) { return Call("sigmoid", x); }
+
+inline Tensor sin(const Tensor& x) { return Call("sin", x); }
+
 inline Tensor sqrt(const Tensor& x) { return Call("sqrt", x); }
+
+inline Tensor tan(const Tensor& x) { return Call("tan", x); }
+
+inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
 
 tile::lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars);
 
