@@ -527,6 +527,60 @@ TEST(TileCC, CumSum) {
 )"));
 }
 
+Tensor ComplexConv2d(const Tensor& I,               //
+                     const Tensor& K,               //
+                     const std::vector<size_t>& s,  // stride coeffs
+                     const std::vector<size_t>& d   // dilation coeffs
+) {
+  // "same-lower" autopadding will be applied
+  TensorDim N, G, GCI, GCO;
+  std::vector<TensorDim> X(2);
+  std::vector<TensorDim> KX(2);
+  TensorIndex n, g, gci, gco;
+  std::vector<TensorIndex> x(2);
+  std::vector<TensorIndex> k(2);
+  I.match_dims(N, X[0], X[1], G, GCI);
+  K.match_dims(KX[0], KX[1], G, GCI, GCO);
+  // Compute output spatial dimensions
+  std::vector<TensorDim> Y(2);
+  for (size_t i = 0; i < Y.size(); ++i) {
+    Y[i] = (X[i] + s[i] - 1) / s[i];
+  }
+  // Compute the effective kernel size after dilation
+  std::vector<TensorDim> EK(2);
+  for (size_t i = 0; i < EK.size(); ++i) {
+    EK[i] = d[i] * (KX[i] - 1) + 1;
+  }
+  // Compute the padding offset
+  std::vector<TensorDim> P(2);
+  for (size_t i = 0; i < P.size(); ++i) {
+    P[i] = ((Y[i] - 1) * s[i] + EK[i] - X[i]) / 2;
+  }
+  // Specify the output size
+  auto O = TensorOutput(N, Y[0], Y[1], G, GCO);
+  // Compute the convolution
+  O(n, x[0], x[1], g, gco) +=
+      I(n, s[0] * x[0] + d[0] * k[0] - P[0], s[1] * x[1] + d[1] * k[1] - P[1], g, gci) * K(k[0], k[1], g, gci, gco);
+  return O;
+}
+
+TEST(TileCC, ComplexConv2d) {
+  Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {1, 224, 224, 3, 3}));
+  Tensor K(tile::SimpleShape(tile::DataType::FLOAT32, {3, 3, 3, 3, 32}));
+  auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
+  auto program = to_string(Evaluate("complex_conv_2d", {O}).program);
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3, _X0_4],
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3, _X1_4]
+) -> (
+  _X2
+) {
+  _X2[x0, x1, x3, x5, x7 : 1, 112, 112, 3, 32] = +(_X0[x0, -2 + 2*x1 + 3*x2, -2 + 2*x3 + 3*x4, x5, x6] * _X1[x2, x4, x5, x6, x7]);
+}
+)"));
+}
+
 }  // namespace
 }  // namespace lang
 }  // namespace tile
