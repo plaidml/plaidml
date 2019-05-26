@@ -36,7 +36,7 @@ std::string to_string(const Expr* expr) {
 
 struct TensorIndex::Impl {
   std::shared_ptr<PolyExpr> expr;
-  std::vector<std::shared_ptr<ConstraintExpr>> constraints;
+  mutable std::vector<std::shared_ptr<ConstraintExpr>> constraints;
 };
 
 struct TensorDim::Impl {
@@ -180,9 +180,70 @@ TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(-, PolyOp::Sub);
 TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(*, PolyOp::Mul);
 TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(/, PolyOp::Div);
 
+// This is necessary to allow for these kinds of expressions:
+//   if (i - j < 10) {}
+//
+// What we want is for both `i` and `j` to refer to the `i - j < 10` constraint.
+// Later, the ConstraintCollector will track each constraint that is associated
+// with the indexes that are in turn associated with a contraction.
+class ConstraintApplier : public PolyVisitor {
+ public:
+  explicit ConstraintApplier(const std::shared_ptr<ConstraintExpr>& constraint) : constraint_(constraint) {}
+
+ private:
+  Polynomial Visit(const PolyIndex& expr) {
+    auto impl = TensorFriend::GetImpl(expr);
+    impl->constraints.emplace_back(constraint_);
+    return Polynomial();
+  }
+
+  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
+
+  Polynomial Visit(const PolyOpExpr& expr) {
+    for (auto operand : expr.operands) {
+      operand->Accept(this);
+    }
+    return Polynomial();
+  }
+
+ private:
+  std::shared_ptr<ConstraintExpr> constraint_;
+};
+
+// Add each unique constraint on indexes associated with a contraction.
+// Duplicates may occur in cases like:
+//   if (i - j < 10) {}
+//
+// Both `i` and `j` will refer to the same `i - j < 10` constraint.
+struct ConstraintCollector : public PolyVisitor {
+  Polynomial Visit(const PolyIndex& expr) {
+    auto impl = TensorFriend::GetImpl(expr);
+    for (const auto& constraint : impl->constraints) {
+      auto it = std::find(constraints.begin(), constraints.end(), constraint);
+      if (it == constraints.end()) {
+        constraints.emplace_back(constraint);
+      }
+    }
+    return Polynomial();
+  }
+
+  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
+
+  Polynomial Visit(const PolyOpExpr& expr) {
+    for (const auto& op : expr.operands) {
+      op->Accept(this);
+    }
+    return Polynomial();
+  }
+
+  std::vector<std::shared_ptr<ConstraintExpr>> constraints;
+};
+
 Constraint TensorIndex::operator<(size_t rhs) const {
+  IVLOG(3, "Add size_t constraint: " << rhs);
   auto constraint = std::make_shared<ConstraintExpr>(impl_->expr, rhs);
-  impl_->constraints.emplace_back(constraint);
+  ConstraintApplier applier(constraint);
+  impl_->expr->Accept(&applier);
   return Constraint();
 }
 
@@ -190,8 +251,10 @@ Constraint TensorIndex::operator<(const TensorDim& rhs) const {
   if (!rhs.impl_->size) {
     throw std::runtime_error("Undefined dimension.");
   }
+  IVLOG(3, "Add TensorDim constraint: " << *rhs.impl_->size);
   auto constraint = std::make_shared<ConstraintExpr>(impl_->expr, *rhs.impl_->size);
-  impl_->constraints.emplace_back(constraint);
+  ConstraintApplier applier(constraint);
+  impl_->expr->Accept(&applier);
   return Constraint();
 }
 
@@ -289,21 +352,21 @@ void Tensor::match_dims(const std::vector<TensorDim>& dims) const {
 
 IndexedTensor Tensor::operator()(const std::vector<TensorIndex>& idxs) const {
   std::vector<size_t> sizes;
-  if (impl_->dims.size()) {
-    // this handles the case where we're constructing the lhs (e.g. a tensor output)
-    for (const auto& dim : impl_->dims) {
-      if (!dim.impl_->size) {
-        throw std::runtime_error("Undefined dimension.");
-      }
-      sizes.emplace_back(*dim.impl_->size);
-    }
-  } else {
+  if (impl_->expr) {
     // this handles the case where we're constructing the rhs (e.g. a tensor input)
     auto this_shape = shape();
     if (idxs.size() != this_shape.dims.size()) {
       throw std::runtime_error(
           str(boost::format("Unexpected number of dimensions in contraction. Expected: %1%, Actual: %2%") %
               this_shape.dims.size() % idxs.size()));
+    }
+  } else {
+    // this handles the case where we're constructing the lhs (e.g. a tensor output)
+    for (const auto& dim : impl_->dims) {
+      if (!dim.impl_->size) {
+        throw std::runtime_error("Undefined dimension.");
+      }
+      sizes.emplace_back(*dim.impl_->size);
     }
   }
   std::vector<std::shared_ptr<PolyExpr>> idx_exprs;
@@ -377,25 +440,6 @@ IndexedTensor::~IndexedTensor() = default;
 IndexedTensor::IndexedTensor(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 
 IndexedTensor::IndexedTensor(IndexedTensor&& rhs) noexcept : impl_(std::move(rhs.impl_)) {}
-
-struct ConstraintCollector : public PolyVisitor {
-  Polynomial Visit(const PolyIndex& expr) {
-    auto impl = TensorFriend::GetImpl(expr);
-    std::copy(impl->constraints.begin(), impl->constraints.end(), std::back_inserter(constraints));
-    return Polynomial();
-  }
-
-  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
-
-  Polynomial Visit(const PolyOpExpr& expr) {
-    for (const auto& op : expr.operands) {
-      op->Accept(this);
-    }
-    return Polynomial();
-  }
-
-  std::vector<std::shared_ptr<ConstraintExpr>> constraints;
-};
 
 void IndexedTensor::Impl::MakeContraction(AggregationOp agg_op, const IndexedTensor& rhs) {
   auto output_spec = std::dynamic_pointer_cast<TensorSpecExpr>(expr);
@@ -605,6 +649,9 @@ class AstTraversal : public AstVisitor {
 
  private:
   void Push(const std::shared_ptr<Expr>& expr) {
+    if (!expr) {
+      throw std::runtime_error("Invalid expression");
+    }
     IVLOG(4, "AstTraversal::Push> " << expr.get());
     stack_.push(std::make_pair(expr, false));
   }
@@ -991,6 +1038,9 @@ class Evaluator : public AstVisitor {
 };
 
 TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr) {
+  if (!expr) {
+    throw std::runtime_error("Invalid expression");
+  }
   AstTraversal traversal({expr});
   std::unordered_map<const Expr*, Binding> bindings;
   ShapeEvaluator evaluator(traversal.flat(), &bindings);

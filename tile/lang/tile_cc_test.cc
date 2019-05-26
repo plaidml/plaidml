@@ -485,6 +485,48 @@ TEST(TileCC, UniqueNames) {
 )"));
 }
 
+TEST(TileCC, GlobalMin) {
+  Tensor I("I", tile::SimpleShape(tile::DataType::FLOAT32, {10, 10, 10}));
+  TensorIndex i, j, k;
+  auto O_Neg = TensorOutput();
+  auto Neg = -I;
+  O_Neg() >= Neg(i, j, k);
+  auto O = -O_Neg;
+  auto program = to_string(Evaluate("global_min", {O}).program);
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2]
+) -> (
+  _X2
+) {
+  _X0 = neg(I);
+  _X1[] = >(_X0[x0, x1, x2]);
+  _X2 = neg(_X1);
+}
+)"));
+}
+
+TEST(TileCC, CumSum) {
+  Tensor I("I", tile::SimpleShape(tile::DataType::FLOAT32, {10}));
+  TensorDim N;
+  TensorIndex i, k;
+  I.match_dims(N);
+  auto O = TensorOutput(N);
+  if (i - k < N) {
+    O(i) += I(k);
+  }
+  auto program = to_string(Evaluate("csum", {O}).program);
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0[x1 : 10] = +(I[x0]), -x0 + x1 < 10;
+}
+)"));
+}
+
 }  // namespace
 }  // namespace lang
 }  // namespace tile
