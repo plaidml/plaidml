@@ -61,6 +61,7 @@ class SubgroupCostModel {
       tot_tile[idx] = plan_.subgroup_tile[idx] * plan_.extra_tile[idx];
     }
     // Compute the amount of memory transfer for each refinement
+    size_t tot_accesses = 0;
     size_t tot_mem = 0;
     double tot_mem_io = 0;
     plan_.ref_idx.clear();
@@ -71,7 +72,8 @@ class SubgroupCostModel {
       int subgroup = 0;
       size_t mem = tile_shape.sizes_product_bytes();
       double cache_miss = tile_shape.memory_io(options_.cache_width());
-      double cache_hit = num_accesses(tot_tile, ref) - cache_miss;
+      size_t accesses = num_accesses(tot_tile, ref);
+      double cache_hit = accesses - cache_miss;
       double mem_io = cache_miss * options_.mem_latency() + cache_hit * options_.cache_latency();
       // Figure out if we have a single unique stride 1 subgroup block
       for (size_t i = 0; i < ref.access.size(); i++) {
@@ -95,6 +97,7 @@ class SubgroupCostModel {
         if (ref.dir == stripe::RefDir::Out) {
           plan_.thread_idx = plan_.ref_idx[ref.into()];
         }
+        accesses /= plan_.subgroup_size;
         mem /= plan_.subgroup_size;
         mem_io /= plan_.subgroup_size;
       }
@@ -102,6 +105,7 @@ class SubgroupCostModel {
       if (subgroup > 1) {
         return;
       }
+      tot_accesses += accesses;
       tot_mem += mem;
       tot_mem_io += mem_io;
     }
@@ -129,6 +133,13 @@ class SubgroupCostModel {
     size_t tot_ops = 1;
     for (const auto& kvp : tot_tile) {
       tot_ops *= kvp.second;
+    }
+
+    size_t tot_stmts = tot_accesses * 2 + tot_ops * block_->stmts.size() / plan_.subgroup_size;
+
+    // Unrolling too many inner stmts may slow down
+    if (tot_stmts > options_.inner_stmts_limit()) {
+      return;
     }
 
     size_t num_wis = num_work_items(tot_tile);
@@ -366,6 +377,7 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   for (const auto& kvp : orig_by_name) {
     std::string ri = kvp.first;
     stripe::Refinement orig = kvp.second;
+    orig.from = orig.into();
     auto xfer = std::make_shared<stripe::Block>();
 
     for (const auto& idx : inner_idxs) {

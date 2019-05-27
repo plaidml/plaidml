@@ -7,6 +7,7 @@ local PARAMS = {
     LOCAL_MEM_LAT: 125,
     MEM_BOUNDED_THRESHOLD: 30,
     CACHE_SIZE: 3 * 768 * 1024,
+    INNER_STMTS_LIMIT: 1200,
   },
 };
 
@@ -100,6 +101,7 @@ local PARAMS = {
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
                 cache_size: PARAMS[cfg].CACHE_SIZE,
                 mem_bounded_threshold: PARAMS[cfg].MEM_BOUNDED_THRESHOLD,
+                inner_stmts_limit: PARAMS[cfg].INNER_STMTS_LIMIT,
               },
             },
 

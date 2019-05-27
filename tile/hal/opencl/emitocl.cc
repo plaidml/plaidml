@@ -405,6 +405,9 @@ void Emit::emitType(const sem::Type& t) {
     emit("__global ");
   }
   EmitC::emitType(t);
+  if (t.region == sem::Type::GLOBAL) {
+    emit("restrict ");
+  }
 }
 
 }  // namespace opencl

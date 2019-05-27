@@ -1,5 +1,6 @@
 // Copyright 2019, Intel Corp.
 
+#include <boost/dynamic_bitset.hpp>
 #include "tile/codegen/pad.h"
 
 #include "base/util/any_factory_map.h"
@@ -11,6 +12,41 @@ namespace tile {
 namespace codegen {
 
 using namespace stripe;  // NOLINT
+
+// Check if the dimension range is a large prime 
+// and advise a better number for the dimension
+class PrimeAdvisor {
+public:
+  PrimeAdvisor(size_t size, size_t large_threshold) {
+    check_.resize(size, true);
+    large_ = large_threshold;
+    for (size_t n = 2; n < size; ++n) {
+      if (check_.test(n)) {
+        size_t k = n + n;
+        while (k < size) {
+          check_.reset(k);
+          k += n;
+        }
+      }
+    }
+  }
+
+  bool IsLargePrime(size_t n) {
+    if (n <= large_) {
+      return false;
+    }
+    return check_.test(n);
+  }
+
+  size_t NextBetterNumber(size_t n) {
+    return (n / 8 + 1) * 8;
+  }
+
+private:
+  boost::dynamic_bitset<> check_;
+  size_t large_;
+};
+
 struct ExtentIO {
   explicit ExtentIO(int64_t init) : load{init, init}, store{init, init} {}
   Extent load;
@@ -104,14 +140,145 @@ void ComputeExtents(Block* block, const AliasMap& map, Extents* extents) {
   }
 }
 
+// Given the new index for a block
+// 1) Set the new size for the block's output
+// 2) Add a new block for transfering the new output to the original output
+void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs,
+                     Block* parent, StatementIt stmt_it) {
+  // Check if the output refs are affected
+  std::set<std::string> affected_out;
+  for (const auto& ref : block->ref_outs()) {
+    for (const auto& acc : ref->access) {
+      const auto acc_map = acc.getMap();
+      for (const auto it : new_idxs) {
+        if (acc_map.find(it.first) != acc_map.end()) {
+          if (acc_map.size() > 1) {
+            // If the access is affected by the new idx
+            // and the access is complex, give up
+            return;
+          }
+          affected_out.insert(ref->from);
+        }
+      }
+    }
+  }
+  // For each affected ref, we have to generate a new block for reshape
+  for (const auto& ref_name : affected_out) {
+    auto reshape = std::make_shared<Block>();
+    auto parent_ref_it = parent->ref_by_into(ref_name);
+    auto block_ref_it = block->ref_by_from(ref_name);
+    std::vector<Affine> access;
+    size_t n_dim = parent_ref_it->interior_shape.dims.size();
+    std::vector<size_t> src_shape_dims;
+    for (size_t i = 0; i < n_dim; ++i) {
+      const auto& affine = block_ref_it->access[i];
+      const auto& acc_map = affine.getMap();
+      if (acc_map.size() == 1) {
+        const auto& idx_name = acc_map.begin()->first;
+        auto it = new_idxs.find(idx_name);
+        if (it != new_idxs.end()) {
+          src_shape_dims.push_back(it->second);
+        }
+        else {
+          src_shape_dims.push_back(parent_ref_it->interior_shape.dims[i].size);
+        }
+      }
+      else {
+        src_shape_dims.push_back(parent_ref_it->interior_shape.dims[i].size);
+      }
+    }
+    TensorShape src_outer_shape = SimpleShape(parent_ref_it->interior_shape.type, src_shape_dims);
+    TensorShape src_inner_shape = src_outer_shape;
+    TensorShape dst_inner_shape = parent_ref_it->interior_shape;
+    for (size_t i = 0; i < n_dim; ++i) {
+      std::string idx_name = "i" + std::to_string(i);
+      reshape->idxs.push_back({idx_name, parent_ref_it->interior_shape.dims[i].size});
+      access.push_back(Affine(idx_name));
+      src_inner_shape.dims[i].size = 1;
+      dst_inner_shape.dims[i].size = 1;
+    }
+    std::string src_ref_name = ref_name + "_copy";
+    Refinement src_outer_ref(RefDir::None, "", src_ref_name, parent_ref_it->access, src_outer_shape,
+      parent_ref_it->agg_op, parent_ref_it->location, parent_ref_it->offset, parent_ref_it->bank_dim, parent_ref_it->cache_unit);
+    parent->refs.insert(src_outer_ref);
+    Refinement src_inner_ref(RefDir::In, src_ref_name, src_ref_name, access, src_inner_shape,
+      parent_ref_it->agg_op, parent_ref_it->location, parent_ref_it->offset, parent_ref_it->bank_dim, parent_ref_it->cache_unit);
+    reshape->refs.insert(src_inner_ref);
+    Refinement dst_inner_ref(RefDir::Out, ref_name, ref_name, access, dst_inner_shape,
+      parent_ref_it->agg_op, parent_ref_it->location, parent_ref_it->offset, parent_ref_it->bank_dim, parent_ref_it->cache_unit);
+    reshape->refs.insert(dst_inner_ref);
+    auto load = std::make_shared<Load>(src_ref_name, "$x");
+    auto store = std::make_shared<Store>("$x", ref_name);
+    reshape->stmts.push_back(load);
+    reshape->stmts.push_back(store);
+    reshape->set_tag("eltwise");
+    reshape->set_tag("kernel");
+    reshape->name = "kernel_" + std::to_string(parent->stmts.size()) + "(" + src_ref_name + ")";
+    // Modify the ref in the original block
+    Refinement new_block_ref(RefDir::Out, src_ref_name, ref_name, block_ref_it->access, src_inner_shape,
+      block_ref_it->agg_op, block_ref_it->location, block_ref_it->offset, block_ref_it->bank_dim, block_ref_it->cache_unit);
+    block->refs.erase(*block_ref_it);
+    block->refs.insert(new_block_ref);
+    for (auto& idx : block->idxs) {
+      auto it = new_idxs.find(idx.name);
+      if (it != new_idxs.end()) {
+        idx.range = it->second;
+      }
+    }
+    // Add reshape to parent
+    parent->stmts.insert(++stmt_it, reshape);
+  }
+}
+
+bool QualifiedBlock(Block* block) {
+  return block && block->has_tag("agg_op_add") && (block->has_tag("comb_op_mul") || block->has_tag("agg_op_add_no_comb_op"));
+}
+
+// If the dimension's range is a large prime,
+// change it to a better number that can be divisible by more factors
+void PrimeDimension(Block* block, const proto::PadPass& options) {
+  // Find the largest dim size in order to construct the prime list later
+  size_t max_idx_range = 0;
+  for (StatementIt stmt_it = block->stmts.begin(); stmt_it != block->stmts.end(); ++stmt_it) {
+    auto inner = Block::Downcast(*stmt_it);
+    if (QualifiedBlock(inner.get())) {
+      for (auto& idx : inner->idxs) {
+        if (idx.range > max_idx_range) {
+          max_idx_range = idx.range;
+        }
+      }
+    }
+  }
+
+  // Construct the prime list
+  PrimeAdvisor prime(max_idx_range + 1, options.prime_threshold());
+
+  // Check if the idxs are large primes, and the output accesses are simple
+  for (StatementIt stmt_it = block->stmts.begin(); stmt_it != block->stmts.end(); ++stmt_it) {
+    auto inner = Block::Downcast(*stmt_it);
+    if (QualifiedBlock(inner.get())) {
+      std::map<std::string, size_t> new_idxs;
+      for (auto& idx : inner->idxs) {
+        if (prime.IsLargePrime(idx.range)) {
+          new_idxs.emplace(idx.name, prime.NextBetterNumber(idx.range));
+        }
+      }
+      if (new_idxs.size() > 0) {
+        ModifyBlockIdxs(inner.get(), new_idxs, block, stmt_it);
+      }
+    }
+  }
+}
+
 void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   AliasMap self(map, block);
+
   // Generate a map extents for possible padding candidates
   Extents extents;
   // Look for buffers that are used for multiply accumulates
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
-    if (inner && inner->has_tag("agg_op_add") && inner->has_tag("comb_op_mul")) {
+    if (QualifiedBlock(inner.get())) {
       // Add any inputs as possible candidates
       for (auto ref : inner->ref_ins()) {
         std::string bname = self.at(ref->from).base_name;
@@ -149,7 +316,7 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     std::vector<Affine> new_cons;
-    if (inner && inner->has_tag("agg_op_add") && inner->has_tag("comb_op_mul")) {
+    if (QualifiedBlock(inner.get())) {
       for (const auto& con : inner->constraints) {
         bool is_safe = false;
         // Remove all constraints that are simple edge checks on inputs.
@@ -162,12 +329,10 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
             const auto& ai = self.at(ref->from);
             // Check if constraint is a lower bound match
             if (ref->access[i] - con == Affine()) {
-              // IVLOG(1, "Lower bound: " << con);
               is_safe = true;
             }
             // Check if constraint is an upper bound match
             if (ref->access[i] + con == Affine(ai.base_ref->interior_shape.dims[i].size - 1)) {
-              // IVLOG(1, "Upper bound: " << con);
               is_safe = true;
             }
           }
@@ -183,7 +348,6 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
 
   // Do the caching
   for (const auto& name : to_cache) {
-    // IVLOG(1, "Cacheing: " << name);
     Location loc = block->ref_by_into(name)->location;
     ApplyCache(self, block, name, loc, Location(), {"kernel", "eltwise", "eltwise_padding"},
                {"kernel", "eltwise", "eltwise_padding"});
@@ -264,6 +428,7 @@ void PadPass::Apply(CompilerState* state) const {
   stripe::Block* root = state->entry();
   auto reqs = stripe::FromProto(options_.reqs());
   RefDefineMap ref_def_map;
+  PrimeDimension(root->SubBlock(0).get(), options_);
   CollectRefDefine(root->SubBlock(0).get(), &ref_def_map);
   RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, stripe::Block* block) {  //
     Pad(block, map, ref_def_map);

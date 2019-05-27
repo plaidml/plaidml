@@ -59,6 +59,8 @@ message ComputeDepsPass {
 // Expand the size of buffers to reduce constraints required.
 message PadPass {
   repeated string reqs = 1;
+  // Modify the prime dimension greater than prime_threshold
+  optional uint32 prime_threshold = 2 [default = 32];
 }
 
 // Reorder blocks
@@ -550,6 +552,8 @@ message SubgroupPass {
   optional int64 cache_width = 8 [default = 0];
   // Cache size
   required uint64 cache_size = 9;
+  // Limit of inner block operations
+  required uint64 inner_stmts_limit = 10;
 }
 
 // Rewrites refinement and block locations.
