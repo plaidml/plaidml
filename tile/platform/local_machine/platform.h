@@ -38,7 +38,8 @@ class Platform : public tile::Platform {
   std::shared_ptr<tile::Buffer> MakeBuffer(const context::Context& ctx, const std::string& device_id,
                                            std::uint64_t size) final;
 
-  std::unique_ptr<tile::Program> MakeProgram(const context::Context& ctx, const tile::proto::Program& program) final;
+  std::unique_ptr<tile::Program> MakeProgram(const context::Context& ctx, const tile::proto::Program& program,
+                                             ConstBufferManager* const_bufs) final;
 
   void ListDevices(const context::Context& ctx, const tile::proto::ListDevicesRequest& request,
                    tile::proto::ListDevicesResponse* response) final;

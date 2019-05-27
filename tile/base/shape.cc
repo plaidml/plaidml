@@ -30,6 +30,9 @@ std::ostream& operator<<(std::ostream& os, const TensorShape& shape) {
   } else {
     os << shape.byte_size() / 1024.0 << " KiB";
   }
+  if (shape.is_const) {
+    os << " const";
+  }
   return os;
 }
 

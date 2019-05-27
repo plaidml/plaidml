@@ -37,7 +37,8 @@ std::unique_ptr<Program> PlatformTest::MakeProgram(tile::proto::TileScanningPara
   *(*pb_program.mutable_inputs())["A"].mutable_shape() = pb_shape;
   *(*pb_program.mutable_inputs())["B"].mutable_shape() = pb_shape;
   *(*pb_program.mutable_outputs())["C"].mutable_shape() = pb_shape;
-  auto program = platform_->MakeProgram(ctx_, pb_program);
+  ConstBufferManager cbm;
+  auto program = platform_->MakeProgram(ctx_, pb_program, &cbm);
 
   EXPECT_THAT(program, NotNull());
   return program;

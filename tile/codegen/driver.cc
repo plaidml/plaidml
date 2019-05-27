@@ -100,6 +100,18 @@ void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions&
     DumpProgram(*state->entry(), options, pass.name(), counter++);
     ValidateBlock(state->entry());
   }
+  // Remove constants that are no longer used
+  if (state->const_bufs == nullptr) {
+    return;
+  }
+  auto& cbufs = state->const_bufs->buffers;
+  for (auto it = cbufs.begin(); it != cbufs.end();) {
+    if (state->entry()->ref_by_into(it->first, false) == state->entry()->refs.end()) {
+      it = cbufs.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 void Configs::Register(const std::string& name, const std::string& pb_bytes) {

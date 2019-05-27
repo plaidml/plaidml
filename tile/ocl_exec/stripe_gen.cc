@@ -19,12 +19,12 @@ using namespace lang;  // NOLINT
 
 KernelList GenerateProgram(const RunInfo& runinfo,       //
                            const std::string& cfg_name,  //
-                           const std::string& out_dir) {
+                           const std::string& out_dir,   //
+                           ConstBufferManager* const_bufs) {
   IVLOG(1, runinfo.input_shapes);
   IVLOG(1, runinfo.output_shapes);
   IVLOG(1, to_string(runinfo.program));
   auto stripe = GenerateStripe(runinfo);
-
   codegen::OptimizeOptions options;
   options.dump_passes = !out_dir.empty();
   options.dbg_dir = out_dir + "/passes";
@@ -33,6 +33,7 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   const auto& cfg = cfgs.configs().at(cfg_name);
   const auto& stage = cfg.stages().at("default");
   codegen::CompilerState state(stripe);
+  state.const_bufs = const_bufs;
   codegen::Optimize(&state, stage.passes(), options);
   IVLOG(1, *stripe->entry);
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);

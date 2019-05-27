@@ -677,6 +677,14 @@ class _Library(plaidml.library.Library):
             ctypes.POINTER(_C_Invoker)  # plaidml_invoker* invoker
         ]
 
+        # PLAIDML_API bool plaidml_set_invoker_const(plaidml_invoker* function);
+        self.plaidml_set_invoker_const = lib.plaidml_set_invoker_const
+        self.plaidml_set_invoker_const.argtypes = [
+            ctypes.POINTER(_C_Invoker),  # plaidml_invoker* invoker 
+        ]
+        self.plaidml_set_invoker_const.restype = ctypes.c_bool
+        self.plaidml_set_invoker_const.errcheck = self._check_err
+
         # bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filename, plaidml_file_format format)
         self.plaidml_save_invoker = lib.plaidml_save_invoker
         self.plaidml_save_invoker.argtypes = [
@@ -1435,6 +1443,9 @@ class Invoker(object):
     def set_outputs(self, outputs):
         for (name, value) in outputs.items():
             self.set_output(name, value)
+
+    def set_const(self):
+        _lib().plaidml_set_invoker_const(self)
 
     def invoke(self):
         return Invocation(self._ctx, self)

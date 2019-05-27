@@ -27,7 +27,8 @@ class Platform {
                                              std::uint64_t size) = 0;
 
   // Builds (pre-compiling if possible) a program for executing the supplied Program
-  virtual std::unique_ptr<Program> MakeProgram(const context::Context& ctx, const proto::Program& program) = 0;
+  virtual std::unique_ptr<Program> MakeProgram(const context::Context& ctx, const proto::Program& program,
+                                               ConstBufferManager* const_bufs) = 0;
 
   virtual void ListDevices(const context::Context& ctx, const proto::ListDevicesRequest& request,
                            proto::ListDevicesResponse* response) = 0;

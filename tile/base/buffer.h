@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -70,6 +71,18 @@ class Buffer {
   // Synchronously maps a read/write view of a buffer, optionally (implementation-specific) discarding the buffer's
   // existing contents.
   virtual std::unique_ptr<View> MapDiscard(const context::Context& ctx) = 0;
+};
+
+class Allocator {
+ public:
+  virtual ~Allocator() {}
+  virtual std::shared_ptr<Buffer> allocate(size_t size) = 0;
+};
+
+// A mechanism used to modify / optimize constant buffers during compilation
+struct ConstBufferManager {
+  std::shared_ptr<Allocator> allocator;
+  std::map<std::string, std::shared_ptr<tile::Buffer>> buffers;
 };
 
 }  // namespace tile

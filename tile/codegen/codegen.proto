@@ -62,7 +62,8 @@ message PadPass {
 }
 
 // Reorder blocks
-message ReorderBlocksPass {}
+message ReorderBlocksPass {
+}
 
 // The scalarize pass looks for refinements which (usually due to
 // localization) now hold only a single element, and replaces
@@ -600,4 +601,8 @@ message KernelTagPass {
 // Mark #temp_var for the multiple used variables
 message TempVarPass {
   repeated string reqs = 1;
+}
+
+// Propagate constant tensors.
+message ConstantPropagatePass {
 }

@@ -17,8 +17,9 @@ std::shared_ptr<tile::Buffer> Platform::MakeBuffer(const context::Context& ctx, 
   return std::make_shared<Buffer>(size);
 }
 
-std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx, const tile::proto::Program& program) {
-  return std::make_unique<Program>(ctx, program);
+std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx, const tile::proto::Program& program,
+                                                     ConstBufferManager* const_bufs) {
+  return std::make_unique<Program>(ctx, program, const_bufs);
 }
 
 void Platform::ListDevices(const context::Context& ctx, const tile::proto::ListDevicesRequest& request,

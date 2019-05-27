@@ -525,6 +525,10 @@ typedef enum {
   PLAIDML_FILE_FORMAT_STRIPE_BINARY = 4,
 } plaidml_file_format;
 
+// Mark a functions inputs as 'const', that is, subject to constant folding
+// and other operations that assume they will no longer be changed
+PLAIDML_API bool plaidml_set_invoker_const(plaidml_invoker* invoker);
+
 // Serializes an invoker to a file.  All inputs to the invoker must
 // already be set to concrete values that are consistent in size.
 PLAIDML_API bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filename, plaidml_file_format format);

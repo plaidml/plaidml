@@ -155,9 +155,10 @@ class Evaluator final {
   const std::string& get_id() const { return id_; }
   const std::shared_ptr<tile::ProgramCache>& get_program_cache() const { return program_cache_; }
 
-  std::shared_ptr<tile::Program> MakeProgram(const context::Context& ctx, const tile::proto::Program& prog) {
+  std::shared_ptr<tile::Program> MakeProgram(const context::Context& ctx, const tile::proto::Program& prog,
+                                             tile::ConstBufferManager* const_bufs) {
     std::shared_ptr<tile::Program> compiled;
-    std::tie(std::ignore, compiled) = program_cache_->GetProgram(ctx, "sdk", prog);
+    std::tie(std::ignore, compiled) = program_cache_->GetProgram(ctx, "sdk", prog, const_bufs);
     return compiled;
   }
 
@@ -1484,6 +1485,11 @@ extern "C" bool plaidml_set_invoker_output(plaidml_invoker* invoker, const char*
   }
 }
 
+extern "C" bool plaidml_set_invoker_const(plaidml_invoker* invoker) {
+  invoker->func->SetBoundConst();
+  return true;
+}
+
 extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filename, plaidml_file_format format) {
   if (!invoker || !filename || !format) {
     vertexai::SetLastOOM();
@@ -1559,6 +1565,25 @@ extern "C" bool plaidml_save_invoker(plaidml_invoker* invoker, const char* filen
 
 struct plaidml_invocation {};
 
+namespace {
+
+class PlatformAllocator : public tile::Allocator {
+ public:
+  explicit PlatformAllocator(const Evaluator& evaluator)
+      : platform_(evaluator.get_platform()), id_(evaluator.get_id()) {}
+
+  std::shared_ptr<tile::Buffer> allocate(size_t size) {
+    context::Context ctx;
+    return platform_->MakeBuffer(ctx, id_, size);
+  }
+
+ private:
+  std::shared_ptr<tile::Platform> platform_;
+  std::string id_;
+};
+
+};  // namespace
+
 extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml_invoker* invoker) {
   if (!ctx || !invoker) {
     vertexai::SetLastOOM();
@@ -1622,7 +1647,14 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     params->set_max_trials(max_trials);
     params->set_max_trial_runs(max_trial_runs);
 
-    auto program = evaluator->MakeProgram(activity.ctx(), prog);
+    tile::ConstBufferManager const_bufs;
+    const_bufs.allocator = std::make_shared<PlatformAllocator>(*evaluator);
+    for (const auto& kvp : invoker->runinfo->input_shapes) {
+      if (kvp.second.is_const) {
+        const_bufs.buffers[kvp.first] = in_buffers[kvp.first];
+      }
+    }
+    auto program = evaluator->MakeProgram(activity.ctx(), prog, &const_bufs);
 
     // Run the program
     auto result = program->Run(activity.ctx(), in_buffers, out_buffers);

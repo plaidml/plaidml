@@ -31,7 +31,8 @@ class ProgramCache final {
   // This is internally synchronized.
   std::tuple<std::string, std::shared_ptr<Program>> GetProgram(const context::Context& ctx,
                                                                const std::string& fallback_id,
-                                                               const tile::proto::Program& program);
+                                                               const tile::proto::Program& program,
+                                                               ConstBufferManager* const_bufs = {});
 
   // Returns the output of the tile parser, which is generally used during program setup.
   std::shared_ptr<lang::Program> GetParsedProgram(const context::Context& ctx, const std::string& fallback_id,
@@ -61,7 +62,7 @@ class ProgramCache final {
 
     const std::string& id() const { return id_; }
 
-    std::shared_ptr<Program> GetProgram(const context::Context& ctx, Platform* dev);
+    std::shared_ptr<Program> GetProgram(const context::Context& ctx, Platform* dev, ConstBufferManager* const_bufs);
 
     std::shared_ptr<lang::Program> GetParsedProgram();
 

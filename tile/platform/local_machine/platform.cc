@@ -151,12 +151,13 @@ std::shared_ptr<tile::Buffer> Platform::MakeBuffer(const context::Context& ctx, 
   return std::make_shared<Buffer>(platform_dev.devinfo, platform_dev.mem_strategy, size);
 }
 
-std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx, const tile::proto::Program& program) {
+std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx, const tile::proto::Program& program,
+                                                     ConstBufferManager* const_bufs) {
   auto& platform_dev = LookupDevice(program.dev_id());
   return std::make_unique<Program>(ctx, program, platform_dev.devinfo, platform_dev.scheduler,
                                    platform_dev.mem_strategy,
                                    std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source),
-                                   platform_dev.tmp_mem_source, tile_optimizer_);
+                                   platform_dev.tmp_mem_source, tile_optimizer_, const_bufs);
 }
 
 void _fill_device(const Platform::PlatformDev& pdev, tile::proto::Device* dev) {

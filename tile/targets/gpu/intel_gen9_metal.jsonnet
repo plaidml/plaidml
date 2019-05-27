@@ -17,6 +17,13 @@ local PARAMS = {
         default: {
           // Define the stripe passes
           passes: [
+            // Do constant propagation
+            {
+              name: 'const_prop',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ConstantPropagatePass',
+              }
+            },
             // First, we place all the initial buffer in global memory (DRAM)
             {
               name: 'loc_program',

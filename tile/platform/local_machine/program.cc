@@ -74,7 +74,7 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
 }
 
 lang::KernelList CompileProgram(const tile::proto::Program& program, const DevInfo& devinfo,
-                                const lang::TileOptimizer& optimizer) {
+                                const lang::TileOptimizer& optimizer, ConstBufferManager* const_bufs) {
   IVLOG(2, "Compiling: " << program.code());
   size_t tile_trials = 1;
   size_t trial_runs = 1;
@@ -101,7 +101,12 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
     runinfo.input_shapes = inputs;
     runinfo.output_shapes = outputs;
     runinfo.program_name = "stripe_program";
-    return codegen::GenerateProgram(runinfo, stripe_cfg, out_path);
+    for (const auto& kvp : inputs) {
+      if (kvp.second.is_const) {
+        runinfo.const_inputs.emplace(kvp.first);
+      }
+    }
+    return codegen::GenerateProgram(runinfo, stripe_cfg, out_path, const_bufs);
   }
 
   auto settings = hal::settings::ToHardwareSettings(devinfo.settings);
@@ -162,7 +167,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
                  const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<Scheduler>& scheduler,
                  const std::shared_ptr<MemStrategy>& output_mem_strategy,
                  const std::shared_ptr<MemStrategy>& tmp_mem_strategy, hal::Memory* tmp_memory,
-                 const lang::TileOptimizer& optimizer)
+                 const lang::TileOptimizer& optimizer, ConstBufferManager* const_bufs)
     : devinfo_{devinfo}, output_mem_strategy_{output_mem_strategy}, tmp_mem_strategy_{tmp_mem_strategy} {
   // TODO: Make this path asynchronous.
   // Asynchronous programming is a little tricky in this case, since if we compile asynchronously, the
@@ -179,19 +184,29 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
 
   context::Activity activity{ctx, "tile::local_machine::Compile"};
 
-  kernel_list_ = CompileProgram(program, *devinfo_.get(), optimizer);
+  kernel_list_ = CompileProgram(program, *devinfo_.get(), optimizer, const_bufs);
+  const_bufs_ = const_bufs->buffers;
 
+  tile::proto::Program new_program = program;  // Modify logical program inputs for const_bufs
+  for (const auto& kvp : const_bufs_) {
+    if (!program.inputs().count(kvp.first)) {
+      auto shape = kernel_list_.types.at(kvp.first);
+      vertexai::tile::proto::ProgramInput input;
+      (*input.mutable_shape()) = IntoProto(shape);
+      (*new_program.mutable_inputs())[kvp.first] = input;
+    }
+  }
   auto lib = devinfo_->dev->compiler()->Build(activity.ctx(), kernel_list_.kernels, devinfo_->settings).get();
   executable_ = devinfo_->dev->executor()->Prepare(lib.get()).get();
-  schedule_ = scheduler->BuildSchedule(program, kernel_list_);
+  schedule_ = scheduler->BuildSchedule(new_program, kernel_list_);
 
   if (activity.ctx().is_logging_events()) {
     hal::proto::CompilationInfo cinfo;
     for (auto kernel : kernel_list_.kernels) {
       (*cinfo.mutable_kernels())[kernel.kname] = kernel.info;
     }
-    SummarizeSchedule(&cinfo, program, kernel_list_, schedule_);
-    *(cinfo.mutable_program()) = std::move(program);
+    SummarizeSchedule(&cinfo, new_program, kernel_list_, schedule_);
+    *(cinfo.mutable_program()) = new_program;
     activity.AddMetadata(cinfo);
     schedule::proto::Schedule sched_pb;
     schedule::ScheduleToProto(&sched_pb, schedule_);
@@ -201,7 +216,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
     activity.AddMetadata(sched_pb);
   }
 
-  ValidateSchedule(program, kernel_list_, schedule_);
+  ValidateSchedule(new_program, kernel_list_, schedule_);
 }
 
 boost::future<void> Program::Run(const context::Context& ctx,
@@ -210,6 +225,9 @@ boost::future<void> Program::Run(const context::Context& ctx,
   std::map<std::string, std::shared_ptr<tile::Buffer>> rewrite_outputs;
   for (auto kvp : outputs) {
     rewrite_outputs.emplace(kernel_list_.var_rewrites.Lookup(kvp.first), std::move(kvp.second));
+  }
+  for (const auto& kvp : const_bufs_) {
+    inputs[kvp.first] = kvp.second;
   }
   return RunRequest::Run(ctx, this, std::move(inputs), std::move(rewrite_outputs));
 }
