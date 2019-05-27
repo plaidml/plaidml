@@ -43,7 +43,7 @@ before_install:
   - git clone http://github.com/plaidml/plaidbench
   # Bazel
   - chmod +x bazel-0.19.2-installer-linux-x86_64.sh
-  - ./bazel-0.19.0-installer-linux-x86_64.sh --user
+  - ./bazel-0.19.2-installer-linux-x86_64.sh --user
   - export PATH=$HOME/bin:$PATH
 
 install:
