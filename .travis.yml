@@ -9,16 +9,16 @@ matrix:
   - python: "2.7"
     env:
       - BZL_PY_VER=PY2
-      - PLAIDML_EXPERIMENTAL=1 
+      - PLAIDML_EXPERIMENTAL=1
       - PLAIDML_DEVICE_IDS=opencl_cpu.0
   - python: "3.6"
-    env: 
+    env:
       - BZL_PY_VER=PY3
-      - PLAIDML_EXPERIMENTAL=1 
+      - PLAIDML_EXPERIMENTAL=1
       - PLAIDML_DEVICE_IDS=opencl_cpu.0
 
 before_install:
-  - sudo apt-get install g++ wget -y
+  - sudo apt-get install g++ wget cpio -y
   - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.2_x64_rh_6.4.0.37.tgz
   # Conda
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
@@ -31,18 +31,18 @@ before_install:
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
-  - conda env create -n plaidml
+  - conda create -n plaidml
   - source activate plaidml
   # OpenCL
-  - tar xzvf opencl_runtime_16.1.2_x64_rh_6.4.0.37.tgz
+  - tar xzf opencl_runtime_16.1.2_x64_rh_6.4.0.37.tgz
   - pushd opencl_runtime_16.1.2_x64_rh_6.4.0.37
   - sudo ./install.sh --cli-mode --silent ../tools/intel-ocl-silent
   - popd
   - conda install tensorflow theano setuptools h5py click
-  - git clone http://github.com/plaidml/plaidbench  
+  - git clone http://github.com/plaidml/plaidbench
 
 install:
-  - bazel build --config=linux_x86_64 --build_tag_filters=-llvm --force_python=$BZL_PY_VER plaidml:wheel plaidml/keras:wheel 
+  - bazel build --config=linux_x86_64 --build_tag_filters=-llvm --force_python=$BZL_PY_VER plaidml:wheel plaidml/keras:wheel
   - pip install bazel-bin/plaidml/*whl bazel-bin/plaidml/keras/*whl
 
 script:
