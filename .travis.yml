@@ -20,7 +20,7 @@ matrix:
 before_install:
   - sudo apt-get install g++ wget -y
   - wget https://storage.googleapis.com/external_build_repo/opencl_runtime_16.1.2_x64_rh_6.4.0.37.tgz
-  - wget https://github.com/bazelbuild/bazel/releases/download/0.22.0/bazel-0.22.0-installer-linux-x86_64.sh
+  - wget https://github.com/bazelbuild/bazel/releases/download/0.19.2/bazel-0.19.2-installer-linux-x86_64.sh
   # Conda
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
@@ -42,8 +42,8 @@ before_install:
   - conda install tensorflow theano setuptools h5py click
   - git clone http://github.com/plaidml/plaidbench
   # Bazel
-  - chmod +x bazel-0.22.0-installer-linux-x86_64.sh
-  - ./bazel-0.22.0-installer-linux-x86_64.sh --user
+  - chmod +x bazel-0.19.2-installer-linux-x86_64.sh
+  - ./bazel-0.19.0-installer-linux-x86_64.sh --user
   - export PATH=$HOME/bin:$PATH
 
 install:
