@@ -22,5 +22,8 @@ plaidml_cc_library(
         "//tile/bilp",
         "//tile/stripe",
         "@boost//:filesystem",
-    ],
+    ] + select({
+        "@toolchain//:windows_x86_64": [],
+	"//conditions:default": ["//tile/targets/cpu"],
+    })
 )

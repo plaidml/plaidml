@@ -672,6 +672,12 @@ Program DeXify(const Program& orig) {
   return r;
 }
 
+void BoundFunction::SetBoundConst() {
+  for (auto& kvp : in_bound_) {
+    kvp.second->set_const();
+  }
+}
+
 RunInfo BoundFunction::PrepareToRun(const std::string& name) const {
   if (num_inputs() != 0) {
     throw std::runtime_error("Unable to run function with unbound inputs");

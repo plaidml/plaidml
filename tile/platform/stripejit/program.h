@@ -25,7 +25,7 @@ namespace stripejit {
 
 class Program final : public tile::Program {
  public:
-  Program(const context::Context& ctx, const tile::proto::Program& program);
+  Program(const context::Context& ctx, const tile::proto::Program& program, ConstBufferManager* const_bufs);
   ~Program();
 
   boost::future<void> Run(const context::Context& ctx, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,

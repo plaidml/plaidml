@@ -23,7 +23,6 @@ plaidml_cc_library(
     ],
     tags = ["llvm"],
     deps = [
-        "//tile/codegen",
         "//tile/stripe",
         "@half",
         "@llvm_shim//:llvm",

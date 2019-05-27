@@ -16,7 +16,7 @@ namespace vertexai {
 namespace tile {
 namespace stripejit {
 
-Program::Program(const context::Context& ctx, const tile::proto::Program& program)
+Program::Program(const context::Context& ctx, const tile::proto::Program& program, ConstBufferManager* const_bufs)
     : executable_{new targets::cpu::Native} {
   lang::Parser parser;
   lang::RunInfo runinfo;
@@ -35,6 +35,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   const auto& cfg = cfgs.configs().at("cpu");
   const auto& stage = cfg.stages().at("default");
   codegen::CompilerState state(stripe);
+  state.const_bufs = const_bufs;
   codegen::Optimize(&state, stage.passes(), options);
   executable_->compile(*stripe->entry);
 }

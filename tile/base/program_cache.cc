@@ -15,10 +15,11 @@ ProgramCache::ProgramCache(std::shared_ptr<Platform> platform, std::size_t size_
 
 std::tuple<std::string, std::shared_ptr<Program>> ProgramCache::GetProgram(const context::Context& ctx,
                                                                            const std::string& fallback_id,
-                                                                           const tile::proto::Program& program) {
+                                                                           const tile::proto::Program& program,
+                                                                           ConstBufferManager* const_bufs) {
   auto entry = GetEntry(fallback_id, program);
   VLOG(3) << "Using compiled program " << entry->id() << " for user program " << program.id();
-  return std::make_tuple(entry->id(), entry->GetProgram(ctx, platform_.get()));
+  return std::make_tuple(entry->id(), entry->GetProgram(ctx, platform_.get(), const_bufs));
 }
 
 std::shared_ptr<lang::Program> ProgramCache::GetParsedProgram(const context::Context& ctx,
@@ -77,9 +78,10 @@ std::shared_ptr<ProgramCache::Entry> ProgramCache::GetEntry(const std::string& f
   });
 }
 
-std::shared_ptr<Program> ProgramCache::Entry::GetProgram(const context::Context& ctx, Platform* dev) {
-  std::call_once(compile_once_, [this, ctx, dev]() {
-    compiled_ = dev->MakeProgram(ctx, proto_);
+std::shared_ptr<Program> ProgramCache::Entry::GetProgram(const context::Context& ctx, Platform* dev,
+                                                         ConstBufferManager* const_bufs) {
+  std::call_once(compile_once_, [this, ctx, dev, const_bufs]() {
+    compiled_ = dev->MakeProgram(ctx, proto_, const_bufs);
     proto_.Clear();
   });
   return compiled_;

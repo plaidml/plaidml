@@ -26,7 +26,7 @@ class Program final : public tile::Program {
   Program(const context::Context& ctx, const tile::proto::Program& program, const std::shared_ptr<DevInfo>& devinfo,
           const std::shared_ptr<Scheduler>& scheduler, const std::shared_ptr<MemStrategy>& output_mem_strategy,
           const std::shared_ptr<MemStrategy>& tmp_mem_strategy, hal::Memory* tmp_memory,
-          const lang::TileOptimizer& optimizer);
+          const lang::TileOptimizer& optimizer, ConstBufferManager* const_bufs);
 
   boost::future<void> Run(const context::Context& ctx, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
                           std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) final;
@@ -44,6 +44,7 @@ class Program final : public tile::Program {
   std::shared_ptr<MemStrategy> tmp_mem_strategy_;
   lang::KernelList kernel_list_;
   schedule::Schedule schedule_;
+  std::map<std::string, std::shared_ptr<tile::Buffer>> const_bufs_;
   std::unique_ptr<hal::Executable> executable_;
 };
 

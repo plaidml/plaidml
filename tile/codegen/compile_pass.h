@@ -6,6 +6,7 @@
 
 #include "base/util/any_factory.h"
 #include "base/util/any_factory_map.h"
+#include "tile/base/buffer.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
@@ -14,11 +15,12 @@ namespace codegen {
 
 class CompilerState {
  public:
-  explicit CompilerState(std::shared_ptr<stripe::Program> prog) : prog_(prog) {}
-  stripe::Block* entry() { return prog_->entry.get(); }
+  explicit CompilerState(std::shared_ptr<stripe::Program> prog_) : prog(prog_), const_bufs(nullptr) {}
 
- private:
-  std::shared_ptr<stripe::Program> prog_;
+  std::shared_ptr<stripe::Program> prog;
+  ConstBufferManager* const_bufs;
+
+  stripe::Block* entry() { return prog->entry.get(); }
 };
 
 // A CompilePass applies an arbitrary transformation to a Stripe

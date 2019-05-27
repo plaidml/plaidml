@@ -102,6 +102,10 @@ class TensorValue final : public Value {
   }
   const std::shared_ptr<TensorValue>& qparams() const { return qparams_; }
   void attach_qparams(const std::shared_ptr<TensorValue>& qparams) { qparams_ = qparams; }
+  void set_const() {
+    shape_.is_const = true;
+    is_const_ = true;
+  }
 
  private:
   std::shared_ptr<BufferBase> buffer_;
@@ -277,6 +281,9 @@ class BoundFunction final : public ValueVisitor<std::string> {
   size_t num_outputs() const { return prog_.outputs.size() - out_bound_.size(); }
   const std::string& input_name(size_t i) const { return prog_.inputs[i].name; }
   const std::string& output_name(size_t i) const { return prog_.outputs[i]; }
+
+  // Set bound input values to constants
+  void SetBoundConst();
 
   // Prepare to run a function, this is only valid if num_inputs() == 0 and num_outputs() == 0
   RunInfo PrepareToRun(const std::string& name) const;
