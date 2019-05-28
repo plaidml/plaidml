@@ -37,7 +37,8 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   codegen::CompilerState state(stripe);
   state.const_bufs = const_bufs;
   codegen::Optimize(&state, stage.passes(), options);
-  executable_->compile(*stripe->entry);
+  std::map<std::string, targets::cpu::External> externals;
+  executable_->compile(*stripe->entry, externals);
 }
 
 Program::~Program() {}

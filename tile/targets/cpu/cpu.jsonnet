@@ -21,6 +21,16 @@ local PARAMS = {
                 ref_reqs: ['tmp'],
               },
             },
+
+            // Remove unused refinements
+            {
+              name: 'prune_refs',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneRefinementsPass',
+                reqs: ['program'],
+              },
+            },
+
             {
               name: 'stencil_mac',
               pass: {

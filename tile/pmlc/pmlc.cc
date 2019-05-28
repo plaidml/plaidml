@@ -116,7 +116,8 @@ std::shared_ptr<Program> DefaultStage(const App& app,                      //
 #ifdef ENABLE_LLVM_BITCODE
   if (app.args.count("llvm")) {
     targets::cpu::Native native;
-    native.compile(*program->entry);
+    std::map<std::string, targets::cpu::External> externals;
+    native.compile(*program->entry, externals);
     native.save((out_dir / "stripe.bc").string());
   }
 #endif

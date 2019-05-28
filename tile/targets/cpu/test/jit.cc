@@ -418,6 +418,54 @@ TEST(Jit, JitNestedAlloc) {
   EXPECT_THAT(bufB, ContainerEq(expected));
 }
 
+static float foo_impl(float a, float b) { return a * b; }
+
+TEST(Jit, JitExternalMUL_F32) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          access { }
+        }
+      },
+      {
+        key: "b2"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          access { }
+        }
+      }
+    ]
+    stmts { load { from:"b1" into:"$1" } }
+    stmts { load { from:"b2" into:"$2" } }
+    stmts { intrinsic { name:"foo" type:FLOAT32 inputs:"$1" inputs:"$2" outputs:"$3"} }
+    stmts { store { from:"$3" into:"b2"} }
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> b1{3.0};
+  std::vector<float> b2{2.0};
+  std::map<std::string, void*> buffers{{"b1", b1.data()}, {"b2", b2.data()}};
+  std::map<std::string, External> externals{{"foo", [=](std::vector<DataType>* inputs, DataType* output) -> void* {
+                                               std::vector<DataType> input_types(2, DataType::FLOAT32);
+                                               *inputs = input_types;
+                                               *output = DataType::FLOAT32;
+                                               return reinterpret_cast<void*>(&foo_impl);
+                                             }}};
+  JitExecute(*block, externals, buffers);
+
+  EXPECT_THAT(b2[0], Eq(6.0));
+}
+
 }  // namespace test
 }  // namespace cpu
 }  // namespace targets
