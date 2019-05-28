@@ -56,7 +56,8 @@ int main(int argc, char* argv[]) {
   io["C"] = c_data.data();
 
   targets::cpu::Native native;
-  native.compile(*program->entry);
+  std::map<std::string, targets::cpu::External> externals;
+  native.compile(*program->entry, externals);
 
   for (int i = 0; i < 10; i++) {
     for (auto& f : c_data) {

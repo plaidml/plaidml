@@ -33,6 +33,7 @@ const char invoker_name_[] = "__invoke_";
 struct ProgramModule {
   std::unique_ptr<llvm::Module> module;
   std::vector<std::string> parameters;
+  std::map<std::string, void*> externals;
 };
 
 class Executable {
@@ -53,17 +54,21 @@ class Error : public std::runtime_error {
 
 class Runtime : public llvm::LegacyJITSymbolResolver {
  public:
+  explicit Runtime(const std::map<std::string, void*> externals) : externals_(externals) {}
   llvm::JITSymbol findSymbol(const std::string&) override;
   llvm::JITSymbol findSymbolInLogicalDylib(const std::string&) override;
+
+ private:
+  std::map<std::string, void*> externals_;
 };
 
 class Compiler : private stripe::ConstStmtVisitor {
  public:
-  explicit Compiler(llvm::LLVMContext* context);
+  Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals);
   ProgramModule CompileProgram(const stripe::Block& program);
 
  protected:
-  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module);
+  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals);
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
@@ -73,6 +78,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Visit(const stripe::Special&) override;
   void Visit(const stripe::Intrinsic&) override;
   void Visit(const stripe::Block&) override;
+  void Intrinsic(const stripe::Intrinsic&, External handler);
   void Add(const stripe::Intrinsic&);
   void Subtract(const stripe::Intrinsic&);
   void Negate(const stripe::Intrinsic&);
@@ -143,13 +149,16 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
   llvm::Module* module_ = nullptr;
+  std::map<std::string, External> external_handlers_;
+  std::map<std::string, void*> external_funcptrs_;
 
   std::map<std::string, scalar> scalars_;
   std::map<std::string, buffer> buffers_;
   std::map<std::string, index> indexes_;
 };
 
-Compiler::Compiler(llvm::LLVMContext* context) : context_(*context), builder_{context_} {
+Compiler::Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals)
+    : context_(*context), builder_{context_}, external_handlers_{externals} {
   static std::once_flag init_once;
   std::call_once(init_once, []() {
     LLVMInitializeNativeTarget();
@@ -165,6 +174,7 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   ret.module = std::make_unique<llvm::Module>("stripe", context_);
   module_ = ret.module.get();
   llvm::Function* main = CompileBlock(program);
+  ret.externals = external_funcptrs_;
   // Generate a stub function we can invoke from the outside, passing buffers
   // as an array of generic pointers.
   GenerateInvoker(program, main);
@@ -198,8 +208,8 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   return ret;
 }
 
-Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module)
-    : context_(*context), builder_{context_}, module_(module) {
+Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals)
+    : context_(*context), builder_{context_}, module_(module), external_handlers_{externals} {
   // This private constructor sets up a nested compiler instance which will
   // process a nested block, generating output into the same module as its
   // containing compiler instance.
@@ -382,7 +392,7 @@ void Compiler::Visit(const stripe::Store& store) {
   // op->into is the name of a destination buffer
   // get the offset into the destination buffer from the scope context
   // look up the expected aggregation operation for the destination from the
-  // context
+  // context (assign, add, product/mul, min, max)
   // load the value to be stored from the source variable
   // use GEP to compute the destination element address
   // use the specified aggregation to store the value
@@ -467,11 +477,14 @@ void Compiler::Visit(const stripe::Special& special) {
 
 void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
   // Find the correct handler for this intrinsic.
+  // If the context has provided an external handler for this intrinsic name,
+  // we'll use it - that allows the context to override builtin definitions.
+  // If there is no external handler, look up a builtin handler definition.
   // Note that stripe::Intrinsic defines a bunch of strings which are not
   // actually intrinsics; they are values for stripe::Refinement::agg_op. Not
   // sure why they are located in the wrong structure. There are no constants
   // defined for actual intrinsic names; these have been derived experimentally.
-  static std::map<std::string, std::function<void(Compiler*, const stripe::Intrinsic&)>> handlers{
+  static std::map<std::string, std::function<void(Compiler*, const stripe::Intrinsic&)>> builtins{
       {"add", &Compiler::Add},
       {"sub", &Compiler::Subtract},
       {"neg", &Compiler::Negate},
@@ -509,17 +522,25 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"pow", &Compiler::Pow},
       {"tanh", &Compiler::Tanh},
   };
-  auto it = handlers.find(intrinsic.name);
-  if (it == handlers.end()) {
-    throw Error("Unknown intrinsic \"" + intrinsic.name + "\"");
+  auto externiter = external_handlers_.find(intrinsic.name);
+  if (externiter != external_handlers_.end()) {
+    Intrinsic(intrinsic, externiter->second);
+  } else {
+    auto builtiniter = builtins.find(intrinsic.name);
+    if (builtiniter == builtins.end()) {
+      throw Error("Unknown intrinsic \"" + intrinsic.name + "\"");
+    }
+    builtiniter->second(this, intrinsic);
   }
-  it->second(this, intrinsic);
 }
 
 void Compiler::Visit(const stripe::Block& block) {
   // Compile a nested block as a function in the same module
-  Compiler nested(&context_, module_);
+  Compiler nested(&context_, module_, external_handlers_);
   auto function = nested.CompileBlock(block);
+  for (auto& fptr_iter : nested.external_funcptrs_) {
+    external_funcptrs_.emplace(fptr_iter);
+  }
   // Generate a list of args.
   // The argument list begins with a pointer to each refinement. We will either
   // pass along the address of a refinement from the current block, or allocate
@@ -563,6 +584,66 @@ void Compiler::Visit(const stripe::Block& block) {
     free_args.push_back(ptr);
     auto free_func = FreeFunction();
     builder_.CreateCall(free_func, free_args, "");
+  }
+}
+
+void Compiler::Intrinsic(const stripe::Intrinsic& intrinsic, External handler) {
+  // Process an intrinsic statement using an external handler function.
+  // Load all the input scalars. Create a vector containing their types.
+  // We will provide this as input to the handler, so the handler may perform
+  // overloading if it so desires. The handler must replace the input types
+  // with its own list of desired inputs. We will use this for argument count
+  // verification, then cast each input scalar accordingly.
+  std::vector<scalar> inputs;
+  std::vector<DataType> input_types;
+  for (auto& input_name : intrinsic.inputs) {
+    scalar input = scalars_[input_name];
+    inputs.push_back(input);
+    input_types.push_back(input.type);
+  }
+  DataType output_type = intrinsic.type;
+  // Call the handler. It will process the input and output types, then return
+  // an entrypoint address. If it does not like the types, it may throw, or
+  // return nullptr_t, in which case we will throw.
+  auto funcptr = handler(&input_types, &output_type);
+  if (!funcptr) {
+    throw Error("External intrinsic rejected for " + intrinsic.name);
+  }
+  // Verify that we have the expected number of inputs. Cast each input to the
+  // type specified by the handler.
+  if (inputs.size() != input_types.size()) {
+    throw Error("External intrinsic " + intrinsic.name + " expects " + std::to_string(input_types.size()) +
+                " input(s), but the invocation " + "provided " + std::to_string(inputs.size()));
+  }
+  std::vector<llvm::Type*> argtypes(inputs.size());
+  std::vector<llvm::Value*> argvals(inputs.size());
+  for (size_t i = 0; i < inputs.size(); ++i) {
+    inputs[i] = Cast(inputs[i], input_types[i]);
+    argvals[i] = inputs[i].value;
+    assert(argvals[i]);
+    argtypes[i] = CType(inputs[i].type);
+  }
+  // Build a function type signature for this list of input and output types
+  llvm::Type* rtype = CType(output_type);
+  auto functype = llvm::FunctionType::get(rtype, argtypes, false);
+  // llvm::Type* fptrtype = functype->getPointerTo();
+  // Embed the funcptr as a constant, cast to the relevant function type
+  // llvm::Value* funcval = llvm::ConstantInt::get(fptrtype, (intptr_t)funcptr);
+  // Generate a call to the funcptr
+  std::string funcname = "external_" + intrinsic.name;
+  external_funcptrs_[funcname] = funcptr;
+  auto funcval = module_->getOrInsertFunction(funcname.c_str(), functype);
+  auto ret = builder_.CreateCall(funcval, argvals, "");
+  // If we have an output, store the new scalar value.
+  size_t expected_outputs = 0;
+  if (output_type != DataType::INVALID) {
+    expected_outputs = 1;
+    scalars_[intrinsic.outputs[0]] = scalar{ret, output_type};
+  }
+  // Verify that we have the expected number of outputs.
+  if (expected_outputs != intrinsic.outputs.size()) {
+    throw Error("External intrinsic " + intrinsic.name + " expects " + std::to_string(expected_outputs) +
+                " output(s), but the invocation " + "provided " + std::to_string(intrinsic.outputs.size()));
   }
 }
 
@@ -1042,7 +1123,7 @@ llvm::Value* Compiler::FreeFunction(void) {
 
 Executable::Executable(const ProgramModule& module) : parameters_(module.parameters) {
   std::string errStr;
-  std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime);
+  std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime(module.externals));
   assert(module.module);
   std::unique_ptr<llvm::Module> clone(llvm::CloneModule(*module.module));
   auto ee = llvm::EngineBuilder(std::move(clone))
@@ -1090,9 +1171,19 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
       {"___truncsfhf2", symInfo(rt::f2h)},
       {"___extendhfsf2", symInfo(rt::h2f)},
   };
-  auto loc = symbols.find(name);
-  if (loc != symbols.end()) {
-    return loc->second;
+  auto loc_rt = symbols.find(name);
+  if (loc_rt != symbols.end()) {
+    return loc_rt->second;
+  }
+  auto loc_extern = externals_.find(name);
+  if (loc_extern != externals_.end()) {
+    return symInfo(loc_extern->second);
+  }
+  if (name.size() > 1 && name[0] == '_') {
+    loc_extern = externals_.find(name.substr(1));
+    if (loc_extern != externals_.end()) {
+      return symInfo(loc_extern->second);
+    }
   }
   auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
   // If we failed to resolve the symbol, and its first character is an
@@ -1114,21 +1205,13 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
 
 llvm::JITSymbol Runtime::findSymbolInLogicalDylib(const std::string& name) { return llvm::JITSymbol(nullptr); }
 
-void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers) {
-  llvm::LLVMContext context;
-  Compiler compiler(&context);
-  auto module = compiler.CompileProgram(program);
-  Executable executable(std::move(module));
-  executable.Run(buffers);
-}
-
 struct Native::Impl {
   llvm::LLVMContext context;
   ProgramModule module;
   std::unique_ptr<Executable> executable;
 
-  void compile(const stripe::Block& program) {
-    Compiler compiler(&context);
+  void compile(const stripe::Block& program, const std::map<std::string, External>& externals) {
+    Compiler compiler(&context, externals);
     module = compiler.CompileProgram(program);
     assert(module.module);
     executable.reset(new Executable(module));
@@ -1146,9 +1229,29 @@ struct Native::Impl {
 
 Native::Native() : m_impl(new Native::Impl) {}
 Native::~Native() {}
-void Native::compile(const stripe::Block& program) { m_impl->compile(program); }
+void Native::compile(const stripe::Block& program, const std::map<std::string, External>& externals) {
+  m_impl->compile(program, externals);
+}
 void Native::run(const std::map<std::string, void*>& buffers) { m_impl->run(buffers); }
 void Native::save(const std::string& filename) { m_impl->save(filename); }
+
+void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers) {
+  llvm::LLVMContext context;
+  std::map<std::string, External> externals;
+  Compiler compiler(&context, externals);
+  auto module = compiler.CompileProgram(program);
+  Executable executable(std::move(module));
+  executable.Run(buffers);
+}
+
+void JitExecute(const stripe::Block& program, const std::map<std::string, External>& externals,
+                const std::map<std::string, void*>& buffers) {
+  llvm::LLVMContext context;
+  Compiler compiler(&context, externals);
+  auto module = compiler.CompileProgram(program);
+  Executable executable(std::move(module));
+  executable.Run(buffers);
+}
 
 }  // namespace cpu
 }  // namespace targets
