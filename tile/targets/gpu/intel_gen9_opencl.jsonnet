@@ -37,6 +37,14 @@ local PARAMS = {
               },
             },
 
+            {
+              name: 'const_tensor',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ConstTensorPass',
+                reqs: ['main'],
+              },
+            },
+
             // Change tags before optimizations
             {
               name: 'kernel_tag',

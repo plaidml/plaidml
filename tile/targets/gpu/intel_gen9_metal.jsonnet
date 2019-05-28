@@ -43,6 +43,14 @@ local PARAMS = {
               },
             },
 
+            {
+              name: 'const_tensor',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ConstTensorPass',
+                reqs: ['main'],
+              },
+            },
+
             // Prune indexes
             {
               name: 'prune_idxs',
