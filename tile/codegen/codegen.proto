@@ -610,3 +610,8 @@ message TempVarPass {
 // Propagate constant tensors.
 message ConstantPropagatePass {
 }
+
+// Remove constant tensor and replace the corresponding loads with constants
+message ConstTensorPass {
+  repeated string reqs = 1;
+}
