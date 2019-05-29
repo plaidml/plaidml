@@ -1,4 +1,5 @@
 import argparse
+import functools
 import sys
 import unittest
 
@@ -53,25 +54,47 @@ def max_pool_2d(I):
 
 
 def flatten(X):
-    product = 1
-    X_shape = X.shape()
-    for i in range(1, len(X_shape.dims) - 1):
-        product *= X_shape.dims[i].size
-    shape = TensorShape(X_shape.type, (1, product))
+    sizes = X.shape().sizes
+    product = functools.reduce(lambda x, y: x * y, sizes[1:-1])
+    shape = TensorShape(X.shape().type, (1, product))
     return reshape(X, shape)
 
 
 def normalize(X):
-    idxs = TensorIndexes(X.shape().dims.size())
+    idxs = TensorIndexes(X.shape().rank)
     XSqr = X * X
     X_MS = TensorOutput()
     X_MS[()] += XSqr[idxs]
     return sqrt(X_MS)
 
 
-class TestEdsl(unittest.TestCase):
+def lars_momentum(X, Grad, Veloc, LR, lars_coeff, lars_weight_decay, momentum):
+    XNorm = normalize(X)
+    GradNorm = normalize(Grad)
+    LocLR = LR * lars_coeff * XNorm / (GradNorm + lars_weight_decay * XNorm)
+    NewVeloc = momentum * Veloc + LocLR * (Grad + lars_weight_decay * X)
+    return (X - NewVeloc, NewVeloc)
 
-    def testMnistMlp(self):
+
+def arg_max(I):
+    X0, X1, X2 = TensorDims(3)
+    x0, x1, x2 = TensorIndexes(3)
+    I.bind_dims(X0, X1, X2)
+    Max = TensorOutput(X0, X2)
+    Max[x0, x2] >= I[x0, x1, x2]
+    One = Tensor(TensorShape(plaidml.DType.FLOAT32))
+    T = TensorOutput(X1)
+    T[x1] = One[()]
+    IX = index(T, 0)
+    O = TensorOutput(X0, X2)
+    O[x0, x2] >= cond(I[x0, x1, x2], Max[x0, x2], IX[x1])
+    return as_uint(O, 32)
+
+
+class TestEdsl(unittest.TestCase):
+    maxDiff = None
+
+    def test_mnist_mlp(self):
         # model.add(Dense(512, activation='relu', input_shape=(784,)))
         I = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 784]))
         K1 = Tensor(TensorShape(plaidml.DType.FLOAT32, [784, 512]))
@@ -85,8 +108,42 @@ class TestEdsl(unittest.TestCase):
         K3 = Tensor(TensorShape(plaidml.DType.FLOAT32, [512, 10]))
         B3 = Tensor(TensorShape(plaidml.DType.FLOAT32, [10]))
         D3 = softmax(dot(D2, K3) + B3)
+        program = Program('mnist_mlp', D3)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  _X0[_X0_0, _X0_1],
+  _X1[_X1_0, _X1_1],
+  _X3[_X3_0],
+  _X9[_X9_0, _X9_1],
+  _X11[_X11_0],
+  _X17[_X17_0, _X17_1],
+  _X19[_X19_0]
+) -> (
+  _X25
+) {
+  _X2[x0, x2 : 1, 512] = +(_X0[x0, x1] * _X1[x1, x2]);
+  _X4 = add(_X2, _X3);
+  _X5 = 0.000000;
+  _X6 = cmp_lt(_X4, _X5);
+  _X7 = 0.000000;
+  _X8 = cond(_X6, _X7, _X4);
+  _X10[x0, x2 : 1, 512] = +(_X8[x0, x1] * _X9[x1, x2]);
+  _X12 = add(_X10, _X11);
+  _X13 = 0.000000;
+  _X14 = cmp_lt(_X12, _X13);
+  _X15 = 0.000000;
+  _X16 = cond(_X14, _X15, _X12);
+  _X18[x0, x2 : 1, 10] = +(_X16[x0, x1] * _X17[x1, x2]);
+  _X20 = add(_X18, _X19);
+  _X21[x0, 0 : 1, 1] = >(_X20[x0, x1]);
+  _X22 = sub(_X20, _X21);
+  _X23 = exp(_X22);
+  _X24[x0, 0 : 1, 1] = +(_X23[x0, x1]);
+  _X25 = div(_X23, _X24);
+}
+''')
 
-    def testMnistCnn(self):
+    def test_mnist_cnn(self):
         # model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
         I = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
         K1 = Tensor(TensorShape(plaidml.DType.FLOAT32, [3, 3, 1, 32]))
@@ -99,14 +156,227 @@ class TestEdsl(unittest.TestCase):
         # model.add(MaxPooling2D(pool_size=(2, 2)))
         P1 = max_pool_2d(C2)
         # model.add(Flatten())
-        # F = flatten(P1)
-        # K3 = Tensor()
-        # B3 = Tensor()
-        # D1 = relu(dot(F, K3) + B3)
-        # # model.add(Dense(num_classes, activation='softmax'))
-        # K4 = Tensor()
-        # B4 = Tensor()
-        # D2 = softmax(dot(D1, K4) + B4)
+        F = flatten(P1)
+        self.assertEqual(str(F.shape()), 'fp32(1, 12100):(12100, 1):47.2656 KiB')
+        K3 = Tensor(TensorShape(plaidml.DType.FLOAT32, [12100, 128]))
+        B3 = Tensor(TensorShape(plaidml.DType.FLOAT32, [128]))
+        D1 = relu(dot(F, K3) + B3)
+        # model.add(Dense(num_classes, activation='softmax'))
+        K4 = Tensor(TensorShape(plaidml.DType.FLOAT32, [128, 100]))
+        B4 = Tensor(TensorShape(plaidml.DType.FLOAT32, [100]))
+        D2 = softmax(dot(D1, K4) + B4)
+        program = Program('mnist_mlp', D2)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
+  _X3[_X3_0],
+  _X9[_X9_0, _X9_1, _X9_2, _X9_3],
+  _X11[_X11_0],
+  _X21[_X21_0, _X21_1],
+  _X23[_X23_0],
+  _X29[_X29_0, _X29_1],
+  _X31[_X31_0]
+) -> (
+  _X37
+) {
+  _X2[x0, x1, x3, x6 : 1, 222, 222, 32] = +(_X0[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X1[x2, x4, x5, x6]);
+  _X4 = add(_X2, _X3);
+  _X5 = 0.000000;
+  _X6 = cmp_lt(_X4, _X5);
+  _X7 = 0.000000;
+  _X8 = cond(_X6, _X7, _X4);
+  _X10[x0, x1, x3, x6 : 1, 220, 220, 64] = +(_X8[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X9[x2, x4, x5, x6]);
+  _X12 = add(_X10, _X11);
+  _X13 = 0.000000;
+  _X14 = cmp_lt(_X12, _X13);
+  _X15 = 0.000000;
+  _X16 = cond(_X14, _X15, _X12);
+  _X17[x0, x1, x3, x5 : 1, 110, 110, 64] = >(_X16[x0, 2*x1 + x2, 2*x3 + x4, x5]), x2 < 2, x4 < 2;
+  _X18 = 1;
+  _X19 = 12100;
+  _X20 = reshape(_X17, _X18, _X19);
+  _X22[x0, x2 : 1, 128] = +(_X20[x0, x1] * _X21[x1, x2]);
+  _X24 = add(_X22, _X23);
+  _X25 = 0.000000;
+  _X26 = cmp_lt(_X24, _X25);
+  _X27 = 0.000000;
+  _X28 = cond(_X26, _X27, _X24);
+  _X30[x0, x2 : 1, 100] = +(_X28[x0, x1] * _X29[x1, x2]);
+  _X32 = add(_X30, _X31);
+  _X33[x0, 0 : 1, 1] = >(_X32[x0, x1]);
+  _X34 = sub(_X32, _X33);
+  _X35 = exp(_X34);
+  _X36[x0, 0 : 1, 1] = +(_X35[x0, x1]);
+  _X37 = div(_X35, _X36);
+}
+''')
+
+    def test_arg_max(self):
+        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 10, 10]))
+        O = arg_max(I)
+        self.assertEqual(str(O.shape()), 'u32(1, 10):(10, 1):40 bytes')
+        program = Program('arg_max', O)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  _X0[_X0_0, _X0_1, _X0_2],
+  _X2[]
+) -> (
+  _X8
+) {
+  _X1[x0, x2 : 1, 10] = >(_X0[x0, x1, x2]);
+  _X3[x0 : 10] = =(_X2[]);
+  _X4 = 0;
+  _X5 = index(_X3, _X4);
+  _X6[x0, x2 : 1, 10] = >(_X0[x0, x1, x2] == _X1[x0, x2] ? _X5[x1]);
+  _X7 = 32;
+  _X8 = as_uint(_X6, _X7);
+}
+''')
+
+    def test_global_min(self):
+        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [10, 10, 10]), name='I')
+        i, j, k = TensorIndexes(3)
+        O_Neg = TensorOutput()
+        Neg = -I
+        O_Neg[()] >= Neg[i, j, k]
+        O = -O_Neg
+        program = Program('global_min', O)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0, I_1, I_2]
+) -> (
+  _X2
+) {
+  _X0 = neg(I);
+  _X1[] = >(_X0[x0, x1, x2]);
+  _X2 = neg(_X1);
+}
+''')
+
+    def test_cum_sum(self):
+        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [10]), name='I')
+        N = TensorDim()
+        i, k = TensorIndexes(2)
+        I.bind_dims(N)
+        O = TensorOutput(N)
+        if i - k < N:
+            O[i] += I[k]
+        program = Program('cum_sum', O)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0[x1 : 10] = +(I[x0]), -x0 + x1 < 10;
+}
+''')
+
+    def test_unique_names(self):
+        A = Tensor(TensorShape(plaidml.DType.FLOAT32), name='A')
+        B = Tensor(TensorShape(plaidml.DType.FLOAT32), name='B')
+        C0 = Tensor(TensorShape(plaidml.DType.FLOAT32), name='C')
+        C1 = Tensor(TensorShape(plaidml.DType.FLOAT32), name='C')
+        program = Program('unique_names', A + B + C0 + C1)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  A[],
+  B[],
+  C[],
+  C0[]
+) -> (
+  _X2
+) {
+  _X0 = add(A, B);
+  _X1 = add(_X0, C);
+  _X2 = add(_X1, C0);
+}
+''')
+
+    def test_lars_momentum_4d(self):
+        X_shape = TensorShape(plaidml.DType.FLOAT32, [4, 7, 3, 9])
+        LR_Shape = TensorShape(plaidml.DType.FLOAT32)
+        X = Tensor(X_shape)
+        Grad = Tensor(X_shape)
+        Veloc = Tensor(X_shape)
+        LR = Tensor(LR_Shape)
+        R = lars_momentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.)
+        program = Program('lars_momentum_4d', *R)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
+  _X3[],
+  _X6[_X6_0, _X6_1, _X6_2, _X6_3],
+  _X11[_X11_0, _X11_1, _X11_2, _X11_3]
+) -> (
+  _X24,
+  _X23
+) {
+  _X0 = 0.125000;
+  _X2 = mul(_X0, _X1);
+  _X4 = 0.000977;
+  _X5 = mul(_X3, _X4);
+  _X7 = mul(_X6, _X6);
+  _X8[] = +(_X7[x0, x1, x2, x3]);
+  _X9 = sqrt(_X8);
+  _X10 = mul(_X5, _X9);
+  _X12 = mul(_X11, _X11);
+  _X13[] = +(_X12[x0, x1, x2, x3]);
+  _X14 = sqrt(_X13);
+  _X15 = 0.000488;
+  _X16 = mul(_X15, _X9);
+  _X17 = add(_X14, _X16);
+  _X18 = div(_X10, _X17);
+  _X19 = 0.000488;
+  _X20 = mul(_X19, _X6);
+  _X21 = add(_X11, _X20);
+  _X22 = mul(_X18, _X21);
+  _X23 = add(_X2, _X22);
+  _X24 = sub(_X6, _X23);
+}
+''')
+
+    def test_repeat_elts(self):
+        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [10, 10, 10]))
+        N0, N1, N2 = TensorDims(3)
+        n0, n1, n2, k = TensorIndexes(4)
+        I.bind_dims(N0, N1, N2)
+        O = TensorOutput(N0, 3 * N1, N2)
+        if k < 3:
+            O[n0, 3 * n1 + k, n2] = I[n0, n1, n2]
+        O.no_defract()
+        program = Program('repeat_elts', O)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  _X0[_X0_0, _X0_1, _X0_2]
+) -> (
+  _X1
+) {
+  _X1[x0, 3*x1 + x3, x2 : 10, 30, 10] = =(_X0[x0, x1, x2]), x3 < 3 no_defract;
+}
+''')
+
+    def test_use_default(self):
+        P = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 7, 10, 10]))
+        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 10, 10]))
+        B, N1, N2 = TensorDims(3)
+        b, i1, i2 = TensorIndexes(3)
+        I.bind_dims(B, N1, N2)
+        O = TensorOutput(B, 7, N1, N2)
+        O[b, 3, i1, i2] = I[b, i1, i2]
+        O.use_default(P)
+        program = Program('use_default', O)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2]
+) -> (
+  _X2
+) {
+  _X2[x0, 3, x1, x2 : 1, 7, 10, 10] = =(_X1[x0, x1, x2]) default _X0;
+}
+''')
 
 
 if __name__ == '__main__':

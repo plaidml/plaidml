@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/format.hpp>
-
 #include "tile/base/shape.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/type.h"
@@ -56,7 +54,7 @@ struct ParamExpr : Expr {
 
   explicit ParamExpr(const TensorShape& shape, const std::string& name = "") : Expr(name), shape(shape) {}
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
-  std::string str() const { return "ParamExpr"; }
+  std::string str() const;
 };
 
 struct IntConst : Expr {
@@ -64,7 +62,7 @@ struct IntConst : Expr {
 
   explicit IntConst(int64_t value) : value(value) {}
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
-  std::string str() const { return "IntConst"; }
+  std::string str() const;
 };
 
 struct FloatConst : Expr {
@@ -72,7 +70,7 @@ struct FloatConst : Expr {
 
   explicit FloatConst(double value) : value(value) {}
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
-  std::string str() const { return "FloatConst"; }
+  std::string str() const;
 };
 
 struct CallExpr : Expr {
@@ -82,7 +80,7 @@ struct CallExpr : Expr {
   CallExpr(const std::string& fn, const std::vector<std::shared_ptr<Expr>>& args) : fn(fn), args(args) {}
 
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
-  std::string str() const { return boost::str(boost::format("CallExpr(%1%)") % fn); }
+  std::string str() const;
 };
 
 struct TensorSpecExpr : Expr {
@@ -99,7 +97,7 @@ struct TensorSpecExpr : Expr {
         output_sizes(output_sizes) {}
 
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
-  std::string str() const { return "TensorSpecExpr"; }
+  std::string str() const;
 };
 
 struct ConstraintExpr : Expr {
@@ -108,7 +106,7 @@ struct ConstraintExpr : Expr {
 
   ConstraintExpr(const std::shared_ptr<PolyExpr>& lhs, size_t rhs) : lhs(lhs), rhs(rhs) {}
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
-  std::string str() const { return "ConstraintExpr"; }
+  std::string str() const;
 };
 
 struct ContractionExpr : Expr {
@@ -121,7 +119,7 @@ struct ContractionExpr : Expr {
   std::shared_ptr<Expr> use_default;
 
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
-  std::string str() const { return "ContractionExpr"; }
+  std::string str() const;
 };
 
 struct PolyVisitor {
@@ -140,16 +138,11 @@ struct PolyExpr {
 struct PolyIndex : PolyExpr {
   const void* ptr;
   std::string name;
+  mutable std::vector<std::shared_ptr<ConstraintExpr>> constraints;
 
   explicit PolyIndex(const void* ptr, const std::string& name = "") : ptr(ptr), name(name) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
-
-  std::string str() const {
-    if (name.size()) {
-      return name;
-    }
-    return "PolyIndex";
-  }
+  std::string str() const;
 };
 
 struct PolyLiteral : PolyExpr {
@@ -157,8 +150,7 @@ struct PolyLiteral : PolyExpr {
 
   explicit PolyLiteral(int64_t value) : value(value) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
-
-  std::string str() const { return std::to_string(value); }
+  std::string str() const;
 };
 
 enum class PolyOp {
@@ -175,36 +167,64 @@ struct PolyOpExpr : PolyExpr {
 
   PolyOpExpr(PolyOp op, const std::vector<std::shared_ptr<PolyExpr>>& operands) : op(op), operands(operands) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
+  std::string str() const;
+};
 
-  std::string str() const {
-    std::stringstream ss;
-    switch (op) {
-      case PolyOp::Neg:
-        ss << "Neg";
-        break;
-      case PolyOp::Add:
-        ss << "Add";
-        break;
-      case PolyOp::Sub:
-        ss << "Sub";
-        break;
-      case PolyOp::Mul:
-        ss << "Mul";
-        break;
-      case PolyOp::Div:
-        ss << "Div";
-        break;
-    }
-    ss << "(";
-    for (size_t i = 0; i < operands.size(); i++) {
-      if (i) {
-        ss << ", ";
-      }
-      ss << operands[i]->str();
-    }
-    ss << ")";
-    return ss.str();
+// This is necessary to allow for these kinds of expressions:
+//   if (i - j < 10) {}
+//
+// What we want is for both `i` and `j` to refer to the `i - j < 10` constraint.
+// Later, the ConstraintCollector will track each constraint that is associated
+// with the indexes that are in turn associated with a contraction.
+class ConstraintApplier : public PolyVisitor {
+ public:
+  explicit ConstraintApplier(const std::shared_ptr<ConstraintExpr>& constraint) : constraint_(constraint) {}
+
+ private:
+  Polynomial Visit(const PolyIndex& expr) {
+    expr.constraints.emplace_back(constraint_);
+    return Polynomial();
   }
+
+  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
+
+  Polynomial Visit(const PolyOpExpr& expr) {
+    for (auto operand : expr.operands) {
+      operand->Accept(this);
+    }
+    return Polynomial();
+  }
+
+ private:
+  std::shared_ptr<ConstraintExpr> constraint_;
+};
+
+// Add each unique constraint on indexes associated with a contraction.
+// Duplicates may occur in cases like:
+//   if (i - j < 10) {}
+//
+// Both `i` and `j` will refer to the same `i - j < 10` constraint.
+struct ConstraintCollector : public PolyVisitor {
+  Polynomial Visit(const PolyIndex& expr) {
+    for (const auto& constraint : expr.constraints) {
+      auto it = std::find(constraints.begin(), constraints.end(), constraint);
+      if (it == constraints.end()) {
+        constraints.emplace_back(constraint);
+      }
+    }
+    return Polynomial();
+  }
+
+  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
+
+  Polynomial Visit(const PolyOpExpr& expr) {
+    for (const auto& op : expr.operands) {
+      op->Accept(this);
+    }
+    return Polynomial();
+  }
+
+  std::vector<std::shared_ptr<ConstraintExpr>> constraints;
 };
 
 TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr);

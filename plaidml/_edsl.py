@@ -66,6 +66,10 @@ typedef struct {
 } tile_poly_expr;
 
 typedef struct {
+    // opaque
+} tile_program;
+
+typedef struct {
     size_t code;
     tile_string* msg;
 } tile_error;
@@ -77,6 +81,7 @@ tile_shape* tile_shape_alloc(tile_error* err, plaidml_datatype datatype);
 tile_string* tile_shape_repr(tile_error* err, tile_shape* shape);
 void tile_shape_free(tile_error* err, tile_shape* shape);
 void tile_shape_add_dimension(tile_error* err, tile_shape* shape, uint64_t size, int64_t stride);
+plaidml_datatype tile_shape_get_type(tile_error* err, tile_shape* shape);
 size_t tile_shape_get_rank(tile_error* err, tile_shape* shape);
 uint64_t tile_shape_get_dimension_size(tile_error* err, tile_shape* shape, size_t dim);
 int64_t tile_shape_get_dimension_stride(tile_error* err, tile_shape* shape, size_t dim);
@@ -93,11 +98,7 @@ tile_expr* tile_expr_contraction(
     tile_combo_op combo_op,
     tile_expr* output,
     size_t ninputs,
-    tile_expr** inputs,
-    size_t nconstraints,
-    tile_expr** constraints,
-    bool no_defract,
-    tile_expr* use_default
+    tile_expr** inputs
 );
 tile_expr* tile_expr_tensor_spec(
     tile_error* err,
@@ -107,16 +108,8 @@ tile_expr* tile_expr_tensor_spec(
     size_t* sizes
 );
 tile_expr* tile_expr_constraint(tile_error* err, tile_poly_expr* lhs, size_t rhs);
-tile_expr* tile_expr_contraction_set_no_defract(
-    tile_error* err,
-    tile_expr* expr,
-    bool no_defract
-);
-tile_expr* tile_expr_contraction_set_use_default(
-    tile_error* err,
-    tile_expr* expr,
-    tile_expr* use_default
-);
+void tile_expr_contraction_set_no_defract(tile_error* err, tile_expr* expr, bool no_defract);
+void tile_expr_contraction_set_use_default(tile_error* err, tile_expr* expr, tile_expr* use_default);
 tile_shape* tile_expr_evaluate_shape(tile_error* err, tile_expr* expr);
 
 void tile_poly_expr_free(tile_error* err, tile_poly_expr* expr);
@@ -128,6 +121,16 @@ tile_poly_expr* tile_poly_expr_op(
     tile_poly_op op,
     size_t nargs,
     tile_poly_expr** args
+);
+void tile_poly_expr_add_constraint(tile_error* err, tile_poly_expr* lhs, size_t rhs);
+
+void tile_program_free(tile_error* err, tile_program* program);
+tile_string* tile_program_repr(tile_error* err, tile_program* program);
+tile_program* tile_program_evaluate(
+    tile_error* err,
+    const char* name,
+    size_t nexprs,
+    tile_expr** exprs
 );
 '''
 
@@ -200,11 +203,8 @@ class TileError(Exception):
         Exception.__init__(self)
         self.code = err.code
         self.msg = decode_str(err.msg)
-        # self.backtrace = decode_str(err.backtrace)
 
     def __str__(self):
-        # if self.backtrace:
-        #     return '{}\n\n{}'.format(self.message, self.backtrace)
         return self.msg
 
 
