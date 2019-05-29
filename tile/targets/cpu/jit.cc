@@ -107,6 +107,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Zero(const stripe::Special&);
   void Copy(const stripe::Special&);
   void Reshape(const stripe::Special&);
+  void PrngStep(const stripe::Special&);
 
   struct scalar {
     llvm::Value* value = nullptr;
@@ -145,6 +146,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::FunctionType* BlockType(const stripe::Block&);
   llvm::Value* MallocFunction();
   llvm::Value* FreeFunction();
+  llvm::Value* PrngStepFunction();
 
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
@@ -463,10 +465,14 @@ void Compiler::Visit(const stripe::Constant& constant) {
 }
 
 void Compiler::Visit(const stripe::Special& special) {
+  // The list of specials defined in the spec differs from the list defined in
+  // tile/lang/gen_special.cc. The spec lists "zero", "copy", and "reshape",
+  // while gen_special.cc uses "gather", "scatter", "shape", and "prng_step".
   static std::map<std::string, std::function<void(Compiler*, const stripe::Special&)>> handlers{
       {"zero", &Compiler::Zero},
       {"copy", &Compiler::Copy},
       {"reshape", &Compiler::Reshape},
+      {"prng_step", &Compiler::PrngStep},
   };
   auto it = handlers.find(special.name);
   if (it == handlers.end()) {
@@ -980,6 +986,24 @@ void Compiler::Reshape(const stripe::Special& reshape) {
   builder_.CreateMemCpy(dst.base, 0, src.base, 0, size);
 }
 
+void Compiler::PrngStep(const stripe::Special& prng_step) {
+  // Input is a matrix of 3xN containing PRNG state.
+  assert(1 == prng_step.inputs.size());
+  buffer in_state = buffers_[prng_step.inputs[0]];
+  // Outputs are another matrix of PRNG state, and a buffer to be filled.
+  // Output state shape must match input state shape.
+  assert(2 == prng_step.outputs.size());
+  buffer out_state = buffers_[prng_step.outputs[0]];
+  assert(out_state.refinement->interior_shape == in_state.refinement->interior_shape);
+  buffer dest = buffers_[prng_step.outputs[1]];
+  llvm::Type* int32ptrType = builder_.getInt32Ty()->getPointerTo();
+  llvm::Value* dest_arg = builder_.CreateBitCast(dest.base, int32ptrType);
+  size_t dest_bytes = dest.refinement->interior_shape.byte_size();
+  llvm::Value* count = IndexConst(dest_bytes / sizeof(uint32_t));
+  std::vector<llvm::Value*> args{in_state.base, out_state.base, dest_arg, count};
+  builder_.CreateCall(PrngStepFunction(), args, "");
+}
+
 Compiler::scalar Compiler::Cast(scalar v, DataType to_type) {
   if (v.type == to_type) {
     return v;
@@ -1121,6 +1145,15 @@ llvm::Value* Compiler::FreeFunction(void) {
   return module_->getOrInsertFunction(funcname, functype);
 }
 
+llvm::Value* Compiler::PrngStepFunction(void) {
+  llvm::Type* int32ptrType = builder_.getInt32Ty()->getPointerTo();
+  std::vector<llvm::Type*> argtypes{int32ptrType, int32ptrType, int32ptrType, IndexType()};
+  llvm::Type* rettype = llvm::Type::getVoidTy(context_);
+  auto functype = llvm::FunctionType::get(rettype, argtypes, false);
+  const char* funcname = "prng_step";
+  return module_->getOrInsertFunction(funcname, functype);
+}
+
 Executable::Executable(const ProgramModule& module) : parameters_(module.parameters) {
   std::string errStr;
   std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime(module.externals));
@@ -1155,6 +1188,20 @@ namespace rt {
 // that we won't be able to resolve from system libraries.
 float h2f(half_float::half n) { return n; }
 half_float::half f2h(float n) { return half_float::half_cast<half_float::half>(n); }
+void prng_step(uint32_t* in_state, uint32_t* out_state, uint32_t* buf, size_t count) {
+  // A reimplementation of the PRNG from tile/lang/gen_special.cc.
+  // x_n = (s1_n ^ s2_n ^ s3_n)
+  // s1_{n+1} = (((s1_n & 4294967294) <<12) ^ (((s1_n <<13) ^ s1_n) >>19))
+  // s2_{n+1} = (((s2_n & 4294967288) << 4) ^ (((s2_n << 2) ^ s2_n) >>25))
+  // s3_{n+1} = (((s3_n & 4294967280) <<17) ^ (((s3_n << 3) ^ s3_n) >>11))
+  for (size_t i = 0; i < count; ++i) {
+    buf[i] = in_state[0] ^ in_state[1] ^ in_state[2];
+    out_state[0] = (((in_state[0] & 4294967294) << 12) ^ (((in_state[0] << 13) ^ in_state[0]) >> 19));
+    out_state[1] = (((in_state[1] & 4294967288) << 4) ^ (((in_state[1] << 2) ^ in_state[1]) >> 25));
+    out_state[2] = (((in_state[2] & 4294967280) << 17) ^ (((in_state[2] << 3) ^ in_state[2]) >> 11));
+    in_state = out_state;
+  }
+}
 }  // namespace rt
 
 template <typename T>
@@ -1166,10 +1213,9 @@ llvm::JITEvaluatedSymbol symInfo(T ptr) {
 
 llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
   static std::map<std::string, llvm::JITEvaluatedSymbol> symbols{
-      {"__gnu_h2f_ieee", symInfo(rt::h2f)},
-      {"__gnu_f2h_ieee", symInfo(rt::f2h)},
-      {"___truncsfhf2", symInfo(rt::f2h)},
-      {"___extendhfsf2", symInfo(rt::h2f)},
+      {"__gnu_h2f_ieee", symInfo(rt::h2f)},  {"__gnu_f2h_ieee", symInfo(rt::f2h)},
+      {"___truncsfhf2", symInfo(rt::f2h)},   {"___extendhfsf2", symInfo(rt::h2f)},
+      {"prng_step", symInfo(rt::prng_step)}, {"_prng_step", symInfo(rt::prng_step)},
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {
@@ -1187,11 +1233,9 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
   }
   auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
   // If we failed to resolve the symbol, and its first character is an
-  // underscore, try again without
-  // the underscore, because the code may have been generated for a system whose
-  // loader expects every
-  // symbol to have an underscore prefix, but the DynamicLibrary module expects
-  // not to have a prefix.
+  // underscore, try again without the underscore. The code may have been
+  // generated for a system whose loader expects every symbol to have an
+  // underscore prefix, but the DynamicLibrary module expects no prefix.
   if (!ptr && name[0] == '_' && name.size() > 1) {
     ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name.substr(1));
   }
