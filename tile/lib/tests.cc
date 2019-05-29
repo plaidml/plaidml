@@ -233,6 +233,10 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                                         TensorShape(PLAIDML_DATA_FLOAT32, {1024, 1024}));  //
                 }),
       MakeEntry("const_test", [](const std::string& name) { return LoadConstCalc(name); }),
+      MakeEntry("const_scalar_mul",
+                [](const std::string& name) {
+                  return LoadConstScalarMul(name, 4.7, TensorShape(PLAIDML_DATA_FLOAT32, {256, 256}));
+                }),
       MakeEntry("dilated_conv2d",
                 [](const std::string& name) {
                   return LoadDilatedConv2d(name,                                                     //

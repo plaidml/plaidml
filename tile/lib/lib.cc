@@ -180,6 +180,12 @@ lang::RunInfo LoadEltwiseDiv(const std::string& name, const TensorShape& i1, con
   return Evaluate(name, {A / B});
 }
 
+lang::RunInfo LoadConstScalarMul(const std::string& name, const double s, const TensorShape& i1) {
+  Tensor scalar(s);
+  Tensor A("A", i1);
+  return Evaluate(name, {scalar * A});
+}
+
 lang::RunInfo LoadEltwiseMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
   Tensor A("A", i1);
   Tensor B("B", i2);

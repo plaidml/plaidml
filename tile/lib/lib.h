@@ -80,6 +80,10 @@ lang::RunInfo LoadNegThenMul(const std::string& name,  //
 
 lang::RunInfo LoadConstCalc(const std::string& name);
 
+lang::RunInfo LoadConstScalarMul(const std::string& name,  //
+                                 const double s,           //
+                                 const TensorShape& i1);
+
 lang::RunInfo LoadConv1d(const std::string& name,    //
                          const TensorShape& input,   //
                          const TensorShape& kernel,  //
