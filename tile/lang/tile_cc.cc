@@ -17,7 +17,6 @@ using Polynomial = math::Polynomial<math::Rational>;
 
 struct TensorIndex::Impl {
   std::shared_ptr<PolyExpr> expr;
-  mutable std::vector<std::shared_ptr<ConstraintExpr>> constraints;
 };
 
 struct TensorDim::Impl {
@@ -160,65 +159,6 @@ TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(+, PolyOp::Add);
 TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(-, PolyOp::Sub);
 TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(*, PolyOp::Mul);
 TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(/, PolyOp::Div);
-
-// This is necessary to allow for these kinds of expressions:
-//   if (i - j < 10) {}
-//
-// What we want is for both `i` and `j` to refer to the `i - j < 10` constraint.
-// Later, the ConstraintCollector will track each constraint that is associated
-// with the indexes that are in turn associated with a contraction.
-class ConstraintApplier : public PolyVisitor {
- public:
-  explicit ConstraintApplier(const std::shared_ptr<ConstraintExpr>& constraint) : constraint_(constraint) {}
-
- private:
-  Polynomial Visit(const PolyIndex& expr) {
-    auto impl = TensorFriend::GetImpl(expr);
-    impl->constraints.emplace_back(constraint_);
-    return Polynomial();
-  }
-
-  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
-
-  Polynomial Visit(const PolyOpExpr& expr) {
-    for (auto operand : expr.operands) {
-      operand->Accept(this);
-    }
-    return Polynomial();
-  }
-
- private:
-  std::shared_ptr<ConstraintExpr> constraint_;
-};
-
-// Add each unique constraint on indexes associated with a contraction.
-// Duplicates may occur in cases like:
-//   if (i - j < 10) {}
-//
-// Both `i` and `j` will refer to the same `i - j < 10` constraint.
-struct ConstraintCollector : public PolyVisitor {
-  Polynomial Visit(const PolyIndex& expr) {
-    auto impl = TensorFriend::GetImpl(expr);
-    for (const auto& constraint : impl->constraints) {
-      auto it = std::find(constraints.begin(), constraints.end(), constraint);
-      if (it == constraints.end()) {
-        constraints.emplace_back(constraint);
-      }
-    }
-    return Polynomial();
-  }
-
-  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
-
-  Polynomial Visit(const PolyOpExpr& expr) {
-    for (const auto& op : expr.operands) {
-      op->Accept(this);
-    }
-    return Polynomial();
-  }
-
-  std::vector<std::shared_ptr<ConstraintExpr>> constraints;
-};
 
 Constraint TensorIndex::operator<(size_t rhs) const {
   IVLOG(3, "Add size_t constraint: " << rhs);

@@ -57,6 +57,10 @@ struct tile_poly_expr {
   std::shared_ptr<PolyExpr> expr;
 };
 
+struct tile_program {
+  RunInfo runinfo;
+};
+
 }  // extern "C"
 
 namespace {
@@ -91,6 +95,40 @@ void ffi_wrap_void(tile_error* err, F fn) {
     err->code = 1;
     err->msg = new tile_string{"C++ exception"};
   }
+}
+
+AggregationOp into_agg_op(tile_agg_op op) {
+  switch (op) {
+    case TILE_AGG_OP_NONE:
+      return AggregationOp::NONE;
+    case TILE_AGG_OP_SUM:
+      return AggregationOp::SUM;
+    case TILE_AGG_OP_PROD:
+      return AggregationOp::PROD;
+    case TILE_AGG_OP_MIN:
+      return AggregationOp::MIN;
+    case TILE_AGG_OP_MAX:
+      return AggregationOp::MAX;
+    case TILE_AGG_OP_ASSIGN:
+      return AggregationOp::ASSIGN;
+  }
+  throw std::runtime_error("Invalid agg_op");
+}
+
+CombinationOp into_combo_op(tile_combo_op op) {
+  switch (op) {
+    case TILE_COMBO_OP_NONE:
+      return CombinationOp::NONE;
+    case TILE_COMBO_OP_ADD:
+      return CombinationOp::PLUS;
+    case TILE_COMBO_OP_MUL:
+      return CombinationOp::MULTIPLY;
+    case TILE_COMBO_OP_COND:
+      return CombinationOp::COND;
+    case TILE_COMBO_OP_EQ:
+      return CombinationOp::EQ;
+  }
+  throw std::runtime_error("Invalid combo_op");
 }
 
 }  // namespace
@@ -133,6 +171,12 @@ size_t tile_shape_get_rank(tile_error* err, tile_shape* shape) {
   });
 }
 
+plaidml_datatype tile_shape_get_type(tile_error* err, tile_shape* shape) {
+  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {  //
+    return static_cast<plaidml_datatype>(shape->shape.type);
+  });
+}
+
 uint64_t tile_shape_get_dimension_size(tile_error* err, tile_shape* shape, size_t dim) {
   return ffi_wrap<uint64_t>(err, 0, [&] {  //
     return shape->shape.dims.at(dim).size;
@@ -164,10 +208,11 @@ tile_string* tile_expr_repr(tile_error* err, tile_expr* expr) {
 }
 
 tile_expr* tile_expr_param(tile_error* err, tile_shape* shape, const char* name) {
-  return ffi_wrap<tile_expr*>(err, nullptr,
-                              [&] {  //
-                                return new tile_expr{std::make_shared<ParamExpr>(shape->shape, name)};
-                              });
+  return ffi_wrap<tile_expr*>(  //
+      err, nullptr,
+      [&] {  //
+        return new tile_expr{std::make_shared<ParamExpr>(shape->shape, name)};
+      });
 }
 
 tile_expr* tile_expr_int(tile_error* err, int64_t value) {
@@ -192,7 +237,10 @@ tile_expr* tile_expr_call(tile_error* err, const char* fn, size_t nargs, tile_ex
   });
 }
 
-tile_expr* tile_expr_tensor_spec(tile_error* err, tile_expr* ref, size_t rank, tile_poly_expr** input_idxs,
+tile_expr* tile_expr_tensor_spec(tile_error* err,              //
+                                 tile_expr* ref,               //
+                                 size_t rank,                  //
+                                 tile_poly_expr** input_idxs,  //
                                  size_t* output_sizes) {
   return ffi_wrap<tile_expr*>(err, nullptr, [&] {
     std::vector<size_t> vec_sizes;
@@ -207,25 +255,20 @@ tile_expr* tile_expr_tensor_spec(tile_error* err, tile_expr* ref, size_t rank, t
   });
 }
 
-tile_expr* tile_expr_contraction(tile_error* err,              //
-                                 tile_agg_op agg_op,           //
-                                 tile_combo_op combo_op,       //
-                                 tile_expr* raw_output,        //
-                                 size_t ninputs,               //
-                                 tile_expr** raw_inputs,       //
-                                 size_t nconstraints,          //
-                                 tile_expr** raw_constraints,  //
-                                 bool no_defract,              //
-                                 tile_expr* raw_use_default) {
+tile_expr* tile_expr_contraction(tile_error* err,         //
+                                 tile_agg_op agg_op,      //
+                                 tile_combo_op combo_op,  //
+                                 tile_expr* raw_output,   //
+                                 size_t ninputs,          //
+                                 tile_expr** raw_inputs) {
   return ffi_wrap<tile_expr*>(err, nullptr, [&] {
-    // std::vector<std::shared_ptr<ConstraintExpr>> constraints;
     auto output = std::dynamic_pointer_cast<TensorSpecExpr>(raw_output->expr);
     if (!output) {
       throw std::runtime_error("oops: out_spec");
     }
     auto expr = std::make_shared<ContractionExpr>();
-    expr->agg_op = AggregationOp::SUM;
-    expr->combo_op = CombinationOp::MULTIPLY;
+    expr->agg_op = into_agg_op(agg_op);
+    expr->combo_op = into_combo_op(combo_op);
     expr->output = output;
     for (size_t i = 0; i < ninputs; i++) {
       auto input = std::dynamic_pointer_cast<TensorSpecExpr>(raw_inputs[i]->expr);
@@ -234,13 +277,36 @@ tile_expr* tile_expr_contraction(tile_error* err,              //
       }
       expr->inputs.emplace_back(input);
     }
-    for (size_t i = 0; i < nconstraints; i++) {
+    ConstraintCollector cc;
+    for (const auto& idx : output->index_spec) {
+      idx->Accept(&cc);
     }
-    expr->no_defract = no_defract;
-    if (raw_use_default) {
-      expr->use_default = raw_use_default->expr;
+    for (const auto& tensor : expr->inputs) {
+      for (const auto& idx : tensor->index_spec) {
+        idx->Accept(&cc);
+      }
     }
+    expr->constraints = cc.constraints;
     return new tile_expr{expr};
+  });
+}
+void tile_expr_contraction_set_no_defract(tile_error* err, tile_expr* expr, bool no_defract) {
+  ffi_wrap_void(err, [&] {
+    auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
+    if (!cion) {
+      throw std::runtime_error("no_defract can only be specified on a contraction.");
+    }
+    cion->no_defract = no_defract;
+  });
+}
+
+void tile_expr_contraction_set_use_default(tile_error* err, tile_expr* expr, tile_expr* use_default) {
+  ffi_wrap_void(err, [&] {
+    auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
+    if (!cion) {
+      throw std::runtime_error("use_default can only be specified on a contraction.");
+    }
+    cion->use_default = use_default->expr;
   });
 }
 
@@ -281,6 +347,36 @@ tile_poly_expr* tile_poly_expr_op(tile_error* err, tile_poly_op op, size_t nargs
       vec_args[i] = args[i]->expr;
     }
     return new tile_poly_expr{std::make_shared<PolyOpExpr>(static_cast<PolyOp>(op), vec_args)};
+  });
+}
+
+void tile_poly_expr_add_constraint(tile_error* err, tile_poly_expr* lhs, size_t rhs) {
+  ffi_wrap_void(err, [&] {
+    auto constraint = std::make_shared<ConstraintExpr>(lhs->expr, rhs);
+    ConstraintApplier applier(constraint);
+    lhs->expr->Accept(&applier);
+  });
+}
+
+void tile_program_free(tile_error* err, tile_program* program) {
+  ffi_wrap_void(err, [&] {  //
+    delete program;
+  });
+}
+
+tile_program* tile_program_evaluate(tile_error* err, const char* name, size_t nexprs, tile_expr** raw_exprs) {
+  return ffi_wrap<tile_program*>(err, nullptr, [&] {
+    std::vector<std::shared_ptr<Expr>> exprs(nexprs);
+    for (size_t i = 0; i < nexprs; i++) {
+      exprs[i] = raw_exprs[i]->expr;
+    }
+    return new tile_program{Evaluate(name, exprs)};
+  });
+}
+
+tile_string* tile_program_repr(tile_error* err, tile_program* program) {
+  return ffi_wrap<tile_string*>(err, nullptr, [&] {  //
+    return new tile_string{to_string(program->runinfo.program)};
   });
 }
 

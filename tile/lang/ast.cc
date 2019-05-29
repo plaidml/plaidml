@@ -838,6 +838,77 @@ RunInfo Evaluate(const std::string& name, const std::vector<std::shared_ptr<Expr
   return Evaluator(name).Evaluate(exprs);
 }
 
+std::string IntConst::str() const { return "IntConst"; }
+
+std::string FloatConst::str() const { return "FloatConst"; }
+
+std::string ParamExpr::str() const {
+  if (name.size()) {
+    return name;
+  }
+  std::stringstream ss;
+  ss << "ParamExpr{" << shape << "}";
+  return ss.str();
+}
+
+std::string CallExpr::str() const {
+  std::stringstream ss;
+  ss << fn << "(";
+  for (size_t i = 0; i < args.size(); i++) {
+    if (i) {
+      ss << ", ";
+    }
+    ss << args[i]->str();
+  }
+  ss << ")";
+  return ss.str();
+}
+
+std::string ContractionExpr::str() const { return "ContractionExpr"; }
+
+std::string ConstraintExpr::str() const { return "ConstraintExpr"; }
+
+std::string TensorSpecExpr::str() const { return "TensorSpecExpr"; }
+
+std::string PolyIndex::str() const {
+  if (name.size()) {
+    return name;
+  }
+  return boost::str(boost::format("PolyIndex: %1%") % ptr);
+}
+
+std::string PolyLiteral::str() const { return std::to_string(value); }
+
+std::string PolyOpExpr::str() const {
+  std::stringstream ss;
+  switch (op) {
+    case PolyOp::Neg:
+      ss << "Neg";
+      break;
+    case PolyOp::Add:
+      ss << "Add";
+      break;
+    case PolyOp::Sub:
+      ss << "Sub";
+      break;
+    case PolyOp::Mul:
+      ss << "Mul";
+      break;
+    case PolyOp::Div:
+      ss << "Div";
+      break;
+  }
+  ss << "(";
+  for (size_t i = 0; i < operands.size(); i++) {
+    if (i) {
+      ss << ", ";
+    }
+    ss << operands[i]->str();
+  }
+  ss << ")";
+  return ss.str();
+}
+
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai
