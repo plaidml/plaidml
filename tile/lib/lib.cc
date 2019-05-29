@@ -22,8 +22,8 @@ std::shared_ptr<BufferBase> MakeBuffer(const TensorShape& shape) {
 
 Tensor MatMul(const Tensor& A, const Tensor& B) {
   TensorDim M, N, K;
-  A.match_dims(M, K);
-  B.match_dims(K, N);
+  A.bind_dims(M, K);
+  B.bind_dims(K, N);
   TensorIndex k("k"), m("m"), n("n");
   Tensor C("C", M, N);
   C(m, n) += A(m, k) * B(k, n);
@@ -32,8 +32,8 @@ Tensor MatMul(const Tensor& A, const Tensor& B) {
 
 Tensor DilatedConvolution2(const Tensor& I, const Tensor& K) {
   TensorDim N, Lx, Ly, LKx, LKy, CI, CO;
-  I.match_dims(N, Lx, Ly, CI);
-  K.match_dims(LKx, LKy, CI, CO);
+  I.bind_dims(N, Lx, Ly, CI);
+  K.bind_dims(LKx, LKy, CI, CO);
   Tensor O("O", N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO);
   TensorIndex n, x, y, kx, ky, ci, co;
   O(n, x, y, co) += I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co);
@@ -113,8 +113,8 @@ Tensor Convolution(const Tensor& I,                     //
     K_dims.push_back(CI);
     K_dims.push_back(CO);
   }
-  I.match_dims(I_dims);
-  K.match_dims(K_dims);
+  I.bind_dims(I_dims);
+  K.bind_dims(K_dims);
   Tensor O("O", O_dims);
   O(O_idxs) += I(I_idxs) * K(K_idxs);
   return O;
@@ -371,7 +371,7 @@ RunInfo LoadPow(const std::string& name,  //
 
 Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor& Epsilon) {
   TensorDim I0, I1, I2, I3;
-  I.match_dims(I0, I1, I2, I3);
+  I.bind_dims(I0, I1, I2, I3);
   int64_t H = I.dims(2) * I.dims(3);
   auto Sum = TensorOutput(I0, I1, 1, 1);
   TensorIndex i0, i1, i2, i3;
@@ -397,7 +397,7 @@ RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
 
 Tensor PolygonBoxTransform(const Tensor& I) {
   TensorDim N, C, H, W;
-  I.match_dims(N, C, H, W);
+  I.bind_dims(N, C, H, W);
   auto TEpartial = TensorOutput(N, C, H, W);
   auto TOpartial = TensorOutput(N, C, H, W);
   TensorIndex n, c, h, w;
@@ -421,7 +421,7 @@ lang::RunInfo LoadSoftmax(const std::string& name,     //
                           const TensorShape& input) {  //
   Tensor X1(input);
   TensorDim I, J;
-  X1.match_dims(I, J);
+  X1.bind_dims(I, J);
   TensorIndex i("i"), j("j");
   Tensor M("M", I, 1);
   M(i, 0) >= X1(i, j);

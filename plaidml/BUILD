@@ -14,7 +14,6 @@ load(
     "plaidml_py_library",
     "plaidml_py_wheel",
 )
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_deb", "pkg_tar")
 load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
 
 exports_files(["requirements.txt"])
@@ -34,6 +33,7 @@ plaidml_cc_version(
 PLAIDML_CPP_SOURCES = [
     "config.h",
     "plaidml.cc",
+    "tile.cc",
     ":version",
 ]
 
@@ -232,7 +232,9 @@ conda_binary(
 
 PYTHON_SRCS = [
     "__init__.py",
+    "_edsl.py",
     "context.py",
+    "edsl.py",
     "exceptions.py",
     "library.py",
     "op.py",
@@ -284,26 +286,13 @@ conda_test(
     ],
 )
 
-pkg_tar(
-    name = "py_deb_data",
-    srcs = [":py"],
-    package_dir = "/usr/lib/python2.7/dist-packages/plaidml",
-)
-
-pkg_deb(
-    name = "python-plaidml",
-    data = ":py_deb_data",
-    depends = [
-        "python",
+conda_test(
+    name = "edsl_test",
+    srcs = ["edsl_test.py"],
+    env = "@com_intel_plaidml_conda//:env",
+    deps = [
+        ":py",
     ],
-    description = "Vertex.AI PlaidML Python",
-    homepage = "https://www.vertex.ai",
-    maintainer = "eng@vertex.ai",
-    package = "python-plaidml",
-    priority = "extra",
-    section = "non-free/misc",
-    tags = ["deb"],
-    version = "0.0.1",
 )
 
 genrule(

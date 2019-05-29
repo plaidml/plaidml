@@ -233,13 +233,13 @@ class Tensor {
   size_t dims(const size_t dim) const;
 
   // Verify that the specified dims match the dims of this tensor.
-  void match_dims(const std::vector<TensorDim>& dims) const;
+  void bind_dims(const std::vector<TensorDim>& dims) const;
 
   template <typename... Ts>
-  void match_dims(Ts... dims) const {
+  void bind_dims(Ts... dims) const {
     std::vector<TensorDim> vec;
     IntoVector(&vec, std::forward<Ts>(dims)...);
-    match_dims(vec);
+    bind_dims(vec);
   }
 
  private:

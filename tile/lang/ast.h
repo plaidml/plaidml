@@ -7,6 +7,7 @@
 #include <boost/format.hpp>
 
 #include "tile/base/shape.h"
+#include "tile/lang/compose.h"
 #include "tile/lang/type.h"
 #include "tile/math/polynomial.h"
 
@@ -205,6 +206,10 @@ struct PolyOpExpr : PolyExpr {
     return ss.str();
   }
 };
+
+TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr);
+
+RunInfo Evaluate(const std::string& name, const std::vector<std::shared_ptr<Expr>>& exprs);
 
 }  // namespace lang
 }  // namespace tile
