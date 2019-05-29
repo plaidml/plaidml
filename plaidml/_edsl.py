@@ -1,6 +1,7 @@
 import os
 import platform
 import sys
+import threading
 
 import cffi
 
@@ -69,63 +70,25 @@ typedef struct {
     tile_string* msg;
 } tile_error;
 
-typedef struct {
-    tile_error err;
-} tile_ret_void;
-
-typedef struct {
-    tile_error err;
-    size_t ret;
-} tile_ret_uint;
-
-typedef struct {
-    tile_error err;
-    int64_t ret;
-} tile_ret_i64;
-
-typedef struct {
-    tile_error err;
-    uint64_t ret;
-} tile_ret_u64;
-
-typedef struct {
-    tile_error err;
-    tile_string* ret;
-} tile_ret_string;
-
-typedef struct {
-    tile_error err;
-    tile_shape* ret;
-} tile_ret_shape;
-
-typedef struct {
-    tile_error err;
-    tile_expr* ret;
-} tile_ret_expr;
-
-typedef struct {
-    tile_error err;
-    tile_poly_expr* ret;
-} tile_ret_poly_expr;
-
 const char* tile_string_ptr(tile_string* str);
 void tile_string_free(const char* ptr);
 
-tile_ret_shape tile_shape_alloc(plaidml_datatype datatype);
-tile_ret_string tile_shape_repr(tile_shape* shape);
-tile_ret_void tile_shape_free(tile_shape* shape);
-tile_ret_void tile_shape_add_dimension(tile_shape* shape, uint64_t size, int64_t stride);
-tile_ret_uint tile_shape_get_rank(tile_shape* shape);
-tile_ret_u64 tile_shape_get_dimension_size(tile_shape* shape, size_t dim);
-tile_ret_i64 tile_shape_get_dimension_stride(tile_shape* shape, size_t dim);
+tile_shape* tile_shape_alloc(tile_error* err, plaidml_datatype datatype);
+tile_string* tile_shape_repr(tile_error* err, tile_shape* shape);
+void tile_shape_free(tile_error* err, tile_shape* shape);
+void tile_shape_add_dimension(tile_error* err, tile_shape* shape, uint64_t size, int64_t stride);
+size_t tile_shape_get_rank(tile_error* err, tile_shape* shape);
+uint64_t tile_shape_get_dimension_size(tile_error* err, tile_shape* shape, size_t dim);
+int64_t tile_shape_get_dimension_stride(tile_error* err, tile_shape* shape, size_t dim);
 
-tile_ret_void tile_expr_free(tile_expr* expr);
-tile_ret_string tile_expr_repr(tile_expr* expr);
-tile_ret_expr tile_expr_param(tile_shape* shape, const char* name);
-tile_ret_expr tile_expr_int(int64_t value);
-tile_ret_expr tile_expr_float(double value);
-tile_ret_expr tile_expr_call(const char* fn, size_t nargs, tile_expr** args);
-tile_ret_expr tile_expr_contraction(
+void tile_expr_free(tile_error* err, tile_expr* expr);
+tile_string* tile_expr_repr(tile_error* err, tile_expr* expr);
+tile_expr* tile_expr_param(tile_error* err, tile_shape* shape, const char* name);
+tile_expr* tile_expr_int(tile_error* err, int64_t value);
+tile_expr* tile_expr_float(tile_error* err, double value);
+tile_expr* tile_expr_call(tile_error* err, const char* fn, size_t nargs, tile_expr** args);
+tile_expr* tile_expr_contraction(
+    tile_error* err,
     tile_agg_op agg_op,
     tile_combo_op combo_op,
     tile_expr* output,
@@ -136,17 +99,36 @@ tile_ret_expr tile_expr_contraction(
     bool no_defract,
     tile_expr* use_default
 );
-tile_ret_expr tile_expr_tensor_spec(tile_expr* ref, size_t rank, tile_poly_expr** idxs, size_t* sizes);
-tile_ret_expr tile_expr_constraint(tile_poly_expr* lhs, size_t rhs);
-tile_ret_expr tile_expr_contraction_set_no_defract(tile_expr* expr, bool no_defract);
-tile_ret_expr tile_expr_contraction_set_use_default(tile_expr* expr, tile_expr* use_default);
-tile_ret_shape tile_expr_evaluate_shape(tile_expr* expr);
+tile_expr* tile_expr_tensor_spec(
+    tile_error* err,
+    tile_expr* ref,
+    size_t rank,
+    tile_poly_expr** idxs,
+    size_t* sizes
+);
+tile_expr* tile_expr_constraint(tile_error* err, tile_poly_expr* lhs, size_t rhs);
+tile_expr* tile_expr_contraction_set_no_defract(
+    tile_error* err,
+    tile_expr* expr,
+    bool no_defract
+);
+tile_expr* tile_expr_contraction_set_use_default(
+    tile_error* err,
+    tile_expr* expr,
+    tile_expr* use_default
+);
+tile_shape* tile_expr_evaluate_shape(tile_error* err, tile_expr* expr);
 
-tile_ret_void tile_poly_expr_free(tile_poly_expr* expr);
-tile_ret_string tile_poly_expr_repr(tile_poly_expr* expr);
-tile_ret_poly_expr tile_poly_expr_index(const void* ptr, const char* name);
-tile_ret_poly_expr tile_poly_expr_literal(int64_t value);
-tile_ret_poly_expr tile_poly_expr_op(tile_poly_op op, size_t nargs, tile_poly_expr** args);
+void tile_poly_expr_free(tile_error* err, tile_poly_expr* expr);
+tile_string* tile_poly_expr_repr(tile_error* err, tile_poly_expr* expr);
+tile_poly_expr* tile_poly_expr_index(tile_error* err, const void* ptr, const char* name);
+tile_poly_expr* tile_poly_expr_literal(tile_error* err, int64_t value);
+tile_poly_expr* tile_poly_expr_op(
+    tile_error* err,
+    tile_poly_op op,
+    size_t nargs,
+    tile_poly_expr** args
+);
 '''
 
 
@@ -191,14 +173,16 @@ def __load_library():
 
 ffi, lib = __load_library()
 
+_TLS = threading.local()
+_TLS.err = ffi.new('tile_error*')
+
 
 def ffi_call(func, *args):
     """Calls ffi function and does some error handling."""
-    ret = func(*args)
-    if ret.err.code:
-        raise TileError(ret.err)
-    if hasattr(ret, 'ret'):
-        return ret.ret
+    ret = func(_TLS.err, *args)
+    if _TLS.err.code:
+        raise TileError(_TLS.err)
+    return ret
 
 
 def decode_str(ptr):
