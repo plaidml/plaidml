@@ -26,6 +26,16 @@ class StripeGenerator {
         runinfo_.program = parser.Parse(runinfo_.code);
       }
       runinfo_.vars = BindProgram(&runinfo_.program, runinfo_.input_shapes, runinfo_.output_shapes);
+      EnforceSpecifiedShapes();
+    }
+  }
+
+  void EnforceSpecifiedShapes() {
+    for (auto& out_it : runinfo_.output_shapes) {
+      auto var_it = runinfo_.vars.find(out_it.first);
+      if (var_it != runinfo_.vars.end()) {
+        var_it->second.shape = out_it.second;
+      }
     }
   }
 
@@ -396,12 +406,16 @@ class StripeGenerator {
           }
           loaded.emplace(input);
           std::vector<Affine> access;
-          int diff = out_shape.dims.size() - shape.dims.size();
-          for (int i = 0; i < out_shape.dims.size(); i++) {
-            if (i >= diff) {
-              const auto& dim = shape.dims[i - diff];
+          int start = (out_shape.dims.size() >= shape.dims.size()) ? 0 : (shape.dims.size() - out_shape.dims.size());
+          int idx_offset = out_shape.dims.size() - shape.dims.size(); // can be negative
+          for (int i = 0; i < shape.dims.size(); i++) {
+            if (i < start) {
+              access.emplace_back(Affine{});
+            }
+            else {
+              const auto& dim = shape.dims[i];
               if (dim.size > 1) {
-                access.emplace_back(Affine{kernel->idxs[i].name});
+                access.emplace_back(Affine{kernel->idxs[i + idx_offset].name});
               } else {
                 access.emplace_back(Affine{});
               }
