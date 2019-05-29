@@ -4,7 +4,7 @@ licenses(["by_exception_only"])
 
 load("//bzl:conda.bzl", "conda_test")
 load("//bzl:plaidml.bzl", "plaidml_py_library", "plaidml_py_wheel")
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_deb", "pkg_tar")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 package(default_visibility = ["//visibility:public"])
 

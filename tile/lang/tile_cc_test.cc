@@ -15,8 +15,8 @@ namespace {
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
-  X.match_dims(I, K);
-  Y.match_dims(K, J);
+  X.bind_dims(I, K);
+  Y.bind_dims(K, J);
   auto R = TensorOutput(I, J);
   for (auto i : TensorIndex()) {
     for (auto j : TensorIndex()) {
@@ -32,7 +32,7 @@ Tensor Relu(const Tensor& I) { return select(I < 0.0, Tensor{0.0}, I); }
 
 Tensor Softmax(const Tensor& X) {
   TensorDim I, J;
-  X.match_dims(I, J);
+  X.bind_dims(I, J);
   auto M = TensorOutput(I, 1);
   for (auto i : TensorIndex()) {
     for (auto j : TensorIndex()) {
@@ -101,8 +101,8 @@ TEST(TileCC, MnistMlp) {
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
   TensorDim CI, CO, K0, K1, N, X0, X1;
-  I.match_dims(N, X0, X1, CI);
-  K.match_dims(K0, K1, CI, CO);
+  I.bind_dims(N, X0, X1, CI);
+  K.bind_dims(K0, K1, CI, CO);
   auto R = TensorOutput(N, X0 - (K0 - 1), X1 - (K1 - 1), CO);
   for (auto n : TensorIndex()) {
     for (auto x0 : TensorIndex()) {
@@ -124,7 +124,7 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 
 Tensor MaxPooling2(const Tensor& I) {
   TensorDim N, X0, X1, C;
-  I.match_dims(N, X0, X1, C);
+  I.bind_dims(N, X0, X1, C);
   auto R = TensorOutput(N, (X0 + 1) / 2, (X1 + 1) / 2, C);
   for (auto n : TensorIndex()) {
     for (auto x0 : TensorIndex()) {
@@ -297,7 +297,7 @@ TEST(TileCC, LarsMomentum4d) {
 TEST(TileCC, RepeatElements) {
   Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {10, 10, 10}));
   TensorDim N0, N1, N2;
-  I.match_dims(N0, N1, N2);
+  I.bind_dims(N0, N1, N2);
   auto O = TensorOutput(N0, 3 * N1, N2);
   for (auto n0 : TensorIndex()) {
     for (auto n1 : TensorIndex()) {
@@ -327,7 +327,7 @@ TEST(TileCC, UseDefault) {
   Tensor P(tile::SimpleShape(tile::DataType::FLOAT32, {1, 7, 10, 10}));
   Tensor I(tile::SimpleShape(tile::DataType::FLOAT32, {1, 10, 10}));
   TensorDim B, N1, N2;
-  I.match_dims(B, N1, N2);
+  I.bind_dims(B, N1, N2);
   auto O = TensorOutput(B, 7, N1, N2);
   for (auto b : TensorIndex()) {
     for (auto i1 : TensorIndex()) {
@@ -352,7 +352,7 @@ TEST(TileCC, UseDefault) {
 
 Tensor ArgMax(const Tensor& I) {
   TensorDim X0, X1, X2;
-  I.match_dims(X0, X1, X2);
+  I.bind_dims(X0, X1, X2);
   auto Max = TensorOutput(X0, X2);
   for (const auto x0 : TensorIndex()) {
     for (const auto x1 : TensorIndex()) {
@@ -403,11 +403,11 @@ TEST(TileCC, ArgMax) {
 
 Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor& B, const Tensor& G) {
   TensorDim N, S, X, Y, CI, CO, BI, BO;
-  I.match_dims(N, X, Y, CI);
-  K.match_dims(S, S, CI, CO);
-  A.match_dims(BI, BO);
-  B.match_dims(BI, BI);
-  G.match_dims(BI, S);
+  I.bind_dims(N, X, Y, CI);
+  K.bind_dims(S, S, CI, CO);
+  A.bind_dims(BI, BO);
+  B.bind_dims(BI, BI);
+  G.bind_dims(BI, S);
   auto XO = (X - S + 1) / 1;
   auto YO = (Y - S + 1) / 1;
   auto XB = (XO + BO - 1) / BO;
@@ -510,7 +510,7 @@ TEST(TileCC, CumSum) {
   Tensor I("I", tile::SimpleShape(tile::DataType::FLOAT32, {10}));
   TensorDim N;
   TensorIndex i, k;
-  I.match_dims(N);
+  I.bind_dims(N);
   auto O = TensorOutput(N);
   if (i - k < N) {
     O(i) += I(k);
@@ -539,8 +539,8 @@ Tensor ComplexConv2d(const Tensor& I,               //
   TensorIndex n, g, gci, gco;
   std::vector<TensorIndex> x(2);
   std::vector<TensorIndex> k(2);
-  I.match_dims(N, X[0], X[1], G, GCI);
-  K.match_dims(KX[0], KX[1], G, GCI, GCO);
+  I.bind_dims(N, X[0], X[1], G, GCI);
+  K.bind_dims(KX[0], KX[1], G, GCI, GCO);
   // Compute output spatial dimensions
   std::vector<TensorDim> Y(2);
   for (size_t i = 0; i < Y.size(); ++i) {

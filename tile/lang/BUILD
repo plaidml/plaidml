@@ -16,6 +16,7 @@ plaidml_proto_library(
 plaidml_cc_library(
     name = "lang",
     srcs = [
+        "ast.cc",
         "bound.cc",
         "bound.h",
         "builtins.cc",

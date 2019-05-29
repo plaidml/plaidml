@@ -16,8 +16,8 @@ namespace {
 
 Tensor ContractPlusElementwise(const Tensor& A, const Tensor& B) {
   TensorDim M, N, K;
-  A.match_dims(M, K);
-  B.match_dims(K, N);
+  A.bind_dims(M, K);
+  B.bind_dims(K, N);
   auto C = TensorOutput(M, N);
   TensorIndex k, m, n;
   C(m, n) += A(m, k) * B(k, n);
