@@ -10,8 +10,8 @@
 #include "tile/lang/compose.h"
 
 namespace vertexai {
-namespace tile {
-namespace lang {
+namespace plaidml {
+namespace edsl {
 
 class IndexedTensor;
 class Tensor;
@@ -379,6 +379,6 @@ inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
 
 tile::lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars);
 
-}  // namespace lang
-}  // namespace tile
+}  // namespace edsl
+}  // namespace plaidml
 }  // namespace vertexai

@@ -3,12 +3,14 @@
 #include <string>
 #include <vector>
 
+#include "plaidml/edsl/tile.h"
 #include "tile/lang/compose.h"
-#include "tile/lang/tile_cc.h"
 
 namespace vertexai {
 namespace tile {
 namespace lib {
+
+namespace edsl = plaidml::edsl;
 
 enum class ConvolutionFormat {
   ChannelsFirst,
@@ -16,8 +18,8 @@ enum class ConvolutionFormat {
 };
 
 // TODO: add support for AutoPadding
-lang::Tensor Convolution(const lang::Tensor& I,                                         //
-                         const lang::Tensor& K,                                         //
+edsl::Tensor Convolution(const edsl::Tensor& I,                                         //
+                         const edsl::Tensor& K,                                         //
                          const std::vector<size_t>& O_dims,                             //
                          std::vector<size_t> strides = {},                              //
                          ConvolutionFormat I_format = ConvolutionFormat::ChannelsLast,  //

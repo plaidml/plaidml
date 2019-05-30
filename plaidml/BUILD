@@ -16,8 +16,6 @@ load(
 )
 load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
 
-exports_files(["requirements.txt"])
-
 # The PlaidML configuration protobuf definition.
 plaidml_proto_library(
     name = "proto",
@@ -33,7 +31,6 @@ plaidml_cc_version(
 PLAIDML_CPP_SOURCES = [
     "config.h",
     "plaidml.cc",
-    "tile.cc",
     ":version",
 ]
 
@@ -48,6 +45,7 @@ PLAIDML_CPP_DEPS = [
     "//base/eventing/file",
     "//base/util:runfiles_db",
     "//plaidml/base",
+    "//plaidml/edsl",
     "//tile/base",
     "//tile/base:program_cache",
     "//tile/stripe",
@@ -92,28 +90,16 @@ plaidml_cc_library(
 
 plaidml_cc_binary(
     name = "libplaidml.so",
-    srcs = select({
-        "@toolchain//:windows_x86_64": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
-        "//conditions:default": [],
-    }),
     linkshared = 1,
     tags = ["linux"],
-    deps = [
-        ":api",
-    ],
+    deps = [":api"],
 )
 
 plaidml_cc_binary(
     name = "plaidml.dll",
-    srcs = select({
-        "@toolchain//:windows_x86_64": ["dummy.cc"],  # Work around for https://github.com/bazelbuild/bazel/issues/4003
-        "//conditions:default": [],
-    }),
     linkshared = 1,
     tags = ["msvc"],
-    deps = [
-        ":api",
-    ],
+    deps = [":api"],
 )
 
 apple_binary(
@@ -232,9 +218,7 @@ conda_binary(
 
 PYTHON_SRCS = [
     "__init__.py",
-    "_edsl.py",
     "context.py",
-    "edsl.py",
     "exceptions.py",
     "library.py",
     "op.py",
@@ -259,9 +243,7 @@ conda_test(
     name = "settings_test",
     srcs = ["settings_test.py"],
     env = "@com_intel_plaidml_conda//:env",
-    deps = [
-        ":py",
-    ],
+    deps = [":py"],
 )
 
 conda_test(
@@ -283,15 +265,6 @@ conda_test(
     deps = [
         ":py",
         "//testing:plaidml_py",
-    ],
-)
-
-conda_test(
-    name = "edsl_test",
-    srcs = ["edsl_test.py"],
-    env = "@com_intel_plaidml_conda//:env",
-    deps = [
-        ":py",
     ],
 )
 
@@ -387,28 +360,29 @@ bin =
     visibility = ["//visibility:public"],
 )
 
+plaidml_cc_library(
+    name = "public_lib",
+    srcs = PLAIDML_CPP_SOURCES + select({
+        "@toolchain//:windows_x86_64": ["config-windows.cc"],
+        "//conditions:default": ["config-unix.cc"],
+    }),
+    hdrs = PLAIDML_CPP_HEADERS,
+    deps = PLAIDML_CPP_DEPS,
+    alwayslink = 1,
+)
+
 plaidml_cc_binary(
     name = "libplaidml_pub.so",
-    srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-unix.cc"],
     linkshared = 1,
     tags = ["linux"],
-    deps = PLAIDML_CPP_DEPS,
+    deps = [":public_lib"],
 )
 
 plaidml_cc_binary(
     name = "plaidml_pub.dll",
-    srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-windows.cc"],
     linkshared = 1,
     tags = ["msvc"],
-    deps = PLAIDML_CPP_DEPS,
-)
-
-plaidml_cc_library(
-    name = "apple_lib_pub",
-    srcs = PLAIDML_CPP_SOURCES + PLAIDML_CPP_HEADERS + ["config-unix.cc"],
-    tags = ["darwin"],
-    deps = PLAIDML_CPP_DEPS,
-    alwayslink = 1,
+    deps = [":public_lib"],
 )
 
 apple_binary(
@@ -416,7 +390,7 @@ apple_binary(
     binary_type = "dylib",
     platform_type = "macos",
     tags = ["darwin"],
-    deps = [":apple_lib_pub"],
+    deps = [":public_lib"],
 )
 
 plaidml_macos_dylib(

@@ -3,15 +3,18 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "plaidml/edsl/tile.h"
 #include "testing/matchers.h"
 #include "tile/lang/gen_stripe.h"
-#include "tile/lang/tile_cc.h"
 
 using ::testing::EqualsProtoText;
 
 namespace vertexai {
 namespace tile {
 namespace lang {
+
+using namespace plaidml::edsl;  // NOLINT
+
 namespace {
 
 Tensor ContractPlusElementwise(const Tensor& A, const Tensor& B) {

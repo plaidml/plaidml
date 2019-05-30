@@ -159,7 +159,7 @@ def __load_library():
     # library will never be in the script's directory, so this
     # shouldn't find anything.
     self_path = os.path.abspath(__file__)
-    self_dir = os.path.dirname(self_path)
+    self_dir = os.path.dirname(os.path.dirname(self_path))
     libpath = os.path.join(self_dir, libname)
     try:
         return ffi, ffi.dlopen(libpath)

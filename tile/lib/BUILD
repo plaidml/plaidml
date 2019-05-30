@@ -9,6 +9,7 @@ plaidml_cc_library(
         "*.h",
     ]),
     deps = [
+        "//plaidml/edsl",
         "//tile/lang",
         "//tile/util",
         "@boost",
