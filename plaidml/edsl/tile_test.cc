@@ -4,13 +4,13 @@
 #include <gtest/gtest.h>
 
 #include "base/util/logging.h"
-#include "tile/lang/tile_cc.h"
+#include "plaidml/edsl/tile.h"
 
 using ::testing::Eq;
 
 namespace vertexai {
-namespace tile {
-namespace lang {
+namespace plaidml {
+namespace edsl {
 namespace {
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
@@ -597,6 +597,6 @@ TEST(TileCC, Reciprocal) {
 }
 
 }  // namespace
-}  // namespace lang
-}  // namespace tile
+}  // namespace edsl
+}  // namespace plaidml
 }  // namespace vertexai

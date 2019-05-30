@@ -1,4 +1,4 @@
-#include "tile/lang/tile_cc.h"
+#include "plaidml/edsl/tile.h"
 
 #include <algorithm>
 #include <iterator>
@@ -10,13 +10,14 @@
 #include "tile/lang/ast.h"
 
 namespace vertexai {
-namespace tile {
-namespace lang {
+namespace plaidml {
+namespace edsl {
 
-using Polynomial = math::Polynomial<math::Rational>;
+namespace ast = tile::lang;
+using Polynomial = tile::math::Polynomial<tile::math::Rational>;
 
 struct TensorIndex::Impl {
-  std::shared_ptr<PolyExpr> expr;
+  std::shared_ptr<ast::PolyExpr> expr;
 };
 
 struct TensorDim::Impl {
@@ -24,50 +25,51 @@ struct TensorDim::Impl {
 };
 
 struct IndexedTensor::Impl {
-  std::shared_ptr<Expr> expr;
+  std::shared_ptr<ast::Expr> expr;
   Tensor::Impl* src = nullptr;
-  void MakeContraction(AggregationOp agg_op, const IndexedTensor& rhs);
+  void MakeContraction(ast::AggregationOp agg_op, const IndexedTensor& rhs);
   IndexedTensor MakeCall(const std::string& fn, const IndexedTensor& rhs);
 };
 
 struct Tensor::Impl {
-  std::shared_ptr<Expr> expr;
+  std::shared_ptr<ast::Expr> expr;
   std::vector<TensorDim> dims;
   std::string name;
 };
 
 class TensorFriend {
  public:
-  static TensorIndex MakePolyOp(PolyOp op, const std::vector<TensorIndex>& args) {
+  static TensorIndex MakePolyOp(ast::PolyOp op, const std::vector<TensorIndex>& args) {
     auto impl = std::make_unique<TensorIndex::Impl>();
-    std::vector<std::shared_ptr<PolyExpr>> operands;
+    std::vector<std::shared_ptr<ast::PolyExpr>> operands;
     for (const auto& arg : args) {
       operands.push_back(arg.impl_->expr);
     }
-    impl->expr = std::make_shared<PolyOpExpr>(op, operands);
+    impl->expr = std::make_shared<ast::PolyOpExpr>(op, operands);
     IVLOG(2, "MakePolyOp> " << impl->expr->str());
     return TensorIndex{std::move(impl)};
   }
 
-  static TensorIndex MakeMixedPolyBinaryOp(PolyOp op, const TensorIndex& idx, const TensorDim& dim, bool lhs_first) {
+  static TensorIndex MakeMixedPolyBinaryOp(ast::PolyOp op, const TensorIndex& idx, const TensorDim& dim,
+                                           bool lhs_first) {
     if (!dim.impl_->size) {
       throw std::runtime_error("Undefined dimension.");
     }
     auto impl = std::make_unique<TensorIndex::Impl>();
-    std::vector<std::shared_ptr<PolyExpr>> operands;
+    std::vector<std::shared_ptr<ast::PolyExpr>> operands;
     if (lhs_first) {
       operands.emplace_back(idx.impl_->expr);
-      operands.emplace_back(std::make_shared<PolyLiteral>(*dim.impl_->size));
+      operands.emplace_back(std::make_shared<ast::PolyLiteral>(*dim.impl_->size));
     } else {
-      operands.emplace_back(std::make_shared<PolyLiteral>(*dim.impl_->size));
+      operands.emplace_back(std::make_shared<ast::PolyLiteral>(*dim.impl_->size));
       operands.emplace_back(idx.impl_->expr);
     }
-    impl->expr = std::make_shared<PolyOpExpr>(op, operands);
+    impl->expr = std::make_shared<ast::PolyOpExpr>(op, operands);
     IVLOG(2, "MakeMixedPolyBinaryOp> " << impl->expr->str());
     return TensorIndex{std::move(impl)};
   }
 
-  static TensorDim DimOp(PolyOp op, const std::vector<TensorDim>& args) {
+  static TensorDim DimOp(ast::PolyOp op, const std::vector<TensorDim>& args) {
     std::vector<size_t> sizes;
     for (const auto& arg : args) {
       if (!arg.impl_->size) {
@@ -76,22 +78,22 @@ class TensorFriend {
       sizes.emplace_back(*arg.impl_->size);
     }
     switch (op) {
-      case PolyOp::Neg:
+      case ast::PolyOp::Neg:
         return TensorDim{-sizes[0]};
-      case PolyOp::Add:
+      case ast::PolyOp::Add:
         return TensorDim{sizes[0] + sizes[1]};
-      case PolyOp::Sub:
+      case ast::PolyOp::Sub:
         return TensorDim{sizes[0] - sizes[1]};
-      case PolyOp::Mul:
+      case ast::PolyOp::Mul:
         return TensorDim{sizes[0] * sizes[1]};
-      case PolyOp::Div:
+      case ast::PolyOp::Div:
         return TensorDim{sizes[0] / sizes[1]};
       default:
         throw std::runtime_error("Invalid poly op");
     }
   }
 
-  inline static const TensorIndex::Impl* GetImpl(const PolyIndex& expr) {
+  inline static const TensorIndex::Impl* GetImpl(const ast::PolyIndex& expr) {
     return static_cast<const TensorIndex::Impl*>(expr.ptr);
   }
 
@@ -99,35 +101,37 @@ class TensorFriend {
 
   static IndexedTensor cond(const IndexedTensor& lhs, const IndexedTensor& rhs, const IndexedTensor& true_case) {
     auto impl = std::make_unique<IndexedTensor::Impl>();
-    std::vector<std::shared_ptr<Expr>> args = {lhs.impl_->expr, rhs.impl_->expr, true_case.impl_->expr};
-    impl->expr = std::make_shared<CallExpr>("cond", args);
+    std::vector<std::shared_ptr<ast::Expr>> args = {lhs.impl_->expr, rhs.impl_->expr, true_case.impl_->expr};
+    impl->expr = std::make_shared<ast::CallExpr>("cond", args);
     return IndexedTensor{std::move(impl)};
   }
 
   static Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {
     auto impl = std::make_unique<Tensor::Impl>();
-    std::vector<std::shared_ptr<Expr>> exprs;
+    std::vector<std::shared_ptr<ast::Expr>> exprs;
     for (const auto& tensor : args) {
       exprs.push_back(tensor.impl_->expr);
     }
-    impl->expr = std::make_shared<CallExpr>(fn, exprs);
+    impl->expr = std::make_shared<ast::CallExpr>(fn, exprs);
     return Tensor{std::move(impl)};
   }
 };
 
-TensorIndex::TensorIndex() : impl_(std::make_shared<Impl>()) { impl_->expr = std::make_shared<PolyIndex>(impl_.get()); }
+TensorIndex::TensorIndex() : impl_(std::make_shared<Impl>()) {
+  impl_->expr = std::make_shared<ast::PolyIndex>(impl_.get());
+}
 
 TensorIndex::TensorIndex(size_t value) : impl_(std::make_shared<Impl>()) {
-  impl_->expr = std::make_shared<PolyLiteral>(value);
+  impl_->expr = std::make_shared<ast::PolyLiteral>(value);
 }
 
 TensorIndex::TensorIndex(const std::string& name) : impl_(std::make_shared<Impl>()) {
-  impl_->expr = std::make_shared<PolyIndex>(impl_.get(), name);
+  impl_->expr = std::make_shared<ast::PolyIndex>(impl_.get(), name);
 }
 
 TensorIndex::TensorIndex(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 
-TensorIndex TensorIndex::operator-() const { return TensorFriend::MakePolyOp(PolyOp::Neg, {*this}); }
+TensorIndex TensorIndex::operator-() const { return TensorFriend::MakePolyOp(ast::PolyOp::Neg, {*this}); }
 
 #define TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(_op_, _poly_op_)              \
   TensorIndex operator _op_(const TensorIndex& lhs, const TensorIndex& rhs) { \
@@ -155,15 +159,15 @@ TensorIndex TensorIndex::operator-() const { return TensorFriend::MakePolyOp(Pol
     return TensorFriend::DimOp(_poly_op_, {lhs, TensorDim{rhs}});             \
   }
 
-TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(+, PolyOp::Add);
-TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(-, PolyOp::Sub);
-TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(*, PolyOp::Mul);
-TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(/, PolyOp::Div);
+TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(+, ast::PolyOp::Add);
+TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(-, ast::PolyOp::Sub);
+TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(*, ast::PolyOp::Mul);
+TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(/, ast::PolyOp::Div);
 
 Constraint TensorIndex::operator<(size_t rhs) const {
   IVLOG(3, "Add size_t constraint: " << rhs);
-  auto constraint = std::make_shared<ConstraintExpr>(impl_->expr, rhs);
-  ConstraintApplier applier(constraint);
+  auto constraint = std::make_shared<ast::ConstraintExpr>(impl_->expr, rhs);
+  ast::ConstraintApplier applier(constraint);
   impl_->expr->Accept(&applier);
   return Constraint();
 }
@@ -173,8 +177,8 @@ Constraint TensorIndex::operator<(const TensorDim& rhs) const {
     throw std::runtime_error("Undefined dimension.");
   }
   IVLOG(3, "Add TensorDim constraint: " << *rhs.impl_->size);
-  auto constraint = std::make_shared<ConstraintExpr>(impl_->expr, *rhs.impl_->size);
-  ConstraintApplier applier(constraint);
+  auto constraint = std::make_shared<ast::ConstraintExpr>(impl_->expr, *rhs.impl_->size);
+  ast::ConstraintApplier applier(constraint);
   impl_->expr->Accept(&applier);
   return Constraint();
 }
@@ -183,16 +187,18 @@ TensorDim::TensorDim() : impl_(std::make_shared<Impl>()) {}
 
 TensorDim::TensorDim(size_t value) : impl_(std::make_shared<Impl>()) { impl_->size = value; }
 
-Tensor::Tensor() : impl_(new Impl) { impl_->expr = std::make_shared<ParamExpr>(TensorShape{}, ""); }
+Tensor::Tensor() : impl_(new Impl) { impl_->expr = std::make_shared<ast::ParamExpr>(tile::TensorShape{}, ""); }
 
 Tensor::Tensor(const std::string& name) : impl_(new Impl) {
-  impl_->expr = std::make_shared<ParamExpr>(TensorShape{}, name);
+  impl_->expr = std::make_shared<ast::ParamExpr>(tile::TensorShape{}, name);
 }
 
-Tensor::Tensor(const TensorShape& shape) : impl_(new Impl) { impl_->expr = std::make_shared<ParamExpr>(shape, ""); }
+Tensor::Tensor(const tile::TensorShape& shape) : impl_(new Impl) {
+  impl_->expr = std::make_shared<ast::ParamExpr>(shape, "");
+}
 
-Tensor::Tensor(const std::string& name, const TensorShape& shape) : impl_(new Impl) {
-  impl_->expr = std::make_shared<ParamExpr>(shape, name);
+Tensor::Tensor(const std::string& name, const tile::TensorShape& shape) : impl_(new Impl) {
+  impl_->expr = std::make_shared<ast::ParamExpr>(shape, name);
 }
 
 Tensor::Tensor(const std::initializer_list<TensorDim>& dims) : impl_(new Impl) { impl_->dims = dims; }
@@ -209,11 +215,11 @@ Tensor::Tensor(const std::string& name, const std::initializer_list<TensorDim>& 
   impl_->name = name;
 }
 
-Tensor::Tensor(int value) : impl_(new Impl) { impl_->expr = std::make_shared<IntConst>(value); }
+Tensor::Tensor(int value) : impl_(new Impl) { impl_->expr = std::make_shared<ast::IntConst>(value); }
 
-Tensor::Tensor(int64_t value) : impl_(new Impl) { impl_->expr = std::make_shared<IntConst>(value); }
+Tensor::Tensor(int64_t value) : impl_(new Impl) { impl_->expr = std::make_shared<ast::IntConst>(value); }
 
-Tensor::Tensor(double value) : impl_(new Impl) { impl_->expr = std::make_shared<FloatConst>(value); }
+Tensor::Tensor(double value) : impl_(new Impl) { impl_->expr = std::make_shared<ast::FloatConst>(value); }
 
 Tensor::~Tensor() = default;
 
@@ -233,7 +239,7 @@ Tensor& Tensor::operator=(const Tensor& rhs) {
 
 void Tensor::bind_dims(const std::vector<TensorDim>& dims) const {
   std::vector<size_t> sizes;
-  auto expr = std::dynamic_pointer_cast<ParamExpr>(impl_->expr);
+  auto expr = std::dynamic_pointer_cast<ast::ParamExpr>(impl_->expr);
   if (expr) {
     // this handles user inputs
     for (const auto& dim : expr->shape.dims) {
@@ -290,13 +296,13 @@ IndexedTensor Tensor::operator()(const std::vector<TensorIndex>& idxs) const {
       sizes.emplace_back(*dim.impl_->size);
     }
   }
-  std::vector<std::shared_ptr<PolyExpr>> idx_exprs;
+  std::vector<std::shared_ptr<ast::PolyExpr>> idx_exprs;
   for (const auto& idx : idxs) {
     idx_exprs.push_back(idx.impl_->expr);
   }
   auto impl = std::make_unique<IndexedTensor::Impl>();
   impl->src = impl_.get();
-  impl->expr = std::make_shared<TensorSpecExpr>(impl_->expr, idx_exprs, sizes);
+  impl->expr = std::make_shared<ast::TensorSpecExpr>(impl_->expr, idx_exprs, sizes);
   return IndexedTensor{std::move(impl)};
 }
 
@@ -337,7 +343,7 @@ TILE_CC_DEFINE_TENSOR_BINARY_OPS(|, "bit_or");
 TILE_CC_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
 
 Tensor& Tensor::no_defract() {
-  auto cion_expr = std::dynamic_pointer_cast<ContractionExpr>(impl_->expr);
+  auto cion_expr = std::dynamic_pointer_cast<ast::ContractionExpr>(impl_->expr);
   if (!cion_expr) {
     throw std::runtime_error("no_defract can only be specified on a contraction");
   }
@@ -346,7 +352,7 @@ Tensor& Tensor::no_defract() {
 }
 
 Tensor& Tensor::use_default(const Tensor& rhs) {
-  auto cion_expr = std::dynamic_pointer_cast<ContractionExpr>(impl_->expr);
+  auto cion_expr = std::dynamic_pointer_cast<ast::ContractionExpr>(impl_->expr);
   if (!cion_expr) {
     throw std::runtime_error("use_default can only be specified on a contraction");
   }
@@ -354,7 +360,7 @@ Tensor& Tensor::use_default(const Tensor& rhs) {
   return *this;
 }
 
-TensorShape Tensor::shape() const { return EvaluateShape(impl_->expr); }
+tile::TensorShape Tensor::shape() const { return EvaluateShape(impl_->expr); }
 
 IndexedTensor::~IndexedTensor() = default;
 
@@ -362,40 +368,40 @@ IndexedTensor::IndexedTensor(std::unique_ptr<Impl> impl) : impl_(std::move(impl)
 
 IndexedTensor::IndexedTensor(IndexedTensor&& rhs) noexcept : impl_(std::move(rhs.impl_)) {}
 
-void IndexedTensor::Impl::MakeContraction(AggregationOp agg_op, const IndexedTensor& rhs) {
-  auto output_spec = std::dynamic_pointer_cast<TensorSpecExpr>(expr);
+void IndexedTensor::Impl::MakeContraction(ast::AggregationOp agg_op, const IndexedTensor& rhs) {
+  auto output_spec = std::dynamic_pointer_cast<ast::TensorSpecExpr>(expr);
   if (!output_spec) {
     throw std::runtime_error("oops: out_spec");
   }
 
-  auto cion_expr = std::make_shared<ContractionExpr>();
+  auto cion_expr = std::make_shared<ast::ContractionExpr>();
   cion_expr->agg_op = agg_op;
   cion_expr->output = output_spec;
 
-  auto input_spec = std::dynamic_pointer_cast<TensorSpecExpr>(rhs.impl_->expr);
+  auto input_spec = std::dynamic_pointer_cast<ast::TensorSpecExpr>(rhs.impl_->expr);
   if (input_spec) {
     cion_expr->inputs = {input_spec};
   } else {
-    auto call_expr = std::dynamic_pointer_cast<CallExpr>(rhs.impl_->expr);
+    auto call_expr = std::dynamic_pointer_cast<ast::CallExpr>(rhs.impl_->expr);
     if (!call_expr) {
       throw std::runtime_error("oops: call_expr");
     }
     if (call_expr->fn == "add") {
-      cion_expr->combo_op = CombinationOp::PLUS;
+      cion_expr->combo_op = ast::CombinationOp::PLUS;
     } else if (call_expr->fn == "mul") {
-      cion_expr->combo_op = CombinationOp::MULTIPLY;
+      cion_expr->combo_op = ast::CombinationOp::MULTIPLY;
     } else if (call_expr->fn == "eq") {
-      cion_expr->combo_op = CombinationOp::EQ;
+      cion_expr->combo_op = ast::CombinationOp::EQ;
     } else if (call_expr->fn == "cond") {
-      cion_expr->combo_op = CombinationOp::COND;
+      cion_expr->combo_op = ast::CombinationOp::COND;
     }
     for (const auto& arg : call_expr->args) {
-      auto spec = std::dynamic_pointer_cast<TensorSpecExpr>(arg);
+      auto spec = std::dynamic_pointer_cast<ast::TensorSpecExpr>(arg);
       cion_expr->inputs.push_back(spec);
     }
   }
 
-  ConstraintCollector cc;
+  ast::ConstraintCollector cc;
   for (const auto& idx : output_spec->index_spec) {
     idx->Accept(&cc);
   }
@@ -409,7 +415,7 @@ void IndexedTensor::Impl::MakeContraction(AggregationOp agg_op, const IndexedTen
 
   // If the lhs has been optionally named, use it
   cion_expr->name = src->name;
-  auto param = std::dynamic_pointer_cast<ParamExpr>(src->expr);
+  auto param = std::dynamic_pointer_cast<ast::ParamExpr>(src->expr);
   if (param) {
     cion_expr->name = param->name;
   }
@@ -417,34 +423,34 @@ void IndexedTensor::Impl::MakeContraction(AggregationOp agg_op, const IndexedTen
 }
 
 IndexedTensor& IndexedTensor::operator+=(const IndexedTensor& rhs) {
-  impl_->MakeContraction(AggregationOp::SUM, rhs);
+  impl_->MakeContraction(ast::AggregationOp::SUM, rhs);
   return *this;
 }
 
 IndexedTensor& IndexedTensor::operator*=(const IndexedTensor& rhs) {
-  impl_->MakeContraction(AggregationOp::PROD, rhs);
+  impl_->MakeContraction(ast::AggregationOp::PROD, rhs);
   return *this;
 }
 
 IndexedTensor& IndexedTensor::operator>=(const IndexedTensor& rhs) {
-  impl_->MakeContraction(AggregationOp::MAX, rhs);
+  impl_->MakeContraction(ast::AggregationOp::MAX, rhs);
   return *this;
 }
 
 IndexedTensor& IndexedTensor::operator<=(const IndexedTensor& rhs) {
-  impl_->MakeContraction(AggregationOp::MIN, rhs);
+  impl_->MakeContraction(ast::AggregationOp::MIN, rhs);
   return *this;
 }
 
 IndexedTensor& IndexedTensor::operator=(const IndexedTensor& rhs) {
-  impl_->MakeContraction(AggregationOp::ASSIGN, rhs);
+  impl_->MakeContraction(ast::AggregationOp::ASSIGN, rhs);
   return *this;
 }
 
 IndexedTensor IndexedTensor::Impl::MakeCall(const std::string& fn, const IndexedTensor& rhs) {
   auto impl = std::make_unique<Impl>();
-  std::vector<std::shared_ptr<Expr>> args = {expr, rhs.impl_->expr};
-  impl->expr = std::make_shared<CallExpr>(fn, args);
+  std::vector<std::shared_ptr<ast::Expr>> args = {expr, rhs.impl_->expr};
+  impl->expr = std::make_shared<ast::CallExpr>(fn, args);
   return IndexedTensor{std::move(impl)};
 }
 
@@ -458,14 +464,14 @@ IndexedTensor cond(const IndexedTensor& lhs, const IndexedTensor& rhs, const Ind
 
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args) { return TensorFriend::Call(fn, args); }
 
-RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
-  std::vector<std::shared_ptr<Expr>> exprs;
+ast::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
+  std::vector<std::shared_ptr<ast::Expr>> exprs;
   for (const auto& var : vars) {
     exprs.push_back(TensorFriend::GetImpl(var)->expr);
   }
   return Evaluate(name, exprs);
 }
 
-}  // namespace lang
-}  // namespace tile
+}  // namespace edsl
+}  // namespace plaidml
 }  // namespace vertexai

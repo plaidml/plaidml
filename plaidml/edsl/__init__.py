@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-from plaidml._edsl import NativeObject, decode_str, ffi, ffi_call, lib
+from plaidml.edsl._ffi import NativeObject, decode_str, ffi, ffi_call, lib
 
 
 class TensorShape(NativeObject):

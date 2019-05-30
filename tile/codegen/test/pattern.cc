@@ -18,8 +18,9 @@ namespace codegen {
 namespace pattern {
 namespace test {
 
-using namespace lang;    // NOLINT
-using namespace stripe;  // NOLINT
+using namespace lang;           // NOLINT
+using namespace stripe;         // NOLINT
+using namespace plaidml::edsl;  // NOLINT
 
 void RoundTrip(const std::string& code) { EXPECT_THAT(to_string(Parse(code)), Eq(code)); }
 
