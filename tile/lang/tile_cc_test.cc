@@ -581,6 +581,21 @@ TEST(TileCC, ComplexConv2d) {
 )"));
 }
 
+TEST(TileCC, Reciprocal) {
+  Tensor A("A", tile::SimpleShape(tile::DataType::FLOAT32, {10}));
+  auto program = to_string(Evaluate("reciprocal", {1 / A}).program);
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0]
+) -> (
+  _X1
+) {
+  _X0 = 1;
+  _X1 = div(_X0, A);
+}
+)"));
+}
+
 }  // namespace
 }  // namespace lang
 }  // namespace tile
