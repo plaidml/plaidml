@@ -4,10 +4,8 @@
 
 #include <algorithm>
 #include <iterator>
+#include <sstream>
 
-#include <boost/optional.hpp>
-
-#include "base/util/logging.h"
 #include "plaidml/edsl/ffi.h"
 
 namespace vertexai {
@@ -31,7 +29,7 @@ struct Program::Impl {
 };
 
 struct TensorDim::Impl {
-  boost::optional<size_t> size;
+  std::unique_ptr<size_t> size;
 };
 
 struct TensorIndex::Impl {
@@ -323,7 +321,6 @@ TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(*, TILE_POLY_OP_MUL);
 TILE_CC_DEFINE_TENSOR_IDXDIM_BINARY_OPS(/, TILE_POLY_OP_DIV);
 
 Constraint TensorIndex::operator<(size_t rhs) const {
-  IVLOG(3, "Add size_t constraint: " << rhs);
   ffi_call_void(tile_poly_expr_add_constraint, impl_->ptr.get(), rhs);
   return Constraint();
 }
@@ -332,7 +329,6 @@ Constraint TensorIndex::operator<(const TensorDim& rhs) const {
   if (!rhs.impl_->size) {
     throw std::runtime_error("Undefined dimension.");
   }
-  IVLOG(3, "Add TensorDim constraint: " << *rhs.impl_->size);
   ffi_call_void(tile_poly_expr_add_constraint, impl_->ptr.get(), *rhs.impl_->size);
   return Constraint();
 }
@@ -341,7 +337,7 @@ std::string TensorIndex::str() const { return ffi_str(ffi_call<tile_string*>(til
 
 TensorDim::TensorDim() : impl_(std::make_shared<Impl>()) {}
 
-TensorDim::TensorDim(size_t value) : impl_(std::make_shared<Impl>()) { impl_->size = value; }
+TensorDim::TensorDim(size_t value) : impl_(std::make_shared<Impl>()) { impl_->size.reset(new size_t(value)); }
 
 Tensor::Tensor(const TensorShape& shape) : impl_(new Impl) {
   impl_->ptr = make_tile_expr(     //
@@ -405,13 +401,6 @@ std::string Tensor::str() const { return ffi_str(ffi_call<tile_string*>(tile_exp
 
 void Tensor::bind_dims(const std::vector<TensorDim>& dims) const {
   std::vector<size_t> sizes;
-  // auto expr = std::dynamic_pointer_cast<ast::ParamExpr>(impl_->expr);
-  // if (expr) {
-  //   // this handles user inputs
-  //   for (const auto& dim : expr->shape.dims) {
-  //     sizes.emplace_back(dim.size);
-  //   }
-  // } else
   if (impl_->dims.size()) {
     // this handles intermediate temporaries (results of previous outputs)
     for (const auto& dim : impl_->dims) {
@@ -438,7 +427,7 @@ void Tensor::bind_dims(const std::vector<TensorDim>& dims) const {
   for (size_t i = 0; i < dims.size(); i++) {
     auto& dim = dims[i];
     if (!dim.impl_->size) {
-      dim.impl_->size = sizes[i];
+      dim.impl_->size.reset(new size_t(sizes[i]));
     } else if (sizes[i] != *dim.impl_->size) {
       std::stringstream ss;
       ss << "bind_dims() mismatch on dim " << i << ". "
@@ -450,16 +439,6 @@ void Tensor::bind_dims(const std::vector<TensorDim>& dims) const {
 
 IndexedTensor Tensor::operator()(const std::vector<TensorIndex>& idxs) const {
   std::vector<size_t> sizes;
-  // if (impl_->expr) {
-  //   // this handles the case where we're constructing the rhs (e.g. a tensor input)
-  //   auto this_shape = shape();
-  //   if (idxs.size() != this_shape.dims.size()) {
-  //     throw std::runtime_error(
-  //         str(boost::format("Unexpected number of dimensions in contraction. Expected: %1%, Actual: %2%") %
-  //             this_shape.dims.size() % idxs.size()));
-  //   }
-  // } else {
-  // this handles the case where we're constructing the lhs (e.g. a tensor output)
   for (const auto& dim : impl_->dims) {
     if (!dim.impl_->size) {
       throw std::runtime_error("Undefined dimension.");

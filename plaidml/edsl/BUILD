@@ -7,21 +7,36 @@ load(
 )
 
 plaidml_cc_library(
-    name = "edsl",
-    srcs = [
-        "edsl.cc",
-        "ffi.cc",
-    ],
-    hdrs = [
-        "edsl.h",
-        "ffi.h",
-    ],
+    name = "ffi",
+    srcs = ["ffi.cc"],
+    hdrs = ["ffi.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
         "//tile/lang",
     ],
     alwayslink = 1,
+)
+
+plaidml_cc_library(
+    name = "public",
+    srcs = [
+        "edsl.cc",
+    ],
+    hdrs = [
+        "edsl.h",
+        "ffi.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+plaidml_cc_library(
+    name = "edsl",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ffi",
+        ":public",
+    ],
 )
 
 plaidml_py_library(
@@ -31,9 +46,7 @@ plaidml_py_library(
         "_ffi.py",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        "//plaidml:py",
-    ],
+    deps = ["//plaidml:py"],
 )
 
 plaidml_cc_test(
@@ -47,7 +60,5 @@ conda_test(
     srcs = ["edsl_test.py"],
     env = "@com_intel_plaidml_conda//:env",
     main = "edsl_test.py",
-    deps = [
-        ":py",
-    ],
+    deps = [":py"],
 )
