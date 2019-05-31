@@ -335,6 +335,8 @@ bin =
         ":configs",
         "//plaidml/base:base.h",
         "//plaidml/base:base_cpp.h",
+        "//plaidml/edsl:edsl.h",
+        "//plaidml/edsl:ffi.h",
         "@half//:include/half.hpp",
         "plaidml-config.cmake",
         "//tile/pmlc",
