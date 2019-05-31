@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "plaidml/edsl/ffi.h"
-#include "tile/base/shape.h"
 
 namespace vertexai {
 namespace plaidml {
