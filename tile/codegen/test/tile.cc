@@ -21,6 +21,8 @@ namespace test {
 
 namespace {
 
+using plaidml::edsl::TensorShape;
+
 template <typename T>
 T ParseProtoJson(const std::string& str) {
   T proto;
@@ -78,9 +80,9 @@ std::vector<float> kConv1dExpected = {
 
 TEST(Codegen, ApplyTile) {
   size_t dim = sqrt(kMatMulExpected.size());
-  auto runinfo = lib::LoadMatMul("matmul",                                    //
-                                 SimpleShape(DataType::FLOAT32, {dim, dim}),  //
-                                 SimpleShape(DataType::FLOAT32, {dim, dim}));
+  auto runinfo = lib::LoadMatMul("matmul",                                       //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto data = MakeMatMulTestData();
@@ -128,9 +130,9 @@ TEST(Stencil, MatchMatMul) {
   )");
 
   const auto DIM = 100;
-  auto runinfo = lib::LoadMatMul("matmul",                                    //
-                                 SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
-                                 SimpleShape(DataType::FLOAT32, {DIM, DIM}));
+  auto runinfo = lib::LoadMatMul("matmul",                                       //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -138,6 +140,7 @@ TEST(Stencil, MatchMatMul) {
   IVLOG(2, *kernel);
 
   auto match = FindBestStencil({spec}, kernel.get());
+  ASSERT_TRUE(match);
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1255968,  // total
@@ -162,9 +165,9 @@ TEST(Stencil, MatchConv1D) {
     }
   )");
 
-  auto runinfo = lib::LoadConv1d("conv",                                        //
-                                 SimpleShape(DataType::FLOAT32, {1, 100, 64}),  //
-                                 SimpleShape(DataType::FLOAT32, {3, 64, 64}),   //
+  auto runinfo = lib::LoadConv1d("conv",                                           //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {1, 100, 64}),  //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {3, 64, 64}),   //
                                  {1, 100, 64});
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
@@ -173,6 +176,7 @@ TEST(Stencil, MatchConv1D) {
   IVLOG(2, *kernel);
 
   auto match = FindBestStencil({spec}, kernel.get());
+  ASSERT_TRUE(match);
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1378944,  // total
@@ -216,10 +220,10 @@ TEST(Stencil, MatchConv2D) {
     specs.push_back(stencil);
   }
 
-  auto runinfo = lib::LoadConv2d("conv",                                             //
-                                 SimpleShape(DataType::FLOAT32, {1, 100, 100, 56}),  //
-                                 SimpleShape(DataType::FLOAT32, {3, 3, 56, 56}),     //
-                                 {1, 100, 100, 56});                                 //
+  auto runinfo = lib::LoadConv2d("conv",                                                //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {1, 100, 100, 56}),  //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {3, 3, 56, 56}),     //
+                                 {1, 100, 100, 56});                                    //
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -227,6 +231,7 @@ TEST(Stencil, MatchConv2D) {
   IVLOG(2, "\n" << *kernel);
 
   auto match = FindBestStencil(specs, kernel.get());
+  ASSERT_TRUE(match);
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       323280000,  // total
@@ -257,9 +262,9 @@ TEST(Stencil, Pass) {
   )");
 
   const auto DIM = 5;
-  auto runinfo = lib::LoadMatMul("matmul",                                    //
-                                 SimpleShape(DataType::FLOAT32, {DIM, DIM}),  //
-                                 SimpleShape(DataType::FLOAT32, {DIM, DIM}));
+  auto runinfo = lib::LoadMatMul("matmul",                                       //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
   CompilerState state(program);
   StencilPass(options).Apply(&state);
@@ -278,9 +283,9 @@ TEST(Codegen, TilePassBroadcast) {
   lang::RunInfo runinfo;
   runinfo.program_name = "broadcast";
   runinfo.code = "function (A, B) -> (C) { C = add(A, B); }";
-  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
-  runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {32}));
-  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
+  runinfo.input_shapes.emplace("A", tile::SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
+  runinfo.input_shapes.emplace("B", tile::SimpleShape(DataType::FLOAT32, {32}));
+  runinfo.output_shapes.emplace("C", tile::SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
 

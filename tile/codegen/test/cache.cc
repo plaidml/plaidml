@@ -19,6 +19,7 @@ namespace codegen {
 namespace test {
 
 using namespace stripe;  // NOLINT
+using plaidml::edsl::TensorShape;
 
 TEST(Codegen, Cache) {
   std::map<std::string, std::vector<float>> data = {
@@ -57,9 +58,9 @@ TEST(Codegen, Cache) {
   };
 
   size_t dim = sqrt(expected.size());
-  auto runinfo = lib::LoadMatMul("matmul",                                    //
-                                 SimpleShape(DataType::FLOAT32, {dim, dim}),  //
-                                 SimpleShape(DataType::FLOAT32, {dim, dim}));
+  auto runinfo = lib::LoadMatMul("matmul",                                       //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
+                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);

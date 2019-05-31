@@ -296,13 +296,13 @@ class ShapeEvaluator : AstVisitor {
 class PolyEvaluator : public PolyVisitor {
  private:
   Polynomial Visit(const PolyIndex& expr) {
-    auto it = seen_.find(expr.ptr);
+    auto it = seen_.find(expr.idx_id);
     if (it == seen_.end()) {
       auto name = expr.name;
       if (name.empty()) {
         name = NewIdx();
       }
-      std::tie(it, std::ignore) = seen_.emplace(expr.ptr, name);
+      std::tie(it, std::ignore) = seen_.emplace(expr.idx_id, name);
     }
     return Polynomial(it->second);
   }
@@ -350,7 +350,7 @@ class PolyEvaluator : public PolyVisitor {
   std::string NewIdx() { return str(boost::format("x%1%") % next_++); }
 
  private:
-  std::unordered_map<const void*, std::string> seen_;
+  std::unordered_map<size_t, std::string> seen_;
   std::vector<Polynomial> constraints_;
   size_t next_ = 0;
 };
@@ -874,7 +874,7 @@ std::string PolyIndex::str() const {
   if (name.size()) {
     return name;
   }
-  return boost::str(boost::format("PolyIndex: %1%") % ptr);
+  return boost::str(boost::format("PolyIndex: %1%") % idx_id);
 }
 
 std::string PolyLiteral::str() const { return std::to_string(value); }

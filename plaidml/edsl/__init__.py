@@ -7,11 +7,11 @@ class TensorShape(NativeObject):
     __ffi_del__ = lib.tile_shape_free
     __ffi_repr__ = lib.tile_shape_repr
 
-    def __init__(self, dtype=None, sizes=[], strides=None, ptr=None):
+    def __init__(self, dtype=None, sizes=[], strides=None, ptr=None, layout=''):
         if ptr:
             ffi_obj = ptr
         elif dtype is not None:
-            ffi_obj = ffi_call(lib.tile_shape_alloc, dtype)
+            ffi_obj = ffi_call(lib.tile_shape_alloc, dtype, layout.encode())
             if strides is None:
                 strides = []
             if len(strides) != len(sizes):
@@ -131,8 +131,7 @@ class TensorIndex(NativeObject):
 
     def __init__(self, expr=None, name=''):
         if expr is None:
-            self._handle = ffi.new_handle(self)
-            expr = ffi_call(lib.tile_poly_expr_index, self._handle, name.encode())
+            expr = ffi_call(lib.tile_poly_expr_index, name.encode())
         super(TensorIndex, self).__init__(expr)
 
     def __lt__(self, rhs):
@@ -208,7 +207,7 @@ class _Contraction(NativeObject):
     __ffi_del__ = lib.tile_expr_free
     __ffi_repr__ = lib.tile_expr_repr
 
-    def __init__(self, agg_op, combo_op, output, inputs):
+    def __init__(self, agg_op, combo_op, output, inputs, name):
         inputs = [x.as_ptr() for x in inputs]
         expr = ffi_call(
             lib.tile_expr_contraction,
@@ -217,6 +216,7 @@ class _Contraction(NativeObject):
             output.as_ptr(),
             len(inputs),
             inputs,
+            name.encode(),
         )
         super(_Contraction, self).__init__(expr)
 
@@ -273,7 +273,13 @@ class IndexedTensor(object):
             inputs = [x._impl for x in rhs._impl.args]
         else:
             raise ValueError('Invalid impl')
-        return _Contraction(agg_op, combo_op, self._impl, inputs)
+        return _Contraction(
+            agg_op,
+            combo_op,
+            self._impl,
+            inputs,
+            self._tensor._name,
+        )
 
 
 class Tensor(NativeObject):
@@ -313,6 +319,7 @@ class Tensor(NativeObject):
                     lib.TILE_COMBO_OP_NONE,
                     _TensorSpec(self, key, self._dims),
                     [value._impl],
+                    self._name,
                 ))
         else:
             raise ValueError('Invalid impl')
@@ -517,8 +524,8 @@ def as_uint(x, bit_size):
 # def element(x) : return call("element", {x}) # TODO: tuple
 
 
-def cond(cond, true_case, false_case):
-    return IndexedTensor(_ContractionPart(lib.TILE_COMBO_OP_COND, (cond, true_case, false_case)))
+def cond(lhs, rhs, true_case):
+    return IndexedTensor(_ContractionPart(lib.TILE_COMBO_OP_COND, (lhs, rhs, true_case)))
 
 
 def cos(x):

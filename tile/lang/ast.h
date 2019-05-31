@@ -136,11 +136,11 @@ struct PolyExpr {
 };
 
 struct PolyIndex : PolyExpr {
-  const void* ptr;
+  size_t idx_id;
   std::string name;
   mutable std::vector<std::shared_ptr<ConstraintExpr>> constraints;
 
-  explicit PolyIndex(const void* ptr, const std::string& name = "") : ptr(ptr), name(name) {}
+  explicit PolyIndex(size_t idx_id, const std::string& name = "") : idx_id(idx_id), name(name) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
   std::string str() const;
 };

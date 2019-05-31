@@ -3,7 +3,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "plaidml/edsl/tile.h"
+#include "plaidml/edsl/edsl.h"
 #include "testing/matchers.h"
 #include "tile/lang/gen_stripe.h"
 
@@ -17,6 +17,11 @@ using namespace plaidml::edsl;  // NOLINT
 
 namespace {
 
+lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
+  plaidml::edsl::Program program(name, vars);
+  return *static_cast<const tile::lang::RunInfo*>(program.runinfo());
+}
+
 Tensor ContractPlusElementwise(const Tensor& A, const Tensor& B) {
   TensorDim M, N, K;
   A.bind_dims(M, K);
@@ -28,7 +33,8 @@ Tensor ContractPlusElementwise(const Tensor& A, const Tensor& B) {
 }
 
 TEST(GenStripeTest, ContractPlusElementwise) {
-  auto shape = SimpleShape(DataType::FLOAT32, {10, 10});
+  using plaidml::edsl::TensorShape;
+  TensorShape shape(PLAIDML_DATA_FLOAT32, {10, 10});
   Tensor A(shape), B(shape);
   auto runinfo = Evaluate("ContractPlusElementwise", {ContractPlusElementwise(A, B)});
   auto program = GenerateStripe(runinfo);

@@ -13,6 +13,11 @@ using namespace plaidml::edsl;  // NOLINT
 
 namespace {
 
+lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
+  Program program(name, vars);
+  return *static_cast<const tile::lang::RunInfo*>(program.runinfo());
+}
+
 std::shared_ptr<lang::BufferBase> MakeBuffer(const TensorShape& shape) {
   auto buffer = std::make_shared<util::SimpleBuffer>();
   buffer->bytes.resize(shape.byte_size());
@@ -24,7 +29,7 @@ Tensor MatMul(const Tensor& A, const Tensor& B) {
   A.bind_dims(M, K);
   B.bind_dims(K, N);
   TensorIndex k("k"), m("m"), n("n");
-  Tensor C("C", M, N);
+  auto C = NamedTensorOutput("C", M, N);
   C(m, n) += A(m, k) * B(k, n);
   return C;
 }
@@ -33,7 +38,7 @@ Tensor DilatedConvolution2(const Tensor& I, const Tensor& K) {
   TensorDim N, Lx, Ly, LKx, LKy, CI, CO;
   I.bind_dims(N, Lx, Ly, CI);
   K.bind_dims(LKx, LKy, CI, CO);
-  Tensor O("O", N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO);
+  auto O = NamedTensorOutput("O", N, Lx - 2 * (LKx - 1), Ly - 3 * (LKy - 1), CO);
   TensorIndex n, x, y, kx, ky, ci, co;
   O(n, x, y, co) += I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co);
   return O;
@@ -56,7 +61,9 @@ Tensor Convolution(const Tensor& I,                     //
   TensorDim N, CI, CO;
   auto I_shape = I.shape();
   auto K_shape = K.shape();
-  auto rank = I_shape.dims.size() - 2;
+  IVLOG(1, "I.shape(): " << I_shape);
+  IVLOG(1, "K.shape(): " << K_shape);
+  auto rank = I_shape.rank() - 2;
   if (strides.empty()) {
     for (size_t i = 0; i < rank; i++) {
       strides.push_back(1);
@@ -96,7 +103,8 @@ Tensor Convolution(const Tensor& I,                     //
   for (size_t i = 0; i < rank; i++) {
     TensorIndex x(str(boost::format("x%1%") % i));
     TensorIndex k(str(boost::format("k%1%") % i));
-    auto K_dim = K_shape.dims[K_spatial_dims_offset + i].size;
+    IVLOG(1, "Adding " << i);
+    auto K_dim = K_shape.size_at(K_spatial_dims_offset + i);
     I_idxs.emplace_back(strides[i] * x + k - K_dim / 2);
     K_idxs.push_back(k);
     O_idxs.push_back(x);
@@ -292,10 +300,9 @@ lang::RunInfo LoadConv2d3Deep(const std::string& name,     //
   Tensor K1("K1", input);
   Tensor K2("K2", input);
   Tensor K3("K3", input);
-  auto I_dims = input.sizes();
-  auto O1 = Convolution(I, K1, {I_dims[0], I_dims[1], I_dims[2], kernel1.dims[3].size});
-  auto O2 = Convolution(O1, K2, {I_dims[0], I_dims[1], I_dims[2], kernel2.dims[3].size});
-  auto O3 = Convolution(O2, K3, {I_dims[0], I_dims[1], I_dims[2], kernel3.dims[3].size});
+  auto O1 = Convolution(I, K1, {input.size_at(0), input.size_at(1), input.size_at(2), kernel1.size_at(3)});
+  auto O2 = Convolution(O1, K2, {input.size_at(0), input.size_at(1), input.size_at(2), kernel2.size_at(3)});
+  auto O3 = Convolution(O2, K3, {input.size_at(0), input.size_at(1), input.size_at(2), kernel3.size_at(3)});
   auto runinfo = Evaluate(name, {O3});
   runinfo.const_inputs = {"K1", "K2", "K3"};
   runinfo.input_buffers = {
@@ -316,11 +323,9 @@ lang::RunInfo LoadDilatedConv2d(const std::string& name,   //
 
 Tensor Normalize(const Tensor& X) {
   auto XSqr = X * X;
-  Tensor X_MS;
-  {
-    std::vector<TensorIndex> idxs(X.shape().dims.size());
-    X_MS() += XSqr(idxs);
-  }
+  auto X_MS = TensorOutput();
+  std::vector<TensorIndex> idxs(X.shape().rank());
+  X_MS() += XSqr(idxs);
   return sqrt(X_MS);
 }
 
@@ -390,7 +395,7 @@ lang::RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
   Tensor I(input);
   Tensor G(input);
   Tensor B(input);
-  Tensor Epsilon(SimpleShape(DataType::FLOAT32, {}));
+  Tensor Epsilon(TensorShape(PLAIDML_DATA_FLOAT32, {}));
   return Evaluate(name, {Norm4dAx2(I, G, B, Epsilon)});
 }
 
@@ -422,10 +427,10 @@ lang::RunInfo LoadSoftmax(const std::string& name,     //
   TensorDim I, J;
   X1.bind_dims(I, J);
   TensorIndex i("i"), j("j");
-  Tensor M("M", I, 1);
+  auto M = NamedTensorOutput("M", I, 1);
   M(i, 0) >= X1(i, j);
   auto E = exp(X1 - M);
-  Tensor N("N", I, 1);
+  auto N = NamedTensorOutput("N", I, 1);
   N(i, 0) += E(i, j);
   return Evaluate(name, {E / N});
 }
