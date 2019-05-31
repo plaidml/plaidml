@@ -1,13 +1,16 @@
+// Copyright 2019 Intel Corporation.
+
 #pragma once
 
 #include <algorithm>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "plaidml/edsl/ffi.h"
 #include "tile/base/shape.h"
-#include "tile/lang/compose.h"
 
 namespace vertexai {
 namespace plaidml {
@@ -18,6 +21,63 @@ class Tensor;
 class TensorDim;
 class TensorFriend;
 class TensorIndex;
+
+namespace details {
+
+template <typename T>
+void into_vector(std::vector<T>*) {}
+
+template <typename T, typename Head, typename... Tail>
+void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
+  into->emplace_back(std::forward<Head>(head));
+  into_vector(into, std::forward<Tail>(tail)...);
+}
+
+}  // namespace details
+
+class TensorShape {
+  friend class Tensor;
+  friend class TensorFriend;
+  struct Impl;
+
+ public:
+  TensorShape(plaidml_datatype dtype,              //
+              const std::vector<uint64_t>& sizes,  //
+              const std::string& layout = "");
+
+  TensorShape(plaidml_datatype dtype,               //
+              const std::vector<uint64_t>& sizes,   //
+              const std::vector<int64_t>& strides,  //
+              const std::string& layout = "");
+
+  plaidml_datatype type() const;
+  size_t rank() const;
+  uint64_t size_at(size_t dim) const;
+  int64_t stride_at(size_t dim) const;
+  uint64_t byte_size() const;
+  std::string str() const;
+  const void* ptr() const;
+
+  bool operator==(const TensorShape& rhs) const;
+
+ private:
+  explicit TensorShape(const std::shared_ptr<Impl>& impl);
+
+ private:
+  std::shared_ptr<Impl> impl_;
+};
+
+class Program {
+  struct Impl;
+
+ public:
+  Program(const std::string& name, const std::vector<Tensor>& tensors);
+  std::string str() const;
+  const void* runinfo() const;
+
+ private:
+  std::shared_ptr<Impl> impl_;
+};
 
 class TensorIndexIterator {
  public:
@@ -83,8 +143,11 @@ class TensorIndex {
   Constraint operator<(size_t rhs) const;
   Constraint operator<(const TensorDim& rhs) const;
 
+  std::string str() const;
+
  private:
   std::shared_ptr<Impl> impl_;
+  std::shared_ptr<tile_poly_expr> ptr_;
   explicit TensorIndex(std::unique_ptr<Impl> impl);
 };
 
@@ -156,46 +219,25 @@ inline IndexedTensor assign(IndexedTensor lhs, const IndexedTensor& rhs) { retur
 // Represents a combo_op of COND in a contraction
 IndexedTensor cond(const IndexedTensor& cond_lhs, const IndexedTensor& cond_rhs, const IndexedTensor& true_case);
 
-template <typename T>
-void IntoVector(std::vector<T>*) {}
-
-template <typename T, typename Head, typename... Tail>
-void IntoVector(std::vector<T>* into, Head&& head, Tail&&... tail) {
-  into->emplace_back(std::forward<Head>(head));
-  IntoVector(into, std::forward<Tail>(tail)...);
-}
-
-template <typename... Ts>
-std::vector<TensorDim> MakeTensorDims(Ts... dims) {
-  std::vector<TensorDim> vec;
-  IntoVector(&vec, std::forward<Ts>(dims)...);
-  return vec;
-}
-
 class Tensor {
   friend class IndexedTensor;
   friend class TensorFriend;
   struct Impl;
 
  public:
-  Tensor();
   ~Tensor();
 
   explicit Tensor(int value);
   explicit Tensor(int64_t value);
   explicit Tensor(double value);
 
-  explicit Tensor(const tile::TensorShape& shape);
+  explicit Tensor(const TensorShape& shape);
   explicit Tensor(const std::vector<TensorDim>& dims);
   explicit Tensor(const std::initializer_list<TensorDim>& dims);
 
-  explicit Tensor(const std::string& name);
-  Tensor(const std::string& name, const tile::TensorShape& shape);
+  Tensor(const std::string& name, const TensorShape& shape);
   Tensor(const std::string& name, const std::vector<TensorDim>& dims);
   Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims);
-
-  template <typename... Ts>
-  Tensor(const std::string& name, Ts... dims) : Tensor(name, MakeTensorDims(dims...)) {}
 
   // Copyable
   Tensor(const Tensor& rhs);
@@ -210,7 +252,7 @@ class Tensor {
   template <typename... Ts>
   IndexedTensor operator()(Ts... idxs) const {
     std::vector<TensorIndex> vec;
-    IntoVector(&vec, std::forward<Ts>(idxs)...);
+    details::into_vector(&vec, std::forward<Ts>(idxs)...);
     return operator()(vec);
   }
 
@@ -220,6 +262,8 @@ class Tensor {
   // Represents an eltwise bit_not
   Tensor operator~() const;
 
+  std::string str() const;
+
   // Enable no_defract on a contraction
   Tensor& no_defract();
 
@@ -227,7 +271,7 @@ class Tensor {
   Tensor& use_default(const Tensor& rhs);
 
   // Return the tensor's shape
-  tile::TensorShape shape() const;
+  TensorShape shape() const;
 
   // Return the size of the tensor's shape at the specified dimension.
   size_t dims(const size_t dim) const;
@@ -238,7 +282,7 @@ class Tensor {
   template <typename... Ts>
   void bind_dims(Ts... dims) const {
     std::vector<TensorDim> vec;
-    IntoVector(&vec, std::forward<Ts>(dims)...);
+    details::into_vector(&vec, std::forward<Ts>(dims)...);
     bind_dims(vec);
   }
 
@@ -250,9 +294,16 @@ class Tensor {
 };
 
 template <typename... Ts>
+Tensor NamedTensorOutput(const std::string& name, Ts... dims) {
+  std::vector<TensorDim> vec;
+  details::into_vector(&vec, dims...);
+  return Tensor{name, vec};
+}
+
+template <typename... Ts>
 Tensor TensorOutput(Ts... dims) {
   std::vector<TensorDim> vec;
-  IntoVector(&vec, dims...);
+  details::into_vector(&vec, dims...);
   return Tensor{vec};
 }
 
@@ -315,7 +366,7 @@ Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
 template <typename... Ts>
 Tensor Call(const std::string& fn, Ts... args) {
   std::vector<Tensor> vec;
-  IntoVector(&vec, std::forward<Ts>(args)...);
+  details::into_vector(&vec, std::forward<Ts>(args)...);
   return Call(fn, vec);
 }
 
@@ -351,10 +402,10 @@ inline Tensor prng_step(const Tensor& x, const std::vector<size_t>& sizes) {
 
 inline Tensor prng_value(const Tensor& x) { return Call("prng_value", x); }
 
-inline Tensor reshape(const Tensor& x, const tile::TensorShape& shape) {
+inline Tensor reshape(const Tensor& x, const TensorShape& shape) {
   std::vector<Tensor> args = {x};
-  for (const auto& dim : shape.dims) {
-    args.emplace_back(static_cast<int64_t>(dim.size));
+  for (size_t i = 0; i < shape.rank(); i++) {
+    args.emplace_back(static_cast<int64_t>(shape.size_at(i)));
   }
   return Call("reshape", args);
 }
@@ -377,7 +428,10 @@ inline Tensor tan(const Tensor& x) { return Call("tan", x); }
 
 inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
 
-tile::lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars);
+inline std::ostream& operator<<(std::ostream& os, const TensorShape& shape) {
+  os << shape.str();
+  return os;
+}
 
 }  // namespace edsl
 }  // namespace plaidml

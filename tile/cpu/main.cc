@@ -24,9 +24,11 @@ int main(int argc, char* argv[]) {
   using namespace vertexai::tile;  // NOLINT
   std::cout << "Hey!" << std::endl;
 
+  using vertexai::plaidml::edsl::TensorShape;
+
   // Express
-  auto in1 = SimpleShape(DataType::FLOAT32, {1024, 1024});
-  auto in2 = SimpleShape(DataType::FLOAT32, {1024, 1024});
+  TensorShape in1(PLAIDML_DATA_FLOAT32, {1024, 1024});
+  TensorShape in2(PLAIDML_DATA_FLOAT32, {1024, 1024});
   auto runinfo = lib::LoadMatMul("test", in1, in2);
   auto program = lang::GenerateStripe(runinfo);
   std::cout << *program->entry << std::endl;

@@ -77,7 +77,7 @@ typedef struct {
 const char* tile_string_ptr(tile_string* str);
 void tile_string_free(const char* ptr);
 
-tile_shape* tile_shape_alloc(tile_error* err, plaidml_datatype datatype);
+tile_shape* tile_shape_alloc(tile_error* err, plaidml_datatype datatype, const char* layout);
 tile_string* tile_shape_repr(tile_error* err, tile_shape* shape);
 void tile_shape_free(tile_error* err, tile_shape* shape);
 void tile_shape_add_dimension(tile_error* err, tile_shape* shape, uint64_t size, int64_t stride);
@@ -98,7 +98,8 @@ tile_expr* tile_expr_contraction(
     tile_combo_op combo_op,
     tile_expr* output,
     size_t ninputs,
-    tile_expr** inputs
+    tile_expr** inputs,
+    const char* name
 );
 tile_expr* tile_expr_tensor_spec(
     tile_error* err,
@@ -114,7 +115,7 @@ tile_shape* tile_expr_evaluate_shape(tile_error* err, tile_expr* expr);
 
 void tile_poly_expr_free(tile_error* err, tile_poly_expr* expr);
 tile_string* tile_poly_expr_repr(tile_error* err, tile_poly_expr* expr);
-tile_poly_expr* tile_poly_expr_index(tile_error* err, const void* ptr, const char* name);
+tile_poly_expr* tile_poly_expr_index(tile_error* err, const char* name);
 tile_poly_expr* tile_poly_expr_literal(tile_error* err, int64_t value);
 tile_poly_expr* tile_poly_expr_op(
     tile_error* err,

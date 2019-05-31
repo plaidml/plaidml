@@ -9,11 +9,12 @@ load(
 plaidml_cc_library(
     name = "edsl",
     srcs = [
+        "edsl.cc",
         "ffi.cc",
-        "tile.cc",
     ],
     hdrs = [
-        "tile.h",
+        "edsl.h",
+        "ffi.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -37,15 +38,15 @@ plaidml_py_library(
 
 plaidml_cc_test(
     name = "cc_test",
-    srcs = ["tile_test.cc"],
+    srcs = ["edsl_test.cc"],
     deps = [":edsl"],
 )
 
 conda_test(
     name = "py_test",
-    srcs = ["test.py"],
+    srcs = ["edsl_test.py"],
     env = "@com_intel_plaidml_conda//:env",
-    main = "test.py",
+    main = "edsl_test.py",
     deps = [
         ":py",
     ],

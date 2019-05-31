@@ -1,6 +1,10 @@
 // Copyright 2019 Intel Corporation.
 
+#include "plaidml/edsl/ffi.h"
+
 #include <sstream>
+
+#include <boost/format.hpp>
 
 #include "base/util/logging.h"
 #include "tile/lang/ast.h"
@@ -10,56 +14,8 @@ using namespace vertexai::tile::lang;  // NOLINT
 
 extern "C" {
 
-typedef enum {
-  PLAIDML_DATA_INVALID = 0,
-  PLAIDML_DATA_BOOLEAN = 0x02,
-  PLAIDML_DATA_INT8 = 0x10,
-  PLAIDML_DATA_INT16 = 0x11,
-  PLAIDML_DATA_INT32 = 0x12,
-  PLAIDML_DATA_INT64 = 0x13,
-  PLAIDML_DATA_INT128 = 0x14,
-  PLAIDML_DATA_UINT8 = 0x20,
-  PLAIDML_DATA_UINT16 = 0x21,
-  PLAIDML_DATA_UINT32 = 0x22,
-  PLAIDML_DATA_UINT64 = 0x23,
-  PLAIDML_DATA_FLOAT16 = 0x31,
-  PLAIDML_DATA_FLOAT32 = 0x32,
-  PLAIDML_DATA_FLOAT64 = 0x33,
-  PLAIDML_DATA_PRNG = 0x40,
-} plaidml_datatype;
-
-typedef enum {
-  TILE_POLY_OP_NEG,
-  TILE_POLY_OP_ADD,
-  TILE_POLY_OP_SUB,
-  TILE_POLY_OP_MUL,
-  TILE_POLY_OP_DIV,
-} tile_poly_op;
-
-typedef enum {
-  TILE_AGG_OP_NONE,
-  TILE_AGG_OP_SUM,
-  TILE_AGG_OP_MAX,
-  TILE_AGG_OP_MIN,
-  TILE_AGG_OP_PROD,
-  TILE_AGG_OP_ASSIGN
-} tile_agg_op;
-
-typedef enum {
-  TILE_COMBO_OP_NONE,
-  TILE_COMBO_OP_MUL,
-  TILE_COMBO_OP_ADD,
-  TILE_COMBO_OP_EQ,
-  TILE_COMBO_OP_COND,
-} tile_combo_op;
-
 struct tile_string {
   std::string str;
-};
-
-struct tile_error {
-  size_t code;
-  tile_string* msg;
 };
 
 struct tile_shape {
@@ -81,6 +37,8 @@ struct tile_program {
 }  // extern "C"
 
 namespace {
+
+static std::atomic<size_t> next_idx_id{0};
 
 template <typename T, typename F>
 T ffi_wrap(tile_error* err, T val, F fn) {
@@ -161,10 +119,10 @@ void tile_string_free(tile_string* str) {
   });
 }
 
-tile_shape* tile_shape_alloc(tile_error* err, plaidml_datatype dtype) {
+tile_shape* tile_shape_alloc(tile_error* err, plaidml_datatype dtype, const char* layout) {
   return ffi_wrap<tile_shape*>(err, nullptr, [&] {
     std::vector<TensorDimension> dims;
-    return new tile_shape{TensorShape{static_cast<DataType>(dtype), dims}};
+    return new tile_shape{TensorShape(static_cast<DataType>(dtype), dims, layout)};
   });
 }
 
@@ -203,6 +161,18 @@ uint64_t tile_shape_get_dimension_size(tile_error* err, tile_shape* shape, size_
 int64_t tile_shape_get_dimension_stride(tile_error* err, tile_shape* shape, size_t dim) {
   return ffi_wrap<int64_t>(err, 0, [&] {  //
     return shape->shape.dims.at(dim).stride;
+  });
+}
+
+uint64_t tile_shape_get_byte_size(tile_error* err, tile_shape* shape) {
+  return ffi_wrap<uint64_t>(err, 0, [&] {  //
+    return shape->shape.byte_size();
+  });
+}
+
+const void* tile_shape_get_ptr(tile_error* err, tile_shape* shape) {
+  return ffi_wrap<const void*>(err, 0, [&] {  //
+    return &shape->shape;
   });
 }
 
@@ -248,6 +218,9 @@ tile_expr* tile_expr_call(tile_error* err, const char* fn, size_t nargs, tile_ex
   return ffi_wrap<tile_expr*>(err, nullptr, [&] {
     std::vector<std::shared_ptr<Expr>> exprs(nargs);
     for (size_t i = 0; i < nargs; i++) {
+      if (!args[i]) {
+        throw std::runtime_error(str(boost::format("Undefined tensor in call to %1%()") % fn));
+      }
       exprs[i] = args[i]->expr;
     }
     return new tile_expr{std::make_shared<CallExpr>(fn, exprs)};
@@ -277,13 +250,15 @@ tile_expr* tile_expr_contraction(tile_error* err,         //
                                  tile_combo_op combo_op,  //
                                  tile_expr* raw_output,   //
                                  size_t ninputs,          //
-                                 tile_expr** raw_inputs) {
+                                 tile_expr** raw_inputs,  //
+                                 const char* name) {
   return ffi_wrap<tile_expr*>(err, nullptr, [&] {
     auto output = std::dynamic_pointer_cast<TensorSpecExpr>(raw_output->expr);
     if (!output) {
       throw std::runtime_error("oops: out_spec");
     }
     auto expr = std::make_shared<ContractionExpr>();
+    expr->name = name;
     expr->agg_op = into_agg_op(agg_op);
     expr->combo_op = into_combo_op(combo_op);
     expr->output = output;
@@ -345,9 +320,9 @@ tile_string* tile_poly_expr_repr(tile_error* err, tile_poly_expr* expr) {
   });
 }
 
-tile_poly_expr* tile_poly_expr_index(tile_error* err, const void* ptr, const char* name) {
+tile_poly_expr* tile_poly_expr_index(tile_error* err, const char* name) {
   return ffi_wrap<tile_poly_expr*>(err, nullptr, [&] {  //
-    return new tile_poly_expr{std::make_shared<PolyIndex>(ptr, std::string{name})};
+    return new tile_poly_expr{std::make_shared<PolyIndex>(next_idx_id++, std::string{name})};
   });
 }
 
@@ -394,6 +369,12 @@ tile_program* tile_program_evaluate(tile_error* err, const char* name, size_t ne
 tile_string* tile_program_repr(tile_error* err, tile_program* program) {
   return ffi_wrap<tile_string*>(err, nullptr, [&] {  //
     return new tile_string{to_string(program->runinfo.program)};
+  });
+}
+
+const void* tile_program_runinfo(tile_error* err, tile_program* program) {
+  return ffi_wrap<const void*>(err, nullptr, [&] {  //
+    return &program->runinfo;
   });
 }
 
