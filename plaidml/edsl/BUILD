@@ -6,6 +6,11 @@ load(
     "plaidml_py_library",
 )
 
+exports_files([
+    "edsl.h",
+    "ffi.h",
+])
+
 plaidml_cc_library(
     name = "ffi",
     srcs = ["ffi.cc"],
@@ -20,9 +25,6 @@ plaidml_cc_library(
 
 plaidml_cc_library(
     name = "public",
-    srcs = [
-        "edsl.cc",
-    ],
     hdrs = [
         "edsl.h",
         "ffi.h",
