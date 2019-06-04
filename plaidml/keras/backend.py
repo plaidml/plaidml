@@ -250,9 +250,11 @@ class BatchDot(ptile.Operation):
         else:
             for i in range(len(n_only)):
                 bcast_pairs[n_only[i]] = m_only[i]
+        # for the case where x.shape.dims[N] == None, the PlaidML backend will always evaluate the comparison x.shape.dims[N] > 1 to True. This behavior is necessary for the correctness of xidx_list.
         xidx_list = [
             xdim_list[N].lower() if x.shape.dims[N] > 1 else '0' for N in range(len(xdim_list))
         ]
+        # for the case where y.shape.dims[N] == None, the PlaidML backend will always evaluate the comparison y.shape.dims[N] > 1 to True. This behavior is necessary for the correctness of yidx_list.
         yidx_list = [
             ydim_list[N].lower() if y.shape.dims[N] > 1 else '0' for N in range(len(ydim_list))
         ]
