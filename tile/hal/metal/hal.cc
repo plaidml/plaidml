@@ -383,7 +383,7 @@ ComputeKernel::ComputeKernel(Device* device, const lang::KernelInfo& ki, context
   if (ki_.lwork[0] == 0) {
     size_t tot_threads = 1;
     size_t goal_threads = 256;
-    std::vector<std::vector<size_t>> factors;
+    std::vector<std::vector<uint64_t>> factors;
     for (size_t i = 0; i < 3; i++) {
       ki_.lwork[i] = 1;
       factors.push_back(math::Factor(ki_.gwork[i]));

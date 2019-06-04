@@ -615,3 +615,9 @@ message ConstantPropagatePass {
 message ConstTensorPass {
   repeated string reqs = 1;
 }
+
+// Reorder the strides of allocations and constants to maximize divisibility of
+// low stride elements
+message FixStridesPass {
+  repeated string reqs = 1;
+}

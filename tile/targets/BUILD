@@ -7,8 +7,7 @@ gencfg(
     name = "configs",
     srcs = [
         "//tile/targets/gpu:amd.json",
-        "//tile/targets/gpu:intel_gen9_metal.json",
-        "//tile/targets/gpu:intel_gen9_opencl.json",
+        "//tile/targets/gpu:intel_gen9.json",
     ] + select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": [

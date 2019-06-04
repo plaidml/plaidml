@@ -11,13 +11,8 @@ jsonnet_to_json(
 )
 
 jsonnet_to_json(
-    name = "intel_gen9_metal",
-    src = "intel_gen9_metal.jsonnet",
-    outs = ["intel_gen9_metal.json"],
+    name = "intel_gen9",
+    src = "intel_gen9.jsonnet",
+    outs = ["intel_gen9.json"],
 )
 
-jsonnet_to_json(
-    name = "intel_gen9_opencl",
-    src = "intel_gen9_opencl.jsonnet",
-    outs = ["intel_gen9_opencl.json"],
-)
