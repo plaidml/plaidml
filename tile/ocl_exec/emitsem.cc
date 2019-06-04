@@ -62,8 +62,8 @@ sem::ExprPtr SemtreeEmitter::default_intrinsic_emitter(const stripe::Intrinsic& 
     opexpr = std::make_shared<sem::UnaryExpr>("~", in_val(0, false));
   } else {
     std::vector<sem::ExprPtr> inputs;
-    for (const auto& str : in.inputs) {
-      inputs.push_back(_(scalar_name(str)));
+    for (size_t i = 0; i < in.inputs.size(); ++i) {
+      inputs.push_back(in_val(i));
     }
     opexpr = std::make_shared<sem::CallExpr>(_(in.name), inputs);
   }

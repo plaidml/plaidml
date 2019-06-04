@@ -244,6 +244,8 @@ message FusionPass {
   optional bool perfect = 6 [default = false];
   // Only fuse if output sizes match
   optional bool output_match = 7 [default = false];
+  // Whether allowing inner block for the fused block
+  optional bool no_inner = 8 [default = false];
 }
 
 // A localize pass detects allocations (refinements with dir = None)

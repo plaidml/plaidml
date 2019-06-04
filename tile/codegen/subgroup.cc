@@ -53,6 +53,35 @@ class SubgroupCostModel {
     return num;
   }
 
+  int SetRefIdxStrideOne(Refinement* ref) {
+    int subgroup = 0;
+    for (size_t i = 0; i < ref->access.size(); i++) {
+      if (ref->interior_shape.dims[i].stride != 1) {
+        continue;
+      }
+      for (const auto& kvp : ref->access[i].getMap()) {
+        if (kvp.first != "" && kvp.second == 1 &&
+            plan_.subgroup_tile.at(kvp.first) == static_cast<size_t>(plan_.subgroup_size)) {
+          subgroup++;
+          plan_.ref_idx[ref->into()] = kvp.first;
+        }
+      }
+    }
+    return subgroup;
+  }
+
+  int SetRefIdxThreadIdx(Refinement *ref) {
+    int subgroup = 0;
+    for (size_t i = 0; i < ref->access.size(); i++) {
+      auto acc_map = ref->access[i].getMap();
+      if (acc_map.size() == 1 && acc_map.begin()->first == plan_.thread_idx && acc_map.begin()->second == 1) {
+        subgroup++;
+        plan_.ref_idx[ref->into()] = acc_map.begin()->first;
+      }
+    }
+    return subgroup;
+  }
+
   void ComputeCost() {
     // Compute total tile size for each index
     std::map<std::string, size_t> tot_tile;
@@ -65,36 +94,51 @@ class SubgroupCostModel {
     double tot_mem_io = 0;
     plan_.ref_idx.clear();
     plan_.thread_idx = "";
-    for (const auto& ref : block_->refs) {
-      TensorShape tile_shape = ref.ApplyTile(tot_tile);
+    // Process outputs first to determine the thread_idx first
+    std::vector<Refinement*> ref_list;
+    for (const auto ref : block_->ref_outs()) {
+       ref_list.push_back(ref);
+    }
+    for (const auto ref : block_->ref_ins()) {
+       ref_list.push_back(ref);
+    }
+    for (const auto& ref : ref_list) {
+      TensorShape tile_shape = ref->ApplyTile(tot_tile);
       // Get overall memory cost
       int subgroup = 0;
       size_t mem = tile_shape.sizes_product_bytes();
       double cache_miss = tile_shape.memory_io(options_.cache_width());
-      size_t accesses = num_accesses(tot_tile, ref);
+      size_t accesses = num_accesses(tot_tile, *ref);
       double cache_hit = accesses - cache_miss;
       double mem_io = cache_miss * options_.mem_latency() + cache_hit * options_.cache_latency();
       // Figure out if we have a single unique stride 1 subgroup block
-      for (size_t i = 0; i < ref.access.size(); i++) {
-        if (ref.interior_shape.dims[i].stride != 1) {
-          continue;
+      if (IsWriteDir(ref->dir)) {
+        subgroup = SetRefIdxStrideOne(ref);
+        // To determine out ref's idx as well as thread_idx
+        if (subgroup == 1) {
+          plan_.thread_idx = plan_.ref_idx[ref->into()];
         }
-        for (const auto& kvp : ref.access[i].getMap()) {
-          if (kvp.first != "" && kvp.second == 1 &&
-              plan_.subgroup_tile.at(kvp.first) == static_cast<size_t>(plan_.subgroup_size)) {
-            subgroup++;
-            plan_.ref_idx[ref.into()] = kvp.first;
-          }
+        else {
+          return;
         }
+      }
+      else {
+        // For in refs
+        if (plan_.thread_idx == "") {
+          return;
+        }
+        auto flat_access = ref->FlatAccess().getMap();
+        subgroup = (flat_access.find(plan_.thread_idx) == flat_access.end()) ?
+                   SetRefIdxStrideOne(ref) : SetRefIdxThreadIdx(ref);
       }
       if (subgroup > 1) {
         subgroup = 0;
-        plan_.ref_idx.erase(ref.into());
+        plan_.ref_idx.erase(ref->into());
       }
       // If it works, set thread_idx, otherwise increase memory
       if (subgroup == 1) {
-        if (ref.dir == stripe::RefDir::Out) {
-          plan_.thread_idx = plan_.ref_idx[ref.into()];
+        if (ref->dir == stripe::RefDir::Out) {
+          plan_.thread_idx = plan_.ref_idx[ref->into()];
         }
         accesses /= plan_.subgroup_size;
         mem /= plan_.subgroup_size;
@@ -279,61 +323,6 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
       replace[idx] = stripe::Affine(idx + "_e");
     }
   }
-  // Compute all the refinements for the various blocks
-  std::set<stripe::Refinement> reg_allocs;                  // Allocations of register caches
-  std::set<stripe::Refinement> reg_passthrus;               // Passthru's for register caches
-  std::set<stripe::Refinement> reg_inners;                  // Passthru's for register caches
-  std::map<std::string, stripe::Refinement> orig_by_name;   // Passthru's for register caches
-  std::map<std::string, stripe::Refinement> inner_by_name;  // Passthru's for register caches
-  for (const auto& oref : block->refs) {
-    // Modify original reference to remove constants
-    stripe::Refinement ref = oref;
-    for (auto& aff : ref.access) {
-      aff.setConstant(0);
-    }
-    // Start with the normal interior tiling
-    auto ref_tile = inner_tile;
-    auto ridx = plan.ref_idx[ref.into()];
-    // If subgrouped, just use outer tiling
-    if (ridx.size()) {
-      ref_tile[ridx] = plan.extra_tile[ridx];
-    }
-    std::vector<size_t> sizes = ref.ApplyTile(ref_tile).sizes();
-    auto reg_shape = SimpleShape(ref.interior_shape.type, sizes);
-    // If subgrouped, add a banked dimension
-    if (ridx.size()) {
-      reg_shape.dims.emplace_back(0, plan.subgroup_tile[ridx]);
-    }
-    // Build the actual allocation
-    std::vector<stripe::Affine> reg_access(reg_shape.dims.size());
-    stripe::Refinement reg_ref =
-        stripe::Refinement(stripe::RefDir::None, "", ref.into() + "_reg", reg_access, reg_shape, ref.agg_op);
-    if (ridx.size()) {
-      reg_ref.bank_dim = stripe::BankDimension{sizes.size()};
-    }
-    reg_allocs.emplace(reg_ref);
-    // Now modify to make the passthru
-    reg_ref.from = reg_ref.into();
-    reg_ref.dir = stripe::RefDir::InOut;
-    reg_passthrus.emplace(reg_ref);
-    // Now, make the innermost register refinements
-    auto ref_repl = replace;
-    if (ridx.size()) {
-      ref_repl[ridx] = stripe::Affine(ridx + "_e");
-    }
-    reg_ref.access.clear();
-    for (auto poly : ref.access) {
-      reg_ref.access.push_back(poly.sym_eval(ref_repl));
-    }
-    if (ridx.size()) {
-      reg_ref.access.push_back(stripe::Affine(ridx + "_i"));
-    }
-    orig_by_name[ref.into()] = ref;
-    inner_by_name[ref.into()] = reg_ref;
-    reg_ref = reg_ref.WithInto(ref.into());
-    reg_ref.dir = ref.dir;
-    reg_inners.emplace(reg_ref);
-  }
 
   // Now, prepare to tile the block
   TileShape threaded_ts, accum_ts, inner_ts;
@@ -363,13 +352,74 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   stripe::Block* inner = accum->SubBlock(0).get();
 
   // Change up the inner indexes
+  auto ref_list = inner->refs;
   inner->idxs = inner_idxs;
+  inner->refs.clear();
+  // Compute all the refinements for the various blocks
+  std::set<stripe::Refinement> reg_allocs;                  // Allocations of register caches
+  std::set<stripe::Refinement> reg_passthrus;               // Passthru's for register caches
+  std::set<stripe::Refinement> reg_inners;                  // Passthru's for register caches
+  std::map<std::string, stripe::Refinement> orig_by_name;   // Passthru's for register caches
+  std::map<std::string, stripe::Refinement> inner_by_name;  // Passthru's for register caches
+  for (const auto& oref : ref_list) {
+    // The new refinement is mostly like inner ref
+    stripe::Refinement ref = oref;
+    //ref.interior_shape = accum->ref_by_into(oref.from)->interior_shape;
+    auto ridx = plan.ref_idx[ref.into()];
+    // This temp ref is for only shape calculation
+    stripe::Refinement reg_ref = 
+      stripe::Refinement(ref.dir, ref.into() + "_reg", ref.into(), ref.access, ref.interior_shape, ref.agg_op);
+    // Now, make the innermost register refinements
+    auto ref_repl = replace;
+    if (ridx.size()) {
+      ref_repl[ridx] = stripe::Affine(ridx + "_e");
+    }
+    reg_ref.access.clear();
+    for (auto& poly : ref.access) {
+      auto reg_poly = poly;
+      if (ridx.size()) {
+        for (auto& kvp : reg_poly.mutateMap()) {
+          if (kvp.first == ridx && kvp.second >= static_cast<int>(plan.subgroup_size)) {
+            kvp.second /= plan.subgroup_size;
+          }
+        }
+      }
+      reg_ref.access.push_back(reg_poly.sym_eval(ref_repl));
+    }
+    inner->refs.insert(reg_ref);
+    auto& reg_ref_mut = inner->ref_by_into(ref.into())->mut();
+    auto sizes = inner->exterior_shape(ref.into()).sizes();
+    auto reg_shape = SimpleShape(ref.interior_shape.type, sizes);
+    reg_ref_mut.interior_shape = reg_shape;
+    if (ridx.size()) {
+      reg_ref_mut.access.push_back(stripe::Affine(ridx + "_i"));
+      reg_ref_mut.interior_shape.dims.emplace_back(0, plan.subgroup_tile[ridx]);
+      reg_ref_mut.bank_dim = stripe::BankDimension{ref.access.size()};
+    }
+
+    // refs for the xfer blocks
+    reg_ref = reg_ref_mut;
+    orig_by_name[ref.into()] = ref;
+    reg_inners.insert(reg_ref);
+    reg_ref = reg_ref.WithInto(ref.into() + "_reg");
+    inner_by_name[ref.into()] = reg_ref;
+
+    // Passthru and allocation 
+    for (auto& acc : reg_ref.access) {
+      acc.mutateMap().clear();
+    }
+    reg_ref.dir = RefDir::InOut;
+    reg_passthrus.emplace(reg_ref);
+    reg_ref.dir = RefDir::None;
+    reg_ref.from = "";
+    reg_allocs.emplace(reg_ref);
+  }
 
   // Add in the register refinements
   outer->refs.insert(reg_allocs.begin(), reg_allocs.end());
   thread->refs.insert(reg_passthrus.begin(), reg_passthrus.end());
   accum->refs.insert(reg_passthrus.begin(), reg_passthrus.end());
-  inner->refs = reg_inners;
+  //inner->refs = reg_inners;
 
   // Pass the thread_id through
   accum->idxs.emplace_back("thread_idx", 1, stripe::Affine(plan.thread_idx));
@@ -380,9 +430,8 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   for (auto& ref : thread->refs) {
     if (plan.ref_idx[ref.into()] != "" && plan.ref_idx[ref.into()] != plan.thread_idx) {
       for (size_t i = 0; i < ref.access.size(); i++) {
-        if (ref.access[i] == stripe::Affine(plan.ref_idx[ref.into()])) {
+        if (ref.interior_shape.dims[i].stride == 1) {
           ref.mut().access[i] = stripe::Affine(plan.thread_idx);
-          break;
         }
       }
     }
@@ -404,7 +453,8 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
     std::string ref_idx = plan.ref_idx[ri];
     auto repl = replace;
     if (ref_idx.size()) {
-      repl[ref_idx] = stripe::Affine(ref_idx + "_e", plan.subgroup_tile[ref_idx]);
+      repl[ref_idx] = (ref_idx == plan.thread_idx) ? stripe::Affine(ref_idx + "_e") : 
+                      stripe::Affine(ref_idx + "_e", plan.subgroup_size);
     }
     for (auto& poly : orig.access) {
       poly = poly.sym_eval(repl);
