@@ -22,6 +22,7 @@ plaidml_cc_library(
         "bignum.cc",
         "matrix.cc",
         "polynomial.cc",
+        "util.cc",
     ],
     hdrs = [
         "basis.h",

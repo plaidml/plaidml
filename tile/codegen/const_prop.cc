@@ -86,7 +86,7 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
       // Set the direction to input + and const to the regular block
       main->ref_by_into(name)->mut().dir = stripe::RefDir::In;
       prog->ref_by_into(name)->mut().interior_shape.is_const = true;
-      main->ref_by_into(name)->mut().interior_shape.is_const = true;
+      FixupRefs(prog, name);
       // Make a new buffer in the constant buffers
       size_t buf_size = cprog->ref_by_into(name)->interior_shape.byte_size();
       state->const_bufs->buffers.emplace(name, state->const_bufs->allocator->allocate(buf_size));

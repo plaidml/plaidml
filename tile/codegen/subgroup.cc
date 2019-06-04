@@ -8,7 +8,7 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-using namespace stripe; // NOLINT
+using namespace stripe;  // NOLINT
 
 struct SubgroupPlan {
   size_t subgroup_size;
@@ -44,8 +44,7 @@ class SubgroupCostModel {
       size_t prod = 1;
       if (out_flat[idx.name] == 0) {
         prod = idx.range;
-      }
-      else {
+      } else {
         prod = (idx.name == plan_.thread_idx ? 1 : plan_.subgroup_tile[idx.name]);
         prod *= plan_.extra_tile[idx.name];
       }
@@ -143,7 +142,9 @@ class SubgroupCostModel {
     }
 
     size_t num_wis = num_work_items(tot_tile);
-    bool is_mem_bounded = (tot_mem * num_wis > options_.cache_size()) || (static_cast<double>(tot_ops) / static_cast<double>(tot_mem) <= options_.mem_bounded_threshold());
+    bool is_mem_bounded =
+        (tot_mem * num_wis > options_.cache_size()) ||
+        (static_cast<double>(tot_ops) / static_cast<double>(tot_mem) <= options_.mem_bounded_threshold());
     // Cost = mem / compute
     IVLOG(2, "subgroup: " << plan_.subgroup_tile << ", extra: " << plan_.extra_tile << ", mem: " << tot_mem
                           << ", mem_io: " << tot_mem_io << ", cost: " << tot_mem_io / static_cast<double>(tot_ops));
@@ -225,8 +226,18 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
     return;
   }
   if (block->ref_outs().size() != 1) {
-    IVLOG(1, "Giving up due to outputs == 1");
+    IVLOG(1, "Giving up due to outputs != 1");
     return;
+  }
+  for (const auto& ref : block->refs) {
+    for (const auto& aff : ref.access) {
+      for (const auto& kvp : aff.getMap()) {
+        if (kvp.first != "" && kvp.second < 0) {
+          IVLOG(1, "Giving up due to negative strides");
+          return;
+        }
+      }
+    }
   }
   // Setup an empty plan
   SubgroupPlan plan;
@@ -368,7 +379,12 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   // Adjust offset of other subgroup refinement
   for (auto& ref : thread->refs) {
     if (plan.ref_idx[ref.into()] != "" && plan.ref_idx[ref.into()] != plan.thread_idx) {
-      ref.mut().access[ref.access.size() - 1] = stripe::Affine(plan.thread_idx);
+      for (size_t i = 0; i < ref.access.size(); i++) {
+        if (ref.access[i] == stripe::Affine(plan.ref_idx[ref.into()])) {
+          ref.mut().access[i] = stripe::Affine(plan.thread_idx);
+          break;
+        }
+      }
     }
   }
 

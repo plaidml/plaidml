@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 #include <cstdint>
 #include <vector>
 
@@ -29,21 +31,24 @@ inline constexpr size_t Align(size_t count, size_t alignment) {
 
 inline int64_t Sign(int64_t a) { return (a == 0 ? 0 : (a < 0 ? -1 : 1)); }
 
-inline std::vector<size_t> Factor(size_t in) {
-  size_t p = 2;
-  size_t cur = in;
-  std::vector<size_t> out;
-  while (p * p <= cur) {
-    if (cur % p == 0) {
-      out.push_back(p);
-      cur /= p;
-    } else {
-      p = (p == 2) ? 3 : p + 2;
-    }
-  }
-  out.push_back(cur);
-  return out;
-}
+struct Seive {
+  // First factor for each number.  We leave 0 + 1 in the list to make things easier to read
+  std::vector<uint64_t> first_factor;
+  std::vector<uint64_t> primes;
+  explicit Seive(uint64_t size);
+};
+
+// Reeturn the first prime factor of a number
+uint64_t FirstFactor(uint64_t in);
+
+// Return the full factorization of a number
+std::vector<uint64_t> Factor(uint64_t in);
+
+// Return the number of factors a number has
+uint64_t NumFactors(uint64_t in);
+
+// Check if a number is prime
+bool IsPrime(uint64_t in);
 
 }  // namespace math
 }  // namespace tile

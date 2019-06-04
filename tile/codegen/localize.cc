@@ -27,6 +27,7 @@ void FixupRefs(Block* block, const std::string& var_name) {
         if (ref.from == var_name) {
           ref.mut().location = it->location;
           ref.mut().offset = it->offset;
+          ref.mut().interior_shape.is_const = it->interior_shape.is_const;
           for (size_t i = 0; i < ref.interior_shape.dims.size(); i++) {
             ref.mut().interior_shape.dims[i].stride = it->interior_shape.dims[i].stride;
           }

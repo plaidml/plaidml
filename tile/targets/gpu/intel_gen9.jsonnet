@@ -1,4 +1,14 @@
 local PARAMS = {
+  intel_gen9_opencl: {
+    CACHE_WIDTH: 64,
+    MAX_MEM: [280, 280],
+    SUBGROUP_SIZES: [8, 16],
+    GLOBAL_MEM_LAT: 420,
+    LOCAL_MEM_LAT: 125,
+    MEM_BOUNDED_THRESHOLD: 14,
+    CACHE_SIZE: 3 * 768 * 1024,
+    INNER_STMTS_LIMIT: 1250,
+  },
   intel_gen9_metal: {
     CACHE_WIDTH: 64,
     MAX_MEM: [180],
@@ -25,7 +35,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ConstantPropagatePass',
               }
             },
-            // First, we place all the initial buffer in global memory (DRAM)
+            // , we place all the initial buffer in global memory (DRAM)
             {
               name: 'loc_program',
               pass: {
@@ -34,6 +44,7 @@ local PARAMS = {
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
+
             {
               name: 'loc_main',
               pass: {
@@ -48,6 +59,15 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ConstTensorPass',
                 reqs: ['main'],
+              },
+            },
+
+            // Change tags before optimizations
+            {
+              name: 'kernel_tag',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.KernelTagPass',
+                reqs: ['kernel']
               },
             },
 
@@ -87,13 +107,32 @@ local PARAMS = {
               }
             },
 
-            // Padding, disabled for now due ot issues with gradiants
+            // Pad tensors to remove inner conditionals
             {
               name: 'pad',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PadPass',
                 reqs: ['main'],
               },
+            },
+            // Adjust stride of intermediate values
+            {
+              name: 'fix_strides',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FixStridesPass',
+                reqs: ['main'],
+              },
+            },
+            // Process large fully connected
+            {
+              name: 'large_fc',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FullyConnectedPass',
+                reqs: ['contraction', 'agg_op_add', 'comb_op_mul'],
+                subgroup_sizes: PARAMS[cfg].SUBGROUP_SIZES,
+                threshold: 1024 * 2048,
+                zero_error: 0.00001
+              }
             },
 
             // Do subgroup pass
@@ -280,7 +319,6 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
-
             {
               name: 'localize_main',
               pass: {

@@ -653,6 +653,8 @@ class invoker {
     vai_exception::check_and_throw(plaidml_save_invoker(invoker_.get(), file.c_str(), format));
   }
 
+  void set_const() { vai_exception::check_and_throw(plaidml_set_invoker_const(invoker_.get())); }
+
   std::unique_ptr<plaidml_invocation> invoke() {
     std::unique_ptr<plaidml_invocation> invocation{plaidml_schedule_invocation(ctx_->get_ctx(), invoker_.get())};
     vai_exception::check_and_throw(invocation);

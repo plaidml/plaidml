@@ -1,51 +1,17 @@
 // Copyright 2019, Intel Corp.
 
-#include <boost/dynamic_bitset.hpp>
 #include "tile/codegen/pad.h"
 
 #include "base/util/any_factory_map.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/localize.h"
+#include "tile/math/util.h"
 
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
 using namespace stripe;  // NOLINT
-
-// Check if the dimension range is a large prime 
-// and advise a better number for the dimension
-class PrimeAdvisor {
-public:
-  PrimeAdvisor(size_t size, size_t large_threshold) {
-    check_.resize(size, true);
-    large_ = large_threshold;
-    for (size_t n = 2; n < size; ++n) {
-      if (check_.test(n)) {
-        size_t k = n + n;
-        while (k < size) {
-          check_.reset(k);
-          k += n;
-        }
-      }
-    }
-  }
-
-  bool IsLargePrime(size_t n) {
-    if (n <= large_) {
-      return false;
-    }
-    return check_.test(n);
-  }
-
-  size_t NextBetterNumber(size_t n) {
-    return (n / 8 + 1) * 8;
-  }
-
-private:
-  boost::dynamic_bitset<> check_;
-  size_t large_;
-};
 
 struct ExtentIO {
   explicit ExtentIO(int64_t init) : load{init, init}, store{init, init} {}
@@ -143,8 +109,7 @@ void ComputeExtents(Block* block, const AliasMap& map, Extents* extents) {
 // Given the new index for a block
 // 1) Set the new size for the block's output
 // 2) Add a new block for transfering the new output to the original output
-void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs,
-                     Block* parent, StatementIt stmt_it) {
+void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs, Block* parent, StatementIt stmt_it) {
   // Check if the output refs are affected
   std::set<std::string> affected_out;
   for (const auto& ref : block->ref_outs()) {
@@ -178,12 +143,10 @@ void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs
         auto it = new_idxs.find(idx_name);
         if (it != new_idxs.end()) {
           src_shape_dims.push_back(it->second);
-        }
-        else {
+        } else {
           src_shape_dims.push_back(parent_ref_it->interior_shape.dims[i].size);
         }
-      }
-      else {
+      } else {
         src_shape_dims.push_back(parent_ref_it->interior_shape.dims[i].size);
       }
     }
@@ -199,13 +162,16 @@ void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs
     }
     std::string src_ref_name = ref_name + "_copy";
     Refinement src_outer_ref(RefDir::None, "", src_ref_name, parent_ref_it->access, src_outer_shape,
-      parent_ref_it->agg_op, parent_ref_it->location, parent_ref_it->offset, parent_ref_it->bank_dim, parent_ref_it->cache_unit);
+                             parent_ref_it->agg_op, parent_ref_it->location, parent_ref_it->offset,
+                             parent_ref_it->bank_dim, parent_ref_it->cache_unit);
     parent->refs.insert(src_outer_ref);
-    Refinement src_inner_ref(RefDir::In, src_ref_name, src_ref_name, access, src_inner_shape,
-      parent_ref_it->agg_op, parent_ref_it->location, parent_ref_it->offset, parent_ref_it->bank_dim, parent_ref_it->cache_unit);
+    Refinement src_inner_ref(RefDir::In, src_ref_name, src_ref_name, access, src_inner_shape, parent_ref_it->agg_op,
+                             parent_ref_it->location, parent_ref_it->offset, parent_ref_it->bank_dim,
+                             parent_ref_it->cache_unit);
     reshape->refs.insert(src_inner_ref);
-    Refinement dst_inner_ref(RefDir::Out, ref_name, ref_name, access, dst_inner_shape,
-      parent_ref_it->agg_op, parent_ref_it->location, parent_ref_it->offset, parent_ref_it->bank_dim, parent_ref_it->cache_unit);
+    Refinement dst_inner_ref(RefDir::Out, ref_name, ref_name, access, dst_inner_shape, parent_ref_it->agg_op,
+                             parent_ref_it->location, parent_ref_it->offset, parent_ref_it->bank_dim,
+                             parent_ref_it->cache_unit);
     reshape->refs.insert(dst_inner_ref);
     auto load = std::make_shared<Load>(src_ref_name, "$x");
     auto store = std::make_shared<Store>("$x", ref_name);
@@ -216,7 +182,8 @@ void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs
     reshape->name = "kernel_" + std::to_string(parent->stmts.size()) + "(" + src_ref_name + ")";
     // Modify the ref in the original block
     Refinement new_block_ref(RefDir::Out, src_ref_name, ref_name, block_ref_it->access, src_inner_shape,
-      block_ref_it->agg_op, block_ref_it->location, block_ref_it->offset, block_ref_it->bank_dim, block_ref_it->cache_unit);
+                             block_ref_it->agg_op, block_ref_it->location, block_ref_it->offset, block_ref_it->bank_dim,
+                             block_ref_it->cache_unit);
     block->refs.erase(*block_ref_it);
     block->refs.insert(new_block_ref);
     for (auto& idx : block->idxs) {
@@ -231,36 +198,21 @@ void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs
 }
 
 bool QualifiedBlock(Block* block) {
-  return block && block->has_tag("agg_op_add") && (block->has_tag("comb_op_mul") || block->has_tag("agg_op_add_no_comb_op"));
+  return block && block->has_tag("agg_op_add") &&
+         (block->has_tag("comb_op_mul") || block->has_tag("agg_op_add_no_comb_op"));
 }
 
 // If the dimension's range is a large prime,
 // change it to a better number that can be divisible by more factors
 void PrimeDimension(Block* block, const proto::PadPass& options) {
-  // Find the largest dim size in order to construct the prime list later
-  size_t max_idx_range = 0;
-  for (StatementIt stmt_it = block->stmts.begin(); stmt_it != block->stmts.end(); ++stmt_it) {
-    auto inner = Block::Downcast(*stmt_it);
-    if (QualifiedBlock(inner.get())) {
-      for (auto& idx : inner->idxs) {
-        if (idx.range > max_idx_range) {
-          max_idx_range = idx.range;
-        }
-      }
-    }
-  }
-
-  // Construct the prime list
-  PrimeAdvisor prime(max_idx_range + 1, options.prime_threshold());
-
   // Check if the idxs are large primes, and the output accesses are simple
   for (StatementIt stmt_it = block->stmts.begin(); stmt_it != block->stmts.end(); ++stmt_it) {
     auto inner = Block::Downcast(*stmt_it);
     if (QualifiedBlock(inner.get())) {
       std::map<std::string, size_t> new_idxs;
       for (auto& idx : inner->idxs) {
-        if (prime.IsLargePrime(idx.range)) {
-          new_idxs.emplace(idx.name, prime.NextBetterNumber(idx.range));
+        if (idx.range > options.prime_threshold() && math::IsPrime(idx.range)) {
+          new_idxs.emplace(idx.name, (idx.range / 8 + 1) * 8);
         }
       }
       if (new_idxs.size() > 0) {
