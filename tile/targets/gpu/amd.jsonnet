@@ -148,6 +148,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 a_reqs: ['subgroup_write'],
                 b_reqs: ['eltwise'],
+                no_inner: true,
               },
             },
 

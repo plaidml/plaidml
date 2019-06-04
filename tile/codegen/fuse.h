@@ -53,7 +53,7 @@ class FusionStrategy {
   virtual void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) = 0;
 };
 
-void FusionInner(const AliasMap& scope, stripe::Block* block, FusionStrategy* strategy);
+void FusionInner(const AliasMap& scope, stripe::Block* block, FusionStrategy* strategy, bool no_inner = false);
 
 class AlwaysFuseRecursive : public FusionStrategy {
  public:
@@ -62,7 +62,7 @@ class AlwaysFuseRecursive : public FusionStrategy {
   void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
     block->location = a.location;
     AliasMap inner(outer, block);
-    FusionInner(inner, block, this);
+    FusionInner(inner, block, this, false);
   }
 };
 

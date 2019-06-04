@@ -14,6 +14,7 @@ from __future__ import print_function
 
 import sys
 
+import argparse
 import plaidml.keras
 plaidml.keras.install_backend()
 import plaidml.keras.backend
@@ -94,6 +95,13 @@ def run(use_batch_normalization=False, use_dropout=False):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--fp16', action='store_true')
+    parser.add_argument('-v', '--verbose', action='count', default=0)
+    args, remainder = parser.parse_known_args()
+
+    plaidml._internal_set_vlog(args.verbose)
+
     score = run()
 
     print('Test score:', score[0])
