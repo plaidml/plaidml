@@ -70,7 +70,7 @@ class SubgroupCostModel {
     return subgroup;
   }
 
-  int SetRefIdxThreadIdx(Refinement *ref) {
+  int SetRefIdxThreadIdx(Refinement* ref) {
     int subgroup = 0;
     for (size_t i = 0; i < ref->access.size(); i++) {
       auto acc_map = ref->access[i].getMap();
@@ -97,10 +97,10 @@ class SubgroupCostModel {
     // Process outputs first to determine the thread_idx first
     std::vector<Refinement*> ref_list;
     for (const auto ref : block_->ref_outs()) {
-       ref_list.push_back(ref);
+      ref_list.push_back(ref);
     }
     for (const auto ref : block_->ref_ins()) {
-       ref_list.push_back(ref);
+      ref_list.push_back(ref);
     }
     for (const auto& ref : ref_list) {
       TensorShape tile_shape = ref->ApplyTile(tot_tile);
@@ -117,19 +117,17 @@ class SubgroupCostModel {
         // To determine out ref's idx as well as thread_idx
         if (subgroup == 1) {
           plan_.thread_idx = plan_.ref_idx[ref->into()];
-        }
-        else {
+        } else {
           return;
         }
-      }
-      else {
+      } else {
         // For in refs
         if (plan_.thread_idx == "") {
           return;
         }
         auto flat_access = ref->FlatAccess().getMap();
-        subgroup = (flat_access.find(plan_.thread_idx) == flat_access.end()) ?
-                   SetRefIdxStrideOne(ref) : SetRefIdxThreadIdx(ref);
+        subgroup = (flat_access.find(plan_.thread_idx) == flat_access.end()) ? SetRefIdxStrideOne(ref)
+                                                                             : SetRefIdxThreadIdx(ref);
       }
       if (subgroup > 1) {
         subgroup = 0;
@@ -273,16 +271,6 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
     IVLOG(1, "Giving up due to outputs != 1");
     return;
   }
-  for (const auto& ref : block->refs) {
-    for (const auto& aff : ref.access) {
-      for (const auto& kvp : aff.getMap()) {
-        if (kvp.first != "" && kvp.second < 0) {
-          IVLOG(1, "Giving up due to negative strides");
-          return;
-        }
-      }
-    }
-  }
   // Setup an empty plan
   SubgroupPlan plan;
   for (const auto& idx : block->idxs) {
@@ -364,11 +352,11 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   for (const auto& oref : ref_list) {
     // The new refinement is mostly like inner ref
     stripe::Refinement ref = oref;
-    //ref.interior_shape = accum->ref_by_into(oref.from)->interior_shape;
+    // ref.interior_shape = accum->ref_by_into(oref.from)->interior_shape;
     auto ridx = plan.ref_idx[ref.into()];
     // This temp ref is for only shape calculation
-    stripe::Refinement reg_ref = 
-      stripe::Refinement(ref.dir, ref.into() + "_reg", ref.into(), ref.access, ref.interior_shape, ref.agg_op);
+    stripe::Refinement reg_ref =
+        stripe::Refinement(ref.dir, ref.into() + "_reg", ref.into(), ref.access, ref.interior_shape, ref.agg_op);
     // Now, make the innermost register refinements
     auto ref_repl = replace;
     if (ridx.size()) {
@@ -404,7 +392,7 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
     reg_ref = reg_ref.WithInto(ref.into() + "_reg");
     inner_by_name[ref.into()] = reg_ref;
 
-    // Passthru and allocation 
+    // Passthru and allocation
     for (auto& acc : reg_ref.access) {
       acc.mutateMap().clear();
     }
@@ -419,7 +407,7 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   outer->refs.insert(reg_allocs.begin(), reg_allocs.end());
   thread->refs.insert(reg_passthrus.begin(), reg_passthrus.end());
   accum->refs.insert(reg_passthrus.begin(), reg_passthrus.end());
-  //inner->refs = reg_inners;
+  // inner->refs = reg_inners;
 
   // Pass the thread_id through
   accum->idxs.emplace_back("thread_idx", 1, stripe::Affine(plan.thread_idx));
@@ -453,8 +441,8 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
     std::string ref_idx = plan.ref_idx[ri];
     auto repl = replace;
     if (ref_idx.size()) {
-      repl[ref_idx] = (ref_idx == plan.thread_idx) ? stripe::Affine(ref_idx + "_e") : 
-                      stripe::Affine(ref_idx + "_e", plan.subgroup_size);
+      repl[ref_idx] = (ref_idx == plan.thread_idx) ? stripe::Affine(ref_idx + "_e")
+                                                   : stripe::Affine(ref_idx + "_e", plan.subgroup_size);
     }
     for (auto& poly : orig.access) {
       poly = poly.sym_eval(repl);

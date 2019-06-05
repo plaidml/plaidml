@@ -28,8 +28,8 @@ static void FixStridesBlock(stripe::Block* block, CompilerState* state) {
   std::set<std::string> used_in_special;
   for (auto& stmt : block->stmts) {
     auto spec = stripe::Special::Downcast(stmt);
-    if (!spec) {
-      return;
+    if (!spec || spec->name == "zero") {
+      continue;
     }
     for (auto& s : spec->inputs) {
       used_in_special.emplace(s);
@@ -41,16 +41,19 @@ static void FixStridesBlock(stripe::Block* block, CompilerState* state) {
   for (auto& ref : block->refs) {
     // Skip things used in specials
     if (used_in_special.count(ref.into())) {
+      IVLOG(2, "Skipping " << ref.into() << " due to use in special");
       continue;
     }
     // Skip non allocations
     if (ref.dir != stripe::RefDir::None) {
+      IVLOG(2, "Skipping " << ref.into() << " due to direction");
       continue;
     }
     // Get the shape
     auto shape = ref.interior_shape;
     // Skip non-const user buffers
     if (ref.has_tag("user") && !shape.is_const) {
+      IVLOG(2, "Skipping " << ref.into() << " due to user");
       continue;
     }
     // Skip PRNG buffers
@@ -96,7 +99,7 @@ static void FixStridesBlock(stripe::Block* block, CompilerState* state) {
     }
     ref.mut().interior_shape = new_shape;
     FixupRefs(block, ref.into());
-    IVLOG(1, "Changed shape: " << shape << " -> " << new_shape);
+    IVLOG(2, "Changed shape: " << shape << " -> " << new_shape);
   }
 }
 
