@@ -1,5 +1,7 @@
 from collections import namedtuple
 
+import six
+
 from plaidml.edsl._ffi import NativeObject, decode_str, ffi, ffi_call, lib
 
 
@@ -113,7 +115,7 @@ class TensorDim(object):
 def poly_op(op, *args):
 
     def wrap(x):
-        if isinstance(x, int):
+        if isinstance(x, six.integer_types):
             return ffi_call(lib.tile_poly_expr_literal, x)
         if isinstance(x, TensorDim):
             if x.size is None:
@@ -174,6 +176,12 @@ class TensorIndex(NativeObject):
         return TensorIndex(poly_op(lib.TILE_POLY_OP_DIV, lhs, self))
 
 
+def _wrap_dim(x):
+    if isinstance(x, six.integer_types):
+        return x
+    return x.size
+
+
 class _TensorSpec(NativeObject):
     __ffi_del__ = lib.tile_expr_free
     __ffi_repr__ = lib.tile_expr_repr
@@ -185,20 +193,15 @@ class _TensorSpec(NativeObject):
             idxs = [key]
 
         def wrap_idx(x):
-            if isinstance(x, int):
+            if isinstance(x, six.integer_types):
                 return ffi_call(lib.tile_poly_expr_literal, x)
             return x.as_ptr()
-
-        def wrap_dim(x):
-            if isinstance(x, int):
-                return x
-            return x.size
 
         idxs = [wrap_idx(x) for x in idxs]
         if dims is None:
             dims = ffi.NULL
         else:
-            dims = [wrap_dim(x) for x in dims]
+            dims = [_wrap_dim(x) for x in dims]
         expr = ffi_call(lib.tile_expr_tensor_spec, ref.as_ptr(), len(idxs), idxs, dims)
         super(_TensorSpec, self).__init__(expr)
 
@@ -290,7 +293,7 @@ class Tensor(NativeObject):
     _shape = None
     _is_contraction = False
 
-    def __init__(self, shape=None, dims=None, expr=None, name=''):
+    def __init__(self, shape=None, dims=None, expr=None, value=None, name=''):
         self._name = name
         if shape:
             self._shape = shape
@@ -298,9 +301,19 @@ class Tensor(NativeObject):
         elif dims is not None:
             self._dims = dims
             expr = None
+        elif value is not None:
+            if isinstance(value, six.integer_types):
+                expr = ffi_call(lib.tile_expr_int, value)
+            elif isinstance(value, float):
+                expr = ffi_call(lib.tile_expr_float, value)
+            else:
+                raise TypeError('Invalid type for value={}'.format(value))
         elif expr is None:
             raise ValueError('One of dims=, shape=, or expr= must be specified.')
         super(Tensor, self).__init__(expr)
+
+    def __hash__(self):
+        return hash((self.as_ptr(), self._dims, self._shape, self._is_contraction))
 
     def __getitem__(self, key):
         return IndexedTensor(_TensorSpec(self, key, self._dims), tensor=self)
@@ -458,7 +471,7 @@ class Tensor(NativeObject):
     def bind_dims(self, *dims):
         if self._dims is not None:
             # this handles intermediate temporaries (results of previous outputs)
-            sizes = [x.size for x in self._dims]
+            sizes = [_wrap_dim(x) for x in self._dims]
         else:
             # this is the fallback which handles user inputs and any other case
             sizes = self.shape().sizes
@@ -499,11 +512,13 @@ class Program(NativeObject):
 def call(fn, *args):
 
     def wrap(x):
-        if isinstance(x, int):
+        if isinstance(x, six.integer_types):
             return ffi_call(lib.tile_expr_int, x)
         if isinstance(x, float):
             return ffi_call(lib.tile_expr_float, x)
-        return x.as_ptr()
+        if isinstance(x, Tensor):
+            return x.as_ptr()
+        raise TypeError('Unexpected type for call argument: {}. args: {}'.format(x, args))
 
     args = [wrap(x) for x in args]
     return Tensor(expr=ffi_call(lib.tile_expr_call, fn.encode(), len(args), args))
