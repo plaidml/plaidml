@@ -28,7 +28,7 @@ class Library final : public hal::Library {
           const std::vector<lang::KernelInfo>& kernels);
   virtual ~Library();
 
-  std::string Serialize() final { return ""; }
+  std::map<std::string, std::string> Serialize() final { return {}; }
 
   std::shared_ptr<llvm::LLVMContext> llvm_context() { return context_; }
   const std::vector<std::shared_ptr<llvm::ExecutionEngine>>& engines() { return engines_; }
