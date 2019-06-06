@@ -20,22 +20,26 @@ Library* Library::Downcast(hal::Library* library, const std::shared_ptr<DeviceSt
   return exe;
 }
 
-Library::Library(const std::shared_ptr<DeviceState>& device_state, CLObj<cl_program> program,
+Library::Library(const std::shared_ptr<DeviceState>& device_state, const std::map<std::string, CLObj<cl_program>>& program,
                  const std::vector<lang::KernelInfo>& kernel_info, std::vector<context::proto::ActivityID> kernel_ids)
     : device_state_{device_state},
       program_{std::move(program)},
       kernel_info_{kernel_info},
       kernel_ids_{std::move(kernel_ids)} {}
 
-std::string Library::Serialize() {
-  std::size_t size;
-  Err::Check(ocl::GetProgramInfo(program_.get(), CL_PROGRAM_BINARY_SIZES, sizeof(size), &size, nullptr),
-             "Unable to compute binary size");
-  std::string result;
-  result.resize(size);
-  const char* datum = result.data();
-  Err::Check(ocl::GetProgramInfo(program_.get(), CL_PROGRAM_BINARIES, sizeof(datum), &datum, nullptr),
-             "Unable to serialize binary");
+std::map<std::string, std::string> Library::Serialize() {
+  std::map<std::string, std::string> result;
+  for (auto& prog_it : program_) {
+    std::size_t size;
+    Err::Check(ocl::GetProgramInfo(prog_it.second.get(), CL_PROGRAM_BINARY_SIZES, sizeof(size), &size, nullptr),
+               "Unable to compute binary size for " + prog_it.first);
+    std::string prog_str;
+    prog_str.resize(size);
+    const char* datum = prog_str.data();
+    Err::Check(ocl::GetProgramInfo(prog_it.second.get(), CL_PROGRAM_BINARIES, sizeof(datum), &datum, nullptr),
+               "Unable to serialize binary for " + prog_it.first);
+    result.emplace(prog_it.first, prog_str);
+  }
   return result;
 }
 

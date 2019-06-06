@@ -260,7 +260,7 @@ Library* Library::Downcast(hal::Library* library) {  //
   return dynamic_cast<Library*>(library);
 }
 
-std::string Library::Serialize() {  //
+std::map<std::string, std::string> Library::Serialize() {  //
   throw error::Unimplemented("Not implemented: Library::Serialize");
 }
 

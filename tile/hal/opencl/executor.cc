@@ -161,7 +161,7 @@ boost::future<std::unique_ptr<hal::Executable>> Executor::Prepare(hal::Library* 
 
     Err err;
     std::string kname = kinfo.kname;
-    CLObj<cl_kernel> kernel = ocl::CreateKernel(exe->program().get(), kname.c_str(), err.ptr());
+    CLObj<cl_kernel> kernel = ocl::CreateKernel(exe->program().at(kname).get(), kname.c_str(), err.ptr());
     if (!kernel) {
       throw std::runtime_error(std::string("Unable to initialize OpenCL kernel: ") + err.str());
     }

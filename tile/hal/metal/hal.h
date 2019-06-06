@@ -241,7 +241,7 @@ class Library final : public hal::Library {
           id<MTLLibrary> library,       //
           const std::vector<KernelContext>& kernel_ctxs);
 
-  std::string Serialize() final;
+  std::map<std::string, std::string> Serialize() final;
 
  public:
   static Library* Downcast(hal::Library* library);

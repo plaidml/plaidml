@@ -172,9 +172,10 @@ class Library {
  public:
   virtual ~Library() noexcept {}
 
-  // Serializes the library.  The serialized library can be subsequently passed to a Loader to turn it back into a
-  // Library.
-  virtual std::string Serialize() = 0;
+  // Serializes the library.
+  // The serialized library can be subsequently passed to a Loader to turn it back into a Library.
+  // A library may contain more than one binaries.
+  virtual std::map<std::string, std::string> Serialize() = 0;
 };
 
 // A Tile compiler is able to compile a device-independent kernel definition into a device-specific executable.
