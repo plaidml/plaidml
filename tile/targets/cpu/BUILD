@@ -29,3 +29,21 @@ plaidml_cc_library(
     ],
     alwayslink = 1,
 )
+
+plaidml_cc_library(
+    name = "jit",
+    srcs = glob([
+        "jit.cc",
+        "jit.h",
+    ]),
+    copts = [
+        "-D__STDC_LIMIT_MACROS",
+        "-D__STDC_CONSTANT_MACROS",
+    ],
+    tags = ["llvm"],
+    deps = [
+        "//tile/stripe",
+        "@half",
+        "@llvm_shim//:llvm",
+    ],
+)

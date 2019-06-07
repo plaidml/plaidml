@@ -145,6 +145,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
   llvm::Value* MallocFunction();
+  llvm::Value* CallocFunction();
   llvm::Value* FreeFunction();
   llvm::Value* PrngStepFunction();
 
@@ -171,6 +172,7 @@ Compiler::Compiler(llvm::LLVMContext* context, const std::map<std::string, Exter
 }
 
 ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
+  IVLOG(4, program);
   // Compile each block in this program into a function within an LLVM module.
   ProgramModule ret;
   ret.module = std::make_unique<llvm::Module>("stripe", context_);
@@ -191,18 +193,17 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   pmb.MergeFunctions = true;
   llvm::legacy::PassManager modopt;
   pmb.populateModulePassManager(modopt);
-  if (VLOG_IS_ON(2)) {
-    IVLOG(2, "\n============================================================\n");
+  if (VLOG_IS_ON(4)) {
+    IVLOG(4, "\n============================================================\n");
     module_->print(llvm::errs(), nullptr);
   }
   modopt.run(*module_);
-  if (VLOG_IS_ON(2)) {
-    IVLOG(2, "\n============================================================\n");
+  if (VLOG_IS_ON(4)) {
+    IVLOG(4, "\n============================================================\n");
     module_->print(llvm::errs(), nullptr);
   }
   // Wrap the finished module and the parameter names into a ProgramModule.
   for (auto& ref : program.refs) {
-    assert(ref.dir != stripe::RefDir::None);
     ret.parameters.push_back(ref.into());
   }
   module_ = nullptr;
@@ -444,8 +445,7 @@ void Compiler::Visit(const stripe::LoadIndex& load_index) {
   // op->from is an affine
   // op->into is the name of a destination scalar
   llvm::Value* rval = Eval(load_index.from);
-  llvm::Value* value = builder_.CreateLoad(rval);
-  scalars_[load_index.into] = scalar{value, DataType::INT64};
+  scalars_[load_index.into] = scalar{rval, DataType::INT64};
 }
 
 void Compiler::Visit(const stripe::Constant& constant) {
@@ -560,10 +560,11 @@ void Compiler::Visit(const stripe::Block& block) {
     if (ref.dir == stripe::RefDir::None && ref.from.empty()) {
       // Allocate new storage for the buffer.
       size_t size = ref.interior_shape.byte_size();
-      std::vector<llvm::Value*> malloc_args;
-      malloc_args.push_back(IndexConst(size));
-      auto malloc_func = MallocFunction();
-      buffer = builder_.CreateCall(malloc_func, malloc_args, "");
+      std::vector<llvm::Value*> calloc_args;
+      calloc_args.push_back(IndexConst(size));
+      calloc_args.push_back(IndexConst(1));
+      auto calloc_func = CallocFunction();
+      buffer = builder_.CreateCall(calloc_func, calloc_args, "");
       allocs.push_back(buffer);
       llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
       buffer = builder_.CreateBitCast(buffer, buftype);
@@ -1133,6 +1134,14 @@ llvm::Value* Compiler::MallocFunction(void) {
   llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "malloc";
+  return module_->getOrInsertFunction(funcname, functype);
+}
+
+llvm::Value* Compiler::CallocFunction(void) {
+  std::vector<llvm::Type*> argtypes{IndexType(), IndexType()};
+  llvm::Type* rettype = builder_.getInt8PtrTy();
+  auto functype = llvm::FunctionType::get(rettype, argtypes, false);
+  const char* funcname = "calloc";
   return module_->getOrInsertFunction(funcname, functype);
 }
 
