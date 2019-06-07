@@ -166,14 +166,16 @@ message MemoryPlacementPass {
 message CachePass {
   // Do the caching pass on blocks that match there tags
   repeated string reqs = 1;
+  // The compute block for reference
+  required string ref = 2;
   // Cache only inputs, only outputs, or both
-  repeated stripe.proto.Refinement.Dir dirs = 2;
+  repeated stripe.proto.Refinement.Dir dirs = 3;
   // The location to assign to the 'cache' memory allocated
-  required stripe.proto.Location mem_loc = 3;
+  required stripe.proto.Location mem_loc = 4;
   // The unit to assign to transfer (DMA) data into / out of the cache
-  required stripe.proto.Location xfer_loc = 4;
+  required stripe.proto.Location xfer_loc = 5;
   // Add constraints during load/store to prevent OOB access
-  optional bool add_constraints = 5 [default = true];
+  optional bool add_constraints = 6 [default = true];
 }
 
 // Use registers instead of local memory as cache.
@@ -425,6 +427,10 @@ message AutotilePass {
   // block's location, expanding the supplied tag as the tile index
   // affine.
   optional string location_idx_tag = 33;
+  // If failed, tile the whole block into inner, and set the following tags for inner block
+  repeated string fail_inner_set = 34;
+  // If failed, tile the whole block into inner, and set the following tags for outer block
+  repeated string fail_outer_set = 35;
 }
 
 // A pass that attempts to transpose intermediate buffers such that any

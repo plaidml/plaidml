@@ -38,7 +38,7 @@ class SubgroupCostModel {
   }
 
   size_t num_work_items(const std::map<std::string, size_t>& tot_tile) {
-    stripe::Affine out_flat = block_->ref_outs()[0]->FlatAccess();
+    stripe::Affine out_flat = block_->ref_outs(true)[0]->FlatAccess();
     size_t num = 1;
     for (const auto& idx : block_->idxs) {
       size_t prod = 1;
@@ -96,7 +96,7 @@ class SubgroupCostModel {
     plan_.thread_idx = "";
     // Process outputs first to determine the thread_idx first
     std::vector<Refinement*> ref_list;
-    for (const auto ref : block_->ref_outs()) {
+    for (const auto ref : block_->ref_outs(true)) {
       ref_list.push_back(ref);
     }
     for (const auto ref : block_->ref_ins()) {
@@ -267,7 +267,7 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
     IVLOG(1, "Failed due to constraints");
     return;
   }
-  if (block->ref_outs().size() != 1) {
+  if (block->ref_outs(true).size() != 1) {
     IVLOG(1, "Giving up due to outputs != 1");
     return;
   }
@@ -314,7 +314,7 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
 
   // Now, prepare to tile the block
   TileShape threaded_ts, accum_ts, inner_ts;
-  stripe::Affine out_flat = block->ref_outs()[0]->FlatAccess();
+  stripe::Affine out_flat = block->ref_outs(true)[0]->FlatAccess();
   for (const auto& idx : plan.idxs) {
     size_t prod = 1;
     prod *= (idx == plan.thread_idx ? 1 : plan.subgroup_tile[idx]);
@@ -471,7 +471,7 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
     load->set_tag("subgroup_inline");
     accum->stmts.push_front(load);
   }
-  for (const stripe::Refinement* ref : block->ref_outs()) {
+  for (const stripe::Refinement* ref : block->ref_outs(true)) {
     auto store = xfer_blocks[ref->into()];
     store->stmts.push_back(std::make_shared<stripe::Load>(ref->into() + "_reg", "$x"));
     store->stmts.push_back(std::make_shared<stripe::Store>("$x", ref->into()));

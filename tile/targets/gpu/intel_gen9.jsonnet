@@ -175,7 +175,8 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.CachePass',
                 reqs: ['fallback_outer'],
-                dirs: ['Out'],
+                ref: 'fallback_inner',
+                dirs: ['Out', 'InOut'],
                 mem_loc: { devs: [{ name: 'LOCAL' }] },
                 xfer_loc: { devs: [{ name: 'DMA' }] },
               },

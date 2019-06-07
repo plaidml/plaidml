@@ -601,20 +601,20 @@ std::vector<std::string> Block::buffer_writes() const {
   return results;
 }
 
-std::vector<const Refinement*> Block::ref_ins() const {
+std::vector<const Refinement*> Block::ref_ins(bool inout) const {
   std::vector<const Refinement*> results;
   for (const auto& ref : refs) {
-    if (ref.dir == RefDir::In) {
+    if (ref.dir == RefDir::In || (inout && ref.dir == RefDir::InOut)) {
       results.push_back(&ref);
     }
   }
   return results;
 }
 
-std::vector<const Refinement*> Block::ref_outs() const {
+std::vector<const Refinement*> Block::ref_outs(bool inout) const {
   std::vector<const Refinement*> results;
   for (const auto& ref : refs) {
-    if (ref.dir == RefDir::Out) {
+    if (ref.dir == RefDir::Out || (inout && ref.dir == RefDir::InOut)) {
       results.push_back(&ref);
     }
   }
@@ -631,20 +631,20 @@ std::vector<const Refinement*> Block::ref_inouts() const {
   return results;
 }
 
-std::vector<Refinement*> Block::ref_ins() {
+std::vector<Refinement*> Block::ref_ins(bool inout) {
   std::vector<Refinement*> results;
   for (auto& ref : refs) {
-    if (ref.dir == RefDir::In) {
+    if (ref.dir == RefDir::In || (inout && ref.dir == RefDir::InOut)) {
       results.push_back(&ref.mut());
     }
   }
   return results;
 }
 
-std::vector<Refinement*> Block::ref_outs() {
+std::vector<Refinement*> Block::ref_outs(bool inout) {
   std::vector<Refinement*> results;
   for (auto& ref : refs) {
-    if (ref.dir == RefDir::Out) {
+    if (ref.dir == RefDir::Out || (inout && ref.dir == RefDir::InOut)) {
       results.push_back(&ref.mut());
     }
   }
@@ -907,11 +907,11 @@ size_t Block::idxs_product() const {
   return product;
 }
 
-std::set<const Index*> Block::accumulation_idxs() const {
+std::set<const Index*> Block::accumulation_idxs(bool inout) const {
   std::set<const Index*> ret;
   for (const auto& idx : idxs) {
     bool used = false;
-    for (const auto& ref : ref_outs()) {
+    for (const auto& ref : ref_outs(inout)) {
       for (const auto& access : ref->access) {
         if (access.getMap().count(idx.name)) {
           used = true;

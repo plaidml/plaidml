@@ -502,9 +502,12 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy, 
       }
       // Get the list of outputs for this block
       std::set<std::string> outs_for_fuse;
-      for (const auto& ro : block1->ref_outs()) {
-        IVLOG(3, "Considering output: " << ro->from);
-        outs_for_fuse.emplace(ro->from);
+      // Do not use block1->ref_outs() because we need also InOut refs
+      for (const auto& ro : block1->refs) {
+        if (IsWriteDir(ro.dir)) {
+          IVLOG(3, "Considering output: " << ro.from);
+          outs_for_fuse.emplace(ro.from);
+        }
       }
       IVLOG(3, "Outs for fuse size: " << outs_for_fuse.size());
       std::string fuse_on = "";

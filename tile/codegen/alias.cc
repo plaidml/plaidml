@@ -296,17 +296,27 @@ void AliasMap::AddConstraintForIndex(stripe::Block* block,         //
   bool overflow = alias_info.extents[idx].max > top_index;
   if (underflow || overflow) {
     IVLOG(3, "AddConstraintForIndex: " << alias_info.base_name << ", " << idx_name);
-    IVLOG(4, "extents = " << alias_info.extents[idx] << ", top_index = " << top_index);
-    IVLOG(4, *block);
-    std::string global_idx_name = block->unique_idx_name(idx_name);
-    block->idxs.emplace_back(Index{global_idx_name, 1, translate(alias_info.access[idx])});
-    if (underflow) {
-      block->constraints.push_back(idx_passthru ? Affine(global_idx_name)
-                                                : (Affine(global_idx_name) + Affine(idx_name)));
+    IVLOG(3, "extents = " << alias_info.extents[idx] << ", top_index = " << top_index);
+    if (idx_name != "") {
+      std::string global_idx_name = block->unique_idx_name(idx_name);
+      block->idxs.emplace_back(Index{global_idx_name, 1, translate(alias_info.access[idx])});
+      if (underflow) {
+        block->constraints.push_back(idx_passthru ? Affine(global_idx_name)
+                                                  : (Affine(global_idx_name) + Affine(idx_name)));
+      }
+      if (overflow) {
+        block->constraints.push_back(idx_passthru ? (Affine(top_index) - Affine(global_idx_name))
+                                                  : (Affine(top_index) - Affine(global_idx_name) - Affine(idx_name)));
+      }
     }
-    if (overflow) {
-      block->constraints.push_back(idx_passthru ? (Affine(top_index) - Affine(global_idx_name))
-                                                : (Affine(top_index) - Affine(global_idx_name) - Affine(idx_name)));
+    else {
+      Affine exp = translate(alias_info.access[idx]);
+      if (underflow) {
+        block->constraints.push_back(exp);
+      }
+      if (overflow) {
+        block->constraints.push_back(Affine(top_index) - exp);
+      }
     }
   }
 }

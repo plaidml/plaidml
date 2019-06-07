@@ -246,26 +246,6 @@ static proto::Stage GenerateStage() {
         }
       }
     }, {
-      name: "cache_dpu_in"
-      pass: {
-        [type.vertex.ai/vertexai.tile.codegen.proto.CachePass] {
-          reqs: ["dpu"]
-          dirs: [ In ]
-          mem_loc: { devs: [{name: "MRM"}] }
-          xfer_loc: { devs: [{name: "IDU"}] }
-        }
-      }
-    }, {
-      name: "cache_dpu_out"
-      pass: {
-        [type.vertex.ai/vertexai.tile.codegen.proto.CachePass] {
-          reqs: ["dpu"]
-          dirs: [ Out ]
-          mem_loc: { devs: [{name: "ACC"}] }
-          xfer_loc: { devs: [{name: "ODU"}] }
-        }
-      }
-    }, {
       name: "loc_dpu_fused"
       pass: {
         [type.vertex.ai/vertexai.tile.codegen.proto.LocateBlockPass] {
