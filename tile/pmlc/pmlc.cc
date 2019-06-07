@@ -62,7 +62,8 @@ bool App::parse(int argc, char* argv[]) {
       ("outdir,D", po::value<fs::path>()->default_value("."), "output directory")         //
       ("int8", "treat all datatypes as int8")                                             //
       ("internal", "input specifies an internally defined network")                       //
-      ("dump-passes", "dump passes")                                                      //
+      ("dump-passes", "dump passes in *.txt format")                                      //
+      ("dump-passes-proto", "dump passes in *.pb format")                                 //
 #ifdef ENABLE_LLVM_BITCODE
       ("llvm", "enable LLVM bitcode output")  //
 #endif
@@ -141,6 +142,10 @@ std::shared_ptr<Program> Main() {
   OptimizeOptions options;
   if (app->args.count("dump-passes")) {
     options.dump_passes = true;
+    options.dbg_dir = out_dir / "passes";
+  }
+  if (app->args.count("dump-passes-proto")) {
+    options.dump_passes_proto = true;
     options.dbg_dir = out_dir / "passes";
   }
   return DefaultStage(*app, input_path, out_dir, stage, options);

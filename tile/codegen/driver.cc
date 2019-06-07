@@ -23,13 +23,23 @@ void DumpProgram(const Block& program,            //
                  const OptimizeOptions& options,  //
                  const std::string& name,         //
                  size_t counter) {
-  if (options.dump_passes || options.dump_code) {
+  if (options.dump_passes || options.dump_passes_proto || options.dump_code) {
     boost::filesystem::create_directory(options.dbg_dir);
     if (options.dump_passes) {
       auto filename = str(boost::format("%02zu_%s.txt") % counter % name);
       auto path = (options.dbg_dir / filename).string();
       std::ofstream fout(path);
       fout << program << std::endl;
+    }
+    if (options.dump_passes_proto) {
+      auto filename = str(boost::format("%02zu_%s.pb") % counter % name);
+      auto path = (options.dbg_dir / filename).string();
+      std::ofstream fout(path, std::ofstream::binary);
+      // Save without Buffers
+      Program true_program;
+      true_program.entry = std::make_shared<Block>(program);
+      auto proto = IntoProto(true_program);
+      proto.SerializeToOstream(&fout);
     }
     if (options.dump_code) {
       auto filename = str(boost::format("%02zu_%s.c") % counter % name);
@@ -112,6 +122,7 @@ void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions&
       ++it;
     }
   }
+  IVLOG(3, "All optimization passes complete");
 }
 
 void Configs::Register(const std::string& name, const std::string& pb_bytes) {

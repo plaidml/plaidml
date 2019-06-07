@@ -28,6 +28,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   auto out_dir = boost::filesystem::path(env::Get("STRIPE_OUTPUT"));
   codegen::OptimizeOptions options = {
       !out_dir.empty(),    // dump_passes
+      false,               // dump_passes_proto
       false,               // dump_code
       out_dir / "passes",  // dbg_dir
   };
