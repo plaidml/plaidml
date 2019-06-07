@@ -3,8 +3,6 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 plaidml_cc_library(
     name = "stripejit",
     srcs = [
-        "buffer.cc",
-        "buffer.h",
         "platform.cc",
         "platform.h",
         "program.cc",

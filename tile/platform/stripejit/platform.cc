@@ -5,7 +5,6 @@
 #include <memory>
 #include <utility>
 
-#include "tile/platform/stripejit/buffer.h"
 #include "tile/platform/stripejit/program.h"
 
 namespace vertexai {
@@ -14,7 +13,7 @@ namespace stripejit {
 
 std::shared_ptr<tile::Buffer> Platform::MakeBuffer(const context::Context& ctx, const std::string& device_id,
                                                    std::uint64_t size) {
-  return std::make_shared<Buffer>(size);
+  return std::make_shared<SimpleBuffer>(size);
 }
 
 std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx, const tile::proto::Program& program,
