@@ -83,8 +83,8 @@ static void PruneRefinements(Block* block) {
         if (uses.find(ref.into()) == uses.end() && defs.find(ref.into()) == defs.end()) {
           ref.mut().set_tag("removed");
         }
-        if (uses.find(ref.into()) == uses.end()) {
-          // never used, set as Out
+        if (uses.find(ref.into()) == uses.end() && !ref.has_tag("initialized")) {
+          // never used and initialized before, set as Out
           ref.mut().dir = RefDir::Out;
         } else if (defs.find(ref.into()) == defs.end()) {
           // never defined, set as In

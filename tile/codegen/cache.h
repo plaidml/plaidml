@@ -14,13 +14,25 @@ namespace tile {
 namespace codegen {
 
 void ApplyCache(const AliasMap& map,                                       //
-                stripe::Block* block,                                      //
+                stripe::RefDir dir,                                        //
+                stripe::Block* ref_block,                                  //
+                stripe::Block* outer_block,                                //
                 const std::string& var_name,                               //
                 const stripe::Location& mem_loc,                           //
                 const stripe::Location& xfer_loc,                          //
                 const stripe::Tags load_tags = {"cache", "cache_load"},    //
                 const stripe::Tags store_tags = {"cache", "cache_store"},  //
                 bool add_constraints = true);
+
+void ApplySimpleCache(const AliasMap& map,                                       //
+                      stripe::RefDir dir,                                        //
+                      stripe::Block* block,                                      //
+                      const std::string& var_name,                               //
+                      const stripe::Location& mem_loc,                           //
+                      const stripe::Location& xfer_loc,                          //
+                      const stripe::Tags load_tags = {"cache", "cache_load"},    //
+                      const stripe::Tags store_tags = {"cache", "cache_store"},  //
+                      bool add_constraints = true);
 
 class CachePass final : public CompilePass {
  public:

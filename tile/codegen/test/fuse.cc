@@ -236,20 +236,6 @@ TEST(Codegen, FuseTiled) {
   bool r = FuseBlocks(main_map, r1.get(), r2.get());
   ASSERT_TRUE(r);
   IVLOG(2, "Fused\n" << *r1);
-
-  // Now cache output for fun
-  ApplyCache(main_map, r1.get(), "B", {{{"CMX"}}}, {{{"DMA"}}});
-  ApplyCache(main_map, r1.get(), "O", {{{"CMX"}}}, {{{"DMA"}}});
-  ApplyCache(main_map, r1.get(), "BO", {{{"CMX"}}}, {{{"DMA"}}});
-  IVLOG(1, "Cached\n" << *program->entry);
-
-  auto inner = r1->SubBlock(1);
-  IVLOG(1, "Inner\n" << *inner);
-  AliasMap r1_map(main_map, r1.get());
-  AliasMap inner_map(r1_map, inner.get());
-  ApplyCache(inner_map, inner.get(), "In", {{{"CMX"}}}, {{{"DMA"}}});
-  ApplyCache(inner_map, inner.get(), "K", {{{"CMX"}}}, {{{"DMA"}}});
-  IVLOG(2, "Fused + Cached\n" << *r1);
 }
 
 TEST(Codegen, FuseFancy) {
@@ -300,10 +286,6 @@ TEST(Codegen, FuseFancy) {
   IVLOG(2, "r2\n" << *r2);
   bool r = FuseBlocks(main_map, r1.get(), r2.get());
   IVLOG(2, "Fused\n" << *r1);
-  // Do some caching
-  ApplyCache(main_map, r1.get(), "O1", {{{"CMX"}}}, {{{"DMA"}}});
-  IVLOG(2, "Cached\n" << *r1);
-
   ASSERT_TRUE(r);
 }
 
