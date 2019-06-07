@@ -23,6 +23,18 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                                     TensorShape(PLAIDML_DATA_FLOAT32, {100, 100}),   //
                                     TensorShape(PLAIDML_DATA_FLOAT32, {100, 100}));  //
                 }),
+      MakeEntry("matmul_1",
+                [](const std::string& name) {
+                  return LoadMatMul(name,                                        //
+                                    TensorShape(PLAIDML_DATA_FLOAT32, {1, 1}),   //
+                                    TensorShape(PLAIDML_DATA_FLOAT32, {1, 1}));  //
+                }),
+      MakeEntry("matmul_2",
+                [](const std::string& name) {
+                  return LoadMatMul(name,                                        //
+                                    TensorShape(PLAIDML_DATA_FLOAT32, {2, 2}),   //
+                                    TensorShape(PLAIDML_DATA_FLOAT32, {2, 2}));  //
+                }),
       MakeEntry("matmul_32",
                 [](const std::string& name) {
                   return LoadMatMul(name,                                          //
