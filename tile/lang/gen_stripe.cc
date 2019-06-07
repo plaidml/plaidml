@@ -297,6 +297,9 @@ class StripeGenerator {
     if (NeedsInitialize(*kernel, out_ref_name, shapes[0])) {
       auto stmt = InitBuffer(main, op, shapes[0]);
       main->stmts.insert(std::prev(main->stmts.end()), stmt);
+      auto ref_it = kernel->ref_by_into(out_ref_name);
+      ref_it->mut().dir = RefDir::InOut;
+      ref_it->mut().set_tag("initialized");
     }
 
     // Combination Op

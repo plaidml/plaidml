@@ -195,7 +195,7 @@ struct ComputeDensityCostModel {
 
   explicit ComputeDensityCostModel(const Block& block, const proto::AutotilePass& options)
       : options(options),  //
-        acc_idxs(block.accumulation_idxs()) {}
+        acc_idxs(block.accumulation_idxs(true)) {}
 
   bool IndexFilter(const Block& block, const Index& idx) const {  //
     return options.acc_idxs() || !acc_idxs.count(&idx);
@@ -394,6 +394,20 @@ void AutotilePass::Apply(CompilerState* state) const {
         }
       }
     } else {
+      auto fail_inner_set = FromProto(options_.fail_inner_set());
+      auto fail_outer_set = FromProto(options_.fail_outer_set());
+      if (fail_inner_set.size() > 0 || fail_outer_set.size() > 0) {
+        TileShape tiling_shape;
+        for (const auto idx : block->idxs) {
+          if (idx.affine == Affine()) {
+            tiling_shape.push_back(idx.range);
+          }
+        }
+        ApplyTile(block, tiling_shape, false, false, options_.flip(), options_.split_unaligned(), options_.location_idx_tag());
+        auto inner = block->SubBlock(0);
+        inner->add_tags(FromProto(options_.fail_inner_set()));
+        block->add_tags(FromProto(options_.fail_outer_set()));
+      }
       LOG(WARNING) << "Autotile> block: " << block->name << " was NOT split; unable to find a valid tiling";
     }
   });

@@ -39,6 +39,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void Visit(const stripe::Intrinsic&);
   void Visit(const stripe::Block&);
 
+  size_t max_threads(const stripe::Block& block);
   sem::StmtPtr add_loops(const stripe::Block&);
   void do_gids(const stripe::Block&);
   sem::StmtPtr make_special(const std::string& name, const stripe::Block& block,
@@ -53,6 +54,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   size_t hw_threads_;
   size_t threads_;
   size_t used_threads_;
+  size_t outer_threads_;
   size_t loop_mul_;
   size_t tot_ops_;
   size_t tot_loads_;
@@ -64,6 +66,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   const AliasMap* scope_;
   size_t in_kernel_ = 0;
   size_t in_threads_ = 0;
+  bool local_var_;
   // Intrinsic list and emitters
   lang::IntrinsicList intrinsics_;
   lang::KernelList kernels_;

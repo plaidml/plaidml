@@ -1,5 +1,10 @@
 local PARAMS = {
-  amd: {},
+  amd: {
+    LOCAL_MEM_KIB: 20,
+    NUM_THREADS: 256,
+    CACHE_WIDTH: 1024, 
+    NUM_UNITS: 32
+  },
 };
 
 {
@@ -56,15 +61,14 @@ local PARAMS = {
             },
 
             // Reorder Blocks
-            // {
-            //   name: 'reorder_blocks',
-            //   pass : {
-            //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
-            //     reqs: ['program']
-            //   }
-            // },
+            {
+              name: 'reorder_blocks',
+              pass : {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
+              }
+            },
 
-            // Padding, disabled for now due ot issues with gradiants
+            // Pad tensors to remove inner conditionals
             {
               name: 'pad',
               pass: {
@@ -73,102 +77,69 @@ local PARAMS = {
               },
             },
 
-            // Do subgroup pass
-            // TODO: Fix this!
-            // {
-            //   name: 'subgroup',
-            //   pass: {
-            //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.SubgroupPass',
-            //     reqs: ['contraction'],
-            //     max_mem: 10000,
-            //     subgroup_size: 64,
-            //     cache_width: 1024,
-            //   },
-            // },
-
-            // Do a backup codegen on any remaining contractions
             {
-              name: 'tile_fallback',
+              name: 'tile_contract',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
-                reqs: ['contraction'],  // Apply to only dense operations
-                outer_set: ['fallback_outer', 'kernel', 'no_threads'],
-                inner_set: ['fallback_inner'],
+                reqs: ['contraction'],
+                outer_set: ['contract_outer', 'kernel'],
+                inner_set: ['contract_inner'],
+                fail_outer_set: ['contract_unexpanded', 'kernel'],
+                fail_inner_set: ['no_threads'],
                 clear_outer: true,
+                acc_idxs: true,
+                only_even: true,
+                split_factor: -0.1,
+                max_total_size: PARAMS[cfg].LOCAL_MEM_KIB * 1024,
+                min_out_size: PARAMS[cfg].NUM_THREADS,
+                cache_width: PARAMS[cfg].CACHE_WIDTH,
+              }
+            },
+
+            {
+              name: 'tile_middle',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
+                reqs: ['contract_outer'],
+                inner_set: ['contract_middle'],
                 acc_idxs: false,
-                // With i/o costs zeroed out, and split factor set high, we basically
-                // should pick the largest tile that doesn't use accumuation indexes
-                input_cost: 0.0,
+                input_cost: 0.0, 
                 output_cost: 0.0,
                 split_factor: -100.0,
-                only_po2: true,  // Only consider PO2 sizes for speed
-              },
-            },
-            {
-              name: 'cache_backup',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.CachePass',
-                reqs: ['fallback_outer'],
-                dirs: ['Out'],
-                mem_loc: { devs: [{ name: 'LOCAL' }] },
-                xfer_loc: { devs: [{ name: 'DMA' }] },
-              },
+                only_even: true,
+              }
             },
 
-            // Clean up extra indexes
-            // {
-            //   name: 'subgroup_prune',
-            //   pass: {
-            //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-            //     reqs: ['main']
-            //   }
-            // },
-
-            // Next we fuse in any element-wise operations which operate on the output of contraction block
-            // We need to fuse through multiple levels of the hierarchy
             {
-              name: 'fuse_contract_eltwise_1',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
-                a_reqs: ['subgroup_outer'],
-                b_reqs: ['eltwise'],
-              },
-            },
-            {
-              name: 'fuse_contract_eltwise_2',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
-                a_reqs: ['subgroup_thread'],
-                b_reqs: ['eltwise'],
-              },
-            },
-            {
-              name: 'fuse_contract_eltwise_3',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
-                a_reqs: ['subgroup_write'],
-                b_reqs: ['eltwise'],
-                no_inner: true,
-              },
-            },
-
-            // Clean things up to allow further optimizations
-            {
-              name: 'fuse_clean_1',
+              name: 'prune_idxs',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-                reqs: ['main'],
-              },
-            },
-            {
-              name: 'fuse_clean_2',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneRefinementsPass',
-                reqs: ['main'],
+                reqs: ['all'],
               },
             },
 
-            // Then we fuse multiple eltwise things
+            {
+              name: 'cache_input',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.CachePass',
+                reqs: ['contract_middle'],
+                ref: 'contract_inner',
+                dirs: [ 'In' ],
+                mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
+                xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
+              }
+            },
+
+            {
+              name: 'fuse_contract_eltwise',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['contract_outer'],
+                b_reqs: ['eltwise'],
+                output_match: true,
+              }
+            },
+
             {
               name: 'fuse_eltwise_eltwise',
               pass: {
@@ -177,7 +148,7 @@ local PARAMS = {
                 a_reqs: ['eltwise'],
                 b_reqs: ['eltwise'],
                 output_match: true,
-              },
+              } 
             },
 
             // Then we 'localize' buffers, which moves any temporaries the only are needed to hold the output
@@ -189,6 +160,81 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
+            // After all fusion, eliminate dead code again
+            {
+              name: 'dead_code_elimination',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.DeadCodeEliminationPass',
+                reqs: ['all'],
+              },
+            },
+
+            {
+              name: 'cache_output',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.CachePass',
+                reqs: ['contract_outer'],
+                ref: 'contract_inner',
+                dirs: [ 'Out', 'InOut' ],
+                mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
+                xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
+              } 
+            },
+
+            {
+              name: 'cache_unexpanded',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.CachePass',
+                reqs: ['contract_unexpanded'],
+                ref: 'no_threads',
+                dirs: [ 'Out' ],
+                mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
+                xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
+              }
+            },
+
+            {
+              name: 'prune_idxs',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
+                reqs: ['all'],
+              },
+            },
+
+            {
+              name: 'fuse_inner',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                parent_reqs: ['contract_outer'],
+                fused_set: ['cache'],
+                exclude: ['contract_middle'],
+              } 
+            },
+
+            {
+              name: 'tile_eltwise',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
+                reqs: ['eltwise', 'kernel'],
+                outer_set: ['eltwise_outer', 'kernel'],
+                inner_set: ['eltwise_inner'],
+                clear_outer: true,
+                only_even: true,
+                min_count: PARAMS[cfg].NUM_UNITS,
+                min_size: PARAMS[cfg].NUM_THREADS,
+                cache_width: PARAMS[cfg].CACHE_WIDTH,
+              }
+            },
+
+            {
+              name: 'localize_main',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
+                reqs: ['main'],
+              },
+            },
+
             {
               name: 'scalarize_main',
               pass: {
@@ -197,38 +243,14 @@ local PARAMS = {
               },
             },
 
-            // Let's do some additional threading
+            ## We now relabel any remaining buffer inside the contractions as local memory
             {
-              name: 'tile_subgroups',
+              name: 'make_local',
               pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
-                reqs: ['subgroup_outer'],  // Apply to only dense operations
-                outer_set: ['subgroup_outer', 'kernel'],
-                inner_set: ['gpu_thread', 'subgroup_othreads'],
-                clear_outer: true,
-                only_even: true,
-                min_size: 4,
-                max_sizes_product: 4,
-              },
-            },
-
-            // Do a backup codegen on eltwise stuff
-            {
-              name: 'tile_elt_fallback',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
-                reqs: ['eltwise', 'kernel'],  // Apply to eltwise ops
-                outer_set: ['fallback_elt_outer', 'kernel', 'no_threads'],
-                inner_set: ['fallback_elt_inner'],
-                clear_outer: true,
-                acc_idxs: false,
-                // With i/o costs zeroed out, and split factor set high, we basically
-                // should pick the largest tile that doesn't use accumuation indexes
-                input_cost: 0.0,
-                output_cost: 0.0,
-                split_factor: -100.0,
-                only_po2: true,  // Only consider PO2 sizes for speed
-              },
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
+                reqs: ['contract_outer'],
+                loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
+              }
             },
 
             // After all fusion, eliminate dead code again
@@ -238,6 +260,63 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.DeadCodeEliminationPass',
                 reqs: ['all'],
               },
+            },
+
+            {
+              name: 'thread_cache',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
+                reqs: ['cache'],
+                outer_set: ['cache_outer', 'gpu_thread'],
+                inner_set: ['cache_threads'],
+                only_even: true,
+                max_sizes_product: PARAMS[cfg].NUM_THREADS,
+                cache_width: PARAMS[cfg].CACHE_WIDTH,
+                loc_name: 'GLOBAL',
+                flip: true,
+              }
+            },
+
+            {
+              name: 'thread_contract',
+              pass : {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
+                reqs: ['contract_inner'],
+                threads: PARAMS[cfg].NUM_THREADS,
+              }
+            },
+
+            {
+              name: 'thread_eltwise',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
+                reqs: ['eltwise_inner'],
+                outer_set: ['eltwise_struct', 'gpu_thread'],
+                inner_set: ['eltwise_threads'],
+                only_even: true,
+                max_sizes_product: PARAMS[cfg].NUM_THREADS,
+                cache_width: PARAMS[cfg].CACHE_WIDTH,
+                loc_name: 'GLOBAL',
+                flip: true,
+              }
+            },
+
+            {
+              name: 'thread_elemwise',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
+                reqs: ['kernel', 'eltwise'],
+                threads: PARAMS[cfg].NUM_THREADS,
+              } 
+            },
+
+            {
+              name: 'loc_gpu',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateInnerBlockPass',
+                reqs: ['kernel'],
+                loc: { 'devs': [{'name': 'GPU', 'units': [{'offset': 0}]}] }
+              }
             },
 
             {
@@ -262,6 +341,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'scalarize_main',
               pass: {
@@ -269,6 +349,23 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
+            {
+              name: 'compute_deps',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ComputeDepsPass', 
+              }
+            }, 
+
+            {
+              name: 'place_program',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass',
+                reqs: ['program'],
+                locs: [{ "devs": [{"name": "GLOBAL", "units": [{"offset": 0}]}] }],
+                alignment: 4,
+              }
+            }
           ],
         },
       },

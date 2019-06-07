@@ -301,7 +301,7 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   // Do the caching
   for (const auto& name : to_cache) {
     Location loc = block->ref_by_into(name)->location;
-    ApplyCache(self, block, name, loc, Location(), {"kernel", "eltwise", "eltwise_padding"},
+    ApplySimpleCache(self, RefDir::In, block, name, loc, Location(), {"kernel", "eltwise", "eltwise_padding"},
                {"kernel", "eltwise", "eltwise_padding"});
   }
 
@@ -373,6 +373,18 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
     zero->name = "zero";
     zero->outputs = {name};
     block->stmts.push_front(zero);
+  }
+  // For the Out refs initialized by zero, set them as InOut
+  for (auto stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (QualifiedBlock(inner.get())) {
+      for (auto ref : inner->ref_outs()) {
+        if (to_pad.find(ref->from) != to_pad.end()) {
+          ref->mut().dir = RefDir::InOut;
+          ref->mut().set_tag("initialized");
+        }
+      }
+    }
   }
 }
 

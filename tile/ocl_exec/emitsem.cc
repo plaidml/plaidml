@@ -124,8 +124,7 @@ void SemtreeEmitter::Visit(const stripe::Load& stmt) {
   auto type = scope_->at(stmt.from).shape.type;
   if (stmt.has_tag("vector_tx")) {
     cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), _("vector_load")(lval)));
-  }
-  else {
+  } else {
     cur_->push_back(_Declare({sem::Type::VALUE, type}, scalar_name(stmt.into), lval));
   }
   tot_loads_ += loop_mul_;
@@ -151,7 +150,7 @@ static sem::ExprPtr DoAgg(const std::string& agg_op, sem::ExprPtr lval, sem::Exp
 
 void SemtreeEmitter::Visit(const stripe::Store& stmt) {
   auto lval = _(ref_buf(stmt.into))[_(ref_idx(stmt.into))];
-  std::string agg_op = scope_->at(stmt.into).base_ref->agg_op;
+  std::string agg_op = scope_->this_block()->ref_by_into(stmt.into)->agg_op;
   auto rval = _(scalar_name(stmt.from));
   sem::ExprPtr agg = DoAgg(agg_op, lval, rval);
   if (stmt.has_tag("vector_tx")) {
@@ -274,8 +273,43 @@ sem::StmtPtr SemtreeEmitter::add_loops(const stripe::Block& block) {
   return top;
 }
 
+// Get the maximum threads within the block excluding outermost threads
+size_t SemtreeEmitter::max_threads(const stripe::Block& block) {
+  size_t result = 1;
+  for (const auto& stmt : block.stmts) {
+    auto inner = stripe::Block::Downcast(stmt);
+    if (inner) {
+      size_t inner_threads = max_threads(*inner);
+      if (inner->has_tag("gpu_thread")) {
+        inner_threads *= inner->idxs_product();
+      }
+      if (inner_threads > result) {
+        result = inner_threads;
+      }
+    }
+  }
+  return result;
+}
+
+// Check if there is any non-block inner stmt in the block.
+bool inner_non_block_stmt(const stripe::Block& block) {
+  for (const auto& stmt : block.stmts) {
+    if (stmt->kind() != stripe::StmtKind::Block) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void SemtreeEmitter::do_gids(const stripe::Block& block) {
-  if (block.ref_outs().size() == 0) {
+  bool has_out = false;
+  for (const auto& ref : block.refs) {
+    if (IsWriteDir(ref.dir)) {
+      has_out = true;
+      break;
+    }
+  }
+  if (!has_out) {
     return;
   }
   std::vector<size_t> logical;
@@ -300,12 +334,16 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   ki.kname = "kernel_" + std::to_string(kernels_.kernels.size());
   ki.comments = "//" + block.name + "\n//" + block.comments + "\n";
   std::vector<sem::Function::param_t> params;
-  for (const auto& ref : block.ref_outs()) {
-    sem::Type type = {sem::Type::POINTER_MUT, ref->interior_shape.type, 1, 0, sem::Type::GLOBAL};
-    params.push_back(std::make_pair(type, ref_buf(ref->into())));
-    ki.outputs.push_back(ref->from);
+  // Do not use block.ref_outs() because we need also InOut refs
+  for (const auto& ref : block.refs) {
+    if (IsWriteDir(ref.dir)) {
+      sem::Type type = {sem::Type::POINTER_MUT, ref.interior_shape.type, 1, 0, sem::Type::GLOBAL};
+      params.push_back(std::make_pair(type, ref_buf(ref.into())));
+      ki.outputs.push_back(ref.from);
+    }
   }
   std::set<std::string> dups;
+  // Do not count InOut refs
   for (const auto& ref : block.ref_ins()) {
     if (dups.count(ref->from)) {
       continue;
@@ -320,7 +358,7 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
     ki.kfunc->subgroup_size = static_cast<size_t>(block.get_attr_int("subgroup_size"));
   }
   ki.gwork = {{map.gid_sizes[0] * used_threads_, map.gid_sizes[1], map.gid_sizes[2]}};
-  if (used_threads_ == 1) {
+  if (used_threads_ == 1 && !local_var_) {
     ki.lwork = {{0, 0, 0}};
   } else {
     ki.lwork = {{used_threads_, 1, 1}};
@@ -382,92 +420,28 @@ sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
     }
     top->push_front(_Declare({sem::Type::INDEX}, ref_idx(ref.into()), idx_value));
   }
+  size_t local_threads = max_threads(block);
   for (size_t i = block.idxs.size(); i > 0; i--) {
     const auto& idx = block.idxs[i - 1];
     if (idx.affine != stripe::Affine()) {
       continue;
     }
-    auto expr = block.has_tag("reg_cache") ? ((tid % block.idxs_product()) / used_threads_) : (tid / used_threads_);
+    auto expr = block.has_tag("reg_cache") ? ((tid % block.idxs_product()) / local_threads) : (tid / local_threads);
     expr = expr % idx.range;
     top->push_front(_Declare({sem::Type::INDEX}, idx_name(idx.name), expr));
-    used_threads_ *= idx.range;
+    local_threads *= idx.range;
   }
-  /*
-  if (!block.has_tag("reg_cache") && block.idxs_product() < threads_) {
-    return sem::builder::_If(tid < sem::ExprPtr(_Const(block.idxs_product())),
-  top);
-  }
-  */
+
   return top;
 }
 
 void SemtreeEmitter::init_loop_local(const std::string& buf, DataType type,  //
                                      size_t size, const sem::ExprPtr& init) {
-  if (size < threads_ * 2) {
-    auto while_loop = _Block({});
-    while_loop->push_back(_Declare({sem::Type::INDEX}, "_init_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
-    while_loop->push_back(_While(_("_init_") < _Const(size),
-                                 _Block({_(ref_buf(buf))[_("_init_")] = init, _("_init_") = _("_init_") + threads_})));
-    cur_->push_front(while_loop);
-  } else {
-    size_t vec_size = size / threads_;
-    if (vec_size > 8) {
-      vec_size = 16;
-    } else if (vec_size > 4) {
-      vec_size = 8;
-    } else if (vec_size > 2) {
-      vec_size = 4;
-    }  // else vec_size is 2
-
-    size_t align_size = (size / vec_size) * vec_size;
-    // We process buf[0..align_size-1] using vectors first
-    auto inner = _Block({});
-    std::string fname = "vstore" + std::to_string(vec_size);
-    auto outer = _Block({});
-    sem::Type ptype = {sem::Type::POINTER_MUT, type, 1, 0, sem::Type::NORMAL};
-    sem::Type vptype = {sem::Type::POINTER_MUT, type, vec_size, 0, sem::Type::NORMAL};
-    sem::Type vtype = {sem::Type::VALUE, type, vec_size, 0, sem::Type::NORMAL};
-    outer->push_back(_Declare({sem::Type::INDEX}, "_thread_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
-    outer->push_back(_Declare(vtype, "_init_", init));
-    for (size_t i = 0; i < align_size / vec_size / threads_; i++) {
-      sem::StmtPtr call;
-      if (i > 0) {
-        call = _Special(fname, {_("_init_"), _("_thread_") + _Const(i * threads_), _(ref_buf(buf))});
-      } else {
-        call = _Special(fname, {_("_init_"), _("_thread_"), _(ref_buf(buf))});
-      }
-      outer->push_back(call);
-    }
-
-    size_t last = align_size / vec_size / threads_;
-    if (align_size > last * vec_size * threads_) {
-      if (last > 0) {
-        outer->push_back(_Declare({sem::Type::INDEX}, "_next_", _("_thread_") + (last * threads_)));
-        sem::StmtPtr call = _Special(fname, {_("_init_"), _("_next_"), _(ref_buf(buf))});
-        auto iftrue = _Block({call});
-        auto ifstmt = sem::builder::_If(_("_next_") < _Const(align_size / vec_size), iftrue);
-        outer->push_back(ifstmt);
-      } else {
-        sem::StmtPtr call = _Special(fname, {_("_init_"), _("_thread_"), _(ref_buf(buf))});
-        auto iftrue = _Block({call});
-        auto ifstmt = sem::builder::_If(_("_thread_") < _Const(align_size / vec_size), iftrue);
-        outer->push_back(ifstmt);
-      }
-    }
-
-    // Then initialize buf[align_size..size-1]
-    // size - align_size < threads, so we do it in element-wise
-    // Use the last threads first because they may be not full
-    if (align_size < size) {
-      // for thread idx, it initializes buf[idx + size - threads_]
-      auto ifstmt = _Block({_Declare({sem::Type::INDEX}, "_buf_idx_", _("_thread_") + (size - threads_))});
-      auto iftrue = _Block({_(ref_buf(buf))[_("_buf_idx_")] = init});
-      ifstmt->push_back(sem::builder::_If(_("_buf_idx_") >= _Const(align_size), iftrue));
-      outer->push_back(ifstmt);
-    }
-
-    cur_->push_front(outer);
-  }
+  auto while_loop = _Block({});
+  while_loop->push_back(_Declare({sem::Type::INDEX}, "_init_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
+  while_loop->push_back(_While(_("_init_") < _Const(size),
+                        _Block({_(ref_buf(buf))[_("_init_")] = init, _("_init_") = _("_init_") + used_threads_})));
+  cur_->push_front(while_loop);
 }
 
 class Unroller : public stripe::ConstStmtVisitor {
@@ -517,7 +491,7 @@ class Unroller : public stripe::ConstStmtVisitor {
     if (load.has_attr("zero_skip")) {
       std::string var = emitter_.scalar_name(load.get_attr_str("zero_skip"));
       double error = load.get_attr_float("zero_error");
-      auto cond =  std::make_shared<vertexai::tile::sem::BinaryExpr>("<=", _(var) * _(var), _Const(error * error));
+      auto cond = std::make_shared<vertexai::tile::sem::BinaryExpr>("<=", _(var) * _(var), _Const(error * error));
       auto result = emitter_.scalar_name(load.into);
       if (declared_.find(result) == declared_.end()) {
         out_->push_back(_Declare({sem::Type::VALUE, ref->interior_shape.type}, result, _Const(0)));
@@ -527,15 +501,14 @@ class Unroller : public stripe::ConstStmtVisitor {
       scalars_[load.into] = _(result);
       return;
     }
-    // Sometimes we use the result of a load multiple times. 
+    // Sometimes we use the result of a load multiple times.
     // With temp_var tag, we explicitly generate the temp variable for the result of a load
     if (load.has_tag("temp_var")) {
       auto var_name = emitter_.scalar_name(load.into);
       if (declared_.find(var_name) == declared_.end()) {
         out_->push_back(_Declare({sem::Type::VALUE, ref->interior_shape.type}, var_name, val));
         declared_.insert(var_name);
-      }
-      else {
+      } else {
         out_->push_back(_(var_name) = val);
       }
       scalars_[load.into] = _(var_name);
@@ -639,13 +612,18 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       return;
     }
     in_kernel_++;
+    local_var_ = false;
     if (block.has_tag("no_threads")) {
       in_threads_++;
     }
-    used_threads_ = 1;
+    if (in_kernel_ == 1) {
+      used_threads_ = max_threads(block);
+      outer_threads_ = 1;
+    }
   }
   if (block.has_tag("gpu_thread")) {
     in_threads_++;
+    outer_threads_ *= block.idxs_product();
   }
   scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
   scope_ = &scopes_.back();
@@ -669,11 +647,12 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       bool use_register = ref.location.devs.size() == 1 && ref.location.devs[0].name == "REGISTER";
       size_t size = ref.interior_shape.elem_size();
       sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, size,
-                         ((in_threads_ || use_register) ? sem::Type::NORMAL : sem::Type::LOCAL)};
+                         ((use_register || in_threads_) ? sem::Type::NORMAL : sem::Type::LOCAL)};
       sem::ExprPtr init = AggInit(ref.interior_shape.type, ref.agg_op);
       if (use_register || in_threads_) {
         cur_->push_front(_Declare(ptype, ref_buf(ref.into()), init));
       } else {
+        local_var_ = true;
         if (init) {
           cur_->push_front(_Barrier());
           init_loop_local(ref.into(), ref.interior_shape.type, size, init);
@@ -691,6 +670,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     }
     cur_ = _Block({sem::builder::_If(bexpr, cur_)});
   }
+
   // Add block loops
   if (block.has_tag("kernel") && in_kernel_ == 1) {
     do_gids(block);
@@ -699,31 +679,46 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     }
   } else if (block.has_tag("main") || block.has_tag("program")) {
     // No-op
-  } else if (block.has_tag("gpu_thread") && in_threads_ >= 1) {
-    outer->push_back(do_lids(block));
-    outer->push_back(_Barrier());
   } else {
-    auto wrapped = add_loops(block);
-    if (block.has_tag("mac_middle")) {
-      std::shared_ptr<sem::Block> sblock;
-      if (wrapped->isBlock()) {
-        sblock = std::dynamic_pointer_cast<sem::Block>(wrapped);
-      } else {
-        sblock = std::make_shared<sem::Block>();
-        sblock->push_back(wrapped);
+    sem::StmtPtr wrapped;
+    if (block.has_tag("gpu_thread") && in_threads_ >= 1) {
+      wrapped = do_lids(block);
+    } else {
+      wrapped = add_loops(block);
+      if (block.has_tag("mac_middle")) {
+        std::shared_ptr<sem::Block> sblock;
+        if (wrapped->isBlock()) {
+          sblock = std::dynamic_pointer_cast<sem::Block>(wrapped);
+        } else {
+          sblock = std::make_shared<sem::Block>();
+          sblock->push_back(wrapped);
+        }
+        sblock->push_front(make_special("MAC_INIT", block, {}));
+        sblock->push_back(make_special("MAC_FINISH", block, {block.ref_outs(true)[0]}));
+        wrapped = sblock;
       }
-      sblock->push_front(make_special("MAC_INIT", block, {}));
-      sblock->push_back(make_special("MAC_FINISH", block, {block.ref_outs()[0]}));
-      wrapped = sblock;
+    }
+    // If the number of threads in this block is less than the number of threads in the kernel.
+    // add an if statement
+    if (!block.has_tag("reg_cache") && max_threads(block) == 1
+        && outer_threads_ < used_threads_ && inner_non_block_stmt(block)) {
+      sem::ExprPtr tid = _Index(sem::IndexExpr::LOCAL, 0);
+      sem::ExprPtr block_threads = _Const(outer_threads_);
+      wrapped = _Block({sem::builder::_If(tid < block_threads, wrapped)});
     }
     outer->push_back(wrapped);
+    if (block.has_tag("gpu_thread") && in_threads_ >= 1) {
+      outer->push_back(_Barrier());
+    }
   }
+
   // Unwind depth
   if (block.has_tag("kernel")) {
     in_kernel_--;
   }
   if (block.has_tag("gpu_thread")) {
     in_threads_--;
+    outer_threads_ /= block.idxs_product();
   }
   loop_mul_ /= block.idxs_product();
   depth_--;

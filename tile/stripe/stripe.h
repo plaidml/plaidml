@@ -425,15 +425,15 @@ struct Block : Statement {
   Location location;
 
   // Helper methods
-  std::vector<const Refinement*> ref_ins() const;
-  std::vector<const Refinement*> ref_outs() const;
+  std::vector<const Refinement*> ref_ins(bool inout = false) const;
+  std::vector<const Refinement*> ref_outs(bool inout = false) const;
   std::vector<const Refinement*> ref_inouts() const;
-  std::vector<Refinement*> ref_ins();
-  std::vector<Refinement*> ref_outs();
+  std::vector<Refinement*> ref_ins(bool inout = false);
+  std::vector<Refinement*> ref_outs(bool inout = false);
   std::vector<Refinement*> ref_inouts();
   Index* idx_by_name(const std::string& name);
   const Index* idx_by_name(const std::string& name) const;
-  std::set<const Index*> accumulation_idxs() const;
+  std::set<const Index*> accumulation_idxs(bool inout = false) const;
   size_t idxs_product() const;
   // Find which refinement has an into called 'ref_name'
   std::set<Refinement>::iterator ref_by_into(const std::string& ref_name, bool fail = true);
