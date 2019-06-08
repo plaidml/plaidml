@@ -25,6 +25,7 @@ cc_library(
         "BOOST_ALL_NO_LIB",
     ] + select({
         "@toolchain//:macos_x86_64": ["BOOST_ASIO_HAS_STD_STRING_VIEW"],
+        "@toolchain//:windows_x86_64": ["BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE"],
         "//conditions:default": [],
     }),
     includes = ["."],
