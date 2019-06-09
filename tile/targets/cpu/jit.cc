@@ -109,23 +109,23 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Reshape(const stripe::Special&);
   void PrngStep(const stripe::Special&);
 
-  struct scalar {
+  struct Scalar {
     llvm::Value* value = nullptr;
     DataType type = DataType::INVALID;
   };
 
-  struct buffer {
+  struct Buffer {
     const stripe::Refinement* refinement = nullptr;
     llvm::Value* base = nullptr;
   };
 
-  struct index {
+  struct Index {
     const stripe::Index* index = nullptr;
     llvm::Value* variable = nullptr;
     llvm::Value* init = nullptr;
   };
 
-  struct loop {
+  struct Loop {
     llvm::BasicBlock* init = nullptr;
     llvm::BasicBlock* test = nullptr;
     llvm::BasicBlock* body = nullptr;
@@ -133,10 +133,10 @@ class Compiler : private stripe::ConstStmtVisitor {
   };
 
  private:
-  scalar Cast(scalar, DataType);
-  scalar CheckBool(scalar);
+  Scalar Cast(Scalar, DataType);
+  Scalar CheckBool(Scalar);
   llvm::Type* CType(DataType);
-  llvm::Value* ElementPtr(const buffer& buf);
+  llvm::Value* ElementPtr(const Buffer& buf);
   llvm::Value* Eval(const stripe::Affine& access);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
@@ -155,9 +155,9 @@ class Compiler : private stripe::ConstStmtVisitor {
   std::map<std::string, External> external_handlers_;
   std::map<std::string, void*> external_funcptrs_;
 
-  std::map<std::string, scalar> scalars_;
-  std::map<std::string, buffer> buffers_;
-  std::map<std::string, index> indexes_;
+  std::map<std::string, Scalar> scalars_;
+  std::map<std::string, Buffer> buffers_;
+  std::map<std::string, Index> indexes_;
 };
 
 Compiler::Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals)
@@ -270,10 +270,10 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   // the initial value for each index.
 
   for (const auto& ref : block.refs) {
-    buffers_[ref.into()] = buffer{&ref};
+    buffers_[ref.into()] = Buffer{&ref};
   }
   for (const auto& idx : block.idxs) {
-    indexes_[idx.name] = index{&idx};
+    indexes_[idx.name] = Index{&idx};
   }
 
   // create the LLVM function which will implement the Stripe block
@@ -313,7 +313,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   }
 
   // generate the basic blocks for each nested loop's evaluation stages
-  std::vector<loop> loops;
+  std::vector<Loop> loops;
   for (auto& idx : block.idxs) {
     std::string name = idx.name;
     auto init = llvm::BasicBlock::Create(context_, "init_" + name, function);
@@ -381,13 +381,13 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
 void Compiler::Visit(const stripe::Load& load) {
   // op->from is the name of a source buffer
   // op->into is the name of a destination scalar
-  buffer from = buffers_[load.from];
+  Buffer from = buffers_[load.from];
   // Look up the address of the target element.
   // Load the value from that address and use it to redefine the
   // destination scalar.
   llvm::Value* element = ElementPtr(from);
   llvm::Value* value = builder_.CreateLoad(element);
-  scalars_[load.into] = scalar{value, from.refinement->interior_shape.type};
+  scalars_[load.into] = Scalar{value, from.refinement->interior_shape.type};
 }
 
 void Compiler::Visit(const stripe::Store& store) {
@@ -399,8 +399,8 @@ void Compiler::Visit(const stripe::Store& store) {
   // load the value to be stored from the source variable
   // use GEP to compute the destination element address
   // use the specified aggregation to store the value
-  buffer into = buffers_[store.into];
-  scalar from = Cast(scalars_[store.from], into.refinement->interior_shape.type);
+  Buffer into = buffers_[store.into];
+  Scalar from = Cast(scalars_[store.from], into.refinement->interior_shape.type);
   llvm::Value* value = from.value;
   llvm::Value* element = ElementPtr(into);
   std::string agg_op = into.refinement->agg_op;
@@ -445,7 +445,7 @@ void Compiler::Visit(const stripe::LoadIndex& load_index) {
   // op->from is an affine
   // op->into is the name of a destination scalar
   llvm::Value* rval = Eval(load_index.from);
-  scalars_[load_index.into] = scalar{rval, DataType::INT64};
+  scalars_[load_index.into] = Scalar{rval, DataType::INT64};
 }
 
 void Compiler::Visit(const stripe::Constant& constant) {
@@ -454,12 +454,12 @@ void Compiler::Visit(const stripe::Constant& constant) {
     case stripe::ConstType::Integer: {
       auto ty = builder_.getInt64Ty();
       auto value = llvm::ConstantInt::get(ty, constant.iconst);
-      scalars_[constant.name] = scalar{value, DataType::INT64};
+      scalars_[constant.name] = Scalar{value, DataType::INT64};
     } break;
     case stripe::ConstType::Float: {
       auto ty = builder_.getDoubleTy();
       auto value = llvm::ConstantFP::get(ty, constant.fconst);
-      scalars_[constant.name] = scalar{value, DataType::FLOAT64};
+      scalars_[constant.name] = Scalar{value, DataType::FLOAT64};
     } break;
   }
 }
@@ -601,10 +601,10 @@ void Compiler::Intrinsic(const stripe::Intrinsic& intrinsic, External handler) {
   // overloading if it so desires. The handler must replace the input types
   // with its own list of desired inputs. We will use this for argument count
   // verification, then cast each input scalar accordingly.
-  std::vector<scalar> inputs;
+  std::vector<Scalar> inputs;
   std::vector<DataType> input_types;
   for (auto& input_name : intrinsic.inputs) {
-    scalar input = scalars_[input_name];
+    Scalar input = scalars_[input_name];
     inputs.push_back(input);
     input_types.push_back(input.type);
   }
@@ -645,7 +645,7 @@ void Compiler::Intrinsic(const stripe::Intrinsic& intrinsic, External handler) {
   size_t expected_outputs = 0;
   if (output_type != DataType::INVALID) {
     expected_outputs = 1;
-    scalars_[intrinsic.outputs[0]] = scalar{ret, output_type};
+    scalars_[intrinsic.outputs[0]] = Scalar{ret, output_type};
   }
   // Verify that we have the expected number of outputs.
   if (expected_outputs != intrinsic.outputs.size()) {
@@ -657,8 +657,8 @@ void Compiler::Intrinsic(const stripe::Intrinsic& intrinsic, External handler) {
 void Compiler::Add(const stripe::Intrinsic& add) {
   // Accepts two inputs, cast to operation type
   assert(2 == add.inputs.size());
-  scalar lhs = Cast(scalars_[add.inputs[0]], add.type);
-  scalar rhs = Cast(scalars_[add.inputs[1]], add.type);
+  Scalar lhs = Cast(scalars_[add.inputs[0]], add.type);
+  Scalar rhs = Cast(scalars_[add.inputs[1]], add.type);
   // Sum placed into the single output
   // Output type is operation type
   llvm::Value* ret = nullptr;
@@ -675,8 +675,8 @@ void Compiler::Add(const stripe::Intrinsic& add) {
 void Compiler::Subtract(const stripe::Intrinsic& sub) {
   // Accepts two inputs, cast to operation type
   assert(2 == sub.inputs.size());
-  scalar lhs = Cast(scalars_[sub.inputs[0]], sub.type);
-  scalar rhs = Cast(scalars_[sub.inputs[1]], sub.type);
+  Scalar lhs = Cast(scalars_[sub.inputs[0]], sub.type);
+  Scalar rhs = Cast(scalars_[sub.inputs[1]], sub.type);
   // Difference placed into the single output
   // Output type is operation type
   llvm::Value* ret = nullptr;
@@ -693,7 +693,7 @@ void Compiler::Subtract(const stripe::Intrinsic& sub) {
 void Compiler::Negate(const stripe::Intrinsic& neg) {
   // Accepts one input
   assert(1 == neg.inputs.size());
-  scalar op = Cast(scalars_[neg.inputs[0]], neg.type);
+  Scalar op = Cast(scalars_[neg.inputs[0]], neg.type);
   // Negated operand value placed into the single output
   // Output type is operation type
   llvm::Value* ret = nullptr;
@@ -710,8 +710,8 @@ void Compiler::Negate(const stripe::Intrinsic& neg) {
 void Compiler::Multiply(const stripe::Intrinsic& mul) {
   // Accepts two inputs, cast to operation type
   assert(2 == mul.inputs.size());
-  scalar lhs = Cast(scalars_[mul.inputs[0]], mul.type);
-  scalar rhs = Cast(scalars_[mul.inputs[1]], mul.type);
+  Scalar lhs = Cast(scalars_[mul.inputs[0]], mul.type);
+  Scalar rhs = Cast(scalars_[mul.inputs[1]], mul.type);
   // Product placed into the single output
   // Output type is operation type
   llvm::Value* ret = nullptr;
@@ -728,8 +728,8 @@ void Compiler::Multiply(const stripe::Intrinsic& mul) {
 void Compiler::Divide(const stripe::Intrinsic& div) {
   // Accepts two inputs, cast to operation type
   assert(2 == div.inputs.size());
-  scalar lhs = Cast(scalars_[div.inputs[0]], div.type);
-  scalar rhs = Cast(scalars_[div.inputs[1]], div.type);
+  Scalar lhs = Cast(scalars_[div.inputs[0]], div.type);
+  Scalar rhs = Cast(scalars_[div.inputs[1]], div.type);
   // Product placed into the single output
   // Output type is operation type
   llvm::Value* ret = nullptr;
@@ -748,8 +748,8 @@ void Compiler::Divide(const stripe::Intrinsic& div) {
 void Compiler::Mod(const stripe::Intrinsic& mod) {
   // Accepts two inputs, cast to operation type
   assert(2 == mod.inputs.size());
-  scalar lhs = Cast(scalars_[mod.inputs[0]], mod.type);
-  scalar rhs = Cast(scalars_[mod.inputs[1]], mod.type);
+  Scalar lhs = Cast(scalars_[mod.inputs[0]], mod.type);
+  Scalar rhs = Cast(scalars_[mod.inputs[1]], mod.type);
   // Product placed into the single output
   // Output type is operation type
   llvm::Value* ret = nullptr;
@@ -766,8 +766,8 @@ void Compiler::Mod(const stripe::Intrinsic& mod) {
 void Compiler::LessThan(const stripe::Intrinsic& lt) {
   // Accepts two inputs
   assert(2 == lt.inputs.size());
-  scalar lhs = Cast(scalars_[lt.inputs[0]], lt.type);
-  scalar rhs = Cast(scalars_[lt.inputs[1]], lt.type);
+  Scalar lhs = Cast(scalars_[lt.inputs[0]], lt.type);
+  Scalar rhs = Cast(scalars_[lt.inputs[1]], lt.type);
   // Inputs are cast to operation type
   // Equality placed into single output
   // Output type is boolean
@@ -787,8 +787,8 @@ void Compiler::LessThan(const stripe::Intrinsic& lt) {
 void Compiler::LessThanOrEqualTo(const stripe::Intrinsic& lte) {
   // Accepts two inputs
   assert(2 == lte.inputs.size());
-  scalar lhs = Cast(scalars_[lte.inputs[0]], lte.type);
-  scalar rhs = Cast(scalars_[lte.inputs[1]], lte.type);
+  Scalar lhs = Cast(scalars_[lte.inputs[0]], lte.type);
+  Scalar rhs = Cast(scalars_[lte.inputs[1]], lte.type);
   // Inputs are cast to operation type
   // Equality placed into single output
   // Output type is boolean
@@ -808,8 +808,8 @@ void Compiler::LessThanOrEqualTo(const stripe::Intrinsic& lte) {
 void Compiler::GreaterThan(const stripe::Intrinsic& gt) {
   // Accepts two inputs
   assert(2 == gt.inputs.size());
-  scalar lhs = Cast(scalars_[gt.inputs[0]], gt.type);
-  scalar rhs = Cast(scalars_[gt.inputs[1]], gt.type);
+  Scalar lhs = Cast(scalars_[gt.inputs[0]], gt.type);
+  Scalar rhs = Cast(scalars_[gt.inputs[1]], gt.type);
   // Inputs are cast to operation type
   // Equality placed into single output
   // Output type is boolean
@@ -829,8 +829,8 @@ void Compiler::GreaterThan(const stripe::Intrinsic& gt) {
 void Compiler::GreaterThanOrEqualTo(const stripe::Intrinsic& gte) {
   // Accepts two inputs
   assert(2 == gte.inputs.size());
-  scalar lhs = Cast(scalars_[gte.inputs[0]], gte.type);
-  scalar rhs = Cast(scalars_[gte.inputs[1]], gte.type);
+  Scalar lhs = Cast(scalars_[gte.inputs[0]], gte.type);
+  Scalar rhs = Cast(scalars_[gte.inputs[1]], gte.type);
   // Inputs are cast to operation type
   // Equality placed into single output
   // Output type is boolean
@@ -850,8 +850,8 @@ void Compiler::GreaterThanOrEqualTo(const stripe::Intrinsic& gte) {
 void Compiler::Equal(const stripe::Intrinsic& eq) {
   // Accepts two inputs
   assert(2 == eq.inputs.size());
-  scalar lhs = Cast(scalars_[eq.inputs[0]], eq.type);
-  scalar rhs = Cast(scalars_[eq.inputs[1]], eq.type);
+  Scalar lhs = Cast(scalars_[eq.inputs[0]], eq.type);
+  Scalar rhs = Cast(scalars_[eq.inputs[1]], eq.type);
   // Inputs are cast to operation type
   // Equality placed into single output
   // Output type is boolean
@@ -869,8 +869,8 @@ void Compiler::Equal(const stripe::Intrinsic& eq) {
 void Compiler::Unequal(const stripe::Intrinsic& neq) {
   // Accepts two inputs
   assert(2 == neq.inputs.size());
-  scalar lhs = Cast(scalars_[neq.inputs[0]], neq.type);
-  scalar rhs = Cast(scalars_[neq.inputs[1]], neq.type);
+  Scalar lhs = Cast(scalars_[neq.inputs[0]], neq.type);
+  Scalar rhs = Cast(scalars_[neq.inputs[1]], neq.type);
   // Inputs are cast to operation type
   // Equality placed into single output
   // Output type is boolean
@@ -888,9 +888,9 @@ void Compiler::Unequal(const stripe::Intrinsic& neq) {
 void Compiler::Conditional(const stripe::Intrinsic& cond) {
   // Three inputs: C, T, F; C is boolean, T and F are operation type
   assert(3 == cond.inputs.size());
-  scalar c = CheckBool(scalars_[cond.inputs[0]]);
-  scalar t = Cast(scalars_[cond.inputs[1]], cond.type);
-  scalar f = Cast(scalars_[cond.inputs[2]], cond.type);
+  Scalar c = CheckBool(scalars_[cond.inputs[0]]);
+  Scalar t = Cast(scalars_[cond.inputs[1]], cond.type);
+  Scalar f = Cast(scalars_[cond.inputs[2]], cond.type);
   // Single output will be one of T or F
   // Output type is operation type
   llvm::Value* ret = builder_.CreateSelect(c.value, t.value, f.value);
@@ -899,54 +899,54 @@ void Compiler::Conditional(const stripe::Intrinsic& cond) {
 
 void Compiler::And(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateAnd(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Or(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateOr(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Not(const stripe::Intrinsic& stmt) {
   assert(1 == stmt.inputs.size());
-  scalar op = CheckBool(scalars_[stmt.inputs[0]]);
+  Scalar op = CheckBool(scalars_[stmt.inputs[0]]);
   llvm::Value* ret = builder_.CreateNot(op.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Xor(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateXor(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Assign(const stripe::Intrinsic& stmt) {
   assert(1 == stmt.inputs.size());
-  scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  Scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
   llvm::Value* ret = op.value;
   OutputType(ret, stmt);
 }
 
 void Compiler::BitLeft(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
-  scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
+  Scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  Scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
   llvm::Value* ret = builder_.CreateShl(lhs.value, rhs.value);
   OutputType(ret, stmt);
 }
 
 void Compiler::BitRight(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
-  scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
+  Scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  Scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
   llvm::Value* ret = nullptr;
   if (is_int(stmt.type)) {
     ret = builder_.CreateAShr(lhs.value, rhs.value);
@@ -980,9 +980,9 @@ void Compiler::Copy(const stripe::Special& copy) {
 
 void Compiler::Reshape(const stripe::Special& reshape) {
   assert(1 == reshape.inputs.size());
-  buffer src = buffers_[reshape.inputs[0]];
+  Buffer src = buffers_[reshape.inputs[0]];
   assert(1 == reshape.outputs.size());
-  buffer dst = buffers_[reshape.outputs[0]];
+  Buffer dst = buffers_[reshape.outputs[0]];
   auto size = IndexConst(dst.refinement->interior_shape.byte_size());
   builder_.CreateMemCpy(dst.base, 0, src.base, 0, size);
 }
@@ -990,13 +990,13 @@ void Compiler::Reshape(const stripe::Special& reshape) {
 void Compiler::PrngStep(const stripe::Special& prng_step) {
   // Input is a matrix of 3xN containing PRNG state.
   assert(1 == prng_step.inputs.size());
-  buffer in_state = buffers_[prng_step.inputs[0]];
+  Buffer in_state = buffers_[prng_step.inputs[0]];
   // Outputs are another matrix of PRNG state, and a buffer to be filled.
   // Output state shape must match input state shape.
   assert(2 == prng_step.outputs.size());
-  buffer out_state = buffers_[prng_step.outputs[0]];
+  Buffer out_state = buffers_[prng_step.outputs[0]];
   assert(out_state.refinement->interior_shape == in_state.refinement->interior_shape);
-  buffer dest = buffers_[prng_step.outputs[1]];
+  Buffer dest = buffers_[prng_step.outputs[1]];
   llvm::Type* int32ptrType = builder_.getInt32Ty()->getPointerTo();
   llvm::Value* dest_arg = builder_.CreateBitCast(dest.base, int32ptrType);
   size_t dest_bytes = dest.refinement->interior_shape.byte_size();
@@ -1005,7 +1005,7 @@ void Compiler::PrngStep(const stripe::Special& prng_step) {
   builder_.CreateCall(PrngStepFunction(), args, "");
 }
 
-Compiler::scalar Compiler::Cast(scalar v, DataType to_type) {
+Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {
   if (v.type == to_type) {
     return v;
   }
@@ -1014,10 +1014,10 @@ Compiler::scalar Compiler::Cast(scalar v, DataType to_type) {
   bool to_signed = is_int(to_type) || is_float(to_type);
   auto op = llvm::CastInst::getCastOpcode(v.value, from_signed, to_llvmtype, to_signed);
   llvm::Value* ret = builder_.CreateCast(op, v.value, to_llvmtype);
-  return scalar{ret, to_type};
+  return Scalar{ret, to_type};
 }
 
-Compiler::scalar Compiler::CheckBool(scalar v) {
+Compiler::Scalar Compiler::CheckBool(Scalar v) {
   if (v.type == DataType::BOOLEAN) {
     return v;
   }
@@ -1054,7 +1054,7 @@ llvm::Type* Compiler::CType(DataType type) {
   return builder_.getVoidTy();
 }
 
-llvm::Value* Compiler::ElementPtr(const buffer& buf) {
+llvm::Value* Compiler::ElementPtr(const Buffer& buf) {
   // Ask the source refinement to generate an access path, in the form of
   // a sequence of indexes to scale and sum. Load each index value, multiply,
   // and the result is an offset from the buffer base address.
@@ -1082,17 +1082,17 @@ llvm::Value* Compiler::Eval(const stripe::Affine& access) {
 
 void Compiler::OutputType(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
   assert(1 == intrinsic.outputs.size());
-  scalars_[intrinsic.outputs[0]] = scalar{ret, intrinsic.type};
+  scalars_[intrinsic.outputs[0]] = Scalar{ret, intrinsic.type};
 }
 
 void Compiler::OutputBool(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
   assert(1 == intrinsic.outputs.size());
-  scalars_[intrinsic.outputs[0]] = scalar{ret, DataType::BOOLEAN};
+  scalars_[intrinsic.outputs[0]] = Scalar{ret, DataType::BOOLEAN};
 }
 
 void Compiler::CallIntrinsicFunc(const stripe::Intrinsic& stmt, const char* name) {
   assert(1 == stmt.inputs.size());
-  scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  Scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
   std::vector<llvm::Value*> argvals{op.value};
   auto ctype = CType(stmt.type);
   std::vector<llvm::Type*> argtypes{ctype};
