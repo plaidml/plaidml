@@ -108,7 +108,7 @@ TEST(Codegen, ApplyTile) {
 
   IVLOG(2, "After>\n" << *program->entry);
 
-  std::fill(data["C"].begin(), data["C"].end(), 0);
+  std::fill(data["C"].begin(), data["C"].end(), 0.f);
   ExecuteProgram(*program->entry, &data);
 
   IVLOG(2, "A: " << data["A"]);
@@ -129,7 +129,7 @@ TEST(Stencil, MatchMatMul) {
     }
   )");
 
-  const auto DIM = 100;
+  const std::uint64_t DIM = 100;
   auto runinfo = lib::LoadMatMul("matmul",                                       //
                                  TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
                                  TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
@@ -261,7 +261,7 @@ TEST(Stencil, Pass) {
     }
   )");
 
-  const auto DIM = 5;
+  const std::uint64_t DIM = 5;
   auto runinfo = lib::LoadMatMul("matmul",                                       //
                                  TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
                                  TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
