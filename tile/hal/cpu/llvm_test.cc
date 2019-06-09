@@ -373,6 +373,9 @@ TEST(CpuDevice, LLVM_rounding_builtins) {
   }
 }
 
+#if !(defined _WIN32 || defined __CYGWIN__)
+// TODO: Get this test to run correctly on Windows.
+
 TEST(CpuDevice, LLVM_half_float_vec) {
   using namespace sem::builder;  // NOLINT
   typedef half_float::half half;
@@ -394,6 +397,7 @@ TEST(CpuDevice, LLVM_half_float_vec) {
     }
   }
 }
+#endif
 
 TEST(CpuDevice, LLVM_vec_add_loop) {
   using namespace sem::builder;  // NOLINT
