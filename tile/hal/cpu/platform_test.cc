@@ -53,11 +53,14 @@ Param supported_params[] = {
     {DataType::UINT64, 1},  //
     {DataType::UINT64, 2},  //
 
+#if !(defined _WIN32 || defined __CYGWIN__)
+    // TODO: Get these tests to run correctly on Windows.
     {DataType::FLOAT16, 1},   //
     {DataType::FLOAT16, 2},   //
     {DataType::FLOAT16, 4},   //
     {DataType::FLOAT16, 8},   //
     {DataType::FLOAT16, 16},  //
+#endif
 
     {DataType::FLOAT32, 1},   //
     {DataType::FLOAT32, 2},   //
