@@ -19,6 +19,11 @@ PLATFORM_COPTS = select({
         "-D__STDC_CONSTANT_MACROS",
         "-w",
     ],
+    "@toolchain//:windows_x86_64": [
+        "/w",
+        "/wd4244",
+        "/wd4267",
+    ],
     "//conditions:default": [
         "-fPIC",
         "-w",
@@ -51,6 +56,13 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_LIBEDIT=0 \
     -DHAVE_FUTIMENS=0 \
+    -DHAVE_VALGRIND_VALGRIND_H=0 \
+    -DLLVM_TARGETS_TO_BUILD="X86"
+""",
+        "@toolchain//:windows_x86_64": """
+env;$${CONDA_PREFIX}/Library/bin/cmake -Thost=x64 -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+    -DPYTHON_EXECUTABLE=$$(which python) \
+    -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_VALGRIND_VALGRIND_H=0 \
     -DLLVM_TARGETS_TO_BUILD="X86"
 """,
@@ -94,14 +106,17 @@ cc_library(
 )
 
 cc_library(
-    name = "tblgen-lib",
+   name = "tblgen-lib",
     srcs = glob([
         "lib/TableGen/**/*.cpp",
         "lib/TableGen/**/*.c",
         "lib/TableGen/**/*.h",
     ]),
     copts = PLATFORM_COPTS,
-    linkopts = ["-lm"],
+    linkopts = select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["-lm"],
+    }),
     deps = [":support"],
     visibility = ["//visibility:public"],
 )
@@ -114,7 +129,10 @@ cc_binary(
         "utils/TableGen/**/*.h",
     ]),
     copts = PLATFORM_COPTS,
-    linkopts = ["-lm"],
+    linkopts = select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["-lm"],
+    }),
     deps = [":tblgen-lib"],
 )
 
@@ -322,12 +340,18 @@ cc_library(
         ":gen-intrinsic-impl",
         ":gen-intrinsic-enums",
     ],
-    copts = PLATFORM_COPTS + [
-        "-iquote",
-        "external/llvm/lib/Target/X86",
-        "-iquote",
-        "$(GENDIR)/external/llvm/lib/Target/X86",
-    ],
+    copts = PLATFORM_COPTS + select({
+        "@toolchain//:windows_x86_64": [
+            "/Iexternal/llvm/lib/Target/X86",
+            "/I$(GENDIR)/external/llvm/lib/Target/X86",
+        ],
+        "//conditions:default": [
+            "-iquote",
+            "external/llvm/lib/Target/X86",
+            "-iquote",
+            "$(GENDIR)/external/llvm/lib/Target/X86",
+        ],
+    }),
     deps = [
         ":support",
     ],
@@ -412,12 +436,18 @@ cc_library(
         ":gen-intrinsic-enums",
         ":gen-inst-combine-tables",
     ],
-    copts = PLATFORM_COPTS + [
-        "-iquote",
-        "$(GENDIR)/external/llvm/lib/IR",
-        "-iquote",
-        "$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
-    ],
+    copts = PLATFORM_COPTS + select({
+        "@toolchain//:windows_x86_64": [
+            "/I$(GENDIR)/external/llvm/lib/IR",
+            "/I$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
+        ],
+        "//conditions:default": [
+            "-iquote",
+            "$(GENDIR)/external/llvm/lib/IR",
+            "-iquote",
+            "$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
+        ],
+    }),
     deps = [
         ":support",
     ],
