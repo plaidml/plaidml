@@ -147,7 +147,7 @@ def __load_library():
     if platform.system() == 'Windows':
         libname = 'plaidml.dll'
         libdirs = ['Library', 'bin']
-    if platform.system() == 'Darwin':
+    elif platform.system() == 'Darwin':
         libname = 'libplaidml.dylib'
         libdirs = ['lib']
     else:
