@@ -36,9 +36,9 @@ TEST(Codegen, FuseSimple) {
       [[pid(cond)]] C = (X ? 0 : T);
     }
   )***";
-  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {100, 20}));
+  runinfo.input_shapes.emplace("A", SimpleShape(DataType::FLOAT32, {128, 20}));
   runinfo.input_shapes.emplace("B", SimpleShape(DataType::FLOAT32, {20}));
-  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {100, 20}));
+  runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {128, 20}));
   auto program = GenerateStripe(runinfo);
   CompilerState state(program);
 
@@ -60,27 +60,27 @@ TEST(Codegen, FuseSimple) {
 
   auto expected = R"**(0: #program #total_macs=0 
 block []:1 ( // simple_fuse
-    #user none new@0x00000000 A[0, 0] fp32:I(100, 20):(20, 1):7.8125 KiB
+    #user none new@0x00000000 A[0, 0] fp32:I(128, 20):(20, 1):10 KiB
     #user none new@0x00000000 B[0] fp32:I(20):(1):80 B
-    #user none new@0x00000000 C[0, 0] fp32:I(100, 20):(20, 1):7.8125 KiB
-    #tmp none new@0x00000000 T[0, 0] fp32:I(100, 20):(20, 1):7.8125 KiB
-    #tmp none new@0x00000000 X[0, 0] bool:I(100, 20):(20, 1):1.95312 KiB
+    #user none new@0x00000000 C[0, 0] fp32:I(128, 20):(20, 1):10 KiB
+    #tmp none new@0x00000000 T[0, 0] fp32:I(128, 20):(20, 1):10 KiB
+    #tmp none new@0x00000000 X[0, 0] bool:I(128, 20):(20, 1):2.5 KiB
 ) {
   0: #main 
   block []:1 ( // main
-      in A[0, 0] fp32:I(100, 20):(20, 1):7.8125 KiB, E(100, 20):7.8125 KiB
+      in A[0, 0] fp32:I(128, 20):(20, 1):10 KiB, E(128, 20):10 KiB
       in B[0] fp32:I(20):(1):80 B, E(20):80 B
-      out C[0, 0]:assign fp32:I(100, 20):(20, 1):7.8125 KiB, E(100, 20):7.8125 KiB
-      #tmp inout T[0, 0] fp32:I(100, 20):(20, 1):7.8125 KiB, E(100, 20):7.8125 KiB
-      #tmp inout X[0, 0] bool:I(100, 20):(20, 1):1.95312 KiB, E(100, 20):1.95312 KiB
+      out C[0, 0]:assign fp32:I(128, 20):(20, 1):10 KiB, E(128, 20):10 KiB
+      #tmp inout T[0, 0] fp32:I(128, 20):(20, 1):10 KiB, E(128, 20):10 KiB
+      #tmp inout X[0, 0] bool:I(128, 20):(20, 1):2.5 KiB, E(128, 20):2.5 KiB
   ) {
     0: #eltwise #eltwise_add #fused #kernel 
-    block [i1:100, i2:20]:2000 ( // add(A,B)+cmp_lt(T,_T1)+cond(X,_T3,T)
-        #eltwise_add in A[i1, i2] fp32:I(1, 1):(20, 1):4 B, E(100, 20):7.8125 KiB
+    block [i1:128, i2:20]:2560 ( // add(A,B)+cmp_lt(T,_T1)+cond(X,_T3,T)
+        #eltwise_add in A[i1, i2] fp32:I(1, 1):(20, 1):4 B, E(128, 20):10 KiB
         #eltwise_add in B[i2] fp32:I(1):(1):4 B, E(20):80 B
-        out C[i1, i2] fp32:I(1, 1):(20, 1):4 B, E(100, 20):7.8125 KiB
-        out T[i1, i2] fp32:I(1, 1):(20, 1):4 B, E(100, 20):7.8125 KiB
-        out X[i1, i2] bool:I(1, 1):(20, 1):1 B, E(100, 20):1.95312 KiB
+        out C[i1, i2] fp32:I(1, 1):(20, 1):4 B, E(128, 20):10 KiB
+        out T[i1, i2] fp32:I(1, 1):(20, 1):4 B, E(128, 20):10 KiB
+        out X[i1, i2] bool:I(1, 1):(20, 1):1 B, E(128, 20):2.5 KiB
     ) {
       0: $A = load(A)
       1: $B = load(B)
