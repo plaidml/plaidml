@@ -24,5 +24,6 @@ plaidml_cc_binary(
         "//tile/lib",
         "//tile/stripe",
         "//tile/targets",
+        "//tile/targets/cpu",
     ],
 )
