@@ -19,6 +19,7 @@ plaidml_cc_library(
         "//tile/hal/util:settings",
         "//tile/proto:support",
         "//tile/targets",
+        "//tile/targets/cpu",
     ],
     alwayslink = 1,
 )
