@@ -21,6 +21,7 @@ plaidml_cc_library(
         "//tile/lang",
     ],
     alwayslink = 1,
+    defines = ["PLAIDML_EDSL_DLL"],
 )
 
 plaidml_cc_library(
