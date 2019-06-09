@@ -4,6 +4,7 @@ dependencies:
   - cffi
   - h5py
   - numpy
+  - pip
   - python=3.6
   - scipy=1.2.1
   - pip:

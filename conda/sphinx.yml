@@ -2,6 +2,7 @@ channels:
   - conda-forge
 dependencies:
   - numpy
+  - pip
   - python=3.6
   - pip:
     - autoapi
