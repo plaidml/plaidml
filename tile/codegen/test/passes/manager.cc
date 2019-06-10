@@ -33,8 +33,8 @@ bool random_value<bool>() {
 
 template <>
 int8_t random_value<int8_t>() {
-  static std::uniform_int_distribution<int8_t> i8_dist{-100, 100};
-  int8_t val = i8_dist(g_rand_engine);
+  static std::uniform_int_distribution<short> i8_dist{-100, 100};
+  int8_t val = static_cast<int8_t>(i8_dist(g_rand_engine));
   IVLOG(5, "Making a random i8: " << (int)val);
   return val;
 }
@@ -65,8 +65,8 @@ int64_t random_value<int64_t>() {
 
 template <>
 uint8_t random_value<uint8_t>() {
-  static std::uniform_int_distribution<uint8_t> u8_dist{0, 200};
-  uint8_t val = u8_dist(g_rand_engine);
+  static std::uniform_int_distribution<unsigned short> u8_dist{0, 200};
+  uint8_t val = static_cast<uint8_t>(u8_dist(g_rand_engine));
   IVLOG(5, "Making a random u8: " << val);
   return val;
 }
