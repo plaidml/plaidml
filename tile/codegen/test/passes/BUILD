@@ -9,6 +9,7 @@ plaidml_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//tile/codegen",
+        "//tile/targets/cpu",
         "@boost//:filesystem",
         "@boost//:program_options",
     ],
