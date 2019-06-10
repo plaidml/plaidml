@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import os
 import re
@@ -59,27 +59,32 @@ def CreatePythonPathEntries(python_imports, module_space):
 
 # Find the runfiles tree
 def FindModuleSpace():
-    stub_filename = os.path.abspath(sys.argv[0])
-    while True:
-        module_space = stub_filename + '.runfiles'
-        if os.path.isdir(module_space):
-            return module_space
+    base_filename = os.path.abspath(sys.argv[0])
+    extensions = ['']
+    if IsWindows() and not len(os.path.splitext(base_filename)[1]):
+        extensions.append('.exe')
+    for ext in extensions:
+        stub_filename = base_filename + ext
+        while True:
+            module_space = stub_filename + '.runfiles'
+            if os.path.isdir(module_space):
+                return module_space
 
-        if IsWindows():
-            runfiles_pattern = "(.*\.runfiles)\\.*"
-        else:
-            runfiles_pattern = "(.*\.runfiles)/.*"
-        matchobj = re.match(runfiles_pattern, stub_filename)
-        if matchobj:
-            return matchobj.group(1)
+            if IsWindows():
+                runfiles_pattern = "(.*\.runfiles)\\.*"
+            else:
+                runfiles_pattern = "(.*\.runfiles)/.*"
+            matchobj = re.match(runfiles_pattern, stub_filename)
+            if matchobj:
+                return matchobj.group(1)
 
-        if not os.path.islink(stub_filename):
-            break
-        target = os.readlink(stub_filename)
-        if os.path.isabs(target):
-            stub_filename = target
-        else:
-            stub_filename = os.path.join(os.path.dirname(stub_filename), target)
+            if not os.path.islink(stub_filename):
+                break
+            target = os.readlink(stub_filename)
+            if os.path.isabs(target):
+                stub_filename = target
+            else:
+                stub_filename = os.path.join(os.path.dirname(stub_filename), target)
 
     raise AssertionError('Cannot find .runfiles directory for %s' % sys.argv[0])
 
@@ -118,12 +123,46 @@ def Main():
 
     module_space = FindModuleSpace()
 
+    # Now look for my main python source file.
+    # The magic string percent-main-percent is replaced with the filename of the
+    # main file of the Python binary in BazelPythonSemantics.java.
+    rel_path = os.path.normpath('%main%')
+
+    packages = {}
+    manifest_filename = os.path.join(module_space, 'MANIFEST')
+    with open(manifest_filename) as manifest_file:
+        for line in manifest_file:
+            (logical, physical) = line.split(' ', 2)
+            local = os.path.join(module_space, os.path.normpath(logical))
+            if os.path.basename(local) == '__init__.py':
+                packages[os.path.dirname(os.path.dirname(local))] = True
+            if not os.path.exists(local):
+                if os.path.islink(local):
+                    os.unlink(local)
+                dir_name = os.path.dirname(local)
+                if not os.path.isdir(dir_name):
+                    os.makedirs(GetWindowsPathWithUNCPrefix(dir_name))
+                src = GetWindowsPathWithUNCPrefix(os.path.normpath(physical.rstrip()))
+                try:
+                    os.symlink(src, GetWindowsPathWithUNCPrefix(local))
+                except:
+                    pass
+
+    main_filename = os.path.join(module_space, rel_path)
+    main_filename = GetWindowsPathWithUNCPrefix(main_filename)
+    assert os.path.exists(main_filename), 'Cannot exec() %r: file not found.' % main_filename
+    assert os.access(main_filename, os.R_OK), 'Cannot exec() %r: file not readable.' % main_filename
+
     python_imports = '%imports%'
     python_path_entries = CreatePythonPathEntries(python_imports, module_space)
     python_path_entries += GetRepositoriesImports(module_space, %import_all%)
+    if %import_all%:
+        pkgs = list(packages.keys())
+        for pkg in pkgs:
+            if os.path.dirname(pkg) not in packages:
+                python_path_entries.append(pkg)
 
     python_path_entries = [GetWindowsPathWithUNCPrefix(d) for d in python_path_entries]
-
     old_python_path = os.environ.get('PYTHONPATH')
     python_path = os.pathsep.join(python_path_entries)
     if old_python_path:
@@ -136,31 +175,6 @@ def Main():
     runfiles_envkey, runfiles_envvalue = RunfilesEnvvar(module_space)
     if runfiles_envkey:
         new_env[runfiles_envkey] = runfiles_envvalue
-
-    # Now look for my main python source file.
-    # The magic string percent-main-percent is replaced with the filename of the
-    # main file of the Python binary in BazelPythonSemantics.java.
-    rel_path = os.path.normpath('%main%')
-
-    manifest = {}
-    manifest_filename = os.path.join(module_space, 'MANIFEST')
-    with open(manifest_filename) as manifest_file:
-        for line in manifest_file:
-            (logical, physical) = line.split(' ', 2)
-            local = os.path.join(module_space, os.path.normpath(logical))
-            if not os.path.exists(local):
-                if os.path.islink(local):
-                    os.unlink(local)
-                dir_name = os.path.dirname(local)
-                if not os.path.isdir(dir_name):
-                    os.makedirs(GetWindowsPathWithUNCPrefix(dir_name))
-                src = GetWindowsPathWithUNCPrefix(os.path.normpath(physical.rstrip()))
-                os.symlink(src, GetWindowsPathWithUNCPrefix(local))
-
-    main_filename = os.path.join(module_space, rel_path)
-    main_filename = GetWindowsPathWithUNCPrefix(main_filename)
-    assert os.path.exists(main_filename), 'Cannot exec() %r: file not found.' % main_filename
-    assert os.access(main_filename, os.R_OK), 'Cannot exec() %r: file not readable.' % main_filename
 
     cenv_dir = os.path.join(module_space, '.cenv')
     path = os.environ['PATH'].split(os.pathsep)
