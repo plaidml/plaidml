@@ -36,6 +36,7 @@ except ImportError:
     pass
 try:
     import msvcrt
+    import win32event
     WIN = 1
 except ImportError:
     # Not Windows
@@ -206,13 +207,19 @@ class Singlet:
 
 
 def main():
-    lock_path = os.path.normpath(os.path.expanduser('~/.conda_lock'))
-    with Singlet(lock_path):
-        sys.exit(subprocess.call(['conda'] + sys.argv[1:]))
+    if WIN:
+        mut = win32event.CreateMutex(None, False, 'Local\\CondaLock')
+        win32event.WaitForSingleObject(mut, win32event.INFINITE)
+        sys.exit(subprocess.call([os.environ['CONDA_EXE']] + sys.argv[1:]))
+    else:
+        lock_path = os.path.normpath(os.path.expanduser('~/.conda_lock'))
+        with Singlet(lock_path):
+            sys.exit(subprocess.call(['conda'] + sys.argv[1:]))
 
 
 logger = logging.getLogger("singletony")
 logger.addHandler(logging.StreamHandler())
+
 
 if __name__ == "__main__":
     main()
