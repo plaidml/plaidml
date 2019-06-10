@@ -3,7 +3,7 @@ channels:
 dependencies:
   - numpy
   - pip
-  - python=3.6
+  - python=3.6.0
   - pip:
     - autoapi
     - m2r==0.1.13

@@ -3,5 +3,5 @@ dependencies:
   - bison
   - cmake
   - flex
-  - python=3.6
+  - python=3.6.0
   - setuptools>=40.6.0
