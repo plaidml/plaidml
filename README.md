@@ -40,7 +40,7 @@ It works on all major operating systems: Linux, macOS, and Windows.
 
 For most platforms, getting started with accelerated deep learning is as easy as
 running a few commands (assuming you have Python (v2 or v3) installed. If this 
-doesn't work, see the [installation instructions]:
+doesn't work, see the [troubleshooting documentation](docs/troubleshooting.md):
 
     virtualenv plaidml
     source plaidml/bin/activate
@@ -96,15 +96,17 @@ continuous integration system.
 
 ## Installation Instructions
 
-See detailed per-platform instructions [here].
+We support a variety of operating systems and installation methods. 
 
-### Plaidvision and Plaidbench
+* [Ubuntu Linux](docs/install.rst#ubuntu-linux)
+* [macOS](docs/install.rst#macos)
+* [Windows](docs/install.rst#windows)
 
-We've developed two open source projects: 
+## Demos and Related Projects
 
-  * [plaidvision](https://github.com/plaidml/plaidvision) provides a simple shell for developing vision applications using your webcam
-  * [plaidbench](https://github.com/plaidml/plaidbench) is a performance testing suite designed to help users compare the performance
-  of different cards and different frameworks
+### Plaidbench
+
+[Plaidbench](https://github.com/plaidml/plaidbench) is a performance testing suite designed to help users compare the performance of different cards and different frameworks.
   
 
 ### Hello VGG
@@ -149,6 +151,5 @@ Either open a ticket on [GitHub] or post to [plaidml-dev].
 
 [nGraph Compiler stack]: https://ngraph.nervanasys.com/docs/latest/
 [Keras]: https://keras.io/
-[here]: docs/install.rst
 [GitHub]: https://github.com/plaidml/plaidml/issues
 [plaidml-dev]: https://groups.google.com/forum/#!forum/plaidml-dev
