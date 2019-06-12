@@ -355,6 +355,9 @@ TEST_F(ScheduleTest, CachesIO) {
   )"));
 }
 
+#if !(defined _WIN32 || defined __CYGWIN__)
+// TODO: Get this test to run correctly on Windows.
+
 TEST_F(ScheduleTest, UsesTmps) {
   main_->stmts.emplace_back(stripe::FromProto(ParseProtoText<stripe::proto::Block>(R"(
     name: "sub_block_1" loc {}
@@ -604,6 +607,8 @@ TEST_F(ScheduleTest, UsesTmps) {
     }]
   )"));
 }
+
+#endif  // !Windows
 
 TEST(Schedule, Basic) {
   auto cfg_tmpl = R"(
