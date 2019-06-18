@@ -427,8 +427,10 @@ struct Block : Statement {
   // Helper methods
   std::vector<const Refinement*> ref_ins() const;
   std::vector<const Refinement*> ref_outs() const;
+  std::vector<const Refinement*> ref_inouts() const;
   std::vector<Refinement*> ref_ins();
   std::vector<Refinement*> ref_outs();
+  std::vector<Refinement*> ref_inouts();
   Index* idx_by_name(const std::string& name);
   const Index* idx_by_name(const std::string& name) const;
   std::set<const Index*> accumulation_idxs() const;
