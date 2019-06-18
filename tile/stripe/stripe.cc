@@ -621,6 +621,16 @@ std::vector<const Refinement*> Block::ref_outs() const {
   return results;
 }
 
+std::vector<const Refinement*> Block::ref_inouts() const {
+  std::vector<const Refinement*> results;
+  for (const auto& ref : refs) {
+    if (ref.dir == RefDir::InOut) {
+      results.push_back(&ref);
+    }
+  }
+  return results;
+}
+
 std::vector<Refinement*> Block::ref_ins() {
   std::vector<Refinement*> results;
   for (auto& ref : refs) {
@@ -635,6 +645,16 @@ std::vector<Refinement*> Block::ref_outs() {
   std::vector<Refinement*> results;
   for (auto& ref : refs) {
     if (ref.dir == RefDir::Out) {
+      results.push_back(&ref.mut());
+    }
+  }
+  return results;
+}
+
+std::vector<Refinement*> Block::ref_inouts() {
+  std::vector<Refinement*> results;
+  for (auto& ref : refs) {
+    if (ref.dir == RefDir::InOut) {
       results.push_back(&ref.mut());
     }
   }
