@@ -7,13 +7,31 @@ import uuid
 
 import plaidml.exceptions
 
-if 'PLAIDML_EXPERIMENTAL_CONFIG' not in os.environ:
-    os.environ['PLAIDML_EXPERIMENTAL_CONFIG'] = os.path.join(sys.prefix, 'share', 'plaidml',
-                                                             'experimental.json')
 
-if 'PLAIDML_DEFAULT_CONFIG' not in os.environ:
-    os.environ['PLAIDML_DEFAULT_CONFIG'] = os.path.join(sys.prefix, 'share', 'plaidml',
-                                                        'config.json')
+def _find_config(name):
+    prefixes = [
+        sys.prefix,
+        os.path.join(sys.prefix, 'local'),
+    ]
+    for prefix in prefixes:
+        cfg_path = os.path.join(prefix, 'share', 'plaidml', name)
+        if os.path.exists(cfg_path):
+            return cfg_path
+    return None
+
+
+def _setup_config(env_var, filename):
+    if env_var not in os.environ:
+        cfg_path = _find_config(filename)
+        if cfg_path:
+            os.environ[env_var] = cfg_path
+        elif 'RUNFILES_DIR' not in os.environ:
+            raise plaidml.exceptions.PlaidMLError(
+                'Could not find PlaidML configuration file: "{}".'.format(filename))
+
+
+_setup_config('PLAIDML_EXPERIMENTAL_CONFIG', 'experimental.json')
+_setup_config('PLAIDML_DEFAULT_CONFIG', 'config.json')
 
 CONFIG = 'PLAIDML_CONFIG'
 CONFIG_FILE = 'PLAIDML_CONFIG_FILE'

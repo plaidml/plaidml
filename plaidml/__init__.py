@@ -140,7 +140,7 @@ class _Library(plaidml.library.Library):
             plog.addHandler(DEFAULT_LOG_HANDLER)
             logger = plog.log
 
-        def load_library(libname, libdirs):
+        def load_library(libname, libdirs, prefixes=[sys.exec_prefix]):
             # When running under Bazel with an uninstalled native
             # library, we'll be able to find correct native library to
             # use in this script's directory -- if it exists, we
@@ -160,8 +160,12 @@ class _Library(plaidml.library.Library):
                 # mis-installed), this will fail, and report the
                 # correct path for diagnosis.
                 libdirs.append(libname)
-                libpath = os.path.join(sys.exec_prefix, *libdirs)
-                return ctypes.cdll.LoadLibrary(libpath)
+                for prefix in prefixes:
+                    libpath = os.path.join(prefix, *libdirs)
+                    if os.path.exists(libpath):
+                        return ctypes.cdll.LoadLibrary(libpath)
+                raise exceptions.PlaidMLError(
+                    'Could not find PlaidML library file: "{}".'.format(libname))
 
         if 'PLAIDML_NATIVE_PATH' in os.environ:
             # If we have an environment var pointing to our native
@@ -173,7 +177,8 @@ class _Library(plaidml.library.Library):
         elif platform.system() == 'Darwin':
             lib = load_library('libplaidml.dylib', ['lib'])
         else:
-            lib = load_library('libplaidml.so', ['lib'])
+            prefixes = [sys.exec_prefix, os.path.join(sys.exec_prefix, 'local')]
+            lib = load_library('libplaidml.so', ['lib'], prefixes)
 
         super(_Library, self).__init__(lib, logger=logger)
 
@@ -913,8 +918,8 @@ class Function(_Function):
                 logging.getLogger(__name__).info(code)
                 logging.getLogger(__name__).info(backtrace)
 
-        super(Function, self).__init__(_lib().plaidml_build_coded_function(
-            code.encode(), fid.encode()))
+        super(Function,
+              self).__init__(_lib().plaidml_build_coded_function(code.encode(), fid.encode()))
 
 
 def load_function(ctx, device, filename):
@@ -1251,9 +1256,8 @@ class Tensor(Var):
 
     def as_ndarray(self, ctx):
         if self._ndarray is None:
-            self._ndarray = np.ndarray(
-                tuple(dim.size for dim in self.shape.dimensions),
-                dtype=_NP_TYPES[self.shape.dtype])
+            self._ndarray = np.ndarray(tuple(dim.size for dim in self.shape.dimensions),
+                                       dtype=_NP_TYPES[self.shape.dtype])
         with self.mmap_current() as view:
             view.copy_to_ndarray(self._ndarray)
         return self._ndarray
