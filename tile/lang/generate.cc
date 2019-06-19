@@ -257,10 +257,39 @@ static void ContractionWrap(KernelList& r, const Contraction* c, FlatContraction
   // Flatten out needless dimensions
   while (SimplifyFlat(&flat)) {
   }
-  // Do memory based tile optimization
-  for (auto vec_size = settings.vec_size; flat.agg_vec == 1 && 1 < vec_size; vec_size /= 2) {
-    flat = Vectorize(flat, vec_size);
+
+  bool do_vectorization = true;
+  auto is_small_data_element = [&](const std::string& name) {
+    auto it = vars.find(name);
+    if (it == vars.end()) {
+      return true;
+    }
+    switch (it->second.shape.type) {
+      case DataType::INT64:
+      case DataType::INT128:
+      case DataType::UINT64:
+        return false;
+      default:
+        return true;
+    }
+  };
+  for (auto it = flat.inputs.begin(); do_vectorization && it != flat.inputs.end(); ++it) {
+    do_vectorization &= is_small_data_element(*it);
   }
+  do_vectorization &= is_small_data_element(flat.output);
+  for (auto it = flat.post_op_inputs.begin(); do_vectorization && it != flat.post_op_inputs.end(); ++it) {
+    do_vectorization &= is_small_data_element(it->name);
+  }
+  for (auto it = flat.kernel_outputs.begin(); do_vectorization && it != flat.kernel_outputs.end(); ++it) {
+    do_vectorization &= is_small_data_element(*it);
+  }
+  if (do_vectorization) {
+    // Do memory based tile optimization
+    for (auto vec_size = settings.vec_size; flat.agg_vec == 1 && 1 < vec_size; vec_size /= 2) {
+      flat = Vectorize(flat, vec_size);
+    }
+  }
+
   std::string flat_key = flat.CacheKeyString(vars);
   auto it = flat_cache->find(flat_key);
   if (it != flat_cache->end()) {
