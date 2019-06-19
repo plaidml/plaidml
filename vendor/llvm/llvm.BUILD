@@ -41,14 +41,16 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python3) \
     -DCMAKE_CROSSCOMPILING=True \
     -DLLVM_DEFAULT_TARGET_TRIPLE=arm-linux-gnueabihf \
-    -DLLVM_ENABLE_TERMINFO=OFF
+    -DLLVM_ENABLE_TERMINFO=OFF \
+    -DHAVE_LIBEDIT=0
 """,
         "@toolchain//:linux_arm_64v8": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python3) \
     -DCMAKE_CROSSCOMPILING=True \
     -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-linux-gnueabi \
-    -DLLVM_ENABLE_TERMINFO=OFF
+    -DLLVM_ENABLE_TERMINFO=OFF \
+    -DHAVE_LIBEDIT=0
 """,
         "@toolchain//:macos_x86_64": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
@@ -57,21 +59,24 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DHAVE_LIBEDIT=0 \
     -DHAVE_FUTIMENS=0 \
     -DHAVE_VALGRIND_VALGRIND_H=0 \
-    -DLLVM_TARGETS_TO_BUILD="X86"
+    -DLLVM_TARGETS_TO_BUILD="X86" \
+    -DHAVE_LIBEDIT=0
 """,
         "@toolchain//:windows_x86_64": """
 env;$${CONDA_PREFIX}/Library/bin/cmake -Thost=x64 -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python) \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_VALGRIND_VALGRIND_H=0 \
-    -DLLVM_TARGETS_TO_BUILD="X86"
+    -DLLVM_TARGETS_TO_BUILD="X86" \
+    -DHAVE_LIBEDIT=0
 """,
         "//conditions:default": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python3) \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_VALGRIND_VALGRIND_H=0 \
-    -DLLVM_TARGETS_TO_BUILD="X86"
+    -DLLVM_TARGETS_TO_BUILD="X86" \
+    -DHAVE_LIBEDIT=0
 """,
     }),
 )
