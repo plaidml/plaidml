@@ -235,7 +235,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
       promise->set_value(std::move(library));
     } catch (...) {
       try {
-        promise->set_exception(std::current_exception());
+        promise->set_exception(boost::current_exception());
       } catch (...) {
       }  // set_exception() may throw too
     }
@@ -309,7 +309,7 @@ boost::future<std::unique_ptr<hal::Executable>> Library::Prepare() {
         promise->set_value(std::move(kernel));
       } catch (...) {
         try {
-          promise->set_exception(std::current_exception());
+          promise->set_exception(boost::current_exception());
         } catch (...) {
         }  // set_exception() may throw too
       }
@@ -528,7 +528,7 @@ Event::Event(const context::Context& ctx,  //
       promise->set_value(result);
     } catch (...) {
       try {
-        promise->set_exception(std::current_exception());
+        promise->set_exception(boost::current_exception());
       } catch (...) {
       }  // set_exception() may throw too
     }
