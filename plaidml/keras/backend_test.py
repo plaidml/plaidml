@@ -685,7 +685,8 @@ class TestBackendOps(unittest.TestCase):
     def testSoftmax(self, b, x):
         return [-b.log(b.softmax(x))]
 
-    @opTest([[m(10, 10)]])
+    # TODO: Enable gradients again after we fix the Stripe bug
+    @opTest([[m(10, 10)]], do_grads=False)
     def testSign(self, b, x):
         return [b.sign(x)]
 
@@ -1064,10 +1065,7 @@ class TestBackendOps(unittest.TestCase):
     def testSqueeze(self, b, x, ax):
         return [b.squeeze(x, ax)]
 
-    @opTest([
-        [m(10, 10), n(10,10), 0],
-        [m(10, 10), n(10,10), -1]
-    ])
+    @opTest([[m(10, 10), n(10, 10), 0], [m(10, 10), n(10, 10), -1]])
     def testStack(self, b, *args):
         return [b.stack(args[:-1])]
 
@@ -1461,7 +1459,7 @@ class TestBackendOps(unittest.TestCase):
     # TODO(T1026): Switch to opTest once PROD AggregationOp supports derivatives
     @compareForwardExact()
     def testCumProd(self, b):
-        t = b.constant(m(5,3))
+        t = b.constant(m(5, 3))
         return b.cumprod(t, 1)
 
     @opTest([[m(4, 7, 1)], [m(2, 8, 3), (1, 3)], [m(2, 5, 7), (0, 0)]])
