@@ -4,6 +4,8 @@
 
 #include <string>
 
+#include <boost/exception_ptr.hpp>
+
 #include "base/util/error.h"
 #include "base/util/logging.h"
 #include "plaidml/base/status_strings.h"
@@ -71,7 +73,16 @@ void SetLastStatus(vai_status status, const char* str) noexcept {
 
 void SetLastException(std::exception_ptr ep) noexcept {
   try {
-    std::rethrow_exception(ep);
+    try {
+      std::rethrow_exception(ep);
+    } catch (const std::exception_ptr& epp) {
+      // This shouldn't ever happen, but it's pretty easy to get into this situation; for example,
+      // boost::exception_ptr can be constructed to wrap std::exception_ptr (as a generic object, not with
+      // knowledge that it's wrapping an exception), so if you resolve a boost::promise<> with
+      // std::current_exception(), you'll get a boost::exception_ptr wrapping a std::exception_ptr wrapping
+      // the original exception.
+      std::rethrow_exception(epp);
+    }
   } catch (const error::Error& e) {
     ErrToCode coder;
     e.Accept(&coder);
@@ -81,7 +92,8 @@ void SetLastException(std::exception_ptr ep) noexcept {
   } catch (const std::exception& e) {
     SetLastStatus(VAI_STATUS_UNKNOWN, e.what());
   } catch (...) {
-    SetLastStatus(VAI_STATUS_INTERNAL, "The exception chain appears to be corrupt");
+    std::string info = boost::diagnostic_information(boost::current_exception());
+    SetLastStatus(VAI_STATUS_UNKNOWN, info.c_str());
   }
 }
 
