@@ -466,6 +466,492 @@ TEST(Jit, JitExternalMUL_F32) {
   EXPECT_THAT(b2[0], Eq(6.0));
 }
 
+TEST(Jit, JitExpSub1Nested) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    loc {}
+    idxs { name: "i1" range: 3 }
+    refs [
+      {
+        key: "X_I_0"
+        value {
+          loc {}
+          dir: 1
+          interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+          access { offset: 0 terms {key:"i1" value:1} }
+        }
+      },
+      {
+        key: "X_T1"
+        value {
+          loc {}
+          dir: 2
+          interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+          access { offset: 0 terms {key:"i1" value:1} }
+        }
+      }
+    ]
+    stmts { load { from:"X_I_0" into:"$X_I_0" } }
+    stmts { intrinsic { name:"exp" type:FLOAT64 inputs:"$X_I_0" outputs:"$X_T1" } }
+    stmts { store { from:"$X_T1" into:"X_T1"} }
+
+
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> X_I_0{2.0, 1.0, 0.5};
+  std::vector<float> X_T1{47, 99, 100};
+  std::map<std::string, void*> buffers{{"X_I_0", X_I_0.data()}, {"X_T1", X_T1.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_FLOAT_EQ(X_T1[0], 7.3890562);
+  EXPECT_FLOAT_EQ(X_T1[1], 2.7182817);
+  EXPECT_FLOAT_EQ(X_T1[2], 1.6487212);
+}
+
+TEST(Jit, JitExpSub2) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    loc {}
+
+    idxs { name: "x0" range: 3 }
+    refs [
+      {
+        key: "X_T4"
+        value {
+          loc {}
+          dir: 2
+          agg_op: "add"
+          interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+          access { offset: 0 terms {key:"x0" value:1} }
+        }
+      }
+    ]
+    stmts { constant { name: "$X_T3" fconst:0.333333 } }
+    stmts { intrinsic { name: "assign" type:FLOAT32 inputs: "$X_T3" outputs: "$X_T4" } }
+    stmts { store { from: "$X_T4" into: "X_T4" } }
+
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> X_T4{47, 99, 100};
+  std::map<std::string, void*> buffers{{"X_T4", X_T4.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_FLOAT_EQ(X_T4[0], 47.333333);
+  EXPECT_FLOAT_EQ(X_T4[1], 99.333333);
+  EXPECT_FLOAT_EQ(X_T4[2], 100.333333);
+}
+
+TEST(Jit, JitExpSub2Nested) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    loc {}
+    refs [
+      {
+        key: "X_T4"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+          access { }
+        }
+      }
+    ]
+
+    stmts { block {
+      idxs { name: "x0" range: 3 }
+      refs [
+        {
+          key: "X_T4"
+          value {
+            loc {}
+            dir: 2
+            agg_op: "add"
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { offset: 0 terms {key:"x0" value:1} }
+          }
+        }
+      ]
+      stmts { constant { name: "$X_T3" fconst:0.333333 } }
+      stmts { intrinsic { name: "assign" type:FLOAT32 inputs: "$X_T3" outputs: "$X_T4" } }
+      stmts { store { from: "$X_T4" into: "X_T4" } }
+    }}
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> X_T4{47, 99, 100};
+  std::map<std::string, void*> buffers{{"X_T4", X_T4.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_FLOAT_EQ(X_T4[0], 47.333333);
+  EXPECT_FLOAT_EQ(X_T4[1], 99.333333);
+  EXPECT_FLOAT_EQ(X_T4[2], 100.333333);
+}
+
+TEST(Jit, JitExpSub3Nested) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    loc {}
+    refs [
+      {
+        key: "X_I_0"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+          access { }
+        }
+      },
+      {
+        key: "X_T6"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+          access { }
+        }
+      }
+    ]
+    stmts { block {
+      refs [
+        {
+          key: "X_I_0"
+          value {
+            loc {}
+            dir: 1
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "X_T1"
+          value {
+            loc {}
+            dir: 0
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "X_T4"
+          value {
+            loc {}
+            dir: 0
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "X_T6"
+          value {
+            loc {}
+            dir: 2
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        }
+      ]
+
+      stmts { block {
+        idxs { name: "i1" range: 3 }
+        refs [
+          {
+            key: "X_I_0"
+            value {
+              loc {}
+              dir: 1
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          },
+          {
+            key: "X_T1"
+            value {
+              loc {}
+              dir: 2
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          }
+        ]
+        stmts { load { from:"X_I_0" into:"$X_I_0" } }
+        stmts { intrinsic { name:"exp" type:FLOAT32 inputs:"$X_I_0" outputs:"$X_T1" } }
+        stmts { store { from:"$X_T1" into:"X_T1"} }
+      } }
+
+      stmts { block {
+        idxs { name: "x0" range: 3 }
+        refs [
+          {
+            key: "X_T4"
+            value {
+              loc {}
+              dir: 2
+              agg_op: "add"
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"x0" value:1} }
+            }
+          }
+        ]
+        stmts { constant { name: "$X_T3" fconst:0.333333 } }
+        stmts { intrinsic { name: "assign" type:FLOAT32 inputs: "$X_T3" outputs: "$X_T4" } }
+        stmts { store { from: "$X_T4" into: "X_T4" } }
+      } }
+
+      stmts { block {
+        idxs { name: "i1" range: 3 }
+        refs [
+          {
+            key: "X_T1"
+            value {
+              loc {}
+              dir: 1
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          },
+          {
+            key: "X_T4"
+            value {
+              loc {}
+              dir: 1
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          },
+          {
+            key: "X_T6"
+            value {
+              loc {}
+              dir: 2
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          }
+        ]
+        stmts { load { from: "X_T1" into: "$X_T1" } }
+        stmts { load { from: "X_T4" into: "$X_T4" } }
+        stmts { intrinsic { name: "mul" type:FLOAT32 inputs: "$X_T1" inputs: "$X_T4" outputs: "$X_T6" } }
+        stmts { store { from: "$X_T6" into: "X_T6" } }
+      } }
+
+    } }
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> X_I_0{-2.0, -1.0, 0.0};
+  std::vector<float> X_T6{47, 99, 100};
+  std::map<std::string, void*> buffers{{"X_I_0", X_I_0.data()}, {"X_T6", X_T6.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_FLOAT_EQ(X_T6[0], 0.0451117);
+  EXPECT_FLOAT_EQ(X_T6[1], 0.12262636);
+  EXPECT_FLOAT_EQ(X_T6[2], 0.333333);
+}
+
+TEST(Jit, JitExpSub4Nested) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    loc {}
+    refs [
+      {
+        key: "X_I_0"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+          access { }
+        }
+      },
+      {
+        key: "X_T7"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+          access { }
+        }
+      }
+    ]
+    stmts { block {
+      refs [
+        {
+          key: "X_I_0"
+          value {
+            loc {}
+            dir: 1
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "X_T1"
+          value {
+            loc {}
+            dir: 0
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "X_T4"
+          value {
+            loc {}
+            dir: 0
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "X_T6"
+          value {
+            loc {}
+            dir: 0
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        },
+        {
+          key: "X_T7"
+          value {
+            loc {}
+            dir: 2
+            interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+            access { }
+          }
+        }
+      ]
+
+      stmts { block {
+        idxs { name: "i1" range: 3 }
+        refs [
+          {
+            key: "X_I_0"
+            value {
+              loc {}
+              dir: 1
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          },
+          {
+            key: "X_T1"
+            value {
+              loc {}
+              dir: 2
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          }
+        ]
+        stmts { load { from:"X_I_0" into:"$X_I_0" } }
+        stmts { intrinsic { name:"exp" type:FLOAT32 inputs:"$X_I_0" outputs:"$X_T1" } }
+        stmts { store { from:"$X_T1" into:"X_T1"} }
+      } }
+
+      stmts { block {
+        idxs { name: "x0" range: 3 }
+        refs [
+          {
+            key: "X_T4"
+            value {
+              loc {}
+              dir: 2
+              agg_op: "add"
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"x0" value:1} }
+            }
+          }
+        ]
+        stmts { constant { name: "$X_T3" fconst:0.333333 } }
+        stmts { intrinsic { name: "assign" type:FLOAT32 inputs: "$X_T3" outputs: "$X_T4" } }
+        stmts { store { from: "$X_T4" into: "X_T4" } }
+      } }
+
+      stmts { block {
+        idxs { name: "i1" range: 3 }
+        refs [
+          {
+            key: "X_T1"
+            value {
+              loc {}
+              dir: 1
+               interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { }
+            }
+          },
+          {
+            key: "X_T4"
+            value {
+              loc {}
+              dir: 1
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          },
+          {
+            key: "X_T6"
+            value {
+              loc {}
+              dir: 2
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          }
+        ]
+        stmts { load { from: "X_T1" into: "$X_T1" } }
+        stmts { load { from: "X_T4" into: "$X_T4" } }
+        stmts { intrinsic { name: "mul" type:FLOAT32 inputs: "$X_T1" inputs: "$X_T4" outputs: "$X_T6" } }
+        stmts { store { from: "$X_T6" into: "X_T6" } }
+      } }
+
+      stmts { block {
+        idxs { name: "i1" range: 3 }
+        refs [
+          {
+            key: "X_T6"
+            value {
+              loc {}
+              dir: 1
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          },
+          {
+            key: "X_T7"
+            value {
+              loc {}
+              dir: 2
+              interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
+              access { offset: 0 terms {key:"i1" value:1} }
+            }
+          }
+        ]
+        stmts { load { from: "X_T6" into: "$X_T6" } }
+        stmts { intrinsic { name: "ident" type:FLOAT32 inputs: "$X_T6" outputs: "$X_T7" } }
+        stmts { store { from: "$X_T7" into: "X_T7" } }
+      } }
+
+    } }
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<float> X_I_0{-2.0, -1.0, 0.0};
+  std::vector<float> X_T7{47, 99, 100};
+  std::map<std::string, void*> buffers{{"X_I_0", X_I_0.data()}, {"X_T7", X_T7.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_FLOAT_EQ(X_T7[0], 0.0451117);
+  EXPECT_FLOAT_EQ(X_T7[1], 0.0451117);
+  EXPECT_FLOAT_EQ(X_T7[2], 0.0451117);
+}
+
 }  // namespace test
 }  // namespace cpu
 }  // namespace targets
