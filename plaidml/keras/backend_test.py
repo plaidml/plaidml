@@ -1500,6 +1500,10 @@ class TestBackendOps(unittest.TestCase):
     def res2a_branch2a(self, b, x, k):
         return [b.conv2d(x, k, strides=(1, 1), padding='same')]
 
+    @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]], do_grads=False)
+    def res2a_branch2b(self, b, x, k):
+        return [b.conv2d(x, k, strides=(1, 1), padding='same')]
+
     @opTest([[m(1, 2048), m(2048, 1000)]], do_grads=False)
     def fc_1000(self, b, x, k):
         return [b.dot(x, k)]

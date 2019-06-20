@@ -140,7 +140,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Value* Eval(const stripe::Affine& access);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
-  void CallIntrinsicFunc(const stripe::Intrinsic&, const char* name);
+  void CallIntrinsicFunc(const stripe::Intrinsic&, const char* name_f32, const char* name_f64);
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
@@ -333,6 +333,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     builder_.CreateBr(loops[i].test);
     builder_.SetInsertPoint(loops[i].test);
     llvm::Value* index = builder_.CreateLoad(variable);
+    assert(block.idxs[i].affine == Affine());
     llvm::Value* range = IndexConst(block.idxs[i].range);
     llvm::Value* limit = builder_.CreateAdd(init, range);
     llvm::Value* go = builder_.CreateICmpULT(index, limit);
@@ -958,15 +959,15 @@ void Compiler::BitRight(const stripe::Intrinsic& stmt) {
   OutputType(ret, stmt);
 }
 
-void Compiler::Sqrt(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "sqrt"); }
+void Compiler::Sqrt(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "sqrtf", "sqrt"); }
 
-void Compiler::Exp(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "exp"); }
+void Compiler::Exp(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "expf", "exp"); }
 
-void Compiler::Log(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "log"); }
+void Compiler::Log(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "logf", "log"); }
 
-void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "pow"); }
+void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "powf", "pow"); }
 
-void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanh"); }
+void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanhf", "tanh"); }
 
 void Compiler::Zero(const stripe::Special& zero) {
   // present in stripe.proto but not defined in the specification
@@ -1090,11 +1091,15 @@ void Compiler::OutputBool(llvm::Value* ret, const stripe::Intrinsic& intrinsic) 
   scalars_[intrinsic.outputs[0]] = Scalar{ret, DataType::BOOLEAN};
 }
 
-void Compiler::CallIntrinsicFunc(const stripe::Intrinsic& stmt, const char* name) {
+void Compiler::CallIntrinsicFunc(const stripe::Intrinsic& stmt, const char* name_f32, const char* name_f64) {
   assert(1 == stmt.inputs.size());
   Scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
   std::vector<llvm::Value*> argvals{op.value};
-  auto ctype = CType(stmt.type);
+  // C intrinsics come in either f32 or f64 flavors. We'll use f32 for single
+  // and half-precision float inputs, f64 for ints and doubles
+  bool use_f32 = (stmt.type == DataType::FLOAT16 || stmt.type == DataType::FLOAT32);
+  const char* name = use_f32 ? name_f32 : name_f64;
+  llvm::Type* ctype = use_f32 ? builder_.getFloatTy() : builder_.getDoubleTy();
   std::vector<llvm::Type*> argtypes{ctype};
   auto functype = llvm::FunctionType::get(ctype, argtypes, false);
   auto func = module_->getOrInsertFunction(name, functype);
