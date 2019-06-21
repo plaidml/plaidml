@@ -104,6 +104,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Log(const stripe::Intrinsic&);
   void Pow(const stripe::Intrinsic&);
   void Tanh(const stripe::Intrinsic&);
+  void Cos(const stripe::Intrinsic&);
   void Zero(const stripe::Special&);
   void Copy(const stripe::Special&);
   void Reshape(const stripe::Special&);
@@ -434,6 +435,17 @@ void Compiler::Visit(const stripe::Store& store) {
       flag = builder_.CreateICmpUGT(prev, value);
     }
     value = builder_.CreateSelect(flag, prev, value);
+  } else if ("min" == agg_op) {
+    llvm::Value* prev = builder_.CreateLoad(element);
+    llvm::Value* flag = nullptr;
+    if (is_float(from.type)) {
+      flag = builder_.CreateFCmpULT(prev, value);
+    } else if (is_int(from.type)) {
+      flag = builder_.CreateICmpSLT(prev, value);
+    } else if (is_uint(from.type)) {
+      flag = builder_.CreateICmpULT(prev, value);
+    }
+    value = builder_.CreateSelect(flag, prev, value);
   } else if ("assign" == agg_op) {
     // fall through to assignment
   } else if (!agg_op.empty()) {
@@ -528,6 +540,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"log", &Compiler::Log},
       {"pow", &Compiler::Pow},
       {"tanh", &Compiler::Tanh},
+      {"cos", &Compiler::Cos},
   };
   auto externiter = external_handlers_.find(intrinsic.name);
   if (externiter != external_handlers_.end()) {
@@ -861,6 +874,8 @@ void Compiler::Equal(const stripe::Intrinsic& eq) {
     ret = builder_.CreateFCmpOEQ(lhs.value, rhs.value);
   } else if (is_int(eq.type) || is_uint(eq.type)) {
     ret = builder_.CreateICmpEQ(lhs.value, rhs.value);
+  } else if (DataType::BOOLEAN == eq.type) {
+    ret = builder_.CreateICmpEQ(lhs.value, rhs.value);
   } else {
     throw Error("Invalid comparison type (EQ): " + to_string(eq.type));
   }
@@ -879,6 +894,8 @@ void Compiler::Unequal(const stripe::Intrinsic& neq) {
   if (is_float(neq.type)) {
     ret = builder_.CreateFCmpONE(lhs.value, rhs.value);
   } else if (is_int(neq.type) || is_uint(neq.type)) {
+    ret = builder_.CreateICmpNE(lhs.value, rhs.value);
+  } else if (DataType::BOOLEAN == neq.type) {
     ret = builder_.CreateICmpNE(lhs.value, rhs.value);
   } else {
     throw Error("Invalid comparison type (NE): " + to_string(neq.type));
@@ -968,6 +985,8 @@ void Compiler::Log(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "log
 void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "powf", "pow"); }
 
 void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanhf", "tanh"); }
+
+void Compiler::Cos(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "cosf", "cos"); }
 
 void Compiler::Zero(const stripe::Special& zero) {
   // present in stripe.proto but not defined in the specification
