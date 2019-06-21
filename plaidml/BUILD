@@ -67,6 +67,7 @@ PLAIDML_CPP_DEPS = [
         "//tile/hal/opencl",
     ],
     "@toolchain//:windows_x86_64": [
+        "//tile/hal/cpu",
         "//tile/hal/opencl",
     ],
     "//conditions:default": [
