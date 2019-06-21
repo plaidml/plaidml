@@ -80,6 +80,22 @@ conda_test(
 )
 
 conda_test(
+    name = "tf_test",
+    srcs = [
+        "tf_test.py",
+    ],
+    env = "@com_intel_plaidml_conda//:env",
+    tags = [
+        "keras",
+        "tensorflow",
+    ],
+    deps = [
+        ":keras",
+        "//testing:plaidml_py",
+    ],
+)
+
+conda_test(
     name = "tile_sandbox",
     srcs = [
         "tile_sandbox.py",
