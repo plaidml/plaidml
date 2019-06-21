@@ -126,6 +126,22 @@ class TestTF(unittest.TestCase):
     """Tensorflow like operation tests."""
 
     @opTest([
+        [np.random.random((5, 60, 10, 3)), [1, 3, 4, 1], [1, 3, 3, 1], [1, 1, 1, 1], "SAME"],
+        [np.random.random((5, 60, 10, 3)), [1, 3, 4, 1], [1, 3, 3, 1], [1, 1, 1, 1], "VALID"],
+        [np.random.random((5, 60, 10, 3)), [1, 4, 3, 1], [1, 1, 1, 1], [1, 1, 1, 1], "SAME"],
+        [np.random.random((5, 60, 10, 3)), [1, 4, 3, 1], [1, 1, 1, 1], [1, 6, 5, 1], "SAME"],
+    ])
+    def testExtractImagePatches(self,
+                                b,
+                                images,
+                                ksizes,
+                                strides,
+                                rates=(1, 1, 1, 1),
+                                padding="VALID"):
+        func = tensorflow.extract_image_patches if b == tf else plaidml.op.extract_image_patches
+        return [func(images, ksizes, strides, rates, padding)]
+
+    @opTest([
         [np.random.random((5, 60, 10, 3)), [[0, 0], [5, 2], [5, 3], [0, 0]]],
         [np.random.random((5, 60, 10, 3)), [[4, 0], [0, 2], [5, 3], [0, 1]]],
         [np.random.random((60, 10)), [[0, 0], [0, 0]]],
