@@ -33,9 +33,9 @@ local PARAMS = {
               name: 'const_prop',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ConstantPropagatePass',
-              }
+              },
             },
-            // , we place all the initial buffer in global memory (DRAM)
+            // we place all the initial buffer in global memory (DRAM)
             {
               name: 'loc_program',
               pass: {
@@ -67,7 +67,7 @@ local PARAMS = {
               name: 'kernel_tag',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.KernelTagPass',
-                reqs: ['kernel']
+                reqs: ['kernel'],
               },
             },
 
@@ -102,9 +102,9 @@ local PARAMS = {
             // Reorder Blocks
             {
               name: 'reorder_blocks',
-              pass : {
+              pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
-              }
+              },
             },
 
             // Pad tensors to remove inner conditionals
@@ -131,8 +131,8 @@ local PARAMS = {
                 reqs: ['contraction', 'agg_op_add', 'comb_op_mul'],
                 subgroup_sizes: PARAMS[cfg].SUBGROUP_SIZES,
                 threshold: 1024 * 2048,
-                zero_error: 0.00001
-              }
+                zero_error: 0.00001,
+              },
             },
 
             // Do subgroup pass
@@ -341,7 +341,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.TempVarPass',
                 reqs: ['all'],
               },
-            }
+            },
           ],
         },
       },
