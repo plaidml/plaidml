@@ -373,7 +373,9 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
 
 sem::StmtPtr SemtreeEmitter::make_special(const std::string& name, const stripe::Block& block,
                                           std::vector<const stripe::Refinement*> args) {
-  throw std::runtime_error("TODO: Special");
+  std::stringstream ss;
+  ss << "TODO: Special: " << name;
+  throw std::runtime_error(ss.str());
   /*
   std::vector<sem::ExprPtr> params;
   for (const stripe::Refinement* ref : args) {

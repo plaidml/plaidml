@@ -135,7 +135,6 @@ conda_test(
     env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
-        "trusty",
     ],
     deps = [
         ":keras",

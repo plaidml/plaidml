@@ -27,6 +27,7 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   auto stripe = GenerateStripe(runinfo);
   codegen::OptimizeOptions options;
   options.dump_passes = !out_dir.empty();
+  options.dump_passes_proto = !out_dir.empty();
   options.dbg_dir = out_dir + "/passes";
   IVLOG(1, *stripe->entry);
   const auto& cfgs = targets::GetConfigs();
