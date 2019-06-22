@@ -2,7 +2,7 @@
 
 def _gencfg_impl(ctx):
     args = ctx.actions.args()
-    args.add(ctx.files.srcs)
+    args.add_all(ctx.files.srcs)
     args.add("--identifier", ctx.attr.identifier)
     args.add("--out", ctx.outputs.out)
     ctx.actions.run(

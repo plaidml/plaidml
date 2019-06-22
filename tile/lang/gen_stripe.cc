@@ -410,12 +410,11 @@ class StripeGenerator {
           loaded.emplace(input);
           std::vector<Affine> access;
           int start = (out_shape.dims.size() >= shape.dims.size()) ? 0 : (shape.dims.size() - out_shape.dims.size());
-          int idx_offset = out_shape.dims.size() - shape.dims.size(); // can be negative
+          int idx_offset = out_shape.dims.size() - shape.dims.size();  // can be negative
           for (int i = 0; i < shape.dims.size(); i++) {
             if (i < start) {
               access.emplace_back(Affine{});
-            }
-            else {
+            } else {
               const auto& dim = shape.dims[i];
               if (dim.size > 1) {
                 access.emplace_back(Affine{kernel->idxs[i + idx_offset].name});
