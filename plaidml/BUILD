@@ -118,6 +118,23 @@ plaidml_macos_dylib(
     tags = ["darwin"],
 )
 
+plaidml_cc_library(
+    name = "internal",
+    srcs = select({
+        "@toolchain//:windows_x86_64": [":plaidml.dll"],
+        "@toolchain//:macos_x86_64": [":libplaidml_macos"],
+        "//conditions:default": [":libplaidml.so"],
+    }),
+    hdrs = PLAIDML_CPP_HEADERS,
+    linkstatic = 1,  # bazel warning suggests setting this
+    visibility = ["//visibility:public"],
+    deps = [
+        "//plaidml/base:api",
+        "//plaidml/edsl:public",
+        "@half",
+    ],
+)
+
 plaidml_cc_test(
     name = "plaidml_test",
     srcs = ["plaidml_test.cc"],

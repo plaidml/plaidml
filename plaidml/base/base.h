@@ -215,6 +215,26 @@ VAI_API int64_t vai_get_perf_counter(const char* name);
 // If there is no performance counter with that name, no action is taken.
 VAI_API void vai_set_perf_counter(const char* name, int64_t value);
 
+// A PlaidML datatype indicates the type of data stored within a buffer, as
+// observed by a program.
+typedef enum {
+  PLAIDML_DATA_INVALID = 0,
+  PLAIDML_DATA_BOOLEAN = 0x02,
+  PLAIDML_DATA_INT8 = 0x10,
+  PLAIDML_DATA_INT16 = 0x11,
+  PLAIDML_DATA_INT32 = 0x12,
+  PLAIDML_DATA_INT64 = 0x13,
+  PLAIDML_DATA_INT128 = 0x14,
+  PLAIDML_DATA_UINT8 = 0x20,
+  PLAIDML_DATA_UINT16 = 0x21,
+  PLAIDML_DATA_UINT32 = 0x22,
+  PLAIDML_DATA_UINT64 = 0x23,
+  PLAIDML_DATA_FLOAT16 = 0x31,
+  PLAIDML_DATA_FLOAT32 = 0x32,
+  PLAIDML_DATA_FLOAT64 = 0x33,
+  PLAIDML_DATA_PRNG = 0x40,
+} plaidml_datatype;
+
 #ifdef __cplusplus
 }  // extern "C"
 

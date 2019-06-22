@@ -14,10 +14,14 @@ exports_files([
 plaidml_cc_library(
     name = "ffi",
     srcs = ["ffi.cc"],
-    hdrs = ["ffi.h"],
+    hdrs = [
+        "ffi.h",
+        "internal.h",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
+        "//plaidml/base:api",
         "//tile/lang",
     ],
     alwayslink = 1,
@@ -31,6 +35,7 @@ plaidml_cc_library(
         "ffi.h",
     ],
     visibility = ["//visibility:public"],
+    deps = ["//plaidml/base:api"],
 )
 
 plaidml_cc_library(

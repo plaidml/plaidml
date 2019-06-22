@@ -229,7 +229,13 @@ struct ConstraintCollector : public PolyVisitor {
 
 TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr);
 
-RunInfo Evaluate(const std::string& name, const std::vector<std::shared_ptr<Expr>>& exprs);
+struct ProgramEvaluation {
+  RunInfo runinfo;
+  std::vector<const Expr*> inputs;
+  std::vector<const Expr*> outputs;
+};
+
+ProgramEvaluation Evaluate(const std::string& name, const std::vector<std::shared_ptr<Expr>>& outputs);
 
 }  // namespace lang
 }  // namespace tile

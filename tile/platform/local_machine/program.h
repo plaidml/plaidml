@@ -12,6 +12,7 @@
 #include "tile/base/buffer.h"
 #include "tile/base/program.h"
 #include "tile/base/schedule.h"
+#include "tile/lang/compose.h"
 #include "tile/platform/local_machine/devinfo.h"
 #include "tile/platform/local_machine/mem_strategy.h"
 #include "tile/platform/local_machine/scheduler.h"
@@ -27,6 +28,15 @@ class Program final : public tile::Program {
           const std::shared_ptr<Scheduler>& scheduler, const std::shared_ptr<MemStrategy>& output_mem_strategy,
           const std::shared_ptr<MemStrategy>& tmp_mem_strategy, hal::Memory* tmp_memory,
           const lang::TileOptimizer& optimizer, ConstBufferManager* const_bufs);
+
+  Program(const context::Context& ctx,                              //
+          const lang::RunInfo& runinfo,                             //
+          const std::shared_ptr<DevInfo>& devinfo,                  //
+          const std::shared_ptr<Scheduler>& scheduler,              //
+          const std::shared_ptr<MemStrategy>& output_mem_strategy,  //
+          const std::shared_ptr<MemStrategy>& tmp_mem_strategy,     //
+          hal::Memory* tmp_memory,                                  //
+          ConstBufferManager* const_bufs);
 
   boost::future<void> Run(const context::Context& ctx, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
                           std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) final;

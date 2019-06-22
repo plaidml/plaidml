@@ -7,34 +7,11 @@
 #include <boost/format.hpp>
 
 #include "base/util/logging.h"
+#include "plaidml/edsl/internal.h"
 #include "tile/lang/ast.h"
 
 using namespace vertexai::tile;        // NOLINT
 using namespace vertexai::tile::lang;  // NOLINT
-
-extern "C" {
-
-struct tile_string {
-  std::string str;
-};
-
-struct tile_shape {
-  TensorShape shape;
-};
-
-struct tile_expr {
-  std::shared_ptr<Expr> expr;
-};
-
-struct tile_poly_expr {
-  std::shared_ptr<PolyExpr> expr;
-};
-
-struct tile_program {
-  RunInfo runinfo;
-};
-
-}  // extern "C"
 
 namespace {
 
@@ -208,9 +185,32 @@ tile_expr* tile_expr_int(tile_error* err, int64_t value) {
   });
 }
 
+int64_t tile_expr_int_get_value(tile_error* err, tile_expr* expr) {
+  return ffi_wrap<int64_t>(err, 0, [&] {
+    if (!expr) {
+      throw std::runtime_error("tile_expr_int_get_value can only be used on an IntConst");
+    }
+    auto int_expr = std::dynamic_pointer_cast<IntConst>(expr->expr);
+    if (!int_expr) {
+      throw std::runtime_error("tile_expr_int_get_value can only be used on an IntConst");
+    }
+    return int_expr->value;
+  });
+}
+
 tile_expr* tile_expr_float(tile_error* err, double value) {
   return ffi_wrap<tile_expr*>(err, nullptr, [&] {  //
     return new tile_expr{std::make_shared<FloatConst>(value)};
+  });
+}
+
+double tile_expr_float_get_value(tile_error* err, tile_expr* expr) {
+  return ffi_wrap<double>(err, 0, [&] {
+    auto float_expr = std::dynamic_pointer_cast<FloatConst>(expr->expr);
+    if (!float_expr) {
+      throw std::runtime_error("tile_expr_float_get_value can only be used on an FloatConst");
+    }
+    return float_expr->value;
   });
 }
 
@@ -282,6 +282,7 @@ tile_expr* tile_expr_contraction(tile_error* err,         //
     return new tile_expr{expr};
   });
 }
+
 void tile_expr_contraction_set_no_defract(tile_error* err, tile_expr* expr, bool no_defract) {
   ffi_wrap_void(err, [&] {
     auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
@@ -360,6 +361,9 @@ tile_program* tile_program_evaluate(tile_error* err, const char* name, size_t ne
   return ffi_wrap<tile_program*>(err, nullptr, [&] {
     std::vector<std::shared_ptr<Expr>> exprs(nexprs);
     for (size_t i = 0; i < nexprs; i++) {
+      if (!raw_exprs[i]) {
+        throw std::runtime_error("Undefined expression in tile_program_evaluate");
+      }
       exprs[i] = raw_exprs[i]->expr;
     }
     return new tile_program{Evaluate(name, exprs)};
@@ -368,13 +372,13 @@ tile_program* tile_program_evaluate(tile_error* err, const char* name, size_t ne
 
 tile_string* tile_program_repr(tile_error* err, tile_program* program) {
   return ffi_wrap<tile_string*>(err, nullptr, [&] {  //
-    return new tile_string{to_string(program->runinfo.program)};
+    return new tile_string{to_string(program->eval.runinfo.program)};
   });
 }
 
 const void* tile_program_runinfo(tile_error* err, tile_program* program) {
   return ffi_wrap<const void*>(err, nullptr, [&] {  //
-    return &program->runinfo;
+    return &program->eval.runinfo;
   });
 }
 

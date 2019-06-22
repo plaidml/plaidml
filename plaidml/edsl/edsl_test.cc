@@ -22,16 +22,11 @@ std::string Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
+  TensorIndex i, j, k;
   X.bind_dims(I, K);
   Y.bind_dims(K, J);
   auto R = TensorOutput(I, J);
-  for (auto i : TensorIndex()) {
-    for (auto j : TensorIndex()) {
-      for (auto k : TensorIndex()) {
-        R(i, j) += X(i, k) * Y(k, j);
-      }
-    }
-  }
+  R(i, j) += X(i, k) * Y(k, j);
   return R;
 }
 
