@@ -44,18 +44,6 @@ def plaidml_cc_test(copts = [], deps = (), linkopts = [], **kwargs):
 def plaidml_py_library(**kwargs):
     native.py_library(srcs_version = PY_SRCS_VER, **kwargs)
 
-def plaidml_py_init(name, **kwargs):
-    pyinit_name = name + "_init_py"
-
-    native.genrule(
-        name = pyinit_name,
-        visibility = ["//visibility:private"],
-        outs = ["__init__.py"],
-        cmd = "touch $(location __init__.py)",
-    )
-
-    plaidml_py_library(name = name, srcs = [":" + pyinit_name], **kwargs)
-
 def plaidml_proto_library(name, **kwargs):
     plaidml_cc_proto_library(name = name, **kwargs)
     plaidml_py_proto_library(name = name, **kwargs)
@@ -82,45 +70,83 @@ def plaidml_cc_proto_library(name, srcs, deps = (), **kwargs):
         **kwargs
     )
 
-def plaidml_ast(name, ast, output, template = "base", visibility = None):
-    native.genrule(
-        name = name,
-        outs = [output],
-        srcs = [ast],
-        tools = ["//base/util/astgen"],
-        cmd = "$(location //base/util/astgen) -i $(SRCS) -t {} -o $(OUTS)".format(template),
+def _plaidml_bison_impl(ctx):
+    args = ctx.actions.args()
+    args.add("-o", ctx.outputs.out)
+    args.add("--defines={}".format(ctx.outputs.defines.path))
+    args.add("--verbose")
+    args.add_all(ctx.files.src)
+    outputs = [ctx.outputs.out, ctx.outputs.defines]
+    ctx.actions.run(
+        inputs = [ctx.executable.tool] + ctx.files.src,
+        outputs = outputs,
+        arguments = [args],
+        env = ctx.attr.env,
+        executable = ctx.executable.tool,
+        mnemonic = "bison",
     )
+    return [DefaultInfo(files = depset(outputs))]
 
-def plaidml_bison(name, src, out, defines, visibility = None):
-    COMMON_ARGS = "-o $(location %s) --defines=$(location %s) $(SRCS)" % (out, defines)
-    native.genrule(
-        name = name,
-        srcs = [src],
-        outs = [out, defines],
-        visibility = visibility,
-        cmd = "bison --verbose " + COMMON_ARGS,
-    )
+plaidml_bison = rule(
+    attrs = {
+        "src": attr.label(
+            mandatory = True,
+            allow_single_file = True,
+        ),
+        "env": attr.string_dict(),
+        "tool": attr.label(
+            mandatory = True,
+            allow_single_file = True,
+            executable = True,
+            cfg = "host",
+        ),
+    },
+    output_to_genfiles = True,
+    outputs = {
+        "out": "%{name}.y.cc",
+        "defines": "%{name}.y.h",
+    },
+    implementation = _plaidml_bison_impl,
+)
 
-def plaidml_flex(name, src, out, hdr, visibility = None):
-    COMMON_ARGS = "-o $(location %s) --header-file=$(location %s) $(SRCS)" % (out, hdr)
-    native.genrule(
-        name = name,
-        srcs = [src],
-        outs = [out, hdr],
-        visibility = visibility,
-        cmd = select({
-            "@toolchain//:windows_x86_64": "flex --nounistd " + COMMON_ARGS,
-            "//conditions:default": "flex " + COMMON_ARGS,
-        }),
+def _plaidml_flex_impl(ctx):
+    args = ctx.actions.args()
+    args.add("-o", ctx.outputs.out)
+    args.add("--header-file={}".format(ctx.outputs.hdr.path))
+    args.add_all(ctx.attr.flags)
+    args.add_all(ctx.files.src)
+    outputs = [ctx.outputs.out, ctx.outputs.hdr]
+    ctx.actions.run(
+        inputs = [ctx.executable.tool] + ctx.files.src,
+        outputs = outputs,
+        arguments = [args],
+        use_default_shell_env = True,
+        executable = ctx.executable.tool,
+        mnemonic = "flex",
     )
+    return [DefaultInfo(files = depset(outputs))]
 
-def plaidml_cp(name, files):
-    native.genrule(
-        name = name,
-        srcs = [files[k] for k in files],
-        outs = [k for k in files],
-        cmd = "; ".join(["cp $(location %s) $(location %s)" % (files[k], k) for k in files]),
-    )
+plaidml_flex = rule(
+    attrs = {
+        "src": attr.label(
+            mandatory = True,
+            allow_single_file = True,
+        ),
+        "flags": attr.string_list(),
+        "tool": attr.label(
+            mandatory = True,
+            allow_single_file = True,
+            executable = True,
+            cfg = "host",
+        ),
+    },
+    output_to_genfiles = True,
+    outputs = {
+        "out": "%{name}.cc",
+        "hdr": "%{name}.h",
+    },
+    implementation = _plaidml_flex_impl,
+)
 
 def _plaidml_py_wheel_impl(ctx):
     tpl = ctx.file._setup_py_tpl

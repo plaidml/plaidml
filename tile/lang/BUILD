@@ -72,8 +72,8 @@ plaidml_cc_library(
         "type.cc",
         "usedef.cc",
         "usedef.h",
-        ":lexer",
         ":parser",
+        ":parser_lex",
     ],
     hdrs = [
         "ast.h",
@@ -129,15 +129,29 @@ plaidml_cc_test(
 plaidml_bison(
     name = "parser",
     src = "tile.y",
-    out = "parser.y.cc",
-    defines = "parser.y.h",
+    env = select({
+        "@toolchain//:windows_x86_64": {},
+        "//conditions:default": {
+            "PATH": "external/com_intel_plaidml_conda_tools_unix/env/bin",
+        },
+    }),
+    tool = select({
+        "@toolchain//:windows_x86_64": "@com_intel_plaidml_conda_tools_windows//:bison",
+        "//conditions:default": "@com_intel_plaidml_conda_tools_unix//:bison",
+    }),
 )
 
 plaidml_flex(
-    name = "lexer",
+    name = "parser_lex",
     src = "tile.lex",
-    out = "parser_lex.cc",
-    hdr = "parser_lex.h",
+    flags = select({
+        "@toolchain//:windows_x86_64": ["--nounistd"],
+        "//conditions:default": [],
+    }),
+    tool = select({
+        "@toolchain//:windows_x86_64": "@com_intel_plaidml_conda_tools_windows//:flex",
+        "//conditions:default": "@com_intel_plaidml_conda_tools_unix//:flex",
+    }),
 )
 
 plaidml_cc_test(

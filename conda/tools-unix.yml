@@ -1,0 +1,6 @@
+channels:
+  - conda-forge
+dependencies:
+  - bison
+  - cmake
+  - flex

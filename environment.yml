@@ -1,7 +1,12 @@
+channels:
+  - conda-forge
 dependencies:
   - bazel
-  - bison
   - cmake
-  - flex
+  - pre_commit
+  - pip
   - python=3.6.0
   - setuptools>=40.6.0
+  - pip:
+    - cpplint
+    - yapf==0.27.0
