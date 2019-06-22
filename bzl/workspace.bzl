@@ -134,6 +134,18 @@ def plaidml_workspace():
         env = Label("//conda:sphinx.yml"),
     )
 
+    conda_repo(
+        name = "com_intel_plaidml_conda_tools_unix",
+        env = Label("//conda:tools-unix.yml"),
+        build_file = Label("//conda:tools-unix.BUILD"),
+    )
+
+    conda_repo(
+        name = "com_intel_plaidml_conda_tools_windows",
+        env = Label("//conda:tools-windows.yml"),
+        build_file = Label("//conda:tools-windows.BUILD"),
+    )
+
     http_archive(
         name = "mlir",
         url = "https://github.com/tensorflow/mlir/archive/2f17f4dfe8daf10789bcd7cf16e4112bd6bd2244.zip",

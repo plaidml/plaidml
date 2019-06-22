@@ -1,0 +1,7 @@
+channels:
+  - conda-forge
+dependencies:
+  - cmake
+  - m2-bison
+  - m2-flex
+  - m2-perl

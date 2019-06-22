@@ -1,8 +1,6 @@
 dependencies:
   - bazel
   - cmake
-  - m2-bison
-  - m2-flex
   - m2-perl
   - python=3.6.0
   - setuptools>=40.6.0
