@@ -1,10 +1,10 @@
 def _get_main(ctx):
     if ctx.file.main:
-        return ctx.workspace_name + "/" + ctx.file.main.path
+        return ctx.file.main.path
     main = ctx.label.name + ".py"
     for src in ctx.files.srcs:
         if src.basename == main:
-            return ctx.workspace_name + "/" + src.path
+            return src.path
     fail(
         "corresponding default '{}' does not appear in srcs. ".format(main) +
         "Add it or override default file name with a 'main' attribute",
@@ -12,26 +12,33 @@ def _get_main(ctx):
 
 def _conda_impl(ctx):
     env = ctx.attr.env
-    script = ctx.actions.declare_file(ctx.label.name)
-    main = _get_main(ctx)
-    ctx.actions.expand_template(
-        template = ctx.file._template,
-        output = script,
-        substitutions = {
-            "%imports%": "",
-            "%import_all%": "True",
-            "%main%": main,
-            "%workspace_name%": ctx.workspace_name,
-        },
-        is_executable = True,
+    launcher = ctx.actions.declare_file(ctx.label.name)
+    args = ctx.actions.args()
+    args.add(ctx.file.launcher)
+    args.add(launcher)
+    ctx.actions.run_shell(
+        inputs = [ctx.file.launcher],
+        outputs = [launcher],
+        arguments = [args],
+        command = "cp $1 $2",
     )
+
+    launcher_main = ctx.actions.declare_file(ctx.label.name + ".main")
+    ctx.actions.write(
+        output = launcher_main,
+        content = _get_main(ctx),
+    )
+
     runfiles = ctx.runfiles(
         collect_data = True,
         collect_default = True,
         files = ctx.files.srcs,
-        root_symlinks = {".cenv": env.files.to_list()[0]},
+        root_symlinks = {
+            ".cenv": env.files.to_list()[0],
+            ".main": launcher_main,
+        },
     )
-    return [DefaultInfo(executable = script, runfiles = runfiles)]
+    return [DefaultInfo(executable = launcher, runfiles = runfiles)]
 
 _conda_attrs = {
     "srcs": attr.label_list(allow_files = [".py"]),
@@ -42,8 +49,8 @@ _conda_attrs = {
         allow_files = True,
     ),
     "main": attr.label(allow_single_file = [".py"]),
-    "_template": attr.label(
-        default = Label("//bzl:conda.tpl.py"),
+    "launcher": attr.label(
+        default = Label("//tools/conda_run"),
         allow_single_file = True,
     ),
 }
