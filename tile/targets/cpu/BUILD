@@ -25,7 +25,7 @@ plaidml_cc_library(
     deps = [
         "//tile/stripe",
         "@half",
-        "@llvm_shim//:llvm",
+        "@llvm",
     ],
     alwayslink = 1,
 )
@@ -44,6 +44,6 @@ plaidml_cc_library(
     deps = [
         "//tile/stripe",
         "@half",
-        "@llvm_shim//:llvm",
+        "@llvm",
     ],
 )

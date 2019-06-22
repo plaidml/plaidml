@@ -1,14 +1,10 @@
-load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("//bzl:conda_repo.bzl", "conda_repo")
+load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
+load("@toolchain//:workspace.bzl", toolchain_repositories = "repositories")
 
 def plaidml_workspace():
-    http_archive(
-        name = "bazel_skylib",
-        url = "https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz",
-        sha256 = "2ea8a5ed2b448baf4a6855d3ce049c4c452a6470b1efd1504fdb7c1c134d220a",
-        strip_prefix = "bazel-skylib-0.8.0",
-    )
+    toolchain_repositories()
 
     http_archive(
         name = "boost",
@@ -145,6 +141,13 @@ def plaidml_workspace():
         env = Label("//conda:tools-windows.yml"),
         build_file = Label("//conda:tools-windows.BUILD"),
     )
+
+    # http_archive(
+    #     name = "rules_foreign_cc",
+    #     url = "https://github.com/bazelbuild/rules_foreign_cc/archive/dea1437d926c6ee171625ba16e719d9ee7a8aad3.zip",
+    #     sha256 = "e161ad5078822830f0499b5a210cea00cbed827dfe0e90a9579c2a77308ef88e",
+    #     strip_prefix = "rules_foreign_cc-dea1437d926c6ee171625ba16e719d9ee7a8aad3",
+    # )
 
     http_archive(
         name = "mlir",

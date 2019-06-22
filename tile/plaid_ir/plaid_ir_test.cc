@@ -8,7 +8,6 @@
 
 int main() {
   mlir::MLIRContext context;
-  std::unique_ptr<mlir::Module> module;
   printf("Hello IR\n");
-  module = std::unique_ptr<mlir::Module>(mlir::parseSourceFile("woot.mlir", &context));
+  auto module = std::make_unique<mlir::Module>(&context);
 }
