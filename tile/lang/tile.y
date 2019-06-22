@@ -1,6 +1,6 @@
 %define api.pure full
-%error-verbose
- 
+%define parse.error verbose
+
 %code requires {
 #pragma once
 

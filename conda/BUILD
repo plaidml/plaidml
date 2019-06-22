@@ -6,6 +6,8 @@ exports_files([
     "plaidml.yml",
     "pytorch.yml",
     "sphinx.yml",
+    "tools-unix.yml",
+    "tools-windows.yml",
 ])
 
 pkg_tar(
