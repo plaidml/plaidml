@@ -9,6 +9,7 @@
 #include "base/context/context.h"
 #include "tile/base/buffer.h"
 #include "tile/base/program.h"
+#include "tile/lang/compose.h"
 #include "tile/lang/generate.h"
 #include "tile/proto/tile.pb.h"
 
@@ -28,6 +29,12 @@ class Platform {
 
   // Builds (pre-compiling if possible) a program for executing the supplied Program
   virtual std::unique_ptr<Program> MakeProgram(const context::Context& ctx, const proto::Program& program,
+                                               ConstBufferManager* const_bufs) = 0;
+
+  // Builds a program for executing the supplied RunInfo
+  virtual std::shared_ptr<Program> MakeProgram(const context::Context& ctx,   //
+                                               const std::string& device_id,  //
+                                               const lang::RunInfo& runinfo,  //
                                                ConstBufferManager* const_bufs) = 0;
 
   virtual void ListDevices(const context::Context& ctx, const proto::ListDevicesRequest& request,
