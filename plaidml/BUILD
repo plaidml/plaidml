@@ -313,7 +313,7 @@ genrule(
 
 genrule(
     name = "llvm_license",
-    srcs = ["@llvm_shim//:license"],
+    srcs = ["@llvm//:license"],
     outs = ["llvm-LICENSE"],
     cmd = "cp $(SRCS) $(@D)/",
     tags = ["llvm"],

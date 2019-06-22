@@ -32,15 +32,15 @@ build:linux_arm_32v7 --cpu=linux_arm_32v7
 build:linux_arm_32v7 --host_cpu=linux_x86_64
 build:linux_arm_32v7 --crosstool_top=@toolchain//:toolchain
 build:linux_arm_32v7 --host_crosstool_top=@toolchain//:toolchain
-build:linux_arm_32v7 --build_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
-test:linux_arm_32v7 --test_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
+build:linux_arm_32v7 --build_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-arm7_fail
+test:linux_arm_32v7 --test_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-arm7_fail
 
 build:linux_arm_64v8 --cpu=linux_arm_64v8
 build:linux_arm_64v8 --host_cpu=linux_x86_64
 build:linux_arm_64v8 --crosstool_top=@toolchain//:toolchain
 build:linux_arm_64v8 --host_crosstool_top=@toolchain//:toolchain
-build:linux_arm_64v8 --build_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
-test:linux_arm_64v8 --test_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-trusty,-arm7_fail
+build:linux_arm_64v8 --build_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-arm7_fail
+test:linux_arm_64v8 --test_tag_filters=-darwin,-jupyter,-large,-llvm,-metal,-msvc,-rtest_fail,-tensorflow,-arm7_fail
 
 build:macos_x86_64 --apple_platform_type=macos
 build:macos_x86_64 --cpu=darwin_x86_64

@@ -36,20 +36,6 @@ genrule(
     srcs = ["CMakeLists.txt"],
     outs = CFG_FILES,
     cmd = select({
-        "@toolchain//:linux_arm_32v7": """
-cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
-    -DPYTHON_EXECUTABLE=$$(which python3) \
-    -DCMAKE_CROSSCOMPILING=True \
-    -DLLVM_DEFAULT_TARGET_TRIPLE=arm-linux-gnueabihf \
-    -DLLVM_ENABLE_TERMINFO=OFF
-""",
-        "@toolchain//:linux_arm_64v8": """
-cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
-    -DPYTHON_EXECUTABLE=$$(which python3) \
-    -DCMAKE_CROSSCOMPILING=True \
-    -DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-linux-gnueabi \
-    -DLLVM_ENABLE_TERMINFO=OFF
-""",
         "@toolchain//:macos_x86_64": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python3) \
@@ -60,7 +46,7 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DLLVM_TARGETS_TO_BUILD="X86"
 """,
         "@toolchain//:windows_x86_64": """
-env;$${CONDA_PREFIX}/Library/bin/cmake -Thost=x64 -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+$${CONDA_PREFIX}/Library/bin/cmake -Thost=x64 -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python) \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_VALGRIND_VALGRIND_H=0 \
@@ -106,7 +92,7 @@ cc_library(
 )
 
 cc_library(
-   name = "tblgen-lib",
+    name = "tblgen-lib",
     srcs = glob([
         "lib/TableGen/**/*.cpp",
         "lib/TableGen/**/*.c",
@@ -117,8 +103,8 @@ cc_library(
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": ["-lm"],
     }),
-    deps = [":support"],
     visibility = ["//visibility:public"],
+    deps = [":support"],
 )
 
 cc_binary(

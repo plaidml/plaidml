@@ -25,7 +25,7 @@ cc_binary(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     linkopts = ["-lm"],
-    deps = ["@llvm_shim//:llvm", "@llvm_shim//:tblgen-lib"],
+    deps = ["@llvm//:tblgen-lib"],
 )
 
 mlir_tblgen(
@@ -46,26 +46,36 @@ mlir_tblgen(
 
 cc_library(
     name = "ir",
+    srcs = glob([
+        "lib/AffineOps/**/*.cpp",
+        "lib/Analysis/**/*.h",
+        "lib/Analysis/**/*.cpp",
+        "lib/EDSC/**/*.h",
+        "lib/EDSC/**/*.cpp",
+        "lib/IR/**/*.h",
+        "lib/IR/**/*.cpp",
+        "lib/Parser/**/*.h",
+        "lib/Parser/**/*.cpp",
+        "lib/Pass/**/*.h",
+        "lib/Pass/**/*.cpp",
+        "lib/StandardOps/**/*.h",
+        "lib/StandardOps/**/*.cpp",
+        "lib/Support/**/*.h",
+        "lib/Support/**/*.cpp",
+        "lib/Transforms/**/*.h",
+        "lib/Transforms/**/*.cpp",
+        "lib/VectorOps/**/*.cpp",
+    ]) + [
+        ":gen-op-defs",
+    ],
     hdrs = glob([
         "lib/Parser/**/*.def",
     ]) + [
         ":gen-op-decls",
     ],
-    srcs = glob([
-        "lib/Parser/**/*.h",
-        "lib/Parser/**/*.cpp",
-        "lib/Support/**/*.h",
-        "lib/Support/**/*.cpp",
-        "lib/IR/**/*.h",
-        "lib/IR/**/*.cpp",
-        "lib/StandardOps/**/*.h",
-        "lib/StandardOps/**/*.cpp",
-    ]) + [
-        ":gen-op-defs",
-    ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
-    deps = ["@llvm_shim//:llvm"],
     visibility = ["//visibility:public"],
+    deps = ["@llvm"],
     alwayslink = 1,
 )
