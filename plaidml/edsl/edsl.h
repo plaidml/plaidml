@@ -140,6 +140,7 @@ class TensorShape {
 class Program {
  public:
   Program(const std::string& name, const std::vector<Tensor>& tensors);
+  tile_program* ptr() const { return ptr_.get(); }
   std::string str() const { return ffi::str(ffi::call<tile_string*>(tile_program_repr, ptr_.get())); }
   const void* runinfo() const { return ffi::call<const void*>(tile_program_runinfo, ptr_.get()); }
 
@@ -190,6 +191,23 @@ class TensorDim {
   explicit TensorDim(size_t value) : impl_(new Impl) { impl_->size.reset(new size_t(value)); }
 
   TensorDim operator-() const;
+
+  size_t value() const {
+    if (!impl_->size) {
+      throw std::runtime_error("TensorDim is unbound");
+    }
+    return *impl_->size;
+  }
+
+  std::string str() const {
+    std::stringstream ss;
+    if (impl_->size) {
+      ss << *impl_->size;
+    } else {
+      ss << "(null)";
+    }
+    return ss.str();
+  }
 
  private:
   std::shared_ptr<Impl> impl_;
@@ -326,11 +344,19 @@ class Tensor {
   struct Impl {
     std::shared_ptr<tile_expr> ptr;
     std::vector<TensorDim> dims;
+    bool is_tuple = false;
+    std::vector<Tensor> tuple;
     std::string name;
   };
 
  public:
+  Tensor() : impl_(new Impl) {}
   ~Tensor() = default;
+
+  explicit Tensor(const std::vector<Tensor>& tuple) : impl_(new Impl) {
+    impl_->is_tuple = true;
+    impl_->tuple = tuple;
+  }
 
   explicit Tensor(int value) : impl_(new Impl) {  //
     impl_->ptr = details::make_tile_expr(ffi::call<tile_expr*>(tile_expr_int, value));
@@ -425,8 +451,50 @@ class Tensor {
   // Represents an eltwise bit_not
   Tensor operator~() const;
 
-  std::string str() const {  //
+  const tile_expr* ptr() const { return impl_->ptr.get(); }
+
+  std::string str() const {
+    if (is_none()) {
+      return "None";
+    }
+    if (is_tuple()) {
+      std::stringstream ss;
+      ss << "(";
+      for (size_t i = 0; i < impl_->tuple.size(); i++) {
+        if (i) {
+          ss << ", ";
+        }
+        ss << impl_->tuple.at(i).str();
+      }
+      ss << ")";
+      return ss.str();
+    }
     return ffi::str(ffi::call<tile_string*>(tile_expr_repr, impl_->ptr.get()));
+  }
+
+  bool is_tuple() const { return impl_->is_tuple; }
+
+  bool is_none() const { return impl_->is_tuple && impl_->tuple.empty(); }
+
+  const std::vector<Tensor>& as_tuple() const {
+    if (!impl_->is_tuple) {
+      throw std::runtime_error("Tensor tuple access only available on tuple type");
+    }
+    return impl_->tuple;
+  }
+
+  int64_t as_int() const {
+    if (!impl_->ptr) {
+      throw std::runtime_error("as_int() only available on Tensor with IntConst value");
+    }
+    return ffi::call<int64_t>(tile_expr_int_get_value, impl_->ptr.get());
+  }
+
+  double as_float() const {
+    if (!impl_->ptr) {
+      throw std::runtime_error("as_float() only available on Tensor with FloatConst value");
+    }
+    return ffi::call<double>(tile_expr_float_get_value, impl_->ptr.get());
   }
 
   // Enable no_defract on a contraction
@@ -523,6 +591,17 @@ Tensor TensorOutput(Ts... dims) {
   return Tensor{vec};
 }
 
+inline Tensor Tuple(const std::vector<Tensor>& elts) { return Tensor{elts}; }
+
+template <typename... Ts>
+Tensor make_tuple(Ts... elts) {
+  std::vector<Tensor> vec;
+  details::into_vector(&vec, elts...);
+  return Tuple(vec);
+}
+
+inline Tensor None() { return make_tuple(); }
+
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
 
 template <typename... Ts>
@@ -531,6 +610,8 @@ Tensor Call(const std::string& fn, Ts... args) {
   details::into_vector(&vec, std::forward<Ts>(args)...);
   return Call(fn, vec);
 }
+
+inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
 inline Tensor as_float(const Tensor& x, size_t bit_size) { return Call("as_float", x, static_cast<int64_t>(bit_size)); }
 
@@ -563,6 +644,14 @@ inline Tensor prng_step(const Tensor& x, const std::vector<size_t>& sizes) {
 }
 
 inline Tensor prng_value(const Tensor& x) { return Call("prng_value", x); }
+
+inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
+  std::vector<Tensor> args = {x};
+  for (size_t i = 0; i < dims.size(); i++) {
+    args.emplace_back(static_cast<int64_t>(dims[i]));
+  }
+  return Call("reshape", args);
+}
 
 inline Tensor reshape(const Tensor& x, const TensorShape& shape) {
   std::vector<Tensor> args = {x};
@@ -600,7 +689,13 @@ class TensorFriend {
   static tile_program* evaluate(const std::string& name, const std::vector<Tensor>& tensors) {
     std::vector<tile_expr*> exprs;
     for (const auto& tensor : tensors) {
-      exprs.emplace_back(tensor.impl_->ptr.get());
+      auto ptr = tensor.impl_->ptr.get();
+      if (!ptr) {
+        std::stringstream ss;
+        ss << "Invalid tensor output requested of Program: " << tensor.str();
+        throw std::runtime_error(ss.str());
+      }
+      exprs.emplace_back(ptr);
     }
     return ffi::call<tile_program*>(tile_program_evaluate, name.c_str(), exprs.size(), exprs.data());
   }
