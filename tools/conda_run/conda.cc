@@ -33,9 +33,11 @@ std::string read_file(const fs::path& path) {
 }
 
 int main(int argc, char* argv[]) {
-  fs::path this_path = fs::canonical(argv[0]);
-  auto main_str = read_file(this_path.replace_extension(".main"));
-
+  fs::path this_path = fs::absolute(argv[0]);
+  if (fs::is_symlink(this_path)) {
+    this_path = fs::read_symlink(this_path);
+  }
+  auto main_str = read_file(fs::canonical(this_path).replace_extension(".main"));
   auto cwd_path = fs::current_path();
   auto main_path = cwd_path / main_str;
   auto runfiles_dir = this_path.replace_extension(".runfiles");
