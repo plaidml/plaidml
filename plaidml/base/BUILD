@@ -1,7 +1,7 @@
 # Copyright 2018 Intel Corporation.
 package(default_visibility = ["//visibility:public"])
 
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_py_library", "plaidml_py_init")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test", "plaidml_py_library")
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 plaidml_cc_library(
@@ -28,6 +28,14 @@ plaidml_cc_library(
         "//base/util",
     ],
     alwayslink = 1,
+)
+
+plaidml_cc_library(
+    name = "api",
+    hdrs = [
+        "base.h",
+        "base_cpp.h",
+    ],
 )
 
 plaidml_cc_test(

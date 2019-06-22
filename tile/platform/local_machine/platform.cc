@@ -160,6 +160,21 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx
                                    platform_dev.tmp_mem_source, tile_optimizer_, const_bufs);
 }
 
+std::shared_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx,   //
+                                                     const std::string& device_id,  //
+                                                     const lang::RunInfo& runinfo,  //
+                                                     ConstBufferManager* const_bufs) {
+  auto& platform_dev = LookupDevice(device_id);
+  return std::make_shared<Program>(ctx,                     //
+                                   runinfo,                 //
+                                   platform_dev.devinfo,    //
+                                   platform_dev.scheduler,  //
+                                   platform_dev.mem_strategy,
+                                   std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source),
+                                   platform_dev.tmp_mem_source,  //
+                                   const_bufs);
+}
+
 void _fill_device(const Platform::PlatformDev& pdev, tile::proto::Device* dev) {
   google::protobuf::util::JsonPrintOptions options;
   options.add_whitespace = true;

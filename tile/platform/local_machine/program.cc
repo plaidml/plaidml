@@ -161,6 +161,17 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
   return kernel_list;
 }
 
+lang::KernelList CompileProgram(const lang::RunInfo& runinfo,  //
+                                const DevInfo& devinfo,        //
+                                ConstBufferManager* const_bufs) {
+  auto stripe_cfg = devinfo.settings.stripe_config();
+  if (stripe_cfg.empty()) {
+    throw std::runtime_error("Selected device must have a stripe_config when USE_STRIPE is enabled");
+  }
+  auto out_path = env::Get("STRIPE_OUTPUT");
+  return codegen::GenerateProgram(runinfo, stripe_cfg, out_path, const_bufs);
+}
+
 }  // namespace
 
 Program::Program(const context::Context& ctx, const tile::proto::Program& program,
@@ -217,6 +228,61 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   }
 
   ValidateSchedule(new_program, kernel_list_, schedule_);
+}
+
+Program::Program(const context::Context& ctx,                              //
+                 const lang::RunInfo& runinfo,                             //
+                 const std::shared_ptr<DevInfo>& devinfo,                  //
+                 const std::shared_ptr<Scheduler>& scheduler,              //
+                 const std::shared_ptr<MemStrategy>& output_mem_strategy,  //
+                 const std::shared_ptr<MemStrategy>& tmp_mem_strategy,     //
+                 hal::Memory* tmp_memory,                                  //
+                 ConstBufferManager* const_bufs)
+    : devinfo_{devinfo},  //
+      output_mem_strategy_{output_mem_strategy},
+      tmp_mem_strategy_{tmp_mem_strategy} {
+  if (!devinfo->dev->compiler() || !devinfo->dev->executor()) {
+    // TODO: Implement a mechanism for providing a pre-compiled program.
+    throw error::Unavailable{"The requested device is unavailable for running Tile programs"};
+  }
+
+  context::Activity activity{ctx, "tile::local_machine::Compile"};
+
+  kernel_list_ = CompileProgram(runinfo, *devinfo_.get(), const_bufs);
+  const_bufs_ = const_bufs->buffers;
+
+  tile::proto::Program program;
+  *program.mutable_inputs() = IntoProtoInput(runinfo.input_shapes);
+  *program.mutable_outputs() = IntoProtoOutput(runinfo.output_shapes);
+  for (const auto& kvp : const_bufs_) {
+    if (!program.inputs().count(kvp.first)) {
+      auto shape = kernel_list_.types.at(kvp.first);
+      vertexai::tile::proto::ProgramInput input;
+      (*input.mutable_shape()) = IntoProto(shape);
+      (*program.mutable_inputs())[kvp.first] = input;
+    }
+  }
+  auto lib = devinfo_->dev->compiler()->Build(activity.ctx(), kernel_list_.kernels, devinfo_->settings).get();
+  executable_ = devinfo_->dev->executor()->Prepare(lib.get()).get();
+  schedule_ = scheduler->BuildSchedule(program, kernel_list_);
+
+  if (activity.ctx().is_logging_events()) {
+    hal::proto::CompilationInfo cinfo;
+    for (auto kernel : kernel_list_.kernels) {
+      (*cinfo.mutable_kernels())[kernel.kname] = kernel.info;
+    }
+    SummarizeSchedule(&cinfo, program, kernel_list_, schedule_);
+    *(cinfo.mutable_program()) = program;
+    activity.AddMetadata(cinfo);
+    schedule::proto::Schedule sched_pb;
+    schedule::ScheduleToProto(&sched_pb, schedule_);
+    for (auto kernel : kernel_list_.kernels) {
+      sched_pb.add_knames(kernel.kname);
+    }
+    activity.AddMetadata(sched_pb);
+  }
+
+  ValidateSchedule(program, kernel_list_, schedule_);
 }
 
 boost::future<void> Program::Run(const context::Context& ctx,

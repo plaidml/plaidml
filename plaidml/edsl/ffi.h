@@ -14,6 +14,8 @@
 #define PLAIDML_EDSL_API
 #endif
 
+#include "plaidml/base/base.h"
+
 #ifdef __cplusplus
 #include <cstddef>
 #include <cstdint>
@@ -25,24 +27,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-typedef enum {
-  PLAIDML_DATA_INVALID = 0,
-  PLAIDML_DATA_BOOLEAN = 0x02,
-  PLAIDML_DATA_INT8 = 0x10,
-  PLAIDML_DATA_INT16 = 0x11,
-  PLAIDML_DATA_INT32 = 0x12,
-  PLAIDML_DATA_INT64 = 0x13,
-  PLAIDML_DATA_INT128 = 0x14,
-  PLAIDML_DATA_UINT8 = 0x20,
-  PLAIDML_DATA_UINT16 = 0x21,
-  PLAIDML_DATA_UINT32 = 0x22,
-  PLAIDML_DATA_UINT64 = 0x23,
-  PLAIDML_DATA_FLOAT16 = 0x31,
-  PLAIDML_DATA_FLOAT32 = 0x32,
-  PLAIDML_DATA_FLOAT64 = 0x33,
-  PLAIDML_DATA_PRNG = 0x40,
-} plaidml_datatype;
 
 typedef enum {
   TILE_POLY_OP_NEG,
@@ -116,7 +100,11 @@ PLAIDML_EDSL_API tile_expr* tile_expr_param(tile_error* err, tile_shape* shape, 
 
 PLAIDML_EDSL_API tile_expr* tile_expr_int(tile_error* err, int64_t value);
 
+PLAIDML_EDSL_API int64_t tile_expr_int_get_value(tile_error* err, tile_expr* expr);
+
 PLAIDML_EDSL_API tile_expr* tile_expr_float(tile_error* err, double value);
+
+PLAIDML_EDSL_API double tile_expr_float_get_value(tile_error* err, tile_expr* expr);
 
 PLAIDML_EDSL_API tile_expr* tile_expr_call(tile_error* err, const char* fn, size_t nargs, tile_expr** args);
 

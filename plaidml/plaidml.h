@@ -14,6 +14,7 @@
 #endif  // __cplusplus
 
 #include "plaidml/base/base.h"
+#include "plaidml/edsl/edsl.h"
 
 #define PLAIDML_API VAI_API
 
@@ -154,6 +155,23 @@ struct plaidml_buffer;
 typedef struct plaidml_buffer plaidml_buffer;
 #endif  // __cplusplus
 
+struct plaidml_binding {
+  const tile_expr* expr;
+  plaidml_buffer* buffer;
+};
+
+typedef struct plaidml_executable plaidml_executable;
+
+PLAIDML_API plaidml_executable* plaidml_device_compile(plaidml_device* device,         //
+                                                       tile_program* program,          //
+                                                       size_t ninputs,                 //
+                                                       const plaidml_binding* inputs,  //
+                                                       size_t noutputs,                //
+                                                       const plaidml_binding* outputs);
+
+PLAIDML_API void plaidml_executable_run(plaidml_executable* exec);
+PLAIDML_API void plaidml_executable_free(plaidml_executable* exec);
+
 // PlaidML mappings are used to view and manipulate the contents of buffers.
 #ifdef __cplusplus
 struct plaidml_mapping;
@@ -242,26 +260,6 @@ struct plaidml_shape;
 #else
 typedef struct plaidml_shape plaidml_shape;
 #endif  // __cplusplus
-
-// A PlaidML datatype indicates the type of data stored within a buffer, as
-// observed by a program.
-typedef enum {
-  PLAIDML_DATA_INVALID = 0,
-  PLAIDML_DATA_BOOLEAN = 0x02,
-  PLAIDML_DATA_INT8 = 0x10,
-  PLAIDML_DATA_INT16 = 0x11,
-  PLAIDML_DATA_INT32 = 0x12,
-  PLAIDML_DATA_INT64 = 0x13,
-  PLAIDML_DATA_INT128 = 0x14,
-  PLAIDML_DATA_UINT8 = 0x20,
-  PLAIDML_DATA_UINT16 = 0x21,
-  PLAIDML_DATA_UINT32 = 0x22,
-  PLAIDML_DATA_UINT64 = 0x23,
-  PLAIDML_DATA_FLOAT16 = 0x31,
-  PLAIDML_DATA_FLOAT32 = 0x32,
-  PLAIDML_DATA_FLOAT64 = 0x33,
-  PLAIDML_DATA_PRNG = 0x40,
-} plaidml_datatype;
 
 // Set the default datatype for floating-point computations.
 PLAIDML_API void plaidml_set_floatx(plaidml_datatype datatype);

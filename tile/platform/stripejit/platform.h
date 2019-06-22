@@ -25,6 +25,11 @@ class Platform : public tile::Platform {
   std::unique_ptr<tile::Program> MakeProgram(const context::Context& ctx, const proto::Program& program,
                                              ConstBufferManager* const_bufs) final;
 
+  std::shared_ptr<tile::Program> MakeProgram(const context::Context& ctx,   //
+                                             const std::string& device_id,  //
+                                             const lang::RunInfo& runinfo,  //
+                                             ConstBufferManager* const_bufs);
+
   void ListDevices(const context::Context& ctx, const proto::ListDevicesRequest& request,
                    proto::ListDevicesResponse* response) final;
 

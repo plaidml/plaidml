@@ -357,9 +357,9 @@ class PolyEvaluator : public PolyVisitor {
 
 class Evaluator : public AstVisitor {
  public:
-  explicit Evaluator(const std::string& name) { runinfo_.program_name = name; }
+  explicit Evaluator(const std::string& name) { eval_.runinfo.program_name = name; }
 
-  RunInfo Evaluate(const std::vector<std::shared_ptr<Expr>>& exprs) {
+  ProgramEvaluation Evaluate(const std::vector<std::shared_ptr<Expr>>& exprs) {
     AstTraversal traversal(exprs);
     // Traverse the entire graph in least-dependent to most-dependent order.
     ShapeEvaluator evaluator(traversal.flat(), &bindings_by_expr_);
@@ -371,18 +371,19 @@ class Evaluator : public AstVisitor {
       auto name = safe_at(&names_by_expr_, expr.get());
       auto shape = safe_at(&bindings_by_expr_, expr.get()).shape;
       IVLOG(2, "Output> " << name << ": " << shape);
-      runinfo_.output_shapes.emplace(name, shape);
-      runinfo_.program.outputs.push_back(name);
+      eval_.runinfo.output_shapes.emplace(name, shape);
+      eval_.runinfo.program.outputs.push_back(name);
+      eval_.outputs.push_back(expr.get());
     }
     for (const auto& kvp : names_by_expr_) {
       auto name = kvp.second;
       auto binding = safe_at(&bindings_by_expr_, kvp.first);
-      runinfo_.vars.emplace(name, binding);
+      eval_.runinfo.vars.emplace(name, binding);
     }
-    runinfo_.code = to_string(runinfo_.program);
-    runinfo_.from_edsl = true;
-    IVLOG(2, "Evaluator::Evaluate> " << runinfo_.code);
-    return runinfo_;
+    eval_.runinfo.code = to_string(eval_.runinfo.program);
+    eval_.runinfo.from_edsl = true;
+    IVLOG(2, "Evaluator::Evaluate> " << eval_.runinfo.code);
+    return eval_;
   }
 
  private:
@@ -394,8 +395,9 @@ class Evaluator : public AstVisitor {
       auto dim_name = str(boost::format("%1%_%2%") % name % i);
       input.dims.emplace_back(dim_name);
     }
-    runinfo_.program.inputs.push_back(input);
-    runinfo_.input_shapes.emplace(name, expr.shape);
+    eval_.inputs.push_back(&expr);
+    eval_.runinfo.program.inputs.push_back(input);
+    eval_.runinfo.input_shapes.emplace(name, expr.shape);
     names_by_expr_.emplace(&expr, name);
   }
 
@@ -409,7 +411,7 @@ class Evaluator : public AstVisitor {
         {},                            // Contraction
         {"fconst"},                    // Function
     };
-    runinfo_.program.ops.emplace_back(op);
+    eval_.runinfo.program.ops.emplace_back(op);
     names_by_expr_.emplace(&expr, name);
   }
 
@@ -423,7 +425,7 @@ class Evaluator : public AstVisitor {
         {},                            // Contraction
         {"iconst"},                    // Function
     };
-    runinfo_.program.ops.emplace_back(op);
+    eval_.runinfo.program.ops.emplace_back(op);
     names_by_expr_.emplace(&expr, name);
   }
 
@@ -441,7 +443,7 @@ class Evaluator : public AstVisitor {
         {},            // Contraction
         {expr.fn},     // Function
     };
-    runinfo_.program.ops.emplace_back(op);
+    eval_.runinfo.program.ops.emplace_back(op);
     names_by_expr_.emplace(&expr, name);
   }
 
@@ -490,7 +492,7 @@ class Evaluator : public AstVisitor {
         inputs,           // inputs
         cion,             // Contraction
     };
-    runinfo_.program.ops.emplace_back(op);
+    eval_.runinfo.program.ops.emplace_back(op);
     names_by_expr_.emplace(&expr, name);
   }
 
@@ -502,7 +504,7 @@ class Evaluator : public AstVisitor {
   // underscore ("_") are reserved by the system.
   std::string NewTmp(const Expr& expr) {
     if (expr.name.empty()) {
-      return str(boost::format("_X%1%") % runinfo_.program.next_tmp++);
+      return str(boost::format("_X%1%") % eval_.runinfo.program.next_tmp++);
     }
     return MakeUniqueName(expr.name);
   }
@@ -522,7 +524,7 @@ class Evaluator : public AstVisitor {
   std::set<std::string> names_;
   std::unordered_map<const Expr*, std::string> names_by_expr_;
   std::unordered_map<const Expr*, Binding> bindings_by_expr_;
-  RunInfo runinfo_;
+  ProgramEvaluation eval_;
 };
 
 struct ReshapeOp : SpecialOp {
@@ -834,13 +836,21 @@ TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr) {
   return safe_at(&bindings, expr.get()).shape;
 }
 
-RunInfo Evaluate(const std::string& name, const std::vector<std::shared_ptr<Expr>>& exprs) {
+ProgramEvaluation Evaluate(const std::string& name, const std::vector<std::shared_ptr<Expr>>& exprs) {
   return Evaluator(name).Evaluate(exprs);
 }
 
-std::string IntConst::str() const { return "IntConst"; }
+std::string IntConst::str() const {
+  std::stringstream ss;
+  ss << value;
+  return ss.str();
+}
 
-std::string FloatConst::str() const { return "FloatConst"; }
+std::string FloatConst::str() const {
+  std::stringstream ss;
+  ss << value;
+  return ss.str();
+}
 
 std::string ParamExpr::str() const {
   if (name.size()) {

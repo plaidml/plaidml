@@ -21,6 +21,13 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx
   return std::make_unique<Program>(ctx, program, const_bufs);
 }
 
+std::shared_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx,   //
+                                                     const std::string& device_id,  //
+                                                     const lang::RunInfo& runinfo,  //
+                                                     ConstBufferManager* const_bufs) {
+  throw std::runtime_error("Not implemented");
+}
+
 void Platform::ListDevices(const context::Context& ctx, const tile::proto::ListDevicesRequest& request,
                            tile::proto::ListDevicesResponse* response) {
   // register one single device
