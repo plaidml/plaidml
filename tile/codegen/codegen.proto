@@ -178,6 +178,8 @@ message CachePass {
   optional bool add_constraints = 6 [default = true];
   // Whether reorder the cache block index in order
   optional bool reorder_idx = 7 [default = true];
+  // Whether make the dim sizes be odd for cached refinements
+  optional bool odd_size = 8 [default = false];
 }
 
 // Use registers instead of local memory as cache.
