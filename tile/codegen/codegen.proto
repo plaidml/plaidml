@@ -176,6 +176,8 @@ message CachePass {
   required stripe.proto.Location xfer_loc = 5;
   // Add constraints during load/store to prevent OOB access
   optional bool add_constraints = 6 [default = true];
+  // Whether reorder the cache block index in order
+  optional bool reorder_idx = 7 [default = true];
 }
 
 // Use registers instead of local memory as cache.
@@ -627,5 +629,11 @@ message ConstTensorPass {
 // Reorder the strides of allocations and constants to maximize divisibility of
 // low stride elements
 message FixStridesPass {
+  repeated string reqs = 1;
+}
+
+// Reorder the index in order to make the low bits of the thread ID be 
+// correspond to the low stride
+message IdxOrderPass {
   repeated string reqs = 1;
 }

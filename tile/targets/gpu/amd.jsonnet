@@ -212,6 +212,17 @@ local PARAMS = {
               } 
             },
 
+/*
+            // It is usually useless
+            {
+              name: 'eltwise_idx_order',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IdxOrderPass',
+                reqs: ['eltwise', 'kernel'],
+              }
+            },
+*/
+
             {
               name: 'tile_eltwise',
               pass: {
