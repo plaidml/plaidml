@@ -40,6 +40,11 @@ bool AllZeroAccess(const Refinement& ref) {
   return true;
 }
 
+// Find out the minimal odd >= n
+size_t NextOdd(size_t n) {
+  return (n & 0x1) ? n : (n + 1);
+}
+
 // Make a passthru index if it doesn't exist
 std::string MakePassthruIdx(Block* block, const std::string& idx_name) {
   for (const auto idx : block->idxs) {
@@ -168,7 +173,8 @@ void ApplyCache(const AliasMap& alias_map,    //
                 const Tags load_tags,         //
                 const Tags store_tags,        //
                 bool add_constraints,         //
-                bool reorder_idx) {
+                bool reorder_idx,             //
+                bool odd_size) {
   auto ref_it = ref_block->ref_by_from(var_name, false);
   if (ref_it == ref_block->refs.end()) {
     return;
@@ -245,7 +251,7 @@ void ApplyCache(const AliasMap& alias_map,    //
       const auto& var = vars[i];
       xfer_block.idxs.push_back({var.idx, var.range});
       local_access.push_back(Affine(var.idx));
-      local_sizes.push_back(var.range);
+      local_sizes.push_back(odd_size ? NextOdd(var.range) : var.range);
     }
   }
   else {
@@ -414,7 +420,8 @@ void ApplySimpleCache(const AliasMap& map,          //
                       const Tags load_tags,         //
                       const Tags store_tags,        //
                       bool add_constraints,         //
-                      bool reorder_idx) {
+                      bool reorder_idx,             //
+                      bool odd_size) {
   auto it = block->ref_by_into(var_name, false);
   if (it == block->refs.end()) {
     throw std::runtime_error("ApplySimpleCache: Invalid var_name");
@@ -424,6 +431,11 @@ void ApplySimpleCache(const AliasMap& map,          //
   // Get the shape
   TensorShape raw_ts = it->interior_shape;
   std::vector<size_t> sizes = raw_ts.sizes();
+  if (odd_size) {
+    for (size_t i = 0; i < sizes.size(); ++i) {
+      sizes[i] = NextOdd(sizes[i]);
+    }
+  }
   TensorShape cached_ts = SimpleShape(raw_ts.type, sizes);
   // Make a new name for the raw variable
   std::string raw_name = block->unique_ref_name(var_name + "_raw");
@@ -579,7 +591,7 @@ static void CacheBlock(const AliasMap& map, Block* block, const proto::CachePass
       if (dirs.count(ref.dir)) {
         codegen::ApplyCache(map, inout, ref_block, block, ref.into(), mem_loc, xfer_loc, 
           {"cache", "cache_load"}, {"cache", "cache_store"}, options.add_constraints(),
-          options.reorder_idx());
+          options.reorder_idx(), options.odd_size());
       }
     }
   }
@@ -590,7 +602,7 @@ static void CacheBlock(const AliasMap& map, Block* block, const proto::CachePass
       if (dirs.count(ref.dir)) {
         codegen::ApplySimpleCache(map, inout, block, ref.into(), mem_loc, xfer_loc,
           {"cache", "cache_load"}, {"cache", "cache_store"}, options.add_constraints(),
-          options.reorder_idx());
+          options.reorder_idx(), options.odd_size());
       }
     }
   }
