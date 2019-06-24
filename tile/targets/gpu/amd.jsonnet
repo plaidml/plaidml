@@ -1,6 +1,6 @@
 local PARAMS = {
   amd: {
-    LOCAL_MEM_KIB: 20,
+    LOCAL_MEM_KIB: 16,
     NUM_THREADS: 256,
     CACHE_WIDTH: 1024, 
     NUM_UNITS: 32
@@ -89,9 +89,9 @@ local PARAMS = {
                 clear_outer: true,
                 acc_idxs: true,
                 only_even: true,
-                split_factor: -0.1,
                 max_total_size: PARAMS[cfg].LOCAL_MEM_KIB * 1024,
                 min_out_size: PARAMS[cfg].NUM_THREADS,
+                min_size: PARAMS[cfg].NUM_THREADS,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
               }
             },
@@ -127,6 +127,7 @@ local PARAMS = {
                 dirs: [ 'In' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
                 xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
+                odd_size: true,
               }
             },
 
@@ -179,6 +180,7 @@ local PARAMS = {
                 dirs: [ 'Out', 'InOut' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
                 xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
+                odd_size: true,
               } 
             },
 
