@@ -1,6 +1,7 @@
 // Copyright 2018, Intel Corporation
 
 #include "tile/codegen/cache.h"
+#include "tile/codegen/idx_order.h"
 
 #include <algorithm>
 
@@ -166,7 +167,8 @@ void ApplyCache(const AliasMap& alias_map,    //
                 const Location& xfer_loc,     //
                 const Tags load_tags,         //
                 const Tags store_tags,        //
-                bool add_constraints) {
+                bool add_constraints,         //
+                bool reorder_idx) {
   auto ref_it = ref_block->ref_by_from(var_name, false);
   if (ref_it == ref_block->refs.end()) {
     return;
@@ -319,6 +321,9 @@ void ApplyCache(const AliasMap& alias_map,    //
     src.interior_shape = ref_it->interior_shape;
     src.access = global_access;
     dst.location = mem_loc;
+    if (reorder_idx) {
+      ReorderIndex(cache_block.get(), src);
+    }
     StatementIt pos = InsertPosition(outer_block, ref_block);
     outer_block->stmts.insert(pos, cache_block);
   }
@@ -334,6 +339,9 @@ void ApplyCache(const AliasMap& alias_map,    //
     dst.interior_shape = ref_it->interior_shape;
     dst.access = global_access;
     src.location = mem_loc;
+    if (reorder_idx) {
+      ReorderIndex(cache_block.get(), dst);
+    }
     StatementIt pos = InsertPosition(outer_block, ref_block);
     ++pos;
     outer_block->stmts.insert(pos, cache_block);
@@ -405,7 +413,8 @@ void ApplySimpleCache(const AliasMap& map,          //
                       const Location& xfer_loc,     //
                       const Tags load_tags,         //
                       const Tags store_tags,        //
-                      bool add_constraints) {
+                      bool add_constraints,         //
+                      bool reorder_idx) {
   auto it = block->ref_by_into(var_name, false);
   if (it == block->refs.end()) {
     throw std::runtime_error("ApplySimpleCache: Invalid var_name");
@@ -480,6 +489,9 @@ void ApplySimpleCache(const AliasMap& map,          //
     src.from = raw_name;
     src.interior_shape = raw_xfer_shape;
     dst.location = mem_loc;
+    if (reorder_idx) {
+      ReorderIndex(cache_load.get(), src);
+    }
     block->stmts.emplace_front(cache_load);
   }
   // If original refinement was output, flush from cache
@@ -492,6 +504,9 @@ void ApplySimpleCache(const AliasMap& map,          //
     dst.from = raw_name;
     dst.interior_shape = raw_xfer_shape;
     src.location = mem_loc;
+    if (reorder_idx) {
+      ReorderIndex(cache_store.get(), dst);
+    }
     block->stmts.emplace_back(cache_store);
   }
   // Add the new declaration (replacing the original)
@@ -527,10 +542,11 @@ static Block* LookupRefBlock(Block* block, const std::string& ref_tag) {
   return nullptr;
 }
 
-static void CacheBlock(const AliasMap& map, Block* block, 
-                       const std::string& ref_tag, const std::set<RefDir>& dirs,
-                       const Location& mem_loc, const Location& xfer_loc, 
-                       bool add_constraints) {
+static void CacheBlock(const AliasMap& map, Block* block, const proto::CachePass& options) {
+  std::set<RefDir> dirs;
+  for (const auto& dir : options.dirs()) {
+    dirs.emplace(stripe::FromProto(static_cast<stripe::proto::Refinement::Dir>(dir)));
+  }
   // This indicates how to deal with InOut ref
   RefDir inout;
   if (dirs.count(RefDir::In) && dirs.count(RefDir::Out)) {
@@ -549,6 +565,9 @@ static void CacheBlock(const AliasMap& map, Block* block,
   else {
     throw std::runtime_error("Incorrect dir for cache pass.");
   }
+  std::string ref_tag = options.ref();
+  auto mem_loc = stripe::FromProto(options.mem_loc());
+  auto xfer_loc = stripe::FromProto(options.xfer_loc());
   auto refs = block->refs;
   if (ref_tag.size() > 0) {
     // If we have the reference block, do the advanced cahce pass
@@ -559,7 +578,8 @@ static void CacheBlock(const AliasMap& map, Block* block,
     for (const auto& ref : refs) {
       if (dirs.count(ref.dir)) {
         codegen::ApplyCache(map, inout, ref_block, block, ref.into(), mem_loc, xfer_loc, 
-          {"cache", "cache_load"}, {"cache", "cache_store"}, add_constraints);
+          {"cache", "cache_load"}, {"cache", "cache_store"}, options.add_constraints(),
+          options.reorder_idx());
       }
     }
   }
@@ -569,7 +589,8 @@ static void CacheBlock(const AliasMap& map, Block* block,
     for (const auto& ref : refs) {
       if (dirs.count(ref.dir)) {
         codegen::ApplySimpleCache(map, inout, block, ref.into(), mem_loc, xfer_loc,
-          {"cache", "cache_load"}, {"cache", "cache_store"}, add_constraints);
+          {"cache", "cache_load"}, {"cache", "cache_store"}, options.add_constraints(),
+          options.reorder_idx());
       }
     }
   }
@@ -577,15 +598,8 @@ static void CacheBlock(const AliasMap& map, Block* block,
 
 void CachePass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
-  std::set<RefDir> dirs;
-  for (const auto& dir : options_.dirs()) {
-    dirs.emplace(stripe::FromProto(static_cast<stripe::proto::Refinement::Dir>(dir)));
-  }
-  auto mem_loc = stripe::FromProto(options_.mem_loc());
-  auto xfer_loc = stripe::FromProto(options_.xfer_loc());
   RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, Block* block) {  //
-    CacheBlock(map, block, options_.ref(), dirs,
-               mem_loc, xfer_loc, options_.add_constraints());
+    CacheBlock(map, block, options_);
   });
 }
 
