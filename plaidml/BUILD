@@ -395,7 +395,17 @@ plaidml_cc_binary(
     name = "libplaidml_pub.so",
     linkshared = 1,
     tags = ["linux"],
-    deps = [":public_lib"],
+    deps = [
+        ":public_lib",
+        ":libplaidml.lds",
+    ],
+    linkopts = [
+        # Prefer internal library definitions.
+        "-Wl,-Bsymbolic-functions",
+
+        # Use an explicit linker script.
+        "-Wl,$(location :libplaidml.lds)",
+    ],
 )
 
 plaidml_cc_binary(
