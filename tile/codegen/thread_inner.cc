@@ -19,7 +19,7 @@ using namespace stripe;  // NOLINT
 using math::NearestPo2;
 using math::RoundUp;
 
-void DoThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
+void DoThreadInnerPass(const AliasMap& scope, Block* block, const proto::ThreadInnerPass& options) {
   if (block->ref_outs(true).size() != 1) {
     if (block->ref_outs(true).size() == 0) {
       // We may remove the output refinements in the contracts during optimizations,
@@ -58,7 +58,7 @@ void DoThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
   std::sort(sorted_idxs.begin(), sorted_idxs.end(), sort_func);
   IVLOG(1, "Sorted indexes: " << sorted_idxs);
   size_t cur = 0;
-
+  size_t threads = options.threads();
   while (threads > 1 && cur < sorted_idxs.size()) {
     size_t ci = sorted_idxs[cur];
     size_t split = std::min(size_t(threads), size_t(NearestPo2(idxs[ci].range)));
@@ -70,14 +70,15 @@ void DoThreadInnerPass(const AliasMap& scope, Block* block, int64_t threads) {
     tile[i] = RoundUp(block->idxs[i].range, tile[i]);
   }
   ApplyTile(block, tile, false, false, true);
-  block->set_tag("gpu_thread");
+  block->add_tags(FromProto(options.outer_set()));
+  block->SubBlock(0)->add_tags(FromProto(options.inner_set()));
 }
 
 // Localize starting from root for things that match reqs
 void ThreadInnerPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
   RunOnBlocks(state->entry(), reqs, [this](const AliasMap& map, stripe::Block* block) {  //
-    DoThreadInnerPass(map, block, options_.threads());
+    DoThreadInnerPass(map, block, options_);
   });
 }
 

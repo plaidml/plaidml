@@ -66,6 +66,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   const AliasMap* scope_;
   size_t in_kernel_ = 0;
   size_t in_threads_ = 0;
+  const stripe::Block* thread_condition_ = nullptr;
   bool local_var_;
   // Intrinsic list and emitters
   lang::IntrinsicList intrinsics_;

@@ -507,6 +507,10 @@ message ThreadInnerPass {
   repeated string reqs = 1;
   // How many threads should be introduce during threading
   required int64 threads = 2;
+  // Set the following tags on the outer block post tiling
+  repeated string outer_set = 3;
+  // Set the following tags on the inner block post tiling
+  repeated string inner_set = 4;
 }
 
 // Assign a codec to matching refinements. A codec defines the physical layout

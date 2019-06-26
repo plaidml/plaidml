@@ -291,16 +291,6 @@ size_t SemtreeEmitter::max_threads(const stripe::Block& block) {
   return result;
 }
 
-// Check if there is any non-block inner stmt in the block.
-bool inner_non_block_stmt(const stripe::Block& block) {
-  for (const auto& stmt : block.stmts) {
-    if (stmt->kind() != stripe::StmtKind::Block) {
-      return true;
-    }
-  }
-  return false;
-}
-
 void SemtreeEmitter::do_gids(const stripe::Block& block) {
   bool has_out = false;
   for (const auto& ref : block.refs) {
@@ -428,8 +418,7 @@ sem::StmtPtr SemtreeEmitter::do_lids(const stripe::Block& block) {
     if (idx.affine != stripe::Affine()) {
       continue;
     }
-    auto expr = block.has_tag("reg_cache") ? ((tid % block.idxs_product()) / local_threads) : (tid / local_threads);
-    expr = expr % idx.range;
+    auto expr = (tid / local_threads) % idx.range;
     top->push_front(_Declare({sem::Type::INDEX}, idx_name(idx.name), expr));
     local_threads *= idx.range;
   }
@@ -578,7 +567,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     cur_->push_back(make_special("MAC_INNER", block, args));
     return;
   }
-  if (block.has_tag("subgroup_inline")) {
+  if (block.has_tag("subgroup_inline") || block.has_tag("inline")) {
     scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
     scope_ = &scopes_.back();
     depth_++;
@@ -622,10 +611,15 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       used_threads_ = max_threads(block);
       outer_threads_ = 1;
     }
+    thread_condition_ = nullptr;
   }
   if (block.has_tag("gpu_thread")) {
     in_threads_++;
     outer_threads_ *= block.idxs_product();
+  }
+  if (thread_condition_ == nullptr && !block.has_tag("reg_cache") &&
+      max_threads(block) == 1 && outer_threads_ < used_threads_) {
+    thread_condition_ = &block;
   }
   scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
   scope_ = &scopes_.back();
@@ -702,8 +696,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     }
     // If the number of threads in this block is less than the number of threads in the kernel.
     // add an if statement
-    if (!block.has_tag("reg_cache") && max_threads(block) == 1
-        && outer_threads_ < used_threads_ && inner_non_block_stmt(block)) {
+    if (thread_condition_ == &block) {
       sem::ExprPtr tid = _Index(sem::IndexExpr::LOCAL, 0);
       sem::ExprPtr block_threads = _Const(outer_threads_);
       wrapped = _Block({sem::builder::_If(tid < block_threads, wrapped)});
@@ -721,6 +714,9 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   if (block.has_tag("gpu_thread")) {
     in_threads_--;
     outer_threads_ /= block.idxs_product();
+  }
+  if (thread_condition_ == &block) {
+    thread_condition_ = nullptr;
   }
   loop_mul_ /= block.idxs_product();
   depth_--;

@@ -3,7 +3,12 @@ local PARAMS = {
     LOCAL_MEM_KIB: 16,
     NUM_THREADS: 256,
     CACHE_WIDTH: 1024, 
-    NUM_UNITS: 32
+    NUM_UNITS: 32,
+    REGS_MEM_B: 128,
+    REG_MEM_LAT: 1,
+    LOCAL_MEM_LAT: 30,
+    GLOBAL_MEM_LAT: 100,
+    ALIGN_SIZE_B: 64
   },
 };
 
@@ -281,7 +286,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['cache'],
                 outer_set: ['cache_outer', 'gpu_thread'],
-                inner_set: ['cache_threads'],
+                inner_set: ['cache_threads', 'inline'],
                 only_even: true,
                 max_sizes_product: PARAMS[cfg].NUM_THREADS,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
@@ -295,6 +300,8 @@ local PARAMS = {
               pass : {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
                 reqs: ['contract_inner'],
+                outer_set: ['contract_inner', 'gpu_thread'],
+                inner_set: ['contract_inner_threads', 'inline'],
                 threads: PARAMS[cfg].NUM_THREADS,
               }
             },
@@ -305,22 +312,52 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['eltwise_inner'],
                 outer_set: ['eltwise_struct', 'gpu_thread'],
-                inner_set: ['eltwise_threads'],
+                inner_set: ['eltwise_threads', 'inline'],
                 only_even: true,
-                max_sizes_product: PARAMS[cfg].NUM_THREADS,
+                max_count: PARAMS[cfg].NUM_THREADS,
+                min_out_count: PARAMS[cfg].NUM_THREADS,
+                min_count: PARAMS[cfg].NUM_THREADS,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
                 loc_name: 'GLOBAL',
-                flip: true,
               }
             },
 
+            // Load cache into registers
             {
-              name: 'thread_elemwise',
+              name: 'register_cache_load',
               pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
-                reqs: ['kernel', 'eltwise'],
-                threads: PARAMS[cfg].NUM_THREADS,
-              } 
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.RegisterCachePass',
+                reqs: ['cache_load', 'gpu_thread'],
+                dir: 'In',
+                local_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
+                register_loc: { 'devs': [{'name': 'REGISTER', 'units': [{'offset': 0}]}] },
+                register_size: PARAMS[cfg].REGS_MEM_B,
+                global_memory_latency: PARAMS[cfg].GLOBAL_MEM_LAT,
+                local_memory_latency: PARAMS[cfg].LOCAL_MEM_LAT,
+                register_latency: PARAMS[cfg].REG_MEM_LAT,
+                comp_parent_tag: 'contract_middle',
+                index_order: 'cache',
+                align_size: PARAMS[cfg].ALIGN_SIZE_B,
+              }
+            },
+
+            // Store cache into registers
+            {
+              name: 'register_cache_store',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.RegisterCachePass',
+                reqs: ['cache_store', 'gpu_thread'],
+                dir: 'Out',
+                local_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
+                register_loc: { 'devs': [{'name': 'REGISTER', 'units': [{'offset': 0}]}] },
+                register_size: PARAMS[cfg].REGS_MEM_B,
+                global_memory_latency: PARAMS[cfg].GLOBAL_MEM_LAT,
+                local_memory_latency: PARAMS[cfg].LOCAL_MEM_LAT,
+                register_latency: PARAMS[cfg].REG_MEM_LAT,
+                comp_parent_tag: 'contract_middle',
+                index_order: 'comp',
+                align_size: PARAMS[cfg].ALIGN_SIZE_B,
+              }
             },
 
             {
@@ -375,7 +412,7 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass',
                 reqs: ['program'],
-                locs: [{ "devs": [{"name": "GLOBAL", "units": [{"offset": 0}]}] }],
+                locs: [{ 'devs': [{'name': 'GLOBAL', 'units': [{'offset': 0}]}] }],
                 alignment: 4,
               }
             }
