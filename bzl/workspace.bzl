@@ -1,4 +1,5 @@
 load("//bzl:conda_repo.bzl", "conda_repo")
+load("//bzl:xsmm_repo.bzl", "xsmm_repo")
 load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("@toolchain//:workspace.bzl", toolchain_repositories = "repositories")
@@ -148,6 +149,12 @@ def plaidml_workspace():
     #     sha256 = "e161ad5078822830f0499b5a210cea00cbed827dfe0e90a9579c2a77308ef88e",
     #     strip_prefix = "rules_foreign_cc-dea1437d926c6ee171625ba16e719d9ee7a8aad3",
     # )
+
+    xsmm_repo(
+        name = "xsmm",
+        env = Label("//conda:plaidml.yml"),
+        build_file = Label("//bzl:xsmm.BUILD"),
+    )
 
     http_archive(
         name = "mlir",
