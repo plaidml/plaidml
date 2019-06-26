@@ -1104,9 +1104,6 @@ TensorShape FunctionApplication::GetOutputShape(const std::string& name) {
   }
 
   const Binding& binding = typecheck_bindings_.at(name);
-  if (binding.tag != Binding::TENSOR) {
-    throw std::runtime_error("Output parameter " + name + " is not a tensor");
-  }
 
   return binding.shape;
 }

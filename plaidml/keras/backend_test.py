@@ -54,7 +54,7 @@ def m(*args, **kwargs):
     dtype = kwargs.get('dtype', floatx())
     """Makes a test matrix whose dimensions are the supplied arguments."""
     total = functools.reduce(operator.mul, args, 1)
-    arr = np.array(range(-2, total - 2), dtype=dtype)
+    arr = np.array(range(-2, total - 2), dtype=dtype) / 2.
     arr = np.reshape(arr, args)
     return arr
 
