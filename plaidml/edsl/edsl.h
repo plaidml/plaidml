@@ -422,7 +422,7 @@ class Tensor {
     for (size_t i = 0; i < idxs.size(); i++) {
       idx_ptrs[i] = idxs[i].impl_->ptr.get();
     }
-    auto impl = std::make_unique<IndexedTensor::Impl>();
+    std::unique_ptr<IndexedTensor::Impl> impl(new IndexedTensor::Impl());
     impl->src = this;
     impl->unary = details::make_tile_expr(  //
         ffi::call<tile_expr*>(              //
@@ -764,7 +764,7 @@ class TensorFriend {
   }
 
   static IndexedTensor ComboParts(tile_combo_op op, const std::vector<const IndexedTensor*>& args) {
-    auto impl = std::make_unique<IndexedTensor::Impl>();
+    std::unique_ptr<IndexedTensor::Impl> impl(new IndexedTensor::Impl());
     impl->nary.reset(new IndexedTensor::ComboParts);
     impl->nary->op = op;
     for (const auto& arg : args) {
@@ -778,7 +778,7 @@ class TensorFriend {
     for (size_t i = 0; i < args.size(); i++) {
       ptrs[i] = args[i].impl_->ptr.get();
     }
-    auto impl = std::make_unique<Tensor::Impl>();
+    std::unique_ptr<Tensor::Impl> impl(new Tensor::Impl());
     impl->ptr = details::make_tile_expr(  //
         ffi::call<tile_expr*>(            //
             tile_expr_call,               //
