@@ -617,7 +617,6 @@ def ctc_label_dense_to_sparse(labels, label_lengths):
 
 cumprod = op.cumulative_prod
 
-
 cumsum = op.cumulative_sum
 
 
@@ -1501,10 +1500,7 @@ sigmoid = op.sigmoid
 
 
 def sign(x):
-    x = clip(x, -1, 1)
-    if x.shape.dtype < plaidml.DType.INT8 or x.shape.dtype > plaidml.DType.INT128:
-        x = cast(x, 'int32')
-    return x
+    return ptile.unary_op(x, "I == 0 ? 0 : (I > 0 ? 1 : -1)", name="Sign")
 
 
 sin = op.sin
@@ -1620,7 +1616,6 @@ def stack(x, axis=0):
     nshape = list(tshape.dims)
     nshape.insert(axis if axis >= 0 else len(nshape), 1)
     return concatenate([reshape(item, nshape) for item in x], axis=axis)
-
 
 
 def std(x, axis=None, keepdims=False):
