@@ -152,7 +152,9 @@ def plaidml_workspace():
 
     xsmm_repo(
         name = "xsmm",
-        env = Label("//conda:plaidml.yml"),
+        url = "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
+        sha256 = "451ec9d30f0890bf3081aa3d0d264942a6dea8f9d29c17bececc8465a10a832b",
+        stripPrefix = "libxsmm-1.12.1",
         build_file = Label("//bzl:xsmm.BUILD"),
     )
 
