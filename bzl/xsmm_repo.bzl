@@ -1,13 +1,8 @@
-BUILD_FILE = """
-package(default_visibility = ["//visibility:public"])
-
-exports_files(["env"])
-"""
-
 def _xsmm_repo_impl(repository_ctx):
     name = repository_ctx.name
-    env_path = repository_ctx.path(repository_ctx.attr.env)
-    prefix_path = repository_ctx.path("env")
+    url = repository_ctx.attr.url
+    sha256 = repository_ctx.attr.sha256
+    stripPrefix = repository_ctx.attr.stripPrefix
 
     args = [
         repository_ctx.which("make"),
@@ -17,10 +12,9 @@ def _xsmm_repo_impl(repository_ctx):
     ]
 
     result = repository_ctx.download_and_extract(
-        "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
-        output='.',
-        sha256="451ec9d30f0890bf3081aa3d0d264942a6dea8f9d29c17bececc8465a10a832b",
-        stripPrefix='libxsmm-1.12.1',
+        url=url,
+        sha256=sha256,
+        stripPrefix=stripPrefix,
     )
 
     result = repository_ctx.execute(args, quiet = False, timeout = 1200)
@@ -28,18 +22,23 @@ def _xsmm_repo_impl(repository_ctx):
     if result.return_code:
         fail("xmss_repo failed: %s (%s)" % (result.stdout, result.stderr))
 
-    if repository_ctx.attr.build_file:
-        repository_ctx.template("BUILD", repository_ctx.attr.build_file, {}, False)
-    else:
-        repository_ctx.file("BUILD", BUILD_FILE)
+    repository_ctx.template("BUILD", repository_ctx.attr.build_file, {}, False)
     
 xsmm_repo = repository_rule(
     attrs = {
-        "env": attr.label(
-            allow_single_file = True,
+        "url": attr.string(
             mandatory = True,
         ),
-        "build_file": attr.label(allow_single_file = True),
+        "sha256": attr.string(
+            mandatory = True,
+        ),
+        "stripPrefix": attr.string(
+            mandatory = True,
+        ),
+        "build_file": attr.label(
+            mandatory = True,
+            allow_single_file = True
+        ),
     },
     
     implementation = _xsmm_repo_impl,
