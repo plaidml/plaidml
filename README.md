@@ -76,6 +76,9 @@ Vertex.AI runs a comprehensive set of tests for each release against these hardw
     * K80, GTX 780, GT 640M
     * GTX 1070, 1050
 
+If you are using a hardware target not supported by PlaidML by default, such as Clover, 
+check out the instructions at `building.md` to build a custom configuration for your hardware.
+
 ### Validated Networks
 
 We support all of the Keras application networks from current versions of 2.x.

@@ -171,3 +171,69 @@ running `plaidml-setup` prior to execution)
 [Bazel-on-Windows]:https://docs.bazel.build/versions/master/windows.html
 [PlaidML backend]:https://ngraph.nervanasys.com/docs/latest/programmable/index.html#plaidml
 [nGraph build]:https://ngraph.nervanasys.com/docs/latest/buildlb.html 
+
+# Custom Hardware Configuration
+
+Custom configuration can be set by producing a .json file. Here is an example with two device
+configurations specified:
+```
+{
+"platform": {
+    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+    "hardware_configs": [
+    {
+        "description": "Intel *HD Graphics GPU config",
+        "sel": {
+        "and": {
+            "sel": [
+            {
+                "name_regex": ".*HD Graphics.*"
+            },
+            {
+                "platform_regex": "Metal.*"
+            }
+            ]
+        }
+        },
+        "settings": {
+        "threads": 128,
+        "vec_size": 4,
+        "mem_width": 256,
+        "max_mem": 16000,
+        "max_regs": 16000,
+        "goal_groups": 6,
+        "goal_flops_per_byte": 50
+        }
+    },
+    {
+        "description": "Intel Iris GPU config",
+        "sel": {
+        "and": {
+            "sel": [
+            {
+                "name_regex": ".*Iris.*"
+            },
+            {
+                "platform_regex": "Metal.*"
+            }
+            ]
+        }
+        },
+        "settings": {
+        "threads": 128,
+        "vec_size": 4,
+        "mem_width": 256,
+        "max_mem": 16000,
+        "max_regs": 16000,
+        "goal_groups": 6,
+        "goal_flops_per_byte": 50,
+        "use_global": true
+        }
+    }
+    ]
+}
+}
+```
+The custom configuration file can be read into PlaidML by setting the enviornment variable
+`PLAIDML_EXPERIMENTAL_CONFIG` to point to the custom .json file. PlaidML will then read the
+custom configuration file and list it as a device when running `plaidml-setup`.
