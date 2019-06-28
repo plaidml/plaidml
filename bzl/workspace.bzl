@@ -55,16 +55,16 @@ def plaidml_workspace():
 
     http_archive(
         name = "jsonnet",
-        url = "https://github.com/google/jsonnet/archive/v0.12.1.tar.gz",
-        sha256 = "257c6de988f746cc90486d9d0fbd49826832b7a2f0dbdb60a515cc8a2596c950",
-        strip_prefix = "jsonnet-0.12.1",
+        url = "https://github.com/google/jsonnet/archive/v0.13.0.zip",
+        sha256 = "e9f7095dd2a383001188aa622edaf82059732e11d74f8d0bfdfa84f2682dd547",
+        strip_prefix = "jsonnet-0.13.0",
     )
 
     http_archive(
         name = "io_bazel_rules_jsonnet",
-        sha256 = "5e2bf166593134d2b07dc6756598e9af6413e9aa8084eed7e87e9823c21792b2",
-        strip_prefix = "rules_jsonnet-ad2b4204157ddcf7919e8bd210f607f8a801aa7f",
-        url = "https://github.com/bazelbuild/rules_jsonnet/archive/ad2b4204157ddcf7919e8bd210f607f8a801aa7f.zip",
+        sha256 = "d05d719c4738e8aac5f13b32f745ff4832b9638ecc89ddcb6e36c379a1ada025",
+        strip_prefix = "rules_jsonnet-0.1.0",
+        url = "https://github.com/bazelbuild/rules_jsonnet/archive/0.1.0.zip",
     )
 
     http_archive(
