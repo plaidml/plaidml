@@ -2,6 +2,7 @@
 """Creates a plaidml user configuration file."""
 from __future__ import print_function
 
+import os
 import sys
 
 from six.moves import input
@@ -37,6 +38,11 @@ Some Notes:
   * PlaidML is licensed under the Apache License 2.0
  """.format(plaidml.__version__))
 
+    # Placeholder env var
+    if os.getenv("PLAIDML_VERBOSE"):
+        (cfg_path, cfg_file) = os.path.split(plaidml.settings.default_config)
+        (exp_path, exp_file) = os.path.split(plaidml.settings.experimental_config)
+
     # Operate as if nothing is set
     plaidml.settings._setup_for_test(plaidml.settings.user_settings)
 
@@ -58,11 +64,19 @@ No supported devices found. Run 'clinfo' and file an issue containing the full o
 """)
         sys.exit(-1)
 
-    print("Default Config Devices:")
+    if devices and os.getenv("PLAIDML_VERBOSE"):
+        print("Default Config File Location:")
+        print("   {0}/".format(cfg_path))
+
+    print("\nDefault Config Devices:")
     if not devices:
         print("   No devices.")
     for dev in devices:
         print("   {0} : {1}".format(dev.id.decode(), dev.description.decode()))
+
+    if exp_devices and os.getenv("PLAIDML_VERBOSE"):
+        print("\nExperimental Config File Location:")
+        print("   {0}/".format(exp_path))
 
     print("\nExperimental Config Devices:")
     if not exp_devices:
