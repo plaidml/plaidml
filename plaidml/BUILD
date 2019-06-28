@@ -15,6 +15,7 @@ load(
     "plaidml_py_wheel",
 )
 load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
+load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 
 # The PlaidML configuration protobuf definition.
 plaidml_proto_library(
@@ -393,18 +394,18 @@ plaidml_cc_library(
 
 plaidml_cc_binary(
     name = "libplaidml_pub.so",
-    linkshared = 1,
-    tags = ["linux"],
-    deps = [
-        ":public_lib",
-        ":libplaidml.lds",
-    ],
     linkopts = [
         # Prefer internal library definitions.
         "-Wl,-Bsymbolic-functions",
 
         # Use an explicit linker script.
-        "-Wl,$(location :libplaidml.lds)",
+        "-Wl,$(location :plaidml.lds)",
+    ],
+    linkshared = 1,
+    tags = ["linux"],
+    deps = [
+        ":plaidml.lds",
+        ":public_lib",
     ],
 )
 
@@ -412,15 +413,22 @@ plaidml_cc_binary(
     name = "plaidml_pub.dll",
     linkshared = 1,
     tags = ["msvc"],
+    win_def_file = ":plaidml.def",
     deps = [":public_lib"],
 )
 
-apple_binary(
+plaidml_cc_binary(
     name = "libplaidml_raw_pub.dylib",
-    binary_type = "dylib",
-    platform_type = "macos",
+    linkopts = [
+        "-dynamiclib",
+        "-exported_symbols_list",
+        "$(location :plaidml.ld)",
+    ],
     tags = ["darwin"],
-    deps = [":public_lib"],
+    deps = [
+        ":plaidml.ld",
+        ":public_lib",
+    ],
 )
 
 plaidml_macos_dylib(
@@ -429,4 +437,15 @@ plaidml_macos_dylib(
     internal_libname = "libplaidml.dylib",
     lib = "libplaidml_pub.dylib",
     tags = ["darwin"],
+)
+
+jsonnet_to_json(
+    name = "plaidml_link",
+    src = "plaidml_link.jsonnet",
+    outs = [
+        "plaidml.def",
+        "plaidml.ld",
+        "plaidml.lds",
+    ],
+    extra_args = ["-S"],
 )
