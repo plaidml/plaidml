@@ -9,13 +9,17 @@
 
 using namespace vertexai::tile::sem::builder;  // NOLINT
 
+#define MAX_UNROLL_SIZE 64
+
 namespace vertexai {
 namespace tile {
 namespace codegen {
 
-static sem::ExprPtr AggInit(DataType type, const std::string agg_op) {
+static sem::ExprPtr AggInit(DataType type, const std::string agg_op, bool has_constraint) {
   if (agg_op == "" || agg_op == "assign") {
-    return sem::ExprPtr();
+    // If there is constraint in the block, the local buffer may not be fully covered.
+    // So we have to initialize the buffer in this case.
+    return has_constraint ? _LimitConst(sem::LimitConst::ZERO, type) : sem::ExprPtr();
   } else if (agg_op == "add") {
     return _LimitConst(sem::LimitConst::ZERO, type);
   } else if (agg_op == "max") {
@@ -26,6 +30,19 @@ static sem::ExprPtr AggInit(DataType type, const std::string agg_op) {
     return _LimitConst(sem::LimitConst::ONE, type);
   }
   throw std::runtime_error("Unknown agg-op:" + agg_op);
+}
+
+bool HasConstraints(stripe::Block* block) {
+  if (block->constraints.size() > 0) {
+    return true;
+  }
+  for (const auto& stmt : block->stmts) {
+    auto sub = stripe::Block::Downcast(stmt);
+    if (sub && HasConstraints(sub.get())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 sem::ExprPtr SemtreeEmitter::default_intrinsic_emitter(const stripe::Intrinsic& in,
@@ -547,7 +564,11 @@ class Unroller : public stripe::ConstStmtVisitor {
     scalars_[in.outputs[0]] = opexpr;
   }
 
-  void Visit(const stripe::LoadIndex&) { throw std::runtime_error("LoadIndex unimplmented in unrolling"); }
+  void Visit(const stripe::LoadIndex& stmt) {
+    auto rhs = emitter_.convert_affine(stmt.from.sym_eval(emitter_.scope_->idx_sources()));
+    scalars_[stmt.into] = rhs;
+  }
+
   void Visit(const stripe::Special&) { throw std::runtime_error("Special unimplemented in unrolling"); }
   void Visit(const stripe::Block&) { throw std::runtime_error("Block unimplemented in unrolling"); }
 
@@ -567,7 +588,11 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     cur_->push_back(make_special("MAC_INNER", block, args));
     return;
   }
-  if (block.has_tag("subgroup_inline") || block.has_tag("inline")) {
+  // For subgroup_inline, we unroll the block directly because
+  // we implement subgroup functions in only the unroller
+  if ((block.has_tag("subgroup_inline") || 
+      (block.has_tag("inline") && block.idxs_product() <= MAX_UNROLL_SIZE)) &&
+      block.constraints.size() == 0) {
     scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
     scope_ = &scopes_.back();
     depth_++;
@@ -644,7 +669,8 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       size_t size = ref.interior_shape.elem_size();
       sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, size,
                          ((use_register || in_threads_) ? sem::Type::NORMAL : sem::Type::LOCAL)};
-      sem::ExprPtr init = AggInit(ref.interior_shape.type, ref.agg_op);
+      sem::ExprPtr init = AggInit(ref.interior_shape.type, ref.agg_op,
+                          HasConstraints(const_cast<stripe::Block*>(&block)));
       if (use_register || in_threads_) {
         cur_->push_front(_Declare(ptype, ref_buf(ref.into()), init));
       } else {

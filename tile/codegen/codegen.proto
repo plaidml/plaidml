@@ -252,6 +252,12 @@ message FusionPass {
   optional bool output_match = 7 [default = false];
   // Whether allowing inner block for the fused block
   optional bool no_inner = 8 [default = false];
+  // Remove tags for inner blocks
+  repeated string inner_remove_set = 9; 
+  // New tags for the first inner block
+  repeated string a_inner_set = 36;
+  // New tags for the second inner block
+  repeated string b_inner_set = 37;
 }
 
 // A localize pass detects allocations (refinements with dir = None)
@@ -435,6 +441,10 @@ message AutotilePass {
   repeated string fail_inner_set = 34;
   // If failed, tile the whole block into inner, and set the following tags for outer block
   repeated string fail_outer_set = 35;
+  // Exclude some set of blocks based on tags
+  repeated string exclude = 36;
+  // If the tiling is interleaved
+  optional bool interleave = 37;
 }
 
 // A pass that attempts to transpose intermediate buffers such that any
@@ -511,6 +521,8 @@ message ThreadInnerPass {
   repeated string outer_set = 3;
   // Set the following tags on the inner block post tiling
   repeated string inner_set = 4;
+  // Exclude some set of blocks based on tags
+  repeated string exclude = 5;
 }
 
 // Assign a codec to matching refinements. A codec defines the physical layout

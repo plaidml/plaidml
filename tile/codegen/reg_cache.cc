@@ -77,10 +77,9 @@ static void AdjustRefAccessHelper(Block* outer, Refinement* outer_ref, Block* in
     if (adjust_all || inner_ref.from == outer_ref->into()) {
       for (auto& aff : inner_ref.mut().access) {
         auto& aff_map = aff.mutateMap();
-        if (aff_map.size() == 1) {
-          auto it = aff_map.begin();
-          it->second = (inner_ref.from == outer_ref->into()) ?
-                       1 : ToInteger(it->second / multiple.at(it->first));
+        for (auto& it : aff_map) {
+          it.second = (inner_ref.from == outer_ref->into()) ?
+                      1 : ToInteger(it.second / multiple.at(it.first));
         }
       }
     }
@@ -89,10 +88,9 @@ static void AdjustRefAccessHelper(Block* outer, Refinement* outer_ref, Block* in
   // Clear the accesses in block index to zero
   for (auto& aff : outer_ref->mut().access) {
     auto& aff_map = aff.mutateMap();
-    if (aff_map.size() == 1) {
-      auto aff_it = aff_map.begin();
+    for (auto& aff_it : aff_map) {
       for (const auto& idx : outer->idxs) {
-        if (idx.name == aff_it->first) {
+        if (idx.name == aff_it.first) {
           aff_map.clear();
           break;
         }

@@ -12,14 +12,79 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
+bool NotUsedInRefs(Block* block, const std::string& idx_name) {
+  for (const auto& ref : block->refs) {
+    for (const auto& acc : ref.access) {
+      if (acc.getMap().find(idx_name) != acc.getMap().end()) {
+        return false;
+      }
+    } 
+  }
+  return true;
+}
+
+bool NotUsedInConstraints(Block* block, const std::string& idx_name) {
+  for (const auto& cons : block->constraints) {
+    if (cons.getMap().find(idx_name) != cons.getMap().end()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool UsedInIdxs(Block* block, const std::string& idx_name) {
+  for (const auto& idx : block->idxs) {
+    if (idx.affine != Affine()) {
+      if (idx.affine.getMap().find(idx_name) != idx.affine.getMap().end()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool NotUsedInStmts(Block* block, const std::string& idx_name) {
+  for (const auto& stmt : block->stmts) {
+    auto load_index = LoadIndex::Downcast(stmt);
+    if (load_index) {
+      if (load_index->from.getMap().find(idx_name) != load_index->from.getMap().end()) {
+        return false;
+      }
+      continue;
+    }
+    auto sub_block = Block::Downcast(stmt);
+    if (sub_block) {
+      if (UsedInIdxs(sub_block.get(), idx_name)) {
+        return false;
+      }
+      continue;
+    } 
+  }
+  return true;
+}
+
+bool NotUsedInBlock(Block* block, const std::string& idx_name) {
+  return NotUsedInRefs(block, idx_name) &&
+         NotUsedInConstraints(block, idx_name) &&
+         NotUsedInStmts(block, idx_name);
+}
+
 void PruneIndexes(Block* block, const Tags& exclude_tags) {
   // Find all the indexes to remove
   std::set<const Index*> to_remove;
   std::map<std::string, int64_t> idx_values;
   for (const auto& idx : block->idxs) {
-    if (!idx.has_any_tags(exclude_tags) && idx.range == 1 && idx.affine == 0) {
-      to_remove.emplace(&idx);
-      idx_values.emplace(idx.name, 0);
+    if (!idx.has_any_tags(exclude_tags)) {
+      if (idx.range == 1 && idx.affine == 0) {
+        to_remove.emplace(&idx);
+        idx_values.emplace(idx.name, 0);
+      }
+      else if (idx.affine != Affine()) {
+        if (NotUsedInBlock(block, idx.name)) {
+          to_remove.emplace(&idx);
+          idx_values.emplace(idx.name, 0);
+        }
+      }
     }
   }
   // Remove from refinements

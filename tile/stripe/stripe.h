@@ -99,6 +99,7 @@ class Taggable {
   void add_tags(const Tags& to_add);
   void clear_tags();
   void remove_tag(const std::string& tag);
+  void remove_tags(const Tags& tags);
 
   bool has_tag(const std::string& tag) const;
   bool has_tags(const Tags& to_find) const;

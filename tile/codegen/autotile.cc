@@ -338,7 +338,7 @@ boost::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool
         tile.set(i, 2 * prev.size, block.idxs[i].range);
       } else if (only_even) {
         // Find the next even divisor of range
-        for (size_t j = prev.size + 1; j < block.idxs[i].range; j++) {
+        for (size_t j = prev.size + 1; j <= block.idxs[i].range; j++) {
           if (block.idxs[i].range % j == 0) {
             tile.set(i, j, block.idxs[i].range);
             break;
@@ -364,6 +364,9 @@ boost::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool
 void AutotilePass::Apply(CompilerState* state) const {
   auto reqs = FromProto(options_.reqs());
   RunOnBlocks(state->entry(), reqs, [this](const AliasMap& map, Block* block) {
+    if (block->has_any_tags(FromProto(options_.exclude()))) {
+      return;
+    }
     if (block->has_tag("cache")) {
       for (const auto& ref : block->refs) {
         if (IsWriteDir(ref.dir) && ref.location.devs[0].name == "REGISTER") {
@@ -378,8 +381,8 @@ void AutotilePass::Apply(CompilerState* state) const {
     if (result) {
       IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result->tile << ", cost: " << result->cost);
       const TileShape& tiling_shape = options_.flip() ? result->tile.counts() : result->tile.sizes();
-      if (ApplyTile(block, tiling_shape, false, false, options_.flip(), options_.split_unaligned(),
-                    options_.location_idx_tag())) {
+      if (ApplyTile(block, tiling_shape, false, false, options_.flip() || options_.interleave(), 
+                    options_.split_unaligned(), options_.location_idx_tag())) {
         auto inner = block->SubBlock(0);
         if (options_.copy_tags()) {
           inner->set_attrs(*block);

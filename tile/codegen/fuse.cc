@@ -15,13 +15,22 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-bool NoInnerBlock(Block *block) {
+bool NoInnerBlock(Block* block) {
   for (const auto& stmt : block->stmts) {
     if (stmt->kind() == StmtKind::Block) {
       return false;
     }
   }
   return true;
+}
+
+void AddInnerTags(Block* block, const Tags& tags) {
+  for (auto stmt : block->stmts) {
+    auto sub = Block::Downcast(stmt);
+    if (sub) {
+       sub->add_tags(tags);
+    }
+  }
 }
 
 static std::vector<Affine> TranslatedContraints(const AliasMap& map, std::map<std::string, std::string> remap,
@@ -474,7 +483,7 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   return true;
 }
 
-void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy, bool no_inner) {
+void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strategy, bool no_inner) {
   // Start with the first statement, and keep tying to fuse until you can't anymore, then move to the next
   auto it = block->stmts.begin();
   while (it != block->stmts.end()) {
@@ -562,6 +571,10 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy, 
                 [](const Index& a, const Index& b) { return a.name < b.name; });
       std::sort(refactor2->idxs.begin(), refactor2->idxs.end(),
                 [](const Index& a, const Index& b) { return a.name < b.name; });
+
+      AddInnerTags(refactor1.get(), FromProto(strategy->Options().a_inner_set()));
+      AddInnerTags(refactor2.get(), FromProto(strategy->Options().b_inner_set()));
+
       // IVLOG(3, "Fusion refactor 1:\n" << *refactor1);
       // IVLOG(3, "Fusion refactor 2:\n" << *refactor2);
       // Try the actual fusion
@@ -580,44 +593,6 @@ void FusionInner(const AliasMap& scope, Block* block, FusionStrategy* strategy, 
   }
 }
 
-struct FusionPassOptions {
-  Tags parent_reqs;
-  Tags a_block_reqs;
-  Tags b_block_reqs;
-  Tags fused_set;
-  Tags exclude;
-  bool perfect;
-  bool output_match;
-  bool no_inner;
-};
-
-class TagFusionStrategy : public FusionStrategy {
- public:
-  explicit TagFusionStrategy(const FusionPassOptions& options) : options_(options) {}
-  bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
-    bool tag_match = parent.has_tags(options_.parent_reqs) &&  //
-                     a.has_tags(options_.a_block_reqs) &&      //
-                     b.has_tags(options_.b_block_reqs) &&      //
-                     !a.has_any_tags(options_.exclude) &&      //
-                     !b.has_any_tags(options_.exclude);
-    if (!tag_match) {
-      return false;
-    }
-    if (options_.output_match && a.idxs.size() != b.idxs.size()) {
-      return false;
-    }
-    return true;
-  }
-  void OnFailed() {}
-  void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
-    block->add_tags(options_.fused_set);
-  }
-  bool NoInner() { return options_.no_inner; }
-
- private:
-  const FusionPassOptions& options_;
-};
-
 static void FusionPassRecurse(const AliasMap& map, stripe::Block* block, TagFusionStrategy* strategy) {
   FusionInner(map, block, strategy, strategy->NoInner());
   for (const auto& stmt : block->stmts) {
@@ -631,20 +606,10 @@ static void FusionPassRecurse(const AliasMap& map, stripe::Block* block, TagFusi
 
 void FusionPass::Apply(CompilerState* state) const {
   stripe::Block* root = state->entry();
-  FusionPassOptions fopts = {
-      FromProto(options_.parent_reqs()),  // parent_reqs
-      FromProto(options_.a_reqs()),       // a_block_reqs
-      FromProto(options_.b_reqs()),       // b_block_reqs
-      FromProto(options_.fused_set()),    // fused_set
-      FromProto(options_.exclude()),      // exclude
-      options_.perfect(),                 // perfect
-      options_.output_match(),            // output_match
-      options_.no_inner()                 // elide trivial plan
-  };
   AliasMap base;
   AliasMap root_map(base, root);
   // Check if we should fuse this block
-  TagFusionStrategy strategy(fopts);
+  TagFusionStrategy strategy(options_);
   FusionPassRecurse(root_map, root, &strategy);
 }
 

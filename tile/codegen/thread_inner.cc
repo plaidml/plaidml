@@ -20,13 +20,21 @@ using math::NearestPo2;
 using math::RoundUp;
 
 void DoThreadInnerPass(const AliasMap& scope, Block* block, const proto::ThreadInnerPass& options) {
+  if (block->has_any_tags(FromProto(options.exclude()))) {
+    return;
+  }
   if (block->ref_outs(true).size() != 1) {
     if (block->ref_outs(true).size() == 0) {
       // We may remove the output refinements in the contracts during optimizations,
       // so here is not definitely wrong.
       return;
     }
-    throw std::runtime_error("Thread inner pass only works with a single output");
+    const auto refs = block->ref_outs(true);
+    for (size_t i = 1; i < refs.size(); ++i) {
+      if (refs[0]->access != refs[i]->access) {
+        throw std::runtime_error("Thread inner pass only works with a single output");
+      }
+    }
   }
   const Refinement* out_ref = block->ref_outs(true)[0];
   const auto& idxs = block->idxs;
@@ -39,7 +47,7 @@ void DoThreadInnerPass(const AliasMap& scope, Block* block, const proto::ThreadI
       sorted_idxs.push_back(i);
     }
   }
-  IVLOG(1, "Output indexes: " << sorted_idxs);
+  IVLOG(3, "Output indexes: " << sorted_idxs);
   // Sort indexes by is_out, power-of-twoness, then size
   auto sort_func = [&](size_t i, size_t j) {
     bool out_i = flat.get(idxs[i].name) == 0;
@@ -56,7 +64,7 @@ void DoThreadInnerPass(const AliasMap& scope, Block* block, const proto::ThreadI
   };
   TileShape tile(block->idxs.size(), 1);
   std::sort(sorted_idxs.begin(), sorted_idxs.end(), sort_func);
-  IVLOG(1, "Sorted indexes: " << sorted_idxs);
+  IVLOG(3, "Sorted indexes: " << sorted_idxs);
   size_t cur = 0;
   size_t threads = options.threads();
   while (threads > 1 && cur < sorted_idxs.size()) {

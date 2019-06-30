@@ -1,10 +1,10 @@
 local PARAMS = {
   amd: {
-    LOCAL_MEM_KIB: 16,
+    LOCAL_MEM_KIB: 28,
     NUM_THREADS: 256,
-    CACHE_WIDTH: 1024, 
-    NUM_UNITS: 32,
-    REGS_MEM_B: 128,
+    CACHE_WIDTH: 64, 
+    NUM_UNITS: 64,
+    REGS_MEM_B: 1024,
     REG_MEM_LAT: 1,
     LOCAL_MEM_LAT: 30,
     GLOBAL_MEM_LAT: 100,
@@ -93,10 +93,11 @@ local PARAMS = {
                 fail_inner_set: ['no_threads'],
                 clear_outer: true,
                 acc_idxs: true,
-                only_even: true,
+                only_po2: true,
+                min_out_count: PARAMS[cfg].NUM_UNITS,
                 max_total_size: PARAMS[cfg].LOCAL_MEM_KIB * 1024,
+                max_sizes_product: PARAMS[cfg].NUM_THREADS * 64,
                 min_out_size: PARAMS[cfg].NUM_THREADS,
-                min_size: PARAMS[cfg].NUM_THREADS,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
               }
             },
@@ -110,8 +111,20 @@ local PARAMS = {
                 acc_idxs: false,
                 input_cost: 0.0, 
                 output_cost: 0.0,
+                min_out_count: PARAMS[cfg].NUM_UNITS,
                 split_factor: -100.0,
-                only_even: true,
+                only_po2: true,
+              }
+            },
+
+            {
+              name: 'fuse_contract_eltwise',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['contract_outer'],
+                b_reqs: ['eltwise'],
+                inner_remove_set: ['kernel'],
+                b_inner_set: ['eltwise_middle'],
               }
             },
 
@@ -131,18 +144,41 @@ local PARAMS = {
                 ref: 'contract_inner',
                 dirs: [ 'In' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
-                xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
+                xfer_loc: {},
+                //xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
                 odd_size: true,
               }
             },
 
             {
-              name: 'fuse_contract_eltwise',
+              name: 'cache_output',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.CachePass',
+                reqs: ['contract_outer'],
+                ref: 'contract_inner',
+                dirs: [ 'Out', 'InOut' ],
+                mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
+                xfer_loc: {},
+                //xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
+                odd_size: true,
+              }
+            },
+
+            {
+              name: 'prune_idxs',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
+                reqs: ['all'],
+              },
+            },
+
+            {
+              name: 'fuse_inner',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
-                a_reqs: ['contract_outer'],
-                b_reqs: ['eltwise'],
-                output_match: true,
+                parent_reqs: ['contract_outer'],
+                fused_set: ['cache'],
+                exclude: ['contract_middle'],
               }
             },
 
@@ -154,7 +190,7 @@ local PARAMS = {
                 a_reqs: ['eltwise'],
                 b_reqs: ['eltwise'],
                 output_match: true,
-              } 
+              }
             },
 
             // Then we 'localize' buffers, which moves any temporaries the only are needed to hold the output
@@ -175,20 +211,7 @@ local PARAMS = {
                 reqs: ['all'],
               },
             },
-
-            {
-              name: 'cache_output',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.CachePass',
-                reqs: ['contract_outer'],
-                ref: 'contract_inner',
-                dirs: [ 'Out', 'InOut' ],
-                mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
-                xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
-                odd_size: true,
-              } 
-            },
-
+            
             {
               name: 'cache_unexpanded',
               pass: {
@@ -200,25 +223,6 @@ local PARAMS = {
                 xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
               }
             },
-
-            {
-              name: 'prune_idxs',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-                reqs: ['all'],
-              },
-            },
-
-            {
-              name: 'fuse_inner',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
-                parent_reqs: ['contract_outer'],
-                fused_set: ['cache'],
-                exclude: ['contract_middle'],
-              } 
-            },
-
 /*
             // It is usually useless
             {
@@ -231,15 +235,16 @@ local PARAMS = {
 */
 
             {
-              name: 'tile_eltwise',
+              name: 'tile_eltwise_kernel',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['eltwise', 'kernel'],
                 outer_set: ['eltwise_outer', 'kernel'],
-                inner_set: ['eltwise_inner'],
+                inner_set: ['eltwise_middle'],
                 clear_outer: true,
-                only_even: true,
+                only_po2: true,
                 min_count: PARAMS[cfg].NUM_UNITS,
+                max_sizes_product: PARAMS[cfg].NUM_THREADS,
                 min_size: PARAMS[cfg].NUM_THREADS,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
               }
@@ -283,15 +288,11 @@ local PARAMS = {
             {
               name: 'thread_cache',
               pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
                 reqs: ['cache'],
                 outer_set: ['cache_outer', 'gpu_thread'],
                 inner_set: ['cache_threads', 'inline'],
-                only_even: true,
-                max_sizes_product: PARAMS[cfg].NUM_THREADS,
-                cache_width: PARAMS[cfg].CACHE_WIDTH,
-                loc_name: 'GLOBAL',
-                flip: true,
+                threads: PARAMS[cfg].NUM_THREADS,
               }
             },
 
@@ -305,20 +306,15 @@ local PARAMS = {
                 threads: PARAMS[cfg].NUM_THREADS,
               }
             },
-
             {
               name: 'thread_eltwise',
               pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
-                reqs: ['eltwise_inner'],
-                outer_set: ['eltwise_struct', 'gpu_thread'],
-                inner_set: ['eltwise_threads', 'inline'],
-                only_even: true,
-                max_count: PARAMS[cfg].NUM_THREADS,
-                min_out_count: PARAMS[cfg].NUM_THREADS,
-                min_count: PARAMS[cfg].NUM_THREADS,
-                cache_width: PARAMS[cfg].CACHE_WIDTH,
-                loc_name: 'GLOBAL',
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
+                reqs: ['eltwise_middle'],
+                exclude: ['cache'],
+                outer_set: ['eltwise_middle', 'gpu_thread'],
+                inner_set: ['eltwise_inner', 'inline'],
+                threads: PARAMS[cfg].NUM_THREADS,
               }
             },
 

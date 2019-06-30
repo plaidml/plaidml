@@ -53,9 +53,44 @@ class FusionStrategy {
   virtual void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) = 0;
 };
 
-void FusionInner(const AliasMap& scope, stripe::Block* block, FusionStrategy* strategy, bool no_inner = false);
+class TagFusionStrategy : public FusionStrategy {
+ public:
+  TagFusionStrategy() {}
+  explicit TagFusionStrategy(const proto::FusionPass& options) : options_(options) {}
+  bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
+    bool tag_match = parent.has_tags(stripe::FromProto(options_.parent_reqs())) &&  //
+                     a.has_tags(stripe::FromProto(options_.a_reqs())) &&      //
+                     b.has_tags(stripe::FromProto(options_.b_reqs())) &&      //
+                     !a.has_any_tags(stripe::FromProto(options_.exclude())) &&      //
+                     !b.has_any_tags(stripe::FromProto(options_.exclude()));
+    if (!tag_match) {
+      return false;
+    }
+    if (options_.output_match() && a.idxs.size() != b.idxs.size()) {
+      return false;
+    }
+    return true;
+  }
+  void OnFailed() {}
+  void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
+    block->add_tags(stripe::FromProto(options_.fused_set()));
+    for (auto stmt : block->stmts) {
+       auto sub = stripe::Block::Downcast(stmt);
+       if (sub) {
+         sub->remove_tags(stripe::FromProto(options_.inner_remove_set()));
+       }
+    }
+  }
+  bool NoInner() { return options_.no_inner(); }
+  const proto::FusionPass& Options() { return options_; }
 
-class AlwaysFuseRecursive : public FusionStrategy {
+ private:
+  const proto::FusionPass options_;
+};
+
+void FusionInner(const AliasMap& scope, stripe::Block* block, TagFusionStrategy* strategy, bool no_inner = false);
+
+class AlwaysFuseRecursive : public TagFusionStrategy {
  public:
   bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) { return true; }
   void OnFailed() {}

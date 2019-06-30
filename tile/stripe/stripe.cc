@@ -262,6 +262,12 @@ void Taggable::clear_tags() { impl_->attrs.clear(); }
 
 void Taggable::remove_tag(const std::string& tag) { impl_->attrs.erase(tag); }
 
+void Taggable::remove_tags(const Tags& to_remove) {
+  for (const auto& tag : to_remove) {
+    impl_->attrs.erase(tag);
+  }
+}
+
 void Taggable::set_tags(const Tags& tags) {
   impl_->attrs.clear();
   add_tags(tags);
