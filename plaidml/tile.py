@@ -1341,6 +1341,8 @@ def compute_aggregation_axes(dims, axes=None, keepdims=False):
         axes = len(dims) - 1
     if isinstance(axes, list) or isinstance(axes, tuple):
         axes = [(len(dims) + i if i < 0 else i) for i in axes]
+    elif type(axes) == np.ndarray:
+        axes = axes.tolist()
     else:
         if axes < 0:
             axes = len(dims) + axes
