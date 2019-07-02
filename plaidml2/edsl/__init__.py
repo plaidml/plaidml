@@ -1,51 +1,47 @@
+# Copyright 2019 Intel Corporation.
+
 from collections import namedtuple
 
 import six
 
-from plaidml.edsl._ffi import NativeObject, decode_str, ffi, ffi_call, lib
+from plaidml2 import DType
+from plaidml2.ffi import ForeignObject, ffi, ffi_call, lib
 
 
-class TensorShape(NativeObject):
-    __ffi_del__ = lib.tile_shape_free
-    __ffi_repr__ = lib.tile_shape_repr
+class LogicalShape(ForeignObject):
+    __ffi_del__ = lib.plaidml_logical_shape_free
+    __ffi_repr__ = lib.plaidml_logical_shape_repr
 
-    def __init__(self, dtype=None, sizes=[], strides=None, ptr=None, layout=''):
+    def __init__(self, dtype=None, dims=[], ptr=None):
         if ptr:
             ffi_obj = ptr
         elif dtype is not None:
-            ffi_obj = ffi_call(lib.tile_shape_alloc, dtype, layout.encode())
-            if strides is None:
-                strides = []
-            if len(strides) != len(sizes):
-                stride = 1
-                for i in range(len(sizes) - 1, -1, -1):
-                    strides.insert(0, stride)
-                    stride *= sizes[i]
-            for (size, stride) in zip(sizes, strides):
-                ffi_call(lib.tile_shape_add_dimension, ffi_obj, size, stride)
+            raw_dims = ffi.new('int64_t[]', [0 if x is None else x for x in dims])
+            ffi_obj = ffi_call(lib.plaidml_logical_shape_alloc, dtype, len(dims), raw_dims)
         else:
             raise ValueError('One of dtype= or ptr= must be specified.')
-        super(TensorShape, self).__init__(ffi_obj)
+        super(LogicalShape, self).__init__(ffi_obj)
 
     @property
-    def type(self):
-        return ffi_call(lib.tile_shape_get_type, self.as_ptr())
+    def dtype(self):
+        return DType(ffi_call(lib.plaidml_logical_shape_get_dtype, self.as_ptr()))
 
     @property
-    def rank(self):
-        return ffi_call(lib.tile_shape_get_rank, self.as_ptr())
+    def ndims(self):
+        return ffi_call(lib.plaidml_logical_shape_get_ndims, self.as_ptr())
 
     @property
-    def sizes(self):
+    def int_dims(self):
         return [
-            ffi_call(lib.tile_shape_get_dimension_size, self.as_ptr(), i) for i in range(self.rank)
+            ffi_call(lib.plaidml_logical_shape_get_dim_int, self.as_ptr(), i)
+            for i in range(self.ndims)
         ]
 
     @property
-    def strides(self):
+    def dims(self):
         return [
-            ffi_call(lib.tile_shape_get_dimension_stride, self.as_ptr(), i)
-            for i in range(self.rank)
+            TensorDim(expr=ffi_call(lib.plaidml_logical_shape_get_dim_expr, self.as_ptr(), i))
+            for i in range(self.ndims)
         ]
 
 
@@ -55,136 +51,117 @@ class Constraint(object):
         return True
 
 
-class TensorDim(object):
+def wrap_dim(x):
+    if isinstance(x, six.integer_types):
+        return TensorDim(expr=ffi_call(lib.plaidml_dim_expr_int, x))
+    return x
 
-    def __init__(self, size=None):
-        self.size = size
 
-    def __repr__(self):
-        if self.size is None:
-            return 'None'
-        return str(self.size)
+def dim_op(op, *args):
+    args = [wrap_dim(x) for x in args]
+    raw_args = [x.as_ptr() for x in args]
+    return ffi_call(lib.plaidml_dim_expr_op, op, len(args), raw_args)
+
+
+class TensorDim(ForeignObject):
+    __ffi_del__ = lib.plaidml_dim_expr_free
+    __ffi_repr__ = lib.plaidml_dim_expr_repr
+
+    def __init__(self, expr=None):
+        if expr is None:
+            expr = ffi_call(lib.plaidml_dim_expr_none)
+        super(TensorDim, self).__init__(expr)
+
+    def _bind(self, expr):
+        self.take_ptr(expr)
 
     def __neg__(self):
-        if self.size is None:
-            raise ValueError('Undefined dimension')
-        return TensorDim(-self.size)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_NEG, self))
 
     def __add__(self, other):
-        return self.__binary_op(other, lambda x, y: x + y)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_ADD, self, other))
 
     def __radd__(self, other):
-        return self.__binary_op(other, lambda x, y: y + x)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_ADD, other, self))
 
     def __sub__(self, other):
-        return self.__binary_op(other, lambda x, y: x - y)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_SUB, self, other))
 
     def __rsub__(self, other):
-        return self.__binary_op(other, lambda x, y: y - x)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_SUB, other, self))
 
     def __mul__(self, other):
-        return self.__binary_op(other, lambda x, y: x * y)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_MUL, self, other))
 
     def __rmul__(self, other):
-        return self.__binary_op(other, lambda x, y: y * x)
-
-    def __div__(self, other):
-        return self.__binary_op(other, lambda x, y: x // y)
-
-    def __rdiv__(self, other):
-        return self.__binary_op(other, lambda x, y: y // x)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_MUL, other, self))
 
     def __floordiv__(self, other):
-        return self.__binary_op(other, lambda x, y: x // y)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_DIV, self, other))
 
     def __rfloordiv__(self, other):
-        return self.__binary_op(other, lambda x, y: y // x)
+        return TensorDim(dim_op(lib.PLAIDML_INT_OP_DIV, other, self))
 
-    def __binary_op(self, other, fn):
-        if self.size is None:
-            raise ValueError('Undefined dimension')
-        if isinstance(other, TensorDim):
-            if other.size is None:
-                raise ValueError('Undefined dimension')
-            size = other.size
-        else:
-            size = other
-        return TensorDim(fn(self.size, size))
+
+def wrap_poly(x):
+    if isinstance(x, six.integer_types):
+        return TensorIndex(expr=ffi_call(lib.plaidml_poly_expr_literal, x))
+    if isinstance(x, TensorDim):
+        return TensorIndex(expr=ffi_call(lib.plaidml_poly_expr_dim, x.as_ptr()))
+    return x
 
 
 def poly_op(op, *args):
-
-    def wrap(x):
-        if isinstance(x, six.integer_types):
-            return ffi_call(lib.tile_poly_expr_literal, x)
-        if isinstance(x, TensorDim):
-            if x.size is None:
-                raise ValueError('Undefined dimension')
-            return ffi_call(lib.tile_poly_expr_literal, x.size)
-        return x.as_ptr()
-
-    args = [wrap(x) for x in args]
-    return ffi_call(lib.tile_poly_expr_op, op, len(args), args)
+    args = [wrap_poly(x) for x in args]
+    raw_args = [x.as_ptr() for x in args]
+    return ffi_call(lib.plaidml_poly_expr_op, op, len(args), raw_args)
 
 
-class TensorIndex(NativeObject):
-    __ffi_del__ = lib.tile_poly_expr_free
-    __ffi_repr__ = lib.tile_poly_expr_repr
+class TensorIndex(ForeignObject):
+    __ffi_del__ = lib.plaidml_poly_expr_free
+    __ffi_repr__ = lib.plaidml_poly_expr_repr
 
     def __init__(self, expr=None, name=''):
         if expr is None:
-            expr = ffi_call(lib.tile_poly_expr_index, name.encode())
+            expr = ffi_call(lib.plaidml_poly_expr_index, name.encode())
         super(TensorIndex, self).__init__(expr)
 
     def __lt__(self, rhs):
-        if isinstance(rhs, TensorDim):
-            rhs = rhs.size
-        ffi_call(lib.tile_poly_expr_add_constraint, self.as_ptr(), rhs)
+        rhs = wrap_dim(rhs)
+        ffi_call(lib.plaidml_poly_expr_add_constraint, self.as_ptr(), rhs.as_ptr())
         return Constraint()
 
     def __neg__(self):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_NEG, self))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_NEG, self))
 
     def __add__(self, rhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_ADD, self, rhs))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_ADD, self, rhs))
 
     def __radd__(self, lhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_ADD, lhs, self))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_ADD, lhs, self))
 
     def __sub__(self, rhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_SUB, self, rhs))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_SUB, self, rhs))
 
     def __rsub__(self, lhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_SUB, lhs, self))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_SUB, lhs, self))
 
     def __mul__(self, rhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_MUL, self, rhs))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_MUL, self, rhs))
 
     def __rmul__(self, lhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_MUL, lhs, self))
-
-    def __div__(self, rhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_DIV, self, rhs))
-
-    def __rdiv__(self, lhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_DIV, lhs, self))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_MUL, lhs, self))
 
     def __floordiv__(self, rhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_DIV, self, rhs))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_DIV, self, rhs))
 
     def __rfloordiv__(self, lhs):
-        return TensorIndex(poly_op(lib.TILE_POLY_OP_DIV, lhs, self))
+        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_DIV, lhs, self))
 
 
-def _wrap_dim(x):
-    if isinstance(x, six.integer_types):
-        return x
-    return x.size
-
-
-class _TensorSpec(NativeObject):
-    __ffi_del__ = lib.tile_expr_free
-    __ffi_repr__ = lib.tile_expr_repr
+class _TensorSpec(ForeignObject):
+    __ffi_del__ = lib.plaidml_expr_free
+    __ffi_repr__ = lib.plaidml_expr_repr
 
     def __init__(self, ref, key, dims):
         if isinstance(key, tuple) or isinstance(key, list):
@@ -192,28 +169,25 @@ class _TensorSpec(NativeObject):
         else:
             idxs = [key]
 
-        def wrap_idx(x):
-            if isinstance(x, six.integer_types):
-                return ffi_call(lib.tile_poly_expr_literal, x)
-            return x.as_ptr()
-
-        idxs = [wrap_idx(x) for x in idxs]
+        idxs = [wrap_poly(x) for x in idxs]
+        raw_idxs = [x.as_ptr() for x in idxs]
         if dims is None:
-            dims = ffi.NULL
+            raw_dims = ffi.NULL
         else:
-            dims = [_wrap_dim(x) for x in dims]
-        expr = ffi_call(lib.tile_expr_tensor_spec, ref.as_ptr(), len(idxs), idxs, dims)
+            dims = [wrap_dim(x) for x in dims]
+            raw_dims = [x.as_ptr() for x in dims]
+        expr = ffi_call(lib.plaidml_expr_tensor_spec, ref.as_ptr(), len(idxs), raw_idxs, raw_dims)
         super(_TensorSpec, self).__init__(expr)
 
 
-class _Contraction(NativeObject):
-    __ffi_del__ = lib.tile_expr_free
-    __ffi_repr__ = lib.tile_expr_repr
+class _Contraction(ForeignObject):
+    __ffi_del__ = lib.plaidml_expr_free
+    __ffi_repr__ = lib.plaidml_expr_repr
 
     def __init__(self, agg_op, combo_op, output, inputs, name):
         inputs = [x.as_ptr() for x in inputs]
         expr = ffi_call(
-            lib.tile_expr_contraction,
+            lib.plaidml_expr_contraction,
             agg_op,
             combo_op,
             output.as_ptr(),
@@ -238,37 +212,37 @@ class IndexedTensor(object):
 
     # Represents an aggregation_op of SUM in a contraction
     def __iadd__(self, rhs):
-        return IndexedTensor(self._make_contraction(lib.TILE_AGG_OP_SUM, rhs))
+        return IndexedTensor(self._make_contraction(lib.PLAIDML_AGG_OP_SUM, rhs))
 
     # Represents an aggregation_op of PROD in a contraction
     def __imul__(self, rhs):
-        return IndexedTensor(self._make_contraction(lib.TILE_AGG_OP_PROD, rhs))
+        return IndexedTensor(self._make_contraction(lib.PLAIDML_AGG_OP_PROD, rhs))
 
     # Represents an aggregation_op of MAX in a contraction
     def __ge__(self, rhs):
-        self._tensor._set_contraction(self._make_contraction(lib.TILE_AGG_OP_MAX, rhs))
+        self._tensor._set_contraction(self._make_contraction(lib.PLAIDML_AGG_OP_MAX, rhs))
 
     # Represents an aggregation_op of MIN in a contraction
     def __le__(self, rhs):
-        self._tensor._set_contraction(self._make_contraction(lib.TILE_AGG_OP_MIN, rhs))
+        self._tensor._set_contraction(self._make_contraction(lib.PLAIDML_AGG_OP_MIN, rhs))
 
     # Represents a combo_op of PLUS in a contraction
     def __add__(self, rhs):
-        return IndexedTensor(_ContractionPart(lib.TILE_COMBO_OP_ADD, (self, rhs)))
+        return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_ADD, (self, rhs)))
 
     # Represents a combo_op of MULTIPLY in a contraction
     def __mul__(self, rhs):
-        return IndexedTensor(_ContractionPart(lib.TILE_COMBO_OP_MUL, (self, rhs)))
+        return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_MUL, (self, rhs)))
 
     # Represents a combo_op of EQ in a contraction
     def __eq__(self, rhs):
-        return IndexedTensor(_ContractionPart(lib.TILE_COMBO_OP_EQ, (self, rhs)))
+        return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_EQ, (self, rhs)))
 
     def _make_contraction(self, agg_op, rhs):
         # Extract combo_op and inputs
         if isinstance(rhs._impl, _TensorSpec):
             # Unary op
-            combo_op = lib.TILE_COMBO_OP_NONE
+            combo_op = lib.PLAIDML_COMBO_OP_NONE
             inputs = [rhs._impl]
         elif isinstance(rhs._impl, _ContractionPart):
             # Binary/Ternary op
@@ -285,27 +259,25 @@ class IndexedTensor(object):
         )
 
 
-class Tensor(NativeObject):
-    __ffi_del__ = lib.tile_expr_free
-    __ffi_repr__ = lib.tile_expr_repr
+class Tensor(ForeignObject):
+    __ffi_del__ = lib.plaidml_expr_free
+    __ffi_repr__ = lib.plaidml_expr_repr
 
     _dims = None
-    _shape = None
     _is_contraction = False
 
     def __init__(self, shape=None, dims=None, expr=None, value=None, name=''):
         self._name = name
         if shape:
-            self._shape = shape
-            expr = ffi_call(lib.tile_expr_param, shape.as_ptr(), name.encode())
+            expr = ffi_call(lib.plaidml_expr_param, shape.as_ptr(), name.encode())
         elif dims is not None:
             self._dims = dims
             expr = None
         elif value is not None:
             if isinstance(value, six.integer_types):
-                expr = ffi_call(lib.tile_expr_int, value)
+                expr = ffi_call(lib.plaidml_expr_int, value)
             elif isinstance(value, float):
-                expr = ffi_call(lib.tile_expr_float, value)
+                expr = ffi_call(lib.plaidml_expr_float, value)
             else:
                 raise TypeError('Invalid type for value={}'.format(value))
         elif expr is None:
@@ -313,7 +285,7 @@ class Tensor(NativeObject):
         super(Tensor, self).__init__(expr)
 
     def __hash__(self):
-        return hash((self.as_ptr(), self._dims, self._shape, self._is_contraction))
+        return hash((self.as_ptr(), self._dims, self._is_contraction))
 
     def __getitem__(self, key):
         return IndexedTensor(_TensorSpec(self, key, self._dims), tensor=self)
@@ -328,8 +300,8 @@ class Tensor(NativeObject):
             # ASSIGN contraction
             self._set_contraction(
                 _Contraction(
-                    lib.TILE_AGG_OP_ASSIGN,
-                    lib.TILE_COMBO_OP_NONE,
+                    lib.PLAIDML_AGG_OP_ASSIGN,
+                    lib.PLAIDML_COMBO_OP_NONE,
                     _TensorSpec(self, key, self._dims),
                     [value._impl],
                     self._name,
@@ -447,44 +419,29 @@ class Tensor(NativeObject):
     def no_defract(self):
         if not self._is_contraction:
             raise TypeError('no_defract can only be specified on a contraction.')
-        ffi_call(lib.tile_expr_contraction_set_no_defract, self.as_ptr(), True)
+        ffi_call(lib.plaidml_expr_contraction_set_no_defract, self.as_ptr(), True)
         return self
 
     # Set use_default on a contraction
     def use_default(self, rhs):
         if not self._is_contraction:
             raise TypeError('use_default can only be specified on a contraction.')
-        ffi_call(lib.tile_expr_contraction_set_use_default, self.as_ptr(), rhs.as_ptr())
+        ffi_call(lib.plaidml_expr_contraction_set_use_default, self.as_ptr(), rhs.as_ptr())
         return self
 
     # Return the tensor's shape
+    @property
     def shape(self):
-        if self._shape is None:
-            self._shape = TensorShape(ptr=ffi_call(lib.tile_expr_evaluate_shape, self.as_ptr()))
-        return self._shape
-
-    # Return the size of the tensor's shape at the specified dimension.
-    # def dims(self, dim):
-    #     return 0
+        return LogicalShape(ptr=ffi_call(lib.plaidml_expr_get_shape, self.as_ptr()))
 
     # Verify that the specified dims match the dims of this tensor.
     def bind_dims(self, *dims):
-        if self._dims is not None:
-            # this handles intermediate temporaries (results of previous outputs)
-            sizes = [_wrap_dim(x) for x in self._dims]
-        else:
-            # this is the fallback which handles user inputs and any other case
-            sizes = self.shape().sizes
-        if len(dims) != len(sizes):
-            raise RuntimeError('bind_dims() mismatch. Tensor shape: {}, dims: {}'.format(
-                len(sizes), len(dims)))
-        for i in range(len(dims)):
-            if dims[i].size is None:
-                dims[i].size = sizes[i]
-            elif dims[i].size != sizes[i]:
-                raise RuntimeError(
-                    'bind_dims() mismatch on dim {}. Required: {}, Actual: {}'.format(
-                        i, dims[i].size, sizes[i]))
+        raw_dims = [x.as_ptr() for x in dims]
+        ffi_call(lib.plaidml_expr_bind_dims, self.as_ptr(), len(raw_dims), raw_dims)
+
+    # bind a concrete shape to this tensor
+    def bind(self, shape):
+        ffi_call(lib.plaidml_expr_bind_shape, self.as_ptr(), shape.as_ptr())
 
 
 def TensorOutput(*args):
@@ -499,13 +456,13 @@ def TensorIndexes(count):
     return [TensorIndex() for i in range(count)]
 
 
-class Program(NativeObject):
-    __ffi_del__ = lib.tile_program_free
-    __ffi_repr__ = lib.tile_program_repr
+class Program(ForeignObject):
+    __ffi_del__ = lib.plaidml_program_free
+    __ffi_repr__ = lib.plaidml_program_repr
 
-    def __init__(self, name, *vars):
+    def __init__(self, name, vars):
         exprs = [x.as_ptr() for x in vars]
-        ffi_obj = ffi_call(lib.tile_program_evaluate, name.encode(), len(exprs), exprs)
+        ffi_obj = ffi_call(lib.plaidml_program_evaluate, name.encode(), len(exprs), exprs)
         super(Program, self).__init__(ffi_obj)
 
 
@@ -513,15 +470,19 @@ def call(fn, *args):
 
     def wrap(x):
         if isinstance(x, six.integer_types):
-            return ffi_call(lib.tile_expr_int, x)
+            return Tensor(expr=ffi_call(lib.plaidml_expr_int, x))
         if isinstance(x, float):
-            return ffi_call(lib.tile_expr_float, x)
+            return Tensor(expr=ffi_call(lib.plaidml_expr_float, x))
+        if isinstance(x, TensorDim):
+            return Tensor(expr=ffi_call(lib.plaidml_expr_dim, x.as_ptr()))
         if isinstance(x, Tensor):
-            return x.as_ptr()
-        raise TypeError('Unexpected type for call argument: {}. args: {}'.format(x, args))
+            return x
+        raise TypeError('Unexpected type for call argument: {}. fn: {}, args: {}'.format(
+            type(x), fn, args))
 
     args = [wrap(x) for x in args]
-    return Tensor(expr=ffi_call(lib.tile_expr_call, fn.encode(), len(args), args))
+    raw_args = [x.as_ptr() for x in args]
+    return Tensor(expr=ffi_call(lib.plaidml_expr_call, fn.encode(), len(args), raw_args))
 
 
 def as_float(x, bit_size):
@@ -536,11 +497,15 @@ def as_uint(x, bit_size):
     return call("as_uint", x, bit_size)
 
 
+def cast(x, dtype):
+    return call("as_{}".format(dtype.info.base), x, dtype.info.bitwidth)
+
+
 # def element(x) : return call("element", {x}) # TODO: tuple
 
 
 def cond(lhs, rhs, true_case):
-    return IndexedTensor(_ContractionPart(lib.TILE_COMBO_OP_COND, (lhs, rhs, true_case)))
+    return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_COND, (lhs, rhs, true_case)))
 
 
 def cos(x):
@@ -579,8 +544,8 @@ def prng_value(x):
     return call("prng_value", x)
 
 
-def reshape(x, shape):
-    return call("reshape", x, *shape.sizes)
+def reshape(x, dims):
+    return call("reshape", x, *dims)
 
 
 def scatter(x, y, z):

@@ -6,12 +6,11 @@ import platform
 import sys
 import unittest
 
-import plaidml
-import plaidml.pytorch
+import plaidml2.bridge.pytorch as plaidml_pytorch
 import skimage
 import torch
 import torch.nn.functional as F
-from plaidml.pytorch.test_utils import TestBase
+from plaidml2.bridge.pytorch.test_utils import TestBase
 
 
 class TestOps(TestBase):
@@ -373,7 +372,6 @@ if __name__ == '__main__':
 
     # print('compiled_with_cxx11_abi: {}'.format(torch.compiled_with_cxx11_abi()))
 
-    # plaidml._internal_set_vlog(args.verbose)
-    plaidml.pytorch.set_vlog(args.verbose)
+    plaidml_pytorch.set_vlog(args.verbose)
 
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

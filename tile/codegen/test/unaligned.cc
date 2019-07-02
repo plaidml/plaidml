@@ -21,7 +21,7 @@ namespace codegen {
 namespace test {
 
 using namespace stripe;  // NOLINT
-using plaidml::edsl::TensorShape;
+using plaidml::edsl::LogicalShape;
 
 static std::vector<float> GenerateMatrix(size_t m, size_t n, bool zero) {
   std::vector<float> result(m * n);
@@ -38,14 +38,14 @@ static std::vector<float> GenerateMatrix(size_t m, size_t n, bool zero) {
 }
 
 TEST(Codegen, Unaligned) {
-  size_t dim = 112;
+  int64_t dim = 112;
   std::map<std::string, std::vector<float>> data;
   data["A"] = test::GenerateMatrix(dim, dim, false);
   data["B"] = test::GenerateMatrix(dim, dim, false);
   data["C"] = test::GenerateMatrix(dim, dim, true);
-  auto runinfo = lib::LoadMatMul("matmul",                                       //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
+  auto runinfo = lib::LoadMatMul("matmul",                                        //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);

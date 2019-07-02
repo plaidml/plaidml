@@ -871,23 +871,6 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
   return vars;
 }
 
-DataType CommonSupertype(DataType left, DataType right) {
-  DataType out = left;
-  if (is_float(right) != is_float(left)) {
-    if (is_float(right)) {
-      out = right;
-    }
-  } else {
-    // TODO: This is a bit primitive; for example, it will pick
-    // the first of "int32" or "float32".  We may want to make it
-    // a bit more sophisticated.
-    if (bit_width(right) > bit_width(left)) {
-      out = right;
-    }
-  }
-  return out;
-}
-
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

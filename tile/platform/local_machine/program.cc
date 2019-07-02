@@ -162,14 +162,10 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
 }
 
 lang::KernelList CompileProgram(const lang::RunInfo& runinfo,  //
-                                const DevInfo& devinfo,        //
+                                const std::string& target_id,  //
                                 ConstBufferManager* const_bufs) {
-  auto stripe_cfg = devinfo.settings.stripe_config();
-  if (stripe_cfg.empty()) {
-    throw std::runtime_error("Selected device must have a stripe_config when USE_STRIPE is enabled");
-  }
   auto out_path = env::Get("STRIPE_OUTPUT");
-  return codegen::GenerateProgram(runinfo, stripe_cfg, out_path, const_bufs);
+  return codegen::GenerateProgram(runinfo, target_id, out_path, const_bufs);
 }
 
 }  // namespace
@@ -232,6 +228,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
 
 Program::Program(const context::Context& ctx,                              //
                  const lang::RunInfo& runinfo,                             //
+                 const std::string& target_id,                             //
                  const std::shared_ptr<DevInfo>& devinfo,                  //
                  const std::shared_ptr<Scheduler>& scheduler,              //
                  const std::shared_ptr<MemStrategy>& output_mem_strategy,  //
@@ -248,7 +245,7 @@ Program::Program(const context::Context& ctx,                              //
 
   context::Activity activity{ctx, "tile::local_machine::Compile"};
 
-  kernel_list_ = CompileProgram(runinfo, *devinfo_.get(), const_bufs);
+  kernel_list_ = CompileProgram(runinfo, target_id, const_bufs);
   const_bufs_ = const_bufs->buffers;
 
   tile::proto::Program program;

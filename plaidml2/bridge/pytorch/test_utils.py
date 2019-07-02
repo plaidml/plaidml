@@ -1,8 +1,7 @@
 import time
 import unittest
 
-import plaidml
-import plaidml.pytorch
+import plaidml2.bridge.pytorch as plaidml_pytorch
 import torch
 
 
@@ -21,7 +20,7 @@ class TestBase(unittest.TestCase):
 
     def _run_pml(self, func, inputs):
         with torch.no_grad():
-            with plaidml.pytorch.toggle():
+            with plaidml_pytorch.toggle():
                 trace_pml = torch.jit.trace(func, inputs)
                 pml_out = trace_pml(*inputs)
                 assert "plaidml::CompilationGroup" in str(trace_pml.graph_for(*inputs))
@@ -45,7 +44,7 @@ class TestBase(unittest.TestCase):
             jit_time = time.time() - start
             printf("Done benchmarking JIT")
 
-            with plaidml.pytorch.toggle():
+            with plaidml_pytorch.toggle():
                 printf("Tracing model with PlaidML")
                 trace_pml = torch.jit.trace(func, inputs)
                 printf("Warming PlaidML up with {} iters".format(warmup))

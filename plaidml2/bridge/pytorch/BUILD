@@ -20,7 +20,7 @@ plaidml_cc_library(
     tags = ["pytorch"],
     visibility = ["//visibility:public"],
     deps = [
-        "//plaidml:internal",
+        "//plaidml2:api",
         "@com_intel_plaidml_conda_pytorch//:pytorch",
     ],
     alwayslink = 1,
@@ -39,7 +39,7 @@ plaidml_py_library(
     data = [":plaidml_pytorch.so"],
     tags = ["pytorch"],
     visibility = ["//visibility:public"],
-    deps = ["//plaidml:py"],
+    deps = ["//plaidml2:py"],
 )
 
 plaidml_py_library(
@@ -53,7 +53,10 @@ conda_test(
     name = "ops_test",
     srcs = ["ops_test.py"],
     env = "@com_intel_plaidml_conda_pytorch//:env",
-    tags = ["pytorch"],
+    tags = [
+        "manual",
+        "pytorch",
+    ],
     deps = [":test_utils"],
 )
 

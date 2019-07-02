@@ -1,3 +1,5 @@
+# Copyright 2019 Intel Corporation.
+
 load("//bzl:conda.bzl", "conda_test")
 load(
     "//bzl:plaidml.bzl",
@@ -7,60 +9,56 @@ load(
 )
 
 exports_files([
-    "edsl.h",
     "ffi.h",
 ])
 
 plaidml_cc_library(
-    name = "ffi",
-    srcs = ["ffi.cc"],
-    hdrs = [
-        "ffi.h",
-        "internal.h",
+    name = "edsl",
+    srcs = [
+        "ffi.cc",
     ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//base/util",
-        "//plaidml/base:api",
-        "//tile/lang",
-    ],
-    alwayslink = 1,
-    defines = ["PLAIDML_EDSL_DLL"],
-)
-
-plaidml_cc_library(
-    name = "public",
     hdrs = [
         "edsl.h",
         "ffi.h",
     ],
-    visibility = ["//visibility:public"],
-    deps = ["//plaidml/base:api"],
-)
-
-plaidml_cc_library(
-    name = "edsl",
+    defines = ["PLAIDML_EDSL_DLL"],
     visibility = ["//visibility:public"],
     deps = [
-        ":ffi",
-        ":public",
+        "//base/util",
+        "//plaidml2/core",
+        "//tile/lang",
     ],
+    alwayslink = 1,
 )
 
 plaidml_py_library(
     name = "py",
     srcs = [
         "__init__.py",
-        "_ffi.py",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//plaidml:py"],
+    deps = [
+        "//plaidml2:py",
+    ],
+)
+
+plaidml_cc_library(
+    name = "api",
+    hdrs = [
+        "edsl.h",
+        "ffi.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = ["//plaidml2/core:api"],
 )
 
 plaidml_cc_test(
     name = "cc_test",
     srcs = ["edsl_test.cc"],
-    deps = [":edsl"],
+    deps = [
+        ":api",
+        ":edsl",
+    ],
 )
 
 conda_test(

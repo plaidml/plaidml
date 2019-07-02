@@ -15,7 +15,6 @@
 #include <half.hpp>
 
 #include "plaidml/base/base_cpp.h"
-#include "plaidml/edsl/edsl.h"
 #include "plaidml/plaidml.h"
 
 using half_float::half;
@@ -708,23 +707,6 @@ class gradient {
   std::shared_ptr<plaidml_gradient> ptr_;
 };
 
-struct binding {
-  edsl::Tensor tensor;
-  buffer buf;
-};
-
-class executable {
-  friend class device;
-
- public:
-  executable() = default;
-  void run() { plaidml_executable_run(ptr_.get()); }
-
- private:
-  explicit executable(plaidml_executable* ptr) : ptr_(ptr, plaidml_executable_free) {}
-  std::shared_ptr<plaidml_executable> ptr_;
-};
-
 class device {
   friend class function;
   friend class device_config;
@@ -748,26 +730,6 @@ class device {
   template <class T>
   tensor<T> allocate(const shape<T>& s) const {
     return tensor<T>(s.get_context(), allocate(s.buffer_size()), s);
-  }
-
-  executable compile(tile_program* program,               //
-                     const std::vector<binding>& inputs,  //
-                     const std::vector<binding>& outputs) {
-    std::vector<plaidml_binding> input_bindings(inputs.size());
-    for (size_t i = 0; i < inputs.size(); i++) {
-      input_bindings[i] = plaidml_binding{inputs[i].tensor.ptr(), inputs[i].buf.ptr_.get()};
-    }
-    std::vector<plaidml_binding> output_bindings(outputs.size());
-    for (size_t i = 0; i < outputs.size(); i++) {
-      output_bindings[i] = plaidml_binding{outputs[i].tensor.ptr(), outputs[i].buf.ptr_.get()};
-    }
-    auto exec = plaidml_device_compile(ptr_.get(),              //
-                                       program,                 //
-                                       input_bindings.size(),   //
-                                       input_bindings.data(),   //
-                                       output_bindings.size(),  //
-                                       output_bindings.data());
-    return executable{exec};
   }
 
  private:

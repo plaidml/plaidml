@@ -13,7 +13,8 @@
 #include <vector>
 
 #include "base/util/compat.h"
-#include "plaidml/base/base.h"
+
+extern "C" const char* vai_last_status_str();
 
 namespace testing {
 

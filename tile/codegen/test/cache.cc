@@ -19,7 +19,7 @@ namespace codegen {
 namespace test {
 
 using namespace stripe;  // NOLINT
-using plaidml::edsl::TensorShape;
+using plaidml::edsl::LogicalShape;
 
 TEST(Codegen, Cache) {
   std::map<std::string, std::vector<float>> data = {
@@ -57,10 +57,10 @@ TEST(Codegen, Cache) {
       9,  18, 27,  9,  18,  //
   };
 
-  size_t dim = sqrt(expected.size());
-  auto runinfo = lib::LoadMatMul("matmul",                                       //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
+  int64_t dim = sqrt(expected.size());
+  auto runinfo = lib::LoadMatMul("matmul",                                        //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -87,14 +87,13 @@ TEST(Codegen, Cache) {
 }
 
 TEST(Codegen, CacheConv2d) {
-  auto runinfo = lib::LoadConv2d("conv2d",                                       //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {100, 14, 14, 3}),  //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3}),
-                                 {100, 12, 12, 3});
+  auto runinfo = lib::LoadConv2d("conv2d",                                              //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {100, 14, 14, 3}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3}), {100, 12, 12, 3});
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
-  
+
   // Must explicitly define program_map and main_map.
   // Otherwise, they may be freed in ApplyCache.
   AliasMap program_map(AliasMap(), program->entry.get());

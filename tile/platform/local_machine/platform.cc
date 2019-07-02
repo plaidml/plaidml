@@ -72,6 +72,72 @@ bool MatchConfig(const proto::Platform& config, const hal::proto::HardwareInfo& 
 
 }  // namespace
 
+Platform::Platform() {
+  context::Context ctx;
+  auto env = boost::this_process::environment();
+  if (env.count("PLAIDML_DEBUG")) {
+    LOG(INFO) << "Press any key after attaching a debugger to pid: " << boost::this_process::get_id();
+    std::getchar();
+  }
+
+  for (auto& item : FactoryRegistrar<hal::Driver>::Instance()->Factories()) {
+    try {
+      VLOG(1) << "Creating HAL: " << item.second.name;
+      auto driver = item.second.factory(ctx);
+      drivers_.emplace_back(std::move(driver));
+    } catch (const std::exception& ex) {
+      VLOG(1) << "Failed to initialize HAL: " << ex.what();
+    }
+  }
+
+  for (const auto& driver : drivers_) {
+    for (const auto& devset : driver->device_sets()) {
+      for (const auto& dev : devset->devices()) {
+        if (dev->executor()) {
+          const hal::proto::HardwareInfo& info = dev->executor()->info();
+          hal::proto::HardwareSettings settings = info.settings();
+
+          // Loop over identical devices and ensure each one gets a unique id
+          int ididx = 0;
+          std::string id;
+          do {
+            std::stringstream ss;
+            ss << info.name() << "." << ididx++;
+            id = ss.str();
+            std::replace(id.begin(), id.end(), ' ', '_');
+            std::transform(id.begin(), id.end(), id.begin(), ::tolower);
+          } while (devs_.find(id) != devs_.end());
+
+          try {
+            dev->Initialize(settings);
+          } catch (const std::exception& e) {
+            VLOG(1) << "Failed to initialize device " << info.name() << ": " << e.what();
+            continue;
+          } catch (...) {
+            VLOG(1) << "Failed to initialize device " << info.name();
+            continue;
+          }
+          auto devinfo = std::make_shared<DevInfo>(DevInfo{devset, dev, settings});
+          PlatformDev pd{id, devinfo};
+          VLOG(1) << settings.DebugString();
+          GetMemStrategy(devinfo, &pd);
+
+          auto memory = (dev->executor() && dev->executor()->device_memory() ? dev->executor()->device_memory()
+                                                                             : devset->host_memory());
+          if (dev->executor() && dev->executor()->is_synchronous()) {
+            IVLOG(1, "Device is synchronous");
+          }
+          auto size_goal = memory->size_goal() * kGoalMemPercentage;
+          IVLOG(1, "Using fifo scheduler; size_goal=" << size_goal);
+          pd.scheduler = std::make_shared<fifo_scheduler::FifoScheduler>(memory->ArenaBufferAlignment(),
+                                                                         std::lround(std::floor(size_goal)), settings);
+          devs_[id] = std::move(pd);
+        }
+      }
+    }
+  }
+}
+
 Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
   auto env = boost::this_process::environment();
   if (env.count("PLAIDML_DEBUG")) {
@@ -162,11 +228,13 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx
 
 std::shared_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx,   //
                                                      const std::string& device_id,  //
+                                                     const std::string& target_id,  //
                                                      const lang::RunInfo& runinfo,  //
                                                      ConstBufferManager* const_bufs) {
   auto& platform_dev = LookupDevice(device_id);
   return std::make_shared<Program>(ctx,                     //
                                    runinfo,                 //
+                                   target_id,               //
                                    platform_dev.devinfo,    //
                                    platform_dev.scheduler,  //
                                    platform_dev.mem_strategy,
@@ -197,6 +265,14 @@ void Platform::ListDevices(const context::Context& ctx, const tile::proto::ListD
   for (const auto& dev : unmatched_devs_) {
     _fill_device(dev.second, response->add_unmatched_devices());
   }
+}
+
+std::vector<std::string> Platform::ListDevices() {
+  std::vector<std::string> device_ids;
+  for (const auto& kvp : devs_) {
+    device_ids.push_back(kvp.first);
+  }
+  return device_ids;
 }
 
 const Platform::PlatformDev& Platform::LookupDevice(const std::string& id) {

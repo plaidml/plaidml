@@ -23,6 +23,7 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx
 
 std::shared_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx,   //
                                                      const std::string& device_id,  //
+                                                     const std::string& target_id,  //
                                                      const lang::RunInfo& runinfo,  //
                                                      ConstBufferManager* const_bufs) {
   throw std::runtime_error("Not implemented");

@@ -112,6 +112,8 @@ inline size_t bit_width(const DataType& dt) {
 
 inline std::string to_string(const DataType& dt) {
   switch (dt) {
+    case DataType::INVALID:
+      return "void";
     case DataType::BOOLEAN:
       return "bool";
     case DataType::INT8:
@@ -147,6 +149,24 @@ inline std::string to_string(const DataType& dt) {
 
 inline size_t byte_width(const DataType& dt) { return (bit_width(dt) + 7) / 8; }
 
+// Compute result type by 'upcasting' to the highest type in the hierarchy
+inline DataType CommonSupertype(DataType left, DataType right) {
+  if (is_float(right) != is_float(left)) {
+    if (is_float(right)) {
+      return right;
+    } else {
+      return left;
+    }
+  }
+  // TODO: This is a bit primitive; for example, it will pick
+  // the first of "int32" or "float32".  We may want to make it
+  // a bit more sophisticated.
+  if (bit_width(right) > bit_width(left)) {
+    return right;
+  }
+  return left;
+}
+
 struct TensorDimension {
   TensorDimension() = default;
   TensorDimension(int64_t stride, uint64_t size) : stride(stride), size(size) {}
@@ -177,6 +197,7 @@ struct TensorShape {
   std::string layout;
 
   uint64_t byte_size() const { return elem_size() * byte_width(type); }
+
   uint64_t elem_size() const {
     uint64_t max_elem = 0;
     for (const auto& dim : dims) {

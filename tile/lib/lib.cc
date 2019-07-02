@@ -18,9 +18,14 @@ lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars)
   return *static_cast<const tile::lang::RunInfo*>(program.runinfo());
 }
 
-std::shared_ptr<lang::BufferBase> MakeBuffer(const TensorShape& shape) {
+std::shared_ptr<lang::BufferBase> MakeBuffer(const LogicalShape& shape) {
+  std::vector<size_t> sizes;
+  for (const auto& dim : shape.int_dims()) {
+    sizes.push_back(dim);
+  }
+  auto tensor_shape = tile::SimpleShape(static_cast<DataType>(shape.dtype()), sizes);
   auto buffer = std::make_shared<util::SimpleBuffer>();
-  buffer->bytes.resize(shape.byte_size());
+  buffer->bytes.resize(tensor_shape.byte_size());
   return buffer;
 }
 
@@ -52,32 +57,32 @@ Tensor Tanh(const Tensor& X) { return Call("tanh", X); }
 
 }  // namespace
 
-Tensor Convolution(const Tensor& I,                     //
-                   const Tensor& K,                     //
-                   const std::vector<size_t>& O_sizes,  //
-                   std::vector<size_t> strides,         //
-                   ConvolutionFormat I_format,          //
+Tensor Convolution(const Tensor& I,                      //
+                   const Tensor& K,                      //
+                   const std::vector<int64_t>& O_sizes,  //
+                   std::vector<size_t> strides,          //
+                   ConvolutionFormat I_format,           //
                    ConvolutionFormat K_format) {
   TensorDim N, CI, CO;
   auto I_shape = I.shape();
   auto K_shape = K.shape();
   IVLOG(1, "I.shape(): " << I_shape);
   IVLOG(1, "K.shape(): " << K_shape);
-  auto rank = I_shape.rank() - 2;
+  auto ndims = I_shape.ndims() - 2;
   if (strides.empty()) {
-    for (size_t i = 0; i < rank; i++) {
+    for (size_t i = 0; i < ndims; i++) {
       strides.push_back(1);
     }
-  } else if (strides.size() != rank) {
-    throw std::runtime_error(
-        str(boost::format("Convolution strides length inconsistent with input shape: %1% (rank %2%) v %3% (rank %4%)") %
-            StreamContainer(strides) % strides.size() % I_shape % rank));
+  } else if (strides.size() != ndims) {
+    throw std::runtime_error(str(
+        boost::format("Convolution strides length inconsistent with input shape: %1% (ndims %2%) v %3% (ndims %4%)") %
+        StreamContainer(strides) % strides.size() % I_shape % ndims));
   }
   TensorIndex n("n"), co("co"), ci("ci");
   std::vector<TensorDim> I_dims = {N};
-  std::vector<TensorDim> I_spatial_dims(rank);
+  std::vector<TensorDim> I_spatial_dims(ndims);
   std::vector<TensorDim> K_dims;
-  std::vector<TensorDim> K_spatial_dims(rank);
+  std::vector<TensorDim> K_spatial_dims(ndims);
   std::vector<TensorDim> O_dims;
   for (const auto& size : O_sizes) {
     O_dims.emplace_back(size);
@@ -100,11 +105,11 @@ Tensor Convolution(const Tensor& I,                     //
   }
   K_dims.insert(std::end(K_dims), std::begin(K_spatial_dims), std::end(K_spatial_dims));
   I_dims.insert(std::end(I_dims), std::begin(I_spatial_dims), std::end(I_spatial_dims));
-  for (size_t i = 0; i < rank; i++) {
+  for (size_t i = 0; i < ndims; i++) {
     TensorIndex x(str(boost::format("x%1%") % i));
     TensorIndex k(str(boost::format("k%1%") % i));
     IVLOG(1, "Adding " << i);
-    auto K_dim = K_shape.size_at(K_spatial_dims_offset + i);
+    auto K_dim = K_shape.dims()[K_spatial_dims_offset + i];
     I_idxs.emplace_back(strides[i] * x + k - K_dim / 2);
     K_idxs.push_back(k);
     O_idxs.push_back(x);
@@ -127,14 +132,14 @@ Tensor Convolution(const Tensor& I,                     //
   return O;
 }
 
-lang::RunInfo LoadMatMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+lang::RunInfo LoadMatMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   return Evaluate(name, {MatMul(A, B)});
 }
 
-lang::RunInfo LoadMatMulIntermediate(const std::string& name, const TensorShape& i1, const TensorShape& i2,
-                                     const TensorShape& i3) {
+lang::RunInfo LoadMatMulIntermediate(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,
+                                     const LogicalShape& i3) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   Tensor C("C", i2);
@@ -143,13 +148,13 @@ lang::RunInfo LoadMatMulIntermediate(const std::string& name, const TensorShape&
   return Evaluate(name, {D, E});
 }
 
-lang::RunInfo LoadEltwiseMulFlip(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+lang::RunInfo LoadEltwiseMulFlip(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   Tensor A{"A", i1}, B{"B", i2};
   return Evaluate(name, {~(A * B)});
 }
 
-lang::RunInfo LoadMatMulAmongEltwise(const std::string& name, const TensorShape& i1, const TensorShape& i2,
-                                     const TensorShape& i3) {
+lang::RunInfo LoadMatMulAmongEltwise(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,
+                                     const LogicalShape& i3) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   Tensor C("C", i3);
@@ -159,14 +164,14 @@ lang::RunInfo LoadMatMulAmongEltwise(const std::string& name, const TensorShape&
   return Evaluate(name, {P + C});
 }
 
-lang::RunInfo LoadEltwiseAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+lang::RunInfo LoadEltwiseAdd(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   return Evaluate(name, {A + B});
 }
 
-lang::RunInfo LoadEltwiseMultiAdd(const std::string& name, const TensorShape& i1, const TensorShape& i2,
-                                  const TensorShape& i3, const TensorShape& i4) {
+lang::RunInfo LoadEltwiseMultiAdd(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,
+                                  const LogicalShape& i3, const LogicalShape& i4) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   Tensor C("C", i3);
@@ -174,26 +179,26 @@ lang::RunInfo LoadEltwiseMultiAdd(const std::string& name, const TensorShape& i1
   return Evaluate(name, {A + B + C + D});
 }
 
-lang::RunInfo LoadEltwiseDiv(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+lang::RunInfo LoadEltwiseDiv(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   return Evaluate(name, {A / B});
 }
 
-lang::RunInfo LoadConstScalarMul(const std::string& name, const double s, const TensorShape& i1) {
+lang::RunInfo LoadConstScalarMul(const std::string& name, const double s, const LogicalShape& i1) {
   Tensor scalar(s);
   Tensor A("A", i1);
   return Evaluate(name, {scalar * A});
 }
 
-lang::RunInfo LoadEltwiseMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+lang::RunInfo LoadEltwiseMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   return Evaluate(name, {A * B});
 }
 
-lang::RunInfo LoadEltwiseMultiMul(const std::string& name, const TensorShape& i1, const TensorShape& i2,
-                                  const TensorShape& i3, const TensorShape& i4) {
+lang::RunInfo LoadEltwiseMultiMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,
+                                  const LogicalShape& i3, const LogicalShape& i4) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   Tensor C("C", i3);
@@ -201,24 +206,24 @@ lang::RunInfo LoadEltwiseMultiMul(const std::string& name, const TensorShape& i1
   return Evaluate(name, {A * B * C * D});
 }
 
-lang::RunInfo LoadSin(const std::string& name, const TensorShape& i1) {
+lang::RunInfo LoadSin(const std::string& name, const LogicalShape& i1) {
   Tensor A("A", i1);
   return Evaluate(name, {Sin(A)});
 }
 
-lang::RunInfo LoadTanh(const std::string& name, const TensorShape& i1) {
+lang::RunInfo LoadTanh(const std::string& name, const LogicalShape& i1) {
   Tensor A("A", i1);
   return Evaluate(name, {Tanh(A)});
 }
 
-lang::RunInfo LoadMulThenNeg(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+lang::RunInfo LoadMulThenNeg(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   Tensor C = A * B;
   return Evaluate(name, {-C});
 }
 
-lang::RunInfo LoadNegThenMul(const std::string& name, const TensorShape& i1, const TensorShape& i2) {
+lang::RunInfo LoadNegThenMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   Tensor A("A", i1);
   Tensor B("B", i2);
   Tensor NegA = -A;
@@ -240,10 +245,10 @@ lang::RunInfo LoadConstCalc(const std::string& name) {
   return Evaluate(name, {O});
 }
 
-lang::RunInfo LoadConv1d(const std::string& name,    //
-                         const TensorShape& input,   //
-                         const TensorShape& kernel,  //
-                         const std::vector<size_t>& output) {
+lang::RunInfo LoadConv1d(const std::string& name,     //
+                         const LogicalShape& input,   //
+                         const LogicalShape& kernel,  //
+                         const std::vector<int64_t>& output) {
   Tensor I("I", input);
   Tensor K("K", kernel);
   auto runinfo = Evaluate(name, {Convolution(I, K, output)});
@@ -252,10 +257,10 @@ lang::RunInfo LoadConv1d(const std::string& name,    //
   return runinfo;
 }
 
-lang::RunInfo LoadConv2d(const std::string& name,    //
-                         const TensorShape& input,   //
-                         const TensorShape& kernel,  //
-                         const std::vector<size_t>& output) {
+lang::RunInfo LoadConv2d(const std::string& name,     //
+                         const LogicalShape& input,   //
+                         const LogicalShape& kernel,  //
+                         const std::vector<int64_t>& output) {
   Tensor I("I", input);
   Tensor K("K", kernel);
   auto runinfo = Evaluate(name, {Convolution(I, K, output)});
@@ -264,10 +269,10 @@ lang::RunInfo LoadConv2d(const std::string& name,    //
   return runinfo;
 }
 
-lang::RunInfo LoadConv2dRelu(const std::string& name,    //
-                             const TensorShape& input,   //
-                             const TensorShape& kernel,  //
-                             const std::vector<size_t>& output) {
+lang::RunInfo LoadConv2dRelu(const std::string& name,     //
+                             const LogicalShape& input,   //
+                             const LogicalShape& kernel,  //
+                             const std::vector<int64_t>& output) {
   Tensor I("I", input);
   Tensor K("K", kernel);
   auto runinfo = Evaluate(name, {Relu(Convolution(I, K, output))});
@@ -276,11 +281,11 @@ lang::RunInfo LoadConv2dRelu(const std::string& name,    //
   return runinfo;
 }
 
-lang::RunInfo LoadConv2dBnRelu(const std::string& name,      //
-                               const TensorShape& input,     //
-                               const TensorShape& kernel,    //
-                               const TensorShape& channels,  //
-                               const std::vector<size_t>& output) {
+lang::RunInfo LoadConv2dBnRelu(const std::string& name,       //
+                               const LogicalShape& input,     //
+                               const LogicalShape& kernel,    //
+                               const LogicalShape& channels,  //
+                               const std::vector<int64_t>& output) {
   Tensor I("I", input);
   Tensor K("K", kernel);
   Tensor B("B", channels);
@@ -297,18 +302,19 @@ lang::RunInfo LoadConv2dBnRelu(const std::string& name,      //
   return runinfo;
 }
 
-lang::RunInfo LoadConv2d3Deep(const std::string& name,     //
-                              const TensorShape& input,    //
-                              const TensorShape& kernel1,  //
-                              const TensorShape& kernel2,  //
-                              const TensorShape& kernel3) {
+lang::RunInfo LoadConv2d3Deep(const std::string& name,      //
+                              const LogicalShape& input,    //
+                              const LogicalShape& kernel1,  //
+                              const LogicalShape& kernel2,  //
+                              const LogicalShape& kernel3) {
   Tensor I("I", input);
   Tensor K1("K1", input);
   Tensor K2("K2", input);
   Tensor K3("K3", input);
-  auto O1 = Convolution(I, K1, {input.size_at(0), input.size_at(1), input.size_at(2), kernel1.size_at(3)});
-  auto O2 = Convolution(O1, K2, {input.size_at(0), input.size_at(1), input.size_at(2), kernel2.size_at(3)});
-  auto O3 = Convolution(O2, K3, {input.size_at(0), input.size_at(1), input.size_at(2), kernel3.size_at(3)});
+  auto dims = input.int_dims();
+  auto O1 = Convolution(I, K1, {dims[0], dims[1], dims[2], kernel1.int_dims()[3]});
+  auto O2 = Convolution(O1, K2, {dims[0], dims[1], dims[2], kernel2.int_dims()[3]});
+  auto O3 = Convolution(O2, K3, {dims[0], dims[1], dims[2], kernel3.int_dims()[3]});
   auto runinfo = Evaluate(name, {O3});
   runinfo.const_inputs = {"K1", "K2", "K3"};
   runinfo.input_buffers = {
@@ -319,9 +325,9 @@ lang::RunInfo LoadConv2d3Deep(const std::string& name,     //
   return runinfo;
 }
 
-lang::RunInfo LoadDilatedConv2d(const std::string& name,   //
-                                const TensorShape& input,  //
-                                const TensorShape& kernel) {
+lang::RunInfo LoadDilatedConv2d(const std::string& name,    //
+                                const LogicalShape& input,  //
+                                const LogicalShape& kernel) {
   Tensor I(input);
   Tensor K(kernel);
   return Evaluate(name, {DilatedConvolution2(I, K)});
@@ -330,7 +336,7 @@ lang::RunInfo LoadDilatedConv2d(const std::string& name,   //
 Tensor Normalize(const Tensor& X) {
   auto XSqr = X * X;
   auto X_MS = TensorOutput();
-  std::vector<TensorIndex> idxs(X.shape().rank());
+  std::vector<TensorIndex> idxs(X.shape().ndims());
   X_MS() += XSqr(idxs);
   return sqrt(X_MS);
 }
@@ -349,9 +355,9 @@ std::tuple<Tensor, Tensor> LarsMomentum(const Tensor& X,           //
   return std::make_tuple(X - NewVeloc, NewVeloc);
 }
 
-lang::RunInfo LoadLarsMomentum4d(const std::string& name,     //
-                                 const TensorShape& x_shape,  //
-                                 const TensorShape& lr_shape) {
+lang::RunInfo LoadLarsMomentum4d(const std::string& name,      //
+                                 const LogicalShape& x_shape,  //
+                                 const LogicalShape& lr_shape) {
   // Note: X/Grad/Veloc/NewX/NewVeloc should all have the same shape for the
   // semantics of this operation to be correct, so we only pass in 1 shape for
   // all of them.
@@ -367,8 +373,8 @@ lang::RunInfo LoadLarsMomentum4d(const std::string& name,     //
 }
 
 lang::RunInfo LoadPow(const std::string& name,  //
-                      const TensorShape& i1,    //
-                      const TensorShape& i2) {
+                      const LogicalShape& i1,   //
+                      const LogicalShape& i2) {
   Tensor X("X", i1);
   Tensor Y("Y", i2);
   auto runinfo = Evaluate(name, {pow(X, Y)});
@@ -382,7 +388,7 @@ lang::RunInfo LoadPow(const std::string& name,  //
 Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor& Epsilon) {
   TensorDim I0, I1, I2, I3;
   I.bind_dims(I0, I1, I2, I3);
-  int64_t H = I.dims(2) * I.dims(3);
+  auto H = I2 * I3;
   auto Sum = TensorOutput(I0, I1, 1, 1);
   TensorIndex i0, i1, i2, i3;
   Sum(i0, i1, 0, 0) += I(i0, i1, i2, i3);
@@ -396,12 +402,12 @@ Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor
 }
 
 lang::RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
-                                 const TensorShape& input) {
+                                 const LogicalShape& input) {
   // Note: I/G/B/O should all have the same shape, so pass in one shape to share
   Tensor I(input);
   Tensor G(input);
   Tensor B(input);
-  Tensor Epsilon(TensorShape(PLAIDML_DATA_FLOAT32, {}));
+  Tensor Epsilon(LogicalShape(PLAIDML_DATA_FLOAT32, {}));
   return Evaluate(name, {Norm4dAx2(I, G, B, Epsilon)});
 }
 
@@ -421,14 +427,14 @@ Tensor PolygonBoxTransform(const Tensor& I) {
 }
 
 lang::RunInfo LoadPolygonBoxTransform(const std::string& name,  //
-                                      const TensorShape& input) {
+                                      const LogicalShape& input) {
   // Note: I and O have the same shape
   Tensor I(input);
   return Evaluate(name, {PolygonBoxTransform(I)});
 }
 
-lang::RunInfo LoadSoftmax(const std::string& name,     //
-                          const TensorShape& input) {  //
+lang::RunInfo LoadSoftmax(const std::string& name,      //
+                          const LogicalShape& input) {  //
   Tensor X1(input);
   TensorDim I, J;
   X1.bind_dims(I, J);

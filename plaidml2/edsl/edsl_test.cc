@@ -4,19 +4,18 @@
 #include <gtest/gtest.h>
 
 #include "base/util/logging.h"
-#include "plaidml/edsl/edsl.h"
+#include "plaidml2/edsl/edsl.h"
 #include "tile/lang/compose.h"
 
 using ::testing::Eq;
 
-namespace vertexai {
 namespace plaidml {
 namespace edsl {
 namespace {
 
 std::string Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
   Program program(name, vars);
-  auto runinfo = static_cast<const tile::lang::RunInfo*>(program.runinfo());
+  auto runinfo = static_cast<const vertexai::tile::lang::RunInfo*>(program.runinfo());
   return to_string(runinfo->program);
 }
 
@@ -53,17 +52,17 @@ Tensor Softmax(const Tensor& X) {
 
 TEST(TileCC, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
-  Tensor input(TensorShape(PLAIDML_DATA_FLOAT32, {1, 784}));
-  Tensor kernel1(TensorShape(PLAIDML_DATA_FLOAT32, {784, 512}));
-  Tensor bias1(TensorShape(PLAIDML_DATA_FLOAT32, {512}));
+  Tensor input(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 784}));
+  Tensor kernel1(LogicalShape(PLAIDML_DATA_FLOAT32, {784, 512}));
+  Tensor bias1(LogicalShape(PLAIDML_DATA_FLOAT32, {512}));
   auto dense1 = Relu(Dot(input, kernel1) + bias1);
   // model.add(Dense(512, activation='relu'))
-  Tensor kernel2(TensorShape(PLAIDML_DATA_FLOAT32, {512, 512}));
-  Tensor bias2(TensorShape(PLAIDML_DATA_FLOAT32, {512}));
+  Tensor kernel2(LogicalShape(PLAIDML_DATA_FLOAT32, {512, 512}));
+  Tensor bias2(LogicalShape(PLAIDML_DATA_FLOAT32, {512}));
   auto dense2 = Relu(Dot(dense1, kernel2) + bias2);
   // model.add(Dense(10, activation='softmax'))
-  Tensor kernel3(TensorShape(PLAIDML_DATA_FLOAT32, {512, 10}));
-  Tensor bias3(TensorShape(PLAIDML_DATA_FLOAT32, {10}));
+  Tensor kernel3(LogicalShape(PLAIDML_DATA_FLOAT32, {512, 10}));
+  Tensor bias3(LogicalShape(PLAIDML_DATA_FLOAT32, {10}));
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   auto program = Evaluate("mnist_mlp", {dense3});
   IVLOG(1, program);
@@ -147,38 +146,40 @@ Tensor MaxPooling2(const Tensor& I) {
 }
 
 Tensor Flatten(const Tensor& X) {
-  size_t product = 1;
-  auto X_shape = X.shape();
-  for (size_t i = 1; i < X_shape.rank() - 1; i++) {
-    product *= X_shape.size_at(i);
+  auto X_dims = X.shape().dims();
+  if (X_dims.empty()) {
+    return X;
   }
-  auto shape = TensorShape(X_shape.type(), {1, product});
-  return reshape(X, shape);
+  TensorDim product{1};
+  for (size_t i = 1; i < X_dims.size() - 1; i++) {
+    product = product * X_dims[i];
+  }
+  return reshape(X, {TensorDim{1}, product});
 }
 
 TEST(TileCC, MnistCnn) {
   // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
-  Tensor input(TensorShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1}));
-  Tensor kernel1(TensorShape(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32}));
-  Tensor bias1(TensorShape(PLAIDML_DATA_FLOAT32, {32}));
+  Tensor input(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1}));
+  Tensor kernel1(LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32}));
+  Tensor bias1(LogicalShape(PLAIDML_DATA_FLOAT32, {32}));
   auto conv1 = Relu(Convolution2(input, kernel1) + bias1);
   // model.add(Conv2D(64, (3, 3), activation='relu'))
-  Tensor kernel2(TensorShape(PLAIDML_DATA_FLOAT32, {3, 3, 32, 64}));
-  Tensor bias2(TensorShape(PLAIDML_DATA_FLOAT32, {64}));
+  Tensor kernel2(LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 32, 64}));
+  Tensor bias2(LogicalShape(PLAIDML_DATA_FLOAT32, {64}));
   auto conv2 = Relu(Convolution2(conv1, kernel2) + bias2);
   // model.add(MaxPooling2D(pool_size=(2, 2)))
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
-  EXPECT_THAT(flat.shape(), Eq(TensorShape(PLAIDML_DATA_FLOAT32, {1, 12100})));
+  EXPECT_THAT(flat.shape(), Eq(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 12100})));
   // model.add(Dense(128, activation='relu'))
-  Tensor kernel3(TensorShape(PLAIDML_DATA_FLOAT32, {12100, 128}));
-  Tensor bias3(TensorShape(PLAIDML_DATA_FLOAT32, {128}));
+  Tensor kernel3(LogicalShape(PLAIDML_DATA_FLOAT32, {12100, 128}));
+  Tensor bias3(LogicalShape(PLAIDML_DATA_FLOAT32, {128}));
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
   const size_t kNumClasses = 100;
   // model.add(Dense(num_classes, activation='softmax'))
-  Tensor kernel4(TensorShape(PLAIDML_DATA_FLOAT32, {128, kNumClasses}));
-  Tensor bias4(TensorShape(PLAIDML_DATA_FLOAT32, {kNumClasses}));
+  Tensor kernel4(LogicalShape(PLAIDML_DATA_FLOAT32, {128, kNumClasses}));
+  Tensor bias4(LogicalShape(PLAIDML_DATA_FLOAT32, {kNumClasses}));
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   auto program = Evaluate("mnist_cnn", {dense2});
   IVLOG(1, program);
@@ -231,7 +232,7 @@ TEST(TileCC, MnistCnn) {
 Tensor Normalize(const Tensor& X) {
   auto XSqr = X * X;
   auto X_MS = TensorOutput();
-  std::vector<TensorIndex> idxs(X.shape().rank());
+  std::vector<TensorIndex> idxs(X.shape().ndims());
   X_MS() += XSqr(idxs);
   return sqrt(X_MS);
 }
@@ -251,8 +252,8 @@ std::tuple<Tensor, Tensor> LarsMomentum(const Tensor& X,           //
 }
 
 TEST(TileCC, LarsMomentum4d) {
-  auto X_shape = TensorShape(PLAIDML_DATA_FLOAT32, {4, 7, 3, 9});
-  auto LR_shape = TensorShape(PLAIDML_DATA_FLOAT32, {});
+  auto X_shape = LogicalShape(PLAIDML_DATA_FLOAT32, {4, 7, 3, 9});
+  auto LR_shape = LogicalShape(PLAIDML_DATA_FLOAT32, {});
   Tensor X(X_shape);
   Tensor Grad(X_shape);
   Tensor Veloc(X_shape);
@@ -295,7 +296,7 @@ TEST(TileCC, LarsMomentum4d) {
 }
 
 TEST(TileCC, RepeatElements) {
-  Tensor I(TensorShape(PLAIDML_DATA_FLOAT32, {10, 10, 10}));
+  Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {10, 10, 10}));
   TensorDim N0, N1, N2;
   I.bind_dims(N0, N1, N2);
   auto O = TensorOutput(N0, 3 * N1, N2);
@@ -324,8 +325,8 @@ TEST(TileCC, RepeatElements) {
 }
 
 TEST(TileCC, UseDefault) {
-  Tensor P(TensorShape(PLAIDML_DATA_FLOAT32, {1, 7, 10, 10}));
-  Tensor I(TensorShape(PLAIDML_DATA_FLOAT32, {1, 10, 10}));
+  Tensor P(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 7, 10, 10}));
+  Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 10, 10}));
   TensorDim B, N1, N2;
   I.bind_dims(B, N1, N2);
   auto O = TensorOutput(B, 7, N1, N2);
@@ -361,7 +362,7 @@ Tensor ArgMax(const Tensor& I) {
       }
     }
   }
-  Tensor One(TensorShape(I.shape().type(), {}));
+  Tensor One(LogicalShape(I.shape().dtype(), {}));
   auto T = TensorOutput(X1);
   for (const auto x1 : TensorIndex()) {
     T(x1) = One();
@@ -379,11 +380,11 @@ Tensor ArgMax(const Tensor& I) {
 }
 
 TEST(TileCC, ArgMax) {
-  Tensor I(TensorShape(PLAIDML_DATA_FLOAT32, {1, 10, 10}));
+  Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 10, 10}));
   auto X = ArgMax(I);
   auto program = Evaluate("arg_max", {X});
   IVLOG(1, program);
-  EXPECT_THAT(X.shape(), Eq(TensorShape(PLAIDML_DATA_UINT32, {1, 10})));
+  EXPECT_THAT(X.shape(), Eq(LogicalShape(PLAIDML_DATA_UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2],
   _X2[]
@@ -435,11 +436,11 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
 
 TEST(TileCC, Winograd) {
   const size_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
-  Tensor I(TensorShape(PLAIDML_DATA_FLOAT32, {N, X, Y, CI}));
-  Tensor K(TensorShape(PLAIDML_DATA_FLOAT32, {S, S, CI, CO}));
-  Tensor A(TensorShape(PLAIDML_DATA_FLOAT32, {BI, BO}));
-  Tensor B(TensorShape(PLAIDML_DATA_FLOAT32, {BI, BI}));
-  Tensor G(TensorShape(PLAIDML_DATA_FLOAT32, {BI, S}));
+  Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {N, X, Y, CI}));
+  Tensor K(LogicalShape(PLAIDML_DATA_FLOAT32, {S, S, CI, CO}));
+  Tensor A(LogicalShape(PLAIDML_DATA_FLOAT32, {BI, BO}));
+  Tensor B(LogicalShape(PLAIDML_DATA_FLOAT32, {BI, BI}));
+  Tensor G(LogicalShape(PLAIDML_DATA_FLOAT32, {BI, S}));
   auto W = Winograd(I, K, A, B, G);
   auto program = Evaluate("winograd", {W});
   IVLOG(1, program);
@@ -464,7 +465,7 @@ TEST(TileCC, Winograd) {
 }
 
 TEST(TileCC, UniqueNames) {
-  TensorShape shape(PLAIDML_DATA_FLOAT32, {});
+  LogicalShape shape(PLAIDML_DATA_FLOAT32, {});
   Tensor A("A", shape);
   Tensor B("B", shape);
   Tensor C0("C", shape);
@@ -487,7 +488,7 @@ TEST(TileCC, UniqueNames) {
 }
 
 TEST(TileCC, GlobalMin) {
-  Tensor I("I", TensorShape(PLAIDML_DATA_FLOAT32, {10, 10, 10}));
+  Tensor I("I", LogicalShape(PLAIDML_DATA_FLOAT32, {10, 10, 10}));
   TensorIndex i, j, k;
   auto O_Neg = TensorOutput();
   auto Neg = -I;
@@ -508,7 +509,7 @@ TEST(TileCC, GlobalMin) {
 }
 
 TEST(TileCC, CumSum) {
-  Tensor I("I", TensorShape(PLAIDML_DATA_FLOAT32, {10}));
+  Tensor I("I", LogicalShape(PLAIDML_DATA_FLOAT32, {10}));
   TensorDim N;
   TensorIndex i, k;
   I.bind_dims(N);
@@ -566,8 +567,8 @@ Tensor ComplexConv2d(const Tensor& I,               //
 }
 
 TEST(TileCC, ComplexConv2d) {
-  Tensor I(TensorShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3, 3}));
-  Tensor K(TensorShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3, 32}));
+  Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3, 3}));
+  Tensor K(LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3, 32}));
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
   auto program = Evaluate("complex_conv_2d", {O});
   IVLOG(1, program);
@@ -583,7 +584,7 @@ TEST(TileCC, ComplexConv2d) {
 }
 
 TEST(TileCC, Reciprocal) {
-  Tensor A("A", TensorShape(PLAIDML_DATA_FLOAT32, {10}));
+  Tensor A("A", LogicalShape(PLAIDML_DATA_FLOAT32, {10}));
   auto program = Evaluate("reciprocal", {1 / A});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -600,4 +601,3 @@ TEST(TileCC, Reciprocal) {
 }  // namespace
 }  // namespace edsl
 }  // namespace plaidml
-}  // namespace vertexai

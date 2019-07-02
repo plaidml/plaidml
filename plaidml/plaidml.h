@@ -14,7 +14,6 @@
 #endif  // __cplusplus
 
 #include "plaidml/base/base.h"
-#include "plaidml/edsl/edsl.h"
 
 #define PLAIDML_API VAI_API
 
@@ -154,23 +153,6 @@ struct plaidml_buffer;
 #else
 typedef struct plaidml_buffer plaidml_buffer;
 #endif  // __cplusplus
-
-struct plaidml_binding {
-  const tile_expr* expr;
-  plaidml_buffer* buffer;
-};
-
-typedef struct plaidml_executable plaidml_executable;
-
-PLAIDML_API plaidml_executable* plaidml_device_compile(plaidml_device* device,         //
-                                                       tile_program* program,          //
-                                                       size_t ninputs,                 //
-                                                       const plaidml_binding* inputs,  //
-                                                       size_t noutputs,                //
-                                                       const plaidml_binding* outputs);
-
-PLAIDML_API void plaidml_executable_run(plaidml_executable* exec);
-PLAIDML_API void plaidml_executable_free(plaidml_executable* exec);
 
 // PlaidML mappings are used to view and manipulate the contents of buffers.
 #ifdef __cplusplus

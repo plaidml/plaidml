@@ -41,7 +41,6 @@
 #include "plaidml/base/status.h"
 #include "plaidml/base/status_strings.h"
 #include "plaidml/config.h"
-#include "plaidml/edsl/internal.h"
 #include "plaidml/plaidml.pb.h"
 #include "tile/base/buffer.h"
 #include "tile/base/lru_cache.h"
@@ -161,12 +160,6 @@ class Evaluator final {
     std::shared_ptr<tile::Program> compiled;
     std::tie(std::ignore, compiled) = program_cache_->GetProgram(ctx, "sdk", prog, const_bufs);
     return compiled;
-  }
-
-  std::shared_ptr<tile::Program> MakeProgram(const context::Context& ctx,  //
-                                             const RunInfo& runinfo,       //
-                                             tile::ConstBufferManager* const_bufs) {
-    return platform_->MakeProgram(ctx, id_, runinfo, const_bufs);
   }
 
  private:
@@ -1732,55 +1725,3 @@ plaidml_var* plaidml_compute_grad_wrt(plaidml_gradient* grad, plaidml_var* wrt) 
     return nullptr;
   }
 }
-
-struct plaidml_executable {
-  using BufferMap = std::map<std::string, std::shared_ptr<tile::Buffer>>;
-  BufferMap input_bufs;
-  BufferMap output_bufs;
-  std::shared_ptr<tile::Program> program;
-};
-
-extern "C" plaidml_executable* plaidml_device_compile(plaidml_device* device,         //
-                                                      tile_program* program,          //
-                                                      size_t ninputs,                 //
-                                                      const plaidml_binding* inputs,  //
-                                                      size_t noutputs,                //
-                                                      const plaidml_binding* outputs) {
-  context::Context ctx;
-  auto exec = new plaidml_executable{};
-  tile::ConstBufferManager const_bufs;
-  const_bufs.allocator = std::make_shared<PlatformAllocator>(*device->evaluator);
-  exec->program = device->evaluator->MakeProgram(ctx, program->eval.runinfo, &const_bufs);
-  for (size_t i = 0; i < ninputs; i++) {
-    if (!inputs[i].expr || !inputs[i].buffer) {
-      vertexai::SetLastOOM();
-      return nullptr;
-    }
-    auto expr = inputs[i].expr->expr;
-    const auto& inputs_ord = program->eval.inputs;
-    auto it = std::find(inputs_ord.begin(), inputs_ord.end(), expr.get());
-    size_t j = std::distance(inputs_ord.begin(), it);
-    const auto& name = program->eval.runinfo.program.inputs[j].name;
-    exec->input_bufs[name] = inputs[i].buffer->state->buffer();
-  }
-  for (size_t i = 0; i < noutputs; i++) {
-    if (!outputs[i].expr || !outputs[i].buffer) {
-      vertexai::SetLastOOM();
-      return nullptr;
-    }
-    auto expr = outputs[i].expr->expr;
-    const auto& outputs_ord = program->eval.outputs;
-    auto it = std::find(outputs_ord.begin(), outputs_ord.end(), expr.get());
-    size_t j = std::distance(outputs_ord.begin(), it);
-    const auto& name = program->eval.runinfo.program.outputs[j];
-    exec->output_bufs[name] = outputs[i].buffer->state->buffer();
-  }
-  return exec;
-}
-
-extern "C" void plaidml_executable_run(plaidml_executable* exec) {
-  context::Context ctx;
-  exec->program->Run(ctx, exec->input_bufs, exec->output_bufs).get();
-}
-
-extern "C" void plaidml_executable_free(plaidml_executable* exec) { delete exec; }

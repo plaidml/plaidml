@@ -299,3 +299,36 @@ def plaidml_macos_dylib(name, lib, src, tags, internal_libname = ""):
             chmod $${original_mode} $@
         """,
     )
+
+def _dylib_name_patterns(name):
+    return {
+        "@toolchain//:windows_x86_64": ["{}.dll".format(name)],
+        "@toolchain//:macos_x86_64": ["lib{}.dylib".format(name)],
+        "//conditions:default": ["lib{}.so".format(name)],
+    }
+
+def plaidml_cc_dylib(
+        name,
+        dylib_name = None,
+        copts = [],
+        linkopts = [],
+        visibility = None,
+        **kwargs):
+    if dylib_name == None:
+        dylib_name = name
+    names = _dylib_name_patterns(dylib_name)
+    for name_list in names.values():
+        for name_os in name_list:
+            native.cc_binary(
+                name = name_os,
+                copts = PLAIDML_COPTS + copts,
+                linkopts = PLAIDML_LINKOPTS + linkopts,
+                linkshared = 1,
+                visibility = visibility,
+                **kwargs
+            )
+    native.filegroup(
+        name = name,
+        srcs = select(names),
+        visibility = visibility,
+    )

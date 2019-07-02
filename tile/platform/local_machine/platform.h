@@ -33,6 +33,9 @@ class Platform : public tile::Platform {
     std::shared_ptr<Scheduler> scheduler;
   };
 
+  Platform();
+  std::vector<std::string> ListDevices();
+
   Platform(const context::Context& ctx, const proto::Platform& config);
 
   std::shared_ptr<tile::Buffer> MakeBuffer(const context::Context& ctx, const std::string& device_id,
@@ -43,6 +46,7 @@ class Platform : public tile::Platform {
 
   std::shared_ptr<tile::Program> MakeProgram(const context::Context& ctx,   //
                                              const std::string& device_id,  //
+                                             const std::string& target_id,  //
                                              const lang::RunInfo& runinfo,  //
                                              ConstBufferManager* const_bufs);
 

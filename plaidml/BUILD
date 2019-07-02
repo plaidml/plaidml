@@ -46,7 +46,6 @@ PLAIDML_CPP_DEPS = [
     "//base/eventing/file",
     "//base/util:runfiles_db",
     "//plaidml/base",
-    "//plaidml/edsl",
     "//tile/base",
     "//tile/base:program_cache",
     "//tile/stripe",
@@ -131,7 +130,6 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml/base:api",
-        "//plaidml/edsl:public",
         "@half",
     ],
 )
@@ -354,8 +352,6 @@ bin =
         ":configs",
         "//plaidml/base:base.h",
         "//plaidml/base:base_cpp.h",
-        "//plaidml/edsl:edsl.h",
-        "//plaidml/edsl:ffi.h",
         "@half//:include/half.hpp",
         "plaidml-config.cmake",
         "//tile/pmlc",

@@ -21,7 +21,7 @@ namespace test {
 
 namespace {
 
-using plaidml::edsl::TensorShape;
+using plaidml::edsl::LogicalShape;
 
 template <typename T>
 T ParseProtoJson(const std::string& str) {
@@ -79,10 +79,10 @@ std::vector<float> kConv1dExpected = {
 }  // namespace
 
 TEST(Codegen, ApplyTile) {
-  size_t dim = sqrt(kMatMulExpected.size());
-  auto runinfo = lib::LoadMatMul("matmul",                                       //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
+  int64_t dim = sqrt(kMatMulExpected.size());
+  auto runinfo = lib::LoadMatMul("matmul",                                        //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto data = MakeMatMulTestData();
@@ -129,10 +129,10 @@ TEST(Stencil, MatchMatMul) {
     }
   )");
 
-  const std::uint64_t DIM = 100;
-  auto runinfo = lib::LoadMatMul("matmul",                                       //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
+  const std::int64_t DIM = 100;
+  auto runinfo = lib::LoadMatMul("matmul",                                        //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -165,9 +165,9 @@ TEST(Stencil, MatchConv1D) {
     }
   )");
 
-  auto runinfo = lib::LoadConv1d("conv",                                           //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {1, 100, 64}),  //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {3, 64, 64}),   //
+  auto runinfo = lib::LoadConv1d("conv",                                            //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {1, 100, 64}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {3, 64, 64}),   //
                                  {1, 100, 64});
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
@@ -220,10 +220,10 @@ TEST(Stencil, MatchConv2D) {
     specs.push_back(stencil);
   }
 
-  auto runinfo = lib::LoadConv2d("conv",                                                //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {1, 100, 100, 56}),  //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {3, 3, 56, 56}),     //
-                                 {1, 100, 100, 56});                                    //
+  auto runinfo = lib::LoadConv2d("conv",                                                 //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {1, 100, 100, 56}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 56, 56}),     //
+                                 {1, 100, 100, 56});                                     //
   auto program = GenerateStripe(runinfo);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
@@ -261,10 +261,10 @@ TEST(Stencil, Pass) {
     }
   )");
 
-  const std::uint64_t DIM = 5;
-  auto runinfo = lib::LoadMatMul("matmul",                                       //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
-                                 TensorShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
+  const std::int64_t DIM = 5;
+  auto runinfo = lib::LoadMatMul("matmul",                                        //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
   auto program = GenerateStripe(runinfo);
   CompilerState state(program);
   StencilPass(options).Apply(&state);

@@ -6,8 +6,9 @@
 #include <torch/csrc/jit/pass_manager.h>
 #include <torch/csrc/jit/passes/graph_fuser.h>
 
-#include "plaidml/pytorch/compiler.h"
-#include "plaidml/pytorch/logging.h"
+#include "plaidml2/bridge/pytorch/compiler.h"
+#include "plaidml2/bridge/pytorch/logging.h"
+#include "plaidml2/core/core.h"
 
 // Based largely on https://github.com/pytorch/tvm
 // https://jott.live/markdown/Writing%20a%20Toy%20Backend%20Compiler%20for%20PyTorch
@@ -24,16 +25,13 @@
 using namespace torch::jit;  // NOLINT
 
 static bool g_fusion_enabled = false;
+static std::string g_device_id;  // NOLINT
+static std::string g_target_id;  // NOLINT
 
 size_t g_verbosity = 0;
 
 PYBIND11_MODULE(plaidml_pytorch, module) {
-  auto ctx = std::make_shared<vertexai::ctx>();
-  const auto& devices = vertexai::plaidml::enumerate_devices(ctx);
-  if (devices.empty()) {
-    throw std::runtime_error("No available devices.");
-  }
-  auto device = devices.at(0).open();
+  plaidml::init();
 
   RegisterPass pass([](std::shared_ptr<Graph> graph) {
     if (g_fusion_enabled) {
@@ -46,8 +44,8 @@ PYBIND11_MODULE(plaidml_pytorch, module) {
 
   RegisterOperators op({Operator(
       Compiler::symbol,
-      [device](const Node* node) {
-        auto compiler = std::make_shared<Compiler>(device, node);
+      [](const Node* node) {
+        auto compiler = std::make_shared<Compiler>(g_device_id, g_target_id, node);
         return [compiler](Stack& stack) {
           RECORD_FUNCTION("PlaidML", std::vector<c10::IValue>());
           compiler->run(&stack);
@@ -56,7 +54,15 @@ PYBIND11_MODULE(plaidml_pytorch, module) {
       },
       options)});
 
-  module.def("enable", []() { g_fusion_enabled = true; });
+  module.def(
+      "enable",
+      [](const std::string& device_id, const std::string& target_id) {
+        g_fusion_enabled = true;
+        g_device_id = device_id;
+        g_target_id = target_id;
+      },
+      pybind11::arg("device_id"),  //
+      pybind11::arg("target_id"));
   module.def("disable", []() { g_fusion_enabled = false; });
   module.def("set_vlog", [](size_t verbosity) { g_verbosity = verbosity; });
 }

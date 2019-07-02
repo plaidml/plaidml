@@ -1,10 +1,9 @@
-import numpy as np
+import os
 import sys
 
-import plaidml.keras
-plaidml.keras.install_backend()
-import plaidml.keras.backend
+os.environ['KERAS_BACKEND'] = 'plaidml.keras.backend'
 
+import numpy as np
 from keras.layers import Input
 from keras.models import Model
 

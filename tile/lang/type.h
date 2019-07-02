@@ -61,9 +61,6 @@ Bindings BindProgram(Program* p, const ShapeMap& inputs, const ShapeMap& outputs
 // Set the default data type for floating-point computations
 void SetFloatX(DataType dtype);
 
-// Compute result type by 'upcasting' to the highest type in the hierarchy
-DataType CommonSupertype(DataType left, DataType right);
-
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

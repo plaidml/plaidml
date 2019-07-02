@@ -1,11 +1,11 @@
 // Copyright 2019, Intel Corporation.
 
-#include "plaidml/pytorch/compiler.h"
+#include "plaidml2/bridge/pytorch/compiler.h"
 
-#include "plaidml/pytorch/logging.h"
+#include "plaidml2/bridge/pytorch/logging.h"
 
 using namespace torch::jit;  // NOLINT
-namespace edsl = vertexai::plaidml::edsl;
+namespace edsl = plaidml::edsl;
 
 using OpFunction = std::function<edsl::Tensor(const std::vector<edsl::Tensor>& args)>;
 
@@ -85,7 +85,7 @@ edsl::Tensor batch_norm(const std::vector<edsl::Tensor>& args) {
   edsl::TensorDim N, C, H, W;
   I.bind_dims(N, C, H, W);
 
-  std::vector<int64_t> dims{static_cast<int64_t>(N.value()), static_cast<int64_t>(C.value()), 1, 1};
+  std::vector<edsl::TensorDim> dims{N, C, edsl::TensorDim{1}, edsl::TensorDim{1}};
   IVLOG(2, "  Weight: " << args[1].str());
   auto Weight = args[1];  // weight
   if (!Weight.is_none()) {
@@ -168,18 +168,18 @@ edsl::Tensor convolution(const std::vector<edsl::Tensor>& args) {
   const auto& groups = args[8];  // groups
   IVLOG(2, "  groups: " << groups.str());
 
-  auto rank = S.size();
+  auto ndims = S.size();
 
   edsl::TensorDim N, CI, CO;
   edsl::TensorIndex n, ci, co;
 
-  std::vector<edsl::TensorDim> I_spatial_dims(rank);
+  std::vector<edsl::TensorDim> I_spatial_dims(ndims);
   std::vector<edsl::TensorDim> I_dims = {N, CI};
   std::vector<edsl::TensorIndex> I_idxs = {n, ci};
   I_dims.insert(std::end(I_dims), std::begin(I_spatial_dims), std::end(I_spatial_dims));
   I.bind_dims(I_dims);
 
-  std::vector<edsl::TensorDim> K_spatial_dims(rank);
+  std::vector<edsl::TensorDim> K_spatial_dims(ndims);
   std::vector<edsl::TensorDim> K_dims = {CO, CI};
   std::vector<edsl::TensorIndex> K_idxs = {co, ci};
   K_dims.insert(std::end(K_dims), std::begin(K_spatial_dims), std::end(K_spatial_dims));
@@ -188,7 +188,7 @@ edsl::Tensor convolution(const std::vector<edsl::Tensor>& args) {
   std::vector<edsl::TensorDim> O_dims = {N, CO};
   std::vector<edsl::TensorIndex> O_idxs = {n, co};
 
-  for (size_t i = 0; i < rank; i++) {
+  for (size_t i = 0; i < ndims; i++) {
     edsl::TensorIndex x;
     edsl::TensorIndex k;
     I_idxs.emplace_back(S[i].as_int() * x + D[i].as_int() * k - P[i].as_int());
@@ -201,7 +201,7 @@ edsl::Tensor convolution(const std::vector<edsl::Tensor>& args) {
   edsl::Tensor O(O_dims);
   O(O_idxs) += I(I_idxs) * K(K_idxs);
   if (!bias.is_none()) {
-    std::vector<int64_t> dims{static_cast<int64_t>(N.value()), static_cast<int64_t>(CO.value()), 1, 1};
+    std::vector<edsl::TensorDim> dims{N, CO, edsl::TensorDim{1}, edsl::TensorDim{1}};
     O = O + edsl::reshape(bias, dims);
   }
   return O;
@@ -265,18 +265,18 @@ edsl::Tensor adaptive_avg_pool2d(const std::vector<edsl::Tensor>& args) {
   edsl::TensorDim N, C, H, W;
   I.bind_dims(N, C, H, W);
 
-  auto X0 = static_cast<int64_t>(H.value());
-  auto X1 = static_cast<int64_t>(W.value());
+  auto X0 = H.as_int();
+  auto X1 = W.as_int();
   auto P0 = 0;
   auto P1 = 0;
   // auto K0 = ceil_div(X0, output_size[0].as_int());
   // auto K1 = ceil_div(X1, output_size[1].as_int());
   // auto S0 = K0;
   // auto S1 = K1;
-  auto S0 = ceil_div(X0, output_size[0].as_int());
-  auto S1 = ceil_div(X1, output_size[1].as_int());
-  auto K0 = X0 - (output_size[0].as_int() - 1) * S0;
-  auto K1 = X1 - (output_size[1].as_int() - 1) * S1;
+  auto S0 = ceil_div(X0, output_size[0]);
+  auto S1 = ceil_div(X1, output_size[1]);
+  auto K0 = X0 - (output_size[0] - 1) * S0;
+  auto K1 = X1 - (output_size[1] - 1) * S1;
 
   return avg_pool2d({
       I,                         // self
@@ -356,8 +356,8 @@ edsl::Tensor reshape(const std::vector<edsl::Tensor>& args) {
   IVLOG(1, "reshape");
 
   const auto& I = args[0];
-  auto I_shape = I.shape();
-  IVLOG(2, "  I: " << I_shape.str());
+  auto I_dims = I.shape().int_dims();
+  IVLOG(2, "  I: " << I.shape().str());
 
   const auto& shape = args[1].as_tuple();
   IVLOG(2, "  shape: " << args[1].str());
@@ -365,25 +365,25 @@ edsl::Tensor reshape(const std::vector<edsl::Tensor>& args) {
   // reshape((6, 6), (3, -1)) -> reshape((6, 6), (3, 12))
   // reshape((2, 3, 4), (2, -1)) -> reshape((2, 3, 4), (2, 12))
   int64_t product = 1;
-  for (size_t i = 0; i < I_shape.rank(); i++) {
+  for (size_t i = 0; i < I_dims.size(); i++) {
     if (i < shape.size()) {
       if (shape[i].as_int() == -1) {
-        product *= I_shape.size_at(i);
+        product *= I_dims[i];
       } else {
-        product *= ceil_div(I_shape.size_at(i), shape[i].as_int());
+        product *= ceil_div(I_dims[i], shape[i].as_int());
       }
     } else {
-      product *= I_shape.size_at(i);
+      product *= I_dims[i];
     }
   }
 
-  std::vector<int64_t> dims;
+  std::vector<edsl::TensorDim> dims;
   for (const auto& dim : shape) {
     auto dim_int = dim.as_int();
     if (dim_int == -1) {
-      dims.push_back(product);
+      dims.push_back(edsl::TensorDim{product});
     } else {
-      dims.push_back(dim_int);
+      dims.push_back(edsl::TensorDim{dim_int});
     }
   }
 
@@ -452,8 +452,9 @@ std::map<Symbol, OpFunction> kSupportedOps = {
 
 const at::Symbol Compiler::symbol = Symbol::fromQualString("plaidml::CompilationGroup");
 
-Compiler::Compiler(const vertexai::plaidml::device& device, const Node* node)
-    : device_(device),                      //
+Compiler::Compiler(const std::string& device_id, const std::string& target_id, const Node* node)
+    : device_id_(device_id),                //
+      target_id_(target_id),                //
       subgraph_(node->g(attr::Subgraph)) {  //
 }
 
@@ -508,12 +509,12 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
       throw std::runtime_error("Unexpected non-tensor input");
     }
     const auto& tensor = ival.toTensor();
-    std::vector<uint64_t> sizes;
+    std::vector<int64_t> sizes;
     for (const auto& size : tensor.sizes()) {
       sizes.emplace_back(size);
     }
     // TODO: convert dtype
-    edsl::TensorShape shape(PLAIDML_DATA_FLOAT32, sizes);
+    edsl::LogicalShape shape(PLAIDML_DATA_FLOAT32, sizes);
     edsl::Tensor input_tensor(shape);
     input_tensors.push_back(input_tensor);
     const auto& input = subgraph_->inputs()[i];
@@ -577,33 +578,36 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
   }
 
   IVLOG(1, "Compiler::compile> done");
-  return std::make_shared<Executable>(device_, input_tensors, output_tensors);
+  return std::make_shared<Executable>(device_id_, target_id_, input_tensors, output_tensors);
 }
 
 static size_t g_program_id = 1;
 
-Executable::Executable(const vertexai::plaidml::device& device,  //
+Executable::Executable(const std::string& device_id,             //
+                       const std::string& target_id,             //
                        const std::vector<edsl::Tensor>& inputs,  //
                        const std::vector<edsl::Tensor>& outputs)
-    : device_(device),  //
+    : device_id_(device_id),  //
+      target_id_(target_id),
       input_bindings_(inputs.size()),
-      output_ivalues_(outputs.size()),
-      ctx_(std::make_shared<vertexai::ctx>()) {
+      output_ivalues_(outputs.size()) {
   for (size_t i = 0; i < inputs.size(); i++) {
-    input_bindings_[i] = vertexai::plaidml::binding{
-        inputs[i],                                       // tensor
-        device_.allocate(inputs[i].shape().byte_size())  // buffer
-    };
+    auto shape = inputs[i].shape();
+    plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+    plaidml::exec::Buffer buffer(device_id, tensor_shape);
+    input_bindings_[i] = plaidml::exec::Binding{inputs[i], buffer};
   }
   for (size_t i = 0; i < outputs.size(); i++) {
-    const auto& shape = outputs[i].shape();
-    output_bindings_.push_back(vertexai::plaidml::binding{
-        outputs[i],                          // tensor
-        device_.allocate(shape.byte_size())  // buffer
+    auto shape = outputs[i].shape();
+    plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+    output_bindings_.emplace_back(plaidml::exec::Binding{
+        outputs[i],                                     // tensor
+        plaidml::exec::Buffer{device_id, tensor_shape}  // buffer
     });
     std::vector<int64_t> sizes;
-    for (size_t j = 0; j < shape.rank(); j++) {
-      sizes.push_back(shape.size_at(j));
+    auto dims = shape.int_dims();
+    for (size_t j = 0; j < dims.size(); j++) {
+      sizes.push_back(dims[j]);
     }
     output_ivalues_[i] = at::empty(at::IntArrayRef(sizes));
   }
@@ -613,19 +617,20 @@ Executable::Executable(const vertexai::plaidml::device& device,  //
   program_ = std::make_unique<edsl::Program>(name_, outputs);
   IVLOG(1, "Executable::Executable>");
   IVLOG(2, program_->str());
-  exec_ = device_.compile(program_->ptr(), input_bindings_, output_bindings_);
+  exec_ =
+      std::make_shared<plaidml::exec::Executable>(*program_, device_id_, target_id_, input_bindings_, output_bindings_);
   IVLOG(1, "Executable::Executable> done");
 }
 
 std::vector<torch::jit::IValue> Executable::run(at::ArrayRef<torch::jit::IValue>* inputs) {
   IVLOG(1, "Executable::run> " << name_);
   for (size_t i = 0; i < input_bindings_.size(); i++) {
-    input_bindings_[i].buf.copy_from(ctx_, (*inputs)[i].toTensor().data_ptr());
+    input_bindings_[i].buffer.copy_from((*inputs)[i].toTensor().data_ptr());
   }
-  exec_.run();
+  exec_->run();
   for (size_t i = 0, j = 0; i < output_bindings_.size(); i++) {
     if (output_ivalues_[i].isTensor()) {
-      output_bindings_[j++].buf.copy_into(ctx_, output_ivalues_[i].toTensor().data_ptr());
+      output_bindings_[j++].buffer.copy_into(output_ivalues_[i].toTensor().data_ptr());
     }
   }
   IVLOG(1, "Executable::run> done");

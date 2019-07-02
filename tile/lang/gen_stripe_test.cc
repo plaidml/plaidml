@@ -3,7 +3,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "plaidml/edsl/edsl.h"
+#include "plaidml2/edsl/edsl.h"
 #include "testing/matchers.h"
 #include "tile/lang/gen_stripe.h"
 
@@ -33,8 +33,8 @@ Tensor ContractPlusElementwise(const Tensor& A, const Tensor& B) {
 }
 
 TEST(GenStripeTest, ContractPlusElementwise) {
-  using plaidml::edsl::TensorShape;
-  TensorShape shape(PLAIDML_DATA_FLOAT32, {10, 10});
+  using plaidml::edsl::LogicalShape;
+  LogicalShape shape(PLAIDML_DATA_FLOAT32, {10, 10});
   Tensor A(shape), B(shape);
   auto runinfo = Evaluate("ContractPlusElementwise", {ContractPlusElementwise(A, B)});
   auto program = GenerateStripe(runinfo);

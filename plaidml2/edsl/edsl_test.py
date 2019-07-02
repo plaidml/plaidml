@@ -1,10 +1,12 @@
+# Copyright 2019 Intel Corporation.
+
 import argparse
 import functools
 import sys
 import unittest
 
-import plaidml
-from plaidml.edsl import *
+import plaidml2 as plaidml
+from plaidml2.edsl import *
 
 
 def dot(X, Y):
@@ -54,14 +56,13 @@ def max_pool_2d(I):
 
 
 def flatten(X):
-    sizes = X.shape().sizes
-    product = functools.reduce(lambda x, y: x * y, sizes[1:-1])
-    shape = TensorShape(X.shape().type, (1, product))
-    return reshape(X, shape)
+    dims = X.shape.dims
+    product = functools.reduce(lambda x, y: x * y, dims[1:-1])
+    return reshape(X, (1, product))
 
 
 def normalize(X):
-    idxs = TensorIndexes(X.shape().rank)
+    idxs = TensorIndexes(X.shape.ndims)
     XSqr = X * X
     X_MS = TensorOutput()
     X_MS[()] += XSqr[idxs]
@@ -82,7 +83,7 @@ def arg_max(I):
     I.bind_dims(X0, X1, X2)
     Max = TensorOutput(X0, X2)
     Max[x0, x2] >= I[x0, x1, x2]
-    One = Tensor(TensorShape(plaidml.DType.FLOAT32))
+    One = Tensor(LogicalShape(plaidml.DType.FLOAT32))
     T = TensorOutput(X1)
     T[x1] = One[()]
     IX = index(T, 0)
@@ -96,19 +97,19 @@ class TestEdsl(unittest.TestCase):
 
     def test_mnist_mlp(self):
         # model.add(Dense(512, activation='relu', input_shape=(784,)))
-        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 784]))
-        K1 = Tensor(TensorShape(plaidml.DType.FLOAT32, [784, 512]))
-        B1 = Tensor(TensorShape(plaidml.DType.FLOAT32, [512]))
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+        K1 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [784, 512]))
+        B1 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [512]))
         D1 = relu(dot(I, K1) + B1)
         # model.add(Dense(512, activation='relu'))
-        K2 = Tensor(TensorShape(plaidml.DType.FLOAT32, [512, 512]))
-        B2 = Tensor(TensorShape(plaidml.DType.FLOAT32, [512]))
+        K2 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [512, 512]))
+        B2 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [512]))
         D2 = relu(dot(D1, K2) + B2)
         # model.add(Dense(10, activation='softmax'))
-        K3 = Tensor(TensorShape(plaidml.DType.FLOAT32, [512, 10]))
-        B3 = Tensor(TensorShape(plaidml.DType.FLOAT32, [10]))
+        K3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [512, 10]))
+        B3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]))
         D3 = softmax(dot(D2, K3) + B3)
-        program = Program('mnist_mlp', D3)
+        program = Program('mnist_mlp', [D3])
         self.assertMultiLineEqual(
             str(program), '''function (
   _X0[_X0_0, _X0_1],
@@ -145,27 +146,27 @@ class TestEdsl(unittest.TestCase):
 
     def test_mnist_cnn(self):
         # model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
-        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
-        K1 = Tensor(TensorShape(plaidml.DType.FLOAT32, [3, 3, 1, 32]))
-        B1 = Tensor(TensorShape(plaidml.DType.FLOAT32, [32]))
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
+        K1 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1, 32]))
+        B1 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [32]))
         C1 = relu(conv_2d(I, K1) + B1)
         # model.add(Conv2D(64, (3, 3), activation='relu'))
-        K2 = Tensor(TensorShape(plaidml.DType.FLOAT32, [3, 3, 32, 64]))
-        B2 = Tensor(TensorShape(plaidml.DType.FLOAT32, [64]))
+        K2 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 32, 64]))
+        B2 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [64]))
         C2 = relu(conv_2d(C1, K2) + B2)
         # model.add(MaxPooling2D(pool_size=(2, 2)))
         P1 = max_pool_2d(C2)
         # model.add(Flatten())
         F = flatten(P1)
-        self.assertEqual(str(F.shape()), 'fp32(1, 12100):(12100, 1):47.2656 KiB')
-        K3 = Tensor(TensorShape(plaidml.DType.FLOAT32, [12100, 128]))
-        B3 = Tensor(TensorShape(plaidml.DType.FLOAT32, [128]))
+        self.assertEqual(str(F.shape), 'fp32(1, 12100)')
+        K3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [12100, 128]))
+        B3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [128]))
         D1 = relu(dot(F, K3) + B3)
         # model.add(Dense(num_classes, activation='softmax'))
-        K4 = Tensor(TensorShape(plaidml.DType.FLOAT32, [128, 100]))
-        B4 = Tensor(TensorShape(plaidml.DType.FLOAT32, [100]))
+        K4 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [128, 100]))
+        B4 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [100]))
         D2 = softmax(dot(D1, K4) + B4)
-        program = Program('mnist_mlp', D2)
+        program = Program('mnist_mlp', [D2])
         self.assertMultiLineEqual(
             str(program), '''function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3],
@@ -213,10 +214,10 @@ class TestEdsl(unittest.TestCase):
 ''')
 
     def test_arg_max(self):
-        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 10, 10]))
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 10, 10]))
         O = arg_max(I)
-        self.assertEqual(str(O.shape()), 'u32(1, 10):(10, 1):40 bytes')
-        program = Program('arg_max', O)
+        self.assertEqual(str(O.shape), 'u32(1, 10)')
+        program = Program('arg_max', [O])
         self.assertMultiLineEqual(
             str(program), '''function (
   _X0[_X0_0, _X0_1, _X0_2],
@@ -235,13 +236,13 @@ class TestEdsl(unittest.TestCase):
 ''')
 
     def test_global_min(self):
-        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [10, 10, 10]), name='I')
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]), name='I')
         i, j, k = TensorIndexes(3)
         O_Neg = TensorOutput()
         Neg = -I
         O_Neg[()] >= Neg[i, j, k]
         O = -O_Neg
-        program = Program('global_min', O)
+        program = Program('global_min', [O])
         self.assertMultiLineEqual(
             str(program), '''function (
   I[I_0, I_1, I_2]
@@ -255,14 +256,14 @@ class TestEdsl(unittest.TestCase):
 ''')
 
     def test_cum_sum(self):
-        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [10]), name='I')
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
         N = TensorDim()
         i, k = TensorIndexes(2)
         I.bind_dims(N)
         O = TensorOutput(N)
         if i - k < N:
             O[i] += I[k]
-        program = Program('cum_sum', O)
+        program = Program('cum_sum', [O])
         self.assertMultiLineEqual(
             str(program), '''function (
   I[I_0]
@@ -274,11 +275,11 @@ class TestEdsl(unittest.TestCase):
 ''')
 
     def test_unique_names(self):
-        A = Tensor(TensorShape(plaidml.DType.FLOAT32), name='A')
-        B = Tensor(TensorShape(plaidml.DType.FLOAT32), name='B')
-        C0 = Tensor(TensorShape(plaidml.DType.FLOAT32), name='C')
-        C1 = Tensor(TensorShape(plaidml.DType.FLOAT32), name='C')
-        program = Program('unique_names', A + B + C0 + C1)
+        A = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='A')
+        B = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='B')
+        C0 = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='C')
+        C1 = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='C')
+        program = Program('unique_names', [A + B + C0 + C1])
         self.assertMultiLineEqual(
             str(program), '''function (
   A[],
@@ -295,14 +296,14 @@ class TestEdsl(unittest.TestCase):
 ''')
 
     def test_lars_momentum_4d(self):
-        X_shape = TensorShape(plaidml.DType.FLOAT32, [4, 7, 3, 9])
-        LR_Shape = TensorShape(plaidml.DType.FLOAT32)
+        X_shape = LogicalShape(plaidml.DType.FLOAT32, [4, 7, 3, 9])
+        LR_Shape = LogicalShape(plaidml.DType.FLOAT32)
         X = Tensor(X_shape)
         Grad = Tensor(X_shape)
         Veloc = Tensor(X_shape)
         LR = Tensor(LR_Shape)
         R = lars_momentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.)
-        program = Program('lars_momentum_4d', *R)
+        program = Program('lars_momentum_4d', R)
         self.assertMultiLineEqual(
             str(program), '''function (
   _X1[_X1_0, _X1_1, _X1_2, _X1_3],
@@ -338,7 +339,7 @@ class TestEdsl(unittest.TestCase):
 ''')
 
     def test_repeat_elts(self):
-        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [10, 10, 10]))
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]))
         N0, N1, N2 = TensorDims(3)
         n0, n1, n2, k = TensorIndexes(4)
         I.bind_dims(N0, N1, N2)
@@ -346,7 +347,7 @@ class TestEdsl(unittest.TestCase):
         if k < 3:
             O[n0, 3 * n1 + k, n2] = I[n0, n1, n2]
         O.no_defract()
-        program = Program('repeat_elts', O)
+        program = Program('repeat_elts', [O])
         self.assertMultiLineEqual(
             str(program), '''function (
   _X0[_X0_0, _X0_1, _X0_2]
@@ -358,15 +359,15 @@ class TestEdsl(unittest.TestCase):
 ''')
 
     def test_use_default(self):
-        P = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 7, 10, 10]))
-        I = Tensor(TensorShape(plaidml.DType.FLOAT32, [1, 10, 10]))
+        P = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 7, 10, 10]))
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 10, 10]))
         B, N1, N2 = TensorDims(3)
         b, i1, i2 = TensorIndexes(3)
         I.bind_dims(B, N1, N2)
         O = TensorOutput(B, 7, N1, N2)
         O[b, 3, i1, i2] = I[b, i1, i2]
         O.use_default(P)
-        program = Program('use_default', O)
+        program = Program('use_default', [O])
         self.assertMultiLineEqual(
             str(program), '''function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3],
@@ -383,5 +384,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', type=int, default=0)
     args, remainder = parser.parse_known_args()
-    plaidml._internal_set_vlog(args.verbose)
+    # plaidml._internal_set_vlog(args.verbose)
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

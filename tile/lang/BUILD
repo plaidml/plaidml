@@ -17,6 +17,8 @@ plaidml_cc_library(
     name = "lang",
     srcs = [
         "ast.cc",
+        "ast_ops.cc",
+        "ast_ops.h",
         "bound.cc",
         "bound.h",
         "builtins.cc",
@@ -117,6 +119,7 @@ plaidml_cc_library(
         "//tile/stripe",
         "@boost",
     ],
+    alwayslink = 1,
 )
 
 plaidml_cc_test(
@@ -193,7 +196,7 @@ plaidml_cc_test(
     srcs = ["gen_stripe_test.cc"],
     deps = [
         ":lang",
-        "//plaidml/edsl",
+        "//plaidml2/edsl",
         "//testing:matchers",
     ],
 )

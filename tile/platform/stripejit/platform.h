@@ -27,6 +27,7 @@ class Platform : public tile::Platform {
 
   std::shared_ptr<tile::Program> MakeProgram(const context::Context& ctx,   //
                                              const std::string& device_id,  //
+                                             const std::string& target_id,  //
                                              const lang::RunInfo& runinfo,  //
                                              ConstBufferManager* const_bufs);
 
