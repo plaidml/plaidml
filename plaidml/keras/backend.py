@@ -197,8 +197,7 @@ def abs(x):
     return builtins.abs(x)
 
 
-def all(x, axis=None, keepdims=False):
-    _report_unimplemented('all')
+all = op.all
 
 
 def any(x, axis=None, keepdims=False):
