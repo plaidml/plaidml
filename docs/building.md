@@ -41,19 +41,25 @@ Microsoft Windows\* OS:
     conda env create -n plaidml -f environment-windows.yml
     conda activate plaidml
 
+## Install bazelisk
+
+Install the latest bazelisk tool:
+
+https://github.com/bazelbuild/bazelisk/releases
+
 ## Build the PlaidML Python wheel
 
 macOS\*:
 
-    bazel build --config macos_x86_64 //plaidml:wheel
+    bazelisk build --config macos_x86_64 //plaidml:wheel
 
 Linux\*:
 
-    bazel build --config linux_x86_64 //plaidml:wheel
+    bazelisk build --config linux_x86_64 //plaidml:wheel
 
 Microsoft Windows\* OS:
 
-    bazel build --config windows_x86_64 //plaidml:wheel
+    bazelisk build --config windows_x86_64 //plaidml:wheel
 
 ## Install the PlaidML Python wheel
 
@@ -143,13 +149,16 @@ above.
 ## Build the PlaidML-Keras wheel
 
 macOS\*:
-    `bazel build --config macos_x86_64 //plaidml/keras:wheel`
+
+    bazelisk build --config macos_x86_64 //plaidml/keras:wheel
 
 Linux\*:
-    `bazel build --config linux_x86_64 //plaidml/keras:wheel`
+
+    bazelisk build --config linux_x86_64 //plaidml/keras:wheel
 
 Microsoft Windows\* OS:
-    `bazel build --config windows_x86_64 //plaidml/keras:wheel`
+    
+    bazelisk build --config windows_x86_64 //plaidml/keras:wheel
 
 ## Install the PlaidML-Keras Python wheel
 
@@ -159,12 +168,22 @@ Microsoft Windows\* OS:
 
 Unit tests are executed through bazel:
 
-    bazel test //...
+macOS\*:
+
+    bazelisk test --config macos_x86_64 //...
+
+Linux\*:
+
+    bazelisk test --config linux_x86_64 //...
+
+Microsoft Windows\* OS: (not all tests are building & passing on Windows yet)
+
+    bazelisk test --config windows_x86_64 //...
 
 Unit tests for frontends are marked manual and must be executed individually (requires 
 running `plaidml-setup` prior to execution)
 
-    bazel test //plaidml/keras:backend_test
+    bazelisk test --config <config> //plaidml/keras:backend_test
 
 [Anaconda]:https://www.anaconda.com/download
 [Bazel]:http://bazel.build

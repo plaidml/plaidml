@@ -1,5 +1,4 @@
 dependencies:
-  - bazel
   - cmake
   - m2-perl
   - python=3.6.0

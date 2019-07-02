@@ -1,7 +1,6 @@
 channels:
   - conda-forge
 dependencies:
-  - bazel
   - cmake
   - pre_commit
   - pip

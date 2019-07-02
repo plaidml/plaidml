@@ -14,7 +14,7 @@ http_archive(
 
 git_repository(
     name = "toolchain",
-    commit = "a487bf9f2cc4edc47d376606abaaf29d85fffcd8",
+    commit = "28d04e385dd92102c4d3986e960e2f2b67a65ec4",
     remote = "https://github.com/plaidml/toolchain",
 )
 

@@ -1,0 +1,11 @@
+/.tools
+/.vscode
+/tmp
+*.pyc
+/**/bazel-*
+/**/.ipynb*
+/**/.vs/
+/docs/_build
+/docs/venv
+/**/x64/Debug/
+/**/x64/Release/
