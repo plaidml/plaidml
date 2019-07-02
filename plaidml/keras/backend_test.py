@@ -578,6 +578,11 @@ class TestBackendOps(unittest.TestCase):
     def testProdAxis(self, b):
         return b.prod(b.variable(m(2, 3, 4, 5)), axis=[1, 3])
 
+    # TODO(T1026): Switch to opTest once PROD AggregationOp supports derivatives
+    @compareForwardClose()
+    def testProdAxisNumpy(self, b):
+        return b.prod(b.variable(m(2, 3, 4, 5)), axis=np.array((1, 3)))
+
     # TODO(T1026): Switch to opTest once PROD AggregationOp supports derivs
     @compareForwardClose()
     def testProdNegAxis(self, b):
