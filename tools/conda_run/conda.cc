@@ -15,6 +15,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/process.hpp>
 
+#include "base/util/env.h"
+
 extern char** environ;
 
 namespace fs = boost::filesystem;
@@ -37,7 +39,12 @@ int main(int argc, char* argv[]) {
   if (fs::is_symlink(this_path)) {
     this_path = fs::read_symlink(this_path);
   }
-  auto main_str = read_file(fs::canonical(this_path).replace_extension(".main"));
+  auto main_file_path = fs::canonical(this_path).replace_extension(".main");
+  auto main_str = read_file(main_file_path);
+  if (main_str.empty()) {
+    std::cerr << "Main pointer not found: " << main_file_path << std::endl;
+    return 1;
+  }
   auto cwd_path = fs::current_path();
   auto main_path = cwd_path / main_str;
   auto runfiles_dir = this_path.replace_extension(".runfiles");
@@ -52,13 +59,6 @@ int main(int argc, char* argv[]) {
   std::vector<std::string> args = {python.string(), main_path.string()};
   for (int i = 1; i < argc; i++) {
     args.push_back(argv[i]);
-  }
-
-  std::map<std::string, std::string> env_map;
-  for (char** env = environ; *env; env++) {
-    std::string env_str(*env);
-    auto pos = env_str.find("=");
-    env_map.emplace(env_str.substr(0, pos), env_str.substr(pos + 1));
   }
 
   std::list<std::string> python_paths;
@@ -88,39 +88,43 @@ int main(int argc, char* argv[]) {
     ss << dir;
   }
 
-  std::string python_path = ss.str();
-  auto it = env_map.find("PYTHONPATH");
-  if (it != env_map.end()) {
-    python_path = ss.str() + kPathSeparator + it->second;
+  auto python_path = vertexai::env::Get("PYTHONPATH");
+  if (python_path.size()) {
+    python_path = ss.str() + kPathSeparator + python_path;
+  } else {
+    python_path = ss.str();
   }
 
-  env_map["PYTHONPATH"] = python_path;
-  env_map["RUNFILES_DIR"] = runfiles_dir.string();
-  env_map["CONDA_DEFAULT_ENV"] = cenv_dir.string();
+  vertexai::env::Set("PYTHONPATH", python_path.c_str());
+  vertexai::env::Set("RUNFILES_DIR", runfiles_dir.string());
+  vertexai::env::Set("CONDA_DEFAULT_ENV", cenv_dir.string());
 #ifdef _WIN32
   auto scripts_dir = cenv_dir / "Scripts";
   auto bin_dir = cenv_dir / "Library" / "bin";
-  env_map["PATH"] = bin_dir.string() + kPathSeparator +      //
-                    cenv_dir.string() + kPathSeparator +     //
-                    scripts_dir.string() + kPathSeparator +  //
-                    env_map["PATH"];
+  vertexai::env::Set("PATH", bin_dir.string() + kPathSeparator +          //
+                                 cenv_dir.string() + kPathSeparator +     //
+                                 scripts_dir.string() + kPathSeparator +  //
+                                 vertexai::env::Get("PATH"));
 #else
-  env_map["PATH"] = bin_dir.string() + kPathSeparator +  //
-                    env_map["PATH"];
+  vertexai::env::Set("PATH", bin_dir.string() + kPathSeparator +  //
+                                 vertexai::env::Get("PATH"));
 #endif
 
-  if (env_map.count("ASAN_ENABLE")) {
-    env_map["DYLD_INSERT_LIBRARIES"] =
+  if (vertexai::env::Get("ASAN_ENABLE").size()) {
+    vertexai::env::Set(
+        "DYLD_INSERT_LIBRARIES",
         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/10.0.1/lib/"
-        "darwin/libclang_rt.asan_osx_dynamic.dylib";
+        "darwin/libclang_rt.asan_osx_dynamic.dylib");
   }
-
-  // for (const auto& kvp : env_map) {
-  //   std::cout << kvp.first << "=" << kvp.second << std::endl;
-  // }
 
 #ifdef _WIN32
   namespace bp = boost::process;
+  std::map<std::string, std::string> env_map;
+  for (char** env = environ; *env; env++) {
+    std::string env_str(*env);
+    auto pos = env_str.find("=");
+    env_map.emplace(env_str.substr(0, pos), env_str.substr(pos + 1));
+  }
   bp::environment new_env;
   for (const auto& kvp : env_map) {
     new_env[kvp.first] = kvp.second;
@@ -133,17 +137,6 @@ int main(int argc, char* argv[]) {
     raw_args.push_back(arg.c_str());
   }
   raw_args.push_back(nullptr);
-
-  std::vector<std::string> env_strs;
-  std::vector<const char*> raw_envs;
-  for (const auto& kvp : env_map) {
-    auto it = env_strs.insert(env_strs.end(), kvp.first + "=" + kvp.second);
-    raw_envs.push_back(it->c_str());
-  }
-  raw_envs.push_back(nullptr);
-
-  return execve(python.c_str(),                             //
-                const_cast<char* const*>(raw_args.data()),  //
-                const_cast<char* const*>(raw_envs.data()));
+  return execv(python.c_str(), const_cast<char* const*>(raw_args.data()));
 #endif
 }

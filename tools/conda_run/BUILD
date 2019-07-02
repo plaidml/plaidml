@@ -11,11 +11,8 @@ plaidml_cc_binary(
         "@toolchain//:linux_x86_64": ["-pthread"],
         "//conditions:default": [],
     }),
-    deps = ["@boost//:filesystem"],
-)
-
-plaidml_cc_library(
-    name = "lib",
-    srcs = ["conda.cc"],
-    deps = ["@boost//:filesystem"],
+    deps = [
+        "//base/util",
+        "@boost//:filesystem",
+    ],
 )

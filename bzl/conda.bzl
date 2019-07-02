@@ -33,6 +33,9 @@ def _conda_impl(ctx):
         collect_data = True,
         collect_default = True,
         files = ctx.files.srcs,
+        symlinks = {
+            ".main": launcher_main,
+        },
         root_symlinks = {
             ".cenv": env.files.to_list()[0],
             ".main": launcher_main,
