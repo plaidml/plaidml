@@ -24,6 +24,7 @@ struct FloatConst;
 struct IntConst;
 struct ParamExpr;
 struct TensorSpecExpr;
+struct TupleExpr;
 
 struct PolyExpr;
 struct PolyDimExpr;
@@ -102,6 +103,20 @@ struct FloatConst : Expr {
 
   explicit FloatConst(double value);
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  std::string str() const;
+};
+
+struct NoneExpr : Expr {
+  NoneExpr() = default;
+  void Accept(AstVisitor* visitor) {}
+  std::string str() const { return "None"; }
+};
+
+struct TupleExpr : Expr {
+  std::vector<std::shared_ptr<Expr>> exprs;
+
+  explicit TupleExpr(const std::vector<std::shared_ptr<Expr>>& exprs);
+  void Accept(AstVisitor* visitor) {}
   std::string str() const;
 };
 

@@ -1,5 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
+import logging
 import os
 from collections import defaultdict
 from contextlib import contextmanager
@@ -10,8 +11,12 @@ import numpy as np
 import plaidml2 as plaidml
 import plaidml2.edsl as edsl
 import plaidml2.exec as plaidml_exec
+import plaidml2.op as plaidml_op
+import plaidml2.settings as plaidml_settings
 from keras.backend.common import floatx
 from keras.backend.common import set_floatx as keras_set_floatx
+
+logger = logging.getLogger(__name__)
 
 # Keras needs us to keep track of unique IDs for prefix strings
 # (for use with get_uid and reset_uids)
@@ -22,7 +27,7 @@ _NAME_SCOPE_STACK = []
 
 @contextmanager
 def name_scope(name):
-    # print('name_scope({})'.format(name))
+    # logger.debug('name_scope({})'.format(name))
     _NAME_SCOPE_STACK.append(name)
     yield
     _NAME_SCOPE_STACK.pop()
@@ -37,13 +42,6 @@ def _prepend_name_scope(name, default):
     return r
 
 
-# for device in plaidml_exec.list_devices():
-#     print('device:', device)
-
-# for target in plaidml_exec.list_targets():
-#     print('target:', target)
-
-
 class _Function(object):
 
     def __init__(self, inputs, outputs, updates, name):
@@ -55,7 +53,7 @@ class _Function(object):
 
     def __call__(self, inputs):
         input_shapes = tuple([x.shape for x in inputs])
-        # print('_Function: {}({})'.format(self._name, input_shapes))
+        # logger.debug('_Function: {}({})'.format(self._name, input_shapes))
         exe = self._cache.get(input_shapes)
         if not exe:
             exe = self._compile(inputs)
@@ -68,19 +66,19 @@ class _Function(object):
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
         program = edsl.Program(self._name, [x.tensor for x in self._outputs])
-        device_id = os.getenv('PLAIDML_DEVICE_ID')
-        target = os.getenv('PLAIDML_TARGET')
+        device = plaidml_settings.get('PLAIDML_DEVICE')
+        target = plaidml_settings.get('PLAIDML_TARGET')
 
         def make_buffer(tensor):
             # convert LogicalShape into TensorShape
             shape = plaidml.TensorShape(tensor.shape.dtype, tensor.shape.int_dims)
-            return plaidml_exec.Buffer(device_id, shape)
+            return plaidml_exec.Buffer(device, shape)
 
         input_bindings = [(x.tensor, make_buffer(x.tensor)) for x in self._inputs]
         output_bindings = [(x.tensor, make_buffer(x.tensor)) for x in self._outputs]
         return plaidml_exec.Executable(
             program,
-            device_id,
+            device,
             target,
             input_bindings,
             output_bindings,
@@ -93,7 +91,7 @@ class _KerasNode(object):
         name = _prepend_name_scope(name, opname)
         if tensor is None:
             tensor = edsl.Tensor(shape=shape, name=name)
-        # print('_KerasNode({})'.format(tensor))
+        # logger.debug('_KerasNode({})'.format(tensor))
         self.tensor = tensor
 
     def __repr__(self):
@@ -111,7 +109,7 @@ class _KerasNode(object):
         raise NotImplementedError()
 
     def __getitem__(self, key):
-        # print('__getitem__(self: {}, key: {})'.format(self, key))
+        # logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
         # TODO: slice_of
         pass
 
@@ -170,47 +168,12 @@ def _make_rng_state(seed=None):
     return rng_state
 
 
-def _compute_aggregation_axes(ndims, axes=None, keepdims=False):
-    # print('compute_aggregation_axes(ndims: {}, axes: {}, keepdims: {})'.format(
-    #     ndims, axes, keepdims))
-    if axes is None:
-        axes = ndims - 1
-    if isinstance(axes, list) or isinstance(axes, tuple):
-        axes = [(ndims + i if i < 0 else i) for i in axes]
-    else:
-        if axes < 0:
-            axes = ndims + axes
-        axes = [axes]
-    axes.sort(reverse=True)
-    # print('axes: {}'.format(axes))
-    src_indices = edsl.TensorIndexes(ndims)
-    src_ranges = edsl.TensorDims(ndims)
-    dst_indices = src_indices[:]
-    dst_ranges = src_ranges[:]
-    # reduce_indices = [dst_indices[i] for i in axes]
-    # reduce_ranges = [dst_ranges[i] for i in axes]
-    # dims = list(dims)
-    if keepdims:
-        for axis in axes:
-            dst_indices[axis] = TensorIndex()
-            dst_ranges[axis] = 1
-            # dims[axis] = 1
-    else:
-        for axis in axes:
-            del dst_indices[axis]
-            del dst_ranges[axis]
-            # del dims[axis]
-    # print('src_indices: {}, src_ranges: {}'.format(src_indices, src_ranges))
-    # print('dst_indices: {}, dst_ranges: {}'.format(dst_indices, dst_ranges))
-    return src_indices, src_ranges, dst_indices, dst_ranges, axes
-
-
 def backend():
     return 'edsl_plaidml'
 
 
 def cast(x, dtype):
-    # print('cast(x: {}, dtype: {})'.format(x, dtype))
+    logger.debug('cast(x: {}, dtype: {})'.format(x, dtype))
     # Not clear what datatypes Keras supports.
     # Each backend appears to implement support for its own subset of some assumed
     # but undocumented pool of possible numeric types. Perhaps this pool may be
@@ -235,7 +198,8 @@ def cast(x, dtype):
 
 
 def constant(value, dtype=None, shape=None, name=None):
-    # print('constant(value: {}, dtype: {}, shape: {}, name: {})'.format(value, dtype, shape, name))
+    logger.debug('constant(value: {}, dtype: {}, shape: {}, name: {})'.format(
+        value, dtype, shape, name))
     # Enforce sensible defaults if given None
     dtype = dtype or floatx()
     if shape is None:
@@ -254,7 +218,7 @@ def dtype(x):
 
 
 def expand_dims(x, axis=-1, name=None):
-    # print('expand_dims(x: {}, axis: {}, name={})'.format(x, axis, name))
+    logger.debug('expand_dims(x: {}, axis: {}, name={})'.format(x, axis, name))
     I = x.tensor
     ndims = I.shape.ndims
     if axis < 0:
@@ -270,8 +234,8 @@ def expand_dims(x, axis=-1, name=None):
 
 
 def function(inputs, outputs, updates=None, name=None):
-    # print('function(inputs: {}, outputs: {}, updates: {}, name: {})'.format(
-    #     inputs, outputs, updates, name))
+    logger.debug('function(inputs: {}, outputs: {}, updates: {}, name: {})'.format(
+        inputs, outputs, updates, name))
     if updates is None:
         updates = []
     if name is None:
@@ -289,7 +253,7 @@ def int_shape(x):
 
 
 def is_keras_tensor(x):
-    # print('>>is_keras_tensor({})'.format(x))
+    # logger.debug('>>is_keras_tensor({})'.format(x))
     if not is_tensor(x):
         raise ValueError()
     return hasattr(x, '_keras_history')
@@ -300,49 +264,22 @@ def is_sparse(x):
 
 
 def is_tensor(x):
-    # print('>>is_tensor({})'.format(x))
+    # logger.debug('>>is_tensor({})'.format(x))
     return isinstance(x, _KerasNode)
 
 
 def mean(x, axis=None, keepdims=False):
-    # print('mean(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
-
-    I = x.tensor
-    if not I.shape.ndims:
-        return x
-
-    if isinstance(axis, (tuple, list)) and not len(axis):
-        # We're taking the mean across an empty axis list.
-        # Keras sometimes does this when squeezing a matrix that doesn't need
-        # to be squeezed.
-        return x
-
-    if I.shape.dtype == plaidml.DType.BOOLEAN:
-        x = cast(x, floatx)
-
-    if axis is None:
-        axis = list(range(I.shape.ndims))
-
-    src_indices, src_ranges, dst_indices, dst_ranges, axis = _compute_aggregation_axes(
-        I.shape.ndims, axis, keepdims)
-    I.bind_dims(*src_ranges)
-    SO = edsl.TensorOutput(*dst_ranges)
-    SO[dst_indices] += I[src_indices]
-    denom = 1
-    for i in axis:
-        denom *= src_ranges[i]
-    O = SO / denom
-
-    return _KerasNode('mean', tensor=O)
+    logger.debug('mean(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
+    return _KerasNode('mean', tensor=plaidml_op.mean(x.tensor, axis, keepdims))
 
 
 def ndim(x):
-    # print('ndim({})'.format(x))
+    logger.debug('ndim({})'.format(x))
     return len(x._keras_shape)
 
 
 def not_equal(lhs, rhs):
-    # print('not_equal(lhs: {}, rhs: {})'.format(lhs, rhs))
+    logger.debug('not_equal(lhs: {}, rhs: {})'.format(lhs, rhs))
     if isinstance(rhs, _KerasNode):
         O = lhs.tensor != rhs.tensor
         return _KerasNode('not_equal', tensor=O)
@@ -351,8 +288,8 @@ def not_equal(lhs, rhs):
 
 
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
-    # print('placeholder(shape: {}, ndim: {}, dtype: {}, sparse: {}, name: {})'.format(
-    #     shape, ndim, dtype, sparse, name))
+    logger.debug('placeholder(shape: {}, ndim: {}, dtype: {}, sparse: {}, name: {})'.format(
+        shape, ndim, dtype, sparse, name))
     dtype = plaidml.DType.from_numpy(dtype or floatx())
     if shape:
         return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, shape), name=name)
@@ -362,8 +299,8 @@ def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
 
 
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
-    # print('random_uniform(shape: {}, minval: {}, maxval: {}, dtype: {}, seed: {})'.format(
-    #     shape, minval, maxval, dtype, seed))
+    logger.debug('random_uniform(shape: {}, minval: {}, maxval: {}, dtype: {}, seed: {})'.format(
+        shape, minval, maxval, dtype, seed))
     dtype = dtype or floatx()
     rng_state = _make_rng_state(seed)
     # for x in shape:
@@ -385,9 +322,9 @@ def rnn(step_function,
         constants=None,
         unroll=False,
         input_length=None):
-    # print(
-    #     'rnn(step_function: {}, inputs: {}, initial_states: {}, mask: {}, constants: {}, unroll: {}, input_length: {})'
-    #     .format(step_function, inputs, initial_states, mask, constants, unroll, input_length))
+    logger.debug(
+        'rnn(step_function: {}, inputs: {}, initial_states: {}, mask: {}, constants: {}, unroll: {}, input_length: {})'
+        .format(step_function, inputs, initial_states, mask, constants, unroll, input_length))
     if input_length is None:
         input_length = inputs.shape.dims[1]
     states = initial_states
@@ -398,32 +335,23 @@ def rnn(step_function,
 
 
 def set_floatx(dtype):
-    # print('set_floatx(dtype: {})'.format(dtype))
+    logger.debug('set_floatx(dtype: {})'.format(dtype))
     keras_set_floatx(dtype)
     # plaidml.set_floatx(ptile.convert_np_dtype_to_pml(dtype))
 
 
 def square(x):
-    # print('square(x: {})'.format(x))
-    return _KerasNode('square', tensor=(x.tensor * x.tensor))
+    logger.debug('square(x: {})'.format(x))
+    return _KerasNode('square', tensor=plaidml_op.square(x.tensor))
 
 
 def sum(x, axis=None, keepdims=False):
-    # print('sum(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
-    I = x.tensor
-
-    src_indices, src_ranges, dst_indices, dst_ranges, axis = _compute_aggregation_axes(
-        I.shape.ndims, axis, keepdims)
-
-    I.bind_dims(*src_ranges)
-    O = edsl.TensorOutput(*dst_ranges)
-    O[dst_indices] += I[src_indices]
-
-    return _KerasNode('sum', tensor=O)
+    logger.debug('sum(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
+    return _KerasNode('sum', tensor=plaidml_op.sum(x.tensor, axis, keepdims))
 
 
 def tile(x, n):
-    # print('tile(x: {}, n: {})'.format(x, n))
+    logger.debug('tile(x: {}, n: {})'.format(x, n))
     I = x.tensor
     ndims = I.shape.ndims
     if len(n) != ndims:
@@ -440,8 +368,8 @@ def tile(x, n):
 
 
 def variable(value, dtype=None, name=None, constraint=None):
-    # print('variable(value: {}, dtype: {}, name: {}, constraint: {})'.format(
-    #     value, dtype, name, constraint))
+    logger.debug('variable(value: {}, dtype: {}, name: {}, constraint: {})'.format(
+        value, dtype, name, constraint))
     if name is None:
         name = ''
     if isinstance(value, _KerasNode):
@@ -462,7 +390,7 @@ def variable(value, dtype=None, name=None, constraint=None):
 
 
 def zeros_like(x, dtype=floatx(), name=None):
-    # print('zeros_like(z: {}, dtype: {}, name: {})'.format(x, dtype, name))
+    logger.debug('zeros_like(z: {}, dtype: {}, name: {})'.format(x, dtype, name))
     I = x.tensor
     dtype = dtype or floatx()
     a_zero = constant(0.0, shape=(1), dtype=dtype, name=_prepend_name_scope(name, 'a_zero'))

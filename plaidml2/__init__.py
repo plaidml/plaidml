@@ -113,7 +113,7 @@ class TensorShape(ForeignObject):
                 for i in range(len(sizes) - 1, -1, -1):
                     strides.insert(0, stride)
                     stride *= sizes[i]
-            raw_sizes = ffi.new('uint64_t[]', sizes)
+            raw_sizes = ffi.new('int64_t[]', sizes)
             raw_strides = ffi.new('int64_t[]', strides)
             ffi_obj = ffi_call(lib.plaidml_shape_alloc, dtype, len(sizes), raw_sizes, raw_strides)
         else:

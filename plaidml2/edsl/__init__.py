@@ -1,11 +1,14 @@
 # Copyright 2019 Intel Corporation.
 
 from collections import namedtuple
+import logging
 
 import six
 
 from plaidml2 import DType
 from plaidml2.ffi import ForeignObject, ffi, ffi_call, lib
+
+logger = logging.getLogger(__name__)
 
 
 class LogicalShape(ForeignObject):
@@ -442,6 +445,34 @@ class Tensor(ForeignObject):
     # bind a concrete shape to this tensor
     def bind(self, shape):
         ffi_call(lib.plaidml_expr_bind_shape, self.as_ptr(), shape.as_ptr())
+
+
+class Value(ForeignObject):
+    __ffi_del__ = lib.plaidml_expr_free
+    __ffi_repr__ = lib.plaidml_expr_repr
+
+    def __init__(self, value):
+        # logger.debug('Value({})'.format(value))
+        if value is None:
+            ffi_obj = ffi_call(lib.plaidml_expr_none)
+        elif isinstance(value, (six.integer_types, bool)):
+            ffi_obj = ffi_call(lib.plaidml_expr_int, value)
+        elif isinstance(value, float):
+            ffi_obj = ffi_call(lib.plaidml_expr_float, value)
+        elif isinstance(value, Tensor):
+            ffi_obj = ffi_call(lib.plaidml_expr_clone, value.as_ptr())
+        elif isinstance(value, (list, tuple)):
+            self._elts = [Value(x) for x in value]
+            raw_elts = [x.as_ptr() for x in self._elts]
+            ffi_obj = ffi_call(lib.plaidml_expr_tuple, len(raw_elts), raw_elts)
+        elif isinstance(value, ffi.CData) and ffi.typeof(value) is ffi.typeof('plaidml_expr*'):
+            ffi_obj = value
+        else:
+            raise TypeError('Unsupported type for value={}'.format(value))
+        super(Value, self).__init__(ffi_obj)
+
+    def as_tensor(self):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_clone, self.as_ptr()))
 
 
 def TensorOutput(*args):

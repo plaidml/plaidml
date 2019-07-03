@@ -7,7 +7,7 @@
 using namespace torch::jit;  // NOLINT
 namespace edsl = plaidml::edsl;
 
-using OpFunction = std::function<edsl::Tensor(const std::vector<edsl::Tensor>& args)>;
+using OpFunction = std::function<edsl::Tensor(const std::vector<edsl::Value>& args)>;
 
 template <typename X, typename Y>
 inline constexpr auto ceil_div(X x, Y y) -> decltype((x + y - 1) / y) {
@@ -24,23 +24,23 @@ namespace ops {
 //   Scalar beta,
 //   Scalar alpha
 // ) -> Tensor;
-edsl::Tensor addmm(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor addmm(const std::vector<edsl::Value>& args) {
   IVLOG(1, "addmm");
 
-  const auto& A = args[0];
+  const auto& A = args[0].as_tensor();
   IVLOG(2, "  A: " << A.shape().str());
 
-  const auto& B = args[1];
+  const auto& B = args[1].as_tensor();
   IVLOG(2, "  B: " << B.shape().str());
 
-  const auto& C = args[2];
+  const auto& C = args[2].as_tensor();
   IVLOG(2, "  C: " << C.shape().str());
 
-  const auto& beta = args[3];
-  IVLOG(2, "  beta: " << beta.str());
+  const auto& beta = args[3].as_scalar();
+  IVLOG(2, "  beta: " << beta);
 
-  const auto& alpha = args[4];
-  IVLOG(2, "  alpha: " << alpha.str());
+  const auto& alpha = args[4].as_scalar();
+  IVLOG(2, "  alpha: " << alpha);
 
   edsl::TensorDim I, J, K;
   edsl::TensorIndex i, j, k;
@@ -52,17 +52,22 @@ edsl::Tensor addmm(const std::vector<edsl::Tensor>& args) {
 }
 
 // aten::add(Tensor self, Scalar other, Scalar alpha) -> Tensor
-edsl::Tensor add(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor add(const std::vector<edsl::Value>& args) {
   IVLOG(1, "add");
-  IVLOG(2, "  " << args[0].shape().str() << " + " << args[1].shape().str() << " * " << args[2].str());
-  return args[0] + args[1] * args[2];
+  auto A = args[0].as_tensor();
+  auto B = args[1].as_tensor();
+  auto C = args[2].as_scalar();
+  IVLOG(2, "  " << A.shape().str() << " + " << B.shape().str() << " * " << C);
+  return A + B * C;
 }
 
 // aten::mul(Tensor self, Scalar other) -> Tensor
-edsl::Tensor mul(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor mul(const std::vector<edsl::Value>& args) {
   IVLOG(1, "mul");
-  IVLOG(2, "  " << args[0].shape().str() << " * " << args[1].shape().str());
-  return args[0] * args[1];
+  auto A = args[0].as_tensor();
+  auto B = args[1].as_tensor();
+  IVLOG(2, "  " << A.shape().str() << " * " << B.shape().str());
+  return A * B;
 }
 
 // aten::batch_norm(
@@ -76,10 +81,10 @@ edsl::Tensor mul(const std::vector<edsl::Tensor>& args) {
 //   float eps,
 //   bool cudnn_enabled
 // ) -> Tensor
-edsl::Tensor batch_norm(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor batch_norm(const std::vector<edsl::Value>& args) {
   IVLOG(1, "batch_norm");
 
-  const auto& I = args[0];  // input
+  const auto& I = args[0].as_tensor();  // input
   IVLOG(2, "  I: " << I.shape().str());
 
   edsl::TensorDim N, C, H, W;
@@ -89,20 +94,20 @@ edsl::Tensor batch_norm(const std::vector<edsl::Tensor>& args) {
   IVLOG(2, "  Weight: " << args[1].str());
   auto Weight = args[1];  // weight
   if (!Weight.is_none()) {
-    Weight = edsl::reshape(Weight, dims);
+    Weight = edsl::Value(edsl::reshape(Weight.as_tensor(), dims));
   }
 
   IVLOG(2, "  Bias: " << args[2].str());
   auto Bias = args[2];  // bias
   if (!Bias.is_none()) {
-    Bias = edsl::reshape(Bias, dims);
+    Bias = edsl::Value(edsl::reshape(Bias.as_tensor(), dims));
   }
 
   IVLOG(2, "  Mean: " << args[3].str());
-  auto Mean = edsl::reshape(args[3], dims);  // running_mean
+  auto Mean = edsl::reshape(args[3].as_tensor(), dims);  // running_mean
 
   IVLOG(2, "  Var: " << args[4].str());
-  auto Var = edsl::reshape(args[4], dims);  // running_var
+  auto Var = edsl::reshape(args[4].as_tensor(), dims);  // running_var
 
   auto is_training = args[5].as_int();  // training
   IVLOG(2, "  is_training: " << is_training);
@@ -115,11 +120,11 @@ edsl::Tensor batch_norm(const std::vector<edsl::Tensor>& args) {
 
   auto O = (I - Mean);
   if (!Weight.is_none()) {
-    O = O * Weight;
+    O = O * Weight.as_tensor();
   }
   O = O / edsl::sqrt(Var + epsilon);
   if (!Bias.is_none()) {
-    O = O + Bias;
+    O = O + Bias.as_tensor();
   }
   return O;
 }
@@ -138,13 +143,13 @@ edsl::Tensor batch_norm(const std::vector<edsl::Tensor>& args) {
 //   bool deterministic,
 //   bool cudnn_enabled
 // ) -> Tensor
-edsl::Tensor convolution(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor convolution(const std::vector<edsl::Value>& args) {
   IVLOG(1, "convolution");
 
-  const auto& I = args[0];  // input
+  const auto& I = args[0].as_tensor();  // input
   IVLOG(2, "  I: " << I.shape().str());
 
-  const auto& K = args[1];  // weight
+  const auto& K = args[1].as_tensor();  // weight
   IVLOG(2, "  K: " << K.str());
 
   const auto& bias = args[2];  // bias
@@ -202,7 +207,7 @@ edsl::Tensor convolution(const std::vector<edsl::Tensor>& args) {
   O(O_idxs) += I(I_idxs) * K(K_idxs);
   if (!bias.is_none()) {
     std::vector<edsl::TensorDim> dims{N, CO, edsl::TensorDim{1}, edsl::TensorDim{1}};
-    O = O + edsl::reshape(bias, dims);
+    O = O + edsl::reshape(bias.as_tensor(), dims);
   }
   return O;
 }
@@ -215,10 +220,10 @@ edsl::Tensor convolution(const std::vector<edsl::Tensor>& args) {
 //   bool ceil_mode=False,
 //   bool count_include_pad=True
 // ) -> Tensor;
-edsl::Tensor avg_pool2d(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor avg_pool2d(const std::vector<edsl::Value>& args) {
   IVLOG(1, "avg_pool2d");
 
-  const auto& I = args[0];
+  const auto& I = args[0].as_tensor();
   IVLOG(2, "  I: " << I.shape().str());
 
   const auto& kernel_size = args[1].as_tuple();
@@ -253,14 +258,17 @@ edsl::Tensor avg_pool2d(const std::vector<edsl::Tensor>& args) {
 //   Tensor self,
 //   int[2] output_size
 // ) -> Tensor
-edsl::Tensor adaptive_avg_pool2d(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor adaptive_avg_pool2d(const std::vector<edsl::Value>& args) {
   IVLOG(1, "adaptive_avg_pool2d");
 
-  const auto& I = args[0];
+  const auto& I = args[0].as_tensor();
   IVLOG(2, "  I: " << I.shape().str());
 
   const auto& output_size = args[1].as_tuple();
   IVLOG(2, "  output_size: " << args[1].str());
+
+  auto O0 = output_size[0].as_int();
+  auto O1 = output_size[1].as_int();
 
   edsl::TensorDim N, C, H, W;
   I.bind_dims(N, C, H, W);
@@ -273,18 +281,18 @@ edsl::Tensor adaptive_avg_pool2d(const std::vector<edsl::Tensor>& args) {
   // auto K1 = ceil_div(X1, output_size[1].as_int());
   // auto S0 = K0;
   // auto S1 = K1;
-  auto S0 = ceil_div(X0, output_size[0]);
-  auto S1 = ceil_div(X1, output_size[1]);
-  auto K0 = X0 - (output_size[0] - 1) * S0;
-  auto K1 = X1 - (output_size[1] - 1) * S1;
+  auto S0 = ceil_div(X0, O0);
+  auto S1 = ceil_div(X1, 01);
+  auto K0 = X0 - (O0 - 1) * S0;
+  auto K1 = X1 - (O1 - 1) * S1;
 
   return avg_pool2d({
-      I,                         // self
+      edsl::Value(I),            // self
       edsl::make_tuple(K0, K1),  // kernel_size
       edsl::make_tuple(S0, S1),  // stride
       edsl::make_tuple(P0, P1),  // padding
-      edsl::Tensor(0),           // ceil_mode
-      edsl::Tensor(1)            // count_include_pad
+      edsl::Value(0),            // ceil_mode
+      edsl::Value(1)             // count_include_pad
   });
 }
 
@@ -296,10 +304,10 @@ edsl::Tensor adaptive_avg_pool2d(const std::vector<edsl::Tensor>& args) {
 //   int[2] dilation=1,
 //   bool ceil_mode=False
 // ) -> Tensor;
-edsl::Tensor max_pool2d(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor max_pool2d(const std::vector<edsl::Value>& args) {
   IVLOG(1, "max_pool2d");
 
-  const auto& I = args[0];
+  const auto& I = args[0].as_tensor();
   IVLOG(2, "  I: " << I.shape().str());
 
   const auto& kernel_size = args[1].as_tuple();
@@ -341,10 +349,10 @@ edsl::Tensor max_pool2d(const std::vector<edsl::Tensor>& args) {
 }
 
 // aten::relu(Tensor self) -> Tensor
-edsl::Tensor relu(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor relu(const std::vector<edsl::Value>& args) {
   IVLOG(1, "relu");
 
-  const auto& I = args[0];
+  const auto& I = args[0].as_tensor();
   IVLOG(2, "  I: " << I.shape().str());
 
   edsl::Tensor Z{0.0};
@@ -352,10 +360,10 @@ edsl::Tensor relu(const std::vector<edsl::Tensor>& args) {
 }
 
 // aten::reshape(Tensor self, int[] shape) -> Tensor
-edsl::Tensor reshape(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor reshape(const std::vector<edsl::Value>& args) {
   IVLOG(1, "reshape");
 
-  const auto& I = args[0];
+  const auto& I = args[0].as_tensor();
   auto I_dims = I.shape().int_dims();
   IVLOG(2, "  I: " << I.shape().str());
 
@@ -391,10 +399,10 @@ edsl::Tensor reshape(const std::vector<edsl::Tensor>& args) {
 }
 
 // aten::t(Tensor self) -> Tensor
-edsl::Tensor transpose(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor transpose(const std::vector<edsl::Value>& args) {
   IVLOG(1, "transpose");
 
-  const auto& I = args[0];
+  const auto& I = args[0].as_tensor();
   IVLOG(2, "  I: " << I.shape().str());
 
   edsl::TensorDim X, Y;
@@ -406,13 +414,13 @@ edsl::Tensor transpose(const std::vector<edsl::Tensor>& args) {
 }
 
 // aten::linear(Tensor input, Tensor weight, Tensor? bias) -> Tensor
-edsl::Tensor linear(const std::vector<edsl::Tensor>& args) {
+edsl::Tensor linear(const std::vector<edsl::Value>& args) {
   IVLOG(1, "linear");
 
-  const auto& input = args[0];
+  const auto& input = args[0].as_tensor();
   IVLOG(2, "  input: " << input.shape().str());
 
-  const auto& weight = args[1];
+  const auto& weight = args[1].as_tensor();
   IVLOG(2, "  weight: " << weight.str());
 
   const auto& bias = args[2];
@@ -425,7 +433,7 @@ edsl::Tensor linear(const std::vector<edsl::Tensor>& args) {
   auto O = edsl::TensorOutput(I, J);
   O(i, j) += input(i, k) * weight(j, k);
   if (!bias.is_none()) {
-    O = bias + O;
+    O = bias.as_tensor() + O;
   }
   return O;
 }
@@ -502,7 +510,7 @@ void Compiler::run(Stack* stack) {
 std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
   IVLOG(1, "Compiler::compile>");
   std::vector<edsl::Tensor> input_tensors;
-  std::unordered_map<const Value*, edsl::Tensor> tensors_by_value;
+  std::unordered_map<const Value*, edsl::Value> value_map;
   for (size_t i = 0; i < inputs->size(); i++) {
     const auto& ival = inputs->at(i);
     if (!ival.isTensor()) {
@@ -518,7 +526,7 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
     edsl::Tensor input_tensor(shape);
     input_tensors.push_back(input_tensor);
     const auto& input = subgraph_->inputs()[i];
-    tensors_by_value.emplace(input, input_tensor);
+    value_map.emplace(input, input_tensor);
   }
 
   for (auto node : subgraph_->nodes()) {
@@ -530,19 +538,19 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
         }
         auto ivalue = opt_ivalue.value();
         if (ivalue.isDouble()) {
-          tensors_by_value.emplace(node->output(), edsl::Tensor(ivalue.toDouble()));
+          value_map.emplace(node->output(), ivalue.toDouble());
         } else if (ivalue.isInt()) {
-          tensors_by_value.emplace(node->output(), edsl::Tensor(ivalue.toInt()));
+          value_map.emplace(node->output(), ivalue.toInt());
         } else if (ivalue.isBool()) {
-          tensors_by_value.emplace(node->output(), edsl::Tensor(ivalue.toBool()));
+          value_map.emplace(node->output(), ivalue.toBool());
         } else if (ivalue.isNone()) {
-          tensors_by_value.emplace(node->output(), edsl::None());
+          value_map.emplace(node->output(), edsl::None());
         } else if (ivalue.isIntList()) {
-          std::vector<edsl::Tensor> elts;
+          std::vector<edsl::Value> elts;
           for (const auto& elt : ivalue.toIntList()) {
             elts.emplace_back(elt);
           }
-          tensors_by_value.emplace(node->output(), edsl::Tuple(elts));
+          value_map.emplace(node->output(), edsl::make_tuple(elts));
         } else {
           throw std::runtime_error("prim::Constant has unsupported value type");
         }
@@ -552,15 +560,15 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
         if (it_op == kSupportedOps.end()) {
           throw std::runtime_error("Unsupported op");
         }
-        std::vector<edsl::Tensor> args;
+        std::vector<edsl::Value> args;
         for (const auto& input : node->inputs()) {
-          auto it = tensors_by_value.find(input);
-          if (it == tensors_by_value.end()) {
+          auto it = value_map.find(input);
+          if (it == value_map.end()) {
             throw std::runtime_error("Missing input.");
           }
           args.emplace_back(it->second);
         }
-        tensors_by_value.emplace(node->output(), it_op->second(args));
+        value_map.emplace(node->output(), it_op->second(args));
       } break;
     }
   }
@@ -569,12 +577,12 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
   std::vector<edsl::Tensor> output_tensors;
   for (size_t i = 0; i < subgraph_->outputs().size(); i++) {
     const auto& output = subgraph_->outputs()[i];
-    auto it = tensors_by_value.find(output);
-    if (it == tensors_by_value.end()) {
+    auto it = value_map.find(output);
+    if (it == value_map.end()) {
       throw std::runtime_error("Missing output.");
     }
     IVLOG(2, "  " << i << ": " << it->second.str());
-    output_tensors.emplace_back(it->second);
+    output_tensors.emplace_back(it->second.as_tensor());
   }
 
   IVLOG(1, "Compiler::compile> done");

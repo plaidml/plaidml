@@ -15,6 +15,7 @@ plaidml_cc_library(
         "//plaidml2/core",
         "//plaidml2/edsl",
         "//plaidml2/exec",
+        "//plaidml2/op",
     ],
 )
 
@@ -36,6 +37,7 @@ plaidml_cc_library(
         "//plaidml2/core:api",
         "//plaidml2/edsl:api",
         "//plaidml2/exec:api",
+        "//plaidml2/op:api",
     ],
 )
 
@@ -60,5 +62,6 @@ py_cffi(
         "//plaidml2/core:ffi.h",
         "//plaidml2/edsl:ffi.h",
         "//plaidml2/exec:ffi.h",
+        "//plaidml2/op:ffi.h",
     ],
 )

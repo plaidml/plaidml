@@ -569,6 +569,16 @@ void LogicalShape::bind_dims(std::vector<std::shared_ptr<DimExpr>>* into) {
   }
 }
 
+TupleExpr::TupleExpr(const std::vector<std::shared_ptr<Expr>>& exprs) : exprs(exprs) {
+  // TODO: compute shape?
+}
+
+std::string TupleExpr::str() const {
+  std::stringstream ss;
+  ss << StreamContainer(exprs);
+  return ss.str();
+}
+
 IntConst::IntConst(int64_t value) : Expr(LogicalShape{DataType::INT32}), value(value) {
   // TODO: should this be a DataType::INT64?
 }

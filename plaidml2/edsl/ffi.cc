@@ -211,6 +211,82 @@ plaidml_expr* plaidml_expr_param(  //
   });
 }
 
+plaidml_expr* plaidml_expr_clone(  //
+    plaidml_error* err,            //
+    plaidml_expr* expr) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {  //
+    return new plaidml_expr{expr->expr};
+  });
+}
+plaidml_expr_kind plaidml_expr_get_kind(  //
+    plaidml_error* err,                   //
+    plaidml_expr* expr) {
+  return ffi_wrap<plaidml_expr_kind>(err, PLAIDML_EXPR_NONE, [&] {
+    if (std::dynamic_pointer_cast<NoneExpr>(expr->expr)) {
+      return PLAIDML_EXPR_NONE;
+    }
+    if (std::dynamic_pointer_cast<IntConst>(expr->expr)) {
+      return PLAIDML_EXPR_INT;
+    }
+    if (std::dynamic_pointer_cast<FloatConst>(expr->expr)) {
+      return PLAIDML_EXPR_FLOAT;
+    }
+    if (std::dynamic_pointer_cast<TupleExpr>(expr->expr)) {
+      return PLAIDML_EXPR_TUPLE;
+    }
+    return PLAIDML_EXPR_TENSOR;
+  });
+}
+
+plaidml_expr* plaidml_expr_none(  //
+    plaidml_error* err            //
+) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {  //
+    return new plaidml_expr{std::make_shared<NoneExpr>()};
+  });
+}
+
+plaidml_expr* plaidml_expr_tuple(  //
+    plaidml_error* err,            //
+    size_t nargs,                  //
+    plaidml_expr** args) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    std::vector<std::shared_ptr<Expr>> exprs(nargs);
+    for (size_t i = 0; i < nargs; i++) {
+      exprs[i] = args[i]->expr;
+    }
+    return new plaidml_expr{std::make_shared<TupleExpr>(exprs)};
+  });
+}
+
+size_t plaidml_expr_tuple_get_count(  //
+    plaidml_error* err,               //
+    plaidml_expr* expr) {
+  return ffi_wrap<size_t>(err, 0, [&] {
+    auto tuple_expr = std::dynamic_pointer_cast<TupleExpr>(expr->expr);
+    if (!tuple_expr) {
+      throw std::runtime_error("Expression is not a tuple");
+    }
+    return tuple_expr->exprs.size();
+  });
+}
+
+void plaidml_expr_tuple_get_exprs(  //
+    plaidml_error* err,             //
+    plaidml_expr* expr,             //
+    size_t nexprs,                  //
+    plaidml_expr** exprs) {
+  return ffi_wrap_void(err, [&] {
+    auto tuple_expr = std::dynamic_pointer_cast<TupleExpr>(expr->expr);
+    if (!tuple_expr) {
+      throw std::runtime_error("Expression is not a tuple");
+    }
+    for (size_t i = 0; i < std::min(nexprs, tuple_expr->exprs.size()); i++) {
+      exprs[i] = new plaidml_expr{tuple_expr->exprs[i]};
+    }
+  });
+}
+
 plaidml_expr* plaidml_expr_int(  //
     plaidml_error* err,          //
     int64_t value) {

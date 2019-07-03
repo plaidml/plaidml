@@ -4,7 +4,6 @@ licenses(["by_exception_only"])
 
 load("//bzl:conda.bzl", "conda_test")
 load("//bzl:plaidml.bzl", "plaidml_py_library", "plaidml_py_wheel")
-# load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -17,18 +16,9 @@ plaidml_py_library(
         "//plaidml2:py",
         "//plaidml2/edsl:py",
         "//plaidml2/exec:py",
+        "//plaidml2/op:py",
     ],
 )
-
-# pkg_tar(
-#     name = "pkg",
-#     srcs = glob(
-#         ["**/*"],
-#         exclude = ["__pycache__/*"],
-#     ),
-#     package_dir = "plaidml/backend/keras",
-#     strip_prefix = ".",
-# )
 
 # conda_test(
 #     name = "backend_test",
@@ -75,7 +65,6 @@ conda_test(
     ],
     deps = [
         ":keras",
-        # "//testing:plaidml_py",
     ],
 )
 
@@ -91,7 +80,6 @@ conda_test(
 #     ],
 #     deps = [
 #         ":keras",
-#         "//testing:plaidml_py",
 #     ],
 # )
 
@@ -107,7 +95,6 @@ conda_test(
 #     ],
 #     deps = [
 #         ":keras",
-#         "//testing:plaidml_py",
 #     ],
 # )
 
@@ -121,7 +108,6 @@ conda_test(
     ],
     deps = [
         ":keras",
-        # "//testing:plaidml_py",
     ],
 )
 
@@ -136,7 +122,6 @@ conda_test(
 #     ],
 #     deps = [
 #         ":keras",
-#         "//testing:plaidml_py",
 #     ],
 # )
 

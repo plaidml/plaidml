@@ -28,6 +28,14 @@ typedef enum {
   PLAIDML_INT_OP_DIV,
 } plaidml_int_op;
 
+typedef enum {
+  PLAIDML_EXPR_NONE,
+  PLAIDML_EXPR_INT,
+  PLAIDML_EXPR_FLOAT,
+  PLAIDML_EXPR_TENSOR,
+  PLAIDML_EXPR_TUPLE,
+} plaidml_expr_kind;
+
 PLAIDML_EDSL_API plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                                               //
     plaidml_datatype dtype,                                           //
@@ -141,8 +149,16 @@ PLAIDML_EDSL_API void plaidml_expr_bind_dims(  //
     size_t ndims,                              //
     plaidml_dim_expr** dims);
 
+PLAIDML_EDSL_API plaidml_expr_kind plaidml_expr_get_kind(  //
+    plaidml_error* err,                                    //
+    plaidml_expr* expr);
+
 PLAIDML_EDSL_API plaidml_string* plaidml_expr_repr(  //
     plaidml_error* err,                              //
+    plaidml_expr* expr);
+
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_clone(  //
+    plaidml_error* err,                             //
     plaidml_expr* expr);
 
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_dim(  //
@@ -153,6 +169,25 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_param(  //
     plaidml_error* err,                             //
     plaidml_logical_shape* shape,                   //
     const char* name);
+
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_none(  //
+    plaidml_error* err                             //
+);
+
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_tuple(  //
+    plaidml_error* err,                             //
+    size_t nargs,                                   //
+    plaidml_expr** args);
+
+PLAIDML_EDSL_API size_t plaidml_expr_tuple_get_count(  //
+    plaidml_error* err,                                //
+    plaidml_expr* expr);
+
+PLAIDML_EDSL_API void plaidml_expr_tuple_get_exprs(  //
+    plaidml_error* err,                              //
+    plaidml_expr* expr,                              //
+    size_t nexprs,                                   //
+    plaidml_expr** exprs);
 
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_int(  //
     plaidml_error* err,                           //

@@ -334,7 +334,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     builder_.CreateBr(loops[i].test);
     builder_.SetInsertPoint(loops[i].test);
     llvm::Value* index = builder_.CreateLoad(variable);
-    assert(block.idxs[i].affine == Affine());
+    assert(block.idxs[i].affine == stripe::Affine());
     llvm::Value* range = IndexConst(block.idxs[i].range);
     llvm::Value* limit = builder_.CreateAdd(init, range);
     llvm::Value* go = builder_.CreateICmpULT(index, limit);

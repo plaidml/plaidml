@@ -1,5 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
+import logging
 import os
 import platform
 import sys
@@ -8,6 +9,8 @@ import threading
 import pkg_resources
 
 from plaidml2._ffi import ffi
+
+logger = logging.getLogger(__name__)
 
 _TLS = threading.local()
 _TLS.err = ffi.new('plaidml_error*')
