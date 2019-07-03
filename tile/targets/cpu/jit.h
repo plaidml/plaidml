@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "libxsmm.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {

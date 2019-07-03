@@ -4,8 +4,9 @@ licenses(["notice"])  # BSD/MIT-like license
 
 cc_library(
    name = "xsmm",
-   srcs = [ ],
-   hdrs = glob(["**"]),
+   srcs = ["include/libxsmm_source.h"],
+   hdrs = glob(["include/*"]),
+   includes=["include"],
 )
 
 genrule(

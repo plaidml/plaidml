@@ -26,6 +26,7 @@ plaidml_cc_library(
         "//tile/stripe",
         "@half",
         "@llvm",
+        "@xsmm//:xsmm",
     ],
     alwayslink = 1,
 )
@@ -45,5 +46,6 @@ plaidml_cc_library(
         "//tile/stripe",
         "@half",
         "@llvm",
+        "@xsmm//:xsmm",
     ],
 )
