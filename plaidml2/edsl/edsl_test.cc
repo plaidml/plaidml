@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "base/util/logging.h"
+#include "plaidml2/edsl/autodiff.h"
 #include "plaidml2/edsl/edsl.h"
 #include "tile/lang/compose.h"
 
@@ -12,6 +13,18 @@ using ::testing::Eq;
 namespace plaidml {
 namespace edsl {
 namespace {
+
+class Environment : public ::testing::Environment {
+  void SetUp() override {  //
+    plaidml::init();
+    plaidml::edsl::init();
+  }
+};
+
+[[gnu::unused]] auto init = []() {  //
+  ::testing::AddGlobalTestEnvironment(new Environment);
+  return 0;
+}();
 
 std::string Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
   Program program(name, vars);
@@ -33,24 +46,17 @@ Tensor Relu(const Tensor& I) { return select(I < 0.0, Tensor{0.0}, I); }
 
 Tensor Softmax(const Tensor& X) {
   TensorDim I, J;
+  TensorIndex i, j;
   X.bind_dims(I, J);
   auto M = TensorOutput(I, 1);
-  for (auto i : TensorIndex()) {
-    for (auto j : TensorIndex()) {
-      M(i, 0) >= X(i, j);
-    }
-  }
+  M(i, 0) >= X(i, j);
   auto E = exp(X - M);
   auto N = TensorOutput(I, 1);
-  for (auto i : TensorIndex()) {
-    for (auto j : TensorIndex()) {
-      N(i, 0) += E(i, j);
-    }
-  }
+  N(i, 0) += E(i, j);
   return E / N;
 }
 
-TEST(TileCC, MnistMlp) {
+TEST(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
   Tensor input(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 784}));
   Tensor kernel1(LogicalShape(PLAIDML_DATA_FLOAT32, {784, 512}));
@@ -102,45 +108,21 @@ TEST(TileCC, MnistMlp) {
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
   TensorDim CI, CO, K0, K1, N, X0, X1;
+  TensorIndex n, x0, x1, co, ci, k0, k1;
   I.bind_dims(N, X0, X1, CI);
   K.bind_dims(K0, K1, CI, CO);
   auto R = TensorOutput(N, X0 - (K0 - 1), X1 - (K1 - 1), CO);
-  for (auto n : TensorIndex()) {
-    for (auto x0 : TensorIndex()) {
-      for (auto x1 : TensorIndex()) {
-        for (auto co : TensorIndex()) {
-          for (auto ci : TensorIndex()) {
-            for (auto k0 : TensorIndex()) {
-              for (auto k1 : TensorIndex()) {
-                R(n, x0, x1, co) += I(n, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2), ci) * K(k0, k1, ci, co);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  R(n, x0, x1, co) += I(n, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2), ci) * K(k0, k1, ci, co);
   return R;
 }
 
 Tensor MaxPooling2(const Tensor& I) {
   TensorDim N, X0, X1, C;
+  TensorIndex n, x0, x1, i, j, c;
   I.bind_dims(N, X0, X1, C);
   auto R = TensorOutput(N, (X0 + 1) / 2, (X1 + 1) / 2, C);
-  for (auto n : TensorIndex()) {
-    for (auto x0 : TensorIndex()) {
-      for (auto x1 : TensorIndex()) {
-        for (auto i : TensorIndex()) {
-          for (auto j : TensorIndex()) {
-            for (auto c : TensorIndex()) {
-              if (i < 2 && j < 2) {
-                R(n, x0, x1, c) >= I(n, 2 * x0 + i, 2 * x1 + j, c);
-              }
-            }
-          }
-        }
-      }
-    }
+  if (i < 2 && j < 2) {
+    R(n, x0, x1, c) >= I(n, 2 * x0 + i, 2 * x1 + j, c);
   }
   return R;
 }
@@ -157,7 +139,7 @@ Tensor Flatten(const Tensor& X) {
   return reshape(X, {TensorDim{1}, product});
 }
 
-TEST(TileCC, MnistCnn) {
+TEST(CppEdsl, MnistCnn) {
   // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
   Tensor input(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1}));
   Tensor kernel1(LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32}));
@@ -251,7 +233,7 @@ std::tuple<Tensor, Tensor> LarsMomentum(const Tensor& X,           //
   return std::make_tuple(X - NewVeloc, NewVeloc);
 }
 
-TEST(TileCC, LarsMomentum4d) {
+TEST(CppEdsl, LarsMomentum4d) {
   auto X_shape = LogicalShape(PLAIDML_DATA_FLOAT32, {4, 7, 3, 9});
   auto LR_shape = LogicalShape(PLAIDML_DATA_FLOAT32, {});
   Tensor X(X_shape);
@@ -295,22 +277,15 @@ TEST(TileCC, LarsMomentum4d) {
 )"));
 }
 
-TEST(TileCC, RepeatElements) {
+TEST(CppEdsl, RepeatElements) {
   Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {10, 10, 10}));
   TensorDim N0, N1, N2;
+  TensorIndex n0, n1, n2, k;
   I.bind_dims(N0, N1, N2);
   auto O = TensorOutput(N0, 3 * N1, N2);
-  for (auto n0 : TensorIndex()) {
-    for (auto n1 : TensorIndex()) {
-      for (auto n2 : TensorIndex()) {
-        for (auto k : TensorIndex()) {
-          if (k < 3) {
-            O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
-            O.no_defract();
-          }
-        }
-      }
-    }
+  if (k < 3) {
+    O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
+    O.no_defract();
   }
   auto program = Evaluate("repeat_elts", {O});
   IVLOG(1, program);
@@ -324,20 +299,15 @@ TEST(TileCC, RepeatElements) {
 )"));
 }
 
-TEST(TileCC, UseDefault) {
+TEST(CppEdsl, UseDefault) {
   Tensor P(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 7, 10, 10}));
   Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 10, 10}));
   TensorDim B, N1, N2;
+  TensorIndex b, i1, i2;
   I.bind_dims(B, N1, N2);
   auto O = TensorOutput(B, 7, N1, N2);
-  for (auto b : TensorIndex()) {
-    for (auto i1 : TensorIndex()) {
-      for (auto i2 : TensorIndex()) {
-        O(b, 3, i1, i2) = I(b, i1, i2);
-        O.use_default(P);
-      }
-    }
-  }
+  O(b, 3, i1, i2) = I(b, i1, i2);
+  O.use_default(P);
   auto program = Evaluate("use_default", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -353,15 +323,10 @@ TEST(TileCC, UseDefault) {
 
 Tensor ArgMax(const Tensor& I) {
   TensorDim X0, X1, X2;
+  TensorIndex x0, x1, x2;
   I.bind_dims(X0, X1, X2);
   auto Max = TensorOutput(X0, X2);
-  for (const auto x0 : TensorIndex()) {
-    for (const auto x1 : TensorIndex()) {
-      for (const auto x2 : TensorIndex()) {
-        Max(x0, x2) >= I(x0, x1, x2);
-      }
-    }
-  }
+  Max(x0, x2) >= I(x0, x1, x2);
   Tensor One(LogicalShape(I.shape().dtype(), {}));
   auto T = TensorOutput(X1);
   for (const auto x1 : TensorIndex()) {
@@ -369,17 +334,11 @@ Tensor ArgMax(const Tensor& I) {
   }
   Tensor IX = index(T, 0);
   auto O = TensorOutput(X0, X2);
-  for (const auto x0 : TensorIndex()) {
-    for (const auto x1 : TensorIndex()) {
-      for (const auto x2 : TensorIndex()) {
-        O(x0, x2) >= cond(I(x0, x1, x2), Max(x0, x2), IX(x1));
-      }
-    }
-  }
+  O(x0, x2) >= cond(I(x0, x1, x2), Max(x0, x2), IX(x1));
   return as_uint(O, 32);
 }
 
-TEST(TileCC, ArgMax) {
+TEST(CppEdsl, ArgMax) {
   Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 10, 10}));
   auto X = ArgMax(I);
   auto program = Evaluate("arg_max", {X});
@@ -434,7 +393,7 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
   return O;
 }
 
-TEST(TileCC, Winograd) {
+TEST(CppEdsl, Winograd) {
   const size_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {N, X, Y, CI}));
   Tensor K(LogicalShape(PLAIDML_DATA_FLOAT32, {S, S, CI, CO}));
@@ -464,7 +423,7 @@ TEST(TileCC, Winograd) {
 )"));
 }
 
-TEST(TileCC, UniqueNames) {
+TEST(CppEdsl, UniqueNames) {
   LogicalShape shape(PLAIDML_DATA_FLOAT32, {});
   Tensor A("A", shape);
   Tensor B("B", shape);
@@ -487,7 +446,7 @@ TEST(TileCC, UniqueNames) {
 )"));
 }
 
-TEST(TileCC, GlobalMin) {
+TEST(CppEdsl, GlobalMin) {
   Tensor I("I", LogicalShape(PLAIDML_DATA_FLOAT32, {10, 10, 10}));
   TensorIndex i, j, k;
   auto O_Neg = TensorOutput();
@@ -508,7 +467,7 @@ TEST(TileCC, GlobalMin) {
 )"));
 }
 
-TEST(TileCC, CumSum) {
+TEST(CppEdsl, CumSum) {
   Tensor I("I", LogicalShape(PLAIDML_DATA_FLOAT32, {10}));
   TensorDim N;
   TensorIndex i, k;
@@ -566,7 +525,7 @@ Tensor ComplexConv2d(const Tensor& I,               //
   return O;
 }
 
-TEST(TileCC, ComplexConv2d) {
+TEST(CppEdsl, ComplexConv2d) {
   Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3, 3}));
   Tensor K(LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3, 32}));
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
@@ -583,7 +542,7 @@ TEST(TileCC, ComplexConv2d) {
 )"));
 }
 
-TEST(TileCC, Reciprocal) {
+TEST(CppEdsl, Reciprocal) {
   Tensor A("A", LogicalShape(PLAIDML_DATA_FLOAT32, {10}));
   auto program = Evaluate("reciprocal", {1 / A});
   IVLOG(1, program);
@@ -594,6 +553,102 @@ TEST(TileCC, Reciprocal) {
 ) {
   _X0 = 1;
   _X1 = div(_X0, A);
+}
+)"));
+}
+
+TEST(CppEdsl, GradientDot) {
+  Tensor A("A", LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}));
+  Tensor B("B", LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}));
+  auto O = Dot(A, B);
+  auto A_dims = A.shape().int_dims();
+  auto B_dims = B.shape().int_dims();
+  Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {A_dims[0], B_dims[1]}));
+  auto grads = Gradient({A, B}, O, dO);
+  auto program = Evaluate("gradient_dot", {grads});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1],
+  dO[dO_0, dO_1],
+  B[B_0, B_1]
+) -> (
+  _X1,
+  _X0
+) {
+  _X0[x1, x2 : 100, 100] = +(A[x0, x1] * dO[x0, x2]);
+  _X1[x0, x2 : 100, 100] = +(dO[x0, x1] * B[x2, x1]);
+}
+)"));
+}
+
+Tensor Max2Da0(const Tensor& A) {
+  TensorDim M, N;
+  A.bind_dims(M, N);
+  TensorIndex m("m"), n("n");
+  auto O = NamedTensorOutput("O", N);
+  O(n) >= A(m, n);
+  // O(n) += A(m, n);
+  return O;
+}
+
+TEST(CppEdsl, GradientMultiDot) {
+  Tensor A("A", LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}));
+  Tensor B("B", LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}));
+  auto C = Dot(A, B);
+  auto D = Dot(A, C);
+  auto O = Max2Da0(D);
+  auto B_dims = B.shape().int_dims();
+  Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {B_dims[1]}));
+  auto grads = Gradient({A, B}, O, dO);
+  auto program = Evaluate("gradient_dot", {grads});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1],
+  B[B_0, B_1],
+  dO[dO_0]
+) -> (
+  _X7,
+  _X4
+) {
+  _X0[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
+  _X1[x0, x2 : 100, 100] = +(A[x0, x1] * _X0[x1, x2]);
+  O[n : 100] = >(_X1[m, n]);
+  _X2[m, n : 100, 100] = +(_X1[m, n] == O[n] ? dO[n]);
+  _X3[x1, x2 : 100, 100] = +(A[x0, x1] * _X2[x0, x2]);
+  _X4[x1, x2 : 100, 100] = +(A[x0, x1] * _X3[x0, x2]);
+  _X5[x0, x2 : 100, 100] = +(_X2[x0, x1] * _X0[x2, x1]);
+  _X6[x0, x2 : 100, 100] = +(_X3[x0, x1] * B[x2, x1]);
+  _X7 = add(_X5, _X6);
+}
+)"));
+}
+
+TEST(CppEdsl, GradientDotSqrt) {
+  Tensor A("A", LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}));
+  Tensor B("B", LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}));
+  auto C = Dot(A, B);
+  auto O = sqrt(C);
+  auto A_dims = A.shape().int_dims();
+  auto B_dims = B.shape().int_dims();
+  Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {A_dims[0], B_dims[1]}));
+  auto grads = Gradient({A, B}, O, dO);
+  auto program = Evaluate("gradient_dot", {grads});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1],
+  B[B_0, B_1],
+  dO[dO_0, dO_1]
+) -> (
+  _X6,
+  _X5
+) {
+  _X0[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
+  _X1 = sqrt(_X0);
+  _X2 = 2;
+  _X3 = mul(_X2, dO);
+  _X4 = div(_X1, _X3);
+  _X5[x1, x2 : 100, 100] = +(A[x0, x1] * _X4[x0, x2]);
+  _X6[x0, x2 : 100, 100] = +(_X4[x0, x1] * B[x2, x1]);
 }
 )"));
 }

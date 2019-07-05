@@ -20,6 +20,9 @@
 extern "C" {
 #endif  // __cplusplus
 
+PLAIDML_EXEC_API void plaidml_exec_init(  //
+    plaidml_error* err);
+
 //
 // Device
 //

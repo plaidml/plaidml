@@ -16,6 +16,7 @@ std::pair<std::string, std::function<lang::RunInfo()>> MakeEntry(
 }
 
 std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
+  plaidml::edsl::init();
   static std::map<std::string, std::function<lang::RunInfo()>> tests = {
       MakeEntry("matmul",
                 [](const std::string& name) {
@@ -43,13 +44,40 @@ std::map<std::string, std::function<lang::RunInfo()>>* InternalTests() {
                 }),
       MakeEntry("matmul_big",
                 [](const std::string& name) {
-                  return LoadMatMul(name, LogicalShape(PLAIDML_DATA_FLOAT32, {1000, 1000}),  //
-                                    LogicalShape(PLAIDML_DATA_FLOAT32, {1000, 1000}));       //
+                  return LoadMatMul(                                      //
+                      name,                                               //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {1000, 1000}),   //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {1000, 1000}));  //
+                }),
+      MakeEntry("matmul_grad",
+                [](const std::string& name) {
+                  return LoadMatMulGradient(                            //
+                      name,                                             //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}),   //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}));  //
+                }),
+      // TODO: multimatmul_grad has small shapes due to Crest compile times; note that Crest eventually segfaults
+      // regardless
+      MakeEntry("multimatmul_grad",
+                [](const std::string& name) {
+                  return LoadMultiMatMulGradient(                     //
+                      name,                                           //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {10, 10}),   //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {10, 10}));  //
+                }),
+      MakeEntry("matmulsqrt_grad",
+                [](const std::string& name) {
+                  return LoadMatMulSqrtGradient(                        //
+                      name,                                             //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}),   //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {100, 100}));  //
                 }),
       MakeEntry("matmul_4k",
                 [](const std::string& name) {
-                  return LoadMatMul(name, LogicalShape(PLAIDML_DATA_FLOAT32, {4096, 32}),  //
-                                    LogicalShape(PLAIDML_DATA_FLOAT32, {4096, 32}));       //
+                  return LoadMatMul(                                    //
+                      name,                                             //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {4096, 32}),   //
+                      LogicalShape(PLAIDML_DATA_FLOAT32, {4096, 32}));  //
                 }),
       MakeEntry("matmul_intermediate",
                 [](const std::string& name) {

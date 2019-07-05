@@ -24,6 +24,12 @@ PLAIDML_LINKOPTS = select({
     ],
 })
 
+PLATFORM_TAGS = {
+    "@toolchain//:windows_x86_64": ["msvc"],
+    "@toolchain//:macos_x86_64": ["darwin"],
+    "//conditions:default": ["linux"],
+}
+
 def plaidml_cc_library(copts = [], linkopts = [], **kwargs):
     native.cc_library(copts = PLAIDML_COPTS + copts, linkopts = PLAIDML_LINKOPTS + linkopts, **kwargs)
 
@@ -317,13 +323,14 @@ def plaidml_cc_dylib(
     if dylib_name == None:
         dylib_name = name
     names = _dylib_name_patterns(dylib_name)
-    for name_list in names.values():
+    for key, name_list in names.items():
         for name_os in name_list:
             native.cc_binary(
                 name = name_os,
                 copts = PLAIDML_COPTS + copts,
                 linkopts = PLAIDML_LINKOPTS + linkopts,
                 linkshared = 1,
+                tags = PLATFORM_TAGS[key],
                 visibility = visibility,
                 **kwargs
             )

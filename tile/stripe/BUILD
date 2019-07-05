@@ -17,7 +17,7 @@ plaidml_cc_library(
         [
             "*.cc",
             "impl.h",
-    ],
+        ],
         exclude = glob(["*_test.cc"]),
     ),
     hdrs = ["stripe.h"],

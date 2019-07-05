@@ -1,19 +1,19 @@
-#include "tile/lang/ast.h"
+// Copyright 2019 Intel Corporation.
+
+#include "tile/lang/ast/ast.h"
 
 #include <boost/format.hpp>
 
 #include "base/util/logging.h"
 #include "base/util/lookup.h"
 #include "base/util/stream_container.h"
-#include "tile/lang/ast_ops.h"
+#include "tile/lang/ast/ast_ops.h"
 #include "tile/lang/gen_special.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
-
-using AstVector = std::vector<std::shared_ptr<Expr>>;
-using Polynomial = math::Polynomial<math::Rational>;
+namespace ast {
 
 std::ostream& operator<<(std::ostream& os, const Expr* expr) {
   os << expr->str() << ": " << static_cast<const void*>(expr);
@@ -121,7 +121,7 @@ DataType ComputeOutputType(const std::vector<DataType>& dtypes) {
   return ret;
 }
 
-LogicalShape ComputeOutputShape(const std::vector<std::shared_ptr<Expr>>& args) {
+LogicalShape ComputeOutputShape(const std::vector<ExprPtr>& args) {
   LogicalShape ret;
   for (const auto& arg : args) {
     MergeShapes(&ret, arg->shape);
@@ -131,7 +131,7 @@ LogicalShape ComputeOutputShape(const std::vector<std::shared_ptr<Expr>>& args) 
 
 class AstTraversal : public AstVisitor {
  public:
-  explicit AstTraversal(const std::vector<std::shared_ptr<Expr>>& exprs) {
+  explicit AstTraversal(const std::vector<ExprPtr>& exprs) {
     for (const auto& expr : exprs) {
       Push(expr);
     }
@@ -149,7 +149,7 @@ class AstTraversal : public AstVisitor {
     IVLOG(4, "AstTraversal: " << StreamContainer(flat_));
   }
 
-  const AstVector& flat() const { return flat_; }
+  const std::vector<ExprPtr>& flat() const { return flat_; }
 
  private:
   void Visit(const CallExpr& expr) {
@@ -159,10 +159,14 @@ class AstTraversal : public AstVisitor {
     }
   }
 
-  void Visit(const ConstraintExpr& expr) { throw std::runtime_error("ConstraintExpr visitor not implemented"); }
+  void Visit(const ConstraintExpr& expr) {
+    throw std::runtime_error("Not implemented: AstTraversal::Visit(ConstraintExpr)");
+  }
 
   void Visit(const ContractionExpr& expr) {
     // push inputs from right-to-left so they eventually get processed in left-to-right order
+    IVLOG(6, "Visiting ContractionExpr: " << &expr);
+    IVLOG(6, "  with agg_op " << to_string(expr.agg_op) << ", combo_op " << to_string(expr.combo_op));
     for (auto it = expr.inputs.rbegin(); it != expr.inputs.rend(); ++it) {
       Push((*it)->ref);
     }
@@ -177,22 +181,24 @@ class AstTraversal : public AstVisitor {
 
   void Visit(const ParamExpr& expr) {}
 
+  void Visit(const TensorSpecExpr& expr) {
+    throw std::runtime_error("Not implemented: AstTraversal::Visit(TensorSpecExpr)");
+  }
+
   void Visit(const DimExprExpr& expr) {}
 
-  void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("TensorSpecExpr visitor not implemented"); }
-
  private:
-  void Push(const std::shared_ptr<Expr>& expr) {
+  void Push(const ExprPtr& expr) {
     if (!expr) {
-      throw std::runtime_error("Invalid expression");
+      throw std::runtime_error("Invalid expression in AstTraversal::Push");
     }
     IVLOG(4, "AstTraversal::Push> " << expr.get());
     stack_.push(std::make_pair(expr, false));
   }
 
  private:
-  std::stack<std::pair<std::shared_ptr<Expr>, bool>> stack_;
-  AstVector flat_;
+  std::stack<std::pair<ExprPtr, bool>> stack_;
+  std::vector<ExprPtr> flat_;
   std::unordered_set<const Expr*> seen_;
 };
 
@@ -263,7 +269,9 @@ class ShapeEvaluator : public AstVisitor {
     bindings_by_expr_->emplace(&expr, Binding{value});
   }
 
-  void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("Not implemented"); }
+  void Visit(const TensorSpecExpr& expr) {
+    throw std::runtime_error("Not implemented: ShapeEvaluator::Visit(TensorSpecExpr)");
+  }
 
  private:
   std::unordered_map<const Expr*, Binding>* bindings_by_expr_;
@@ -340,7 +348,7 @@ class Evaluator : public AstVisitor {
  public:
   explicit Evaluator(const std::string& name) { eval_.runinfo.program_name = name; }
 
-  ProgramEvaluation Evaluate(const std::vector<std::shared_ptr<Expr>>& exprs) {
+  ProgramEvaluation Evaluate(const std::vector<ExprPtr>& exprs) {
     ShapeEvaluator evaluator(&bindings_by_expr_);
     // Traverse the entire graph in least-dependent to most-dependent order.
     AstTraversal traversal(exprs);
@@ -446,7 +454,9 @@ class Evaluator : public AstVisitor {
     names_by_expr_.emplace(&expr, name);
   }
 
-  void Visit(const ConstraintExpr& expr) { throw std::runtime_error("ConstraintExpr visitor not implemented"); }
+  void Visit(const ConstraintExpr& expr) {
+    throw std::runtime_error("Not implemented: Evaluator::Visit(ConstraintExpr)");
+  }
 
   void Visit(const ContractionExpr& expr) {
     IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
@@ -477,7 +487,7 @@ class Evaluator : public AstVisitor {
       auto poly = idx->Accept(&poly_eval);
       cion.specs[0].spec.push_back(poly);
     }
-    for (const auto& size_expr : expr.output->output_sizes) {
+    for (const auto& size_expr : expr.output->output_dims) {
       auto size = size_expr->Accept(&dim_eval);
       cion.output_size.push_back(std::to_string(size));
     }
@@ -497,7 +507,9 @@ class Evaluator : public AstVisitor {
     names_by_expr_.emplace(&expr, name);
   }
 
-  void Visit(const TensorSpecExpr& expr) { throw std::runtime_error("TensorSpecExec visitor not implemented"); }
+  void Visit(const TensorSpecExpr& expr) {
+    throw std::runtime_error("Not implemented: Evaluator::Visit(TensorSpecExpr)");
+  }
 
  private:
   // The current algorithm works by making all unnamed nodes automatically
@@ -528,7 +540,7 @@ class Evaluator : public AstVisitor {
   ProgramEvaluation eval_;
 };
 
-ProgramEvaluation Evaluate(const std::string& name, const std::vector<std::shared_ptr<Expr>>& exprs) {
+ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& exprs) {
   return Evaluator(name).Evaluate(exprs);
 }
 
@@ -546,7 +558,15 @@ std::string LogicalShape::str() const {
   return ss.str();
 }
 
-void LogicalShape::bind_dims(std::vector<std::shared_ptr<DimExpr>>* into) {
+std::vector<DimExprPtr> LogicalShape::dims_as_exprs() const {
+  std::vector<DimExprPtr> ret(dims.size());
+  for (size_t i = 0; i < dims.size(); i++) {
+    ret[i] = dims[i].expr;
+  }
+  return ret;
+}
+
+void LogicalShape::bind_dims(std::vector<DimExprPtr>* into) {
   if (dims.size() != into->size()) {
     throw std::runtime_error(
         boost::str(boost::format("bind_dims() mismatch. Tensor shape: %1%, dims: %2%") % dims.size() % into->size()));
@@ -569,7 +589,7 @@ void LogicalShape::bind_dims(std::vector<std::shared_ptr<DimExpr>>* into) {
   }
 }
 
-TupleExpr::TupleExpr(const std::vector<std::shared_ptr<Expr>>& exprs) : exprs(exprs) {
+TupleExpr::TupleExpr(const std::vector<ExprPtr>& exprs) : exprs(exprs) {
   // TODO: compute shape?
 }
 
@@ -597,7 +617,7 @@ std::string FloatConst::str() const {
   return ss.str();
 }
 
-DimExprExpr::DimExprExpr(const std::shared_ptr<DimExpr>& expr) : Expr(LogicalShape{DataType::INT32}), expr(expr) {
+DimExprExpr::DimExprExpr(const DimExprPtr& expr) : Expr(LogicalShape{DataType::INT32}), expr(expr) {
   // TODO: should this be a DataType::INT64?
 }
 
@@ -628,11 +648,11 @@ std::string ParamExpr::str() const {
     return name;
   }
   std::stringstream ss;
-  ss << "ParamExpr{" << shape.str() << "}";
+  ss << "ParamExpr{" << shape << "}";
   return ss.str();
 }
 
-CallExpr::CallExpr(const std::string& fn, const std::vector<std::shared_ptr<Expr>>& args) : fn(fn), args(args) {}
+CallExpr::CallExpr(const std::string& fn, const std::vector<ExprPtr>& args) : fn(fn), args(args) {}
 
 void CallExpr::ComputeShape() {
   IVLOG(4, "CallExpr::ComputeShape> fn: " << fn);
@@ -674,25 +694,36 @@ void ContractionExpr::ComputeShape() {
     dtype = ComputeOutputType(dtypes);
   }
   shape = LogicalShape(dtype);
-  for (const auto& size : output->output_sizes) {
+  for (const auto& size : output->output_dims) {
     shape.dims.push_back(LogicalDim{size});
   }
 }
 
-std::string ContractionExpr::str() const { return "ContractionExpr"; }
+std::string ContractionExpr::str() const {
+  std::stringstream ss;
+  ss << "ContractionExpr";
+  return ss.str();
+}
 
-ConstraintExpr::ConstraintExpr(const std::shared_ptr<PolyExpr>& lhs, const std::shared_ptr<DimExpr>& rhs)
+ConstraintExpr::ConstraintExpr(const PolyExprPtr& lhs, const DimExprPtr& rhs)
     : lhs(lhs),  //
       rhs(rhs) {}
 
 std::string ConstraintExpr::str() const { return "ConstraintExpr"; }
 
-TensorSpecExpr::TensorSpecExpr(const std::shared_ptr<Expr>& ref,  //
-                               const std::vector<std::shared_ptr<PolyExpr>>& index_spec,
-                               const std::vector<std::shared_ptr<DimExpr>>& output_sizes)
+// input ctor
+TensorSpecExpr::TensorSpecExpr(  //
+    const ExprPtr& ref,          //
+    const std::vector<PolyExprPtr>& index_spec)
     : ref(ref),  //
-      index_spec(index_spec),
-      output_sizes(output_sizes) {}
+      index_spec(index_spec) {}
+
+// output ctor
+TensorSpecExpr::TensorSpecExpr(                  //
+    const std::vector<PolyExprPtr>& index_spec,  //
+    const std::vector<DimExprPtr>& output_dims)
+    : index_spec(index_spec),  //
+      output_dims(output_dims) {}
 
 std::string TensorSpecExpr::str() const { return "TensorSpecExpr"; }
 
@@ -872,15 +903,15 @@ std::shared_ptr<ExprType> MakeOp(IntOp op, const std::vector<std::shared_ptr<Exp
   return std::make_shared<OpType>(op, args);
 }
 
-std::shared_ptr<PolyExpr> MakeOp(IntOp op, const std::vector<std::shared_ptr<PolyExpr>>& args) {
+PolyExprPtr MakeOp(IntOp op, const std::vector<PolyExprPtr>& args) {  //
   return MakeOp<PolyLiteral, PolyOpExpr>(op, args);
 }
 
-std::shared_ptr<DimExpr> MakeOp(IntOp op, const std::vector<std::shared_ptr<DimExpr>>& args) {
+DimExprPtr MakeOp(IntOp op, const std::vector<DimExprPtr>& args) {  //
   return MakeOp<DimIntExpr, DimOpExpr>(op, args);
 }
 
-std::shared_ptr<Expr> MakeCall(const std::string& fn, const std::vector<std::shared_ptr<Expr>>& args) {
+ExprPtr MakeCall(const std::string& fn, const std::vector<ExprPtr>& args) {
   if (fn == "neg") {
     auto int_expr = std::dynamic_pointer_cast<IntConst>(args[0]);
     if (int_expr) {
@@ -932,6 +963,7 @@ std::shared_ptr<Expr> MakeCall(const std::string& fn, const std::vector<std::sha
   return expr;
 }
 
+}  // namespace ast
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

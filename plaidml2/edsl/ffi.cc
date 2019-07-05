@@ -2,16 +2,20 @@
 
 #include "plaidml2/edsl/ffi.h"
 
+#include <mutex>
 #include <sstream>
 
 #include <boost/format.hpp>
 
 #include "base/util/logging.h"
 #include "plaidml2/core/internal.h"
-#include "tile/lang/ast.h"
+#include "plaidml2/edsl/derivs.h"
+#include "tile/lang/ast/ast.h"
+#include "tile/lang/ast/gradient.h"
 
-using namespace vertexai::tile;        // NOLINT
-using namespace vertexai::tile::lang;  // NOLINT
+using namespace vertexai::tile;             // NOLINT
+using namespace vertexai::tile::lang;       // NOLINT
+using namespace vertexai::tile::lang::ast;  // NOLINT
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 
@@ -58,16 +62,27 @@ CombinationOp into_combo_op(plaidml_combo_op op) {
 extern "C" {
 
 struct plaidml_logical_shape {
-  vertexai::tile::lang::LogicalShape shape;
+  LogicalShape shape;
 };
 
 struct plaidml_dim_expr {
-  std::shared_ptr<vertexai::tile::lang::DimExpr> expr;
+  std::shared_ptr<DimExpr> expr;
 };
 
 struct plaidml_poly_expr {
-  std::shared_ptr<vertexai::tile::lang::PolyExpr> expr;
+  std::shared_ptr<PolyExpr> expr;
 };
+
+void plaidml_edsl_init(  //
+    plaidml_error* err) {
+  static std::once_flag is_initialized;
+  ffi_wrap_void(err, [&] {
+    std::call_once(is_initialized, []() {
+      IVLOG(1, "plaidml_edsl_init");
+      plaidml::edsl::deriv::RegisterDerivs();
+    });
+  });
+}
 
 plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                              //
@@ -352,20 +367,23 @@ plaidml_expr* plaidml_expr_tensor_spec(  //
     plaidml_expr* ref,                   //
     size_t ndims,                        //
     plaidml_poly_expr** input_idxs,      //
-    plaidml_dim_expr** output_sizes) {
+    plaidml_dim_expr** output_dims) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    std::vector<std::shared_ptr<DimExpr>> vec_sizes;
+    std::vector<std::shared_ptr<DimExpr>> vec_dims;
     std::vector<std::shared_ptr<PolyExpr>> vec_idxs(ndims);
     for (size_t i = 0; i < ndims; i++) {
       vec_idxs[i] = input_idxs[i]->expr;
-      if (output_sizes) {
-        if (!output_sizes[i]) {
-          throw std::runtime_error("Undefined output_size in TensorSpec");
+      if (output_dims) {
+        if (!output_dims[i]) {
+          throw std::runtime_error("Undefined output_dim in TensorSpec");
         }
-        vec_sizes.emplace_back(output_sizes[i]->expr);
+        vec_dims.emplace_back(output_dims[i]->expr);
       }
     }
-    return new plaidml_expr{std::make_shared<TensorSpecExpr>(ref ? ref->expr : nullptr, vec_idxs, vec_sizes)};
+    if (ref) {
+      return new plaidml_expr{std::make_shared<TensorSpecExpr>(ref->expr, vec_idxs)};
+    }
+    return new plaidml_expr{std::make_shared<TensorSpecExpr>(vec_idxs, vec_dims)};
   });
 }
 
@@ -432,6 +450,60 @@ void plaidml_expr_contraction_set_use_default(  //
       throw std::runtime_error("use_default can only be specified on a contraction.");
     }
     cion->use_default = use_default->expr;
+  });
+}
+
+void plaidml_expr_gradient(  //
+    plaidml_error* err,      //
+    size_t nwrts,            //
+    plaidml_expr** wrts,     //
+    plaidml_expr* result,    //
+    plaidml_expr* loss,      //
+    plaidml_expr** derivs) {
+  // Given a forward pass tensor operation that takes `nwrt` inputs given in `wrt` and produces the output `result`,
+  // along with an already-computed derivative `loss` of `result`, produce the derivatives for each tensor in `wrt` and
+  // store these `nwrt` derivatives in `derivs` in the corresponding order as they were received in `wrt`.
+  ffi_wrap_void(err, [&] {
+    std::vector<ExprPtr> wrt_exprs(nwrts);
+    for (size_t i = 0; i < nwrts; i++) {
+      wrt_exprs[i] = wrts[i]->expr;
+    }
+    auto deriv_exprs = ComputeGradients(wrt_exprs, result->expr, loss->expr);
+    for (size_t i = 0; i < nwrts; i++) {
+      derivs[i] = new plaidml_expr{deriv_exprs[i]};
+    }
+  });
+}
+
+void plaidml_deriv_register(  //
+    plaidml_error* err,       //
+    const char* name,         //
+    plaidml_deriv fn,         //
+    void* user_ctx) {
+  auto thunk = [](const ExprPtr& Y,                //
+                  const ExprPtr& dY,               //
+                  const std::vector<ExprPtr>& Xs,  //
+                  void* user_fn,                   //
+                  void* user_ctx) {
+    plaidml_deriv fn = reinterpret_cast<plaidml_deriv>(user_fn);
+    std::vector<plaidml_expr*> X_exprs(Xs.size());
+    std::vector<plaidml_expr*> dX_exprs(Xs.size());
+    auto Y_expr = new plaidml_expr{Y};
+    auto dY_expr = new plaidml_expr{dY};
+    for (size_t i = 0; i < X_exprs.size(); i++) {
+      X_exprs[i] = new plaidml_expr{Xs[i]};
+    }
+    fn(user_ctx, Y_expr, dY_expr, X_exprs.size(), X_exprs.data(), dX_exprs.data());
+    std::vector<ExprPtr> ret(Xs.size());
+    for (size_t i = 0; i < ret.size(); i++) {
+      ret[i] = dX_exprs[i]->expr;
+      delete dX_exprs[i];
+    }
+    return ret;
+  };
+  ffi_wrap_void(err, [&] {
+    IVLOG(5, "plaidml_deriv_register> " << name);
+    DerivRegistry::Instance()->Register(name, thunk, reinterpret_cast<void*>(fn), user_ctx);
   });
 }
 

@@ -1,10 +1,11 @@
+// Copyright 2019 Intel Corporation.
+
 #pragma once
 
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "tile/base/shape.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/type.h"
 #include "tile/math/polynomial.h"
@@ -12,6 +13,7 @@
 namespace vertexai {
 namespace tile {
 namespace lang {
+namespace ast {
 
 using Polynomial = math::Polynomial<math::Rational>;
 
@@ -38,6 +40,10 @@ struct DimNoneExpr;
 struct DimOpExpr;
 struct DimRefExpr;
 
+using ExprPtr = std::shared_ptr<Expr>;
+using DimExprPtr = std::shared_ptr<DimExpr>;
+using PolyExprPtr = std::shared_ptr<PolyExpr>;
+
 struct AstVisitor {
   virtual ~AstVisitor() = default;
   virtual void Visit(const CallExpr& expr) = 0;
@@ -51,7 +57,7 @@ struct AstVisitor {
 };
 
 struct LogicalDim {
-  std::shared_ptr<DimExpr> expr;
+  DimExprPtr expr;
 
   std::string str() const;
 };
@@ -61,16 +67,15 @@ struct LogicalShape {
   std::vector<LogicalDim> dims;
 
   explicit LogicalShape(DataType dtype = DataType::INVALID) : dtype(dtype) {}
-  LogicalShape(DataType dtype, const std::vector<std::shared_ptr<DimExpr>>& exprs) : dtype(dtype) {
+  LogicalShape(DataType dtype, const std::vector<DimExprPtr>& exprs) : dtype(dtype) {
     for (const auto& dim : exprs) {
       dims.emplace_back(LogicalDim{dim});
     }
   }
   std::string str() const;
-  void bind_dims(std::vector<std::shared_ptr<DimExpr>>* into);
+  void bind_dims(std::vector<DimExprPtr>* into);
+  std::vector<DimExprPtr> dims_as_exprs() const;
 };
-
-TensorShape IntoTensorShape(const LogicalShape& shape);
 
 struct Expr {
   std::string name;
@@ -113,50 +118,57 @@ struct NoneExpr : Expr {
 };
 
 struct TupleExpr : Expr {
-  std::vector<std::shared_ptr<Expr>> exprs;
+  std::vector<ExprPtr> exprs;
 
-  explicit TupleExpr(const std::vector<std::shared_ptr<Expr>>& exprs);
+  explicit TupleExpr(const std::vector<ExprPtr>& exprs);
   void Accept(AstVisitor* visitor) {}
   std::string str() const;
 };
 
-std::shared_ptr<Expr> MakeCall(const std::string& fn, const std::vector<std::shared_ptr<Expr>>& args);
+ExprPtr MakeCall(const std::string& fn, const std::vector<ExprPtr>& args);
 
 struct CallExpr : Expr {
   std::string fn;
-  std::vector<std::shared_ptr<Expr>> args;
+  std::vector<ExprPtr> args;
 
-  CallExpr(const std::string& fn, const std::vector<std::shared_ptr<Expr>>& args);
+  CallExpr(const std::string& fn, const std::vector<ExprPtr>& args);
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
   std::string str() const;
   void ComputeShape();
 };
 
 struct DimExprExpr : Expr {
-  std::shared_ptr<DimExpr> expr;
+  DimExprPtr expr;
 
-  explicit DimExprExpr(const std::shared_ptr<DimExpr>& expr);
+  explicit DimExprExpr(const DimExprPtr& expr);
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
   std::string str() const;
 };
 
 struct TensorSpecExpr : Expr {
-  std::shared_ptr<Expr> ref;
-  std::vector<std::shared_ptr<PolyExpr>> index_spec;
-  std::vector<std::shared_ptr<DimExpr>> output_sizes;
+  ExprPtr ref;
+  std::vector<PolyExprPtr> index_spec;
+  std::vector<DimExprPtr> output_dims;
 
-  TensorSpecExpr(const std::shared_ptr<Expr>& ref,                          //
-                 const std::vector<std::shared_ptr<PolyExpr>>& index_spec,  //
-                 const std::vector<std::shared_ptr<DimExpr>>& output_sizes);
+  // input ctor
+  TensorSpecExpr(          //
+      const ExprPtr& ref,  //
+      const std::vector<PolyExprPtr>& index_spec);
+
+  // output ctor
+  TensorSpecExpr(                                  //
+      const std::vector<PolyExprPtr>& index_spec,  //
+      const std::vector<DimExprPtr>& output_dims);
+
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
   std::string str() const;
 };
 
 struct ConstraintExpr : Expr {
-  std::shared_ptr<PolyExpr> lhs;
-  std::shared_ptr<DimExpr> rhs;
+  PolyExprPtr lhs;
+  DimExprPtr rhs;
 
-  ConstraintExpr(const std::shared_ptr<PolyExpr>& lhs, const std::shared_ptr<DimExpr>& rhs);
+  ConstraintExpr(const PolyExprPtr& lhs, const DimExprPtr& rhs);
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
   std::string str() const;
 };
@@ -168,11 +180,12 @@ struct ContractionExpr : Expr {
   std::vector<std::shared_ptr<TensorSpecExpr>> inputs;
   std::vector<std::shared_ptr<ConstraintExpr>> constraints;
   bool no_defract = false;
-  std::shared_ptr<Expr> use_default;
+  ExprPtr use_default;
 
   ContractionExpr();
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
   std::string str() const;
+  size_t logical_input_size() const { return (use_default ? inputs.size() - 1 : inputs.size()); }
   void ComputeShape();
 };
 
@@ -191,9 +204,9 @@ struct PolyExpr {
 };
 
 struct PolyDimExpr : PolyExpr {
-  std::shared_ptr<DimExpr> expr;
+  DimExprPtr expr;
 
-  explicit PolyDimExpr(const std::shared_ptr<DimExpr>& expr) : expr(expr) {}
+  explicit PolyDimExpr(const DimExprPtr& expr) : expr(expr) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
   std::string str() const;
 };
@@ -224,13 +237,13 @@ enum class IntOp {
   Div,
 };
 
-std::shared_ptr<PolyExpr> MakeOp(IntOp op, const std::vector<std::shared_ptr<PolyExpr>>& operands);
+PolyExprPtr MakeOp(IntOp op, const std::vector<PolyExprPtr>& operands);
 
 struct PolyOpExpr : PolyExpr {
   IntOp op;
-  std::vector<std::shared_ptr<PolyExpr>> operands;
+  std::vector<PolyExprPtr> operands;
 
-  PolyOpExpr(IntOp op, const std::vector<std::shared_ptr<PolyExpr>>& operands) : op(op), operands(operands) {}
+  PolyOpExpr(IntOp op, const std::vector<PolyExprPtr>& operands) : op(op), operands(operands) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
   std::string str() const;
 };
@@ -257,13 +270,13 @@ struct DimIntExpr : DimExpr {
   std::string str() const;
 };
 
-std::shared_ptr<DimExpr> MakeOp(IntOp op, const std::vector<std::shared_ptr<DimExpr>>& operands);
+DimExprPtr MakeOp(IntOp op, const std::vector<DimExprPtr>& operands);
 
 struct DimOpExpr : DimExpr {
   IntOp op;
-  std::vector<std::shared_ptr<DimExpr>> operands;
+  std::vector<DimExprPtr> operands;
 
-  DimOpExpr(IntOp op, const std::vector<std::shared_ptr<DimExpr>>& operands) : op(op), operands(operands) {}
+  DimOpExpr(IntOp op, const std::vector<DimExprPtr>& operands) : op(op), operands(operands) {}
   int64_t Accept(DimVisitor* visitor) { return visitor->Visit(*this); }
   std::string str() const;
 };
@@ -274,10 +287,10 @@ struct DimNoneExpr : DimExpr {
 };
 
 struct DimRefExpr : DimExpr {
-  std::shared_ptr<Expr> ref;
+  ExprPtr ref;
   size_t dim;
 
-  DimRefExpr(const std::shared_ptr<Expr>& ref, size_t dim) : ref(ref), dim(dim) {}
+  DimRefExpr(const ExprPtr& ref, size_t dim) : ref(ref), dim(dim) {}
   int64_t Accept(DimVisitor* visitor) { return visitor->Visit(*this); }
   std::string str() const;
 };
@@ -343,16 +356,15 @@ struct ConstraintCollector : public PolyVisitor {
   std::vector<std::shared_ptr<ConstraintExpr>> constraints;
 };
 
-TensorShape EvaluateShape(const std::shared_ptr<Expr>& expr);
-
 struct ProgramEvaluation {
   RunInfo runinfo;
   std::vector<const Expr*> inputs;
   std::vector<const Expr*> outputs;
 };
 
-ProgramEvaluation Evaluate(const std::string& name, const std::vector<std::shared_ptr<Expr>>& outputs);
+ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& outputs);
 
+}  // namespace ast
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

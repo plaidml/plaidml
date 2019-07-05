@@ -20,6 +20,9 @@
 extern "C" {
 #endif  // __cplusplus
 
+PLAIDML_OP_API void plaidml_op_init(  //
+    plaidml_error* err);
+
 PLAIDML_OP_API plaidml_expr* plaidml_op_make(  //
     plaidml_error* err,                        //
     const char* op_name,                       //

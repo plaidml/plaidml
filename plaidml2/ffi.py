@@ -63,13 +63,6 @@ def ffi_call(func, *args):
     return ret
 
 
-def __init():
-    ffi_call(lib.plaidml_init)
-
-
-ffi.init_once(__init, 'plaidml_init')
-
-
 class ForeignObject(object):
     __ffi_obj__ = None
     __ffi_del__ = None

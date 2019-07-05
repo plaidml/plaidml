@@ -14,7 +14,10 @@ def all():
 
 
 def get(key):
-    return os.getenv(key, all().get(key))
+    ret = os.getenv(key, all().get(key))
+    if ret is None:
+        raise EnvironmentError('Could not find setting: {}'.format(key))
+    return ret
 
 
 def set(key, value):

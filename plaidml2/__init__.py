@@ -7,6 +7,13 @@ import numpy as np
 from plaidml2.ffi import ForeignObject, ffi, ffi_call, lib
 
 
+def __init():
+    ffi_call(lib.plaidml_init)
+
+
+ffi.init_once(__init, 'plaidml_init')
+
+
 class DType(enum.IntEnum):
     """Describes the type of a tensor element."""
     INVALID = 0

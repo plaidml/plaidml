@@ -24,7 +24,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
-        "//tile/lang",
+        "//tile/lang/ast",
         "@boost//:filesystem",
     ],
     alwayslink = 1,

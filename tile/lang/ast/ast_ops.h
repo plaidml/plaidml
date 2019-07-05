@@ -1,3 +1,5 @@
+// Copyright 2019 Intel Corporation.
+
 #pragma once
 
 #include <memory>
@@ -6,17 +8,17 @@
 #include <utility>
 #include <vector>
 
-#include "tile/base/shape.h"
-#include "tile/lang/ast.h"
+#include "tile/lang/ast/ast.h"
 #include "tile/lang/type.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
+namespace ast {
 
 struct PrimitiveOp {
   virtual ~PrimitiveOp() = default;
-  virtual LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const = 0;
+  virtual LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const = 0;
 };
 
 class PrimitiveOpRegistry {
@@ -42,8 +44,9 @@ class PrimitiveOpRegistry {
   std::unordered_map<std::string, std::unique_ptr<PrimitiveOp>> registry_;
 };
 
-LogicalShape ComputeOutputShape(const std::vector<std::shared_ptr<Expr>>& args);
+LogicalShape ComputeOutputShape(const std::vector<ExprPtr>& args);
 
+}  // namespace ast
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

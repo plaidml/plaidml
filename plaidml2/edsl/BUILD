@@ -15,9 +15,12 @@ exports_files([
 plaidml_cc_library(
     name = "edsl",
     srcs = [
+        "derivs.cc",
+        "derivs.h",
         "ffi.cc",
     ],
     hdrs = [
+        "autodiff.h",
         "edsl.h",
         "ffi.h",
     ],
@@ -26,9 +29,8 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//plaidml2/core",
-        "//tile/lang",
+        "//tile/lang/ast",
     ],
-    alwayslink = 1,
 )
 
 plaidml_py_library(
@@ -45,6 +47,7 @@ plaidml_py_library(
 plaidml_cc_library(
     name = "api",
     hdrs = [
+        "autodiff.h",
         "edsl.h",
         "ffi.h",
     ],

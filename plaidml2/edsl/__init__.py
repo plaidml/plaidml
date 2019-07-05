@@ -11,6 +11,13 @@ from plaidml2.ffi import ForeignObject, ffi, ffi_call, lib
 logger = logging.getLogger(__name__)
 
 
+def __init():
+    ffi_call(lib.plaidml_edsl_init)
+
+
+ffi.init_once(__init, 'plaidml_edsl_init')
+
+
 class LogicalShape(ForeignObject):
     __ffi_del__ = lib.plaidml_logical_shape_free
     __ffi_repr__ = lib.plaidml_logical_shape_repr

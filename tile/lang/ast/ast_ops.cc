@@ -1,13 +1,16 @@
-#include "tile/lang/ast_ops.h"
+// Copyright 2019 Intel Corporation.
+
+#include "tile/lang/ast/ast_ops.h"
 
 #include "tile/lang/gen_special.h"
 
 namespace vertexai {
 namespace tile {
 namespace lang {
+namespace ast {
 
 struct ReshapeOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     IVLOG(1, "ReshapeOp");
     if (args.size() < 1) {
       throw std::runtime_error("'reshape' requires at least one argument.");
@@ -30,7 +33,7 @@ struct ReshapeOp : PrimitiveOp {
 };
 
 struct BooleanOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     auto ret = ComputeOutputShape(args);
     ret.dtype = DataType::BOOLEAN;
     return ret;
@@ -38,7 +41,7 @@ struct BooleanOp : PrimitiveOp {
 };
 
 struct FloatCastOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 2) {
       throw std::runtime_error("'as_float' requires 2 arguments.");
     }
@@ -65,7 +68,7 @@ struct FloatCastOp : PrimitiveOp {
 };
 
 struct IntCastOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 2) {
       throw std::runtime_error("'as_int' requires 2 arguments.");
     }
@@ -92,7 +95,7 @@ struct IntCastOp : PrimitiveOp {
 };
 
 struct UintCastOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 2) {
       throw std::runtime_error("'as_uint' requires 2 arguments.");
     }
@@ -119,7 +122,7 @@ struct UintCastOp : PrimitiveOp {
 };
 
 struct IndexOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 2) {
       throw std::runtime_error("'index' requires 2 arguments.");
     }
@@ -134,7 +137,7 @@ struct IndexOp : PrimitiveOp {
 };
 
 // struct ElementOp : PrimitiveOp {
-//   LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+//   LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const {
 //     if (args.size() != 2) {
 //       throw std::runtime_error("'element' requires 2 arguments.");
 //     }
@@ -158,7 +161,7 @@ struct IndexOp : PrimitiveOp {
 // };
 
 struct GatherOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 2) {
       throw std::runtime_error("'gather' requires 2 arguments.");
     }
@@ -183,7 +186,7 @@ struct GatherOp : PrimitiveOp {
 };
 
 struct ScatterOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 3) {
       throw std::runtime_error("'scatter' requires 3 arguments.");
     }
@@ -203,7 +206,7 @@ struct ScatterOp : PrimitiveOp {
 };
 
 struct ShapeOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 1) {
       throw std::runtime_error("'shape' requires exactly one argument.");
     }
@@ -213,7 +216,7 @@ struct ShapeOp : PrimitiveOp {
 };
 
 struct PrngStateOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 1) {
       throw std::runtime_error("'prng_state' requires exactly one argument.");
     }
@@ -229,7 +232,7 @@ struct PrngStateOp : PrimitiveOp {
 };
 
 struct PrngValueOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 1) {
       throw std::runtime_error("'prng_value' requires exactly one argument.");
     }
@@ -243,7 +246,7 @@ struct PrngValueOp : PrimitiveOp {
 };
 
 struct PrngStepOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<std::shared_ptr<Expr>>& args) const {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() < 1) {
       throw std::runtime_error("'prng_step' must have at least one argument.");
     }
@@ -288,6 +291,7 @@ struct PrngStepOp : PrimitiveOp {
   return 0;
 }();
 
+}  // namespace ast
 }  // namespace lang
 }  // namespace tile
 }  // namespace vertexai

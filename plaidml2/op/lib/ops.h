@@ -35,5 +35,7 @@ class OperationRegistry {
   std::unordered_map<std::string, Operation> registry_;
 };
 
+void RegisterOps();
+
 }  // namespace op
 }  // namespace plaidml

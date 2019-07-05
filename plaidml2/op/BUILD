@@ -15,8 +15,6 @@ plaidml_cc_library(
     name = "op",
     srcs = [
         "ffi.cc",
-        "ops.cc",
-        "ops.h",
     ],
     hdrs = [
         "ffi.h",
@@ -26,15 +24,16 @@ plaidml_cc_library(
         "//base/util",
         "//plaidml2/core",
         "//plaidml2/edsl",
+        "//plaidml2/op/lib",
         "@boost",
     ],
-    alwayslink = 1,
 )
 
 plaidml_cc_library(
     name = "api",
     hdrs = [
         "ffi.h",
+        "op.h",
     ],
     visibility = ["//visibility:public"],
     deps = [

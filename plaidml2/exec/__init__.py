@@ -7,6 +7,13 @@ import plaidml2 as plaidml
 from plaidml2.ffi import ForeignObject, decode_str, ffi, ffi_call, lib
 
 
+def __init():
+    ffi_call(lib.plaidml_exec_init)
+
+
+ffi.init_once(__init, 'plaidml_exec_init')
+
+
 def list_devices():
     ndevices = ffi_call(lib.plaidml_device_list_count)
     raw_devices = ffi.new('plaidml_string*[]', ndevices)

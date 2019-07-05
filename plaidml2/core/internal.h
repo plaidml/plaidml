@@ -5,7 +5,7 @@
 
 #include "plaidml2/core/ffi.h"
 #include "tile/base/shape.h"
-#include "tile/lang/ast.h"
+#include "tile/lang/ast/ast.h"
 
 extern "C" {
 
@@ -18,11 +18,11 @@ struct plaidml_shape {
 };
 
 struct plaidml_expr {
-  std::shared_ptr<vertexai::tile::lang::Expr> expr;
+  std::shared_ptr<vertexai::tile::lang::ast::Expr> expr;
 };
 
 struct plaidml_program {
-  vertexai::tile::lang::ProgramEvaluation eval;
+  vertexai::tile::lang::ast::ProgramEvaluation eval;
 };
 
 }  // extern "C"

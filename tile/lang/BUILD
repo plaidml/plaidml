@@ -16,9 +16,6 @@ plaidml_proto_library(
 plaidml_cc_library(
     name = "lang",
     srcs = [
-        "ast.cc",
-        "ast_ops.cc",
-        "ast_ops.h",
         "bound.cc",
         "bound.h",
         "builtins.cc",
@@ -78,7 +75,6 @@ plaidml_cc_library(
         ":parser_lex",
     ],
     hdrs = [
-        "ast.h",
         "compile.h",
         "compose.h",
         "emitc.h",
@@ -119,7 +115,6 @@ plaidml_cc_library(
         "//tile/stripe",
         "@boost",
     ],
-    alwayslink = 1,
 )
 
 plaidml_cc_test(

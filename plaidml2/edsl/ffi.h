@@ -36,6 +36,9 @@ typedef enum {
   PLAIDML_EXPR_TUPLE,
 } plaidml_expr_kind;
 
+PLAIDML_EDSL_API void plaidml_edsl_init(  //
+    plaidml_error* err);
+
 PLAIDML_EDSL_API plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                                               //
     plaidml_datatype dtype,                                           //
@@ -253,6 +256,28 @@ PLAIDML_EDSL_API void plaidml_expr_contraction_set_use_default(  //
     plaidml_error* err,                                          //
     plaidml_expr* expr,                                          //
     plaidml_expr* use_default);
+
+PLAIDML_EDSL_API void plaidml_expr_gradient(  //
+    plaidml_error* err,                       //
+    size_t nwrts,                             //
+    plaidml_expr** wrts,                      //
+    plaidml_expr* result,                     //
+    plaidml_expr* loss,                       //
+    plaidml_expr** derivs);
+
+typedef void (*plaidml_deriv)(  //
+    void* user_ctx,             //
+    plaidml_expr* Y,            //
+    plaidml_expr* dY,           //
+    size_t nXs,                 //
+    plaidml_expr** Xs,          //
+    plaidml_expr** dXs);
+
+PLAIDML_EDSL_API void plaidml_deriv_register(  //
+    plaidml_error* err,                        //
+    const char* name,                          //
+    plaidml_deriv fn,                          //
+    void* user_ctx);
 
 PLAIDML_EDSL_API void plaidml_program_free(  //
     plaidml_error* err,                      //

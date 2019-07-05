@@ -3,6 +3,7 @@
 #include <boost/format.hpp>
 
 #include "base/util/stream_container.h"
+#include "plaidml2/edsl/autodiff.h"
 #include "tile/util/tile_file.h"
 
 namespace vertexai {
@@ -37,6 +38,16 @@ Tensor MatMul(const Tensor& A, const Tensor& B) {
   auto C = NamedTensorOutput("C", M, N);
   C(m, n) += A(m, k) * B(k, n);
   return C;
+}
+
+Tensor Max2Da0(const Tensor& A) {
+  TensorDim M, N;
+  A.bind_dims(M, N);
+  TensorIndex m("m"), n("n");
+  auto O = NamedTensorOutput("O", N);
+  O(n) >= A(m, n);
+  // O(n) += A(m, n);
+  return O;
 }
 
 Tensor DilatedConvolution2(const Tensor& I, const Tensor& K) {
@@ -136,6 +147,51 @@ lang::RunInfo LoadMatMul(const std::string& name, const LogicalShape& i1, const 
   Tensor A("A", i1);
   Tensor B("B", i2);
   return Evaluate(name, {MatMul(A, B)});
+}
+
+lang::RunInfo LoadMatMulGradient(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+  Tensor A("A", i1);
+  Tensor B("B", i2);
+  Tensor O = MatMul(A, B);
+  auto A_dims = A.shape().int_dims();
+  auto B_dims = B.shape().int_dims();
+  Tensor dO("dO", LogicalShape(A.shape().dtype(), {A_dims[0], B_dims[1]}));
+  auto grads = Gradient({A, B}, O, dO);
+  return Evaluate(name, grads);
+}
+
+lang::RunInfo LoadMultiMatMulGradient(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+  // Note: This should fail if i1 isn't square
+  Tensor A("A", i1);
+  Tensor B("B", i2);
+  Tensor C = MatMul(A, B);
+  Tensor D = MatMul(A, C);
+  Tensor O = Max2Da0(D);
+  auto B_dims = B.shape().int_dims();
+  Tensor dO("dO", LogicalShape(A.shape().dtype(), {B_dims[1]}));
+  auto grads = Gradient({A, B}, O, dO);
+  return Evaluate(name, grads);
+}
+
+namespace deriv {
+
+std::vector<Tensor> sqrt(const Tensor& Y, const Tensor& dY, const std::vector<Tensor>& X) {  //
+  return {dY / (2 * Y)};
+}
+
+}  // namespace deriv
+
+lang::RunInfo LoadMatMulSqrtGradient(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+  Tensor A("A", i1);
+  Tensor B("B", i2);
+  Tensor C = MatMul(A, B);
+  Tensor O = sqrt(C);
+  auto A_dims = A.shape().int_dims();
+  auto B_dims = B.shape().int_dims();
+  Tensor dO("dO", LogicalShape(A.shape().dtype(), {A_dims[0], B_dims[1]}));
+  RegisterTensorDeriv("sqrt", deriv::sqrt);
+  auto grads = Gradient({A, B}, O, dO);
+  return Evaluate(name, grads);
 }
 
 lang::RunInfo LoadMatMulIntermediate(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,

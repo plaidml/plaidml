@@ -30,6 +30,18 @@ lang::RunInfo LoadMatMul(const std::string& name,     //
                          const LogicalShape& input1,  //
                          const LogicalShape& input2);
 
+lang::RunInfo LoadMatMulGradient(const std::string& name,     //
+                                 const LogicalShape& input1,  //
+                                 const LogicalShape& input2);
+
+lang::RunInfo LoadMultiMatMulGradient(const std::string& name,     //
+                                      const LogicalShape& input1,  //
+                                      const LogicalShape& input2);
+
+lang::RunInfo LoadMatMulSqrtGradient(const std::string& name,     //
+                                     const LogicalShape& input1,  //
+                                     const LogicalShape& input2);
+
 lang::RunInfo LoadMatMulIntermediate(const std::string& name,  //
                                      const LogicalShape& i1,   //
                                      const LogicalShape& i2,   //

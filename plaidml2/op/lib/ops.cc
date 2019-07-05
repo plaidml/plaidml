@@ -1,6 +1,6 @@
 // Copyright 2019 Intel Corporation.
 
-#include "plaidml2/op/ops.h"
+#include "plaidml2/op/lib/ops.h"
 
 #include "base/util/logging.h"
 
@@ -121,12 +121,11 @@ Value sum(const Value& value) {
   return Value{O};
 }
 
-[[gnu::unused]] auto init = []() {
+void RegisterOps() {
   auto registry = OperationRegistry::Instance();
   registry->Register("mean", mean);
   registry->Register("sum", sum);
-  return 0;
-}();
+}
 
 }  // namespace op
 }  // namespace plaidml

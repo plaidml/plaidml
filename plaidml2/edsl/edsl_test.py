@@ -384,5 +384,4 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', type=int, default=0)
     args, remainder = parser.parse_known_args()
-    # plaidml._internal_set_vlog(args.verbose)
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

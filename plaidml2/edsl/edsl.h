@@ -63,6 +63,11 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 
 }  // namespace details
 
+inline void init() {
+  plaidml::init();
+  ffi::call_void(plaidml_edsl_init);
+}
+
 class Program {
  public:
   Program(const std::string& name, const std::vector<Tensor>& tensors);
@@ -543,6 +548,8 @@ inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint",
 
 inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 
+inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
+
 inline Tensor exp(const Tensor& x) { return Call("exp", x); }
 
 inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x, y); }
@@ -593,11 +600,15 @@ inline Tensor sigmoid(const Tensor& x) { return Call("sigmoid", x); }
 
 inline Tensor sin(const Tensor& x) { return Call("sin", x); }
 
+inline Tensor sinh(const Tensor& x) { return Call("sinh", x); }
+
 inline Tensor sqrt(const Tensor& x) { return Call("sqrt", x); }
 
 inline Tensor tan(const Tensor& x) { return Call("tan", x); }
 
 inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
+
+inline Tensor zero() { return Tensor{0}; }
 
 inline std::ostream& operator<<(std::ostream& os, const LogicalShape& shape) {
   os << shape.str();

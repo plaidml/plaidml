@@ -2,6 +2,8 @@
 
 #include "plaidml2/exec/ffi.h"
 
+#include <mutex>
+
 #include <boost/format.hpp>
 
 #include "plaidml2/core/internal.h"
@@ -57,6 +59,16 @@ struct plaidml_executable {
   BufferMap output_bufs;
   std::shared_ptr<Program> program;
 };
+
+void plaidml_exec_init(  //
+    plaidml_error* err) {
+  static std::once_flag is_initialized;
+  ffi_wrap_void(err, [&] {
+    std::call_once(is_initialized, []() {  //
+      IVLOG(1, "plaidml_exec_init");
+    });
+  });
+}
 
 size_t plaidml_device_list_count(  //
     plaidml_error* err) {

@@ -2,6 +2,8 @@
 
 #include "plaidml2/core/ffi.h"
 
+#include <mutex>
+
 #include <boost/filesystem.hpp>
 
 #include "base/util/env.h"
@@ -62,9 +64,9 @@ void load_settings() {
 extern "C" {
 
 void plaidml_init(plaidml_error* err) {
-  static std::atomic<bool> is_initialized{false};
+  static std::once_flag is_initialized;
   ffi_wrap_void(err, [&] {
-    if (!is_initialized) {
+    std::call_once(is_initialized, []() {
       auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
       if (level_str.size()) {
         auto level = std::atoi(level_str.c_str());
@@ -74,8 +76,7 @@ void plaidml_init(plaidml_error* err) {
       }
       IVLOG(1, "plaidml_init");
       load_settings();
-      is_initialized = true;
-    }
+    });
   });
 }
 

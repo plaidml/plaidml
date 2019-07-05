@@ -13,6 +13,11 @@
 namespace plaidml {
 namespace exec {
 
+inline void init() {  //
+  plaidml::init();
+  ffi::call_void(plaidml_exec_init);
+}
+
 namespace details {
 
 template <typename T>
