@@ -79,10 +79,12 @@ class _View(ForeignObject):
 
     def copy_from_ndarray(self, src):
         dst = np.frombuffer(self.data, dtype=self.shape.dtype.into_numpy())
+        dst = dst.reshape(self.shape.sizes)
         np.copyto(dst, src)
 
     def copy_to_ndarray(self, dst):
         src = np.frombuffer(self.data, dtype=self.shape.dtype.into_numpy())
+        src = src.reshape(self.shape.sizes)
         np.copyto(dst, src)
 
 

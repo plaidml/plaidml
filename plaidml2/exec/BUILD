@@ -35,7 +35,6 @@ plaidml_cc_library(
         ],
         "//conditions:default": [],
     }),
-    alwayslink = 1,
 )
 
 plaidml_cc_library(

@@ -1,3 +1,5 @@
+// Copyright 2019 Intel Corporation.
+
 #pragma once
 
 #include <memory>

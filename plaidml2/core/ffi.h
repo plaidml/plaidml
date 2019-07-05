@@ -77,6 +77,9 @@ typedef struct {
 PLAIDML_CORE_API void plaidml_init(  //
     plaidml_error* err);
 
+PLAIDML_CORE_API const char* plaidml_version(  //
+    plaidml_error* err);
+
 PLAIDML_CORE_API size_t plaidml_settings_list_count(  //
     plaidml_error* err);
 
@@ -85,6 +88,21 @@ PLAIDML_CORE_API void plaidml_settings_list(  //
     size_t nitems,                            //
     plaidml_string** keys,                    //
     plaidml_string** values);
+
+PLAIDML_CORE_API plaidml_string* plaidml_settings_get(  //
+    plaidml_error* err,                                 //
+    const char* key);
+
+PLAIDML_CORE_API void plaidml_settings_set(  //
+    plaidml_error* err,                      //
+    const char* key,                         //
+    const char* value);
+
+PLAIDML_CORE_API void plaidml_settings_load(  //
+    plaidml_error* err);
+
+PLAIDML_CORE_API void plaidml_settings_save(  //
+    plaidml_error* err);
 
 //
 // Shape

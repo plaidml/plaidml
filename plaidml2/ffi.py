@@ -15,20 +15,23 @@ logger = logging.getLogger(__name__)
 _TLS = threading.local()
 _TLS.err = ffi.new('plaidml_error*')
 
+if platform.system() == 'Windows':
+    lib_name = 'plaidml.dll'
+elif platform.system() == 'Darwin':
+    lib_name = 'libplaidml.dylib'
+else:
+    lib_name = 'libplaidml.so'
+
+lib_path = os.getenv('PLAIDML_LIB_PATH')
+if not lib_path:
+    lib_path = pkg_resources.resource_filename(__name__, lib_name)
+
 
 def __load_library():
-    native_path = os.getenv('PLAIDML_NATIVE_PATH')
-    if native_path:
-        return ffi.dlopen(native_path)
-
-    if platform.system() == 'Windows':
-        lib_name = 'plaidml.dll'
-    elif platform.system() == 'Darwin':
-        lib_name = 'libplaidml.dylib'
-    else:
-        lib_name = 'libplaidml.so'
-
-    lib_path = pkg_resources.resource_filename(__name__, lib_name)
+    if os.getenv('PLAIDML_VERBOSE'):
+        logger.addHandler(logging.StreamHandler())
+        logger.setLevel(logging.DEBUG)
+    logger.debug('Loading {} from {}'.format(lib_name, lib_path))
     return ffi.dlopen(lib_path)
 
 

@@ -1,6 +1,7 @@
 # Copyright 2019 Intel Corporation.
 
 load("//tools/py_cffi:build_defs.bzl", "py_cffi")
+load("//bzl:conda.bzl", "conda_binary", "conda_test")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_dylib",
@@ -46,12 +47,12 @@ plaidml_py_library(
     srcs = [
         "__init__.py",
         "ffi.py",
-        "settings.py",
     ],
     data = [":dylib"],
     visibility = ["//visibility:public"],
     deps = [
         ":_ffi",
+        "//plaidml2/core:py",
     ],
 )
 
@@ -63,5 +64,18 @@ py_cffi(
         "//plaidml2/edsl:ffi.h",
         "//plaidml2/exec:ffi.h",
         "//plaidml2/op:ffi.h",
+    ],
+)
+
+conda_binary(
+    name = "setup",
+    srcs = ["plaidml_setup.py"],
+    env = "@com_intel_plaidml_conda//:env",
+    main = "plaidml_setup.py",
+    deps = [
+        ":py",
+        "//plaidml2/edsl:py",
+        "//plaidml2/exec:py",
+        "//plaidml2/op:py",
     ],
 )

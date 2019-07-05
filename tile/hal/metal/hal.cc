@@ -2,6 +2,7 @@
 
 #include "tile/hal/metal/hal.h"
 
+#include "base/util/env.h"
 #include "base/util/error.h"
 #include "base/util/factory.h"
 #include "tile/hal/opencl/opencl.pb.h"
@@ -48,8 +49,13 @@ std::string Device::description() {  //
 
 hal::proto::HardwareInfo Device::GetHardwareInfo() {
   hal::proto::HardwareInfo info;
-
-  info.set_name(std::string("Metal ") + name());
+  auto clean_name = name();
+  if (vertexai::env::Get("PLAIDML_CLEANUP_NAMES").size()) {
+    if (clean_name.find("Intel(R) ") == 0) {
+      clean_name = "Intel " + clean_name.substr(9);
+    }
+  }
+  info.set_name(std::string("Metal ") + clean_name);
   info.set_vendor("Metal");
   info.set_platform("Metal");
 

@@ -277,12 +277,24 @@ plaidml_cc_version = rule(
         "prefix": attr.string(mandatory = True),
         "_template": attr.label(
             default = Label("//bzl:version.tpl.cc"),
-            allow_files = True,
-            single_file = True,
+            allow_single_file = True,
         ),
     },
     output_to_genfiles = True,
     outputs = {"version_file": "_version.cc"},
+    implementation = _plaidml_version_impl,
+)
+
+plaidml_py_version = rule(
+    attrs = {
+        "prefix": attr.string(mandatory = True),
+        "_template": attr.label(
+            default = Label("//bzl:version.tpl.py"),
+            allow_single_file = True,
+        ),
+    },
+    output_to_genfiles = True,
+    outputs = {"version_file": "_version.py"},
     implementation = _plaidml_version_impl,
 )
 

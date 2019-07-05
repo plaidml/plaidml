@@ -125,15 +125,16 @@ class Executable {
       outputs_storage[i].buffer = outputs[i].buffer.as_ptr();
       raw_outputs[i] = &outputs_storage[i];
     }
-    ptr_ = details::make_plaidml_executable(ffi::call<plaidml_executable*>(  //
-        plaidml_compile,                                                     //
-        program.as_ptr(),                                                    //
-        device_id.c_str(),                                                   //
-        target_id.c_str(),                                                   //
-        raw_inputs.size(),                                                   //
-        raw_inputs.data(),                                                   //
-        raw_outputs.size(),                                                  //
-        raw_outputs.data()));
+    ptr_ = details::make_plaidml_executable(  //
+        ffi::call<plaidml_executable*>(       //
+            plaidml_compile,                  //
+            program.as_ptr(),                 //
+            device_id.c_str(),                //
+            target_id.c_str(),                //
+            raw_inputs.size(),                //
+            raw_inputs.data(),                //
+            raw_outputs.size(),               //
+            raw_outputs.data()));
   }
 
   void run() {  //

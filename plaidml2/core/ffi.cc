@@ -8,58 +8,16 @@
 
 #include "base/util/env.h"
 #include "plaidml2/core/internal.h"
+#include "plaidml2/core/settings.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
+using plaidml::core::Settings;
 using vertexai::tile::DataType;
 using vertexai::tile::TensorDimension;
 using vertexai::tile::TensorShape;
-namespace fs = boost::filesystem;
 
-namespace {
-
-std::map<std::string, std::string> g_settings;
-
-fs::path user_path() {
-  auto home = vertexai::env::Get("HOME");
-  if (home.size()) {
-    return home;
-  }
-  auto user_profile = vertexai::env::Get("USERPROFILE");
-  if (user_profile.size()) {
-    return user_profile;
-  }
-  auto home_drive = vertexai::env::Get("HOMEDRIVE");
-  auto home_path = vertexai::env::Get("HOMEPATH");
-  if (home_drive.size() && home_path.size()) {
-    return home_drive + home_path;
-  }
-  throw std::runtime_error("Could not detect HOME/USERPROFILE");
-}
-
-void load_settings() {
-  fs::path settings_path = vertexai::env::Get("PLAIDML_SETTINGS");
-  if (!fs::exists(settings_path)) {
-    settings_path = user_path() / ".plaidml2";
-  }
-  if (!fs::exists(settings_path)) {
-    LOG(WARNING) << "No PlaidML settings found.";
-    return;
-  }
-  fs::ifstream file(settings_path);
-  for (std::string line; std::getline(file, line);) {
-    auto pos = line.find('=');
-    if (pos != std::string::npos) {
-      auto key = line.substr(0, pos);
-      auto value = line.substr(pos + 1);
-      IVLOG(1, key << " = " << value);
-      vertexai::env::Set(key, value);
-      g_settings[key] = value;
-    }
-  }
-}
-
-}  // namespace
+extern const char* PLAIDML_VERSION;
 
 extern "C" {
 
@@ -67,6 +25,7 @@ void plaidml_init(plaidml_error* err) {
   static std::once_flag is_initialized;
   ffi_wrap_void(err, [&] {
     std::call_once(is_initialized, []() {
+      vertexai::env::Set("PLAIDML_CLEANUP_NAMES", "1");
       auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
       if (level_str.size()) {
         auto level = std::atoi(level_str.c_str());
@@ -75,15 +34,22 @@ void plaidml_init(plaidml_error* err) {
         }
       }
       IVLOG(1, "plaidml_init");
-      load_settings();
+      Settings::Instance()->load();
     });
+  });
+}
+
+const char* plaidml_version(  //
+    plaidml_error* err) {
+  return ffi_wrap<const char*>(err, nullptr, [&] {  //
+    return PLAIDML_VERSION;
   });
 }
 
 size_t plaidml_settings_list_count(  //
     plaidml_error* err) {
   return ffi_wrap<size_t>(err, 0, [&] {  //
-    return g_settings.size();
+    return Settings::Instance()->all().size();
   });
 }
 
@@ -94,11 +60,42 @@ void plaidml_settings_list(  //
     plaidml_string** values) {
   ffi_wrap_void(err, [&] {
     size_t i = 0;
-    for (const auto& kvp : g_settings) {
-      keys[i] = new plaidml_string{kvp.first};
-      values[i] = new plaidml_string{kvp.second};
-      i++;
+    const auto& settings = Settings::Instance()->all();
+    for (auto it = settings.begin(); it != settings.end() && i < nitems; it++, i++) {
+      keys[i] = new plaidml_string{it->first};
+      values[i] = new plaidml_string{it->second};
     }
+  });
+}
+
+void plaidml_settings_load(  //
+    plaidml_error* err) {
+  ffi_wrap_void(err, [&] {  //
+    Settings::Instance()->load();
+  });
+}
+
+void plaidml_settings_save(  //
+    plaidml_error* err) {
+  ffi_wrap_void(err, [&] {  //
+    Settings::Instance()->save();
+  });
+}
+
+plaidml_string* plaidml_settings_get(  //
+    plaidml_error* err,                //
+    const char* key) {
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&]() -> plaidml_string* {  //
+    return new plaidml_string{Settings::Instance()->get(key)};
+  });
+}
+
+void plaidml_settings_set(  //
+    plaidml_error* err,     //
+    const char* key,        //
+    const char* value) {
+  ffi_wrap_void(err, [&] {  //
+    Settings::Instance()->set(key, value);
   });
 }
 

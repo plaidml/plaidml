@@ -8,6 +8,7 @@ exports_files([
     "setup.tpl.py",
     "sphinx.py",
     "version.tpl.cc",
+    "version.tpl.py",
 ])
 
 config_setting(

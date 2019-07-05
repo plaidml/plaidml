@@ -1,7 +1,5 @@
 # Copyright 2019 Intel Corporation.
 
-import os
-
 from plaidml2.ffi import decode_str, ffi, ffi_call, lib
 
 
@@ -14,11 +12,20 @@ def all():
 
 
 def get(key):
-    ret = os.getenv(key, all().get(key))
+    ret = decode_str(ffi_call(lib.plaidml_settings_get, key.encode()))
     if ret is None:
         raise EnvironmentError('Could not find setting: {}'.format(key))
     return ret
 
 
 def set(key, value):
-    pass
+    ffi_call(lib.plaidml_settings_set, key.encode(), value.encode())
+
+
+def save():
+    ffi_call(lib.plaidml_settings_save)
+
+
+def load():
+    ffi_call(lib.plaidml_settings_load)
+    return all()
