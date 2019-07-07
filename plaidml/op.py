@@ -988,9 +988,9 @@ class All(tile.Operation):
         shape, axis, subs = tile.compute_aggregation_axes(x.shape.dims, axis, keepdims)
 
         f = """function (I[{src_ranges}]) -> (O) {{
-                   M[{dest_indices}{dest_sep}{dest_ranges}] = *(I[{src_indices}]);
-                   Temp = (M == 0.0 ? 0.0 : 1.0);
-                   O = as_uint(Temp, 8);
+                   Temp = (I == 0.0 ? 0.0 : 1.0);
+                   M[{dest_indices}{dest_sep}{dest_ranges}] = *(Temp[{src_indices}]);
+                   O = as_uint(M, 8);
                }}""".format(**subs)
 
         super(All, self).__init__(f, [('I', x)], [('O', tile.Shape(plaidml.DType.UINT8, shape))])
