@@ -22,9 +22,7 @@ def op(op_name, args):
 
 
 def mean(I, axis=None, keepdims=False):
-    if axis is None:
-        axis = list(range(I.shape.ndims))
-    elif isinstance(axis, np.ndarray):
+    if isinstance(axis, np.ndarray):
         axis = axis.tolist()
     return op("mean", [I, axis, keepdims]).as_tensor()
 
@@ -34,8 +32,6 @@ def square(I):
 
 
 def sum(I, axis=None, keepdims=False):
-    if axis is None:
-        axis = list(range(I.shape.ndims))
-    elif isinstance(axis, np.ndarray):
+    if isinstance(axis, np.ndarray):
         axis = axis.tolist()
     return op("sum", [I, axis, keepdims]).as_tensor()

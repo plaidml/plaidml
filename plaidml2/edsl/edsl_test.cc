@@ -6,12 +6,16 @@
 #include "base/util/logging.h"
 #include "plaidml2/edsl/autodiff.h"
 #include "plaidml2/edsl/edsl.h"
-#include "tile/lang/compose.h"
 
 using ::testing::Eq;
 
 namespace plaidml {
 namespace edsl {
+
+bool operator==(const Program& lhs, const std::string& rhs) {  //
+  return lhs.str() == rhs;
+}
+
 namespace {
 
 class Environment : public ::testing::Environment {
@@ -25,12 +29,6 @@ class Environment : public ::testing::Environment {
   ::testing::AddGlobalTestEnvironment(new Environment);
   return 0;
 }();
-
-std::string Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
-  Program program(name, vars);
-  auto runinfo = static_cast<const vertexai::tile::lang::RunInfo*>(program.runinfo());
-  return to_string(runinfo->program);
-}
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
@@ -70,7 +68,7 @@ TEST(CppEdsl, MnistMlp) {
   Tensor kernel3(LogicalShape(PLAIDML_DATA_FLOAT32, {512, 10}));
   Tensor bias3(LogicalShape(PLAIDML_DATA_FLOAT32, {10}));
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
-  auto program = Evaluate("mnist_mlp", {dense3});
+  Program program("mnist_mlp", {dense3});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1],
@@ -163,7 +161,7 @@ TEST(CppEdsl, MnistCnn) {
   Tensor kernel4(LogicalShape(PLAIDML_DATA_FLOAT32, {128, kNumClasses}));
   Tensor bias4(LogicalShape(PLAIDML_DATA_FLOAT32, {kNumClasses}));
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
-  auto program = Evaluate("mnist_cnn", {dense2});
+  Program program("mnist_cnn", {dense2});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3],
@@ -241,7 +239,7 @@ TEST(CppEdsl, LarsMomentum4d) {
   Tensor Veloc(X_shape);
   Tensor LR(LR_shape);
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
-  auto program = Evaluate("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
+  Program program("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X1[_X1_0, _X1_1, _X1_2, _X1_3],
@@ -287,7 +285,7 @@ TEST(CppEdsl, RepeatElements) {
     O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
     O.no_defract();
   }
-  auto program = Evaluate("repeat_elts", {O});
+  Program program("repeat_elts", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2]
@@ -308,7 +306,7 @@ TEST(CppEdsl, UseDefault) {
   auto O = TensorOutput(B, 7, N1, N2);
   O(b, 3, i1, i2) = I(b, i1, i2);
   O.use_default(P);
-  auto program = Evaluate("use_default", {O});
+  Program program("use_default", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3],
@@ -341,7 +339,7 @@ Tensor ArgMax(const Tensor& I) {
 TEST(CppEdsl, ArgMax) {
   Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 10, 10}));
   auto X = ArgMax(I);
-  auto program = Evaluate("arg_max", {X});
+  Program program("arg_max", {X});
   IVLOG(1, program);
   EXPECT_THAT(X.shape(), Eq(LogicalShape(PLAIDML_DATA_UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"(function (
@@ -401,7 +399,7 @@ TEST(CppEdsl, Winograd) {
   Tensor B(LogicalShape(PLAIDML_DATA_FLOAT32, {BI, BI}));
   Tensor G(LogicalShape(PLAIDML_DATA_FLOAT32, {BI, S}));
   auto W = Winograd(I, K, A, B, G);
-  auto program = Evaluate("winograd", {W});
+  Program program("winograd", {W});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1],
@@ -429,7 +427,7 @@ TEST(CppEdsl, UniqueNames) {
   Tensor B("B", shape);
   Tensor C0("C", shape);
   Tensor C1("C", shape);
-  auto program = Evaluate("unique_names", {A + B + C0 + C1});
+  Program program("unique_names", {A + B + C0 + C1});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[],
@@ -453,7 +451,7 @@ TEST(CppEdsl, GlobalMin) {
   auto Neg = -I;
   O_Neg() >= Neg(i, j, k);
   auto O = -O_Neg;
-  auto program = Evaluate("global_min", {O});
+  Program program("global_min", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0, I_1, I_2]
@@ -476,7 +474,7 @@ TEST(CppEdsl, CumSum) {
   if (i - k < N) {
     O(i) += I(k);
   }
-  auto program = Evaluate("csum", {O});
+  Program program("csum", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0]
@@ -529,7 +527,7 @@ TEST(CppEdsl, ComplexConv2d) {
   Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3, 3}));
   Tensor K(LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3, 32}));
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
-  auto program = Evaluate("complex_conv_2d", {O});
+  Program program("complex_conv_2d", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3, _X0_4],
@@ -544,7 +542,7 @@ TEST(CppEdsl, ComplexConv2d) {
 
 TEST(CppEdsl, Reciprocal) {
   Tensor A("A", LogicalShape(PLAIDML_DATA_FLOAT32, {10}));
-  auto program = Evaluate("reciprocal", {1 / A});
+  Program program("reciprocal", {1 / A});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0]
@@ -565,7 +563,7 @@ TEST(CppEdsl, GradientDot) {
   auto B_dims = B.shape().int_dims();
   Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {A_dims[0], B_dims[1]}));
   auto grads = Gradient({A, B}, O, dO);
-  auto program = Evaluate("gradient_dot", {grads});
+  Program program("gradient_dot", {grads});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
@@ -600,7 +598,7 @@ TEST(CppEdsl, GradientMultiDot) {
   auto B_dims = B.shape().int_dims();
   Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {B_dims[1]}));
   auto grads = Gradient({A, B}, O, dO);
-  auto program = Evaluate("gradient_dot", {grads});
+  Program program("gradient_dot", {grads});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
@@ -632,7 +630,7 @@ TEST(CppEdsl, GradientDotSqrt) {
   auto B_dims = B.shape().int_dims();
   Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {A_dims[0], B_dims[1]}));
   auto grads = Gradient({A, B}, O, dO);
-  auto program = Evaluate("gradient_dot", {grads});
+  Program program("gradient_dot", {grads});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],

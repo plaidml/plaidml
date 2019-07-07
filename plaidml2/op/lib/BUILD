@@ -15,6 +15,7 @@ plaidml_cc_library(
         "//base/util",
         "//plaidml2/core",
         "//plaidml2/edsl",
+        "//plaidml2/op:api",
         "@boost",
     ],
 )

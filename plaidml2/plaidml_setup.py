@@ -14,18 +14,18 @@ import plaidml2.exec as plaidml_exec
 import plaidml2.settings as plaidml_settings
 
 
+def choice_prompt(question, choices, default):
+    inp = ""
+    while not inp in choices:
+        inp = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
+        if not inp:
+            inp = default
+        elif inp not in choices:
+            print("Invalid choice: {}".format(inp))
+    return inp
+
+
 def main():
-
-    def choice_prompt(question, choices, default):
-        inp = ""
-        while not inp in choices:
-            inp = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
-            if not inp:
-                inp = default
-            elif inp not in choices:
-                print("Invalid choice: {}".format(inp))
-        return inp
-
     print("""
 PlaidML Setup ({0})
 
@@ -112,13 +112,15 @@ Please choose a default device:
         return [x.as_ndarray() for x in exe([y for x, y in inputs])]
 
     run(program, [(B, np.random.rand(3, 3)), (C, np.random.rand(3, 3))], [A])
-    print("Whew. That worked.\n")
+    print("Whew. That worked.")
+    print()
 
     settings_path = plaidml_settings.get('PLAIDML_SETTINGS')
     save = choice_prompt("Save settings to {0}".format(settings_path), ["y", "n"], "y")
     if save == "y":
         plaidml_settings.save()
-    print("Success!\n")
+    print("Success!")
+    print()
 
 
 if __name__ == "__main__":

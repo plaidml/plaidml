@@ -20,7 +20,7 @@ struct plaidml_shape {
 };
 
 struct plaidml_expr {
-  std::shared_ptr<vertexai::tile::lang::ast::Expr> expr;
+  vertexai::tile::lang::ast::ExprPtr expr;
 };
 
 struct plaidml_program {

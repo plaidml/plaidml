@@ -3,9 +3,11 @@
 #include "plaidml2/bridge/pytorch/compiler.h"
 
 #include "plaidml2/bridge/pytorch/logging.h"
+#include "plaidml2/op/op.h"
 
 using namespace torch::jit;  // NOLINT
 namespace edsl = plaidml::edsl;
+namespace op = plaidml::op;
 
 using OpFunction = std::function<edsl::Tensor(const std::vector<edsl::Value>& args)>;
 
@@ -146,68 +148,51 @@ edsl::Tensor batch_norm(const std::vector<edsl::Value>& args) {
 edsl::Tensor convolution(const std::vector<edsl::Value>& args) {
   IVLOG(1, "convolution");
 
-  const auto& I = args[0].as_tensor();  // input
-  IVLOG(2, "  I: " << I.shape().str());
+  auto I = args[0].as_tensor();  // input
+  IVLOG(2, "  I: " << I.shape());
 
-  const auto& K = args[1].as_tensor();  // weight
-  IVLOG(2, "  K: " << K.str());
+  auto K = args[1].as_tensor();  // weight
+  IVLOG(2, "  K: " << K);
 
-  const auto& bias = args[2];  // bias
-  IVLOG(2, "  bias: " << bias.str());
+  auto bias = args[2];  // bias
+  IVLOG(2, "  bias: " << bias);
 
-  const auto& S = args[3].as_tuple();  // stride
-  IVLOG(2, "  strides: " << args[3].str());
+  auto S = args[3].as_tuple();  // stride
+  IVLOG(2, "  strides: " << args[3]);
 
-  const auto& P = args[4].as_tuple();  // padding
-  IVLOG(2, "  padding: " << args[4].str());
+  auto P = args[4].as_tuple();  // padding
+  IVLOG(2, "  padding: " << args[4]);
 
-  const auto& D = args[5].as_tuple();  // dilation
-  IVLOG(2, "  dilation: " << args[5].str());
+  auto D = args[5].as_tuple();  // dilation
+  IVLOG(2, "  dilation: " << args[5]);
 
-  const auto& is_transposed = args[6];  // transposed
-  IVLOG(2, "  is_transposed: " << is_transposed.str());
+  auto is_transposed = args[6];  // transposed
+  IVLOG(2, "  is_transposed: " << is_transposed);
 
-  const auto& output_padding = args[7];  // output_padding
-  IVLOG(2, "  output_padding: " << output_padding.str());
+  auto output_padding = args[7];  // output_padding
+  IVLOG(2, "  output_padding: " << output_padding);
 
-  const auto& groups = args[8];  // groups
-  IVLOG(2, "  groups: " << groups.str());
+  auto groups = args[8].as_int();  // groups
+  IVLOG(2, "  groups: " << groups);
 
-  auto ndims = S.size();
-
-  edsl::TensorDim N, CI, CO;
-  edsl::TensorIndex n, ci, co;
-
-  std::vector<edsl::TensorDim> I_spatial_dims(ndims);
-  std::vector<edsl::TensorDim> I_dims = {N, CI};
-  std::vector<edsl::TensorIndex> I_idxs = {n, ci};
-  I_dims.insert(std::end(I_dims), std::begin(I_spatial_dims), std::end(I_spatial_dims));
-  I.bind_dims(I_dims);
-
-  std::vector<edsl::TensorDim> K_spatial_dims(ndims);
-  std::vector<edsl::TensorDim> K_dims = {CO, CI};
-  std::vector<edsl::TensorIndex> K_idxs = {co, ci};
-  K_dims.insert(std::end(K_dims), std::begin(K_spatial_dims), std::end(K_spatial_dims));
-  K.bind_dims(K_dims);
-
-  std::vector<edsl::TensorDim> O_dims = {N, CO};
-  std::vector<edsl::TensorIndex> O_idxs = {n, co};
-
-  for (size_t i = 0; i < ndims; i++) {
-    edsl::TensorIndex x;
-    edsl::TensorIndex k;
-    I_idxs.emplace_back(S[i].as_int() * x + D[i].as_int() * k - P[i].as_int());
-    O_idxs.push_back(x);
-    K_idxs.push_back(k);
-    O_dims.emplace_back(
-        (I_spatial_dims[i] + 2 * P[i].as_int() - D[i].as_int() * (K_spatial_dims[i] - 1) - 1) / S[i].as_int() + 1);
+  std::vector<int> strides(S.size());
+  for (size_t i = 0; i < S.size(); i++) {
+    strides[i] = S[0].as_int();
   }
+  std::vector<int> padding(P.size());
+  for (size_t i = 0; i < P.size(); i++) {
+    padding[i] = P[0].as_int();
+  }
+  std::vector<int> dilation(D.size());
+  for (size_t i = 0; i < D.size(); i++) {
+    dilation[i] = D[0].as_int();
+  }
+  auto O = op::convolution(I, K, strides, padding, dilation, groups, op::NCHW, op::KCHW);
 
-  edsl::Tensor O(O_dims);
-  O(O_idxs) += I(I_idxs) * K(K_idxs);
+  edsl::TensorDim N, C, H, W;
+  O.bind_dims(N, C, H, W);
   if (!bias.is_none()) {
-    std::vector<edsl::TensorDim> dims{N, CO, edsl::TensorDim{1}, edsl::TensorDim{1}};
-    O = O + edsl::reshape(bias.as_tensor(), dims);
+    O = O + edsl::reshape(bias.as_tensor(), {N, C, edsl::TensorDim{1}, edsl::TensorDim{1}});
   }
   return O;
 }

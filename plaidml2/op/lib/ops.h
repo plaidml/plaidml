@@ -9,6 +9,7 @@
 
 namespace plaidml {
 namespace op {
+namespace lib {
 
 using Operation = std::function<edsl::Value(const edsl::Value& value)>;
 
@@ -37,5 +38,6 @@ class OperationRegistry {
 
 void RegisterOps();
 
+}  // namespace lib
 }  // namespace op
 }  // namespace plaidml

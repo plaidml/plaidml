@@ -66,11 +66,11 @@ struct plaidml_logical_shape {
 };
 
 struct plaidml_dim_expr {
-  std::shared_ptr<DimExpr> expr;
+  DimExprPtr expr;
 };
 
 struct plaidml_poly_expr {
-  std::shared_ptr<PolyExpr> expr;
+  PolyExprPtr expr;
 };
 
 void plaidml_edsl_init(  //
@@ -88,10 +88,12 @@ plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                              //
     plaidml_datatype dtype,                          //
     size_t ndims,                                    //
-    const int64_t* dims) {
+    const int64_t* dims,                             //
+    const char* layout) {
   return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
     auto ret = new plaidml_logical_shape;
     ret->shape.dtype = static_cast<DataType>(dtype);
+    ret->shape.layout = layout;
     for (size_t i = 0; i < ndims; i++) {
       auto int_expr = std::make_shared<DimIntExpr>(dims[i]);
       ret->shape.dims.emplace_back(LogicalDim{int_expr});
@@ -107,6 +109,14 @@ plaidml_string* plaidml_logical_shape_repr(  //
     std::stringstream ss;
     ss << shape->shape.str();
     return new plaidml_string{ss.str()};
+  });
+}
+
+plaidml_string* plaidml_logical_shape_get_layout(  //
+    plaidml_error* err,                            //
+    plaidml_logical_shape* shape) {
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
+    return new plaidml_string{shape->shape.layout};
   });
 }
 
@@ -188,7 +198,7 @@ void plaidml_expr_bind_dims(  //
     size_t ndims,             //
     plaidml_dim_expr** dims) {
   return ffi_wrap_void(err, [&] {
-    std::vector<std::shared_ptr<DimExpr>> vec_dims(ndims);
+    std::vector<DimExprPtr> vec_dims(ndims);
     for (size_t i = 0; i < ndims; i++) {
       vec_dims[i] = dims[i]->expr;
     }
@@ -239,6 +249,9 @@ plaidml_expr_kind plaidml_expr_get_kind(  //
   return ffi_wrap<plaidml_expr_kind>(err, PLAIDML_EXPR_NONE, [&] {
     if (std::dynamic_pointer_cast<NoneExpr>(expr->expr)) {
       return PLAIDML_EXPR_NONE;
+    }
+    if (std::dynamic_pointer_cast<StringExpr>(expr->expr)) {
+      return PLAIDML_EXPR_STR;
     }
     if (std::dynamic_pointer_cast<IntConst>(expr->expr)) {
       return PLAIDML_EXPR_INT;
@@ -299,6 +312,29 @@ void plaidml_expr_tuple_get_exprs(  //
     for (size_t i = 0; i < std::min(nexprs, tuple_expr->exprs.size()); i++) {
       exprs[i] = new plaidml_expr{tuple_expr->exprs[i]};
     }
+  });
+}
+
+plaidml_expr* plaidml_expr_str(  //
+    plaidml_error* err,          //
+    const char* value) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {  //
+    return new plaidml_expr{std::make_shared<StringExpr>(value)};
+  });
+}
+
+plaidml_string* plaidml_expr_str_get_value(  //
+    plaidml_error* err,                      //
+    plaidml_expr* expr) {
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
+    if (!expr) {
+      throw std::runtime_error("plaidml_expr_str_get_value can only be used on an StringExpr");
+    }
+    auto str_expr = std::dynamic_pointer_cast<StringExpr>(expr->expr);
+    if (!str_expr) {
+      throw std::runtime_error("plaidml_expr_str_get_value can only be used on an StringExpr");
+    }
+    return new plaidml_string{str_expr->value};
   });
 }
 
@@ -369,7 +405,7 @@ plaidml_expr* plaidml_expr_tensor_spec(  //
     plaidml_poly_expr** input_idxs,      //
     plaidml_dim_expr** output_dims) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    std::vector<std::shared_ptr<DimExpr>> vec_dims;
+    std::vector<DimExprPtr> vec_dims;
     std::vector<std::shared_ptr<PolyExpr>> vec_idxs(ndims);
     for (size_t i = 0; i < ndims; i++) {
       vec_idxs[i] = input_idxs[i]->expr;
@@ -394,7 +430,8 @@ plaidml_expr* plaidml_expr_contraction(  //
     plaidml_expr* raw_output,            //
     size_t ninputs,                      //
     plaidml_expr** raw_inputs,           //
-    const char* name) {
+    const char* name,                    //
+    const char* layout) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     auto output = std::dynamic_pointer_cast<TensorSpecExpr>(raw_output->expr);
     if (!output) {
@@ -422,7 +459,7 @@ plaidml_expr* plaidml_expr_contraction(  //
       }
     }
     expr->constraints = cc.constraints;
-    expr->ComputeShape();
+    expr->ComputeShape(layout);
     return new plaidml_expr{expr};
   });
 }
@@ -632,7 +669,7 @@ plaidml_dim_expr* plaidml_dim_expr_op(  //
     size_t nargs,                       //
     plaidml_dim_expr** args) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
-    std::vector<std::shared_ptr<DimExpr>> vec_args(nargs);
+    std::vector<DimExprPtr> vec_args(nargs);
     for (size_t i = 0; i < nargs; i++) {
       vec_args[i] = args[i]->expr;
     }

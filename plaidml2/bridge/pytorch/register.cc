@@ -9,6 +9,7 @@
 #include "plaidml2/bridge/pytorch/compiler.h"
 #include "plaidml2/bridge/pytorch/logging.h"
 #include "plaidml2/exec/exec.h"
+#include "plaidml2/op/op.h"
 
 // Based largely on https://github.com/pytorch/tvm
 // https://jott.live/markdown/Writing%20a%20Toy%20Backend%20Compiler%20for%20PyTorch
@@ -31,6 +32,7 @@ static std::string g_target_id;  // NOLINT
 size_t g_verbosity = 0;
 
 PYBIND11_MODULE(plaidml_pytorch, module) {
+  plaidml::op::init();
   plaidml::exec::init();
 
   RegisterPass pass([](std::shared_ptr<Graph> graph) {

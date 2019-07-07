@@ -25,6 +25,7 @@ struct DimExprExpr;
 struct FloatConst;
 struct IntConst;
 struct ParamExpr;
+struct StringExpr;
 struct TensorSpecExpr;
 struct TupleExpr;
 
@@ -64,14 +65,18 @@ struct LogicalDim {
 
 struct LogicalShape {
   DataType dtype;
+  std::string layout;
   std::vector<LogicalDim> dims;
 
-  explicit LogicalShape(DataType dtype = DataType::INVALID) : dtype(dtype) {}
+  explicit LogicalShape(DataType dtype = DataType::INVALID, const std::string& layout = "")
+      : dtype(dtype), layout(layout) {}
+
   LogicalShape(DataType dtype, const std::vector<DimExprPtr>& exprs) : dtype(dtype) {
     for (const auto& dim : exprs) {
       dims.emplace_back(LogicalDim{dim});
     }
   }
+
   std::string str() const;
   void bind_dims(std::vector<DimExprPtr>* into);
   std::vector<DimExprPtr> dims_as_exprs() const;
@@ -109,6 +114,14 @@ struct FloatConst : Expr {
   explicit FloatConst(double value);
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
   std::string str() const;
+};
+
+struct StringExpr : Expr {
+  std::string value;
+
+  explicit StringExpr(const std::string& value) : value(value) {}
+  void Accept(AstVisitor* visitor) {}
+  std::string str() const { return "\"" + value + "\""; }
 };
 
 struct NoneExpr : Expr {
@@ -186,7 +199,7 @@ struct ContractionExpr : Expr {
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
   std::string str() const;
   size_t logical_input_size() const { return (use_default ? inputs.size() - 1 : inputs.size()); }
-  void ComputeShape();
+  void ComputeShape(const std::string& layout);
 };
 
 struct PolyVisitor {

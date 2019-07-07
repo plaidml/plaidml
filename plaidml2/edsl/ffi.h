@@ -30,6 +30,7 @@ typedef enum {
 
 typedef enum {
   PLAIDML_EXPR_NONE,
+  PLAIDML_EXPR_STR,
   PLAIDML_EXPR_INT,
   PLAIDML_EXPR_FLOAT,
   PLAIDML_EXPR_TENSOR,
@@ -43,7 +44,8 @@ PLAIDML_EDSL_API plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                                               //
     plaidml_datatype dtype,                                           //
     size_t ndims,                                                     //
-    const int64_t* dims);
+    const int64_t* dims,                                              //
+    const char* layout);
 
 PLAIDML_EDSL_API void plaidml_logical_shape_free(  //
     plaidml_error* err,                            //
@@ -51,6 +53,10 @@ PLAIDML_EDSL_API void plaidml_logical_shape_free(  //
 
 PLAIDML_EDSL_API plaidml_string* plaidml_logical_shape_repr(  //
     plaidml_error* err,                                       //
+    plaidml_logical_shape* shape);
+
+PLAIDML_EDSL_API plaidml_string* plaidml_logical_shape_get_layout(  //
+    plaidml_error* err,                                             //
     plaidml_logical_shape* shape);
 
 PLAIDML_EDSL_API size_t plaidml_logical_shape_get_ndims(  //
@@ -192,6 +198,14 @@ PLAIDML_EDSL_API void plaidml_expr_tuple_get_exprs(  //
     size_t nexprs,                                   //
     plaidml_expr** exprs);
 
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_str(  //
+    plaidml_error* err,                           //
+    const char* value);
+
+PLAIDML_EDSL_API plaidml_string* plaidml_expr_str_get_value(  //
+    plaidml_error* err,                                       //
+    plaidml_expr* expr);
+
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_int(  //
     plaidml_error* err,                           //
     int64_t value);
@@ -245,7 +259,8 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_contraction(  //
     plaidml_expr* raw_output,                             //
     size_t ninputs,                                       //
     plaidml_expr** raw_inputs,                            //
-    const char* name);
+    const char* name,                                     //
+    const char* layout);
 
 PLAIDML_EDSL_API void plaidml_expr_contraction_set_no_defract(  //
     plaidml_error* err,                                         //

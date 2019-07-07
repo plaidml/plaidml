@@ -555,6 +555,9 @@ std::string LogicalShape::str() const {
     ss << dims[i];
   }
   ss << ")";
+  if (layout.size()) {
+    ss << ":" << layout;
+  }
   return ss.str();
 }
 
@@ -652,7 +655,9 @@ std::string ParamExpr::str() const {
   return ss.str();
 }
 
-CallExpr::CallExpr(const std::string& fn, const std::vector<ExprPtr>& args) : fn(fn), args(args) {}
+CallExpr::CallExpr(const std::string& fn, const std::vector<ExprPtr>& args)
+    : fn(fn),  //
+      args(args) {}
 
 void CallExpr::ComputeShape() {
   IVLOG(4, "CallExpr::ComputeShape> fn: " << fn);
@@ -682,7 +687,7 @@ std::string CallExpr::str() const {
 
 ContractionExpr::ContractionExpr() : Expr(LogicalShape{}) {}
 
-void ContractionExpr::ComputeShape() {
+void ContractionExpr::ComputeShape(const std::string& layout) {
   DataType dtype = DataType::INVALID;
   if (combo_op == CombinationOp::COND) {
     dtype = DataType::BOOLEAN;
@@ -693,7 +698,7 @@ void ContractionExpr::ComputeShape() {
     }
     dtype = ComputeOutputType(dtypes);
   }
-  shape = LogicalShape(dtype);
+  shape = LogicalShape(dtype, layout);
   for (const auto& size : output->output_dims) {
     shape.dims.push_back(LogicalDim{size});
   }

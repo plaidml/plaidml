@@ -1,5 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
+load("//bzl:conda.bzl", "conda_test")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_library",
@@ -52,4 +53,21 @@ plaidml_py_library(
         "//plaidml2:py",
         "//plaidml2/edsl:py",
     ],
+)
+
+plaidml_cc_test(
+    name = "cc_test",
+    srcs = ["op_test.cc"],
+    deps = [
+        ":api",
+        ":op",
+    ],
+)
+
+conda_test(
+    name = "py_test",
+    srcs = ["op_test.py"],
+    env = "@com_intel_plaidml_conda//:env",
+    main = "op_test.py",
+    deps = [":py"],
 )

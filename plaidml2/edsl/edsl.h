@@ -23,6 +23,7 @@ class Tensor;
 class TensorDim;
 class TensorFriend;
 class TensorIndex;
+class Value;
 
 namespace details {
 
@@ -70,6 +71,7 @@ inline void init() {
 
 class Program {
  public:
+  // Program(const std::string& name, const Value& value);
   Program(const std::string& name, const std::vector<Tensor>& tensors);
   plaidml_program* as_ptr() const { return ptr_.get(); }
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
@@ -208,6 +210,7 @@ class IndexedTensor {
     std::shared_ptr<plaidml_expr> unary;
     std::shared_ptr<ComboParts> nary;
     const Tensor* src = nullptr;
+    std::string layout;
     void MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs);
   };
 
@@ -276,10 +279,15 @@ class LogicalShape {
   friend class TensorFriend;
 
  public:
-  LogicalShape(plaidml_datatype dtype,  //
-               const std::vector<int64_t>& dims)
-      : ptr_(details::make_plaidml_logical_shape(
-            ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
+  LogicalShape(plaidml_datatype dtype,            //
+               const std::vector<int64_t>& dims,  //
+               const std::string& layout = "")
+      : ptr_(details::make_plaidml_logical_shape(ffi::call<plaidml_logical_shape*>(  //
+            plaidml_logical_shape_alloc,                                             //
+            dtype,                                                                   //
+            dims.size(),                                                             //
+            dims.data(),                                                             //
+            layout.c_str()))) {}
 
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_repr, ptr_.get()));
@@ -287,6 +295,10 @@ class LogicalShape {
 
   plaidml_datatype dtype() const {  //
     return ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
+  }
+
+  std::string layout() const {  //
+    return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_get_layout, ptr_.get()));
   }
 
   size_t ndims() const {  //
@@ -331,6 +343,7 @@ class Tensor {
     bool has_dims = false;
     std::vector<TensorDim> dims;
     std::string name;
+    std::string layout;
   };
 
  public:
@@ -370,14 +383,16 @@ class Tensor {
             ""));
   }
 
-  explicit Tensor(const std::vector<TensorDim>& dims) : impl_(new Impl) {
+  explicit Tensor(const std::vector<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
+    impl_->layout = layout;
   }
 
-  explicit Tensor(const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
+  explicit Tensor(const std::initializer_list<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
+    impl_->layout = layout;
   }
 
   Tensor(const std::string& name, const LogicalShape& shape) : impl_(new Impl) {
@@ -388,16 +403,20 @@ class Tensor {
             name.c_str()));
   }
 
-  Tensor(const std::string& name, const std::vector<TensorDim>& dims) : impl_(new Impl) {
+  Tensor(const std::string& name, const std::vector<TensorDim>& dims, const std::string& layout = "")
+      : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
+    impl_->layout = layout;
   }
 
-  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
+  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims, const std::string& layout = "")
+      : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
+    impl_->layout = layout;
   }
 
   // Copyable
@@ -417,6 +436,7 @@ class Tensor {
     }
     std::unique_ptr<IndexedTensor::Impl> impl(new IndexedTensor::Impl());
     impl->src = this;
+    impl->layout = impl_->layout;
     if (impl_->has_dims) {
       std::vector<plaidml_dim_expr*> sizes;
       for (const auto& dim : impl_->dims) {
@@ -523,8 +543,8 @@ Tensor TensorOutput(Ts... dims) {
   return Tensor{vec};
 }
 
-inline Tensor TensorOutput(const std::vector<TensorDim>& dims) {  //
-  return Tensor{dims};
+inline Tensor TensorOutput(const std::vector<TensorDim>& dims, const std::string& layout = "") {  //
+  return Tensor(dims, layout);
 }
 
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
@@ -609,26 +629,6 @@ inline Tensor tan(const Tensor& x) { return Call("tan", x); }
 inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
 
 inline Tensor zero() { return Tensor{0}; }
-
-inline std::ostream& operator<<(std::ostream& os, const LogicalShape& shape) {
-  os << shape.str();
-  return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {
-  os << tensor.str();
-  return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const TensorDim& dim) {
-  os << dim.str();
-  return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const TensorIndex& idx) {
-  os << idx.str();
-  return os;
-}
 
 class TensorFriend {
  public:
@@ -816,7 +816,8 @@ inline void IndexedTensor::Impl::MakeContraction(plaidml_agg_op agg_op, const In
           unary.get(),                           //
           inputs.size(),                         //
           inputs.data(),                         //
-          src->impl_->name.c_str()));
+          src->impl_->name.c_str(),              //
+          layout.c_str()));
 }
 
 // Represents a combo_op of COND in a contraction
@@ -856,6 +857,9 @@ class Value {
   explicit Value(double value)
       : ptr_(details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_float, value))) {}
 
+  explicit Value(const std::string& value)
+      : ptr_(details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_str, value.c_str()))) {}
+
   explicit Value(const Tensor& tensor)
       : ptr_(details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_clone, tensor.as_ptr()))) {}
 
@@ -891,12 +895,20 @@ class Value {
     return ffi::call<plaidml_expr_kind>(plaidml_expr_get_kind, as_ptr()) == PLAIDML_EXPR_TUPLE;
   }
 
+  bool is_str() const {  //
+    return ffi::call<plaidml_expr_kind>(plaidml_expr_get_kind, as_ptr()) == PLAIDML_EXPR_STR;
+  }
+
   int64_t as_int() const {  //
     return ffi::call<int64_t>(plaidml_expr_int_get_value, as_ptr());
   }
 
   double as_float() const {  //
     return ffi::call<double>(plaidml_expr_float_get_value, as_ptr());
+  }
+
+  std::string as_str() const {  //
+    return ffi::str(ffi::call<plaidml_string*>(plaidml_expr_str_get_value, as_ptr()));
   }
 
   Tensor as_scalar() const {  //
@@ -931,11 +943,63 @@ Value make_tuple(Ts... elts) {
   return Value{vec};
 }
 
+template <typename T>
+Value make_tuple(const std::vector<T>& elts) {
+  std::vector<Value> vec(elts.size());
+  for (size_t i = 0; i < vec.size(); i++) {
+    vec[i] = Value{elts[i]};
+  }
+  return Value{vec};
+}
+
 inline Value make_tuple(const std::vector<Value>& elts) {  //
   return Value{elts};
 }
 
 inline Value None() { return Value(); }
+
+// inline Program::Program(const std::string& name, const Value& value) {
+//   std::vector<Tensor> outputs;
+//   if (value.is_tensor()) {
+//     outputs.emplace_back(value.as_tensor());
+//   }
+//   if (value.is_tuple()) {
+//     for (const auto& item : value.as_tuple()) {
+//       outputs.emplace_back(item.as_tensor());
+//     }
+//   }
+//   ptr_ = details::make_plaidml_program(TensorFriend::evaluate(name, outputs));
+// }
+
+inline std::ostream& operator<<(std::ostream& os, const LogicalShape& x) {
+  os << x.str();
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Tensor& x) {
+  os << x.str();
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const TensorDim& x) {
+  os << x.str();
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const TensorIndex& x) {
+  os << x.str();
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Program& x) {
+  os << x.str();
+  return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Value& x) {
+  os << x.str();
+  return os;
+}
 
 }  // namespace edsl
 }  // namespace plaidml

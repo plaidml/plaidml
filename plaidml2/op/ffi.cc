@@ -22,7 +22,7 @@ void plaidml_op_init(  //
   ffi_wrap_void(err, [&] {
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_op_init");
-      RegisterOps();
+      lib::RegisterOps();
     });
   });
 }
@@ -33,7 +33,7 @@ plaidml_expr* plaidml_op_make(  //
     plaidml_expr* expr) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     Value value{expr};
-    auto op = OperationRegistry::Instance()->Resolve(op_name);
+    auto op = lib::OperationRegistry::Instance()->Resolve(op_name);
     if (!op) {
       throw std::runtime_error(str(boost::format("Operation not registered: %1%") % op_name));
     }
