@@ -28,7 +28,7 @@ std::string GetConfigFilename(const char* env_var, const char* basename) {
 
   // Assuming that the PlaidML library has been properly installed, we
   // should be able to find the config file from the library's path.
-  auto path = boost::dll::symbol_location_ptr(&GetConfigFilename);
+  auto path = boost::dll::symbol_location_ptr(&GetConfigFilename).lexically_normal();
   path.remove_filename();  // Trim to "/lib"
   path.remove_filename();  // Trim to root install directory
   path /= "share";
