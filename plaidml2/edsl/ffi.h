@@ -177,6 +177,7 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_dim(  //
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_param(  //
     plaidml_error* err,                             //
     plaidml_logical_shape* shape,                   //
+    plaidml_buffer* buffer,                         //
     const char* name);
 
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_none(  //

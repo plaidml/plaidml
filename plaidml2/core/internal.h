@@ -8,6 +8,7 @@
 #include "plaidml2/core/ffi.h"
 #include "tile/base/shape.h"
 #include "tile/lang/ast/ast.h"
+#include "tile/platform/local_machine/platform.h"
 
 extern "C" {
 
@@ -27,10 +28,20 @@ struct plaidml_program {
   vertexai::tile::lang::ast::ProgramEvaluation eval;
 };
 
+struct plaidml_buffer {
+  std::shared_ptr<vertexai::tile::Buffer> buffer;
+};
+
+struct plaidml_view {
+  std::shared_ptr<vertexai::tile::View> view;
+};
+
 }  // extern "C"
 
 namespace plaidml {
 namespace core {
+
+vertexai::tile::local_machine::Platform* GetPlatform();
 
 template <typename T, typename F>
 T ffi_wrap(plaidml_error* err, T val, F fn) {

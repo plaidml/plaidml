@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -51,6 +52,14 @@ inline std::shared_ptr<plaidml_shape> make_plaidml_shape(plaidml_shape* ptr) {
   return std::shared_ptr<plaidml_shape>(ptr, Deleter<plaidml_shape>{plaidml_shape_free});
 }
 
+inline std::shared_ptr<plaidml_buffer> make_plaidml_buffer(plaidml_buffer* ptr) {
+  return std::shared_ptr<plaidml_buffer>(ptr, Deleter<plaidml_buffer>{plaidml_buffer_free});
+}
+
+inline std::shared_ptr<plaidml_view> make_plaidml_view(plaidml_view* ptr) {
+  return std::shared_ptr<plaidml_view>(ptr, Deleter<plaidml_view>{plaidml_view_free});
+}
+
 }  // namespace details
 
 inline void init() {  //
@@ -96,6 +105,65 @@ class TensorShape {
 
  private:
   std::shared_ptr<plaidml_shape> ptr_;
+};
+
+class View {
+  friend class Buffer;
+
+ public:
+  char* data() {  //
+    return ffi::call<char*>(plaidml_view_data, ptr_.get());
+  }
+
+  size_t size() {  //
+    return ffi::call<size_t>(plaidml_view_size, ptr_.get());
+  }
+
+  void writeback() {  //
+    ffi::call_void(plaidml_view_writeback, ptr_.get());
+  }
+
+ private:
+  explicit View(const std::shared_ptr<plaidml_view>& ptr) : ptr_(ptr) {}
+
+ private:
+  std::shared_ptr<plaidml_view> ptr_;
+};
+
+class Buffer {
+ public:
+  Buffer() = default;
+  Buffer(const std::string& device_id, const TensorShape& shape)
+      : ptr_(details::make_plaidml_buffer(
+            ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, device_id.c_str(), shape.nbytes()))),
+        shape_(shape) {}
+
+  plaidml_buffer* as_ptr() const {  //
+    return ptr_.get();
+  }
+
+  View mmap_current() {
+    return View(details::make_plaidml_view(ffi::call<plaidml_view*>(plaidml_buffer_mmap_current, ptr_.get())));
+  }
+
+  View mmap_discard() {
+    return View(details::make_plaidml_view(ffi::call<plaidml_view*>(plaidml_buffer_mmap_discard, ptr_.get())));
+  }
+
+  void copy_into(void* dst) {
+    auto view = mmap_current();
+    memcpy(dst, view.data(), view.size());
+  }
+
+  void copy_from(const void* src) {
+    auto view = mmap_discard();
+    memcpy(view.data(), src, view.size());
+    view.writeback();
+  }
+
+ private:
+  std::shared_ptr<plaidml_buffer> ptr_;
+  TensorShape shape_;
 };
 
 }  // namespace plaidml

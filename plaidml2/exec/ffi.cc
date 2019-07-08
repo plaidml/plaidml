@@ -7,26 +7,21 @@
 #include <boost/format.hpp>
 
 #include "plaidml2/core/internal.h"
-#include "tile/platform/local_machine/platform.h"
 #include "tile/targets/targets.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
+using plaidml::core::GetPlatform;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
 using vertexai::tile::Buffer;
 using vertexai::tile::ConstBufferManager;
 using vertexai::tile::Program;
 using vertexai::tile::View;
-using vertexai::tile::local_machine::Platform;
+using vertexai::tile::lang::ast::ParamExpr;
 using vertexai::tile::targets::GetConfigs;
 
 namespace {
-
-Platform* GetPlatform() {
-  static Platform platform;
-  return &platform;
-}
 
 class PlatformAllocator : public Allocator {
  public:
@@ -45,14 +40,6 @@ class PlatformAllocator : public Allocator {
 
 extern "C" {
 
-struct plaidml_buffer {
-  std::shared_ptr<Buffer> buffer;
-};
-
-struct plaidml_view {
-  std::shared_ptr<View> view;
-};
-
 struct plaidml_executable {
   using BufferMap = std::map<std::string, std::shared_ptr<Buffer>>;
   BufferMap input_bufs;
@@ -66,6 +53,7 @@ void plaidml_exec_init(  //
   ffi_wrap_void(err, [&] {
     std::call_once(is_initialized, []() {  //
       IVLOG(1, "plaidml_exec_init");
+      GetPlatform();
     });
   });
 }
@@ -109,24 +97,28 @@ plaidml_executable* plaidml_compile(  //
     auto exec = new plaidml_executable{};
     exec->program = GetPlatform()->MakeProgram(ctx, device_id, target, program->eval.runinfo, &const_bufs);
     for (size_t i = 0; i < ninputs; i++) {
-      if (!inputs[i] || !inputs[i]->expr || !inputs[i]->buffer) {
-        throw std::runtime_error("Undefined input bindings");
+      auto param_expr = std::dynamic_pointer_cast<ParamExpr>(inputs[i]->expr->expr);
+      if (!param_expr) {
+        throw std::runtime_error("Buffers can only be bound to ParamExprs");
       }
-      auto expr = inputs[i]->expr->expr;
-      const auto& inputs_ord = program->eval.inputs;
-      auto it = std::find(inputs_ord.begin(), inputs_ord.end(), expr.get());
-      size_t j = std::distance(inputs_ord.begin(), it);
-      const auto& name = program->eval.runinfo.program.inputs[j].name;
-      exec->input_bufs[name] = inputs[i]->buffer->buffer;
+      param_expr->buffer = inputs[i]->buffer->buffer;
     }
+    const auto& program_inputs = program->eval.inputs;
+    for (size_t i = 0; i < program_inputs.size(); i++) {
+      const auto& name = program->eval.runinfo.program.inputs[i].name;
+      if (!program_inputs[i]->buffer) {
+        throw std::runtime_error(str(boost::format("Unbound buffer for input: %1%") % name));
+      }
+      exec->input_bufs[name] = program_inputs[i]->buffer;
+    }
+    const auto& program_outputs = program->eval.outputs;
     for (size_t i = 0; i < noutputs; i++) {
       if (!outputs[i] || !outputs[i]->expr || !outputs[i]->buffer) {
         throw std::runtime_error("Undefined output bindings");
       }
       auto expr = outputs[i]->expr->expr;
-      const auto& outputs_ord = program->eval.outputs;
-      auto it = std::find(outputs_ord.begin(), outputs_ord.end(), expr.get());
-      size_t j = std::distance(outputs_ord.begin(), it);
+      auto it = std::find(program_outputs.begin(), program_outputs.end(), expr.get());
+      size_t j = std::distance(program_outputs.begin(), it);
       const auto& name = program->eval.runinfo.program.outputs[j];
       exec->output_bufs[name] = outputs[i]->buffer->buffer;
     }
@@ -154,76 +146,6 @@ void plaidml_target_list(  //
       }
       targets[i++] = new plaidml_string{kvp.first};
     }
-  });
-}
-
-void plaidml_buffer_free(  //
-    plaidml_error* err,    //
-    plaidml_buffer* buffer) {
-  ffi_wrap_void(err, [&] {  //
-    delete buffer;
-  });
-}
-
-plaidml_buffer* plaidml_buffer_alloc(  //
-    plaidml_error* err,                //
-    const char* device_id,             //
-    size_t size) {
-  return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {
-    Context ctx;
-    auto buffer = GetPlatform()->MakeBuffer(ctx, device_id, size);
-    return new plaidml_buffer{buffer};
-  });
-}
-
-plaidml_view* plaidml_buffer_mmap_current(  //
-    plaidml_error* err,                     //
-    plaidml_buffer* buffer) {
-  return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    Context ctx;
-    return new plaidml_view{buffer->buffer->MapCurrent(ctx).get()};
-  });
-}
-
-plaidml_view* plaidml_buffer_mmap_discard(  //
-    plaidml_error* err,                     //
-    plaidml_buffer* buffer) {
-  return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    Context ctx;
-    return new plaidml_view{buffer->buffer->MapDiscard(ctx)};
-  });
-}
-
-void plaidml_view_free(  //
-    plaidml_error* err,  //
-    plaidml_view* view) {
-  ffi_wrap_void(err, [&] {  //
-    delete view;
-  });
-}
-
-char* plaidml_view_data(  //
-    plaidml_error* err,   //
-    plaidml_view* view) {
-  return ffi_wrap<char*>(err, nullptr, [&] {  //
-    return view->view->data();
-  });
-}
-
-size_t plaidml_view_size(  //
-    plaidml_error* err,    //
-    plaidml_view* view) {
-  return ffi_wrap<size_t>(err, 0, [&] {  //
-    return view->view->size();
-  });
-}
-
-void plaidml_view_writeback(  //
-    plaidml_error* err,       //
-    plaidml_view* view) {
-  ffi_wrap_void(err, [&] {
-    Context ctx;
-    view->view->WriteBack(ctx);
   });
 }
 

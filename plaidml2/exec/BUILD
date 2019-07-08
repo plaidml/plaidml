@@ -20,21 +20,12 @@ plaidml_cc_library(
         "exec.h",
         "ffi.h",
     ],
+    defines = ["PLAIDML_EXEC_DLL"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
         "//plaidml2/core",
-        "//tile/hal/cpu",
-        "//tile/hal/opencl",
-        "//tile/lang",
-        "//tile/platform/local_machine",
-        "//tile/targets",
-    ] + select({
-        "@toolchain//:macos_x86_64": [
-            "//tile/hal/metal",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 plaidml_cc_library(

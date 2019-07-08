@@ -48,47 +48,6 @@ PLAIDML_EXEC_API void plaidml_target_list(  //
     plaidml_string** targets);
 
 //
-// Buffer
-//
-
-PLAIDML_EXEC_API void plaidml_buffer_free(  //
-    plaidml_error* err,                     //
-    plaidml_buffer* buffer);
-
-PLAIDML_EXEC_API plaidml_buffer* plaidml_buffer_alloc(  //
-    plaidml_error* err,                                 //
-    const char* device_id,                              //
-    size_t size);
-
-PLAIDML_EXEC_API plaidml_view* plaidml_buffer_mmap_current(  //
-    plaidml_error* err,                                      //
-    plaidml_buffer* buffer);
-
-PLAIDML_EXEC_API plaidml_view* plaidml_buffer_mmap_discard(  //
-    plaidml_error* err,                                      //
-    plaidml_buffer* buffer);
-
-//
-// View
-//
-
-PLAIDML_EXEC_API void plaidml_view_free(  //
-    plaidml_error* err,                   //
-    plaidml_view* view);
-
-PLAIDML_EXEC_API char* plaidml_view_data(  //
-    plaidml_error* err,                    //
-    plaidml_view* view);
-
-PLAIDML_EXEC_API size_t plaidml_view_size(  //
-    plaidml_error* err,                     //
-    plaidml_view* view);
-
-PLAIDML_EXEC_API void plaidml_view_writeback(  //
-    plaidml_error* err,                        //
-    plaidml_view* view);
-
-//
 // Executable
 //
 

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "tile/base/buffer.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/type.h"
 #include "tile/math/polynomial.h"
@@ -94,6 +95,7 @@ struct Expr {
 };
 
 struct ParamExpr : Expr {
+  std::shared_ptr<tile::Buffer> buffer;
   explicit ParamExpr(const std::string& name = "");
   void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
   std::string str() const;
@@ -371,7 +373,7 @@ struct ConstraintCollector : public PolyVisitor {
 
 struct ProgramEvaluation {
   RunInfo runinfo;
-  std::vector<const Expr*> inputs;
+  std::vector<const ParamExpr*> inputs;
   std::vector<const Expr*> outputs;
 };
 

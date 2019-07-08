@@ -20,23 +20,22 @@ plaidml_py_library(
     ],
 )
 
-# conda_test(
-#     name = "backend_test",
-#     timeout = "long",
-#     srcs = [
-#         "backend_test.py",
-#     ],
-#     env = "@com_intel_plaidml_conda//:env",
-#     tags = [
-#         "keras",
-#         "manual",
-#         "tensorflow",
-#     ],
-#     deps = [
-#         ":keras",
-#         "//testing:plaidml_py",
-#     ],
-# )
+conda_test(
+    name = "backend_test",
+    timeout = "long",
+    srcs = [
+        "backend_test.py",
+    ],
+    env = "@com_intel_plaidml_conda//:env",
+    tags = [
+        "keras",
+        "manual",
+        "tensorflow",
+    ],
+    deps = [
+        ":keras",
+    ],
+)
 
 conda_test(
     name = "mnist_mlp_test",

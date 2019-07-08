@@ -380,6 +380,7 @@ class Tensor {
         ffi::call<plaidml_expr*>(             //
             plaidml_expr_param,               //
             shape.ptr_.get(),                 //
+            nullptr,                          //
             ""));
   }
 
@@ -400,6 +401,7 @@ class Tensor {
         ffi::call<plaidml_expr*>(             //
             plaidml_expr_param,               //
             shape.ptr_.get(),                 //
+            nullptr,                          //
             name.c_str()));
   }
 

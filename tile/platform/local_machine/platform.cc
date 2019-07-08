@@ -38,20 +38,20 @@ constexpr float kGoalMemPercentage = .85;
 
 void GetMemStrategy(const std::shared_ptr<DevInfo>& devinfo, Platform::PlatformDev* pd) {
   if (devinfo->dev->executor() && devinfo->dev->executor()->shared_memory()) {
-    IVLOG(1, "Using shared memory for data transfer");
+    IVLOG(2, "Using shared memory for data transfer");
     pd->mem_strategy = std::make_shared<DirectMemStrategy>(devinfo, devinfo->dev->executor()->shared_memory());
     pd->tmp_mem_source = devinfo->dev->executor()->shared_memory();
     return;
   }
 
   if (devinfo->dev->executor() && devinfo->dev->executor()->device_memory()) {
-    IVLOG(1, "Using device memory and direct memory strategy");
+    IVLOG(2, "Using device memory and direct memory strategy");
     pd->mem_strategy = std::make_shared<DirectMemStrategy>(devinfo, devinfo->dev->executor()->device_memory());
     pd->tmp_mem_source = devinfo->dev->executor()->device_memory();
     return;
   }
 
-  IVLOG(1, "Using host memory for data transfer");
+  IVLOG(2, "Using host memory for data transfer");
   pd->mem_strategy = std::make_shared<DirectMemStrategy>(devinfo, devinfo->devset->host_memory());
   pd->tmp_mem_source = devinfo->devset->host_memory();
 }
@@ -119,16 +119,16 @@ Platform::Platform() {
           }
           auto devinfo = std::make_shared<DevInfo>(DevInfo{devset, dev, settings});
           PlatformDev pd{id, devinfo};
-          VLOG(1) << settings.DebugString();
+          VLOG(2) << settings.DebugString();
           GetMemStrategy(devinfo, &pd);
 
           auto memory = (dev->executor() && dev->executor()->device_memory() ? dev->executor()->device_memory()
                                                                              : devset->host_memory());
           if (dev->executor() && dev->executor()->is_synchronous()) {
-            IVLOG(1, "Device is synchronous");
+            IVLOG(2, "Device is synchronous");
           }
           auto size_goal = memory->size_goal() * kGoalMemPercentage;
-          IVLOG(1, "Using fifo scheduler; size_goal=" << size_goal);
+          IVLOG(2, "Using fifo scheduler; size_goal=" << size_goal);
           pd.scheduler = std::make_shared<fifo_scheduler::FifoScheduler>(memory->ArenaBufferAlignment(),
                                                                          std::lround(std::floor(size_goal)), settings);
           devs_[id] = std::move(pd);
@@ -190,16 +190,16 @@ Platform::Platform(const context::Context& ctx, const proto::Platform& config) {
             unmatched_devs_[id] = std::move(pd);
             continue;
           }
-          VLOG(1) << settings.DebugString();
+          VLOG(2) << settings.DebugString();
           GetMemStrategy(devinfo, &pd);
 
           auto memory = (dev->executor() && dev->executor()->device_memory() ? dev->executor()->device_memory()
                                                                              : devset->host_memory());
           if (dev->executor() && dev->executor()->is_synchronous()) {
-            IVLOG(1, "Device is synchronous");
+            IVLOG(2, "Device is synchronous");
           }
           auto size_goal = memory->size_goal() * kGoalMemPercentage;
-          IVLOG(1, "Using fifo scheduler; size_goal=" << size_goal);
+          IVLOG(2, "Using fifo scheduler; size_goal=" << size_goal);
           pd.scheduler = std::make_shared<fifo_scheduler::FifoScheduler>(memory->ArenaBufferAlignment(),
                                                                          std::lround(std::floor(size_goal)), settings);
           devs_[id] = std::move(pd);

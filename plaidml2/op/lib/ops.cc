@@ -27,7 +27,14 @@ struct AggregationAxes {
       }
     } else if (in_axes.is_tuple()) {
       for (const auto& axis : in_axes.as_tuple()) {
-        axes.insert(axis.as_int());
+        auto int_axis = axis.as_int();
+        if (int_axis < 0) {
+          int_axis = ndims + int_axis;
+        }
+        if (int_axis < 0 || ndims < static_cast<size_t>(int_axis)) {
+          throw std::out_of_range(str(boost::format("axis out of range: %1%") % int_axis));
+        }
+        axes.insert(int_axis);
       }
     } else if (in_axes.is_int()) {
       auto axis = in_axes.as_int();
@@ -196,7 +203,7 @@ Value mean(const Value& value) {
   SO(agg.dst_idxs) += I(agg.src_idxs);
   auto denom = Tensor{1};
   for (const auto& axis : agg.axes) {
-    denom = denom * agg.src_dims[axis];
+    denom = denom * agg.src_dims.at(axis);
   }
   return Value{SO / denom};
 }

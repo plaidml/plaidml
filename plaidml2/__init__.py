@@ -1,6 +1,17 @@
 # Copyright 2019 Intel Corporation.
 
+import logging
+import os
 import sys
+
+logger = logging.getLogger(__name__)
+
+if os.getenv('PLAIDML_VERBOSE'):
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    logger.debug('PLAIDML_VERBOSE enabled on logger: {}'.format(logger.name))
 
 from plaidml2.core import *
 from plaidml2.core import settings

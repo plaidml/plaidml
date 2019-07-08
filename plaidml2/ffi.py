@@ -28,9 +28,6 @@ if not lib_path:
 
 
 def __load_library():
-    if os.getenv('PLAIDML_VERBOSE'):
-        logger.addHandler(logging.StreamHandler())
-        logger.setLevel(logging.DEBUG)
     logger.debug('Loading {} from {}'.format(lib_name, lib_path))
     return ffi.dlopen(lib_path)
 

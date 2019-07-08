@@ -1,5 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
+import contextlib
 import enum
 from collections import namedtuple
 
@@ -154,3 +155,67 @@ class TensorShape(ForeignObject):
         return [
             ffi_call(lib.plaidml_shape_get_dim_stride, self.as_ptr(), i) for i in range(self.ndims)
         ]
+
+
+class _View(ForeignObject):
+    __ffi_del__ = lib.plaidml_view_free
+
+    def __init__(self, ffi_obj, shape):
+        self.shape = shape
+        super(_View, self).__init__(ffi_obj)
+
+    @property
+    def data(self):
+        return ffi.buffer(ffi_call(lib.plaidml_view_data, self.as_ptr()), self.size)
+
+    @property
+    def size(self):
+        return ffi_call(lib.plaidml_view_size, self.as_ptr())
+
+    def writeback(self):
+        ffi_call(lib.plaidml_view_writeback, self.as_ptr())
+
+    def copy_from_ndarray(self, src):
+        dst = np.frombuffer(self.data, dtype=self.shape.dtype.into_numpy())
+        dst = dst.reshape(self.shape.sizes)
+        np.copyto(dst, src)
+
+    def copy_to_ndarray(self, dst):
+        src = np.frombuffer(self.data, dtype=self.shape.dtype.into_numpy())
+        src = src.reshape(self.shape.sizes)
+        np.copyto(dst, src)
+
+
+class Buffer(ForeignObject):
+    __ffi_del__ = lib.plaidml_buffer_free
+
+    def __init__(self, device_id, shape):
+        self._shape = shape
+        self._ndarray = None
+        ffi_obj = ffi_call(lib.plaidml_buffer_alloc, device_id.encode(), shape.nbytes)
+        super(Buffer, self).__init__(ffi_obj)
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @contextlib.contextmanager
+    def mmap_current(self):
+        yield _View(ffi_call(lib.plaidml_buffer_mmap_current, self.as_ptr()), self.shape)
+
+    @contextlib.contextmanager
+    def mmap_discard(self):
+        yield _View(ffi_call(lib.plaidml_buffer_mmap_discard, self.as_ptr()), self.shape)
+
+    def as_ndarray(self):
+        if self._ndarray is None:
+            self._ndarray = np.ndarray(tuple(x for x in self.shape.sizes),
+                                       dtype=self.shape.dtype.into_numpy())
+        with self.mmap_current() as view:
+            view.copy_to_ndarray(self._ndarray)
+        return self._ndarray
+
+    def copy_from_ndarray(self, ndarray):
+        with self.mmap_discard() as view:
+            view.copy_from_ndarray(ndarray)
+            view.writeback()

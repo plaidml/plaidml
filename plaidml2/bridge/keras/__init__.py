@@ -24,13 +24,8 @@ _UID_PREFIX_DICT = defaultdict(int)
 
 _NAME_SCOPE_STACK = []
 
-
-@contextmanager
-def name_scope(name):
-    # logger.debug('name_scope({})'.format(name))
-    _NAME_SCOPE_STACK.append(name)
-    yield
-    _NAME_SCOPE_STACK.pop()
+_device = plaidml_settings.get('PLAIDML_DEVICE')
+_target = plaidml_settings.get('PLAIDML_TARGET')
 
 
 def _prepend_name_scope(name, default):
@@ -66,23 +61,15 @@ class _Function(object):
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
         program = edsl.Program(self._name, [x.tensor for x in self._outputs])
-        device = plaidml_settings.get('PLAIDML_DEVICE')
-        target = plaidml_settings.get('PLAIDML_TARGET')
 
         def make_buffer(tensor):
             # convert LogicalShape into TensorShape
             shape = plaidml.TensorShape(tensor.shape.dtype, tensor.shape.int_dims)
-            return plaidml_exec.Buffer(device, shape)
+            return plaidml.Buffer(_device, shape)
 
         input_bindings = [(x.tensor, make_buffer(x.tensor)) for x in self._inputs]
         output_bindings = [(x.tensor, make_buffer(x.tensor)) for x in self._outputs]
-        return plaidml_exec.Executable(
-            program,
-            device,
-            target,
-            input_bindings,
-            output_bindings,
-        )
+        return plaidml_exec.Executable(program, _device, _target, input_bindings, output_bindings)
 
 
 class _KerasNode(object):
@@ -99,6 +86,9 @@ class _KerasNode(object):
 
     def __str__(self):
         return str(self.tensor)
+
+    def eval(self):
+        return get_value(self)
 
     @property
     def _keras_shape(self):
@@ -233,6 +223,10 @@ def expand_dims(x, axis=-1, name=None):
     return _KerasNode('expand_dims', name=name, tensor=O)
 
 
+def eval(x):
+    return get_value(x)
+
+
 def function(inputs, outputs, updates=None, name=None):
     logger.debug('function(inputs: {}, outputs: {}, updates: {}, name: {})'.format(
         inputs, outputs, updates, name))
@@ -246,6 +240,13 @@ def function(inputs, outputs, updates=None, name=None):
 def get_uid(prefix=''):
     _UID_PREFIX_DICT[prefix] += 1
     return _UID_PREFIX_DICT[prefix]
+
+
+def get_value(x):
+    inputs = []
+    fn = _Function(inputs, [x], [], name='get_value')
+    outputs = fn(inputs)
+    return outputs[0]
 
 
 def int_shape(x):
@@ -271,6 +272,14 @@ def is_tensor(x):
 def mean(x, axis=None, keepdims=False):
     logger.debug('mean(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
     return _KerasNode('mean', tensor=plaidml_op.mean(x.tensor, axis, keepdims))
+
+
+@contextmanager
+def name_scope(name):
+    # logger.debug('name_scope({})'.format(name))
+    _NAME_SCOPE_STACK.append(name)
+    yield
+    _NAME_SCOPE_STACK.pop()
 
 
 def ndim(x):
@@ -383,8 +392,10 @@ def variable(value, dtype=None, name=None, constraint=None):
         # print(value.shape)
         dtype = plaidml.DType.from_numpy(dtype or floatx())
         shape = edsl.LogicalShape(dtype, value.shape)
-        tensor = edsl.Tensor(shape=shape, name=name)
-        # TODO: do something with the actual data
+        tensor_shape = plaidml.TensorShape(dtype, value.shape)
+        buffer = plaidml.Buffer(_device, tensor_shape)
+        buffer.copy_from_ndarray(value)
+        tensor = edsl.Tensor(shape=shape, name=name, buffer=buffer)
         return _KerasNode('variable', name=name, tensor=tensor)
     raise TypeError('Unknown type for variable: {}'.format(type(value)))
 

@@ -587,15 +587,15 @@ Executable::Executable(const std::string& device_id,             //
   for (size_t i = 0; i < inputs.size(); i++) {
     auto shape = inputs[i].shape();
     plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
-    plaidml::exec::Buffer buffer(device_id, tensor_shape);
+    plaidml::Buffer buffer(device_id, tensor_shape);
     input_bindings_[i] = plaidml::exec::Binding{inputs[i], buffer};
   }
   for (size_t i = 0; i < outputs.size(); i++) {
     auto shape = outputs[i].shape();
     plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
     output_bindings_.emplace_back(plaidml::exec::Binding{
-        outputs[i],                                     // tensor
-        plaidml::exec::Buffer{device_id, tensor_shape}  // buffer
+        outputs[i],                               // tensor
+        plaidml::Buffer{device_id, tensor_shape}  // buffer
     });
     std::vector<int64_t> sizes;
     auto dims = shape.int_dims();

@@ -188,7 +188,11 @@ void plaidml_expr_bind_shape(  //
     plaidml_expr* expr,        //
     plaidml_logical_shape* shape) {
   return ffi_wrap_void(err, [&] {  //
-    expr->expr->shape = shape->shape;
+    auto param_expr = std::dynamic_pointer_cast<ParamExpr>(expr->expr);
+    if (!param_expr) {
+      throw std::runtime_error("Shape binding is only supported on ParamExprs");
+    }
+    param_expr->shape = shape->shape;
   });
 }
 
@@ -228,9 +232,13 @@ plaidml_expr* plaidml_expr_dim(  //
 plaidml_expr* plaidml_expr_param(  //
     plaidml_error* err,            //
     plaidml_logical_shape* shape,  //
+    plaidml_buffer* buffer,        //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     auto expr = std::make_shared<ParamExpr>(name);
+    if (buffer) {
+      expr->buffer = buffer->buffer;
+    }
     expr->ComputeShape(expr, shape->shape);
     return new plaidml_expr{expr};
   });

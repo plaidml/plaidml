@@ -36,12 +36,23 @@ plaidml_cc_library(
         "core.h",
         "ffi.h",
     ],
+    defines = ["PLAIDML_CORE_DLL"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
+        "//tile/hal/cpu",
+        "//tile/hal/opencl",
+        "//tile/lang",
         "//tile/lang/ast",
+        "//tile/platform/local_machine",
+        "//tile/targets",
         "@boost//:filesystem",
-    ],
+    ] + select({
+        "@toolchain//:macos_x86_64": [
+            "//tile/hal/metal",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 plaidml_cc_library(

@@ -12,12 +12,26 @@
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
+using plaidml::core::GetPlatform;
 using plaidml::core::Settings;
+using vertexai::context::Context;
 using vertexai::tile::DataType;
 using vertexai::tile::TensorDimension;
 using vertexai::tile::TensorShape;
+using vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
+
+namespace plaidml {
+namespace core {
+
+Platform* GetPlatform() {
+  static Platform platform;
+  return &platform;
+}
+
+}  // namespace core
+}  // namespace plaidml
 
 extern "C" {
 
@@ -180,6 +194,76 @@ uint64_t plaidml_shape_get_nbytes(  //
     plaidml_shape* shape) {
   return ffi_wrap<int64_t>(err, 0, [&] {  //
     return shape->shape.byte_size();
+  });
+}
+
+void plaidml_buffer_free(  //
+    plaidml_error* err,    //
+    plaidml_buffer* buffer) {
+  ffi_wrap_void(err, [&] {  //
+    delete buffer;
+  });
+}
+
+plaidml_buffer* plaidml_buffer_alloc(  //
+    plaidml_error* err,                //
+    const char* device_id,             //
+    size_t size) {
+  return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {
+    Context ctx;
+    auto buffer = GetPlatform()->MakeBuffer(ctx, device_id, size);
+    return new plaidml_buffer{buffer};
+  });
+}
+
+plaidml_view* plaidml_buffer_mmap_current(  //
+    plaidml_error* err,                     //
+    plaidml_buffer* buffer) {
+  return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
+    Context ctx;
+    return new plaidml_view{buffer->buffer->MapCurrent(ctx).get()};
+  });
+}
+
+plaidml_view* plaidml_buffer_mmap_discard(  //
+    plaidml_error* err,                     //
+    plaidml_buffer* buffer) {
+  return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
+    Context ctx;
+    return new plaidml_view{buffer->buffer->MapDiscard(ctx)};
+  });
+}
+
+void plaidml_view_free(  //
+    plaidml_error* err,  //
+    plaidml_view* view) {
+  ffi_wrap_void(err, [&] {  //
+    delete view;
+  });
+}
+
+char* plaidml_view_data(  //
+    plaidml_error* err,   //
+    plaidml_view* view) {
+  return ffi_wrap<char*>(err, nullptr, [&] {  //
+    return view->view->data();
+  });
+}
+
+size_t plaidml_view_size(  //
+    plaidml_error* err,    //
+    plaidml_view* view) {
+  return ffi_wrap<size_t>(err, 0, [&] {  //
+    return view->view->size();
+  });
+}
+
+void plaidml_view_writeback(  //
+    plaidml_error* err,       //
+    plaidml_view* view) {
+  ffi_wrap_void(err, [&] {
+    Context ctx;
+    view->view->WriteBack(ctx);
   });
 }
 

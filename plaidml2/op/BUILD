@@ -20,6 +20,7 @@ plaidml_cc_library(
     hdrs = [
         "ffi.h",
     ],
+    defines = ["PLAIDML_OP_DLL"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",

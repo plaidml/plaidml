@@ -278,10 +278,14 @@ class Tensor(ForeignObject):
     _dims = None
     _is_contraction = False
 
-    def __init__(self, shape=None, dims=None, expr=None, value=None, name=''):
+    def __init__(self, shape=None, dims=None, expr=None, value=None, name='', buffer=None):
         self._name = name
         if shape:
-            expr = ffi_call(lib.plaidml_expr_param, shape.as_ptr(), name.encode())
+            if buffer is None:
+                raw_buffer = ffi.NULL
+            else:
+                raw_buffer = buffer.as_ptr()
+            expr = ffi_call(lib.plaidml_expr_param, shape.as_ptr(), raw_buffer, name.encode())
         elif dims is not None:
             self._dims = dims
             expr = None
