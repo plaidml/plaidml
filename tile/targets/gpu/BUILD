@@ -11,6 +11,12 @@ jsonnet_to_json(
 )
 
 jsonnet_to_json(
+    name = "nvidia",
+    src = "nvidia.jsonnet",
+    outs = ["nvidia.json"],
+)
+
+jsonnet_to_json(
     name = "intel_gen9",
     src = "intel_gen9.jsonnet",
     outs = ["intel_gen9.json"],
