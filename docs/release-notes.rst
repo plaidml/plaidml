@@ -3,7 +3,25 @@
 Release Notes
 #############
 
-PlaidML 0.5.0
+PlaidML 0.6.2
+* Well defined exports for easier inclusion in other projects & frameworks, e.g., nGraph
+* Initial AMD stripe config
+* Initial stripe CPU support
+* LLVM support in windows
+* Prototype pytorch JIT bridge (limited by pytorch JIT interface)
+* Initial C++ EDSL API support (major revisions expected) (edited)
+
+
+
+
+
+
+
+
+
+Previous releases
+=================
+* PlaidML 0.5.0
   - Support Keras 2.2.4
   - Several fixes to Metal backend
   - Preliminary release of Stripe
@@ -12,14 +30,6 @@ PlaidML 0.5.0
     - GPU / OpenCL backend and tutorial coming soon
   - nGraph support (wheels coming soon)
     - Supports tensorflow via tensorflow nGraph bridge.
-
-
-
-
-
-
-Previous releases 
-=================
 
 * PlaidML 0.3.3 - 0.3.5
   - Support Keras 2.2.0 - 2.2.2
@@ -46,5 +56,3 @@ Previous releases
 
 
 .. For example: See also our recent `API changes`_
-
-

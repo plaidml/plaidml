@@ -6,8 +6,10 @@ needed to use PlaidML from other languages.
 
 You can get the latest release of the PlaidML Python Wheel by running:
 
-    pip install plaidml
-    plaidml-setup
+```
+pip install plaidml
+plaidml-setup
+```
 
 You can also build and install the wheel from source, by following
 these instructions.
@@ -23,7 +25,7 @@ tool and shell integrations).
 For Microsoft Windows\* OS, you'll also need the Visual C++ compiler
 and the Windows\* SDK, following the [Bazel-on-Windows] instructions.
 Note that Conda will take care of the getting you a working Python and
-an msys2 shell (you shouldn't need to set BAZEL_* environment
+an msys2 shell (you shouldn't need to set `BAZEL`* environment
 variables unless you've installed tools in unusual locations).
 
 ## Create and activate a Conda environment
@@ -33,14 +35,15 @@ commands for setting up a Conda environment.
 
 macOS\* and Linux\*:
 
-    conda env create -n plaidml
-    conda activate plaidml
-
+```
+conda env create -n plaidml
+conda activate plaidml
+```
 Microsoft Windows\* OS:
-
-    conda env create -n plaidml -f environment-windows.yml
-    conda activate plaidml
-
+```
+conda env create -n plaidml -f environment-windows.yml
+conda activate plaidml
+```
 ## Install bazelisk
 
 Install the latest bazelisk tool:
@@ -50,21 +53,23 @@ https://github.com/bazelbuild/bazelisk/releases
 ## Build the PlaidML Python wheel
 
 macOS\*:
-
-    bazelisk build --config macos_x86_64 //plaidml:wheel
-
+```
+bazelisk build --config macos_x86_64 //plaidml:wheel
+```
 Linux\*:
-
-    bazelisk build --config linux_x86_64 //plaidml:wheel
-
+```
+bazelisk build --config linux_x86_64 //plaidml:wheel
+```
 Microsoft Windows\* OS:
-
-    bazelisk build --config windows_x86_64 //plaidml:wheel
+```
+bazelisk build --config windows_x86_64 //plaidml:wheel
+```
 
 ## Install the PlaidML Python wheel
-
-    pip install -U bazel-bin/plaidml/*.whl
-    plaidml-setup
+```
+pip install -U bazel-bin/plaidml/*.whl
+plaidml-setup
+```
 
 # PlaidML with nGraph
 
@@ -72,52 +77,55 @@ Follow these instructions if you are wanting to work with the [PlaidML backend].
 
 Building the nGraph PlaidML backend requires that you've installed the
 PlaidML Python wheel.  You can do this by running:
+```
+pip install plaidml
+plaidml-setup
+```
 
-    pip install plaidml
-    plaidml-setup
-
-or by following the instructions for building the PlaidML Python
-Wheel, above.
+or by following the instructions for [building the PlaidML Python Wheel], above.
 
 When the PlaidML wheel is installed, the default nGraph build contains
 the PlaidML backend.  From the nGraph source directory, you can run:
-
-    mkdir build
-    cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=~/ngraph_plaidml_dist -DNGRAPH_PLAIDML_ENABLE=ON -DNGRAPH_CPU_ENABLE=OFF
-    make
-    make install
-  
+```
+mkdir build
+cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=~/ngraph_plaidml_dist -DNGRAPH_PLAIDML_ENABLE=ON -DNGRAPH_CPU_ENABLE=OFF
+make
+make install
+```
 Running the build with the above options will install nGraph into
 `~/ngraph_plaidml_dist`. When you do not explicitly use
 `-DNGRAPH_CPU_ENABLE=FALSE`, the default build enables CPU for operations.
 
-After running `make` and `make install`, be sure to set the environment variables 
-to the correct location where the libraries were built. Continuing the above 
-example, this would be as follows for each respective OS:
+After running `make` and `make install`, be sure to set the environment
+variables to the correct location where the libraries were built. Continuing the
+above example, this would be as follows for each respective OS:
 
 ## Linux\*
 
 Most Linux distributions support `LD_LIBRARY_PATH`; consult the distribution's
-documentation for specifics. 
+documentation for specifics.
+```
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/ngraph_plaidml_dist/lib
+export NGRAPH_CPP_BUILD_PATH=~/ngraph_plaidml_dist
+```
 
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/ngraph_plaidml_dist/lib
-    export NGRAPH_CPP_BUILD_PATH=~/ngraph_plaidml_dist
-
-## macOS\* 
+## macOS\*
 
 MacOS usually requires use of `DYLD_LIBRARY_PATH`.
+```
+export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:~/ngraph_plaidml_dist/lib
+export NGRAPH_CPP_BUILD_PATH=~/ngraph_plaidml_dist
+```
 
-    export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:~/ngraph_plaidml_dist/lib
-    export NGRAPH_CPP_BUILD_PATH=~/ngraph_plaidml_dist
-
-## Microsoft Windows\* OS 
+## Microsoft Windows\* OS
 
 Windows requires that dynamic libraries are on your `PATH`.
+```
+set PATH=%PATH%:~/ngraph_plaidml_dist
+```
 
-    set PATH=%PATH%:~/ngraph_plaidml_dist
-
-## Test 
+## Test
 
 - To run the tests on experimental device #0, try something like
     `~/path/to/ngraph/build/test/unit-test --gtest_filter=PlaidML.*`.
@@ -125,7 +133,7 @@ Windows requires that dynamic libraries are on your `PATH`.
 - To run nBench, try something like
     `~/ngraph_plaidml_dist/bin/nbench -b "PlaidML:0" -f ~/test/model_inference_batch1_float32.json`.
 
-  This runs the nGraph model specified in the file given by the `-f` option on 
+  This runs the nGraph model specified in the file given by the `-f` option on
   non-experimental device #0. If you want to use an experimental device, set
   the environment variable `PLAIDML_EXPERIMENTAL=1`.
 
@@ -136,66 +144,62 @@ integration with Keras\*.
 
 You can get the latest release of the PlaidML-Keras Python Wheel by
 running:
-
-    pip install plaidml-keras
-
+```
+pip install plaidml-keras
+```
 You can also build and install the wheel from source.
 
 ## Set up a build environment
 
-Follow the setup instructions for building the PlaidML Python Wheel,
-above.
+Follow the setup instructions for [building the PlaidML Python Wheel], above.
 
 ## Build the PlaidML-Keras wheel
 
 macOS\*:
-
-    bazelisk build --config macos_x86_64 //plaidml/keras:wheel
-
+```
+bazelisk build --config macos_x86_64 //plaidml/keras:wheel
+```
 Linux\*:
-
-    bazelisk build --config linux_x86_64 //plaidml/keras:wheel
-
+```
+bazelisk build --config linux_x86_64 //plaidml/keras:wheel
+```
 Microsoft Windows\* OS:
-    
-    bazelisk build --config windows_x86_64 //plaidml/keras:wheel
+```
+bazelisk build --config windows_x86_64 //plaidml/keras:wheel
+```
 
 ## Install the PlaidML-Keras Python wheel
-
-    pip install -U bazel-bin/plaidml/keras/*.whl
+```
+  pip install -U bazel-bin/plaidml/keras/*.whl
+```
 
 # Testing PlaidML
 
 Unit tests are executed through bazel:
 
 macOS\*:
-
-    bazelisk test --config macos_x86_64 //...
-
+```
+bazelisk test --config macos_x86_64 //...
+```
 Linux\*:
-
-    bazelisk test --config linux_x86_64 //...
-
+```
+bazelisk test --config linux_x86_64 //...
+```
 Microsoft Windows\* OS: (not all tests are building & passing on Windows yet)
-
-    bazelisk test --config windows_x86_64 //...
-
-Unit tests for frontends are marked manual and must be executed individually (requires 
+```
+bazelisk test --config windows_x86_64 //...
+```
+Unit tests for frontends are marked manual and must be executed individually (requires
 running `plaidml-setup` prior to execution)
-
-    bazelisk test --config <config> //plaidml/keras:backend_test
-
-[Anaconda]:https://www.anaconda.com/download
-[Bazel]:http://bazel.build
-[Bazel-on-Windows]:https://docs.bazel.build/versions/master/windows.html
-[PlaidML backend]:https://ngraph.nervanasys.com/docs/latest/programmable/index.html#plaidml
-[nGraph build]:https://ngraph.nervanasys.com/docs/latest/buildlb.html 
+```
+bazelisk test --config <config> //plaidml/keras:backend_test
+```
 
 # Custom Hardware Configuration
 
-Custom configuration can be set by producing a .json file. Here is an example with two device
-configurations specified:
-```
+Custom configuration can be set by producing a .json file. Here is an example
+with two device configurations specified:
+```json
 {
 "platform": {
     "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
@@ -253,6 +257,15 @@ configurations specified:
 }
 }
 ```
-The custom configuration file can be read into PlaidML by setting the enviornment variable
-`PLAIDML_EXPERIMENTAL_CONFIG` to point to the custom .json file. PlaidML will then read the
-custom configuration file and list it as a device when running `plaidml-setup`.
+
+The custom configuration file can be read into PlaidML by setting the
+enviornment variable `PLAIDML_EXPERIMENTAL_CONFIG` to point to the custom .json
+file. PlaidML will then read the custom configuration file and list it as a
+device when running `plaidml-setup`.
+
+[Anaconda]:https://www.anaconda.com/download
+[Bazel]:http://bazel.build
+[Bazel-on-Windows]:https://docs.bazel.build/versions/master/windows.html
+[PlaidML backend]:https://www.ngraph.ai/documentation/backend-support/cpp-api#plaidml
+[nGraph build]:https://ngraph.nervanasys.com/docs/latest/buildlb.html
+[building the PlaidML Python Wheel]:(#build-the-plaidml-python-wheel)
