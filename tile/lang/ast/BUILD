@@ -13,6 +13,7 @@ plaidml_cc_library(
         "ast_ops.cc",
         "ast_ops.h",
         "gradient.cc",
+        "traversal.h",
     ],
     hdrs = [
         "ast.h",

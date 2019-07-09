@@ -83,7 +83,7 @@ struct LogicalShape {
   std::vector<DimExprPtr> dims_as_exprs() const;
 };
 
-struct Expr {
+struct Expr : std::enable_shared_from_this<Expr> {
   std::string name;
   LogicalShape shape;
 
@@ -92,6 +92,9 @@ struct Expr {
   virtual ~Expr() = default;
   virtual void Accept(AstVisitor*) = 0;
   virtual std::string str() const = 0;
+
+  std::shared_ptr<Expr> as_ptr() { return shared_from_this(); }
+  std::shared_ptr<const Expr> as_ptr() const { return shared_from_this(); }
 };
 
 struct ParamExpr : Expr {
@@ -378,6 +381,8 @@ struct ProgramEvaluation {
 };
 
 ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& outputs);
+
+std::ostream& operator<<(std::ostream& os, const Expr* expr);
 
 }  // namespace ast
 }  // namespace lang

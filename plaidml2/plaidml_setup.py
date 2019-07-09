@@ -103,7 +103,7 @@ Please choose a default device:
         def make_buffer(tensor):
             # convert LogicalShape into TensorShape
             shape = plaidml.TensorShape(tensor.shape.dtype, tensor.shape.int_dims)
-            return plaidml_exec.Buffer(device, shape)
+            return plaidml.Buffer(device, shape)
 
         ibindings = [(x, make_buffer(x)) for x, y in inputs]
         obindings = [(x, make_buffer(x)) for x in outputs]

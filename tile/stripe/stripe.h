@@ -451,13 +451,7 @@ struct Block : Statement {
   std::string unique_idx_name(const std::string& name) const;
   TensorShape exterior_shape(const std::string& name) const;
 
-  std::shared_ptr<Block> SubBlock(size_t pos) const {
-    auto it = stmts.begin();
-    for (size_t i = 0; i < pos; i++) {
-      ++it;
-    }
-    return Block::Downcast(*it);
-  }
+  std::shared_ptr<Block> SubBlock(size_t pos) const;
 };
 
 struct Buffer {

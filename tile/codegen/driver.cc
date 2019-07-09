@@ -24,7 +24,7 @@ void DumpProgram(const Block& program,            //
                  const std::string& name,         //
                  size_t counter) {
   if (options.dump_passes || options.dump_passes_proto || options.dump_code) {
-    boost::filesystem::create_directory(options.dbg_dir);
+    boost::filesystem::create_directories(options.dbg_dir);
     if (options.dump_passes) {
       auto filename = str(boost::format("%02zu_%s.txt") % counter % name);
       auto path = (options.dbg_dir / filename).string();

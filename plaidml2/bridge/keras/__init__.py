@@ -75,9 +75,9 @@ class _Function(object):
 class _KerasNode(object):
 
     def __init__(self, opname, name=None, shape=None, tensor=None):
-        name = _prepend_name_scope(name, opname)
+        self.name = _prepend_name_scope(name, opname)
         if tensor is None:
-            tensor = edsl.Tensor(shape=shape, name=name)
+            tensor = edsl.Tensor(shape=shape, name=self.name)
         # logger.debug('_KerasNode({})'.format(tensor))
         self.tensor = tensor
 
@@ -85,7 +85,7 @@ class _KerasNode(object):
         return str(self.tensor)
 
     def __str__(self):
-        return str(self.tensor)
+        return '{}: {}'.format(self.name, self.tensor.shape)
 
     def eval(self):
         return get_value(self)
@@ -158,8 +158,68 @@ def _make_rng_state(seed=None):
     return rng_state
 
 
+def _report_unimplemented(name):
+    report = (
+        'The Keras backend function \'{}\' is not yet implemented in ' +
+        'plaidml2. You can help us prioritize by letting us know if this ' +
+        'function is important to you, and as always, contributions are welcome!').format(name)
+    raise NotImplementedError(report)
+
+
+def abs(x):
+    _report_unimplemented('abs')
+
+
+def all(x, axis=None, keepdims=False):
+    _report_unimplemented('all')
+
+
+def any(x, axis=None, keepdims=False):
+    _report_unimplemented('any')
+
+
+def arange(start, stop=None, step=1, dtype='int32'):
+    _report_unimplemented('arange')
+
+
+def argmax(x, axis=-1):
+    _report_unimplemented('argmax')
+
+
+def argmin(x, axis=-1):
+    return argmax(-x, axis=axis)
+
+
 def backend():
     return 'edsl_plaidml'
+
+
+def batch_dot(x, y, axes=None, name=None):
+    _report_unimplemented('batch_dot')
+
+
+def batch_flatten(x):
+    _report_unimplemented('batch_flatten')
+
+
+def batch_set_value(tuples):
+    _report_unimplemented('batch_set_value')
+
+
+def batch_get_value(xs):
+    _report_unimplemented('batch_get_value')
+
+
+def batch_normalization(x, mean, var, beta, gamma, axis=-1, epsilon=1e-3):
+    _report_unimplemented('batch_normalization')
+
+
+def bias_add(x, bias, data_format=None):
+    _report_unimplemented('bias_add')
+
+
+def binary_crossentropy(target, output, from_logits=False):
+    _report_unimplemented('binary_crossentropy')
 
 
 def cast(x, dtype):
@@ -187,6 +247,26 @@ def cast(x, dtype):
     return _KerasNode('cast', tensor=edsl.cast(x.tensor, dtype))
 
 
+def categorical_crossentropy(target, output, from_logits=False):
+    _report_unimplemented('categorical_crossentropy')
+
+
+def ceil(x):
+    _report_unimplemented('ceil')
+
+
+def clear_session():
+    _report_unimplemented('clear_session')
+
+
+def clip(x, min_val, max_val):
+    _report_unimplemented('clip')
+
+
+def concatenate(tensors, axis=-1):
+    _report_unimplemented('concatenate')
+
+
 def constant(value, dtype=None, shape=None, name=None):
     logger.debug('constant(value: {}, dtype: {}, shape: {}, name: {})'.format(
         value, dtype, shape, name))
@@ -203,8 +283,119 @@ def constant(value, dtype=None, shape=None, name=None):
     return variable(np_value, dtype=dtype, name=_prepend_name_scope(name, 'constant'))
 
 
+def cos(x):
+    _report_unimplemented('cos')
+
+
+def conv(x,
+         kernel,
+         strides=None,
+         padding='valid',
+         data_format=None,
+         dilation_rate=None,
+         channelwise=False):
+    _report_unimplemented('conv')
+
+
+def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate):
+    _report_unimplemented('conv_transpose')
+
+
+def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rate=1):
+    _report_unimplemented('conv1d')
+
+
+def conv2d(x, kernel, strides=(1, 1), padding='valid', dilation_rate=(1, 1), data_format=None):
+    _report_unimplemented('conv2d')
+
+
+def conv2d_transpose(x,
+                     kernel,
+                     output_shape,
+                     strides=(1, 1),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1, 1)):
+    _report_unimplemented('conv2d_transpose')
+
+
+def conv3d(x,
+           kernel,
+           strides=(1, 1, 1),
+           padding='valid',
+           dilation_rate=(1, 1, 1),
+           data_format=None):
+    _report_unimplemented('conv3d')
+
+
+def conv3d_transpose(x,
+                     kernel,
+                     output_shape,
+                     strides=(1, 1, 1),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1, 1, 1)):
+    _report_unimplemented('conv3d_transpose')
+
+
+def count_params(x):
+    _report_unimplemented('count_params')
+
+
+def ctc_batch_cost(y_true, y_pred, input_length, label_length):
+    _report_unimplemented('ctc_batch_cost')
+
+
+def ctc_decode(y_pred, input_length, greedy=True, beam_width=100, top_paths=1):
+    _report_unimplemented('ctc_decode')
+
+
+def ctc_label_dense_to_sparse(labels, label_lengths):
+    _report_unimplemented('ctc_label_dense_to_sparse')
+
+
+# cumprod = op.cumulative_prod
+
+# cumsum = op.cumulative_sum
+
+
+def cur_name():
+    if len(_NAME_SCOPE_STACK):
+        return _NAME_SCOPE_STACK[0]
+    return ''
+
+
+def depthwise_conv2d(x,
+                     kernel,
+                     strides=(1, 1),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1, 1)):
+    _report_unimplemented('depthwise_conv2d')
+
+
+# dot = op.dot
+def dropout(x, level, noise_shape=None, seed=None):
+    _report_unimplemented('dropout')
+
+
 def dtype(x):
     return x.tensor.shape.dtype.into_numpy()
+
+
+def elu(x, alpha=1.0):
+    _report_unimplemented('elu')
+
+
+def equal(x, y):
+    _report_unimplemented('equal')
+
+
+# exp = op.exp
+
+
+def eval(x):
+    return get_value(x)
 
 
 def expand_dims(x, axis=-1, name=None):
@@ -223,8 +414,20 @@ def expand_dims(x, axis=-1, name=None):
     return _KerasNode('expand_dims', name=name, tensor=O)
 
 
-def eval(x):
-    return get_value(x)
+def eye(size, dtype=None, name=None):
+    _report_unimplemented('eye')
+
+
+# flatten = op.flatten
+
+
+# floor = op.floor
+def foldl(fn, elems, initializer=None, name=None):
+    _report_unimplemented('foldl')
+
+
+def foldr(fn, elems, initializer=None, name=None):
+    _report_unimplemented('foldr')
 
 
 def function(inputs, outputs, updates=None, name=None):
@@ -235,6 +438,9 @@ def function(inputs, outputs, updates=None, name=None):
     if name is None:
         name = ''
     return _Function(inputs, outputs, updates, name)
+
+
+# gather = op.gather
 
 
 def get_uid(prefix=''):
@@ -249,6 +455,46 @@ def get_value(x):
     return outputs[0]
 
 
+def get_variable_shape(x):
+    return x._keras_shape
+
+
+def gradients(loss, variables):
+    logger.debug('gradients(loss: {}, variables: {})'.format(loss, variables))
+    program = edsl.Program('gradients', [loss.tensor])
+    logger.debug('program: {}'.format(program))
+
+    grads = edsl.gradients(loss.tensor, [x.tensor for x in variables])
+    return [_KerasNode('gradients', tensor=x) for x in grads]
+
+
+def greater(x, y):
+    return x > y
+
+
+def greater_equal(x, y):
+    return x >= y
+
+
+def hard_sigmoid(x):
+    _report_unimplemented('hard_sigmoid')
+
+
+# identity = op.identity
+
+
+def in_test_phase(x, alt, training=None):
+    _report_unimplemented('in_test_phase')
+
+
+def in_top_k(predictions, targets, k):
+    _report_unimplemented('in_top_k')
+
+
+def in_train_phase(x, alt, training=None):
+    _report_unimplemented('in_train_phase')
+
+
 def int_shape(x):
     return tuple(None if x == 0 else x for x in x.tensor.shape.int_dims)
 
@@ -260,6 +506,10 @@ def is_keras_tensor(x):
     return hasattr(x, '_keras_history')
 
 
+def is_placeholder(x):
+    _report_unimplemented('is_placeholder')
+
+
 def is_sparse(x):
     return False
 
@@ -269,9 +519,66 @@ def is_tensor(x):
     return isinstance(x, _KerasNode)
 
 
+def l2_normalize(x, axis):
+    _report_unimplemented('l2_normalize')
+
+
+def learning_phase():
+    _report_unimplemented('learning_phase')
+
+
+def less(x, y):
+    return x < y
+
+
+def less_equal(x, y):
+    return x <= y
+
+
+def local_conv1d(inputs, kernel, kernel_size, strides, data_format=None):
+    _report_unimplemented('local_conv1d')
+
+
+def local_conv2d(inputs, kernel, kernel_size, strides, output_shape, data_format=None):
+    _report_unimplemented('local_conv2d')
+
+
+# log = op.log
+
+
+def logsumexp(x, axis=None, keepdims=False):
+    _report_unimplemented('logsumexp')
+
+
+def manual_variable_initialization(value):
+    _report_unimplemented('manual_variable_initialization')
+
+
+def map_fn(fn, elems, name=None, dtype=None):
+    _report_unimplemented('map_fn')
+
+
+def max(x, axis=None, keepdims=False):
+    _report_unimplemented('max')
+
+
+# maximum = op.maximum
+
+
 def mean(x, axis=None, keepdims=False):
     logger.debug('mean(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
     return _KerasNode('mean', tensor=plaidml_op.mean(x.tensor, axis, keepdims))
+
+
+def min(x, axis=None, keepdims=False):
+    _report_unimplemented('min')
+
+
+# minimum = op.minimum
+
+
+def moving_average_update(x, value, momentum):
+    _report_unimplemented('moving_average_update')
 
 
 @contextmanager
@@ -296,6 +603,26 @@ def not_equal(lhs, rhs):
     return _KerasNode('not_equal', tensor=O)
 
 
+def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
+    _report_unimplemented('normalize_batch_in_training')
+
+
+def one_hot(indices, num_classes):
+    _report_unimplemented('one_hot')
+
+
+def ones(shape, dtype=None, name=None):
+    _report_unimplemented('ones')
+
+
+def ones_like(x, dtype=None, name=None):
+    _report_unimplemented('ones_like')
+
+
+def permute_dimensions(x, pattern):
+    _report_unimplemented('permute_dimensions')
+
+
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     logger.debug('placeholder(shape: {}, ndim: {}, dtype: {}, sparse: {}, name: {})'.format(
         shape, ndim, dtype, sparse, name))
@@ -305,6 +632,42 @@ def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     if ndim:
         return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, [0] * ndim), name=name)
     raise ValueError()
+
+
+def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mode='max'):
+    _report_unimplemented('pool')
+
+
+def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool_mode='max'):
+    _report_unimplemented('pool2d')
+
+
+def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, pool_mode='max'):
+    _report_unimplemented('pool3d')
+
+
+def pow(x, a):
+    _report_unimplemented('pow')
+
+
+def print_tensor(x, message=''):
+    _report_unimplemented('print_tensor')
+
+
+def prod(value, axis=None, keepdims=False):
+    _report_unimplemented('prod')
+
+
+def random_binomial(shape, p=0.0, dtype=None, see=None):
+    _report_unimplemented('random_binomial')
+
+
+def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
+    _report_unimplemented('random_normal')
+
+
+def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None):
+    _report_unimplemented('random_normal_variable')
 
 
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
@@ -321,6 +684,45 @@ def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
     #     O = edsl.cast()
     O = (maxval - minval) * O + minval
     return _KerasNode('random_uniform', tensor=O)
+
+
+def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
+    _report_unimplemented('random_uniform_variable')
+
+
+# relu = op.relu
+
+
+def repeat(x, n):
+    _report_unimplemented('repeat')
+
+
+def repeat_elements(x, rep, axis):
+    _report_unimplemented('repeat_elements')
+
+
+def reset_uids():
+    global _UID_PREFIX_DICT
+    _UID_PREFIX_DICT.clear()
+
+
+# reshape = op.reshape
+
+
+def resize_images(x, height_factor, width_factor, data_format, interpolation='nearest'):
+    _report_unimplemented('resize_images')
+
+
+def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
+    _report_unimplemented('resize_volumes')
+
+
+def reverse(x, axes):
+    _report_unimplemented('reverse')
+
+
+def reverse_gradient(x, coeff=1.0):
+    _report_unimplemented('reverse_gradient')
 
 
 def rnn(step_function,
@@ -343,10 +745,69 @@ def rnn(step_function,
     return (output_val, output, states)
 
 
+def round(x):
+    _report_unimplemented('round')
+
+
+def separable_conv(x,
+                   depthwise_kernel,
+                   pointwise_kernel,
+                   strides=None,
+                   padding='valid',
+                   data_format=None,
+                   dilation_rate=None):
+    _report_unimplemented('separable_conv')
+
+
 def set_floatx(dtype):
     logger.debug('set_floatx(dtype: {})'.format(dtype))
     keras_set_floatx(dtype)
     # plaidml.set_floatx(ptile.convert_np_dtype_to_pml(dtype))
+
+
+def set_learning_phase(value):
+    _report_unimplemented('set_learning_phase')
+
+
+def set_value(x, value):
+    _report_unimplemented('set_value')
+
+
+# sigmoid = op.sigmoid
+
+
+def sign(x):
+    _report_unimplemented('sign')
+
+
+# sin = op.sin
+
+
+def softmax(x):
+    _report_unimplemented('softmax')
+
+
+def softplus(x):
+    _report_unimplemented('softplus')
+
+
+def softsign(x):
+    _report_unimplemented('softsign')
+
+
+def sparse_categorical_crossentropy(target, output, from_logits=False):
+    _report_unimplemented('sparse_categorical_crossentropy')
+
+
+def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
+    _report_unimplemented('spatial_2d_padding')
+
+
+def spatial_3d_padding(x, padding=((1, 1), (1, 1), (1, 1)), data_format=None):
+    _report_unimplemented('spatial_3d_padding')
+
+
+# sqrt = op.sqrt
 
 
 def square(x):
@@ -354,9 +815,36 @@ def square(x):
     return _KerasNode('square', tensor=plaidml_op.square(x.tensor))
 
 
+def squeeze(x, axis):
+    _report_unimplemented('squeeze')
+
+
+def stack(x, axis=0):
+    _report_unimplemented('stack')
+
+
+def std(x, axis=None, keepdims=False):
+    _report_unimplemented('std')
+
+
+def stop_gradient(variables):
+    _report_unimplemented('stop_gradient')
+
+
 def sum(x, axis=None, keepdims=False):
     logger.debug('sum(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
     return _KerasNode('sum', tensor=plaidml_op.sum(x.tensor, axis, keepdims))
+
+
+def switch(condition, then_expression, else_expression):
+    _report_unimplemented('switch')
+
+
+# tanh = op.tanh
+
+
+def temporal_padding(x, padding=(1, 1)):
+    _report_unimplemented('temporal_padding')
 
 
 def tile(x, n):
@@ -374,6 +862,34 @@ def tile(x, n):
     O[out_idxs] = I[idxs]
     O.no_defract()
     return _KerasNode('tile', tensor=O)
+
+
+def to_dense(tensor):
+    _report_unimplemented('to_dense')
+
+
+def transpose(x):
+    _report_unimplemented('transpose')
+
+
+def truncated_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
+    _report_unimplemented('truncated_normal')
+
+
+def update(x, new_x):
+    _report_unimplemented('update')
+
+
+def update_add(x, increment):
+    return (x, x + increment)
+
+
+def update_sub(x, decrement):
+    return (x, x - decrement)
+
+
+def var(x, axis=None, keepdims=False):
+    _report_unimplemented('var')
 
 
 def variable(value, dtype=None, name=None, constraint=None):
@@ -398,6 +914,10 @@ def variable(value, dtype=None, name=None, constraint=None):
         tensor = edsl.Tensor(shape=shape, name=name, buffer=buffer)
         return _KerasNode('variable', name=name, tensor=tensor)
     raise TypeError('Unknown type for variable: {}'.format(type(value)))
+
+
+def zeros(shape, dtype=floatx(), name=None):
+    _report_unimplemented('zeros')
 
 
 def zeros_like(x, dtype=floatx(), name=None):

@@ -587,6 +587,17 @@ std::ostream& operator<<(std::ostream& os, const Block& block) {
   return os;
 }
 
+std::shared_ptr<Block> Block::SubBlock(size_t pos) const {
+  if (stmts.size() <= pos) {
+    throw std::out_of_range(str(boost::format("SubBlock(%1%) is out of range") % pos));
+  }
+  auto it = stmts.begin();
+  for (size_t i = 0; i < pos; i++) {
+    ++it;
+  }
+  return Block::Downcast(*it);
+}
+
 std::vector<std::string> Block::buffer_reads() const {
   std::vector<std::string> results;
   for (const auto& ref : refs) {

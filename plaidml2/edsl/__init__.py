@@ -564,6 +564,21 @@ def gather(x, y):
     return call("gather", x, y)
 
 
+def gradients(loss, variables):
+    wrts = [x.as_ptr() for x in variables]
+    raw_grads = ffi.new('plaidml_expr*[]', len(wrts))
+    initial_loss = Tensor(value=1.0)
+    ffi_call(
+        lib.plaidml_expr_gradient,
+        len(wrts),
+        wrts,
+        loss.as_ptr(),
+        initial_loss.as_ptr(),
+        raw_grads,
+    )
+    return [Tensor(expr=x) for x in raw_grads]
+
+
 def index(x, axis):
     return call("index", x, axis)
 

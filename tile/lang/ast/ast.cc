@@ -8,6 +8,7 @@
 #include "base/util/lookup.h"
 #include "base/util/stream_container.h"
 #include "tile/lang/ast/ast_ops.h"
+#include "tile/lang/ast/traversal.h"
 #include "tile/lang/gen_special.h"
 
 namespace vertexai {
@@ -129,78 +130,66 @@ LogicalShape ComputeOutputShape(const std::vector<ExprPtr>& args) {
   return ret;
 }
 
-class AstTraversal : public AstVisitor {
- public:
-  explicit AstTraversal(const std::vector<ExprPtr>& exprs) {
-    for (const auto& expr : exprs) {
-      Push(expr);
-    }
-    while (stack_.size()) {
-      auto entry = stack_.top();
-      stack_.pop();
-      if (entry.second) {
-        flat_.push_back(entry.first);
-      } else if (!seen_.count(entry.first.get())) {
-        seen_.insert(entry.first.get());
-        stack_.push(std::make_pair(entry.first, true));
-        entry.first->Accept(this);
-      }
-    }
-    IVLOG(4, "AstTraversal: " << StreamContainer(flat_));
+AstTraversal::AstTraversal(const std::vector<ExprPtr>& exprs) {
+  for (const auto& expr : exprs) {
+    Push(expr);
   }
-
-  const std::vector<ExprPtr>& flat() const { return flat_; }
-
- private:
-  void Visit(const CallExpr& expr) {
-    // push arguments from right-to-left so they eventually get processed in left-to-right order
-    for (auto it = expr.args.rbegin(); it != expr.args.rend(); ++it) {
-      Push(*it);
+  while (stack_.size()) {
+    auto entry = stack_.top();
+    stack_.pop();
+    if (entry.second) {
+      flat_.push_back(entry.first);
+    } else if (!seen_.count(entry.first.get())) {
+      seen_.insert(entry.first.get());
+      stack_.push(std::make_pair(entry.first, true));
+      entry.first->Accept(this);
     }
   }
+  IVLOG(4, "AstTraversal: " << StreamContainer(flat_));
+}
 
-  void Visit(const ConstraintExpr& expr) {
-    throw std::runtime_error("Not implemented: AstTraversal::Visit(ConstraintExpr)");
+void AstTraversal::Visit(const CallExpr& expr) {
+  // push arguments from right-to-left so they eventually get processed in left-to-right order
+  for (auto it = expr.args.rbegin(); it != expr.args.rend(); ++it) {
+    Push(*it);
   }
+}
 
-  void Visit(const ContractionExpr& expr) {
-    // push inputs from right-to-left so they eventually get processed in left-to-right order
-    IVLOG(6, "Visiting ContractionExpr: " << &expr);
-    IVLOG(6, "  with agg_op " << to_string(expr.agg_op) << ", combo_op " << to_string(expr.combo_op));
-    for (auto it = expr.inputs.rbegin(); it != expr.inputs.rend(); ++it) {
-      Push((*it)->ref);
-    }
-    if (expr.use_default) {
-      Push(expr.use_default);
-    }
+void AstTraversal::Visit(const ConstraintExpr& expr) {
+  throw std::runtime_error("Not implemented: AstTraversal::Visit(ConstraintExpr)");
+}
+
+void AstTraversal::Visit(const ContractionExpr& expr) {
+  // push inputs from right-to-left so they eventually get processed in left-to-right order
+  IVLOG(6, "Visiting ContractionExpr: " << &expr);
+  IVLOG(6, "  with agg_op " << to_string(expr.agg_op) << ", combo_op " << to_string(expr.combo_op));
+  for (auto it = expr.inputs.rbegin(); it != expr.inputs.rend(); ++it) {
+    Push((*it)->ref);
   }
-
-  void Visit(const FloatConst& expr) {}
-
-  void Visit(const IntConst& expr) {}
-
-  void Visit(const ParamExpr& expr) {}
-
-  void Visit(const TensorSpecExpr& expr) {
-    throw std::runtime_error("Not implemented: AstTraversal::Visit(TensorSpecExpr)");
+  if (expr.use_default) {
+    Push(expr.use_default);
   }
+}
 
-  void Visit(const DimExprExpr& expr) {}
+void AstTraversal::Visit(const FloatConst& expr) {}
 
- private:
-  void Push(const ExprPtr& expr) {
-    if (!expr) {
-      throw std::runtime_error("Invalid expression in AstTraversal::Push");
-    }
-    IVLOG(4, "AstTraversal::Push> " << expr.get());
-    stack_.push(std::make_pair(expr, false));
+void AstTraversal::Visit(const IntConst& expr) {}
+
+void AstTraversal::Visit(const ParamExpr& expr) {}
+
+void AstTraversal::Visit(const TensorSpecExpr& expr) {
+  throw std::runtime_error("Not implemented: AstTraversal::Visit(TensorSpecExpr)");
+}
+
+void AstTraversal::Visit(const DimExprExpr& expr) {}
+
+void AstTraversal::Push(const ExprPtr& expr) {
+  if (!expr) {
+    throw std::runtime_error("Invalid expression in AstTraversal::Push");
   }
-
- private:
-  std::stack<std::pair<ExprPtr, bool>> stack_;
-  std::vector<ExprPtr> flat_;
-  std::unordered_set<const Expr*> seen_;
-};
+  IVLOG(4, "AstTraversal::Push> " << expr.get());
+  stack_.push(std::make_pair(expr, false));
+}
 
 class DimExprEvaluator : public DimVisitor {
   int64_t Visit(const DimIntExpr& expr) { return expr.value; }
@@ -688,6 +677,7 @@ std::string CallExpr::str() const {
 ContractionExpr::ContractionExpr() : Expr(LogicalShape{}) {}
 
 void ContractionExpr::ComputeShape(const std::string& layout) {
+  IVLOG(4, "ContractionExpr::ComputeShape> layout: " << layout);
   DataType dtype = DataType::INVALID;
   if (combo_op == CombinationOp::COND) {
     dtype = DataType::BOOLEAN;
