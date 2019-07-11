@@ -21,6 +21,9 @@
 #include "base/util/lookup.h"
 #include "tile/stripe/stripe.h"
 
+// libxsmm
+#include "libxsmm_source.h"
+
 namespace vertexai {
 namespace tile {
 namespace targets {
@@ -70,6 +73,7 @@ class Compiler : private stripe::ConstStmtVisitor {
  protected:
   explicit Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals);
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
+  llvm::Function* CompileXSMMBlock(const stripe::Block& block);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
   void Visit(const stripe::Store&) override;
@@ -145,6 +149,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
+  llvm::Value* XSMMDispatchFunction();
   llvm::Value* MallocFunction();
   llvm::Value* CallocFunction();
   llvm::Value* FreeFunction();
@@ -265,7 +270,105 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   builder_.CreateRetVoid();
 }
 
+llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block) {
+  // Generate a function that implements the body for this block of statements.
+  // Refinements (their buffers) and initial indexes
+  // will be passed as parameters (to the function).
+  for (const auto& ref : block.refs) {
+    buffers_[ref.into()] = Buffer{&ref};
+  }
+  for (const auto& idx : block.idxs) {
+    indexes_[idx.name] = Index{&idx};
+  }
+
+  // Create the LLVM function which will implement the Stripe block
+  auto linkage = llvm::Function::ExternalLinkage;
+  auto name = block.name;
+  auto func_type = BlockType(block);
+  auto function = llvm::Function::Create(func_type, linkage, name, module_);
+
+  // Areate a basic block; configure the builder to start there
+  auto bb = llvm::BasicBlock::Create(context_, "entry", function);
+  builder_.SetInsertPoint(bb);
+
+  // Associate parameter values with buffers and indexes
+  for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
+    unsigned idx = ai->getArgNo();
+    if (idx < block.refs.size()) {
+      auto it = block.refs.begin();
+      std::advance(it, idx);
+      std::string param_name = it->into();
+      ai->setName(param_name);
+      assert(nullptr == buffers_[param_name].base);
+      buffers_[param_name].base = &(*ai);
+    } else {
+      idx -= block.refs.size();
+      std::string param_name = block.idxs[idx].name;
+      ai->setName(param_name);
+      assert(nullptr == indexes_[param_name].init);
+      indexes_[param_name].init = &(*ai);
+    }
+  }
+  auto i32t = builder_.getInt32Ty();
+  llvm::Value* alpha = builder_.CreateAlloca(builder_.getFloatTy());
+  llvm::Value* beta = builder_.CreateAlloca(builder_.getFloatTy());
+  llvm::Value* lda = builder_.CreateAlloca(i32t);
+  llvm::Value* ldb = builder_.CreateAlloca(i32t);
+  llvm::Value* ldc = builder_.CreateAlloca(i32t);
+
+  llvm::Value* one = llvm::ConstantFP::get(builder_.getFloatTy(), 1.0);
+  builder_.CreateStore(one, alpha);
+  builder_.CreateStore(one, beta);
+  builder_.CreateStore(llvm::ConstantInt::get(i32t, 1024), lda);
+  builder_.CreateStore(llvm::ConstantInt::get(i32t, 1024), ldb);
+  builder_.CreateStore(llvm::ConstantInt::get(i32t, 1024), ldc);
+  llvm::Value* nptr = llvm::ConstantPointerNull::get(llvm::Type::getInt32PtrTy(context_));
+  llvm::Value* dispatch = XSMMDispatchFunction();
+  std::vector<llvm::Value*> args1 = {llvm::ConstantInt::get(i32t, 64),
+                                     llvm::ConstantInt::get(i32t, 16),
+                                     llvm::ConstantInt::get(i32t, 64),
+                                     lda,
+                                     ldb,
+                                     ldc,
+                                     alpha,
+                                     beta,
+                                     nptr,
+                                     nptr};
+  llvm::Value* func = builder_.CreateCall(dispatch, args1);
+  IVLOG(1, block);
+  for (const auto& kvp : buffers_) {
+    IVLOG(1, "key:" << kvp.first);
+    IVLOG(1, "value:" << kvp.second.base);
+    // kvp.second.base->dump();
+    std::string type_str;
+    llvm::raw_string_ostream rso(type_str);
+    kvp.second.base->getType()->print(rso);
+    IVLOG(1, "llvm_type:" << type_str);
+    // kvp.second.base->dump();
+  }
+  IVLOG(1, block.ref_ins()[1]->into());
+  IVLOG(1, block.ref_ins()[0]->into());
+  IVLOG(1, block.ref_outs()[0]->into());
+  llvm::Type* fptr = llvm::Type::getFloatPtrTy(context_);
+  std::vector<llvm::Type*> param_types{
+      fptr,  // a
+      fptr,  // b
+      fptr,  // c
+  };
+  llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
+  std::vector<llvm::Value*> args2 = {buffers_[block.ref_ins()[1]->into()].base,
+                                     buffers_[block.ref_ins()[0]->into()].base,
+                                     buffers_[block.ref_outs()[0]->into()].base};
+  builder_.CreateCall(rftype, func, args2);
+  builder_.CreateRetVoid();
+  return function;
+}
+
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
+  if (block.has_tag("xsmm")) {
+    return CompileXSMMBlock(block);
+  }
+
   // Generate a function implementing the body of this block.
   // Buffers (refinements) will be passed in as function parameters, as will
   // the initial value for each index.
@@ -1153,6 +1256,32 @@ llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   return llvm::FunctionType::get(return_type, param_types, false);
 }
 
+llvm::Value* Compiler::XSMMDispatchFunction(void) {
+  llvm::Type* iptr = llvm::Type::getInt32PtrTy(context_);
+  llvm::Type* fptr = llvm::Type::getFloatPtrTy(context_);
+  std::vector<llvm::Type*> param_types{
+      fptr,  // a
+      fptr,  // b
+      fptr,  // c
+  };
+  llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
+  std::vector<llvm::Type*> argtypes{
+      builder_.getInt32Ty(),  // m
+      builder_.getInt32Ty(),  // n
+      builder_.getInt32Ty(),  // k
+      iptr,                   // lda
+      iptr,                   // ldb
+      iptr,                   // ldc
+      fptr,                   // alpha
+      fptr,                   // beta
+      iptr,                   // flags
+      iptr,                   // prefetch
+  };
+  auto functype = llvm::FunctionType::get(rftype->getPointerTo(), argtypes, false);
+  const char* funcname = "libxsmm_smmdispatch";
+  return module_->getOrInsertFunction(funcname, functype);
+}
+
 llvm::Value* Compiler::MallocFunction(void) {
   std::vector<llvm::Type*> argtypes{IndexType()};
   llvm::Type* rettype = builder_.getInt8PtrTy();
@@ -1246,9 +1375,14 @@ llvm::JITEvaluatedSymbol symInfo(T ptr) {
 
 llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
   static std::map<std::string, llvm::JITEvaluatedSymbol> symbols{
-      {"__gnu_h2f_ieee", symInfo(rt::h2f)},  {"__gnu_f2h_ieee", symInfo(rt::f2h)},
-      {"___truncsfhf2", symInfo(rt::f2h)},   {"___extendhfsf2", symInfo(rt::h2f)},
-      {"prng_step", symInfo(rt::prng_step)}, {"_prng_step", symInfo(rt::prng_step)},
+      {"__gnu_h2f_ieee", symInfo(rt::h2f)},
+      {"__gnu_f2h_ieee", symInfo(rt::f2h)},
+      {"___truncsfhf2", symInfo(rt::f2h)},
+      {"___extendhfsf2", symInfo(rt::h2f)},
+      {"prng_step", symInfo(rt::prng_step)},
+      {"_prng_step", symInfo(rt::prng_step)},
+      {"libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
+      {"_libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {

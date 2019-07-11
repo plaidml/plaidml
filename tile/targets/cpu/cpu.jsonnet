@@ -37,18 +37,22 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.StencilPass',
                 reqs: ['agg_op_add', 'comb_op_mul'],
                 outer_set: ['mac'],
-                inner_set: ['mac_inner'],
+                inner_set: ['mac_inner', 'xsmm'],
                 stencils: [
                   {
                     startup_cost: 32,
                     idxs: [
-                      { name: 'a', size: 8, outs: [1], ins: [1, 0] },
+                      { name: 'm', size: 64, outs: [1], ins: [1, 0] },
+                      { name: 'n', size: 16, outs: [-1], ins: [0, -1] },
+                      { name: 'k', size: 64, outs: [0], ins: [-1, 1] },
                     ],
                   },
                   {
                     startup_cost: 32,
                     idxs: [
-                      { name: 'a', size: 8, outs: [1], ins: [0, 1] },
+                      { name: 'm', size: 64, outs: [1], ins: [0, 1] },
+                      { name: 'n', size: 16, outs: [-1], ins: [-1, 0] },
+                      { name: 'k', size: 64, outs: [0], ins: [1, -1] },
                     ],
                   },
                 ],

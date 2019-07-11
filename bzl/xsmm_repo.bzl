@@ -12,18 +12,22 @@ def _xsmm_repo_impl(repository_ctx):
     ]
 
     result = repository_ctx.download_and_extract(
-        url=url,
-        sha256=sha256,
-        stripPrefix=stripPrefix,
+        url = url,
+        sha256 = sha256,
+        stripPrefix = stripPrefix,
     )
 
-    result = repository_ctx.execute(args, quiet = False, timeout = 1200)
+    result = repository_ctx.execute(
+        args,
+        quiet = False,
+        timeout = 1200,
+    )
 
     if result.return_code:
         fail("xmss_repo failed: %s (%s)" % (result.stdout, result.stderr))
 
     repository_ctx.template("BUILD", repository_ctx.attr.build_file, {}, False)
-    
+
 xsmm_repo = repository_rule(
     attrs = {
         "url": attr.string(
@@ -37,9 +41,8 @@ xsmm_repo = repository_rule(
         ),
         "build_file": attr.label(
             mandatory = True,
-            allow_single_file = True
+            allow_single_file = True,
         ),
     },
-    
     implementation = _xsmm_repo_impl,
 )
