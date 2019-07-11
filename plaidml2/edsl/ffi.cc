@@ -287,7 +287,7 @@ plaidml_expr* plaidml_expr_tuple(  //
     size_t nargs,                  //
     plaidml_expr** args) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    std::vector<std::shared_ptr<Expr>> exprs(nargs);
+    std::vector<ExprPtr> exprs(nargs);
     for (size_t i = 0; i < nargs; i++) {
       exprs[i] = args[i]->expr;
     }
@@ -395,7 +395,7 @@ plaidml_expr* plaidml_expr_call(  //
     size_t nargs,                 //
     plaidml_expr** args) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    std::vector<std::shared_ptr<Expr>> exprs(nargs);
+    std::vector<ExprPtr> exprs(nargs);
     for (size_t i = 0; i < nargs; i++) {
       if (!args[i]) {
         throw std::runtime_error(str(boost::format("Undefined tensor in call to %1%()") % fn));
@@ -696,17 +696,22 @@ void plaidml_program_free(  //
 plaidml_program* plaidml_program_evaluate(  //
     plaidml_error* err,                     //
     const char* name,                       //
-    size_t nexprs,                          //
-    plaidml_expr** raw_exprs) {
+    size_t noutputs,                        //
+    plaidml_expr** raw_outputs,             //
+    plaidml_expr** new_outputs) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
-    std::vector<std::shared_ptr<Expr>> exprs(nexprs);
-    for (size_t i = 0; i < nexprs; i++) {
-      if (!raw_exprs[i]) {
+    std::vector<ExprPtr> outputs(noutputs);
+    for (size_t i = 0; i < noutputs; i++) {
+      if (!raw_outputs[i]) {
         throw std::runtime_error("Undefined expression in plaidml_program_evaluate");
       }
-      exprs[i] = raw_exprs[i]->expr;
+      outputs[i] = raw_outputs[i]->expr;
     }
-    return new plaidml_program{Evaluate(name, exprs)};
+    auto ret = new plaidml_program{Evaluate(name, outputs)};
+    for (size_t i = 0; i < noutputs; i++) {
+      new_outputs[i] = new plaidml_expr{ret->eval.outputs[i]};
+    }
+    return ret;
   });
 }
 

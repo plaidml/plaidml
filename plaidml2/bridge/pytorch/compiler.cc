@@ -590,11 +590,17 @@ Executable::Executable(const std::string& device_id,             //
     plaidml::Buffer buffer(device_id, tensor_shape);
     input_bindings_[i] = plaidml::exec::Binding{inputs[i], buffer};
   }
+  std::stringstream ss;
+  ss << "pytorch_" << g_program_id++;
+  name_ = ss.str();
+  program_ = std::make_unique<edsl::Program>(name_, outputs);
+  IVLOG(1, "Executable::Executable>");
+  IVLOG(2, program_->str());
   for (size_t i = 0; i < outputs.size(); i++) {
     auto shape = outputs[i].shape();
     plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
     output_bindings_.emplace_back(plaidml::exec::Binding{
-        outputs[i],                               // tensor
+        program_->outputs().at(i),                // tensor
         plaidml::Buffer{device_id, tensor_shape}  // buffer
     });
     std::vector<int64_t> sizes;
@@ -604,12 +610,6 @@ Executable::Executable(const std::string& device_id,             //
     }
     output_ivalues_[i] = at::empty(at::IntArrayRef(sizes));
   }
-  std::stringstream ss;
-  ss << "pytorch_" << g_program_id++;
-  name_ = ss.str();
-  program_ = std::make_unique<edsl::Program>(name_, outputs);
-  IVLOG(1, "Executable::Executable>");
-  IVLOG(2, program_->str());
   exec_ =
       std::make_shared<plaidml::exec::Executable>(*program_, device_id_, target_id_, input_bindings_, output_bindings_);
   IVLOG(1, "Executable::Executable> done");

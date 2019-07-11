@@ -22,7 +22,6 @@ def run():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
     score = run()
     print('score:', score)
     expected = 1.66666666666666666666

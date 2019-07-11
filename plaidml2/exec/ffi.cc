@@ -117,7 +117,7 @@ plaidml_executable* plaidml_compile(  //
         throw std::runtime_error("Undefined output bindings");
       }
       auto expr = outputs[i]->expr->expr;
-      auto it = std::find(program_outputs.begin(), program_outputs.end(), expr.get());
+      auto it = std::find(program_outputs.begin(), program_outputs.end(), expr);
       size_t j = std::distance(program_outputs.begin(), it);
       const auto& name = program->eval.runinfo.program.outputs[j];
       exec->output_bufs[name] = outputs[i]->buffer->buffer;

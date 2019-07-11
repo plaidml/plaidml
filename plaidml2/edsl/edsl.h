@@ -71,14 +71,15 @@ inline void init() {
 
 class Program {
  public:
-  // Program(const std::string& name, const Value& value);
-  Program(const std::string& name, const std::vector<Tensor>& tensors);
+  Program(const std::string& name, const std::vector<Tensor>& outputs);
   plaidml_program* as_ptr() const { return ptr_.get(); }
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
   const void* runinfo() const { return ffi::call<const void*>(plaidml_program_runinfo, ptr_.get()); }
+  const std::vector<Tensor>& outputs() const { return outputs_; }
 
  private:
   std::shared_ptr<plaidml_program> ptr_;
+  std::vector<Tensor> outputs_;
 };
 
 class TensorIndexIterator {
@@ -634,20 +635,6 @@ inline Tensor zero() { return Tensor{0}; }
 
 class TensorFriend {
  public:
-  static plaidml_program* evaluate(const std::string& name, const std::vector<Tensor>& tensors) {
-    std::vector<plaidml_expr*> exprs;
-    for (const auto& tensor : tensors) {
-      auto ptr = tensor.as_ptr();
-      if (!ptr) {
-        std::stringstream ss;
-        ss << "Invalid tensor output requested of Program: " << tensor.str();
-        throw std::runtime_error(ss.str());
-      }
-      exprs.emplace_back(ptr);
-    }
-    return ffi::call<plaidml_program*>(plaidml_program_evaluate, name.c_str(), exprs.size(), exprs.data());
-  }
-
   static TensorDim DimOp(plaidml_int_op op, const std::vector<TensorDim>& args) {
     std::vector<plaidml_dim_expr*> operands;
     for (const auto& arg : args) {
@@ -724,8 +711,28 @@ class TensorFriend {
   }
 };
 
-inline Program::Program(const std::string& name, const std::vector<Tensor>& tensors)
-    : ptr_(details::make_plaidml_program(TensorFriend::evaluate(name, tensors))) {}
+inline Program::Program(const std::string& name, const std::vector<Tensor>& outputs) : outputs_(outputs.size()) {
+  std::vector<plaidml_expr*> raw_outputs(outputs.size());
+  std::vector<plaidml_expr*> new_outputs(outputs.size());
+  for (size_t i = 0; i < raw_outputs.size(); i++) {
+    auto ptr = outputs[i].as_ptr();
+    if (!ptr) {
+      std::stringstream ss;
+      ss << "Invalid tensor output requested by Program: " << outputs[i].str();
+      throw std::runtime_error(ss.str());
+    }
+    raw_outputs[i] = ptr;
+  }
+  ptr_ = details::make_plaidml_program(ffi::call<plaidml_program*>(  //
+      plaidml_program_evaluate,                                      //
+      name.c_str(),                                                  //
+      raw_outputs.size(),                                            //
+      raw_outputs.data(),                                            //
+      new_outputs.data()));
+  for (size_t i = 0; i < new_outputs.size(); i++) {
+    outputs_[i] = Tensor(new_outputs[i]);
+  }
+}
 
 inline TensorDim TensorDim::operator-() const { return TensorFriend::DimOp(PLAIDML_INT_OP_NEG, {*this}); }
 
@@ -959,19 +966,6 @@ inline Value make_tuple(const std::vector<Value>& elts) {  //
 }
 
 inline Value None() { return Value(); }
-
-// inline Program::Program(const std::string& name, const Value& value) {
-//   std::vector<Tensor> outputs;
-//   if (value.is_tensor()) {
-//     outputs.emplace_back(value.as_tensor());
-//   }
-//   if (value.is_tuple()) {
-//     for (const auto& item : value.as_tuple()) {
-//       outputs.emplace_back(item.as_tensor());
-//     }
-//   }
-//   ptr_ = details::make_plaidml_program(TensorFriend::evaluate(name, outputs));
-// }
 
 inline std::ostream& operator<<(std::ostream& os, const LogicalShape& x) {
   os << x.str();

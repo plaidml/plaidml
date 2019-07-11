@@ -58,13 +58,11 @@ TEST(Op, Mean) {
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1]
 ) -> (
-  _X4
+  _X2
 ) {
   _X0[] = +(A[x0, x1]);
-  _X1 = 10;
-  _X2 = 20;
-  _X3 = mul(_X1, _X2);
-  _X4 = div(_X0, _X3);
+  _X1 = 200;
+  _X2 = div(_X0, _X1);
 }
 )"));
 }

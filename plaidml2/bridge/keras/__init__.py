@@ -68,7 +68,7 @@ class _Function(object):
             return plaidml.Buffer(_device, shape)
 
         input_bindings = [(x.tensor, make_buffer(x.tensor)) for x in self._inputs]
-        output_bindings = [(x.tensor, make_buffer(x.tensor)) for x in self._outputs]
+        output_bindings = [(x, make_buffer(x)) for x in program.outputs]
         return plaidml_exec.Executable(program, _device, _target, input_bindings, output_bindings)
 
 
@@ -461,9 +461,6 @@ def get_variable_shape(x):
 
 def gradients(loss, variables):
     logger.debug('gradients(loss: {}, variables: {})'.format(loss, variables))
-    program = edsl.Program('gradients', [loss.tensor])
-    logger.debug('program: {}'.format(program))
-
     grads = edsl.gradients(loss.tensor, [x.tensor for x in variables])
     return [_KerasNode('gradients', tensor=x) for x in grads]
 

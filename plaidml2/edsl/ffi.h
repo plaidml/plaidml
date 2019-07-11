@@ -302,8 +302,9 @@ PLAIDML_EDSL_API void plaidml_program_free(  //
 PLAIDML_EDSL_API plaidml_program* plaidml_program_evaluate(  //
     plaidml_error* err,                                      //
     const char* name,                                        //
-    size_t nexprs,                                           //
-    plaidml_expr** raw_exprs);
+    size_t noutputs,                                         //
+    plaidml_expr** outputs,                                  //
+    plaidml_expr** new_outputs);
 
 PLAIDML_EDSL_API plaidml_string* plaidml_program_repr(  //
     plaidml_error* err,                                 //

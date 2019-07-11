@@ -46,16 +46,15 @@ using ExprPtr = std::shared_ptr<Expr>;
 using DimExprPtr = std::shared_ptr<DimExpr>;
 using PolyExprPtr = std::shared_ptr<PolyExpr>;
 
+template <typename T>
 struct AstVisitor {
   virtual ~AstVisitor() = default;
-  virtual void Visit(const CallExpr& expr) = 0;
-  virtual void Visit(const ConstraintExpr& expr) = 0;
-  virtual void Visit(const ContractionExpr& expr) = 0;
-  virtual void Visit(const DimExprExpr& expr) = 0;
-  virtual void Visit(const FloatConst& expr) = 0;
-  virtual void Visit(const IntConst& expr) = 0;
-  virtual void Visit(const ParamExpr& expr) = 0;
-  virtual void Visit(const TensorSpecExpr& expr) = 0;
+  virtual T Visit(const CallExpr& expr) = 0;
+  virtual T Visit(const ContractionExpr& expr) = 0;
+  virtual T Visit(const DimExprExpr& expr) = 0;
+  virtual T Visit(const FloatConst& expr) = 0;
+  virtual T Visit(const IntConst& expr) = 0;
+  virtual T Visit(const ParamExpr& expr) = 0;
 };
 
 struct LogicalDim {
@@ -90,7 +89,7 @@ struct Expr : std::enable_shared_from_this<Expr> {
   explicit Expr(const std::string& name = "") : name(name) {}
   explicit Expr(const LogicalShape& shape, const std::string& name = "") : name(name), shape(shape) {}
   virtual ~Expr() = default;
-  virtual void Accept(AstVisitor*) = 0;
+  virtual void Accept(AstVisitor<void>*) = 0;
   virtual std::string str() const = 0;
 
   std::shared_ptr<Expr> as_ptr() { return shared_from_this(); }
@@ -100,7 +99,7 @@ struct Expr : std::enable_shared_from_this<Expr> {
 struct ParamExpr : Expr {
   std::shared_ptr<tile::Buffer> buffer;
   explicit ParamExpr(const std::string& name = "");
-  void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
   void ComputeShape(const std::shared_ptr<ParamExpr>& ref, const LogicalShape& shape);
 };
@@ -109,7 +108,7 @@ struct IntConst : Expr {
   int64_t value;
 
   explicit IntConst(int64_t value);
-  void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
 };
 
@@ -117,7 +116,7 @@ struct FloatConst : Expr {
   double value;
 
   explicit FloatConst(double value);
-  void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
 };
 
@@ -125,13 +124,13 @@ struct StringExpr : Expr {
   std::string value;
 
   explicit StringExpr(const std::string& value) : value(value) {}
-  void Accept(AstVisitor* visitor) {}
+  void Accept(AstVisitor<void>* visitor) {}
   std::string str() const { return "\"" + value + "\""; }
 };
 
 struct NoneExpr : Expr {
   NoneExpr() = default;
-  void Accept(AstVisitor* visitor) {}
+  void Accept(AstVisitor<void>* visitor) {}
   std::string str() const { return "None"; }
 };
 
@@ -139,7 +138,7 @@ struct TupleExpr : Expr {
   std::vector<ExprPtr> exprs;
 
   explicit TupleExpr(const std::vector<ExprPtr>& exprs);
-  void Accept(AstVisitor* visitor) {}
+  void Accept(AstVisitor<void>* visitor) {}
   std::string str() const;
 };
 
@@ -150,7 +149,7 @@ struct CallExpr : Expr {
   std::vector<ExprPtr> args;
 
   CallExpr(const std::string& fn, const std::vector<ExprPtr>& args);
-  void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
   void ComputeShape();
 };
@@ -159,7 +158,7 @@ struct DimExprExpr : Expr {
   DimExprPtr expr;
 
   explicit DimExprExpr(const DimExprPtr& expr);
-  void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
 };
 
@@ -178,7 +177,7 @@ struct TensorSpecExpr : Expr {
       const std::vector<PolyExprPtr>& index_spec,  //
       const std::vector<DimExprPtr>& output_dims);
 
-  void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  void Accept(AstVisitor<void>* visitor) {}
   std::string str() const;
 };
 
@@ -187,7 +186,7 @@ struct ConstraintExpr : Expr {
   DimExprPtr rhs;
 
   ConstraintExpr(const PolyExprPtr& lhs, const DimExprPtr& rhs);
-  void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  void Accept(AstVisitor<void>* visitor) {}
   std::string str() const;
 };
 
@@ -201,7 +200,7 @@ struct ContractionExpr : Expr {
   ExprPtr use_default;
 
   ContractionExpr();
-  void Accept(AstVisitor* visitor) { visitor->Visit(*this); }
+  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
   size_t logical_input_size() const { return (use_default ? inputs.size() - 1 : inputs.size()); }
   void ComputeShape(const std::string& layout);
@@ -377,7 +376,7 @@ struct ConstraintCollector : public PolyVisitor {
 struct ProgramEvaluation {
   RunInfo runinfo;
   std::vector<const ParamExpr*> inputs;
-  std::vector<const Expr*> outputs;
+  std::vector<ExprPtr> outputs;
 };
 
 ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& outputs);

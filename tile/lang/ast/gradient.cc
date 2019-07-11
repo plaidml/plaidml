@@ -13,13 +13,12 @@ namespace ast {
 
 namespace {
 
-class Gradient : AstVisitor {
+class Gradient : AstVisitor<void> {
  public:
   Gradient(const ExprPtr& result, const ExprPtr& loss) {
     IVLOG(4, "Gradient::Gradient> result: " << result << ", loss: " << loss);
     seen_[result.get()] = loss;
-    AstTraversal traversal({result});
-    const auto& flat = traversal.flat();
+    auto flat = FlattenAst({result});
     for (auto it = flat.rbegin(); it != flat.rend(); it++) {
       (*it)->Accept(this);
     }
@@ -37,7 +36,7 @@ class Gradient : AstVisitor {
   }
 
  private:
-  void Visit(const CallExpr& expr) {  //
+  void Visit(const CallExpr& expr) final {
     IVLOG(4, "Gradient::Visit(CallExpr)> " << &expr);
     auto dout = GetDerivative(&expr);
     for (size_t i = 0; i < expr.args.size(); i++) {
@@ -46,11 +45,7 @@ class Gradient : AstVisitor {
     }
   }
 
-  void Visit(const ConstraintExpr& expr) {  //
-    throw std::runtime_error("Not implemented: Gradient::Visit(ConstraintExpr)");
-  }
-
-  void Visit(const ContractionExpr& expr) {
+  void Visit(const ContractionExpr& expr) final {
     IVLOG(4, "Gradient::Visit(ContractionExpr)> " << &expr);
     auto dout = GetDerivative(&expr);
     for (size_t i = 0; i < expr.inputs.size(); i++) {
@@ -59,14 +54,10 @@ class Gradient : AstVisitor {
     }
   }
 
-  void Visit(const DimExprExpr& expr) { IVLOG(4, "Gradient::Visit(DimExprExpr)> " << &expr); }
-  void Visit(const FloatConst& expr) { IVLOG(4, "Gradient::Visit(FloatConst)> " << &expr); }
-  void Visit(const IntConst& expr) { IVLOG(4, "Gradient::Visit(IntConst)> " << &expr); }
-  void Visit(const ParamExpr& expr) { IVLOG(4, "Gradient::Visit(ParamExpr)> " << &expr); }
-
-  void Visit(const TensorSpecExpr& expr) {
-    throw std::runtime_error("Not implemented: Gradient::Visit(TensorSpecExpr)");
-  }
+  void Visit(const DimExprExpr& expr) final { IVLOG(4, "Gradient::Visit(DimExprExpr)> " << &expr); }
+  void Visit(const FloatConst& expr) final { IVLOG(4, "Gradient::Visit(FloatConst)> " << &expr); }
+  void Visit(const IntConst& expr) final { IVLOG(4, "Gradient::Visit(IntConst)> " << &expr); }
+  void Visit(const ParamExpr& expr) final { IVLOG(4, "Gradient::Visit(ParamExpr)> " << &expr); }
 
  private:
   void AddValue(const ExprPtr& expr, const ExprPtr& dop) {
@@ -77,17 +68,9 @@ class Gradient : AstVisitor {
       it->second = MakeCall("add", {it->second, dop});
     }
     IVLOG(2, "Gradient::AddValue> expr: " << expr->shape.str() << ", add: " << it->second->shape.str());
-    // if (it->second->shape.dims.size()) {
-    //   throw std::runtime_error("TODO: implement simple_reduce");
-    //   // TODO: Typically need to perform a simple_reduce to "unbroadcast" here.
-    //   // Currently skipping this to get something running, but this will break for most real networks
-    //   // std::vector<ExprPtr> inputs = {tot};
-    //   // for (size_t i = 0; i < expr->num_dims(); ++i) {
-    //   //   inputs.push_back(expr->dim_value(i));
-    //   // }
-    //   // // TODO: the `simple_reduce` processing code needs to get ported out of `type.cc`'s TypeCheck
-    //   // tot = FunctionValue::make("simple_reduce", inputs);
-    // }
+    if (it->second->shape.dims.size()) {
+      it->second = MakeCall("simple_reduce", {it->second, expr});
+    }
   }
 
   ExprPtr ContractionOp(const ExprPtr& dout, const ContractionExpr& expr, size_t idx) {
@@ -198,17 +181,17 @@ class Gradient : AstVisitor {
     //  ```dI(iidxs) += (I(iidxs) == O(oidxs)) ? dO(oidxs);```
     // where the above notation is meant to represent a COND combination op
     IVLOG(4, "Gradient::ExtremeOp> dout=" << dout << ", op=" << &op << ", idx=" << idx);
+    auto input = op.inputs[0];
     auto dop = std::make_shared<ContractionExpr>();
     dop->agg_op = AggregationOp::SUM;
     dop->combo_op = CombinationOp::COND;
     dop->constraints = op.constraints;
     // Anywhere the forward pass hits the default, the derivative w.r.t. any other tensor is 0;
     // thus, for the corresponding gradient, the default is everywhere zero i.e. the standard unspecified default
-    dop->inputs.push_back(op.inputs[0]);
+    dop->inputs.push_back(input);
     auto ptr = std::const_pointer_cast<Expr>(op.as_ptr());
     dop->inputs.push_back(std::make_shared<TensorSpecExpr>(ptr, op.output->index_spec));
     dop->inputs.push_back(std::make_shared<TensorSpecExpr>(dout, op.output->index_spec));
-    auto input = op.inputs[0];
     dop->output = std::make_shared<TensorSpecExpr>(input->index_spec, input->ref->shape.dims_as_exprs());
     dop->ComputeShape(input->ref->shape.layout);
     return dop;
@@ -224,19 +207,6 @@ class Gradient : AstVisitor {
 };
 
 }  // namespace
-
-/*
-// TODO: This is a draft of an idea for handling `simple_reduce`;
-//       I'm uncertain if this kind of function is even the right approach
-ExprPtr Gradient::SimpleReduceOp(const ExprPtr& op) {
-  std::shared_ptr<ContractionExpr> ret = std::make_shared<ContractionExpr>();
-  ret->agg_op = AggregationOp::SUM;
-  ret->combo_op = CombinationOp::PLUS;
-  // ret->constraints is empty
-
-  // TODO
-}
-*/
 
 std::vector<ExprPtr> ComputeGradients(  //
     const std::vector<ExprPtr>& wrts,   //
@@ -257,7 +227,6 @@ std::vector<ExprPtr> ComputeGradients(  //
   //   cion->ComputeShape("");
   //   value = cion;
   // }
-
   Gradient grad(value, loss);
   std::vector<ExprPtr> ret(wrts.size());
   for (size_t i = 0; i < wrts.size(); i++) {

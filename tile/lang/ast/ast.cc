@@ -8,6 +8,7 @@
 #include "base/util/lookup.h"
 #include "base/util/stream_container.h"
 #include "tile/lang/ast/ast_ops.h"
+#include "tile/lang/ast/fold.h"
 #include "tile/lang/ast/traversal.h"
 #include "tile/lang/gen_special.h"
 
@@ -45,7 +46,7 @@ std::ostream& operator<<(std::ostream& os, const LogicalShape& shape) {
 }
 
 bool MergeDims(LogicalDim* lhs, const LogicalDim& rhs) {
-  IVLOG(4, "MergeDims> " << *lhs << ", " << rhs);
+  IVLOG(6, "MergeDims> " << *lhs << ", " << rhs);
   auto lhs_int = std::dynamic_pointer_cast<DimIntExpr>(lhs->expr);
   auto rhs_int = std::dynamic_pointer_cast<DimIntExpr>(rhs.expr);
   if (!lhs_int && !rhs_int) {
@@ -78,19 +79,19 @@ bool MergeDims(LogicalDim* lhs, const LogicalDim& rhs) {
 }
 
 bool MergeShapes(LogicalShape* into, const LogicalShape& shape) {
-  IVLOG(4, "MergeShapes> " << *into << ", " << shape);
+  IVLOG(6, "MergeShapes> " << *into << ", " << shape);
   into->dtype = CommonSupertype(into->dtype, shape.dtype);
   if (shape.dims.size()) {
     if (into->dims.empty()) {
       into->dims = shape.dims;
       return false;
     }
-    IVLOG(4, "  Checking compatibility between " << into->dims << " and " << shape.dims);
+    IVLOG(6, "  Checking compatibility between " << into->dims << " and " << shape.dims);
     auto src = shape.dims.rbegin();
     auto dst = into->dims.rbegin();
     for (;; ++dst, ++src) {
       if (src == shape.dims.rend()) {
-        IVLOG(4, "  src broadcasts to dst");
+        IVLOG(6, "  src broadcasts to dst");
         break;
       }
       if (dst == into->dims.rend()) {
@@ -98,7 +99,7 @@ bool MergeShapes(LogicalShape* into, const LogicalShape& shape) {
         // We just need to augment 'into' with the remaining elements of 'src'.
         into->dims.insert(into->dims.begin(), shape.dims.begin(),
                           shape.dims.begin() + (shape.dims.size() - (src - shape.dims.rbegin())));
-        IVLOG(4, "  dst broadcasts to src; dims = " << into->dims);
+        IVLOG(6, "  dst broadcasts to src; dims = " << into->dims);
         break;
       }
       if (!MergeDims(&*dst, *src)) {
@@ -108,7 +109,7 @@ bool MergeShapes(LogicalShape* into, const LogicalShape& shape) {
                 % StreamContainer(into->dims) % StreamContainer(shape.dims)));
       }
     }
-    IVLOG(4, "  Broadcast possible; LCM dims=" << into->dims);
+    IVLOG(6, "  Broadcast possible; LCM dims=" << into->dims);
     return true;
   }
   return false;
@@ -130,71 +131,10 @@ LogicalShape ComputeOutputShape(const std::vector<ExprPtr>& args) {
   return ret;
 }
 
-AstTraversal::AstTraversal(const std::vector<ExprPtr>& exprs) {
-  for (const auto& expr : exprs) {
-    Push(expr);
-  }
-  while (stack_.size()) {
-    auto entry = stack_.top();
-    stack_.pop();
-    if (entry.second) {
-      flat_.push_back(entry.first);
-    } else if (!seen_.count(entry.first.get())) {
-      seen_.insert(entry.first.get());
-      stack_.push(std::make_pair(entry.first, true));
-      entry.first->Accept(this);
-    }
-  }
-  IVLOG(4, "AstTraversal: " << StreamContainer(flat_));
-}
-
-void AstTraversal::Visit(const CallExpr& expr) {
-  // push arguments from right-to-left so they eventually get processed in left-to-right order
-  for (auto it = expr.args.rbegin(); it != expr.args.rend(); ++it) {
-    Push(*it);
-  }
-}
-
-void AstTraversal::Visit(const ConstraintExpr& expr) {
-  throw std::runtime_error("Not implemented: AstTraversal::Visit(ConstraintExpr)");
-}
-
-void AstTraversal::Visit(const ContractionExpr& expr) {
-  // push inputs from right-to-left so they eventually get processed in left-to-right order
-  IVLOG(6, "Visiting ContractionExpr: " << &expr);
-  IVLOG(6, "  with agg_op " << to_string(expr.agg_op) << ", combo_op " << to_string(expr.combo_op));
-  for (auto it = expr.inputs.rbegin(); it != expr.inputs.rend(); ++it) {
-    Push((*it)->ref);
-  }
-  if (expr.use_default) {
-    Push(expr.use_default);
-  }
-}
-
-void AstTraversal::Visit(const FloatConst& expr) {}
-
-void AstTraversal::Visit(const IntConst& expr) {}
-
-void AstTraversal::Visit(const ParamExpr& expr) {}
-
-void AstTraversal::Visit(const TensorSpecExpr& expr) {
-  throw std::runtime_error("Not implemented: AstTraversal::Visit(TensorSpecExpr)");
-}
-
-void AstTraversal::Visit(const DimExprExpr& expr) {}
-
-void AstTraversal::Push(const ExprPtr& expr) {
-  if (!expr) {
-    throw std::runtime_error("Invalid expression in AstTraversal::Push");
-  }
-  IVLOG(4, "AstTraversal::Push> " << expr.get());
-  stack_.push(std::make_pair(expr, false));
-}
-
 class DimExprEvaluator : public DimVisitor {
-  int64_t Visit(const DimIntExpr& expr) { return expr.value; }
+  int64_t Visit(const DimIntExpr& expr) final { return expr.value; }
 
-  int64_t Visit(const DimOpExpr& expr) {
+  int64_t Visit(const DimOpExpr& expr) final {
     if (expr.op == IntOp::Neg) {
       if (expr.operands.size() != 1) {
         throw std::runtime_error("Invalid number of operands in DimOpExpr");
@@ -220,9 +160,9 @@ class DimExprEvaluator : public DimVisitor {
     }
   }
 
-  int64_t Visit(const DimNoneExpr&) { throw std::runtime_error("None value during DimExpr evaluation."); }
+  int64_t Visit(const DimNoneExpr&) final { throw std::runtime_error("None value during DimExpr evaluation."); }
 
-  int64_t Visit(const DimRefExpr& expr) {
+  int64_t Visit(const DimRefExpr& expr) final {
     if (!expr.ref) {
       throw std::runtime_error("Undefined ref in DimRefExpr");
     }
@@ -240,26 +180,35 @@ TensorShape IntoTensorShape(const LogicalShape& shape) {
   return SimpleShape(shape.dtype, sizes);
 }
 
-class ShapeEvaluator : public AstVisitor {
+class ShapeEvaluator : public AstVisitor<void> {
  public:
   explicit ShapeEvaluator(std::unordered_map<const Expr*, Binding>* bindings) : bindings_by_expr_(bindings) {}
 
  private:
-  void Visit(const ParamExpr& expr) { bindings_by_expr_->emplace(&expr, Binding{IntoTensorShape(expr.shape)}); }
-  void Visit(const CallExpr& expr) { bindings_by_expr_->emplace(&expr, Binding{IntoTensorShape(expr.shape)}); }
-  void Visit(const ConstraintExpr&) { throw std::runtime_error("Not implemented"); }
-  void Visit(const ContractionExpr& expr) { bindings_by_expr_->emplace(&expr, Binding{IntoTensorShape(expr.shape)}); }
-  void Visit(const FloatConst& expr) { bindings_by_expr_->emplace(&expr, Binding(expr.value, DataType::FLOAT32)); }
-  void Visit(const IntConst& expr) { bindings_by_expr_->emplace(&expr, Binding{expr.value}); }
+  void Visit(const ParamExpr& expr) final {  //
+    bindings_by_expr_->emplace(&expr, Binding{IntoTensorShape(expr.shape)});
+  }
 
-  void Visit(const DimExprExpr& expr) {
+  void Visit(const CallExpr& expr) final {  //
+    bindings_by_expr_->emplace(&expr, Binding{IntoTensorShape(expr.shape)});
+  }
+
+  void Visit(const ContractionExpr& expr) final {
+    bindings_by_expr_->emplace(&expr, Binding{IntoTensorShape(expr.shape)});
+  }
+
+  void Visit(const FloatConst& expr) final {
+    bindings_by_expr_->emplace(&expr, Binding(expr.value, DataType::FLOAT32));
+  }
+
+  void Visit(const IntConst& expr) final {  //
+    bindings_by_expr_->emplace(&expr, Binding{expr.value});
+  }
+
+  void Visit(const DimExprExpr& expr) final {
     DimExprEvaluator dim_eval;
     auto value = expr.expr->Accept(&dim_eval);
     bindings_by_expr_->emplace(&expr, Binding{value});
-  }
-
-  void Visit(const TensorSpecExpr& expr) {
-    throw std::runtime_error("Not implemented: ShapeEvaluator::Visit(TensorSpecExpr)");
   }
 
  private:
@@ -268,12 +217,12 @@ class ShapeEvaluator : public AstVisitor {
 
 class PolyEvaluator : public PolyVisitor {
  private:
-  Polynomial Visit(const PolyDimExpr& expr) {
+  Polynomial Visit(const PolyDimExpr& expr) final {
     DimExprEvaluator dim_eval;
     return Polynomial(expr.expr->Accept(&dim_eval));
   }
 
-  Polynomial Visit(const PolyIndex& expr) {
+  Polynomial Visit(const PolyIndex& expr) final {
     auto it = seen_.find(expr.idx_id);
     if (it == seen_.end()) {
       auto name = expr.name;
@@ -285,9 +234,9 @@ class PolyEvaluator : public PolyVisitor {
     return Polynomial(it->second);
   }
 
-  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(expr.value); }
+  Polynomial Visit(const PolyLiteral& expr) final { return Polynomial(expr.value); }
 
-  Polynomial Visit(const PolyOpExpr& expr) {
+  Polynomial Visit(const PolyOpExpr& expr) final {
     if (expr.op == IntOp::Neg) {
       if (expr.operands.size() != 1) {
         throw std::runtime_error("Invalid number of operands in PolyOpExpr");
@@ -333,26 +282,26 @@ class PolyEvaluator : public PolyVisitor {
   size_t next_ = 0;
 };
 
-class Evaluator : public AstVisitor {
+class ProgramEvaluator : public AstVisitor<void> {
  public:
-  explicit Evaluator(const std::string& name) { eval_.runinfo.program_name = name; }
+  explicit ProgramEvaluator(const std::string& name) { eval_.runinfo.program_name = name; }
 
-  ProgramEvaluation Evaluate(const std::vector<ExprPtr>& exprs) {
+  ProgramEvaluation Evaluate(const std::vector<ExprPtr>& outputs) {
     ShapeEvaluator evaluator(&bindings_by_expr_);
     // Traverse the entire graph in least-dependent to most-dependent order.
-    AstTraversal traversal(exprs);
-    for (const auto& expr : traversal.flat()) {
+    auto ast = FlattenAst(outputs);
+    for (const auto& expr : ast) {
       expr->Accept(&evaluator);
       expr->Accept(this);
     }
-    for (const auto& expr : exprs) {
+    for (const auto& expr : outputs) {
       // At this point, it should be guaranteed that the output expressions have been visited.
       auto name = safe_at(&names_by_expr_, expr.get());
       auto shape = safe_at(&bindings_by_expr_, expr.get()).shape;
       IVLOG(2, "Output> " << name << ": " << shape);
       eval_.runinfo.output_shapes.emplace(name, shape);
       eval_.runinfo.program.outputs.push_back(name);
-      eval_.outputs.push_back(expr.get());
+      eval_.outputs.push_back(expr);
     }
     for (const auto& kvp : names_by_expr_) {
       auto name = kvp.second;
@@ -361,13 +310,13 @@ class Evaluator : public AstVisitor {
     }
     eval_.runinfo.code = to_string(eval_.runinfo.program);
     eval_.runinfo.from_edsl = true;
-    IVLOG(2, "Evaluator::Evaluate>\n" << eval_.runinfo.code);
+    IVLOG(2, "ProgramEvaluator::Evaluate>\n" << eval_.runinfo.code);
     return eval_;
   }
 
  private:
-  void Visit(const ParamExpr& expr) {
-    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+  void Visit(const ParamExpr& expr) final {
+    IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
     auto name = NewTmp(expr);
     Input input{Input::FIXED, name};
     for (size_t i = 0; i < expr.shape.dims.size(); i++) {
@@ -381,8 +330,8 @@ class Evaluator : public AstVisitor {
     names_by_expr_.emplace(&expr, name);
   }
 
-  void Visit(const FloatConst& expr) {
-    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+  void Visit(const FloatConst& expr) final {
+    IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
     auto name = NewTmp(expr);
     Op op{
         Op::CONSTANT,                  // tag
@@ -395,8 +344,8 @@ class Evaluator : public AstVisitor {
     names_by_expr_.emplace(&expr, name);
   }
 
-  void Visit(const IntConst& expr) {
-    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+  void Visit(const IntConst& expr) final {
+    IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
     auto name = NewTmp(expr);
     Op op{
         Op::CONSTANT,                  // tag
@@ -409,8 +358,8 @@ class Evaluator : public AstVisitor {
     names_by_expr_.emplace(&expr, name);
   }
 
-  void Visit(const DimExprExpr& expr) {
-    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+  void Visit(const DimExprExpr& expr) final {
+    IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
     DimExprEvaluator dim_eval;
     auto value = expr.expr->Accept(&dim_eval);
     auto name = NewTmp(expr);
@@ -425,8 +374,8 @@ class Evaluator : public AstVisitor {
     names_by_expr_.emplace(&expr, name);
   }
 
-  void Visit(const CallExpr& expr) {
-    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+  void Visit(const CallExpr& expr) final {
+    IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
     std::vector<std::string> args;
     for (const auto& arg : expr.args) {
       args.emplace_back(safe_at(&names_by_expr_, arg.get()));
@@ -443,12 +392,8 @@ class Evaluator : public AstVisitor {
     names_by_expr_.emplace(&expr, name);
   }
 
-  void Visit(const ConstraintExpr& expr) {
-    throw std::runtime_error("Not implemented: Evaluator::Visit(ConstraintExpr)");
-  }
-
-  void Visit(const ContractionExpr& expr) {
-    IVLOG(4, "Evaluator::Visit> " << to_string(&expr));
+  void Visit(const ContractionExpr& expr) final {
+    IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
     PolyEvaluator poly_eval;
     DimExprEvaluator dim_eval;
     Contraction cion;
@@ -496,10 +441,6 @@ class Evaluator : public AstVisitor {
     names_by_expr_.emplace(&expr, name);
   }
 
-  void Visit(const TensorSpecExpr& expr) {
-    throw std::runtime_error("Not implemented: Evaluator::Visit(TensorSpecExpr)");
-  }
-
  private:
   // The current algorithm works by making all unnamed nodes automatically
   // generated so that they are unique but only if names that begin with
@@ -529,8 +470,41 @@ class Evaluator : public AstVisitor {
   ProgramEvaluation eval_;
 };
 
-ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& exprs) {
-  return Evaluator(name).Evaluate(exprs);
+class ExprOptimizer : public AstPass {
+ private:
+  ExprPtr Visit(const CallExpr& expr) final {
+    IVLOG(4, "ExprOptimizer::Visit(CallExpr)> " << &expr);
+    if (expr.fn == "simple_reduce") {
+      return simple_reduce(expr.args);
+    }
+    return MakeCall(expr.fn, expr.args);
+  }
+
+  ExprPtr Visit(const DimExprExpr& expr) final {
+    IVLOG(4, "ExprOptimizer::Visit(DimExprExpr)> " << &expr);
+    DimExprEvaluator dim_eval;
+    auto value = expr.expr->Accept(&dim_eval);
+    return std::make_shared<IntConst>(value);
+  }
+
+ private:
+  ExprPtr simple_reduce(const std::vector<ExprPtr>& args) {
+    IVLOG(4, "ExprOptimizer::simple_reduce>");
+    if (args.size() != 2) {
+      throw std::runtime_error("simple_reduce expects 2 arguments");
+    }
+    auto deriv = args[0];
+    auto expr = args[1];
+    IVLOG(4, "  deriv: " << deriv->shape);
+    IVLOG(4, "  expr: " << deriv->shape);
+    return deriv;
+  }
+};
+
+ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& outputs) {
+  ExprOptimizer optimizer;
+  auto new_outputs = RunAstPass(outputs, &optimizer);
+  return ProgramEvaluator(name).Evaluate(new_outputs);
 }
 
 std::string LogicalShape::str() const {
@@ -649,9 +623,9 @@ CallExpr::CallExpr(const std::string& fn, const std::vector<ExprPtr>& args)
       args(args) {}
 
 void CallExpr::ComputeShape() {
-  IVLOG(4, "CallExpr::ComputeShape> fn: " << fn);
+  IVLOG(5, "CallExpr::ComputeShape> fn: " << fn);
   for (const auto& arg : args) {
-    IVLOG(4, "  " << arg->shape.str());
+    IVLOG(5, "  " << arg->shape.str());
   }
   auto op = PrimitiveOpRegistry::Instance()->Resolve(fn);
   if (op) {
@@ -677,7 +651,7 @@ std::string CallExpr::str() const {
 ContractionExpr::ContractionExpr() : Expr(LogicalShape{}) {}
 
 void ContractionExpr::ComputeShape(const std::string& layout) {
-  IVLOG(4, "ContractionExpr::ComputeShape> layout: " << layout);
+  IVLOG(5, "ContractionExpr::ComputeShape> layout: \"" << layout << "\"");
   DataType dtype = DataType::INVALID;
   if (combo_op == CombinationOp::COND) {
     dtype = DataType::BOOLEAN;
@@ -696,7 +670,30 @@ void ContractionExpr::ComputeShape(const std::string& layout) {
 
 std::string ContractionExpr::str() const {
   std::stringstream ss;
-  ss << "ContractionExpr";
+  ss << output->str() << " = ";
+  ss << static_cast<char>(agg_op) << "(";
+  for (size_t i = 0; i < inputs.size(); i++) {
+    if (i) {
+      if (i == 1 && combo_op == CombinationOp::COND) {
+        ss << " == ";
+      } else if (combo_op == CombinationOp::EQ) {
+        ss << " == ";
+      } else {
+        ss << " " << static_cast<char>(combo_op) << " ";
+      }
+    }
+    ss << inputs[i]->str();
+  }
+  ss << ")";
+  for (const auto& constraint : constraints) {
+    ss << ", " << constraint->str();
+  }
+  if (no_defract) {
+    ss << " no_defract";
+  }
+  if (use_default) {
+    ss << " default " << use_default->str();
+  }
   return ss.str();
 }
 
@@ -720,13 +717,43 @@ TensorSpecExpr::TensorSpecExpr(                  //
     : index_spec(index_spec),  //
       output_dims(output_dims) {}
 
-std::string TensorSpecExpr::str() const { return "TensorSpecExpr"; }
+std::string TensorSpecExpr::str() const {
+  std::stringstream ss;
+  if (name.size()) {
+    ss << name;
+  } else {
+    if (ref) {
+      ss << "_";
+
+    } else {
+      ss << "O";
+    }
+  }
+  ss << "[";
+  for (size_t i = 0; i < index_spec.size(); i++) {
+    if (i) {
+      ss << ", ";
+    }
+    ss << index_spec[i]->str();
+  }
+  if (!ref && output_dims.size()) {
+    ss << " : ";
+    for (size_t i = 0; i < output_dims.size(); i++) {
+      if (i) {
+        ss << ", ";
+      }
+      ss << output_dims[i]->str();
+    }
+  }
+  ss << "]";
+  return ss.str();
+}
 
 std::string PolyIndex::str() const {
   if (name.size()) {
     return name;
   }
-  return boost::str(boost::format("PolyIndex: %1%") % idx_id);
+  return boost::str(boost::format("x%1%") % idx_id);
 }
 
 std::string PolyLiteral::str() const { return std::to_string(value); }
@@ -793,170 +820,6 @@ std::string DimRefExpr::str() const {
 }
 
 std::string PolyDimExpr::str() const { return expr->str(); }
-
-template <typename NumType, typename ExprType>
-std::shared_ptr<ExprType> fold_add(const std::shared_ptr<ExprType>& lhs, const std::shared_ptr<ExprType>& rhs) {
-  auto lhs_num = std::dynamic_pointer_cast<NumType>(lhs);
-  auto rhs_num = std::dynamic_pointer_cast<NumType>(rhs);
-  if (lhs_num && rhs_num) {
-    return std::make_shared<NumType>(lhs_num->value + rhs_num->value);
-  }
-  if (lhs_num && lhs_num->value == 0) {
-    return rhs;
-  }
-  if (rhs_num && rhs_num->value == 0) {
-    return lhs;
-  }
-  return nullptr;
-}
-
-template <typename NumType, typename OpExprType, typename NegOpType, typename ExprType>
-std::shared_ptr<ExprType> fold_sub(const std::shared_ptr<ExprType>& lhs, const std::shared_ptr<ExprType>& rhs,
-                                   NegOpType neg_op) {
-  auto lhs_num = std::dynamic_pointer_cast<NumType>(lhs);
-  auto rhs_num = std::dynamic_pointer_cast<NumType>(rhs);
-  if (lhs_num && rhs_num) {
-    return std::make_shared<NumType>(lhs_num->value - rhs_num->value);
-  }
-  // TODO: deal with ComputeShape
-  // if (lhs_num && lhs_num->value == 0) {
-  //   std::vector<std::shared_ptr<ExprType>> args{rhs};
-  //   return std::make_shared<OpExprType>(neg_op, args);
-  // }
-  if (rhs_num && rhs_num->value == 0) {
-    return lhs;
-  }
-  return nullptr;
-}
-
-template <typename NumType, typename ExprType>
-std::shared_ptr<ExprType> fold_mul(const std::shared_ptr<ExprType>& lhs, const std::shared_ptr<ExprType>& rhs) {
-  auto lhs_num = std::dynamic_pointer_cast<NumType>(lhs);
-  auto rhs_num = std::dynamic_pointer_cast<NumType>(rhs);
-  if (lhs_num && rhs_num) {
-    return std::make_shared<NumType>(lhs_num->value * rhs_num->value);
-  }
-  if (lhs_num && lhs_num->value == 1) {
-    return rhs;
-  }
-  if (rhs_num && rhs_num->value == 1) {
-    return lhs;
-  }
-  return nullptr;
-}
-
-template <typename NumType, typename ExprType>
-std::shared_ptr<ExprType> fold_div(const std::shared_ptr<ExprType>& lhs, const std::shared_ptr<ExprType>& rhs) {
-  auto lhs_num = std::dynamic_pointer_cast<NumType>(lhs);
-  auto rhs_num = std::dynamic_pointer_cast<NumType>(rhs);
-  if (lhs_num && rhs_num) {
-    return std::make_shared<NumType>(lhs_num->value / rhs_num->value);
-  }
-  if (lhs_num && lhs_num->value == 0) {
-    return std::make_shared<NumType>(0);
-  }
-  if (rhs_num && rhs_num->value == 1) {
-    return lhs;
-  }
-  return nullptr;
-}
-
-template <typename IntType, typename OpType, typename ExprType>
-std::shared_ptr<ExprType> MakeOp(IntOp op, const std::vector<std::shared_ptr<ExprType>>& args) {
-  switch (op) {
-    case IntOp::Neg: {
-      auto int_expr = std::dynamic_pointer_cast<IntType>(args[0]);
-      if (int_expr) {
-        return std::make_shared<IntType>(-int_expr->value);
-      }
-    } break;
-    case IntOp::Add: {
-      auto ret = fold_add<IntType>(args[0], args[1]);
-      if (ret) {
-        return ret;
-      }
-    } break;
-    case IntOp::Sub: {
-      auto ret = fold_sub<IntType, OpType>(args[0], args[1], IntOp::Neg);
-      if (ret) {
-        return ret;
-      }
-    } break;
-    case IntOp::Mul: {
-      auto ret = fold_mul<IntType>(args[0], args[1]);
-      if (ret) {
-        return ret;
-      }
-    } break;
-    case IntOp::Div: {
-      auto ret = fold_div<IntType>(args[0], args[1]);
-      if (ret) {
-        return ret;
-      }
-    } break;
-  }
-  return std::make_shared<OpType>(op, args);
-}
-
-PolyExprPtr MakeOp(IntOp op, const std::vector<PolyExprPtr>& args) {  //
-  return MakeOp<PolyLiteral, PolyOpExpr>(op, args);
-}
-
-DimExprPtr MakeOp(IntOp op, const std::vector<DimExprPtr>& args) {  //
-  return MakeOp<DimIntExpr, DimOpExpr>(op, args);
-}
-
-ExprPtr MakeCall(const std::string& fn, const std::vector<ExprPtr>& args) {
-  if (fn == "neg") {
-    auto int_expr = std::dynamic_pointer_cast<IntConst>(args[0]);
-    if (int_expr) {
-      return std::make_shared<IntConst>(-int_expr->value);
-    }
-    auto float_expr = std::dynamic_pointer_cast<FloatConst>(args[0]);
-    if (float_expr) {
-      return std::make_shared<FloatConst>(-float_expr->value);
-    }
-  } else if (fn == "add") {
-    auto int_ret = fold_add<IntConst>(args[0], args[1]);
-    if (int_ret) {
-      return int_ret;
-    }
-    auto float_ret = fold_add<FloatConst>(args[0], args[1]);
-    if (float_ret) {
-      return float_ret;
-    }
-  } else if (fn == "sub") {
-    auto int_ret = fold_sub<IntConst, CallExpr>(args[0], args[1], "neg");
-    if (int_ret) {
-      return int_ret;
-    }
-    auto float_ret = fold_sub<FloatConst, CallExpr>(args[0], args[1], "neg");
-    if (float_ret) {
-      return float_ret;
-    }
-  } else if (fn == "mul") {
-    auto int_ret = fold_mul<IntConst>(args[0], args[1]);
-    if (int_ret) {
-      return int_ret;
-    }
-    auto float_ret = fold_mul<FloatConst>(args[0], args[1]);
-    if (float_ret) {
-      return float_ret;
-    }
-  } else if (fn == "div") {
-    auto int_ret = fold_div<IntConst>(args[0], args[1]);
-    if (int_ret) {
-      return int_ret;
-    }
-    auto float_ret = fold_div<FloatConst>(args[0], args[1]);
-    if (float_ret) {
-      return float_ret;
-    }
-  }
-  auto expr = std::make_shared<CallExpr>(fn, args);
-  expr->ComputeShape();
-  return expr;
-}
 
 }  // namespace ast
 }  // namespace lang

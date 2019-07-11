@@ -504,9 +504,17 @@ class Program(ForeignObject):
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 
-    def __init__(self, name, vars):
-        exprs = [x.as_ptr() for x in vars]
-        ffi_obj = ffi_call(lib.plaidml_program_evaluate, name.encode(), len(exprs), exprs)
+    def __init__(self, name, outputs):
+        raw_outputs = [x.as_ptr() for x in outputs]
+        new_outputs = ffi.new('plaidml_expr*[]', len(outputs))
+        ffi_obj = ffi_call(
+            lib.plaidml_program_evaluate,
+            name.encode(),
+            len(raw_outputs),
+            raw_outputs,
+            new_outputs,
+        )
+        self.outputs = [Tensor(expr=x) for x in new_outputs]
         super(Program, self).__init__(ffi_obj)
 
 

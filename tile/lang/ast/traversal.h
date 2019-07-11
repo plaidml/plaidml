@@ -14,29 +14,25 @@ namespace tile {
 namespace lang {
 namespace ast {
 
-class AstTraversal : public AstVisitor {
+class AstPass : public AstVisitor<ExprPtr> {
  public:
-  explicit AstTraversal(const std::vector<ExprPtr>& exprs);
-  const std::vector<ExprPtr>& flat() const { return flat_; }
+  ExprPtr Visit(const CallExpr& expr) override { return GenericVisit(expr); }
+  ExprPtr Visit(const ContractionExpr& expr) override { return GenericVisit(expr); }
+  ExprPtr Visit(const DimExprExpr& expr) override { return GenericVisit(expr); }
+  ExprPtr Visit(const FloatConst& expr) override { return GenericVisit(expr); }
+  ExprPtr Visit(const IntConst& expr) override { return GenericVisit(expr); }
+  ExprPtr Visit(const ParamExpr& expr) override { return GenericVisit(expr); }
 
- private:
-  void Visit(const CallExpr& expr);
-  void Visit(const ConstraintExpr& expr);
-  void Visit(const ContractionExpr& expr);
-  void Visit(const FloatConst& expr);
-  void Visit(const IntConst& expr);
-  void Visit(const ParamExpr& expr);
-  void Visit(const TensorSpecExpr& expr);
-  void Visit(const DimExprExpr& expr);
-
- private:
-  void Push(const ExprPtr& expr);
-
- private:
-  std::stack<std::pair<ExprPtr, bool>> stack_;
-  std::vector<ExprPtr> flat_;
-  std::unordered_set<const Expr*> seen_;
+ protected:
+  template <typename T>
+  ExprPtr GenericVisit(const T& expr) {
+    return ExprPtr{std::const_pointer_cast<Expr>(expr.as_ptr())};
+  }
 };
+
+std::vector<ExprPtr> FlattenAst(const std::vector<ExprPtr>& exprs);
+
+std::vector<ExprPtr> RunAstPass(const std::vector<ExprPtr>& outputs, AstPass* pass);
 
 }  // namespace ast
 }  // namespace lang
