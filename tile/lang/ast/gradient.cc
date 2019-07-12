@@ -67,7 +67,7 @@ class Gradient : AstVisitor<void> {
     if (!is_new) {
       it->second = MakeCall("add", {it->second, dop});
     }
-    IVLOG(2, "Gradient::AddValue> expr: " << expr->shape.str() << ", add: " << it->second->shape.str());
+    IVLOG(2, "Gradient::AddValue> expr: " << expr->str() << ", add: " << it->second->str());
     if (it->second->shape.dims.size()) {
       it->second = MakeCall("simple_reduce", {it->second, expr});
     }
@@ -133,7 +133,7 @@ class Gradient : AstVisitor<void> {
 
     auto deriv = DerivRegistry::Instance()->Resolve(op.fn);
     auto ptr = std::const_pointer_cast<Expr>(op.as_ptr());
-    return deriv.fn(dout, ptr, op.args, deriv.user_fn, deriv.user_ctx)[idx];
+    return deriv.fn(ptr, dout, op.args, deriv.user_fn, deriv.user_ctx)[idx];
   }
 
   ExprPtr SumOp(const ExprPtr& dout, const ContractionExpr& op, size_t idx) {

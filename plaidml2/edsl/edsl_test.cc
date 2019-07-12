@@ -634,17 +634,17 @@ TEST(CppEdsl, GradientDotSqrt) {
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
-  B[B_0, B_1],
-  dO[dO_0, dO_1]
+  dO[dO_0, dO_1],
+  B[B_0, B_1]
 ) -> (
   _X6,
   _X5
 ) {
-  _X0[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
-  _X1 = sqrt(_X0);
-  _X2 = 2;
-  _X3 = mul(_X2, dO);
-  _X4 = div(_X1, _X3);
+  _X0 = 2;
+  _X1[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
+  _X2 = sqrt(_X1);
+  _X3 = mul(_X0, _X2);
+  _X4 = div(dO, _X3);
   _X5[x1, x2 : 100, 100] = +(A[x0, x1] * _X4[x0, x2]);
   _X6[x0, x2 : 100, 100] = +(_X4[x0, x1] * B[x2, x1]);
 }

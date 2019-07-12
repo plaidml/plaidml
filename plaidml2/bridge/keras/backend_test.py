@@ -184,15 +184,14 @@ def compareMultiple(arguments):
     return decorator
 
 
-def opTest(
-        in_data,
-        tol=DEFAULT_TOL,
-        atol=DEFAULT_ATOL,
-        do_grads=False,  # TODO: re-enable when gradients are fixed
-        skip_theano=True,
-        skip_tensorflow=False,
-        verbose=False,
-        input_shapes=None):
+def opTest(in_data,
+           tol=DEFAULT_TOL,
+           atol=DEFAULT_ATOL,
+           do_grads=True,
+           skip_theano=True,
+           skip_tensorflow=False,
+           verbose=False,
+           input_shapes=None):
     # If using with non-tensor parameters, all tensor params must appear before
     # all non-tensor params
     # input_shapes should be None or an iterable containing tuples
