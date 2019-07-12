@@ -103,24 +103,26 @@ plaidml_executable* plaidml_compile(  //
       }
       param_expr->buffer = inputs[i]->buffer->buffer;
     }
-    const auto& program_inputs = program->eval.inputs;
-    for (size_t i = 0; i < program_inputs.size(); i++) {
-      const auto& name = program->eval.runinfo.program.inputs[i].name;
-      if (!program_inputs[i]->buffer) {
-        throw std::runtime_error(str(boost::format("Unbound buffer for input: %1%") % name));
+    for (const auto& input : program->eval.inputs) {
+      auto it = program->eval.names_by_expr.find(input);
+      if (it == program->eval.names_by_expr.end()) {
+        throw std::runtime_error("Invalid program, input with unknown name");
       }
-      exec->input_bufs[name] = program_inputs[i]->buffer;
+      exec->input_bufs[it->second] = input->buffer;
     }
-    const auto& program_outputs = program->eval.outputs;
     for (size_t i = 0; i < noutputs; i++) {
       if (!outputs[i] || !outputs[i]->expr || !outputs[i]->buffer) {
         throw std::runtime_error("Undefined output bindings");
       }
       auto expr = outputs[i]->expr->expr;
-      auto it = std::find(program_outputs.begin(), program_outputs.end(), expr);
-      size_t j = std::distance(program_outputs.begin(), it);
-      const auto& name = program->eval.runinfo.program.outputs[j];
-      exec->output_bufs[name] = outputs[i]->buffer->buffer;
+      auto it = program->eval.names_by_expr.find(expr.get());
+      if (it == program->eval.names_by_expr.end()) {
+        throw std::runtime_error("Invalid program, output with unknown name");
+      }
+      exec->output_bufs[it->second] = outputs[i]->buffer->buffer;
+    }
+    for (const auto& kvp : program->eval.updates) {
+      exec->output_bufs[kvp.first] = kvp.second->buffer;
     }
     return exec;
   });

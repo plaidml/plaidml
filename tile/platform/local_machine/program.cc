@@ -285,6 +285,15 @@ Program::Program(const context::Context& ctx,                              //
 boost::future<void> Program::Run(const context::Context& ctx,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
+  IVLOG(2, "Program::Run>");
+  IVLOG(2, "  Inputs:");
+  for (const auto& kvp : inputs) {
+    IVLOG(2, "    " << kvp.first << ": " << kvp.second);
+  }
+  IVLOG(2, "  Outputs:");
+  for (const auto& kvp : outputs) {
+    IVLOG(2, "    " << kvp.first << ": " << kvp.second);
+  }
   std::map<std::string, std::shared_ptr<tile::Buffer>> rewrite_outputs;
   for (auto kvp : outputs) {
     rewrite_outputs.emplace(kernel_list_.var_rewrites.Lookup(kvp.first), std::move(kvp.second));

@@ -7,9 +7,10 @@ import sys
 logger = logging.getLogger(__name__)
 
 if os.getenv('PLAIDML_VERBOSE'):
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
-    logger.addHandler(handler)
+    if not logger.hasHandlers():
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
+        logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
     logger.debug('PLAIDML_VERBOSE enabled on logger: {}'.format(logger.name))
 

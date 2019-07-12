@@ -284,7 +284,9 @@ class PolyEvaluator : public PolyVisitor {
 
 class ProgramEvaluator : public AstVisitor<void> {
  public:
-  explicit ProgramEvaluator(const std::string& name) { eval_.runinfo.program_name = name; }
+  explicit ProgramEvaluator(const std::string& name) {  //
+    eval_.runinfo.program_name = name;
+  }
 
   ProgramEvaluation Evaluate(const std::vector<ExprPtr>& outputs) {
     ShapeEvaluator evaluator(&bindings_by_expr_);
@@ -296,14 +298,14 @@ class ProgramEvaluator : public AstVisitor<void> {
     }
     for (const auto& expr : outputs) {
       // At this point, it should be guaranteed that the output expressions have been visited.
-      auto name = safe_at(&names_by_expr_, expr.get());
+      auto name = safe_at(&eval_.names_by_expr, expr.get());
       auto shape = safe_at(&bindings_by_expr_, expr.get()).shape;
       IVLOG(2, "Output> " << name << ": " << shape);
       eval_.runinfo.output_shapes.emplace(name, shape);
       eval_.runinfo.program.outputs.push_back(name);
       eval_.outputs.push_back(expr);
     }
-    for (const auto& kvp : names_by_expr_) {
+    for (const auto& kvp : eval_.names_by_expr) {
       auto name = kvp.second;
       auto binding = safe_at(&bindings_by_expr_, kvp.first);
       eval_.runinfo.vars.emplace(name, binding);
@@ -327,7 +329,7 @@ class ProgramEvaluator : public AstVisitor<void> {
     eval_.inputs.push_back(&expr);
     eval_.runinfo.program.inputs.push_back(input);
     eval_.runinfo.input_shapes.emplace(name, shape);
-    names_by_expr_.emplace(&expr, name);
+    eval_.names_by_expr.emplace(&expr, name);
   }
 
   void Visit(const FloatConst& expr) final {
@@ -341,7 +343,7 @@ class ProgramEvaluator : public AstVisitor<void> {
         {"fconst"},                    // Function
     };
     eval_.runinfo.program.ops.emplace_back(op);
-    names_by_expr_.emplace(&expr, name);
+    eval_.names_by_expr.emplace(&expr, name);
   }
 
   void Visit(const IntConst& expr) final {
@@ -355,7 +357,7 @@ class ProgramEvaluator : public AstVisitor<void> {
         {"iconst"},                    // Function
     };
     eval_.runinfo.program.ops.emplace_back(op);
-    names_by_expr_.emplace(&expr, name);
+    eval_.names_by_expr.emplace(&expr, name);
   }
 
   void Visit(const DimExprExpr& expr) final {
@@ -371,14 +373,18 @@ class ProgramEvaluator : public AstVisitor<void> {
         {"iconst"},               // Function
     };
     eval_.runinfo.program.ops.emplace_back(op);
-    names_by_expr_.emplace(&expr, name);
+    eval_.names_by_expr.emplace(&expr, name);
   }
 
   void Visit(const CallExpr& expr) final {
     IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
+    if (expr.fn == "prng") {
+      ProcessPrng(expr);
+      return;
+    }
     std::vector<std::string> args;
     for (const auto& arg : expr.args) {
-      args.emplace_back(safe_at(&names_by_expr_, arg.get()));
+      args.emplace_back(safe_at(&eval_.names_by_expr, arg.get()));
     }
     auto name = NewTmp(expr);
     Op op{
@@ -389,7 +395,7 @@ class ProgramEvaluator : public AstVisitor<void> {
         {expr.fn},     // Function
     };
     eval_.runinfo.program.ops.emplace_back(op);
-    names_by_expr_.emplace(&expr, name);
+    eval_.names_by_expr.emplace(&expr, name);
   }
 
   void Visit(const ContractionExpr& expr) final {
@@ -401,13 +407,13 @@ class ProgramEvaluator : public AstVisitor<void> {
     cion.comb_op = expr.combo_op;
     cion.no_defract = expr.no_defract;
     if (expr.use_default) {
-      cion.use_default = safe_at(&names_by_expr_, expr.use_default.get());
+      cion.use_default = safe_at(&eval_.names_by_expr, expr.use_default.get());
     }
     cion.specs.emplace_back(TensorSpec{});
     std::vector<std::string> inputs;
     for (const auto& input : expr.inputs) {
       TensorSpec tensor_spec;
-      tensor_spec.id = safe_at(&names_by_expr_, input->ref.get());
+      tensor_spec.id = safe_at(&eval_.names_by_expr, input->ref.get());
       inputs.push_back(tensor_spec.id);
       for (const auto& idx : input->index_spec) {
         auto poly = idx->Accept(&poly_eval);
@@ -438,7 +444,7 @@ class ProgramEvaluator : public AstVisitor<void> {
         cion,             // Contraction
     };
     eval_.runinfo.program.ops.emplace_back(op);
-    names_by_expr_.emplace(&expr, name);
+    eval_.names_by_expr.emplace(&expr, name);
   }
 
  private:
@@ -463,9 +469,49 @@ class ProgramEvaluator : public AstVisitor<void> {
     return name;
   }
 
+  void ProcessPrng(const CallExpr& expr) {
+    auto step = NewTmp(expr);
+    auto state = NewTmp(expr);
+    auto value = NewTmp(expr);
+    std::vector<std::string> step_args(expr.args.size());
+    for (size_t i = 0; i < step_args.size(); i++) {
+      if (i == 0) {
+        auto state_expr = std::dynamic_pointer_cast<ParamExpr>(expr.args[i]);
+        if (!state_expr) {
+          throw std::runtime_error("First argument to prng() must be a ParamExpr");
+        }
+        eval_.updates.emplace(state, state_expr.get());
+      }
+      step_args[i] = safe_at(&eval_.names_by_expr, expr.args[i].get());
+    }
+    eval_.runinfo.output_shapes.emplace(state, SimpleShape(DataType::UINT32, {3, k_rng_size}));
+    eval_.runinfo.program.outputs.push_back(state);
+    eval_.runinfo.program.ops.emplace_back(Op{
+        Op::FUNCTION,   // tag
+        step,           // output
+        step_args,      // inputs
+        {},             // Contraction
+        {"prng_step"},  // Function
+    });
+    eval_.runinfo.program.ops.emplace_back(Op{
+        Op::FUNCTION,    // tag
+        state,           // output
+        {step},          // inputs
+        {},              // Contraction
+        {"prng_state"},  // Function
+    });
+    eval_.runinfo.program.ops.emplace_back(Op{
+        Op::FUNCTION,    // tag
+        value,           // output
+        {step},          // inputs
+        {},              // Contraction
+        {"prng_value"},  // Function
+    });
+    eval_.names_by_expr.emplace(&expr, value);
+  }
+
  private:
   std::set<std::string> names_;
-  std::unordered_map<const Expr*, std::string> names_by_expr_;
   std::unordered_map<const Expr*, Binding> bindings_by_expr_;
   ProgramEvaluation eval_;
 };
@@ -502,8 +548,17 @@ class ExprOptimizer : public AstPass {
 };
 
 ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& outputs) {
+  std::vector<ExprPtr> new_outputs(outputs.size());
+  for (size_t i = 0; i < outputs.size(); i++) {
+    auto param_expr = std::dynamic_pointer_cast<ParamExpr>(outputs[i]);
+    if (param_expr) {
+      new_outputs[i] = MakeCall("ident", {outputs[i]});
+    } else {
+      new_outputs[i] = outputs[i];
+    }
+  }
   ExprOptimizer optimizer;
-  auto new_outputs = RunAstPass(outputs, &optimizer);
+  new_outputs = RunAstPass(new_outputs, &optimizer);
   return ProgramEvaluator(name).Evaluate(new_outputs);
 }
 

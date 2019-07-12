@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "tile/base/buffer.h"
@@ -377,6 +378,8 @@ struct ProgramEvaluation {
   RunInfo runinfo;
   std::vector<const ParamExpr*> inputs;
   std::vector<ExprPtr> outputs;
+  std::unordered_map<const Expr*, std::string> names_by_expr;
+  std::unordered_map<std::string, const ParamExpr*> updates;
 };
 
 ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& outputs);

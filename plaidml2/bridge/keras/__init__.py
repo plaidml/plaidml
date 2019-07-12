@@ -99,12 +99,11 @@ class _KerasNode(object):
         raise NotImplementedError()
 
     def __getitem__(self, key):
-        # logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
-        # TODO: slice_of
-        pass
+        logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
+        raise NotImplementedError('TODO: slice_of')
 
     def __neg__(self):
-        return _KerasNode('neg', -self.tensor)
+        return _KerasNode('neg', tensor=-self.tensor)
 
     def __add__(self, other):
         return self.__binary_op('add', other, lambda x, y: x + y)
@@ -135,6 +134,18 @@ class _KerasNode(object):
 
     def __rtruediv__(self, other):
         return self.__binary_op('div', other, lambda x, y: y / x)
+
+    def __ge__(self, other):
+        return self.__binary_op('cmp_ge', other, lambda x, y: x >= y)
+
+    def __gt__(self, other):
+        return self.__binary_op('cmp_gt', other, lambda x, y: x > y)
+
+    def __le__(self, other):
+        return self.__binary_op('cmp_le', other, lambda x, y: x <= y)
+
+    def __lt__(self, other):
+        return self.__binary_op('cmp_lt', other, lambda x, y: x < y)
 
     def __binary_op(self, op, other, fn):
         if isinstance(other, _KerasNode):
@@ -191,7 +202,7 @@ def argmin(x, axis=-1):
 
 
 def backend():
-    return 'edsl_plaidml'
+    return 'plaidml2'
 
 
 def batch_dot(x, y, axes=None, name=None):
@@ -284,7 +295,8 @@ def constant(value, dtype=None, shape=None, name=None):
 
 
 def cos(x):
-    _report_unimplemented('cos')
+    logger.debug('cos(x: {})'.format(x))
+    return _KerasNode('cos', tensor=edsl.cos(x.tensor))
 
 
 def conv(x,
@@ -354,9 +366,12 @@ def ctc_label_dense_to_sparse(labels, label_lengths):
     _report_unimplemented('ctc_label_dense_to_sparse')
 
 
-# cumprod = op.cumulative_prod
+def cumprod(x, axis=0):
+    _report_unimplemented('cumprod')
 
-# cumsum = op.cumulative_sum
+
+def cumsum(x, axis=0):
+    _report_unimplemented('cumsum')
 
 
 def cur_name():
@@ -374,9 +389,26 @@ def depthwise_conv2d(x,
     _report_unimplemented('depthwise_conv2d')
 
 
-# dot = op.dot
+def dot(x, y, name=None):
+    _report_unimplemented('dot')
+
+
 def dropout(x, level, noise_shape=None, seed=None):
-    _report_unimplemented('dropout')
+    logger.debug('dropout(x: {}, level: {}, noise_shape: {}, seed: {})'.format(
+        x, level, noise_shape, seed))
+    I = x.tensor
+    if noise_shape is not None and len(noise_shape) != I.shape.ndims:
+        raise ValueError("noise_shape ndims doesn't match input ndims")
+    if noise_shape is None:
+        shape = I.shape.dims
+    else:
+        shape = noise_shape
+    rng_state = _make_rng_state(seed)
+    R = 1.0 - level
+    M = 1.0 / R
+    T = edsl.prng(rng_state.tensor, shape)
+    O = edsl.select(T < R, I * M, 0.0)
+    return _KerasNode('dropout', tensor=O)
 
 
 def dtype(x):
@@ -391,7 +423,9 @@ def equal(x, y):
     _report_unimplemented('equal')
 
 
-# exp = op.exp
+def exp(x):
+    logger.debug('exp(x: {})'.format(x))
+    return _KerasNode('exp', tensor=edsl.exp(x.tensor))
 
 
 def eval(x):
@@ -418,10 +452,16 @@ def eye(size, dtype=None, name=None):
     _report_unimplemented('eye')
 
 
-# flatten = op.flatten
+def flatten(x):
+    logger.debug('flatten(x: {})'.format(x))
+    _report_unimplemented('flatten')
 
 
-# floor = op.floor
+def floor(x):
+    logger.debug('floor(x: {})'.format(x))
+    return _KerasNode('floor', tensor=edsl.floor(x.tensor))
+
+
 def foldl(fn, elems, initializer=None, name=None):
     _report_unimplemented('foldl')
 
@@ -440,7 +480,9 @@ def function(inputs, outputs, updates=None, name=None):
     return _Function(inputs, outputs, updates, name)
 
 
-# gather = op.gather
+def gather(x, indicies):
+    logger.debug('gather(x: {}, indicies: {})'.format(x, indicies))
+    return _KerasNode('gather', tensor=edsl.gather(x.tensor, indicies.tensor))
 
 
 def get_uid(prefix=''):
@@ -449,6 +491,7 @@ def get_uid(prefix=''):
 
 
 def get_value(x):
+    logger.debug('get_value(x: {})'.format(x))
     inputs = []
     fn = _Function(inputs, [x], [], name='get_value')
     outputs = fn(inputs)
@@ -477,7 +520,9 @@ def hard_sigmoid(x):
     _report_unimplemented('hard_sigmoid')
 
 
-# identity = op.identity
+def identity(x):
+    logger.debug('identity(x: {})'.format(x))
+    return _KerasNode('identity', tensor=edsl.ident(x.tensor))
 
 
 def in_test_phase(x, alt, training=None):
@@ -540,7 +585,9 @@ def local_conv2d(inputs, kernel, kernel_size, strides, output_shape, data_format
     _report_unimplemented('local_conv2d')
 
 
-# log = op.log
+def log(x):
+    logger.debug('log(x: {})'.format(x))
+    return _KerasNode('log', tensor=edsl.log(x.tensor))
 
 
 def logsumexp(x, axis=None, keepdims=False):
@@ -559,7 +606,9 @@ def max(x, axis=None, keepdims=False):
     _report_unimplemented('max')
 
 
-# maximum = op.maximum
+def maximum(x, y):
+    logger.debug('maximum(x: {}, y: {})'.format(x, y))
+    return _KerasNode('maximum', tensor=edsl.max(x.tensor, y.tensor))
 
 
 def mean(x, axis=None, keepdims=False):
@@ -571,7 +620,9 @@ def min(x, axis=None, keepdims=False):
     _report_unimplemented('min')
 
 
-# minimum = op.minimum
+def minimum(x, y):
+    logger.debug('minimum(x: {}, y: {})'.format(x, y))
+    return _KerasNode('minimum', tensor=edsl.min(x.tensor, y.tensor))
 
 
 def moving_average_update(x, value, momentum):
@@ -644,7 +695,8 @@ def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, p
 
 
 def pow(x, a):
-    _report_unimplemented('pow')
+    logger.debug('pow(x: {}, a: {})'.format(x, a))
+    return _KerasNode('pow', tensor=edsl.pow(x.tensor, a))
 
 
 def print_tensor(x, message=''):
@@ -672,14 +724,10 @@ def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
         shape, minval, maxval, dtype, seed))
     dtype = dtype or floatx()
     rng_state = _make_rng_state(seed)
-    # for x in shape:
-    #     print('  {}: {}'.format(type(x), x))
-    T = edsl.prng_step(rng_state.tensor, shape)
-    # n = edsl.prng_state(T)
-    O = edsl.prng_value(T)
-    # if dtype != 'float32':
-    #     O = edsl.cast()
-    O = (maxval - minval) * O + minval
+    R = edsl.prng(rng_state.tensor, shape)
+    if dtype != 'float32':
+        R = edsl.cast(R, dtype)
+    O = (maxval - minval) * R + minval
     return _KerasNode('random_uniform', tensor=O)
 
 
@@ -687,7 +735,10 @@ def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
     _report_unimplemented('random_uniform_variable')
 
 
-# relu = op.relu
+def relu(x, alpha=None, max_value=None, threshold=0.):
+    logger.debug('relu(x: {}, alpha: {}, max_value: {}, threshold: {})'.format(
+        x, alpha, max_value, threshold))
+    _report_unimplemented('relu')
 
 
 def repeat(x, n):
@@ -703,7 +754,9 @@ def reset_uids():
     _UID_PREFIX_DICT.clear()
 
 
-# reshape = op.reshape
+def reshape(x, dims):
+    logger.debug('reshape(x: {}, dims: {})'.format(x, dims))
+    _report_unimplemented('reshape')
 
 
 def resize_images(x, height_factor, width_factor, data_format, interpolation='nearest'):
@@ -733,13 +786,14 @@ def rnn(step_function,
     logger.debug(
         'rnn(step_function: {}, inputs: {}, initial_states: {}, mask: {}, constants: {}, unroll: {}, input_length: {})'
         .format(step_function, inputs, initial_states, mask, constants, unroll, input_length))
-    if input_length is None:
-        input_length = inputs.shape.dims[1]
-    states = initial_states
-    for i in range(input_length):
-        input_val = inputs[:, i]
-        output_val, new_states = step_function(input_val, states + constants)
-    return (output_val, output, states)
+    _report_unimplemented('rnn')
+    # if input_length is None:
+    #     input_length = inputs.tensor.shape.dims[1]
+    # states = initial_states
+    # for i in range(input_length):
+    #     input_val = inputs[:, i]
+    #     output_val, new_states = step_function(input_val, states + constants)
+    # return (output_val, output, states)
 
 
 def round(x):
@@ -756,6 +810,16 @@ def separable_conv(x,
     _report_unimplemented('separable_conv')
 
 
+def separable_conv2d(x,
+                     depthwise_kernel,
+                     pointwise_kernel,
+                     strides=(1, 1),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1, 1)):
+    _report_unimplemented('separable_conv2d')
+
+
 def set_floatx(dtype):
     logger.debug('set_floatx(dtype: {})'.format(dtype))
     keras_set_floatx(dtype)
@@ -770,14 +834,23 @@ def set_value(x, value):
     _report_unimplemented('set_value')
 
 
-# sigmoid = op.sigmoid
+def shape(x):
+    logger.debug('shape(x: {})'.format(x))
+    return _KerasNode('shape', tensor=edsl.shape(x.tensor))
+
+
+def sigmoid(x):
+    logger.debug('sigmoid(x: {})'.format(x))
+    return _KerasNode('sigmoid', tensor=edsl.sigmoid(x.tensor))
 
 
 def sign(x):
     _report_unimplemented('sign')
 
 
-# sin = op.sin
+def sin(x):
+    logger.debug('sin(x: {})'.format(x))
+    return _KerasNode('sin', tensor=edsl.sin(x.tensor))
 
 
 def softmax(x):
@@ -804,7 +877,9 @@ def spatial_3d_padding(x, padding=((1, 1), (1, 1), (1, 1)), data_format=None):
     _report_unimplemented('spatial_3d_padding')
 
 
-# sqrt = op.sqrt
+def sqrt(x):
+    logger.debug('sqrt(x: {})'.format(x))
+    return _KerasNode('sqrt', tensor=edsl.sqrt(x.tensor))
 
 
 def square(x):
@@ -837,7 +912,9 @@ def switch(condition, then_expression, else_expression):
     _report_unimplemented('switch')
 
 
-# tanh = op.tanh
+def tanh(x):
+    logger.debug('tanh(x: {})'.format(x))
+    return _KerasNode('tanh', tensor=edsl.tanh(x.tensor))
 
 
 def temporal_padding(x, padding=(1, 1)):
@@ -914,11 +991,11 @@ def variable(value, dtype=None, name=None, constraint=None):
 
 
 def zeros(shape, dtype=floatx(), name=None):
-    _report_unimplemented('zeros')
+    return constant(0.0, shape=shape, dtype=dtype, name=_prepend_name_scope(name, 'zeros'))
 
 
 def zeros_like(x, dtype=floatx(), name=None):
-    logger.debug('zeros_like(z: {}, dtype: {}, name: {})'.format(x, dtype, name))
+    logger.debug('zeros_like(x: {}, dtype: {}, name: {})'.format(x, dtype, name))
     I = x.tensor
     dtype = dtype or floatx()
     a_zero = constant(0.0, shape=(1), dtype=dtype, name=_prepend_name_scope(name, 'a_zero'))
@@ -927,5 +1004,5 @@ def zeros_like(x, dtype=floatx(), name=None):
     idxs = edsl.TensorIndexes(ndim)
     I.bind_dims(*dims)
     O = edsl.TensorOutput(*dims)
-    O[idxs] = a_zero.tensor[()]
+    O[idxs] = a_zero.tensor[0]
     return _KerasNode('zeros_like', name=name, tensor=O)

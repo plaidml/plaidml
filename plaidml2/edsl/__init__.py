@@ -595,20 +595,20 @@ def log(x):
     return call("log", x)
 
 
+def max(x, y):
+    return call("max", x, y)
+
+
+def min(x, y):
+    return call("min", x, y)
+
+
 def pow(x, y):
     return call("pow", x, y)
 
 
-def prng_state(x):
-    return call("prng_state", x)
-
-
-def prng_step(x, sizes):
-    return call("prng_step", x, *sizes)
-
-
-def prng_value(x):
-    return call("prng_value", x)
+def prng(state, shape):
+    return call("prng", state, *shape)
 
 
 def reshape(x, dims):

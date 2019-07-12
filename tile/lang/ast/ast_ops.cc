@@ -78,6 +78,9 @@ struct IntCastOp : PrimitiveOp {
     }
     LogicalShape ret = args[0]->shape;
     switch (int_expr->value) {
+      case 8:
+        ret.dtype = DataType::INT8;
+        break;
       case 16:
         ret.dtype = DataType::INT16;
         break;
@@ -88,7 +91,7 @@ struct IntCastOp : PrimitiveOp {
         ret.dtype = DataType::INT64;
         break;
       default:
-        throw std::runtime_error("'as_int' requires the width to be one of: (16, 32, 64)");
+        throw std::runtime_error("'as_int' requires the width to be one of: (8, 16, 32, 64)");
     }
     return ret;
   }
@@ -105,6 +108,9 @@ struct UintCastOp : PrimitiveOp {
     }
     LogicalShape ret = args[0]->shape;
     switch (int_expr->value) {
+      case 8:
+        ret.dtype = DataType::UINT8;
+        break;
       case 16:
         ret.dtype = DataType::UINT16;
         break;
@@ -115,7 +121,7 @@ struct UintCastOp : PrimitiveOp {
         ret.dtype = DataType::UINT64;
         break;
       default:
-        throw std::runtime_error("'as_uint' requires the width to be one of: (16, 32, 64)");
+        throw std::runtime_error("'as_uint' requires the width to be one of: (8, 16, 32, 64)");
     }
     return ret;
   }
@@ -215,56 +221,20 @@ struct ShapeOp : PrimitiveOp {
   }
 };
 
-struct PrngStateOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
-    if (args.size() != 1) {
-      throw std::runtime_error("'prng_state' requires exactly one argument.");
-    }
-    if (args[0]->shape.dtype != DataType::PRNG) {
-      throw std::runtime_error("'prng_state' requires one argument that is the result of 'prng_step'");
-    }
-    std::vector<std::shared_ptr<DimExpr>> dims = {
-        std::make_shared<DimIntExpr>(3),
-        std::make_shared<DimIntExpr>(k_rng_size),
-    };
-    return LogicalShape(DataType::UINT32, dims);
-  }
-};
-
-struct PrngValueOp : PrimitiveOp {
-  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
-    if (args.size() != 1) {
-      throw std::runtime_error("'prng_value' requires exactly one argument.");
-    }
-    if (args[0]->shape.dtype != DataType::PRNG) {
-      throw std::runtime_error("'prng_value' requires one argument that is the result of 'prng_step'");
-    }
-    auto ret = args[0]->shape;
-    ret.dtype = DataType::FLOAT32;
-    return ret;
-  }
-};
-
-struct PrngStepOp : PrimitiveOp {
+struct PrngOp : PrimitiveOp {
   LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() < 1) {
-      throw std::runtime_error("'prng_step' must have at least one argument.");
+      throw std::runtime_error("'prng' must have at least one argument.");
     }
-    // Valididate PRNG state size
-    // auto shape = args[0]->shape;
-    // if (shape != LogicalShape(DataType::UINT32, {3, k_rng_size})) {
-    //   throw std::runtime_error("'prng_step' requires a valid PRNG state tensor.");
-    // }
-    // Get the output shape sizes
     std::vector<std::shared_ptr<DimExpr>> dims;
     for (size_t i = 1; i < args.size(); i++) {
       auto int_expr = std::dynamic_pointer_cast<IntConst>(args[i]);
       if (!int_expr) {
-        throw std::runtime_error("'prng_step' requires additional arguments to be integers.");
+        throw std::runtime_error("'prng' requires additional arguments to be integers.");
       }
       dims.push_back(std::make_shared<DimIntExpr>(int_expr->value));
     }
-    return LogicalShape(DataType::PRNG, dims);
+    return LogicalShape(DataType::FLOAT32, dims);
   }
 };
 
@@ -282,9 +252,7 @@ struct PrngStepOp : PrimitiveOp {
   // registry->Register("element", std::make_unique<ElementOp>());
   registry->Register("gather", std::make_unique<GatherOp>());
   registry->Register("index", std::make_unique<IndexOp>());
-  registry->Register("prng_state", std::make_unique<PrngStateOp>());
-  registry->Register("prng_step", std::make_unique<PrngStepOp>());
-  registry->Register("prng_value", std::make_unique<PrngValueOp>());
+  registry->Register("prng", std::make_unique<PrngOp>());
   registry->Register("reshape", std::make_unique<ReshapeOp>());
   registry->Register("scatter", std::make_unique<ScatterOp>());
   registry->Register("shape", std::make_unique<ShapeOp>());
