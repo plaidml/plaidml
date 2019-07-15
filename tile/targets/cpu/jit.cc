@@ -22,7 +22,7 @@
 #include "tile/stripe/stripe.h"
 
 // libxsmm
-#include "libxsmm_source.h"
+#include "libxsmm_source.h"  // NOLINT
 
 namespace vertexai {
 namespace tile {
@@ -756,7 +756,7 @@ void Compiler::Intrinsic(const stripe::Intrinsic& intrinsic, External handler) {
   // Generate a call to the funcptr
   std::string funcname = "external_" + intrinsic.name;
   external_funcptrs_[funcname] = funcptr;
-  auto funcval = module_->getOrInsertFunction(funcname.c_str(), functype);
+  auto funcval = module_->getOrInsertFunction(funcname.c_str(), functype).getCallee();
   auto ret = builder_.CreateCall(funcval, argvals, "");
   // If we have an output, store the new scalar value.
   size_t expected_outputs = 0;
@@ -1224,7 +1224,7 @@ void Compiler::CallIntrinsicFunc(const stripe::Intrinsic& stmt, const char* name
   llvm::Type* ctype = use_f32 ? builder_.getFloatTy() : builder_.getDoubleTy();
   std::vector<llvm::Type*> argtypes{ctype};
   auto functype = llvm::FunctionType::get(ctype, argtypes, false);
-  auto func = module_->getOrInsertFunction(name, functype);
+  auto func = module_->getOrInsertFunction(name, functype).getCallee();
   llvm::Value* ret = builder_.CreateCall(func, argvals, "");
   OutputType(ret, stmt);
 }
@@ -1279,7 +1279,7 @@ llvm::Value* Compiler::XSMMDispatchFunction(void) {
   };
   auto functype = llvm::FunctionType::get(rftype->getPointerTo(), argtypes, false);
   const char* funcname = "libxsmm_smmdispatch";
-  return module_->getOrInsertFunction(funcname, functype);
+  return module_->getOrInsertFunction(funcname, functype).getCallee();
 }
 
 llvm::Value* Compiler::MallocFunction(void) {
@@ -1287,7 +1287,7 @@ llvm::Value* Compiler::MallocFunction(void) {
   llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "malloc";
-  return module_->getOrInsertFunction(funcname, functype);
+  return module_->getOrInsertFunction(funcname, functype).getCallee();
 }
 
 llvm::Value* Compiler::CallocFunction(void) {
@@ -1295,7 +1295,7 @@ llvm::Value* Compiler::CallocFunction(void) {
   llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "calloc";
-  return module_->getOrInsertFunction(funcname, functype);
+  return module_->getOrInsertFunction(funcname, functype).getCallee();
 }
 
 llvm::Value* Compiler::FreeFunction(void) {
@@ -1304,7 +1304,7 @@ llvm::Value* Compiler::FreeFunction(void) {
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "free";
-  return module_->getOrInsertFunction(funcname, functype);
+  return module_->getOrInsertFunction(funcname, functype).getCallee();
 }
 
 llvm::Value* Compiler::PrngStepFunction(void) {
@@ -1313,7 +1313,7 @@ llvm::Value* Compiler::PrngStepFunction(void) {
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "prng_step";
-  return module_->getOrInsertFunction(funcname, functype);
+  return module_->getOrInsertFunction(funcname, functype).getCallee();
 }
 
 Executable::Executable(const ProgramModule& module) : parameters_(module.parameters) {

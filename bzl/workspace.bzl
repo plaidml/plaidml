@@ -160,10 +160,10 @@ def plaidml_workspace():
 
     http_archive(
         name = "mlir",
-        url = "https://github.com/tensorflow/mlir/archive/2f17f4dfe8daf10789bcd7cf16e4112bd6bd2244.zip",
-        sha256 = "fdf46ba9e43403731144db3fc0037905d01a3045e2f9da40dea9c44c7eb93fc2",
-        strip_prefix = "mlir-2f17f4dfe8daf10789bcd7cf16e4112bd6bd2244",
-        build_file = Label("//bzl:mlir.BUILD"),
+        url = "https://github.com/tensorflow/mlir/archive/6a986290c2848b060aa831dbc94209a9c5495d41.zip",
+        sha256 = "af0dded78324ec31e879c317d41f65972e3a166daeafbd7be2044bbe174417ab",
+        strip_prefix = "mlir-6a986290c2848b060aa831dbc94209a9c5495d41",
+        build_file = str(Label("//bzl:mlir.BUILD")),
     )
 
 def configure_protobuf():
@@ -191,8 +191,8 @@ def configure_protobuf():
 def configure_llvm():
     http_archive(
         name = "llvm",
-        url = "http://releases.llvm.org/8.0.0/llvm-8.0.0.src.tar.xz",
-        sha256 = "8872be1b12c61450cacc82b3d153eab02be2546ef34fa3580ed14137bb26224c",
-        strip_prefix = "llvm-8.0.0.src",
+        url = "https://github.com/llvm-mirror/llvm/archive/baa325e1de31e4be5b0a99ea19c8305d339c722a.zip",
+        sha256 = "c9252af344c980b625099e304b3820bc19938dd5dce28f6afe842b113983e93d",
+        strip_prefix = "llvm-baa325e1de31e4be5b0a99ea19c8305d339c722a",
         build_file = Label("//vendor/llvm:llvm.BUILD"),
     )
