@@ -980,6 +980,7 @@ class _ConvolutionStringFormatter:
             return tuple(self.O_batch_dim_numeric() + self.O_spatial_dims_numeric() +
                          self.O_channel_dims_numeric())
 
+
 class All(tile.Operation):
     def __init__(self, x, axis=None, keepdims=False):
         if axis == None:
@@ -995,7 +996,30 @@ class All(tile.Operation):
 
         super(All, self).__init__(f, [('I', x)], [('O', tile.Shape(plaidml.DType.UINT8, shape))])
 
+
 all = All.function
+
+
+class Any(tile.Operation):
+    def __init__(self, x, axis=None, keepdims=False):
+        if axis == None:
+            axis = list(range(x.shape.ndims))
+
+        shape, axis, subs = tile.compute_aggregation_axes(x.shape.dims, axis, keepdims)
+
+        f = """
+            function (I[{src_ranges}]) -> (O) {{
+                Temp = (I == 0.0 ? 0.0 : 1.0);
+                S[{dest_indices}{dest_sep}{dest_ranges}] = +(Temp[{src_indices}]);
+                F = (S == 0.0 ? 0.0 : 1.0);
+                O = as_uint(F, 8);
+            }}""".format(**subs)
+
+        super(Any, self).__init__(f, [('I', x)], [('O', tile.Shape(plaidml.DType.UINT8, shape))])
+
+
+any = Any.function
+
 
 class ArgMax(tile.Operation):
     """Maximum of elements along an axis.
