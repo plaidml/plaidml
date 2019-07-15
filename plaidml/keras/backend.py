@@ -200,8 +200,7 @@ def abs(x):
 all = op.all
 
 
-def any(x, axis=None, keepdims=False):
-    _report_unimplemented('any')
+any = op.any
 
 
 def arange(start, stop=None, step=1, dtype='int32'):
