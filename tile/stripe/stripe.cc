@@ -1101,6 +1101,18 @@ const Index* FindIndexByTag(const Block& block, const std::string& tag) {
   return nullptr;
 }
 
+bool InsertAfterBlock(Block* parent, Block* sub, std::shared_ptr<Statement> stmt) {
+  for (auto it = parent->stmts.begin(); it != parent->stmts.end(); ++it) {
+    auto block = Block::Downcast(*it);
+    if (block && block.get() == sub) {
+      ++it;
+      parent->stmts.insert(it, stmt);
+      return true;
+    }
+  }
+  return false;
+}
+
 Codec::Codec(const TensorShape* shape) : shape_(shape) {  //
 }
 

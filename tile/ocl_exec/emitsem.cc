@@ -588,11 +588,16 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     cur_->push_back(make_special("MAC_INNER", block, args));
     return;
   }
+  size_t this_block_threads = block.has_tag("gpu_thread") ? block.idxs_product() : 1;
+  if (thread_condition_ == nullptr && !block.has_tag("reg_cache") &&
+      max_threads(block) == 1 && outer_threads_ * this_block_threads < used_threads_) {
+    thread_condition_ = &block;
+  }
   // For subgroup_inline, we unroll the block directly because
   // we implement subgroup functions in only the unroller
   if ((block.has_tag("subgroup_inline") || 
       (block.has_tag("inline") && block.idxs_product() <= MAX_UNROLL_SIZE)) &&
-      block.constraints.size() == 0) {
+      block.constraints.size() == 0 && thread_condition_ == nullptr) {
     scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
     scope_ = &scopes_.back();
     depth_++;
@@ -641,10 +646,6 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   if (block.has_tag("gpu_thread")) {
     in_threads_++;
     outer_threads_ *= block.idxs_product();
-  }
-  if (thread_condition_ == nullptr && !block.has_tag("reg_cache") &&
-      max_threads(block) == 1 && outer_threads_ < used_threads_) {
-    thread_condition_ = &block;
   }
   scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
   scope_ = &scopes_.back();

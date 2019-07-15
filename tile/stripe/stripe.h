@@ -556,6 +556,8 @@ const Block* FindBlockByTag(const Block& block, const std::string& tag);
 void FindBlocksByTag(std::vector<const Block*>* into, const Block& block, const std::string& tag);
 const Index* FindIndexByTag(const Block& block, const std::string& tag);
 
+bool InsertAfterBlock(Block* parent, Block* sub, std::shared_ptr<Statement> stmt);
+
 template <typename F>
 void PreIterate(Block* block, const F& func) {
   auto it = block->stmts.begin();
