@@ -51,6 +51,9 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void init_loop_register(const std::string& buf, DataType type,  //
                           size_t size, const sem::ExprPtr& init);
 
+  void add_local_var(const sem::Type ptype, const std::string& name);
+  void move_locals_to_block();
+
   size_t hw_threads_;
   size_t threads_;
   size_t used_threads_;
@@ -62,6 +65,8 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   std::vector<size_t> lid_limits_;
   size_t depth_ = 0;
   std::shared_ptr<sem::Block> cur_;
+  std::vector<sem::StmtPtr> locals_;
+  std::set<std::string> defined_locals_;
   std::vector<AliasMap> scopes_;
   const AliasMap* scope_;
   size_t in_kernel_ = 0;

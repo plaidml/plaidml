@@ -45,6 +45,19 @@ bool HasConstraints(stripe::Block* block) {
   return false;
 }
 
+void SemtreeEmitter::add_local_var(const sem::Type ptype, const std::string& name) {
+  if (defined_locals_.find(name) == defined_locals_.end()) {
+    defined_locals_.insert(name);
+    locals_.push_back(_Declare(ptype, name, sem::ExprPtr()));
+  }
+}
+
+void SemtreeEmitter::move_locals_to_block() {
+  for (const auto& decl : locals_) {
+    cur_->push_front(decl);
+  }
+}
+
 sem::ExprPtr SemtreeEmitter::default_intrinsic_emitter(const stripe::Intrinsic& in,
                                                        const std::map<std::string, sem::ExprPtr>& exprs) const {
   static auto bin_ops = lang::BinaryOpMap();
@@ -632,6 +645,8 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       kernels_.kernels.push_back(ki);
       return;
     }
+    locals_.clear();
+    defined_locals_.clear();
     in_kernel_++;
     local_var_ = false;
     if (block.has_tag("no_threads")) {
@@ -673,6 +688,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       sem::ExprPtr init = AggInit(ref.interior_shape.type, ref.agg_op,
                           HasConstraints(const_cast<stripe::Block*>(&block)));
       if (use_register || in_threads_) {
+        // not local variable
         cur_->push_front(_Declare(ptype, ref_buf(ref.into()), init));
       } else {
         local_var_ = true;
@@ -680,7 +696,8 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
           cur_->push_front(_Barrier());
           init_loop_local(ref.into(), ref.interior_shape.type, size, init);
         }
-        cur_->push_front(_Declare(ptype, ref_buf(ref.into()), sem::ExprPtr()));
+        // We will push all local variables to the front of the outermost block
+        add_local_var(ptype, ref_buf(ref.into()));
       }
     }
   }
@@ -736,6 +753,8 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
 
   // Unwind depth
   if (block.has_tag("kernel")) {
+    // Add the local variables
+    move_locals_to_block();
     in_kernel_--;
   }
   if (block.has_tag("gpu_thread")) {
