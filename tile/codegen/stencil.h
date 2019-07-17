@@ -23,6 +23,7 @@ struct StencilIndexMatch {
 
 struct StencilMatch {
   size_t cost;
+  bool skip_non_strict;
   std::vector<StencilIndexMatch> idxs;
   std::vector<stripe::Refinement*> ref_ins;
   std::vector<stripe::Refinement*> ref_outs;
@@ -32,7 +33,8 @@ std::ostream& operator<<(std::ostream& os, const StencilMatch& match);
 bool operator==(const StencilMatch& lhs, const StencilMatch& rhs);
 bool operator<(const StencilMatch& lhs, const StencilMatch& rhs);
 
-boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, stripe::Block* block);
+boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const bool is_strict_dims,
+                                              stripe::Block* block);
 
 class StencilPass final : public CompilePass {
  public:

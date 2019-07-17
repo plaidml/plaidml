@@ -1513,7 +1513,19 @@ class TestBackendOps(unittest.TestCase):
     def fc_1000(self, b, x, k):
         return [b.dot(x, k)]
 
-    @opTest([[m(1024, 1024), m(1024, 1024)]], do_grads=False)
+    @opTest([
+        [m(1024, 1024), m(1024, 1024)],
+        [m(517, 121), m(121, 517)],
+        [m(512, 128), m(128, 512)],
+        [m(67, 33), m(33, 67)],
+        [m(64, 16), m(16, 64)],
+        [m(32, 32), m(32, 32)],
+        [m(13, 17), m(17, 13)],
+        [m(16, 16), m(16, 16)],
+        [m(16, 8), m(8, 16)],
+        [m(3, 4), m(4, 3)],
+    ],
+            do_grads=False)
     def bigMatMul(self, b, A, B):
         return [b.dot(A, B)]
 

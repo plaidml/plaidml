@@ -139,11 +139,12 @@ TEST(Stencil, MatchMatMul) {
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({spec}, kernel.get());
+  auto match = FindBestStencil({spec}, false, kernel.get());
   ASSERT_TRUE(match);
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1255968,  // total
+      false,
       {
           {"k", "c", 100},
           {"m", "k", 16},
@@ -151,6 +152,70 @@ TEST(Stencil, MatchMatMul) {
       }  // idxs
   };
   EXPECT_THAT(*match, Eq(expected));
+}
+
+TEST(Stencil, MatchMatMulForXSMMStrict) {
+  auto spec = ParseProtoJson<proto::Stencil>(R"(
+    {
+      startup_cost: 32,
+      idxs: [
+        { "name": "m", "size": 64, "outs": [1], "ins": [1, 0] },
+        { "name": "n", "size": 16, "outs": [-1], "ins": [0, -1] },
+        { "name": "k", "size": 64, "outs": [0], "ins": [-1, 1] },
+      ],
+    }
+  )");
+
+  const std::int64_t DIM = 1024;
+  auto runinfo = lib::LoadMatMul("matmul",                                        //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
+  auto kernel = main->SubBlock(0);
+
+  IVLOG(2, *kernel);
+
+  auto match = FindBestStencil({spec}, true, kernel.get());
+  ASSERT_TRUE(match);
+  IVLOG(1, "Best match: " << *match);
+  StencilMatch expected{
+      1074266112,  // total
+      false,
+      {
+          {"k", "k", 64},
+          {"m", "n", 16},
+          {"n", "m", 64},
+      }  // idxs
+  };
+
+  EXPECT_THAT(*match, Eq(expected));
+}
+
+TEST(Stencil, MatchMatMulForXSMMNonStrict) {
+  auto spec = ParseProtoJson<proto::Stencil>(R"(
+    {
+      startup_cost: 32,
+      idxs: [
+        { name: 'm', size: 64, outs: [1], ins: [1, 0] },
+        { name: 'n', size: 16, outs: [-1], ins: [0, -1] },
+        { name: 'k', size: 64, outs: [0], ins: [-1, 1] },
+      ],
+    }
+  )");
+
+  const std::int64_t DIM = 100;
+  auto runinfo = lib::LoadMatMul("matmul",                                        //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
+  auto program = GenerateStripe(runinfo);
+  auto main = program->entry->SubBlock(0);
+  auto kernel = main->SubBlock(0);
+
+  IVLOG(2, *kernel);
+
+  auto match = FindBestStencil({spec}, true, kernel.get());
+  ASSERT_FALSE(match);
 }
 
 TEST(Stencil, MatchConv1D) {
@@ -175,11 +240,12 @@ TEST(Stencil, MatchConv1D) {
 
   IVLOG(2, *kernel);
 
-  auto match = FindBestStencil({spec}, kernel.get());
+  auto match = FindBestStencil({spec}, false, kernel.get());
   ASSERT_TRUE(match);
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       1378944,  // total
+      false,
       {
           {"ci", "c", 64},
           {"co", "k", 16},
@@ -230,11 +296,12 @@ TEST(Stencil, MatchConv2D) {
 
   IVLOG(2, "\n" << *kernel);
 
-  auto match = FindBestStencil(specs, kernel.get());
+  auto match = FindBestStencil(specs, false, kernel.get());
   ASSERT_TRUE(match);
   IVLOG(1, "Best match: " << *match);
   StencilMatch expected{
       323280000,  // total
+      false,
       {
           {"ci", "c", 56},
           {"co", "k", 16},

@@ -31,6 +31,41 @@ local PARAMS = {
               },
             },
 
+            // Get dimensions for GEMM
+            {
+              name: 'get_dimensions',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PatternPass',
+                reqs: ['agg_op_add', 'comb_op_mul'],
+                pattern: |||
+                  block({
+                    ref(in, {
+                        dim(0,  {term(1, M)}, _, _),
+                        dim(0,  {term(1, K)}, _, _)
+                    }),
+                    ref(in, {
+                        dim(0, {term(1, K)}, _, _),
+                        dim(0, {term(1, N)}, _, _)
+                    }),
+                    ref(out, { // output
+                        dim(0, {term(1, M)},  _, _),
+                        dim(0, {term(1, N)}, _, _)
+                    })
+                  }, {
+                    idx(M, M_range),
+                    idx(K, K_range),
+                    idx(N, N_range),
+                  })
+                |||,
+                set_vars: {
+                  'm_idx': 'M_range',
+                  'k_idx': 'K_range',
+                  'n_idx': 'N_range',
+                },
+              },
+            },
+
+            // Stencil pass to tile the data for XSMM
             {
               name: 'stencil_mac',
               pass: {
@@ -38,6 +73,7 @@ local PARAMS = {
                 reqs: ['agg_op_add', 'comb_op_mul'],
                 outer_set: ['mac'],
                 inner_set: ['mac_inner', 'xsmm'],
+                is_strict_dims: true,
                 stencils: [
                   {
                     startup_cost: 32,
@@ -50,9 +86,9 @@ local PARAMS = {
                   {
                     startup_cost: 32,
                     idxs: [
-                      { name: 'm', size: 64, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: 16, outs: [-1], ins: [-1, 0] },
-                      { name: 'k', size: 64, outs: [0], ins: [1, -1] },
+                      { name: 'm', size: 32, outs: [1], ins: [1, 0] },
+                      { name: 'n', size: 16, outs: [-1], ins: [0, -1] },
+                      { name: 'k', size: 32, outs: [0], ins: [-1, 1] },
                     ],
                   },
                 ],
@@ -66,7 +102,6 @@ local PARAMS = {
                 reqs: ['contraction'],
                 outer_set: ['contract_outer', 'kernel'],
                 inner_set: ['contract_inner'],
-                clear_outer: true,
                 // "acc_idxs": false,
                 // Only consider PO2 sizes for speed
                 only_po2: true,

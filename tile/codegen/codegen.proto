@@ -64,8 +64,7 @@ message PadPass {
 }
 
 // Reorder blocks
-message ReorderBlocksPass {
-}
+message ReorderBlocksPass {}
 
 // The scalarize pass looks for refinements which (usually due to
 // localization) now hold only a single element, and replaces
@@ -253,7 +252,7 @@ message FusionPass {
   // Whether allowing inner block for the fused block
   optional bool no_inner = 8 [default = false];
   // Remove tags for inner blocks
-  repeated string inner_remove_set = 9; 
+  repeated string inner_remove_set = 9;
   // New tags for the first inner block
   repeated string a_inner_set = 36;
   // New tags for the second inner block
@@ -313,6 +312,10 @@ message StencilPass {
   repeated StencilTagList inputs_set = 5;
   // Set the following tags on output refinements (in stencil index outs order)
   repeated StencilTagList outputs_set = 6;
+  // Makes the stencil use strict dimension sizes.
+  // The size is cosidered being a match for the strict requirement if
+  // the block.shape[dim] % tile[dim] == 0 for all dimensions.
+  optional bool is_strict_dims = 7 [default = false];
 }
 
 message Stencil {
@@ -437,9 +440,11 @@ message AutotilePass {
   // block's location, expanding the supplied tag as the tile index
   // affine.
   optional string location_idx_tag = 33;
-  // If failed, tile the whole block into inner, and set the following tags for inner block
+  // If failed, tile the whole block into inner, and set the following tags for
+  // inner block
   repeated string fail_inner_set = 34;
-  // If failed, tile the whole block into inner, and set the following tags for outer block
+  // If failed, tile the whole block into inner, and set the following tags for
+  // outer block
   repeated string fail_outer_set = 35;
   // Exclude some set of blocks based on tags
   repeated string exclude = 36;
@@ -636,8 +641,7 @@ message TempVarPass {
 }
 
 // Propagate constant tensors.
-message ConstantPropagatePass {
-}
+message ConstantPropagatePass {}
 
 // Remove constant tensor and replace the corresponding loads with constants
 message ConstTensorPass {
@@ -650,7 +654,7 @@ message FixStridesPass {
   repeated string reqs = 1;
 }
 
-// Reorder the index in order to make the low bits of the thread ID be 
+// Reorder the index in order to make the low bits of the thread ID be
 // correspond to the low stride
 message IdxOrderPass {
   repeated string reqs = 1;

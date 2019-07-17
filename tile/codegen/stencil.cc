@@ -49,7 +49,8 @@ void swap(Orderer<V>& v1, Orderer<V>& v2) {
   std::swap(*v1, *v2);
 }
 
-boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, stripe::Block* block) {
+boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const bool is_strict_dims,
+                                              stripe::Block* block) {
   boost::optional<StencilMatch> lowest_cost_match;
 
   std::vector<Orderer<Refinement*>> ref_ins;
@@ -104,7 +105,7 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
     // order to make the loops a bit more straightforward to
     // understand.
     auto build_stencil_match = [&]() {
-      StencilMatch match{1, {}};
+      StencilMatch match{1, false, {}};
       std::map<std::string, StencilIndexMatch> idx_matches;
       for (const auto& idx : block->idxs) {
         idx_matches[idx.name] = StencilIndexMatch{idx.name, "*", 1};
@@ -124,9 +125,14 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
         ++rule_it;
         ++idx_it;
       }
+
       size_t total_tiles = 1;
       for (const auto& idx : block->idxs) {
         auto tile = safe_at(idx_matches, idx.name);
+        // If we should skip non strict tiles - with a dimension
+        // that is not no-remainder dividing the block shape's
+        // dimension - mark the match appropriately.
+        match.skip_non_strict = is_strict_dims && (match.skip_non_strict || (idx.range % tile.value));
         size_t num_tiles = math::RoundUp(idx.range, tile.value);
         total_tiles *= num_tiles;
         match.cost *= num_tiles * tile.value;
@@ -178,7 +184,7 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
             // the stencil.  Generate the corresponding StencilMatch,
             // and accumulate it into lowest_cost_match.
             auto match = build_stencil_match();
-            if (!lowest_cost_match || match < *lowest_cost_match) {
+            if (!match.skip_non_strict && (!lowest_cost_match || match < *lowest_cost_match)) {
               IVLOG(4, "  Accepting match: " << match);
               lowest_cost_match = std::move(match);
             }
@@ -200,6 +206,7 @@ struct StencilPassOptions {
   Tags set_inner;
   std::vector<Tags> set_inputs;
   std::vector<Tags> set_outputs;
+  bool is_strict_dims;
 };
 
 void ApplyIndexTags(Block* block, const StencilMatch& match) {
@@ -241,10 +248,11 @@ void StencilPassRecurse(Block* block, const StencilPassOptions& options) {
     }
   }
   if (block->has_tags(options.reqs)) {
-    auto match = FindBestStencil(options.specs, block);
+    auto match = FindBestStencil(options.specs, options.is_strict_dims, block);
     if (!match) {
       return;
     }
+
     ApplyRefTags(block, *match, options);
     TileShape tile;
     for (const auto& idx : match->idxs) {
@@ -264,7 +272,7 @@ void StencilPass::Apply(CompilerState* state) const {
       FromProto(options_.reqs()),       // reqs
       {},                               // specs
       FromProto(options_.outer_set()),  // set_outer
-      FromProto(options_.inner_set())   // set_inner
+      FromProto(options_.inner_set()),  // set_inner
   };
   for (const auto& stencil : options_.stencils()) {
     sopts.specs.push_back(stencil);
@@ -275,6 +283,9 @@ void StencilPass::Apply(CompilerState* state) const {
   for (const auto& output_set : options_.outputs_set()) {
     sopts.set_outputs.emplace_back(FromProto(output_set.tags()));
   }
+
+  sopts.is_strict_dims = options_.is_strict_dims();
+
   StencilPassRecurse(state->entry(), sopts);
 }
 

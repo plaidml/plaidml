@@ -69,11 +69,17 @@ class Compiler : private stripe::ConstStmtVisitor {
  public:
   Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals);
   ProgramModule CompileProgram(const stripe::Block& program);
+  virtual ~Compiler() {
+    // make sure the blockStack is drained.
+    blockStack_.clear();
+  }
 
  protected:
-  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals);
+  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals,
+                    std::vector<std::shared_ptr<stripe::Block>> blockStack);
+
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
-  llvm::Function* CompileXSMMBlock(const stripe::Block& block);
+  llvm::Function* CompileXSMMBlock(const stripe::Block& block, const stripe::Block* const dimBlock);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
   void Visit(const stripe::Store&) override;
@@ -138,6 +144,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   };
 
  private:
+  const stripe::Block* const GetBlockWithDimensionAttributes() const;
   Scalar Cast(Scalar, DataType);
   Scalar CheckBool(Scalar);
   llvm::Type* CType(DataType);
@@ -164,6 +171,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   std::map<std::string, Scalar> scalars_;
   std::map<std::string, Buffer> buffers_;
   std::map<std::string, Index> indexes_;
+  std::vector<std::shared_ptr<stripe::Block>> blockStack_;
 };
 
 Compiler::Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals)
@@ -217,9 +225,10 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   return ret;
 }
 
-Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals)
-    : context_(*context), builder_{context_}, module_(module), external_handlers_{externals} {
-  // This private constructor sets up a nested compiler instance which will
+Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals,
+                   std::vector<std::shared_ptr<stripe::Block>> blockStack)
+    : context_(*context), builder_{context_}, module_(module), external_handlers_{externals}, blockStack_{blockStack} {
+  // This private constructor sets up a nested instance which will
   // process a nested block, generating output into the same module as its
   // containing compiler instance.
 }
@@ -270,7 +279,19 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   builder_.CreateRetVoid();
 }
 
-llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block) {
+// Gets the parent block that has the GEMM dimension attributes.
+const stripe::Block* const Compiler::GetBlockWithDimensionAttributes() const {
+  for (auto it = blockStack_.crbegin(); it != blockStack_.crend(); ++it) {
+    const std::shared_ptr<stripe::Block> block = *it;
+    const stripe::Block* retBlock = block.get();
+    if (retBlock->has_attr("m_idx") && retBlock->has_attr("n_idx") && retBlock->has_attr("k_idx")) {
+      return retBlock;
+    }
+  }
+  throw std::runtime_error("No dimensions set in the GEMM block hierarchy.");
+}
+
+llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const stripe::Block* const dimBlock) {
   // Generate a function that implements the body for this block of statements.
   // Refinements (their buffers) and initial indexes
   // will be passed as parameters (to the function).
@@ -319,14 +340,27 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block) {
   llvm::Value* one = llvm::ConstantFP::get(builder_.getFloatTy(), 1.0);
   builder_.CreateStore(one, alpha);
   builder_.CreateStore(one, beta);
-  builder_.CreateStore(llvm::ConstantInt::get(i32t, 1024), lda);
-  builder_.CreateStore(llvm::ConstantInt::get(i32t, 1024), ldb);
-  builder_.CreateStore(llvm::ConstantInt::get(i32t, 1024), ldc);
+
+  if (!dimBlock->has_attr("m_idx")) {
+    throw std::runtime_error("Expected m_idx attribute not set!");
+  }
+
+  if (!dimBlock->has_attr("k_idx")) {
+    throw std::runtime_error("Expected k_idx attribute not set!");
+  }
+
+  if (!dimBlock->has_attr("n_idx")) {
+    throw std::runtime_error("Expected n_idx attribute not set!");
+  }
+
+  builder_.CreateStore(llvm::ConstantInt::get(i32t, dimBlock->get_attr_int("m_idx")), lda);
+  builder_.CreateStore(llvm::ConstantInt::get(i32t, dimBlock->get_attr_int("k_idx")), ldb);
+  builder_.CreateStore(llvm::ConstantInt::get(i32t, dimBlock->get_attr_int("n_idx")), ldc);
   llvm::Value* nptr = llvm::ConstantPointerNull::get(llvm::Type::getInt32PtrTy(context_));
   llvm::Value* dispatch = XSMMDispatchFunction();
-  std::vector<llvm::Value*> args1 = {llvm::ConstantInt::get(i32t, 64),
-                                     llvm::ConstantInt::get(i32t, 16),
-                                     llvm::ConstantInt::get(i32t, 64),
+  std::vector<llvm::Value*> args1 = {llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_m")->range),
+                                     llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_n")->range),
+                                     llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_k")->range),
                                      lda,
                                      ldb,
                                      ldc,
@@ -366,7 +400,10 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block) {
 
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   if (block.has_tag("xsmm")) {
-    return CompileXSMMBlock(block);
+    const stripe::Block* const pBlock = GetBlockWithDimensionAttributes();
+    if (nullptr != pBlock) {
+      return CompileXSMMBlock(block, pBlock);
+    }
   }
 
   // Generate a function implementing the body of this block.
@@ -460,9 +497,12 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
 
   // process each statement in the block body, generating code to modify the
   // parameter buffer contents
+  std::shared_ptr<stripe::Block> pBlock = std::make_shared<stripe::Block>(block);
+  blockStack_.push_back(pBlock);
   for (const auto& stmt : block.stmts) {
     stmt->Accept(this);
   }
+  blockStack_.pop_back();
 
   // rejoin instruction flow after the constraint check
   builder_.CreateBr(block_done);
@@ -659,7 +699,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
 
 void Compiler::Visit(const stripe::Block& block) {
   // Compile a nested block as a function in the same module
-  Compiler nested(&context_, module_, external_handlers_);
+  Compiler nested(&context_, module_, external_handlers_, blockStack_);
   auto function = nested.CompileBlock(block);
   for (auto& fptr_iter : nested.external_funcptrs_) {
     external_funcptrs_.emplace(fptr_iter);
