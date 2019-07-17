@@ -27,6 +27,20 @@ def mean(I, axis=None, keepdims=False):
     return op("mean", [I, axis, keepdims]).as_tensor()
 
 
+def pool(I, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,
+         include_pad_in_avg):
+    if isinstance(pool_size, np.ndarray):
+        pool_size = pool_size.tolist()
+    if isinstance(strides, np.ndarray):
+        strides = strides.tolist()
+    if isinstance(manual_padding, np.ndarray):
+        manual_padding = manual_padding.to_list()
+    return op("pool", [
+        I, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,
+        include_pad_in_avg
+    ]).as_tensor()
+
+
 def square(I):
     return I * I
 

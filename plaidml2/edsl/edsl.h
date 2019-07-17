@@ -908,6 +908,11 @@ class Value {
     return ffi::call<plaidml_expr_kind>(plaidml_expr_get_kind, as_ptr()) == PLAIDML_EXPR_STR;
   }
 
+  bool as_bool() const {
+    // bools are ints under the hood, but we can still return a bool type
+    return static_cast<bool>(ffi::call<int64_t>(plaidml_expr_int_get_value, as_ptr()));
+  }
+
   int64_t as_int() const {  //
     return ffi::call<int64_t>(plaidml_expr_int_get_value, as_ptr());
   }
@@ -935,6 +940,17 @@ class Value {
     ffi::call_void(plaidml_expr_tuple_get_exprs, as_ptr(), exprs.size(), exprs.data());
     for (size_t i = 0; i < ret.size(); i++) {
       ret[i] = Value{exprs[i]};
+    }
+    return ret;
+  }
+
+  std::vector<int64_t> as_int_tuple() const {
+    auto count = ffi::call<size_t>(plaidml_expr_tuple_get_count, as_ptr());
+    std::vector<int64_t> ret(count);
+    std::vector<plaidml_expr*> exprs(count);
+    ffi::call_void(plaidml_expr_tuple_get_exprs, as_ptr(), exprs.size(), exprs.data());
+    for (size_t i = 0; i < ret.size(); i++) {
+      ret[i] = Value{exprs[i]}.as_int();
     }
     return ret;
   }

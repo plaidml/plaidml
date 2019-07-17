@@ -709,7 +709,10 @@ void ContractionExpr::ComputeShape(const std::string& layout) {
   IVLOG(5, "ContractionExpr::ComputeShape> layout: \"" << layout << "\"");
   DataType dtype = DataType::INVALID;
   if (combo_op == CombinationOp::COND) {
-    dtype = DataType::BOOLEAN;
+    if (inputs.size() != 3) {
+      throw std::runtime_error("Internal error: Invalid number of inputs for COND");
+    }
+    dtype = inputs[2]->ref->shape.dtype;
   } else {
     std::vector<DataType> dtypes;
     for (const auto& input : inputs) {

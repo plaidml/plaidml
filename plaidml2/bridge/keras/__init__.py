@@ -14,6 +14,7 @@ import plaidml2.exec as plaidml_exec
 import plaidml2.op as plaidml_op
 import plaidml2.settings as plaidml_settings
 from keras.backend.common import floatx
+from keras.backend.common import image_data_format
 from keras.backend.common import set_floatx as keras_set_floatx
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,26 @@ def _prepend_name_scope(name, default):
         r = '_'.join(_NAME_SCOPE_STACK + [default])
         r += '_' + str(get_uid(r))
     return r
+
+
+def _normalize_data_format(data_format):
+    if data_format is None:
+        data_format = image_data_format()
+    if data_format == 'channels_last':
+        return 'nxc'
+    if data_format == 'channels_first':
+        return 'ncx'
+    if data_format in ['nxc', 'ncx']:
+        return data_format
+    raise ValueError("Unrecognized data_format '{}'".format(data_format))
+
+
+def _normalize_padding(padding):
+    if padding == 'same':
+        return 'same_lower'
+    if padding in ['same_lower', 'same_upper', 'valid', 'full']:
+        return padding
+    raise ValueError("Unrecognized padding type '{}'".format(padding))
 
 
 class _Function(object):
@@ -683,15 +704,39 @@ def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
 
 
 def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mode='max'):
-    _report_unimplemented('pool')
+    logger.debug(
+        'pool(x: {}, pool_size: {}, strides: {}, padding: {}, data_format: {}, pool_mode: {})'.
+        format(x, pool_size, strides, padding, data_format, pool_mode))
+    return _KerasNode(
+        'pool',
+        tensor=plaidml_op.pool(
+            x.tensor,  #
+            pool_mode,  #
+            pool_size,  #
+            strides,  #
+            _normalize_padding(padding),  #
+            tuple(),  #
+            _normalize_data_format(data_format),  #
+            False,  #
+            False))
 
 
 def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool_mode='max'):
-    _report_unimplemented('pool2d')
+    return pool(x=x,
+                pool_size=pool_size,
+                strides=strides,
+                padding=padding,
+                data_format=data_format,
+                pool_mode=pool_mode)
 
 
 def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, pool_mode='max'):
-    _report_unimplemented('pool3d')
+    return pool(x=x,
+                pool_size=pool_size,
+                strides=strides,
+                padding=padding,
+                data_format=data_format,
+                pool_mode=pool_mode)
 
 
 def pow(x, a):

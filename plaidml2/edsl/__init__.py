@@ -478,6 +478,8 @@ class Value(ForeignObject):
             self._elts = [Value(x) for x in value]
             raw_elts = [x.as_ptr() for x in self._elts]
             ffi_obj = ffi_call(lib.plaidml_expr_tuple, len(raw_elts), raw_elts)
+        elif isinstance(value, six.string_types):
+            ffi_obj = ffi_call(lib.plaidml_expr_str, value.encode('utf-8'))
         elif isinstance(value, ffi.CData) and ffi.typeof(value) is ffi.typeof('plaidml_expr*'):
             ffi_obj = value
         else:
