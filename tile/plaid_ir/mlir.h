@@ -10,7 +10,9 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Function.h"
 #include "mlir/IR/Identifier.h"
+#include "mlir/IR/Module.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
@@ -43,6 +45,7 @@ using mlir::Op;
 using mlir::OpBuilder;
 using mlir::Operation;
 using mlir::OperationState;
+using mlir::Region;
 using mlir::StringAttr;
 using mlir::StringRef;
 using mlir::Type;

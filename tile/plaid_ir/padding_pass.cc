@@ -28,7 +28,7 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
       assert(ref.offsets().end() - ref.offsets().begin() == inner.size());
       // Add the effect of the offset to the inner ranges
       for (size_t i = 0; i < inner.size(); i++) {
-        inner[i] += UnboundedRange(*(ref.offsets().begin() + i));
+        inner[i] += AffineRange(*(ref.offsets().begin() + i));
       }
     } else if (auto op = mlir::dyn_cast<LoadOp>(use.getOwner())) {
       inner.resize(op.from()->getType().cast<TensorType>().dims().size());
@@ -44,7 +44,7 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
       // Otherwise, union in
       assert(r.size() == inner.size());
       for (size_t i = 0; i < r.size(); i++) {
-        r[i].merge(inner[i]);
+        r[i] |= inner[i];
       }
     }
   }
@@ -52,7 +52,7 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
 }
 
 void PaddingPass::runOnFunction() {
-  mlir::Function& f = getFunction();
+  mlir::FuncOp f = getFunction();
   // Get the unbounded access ranges for each function input
   std::cout << "Args\n";
   for (const auto& arg : f.getArguments()) {
