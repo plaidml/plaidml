@@ -84,7 +84,7 @@ std::shared_ptr<hal::Event> ComputeKernel::Run(const context::Context& ctx,
   CLObj<cl_event> done;
   auto local_work_size = ki_.lwork[0] ? ki_.lwork.data() : nullptr;
   auto event_wait_list = deps.size() ? deps.data() : nullptr;
-  IVLOG(4, "Running kernel,  gwork = " << ki_.gwork << ", lwork = " << local_work_size[0]);
+  IVLOG(4, "Running kernel,  gwork = " << ki_.gwork << ", lwork = " << (local_work_size ? local_work_size[0] : 0));
   Err err = ocl::EnqueueNDRangeKernel(queue.cl_queue.get(),  // command_queue
                                       kernel_.get(),         // kernel
                                       3,                     // work_dim
