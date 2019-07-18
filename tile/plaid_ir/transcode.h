@@ -9,7 +9,8 @@ namespace vertexai {
 namespace tile {
 namespace plaid_ir {
 
-mlir::Function* StripeToPlaidIR(MLIRContext* ctx, const stripe::Program& prog);
+mlir::FuncOp StripeToPlaidIR(MLIRContext* ctx, const stripe::Program& prog);
+stripe::Program PlaidIRToStripe(const mlir::FuncOp& func);
 
 }  // namespace plaid_ir
 }  // namespace tile

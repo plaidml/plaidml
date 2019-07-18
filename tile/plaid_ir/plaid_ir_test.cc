@@ -39,7 +39,7 @@ int main() {
 
   printf("Making context + module\n");
   mlir::MLIRContext context;
-  auto module = std::make_unique<mlir::Module>(&context);
+  auto module = mlir::ModuleOp::create(mlir::UnknownLoc::get(&context));
 
   printf("Making a stripe program + fixing locals\n");
   auto prog = lang::GenerateStripe(example());
@@ -49,19 +49,25 @@ int main() {
   auto func = StripeToPlaidIR(&context, *prog);
 
   printf("Adding function to module\n");
-  module->getFunctions().push_back(func);
+  module.push_back(func);
 
   printf("Verifying module\n");
-  module->verify();
+  module.verify();
 
   printf("Doing some passes\n");
   mlir::PassManager pm;
   pm.addPass(mlir::createCSEPass());
   pm.addPass(new PaddingPass());
-  if (failed(pm.run(module.get()))) {
+  if (failed(pm.run(module))) {
     throw std::runtime_error("Invalid goo\n");
   }
 
   printf("Dumping modules\n");
-  module->dump();
+  module.dump();
+
+  printf("Converting the other way\n");
+  auto prog2 = PlaidIRToStripe(func);
+
+  printf("New version:\n");
+  std::cout << *prog2.entry;
 }

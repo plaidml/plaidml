@@ -7,12 +7,6 @@ namespace vertexai {
 namespace tile {
 namespace plaid_ir {
 
-static void TerminateBlock(Block* block, OpBuilder* builder) {
-  OperationState terminatorState(builder->getContext(), builder->getUnknownLoc(), TerminateOp::getOperationName());
-  TerminateOp::build(builder, &terminatorState);
-  block->push_back(Operation::create(terminatorState));
-}
-
 static Type ToPlaidIR(MLIRContext* ctx, DataType dtype) {
   switch (dtype) {
     case DataType::FLOAT16:
@@ -73,11 +67,10 @@ static void ToPlaidIR(OpBuilder* builder, const SymbolTable& outer, const stripe
   SymbolTable locals;
 
   // Make the actual inner block + terminate it
-  Block* body = new Block();
-  TerminateBlock(body, builder);
-
-  // Save the insertion point and set to the new block
   auto orig_insert = builder->saveInsertionPoint();
+  Block* body = new Block();
+  builder->setInsertionPointToStart(body);
+  builder->create<TerminateOp>(builder->getUnknownLoc());
   builder->setInsertionPointToStart(body);
 
   // Process the indexes
@@ -122,9 +115,10 @@ static void ToPlaidIR(OpBuilder* builder, const SymbolTable& outer, const stripe
     auto aif = builder->create<AffineIfOp>(builder->getUnknownLoc(), ToPlaidIR(builder, locals, con));
     // Make the block + attach to the region
     Block* if_body = new Block();
-    TerminateBlock(if_body, builder);
     aif.getOperation()->getRegion(0).push_back(if_body);
     // Move to the interior
+    builder->setInsertionPointToStart(if_body);
+    builder->create<TerminateOp>(builder->getUnknownLoc());
     builder->setInsertionPointToStart(if_body);
   }
 
@@ -184,7 +178,7 @@ static void ToPlaidIR(OpBuilder* builder, const SymbolTable& outer, const stripe
   loop_op.getOperation()->getRegion(0).push_back(body);
 }
 
-mlir::Function* StripeToPlaidIR(MLIRContext* ctx, const stripe::Program& prog) {
+mlir::FuncOp StripeToPlaidIR(MLIRContext* ctx, const stripe::Program& prog) {
   std::cout << *prog.entry;
   // Build the function prototype from program entry
   std::vector<mlir::Type> arg_types;
@@ -194,9 +188,9 @@ mlir::Function* StripeToPlaidIR(MLIRContext* ctx, const stripe::Program& prog) {
   auto func_type = mlir::FunctionType::get(arg_types, {}, ctx);
   // Make function
   mlir::Location loc = mlir::UnknownLoc::get(ctx);
-  mlir::Function* func = new mlir::Function(loc, "test", func_type, {});
-  func->addEntryBlock();
-  auto& region = func->getBody();
+  mlir::FuncOp func = mlir::FuncOp::create(loc, "test", func_type, {});
+  func.addEntryBlock();
+  auto& region = func.getBody();
   auto& block = region.front();
   auto builder = llvm::make_unique<mlir::OpBuilder>(region);
   // Fill initial symbol table with parameters
@@ -208,6 +202,13 @@ mlir::Function* StripeToPlaidIR(MLIRContext* ctx, const stripe::Program& prog) {
   ToPlaidIR(builder.get(), initial, *prog.entry->SubBlock(0));
   builder->create<TerminateOp>(builder->getUnknownLoc());
   return func;
+}
+
+stripe::Program PlaidIRToStripe(const mlir::FuncOp& func) {
+  stripe::Program r;
+  auto prog = std::make_shared<stripe::Block>();
+  r.entry = prog;
+  return r;
 }
 
 }  // namespace plaid_ir

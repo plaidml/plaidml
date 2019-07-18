@@ -1,10 +1,13 @@
 TBLGEN_ACTIONS = [
     "-gen-llvmir-conversions",
     "-gen-op-decls",
+    "-gen-enum-defs",
+    "-gen-enum-decls",
     "-gen-op-defs",
     "-gen-op-doc",
     "-gen-reference-implementations",
     "-gen-rewriters",
+    "-gen-llvmir-conversions",
 ]
 
 def _tblgen_impl(ctx):
