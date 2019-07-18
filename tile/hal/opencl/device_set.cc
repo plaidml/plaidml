@@ -11,6 +11,8 @@
 #include "base/util/error.h"
 #include "tile/hal/opencl/info.h"
 
+#define PLAIDML_MIN_OPENCL_VERSION "OpenCL 1.2"
+
 namespace vertexai {
 namespace tile {
 namespace hal {
@@ -219,8 +221,9 @@ proto::DeviceInfo GetDeviceInfo(cl_device_id did, std::uint32_t pidx, const prot
   info.set_queue_on_device_max_size(CLInfo<CL_DEVICE_QUEUE_ON_DEVICE_MAX_SIZE>(did));
   info.set_max_on_device_queues(CLInfo<CL_DEVICE_MAX_ON_DEVICE_QUEUES>(did));
   info.set_max_on_device_events(CLInfo<CL_DEVICE_MAX_ON_DEVICE_EVENTS>(did));
-  ForEachElt(CLInfo<CL_DEVICE_BUILT_IN_KERNELS>(did),
-             [&info](std::string kernel) { info.add_built_in_kernel(std::move(kernel)); }, boost::regex{R"([^;]+)"});
+  ForEachElt(
+      CLInfo<CL_DEVICE_BUILT_IN_KERNELS>(did),
+      [&info](std::string kernel) { info.add_built_in_kernel(std::move(kernel)); }, boost::regex{R"([^;]+)"});
 #endif
   info.set_platform_index(pidx);
   {
@@ -351,6 +354,18 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
   ocl::GetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
   std::vector<cl_device_id> devices(device_count);
   ocl::GetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, devices.size(), devices.data(), nullptr);
+
+  // Remove OpenCL devices that are older than PLAIDML_MIN_OPENCL_VERSION
+  devices.erase(std::remove_if(devices.begin(), devices.end(),
+                               [](const cl_device_id& did) {
+                                 size_t len;
+                                 std::vector<char> device_version;
+                                 ocl::GetDeviceInfo(did, CL_DEVICE_VERSION, 0, nullptr, &len);
+                                 device_version.reserve(len);
+                                 ocl::GetDeviceInfo(did, CL_DEVICE_VERSION, len, device_version.data(), nullptr);
+                                 return (std::string(device_version.data()).compare(PLAIDML_MIN_OPENCL_VERSION) < 0);
+                               }),
+                devices.end());
 
   cl_context_properties props[3] = {CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties>(pid), 0};
   Err err;
