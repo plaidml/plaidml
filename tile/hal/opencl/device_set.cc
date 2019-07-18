@@ -358,12 +358,8 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
   // Remove OpenCL devices that are older than PLAIDML_MIN_OPENCL_VERSION
   devices.erase(std::remove_if(devices.begin(), devices.end(),
                                [](const cl_device_id& did) {
-                                 size_t len;
-                                 std::vector<char> device_version;
-                                 ocl::GetDeviceInfo(did, CL_DEVICE_VERSION, 0, nullptr, &len);
-                                 device_version.reserve(len);
-                                 ocl::GetDeviceInfo(did, CL_DEVICE_VERSION, len, device_version.data(), nullptr);
-                                 return (std::string(device_version.data()).compare(PLAIDML_MIN_OPENCL_VERSION) < 0);
+                                 auto device_version = CLInfoType<CL_DEVICE_VERSION>::Read(did);
+                                 return (device_version.compare(PLAIDML_MIN_OPENCL_VERSION) < 0);
                                }),
                 devices.end());
 
