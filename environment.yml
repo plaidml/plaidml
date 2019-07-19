@@ -1,11 +1,11 @@
 channels:
   - conda-forge
 dependencies:
-  - cmake
-  - pre_commit
-  - pip
-  - python=3.6.0
-  - setuptools>=40.6.0
+  - cmake=3.14.5
+  - pre_commit=1.17.0
+  - pip=19.1.1
+  - python=3.7.0
+  - setuptools=41.0.1
   - pip:
-    - cpplint
+    - cpplint==1.4.4
     - yapf==0.27.0
