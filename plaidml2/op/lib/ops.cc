@@ -16,8 +16,10 @@ namespace lib {
 struct AggregationAxes {
   std::vector<TensorIndex> src_idxs;
   std::vector<TensorIndex> dst_idxs;
+  std::vector<TensorIndex> reduce_idxs;
   std::vector<TensorDim> src_dims;
   std::vector<TensorDim> dst_dims;
+  std::vector<TensorDim> reduce_dims;
   std::set<size_t> axes;
 
   AggregationAxes(size_t ndims, const Value& in_axes, bool keepdims) : src_idxs(ndims), src_dims(ndims) {
@@ -45,7 +47,10 @@ struct AggregationAxes {
     } else {
       throw std::runtime_error("Invalid Value type for AggregationAxes: in_axes");
     }
-
+    for (auto axis : axes) {
+      reduce_idxs.push_back(src_idxs[axis]);
+      reduce_dims.push_back(src_dims[axis]);
+    }
     if (keepdims) {
       dst_idxs = src_idxs;
       dst_dims = src_dims;
@@ -204,7 +209,31 @@ std::vector<int64_t>* extend_manual_padding(std::vector<int64_t>* pads, size_t r
 
 }  // namespace
 
+Value argmax(const Value& value) {
+  IVLOG(1, "argmax");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("argmax expects 2 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto I_shape = I.shape();
+  auto axes = args[1];
+  AggregationAxes agg(I_shape.ndims(), axes, false);
+  I.bind_dims(agg.src_dims);
+  auto M = TensorOutput(agg.dst_dims);
+  M(agg.dst_idxs) >= I(agg.src_idxs);
+  Tensor One(1);
+  auto T = TensorOutput(agg.reduce_dims);
+  T(agg.reduce_idxs) = One();
+  auto IX = index(T, 0);
+  auto AM = TensorOutput(agg.dst_dims);
+  AM(agg.dst_idxs) >= cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs));
+  auto O = as_uint(AM, 32);
+  return Value{O};
+}
+
 Value convolution(const Value& value) {
+  IVLOG(1, "convolution");
   auto args = value.as_tuple();
   if (args.size() != 8) {
     throw std::runtime_error("convolution expects 8 arguments");
@@ -310,6 +339,59 @@ Value convolution(const Value& value) {
   auto O = TensorOutput(O_dims, I_layout);
   O(O_idxs) += I(I_idxs) * K(K_idxs);
   return Value{O};
+}
+
+Value dot(const Value& value) {
+  IVLOG(1, "dot");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("dot expects 2 arguments");
+  }
+  auto X = args[0].as_tensor();
+  auto X_shape = X.shape();
+  auto Y = args[1].as_tensor();
+  auto Y_shape = Y.shape();
+  if (X_shape.dtype() != Y_shape.dtype()) {
+    throw std::runtime_error(str(boost::format("Invalid dtype in dot: X.dtype = '%1%', Y.dtype = '%2%'") %
+                                 X_shape.dtype() % Y_shape.dtype()));
+  }
+  if (X_shape.ndims() == 1 && Y_shape.ndims() == 1) {
+    TensorDim I;
+    TensorIndex i;
+    X.bind_dims(I);
+    Y.bind_dims(I);
+    auto O = TensorOutput(I);
+    O(i) += X(i) * Y(i);
+    return Value{O};
+  }
+  if (1 <= X_shape.ndims() && 2 <= Y_shape.ndims()) {
+    std::vector<TensorDim> X_dims(X_shape.ndims());
+    std::vector<TensorDim> Y_dims(Y_shape.ndims());
+    TensorIndex z;
+    std::vector<TensorIndex> X_idxs(X_shape.ndims());
+    std::vector<TensorIndex> Y_idxs(Y_shape.ndims());
+    X_idxs[X_shape.ndims() - 1] = z;
+    Y_idxs[Y_shape.ndims() - 2] = z;
+    X.bind_dims(X_dims);
+    Y.bind_dims(Y_dims);
+    std::vector<TensorDim> O_dims;
+    std::vector<TensorIndex> O_idxs;
+    for (size_t i = 0; i < X_shape.ndims() - 1; i++) {
+      O_dims.push_back(X_dims[i]);
+      O_idxs.push_back(X_idxs[i]);
+    }
+    for (size_t i = 0; i < Y_shape.ndims() - 2; i++) {
+      O_dims.push_back(Y_dims[i]);
+      O_idxs.push_back(Y_idxs[i]);
+    }
+    O_dims.push_back(Y_dims[Y_shape.ndims() - 1]);
+    O_idxs.push_back(Y_idxs[Y_shape.ndims() - 1]);
+    auto O = TensorOutput(O_dims);
+    O(O_idxs) += X(X_idxs) * Y(Y_idxs);
+    return Value{O};
+  }
+  throw std::runtime_error(str(boost::format("Unsupported dims for dot operation: X.dims = %1%, Y.dims = %2%") %
+                               X_shape.ndims() % Y_shape.ndims()));
 }
 
 Value mean(const Value& value) {
@@ -488,7 +570,53 @@ Value pool(const Value& value) {
   }
 }
 
+Value relu(const Value& value) {
+  IVLOG(1, "relu");
+  auto args = value.as_tuple();
+  if (args.size() != 4) {
+    throw std::runtime_error("relu expects 4 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto alpha = args[1];
+  auto max_value = args[2];
+  auto threshold = args[3].as_float();
+  Tensor A;
+  if (alpha.is_none()) {
+    A = Tensor(0.0);
+  } else {
+    A = alpha.as_tensor();
+  }
+  auto O = select(I < threshold, A * (I - threshold), I);
+  if (!max_value.is_none()) {
+    auto M = max_value.as_tensor();
+    O = select(O < M, O, M);
+  }
+  return Value{O};
+}
+
+Value softmax(const Value& value) {
+  IVLOG(1, "softmax");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("softmax expects 2 arguments");
+  }
+  auto X = args[0].as_tensor();
+  if (X.shape().ndims() == 2) {
+    TensorDim I, J;
+    TensorIndex i, j;
+    X.bind_dims(I, J);
+    auto M = TensorOutput(I, 1);
+    M(i, 0) >= X(i, j);
+    auto E = exp(X - M);
+    auto N = TensorOutput(I, 1);
+    N(i, 0) += E(i, j);
+    return Value{E / N};
+  }
+  throw std::runtime_error("softmax only works on 2 dimensions at this time.");
+}
+
 Value square(const Value& value) {
+  IVLOG(1, "square");
   auto x = value.as_tensor();
   return Value(x * x);
 }
@@ -528,9 +656,13 @@ Value sum(const Value& value) {
 
 void RegisterOps() {
   auto registry = OperationRegistry::Instance();
+  registry->Register("argmax", argmax);
   registry->Register("convolution", convolution);
+  registry->Register("dot", dot);
   registry->Register("mean", mean);
   registry->Register("pool", pool);
+  registry->Register("relu", relu);
+  registry->Register("softmax", softmax);
   registry->Register("square", square);
   registry->Register("sum", sum);
 }

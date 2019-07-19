@@ -75,6 +75,13 @@ void RegisterDerivs() {
   RegisterTensorDeriv("cmp_ge", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
   });
+  RegisterTensorDeriv("cond", [](DERIV_ARGS) {  //
+    return Tensors{
+        zero(),
+        select(X[0], DY, zero()),
+        select(X[0], zero(), DY),
+    };
+  });
   RegisterTensorDeriv("cos", [](DERIV_ARGS) {  //
     return Tensors{-sin(X[0]) * DY};
   });
@@ -128,16 +135,6 @@ void RegisterDerivs() {
   });
   RegisterTensorDeriv("recip", [](DERIV_ARGS) {  //
     return Tensors{-Y * Y * DY};
-  });
-  RegisterTensorDeriv("relu", [](DERIV_ARGS) {  //
-    return Tensors{select(Y <= 0.0, Tensor{0.0}, DY)};
-  });
-  RegisterTensorDeriv("select", [](DERIV_ARGS) {  //
-    return Tensors{
-        zero(),
-        select(X[0], DY, zero()),
-        select(X[0], zero(), DY),
-    };
   });
   RegisterTensorDeriv("shape", [](DERIV_ARGS) {  //
     return Tensors{zero()};

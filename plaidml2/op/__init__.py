@@ -21,10 +21,26 @@ def op(op_name, args):
     return edsl.Value(ffi_call(lib.plaidml_op_make, op_name.encode(), value.as_ptr()))
 
 
+def argmax(x, axis=-1):
+    return op('argmax', [x, axis]).as_tensor()
+
+
+def dot(x, y):
+    return op('dot', [x, y]).as_tensor()
+
+
 def mean(I, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
-    return op("mean", [I, axis, keepdims]).as_tensor()
+    return op('mean', [I, axis, keepdims]).as_tensor()
+
+
+def relu(x, alpha=None, max_value=None, threshold=0.):
+    return op('relu', [x, alpha, max_value, threshold]).as_tensor()
+
+
+def softmax(x, axis=None):
+    return op('softmax', [x, axis]).as_tensor()
 
 
 def pool(I, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,
@@ -48,4 +64,4 @@ def square(I):
 def sum(I, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
-    return op("sum", [I, axis, keepdims]).as_tensor()
+    return op('sum', [I, axis, keepdims]).as_tensor()

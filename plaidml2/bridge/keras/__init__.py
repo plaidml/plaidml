@@ -13,8 +13,7 @@ import plaidml2.edsl as edsl
 import plaidml2.exec as plaidml_exec
 import plaidml2.op as plaidml_op
 import plaidml2.settings as plaidml_settings
-from keras.backend.common import floatx
-from keras.backend.common import image_data_format
+from keras.backend.common import epsilon, floatx, image_data_format
 from keras.backend.common import set_floatx as keras_set_floatx
 
 logger = logging.getLogger(__name__)
@@ -24,6 +23,8 @@ logger = logging.getLogger(__name__)
 _UID_PREFIX_DICT = defaultdict(int)
 
 _NAME_SCOPE_STACK = []
+
+_CONV_DATA_FORMAT = ['channels_first', 'channels_last']
 
 _device = plaidml_settings.get('PLAIDML_DEVICE')
 _target = plaidml_settings.get('PLAIDML_TARGET')
@@ -169,6 +170,7 @@ class _KerasNode(object):
         return self.__binary_op('cmp_lt', other, lambda x, y: x < y)
 
     def __binary_op(self, op, other, fn):
+        logger.debug('{}(self: {}, other: {})'.format(op, self, other))
         if isinstance(other, _KerasNode):
             other = other.tensor
         return _KerasNode(op, tensor=fn(self.tensor, other))
@@ -198,6 +200,10 @@ def _report_unimplemented(name):
     raise NotImplementedError(report)
 
 
+class PlaidMLKerasException(Exception):
+    pass
+
+
 def abs(x):
     _report_unimplemented('abs')
 
@@ -215,7 +221,8 @@ def arange(start, stop=None, step=1, dtype='int32'):
 
 
 def argmax(x, axis=-1):
-    _report_unimplemented('argmax')
+    logger.debug('argmax(x: {}, axis: {})'.format(x, axis))
+    return _KerasNode('argmax', tensor=plaidml_op.argmax(x.tensor, axis))
 
 
 def argmin(x, axis=-1):
@@ -247,7 +254,25 @@ def batch_normalization(x, mean, var, beta, gamma, axis=-1, epsilon=1e-3):
 
 
 def bias_add(x, bias, data_format=None):
-    _report_unimplemented('bias_add')
+    logger.debug('bias_add(x: {}, bias: {}, data_format: {})'.format(x, bias, data_format))
+    if data_format is None:
+        data_format = image_data_format()
+    if data_format not in _CONV_DATA_FORMAT:
+        raise PlaidMLKerasException(
+            "Unrecognized data_format given to bias_add: '{}'; ".format(data_format) +
+            "only 'channels_first' and 'channels_last' recognized.")
+    if ndim(x) > 2:
+        if data_format == 'channels_first':
+            try:
+                bias_dims = bias.tensor.shape.dims
+            except AttributeError:
+                bias_dims = bias.shape
+            x += reshape(bias, (1, bias_dims[0]) + (1,) * (ndim(x) - 2))
+        elif data_format == 'channels_last':
+            x += bias
+    else:
+        x += bias
+    return x
 
 
 def binary_crossentropy(target, output, from_logits=False):
@@ -280,7 +305,28 @@ def cast(x, dtype):
 
 
 def categorical_crossentropy(target, output, from_logits=False):
-    _report_unimplemented('categorical_crossentropy')
+    logger.debug('categorical_crossentropy(target: {}, output: {}, from_logits: {})'.format(
+        target, output, from_logits))
+    if from_logits:
+        output = softmax(output)
+    elif output.opname != 'softmax':
+        output /= sum(output, axis=(-1,), keepdims=True)
+        output = clip(output, epsilon(), 1.0 - epsilon())
+    T = target.tensor
+    O = output.tensor
+    ndims = O.shape.ndims
+    fixed_dims = edsl.TensorDims(ndims - 1)
+    fixed_idxs = edsl.TensorIndexes(ndims - 1)
+    Y = edsl.TensorDim()
+    y = edsl.TensorIndex()
+    input_dims = fixed_dims + [Y]
+    O.bind_dims(*input_dims)
+    T.bind_dims(*input_dims)
+    LO = edsl.log(O)
+    TR = edsl.TensorOutput(*fixed_dims)
+    TR[fixed_idxs] += T[fixed_idxs + [y]] * LO[fixed_idxs + [y]]
+    R = -TR
+    return _KerasNode('categorical_crossentropy', tensor=R)
 
 
 def ceil(x):
@@ -372,7 +418,11 @@ def conv3d_transpose(x,
 
 
 def count_params(x):
-    _report_unimplemented('count_params')
+    logger.debug('count_params(x: {})'.format(x))
+    result = 1
+    for dim in x.tensor.shape.int_dims:
+        result *= dim
+    return result
 
 
 def ctc_batch_cost(y_true, y_pred, input_length, label_length):
@@ -411,7 +461,8 @@ def depthwise_conv2d(x,
 
 
 def dot(x, y, name=None):
-    _report_unimplemented('dot')
+    logger.debug('dot(x: {}, y: {}, name: {})'.format(x, y, name))
+    return _KerasNode('dot', tensor=plaidml_op.dot(x.tensor, y.tensor), name=name)
 
 
 def dropout(x, level, noise_shape=None, seed=None):
@@ -441,7 +492,8 @@ def elu(x, alpha=1.0):
 
 
 def equal(x, y):
-    _report_unimplemented('equal')
+    logger.debug('equal(x: {}, y: {})'.format(x, y))
+    return _KerasNode('equal', tensor=(x.tensor == y.tensor))
 
 
 def exp(x):
@@ -783,7 +835,7 @@ def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
 def relu(x, alpha=None, max_value=None, threshold=0.):
     logger.debug('relu(x: {}, alpha: {}, max_value: {}, threshold: {})'.format(
         x, alpha, max_value, threshold))
-    _report_unimplemented('relu')
+    return _KerasNode('relu', tensor=plaidml_op.relu(x.tensor, alpha, max_value, threshold))
 
 
 def repeat(x, n):
@@ -899,7 +951,9 @@ def sin(x):
 
 
 def softmax(x):
-    _report_unimplemented('softmax')
+    logger.debug('softmax(x: {})'.format(x))
+    y = plaidml_op.softmax(x.tensor, axis=x.tensor.shape.ndims - 1)
+    return _KerasNode('softmax', tensor=y)
 
 
 def softplus(x):
@@ -996,14 +1050,17 @@ def truncated_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
 
 
 def update(x, new_x):
-    _report_unimplemented('update')
+    logger.debug('update(x: {}, new_x: {})'.format(x, new_x))
+    return (x, new_x)
 
 
 def update_add(x, increment):
+    logger.debug('update_add(x: {}, increment: {})'.format(x, increment))
     return (x, x + increment)
 
 
 def update_sub(x, decrement):
+    logger.debug('update_sub(x: {}, decrement: {})'.format(x, decrement))
     return (x, x - decrement)
 
 
