@@ -277,7 +277,6 @@ PLAIDML_EDSL_API void plaidml_expr_gradient(  //
     plaidml_error* err,                       //
     size_t nwrts,                             //
     plaidml_expr** wrts,                      //
-    plaidml_expr* result,                     //
     plaidml_expr* loss,                       //
     plaidml_expr** derivs);
 
@@ -304,7 +303,10 @@ PLAIDML_EDSL_API plaidml_program* plaidml_program_evaluate(  //
     const char* name,                                        //
     size_t noutputs,                                         //
     plaidml_expr** outputs,                                  //
-    plaidml_expr** new_outputs);
+    plaidml_expr** new_outputs,                              //
+    size_t nupdates,                                         //
+    plaidml_expr** src_updates,                              //
+    plaidml_expr** dst_updates);
 
 PLAIDML_EDSL_API plaidml_string* plaidml_program_repr(  //
     plaidml_error* err,                                 //

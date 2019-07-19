@@ -15,13 +15,9 @@ using TensorDeriv = std::vector<Tensor> (*)(  //
     const Tensor& dY,                         //
     const std::vector<Tensor>& Xs);
 
-// Given a forward pass tensor operation that takes inputs `wrt` and produces output `result`,
-// and an already computed gradient `loss` of `result`,
+// Given a forward pass tensor operation that takes inputs `wrt` and produces output `loss`,
 // compute the gradients for each Tensor in `wrt`.
-inline std::vector<Tensor> Gradient(  //
-    const std::vector<Tensor>& wrt,   //
-    const Tensor& result,             //
-    const Tensor& loss) {
+inline std::vector<Tensor> Gradient(const std::vector<Tensor>& wrt, const Tensor& loss) {
   std::vector<plaidml_expr*> wrt_exprs(wrt.size());
   std::vector<plaidml_expr*> deriv_exprs(wrt.size());
   for (size_t i = 0; i < wrt.size(); ++i) {
@@ -31,7 +27,6 @@ inline std::vector<Tensor> Gradient(  //
       plaidml_expr_gradient,  //
       wrt_exprs.size(),       //
       wrt_exprs.data(),       //
-      result.as_ptr(),        //
       loss.as_ptr(),          //
       deriv_exprs.data());
   std::vector<Tensor> ret(wrt.size());

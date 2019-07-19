@@ -9,6 +9,7 @@
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -71,7 +72,10 @@ inline void init() {
 
 class Program {
  public:
-  Program(const std::string& name, const std::vector<Tensor>& outputs);
+  Program(                                 //
+      const std::string& name,             //
+      const std::vector<Tensor>& outputs,  //
+      const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
   plaidml_program* as_ptr() const { return ptr_.get(); }
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
   const void* runinfo() const { return ffi::call<const void*>(plaidml_program_runinfo, ptr_.get()); }
@@ -711,7 +715,11 @@ class TensorFriend {
   }
 };
 
-inline Program::Program(const std::string& name, const std::vector<Tensor>& outputs) : outputs_(outputs.size()) {
+inline Program::Program(                 //
+    const std::string& name,             //
+    const std::vector<Tensor>& outputs,  //
+    const std::vector<std::tuple<Tensor, Tensor>>& updates)
+    : outputs_(outputs.size()) {
   std::vector<plaidml_expr*> raw_outputs(outputs.size());
   std::vector<plaidml_expr*> new_outputs(outputs.size());
   for (size_t i = 0; i < raw_outputs.size(); i++) {
@@ -723,12 +731,21 @@ inline Program::Program(const std::string& name, const std::vector<Tensor>& outp
     }
     raw_outputs[i] = ptr;
   }
+  std::vector<plaidml_expr*> src_updates;
+  std::vector<plaidml_expr*> dst_updates;
+  for (size_t i = 0; i < updates.size(); i++) {
+    dst_updates[i] = std::get<0>(updates[i]).as_ptr();
+    src_updates[i] = std::get<1>(updates[i]).as_ptr();
+  }
   ptr_ = details::make_plaidml_program(ffi::call<plaidml_program*>(  //
       plaidml_program_evaluate,                                      //
       name.c_str(),                                                  //
       raw_outputs.size(),                                            //
       raw_outputs.data(),                                            //
-      new_outputs.data()));
+      new_outputs.data(),                                            //
+      updates.size(),                                                //
+      src_updates.data(),                                            //
+      dst_updates.data()));
   for (size_t i = 0; i < new_outputs.size(); i++) {
     outputs_[i] = Tensor(new_outputs[i]);
   }

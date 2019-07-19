@@ -30,9 +30,9 @@ class AstPass : public AstVisitor<ExprPtr> {
   }
 };
 
-std::vector<ExprPtr> FlattenAst(const std::vector<ExprPtr>& exprs);
+std::vector<ExprPtr> FlattenAst(const ProgramMutations& mutations);
 
-std::vector<ExprPtr> RunAstPass(const std::vector<ExprPtr>& outputs, AstPass* pass);
+ProgramMutations RunAstPass(const ProgramMutations& mutations, AstPass* pass);
 
 }  // namespace ast
 }  // namespace lang

@@ -502,18 +502,17 @@ void plaidml_expr_gradient(  //
     plaidml_error* err,      //
     size_t nwrts,            //
     plaidml_expr** wrts,     //
-    plaidml_expr* result,    //
     plaidml_expr* loss,      //
     plaidml_expr** derivs) {
-  // Given a forward pass tensor operation that takes `nwrt` inputs given in `wrt` and produces the output `result`,
-  // along with an already-computed derivative `loss` of `result`, produce the derivatives for each tensor in `wrt` and
-  // store these `nwrt` derivatives in `derivs` in the corresponding order as they were received in `wrt`.
+  // Given a forward pass tensor operation that takes `nwrt` inputs given in `wrt` and produces the output `loss`,
+  // produce the derivatives for each tensor in `wrt` and store these `nwrt` derivatives in `derivs` in the
+  // corresponding order as they were received in `wrt`.
   ffi_wrap_void(err, [&] {
     std::vector<ExprPtr> wrt_exprs(nwrts);
     for (size_t i = 0; i < nwrts; i++) {
       wrt_exprs[i] = wrts[i]->expr;
     }
-    auto deriv_exprs = ComputeGradients(wrt_exprs, result->expr, loss->expr);
+    auto deriv_exprs = ComputeGradients(wrt_exprs, loss->expr);
     for (size_t i = 0; i < nwrts; i++) {
       derivs[i] = new plaidml_expr{deriv_exprs[i]};
     }
@@ -698,16 +697,33 @@ plaidml_program* plaidml_program_evaluate(  //
     const char* name,                       //
     size_t noutputs,                        //
     plaidml_expr** raw_outputs,             //
-    plaidml_expr** new_outputs) {
+    plaidml_expr** new_outputs,             //
+    size_t nupdates,                        //
+    plaidml_expr** src_updates,             //
+    plaidml_expr** dst_updates) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
+    ProgramMutations mutations;
     std::vector<ExprPtr> outputs(noutputs);
     for (size_t i = 0; i < noutputs; i++) {
       if (!raw_outputs[i]) {
-        throw std::runtime_error("Undefined expression in plaidml_program_evaluate");
+        throw std::runtime_error("Undefined output in plaidml_program_evaluate");
       }
-      outputs[i] = raw_outputs[i]->expr;
+      mutations.outputs.emplace_back(raw_outputs[i]->expr);
     }
-    auto ret = new plaidml_program{Evaluate(name, outputs)};
+    std::vector<ProgramUpdate> updates(nupdates);
+    for (size_t i = 0; i < nupdates; i++) {
+      if (!src_updates[i]) {
+        throw std::runtime_error("Undefined update src in plaidml_program_evaluate");
+      }
+      if (!dst_updates[i]) {
+        throw std::runtime_error("Undefined update dst in plaidml_program_evaluate");
+      }
+      mutations.updates.emplace_back(ProgramUpdate{src_updates[i]->expr, dst_updates[i]->expr});
+    }
+    auto ret = new plaidml_program{Evaluate(name, mutations)};
+    if (noutputs != ret->eval.outputs.size()) {
+      throw std::runtime_error("Internal error: noutputs != ret->eval.outputs.size()");
+    }
     for (size_t i = 0; i < noutputs; i++) {
       new_outputs[i] = new plaidml_expr{ret->eval.outputs[i]};
     }

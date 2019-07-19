@@ -382,7 +382,17 @@ struct ProgramEvaluation {
   std::unordered_map<std::string, const ParamExpr*> updates;
 };
 
-ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& outputs);
+struct ProgramUpdate {
+  ExprPtr src;
+  ExprPtr dst;
+};
+
+struct ProgramMutations {
+  std::vector<ExprPtr> outputs;
+  std::vector<ProgramUpdate> updates;
+};
+
+ProgramEvaluation Evaluate(const std::string& name, ProgramMutations mutations);
 
 std::ostream& operator<<(std::ostream& os, const Expr* expr);
 

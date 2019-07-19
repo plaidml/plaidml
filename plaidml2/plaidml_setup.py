@@ -98,7 +98,7 @@ Please choose a default device:
 
     program = edsl.Program('plaidml_setup', [A])
 
-    def run(program, inputs, outputs):
+    def run(program, inputs):
 
         def make_buffer(tensor):
             # convert LogicalShape into TensorShape
@@ -106,12 +106,12 @@ Please choose a default device:
             return plaidml.Buffer(device, shape)
 
         ibindings = [(x, make_buffer(x)) for x, y in inputs]
-        obindings = [(x, make_buffer(x)) for x in outputs]
+        obindings = [(x, make_buffer(x)) for x in program.outputs]
 
         exe = plaidml_exec.Executable(program, device, target, ibindings, obindings)
         return [x.as_ndarray() for x in exe([y for x, y in inputs])]
 
-    run(program, [(B, np.random.rand(3, 3)), (C, np.random.rand(3, 3))], [A])
+    run(program, [(B, np.random.rand(3, 3)), (C, np.random.rand(3, 3))])
     print("Whew. That worked.")
     print()
 

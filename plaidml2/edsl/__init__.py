@@ -506,15 +506,20 @@ class Program(ForeignObject):
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 
-    def __init__(self, name, outputs):
+    def __init__(self, name, outputs, updates=[]):
         raw_outputs = [x.as_ptr() for x in outputs]
         new_outputs = ffi.new('plaidml_expr*[]', len(outputs))
+        dst_updates = [x[0].as_ptr() for x in updates]
+        src_updates = [x[1].as_ptr() for x in updates]
         ffi_obj = ffi_call(
             lib.plaidml_program_evaluate,
             name.encode(),
             len(raw_outputs),
             raw_outputs,
             new_outputs,
+            len(updates),
+            src_updates,
+            dst_updates,
         )
         self.outputs = [Tensor(expr=x) for x in new_outputs]
         super(Program, self).__init__(ffi_obj)
@@ -577,13 +582,11 @@ def gather(x, y):
 def gradients(loss, variables):
     wrts = [x.as_ptr() for x in variables]
     raw_grads = ffi.new('plaidml_expr*[]', len(wrts))
-    initial_loss = Tensor(value=1.0)
     ffi_call(
         lib.plaidml_expr_gradient,
         len(wrts),
         wrts,
         loss.as_ptr(),
-        initial_loss.as_ptr(),
         raw_grads,
     )
     return [Tensor(expr=x) for x in raw_grads]

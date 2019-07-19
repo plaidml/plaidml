@@ -12,9 +12,13 @@ namespace ast {
 
 class AstTraversal : public AstVisitor<void> {
  public:
-  explicit AstTraversal(const std::vector<ExprPtr>& outputs) {
-    for (const auto& expr : outputs) {
+  explicit AstTraversal(const ProgramMutations& mutations) {
+    for (const auto& expr : mutations.outputs) {
       Push(expr);
+    }
+    for (const auto& update : mutations.updates) {
+      Push(update.src);
+      Push(update.dst);
     }
     while (stack_.size()) {
       auto entry = stack_.top();
@@ -72,29 +76,35 @@ class AstTraversal : public AstVisitor<void> {
   std::unordered_set<const Expr*> seen_;
 };
 
-std::vector<ExprPtr> FlattenAst(const std::vector<ExprPtr>& exprs) {
-  AstTraversal traversal(exprs);
+std::vector<ExprPtr> FlattenAst(const ProgramMutations& mutations) {
+  AstTraversal traversal(mutations);
   return traversal.flat();
 }
 
 class AstPassRunner : AstVisitor<void> {
  public:
-  AstPassRunner(                            //
-      const std::vector<ExprPtr>& ast,      //
-      const std::vector<ExprPtr>& outputs,  //
+  AstPassRunner(                          //
+      const std::vector<ExprPtr>& ast,    //
+      const ProgramMutations& mutations,  //
       AstPass* pass)
       : pass_(pass) {
     for (const auto& expr : ast) {
       expr->Accept(this);
     }
-    for (const auto& output : outputs) {
+    for (const auto& output : mutations.outputs) {
       auto new_output = Translate(output);
       IVLOG(4, "AstPassRunner> output: " << output << " -> " << new_output);
-      outputs_.emplace_back(new_output);
+      mutations_.outputs.emplace_back(new_output);
+    }
+    for (const auto& update : mutations.updates) {
+      ProgramUpdate new_update{Translate(update.src), Translate(update.dst)};
+      IVLOG(4, "AstPassRunner> update.src: " << update.src << " -> " << new_update.src);
+      IVLOG(4, "AstPassRunner> update.dst: " << update.dst << " -> " << new_update.dst);
+      mutations_.updates.emplace_back(new_update);
     }
   }
 
-  const std::vector<ExprPtr>& outputs() const { return outputs_; }
+  const ProgramMutations& mutations() const { return mutations_; }
 
  private:
   void Visit(const CallExpr& expr) final {
@@ -161,13 +171,13 @@ class AstPassRunner : AstVisitor<void> {
  private:
   AstPass* pass_;
   std::unordered_map<const Expr*, ExprPtr> rewrites_;
-  std::vector<ExprPtr> outputs_;
+  ProgramMutations mutations_;
 };
 
-std::vector<ExprPtr> RunAstPass(const std::vector<ExprPtr>& outputs, AstPass* pass) {
-  auto ast = FlattenAst(outputs);
-  AstPassRunner runner(ast, outputs, pass);
-  return runner.outputs();
+ProgramMutations RunAstPass(const ProgramMutations& mutations, AstPass* pass) {
+  auto ast = FlattenAst(mutations);
+  AstPassRunner runner(ast, mutations, pass);
+  return runner.mutations();
 }
 
 }  // namespace ast

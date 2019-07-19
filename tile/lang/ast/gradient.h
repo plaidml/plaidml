@@ -54,10 +54,7 @@ class DerivRegistry {
   std::unordered_map<std::string, ExprDerivEntry> registry_;
 };
 
-std::vector<ExprPtr> ComputeGradients(  //
-    const std::vector<ExprPtr>& wrts,   //
-    const ExprPtr& result,              //
-    const ExprPtr& loss);
+std::vector<ExprPtr> ComputeGradients(const std::vector<ExprPtr>& wrts, const ExprPtr& loss);
 
 }  // namespace ast
 }  // namespace lang

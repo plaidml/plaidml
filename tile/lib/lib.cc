@@ -15,7 +15,7 @@ using namespace plaidml::edsl;  // NOLINT
 namespace {
 
 lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
-  Program program(name, vars);
+  Program program(name, vars, {});
   return *static_cast<const tile::lang::RunInfo*>(program.runinfo());
 }
 

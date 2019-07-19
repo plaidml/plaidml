@@ -288,15 +288,15 @@ class ProgramEvaluator : public AstVisitor<void> {
     eval_.runinfo.program_name = name;
   }
 
-  ProgramEvaluation Evaluate(const std::vector<ExprPtr>& outputs) {
+  ProgramEvaluation Evaluate(const ProgramMutations& mutations) {
     ShapeEvaluator evaluator(&bindings_by_expr_);
     // Traverse the entire graph in least-dependent to most-dependent order.
-    auto ast = FlattenAst(outputs);
+    auto ast = FlattenAst(mutations);
     for (const auto& expr : ast) {
       expr->Accept(&evaluator);
       expr->Accept(this);
     }
-    for (const auto& expr : outputs) {
+    for (const auto& expr : mutations.outputs) {
       // At this point, it should be guaranteed that the output expressions have been visited.
       auto name = safe_at(&eval_.names_by_expr, expr.get());
       auto shape = safe_at(&bindings_by_expr_, expr.get()).shape;
@@ -304,6 +304,18 @@ class ProgramEvaluator : public AstVisitor<void> {
       eval_.runinfo.output_shapes.emplace(name, shape);
       eval_.runinfo.program.outputs.push_back(name);
       eval_.outputs.push_back(expr);
+    }
+    for (const auto& update : mutations.updates) {
+      auto src_name = safe_at(&eval_.names_by_expr, update.src.get());
+      auto src_shape = safe_at(&bindings_by_expr_, update.src.get()).shape;
+      auto dst_expr = std::dynamic_pointer_cast<ParamExpr>(update.dst);
+      if (!dst_expr) {
+        throw std::runtime_error("Updates can only have ParamExpr destinations.");
+      }
+      IVLOG(2, "Update> " << src_name << ": " << src_shape);
+      eval_.updates.emplace(src_name, dst_expr.get());
+      eval_.runinfo.output_shapes.emplace(src_name, src_shape);
+      eval_.runinfo.program.outputs.push_back(src_name);
     }
     for (const auto& kvp : eval_.names_by_expr) {
       auto name = kvp.second;
@@ -547,19 +559,15 @@ class ExprOptimizer : public AstPass {
   }
 };
 
-ProgramEvaluation Evaluate(const std::string& name, const std::vector<ExprPtr>& outputs) {
-  std::vector<ExprPtr> new_outputs(outputs.size());
-  for (size_t i = 0; i < outputs.size(); i++) {
-    auto param_expr = std::dynamic_pointer_cast<ParamExpr>(outputs[i]);
+ProgramEvaluation Evaluate(const std::string& name, ProgramMutations mutations) {
+  for (size_t i = 0; i < mutations.outputs.size(); i++) {
+    auto param_expr = std::dynamic_pointer_cast<ParamExpr>(mutations.outputs[i]);
     if (param_expr) {
-      new_outputs[i] = MakeCall("ident", {outputs[i]});
-    } else {
-      new_outputs[i] = outputs[i];
+      mutations.outputs[i] = MakeCall("ident", {mutations.outputs[i]});
     }
   }
   ExprOptimizer optimizer;
-  new_outputs = RunAstPass(new_outputs, &optimizer);
-  return ProgramEvaluator(name).Evaluate(new_outputs);
+  return ProgramEvaluator(name).Evaluate(RunAstPass(mutations, &optimizer));
 }
 
 std::string LogicalShape::str() const {
@@ -626,7 +634,7 @@ IntConst::IntConst(int64_t value) : Expr(LogicalShape{DataType::INT32}), value(v
 
 std::string IntConst::str() const {
   std::stringstream ss;
-  ss << value;
+  ss << "int(" << value << ")";
   return ss.str();
 }
 
@@ -634,7 +642,7 @@ FloatConst::FloatConst(double value) : Expr(LogicalShape{DataType::FLOAT32}), va
 
 std::string FloatConst::str() const {
   std::stringstream ss;
-  ss << value;
+  ss << "float(" << value << ")";
   return ss.str();
 }
 
@@ -692,14 +700,7 @@ void CallExpr::ComputeShape() {
 
 std::string CallExpr::str() const {
   std::stringstream ss;
-  ss << fn << "(";
-  for (size_t i = 0; i < args.size(); i++) {
-    if (i) {
-      ss << ", ";
-    }
-    ss << args[i]->str();
-  }
-  ss << ")";
+  ss << fn << "()";
   return ss.str();
 }
 
