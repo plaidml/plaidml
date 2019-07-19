@@ -21,9 +21,12 @@ Driver::Driver(const context::Context& ctx) {
   ocl::GetPlatformIDs(platforms.size(), platforms.data(), nullptr);
 
   for (std::uint32_t pidx = 0; pidx < platforms.size(); ++pidx) {
-    auto device_set = std::make_shared<DeviceSet>(enumerating.ctx(), pidx, platforms[pidx]);
-    if (device_set->devices().size()) {
-      device_sets_.emplace_back(std::move(device_set));
+    if (CLPlatformInfo<CL_PLATFORM_VERSION, std::string>::Read(platforms[pidx]).compare(PLAIDML_MIN_OPENCL_VERSION) >=
+        0) {
+      auto device_set = std::make_shared<DeviceSet>(enumerating.ctx(), pidx, platforms[pidx]);
+      if (device_set->devices().size()) {
+        device_sets_.emplace_back(std::move(device_set));
+      }
     }
   }
 }

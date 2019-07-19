@@ -11,8 +11,6 @@
 #include "base/util/error.h"
 #include "tile/hal/opencl/info.h"
 
-#define PLAIDML_MIN_OPENCL_VERSION "OpenCL 1.2"
-
 namespace vertexai {
 namespace tile {
 namespace hal {

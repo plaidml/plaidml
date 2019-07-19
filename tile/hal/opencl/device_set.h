@@ -13,6 +13,8 @@
 #include "tile/hal/opencl/ocl.h"
 #include "tile/hal/opencl/opencl.pb.h"
 
+#define PLAIDML_MIN_OPENCL_VERSION "OpenCL 1.2"
+
 namespace vertexai {
 namespace tile {
 namespace hal {
