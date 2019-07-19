@@ -561,20 +561,20 @@ TEST(CppEdsl, GradientDot) {
   auto O = Dot(A, B);
   auto A_dims = A.shape().int_dims();
   auto B_dims = B.shape().int_dims();
-  Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {A_dims[0], B_dims[1]}));
-  auto grads = Gradient({A, B}, O, dO);
+  auto grads = Gradient({A, B}, O);
   Program program("gradient_dot", {grads});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
-  dO[dO_0, dO_1],
   B[B_0, B_1]
 ) -> (
-  _X1,
-  _X0
+  _X3,
+  _X2
 ) {
-  _X0[x1, x2 : 100, 100] = +(A[x0, x1] * dO[x0, x2]);
-  _X1[x0, x2 : 100, 100] = +(dO[x0, x1] * B[x2, x1]);
+  _X0 = 1.000000;
+  _X1[x0, x1 : 100, 100] = +(_X0[]);
+  _X2[x1, x2 : 100, 100] = +(A[x0, x1] * _X1[x0, x2]);
+  _X3[x0, x2 : 100, 100] = +(_X1[x0, x1] * B[x2, x1]);
 }
 )"));
 }
@@ -596,27 +596,27 @@ TEST(CppEdsl, GradientMultiDot) {
   auto D = Dot(A, C);
   auto O = Max2Da0(D);
   auto B_dims = B.shape().int_dims();
-  Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {B_dims[1]}));
-  auto grads = Gradient({A, B}, O, dO);
+  auto grads = Gradient({A, B}, O);
   Program program("gradient_dot", {grads});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
-  B[B_0, B_1],
-  dO[dO_0]
+  B[B_0, B_1]
 ) -> (
-  _X7,
-  _X4
+  _X9,
+  _X6
 ) {
   _X0[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
   _X1[x0, x2 : 100, 100] = +(A[x0, x1] * _X0[x1, x2]);
   O[n : 100] = >(_X1[m, n]);
-  _X2[m, n : 100, 100] = +(_X1[m, n] == O[n] ? dO[n]);
-  _X3[x1, x2 : 100, 100] = +(A[x0, x1] * _X2[x0, x2]);
-  _X4[x1, x2 : 100, 100] = +(A[x0, x1] * _X3[x0, x2]);
-  _X5[x0, x2 : 100, 100] = +(_X2[x0, x1] * _X0[x2, x1]);
-  _X6[x0, x2 : 100, 100] = +(_X3[x0, x1] * B[x2, x1]);
-  _X7 = add(_X5, _X6);
+  _X2 = 1.000000;
+  _X3[x0 : 100] = +(_X2[]);
+  _X4[m, n : 100, 100] = +(_X1[m, n] == O[n] ? _X3[n]);
+  _X5[x1, x2 : 100, 100] = +(A[x0, x1] * _X4[x0, x2]);
+  _X6[x1, x2 : 100, 100] = +(A[x0, x1] * _X5[x0, x2]);
+  _X7[x0, x2 : 100, 100] = +(_X4[x0, x1] * _X0[x2, x1]);
+  _X8[x0, x2 : 100, 100] = +(_X5[x0, x1] * B[x2, x1]);
+  _X9 = add(_X7, _X8);
 }
 )"));
 }
@@ -628,25 +628,25 @@ TEST(CppEdsl, GradientDotSqrt) {
   auto O = sqrt(C);
   auto A_dims = A.shape().int_dims();
   auto B_dims = B.shape().int_dims();
-  Tensor dO("dO", LogicalShape(PLAIDML_DATA_FLOAT32, {A_dims[0], B_dims[1]}));
-  auto grads = Gradient({A, B}, O, dO);
+  auto grads = Gradient({A, B}, O);
   Program program("gradient_dot", {grads});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
-  dO[dO_0, dO_1],
   B[B_0, B_1]
 ) -> (
-  _X6,
-  _X5
+  _X8,
+  _X7
 ) {
-  _X0 = 2;
-  _X1[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
-  _X2 = sqrt(_X1);
-  _X3 = mul(_X0, _X2);
-  _X4 = div(dO, _X3);
-  _X5[x1, x2 : 100, 100] = +(A[x0, x1] * _X4[x0, x2]);
-  _X6[x0, x2 : 100, 100] = +(_X4[x0, x1] * B[x2, x1]);
+  _X0 = 1.000000;
+  _X1[x0, x1 : 100, 100] = +(_X0[]);
+  _X2 = 2;
+  _X3[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
+  _X4 = sqrt(_X3);
+  _X5 = mul(_X2, _X4);
+  _X6 = div(_X1, _X5);
+  _X7[x1, x2 : 100, 100] = +(A[x0, x1] * _X6[x0, x2]);
+  _X8[x0, x2 : 100, 100] = +(_X6[x0, x1] * B[x2, x1]);
 }
 )"));
 }
