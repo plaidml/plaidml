@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+
+import argparse
+import platform
+
+BAZELRC = '.bazelrc.configure'
+
+DEFAULT_VARIANTS = {
+    'Darwin': 'macos_x86_64',
+    'Linux': 'linux_x86_64',
+    'Windows': 'windows_x86_64',
+}
+
+DEFAULT_UNIX_PATH = 'PATH=/usr/local/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+
+def is_linux():
+    return platform.system() == 'Linux'
+
+
+def is_macos():
+    return platform.system() == 'Darwin'
+
+
+def is_windows():
+    return platform.system() == 'Windows'
+
+
+def write_to_bazelrc(line):
+    with open(BAZELRC, 'a') as f:
+        f.write(line + '\n')
+
+
+def choice_prompt(question, choices, default):
+    inp = ""
+    while not inp in choices:
+        inp = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
+        if not inp:
+            inp = default
+        elif inp not in choices:
+            print("Invalid choice: {}".format(inp))
+    return inp
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    args = parser.parse_args()
+
+    print("Configuring PlaidML build environment")
+    print()
+
+    # reset custom config settings
+    open(BAZELRC, 'w').close()
+
+    variant = DEFAULT_VARIANTS.get(platform.system())
+
+    print('Using variant: {}'.format(variant))
+    print()
+    write_to_bazelrc('build --config={}'.format(variant))
+
+    bazel_cache = input("Enter a bazel cache server URL (leave blank to disable): ")
+    if bazel_cache:
+        write_to_bazelrc('build --remote_cache={}'.format(bazel_cache))
+        if is_windows():
+            pass
+        else:
+            write_to_bazelrc('build --action_env={}'.format(DEFAULT_UNIX_PATH))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

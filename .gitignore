@@ -109,3 +109,7 @@ ENV/
 
 # Visual Studio Code
 .vscode
+
+# .bazelrc files
+.bazelrc.configure
+.bazelrc.user

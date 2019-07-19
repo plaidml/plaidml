@@ -11,6 +11,7 @@ test --genrule_strategy=standalone
 run --genrule_strategy=standalone
 
 build --distinct_host_configuration=false
+build:ro --remote_upload_local_results=false
 
 build --action_env=LC_ALL # This is to allow plaidbench to work on *nix under python3
 build --action_env=LANG # This is to allow plaidbench to work on *nix under python3
@@ -41,17 +42,17 @@ build:linux_x86_64 --host_crosstool_top=@toolchain//:toolchain
 build:linux_x86_64 --build_tag_filters=-darwin,-metal,-msvc,-pytorch
 test:linux_x86_64 --test_tag_filters=-darwin,-metal,-msvc,-pytorch
 
-build:macos_x86_64 --apple_platform_type=macos
 build:macos_x86_64 --cpu=darwin_x86_64
-build:macos_x86_64 --build_tag_filters=-large,-linux,-darwin_fail,-msvc,-opengl
-test:macos_x86_64 --test_tag_filters=-large,-linux,-darwin_fail,-msvc,-opengl
+build:macos_x86_64 --apple_platform_type=macos
+build:macos_x86_64 --build_tag_filters=-large,-linux,-msvc
+test:macos_x86_64 --test_tag_filters=-large,-linux,-msvc
 
-build:windows_x86_64 --build_tag_filters=-darwin,-deb,-docs,-graphviz,-linux,-metal,-opengl,-shell
+build:windows_x86_64 --build_tag_filters=-darwin,-deb,-docs,-graphviz,-linux,-metal,-shell
 build:windows_x86_64 --action_env=CONDA_EXE
 build:windows_x86_64 --action_env=CONDA_PREFIX
 build:windows_x86_64 --action_env=NUMBER_OF_PROCESSORS
 build:windows_x86_64 --action_env=PLAIDML_SETTINGS
-test:windows_x86_64 --test_tag_filters=-darwin,-deb,-docs,-graphviz,-linux,-metal,-opengl,-shell,-windows_path_fail
+test:windows_x86_64 --test_tag_filters=-darwin,-deb,-docs,-graphviz,-linux,-metal,-shell,-windows_path_fail
 test:windows_x86_64 --test_env=CONDA_EXE
 test:windows_x86_64 --test_env=CONDA_PREFIX
 test:windows_x86_64 --test_env=NUMBER_OF_PROCESSORS
