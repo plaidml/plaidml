@@ -6,9 +6,9 @@
 #include <string>
 
 #include "plaidml2/core/ffi.h"
+#include "tile/base/platform.h"
 #include "tile/base/shape.h"
 #include "tile/lang/ast/ast.h"
-#include "tile/platform/local_machine/platform.h"
 
 extern "C" {
 
@@ -41,7 +41,7 @@ struct plaidml_view {
 namespace plaidml {
 namespace core {
 
-vertexai::tile::local_machine::Platform* GetPlatform();
+vertexai::tile::Platform* GetPlatform();
 
 template <typename T, typename F>
 T ffi_wrap(plaidml_error* err, T val, F fn) {

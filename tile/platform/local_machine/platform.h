@@ -34,7 +34,7 @@ class Platform : public tile::Platform {
   };
 
   Platform();
-  std::vector<std::string> ListDevices();
+  std::vector<std::string> ListDevices() final;
 
   Platform(const context::Context& ctx, const proto::Platform& config);
 

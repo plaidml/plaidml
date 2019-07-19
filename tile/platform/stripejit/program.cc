@@ -7,8 +7,6 @@
 #include "base/util/env.h"
 #include "tile/codegen/driver.h"
 #include "tile/lang/gen_stripe.h"
-#include "tile/lang/parser.h"
-#include "tile/proto/support.h"
 #include "tile/targets/cpu/jit.h"
 #include "tile/targets/targets.h"
 
@@ -16,14 +14,11 @@ namespace vertexai {
 namespace tile {
 namespace stripejit {
 
-Program::Program(const context::Context& ctx, const tile::proto::Program& program, ConstBufferManager* const_bufs)
+Program::Program(                  //
+    const std::string& target,     //
+    const lang::RunInfo& runinfo,  //
+    ConstBufferManager* const_bufs)
     : executable_{new targets::cpu::Native} {
-  lang::Parser parser;
-  lang::RunInfo runinfo;
-  runinfo.program = parser.Parse(program.code());
-  runinfo.input_shapes = FromProto(program.inputs());
-  runinfo.output_shapes = FromProto(program.outputs());
-  runinfo.program_name = "stripe_program";
   auto stripe = GenerateStripe(runinfo);
   auto out_dir = boost::filesystem::path(env::Get("STRIPE_OUTPUT"));
   codegen::OptimizeOptions options = {
@@ -33,7 +28,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
       out_dir / "passes",  // dbg_dir
   };
   const auto& cfgs = targets::GetConfigs();
-  const auto& cfg = cfgs.configs().at("cpu");
+  const auto& cfg = cfgs.configs().at(target);
   const auto& stage = cfg.stages().at("default");
   codegen::CompilerState state(stripe);
   state.const_bufs = const_bufs;
@@ -44,23 +39,24 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
 
 Program::~Program() {}
 
-boost::future<void> Program::Run(const context::Context& ctx,
-                                 std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-                                 std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
+boost::future<void> Program::Run(  //
+    const context::Context& ctx,   //
+    std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
+    std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
   std::map<std::string, void*> buffers;
   // map in the input buffers, preserving contents
-  for (auto& iter : inputs) {
-    std::string name = iter.first;
-    auto view = iter.second->MapCurrent(ctx).get();
-    buffers.emplace(name, view->data());
+  for (auto& kvp : inputs) {
+    IVLOG(2, "Input: " << kvp.first);
+    auto view = kvp.second->MapCurrent(ctx).get();
+    buffers.emplace(kvp.first, view->data());
   }
   // map in output buffers, discarding contents
-  for (auto& iter : outputs) {
-    std::string name = iter.first;
+  for (auto& kvp : outputs) {
+    IVLOG(2, "Output: " << kvp.first);
     // don't overwrite the buffer if it's already been mapped in
-    if (buffers.find(name) == buffers.end()) {
-      auto view = iter.second->MapDiscard(ctx);
-      buffers.emplace(name, view->data());
+    if (buffers.find(kvp.first) == buffers.end()) {
+      auto view = kvp.second->MapDiscard(ctx);
+      buffers.emplace(kvp.first, view->data());
     }
   }
   executable_->run(buffers);

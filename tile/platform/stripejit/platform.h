@@ -31,6 +31,8 @@ class Platform : public tile::Platform {
                                              const lang::RunInfo& runinfo,  //
                                              ConstBufferManager* const_bufs);
 
+  std::vector<std::string> ListDevices() final;
+
   void ListDevices(const context::Context& ctx, const proto::ListDevicesRequest& request,
                    proto::ListDevicesResponse* response) final;
 

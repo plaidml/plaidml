@@ -9,6 +9,11 @@
 #include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
+#include "tile/platform/local_machine/platform.h"
+
+#ifndef _WIN32
+#include "tile/platform/stripejit/platform.h"
+#endif
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
@@ -16,18 +21,35 @@ using plaidml::core::GetPlatform;
 using plaidml::core::Settings;
 using vertexai::context::Context;
 using vertexai::tile::DataType;
+using vertexai::tile::Platform;
 using vertexai::tile::TensorDimension;
 using vertexai::tile::TensorShape;
-using vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
 
 namespace plaidml {
 namespace core {
 
-Platform* GetPlatform() {
-  static Platform platform;
+Platform* GetLocalPlatform() {
+  static vertexai::tile::local_machine::Platform platform;
   return &platform;
+}
+
+#ifndef _WIN32
+Platform* GetJitPlatform() {
+  static vertexai::tile::stripejit::Platform platform;
+  return &platform;
+}
+#endif
+
+Platform* GetPlatform() {
+#ifndef _WIN32
+  auto target = vertexai::env::Get("PLAIDML_DEVICE");
+  if (target == "llvm_cpu.0") {
+    return GetJitPlatform();
+  }
+#endif
+  return GetLocalPlatform();
 }
 
 }  // namespace core

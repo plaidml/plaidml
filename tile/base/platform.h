@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "base/context/context.h"
 #include "tile/base/buffer.h"
@@ -31,17 +32,24 @@ class Platform {
   virtual std::unique_ptr<Program> MakeProgram(const context::Context& ctx, const proto::Program& program,
                                                ConstBufferManager* const_bufs) = 0;
 
+  virtual void ListDevices(const context::Context& ctx, const proto::ListDevicesRequest& request,
+                           proto::ListDevicesResponse* response) = 0;
+
+  virtual void RegisterCostModel(const lang::TileCostFunction& cost_fn) = 0;
+
+  //
+  // plaidml2 interfaces
+  //
+
+  // List devices
+  virtual std::vector<std::string> ListDevices() = 0;
+
   // Builds a program for executing the supplied RunInfo
   virtual std::shared_ptr<Program> MakeProgram(const context::Context& ctx,   //
                                                const std::string& device_id,  //
                                                const std::string& target_id,  //
                                                const lang::RunInfo& runinfo,  //
                                                ConstBufferManager* const_bufs) = 0;
-
-  virtual void ListDevices(const context::Context& ctx, const proto::ListDevicesRequest& request,
-                           proto::ListDevicesResponse* response) = 0;
-
-  virtual void RegisterCostModel(const lang::TileCostFunction& cost_fn) = 0;
 };
 
 }  // namespace tile
