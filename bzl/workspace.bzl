@@ -84,14 +84,6 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "opencl_icd_loader",
-        url = "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/6849f617e991e8a46eebf746df43032175f263b3.zip",
-        sha256 = "1c82be071237ccce36753be9331de3c6b8d4f461d931b40bc070d6c0fb80ff83",
-        strip_prefix = "OpenCL-ICD-Loader-6849f617e991e8a46eebf746df43032175f263b3",
-        build_file = Label("//bzl:opencl_icd_loader.BUILD"),
-    )
-
-    http_archive(
         name = "pybind11",
         url = "https://github.com/pybind/pybind11/archive/v2.2.4.tar.gz",
         sha256 = "b69e83658513215b8d1443544d0549b7d231b9f201f6fc787a2b2218b408181e",

@@ -40,8 +40,8 @@ plaidml_cc_library(
     ] + select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": [
-          "factory_jit.cc",
-	]
+            "factory_jit.cc",
+        ],
     }),
     hdrs = [
         "local_machine.h",
@@ -63,8 +63,8 @@ plaidml_cc_library(
     ] + select({
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": [
-          "//tile/platform/stripejit",
-	]
+            "//tile/platform/stripejit",
+        ],
     }),
     alwayslink = 1,
 )
@@ -150,7 +150,6 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "fifo_scheduler_test",
     srcs = ["fifo_scheduler_test.cc"],
-    tags = ["rtest_fail"],
     deps = [
         ":fifo_scheduler",
         ":scheduler_test",
@@ -173,9 +172,6 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "loose_scheduler_test",
     srcs = ["loose_scheduler_test.cc"],
-    tags = [
-        "rtest_fail",
-    ],
     deps = [
         ":loose_scheduler",
         ":scheduler_test",
@@ -198,9 +194,6 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "linear_scheduler_test",
     srcs = ["linear_scheduler_test.cc"],
-    tags = [
-        "rtest_fail",
-    ],
     deps = [
         ":linear_scheduler",
         ":scheduler_test",
@@ -223,9 +216,6 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "tdep_scheduler_test",
     srcs = ["tdep_scheduler_test.cc"],
-    tags = [
-        "rtest_fail",
-    ],
     deps = [
         ":scheduler_test",
         ":tdep_scheduler",

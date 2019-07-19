@@ -18,11 +18,6 @@ git_repository(
     remote = "https://github.com/plaidml/toolchain",
 )
 
-local_repository(
-    name = "opengl_repo",
-    path = "vendor/opengl",
-)
-
 load("//bzl:workspace.bzl", "configure_llvm", "plaidml_workspace")
 
 plaidml_workspace()
