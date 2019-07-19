@@ -25,6 +25,28 @@ def argmax(x, axis=-1):
     return op('argmax', [x, axis]).as_tensor()
 
 
+def convolution(I, F, strides, dilations, data_dilations, filter_shape, groups, autopad_mode,
+                manual_padding, input_layout, filter_layout, group_layout, winograd_allowed, name,
+                autogroup_mode, deriv_mode, result_shape):
+    if isinstance(strides, np.ndarray):
+        strides = strides.to_list()
+    if isinstance(dilations, np.ndarray):
+        dilations = dilations.to_list()
+    if isinstance(data_dilations, np.ndarray):
+        data_dilations = data_dilations.to_list()
+    if isinstance(filter_shape, np.ndarray):
+        filter_shape = filter_shape.to_list()
+    if isinstance(manual_padding, np.ndarray):
+        manual_padding = manual_padding.to_list()
+    if isinstance(result_shape, np.ndarray):
+        manual_padding = manual_padding.to_list()
+    return op("convolution", [
+        I, F, strides, dilations, data_dilations, filter_shape, groups, autopad_mode,
+        manual_padding, input_layout, filter_layout, group_layout, winograd_allowed, name,
+        autogroup_mode, deriv_mode, result_shape
+    ]).as_tensor()
+
+
 def dot(x, y):
     return op('dot', [x, y]).as_tensor()
 

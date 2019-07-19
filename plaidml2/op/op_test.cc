@@ -34,19 +34,19 @@ class Environment : public ::testing::Environment {
 }();
 
 TEST(Op, Convolution) {
-  Tensor I("I", LogicalShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, NCHW));
-  Tensor K("K", LogicalShape(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, HWCK));
-  auto conv = op::convolution(I, K, {2, 2}, {3, 3}, {1, 1}, 1);
-  EXPECT_THAT(conv.shape().layout(), Eq(NHWC));
+  Tensor I("I", LogicalShape(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, NCX));
+  Tensor K("K", LogicalShape(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, XCK));
+  auto conv = op::convolution(I, K, {2, 2}, {1, 1}, {1, 1}, {}, 1, "explicit", {3, 3}, "nxc", "xck", "none", false, "",
+                              "ungrouped", "none", {});
   Program program("convolution", {conv});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0, I_1, I_2, I_3],
   K[K_0, K_1, K_2, K_3]
 ) -> (
-  _X0
+  conv
 ) {
-  _X0[x0, x1, x3, x6 : 1, 112, 112, 64] = +(I[x0, -3 + 2*x1 + x2, -3 + 2*x3 + x4, x5] * K[x2, x4, x5, x6]);
+  conv[n, x0, x1, co : 1, 112, 112, 64] = +(I[n, -3 + k0 + 2*x0, -3 + k1 + 2*x1, ci] * K[k0, k1, ci, co]);
 }
 )"));
 }

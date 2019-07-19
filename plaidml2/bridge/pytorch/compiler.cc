@@ -179,15 +179,40 @@ edsl::Tensor convolution(const std::vector<edsl::Value>& args) {
   for (size_t i = 0; i < S.size(); i++) {
     strides[i] = S[0].as_int();
   }
+  // Our shared conv. op has separate pre and post padding; pytorch assumes they're the same
+  // However, the shared op will automatically mirror prepadding to post if post is omitted
   std::vector<int> padding(P.size());
   for (size_t i = 0; i < P.size(); i++) {
     padding[i] = P[0].as_int();
   }
   std::vector<int> dilation(D.size());
+  std::vector<int> data_dilation(D.size());
   for (size_t i = 0; i < D.size(); i++) {
     dilation[i] = D[0].as_int();
+    // ATen doesn't use data_dilations
+    data_dilation[i] = 1;
   }
-  auto O = op::convolution(I, K, strides, padding, dilation, groups, op::NCHW, op::KCHW);
+  auto O = op::convolution(  //
+      I,                     //
+      K,                     //
+      strides,               //
+      dilation,              //
+      data_dilation,         //
+      {},                    // filter_shape
+      groups,                //
+      "explicit",            //
+      padding,               //
+      "ncx",                 //
+      "kcx",                 //
+      "in_K",                // group_layout
+      false,                 // winograd_allowed
+      "",                    // name
+      "explicit",            // autogroup_mode
+      "none",                // deriv_mode  // TODO: Will need to change this for transposed support
+      {});                   // result_shape  // TODO: Adding transposed support will require this
+  // TODO: transposed support may need additional options for convolution, as ATen's `output_padding` cannot directly
+  // translate into our `result_shape` without shape information that may not be known until runtime, which I believe
+  // means that this translation must be done inside op::convolution.
 
   edsl::TensorDim N, C, H, W;
   O.bind_dims(N, C, H, W);

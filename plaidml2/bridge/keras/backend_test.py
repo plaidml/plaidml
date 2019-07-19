@@ -870,6 +870,44 @@ class TestBackendOps(unittest.TestCase):
                                data_format=df),
         ]
 
+    @opTest([
+        [m(1, 4, 4, 3), m(3, 3, 3, 3), 'channels_last'],
+        [m(4, 8, 6, 3), m(3, 4, 3, 6), 'channels_last'],
+        [m(1, 7, 11, 2), m(2, 3, 2, 5), 'channels_last'],
+        [m(1, 5, 5, 1), m(3, 3, 1, 1), 'channels_last'],
+        [m(1, 1, 5, 7), m(3, 3, 1, 1), 'channels_first'],
+    ],
+            do_grads=False,
+            verbose=False,
+            skip_theano=True)
+    def testDepthwiseConv2d(self, b, im, km, df):
+        # A number of tests are turned off due to bizarre TF behavior that seems like it must be bugged
+        # (e.g. increasing spatial size of input decreasing spatial size of output)
+        return [
+            b.depthwise_conv2d(im,
+                               km,
+                               strides=(1, 1),
+                               padding='same',
+                               data_format=df,
+                               dilation_rate=(1, 1)),
+            #b.depthwise_conv2d(im, km, strides=(3, 2), padding='same', data_format=df, dilation_rate=(1, 1)),  # TF unhappy with mixed strides
+            b.depthwise_conv2d(im,
+                               km,
+                               strides=(2, 2),
+                               padding='same',
+                               data_format=df,
+                               dilation_rate=(1, 1)),
+            b.depthwise_conv2d(im,
+                               km,
+                               strides=(1, 1),
+                               padding='same',
+                               data_format=df,
+                               dilation_rate=(2, 3)),
+            #b.depthwise_conv2d(im, km, strides=(2, 2), padding='same', data_format=df, dilation_rate=(2, 3)),  # TF unhappy with strides + dilation
+            #b.depthwise_conv2d(im, km, strides=(2, 2), padding='same', data_format=df, dilation_rate=(2, 2)),  # TF unhappy with strides + dilation
+            #b.depthwise_conv2d(im, km, strides=(2, 2), padding='valid', data_format=df, dilation_rate=(2, 2)),  # TF unhappy with strides + dilation
+        ]
+
     @opTest(
         [
             _conv_inp(IN=1, IC=3, OC=1, IS=[8], KS=[2], data_format='channels_last'),

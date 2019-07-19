@@ -11,10 +11,10 @@
 namespace plaidml {
 namespace op {
 
-static const char* const NCHW = "NCHW";
-static const char* const NHWC = "NHWC";
-static const char* const KCHW = "KCHW";
-static const char* const HWCK = "HWCK";
+static const char* const NCX = "ncx";
+static const char* const NXC = "nxc";
+static const char* const KCX = "kcx";
+static const char* const XCK = "xck";
 
 inline void init() {  //
   plaidml::init();
@@ -31,23 +31,42 @@ inline edsl::Value op(const std::string& name, const edsl::Value& args) {
 }  // namespace details
 
 inline edsl::Tensor convolution(             //
-    const edsl::Tensor& input,               //
-    const edsl::Tensor& weights,             //
-    const std::vector<int>& stride,          //
-    const std::vector<int>& padding,         //
-    const std::vector<int>& dilation,        //
+    const edsl::Tensor& I_or_O,              //
+    const edsl::Tensor& F_or_O,              //
+    const std::vector<int>& strides,         //
+    const std::vector<int>& dilations,       //
+    const std::vector<int>& data_dilations,  //
+    const std::vector<int>& filter_shape,    //
     int groups,                              //
-    const std::string& input_layout = NHWC,  //
-    const std::string& weights_layout = HWCK) {
-  auto args = edsl::make_tuple(    //
-      input,                       //
-      weights,                     //
-      edsl::make_tuple(stride),    //
-      edsl::make_tuple(padding),   //
-      edsl::make_tuple(dilation),  //
-      groups,                      //
-      input_layout,                //
-      weights_layout);
+    const std::string& autopad_mode,         //
+    const std::vector<int>& manual_padding,  //
+    const std::string& input_layout,         //
+    const std::string& filter_layout,        //
+    const std::string& group_layout,         //
+    bool winograd_allowed,                   //
+    const std::string& name,                 //
+    const std::string& autogroup_mode,       //
+    const std::string& deriv_mode,           //
+    const std::vector<int>& result_shape     //
+) {
+  auto args = edsl::make_tuple(          //
+      I_or_O,                            //
+      F_or_O,                            //
+      edsl::make_tuple(strides),         //
+      edsl::make_tuple(dilations),       //
+      edsl::make_tuple(data_dilations),  //
+      edsl::make_tuple(filter_shape),    //
+      groups,                            //
+      autopad_mode,                      //
+      edsl::make_tuple(manual_padding),  //
+      input_layout,                      //
+      filter_layout,                     //
+      group_layout,                      //
+      winograd_allowed,                  //
+      name,                              //
+      autogroup_mode,                    //
+      deriv_mode,                        //
+      edsl::make_tuple(result_shape));
   return details::op("convolution", args).as_tensor();
 }
 

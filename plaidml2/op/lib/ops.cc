@@ -69,6 +69,13 @@ struct AggregationAxes {
   }
 };
 
+enum class AutogroupMode {
+  UNGROUPED,  // Group size explicitly 1
+  EXPLICIT,   // Group size explicitly specified, > 1
+  AUTO,       // Group size determined from shapes of I and F
+  MAX         // for channelized convolutions (i.e. where G = CI)
+};
+
 enum class AutopadMode : char {
   NONE = '-',
   NOTSET = NONE,
@@ -78,12 +85,59 @@ enum class AutopadMode : char {
   VALID = 'V'
 };
 
+enum class ConvDerivMode {
+  NONE,   // Forward Pass
+  DATA,   // Computing derivative of input data (or equivalently a transposed conv)
+  FILTER  // Computing derivative of filters
+};
+
+// For grouped convolutions, in the filters (i.e. weights/kernel) tensor, there
+// are multiple ways of laying out the channels. For a convolution with:
+//  G groups
+//  C input channels
+//  K output channels
+// there must be a total of (C * K) / G channel combinations. This is generally
+// accomplished by having one of the input or output channel dimensions include
+// the group and having the other be the within-group channel; but the group
+// can also be included as a separate dimension. This gives the following total
+// sizes for the channel dimensions:
+//  SEPARATE: G, C/G, K/G
+//  IN_C:     C, K/G
+//  IN_K:     C/G, K
+// SEPARATE is the layout with the group given as a separate dimension. IN_C is
+// the layout with the group included in C, and with the K dim representing the
+// within-group output channel. IN_K is the layout with the group included in K
+// with the C dim representing the within-group input channel.
+// The NONE layout is used for convolutions that aren't grouped.
+enum class GroupLayout {
+  NONE,      // Not grouped
+  SEPARATE,  // Group given as a separate dimension
+  IN_C,      // Group included in the input channels dimension
+  IN_K       // Group included in the output channels dimensiono
+};
+
 enum class PoolMode : char { AVG = 'A', MAX = '>', MIN = '<', SUM = '+' };
 
-enum class TensorLayout { NXC, NCX, KCX, XCK };
+enum class TensorLayout { NXC, NCX, KCX, XCK, GKCX, XGCK };
 
 namespace {
 // TODO: I haven't decided whether to make these helper functions visible to the outside world
+
+AutogroupMode autogroup_mode_from_str(const std::string& s) {
+  if (s == "ungrouped") {
+    return AutogroupMode::UNGROUPED;
+  }
+  if (s == "explicit") {
+    return AutogroupMode::EXPLICIT;
+  }
+  if (s == "auto") {
+    return AutogroupMode::AUTO;
+  }
+  if (s == "max") {
+    return AutogroupMode::MAX;
+  }
+  throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as an autogroup mode") % s));
+}
 
 AutopadMode autopad_mode_from_str(const std::string& s) {
   if (s == "none") {
@@ -108,19 +162,60 @@ AutopadMode autopad_mode_from_str(const std::string& s) {
 }
 
 std::string to_string(AutopadMode m) {
-  if (m == AutopadMode::NONE) {
-    return "none";
+  switch (m) {
+    case AutopadMode::NONE:
+      return "none";
+    case AutopadMode::SAME_LOWER:
+      return "same_lower";
+    case AutopadMode::SAME_UPPER:
+      return "same_upper";
+    case AutopadMode::VALID:
+      return "valid";
   }
-  if (m == AutopadMode::SAME_LOWER) {
-    return "same_lower";
+  throw std::runtime_error("Unable to convert autopadding mode to string due to unrecognized mode");
+}
+
+ConvDerivMode conv_deriv_mode_from_str(const std::string& s) {
+  if (s == "none") {
+    return ConvDerivMode::NONE;
   }
-  if (m == AutopadMode::SAME_UPPER) {
-    return "same_upper";
+  if (s == "data") {
+    return ConvDerivMode::DATA;
   }
-  if (m == AutopadMode::VALID) {
-    return "valid";
+  if (s == "filter") {
+    return ConvDerivMode::FILTER;
   }
-  throw std::runtime_error("Unable to autopadding mode to string due to unrecognized mode");
+  throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as a convolution derivative mode") % s));
+}
+
+GroupLayout group_layout_from_str(const std::string& s) {
+  if (s == "none") {
+    return GroupLayout::NONE;
+  }
+  if (s == "in_C") {
+    return GroupLayout::IN_C;
+  }
+  if (s == "in_K") {
+    return GroupLayout::IN_K;
+  }
+  if (s == "separate") {
+    return GroupLayout::SEPARATE;
+  }
+  throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as a group layout") % s));
+}
+
+std::string to_string(GroupLayout l) {
+  switch (l) {
+    case GroupLayout::IN_C:
+      return "in_C";
+    case GroupLayout::IN_K:
+      return "in_K";
+    case GroupLayout::NONE:
+      return "none";
+    case GroupLayout::SEPARATE:
+      return "separate";
+  }
+  throw std::runtime_error("Unable to convert group layout to string due to unrecognized layout");
 }
 
 PoolMode pool_mode_from_str(const std::string& s) {
@@ -139,6 +234,21 @@ PoolMode pool_mode_from_str(const std::string& s) {
   throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as a pooling mode") % s));
 }
 
+// TODO: Enable when needed
+// std::string to_string(PoolMode m) {
+//   switch (m) {
+//    case PoolMode::AVG:
+//     return "avg";
+//    case PoolMode::MAX:
+//     return "max";
+//    case PoolMode::MIN:
+//     return "min";
+//    case PoolMode::SUM:
+//     return "sum";
+//   }
+//   throw std::runtime_error("Unable to convert pooling mode to string due to unrecognized mode");
+// }
+
 TensorLayout tensor_layout_from_str(const std::string& s) {
   if (s == "nxc" || s == "nwc" || s == "nhwc" || s == "ndhwc") {
     return TensorLayout::NXC;
@@ -152,57 +262,176 @@ TensorLayout tensor_layout_from_str(const std::string& s) {
   if (s == "xck" || s == "wck" || s == "hwck" || s == "dhwck") {
     return TensorLayout::XCK;
   }
+  if (s == "gkcx" || s == "gkcw" || s == "gkchw" || s == "gkcdhw") {
+    return TensorLayout::GKCX;
+  }
+  if (s == "xgck" || s == "wgck" || s == "hwgck" || s == "dhwgck") {
+    return TensorLayout::XGCK;
+  }
   throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as a tensor layout") % s));
 }
+
+size_t nonspatial_dims(TensorLayout layout) {
+  switch (layout) {
+    case TensorLayout::NXC:
+    case TensorLayout::NCX:
+    case TensorLayout::KCX:
+    case TensorLayout::XCK:
+      return 2;
+    case TensorLayout::GKCX:
+    case TensorLayout::XGCK:
+      return 3;
+    default:
+      throw std::runtime_error("Unrecognized layout when attempting to count non-spatial dimensions");
+  }
+}
+
+// TODO: Enable when needed
+// std::string to_string(TensorLayout m) {
+//   switch (m) {
+//    case TensorLayout::NXC:
+//     return "NXC";
+//    case TensorLayout::NCX:
+//     return "NCX";
+//    case TensorLayout::KCX:
+//     return "KCX";
+//    case TensorLayout::XCK:
+//     return "XCK";
+//    case TensorLayout::GKCX:
+//     return "GKCX";
+//    case TensorLayout::XGCK:
+//     return "XGCK";
+//   }
+//   throw std::runtime_error("Unable to convert tensor layout to string due to unrecognized layout");
+// }
 
 bool is_input_layout(TensorLayout layout) {  //
   return (layout == TensorLayout::NCX || layout == TensorLayout::NXC);
 }
 
-// TODO: Uncomment once we actually have a use for this
-// bool is_kernel_layout(TensorLayout layout) {
-//   return (layout == TensorLayout::KCX || layout == TensorLayout::XCK);
-// }
+bool is_filter_layout(TensorLayout layout) {
+  return (layout == TensorLayout::KCX || layout == TensorLayout::XCK || layout == TensorLayout::GKCX ||
+          layout == TensorLayout::XGCK);
+}
+
+bool is_filter_layout_with_separate_groups(TensorLayout layout) {
+  return (layout == TensorLayout::GKCX || layout == TensorLayout::XGCK);
+}
+
+void normalize_grouping_strategy(int64_t* groups, AutogroupMode* autogroup_mode, GroupLayout* group_layout) {
+  // This normalization enforces:
+  //  * If group_layout is NONE:
+  //      - autogroup_mode is UNGROUPED
+  //        (AUTO is converted to UNGROUPED, as is EXPLICIT if groups == 1)
+  //        (MAX throws, as does EXPLICIT if groups != 1)
+  //      - groups is 1
+  //        (If non-1, it is converted after autogroup_mode conversion succeeds)
+  //  * If autogroup_mode is UNGROUPED:
+  //      - groups is 1
+  //        (If non-1, it throws)
+  //      - group_layout allowed to vary
+  //  * If autogroup_mode is EXPLICIT:
+  //      - groups is > 1
+  //        (If < 1, throw; if == 1, autogroup_mode is converted to UNGROUPED)
+  //      - group_layout is allowed to vary, but may not be NONE
+  //        (If group_layout is NONE and groups != 1, this throws (see above))
+  //        (If group_layout is NONE and groupd == 1, autogroup_mode is converted to UNGROUPED (see above))
+  //  * If autogroup_mode is AUTO:
+  //      - groups is to be ignored
+  //      - group_layout is SEPARATE or IN_K
+  //        (throws if group_layout is IN_C)
+  //        (if group_layout is NONE, autogroup_mode is converted to UNGROUPED (see above))
+  //  * If autogroup_mode is MAX:
+  //      - groups is to be ignored
+  //      - group_layout is IN_C or IN_K
+  //        (throws if group_layout is SEPARATE or NONE)
+  switch (*autogroup_mode) {
+    case AutogroupMode::UNGROUPED:
+      if (*groups != 1) {
+        throw std::runtime_error("Convolution AutogroupMode::UNGROUPED requires groups == 1");
+      }
+      break;
+    case AutogroupMode::AUTO:
+      if (*group_layout == GroupLayout::NONE) {
+        *groups = 1;
+        *autogroup_mode = AutogroupMode::UNGROUPED;
+      }
+      if (*group_layout == GroupLayout::IN_C) {
+        // TODO: This and related cases may depend on the deriv_mode; take that into account
+        throw std::runtime_error("Cannot automatically detect group size of convolution with IN_C GroupLayout");
+      }
+      break;
+    case AutogroupMode::EXPLICIT:
+      if (*groups < 1) {
+        throw std::runtime_error("Requested grouped convolution with fewer than 1 groups");
+      }
+      if (*groups == 1) {
+        *autogroup_mode = AutogroupMode::UNGROUPED;
+      }
+      if (*group_layout == GroupLayout::NONE && *groups != 1) {
+        throw std::runtime_error("GroupLayout not specified for grouped convolution");
+      }
+      break;
+    case AutogroupMode::MAX:
+      if (*group_layout == GroupLayout::NONE) {
+        throw std::runtime_error("Convolution GroupLayout must be specified to use MAX AutogroupMode");
+      }
+      if (*group_layout == GroupLayout::SEPARATE) {
+        throw std::runtime_error("Convolution AutogroupMode MAX not compatible with SEPARATE GroupLayout");
+      }
+      break;
+    default:
+      throw std::runtime_error("Unrecognized AutogroupMode");
+  }
+}
 
 std::pair<TensorDim, TensorDim> compute_padding_and_output_size(const TensorDim& input_size,
-                                                                const TensorDim& effective_filter_size, int64_t stride,
+                                                                const TensorDim& filter_size, int64_t stride,
                                                                 AutopadMode autopad_mode, int64_t pad_lo,
-                                                                int64_t pad_hi, bool use_ceil_for_output_shape) {
-  // effective_filter_size is the filter size after dilation is accounted for. So a 4x3 filter dilated by (3, 2) has
-  // effective_filter_sizes of 11 and 5 for its two spatial dimensions
+                                                                int64_t pad_hi, int64_t dilation, int64_t data_dilation,
+                                                                bool use_ceil_for_output_shape) {
+  // Effective input and filter sizes are the sizes after dilations are accounted for. So a 4x3 filter dilated by (3, 2)
+  // has an effective filter size of 11 and 5 for its 2 spatial dims
 
+  auto I_eff = (data_dilation * (input_size - 1)) + 1;  // Effective Input Size
+  auto F_eff = (dilation * (filter_size - 1)) + 1;      // Effective Filter Size
   int64_t ceil_term =
       use_ceil_for_output_shape ? stride - 1 : 0;  // TODO: Will need to confirm that this is the intended behavior
   if (autopad_mode == AutopadMode::NONE) {
     TensorDim pad_before(pad_lo);
-    TensorDim output_size((input_size + pad_lo + pad_hi - effective_filter_size + stride + ceil_term) / stride);
+    TensorDim output_size((I_eff + pad_lo + pad_hi - F_eff + stride + ceil_term) / stride);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
   }
   if (autopad_mode == AutopadMode::VALID) {
     TensorDim pad_before(0);
-    TensorDim output_size((input_size - effective_filter_size + stride + ceil_term) / stride);
+    TensorDim output_size((I_eff - F_eff + stride + ceil_term) / stride);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
   }
   if (autopad_mode == AutopadMode::SAME_LOWER || autopad_mode == AutopadMode::SAME_UPPER) {
-    TensorDim output_size((input_size + stride - 1 + ceil_term) / stride);
-    int64_t upper_term = (autopad_mode == AutopadMode::SAME_UPPER) ? 1 : 0;
-    // TensorDim pad_before((max(0, (output_size - 1) * stride + effective_filter_size - input_size) + upper_term) / 2);
+    TensorDim output_size((I_eff + stride - 1 + ceil_term) / stride);
+    int64_t lower_term = (autopad_mode == AutopadMode::SAME_LOWER) ? 1 : 0;
+    // TensorDim pad_before((max(0, (output_size - 1) * stride + F_eff - I_eff) + upper_term) / 2);
     // TODO: Switch to above once max(TensorDim, TensorDim) is working
-    TensorDim pad_before(((output_size - 1) * stride + effective_filter_size - input_size + upper_term) / 2);
+    TensorDim pad_before(((output_size - 1) * stride + F_eff - I_eff + lower_term) / 2);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
   }
   throw std::runtime_error(str(boost::format("Unexpected autopadding mode: %1%") % to_string(autopad_mode)));
 }
 
 std::vector<int64_t>* extend_manual_padding(std::vector<int64_t>* pads, size_t rank) {
+  // TODO: Perhaps we should throw for sizes != 0, rank, 2*rank?
   if (pads->size() > 2 * rank) {
     throw std::runtime_error(str(
         boost::format(
             "Inconsistent spatial rank: operation with %1% spatial dimensions had %2% manual padding values given") %
         rank % pads->size()));
   }
-  while (pads->size() < 2 * rank) {
+  while (pads->size() < rank) {
     pads->push_back(0);
+  }
+  while (pads->size() < 2 * rank) {
+    // Where pad_hi isn't set, copy the pad_lo value
+    pads->push_back(pads->at(pads->size() - rank));
   }
   return pads;
 }
@@ -234,111 +463,545 @@ Value argmax(const Value& value) {
 
 Value convolution(const Value& value) {
   IVLOG(1, "convolution");
+  // Parameters:
+  //  0. Input Tensor
+  //  1. Filter Tensor
+  //  2. Strides
+  //  3. Dilations
+  //  4. Data Dilations
+  //  5. Kernel Shape
+  //  6. Groups
+  //  7. Autopad Mode
+  //  8. Manual Padding
+  //  9. Input Tensor Layout
+  // 10. Filter Tensor Layout
+  // 11. Grouping Layout
+  // 12. Winograd allowed
+  // 13. Name
+  // 14. Autogrouping (? Unclear if we really need this)
+  // 15. Deriv Mode (DATA is equivalent to transposed conv)
+  // 16. Result Shape (a.k.a. output shape, used for transposed/derivative convs)
+
+  // Read Arguments
   auto args = value.as_tuple();
-  if (args.size() != 8) {
-    throw std::runtime_error("convolution expects 8 arguments");
+  if (args.size() != 17) {
+    throw std::runtime_error("Convolution op expects 17 arguments");
+  }
+  auto I_or_O = args[0].as_tensor();  // O if deriv_mode is DATA, else I
+  auto F_or_O = args[1].as_tensor();  // O if deriv_mode is FILTER, else F
+  auto strides = args[2].as_int_tuple();
+  auto dilations = args[3].as_int_tuple();
+  auto data_dilations = args[4].as_int_tuple();
+  // TODO: Perhaps could upgrade use of filter_shape?
+  auto filter_shape = args[5].as_int_tuple();  // This is the shape of the _spatial_ filter dims _only_
+  auto groups = args[6].as_int();              // will be 1 for non-grouped convolutions
+  auto autopad_mode = autopad_mode_from_str(args[7].as_str());
+  auto manual_padding = args[8].as_int_tuple();
+  auto input_layout = tensor_layout_from_str(args[9].as_str());
+  auto filter_layout = tensor_layout_from_str(args[10].as_str());
+  auto group_layout = group_layout_from_str(args[11].as_str());
+  // auto winograd_allowed = args[12].as_bool();  // TODO: Implement Winograd
+  auto name = args[13].as_str();
+  auto autogroup_mode = autogroup_mode_from_str(args[14].as_str());
+  auto deriv_mode = conv_deriv_mode_from_str(args[15].as_str());
+  auto result_shape = args[16].as_int_tuple();
+
+  Tensor I;       // Inputs (i.e. Data) tensor
+  Tensor F;       // Filters (i.e. Weights i.e. Kernel) tensor
+  Tensor O;       // Output (i.e. of a forward pass) tensor
+  Tensor Result;  // The tensor that is actually returned, depends on deriv_mode
+
+  // Connect the inputs to the right names
+  switch (deriv_mode) {
+    case ConvDerivMode::NONE:
+      I = I_or_O;
+      F = F_or_O;
+      break;
+    case ConvDerivMode::DATA:
+      O = I_or_O;
+      F = F_or_O;
+      break;
+    case ConvDerivMode::FILTER:
+      I = I_or_O;
+      O = F_or_O;
+      break;
   }
 
-  auto I = args[0].as_tensor();  // input
-  auto I_shape = I.shape();
-  auto I_layout = args[6].as_str();
-  if (I_shape.layout().size()) {
-    I_layout = I_shape.layout();
-  }
-  if (I_layout.empty()) {
-    I_layout = NHWC;
-  }
-  if (I_layout != NHWC && I_layout != NCHW) {
-    throw std::runtime_error(str(boost::format("Unsupported layout for input of convolution: %1%") % I_layout));
-  }
-  IVLOG(2, "I_layout: " << I_layout);
+  // Initialize useful values
+  auto spatial_rank = strides.size();
 
-  auto K = args[1].as_tensor();  // kernel/weights
-  auto K_shape = K.shape();
-  auto K_layout = args[7].as_str();
-  if (K_shape.layout().size()) {
-    K_layout = K_shape.layout();
+  // Verify inputs are consistent
+  if (manual_padding.size() && autopad_mode != AutopadMode::NONE) {
+    throw std::runtime_error("Autopadding and manual padding both requested for single conv operation");
   }
-  if (K_layout.empty()) {
-    K_layout = HWCK;
+  if (dilations.size() != spatial_rank) {
+    throw std::runtime_error(
+        str(boost::format("Inconsistent spatial rank in conv op (received %1%D strides and %2%D dilations)") %
+            strides.size() % dilations.size()));
   }
-  if (K_layout != HWCK && K_layout != KCHW) {
-    throw std::runtime_error(str(boost::format("Unsupported layout for kernel of convolution: %1%") % K_layout));
+  if (data_dilations.size() != spatial_rank) {
+    throw std::runtime_error(
+        str(boost::format("Inconsistent spatial rank in conv op (received %1%D strides and %2%D data_dilations)") %
+            strides.size() % data_dilations.size()));
   }
-  IVLOG(2, "K_layout: " << K_layout);
-
-  auto S = args[2].as_tuple();  // strides
-  auto P = args[3].as_tuple();  // padding
-  auto D = args[4].as_tuple();  // dilation
-  // TODO: handle grouped convolutions
-  // auto groups = args[5].as_int();
-
-  auto ndims = S.size();
-
-  TensorDim N, CI, CO;
-  TensorIndex n, ci, co;
-
-  std::vector<TensorDim> I_spatial_dims(ndims);
-  std::vector<TensorDim> K_spatial_dims(ndims);
-  std::vector<TensorDim> I_dims = {N};
-  std::vector<TensorDim> K_dims;
-  std::vector<TensorIndex> I_idxs = {n};
-  std::vector<TensorIndex> O_idxs = {n};
-  std::vector<TensorIndex> K_idxs;
-
-  if (I_layout == NCHW) {
-    I_idxs.emplace_back(ci);
-    I_dims.emplace_back(CI);
-    O_idxs.emplace_back(co);
+  if (!is_input_layout(input_layout)) {
+    throw std::runtime_error("Input tensor layout requested in conv op does not apply to convolution input tensors");
   }
-  if (K_layout == KCHW) {
-    K_idxs.emplace_back(co);
-    K_dims.emplace_back(CO);
-    K_idxs.emplace_back(ci);
-    K_dims.emplace_back(CI);
+  if (!is_filter_layout(filter_layout)) {
+    throw std::runtime_error("Filter tensor layout requested in conv op does not apply to convolution filter tensors");
   }
-  for (size_t i = 0; i < ndims; i++) {
-    auto X = I_spatial_dims[i];
-    auto K = K_spatial_dims[i];
-    TensorIndex x;
-    TensorIndex k;
-    I_idxs.emplace_back(S[i].as_int() * x + D[i].as_int() * k - P[i].as_int());
-    I_dims.emplace_back(X);
-    K_idxs.push_back(k);
-    K_dims.emplace_back(K);
-    O_idxs.push_back(x);
+  if (deriv_mode != ConvDerivMode::DATA && I.shape().ndims() - spatial_rank != nonspatial_dims(input_layout)) {
+    // If we ever extend possible layouts so that I and O may have different layouts, we will
+    // need to do this check in different ways depending on whether deriv_mode is DATA or not
+    throw std::runtime_error(
+        str(boost::format("Inconsistent spatial rank in conv op (received %1% spatial dimensions based on strides but "
+                          "input tensor has %2% dimensions, and thus %3% spatial dims). (This error can also occur if "
+                          "the layout of I is incorrectly specified or interpreted.)") %
+            spatial_rank % I.shape().ndims() % (I.shape().ndims() - nonspatial_dims(input_layout))));
   }
-  if (I_layout == NHWC) {
-    I_dims.emplace_back(CI);
-    I_idxs.emplace_back(ci);
-    O_idxs.emplace_back(co);
+  if (deriv_mode != ConvDerivMode::FILTER && F.shape().ndims() - spatial_rank != nonspatial_dims(filter_layout)) {
+    throw std::runtime_error(str(
+        boost::format("Inconsistent spatial rank in conv op (received %1% spatial dimensions based on strides "
+                      "but filter tensor has %2% dimensions, and thus %3% spatial dims). (This error can also occur "
+                      "if the layout of F is incorrectly specified or interpreted.)") %
+        spatial_rank % F.shape().ndims() % (F.shape().ndims() - nonspatial_dims(filter_layout))));
   }
-  if (K_layout == HWCK) {
-    K_idxs.emplace_back(ci);
-    K_dims.emplace_back(CI);
-    K_idxs.emplace_back(co);
-    K_dims.emplace_back(CO);
+  if (filter_shape.size() && (filter_shape.size() != spatial_rank)) {
+    throw std::runtime_error(
+        str(boost::format("Filter shape manually specified with inconsistent rank (received %1% spatial dimensions "
+                          "based on strides but filter_shape has %2% dimensions)") %
+            spatial_rank % filter_shape.size()));
+  }
+  if (is_filter_layout_with_separate_groups(filter_layout) && group_layout != GroupLayout::SEPARATE) {
+    throw std::runtime_error("Filter_layout specifies separate groups but group_layout isn't SEPARATE");
+  }
+  if (!is_filter_layout_with_separate_groups(filter_layout) && group_layout == GroupLayout::SEPARATE) {
+    throw std::runtime_error("Filter_layout lacks separate groups but group_layout is SEPARATE");
+  }
+  if (result_shape.size() == 0) {
+    if (deriv_mode != ConvDerivMode::NONE) {
+      throw std::runtime_error("Transposed/gradient convolutions require specifying the result_shape");
+    }
+  } else {
+    if (result_shape.size() != spatial_rank) {
+      throw std::runtime_error(
+          str(boost::format("Inconsistent spatial rank in conv op (received %1% spatial dimensions based on strides "
+                            "but result shape has %2% spatial dims).") %
+              spatial_rank % result_shape.size()));
+    }
   }
 
-  I.bind_dims(I_dims);
-  K.bind_dims(K_dims);
+  // Fill in defaults & normalize inputs
+  extend_manual_padding(&manual_padding, spatial_rank);
+  if (name.empty()) {
+    name = "conv";
+  }
+  normalize_grouping_strategy(&groups, &autogroup_mode, &group_layout);
 
-  std::vector<TensorDim> O_dims = {N};
-  if (I_layout == NCHW) {
-    O_dims.emplace_back(CO);
+  // Prepare dimension and index variables
+  TensorDim N, CI, CO, G;
+  TensorDim F_CI, F_CO;  // The channel dimensions as used by the filters, adjusted for group layout
+  TensorIndex n("n");
+  TensorIndex ci("ci");
+  TensorIndex co("co");
+  TensorIndex g("g");
+  std::vector<TensorDim> X(spatial_rank);  // The spatial dimensions of I
+  std::vector<TensorIndex> x;              // The spatial indexes of I
+  for (size_t i = 0; i < spatial_rank; ++i) {
+    x.emplace_back(TensorIndex(str(boost::format("x%1%") % i)));
   }
-  for (size_t i = 0; i < ndims; i++) {
-    auto X = I_spatial_dims[i];
-    auto K = K_spatial_dims[i];
-    O_dims.emplace_back((X + 2 * P[i].as_int() - D[i].as_int() * (K - 1) - 1) / S[i].as_int() + 1);
+  std::vector<TensorDim> Y(spatial_rank);  // The spatial dimensions of O; nearly unused
+  std::vector<TensorDim> K(spatial_rank);  // The spatial dimensions of F
+  std::vector<TensorIndex> k;              // The spatial indexs of F
+  for (size_t i = 0; i < spatial_rank; ++i) {
+    k.emplace_back(TensorIndex(str(boost::format("k%1%") % i)));
   }
-  if (I_layout == NHWC) {
-    O_dims.emplace_back(CO);
+  std::vector<TensorDim> I_dims;
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorDim> F_dims;
+  std::vector<TensorDim>
+      F_explicit_dims;  // this ensures that the inferred filter shape matches filter_shape if the latter is passed in
+  std::vector<TensorIndex> F_idxs;
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> O_idxs;
+  TensorDim G_explicit(groups);  // G may be explicit or automatically set, based on autogroup_mode
+  switch (autogroup_mode) {
+    case AutogroupMode::EXPLICIT:
+    case AutogroupMode::UNGROUPED:
+      G = G_explicit;
+      break;
+    case AutogroupMode::MAX:
+      if (group_layout == GroupLayout::IN_C) {
+        G = CI;
+      } else {
+        throw std::runtime_error("Autogroup Mode MAX only available with the IN_C Group Layout");
+      }
+      break;
+    case AutogroupMode::AUTO:
+      if (group_layout == GroupLayout::SEPARATE || group_layout == GroupLayout::IN_K) {
+        // just let G be inferred; i.e. do nothing  // nolint(whitespace/empty_if_body)
+      } else {
+        throw std::runtime_error(str(boost::format("Unsupported group layout '%1%' used with autogroup mode AUTO") %
+                                     to_string(group_layout)));
+      }
+      break;
+    default:
+      throw std::runtime_error("Unrecognized AutogroupMode");
   }
 
-  auto O = TensorOutput(O_dims, I_layout);
-  O(O_idxs) += I(I_idxs) * K(K_idxs);
-  return Value{O};
+  // Set up dimensions of the inputs first so they can be bound
+  // Group layout affects the size of filter dimensions; we pass through the dims that don't need to be adjusted here,
+  // and we will calculate those dimensions that will be adjusted later (after some more dims are bound).
+  // TODO: This needs more thorough test converage
+  switch (group_layout) {
+    case GroupLayout::NONE:
+      F_CO = CO;
+      F_CI = CI;
+      break;
+    case GroupLayout::IN_C:
+      // Later: F_CO = CO / G;
+      F_CI = CI;
+      break;
+    case GroupLayout::IN_K:
+      F_CO = CO;
+      // Later: F_CI = CI / G;
+      break;
+    case GroupLayout::SEPARATE:
+      // Later: F_CO = CO / G;
+      // Later: F_CI = CI / G;
+      break;
+  }
+
+  // The input data dims
+  if (deriv_mode != ConvDerivMode::DATA) {
+    switch (input_layout) {
+      case TensorLayout::NCX:
+        I_dims.push_back(N);
+        I_dims.push_back(CI);
+        for (size_t i = 0; i < spatial_rank; ++i) {
+          I_dims.push_back(X[i]);
+        }
+        break;
+      case TensorLayout::NXC:
+        I_dims.push_back(N);
+        for (size_t i = 0; i < spatial_rank; ++i) {
+          I_dims.push_back(X[i]);
+        }
+        I_dims.push_back(CI);
+        break;
+      default:
+        throw std::runtime_error("Invalid input_layout");
+    }
+    I.bind_dims(I_dims);
+  }
+
+  // The filter dims
+  if (deriv_mode != ConvDerivMode::FILTER) {
+    switch (filter_layout) {
+      case TensorLayout::GKCX:
+        F_dims.push_back(G);
+        F_explicit_dims.push_back(G);
+        // Fall through deliberately
+      case TensorLayout::KCX:
+        F_dims.push_back(F_CO);
+        F_explicit_dims.push_back(F_CO);
+        F_dims.push_back(F_CI);
+        F_explicit_dims.push_back(F_CI);
+        for (size_t i = 0; i < spatial_rank; ++i) {
+          F_dims.push_back(K[i]);
+          if (filter_shape.size()) {
+            F_explicit_dims.push_back(TensorDim(filter_shape[i]));
+          }
+        }
+        break;
+      case TensorLayout::XCK:
+      case TensorLayout::XGCK:
+        for (size_t i = 0; i < spatial_rank; ++i) {
+          F_dims.push_back(K[i]);
+          if (filter_shape.size()) {
+            F_explicit_dims.push_back(TensorDim(filter_shape[i]));
+          }
+        }
+        if (filter_layout == TensorLayout::XGCK) {
+          F_dims.push_back(G);
+          F_explicit_dims.push_back(G);
+        }
+        F_dims.push_back(F_CI);
+        F_explicit_dims.push_back(F_CI);
+        F_dims.push_back(F_CO);
+        F_explicit_dims.push_back(F_CO);
+        break;
+      default:
+        throw std::runtime_error("Invalid filter_layout");
+    }
+    F.bind_dims(F_dims);
+    if (filter_shape.size()) {
+      F.bind_dims(F_explicit_dims);
+    }
+  }
+
+  // The output data dims
+  if (deriv_mode != ConvDerivMode::NONE) {
+    // This assumes we infer the output layout from the input layout. So if we change that, the output data dims section
+    // will need to be adapted.
+    switch (input_layout) {
+      case TensorLayout::NCX:
+        O_dims.push_back(N);
+        O_dims.push_back(CO);
+        for (size_t i = 0; i < spatial_rank; ++i) {
+          O_dims.push_back(Y[i]);
+        }
+        break;
+      case TensorLayout::NXC:
+        O_dims.push_back(N);
+        for (size_t i = 0; i < spatial_rank; ++i) {
+          O_dims.push_back(Y[i]);
+        }
+        O_dims.push_back(CO);
+        break;
+      default:
+        throw std::runtime_error("Invalid input_layout");
+    }
+    O.bind_dims(O_dims);
+  }
+
+  // Compute the adjustments to the filter channel dimensions that come from group size
+  switch (group_layout) {
+    case GroupLayout::NONE:
+      break;
+    case GroupLayout::IN_C:
+      CO = F_CO * G;
+      break;
+    case GroupLayout::IN_K:
+      CI = F_CI * G;
+      break;
+    case GroupLayout::SEPARATE:
+      CO = F_CO * G;
+      CI = F_CI * G;
+      break;
+  }
+
+  // Determine the padding and the shape of the result tensor
+  std::vector<TensorDim> pad_before;
+  std::vector<TensorDim> O_spatial_dims;
+  for (size_t i = 0; i < spatial_rank; ++i) {
+    TensorDim local_pad_before;
+    TensorDim local_output_size;
+    TensorDim local_input_size = (deriv_mode == ConvDerivMode::DATA) ? TensorDim(result_shape[i]) : X[i];
+    TensorDim local_filter_size = (deriv_mode == ConvDerivMode::FILTER) ? TensorDim(result_shape[i]) : K[i];
+    std::tie(local_pad_before, local_output_size) = compute_padding_and_output_size(
+        local_input_size, local_filter_size, strides[i], autopad_mode, manual_padding[i],
+        manual_padding[i + spatial_rank], dilations[i], data_dilations[i], false);
+    pad_before.emplace_back(local_pad_before);
+    O_spatial_dims.emplace_back(local_output_size);
+  }
+
+  // Now set up the dimensions of the result to be returned
+  switch (deriv_mode) {
+    case ConvDerivMode::NONE:
+      // This assumes we infer the output layout from the input layout. So if we change that, the below switch will need
+      // to be adapted.
+      switch (input_layout) {
+        case TensorLayout::NCX:
+          O_dims.push_back(N);
+          O_dims.push_back(CO);
+          for (size_t i = 0; i < spatial_rank; ++i) {
+            O_dims.push_back(O_spatial_dims[i]);
+          }
+          break;
+        case TensorLayout::NXC:
+          O_dims.push_back(N);
+          for (size_t i = 0; i < spatial_rank; ++i) {
+            O_dims.push_back(O_spatial_dims[i]);
+          }
+          O_dims.push_back(CO);
+          break;
+        default:
+          throw std::runtime_error("Invalid input_layout");
+      }
+      O = Tensor{name, O_dims};
+      // O = NamedTensorOutput(name, O_dims);  // TODO: Re-enable when ready
+      break;
+    case ConvDerivMode::DATA:
+      switch (input_layout) {
+        case TensorLayout::NCX:
+          I_dims.push_back(N);
+          I_dims.push_back(CI);
+          for (size_t i = 0; i < spatial_rank; ++i) {
+            I_dims.push_back(TensorDim(result_shape[i]));
+          }
+          break;
+        case TensorLayout::NXC:
+          I_dims.push_back(N);
+          for (size_t i = 0; i < spatial_rank; ++i) {
+            I_dims.push_back(TensorDim(result_shape[i]));
+          }
+          I_dims.push_back(CI);
+          break;
+        default:
+          throw std::runtime_error("Invalid input_layout");
+      }
+      I = Tensor{name, I_dims};
+      // I = NamedTensorOutput(name, I_dims);  // TODO: Re-enable when ready
+      break;
+    case ConvDerivMode::FILTER:
+      switch (filter_layout) {
+        // TODO: This won't always work for grouped convolutions, will have to update
+        case TensorLayout::GKCX:
+          F_dims.push_back(G);
+          // Fall through deliberately
+        case TensorLayout::KCX:
+          F_dims.push_back(F_CO);
+          F_dims.push_back(F_CI);
+          for (size_t i = 0; i < spatial_rank; ++i) {
+            F_dims.push_back(TensorDim(result_shape[i]));
+          }
+          break;
+        case TensorLayout::XCK:
+        case TensorLayout::XGCK:
+          for (size_t i = 0; i < spatial_rank; ++i) {
+            F_dims.push_back(TensorDim(result_shape[i]));
+          }
+          if (filter_layout == TensorLayout::XGCK) {
+            F_dims.push_back(G);
+          }
+          F_dims.push_back(F_CI);
+          F_dims.push_back(F_CO);
+          break;
+        default:
+          throw std::runtime_error("Invalid filter_layout");
+      }
+      F = Tensor{name, F_dims};
+      // F = NamedTensorOutput(name, F_dims);  // TODO: Re-enable when ready
+      break;
+    default:
+      throw std::runtime_error("Invalid deriv_mode");
+  }
+
+  // Set up index formulas
+  // Input data indexes
+  switch (input_layout) {
+    case TensorLayout::NCX:
+      I_idxs.push_back(n);
+      if (group_layout == GroupLayout::NONE) {
+        I_idxs.push_back(ci);
+      } else {
+        I_idxs.push_back((CI / G) * g + ci);
+      }
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        I_idxs.emplace_back((strides[i] * x[i] + dilations[i] * k[i] - pad_before[i]) / data_dilations[i]);
+      }
+      break;
+    case TensorLayout::NXC:
+      I_idxs.push_back(n);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        I_idxs.emplace_back((strides[i] * x[i] + dilations[i] * k[i] - pad_before[i]) / data_dilations[i]);
+      }
+      if (group_layout == GroupLayout::NONE) {
+        I_idxs.push_back(ci);
+      } else {
+        I_idxs.push_back((CI / G) * g + ci);
+      }
+      break;
+    default:
+      throw std::runtime_error("Invalid input_layout");
+  }
+
+  // Filter indexes
+  TensorIndex f_co, f_ci;  // Filter index formulas for out/in channels; depend on group layout
+  switch (group_layout) {
+    case GroupLayout::NONE:
+    case GroupLayout::SEPARATE:
+      f_co = co;
+      f_ci = ci;
+      break;
+    case GroupLayout::IN_C:
+      f_co = co;
+      f_ci = (CI / G) * g + ci;
+      if (ci < CI / G) {
+        // Do nothing; this is just a constraint
+      }
+      break;
+    case GroupLayout::IN_K:
+      f_co = (CO / G) * g + co;
+      f_ci = ci;
+      if (co < CO / G) {
+        // Do nothing; this is just a constraint
+      }
+      break;
+    default:
+      throw std::runtime_error("Unrecognized group layout");
+  }
+  switch (filter_layout) {
+    case TensorLayout::GKCX:
+      F_idxs.push_back(g);
+      // Fall through deliberately
+    case TensorLayout::KCX:
+      F_idxs.push_back(f_co);
+      F_idxs.push_back(f_ci);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        F_idxs.push_back(k[i]);
+      }
+      break;
+    case TensorLayout::XCK:
+    case TensorLayout::XGCK:
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        F_idxs.push_back(k[i]);
+      }
+      if (filter_layout == TensorLayout::XGCK) {
+        F_idxs.push_back(g);
+      }
+      F_idxs.push_back(f_ci);
+      F_idxs.push_back(f_co);
+      break;
+    default:
+      throw std::runtime_error("Invalid filter_layout");
+  }
+
+  // Output data indexes
+  // This assumes we infer the output layout from the input layout. So if we change that, the below switch will need to
+  // be adapted.
+  switch (input_layout) {
+    case TensorLayout::NCX:
+      O_idxs.push_back(n);
+      if (group_layout == GroupLayout::NONE) {
+        O_idxs.push_back(co);
+      } else {
+        O_idxs.push_back((CO / G) * g + co);
+      }
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        O_idxs.push_back(x[i]);
+      }
+      break;
+    case TensorLayout::NXC:
+      O_idxs.push_back(n);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        O_idxs.push_back(x[i]);
+      }
+      if (group_layout == GroupLayout::NONE) {
+        O_idxs.push_back(co);
+      } else {
+        O_idxs.push_back((CO / G) * g + co);
+      }
+      break;
+    default:
+      throw std::runtime_error("Invalid input_layout");
+  }
+
+  // Return the contraction
+  switch (deriv_mode) {
+    case ConvDerivMode::NONE:
+      O(O_idxs) += (I(I_idxs) * F(F_idxs));
+      return Value{O};
+    case ConvDerivMode::DATA:
+      I(I_idxs) += (O(O_idxs) * F(F_idxs));
+      return Value{I};
+    case ConvDerivMode::FILTER:
+      F(F_idxs) += (I(I_idxs) * O(O_idxs));
+      return Value{F};
+    default:
+      throw std::runtime_error("Unrecognized deriv_mode");
+  }
 }
 
 Value dot(const Value& value) {
@@ -476,10 +1139,10 @@ Value pool(const Value& value) {
         str(boost::format("Inconsistent spatial rank in pool op (received %1%D pool_size and %2%D strides)") %
             spatial_rank % strides.size()));
   }
-  if (I_channel_dims < 1) {
+  if (I_channel_dims != 1) {
     throw std::runtime_error(
         str(boost::format("Inconsistent spatial rank in pool op (pool_size has %1% spatial dimensions but input tensor "
-                          "has %2% dimensions, and thus at most %3% spatial dims)") %
+                          "has %2% dimensions, and thus %3% spatial dims)") %
             spatial_rank % I.shape().ndims() % (I.shape().ndims() - 2)));
   }
   if (!is_input_layout(input_layout)) {
@@ -520,8 +1183,8 @@ Value pool(const Value& value) {
     TensorDim local_output_size;
     TensorIndex local_index;
     std::tie(local_pad_before, local_output_size) =
-        compute_padding_and_output_size(X[i], TensorDim(pool_size[i]), strides[i], autopad_mode, manual_padding[2 * i],
-                                        manual_padding[2 * i + 1], use_ceil_for_output_shape);
+        compute_padding_and_output_size(X[i], TensorDim(pool_size[i]), strides[i], autopad_mode, manual_padding[i],
+                                        manual_padding[spatial_rank + i], 1, 1, use_ceil_for_output_shape);
     pad_before.emplace_back(local_pad_before);
     local_index = strides[i] * x[i] + k[i] - pad_before[i];
     O_dims.emplace_back(local_output_size);

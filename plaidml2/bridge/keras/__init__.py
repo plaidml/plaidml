@@ -53,7 +53,7 @@ def _normalize_data_format(data_format):
 
 def _normalize_padding(padding):
     if padding == 'same':
-        return 'same_lower'
+        return 'same_upper'
     if padding in ['same_lower', 'same_upper', 'valid', 'full']:
         return padding
     raise ValueError("Unrecognized padding type '{}'".format(padding))
@@ -388,19 +388,85 @@ def conv(x,
          data_format=None,
          dilation_rate=None,
          channelwise=False):
-    _report_unimplemented('conv')
+    logger.debug(
+        'conv(x: {}, kernel: {}, strides: {}, padding: {}, data_format: {}, dilation_rate: {}, channelwise: {}'
+        .format(x, kernel, strides, padding, data_format, dilation_rate, channelwise))
+    if channelwise:
+        group_layout = 'in_C'
+        autogroup_mode = 'max'
+    else:
+        group_layout = 'none'
+        autogroup_mode = 'ungrouped'
+    return _KerasNode(
+        'conv',
+        tensor=plaidml_op.convolution(
+            x.tensor,
+            kernel.tensor,
+            strides,
+            dilation_rate,
+            [1] * len(strides),
+            [],
+            1,
+            _normalize_padding(padding),
+            [],
+            _normalize_data_format(data_format),
+            'xck',
+            group_layout,
+            False,  # winograd_allowed
+            cur_name(),
+            autogroup_mode,
+            'none',
+            []))
 
 
 def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate):
-    _report_unimplemented('conv_transpose')
+    logger.debug(
+        'conv_transpose(x: {}, kernel: {}, output_shape: {}, strides: {}, padding: {}, data_format: {}, dilation_rate: {}'
+        .format(x, kernel, output_shape, strides, padding, data_format, dilation_rate))
+    # Keras gives every dim on the output_shape, but PlaidML expects to infer the channel dims; so restrict to spatial dims
+    data_format = _normalize_data_format(data_format)
+    if data_format == 'nxc':
+        output_shape = output_shape[1:-1]
+    elif data_format == 'ncx':
+        output_shape = output_shape[2:]
+    else:
+        raise ValueError("Could not parse data_format '{}'".format(data_format))
+    return _KerasNode(
+        'conv',
+        tensor=plaidml_op.convolution(
+            x.tensor,
+            kernel.tensor,
+            strides,
+            dilation_rate,
+            [1] * len(strides),
+            [],
+            1,
+            _normalize_padding(padding),
+            [],
+            data_format,
+            'xck',
+            'none',
+            False,  # winograd_allowed
+            cur_name(),
+            'ungrouped',
+            'data',
+            output_shape))
 
 
 def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rate=1):
-    _report_unimplemented('conv1d')
+    if padding == 'causal':
+        left_pad = dilation_rate * (kernel.tensor.shape.dims[0] - 1)
+        x = temporal_padding(x, (left_pad, 0))
+        padding = 'valid'
+    return conv(x, kernel, (strides,), padding, data_format, (dilation_rate,))
 
 
 def conv2d(x, kernel, strides=(1, 1), padding='valid', dilation_rate=(1, 1), data_format=None):
-    _report_unimplemented('conv2d')
+    if isinstance(strides, six.integer_types):
+        strides = (strides,) * 2
+    if isinstance(dilation_rate, six.integer_types):
+        dilation_rate = (dilation_rate,) * 2
+    return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
 def conv2d_transpose(x,
@@ -410,7 +476,11 @@ def conv2d_transpose(x,
                      padding='valid',
                      data_format=None,
                      dilation_rate=(1, 1)):
-    _report_unimplemented('conv2d_transpose')
+    if isinstance(strides, six.integer_types):
+        strides = (strides,) * 2
+    if isinstance(dilation_rate, six.integer_types):
+        dilation_rate = (dilation_rate,) * 2
+    return conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate)
 
 
 def conv3d(x,
@@ -419,7 +489,11 @@ def conv3d(x,
            padding='valid',
            dilation_rate=(1, 1, 1),
            data_format=None):
-    _report_unimplemented('conv3d')
+    if isinstance(strides, six.integer_types):
+        strides = (strides,) * 3
+    if isinstance(dilation_rate, six.integer_types):
+        dilation_rate = (dilation_rate,) * 3
+    return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
 def conv3d_transpose(x,
@@ -429,7 +503,11 @@ def conv3d_transpose(x,
                      padding='valid',
                      data_format=None,
                      dilation_rate=(1, 1, 1)):
-    _report_unimplemented('conv3d_transpose')
+    if isinstance(strides, six.integer_types):
+        strides = (strides,) * 3
+    if isinstance(dilation_rate, six.integer_types):
+        dilation_rate = (dilation_rate,) * 3
+    return conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate)
 
 
 def count_params(x):
@@ -472,7 +550,7 @@ def depthwise_conv2d(x,
                      padding='valid',
                      data_format=None,
                      dilation_rate=(1, 1)):
-    _report_unimplemented('depthwise_conv2d')
+    return conv(x, kernel, strides, padding, data_format, dilation_rate, channelwise=True)
 
 
 def dot(x, y, name=None):
@@ -929,7 +1007,31 @@ def separable_conv(x,
                    padding='valid',
                    data_format=None,
                    dilation_rate=None):
-    _report_unimplemented('separable_conv')
+    data_format = _normalize_data_format(data_format)
+    if int_shape(pointwise_kernel
+                )[-2] != int_shape(depthwise_kernel)[-1] * int_shape(depthwise_kernel)[-2]:
+        raise ValueError(
+            ('Shape mismatch in separable convolution. Depthwise kernel input ' +
+             'channel count must match pointwise kernel channel count times channel ' +
+             'multiplier.\nReceived {} v {} * {} (from full shapes {} and ' + '{})').format(
+                 pointwise_kernel.tensor.shape.dims[-2], depthwise_kernel.tensor.shape.dims[-2],
+                 depthwise_kernel.tensor.shape.dims[-1], pointwise_kernel.tensor.shape,
+                 depthwise_kernel.tensor.shape))
+    intermediate = conv(x,
+                        depthwise_kernel,
+                        strides=strides,
+                        padding=padding,
+                        data_format=data_format,
+                        dilation_rate=dilation_rate,
+                        channelwise=True)
+    rank = x.tensor.shape.ndims - 2
+    ones = tuple(1 for _ in range(rank))
+    return conv(intermediate,
+                pointwise_kernel,
+                strides=ones,
+                padding='valid',
+                data_format=data_format,
+                dilation_rate=ones)
 
 
 def separable_conv2d(x,
@@ -939,7 +1041,8 @@ def separable_conv2d(x,
                      padding='valid',
                      data_format=None,
                      dilation_rate=(1, 1)):
-    _report_unimplemented('separable_conv2d')
+    return separable_conv(x, depthwise_kernel, pointwise_kernel, strides, padding, data_format,
+                          dilation_rate)
 
 
 def set_floatx(dtype):
