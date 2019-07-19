@@ -419,6 +419,7 @@ void PlaceRefinements(stripe::Block* outermost_block, const proto::MemoryPlaceme
 
     // We have an offset for this chunk.
     chunk.ref->offset = gap_offset;
+    chunk.ref->set_tag("placed");
     chunk.placed = true;
   }
 }

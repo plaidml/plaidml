@@ -57,13 +57,15 @@ TEST(PlacerTest, TemporalSeparationCausesSpatialReuse) {
         value: {
           loc { devs: [{name: "loc_1"}]}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          attrs { key: "placed" value {} }
         }
       },
       {
         key: "b2"
         value: {
-         loc { devs: [{name: "loc_1"}]}
-         interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          loc { devs: [{name: "loc_1"}]}
+          interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          attrs { key: "placed" value {} }
         }
       }
     ]
@@ -118,6 +120,7 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
         value: {
           loc { devs: [{name: "loc_1"}]}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          attrs { key: "placed" value {} }
         }
       },
       {
@@ -125,6 +128,7 @@ TEST(PlacerTest, TemporalOverlapCausesSpacialSeparation) {
         value: {
           loc { devs: [{name: "loc_1"}]}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          attrs { key: "placed" value {} }
           offset: 16
         }
       }
@@ -181,6 +185,7 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
         value: {
           loc { devs: [{name: "loc_1"}]}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          attrs { key: "placed" value {} }
         }
       },
       {
@@ -188,6 +193,7 @@ TEST(PlacerTest, DistinctlocCausesSpacialReuse) {
         value: {
           loc { devs: [{name: "loc_2"}]}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          attrs { key: "placed" value {} }
         }
       }
     ]
@@ -250,6 +256,7 @@ TEST(PlacerTest, LocationSubsetCanBePlaced) {
         value: {
           loc { devs: [{name: "loc_1"}]}
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
+          attrs { key: "placed" value {} }
         }
       },
       {

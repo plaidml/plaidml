@@ -31,6 +31,17 @@ local PARAMS = {
               },
             },
 
+            // Assign offsets to allocation arena throughout the program.
+            {
+              name: 'place_program',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass',
+                reqs: ['program'],
+                locs: [{ devs: [{ name: 'DRAM', units: [{ offset: 0 }] }] }],
+                alignment: 4,
+              },
+            },
+
             // Get dimensions for GEMM
             {
               name: 'get_dimensions',

@@ -31,7 +31,8 @@ namespace cpu {
 
 namespace {
 const char invoker_name_[] = "__invoke_";
-}
+const char arena_name_[] = "__arena_";
+}  // namespace
 
 struct ProgramModule {
   std::unique_ptr<llvm::Module> module;
@@ -79,6 +80,8 @@ class Compiler : private stripe::ConstStmtVisitor {
                     std::vector<std::shared_ptr<stripe::Block>> blockStack);
 
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
+  uint64_t MeasureArena(const stripe::Block& block);
+  void GenerateArena(const stripe::Block& block);
   llvm::Function* CompileXSMMBlock(const stripe::Block& block, const stripe::Block* const dimBlock, DataType dataType);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
@@ -193,6 +196,7 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   ProgramModule ret;
   ret.module = std::make_unique<llvm::Module>("stripe", context_);
   module_ = ret.module.get();
+  GenerateArena(program);
   llvm::Function* main = CompileBlock(program);
   ret.externals = external_funcptrs_;
   // Generate a stub function we can invoke from the outside, passing buffers
@@ -300,6 +304,41 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
     builder_.CreateCall(FreeFunction(), free_args, "");
   }
   builder_.CreateRetVoid();
+}
+
+uint64_t Compiler::MeasureArena(const stripe::Block& block) {
+  // Look for refinements which have been placed into an arena.
+  uint64_t extent = 0;
+  for (const auto& ref : block.refs) {
+    // skip the special case of top-level parameters
+    if (ref.has_tag("user")) {
+      continue;
+    }
+    // skip refinements which lack the "placed" attribute applied by the placer
+    if (!ref.has_tag("placed")) {
+      continue;
+    }
+    // otherwise, look for refinements which are neither inputs nor outputs,
+    // and which do not name a refinement in the context as "from"
+    if (ref.dir == stripe::RefDir::None && ref.from.empty()) {
+      extent = std::max(extent, ref.offset + ref.interior_shape.byte_size());
+    }
+  }
+  // Scan any nested blocks for additional refinements.
+  for (const auto& stmt : block.stmts) {
+    if (stmt->kind() == stripe::StmtKind::Block) {
+      extent = std::max(extent, MeasureArena(*stripe::Block::Downcast(stmt)));
+    }
+  }
+  return extent;
+}
+
+void Compiler::GenerateArena(const stripe::Block& block) {
+  uint64_t extent = MeasureArena(block);
+  auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), extent);
+  module_->getOrInsertGlobal(arena_name_, arenatype);
+  auto gval = module_->getNamedGlobal(arena_name_);
+  gval->setLinkage(llvm::GlobalValue::CommonLinkage);
 }
 
 // Gets the parent block that has the GEMM dimension attributes.
@@ -798,11 +837,16 @@ void Compiler::Visit(const stripe::Block& block) {
     // When a refinement is neither in nor out, and it has no "from"
     // name, it represents a local allocation.
     if (ref.dir == stripe::RefDir::None && ref.from.empty()) {
-      // Allocate new storage for the buffer.
-      size_t size = ref.interior_shape.byte_size();
-      std::vector<llvm::Value*> calloc_args{IndexConst(size), IndexConst(1)};
-      buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
-      allocs.push_back(buffer);
+      if (ref.has_tag("placed")) {
+        auto arena = module_->getNamedGlobal(arena_name_);
+        buffer = builder_.CreateConstGEP1_64(arena, ref.offset);
+      } else {
+        // Allocate new storage for the buffer.
+        size_t size = ref.interior_shape.byte_size();
+        std::vector<llvm::Value*> calloc_args{IndexConst(size), IndexConst(1)};
+        buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
+        allocs.push_back(buffer);
+      }
       llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
       buffer = builder_.CreateBitCast(buffer, buftype);
     } else {
