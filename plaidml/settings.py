@@ -40,7 +40,7 @@ EXPERIMENTAL = 'PLAIDML_EXPERIMENTAL'
 SESSION = 'PLAIDML_SESSION'
 SETTINGS = 'PLAIDML_SETTINGS'
 TELEMETRY = 'PLAIDML_TELEMETRY'
-PROHIBIT_WINOGRAD = 'PLAIDML_PROHIBIT_WINOGRAD'
+ENABLE_WINOGRAD = 'PLAIDML_ENABLE_WINOGRAD'
 USE_STRIPE = 'USE_STRIPE'
 DEFAULT_CONFIG = 'PLAIDML_DEFAULT_CONFIG'
 EXPERIMENTAL_CONFIG = 'PLAIDML_EXPERIMENTAL_CONFIG'
@@ -52,7 +52,7 @@ ENV_SETTINGS = [
     EXPERIMENTAL,
     SESSION,
     TELEMETRY,
-    PROHIBIT_WINOGRAD,
+    ENABLE_WINOGRAD,
 ]
 
 USER_SETTINGS = os.path.expanduser(os.path.join('~', '.plaidml'))
@@ -190,13 +190,13 @@ class _Settings(object):
         os.environ[TELEMETRY] = '1' if val else '0'
 
     @property
-    def prohibit_winograd(self):
-        return os.environ.get(PROHIBIT_WINOGRAD, '0') is not '0'
+    def enable_winograd(self):
+        return os.environ.get(ENABLE_WINOGRAD, '0') is not '0'
         #or os.environ.get( USE_STRIPE, '0') is not '0'
 
-    @prohibit_winograd.setter
-    def prohibit_winograd(self, val):
-        os.environ[PROHIBIT_WINOGRAD] = '1' if val else '0'
+    @enable_winograd.setter
+    def enable_winograd(self, val):
+        os.environ[ENABLE_WINOGRAD] = '1' if val else '0'
 
     @property
     def default_config(self):
