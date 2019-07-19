@@ -79,7 +79,7 @@ class Compiler : private stripe::ConstStmtVisitor {
                     std::vector<std::shared_ptr<stripe::Block>> blockStack);
 
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
-  llvm::Function* CompileXSMMBlock(const stripe::Block& block, const stripe::Block* const dimBlock);
+  llvm::Function* CompileXSMMBlock(const stripe::Block& block, const stripe::Block* const dimBlock, DataType dataType);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
   void Visit(const stripe::Store&) override;
@@ -156,11 +156,13 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
-  llvm::Value* XSMMDispatchFunction();
+  llvm::Value* XSMMDispatchFunction(llvm::Type* alphaBetaPrtrType, const std::string& funcionName);
   llvm::Value* MallocFunction();
   llvm::Value* CallocFunction();
   llvm::Value* FreeFunction();
   llvm::Value* PrngStepFunction();
+  bool isXSMMSuppotedDataType(DataType dataType);
+  const DataType GetBlockRefsDataType(const stripe::Block& block);
 
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
@@ -291,7 +293,21 @@ const stripe::Block* const Compiler::GetBlockWithDimensionAttributes() const {
   throw std::runtime_error("No dimensions set in the GEMM block hierarchy.");
 }
 
-llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const stripe::Block* const dimBlock) {
+llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const stripe::Block* const dimBlock,
+                                           const DataType dataType) {
+  // Validate incomingparams.
+  if (!dimBlock->has_attr("m_idx")) {
+    throw std::runtime_error("Expected m_idx attribute not set!");
+  }
+
+  if (!dimBlock->has_attr("k_idx")) {
+    throw std::runtime_error("Expected k_idx attribute not set!");
+  }
+
+  if (!dimBlock->has_attr("n_idx")) {
+    throw std::runtime_error("Expected n_idx attribute not set!");
+  }
+
   // Generate a function that implements the body for this block of statements.
   // Refinements (their buffers) and initial indexes
   // will be passed as parameters (to the function).
@@ -331,33 +347,44 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const str
     }
   }
   auto i32t = builder_.getInt32Ty();
-  llvm::Value* alpha = builder_.CreateAlloca(builder_.getFloatTy());
-  llvm::Value* beta = builder_.CreateAlloca(builder_.getFloatTy());
   llvm::Value* lda = builder_.CreateAlloca(i32t);
   llvm::Value* ldb = builder_.CreateAlloca(i32t);
   llvm::Value* ldc = builder_.CreateAlloca(i32t);
 
-  llvm::Value* one = llvm::ConstantFP::get(builder_.getFloatTy(), 1.0);
+  llvm::Value* alpha = nullptr;
+  llvm::Value* beta = nullptr;
+  llvm::Value* one = nullptr;
+  llvm::Type* alpha_beta_ptr_type = nullptr;
+  std::string functionName("Invalid");
+  switch (dataType) {
+    case DataType::FLOAT32:
+      one = llvm::ConstantFP::get(builder_.getFloatTy(), 1.0);
+      alpha = builder_.CreateAlloca(builder_.getFloatTy());
+      beta = builder_.CreateAlloca(builder_.getFloatTy());
+      alpha_beta_ptr_type = llvm::Type::getFloatPtrTy(context_);
+      functionName = "libxsmm_smmdispatch";
+      break;
+
+    case DataType::FLOAT64:
+      one = llvm::ConstantFP::get(builder_.getDoubleTy(), 1.0L);
+      alpha = builder_.CreateAlloca(builder_.getDoubleTy());
+      beta = builder_.CreateAlloca(builder_.getDoubleTy());
+      alpha_beta_ptr_type = llvm::Type::getDoublePtrTy(context_);
+      functionName = "libxsmm_dmmdispatch";
+      break;
+
+    default:
+      throw std::runtime_error("Unsupported DataType for XSMM.");
+  }
+
   builder_.CreateStore(one, alpha);
   builder_.CreateStore(one, beta);
-
-  if (!dimBlock->has_attr("m_idx")) {
-    throw std::runtime_error("Expected m_idx attribute not set!");
-  }
-
-  if (!dimBlock->has_attr("k_idx")) {
-    throw std::runtime_error("Expected k_idx attribute not set!");
-  }
-
-  if (!dimBlock->has_attr("n_idx")) {
-    throw std::runtime_error("Expected n_idx attribute not set!");
-  }
 
   builder_.CreateStore(llvm::ConstantInt::get(i32t, dimBlock->get_attr_int("m_idx")), lda);
   builder_.CreateStore(llvm::ConstantInt::get(i32t, dimBlock->get_attr_int("k_idx")), ldb);
   builder_.CreateStore(llvm::ConstantInt::get(i32t, dimBlock->get_attr_int("n_idx")), ldc);
   llvm::Value* nptr = llvm::ConstantPointerNull::get(llvm::Type::getInt32PtrTy(context_));
-  llvm::Value* dispatch = XSMMDispatchFunction();
+  llvm::Value* dispatch = XSMMDispatchFunction(alpha_beta_ptr_type, functionName);
   std::vector<llvm::Value*> args1 = {llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_m")->range),
                                      llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_n")->range),
                                      llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_k")->range),
@@ -383,11 +410,10 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const str
   IVLOG(1, block.ref_ins()[1]->into());
   IVLOG(1, block.ref_ins()[0]->into());
   IVLOG(1, block.ref_outs()[0]->into());
-  llvm::Type* fptr = llvm::Type::getFloatPtrTy(context_);
   std::vector<llvm::Type*> param_types{
-      fptr,  // a
-      fptr,  // b
-      fptr,  // c
+      alpha_beta_ptr_type,  // a
+      alpha_beta_ptr_type,  // b
+      alpha_beta_ptr_type,  // c
   };
   llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   std::vector<llvm::Value*> args2 = {buffers_[block.ref_ins()[1]->into()].base,
@@ -398,11 +424,47 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const str
   return function;
 }
 
+bool Compiler::isXSMMSuppotedDataType(DataType dataType) {
+  switch (dataType) {
+    case DataType::FLOAT32:
+    case DataType::FLOAT64:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+// Make sure all the refinments of this block are of the same type.
+// If they are not, XSMM functions can't be called and we should
+// to slower GEMM calculation process.
+const DataType Compiler::GetBlockRefsDataType(const stripe::Block& block) {
+  DataType retDataType = DataType::INVALID;
+  bool firstIteration = true;
+  const auto allRefs = block.refs;
+  for (auto it = allRefs.cbegin(); it != allRefs.cend(); ++it) {
+    if (firstIteration) {
+      retDataType = it->interior_shape.type;
+      firstIteration = false;
+    } else {
+      if (retDataType != it->interior_shape.type) {
+        // Refinments with tdifferent DataType detected.
+        // Return INVALID, so the XSMM logic detects XSMM
+        // should not be used.
+        return DataType::INVALID;
+      }
+    }
+  }
+
+  return retDataType;
+}
+
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   if (block.has_tag("xsmm")) {
     const stripe::Block* const pBlock = GetBlockWithDimensionAttributes();
-    if (nullptr != pBlock) {
-      return CompileXSMMBlock(block, pBlock);
+    DataType dataType = GetBlockRefsDataType(block);
+    if (nullptr != pBlock && isXSMMSuppotedDataType(dataType)) {
+      return CompileXSMMBlock(block, pBlock, dataType);
     }
   }
 
@@ -1296,13 +1358,12 @@ llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   return llvm::FunctionType::get(return_type, param_types, false);
 }
 
-llvm::Value* Compiler::XSMMDispatchFunction(void) {
+llvm::Value* Compiler::XSMMDispatchFunction(llvm::Type* alphaBetaPrtrType, const std::string& functionName) {
   llvm::Type* iptr = llvm::Type::getInt32PtrTy(context_);
-  llvm::Type* fptr = llvm::Type::getFloatPtrTy(context_);
   std::vector<llvm::Type*> param_types{
-      fptr,  // a
-      fptr,  // b
-      fptr,  // c
+      alphaBetaPrtrType,  // a
+      alphaBetaPrtrType,  // b
+      alphaBetaPrtrType,  // c
   };
   llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   std::vector<llvm::Type*> argtypes{
@@ -1312,14 +1373,13 @@ llvm::Value* Compiler::XSMMDispatchFunction(void) {
       iptr,                   // lda
       iptr,                   // ldb
       iptr,                   // ldc
-      fptr,                   // alpha
-      fptr,                   // beta
+      alphaBetaPrtrType,      // alpha
+      alphaBetaPrtrType,      // beta
       iptr,                   // flags
       iptr,                   // prefetch
   };
   auto functype = llvm::FunctionType::get(rftype->getPointerTo(), argtypes, false);
-  const char* funcname = "libxsmm_smmdispatch";
-  return module_->getOrInsertFunction(funcname, functype).getCallee();
+  return module_->getOrInsertFunction(functionName.c_str(), functype).getCallee();
 }
 
 llvm::Value* Compiler::MallocFunction(void) {
@@ -1423,6 +1483,8 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
       {"_prng_step", symInfo(rt::prng_step)},
       {"libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
       {"_libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
+      {"libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
+      {"_libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {

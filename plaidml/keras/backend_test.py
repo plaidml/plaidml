@@ -54,7 +54,13 @@ def m(*args, **kwargs):
     dtype = kwargs.get('dtype', floatx())
     """Makes a test matrix whose dimensions are the supplied arguments."""
     total = functools.reduce(operator.mul, args, 1)
-    arr = np.array(range(-2, total - 2), dtype=dtype) / 2.
+    arr = np.array(range(-2, total - 2), dtype=dtype)
+    if (arr.dtype in [
+            "float16",
+            "float32",
+            "float64",
+    ]):
+        arr = arr / 2.0
     arr = np.reshape(arr, args)
     return arr
 
@@ -187,7 +193,8 @@ def opTest(in_data,
            skip_theano=True,
            skip_tensorflow=False,
            verbose=False,
-           input_shapes=None):
+           input_shapes=None,
+           dtype=floatx()):
     # If using with non-tensor parameters, all tensor params must appear before
     # all non-tensor params
     # input_shapes should be None or an iterable containing tuples
@@ -202,7 +209,7 @@ def opTest(in_data,
                 x = [b.placeholder(shape=t) for t in shapes]
             else:
                 x = [b.placeholder(shape=t.shape) for t in data if hasattr(t, 'shape')]
-            xv = [b.variable(t, dtype=floatx()) for t in data if hasattr(t, 'shape')]
+            xv = [b.variable(t, dtype=dtype) for t in data if hasattr(t, 'shape')]
             ps = [t for t in data if not hasattr(t, 'shape')]
             grad_funcs = test_func(self, b, *(x + ps + list(run_args)))
             funcs = test_func(self, b, *(xv + ps + list(run_args)))
@@ -1526,7 +1533,46 @@ class TestBackendOps(unittest.TestCase):
         [m(3, 4), m(4, 3)],
     ],
             do_grads=False)
-    def bigMatMul(self, b, A, B):
+    def bigMatMulFloat32(self, b, A, B):
+        return [b.dot(A, B)]
+
+    @opTest(
+        [
+            [m(1024, 1024), m(1024, 1024)],
+            [m(517, 121), m(121, 517)],
+            [m(512, 128), m(128, 512)],
+            [m(67, 33), m(33, 67)],
+            [m(64, 16), m(16, 64)],
+            [m(32, 32), m(32, 32)],
+            [m(13, 17), m(17, 13)],
+            [m(16, 16), m(16, 16)],
+            [m(16, 8), m(8, 16)],
+            [m(3, 4), m(4, 3)],
+        ],
+        do_grads=False,
+        dtype="float64",
+    )
+    def bigMatMulFloat64(self, b, A, B):
+        return [b.dot(A, B)]
+
+    @opTest(
+        [
+            [m(1024, 1024, dtype="int32"),
+             m(1024, 1024, dtype="int32")],
+            [m(517, 121, dtype="int32"), m(121, 517, dtype="int32")],
+            [m(512, 128, dtype="int32"), m(128, 512, dtype="int32")],
+            [m(67, 33, dtype="int32"), m(33, 67, dtype="int32")],
+            [m(64, 16, dtype="int32"), m(16, 64, dtype="int32")],
+            [m(32, 32, dtype="int32"), m(32, 32, dtype="int32")],
+            [m(13, 17, dtype="int32"), m(17, 13, dtype="int32")],
+            [m(16, 16, dtype="int32"), m(16, 16, dtype="int32")],
+            [m(16, 8, dtype="int32"), m(8, 16, dtype="int32")],
+            [m(3, 4, dtype="int32"), m(4, 3, dtype="int32")],
+        ],
+        do_grads=False,
+        dtype="int32",
+    )
+    def bigMatMulInt32(self, b, A, B):
         return [b.dot(A, B)]
 
 
