@@ -25,7 +25,7 @@
         }
       },
       {
-        "description": "AMD config",
+        "description": "AMD OpenCL config",
         "sel": {
           "and": {
             "sel": [
@@ -42,6 +42,9 @@
                 }
               },
               {
+                "name_regex": ".*OpenCL.*"
+              },
+              {
                 "platform_regex": ".*"
               }
             ]
@@ -55,9 +58,46 @@
           "max_regs": 16384,
           "goal_groups": 1,
           "goal_flops_per_byte": 50,
-          "stripe_config": "amd"
+          "stripe_config": "amd_opencl"
         }
       },
+      { 
+        "description": "AMD Metal config",
+        "sel": { 
+          "and": { 
+            "sel": [
+              { 
+                "or": {
+                  "sel": [
+                    { 
+                      "name_regex": ".*AMD.*"
+                    },
+                    { 
+                      "name_regex": ".*Advanced Micro Devices.*"
+                    }
+                  ]
+                }
+              },
+              {
+                "name_regex": ".*Metal.*"
+              },
+              { 
+                "platform_regex": ".*"
+              }
+            ]
+          }
+        },
+        "settings": {
+          "threads": 256,
+          "vec_size": 1,
+          "mem_width": 128,
+          "max_mem": 32768,
+          "max_regs": 16384,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50,
+          "stripe_config": "amd_metal"
+        }
+      },      
       {
         "description": "Intel CPU config",
         "sel": {

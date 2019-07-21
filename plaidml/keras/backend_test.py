@@ -9,6 +9,7 @@ import functools
 import operator
 import os
 import sys
+import platform
 import unittest
 from collections import OrderedDict
 
@@ -796,6 +797,13 @@ class TestBackendOps(unittest.TestCase):
     def testExp(self, b, x):
         return [b.exp(x)]
 
+
+    # For pow(x, y), there is an Metal bug on AMD if x < 0 and y is odd.
+    # Even if y is even, the do_grad function that runs pow(x, odd) is also wrong.
+    # So disable this case for now and restore it when the driver bug is fixed.
+    @unittest.skipIf(
+        "darwin" in platform.system().lower(),
+        "Stripe does not correctly validate assignment ops") 
     @opTest([[m(20)], [m(2, 2, 2)]])
     def testPow(self, b, x):
         return [b.pow(x, 5)]
@@ -804,7 +812,7 @@ class TestBackendOps(unittest.TestCase):
     def testLog(self, b, x):
         return [b.log(x)]
 
-    @opTest([[m(10)], [m(2, 2, 2, 3)]], 1e-2)
+    @opTest([[m(10)], [m(2, 2, 2, 3)]], 1e-2, 1e-7)
     def testTanh(self, b, x):
         return [b.tanh(x)]
 
@@ -943,6 +951,13 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='valid', strides=(3, 1), data_format=df),
             b.conv2d(im, km, padding='same', dilation_rate=(2, 2), data_format=df),
         ]
+
+    @opTest([_conv_inp(IN=2, IC=3, OC=8, IS=[256, 256], KS=[3, 3]),],
+            1e-04,
+            skip_theano=True)
+    def testConv2dActivation(self, b, im, km, df):
+        c = b.conv2d(im, km, padding='valid', strides=(2, 2), data_format=df)
+        return [b.relu(c)]
 
     @opTest(
         [[m(1, 1, 3, 1),

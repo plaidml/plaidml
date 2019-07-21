@@ -67,8 +67,18 @@ void gencfg(const po::variables_map& args) {
     ns_end << "\n} // namespace " << identifier_parts[i];
   }
 
+  // With MSVC, we need to split the long string into pieces less then 16380
+  std::string body_str = body.str();
+  size_t max_len = 16000;
+  size_t start = 0;
+  while (body_str.size() - start + 1 >= max_len) {
+    // Split body_str
+    body_str.insert(start + max_len, "\"\"");
+    start += (max_len + 2);
+  }
+
   std::string output{
-      str(boost::format(kTemplate) % ns_begin.str() % identifier % body.str() % master_buf.size() % ns_end.str())};
+      str(boost::format(kTemplate) % ns_begin.str() % identifier % body_str % master_buf.size() % ns_end.str())};
   WriteFile(args["out"].as<fs::path>(), output, true);
 }
 

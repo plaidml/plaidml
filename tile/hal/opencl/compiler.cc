@@ -255,16 +255,21 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
 
       Emit ocl{cl_khr_fp16, cl_khr_fp64};
       ocl.Visit(*ki.kfunc);
-      std::string src = ki.comments + ocl.str();
+
+      std::stringstream src;
+      src << "// gid: " << ki.gwork[0] << " " << ki.gwork[1] << " " << ki.gwork[2] << "\n";
+      src << "// lid: " << ki.lwork[0] << " " << ki.lwork[1] << " " << ki.lwork[2] << "\n";
+      src << ki.comments << ocl.str();
 
       if (is_directory(cache_dir)) {
         fs::path src_path = (cache_dir / ki.kname).replace_extension("cl");
         if (fs::is_regular_file(src_path)) {
           VLOG(1) << "Reading OpenCL code from cache: " << src_path;
-          src = ReadFile(src_path);
+          src.clear();
+          src << ReadFile(src_path);
         } else {
           VLOG(1) << "Writing OpenCL code to cache: " << src_path;
-          WriteFile(src_path, src);
+          WriteFile(src_path, src.str());
         }
       } else {
         if (VLOG_IS_ON(4)) {
@@ -275,8 +280,8 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
         }
       }
 
-      code << src;
-      kinfo.set_src(src);
+      code << src.str();
+      kinfo.set_src(src.str());
       proto::BuildInfo binfo;
       *binfo.mutable_device_id() = device_state_->id();
       binfo.set_src(code.str());

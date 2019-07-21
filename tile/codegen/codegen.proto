@@ -253,10 +253,12 @@ message FusionPass {
   optional bool no_inner = 8 [default = false];
   // Remove tags for inner blocks
   repeated string inner_remove_set = 9;
+  // Whether allowing inner constraints after fusion
+  optional bool no_constraints = 10 [default = false];
   // New tags for the first inner block
-  repeated string a_inner_set = 36;
+  repeated string a_inner_set = 11;
   // New tags for the second inner block
-  repeated string b_inner_set = 37;
+  repeated string b_inner_set = 12;
 }
 
 // A localize pass detects allocations (refinements with dir = None)

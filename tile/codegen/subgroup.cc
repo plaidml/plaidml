@@ -3,6 +3,7 @@
 #include "tile/codegen/subgroup.h"
 
 #include "tile/codegen/tile.h"
+#include "tile/codegen/cache.h"
 
 namespace vertexai {
 namespace tile {
@@ -262,6 +263,70 @@ class SubgroupCostModel {
   proto::SubgroupPass options_;
 };
 
+// Add a dim with access idx_name
+void AddSubgroupDim(const Refinement& ref, const std::string& idx_name, size_t size) {
+  ref.mut().access.push_back(idx_name == "" ? Affine(0) : Affine(idx_name));
+  ref.mut().interior_shape.dims.emplace_back(0, size);
+  ref.mut().bank_dim = stripe::BankDimension{ref.access.size() - 1};
+}
+
+// Move the dim access with idx_name to the lowest dim
+void MoveSubgroupDim(const Refinement& ref, const std::string& idx_name, size_t size) {
+  bool found = false;
+  for (size_t i = 0; i < ref.access.size(); ++i) {
+    if (ref.access[i] == Affine(idx_name)) {
+      ref.mut().access.erase(ref.mut().access.begin() + i);
+      ref.mut().interior_shape.dims.erase(ref.mut().interior_shape.dims.begin() + i);
+      found = true;
+      break;
+    }
+  }
+  if (found) {
+    ref.mut().access.push_back(idx_name == "" ? Affine(0) : Affine(idx_name));
+    ref.mut().interior_shape.dims.emplace_back(0, size);
+    ref.mut().bank_dim = stripe::BankDimension{ref.access.size() - 1};
+  }
+}
+
+void FixRefInCacheBlock(Block* outer, const std::string& tag, RefDir dir, 
+                        const SubgroupPlan& plan, bool use_ref_idx) {
+  for (const auto& stmt : outer->stmts) {
+    auto cache_block = Block::Downcast(stmt);
+    if (cache_block && cache_block->has_tag(tag)) {
+      std::string ridx;
+      for (auto& ref : cache_block->refs) {
+        if (ref.dir == dir && plan.ref_idx.find(ref.from) != plan.ref_idx.end()) {
+          ridx = plan.ref_idx.at(ref.from);
+          break;
+        }
+      }
+      if (ridx.size() == 0) {
+        continue;
+      }
+      std::string tidx_name = ridx + "_i";
+      Index* idx = cache_block->idx_by_name(tidx_name);
+      if (idx) {
+        idx->range = 1;
+        idx->affine = Affine(use_ref_idx ? ridx : "thread_idx");
+      }
+      else {
+        cache_block->idxs.push_back({tidx_name, 1, Affine(use_ref_idx ? ridx : "thread_idx")});
+      }
+      for (auto& ref : cache_block->refs) {
+        if (ref.dir == dir) {
+          // insert new subgroup dim
+          if (ridx == plan.thread_idx) {
+            AddSubgroupDim(ref, tidx_name, 1);
+          }
+          else {
+            MoveSubgroupDim(ref, tidx_name, 1);
+          }
+        }
+      }
+    }
+  }
+}
+
 void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPass& options) {
   if (block->constraints.size()) {
     IVLOG(1, "Failed due to constraints");
@@ -339,159 +404,6 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   ApplyTile(accum, inner_ts, false);
   stripe::Block* inner = accum->SubBlock(0).get();
 
-  // Change up the inner indexes
-  auto ref_list = inner->refs;
-  inner->idxs = inner_idxs;
-  inner->refs.clear();
-  // Compute all the refinements for the various blocks
-  std::set<stripe::Refinement> reg_allocs;                  // Allocations of register caches
-  std::set<stripe::Refinement> reg_passthrus;               // Passthru's for register caches
-  std::set<stripe::Refinement> reg_inners;                  // Passthru's for register caches
-  std::map<std::string, stripe::Refinement> orig_by_name;   // Passthru's for register caches
-  std::map<std::string, stripe::Refinement> inner_by_name;  // Passthru's for register caches
-  for (const auto& oref : ref_list) {
-    // The new refinement is mostly like inner ref
-    stripe::Refinement ref = oref;
-    // ref.interior_shape = accum->ref_by_into(oref.from)->interior_shape;
-    auto ridx = plan.ref_idx[ref.into()];
-    // This temp ref is for only shape calculation
-    stripe::Refinement reg_ref =
-        stripe::Refinement(ref.dir, ref.into() + "_reg", ref.into(), ref.access, ref.interior_shape, ref.agg_op);
-    // Now, make the innermost register refinements
-    auto ref_repl = replace;
-    if (ridx.size()) {
-      ref_repl[ridx] = stripe::Affine(ridx + "_e");
-    }
-    reg_ref.access.clear();
-    for (auto& poly : ref.access) {
-      auto reg_poly = poly;
-      if (ridx.size()) {
-        for (auto& kvp : reg_poly.mutateMap()) {
-          if (kvp.first == ridx && kvp.second >= static_cast<int>(plan.subgroup_size)) {
-            kvp.second /= plan.subgroup_size;
-          }
-        }
-      }
-      reg_ref.access.push_back(reg_poly.sym_eval(ref_repl));
-    }
-    inner->refs.insert(reg_ref);
-    auto& reg_ref_mut = inner->ref_by_into(ref.into())->mut();
-    auto sizes = inner->exterior_shape(ref.into()).sizes();
-    auto reg_shape = SimpleShape(ref.interior_shape.type, sizes);
-    reg_ref_mut.interior_shape = reg_shape;
-    if (ridx.size()) {
-      reg_ref_mut.access.push_back(stripe::Affine(ridx + "_i"));
-      reg_ref_mut.interior_shape.dims.emplace_back(0, plan.subgroup_tile[ridx]);
-      reg_ref_mut.bank_dim = stripe::BankDimension{ref.access.size()};
-    }
-
-    // refs for the xfer blocks
-    reg_ref = reg_ref_mut;
-    orig_by_name[ref.into()] = ref;
-    reg_inners.insert(reg_ref);
-    reg_ref = reg_ref.WithInto(ref.into() + "_reg");
-    inner_by_name[ref.into()] = reg_ref;
-
-    // Passthru and allocation
-    for (auto& acc : reg_ref.access) {
-      acc.mutateMap().clear();
-    }
-    reg_ref.dir = RefDir::InOut;
-    reg_passthrus.emplace(reg_ref);
-    reg_ref.dir = RefDir::None;
-    reg_ref.from = "";
-    reg_allocs.emplace(reg_ref);
-  }
-
-  // Add in the register refinements
-  outer->refs.insert(reg_allocs.begin(), reg_allocs.end());
-  thread->refs.insert(reg_passthrus.begin(), reg_passthrus.end());
-  accum->refs.insert(reg_passthrus.begin(), reg_passthrus.end());
-  // inner->refs = reg_inners;
-
-  // Pass the thread_id through
-  accum->idxs.emplace_back("thread_idx", 1, stripe::Affine(plan.thread_idx));
-  inner->idx_by_name(plan.thread_idx + "_i")->range = 1;
-  inner->idx_by_name(plan.thread_idx + "_i")->affine = stripe::Affine("thread_idx");
-
-  // Adjust offset of other subgroup refinement
-  for (auto& ref : thread->refs) {
-    if (plan.ref_idx[ref.into()] != "" && plan.ref_idx[ref.into()] != plan.thread_idx) {
-      for (size_t i = 0; i < ref.access.size(); i++) {
-        if (ref.interior_shape.dims[i].stride == 1) {
-          ref.mut().access[i] = stripe::Affine(plan.thread_idx);
-        }
-      }
-    }
-  }
-
-  // Make the base transfer blocks
-  std::map<std::string, std::shared_ptr<stripe::Block>> xfer_blocks;
-  for (const auto& kvp : orig_by_name) {
-    std::string ri = kvp.first;
-    stripe::Refinement orig = kvp.second;
-    orig.from = orig.into();
-    auto xfer = std::make_shared<stripe::Block>();
-
-    for (const auto& idx : inner_idxs) {
-      if (orig.FlatAccess()[idx.name.substr(0, idx.name.size() - 2)]) {
-        xfer->idxs.push_back(idx);
-      }
-    }
-    std::string ref_idx = plan.ref_idx[ri];
-    auto repl = replace;
-    if (ref_idx.size()) {
-      repl[ref_idx] = (ref_idx == plan.thread_idx) ? stripe::Affine(ref_idx + "_e")
-                                                   : stripe::Affine(ref_idx + "_e", plan.subgroup_size);
-    }
-    for (auto& poly : orig.access) {
-      poly = poly.sym_eval(repl);
-    }
-    xfer->refs.emplace(orig);
-    xfer->refs.emplace(inner_by_name[ri]);
-    if (ref_idx.size()) {
-      xfer->idx_by_name(ref_idx + "_i")->range = 1;
-      xfer->idx_by_name(ref_idx + "_i")->affine = stripe::Affine("thread_idx");
-    }
-    for (auto& xref : xfer->refs) {
-      for (auto& dim : xref.mut().interior_shape.dims) {
-        dim.size = 1;
-      }
-    }
-    xfer_blocks[ri] = xfer;
-  }
-
-  // Add them in the appropriate places and add the load/stores as required
-  for (const stripe::Refinement* ref : block->ref_ins()) {
-    auto load = xfer_blocks[ref->into()];
-    load->stmts.push_back(std::make_shared<stripe::Load>(ref->into(), "$x"));
-    load->stmts.push_back(std::make_shared<stripe::Store>("$x", ref->into() + "_reg"));
-    load->ref_by_into(ref->into() + "_reg")->mut().dir = stripe::RefDir::Out;
-    load->set_tag("subgroup_read");
-    load->set_tag("subgroup_inline");
-    accum->stmts.push_front(load);
-  }
-  for (const stripe::Refinement* ref : block->ref_outs(true)) {
-    auto store = xfer_blocks[ref->into()];
-    store->stmts.push_back(std::make_shared<stripe::Load>(ref->into() + "_reg", "$x"));
-    store->stmts.push_back(std::make_shared<stripe::Store>("$x", ref->into()));
-    store->ref_by_into(ref->into() + "_reg")->mut().dir = stripe::RefDir::In;
-    store->idx_by_name(plan.thread_idx + "_i")->affine = stripe::Affine(plan.thread_idx);
-    store->set_tag("subgroup_write");
-    store->set_tag("subgroup_inline");
-    thread->stmts.push_back(store);
-  }
-  for (auto& stmt : inner->stmts) {
-    auto load = stripe::Load::Downcast(stmt);
-    if (!load) {
-      continue;
-    }
-    std::string sub_idx = plan.ref_idx[load->from];
-    if (sub_idx != "" && sub_idx != plan.thread_idx) {
-      load->add_tags({"subgroup_broadcast"});
-    }
-  }
-
   // Add some tags!
   outer->remove_tag("contraction");
   outer->set_tag("subgroup_outer");
@@ -501,10 +413,162 @@ void Subgroup(stripe::Block* block, const AliasMap& map, const proto::SubgroupPa
   accum->set_tag("subgroup_accum");
   inner->set_tag("subgroup_inner");
   inner->set_tag("subgroup_inline");
+
+  // Pass the thread_id through
+  inner->idxs = inner_idxs;
+  accum->idxs.emplace_back("thread_idx", 1, stripe::Affine(plan.thread_idx));
+  inner->idx_by_name(plan.thread_idx + "_i")->range = 1;
+  inner->idx_by_name(plan.thread_idx + "_i")->affine = stripe::Affine("thread_idx");
+
+  // Change index names in inner block
+  for (const auto& ref : inner->refs) {
+    auto ref_idx = plan.ref_idx[ref.into()];
+    auto ref_repl = replace;
+    if (ref_idx.size()) {
+      ref_repl[ref_idx] = (ref_idx == plan.thread_idx) ? stripe::Affine(ref_idx + "_e") :
+        (stripe::Affine(ref_idx + "_e", plan.subgroup_size) + stripe::Affine(ref_idx + "_i"));
+    }
+    std::vector<Affine> new_access;
+    for (auto& aff : ref.mut().access) {
+      new_access.push_back(aff.sym_eval(ref_repl));
+    }
+    ref.mut().access = new_access;
+  }
+
+  // Out index at accum level should be all zero
+  // Check the fact and clear the access of the out ref at accum level
+  for (auto ref : accum->ref_outs(true)) {
+    for (auto& acc : ref->mut().access) {
+      auto& acc_map = acc.mutateMap();
+      for (auto& kvp : acc_map) {
+        if (kvp.first == "") {
+          if (kvp.second != 0) {
+            throw std::runtime_error("Wrong refinement access at accum level.");
+          }
+          continue;
+        }
+        Index* idx = accum->idx_by_name(kvp.first);
+        if (idx->range != 1) {
+          throw std::runtime_error("Non-zero access of output refinement at accum level.");
+        }
+      }
+      acc_map.clear();
+    }
+  }
+
+  AliasMap outer_map(*(map.parent_alias_map()), outer);
+  AliasMap thread_map(outer_map, thread);
+  AliasMap accum_map(thread_map, accum);
+  Location reg_loc = {{{"REGISTER", {0}}}};
+
+  // We have to separately process the In and Out refinements.
+  // When an out ref is cached, we modify the refs in thread block 
+  // and affect its alias map. So the accum_map is invalid then.
+  for (auto ref : inner->refs) {
+    if (ref.dir == RefDir::In) {
+      ApplyCache(accum_map,                              // alias_map
+                 RefDir::In,                             // dir
+                 inner,                                  // ref_block
+                 accum,                                  // outer_block
+                 ref.into(),                             // var_name
+                 reg_loc,                                // mem_loc
+                 {},                                     // xfer_loc
+                 {"subgroup_read", "subgroup_inline"},   // load_tags
+                 {"subgroup_write", "subgroup_inline"},  // store_tags
+                 true,                                   // add_constraints
+                 true,                                   // reorder_idx
+                 false                                   // odd_size
+      );
+    }
+  }
+
+  for (auto ref : inner->refs) {
+    if (IsWriteDir(ref.dir)) {
+      ApplyCache(thread_map,                             // alias_map
+                 RefDir::Out,                            // dir
+                 inner,                                  // ref_block
+                 thread,                                 // outer_block
+                 ref.into(),                             // var_name
+                 reg_loc,                                // mem_loc
+                 {},                                     // xfer_loc
+                 {"subgroup_read", "subgroup_inline"},   // load_tags
+                 {"subgroup_write", "subgroup_inline"},  // store_tags
+                 true,                                   // add_constraints
+                 true,                                   // reorder_idx
+                 false                                   // odd_size
+      );
+    }
+  }
+
+  // Add subgroup dims in refs in inner block
+  for (auto& ref : inner->refs) {
+    auto ridx = plan.ref_idx[ref.into()];
+    if (ridx.size()) {
+      if (ridx == plan.thread_idx) {
+        AddSubgroupDim(ref, ridx + "_i", plan.subgroup_tile[ridx]);
+      }
+      else {
+        MoveSubgroupDim(ref, ridx + "_i", plan.subgroup_tile[ridx]);
+      }
+    }
+  }
+
+  // Fix thread block refs
+  for (auto& ref : thread->refs) {
+    if (ref.dir == RefDir::None) {
+      auto ridx = plan.ref_idx[ref.into()];
+      if (ridx.size()) {
+        if (ridx == plan.thread_idx) {
+          AddSubgroupDim(ref, "", plan.subgroup_tile[ridx]);
+        }
+        else {
+          MoveSubgroupDim(ref, "", plan.subgroup_tile[ridx]);
+        }
+      }
+    }
+  }
+
+  // Fix accum block refs
+  for (auto& ref : accum->refs) {
+    if (ref.dir == RefDir::None || IsWriteDir(ref.dir)) {
+      auto ridx = plan.ref_idx[ref.into()];
+      if (ridx.size()) {
+        if (ridx == plan.thread_idx) {
+          AddSubgroupDim(ref, "", plan.subgroup_tile[ridx]);
+        }
+        else {
+          MoveSubgroupDim(ref, "", plan.subgroup_tile[ridx]);
+        }
+      }
+    }
+  }
+
+  // Fix refs in read cache block
+  FixRefInCacheBlock(accum, "subgroup_read", RefDir::Out, plan, false);
+
+  // Fix refs in write cache block
+  FixRefInCacheBlock(thread, "subgroup_write", RefDir::In, plan, true);
+
+  // Set broadcast directives
+  for (auto& stmt : inner->stmts) {
+    auto load = stripe::Load::Downcast(stmt);
+    if (!load) {
+      continue;
+    }
+    std::string sub_idx = plan.ref_idx[load->from];
+    // If sub_idx is merged, the last dim is not subgroup dim.
+    // Then ignore the broadcast
+    if (sub_idx != "" && sub_idx != plan.thread_idx) {
+      auto ref_it = inner->ref_by_into(load->from);
+      if (ref_it->bank_dim) {
+        load->add_tags({"subgroup_broadcast"});
+      }
+    }
+  }
 }
 
 static void TagTx(stripe::Block* block, const std::set<std::string>& elems) {
-  IVLOG(1, "TagTX: " << elems);
+  IVLOG(2, "TagTX: " << elems);
   for (auto& stmt : block->stmts) {
     switch (stmt->kind()) {
       case stripe::StmtKind::Load: {

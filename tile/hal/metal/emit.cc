@@ -7,6 +7,26 @@
 #include "tile/lang/generate.h"
 #include "tile/lang/scope.h"
 
+#define QUAD_GROUP
+
+#if defined(SIMD_GROUP) && defined(QUAD_GROUP)
+#error *** Cannot define both SIMD_GROUP and QUAD_GROUP. ***
+#endif
+
+#ifdef SIMD_GROUP
+#define BROADCAST "simd_braodcast"
+#define BARRIER "simdgroup_barrier"
+#endif
+
+#ifdef QUAD_GROUP
+#define BROADCAST "quad_broadcast"
+#define BARRIER "simdgroup_barrier"
+#endif
+
+#if !defined(BROADCAST)
+#error *** BROADCAST is not defined. ***
+#endif
+
 namespace vertexai {
 namespace tile {
 namespace hal {
@@ -196,7 +216,7 @@ class Emitter : public sem::Visitor {
       } break;
       default: {
         if (node.name == "sub_group_broadcast") {
-          emit("simd_broadcast");
+          emit(BROADCAST);
         } else {
           emit(node.name);
         }
@@ -313,7 +333,7 @@ class Emitter : public sem::Visitor {
   void Visit(const sem::BarrierStmt& node) {
     emitTab();
     if (node.subgroup) {
-      emit("simdgroup_barrier(mem_flags::mem_threadgroup);\n");
+      emit(std::string(BARRIER) + std::string("(mem_flags::mem_threadgroup);\n"));
     } else {
       emit("threadgroup_barrier(mem_flags::mem_threadgroup);\n");
     }

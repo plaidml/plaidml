@@ -82,13 +82,15 @@ class TagFusionStrategy : public FusionStrategy {
     }
   }
   bool NoInner() { return options_.no_inner(); }
+  bool NoConstraints() { return options_.no_constraints(); }
   const proto::FusionPass& Options() { return options_; }
 
  private:
   const proto::FusionPass options_;
 };
 
-void FusionInner(const AliasMap& scope, stripe::Block* block, TagFusionStrategy* strategy, bool no_inner = false);
+void FusionInner(const AliasMap& scope, stripe::Block* block, TagFusionStrategy* strategy, 
+                 bool no_inner = false, bool no_constraints = false);
 
 class AlwaysFuseRecursive : public TagFusionStrategy {
  public:

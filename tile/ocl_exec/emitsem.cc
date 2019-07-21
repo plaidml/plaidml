@@ -347,7 +347,9 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   }
   for (size_t i = 0; i < block.idxs.size(); i++) {
     const auto& idx = block.idxs[i];
-    cur_->push_front(_Declare({sem::Type::INDEX}, idx_name(idx.name), LogicalIndex(gids, map.dims[i])));
+    // TODO: Metal Gen9 Compiler workaround
+    auto fixed_expr = LogicalIndex(gids, map.dims[i]) % idx.range;
+    cur_->push_front(_Declare({sem::Type::INDEX}, idx_name(idx.name), fixed_expr));
   }
   kernels_.kernels.emplace_back();
   lang::KernelInfo& ki = kernels_.kernels.back();

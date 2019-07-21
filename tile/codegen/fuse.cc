@@ -24,6 +24,19 @@ bool NoInnerBlock(Block* block) {
   return true;
 }
 
+bool InnerConstraints(Block* block) {
+  if (block->constraints.size() > 0) {
+    return true;
+  }
+  for (const auto& stmt : block->stmts) {
+    auto sub = Block::Downcast(stmt);
+    if (sub && InnerConstraints(sub.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void AddInnerTags(Block* block, const Tags& tags) {
   for (auto stmt : block->stmts) {
     auto sub = Block::Downcast(stmt);
@@ -483,7 +496,8 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   return true;
 }
 
-void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strategy, bool no_inner) {
+void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strategy,
+                 bool no_inner, bool no_constraints) {
   // Start with the first statement, and keep tying to fuse until you can't anymore, then move to the next
   auto it = block->stmts.begin();
   while (it != block->stmts.end()) {
@@ -555,6 +569,12 @@ void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strateg
           break;
         }
       }
+      if (no_constraints) {
+        if (InnerConstraints(refactor1.get()) || InnerConstraints(refactor2.get())) {
+          IVLOG(3, "Generate constraints if fused.");
+          break;
+        }
+      }
       // Now copy computed indexes if it's safe
       for (const auto& idx : refactor1->idxs) {
         if (idx.affine != stripe::Affine() && !refactor2->idx_by_name(idx.name)) {
@@ -594,7 +614,7 @@ void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strateg
 }
 
 static void FusionPassRecurse(const AliasMap& map, stripe::Block* block, TagFusionStrategy* strategy) {
-  FusionInner(map, block, strategy, strategy->NoInner());
+  FusionInner(map, block, strategy, strategy->NoInner(), strategy->NoConstraints());
   for (const auto& stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {

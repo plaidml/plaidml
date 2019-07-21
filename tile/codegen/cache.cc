@@ -134,14 +134,16 @@ void FixPassthruIdx(const AliasMap& inner_map, Block* outer, Affine exp) {
 
 // Fixup the refs between the outer block and the inner block
 void FixupMiddleBlockRefs(Block* outer, Block* inner,
-                          const std::string& var_name, const std::string& raw_name) {
+                          const std::string& var_name,
+                          const std::string& raw_name,
+                          const Tags& end_tags) {
   auto it = outer->ref_by_into(var_name, false);
   if (it == outer->refs.end()) {
     return;
   }
   for (auto stmt : outer->stmts) {
     auto sub = Block::Downcast(stmt);
-    if (sub && sub.get() != inner && !sub->has_tag("cache")) {
+    if (sub && sub.get() != inner && !sub->has_any_tags(end_tags)) {
       for (auto& ref : sub->refs) {
         if (ref.from == var_name) {
           if (AllZeroAccess(ref)) {
@@ -149,7 +151,7 @@ void FixupMiddleBlockRefs(Block* outer, Block* inner,
             ref.mut().offset = it->offset;
             ref.mut().access = it->access;
             ref.mut().interior_shape = it->interior_shape;
-            FixupMiddleBlockRefs(sub.get(), inner, ref.into(), raw_name);
+            FixupMiddleBlockRefs(sub.get(), inner, ref.into(), raw_name, end_tags);
           }
           else {
             ref.mut().from = raw_name;
@@ -236,6 +238,7 @@ void ApplyCache(const AliasMap& alias_map,    //
     }
     vars.push_back(dim_vars);
   }
+
   // Make a base block for loading/storing
   Block xfer_block;
   xfer_block.location = xfer_loc;
@@ -384,7 +387,8 @@ void ApplyCache(const AliasMap& alias_map,    //
   ref_it->mut().access = ref_local_access;
 
   // Update inner blocks strides + locations
-  FixupMiddleBlockRefs(outer_block, ref_block, var_name, raw_name);
+  FixupMiddleBlockRefs(outer_block, ref_block, var_name, raw_name,
+    IsReadDir(dir) ? load_tags : store_tags);
 
   // Add constraints
   if (add_constraints) {

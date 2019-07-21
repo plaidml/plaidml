@@ -1,10 +1,21 @@
 local PARAMS = {
-  amd: {
+  amd_opencl: {
     LOCAL_MEM_KIB: 28,
     NUM_THREADS: 256,
     CACHE_WIDTH: 64, 
     NUM_UNITS: 64,
-    REGS_MEM_B: 1024,
+    REGS_MEM_B: 128,
+    REG_MEM_LAT: 1,
+    LOCAL_MEM_LAT: 30,
+    GLOBAL_MEM_LAT: 100,
+    ALIGN_SIZE_B: 64
+  },
+  amd_metal: {
+    LOCAL_MEM_KIB: 28,
+    NUM_THREADS: 256,
+    CACHE_WIDTH: 64,
+    NUM_UNITS: 64,
+    REGS_MEM_B: 128,
     REG_MEM_LAT: 1,
     LOCAL_MEM_LAT: 30,
     GLOBAL_MEM_LAT: 100,
@@ -223,16 +234,6 @@ local PARAMS = {
                 xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
               }
             },
-/*
-            // It is usually useless
-            {
-              name: 'eltwise_idx_order',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IdxOrderPass',
-                reqs: ['eltwise', 'kernel'],
-              }
-            },
-*/
 
             {
               name: 'tile_eltwise_kernel',

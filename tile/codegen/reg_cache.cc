@@ -83,6 +83,7 @@ static Index* IndexByDim(Block* block, const Refinement& ref, size_t dim) {
 static void AdjustRefAccessHelper(Block* outer, Refinement* outer_ref, Block* inner, //
                                   const std::map<std::string, Rational>& multiple,   //
                                   bool adjust_all) {
+
   // Adjust the refinement in inner
   // For the cached refinement, the access must be the corresponding index.
   // Only if adjust_all == true, adjust other refinements.
@@ -104,11 +105,9 @@ static void AdjustRefAccessHelper(Block* outer, Refinement* outer_ref, Block* in
   for (auto& aff : outer_ref->mut().access) {
     auto& aff_map = aff.mutateMap();
     for (auto& aff_it : aff_map) {
-      for (const auto& idx : outer->idxs) {
-        if (idx.name == aff_it.first) {
-          aff_map.clear();
-          break;
-        }
+      if (outer->idx_by_name(aff_it.first)) {
+        aff_map.clear();
+        break;
       }
     }
   }
@@ -226,6 +225,7 @@ static void PartialCacheInRegister(const AliasMap& parent_map,          //
                                    bool keep_local,                     //
                                    const std::string& ref_name,         //
                                    const std::map<std::string, Rational>& multiple) {
+
   // Note that parent is cache block's parent, probably not be computational block's parent
   auto parent_ref_it = parent->ref_by_into(ref_name);
   auto cache_inner = cache->SubBlock(0);
@@ -499,6 +499,7 @@ static bool CacheRefInRegister(const AliasMap& parent_map,                      
       keep_local = true;
     }
   }
+
   if (keep_local) {
     // New cache block from local to register
     auto new_cache = CloneBlock(*cache);
@@ -527,6 +528,7 @@ static bool CacheRefInRegister(const AliasMap& parent_map,                      
     to_cache = new_cache.get();
     cache_index_order = false;
   }
+
   // Now it's better to load the refinement into registers
   PartialCacheInRegister(parent_map, parent, comp_parent, to_cache, comp, cache, 
                          cache_index_order, keep_local, ref_name, multiple);

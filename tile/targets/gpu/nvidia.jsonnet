@@ -223,16 +223,6 @@ local PARAMS = {
                 xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
               }
             },
-/*
-            // It is usually useless
-            {
-              name: 'eltwise_idx_order',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IdxOrderPass',
-                reqs: ['eltwise', 'kernel'],
-              }
-            },
-*/
 
             {
               name: 'tile_eltwise_kernel',

@@ -4,9 +4,13 @@
 
 #include "base/util/env.h"
 #include "base/util/error.h"
+#include "base/util/file.h"
 #include "base/util/factory.h"
 #include "tile/hal/opencl/opencl.pb.h"
 #include "tile/math/util.h"
+
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
 
 namespace vertexai {
 namespace tile {
@@ -198,6 +202,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
   std::map<std::string, std::string> seen;
   std::stringstream src;
   src << "using namespace metal;\n\n";
+  std::string out_dir = env::Get("PLAIDML_METAL_OUTPUT");
   for (const auto& ki : kernel_infos) {
     auto it = seen.find(ki.kname);
     if (it == seen.end()) {
@@ -205,6 +210,17 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
       src << ki.comments;
       src << kernel_src;
       src << "\n\n";
+
+      if (out_dir.size() > 0) {
+        fs::path out_path = out_dir;
+        fs::path src_path = (out_path / ki.kname).replace_extension("metal");
+        std::stringstream output;
+        output << "using namespace metal;\n\n" << ki.comments;
+        output << "// gid: " << ki.gwork[0] << " " << ki.gwork[1] << " " << ki.gwork[2] << "\n";
+        output << "// lid: " << ki.lwork[0] << " " << ki.lwork[1] << " " << ki.lwork[2] << "\n";
+        output << kernel_src << "\n\n";
+        WriteFile(src_path, output.str());
+      }
       seen.insert(std::make_pair(ki.kname, kernel_src));
       kernel_ctxs.emplace_back(KernelContext{ki, kernel_src});
     } else {

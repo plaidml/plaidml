@@ -11,11 +11,11 @@ local PARAMS = {
   },
   intel_gen9_metal: {
     CACHE_WIDTH: 64,
-    MAX_MEM: [180],
-    SUBGROUP_SIZES: [16],
+    MAX_MEM: [280, 280],
+    SUBGROUP_SIZES: [4],
     GLOBAL_MEM_LAT: 420,
     LOCAL_MEM_LAT: 125,
-    MEM_BOUNDED_THRESHOLD: 30,
+    MEM_BOUNDED_THRESHOLD: 14,
     CACHE_SIZE: 3 * 768 * 1024,
     INNER_STMTS_LIMIT: 1200,
   },
@@ -182,15 +182,6 @@ local PARAMS = {
               },
             },
 
-            // Clean up extra indexes
-            // {
-            //   name: 'subgroup_prune',
-            //   pass: {
-            //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-            //     reqs: ['main']
-            //   }
-            // },
-
             // Next we fuse in any element-wise operations which operate on the output of contraction block
             // We need to fuse through multiple levels of the hierarchy
             {
@@ -199,6 +190,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 a_reqs: ['subgroup_outer'],
                 b_reqs: ['eltwise'],
+                no_constraints: true,
               },
             },
             {
