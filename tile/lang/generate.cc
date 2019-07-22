@@ -701,12 +701,13 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
   std::set<std::string> kernel_outputs;
   for (auto unified_opidx : unified_opidxs) {
     auto& unified_op = prog.ops[unified_opidx];
-    if (kernel_inputs.count(var_rewrites->Lookup(unified_op.output))) {
+    auto rewritten_output = var_rewrites->Lookup(unified_op.output);
+    if (kernel_inputs.count(rewritten_output) || post_contraction_set.count(rewritten_output)) {
       // This was a kernel input; it never needs to be a kernel output.
       continue;
     }
     bool needed_as_output = false;
-    if (outputs.count(unified_op.output)) {
+    if (outputs.count(unified_op.output) || outputs.count(rewritten_output)) {
       // It's a program output; we need to write it.
       needed_as_output = true;
     } else {
@@ -719,10 +720,19 @@ static void DoUnification(FlatContraction* flat, std::set<std::size_t>* computed
           }
         }
       }
+      use_it = ud.uses().find(rewritten_output);
+      if (use_it != ud.uses().end()) {
+        for (auto use_opidx : use_it->second) {
+          if (!unified_opidxs.count(use_opidx)) {
+            needed_as_output = true;
+            break;
+          }
+        }
+      }
     }
 
     if (needed_as_output) {
-      kernel_outputs.insert(var_rewrites->Lookup(unified_op.output));
+      kernel_outputs.insert(rewritten_output);
     }
   }
 
