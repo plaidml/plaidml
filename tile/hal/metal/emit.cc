@@ -185,19 +185,31 @@ class Emitter : public sem::Visitor {
   }
 
   void Visit(const sem::CallExpr& node) {
-    if (node.name == "sub_group_broadcast") {
-      emit("simd_broadcast");
-    } else {
-      emit(node.name);
+    switch (node.function) {
+      case sem::CallExpr::Function::CEIL:
+      case sem::CallExpr::Function::FLOOR: {
+        emit(node.name);
+        emit("((float)(");
+        assert(1 == node.vals.size());
+        node.vals[0]->Accept(*this);
+        emit("))");
+      } break;
+      default: {
+        if (node.name == "sub_group_broadcast") {
+          emit("simd_broadcast");
+        } else {
+          emit(node.name);
+        }
+        emit("(");
+        for (size_t i = 0; i < node.vals.size(); i++) {
+          if (i) {
+            emit(", ");
+          }
+          node.vals[i]->Accept(*this);
+        }
+        emit(")");
+      } break;
     }
-    emit("(");
-    for (size_t i = 0; i < node.vals.size(); i++) {
-      if (i) {
-        emit(", ");
-      }
-      node.vals[i]->Accept(*this);
-    }
-    emit(")");
   }
 
   void Visit(const sem::DeclareStmt& node) {

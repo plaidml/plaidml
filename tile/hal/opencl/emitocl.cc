@@ -188,22 +188,34 @@ void Emit::Visit(const sem::ClampExpr& n) {
 void Emit::Visit(const sem::CastExpr& n) { n.val->Accept(*this); }
 
 void Emit::Visit(const sem::CallExpr& n) {
-  auto it = FuncNameMap.find(n.name);
-  if (it != FuncNameMap.end()) {
-    emit(it->second);
-  } else {
-    // Assume this is an OpenCL function.
-    // TODO: Enumerate the set of callable functions.
-    emit(n.name);
+  switch (n.function) {
+    case sem::CallExpr::Function::CEIL:
+    case sem::CallExpr::Function::FLOOR: {
+      emit(n.name);
+      emit("((float)(");
+      assert(1 == n.vals.size());
+      n.vals[0]->Accept(*this);
+      emit("))");
+    } break;
+    default: {
+      auto it = FuncNameMap.find(n.name);
+      if (it != FuncNameMap.end()) {
+        emit(it->second);
+      } else {
+        // Assume this is an OpenCL function.
+        // TODO: Enumerate the set of callable functions.
+        emit(n.name);
+      }
+      emit("(");
+      for (size_t i = 0; i < n.vals.size(); i++) {
+        n.vals[i]->Accept(*this);
+        if (i != n.vals.size() - 1) {
+          emit(", ");
+        }
+      }
+      emit(")");
+    } break;
   }
-  emit("(");
-  for (size_t i = 0; i < n.vals.size(); i++) {
-    n.vals[i]->Accept(*this);
-    if (i != n.vals.size() - 1) {
-      emit(", ");
-    }
-  }
-  emit(")");
 }
 
 void Emit::Visit(const sem::IndexExpr& n) {
@@ -242,7 +254,7 @@ void Emit::Visit(const sem::ForStmt& n) {
 void Emit::Visit(const sem::BarrierStmt& n) {
   emitTab();
   if (n.subgroup) {
-    //emit("sub_group_barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);\n");
+    // emit("sub_group_barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);\n");
   } else {
     emit("barrier(CLK_LOCAL_MEM_FENCE);\n");
   }
