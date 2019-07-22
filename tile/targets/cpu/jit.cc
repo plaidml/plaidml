@@ -220,7 +220,9 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   }
   // Wrap the finished module and the parameter names into a ProgramModule.
   for (auto& ref : program.refs) {
-    ret.parameters.push_back(ref.into());
+    if (ref.has_tag("user")) {
+      ret.parameters.push_back(ref.into());
+    }
   }
   module_ = nullptr;
   assert(ret.module);
@@ -259,15 +261,29 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   // The body of the invoker will compute the element pointer for each
   // argument value in order, then load the value.
   std::vector<llvm::Value*> args;
+  std::vector<llvm::Value*> allocs;
   {
     unsigned i = 0;
     for (auto& ref : program.refs) {
-      llvm::Value* index = builder_.getInt32(i++);
-      std::vector<llvm::Value*> idxList{index};
-      llvm::Value* elptr = builder_.CreateGEP(argvec, idxList);
-      llvm::Value* elval = builder_.CreateLoad(elptr);
-      llvm::Type* eltype = CType(ref.interior_shape.type)->getPointerTo();
-      args.push_back(builder_.CreateBitCast(elval, eltype));
+      if (ref.has_tag("user")) {
+        // The refinement must be provided as a parameter by the user
+        llvm::Value* index = builder_.getInt32(i++);
+        std::vector<llvm::Value*> idxList{index};
+        llvm::Value* elptr = builder_.CreateGEP(argvec, idxList);
+        llvm::Value* elval = builder_.CreateLoad(elptr);
+        llvm::Type* eltype = CType(ref.interior_shape.type)->getPointerTo();
+        args.push_back(builder_.CreateBitCast(elval, eltype));
+      } else if (ref.has_tag("tmp")) {
+        // Allocate a temporary buffer for this refinement
+        size_t size = ref.interior_shape.byte_size();
+        std::vector<llvm::Value*> calloc_args{IndexConst(size), IndexConst(1)};
+        auto buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
+        allocs.push_back(buffer);
+        llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
+        args.push_back(builder_.CreateBitCast(buffer, buftype));
+      } else {
+        throw std::runtime_error("Top-level refinement missing #user or #tmp");
+      }
     }
   }
   // After passing in buffer pointers, we also provide an initial value for
@@ -278,6 +294,11 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   // Having built the argument list, we'll call the actual kernel using the
   // parameter signature it expects.
   builder_.CreateCall(main, args, "");
+  // Free any temporary buffers we may have allocated.
+  for (auto ptr : allocs) {
+    std::vector<llvm::Value*> free_args{ptr};
+    builder_.CreateCall(FreeFunction(), free_args, "");
+  }
   builder_.CreateRetVoid();
 }
 
@@ -779,11 +800,8 @@ void Compiler::Visit(const stripe::Block& block) {
     if (ref.dir == stripe::RefDir::None && ref.from.empty()) {
       // Allocate new storage for the buffer.
       size_t size = ref.interior_shape.byte_size();
-      std::vector<llvm::Value*> calloc_args;
-      calloc_args.push_back(IndexConst(size));
-      calloc_args.push_back(IndexConst(1));
-      auto calloc_func = CallocFunction();
-      buffer = builder_.CreateCall(calloc_func, calloc_args, "");
+      std::vector<llvm::Value*> calloc_args{IndexConst(size), IndexConst(1)};
+      buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
       allocs.push_back(buffer);
       llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
       buffer = builder_.CreateBitCast(buffer, buftype);

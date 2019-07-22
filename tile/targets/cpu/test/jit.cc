@@ -30,6 +30,7 @@ TEST(Jit, JitIntrinsicMUL_F32) {
         key: "b1"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
           access { }
@@ -39,6 +40,7 @@ TEST(Jit, JitIntrinsicMUL_F32) {
         key: "b2"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
           access { }
@@ -70,6 +72,7 @@ TEST(Jit, JitIntrinsicADD_F32) {
         key: "b1"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
           access { }
@@ -79,6 +82,7 @@ TEST(Jit, JitIntrinsicADD_F32) {
         key: "b2"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
           access { }
@@ -118,6 +122,7 @@ TEST(Jit, JitSimpleLoop) {
         key: "bufA"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           access { offset: 0 terms {key: "i" value: 1} }
           interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
@@ -127,6 +132,7 @@ TEST(Jit, JitSimpleLoop) {
         key: "bufB"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           access { offset: 0 terms {key: "i" value: 1} }
           interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
@@ -166,6 +172,7 @@ TEST(Jit, JitCopy2D) {
         key: "bufA"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           access { offset: 0 terms {key:"j" value:1} }
           interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
@@ -175,6 +182,7 @@ TEST(Jit, JitCopy2D) {
         key: "bufB"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           access { offset: 0 terms {key:"i" value:1} }
           access { offset: 0 terms {key:"j" value:1} }
@@ -223,6 +231,7 @@ TEST(Jit, JitAggSum2D) {
         key: "bufA"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           access { offset: 0 terms {key:"j" value:1} }
           interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
@@ -232,6 +241,7 @@ TEST(Jit, JitAggSum2D) {
         key: "bufB"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           agg_op: "add"
           access { offset: 0 terms {key:"i" value:1} }
@@ -312,7 +322,7 @@ TEST(Jit, JitMatMul) {
   runinfo.output_shapes.emplace("C", SimpleShape(DataType::FLOAT32, {dim, dim}));
 
   auto program = GenerateStripe(runinfo);
-  auto main = program->entry->SubBlock(0);
+  auto main = program->entry;
 
   IVLOG(2, "Before>\n" << *main);
 
@@ -340,6 +350,7 @@ TEST(Jit, JitNestedAlloc) {
         key: "bufA"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           access { offset: 0 terms {key:"j" value:1} }
           interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
@@ -349,6 +360,7 @@ TEST(Jit, JitNestedAlloc) {
         key: "bufB"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           agg_op: "add"
           access { offset: 0 terms {key:"i" value:1} }
@@ -429,6 +441,7 @@ TEST(Jit, JitExternalMUL_F32) {
         key: "b1"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
           access { }
@@ -438,6 +451,7 @@ TEST(Jit, JitExternalMUL_F32) {
         key: "b2"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:1 stride:1} }
           access { }
@@ -476,6 +490,7 @@ TEST(Jit, JitExpSub1Nested) {
         key: "X_I_0"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 1
           interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
           access { offset: 0 terms {key:"i1" value:1} }
@@ -485,6 +500,7 @@ TEST(Jit, JitExpSub1Nested) {
         key: "X_T1"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 2
           interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
           access { offset: 0 terms {key:"i1" value:1} }
@@ -521,6 +537,7 @@ TEST(Jit, JitExpSub2) {
         key: "X_T4"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 2
           agg_op: "add"
           interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
@@ -554,6 +571,7 @@ TEST(Jit, JitExpSub2Nested) {
         key: "X_T4"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
           access { }
@@ -601,6 +619,7 @@ TEST(Jit, JitExpSub3Nested) {
         key: "X_I_0"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
           access { }
@@ -610,6 +629,7 @@ TEST(Jit, JitExpSub3Nested) {
         key: "X_T6"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
           access { }
@@ -763,6 +783,7 @@ TEST(Jit, JitExpSub4Nested) {
         key: "X_I_0"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
           access { }
@@ -772,6 +793,7 @@ TEST(Jit, JitExpSub4Nested) {
         key: "X_T7"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: FLOAT32 dims: {size:3 stride:1} }
           access { }
