@@ -1212,8 +1212,11 @@ void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "ta
 void Compiler::Cos(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "cosf", "cos"); }
 
 void Compiler::Zero(const stripe::Special& zero) {
-  // present in stripe.proto but not defined in the specification
-  throw Error("Special operation ZERO is not yet specified");
+  assert(0 == zero.inputs.size());
+  assert(1 == zero.outputs.size());
+  Buffer dst = buffers_[zero.outputs[0]];
+  auto size = dst.refinement->interior_shape.byte_size();
+  builder_.CreateMemSet(dst.base, builder_.getInt8(0), size, 0);
 }
 
 void Compiler::Copy(const stripe::Special& copy) {

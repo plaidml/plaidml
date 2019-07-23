@@ -974,6 +974,36 @@ TEST(Jit, JitExpSub4Nested) {
   EXPECT_FLOAT_EQ(X_T7[2], 0.0451117);
 }
 
+TEST(Jit, JitSpecialZero) {
+  stripe::proto::Block input_proto;
+  gp::TextFormat::ParseFromString(R"(
+    loc {}
+    refs [
+      {
+        key: "b1"
+        value {
+          loc {}
+          dir: 3
+          interior_shape { type: INT32 dims: {size:4 stride:1} }
+          access { }
+        }
+      }
+    ]
+    stmts { special { name:"zero" outputs:"b1" } }
+  )",
+                                  &input_proto);
+  std::shared_ptr<stripe::Block> block{stripe::FromProto(input_proto)};
+
+  std::vector<int32_t> b1{0x04040404, 0x05050505, 0x06060606, 0x7F7F7F7F};
+  std::map<std::string, void*> buffers{{"b1", b1.data()}};
+  JitExecute(*block, buffers);
+
+  EXPECT_THAT(b1[0], Eq(0));
+  EXPECT_THAT(b1[1], Eq(0));
+  EXPECT_THAT(b1[2], Eq(0));
+  EXPECT_THAT(b1[3], Eq(0));
+}
+
 }  // namespace test
 }  // namespace cpu
 }  // namespace targets
