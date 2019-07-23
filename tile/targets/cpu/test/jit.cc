@@ -441,6 +441,7 @@ TEST(Jit, JitPlacedAlloc) {
         key: "bufA"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           access { offset: 0 terms {key:"j" value:1} }
           interior_shape { type: FLOAT32 dims: {size:5 stride:1} }
@@ -450,6 +451,7 @@ TEST(Jit, JitPlacedAlloc) {
         key: "bufB"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           agg_op: "add"
           access { offset: 0 terms {key:"i" value:1} }
