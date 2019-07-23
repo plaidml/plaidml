@@ -184,6 +184,7 @@ struct CallExpr : public Expression {
     SIN,
     SINH,
     SQRT,
+    SUB_GROUP_BROADCAST,
     TAN,
     TANH,
   };

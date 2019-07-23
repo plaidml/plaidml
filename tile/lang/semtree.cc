@@ -68,11 +68,15 @@ void CastExpr::Accept(Visitor& v) const { v.Visit(*this); }
 
 CallExpr::CallExpr(Function f, const std::vector<ExprPtr>& v) : function(f), vals(v) {
   static std::map<Function, std::string> names{
-      {Function::ACOS, "acos"}, {Function::ASIN, "asin"}, {Function::ATAN, "atan"}, {Function::CEIL, "ceil"},
-      {Function::COS, "cos"},   {Function::COSH, "cosh"}, {Function::EXP, "exp"},   {Function::FLOOR, "floor"},
-      {Function::LOG, "log"},   {Function::MAD, "mad"},   {Function::POW, "pow"},   {Function::ROUND, "round"},
-      {Function::SIN, "sin"},   {Function::SINH, "sinh"}, {Function::SQRT, "sqrt"}, {Function::TAN, "tan"},
-      {Function::TANH, "tanh"},
+      {Function::ACOS, "acos"}, {Function::ASIN, "asin"},
+      {Function::ATAN, "atan"}, {Function::CEIL, "ceil"},
+      {Function::COS, "cos"},   {Function::COSH, "cosh"},
+      {Function::EXP, "exp"},   {Function::FLOOR, "floor"},
+      {Function::LOG, "log"},   {Function::MAD, "mad"},
+      {Function::POW, "pow"},   {Function::ROUND, "round"},
+      {Function::SIN, "sin"},   {Function::SINH, "sinh"},
+      {Function::SQRT, "sqrt"}, {Function::SUB_GROUP_BROADCAST, "sub_group_broadcast"},
+      {Function::TAN, "tan"},   {Function::TANH, "tanh"},
   };
   name = names.at(f);
 }
@@ -93,16 +97,19 @@ CallExpr::CallExpr(ExprPtr f, const std::vector<ExprPtr>& v) : vals(v) {
   if (!lookup) throw std::runtime_error("CallExpr only invokes lval");
   name = lookup->name;
   static std::map<std::string, Function> functions{
-      {"acos", Function::ACOS}, {"asin", Function::ASIN}, {"atan", Function::ATAN}, {"ceil", Function::CEIL},
-      {"cos", Function::COS},   {"cosh", Function::COSH}, {"exp", Function::EXP},   {"floor", Function::FLOOR},
-      {"log", Function::LOG},   {"mad", Function::MAD},   {"pow", Function::POW},   {"round", Function::ROUND},
-      {"sin", Function::SIN},   {"sinh", Function::SINH}, {"sqrt", Function::SQRT}, {"tan", Function::TAN},
-      {"tanh", Function::TANH},
+      {"acos", Function::ACOS}, {"asin", Function::ASIN},
+      {"atan", Function::ATAN}, {"ceil", Function::CEIL},
+      {"cos", Function::COS},   {"cosh", Function::COSH},
+      {"exp", Function::EXP},   {"floor", Function::FLOOR},
+      {"log", Function::LOG},   {"mad", Function::MAD},
+      {"pow", Function::POW},   {"round", Function::ROUND},
+      {"sin", Function::SIN},   {"sinh", Function::SINH},
+      {"sqrt", Function::SQRT}, {"sub_group_broadcast", Function::SUB_GROUP_BROADCAST},
+      {"tan", Function::TAN},   {"tanh", Function::TANH},
   };
   auto it = functions.find(name);
   if (it == functions.end()) {
-    return;
-    // throw std::runtime_error("Unable to find function mapping for: " + name);
+    throw std::runtime_error("Unable to find function mapping for: " + name);
   }
 
   function = it->second;

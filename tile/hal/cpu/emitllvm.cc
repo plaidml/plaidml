@@ -483,6 +483,8 @@ void Emit::Visit(const sem::CallExpr& n) {
       linkName = n.name;
       devectorize = true;
       break;
+    case sem::CallExpr::Function::SUB_GROUP_BROADCAST:
+      throw Error("No definition for sub_group_broadcast on this platform");
   }
   // Find a reference to that builtin function, or generate a reference if this
   // is the first time we've called it.
