@@ -1076,6 +1076,7 @@ TEST(Jit, JitSpecialZero) {
         key: "b1"
         value {
           loc {}
+          attrs: { key: "user" value: {} }
           dir: 3
           interior_shape { type: INT32 dims: {size:4 stride:1} }
           access { }
