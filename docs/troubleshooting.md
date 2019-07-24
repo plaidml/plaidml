@@ -44,7 +44,15 @@ bazel test --config macos_x86_64 @com_intel_plaidml//plaidml/keras:backend_test
 
 ## Enable Verbose Logging
 
-If you are importing the `plaidml` package in your code, you can enable verbose
-logging with the function `plaidml_set_internal_vlog`. The function takes a
-single integer argument specifying the level of verbosity (available levels are
-1-4 inclusive).
+You can enable verbose logging through the environment variable
+`PLAIDML_VERBOSE`.
+
+`PLAIDML_VERBOSE` should be set to an integer specifying the level of verbosity
+(valid levels are 0-4 inclusive, where 0 is not verbose and 4 is the most
+verbose).
+
+For instance, the following command would set a verbosity level of 1.
+
+```
+export PLAIDML_VERBOSE=1
+```
