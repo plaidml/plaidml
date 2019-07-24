@@ -40,6 +40,13 @@ Some Notes:
 
     # Placeholder env var
     if os.getenv("PLAIDML_VERBOSE"):
+        # change verbose settings to PLAIDML_VERBOSE, or 4 if PLAIDML_VERBOSE is invalid
+        try:
+            arg_verbose = int(os.getenv("PLAIDML_VERBOSE"))
+        except ValueError:
+            arg_verbose = 4
+        plaidml._internal_set_vlog(arg_verbose)
+        print("INFO:Verbose logging has been enabled - verbose level", arg_verbose, "\n")
         (cfg_path, cfg_file) = os.path.split(plaidml.settings.default_config)
         (exp_path, exp_file) = os.path.split(plaidml.settings.experimental_config)
 
