@@ -47,8 +47,14 @@ Some Notes:
             arg_verbose = 4
         plaidml._internal_set_vlog(arg_verbose)
         print("INFO:Verbose logging has been enabled - verbose level", arg_verbose, "\n")
-        (cfg_path, cfg_file) = os.path.split(plaidml.settings.default_config)
-        (exp_path, exp_file) = os.path.split(plaidml.settings.experimental_config)
+        if plaidml.settings.default_config:
+            (cfg_path, cfg_file) = os.path.split(plaidml.settings.default_config)
+        else:
+            (cfg_path, cfg_file) = ("Unknown", "Unknown")
+        if plaidml.settings.experimental_config:
+            (exp_path, exp_file) = os.path.split(plaidml.settings.experimental_config)
+        else:
+            (exp_path, exp_file) = ("Unknown", "Unknown")
 
     # Operate as if nothing is set
     plaidml.settings._setup_for_test(plaidml.settings.user_settings)
