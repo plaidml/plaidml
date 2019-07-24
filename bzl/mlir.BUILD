@@ -8,6 +8,11 @@ PLATFORM_COPTS = select({
         "-D__STDC_CONSTANT_MACROS",
         "-w",
     ],
+    "@toolchain//:windows_x86_64": [
+        "/w",
+        "/wd4244",
+        "/wd4267",
+    ],
     "//conditions:default": [
         "-fPIC",
         "-w",
@@ -36,6 +41,7 @@ cc_binary(
     ]),
     copts = PLATFORM_COPTS,
     includes = ["include"],
+<<<<<<< HEAD
     linkopts = select({
         "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "@com_intel_plaidml//toolchain:macos_x86_64": [],
@@ -45,6 +51,14 @@ cc_binary(
             "-lm",
         ],
     }),
+||||||| merged common ancestors
+    linkopts = ["-lm"],
+=======
+    linkopts = select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["-lm"],
+    }),
+>>>>>>> Windows mlir
     visibility = ["//visibility:public"],
     deps = [
         ":Support",
