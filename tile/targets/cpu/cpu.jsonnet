@@ -42,37 +42,12 @@ local PARAMS = {
               },
             },
 
-            // Get dimensions for GEMM
+            // Pad tensors to remove inner conditionals
             {
-              name: 'get_dimensions',
+              name: 'pad',
               pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PatternPass',
-                reqs: ['agg_op_add', 'comb_op_mul'],
-                pattern: |||
-                  block({
-                    ref(in, {
-                        dim(0,  {term(1, M)}, _, _),
-                        dim(0,  {term(1, K)}, _, _)
-                    }),
-                    ref(in, {
-                        dim(0, {term(1, K)}, _, _),
-                        dim(0, {term(1, N)}, _, _)
-                    }),
-                    ref(out, { // output
-                        dim(0, {term(1, M)},  _, _),
-                        dim(0, {term(1, N)}, _, _)
-                    })
-                  }, {
-                    idx(M, M_range),
-                    idx(K, K_range),
-                    idx(N, N_range),
-                  })
-                |||,
-                set_vars: {
-                  'm_idx': 'M_range',
-                  'k_idx': 'K_range',
-                  'n_idx': 'N_range',
-                },
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PadPass',
+                reqs: ['main'],
               },
             },
 
@@ -89,12 +64,14 @@ local PARAMS = {
                   {
                     startup_cost: 32,
                     idxs: [
-                      { name: 'm', size: i, outs: [1], ins: [1, 0] },
-                      { name: 'n', size: j, outs: [-1], ins: [0, -1] },
-                      { name: 'k', size: i, outs: [0], ins: [-1, 1] },
+                      { name: 'm', size: i, outs: [-1], ins: [-1, 0] },
+                      { name: 'n', size: j, outs: [1], ins: [0, 1] },
+                      { name: 'k', size: k, outs: [0], ins: [1, -1] },
                     ],
-                  } for i in [8, 16, 32, 48, 64, 80, 96] for j in [8, 18, 34, 46, 62, 80, 96]
+                  } for i in [8, 16, 32, 48, 64, 80, 96] for j in [8, 16, 32, 64, 48, 80, 96] for k in [8, 16, 32, 48, 64, 80, 96]
                 ],
+                inputs_set: [{tags: ["A"]}, {tags: ["B"]}],
+                outputs_set: [{tags: ["C"]}],
               },
             },
             {

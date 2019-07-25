@@ -1504,6 +1504,12 @@ class TestBackendOps(unittest.TestCase):
         o = b.relu(c)
         return [o]
 
+    @opTest([[m(1, 64, 64, 128), m(3, 3, 128, 128)]], do_grads=False)
+    def resnetLayer3(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
     @opTest([[m(1, 56, 56, 256), m(3, 3, 256, 128)]], do_grads=False)
     def res3a_branch2a(self, b, x, k):
         return [b.conv2d(x, k, strides=(2, 2), padding='same')]
@@ -1522,6 +1528,7 @@ class TestBackendOps(unittest.TestCase):
 
     @opTest([
         [m(1024, 1024), m(1024, 1024)],
+        [m(1024, 512), m(512, 1024)],
         [m(517, 121), m(121, 517)],
         [m(512, 128), m(128, 512)],
         [m(67, 33), m(33, 67)],
