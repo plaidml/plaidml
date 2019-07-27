@@ -10,7 +10,6 @@ PLAIDML_COPTS = select({
         "/DWIN32_LEAN_AND_MEAN",
     ],
     "//conditions:default": [
-        "-g",  # always enable debug information
         "-std=c++14",
         "-Werror",
     ],
