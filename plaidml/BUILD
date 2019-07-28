@@ -103,10 +103,9 @@ plaidml_cc_binary(
     deps = [":api"],
 )
 
-apple_binary(
+plaidml_cc_binary(
     name = "libplaidml_raw.dylib",
-    binary_type = "dylib",
-    platform_type = "macos",
+    linkshared = 1,
     tags = ["darwin"],
     deps = [":api"],
 )

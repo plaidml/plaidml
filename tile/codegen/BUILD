@@ -14,7 +14,6 @@ plaidml_cc_library(
         "*.h",
     ]),
     visibility = ["//visibility:public"],
-    alwayslink = 1,
     deps = [
         ":proto_cc",
         "//base/config",
@@ -24,6 +23,7 @@ plaidml_cc_library(
         "@boost//:filesystem",
     ] + select({
         "@toolchain//:windows_x86_64": [],
-	"//conditions:default": ["//tile/targets/cpu"],
-    })
+        "//conditions:default": ["//tile/targets/cpu"],
+    }),
+    alwayslink = 1,
 )

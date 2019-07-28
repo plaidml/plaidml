@@ -25,27 +25,9 @@ plaidml_cc_library(
     deps = [
         "//tile/stripe",
         "@half",
-        "@llvm",
-        "@xsmm//:xsmm",
-    ],
-    alwayslink = 1,
-)
-
-plaidml_cc_library(
-    name = "jit",
-    srcs = glob([
-        "jit.cc",
-        "jit.h",
-    ]),
-    copts = [
-        "-D__STDC_LIMIT_MACROS",
-        "-D__STDC_CONSTANT_MACROS",
-    ],
-    tags = ["llvm"],
-    deps = [
-        "//tile/stripe",
-        "@half",
-        "@llvm",
-        "@xsmm//:xsmm",
+        "@llvm//:MCJIT",
+        "@llvm//:X86",
+        "@llvm//:ipo",
+        "@xsmm",
     ],
 )

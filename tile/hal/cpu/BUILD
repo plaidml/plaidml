@@ -50,7 +50,9 @@ plaidml_cc_library(
         "//tile/proto:proto_cc",
         "//tile/proto:support",
         "@half",
-        "@llvm",
+        "@llvm//:MCJIT",
+        "@llvm//:X86",
+        "@llvm//:ipo",
     ],
     alwayslink = 1,
 )

@@ -26,7 +26,7 @@ cc_binary(
     includes = ["include"],
     linkopts = ["-lm"],
     visibility = ["//visibility:public"],
-    deps = ["@llvm//:tblgen-lib"],
+    deps = ["@llvm//:TableGen"],
 )
 
 mlir_tblgen(
@@ -222,6 +222,24 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     visibility = ["//visibility:public"],
-    deps = ["@llvm"],
+    deps = [
+        "@llvm//:Core",
+        "@llvm//:ExecutionEngine",
+        "@llvm//:OrcJIT",
+        "@llvm//:Support",
+        "@llvm//:TransformUtils",
+        "@llvm//:X86",
+        "@llvm//:ipo",
+    ],
+)
+
+cc_library(
+    name = "test_transforms",
+    srcs = glob([
+        "test/lib/Transforms/**/*.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [":mlir"],
     alwayslink = 1,
 )

@@ -22,7 +22,7 @@ def _tblgen_impl(ctx):
         outputs = [ctx.outputs.out],
         arguments = [args],
         executable = ctx.executable._tool,
-        mnemonic = "TblGen",
+        mnemonic = "MLIRTableGen",
     )
     return [DefaultInfo(files = depset([ctx.outputs.out]))]
 

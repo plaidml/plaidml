@@ -40,7 +40,7 @@ def _tblgen_impl(ctx):
         outputs = [ctx.outputs.out],
         arguments = [args],
         executable = ctx.executable._tool,
-        mnemonic = "TblGen",
+        mnemonic = "TableGen",
     )
     return [DefaultInfo(files = depset([ctx.outputs.out]))]
 
@@ -62,7 +62,7 @@ tblgen = rule(
         ),
         "flags": attr.string_list(),
         "_tool": attr.label(
-            default = Label("@llvm//:tblgen"),
+            default = Label("@llvm//:llvm-tblgen"),
             allow_single_file = True,
             executable = True,
             cfg = "host",

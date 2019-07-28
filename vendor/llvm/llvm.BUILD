@@ -63,19 +63,30 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
 )
 
 cc_library(
-    name = "support",
+    name = "Demangle",
+    srcs = glob([
+        "lib/Demangle/**/*.cpp",
+        "lib/Demangle/**/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Demangle/**/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "Support",
     srcs = glob([
         "lib/Support/**/*.cpp",
         "lib/Support/**/*.c",
         "lib/Support/**/*.h",
-        "lib/Demangle/**/*.cpp",
-        "lib/Demangle/**/*.c",
-        "lib/Demangle/**/*.h",
+        "lib/Support/**/*.inc",
     ]),
     hdrs = glob([
-        "lib/Support/**/*.inc",
-        "lib/Target/**/*.h",
-        "lib/Demangle/**/*.h",
+        "include/llvm/ADT/**/*.h",
+        "include/llvm/Support/**/*.h",
     ]) + CFG_FILES,
     copts = PLATFORM_COPTS,
     includes = ["include"],
@@ -87,16 +98,54 @@ cc_library(
             "-ldl",
         ],
     }),
-    deps = ["@zlib"],
-    alwayslink = 1,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Demangle",
+        "@zlib",
+    ],
 )
 
 cc_library(
-    name = "tblgen-lib",
+    name = "Core",
+    srcs = glob([
+        "lib/IR/**/*.cpp",
+        "lib/IR/**/*.h",
+        "lib/IR/**/*.inc",
+    ]),
+    hdrs = glob([
+        "include/llvm/IR/**/*.h",
+    ]) + [
+        ":gen-attrs",
+        ":gen-attrs-compat",
+        ":gen-intrinsic-enums",
+        ":gen-intrinsic-impl",
+    ],
+    copts = PLATFORM_COPTS + select({
+        "@toolchain//:windows_x86_64": [
+            "/I$(GENDIR)/external/llvm/lib/IR",
+        ],
+        "//conditions:default": [
+            "-iquote",
+            "$(GENDIR)/external/llvm/lib/IR",
+        ],
+    }),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":BinaryFormat",
+        ":Remarks",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "TableGen",
     srcs = glob([
         "lib/TableGen/**/*.cpp",
-        "lib/TableGen/**/*.c",
         "lib/TableGen/**/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/TableGen/**/*.h",
     ]),
     copts = PLATFORM_COPTS,
     linkopts = select({
@@ -104,14 +153,809 @@ cc_library(
         "//conditions:default": ["-lm"],
     }),
     visibility = ["//visibility:public"],
-    deps = [":support"],
+    deps = [":Support"],
+)
+
+cc_library(
+    name = "DebugInfoCodeView",
+    srcs = glob([
+        "lib/DebugInfo/CodeView/*.cpp",
+        "lib/DebugInfo/CodeView/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/DebugInfo/CodeView/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":DebugInfoMSF",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "DebugInfoDWARF",
+    srcs = glob([
+        "lib/DebugInfo/DWARF/*.cpp",
+        "lib/DebugInfo/DWARF/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/DebugInfo/DWARF/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":BinaryFormat",
+        ":MC",
+        ":Object",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "DebugInfoMSF",
+    srcs = glob([
+        "lib/DebugInfo/MSF/*.cpp",
+        "lib/DebugInfo/MSF/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/DebugInfo/MSF/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "ExecutionEngine",
+    srcs = glob([
+        "lib/ExecutionEngine/*.cpp",
+        "lib/ExecutionEngine/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/ExecutionEngine/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Core",
+        ":MC",
+        ":Object",
+        ":RuntimeDyld",
+        ":Support",
+        ":Target",
+    ],
+)
+
+cc_library(
+    name = "Remarks",
+    srcs = glob([
+        "lib/Remarks/*.cpp",
+        "lib/Remarks/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Remarks/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [":Support"],
+)
+
+cc_library(
+    name = "RuntimeDyld",
+    srcs = glob([
+        "lib/ExecutionEngine/RuntimeDyld/**/*.cpp",
+        "lib/ExecutionEngine/RuntimeDyld/**/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/ExecutionEngine/RuntimeDyld/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [":Core"],
+)
+
+cc_library(
+    name = "Object",
+    srcs = glob([
+        "lib/Object/*.cpp",
+        "lib/Object/*.h",
+    ]) + [
+        ":llvm_vcsrevision_h",
+    ],
+    hdrs = glob([
+        "include/llvm/Object/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":BinaryFormat",
+        ":BitReader",
+        ":Core",
+        ":MC",
+        ":MCParser",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "MCJIT",
+    srcs = glob([
+        "lib/ExecutionEngine/MCJIT/*.cpp",
+        "lib/ExecutionEngine/MCJIT/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/ExecutionEngine/MCJIT/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Core",
+        ":ExecutionEngine",
+        ":Object",
+        ":RuntimeDyld",
+        ":Support",
+        ":Target",
+    ],
+)
+
+cc_library(
+    name = "OrcJIT",
+    srcs = glob([
+        "lib/ExecutionEngine/Orc/*.cpp",
+        "lib/ExecutionEngine/Orc/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/ExecutionEngine/Orc/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Core",
+        ":ExecutionEngine",
+        ":JITLink",
+        ":MC",
+        ":Object",
+        ":RuntimeDyld",
+        ":Support",
+        ":Target",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "JITLink",
+    srcs = glob([
+        "lib/ExecutionEngine/JITLink/*.cpp",
+        "lib/ExecutionEngine/JITLink/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/ExecutionEngine/JITLink/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":BinaryFormat",
+        ":Object",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "AsmPrinter",
+    srcs = glob([
+        "lib/CodeGen/AsmPrinter/*.cpp",
+        "lib/CodeGen/AsmPrinter/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/CodeGen/AsmPrinter/*.h",
+        "lib/CodeGen/AsmPrinter/*.def",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":BinaryFormat",
+        ":CodeGen",
+        ":Core",
+        ":DebugInfoCodeView",
+        ":DebugInfoDWARF",
+        ":DebugInfoMSF",
+        ":MC",
+        ":MCParser",
+        ":Remarks",
+        ":Support",
+        ":Target",
+    ],
+)
+
+cc_library(
+    name = "CodeGen",
+    srcs = glob([
+        "lib/CodeGen/*.cpp",
+        "lib/CodeGen/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/CodeGen/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":BitReader",
+        ":BitWriter",
+        ":Core",
+        ":MC",
+        ":ProfileData",
+        ":Scalar",
+        ":Support",
+        ":Target",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "GlobalISel",
+    srcs = glob([
+        "lib/CodeGen/GlobalISel/*.cpp",
+        "lib/CodeGen/GlobalISel/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/CodeGen/GlobalISel/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":CodeGen",
+        ":Core",
+        ":MC",
+        ":Support",
+        ":Target",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "SelectionDAG",
+    srcs = glob([
+        "lib/CodeGen/SelectionDAG/*.cpp",
+        "lib/CodeGen/SelectionDAG/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/CodeGen/SelectionDAG/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":CodeGen",
+        ":Core",
+        ":MC",
+        ":Support",
+        ":Target",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "MC",
+    srcs = glob([
+        "lib/MC/*.cpp",
+        "lib/MC/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/MC/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":BinaryFormat",
+        ":DebugInfoCodeView",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "MCDisassembler",
+    srcs = glob([
+        "lib/MC/MCDisassembler/*.cpp",
+        "lib/MC/MCDisassembler/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/MC/MCDisassembler/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":MC",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "MCParser",
+    srcs = glob([
+        "lib/MC/MCParser/*.cpp",
+        "lib/MC/MCParser/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/MC/MCParser/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":MC",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "BinaryFormat",
+    srcs = glob([
+        "lib/BinaryFormat/*.cpp",
+        "lib/BinaryFormat/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/BinaryFormat/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "BitReader",
+    srcs = glob([
+        "lib/Bitcode/Reader/*.cpp",
+        "lib/Bitcode/Reader/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Bitcode/Reader/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Core",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "BitWriter",
+    srcs = glob([
+        "lib/Bitcode/Writer/*.cpp",
+        "lib/Bitcode/Writer/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Bitcode/Writer/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":Core",
+        ":MC",
+        ":Object",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "AsmParser",
+    srcs = glob([
+        "lib/AsmParser/*.cpp",
+        "lib/AsmParser/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/AsmParser/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":BinaryFormat",
+        ":Core",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "TransformUtils",
+    srcs = glob([
+        "lib/Transforms/Utils/*.cpp",
+        "lib/Transforms/Utils/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Transforms/Utils/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":Core",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "AggressiveInstCombine",
+    srcs = glob([
+        "lib/Transforms/AggressiveInstCombine/*.cpp",
+        "lib/Transforms/AggressiveInstCombine/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Transforms/AggressiveInstCombine/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":Core",
+        ":Support",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "IRReader",
+    srcs = glob([
+        "lib/IRReader/*.cpp",
+        "lib/IRReader/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/IRReader/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":AsmParser",
+        ":BitReader",
+        ":Core",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "InstCombine",
+    srcs = glob([
+        "lib/Transforms/InstCombine/*.cpp",
+        "lib/Transforms/InstCombine/*.h",
+    ]) + [
+        ":gen-inst-combine-tables",
+    ],
+    hdrs = glob([
+        "include/llvm/Transforms/InstCombine/*.h",
+    ]),
+    copts = PLATFORM_COPTS + select({
+        "@toolchain//:windows_x86_64": [
+            "/I$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
+        ],
+        "//conditions:default": [
+            "-iquote",
+            "$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
+        ],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":Core",
+        ":Support",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "Instrumentation",
+    srcs = glob([
+        "lib/Transforms/Instrumentation/*.cpp",
+        "lib/Transforms/Instrumentation/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Transforms/Instrumentation/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":Core",
+        ":MC",
+        ":ProfileData",
+        ":Support",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "Linker",
+    srcs = glob([
+        "lib/Linker/*.cpp",
+        "lib/Linker/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Linker/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Core",
+        ":Support",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "Scalar",
+    srcs = glob([
+        "lib/Transforms/Scalar/*.cpp",
+        "lib/Transforms/Scalar/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Transforms/Scalar/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":AggressiveInstCombine",
+        ":Analysis",
+        ":Core",
+        ":InstCombine",
+        ":Support",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "Vectorize",
+    srcs = glob([
+        "lib/Transforms/Vectorize/*.cpp",
+        "lib/Transforms/Vectorize/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Transforms/Vectorize/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":Core",
+        ":Support",
+        ":TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "ipo",
+    srcs = glob([
+        "lib/Transforms/IPO/*.cpp",
+        "lib/Transforms/IPO/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Transforms/IPO/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":AggressiveInstCombine",
+        ":Analysis",
+        ":BitReader",
+        ":BitWriter",
+        ":Core",
+        ":IRReader",
+        ":InstCombine",
+        ":Instrumentation",
+        ":Linker",
+        ":Object",
+        ":ProfileData",
+        ":Scalar",
+        ":Support",
+        ":TransformUtils",
+        ":Vectorize",
+    ],
+)
+
+cc_library(
+    name = "Analysis",
+    srcs = glob([
+        "lib/Analysis/*.cpp",
+        "lib/Analysis/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Analysis/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":BinaryFormat",
+        ":Core",
+        ":Object",
+        ":ProfileData",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "ProfileData",
+    srcs = glob([
+        "lib/ProfileData/*.cpp",
+        "lib/ProfileData/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/ProfileData/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Core",
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "Target",
+    srcs = glob([
+        "lib/Target/*.cpp",
+        "lib/Target/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":Core",
+        ":MC",
+        ":Support",
+    ],
+)
+
+X86_COPTS = select({
+    "@toolchain//:windows_x86_64": [
+        "/Iexternal/llvm/lib/Target/X86",
+        "/I$(GENDIR)/external/llvm/lib/Target/X86",
+    ],
+    "//conditions:default": [
+        "-iquote",
+        "external/llvm/lib/Target/X86",
+        "-iquote",
+        "$(GENDIR)/external/llvm/lib/Target/X86",
+    ],
+})
+
+cc_library(
+    name = "X86AsmParser",
+    srcs = glob([
+        "lib/Target/X86/AsmParser/*.cpp",
+        "lib/Target/X86/AsmParser/*.h",
+    ]) + [
+        ":gen-asm-matcher",
+    ],
+    hdrs = glob([
+        "include/llvm/Target/X86/AsmParser/*.h",
+    ]),
+    copts = PLATFORM_COPTS + X86_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":MC",
+        ":MCParser",
+        ":Support",
+        ":X86Desc",
+        ":X86Info",
+    ],
+)
+
+cc_library(
+    name = "X86",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":X86AsmParser",
+        ":X86CodeGen",
+    ],
+)
+
+cc_library(
+    name = "X86CodeGen",
+    srcs = glob([
+        "lib/Target/X86/*.cpp",
+        "lib/Target/X86/*.h",
+    ]) + [
+        ":gen-callingconv",
+        ":gen-fast-isel",
+        ":gen-x86-evex2vex-tables",
+        ":gen-register-bank",
+        ":gen-dag-isel",
+        ":gen-global-isel",
+    ],
+    hdrs = glob([
+        "include/llvm/Target/X86/*.h",
+        "lib/Target/X86/*.def",
+    ]),
+    copts = PLATFORM_COPTS + X86_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":AsmPrinter",
+        ":CodeGen",
+        ":Core",
+        ":GlobalISel",
+        ":MC",
+        ":ProfileData",
+        ":SelectionDAG",
+        ":Support",
+        ":Target",
+        ":X86Desc",
+        ":X86Info",
+        ":X86Utils",
+    ],
+)
+
+cc_library(
+    name = "X86Desc",
+    srcs = glob([
+        "lib/Target/X86/MCTargetDesc/*.cpp",
+        "lib/Target/X86/MCTargetDesc/*.h",
+    ]) + [
+        ":gen-register-info",
+        ":gen-instr-info",
+        ":gen-subtarget",
+        ":gen-asm-writer",
+        ":gen-asm-writer-1",
+    ],
+    hdrs = glob([
+        "include/llvm/Target/X86/MCTargetDesc/*.h",
+    ]),
+    copts = PLATFORM_COPTS + X86_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":MC",
+        ":MCDisassembler",
+        ":Object",
+        ":Support",
+        ":X86Info",
+        ":X86Utils",
+    ],
+)
+
+cc_library(
+    name = "X86Info",
+    srcs = glob([
+        "lib/Target/X86/TargetInfo/*.cpp",
+        "lib/Target/X86/TargetInfo/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/X86/TargetInfo/*.h",
+    ]),
+    copts = PLATFORM_COPTS + X86_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Support",
+    ],
+)
+
+cc_library(
+    name = "X86Utils",
+    srcs = glob([
+        "lib/Target/X86/Utils/*.cpp",
+        "lib/Target/X86/Utils/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/X86/Utils/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Support",
+    ],
 )
 
 cc_binary(
-    name = "tblgen",
+    name = "llvm-tblgen",
     srcs = glob([
         "utils/TableGen/**/*.cpp",
-        "utils/TableGen/**/*.c",
         "utils/TableGen/**/*.h",
     ]),
     copts = PLATFORM_COPTS,
@@ -119,7 +963,7 @@ cc_binary(
         "@toolchain//:windows_x86_64": [],
         "//conditions:default": ["-lm"],
     }),
-    deps = [":tblgen-lib"],
+    deps = [":TableGen"],
 )
 
 tblgen(
@@ -298,74 +1142,6 @@ tblgen(
     ],
 )
 
-cc_library(
-    name = "targets",
-    srcs = glob([
-        "lib/Target/*.cpp",
-        "lib/Target/*.h",
-        "lib/Target/X86/**/*.cpp",
-    ]) + [
-        ":gen-asm-matcher",
-        ":gen-asm-writer",
-        ":gen-asm-writer-1",
-        ":gen-callingconv",
-        ":gen-dag-isel",
-        ":gen-disassembler",
-        ":gen-fast-isel",
-        ":gen-global-isel",
-        ":gen-instr-info",
-        ":gen-register-info",
-        ":gen-register-bank",
-        ":gen-subtarget",
-        ":gen-x86-evex2vex-tables",
-    ],
-    hdrs = glob([
-        "lib/Target/X86/**/*.def",
-    ]) + [
-        ":gen-attrs",
-        ":gen-intrinsic-impl",
-        ":gen-intrinsic-enums",
-    ],
-    copts = PLATFORM_COPTS + select({
-        "@toolchain//:windows_x86_64": [
-            "/Iexternal/llvm/lib/Target/X86",
-            "/I$(GENDIR)/external/llvm/lib/Target/X86",
-        ],
-        "//conditions:default": [
-            "-iquote",
-            "external/llvm/lib/Target/X86",
-            "-iquote",
-            "$(GENDIR)/external/llvm/lib/Target/X86",
-        ],
-    }),
-    deps = [
-        ":support",
-    ],
-    alwayslink = 1,
-)
-
-tblgen(
-    name = "gen-lib-opt-parser-defs",
-    src = "lib/ToolDrivers/llvm-lib/Options.td",
-    out = "lib/ToolDrivers/llvm-lib/Options.inc",
-    action = "-gen-opt-parser-defs",
-    incs = [
-        "include",
-        "lib/Target/X86",
-    ],
-)
-
-tblgen(
-    name = "gen-dlltool-opt-parser-defs",
-    src = "lib/ToolDrivers/llvm-dlltool/Options.td",
-    out = "lib/ToolDrivers/llvm-dlltool/Options.inc",
-    action = "-gen-opt-parser-defs",
-    incs = [
-        "include",
-        "lib/Target/X86",
-    ],
-)
-
 tblgen(
     name = "gen-inst-combine-tables",
     src = "lib/Transforms/InstCombine/InstCombineTables.td",
@@ -378,98 +1154,48 @@ tblgen(
 # This would be constructed by the CMake build infrastructure; a few of the
 # source files try to include it. We leave it blank.
 genrule(
-    name = "vcs_revision_gen",
+    name = "llvm_vcsrevision_h",
     srcs = [],
     outs = ["include/llvm/Support/VCSRevision.h"],
-    cmd = "echo '' > \"$@\"",
+    cmd = "echo '#define LLVM_REVISION \"pml-llvm\"' > $@",
 )
 
-cc_library(
-    name = "lib",
-    srcs = glob(
-        [
-            "lib/**/*.cpp",
-            "lib/**/*.h",
-        ],
-        exclude = [
-            "lib/Support/**/*",
-            "lib/TableGen/*",
-            "lib/Target/**/*",
-            "lib/ToolDrivers/**/*",
-            "lib/Demangle/**/*",
-            # need to switch on windows in order to get PDBs
-            "lib/DebugInfo/PDB/DIA/**/*",
-            # excluded because they don't build cleanly
-            "lib/ExecutionEngine/OProfileJIT/**/*",
-            "lib/ExecutionEngine/IntelJITEvents/**/*",
-            "lib/ExecutionEngine/PerfJITEvents/**/*",
-            "lib/Fuzzer/**/*",
-            "lib/Testing/**/*",
-            "lib/WindowsManifest/**/*",
-        ],
-    ) + [
-        ":gen-attrs-compat",
-        ":gen-lib-opt-parser-defs",
-        ":gen-dlltool-opt-parser-defs",
-    ],
-    hdrs = glob([
-        "lib/**/*.def",
-        "include/llvm/**/*.h",
-    ]) + [
-        ":vcs_revision_gen",
-        ":gen-attrs",
-        ":gen-intrinsic-impl",
-        ":gen-intrinsic-enums",
-        ":gen-inst-combine-tables",
-    ],
-    copts = PLATFORM_COPTS + select({
-        "@toolchain//:windows_x86_64": [
-            "/I$(GENDIR)/external/llvm/lib/IR",
-            "/I$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
-        ],
-        "//conditions:default": [
-            "-iquote",
-            "$(GENDIR)/external/llvm/lib/IR",
-            "-iquote",
-            "$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
-        ],
+py_binary(
+    name = "lit",
+    srcs = glob(["utils/lit/**/*.py"]),
+    imports = ["utils/lit"],
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "FileCheck",
+    srcs = glob(["utils/FileCheck/**/*.cpp"]),
+    copts = PLATFORM_COPTS,
+    linkopts = select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["-lm"],
     }),
-    deps = [
-        ":support",
-    ],
-    alwayslink = 1,
+    visibility = ["//visibility:public"],
+    deps = [":Support"],
 )
 
-cc_library(
-    name = "llvm",
+cc_binary(
+    name = "count",
+    srcs = glob(["utils/count/**/*.c"]),
+    copts = PLATFORM_COPTS,
     visibility = ["//visibility:public"],
-    deps = [
-        ":lib",
-        ":support",
-        ":targets",
-    ],
 )
 
-pkg_tar(
-    name = "pkg",
-    srcs = glob([
-        "include/**",
-        "lib/Support/**/*.inc",
-        "lib/Target/**/*.h",
-        "lib/TableGen/**/*.h",
-    ]) + CFG_FILES + [
-        ":gen-attrs",
-        ":gen-intrinsic-impl",
-        ":gen-intrinsic-enums",
-        ":license",
-        ":lib",
-        ":tblgen-lib",
-        ":support",
-        ":targets",
-    ],
-    extension = "tar.bz2",
-    strip_prefix = ".",
+cc_binary(
+    name = "not",
+    srcs = glob(["utils/not/**/*.cpp"]),
+    copts = PLATFORM_COPTS,
+    linkopts = select({
+        "@toolchain//:windows_x86_64": [],
+        "//conditions:default": ["-lm"],
+    }),
     visibility = ["//visibility:public"],
+    deps = [":Support"],
 )
 
 genrule(
