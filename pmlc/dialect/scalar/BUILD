@@ -1,9 +1,11 @@
 # Copyright 2019 Intel Corporation.
 
-package(default_visibility = ["//visibility:public"])
-
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 load("//bzl:mlir.bzl", "mlir_tblgen")
+load(
+    "//bzl:plaidml.bzl",
+    "plaidml_cc_library",
+    "plaidml_cc_test",
+)
 
 mlir_tblgen(
     name = "gen-op-decls",
@@ -22,53 +24,50 @@ mlir_tblgen(
 )
 
 plaidml_cc_library(
-    name = "plaid_ir",
-    hdrs = [
-        "analysis.h",
-        "dialect.h",
-        "mlir.h",
-        "ops.h",
-	"padding_pass.h",
-        "types.h",
-        ":gen-op-defs",
-    ],
+    name = "scalar",
     srcs = [
-        "analysis.cc",
         "dialect.cc",
         "ops.cc",
-	"padding_pass.cc",
+        ":gen-op-defs",
+    ],
+    hdrs = [
+        "ops.h",
+        "types.h",
         ":gen-op-decls",
     ],
-    tags = ["llvm"],
+    visibility = ["//visibility:public"],
     deps = [
-        "@mlir//:ir",
-        "@boost",
+        "//tile/base",
+        "@llvm//:Support",
+        "@mlir//:IR",
+        "@mlir//:StandardOps",
     ],
+    alwayslink = 1,
 )
 
 plaidml_cc_library(
     name = "transcode",
-    hdrs = [
-        "transcode.h",
-    ],
     srcs = [
         "transcode.cc",
     ],
+    hdrs = [
+        "transcode.h",
+    ],
     tags = ["llvm"],
+    visibility = ["//visibility:public"],
     deps = [
-	":plaid_ir",
+        ":scalar",
         "//tile/stripe",
+        "@mlir//:IR",
     ],
 )
 
 plaidml_cc_test(
-    name = "plaid_ir_test",
-    srcs = ["plaid_ir_test.cc"],
-    tags = ["llvm"],
+    name = "scalar_test",
+    srcs = ["scalar_test.cc"],
     deps = [
-        ":transcode",
-	"//tile/lang",
-	"//tile/lib",
-	"//tile/codegen",
+        ":scalar",
+        "@mlir//:EDSC",
+        "@mlir//:Transforms",
     ],
 )

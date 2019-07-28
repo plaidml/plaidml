@@ -1,15 +1,15 @@
 // Copyright 2019, Intel Corporation
 
-#include "tile/plaid_ir/padding_pass.h"
+#include "pmlc/dialect/mir/padding_pass.h"
 
 #include <iostream>
 
-#include "tile/plaid_ir/analysis.h"
-#include "tile/plaid_ir/ops.h"
+#include "pmlc/dialect/mir/analysis.h"
+#include "pmlc/dialect/mir/ops.h"
 
-namespace vertexai {
-namespace tile {
-namespace plaid_ir {
+namespace pmlc {
+namespace dialect {
+namespace mir {
 
 // Compute for a given tensor the range of each of it's dimensions
 std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
@@ -25,15 +25,15 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
       if (inner.size() == 0) {
         continue;
       }
-      assert(ref.offsets().end() - ref.offsets().begin() == inner.size());
+      assert(ref.offsets().end() - ref.offsets().begin() == static_cast<signed>(inner.size()));
       // Add the effect of the offset to the inner ranges
       for (size_t i = 0; i < inner.size(); i++) {
         inner[i] += AffineRange(*(ref.offsets().begin() + i));
       }
     } else if (auto op = mlir::dyn_cast<LoadOp>(use.getOwner())) {
-      inner.resize(op.from()->getType().cast<TensorType>().dims().size());
+      inner.resize(op.from()->getType().cast<TensorType>().ndim());
     } else if (auto op = mlir::dyn_cast<StoreOp>(use.getOwner())) {
-      inner.resize(op.into()->getType().cast<TensorType>().dims().size());
+      inner.resize(op.into()->getType().cast<TensorType>().ndim());
     } else {
       throw std::runtime_error("Invalid type");
     }
@@ -73,6 +73,6 @@ void PaddingPass::runOnFunction() {
   });
 }
 
-}  // namespace plaid_ir
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace mir
+}  // namespace dialect
+}  // namespace pmlc

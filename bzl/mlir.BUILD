@@ -14,19 +14,34 @@ PLATFORM_COPTS = select({
     ],
 })
 
+cc_library(
+    name = "TableGen",
+    srcs = glob([
+        "lib/TableGen/**/*.cpp",
+        "lib/TableGen/**/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@llvm//:Support",
+        "@llvm//:TableGen",
+    ],
+)
+
 cc_binary(
     name = "mlir-tblgen",
     srcs = glob([
         "tools/mlir-tblgen/*.cpp",
-        "lib/TableGen/**/*.cpp",
-        "lib/TableGen/**/*.c",
-        "lib/TableGen/**/*.h",
     ]),
     copts = PLATFORM_COPTS,
     includes = ["include"],
     linkopts = ["-lm"],
     visibility = ["//visibility:public"],
-    deps = ["@llvm//:TableGen"],
+    deps = [
+        ":Support",
+        ":TableGen",
+    ],
 )
 
 mlir_tblgen(
@@ -158,88 +173,364 @@ mlir_tblgen(
 )
 
 cc_library(
-    name = "ir",
+    name = "StandardOps",
     srcs = glob([
-        "lib/AffineOps/**/*.h",
-        "lib/AffineOps/**/*.cpp",
-        "lib/Analysis/**/*.h",
-        "lib/Analysis/**/*.cpp",
-        "lib/Conversion/StandardToLLVM/**/*.h",
-        "lib/Conversion/StandardToLLVM/**/*.cpp",
-        "lib/Conversion/ControlFlowToCFG/**/*.h",
-        "lib/Conversion/ControlFlowToCFG/**/*.cpp",
-        "lib/Dialect/LoopOps/**/*.h",
-        "lib/Dialect/LoopOps/**/*.cpp",
-        "lib/Dialect/LoopOps/**/*.h",
-        "lib/Dialect/LoopOps/**/*.cpp",
-        "lib/EDSC/**/*.h",
-        "lib/EDSC/**/*.cpp",
-        "lib/ExecutionEngine/**/*.h",
-        "lib/ExecutionEngine/**/*.cpp",
-        "lib/GPU/**/*.h",
-        "lib/GPU/**/*.cpp",
-        "lib/IR/**/*.h",
-        "lib/IR/**/*.cpp",
-        "lib/LLVMIR/**/*.h",
-        "lib/LLVMIR/**/*.cpp",
-        "lib/Pass/**/*.h",
-        "lib/Pass/**/*.cpp",
-        "lib/Parser/**/*.h",
-        "lib/Parser/**/*.cpp",
         "lib/StandardOps/**/*.h",
         "lib/StandardOps/**/*.cpp",
-        "lib/Support/**/*.h",
-        "lib/Support/**/*.cpp",
-        "lib/Target/**/*.h",
-        "lib/Target/**/*.cpp",
-        "lib/Transforms/**/*.h",
-        "lib/Transforms/**/*.cpp",
-        "lib/Translation/**/*.h",
-        "lib/Translation/**/*.cpp",
-        "lib/VectorOps/**/*.cpp",
     ]) + [
         ":gen-standard-op-defs",
-        ":gen-affine-op-defs",
-        ":gen-loop-op-defs",
-        ":gen-llvm-op-defs",
-        ":gen-llvm-enum-defs",
-        ":gen-llvm-conversions",
-        ":gen-nvvm-op-defs",
-        ":gen-nvvm-conversions",
-        ":gen-gpu-op-defs",
     ],
-    hdrs = glob([
-        "lib/Parser/**/*.def",
-    ]) + [
+    hdrs = [
         ":gen-standard-op-decls",
-        ":gen-affine-op-decls",
-        ":gen-loop-op-decls",
-        ":gen-llvm-op-decls",
-        ":gen-llvm-enum-decls",
-        ":gen-nvvm-op-decls",
-        ":gen-gpu-op-decls",
     ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
-    visibility = ["//visibility:public"],
     deps = [
         "@llvm//:Core",
-        "@llvm//:ExecutionEngine",
-        "@llvm//:OrcJIT",
         "@llvm//:Support",
-        "@llvm//:TransformUtils",
-        "@llvm//:X86",
-        "@llvm//:ipo",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "Translation",
+    srcs = glob([
+        "lib/Translation/*.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        "@llvm//:Support",
     ],
 )
 
 cc_library(
-    name = "test_transforms",
+    name = "EDSC",
+    srcs = glob([
+        "lib/EDSC/*.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":AffineOps",
+        ":StandardOps",
+        ":TransformUtils",
+        ":VectorOps",
+    ],
+)
+
+cc_library(
+    name = "Support",
+    srcs = glob([
+        "lib/Support/FileUtilities.cpp",
+        "lib/Support/StorageUniquer.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        "@llvm//:Core",
+        "@llvm//:Support",
+    ],
+)
+
+cc_library(
+    name = "OptMain",
+    srcs = glob([
+        "lib/Support/MlirOptMain.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        "@llvm//:Support",
+    ],
+)
+
+cc_library(
+    name = "LLVMIR",
+    srcs = glob([
+        "lib/LLVMIR/IR/LLVMDialect.cpp",
+    ]) + [
+        ":gen-llvm-op-defs",
+        ":gen-llvm-enum-defs",
+        # ":gen-llvm-conversions",
+    ],
+    hdrs = [
+        ":gen-llvm-enum-decls",
+        ":gen-llvm-op-decls",
+    ],
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        "@llvm//:AsmParser",
+        "@llvm//:Core",
+        "@llvm//:Support",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "NVVMIR",
+    srcs = glob([
+        "lib/LLVMIR/IR/NVVMDialect.cpp",
+    ]) + [
+        ":gen-nvvm-op-defs",
+    ],
+    hdrs = [
+        ":gen-nvvm-op-decls",
+        # ":gen-nvvm-conversions",
+    ],
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        "@llvm//:AsmParser",
+        "@llvm//:Core",
+        "@llvm//:Support",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "TargetLLVMIRModuleTranslation",
+    srcs = glob([
+        "lib/Target/LLVMIR/ModuleTranslation.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":LLVMIR",
+        ":Translation",
+        "@llvm//:AsmParser",
+        "@llvm//:Core",
+        "@llvm//:Support",
+        "@llvm//:TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "TargetLLVMIR",
+    srcs = glob([
+        "lib/Target/LLVMIR/ConvertToLLVMIR.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":TargetLLVMIRModuleTranslation",
+    ],
+)
+
+cc_library(
+    name = "GPU",
+    srcs = glob([
+        "lib/GPU/**/*.cpp",
+    ]) + [
+        ":gen-gpu-op-defs",
+    ],
+    hdrs = [
+        ":gen-gpu-op-decls",
+    ],
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":IR",
+        ":StandardOps",
+        "@llvm//:Support",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "TargetNVVMIR",
+    srcs = glob([
+        "lib/Target/LLVMIR/ConvertToNVVMIR.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":GPU",
+        ":IR",
+        ":NVVMIR",
+        ":TargetLLVMIRModuleTranslation",
+    ],
+)
+
+cc_library(
+    name = "IR",
+    srcs = glob([
+        "lib/IR/*.cpp",
+        "lib/IR/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":Support",
+        "@llvm//:Support",
+    ],
+)
+
+cc_library(
+    name = "AffineOps",
+    srcs = glob([
+        "lib/AffineOps/*.cpp",
+        "lib/AffineOps/*.h",
+    ]) + [
+        ":gen-affine-op-defs",
+    ],
+    hdrs = [
+        ":gen-affine-op-decls",
+    ],
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":IR",
+        ":StandardOps",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "Analysis",
+    srcs = glob([
+        "lib/Analysis/*.cpp",
+        "lib/Analysis/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":AffineOps",
+        ":LoopOps",
+    ],
+)
+
+cc_library(
+    name = "Dialect",
+    srcs = glob([
+        "lib/Dialect/*.cpp",
+        "lib/Dialect/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":IR",
+    ],
+)
+
+cc_library(
+    name = "LoopOps",
+    srcs = glob([
+        "lib/Dialect/LoopOps/*.cpp",
+        "lib/Dialect/LoopOps/*.h",
+    ]) + [
+        ":gen-loop-op-defs",
+    ],
+    hdrs = [
+        ":gen-loop-op-decls",
+    ],
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":StandardOps",
+        "@llvm//:Support",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "Pass",
+    srcs = glob([
+        "lib/Pass/*.cpp",
+        "lib/Pass/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":Analysis",
+        ":IR",
+        "@llvm//:Support",
+    ],
+)
+
+cc_library(
+    name = "VectorOps",
+    srcs = glob([
+        "lib/VectorOps/*.cpp",
+        "lib/VectorOps/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        "@llvm//:Support",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "Transforms",
+    srcs = glob([
+        "lib/Transforms/*.cpp",
+        "lib/Transforms/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":AffineOps",
+        ":Analysis",
+        ":EDSC",
+        ":LoopOps",
+        ":Pass",
+        ":TransformUtils",
+        ":VectorOps",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "TransformUtils",
+    srcs = glob([
+        "lib/Transforms/Utils/*.cpp",
+        "lib/Transforms/Utils/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":AffineOps",
+        ":Analysis",
+        ":LoopOps",
+        ":Pass",
+        ":StandardOps",
+    ],
+)
+
+cc_library(
+    name = "Parser",
+    srcs = glob([
+        "lib/Parser/*.cpp",
+        "lib/Parser/*.h",
+    ]),
+    hdrs = glob([
+        "lib/Parser/**/*.def",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":Analysis",
+        ":IR",
+    ],
+)
+
+cc_library(
+    name = "TestTransforms",
     srcs = glob([
         "test/lib/Transforms/**/*.cpp",
     ]),
     copts = PLATFORM_COPTS,
     visibility = ["//visibility:public"],
-    deps = [":mlir"],
+    deps = [
+        ":AffineOps",
+        ":Analysis",
+        ":LoopOps",
+        ":Pass",
+        ":TransformUtils",
+        ":VectorOps",
+    ],
     alwayslink = 1,
 )

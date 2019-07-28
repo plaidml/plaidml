@@ -1,14 +1,14 @@
 // Copyright 2019, Intel Corporation
 
-#include "tile/plaid_ir/analysis.h"
+#include "pmlc/dialect/mir/analysis.h"
 
 #include <boost/math/common_factor.hpp>
 
-#include "tile/plaid_ir/ops.h"
+#include "pmlc/dialect/mir/ops.h"
 
-namespace vertexai {
-namespace tile {
-namespace plaid_ir {
+namespace pmlc {
+namespace dialect {
+namespace mir {
 
 AffinePolynomial::AffinePolynomial() : constant(0) {}
 
@@ -109,6 +109,6 @@ AffineRange::AffineRange(const AffinePolynomial& poly) : min(poly.constant), max
   }
 }
 
-}  // namespace plaid_ir
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace mir
+}  // namespace dialect
+}  // namespace pmlc

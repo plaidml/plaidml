@@ -5,9 +5,9 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
-namespace vertexai {
-namespace tile {
-namespace plaid_ir {
+namespace pmlc {
+namespace dialect {
+namespace mir {
 
 struct PaddingPass : public mlir::FunctionPass<PaddingPass> {
   void runOnFunction() override;
@@ -18,6 +18,6 @@ static mlir::PassRegistration<PaddingPass> pass(
         "padding-pass", "Pad convolutions and such");
 */
 
-}  // namespace plaid_ir
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace mir
+}  // namespace dialect
+}  // namespace pmlc

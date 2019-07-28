@@ -20,9 +20,9 @@
 
 #include "mlir/Support/STLExtras.h"
 
-namespace vertexai {
-namespace tile {
-namespace plaid_ir {
+namespace pmlc {
+namespace dialect {
+namespace mir {
 
 // We load some things from the LLVM / MLIR namespace into our own namespace
 // and add some wrappers for various classes to make life easier.  In general,
@@ -35,25 +35,34 @@ using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::Block;
+using mlir::BoolAttr;
 using mlir::Builder;
+using mlir::DictionaryAttr;
+using mlir::FloatAttr;
 using mlir::IntegerAttr;
 using mlir::LogicalResult;
 using mlir::MLIRContext;
 using mlir::NamedAttribute;
 using mlir::NamedAttributeList;
 using mlir::Op;
+using mlir::OpAsmParser;
+using mlir::OpAsmPrinter;
 using mlir::OpBuilder;
 using mlir::Operation;
 using mlir::OperationState;
+using mlir::Optional;
+using mlir::ParseResult;
 using mlir::Region;
 using mlir::StringAttr;
 using mlir::StringRef;
 using mlir::Type;
+using mlir::TypeAttr;
+using mlir::UnitAttr;
 using mlir::Value;
 
-}  // namespace plaid_ir
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace mir
+}  // namespace dialect
+}  // namespace pmlc
 
 // Helpers for LLVM hashing, implemented in the namespace of the things we are
 // hashing to allow ADL to work.

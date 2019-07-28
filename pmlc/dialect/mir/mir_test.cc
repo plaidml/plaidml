@@ -10,19 +10,18 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "tile/plaid_ir/dialect.h"
-#include "tile/plaid_ir/ops.h"
-#include "tile/plaid_ir/padding_pass.h"
-#include "tile/plaid_ir/transcode.h"
-#include "tile/plaid_ir/types.h"
+#include "pmlc/dialect/mir/ops.h"
+#include "pmlc/dialect/mir/padding_pass.h"
+#include "pmlc/dialect/mir/transcode.h"
+#include "pmlc/dialect/mir/types.h"
 
 #include "tile/codegen/localize.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lib/lib.h"
 
-using namespace vertexai::tile;            // NOLINT
-using namespace vertexai::tile::plaid_ir;  // NOLINT
+using namespace vertexai::tile;      // NOLINT
+using namespace pmlc::dialect::mir;  // NOLINT
 
 lang::RunInfo example() {
   using plaidml::edsl::LogicalShape;
@@ -34,9 +33,6 @@ lang::RunInfo example() {
 }
 
 int main() {
-  printf("Registering dialect\n");
-  mlir::registerDialect<PlaidDialect>();
-
   printf("Making context + module\n");
   mlir::MLIRContext context;
   auto module = mlir::ModuleOp::create(mlir::UnknownLoc::get(&context));

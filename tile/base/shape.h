@@ -147,6 +147,31 @@ inline std::string to_string(const DataType& dt) {
   }
 }
 
+inline DataType DataTypeFromString(const std::string& str) {
+  static std::map<std::string, DataType> tbl = {
+      {"void", DataType::INVALID},  //
+      {"bool", DataType::BOOLEAN},  //
+      {"i8", DataType::INT8},       //
+      {"i16", DataType::INT16},     //
+      {"i32", DataType::INT32},     //
+      {"i64", DataType::INT64},     //
+      {"i128", DataType::INT128},   //
+      {"u8", DataType::UINT8},      //
+      {"u16", DataType::UINT16},    //
+      {"u32", DataType::UINT32},    //
+      {"u64", DataType::UINT64},    //
+      {"fp16", DataType::FLOAT16},  //
+      {"fp32", DataType::FLOAT32},  //
+      {"fp64", DataType::FLOAT64},  //
+      {"prng", DataType::PRNG},     //
+  };
+  auto it = tbl.find(str);
+  if (it == tbl.end()) {
+    throw std::runtime_error("Unknown datatype: " + str);
+  }
+  return it->second;
+}
+
 inline size_t byte_width(const DataType& dt) { return (bit_width(dt) + 7) / 8; }
 
 // Compute result type by 'upcasting' to the highest type in the hierarchy

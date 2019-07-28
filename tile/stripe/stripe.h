@@ -78,6 +78,17 @@ using StatementIt = StatementList::iterator;
 
 using Tags = std::set<std::string>;
 
+class TagVisitor {
+ public:
+  virtual ~TagVisitor() {}
+  virtual void Visit(const std::string& name) = 0;
+  virtual void Visit(const std::string& name, bool value) = 0;
+  virtual void Visit(const std::string& name, int64_t value) = 0;
+  virtual void Visit(const std::string& name, double value) = 0;
+  virtual void Visit(const std::string& name, const std::string& value) = 0;
+  virtual void Visit(const std::string& name, const google::protobuf::Any& value) = 0;
+};
+
 // Generic properties used by optimization passes
 class Taggable {
   friend struct Accessor;
@@ -104,6 +115,9 @@ class Taggable {
   bool has_tag(const std::string& tag) const;
   bool has_tags(const Tags& to_find) const;
   bool has_any_tags(const Tags& to_find) const;
+
+  bool any_tags() const;
+  void visit_tags(TagVisitor* visitor) const;
 
   void set_attr(const std::string& name);
   void set_attr(const std::string& name, bool value);

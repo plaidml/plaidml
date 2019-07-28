@@ -293,6 +293,29 @@ bool Taggable::has_any_tags(const Tags& to_find) const {
   return false;
 }
 
+class TagVisitorVisitor : public boost::static_visitor<> {
+ public:
+  std::string name;
+  TagVisitor* inner;
+  void operator()(const Void& v) const { inner->Visit(name); }
+  void operator()(const bool& v) const { inner->Visit(name, v); }
+  void operator()(const int64_t& v) const { inner->Visit(name, v); }
+  void operator()(const double& v) const { inner->Visit(name, v); }
+  void operator()(const std::string& v) const { inner->Visit(name, v); }
+  void operator()(const google::protobuf::Any& v) const { inner->Visit(name, v); }
+};
+
+bool Taggable::any_tags() const { return !impl_->attrs.empty(); }
+
+void Taggable::visit_tags(TagVisitor* visitor) const {
+  TagVisitorVisitor outer;
+  outer.inner = visitor;
+  for (const auto& kvp : impl_->attrs) {
+    outer.name = kvp.first;
+    boost::apply_visitor(outer, kvp.second);
+  }
+}
+
 void Taggable::set_attr(const std::string& name) { impl_->attrs.emplace(name, Void{}); }
 
 void Taggable::set_attr(const std::string& name, bool value) { impl_->attrs.emplace(name, value); }

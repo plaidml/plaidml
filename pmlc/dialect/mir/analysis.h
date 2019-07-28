@@ -5,11 +5,11 @@
 #include <algorithm>
 #include <map>
 
-#include "tile/plaid_ir/mlir.h"
+#include "pmlc/dialect/mir/mlir.h"
 
-namespace vertexai {
-namespace tile {
-namespace plaid_ir {
+namespace pmlc {
+namespace dialect {
+namespace mir {
 
 // A macro to add operator overloads for a class
 #define AFFINE_OP_OVERLOADS(X)                 \
@@ -89,6 +89,6 @@ std::vector<AffineRange> ComputeInteriorShape(Value* tensor);
 
 */
 
-}  // namespace plaid_ir
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace mir
+}  // namespace dialect
+}  // namespace pmlc
