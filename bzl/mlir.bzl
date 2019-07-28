@@ -1,19 +1,19 @@
 TBLGEN_ACTIONS = [
-    "-gen-llvmir-conversions",
-    "-gen-op-decls",
     "-gen-enum-defs",
     "-gen-enum-decls",
+    "-gen-llvmir-conversions",
+    "-gen-op-decls",
     "-gen-op-defs",
     "-gen-op-doc",
     "-gen-reference-implementations",
     "-gen-rewriters",
-    "-gen-llvmir-conversions",
 ]
 
 def _tblgen_impl(ctx):
     args = ctx.actions.args()
     args.add(ctx.attr.action)
     args.add_all(ctx.attr.flags)
+    args.add("-I", ctx.label.workspace_root)
     args.add_all(ctx.files.incs, before_each = "-I")
     args.add("-o", ctx.outputs.out)
     args.add(ctx.file.src)
