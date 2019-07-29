@@ -48,7 +48,7 @@ plaidml_cc_library(
         "//tile/targets",
         "@boost//:filesystem",
     ] + select({
-        "@toolchain//:macos_x86_64": [
+        "//toolchain:macos_x86_64": [
             "//tile/hal/metal",
         ],
         "//conditions:default": [],

@@ -14,12 +14,12 @@ CFG_FILES = [
 ]
 
 PLATFORM_COPTS = select({
-    "@toolchain//:macos_x86_64": [
+    "@com_intel_plaidml//toolchain:macos_x86_64": [
         "-D__STDC_LIMIT_MACROS",
         "-D__STDC_CONSTANT_MACROS",
         "-w",
     ],
-    "@toolchain//:windows_x86_64": [
+    "@com_intel_plaidml//toolchain:windows_x86_64": [
         "/w",
         "/wd4244",
         "/wd4267",
@@ -36,7 +36,7 @@ genrule(
     srcs = ["CMakeLists.txt"],
     outs = CFG_FILES,
     cmd = select({
-        "@toolchain//:macos_x86_64": """
+        "@com_intel_plaidml//toolchain:macos_x86_64": """
 cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python3) \
     -DLLVM_ENABLE_TERMINFO=OFF \
@@ -45,7 +45,7 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DHAVE_VALGRIND_VALGRIND_H=0 \
     -DLLVM_TARGETS_TO_BUILD="X86"
 """,
-        "@toolchain//:windows_x86_64": """
+        "@com_intel_plaidml//toolchain:windows_x86_64": """
 $${CONDA_PREFIX}/Library/bin/cmake -Thost=x64 -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python) \
     -DLLVM_ENABLE_TERMINFO=OFF \
@@ -91,8 +91,8 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     linkopts = select({
-        "@toolchain//:windows_x86_64": [],
-        "@toolchain//:macos_x86_64": [],
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:macos_x86_64": [],
         "//conditions:default": [
             "-pthread",
             "-ldl",
@@ -121,7 +121,7 @@ cc_library(
         ":gen-intrinsic-impl",
     ],
     copts = PLATFORM_COPTS + select({
-        "@toolchain//:windows_x86_64": [
+        "@com_intel_plaidml//toolchain:windows_x86_64": [
             "/I$(GENDIR)/external/llvm/lib/IR",
         ],
         "//conditions:default": [
@@ -149,7 +149,7 @@ cc_library(
     ]),
     copts = PLATFORM_COPTS,
     linkopts = select({
-        "@toolchain//:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "//conditions:default": ["-lm"],
     }),
     visibility = ["//visibility:public"],
@@ -631,7 +631,7 @@ cc_library(
         "include/llvm/Transforms/InstCombine/*.h",
     ]),
     copts = PLATFORM_COPTS + select({
-        "@toolchain//:windows_x86_64": [
+        "@com_intel_plaidml//toolchain:windows_x86_64": [
             "/I$(GENDIR)/external/llvm/lib/Transforms/InstCombine",
         ],
         "//conditions:default": [
@@ -814,7 +814,7 @@ cc_library(
 )
 
 X86_COPTS = select({
-    "@toolchain//:windows_x86_64": [
+    "@com_intel_plaidml//toolchain:windows_x86_64": [
         "/Iexternal/llvm/lib/Target/X86",
         "/I$(GENDIR)/external/llvm/lib/Target/X86",
     ],
@@ -960,7 +960,7 @@ cc_binary(
     ]),
     copts = PLATFORM_COPTS,
     linkopts = select({
-        "@toolchain//:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "//conditions:default": ["-lm"],
     }),
     deps = [":TableGen"],
@@ -1172,7 +1172,7 @@ cc_binary(
     srcs = glob(["utils/FileCheck/**/*.cpp"]),
     copts = PLATFORM_COPTS,
     linkopts = select({
-        "@toolchain//:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "//conditions:default": ["-lm"],
     }),
     visibility = ["//visibility:public"],
@@ -1191,7 +1191,7 @@ cc_binary(
     srcs = glob(["utils/not/**/*.cpp"]),
     copts = PLATFORM_COPTS,
     linkopts = select({
-        "@toolchain//:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "//conditions:default": ["-lm"],
     }),
     visibility = ["//visibility:public"],

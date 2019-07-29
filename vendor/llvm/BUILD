@@ -7,11 +7,11 @@ package(default_visibility = ["//visibility:public"])
 # cmake_external(
 #     name = "llvm",
 #     additional_tools = select({
-#         "@toolchain//:windows_x86_64": ["@com_intel_plaidml_conda_tools_windows//:ninja"],
+#         "//toolchain:windows_x86_64": ["@com_intel_plaidml_conda_tools_windows//:ninja"],
 #         "//conditions:default": ["@com_intel_plaidml_conda_tools_unix//:ninja"],
 #     }),
 #     cache_entries = select({
-#         "@toolchain//:windows_x86_64": {
+#         "//toolchain:windows_x86_64": {
 #             "CMAKE_MAKE_PROGRAM": "$EXT_BUILD_ROOT/external/com_intel_plaidml_conda_tools_windows/env/bin/ninja.exe",
 #             "LLVM_ENABLE_LIBEDIT": "OFF",
 #             "LLVM_ENABLE_LIBXML2": "OFF",
@@ -33,7 +33,7 @@ package(default_visibility = ["//visibility:public"])
 #     cmake_options = ["-GNinja"],
 #     lib_source = "@llvm//:all",
 #     make_commands = select({
-#         "@toolchain//:windows_x86_64": [
+#         "//toolchain:windows_x86_64": [
 #             "$EXT_BUILD_ROOT/external/com_intel_plaidml_conda_tools_windows/env/bin/ninja.exe",
 #             "$EXT_BUILD_ROOT/external/com_intel_plaidml_conda_tools_windows/env/bin/ninja.exe install",
 #         ],

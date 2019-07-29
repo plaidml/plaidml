@@ -23,7 +23,7 @@ cc_library(
         "zip.h",
     ],
     copts = select({
-        "@toolchain//:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "//conditions:default": [
             "-Wno-implicit-function-declaration",
             "-Wno-int-conversion",
@@ -36,7 +36,7 @@ cc_library(
     }),
     includes = ["."],
     linkopts = select({
-        "@toolchain//:windows_x86_64": ["-DEFAULTLIB:advapi32.lib"],
+        "@com_intel_plaidml//toolchain:windows_x86_64": ["-DEFAULTLIB:advapi32.lib"],
         "//conditions:default": [],
     }),
     deps = ["@zlib"],

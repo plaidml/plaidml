@@ -22,7 +22,7 @@ plaidml_cc_library(
         "//tile/stripe",
         "@boost//:filesystem",
     ] + select({
-        "@toolchain//:windows_x86_64": [],
+        "//toolchain:windows_x86_64": [],
         "//conditions:default": ["//tile/targets/cpu"],
     }),
     alwayslink = 1,

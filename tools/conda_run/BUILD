@@ -8,7 +8,7 @@ plaidml_cc_binary(
     name = "conda_run",
     srcs = ["conda.cc"],
     linkopts = select({
-        "@toolchain//:linux_x86_64": ["-pthread"],
+        "//toolchain:linux_x86_64": ["-pthread"],
         "//conditions:default": [],
     }),
     deps = [

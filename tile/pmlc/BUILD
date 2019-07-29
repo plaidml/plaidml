@@ -7,7 +7,7 @@ plaidml_cc_library(
     srcs = ["pmlc.cc"],
     hdrs = ["pmlc.h"],
     defines = select({
-        "@toolchain//:windows_x86_64": [],
+        "//toolchain:windows_x86_64": [],
         "//conditions:default": ["ENABLE_LLVM_BITCODE"],
     }),
     deps = [
@@ -19,7 +19,7 @@ plaidml_cc_library(
         "//tile/util",
         "@boost//:program_options",
     ] + select({
-        "@toolchain//:windows_x86_64": [],
+        "//toolchain:windows_x86_64": [],
         "//conditions:default": [
             "//tile/targets/cpu",
         ],

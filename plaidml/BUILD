@@ -55,18 +55,18 @@ PLAIDML_CPP_DEPS = [
     "@half",
     "@minizip",
 ] + select({
-    "@toolchain//:linux_arm_32v7": [
+    "//toolchain:linux_arm_32v7": [
         "//tile/hal/opencl",
     ],
-    "@toolchain//:linux_arm_64v8": [
+    "//toolchain:linux_arm_64v8": [
         "//tile/hal/opencl",
     ],
-    "@toolchain//:macos_x86_64": [
+    "//toolchain:macos_x86_64": [
         "//tile/hal/cpu",
         "//tile/hal/metal",
         "//tile/hal/opencl",
     ],
-    "@toolchain//:windows_x86_64": [
+    "//toolchain:windows_x86_64": [
         "//tile/hal/cpu",
         "//tile/hal/opencl",
     ],
@@ -120,8 +120,8 @@ plaidml_macos_dylib(
 plaidml_cc_library(
     name = "internal",
     srcs = select({
-        "@toolchain//:windows_x86_64": [":plaidml.dll"],
-        "@toolchain//:macos_x86_64": [":libplaidml_macos"],
+        "//toolchain:windows_x86_64": [":plaidml.dll"],
+        "//toolchain:macos_x86_64": [":libplaidml_macos"],
         "//conditions:default": [":libplaidml.so"],
     }),
     hdrs = PLAIDML_CPP_HEADERS,
@@ -195,7 +195,7 @@ plaidml_cc_test(
 genrule(
     name = "configs",
     srcs = select({
-        "@toolchain//:macos_x86_64": [
+        "//toolchain:macos_x86_64": [
             "configs/macos.json",
             "configs/macos_experimental.json",
         ],
@@ -248,8 +248,8 @@ plaidml_py_library(
     name = "py",
     srcs = PYTHON_SRCS,
     data = [":configs"] + select({
-        "@toolchain//:windows_x86_64": [":plaidml.dll"],
-        "@toolchain//:macos_x86_64": [":libplaidml.dylib"],
+        "//toolchain:windows_x86_64": [":plaidml.dll"],
+        "//toolchain:macos_x86_64": [":libplaidml.dylib"],
         "//conditions:default": [":libplaidml.so"],
     }),
     visibility = ["//visibility:public"],
@@ -324,17 +324,17 @@ plaidml_py_wheel(
     srcs = PYTHON_SRCS + [
         ":licenses",
     ] + select({
-        "@toolchain//:windows_x86_64": [],
+        "//toolchain:windows_x86_64": [],
         "//conditions:default": [":llvm_license"],
     }),
     config = ":not_setup.cfg",
     config_substitutions = select({
-        "@toolchain//:windows_x86_64": {
+        "//toolchain:windows_x86_64": {
             "{BIN_DATA_FILES}": """Library/bin =
   data/plaidml.dll
   data/pmlc.exe""",
         },
-        "@toolchain//:macos_x86_64": {
+        "//toolchain:macos_x86_64": {
             "{BIN_DATA_FILES}": """lib =
   data/libplaidml.dylib
 bin =
@@ -355,21 +355,21 @@ bin =
         "plaidml-config.cmake",
         "//tile/pmlc",
     ] + select({
-        "@toolchain//:windows_x86_64": [":plaidml_pub.dll"],
-        "@toolchain//:macos_x86_64": [":libplaidml_macos_pub"],
+        "//toolchain:windows_x86_64": [":plaidml_pub.dll"],
+        "//toolchain:macos_x86_64": [":libplaidml_macos_pub"],
         "//conditions:default": ["libplaidml_pub.so"],
     }),
     data_renames = select({
-        "@toolchain//:windows_x86_64": {"plaidml_pub.dll": "plaidml.dll"},
-        "@toolchain//:macos_x86_64": {"libplaidml_pub.dylib": "libplaidml.dylib"},
+        "//toolchain:windows_x86_64": {"plaidml_pub.dll": "plaidml.dll"},
+        "//toolchain:macos_x86_64": {"libplaidml_pub.dylib": "libplaidml.dylib"},
         "//conditions:default": {"libplaidml_pub.so": "libplaidml.so"},
     }),
     package_prefix = "plaidml",
     platform = select({
-        "@toolchain//:linux_arm_32v7": "linux_armv7l",
-        "@toolchain//:linux_arm_64v8": "linux_aarch64",
-        "@toolchain//:macos_x86_64": "macosx_10_10_x86_64",
-        "@toolchain//:windows_x86_64": "win_amd64",
+        "//toolchain:linux_arm_32v7": "linux_armv7l",
+        "//toolchain:linux_arm_64v8": "linux_aarch64",
+        "//toolchain:macos_x86_64": "macosx_10_10_x86_64",
+        "//toolchain:windows_x86_64": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
     }),
     python = "py2.py3",
@@ -379,7 +379,7 @@ bin =
 plaidml_cc_library(
     name = "public_lib",
     srcs = PLAIDML_CPP_SOURCES + select({
-        "@toolchain//:windows_x86_64": ["config-windows.cc"],
+        "//toolchain:windows_x86_64": ["config-windows.cc"],
         "//conditions:default": ["config-unix.cc"],
     }),
     hdrs = PLAIDML_CPP_HEADERS,

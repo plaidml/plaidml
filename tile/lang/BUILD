@@ -89,8 +89,8 @@ plaidml_cc_library(
         "type.h",
     ],
     copts = select({
-        "@toolchain//:windows_x86_64": [],
-        "@toolchain//:linux_x86_64_gcc_4.9.4": [
+        "//toolchain:windows_x86_64": [],
+        "//toolchain:linux_x86_64_gcc_4.9.4": [
             "-Wno-format",
             "-Wno-sign-compare",
             "-Wno-unused-variable",
@@ -134,13 +134,13 @@ plaidml_bison(
     name = "parser",
     src = "tile.y",
     env = select({
-        "@toolchain//:windows_x86_64": {},
+        "//toolchain:windows_x86_64": {},
         "//conditions:default": {
             "PATH": "external/com_intel_plaidml_conda_tools_unix/env/bin",
         },
     }),
     tool = select({
-        "@toolchain//:windows_x86_64": "@com_intel_plaidml_conda_tools_windows//:bison",
+        "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_tools_windows//:bison",
         "//conditions:default": "@com_intel_plaidml_conda_tools_unix//:bison",
     }),
 )
@@ -149,11 +149,11 @@ plaidml_flex(
     name = "parser_lex",
     src = "tile.lex",
     flags = select({
-        "@toolchain//:windows_x86_64": ["--nounistd"],
+        "//toolchain:windows_x86_64": ["--nounistd"],
         "//conditions:default": [],
     }),
     tool = select({
-        "@toolchain//:windows_x86_64": "@com_intel_plaidml_conda_tools_windows//:flex",
+        "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_tools_windows//:flex",
         "//conditions:default": "@com_intel_plaidml_conda_tools_unix//:flex",
     }),
 )

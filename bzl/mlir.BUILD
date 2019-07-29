@@ -3,7 +3,7 @@ package(default_visibility = ["@//visibility:public"])
 load("@com_intel_plaidml//bzl:mlir.bzl", "mlir_tblgen")
 
 PLATFORM_COPTS = select({
-    "@toolchain//:macos_x86_64": [
+    "@com_intel_plaidml//toolchain:macos_x86_64": [
         "-D__STDC_LIMIT_MACROS",
         "-D__STDC_CONSTANT_MACROS",
         "-w",

@@ -24,8 +24,8 @@ cc_library(
         "BOOST_THREAD_PROVIDES_EXECUTORS",
         "BOOST_ALL_NO_LIB",
     ] + select({
-        "@toolchain//:macos_x86_64": ["BOOST_ASIO_HAS_STD_STRING_VIEW"],
-        "@toolchain//:windows_x86_64": ["BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE"],
+        "@com_intel_plaidml//toolchain:macos_x86_64": ["BOOST_ASIO_HAS_STD_STRING_VIEW"],
+        "@com_intel_plaidml//toolchain:windows_x86_64": ["BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE"],
         "//conditions:default": [],
     }),
     includes = ["."],
@@ -43,12 +43,12 @@ cc_library(
 cc_library(
     name = "stacktrace",
     defines = select({
-        "@toolchain//:macos_x86_64": ["BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED"],
+        "@com_intel_plaidml//toolchain:macos_x86_64": ["BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED"],
         "//conditions:default": [],
     }),
     linkopts = select({
-        "@toolchain//:macos_x86_64": [],
-        "@toolchain//:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:macos_x86_64": [],
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "//conditions:default": ["-ldl"],
     }),
 )
@@ -93,15 +93,15 @@ cc_library(
     name = "thread",
     srcs = glob(["libs/thread/src/*.cpp"]) +
            select({
-               "@toolchain//:windows_x86_64": glob(["libs/thread/src/win32/*.cpp"]),
+               "@com_intel_plaidml//toolchain:windows_x86_64": glob(["libs/thread/src/win32/*.cpp"]),
                "//conditions:default": glob(
                    ["libs/thread/src/pthread/*.cpp"],
                    exclude = ["libs/thread/src/pthread/once.cpp"],
                ),
            }),
     linkopts = select({
-        "@toolchain//:macos_x86_64": [],
-        "@toolchain//:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:macos_x86_64": [],
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "//conditions:default": ["-pthread"],
     }),
     deps = [

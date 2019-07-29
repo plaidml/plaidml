@@ -2,10 +2,9 @@ load("//bzl:conda_repo.bzl", "conda_repo")
 load("//bzl:xsmm_repo.bzl", "xsmm_repo")
 load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
-load("@toolchain//:workspace.bzl", toolchain_repositories = "repositories")
 
 def plaidml_workspace():
-    toolchain_repositories()
+    configure_toolchain()
 
     http_archive(
         name = "boost",
@@ -197,4 +196,21 @@ def configure_llvm():
         sha256 = "c9252af344c980b625099e304b3820bc19938dd5dce28f6afe842b113983e93d",
         strip_prefix = "llvm-baa325e1de31e4be5b0a99ea19c8305d339c722a",
         build_file = Label("//vendor/llvm:llvm.BUILD"),
+    )
+
+def configure_toolchain():
+    http_archive(
+        name = "crosstool_ng_linux_x86_64_gcc_5.4.0",
+        build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
+        sha256 = "dfbf72d78bfe876b2864f51ac740a54e5fd12e2b4a86c10514fb7accaa9640e6",
+        strip_prefix = "x86_64-unknown-linux-gnu",
+        url = "https://storage.googleapis.com/vertexai-depot/toolchain/gcc-5.4.0/x86_64-unknown-linux-gnu-20190419.tgz",
+    )
+
+    http_archive(
+        name = "crosstool_ng_linux_x86_64_gcc_4.9.4",
+        build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
+        sha256 = "28fc19c39683c3c1065058ea525eb9fbb20095249e69971215d9451184ab006f",
+        strip_prefix = "x86_64-unknown-linux-gnu",
+        url = "https://storage.googleapis.com/vertexai-depot/toolchain/gcc-4.9.4/x86_64-unknown-linux-gnu-20190617.tgz",
     )

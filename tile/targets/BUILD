@@ -10,7 +10,7 @@ gencfg(
         "//tile/targets/gpu:nvidia.json",
         "//tile/targets/gpu:intel_gen9.json",
     ] + select({
-        "@toolchain//:windows_x86_64": [],
+        "//toolchain:windows_x86_64": [],
         "//conditions:default": [
             "//tile/targets/cpu:cpu.json",
         ],
@@ -30,7 +30,7 @@ plaidml_cc_library(
     deps = [
         "//tile/codegen",
     ] + select({
-        "@toolchain//:windows_x86_64": [],
+        "//toolchain:windows_x86_64": [],
         "//conditions:default": [
             "//tile/targets/cpu",
         ],

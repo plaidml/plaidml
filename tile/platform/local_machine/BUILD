@@ -38,7 +38,7 @@ plaidml_cc_library(
         "tmp_mem_strategy.cc",
         "tmp_mem_strategy.h",
     ] + select({
-        "@toolchain//:windows_x86_64": [],
+        "//toolchain:windows_x86_64": [],
         "//conditions:default": [
             "factory_jit.cc",
         ],
@@ -61,7 +61,7 @@ plaidml_cc_library(
         "//tile/proto:hal_cc",
         "//tile/proto:support",
     ] + select({
-        "@toolchain//:windows_x86_64": [],
+        "//toolchain:windows_x86_64": [],
         "//conditions:default": [
             "//tile/platform/stripejit",
         ],

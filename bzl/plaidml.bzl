@@ -5,7 +5,7 @@ load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_librar
 PY_SRCS_VER = "PY2AND3"
 
 PLAIDML_COPTS = select({
-    "@toolchain//:windows_x86_64": [
+    "@com_intel_plaidml//toolchain:windows_x86_64": [
         "/std:c++14",
         "/DWIN32_LEAN_AND_MEAN",
     ],
@@ -16,8 +16,8 @@ PLAIDML_COPTS = select({
 })
 
 PLAIDML_LINKOPTS = select({
-    "@toolchain//:windows_x86_64": [],
-    "@toolchain//:macos_x86_64": [],
+    "@com_intel_plaidml//toolchain:windows_x86_64": [],
+    "@com_intel_plaidml//toolchain:macos_x86_64": [],
     "//conditions:default": [
         "-pthread",
         "-lm",
@@ -25,8 +25,8 @@ PLAIDML_LINKOPTS = select({
 })
 
 PLATFORM_TAGS = {
-    "@toolchain//:windows_x86_64": ["msvc"],
-    "@toolchain//:macos_x86_64": ["darwin"],
+    "@com_intel_plaidml//toolchain:windows_x86_64": ["msvc"],
+    "@com_intel_plaidml//toolchain:macos_x86_64": ["darwin"],
     "//conditions:default": ["linux"],
 }
 
@@ -320,8 +320,8 @@ def plaidml_macos_dylib(name, lib, src, tags, internal_libname = ""):
 
 def _dylib_name_patterns(name):
     return {
-        "@toolchain//:windows_x86_64": ["{}.dll".format(name)],
-        "@toolchain//:macos_x86_64": ["lib{}.dylib".format(name)],
+        "@com_intel_plaidml//toolchain:windows_x86_64": ["{}.dll".format(name)],
+        "@com_intel_plaidml//toolchain:macos_x86_64": ["lib{}.dylib".format(name)],
         "//conditions:default": ["lib{}.so".format(name)],
     }
 
