@@ -79,6 +79,14 @@ def pool(I, pool_mode, pool_size, strides, autopadding, manual_padding, data_lay
     ]).as_tensor()
 
 
+def spatial_padding(x, lo_pads, hi_pads, data_layout):
+    if isinstance(lo_pads, np.ndarray):
+        lo_pads = lo_pads.tolist()
+    if isinstance(hi_pads, np.ndarray):
+        hi_pads = hi_pads.to_list()
+    return op("spatial_padding", [x, lo_pads, hi_pads, data_layout]).as_tensor()
+
+
 def square(I):
     return I * I
 

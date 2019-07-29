@@ -1279,6 +1279,259 @@ Value softmax(const Value& value) {
   throw std::runtime_error("softmax only works on 2 dimensions at this time.");
 }
 
+Value spatial_padding(const Value& value) {
+  IVLOG(1, "spatial_padding");
+  auto args = value.as_tuple();
+  if (args.size() != 4) {
+    throw std::runtime_error("spatial_padding expects 4 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto lo_pads = args[1].as_int_tuple();
+  auto hi_pads = args[2].as_int_tuple();
+  auto data_layout = tensor_layout_from_str(args[3].as_str());
+
+  // validate inputs
+  auto nonspatial_ndims = nonspatial_dims(data_layout);
+  auto spatial_rank = I.shape().ndims() - nonspatial_ndims;
+
+  if (spatial_rank < 1) {
+    throw std::runtime_error(str(
+        boost::format(
+            "Insufficient spatial rank in spatial_padding op (At least 1 spatial dim required; received %1% spatial "
+            "dims based on an input tensor with %2% dims with a specified layout with %3% nonspatial dims.") %
+        spatial_rank % I.shape().ndims() % nonspatial_ndims));
+  }
+  if (lo_pads.size() != spatial_rank) {
+    throw std::runtime_error(
+        str(boost::format("Inconsistent spatial rank in spatial_padding op (received %1% spatial dim(s) based on an "
+                          "input tensor with %2% dims with a specified layout with %3% nonspatial dims, but received "
+                          "lower padding for %4% spatial dims.") %
+            spatial_rank % I.shape().ndims() % nonspatial_ndims % lo_pads.size()));
+  }
+  if (hi_pads.size() != spatial_rank) {
+    throw std::runtime_error(
+        str(boost::format("Inconsistent spatial rank in spatial_padding op (received %1% spatial dim(s) based on an "
+                          "input tensor with %2% dims with a specified layout with %3% nonspatial dims, but received "
+                          "upper padding for %4% spatial dims.") %
+            spatial_rank % I.shape().ndims() % nonspatial_ndims % hi_pads.size()));
+  }
+
+  std::vector<TensorDim> I_dims;
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorIndex> O_idxs;
+
+  switch (data_layout) {
+    case TensorLayout::GKCX: {
+      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      // Initialize dims & indexes
+      TensorDim G, K, C;
+      TensorIndex g("g");
+      TensorIndex k("k");
+      TensorIndex c("c");
+      std::vector<TensorDim> X(spatial_rank);
+      std::vector<TensorIndex> x;
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        x.emplace_back(str(boost::format("x%1%") % i));
+      }
+
+      // Assign input dims & indexes
+      I_dims.push_back(G);
+      I_idxs.push_back(g);
+      I_dims.push_back(K);
+      I_idxs.push_back(k);
+      I_dims.push_back(C);
+      I_idxs.push_back(c);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        I_dims.push_back(X[i]);
+        I_idxs.push_back(x[i]);
+      }
+      I.bind_dims(I_dims);
+
+      // Assign output dims & indexes
+      O_dims.push_back(G);
+      O_idxs.push_back(g);
+      O_dims.push_back(K);
+      O_idxs.push_back(k);
+      O_dims.push_back(C);
+      O_idxs.push_back(c);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+        O_idxs.push_back(x[i] + lo_pads[i]);
+      }
+    } break;
+    case TensorLayout::KCX: {
+      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      // Initialize dims & indexes
+      TensorDim K, C;
+      TensorIndex k("k");
+      TensorIndex c("c");
+      std::vector<TensorDim> X(spatial_rank);
+      std::vector<TensorIndex> x;
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        x.emplace_back(str(boost::format("x%1%") % i));
+      }
+
+      // Assign input dims & indexes
+      I_dims.push_back(K);
+      I_idxs.push_back(k);
+      I_dims.push_back(C);
+      I_idxs.push_back(c);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        I_dims.push_back(X[i]);
+        I_idxs.push_back(x[i]);
+      }
+      I.bind_dims(I_dims);
+
+      // Assign output dims & indexes
+      O_dims.push_back(K);
+      O_idxs.push_back(k);
+      O_dims.push_back(C);
+      O_idxs.push_back(c);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+        O_idxs.push_back(x[i] + lo_pads[i]);
+      }
+    } break;
+    case TensorLayout::NCX: {
+      TensorDim N, C;
+      TensorIndex n("n");
+      TensorIndex c("c");
+      std::vector<TensorDim> X(spatial_rank);
+      std::vector<TensorIndex> x;
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        x.emplace_back(str(boost::format("x%1%") % i));
+      }
+
+      // Assign input dims & indexes
+      I_dims.push_back(N);
+      I_idxs.push_back(n);
+      I_dims.push_back(C);
+      I_idxs.push_back(c);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        I_dims.push_back(X[i]);
+        I_idxs.push_back(x[i]);
+      }
+      I.bind_dims(I_dims);
+
+      // Assign output dims & indexes
+      O_dims.push_back(N);
+      O_idxs.push_back(n);
+      O_dims.push_back(C);
+      O_idxs.push_back(c);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+        O_idxs.push_back(x[i] + lo_pads[i]);
+      }
+    } break;
+    case TensorLayout::NXC: {
+      TensorDim N, C;
+      TensorIndex n("n");
+      TensorIndex c("c");
+      std::vector<TensorDim> X(spatial_rank);
+      std::vector<TensorIndex> x;
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        x.emplace_back(str(boost::format("x%1%") % i));
+      }
+
+      // Assign input dims & indexes
+      I_dims.push_back(N);
+      I_idxs.push_back(n);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        I_dims.push_back(X[i]);
+        I_idxs.push_back(x[i]);
+      }
+      I_dims.push_back(C);
+      I_idxs.push_back(c);
+      I.bind_dims(I_dims);
+
+      // Assign output dims & indexes
+      O_dims.push_back(N);
+      O_idxs.push_back(n);
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+        O_idxs.push_back(x[i] + lo_pads[i]);
+      }
+      O_dims.push_back(C);
+      O_idxs.push_back(c);
+    } break;
+    case TensorLayout::XCK: {
+      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      TensorDim C, K;
+      TensorIndex c("c");
+      TensorIndex k("k");
+      std::vector<TensorDim> X(spatial_rank);
+      std::vector<TensorIndex> x;
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        x.emplace_back(str(boost::format("x%1%") % i));
+      }
+
+      // Assign input dims & indexes
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        I_dims.push_back(X[i]);
+        I_idxs.push_back(x[i]);
+      }
+      I_dims.push_back(C);
+      I_idxs.push_back(c);
+      I_dims.push_back(K);
+      I_idxs.push_back(k);
+      I.bind_dims(I_dims);
+
+      // Assign output dims & indexes
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+        O_idxs.push_back(x[i] + lo_pads[i]);
+      }
+      O_dims.push_back(C);
+      O_idxs.push_back(c);
+      O_dims.push_back(K);
+      O_idxs.push_back(k);
+    } break;
+    case TensorLayout::XGCK: {
+      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      TensorDim G, C, K;
+      TensorIndex g("g");
+      TensorIndex c("c");
+      TensorIndex k("k");
+      std::vector<TensorDim> X(spatial_rank);
+      std::vector<TensorIndex> x;
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        x.emplace_back(str(boost::format("x%1%") % i));
+      }
+
+      // Assign input dims & indexes
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        I_dims.push_back(X[i]);
+        I_idxs.push_back(x[i]);
+      }
+      I_dims.push_back(G);
+      I_idxs.push_back(g);
+      I_dims.push_back(C);
+      I_idxs.push_back(c);
+      I_dims.push_back(K);
+      I_idxs.push_back(k);
+      I.bind_dims(I_dims);
+
+      // Assign output dims & indexes
+      for (size_t i = 0; i < spatial_rank; ++i) {
+        O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+        O_idxs.push_back(x[i] + lo_pads[i]);
+      }
+      O_dims.push_back(G);
+      O_idxs.push_back(g);
+      O_dims.push_back(C);
+      O_idxs.push_back(c);
+      O_dims.push_back(K);
+      O_idxs.push_back(k);
+    } break;
+    default:
+      throw std::runtime_error("Unrecognized TensorLayout in spatial_padding");
+  }
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
 Value square(const Value& value) {
   IVLOG(1, "square");
   auto x = value.as_tensor();
@@ -1327,6 +1580,7 @@ void RegisterOps() {
   registry->Register("pool", pool);
   registry->Register("relu", relu);
   registry->Register("softmax", softmax);
+  registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);
   registry->Register("sum", sum);
 }

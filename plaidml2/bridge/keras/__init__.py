@@ -455,7 +455,7 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilat
 
 def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rate=1):
     if padding == 'causal':
-        left_pad = dilation_rate * (kernel.tensor.shape.dims[0] - 1)
+        left_pad = dilation_rate * (int_shape(kernel)[0] - 1)
         x = temporal_padding(x, (left_pad, 0))
         padding = 'valid'
     return conv(x, kernel, (strides,), padding, data_format, (dilation_rate,))
@@ -1097,11 +1097,25 @@ def sparse_categorical_crossentropy(target, output, from_logits=False):
 
 
 def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
-    _report_unimplemented('spatial_2d_padding')
+    data_format = _normalize_data_format(data_format)
+    lo_pads = [padding[i][0] for i in range(2)]
+    hi_pads = [padding[i][1] for i in range(2)]
+    return _KerasNode('spatial_2d_padding',
+                      tensor=plaidml_op.spatial_padding(x.tensor,
+                                                        lo_pads=lo_pads,
+                                                        hi_pads=hi_pads,
+                                                        data_layout=data_format))
 
 
 def spatial_3d_padding(x, padding=((1, 1), (1, 1), (1, 1)), data_format=None):
-    _report_unimplemented('spatial_3d_padding')
+    data_format = _normalize_data_format(data_format)
+    lo_pads = [padding[i][0] for i in range(3)]
+    hi_pads = [padding[i][1] for i in range(3)]
+    return _KerasNode('spatial_2d_padding',
+                      tensor=plaidml_op.spatial_padding(x.tensor,
+                                                        lo_pads=lo_pads,
+                                                        hi_pads=hi_pads,
+                                                        data_layout=data_format))
 
 
 def sqrt(x):
@@ -1145,7 +1159,14 @@ def tanh(x):
 
 
 def temporal_padding(x, padding=(1, 1)):
-    _report_unimplemented('temporal_padding')
+    data_format = _normalize_data_format(None)  # uses image_data_format()
+    lo_pads = [padding[0]]
+    hi_pads = [padding[1]]
+    return _KerasNode('temporal_padding',
+                      tensor=plaidml_op.spatial_padding(x.tensor,
+                                                        lo_pads=lo_pads,
+                                                        hi_pads=hi_pads,
+                                                        data_layout=data_format))
 
 
 def tile(x, n):
