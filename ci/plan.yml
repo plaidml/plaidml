@@ -1,0 +1,491 @@
+---
+
+CONST:
+  efficiency_baseline: keras-tf-cuda-gp100gl
+
+  gpu_flops:
+
+    # nvidia
+    gt650m:       605.77
+    gtx780:      3819.42
+    gtx1050:     1733.15
+    gtx1070:     7282.69
+    gtx1080:     9380.39
+    gtx1080ti:  12571.25
+    gp100gl:    10736.02
+    gv100gl:    14757.70
+    # amd
+    r560:        1815.01
+    rx480:       5950.39
+    r9nano:      8077.04
+    vega:       12697.10
+    wx9100:     11300.84
+    gfx803:      3573.79
+    # mali
+    t628:          34.05
+    # intel
+    hd4000:       247.14
+    hd505:        213.80
+    hd630:        417.22 
+    uhd630:       454.72
+    iris655:      757.84
+    neo:         1084.50
+
+PLATFORMS:
+  keras-tf-cuda-gtx780:
+    variant: linux_x86_64
+  keras-tf-cuda-gtx1070:
+    variant: linux_x86_64
+  keras-plaid-ocl-gtx1070:
+    variant: linux_x86_64
+  keras-plaid-ocl-r9nano:
+    variant: linux_x86_64
+  keras-plaid-ocl-rx480:
+    variant: linux_x86_64
+  keras-plaid-ocl-z620:
+    variant: linux_x86_64
+  keras-plaid-ocl-t628:
+    variant: linux_arm_32v7
+  keras-plaid-ocl-vega:
+    variant: linux_x86_64
+  keras-plaid-mtl-gt650m:
+    variant: macos_x86_64
+  keras-plaid-mtl-hd4000:
+    variant: macos_x86_64
+  keras-plaid-mtl-hd630:
+    variant: macos_x86_64
+  keras-plaid-mtl-uhd630:
+    variant: macos_x86_64  
+  keras-stripe-mtl-uhd630:
+    variant: macos_x86_64
+  keras-plaid-mtl-iris655:
+    variant: macos_x86_64  
+  keras-plaid-ocl-neo:
+    variant: linux_x86_64
+  keras-plaid-ocl-gtx1050:
+    variant: windows_x86_64
+  keras-plaid-ocl-hd505:
+    variant: linux_x86_64
+  keras-plaid-ogl-gk20a:
+    variant: linux_arm_32v7
+  keras-plaid-ocl-cpu:
+    variant: linux_x86_64
+  keras-plaid-ocl-gv100gl:
+    variant: linux_x86_64
+  keras-plaid-ocl-gp100gl:
+    variant: linux_x86_64
+  keras-tf-cuda-gp100gl:
+    variant: linux_x86_64
+  keras-plaid-ocl-wx9100:
+    variant: linux_x86_64
+  keras-stripe-ocl-gp100gl:
+    variant: linux_x86_64
+  keras-stripe-ocl-gv100gl:
+    variant: linux_x86_64
+  keras-stripe-ocl-wx9100:
+    variant: linux_x86_64
+  keras-stripe-ocl-neo:
+    variant: linux_x86_64
+  keras-plaid-ocl-gfx803:
+     variant: linux_x86_64
+  keras-stripe-ocl-gfx803:
+     variant: linux_x86_64
+   
+
+VARIANTS:
+  linux_x86_64:
+    arch: manylinux1_x86_64
+    system: Linux
+    experimental: yes
+  macos_x86_64:
+    arch: macosx_10_10_x86_64
+    system: Darwin
+    experimental: yes
+  windows_x86_64:
+    arch: win_amd64
+    system: Windows
+    experimental: yes
+
+SUITES:
+  smoke:
+    platforms:
+      keras-plaid-ocl-cpu:
+        pipelines: []
+      keras-plaid-ocl-gp100gl:
+        pipelines: [pr]
+      keras-stripe-ocl-gp100gl:
+        pipelines: [unstable, stripe]
+    params:
+      pr:
+        batch_sizes: [0]
+      stripe:
+        batch_sizes: [0]
+    wheels:
+      # NOTE: this list must be in least to most dependent order.
+      - plaidml-{version}-py2.py3-none-{arch}.whl
+      - plaidml_keras-{version}-py2.py3-none-any.whl
+      - plaidbench-{version}-py2.py3-none-any.whl
+    timeout: 5
+    conda_env: conda/tensorflow.yml
+    compare: no
+    eventlog: yes
+    runner: plaidbench
+    args: 
+      - --results
+      - '{results}'
+      - --no-kernel-timing
+      - --print-stacktraces
+      - --no-warmup
+      - --examples
+      - 1
+      - keras
+      - '{workload}'
+    workloads:
+      mobilenet:
+        precision: untested
+
+  base:
+    platforms:
+      keras-plaid-ocl-cpu:
+        pipelines: []
+      keras-plaid-ocl-neo:
+        pipelines: [unstable]
+      keras-stripe-ocl-neo:
+        pipelines: [nightly, pr, stripe]
+      keras-plaid-mtl-uhd630:
+        pipelines: [nightly]
+      keras-stripe-mtl-uhd630:
+        pipelines: [nightly, stripe]
+      keras-plaid-ocl-wx9100:
+        pipelines: [pr, nightly]
+      keras-stripe-ocl-wx9100:
+        pipelines: [unstable, stripe]
+      keras-plaid-ocl-gv100gl:
+        pipelines: [pr, nightly]
+      keras-stripe-ocl-gv100gl:
+        pipelines: [unstable, stripe]
+      keras-plaid-ocl-gp100gl:
+        pipelines: [pr, nightly]
+      keras-stripe-ocl-gp100gl:
+        pipelines: [unstable]
+      keras-stripe-ocl-gv100gl:
+        pipelines: [unstable]
+      keras-stripe-ocl-wx9100:
+        pipelines: [unstable]
+      keras-stripe-ocl-neo:
+        pipelines: [pr]
+      keras-plaid-ocl-gfx803:
+        pipelines: [pr]
+    params:
+      pr:
+        batch_sizes: [0]
+      stripe:
+        batch_sizes: [0]
+      nightly:
+        batch_sizes: [0]
+      unstable:
+        batch_sizes: [0]
+    wheels:
+      # NOTE: this list must be in least to most dependent order.
+      - plaidml-{version}-py2.py3-none-{arch}.whl
+      - plaidml_keras-{version}-py2.py3-none-any.whl
+    timeout: 30
+    conda_env: conda/tensorflow.yml
+    compare: no
+    cwd: plaidml/keras
+    runner: python
+    workloads:
+      backend:
+        args: [backend_test.py]
+        conda_env: conda/tools.yml
+        precision: untested
+        retry: 2
+      regression:
+        args: [regression_test.py]
+        precision: untested
+      trivial_model:
+        args: [trivial_model_test.py]
+        precision: untested
+      mnist_mlp:
+        args: [mnist_mlp_test.py]
+        precision: untested
+
+  infer:
+    platforms:
+      keras-plaid-ocl-cpu:
+        pipelines: []
+      keras-tf-cuda-gp100gl:
+        pipelines: [nightly]
+        append_args: [--tensorflow]
+      keras-plaid-ocl-wx9100:
+        pipelines: [pr, nightly, train]
+      keras-plaid-mtl-uhd630:
+        pipelines: [pr, nightly, train]
+      keras-stripe-mtl-uhd630:
+        pipelines: [pr, nightly, train]
+      keras-plaid-ocl-gv100gl:
+        pipelines: [pr, nightly]
+      keras-plaid-ocl-gp100gl:
+        pipelines: [pr, nightly]
+      keras-plaid-ocl-neo:
+        pipelines: [unstable]
+      keras-stripe-ocl-gp100gl:
+        pipelines: [unstable]
+      keras-stripe-ocl-gv100gl:
+        pipelines: [unstable]
+      keras-stripe-ocl-wx9100:
+        pipelines: [unstable]
+      keras-stripe-ocl-neo:
+        pipelines: [pr]
+      keras-plaid-ocl-gfx803:
+        pipelines: [pr]
+    params:
+      pr:
+        batch_sizes: [1]
+      stripe:
+        batch_sizes: [1]
+      nightly:
+        batch_sizes: [1]
+      train:
+        batch_sizes: [32]
+      unstable:
+        batch_sizes: [1,16,32]
+    wheels:
+      # NOTE: this list must be in least to most dependent order.
+      - plaidml-{version}-py2.py3-none-{arch}.whl
+      - plaidml_keras-{version}-py2.py3-none-any.whl
+      - plaidbench-{version}-py2.py3-none-any.whl
+    timeout: 10
+    conda_env: conda/tensorflow.yml
+    runner: plaidbench
+    args: 
+      - --results
+      - '{results}'
+      - --batch-size
+      - '{batch_size}'
+      - --no-kernel-timing
+      - --print-stacktraces
+      - keras
+      - '{workload}'
+    workloads:
+      imdb_lstm:
+        precision: high
+        skip_platforms: [keras-stripe-ocl-neo, keras-stripe-mtl-uhd630]
+        perf_threshold: 0.7
+      
+      inception_v3:
+        precision: high
+        platform_overrides:
+          keras-plaid-mtl-uhd630:
+            prepend_args: [--examples, 256]
+          keras-stripe-mtl-uhd630:
+            prepend_args: [--examples, 256]
+        skip_platforms: [keras-stripe-mtl-uhd630]
+          
+      mobilenet:
+        precision: high
+      mobilenet_v2:
+        precision: high
+      resnet50:
+        precision: high
+        platform_overrides:
+          keras-plaid-mtl-uhd630:
+            prepend_args: [--examples, 512]
+          keras-stripe-mtl-uhd630:
+            prepend_args: [--examples, 512]
+          
+      vgg19:
+        precision: high
+        platform_overrides:
+          keras-plaid-mtl-uhd630:
+            prepend_args: [--examples, 256]
+          keras-stripe-mtl-uhd630:
+            prepend_args: [--examples, 256]                
+        skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630, keras-plaid-ocl-gfx803]
+    
+      xception:
+        precision: high
+        platform_overrides:
+          keras-plaid-mtl-uhd630:
+            prepend_args: [--examples, 192]
+          keras-stripe-mtl-uhd630:
+            prepend_args: [--examples, 192]
+          keras-plaid-ocl-neo:
+            prepend_args: [--examples, 256]
+          keras-stripe-ocl-neo:
+            prepend_args: [--examples, 256]
+        skip_platforms: [keras-stripe-mtl-uhd630]
+
+
+  onnx:
+    platforms:
+      keras-plaid-ocl-cpu:
+        pipelines: []
+      keras-plaid-ocl-wx9100:
+        pipelines: [nightly]
+      keras-plaid-ocl-gp100gl:
+        pipelines: [nightly]
+      keras-plaid-ocl-gv100gl:
+        pipelines: [nightly]
+      keras-plaid-mtl-uhd630:
+        pipelines: [nightly]
+      keras-stripe-mtl-uhd630:
+        pipelines: [nightly]
+    params:
+      nightly:
+        batch_sizes: [1]
+    wheels:
+      # NOTE: this list must be in least to most dependent order.
+      - plaidml-{version}-py2.py3-none-{arch}.whl
+      - onnx_plaidml-{version}-py2.py3-none-any.whl
+      - plaidbench-{version}-py2.py3-none-any.whl
+    timeout: 5
+    conda_env: conda/tensorflow.yml
+    runner: plaidbench
+    args:
+      - --results
+      - '{results}'
+      - --batch-size
+      - '{batch_size}'
+      - --no-kernel-timing
+      - --print-stacktraces
+      - onnx
+      - '{workload}'
+    workloads:
+      bvlc_alexnet:
+        precision: untested
+      densenet121:
+        precision: untested
+      resnet50:
+        precision: untested
+      vgg19:
+        precision: untested
+        skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630]
+
+
+  comprehensive:
+    platforms:
+      keras-plaid-ocl-cpu:
+        pipelines: []
+      keras-tf-cuda-gp100gl:
+        pipelines: [nightly]
+        append_args: [--tensorflow]
+      keras-plaid-ocl-gp100gl:
+        pipelines: [nightly]
+      keras-stripe-ocl-gp100gl:
+        pipelines: [unstable]
+    params:
+      nightly:
+        batch_sizes: [0]
+    wheels:
+      # NOTE: this list must be in least to most dependent order.
+      - plaidml-{version}-py2.py3-none-{arch}.whl
+      - plaidml_keras-{version}-py2.py3-none-any.whl
+    timeout: 5
+    conda_env: conda/ml_gpu.yml
+    cwd: networks/keras
+    runner: python
+    args: [harness.py, '{workload}', --results, '{results}']
+    workloads:
+      addition_rnn:
+        precision: low
+      antirectifier:
+        correct: no
+        precision: low
+      babi_memnn:
+        precision: low
+      babi_rnn:
+        skip: yes
+        precision: low
+        timeout: 10
+        expected: "Unable to compile Tile program"
+      cifar10_cnn:
+        precision: low
+      # conv_filter_visualization:
+      #   skip: yes # Takes longer than 20m
+      conv_lstm:
+        skip: yes
+        expected: "rnn is not implemented for variable sized inputs"
+        precision: untested
+      deep_dream:
+        skip: yes
+        expected: "PROD AggregationOp does not support derivatives yet"
+        precision: high
+      image_ocr:
+        skip: yes
+        expected: "The Keras backend function 'ctc_batch_cost' is not yet implemented"
+        precision: low
+        timeout: 10
+      imdb_bidirectional_lstm:
+        precision: low
+      imdb_cnn:
+        correct: no
+        precision: low
+      imdb_cnn_lstm:
+        precision: low
+      imdb_fasttext:
+        precision: low
+      imdb_lstm:
+        skip: yes
+        expected: "rnn is not implemented for variable sized inputs"
+        precision: low
+      lstm_benchmark:
+        precision: low
+      lstm_text_generation:
+        precision: low
+      mnist_acgan:
+        precision: untested # correctness tests are in vai_mnist_acgan
+      mnist_cnn:
+        correct: no
+        precision: low
+      mnist_hierarchical_rnn:
+        precision: low
+        correct: no
+      mnist_irnn:
+        correct: no
+        precision: low
+        timeout: 10
+      mnist_mlp:
+        correct: no
+        precision: low
+      mnist_net2net:
+        skip: yes
+        expected: "AssertionError: weight and bias from same layer should have compatible shapes"
+      mnist_siamese_graph:
+        corrent: no
+        precision: low
+      mnist_sklearn_wrapper:
+        skip: yes
+        expected: "ModuleNotFoundError: No module named 'sklearn.grid_search'"
+      mnist_swwae:
+        skip: yes
+        expected: "Invalid derivative: unknown function simple_reduce"
+      mnist_transfer_cnn:
+        correct: no
+        precision: low
+      neural_doodle:
+        skip: yes
+        expected: "name 'xrange' is not defined"
+      neural_style_transfer:
+        precision: untested
+      pretrained_word_embeddings:
+        skip: yes
+        expected: "No such file or directory: '/var/lib/buildkite-agent/.keras/datasets/glove.6B/glove.6B.100d.txt'"
+      reuters_mlp:
+        skip: yes
+        correct: no
+        precision: low
+      reuters_mlp_relu_vs_selu:
+        skip: yes
+        precision: low
+      stateful_lstm:
+        expected: "Out of memory"
+        precision: low
+      vai_mnist_acgan:
+        skip: yes
+        precision: untested # tests are in-file, not the harness tests
+        expected: "'utf-8' codec can't decode bytes in position 14-16: invalid continuation byte"
+      variational_autoencoder:
+        skip: yes # Disabled due to: T891
+      variational_autoencoder_deconv:
+        skip: yes # Disabled due to: T860

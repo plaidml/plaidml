@@ -4,6 +4,7 @@ exclude: >
     bzl/version.tpl.cc|
     bzl/version.tpl.py|
     bzl/conda.tpl.py|
+    ci/pipeline.yml|
     vendor/opengl/inc/.*
   )$
 repos:

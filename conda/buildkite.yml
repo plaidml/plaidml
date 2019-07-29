@@ -1,0 +1,6 @@
+channels:
+  - conda-forge
+dependencies:
+  - pip
+  - python=3.6
+  - requests

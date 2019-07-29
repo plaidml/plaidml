@@ -113,6 +113,16 @@ def plaidml_workspace():
     )
 
     conda_repo(
+        name = "com_intel_plaidml_conda_buildkite",
+        env = "@com_intel_plaidml//conda:buildkite.yml",
+    )
+
+    conda_repo(
+        name = "com_intel_plaidml_conda_ml_gpu",
+        env = "@com_intel_plaidml//conda:ml_gpu.yml",
+    )
+
+    conda_repo(
         name = "com_intel_plaidml_conda_pytorch",
         env = Label("//conda:pytorch.yml"),
         build_file = Label("//conda:pytorch.BUILD"),

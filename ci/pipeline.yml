@@ -1,0 +1,45 @@
+env:
+  LC_ALL: en_US.UTF-8
+  LANG: en_US.UTF-8
+
+steps:
+# build phase
+
+{{#variants}}
+  - label: build {{name}}
+    command: {{python}} ci/buildkite.py build {{name}}
+    agents:
+      PLATFORM: {{name}}
+{{/variants}}
+
+  - wait
+
+# test phase
+
+{{#tests}}
+  - label: test {{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}
+    command: |
+      {{python}} -m pip install pyyaml --user
+      {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}}
+    timeout_in_minutes: {{timeout}}
+  {{#retry}}
+    retry:
+      automatic:
+        limit: {{.}}
+  {{/retry}}
+    agents:
+      PLATFORM: {{platform}}
+{{/tests}}
+
+  - wait: ~
+    continue_on_failure: true
+
+# analysis phase
+
+  - label: analysis
+    command: python3 ci/buildkite.py analysis
+    agents:
+      PLATFORM: linux_x86_64
+    retry:
+      manual:
+        permit_on_passed: true
