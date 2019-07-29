@@ -26,6 +26,6 @@ We also want users to be able to either manually specify the number of groups or
  * `UNGROUPED` if the convolution is not grouped
  * `EXPLICIT` if the number of groups will be provided by the user
  * `AUTO` for autogrouping as described above
- * `MAX` for a limited autogrouping where the number of groups is equal to the number of input channels: this is to allow for depthwise convolutions with autogrouping while using the `IN_C` layout, a feature most notably useful for Keras.
+ * `DEPTHWISE` for a limited autogrouping where the number of groups is equal to the number of input channels: this is to allow for depthwise convolutions with autogrouping while using the `IN_C` layout, a feature most notably useful for Keras.
 
 The function `normalize_grouping_strategy` is used to ensure that the `GroupLayout`, the filter `TensorLayout`, and the user provided number of groups are mutually consistent; see comments in that function for details.

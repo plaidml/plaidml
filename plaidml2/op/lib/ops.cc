@@ -73,7 +73,7 @@ enum class AutogroupMode {
   UNGROUPED,  // Group size explicitly 1
   EXPLICIT,   // Group size explicitly specified, > 1
   AUTO,       // Group size determined from shapes of I and F
-  MAX         // for channelized convolutions (i.e. where G = CI)
+  DEPTHWISE   // for channelized convolutions (i.e. where G = CI)
 };
 
 enum class AutopadMode : char {
@@ -134,7 +134,7 @@ AutogroupMode autogroup_mode_from_str(const std::string& s) {
     return AutogroupMode::AUTO;
   }
   if (s == "max") {
-    return AutogroupMode::MAX;
+    return AutogroupMode::DEPTHWISE;
   }
   throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as an autogroup mode") % s));
 }
@@ -323,7 +323,7 @@ void normalize_grouping_strategy(int64_t* groups, AutogroupMode* autogroup_mode,
   //  * If group_layout is NONE:
   //      - autogroup_mode is UNGROUPED
   //        (AUTO is converted to UNGROUPED, as is EXPLICIT if groups == 1)
-  //        (MAX throws, as does EXPLICIT if groups != 1)
+  //        (DEPTHWISE throws, as does EXPLICIT if groups != 1)
   //      - groups is 1
   //        (If non-1, it is converted after autogroup_mode conversion succeeds)
   //  * If autogroup_mode is UNGROUPED:
@@ -341,10 +341,9 @@ void normalize_grouping_strategy(int64_t* groups, AutogroupMode* autogroup_mode,
   //      - group_layout is SEPARATE or IN_K
   //        (throws if group_layout is IN_C)
   //        (if group_layout is NONE, autogroup_mode is converted to UNGROUPED (see above))
-  //  * If autogroup_mode is MAX:
+  //  * If autogroup_mode is DEPTHWISE:
   //      - groups is to be ignored
-  //      - group_layout is IN_C or IN_K
-  //        (throws if group_layout is SEPARATE or NONE)
+  //      - group_layout is not NONE
   switch (*autogroup_mode) {
     case AutogroupMode::UNGROUPED:
       if (*groups != 1) {
@@ -372,12 +371,9 @@ void normalize_grouping_strategy(int64_t* groups, AutogroupMode* autogroup_mode,
         throw std::runtime_error("GroupLayout not specified for grouped convolution");
       }
       break;
-    case AutogroupMode::MAX:
+    case AutogroupMode::DEPTHWISE:
       if (*group_layout == GroupLayout::NONE) {
-        throw std::runtime_error("Convolution GroupLayout must be specified to use MAX AutogroupMode");
-      }
-      if (*group_layout == GroupLayout::SEPARATE) {
-        throw std::runtime_error("Convolution AutogroupMode MAX not compatible with SEPARATE GroupLayout");
+        throw std::runtime_error("Convolution GroupLayout must be specified to use DEPTHWISE AutogroupMode");
       }
       break;
     default:
@@ -630,11 +626,16 @@ Value convolution(const Value& value) {
     case AutogroupMode::UNGROUPED:
       G = G_explicit;
       break;
-    case AutogroupMode::MAX:
-      if (group_layout == GroupLayout::IN_C) {
-        G = CI;
+    case AutogroupMode::DEPTHWISE:
+      G = CI;
+      if (group_layout == GroupLayout::IN_K || group_layout == GroupLayout::SEPARATE) {
+        F_CI = TensorDim(1);
+      } else if (group_layout == GroupLayout::IN_C) {
+        // Everything can be inferred, do nothing  // nolint(whitespace/empty_if_body)
       } else {
-        throw std::runtime_error("Autogroup Mode MAX only available with the IN_C Group Layout");
+        throw std::runtime_error(
+            str(boost::format("Unsupported group layout '%1%' used with autogroup mode DEPTHWISE") %
+                to_string(group_layout)));
       }
       break;
     case AutogroupMode::AUTO:
