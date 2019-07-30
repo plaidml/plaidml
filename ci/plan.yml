@@ -197,7 +197,7 @@ SUITES:
     workloads:
       backend:
         args: [backend_test.py]
-        conda_env: conda/tools.yml
+        conda_env: conda/plaidml.yml
         precision: untested
         retry: 2
       regression:
