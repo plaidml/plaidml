@@ -207,8 +207,9 @@ class Operation(object):
             side_effects ([Value, Value]): A dict of side-effects of this operation.
         """
         self.code = code
-        self.inputs = dict(
-            [(k, _ShapelessValue.from_value(Value.from_python_value(v))) for k, v in inputs])
+        self.inputs = dict([
+            (k, _ShapelessValue.from_value(Value.from_python_value(v))) for k, v in inputs
+        ])
         output_list = [
             (output_name, Value.for_op(shape, self, output_name)) for output_name, shape in outputs
         ]
@@ -301,9 +302,9 @@ def unary_op(value, op_str, name=None):
     Returns:
         Value: A Value representing the result of the operation.
     """
-    operation = Operation(
-        'function (I) -> (O) {{ O = {}; }}'.format(op_str), [('I', value)], [('O', value.shape)],
-        name=name)
+    operation = Operation('function (I) -> (O) {{ O = {}; }}'.format(op_str), [('I', value)],
+                          [('O', value.shape)],
+                          name=name)
 
     return operation.sole_output()
 
@@ -326,17 +327,16 @@ def binary_op(lhs, rhs, op_str, dtype=None, name=None):
     lhs = Value.from_python_value(lhs)
     rhs = Value.from_python_value(rhs)
 
-    shape = Shape(
-        common_dtype(lhs.shape.dtype, rhs.shape.dtype),
-        broadcast_dims(lhs.shape.dims, rhs.shape.dims))
+    shape = Shape(common_dtype(lhs.shape.dtype, rhs.shape.dtype),
+                  broadcast_dims(lhs.shape.dims, rhs.shape.dims))
 
     if dtype:
         shape = Shape(dtype, shape.dims)
 
-    operation = Operation(
-        'function (L, R) -> (O) {{ O = {}; }}'.format(op_str), [('L', lhs), ('R', rhs)],
-        [('O', shape)],
-        name=name)
+    operation = Operation('function (L, R) -> (O) {{ O = {}; }}'.format(op_str), [('L', lhs),
+                                                                                  ('R', rhs)],
+                          [('O', shape)],
+                          name=name)
 
     return operation.sole_output()
 
@@ -458,14 +458,14 @@ class _SliceOf(Operation):
         code = """
                function (I[{indims}]) -> (O) {{
                    {extra_vars}{offsets}{body}
-               }}""".format(
-            indims=', '.join(['N{}'.format(i) for i in range(value.shape.ndims)]),
-            extra_vars=''.join(v + prefix for v in extra_vars),
-            offsets=''.join(o + prefix for o in offset_list),
-            body=body)
+               }}""".format(indims=', '.join(['N{}'.format(i) for i in range(value.shape.ndims)]),
+                            extra_vars=''.join(v + prefix for v in extra_vars),
+                            offsets=''.join(o + prefix for o in offset_list),
+                            body=body)
 
-        super(_SliceOf, self).__init__(
-            code, [('I', value)], [('O', Shape(value.shape.dtype, dims))], name='SliceOf')
+        super(_SliceOf, self).__init__(code, [('I', value)],
+                                       [('O', Shape(value.shape.dtype, dims))],
+                                       name='SliceOf')
         self.key = key
 
     @staticmethod
@@ -515,8 +515,8 @@ class _SliceOf(Operation):
             start_value = maximum(start_value, 0)
         else:
             if isinstance(dims[idx], Value):
-                extra_vars.append('Start{idx} = min({start}, N{idx} - 1);'.format(
-                    start=start, idx=idx))
+                extra_vars.append('Start{idx} = min({start}, N{idx} - 1);'.format(start=start,
+                                                                                  idx=idx))
                 start = 'Start{}'.format(idx)
             else:
                 start = minimum(start, dims[idx] - 1)
@@ -682,6 +682,8 @@ class Value(_ShapelessValue):
         if not isinstance(shape.dims, tuple):
             shape = Shape(shape.dtype, tuple(shape.dims))
         self.shape = shape
+        # created to replicate the _uses_learning_phase attribute in Keras, defaulting to False
+        self._uses_learning_phase = False
         super(Value, self).__init__(var, source, name)
 
     def __str__(self):
@@ -823,11 +825,10 @@ class Value(_ShapelessValue):
                 with tensor.mmap_discard(ctx) as view:
                     view.copy_from_ndarray(py_val)
                     view.writeback()
-                return Value.from_var(
-                    tensor,
-                    py_val.shape,
-                    convert_np_dtype_to_pml(py_val.dtype.name),
-                    name='NDArray')
+                return Value.from_var(tensor,
+                                      py_val.shape,
+                                      convert_np_dtype_to_pml(py_val.dtype.name),
+                                      name='NDArray')
             # Otherwise, defer the value creation.
             return _NDArray(py_val).sole_output()
         else:
@@ -849,8 +850,9 @@ class Value(_ShapelessValue):
         Returns:
             Value: The size of dimension `idx` of `var`.
         """
-        code = 'function (I[{dims}]) -> (O) {{ O = D{idx}; }}'.format(
-            dims=','.join(['D{}'.format(i) for i in range(ndims)]), idx=str(idx))
+        code = 'function (I[{dims}]) -> (O) {{ O = D{idx}; }}'.format(dims=','.join(
+            ['D{}'.format(i) for i in range(ndims)]),
+                                                                      idx=str(idx))
         shape = Shape(plaidml.DType.UINT64, tuple())
         operation = Operation(code, [('I', self)], [('O', shape)], name='SymbolicDim')
         return operation.outputs['O']
