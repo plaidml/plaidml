@@ -1,0 +1,1 @@
+{"compile_duration": 4.472951412200928, "execution_duration": 0.053944602608680725, "example_size": 256, "batch_size": 1, "model": "mobilenet", "correct": true, "max_error": 0.003277271883891761, "max_abs_error": 0.02675151824951172, "fail_ratio": 0.0}

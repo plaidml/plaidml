@@ -1,0 +1,1 @@
+{"compile_duration": 11.159100770950317, "duration_per_example": 0.03942452999763191, "tile_duration_per_example": 1e-09, "examples": 1024, "batch_size": 1, "model": "vgg19", "backend": "plaid", "correct": true, "max_error": 3.0673554647364654e-06, "max_abs_error": 3.8743019104003906e-07, "fail_ratio": 0.0}

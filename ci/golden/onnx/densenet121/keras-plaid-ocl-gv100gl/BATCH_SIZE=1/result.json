@@ -1,0 +1,1 @@
+{"compile_duration": 5.647878170013428, "execution_duration": 0.04138393164612353, "example_size": 1024, "batch_size": 1, "model": "densenet121", "correct": true, "max_error": 0.00025398097932338715, "max_abs_error": 4.76837158203125e-06, "fail_ratio": 0.0}

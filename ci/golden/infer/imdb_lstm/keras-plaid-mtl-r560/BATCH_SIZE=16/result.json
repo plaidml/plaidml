@@ -1,0 +1,1 @@
+{"compile_duration": 2.4879839420318604, "execution_duration": 0.015329389600083232, "example_size": 1024, "batch_size": 16, "model": "imdb_lstm"}

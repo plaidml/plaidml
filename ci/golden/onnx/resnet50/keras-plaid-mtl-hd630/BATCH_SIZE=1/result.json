@@ -1,0 +1,1 @@
+{"compile_duration": 7.962751865386963, "duration_per_example": 0.18432521191425622, "tile_duration_per_example": 1e-09, "examples": 1024, "batch_size": 1, "model": "resnet50", "backend": ["plaid", "onnx_plaidml.backend", null, true, ["onnx-plaidml"]], "correct": false, "max_error": 53.27824020385742, "max_abs_error": 0.1447981297969818, "fail_ratio": 0.999}

@@ -1,0 +1,1 @@
+{"compile_duration": 3.9081642627716064, "execution_duration": 0.034245647955685854, "example_size": 1024, "batch_size": 1, "model": "xception", "correct": true, "max_error": 7.1743002081348095e-06, "max_abs_error": 1.1175870895385742e-06, "fail_ratio": 0.0}

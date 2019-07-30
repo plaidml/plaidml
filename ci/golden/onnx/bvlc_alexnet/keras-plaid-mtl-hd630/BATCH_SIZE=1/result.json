@@ -1,0 +1,1 @@
+{"compile_duration": 17.83116102218628, "duration_per_example": 0.05125230480916798, "tile_duration_per_example": 1e-09, "examples": 1024, "batch_size": 1, "model": "bvlc_alexnet", "backend": ["plaid", "onnx_plaidml.backend", null, true, ["onnx-plaidml"]], "correct": false, "max_error": 0.3137802481651306, "max_abs_error": 0.0016415207646787167, "fail_ratio": 0.996}

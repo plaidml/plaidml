@@ -1,0 +1,1 @@
+{"compile_duration": 14.810746908187866, "duration_per_example": 0.2633295969571918, "tile_duration_per_example": 1e-09, "examples": 1024, "batch_size": 1, "model": "densenet121", "backend": ["plaid", "onnx_plaidml.backend", null, true, ["onnx-plaidml"]], "correct": false, "max_error": 105.59052276611328, "max_abs_error": 15.508010864257812, "fail_ratio": 1.0}

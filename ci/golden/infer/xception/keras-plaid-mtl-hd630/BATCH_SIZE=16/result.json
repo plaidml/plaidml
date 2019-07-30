@@ -1,0 +1,1 @@
+{"compile_duration": 7.841621160507202, "duration_per_example": 0.16610758503278097, "tile_duration_per_example": 1e-09, "examples": 192, "batch_size": 16, "model": "xception", "backend": "plaid"}
