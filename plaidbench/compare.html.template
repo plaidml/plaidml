@@ -1,0 +1,30 @@
+<html>
+  <body style="height: 1024px">
+    <table>
+      <tr>
+        <td></td>
+        <td><h3>Large</h3></td>
+        <td><h3>Medium</h3></td>
+        <td><h3>Small</h3></td>
+      </tr>
+      <tr>
+        <td><h3>PlaidML<h3></td>
+        <td><img src="plaid-ops-report_lrg.png"></img>
+        <td><img src="plaid-ops-report_med.png"></img>
+        <td><img src="plaid-ops-report_sml.png"></img>
+      </tr>
+      <tr>
+        <td><h3>TVM<h3></td>
+        <td><img src="tvm-ops-report_lrg.png"></img>
+        <td><img src="tvm-ops-report_med.png"></img>
+        <td><img src="tvm-ops-report_sml.png"></img>
+      </tr>
+      <tr>
+        <td><h3>TC (30 Min)</h3></td>
+        <td><img src="tc-ops-report_lrg.png"></img>
+        <td><img src="tc-ops-report_med.png"></img>
+        <td><img src="tc-ops-report_sml.png"></img>
+      </tr>
+    <table>
+  </body>
+</html>

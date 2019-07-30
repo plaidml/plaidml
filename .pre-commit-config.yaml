@@ -5,6 +5,7 @@ exclude: >
     bzl/version.tpl.py|
     bzl/conda.tpl.py|
     ci/pipeline.yml|
+    plaidbench/plaidbench/networks/keras/imdb_lstm.h5|
     vendor/opengl/inc/.*
   )$
 repos:

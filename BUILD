@@ -9,16 +9,9 @@ load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 pkg_tar(
     name = "pkg",
     srcs = [
-        # "@com_intel_onnx_plaidml//:wheel",
-        # "@com_intel_plaidbench//:wheel",
+        "//plaidbench:wheel",
         "//plaidml:wheel",
         "//plaidml/keras:wheel",
     ],
     extension = "tar.gz",
-    # deps = [
-    #     "//conda:pkg",
-    #     "//networks/keras:pkg",
-    #     "//conda:pkg",
-    #     "//plaidml/keras:pkg",
-    # ],
 )
