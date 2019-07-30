@@ -23,7 +23,7 @@ def printf(*args, **kwargs):
 def call(cmd, **kwargs):
     if verbose:
         printf(cmd, **kwargs)
-    subprocess.call(cmd, **kwargs)
+    return subprocess.call(cmd, **kwargs)
 
 
 def check_call(cmd, **kwargs):
@@ -67,8 +67,6 @@ class CondaEnv(object):
             env['JAVA_HOME'] = str(self.path)
         else:
             env['JAVA_HOME'] = str(self.path / 'Library')
-            env['CONDA_EXE'] = win32api.SearchPath(os.getenv('PATH'), 'conda', ".exe")[0]
-
         return env
 
     def create(self, spec):
@@ -104,3 +102,73 @@ class DictAction(argparse.Action):
         var = getattr(namespace, self.dest)
         var[k] = v
         setattr(namespace, self.dest, var)
+
+
+def first(choices):
+    for choice in choices:
+        if choice is not None:
+            return choice
+    return None
+
+
+class PlanOption(object):
+
+    def __init__(self, suite, workload, platform):
+        self._suite = suite
+        self._workload = workload
+        self._platform = platform
+
+    def get(self, name, default=None):
+        """
+        precedence order for options:
+        - platform_overrides
+        - workload
+        - suite
+        - default
+        - None
+        """
+        override = self._workload.get('platform_overrides', {}).get(self._platform, {}).get(name)
+        return first([
+            override,
+            self._workload.get(name),
+            self._suite.get(name),
+            default,
+        ])
+
+
+class Platform(object):
+
+    def __init__(self, full, gpu_flops):
+        parts = full.split('-')
+        self.full = full
+        self.framework = parts[0]
+        self.engine = '_'.join(parts[1:3])
+        self.gpu = parts[3]
+        self.gpu_flops = gpu_flops.get(self.gpu)
+
+    def __repr__(self):
+        return '<Platform({})>'.format(self.full)
+
+
+class TestInfo(object):
+
+    def __init__(self, suite, workload, platform, batch_size):
+        self.suite_name, self.suite = suite
+        self.workload_name, self.workload = workload
+        self.platform_name, self.platform = platform
+        self.batch_size = batch_size
+
+    def __repr__(self):
+        return '{}/{}/{}/bs{}'.format(self.suite_name, self.workload_name, self.platform_name,
+                                      self.batch_size)
+
+    def label(self):
+        label_parts = [self.platform.gpu, self.workload_name]
+        if self.batch_size:
+            label_parts += [str(self.batch_size)]
+        label_parts += [self.platform.engine]
+        return '-'.join(label_parts)
+
+    def path(self, root):
+        batch_size = 'BATCH_SIZE={}'.format(self.batch_size)
+        return root / self.suite_name / self.workload_name / self.platform_name / batch_size

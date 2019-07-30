@@ -88,7 +88,6 @@ def main():
     }
     data = {
         'example': args.module,
-        'env': dict(os.environ),
         'args': list(sys.argv),
     }
     stop_watch.start_outer()

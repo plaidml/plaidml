@@ -34,10 +34,10 @@ steps:
   - wait: ~
     continue_on_failure: true
 
-# analysis phase
+# report phase
 
-  - label: analysis
-    command: python3 ci/buildkite.py analysis
+  - label: report
+    command: python3 ci/buildkite.py report
     agents:
       PLATFORM: linux_x86_64
     retry:

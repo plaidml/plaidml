@@ -111,6 +111,8 @@ SUITES:
     platforms:
       keras-plaid-ocl-cpu:
         pipelines: []
+      keras-plaid-mtl-uhd630:
+        pipelines: []
       keras-plaid-ocl-gp100gl:
         pipelines: [plaidml]
       keras-stripe-ocl-gp100gl:
