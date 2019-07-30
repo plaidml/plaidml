@@ -112,6 +112,11 @@ def plaidml_workspace():
     )
 
     conda_repo(
+        name = "com_intel_plaidml_conda_analysis",
+        env = "@com_intel_plaidml//conda:analysis.yml",
+    )
+
+    conda_repo(
         name = "com_intel_plaidml_conda_buildkite",
         env = "@com_intel_plaidml//conda:buildkite.yml",
     )

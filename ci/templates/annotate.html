@@ -1,0 +1,65 @@
+{{#summary}}
+<p>
+  <h3>Summary:
+    <span style="{{css}}">{{status}}</span>
+  </h3>
+  <table border="1">
+    <tr>
+      <td><b>Errors</b></td>
+      <td>{{errors_count}}</td>
+    </tr>
+    <tr>
+      <td><b>Failures</b></td>
+      <td>{{failures_count}}</td>
+    </tr>
+    <tr>
+      <td><b>Skipped</b></td>
+      <td>{{skipped_count}}</td>
+    </tr>
+    <tr>
+      <td><b>Passed</b></td>
+      <td>{{passed_count}}</td>
+    </tr>
+    <tr>
+      <td><b>Total</b></td>
+      <td>{{total_count}}</td>
+    </tr>
+  </table>
+</p>
+{{/summary}}
+
+<p>
+  <a href="{{report_url}}" target="_blank">Build Report</a>
+</p>
+
+{{#failures}}
+<p>
+  {{count}} failure(s):
+  {{#items}}
+    <details>
+      <summary>
+        <a href="{{job_url}}" target="_blank">{{name}}</a>
+      </summary>
+      <code>
+        <pre>{{body}}</pre>
+      </code>
+    </details>
+  {{/items}}
+</p>
+{{/failures}}
+
+{{#errors}}
+<p>
+  {{count}} error(s):
+  {{#items}}
+    <details>
+      <summary>
+        <a href="{{job_url}}" target="_blank">{{name}}</a>
+      </summary>
+      <code>
+        <pre>{{body}}</pre>
+      </code>
+    </details>
+  {{/items}}
+</p>
+{{/errors}}

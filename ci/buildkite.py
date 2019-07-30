@@ -12,6 +12,8 @@ import sys
 import tarfile
 from distutils.dir_util import copy_tree
 
+import util
+
 # Artifacts are stored with buildkite using the following scheme:
 #
 # $ROOT/tmp/output/$SUITE/$WORKLOAD/$PLATFORM/{params}/[result.json, result.npy]
@@ -20,30 +22,6 @@ if platform.system() == 'Windows':
     ARTIFACTS_ROOT = "\\\\rackstation\\artifacts"
 else:
     ARTIFACTS_ROOT = '/nas/artifacts'
-
-
-def printf(*args, **kwargs):
-    excludes_env = {key: kwargs[key] for key in kwargs if key not in ['env']}
-    if excludes_env:
-        print(*args, excludes_env)
-    else:
-        print(*args)
-    sys.stdout.flush()
-
-
-def call(cmd, **kwargs):
-    printf(cmd, **kwargs)
-    subprocess.call(cmd, **kwargs)
-
-
-def check_call(cmd, **kwargs):
-    printf(cmd, **kwargs)
-    subprocess.check_call(cmd, **kwargs)
-
-
-def check_output(cmd, **kwargs):
-    printf(cmd, **kwargs)
-    return subprocess.check_output(cmd, **kwargs)
 
 
 def load_template(name):
@@ -148,131 +126,136 @@ def cmd_build(args, remainder):
     common_args += ['--verbose_failures']
     if platform.system() == 'Windows':
         # TODO: Test everything on windows
-        check_call(['git', 'config', 'core.symlinks', 'true'])
-        check_call(['bazelisk', 'build', ':pkg'] + common_args)
+        util.check_call(['git', 'config', 'core.symlinks', 'true'])
+        util.check_call(['bazelisk', 'build', ':pkg'] + common_args)
     else:
-        check_call(['bazelisk', 'test', '...'] + common_args)
-    archive_dir = os.path.join(ARTIFACTS_ROOT, args.pipeline, args.build_id, 'build', args.variant)
+        util.check_call(['bazelisk', 'test', '...'] + common_args)
+    archive_dir = os.path.join(
+        args.root,
+        args.pipeline,
+        args.build_id,
+        'build',
+        args.variant,
+    )
     os.makedirs(archive_dir, exist_ok=True)
     shutil.copy(os.path.join('bazel-bin', 'pkg.tar.gz'), archive_dir)
 
 
 def cmd_test(args, remainder):
-    print('cmd_test')
-    # import yaml
+    import yaml
 
-    # root = pathlib.Path('.').resolve() / 'tmp'
-    # input = root / 'input'
-    # output = root / 'output' / args.suite / args.workload / args.platform / 'BATCH_SIZE={}'.format(
-    #     args.batch_size)
+    root = pathlib.Path('.').resolve() / 'tmp'
+    input = root / 'input'
+    output = root / 'output' / args.suite / args.workload / args.platform / 'BATCH_SIZE={}'.format(
+        args.batch_size)
 
-    # with open('ci/plan.yml') as fp:
-    #     plan = yaml.safe_load(fp)
+    with open('ci/plan.yml') as fp:
+        plan = yaml.safe_load(fp)
 
-    # platform = plan['PLATFORMS'][args.platform]
-    # variant_name = platform['variant']
-    # variant = plan['VARIANTS'][variant_name]
-    # arch = variant['arch']
+    platform = plan['PLATFORMS'][args.platform]
+    variant_name = platform['variant']
+    variant = plan['VARIANTS'][variant_name]
+    arch = variant['arch']
 
-    # suites = plan['SUITES']
-    # suite = suites.get(args.suite)
-    # if suite is None:
-    #     sys.exit('Invalid suite. Available suites: {}'.format(list(suites)))
-    # platform_cfg = suite['platforms'][args.platform]
+    suites = plan['SUITES']
+    suite = suites.get(args.suite)
+    if suite is None:
+        sys.exit('Invalid suite. Available suites: {}'.format(list(suites)))
+    platform_cfg = suite['platforms'][args.platform]
 
-    # workload = suite['workloads'].get(args.workload)
-    # if workload is None:
-    #     sys.exit('Invalid workload. Available workloads: {}'.format(list(suite['workloads'])))
+    workload = suite['workloads'].get(args.workload)
+    if workload is None:
+        sys.exit('Invalid workload. Available workloads: {}'.format(list(suite['workloads'])))
 
-    # popt = PlanOption(suite, workload, args.platform)
+    popt = PlanOption(suite, workload, args.platform)
 
-    # shutil.rmtree(input, ignore_errors=True)
-    # archive_dir = pathlib.Path(ARTIFACTS_ROOT) / args.pipeline / args.build_id
-    # if args.local:
-    #     pkg_path = pathlib.Path('bazel-bin/pkg.tar.gz')
-    #     outdir = root / 'nas'
-    #     version = '0.0.0.dev0'
-    # else:
-    #     pkg_path = archive_dir / 'build' / variant_name / 'pkg.tar.gz'
-    #     outdir = archive_dir
-    #     version = args.version
-    # with tarfile.open(pkg_path, 'r') as tar:
-    #     tar.extractall(input)
+    shutil.rmtree(input, ignore_errors=True)
+    archive_dir = pathlib.Path(args.root) / args.pipeline / args.build_id
+    if args.local:
+        pkg_path = pathlib.Path('bazel-bin/pkg.tar.gz')
+        outdir = root / 'nas'
+        version = '0.0.0.dev0'
+    else:
+        pkg_path = archive_dir / 'build' / variant_name / 'pkg.tar.gz'
+        outdir = archive_dir
+        version = args.version
 
-    # shutil.rmtree(output, ignore_errors=True)
-    # output.mkdir(parents=True)
+    util.printf('--- Extracting {} -> {}'.format(pkg_path, input))
+    with tarfile.open(pkg_path, 'r') as tar:
+        tar.extractall(input)
 
-    # cwd = input / popt.get('cwd', '.')
-    # spec = input / popt.get('conda_env')
+    shutil.rmtree(output, ignore_errors=True)
+    output.mkdir(parents=True)
 
-    # printf('--- Creating conda env from {}'.format(spec))
-    # instance_name = os.getenv('BUILDKITE_AGENT_NAME', 'harness')
-    # sig = hashlib.md5()
-    # sig.update(spec.read_bytes())
-    # base_path = pathlib.Path('~', '.t2', instance_name, sig.hexdigest()).expanduser()
+    cwd = popt.get('cwd', '.')
+    spec = pathlib.Path(popt.get('conda_env'))
 
-    # base_env = util.CondaEnv(base_path)
-    # base_env.create(spec)
-    # conda_env = base_env.clone(root / pathlib.Path('cenv'))
-    # env = os.environ.copy()
-    # env.update(conda_env.env())
+    util.printf('--- Creating conda env from {}'.format(spec))
+    instance_name = os.getenv('BUILDKITE_AGENT_NAME', 'harness')
+    sig = hashlib.md5()
+    sig.update(spec.read_bytes())
+    base_path = pathlib.Path('~', '.t2', instance_name, sig.hexdigest()).expanduser()
 
-    # for whl in popt.get('wheels', []):
-    #     whl_filename = whl.format(arch=arch, version=version)
-    #     whl_path = input / whl_filename
-    #     conda_env.install(whl_path)
+    base_env = util.CondaEnv(base_path)
+    base_env.create(spec)
+    conda_env = base_env.clone(root / pathlib.Path('cenv'))
+    env = os.environ.copy()
+    env.update(conda_env.env())
 
-    # if 'cuda' in args.platform:
-    #     env['CUDA_VISIBLE_DEVICES'] = buildkite_metadata('CUDA_VISIBLE_DEVICES', '0')
+    for whl in popt.get('wheels', []):
+        whl_filename = whl.format(arch=arch, version=version)
+        whl_path = input / whl_filename
+        conda_env.install(whl_path)
 
-    # if 'stripe' in args.platform:
-    #     env['USE_STRIPE'] = '1'
+    if 'stripe' in args.platform:
+        env['USE_STRIPE'] = '1'
+    if 'cuda' in args.platform:
+        env['CUDA_VISIBLE_DEVICES'] = buildkite_metadata('CUDA_VISIBLE_DEVICES', '0')
+    env['PLAIDML_DEVICE_IDS'] = buildkite_metadata('PLAIDML_DEVICE_IDS')
+    env['PLAIDML_EXPERIMENTAL'] = buildkite_metadata('PLAIDML_EXPERIMENTAL', '0')
 
-    # env['PLAIDML_DEVICE_IDS'] = buildkite_metadata('PLAIDML_DEVICE_IDS')
-    # env['PLAIDML_EXPERIMENTAL'] = buildkite_metadata('PLAIDML_EXPERIMENTAL', '0')
+    with (output / 'env.json').open('w') as fp:
+        util.printf('Writing:', fp.name)
+        json.dump(env, fp)
 
-    # with (output / 'env.json').open('w') as fp:
-    #     printf('Writing:', fp.name)
-    #     json.dump(env, fp)
+    util.printf('--- Running test {suite}/{workload} on {platform}'.format(
+        suite=args.suite,
+        workload=args.workload,
+        platform=args.platform,
+    ))
 
-    # printf('--- Running test {suite}/{workload} on {platform}'.format(
-    #     suite=args.suite,
-    #     workload=args.workload,
-    #     platform=args.platform,
-    # ))
+    cmd_args = platform_cfg.get('prepend_args', []) + popt.get('prepend_args', [])
+    cmd_args += platform_cfg.get('args', []) + popt.get('args', [])
+    cmd_args += platform_cfg.get('append_args', []) + popt.get('append_args', [])
+    ctx = dict(
+        results=output,
+        batch_size=args.batch_size,
+        workload=args.workload,
+    )
+    cmd_args = [str(x).format(**ctx) for x in cmd_args]
+    if 'stripe' in args.platform:
+        try:
+            cmd_args.remove('--no-kernel-timing')
+        except ValueError:
+            pass
 
-    # cmd_args = platform_cfg.get('prepend_args', []) + popt.get('prepend_args', [])
-    # cmd_args += platform_cfg.get('args', []) + popt.get('args', [])
-    # cmd_args += platform_cfg.get('append_args', []) + popt.get('append_args', [])
-    # ctx = dict(
-    #     results=output,
-    #     batch_size=args.batch_size,
-    #     workload=args.workload,
-    # )
-    # cmd_args = [str(x).format(**ctx) for x in cmd_args]
-    # if 'stripe' in args.platform:
-    #     try:
-    #         cmd_args.remove('--no-kernel-timing')
-    #     except ValueError:
-    #         pass
+    cmd = [popt.get('runner')] + cmd_args
+    util.check_call(cmd, cwd=cwd, env=env)
 
-    # cmd = [popt.get('runner')] + cmd_args
-    # check_call(cmd, cwd=cwd, env=env)
-
-    # src = root / 'output'
-    # dst = outdir / 'test'
-    # copy_tree(str(src), str(dst))
+    src = root / 'output'
+    dst = outdir / 'test'
+    copy_tree(str(src), str(dst))
 
 
 def cmd_analysis(args, remainder):
-    archive_dir = os.path.join(ARTIFACTS_ROOT, args.pipeline, args.build_id)
+    archive_dir = os.path.join(args.root, args.pipeline, args.build_id)
     cmd = ['bazelisk', 'run', '//ci:analysis']
     cmd += ['--']
     cmd += ['--pipeline', args.pipeline]
     cmd += ['--annotate']
     cmd += [archive_dir]
     cmd += remainder
-    check_call(cmd)
+    util.check_call(cmd)
 
 
 def make_cmd_build(parent):
@@ -303,7 +286,6 @@ def make_cmd_pipeline(parent):
 
 
 def main():
-
     pipeline = os.getenv('PIPELINE', 'pr')
     branch = os.getenv('BUILDKITE_BRANCH', 'undefined')
     build_id = os.getenv('BUILDKITE_BUILD_NUMBER', '0')
@@ -312,6 +294,7 @@ def main():
     default_version = os.getenv('VAI_VERSION', '{}+{}.dev{}'.format(version, pipeline, build_id))
 
     main_parser = argparse.ArgumentParser()
+    main_parser.add_argument('--root', default=ARTIFACTS_ROOT)
     main_parser.add_argument('--pipeline', default=pipeline)
     main_parser.add_argument('--branch', default=branch)
     main_parser.add_argument('--build_id', default=build_id)

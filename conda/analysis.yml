@@ -1,0 +1,21 @@
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - pip
+  - python=3.7
+  - jupyter
+  - pip:
+    - asq
+    - bokeh
+    - defaultlist
+    - graphviz
+    - humanize
+    - matplotlib
+    - networkx
+    - pandas
+    - protobuf
+    - pystache
+    - pyyaml
+    - six
+    - Pygments

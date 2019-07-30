@@ -113,3 +113,5 @@ ENV/
 # .bazelrc files
 .bazelrc.configure
 .bazelrc.user
+
+/tmp

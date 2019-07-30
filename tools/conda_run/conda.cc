@@ -68,6 +68,7 @@ int main(int argc, char* argv[]) {
       // This whole mess is due to: https://github.com/bazelbuild/bazel/issues/4594
       auto external_dir = dir.path() / "external";
       if (fs::is_directory(external_dir)) {
+        python_paths.emplace_back(external_dir.string());
         for (const auto& inner_dir : fs::directory_iterator(external_dir)) {
           if (fs::is_directory(inner_dir)) {
             python_paths.emplace_front(inner_dir.path().string());

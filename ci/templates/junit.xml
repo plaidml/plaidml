@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+    <testsuite>
+      {{#testcases}}
+        <testcase classname="keras.examples.{{classname}}" name="{{name}}" time="{{time}}">
+          {{#skipped}}
+            <skipped />
+          {{/skipped}}
+          {{#failure}}
+            <failure message="{{message}}" />
+          {{/failure}}
+          {{#error}}
+            <error message="{{message}}" />
+          {{/error}}
+          {{#stdout}}
+            <system-out><![CDATA[{{text}}]]></system-out>
+          {{/stdout}}
+        </testcase>
+      {{/testcases}}
+    </testsuite>
+</testsuites>

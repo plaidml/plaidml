@@ -1,0 +1,80 @@
+{{#summary}}
+<h3>Summary: <span style="{{css}}">{{status}}</span></h3>
+<table border="1">
+  <tr>
+    <td><b>Errors</b></td>
+    <td>{{errors_count}}</td>
+  </tr>
+  <tr>
+    <td><b>Failures</b></td>
+    <td>{{failures_count}}</td>
+  </tr>
+  <tr>
+    <td><b>Skipped</b></td>
+    <td>{{skipped_count}}</td>
+  </tr>
+  <tr>
+    <td><b>Passed</b></td>
+    <td>{{passed_count}}</td>
+  </tr>
+  <tr>
+    <td><b>Total</b></td>
+    <td>{{total_count}}</td>
+  </tr>
+</table>
+{{/summary}}
+
+{{#ratio_png}}
+<div>
+  <img src="{{.}}" />
+</div>
+{{/ratio_png}}
+
+{{#efficiency_png}}
+<div>
+  <img src="{{.}}" />
+</div>
+{{/efficiency_png}}
+
+<div>
+  {{#suites}}
+  <h2>Suite: {{name}}</h2>
+  <table border="1">
+    <tr>
+      <td><b>status</b></td>
+      <td><b>gpu</b></td>
+      <td><b>workload</b></td>
+      <td><b>bs</b></td>
+      <td><b>cur_com</b></td>
+      <td><b>cur_run</b></td>
+      <td><b>ref_run</b></td>
+      <td><b>ratio</b></td>
+      <td><b>log</b></td>
+      <td><b>reason</b></td>
+    </tr>
+    {{#results}}
+    <tr>
+      <td style="{{status_css}}">{{status}}</td>
+      <td>{{gpu}}</td>
+      <td>{{workload}}</td>
+      <td>{{batch_size}}</td>
+      <td>{{cur_com}}</td>
+      <td>{{cur_run}}</td>
+      <td>{{ref_run}}</td>
+      <td>{{ratio}}</td>
+      <td>
+        <div>
+          {{#log}}<a href={{.}} target="_blank">console</a>{{/log}}
+        </div>
+        <div>
+          {{^log}}Missing{{/log}}
+        </div>
+      </td>
+      <td width="100%">
+        <pre>{{reason}}</pre>
+      </td>
+    </tr>
+    {{/results}}
+  </table>
+  {{/suites}}
+</div>

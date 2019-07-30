@@ -112,11 +112,11 @@ SUITES:
       keras-plaid-ocl-cpu:
         pipelines: []
       keras-plaid-ocl-gp100gl:
-        pipelines: [pr]
+        pipelines: [plaidml]
       keras-stripe-ocl-gp100gl:
         pipelines: [unstable, stripe]
     params:
-      pr:
+      plaidml:
         batch_sizes: [0]
       stripe:
         batch_sizes: [0]
@@ -151,21 +151,21 @@ SUITES:
       keras-plaid-ocl-neo:
         pipelines: [unstable]
       keras-stripe-ocl-neo:
-        pipelines: [nightly, pr, stripe]
+        pipelines: [nightly, plaidml, stripe]
       keras-plaid-mtl-uhd630:
         pipelines: [nightly]
       keras-stripe-mtl-uhd630:
         pipelines: [nightly, stripe]
       keras-plaid-ocl-wx9100:
-        pipelines: [pr, nightly]
+        pipelines: [plaidml, nightly]
       keras-stripe-ocl-wx9100:
         pipelines: [unstable, stripe]
       keras-plaid-ocl-gv100gl:
-        pipelines: [pr, nightly]
+        pipelines: [plaidml, nightly]
       keras-stripe-ocl-gv100gl:
         pipelines: [unstable, stripe]
       keras-plaid-ocl-gp100gl:
-        pipelines: [pr, nightly]
+        pipelines: [plaidml, nightly]
       keras-stripe-ocl-gp100gl:
         pipelines: [unstable]
       keras-stripe-ocl-gv100gl:
@@ -173,11 +173,11 @@ SUITES:
       keras-stripe-ocl-wx9100:
         pipelines: [unstable]
       keras-stripe-ocl-neo:
-        pipelines: [pr]
+        pipelines: [plaidml]
       keras-plaid-ocl-gfx803:
-        pipelines: [pr]
+        pipelines: [plaidml]
     params:
-      pr:
+      plaidml:
         batch_sizes: [0]
       stripe:
         batch_sizes: [0]
@@ -218,15 +218,15 @@ SUITES:
         pipelines: [nightly]
         append_args: [--tensorflow]
       keras-plaid-ocl-wx9100:
-        pipelines: [pr, nightly, train]
+        pipelines: [plaidml, nightly, train]
       keras-plaid-mtl-uhd630:
-        pipelines: [pr, nightly, train]
+        pipelines: [plaidml, nightly, train]
       keras-stripe-mtl-uhd630:
-        pipelines: [pr, nightly, train]
+        pipelines: [plaidml, nightly, train]
       keras-plaid-ocl-gv100gl:
-        pipelines: [pr, nightly]
+        pipelines: [plaidml, nightly]
       keras-plaid-ocl-gp100gl:
-        pipelines: [pr, nightly]
+        pipelines: [plaidml, nightly]
       keras-plaid-ocl-neo:
         pipelines: [unstable]
       keras-stripe-ocl-gp100gl:
@@ -236,11 +236,11 @@ SUITES:
       keras-stripe-ocl-wx9100:
         pipelines: [unstable]
       keras-stripe-ocl-neo:
-        pipelines: [pr]
+        pipelines: [plaidml]
       keras-plaid-ocl-gfx803:
-        pipelines: [pr]
+        pipelines: [plaidml]
     params:
-      pr:
+      plaidml:
         batch_sizes: [1]
       stripe:
         batch_sizes: [1]
@@ -315,53 +315,6 @@ SUITES:
           keras-stripe-ocl-neo:
             prepend_args: [--examples, 256]
         skip_platforms: [keras-stripe-mtl-uhd630]
-
-
-  onnx:
-    platforms:
-      keras-plaid-ocl-cpu:
-        pipelines: []
-      keras-plaid-ocl-wx9100:
-        pipelines: [nightly]
-      keras-plaid-ocl-gp100gl:
-        pipelines: [nightly]
-      keras-plaid-ocl-gv100gl:
-        pipelines: [nightly]
-      keras-plaid-mtl-uhd630:
-        pipelines: [nightly]
-      keras-stripe-mtl-uhd630:
-        pipelines: [nightly]
-    params:
-      nightly:
-        batch_sizes: [1]
-    wheels:
-      # NOTE: this list must be in least to most dependent order.
-      - plaidml-{version}-py2.py3-none-{arch}.whl
-      - onnx_plaidml-{version}-py2.py3-none-any.whl
-      - plaidbench-{version}-py2.py3-none-any.whl
-    timeout: 5
-    conda_env: conda/tensorflow.yml
-    runner: plaidbench
-    args:
-      - --results
-      - '{results}'
-      - --batch-size
-      - '{batch_size}'
-      - --no-kernel-timing
-      - --print-stacktraces
-      - onnx
-      - '{workload}'
-    workloads:
-      bvlc_alexnet:
-        precision: untested
-      densenet121:
-        precision: untested
-      resnet50:
-        precision: untested
-      vgg19:
-        precision: untested
-        skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630]
-
 
   comprehensive:
     platforms:
