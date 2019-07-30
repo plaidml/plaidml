@@ -28,6 +28,7 @@ local PARAMS = {
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
+
             {
               name: 'loc_main',
               pass: {
@@ -296,6 +297,7 @@ local PARAMS = {
                 threads: PARAMS[cfg].NUM_THREADS,
               }
             },
+
             {
               name: 'thread_eltwise',
               pass: {

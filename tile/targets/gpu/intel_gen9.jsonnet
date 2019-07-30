@@ -11,7 +11,7 @@ local PARAMS = {
   },
   intel_gen9_metal: {
     CACHE_WIDTH: 64,
-    MAX_MEM: [280, 280],
+    MAX_MEM: [480],
     SUBGROUP_SIZES: [4],
     GLOBAL_MEM_LAT: 420,
     LOCAL_MEM_LAT: 125,
@@ -35,6 +35,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ConstantPropagatePass',
               },
             },
+
             // we place all the initial buffer in global memory (DRAM)
             {
               name: 'loc_program',
@@ -123,6 +124,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             // Process large fully connected
             {
               name: 'large_fc',
@@ -170,6 +172,7 @@ local PARAMS = {
                 only_po2: true,  // Only consider PO2 sizes for speed
               },
             },
+
             {
               name: 'cache_backup',
               pass: {
@@ -193,6 +196,7 @@ local PARAMS = {
                 no_constraints: true,
               },
             },
+
             {
               name: 'fuse_contract_eltwise_2',
               pass: {
@@ -201,6 +205,7 @@ local PARAMS = {
                 b_reqs: ['eltwise'],
               },
             },
+
             {
               name: 'fuse_contract_eltwise_3',
               pass: {
@@ -248,6 +253,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'scalarize_main',
               pass: {
@@ -306,6 +312,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'cleanup2',
               pass: {
@@ -313,6 +320,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'localize_main',
               pass: {
@@ -320,6 +328,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'scalarize_main',
               pass: {
@@ -327,6 +336,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'temp_var',
               pass: {

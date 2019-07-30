@@ -321,6 +321,17 @@ size_t SemtreeEmitter::max_threads(const stripe::Block& block) {
   return result;
 }
 
+size_t SemtreeEmitter::inner_blocks(const stripe::Block& block) {
+  size_t result = 0;
+  for (const auto& stmt : block.stmts) {
+    auto inner = stripe::Block::Downcast(stmt);
+    if (inner) {
+      ++result;
+    }
+  }
+  return result;
+}
+
 void SemtreeEmitter::do_gids(const stripe::Block& block) {
   bool has_out = false;
   for (const auto& ref : block.refs) {
@@ -612,7 +623,7 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
   // we implement subgroup functions in only the unroller
   if ((block.has_tag("subgroup_inline") || 
       (block.has_tag("inline") && block.idxs_product() <= MAX_UNROLL_SIZE)) &&
-      block.constraints.size() == 0 && thread_condition_ == nullptr) {
+      block.constraints.size() == 0 && inner_blocks(block) == 0 && thread_condition_ == nullptr) {
     scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
     scope_ = &scopes_.back();
     depth_++;

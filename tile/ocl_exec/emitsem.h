@@ -40,6 +40,7 @@ class SemtreeEmitter : public stripe::ConstStmtVisitor {
   void Visit(const stripe::Block&);
 
   size_t max_threads(const stripe::Block& block);
+  size_t inner_blocks(const stripe::Block& block);
   sem::StmtPtr add_loops(const stripe::Block&);
   void do_gids(const stripe::Block&);
   sem::StmtPtr make_special(const std::string& name, const stripe::Block& block,

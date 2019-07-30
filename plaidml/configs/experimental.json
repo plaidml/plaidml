@@ -48,7 +48,7 @@
           "max_regs": 16384,
           "goal_groups": 16,
           "goal_flops_per_byte": 50,
-          "stripe_config": "amd"
+          "stripe_config": "amd_opencl"
         }
       },
       {

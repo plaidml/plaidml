@@ -14,7 +14,7 @@
 #endif
 
 #ifdef SIMD_GROUP
-#define BROADCAST "simd_braodcast"
+#define BROADCAST "simd_broadcast"
 #define BARRIER "simdgroup_barrier"
 #endif
 

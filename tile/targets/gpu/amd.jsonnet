@@ -11,15 +11,15 @@ local PARAMS = {
     ALIGN_SIZE_B: 64
   },
   amd_metal: {
-    LOCAL_MEM_KIB: 28,
+    LOCAL_MEM_KIB: 64,
     NUM_THREADS: 256,
-    CACHE_WIDTH: 64,
-    NUM_UNITS: 64,
+    CACHE_WIDTH: 128,
+    NUM_UNITS: 16,
     REGS_MEM_B: 128,
     REG_MEM_LAT: 1,
     LOCAL_MEM_LAT: 30,
     GLOBAL_MEM_LAT: 100,
-    ALIGN_SIZE_B: 64
+    ALIGN_SIZE_B: 128
   },
 };
 
@@ -156,7 +156,6 @@ local PARAMS = {
                 dirs: [ 'In' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
                 xfer_loc: {},
-                //xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
                 odd_size: true,
               }
             },
@@ -170,7 +169,6 @@ local PARAMS = {
                 dirs: [ 'Out', 'InOut' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
                 xfer_loc: {},
-                //xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
                 odd_size: true,
               }
             },
@@ -307,6 +305,7 @@ local PARAMS = {
                 threads: PARAMS[cfg].NUM_THREADS,
               }
             },
+
             {
               name: 'thread_eltwise',
               pass: {
@@ -373,6 +372,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'cleanup2',
               pass: {
