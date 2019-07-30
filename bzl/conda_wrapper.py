@@ -210,7 +210,7 @@ def main():
     if WIN:
         mut = win32event.CreateMutex(None, False, 'Local\\CondaLock')
         win32event.WaitForSingleObject(mut, win32event.INFINITE)
-        sys.exit(subprocess.call([os.environ['CONDA_EXE']] + sys.argv[1:]))
+        sys.exit(subprocess.call(['conda'] + sys.argv[1:]))
     else:
         lock_path = os.path.normpath(os.path.expanduser('~/.conda_lock'))
         with Singlet(lock_path):
@@ -219,7 +219,6 @@ def main():
 
 logger = logging.getLogger("singletony")
 logger.addHandler(logging.StreamHandler())
-
 
 if __name__ == "__main__":
     main()

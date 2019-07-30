@@ -46,7 +46,7 @@ cmake -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DLLVM_TARGETS_TO_BUILD="X86"
 """,
         "@com_intel_plaidml//toolchain:windows_x86_64": """
-$${CONDA_PREFIX}/Library/bin/cmake -Thost=x64 -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
+cmake -Thost=x64 -B$(@D) -H$$(dirname $(location //:CMakeLists.txt)) \
     -DPYTHON_EXECUTABLE=$$(which python) \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DHAVE_VALGRIND_VALGRIND_H=0 \
