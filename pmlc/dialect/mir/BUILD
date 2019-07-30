@@ -44,7 +44,7 @@ plaidml_cc_library(
         "//pmlc/dialect/scalar",
         "//tile/base",
         "@boost",
-        "@llvm//:Support",
+        "@llvm//:support",
         "@mlir//:IR",
         "@mlir//:StandardOps",
         "@mlir//:Transforms",

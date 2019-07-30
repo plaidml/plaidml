@@ -40,7 +40,7 @@ plaidml_cc_library(
         "//tile/base",
         "//tile/lang",
         "@boost",
-        "@llvm//:Support",
+        "@llvm//:support",
         "@mlir//:IR",
         "@mlir//:StandardOps",
     ],

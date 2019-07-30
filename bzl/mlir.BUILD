@@ -24,8 +24,8 @@ cc_library(
     includes = ["include"],
     visibility = ["//visibility:public"],
     deps = [
-        "@llvm//:Support",
-        "@llvm//:TableGen",
+        "@llvm//:support",
+        "@llvm//:tablegen",
     ],
 )
 
@@ -36,7 +36,15 @@ cc_binary(
     ]),
     copts = PLATFORM_COPTS,
     includes = ["include"],
-    linkopts = ["-lm"],
+    linkopts = select({
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:macos_x86_64": [],
+        "//conditions:default": [
+            "-pthread",
+            "-ldl",
+            "-lm",
+        ],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         ":Support",
@@ -186,8 +194,8 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
-        "@llvm//:Core",
-        "@llvm//:Support",
+        "@llvm//:core",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )
@@ -200,7 +208,7 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
-        "@llvm//:Support",
+        "@llvm//:support",
     ],
 )
 
@@ -228,8 +236,8 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
-        "@llvm//:Core",
-        "@llvm//:Support",
+        "@llvm//:core",
+        "@llvm//:support",
     ],
 )
 
@@ -241,7 +249,7 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
-        "@llvm//:Support",
+        "@llvm//:support",
     ],
 )
 
@@ -261,9 +269,9 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
-        "@llvm//:AsmParser",
-        "@llvm//:Core",
-        "@llvm//:Support",
+        "@llvm//:asm_parser",
+        "@llvm//:core",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )
@@ -282,9 +290,9 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
-        "@llvm//:AsmParser",
-        "@llvm//:Core",
-        "@llvm//:Support",
+        "@llvm//:asm_parser",
+        "@llvm//:core",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )
@@ -299,10 +307,10 @@ cc_library(
     deps = [
         ":LLVMIR",
         ":Translation",
-        "@llvm//:AsmParser",
-        "@llvm//:Core",
-        "@llvm//:Support",
-        "@llvm//:TransformUtils",
+        "@llvm//:asm_parser",
+        "@llvm//:core",
+        "@llvm//:support",
+        "@llvm//:transform_utils",
     ],
 )
 
@@ -333,7 +341,7 @@ cc_library(
     deps = [
         ":IR",
         ":StandardOps",
-        "@llvm//:Support",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )
@@ -363,7 +371,7 @@ cc_library(
     includes = ["include"],
     deps = [
         ":Support",
-        "@llvm//:Support",
+        "@llvm//:support",
     ],
 )
 
@@ -429,7 +437,7 @@ cc_library(
     includes = ["include"],
     deps = [
         ":StandardOps",
-        "@llvm//:Support",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )
@@ -445,7 +453,7 @@ cc_library(
     deps = [
         ":Analysis",
         ":IR",
-        "@llvm//:Support",
+        "@llvm//:support",
     ],
 )
 
@@ -458,7 +466,7 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
-        "@llvm//:Support",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )

@@ -38,7 +38,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//tile/base",
-        "@llvm//:Support",
+        "@llvm//:support",
         "@mlir//:IR",
         "@mlir//:StandardOps",
     ],
