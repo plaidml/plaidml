@@ -1,5 +1,7 @@
 dependencies:
   - cmake
+  - conda
   - m2-perl
-  - python=3.6.0
+  - posix
+  - python
   - setuptools>=40.6.0

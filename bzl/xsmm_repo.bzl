@@ -17,17 +17,10 @@ def _xsmm_repo_impl(repository_ctx):
         stripPrefix = stripPrefix,
     )
 
-    repository_ctx.execute([repository_ctx.which("rm"), "Makefile.inc"])
-    repository_ctx.execute([repository_ctx.which("touch"), "Makefile.inc"])
-    repository_ctx.execute([repository_ctx.which("touch"), "include/.make"])
-
     result = repository_ctx.execute(
         args,
         quiet = False,
         timeout = 1200,
-        environment = {
-            "PYTHON": str(repository_ctx.which("python")),
-        },
     )
 
     if result.return_code:
