@@ -4,8 +4,6 @@
 
 #include <boost/math/common_factor.hpp>
 
-#include "pmlc/dialect/mir/ops.h"
-
 namespace pmlc {
 namespace dialect {
 namespace mir {
@@ -31,6 +29,8 @@ AffinePolynomial::AffinePolynomial(Value* x) : constant(0) {
     for (Value* v : op.inputs()) {
       *this += AffinePolynomial(v);
     }
+  } else if (auto op = mlir::dyn_cast<AffineMeta>(dop)) {
+    *this = AffinePolynomial(op.input());
   } else {
     throw std::runtime_error("Invalid affine in ComputeAffineRange");
   }
@@ -57,6 +57,20 @@ AffinePolynomial& AffinePolynomial::operator+=(const AffinePolynomial& x) {
     }
   }
   return *this;
+}
+
+bool AffinePolynomial::operator<(const AffinePolynomial& rhs) const {
+  if (constant < rhs.constant) {
+    return true;
+  }
+  if (constant > rhs.constant) {
+    return false;
+  }
+  return terms < rhs.terms;
+}
+
+bool AffinePolynomial::operator==(const AffinePolynomial& rhs) const {
+  return constant == rhs.constant && terms == rhs.terms;
 }
 
 AffineRange::AffineRange(int64_t _min, int64_t _max, uint64_t _stride) : min(_min), max(_max), stride(_stride) {
@@ -107,6 +121,34 @@ AffineRange::AffineRange(const AffinePolynomial& poly) : min(poly.constant), max
       min += (range - 1) * kvp.second;
     }
   }
+}
+
+bool FlatTensorAccess::operator<(const FlatTensorAccess& rhs) const {
+  if (base != rhs.base) {
+    return base < rhs.base;
+  }
+  return access < rhs.access;
+}
+
+bool FlatTensorAccess::operator==(const FlatTensorAccess& rhs) const {
+  return base == rhs.base && access == rhs.access;
+}
+
+FlatTensorAccess ComputeAccess(Value* tensor) {
+  FlatTensorAccess r;
+  auto bop = tensor->getDefiningOp();
+  if (auto op = mlir::dyn_cast<AllocateOp>(bop)) {
+    r.base = op;
+    r.access.resize(op.layout().dims().size());
+  } else if (auto op = mlir::dyn_cast<RefineOp>(bop)) {
+    r = ComputeAccess(op.in());
+    for (size_t i = 0; i < r.access.size(); i++) {
+      r.access[i] += AffinePolynomial(*(op.offsets().begin() + i));
+    }
+  } else {
+    throw std::runtime_error("Invalid tensor value in ComputeAccess");
+  }
+  return r;
 }
 
 }  // namespace mir

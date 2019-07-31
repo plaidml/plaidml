@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "pmlc/dialect/mir/ops.h"
+#include "pmlc/dialect/mir/mlir.h"
 #include "tile/stripe/stripe.h"
 
 namespace pmlc {
@@ -11,8 +11,8 @@ namespace mir {
 
 namespace stripe = vertexai::tile::stripe;
 
-mlir::FuncOp StripeToPlaidIR(MLIRContext* ctx, const stripe::Program& prog);
-stripe::Program PlaidIRToStripe(mlir::FuncOp func);
+mlir::FuncOp ToMir(MLIRContext* ctx, const stripe::Program& prog);
+stripe::Program ToStripe(mlir::FuncOp func);
 
 }  // namespace mir
 }  // namespace dialect

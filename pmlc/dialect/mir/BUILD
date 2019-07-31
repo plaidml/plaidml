@@ -54,7 +54,8 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "transcode",
     srcs = [
-        "transcode.cc",
+        "to_mir.cc",
+        "to_stripe.cc",
     ],
     hdrs = [
         "transcode.h",
@@ -62,7 +63,6 @@ plaidml_cc_library(
     tags = ["llvm"],
     deps = [
         ":mir",
-        "//pmlc/dialect/scalar:transcode",
         "//tile/stripe",
         "@mlir//:IR",
     ],

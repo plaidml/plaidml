@@ -45,23 +45,6 @@ plaidml_cc_library(
     alwayslink = 1,
 )
 
-plaidml_cc_library(
-    name = "transcode",
-    srcs = [
-        "transcode.cc",
-    ],
-    hdrs = [
-        "transcode.h",
-    ],
-    tags = ["llvm"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":scalar",
-        "//tile/stripe",
-        "@mlir//:IR",
-    ],
-)
-
 plaidml_cc_test(
     name = "scalar_test",
     srcs = ["scalar_test.cc"],

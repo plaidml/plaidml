@@ -42,7 +42,7 @@ int main() {
   codegen::LocalizeBlockPass(codegen::AliasMap(codegen::AliasMap(), prog->entry.get()), prog->entry.get(), {"tmp"});
 
   printf("Converting to MLIR\n");
-  auto func = StripeToPlaidIR(&context, *prog);
+  auto func = ToMir(&context, *prog);
 
   printf("Adding function to module\n");
   module.push_back(func);
@@ -58,11 +58,13 @@ int main() {
     throw std::runtime_error("Invalid goo\n");
   }
 
+  module.verify();
+
   printf("Dumping modules\n");
   module.dump();
 
   printf("Converting the other way\n");
-  auto prog2 = PlaidIRToStripe(func);
+  auto prog2 = ToStripe(func);
 
   printf("New version:\n");
   std::cout << *prog2.entry;

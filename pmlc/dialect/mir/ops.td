@@ -105,24 +105,28 @@ def AffineAddOp : AffineOp<"affine_add"> {
   let arguments = (ins Variadic<AffineType>:$inputs);
 }
 
+def AffineMeta : AffineOp<"affine_meta"> {
+  let summary = "Attach metadata to an affine";
+  let arguments = (ins AffineType:$input, DictionaryAttr:$attrs);
+}
+
 def ParallelForOp : MirOp<"parallel_for"> {
   let summary = "Parallel for loop";
   // At some point, we should be able to dynamically control ranges
   // Variadic<IntegerType>:$dyn_ranges
-  let arguments = (ins I64ArrayAttr:$ranges, DictionaryAttr:$attrs);
+  let arguments = (ins I64ArrayAttr:$ranges, DictionaryAttr:$attrs); //, TypedArrayAttrBase<DictionaryAttr, "per index tags">:$idx_attrs);
   let results = (outs);
   let regions = (region
     SizedRegion<1>:$inner
   );
 }
 
-def AffineIfOp : MirOp<"affine_if"> {
+def ConstraintOp : MirOp<"constraint"> {
   let arguments = (ins AffineType:$input);
   let results = (outs);
   let regions = (region
-    SizedRegion<1>:$tcase
-    // TODO: Add false case
-    // SizedRegion<1>:$fcase
+    AnyRegion:$ge_case,
+    AnyRegion:$lt_case
   );
 }
 

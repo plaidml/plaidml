@@ -12,7 +12,7 @@ def ScalarConstantOp :
     HasFolder {
   let summary = "constant";
   let arguments = (ins AnyAttr:$value);
-  let results = (outs ScalarType);
+  let results = (outs ScalarType:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState* result, ScalarType type, Attribute value", [{
@@ -92,17 +92,17 @@ class CompareOp<string mnemonic, list<OpTrait> traits = []> :
 class UnaryIntOp<string mnemonic, list<OpTrait> traits = []> :
     UnaryOp<mnemonic, traits>,
     Arguments<(ins ScalarIntegerLike:$in, TypeAttr:$type)>,
-    Results<(outs ScalarIntegerLike)>;
+    Results<(outs ScalarIntegerLike:$result)>;
 
 class UnaryFloatOp<string mnemonic, list<OpTrait> traits = []> :
     UnaryOp<mnemonic, traits>,
     Arguments<(ins ScalarFloatLike:$in, TypeAttr:$type)>,
-    Results<(outs ScalarFloatLike)>;
+    Results<(outs ScalarFloatLike:$result)>;
 
 class BinaryIntOp<string mnemonic, list<OpTrait> traits = []> :
     BinaryOp<mnemonic, traits>,
     Arguments<(ins ScalarIntegerLike:$in, TypeAttr:$type)>,
-    Results<(outs ScalarIntegerLike)>;
+    Results<(outs ScalarIntegerLike:$result)>;
 
 def AbsOp : UnaryOp<"abs">;
 def ACosOp : UnaryFloatOp<"acos">;

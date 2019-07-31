@@ -38,6 +38,37 @@ namespace OpTrait = mlir::OpTrait;
 #define GET_OP_CLASSES
 #include "pmlc/dialect/scalar/ops.h.inc"
 
+namespace impl {
+
+template <typename... Args>
+struct ForAllOpsImpl;
+
+template <typename First, typename... Args>
+struct ForAllOpsImpl<First, Args...> {
+  template <typename Operator>
+  static void run(Operator& op) {  // NOLINT
+    op.template apply<First>();
+    ForAllOpsImpl<Args...>::run(op);
+  }
+};
+
+template <>
+struct ForAllOpsImpl<> {
+  template <typename Operator>
+  static void run(Operator& op) {}  // NOLINT
+};
+
+}  // namespace impl
+
+template <typename Operator>
+void ForAllOps(Operator& op) {  // NOLINT
+  impl::ForAllOpsImpl<
+#define GET_OP_LIST
+#include "pmlc/dialect/scalar/ops.cpp.inc"
+#undef GET_OP_LIST
+      >::run(op);
+}
+
 }  // namespace scalar
 }  // namespace dialect
 }  // namespace pmlc

@@ -4,8 +4,10 @@
 
 #include <algorithm>
 #include <map>
+#include <vector>
 
 #include "pmlc/dialect/mir/mlir.h"
+#include "pmlc/dialect/mir/ops.h"
 
 namespace pmlc {
 namespace dialect {
@@ -34,6 +36,13 @@ namespace mir {
     return r;                                  \
   }
 
+// A macro to secondary comparisons for a class
+#define CMP_OVERLOADS(X)                                           \
+  inline bool operator!=(const X& rhs) { return !(*this == rhs); } \
+  inline bool operator>(const X& rhs) { return rhs < *this; }      \
+  inline bool operator<=(const X& rhs) { return !(rhs < *this); }  \
+  inline bool operator>=(const X& rhs) { return !(*this < rhs); }
+
 // An affine 'polynomial', basically a series of terms, each consisting of a
 // multiplier and an index (a Affine that is also a BlockArgument), as well as a
 // constant offset.  We can 'flatten' any affine expression into such a
@@ -50,6 +59,10 @@ struct AffinePolynomial {
   // Perform operations on a polynomial
   AffinePolynomial& operator*=(int64_t x);
   AffinePolynomial& operator+=(const AffinePolynomial& x);
+  // Comparisons
+  bool operator<(const AffinePolynomial& rhs) const;
+  bool operator==(const AffinePolynomial& rhs) const;
+  CMP_OVERLOADS(AffinePolynomial)
 };
 
 AFFINE_OP_OVERLOADS(AffinePolynomial)
@@ -78,15 +91,25 @@ inline AffineRange operator|(const AffineRange& a, const AffineRange& b) {
   return r;
 }
 
-/*
+struct FlatTensorAccess {
+  AllocateOp base;
+  std::vector<AffinePolynomial> access;
 
+  // Comparisons
+  bool operator<(const FlatTensorAccess& rhs) const;
+  bool operator==(const FlatTensorAccess& rhs) const;
+  CMP_OVERLOADS(FlatTensorAccess)
+};
+
+FlatTensorAccess ComputeAccess(Value* tensor);
+
+/*
 // Compute the range as per above per dimension given a refinement and optional base
 std::vector<AffineRange> ComputeTensorRanges(Value* tensor, Value* base = nullptr);
 
 // Find all uses of tensor and compute the union of all accesses with the the
 // passed tensor as the base of the access.
 std::vector<AffineRange> ComputeInteriorShape(Value* tensor);
-
 */
 
 }  // namespace mir
