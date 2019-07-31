@@ -156,7 +156,7 @@ TEST(CppEdsl, MnistCnn) {
   Tensor kernel3(LogicalShape(PLAIDML_DATA_FLOAT32, {12100, 128}));
   Tensor bias3(LogicalShape(PLAIDML_DATA_FLOAT32, {128}));
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
-  const size_t kNumClasses = 100;
+  const std::int64_t kNumClasses = 100;
   // model.add(Dense(num_classes, activation='softmax'))
   Tensor kernel4(LogicalShape(PLAIDML_DATA_FLOAT32, {128, kNumClasses}));
   Tensor bias4(LogicalShape(PLAIDML_DATA_FLOAT32, {kNumClasses}));
@@ -392,7 +392,7 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
 }
 
 TEST(CppEdsl, Winograd) {
-  const size_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
+  const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   Tensor I(LogicalShape(PLAIDML_DATA_FLOAT32, {N, X, Y, CI}));
   Tensor K(LogicalShape(PLAIDML_DATA_FLOAT32, {S, S, CI, CO}));
   Tensor A(LogicalShape(PLAIDML_DATA_FLOAT32, {BI, BO}));
