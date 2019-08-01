@@ -257,14 +257,14 @@ void StripeBuilder::visit(ParallelForOp op) {
   }
   // Add the attributes
   add_attributes(*cur_, op.attrs());
-  blocks_.emplace(&oblock, cur_.get());
+  blocks_.emplace(&oblock, BlockInfo(cur_.get()));
   walk_interior(&oblock);
 }
 
 void StripeBuilder::visit(ConstraintOp op, int count) {
   if (count == 1 && op.lt_case().empty()) {
     Block* inner = &op.ge_case().front();
-    blocks_.emplace(inner, static_cast<stripe::Block*>(nullptr));
+    blocks_.emplace(inner, BlockInfo(nullptr));
     walk_interior(inner);
     // Find the stripe block to attach the contraint to
     Block* block = inner;
