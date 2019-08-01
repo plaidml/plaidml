@@ -13,8 +13,6 @@ dependencies:
       - keras-applications==1.0.6
       - matplotlib
       - olefile
-      - onnx==1.2.2
-      - onnx-tf
       - pillow
       - protobuf
       - requests

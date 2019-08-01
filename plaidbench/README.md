@@ -31,7 +31,6 @@ You can also install various ML backends -- for example,
     pip install plaidml-keras
     pip install tensorflow
     pip install caffe2
-    pip install onnx-plaidml
     pip install onnx-tf
 
 If you don't have a particular package installed, and you run benchmarks that require the package, Plaidbench will try to determine what needs to be installed and tell you how to install it.

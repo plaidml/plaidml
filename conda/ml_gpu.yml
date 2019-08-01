@@ -15,8 +15,6 @@ dependencies:
       - https://github.com/keras-team/keras-contrib/archive/3b510b0a3f5e729c3d253164119f97f92037fbb7.zip
       - matplotlib
       - olefile
-      - onnx==1.2.2
-      - onnx-tf
       - pillow
       - protobuf
       - requests

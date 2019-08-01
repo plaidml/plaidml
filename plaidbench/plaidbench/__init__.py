@@ -36,17 +36,6 @@ SUPPORTED_NETWORKS = {
         'vgg19',
         'xception',
     ],
-    'onnx': [
-        'bvlc_alexnet',
-        'densenet121',
-        'inception_v1',
-        'inception_v2',
-        'resnet50',
-        'shufflenet',
-        'squeezenet',  # TODO: Fix inputs/outputs (only available as *.pb)
-        'vgg16',
-        'vgg19',
-    ],
 }
 
 
@@ -64,7 +53,6 @@ def make_parser():
         help="Use the non-PlaidML backend most appropriate to the chosen frontend")
     frontendargs = parser.add_mutually_exclusive_group()
     frontendargs.add_argument('--keras', action='store_true', help='Use Keras as the frontend')
-    frontendargs.add_argument('--onnx', action='store_true', help='Use ONNX as the frontend')
     parser.add_argument('--fp16',
                         action='store_true',
                         help="Use half-precision floats, setting floatx='float16'.")
@@ -97,12 +85,6 @@ def make_parser():
     parser.add_argument('--print-stacktraces',
                         action='store_true',
                         help="Print a stack trace if an exception occurs.")
-    parser.add_argument('--onnx-cpu',
-                        action='store_true',
-                        help='Use CPU instead of GPU (only used by ONNX)')
-    parser.add_argument('--refresh-onnx-data',
-                        action='store_true',
-                        help='Download ONNX data even if cached')
     all_supported_networks = set()
     for _, networks in SUPPORTED_NETWORKS.items():
         all_supported_networks = all_supported_networks.union(networks)

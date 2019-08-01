@@ -1,1 +1,0 @@
-{"compile_duration": 16.7223060131073, "execution_duration": 0.003208422102034092, "example_size": 1024, "batch_size": 1, "model": "bvlc_alexnet", "correct": true, "max_error": 6.523459319396352e-07, "max_abs_error": 4.190951585769653e-09, "fail_ratio": 0.0}
