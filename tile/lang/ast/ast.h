@@ -203,7 +203,6 @@ struct ContractionExpr : Expr {
   ContractionExpr();
   void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
-  size_t logical_input_size() const { return (use_default ? inputs.size() - 1 : inputs.size()); }
   void ComputeShape(const std::string& layout);
 };
 
