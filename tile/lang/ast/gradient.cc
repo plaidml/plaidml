@@ -112,7 +112,7 @@ class Gradient {
 
  private:
   ExprPtr ContractionOp(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& expr, size_t idx) {
-    if (expr->use_default && idx == expr->inputs.size() - 1) {
+    if (expr->use_default && idx == expr->inputs.size()) {
       return DefaultOp(dout, expr);
     }
     if (expr->combo_op == CombinationOp::EQ) {
@@ -181,7 +181,10 @@ class Gradient {
     dop->constraints = op->constraints;
     // Anywhere the forward pass hits the default, the derivative w.r.t. any other tensor is 0;
     // thus, for the corresponding gradient, the default is everywhere zero i.e. the standard unspecified default
-    for (size_t i = 0; i < op->logical_input_size(); ++i) {
+    if (idx == op->inputs.size()) {
+      throw std::logic_error("A default tensor fell through to the SumOp case during Gradient");
+    }
+    for (size_t i = 0; i < op->inputs.size(); ++i) {
       if (idx == i) {
         dop->inputs.push_back(std::make_shared<TensorSpecExpr>(dout, op->output->index_spec));
       } else {
