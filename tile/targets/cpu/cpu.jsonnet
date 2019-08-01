@@ -64,16 +64,65 @@ local PARAMS = {
                   {
                     startup_cost: 32,
                     idxs: [
-                      { name: 'm', size: i, outs: [-1], ins: [-1, 0] },
-                      { name: 'n', size: j, outs: [1], ins: [0, 1] },
-                      { name: 'k', size: k, outs: [0], ins: [1, -1] },
+                      { name: 'm', size: 64, outs: [1], ins: [0, 1] },
+                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'k', size: 64, outs: [0], ins: [1, -1] },
                     ],
-                  } for i in [8, 16, 32, 48, 64, 80, 96] for j in [8, 16, 32, 64, 48, 80, 96] for k in [8, 16, 32, 48, 64, 80, 96]
+                  },
+                  {
+                    startup_cost: 32,
+                    idxs: [
+                      { name: 'm', size: 64, outs: [1], ins: [0, 1] },
+                      { name: 'n', size: 16, outs: [-1], ins: [-1, 0] },
+                      { name: 'k', size: 64, outs: [0], ins: [1, -1] },
+                    ],
+                  },
+                  {
+                    startup_cost: 32,
+                    idxs: [
+                      { name: 'm', size: 32, outs: [1], ins: [0, 1] },
+                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'k', size: 32, outs: [0], ins: [1, -1] },
+                    ],
+                  },
+                  {
+                    startup_cost: 32,
+                    idxs: [
+                      { name: 'm', size: 16, outs: [1], ins: [0, 1] },
+                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'k', size: 16, outs: [0], ins: [1, -1] },
+                    ],
+                  },
+                  {
+                    startup_cost: 32,
+                    idxs: [
+                      { name: 'm', size: 48, outs: [1], ins: [0, 1] },
+                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'k', size: 48, outs: [0], ins: [1, -1] },
+                    ],
+                  },
+                  {
+                    startup_cost: 32,
+                    idxs: [
+                      { name: 'm', size: 80, outs: [1], ins: [0, 1] },
+                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'k', size: 80, outs: [0], ins: [1, -1] },
+                    ],
+                  },
+                  {
+                    startup_cost: 32,
+                    idxs: [
+                      { name: 'm', size: 96, outs: [1], ins: [0, 1] },
+                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'k', size: 96, outs: [0], ins: [1, -1] },
+                    ],
+                  },
                 ],
                 inputs_set: [{tags: ["A"]}, {tags: ["B"]}],
                 outputs_set: [{tags: ["C"]}],
               },
             },
+
             {
               name: 'tile_contract',
               pass: {

@@ -10,6 +10,7 @@ import operator
 import os
 import sys
 import platform
+import time
 import unittest
 from collections import OrderedDict
 
@@ -195,13 +196,23 @@ def opTest(in_data,
            skip_tensorflow=False,
            verbose=False,
            input_shapes=None,
-           dtype=floatx()):
+           dtype=floatx(),
+           num_iterations=1,
+           measure_eval_time=False):
     # If using with non-tensor parameters, all tensor params must appear before
     # all non-tensor params
     # input_shapes should be None or an iterable containing tuples
     # defining the shape for each input.
     # Use this to define symbolic shapes (None).
-    def run_one_backend(self, data, test_func, b, shapes=None, *run_args):
+    def run_one_backend(self,
+                        data,
+                        test_func,
+                        b,
+                        backend_name,
+                        num_iterations,
+                        measure_eval_time,
+                        shapes=None,
+                        *run_args):
         tf_session = tensorflow.Session()
         tf.set_session(tf_session)
         results = []
@@ -216,7 +227,15 @@ def opTest(in_data,
             funcs = test_func(self, b, *(xv + ps + list(run_args)))
             tf_session.run(tensorflow.global_variables_initializer())
             for gf, f in zip(grad_funcs, funcs):
-                fr = f.eval()
+                for it_counter in range(num_iterations):
+                    if (measure_eval_time == True):
+                        start = time.time()
+                    # Evaluate forward operation
+                    fr = f.eval()
+                    if (measure_eval_time == True):
+                        print("Evaluating %s took: %s sec." % (backend_name,
+                                                               (time.time() - start)))
+
                 if do_grads:
                     df = b.gradients(b.mean(gf), x)
                     gfn = b.function(x, df, updates=[])
@@ -257,6 +276,9 @@ def opTest(in_data,
                                                      data,
                                                      test_func,
                                                      th,
+                                                     "th",
+                                                     num_iterations,
+                                                     measure_eval_time,
                                                      *args,
                                                      shapes=shapes)
                 if not skip_tensorflow:
@@ -264,9 +286,20 @@ def opTest(in_data,
                                                          data,
                                                          test_func,
                                                          tf,
+                                                         "tf",
+                                                         num_iterations,
+                                                         measure_eval_time,
                                                          *args,
                                                          shapes=shapes)
-                plaidml_results = run_one_backend(self, data, test_func, pkb, *args, shapes=shapes)
+                plaidml_results = run_one_backend(self,
+                                                  data,
+                                                  test_func,
+                                                  pkb,
+                                                  "pldml",
+                                                  num_iterations,
+                                                  measure_eval_time,
+                                                  *args,
+                                                  shapes=shapes)
                 if not skip_theano:
                     for idx, (pmlr, thr) in enumerate(zip(plaidml_results, theano_results)):
                         idx = idx + 1
@@ -797,13 +830,11 @@ class TestBackendOps(unittest.TestCase):
     def testExp(self, b, x):
         return [b.exp(x)]
 
-
     # For pow(x, y), there is an Metal bug on AMD if x < 0 and y is odd.
     # Even if y is even, the do_grad function that runs pow(x, odd) is also wrong.
     # So disable this case for now and restore it when the driver bug is fixed.
-    @unittest.skipIf(
-        "darwin" in platform.system().lower(),
-        "Stripe does not correctly validate assignment ops") 
+    @unittest.skipIf("darwin" in platform.system().lower(),
+                     "Stripe does not correctly validate assignment ops")
     @opTest([[m(20)], [m(2, 2, 2)]])
     def testPow(self, b, x):
         return [b.pow(x, 5)]
@@ -952,9 +983,9 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='same', dilation_rate=(2, 2), data_format=df),
         ]
 
-    @opTest([_conv_inp(IN=2, IC=3, OC=8, IS=[256, 256], KS=[3, 3]),],
-            1e-04,
-            skip_theano=True)
+    @opTest([
+        _conv_inp(IN=2, IC=3, OC=8, IS=[256, 256], KS=[3, 3]),
+    ], 1e-04, skip_theano=True)
     def testConv2dActivation(self, b, im, km, df):
         c = b.conv2d(im, km, padding='valid', strides=(2, 2), data_format=df)
         return [b.relu(c)]
@@ -1556,8 +1587,23 @@ class TestBackendOps(unittest.TestCase):
         o = b.relu(c)
         return [o]
 
-    @opTest([[m(1, 64, 64, 128), m(3, 3, 128, 128)]], do_grads=False)
+    @opTest([[m(1, 96, 96, 192), m(3, 3, 192, 192)]], do_grads=False)
     def resnetLayer3(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 96, 96, 192), m(8, 8, 192, 192)]], do_grads=False)
+    def resnetLayer4(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 64, 64, 256), m(3, 3, 256, 256)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer5(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]

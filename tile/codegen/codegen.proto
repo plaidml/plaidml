@@ -385,8 +385,8 @@ message AutotilePass {
   // The maximum amount of memory use (in bytes) for each input read by
   // the inner block.  0 means no limit.
   optional int64 max_per_input_size = 11 [default = 0];
-  // The total size of all data used by the inner block.  Note, this is
-  // generally the place to put a memory limit, but in some architectures
+  // The total size (in bytes) of all data used by the inner block.  Note, this
+  // is generally the place to put a memory limit, but in some architectures
   // inputs are held in one memory and outputs are held in accumulation
   // registers in a separate memory.  0 means no limit.
   optional int64 max_total_size = 12 [default = 0];
@@ -411,6 +411,7 @@ message AutotilePass {
   optional string loc_name = 19 [default = ""];
   // Clear the tags of the original / outer block before adding outer_set
   optional bool clear_outer = 20 [default = false];
+  // Set to false to allow only parallel safe tilings
   optional bool acc_idxs = 21 [default = true];
   // Clear the location the original / outer block
   optional bool clear_location = 22 [default = false];
