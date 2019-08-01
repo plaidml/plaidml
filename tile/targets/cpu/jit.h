@@ -31,11 +31,13 @@ class Native {
   void compile(const stripe::Block& program, const std::map<std::string, External>& externals);
   void run(const std::map<std::string, void*>& buffers);
   void save(const std::string& filename);
+  void set_perf_attrs(stripe::Block* program);
 };
 
 void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers);
 void JitExecute(const stripe::Block& program, const std::map<std::string, External>& externals,
                 const std::map<std::string, void*>& buffers);
+void JitProfile(stripe::Block* program, const std::map<std::string, void*>& buffers);
 
 }  // namespace cpu
 }  // namespace targets

@@ -31,7 +31,9 @@ namespace cpu {
 
 namespace {
 const char invoker_name_[] = "__invoke_";
-const char arena_name_[] = "__arena_";
+const char arena_name_[] = "__arena";
+const char profile_count_name_[] = "__profile_count_";
+const char profile_ticks_name_[] = "__profile_ticks_";
 }  // namespace
 
 struct ProgramModule {
@@ -45,6 +47,7 @@ class Executable {
   explicit Executable(const ProgramModule& module);
   void Run(const std::map<std::string, void*>& buffers);
   void Save(const std::string& filename);
+  void SetPerfAttrs(stripe::Block* block);
 
  private:
   std::unique_ptr<llvm::ExecutionEngine> engine_;
@@ -172,6 +175,9 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Value* CallocFunction();
   llvm::Value* FreeFunction();
   llvm::Value* PrngStepFunction();
+  llvm::Value* ReadCycleCounter();
+  void ProfileBlockEnter(const stripe::Block& block);
+  void ProfileBlockLeave(const stripe::Block& block);
   bool isXSMMSuppotedDataType(DataType dataType);
   const DataType GetBlockRefsDataType(const stripe::Block& block);
 
@@ -617,6 +623,8 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     indexes_[idx.name].variable = variable;
   }
 
+  ProfileBlockEnter(block);
+
   // generate the basic blocks for each nested loop's evaluation stages
   std::vector<Loop> loops;
   for (auto& idx : block.idxs) {
@@ -680,6 +688,8 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     builder_.CreateBr(loops[i].test);
     builder_.SetInsertPoint(loops[i].done);
   }
+
+  ProfileBlockLeave(block);
 
   builder_.CreateRetVoid();
   return function;
@@ -1521,6 +1531,48 @@ llvm::Value* Compiler::PrngStepFunction(void) {
   return module_->getOrInsertFunction(funcname, functype).getCallee();
 }
 
+llvm::Value* Compiler::ReadCycleCounter(void) {
+  auto functype = llvm::FunctionType::get(builder_.getInt64Ty(), {}, false);
+  const char* funcname = "llvm.readcyclecounter";
+  auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
+  return builder_.CreateCall(func, {}, "");
+}
+
+void Compiler::ProfileBlockEnter(const stripe::Block& block) {
+  // allocate counter variable
+  std::string profile_count_name = profile_count_name_ + block.name;
+  module_->getOrInsertGlobal(profile_count_name, IndexType());
+  auto profile_count_gval = module_->getNamedGlobal(profile_count_name);
+  profile_count_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
+  // increment the execution count for this pass through the block
+  llvm::Value* profile_count = builder_.CreateLoad(profile_count_gval);
+  profile_count = builder_.CreateAdd(profile_count, IndexConst(1));
+  builder_.CreateStore(profile_count, profile_count_gval);
+  // allocate timing variable
+  std::string profile_ticks_name = profile_ticks_name_ + block.name;
+  module_->getOrInsertGlobal(profile_ticks_name, IndexType());
+  auto profile_ticks_gval = module_->getNamedGlobal(profile_ticks_name);
+  profile_ticks_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
+  // Subtract the current rdtsc value from the saved tick count. This will
+  // give us a temporarily invalid base value, which we will correct by adding
+  // the ending rdtsc value back in when the block finishes.
+  llvm::Value* profile_ticks = builder_.CreateLoad(profile_ticks_gval);
+  profile_ticks = builder_.CreateSub(profile_ticks, ReadCycleCounter());
+  builder_.CreateStore(profile_ticks, profile_ticks_gval);
+}
+
+void Compiler::ProfileBlockLeave(const stripe::Block& block) {
+  // Add the current rdtsc back into the elapsed time counter, which both
+  // corrects for the bias we introduced on function entry and accumulates
+  // the elapsed time into the running total.
+  std::string profile_ticks_name = profile_ticks_name_ + block.name;
+  auto profile_ticks_gval = module_->getNamedGlobal(profile_ticks_name);
+  // add the current value of the cpu tick counter to the tick count
+  llvm::Value* profile_ticks = builder_.CreateLoad(profile_ticks_gval);
+  profile_ticks = builder_.CreateAdd(profile_ticks, ReadCycleCounter());
+  builder_.CreateStore(profile_ticks, profile_ticks_gval);
+}
+
 Executable::Executable(const ProgramModule& module) : parameters_(module.parameters) {
   std::string errStr;
   std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime(module.externals));
@@ -1548,6 +1600,27 @@ void Executable::Run(const std::map<std::string, void*>& buffers) {
   void* argvec = args.data();
   uint64_t entrypoint = engine_->getFunctionAddress(invoker_name_);
   ((void (*)(void*))entrypoint)(argvec);
+}
+
+void Executable::SetPerfAttrs(stripe::Block* block) {
+  // Look up the performance counters for this block.
+  // Apply their values as tags.
+  std::string count_name = profile_count_name_ + block->name;
+  uint64_t count_addr = engine_->getGlobalValueAddress(count_name);
+  if (count_addr) {
+    block->set_attr("execution_count", *reinterpret_cast<int64_t*>(count_addr));
+  }
+  std::string ticks_name = profile_ticks_name_ + block->name;
+  uint64_t ticks_addr = engine_->getGlobalValueAddress(ticks_name);
+  if (ticks_addr) {
+    block->set_attr("execution_ticks", *reinterpret_cast<int64_t*>(ticks_addr));
+  }
+  // Recurse through nested blocks.
+  for (const auto& stmt : block->stmts) {
+    if (stmt->kind() == stripe::StmtKind::Block) {
+      SetPerfAttrs(stripe::Block::Downcast(stmt).get());
+    }
+  }
 }
 
 namespace rt {
@@ -1643,6 +1716,8 @@ struct Native::Impl {
     WriteBitcodeToFile(*module.module, result.os());
     result.keep();
   }
+
+  void set_perf_attrs(stripe::Block* program) { executable->SetPerfAttrs(program); }
 };
 
 Native::Native() : m_impl(new Native::Impl) {}
@@ -1652,14 +1727,11 @@ void Native::compile(const stripe::Block& program, const std::map<std::string, E
 }
 void Native::run(const std::map<std::string, void*>& buffers) { m_impl->run(buffers); }
 void Native::save(const std::string& filename) { m_impl->save(filename); }
+void Native::set_perf_attrs(stripe::Block* program) { m_impl->set_perf_attrs(program); }
 
 void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers) {
-  llvm::LLVMContext context;
   std::map<std::string, External> externals;
-  Compiler compiler(&context, externals);
-  auto module = compiler.CompileProgram(program);
-  Executable executable(std::move(module));
-  executable.Run(buffers);
+  JitExecute(program, externals, buffers);
 }
 
 void JitExecute(const stripe::Block& program, const std::map<std::string, External>& externals,
@@ -1669,6 +1741,16 @@ void JitExecute(const stripe::Block& program, const std::map<std::string, Extern
   auto module = compiler.CompileProgram(program);
   Executable executable(std::move(module));
   executable.Run(buffers);
+}
+
+void JitProfile(stripe::Block* program, const std::map<std::string, void*>& buffers) {
+  llvm::LLVMContext context;
+  std::map<std::string, External> externals;
+  Compiler compiler(&context, externals);
+  auto module = compiler.CompileProgram(*program);
+  Executable executable(std::move(module));
+  executable.Run(buffers);
+  executable.SetPerfAttrs(program);
 }
 
 }  // namespace cpu
