@@ -175,10 +175,31 @@ def plaidml_workspace():
 def configure_protobuf():
     http_archive(
         name = "com_google_protobuf",
-        url = "https://github.com/protocolbuffers/protobuf/archive/v3.6.1.2.tar.gz",
-        sha256 = "2244b0308846bb22b4ff0bcc675e99290ff9f1115553ae9671eba1030af31bc0",
-        strip_prefix = "protobuf-3.6.1.2",
+        url = "https://github.com/protocolbuffers/protobuf/archive/v3.9.0.tar.gz",
+        sha256 = "2ee9dcec820352671eb83e081295ba43f7a4157181dad549024d7070d079cf65",
+        strip_prefix = "protobuf-3.9.0",
         build_file = Label("//bzl:protobuf.BUILD"),
+    )
+
+    http_archive(
+        name = "rules_cc",
+        sha256 = "29daf0159f0cf552fcff60b49d8bcd4f08f08506d2da6e41b07058ec50cfeaec",
+        strip_prefix = "rules_cc-b7fe9697c0c76ab2fd431a891dbb9a6a32ed7c3e",
+        urls = ["https://github.com/bazelbuild/rules_cc/archive/b7fe9697c0c76ab2fd431a891dbb9a6a32ed7c3e.tar.gz"],
+    )
+
+    http_archive(
+        name = "rules_java",
+        sha256 = "f5a3e477e579231fca27bf202bb0e8fbe4fc6339d63b38ccb87c2760b533d1c3",
+        strip_prefix = "rules_java-981f06c3d2bd10225e85209904090eb7b5fb26bd",
+        urls = ["https://github.com/bazelbuild/rules_java/archive/981f06c3d2bd10225e85209904090eb7b5fb26bd.tar.gz"],
+    )
+
+    http_archive(
+        name = "rules_proto",
+        sha256 = "88b0a90433866b44bb4450d4c30bc5738b8c4f9c9ba14e9661deb123f56a833d",
+        strip_prefix = "rules_proto-b0cc14be5da05168b01db282fe93bdf17aa2b9f4",
+        urls = ["https://github.com/bazelbuild/rules_proto/archive/b0cc14be5da05168b01db282fe93bdf17aa2b9f4.tar.gz"],
     )
 
     http_archive(

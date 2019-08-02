@@ -293,8 +293,8 @@ genrule(
         "@minizip//:license",
         "@gmock//:license",
         "@jsoncpp//:license",
-        "@com_google_protobuf//:license",
         "@six_archive//:license",
+        "@llvm//:license",
     ],
     outs = [
         "boost-LICENSE",
@@ -303,18 +303,21 @@ genrule(
         "minizip-LICENSE",
         "gmock-LICENSE",
         "jsoncpp-LICENSE",
-        "protobuf-LICENSE",
         "six-LICENSE",
+        "llvm-LICENSE",
     ],
     cmd = "cp $(SRCS) $(@D)/",
 )
 
 genrule(
-    name = "llvm_license",
-    srcs = ["@llvm//:license"],
-    outs = ["llvm-LICENSE"],
-    cmd = "cp $(SRCS) $(@D)/",
-    tags = ["llvm"],
+    name = "protobuf_license",
+    srcs = [
+        "@com_google_protobuf//:LICENSE",
+    ],
+    outs = [
+        "protobuf-LICENSE",
+    ],
+    cmd = "cp $(SRCS) $@",
 )
 
 # The PlaidML Wheel definition.
@@ -323,10 +326,8 @@ plaidml_py_wheel(
     package_name = "plaidml",
     srcs = PYTHON_SRCS + [
         ":licenses",
-    ] + select({
-        "//toolchain:windows_x86_64": [],
-        "//conditions:default": [":llvm_license"],
-    }),
+        ":protobuf_license",
+    ],
     config = ":not_setup.cfg",
     config_substitutions = select({
         "//toolchain:windows_x86_64": {
