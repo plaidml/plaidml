@@ -2,6 +2,7 @@ load("//bzl:conda_repo.bzl", "conda_repo")
 load("//bzl:xsmm_repo.bzl", "xsmm_repo")
 load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
+load("//bzl:dev_repo.bzl", "dev_http_archive")
 
 def plaidml_workspace():
     configure_toolchain()
@@ -157,7 +158,7 @@ def plaidml_workspace():
         build_file = Label("//bzl:xsmm.BUILD"),
     )
 
-    http_archive(
+    dev_http_archive(
         name = "llvm",
         url = "https://github.com/llvm-mirror/llvm/archive/b7d166cebcf619a3691eed3f994384aab3d80fa6.zip",
         sha256 = "61bc88374568cb0fc732432ec56bbab0e05c44b8f70f1f1868665204e9de2dba",
@@ -165,7 +166,7 @@ def plaidml_workspace():
         build_file = Label("//vendor/llvm:llvm.BUILD"),
     )
 
-    http_archive(
+    dev_http_archive(
         name = "mlir",
         url = "https://github.com/plaidml/mlir/archive/4fcc9e1d9f8797a26512de1c640e46d24e07831c.zip",
         sha256 = "73cc16075b4190e739ada30e1338765590cfeb84588d057345de597ad3e36e48",
