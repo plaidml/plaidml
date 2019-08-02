@@ -6,10 +6,11 @@ def _gencfg_impl(ctx):
     args.add("--identifier", ctx.attr.identifier)
     args.add("--out", ctx.outputs.out)
     ctx.actions.run(
-        inputs = [ctx.executable._tool] + ctx.files.srcs,
+        inputs = ctx.files.srcs,
         outputs = [ctx.outputs.out],
         arguments = [args],
         executable = ctx.executable._tool,
+        tools = [ctx.executable._tool],
         mnemonic = "gencfg",
     )
     return [DefaultInfo(files = depset([ctx.outputs.out]))]

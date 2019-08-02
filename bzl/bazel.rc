@@ -10,6 +10,7 @@ build --genrule_strategy=standalone
 test --genrule_strategy=standalone
 run --genrule_strategy=standalone
 
+build --announce_rc
 build --distinct_host_configuration=false
 build:ro --remote_upload_local_results=false
 
