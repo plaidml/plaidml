@@ -11,8 +11,6 @@ http_archive(
     url = "https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz",
 )
 
-load("//bzl:workspace.bzl", "configure_llvm", "plaidml_workspace")
+load("//bzl:workspace.bzl", "plaidml_workspace")
 
 plaidml_workspace()
-
-configure_llvm()

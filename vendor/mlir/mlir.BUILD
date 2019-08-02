@@ -1,6 +1,6 @@
 package(default_visibility = ["@//visibility:public"])
 
-load("@com_intel_plaidml//bzl:mlir.bzl", "mlir_tblgen")
+load("@com_intel_plaidml//vendor/mlir:mlir.bzl", "mlir_tblgen")
 
 PLATFORM_COPTS = select({
     "@com_intel_plaidml//toolchain:macos_x86_64": [

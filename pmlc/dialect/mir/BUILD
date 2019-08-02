@@ -3,7 +3,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
-load("//bzl:mlir.bzl", "mlir_tblgen")
+load("//vendor/mlir:mlir.bzl", "mlir_tblgen")
 
 mlir_tblgen(
     name = "gen-op-decls",

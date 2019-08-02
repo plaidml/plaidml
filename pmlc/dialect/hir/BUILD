@@ -1,6 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
-load("//bzl:mlir.bzl", "mlir_tblgen")
+load("//vendor/mlir:mlir.bzl", "mlir_tblgen")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_library",
