@@ -71,7 +71,7 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "mir_test",
     srcs = ["mir_test.cc"],
-    tags = ["llvm"],
+    tags = ["llvm", "mir_test"],
     deps = [
         ":transcode",
         "//tile/codegen",
