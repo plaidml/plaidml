@@ -128,6 +128,7 @@ plaidml_cc_test(
     deps = [
         ":lang",
     ],
+    tags = ["catch"],
 )
 
 plaidml_bison(

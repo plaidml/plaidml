@@ -13,6 +13,7 @@ plaidml_cc_test(
     deps = [
         ":math",
     ],
+    tags = ["catch"],
 )
 
 plaidml_cc_library(
