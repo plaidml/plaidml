@@ -23,6 +23,7 @@ MSVC_COPTS = [
     "/DHAVE_PTHREAD",
     "/DHAVE_ZLIB",
     "/wd4018",  # -Wno-sign-compare
+    "/wd4506",  # No definition for inline function
     "/wd4514",  # -Wno-unused-function
 ]
 
