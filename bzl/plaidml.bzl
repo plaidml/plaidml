@@ -84,10 +84,11 @@ def _plaidml_bison_impl(ctx):
     args.add_all(ctx.files.src)
     outputs = [ctx.outputs.out, ctx.outputs.defines]
     ctx.actions.run(
-        inputs = [ctx.executable.tool] + ctx.files.src,
+        inputs = ctx.files.src,
         outputs = outputs,
         arguments = [args],
         env = ctx.attr.env,
+        tools = [ctx.executable.tool],
         executable = ctx.executable.tool,
         mnemonic = "bison",
     )
@@ -123,10 +124,11 @@ def _plaidml_flex_impl(ctx):
     args.add_all(ctx.files.src)
     outputs = [ctx.outputs.out, ctx.outputs.hdr]
     ctx.actions.run(
-        inputs = [ctx.executable.tool] + ctx.files.src,
+        inputs = ctx.files.src,
         outputs = outputs,
         arguments = [args],
         use_default_shell_env = True,
+        tools = [ctx.executable.tool],
         executable = ctx.executable.tool,
         mnemonic = "flex",
     )
@@ -156,11 +158,11 @@ plaidml_flex = rule(
 
 def _plaidml_py_wheel_impl(ctx):
     tpl = ctx.file._setup_py_tpl
-    setup_py = ctx.new_file(ctx.label.name + ".pkg/setup.py")
-    wheel_inputs = depset([setup_py])
+    setup_py = ctx.actions.declare_file(ctx.label.name + ".pkg/setup.py")
+    wheel_inputs = [setup_py]
     version = ctx.var.get("version", default = "unknown")
     if ctx.file.config:
-        cfg = ctx.new_file(setup_py, "setup.cfg")
+        cfg = ctx.actions.declare_file("setup.cfg", sibling = setup_py)
         ctx.actions.expand_template(
             template = ctx.file.config,
             output = cfg,
@@ -172,8 +174,8 @@ def _plaidml_py_wheel_impl(ctx):
     if pkg_prefix != "":
         pkg_prefix = "/" + pkg_prefix
     for tgt in ctx.attr.srcs:
-        for src in tgt.files + tgt.data_runfiles.files:
-            dest = ctx.new_file(setup_py, "pkg" + pkg_prefix + src.path[src.path.find(build_src_base) + len(build_src_base) - 1:])
+        for src in tgt.files.to_list() + tgt.data_runfiles.files.to_list():
+            dest = ctx.actions.declare_file("pkg" + pkg_prefix + src.path[src.path.find(build_src_base) + len(build_src_base) - 1:], sibling = setup_py)
             ctx.actions.run_shell(
                 outputs = [dest],
                 inputs = [src],
@@ -183,11 +185,11 @@ def _plaidml_py_wheel_impl(ctx):
             )
             wheel_inputs += [dest]
     for tgt in ctx.attr.data:
-        for src in tgt.files + tgt.data_runfiles.files:
+        for src in tgt.files.to_list() + tgt.data_runfiles.files.to_list():
             basename = src.basename
             if basename in ctx.attr.data_renames:
                 basename = ctx.attr.data_renames[basename]
-            dest = ctx.new_file(setup_py, "data/" + basename)
+            dest = ctx.actions.declare_file("data/" + basename, sibling = setup_py)
             ctx.actions.run_shell(
                 outputs = [dest],
                 inputs = [src],
@@ -212,29 +214,30 @@ def _plaidml_py_wheel_impl(ctx):
         ctx.attr.abi,
         ctx.attr.platform,
     )
-    wheel = ctx.new_file(setup_py, wheel_filename)
+    wheel = ctx.actions.declare_file(wheel_filename, sibling = setup_py)
     bdist_wheel_args = [setup_py.path, "--no-user-cfg", "bdist_wheel"]
     if ctx.attr.platform != "any":
         bdist_wheel_args.append("--plat-name")
         bdist_wheel_args.append(ctx.attr.platform)
     ctx.actions.run(
         outputs = [wheel],
-        inputs = wheel_inputs.to_list(),
+        inputs = wheel_inputs,
         executable = "python",
         arguments = bdist_wheel_args,
         mnemonic = "BuildWheel",
         use_default_shell_env = True,
     )
-    output = ctx.new_file(ctx.bin_dir, wheel.basename)
-    ctx.actions.run_shell(
-        outputs = [output],
-        inputs = [wheel],
-        command = "cp $1 $2",
-        arguments = [wheel.path, output.path],
-        mnemonic = "CopyWheel",
-    )
-    runfiles = ctx.runfiles(files = [output])
-    return DefaultInfo(files = depset([output]), runfiles = runfiles)
+
+    # output = ctx.actions.declare_file(wheel.basename, sibling = ctx.bin_dir)
+    # ctx.actions.run_shell(
+    #     outputs = [output],
+    #     inputs = [wheel],
+    #     command = "cp $1 $2",
+    #     arguments = [wheel.path, output.path],
+    #     mnemonic = "CopyWheel",
+    # )
+    runfiles = ctx.runfiles(files = [wheel])
+    return DefaultInfo(files = depset([wheel]), runfiles = runfiles)
 
 plaidml_py_wheel = rule(
     attrs = {

@@ -4,9 +4,10 @@ def _py_cffi_impl(ctx):
     args.add("--module", ctx.attr.module)
     args.add("--output", ctx.outputs.out)
     ctx.actions.run(
-        inputs = [ctx.executable._tool] + ctx.files.srcs,
+        inputs = ctx.files.srcs,
         outputs = [ctx.outputs.out],
         arguments = [args],
+        tools = [ctx.executable._tool],
         executable = ctx.executable._tool,
         mnemonic = "PyCffi",
     )
