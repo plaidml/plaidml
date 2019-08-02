@@ -149,13 +149,6 @@ def plaidml_workspace():
         build_file = Label("//conda:tools-windows.BUILD"),
     )
 
-    # http_archive(
-    #     name = "rules_foreign_cc",
-    #     url = "https://github.com/bazelbuild/rules_foreign_cc/archive/dea1437d926c6ee171625ba16e719d9ee7a8aad3.zip",
-    #     sha256 = "e161ad5078822830f0499b5a210cea00cbed827dfe0e90a9579c2a77308ef88e",
-    #     strip_prefix = "rules_foreign_cc-dea1437d926c6ee171625ba16e719d9ee7a8aad3",
-    # )
-
     xsmm_repo(
         name = "xsmm",
         url = "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
@@ -165,11 +158,19 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "llvm",
+        url = "https://github.com/llvm-mirror/llvm/archive/b7d166cebcf619a3691eed3f994384aab3d80fa6.zip",
+        sha256 = "61bc88374568cb0fc732432ec56bbab0e05c44b8f70f1f1868665204e9de2dba",
+        strip_prefix = "llvm-b7d166cebcf619a3691eed3f994384aab3d80fa6",
+        build_file = Label("//vendor/llvm:llvm.BUILD"),
+    )
+
+    http_archive(
         name = "mlir",
-        url = "https://github.com/tensorflow/mlir/archive/d4e60ddaa853fd5954864a0165773314a8981de4.zip",
-        sha256 = "12dc251dd15101484163a70f3b494d6aa0111f47566f48e39380c801599448d2",
-        strip_prefix = "mlir-d4e60ddaa853fd5954864a0165773314a8981de4",
-        build_file = str(Label("//bzl:mlir.BUILD")),
+        url = "https://github.com/plaidml/mlir/archive/4fcc9e1d9f8797a26512de1c640e46d24e07831c.zip",
+        sha256 = "73cc16075b4190e739ada30e1338765590cfeb84588d057345de597ad3e36e48",
+        strip_prefix = "mlir-4fcc9e1d9f8797a26512de1c640e46d24e07831c",
+        build_file = Label("//vendor/mlir:mlir.BUILD"),
     )
 
 def configure_protobuf():
@@ -213,15 +214,6 @@ def configure_protobuf():
     native.bind(
         name = "six",
         actual = "@six_archive//:six",
-    )
-
-def configure_llvm():
-    http_archive(
-        name = "llvm",
-        url = "https://github.com/llvm-mirror/llvm/archive/baa325e1de31e4be5b0a99ea19c8305d339c722a.zip",
-        sha256 = "c9252af344c980b625099e304b3820bc19938dd5dce28f6afe842b113983e93d",
-        strip_prefix = "llvm-baa325e1de31e4be5b0a99ea19c8305d339c722a",
-        build_file = Label("//vendor/llvm:llvm.BUILD"),
     )
 
 def configure_toolchain():
