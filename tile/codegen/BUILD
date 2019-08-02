@@ -20,6 +20,8 @@ plaidml_cc_library(
         "//base/util",
         "//tile/bilp",
         "//tile/stripe",
+	"//pmlc/dialect/mir:transcode",
+	"//pmlc/dialect/mir:passes",
         "@boost//:filesystem",
     ] + select({
         "//toolchain:windows_x86_64": [],

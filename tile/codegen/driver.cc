@@ -7,6 +7,7 @@
 #include "base/config/config.h"
 #include "base/util/any_factory_map.h"
 #include "base/util/throw.h"
+#include "pmlc/dialect/mir/transcode.h"
 #include "tile/codegen/alias.h"
 #include "tile/codegen/compile_pass.h"
 #include "tile/codegen/emitc.h"
@@ -93,11 +94,24 @@ class ConfigsRegistry {
   std::unordered_map<std::string, std::string> registry_;
 };
 
+void ConvertToStripe(CompilerState* state) {
+  IVLOG(1, "Converting to Stripe");
+  mlir::FuncOp op = mlir::cast<mlir::FuncOp>(state->module.front());
+  *state->prog = pmlc::dialect::mir::ToStripe(op);
+  // TODO: Erase
+}
+
+void ConvertToMir(CompilerState* state) {
+  IVLOG(1, "Converting to MIR");
+  state->module.push_back(pmlc::dialect::mir::ToMir(&state->ctx, *state->prog));
+}
+
 }  // namespace
 
 void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions& options) {
   size_t counter = 0;
   DumpProgram(*state->entry(), options, "initial", counter++);
+  bool in_stripe = true;
   for (const auto& pass : passes) {
     IVLOG(1, "Optimization Pass " << pass.name());
     std::unique_ptr<CompilePass> compile_pass =
@@ -106,9 +120,24 @@ void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions&
       throw_with_trace(std::runtime_error(
           str(boost::format("Unsupported pass: %1% -> %2%") % pass.name() % pass.pass().type_url())));
     }
+    bool wants_stripe = compile_pass->is_stripe();
+    if (!in_stripe && wants_stripe) {
+      ConvertToStripe(state);
+    } else if (in_stripe && !wants_stripe) {
+      ConvertToMir(state);
+    }
+    in_stripe = wants_stripe;
     compile_pass->Apply(state);
-    DumpProgram(*state->entry(), options, pass.name(), counter++);
+    if (in_stripe) {
+      DumpProgram(*state->entry(), options, pass.name(), counter);
+    } else {
+      // DUMP MLIR
+    }
+    counter++;
     ValidateBlock(state->entry());
+  }
+  if (!in_stripe) {
+    ConvertToStripe(state);
   }
   // Remove constants that are no longer used
   if (state->const_bufs == nullptr) {

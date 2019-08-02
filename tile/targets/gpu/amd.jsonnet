@@ -92,7 +92,16 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
               }
             },
-
+            /*
+            // Pad tensors to remove inner conditionals
+            {
+              name: 'pad',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MirPadPass',
+                reqs: ['main'],
+              },
+            },
+            */
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
