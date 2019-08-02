@@ -18,6 +18,7 @@ plaidml_py_library(
         "//plaidml2/exec:py",
         "//plaidml2/op:py",
     ],
+    tags = ["conda"],
 )
 
 conda_test(

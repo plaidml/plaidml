@@ -58,14 +58,20 @@ _conda_attrs = {
     ),
 }
 
-conda_binary = rule(
+_conda_binary = rule(
     attrs = _conda_attrs,
     executable = True,
     implementation = _conda_impl,
 )
 
-conda_test = rule(
+_conda_test = rule(
     attrs = _conda_attrs,
     test = True,
     implementation = _conda_impl,
 )
+
+def conda_binary(tags = [], **kwargs):
+    _conda_binary(tags = tags + ["conda"], **kwargs)
+
+def conda_test(tags = [], **kwargs):
+    _conda_test(tags = tags + ["conda"], **kwargs)

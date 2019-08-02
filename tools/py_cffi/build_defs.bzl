@@ -33,17 +33,19 @@ py_cffi_rule = rule(
 )
 
 # It's named srcs_ordered because we want to prevent buildifier from automatically sorting this list.
-def py_cffi(name, module, srcs_ordered, **kwargs):
+def py_cffi(name, module, srcs_ordered, tags = [], **kwargs):
     out = name + ".py"
     py_cffi_rule(
         name = name + "_py_cffi",
         module = module,
         srcs = srcs_ordered,
         out = out,
+        tags = tags + ["conda"],
     )
 
     native.py_library(
         name = name,
         srcs = [out],
+        tags = tags + ["conda"],
         **kwargs
     )
