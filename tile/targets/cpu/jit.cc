@@ -21,6 +21,13 @@
 #include "base/util/lookup.h"
 #include "tile/stripe/stripe.h"
 
+#if defined(_WIN32)
+// As of 2019-08-01, libxsmm doesn't compile on Windows if UNICODE is defined, since it passes
+// an ANSI string to CreateMutexW().  So we rewrite it.
+#undef CreateMutex
+#define CreateMutex CreateMutexA
+#endif
+
 // libxsmm
 #include "libxsmm_source.h"  // NOLINT
 
