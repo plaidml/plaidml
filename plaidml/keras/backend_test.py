@@ -605,6 +605,22 @@ class TestBackendOps(unittest.TestCase):
     def testAllNegAxis(self, b):
         return b.all(b.variable(m(3, 4, 5)), axis=-1)
 
+    @compareForwardExact()
+    def testAny(self, b):
+        return b.any(b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testAnyKeepdims(self, b):
+        return b.any(b.variable(m(3, 3)), keepdims=True)
+
+    @compareForwardExact()
+    def testAnyAxis(self, b):
+        return b.any(b.variable(m(2, 3, 4, 5)), axis=[1, 3])
+
+    @compareForwardExact()
+    def testAnyNegAxis(self, b):
+        return b.any(b.variable(m(3, 4, 5)), axis=-1)
+
     @opTest([
         [m(3, 3)],
         [m(3, 3), None, True],
