@@ -1,7 +1,13 @@
+channels:
+  - conda-forge
 dependencies:
-  - cmake
-  - conda
-  - m2-perl
+  - conda=4.6
+  - numpy=1.16
+  - pip
   - posix
-  - python
-  - setuptools>=40.6.0
+  - pre_commit=1.17.0
+  - python=3.7.0
+  - pyyaml
+  - pip:
+    - cpplint==1.4.4
+    - yapf==0.27.0

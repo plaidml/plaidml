@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 
 import argparse
+import pathlib
 import platform
+import shutil
+import subprocess
+import sys
 
 BAZELRC = '.bazelrc.configure'
 
@@ -11,7 +15,7 @@ DEFAULT_VARIANTS = {
     'Windows': 'windows_x86_64',
 }
 
-DEFAULT_UNIX_PATH = 'PATH=/usr/local/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+UNIX_PATH = 'PATH=/usr/local/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 
 
 def is_linux():
@@ -34,12 +38,103 @@ def write_to_bazelrc(line):
 def choice_prompt(question, choices, default):
     inp = ""
     while not inp in choices:
-        inp = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
+        inp = input("{0}? ({1})[{2}]: ".format(question, ",".join(choices), default))
         if not inp:
             inp = default
         elif inp not in choices:
             print("Invalid choice: {}".format(inp))
     return inp
+
+
+class Configure:
+
+    def __init__(self):
+        conda = shutil.which('conda')
+        if not conda:
+            print('Please install conda.')
+            print('See: https://docs.conda.io/projects/conda/en/latest/user-guide/install')
+            sys.exit(1)
+        self.conda = pathlib.Path(conda)
+        self.this_dir = pathlib.Path(__file__).absolute().parent
+        self.cenv_dir = self.this_dir / '.cenv'
+        print('conda found at: {}'.format(self.conda))
+
+        # reset custom config settings
+        open(BAZELRC, 'w').close()
+
+    def configure_conda(self):
+        if is_windows():
+            env_file = self.this_dir / 'environment-windows.yml'
+        else:
+            env_file = self.this_dir / 'environment.yml'
+
+        if self.cenv_dir.exists():
+            print('Updating conda environment from: {}'.format(env_file))
+            cmd = [
+                str(self.conda),
+                'env',
+                'update',
+                '-f',
+                str(env_file),
+                '-p',
+                str(self.cenv_dir),
+            ]
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+        else:
+            answer = choice_prompt('Create a conda environment? path: {}'.format(self.cenv_dir),
+                                   ['y', 'n'], 'y')
+            if answer == 'y':
+                print('Creating conda environment from: {}'.format(env_file))
+                cmd = [
+                    str(self.conda),
+                    'env',
+                    'create',
+                    '-f',
+                    str(env_file),
+                    '-p',
+                    str(self.cenv_dir),
+                ]
+                subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+
+    def configure_variant(self):
+        variant = DEFAULT_VARIANTS.get(platform.system())
+        print()
+        print('Using variant: {}'.format(variant))
+        write_to_bazelrc('build --config={}'.format(variant))
+
+    def configure_cache(self):
+        print()
+        bazel_cache = input("Enter a bazel cache server URL (leave blank to disable): ")
+        if bazel_cache:
+            write_to_bazelrc('build --remote_cache={}'.format(bazel_cache))
+            if is_windows():
+                pass  # TODO
+            else:
+                write_to_bazelrc('build --action_env={}'.format(UNIX_PATH))
+
+    def configure_precommit(self):
+        if is_windows():
+            search_path = self.cenv_dir / 'Scripts'
+        else:
+            search_path = self.cenv_dir / 'bin'
+        print()
+        print('Searching for pre-commit in: {}'.format(search_path))
+        pre_commit = shutil.which('pre-commit', path=str(search_path))
+        if not pre_commit:
+            print('pre-commit could not be found.')
+            print('Is your conda environment created and up to date?')
+            sys.exit(1)
+        subprocess.run([pre_commit, 'install'], check=True)
+
+    def configure_bazelisk(self):
+        bazelisk = shutil.which('bazelisk')
+        if not bazelisk:
+            print('Please install bazelisk from:')
+            print('https://github.com/bazelbuild/bazelisk')
+            sys.exit(1)
+        print()
+        print('bazelisk version')
+        subprocess.run([bazelisk, 'version'], check=True)
 
 
 def main():
@@ -49,22 +144,19 @@ def main():
     print("Configuring PlaidML build environment")
     print()
 
-    # reset custom config settings
-    open(BAZELRC, 'w').close()
+    cfg = Configure()
+    cfg.configure_conda()
+    cfg.configure_precommit()
+    cfg.configure_bazelisk()
+    cfg.configure_variant()
+    cfg.configure_cache()
 
-    variant = DEFAULT_VARIANTS.get(platform.system())
-
-    print('Using variant: {}'.format(variant))
     print()
-    write_to_bazelrc('build --config={}'.format(variant))
-
-    bazel_cache = input("Enter a bazel cache server URL (leave blank to disable): ")
-    if bazel_cache:
-        write_to_bazelrc('build --remote_cache={}'.format(bazel_cache))
-        if is_windows():
-            pass
-        else:
-            write_to_bazelrc('build --action_env={}'.format(DEFAULT_UNIX_PATH))
+    print("Your build is configured.")
+    print("Use the following to run all unit tests:")
+    print()
+    print("bazelisk test //...")
+    print()
 
 
 if __name__ == '__main__':

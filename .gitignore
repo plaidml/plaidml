@@ -115,3 +115,4 @@ ENV/
 .bazelrc.user
 
 /tmp
+/.cenv

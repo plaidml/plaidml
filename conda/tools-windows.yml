@@ -2,11 +2,10 @@ channels:
   - conda-forge
 dependencies:
   - cffi
-  - cmake
   - m2-bison
   - m2-flex
   - m2-perl
   - pip
-  - python=3.7
+  - python=3.7.0
   - pip:
     - pcpp
