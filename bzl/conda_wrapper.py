@@ -21,6 +21,7 @@ SOFTWARE.
 import errno
 import logging
 import os
+import platform
 import subprocess
 import sys
 import time
@@ -36,7 +37,6 @@ except ImportError:
     pass
 try:
     import msvcrt
-    import win32event
     WIN = 1
 except ImportError:
     # Not Windows
@@ -207,14 +207,15 @@ class Singlet:
 
 
 def main():
-    if WIN:
+    if platform.system() == 'Windows':
+        import win32event
         mut = win32event.CreateMutex(None, False, 'Local\\CondaLock')
         win32event.WaitForSingleObject(mut, win32event.INFINITE)
-        sys.exit(subprocess.call(['conda'] + sys.argv[1:]))
+        subprocess.check_call(['conda'] + sys.argv[1:])
     else:
         lock_path = os.path.normpath(os.path.expanduser('~/.conda_lock'))
         with Singlet(lock_path):
-            sys.exit(subprocess.call(['conda'] + sys.argv[1:]))
+            subprocess.check_call(['conda'] + sys.argv[1:])
 
 
 logger = logging.getLogger("singletony")
