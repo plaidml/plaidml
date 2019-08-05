@@ -982,6 +982,7 @@ class _ConvolutionStringFormatter:
 
 
 class All(tile.Operation):
+
     def __init__(self, x, axis=None, keepdims=False):
         if axis == None:
             axis = list(range(x.shape.ndims))
@@ -1001,6 +1002,7 @@ all = All.function
 
 
 class Any(tile.Operation):
+
     def __init__(self, x, axis=None, keepdims=False):
         if axis == None:
             axis = list(range(x.shape.ndims))
