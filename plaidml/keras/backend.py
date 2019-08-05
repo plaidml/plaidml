@@ -1510,7 +1510,7 @@ def softmax(x):
 
 
 def softplus(x):
-    _report_unimplemented('softplus')
+    return log(1. + exp(x))
 
 
 def softsign(x):
