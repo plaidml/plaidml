@@ -199,7 +199,6 @@ def abs(x):
 
 all = op.all
 
-
 any = op.any
 
 

@@ -589,6 +589,7 @@ class TestBackendOps(unittest.TestCase):
             x / c,
             c / x,
         ]
+
     @compareForwardExact()
     def testAll(self, b):
         return b.all(b.variable(m(3, 3)))
