@@ -8,6 +8,7 @@ from contextlib import contextmanager
 import six
 
 import numpy as np
+import scipy.stats
 import plaidml2 as plaidml
 import plaidml2.edsl as edsl
 import plaidml2.exec as plaidml_exec
@@ -222,7 +223,8 @@ class PlaidMLKerasException(Exception):
 
 
 def abs(x):
-    _report_unimplemented('abs')
+    logger.debug('abs(x: {})'.format(x))
+    return _KerasNode('abs', tensor=plaidml_op.abs(x.tensor))
 
 
 def all(x, axis=None, keepdims=False):
@@ -359,7 +361,9 @@ def clip(x, min_val, max_val):
 
 
 def concatenate(tensors, axis=-1):
-    _report_unimplemented('concatenate')
+    logger.debug('concatenate(tensors: {}, axis: {})'.format(tensors, axis))
+    tensor_vals = [x.tensor for x in tensors]
+    return _KerasNode('concatenate', tensor=plaidml_op.concatenate(tensor_vals, axis))
 
 
 def constant(value, dtype=None, shape=None, name=None):
@@ -600,18 +604,7 @@ def eval(x):
 
 def expand_dims(x, axis=-1, name=None):
     logger.debug('expand_dims(x: {}, axis: {}, name={})'.format(x, axis, name))
-    I = x.tensor
-    ndims = I.shape.ndims
-    if axis < 0:
-        axis = ndims + 1 + axis
-    dims_in = edsl.TensorDims(ndims)
-    idxs_in = edsl.TensorIndexes(ndims)
-    dims_out = dims_in[0:axis] + [1] + dims_in[axis:]
-    idxs_out = idxs_in[0:axis] + [0] + idxs_in[axis:]
-    I.bind_dims(*dims_in)
-    O = edsl.TensorOutput(*dims_out)
-    O[idxs_out] = I[idxs_in]
-    return _KerasNode('expand_dims', name=name, tensor=O)
+    return _KerasNode('expand_dims', name=name, tensor=plaidml_op.expand_dims(x.tensor, axis))
 
 
 def eye(size, dtype=None, name=None):
@@ -843,14 +836,16 @@ def ones_like(x, dtype=None, name=None):
     _report_unimplemented('ones_like')
 
 
-def permute_dimensions(x, pattern):
-    _report_unimplemented('permute_dimensions')
+def permute_dimensions(x, pattern=None):
+    logger.debug('permute_dimensions(x: {}, pattern: {})'.format(x, pattern))
+    return _KerasNode('permute_dimensions', tensor=plaidml_op.transpose(x.tensor, pattern))
 
 
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     logger.debug('placeholder(shape: {}, ndim: {}, dtype: {}, sparse: {}, name: {})'.format(
         shape, ndim, dtype, sparse, name))
     dtype = plaidml.DType.from_numpy(dtype or floatx())
+    # TODO: Need to support empty shapes; once supported, convert below to `if _ is not None`
     if shape:
         return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, shape), name=name)
     if ndim:
@@ -1085,11 +1080,13 @@ def softmax(x):
 
 
 def softplus(x):
-    _report_unimplemented('softplus')
+    logger.debug('softplus(x: {})'.format(x))
+    return log(1. + exp(x))
 
 
 def softsign(x):
-    _report_unimplemented('softsign')
+    logger.debug('softsign(x: {})'.format(x))
+    return x / (1. + abs(x))
 
 
 def sparse_categorical_crossentropy(target, output, from_logits=False):
@@ -1129,15 +1126,18 @@ def square(x):
 
 
 def squeeze(x, axis):
-    _report_unimplemented('squeeze')
+    logger.debug('squeeze(x: {}, axis: {})'.format(x, axis))
+    return _KerasNode('squeeze', tensor=plaidml_op.squeeze(x.tensor, axis))
 
 
 def stack(x, axis=0):
-    _report_unimplemented('stack')
+    logger.debug('expand_dims(x: {}, axis: {})'.format(x, axis))
+    return concatenate([expand_dims(item, axis) for item in x], axis=axis)
 
 
 def std(x, axis=None, keepdims=False):
-    _report_unimplemented('std')
+    logger.debug('std(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
+    return sqrt(var(x, axis=axis, keepdims=keepdims))
 
 
 def stop_gradient(variables):
@@ -1150,7 +1150,11 @@ def sum(x, axis=None, keepdims=False):
 
 
 def switch(condition, then_expression, else_expression):
-    _report_unimplemented('switch')
+    logger.debug('switch(condition: {}, then_expression: {}, else_expression: {})'.format(
+        condition, then_expression, else_expression))
+    return _KerasNode('switch',
+                      tensor=edsl.select(condition.tensor, then_expression.tensor,
+                                         else_expression.tensor))
 
 
 def tanh(x):
@@ -1171,19 +1175,7 @@ def temporal_padding(x, padding=(1, 1)):
 
 def tile(x, n):
     logger.debug('tile(x: {}, n: {})'.format(x, n))
-    I = x.tensor
-    ndims = I.shape.ndims
-    if len(n) != ndims:
-        raise PlaidMLKerasException('Tile size dimensions doesn\'t match ndims')
-    dims = edsl.TensorDims(ndims)
-    idxs = edsl.TensorIndexes(ndims)
-    I.bind_dims(*dims)
-    out_idxs = [edsl.TensorIndex() * dims[i] + idxs[i] for i in range(ndims)]
-    out_dims = [dims[i] * n[i] for i in range(ndims)]
-    O = edsl.TensorOutput(*out_dims)
-    O[out_idxs] = I[idxs]
-    O.no_defract()
-    return _KerasNode('tile', tensor=O)
+    return _KerasNode('tile', tensor=plaidml_op.tile(x.tensor, n))
 
 
 def to_dense(tensor):
@@ -1191,11 +1183,18 @@ def to_dense(tensor):
 
 
 def transpose(x):
-    _report_unimplemented('transpose')
+    logger.debug('transpose(x: {})'.format(x))
+    return _KerasNode('transpose', tensor=plaidml_op.transpose(x.tensor))
 
 
 def truncated_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
-    _report_unimplemented('truncated_normal')
+    logger.debug('truncated_normal(shape: {}, mean: {}, stddev: {}, dtype: {}, seed: {})'.format(
+        shape, mean, stddev, dtype, seed))
+    if dtype is None:
+        dtype = floatx()
+    if seed:
+        np.random.seed(seed)
+    return variable(stddev * scipy.stats.truncnorm.rvs(-2.0, 2.0, size=shape) + mean, dtype)
 
 
 def update(x, new_x):
@@ -1214,7 +1213,8 @@ def update_sub(x, decrement):
 
 
 def var(x, axis=None, keepdims=False):
-    _report_unimplemented('var')
+    logger.debug('var(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
+    return _KerasNode('var', tensor=plaidml_op.variance(x.tensor, axis, keepdims))
 
 
 def variable(value, dtype=None, name=None, constraint=None):
@@ -1225,12 +1225,16 @@ def variable(value, dtype=None, name=None, constraint=None):
     dtype = dtype or floatx()
     if isinstance(value, _KerasNode):
         value = value.eval()
-        # TODO: cast if incompatible dtype
     if isinstance(value, float) or isinstance(value, six.integer_types):
         value = np.array(value, dtype=dtype)
     if isinstance(value, list) or isinstance(value, tuple):
         value = np.array(value, dtype=dtype)
     if isinstance(value, np.ndarray):
+        if dtype != value.dtype:
+            logger.debug(
+                'Casting to requested dtype in variable, received {} and requested {}'.format(
+                    value.dtype, dtype))
+            value = value.astype(dtype)
         return _KerasNode('variable', name=name, value=value)
     raise TypeError('Unknown type for variable: {}'.format(type(value)))
 

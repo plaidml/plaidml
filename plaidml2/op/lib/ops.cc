@@ -23,6 +23,8 @@ struct AggregationAxes {
   std::set<size_t> axes;
 
   AggregationAxes(size_t ndims, const Value& in_axes, bool keepdims) : src_idxs(ndims), src_dims(ndims) {
+    IVLOG(5, "Received agg axes request with\n\tndims = " << ndims << "\n\tin_axes = " << in_axes
+                                                          << "\n\tkeepdims = " << keepdims);
     if (in_axes.is_none()) {
       for (size_t i = 0; i < ndims; i++) {
         axes.insert(i);
@@ -381,6 +383,24 @@ void normalize_grouping_strategy(int64_t* groups, AutogroupMode* autogroup_mode,
   }
 }
 
+size_t normalize_axis(int64_t axis, size_t ndims, std::string op_name = "") {
+  bool negative_axis_given = false;
+  if (axis < 0) {
+    axis += ndims;
+    negative_axis_given = true;
+  }
+  if (axis < 0 || ndims <= static_cast<size_t>(axis)) {
+    if (negative_axis_given) {
+      axis -= ndims;
+    }
+    auto op_name_str = op_name.empty() ? "" : str(boost::format("for %1% op ") % op_name);
+    throw std::runtime_error(
+        str(boost::format("Axis out of range %1%(axis %2% requested for tensors with %3% dimensions)") % op_name_str %
+            axis % ndims));
+  }
+  return axis;
+}
+
 std::pair<TensorDim, TensorDim> compute_padding_and_output_size(const TensorDim& input_size,
                                                                 const TensorDim& filter_size, int64_t stride,
                                                                 AutopadMode autopad_mode, int64_t pad_lo,
@@ -434,6 +454,17 @@ std::vector<int64_t>* extend_manual_padding(std::vector<int64_t>* pads, size_t r
 
 }  // namespace
 
+Value abs(const Value& value) {
+  IVLOG(1, "abs");
+  auto args = value.as_tuple();
+  if (args.size() != 1) {
+    throw std::runtime_error("abs expects 1 argument");
+  }
+  auto I = args[0].as_tensor();
+  auto O = select(I < 0., -I, I);
+  return Value{O};
+}
+
 Value argmax(const Value& value) {
   IVLOG(1, "argmax");
   auto args = value.as_tuple();
@@ -455,6 +486,64 @@ Value argmax(const Value& value) {
   AM(agg.dst_idxs) >= cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs));
   auto O = as_uint(AM, 32);
   return Value{O};
+}
+
+Value concatenate(const Value& value) {
+  // TODO: Make errors nicer (e.g. when bind_dims fails)
+  IVLOG(1, "concatenate")
+
+  // Read Arguments
+  auto args = value.as_tuple();
+  auto tensor_vals = args[0].as_tuple();
+  auto raw_axis = args[1].as_int();
+
+  // Initialize useful values
+  std::vector<Tensor> tensors;
+  for (auto tensor_val : tensor_vals) {
+    tensors.push_back(tensor_val.as_tensor());
+  }
+  if (tensors.empty()) {
+    throw std::runtime_error("The concatenate op requires at least one input tensor");
+  }
+  auto ndims = tensors[0].shape().ndims();
+  auto axis = normalize_axis(raw_axis, ndims, "concatenate");
+  std::vector<TensorDim> dims(ndims);
+  std::vector<TensorIndex> I_idxs;  // These will be named
+  std::vector<TensorIndex> O_idxs;
+  std::vector<TensorDim> axis_dims(tensors.size());
+  std::vector<TensorDim> axis_dim_subtotals;
+  std::vector<Tensor> results;
+  TensorIndex axis_idx("a");
+  axis_dim_subtotals.emplace_back(0);
+  for (size_t i = 0; i < ndims; ++i) {
+    if (i == axis) {
+      I_idxs.push_back(axis_idx);
+    } else {
+      I_idxs.emplace_back(str(boost::format("n%1%") % i));
+    }
+  }
+
+  // Bind the various input dimensions
+  for (size_t i = 0; i < tensors.size(); ++i) {
+    dims[axis] = axis_dims[i];
+    tensors[i].bind_dims(dims);
+    axis_dim_subtotals.push_back(axis_dims[i] + axis_dim_subtotals.back());
+  }
+  // Set dims to the final output dims
+  dims[axis] = axis_dim_subtotals[tensors.size()];  // There are tensors.size() + 1 TensorDims in the RHS vector
+  O_idxs = I_idxs;                                  // The axis index will be overwritten during the loop
+
+  // Compute each intermediate output
+  for (size_t i = 0; i < tensors.size(); ++i) {
+    results.emplace_back(TensorOutput(dims));
+    O_idxs[axis] = axis_idx + axis_dim_subtotals[i];
+    results[i](O_idxs) = tensors[i](I_idxs);
+    if (i > 0) {
+      results[i].use_default(results[i - 1]);
+    }
+  }
+
+  return Value{results[tensors.size() - 1]};
 }
 
 Value convolution(const Value& value) {
@@ -1058,6 +1147,46 @@ Value dot(const Value& value) {
                                X_shape.ndims() % Y_shape.ndims()));
 }
 
+Value expand_dims(const Value& value) {
+  IVLOG(1, "expand_dims");
+
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(
+        str(boost::format("PlaidML expand_dims op expects 2 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+
+  // Initialize useful values
+  auto ndims = I.shape().ndims();
+  // Axis is relative to _output_ tensor, which has one more dim than I
+  size_t axis = normalize_axis(raw_axis, ndims + 1, "expand_dims");
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> O_idxs;
+  I.bind_dims(I_dims);
+  for (size_t i = 0; i < ndims; ++i) {
+    I_idxs.emplace_back(str(boost::format("n%1%") % i));
+    if (i == axis) {
+      O_dims.emplace_back(1);
+      O_idxs.emplace_back("a");
+    }
+    O_dims.push_back(I_dims[i]);
+    O_idxs.push_back(I_idxs[i]);
+  }
+  if (axis == ndims) {
+    // This one case won't be caught in the main loop, so handle specially
+    O_dims.emplace_back(1);
+    O_idxs.emplace_back("a");
+  }
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
 Value mean(const Value& value) {
   IVLOG(1, "mean");
   auto args = value.as_tuple();
@@ -1071,6 +1200,7 @@ Value mean(const Value& value) {
     return Value{I};
   }
 
+  // TODO: Move this commented block to Keras?
   // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
   //   I = cast(I, floatx());
   // }
@@ -1538,6 +1668,37 @@ Value square(const Value& value) {
   return Value(x * x);
 }
 
+Value squeeze(const Value& value) {
+  IVLOG(1, "squeeze");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("Squeeze expects 2 arguments");
+  }
+
+  // Read arguments
+  auto I = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+
+  // Validate arguments
+  auto ndims = I.shape().ndims();
+  auto axis = normalize_axis(raw_axis, ndims, "squeeze");
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> O_idxs;
+  I.bind_dims(I_dims);
+  for (size_t i = 0; i < ndims; ++i) {
+    I_idxs.emplace_back(str(boost::format("n%1%") % i));
+    if (i != axis) {
+      O_dims.push_back(I_dims[i]);
+      O_idxs.push_back(I_idxs[i]);
+    }
+  }
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
 Value sum(const Value& value) {
   IVLOG(1, "sum");
   auto args = value.as_tuple();
@@ -1551,6 +1712,7 @@ Value sum(const Value& value) {
     return Value{I};
   }
 
+  // TODO: Move this commented block to Keras?
   // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
   //   I = cast(I, floatx());
   // }
@@ -1571,18 +1733,156 @@ Value sum(const Value& value) {
   return Value{O};
 }
 
+Value tile(const Value& value) {
+  IVLOG(1, "tile");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("Tile expects 2 arguments");
+  }
+
+  // Read arguments
+  auto I = args[0].as_tensor();
+  auto reps = args[1].as_int_tuple();
+
+  // Validate args
+  auto ndims = I.shape().ndims();
+  if (reps.empty()) {
+    throw std::runtime_error("No tiling factors provided to tile operation");
+  }
+  while (reps.size() < ndims) {
+    // Numpy style: extend to full rank with 1s
+    reps.push_back(1);
+  }
+  if (reps.size() > ndims) {
+    throw std::runtime_error("More tiling factors provided to tile operation than tensor dimensions");
+  }
+
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  I.bind_dims(I_dims);
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> O_idxs;
+  for (size_t i = 0; i < ndims; ++i) {
+    O_dims.push_back(I_dims[i] * reps[i]);
+    O_idxs.push_back(TensorIndex() * I_dims[i] + I_idxs[i]);
+  }
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+  O.no_defract();
+  return Value{O};
+}
+
+Value transpose(const Value& value) {
+  // Reorders dimensions so dim i of the output is dim pattern[i] of the input
+  IVLOG(1, "transpose");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("Transpose expects 2 arguments");
+  }
+
+  // Read arguments
+  auto I = args[0].as_tensor();
+  auto pattern_val = args[1];
+
+  // Normalize pattern value
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  std::vector<int64_t> pattern;
+  if (pattern_val.is_none()) {
+    // Default is to reverse the dimensions
+    for (size_t i = 0; i < ndims; ++i) {
+      pattern.push_back(ndims - 1 - i);
+    }
+  } else if (pattern_val.is_tuple()) {
+    pattern = pattern_val.as_int_tuple();
+  } else {
+    throw std::runtime_error("Transpose 2nd argument must be none or integer tuple");
+  }
+
+  // Ensure pattern is sane
+  for (const auto& i : pattern) {
+    if (i < 0 || ndims <= static_cast<size_t>(i)) {
+      throw std::runtime_error(
+          str(boost::format("Transpose of nonexistent axis %1% requested (input has %2% dimensions)") % i % ndims));
+    }
+  }
+
+  // Setup inputs and outputs
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  I.bind_dims(I_dims);
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> O_idxs;
+  for (size_t i = 0; i < ndims; ++i) {
+    O_dims.push_back(I_dims[pattern[i]]);
+    O_idxs.push_back(I_idxs[pattern[i]]);
+  }
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
+Value variance(const Value& value) {
+  // This computes the *uncorrected* sample variance (i.e. denominator = n rather than = n-1) to match tensorflow
+  IVLOG(1, "variance");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("Variance expects 3 arguments");
+  }
+
+  // Read arguments
+  auto I = args[0].as_tensor();
+  auto axes = args[1];
+  auto keepdims = args[2].as_int();
+
+  // Handle trivial cases
+  if (I.shape().ndims() == 0) {
+    // TODO: Adjust for dtype?
+    return Value{0};
+  }
+  if (axes.is_tuple() && axes.as_tuple().empty()) {
+    throw std::runtime_error("Variance expects nonempty axis list");
+  }
+
+  // TODO: Move this commented block to Keras?
+  // if (I.shape().dtype() == PLAIDML_DATA_BOOLEAN) {
+  //   I = cast(I, floatx());
+  // }
+
+  auto Mean = mean(edsl::make_tuple(I, axes, true)).as_tensor();
+  AggregationAxes agg(I.shape().ndims(), axes, keepdims);
+
+  I.bind_dims(agg.src_dims);
+
+  auto SquaredDifference = (I - Mean) * (I - Mean);
+  auto SumSqDiff = TensorOutput(agg.dst_dims);
+  SumSqDiff(agg.dst_idxs) += SquaredDifference(agg.src_idxs);
+  auto denom = Tensor{1};
+  for (const auto& axis : agg.axes) {
+    denom = denom * agg.src_dims.at(axis);
+  }
+  return Value{SumSqDiff / denom};
+}
+
 void RegisterOps() {
   auto registry = OperationRegistry::Instance();
+  registry->Register("abs", abs);
   registry->Register("argmax", argmax);
+  registry->Register("concatenate", concatenate);
   registry->Register("convolution", convolution);
   registry->Register("dot", dot);
+  registry->Register("expand_dims", expand_dims);
   registry->Register("mean", mean);
   registry->Register("pool", pool);
   registry->Register("relu", relu);
   registry->Register("softmax", softmax);
   registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);
+  registry->Register("squeeze", squeeze);
   registry->Register("sum", sum);
+  registry->Register("tile", tile);
+  registry->Register("transpose", transpose);
+  registry->Register("variance", variance);
 }
 
 }  // namespace lib

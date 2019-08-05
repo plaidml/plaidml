@@ -90,5 +90,10 @@ inline edsl::Tensor sum(const edsl::Tensor& I, const edsl::Value& axes = edsl::N
   return details::op("sum", args).as_tensor();
 }
 
+inline edsl::Tensor variance(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
+  auto args = edsl::make_tuple(I, axes, keepdims);
+  return details::op("variance", args).as_tensor();
+}
+
 }  // namespace op
 }  // namespace plaidml

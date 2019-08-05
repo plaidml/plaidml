@@ -1683,7 +1683,7 @@ def truncated_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
         dtype = floatx()
     if seed:
         np.random.seed(seed)
-    return stddev * scipy.stats.truncnorm.rvs(-2.0, 2.0, size=shape) + mean
+    return variable(stddev * scipy.stats.truncnorm.rvs(-2.0, 2.0, size=shape) + mean, dtype)
 
 
 def update(x, new_x):
