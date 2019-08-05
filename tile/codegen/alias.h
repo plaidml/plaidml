@@ -70,6 +70,10 @@ class AliasMap {
                              size_t idx,                   //
                              const std::string& idx_name,  //
                              bool idx_passthru = false) const;
+  // Add constraints for a refinement in this block
+  void AddConstraintsForRef(const stripe::Refinement& ref);
+  // Add constraints for all refinements in this block
+  void AddConstraintsForBlock();
 
  private:
   // How deep is this AliasInfo
@@ -86,6 +90,10 @@ class AliasMap {
   std::map<std::string, uint64_t> idx_ranges_;
   // For each current index, how is it built from depth-prefixed indexes
   std::map<std::string, stripe::Affine> idx_sources_;
+  // Add passthru index that are needed by exp from outer to this block
+  void AddPassthruIdx(stripe::Block* outer, stripe::Affine exp);
+  // Add a passthru index named idx_name in block
+  std::string MakePassthruIdx(stripe::Block* block, const std::string& idx_name);
 };
 
 // Determines whether two extent vectors overlap.  This is used to

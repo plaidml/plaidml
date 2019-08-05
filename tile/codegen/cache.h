@@ -24,7 +24,8 @@ void ApplyCache(const AliasMap& map,                                       //
                 const stripe::Tags store_tags = {"cache", "cache_store"},  //
                 bool add_constraints = true,                               //
                 bool reorder_idx = true,                                   //
-                bool odd_size = false);
+                bool odd_size = false,                                     //
+                double odd_limit = 2.0);
 
 void ApplySimpleCache(const AliasMap& map,                                       //
                       stripe::RefDir dir,                                        //
@@ -36,7 +37,8 @@ void ApplySimpleCache(const AliasMap& map,                                      
                       const stripe::Tags store_tags = {"cache", "cache_store"},  //
                       bool add_constraints = true,                               //
                       bool reorder_idx = true,                                   //
-                      bool odd_size = false);
+                      bool odd_size = false,                                     //
+                      double odd_limit = 2.0);
 
 class CachePass final : public CompilePass {
  public:

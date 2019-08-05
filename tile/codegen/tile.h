@@ -15,7 +15,6 @@ bool ApplyTile(stripe::Block* outer,          //
                bool elide_trivial = true,     //
                bool copy_tags = false,        //
                bool interleave = false,       //
-               bool split_unaligned = false,  //
                const std::string& location_idx_tag = "");
 
 }  // namespace codegen

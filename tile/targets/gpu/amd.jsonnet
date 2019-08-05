@@ -1,6 +1,6 @@
 local PARAMS = {
   amd_opencl: {
-    LOCAL_MEM_KIB: 28,
+    LOCAL_MEM_KIB: 32,
     NUM_THREADS: 256,
     CACHE_WIDTH: 64, 
     NUM_UNITS: 64,
@@ -45,6 +45,15 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
                 reqs: ['main'],
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
+              },
+            },
+
+            // Change tags before optimizations
+            {
+              name: 'kernel_tag',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.KernelTagPass',
+                reqs: ['kernel'],
               },
             },
 
@@ -105,6 +114,7 @@ local PARAMS = {
                 clear_outer: true,
                 acc_idxs: true,
                 only_po2: true,
+                odd_size: true,
                 min_out_count: PARAMS[cfg].NUM_UNITS,
                 max_total_size: PARAMS[cfg].LOCAL_MEM_KIB * 1024,
                 max_sizes_product: PARAMS[cfg].NUM_THREADS * 64,
