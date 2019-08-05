@@ -21,8 +21,16 @@ def op(op_name, args):
     return edsl.Value(ffi_call(lib.plaidml_op_make, op_name.encode(), value.as_ptr()))
 
 
+def abs(x):
+    return op('abs', [x]).as_tensor()
+
+
 def argmax(x, axis=-1):
     return op('argmax', [x, axis]).as_tensor()
+
+
+def concatenate(tensors, axis=-1):
+    return op('concatenate', [tensors, axis]).as_tensor()
 
 
 def convolution(I, F, strides, dilations, data_dilations, filter_shape, groups, autopad_mode,
@@ -49,6 +57,10 @@ def convolution(I, F, strides, dilations, data_dilations, filter_shape, groups, 
 
 def dot(x, y):
     return op('dot', [x, y]).as_tensor()
+
+
+def expand_dims(x, axis=-1):
+    return op('expand_dims', [x, axis]).as_tensor()
 
 
 def mean(I, axis=None, keepdims=False):
@@ -91,7 +103,29 @@ def square(I):
     return I * I
 
 
+def squeeze(x, axis):
+    return op("squeeze", [x, axis]).as_tensor()
+
+
 def sum(I, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
     return op('sum', [I, axis, keepdims]).as_tensor()
+
+
+def tile(I, n):
+    if isinstance(n, np.ndarray):
+        n = n.tolist()
+    return op('tile', [I, n]).as_tensor()
+
+
+def transpose(I, pattern=None):
+    if isinstance(pattern, np.ndarray):
+        pattern = pattern.tolist()
+    return op('transpose', [I, pattern]).as_tensor()
+
+
+def variance(I, axis=None, keepdims=False):
+    if isinstance(axis, np.ndarray):
+        axis = axis.tolist()
+    return op('variance', [I, axis, keepdims]).as_tensor()

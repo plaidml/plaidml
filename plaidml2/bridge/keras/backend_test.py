@@ -496,6 +496,10 @@ class TestBackendOps(unittest.TestCase):
     def testAddElements(self, b, x, y):
         return [x + y]
 
+    @opTest([[m(3, 3), m(3, 3), m(3, 3)]])
+    def testAddElementsRepeated(self, b, x, y, z):
+        return [x + y + z]
+
     @opTest([
         [m(3, 3), 1.0],
         [m(3, 3), -3.4],
@@ -617,10 +621,10 @@ class TestBackendOps(unittest.TestCase):
         return [b.minimum(x, y)]
 
     @opTest([
-        # [m(3, 3)],
-        # [m(3, 3), None, True],
+        [m(3, 3)],
+        [m(3, 3), None, True],
         [m(2, 3, 4, 5), [1, 3]],
-        # [m(1, 2, 3, 4, 5), [-2, 2]],  # Note: axis -2 means next to last axis
+        [m(1, 2, 3, 4, 5), [-2, 2]],  # Note: axis -2 means next to last axis
     ])
     def testMean(self, b, x, ax=None, kd=False):
         return [b.mean(x, axis=ax, keepdims=kd)]
@@ -695,6 +699,14 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[np.sqrt(m(5, 5, 10) + 2) - 3], [np.sin(m(4, 3, 2, 1, 6))]], 1e-02, skip_theano=True)
     def testSoftmax(self, b, x):
         return [-b.log(b.softmax(x))]
+
+    @opTest([[m(1, 3, 4)], [m(7, 19) - 10.]])
+    def testSoftsign(self, b, x):
+        return [b.softsign(x)]
+
+    @opTest([[m(2, 6)], [m(2, 9, 9) - 3.1]])
+    def testSoftplus(self, b, x):
+        return [b.softplus(x)]
 
     # TODO: Enable gradients again after we fix the Stripe bug
     @opTest([[m(10, 10)]], do_grads=False)
@@ -830,14 +842,13 @@ class TestBackendOps(unittest.TestCase):
     @compareForwardClose(.1)
     def testTruncatedNormalMean(self, b):
         rand = b.truncated_normal((1000, 1000), mean=42.0, stddev=0.1)
-        return b.mean(b.variable(rand))
+        return b.mean(rand)
 
     @compareForwardClose(.1, skip_theano=True)
     def testTruncatedNormalDev(self, b):
         rand = b.truncated_normal((1000, 1000), mean=42.0, stddev=0.1)
-        X = b.variable(rand)
-        mean = b.mean(X)
-        diffs = X - mean
+        mean = b.mean(rand)
+        diffs = rand - mean
         return b.mean(b.square(diffs))
 
     @opTest([
@@ -1103,6 +1114,15 @@ class TestBackendOps(unittest.TestCase):
         return [b.reshape(x, s)]
 
     @opTest([
+        [m(3)],
+        #[m()],  # TODO: Need to support empty shapes for placeholders
+        [m(4, 7)],
+        [m(6, 3, 2, 4, 7, 1, 5)],
+    ])
+    def testTranspose(self, b, x):
+        return [b.transpose(x)]
+
+    @opTest([
         [m(1, 1, 60), (60,)],
         [m(4, 3, 70, 2), (14, 10, 6, 2)],
         [m(7, 3, 2, 4), (-1,)],
@@ -1110,6 +1130,15 @@ class TestBackendOps(unittest.TestCase):
     ])
     def testTransposeReshape(self, b, x, s):
         return [b.reshape(b.transpose(x), s)]
+
+    @opTest([
+        [m(3), None],
+        #[m(), tuple()],  # TODO: Need to support empty shapes for placeholders
+        [m(4, 7), (1, 0)],
+        [m(3, 6, 2, 4, 7, 1, 5), (5, 2, 0, 3, 6, 1, 4)],
+    ])
+    def testPermuteDimensions(self, b, x, s):
+        return [b.permute_dimensions(x, pattern=s)]
 
     @opTest([
         [m(4, 2, 1, 3, 2), 2],

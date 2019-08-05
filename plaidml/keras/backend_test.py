@@ -906,14 +906,13 @@ class TestBackendOps(unittest.TestCase):
     @compareForwardClose(.1)
     def testTruncatedNormalMean(self, b):
         rand = b.truncated_normal((1000, 1000), mean=42.0, stddev=0.1)
-        return b.mean(b.variable(rand))
+        return b.mean(rand)
 
     @compareForwardClose(.1, skip_theano=True)
     def testTruncatedNormalDev(self, b):
         rand = b.truncated_normal((1000, 1000), mean=42.0, stddev=0.1)
-        X = b.variable(rand)
-        mean = b.mean(X)
-        diffs = X - mean
+        mean = b.mean(rand)
+        diffs = rand - mean
         return b.mean(b.square(diffs))
 
     @opTest([
@@ -1181,6 +1180,15 @@ class TestBackendOps(unittest.TestCase):
         return [b.reshape(x, s)]
 
     @opTest([
+        [m(3)],
+        [m()],
+        [m(4, 7)],
+        [m(6, 3, 2, 4, 7, 1, 5)],
+    ])
+    def testTranspose(self, b, x):
+        return [b.transpose(x)]
+
+    @opTest([
         [m(1, 1, 60), (60,)],
         [m(4, 3, 70, 2), (14, 10, 6, 2)],
         [m(7, 3, 2, 4), (-1,)],
@@ -1188,6 +1196,15 @@ class TestBackendOps(unittest.TestCase):
     ])
     def testTransposeReshape(self, b, x, s):
         return [b.reshape(b.transpose(x), s)]
+
+    @opTest([
+        [m(3), (0,)],
+        [m(), tuple()],
+        [m(4, 7), (1, 0)],
+        [m(3, 6, 2, 4, 7, 1, 5), (5, 2, 0, 3, 6, 1, 4)],
+    ])
+    def testPermuteDimensions(self, b, x, s):
+        return [b.permute_dimensions(x, pattern=s)]
 
     @opTest([
         [m(4, 2, 1, 3, 2), 2],
