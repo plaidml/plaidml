@@ -179,6 +179,8 @@ message CachePass {
   optional bool reorder_idx = 7 [default = true];
   // Whether make the dim sizes be odd for cached refinements
   optional bool odd_size = 8 [default = false];
+  // The multipe limit of odd_size / original size
+  optional double odd_limit = 9 [default = 2.0];
 }
 
 // Use registers instead of local memory as cache.
@@ -428,8 +430,8 @@ message AutotilePass {
   // Note, we do log2(num_tiles) to make this less impactful
   // Positive means more tiles = bad, negative means more tiles = good
   optional double split_factor = 29 [default = .001];
-  // Specify if the unaligned tiles are split
-  optional bool split_unaligned = 30 [default = false];
+  // If the inner tile sizes are odd
+  optional bool odd_size = 30 [default = false];
   // The maximal  number of inner loops allowed by the inner block,
   // where each index is rounded up to the nearest power of 2
   // 0 means no limit.

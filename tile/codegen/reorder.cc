@@ -18,9 +18,10 @@ using namespace math;    // NOLINT
 typedef std::shared_ptr<Statement> StmtPtr;
 
 struct StmtList {
-  bool eltwise;                   // If all stmts in the list are element-wise blocks
+  bool in_eltwise;                // If input stmt in the list is element-wise block
+  bool out_eltwise;               // If output stmt in the list is element-wise block
+  bool contraction;               // If the last stmt is contraction block
   std::vector<StmtPtr> stmts;     // Statements in order
-  std::vector<size_t> shape;      // The block shape
   std::set<std::string> inputs;   // input refinements
   std::set<std::string> outputs;  // output refinements;
   std::set<StmtPtr> deps;         // The stmts that this list depends on
@@ -57,16 +58,14 @@ static bool Depends(std::shared_ptr<StmtList> sl0, std::shared_ptr<StmtList> sl1
 }
 
 // If s0 and s1 may be fused, they should:
-// 1) be blocks with same shape
-// 2) be element-wise
-// 3) s0's output is s1's input
+// 1) be element-wise
+// 2) s0's output is s1's input
 static bool MayFuse(std::shared_ptr<StmtList> s0, std::shared_ptr<StmtList> s1) {
-  if (!s0->eltwise || !s1->eltwise || s0->shape != s1->shape) {
-    return false;
-  }
-  for (const auto& out : s0->outputs) {
-    if (s1->inputs.find(out) != s1->inputs.end()) {
-      return true;
+  if ((s0->out_eltwise && s1->in_eltwise) || (s0->contraction && s1->in_eltwise)) {
+    for (const auto& out : s0->outputs) {
+      if (s1->inputs.find(out) != s1->inputs.end()) {
+        return true;
+      }
     }
   }
   return false;
@@ -87,7 +86,6 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
 
   std::vector<std::shared_ptr<StmtList>> stmt_list;
   StatementList done;
-
   for (const auto& stmt : main_block->stmts) {
     if (ZeroBlock(stmt)) {
       done.push_back(stmt);
@@ -99,28 +97,44 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
     for (const auto& dep_stmt_it : stmt->deps) {
       sl->deps.insert(*dep_stmt_it);
     }
-    if (block && block->has_tag("eltwise")) {
-      sl->eltwise = true;
-      for (const auto& ref : block->refs) {
-        if (!RefMatchIdx(ref, block.get())) {
-          sl->eltwise = false;
+    if (block) {
+      if (block->has_tag("eltwise")) {
+        sl->in_eltwise = true;
+        sl->out_eltwise = true;
+        sl->contraction = false;
+        for (const auto& ref : block->refs) {
+          if (!RefMatchIdx(ref, block.get())) {
+            sl->in_eltwise = false;
+            sl->out_eltwise = false;
+          }
+          if (IsReadDir(ref.dir)) {
+            sl->inputs.insert(ref.from);
+          }
+          if (IsWriteDir(ref.dir)) {
+            sl->outputs.insert(ref.from);
+          }
         }
-        if (IsReadDir(ref.dir)) {
-          sl->inputs.insert(ref.from);
-        }
-        if (IsWriteDir(ref.dir)) {
-          sl->outputs.insert(ref.from);
+      } else {
+        sl->in_eltwise = false;
+        sl->out_eltwise = false;
+        sl->contraction = block->has_tag("contraction");
+        for (const auto& ref : block->refs) {
+          if (IsReadDir(ref.dir)) {
+            sl->inputs.insert(ref.from);
+          }
+          if (IsWriteDir(ref.dir)) {
+            sl->outputs.insert(ref.from);
+          }
         }
       }
-      if (sl->eltwise) {
-        IVLOG(3, "Block: " << block->name);
-      }
-    } else {
-      sl->eltwise = false;
+    }
+    else {
+      sl->in_eltwise = false;
+      sl->out_eltwise = false;
+      sl->contraction = false;
     }
     stmt_list.push_back(sl);
   }
-
   while (stmt_list.size() > 0) {
     std::shared_ptr<StmtList> sl0 = stmt_list.front();
     stmt_list.erase(stmt_list.begin());
@@ -137,6 +151,9 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
         for (const auto& s : sl1->stmts) {
           auto block = Block::Downcast(s);
           IVLOG(3, "    " << block->name);
+        }
+        if (sl0->contraction) {
+          sl1->in_eltwise = false;
         }
         // merge stmts
         sl1->stmts.insert(sl1->stmts.begin(), sl0->stmts.begin(), sl0->stmts.end());

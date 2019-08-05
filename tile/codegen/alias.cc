@@ -321,6 +321,100 @@ void AliasMap::AddConstraintForIndex(stripe::Block* block,         //
   }
 }
 
+// Make a passthru index if it doesn't exist
+std::string AliasMap::MakePassthruIdx(Block* block, const std::string& idx_name) {
+  for (const auto idx : block->idxs) {
+    if (idx.affine == Affine(idx_name)) {
+      // The passthru index exists, return the existing index
+      return idx.name;
+    }
+  }
+  // doesn't exist
+  std::string new_idx = block->unique_idx_name(idx_name);
+  block->idxs.push_back({new_idx, 1, Affine(idx_name)});
+  return new_idx;
+}
+
+// Add passthru index that are needed by exp from outer to this block
+void AliasMap::AddPassthruIdx(Block* outer, Affine exp) {
+  // Find a path from outer to inner
+  std::vector<Block*> path;
+  const AliasMap* am = this;
+  while (am && am->this_block() != outer) {
+    path.push_back(am->this_block());
+    am = am->parent_alias_map();
+  }
+  if (am == nullptr) {
+    throw std::runtime_error("Cannot find outer block.");
+  }
+  path.push_back(outer);
+  // The idxs to be built in this level or inner
+  std::vector<std::pair<std::string, size_t>> to_build;
+  // The idxs to be built in the inner level or inner
+  std::vector<std::pair<std::string, size_t>> to_build_next;
+  // Resolve the initialze idxs
+  for (const auto& it : exp.getMap()) {
+    if (it.first != "") {
+      size_t pos = it.first.find(':');
+      std::string idx_name = it.first.substr(pos + 1);
+      size_t idx_depth = std::stoi(it.first.substr(1, pos - 1));
+      to_build.push_back(std::make_pair(idx_name, idx_depth));
+    }
+  }
+  // Traverse from outer to inner
+  for (int i = path.size() - 1; i >= 0; --i) {
+    Block* this_block = path[i];
+    size_t depth = depth_ - i;
+    for (auto& it : to_build) {
+      if (it.second == depth - 1) {
+        std::string new_idx = MakePassthruIdx(this_block, it.first);
+        to_build_next.push_back(std::make_pair(new_idx, depth));
+      }
+      else {
+        to_build_next.push_back(std::make_pair(it.first, it.second));
+      }
+    }
+    to_build = to_build_next;
+    to_build_next.clear();
+  }
+}
+
+void AliasMap::AddConstraintsForRef(const Refinement& ref) {
+  const auto& old_ai = at(ref.into());
+  // Add the passthru index that are used by the constraints
+  for (size_t i = 0; i < ref.interior_shape.dims.size(); ++i) {
+    AddPassthruIdx(parent_block_, old_ai.access[i]);
+  }
+  // Update alias map
+  AliasMap parent_map(*(parent_alias_map_->parent_alias_map()), parent_block_);
+  AliasMap this_map(parent_map, this_block_);
+  const auto& new_ai = at(ref.into());
+  for (size_t i = 0; i < ref.interior_shape.dims.size(); ++i) {
+    this_map.AddConstraintForIndex(this_block_, new_ai, i,
+       "", ref.interior_shape.dims[i].size <= 1);
+  }
+}
+
+void AliasMap::AddConstraintsForBlock() {
+  for (const auto& ref : this_block_->refs) {
+    const auto& old_ai = at(ref.into());
+    // Add the passthru index that are used by the constraints
+    for (size_t i = 0; i < ref.interior_shape.dims.size(); ++i) {
+      AddPassthruIdx(parent_block_, old_ai.access[i]);
+    }
+  }
+  // Update alias map
+  AliasMap parent_map(*(parent_alias_map_->parent_alias_map()), parent_block_);
+  AliasMap this_map(parent_map, this_block_);
+  for (const auto& ref : this_block_->refs) {
+    const auto& new_ai = at(ref.into());
+    for (size_t i = 0; i < ref.interior_shape.dims.size(); ++i) {
+      this_map.AddConstraintForIndex(this_block_, new_ai, i,
+         "", ref.interior_shape.dims[i].size <= 1);
+    }
+  }
+}
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai

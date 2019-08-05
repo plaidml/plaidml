@@ -45,20 +45,6 @@ size_t NextOdd(size_t n) {
   return (n & 0x1) ? n : (n + 1);
 }
 
-// Make a passthru index if it doesn't exist
-std::string MakePassthruIdx(Block* block, const std::string& idx_name) {
-  for (const auto idx : block->idxs) {
-    if (idx.affine == Affine(idx_name)) {
-      // The passthru index exists, return the existing index
-      return idx.name;
-    }
-  }
-  // doesn't exist
-  std::string new_idx = block->unique_idx_name(idx_name);
-  block->idxs.push_back({new_idx, 1, Affine(idx_name)});
-  return new_idx;
-}
-
 // Test if outer contains inner
 bool ContainBlock(Block* outer, Block* inner) {
   if (outer == inner) {
@@ -84,52 +70,6 @@ StatementIt InsertPosition(Block* outer, Block* inner) {
     }
   }
   throw std::runtime_error("Cannot find the sub-block containing the inner block.");
-}
-
-// When we want to add a constraint in the inner block, it may use some outer blocks' 
-// index. So we have to pass the outer index to the inner block and generate the 
-// corresponding passthru index along the path from outer to inner.
-void FixPassthruIdx(const AliasMap& inner_map, Block* outer, Affine exp) {
-  // Find a path from outer to inner
-  std::vector<Block*> path;
-  const AliasMap* am = &inner_map; 
-  while (am && am->this_block() != outer) {
-    path.push_back(am->this_block());
-    am = am->parent_alias_map();
-  }
-  if (am == nullptr) {
-    throw std::runtime_error("Cannot find outer block.");
-  }
-  path.push_back(outer);
-  // The idxs to be built in this level or inner
-  std::vector<std::pair<std::string, size_t>> to_build;
-  // The idxs to be built in the inner level or inner
-  std::vector<std::pair<std::string, size_t>> to_build_next;
-  // Resolve the initialze idxs
-  for (const auto& it : exp.getMap()) {
-    if (it.first != "") {
-      size_t pos = it.first.find(':');
-      std::string idx_name = it.first.substr(pos + 1);
-      size_t idx_depth = std::stoi(it.first.substr(1, pos - 1));
-      to_build.push_back(std::make_pair(idx_name, idx_depth)); 
-    }
-  }
-  // Traverse from outer to inner
-  for (int i = path.size() - 1; i >= 0; --i) {
-    Block* this_block = path[i];
-    size_t depth = inner_map.depth() - i;
-    for (auto& it : to_build) {
-      if (it.second == depth - 1) {
-        std::string new_idx = MakePassthruIdx(this_block, it.first);
-        to_build_next.push_back(std::make_pair(new_idx, depth));
-      }
-      else {
-        to_build_next.push_back(std::make_pair(it.first, it.second));
-      }
-    }
-    to_build = to_build_next;
-    to_build_next.clear();
-  } 
 }
 
 // Fixup the refs between the outer block and the inner block
@@ -176,18 +116,33 @@ void ApplyCache(const AliasMap& alias_map,    //
                 const Tags store_tags,        //
                 bool add_constraints,         //
                 bool reorder_idx,             //
-                bool odd_size) {
+                bool odd_size,                //
+                double odd_limit) {
 
   auto ref_it = ref_block->ref_by_from(var_name, false);
   if (ref_it == ref_block->refs.end()) {
     return;
   }
 
+  size_t n_dim = ref_it->interior_shape.dims.size();
+  // Collect the index in constraints. We can't merge these
+  // index because they can't be eliminated
+  std::set<std::string> cstr_vars;
+  for (const auto& cons : ref_block->constraints) {
+    for (auto& kvp : cons.getMap()) {
+      if (kvp.first != "") {
+        cstr_vars.insert(kvp.first);
+      }
+    }
+  }
+
   std::vector<std::vector<CacheVar>> vars;
+  std::set<size_t> keep_dims;
   // remain_const is the access' constant minus all index lows
   // i.e., the low of the access, usually zero, but could be positive
   std::vector<int64_t> remain_const;
-  for (const auto& access : ref_it->access) {
+  for (size_t k = 0; k < n_dim; ++k) {
+    auto& access = ref_it->access[k];
     int64_t cst = 0;
     // Set up the initial index according to ref_block 
     std::vector<CacheVar> dim_vars;
@@ -195,6 +150,11 @@ void ApplyCache(const AliasMap& alias_map,    //
       if (it.first == "") {
         cst += it.second;
         continue;
+      }
+      // If any index in this dim is used by the constraints,
+      // do not change the dim
+      if (cstr_vars.find(it.first) != cstr_vars.end()) {
+        keep_dims.insert(k);
       }
       Index* idx = ref_block->idx_by_name(it.first);
       int64_t low = (it.second >= 0) ? 0 : (it.second * (idx->range - 1));
@@ -204,6 +164,10 @@ void ApplyCache(const AliasMap& alias_map,    //
       cst += low;
     }
     remain_const.push_back(cst);
+    if (keep_dims.find(k) != keep_dims.end()) {
+      vars.push_back(dim_vars);
+      continue;
+    }
     // Sort the index by their coefficients
     std::sort(dim_vars.begin(), dim_vars.end(), comp_coeff);
 
@@ -213,7 +177,10 @@ void ApplyCache(const AliasMap& alias_map,    //
     // 2) dim_vars[i] and dim_vars[i + 1] are overlapped for non-zero coefficients
     int i = static_cast<int>(dim_vars.size()) - 1;
     while (i > 0) {
-      if (dim_vars[i - 1].coeff % dim_vars[i].coeff == 0) {
+      if (cstr_vars.find(dim_vars[i - 1].idx) == cstr_vars.end() &&
+          cstr_vars.find(dim_vars[i].idx) == cstr_vars.end() &&
+          dim_vars[i - 1].coeff % dim_vars[i].coeff == 0)
+      {
         // This works for negative coefficients
         if (dim_vars[i].coeff * static_cast<int64_t>(dim_vars[i].range - 1) >= dim_vars[i - 1].coeff) {
           // Merge dim_vars[i] and dim_vars[i + 1]
@@ -249,7 +216,6 @@ void ApplyCache(const AliasMap& alias_map,    //
   outer_block->refs.erase(outer_ref_it);
   outer_ref_it = outer_block->refs.emplace(std::move(replacement_ref)).first;
 
-  size_t n_dim = ref_it->interior_shape.dims.size();
   std::vector<size_t> local_sizes;
   std::vector<Affine> local_access;
   std::vector<Affine> global_access(n_dim);
@@ -258,11 +224,31 @@ void ApplyCache(const AliasMap& alias_map,    //
     const auto& dim_vars = vars[k];
     // Insert the new index, and build the access for the local ref of cache block
     if (dim_vars.size() > 0) {
-      for (size_t i = 0; i < dim_vars.size(); ++i) {
-        const auto& var = dim_vars[i];
-        xfer_block.idxs.push_back({var.idx, var.range});
-        local_access.push_back(Affine(var.idx));
-        local_sizes.push_back(odd_size ? NextOdd(var.range) : var.range);
+      if (keep_dims.find(k) == keep_dims.end()) {
+        // Transform this dim
+        for (size_t i = 0; i < dim_vars.size(); ++i) {
+          const auto& var = dim_vars[i];
+          xfer_block.idxs.push_back({var.idx, var.range});
+          local_access.push_back(Affine(var.idx));
+          local_sizes.push_back(odd_size ? NextOdd(var.range) : var.range);
+        }
+      }
+      else {
+        // keep this dim
+        Affine exp;
+        int64_t high = 0;
+        int64_t low = 0;
+        for (size_t i = 0; i < dim_vars.size(); ++i) {
+          const auto& var = dim_vars[i];
+          xfer_block.idxs.push_back({var.idx, var.range});
+          exp = exp + Affine(var.idx, var.coeff * var.sign);
+          high += var.high;
+          low += var.low;
+        }
+        exp = exp + Affine(remain_const[k] - low);
+        size_t range = high - low + remain_const[k] + 1;
+        local_access.push_back(exp);
+        local_sizes.push_back(odd_size ? NextOdd(range) : range);
       }
     }
     else {
@@ -271,13 +257,18 @@ void ApplyCache(const AliasMap& alias_map,    //
     }
 
     // Build the access for global ref of cache block
-    Affine dim_access;
-    for (size_t i = 0; i < dim_vars.size(); ++i) {
-      global_access[k] = global_access[k]
-                         + Affine(dim_vars[i].idx, dim_vars[i].sign * dim_vars[i].coeff)
-                         + Affine(-dim_vars[i].low);
+    if (keep_dims.find(k) == keep_dims.end()) {
+      Affine dim_access;
+      for (size_t i = 0; i < dim_vars.size(); ++i) {
+        global_access[k] = global_access[k]
+                           + Affine(dim_vars[i].idx, dim_vars[i].sign * dim_vars[i].coeff)
+                           + Affine(-dim_vars[i].low);
+      }
+      global_access[k] = global_access[k] + remain_const[k];
     }
-    global_access[k] = global_access[k] + remain_const[k];
+    else {
+      global_access[k] = local_access.back();
+    }
   }
   
   TensorShape cached_exterior_ts = SimpleShape(outer_ref_it->interior_shape.type, local_sizes);
@@ -382,7 +373,12 @@ void ApplyCache(const AliasMap& alias_map,    //
   std::vector<Affine> ref_local_access;
   for (size_t k = 0; k < local_access.size(); ++k) {
     auto& aff = local_access[k];
-    ref_local_access.push_back(aff.sym_eval(local_map));
+    if (keep_dims.find(k) == keep_dims.end()) {
+      ref_local_access.push_back(aff.sym_eval(local_map));
+    }
+    else {
+      ref_local_access.push_back(aff);
+    }
   }
   ref_it->mut().access = ref_local_access;
 
@@ -392,23 +388,24 @@ void ApplyCache(const AliasMap& alias_map,    //
 
   // Add constraints
   if (add_constraints) {
-    // Build the alias maps first for the new local ref's alias info
-    AliasMap old_outer_map(*(alias_map.parent_alias_map()), outer_block);
-    AliasMap old_cache_map(old_outer_map, cache_block.get());
-    auto ref_it = cache_block->ref_by_from(raw_name);
-    const auto& old_ai = old_cache_map.at(ref_it->into());
-    // Add the passthru index that are used by the constraints
-    for (size_t i = 0; i < ref_it->interior_shape.dims.size(); ++i) {
-      FixPassthruIdx(old_cache_map, outer_block, old_ai.access[i]);
-    }
-    // Build the alias map agian due to new passthru index
+    // Add constraints according to refinement access ranges
     AliasMap outer_map(*(alias_map.parent_alias_map()), outer_block);
     AliasMap cache_map(outer_map, cache_block.get());
-    const auto& ai = cache_map.at(ref_it->into());
-    // We have everything for adding constraints
-    for (size_t i = 0; i < ref_it->interior_shape.dims.size(); ++i) {
-      cache_map.AddConstraintForIndex(cache_block.get(), ai, i,
-          "", ref_it->interior_shape.dims[i].size <= 1);
+    auto cache_ref_it = IsReadDir(dir) ?
+        cache_block->ref_by_into("src") : cache_block->ref_by_into("dst");
+    cache_map.AddConstraintsForRef(*cache_ref_it);
+    // Add possible original constraints in ref_block
+    for (const auto cons : ref_block->constraints) {
+      bool all_exist = true;
+      for (auto& kvp : cons.getMap()) {
+        if (kvp.first != "" && cache_block->idx_by_name(kvp.first) == nullptr) {
+          all_exist = false;
+          break;
+        }
+      }
+      if (all_exist) {
+        cache_block->constraints.push_back(cons);
+      }
     }
   }
 }
@@ -426,7 +423,8 @@ void ApplySimpleCache(const AliasMap& map,          //
                       const Tags store_tags,        //
                       bool add_constraints,         //
                       bool reorder_idx,             //
-                      bool odd_size) {
+                      bool odd_size,                //
+                      double odd_limit) {
   auto it = block->ref_by_into(var_name, false);
   if (it == block->refs.end()) {
     throw std::runtime_error("ApplySimpleCache: Invalid var_name");
@@ -437,7 +435,7 @@ void ApplySimpleCache(const AliasMap& map,          //
   TensorShape raw_ts = it->interior_shape;
   std::vector<size_t> sizes = raw_ts.sizes();
   if (odd_size) {
-    for (size_t i = 0; i < sizes.size(); ++i) {
+    for (int i = sizes.size() - 1; i >= 0; --i) {
       sizes[i] = NextOdd(sizes[i]);
     }
   }
@@ -596,7 +594,7 @@ static void CacheBlock(const AliasMap& map, Block* block, const proto::CachePass
       if (dirs.count(ref.dir)) {
         codegen::ApplyCache(map, inout, ref_block, block, ref.into(), mem_loc, xfer_loc, 
           {"cache", "cache_load"}, {"cache", "cache_store"}, options.add_constraints(),
-          options.reorder_idx(), options.odd_size());
+          options.reorder_idx(), options.odd_size(), options.odd_limit());
       }
     }
   }

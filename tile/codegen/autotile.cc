@@ -122,6 +122,16 @@ std::ostream& operator<<(std::ostream& os, const Tile& tile) {
   return os;
 }
 
+TensorShape MakeOddTile(const TensorShape& tile) {
+  TensorShape odd_tile = tile;
+  for (size_t i = 0; i < odd_tile.dims.size(); ++i) {
+    if ((odd_tile.dims[i].size & 0x1) == 0) {
+      ++odd_tile.dims[i].size;
+    }
+  }
+  return odd_tile;
+}
+
 TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
                          const Block& block,                                 //
                          const proto::AutotilePass& options) {
@@ -137,7 +147,8 @@ TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
       continue;
     }
     auto tiled = ref.ApplyTile(tile_by_name);
-    auto bytes = Codec::Resolve(tiled)->byte_size();
+    int64_t bytes = options.odd_size() ?
+      Codec::Resolve(MakeOddTile(tiled))->byte_size() : Codec::Resolve(tiled)->byte_size();
     double bandwidth = tiled.memory_io(options.cache_width());
     ret.total_bytes += bytes;
     ret.total_bandwidth += bandwidth;
@@ -382,7 +393,7 @@ void AutotilePass::Apply(CompilerState* state) const {
       IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result->tile << ", cost: " << result->cost);
       const TileShape& tiling_shape = options_.flip() ? result->tile.counts() : result->tile.sizes();
       if (ApplyTile(block, tiling_shape, false, false, options_.flip() || options_.interleave(), 
-                    options_.split_unaligned(), options_.location_idx_tag())) {
+                    options_.location_idx_tag())) {
         auto inner = block->SubBlock(0);
         if (options_.copy_tags()) {
           inner->set_attrs(*block);
@@ -406,7 +417,7 @@ void AutotilePass::Apply(CompilerState* state) const {
             tiling_shape.push_back(idx.range);
           }
         }
-        ApplyTile(block, tiling_shape, false, false, options_.flip(), options_.split_unaligned(), options_.location_idx_tag());
+        ApplyTile(block, tiling_shape, false, false, options_.flip(), options_.location_idx_tag());
         auto inner = block->SubBlock(0);
         inner->add_tags(FromProto(options_.fail_inner_set()));
         block->add_tags(FromProto(options_.fail_outer_set()));

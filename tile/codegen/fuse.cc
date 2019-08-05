@@ -138,8 +138,14 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
         if (mul > 1) {
           plan.tile_b[i] = mul_a / mul_b;
         } else if (a_range != b_range) {
-          plan.tile_b[i] = b_range / a_range;
-          plan.b_interleave = true;
+          if (b_range > a_range) {
+            plan.tile_b[i] = b_range / a_range;
+            plan.b_interleave = true;
+          }
+          else {
+            IVLOG(3, "ComputeFusionPlan: b_range is less than a_range");
+            return boost::none;
+          }
         }
       }
     }

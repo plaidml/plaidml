@@ -94,7 +94,7 @@ std::shared_ptr<hal::Event> ComputeKernel::Run(const context::Context& ctx,
                                       deps.size(),           // num_events_in_wait_list
                                       event_wait_list,       // event_wait_list
                                       done.LvaluePtr());     // event
-  Err::Check(err, "unable to run OpenCL kernel");
+  Err::Check(err, "unable to run OpenCL kernel " + ki_.kname);
 
   VLOG(4) << "  Produced dep: " << done.get();
 

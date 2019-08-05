@@ -123,7 +123,7 @@ void PromoteCondition(Block* outer, std::shared_ptr<Block> inner,  //
 }
 
 bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool copy_tags, bool interleave,
-               bool split_unaligned, const std::string& location_idx_tag) {
+               const std::string& location_idx_tag) {
   // A block is split by value on index
   struct DimSplitPoint {
     std::string index;
@@ -199,12 +199,13 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     if ((outer_idx.range % shape[i]) || HasConstraints(*inner, outer_idx) || HasAffines(*inner, outer_idx) ||
         used_idx.count(outer_idx.name)) {
       Index passthru_idx{
-          inner->unique_idx_name(outer_idx.name),                            // name
-          1,                                                                 // range
-          {outer_idx.name, interleave ? 1 : static_cast<int64_t>(shape[i])}  // affine
+          inner->unique_idx_name(outer_idx.name),   // name
+          1,                                        // range
+          Affine(outer_idx.name)                    // affine
       };
+      int64_t coeff = interleave ? 1 : static_cast<int64_t>(shape[i]);
       int64_t local_mul = interleave ? math::RoundUp(outer_idx.range, shape[i]) : 1;
-      Affine replacement = Affine(outer_idx.name) * local_mul + Affine(passthru_idx.name);
+      Affine replacement = Affine(outer_idx.name) * local_mul + Affine(passthru_idx.name, coeff);
       // Update any inner constraints that refer to this index
       for (auto& constraint : inner->constraints) {
         constraint.substitute(outer_idx.name, replacement);
@@ -227,13 +228,9 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
       if (outer_idx.range % shape[i]) {
         // For each index i, if (r_i/t_i) is not integral, add a constraint to the inner block of `o_i * t_i + i_i <
         // r_i`. Or solving to make it in the form poly >= 0, ((r_i - 1) - p_i - i_i >= 0).
-        inner->constraints.emplace_back(Affine(passthru_idx.name, -1) +       //
+        inner->constraints.emplace_back(Affine(passthru_idx.name, -coeff) +   //
                                         Affine(inner_idx.name, -local_mul) +  //
                                         int64_t(outer_idx.range - 1));
-      }
-
-      if (split_unaligned && (outer_idx.range % shape[i] > 0)) {
-        split_points.push_back({passthru_idx.name, outer_idx.range / shape[i], shape[i]});
       }
 
       // Finally add the passthru_idx
@@ -365,61 +362,7 @@ bool ApplyTile(Block* outer, const TileShape& shape, bool elide_trivial, bool co
     inner->ref_by_into(ref.into())->mut().from = ref.into();
   }
 
-  if (split_unaligned && split_points.size() > 0) {
-    outer->stmts = {};
-    std::set<std::string> passthru;
-    for (const auto& sp : split_points) {
-      passthru.insert(sp.index);
-    }
-
-    size_t n_points = split_points.size();
-    for (size_t i = 0; i < n_points; ++i) {
-      auto unaligned = stripe::CloneBlock(*inner);
-      for (size_t j = 0; j < i; ++j) {
-        const auto& sp = split_points[j];
-        // Find the corresponding constraints and replace it
-        for (auto& cons : unaligned->constraints) {
-          auto& cons_map = cons.mutateMap();
-          if (cons_map.size() == 3 && cons_map.find(sp.index) != cons_map.end()) {
-            cons_map.clear();
-            cons_map.emplace(sp.index, -1);
-            cons_map.emplace("", (sp.value - 1) * sp.step);
-          }
-        }
-      }
-      const auto& sp = split_points[i];
-      Affine unaligned_cons(-sp.value * sp.step);
-      auto& aff_map = unaligned_cons.mutateMap();
-      aff_map.emplace(sp.index, 1);
-      unaligned->constraints.push_back(unaligned_cons);
-      if (i > 0) {
-        PromoteCondition(outer, unaligned, passthru, true);
-      } else {
-        outer->stmts.push_back(unaligned);
-      }
-    }
-
-    // Remove all original constraints in inner
-    for (const auto& sp : split_points) {
-      for (auto& cons : inner->constraints) {
-        auto& cons_map = cons.mutateMap();
-        if (cons_map.find(sp.index) != cons_map.end()) {
-          cons_map.clear();
-        }
-      }
-    }
-    inner->constraints.erase(std::remove(inner->constraints.begin(),  //
-                                         inner->constraints.end(), Affine()),
-                             inner->constraints.end());
-    for (const auto& sp : split_points) {
-      Affine aff(sp.index, -1);
-      aff.setConstant((sp.value - 1) * sp.step);
-      inner->constraints.push_back(aff);
-    }
-    PromoteCondition(outer, inner, passthru, false);
-  } else {
-    outer->stmts = {inner};
-  }
+  outer->stmts = {inner};
   return true;
 }
 
