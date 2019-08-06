@@ -841,7 +841,22 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
 
 
 def one_hot(indices, num_classes):
-    _report_unimplemented('one_hot')
+    #Note: does not error check for entries in indices that are >= num_classes
+    logger.debug('one_hot(indices: {}, num_classes: {})'.format(indices, num_classes))
+    count = variable(np.array(range(num_classes)), dtype='int32').tensor
+    I = indices.tensor
+    I_ndims = I.shape.ndims
+    I_dims = edsl.TensorDims(I_ndims)
+    I_idxs = edsl.TensorIndexes(I_ndims)
+    C = edsl.TensorDim()
+    c = edsl.TensorIndex()
+    O_dims = I_dims + [C]
+    O_idxs = I_idxs + [c]
+    I.bind_dims(*I_dims)
+    count.bind_dims(C)
+    O = edsl.TensorOutput(*O_dims)
+    O[O_idxs] = I[I_idxs] == count[c]
+    return _KerasNode('one_hot', name='one_hot', tensor=O)
 
 
 def ones(shape, dtype=None, name=None):

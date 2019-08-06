@@ -313,7 +313,7 @@ class Tensor(ForeignObject):
         elif isinstance(value, Tensor):
             pass
         elif isinstance(value._impl, _TensorSpec):
-            # ASSIGN contraction
+            # Unary ASSIGN contraction
             self._set_contraction(
                 _Contraction(
                     lib.PLAIDML_AGG_OP_ASSIGN,
@@ -322,8 +322,19 @@ class Tensor(ForeignObject):
                     [value._impl],
                     self._name,
                 ))
+        elif isinstance(value._impl, _ContractionPart):
+            # Binary or ternary ASSIGN contraction
+            self._set_contraction(
+                _Contraction(
+                    lib.PLAIDML_AGG_OP_ASSIGN,
+                    value._impl.op,
+                    _TensorSpec(self, key, self._dims),
+                    [x._impl for x in value._impl.args],
+                    self._name,
+                ))
         else:
-            raise ValueError('Invalid impl')
+            raise ValueError('Invalid impl when assigning to a Tensor (Type: {})'.format(
+                type(value._impl)))
 
     def _set_contraction(self, cion):
         self._is_contraction = True
