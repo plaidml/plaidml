@@ -153,9 +153,9 @@ SUITES:
       keras-stripe-ocl-neo:
         pipelines: [nightly, plaidml, stripe]
       keras-plaid-mtl-uhd630:
-        pipelines: [nightly]
+        pipelines: [plaidml, nightly]
       keras-stripe-mtl-uhd630:
-        pipelines: [nightly, stripe]
+        pipelines: [plaidml, nightly, stripe]
       keras-plaid-ocl-gfx900:
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gfx900:
@@ -197,7 +197,12 @@ SUITES:
         args: [backend_test.py]
         conda_env: conda/plaidml.yml
         precision: untested
-        retry: 2
+        platform_overrides:
+          keras-stripe-mtl-uhd630:
+            softfail: true
+          keras-plaid-mtl-uhd630:
+            softfail: true
+
       regression:
         args: [regression_test.py]
         precision: untested
@@ -207,6 +212,11 @@ SUITES:
       mnist_mlp:
         args: [mnist_mlp_test.py]
         precision: untested
+        platform_overrides:
+          keras-stripe-mtl-uhd630:
+            softfail: true
+          keras-plaid-mtl-uhd630:
+            softfail: true
 
   infer:
     platforms:
@@ -278,7 +288,6 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
-        skip_platforms: [keras-stripe-mtl-uhd630]
           
       mobilenet:
         precision: high
