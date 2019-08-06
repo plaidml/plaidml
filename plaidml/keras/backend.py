@@ -883,7 +883,7 @@ log = op.log
 
 
 def logsumexp(x, axis=None, keepdims=False):
-    _report_unimplemented('logsumexp')
+    return log(sum(exp(x), axis=axis, keepdims=keepdims))
 
 
 def manual_variable_initialization(value):
