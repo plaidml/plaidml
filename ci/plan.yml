@@ -153,7 +153,7 @@ SUITES:
       keras-stripe-ocl-neo:
         pipelines: [nightly, plaidml, stripe]
       keras-plaid-mtl-uhd630:
-        pipelines: [nightly]
+        pipelines: [plaidml, nightly]
       keras-stripe-mtl-uhd630:
         pipelines: [nightly, stripe]
       keras-plaid-ocl-gfx900:
@@ -278,7 +278,6 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
-        skip_platforms: [keras-stripe-mtl-uhd630]
           
       mobilenet:
         precision: high
@@ -299,7 +298,7 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]                
-        skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630, keras-plaid-ocl-gfx803]
+        skip_platforms: [keras-plaid-mtl-uhd630, keras-plaid-ocl-gfx803]
     
       xception:
         precision: high
