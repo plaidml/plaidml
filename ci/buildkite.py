@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import pathlib
 import platform
 import shutil
 import subprocess
@@ -86,11 +87,15 @@ def cmd_build(args, remainder):
     common_args += ['--verbose_failures']
     common_args += ['--verbose_explanations']
     if platform.system() == 'Windows':
-        # TODO: Test everything on windows
         util.check_call(['git', 'config', 'core.symlinks', 'true'])
-        util.check_call(['bazelisk', 'build', ':pkg'] + common_args)
+        cenv = util.CondaEnv(pathlib.Path('.cenv'))
+        cenv.create('environment-windows.yml')
+        env = os.environ.copy()
+        env.update(cenv.env())
     else:
-        util.check_call(['bazelisk', 'test', '...'] + common_args)
+        env = None
+    
+    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
     archive_dir = os.path.join(
         args.root,
         args.pipeline,
@@ -172,10 +177,10 @@ def main():
         main_parser.print_help()
         return
 
-    path = os.getenv('PATH').split(os.pathsep)
     if platform.system() == 'Linux' or platform.system() == 'Darwin':
+        path = os.getenv('PATH').split(os.pathsep)
         path.insert(0, '/usr/local/miniconda3/bin')
-    os.environ.update({'PATH': os.pathsep.join(path)})
+        os.environ.update({'PATH': os.pathsep.join(path)})
 
     args.func(args, remainder)
 
