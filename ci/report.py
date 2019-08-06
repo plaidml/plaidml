@@ -391,6 +391,7 @@ def main():
         'errors': make_html_failures(results, 'ERROR'),
         'failures': make_html_failures(results, 'FAIL'),
         'report_url': 'artifact://report/report.html',
+        'wheel_url': 'artifact://all_wheels.tar.gz'
     }
     html = pystache.render(load_template('annotate.html'), context)
     write_file(report_dir / 'annotate.html', html)

@@ -68,7 +68,7 @@ def run(args, shargs):
         version = args.version
 
     util.printf('--- Extracting {} -> {}'.format(pkg_path, input))
-    with tarfile.open(pkg_path, 'r') as tar:
+    with tarfile.open(str(pkg_path), 'r') as tar:
         tar.extractall(input)
 
     shutil.rmtree(output_root, ignore_errors=True)
