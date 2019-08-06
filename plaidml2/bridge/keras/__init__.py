@@ -1239,7 +1239,10 @@ def softsign(x):
 
 
 def sparse_categorical_crossentropy(target, output, from_logits=False):
-    _report_unimplemented('sparse_categorical_crossentropy')
+    dims = edsl.TensorDims(output.tensor.shape.ndims)
+    output.tensor.bind_dims(*dims)
+    return categorical_crossentropy(
+        reshape(one_hot(target, output.tensor.shape.int_dims[-1]), dims), output, from_logits)
 
 
 def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
