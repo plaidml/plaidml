@@ -2,6 +2,11 @@
 
 #include "tile/lang/ast/gradient.h"
 
+#include <map>
+#include <memory>
+#include <stack>
+#include <unordered_set>
+
 #include <boost/format.hpp>
 
 #include "tile/lang/ast/traversal.h"
@@ -42,11 +47,11 @@ class ComputeUses : public AstVisitor<void> {
   }
 
   void Visit(const ContractionExpr& expr) final {
-    for (size_t i = 0; i < expr.inputs.size(); i++) {
-      Push(expr, expr.inputs[i]->ref, i);
+    for (size_t i = 0; i < expr.srcs.size(); i++) {
+      Push(expr, expr.srcs[i]->ref, i);
     }
     if (expr.use_default) {
-      Push(expr, expr.use_default, expr.inputs.size());
+      Push(expr, expr.use_default, expr.srcs.size());
     }
   }
 
@@ -88,9 +93,9 @@ class Gradient {
       ExprPtr dop;
       auto dout = GetDerivative(use.expr);
       if (auto call_expr = std::dynamic_pointer_cast<CallExpr>(use.expr)) {
-        dop = CallOp(dout, call_expr, use.idx);
+        dop = DeriveCall(dout, call_expr, use.idx);
       } else if (auto cion_expr = std::dynamic_pointer_cast<ContractionExpr>(use.expr)) {
-        dop = ContractionOp(dout, cion_expr, use.idx);
+        dop = DeriveContraction(dout, cion_expr, use.idx);
       } else {
         throw std::runtime_error("Invalid operation type in Gradient::GetDerivative");
       }
@@ -111,53 +116,27 @@ class Gradient {
   }
 
  private:
-  ExprPtr ContractionOp(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& expr, size_t idx) {
-    if (expr->use_default && idx == expr->inputs.size()) {
-      return DefaultOp(dout, expr);
+  ExprPtr DeriveContraction(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& expr, size_t idx) {
+    if (expr->use_default && idx == expr->srcs.size()) {
+      return dout;
     }
     if (expr->combo_op == CombinationOp::EQ) {
       return std::make_shared<IntConst>(0);
     }
     if (expr->agg_op == AggregationOp::SUM || expr->agg_op == AggregationOp::ASSIGN) {
-      return SumOp(dout, expr, idx);
+      return DeriveSum(dout, expr, idx);
     }
     if (expr->agg_op == AggregationOp::MIN || expr->agg_op == AggregationOp::MAX) {
-      return ExtremeOp(dout, expr, idx);
+      return DeriveExtreme(dout, expr, idx);
     }
     if (expr->agg_op == AggregationOp::PROD) {
       throw std::runtime_error("PROD AggregationOp does not support differentiation");
     }
-    throw std::runtime_error("Invalid ContractionExpr in ContractionOp");
+    throw std::runtime_error("Invalid ContractionExpr in DeriveContraction");
   }
 
-  ExprPtr CallOp(const ExprPtr& dout, const std::shared_ptr<CallExpr>& op, size_t idx) {
-    IVLOG(4, "Gradient::CallOp> dout=" << dout << ", op=" << op << ", fn=" << op->fn << ", idx=" << idx);
-
-    if (op->fn == "tuple") {
-      // TODO
-      throw std::runtime_error("Not implemented: tuple in CallOp");
-      // return FunctionValue::make("element", {dout, IConstValue::make(idx)});
-    }
-
-    if (op->fn == "element") {
-      // TODO
-      throw std::runtime_error("Not implemented: element in CallOp");
-      // if (idx == 1) {
-      //   return IConstValue::make(0);
-      // }
-      // const FunctionValue* tuple = dynamic_cast<const FunctionValue*>(op->inputs()[0].get());
-      // int64_t elem = dynamic_cast<const IConstValue*>(op->inputs()[1].get())->value();
-      // std::vector<ValuePtr> inputs;
-      // for (size_t i = 0; i < tuple->inputs().size(); i++) {
-      //   if (i == elem) {
-      //     inputs.push_back(dout);
-      //   } else {
-      //     inputs.push_back(IConstValue::make(0));
-      //   }
-      // }
-      // return FunctionValue::make("tuple", inputs);
-    }
-
+  ExprPtr DeriveCall(const ExprPtr& dout, const std::shared_ptr<CallExpr>& op, size_t idx) {
+    IVLOG(4, "Gradient::DeriveCall> dout=" << dout << ", op=" << op << ", fn=" << op->fn << ", idx=" << idx);
     if (op->fn == "reshape") {
       std::vector<ExprPtr> args = {dout};
       auto in = op->args[0];
@@ -167,30 +146,29 @@ class Gradient {
       }
       return MakeCall("reshape", args);
     }
-
     auto deriv = DerivRegistry::Instance()->Resolve(op->fn);
     return deriv.fn(op, dout, op->args, deriv.user_fn, deriv.user_ctx)[idx];
   }
 
-  ExprPtr SumOp(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
-    IVLOG(4, "Gradient::SumOp> dout=" << dout << ", op=" << op << ", idx=" << idx);
+  ExprPtr DeriveSum(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
+    IVLOG(4, "Gradient::DeriveSum> dout=" << dout << ", op=" << op << ", idx=" << idx);
     auto dop = std::make_shared<ContractionExpr>();
     dop->agg_op = AggregationOp::SUM;
     dop->combo_op = CombinationOp::NONE;  // May be overridden below based on op->combo_op
     dop->constraints = op->constraints;
     // Anywhere the forward pass hits the default, the derivative w.r.t. any other tensor is 0;
     // thus, for the corresponding gradient, the default is everywhere zero i.e. the standard unspecified default
-    if (idx == op->inputs.size()) {
-      throw std::logic_error("A default tensor fell through to the SumOp case during Gradient");
+    if (idx == op->srcs.size()) {
+      throw std::logic_error("A default tensor fell through to the DeriveSum case during Gradient");
     }
-    for (size_t i = 0; i < op->inputs.size(); ++i) {
+    for (size_t i = 0; i < op->srcs.size(); ++i) {
       if (idx == i) {
-        dop->inputs.push_back(std::make_shared<TensorSpecExpr>(dout, op->output->index_spec));
+        dop->srcs.push_back(std::make_shared<IndexMapExpr>(dout, op->sink_idxs->idxs));
       } else {
         switch (op->combo_op) {
           case CombinationOp::MULTIPLY:
             // For *, we multiply by the other (non-differentiated) input
-            dop->inputs.push_back(op->inputs[i]);
+            dop->srcs.push_back(op->srcs[i]);
             dop->combo_op = CombinationOp::MULTIPLY;
             break;
           case CombinationOp::PLUS:
@@ -209,35 +187,32 @@ class Gradient {
         }
       }
     }
-    auto input = op->inputs[idx];
-    dop->output = std::make_shared<TensorSpecExpr>(input->index_spec, input->ref->shape.dims_as_exprs());
+    auto input = op->srcs[idx];
+    dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, input->idxs);
+    dop->sink_dims = std::make_shared<SizeMapExpr>(input->ref->shape.dims_as_exprs());
     dop->ComputeShape(input->ref->shape.layout);
     return dop;
   }
 
-  ExprPtr ExtremeOp(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
+  ExprPtr DeriveExtreme(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
     // Given `O(oidxs) >= I(iidxs);` (or a MIN aggregation too), produce the derivative
     //  ```dI(iidxs) += (I(iidxs) == O(oidxs)) ? dO(oidxs);```
     // where the above notation is meant to represent a COND combination op
-    IVLOG(4, "Gradient::ExtremeOp> dout=" << dout << ", op=" << op << ", idx=" << idx);
-    auto input = op->inputs[0];
+    IVLOG(4, "Gradient::DeriveExtreme> dout=" << dout << ", op=" << op << ", idx=" << idx);
+    auto input = op->srcs[0];
     auto dop = std::make_shared<ContractionExpr>();
     dop->agg_op = AggregationOp::SUM;
     dop->combo_op = CombinationOp::COND;
     dop->constraints = op->constraints;
     // Anywhere the forward pass hits the default, the derivative w.r.t. any other tensor is 0;
     // thus, for the corresponding gradient, the default is everywhere zero i.e. the standard unspecified default
-    dop->inputs.push_back(input);
-    dop->inputs.push_back(std::make_shared<TensorSpecExpr>(op, op->output->index_spec));
-    dop->inputs.push_back(std::make_shared<TensorSpecExpr>(dout, op->output->index_spec));
-    dop->output = std::make_shared<TensorSpecExpr>(input->index_spec, input->ref->shape.dims_as_exprs());
+    dop->srcs.push_back(input);
+    dop->srcs.push_back(std::make_shared<IndexMapExpr>(op, op->sink_idxs->idxs));
+    dop->srcs.push_back(std::make_shared<IndexMapExpr>(dout, op->sink_idxs->idxs));
+    dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, input->idxs);
+    dop->sink_dims = std::make_shared<SizeMapExpr>(input->ref->shape.dims_as_exprs());
     dop->ComputeShape(input->ref->shape.layout);
     return dop;
-  }
-
-  ExprPtr DefaultOp(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op) {
-    IVLOG(4, "Gradient::DefaultOp> dout=" << dout << ", op=" << op);
-    return dout;
   }
 
  private:
@@ -258,8 +233,9 @@ std::vector<ExprPtr> ComputeGradients(const std::vector<ExprPtr>& wrts, const Ex
     for (size_t i = 0; i < ndims; i++) {
       idxs.push_back(std::make_shared<PolyIndex>(i));
     }
-    cion->inputs = {std::make_shared<TensorSpecExpr>(loss, idxs)};
-    cion->output = std::make_shared<TensorSpecExpr>(std::vector<PolyExprPtr>{}, std::vector<DimExprPtr>{});
+    cion->srcs = {std::make_shared<IndexMapExpr>(loss, idxs)};
+    cion->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, std::vector<PolyExprPtr>{});
+    cion->sink_dims = std::make_shared<SizeMapExpr>(std::vector<DimExprPtr>{});
     cion->ComputeShape("");
     value = cion;
   }

@@ -36,9 +36,9 @@ struct TensorDim {
 inline llvm::hash_code hash_value(const TensorDim& td) { return llvm::hash_combine(td.unit, td.size, td.stride); }
 
 struct TensorLayoutAttrStorage : public mlir::AttributeStorage {
-  TensorLayoutAttrStorage(scalar::ScalarType base, const std::vector<TensorDim>& dims) : base(base), dims(dims) {}
+  TensorLayoutAttrStorage(eltwise::ScalarType base, const std::vector<TensorDim>& dims) : base(base), dims(dims) {}
 
-  using KeyTy = std::tuple<scalar::ScalarType, std::vector<TensorDim>>;
+  using KeyTy = std::tuple<eltwise::ScalarType, std::vector<TensorDim>>;
 
   bool operator==(const KeyTy& key) const { return base == std::get<0>(key) && dims == std::get<1>(key); }
 
@@ -49,7 +49,7 @@ struct TensorLayoutAttrStorage : public mlir::AttributeStorage {
         TensorLayoutAttrStorage(std::get<0>(key), std::get<1>(key));
   }
 
-  scalar::ScalarType base;
+  eltwise::ScalarType base;
   std::vector<TensorDim> dims;
 };
 
@@ -59,11 +59,11 @@ class TensorLayoutAttr : public Attribute::AttrBase<TensorLayoutAttr, Attribute,
 
   static bool kindof(unsigned kind) { return kind == PlaidAttrKind::TensorLayout; }
 
-  static TensorLayoutAttr get(MLIRContext* context, scalar::ScalarType base, std::vector<TensorDim> dims = {}) {
+  static TensorLayoutAttr get(MLIRContext* context, eltwise::ScalarType base, std::vector<TensorDim> dims = {}) {
     return Base::get(context, PlaidAttrKind::TensorLayout, base, dims);
   }
 
-  scalar::ScalarType base() { return getImpl()->base; }
+  eltwise::ScalarType base() { return getImpl()->base; }
   const std::vector<TensorDim>& dims() { return getImpl()->dims; }
 };
 

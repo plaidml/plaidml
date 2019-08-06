@@ -48,12 +48,12 @@ class LogicalShape(ForeignObject):
             for i in range(self.ndims)
         ]
 
-    @property
-    def dims(self):
-        return [
-            TensorDim(expr=ffi_call(lib.plaidml_logical_shape_get_dim_expr, self.as_ptr(), i))
-            for i in range(self.ndims)
-        ]
+    # @property
+    # def dims(self):
+    #     return [
+    #         TensorDim(expr=ffi_call(lib.plaidml_logical_shape_get_dim_expr, self.as_ptr(), i))
+    #         for i in range(self.ndims)
+    #     ]
 
 
 class Constraint(object):
@@ -170,40 +170,46 @@ class TensorIndex(ForeignObject):
         return TensorIndex(poly_op(lib.PLAIDML_INT_OP_DIV, lhs, self))
 
 
-class _TensorSpec(ForeignObject):
+class _IndexMap(ForeignObject):
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr
 
-    def __init__(self, ref, key, dims):
+    def __init__(self, ref, key):
         if isinstance(key, tuple) or isinstance(key, list):
             idxs = key
         else:
             idxs = [key]
-
         idxs = [wrap_poly(x) for x in idxs]
         raw_idxs = [x.as_ptr() for x in idxs]
-        if dims is None:
-            raw_dims = ffi.NULL
-        else:
-            dims = [wrap_dim(x) for x in dims]
-            raw_dims = [x.as_ptr() for x in dims]
-        expr = ffi_call(lib.plaidml_expr_tensor_spec, ref.as_ptr(), len(idxs), raw_idxs, raw_dims)
-        super(_TensorSpec, self).__init__(expr)
+        expr = ffi_call(lib.plaidml_expr_index_map, ref.as_ptr(), len(idxs), raw_idxs)
+        super(_IndexMap, self).__init__(expr)
+
+
+class _SizeMap(ForeignObject):
+    __ffi_del__ = lib.plaidml_expr_free
+    __ffi_repr__ = lib.plaidml_expr_repr
+
+    def __init__(self, dims):
+        dims = [wrap_dim(x) for x in dims]
+        raw_dims = [x.as_ptr() for x in dims]
+        expr = ffi_call(lib.plaidml_expr_size_map, len(dims), raw_dims)
+        super(_SizeMap, self).__init__(expr)
 
 
 class _Contraction(ForeignObject):
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr
 
-    def __init__(self, agg_op, combo_op, output, inputs, name, layout=''):
-        inputs = [x.as_ptr() for x in inputs]
+    def __init__(self, agg_op, combo_op, src_idxs, sink_idxs, sink_sizes, name, layout=''):
+        src_idxs = [x.as_ptr() for x in src_idxs]
         expr = ffi_call(
             lib.plaidml_expr_contraction,
             agg_op,
             combo_op,
-            output.as_ptr(),
-            len(inputs),
-            inputs,
+            sink_idxs.as_ptr(),
+            sink_sizes.as_ptr(),
+            len(src_idxs),
+            src_idxs,
             name.encode(),
             layout.encode(),  # TODO: carry this thru from TensorOutput()
         )
@@ -252,7 +258,7 @@ class IndexedTensor(object):
 
     def _make_contraction(self, agg_op, rhs):
         # Extract combo_op and inputs
-        if isinstance(rhs._impl, _TensorSpec):
+        if isinstance(rhs._impl, _IndexMap):
             # Unary op
             combo_op = lib.PLAIDML_COMBO_OP_NONE
             inputs = [rhs._impl]
@@ -265,8 +271,9 @@ class IndexedTensor(object):
         return _Contraction(
             agg_op,
             combo_op,
-            self._impl,
             inputs,
+            self._impl,
+            _SizeMap(self._tensor._dims),
             self._tensor._name,
         )
 
@@ -285,7 +292,8 @@ class Tensor(ForeignObject):
                 raw_buffer = ffi.NULL
             else:
                 raw_buffer = buffer.as_ptr()
-            expr = ffi_call(lib.plaidml_expr_param, shape.as_ptr(), raw_buffer, name.encode())
+            expr = ffi_call(lib.plaidml_expr_placeholder, shape.as_ptr(), raw_buffer,
+                            name.encode())
         elif dims is not None:
             self._dims = dims
             expr = None
@@ -304,7 +312,7 @@ class Tensor(ForeignObject):
         return hash((self.as_ptr(), self._dims, self._is_contraction))
 
     def __getitem__(self, key):
-        return IndexedTensor(_TensorSpec(self, key, self._dims), tensor=self)
+        return IndexedTensor(_IndexMap(self, key), tensor=self)
 
     def __setitem__(self, key, value):
         if isinstance(value._impl, _Contraction):
@@ -312,14 +320,15 @@ class Tensor(ForeignObject):
             self._set_contraction(value._impl)
         elif isinstance(value, Tensor):
             pass
-        elif isinstance(value._impl, _TensorSpec):
+        elif isinstance(value._impl, _IndexMap):
             # Unary ASSIGN contraction
             self._set_contraction(
                 _Contraction(
                     lib.PLAIDML_AGG_OP_ASSIGN,
                     lib.PLAIDML_COMBO_OP_NONE,
-                    _TensorSpec(self, key, self._dims),
                     [value._impl],
+                    _IndexMap(self, key),
+                    _SizeMap(self._dims),
                     self._name,
                 ))
         elif isinstance(value._impl, _ContractionPart):
@@ -328,8 +337,9 @@ class Tensor(ForeignObject):
                 _Contraction(
                     lib.PLAIDML_AGG_OP_ASSIGN,
                     value._impl.op,
-                    _TensorSpec(self, key, self._dims),
                     [x._impl for x in value._impl.args],
+                    _IndexMap(self, key),
+                    _SizeMap(self._dims),
                     self._name,
                 ))
         else:

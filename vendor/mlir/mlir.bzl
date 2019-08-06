@@ -9,6 +9,13 @@ TBLGEN_ACTIONS = [
     "-gen-rewriters",
 ]
 
+COPTS = select({
+    "@com_intel_plaidml//toolchain:windows_x86_64": [
+        "/wd4624",
+    ],
+    "//conditions:default": [],
+})
+
 def _tblgen_impl(ctx):
     args = ctx.actions.args()
     args.add(ctx.attr.action)
@@ -18,7 +25,7 @@ def _tblgen_impl(ctx):
     args.add("-o", ctx.outputs.out)
     args.add(ctx.file.src)
     ctx.actions.run(
-        inputs = [ctx.file.src],
+        inputs = [ctx.file.src] + ctx.files.also,
         outputs = [ctx.outputs.out],
         arguments = [args],
         executable = ctx.executable._tool,
@@ -26,11 +33,14 @@ def _tblgen_impl(ctx):
     )
     return [DefaultInfo(files = depset([ctx.outputs.out]))]
 
-mlir_tblgen = rule(
+mlir_tblgen_rule = rule(
     attrs = {
         "src": attr.label(
             allow_single_file = [".td"],
             mandatory = True,
+        ),
+        "also": attr.label_list(
+            allow_files = [".td"],
         ),
         "out": attr.output(
             mandatory = True,
@@ -53,3 +63,18 @@ mlir_tblgen = rule(
     output_to_genfiles = True,
     implementation = _tblgen_impl,
 )
+
+def mlir_tblgen(name, src, out, incs, action, also = [], flags = []):
+    mlir_tblgen_rule(
+        name = "%s_rule" % name,
+        src = src,
+        also = also,
+        out = out,
+        incs = incs,
+        action = action,
+        flags = flags,
+    )
+    native.cc_library(
+        name = name,
+        textual_hdrs = [out],
+    )

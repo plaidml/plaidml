@@ -212,8 +212,9 @@ class IndexedTensor {
   };
 
   struct Impl {
-    std::shared_ptr<plaidml_expr> unary;
-    std::shared_ptr<ComboParts> nary;
+    std::shared_ptr<plaidml_expr> idxs;
+    std::shared_ptr<plaidml_expr> sizes;
+    std::shared_ptr<ComboParts> rhs;
     const Tensor* src = nullptr;
     std::string layout;
     void MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs);
@@ -294,6 +295,8 @@ class LogicalShape {
             dims.data(),                                                             //
             layout.c_str()))) {}
 
+  plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
+
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_repr, ptr_.get()));
   }
@@ -318,16 +321,16 @@ class LogicalShape {
     return ret;
   }
 
-  std::vector<TensorDim> dims() const {
-    std::vector<TensorDim> ret(ndims());
-    for (size_t i = 0; i < ret.size(); i++) {
-      auto impl = std::make_shared<TensorDim::Impl>();
-      impl->ptr = details::make_plaidml_dim_expr(
-          ffi::call<plaidml_dim_expr*>(plaidml_logical_shape_get_dim_expr, ptr_.get(), i));
-      ret[i] = TensorDim(impl);
-    }
-    return ret;
-  }
+  // std::vector<TensorDim> dims() const {
+  //   std::vector<TensorDim> ret(ndims());
+  //   for (size_t i = 0; i < ret.size(); i++) {
+  //     auto impl = std::make_shared<TensorDim::Impl>();
+  //     impl->ptr = details::make_plaidml_dim_expr(
+  //         ffi::call<plaidml_dim_expr*>(plaidml_logical_shape_get_dim_expr, ptr_.get(), i));
+  //     ret[i] = TensorDim(impl);
+  //   }
+  //   return ret;
+  // }
 
   bool operator==(const LogicalShape& rhs) const { return str() == rhs.str(); }
 
@@ -380,15 +383,6 @@ class Tensor {
     impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.impl_->ptr.get()));
   }
 
-  explicit Tensor(const LogicalShape& shape) : impl_(new Impl) {
-    impl_->ptr = details::make_plaidml_expr(  //
-        ffi::call<plaidml_expr*>(             //
-            plaidml_expr_param,               //
-            shape.ptr_.get(),                 //
-            nullptr,                          //
-            ""));
-  }
-
   explicit Tensor(const std::vector<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
@@ -399,15 +393,6 @@ class Tensor {
     impl_->dims = dims;
     impl_->has_dims = true;
     impl_->layout = layout;
-  }
-
-  Tensor(const std::string& name, const LogicalShape& shape) : impl_(new Impl) {
-    impl_->ptr = details::make_plaidml_expr(  //
-        ffi::call<plaidml_expr*>(             //
-            plaidml_expr_param,               //
-            shape.ptr_.get(),                 //
-            nullptr,                          //
-            name.c_str()));
   }
 
   Tensor(const std::string& name, const std::vector<TensorDim>& dims, const std::string& layout = "")
@@ -449,22 +434,18 @@ class Tensor {
       for (const auto& dim : impl_->dims) {
         sizes.emplace_back(dim.impl_->ptr.get());
       }
-      impl->unary = details::make_plaidml_expr(  //
+      impl->sizes = details::make_plaidml_expr(  //
           ffi::call<plaidml_expr*>(              //
-              plaidml_expr_tensor_spec,          //
-              as_ptr(),                          //
-              idx_ptrs.size(),                   //
-              idx_ptrs.data(),                   //
+              plaidml_expr_size_map,             //
+              sizes.size(),                      //
               sizes.data()));
-    } else {
-      impl->unary = details::make_plaidml_expr(  //
-          ffi::call<plaidml_expr*>(              //
-              plaidml_expr_tensor_spec,          //
-              as_ptr(),                          //
-              idx_ptrs.size(),                   //
-              idx_ptrs.data(),                   //
-              nullptr));
     }
+    impl->idxs = details::make_plaidml_expr(  //
+        ffi::call<plaidml_expr*>(             //
+            plaidml_expr_index_map,           //
+            as_ptr(),                         //
+            idx_ptrs.size(),                  //
+            idx_ptrs.data()));
     return IndexedTensor{std::move(impl)};
   }
 
@@ -552,6 +533,25 @@ Tensor TensorOutput(Ts... dims) {
 
 inline Tensor TensorOutput(const std::vector<TensorDim>& dims, const std::string& layout = "") {  //
   return Tensor(dims, layout);
+}
+
+inline Tensor Placeholder(      //
+    const LogicalShape& shape,  //
+    const std::string& name = "") {
+  auto ptr = ffi::call<plaidml_expr*>(  //
+      plaidml_expr_placeholder,         //
+      shape.as_ptr(),                   //
+      nullptr,                          //
+      name.c_str());
+  return Tensor(ptr);
+}
+
+inline Tensor Placeholder(             //
+    plaidml_datatype dtype,            //
+    const std::vector<int64_t>& dims,  //
+    const std::string& name = "") {
+  LogicalShape shape(dtype, dims);
+  return Placeholder(shape, name);
 }
 
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
@@ -691,10 +691,10 @@ class TensorFriend {
 
   static IndexedTensor ComboParts(plaidml_combo_op op, const std::vector<const IndexedTensor*>& args) {
     std::unique_ptr<IndexedTensor::Impl> impl(new IndexedTensor::Impl());
-    impl->nary.reset(new IndexedTensor::ComboParts);
-    impl->nary->op = op;
+    impl->rhs = std::make_shared<IndexedTensor::ComboParts>();
+    impl->rhs->op = op;
     for (const auto& arg : args) {
-      impl->nary->args.emplace_back(arg->impl_->unary.get());
+      impl->rhs->args.emplace_back(arg->impl_->idxs.get());
     }
     return IndexedTensor{std::move(impl)};
   }
@@ -822,26 +822,25 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
 
 inline void IndexedTensor::Impl::MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs) {
   plaidml_combo_op combo_op;
-  std::vector<plaidml_expr*> inputs;
-  if (rhs.impl_->unary) {
+  std::vector<plaidml_expr*> src_idxs;
+  if (rhs.impl_->rhs) {
+    // n-ary op: ComboParts
+    combo_op = rhs.impl_->rhs->op;
+    src_idxs = rhs.impl_->rhs->args;
+  } else {
     // unary op: TensorSpec
     combo_op = PLAIDML_COMBO_OP_NONE;
-    inputs.emplace_back(rhs.impl_->unary.get());
-  } else if (rhs.impl_->nary) {
-    // binary/ternary op: ComboParts
-    combo_op = rhs.impl_->nary->op;
-    inputs = rhs.impl_->nary->args;
-  } else {
-    throw std::runtime_error("Invalid impl");
+    src_idxs.emplace_back(rhs.impl_->idxs.get());
   }
   src->impl_->ptr = details::make_plaidml_expr(  //
       ffi::call<plaidml_expr*>(                  //
           plaidml_expr_contraction,              //
           agg_op,                                //
           combo_op,                              //
-          unary.get(),                           //
-          inputs.size(),                         //
-          inputs.data(),                         //
+          idxs.get(),                            //
+          sizes.get(),                           //
+          src_idxs.size(),                       //
+          src_idxs.data(),                       //
           src->impl_->name.c_str(),              //
           layout.c_str()));
 }
@@ -940,10 +939,6 @@ class Value {
 
   std::string as_str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_expr_str_get_value, as_ptr()));
-  }
-
-  Tensor as_scalar() const {  //
-    return Tensor(ffi::call<plaidml_expr*>(plaidml_expr_clone, as_ptr()));
   }
 
   Tensor as_tensor() const {  //

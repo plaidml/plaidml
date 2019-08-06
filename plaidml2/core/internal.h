@@ -6,6 +6,7 @@
 #include <string>
 
 #include "plaidml2/core/ffi.h"
+#include "pmlc/dialect/tile/builder.h"
 #include "tile/base/platform.h"
 #include "tile/base/shape.h"
 #include "tile/lang/ast/ast.h"
@@ -22,10 +23,12 @@ struct plaidml_shape {
 
 struct plaidml_expr {
   vertexai::tile::lang::ast::ExprPtr expr;
+  mlir::Value* value = nullptr;
 };
 
 struct plaidml_program {
   vertexai::tile::lang::ast::ProgramEvaluation eval;
+  mlir::Operation* op = nullptr;
 };
 
 struct plaidml_buffer {

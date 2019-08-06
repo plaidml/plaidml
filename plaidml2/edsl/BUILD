@@ -29,6 +29,7 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//plaidml2/core",
+        "//pmlc/dialect/tile",
         "//tile/lang/ast",
     ],
 )
@@ -38,11 +39,11 @@ plaidml_py_library(
     srcs = [
         "__init__.py",
     ],
+    tags = ["conda"],
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml2:py",
     ],
-    tags = ["conda"],
 )
 
 plaidml_cc_library(

@@ -2,6 +2,8 @@
 
 #include "tile/lang/ast/ast.h"
 
+#include <set>
+
 #include <boost/format.hpp>
 
 #include "base/util/logging.h"
@@ -423,11 +425,11 @@ class ProgramEvaluator : public AstVisitor<void> {
     }
     cion.specs.emplace_back(TensorSpec{});
     std::vector<std::string> inputs;
-    for (const auto& input : expr.inputs) {
+    for (const auto& src : expr.srcs) {
       TensorSpec tensor_spec;
-      tensor_spec.id = safe_at(&eval_.names_by_expr, input->ref.get());
+      tensor_spec.id = safe_at(&eval_.names_by_expr, src->ref.get());
       inputs.push_back(tensor_spec.id);
-      for (const auto& idx : input->index_spec) {
+      for (const auto& idx : src->idxs) {
         auto poly = idx->Accept(&poly_eval);
         tensor_spec.spec.push_back(poly);
       }
@@ -435,11 +437,11 @@ class ProgramEvaluator : public AstVisitor<void> {
     }
     auto name = NewTmp(expr);
     cion.specs[0].id = name;
-    for (const auto& idx : expr.output->index_spec) {
+    for (const auto& idx : expr.sink_idxs->idxs) {
       auto poly = idx->Accept(&poly_eval);
       cion.specs[0].spec.push_back(poly);
     }
-    for (const auto& size_expr : expr.output->output_dims) {
+    for (const auto& size_expr : expr.sink_dims->dims) {
       auto size = size_expr->Accept(&dim_eval);
       cion.output_size.push_back(std::to_string(size));
     }
@@ -556,15 +558,15 @@ class ExprOptimizer : public AstPass {
     IVLOG(4, "  deriv: " << deriv->shape);
     IVLOG(4, "  expr: " << expr->shape);
 
-    std::vector<PolyExprPtr> input_specs;
-    std::vector<PolyExprPtr> output_specs;
+    std::vector<PolyExprPtr> srcs;
+    std::vector<PolyExprPtr> sink_idxs;
     bool nontrivial_contraction = false;
     auto input_ndims = deriv->shape.dims.size();
     auto input_only_ndims = input_ndims - expr->shape.dims.size();
     for (size_t i = 0; i < deriv->shape.dims.size(); i++) {
       DimExprEvaluator dim_eval;
       auto curr_idx = std::make_shared<PolyIndex>(i);
-      input_specs.push_back(curr_idx);
+      srcs.push_back(curr_idx);
       if (i < input_only_ndims) {
         // Add the initial indexes only to the output spec; only once lengths are aligned look at both
         nontrivial_contraction = true;  // If the lengths don't match this is nontrivial
@@ -573,12 +575,12 @@ class ExprOptimizer : public AstPass {
         // Where the output dim is 1, put a 0 in the output spec
         // Where the output dim is >1, put the index from the corresponding axis of the input_spec
         if (expr->shape.dims[output_i].expr->Accept(&dim_eval) == 1) {
-          output_specs.push_back(std::make_shared<PolyLiteral>(0));
+          sink_idxs.push_back(std::make_shared<PolyLiteral>(0));
           if (deriv->shape.dims[i].expr->Accept(&dim_eval) != 1) {
             nontrivial_contraction = true;
           }
         } else {
-          output_specs.push_back(curr_idx);
+          sink_idxs.push_back(curr_idx);
         }
       }
     }
@@ -587,8 +589,9 @@ class ExprOptimizer : public AstPass {
       auto dop = std::make_shared<ContractionExpr>();
       dop->agg_op = AggregationOp::SUM;
       dop->combo_op = CombinationOp::NONE;
-      dop->inputs.push_back(std::make_shared<TensorSpecExpr>(deriv, input_specs));
-      dop->output = std::make_shared<TensorSpecExpr>(output_specs, expr->shape.dims_as_exprs());
+      dop->srcs.push_back(std::make_shared<IndexMapExpr>(deriv, srcs));
+      dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, sink_idxs);
+      dop->sink_dims = std::make_shared<SizeMapExpr>(expr->shape.dims_as_exprs());
       dop->ComputeShape(expr->shape.layout);
       return dop;
     } else {
@@ -748,28 +751,28 @@ void ContractionExpr::ComputeShape(const std::string& layout) {
   IVLOG(5, "ContractionExpr::ComputeShape> layout: \"" << layout << "\"");
   DataType dtype = DataType::INVALID;
   if (combo_op == CombinationOp::COND) {
-    if (inputs.size() != 3) {
+    if (srcs.size() != 3) {
       throw std::runtime_error("Internal error: Invalid number of inputs for COND");
     }
-    dtype = inputs[2]->ref->shape.dtype;
+    dtype = srcs[2]->ref->shape.dtype;
   } else {
     std::vector<DataType> dtypes;
-    for (const auto& input : inputs) {
-      dtypes.push_back(input->ref->shape.dtype);
+    for (const auto& src : srcs) {
+      dtypes.push_back(src->ref->shape.dtype);
     }
     dtype = ComputeOutputType(dtypes);
   }
   shape = LogicalShape(dtype, layout);
-  for (const auto& size : output->output_dims) {
+  for (const auto& size : sink_dims->dims) {
     shape.dims.push_back(LogicalDim{size});
   }
 }
 
 std::string ContractionExpr::str() const {
   std::stringstream ss;
-  ss << output->str() << " = ";
+  ss << sink_idxs->str() << ":" << sink_dims->str() << " = ";
   ss << static_cast<char>(agg_op) << "(";
-  for (size_t i = 0; i < inputs.size(); i++) {
+  for (size_t i = 0; i < srcs.size(); i++) {
     if (i) {
       if (i == 1 && combo_op == CombinationOp::COND) {
         ss << " == ";
@@ -779,7 +782,7 @@ std::string ContractionExpr::str() const {
         ss << " " << static_cast<char>(combo_op) << " ";
       }
     }
-    ss << inputs[i]->str();
+    ss << srcs[i]->str();
   }
   ss << ")";
   for (const auto& constraint : constraints) {
@@ -800,47 +803,42 @@ ConstraintExpr::ConstraintExpr(const PolyExprPtr& lhs, const DimExprPtr& rhs)
 
 std::string ConstraintExpr::str() const { return "ConstraintExpr"; }
 
-// input ctor
-TensorSpecExpr::TensorSpecExpr(  //
-    const ExprPtr& ref,          //
-    const std::vector<PolyExprPtr>& index_spec)
+IndexMapExpr::IndexMapExpr(  //
+    const ExprPtr& ref,      //
+    const std::vector<PolyExprPtr>& idxs)
     : ref(ref),  //
-      index_spec(index_spec) {}
+      idxs(idxs) {}
 
-// output ctor
-TensorSpecExpr::TensorSpecExpr(                  //
-    const std::vector<PolyExprPtr>& index_spec,  //
-    const std::vector<DimExprPtr>& output_dims)
-    : index_spec(index_spec),  //
-      output_dims(output_dims) {}
-
-std::string TensorSpecExpr::str() const {
+std::string IndexMapExpr::str() const {
   std::stringstream ss;
   if (name.size()) {
     ss << name;
   } else {
-    if (ref) {
-      ss << "_";
-
-    } else {
-      ss << "O";
-    }
+    ss << "_";
   }
   ss << "[";
-  for (size_t i = 0; i < index_spec.size(); i++) {
+  for (size_t i = 0; i < idxs.size(); i++) {
     if (i) {
       ss << ", ";
     }
-    ss << index_spec[i]->str();
+    ss << idxs[i]->str();
   }
-  if (!ref && output_dims.size()) {
-    ss << " : ";
-    for (size_t i = 0; i < output_dims.size(); i++) {
-      if (i) {
-        ss << ", ";
-      }
-      ss << output_dims[i]->str();
+  ss << "]";
+  return ss.str();
+}
+
+SizeMapExpr::SizeMapExpr(  //
+    const std::vector<DimExprPtr>& dims)
+    : dims(dims) {}
+
+std::string SizeMapExpr::str() const {
+  std::stringstream ss;
+  ss << "[";
+  for (size_t i = 0; i < dims.size(); i++) {
+    if (i) {
+      ss << ", ";
     }
+    ss << dims[i]->str();
   }
   ss << "]";
   return ss.str();

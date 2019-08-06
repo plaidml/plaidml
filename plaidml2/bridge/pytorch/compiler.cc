@@ -2,6 +2,8 @@
 
 #include "plaidml2/bridge/pytorch/compiler.h"
 
+#include <map>
+
 #include "plaidml2/bridge/pytorch/logging.h"
 #include "plaidml2/op/op.h"
 
@@ -38,10 +40,10 @@ edsl::Tensor addmm(const std::vector<edsl::Value>& args) {
   const auto& C = args[2].as_tensor();
   IVLOG(2, "  C: " << C.shape().str());
 
-  const auto& beta = args[3].as_scalar();
+  const auto& beta = args[3].as_tensor();
   IVLOG(2, "  beta: " << beta);
 
-  const auto& alpha = args[4].as_scalar();
+  const auto& alpha = args[4].as_tensor();
   IVLOG(2, "  alpha: " << alpha);
 
   edsl::TensorDim I, J, K;
@@ -58,7 +60,7 @@ edsl::Tensor add(const std::vector<edsl::Value>& args) {
   IVLOG(1, "add");
   auto A = args[0].as_tensor();
   auto B = args[1].as_tensor();
-  auto C = args[2].as_scalar();
+  auto C = args[2].as_tensor();
   IVLOG(2, "  " << A.shape().str() << " + " << B.shape().str() << " * " << C);
   return A + B * C;
 }
@@ -532,8 +534,7 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
       sizes.emplace_back(size);
     }
     // TODO: convert dtype
-    edsl::LogicalShape shape(PLAIDML_DATA_FLOAT32, sizes);
-    edsl::Tensor input_tensor(shape);
+    auto input_tensor = edsl::Placeholder(PLAIDML_DATA_FLOAT32, sizes);
     input_tensors.push_back(input_tensor);
     const auto& input = subgraph_->inputs()[i];
     value_map.emplace(input, input_tensor);

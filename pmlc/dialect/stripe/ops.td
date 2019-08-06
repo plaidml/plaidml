@@ -1,6 +1,6 @@
 // Copyright 2019, Intel Corporation
 
-include "pmlc/dialect/scalar/predicates.td"
+include "pmlc/dialect/eltwise/predicates.td"
 
 def StripeDialect : Dialect {
   let name = "stripe";
@@ -11,13 +11,13 @@ def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Reference Type">;
 def PrngType : Type<CPred<"$_self.isa<PrngType>()">, "Plaid PrngType">;
 
-def DictionaryAttr : Attr<CPred<"$_self.isa<mlir::DictionaryAttr>()">, "Dictionary Attribute"> {
-  let storageType = "DictionaryAttr";
-  let returnType = "DictionaryAttr";
-  let convertFromStorage = "$_self";
-  let defaultValue = "{}";
-  let constBuilderCall = "$_builder.getDictionaryAttr($0)";
-}
+// def DictionaryAttr : Attr<CPred<"$_self.isa<mlir::DictionaryAttr>()">, "Dictionary Attribute"> {
+//   let storageType = "DictionaryAttr";
+//   let returnType = "DictionaryAttr";
+//   let convertFromStorage = "$_self";
+//   let defaultValue = "{}";
+//   let constBuilderCall = "$_builder.getDictionaryAttr($0)";
+// }
 
 def TensorLayoutAttr : Attr<CPred<"$_self.isa<TensorLayoutAttr>()">, "Tensor Layout Attribute"> {
   let storageType = "TensorLayoutAttr";
@@ -43,7 +43,7 @@ def RefineOp : StripeOp<"refine", [NoSideEffect]> {
 def LoadOp : StripeOp<"load"> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorType:$from, DictionaryAttr:$attr);
-  let results = (outs ScalarType:$into);
+  let results = (outs Eltwise_AnyTensor:$into);
   /*
   let parser = [{
     mlir::SmallVector<OpAsmParser::OperandType, 1> ops;
@@ -63,7 +63,7 @@ def LoadOp : StripeOp<"load"> {
 
 def StoreOp : StripeOp<"store"> {
   let summary = "Store to a tensor";
-  let arguments = (ins TensorType:$into, ScalarType:$from, DictionaryAttr:$attr);
+  let arguments = (ins TensorType:$into, Eltwise_AnyTensor:$from, DictionaryAttr:$attr);
   let results = (outs);
   /*
   let parser = [{
