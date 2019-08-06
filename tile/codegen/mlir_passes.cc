@@ -1,5 +1,7 @@
 // Copyright 2018, Intel Corporation
 
+#include <functional>
+
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 #include "tile/codegen/compile_pass.h"
