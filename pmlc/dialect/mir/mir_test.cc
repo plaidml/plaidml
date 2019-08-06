@@ -53,7 +53,8 @@ int main() {
   printf("Doing some passes\n");
   mlir::PassManager pm;
   pm.addPass(mlir::createCSEPass());
-  pm.addPass(new PaddingPass());
+  vertexai::tile::codegen::proto::MirPadPass options;
+  pm.addPass(new PaddingPass(options));
   if (failed(pm.run(module))) {
     throw std::runtime_error("Invalid goo\n");
   }

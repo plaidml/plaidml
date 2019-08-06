@@ -6,6 +6,10 @@
 
 #include "base/util/any_factory.h"
 #include "base/util/any_factory_map.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Module.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "tile/base/buffer.h"
 #include "tile/stripe/stripe.h"
 
@@ -15,7 +19,14 @@ namespace codegen {
 
 class CompilerState {
  public:
-  explicit CompilerState(std::shared_ptr<stripe::Program> prog_) : prog(prog_), const_bufs(nullptr) {}
+  explicit CompilerState(std::shared_ptr<stripe::Program> prog_) : prog(prog_), const_bufs(nullptr) {
+    module = mlir::ModuleOp::create(mlir::UnknownLoc::get(&ctx));
+  }
+
+  // Always valid
+  mlir::MLIRContext ctx;
+  // Holds a single function or no function depending on if state is in MLIR
+  mlir::ModuleOp module;
 
   std::shared_ptr<stripe::Program> prog;
   ConstBufferManager* const_bufs;
@@ -28,6 +39,7 @@ class CompilerState {
 class CompilePass {
  public:
   virtual ~CompilePass() {}
+  virtual bool is_stripe() const { return true; }
   virtual void Apply(CompilerState* root) const = 0;
 };
 
