@@ -1,11 +1,11 @@
 channels:
   - conda-forge
 dependencies:
-  - numpy=1.16
+  - numpy=1.16.4
   - pip
   - pre_commit=1.17.0
-  - python=3.7.0
-  - pyyaml
+  - python=3.7.4
+  - pyyaml=5.1.2
   - pip:
     - cpplint==1.4.4
     - yapf==0.27.0

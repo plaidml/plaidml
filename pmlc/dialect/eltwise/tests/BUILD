@@ -18,4 +18,5 @@ conda_test(
     ],
     env = "@com_intel_plaidml_conda//:env",
     main = "lit.py",
+    tags = ["manual"],
 )

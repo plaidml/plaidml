@@ -15,6 +15,7 @@
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/stripe/types.h"
 
+#include "tile/codegen/compile_pass.h"
 #include "tile/codegen/localize.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
@@ -30,6 +31,11 @@ lang::RunInfo example() {
   LogicalShape K(PLAIDML_DATA_FLOAT32, {3, 3, 64, 128});
   LogicalShape C(PLAIDML_DATA_FLOAT32, {128});
   return LoadConv2dBnRelu("foo", I, K, C, {16, 112, 112, 128});
+}
+
+template <typename Pass, typename Config>
+std::unique_ptr<mlir::FunctionPassBase> CreatePass(Config config) {
+  return std::make_unique<Pass>(config);
 }
 
 int main() {
@@ -54,8 +60,9 @@ int main() {
   mlir::PassManager pm;
   pm.addPass(mlir::createCSEPass());
   vertexai::tile::codegen::proto::MLIR_PadPass options;
-  pm.addPass(new PaddingPass(options));
+  pm.addPass(CreatePass<PaddingPass>(options));
   if (failed(pm.run(module))) {
+    module.dump();
     throw std::runtime_error("Invalid goo\n");
   }
 

@@ -4,6 +4,8 @@
 
 #include <utility>
 
+#include <utility>
+
 #include <boost/math/common_factor.hpp>
 
 namespace pmlc {
@@ -111,7 +113,7 @@ AffineRange::AffineRange(const AffinePolynomial& poly) : min(poly.constant), max
     // Update the stride
     stride = boost::math::gcd(stride, uint64_t(std::abs(kvp.second)));
     // Extract the parallel for this affine is an argument of
-    auto pf = mlir::cast<ParallelForOp>(kvp.first->getOwner()->getContainingOp());
+    auto pf = mlir::cast<ParallelForOp>(kvp.first->getOwner()->getParentOp());
     // Extract the appropriate attribute from ranges
     Attribute ra = pf.ranges().getValue()[kvp.first->getArgNumber()];
     // Turn the range into an integer

@@ -4,17 +4,15 @@ load("@com_intel_plaidml//vendor/mlir:mlir.bzl", "mlir_tblgen")
 
 PLATFORM_COPTS = select({
     "@com_intel_plaidml//toolchain:macos_x86_64": [
-        "-D__STDC_LIMIT_MACROS",
-        "-D__STDC_CONSTANT_MACROS",
+        "-std=c++14",
         "-w",
     ],
     "@com_intel_plaidml//toolchain:windows_x86_64": [
         "/w",
-        "/wd4244",
-        "/wd4267",
+        "/DWIN32_LEAN_AND_MEAN",
     ],
     "//conditions:default": [
-        "-fPIC",
+        "-std=c++14",
         "-w",
     ],
 })
@@ -59,32 +57,32 @@ cc_binary(
 
 mlir_tblgen(
     name = "gen-standard-op-decls",
-    src = "include/mlir/StandardOps/Ops.td",
-    out = "include/mlir/StandardOps/Ops.h.inc",
+    src = "include/mlir/Dialect/StandardOps/Ops.td",
+    out = "include/mlir/Dialect/StandardOps/Ops.h.inc",
     action = "-gen-op-decls",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-standard-op-defs",
-    src = "include/mlir/StandardOps/Ops.td",
-    out = "include/mlir/StandardOps/Ops.cpp.inc",
+    src = "include/mlir/Dialect/StandardOps/Ops.td",
+    out = "include/mlir/Dialect/StandardOps/Ops.cpp.inc",
     action = "-gen-op-defs",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-affine-op-decls",
-    src = "include/mlir/AffineOps/AffineOps.td",
-    out = "include/mlir/AffineOps/AffineOps.h.inc",
+    src = "include/mlir/Dialect/AffineOps/AffineOps.td",
+    out = "include/mlir/Dialect/AffineOps/AffineOps.h.inc",
     action = "-gen-op-decls",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-affine-op-defs",
-    src = "include/mlir/AffineOps/AffineOps.td",
-    out = "include/mlir/AffineOps/AffineOps.cpp.inc",
+    src = "include/mlir/Dialect/AffineOps/AffineOps.td",
+    out = "include/mlir/Dialect/AffineOps/AffineOps.cpp.inc",
     action = "-gen-op-defs",
     incs = ["include"],
 )
@@ -107,80 +105,96 @@ mlir_tblgen(
 
 mlir_tblgen(
     name = "gen-llvm-op-decls",
-    src = "include/mlir/LLVMIR/LLVMOps.td",
-    out = "include/mlir/LLVMIR/LLVMOps.h.inc",
+    src = "include/mlir/Dialect/LLVMIR/LLVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/LLVMOps.h.inc",
     action = "-gen-op-decls",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-llvm-enum-decls",
-    src = "include/mlir/LLVMIR/LLVMOps.td",
-    out = "include/mlir/LLVMIR/LLVMOpsEnums.h.inc",
+    src = "include/mlir/Dialect/LLVMIR/LLVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/LLVMOpsEnums.h.inc",
     action = "-gen-enum-decls",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-llvm-op-defs",
-    src = "include/mlir/LLVMIR/LLVMOps.td",
-    out = "include/mlir/LLVMIR/LLVMOps.cpp.inc",
+    src = "include/mlir/Dialect/LLVMIR/LLVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/LLVMOps.cpp.inc",
     action = "-gen-op-defs",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-llvm-enum-defs",
-    src = "include/mlir/LLVMIR/LLVMOps.td",
-    out = "include/mlir/LLVMIR/LLVMOpsEnums.cpp.inc",
+    src = "include/mlir/Dialect/LLVMIR/LLVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/LLVMOpsEnums.cpp.inc",
     action = "-gen-enum-defs",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-llvm-conversions",
-    src = "include/mlir/LLVMIR/LLVMOps.td",
-    out = "include/mlir/LLVMIR/LLVMConversions.inc",
+    src = "include/mlir/Dialect/LLVMIR/LLVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/LLVMConversions.inc",
     action = "-gen-llvmir-conversions",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-nvvm-op-decls",
-    src = "include/mlir/LLVMIR/NVVMOps.td",
-    out = "include/mlir/LLVMIR/NVVMOps.h.inc",
+    src = "include/mlir/Dialect/LLVMIR/NVVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/NVVMOps.h.inc",
     action = "-gen-op-decls",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-nvvm-op-defs",
-    src = "include/mlir/LLVMIR/NVVMOps.td",
-    out = "include/mlir/LLVMIR/NVVMOps.cpp.inc",
+    src = "include/mlir/Dialect/LLVMIR/NVVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/NVVMOps.cpp.inc",
     action = "-gen-op-defs",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-nvvm-conversions",
-    src = "include/mlir/LLVMIR/NVVMOps.td",
-    out = "include/mlir/LLVMIR/NVVMConversions.inc",
+    src = "include/mlir/Dialect/LLVMIR/NVVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/NVVMConversions.inc",
     action = "-gen-llvmir-conversions",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-gpu-op-decls",
-    src = "include/mlir/GPU/GPUOps.td",
-    out = "include/mlir/GPU/GPUOps.h.inc",
+    src = "include/mlir/Dialect/GPU/GPUOps.td",
+    out = "include/mlir/Dialect/GPU/GPUOps.h.inc",
     action = "-gen-op-decls",
     incs = ["include"],
 )
 
 mlir_tblgen(
     name = "gen-gpu-op-defs",
-    src = "include/mlir/GPU/GPUOps.td",
-    out = "include/mlir/GPU/GPUOps.cpp.inc",
+    src = "include/mlir/Dialect/GPU/GPUOps.td",
+    out = "include/mlir/Dialect/GPU/GPUOps.cpp.inc",
+    action = "-gen-op-defs",
+    incs = ["include"],
+)
+
+mlir_tblgen(
+    name = "gen-vector-op-decls",
+    src = "include/mlir/Dialect/VectorOps/VectorOps.td",
+    out = "include/mlir/Dialect/VectorOps/VectorOps.h.inc",
+    action = "-gen-op-decls",
+    incs = ["include"],
+)
+
+mlir_tblgen(
+    name = "gen-vector-op-defs",
+    src = "include/mlir/Dialect/VectorOps/VectorOps.td",
+    out = "include/mlir/Dialect/VectorOps/VectorOps.cpp.inc",
     action = "-gen-op-defs",
     incs = ["include"],
 )
@@ -188,17 +202,18 @@ mlir_tblgen(
 cc_library(
     name = "StandardOps",
     srcs = glob([
-        "lib/StandardOps/**/*.h",
-        "lib/StandardOps/**/*.cpp",
-    ]) + [
-        ":gen-standard-op-defs",
-    ],
+        "lib/Dialect/StandardOps/**/*.h",
+        "lib/Dialect/StandardOps/**/*.cpp",
+    ]),
     hdrs = [
-        ":gen-standard-op-decls",
+        "include/mlir/Dialect/StandardOps/Ops.cpp.inc",
+        "include/mlir/Dialect/StandardOps/Ops.h.inc",
     ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
+        ":gen-standard-op-decls",
+        ":gen-standard-op-defs",
         "@llvm//:core",
         "@llvm//:support",
     ],
@@ -261,19 +276,22 @@ cc_library(
 cc_library(
     name = "LLVMIR",
     srcs = glob([
-        "lib/LLVMIR/IR/LLVMDialect.cpp",
-    ]) + [
-        ":gen-llvm-op-defs",
-        ":gen-llvm-enum-defs",
-        # ":gen-llvm-conversions",
-    ],
+        "lib/Dialect/LLVMIR/IR/LLVMDialect.cpp",
+    ]),
     hdrs = [
-        ":gen-llvm-enum-decls",
-        ":gen-llvm-op-decls",
+        "include/mlir/Dialect/LLVMIR/LLVMOps.cpp.inc",
+        "include/mlir/Dialect/LLVMIR/LLVMOps.h.inc",
+        "include/mlir/Dialect/LLVMIR/LLVMOpsEnums.cpp.inc",
+        "include/mlir/Dialect/LLVMIR/LLVMOpsEnums.h.inc",
     ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
+        # ":gen-llvm-conversions",
+        ":gen-llvm-enum-decls",
+        ":gen-llvm-enum-defs",
+        ":gen-llvm-op-decls",
+        ":gen-llvm-op-defs",
         "@llvm//:asm_parser",
         "@llvm//:core",
         "@llvm//:support",
@@ -284,17 +302,18 @@ cc_library(
 cc_library(
     name = "NVVMIR",
     srcs = glob([
-        "lib/LLVMIR/IR/NVVMDialect.cpp",
-    ]) + [
-        ":gen-nvvm-op-defs",
-    ],
+        "lib/Dialect/LLVMIR/IR/NVVMDialect.cpp",
+    ]),
     hdrs = [
-        ":gen-nvvm-op-decls",
-        # ":gen-nvvm-conversions",
+        "include/mlir/Dialect/LLVMIR/NVVMOps.cpp.inc",
+        "include/mlir/Dialect/LLVMIR/NVVMOps.h.inc",
     ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
+        ":gen-nvvm-op-defs",
+        ":gen-nvvm-op-decls",
+        # ":gen-nvvm-conversions",
         "@llvm//:asm_parser",
         "@llvm//:core",
         "@llvm//:support",
@@ -334,18 +353,19 @@ cc_library(
 cc_library(
     name = "GPU",
     srcs = glob([
-        "lib/GPU/**/*.cpp",
-    ]) + [
-        ":gen-gpu-op-defs",
-    ],
+        "lib/Dialect/GPU/**/*.cpp",
+    ]),
     hdrs = [
-        ":gen-gpu-op-decls",
+        "include/mlir/Dialect/GPU/GPUOps.cpp.inc",
+        "include/mlir/Dialect/GPU/GPUOps.h.inc",
     ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
         ":IR",
         ":StandardOps",
+        ":gen-gpu-op-decls",
+        ":gen-gpu-op-defs",
         "@llvm//:support",
     ],
     alwayslink = 1,
@@ -383,19 +403,20 @@ cc_library(
 cc_library(
     name = "AffineOps",
     srcs = glob([
-        "lib/AffineOps/*.cpp",
-        "lib/AffineOps/*.h",
-    ]) + [
-        ":gen-affine-op-defs",
-    ],
+        "lib/Dialect/AffineOps/*.cpp",
+        "lib/Dialect/AffineOps/*.h",
+    ]),
     hdrs = [
-        ":gen-affine-op-decls",
+        "include/mlir/Dialect/AffineOps/AffineOps.cpp.inc",
+        "include/mlir/Dialect/AffineOps/AffineOps.h.inc",
     ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
         ":IR",
         ":StandardOps",
+        ":gen-affine-op-decls",
+        ":gen-affine-op-defs",
     ],
     alwayslink = 1,
 )
@@ -411,6 +432,7 @@ cc_library(
     deps = [
         ":AffineOps",
         ":LoopOps",
+        ":VectorOps",
     ],
 )
 
@@ -432,16 +454,17 @@ cc_library(
     srcs = glob([
         "lib/Dialect/LoopOps/*.cpp",
         "lib/Dialect/LoopOps/*.h",
-    ]) + [
-        ":gen-loop-op-defs",
-    ],
+    ]),
     hdrs = [
-        ":gen-loop-op-decls",
+        "include/mlir/Dialect/LoopOps/LoopOps.cpp.inc",
+        "include/mlir/Dialect/LoopOps/LoopOps.h.inc",
     ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
         ":StandardOps",
+        ":gen-loop-op-decls",
+        ":gen-loop-op-defs",
         "@llvm//:support",
     ],
     alwayslink = 1,
@@ -465,12 +488,19 @@ cc_library(
 cc_library(
     name = "VectorOps",
     srcs = glob([
-        "lib/VectorOps/*.cpp",
-        "lib/VectorOps/*.h",
+        "lib/Dialect/VectorOps/*.cpp",
+        "lib/Dialect/VectorOps/*.h",
     ]),
+    hdrs = [
+        "include/mlir/Dialect/VectorOps/VectorOps.cpp.inc",
+        "include/mlir/Dialect/VectorOps/VectorOps.h.inc",
+    ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
+        ":IR",
+        ":gen-vector-op-decls",
+        ":gen-vector-op-defs",
         "@llvm//:support",
     ],
     alwayslink = 1,

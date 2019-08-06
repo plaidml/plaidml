@@ -1,6 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
-load("//vendor/mlir:mlir.bzl", "mlir_tblgen")
+load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_library",
@@ -12,6 +12,7 @@ mlir_tblgen(
     src = "ops.td",
     out = "ops.h.inc",
     action = "-gen-op-decls",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
     incs = ["@mlir//:include"],
 )
 
@@ -20,42 +21,39 @@ mlir_tblgen(
     src = "ops.td",
     out = "ops.cpp.inc",
     action = "-gen-op-defs",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
     incs = ["@mlir//:include"],
 )
 
 plaidml_cc_library(
-    name = "hir",
+    name = "tile",
     srcs = [
+        "builder.cc",
         "dialect.cc",
         "ops.cc",
-        ":gen-op-defs",
+        "ops.cpp.inc",
     ],
     hdrs = [
+        "builder.h",
+        "dialect.h",
         "ops.h",
-        ":gen-op-decls",
+        "ops.h.inc",
+        "types.h",
     ],
+    copts = COPTS,
     visibility = ["//visibility:public"],
     deps = [
+        ":gen-op-decls",
+        ":gen-op-defs",
         "//base/util",
+        "//pmlc/dialect/eltwise",
         "//tile/base",
         "//tile/lang",
         "@boost",
         "@llvm//:support",
+        "@mlir//:AffineOps",
         "@mlir//:IR",
         "@mlir//:StandardOps",
     ],
     alwayslink = 1,
-)
-
-plaidml_cc_test(
-    name = "hir_test",
-    srcs = ["hir_test.cc"],
-    deps = [
-        ":hir",
-        "//tile/codegen",
-        "//tile/lang",
-        "//tile/lib",
-        "@mlir//:EDSC",
-        "@mlir//:Transforms",
-    ],
 )

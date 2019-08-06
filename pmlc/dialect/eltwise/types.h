@@ -12,16 +12,14 @@
 
 namespace pmlc {
 namespace dialect {
-namespace scalar {
+namespace eltwise {
 
 using DataType = vertexai::tile::DataType;
 
-namespace PlaidKind {
 enum Kinds {
   // A scalar type
   Scalar = mlir::Type::Kind::FIRST_PRIVATE_EXPERIMENTAL_0_TYPE,
 };
-}  // namespace PlaidKind
 
 struct ScalarTypeStorage : public mlir::TypeStorage {
   explicit ScalarTypeStorage(DataType type) : type(type) {}
@@ -42,15 +40,15 @@ class ScalarType : public mlir::Type::TypeBase<ScalarType, mlir::Type, ScalarTyp
  public:
   using Base::Base;
 
-  static bool kindof(unsigned kind) { return kind == PlaidKind::Scalar; }
+  static bool kindof(unsigned kind) { return kind == Kinds::Scalar; }
 
-  static ScalarType get(mlir::MLIRContext* context, DataType type) {
-    return Base::get(context, PlaidKind::Scalar, type);
+  static ScalarType get(mlir::MLIRContext* context, DataType type) {  //
+    return Base::get(context, Kinds::Scalar, type);
   }
 
   DataType type() { return getImpl()->type; }
 };
 
-}  // namespace scalar
+}  // namespace eltwise
 }  // namespace dialect
 }  // namespace pmlc

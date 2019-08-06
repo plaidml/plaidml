@@ -3,7 +3,7 @@
 #include "pmlc/dialect/stripe/transcode.h"
 
 #include "base/util/lookup.h"
-#include "pmlc/dialect/scalar/ops.h"
+#include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/analysis.h"
 
 namespace pmlc {
@@ -116,7 +116,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
       while (op->getBlock() == block && mlir::isa<RefineOp>(op)) {
         op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
       }
-      block = block->getContainingOp()->getBlock();
+      block = block->getParentOp()->getBlock();
       continue;
     }
     stripe::Block* sblock = blocks_.at(block).stripe;
@@ -190,7 +190,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
       break;
     }
     // Move one block up
-    block = block->getContainingOp()->getBlock();
+    block = block->getParentOp()->getBlock();
   }
   // Special handing for allocation block
   ref->dir = stripe::RefDir::None;
@@ -269,7 +269,7 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
     // Find the stripe block to attach the contraint to
     Block* block = inner;
     while (blocks_.at(block).stripe == nullptr) {
-      block = block->getContainingOp()->getBlock();
+      block = block->getParentOp()->getBlock();
     }
     stripe::Block* sblock = blocks_.at(block).stripe;
     sblock->constraints.push_back(build_affine(sblock, op.input()));
@@ -318,7 +318,7 @@ void StripeBuilder::walk_interior(Block* block) {
     } else {
       // Try all the intrinsic ops
       iop = &op_base;
-      scalar::ForAllOps(*this);
+      eltwise::ForAllOps(*this);
     }
   }
 }

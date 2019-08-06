@@ -5,12 +5,14 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 
-#include "pmlc/dialect/scalar/types.h"
+#include "pmlc/dialect/eltwise/types.h"
+#include "pmlc/dialect/eltwise/util.h"
 
 namespace pmlc {
 namespace dialect {
-namespace scalar {
+namespace eltwise {
 
+using mlir::APInt;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::Builder;
@@ -20,11 +22,14 @@ using mlir::IndexType;
 using mlir::IntegerAttr;
 using mlir::IntegerType;
 using mlir::LogicalResult;
+using mlir::MLIRContext;
 using mlir::NamedAttribute;
 using mlir::Op;
 using mlir::Operation;
 using mlir::OperationState;
 using mlir::OpFoldResult;
+using mlir::OwningRewritePatternList;
+using mlir::RankedTensorType;
 using mlir::ShapedType;
 using mlir::StringRef;
 using mlir::TensorType;
@@ -36,7 +41,7 @@ using mlir::VectorType;
 namespace OpTrait = mlir::OpTrait;
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/scalar/ops.h.inc"
+#include "pmlc/dialect/eltwise/ops.h.inc"
 
 namespace impl {
 
@@ -64,11 +69,11 @@ template <typename Operator>
 void ForAllOps(Operator& op) {  // NOLINT
   impl::ForAllOpsImpl<
 #define GET_OP_LIST
-#include "pmlc/dialect/scalar/ops.cpp.inc"
+#include "pmlc/dialect/eltwise/ops.cpp.inc"
 #undef GET_OP_LIST
       >::run(op);
 }
 
-}  // namespace scalar
+}  // namespace eltwise
 }  // namespace dialect
 }  // namespace pmlc

@@ -40,6 +40,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
+        "//pmlc/dialect/tile",
         "//tile/hal/cpu",
         "//tile/hal/opencl",
         "//tile/lang",
@@ -71,6 +72,6 @@ plaidml_py_library(
         "settings.py",
         ":py_version",
     ],
-    visibility = ["//visibility:public"],
     tags = ["conda"],
+    visibility = ["//visibility:public"],
 )

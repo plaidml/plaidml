@@ -120,10 +120,10 @@ PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_none(  //
     plaidml_error* err                                     //
 );
 
-PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_ref(  //
-    plaidml_error* err,                                   //
-    plaidml_expr* ref,                                    //
-    size_t dim);
+// PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_ref(  //
+//     plaidml_error* err,                                   //
+//     plaidml_expr* ref,                                    //
+//     size_t dim);
 
 PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_int(  //
     plaidml_error* err,                                   //
@@ -174,10 +174,10 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_dim(  //
     plaidml_error* err,                           //
     plaidml_dim_expr* expr);
 
-PLAIDML_EDSL_API plaidml_expr* plaidml_expr_param(  //
-    plaidml_error* err,                             //
-    plaidml_logical_shape* shape,                   //
-    plaidml_buffer* buffer,                         //
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_placeholder(  //
+    plaidml_error* err,                                   //
+    plaidml_logical_shape* shape,                         //
+    plaidml_buffer* buffer,                               //
     const char* name);
 
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_none(  //
@@ -229,12 +229,16 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_call(  //
     size_t nargs,                                  //
     plaidml_expr** args);
 
-PLAIDML_EDSL_API plaidml_expr* plaidml_expr_tensor_spec(  //
-    plaidml_error* err,                                   //
-    plaidml_expr* ref,                                    //
-    size_t ndims,                                         //
-    plaidml_poly_expr** input_idxs,                       //
-    plaidml_dim_expr** output_sizes);
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_index_map(  //
+    plaidml_error* err,                                 //
+    plaidml_expr* ref,                                  //
+    size_t ndims,                                       //
+    plaidml_poly_expr** idxs);
+
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_size_map(  //
+    plaidml_error* err,                                //
+    size_t ndims,                                      //
+    plaidml_dim_expr** sizes);
 
 typedef enum {
   PLAIDML_AGG_OP_NONE,
@@ -257,9 +261,10 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_contraction(  //
     plaidml_error* err,                                   //
     plaidml_agg_op agg_op,                                //
     plaidml_combo_op combo_op,                            //
-    plaidml_expr* raw_output,                             //
-    size_t ninputs,                                       //
-    plaidml_expr** raw_inputs,                            //
+    plaidml_expr* sink_idxs,                              //
+    plaidml_expr* sink_sizes,                             //
+    size_t nsrcs,                                         //
+    plaidml_expr** src_idxs,                              //
     const char* name,                                     //
     const char* layout);
 

@@ -200,8 +200,8 @@ TEST(Pattern, MatchBlock) {
 }
 
 TEST(Pattern, Conv1x1s1) {
-  Tensor I("I", LogicalShape(PLAIDML_DATA_INT8, {1, 100, 100, 56}));
-  Tensor K("K", LogicalShape(PLAIDML_DATA_INT8, {1, 1, 56, 56}));
+  auto I = Placeholder(PLAIDML_DATA_INT8, {1, 100, 100, 56}, "I");
+  auto K = Placeholder(PLAIDML_DATA_INT8, {1, 1, 56, 56}, "K");
   std::vector<int64_t> O_dims = {1, 100, 100, 56};
   auto runinfo = Evaluate("conv1x1s1", {lib::Convolution(I, K, O_dims)});
   runinfo.const_inputs = {"K"};
@@ -256,8 +256,8 @@ block([
 }
 
 TEST(Pattern, Conv3x3s1) {
-  Tensor I("I", LogicalShape(PLAIDML_DATA_INT8, {1, 100, 100, 56}));
-  Tensor K("K", LogicalShape(PLAIDML_DATA_INT8, {3, 3, 56, 56}));
+  auto I = Placeholder(PLAIDML_DATA_INT8, {1, 100, 100, 56}, "I");
+  auto K = Placeholder(PLAIDML_DATA_INT8, {3, 3, 56, 56}, "K");
   std::vector<int64_t> O_dims = {1, 100, 100, 56};
   auto runinfo = Evaluate("conv3x3s1", {lib::Convolution(I, K, O_dims)});
   runinfo.const_inputs = {"K"};
@@ -312,8 +312,8 @@ block([
 }
 
 TEST(Pattern, Conv7x7s2) {
-  Tensor I("I", LogicalShape(PLAIDML_DATA_INT8, {1, 224, 224, 3}));
-  Tensor K("K", LogicalShape(PLAIDML_DATA_INT8, {7, 7, 3, 64}));
+  auto I = Placeholder(PLAIDML_DATA_INT8, {1, 224, 224, 3}, "I");
+  auto K = Placeholder(PLAIDML_DATA_INT8, {7, 7, 3, 64}, "K");
   std::vector<int64_t> O_dims = {1, 112, 112, 64};
   auto runinfo = Evaluate("conv7x7s2", {lib::Convolution(I, K, O_dims, {2, 2})});
   runinfo.const_inputs = {"K"};

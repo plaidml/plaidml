@@ -10,10 +10,10 @@
 #include "base/config/config.h"
 #include "base/util/any_factory_map.h"
 #include "base/util/throw.h"
-#include "pmlc/dialect/stripe/transcode.h"
 #include "tile/codegen/alias.h"
 #include "tile/codegen/compile_pass.h"
 #include "tile/codegen/emitc.h"
+#include "tile/codegen/mlir_passes.h"
 
 namespace vertexai {
 namespace tile {
@@ -96,18 +96,6 @@ class ConfigsRegistry {
  private:
   std::unordered_map<std::string, std::string> registry_;
 };
-
-void ConvertToStripe(CompilerState* state) {
-  IVLOG(1, "Converting to Stripe");
-  mlir::FuncOp op = mlir::cast<mlir::FuncOp>(state->module.front());
-  *state->prog = pmlc::dialect::stripe::ToStripe(op);
-  // TODO: Erase
-}
-
-void ConvertToStripeMLIR(CompilerState* state) {
-  IVLOG(1, "Converting to Stripe MLIR");
-  state->module.push_back(pmlc::dialect::stripe::ToStripeMLIR(&state->ctx, *state->prog));
-}
 
 }  // namespace
 

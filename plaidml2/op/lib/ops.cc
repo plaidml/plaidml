@@ -2,6 +2,11 @@
 
 #include "plaidml2/op/lib/ops.h"
 
+#include <algorithm>
+#include <set>
+#include <utility>
+#include <vector>
+
 #include <boost/format.hpp>
 
 #include "base/util/logging.h"
@@ -449,13 +454,19 @@ size_t normalize_axis(int64_t axis, size_t ndims, std::string op_name = "") {
   return axis;
 }
 
-std::pair<TensorDim, TensorDim> compute_padding_and_output_size(const TensorDim& input_size,
-                                                                const TensorDim& filter_size, int64_t stride,
-                                                                AutopadMode autopad_mode, int64_t pad_lo,
-                                                                int64_t pad_hi, int64_t dilation, int64_t data_dilation,
-                                                                bool use_ceil_for_output_shape) {
-  // Effective input and filter sizes are the sizes after dilations are accounted for. So a 4x3 filter dilated by (3, 2)
-  // has an effective filter size of 11 and 5 for its 2 spatial dims
+std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
+    const TensorDim& input_size,                                  //
+    const TensorDim& filter_size,                                 //
+    int64_t stride,                                               //
+    AutopadMode autopad_mode,                                     //
+    int64_t pad_lo,                                               //
+    int64_t pad_hi,                                               //
+    int64_t dilation,                                             //
+    int64_t data_dilation,                                        //
+    bool use_ceil_for_output_shape) {
+  // Effective input and filter sizes are the sizes after dilations are
+  // accounted for. So a 4x3 filter dilated by (3, 2) has an effective filter
+  // size of 11 and 5 for its 2 spatial dims
 
   auto I_eff = (data_dilation * (input_size - 1)) + 1;  // Effective Input Size
   auto F_eff = (dilation * (filter_size - 1)) + 1;      // Effective Filter Size
@@ -841,31 +852,38 @@ Value convolution(const Value& value) {
 
   // Prepare dimension and index variables
   TensorDim N, CI, CO, G;
-  TensorDim F_CI, F_CO;  // The channel dimensions as used by the filters, adjusted for group layout
+  // The channel dimensions as used by the filters, adjusted for group layout
+  TensorDim F_CI, F_CO;
   TensorIndex n("n");
   TensorIndex ci("ci");
   TensorIndex co("co");
   TensorIndex g("g");
-  std::vector<TensorDim> X(spatial_rank);  // The spatial dimensions of I
-  std::vector<TensorIndex> x;              // The spatial indexes of I
+  // The spatial dimensions of I
+  std::vector<TensorDim> X(spatial_rank);
+  // The spatial indexes of I
+  std::vector<TensorIndex> x;
   for (size_t i = 0; i < spatial_rank; ++i) {
     x.emplace_back(TensorIndex(str(boost::format("x%1%") % i)));
   }
-  std::vector<TensorDim> Y(spatial_rank);  // The spatial dimensions of O; nearly unused
-  std::vector<TensorDim> K(spatial_rank);  // The spatial dimensions of F
-  std::vector<TensorIndex> k;              // The spatial indexs of F
+  // The spatial dimensions of O; nearly unused
+  std::vector<TensorDim> Y(spatial_rank);
+  // The spatial dimensions of F
+  std::vector<TensorDim> K(spatial_rank);
+  // The spatial indexs of F
+  std::vector<TensorIndex> k;
   for (size_t i = 0; i < spatial_rank; ++i) {
     k.emplace_back(TensorIndex(str(boost::format("k%1%") % i)));
   }
   std::vector<TensorDim> I_dims;
   std::vector<TensorIndex> I_idxs;
   std::vector<TensorDim> F_dims;
-  std::vector<TensorDim>
-      F_explicit_dims;  // this ensures that the inferred filter shape matches filter_shape if the latter is passed in
+  // this ensures that the inferred filter shape matches filter_shape if the latter is passed in
+  std::vector<TensorDim> F_explicit_dims;
   std::vector<TensorIndex> F_idxs;
   std::vector<TensorDim> O_dims;
   std::vector<TensorIndex> O_idxs;
-  TensorDim G_explicit(groups);  // G may be explicit or automatically set, based on autogroup_mode
+  // G may be explicit or automatically set, based on autogroup_mode
+  TensorDim G_explicit(groups);
   switch (autogroup_mode) {
     case AutogroupMode::EXPLICIT:
     case AutogroupMode::UNGROUPED:
@@ -895,9 +913,10 @@ Value convolution(const Value& value) {
       throw std::runtime_error("Unrecognized AutogroupMode");
   }
 
-  // Set up dimensions of the inputs first so they can be bound
-  // Group layout affects the size of filter dimensions; we pass through the dims that don't need to be adjusted here,
-  // and we will calculate those dimensions that will be adjusted later (after some more dims are bound).
+  // Set up dimensions of the inputs first so they can be bound Group layout
+  // affects the size of filter dimensions; we pass through the dims that don't
+  // need to be adjusted here, and we will calculate those dimensions that will
+  // be adjusted later (after some more dims are bound).
   // TODO: This needs more thorough test converage
   switch (group_layout) {
     case GroupLayout::NONE:
@@ -988,8 +1007,8 @@ Value convolution(const Value& value) {
 
   // The output data dims
   if (deriv_mode != ConvDerivMode::NONE) {
-    // This assumes we infer the output layout from the input layout. So if we change that, the output data dims section
-    // will need to be adapted.
+    // This assumes we infer the output layout from the input layout. So if we
+    // change that, the output data dims section will need to be adapted.
     switch (input_layout) {
       case TensorLayout::NCX:
         O_dims.push_back(N);
@@ -1045,8 +1064,8 @@ Value convolution(const Value& value) {
   // Now set up the dimensions of the result to be returned
   switch (deriv_mode) {
     case ConvDerivMode::NONE:
-      // This assumes we infer the output layout from the input layout. So if we change that, the below switch will need
-      // to be adapted.
+      // This assumes we infer the output layout from the input layout. So if we
+      // change that, the below switch will need to be adapted.
       switch (input_layout) {
         case TensorLayout::NCX:
           O_dims.push_back(N);
@@ -1205,8 +1224,8 @@ Value convolution(const Value& value) {
   }
 
   // Output data indexes
-  // This assumes we infer the output layout from the input layout. So if we change that, the below switch will need to
-  // be adapted.
+  // This assumes we infer the output layout from the input layout. So if we
+  // change that, the below switch will need to be adapted.
   switch (input_layout) {
     case TensorLayout::NCX:
       O_idxs.push_back(n);
@@ -1237,13 +1256,13 @@ Value convolution(const Value& value) {
   // Return the contraction
   switch (deriv_mode) {
     case ConvDerivMode::NONE:
-      O(O_idxs) += (I(I_idxs) * F(F_idxs));
+      O(O_idxs) += I(I_idxs) * F(F_idxs);
       return Value{O};
     case ConvDerivMode::DATA:
-      I(I_idxs) += (O(O_idxs) * F(F_idxs));
+      I(I_idxs) += O(O_idxs) * F(F_idxs);
       return Value{I};
     case ConvDerivMode::FILTER:
-      F(F_idxs) += (I(I_idxs) * O(O_idxs));
+      F(F_idxs) += I(I_idxs) * O(O_idxs);
       return Value{F};
     default:
       throw std::runtime_error("Unrecognized deriv_mode");
@@ -1740,11 +1759,14 @@ Value pool(const Value& value) {
   //    6. Layout (i.e. Channel Order) (minimally NXC v NCX)
   //    7. Include Padding in Avg Computation (bool)
   //    8. Ceil Mode (i.e. as in ONNX)
-  // n.b. We determine the number of spatial dimensions from the Pool Size and confirm it is consistent with other
-  // parameters that imply a spatial dimension size, specifically strides. We do also check this against the input
-  // tensor shape and the manual padding, but these are less strict: manual padding may omit some padding values
-  // (which are then assumed to be 0), and the input tensor shape may have multiple channel dimensions (i.e. for
-  // cases like tensors going into or coming out of grouped convolutions).
+  //
+  // N.B. We determine the number of spatial dimensions from the Pool Size and
+  // confirm it is consistent with other parameters that imply a spatial
+  // dimension size, specifically strides. We do also check this against the
+  // input tensor shape and the manual padding, but these are less strict:
+  // manual padding may omit some padding values (which are then assumed to be
+  // 0), and the input tensor shape may have multiple channel dimensions (i.e.
+  // for cases like tensors going into or coming out of grouped convolutions).
 
   // Read arguments
   auto args = value.as_tuple();
@@ -1857,9 +1879,10 @@ Value pool(const Value& value) {
       auto One = Tensor{1};
       auto Ones = TensorOutput(I_dims);
       auto Count = TensorOutput(O_dims);
-      // Note: O_idxs is used in both cases b/c both need indexes of the form x0, x1, ...
-      // However, they do not represent the same index values (and notably do not interate
-      // over the same size of dimensions as I_dims != O_dims)
+      // Note: O_idxs is used in both cases b/c both need indexes of the form
+      // x0, x1, ... However, they do not represent the same index values (and
+      // notably do not interate over the same size of dimensions as I_dims !=
+      // O_dims)
       Ones(O_idxs) = One(std::vector<TensorIndex>());
       Count(O_idxs) += Ones(I_idxs);
       return Value{O / Count};
@@ -1896,7 +1919,8 @@ Value relu(const Value& value) {
 Value repeat(const Value& value) {
   IVLOG(1, "repeat");
   // This is numpy-style `repeat`; Keras calls it `repeat_elements`
-  // This is more limited than in numpy (both repeats & axis required, both must be ints)
+  // This is more limited than in numpy (both repeats & axis required, both must
+  // be ints)
 
   // Read arguments
   auto args = value.as_tuple();
@@ -2503,7 +2527,8 @@ Value transpose(const Value& value) {
 }
 
 Value variance(const Value& value) {
-  // This computes the *uncorrected* sample variance (i.e. denominator = n rather than = n-1) to match tensorflow
+  // This computes the *uncorrected* sample variance (i.e. denominator = n
+  // rather than = n-1) to match tensorflow
   IVLOG(1, "variance");
   auto args = value.as_tuple();
   if (args.size() != 3) {

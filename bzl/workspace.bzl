@@ -168,9 +168,9 @@ def plaidml_workspace():
 
     dev_http_archive(
         name = "mlir",
-        url = "https://github.com/plaidml/mlir/archive/4fcc9e1d9f8797a26512de1c640e46d24e07831c.zip",
-        sha256 = "73cc16075b4190e739ada30e1338765590cfeb84588d057345de597ad3e36e48",
-        strip_prefix = "mlir-4fcc9e1d9f8797a26512de1c640e46d24e07831c",
+        url = "https://github.com/plaidml/mlir/archive/68490b2de514d5c897335bce2948cd73230a2719.zip",
+        sha256 = "d659ed13f15ea05e65247ded6939a377271ab97015ad3a7814a09401006a5cf2",
+        strip_prefix = "mlir-68490b2de514d5c897335bce2948cd73230a2719",
         build_file = Label("//vendor/mlir:mlir.BUILD"),
     )
 
