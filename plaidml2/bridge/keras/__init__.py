@@ -191,6 +191,8 @@ class _KerasNode(object):
         logger.debug('{}(self: {}, other: {})'.format(op, self, other))
         if isinstance(other, _KerasNode):
             other = other.tensor
+        if isinstance(other, np.ndarray):
+            other = variable(other).tensor
         return _KerasNode(op, tensor=fn(self.tensor, other))
 
 
@@ -590,7 +592,15 @@ def elu(x, alpha=1.0):
 
 def equal(x, y):
     logger.debug('equal(x: {}, y: {})'.format(x, y))
-    return _KerasNode('equal', tensor=(x.tensor == y.tensor))
+    if isinstance(x, _KerasNode):
+        x = x.tensor
+    if isinstance(x, np.ndarray):
+        x = variable(x).tensor
+    if isinstance(y, _KerasNode):
+        y = y.tensor
+    if isinstance(y, np.ndarray):
+        y = variable(y).tensor
+    return _KerasNode('equal', tensor=(x == y))
 
 
 def exp(x):
@@ -815,11 +825,15 @@ def ndim(x):
 
 def not_equal(lhs, rhs):
     logger.debug('not_equal(lhs: {}, rhs: {})'.format(lhs, rhs))
+    if isinstance(lhs, _KerasNode):
+        lhs = lhs.tensor
+    if isinstance(lhs, np.ndarray):
+        lhs = variable(lhs).tensor
     if isinstance(rhs, _KerasNode):
-        O = lhs.tensor != rhs.tensor
-        return _KerasNode('not_equal', tensor=O)
-    O = lhs.tensor != rhs
-    return _KerasNode('not_equal', tensor=O)
+        rhs = rhs.tensor
+    if isinstance(rhs, np.ndarray):
+        rhs = variable(rhs).tensor
+    return _KerasNode('not_equal', tensor=(lhs != rhs))
 
 
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
@@ -1067,7 +1081,9 @@ def sigmoid(x):
 
 
 def sign(x):
-    _report_unimplemented('sign')
+    logger.debug('sign(x: {})'.format(x))
+    intermediate = _KerasNode('sign_intermediate', tensor=edsl.select((x > 0).tensor, 1., -1.))
+    return _KerasNode('sign', tensor=edsl.select((x.tensor == 0.), 0., intermediate.tensor))
 
 
 def sin(x):

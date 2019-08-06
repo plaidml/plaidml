@@ -665,24 +665,48 @@ class TestBackendOps(unittest.TestCase):
         return b.equal(b.variable(m(3, 3)), b.variable(m(3, 3)))
 
     @compareForwardExact()
+    def testEqualVersusNumeric(self, b):
+        return b.equal(b.variable(m(3, 3)), m(3, 3))
+
+    @compareForwardExact()
     def testNotEqual(self, b):
         return b.not_equal(b.variable(m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testNotEqualVersusNumeric(self, b):
+        return b.not_equal(b.variable(m(3, 3)), m(3, 3))
 
     @compareForwardExact()
     def testLess(self, b):
         return b.less(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
     @compareForwardExact()
+    def testLessVersusNumeric(self, b):
+        return b.less(b.variable(2 * m(3, 3)), m(3, 3))
+
+    @compareForwardExact()
     def testLessEqual(self, b):
         return b.less_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testLessEqualVersusNumeric(self, b):
+        return b.less_equal(b.variable(2 * m(3, 3)), m(3, 3))
 
     @compareForwardExact()
     def testGreater(self, b):
         return b.greater(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
     @compareForwardExact()
+    def testGreaterVersusNumeric(self, b):
+        return b.greater(b.variable(2 * m(3, 3)), m(3, 3))
+
+    @compareForwardExact()
     def testGreaterEqual(self, b):
         return b.greater_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testGreaterEqualVersusNumeric(self, b):
+        return b.greater_equal(b.variable(2 * m(3, 3)), m(3, 3))
 
     @opTest([[m(3, 3) - 0.0001]])
     def testAbs(self, b, x):
