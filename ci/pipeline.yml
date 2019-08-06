@@ -21,6 +21,9 @@ steps:
     command: |
       {{python}} -m pip install pyyaml --user
       {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}}
+  {{#softfail}}
+    soft_fail: true
+  {{/softfail}}
     timeout_in_minutes: {{timeout}}
   {{#retry}}
     retry:
