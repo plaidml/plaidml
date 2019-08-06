@@ -213,7 +213,7 @@ def _make_rng_state(seed=None):
     return rng_state
 
 
-def _normalize_axis(axis, ndims, name = ""):
+def _normalize_axis(axis, ndims, name=""):
     negative_axis_given = False
     if axis < 0:
         axis += ndims
@@ -225,7 +225,9 @@ def _normalize_axis(axis, ndims, name = ""):
             name_str = "for {} op ".format(name)
         else:
             name_str = ""
-        raise RuntimeError("Axis out of range {}(axis {} requested for tensors with {} dimensions)".format(name_str, axis, ndims))
+        raise RuntimeError(
+            "Axis out of range {}(axis {} requested for tensors with {} dimensions)".format(
+                name_str, axis, ndims))
     return axis
 
 
@@ -1200,7 +1202,6 @@ def softmax(x):
     logger.debug('softmax(x: {})'.format(x))
     y = plaidml_op.softmax(x.tensor, axis=x.tensor.shape.ndims - 1)
     return _KerasNode('softmax', tensor=y)
-
 
 
 def softmax(x, axis=None, name=None):
