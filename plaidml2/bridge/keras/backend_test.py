@@ -720,9 +720,19 @@ class TestBackendOps(unittest.TestCase):
     def testSqrt(self, b, x):
         return [b.sqrt(x)]
 
-    @opTest([[np.sqrt(m(5, 5, 10) + 2) - 3], [np.sin(m(4, 3, 2, 1, 6))]], 1e-02, skip_theano=True)
+    @opTest(
+        [
+            [m(1, 2, 1)],
+            #[np.sqrt(m(5, 5, 10) + 2) - 3],
+            #[np.sin(m(4, 3, 2, 1, 6))]
+        ],
+        1e-02,
+        skip_theano=True)
     def testSoftmax(self, b, x):
-        return [-b.log(b.softmax(x))]
+        return [
+            -b.log(b.softmax(x)),
+            -b.log(b.softmax(x, axis=1)),
+        ]
 
     @opTest([[m(1, 3, 4)], [m(7, 19) - 10.]])
     def testSoftsign(self, b, x):
