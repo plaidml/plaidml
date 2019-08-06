@@ -15,6 +15,12 @@ def ScalarConstantOp :
   let results = (outs ScalarType:$result);
 
   let builders = [OpBuilder<
+    "Builder* builder, OperationState* result, double value", [{
+      auto type = builder->getF32Type();
+      result->addTypes(type);
+      auto attr = builder->getFloatAttr(type, value);
+      result->addAttribute("value", attr);
+  }]>, OpBuilder<
     "Builder* builder, OperationState* result, ScalarType type, Attribute value", [{
       result->addAttribute("value", value);
       result->addTypes(type);

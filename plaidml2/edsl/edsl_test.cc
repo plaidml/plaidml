@@ -54,6 +54,13 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
+TEST(CppEdsl, Dot) {
+  Tensor input(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 784}));
+  Tensor kernel1(LogicalShape(PLAIDML_DATA_FLOAT32, {784, 512}));
+  Program program("dot", {Dot(input, kernel1)});
+  IVLOG(1, program);
+}
+
 TEST(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
   Tensor input(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 784}));

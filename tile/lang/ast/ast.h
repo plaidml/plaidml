@@ -50,12 +50,12 @@ using PolyExprPtr = std::shared_ptr<PolyExpr>;
 template <typename T>
 struct AstVisitor {
   virtual ~AstVisitor() = default;
-  virtual T Visit(const CallExpr& expr) = 0;
-  virtual T Visit(const ContractionExpr& expr) = 0;
-  virtual T Visit(const DimExprExpr& expr) = 0;
-  virtual T Visit(const FloatConst& expr) = 0;
-  virtual T Visit(const IntConst& expr) = 0;
-  virtual T Visit(const ParamExpr& expr) = 0;
+  virtual T Visit(const CallExpr& expr) = 0;         // CallOp
+  virtual T Visit(const ContractionExpr& expr) = 0;  // ContractionOp
+  virtual T Visit(const DimExprExpr& expr) = 0;      // DimOp
+  virtual T Visit(const FloatConst& expr) = 0;       // ScalarConstantOp
+  virtual T Visit(const IntConst& expr) = 0;         // ScalarConstantOp
+  virtual T Visit(const ParamExpr& expr) = 0;        // DeclOp
 };
 
 struct LogicalDim {

@@ -66,14 +66,18 @@ TEST(HIR, Basic) {
   func.addEntryBlock();
 
   OpBuilder builder(func.getBody());
+  ConstantFloatOp ff1;
   {
     edsc::ScopedContext scope(builder, loc);
-    auto f1 = builder.create<ConstantFloatOp>(loc, llvm::APFloat(7.0f), f32);
+    ConstantFloatOp f1 = builder.create<ConstantFloatOp>(loc, llvm::APFloat(7.0f), f32);
+    ff1 = f1;
+  }
+  {
     // auto f2 = builder.create<ConstantFloatOp>(loc, llvm::APFloat(3.14f), f32);
     // auto cion = builder.create<ContractionOp>(loc);
     // auto ret = builder.create<AddFOp>(loc, f1, f2);
     // builder.create<ReturnOp>(loc, ret.getResult());
-    builder.create<ReturnOp>(loc, f1.getResult());
+    builder.create<ReturnOp>(loc, ff1.getResult());
   }
 
   module.push_back(func);

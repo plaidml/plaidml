@@ -41,6 +41,7 @@ plaidml_cc_library(
         "//tile/lang",
         "@boost",
         "@llvm//:support",
+        "@mlir//:AffineOps",
         "@mlir//:IR",
         "@mlir//:StandardOps",
     ],
