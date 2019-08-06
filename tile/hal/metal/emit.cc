@@ -10,7 +10,7 @@
 #define QUAD_GROUP
 
 #if defined(SIMD_GROUP) && defined(QUAD_GROUP)
-#error *** Cannot define both SIMD_GROUP and QUAD_GROUP. ***
+#error Cannot define both SIMD_GROUP and QUAD_GROUP.
 #endif
 
 #ifdef SIMD_GROUP
@@ -24,7 +24,7 @@
 #endif
 
 #if !defined(BROADCAST)
-#error *** BROADCAST is not defined. ***
+#error BROADCAST is not defined.
 #endif
 
 namespace vertexai {
@@ -208,11 +208,32 @@ class Emitter : public sem::Visitor {
     switch (node.function) {
       case sem::CallExpr::Function::CEIL:
       case sem::CallExpr::Function::FLOOR: {
-        emit(node.name);
-        emit("((float)(");
         assert(1 == node.vals.size());
-        node.vals[0]->Accept(*this);
-        emit("))");
+        emit(node.name);
+        emit("(");
+        auto val_type = TypeOf(node.vals[0]);
+        auto need_type = val_type;
+        switch (need_type.dtype) {
+          case DataType::BOOLEAN:
+          case DataType::INT8:
+          case DataType::INT16:
+          case DataType::UINT8:
+          case DataType::UINT16:
+            need_type.dtype = DataType::FLOAT16;
+            break;
+          case DataType::INT32:
+          case DataType::UINT32:
+            need_type.dtype = DataType::FLOAT32;
+            break;
+          case DataType::INT64:
+          case DataType::UINT64:
+            need_type.dtype = DataType::FLOAT64;
+            break;
+          default:
+            break;
+        }
+        EmitWithTypeConversion(val_type, need_type, node.vals[0], false);
+        emit(")");
       } break;
       default: {
         if (node.name == "sub_group_broadcast") {
