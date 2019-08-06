@@ -19,7 +19,7 @@ CONST:
     rx480:       5950.39
     r9nano:      8077.04
     vega:       12697.10
-    wx9100:     11300.84
+    gfx900:     11300.84
     gfx803:      3573.79
     # mali
     t628:          34.05
@@ -46,8 +46,6 @@ PLATFORMS:
     variant: linux_x86_64
   keras-plaid-ocl-t628:
     variant: linux_arm_32v7
-  keras-plaid-ocl-vega:
-    variant: linux_x86_64
   keras-plaid-mtl-gt650m:
     variant: macos_x86_64
   keras-plaid-mtl-hd4000:
@@ -76,13 +74,13 @@ PLATFORMS:
     variant: linux_x86_64
   keras-tf-cuda-gp100gl:
     variant: linux_x86_64
-  keras-plaid-ocl-wx9100:
+  keras-plaid-ocl-gfx900:
+    variant: linux_x86_64
+  keras-stripe-ocl-gfx900:
     variant: linux_x86_64
   keras-stripe-ocl-gp100gl:
     variant: linux_x86_64
   keras-stripe-ocl-gv100gl:
-    variant: linux_x86_64
-  keras-stripe-ocl-wx9100:
     variant: linux_x86_64
   keras-stripe-ocl-neo:
     variant: linux_x86_64
@@ -158,9 +156,9 @@ SUITES:
         pipelines: [nightly]
       keras-stripe-mtl-uhd630:
         pipelines: [nightly, stripe]
-      keras-plaid-ocl-wx9100:
+      keras-plaid-ocl-gfx900:
         pipelines: [plaidml, nightly]
-      keras-stripe-ocl-wx9100:
+      keras-stripe-ocl-gfx900:
         pipelines: [unstable, stripe]
       keras-plaid-ocl-gv100gl:
         pipelines: [plaidml, nightly]
@@ -171,8 +169,6 @@ SUITES:
       keras-stripe-ocl-gp100gl:
         pipelines: [unstable]
       keras-stripe-ocl-gv100gl:
-        pipelines: [unstable]
-      keras-stripe-ocl-wx9100:
         pipelines: [unstable]
       keras-stripe-ocl-neo:
         pipelines: [plaidml]
@@ -219,8 +215,10 @@ SUITES:
       keras-tf-cuda-gp100gl:
         pipelines: [nightly]
         append_args: [--tensorflow]
-      keras-plaid-ocl-wx9100:
+      keras-plaid-ocl-gfx900:
         pipelines: [plaidml, nightly, train]
+      keras-stripe-ocl-gfx900:
+        pipelines: [unstable]
       keras-plaid-mtl-uhd630:
         pipelines: [plaidml, nightly, train]
       keras-stripe-mtl-uhd630:
@@ -234,8 +232,6 @@ SUITES:
       keras-stripe-ocl-gp100gl:
         pipelines: [unstable]
       keras-stripe-ocl-gv100gl:
-        pipelines: [unstable]
-      keras-stripe-ocl-wx9100:
         pipelines: [unstable]
       keras-stripe-ocl-neo:
         pipelines: [plaidml]
