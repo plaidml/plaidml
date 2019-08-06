@@ -29,6 +29,14 @@ def argmax(x, axis=-1):
     return op('argmax', [x, axis]).as_tensor()
 
 
+def binary_crossentropy(targets, preds, epsilon):
+    return op('binary_crossentropy', [targets, preds, epsilon]).as_tensor()
+
+
+def clip(x, min=None, max=None):
+    return op('clip', [x, min, max]).as_tensor()
+
+
 def concatenate(tensors, axis=-1):
     return op('concatenate', [tensors, axis]).as_tensor()
 
@@ -55,12 +63,32 @@ def convolution(I, F, strides, dilations, data_dilations, filter_shape, groups, 
     ]).as_tensor()
 
 
+def cumprod(x, axis):
+    return op('cumprod', [x, axis]).as_tensor()
+
+
+def cumsum(x, axis):
+    return op('cumsum', [x, axis]).as_tensor()
+
+
 def dot(x, y):
     return op('dot', [x, y]).as_tensor()
 
 
+def elu(x, alpha=1.0):
+    return op('elu', [x, alpha]).as_tensor()
+
+
 def expand_dims(x, axis=-1):
     return op('expand_dims', [x, axis]).as_tensor()
+
+
+def flip(x, axis=None):
+    return op('flip', [x, axis]).as_tensor()
+
+
+def hard_sigmoid(x, slope):
+    return op('hard_sigmoid', [x, slope]).as_tensor()
 
 
 def max(x, axis=None, keepdims=False):
@@ -69,10 +97,10 @@ def max(x, axis=None, keepdims=False):
     return op('max', [x, axis, keepdims]).as_tensor()
 
 
-def mean(I, axis=None, keepdims=False):
+def mean(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
-    return op('mean', [I, axis, keepdims]).as_tensor()
+    return op('mean', [x, axis, keepdims]).as_tensor()
 
 
 def min(x, axis=None, keepdims=False):
@@ -85,8 +113,22 @@ def relu(x, alpha=None, max_value=None, threshold=0.):
     return op('relu', [x, alpha, max_value, threshold]).as_tensor()
 
 
+def repeat(x, repeats, axis):
+    return op('repeat', [x, repeats, axis]).as_tensor()
+
+
+def sigmoid(x):
+    return op('sigmoid', [x]).as_tensor()
+
+
 def softmax(x, axis=None):
     return op('softmax', [x, axis]).as_tensor()
+
+
+def prod(x, axis=None, keepdims=False):
+    if isinstance(axis, np.ndarray):
+        axis = axis.tolist()
+    return op('prod', [x, axis, keepdims]).as_tensor()
 
 
 def pool(I, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,

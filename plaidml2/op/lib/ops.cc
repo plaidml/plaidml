@@ -488,12 +488,67 @@ Value argmax(const Value& value) {
   return Value{O};
 }
 
+// TODO: Handle function forward declaration in a nice style
+Value clip(const Value& value);  // binary xentropy needs to know about clip
+Value binary_crossentropy(const Value& value) {
+  IVLOG(1, "binary_crossentropy")
+  auto args = value.as_tuple();
+
+  // Read arguments
+  if (args.size() != 3) {
+    throw std::runtime_error("binary_crossentropy expects 3 arguments");
+  }
+  auto T = args[0].as_tensor();  // Targets Tensor
+  auto raw_P = args[1];          // Predictions tensor Value, before clipping
+  auto epsilon = args[2].as_float();
+
+  // Check args & set useful values
+  if (epsilon < 0. || epsilon >= 0.5) {
+    throw std::runtime_error(str(
+        boost::format("The epsilon used in binary_crossentropy must be between 0 and 0.5, received %1%") % epsilon));
+  }
+  std::vector<Value> clip_inputs{raw_P, Value{epsilon}, Value{1. - epsilon}};
+  auto P = clip(Value{clip_inputs}).as_tensor();
+  auto O = -T * log(P) - (1 - T) * log(1 - P);
+  return Value{O};
+}
+
+Value clip(const Value& value) {
+  IVLOG(1, "clip");
+  auto args = value.as_tuple();
+
+  // Read arguments
+  if (args.size() != 3) {
+    throw std::runtime_error("clip expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto raw_min = args[1];
+  auto raw_max = args[2];
+
+  // auto ndims = I.shape().ndims();
+  // std::vector<TensorDim> I_dims(ndims);
+  // I.bind_dims(I_dims);
+  auto O = I;
+  if (!raw_min.is_none()) {
+    auto min = raw_min.as_tensor();
+    O = select(O > min, O, min);
+  }
+  if (!raw_max.is_none()) {
+    auto max = raw_max.as_tensor();
+    O = select(O < max, O, max);
+  }
+  return Value{O};
+}
+
 Value concatenate(const Value& value) {
   // TODO: Make errors nicer (e.g. when bind_dims fails)
   IVLOG(1, "concatenate")
 
   // Read Arguments
   auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("concatenate expects 2 arguments");
+  }
   auto tensor_vals = args[0].as_tuple();
   auto raw_axis = args[1].as_int();
 
@@ -1094,6 +1149,56 @@ Value convolution(const Value& value) {
   }
 }
 
+Value cumprod(const Value& value) {
+  IVLOG(1, "cumprod");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("cumprod expects 2 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  auto axis = normalize_axis(raw_axis, ndims, "cumprod");
+  std::vector<TensorDim> dims(ndims);
+  I.bind_dims(dims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  std::vector<TensorIndex> O_idxs(I_idxs);
+  TensorIndex cumulator_idx;
+  I_idxs[axis] = I_idxs[axis] - cumulator_idx;
+  auto O = TensorOutput(dims);
+  if (cumulator_idx < dims[axis]) {
+    O(O_idxs) *= I(I_idxs);
+  }
+  return Value{O};
+}
+
+Value cumsum(const Value& value) {
+  IVLOG(1, "cumsum");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("cumsum expects 2 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  auto axis = normalize_axis(raw_axis, ndims, "cumsum");
+  std::vector<TensorDim> dims(ndims);
+  I.bind_dims(dims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  std::vector<TensorIndex> O_idxs(I_idxs);
+  TensorIndex cumulator_idx;
+  I_idxs[axis] = I_idxs[axis] - cumulator_idx;
+  auto O = TensorOutput(dims);
+  if (cumulator_idx < dims[axis]) {
+    O(O_idxs) += I(I_idxs);
+  }
+  return Value{O};
+}
+
 Value dot(const Value& value) {
   IVLOG(1, "dot");
   auto args = value.as_tuple();
@@ -1147,6 +1252,29 @@ Value dot(const Value& value) {
                                X_shape.ndims() % Y_shape.ndims()));
 }
 
+Value elu(const Value& value) {
+  IVLOG(1, "elu");
+
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(str(boost::format("PlaidML elu op expects 2 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+
+  // Same algorithm, but alpha may be either int or float
+  if (args[1].is_float()) {
+    auto alpha = args[1].as_float();
+    auto O = select(I < 0, alpha * exp(I) - alpha, I);
+    return Value{O};
+  } else if (args[1].is_int()) {
+    auto alpha = args[1].as_int();
+    auto O = select(I < 0, alpha * exp(I) - alpha, I);
+    return Value{O};
+  }
+  throw std::runtime_error("Unexpected type for alpha in elu");
+}
+
 Value expand_dims(const Value& value) {
   IVLOG(1, "expand_dims");
 
@@ -1184,6 +1312,68 @@ Value expand_dims(const Value& value) {
   }
   auto O = TensorOutput(O_dims);
   O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
+Value flip(const Value& value) {
+  IVLOG(1, "flip");
+  // This is numpy-style `flip`; Keras calls it `repeat`
+
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(str(boost::format("PlaidML flip op expects 2 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+  std::vector<int64_t> raw_axes;
+  // Hold off on reading the axis arg
+
+  // Set up useful variables
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  if (args[1].is_int()) {
+    raw_axes.push_back(args[1].as_int());
+  } else if (args[1].is_none()) {
+    for (int64_t i = 0; i < ndims; ++i) {
+      raw_axes.push_back(i);
+    }
+  } else {
+    raw_axes = args[1].as_int_tuple();
+  }
+  std::vector<size_t> axes;
+  for (auto& raw_axis : raw_axes) {
+    axes.push_back(normalize_axis(raw_axis, ndims, "flip"));
+  }
+
+  // Perform the flip
+  std::vector<TensorDim> dims(ndims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  std::vector<TensorIndex> O_idxs(I_idxs);
+  I.bind_dims(dims);
+  for (const auto& axis : axes) {
+    O_idxs[axis] = dims[axis] - 1 - I_idxs[axis];
+  }
+  auto O = TensorOutput(dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
+Value hard_sigmoid(const Value& value) {
+  IVLOG(1, "hard_sigmoid");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("hard_sigmoid expects 2 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto slope = args[1].as_float();
+  if (slope <= 0) {
+    throw std::runtime_error(str(boost::format("hard_sigmoid expects positive slope, received %1%") % slope));
+  }
+  auto hi_cusp = 1. / (2. * slope);
+  auto lo_cusp = -hi_cusp;
+  auto lo = Tensor(0.);
+  auto hi = Tensor(1.);
+  auto O = select(I < lo_cusp, lo, select(I > hi_cusp, hi, slope * I + 0.5));
   return Value{O};
 }
 
@@ -1227,7 +1417,7 @@ Value mean(const Value& value) {
     return Value{I};
   }
 
-  auto keepdims = args[2].as_int();
+  auto keepdims = args[2].as_bool();
 
   AggregationAxes agg(I_shape.ndims(), axes, keepdims);
 
@@ -1255,6 +1445,38 @@ Value min(const Value& value) {
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
   O(agg.dst_idxs) <= I(agg.src_idxs);
+  return Value{O};
+}
+
+Value prod(const Value& value) {
+  IVLOG(1, "prod");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("prod expects 3 arguments");
+  }
+
+  auto I = args[0].as_tensor();
+  auto raw_axes = args[1];
+  auto keepdims = args[2].as_bool();
+
+  auto I_shape = I.shape();
+  if (I_shape.ndims() == 0) {
+    return Value{I};
+  }
+  if (raw_axes.is_tuple() && raw_axes.as_tuple().empty()) {
+    return Value{I};
+  }
+
+  // TODO: Move this commented block to Keras?
+  // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
+  //   I = cast(I, floatx());  // TODO: cast if * is not && for bools, don't if it is &&
+  // }
+
+  AggregationAxes agg(I_shape.ndims(), raw_axes, keepdims);
+
+  I.bind_dims(agg.src_dims);
+  auto O = TensorOutput(agg.dst_dims);
+  O(agg.dst_idxs) *= I(agg.src_idxs);
   return Value{O};
 }
 
@@ -1419,6 +1641,51 @@ Value relu(const Value& value) {
     auto M = max_value.as_tensor();
     O = select(O < M, O, M);
   }
+  return Value{O};
+}
+
+Value repeat(const Value& value) {
+  IVLOG(1, "repeat");
+  // This is numpy-style `repeat`; Keras calls it `repeat_elements`
+  // This is more limited than in numpy (both repeats & axis required, both must be ints)
+
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error(str(boost::format("PlaidML repeat op expects 3 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+  auto repeats = args[1].as_int();
+  auto raw_axis = args[2].as_int();
+
+  // Set up useful variables
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  auto axis = normalize_axis(raw_axis, ndims, "repeat");
+
+  std::vector<TensorDim> I_dims(ndims);
+  I.bind_dims(I_dims);
+  std::vector<TensorDim> O_dims(I_dims);
+  O_dims[axis] = repeats * I_dims[axis];
+  std::vector<TensorIndex> I_idxs(ndims);
+  std::vector<TensorIndex> O_idxs(I_idxs);
+  TensorIndex inner;
+  O_idxs[axis] = repeats * I_idxs[axis] + inner;
+  auto O = TensorOutput(O_dims);
+  if (inner < repeats) {
+    O(O_idxs) = I(I_idxs);
+  }
+  return Value{O};
+}
+
+Value sigmoid(const Value& value) {
+  IVLOG(1, "sigmoid");
+  auto args = value.as_tuple();
+  if (args.size() != 1) {
+    throw std::runtime_error("sigmoid expects 1 argument");
+  }
+  auto I = args[0].as_tensor();
+  auto O = 1.0 / (1.0 + exp(-I));
   return Value{O};
 }
 
@@ -1756,7 +2023,7 @@ Value sum(const Value& value) {
     return Value{I};
   }
 
-  auto keepdims = args[2].as_int();
+  auto keepdims = args[2].as_bool();
 
   AggregationAxes agg(I_shape.ndims(), axes, keepdims);
 
@@ -1867,7 +2134,7 @@ Value variance(const Value& value) {
   // Read arguments
   auto I = args[0].as_tensor();
   auto axes = args[1];
-  auto keepdims = args[2].as_int();
+  auto keepdims = args[2].as_bool();
 
   // Handle trivial cases
   if (I.shape().ndims() == 0) {
@@ -1902,15 +2169,25 @@ void RegisterOps() {
   auto registry = OperationRegistry::Instance();
   registry->Register("abs", abs);
   registry->Register("argmax", argmax);
+  registry->Register("binary_crossentropy", binary_crossentropy);
+  registry->Register("clip", clip);
   registry->Register("concatenate", concatenate);
   registry->Register("convolution", convolution);
+  registry->Register("cumprod", cumprod);
+  registry->Register("cumsum", cumsum);
   registry->Register("dot", dot);
+  registry->Register("elu", elu);
   registry->Register("expand_dims", expand_dims);
-  registry->Register("min", min);
-  registry->Register("mean", mean);
+  registry->Register("flip", flip);
+  registry->Register("hard_sigmoid", hard_sigmoid);
   registry->Register("max", max);
+  registry->Register("mean", mean);
+  registry->Register("min", min);
   registry->Register("pool", pool);
+  registry->Register("prod", prod);
   registry->Register("relu", relu);
+  registry->Register("repeat", repeat);
+  registry->Register("sigmoid", sigmoid);
   registry->Register("softmax", softmax);
   registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);
