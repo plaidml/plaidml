@@ -1002,6 +1002,7 @@ def reset_uids():
 
 
 def reshape(x, dims):
+    # TODO: This needs to be more thoroughly tested with symbolic shapes
     logger.debug('reshape(x: {}, dims: {})'.format(x, dims))
     dims = list(dims)
     I = x.tensor
@@ -1056,7 +1057,7 @@ def reshape(x, dims):
 
         num = 1
         syms = defaultdict(int)
-        for idx, dim in enumerate(I.shape.dims):    # TODO: Hopefully the Keras dims with None if symbolic
+        for idx, dim in enumerate(I.shape.int_dims):
             if dim is None:
                 syms[I_dims[idx]] += 1
             else:
