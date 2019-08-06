@@ -313,7 +313,7 @@ class Tensor(ForeignObject):
         elif isinstance(value, Tensor):
             pass
         elif isinstance(value._impl, _TensorSpec):
-            # ASSIGN contraction
+            # Unary ASSIGN contraction
             self._set_contraction(
                 _Contraction(
                     lib.PLAIDML_AGG_OP_ASSIGN,
@@ -322,8 +322,19 @@ class Tensor(ForeignObject):
                     [value._impl],
                     self._name,
                 ))
+        elif isinstance(value._impl, _ContractionPart):
+            # Binary or ternary ASSIGN contraction
+            self._set_contraction(
+                _Contraction(
+                    lib.PLAIDML_AGG_OP_ASSIGN,
+                    value._impl.op,
+                    _TensorSpec(self, key, self._dims),
+                    [x._impl for x in value._impl.args],
+                    self._name,
+                ))
         else:
-            raise ValueError('Invalid impl')
+            raise ValueError('Invalid impl when assigning to a Tensor (Type: {})'.format(
+                type(value._impl)))
 
     def _set_contraction(self, cion):
         self._is_contraction = True
@@ -560,6 +571,10 @@ def cast(x, dtype):
     return call("as_{}".format(dtype.info.base), x, dtype.info.bitwidth)
 
 
+def ceil(x):
+    return call("ceil", x)
+
+
 # def element(x) : return call("element", {x}) # TODO: tuple
 
 
@@ -573,6 +588,10 @@ def cos(x):
 
 def exp(x):
     return call("exp", x)
+
+
+def floor(x):
+    return call("floor", x)
 
 
 def gather(x, y):
@@ -590,6 +609,10 @@ def gradients(loss, variables):
         raw_grads,
     )
     return [Tensor(expr=x) for x in raw_grads]
+
+
+def ident(x):
+    return call("ident", x)
 
 
 def index(x, axis):
@@ -618,6 +641,10 @@ def prng(state, shape):
 
 def reshape(x, dims):
     return call("reshape", x, *dims)
+
+
+def round(x):
+    return call("round", x)
 
 
 def scatter(x, y, z):

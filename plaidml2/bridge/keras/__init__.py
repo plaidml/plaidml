@@ -1,6 +1,8 @@
 # Copyright 2019 Intel Corporation.
 
+import functools
 import logging
+import math
 import os
 from collections import defaultdict
 from contextlib import contextmanager
@@ -27,6 +29,8 @@ _NAME_SCOPE_STACK = []
 
 _CONV_DATA_FORMAT = ['channels_first', 'channels_last']
 
+_in_train_phase = None  # Will be initialized on first use
+
 _device = plaidml_settings.get('PLAIDML_DEVICE')
 _target = plaidml_settings.get('PLAIDML_TARGET')
 
@@ -38,6 +42,24 @@ def _prepend_name_scope(name, default):
         r = '_'.join(_NAME_SCOPE_STACK + [default])
         r += '_' + str(get_uid(r))
     return r
+
+
+def _normalize_axis(axis, ndims, name=""):
+    negative_axis_given = False
+    if axis < 0:
+        axis += ndims
+        negative_axis_given = True
+    if axis < 0 or ndims <= axis:
+        if negative_axis_given:
+            axis -= ndims
+        if name:
+            name_str = "for {} op ".format(name)
+        else:
+            name_str = ""
+        raise RuntimeError(
+            "Axis out of range {}(axis {} requested for tensors with {} dimensions)".format(
+                name_str, axis, ndims))
+    return axis
 
 
 def _normalize_data_format(data_format):
@@ -191,6 +213,8 @@ class _KerasNode(object):
         logger.debug('{}(self: {}, other: {})'.format(op, self, other))
         if isinstance(other, _KerasNode):
             other = other.tensor
+        if isinstance(other, np.ndarray):
+            other = variable(other).tensor
         return _KerasNode(op, tensor=fn(self.tensor, other))
 
 
@@ -269,7 +293,19 @@ def batch_get_value(xs):
 
 
 def batch_normalization(x, mean, var, beta, gamma, axis=-1, epsilon=1e-3):
-    _report_unimplemented('batch_normalization')
+    # gamma == scale
+    # beta == offset
+    # The `axis` parameter is only used to tell TF the format of a fused batchnorm,
+    # so we ignore it.
+    denom = sqrt(var + epsilon)
+    if gamma is not None and beta is not None:
+        return ((x - mean) * gamma / denom) + beta
+    elif gamma is not None:
+        return ((x - mean) * gamma / denom)
+    elif beta is not None:
+        return ((x - mean) / denom) + beta
+    else:
+        return ((x - mean) / denom)
 
 
 def bias_add(x, bias, data_format=None):
@@ -295,7 +331,13 @@ def bias_add(x, bias, data_format=None):
 
 
 def binary_crossentropy(target, output, from_logits=False):
-    _report_unimplemented('binary_crossentropy')
+    logger.debug('binary_crossentropy(target: {}, output: {}, from_logits: {})'.format(
+        target, output, from_logits))
+    if from_logits:
+        output = sigmoid(output)
+    return _KerasNode('binary_crossentropy',
+                      tensor=plaidml_op.binary_crossentropy(target.tensor, output.tensor,
+                                                            epsilon()))
 
 
 def cast(x, dtype):
@@ -349,15 +391,23 @@ def categorical_crossentropy(target, output, from_logits=False):
 
 
 def ceil(x):
-    _report_unimplemented('ceil')
+    logger.debug('ceil(x: {})'.format(x))
+    return _KerasNode('ceil', tensor=edsl.ceil(x.tensor))
 
 
 def clear_session():
-    _report_unimplemented('clear_session')
+    logger.debug('clear_session()')
+    global _in_train_phase, _device
+    _in_train_phase = None
+    _dev = None
 
 
 def clip(x, min_val, max_val):
-    _report_unimplemented('clip')
+    logger.debug('clip(x: {}, min_val: {}, max_val: {}'.format(x, min_val, max_val))
+    return _KerasNode('clip',
+                      tensor=plaidml_op.clip(x.tensor,
+                                             variable(min_val).tensor,
+                                             variable(max_val).tensor))
 
 
 def concatenate(tensors, axis=-1):
@@ -535,11 +585,13 @@ def ctc_label_dense_to_sparse(labels, label_lengths):
 
 
 def cumprod(x, axis=0):
-    _report_unimplemented('cumprod')
+    logger.debug('cumprod(x: {}, axis: {})'.format(x, axis))
+    return _KerasNode('cumprod', tensor=plaidml_op.cumprod(x.tensor, axis))
 
 
 def cumsum(x, axis=0):
-    _report_unimplemented('cumsum')
+    logger.debug('cumsum(x: {}, axis: {})'.format(x, axis))
+    return _KerasNode('cumsum', tensor=plaidml_op.cumsum(x.tensor, axis))
 
 
 def cur_name():
@@ -585,12 +637,21 @@ def dtype(x):
 
 
 def elu(x, alpha=1.0):
-    _report_unimplemented('elu')
+    logger.debug('elu(x: {}, alpha: {})'.format(x, alpha))
+    return _KerasNode('elu', name='elu', tensor=plaidml_op.elu(x.tensor, alpha))
 
 
 def equal(x, y):
     logger.debug('equal(x: {}, y: {})'.format(x, y))
-    return _KerasNode('equal', tensor=(x.tensor == y.tensor))
+    if isinstance(x, _KerasNode):
+        x = x.tensor
+    if isinstance(x, np.ndarray):
+        x = variable(x).tensor
+    if isinstance(y, _KerasNode):
+        y = y.tensor
+    if isinstance(y, np.ndarray):
+        y = variable(y).tensor
+    return _KerasNode('equal', tensor=(x == y))
 
 
 def exp(x):
@@ -608,12 +669,21 @@ def expand_dims(x, axis=-1, name=None):
 
 
 def eye(size, dtype=None, name=None):
-    _report_unimplemented('eye')
+    logger.debug('eye(size: {}, dtype: {}, name={})'.format(size, dtype, name))
+    if dtype is None:
+        dtype = floatx()
+    elif isinstance(dtype, plaidml.DType):
+        dtype = dtype.into_numpy()
+    return variable(np.eye(size, dtype=dtype), name=name, dtype=dtype)
 
 
 def flatten(x):
     logger.debug('flatten(x: {})'.format(x))
-    _report_unimplemented('flatten')
+    I = x.tensor
+    I_dims = edsl.TensorDims(I.shape.ndims)
+    I.bind_dims(*I_dims)
+    O_dim = functools.reduce(lambda x, y: x * y, I_dims)
+    return reshape(x, [O_dim])
 
 
 def floor(x):
@@ -685,7 +755,10 @@ def greater_equal(x, y):
 
 
 def hard_sigmoid(x):
-    _report_unimplemented('hard_sigmoid')
+    logger.debug('hard_sigmoid(x: {})'.format(x))
+    return _KerasNode('hard_sigmoid',
+                      name='hard_sigmoid',
+                      tensor=plaidml_op.hard_sigmoid(x.tensor, 0.2))
 
 
 def identity(x):
@@ -694,7 +767,9 @@ def identity(x):
 
 
 def in_test_phase(x, alt, training=None):
-    _report_unimplemented('in_test_phase')
+    logger.debug('in_test_phase(x: {}, alt: {}, training: {})'.format(x, alt, training))
+    # Note that this flips 'alt' and 'x'
+    return in_train_phase(alt, x, training=training)
 
 
 def in_top_k(predictions, targets, k):
@@ -702,7 +777,31 @@ def in_top_k(predictions, targets, k):
 
 
 def in_train_phase(x, alt, training=None):
-    _report_unimplemented('in_train_phase')
+    logger.debug('in_train_phase(x: {}, alt: {}, training: {})'.format(x, alt, training))
+    if training is None:
+        training = learning_phase()
+        uses_learning_phase = True
+    else:
+        uses_learning_phase = False
+
+    if callable(x):
+        cx = x()
+    else:
+        cx = x
+    if callable(alt):
+        calt = alt()
+    else:
+        calt = alt
+
+    if training is 1 or training is True:
+        return cx
+    elif training is 0 or training is False:
+        return calt
+    else:
+        o = switch(training, cx, calt)
+        if uses_learning_phase:
+            o._uses_learning_phase = True
+        return o
 
 
 def int_shape(x):
@@ -730,11 +829,17 @@ def is_tensor(x):
 
 
 def l2_normalize(x, axis):
-    _report_unimplemented('l2_normalize')
+    logger.debug('l2_normalize(x: {}, axis: {})'.format(x, axis))
+    norm = sqrt(sum(square(x), axis=axis, keepdims=True))
+    return x / norm
 
 
 def learning_phase():
-    _report_unimplemented('learning_phase')
+    # Initialize _in_train_phase if this is the first use
+    global _in_train_phase
+    if _in_train_phase is None:
+        _in_train_phase = placeholder(ndim=0, dtype='bool')
+    return _in_train_phase
 
 
 def less(x, y):
@@ -759,7 +864,7 @@ def log(x):
 
 
 def logsumexp(x, axis=None, keepdims=False):
-    _report_unimplemented('logsumexp')
+    return log(sum(exp(x), axis=axis, keepdims=keepdims))
 
 
 def manual_variable_initialization(value):
@@ -815,27 +920,79 @@ def ndim(x):
 
 def not_equal(lhs, rhs):
     logger.debug('not_equal(lhs: {}, rhs: {})'.format(lhs, rhs))
+    if isinstance(lhs, _KerasNode):
+        lhs = lhs.tensor
+    if isinstance(lhs, np.ndarray):
+        lhs = variable(lhs).tensor
     if isinstance(rhs, _KerasNode):
-        O = lhs.tensor != rhs.tensor
-        return _KerasNode('not_equal', tensor=O)
-    O = lhs.tensor != rhs
-    return _KerasNode('not_equal', tensor=O)
+        rhs = rhs.tensor
+    if isinstance(rhs, np.ndarray):
+        rhs = variable(rhs).tensor
+    return _KerasNode('not_equal', tensor=(lhs != rhs))
 
 
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
-    _report_unimplemented('normalize_batch_in_training')
+    I = x.tensor
+    ndims = I.shape.ndims
+    if reduction_axes == None:
+        raw_axes = [ndims - 1]
+    else:
+        raw_axes = reduction_axes
+    axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
+
+    m = mean(x, axis=axes, keepdims=True)
+    v = var(x, axis=axes, keepdims=True)
+
+    normalized_tensor = batch_normalization(x=x,
+                                            mean=m,
+                                            var=v,
+                                            beta=beta,
+                                            gamma=gamma,
+                                            epsilon=epsilon)
+
+    # Tensorflow and Theano disagree on whether mean and var should be squeezed
+    # here. For now, going with Theano for simplicity (i.e. don't squeeze).
+
+    return normalized_tensor, m, v
 
 
 def one_hot(indices, num_classes):
-    _report_unimplemented('one_hot')
+    #Note: does not error check for entries in indices that are >= num_classes
+    logger.debug('one_hot(indices: {}, num_classes: {})'.format(indices, num_classes))
+    count = variable(np.array(range(num_classes)), dtype='int32').tensor
+    I = indices.tensor
+    I_ndims = I.shape.ndims
+    I_dims = edsl.TensorDims(I_ndims)
+    I_idxs = edsl.TensorIndexes(I_ndims)
+    C = edsl.TensorDim()
+    c = edsl.TensorIndex()
+    O_dims = I_dims + [C]
+    O_idxs = I_idxs + [c]
+    I.bind_dims(*I_dims)
+    count.bind_dims(C)
+    O = edsl.TensorOutput(*O_dims)
+    O[O_idxs] = I[I_idxs] == count[c]
+    return _KerasNode('one_hot', name='one_hot', tensor=O)
 
 
 def ones(shape, dtype=None, name=None):
-    _report_unimplemented('ones')
+    logger.debug('ones(shape: {}, dtype: {}, name: {})'.format(shape, dtype, name))
+    value = np.full(shape, 1, dtype=dtype or floatx())
+    return _KerasNode('ones', name=name, value=value)
 
 
 def ones_like(x, dtype=None, name=None):
-    _report_unimplemented('ones_like')
+    logger.debug('ones_like(x: {}, dtype: {}, name: {})'.format(x, dtype, name))
+    value = np.full((1), 1, dtype=dtype or floatx())
+    one = _create_var('a_one', value)
+    I = x.tensor
+    ndim = I.shape.ndims
+    dims = edsl.TensorDims(ndim)
+    idxs = edsl.TensorIndexes(ndim)
+    I.bind_dims(*dims)
+    O = edsl.TensorOutput(*dims)
+    O[idxs] = one[0]
+    return _KerasNode('ones_like', name=name, tensor=O)
 
 
 def permute_dimensions(x, pattern=None):
@@ -901,7 +1058,8 @@ def print_tensor(x, message=''):
 
 
 def prod(value, axis=None, keepdims=False):
-    _report_unimplemented('prod')
+    logger.debug('prod(value: {}, axis: {}, keepdims: {})'.format(value, axis, keepdims))
+    return _KerasNode('prod', tensor=plaidml_op.prod(value.tensor, axis, keepdims))
 
 
 def random_binomial(shape, p=0.0, dtype=None, see=None):
@@ -909,11 +1067,30 @@ def random_binomial(shape, p=0.0, dtype=None, see=None):
 
 
 def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
-    _report_unimplemented('random_normal')
+    if dtype is None:
+        dtype = floatx()
+    if seed:
+        np.random.seed(seed)
+    # TODO: We only use half of the Box-Muller here
+    u1 = random_uniform(shape, dtype='float32')
+    u2 = random_uniform(shape, dtype='float32')
+    z0 = sqrt(-2.0 * log(u1 + (1.0 / (2**33)))) * cos(2.0 * math.pi * u2)
+    z0 = stddev * z0
+    z0 = z0 + mean
+    if dtype != 'float32':
+        z0 = cast(z0, dtype)
+    return z0
 
 
 def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None):
-    _report_unimplemented('random_normal_variable')
+    if dtype is None:
+        dtype = floatx()
+    elif isinstance(dtype, plaidml.DType):
+        dtype = ptile.convert_pml_dtype_to_np(dtype)
+    if seed:
+        np.random.seed(seed)
+    data = np.random.normal(mean, scale, shape).astype(dtype)
+    return variable(data, dtype=dtype, name=name)
 
 
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
@@ -929,7 +1106,10 @@ def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
 
 
 def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
-    _report_unimplemented('random_uniform_variable')
+    if seed:
+        np.random.seed(seed)
+    val = np.random.uniform(low=low, high=high, size=shape)
+    return variable(val, dtype=dtype)
 
 
 def relu(x, alpha=None, max_value=None, threshold=0.):
@@ -939,11 +1119,16 @@ def relu(x, alpha=None, max_value=None, threshold=0.):
 
 
 def repeat(x, n):
-    _report_unimplemented('repeat')
+    logger.debug('repeat_elements(x: {}, n: {})'.format(x, n))
+    y = expand_dims(x, 1, name='repeat')
+    return repeat_elements(y, n, 1)
 
 
 def repeat_elements(x, rep, axis):
-    _report_unimplemented('repeat_elements')
+    logger.debug('repeat_elements(x: {}, rep: {}, axis: {})'.format(x, rep, axis))
+    return _KerasNode('repeat_elements',
+                      name='repeat_elements',
+                      tensor=plaidml_op.repeat(x.tensor, rep, axis))
 
 
 def reset_uids():
@@ -952,8 +1137,77 @@ def reset_uids():
 
 
 def reshape(x, dims):
+    # TODO: This needs to be more thoroughly tested with symbolic shapes
     logger.debug('reshape(x: {}, dims: {})'.format(x, dims))
-    _report_unimplemented('reshape')
+    dims = list(dims)
+    I = x.tensor
+    I_dims = edsl.TensorDims(I.shape.ndims)
+    I.bind_dims(*I_dims)
+    neg_idx = None
+    for idx, dim in enumerate(dims):
+        if isinstance(dim, edsl.TensorDim):
+            continue
+        if dim == 0 or dim is None:
+            dims[idx] = I_dims[idx]  # TODO: Fix how we manage shape
+        elif dim == -1:
+            if neg_idx:
+                raise RuntimeError('At most one dimension of size -1 may be provided in Reshape')
+            neg_idx = idx
+            dims[idx] = 1  # Just to simplify the size computation later
+    if neg_idx is not None:
+        # Compute the value to use for the -1 dimension in the
+        # output shape, by making it what it needs to be in order
+        # to preserve the correct number of elements in the
+        # tensor.
+        #
+        # This code is a little tricky because symbolic values
+        # (e.g. the batch size in a typical neural network) may
+        # appear in both the original shape and the target shape.
+        # Naively multiplying the original shape's dimensions and
+        # dividing by the target shape's dimensions (excluding the
+        # -1 dimension) would produce a symbolic value.
+        #
+        # So:
+        #
+        # We scan the input dimensions, counting the number of
+        # instances of each symbolic size encountered and
+        # multiplying together the non-symbolic sizes into the
+        # numerator.
+        #
+        # We then scan the output dimensions.  Where there's a
+        # symbolic size, we check and see if we have a count for
+        # it, and decrement the count if we do.  Otherwise -- if
+        # we don't have a count for it, or if it's not symbolic --
+        # we multiply it into the denominator.
+        #
+        # We then take the remaining symbolic input dimensions,
+        # and multiply them into the numerator -- these are the
+        # dimensions that haven't been cancelled out.
+        #
+        # And then the size of the -1 dimension is just numerator
+        # / denominator; if there are any remaining uncancelled
+        # symbolic dimension sizes, the output will be symbolic,
+        # but otherwise we'll come out with a concrete dimension
+        # size.
+
+        num = 1
+        syms = defaultdict(int)
+        for idx, dim in enumerate(I.shape.int_dims):
+            if dim is None:
+                syms[I_dims[idx]] += 1
+            else:
+                num *= dim
+        den = 1
+        for dim in dims:
+            if isinstance(dim, edsl.TensorDim) and syms[dim] > 0:
+                syms[dim] -= 1
+            else:
+                den *= dim
+        for sym, count in syms.items():
+            for _ in range(count):
+                num *= sym
+        dims[neg_idx] = num // den
+    return _KerasNode('reshape', tensor=edsl.reshape(I, dims))
 
 
 def resize_images(x, height_factor, width_factor, data_format, interpolation='nearest'):
@@ -965,7 +1219,8 @@ def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
 
 
 def reverse(x, axes):
-    _report_unimplemented('reverse')
+    logger.debug('reverse(x: {}, axes: {})'.format(x, axes))
+    return _KerasNode('reverse', name='reverse', tensor=plaidml_op.flip(x.tensor, axes))
 
 
 def reverse_gradient(x, coeff=1.0):
@@ -994,7 +1249,8 @@ def rnn(step_function,
 
 
 def round(x):
-    _report_unimplemented('round')
+    logger.debug('round(x: {})'.format(x))
+    return _KerasNode('round', tensor=edsl.round(x.tensor))
 
 
 def separable_conv(x,
@@ -1049,7 +1305,11 @@ def set_floatx(dtype):
 
 
 def set_learning_phase(value):
-    _report_unimplemented('set_learning_phase')
+    if value != 0 and value != 1:
+        raise ValueError("May only set_learning_phase to 0 or 1")
+    value = int(value)
+    global _in_train_phase
+    _in_train_phase = value
 
 
 def set_value(x, value):
@@ -1063,11 +1323,13 @@ def shape(x):
 
 def sigmoid(x):
     logger.debug('sigmoid(x: {})'.format(x))
-    return _KerasNode('sigmoid', tensor=edsl.sigmoid(x.tensor))
+    return _KerasNode('sigmoid', tensor=plaidml_op.sigmoid(x.tensor))
 
 
 def sign(x):
-    _report_unimplemented('sign')
+    logger.debug('sign(x: {})'.format(x))
+    intermediate = _KerasNode('sign_intermediate', tensor=edsl.select((x > 0).tensor, 1., -1.))
+    return _KerasNode('sign', tensor=edsl.select((x.tensor == 0.), 0., intermediate.tensor))
 
 
 def sin(x):
@@ -1081,6 +1343,30 @@ def softmax(x):
     return _KerasNode('softmax', tensor=y)
 
 
+def softmax(x, axis=None, name=None):
+    logger.debug('softmax(x: {}, axis: {}, name: {})'.format(x, axis, name))
+    if name is None:
+        name = 'softmax'
+    I = x.tensor
+    ndims = I.shape.ndims
+    I_dims = edsl.TensorDims(ndims)
+    I.bind_dims(*I_dims)
+    if axis is None:
+        axis = ndims - 1
+    axis = _normalize_axis(axis=axis, ndims=ndims, name=name + ' (softmax)')
+    if ndims == 2 and axis == 1:
+        return _KerasNode(name, tensor=plaidml_op.softmax(I, axis=1))
+
+    if axis == 0:
+        group = 1
+    else:
+        group = functools.reduce(lambda x, y: x * y, I_dims[:axis])
+    values = functools.reduce(lambda x, y: x * y, I_dims[axis:])
+    flat_x = reshape(x, (group, values))
+    result = _KerasNode(name, tensor=plaidml_op.softmax(flat_x.tensor, axis=1))
+    return reshape(result, I_dims)
+
+
 def softplus(x):
     logger.debug('softplus(x: {})'.format(x))
     return log(1. + exp(x))
@@ -1092,7 +1378,10 @@ def softsign(x):
 
 
 def sparse_categorical_crossentropy(target, output, from_logits=False):
-    _report_unimplemented('sparse_categorical_crossentropy')
+    dims = edsl.TensorDims(output.tensor.shape.ndims)
+    output.tensor.bind_dims(*dims)
+    return categorical_crossentropy(
+        reshape(one_hot(target, output.tensor.shape.int_dims[-1]), dims), output, from_logits)
 
 
 def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
