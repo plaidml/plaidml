@@ -1640,13 +1640,19 @@ class TestBackendOps(unittest.TestCase):
         o = b.relu(c)
         return [o]
 
-    @opTest([[m(1, 96, 96, 192), m(3, 3, 192, 192)]], do_grads=False)
+    @opTest([[m(1, 96, 96, 192), m(3, 3, 192, 192)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
     def resnetLayer3(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
 
-    @opTest([[m(1, 96, 96, 192), m(8, 8, 192, 192)]], do_grads=False)
+    @opTest([[m(1, 96, 96, 192), m(8, 8, 192, 192)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
     def resnetLayer4(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)

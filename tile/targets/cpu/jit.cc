@@ -486,7 +486,7 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const Dat
   llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   std::vector<llvm::Value*> args2 = {buffers_[xsmmCallData.in1->into()].base, buffers_[xsmmCallData.in0->into()].base,
                                      buffers_[xsmmCallData.out0->into()].base};
-  builder_.CreateCall(rftype, func, args2);
+  // Lubo builder_.CreateCall(rftype, func, args2);
   builder_.CreateRetVoid();
   return function;
 }
