@@ -29,6 +29,10 @@ def argmax(x, axis=-1):
     return op('argmax', [x, axis]).as_tensor()
 
 
+def clip(x, min=None, max=None):
+    return op('clip', [x, min, max]).as_tensor()
+
+
 def concatenate(tensors, axis=-1):
     return op('concatenate', [tensors, axis]).as_tensor()
 

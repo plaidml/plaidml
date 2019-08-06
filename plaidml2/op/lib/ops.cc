@@ -488,12 +488,42 @@ Value argmax(const Value& value) {
   return Value{O};
 }
 
+Value clip(const Value& value) {
+  IVLOG(1, "clip");
+  auto args = value.as_tuple();
+
+  // Read arguments
+  if (args.size() != 3) {
+    throw std::runtime_error("clip expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto raw_min = args[1];
+  auto raw_max = args[2];
+
+  // auto ndims = I.shape().ndims();
+  // std::vector<TensorDim> I_dims(ndims);
+  // I.bind_dims(I_dims);
+  auto O = I;
+  if (!raw_min.is_none()) {
+    auto min = raw_min.as_tensor();
+    O = select(O > min, O, min);
+  }
+  if (!raw_max.is_none()) {
+    auto max = raw_max.as_tensor();
+    O = select(O < max, O, max);
+  }
+  return Value{O};
+}
+
 Value concatenate(const Value& value) {
   // TODO: Make errors nicer (e.g. when bind_dims fails)
   IVLOG(1, "concatenate")
 
   // Read Arguments
   auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("concatenate expects 2 arguments");
+  }
   auto tensor_vals = args[0].as_tuple();
   auto raw_axis = args[1].as_int();
 
@@ -1902,6 +1932,7 @@ void RegisterOps() {
   auto registry = OperationRegistry::Instance();
   registry->Register("abs", abs);
   registry->Register("argmax", argmax);
+  registry->Register("clip", clip);
   registry->Register("concatenate", concatenate);
   registry->Register("convolution", convolution);
   registry->Register("dot", dot);

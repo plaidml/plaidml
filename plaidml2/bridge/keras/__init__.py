@@ -1,5 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
+import functools
 import logging
 import os
 from collections import defaultdict
@@ -359,7 +360,11 @@ def clear_session():
 
 
 def clip(x, min_val, max_val):
-    _report_unimplemented('clip')
+    logger.debug('clip(x: {}, min_val: {}, max_val: {}'.format(x, min_val, max_val))
+    return _KerasNode('clip',
+                      tensor=plaidml_op.clip(x.tensor,
+                                             variable(min_val).tensor,
+                                             variable(max_val).tensor))
 
 
 def concatenate(tensors, axis=-1):
