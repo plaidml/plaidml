@@ -312,7 +312,7 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-ocl-neo:
             prepend_args: [--examples, 256]
-        skip_platforms: [keras-stripe-mtl-uhd630]
+        skip_platforms: [keras-stripe-mtl-uhd630, keras-plaid-ocl-gv100gl]
 
   comprehensive:
     platforms:
