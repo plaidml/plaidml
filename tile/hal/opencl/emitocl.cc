@@ -191,11 +191,32 @@ void Emit::Visit(const sem::CallExpr& n) {
   switch (n.function) {
     case sem::CallExpr::Function::CEIL:
     case sem::CallExpr::Function::FLOOR: {
+      assert(1 == node.vals.size());
       emit(n.name);
-      emit("((float)(");
-      assert(1 == n.vals.size());
-      n.vals[0]->Accept(*this);
-      emit("))");
+      emit("(");
+      auto val_type = TypeOf(n.vals[0]);
+      auto need_type = val_type;
+      switch (need_type.dtype) {
+        case DataType::BOOLEAN:
+        case DataType::INT8:
+        case DataType::INT16:
+        case DataType::UINT8:
+        case DataType::UINT16:
+          need_type.dtype = DataType::FLOAT16;
+          break;
+        case DataType::INT32:
+        case DataType::UINT32:
+          need_type.dtype = DataType::FLOAT32;
+          break;
+        case DataType::INT64:
+        case DataType::UINT64:
+          need_type.dtype = DataType::FLOAT64;
+          break;
+        default:
+          break;
+      }
+      EmitWithTypeConversion(val_type, need_type, n.vals[0], false);
+      emit(")");
     } break;
     default: {
       auto it = FuncNameMap.find(n.name);
