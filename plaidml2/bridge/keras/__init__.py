@@ -213,6 +213,22 @@ def _make_rng_state(seed=None):
     return rng_state
 
 
+def _normalize_axis(axis, ndims, name = ""):
+    negative_axis_given = False
+    if axis < 0:
+        axis += ndims
+        negative_axis_given = True
+    if axis < 0 or ndims <= axis:
+        if negative_axis_given:
+            axis -= ndims
+        if name:
+            name_str = "for {} op ".format(name)
+        else:
+            name_str = ""
+        raise RuntimeError("Axis out of range {}(axis {} requested for tensors with {} dimensions)".format(name_str, axis, ndims))
+    return axis
+
+
 def _report_unimplemented(name):
     report = (
         'The Keras backend function \'{}\' is not yet implemented in ' +
@@ -1183,6 +1199,31 @@ def softmax(x):
     logger.debug('softmax(x: {})'.format(x))
     y = plaidml_op.softmax(x.tensor, axis=x.tensor.shape.ndims - 1)
     return _KerasNode('softmax', tensor=y)
+
+
+
+def softmax(x, axis=None, name=None):
+    logger.debug('softmax(x: {}, axis: {}, name: {})'.format(x, axis, name))
+    if name is None:
+        name = 'softmax'
+    I = x.tensor
+    ndims = I.shape.ndims
+    I_dims = edsl.TensorDims(ndims)
+    I.bind_dims(*I_dims)
+    if axis is None:
+        axis = ndims - 1
+    axis = _normalize_axis(axis=axis, ndims=ndims, name=name + ' (softmax)')
+    if ndims == 2 and axis == 1:
+        return _KerasNode(name, tensor=plaidml_op.softmax(I, axis=1))
+
+    if axis == 0:
+        group = 1
+    else:
+        group = functools.reduce(lambda x, y: x * y, I_dims[:axis])
+    values = functools.reduce(lambda x, y: x * y, I_dims[axis:])
+    flat_x = reshape(x, (group, values))
+    result = _KerasNode(name, tensor=plaidml_op.softmax(flat_x.tensor, axis=1))
+    return reshape(result, I_dims)
 
 
 def softplus(x):
