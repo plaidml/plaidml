@@ -997,7 +997,9 @@ def relu(x, alpha=None, max_value=None, threshold=0.):
 
 
 def repeat(x, n):
-    _report_unimplemented('repeat')
+    logger.debug('repeat_elements(x: {}, n: {})'.format(x, n))
+    y = expand_dims(x, 1, name='repeat')
+    return repeat_elements(y, n, 1)
 
 
 def repeat_elements(x, rep, axis):
