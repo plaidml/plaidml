@@ -66,6 +66,7 @@ def cmd_pipeline(args, remainder):
                             variant=variant,
                             timeout=popt.get('timeout', 20),
                             retry=popt.get('retry'),
+                            softfail=popt.get('softfail'),
                             python=get_python(variant),
                         ))
 
