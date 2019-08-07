@@ -43,6 +43,24 @@ def _prepend_name_scope(name, default):
     return r
 
 
+def _normalize_axis(axis, ndims, name=""):
+    negative_axis_given = False
+    if axis < 0:
+        axis += ndims
+        negative_axis_given = True
+    if axis < 0 or ndims <= axis:
+        if negative_axis_given:
+            axis -= ndims
+        if name:
+            name_str = "for {} op ".format(name)
+        else:
+            name_str = ""
+        raise RuntimeError(
+            "Axis out of range {}(axis {} requested for tensors with {} dimensions)".format(
+                name_str, axis, ndims))
+    return axis
+
+
 def _normalize_data_format(data_format):
     if data_format is None:
         data_format = image_data_format()
@@ -213,24 +231,6 @@ def _make_rng_state(seed=None):
     rng_state = variable(rng_init, dtype='uint32')
 
     return rng_state
-
-
-def _normalize_axis(axis, ndims, name=""):
-    negative_axis_given = False
-    if axis < 0:
-        axis += ndims
-        negative_axis_given = True
-    if axis < 0 or ndims <= axis:
-        if negative_axis_given:
-            axis -= ndims
-        if name:
-            name_str = "for {} op ".format(name)
-        else:
-            name_str = ""
-        raise RuntimeError(
-            "Axis out of range {}(axis {} requested for tensors with {} dimensions)".format(
-                name_str, axis, ndims))
-    return axis
 
 
 def _report_unimplemented(name):
@@ -1092,7 +1092,28 @@ def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
 
 
 def reverse(x, axes):
-    _report_unimplemented('reverse')
+    logger.debug('reverse(x: {}, axes: {})'.format(x, axes))
+    I = x.tensor
+    ndims = I.shape.ndims
+    if isinstance(axes, six.integer_types):
+        axes = [axes]
+    normalized_axes = list()
+    for axis in axes:
+        if not isinstance(axis, six.integer_types):
+            raise ValueError(
+                'The axes parameter of reverse only accepts an integer or a list of integers, received {}'
+                .format(type(axis)))
+        normalized_axes.append(_normalize_axis(axis, ndims, 'reverse'))
+
+    dims = edsl.TensorDims(ndims)
+    I.bind_dims(*dims)
+    I_idxs = edsl.TensorIndexes(ndims)
+    O_idxs = I_idxs.copy()
+    for axis in axes:
+        O_idxs[axis] = -I_idxs[axis] + dims[axis] - 1
+    O = edsl.TensorOutput(*dims)
+    O[O_idxs] = I[I_idxs]
+    return _KerasNode('reverse', name='reverse', tensor=O)
 
 
 def reverse_gradient(x, coeff=1.0):
