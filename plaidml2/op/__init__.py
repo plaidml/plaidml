@@ -67,6 +67,10 @@ def expand_dims(x, axis=-1):
     return op('expand_dims', [x, axis]).as_tensor()
 
 
+def flip(x, axis=None):
+    return op('flip', [x, axis]).as_tensor()
+
+
 def max(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()

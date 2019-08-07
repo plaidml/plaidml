@@ -1093,27 +1093,7 @@ def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
 
 def reverse(x, axes):
     logger.debug('reverse(x: {}, axes: {})'.format(x, axes))
-    I = x.tensor
-    ndims = I.shape.ndims
-    if isinstance(axes, six.integer_types):
-        axes = [axes]
-    normalized_axes = list()
-    for axis in axes:
-        if not isinstance(axis, six.integer_types):
-            raise ValueError(
-                'The axes parameter of reverse only accepts an integer or a list of integers, received {}'
-                .format(type(axis)))
-        normalized_axes.append(_normalize_axis(axis, ndims, 'reverse'))
-
-    dims = edsl.TensorDims(ndims)
-    I.bind_dims(*dims)
-    I_idxs = edsl.TensorIndexes(ndims)
-    O_idxs = I_idxs.copy()
-    for axis in axes:
-        O_idxs[axis] = -I_idxs[axis] + dims[axis] - 1
-    O = edsl.TensorOutput(*dims)
-    O[O_idxs] = I[I_idxs]
-    return _KerasNode('reverse', name='reverse', tensor=O)
+    return _KerasNode('reverse', name='reverse', tensor=plaidml_op.flip(x.tensor, axes))
 
 
 def reverse_gradient(x, coeff=1.0):

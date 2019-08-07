@@ -1217,6 +1217,49 @@ Value expand_dims(const Value& value) {
   return Value{O};
 }
 
+Value flip(const Value& value) {
+  IVLOG(1, "flip");
+  // This is numpy-style `flip`; Keras calls it `repeat`
+
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(str(boost::format("PlaidML flip op expects 2 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+  std::vector<int64_t> raw_axes;
+  // Hold off on reading the axis arg
+
+  // Set up useful variables
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  if (args[1].is_int()) {
+    raw_axes.push_back(args[1].as_int());
+  } else if (args[1].is_none()) {
+    for (int64_t i = 0; i < ndims; ++i) {
+      raw_axes.push_back(i);
+    }
+  } else {
+    raw_axes = args[1].as_int_tuple();
+  }
+  std::vector<size_t> axes;
+  for (auto& raw_axis : raw_axes) {
+    axes.push_back(normalize_axis(raw_axis, ndims, "flip"));
+  }
+
+  // Perform the flip
+  std::vector<TensorDim> dims(ndims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  std::vector<TensorIndex> O_idxs(I_idxs);
+  I.bind_dims(dims);
+  for (const auto& axis : axes) {
+    O_idxs[axis] = dims[axis] - 1 - I_idxs[axis];
+  }
+  auto O = TensorOutput(dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
 Value max(const Value& value) {
   IVLOG(1, "max");
   auto args = value.as_tuple();
@@ -1937,6 +1980,7 @@ void RegisterOps() {
   registry->Register("convolution", convolution);
   registry->Register("dot", dot);
   registry->Register("expand_dims", expand_dims);
+  registry->Register("flip", flip);
   registry->Register("min", min);
   registry->Register("mean", mean);
   registry->Register("max", max);
