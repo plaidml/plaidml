@@ -631,6 +631,10 @@ def reshape(x, dims):
     return call("reshape", x, *dims)
 
 
+def round(x):
+    return call("round", x)
+
+
 def scatter(x, y, z):
     return call("scatter", x, y, z)
 

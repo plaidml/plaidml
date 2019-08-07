@@ -1121,7 +1121,8 @@ def rnn(step_function,
 
 
 def round(x):
-    _report_unimplemented('round')
+    logger.debug('round(x: {})'.format(x))
+    return _KerasNode('round', tensor=edsl.round(x.tensor))
 
 
 def separable_conv(x,
