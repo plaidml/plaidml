@@ -27,6 +27,24 @@ def load_template(name):
         return file_.read()
 
 
+def get_emoji(variant):
+    if variant == 'windows_x86_64':
+        return ':windows:'
+    if variant == 'macos_x86_64':
+        return ':darwin:'
+    return ':linux:'
+
+
+def get_engine(pkey):
+    if 'stripe-ocl' in pkey:
+        return ':barber::cl:'
+    if 'stripe-mtl' in pkey:
+        return ':barber::metal:'
+    if 'plaidml-mtl' in pkey:
+        return ':black_square_button::metal:'
+    return ':black_square_button::cl:'
+
+
 def get_python(variant):
     if variant == 'windows_x86_64':
         return 'python'
@@ -42,7 +60,7 @@ def cmd_pipeline(args, remainder):
 
     variants = []
     for variant in plan['VARIANTS'].keys():
-        variants.append(dict(name=variant, python=get_python(variant)))
+        variants.append(dict(name=variant, python=get_python(variant), emoji=get_emoji(variant)))
 
     tests = []
     for skey, suite in plan['SUITES'].items():
@@ -58,17 +76,17 @@ def cmd_pipeline(args, remainder):
                     continue
                 for batch_size in suite['params'][args.pipeline]['batch_sizes']:
                     tests.append(
-                        dict(
-                            suite=skey,
-                            workload=wkey,
-                            platform=pkey,
-                            batch_size=batch_size,
-                            variant=variant,
-                            timeout=popt.get('timeout', 20),
-                            retry=popt.get('retry'),
-                            softfail=popt.get('softfail'),
-                            python=get_python(variant),
-                        ))
+                        dict(suite=skey,
+                             workload=wkey,
+                             platform=pkey,
+                             batch_size=batch_size,
+                             variant=variant,
+                             timeout=popt.get('timeout', 20),
+                             retry=popt.get('retry'),
+                             softfail=popt.get('softfail'),
+                             python=get_python(variant),
+                             emoji=get_emoji(variant),
+                             engine=get_engine(pkey)))
 
     if args.count:
         print('variants: {}'.format(len(variants)))
@@ -95,7 +113,7 @@ def cmd_build(args, remainder):
         env.update(cenv.env())
     else:
         env = None
-    
+
     util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
     archive_dir = os.path.join(
         args.root,

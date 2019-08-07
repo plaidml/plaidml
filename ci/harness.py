@@ -12,7 +12,7 @@ import yaml
 import analysis
 import util
 
-DEFAULT_BUILD_URL = 'https://buildkite.com/vertex-dot-ai'
+DEFAULT_BUILD_URL = 'https://buildkite.com/plaidml'
 
 
 def buildkite_metadata(key, default=None):
@@ -67,7 +67,7 @@ def run(args):
     cwd = popt.get('cwd', '.')
     spec = pathlib.Path(popt.get('conda_env'))
 
-    util.printf('--- Creating conda env from {}'.format(spec))
+    util.printf('--- :snake: Creating conda env from {}'.format(spec))
     instance_name = os.getenv('BUILDKITE_AGENT_NAME', 'harness')
     sig = hashlib.md5()
     sig.update(spec.read_bytes())
@@ -91,7 +91,7 @@ def run(args):
     env['PLAIDML_DEVICE_IDS'] = buildkite_metadata('PLAIDML_DEVICE_IDS')
     env['PLAIDML_EXPERIMENTAL'] = buildkite_metadata('PLAIDML_EXPERIMENTAL', '0')
 
-    util.printf('--- Running test {suite}/{workload} on {platform}'.format(
+    util.printf('--- :bazel: Running test {suite}/{workload} on {platform}'.format(
         suite=args.suite,
         workload=args.workload,
         platform=args.platform,

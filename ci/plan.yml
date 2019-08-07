@@ -148,32 +148,35 @@ SUITES:
     platforms:
       keras-plaid-ocl-cpu:
         pipelines: []
-      keras-plaid-ocl-neo:
-        pipelines: [unstable]
+
       keras-stripe-ocl-neo:
-        pipelines: [nightly, plaidml, stripe]
+        pipelines: [plaidml, nightly]
+
       keras-plaid-mtl-uhd630:
         pipelines: [plaidml, nightly]
       keras-stripe-mtl-uhd630:
-        pipelines: [plaidml, nightly, stripe]
+        pipelines: [plaidml, nightly]
+
       keras-plaid-ocl-gfx900:
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gfx900:
-        pipelines: [unstable, stripe]
+        pipelines: [plaidml, nightly]
+
       keras-plaid-ocl-gv100gl:
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gv100gl:
-        pipelines: [unstable, stripe]
+        pipelines: [nightly]
+
       keras-plaid-ocl-gp100gl:
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gp100gl:
-        pipelines: [unstable]
-      keras-stripe-ocl-gv100gl:
-        pipelines: [unstable]
-      keras-stripe-ocl-neo:
-        pipelines: [plaidml]
+        pipelines: [plaidml, nightly]
+
       keras-plaid-ocl-gfx803:
-        pipelines: [plaidml]
+        pipelines: [plaidml, nightly]
+      keras-stripe-ocl-gfx803:
+        pipelines: [nightly]
+
     params:
       plaidml:
         batch_sizes: [0]
@@ -297,9 +300,9 @@ SUITES:
         precision: high
         platform_overrides:
           keras-plaid-mtl-uhd630:
-            prepend_args: [--examples, 512]
+            prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 512]
+            prepend_args: [--examples, 256]
           
       vgg19:
         precision: high
