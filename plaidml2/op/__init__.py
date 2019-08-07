@@ -93,6 +93,10 @@ def relu(x, alpha=None, max_value=None, threshold=0.):
     return op('relu', [x, alpha, max_value, threshold]).as_tensor()
 
 
+def repeat(x, repeats, axis):
+    return op('repeat', [x, repeats, axis]).as_tensor()
+
+
 def softmax(x, axis=None):
     return op('softmax', [x, axis]).as_tensor()
 

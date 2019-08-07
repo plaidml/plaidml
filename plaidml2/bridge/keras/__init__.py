@@ -1001,7 +1001,10 @@ def repeat(x, n):
 
 
 def repeat_elements(x, rep, axis):
-    _report_unimplemented('repeat_elements')
+    logger.debug('repeat_elements(x: {}, rep: {}, axis: {})'.format(x, rep, axis))
+    return _KerasNode('repeat_elements',
+                      name='repeat_elements',
+                      tensor=plaidml_op.repeat(x.tensor, rep, axis))
 
 
 def reset_uids():

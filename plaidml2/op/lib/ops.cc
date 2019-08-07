@@ -1495,6 +1495,40 @@ Value relu(const Value& value) {
   return Value{O};
 }
 
+Value repeat(const Value& value) {
+  IVLOG(1, "repeat");
+  // This is numpy-style `repeat`; Keras calls it `repeat_elements`
+  // This is more limited than in numpy (both repeats & axis required, both must be ints)
+
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error(str(boost::format("PlaidML repeat op expects 3 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+  auto repeats = args[1].as_int();
+  auto raw_axis = args[2].as_int();
+
+  // Set up useful variables
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  auto axis = normalize_axis(raw_axis, ndims, "repeat");
+
+  std::vector<TensorDim> I_dims(ndims);
+  I.bind_dims(I_dims);
+  std::vector<TensorDim> O_dims(I_dims);
+  O_dims[axis] = repeats * I_dims[axis];
+  std::vector<TensorIndex> I_idxs(ndims);
+  std::vector<TensorIndex> O_idxs(I_idxs);
+  TensorIndex inner;
+  O_idxs[axis] = repeats * I_idxs[axis] + inner;
+  auto O = TensorOutput(O_dims);
+  if (inner < repeats) {
+    O(O_idxs) = I(I_idxs);
+  }
+  return Value{O};
+}
+
 Value softmax(const Value& value) {
   IVLOG(1, "softmax");
   auto args = value.as_tuple();
@@ -1986,6 +2020,7 @@ void RegisterOps() {
   registry->Register("max", max);
   registry->Register("pool", pool);
   registry->Register("relu", relu);
+  registry->Register("repeat", repeat);
   registry->Register("softmax", softmax);
   registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);
