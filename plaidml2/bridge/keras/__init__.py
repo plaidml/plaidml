@@ -2,6 +2,7 @@
 
 import functools
 import logging
+import math
 import os
 from collections import defaultdict
 from contextlib import contextmanager
@@ -967,11 +968,30 @@ def random_binomial(shape, p=0.0, dtype=None, see=None):
 
 
 def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
-    _report_unimplemented('random_normal')
+    if dtype is None:
+        dtype = floatx()
+    if seed:
+        np.random.seed(seed)
+    # TODO: We only use half of the Box-Muller here
+    u1 = random_uniform(shape, dtype='float32')
+    u2 = random_uniform(shape, dtype='float32')
+    z0 = sqrt(-2.0 * log(u1 + (1.0 / (2**33)))) * cos(2.0 * math.pi * u2)
+    z0 = stddev * z0
+    z0 = z0 + mean
+    if dtype != 'float32':
+        z0 = cast(z0, dtype)
+    return z0
 
 
 def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None):
-    _report_unimplemented('random_normal_variable')
+    if dtype is None:
+        dtype = floatx()
+    elif isinstance(dtype, plaidml.DType):
+        dtype = ptile.convert_pml_dtype_to_np(dtype)
+    if seed:
+        np.random.seed(seed)
+    data = np.random.normal(mean, scale, shape).astype(dtype)
+    return variable(data, dtype=dtype, name=name)
 
 
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
@@ -987,7 +1007,10 @@ def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
 
 
 def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
-    _report_unimplemented('random_uniform_variable')
+    if seed:
+        np.random.seed(seed)
+    val = np.random.uniform(low=low, high=high, size=shape)
+    return variable(val, dtype=dtype)
 
 
 def relu(x, alpha=None, max_value=None, threshold=0.):

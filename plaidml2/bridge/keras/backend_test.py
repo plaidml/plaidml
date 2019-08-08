@@ -854,6 +854,30 @@ class TestBackendOps(unittest.TestCase):
         return [b.tanh(x)]
 
     @compareForwardClose(.1)
+    def testRandomUniformMean(self, b):
+        rand = b.random_uniform((1000, 1000))
+        return b.mean(rand)
+
+    @compareForwardClose(.1)
+    def testRandomUniformDev(self, b):
+        rand = b.random_uniform((1000, 1000))
+        mean = b.mean(rand)
+        diffs = rand - mean
+        return b.mean(b.square(diffs))
+
+    @compareForwardClose(.1)
+    def testRandomUniformVariableMean(self, b):
+        rand = b.random_uniform_variable((1000, 1000), low=0.0, high=1.0)
+        return b.mean(rand)
+
+    @compareForwardClose(.1)
+    def testRandomUniformVariableDev(self, b):
+        rand = b.random_uniform_variable((1000, 1000), low=0.0, high=1.0)
+        mean = b.mean(rand)
+        diffs = rand - mean
+        return b.mean(b.square(diffs))
+
+    @compareForwardClose(.1)
     def testRandomNormalMean(self, b):
         rand = b.random_normal((1000, 1000), mean=42.0, stddev=0.1)
         return b.mean(rand)
