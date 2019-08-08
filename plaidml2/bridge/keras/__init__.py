@@ -389,7 +389,10 @@ def ceil(x):
 
 
 def clear_session():
-    _report_unimplemented('clear_session')
+    logger.debug('clear_session()')
+    global _in_train_phase, _device
+    _in_train_phase = None
+    _dev = None
 
 
 def clip(x, min_val, max_val):
