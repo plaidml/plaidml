@@ -778,7 +778,9 @@ def is_tensor(x):
 
 
 def l2_normalize(x, axis):
-    _report_unimplemented('l2_normalize')
+    logger.debug('l2_normalize(x: {}, axis: {})'.format(x, axis))
+    norm = sqrt(sum(square(x), axis=axis, keepdims=True))
+    return x / norm
 
 
 def learning_phase():
