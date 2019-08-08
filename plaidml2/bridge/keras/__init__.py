@@ -742,7 +742,9 @@ def identity(x):
 
 
 def in_test_phase(x, alt, training=None):
-    _report_unimplemented('in_test_phase')
+    logger.debug('in_test_phase(x: {}, alt: {}, training: {})'.format(x, alt, training))
+    # Note that this flips 'alt' and 'x'
+    return in_train_phase(alt, x, training=training)
 
 
 def in_top_k(predictions, targets, k):
@@ -750,7 +752,31 @@ def in_top_k(predictions, targets, k):
 
 
 def in_train_phase(x, alt, training=None):
-    _report_unimplemented('in_train_phase')
+    logger.debug('in_train_phase(x: {}, alt: {}, training: {})'.format(x, alt, training))
+    if training is None:
+        training = learning_phase()
+        uses_learning_phase = True
+    else:
+        uses_learning_phase = False
+
+    if callable(x):
+        cx = x()
+    else:
+        cx = x
+    if callable(alt):
+        calt = alt()
+    else:
+        calt = alt
+
+    if training is 1 or training is True:
+        return cx
+    elif training is 0 or training is False:
+        return calt
+    else:
+        o = switch(training, cx, calt)
+        if uses_learning_phase:
+            o._uses_learning_phase = True
+        return o
 
 
 def int_shape(x):
