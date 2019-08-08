@@ -890,11 +890,23 @@ def one_hot(indices, num_classes):
 
 
 def ones(shape, dtype=None, name=None):
-    _report_unimplemented('ones')
+    logger.debug('ones(shape: {}, dtype: {}, name: {})'.format(shape, dtype, name))
+    value = np.full(shape, 1, dtype=dtype or floatx())
+    return _KerasNode('ones', name=name, value=value)
 
 
 def ones_like(x, dtype=None, name=None):
-    _report_unimplemented('ones_like')
+    logger.debug('ones_like(x: {}, dtype: {}, name: {})'.format(x, dtype, name))
+    value = np.full((1), 1, dtype=dtype or floatx())
+    one = _create_var('a_one', value)
+    I = x.tensor
+    ndim = I.shape.ndims
+    dims = edsl.TensorDims(ndim)
+    idxs = edsl.TensorIndexes(ndim)
+    I.bind_dims(*dims)
+    O = edsl.TensorOutput(*dims)
+    O[idxs] = one[0]
+    return _KerasNode('ones_like', name=name, tensor=O)
 
 
 def permute_dimensions(x, pattern=None):
