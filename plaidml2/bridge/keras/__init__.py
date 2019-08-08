@@ -656,7 +656,12 @@ def expand_dims(x, axis=-1, name=None):
 
 
 def eye(size, dtype=None, name=None):
-    _report_unimplemented('eye')
+    logger.debug('eye(size: {}, dtype: {}, name={})'.format(size, dtype, name))
+    if dtype is None:
+        dtype = floatx()
+    elif isinstance(dtype, plaidml.DType):
+        dtype = dtype.into_numpy()
+    return variable(np.eye(size, dtype=dtype), name=name, dtype=dtype)
 
 
 def flatten(x):
