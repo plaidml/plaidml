@@ -1124,6 +1124,31 @@ Value convolution(const Value& value) {
   }
 }
 
+Value cumsum(const Value& value) {
+  IVLOG(1, "cumsum");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("cumsum expects 2 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  auto axis = normalize_axis(raw_axis, ndims, "cumsum");
+  std::vector<TensorDim> dims(ndims);
+  I.bind_dims(dims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  std::vector<TensorIndex> O_idxs(I_idxs);
+  TensorIndex cumulator_idx;
+  I_idxs[axis] = I_idxs[axis] - cumulator_idx;
+  auto O = TensorOutput(dims);
+  if (cumulator_idx < dims[axis]) {
+    O(O_idxs) += I(I_idxs);
+  }
+  return Value{O};
+}
+
 Value dot(const Value& value) {
   IVLOG(1, "dot");
   auto args = value.as_tuple();
@@ -2086,6 +2111,7 @@ void RegisterOps() {
   registry->Register("clip", clip);
   registry->Register("concatenate", concatenate);
   registry->Register("convolution", convolution);
+  registry->Register("cumsum", cumsum);
   registry->Register("dot", dot);
   registry->Register("elu", elu);
   registry->Register("expand_dims", expand_dims);

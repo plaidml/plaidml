@@ -579,7 +579,8 @@ def cumprod(x, axis=0):
 
 
 def cumsum(x, axis=0):
-    _report_unimplemented('cumsum')
+    logger.debug('cumsum(x: {}, axis: {})'.format(x, axis))
+    return _KerasNode('cumsum', tensor=plaidml_op.cumsum(x.tensor, axis))
 
 
 def cur_name():
