@@ -575,7 +575,8 @@ def ctc_label_dense_to_sparse(labels, label_lengths):
 
 
 def cumprod(x, axis=0):
-    _report_unimplemented('cumprod')
+    logger.debug('cumprod(x: {}, axis: {})'.format(x, axis))
+    return _KerasNode('cumprod', tensor=plaidml_op.cumprod(x.tensor, axis))
 
 
 def cumsum(x, axis=0):

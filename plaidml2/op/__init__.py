@@ -59,6 +59,10 @@ def convolution(I, F, strides, dilations, data_dilations, filter_shape, groups, 
     ]).as_tensor()
 
 
+def cumprod(x, axis):
+    return op('cumprod', [x, axis]).as_tensor()
+
+
 def cumsum(x, axis):
     return op('cumsum', [x, axis]).as_tensor()
 
