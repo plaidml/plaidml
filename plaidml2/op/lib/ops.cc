@@ -1300,7 +1300,7 @@ Value mean(const Value& value) {
     return Value{I};
   }
 
-  auto keepdims = args[2].as_int();
+  auto keepdims = args[2].as_bool();
 
   AggregationAxes agg(I_shape.ndims(), axes, keepdims);
 
@@ -1328,6 +1328,38 @@ Value min(const Value& value) {
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
   O(agg.dst_idxs) <= I(agg.src_idxs);
+  return Value{O};
+}
+
+Value prod(const Value& value) {
+  IVLOG(1, "prod");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("prod expects 3 arguments");
+  }
+
+  auto I = args[0].as_tensor();
+  auto raw_axes = args[1];
+  auto keepdims = args[2].as_bool();
+
+  auto I_shape = I.shape();
+  if (I_shape.ndims() == 0) {
+    return Value{I};
+  }
+  if (raw_axes.is_tuple() && raw_axes.as_tuple().empty()) {
+    return Value{I};
+  }
+
+  // TODO: Move this commented block to Keras?
+  // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
+  //   I = cast(I, floatx());  // TODO: cast if * is not && for bools, don't if it is &&
+  // }
+
+  AggregationAxes agg(I_shape.ndims(), raw_axes, keepdims);
+
+  I.bind_dims(agg.src_dims);
+  auto O = TensorOutput(agg.dst_dims);
+  O(agg.dst_idxs) *= I(agg.src_idxs);
   return Value{O};
 }
 
@@ -1863,7 +1895,7 @@ Value sum(const Value& value) {
     return Value{I};
   }
 
-  auto keepdims = args[2].as_int();
+  auto keepdims = args[2].as_bool();
 
   AggregationAxes agg(I_shape.ndims(), axes, keepdims);
 
@@ -1974,7 +2006,7 @@ Value variance(const Value& value) {
   // Read arguments
   auto I = args[0].as_tensor();
   auto axes = args[1];
-  auto keepdims = args[2].as_int();
+  auto keepdims = args[2].as_bool();
 
   // Handle trivial cases
   if (I.shape().ndims() == 0) {
@@ -2019,6 +2051,7 @@ void RegisterOps() {
   registry->Register("mean", mean);
   registry->Register("max", max);
   registry->Register("pool", pool);
+  registry->Register("prod", prod);
   registry->Register("relu", relu);
   registry->Register("repeat", repeat);
   registry->Register("softmax", softmax);

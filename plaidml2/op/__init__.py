@@ -77,10 +77,10 @@ def max(x, axis=None, keepdims=False):
     return op('max', [x, axis, keepdims]).as_tensor()
 
 
-def mean(I, axis=None, keepdims=False):
+def mean(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
-    return op('mean', [I, axis, keepdims]).as_tensor()
+    return op('mean', [x, axis, keepdims]).as_tensor()
 
 
 def min(x, axis=None, keepdims=False):
@@ -99,6 +99,12 @@ def repeat(x, repeats, axis):
 
 def softmax(x, axis=None):
     return op('softmax', [x, axis]).as_tensor()
+
+
+def prod(x, axis=None, keepdims=False):
+    if isinstance(axis, np.ndarray):
+        axis = axis.tolist()
+    return op('prod', [x, axis, keepdims]).as_tensor()
 
 
 def pool(I, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,

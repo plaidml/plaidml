@@ -960,7 +960,8 @@ def print_tensor(x, message=''):
 
 
 def prod(value, axis=None, keepdims=False):
-    _report_unimplemented('prod')
+    logger.debug('prod(value: {}, axis: {}, keepdims: {})'.format(value, axis, keepdims))
+    return _KerasNode('prod', tensor=plaidml_op.prod(value.tensor, axis, keepdims))
 
 
 def random_binomial(shape, p=0.0, dtype=None, see=None):
