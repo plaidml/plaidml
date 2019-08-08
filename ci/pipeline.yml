@@ -6,10 +6,10 @@ steps:
 # build phase
 
 {{#variants}}
-  - label: build {{name}}
-    command: {{python}} ci/buildkite.py build {{name}}
+  - label: ':hammer_and_wrench: {{emoji}}'
+    command: '{{python}} ci/buildkite.py build {{name}}'
     agents:
-      PLATFORM: {{name}}
+      PLATFORM: '{{name}}'
 {{/variants}}
 
   - wait
@@ -17,18 +17,21 @@ steps:
 # test phase
 
 {{#tests}}
-  - label: test {{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}
+  - label: '{{emoji}}{{engine}} {{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}'
     command: |
       {{python}} -m pip install pyyaml --user
       {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}}
-    timeout_in_minutes: {{timeout}}
+  {{#softfail}}
+    soft_fail: true
+  {{/softfail}}
+    timeout_in_minutes: '{{timeout}}'
   {{#retry}}
     retry:
       automatic:
         limit: {{.}}
   {{/retry}}
     agents:
-      PLATFORM: {{platform}}
+      PLATFORM: '{{platform}}'
 {{/tests}}
 
   - wait: ~
@@ -36,7 +39,7 @@ steps:
 
 # report phase
 
-  - label: report
+  - label: ':bar_chart:'
     command: python3 ci/buildkite.py report
     agents:
       PLATFORM: linux_x86_64
