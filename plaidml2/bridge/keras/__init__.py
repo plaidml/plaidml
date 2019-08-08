@@ -661,7 +661,11 @@ def eye(size, dtype=None, name=None):
 
 def flatten(x):
     logger.debug('flatten(x: {})'.format(x))
-    _report_unimplemented('flatten')
+    I = x.tensor
+    I_dims = edsl.TensorDims(I.shape.ndims)
+    I.bind_dims(*I_dims)
+    O_dim = functools.reduce(lambda x, y: x * y, I_dims)
+    return reshape(x, [O_dim])
 
 
 def floor(x):
