@@ -63,6 +63,10 @@ def dot(x, y):
     return op('dot', [x, y]).as_tensor()
 
 
+def elu(x, alpha=1.0):
+    return op('elu', [x, alpha]).as_tensor()
+
+
 def expand_dims(x, axis=-1):
     return op('expand_dims', [x, axis]).as_tensor()
 

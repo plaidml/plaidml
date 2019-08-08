@@ -1177,6 +1177,29 @@ Value dot(const Value& value) {
                                X_shape.ndims() % Y_shape.ndims()));
 }
 
+Value elu(const Value& value) {
+  IVLOG(1, "elu");
+
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(str(boost::format("PlaidML elu op expects 2 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+
+  // Same algorithm, but alpha may be either int or float
+  if (args[1].is_float()) {
+    auto alpha = args[1].as_float();
+    auto O = select(I < 0, alpha * exp(I) - alpha, I);
+    return Value{O};
+  } else if (args[1].is_int()) {
+    auto alpha = args[1].as_int();
+    auto O = select(I < 0, alpha * exp(I) - alpha, I);
+    return Value{O};
+  }
+  throw std::runtime_error("Unexpected type for alpha in elu");
+}
+
 Value expand_dims(const Value& value) {
   IVLOG(1, "expand_dims");
 
@@ -2064,6 +2087,7 @@ void RegisterOps() {
   registry->Register("concatenate", concatenate);
   registry->Register("convolution", convolution);
   registry->Register("dot", dot);
+  registry->Register("elu", elu);
   registry->Register("expand_dims", expand_dims);
   registry->Register("flip", flip);
   registry->Register("hard_sigmoid", hard_sigmoid);

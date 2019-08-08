@@ -625,7 +625,8 @@ def dtype(x):
 
 
 def elu(x, alpha=1.0):
-    _report_unimplemented('elu')
+    logger.debug('elu(x: {}, alpha: {})'.format(x, alpha))
+    return _KerasNode('elu', name='elu', tensor=plaidml_op.elu(x.tensor, alpha))
 
 
 def equal(x, y):
