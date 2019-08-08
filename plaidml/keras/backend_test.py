@@ -723,6 +723,10 @@ class TestBackendOps(unittest.TestCase):
             b.relu(x, alpha=a, max_value=m, threshold=threshold),
         ]
 
+    @opTest([[m(3, 6)]])
+    def testHardSigmoid(self, b, x):
+        return [b.hard_sigmoid(x)]
+
     @compareForwardExact()
     def testEqual(self, b):
         return b.equal(b.variable(m(3, 3)), b.variable(m(3, 3)))

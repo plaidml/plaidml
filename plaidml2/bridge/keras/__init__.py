@@ -733,7 +733,10 @@ def greater_equal(x, y):
 
 
 def hard_sigmoid(x):
-    _report_unimplemented('hard_sigmoid')
+    logger.debug('hard_sigmoid(x: {})'.format(x))
+    return _KerasNode('hard_sigmoid',
+                      name='hard_sigmoid',
+                      tensor=plaidml_op.hard_sigmoid(x.tensor, 0.2))
 
 
 def identity(x):

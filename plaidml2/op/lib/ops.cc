@@ -1260,6 +1260,25 @@ Value flip(const Value& value) {
   return Value{O};
 }
 
+Value hard_sigmoid(const Value& value) {
+  IVLOG(1, "hard_sigmoid");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("hard_sigmoid expects 2 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto slope = args[1].as_float();
+  if (slope <= 0) {
+    throw std::runtime_error(str(boost::format("hard_sigmoid expects positive slope, received %1%") % slope));
+  }
+  auto hi_cusp = 1. / (2. * slope);
+  auto lo_cusp = -hi_cusp;
+  auto lo = Tensor(0.);
+  auto hi = Tensor(1.);
+  auto O = select(I < lo_cusp, lo, select(I > hi_cusp, hi, slope * I + 0.5));
+  return Value{O};
+}
+
 Value max(const Value& value) {
   IVLOG(1, "max");
   auto args = value.as_tuple();
@@ -2047,9 +2066,10 @@ void RegisterOps() {
   registry->Register("dot", dot);
   registry->Register("expand_dims", expand_dims);
   registry->Register("flip", flip);
-  registry->Register("min", min);
-  registry->Register("mean", mean);
+  registry->Register("hard_sigmoid", hard_sigmoid);
   registry->Register("max", max);
+  registry->Register("mean", mean);
+  registry->Register("min", min);
   registry->Register("pool", pool);
   registry->Register("prod", prod);
   registry->Register("relu", relu);

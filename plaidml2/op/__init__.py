@@ -71,6 +71,10 @@ def flip(x, axis=None):
     return op('flip', [x, axis]).as_tensor()
 
 
+def hard_sigmoid(x, slope):
+    return op('hard_sigmoid', [x, slope]).as_tensor()
+
+
 def max(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
