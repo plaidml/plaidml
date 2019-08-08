@@ -293,7 +293,19 @@ def batch_get_value(xs):
 
 
 def batch_normalization(x, mean, var, beta, gamma, axis=-1, epsilon=1e-3):
-    _report_unimplemented('batch_normalization')
+    # gamma == scale
+    # beta == offset
+    # The `axis` parameter is only used to tell TF the format of a fused batchnorm,
+    # so we ignore it.
+    denom = sqrt(var + epsilon)
+    if gamma is not None and beta is not None:
+        return ((x - mean) * gamma / denom) + beta
+    elif gamma is not None:
+        return ((x - mean) * gamma / denom)
+    elif beta is not None:
+        return ((x - mean) / denom) + beta
+    else:
+        return ((x - mean) / denom)
 
 
 def bias_add(x, bias, data_format=None):
@@ -867,7 +879,28 @@ def not_equal(lhs, rhs):
 
 
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
-    _report_unimplemented('normalize_batch_in_training')
+    I = x.tensor
+    ndims = I.shape.ndims
+    if reduction_axes == None:
+        raw_axes = [ndims - 1]
+    else:
+        raw_axes = reduction_axes
+    axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
+
+    m = mean(x, axis=axes, keepdims=True)
+    v = var(x, axis=axes, keepdims=True)
+
+    normalized_tensor = batch_normalization(x=x,
+                                            mean=m,
+                                            var=v,
+                                            beta=beta,
+                                            gamma=gamma,
+                                            epsilon=epsilon)
+
+    # Tensorflow and Theano disagree on whether mean and var should be squeezed
+    # here. For now, going with Theano for simplicity (i.e. don't squeeze).
+
+    return normalized_tensor, m, v
 
 
 def one_hot(indices, num_classes):
