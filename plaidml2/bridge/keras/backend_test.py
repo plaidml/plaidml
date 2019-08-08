@@ -849,6 +849,16 @@ class TestBackendOps(unittest.TestCase):
     def testLog(self, b, x):
         return [b.log(x)]
 
+    @opTest([
+        [m(3, 3)],
+        [m(3, 3), None, True],
+        [m(2, 3, 4, 5), [1, 3]],
+        [m(3, 4, 5), -1],
+        [m(2, 3, 4), 0],
+    ])
+    def testLogSumExp(self, b, x, ax=None, kd=False):
+        return [b.logsumexp(x, axis=ax, keepdims=kd)]
+
     @opTest([[m(10)], [m(2, 2, 2, 3)]], 1e-2)
     def testTanh(self, b, x):
         return [b.tanh(x)]
