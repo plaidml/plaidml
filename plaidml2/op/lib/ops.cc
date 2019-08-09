@@ -1187,6 +1187,23 @@ Value expand_dims(const Value& value) {
   return Value{O};
 }
 
+Value max(const Value& value) {
+  IVLOG(1, "max");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("max expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto I_shape = I.shape();
+  auto axes = args[1];
+  auto keepdims = args[2].as_bool();
+  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+  I.bind_dims(agg.src_dims);
+  auto O = TensorOutput(agg.dst_dims);
+  O(agg.dst_idxs) >= I(agg.src_idxs);
+  return Value{O};
+}
+
 Value mean(const Value& value) {
   IVLOG(1, "mean");
   auto args = value.as_tuple();
@@ -1222,6 +1239,23 @@ Value mean(const Value& value) {
     denom = denom * agg.src_dims.at(axis);
   }
   return Value{SO / denom};
+}
+
+Value min(const Value& value) {
+  IVLOG(1, "min");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("min expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto I_shape = I.shape();
+  auto axes = args[1];
+  auto keepdims = args[2].as_bool();
+  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+  I.bind_dims(agg.src_dims);
+  auto O = TensorOutput(agg.dst_dims);
+  O(agg.dst_idxs) <= I(agg.src_idxs);
+  return Value{O};
 }
 
 Value pool(const Value& value) {
@@ -1872,7 +1906,9 @@ void RegisterOps() {
   registry->Register("convolution", convolution);
   registry->Register("dot", dot);
   registry->Register("expand_dims", expand_dims);
+  registry->Register("min", min);
   registry->Register("mean", mean);
+  registry->Register("max", max);
   registry->Register("pool", pool);
   registry->Register("relu", relu);
   registry->Register("softmax", softmax);
