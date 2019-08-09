@@ -385,7 +385,8 @@ def categorical_crossentropy(target, output, from_logits=False):
 
 
 def ceil(x):
-    _report_unimplemented('ceil')
+    logger.debug('ceil(x: {})'.format(x))
+    return _KerasNode('ceil', tensor=edsl.ceil(x.tensor))
 
 
 def clear_session():

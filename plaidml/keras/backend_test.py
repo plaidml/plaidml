@@ -1639,6 +1639,12 @@ class TestBackendOps(unittest.TestCase):
         vals = np.array([[1.7, 0.8, 1.5], [0.9, -0.3, -0.8], [0, 1.7, 0.6]])
         return b.round(b.variable(vals))
 
+    def testCeil(self):
+        npt.assert_allclose(pkb.ceil(pkb.variable(m(6, 2, 3))).eval(), np.ceil(m(6, 2, 3)))
+
+    def testFloor(self):
+        npt.assert_allclose(pkb.floor(pkb.variable(m(6, 2, 3))).eval(), np.floor(m(6, 2, 3)))
+
     @opTest([
         [m(3, 2, 4), n(3, 2, 4), 0],
         [m(2, 3), n(2, 3), 1],

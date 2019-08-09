@@ -571,6 +571,10 @@ def cast(x, dtype):
     return call("as_{}".format(dtype.info.base), x, dtype.info.bitwidth)
 
 
+def ceil(x):
+    return call("ceil", x)
+
+
 # def element(x) : return call("element", {x}) # TODO: tuple
 
 
@@ -584,6 +588,10 @@ def cos(x):
 
 def exp(x):
     return call("exp", x)
+
+
+def floor(x):
+    return call("floor", x)
 
 
 def gather(x, y):
