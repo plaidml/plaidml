@@ -296,6 +296,10 @@ SUITES:
         precision: high
       mobilenet_v2:
         precision: high
+        platform_overrides:
+          keras-plaid-mtl-uhd630:
+            softfail: true
+
       resnet50:
         precision: high
         platform_overrides:
@@ -317,14 +321,19 @@ SUITES:
         precision: high
         platform_overrides:
           keras-plaid-mtl-uhd630:
-            prepend_args: [--examples, 192]
+            prepend_args: [--examples, 128]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 192]
+            prepend_args: [--examples, 128]
           keras-plaid-ocl-neo:
             prepend_args: [--examples, 256]
           keras-stripe-ocl-neo:
             prepend_args: [--examples, 256]
-        skip_platforms: [keras-stripe-mtl-uhd630, keras-plaid-ocl-gv100gl]
+        skip_platforms: [keras-plaid-ocl-gv100gl]
+        platform_overrides:
+          keras-stripe-mtl-uhd630:
+            softfail: true
+          keras-plaid-mtl-uhd630:
+            softfail: true
 
   comprehensive:
     platforms:
