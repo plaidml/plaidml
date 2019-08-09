@@ -331,7 +331,13 @@ def bias_add(x, bias, data_format=None):
 
 
 def binary_crossentropy(target, output, from_logits=False):
-    _report_unimplemented('binary_crossentropy')
+    logger.debug('binary_crossentropy(target: {}, output: {}, from_logits: {})'.format(
+        target, output, from_logits))
+    if from_logits:
+        output = sigmoid(output)
+    return _KerasNode('binary_crossentropy',
+                      tensor=plaidml_op.binary_crossentropy(target.tensor, output.tensor,
+                                                            epsilon()))
 
 
 def cast(x, dtype):
@@ -1317,7 +1323,7 @@ def shape(x):
 
 def sigmoid(x):
     logger.debug('sigmoid(x: {})'.format(x))
-    return _KerasNode('sigmoid', tensor=edsl.sigmoid(x.tensor))
+    return _KerasNode('sigmoid', tensor=plaidml_op.sigmoid(x.tensor))
 
 
 def sign(x):

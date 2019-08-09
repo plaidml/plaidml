@@ -29,6 +29,10 @@ def argmax(x, axis=-1):
     return op('argmax', [x, axis]).as_tensor()
 
 
+def binary_crossentropy(targets, preds, epsilon):
+    return op('binary_crossentropy', [targets, preds, epsilon]).as_tensor()
+
+
 def clip(x, min=None, max=None):
     return op('clip', [x, min, max]).as_tensor()
 
@@ -111,6 +115,10 @@ def relu(x, alpha=None, max_value=None, threshold=0.):
 
 def repeat(x, repeats, axis):
     return op('repeat', [x, repeats, axis]).as_tensor()
+
+
+def sigmoid(x):
+    return op('sigmoid', [x]).as_tensor()
 
 
 def softmax(x, axis=None):

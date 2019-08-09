@@ -488,6 +488,31 @@ Value argmax(const Value& value) {
   return Value{O};
 }
 
+// TODO: Handle function forward declaration in a nice style
+Value clip(const Value& value);  // binary xentropy needs to know about clip
+Value binary_crossentropy(const Value& value) {
+  IVLOG(1, "binary_crossentropy")
+  auto args = value.as_tuple();
+
+  // Read arguments
+  if (args.size() != 3) {
+    throw std::runtime_error("binary_crossentropy expects 3 arguments");
+  }
+  auto T = args[0].as_tensor();  // Targets Tensor
+  auto raw_P = args[1];          // Predictions tensor Value, before clipping
+  auto epsilon = args[2].as_float();
+
+  // Check args & set useful values
+  if (epsilon < 0. || epsilon >= 0.5) {
+    throw std::runtime_error(str(
+        boost::format("The epsilon used in binary_crossentropy must be between 0 and 0.5, received %1%") % epsilon));
+  }
+  std::vector<Value> clip_inputs{raw_P, Value{epsilon}, Value{1. - epsilon}};
+  auto P = clip(Value{clip_inputs}).as_tensor();
+  auto O = -T * log(P) - (1 - T) * log(1 - P);
+  return Value{O};
+}
+
 Value clip(const Value& value) {
   IVLOG(1, "clip");
   auto args = value.as_tuple();
@@ -1653,6 +1678,17 @@ Value repeat(const Value& value) {
   return Value{O};
 }
 
+Value sigmoid(const Value& value) {
+  IVLOG(1, "sigmoid");
+  auto args = value.as_tuple();
+  if (args.size() != 1) {
+    throw std::runtime_error("sigmoid expects 1 argument");
+  }
+  auto I = args[0].as_tensor();
+  auto O = 1.0 / (1.0 + exp(-I));
+  return Value{O};
+}
+
 Value softmax(const Value& value) {
   IVLOG(1, "softmax");
   auto args = value.as_tuple();
@@ -2133,6 +2169,7 @@ void RegisterOps() {
   auto registry = OperationRegistry::Instance();
   registry->Register("abs", abs);
   registry->Register("argmax", argmax);
+  registry->Register("binary_crossentropy", binary_crossentropy);
   registry->Register("clip", clip);
   registry->Register("concatenate", concatenate);
   registry->Register("convolution", convolution);
@@ -2150,6 +2187,7 @@ void RegisterOps() {
   registry->Register("prod", prod);
   registry->Register("relu", relu);
   registry->Register("repeat", repeat);
+  registry->Register("sigmoid", sigmoid);
   registry->Register("softmax", softmax);
   registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);
