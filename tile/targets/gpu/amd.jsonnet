@@ -207,6 +207,7 @@ local PARAMS = {
                 parent_reqs: ['contract_outer'],
                 fused_set: ['cache'],
                 exclude: ['contract_middle'],
+                no_inner: true,
               }
             },
 
