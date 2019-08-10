@@ -1334,7 +1334,7 @@ Value flip(const Value& value) {
   if (args[1].is_int()) {
     raw_axes.push_back(args[1].as_int());
   } else if (args[1].is_none()) {
-    for (int64_t i = 0; i < ndims; ++i) {
+    for (uint64_t i = 0; i < ndims; ++i) {
       raw_axes.push_back(i);
     }
   } else {
@@ -2004,7 +2004,7 @@ Value sum(const Value& value) {
   IVLOG(1, "sum");
   auto args = value.as_tuple();
   if (args.size() != 3) {
-    throw std::runtime_error("mean expects 3 arguments");
+    throw std::runtime_error("sum expects 3 arguments");
   }
 
   auto I = args[0].as_tensor();
