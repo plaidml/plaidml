@@ -156,7 +156,6 @@ local PARAMS = {
                 dirs: [ 'In' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
                 xfer_loc: {},
-                //xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
                 odd_size: true,
               }
             },
@@ -170,7 +169,6 @@ local PARAMS = {
                 dirs: [ 'Out', 'InOut' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
                 xfer_loc: {},
-                //xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
                 odd_size: true,
               }
             },
@@ -190,6 +188,7 @@ local PARAMS = {
                 parent_reqs: ['contract_outer'],
                 fused_set: ['cache'],
                 exclude: ['contract_middle'],
+                no_inner: true,
               }
             },
 
@@ -374,6 +373,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'cleanup2',
               pass: {
