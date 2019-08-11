@@ -37,7 +37,8 @@ void FlattenTrivial(stripe::Block* block);
 std::shared_ptr<stripe::Block> FusionRefactor(const stripe::Block& block,                         //
                                               const std::map<std::string, std::string>& mapping,  //
                                               const TileShape& tile,                              //
-                                              bool interleave = false);
+                                              bool interleave = false,
+                                              bool elide_trivial = true);
 
 // Attempt to fuse b into a.  Return true on success, in which case blocks have been
 // destructively modified.  Otherwise returns false and leave blocks unaltered.

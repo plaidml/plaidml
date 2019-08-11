@@ -465,7 +465,7 @@ struct Block : Statement {
   std::string unique_idx_name(const std::string& name) const;
   TensorShape exterior_shape(const std::string& name) const;
 
-  std::shared_ptr<Block> SubBlock(size_t pos) const;
+  std::shared_ptr<Block> SubBlock(size_t pos, bool reverse = false) const;
 };
 
 struct Buffer {

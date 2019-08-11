@@ -129,6 +129,18 @@ local PARAMS = {
             },
 
             {
+              name: 'fuse_eltwise_eltwise',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                parent_reqs: ['main'],
+                a_reqs: ['eltwise'],
+                b_reqs: ['eltwise'],
+                inner_remove_set: ['kernel'],
+                output_match: true,
+              }
+            },
+
+            {
               name: 'fuse_contract_eltwise',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
@@ -186,20 +198,9 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 parent_reqs: ['contract_outer'],
-                fused_set: ['cache'],
+                fused_set: ['cache', 'eltwise'],
                 exclude: ['contract_middle'],
                 no_inner: true,
-              }
-            },
-
-            {
-              name: 'fuse_eltwise_eltwise',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
-                parent_reqs: ['main'],
-                a_reqs: ['eltwise'],
-                b_reqs: ['eltwise'],
-                output_match: true,
               }
             },
 
