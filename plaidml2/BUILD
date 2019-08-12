@@ -54,7 +54,6 @@ plaidml_py_library(
         ":_ffi",
         "//plaidml2/core:py",
     ],
-    tags = ["conda"],
 )
 
 py_cffi(

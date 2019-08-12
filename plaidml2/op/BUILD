@@ -54,7 +54,6 @@ plaidml_py_library(
         "//plaidml2:py",
         "//plaidml2/edsl:py",
     ],
-    tags = ["conda"],
 )
 
 plaidml_cc_test(

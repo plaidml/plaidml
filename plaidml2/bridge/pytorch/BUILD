@@ -37,7 +37,7 @@ plaidml_py_library(
     name = "py",
     srcs = ["__init__.py"],
     data = [":plaidml_pytorch.so"],
-    tags = ["conda", "pytorch"],
+    tags = ["pytorch"],
     visibility = ["//visibility:public"],
     deps = ["//plaidml2:py"],
 )

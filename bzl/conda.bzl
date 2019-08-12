@@ -29,15 +29,18 @@ def _conda_impl(ctx):
         content = _get_main(ctx),
     )
 
+    launcher_cenv = ctx.actions.declare_file(ctx.label.name + ".cenv")
+    ctx.actions.write(
+        output = launcher_cenv,
+        content = env.files.to_list()[0].path,
+    )
+
     runfiles = ctx.runfiles(
         collect_data = True,
         collect_default = True,
         files = ctx.files.srcs,
-        symlinks = {
-            ".main": launcher_main,
-        },
         root_symlinks = {
-            ".cenv": env.files.to_list()[0],
+            ".cenv": launcher_cenv,
             ".main": launcher_main,
         },
     )

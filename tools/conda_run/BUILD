@@ -13,6 +13,7 @@ plaidml_cc_binary(
     }),
     deps = [
         "//base/util",
+        "@bazel_tools//tools/cpp/runfiles",
         "@boost//:filesystem",
     ],
 )

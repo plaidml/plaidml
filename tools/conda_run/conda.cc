@@ -4,6 +4,7 @@
 #include <unistd.h>
 #endif
 
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -16,10 +17,13 @@
 #include <boost/process.hpp>
 
 #include "base/util/env.h"
+#include "tools/cpp/runfiles/runfiles.h"
 
 extern char** environ;
 
 namespace fs = boost::filesystem;
+
+using bazel::tools::cpp::runfiles::Runfiles;
 
 #ifdef _WIN32
 const char kPathSeparator = ';';
@@ -35,20 +39,32 @@ std::string read_file(const fs::path& path) {
 }
 
 int main(int argc, char* argv[]) {
+  std::string error;
+  std::unique_ptr<Runfiles> runfiles(Runfiles::Create(argv[0], &error));
+  if (!error.empty()) {
+    std::cerr << "Failed to load runfiles manifest: " << error << std::endl;
+    return EXIT_FAILURE;
+  }
   fs::path this_path = fs::absolute(argv[0]);
   if (fs::is_symlink(this_path)) {
     this_path = fs::read_symlink(this_path);
   }
-  auto main_file_path = fs::canonical(this_path).replace_extension(".main");
+  auto main_file_path = fs::canonical(runfiles->Rlocation(".main"));
   auto main_str = read_file(main_file_path);
   if (main_str.empty()) {
     std::cerr << "Main pointer not found: " << main_file_path << std::endl;
-    return 1;
+    return EXIT_FAILURE;
+  }
+  auto cenv_file_path = fs::canonical(runfiles->Rlocation(".cenv"));
+  auto cenv_dir_str = read_file(cenv_file_path);
+  if (cenv_dir_str.empty()) {
+    std::cerr << "Conda environment pointer not found: " << cenv_file_path << std::endl;
+    return EXIT_FAILURE;
   }
   auto cwd_path = fs::current_path();
   auto main_path = cwd_path / main_str;
   auto runfiles_dir = this_path.replace_extension(".runfiles");
-  auto cenv_dir = runfiles_dir / ".cenv";
+  auto cenv_dir = cwd_path / fs::path(cenv_dir_str);
 #ifdef _WIN32
   auto python = cenv_dir / "python.exe";
 #else
@@ -60,6 +76,16 @@ int main(int argc, char* argv[]) {
   for (int i = 1; i < argc; i++) {
     args.push_back(argv[i]);
   }
+
+  // Compute the PYTHONPATH.
+  //
+  // N.B. This technique doesn't work on Windows, since we don't have the
+  // directory structure to walk over; this code should instead build the
+  // PYTHONPATH from the manifest -- except it turns out that doing that
+  // is also a little tricky, since one has to take into account subdirectory
+  // paths specified by py_library() rules (e.g. protobuf).  There are some
+  // heuristics we could use, but ultimately we should see if we can find a
+  // better solution.
 
   std::list<std::string> python_paths;
   for (const auto& dir : fs::directory_iterator(runfiles_dir)) {
@@ -97,8 +123,10 @@ int main(int argc, char* argv[]) {
   }
 
   vertexai::env::Set("PYTHONPATH", python_path.c_str());
-  vertexai::env::Set("RUNFILES_DIR", runfiles_dir.string());
   vertexai::env::Set("CONDA_DEFAULT_ENV", cenv_dir.string());
+  for (const auto& var : runfiles->EnvVars()) {
+    vertexai::env::Set(var.first, var.second);
+  }
 #ifdef _WIN32
   auto scripts_dir = cenv_dir / "Scripts";
   auto bin_dir = cenv_dir / "Library" / "bin";

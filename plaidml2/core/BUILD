@@ -72,5 +72,4 @@ plaidml_py_library(
         ":py_version",
     ],
     visibility = ["//visibility:public"],
-    tags = ["conda"],
 )
