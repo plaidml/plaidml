@@ -73,6 +73,8 @@ class CondaEnv(object):
         try:
             if not self.path.exists():
                 check_call(['conda', 'env', 'create', '-f', spec, '-p', str(self.path)])
+            else:
+                check_call(['conda', 'env', 'update', '--prune', '-f', spec, '-p', str(self.path)])
         except:
             if self.path.exists():
                 shutil.rmtree(self.path)

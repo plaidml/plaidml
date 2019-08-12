@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import pathlib
 import platform
 import shutil
 import subprocess
@@ -26,6 +27,24 @@ def load_template(name):
         return file_.read()
 
 
+def get_emoji(variant):
+    if variant == 'windows_x86_64':
+        return ':windows:'
+    if variant == 'macos_x86_64':
+        return ':darwin:'
+    return ':linux:'
+
+
+def get_engine(pkey):
+    if 'stripe-ocl' in pkey:
+        return ':barber::cl:'
+    if 'stripe-mtl' in pkey:
+        return ':barber::metal:'
+    if 'plaidml-mtl' in pkey:
+        return ':black_square_button::metal:'
+    return ':black_square_button::cl:'
+
+
 def get_python(variant):
     if variant == 'windows_x86_64':
         return 'python'
@@ -41,7 +60,7 @@ def cmd_pipeline(args, remainder):
 
     variants = []
     for variant in plan['VARIANTS'].keys():
-        variants.append(dict(name=variant, python=get_python(variant)))
+        variants.append(dict(name=variant, python=get_python(variant), emoji=get_emoji(variant)))
 
     tests = []
     for skey, suite in plan['SUITES'].items():
@@ -57,16 +76,17 @@ def cmd_pipeline(args, remainder):
                     continue
                 for batch_size in suite['params'][args.pipeline]['batch_sizes']:
                     tests.append(
-                        dict(
-                            suite=skey,
-                            workload=wkey,
-                            platform=pkey,
-                            batch_size=batch_size,
-                            variant=variant,
-                            timeout=popt.get('timeout', 20),
-                            retry=popt.get('retry'),
-                            python=get_python(variant),
-                        ))
+                        dict(suite=skey,
+                             workload=wkey,
+                             platform=pkey,
+                             batch_size=batch_size,
+                             variant=variant,
+                             timeout=popt.get('timeout', 20),
+                             retry=popt.get('retry'),
+                             softfail=popt.get('softfail'),
+                             python=get_python(variant),
+                             emoji=get_emoji(variant),
+                             engine=get_engine(pkey)))
 
     if args.count:
         print('variants: {}'.format(len(variants)))
@@ -86,11 +106,15 @@ def cmd_build(args, remainder):
     common_args += ['--verbose_failures']
     common_args += ['--verbose_explanations']
     if platform.system() == 'Windows':
-        # TODO: Test everything on windows
         util.check_call(['git', 'config', 'core.symlinks', 'true'])
-        util.check_call(['bazelisk', 'build', ':pkg'] + common_args)
+        cenv = util.CondaEnv(pathlib.Path('.cenv'))
+        cenv.create('environment-windows.yml')
+        env = os.environ.copy()
+        env.update(cenv.env())
     else:
-        util.check_call(['bazelisk', 'test', '...'] + common_args)
+        env = None
+
+    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
     archive_dir = os.path.join(
         args.root,
         args.pipeline,
@@ -172,10 +196,10 @@ def main():
         main_parser.print_help()
         return
 
-    path = os.getenv('PATH').split(os.pathsep)
     if platform.system() == 'Linux' or platform.system() == 'Darwin':
+        path = os.getenv('PATH').split(os.pathsep)
         path.insert(0, '/usr/local/miniconda3/bin')
-    os.environ.update({'PATH': os.pathsep.join(path)})
+        os.environ.update({'PATH': os.pathsep.join(path)})
 
     args.func(args, remainder)
 

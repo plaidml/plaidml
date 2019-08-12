@@ -19,7 +19,7 @@ import numpy as np
 from asq.initiators import query
 from asq.record import new
 
-DEFAULT_BUILD_URL = 'https://buildkite.com/vertex-dot-ai'
+DEFAULT_BUILD_URL = 'https://buildkite.com/plaidml'
 PLAN_PATH = pathlib.Path('../com_intel_plaidml/ci/plan.yml')
 
 
@@ -301,7 +301,7 @@ def write_file(filename, content):
 
 
 def buildkite_annotate(root, style, html):
-    printf('--- Uploading artifacts and adding annotations')
+    printf('--- :buildkite: Uploading artifacts and adding annotations')
     check_call(['buildkite-agent', 'artifact', 'upload', 'report/**/*'], cwd=root)
 
     cmd = ['buildkite-agent', 'annotate', '--style', style]
@@ -310,7 +310,7 @@ def buildkite_annotate(root, style, html):
 
 
 def main():
-    printf('--- Analyzing test results')
+    printf('--- :bar_chart: Analyzing test results')
 
     parser = argparse.ArgumentParser()
     parser.add_argument('root', type=pathlib.Path)

@@ -63,8 +63,16 @@ message PadPass {
   optional uint32 prime_threshold = 2 [default = 32];
 }
 
+// Expand the size of buffers to reduce constraints required.
+message MirPadPass {
+  repeated string reqs = 1;
+  // Modify the prime dimension greater than prime_threshold
+  optional uint32 prime_threshold = 2 [default = 32];
+}
+
 // Reorder blocks
-message ReorderBlocksPass {}
+message ReorderBlocksPass {
+}
 
 // The scalarize pass looks for refinements which (usually due to
 // localization) now hold only a single element, and replaces
@@ -646,7 +654,8 @@ message TempVarPass {
 }
 
 // Propagate constant tensors.
-message ConstantPropagatePass {}
+message ConstantPropagatePass {
+}
 
 // Remove constant tensor and replace the corresponding loads with constants
 message ConstTensorPass {

@@ -771,7 +771,8 @@ def map_fn(fn, elems, name=None, dtype=None):
 
 
 def max(x, axis=None, keepdims=False):
-    _report_unimplemented('max')
+    logger.debug('max(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
+    return _KerasNode('max', tensor=plaidml_op.max(x.tensor, axis, keepdims))
 
 
 def maximum(x, y):
@@ -785,7 +786,8 @@ def mean(x, axis=None, keepdims=False):
 
 
 def min(x, axis=None, keepdims=False):
-    _report_unimplemented('min')
+    logger.debug('min(x: {}, axis: {}, keepdims: {})'.format(x, axis, keepdims))
+    return _KerasNode('min', tensor=plaidml_op.min(x.tensor, axis, keepdims))
 
 
 def minimum(x, y):

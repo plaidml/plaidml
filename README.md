@@ -12,7 +12,7 @@ src="docs/images/plaid-final.png" height="200"></a><br>
 </div>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/plaidml/plaidml/blob/master/LICENSE)
-[![Build status](https://badge.buildkite.com/5c9add6b89a14fd498e69a5035062368480e688c4c74cbfab3.svg)](https://buildkite.com/plaidml/plaidml-plaidml)
+[![Build status](https://badge.buildkite.com/5c9add6b89a14fd498e69a5035062368480e688c4c74cbfab3.svg?branch=master)](https://buildkite.com/plaidml/plaidml-plaidml)
 
 PlaidML is an advanced and portable tensor compiler for enabling deep learning
 on laptops, embedded devices, or other devices where the available computing

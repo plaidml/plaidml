@@ -27,7 +27,6 @@ plaidml_cc_library(
         "analysis.cc",
         "dialect.cc",
         "ops.cc",
-        "padding_pass.cc",
         ":gen-op-defs",
     ],
     hdrs = [
@@ -35,7 +34,6 @@ plaidml_cc_library(
         "attrs.h",
         "mlir.h",
         "ops.h",
-        "padding_pass.h",
         "types.h",
         ":gen-op-decls",
     ],
@@ -68,12 +66,28 @@ plaidml_cc_library(
     ],
 )
 
+plaidml_cc_library(
+    name = "passes",
+    srcs = [
+        "padding_pass.cc",
+    ],
+    hdrs = [
+        "padding_pass.h",
+    ],
+    tags = ["llvm"],
+    deps = [
+        "//tile/codegen:proto_cc",
+	":mir",
+    ],
+)
+
 plaidml_cc_test(
     name = "mir_test",
     srcs = ["mir_test.cc"],
     tags = ["llvm", "mir_test"],
     deps = [
         ":transcode",
+        ":passes",
         "//tile/codegen",
         "//tile/lang",
         "//tile/lib",

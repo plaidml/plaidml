@@ -212,7 +212,7 @@ posix_cmake_vars = {
     "HAVE_GETTIMEOFDAY": 1,
     "HAVE_INT64_T": 1,
     "HAVE_ISATTY": 1,
-    "HAVE_LIBEDIT": 1,
+    "HAVE_LIBEDIT": 0,
     "HAVE_LIBPTHREAD": 1,
     "HAVE_LIBZ": 1,
     "HAVE_MKDTEMP": 1,

@@ -294,7 +294,7 @@ def unary_op(value, op_str, name=None):
     """Builds a Value for an elementwise unary operation.
 
     Args:
-        value (Value): The operation input.
+        value (Value or numeric): The operation input.
         op_str (str): The string to use for the operation.
                       The string should be an expression in terms of 'I'.
         name (str): The name of the operation, or None.
@@ -302,6 +302,8 @@ def unary_op(value, op_str, name=None):
     Returns:
         Value: A Value representing the result of the operation.
     """
+    value = Value.from_python_value(value)
+
     operation = Operation('function (I) -> (O) {{ O = {}; }}'.format(op_str), [('I', value)],
                           [('O', value.shape)],
                           name=name)

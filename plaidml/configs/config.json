@@ -36,7 +36,8 @@
                     "max_mem": 32768,
                     "max_regs": 16384,
                     "goal_groups": 16,
-                    "goal_flops_per_byte": 50
+                    "goal_flops_per_byte": 50,
+                    "stripe_config": "amd_opencl"
                 }
             },
             {
@@ -84,7 +85,8 @@
                     "max_mem": 15360,
                     "max_regs": 32768,
                     "goal_groups": 16,
-                    "goal_flops_per_byte": 46
+                    "goal_flops_per_byte": 46,
+                    "stripe_config": "nvidia"
                 }
             }
         ]

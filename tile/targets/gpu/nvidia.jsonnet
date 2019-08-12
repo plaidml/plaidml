@@ -129,6 +129,18 @@ local PARAMS = {
             },
 
             {
+              name: 'fuse_eltwise_eltwise',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                parent_reqs: ['main'],
+                a_reqs: ['eltwise'],
+                b_reqs: ['eltwise'],
+                inner_remove_set: ['kernel'],
+                output_match: true,
+              }
+            },
+
+            {
               name: 'fuse_contract_eltwise',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
@@ -156,7 +168,6 @@ local PARAMS = {
                 dirs: [ 'In' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
                 xfer_loc: {},
-                //xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
                 odd_size: true,
               }
             },
@@ -170,7 +181,6 @@ local PARAMS = {
                 dirs: [ 'Out', 'InOut' ],
                 mem_loc: { 'devs': [{'name': 'LOCAL', 'units': [{'offset': 0}]}] },
                 xfer_loc: {},
-                //xfer_loc: { 'devs': [{'name': 'DMA', 'units': [{'offset': 0}]}] },
                 odd_size: true,
               }
             },
@@ -188,19 +198,9 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 parent_reqs: ['contract_outer'],
-                fused_set: ['cache'],
+                fused_set: ['cache', 'eltwise'],
                 exclude: ['contract_middle'],
-              }
-            },
-
-            {
-              name: 'fuse_eltwise_eltwise',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
-                parent_reqs: ['main'],
-                a_reqs: ['eltwise'],
-                b_reqs: ['eltwise'],
-                output_match: true,
+                no_inner: true,
               }
             },
 
@@ -374,6 +374,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+
             {
               name: 'cleanup2',
               pass: {
