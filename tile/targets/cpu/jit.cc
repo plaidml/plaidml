@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <deque>
 #include <memory>
+#include <utility>
 
 #include <half.hpp>
 
@@ -297,7 +298,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
         llvm::Value* index = builder_.getInt32(i++);
         std::vector<llvm::Value*> idxList{index};
         llvm::Value* elptr = builder_.CreateGEP(argvec, idxList);
-        llvm::Value* elval = builder_.CreateLoad(elptr);
+        llvm::Value* elval = builder_.CreateLoad(elptr, ref.into());
         llvm::Type* eltype = CType(ref.interior_shape.type)->getPointerTo();
         args.push_back(builder_.CreateBitCast(elval, eltype));
       } else if (ref.has_tag("tmp")) {
@@ -311,6 +312,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
       } else {
         throw std::runtime_error("Top-level refinement missing #user or #tmp");
       }
+      args.back()->setName(ref.into());
     }
   }
   // After passing in buffer pointers, we also provide an initial value for
@@ -710,7 +712,7 @@ void Compiler::Visit(const stripe::Load& load) {
   // Load the value from that address and use it to redefine the
   // destination scalar.
   llvm::Value* element = ElementPtr(from);
-  llvm::Value* value = builder_.CreateLoad(element);
+  llvm::Value* value = builder_.CreateLoad(element, load.into);
   scalars_[load.into] = Scalar{value, from.refinement->interior_shape.type};
 }
 
@@ -780,6 +782,7 @@ void Compiler::Visit(const stripe::LoadIndex& load_index) {
   // op->from is an affine
   // op->into is the name of a destination scalar
   llvm::Value* rval = Eval(load_index.from);
+  rval->setName(load_index.into);
   scalars_[load_index.into] = Scalar{rval, DataType::INT64};
 }
 
@@ -790,11 +793,13 @@ void Compiler::Visit(const stripe::Constant& constant) {
       auto ty = builder_.getInt64Ty();
       auto value = llvm::ConstantInt::get(ty, constant.iconst);
       scalars_[constant.name] = Scalar{value, DataType::INT64};
+      value->setName(constant.name);
     } break;
     case stripe::ConstType::Float: {
       auto ty = builder_.getDoubleTy();
       auto value = llvm::ConstantFP::get(ty, constant.fconst);
       scalars_[constant.name] = Scalar{value, DataType::FLOAT64};
+      value->setName(constant.name);
     } break;
   }
 }
@@ -905,7 +910,7 @@ void Compiler::Visit(const stripe::Block& block) {
         allocs.push_back(buffer);
       }
       llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
-      buffer = builder_.CreateBitCast(buffer, buftype);
+      buffer = builder_.CreateBitCast(buffer, buftype, ref.into());
     } else {
       // Pass in the current element address from the source buffer.
       // If a "from" name is specified, use that buffer; if not, that means
@@ -1407,7 +1412,7 @@ llvm::Value* Compiler::ElementPtr(const Buffer& buf) {
   // and the result is an offset from the buffer base address.
   llvm::Value* offset = Eval(buf.refinement->FlatAccess());
   std::vector<llvm::Value*> idxList{offset};
-  return builder_.CreateGEP(buf.base, idxList);
+  return builder_.CreateGEP(buf.base, idxList, buf.refinement->into() + "[]");
 }
 
 llvm::Value* Compiler::Eval(const stripe::Affine& access) {
@@ -1430,11 +1435,13 @@ llvm::Value* Compiler::Eval(const stripe::Affine& access) {
 void Compiler::OutputType(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
   assert(1 == intrinsic.outputs.size());
   scalars_[intrinsic.outputs[0]] = Scalar{ret, intrinsic.type};
+  ret->setName(intrinsic.outputs[0]);
 }
 
 void Compiler::OutputBool(llvm::Value* ret, const stripe::Intrinsic& intrinsic) {
   assert(1 == intrinsic.outputs.size());
   scalars_[intrinsic.outputs[0]] = Scalar{ret, DataType::BOOLEAN};
+  ret->setName(intrinsic.outputs[0]);
 }
 
 void Compiler::CallIntrinsicFunc(const stripe::Intrinsic& stmt, const char* name_f32, const char* name_f64) {
