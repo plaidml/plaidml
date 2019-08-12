@@ -724,14 +724,9 @@ class TestBackendOps(unittest.TestCase):
     def testSqrt(self, b, x):
         return [b.sqrt(x)]
 
-    @opTest(
-        [
-            [m(1, 2, 1)],
-            #[np.sqrt(m(5, 5, 10) + 2) - 3],
-            #[np.sin(m(4, 3, 2, 1, 6))]
-        ],
-        1e-02,
-        skip_theano=True)
+    @opTest([[m(1, 2, 1)], [np.sqrt(m(5, 5, 10) + 2) - 3], [np.sin(m(4, 3, 2, 1, 6))]],
+            1e-02,
+            skip_theano=True)
     def testSoftmax(self, b, x):
         return [
             -b.log(b.softmax(x)),
@@ -1557,9 +1552,16 @@ class TestBackendOps(unittest.TestCase):
     def testSliceBasic(self, b, x):
         return [b.exp(x[2:30]), b.log(x[:5]), b.tanh(x[-4:]), b.sqrt(x[-1])]
 
-    @opTest([[m(4, 3, 3, 2, 5)]])
+    @opTest([
+        [m(4, 3, 3, 2, 5)],
+        [m(5, 4, 4, 3, 6)],
+        [m(6, 5, 5, 4, 7)],
+    ])
     def testSliceMessy(self, b, x):
-        return [x[-1::-3, :2:2, -3:-2, ::-1, -1:-5:-2]]
+        return [
+            x[-1::-3, :2:2, -3:-2, ::-1, -1:-6:-2],
+            x[2::-1, 0:2:1, 1, :1, 1:5:2],
+        ]
 
     @opTest([[m(2, 3, 2)]])
     def testSliceShort(self, b, x):

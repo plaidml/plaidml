@@ -1689,6 +1689,136 @@ Value sigmoid(const Value& value) {
   return Value{O};
 }
 
+Value slice(const Value& value) {
+  // This code avoids using max/min ops to keep start/stop values in the [-dim - 1, dim] range
+  // This means requesting a slice with a start/stop index outside the valid range will give bizarre behavior
+  IVLOG(1, "slice");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("slice expects 2 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto slices = args[1].as_tuple();
+
+  // Useful values and correctness checks
+  auto I_shape = I.shape();
+  auto ndims = I_shape.ndims();
+  if (slices.size() != ndims) {
+    throw std::runtime_error(
+        str(boost::format("%1% slice axes provided to slice %2%-dimensional tensor") % slices.size() % ndims));
+  }
+
+  // Initialize dims & indexes
+  std::vector<TensorDim> I_dims{ndims};
+  I.bind_dims(I_dims);
+  std::vector<TensorIndex> O_idxs{ndims};
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> I_idxs;
+
+  // For each axis, compute output size and formula for extracting requested values
+  size_t skipped_O_idxs = 0;  // How many indexes are unneeded because the slice is a single integer
+  for (size_t i = 0; i < ndims; ++i) {
+    // If this "slice" is just an integer, extract that entry in this axis and continue to the next axis
+    if (slices[i].is_int()) {
+      auto idx_val = slices[i].as_int();
+      TensorIndex idx{idx_val};
+      if (idx_val < 0) {
+        idx = idx + I_dims[i];
+      }
+      // Do not push to O_dims -- this dim is omitted; instead, skip using the index
+      O_idxs.erase(O_idxs.begin() + i - skipped_O_idxs);
+      skipped_O_idxs++;
+      I_idxs.push_back(TensorIndex{idx});
+      continue;
+    }
+
+    // Parse the slice as a tuple of 3 ints or Nones
+    if (!slices[i].is_tuple()) {
+      throw std::runtime_error("Attempted to define slice with invalid type");
+    }
+    auto slice = slices[i].as_tuple();
+    if (slice.size() != 3) {
+      throw std::runtime_error(str(boost::format("Attempted to slice with %1% entries, 3 required") % slice.size()));
+    }
+
+    // Read slice, filling in appropriate default values where Nones appear
+    TensorDim start;
+    TensorDim stop;
+    int64_t step;
+    // Setup step first (needed to determine start/end defaults)
+    if (slice[2].is_none()) {
+      step = 1;
+    } else {
+      try {
+        step = slice[2].as_int();
+      } catch (std::runtime_error& e) {
+        throw std::runtime_error(
+            str(boost::format("Unable to parse step of slice as int, original message: %1%") % e.what()));
+      }
+    }
+    if (step == 0) {
+      throw std::runtime_error("Cannot slice with step size 0");
+    }
+    // Setup start
+    if (slice[0].is_none()) {
+      if (step > 0) {
+        start = TensorDim{0};
+      } else {
+        start = I_dims[i] - 1;
+      }
+    } else {
+      int64_t int_start;
+      try {
+        int_start = slice[0].as_int();
+      } catch (std::runtime_error& e) {
+        throw std::runtime_error(
+            str(boost::format("Unable to parse start of slice as int, original message: %1%") % e.what()));
+      }
+      if (int_start < 0) {
+        start = I_dims[i] + int_start;
+      } else {
+        start = TensorDim{int_start};
+      }
+    }
+    // Setup stop
+    if (slice[1].is_none()) {
+      if (step > 0) {
+        stop = I_dims[i];
+      } else {
+        stop = TensorDim{-1};
+      }
+    } else {
+      int64_t int_stop;
+      try {
+        int_stop = slice[1].as_int();
+      } catch (std::runtime_error& e) {
+        throw std::runtime_error(
+            str(boost::format("Unable to parse stop of slice as int, original message: %1%") % e.what()));
+      }
+      if (int_stop < 0) {
+        stop = I_dims[i] + int_stop;
+      } else {
+        stop = TensorDim{int_stop};
+      }
+    }
+    // Set output size for this axis
+    auto offset_to_ceil = step;  // Make this a ceil division w/ this offset
+    if (step > 0) {
+      offset_to_ceil -= 1;
+    } else {
+      offset_to_ceil += 1;
+    }
+    O_dims.push_back((stop - start + offset_to_ceil) / step);
+    // Set index to read for this axis
+    I_idxs.push_back(start + step * O_idxs[i - skipped_O_idxs]);
+  }
+
+  // Perform the slice
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
 Value softmax(const Value& value) {
   IVLOG(1, "softmax");
   auto args = value.as_tuple();
@@ -2188,6 +2318,7 @@ void RegisterOps() {
   registry->Register("relu", relu);
   registry->Register("repeat", repeat);
   registry->Register("sigmoid", sigmoid);
+  registry->Register("slice", slice);
   registry->Register("softmax", softmax);
   registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);

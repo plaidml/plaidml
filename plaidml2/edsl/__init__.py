@@ -556,26 +556,26 @@ def call(fn, *args):
 
 
 def as_float(x, bit_size):
-    return call("as_float", x, bit_size)
+    return call('as_float', x, bit_size)
 
 
 def as_int(x, bit_size):
-    return call("as_int", x, bit_size)
+    return call('as_int', x, bit_size)
 
 
 def as_uint(x, bit_size):
-    return call("as_uint", x, bit_size)
+    return call('as_uint', x, bit_size)
 
 
 def cast(x, dtype):
-    return call("as_{}".format(dtype.info.base), x, dtype.info.bitwidth)
+    return call('as_{}'.format(dtype.info.base), x, dtype.info.bitwidth)
 
 
 def ceil(x):
-    return call("ceil", x)
+    return call('ceil', x)
 
 
-# def element(x) : return call("element", {x}) # TODO: tuple
+# def element(x) : return call('element', {x}) # TODO: tuple
 
 
 def cond(lhs, rhs, true_case):
@@ -583,19 +583,19 @@ def cond(lhs, rhs, true_case):
 
 
 def cos(x):
-    return call("cos", x)
+    return call('cos', x)
 
 
 def exp(x):
-    return call("exp", x)
+    return call('exp', x)
 
 
 def floor(x):
-    return call("floor", x)
+    return call('floor', x)
 
 
 def gather(x, y):
-    return call("gather", x, y)
+    return call('gather', x, y)
 
 
 def gradients(loss, variables):
@@ -612,68 +612,68 @@ def gradients(loss, variables):
 
 
 def ident(x):
-    return call("ident", x)
+    return call('ident', x)
 
 
 def index(x, axis):
-    return call("index", x, axis)
+    return call('index', x, axis)
 
 
 def log(x):
-    return call("log", x)
+    return call('log', x)
 
 
 def max(x, y):
-    return call("max", x, y)
+    return call('max', x, y)
 
 
 def min(x, y):
-    return call("min", x, y)
+    return call('min', x, y)
 
 
 def pow(x, y):
-    return call("pow", x, y)
+    return call('pow', x, y)
 
 
 def prng(state, shape):
-    return call("prng", state, *shape)
+    return call('prng', state, *shape)
 
 
 def reshape(x, dims):
-    return call("reshape", x, *dims)
+    return call('reshape', x, *dims)
 
 
 def round(x):
-    return call("round", x)
+    return call('round', x)
 
 
 def scatter(x, y, z):
-    return call("scatter", x, y, z)
+    return call('scatter', x, y, z)
 
 
 def select(cond, true_case, false_case):
-    return call("cond", cond, true_case, false_case)
+    return call('cond', cond, true_case, false_case)
 
 
 def shape(x):
-    return call("shape", x)
+    return call('shape', x)
 
 
 def sigmoid(x):
-    return call("sigmoid", x)
+    return call('sigmoid', x)
 
 
 def sin(x):
-    return call("sin", x)
+    return call('sin', x)
 
 
 def sqrt(x):
-    return call("sqrt", x)
+    return call('sqrt', x)
 
 
 def tan(x):
-    return call("tan", x)
+    return call('tan', x)
 
 
 def tanh(x):
-    return call("tanh", x)
+    return call('tanh', x)
