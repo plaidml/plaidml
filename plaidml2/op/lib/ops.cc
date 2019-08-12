@@ -2004,7 +2004,7 @@ Value sum(const Value& value) {
   IVLOG(1, "sum");
   auto args = value.as_tuple();
   if (args.size() != 3) {
-    throw std::runtime_error("mean expects 3 arguments");
+    throw std::runtime_error("sum expects 3 arguments");
   }
 
   auto I = args[0].as_tensor();
