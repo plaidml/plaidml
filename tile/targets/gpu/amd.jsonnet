@@ -39,6 +39,7 @@ local PARAMS = {
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
+
             {
               name: 'loc_main',
               pass: {
@@ -92,16 +93,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
               }
             },
-            /*
-            // Pad tensors to remove inner conditionals
-            {
-              name: 'pad',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MirPadPass',
-                reqs: ['main'],
-              },
-            },
-            */
+
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
@@ -144,6 +136,18 @@ local PARAMS = {
                 min_out_count: PARAMS[cfg].NUM_UNITS,
                 split_factor: -100.0,
                 only_po2: true,
+              }
+            },
+
+            {
+              name: 'fuse_eltwise_eltwise',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                parent_reqs: ['main'],
+                a_reqs: ['eltwise'],
+                b_reqs: ['eltwise'],
+                inner_remove_set: ['kernel'],
+                output_match: true,
               }
             },
 
@@ -205,19 +209,9 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 parent_reqs: ['contract_outer'],
-                fused_set: ['cache'],
+                fused_set: ['cache', 'eltwise'],
                 exclude: ['contract_middle'],
-              }
-            },
-
-            {
-              name: 'fuse_eltwise_eltwise',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
-                parent_reqs: ['main'],
-                a_reqs: ['eltwise'],
-                b_reqs: ['eltwise'],
-                output_match: true,
+                no_inner: true,
               }
             },
 

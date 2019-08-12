@@ -254,12 +254,13 @@ void FlattenTrivial(stripe::Block* outer) {
 std::shared_ptr<Block> FusionRefactor(const stripe::Block& orig,                          //
                                       const std::map<std::string, std::string>& mapping,  //
                                       const TileShape& tile,                              //
-                                      bool interleave) {
+                                      bool interleave,                                    //
+                                      bool elide_trivial) {
   IVLOG(3, "FusionRefactor:\n" << orig);
   IVLOG(3, "mapping: " << StreamContainer(mapping) << ", tile: " << tile);
   // Possibly tile
   auto tiled = std::make_shared<Block>(orig);
-  ApplyTile(tiled.get(), tile, true, true, interleave);
+  ApplyTile(tiled.get(), tile, elide_trivial, true, interleave);
   // IVLOG(3, "Tiled:\n" << *tiled);
   // Make empty inner and outer blocks, and put inner into outer
   auto outer = std::make_shared<Block>();
@@ -567,7 +568,9 @@ void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strateg
       }
       // Do the appropriate refactors
       auto refactor1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a, plan->a_interleave);
-      auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b, plan->b_interleave);
+      auto inner1 = refactor1->SubBlock(0, true);
+      auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b, plan->b_interleave,
+                       (refactor1->idxs_product() > 1) || (inner1 == nullptr)); 
       if (no_inner) {
         // Check if there is any inner block in refactor1 and refactor2
         if (!NoInnerBlock(refactor1.get()) || !NoInnerBlock(refactor2.get())) {
@@ -581,6 +584,19 @@ void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strateg
           break;
         }
       }
+      if (refactor1->idxs_product() == 1 && refactor2->idxs_product() == 1) {
+        auto inner2 = refactor2->SubBlock(0);
+        if ((inner1 && inner2 == nullptr) || (inner1 == nullptr && inner2)) {
+          IVLOG(3, "Cannot fuse inner blocks when the outer block is trivial.")
+          break;
+        }
+        if (inner1 && inner2 && inner1->has_tag("eltwise") && inner2->has_tag("eltwise") &&
+            inner1->idxs_product() != inner2->idxs_product()) {
+          IVLOG(3, "Cannot fuse inner eltwise blocks when the outer block is trivial.")
+          break;
+        }
+      }
+
       // Now copy computed indexes if it's safe
       for (const auto& idx : refactor1->idxs) {
         if (idx.affine != stripe::Affine() && !refactor2->idx_by_name(idx.name)) {

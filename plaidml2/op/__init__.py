@@ -63,10 +63,22 @@ def expand_dims(x, axis=-1):
     return op('expand_dims', [x, axis]).as_tensor()
 
 
+def max(x, axis=None, keepdims=False):
+    if isinstance(axis, np.ndarray):
+        axis = axis.tolist()
+    return op('max', [x, axis, keepdims]).as_tensor()
+
+
 def mean(I, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
     return op('mean', [I, axis, keepdims]).as_tensor()
+
+
+def min(x, axis=None, keepdims=False):
+    if isinstance(axis, np.ndarray):
+        axis = axis.tolist()
+    return op('min', [x, axis, keepdims]).as_tensor()
 
 
 def relu(x, alpha=None, max_value=None, threshold=0.):

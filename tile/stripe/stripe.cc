@@ -610,12 +610,13 @@ std::ostream& operator<<(std::ostream& os, const Block& block) {
   return os;
 }
 
-std::shared_ptr<Block> Block::SubBlock(size_t pos) const {
+std::shared_ptr<Block> Block::SubBlock(size_t pos, bool reverse) const {
   if (stmts.size() <= pos) {
     throw std::out_of_range(str(boost::format("SubBlock(%1%) is out of range") % pos));
   }
   auto it = stmts.begin();
-  for (size_t i = 0; i < pos; i++) {
+  size_t new_pos = reverse ? (stmts.size() - pos - 1) : pos;
+  for (size_t i = 0; i < new_pos; i++) {
     ++it;
   }
   return Block::Downcast(*it);
