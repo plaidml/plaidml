@@ -12,6 +12,7 @@
 #include "tile/base/shape.h"
 #include "tile/codegen/alias.h"
 #include "tile/math/util.h"
+#include "tile/stripe/stripe.h"
 
 // Some terminology: we refer to each Refinement that describes a
 // newly-created block of memory (i.e. !IsReadDir(r) &&
@@ -180,7 +181,7 @@ class ChunkUseRecorder : public stripe::MutableStmtVisitor {
 };
 
 std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<stripe::Location>& locations,
-                                std::size_t alignment, std::size_t stmt_limit) {
+                                std::size_t alignment, std::size_t stmt_limit, const stripe::Tags& skip_tags) {
   // This function:
   //
   // * Logically numbers each statement within the block
@@ -203,7 +204,7 @@ std::list<Chunk> BuildChunkList(stripe::Block* outermost_block, const std::set<s
 
   auto add_block_chunks = [&](stripe::Block* block, const AliasMap& alias_map) {
     for (auto& ref : block->refs) {
-      if (ref.dir == stripe::RefDir::None && locations.count(ref.location)) {
+      if (ref.dir == stripe::RefDir::None && locations.count(ref.location) && !ref.has_any_tags(skip_tags)) {
         auto chunk_it = result.emplace(result.end(), Chunk{&ref.mut(), alignment, stmt_limit});
         chunks[alias_map.at(ref.into()).base_name] = &*chunk_it;
       }
@@ -283,8 +284,9 @@ void PlaceRefinements(stripe::Block* outermost_block, const proto::MemoryPlaceme
 
   std::size_t stmt_limit = CountStatements(outermost_block);
   auto alignment = options.alignment() ? options.alignment() : kDefaultAlignment;
+  auto skip_tags = stripe::FromProto(options.skip_tags());
 
-  std::list<Chunk> chunks = BuildChunkList(outermost_block, locations, alignment, stmt_limit);
+  std::list<Chunk> chunks = BuildChunkList(outermost_block, locations, alignment, stmt_limit, skip_tags);
 
   // Edge case: no chunks means nothing to do.  And then after this,
   // we can assume there's at least one chunk.
