@@ -21,6 +21,7 @@ namespace cpu {
 typedef std::function<void*(std::vector<DataType>*, DataType*)> External;
 
 struct Config {
+  bool profile_block_execution = false;
   std::map<std::string, External> externals;
 };
 

@@ -1553,6 +1553,9 @@ llvm::Value* Compiler::ReadCycleCounter(void) {
 }
 
 void Compiler::ProfileBlockEnter(const stripe::Block& block) {
+  if (!config_.profile_block_execution) {
+    return;
+  }
   // allocate counter variable
   std::string profile_count_name = profile_count_name_ + block.name;
   module_->getOrInsertGlobal(profile_count_name, IndexType());
@@ -1576,6 +1579,9 @@ void Compiler::ProfileBlockEnter(const stripe::Block& block) {
 }
 
 void Compiler::ProfileBlockLeave(const stripe::Block& block) {
+  if (!config_.profile_block_execution) {
+    return;
+  }
   // Add the current rdtsc back into the elapsed time counter, which both
   // corrects for the bias we introduced on function entry and accumulates
   // the elapsed time into the running total.
@@ -1757,6 +1763,7 @@ void JitExecute(const stripe::Block& program, const Config& config, const std::m
 void JitProfile(stripe::Block* program, const std::map<std::string, void*>& buffers) {
   llvm::LLVMContext context;
   Config config;
+  config.profile_block_execution = true;
   Compiler compiler(&context, config);
   auto module = compiler.CompileProgram(*program);
   Executable executable(std::move(module));
