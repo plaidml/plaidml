@@ -2,6 +2,8 @@
 
 #include "tile/pmlc/pmlc.h"
 
+#include <string>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 
@@ -117,8 +119,8 @@ std::shared_ptr<Program> DefaultStage(const App& app,                      //
 #ifdef ENABLE_LLVM_BITCODE
   if (app.args.count("llvm")) {
     targets::cpu::Native native;
-    std::map<std::string, targets::cpu::External> externals;
-    native.compile(*program->entry, externals);
+    targets::cpu::Config config;
+    native.compile(*program->entry, config);
     native.save((out_dir / "stripe.bc").string());
   }
 #endif
