@@ -554,8 +554,46 @@ class ExprOptimizer : public AstPass {
     auto deriv = args[0];
     auto expr = args[1];
     IVLOG(4, "  deriv: " << deriv->shape);
-    IVLOG(4, "  expr: " << deriv->shape);
-    return deriv;
+    IVLOG(4, "  expr: " << expr->shape);
+
+    std::vector<PolyExprPtr> input_specs;
+    std::vector<PolyExprPtr> output_specs;
+    bool nontrivial_contraction = false;
+    auto input_ndims = deriv->shape.dims.size();
+    auto input_only_ndims = input_ndims - expr->shape.dims.size();
+    for (size_t i = 0; i < deriv->shape.dims.size(); i++) {
+      DimExprEvaluator dim_eval;
+      auto curr_idx = std::make_shared<PolyIndex>(i);
+      input_specs.push_back(curr_idx);
+      if (i < input_only_ndims) {
+        // Add the initial indexes only to the output spec; only once lengths are aligned look at both
+        nontrivial_contraction = true;  // If the lengths don't match this is nontrivial
+      } else {
+        auto output_i = i - input_only_ndims;
+        // Where the output dim is 1, put a 0 in the output spec
+        // Where the output dim is >1, put the index from the corresponding axis of the input_spec
+        if (expr->shape.dims[output_i].expr->Accept(&dim_eval) == 1) {
+          output_specs.push_back(std::make_shared<PolyLiteral>(0));
+          if (deriv->shape.dims[i].expr->Accept(&dim_eval) != 1) {
+            nontrivial_contraction = true;
+          }
+        } else {
+          output_specs.push_back(curr_idx);
+        }
+      }
+    }
+
+    if (nontrivial_contraction) {
+      auto dop = std::make_shared<ContractionExpr>();
+      dop->agg_op = AggregationOp::SUM;
+      dop->combo_op = CombinationOp::NONE;
+      dop->inputs.push_back(std::make_shared<TensorSpecExpr>(deriv, input_specs));
+      dop->output = std::make_shared<TensorSpecExpr>(output_specs, expr->shape.dims_as_exprs());
+      dop->ComputeShape(expr->shape.layout);
+      return dop;
+    } else {
+      return deriv;
+    }
   }
 };
 
