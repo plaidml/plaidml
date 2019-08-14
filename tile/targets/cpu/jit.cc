@@ -79,7 +79,7 @@ class Runtime : public llvm::LegacyJITSymbolResolver {
 
 class Compiler : private stripe::ConstStmtVisitor {
  public:
-  Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals);
+  Compiler(llvm::LLVMContext* context, const Config& config);
   ProgramModule CompileProgram(const stripe::Block& program);
 
   // Internal data type definitions.
@@ -97,7 +97,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   };
 
  protected:
-  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals);
+  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module, const Config& config);
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
   uint64_t MeasureArena(const stripe::Block& block);
   void GenerateArena(const stripe::Block& block);
@@ -196,7 +196,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
   llvm::Module* module_ = nullptr;
-  std::map<std::string, External> external_handlers_;
+  Config config_;
   std::map<std::string, void*> external_funcptrs_;
 
   std::map<std::string, Scalar> scalars_;
@@ -204,8 +204,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   std::map<std::string, Index> indexes_;
 };
 
-Compiler::Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals)
-    : context_(*context), builder_{context_}, external_handlers_{externals} {
+Compiler::Compiler(llvm::LLVMContext* context, const Config& config)
+    : context_(*context), builder_{context_}, config_{config} {
   static std::once_flag init_once;
   std::call_once(init_once, []() {
     LLVMInitializeNativeTarget();
@@ -258,8 +258,8 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   return ret;
 }
 
-Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals)
-    : context_(*context), builder_{context_}, module_(module), external_handlers_{externals} {
+Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module, const Config& config)
+    : context_(*context), builder_{context_}, module_(module), config_{config} {
   // This private constructor sets up a nested instance which will
   // process a nested block, generating output into the same module as its
   // containing compiler instance.
@@ -869,8 +869,8 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"tanh", &Compiler::Tanh},
       {"cos", &Compiler::Cos},
   };
-  auto externiter = external_handlers_.find(intrinsic.name);
-  if (externiter != external_handlers_.end()) {
+  auto externiter = config_.externals.find(intrinsic.name);
+  if (externiter != config_.externals.end()) {
     Intrinsic(intrinsic, externiter->second);
   } else {
     auto builtiniter = builtins.find(intrinsic.name);
@@ -883,7 +883,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
 
 void Compiler::Visit(const stripe::Block& block) {
   // Compile a nested block as a function in the same module
-  Compiler nested(&context_, module_, external_handlers_);
+  Compiler nested(&context_, module_, config_);
   auto function = nested.CompileBlock(block);
   for (auto& fptr_iter : nested.external_funcptrs_) {
     external_funcptrs_.emplace(fptr_iter);
@@ -1715,8 +1715,8 @@ struct Native::Impl {
   ProgramModule module;
   std::unique_ptr<Executable> executable;
 
-  void compile(const stripe::Block& program, const std::map<std::string, External>& externals) {
-    Compiler compiler(&context, externals);
+  void compile(const stripe::Block& program, const Config& config) {
+    Compiler compiler(&context, config);
     module = compiler.CompileProgram(program);
     assert(module.module);
     executable.reset(new Executable(module));
@@ -1736,22 +1736,19 @@ struct Native::Impl {
 
 Native::Native() : m_impl(new Native::Impl) {}
 Native::~Native() {}
-void Native::compile(const stripe::Block& program, const std::map<std::string, External>& externals) {
-  m_impl->compile(program, externals);
-}
+void Native::compile(const stripe::Block& program, const Config& config) { m_impl->compile(program, config); }
 void Native::run(const std::map<std::string, void*>& buffers) { m_impl->run(buffers); }
 void Native::save(const std::string& filename) { m_impl->save(filename); }
 void Native::set_perf_attrs(stripe::Block* program) { m_impl->set_perf_attrs(program); }
 
 void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers) {
-  std::map<std::string, External> externals;
-  JitExecute(program, externals, buffers);
+  Config config;
+  JitExecute(program, config, buffers);
 }
 
-void JitExecute(const stripe::Block& program, const std::map<std::string, External>& externals,
-                const std::map<std::string, void*>& buffers) {
+void JitExecute(const stripe::Block& program, const Config& config, const std::map<std::string, void*>& buffers) {
   llvm::LLVMContext context;
-  Compiler compiler(&context, externals);
+  Compiler compiler(&context, config);
   auto module = compiler.CompileProgram(program);
   Executable executable(std::move(module));
   executable.Run(buffers);
@@ -1759,8 +1756,8 @@ void JitExecute(const stripe::Block& program, const std::map<std::string, Extern
 
 void JitProfile(stripe::Block* program, const std::map<std::string, void*>& buffers) {
   llvm::LLVMContext context;
-  std::map<std::string, External> externals;
-  Compiler compiler(&context, externals);
+  Config config;
+  Compiler compiler(&context, config);
   auto module = compiler.CompileProgram(*program);
   Executable executable(std::move(module));
   executable.Run(buffers);
