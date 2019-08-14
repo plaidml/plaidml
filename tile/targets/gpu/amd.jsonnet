@@ -215,16 +215,6 @@ local PARAMS = {
               }
             },
 
-            // Then we 'localize' buffers, which moves any temporaries the only are needed to hold the output
-            // of dense computations before they are used on elementwise operations into the interior of the fused blocks
-            {
-              name: 'localize_main',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
-                reqs: ['main'],
-              },
-            },
-
             // After all fusion, eliminate dead code again
             {
               name: 'dead_code_elimination',
