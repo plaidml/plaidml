@@ -660,29 +660,57 @@ class TestBackendOps(unittest.TestCase):
             b.relu(x, alpha=a, max_value=m, threshold=threshold),
         ]
 
+    @opTest([[m(3, 6)]])
+    def testHardSigmoid(self, b, x):
+        return [b.hard_sigmoid(x)]
+
     @compareForwardExact()
     def testEqual(self, b):
         return b.equal(b.variable(m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testEqualVersusNumeric(self, b):
+        return b.equal(b.variable(m(3, 3)), m(3, 3))
 
     @compareForwardExact()
     def testNotEqual(self, b):
         return b.not_equal(b.variable(m(3, 3)), b.variable(m(3, 3)))
 
     @compareForwardExact()
+    def testNotEqualVersusNumeric(self, b):
+        return b.not_equal(b.variable(m(3, 3)), m(3, 3))
+
+    @compareForwardExact()
     def testLess(self, b):
         return b.less(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testLessVersusNumeric(self, b):
+        return b.less(b.variable(2 * m(3, 3)), m(3, 3))
 
     @compareForwardExact()
     def testLessEqual(self, b):
         return b.less_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
     @compareForwardExact()
+    def testLessEqualVersusNumeric(self, b):
+        return b.less_equal(b.variable(2 * m(3, 3)), m(3, 3))
+
+    @compareForwardExact()
     def testGreater(self, b):
         return b.greater(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
     @compareForwardExact()
+    def testGreaterVersusNumeric(self, b):
+        return b.greater(b.variable(2 * m(3, 3)), m(3, 3))
+
+    @compareForwardExact()
     def testGreaterEqual(self, b):
         return b.greater_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
+
+    @compareForwardExact()
+    def testGreaterEqualVersusNumeric(self, b):
+        return b.greater_equal(b.variable(2 * m(3, 3)), m(3, 3))
 
     @opTest([[m(3, 3) - 0.0001]])
     def testAbs(self, b, x):
@@ -696,9 +724,14 @@ class TestBackendOps(unittest.TestCase):
     def testSqrt(self, b, x):
         return [b.sqrt(x)]
 
-    @opTest([[np.sqrt(m(5, 5, 10) + 2) - 3], [np.sin(m(4, 3, 2, 1, 6))]], 1e-02, skip_theano=True)
+    @opTest([[m(1, 2, 1)], [np.sqrt(m(5, 5, 10) + 2) - 3], [np.sin(m(4, 3, 2, 1, 6))]],
+            1e-02,
+            skip_theano=True)
     def testSoftmax(self, b, x):
-        return [-b.log(b.softmax(x))]
+        return [
+            -b.log(b.softmax(x)),
+            -b.log(b.softmax(x, axis=1)),
+        ]
 
     @opTest([[m(1, 3, 4)], [m(7, 19) - 10.]])
     def testSoftsign(self, b, x):
@@ -815,9 +848,43 @@ class TestBackendOps(unittest.TestCase):
     def testLog(self, b, x):
         return [b.log(x)]
 
+    @opTest([
+        [m(3, 3)],
+        [m(3, 3), None, True],
+        [m(2, 3, 4, 5), [1, 3]],
+        [m(3, 4, 5), -1],
+        [m(2, 3, 4), 0],
+    ])
+    def testLogSumExp(self, b, x, ax=None, kd=False):
+        return [b.logsumexp(x, axis=ax, keepdims=kd)]
+
     @opTest([[m(10)], [m(2, 2, 2, 3)]], 1e-2)
     def testTanh(self, b, x):
         return [b.tanh(x)]
+
+    @compareForwardClose(.1)
+    def testRandomUniformMean(self, b):
+        rand = b.random_uniform((1000, 1000))
+        return b.mean(rand)
+
+    @compareForwardClose(.1)
+    def testRandomUniformDev(self, b):
+        rand = b.random_uniform((1000, 1000))
+        mean = b.mean(rand)
+        diffs = rand - mean
+        return b.mean(b.square(diffs))
+
+    @compareForwardClose(.1)
+    def testRandomUniformVariableMean(self, b):
+        rand = b.random_uniform_variable((1000, 1000), low=0.0, high=1.0)
+        return b.mean(rand)
+
+    @compareForwardClose(.1)
+    def testRandomUniformVariableDev(self, b):
+        rand = b.random_uniform_variable((1000, 1000), low=0.0, high=1.0)
+        mean = b.mean(rand)
+        diffs = rand - mean
+        return b.mean(b.square(diffs))
 
     @compareForwardClose(.1)
     def testRandomNormalMean(self, b):
@@ -1485,9 +1552,16 @@ class TestBackendOps(unittest.TestCase):
     def testSliceBasic(self, b, x):
         return [b.exp(x[2:30]), b.log(x[:5]), b.tanh(x[-4:]), b.sqrt(x[-1])]
 
-    @opTest([[m(4, 3, 3, 2, 5)]])
+    @opTest([
+        [m(4, 3, 3, 2, 5)],
+        [m(5, 4, 4, 3, 6)],
+        [m(6, 5, 5, 4, 7)],
+    ])
     def testSliceMessy(self, b, x):
-        return [x[-1::-3, :2:2, -3:-2, ::-1, -1:-5:-2]]
+        return [
+            x[-1::-3, :2:2, -3:-2, ::-1, -1:-6:-2],
+            x[2::-1, 0:2:1, 1, :1, 1:5:2],
+        ]
 
     @opTest([[m(2, 3, 2)]])
     def testSliceShort(self, b, x):
@@ -1556,6 +1630,12 @@ class TestBackendOps(unittest.TestCase):
     def testRound(self, b):
         vals = np.array([[1.7, 0.8, 1.5], [0.9, -0.3, -0.8], [0, 1.7, 0.6]])
         return b.round(b.variable(vals))
+
+    def testCeil(self):
+        npt.assert_allclose(pkb.ceil(pkb.variable(m(6, 2, 3))).eval(), np.ceil(m(6, 2, 3)))
+
+    def testFloor(self):
+        npt.assert_allclose(pkb.floor(pkb.variable(m(6, 2, 3))).eval(), np.floor(m(6, 2, 3)))
 
     @opTest([
         [m(3, 2, 4), n(3, 2, 4), 0],
