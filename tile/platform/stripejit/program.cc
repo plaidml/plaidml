@@ -36,8 +36,8 @@ Program::Program(                  //
   codegen::CompilerState state(stripe);
   state.const_bufs = const_bufs;
   codegen::Optimize(&state, stage.passes(), options);
-  std::map<std::string, targets::cpu::External> externals;
-  executable_->compile(*stripe->entry, externals);
+  targets::cpu::Config config;
+  executable_->compile(*stripe->entry, config);
 }
 
 Program::~Program() {}
