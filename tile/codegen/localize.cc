@@ -180,12 +180,64 @@ void LocateInnerBlockPass::Apply(CompilerState* state) const {
   });
 }
 
+// LocateInnerBlocksRefinementsRecursively pass. Places all the refinements in the Location specified in the
+// LocateInnerBlocksRefinementsPass options. Very useful for the CPU jit to place all the
+// newly created buffers into the same single arena. (It just appends the new dev to the Location devices.)
+static void LocateBlocksRefinementsRecursively(Block* block, const Location& loc, const stripe::Tags& skip_tags) {
+  if (loc.devs.size() == 0) {
+    // Nothing to add.
+    return;
+  }
+  for (auto& itRef : block->refs) {
+    // The refinment has a skip tag. Don't locate
+    if (itRef.has_any_tags(skip_tags)) {
+      continue;
+    }
+
+    for (auto& newLocDev : loc.devs) {
+      if (itRef.location.devs.size() == 0) {
+        // No Devices on the Ref's location. Add all.
+        auto* ref_loc = &itRef.mut().location;
+        ref_loc->devs.insert(ref_loc->devs.end(), loc.devs.begin(), loc.devs.end());
+      } else {
+        for (auto& itDev : itRef.location.devs) {
+          if (newLocDev.name == itDev.name) {
+            // Already added. Nothing to do.
+            break;
+          }
+
+          auto* mutable_location = &itRef.mut().location;
+          std::vector<stripe::Device> mut_loc_devs = mutable_location->devs;
+          mut_loc_devs.insert(mut_loc_devs.end(), newLocDev);
+        }
+      }
+    }
+  }
+
+  for (auto stmt : block->stmts) {
+    auto inner = Block::Downcast(stmt);
+    if (inner) {
+      LocateBlocksRefinementsRecursively(inner.get(), loc, skip_tags);
+    }
+  }
+}
+
+void LocateBlocksRefinementsRecursivelyPass::Apply(CompilerState* state) const {
+  auto reqs = FromProto(options_.reqs());
+  auto loc = stripe::FromProto(options_.loc());
+  auto skip_tags = stripe::FromProto(options_.skip_tags());
+
+  RunOnBlocks(state->entry(), reqs,
+              [&](const AliasMap& map, Block* block) { LocateBlocksRefinementsRecursively(block, loc, skip_tags); });
+}
+
 namespace {
 [[gnu::unused]] char reg = []() -> char {
   CompilePassFactory<LocalizePass, proto::LocalizePass>::Register();
   CompilePassFactory<LocateMemoryPass, proto::LocateMemoryPass>::Register();
   CompilePassFactory<LocateBlockPass, proto::LocateBlockPass>::Register();
   CompilePassFactory<LocateInnerBlockPass, proto::LocateInnerBlockPass>::Register();
+  CompilePassFactory<LocateBlocksRefinementsRecursivelyPass, proto::LocateBlocksRefinementsRecursivelyPass>::Register();
   return 0;
 }();
 }  // namespace
