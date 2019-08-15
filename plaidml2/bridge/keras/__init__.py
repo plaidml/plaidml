@@ -292,17 +292,19 @@ def abs(x):
 
 @_log_call
 def all(x, axis=None, keepdims=False):
-    _report_unimplemented('all')
+    return _KerasNode('all', tensor=plaidml_op.all(x.tensor, axis, keepdims))
 
 
 @_log_call
 def any(x, axis=None, keepdims=False):
-    _report_unimplemented('any')
+    return _KerasNode('any', tensor=plaidml_op.any(x.tensor, axis, keepdims))
 
 
 @_log_call
 def arange(start, stop=None, step=1, dtype='int32'):
-    _report_unimplemented('arange')
+    if isinstance(dtype, plaidml.DType):
+        dtype = dtype.into_numpy()
+    return variable(np.arange(start, stop, step, dtype), dtype=dtype)
 
 
 @_log_call
@@ -327,17 +329,25 @@ def batch_dot(x, y, axes=None, name=None):
 
 @_log_call
 def batch_flatten(x):
-    _report_unimplemented('batch_flatten')
-
-
-@_log_call
-def batch_set_value(tuples):
-    _report_unimplemented('batch_set_value')
+    I = x.tensor
+    I_dims = edsl.TensorDims(I.shape.ndims)
+    I.bind_dims(*I_dims)
+    if len(I_dims) == 1:
+        return reshape(x, [I_dims[0], 1])
+    if len(I_dims) == 2:
+        return x
+    return reshape(x, [I_dims[0]] + [functools.reduce((lambda x, y: x * y), I_dims[1:])])
 
 
 @_log_call
 def batch_get_value(xs):
-    _report_unimplemented('batch_get_value')
+    return [get_value(x) for x in xs]
+
+
+@_log_call
+def batch_set_value(tuples):
+    for pair in tuples:
+        set_value(pair[0], pair[1])
 
 
 @_log_call
@@ -494,6 +504,11 @@ def conv(x,
     else:
         group_layout = 'none'
         autogroup_mode = 'ungrouped'
+    rank = x.tensor.shape.ndims - 2
+    if strides is None:
+        strides = tuple(1 for _ in range(rank))
+    if dilation_rate is None:
+        dilation_rate = tuple(1 for _ in range(rank))
     return _KerasNode(
         'conv',
         tensor=plaidml_op.convolution(
@@ -526,6 +541,11 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilat
         output_shape = output_shape[2:]
     else:
         raise ValueError('Could not parse data_format "{}"'.format(data_format))
+    rank = x.tensor.shape.ndims - 2
+    if strides is None:
+        strides = tuple(1 for _ in range(rank))
+    if dilation_rate is None:
+        dilation_rate = tuple(1 for _ in range(rank))
     return _KerasNode(
         'conv',
         tensor=plaidml_op.convolution(
@@ -947,7 +967,7 @@ def max(x, axis=None, keepdims=False):
 
 @_log_call
 def maximum(x, y):
-    return _KerasNode('maximum', tensor=edsl.max(x.tensor, y.tensor))
+    return _KerasNode('maximum', tensor=plaidml_op.maximum(x.tensor, y.tensor))
 
 
 @_log_call
@@ -962,12 +982,12 @@ def min(x, axis=None, keepdims=False):
 
 @_log_call
 def minimum(x, y):
-    return _KerasNode('minimum', tensor=edsl.min(x.tensor, y.tensor))
+    return _KerasNode('minimum', tensor=plaidml_op.minimum(x.tensor, y.tensor))
 
 
 @_log_call
 def moving_average_update(x, value, momentum):
-    _report_unimplemented('moving_average_update')
+    return (x, x * momentum + value * (1. - momentum))
 
 
 # No _log_call as this manages logging specially
@@ -1283,12 +1303,26 @@ def reshape(x, dims):
 
 @_log_call
 def resize_images(x, height_factor, width_factor, data_format, interpolation='nearest'):
-    _report_unimplemented('resize_images')
+    return _KerasNode('resize_images',
+                      tensor=plaidml_op.image_resize(x.tensor, (height_factor, width_factor),
+                                                     interpolation,
+                                                     _normalize_data_format(data_format)))
 
 
 @_log_call
 def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
-    _report_unimplemented('resize_volumes')
+    data_format = _normalize_data_format(data_format)
+    if data_format == 'ncx':
+        ret = repeat_elements(x, depth_factor, axis=2)
+        ret = repeat_elements(ret, height_factor, axis=3)
+        ret = repeat_elements(ret, width_factor, axis=4)
+    elif data_format == 'nxc':
+        ret = repeat_elements(x, depth_factor, axis=1)
+        ret = repeat_elements(ret, height_factor, axis=2)
+        ret = repeat_elements(ret, width_factor, axis=3)
+    else:
+        raise ValueError('Invalid data_format {}'.format(data_format))
+    return ret
 
 
 @_log_call

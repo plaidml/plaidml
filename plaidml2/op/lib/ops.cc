@@ -13,6 +13,43 @@ namespace plaidml {
 namespace op {
 namespace lib {
 
+// Forward declare the operations here so they can call each other
+Value abs(const Value&);
+Value all(const Value&);
+Value any(const Value&);
+Value argmax(const Value&);
+Value binary_crossentropy(const Value&);
+Value clip(const Value&);
+Value concatenate(const Value&);
+Value convolution(const Value&);
+Value cumprod(const Value&);
+Value cumsum(const Value&);
+Value dot(const Value&);
+Value elu(const Value&);
+Value expand_dims(const Value&);
+Value flip(const Value&);
+Value hard_sigmoid(const Value&);
+Value image_resize(const Value&);
+Value max(const Value&);
+Value maximum(const Value&);
+Value mean(const Value&);
+Value min(const Value&);
+Value minimum(const Value&);
+Value pool(const Value&);
+Value prod(const Value&);
+Value relu(const Value&);
+Value repeat(const Value&);
+Value sigmoid(const Value&);
+Value slice(const Value&);
+Value softmax(const Value&);
+Value spatial_padding(const Value&);
+Value square(const Value&);
+Value squeeze(const Value&);
+Value sum(const Value&);
+Value tile(const Value&);
+Value transpose(const Value&);
+Value variance(const Value&);
+
 struct AggregationAxes {
   std::vector<TensorIndex> src_idxs;
   std::vector<TensorIndex> dst_idxs;
@@ -118,6 +155,8 @@ enum class GroupLayout {
   IN_K       // Group included in the output channels dimensiono
 };
 
+enum class InterpolationMode { NEAREST, BILINEAR };
+
 enum class PoolMode : char { AVG = 'A', MAX = '>', MIN = '<', SUM = '+' };
 
 enum class TensorLayout { NXC, NCX, KCX, XCK, GKCX, XGCK };
@@ -220,6 +259,16 @@ std::string to_string(GroupLayout l) {
   throw std::runtime_error("Unable to convert group layout to string due to unrecognized layout");
 }
 
+InterpolationMode interpolation_mode_from_str(const std::string& s) {
+  if (s == "nearest") {
+    return InterpolationMode::NEAREST;
+  }
+  if (s == "bilinear") {
+    return InterpolationMode::BILINEAR;
+  }
+  throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as an interpolation mode") % s));
+}
+
 PoolMode pool_mode_from_str(const std::string& s) {
   if (s == "avg" || s == "average") {
     return PoolMode::AVG;
@@ -288,24 +337,23 @@ size_t nonspatial_dims(TensorLayout layout) {
   }
 }
 
-// TODO: Enable when needed
-// std::string to_string(TensorLayout m) {
-//   switch (m) {
-//    case TensorLayout::NXC:
-//     return "NXC";
-//    case TensorLayout::NCX:
-//     return "NCX";
-//    case TensorLayout::KCX:
-//     return "KCX";
-//    case TensorLayout::XCK:
-//     return "XCK";
-//    case TensorLayout::GKCX:
-//     return "GKCX";
-//    case TensorLayout::XGCK:
-//     return "XGCK";
-//   }
-//   throw std::runtime_error("Unable to convert tensor layout to string due to unrecognized layout");
-// }
+std::string to_string(TensorLayout m) {
+  switch (m) {
+    case TensorLayout::NXC:
+      return "NXC";
+    case TensorLayout::NCX:
+      return "NCX";
+    case TensorLayout::KCX:
+      return "KCX";
+    case TensorLayout::XCK:
+      return "XCK";
+    case TensorLayout::GKCX:
+      return "GKCX";
+    case TensorLayout::XGCK:
+      return "XGCK";
+  }
+  throw std::runtime_error("Unable to convert tensor layout to string due to unrecognized layout");
+}
 
 bool is_input_layout(TensorLayout layout) {  //
   return (layout == TensorLayout::NCX || layout == TensorLayout::NXC);
@@ -465,6 +513,61 @@ Value abs(const Value& value) {
   return Value{O};
 }
 
+Value all(const Value& value) {
+  IVLOG(1, "all");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("all expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto axes = args[1];
+  auto keepdims = args[2].as_bool();
+
+  auto I_as_bool = select(I == 0, Tensor{0}, Tensor{1});
+  auto I_shape = I.shape();
+  if (I_shape.ndims() == 0) {
+    return Value{as_uint(I_as_bool, 8)};
+  }
+  if (axes.is_tuple() && axes.as_tuple().empty()) {
+    return Value{as_uint(I_as_bool, 8)};
+  }
+
+  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+
+  I.bind_dims(agg.src_dims);
+  auto O = TensorOutput(agg.dst_dims);
+  O(agg.dst_idxs) *= I_as_bool(agg.src_idxs);
+  return Value{as_uint(O, 8)};
+}
+
+Value any(const Value& value) {
+  IVLOG(1, "any");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("any expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto axes = args[1];
+  auto keepdims = args[2].as_bool();
+
+  auto I_as_bool = select(I == 0, Tensor{0}, Tensor{1});
+  auto I_shape = I.shape();
+  if (I_shape.ndims() == 0) {
+    return Value{as_uint(I_as_bool, 8)};
+  }
+  if (axes.is_tuple() && axes.as_tuple().empty()) {
+    return Value{as_uint(I_as_bool, 8)};
+  }
+
+  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+
+  I.bind_dims(agg.src_dims);
+  auto S = TensorOutput(agg.dst_dims);
+  S(agg.dst_idxs) += I_as_bool(agg.src_idxs);
+  auto O = select(S == 0, Tensor{0}, Tensor{1});
+  return Value{as_uint(O, 8)};
+}
+
 Value argmax(const Value& value) {
   IVLOG(1, "argmax");
   auto args = value.as_tuple();
@@ -488,8 +591,6 @@ Value argmax(const Value& value) {
   return Value{O};
 }
 
-// TODO: Handle function forward declaration in a nice style
-Value clip(const Value& value);  // binary xentropy needs to know about clip
 Value binary_crossentropy(const Value& value) {
   IVLOG(1, "binary_crossentropy")
   auto args = value.as_tuple();
@@ -1377,6 +1478,130 @@ Value hard_sigmoid(const Value& value) {
   return Value{O};
 }
 
+Value image_resize(const Value& value) {
+  // Resize a 2D image's spatial dimensions, each by a positive integer factor
+  IVLOG(1, "image_resize");
+  auto args = value.as_tuple();
+  if (args.size() != 4) {
+    throw std::runtime_error("image_resize expects 4 arguments");
+  }
+  auto raw_I = args[0];
+  auto factors = args[1].as_int_tuple();
+  auto interp = interpolation_mode_from_str(args[2].as_str());
+  auto layout = tensor_layout_from_str(args[3].as_str());
+
+  for (const auto& scale_factor : factors) {
+    if (scale_factor <= 0) {
+      throw std::runtime_error(
+          str(boost::format("All scaling factors in image_resize must be positive (received %1%)") % scale_factor));
+    }
+  }
+
+  // The total number of spatial dimensions and how many non-spatial dimensions are before & after the spatial dims
+  size_t rank;  // an error if this isn't 2
+  size_t pre_axes;
+  auto I = raw_I.as_tensor();
+  auto ndims = I.shape().ndims();
+  switch (layout) {
+    case TensorLayout::NCX:
+      rank = ndims - 2;
+      pre_axes = 2;
+      break;
+    case TensorLayout::NXC:
+      rank = ndims - 2;
+      pre_axes = 1;
+      break;
+    default:
+      throw std::runtime_error(
+          str(boost::format("Unable to apply image_resize to a tensor with layout '%1'") % to_string(layout)));
+  }
+  if (rank != 2) {
+    throw std::runtime_error(str(boost::format("Expected 2 spatial dims for resize_images, received %1%") % rank));
+  }
+  if (factors.size() != 2) {
+    throw std::runtime_error(
+        str(boost::format("Cannot resize a 2D image using %2% spatial scaling factors") % rank % factors.size()));
+  }
+
+  Tensor O;
+  switch (interp) {
+    case InterpolationMode::NEAREST: {
+      std::vector<Value> repeat_inputs{raw_I, Value{factors[0]}, Value{pre_axes}};
+      auto R = repeat(Value{repeat_inputs});
+      std::vector<Value> repeat_inputs2{R, Value{factors[1]}, Value{pre_axes + 1}};
+      O = repeat(Value{repeat_inputs2}).as_tensor();
+    } break;
+    case InterpolationMode::BILINEAR: {
+      // This aligns the corners to 0 and <factor> * (<dim> - 1), and assumes zero-padding, which is a bit weird. But
+      // it's easy to code and for ML the weirdness probably doesn't particularly matter.
+      // Could likely eke out a bit more perf by precomputing K instead of doing it at runtime on device.
+
+      // Setup K
+      auto HCoeff = Tensor{1. / factors[0]};
+      auto WCoeff = Tensor{1. / factors[1]};
+      TensorDim HFactor{factors[0]};
+      TensorDim WFactor{factors[1]};
+      auto HCoeffVec = TensorOutput(HFactor);
+      auto WCoeffVec = TensorOutput(WFactor);
+      HCoeffVec(TensorIndex{"y"}) = HCoeff();
+      WCoeffVec(TensorIndex{"x"}) = WCoeff();
+      auto HK_dim = 2 * HFactor - 1;
+      auto WK_dim = 2 * WFactor - 1;
+      auto HK = TensorOutput(HK_dim);
+      auto WK = TensorOutput(WK_dim);
+      {
+        // Scoped for safe index name reuse
+        TensorIndex j{"j"};
+        TensorIndex i{"i"};
+        TensorIndex y{"y"};
+        TensorIndex x{"x"};
+        if (j < HFactor) {
+          HK(y) += HCoeffVec(j + y - HFactor + 1);
+        }
+        if (i < WFactor) {
+          WK(x) += WCoeffVec(i + x - WFactor + 1);
+        }
+      }
+      auto K = TensorOutput(HK_dim, WK_dim);
+      {
+        // Scoped for safe index name reuse
+        TensorIndex x{"x"};
+        TensorIndex y{"y"};
+        K(y, x) = HK(y) * WK(x);
+      }
+
+      // Resize
+      std::vector<TensorDim> I_dims(ndims);
+      std::vector<TensorIndex> I_idxs(ndims);
+      I.bind_dims(I_dims);
+      std::vector<TensorDim> O_dims;
+      std::vector<TensorIndex> O_idxs;
+      for (size_t ax = 0; ax < pre_axes; ++ax) {
+        O_dims.push_back(I_dims[ax]);
+        O_idxs.push_back(I_idxs[ax]);
+      }
+      {
+        // Scoped for safe index name reuse
+        TensorIndex i{"i"};
+        TensorIndex j{"j"};
+        O_dims.push_back(HFactor * I_dims[pre_axes]);
+        O_dims.push_back(WFactor * I_dims[pre_axes + 1]);
+        O_idxs.push_back(HFactor * I_idxs[pre_axes] + j - HFactor + 1);
+        O_idxs.push_back(WFactor * I_idxs[pre_axes + 1] + i - WFactor + 1);
+        for (size_t ax = pre_axes + 2; ax < ndims; ++ax) {
+          O_dims.push_back(I_dims[ax]);
+          O_idxs.push_back(I_idxs[ax]);
+        }
+        O = TensorOutput(O_dims);
+        O(O_idxs) += I(I_idxs) * K(j, i);
+      }
+    } break;
+    default:
+      throw std::runtime_error("Unrecognized InterpolationMode in image_resize");
+  }
+  return Value{O};
+}
+
 Value max(const Value& value) {
   IVLOG(1, "max");
   auto args = value.as_tuple();
@@ -1391,6 +1616,18 @@ Value max(const Value& value) {
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
   O(agg.dst_idxs) >= I(agg.src_idxs);
+  return Value{O};
+}
+
+Value maximum(const Value& value) {
+  IVLOG(1, "maximum");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("maximum expects 2 arguments");
+  }
+  auto X = args[0].as_tensor();
+  auto Y = args[1].as_tensor();
+  auto O = select(X < Y, Y, X);
   return Value{O};
 }
 
@@ -1445,6 +1682,18 @@ Value min(const Value& value) {
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
   O(agg.dst_idxs) <= I(agg.src_idxs);
+  return Value{O};
+}
+
+Value minimum(const Value& value) {
+  IVLOG(1, "minimum");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error("minimum expects 2 arguments");
+  }
+  auto X = args[0].as_tensor();
+  auto Y = args[1].as_tensor();
+  auto O = select(X < Y, X, Y);
   return Value{O};
 }
 
@@ -2298,6 +2547,8 @@ Value variance(const Value& value) {
 void RegisterOps() {
   auto registry = OperationRegistry::Instance();
   registry->Register("abs", abs);
+  registry->Register("all", all);
+  registry->Register("any", any);
   registry->Register("argmax", argmax);
   registry->Register("binary_crossentropy", binary_crossentropy);
   registry->Register("clip", clip);
@@ -2310,9 +2561,12 @@ void RegisterOps() {
   registry->Register("expand_dims", expand_dims);
   registry->Register("flip", flip);
   registry->Register("hard_sigmoid", hard_sigmoid);
+  registry->Register("image_resize", image_resize);
   registry->Register("max", max);
+  registry->Register("maximum", maximum);
   registry->Register("mean", mean);
   registry->Register("min", min);
+  registry->Register("minimum", minimum);
   registry->Register("pool", pool);
   registry->Register("prod", prod);
   registry->Register("relu", relu);

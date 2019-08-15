@@ -26,6 +26,18 @@ def abs(x):
     return op('abs', [x]).as_tensor()
 
 
+def all(x, axis=None, keepdims=False):
+    if isinstance(axis, np.ndarray):
+        axis = axis.tolist()
+    return op('all', [x, axis, keepdims]).as_tensor()
+
+
+def any(x, axis=None, keepdims=False):
+    if isinstance(axis, np.ndarray):
+        axis = axis.tolist()
+    return op('any', [x, axis, keepdims]).as_tensor()
+
+
 def argmax(x, axis=-1):
     return op('argmax', [x, axis]).as_tensor()
 
@@ -92,10 +104,20 @@ def hard_sigmoid(x, slope):
     return op('hard_sigmoid', [x, slope]).as_tensor()
 
 
+def image_resize(x, factors, interp, layout):
+    if isinstance(factors, np.ndarray):
+        factors = factors.tolist()
+    return op('image_resize', [x, factors, interp, layout]).as_tensor()
+
+
 def max(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
     return op('max', [x, axis, keepdims]).as_tensor()
+
+
+def maximum(x, y):
+    return op('maximum', [x, y]).as_tensor()
 
 
 def mean(x, axis=None, keepdims=False):
@@ -108,6 +130,10 @@ def min(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
     return op('min', [x, axis, keepdims]).as_tensor()
+
+
+def minimum(x, y):
+    return op('minimum', [x, y]).as_tensor()
 
 
 def relu(x, alpha=None, max_value=None, threshold=0.):
