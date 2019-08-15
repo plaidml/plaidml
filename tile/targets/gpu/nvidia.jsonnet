@@ -2,7 +2,7 @@ local PARAMS = {
   nvidia: {
     LOCAL_MEM_KIB: 48,
     NUM_THREADS: 256,
-    CACHE_WIDTH: 512, 
+    CACHE_WIDTH: 128,
     NUM_UNITS: 15,
     REGS_MEM_B: 1024,
     REG_MEM_LAT: 1,
@@ -202,16 +202,6 @@ local PARAMS = {
                 exclude: ['contract_middle'],
                 no_inner: true,
               }
-            },
-
-            // Then we 'localize' buffers, which moves any temporaries the only are needed to hold the output
-            // of dense computations before they are used on elementwise operations into the interior of the fused blocks
-            {
-              name: 'localize_main',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
-                reqs: ['main'],
-              },
             },
 
             // After all fusion, eliminate dead code again
