@@ -40,9 +40,10 @@ def get_engine(pkey):
         return ':barber::cl:'
     if 'stripe-mtl' in pkey:
         return ':barber::metal:'
-    if 'plaidml-mtl' in pkey:
+    if 'plaid-mtl' in pkey:
         return ':black_square_button::metal:'
-    return ':black_square_button::cl:'
+    if 'plaid-ocl' in pkey:
+        return ':black_square_button::cl:'
 
 
 def get_python(variant):
@@ -76,17 +77,18 @@ def cmd_pipeline(args, remainder):
                     continue
                 for batch_size in suite['params'][args.pipeline]['batch_sizes']:
                     tests.append(
-                        dict(suite=skey,
-                             workload=wkey,
-                             platform=pkey,
-                             batch_size=batch_size,
-                             variant=variant,
-                             timeout=popt.get('timeout', 20),
-                             retry=popt.get('retry'),
-                             softfail=popt.get('softfail'),
-                             python=get_python(variant),
-                             emoji=get_emoji(variant),
-                             engine=get_engine(pkey)))
+                        dict(
+                            suite=skey,
+                            workload=wkey,
+                            platform=pkey,
+                            batch_size=batch_size,
+                            variant=variant,
+                            timeout=popt.get('timeout', 20),
+                            retry=popt.get('retry'),
+                            softfail=popt.get('softfail'),
+                            python=get_python(variant),
+                            emoji=get_emoji(variant),
+                            engine=get_engine(pkey)))
 
     if args.count:
         print('variants: {}'.format(len(variants)))
