@@ -38,6 +38,14 @@ theano.config.optimizer = "None"
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--fp16', action='store_true')
+    parser.add_argument(
+        '--shard-count',
+        type=int,
+        default=0,
+        help=
+        'Run sharded test split into this many shards. Does not forward additional arguments to unittest. 0 (default) to not shard.'
+    )
+    parser.add_argument('--shard', type=int, default=0, help='Which shard to run')
     parser.add_argument('-v', '--verbose', action='count', default=0)
     args, remainder = parser.parse_known_args()
 
@@ -1814,5 +1822,15 @@ class TestBackendOps(unittest.TestCase):
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
-    #plaidml._internal_set_vlog(1)
-    unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
+    if args.shard_count:
+        print('Running shard {} of {}'.format(args.shard, args.shard_count))
+        loader = unittest.TestLoader()
+        suite = unittest.TestSuite()
+        for n, test in enumerate(loader.loadTestsFromTestCase(TestBackendOps)):
+            if n % args.shard_count == args.shard:
+                print("n: {}, test: {}".format(n, test))
+                suite.addTest(test)
+        runner = unittest.TextTestRunner()
+        runner.run(suite)
+    else:
+        unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
