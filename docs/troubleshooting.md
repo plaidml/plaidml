@@ -38,7 +38,7 @@ fixed).
 If you have existing Keras code that was written for the TensorFlow backend, 
 and it is running into this issue, you can enable experimental support for 
 TensorFlow-like `BatchDot` behavior by setting the environment variable 
-`PLAIDML_BATCHDOT_TF_BEHAVIOR` tto `True`.
+`PLAIDML_BATCHDOT_TF_BEHAVIOR` to `True`.
 
 `ERROR:plaidml:syntax error, unexpected -, expecting "," or )`
 
