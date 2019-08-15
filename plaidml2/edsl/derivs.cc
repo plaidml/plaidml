@@ -19,7 +19,8 @@ void RegisterDerivs() {
     return Tensors{select(X[0] < 0, -DY, DY)};
   });
   RegisterTensorDeriv("add", [](DERIV_ARGS) {  //
-    return Tensors{DY, DY};
+    // TODO: In the long run, want to catch the matched output lower in the stack (i.e. just {DY, DY} here)
+    return Tensors{DY, Call("ident", DY)};
   });
   RegisterTensorDeriv("acos", [](DERIV_ARGS) {  //
     return Tensors{-DY / sqrt(1 - X[0] * X[0])};

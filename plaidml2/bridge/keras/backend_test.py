@@ -11,6 +11,7 @@ from collections import OrderedDict
 
 # Make sure we win the race with TF to load libstdc++...
 import plaidml2
+from plaidml2.ffi import Error as pml2_ffi_Error
 
 import numpy as np
 import numpy.testing as npt
@@ -462,7 +463,7 @@ class TestBackendOps(unittest.TestCase):
         return [b.batch_dot(x, b.variable(m(2, 5, 2)))]
     """
 
-    @opTest([[m(2, 4, 5)]])
+    @opTest([[m(2, 4, 5)], [m(4)], [m(2, 3)]])
     def testBatchFlatten(self, b, x):
         return [b.batch_flatten(x)]
 
@@ -557,6 +558,24 @@ class TestBackendOps(unittest.TestCase):
         return [
             x / c,
             c / x,
+        ]
+
+    @opTest([[m(2, 3, 2, 4)], [m(1, 1, 2, 1) + 1], [m(1, 2, 3, 1) + 4]], do_grads=False)
+    def testAll(self, b, x):
+        return [
+            b.all(x),
+            b.all(x, keepdims=True),
+            b.all(x, axis=[1, 3]),
+            b.all(x, axis=-1),
+        ]
+
+    @opTest([[m(2, 3, 2, 4)], [m(1, 1, 2, 1) + 1]], do_grads=False)
+    def testAny(self, b, x):
+        return [
+            b.any(x),
+            b.any(x, keepdims=True),
+            b.any(x, axis=[1, 3]),
+            b.any(x, axis=-1),
         ]
 
     @opTest([
@@ -1482,17 +1501,12 @@ class TestBackendOps(unittest.TestCase):
     ])
     def testResizeImagesBilinear(self, b, x, h, w, df):
         # Tested without ends b/c of different padding behavior from TF
+        resized = b.resize_images(x, h, w, df, interpolation='bilinear')
+        shp = b.get_variable_shape(x)
         if df == 'channels_first':
-            return [
-                b.resize_images(x, h, w, df, interpolation='bilinear')[:, :, :h * x.shape.dims[2] -
-                                                                       h, :w * x.shape.dims[3] - w]
-            ]
+            return [resized[:, :, :h * shp[2] - h, :w * shp[3] - w]]
         elif df == 'channels_last':
-            return [
-                b.resize_images(x, h, w, df,
-                                interpolation='bilinear')[:, :h * x.shape.dims[1] -
-                                                          h, :w * x.shape.dims[2] - w, :]
-            ]
+            return [resized[:, :h * shp[1] - h, :w * shp[2] - w, :]]
         else:
             raise ValueError('Bad data format requested for test')
 
@@ -1575,11 +1589,11 @@ class TestBackendOps(unittest.TestCase):
         A = pkb.variable(m(2, 3, 1))
         B = pkb.variable(m(1, 2, 1))
         C = pkb.variable(m(2, 2, 2, 1))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(pml2_ffi_Error):
             pkb.conv(A, C)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(pml2_ffi_Error):
             pkb.conv(A, B, strides=(2, 3))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(pml2_ffi_Error):
             pkb.conv(A, B, dilation_rate=(1, 1))
 
     @unittest.skipIf(
