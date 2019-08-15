@@ -1702,29 +1702,47 @@ class TestBackendOps(unittest.TestCase):
     def resnetLayer1(self, b, x, k):
         return [b.conv2d(x, k, strides=(2, 2), padding='valid')]
 
-    @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]], do_grads=False)
+    @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
     def resnetLayer2(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
 
-    @opTest([[m(1, 96, 96, 192), m(3, 3, 192, 192)]], do_grads=False)
-    def resnetLayer3(self, b, x, k):
-        c = b.conv2d(x, k, padding='same')
-        o = b.relu(c)
-        return [o]
+    # @opTest([[m(1, 96, 96, 192), m(3, 3, 192, 192)]], # For debugging
+    #         do_grads=False,
+    #         num_iterations=10,
+    #         measure_eval_time=True)
+    # def resnetLayer3(self, b, x, k):
+    #     c = b.conv2d(x, k, padding='same')
+    #     o = b.relu(c)
+    #     return [o]
 
-    @opTest([[m(1, 96, 96, 192), m(8, 8, 192, 192)]], do_grads=False)
+    @opTest([[m(1, 96, 96, 192), m(8, 8, 192, 192)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
     def resnetLayer4(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
 
-    @opTest([[m(1, 64, 64, 256), m(3, 3, 256, 256)]],
+    # @opTest([[m(1, 64, 64, 256), m(3, 3, 256, 256)]], # For Debugging
+    #         do_grads=False,
+    #         num_iterations=10,
+    #         measure_eval_time=True)
+    # def resnetLayer5(self, b, x, k):
+    #     c = b.conv2d(x, k, padding='same')
+    #     o = b.relu(c)
+    #     return [o]
+
+    @opTest([[m(1, 64, 64, 128), m(3, 3, 128, 128)]],
             do_grads=False,
             num_iterations=10,
             measure_eval_time=True)
-    def resnetLayer5(self, b, x, k):
+    def resnetLayer6(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]

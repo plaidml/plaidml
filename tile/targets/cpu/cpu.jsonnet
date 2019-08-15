@@ -31,17 +31,6 @@ local PARAMS = {
               },
             },
 
-            // Assign offsets to allocation arena throughout the program.
-            {
-              name: 'place_program',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass',
-                reqs: ['program'],
-                locs: [{ devs: [{ name: 'DRAM', units: [{ offset: 0 }] }] }],
-                alignment: 4,
-              },
-            },
-
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
@@ -139,6 +128,29 @@ local PARAMS = {
                 // Since all loads to/from global memory are across a wide bus, use that as the
                 // cache_width to optimize for contigous regions of DRAM for each inner block
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
+              },
+            },
+
+            // Locate all the non-user buffers of be in the DRAM arena
+            {
+              name: 'locate_program',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateBlocksRefinementsRecursivelyPass',
+                reqs: ['program'],
+                skip_tags: ["user"],
+                loc: { devs: [{ name: 'DRAM' }], },
+              },
+            },
+
+            // Assign offsets to allocation arena throughout the program.
+            {
+              name: 'place_program',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass',
+                reqs: ['program'],
+                skip_tags: ["user"],
+                locs: [{ devs: [{ name: 'DRAM'}] }],
+                alignment: 16,
               },
             },
           ],

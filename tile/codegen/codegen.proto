@@ -71,8 +71,7 @@ message MirPadPass {
 }
 
 // Reorder blocks
-message ReorderBlocksPass {
-}
+message ReorderBlocksPass {}
 
 // The scalarize pass looks for refinements which (usually due to
 // localization) now hold only a single element, and replaces
@@ -159,10 +158,12 @@ message SchedulePass {
 message MemoryPlacementPass {
   // Do memory placement for blocks that match there tags
   repeated string reqs = 1;
+  // Skip placing Refinements marked with a tag contained in the list below.
+  repeated string skip_tags = 2;
   // The mimimal buffer aligment requirement.
-  required uint32 alignment = 2;
+  required uint32 alignment = 3;
   // Only place buffers assigned to this hardware location.
-  repeated stripe.proto.Location locs = 3;
+  repeated stripe.proto.Location locs = 4;
 }
 
 // For each refinement going into or out of a given block (as per dirs), add a
@@ -301,6 +302,13 @@ message LocateInnerBlockPass {
   repeated string inner_reqs = 2;
   required stripe.proto.Location loc = 3;
   optional bool append_devs = 4 [default = false];
+}
+
+// Edit the location of blocks within some tagged blocks to match 'loc'
+message LocateBlocksRefinementsRecursivelyPass {
+  repeated string reqs = 1;
+  required stripe.proto.Location loc = 2;
+  repeated string skip_tags = 3;
 }
 
 // The stencil pass attempts to rewrite blocks to contain an inner block that
@@ -654,8 +662,7 @@ message TempVarPass {
 }
 
 // Propagate constant tensors.
-message ConstantPropagatePass {
-}
+message ConstantPropagatePass {}
 
 // Remove constant tensor and replace the corresponding loads with constants
 message ConstTensorPass {
