@@ -1,6 +1,7 @@
 # Copyright 2019 Intel Corporation.
 
 import logging
+import six
 
 import numpy as np
 import plaidml2.edsl as edsl
@@ -29,13 +30,21 @@ def argmax(x, axis=-1):
     return op('argmax', [x, axis]).as_tensor()
 
 
+def binary_crossentropy(targets, preds, epsilon):
+    return op('binary_crossentropy', [targets, preds, epsilon]).as_tensor()
+
+
+def clip(x, min=None, max=None):
+    return op('clip', [x, min, max]).as_tensor()
+
+
 def concatenate(tensors, axis=-1):
     return op('concatenate', [tensors, axis]).as_tensor()
 
 
-def convolution(I, F, strides, dilations, data_dilations, filter_shape, groups, autopad_mode,
-                manual_padding, input_layout, filter_layout, group_layout, winograd_allowed, name,
-                autogroup_mode, deriv_mode, result_shape):
+def convolution(inputs, filters, strides, dilations, data_dilations, filter_shape, groups,
+                autopad_mode, manual_padding, input_layout, filter_layout, group_layout,
+                winograd_allowed, name, autogroup_mode, deriv_mode, result_shape):
     if isinstance(strides, np.ndarray):
         strides = strides.to_list()
     if isinstance(dilations, np.ndarray):
@@ -49,18 +58,38 @@ def convolution(I, F, strides, dilations, data_dilations, filter_shape, groups, 
     if isinstance(result_shape, np.ndarray):
         manual_padding = manual_padding.to_list()
     return op("convolution", [
-        I, F, strides, dilations, data_dilations, filter_shape, groups, autopad_mode,
+        inputs, filters, strides, dilations, data_dilations, filter_shape, groups, autopad_mode,
         manual_padding, input_layout, filter_layout, group_layout, winograd_allowed, name,
         autogroup_mode, deriv_mode, result_shape
     ]).as_tensor()
+
+
+def cumprod(x, axis):
+    return op('cumprod', [x, axis]).as_tensor()
+
+
+def cumsum(x, axis):
+    return op('cumsum', [x, axis]).as_tensor()
 
 
 def dot(x, y):
     return op('dot', [x, y]).as_tensor()
 
 
+def elu(x, alpha=1.0):
+    return op('elu', [x, alpha]).as_tensor()
+
+
 def expand_dims(x, axis=-1):
     return op('expand_dims', [x, axis]).as_tensor()
+
+
+def flip(x, axis=None):
+    return op('flip', [x, axis]).as_tensor()
+
+
+def hard_sigmoid(x, slope):
+    return op('hard_sigmoid', [x, slope]).as_tensor()
 
 
 def max(x, axis=None, keepdims=False):
@@ -69,10 +98,10 @@ def max(x, axis=None, keepdims=False):
     return op('max', [x, axis, keepdims]).as_tensor()
 
 
-def mean(I, axis=None, keepdims=False):
+def mean(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
-    return op('mean', [I, axis, keepdims]).as_tensor()
+    return op('mean', [x, axis, keepdims]).as_tensor()
 
 
 def min(x, axis=None, keepdims=False):
@@ -85,11 +114,25 @@ def relu(x, alpha=None, max_value=None, threshold=0.):
     return op('relu', [x, alpha, max_value, threshold]).as_tensor()
 
 
+def repeat(x, repeats, axis):
+    return op('repeat', [x, repeats, axis]).as_tensor()
+
+
+def sigmoid(x):
+    return op('sigmoid', [x]).as_tensor()
+
+
 def softmax(x, axis=None):
     return op('softmax', [x, axis]).as_tensor()
 
 
-def pool(I, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,
+def prod(x, axis=None, keepdims=False):
+    if isinstance(axis, np.ndarray):
+        axis = axis.tolist()
+    return op('prod', [x, axis, keepdims]).as_tensor()
+
+
+def pool(x, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,
          include_pad_in_avg):
     if isinstance(pool_size, np.ndarray):
         pool_size = pool_size.tolist()
@@ -98,9 +141,23 @@ def pool(I, pool_mode, pool_size, strides, autopadding, manual_padding, data_lay
     if isinstance(manual_padding, np.ndarray):
         manual_padding = manual_padding.to_list()
     return op("pool", [
-        I, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,
+        x, pool_mode, pool_size, strides, autopadding, manual_padding, data_layout, use_ceil,
         include_pad_in_avg
     ]).as_tensor()
+
+
+def slice_of(x, slices):
+    # Note: ellipses and too-short slice lists must be handled by the calling op if desired
+    reformatted_slices = list()
+    for s in slices:
+        if isinstance(s, six.integer_types):
+            reformatted_slices.append(s)
+            continue
+        if isinstance(s, slice):
+            reformatted_slices.append([s.start, s.stop, s.step])
+            continue
+        raise ValueError("Unexpected type {} used to slice tensor".format(type(s)))
+    return op("slice", [x, reformatted_slices]).as_tensor()
 
 
 def spatial_padding(x, lo_pads, hi_pads, data_layout):
@@ -111,33 +168,33 @@ def spatial_padding(x, lo_pads, hi_pads, data_layout):
     return op("spatial_padding", [x, lo_pads, hi_pads, data_layout]).as_tensor()
 
 
-def square(I):
-    return I * I
+def square(x):
+    return x * x
 
 
 def squeeze(x, axis):
     return op("squeeze", [x, axis]).as_tensor()
 
 
-def sum(I, axis=None, keepdims=False):
+def sum(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
-    return op('sum', [I, axis, keepdims]).as_tensor()
+    return op('sum', [x, axis, keepdims]).as_tensor()
 
 
-def tile(I, n):
+def tile(x, n):
     if isinstance(n, np.ndarray):
         n = n.tolist()
-    return op('tile', [I, n]).as_tensor()
+    return op('tile', [x, n]).as_tensor()
 
 
-def transpose(I, pattern=None):
+def transpose(x, pattern=None):
     if isinstance(pattern, np.ndarray):
         pattern = pattern.tolist()
-    return op('transpose', [I, pattern]).as_tensor()
+    return op('transpose', [x, pattern]).as_tensor()
 
 
-def variance(I, axis=None, keepdims=False):
+def variance(x, axis=None, keepdims=False):
     if isinstance(axis, np.ndarray):
         axis = axis.tolist()
-    return op('variance', [I, axis, keepdims]).as_tensor()
+    return op('variance', [x, axis, keepdims]).as_tensor()

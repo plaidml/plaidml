@@ -568,7 +568,9 @@ TEST(Jit, JitExternalMUL_F32) {
                                                *output = DataType::FLOAT32;
                                                return reinterpret_cast<void*>(&foo_impl);
                                              }}};
-  JitExecute(*block, externals, buffers);
+  Config config;
+  config.externals = externals;
+  JitExecute(*block, config, buffers);
 
   EXPECT_THAT(b2[0], Eq(6.0));
 }
