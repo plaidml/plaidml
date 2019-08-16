@@ -13,7 +13,6 @@
 namespace vertexai {
 namespace tile {
 namespace stripejit {
-
 Program::Program(                  //
     const std::string& target,     //
     const lang::RunInfo& runinfo,  //

@@ -38,6 +38,14 @@ theano.config.optimizer = "None"
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--fp16', action='store_true')
+    parser.add_argument(
+        '--shard-count',
+        type=int,
+        default=0,
+        help=
+        'Run sharded test split into this many shards. Does not forward additional arguments to unittest. 0 (default) to not shard.'
+    )
+    parser.add_argument('--shard', type=int, default=0, help='Which shard to run')
     parser.add_argument('-v', '--verbose', action='count', default=0)
     args, remainder = parser.parse_known_args()
 
@@ -1694,29 +1702,47 @@ class TestBackendOps(unittest.TestCase):
     def resnetLayer1(self, b, x, k):
         return [b.conv2d(x, k, strides=(2, 2), padding='valid')]
 
-    @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]], do_grads=False)
+    @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
     def resnetLayer2(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
 
-    @opTest([[m(1, 96, 96, 192), m(3, 3, 192, 192)]], do_grads=False)
-    def resnetLayer3(self, b, x, k):
-        c = b.conv2d(x, k, padding='same')
-        o = b.relu(c)
-        return [o]
+    # @opTest([[m(1, 96, 96, 192), m(3, 3, 192, 192)]], # For debugging
+    #         do_grads=False,
+    #         num_iterations=10,
+    #         measure_eval_time=True)
+    # def resnetLayer3(self, b, x, k):
+    #     c = b.conv2d(x, k, padding='same')
+    #     o = b.relu(c)
+    #     return [o]
 
-    @opTest([[m(1, 96, 96, 192), m(8, 8, 192, 192)]], do_grads=False)
+    @opTest([[m(1, 96, 96, 192), m(8, 8, 192, 192)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
     def resnetLayer4(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
 
-    @opTest([[m(1, 64, 64, 256), m(3, 3, 256, 256)]],
+    # @opTest([[m(1, 64, 64, 256), m(3, 3, 256, 256)]], # For Debugging
+    #         do_grads=False,
+    #         num_iterations=10,
+    #         measure_eval_time=True)
+    # def resnetLayer5(self, b, x, k):
+    #     c = b.conv2d(x, k, padding='same')
+    #     o = b.relu(c)
+    #     return [o]
+
+    @opTest([[m(1, 64, 64, 128), m(3, 3, 128, 128)]],
             do_grads=False,
             num_iterations=10,
             measure_eval_time=True)
-    def resnetLayer5(self, b, x, k):
+    def resnetLayer6(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
@@ -1796,5 +1822,15 @@ class TestBackendOps(unittest.TestCase):
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
-    #plaidml._internal_set_vlog(1)
-    unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
+    if args.shard_count:
+        print('Running shard {} of {}'.format(args.shard, args.shard_count))
+        loader = unittest.TestLoader()
+        suite = unittest.TestSuite()
+        for n, test in enumerate(loader.loadTestsFromTestCase(TestBackendOps)):
+            if n % args.shard_count == args.shard:
+                print("n: {}, test: {}".format(n, test))
+                suite.addTest(test)
+        runner = unittest.TextTestRunner()
+        runner.run(suite)
+    else:
+        unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

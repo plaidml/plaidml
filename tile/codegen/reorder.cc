@@ -18,52 +18,51 @@ using namespace math;    // NOLINT
 typedef std::shared_ptr<Statement> StmtPtr;
 
 struct StmtList {
-  bool in_eltwise;                // If input stmt in the list is element-wise block
-  bool out_eltwise;               // If output stmt in the list is element-wise block
-  bool contraction;               // If the last stmt is contraction block
-  std::vector<StmtPtr> stmts;     // Statements in order
-  std::set<std::string> inputs;   // input refinements
-  std::set<std::string> outputs;  // output refinements;
-  std::set<StmtPtr> deps;         // The stmts that this list depends on
+  std::vector<StmtPtr> stmts;                          // Statements in order
+  std::map<std::string, std::vector<size_t>> inputs;   // input refinements
+  std::map<std::string, std::vector<size_t>> outputs;  // output refinements;
+  std::set<StmtPtr> deps;                              // The stmts that this list depends on
+  bool skip;                                           // Skip the removed stmts
 };
 
-static bool RefMatchIdx(const Refinement& ref, Block* block) {
-  std::set<std::string> idx_set;
-  for (const auto& idx : block->idxs) {
-    idx_set.insert(idx.name);
-  }
-  for (const auto& acc : ref.access) {
-    if (acc == Affine()) {
-      continue;
-    }
-    const auto& acc_map = acc.getMap();
-    if (acc_map.size() > 1) {
-      return false;
-    }
-    if (idx_set.find(acc_map.begin()->first) == idx_set.end()) {
-      return false;
-    }
-    idx_set.erase(acc_map.begin()->first);
-  }
-  return true;
-}
-
-static bool Depends(std::shared_ptr<StmtList> sl0, std::shared_ptr<StmtList> sl1) {
-  for (const auto& stmt : sl0->stmts) {
-    if (sl1->deps.find(stmt) != sl1->deps.end()) {
+// Determine if any of deps depends on any of stmts
+static bool Depends(const std::vector<StmtPtr>& stmts, const std::set<StmtPtr>& deps) {
+  for (const auto& stmt : stmts) {
+    if (deps.find(stmt) != deps.end()) {
       return true;
     }
   }
   return false;
 }
 
-// If s0 and s1 may be fused, they should:
-// 1) be element-wise
-// 2) s0's output is s1's input
+static std::vector<size_t> MakeRefShape(Block* block, const Refinement& ref) {
+  std::vector<size_t> shape;
+  for (const auto& acc : ref.access) {
+    const auto& acc_map = acc.getMap();
+    if (acc_map.size() > 1) {
+      return {};
+    }
+    if (acc_map.size() == 0) {
+      shape.push_back(1);
+      continue;
+    }
+    auto& idx_name = acc_map.begin()->first;
+    if (idx_name == "") {
+      shape.push_back(1);
+    }
+    else {
+      auto idx = block->idx_by_name(idx_name);
+      shape.push_back((idx->affine == Affine()) ? idx->range : 1);
+    }
+  }
+  return shape;
+}
+
 static bool MayFuse(std::shared_ptr<StmtList> s0, std::shared_ptr<StmtList> s1) {
-  if ((s0->out_eltwise && s1->in_eltwise) || (s0->contraction && s1->in_eltwise)) {
-    for (const auto& out : s0->outputs) {
-      if (s1->inputs.find(out) != s1->inputs.end()) {
+  for (const auto& out_it : s0->outputs) {
+    const auto& in_it = s1->inputs.find(out_it.first);
+    if (in_it != s1->inputs.end()) {
+      if (out_it.second == in_it->second) {
         return true;
       }
     }
@@ -97,51 +96,58 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
     for (const auto& dep_stmt_it : stmt->deps) {
       sl->deps.insert(*dep_stmt_it);
     }
+    sl->skip = false;
     if (block) {
       if (block->has_tag("eltwise")) {
-        sl->in_eltwise = true;
-        sl->out_eltwise = true;
-        sl->contraction = false;
         for (const auto& ref : block->refs) {
-          if (!RefMatchIdx(ref, block.get())) {
-            sl->in_eltwise = false;
-            sl->out_eltwise = false;
-          }
+          std::vector<size_t> rs = MakeRefShape(block.get(), ref);
           if (IsReadDir(ref.dir)) {
-            sl->inputs.insert(ref.from);
+            sl->inputs.emplace(ref.from, rs);
           }
           if (IsWriteDir(ref.dir)) {
-            sl->outputs.insert(ref.from);
+            sl->outputs.emplace(ref.from, rs);
           }
         }
-      } else {
-        sl->in_eltwise = false;
-        sl->out_eltwise = false;
-        sl->contraction = block->has_tag("contraction");
+      } else if (block->has_tag("contraction")) {
         for (const auto& ref : block->refs) {
-          if (IsReadDir(ref.dir)) {
-            sl->inputs.insert(ref.from);
-          }
           if (IsWriteDir(ref.dir)) {
-            sl->outputs.insert(ref.from);
+            std::vector<size_t> rs = MakeRefShape(block.get(), ref);
+            sl->outputs.emplace(ref.from, rs);
           }
         }
       }
-    }
-    else {
-      sl->in_eltwise = false;
-      sl->out_eltwise = false;
-      sl->contraction = false;
     }
     stmt_list.push_back(sl);
   }
   while (stmt_list.size() > 0) {
     std::shared_ptr<StmtList> sl0 = stmt_list.front();
     stmt_list.erase(stmt_list.begin());
-    bool fused = false;
+    if (sl0->skip) {
+      continue;
+    }
+    // Whether sl0 is merged forward into the following StmtList
+    bool merged_forward = false;
+    // Whether any stmt is merged backward to sl0
+    bool merged_backward = false;
+    // Whether it is currently forward merge
+    bool merging_forward = true;
+    // the stmts between sl0 and sl1 while backward merge
+    std::vector<StmtPtr> between_stmts;
+    // Insertion point if backward merge
+    std::vector<std::shared_ptr<StmtList>>::iterator insert_pos;
     // Decide if sl0 can be fused by any following stmt
     for (auto it = stmt_list.begin(); it != stmt_list.end(); ++it) {
       auto& sl1 = *it;
+      if (sl1->skip) {
+        continue;
+      }
+      if (!merging_forward) {
+        // If it is backward merge, sl1 must not depend on the above stmts
+        if (Depends(between_stmts, sl1->deps)) {
+          between_stmts.insert(between_stmts.end(), sl1->stmts.begin(), sl1->stmts.end());
+          continue;
+        }
+      }
       if (MayFuse(sl0, sl1)) {
         IVLOG(3, "Fuse: ");
         for (const auto& s : sl0->stmts) {
@@ -152,36 +158,74 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
           auto block = Block::Downcast(s);
           IVLOG(3, "    " << block->name);
         }
-        if (sl0->contraction) {
-          sl1->in_eltwise = false;
-        }
-        // merge stmts
-        sl1->stmts.insert(sl1->stmts.begin(), sl0->stmts.begin(), sl0->stmts.end());
-        // merge deps
-        for (auto& s : sl0->stmts) {
-          if (sl1->deps.find(s) != sl1->deps.end()) {
-            sl1->deps.erase(s);
+        if (merging_forward) {
+          // Forward merge sl0 into sl1
+          // merge stmts
+          sl1->stmts.insert(sl1->stmts.begin(), sl0->stmts.begin(), sl0->stmts.end());
+          // merge deps
+          for (auto& s : sl0->stmts) {
+            if (sl1->deps.find(s) != sl1->deps.end()) {
+              sl1->deps.erase(s);
+            }
           }
-        }
-        // merge inputs and outputs
-        sl1->deps.insert(sl0->deps.begin(), sl0->deps.end());
-        for (auto& out : sl0->outputs) {
-          if (sl1->inputs.find(out) != sl1->inputs.end()) {
-            sl1->inputs.erase(out);
+          sl1->deps.insert(sl0->deps.begin(), sl0->deps.end());
+          // merge inputs and outputs
+          for (auto& out_it : sl0->outputs) {
+            if (sl1->inputs.find(out_it.first) != sl1->inputs.end()) {
+              sl1->inputs.erase(out_it.first);
+            }
           }
+          sl1->inputs.insert(sl0->inputs.begin(), sl0->inputs.end());
+          sl1->outputs.insert(sl0->outputs.begin(), sl0->outputs.end());
+          merged_forward = true;
+          break;
         }
-        sl1->inputs.insert(sl0->inputs.begin(), sl0->inputs.end());
-        fused = true;
-        break;
+        else {
+          // Backward merge sl1 into sl0
+          sl1->skip = true;
+          // merge stmts
+          sl0->stmts.insert(sl0->stmts.end(), sl1->stmts.begin(), sl1->stmts.end());
+          // merge deps
+          for (auto& s : sl0->stmts) {
+            if (sl1->deps.find(s) != sl1->deps.end()) {
+              sl1->deps.erase(s);
+            }
+          }
+          sl1->deps.insert(sl0->deps.begin(), sl0->deps.end());
+          // merge inputs and outputs
+          for (auto& out_it : sl0->outputs) {
+            if (sl1->inputs.find(out_it.first) != sl1->inputs.end()) {
+              sl1->inputs.erase(out_it.first);
+            }
+          }
+          sl0->inputs.insert(sl1->inputs.begin(), sl1->inputs.end());
+          sl0->outputs.insert(sl1->outputs.begin(), sl1->outputs.end());
+          merged_backward = true;
+        }
       }
       // If sl1 depends on sl0, sl0 can't be merged with the later blocks
-      if (Depends(sl0, sl1)) {
-        break;
+      if (merging_forward) {
+        if (Depends(sl0->stmts, sl1->deps)) {
+          // Start backward merge, insert sl0 before sl1 later
+          merging_forward = false;
+          insert_pos = it;
+        }
+      }
+      // Do not use "else" here. It should be executed if the above block
+      // sets merging_forward to false
+      if (!merging_forward) {
+        between_stmts.insert(between_stmts.end(), sl1->stmts.begin(), sl1->stmts.end());
       }
     }
-    // If sl0 is not fused, put it into ready list
-    if (!fused) {
-      done.insert(done.end(), sl0->stmts.begin(), sl0->stmts.end());
+    if (!merged_forward) {
+      if (merged_backward) {
+        // Something backward is merged into sl0. So insert sl0 into stmt_list.
+        stmt_list.insert(insert_pos, sl0);
+      }
+      else {
+        // Put sl0 into ready list
+        done.insert(done.end(), sl0->stmts.begin(), sl0->stmts.end());
+      }
     }
   }
   main_block->stmts = done;
