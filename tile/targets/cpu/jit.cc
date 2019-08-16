@@ -79,7 +79,7 @@ class Runtime : public llvm::LegacyJITSymbolResolver {
 
 class Compiler : private stripe::ConstStmtVisitor {
  public:
-  Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals);
+  Compiler(llvm::LLVMContext* context, const Config& config);
   ProgramModule CompileProgram(const stripe::Block& program);
 
   // Internal data type definitions.
@@ -97,7 +97,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   };
 
  protected:
-  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals);
+  explicit Compiler(llvm::LLVMContext* context, llvm::Module* module, const Config& config);
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
   uint64_t MeasureArena(const stripe::Block& block);
   void GenerateArena(const stripe::Block& block);
@@ -188,6 +188,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   void ProfileBlockLeave(const stripe::Block& block);
   bool isXSMMSuppotedDataType(DataType dataType);
   const DataType GetBlockRefsDataType(const stripe::Block& block);
+  llvm::Value* RunTimeLogEntry(void);
+  void EmitRunTimeLogEntry(const char* str, const char* extra, llvm::Value* value);
 
   // Gets the leading dimensions and the buffers for an XSMM call if available.
   // @returns true if the XSMM call is applicable, otherwise false.
@@ -196,16 +198,17 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::LLVMContext& context_;
   llvm::IRBuilder<> builder_;
   llvm::Module* module_ = nullptr;
-  std::map<std::string, External> external_handlers_;
+  Config config_;
   std::map<std::string, void*> external_funcptrs_;
 
   std::map<std::string, Scalar> scalars_;
   std::map<std::string, Buffer> buffers_;
   std::map<std::string, Index> indexes_;
+  uint64_t arenaSize_ = 0;
 };
 
-Compiler::Compiler(llvm::LLVMContext* context, const std::map<std::string, External>& externals)
-    : context_(*context), builder_{context_}, external_handlers_{externals} {
+Compiler::Compiler(llvm::LLVMContext* context, const Config& config)
+    : context_(*context), builder_{context_}, config_{config}, arenaSize_(0) {
   static std::once_flag init_once;
   std::call_once(init_once, []() {
     LLVMInitializeNativeTarget();
@@ -239,12 +242,12 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   llvm::legacy::PassManager modopt;
   pmb.populateModulePassManager(modopt);
   if (VLOG_IS_ON(4)) {
-    IVLOG(4, "\n============================================================\n");
+    IVLOG(4, "\nBefore ============================================================\n");
     module_->print(llvm::errs(), nullptr);
   }
   modopt.run(*module_);
   if (VLOG_IS_ON(4)) {
-    IVLOG(4, "\n============================================================\n");
+    IVLOG(4, "\nAfter ============================================================\n");
     module_->print(llvm::errs(), nullptr);
   }
   // Wrap the finished module and the parameter names into a ProgramModule.
@@ -258,8 +261,8 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   return ret;
 }
 
-Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module, const std::map<std::string, External>& externals)
-    : context_(*context), builder_{context_}, module_(module), external_handlers_{externals} {
+Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module, const Config& config)
+    : context_(*context), builder_{context_}, module_(module), config_{config}, arenaSize_(0) {
   // This private constructor sets up a nested instance which will
   // process a nested block, generating output into the same module as its
   // containing compiler instance.
@@ -291,6 +294,15 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   std::vector<llvm::Value*> args;
   std::vector<llvm::Value*> allocs;
   {
+    if (arenaSize_ != 0) {
+      // allocate the arena on the heap. This way static initialization order is never an issue.
+      std::vector<llvm::Value*> calloc_args{IndexConst(arenaSize_), IndexConst(1)};
+      auto buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
+      auto arena_gval = module_->getNamedGlobal(arena_name_);
+      auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), arenaSize_)->getPointerTo();
+      builder_.CreateStore(builder_.CreateBitCast(buffer, arenatype), arena_gval);
+      allocs.push_back(buffer);
+    }
     unsigned i = 0;
     for (auto& ref : program.refs) {
       if (ref.has_tag("user")) {
@@ -359,11 +371,11 @@ uint64_t Compiler::MeasureArena(const stripe::Block& block) {
 }
 
 void Compiler::GenerateArena(const stripe::Block& block) {
-  uint64_t extent = MeasureArena(block);
-  auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), extent);
+  arenaSize_ = MeasureArena(block);
+  auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), arenaSize_)->getPointerTo();
   module_->getOrInsertGlobal(arena_name_, arenatype);
   auto gval = module_->getNamedGlobal(arena_name_);
-  gval->setLinkage(llvm::GlobalValue::CommonLinkage);
+  gval->setInitializer(llvm::Constant::getNullValue(arenatype));
 }
 
 llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const DataType dataType,
@@ -869,8 +881,8 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"tanh", &Compiler::Tanh},
       {"cos", &Compiler::Cos},
   };
-  auto externiter = external_handlers_.find(intrinsic.name);
-  if (externiter != external_handlers_.end()) {
+  auto externiter = config_.externals.find(intrinsic.name);
+  if (externiter != config_.externals.end()) {
     Intrinsic(intrinsic, externiter->second);
   } else {
     auto builtiniter = builtins.find(intrinsic.name);
@@ -883,7 +895,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
 
 void Compiler::Visit(const stripe::Block& block) {
   // Compile a nested block as a function in the same module
-  Compiler nested(&context_, module_, external_handlers_);
+  Compiler nested(&context_, module_, config_);
   auto function = nested.CompileBlock(block);
   for (auto& fptr_iter : nested.external_funcptrs_) {
     external_funcptrs_.emplace(fptr_iter);
@@ -901,7 +913,9 @@ void Compiler::Visit(const stripe::Block& block) {
     if (ref.dir == stripe::RefDir::None && ref.from.empty()) {
       if (ref.has_tag("placed")) {
         auto arena = module_->getNamedGlobal(arena_name_);
-        buffer = builder_.CreateConstGEP1_64(arena, ref.offset);
+        auto baseArenaAddress = builder_.CreateLoad(arena);
+        std::vector<llvm::Value*> idxList{llvm::ConstantInt::get(builder_.getInt64Ty(), ref.offset)};
+        buffer = builder_.CreateGEP(builder_.getInt8Ty()->getPointerTo(), baseArenaAddress, idxList);
       } else {
         // Allocate new storage for the buffer.
         size_t size = ref.interior_shape.byte_size();
@@ -1519,6 +1533,27 @@ llvm::Value* Compiler::MallocFunction(void) {
   return module_->getOrInsertFunction(funcname, functype).getCallee();
 }
 
+llvm::Value* Compiler::RunTimeLogEntry(void) {
+  std::vector<llvm::Type*> argtypes{builder_.getInt8Ty()->getPointerTo(), builder_.getInt8Ty()->getPointerTo(),
+                                    builder_.getInt64Ty()};
+  llvm::Type* rettype = llvm::Type::getVoidTy(context_);
+  auto functype = llvm::FunctionType::get(rettype, argtypes, false);
+  const char* funcname = "RunTimeLogEntry";
+  return module_->getOrInsertFunction(funcname, functype).getCallee();
+}
+
+void Compiler::EmitRunTimeLogEntry(const char* str, const char* extra, llvm::Value* value) {
+  llvm::Type* valueType = builder_.getInt64Ty();
+  auto arg1 = builder_.CreateGlobalStringPtr(str);
+  auto arg2 = builder_.CreateGlobalStringPtr(extra);
+  auto arg3 = builder_.CreatePtrToInt(value, builder_.getInt64Ty());
+  std::vector<llvm::Value*> log_args;
+  log_args.push_back(arg1);
+  log_args.push_back(arg2);
+  log_args.push_back(arg3);
+  auto buffer = builder_.CreateCall(RunTimeLogEntry(), log_args, "");
+}
+
 llvm::Value* Compiler::CallocFunction(void) {
   std::vector<llvm::Type*> argtypes{IndexType(), IndexType()};
   llvm::Type* rettype = builder_.getInt8PtrTy();
@@ -1553,6 +1588,9 @@ llvm::Value* Compiler::ReadCycleCounter(void) {
 }
 
 void Compiler::ProfileBlockEnter(const stripe::Block& block) {
+  if (!config_.profile_block_execution) {
+    return;
+  }
   // allocate counter variable
   std::string profile_count_name = profile_count_name_ + block.name;
   module_->getOrInsertGlobal(profile_count_name, IndexType());
@@ -1576,6 +1614,9 @@ void Compiler::ProfileBlockEnter(const stripe::Block& block) {
 }
 
 void Compiler::ProfileBlockLeave(const stripe::Block& block) {
+  if (!config_.profile_block_execution) {
+    return;
+  }
   // Add the current rdtsc back into the elapsed time counter, which both
   // corrects for the bias we introduced on function entry and accumulates
   // the elapsed time into the running total.
@@ -1656,6 +1697,10 @@ void prng_step(uint32_t* in_state, uint32_t* out_state, uint32_t* buf, size_t co
     in_state = out_state;
   }
 }
+
+void RunTimeLogEntry(char* str, char* extra, uint64_t address) {
+  IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ":" << std::hex << address);
+}
 }  // namespace rt
 
 template <typename T>
@@ -1677,6 +1722,8 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
       {"_libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
       {"libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
       {"_libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
+      {"RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},   // For debugging
+      {"_RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {
@@ -1715,8 +1762,8 @@ struct Native::Impl {
   ProgramModule module;
   std::unique_ptr<Executable> executable;
 
-  void compile(const stripe::Block& program, const std::map<std::string, External>& externals) {
-    Compiler compiler(&context, externals);
+  void compile(const stripe::Block& program, const Config& config) {
+    Compiler compiler(&context, config);
     module = compiler.CompileProgram(program);
     assert(module.module);
     executable.reset(new Executable(module));
@@ -1736,22 +1783,19 @@ struct Native::Impl {
 
 Native::Native() : m_impl(new Native::Impl) {}
 Native::~Native() {}
-void Native::compile(const stripe::Block& program, const std::map<std::string, External>& externals) {
-  m_impl->compile(program, externals);
-}
+void Native::compile(const stripe::Block& program, const Config& config) { m_impl->compile(program, config); }
 void Native::run(const std::map<std::string, void*>& buffers) { m_impl->run(buffers); }
 void Native::save(const std::string& filename) { m_impl->save(filename); }
 void Native::set_perf_attrs(stripe::Block* program) { m_impl->set_perf_attrs(program); }
 
 void JitExecute(const stripe::Block& program, const std::map<std::string, void*>& buffers) {
-  std::map<std::string, External> externals;
-  JitExecute(program, externals, buffers);
+  Config config;
+  JitExecute(program, config, buffers);
 }
 
-void JitExecute(const stripe::Block& program, const std::map<std::string, External>& externals,
-                const std::map<std::string, void*>& buffers) {
+void JitExecute(const stripe::Block& program, const Config& config, const std::map<std::string, void*>& buffers) {
   llvm::LLVMContext context;
-  Compiler compiler(&context, externals);
+  Compiler compiler(&context, config);
   auto module = compiler.CompileProgram(program);
   Executable executable(std::move(module));
   executable.Run(buffers);
@@ -1759,8 +1803,9 @@ void JitExecute(const stripe::Block& program, const std::map<std::string, Extern
 
 void JitProfile(stripe::Block* program, const std::map<std::string, void*>& buffers) {
   llvm::LLVMContext context;
-  std::map<std::string, External> externals;
-  Compiler compiler(&context, externals);
+  Config config;
+  config.profile_block_execution = true;
+  Compiler compiler(&context, config);
   auto module = compiler.CompileProgram(*program);
   Executable executable(std::move(module));
   executable.Run(buffers);

@@ -62,6 +62,16 @@ class LocateInnerBlockPass final : public CompilePass {
   proto::LocateInnerBlockPass options_;
 };
 
+class LocateBlocksRefinementsRecursivelyPass final : public CompilePass {
+ public:
+  explicit LocateBlocksRefinementsRecursivelyPass(const proto::LocateBlocksRefinementsRecursivelyPass& options)
+      : options_{options} {}
+  void Apply(CompilerState* state) const final;
+
+ private:
+  proto::LocateBlocksRefinementsRecursivelyPass options_;
+};
+
 }  // namespace codegen
 }  // namespace tile
 }  // namespace vertexai
