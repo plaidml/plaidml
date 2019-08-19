@@ -168,20 +168,6 @@ std::shared_ptr<Value> FunctionValue::make(std::string fn, std::vector<std::shar
       return inputs[0];
     }
   }
-  if (fn == "mul") {
-    if (inputs[0] == zeroi || inputs[0] == zerof) {
-      return inputs[0];
-    }
-    if (inputs[1] == zeroi || inputs[1] == zerof) {
-      return inputs[1];
-    }
-    if (inputs[0] == onei || inputs[0] == onef) {
-      return inputs[1];
-    }
-    if (inputs[1] == onei || inputs[1] == onef) {
-      return inputs[0];
-    }
-  }
   if (fn == "match" && inputs[0] == inputs[1]) {
     return inputs[0];
   }
