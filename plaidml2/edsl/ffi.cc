@@ -201,6 +201,14 @@ void plaidml_logical_shape_free(  //
   });
 }
 
+plaidml_shape* plaidml_logical_shape_into_tensor_shape(  //
+    plaidml_error* err,                                  //
+    plaidml_logical_shape* shape) {
+  return ffi_wrap<plaidml_shape*>(err, 0, [&] {  //
+    return new plaidml_shape{IntoTensorShape(shape->shape)};
+  });
+}
+
 void plaidml_expr_free(  //
     plaidml_error* err,  //
     plaidml_expr* expr) {
@@ -301,6 +309,20 @@ plaidml_expr* plaidml_expr_placeholder(  //
     }
     auto value = GlobalContext::get()->MakePlaceholderOp(shape->shape.dtype, dims);
     return new plaidml_expr{expr, value};
+  });
+}
+
+void plaidml_expr_param_reset(  //
+    plaidml_error* err,         //
+    plaidml_expr* expr,         //
+    plaidml_buffer* buffer) {
+  return ffi_wrap_void(err, [&] {
+    auto param_expr = std::dynamic_pointer_cast<ParamExpr>(expr->expr);
+    if (param_expr) {
+      param_expr->buffer = buffer->buffer;
+    } else {
+      throw std::runtime_error("ParamExpr value reset requested for non-ParamExpr");
+    }
   });
 }
 

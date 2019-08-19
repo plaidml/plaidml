@@ -40,6 +40,13 @@ std::string to_string(const Type& ty);
 
 inline std::ostream& operator<<(::std::ostream& os, const Type& ty) { return os << to_string(ty); }
 
+inline std::string sanitize_name(const std::string& name) {
+  std::string s = name;
+  auto is_special = [](const char ch) { return !isalnum(ch) && ch != '_'; };
+  std::replace_if(s.begin(), s.end(), is_special, '_');
+  return s;
+}
+
 class Visitor;
 
 // All semtree elements are nodes.
@@ -78,7 +85,7 @@ struct FloatConst : public Expression {
 // A symbol table lookup (ie, a variable name)
 struct LookupLVal : public LValue {
   std::string name;
-  explicit LookupLVal(const std::string& n) : name(n) {}
+  explicit LookupLVal(const std::string& n) : name(sanitize_name(n)) {}
   void Accept(Visitor&) const final;
 };
 
@@ -110,7 +117,7 @@ struct DeclareStmt : public Statement {
   Type type;
   std::string name;
   ExprPtr init;
-  DeclareStmt(const Type& t, const std::string n, ExprPtr i) : type(t), name(n), init(i) {}
+  DeclareStmt(const Type& t, const std::string n, ExprPtr i) : type(t), name(sanitize_name(n)), init(i) {}
   void Accept(Visitor&) const final;
 };
 
@@ -276,7 +283,7 @@ struct ReturnStmt : public Statement {
 struct SpecialStmt : public Statement {
   std::string name;
   std::vector<ExprPtr> params;
-  explicit SpecialStmt(const std::string& n, std::vector<ExprPtr> p) : name(n), params(p) {}
+  explicit SpecialStmt(const std::string& n, std::vector<ExprPtr> p) : name(sanitize_name(n)), params(p) {}
   void Accept(Visitor&) const final;
 };
 

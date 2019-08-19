@@ -2,6 +2,8 @@
 
 from plaidml2.ffi import ForeignObject, decode_str, ffi, ffi_call, lib
 
+import numpy as np
+
 
 def __init():
     ffi_call(lib.plaidml_exec_init)
@@ -50,6 +52,8 @@ class Executable(ForeignObject):
 
     def __call__(self, inputs):
         for buffer, ndarray in zip(self._inputs, inputs):
+            # Cast the input data type to match the dtype expected by the placeholder buffer
+            ndarray = np.array(ndarray, dtype=buffer.shape.dtype.into_numpy())
             buffer.copy_from_ndarray(ndarray)
         ffi_call(lib.plaidml_executable_run, self.as_ptr())
         return self._outputs
