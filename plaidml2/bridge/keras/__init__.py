@@ -86,7 +86,6 @@ def _log_call(func):
             arg_str_list = list()
             for i, arg in enumerate(args):
                 arg_str_list.append('{}: {}'.format(list(sig.parameters)[i][0], arg))
-            logger.debug(kwargs)  # TODO
             for k, v in kwargs.items():
                 arg_str_list.append('{}: {}'.format(k, v))
             logger.debug('{}({})'.format(func.__name__, ', '.join(arg_str_list)))
@@ -106,6 +105,10 @@ class _Function(object):
         self._cache = {}
 
     def __call__(self, inputs):
+        logger.debug('_Function: {}({})'.format(self._name, inputs))
+        inputs = [
+            np.array(inp) if isinstance(inp, (six.integer_types, float)) else inp for inp in inputs
+        ]
         input_shapes = tuple([x.shape for x in inputs])
         # logger.debug('_Function: {}({})'.format(self._name, input_shapes))
         exe = self._cache.get(input_shapes)
@@ -125,7 +128,7 @@ class _Function(object):
 
         def make_buffer(tensor):
             # convert LogicalShape into TensorShape
-            shape = plaidml.TensorShape(tensor.shape.dtype, tensor.shape.int_dims)
+            shape = tensor.shape.into_TensorShape()
             return plaidml.Buffer(_device, shape)
 
         input_bindings = [(x.tensor, make_buffer(x.tensor)) for x in self._inputs]
@@ -1092,9 +1095,9 @@ def permute_dimensions(x, pattern=None):
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     dtype = plaidml.DType.from_numpy(dtype or floatx())
     # TODO: Need to support empty shapes; once supported, convert below to `if _ is not None`
-    if shape:
+    if shape is not None:
         return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, shape), name=name)
-    if ndim:
+    if ndim is not None:
         return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, [0] * ndim), name=name)
     raise ValueError()
 
@@ -1147,6 +1150,10 @@ def print_tensor(x, message=''):
 
 @_log_call
 def prod(value, axis=None, keepdims=False):
+    if isinstance(value, (tuple, list)):
+        # In this case, a product of the elements of the tuple/list is being requested,
+        # rather than a within-tensor product
+        return functools.reduce(lambda x, y: x * y, value)
     return _KerasNode('prod', tensor=plaidml_op.prod(value.tensor, axis, keepdims))
 
 
@@ -1460,7 +1467,11 @@ def set_learning_phase(value):
 
 @_log_call
 def set_value(x, value):
-    _report_unimplemented('set_value')
+    dtype = plaidml.DType.from_numpy(value.dtype)
+    tensor_shape = plaidml.TensorShape(dtype, value.shape)
+    buffer = plaidml.Buffer(_device, tensor_shape)
+    buffer.copy_from_ndarray(value)
+    x.tensor.set_param_value(buffer)
 
 
 @_log_call
@@ -1502,7 +1513,7 @@ def softmax(x, axis=None, name=None):
         axis = ndims - 1
     axis = _normalize_axis(axis=axis, ndims=ndims, name=name + ' (softmax)')
     if ndims == 2 and axis == 1:
-        return _KerasNode(name, tensor=plaidml_op.softmax(I, axis=1))
+        return _KerasNode('softmax', name=name, tensor=plaidml_op.softmax(I, axis=1))
 
     if axis == 0:
         group = 1
@@ -1510,7 +1521,7 @@ def softmax(x, axis=None, name=None):
         group = functools.reduce(lambda x, y: x * y, I_dims[:axis])
     values = functools.reduce(lambda x, y: x * y, I_dims[axis:])
     flat_x = reshape(x, (group, values))
-    result = _KerasNode(name, tensor=plaidml_op.softmax(flat_x.tensor, axis=1))
+    result = _KerasNode('softmax', name=name, tensor=plaidml_op.softmax(flat_x.tensor, axis=1))
     return reshape(result, I_dims)
 
 
@@ -1587,6 +1598,10 @@ def stop_gradient(variables):
 
 @_log_call
 def sum(x, axis=None, keepdims=False):
+    if isinstance(x, (tuple, list)):
+        # In this case, a sum of the elements of the tuple/list is being requested,
+        # rather than a within-tensor sum
+        return functools.reduce(lambda a, b: a + b, x)
     return _KerasNode('sum', tensor=plaidml_op.sum(x.tensor, axis, keepdims))
 
 

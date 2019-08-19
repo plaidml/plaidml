@@ -84,6 +84,8 @@ struct LogicalShape {
   std::vector<DimExprPtr> dims_as_exprs() const;
 };
 
+TensorShape IntoTensorShape(const LogicalShape& shape);
+
 struct Expr : std::enable_shared_from_this<Expr> {
   std::string name;
   LogicalShape shape;
