@@ -21,7 +21,10 @@ struct StmtList {
   std::vector<StmtPtr> stmts;                          // Statements in order
   std::map<std::string, std::vector<size_t>> inputs;   // input refinements
   std::map<std::string, std::vector<size_t>> outputs;  // output refinements;
-  std::set<StmtPtr> deps;                              // The stmts that this list depends on
+  std::set<StmtPtr> direct_deps;                       // The stmts that this list directly depends on
+  std::set<StmtPtr> transitive_deps;                   // The stmts that this list transitively depends on
+  bool in_eltwise;                                     // Whether the first stmt is element-wise
+  bool out_eltwise;                                    // Whether the last stmt is element-wise
   bool skip;                                           // Skip the removed stmts
 };
 
@@ -59,9 +62,28 @@ static std::vector<size_t> MakeRefShape(Block* block, const Refinement& ref) {
 }
 
 static bool MayFuse(std::shared_ptr<StmtList> s0, std::shared_ptr<StmtList> s1) {
+  if (!s1->in_eltwise) {
+    return false;
+  }
+  bool same_shape = false;
+  // s1->in_eltwise must be true here
+  if (s0->out_eltwise) {
+    // Check if the index are same
+    auto b0 = Block::Downcast(s0->stmts.back());
+    auto b1 = Block::Downcast(s1->stmts.front());
+    if (b0 && b1) {
+      same_shape = b0->sorted_idx_ranges() == b1->sorted_idx_ranges();
+      if (!same_shape) {
+        // We can't fuse eltwise blocks with different shapes
+        return false;
+      }
+    }
+  }
+  // Check if there is any common refinement
   for (const auto& out_it : s0->outputs) {
     const auto& in_it = s1->inputs.find(out_it.first);
     if (in_it != s1->inputs.end()) {
+      // Their shape should be same
       if (out_it.second == in_it->second) {
         return true;
       }
@@ -83,22 +105,39 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
   AliasMap alias_map(root_map, main_block.get());
   ComputeDepsForBlock(main_block.get(), alias_map);
 
-  std::vector<std::shared_ptr<StmtList>> stmt_list;
+  // The stmts in done list
+  std::set<StmtPtr> done_stmts;
+  // Initial stmt list with direct dependencies
+  std::vector<std::shared_ptr<StmtList>> direct_list;
+  // stmt list with transitive dependencies
+  std::vector<std::shared_ptr<StmtList>> transitive_list;
+  // stmt list after merging
+  std::vector<std::shared_ptr<StmtList>> ready_list;
+  // final stmt list
   StatementList done;
+
+  // Initialize the statement lists
   for (const auto& stmt : main_block->stmts) {
     if (ZeroBlock(stmt)) {
       done.push_back(stmt);
+      done_stmts.insert(stmt);
       continue;
     }
     auto block = Block::Downcast(stmt);
     auto sl = std::make_shared<StmtList>();
     sl->stmts.push_back(stmt);
     for (const auto& dep_stmt_it : stmt->deps) {
-      sl->deps.insert(*dep_stmt_it);
+      if (done_stmts.find(*dep_stmt_it) == done_stmts.end()) {
+        sl->direct_deps.insert(*dep_stmt_it);
+      }
     }
     sl->skip = false;
+    sl->in_eltwise = false;
+    sl->out_eltwise = false;
     if (block) {
       if (block->has_tag("eltwise")) {
+        sl->in_eltwise = true;
+        sl->out_eltwise = true;
         for (const auto& ref : block->refs) {
           std::vector<size_t> rs = MakeRefShape(block.get(), ref);
           if (IsReadDir(ref.dir)) {
@@ -117,81 +156,80 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
         }
       }
     }
-    stmt_list.push_back(sl);
+    direct_list.push_back(sl);
   }
-  while (stmt_list.size() > 0) {
-    std::shared_ptr<StmtList> sl0 = stmt_list.front();
-    stmt_list.erase(stmt_list.begin());
+
+  // Make transitive dependencies for stmt_list
+  while (!direct_list.empty()) {
+    auto it = direct_list.begin();
+    // Find a stmt list without dependency
+    while (it != direct_list.end() && !(*it)->direct_deps.empty()) {
+      ++it;
+    }
+    if (it == direct_list.end()) {
+      throw std::runtime_error("Statement lists with direct dependencies depend on each other.");
+    }
+    auto& sl0 = *it;
+    // Pass its transitive dependencies to its successors
+    for (auto& sl1 : direct_list) {
+      if (sl0 != sl1 && Depends(sl0->stmts, sl1->direct_deps)) {
+        sl1->transitive_deps.insert(sl0->stmts.begin(), sl0->stmts.end());
+        sl1->transitive_deps.insert(sl0->transitive_deps.begin(), sl0->transitive_deps.end());
+        for (const auto& stmt : sl0->stmts) {
+          if (sl1->direct_deps.find(stmt) != sl1->direct_deps.end()) {
+            sl1->direct_deps.erase(stmt);
+          }
+        }
+      }
+    }
+    transitive_list.push_back(*it);
+    direct_list.erase(it);
+  }
+  // direct_deps are no longer valid after this point
+
+  // Topological sort for transitive_list on transitive_deps field
+  while (!transitive_list.empty()) {
+    auto it = transitive_list.begin();
+    // Find a valid (skip is false) StmtList without transitive dependencies
+    while (it != transitive_list.end() && !(*it)->transitive_deps.empty() && !(*it)->skip) {
+      ++it;
+    }
+    if (it == transitive_list.end()) {
+      throw std::runtime_error("Statement lists with transitive dependencies depend on each other.");
+    }
+    auto sl0 = *it;
+    transitive_list.erase(it);
     if (sl0->skip) {
       continue;
     }
-    // Whether sl0 is merged forward into the following StmtList
-    bool merged_forward = false;
-    // Whether any stmt is merged backward to sl0
-    bool merged_backward = false;
-    // Whether it is currently forward merge
-    bool merging_forward = true;
-    // the stmts between sl0 and sl1 while backward merge
-    std::vector<StmtPtr> between_stmts;
-    // Insertion point if backward merge
-    std::vector<std::shared_ptr<StmtList>>::iterator insert_pos;
-    // Decide if sl0 can be fused by any following stmt
-    for (auto it = stmt_list.begin(); it != stmt_list.end(); ++it) {
-      auto& sl1 = *it;
+    // Find the StmtLists that may be fused after sl0
+    for (auto sl1_it = transitive_list.begin(); sl1_it != transitive_list.end(); ++sl1_it) {
+      auto& sl1 = *sl1_it;
       if (sl1->skip) {
         continue;
       }
-      if (!merging_forward) {
-        // If it is backward merge, sl1 must not depend on the above stmts
-        if (Depends(between_stmts, sl1->deps)) {
-          between_stmts.insert(between_stmts.end(), sl1->stmts.begin(), sl1->stmts.end());
-          continue;
-        }
-      }
       if (MayFuse(sl0, sl1)) {
-        IVLOG(3, "Fuse: ");
-        for (const auto& s : sl0->stmts) {
-          auto block = Block::Downcast(s);
-          IVLOG(3, "    " << block->name);
-        }
-        for (const auto& s : sl1->stmts) {
-          auto block = Block::Downcast(s);
-          IVLOG(3, "    " << block->name);
-        }
-        if (merging_forward) {
-          // Forward merge sl0 into sl1
-          // merge stmts
-          sl1->stmts.insert(sl1->stmts.begin(), sl0->stmts.begin(), sl0->stmts.end());
-          // merge deps
-          for (auto& s : sl0->stmts) {
-            if (sl1->deps.find(s) != sl1->deps.end()) {
-              sl1->deps.erase(s);
-            }
+        // Make sure there is no any block depends on sl0, which sl1 depends on.
+        bool can_merge = true;
+        for (auto sl2_it = transitive_list.begin(); sl2_it != transitive_list.end(); ++sl2_it) {
+          auto& sl2 = *sl2_it;
+          if ((!sl2->skip) && Depends(sl0->stmts, sl2->transitive_deps)
+              && Depends(sl2->stmts, sl1->transitive_deps)) {
+            can_merge = false;
+            break;
           }
-          sl1->deps.insert(sl0->deps.begin(), sl0->deps.end());
-          // merge inputs and outputs
-          for (auto& out_it : sl0->outputs) {
-            if (sl1->inputs.find(out_it.first) != sl1->inputs.end()) {
-              sl1->inputs.erase(out_it.first);
-            }
-          }
-          sl1->inputs.insert(sl0->inputs.begin(), sl0->inputs.end());
-          sl1->outputs.insert(sl0->outputs.begin(), sl0->outputs.end());
-          merged_forward = true;
-          break;
         }
-        else {
-          // Backward merge sl1 into sl0
+        if (can_merge) {
           sl1->skip = true;
           // merge stmts
           sl0->stmts.insert(sl0->stmts.end(), sl1->stmts.begin(), sl1->stmts.end());
           // merge deps
           for (auto& s : sl0->stmts) {
-            if (sl1->deps.find(s) != sl1->deps.end()) {
-              sl1->deps.erase(s);
+            if (sl1->transitive_deps.find(s) != sl1->transitive_deps.end()) {
+              sl1->transitive_deps.erase(s);
             }
           }
-          sl1->deps.insert(sl0->deps.begin(), sl0->deps.end());
+          sl0->transitive_deps.insert(sl1->transitive_deps.begin(), sl1->transitive_deps.end());
           // merge inputs and outputs
           for (auto& out_it : sl0->outputs) {
             if (sl1->inputs.find(out_it.first) != sl1->inputs.end()) {
@@ -200,34 +238,28 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
           }
           sl0->inputs.insert(sl1->inputs.begin(), sl1->inputs.end());
           sl0->outputs.insert(sl1->outputs.begin(), sl1->outputs.end());
-          merged_backward = true;
+          sl0->out_eltwise = sl1->out_eltwise;
         }
-      }
-      // If sl1 depends on sl0, sl0 can't be merged with the later blocks
-      if (merging_forward) {
-        if (Depends(sl0->stmts, sl1->deps)) {
-          // Start backward merge, insert sl0 before sl1 later
-          merging_forward = false;
-          insert_pos = it;
-        }
-      }
-      // Do not use "else" here. It should be executed if the above block
-      // sets merging_forward to false
-      if (!merging_forward) {
-        between_stmts.insert(between_stmts.end(), sl1->stmts.begin(), sl1->stmts.end());
       }
     }
-    if (!merged_forward) {
-      if (merged_backward) {
-        // Something backward is merged into sl0. So insert sl0 into stmt_list.
-        stmt_list.insert(insert_pos, sl0);
+    if (sl0->transitive_deps.empty()) {
+      // Remove deps in the remaining stmt lists
+      for (auto& sl1 : transitive_list) {
+        if (sl0 != sl1) {
+          for (const auto& stmt : sl0->stmts) {
+            if (sl1->transitive_deps.find(stmt) != sl1->transitive_deps.end()) {
+              sl1->transitive_deps.erase(stmt);
+            }
+          }
+        }
       }
-      else {
-        // Put sl0 into ready list
-        done.insert(done.end(), sl0->stmts.begin(), sl0->stmts.end());
-      }
+      done.insert(done.end(), sl0->stmts.begin(), sl0->stmts.end());
+    }
+    else {
+      transitive_list.insert(transitive_list.begin(), sl0);
     }
   }
+  // Replace the stmts in the main block
   main_block->stmts = done;
 }
 

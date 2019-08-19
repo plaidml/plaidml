@@ -24,6 +24,22 @@ This error is caused by incorrect Tile syntax.
 
 ### PlaidML Exceptions
 
+`Applying function, tensor with mismatching dimensionality`
+
+This error may be caused by a known issue with the `BatchDot` operation, where 
+results are inconsistent across backends. The [Keras documentation for 
+BatchDot](https://keras.io/backend/#batch_dot) matches the Theano backend's 
+implemented behavior and the _default_ behavior within PlaidML. The TensorFlow 
+backend implements BatchDot in a different way, and this causes a mismatch in 
+the expected output shape (there is an [open issue against 
+TensorFlow](https://github.com/tensorflow/tensorflow/issues/30846) to get this 
+fixed).
+
+If you have existing Keras code that was written for the TensorFlow backend, 
+and it is running into this issue, you can enable experimental support for 
+TensorFlow-like `BatchDot` behavior by setting the environment variable 
+`PLAIDML_BATCHDOT_TF_BEHAVIOR` to `True`.
+
 `ERROR:plaidml:syntax error, unexpected -, expecting "," or )`
 
 This error may be caused by special characters, such as `-`, that are used in
