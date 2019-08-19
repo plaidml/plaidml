@@ -38,6 +38,14 @@ theano.config.optimizer = "None"
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--fp16', action='store_true')
+    parser.add_argument(
+        '--shard-count',
+        type=int,
+        default=0,
+        help=
+        'Run sharded test split into this many shards. Does not forward additional arguments to unittest. 0 (default) to not shard.'
+    )
+    parser.add_argument('--shard', type=int, default=0, help='Which shard to run')
     parser.add_argument('-v', '--verbose', action='count', default=0)
     args, remainder = parser.parse_known_args()
 
@@ -463,17 +471,13 @@ class TestBackendOps(unittest.TestCase):
     def testDot(self, b, x, y):
         return [b.dot(x, y)]
 
-    # TODO(T1046): Once Keras is updated beyond 2.0.8, re-enable TF on batch_dot tests
-    @opTest(
-        [
-            [m(1, 2), m(1, 3, 2), (1, 2)],
-            #[m(2, 3, 4, 5), m(2, 3, 5, 1), None],
-            #[m(1, 2, 6, 2), m(1, 2, 2, 3), (3, 1)],
-            #[m(2, 3, 3, 2), m(2, 3, 4, 3), (1, 3)],
-            [m(2, 5), m(2, 5), 1],
-            #[m(2, 4, 5), m(2, 5, 1), None],
-        ],
-        skip_tensorflow=False)
+    @opTest([
+        [m(1, 2), m(1, 3, 2), (1, 2)],
+        [m(2, 5), m(2, 5), 1],
+        [m(2, 4, 5), m(2, 5, 1), None],
+    ],
+            skip_tensorflow=not bool(os.getenv('PLAIDML_BATCHDOT_TF_BEHAVIOR')),
+            skip_theano=bool(os.getenv('PLAIDML_BATCHDOT_TF_BEHAVIOR')))
     def testBatchDot(self, b, x, y, ax):
         if ax is None:
             return [b.batch_dot(x, y)]
@@ -1814,5 +1818,15 @@ class TestBackendOps(unittest.TestCase):
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=np.inf)
-    #plaidml._internal_set_vlog(1)
-    unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
+    if args.shard_count:
+        print('Running shard {} of {}'.format(args.shard, args.shard_count))
+        loader = unittest.TestLoader()
+        suite = unittest.TestSuite()
+        for n, test in enumerate(loader.loadTestsFromTestCase(TestBackendOps)):
+            if n % args.shard_count == args.shard:
+                print("n: {}, test: {}".format(n, test))
+                suite.addTest(test)
+        runner = unittest.TextTestRunner()
+        runner.run(suite)
+    else:
+        unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

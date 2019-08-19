@@ -321,19 +321,16 @@ SUITES:
         precision: high
         platform_overrides:
           keras-plaid-mtl-uhd630:
-            prepend_args: [--examples, 128]
+            prepend_args: [-n, 64]
+            softfail: true
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 128]
+            prepend_args: [-n, 64]
+            softfail: true
           keras-plaid-ocl-neo:
-            prepend_args: [--examples, 256]
+            prepend_args: [-n, 256]
           keras-stripe-ocl-neo:
-            prepend_args: [--examples, 256]
+            prepend_args: [-n, 256]
         skip_platforms: [keras-plaid-ocl-gv100gl]
-        platform_overrides:
-          keras-stripe-mtl-uhd630:
-            softfail: true
-          keras-plaid-mtl-uhd630:
-            softfail: true
 
   comprehensive:
     platforms:

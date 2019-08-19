@@ -204,7 +204,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   std::map<std::string, Scalar> scalars_;
   std::map<std::string, Buffer> buffers_;
   std::map<std::string, Index> indexes_;
-  uint64_t arenaSize_;
+  uint64_t arenaSize_ = 0;
 };
 
 Compiler::Compiler(llvm::LLVMContext* context, const Config& config)
@@ -261,7 +261,7 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
 }
 
 Compiler::Compiler(llvm::LLVMContext* context, llvm::Module* module, const Config& config)
-    : context_(*context), builder_{context_}, module_(module), config_{config} {
+    : context_(*context), builder_{context_}, module_(module), config_{config}, arenaSize_(0) {
   // This private constructor sets up a nested instance which will
   // process a nested block, generating output into the same module as its
   // containing compiler instance.
