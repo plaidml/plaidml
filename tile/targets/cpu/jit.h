@@ -22,6 +22,7 @@ typedef std::function<void*(std::vector<DataType>*, DataType*)> External;
 
 struct Config {
   bool profile_block_execution = false;
+  bool profile_loop_body = false;
   std::map<std::string, External> externals;
 };
 
