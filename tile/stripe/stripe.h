@@ -464,6 +464,8 @@ struct Block : Statement {
   // Make a unique index name (by appending _2, etc, if needed)
   std::string unique_idx_name(const std::string& name) const;
   TensorShape exterior_shape(const std::string& name) const;
+  // Sorted index ranges
+  std::vector<size_t> sorted_idx_ranges();
 
   std::shared_ptr<Block> SubBlock(size_t pos, bool reverse = false) const;
 };

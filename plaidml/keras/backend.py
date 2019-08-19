@@ -227,90 +227,122 @@ class BatchDot(ptile.Operation):
             axes = (axes, axes)
         if axes is None:
             axes = (x.shape.ndims - 1, y.shape.ndims - 2)
-        # TensorFlow has output dimensions defined as:
-        # A tensor with shape equal to the concatenation of x's shape
-        # (less the dimension that was summed over) and y's shape
-        # (less the batch dimension and the dimension that was summed over).
-        # If the final rank is 1, we reshape it to (batch_size, 1).
-        x_excl = (x.shape.dims[:axes[0]] + x.shape.dims[axes[0] + 1:])
-        y_excl = (y.shape.dims[:axes[1]] + y.shape.dims[axes[1] + 1:])
-        xdim_list = ['M{}'.format(i) for i in range(x.shape.ndims)]
-        xdim_list[0] = 'B'
-        xdim_list[axes[0]] = 'D'
-        ydim_list = ['N{}'.format(i) for i in range(y.shape.ndims)]
-        ydim_list[0] = 'B'
-        ydim_list[axes[1]] = 'D'
-        m_only = [m for m in xdim_list if m.startswith('M')]
-        n_only = [n for n in ydim_list if n.startswith('N')]
-        bcast_pairs = OrderedDict()
-        if len(n_only) > len(m_only):
-            for i in range(len(m_only)):
-                bcast_pairs[n_only[i]] = m_only[i]
-        else:
-            for i in range(len(n_only)):
-                bcast_pairs[n_only[i]] = m_only[i]
-        # for the case where x.shape.dims[N] == None, the PlaidML backend will always evaluate the comparison x.shape.dims[N] > 1 to True. This behavior is necessary for the correctness of xidx_list.
-        xidx_list = [
-            xdim_list[N].lower() if x.shape.dims[N] > 1 else '0' for N in range(len(xdim_list))
-        ]
-        # for the case where y.shape.dims[N] == None, the PlaidML backend will always evaluate the comparison y.shape.dims[N] > 1 to True. This behavior is necessary for the correctness of yidx_list.
-        yidx_list = [
-            ydim_list[N].lower() if y.shape.dims[N] > 1 else '0' for N in range(len(ydim_list))
-        ]
-        if len(bcast_pairs):
-            yidx_list = [
-                bcast_pairs[str(yidx_list[i]).upper()].lower()
-                if str(yidx_list[i]).upper() in bcast_pairs.keys() else yidx_list[i]
-                for i in range(len(yidx_list))
+        PLAIDML_BATCHDOT_TF_BEHAVIOR = os.getenv('PLAIDML_BATCHDOT_TF_BEHAVIOR')
+        if PLAIDML_BATCHDOT_TF_BEHAVIOR:
+            # replicate tf behavior
+            # TensorFlow has output dimensions defined as:
+            # A tensor with shape equal to the concatenation of x's shape
+            # (less the dimension that was summed over) and y's shape
+            # (less the batch dimension and the dimension that was summed over).
+            # If the final rank is 1, we reshape it to (batch_size, 1).
+            x_excl = (x.shape.dims[:axes[0]] + x.shape.dims[axes[0] + 1:])
+            y_excl = (y.shape.dims[:axes[1]] + y.shape.dims[axes[1] + 1:])
+            xdim_list = ['M{}'.format(i) for i in range(x.shape.ndims)]
+            xdim_list[0] = 'B'
+            xdim_list[axes[0]] = 'D'
+            ydim_list = ['N{}'.format(i) for i in range(y.shape.ndims)]
+            ydim_list[0] = 'B'
+            ydim_list[axes[1]] = 'D'
+            m_only = [m for m in xdim_list if m.startswith('M')]
+            n_only = [n for n in ydim_list if n.startswith('N')]
+            bcast_pairs = OrderedDict()
+            if len(y_excl) > len(x_excl):
+                for i in range(len(m_only)):
+                    bcast_pairs[n_only[i]] = m_only[i]
+            elif len(y_excl) == len(x_excl):
+                for i in range(len(m_only) - 1):
+                    bcast_pairs[n_only[i]] = m_only[i]
+            else:
+                for i in range(len(n_only)):
+                    bcast_pairs[n_only[i]] = m_only[i]
+            # for the case where x.shape.dims[N] == None, the PlaidML backend will always evaluate the comparison x.shape.dims[N] > 1 to True. This behavior is necessary for the correctness of xidx_list.
+            xidx_list = [
+                xdim_list[N].lower() if x.shape.dims[N] >= 1 else '0'
+                for N in range(len(xdim_list))
             ]
-        if len(y_excl) > len(x_excl):
-            out_dims = (x_excl + y_excl[len(x_excl):])
+            # for the case where y.shape.dims[N] == None, the PlaidML backend will always evaluate the comparison y.shape.dims[N] > 1 to True. This behavior is necessary for the correctness of yidx_list.
+            yidx_list = [
+                ydim_list[N].lower() if y.shape.dims[N] >= 1 else '0'
+                for N in range(len(ydim_list))
+            ]
+            if len(bcast_pairs):
+                yidx_list = [
+                    bcast_pairs[str(yidx_list[i]).upper()].lower()
+                    if str(yidx_list[i]).upper() in bcast_pairs.keys() else yidx_list[i]
+                    for i in range(len(yidx_list))
+                ]
+            if len(y_excl) > len(x_excl):
+                out_dims = (x_excl + y_excl[len(x_excl):])
+            elif len(y_excl) == len(x_excl) != 1:
+                out_dims = (x_excl + y_excl[len(x_excl) - 1:])
+            else:
+                out_dims = x_excl
+            odim_list = ['B'] + ['O{}'.format(N + 1) for N in range(len(bcast_pairs))]
+            oidx_list = ['b']
+            if len(m_only) > len(n_only):
+                odim_list += m_only[len(n_only):]
+                oidx_list += [i.lower() for i in m_only[len(n_only):]]
+            elif len(n_only) > len(m_only):
+                odim_list += n_only[len(m_only):]
+                oidx_list += [i.lower() for i in n_only[len(m_only):]]
+            else:
+                odim_list += [i for i in m_only if i not in bcast_pairs.values()]
+                odim_list += [i for i in n_only if i not in bcast_pairs.keys()]
+                oidx_list += [i.lower() for i in m_only]
+                oidx_list += [i.lower() for i in n_only if i not in bcast_pairs.keys()]
+            bcast_cmd_list = [
+                'O{} '.format(i + 1) + '= broadcast({},{});'.format(
+                    list(bcast_pairs.values())[i],
+                    list(bcast_pairs.keys())[i]) for i in range(len(bcast_pairs.items()))
+            ]
+            if out_dims[0] is None:  # can infer batch size from either x or y
+                out_dims = (y.shape.dims[0],) + out_dims[1:]
+            f = """
+                function (X[{xdims}], Y[{ydims}]) -> (O) {{
+                    {bcast_cmd_str}
+                    O[{oidxs}: {odims}] = +(X[{xidxs}] * Y[{yidxs}]);
+                }}""".format(bcast_cmd_str=' '.join(bcast_cmd_list),
+                             xdims=', '.join(xdim_list),
+                             ydims=', '.join(ydim_list),
+                             odims=', '.join(odim_list),
+                             xidxs=', '.join(xidx_list),
+                             yidxs=', '.join(yidx_list),
+                             oidxs=', '.join(oidx_list))
+            super(BatchDot, self).__init__(f, [('X', x), ('Y', y)],
+                                           [('O', ptile.Shape(x.shape.dtype, out_dims))],
+                                           name=name)
         else:
-            out_dims = x_excl
-        odim_list = ['B'] + ['O{}'.format(N + 1) for N in range(len(bcast_pairs))]
-        oidx_list = ['b'] + ['m{}'.format(N + 1) for N in range(len(bcast_pairs))]
-        if len(m_only) > len(n_only):
-            odim_list += m_only[len(n_only):]
-            oidx_list += [i.lower() for i in m_only[len(n_only):]]
-        elif len(n_only) > len(m_only):
-            odim_list += n_only[len(m_only):]
-            oidx_list += [i.lower() for i in n_only[len(m_only):]]
-        bcast_cmd_list = [
-            'O{} '.format(i + 1) + '= broadcast({},{});'.format(
-                list(bcast_pairs.values())[i],
-                list(bcast_pairs.keys())[i]) for i in range(len(bcast_pairs.items()))
-        ]
-        if out_dims[0] is None:  # can infer batch size from either x or y
-            out_dims = (y.shape.dims[0],) + out_dims[1:]
-        # Example (OLD)
-        # function (X[B, M1, M2, M3, D], Y[B, N1, D, N3]) -> (O) {
-        #   O[b, m1, m2, m3, n1, n3: B, M1, M2, M3, N1, N3] = +(X[b, m1, m2, m3, d] * Y[b, n1, d, n3]);
-        # }
-        # Example
-        # function (X[B, M1, M2, M3, D], Y[B, N1, D, N2]) -> (O) {
-        #   O1 = broadcast(M1, N1);
-        #   O2 = broadcast(M2, N2);
-        #   O[b, m1, m2, m3 : B, O1, O2, M3] = +(X[b, m1, m2, m3, d] * Y[b, m1, d, m2]);
-        # check keras ndims for each dim in the inputs
-        # example: suppose X.shape.dims = (8, 4, 1, 7, 5); Y.shape.dims = (8, 1, 5, 3)
-        # X[b, m1, 0, m3, d] * Y[b, 0, d, m2]
-        # if any of these ndims == 1, replace the corresponding index with 0 instead of the index names
-        # }
-        f = """
-            function (X[{xdims}], Y[{ydims}]) -> (O) {{
-                {bcast_cmd_str}
-                O[{oidxs}: {odims}] = +(X[{xidxs}] * Y[{yidxs}]);
-            }}""".format(bcast_cmd_str=' '.join(bcast_cmd_list),
-                         xdims=', '.join(xdim_list),
-                         ydims=', '.join(ydim_list),
-                         odims=', '.join(odim_list),
-                         xidxs=', '.join(xidx_list),
-                         yidxs=', '.join(yidx_list),
-                         oidxs=', '.join(oidx_list))
-
-        super(BatchDot, self).__init__(f, [('X', x), ('Y', y)],
-                                       [('O', ptile.Shape(x.shape.dtype, out_dims))],
-                                       name=name)
+            # replicate theano behavior
+            out_dims = (x.shape.dims[:axes[0]] + x.shape.dims[axes[0] + 1:] +
+                        y.shape.dims[1:axes[1]] + y.shape.dims[axes[1] + 1:])
+            if out_dims[0] is None:  # can infer batch size from either x or y
+                out_dims = (y.shape.dims[0],) + out_dims[1:]
+            xdim_list = ['M{}'.format(i) for i in range(x.shape.ndims)]
+            xdim_list[0] = 'B'
+            xdim_list[axes[0]] = 'D'
+            ydim_list = ['N{}'.format(i) for i in range(y.shape.ndims)]
+            ydim_list[0] = 'B'
+            ydim_list[axes[1]] = 'D'
+            odim_list = [N for N in xdim_list if N != 'D'] + [N for N in ydim_list[1:] if N != 'D']
+            xidx_list = [N.lower() for N in xdim_list]
+            yidx_list = [N.lower() for N in ydim_list]
+            oidx_list = [N.lower() for N in odim_list]
+            # Example
+            # function (X[B, M1, M2, M3, D], Y[B, N1, D, N3]) -> (O) {
+            #   O[b, m1, m2, m3, n1, n3: B, M1, M2, M3, N1, N3] = +(X[b, m1, m2, m3, d] * Y[b, n1, d, n3]);
+            # }
+            f = """
+                function (X[{xdims}], Y[{ydims}]) -> (O) {{
+                    O[{oidxs}: {odims}] = +(X[{xidxs}] * Y[{yidxs}]);
+                }}""".format(xdims=', '.join(xdim_list),
+                             ydims=', '.join(ydim_list),
+                             odims=', '.join(odim_list),
+                             xidxs=', '.join(xidx_list),
+                             yidxs=', '.join(yidx_list),
+                             oidxs=', '.join(oidx_list))
+            super(BatchDot, self).__init__(f, [('X', x), ('Y', y)],
+                                           [('O', ptile.Shape(x.shape.dtype, out_dims))],
+                                           name=name)
 
 
 def batch_dot(x, y, axes=None, name=None):

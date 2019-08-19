@@ -159,14 +159,13 @@ class Gradient {
     }
 
     if (op->fn == "reshape") {
-      // TODO
-      throw std::runtime_error("Not implemented: reshape in CallOp");
-      // std::vector<ValuePtr> inputs = {dout};
-      // ValuePtr in = op->inputs()[0];
-      // for (size_t i = 0; i < in->num_dims(); i++) {
-      //   inputs.push_back(in->dim_value(i));
-      // }
-      // return FunctionValue::make("reshape", inputs);
+      std::vector<ExprPtr> args = {dout};
+      auto in = op->args[0];
+      auto dim_exprs = in->shape.dims_as_exprs();
+      for (size_t i = 0; i < in->shape.dims.size(); ++i) {
+        args.push_back(std::make_shared<DimExprExpr>(dim_exprs[i]));
+      }
+      return MakeCall("reshape", args);
     }
 
     auto deriv = DerivRegistry::Instance()->Resolve(op->fn);

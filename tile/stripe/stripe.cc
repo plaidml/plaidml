@@ -610,6 +610,15 @@ std::ostream& operator<<(std::ostream& os, const Block& block) {
   return os;
 }
 
+std::vector<size_t> Block::sorted_idx_ranges() {
+  std::vector<size_t> ranges;
+  for (const auto& idx : idxs) {
+    ranges.push_back(idx.range);
+  }
+  std::sort(ranges.begin(), ranges.end());
+  return ranges;
+}
+
 std::shared_ptr<Block> Block::SubBlock(size_t pos, bool reverse) const {
   if (stmts.size() <= pos) {
     throw std::out_of_range(str(boost::format("SubBlock(%1%) is out of range") % pos));
