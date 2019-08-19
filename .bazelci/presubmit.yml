@@ -1,0 +1,25 @@
+---
+bazel: 0.28.1
+tasks:
+  ubuntu1604:
+    name: ":linux:"
+    shell_commands:
+    - yes | ./configure
+    build_targets:
+    - "//plaidml/keras:wheel"
+    test_targets:
+    - "..."
+  macos:
+    name: ":apple:"
+    shell_commands:
+    - yes | ./configure
+    build_targets:
+    - "//plaidml/keras:wheel"
+    test_targets:
+    - "..."
+  windows:
+    name: ":window:"
+    build_targets:
+    - "//plaidml/keras:wheel"
+    test_targets:
+    - "..."
