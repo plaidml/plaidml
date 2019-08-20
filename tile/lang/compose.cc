@@ -905,10 +905,7 @@ void FunctionApplication::SetInput(const std::string& name, const std::shared_pt
   if (pi.tag == Input::FIXED) {
     if (val->num_dims() != pi.dims.size()) {
       throw std::runtime_error("Applying function, tensor with mismatching dimensionality: " + name +
-                               ", expected=" + to_string(pi.dims.size()) + ", got=" + to_string(val->num_dims()) +
-                               "\n Check the \"Common Issues\" section on our troubleshooting documentation to see if "
-                               "this issue has previously been sourced.\n" +
-                               "https://github.com/plaidml/plaidml/blob/master/docs/troubleshooting.md#common-issues");
+                               ", expected=" + to_string(pi.dims.size()) + ", got=" + to_string(val->num_dims()));
     }
     for (size_t d = 0; d < pi.dims.size(); d++) {
       bindings_[pi.dims[d]] = val->dim_value(d);
@@ -957,10 +954,7 @@ void FunctionApplication::SetDone() {
     if (pi.tag == Input::FIXED) {
       if (val->num_dims() != pi.dims.size()) {
         throw std::runtime_error(
-            "Applying function, tensor with mismatching dimensionality: " + pi.name +
-            "\n Check the \"Common Issues\" section on our troubleshooting documentation to see if this issue has "
-            "previously been sourced.\n" +
-            "https://github.com/plaidml/plaidml/blob/master/docs/troubleshooting.md#common-issues");
+            "Applying function, tensor with mismatching dimensionality: " + pi.name);
       }
       for (size_t d = 0; d < pi.dims.size(); d++) {
         bindings_[pi.dims[d]] = val->dim_value(d);
