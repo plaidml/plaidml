@@ -6,46 +6,31 @@ tasks:
     shell_commands:
     - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     - bash ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
-    - source $HOME/miniconda/bin/activate
-    - wget https://raw.githubusercontent.com/plaidml/plaidml/master/environment.yml
-    - $HOME/miniconda/bin/conda env update -f ./environment.yml
-    - conda activate $HOME/miniconda
     build_targets:
     - "//plaidml/keras:wheel"
-    build_options:
+    build_flags:
     - "--config=linux_x86_64"
     test_targets:
     - "..."
-    test_options:
-    - "--cpu=linux_x86_64"
   macos:
     name: ":apple:"
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh 
     - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
-    - curl -O https://raw.githubusercontent.com/plaidml/plaidml/master/environment.yml
-    - $HOME/miniconda/bin/conda env update -f ./environment.yml
-    - conda activate $HOME/miniconda
     build_targets:
     - "//plaidml/keras:wheel"
-    build_options:
-    - "--config=windows_x86_64"
+    build_flags:
+    - "--config=macos_x86_64"
     test_targets:
     - "..."
-    test_options:
-    - "--cpu=windows_x86_64"
   windows:
     name: ":window:"
     batch_commands:
     - curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -OutFile .\miniconda.exe
     - start /wait "" .\miniconda.exe /InstallationType=JustMe /S /D=%UserProfile%\Miniconda3
-    - curl https://raw.githubusercontent.com/plaidml/plaidml/master/environment-windows.yml -OutFile .\environment-windows.yml
-    - conda.exe env update -f .\environment-windows.yml
     build_targets:
     - "//plaidml/keras:wheel"
-    build_options:
-    - "--config=macos_x86_64"
+    build_flags:
+    - "--config=windows_x86_64"
     test_targets:
     - "..."
-    test_options:
-    - "--cpu=darwin_x86_64 --apple_platform_type=macos"
