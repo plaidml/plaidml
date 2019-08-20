@@ -3,7 +3,6 @@ warnings.simplefilter('ignore')
 
 import ngraph_bridge
 ngraph_bridge.enable()
-#ngraph_bridge.set_backend('PLAIDML')
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,11 +21,8 @@ from keras.applications.resnet50 import preprocess_input
 from keras.preprocessing.image import ImageDataGenerator
 
 import ipywidgets as widgets
-from ipywidgets import VBox
 
 from IPython.display import clear_output
-
-import datetime
 
 
 class ProgressBar(tf.keras.callbacks.Callback):
@@ -50,16 +46,13 @@ class ProgressBar(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):
         self.epoch = epoch
         self.demo.progress_text.value = "Training epoch " + str(epoch + 1)
-        #print('Training: epoch {} begins at {}'.format(epoch, datetime.datetime.now().time()))
 
     def on_epoch_end(self, epoch, logs=None):
         self.demo.epoch_text.value = "Epoch " + str(epoch + 1) + " val_acc: " + str(
-            logs.get('val_acc')) + " "
-        pass  #print('Training: epoch {} ends at {}'.format(epoch, datetime.datetime.now().time()))
+            logs.get('val_acc'))
 
     def on_train_batch_begin(self, batch, logs=None):
         pass
-        #print('Training: batch {} begins at {}'.format(batch, datetime.datetime.now().time()))
 
     def on_train_batch_end(self, batch, logs=None):
         self.demo.progress_bar.value = self.epoch * self.train_steps_per_epoch + batch
@@ -81,12 +74,10 @@ class ProgressBar(tf.keras.callbacks.Callback):
         self.demo.progress_text.value = "Classifying"
 
     def on_predict_batch_begin(self, batch, logs=None):
-        pass  #print('Evaluating: batch {} begins at {}'.format(batch, datetime.datetime.now().time()))
+        pass
 
     def on_predict_batch_end(self, batch, logs=None):
         self.demo.progress_bar.value = batch
-        #display(self.demo.progress_bar)
-        #print('Evaluating: batch {} ends at {}'.format(batch, datetime.datetime.now().time()))
 
     def on_predict_end(self, batch, logs=None):
         self.demo.progress_bar.value = self.demo.progress_bar.max
@@ -118,6 +109,9 @@ class Demo:
     ngraph_backends.append('DISABLED')
     ngraph_bridge.set_backend(ngraph_backends[0])
 
+    base_model = None
+    model = None
+
     # GUI Elements
     out = widgets.Output(layout={'border': '1px solid black'})
     out_initial = widgets.Output(layout={'border': '1px solid black'})
@@ -138,7 +132,7 @@ class Demo:
     batch_slider = widgets.IntSlider(min=1, max=100, value=batch_size, description='Batch Size:')
     epoch_slider = widgets.IntSlider(min=1, max=16, value=epochs, description='Epochs:')
     fine_tune_slider = widgets.IntSlider(min=1,
-                                         max=100,
+                                         max=500,
                                          value=fine_tune_at,
                                          description='Fine Tune at Layer:')
 
@@ -147,24 +141,25 @@ class Demo:
     fine_tune_button = widgets.Button(description='Fine Tune', disable=True)
     shuffle_button = widgets.Button(description='Shuffle')
 
-    training_tab = VBox(children=[
+    training_tab = widgets.VBox(children=[
         model_dropdown, ngraph_dropdown, batch_slider, epoch_slider, train_button, classify_button,
         shuffle_button
     ])
-    fine_tuning_tab = VBox(children=[
+    fine_tuning_tab = widgets.VBox(children=[
         batch_slider, epoch_slider, fine_tune_slider, fine_tune_button, classify_button,
         shuffle_button
     ])
     tab = widgets.Tab(children=[training_tab, fine_tuning_tab])
     tab.set_title(0, 'Training')
     tab.set_title(1, 'Fine Tuning')
-    gui = VBox(children=[tab, progress_box, out_initial, out])
+    gui = widgets.VBox(children=[tab, progress_box, out_initial, out])
 
-    def __init__(self, verbose=0):
-
+    def __init__(self, verbose=0, test=0):
         self.verbose = verbose
+        self.test = test
+
         if verbose:
-            self.gui = VBox(
+            self.gui = widgets.VBox(
                 children=[self.tab, self.progress_box, self.out_initial, self.out, self.out_stats])
 
         # Images
@@ -172,23 +167,13 @@ class Demo:
         self.test_dir = None
         self.init_images()
 
-        # Model
-        #self.base_model = ResNet50(input_shape=self.IMAGE_SHAPE,include_top=False,weights='imagenet')
-        #self.base_model.trainable = False
-
-        #self.model = tf.keras.Sequential([
-        #  self.base_model,
-        #  keras.layers.GlobalAveragePooling2D(),
-        #  keras.layers.Dense(self.NUM_CLASSES, activation=self.DENSE_LAYER_ACTIVATION)
-        #])
-
         self.sgd = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-        #self.model.compile(optimizer = self.sgd, loss = self.OBJECTIVE_FUNCTION, metrics = self.LOSS_METRICS)
-
         self.predicted_class_indices_init = []
         self.wrong_guesses = []
 
-        display(self.init_gui())
+        if not test:
+            display(self.init_gui())
+
         self.train_button.disabled = False
         self.fine_tune_button.disabled = False
 
@@ -208,19 +193,15 @@ class Demo:
 
         # Directory with our training cat pictures
         train_cats_dir = os.path.join(train_dir, 'cats')
-        #print ('Total training cat images:', len(os.listdir(train_cats_dir)))
 
         # Directory with our training dog pictures
         train_dogs_dir = os.path.join(train_dir, 'dogs')
-        #print ('Total training dog images:', len(os.listdir(train_dogs_dir)))
 
         # Directory with our validation cat pictures
         validation_cats_dir = os.path.join(validation_dir, 'cats')
-        #print ('Total validation cat images:', len(os.listdir(validation_cats_dir)))
 
         # Directory with our validation dog pictures
         validation_dogs_dir = os.path.join(validation_dir, 'dogs')
-        #print ('Total validation dog images:', len(os.listdir(validation_dogs_dir)))
 
         # Directory with our test cat pictures
         test_cats_dir = os.path.join(self.test_dir, 'cats')
@@ -229,7 +210,6 @@ class Demo:
             for i in range(900, 1000):
                 os.rename(train_cats_dir + '/cat.' + str(i) + '.jpg',
                           test_cats_dir + '/cat.' + str(i) + '.jpg')
-        #print ('Total test cat images:', len(os.listdir(test_cats_dir)))
 
         # Directory with our test dog pictures
         test_dogs_dir = os.path.join(self.test_dir, 'dogs')
@@ -238,7 +218,6 @@ class Demo:
             for i in range(900, 1000):
                 os.rename(train_dogs_dir + '/dog.' + str(i) + '.jpg',
                           test_dogs_dir + '/dog.' + str(i) + '.jpg')
-        #print ('Total test dog images:', len(os.listdir(test_dogs_dir)))
 
         # Preprocess images
         train_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
@@ -251,7 +230,6 @@ class Demo:
                 target_size=(self.IMAGE_SIZE, self.IMAGE_SIZE),
                 batch_size=self.batch_size,
                 class_mode='categorical')
-            #print(train_generator.class_indices)
 
             # Flow validation images in batches of 20 using test_datagen generator
             self.validation_generator = validation_datagen.flow_from_directory(
@@ -259,7 +237,6 @@ class Demo:
                 target_size=(self.IMAGE_SIZE, self.IMAGE_SIZE),
                 batch_size=self.batch_size,
                 class_mode='categorical')
-            #print(validation_generator.class_indices)
 
             # Flow validation images in batches of 20 using test_datagen generator
             self.test_generator = validation_datagen.flow_from_directory(
@@ -289,19 +266,7 @@ class Demo:
         self.progress_text.value = "Calculating Initital Predictions"
 
         with self.out:
-            self.base_model = ResNet50(input_shape=self.IMAGE_SHAPE,
-                                       include_top=False,
-                                       weights='imagenet')
-            self.base_model.trainable = False
-
-        self.model = tf.keras.Sequential([
-            self.base_model,
-            keras.layers.GlobalAveragePooling2D(),
-            keras.layers.Dense(self.NUM_CLASSES, activation=self.DENSE_LAYER_ACTIVATION)
-        ])
-        self.model.compile(optimizer=self.sgd,
-                           loss=self.OBJECTIVE_FUNCTION,
-                           metrics=self.LOSS_METRICS)
+            self.compile_model(self.model_dropdown.value)
         predictions_initial = self.model.predict_generator(self.test_generator,
                                                            verbose=0,
                                                            callbacks=[ProgressBar(self)])
@@ -318,7 +283,6 @@ class Demo:
                 self.wrong_guesses.append(randomIndex)
 
         with self.out_initial:
-            print("Foo")
             f, ax = plt.subplots(3, 3, figsize=(15, 15))
 
             for i in range(0, 9):
@@ -336,13 +300,11 @@ class Demo:
                 if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
                     ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
             plt.show()
-            print("bar")
 
     def on_model_change(self, change):
         if change['type'] == 'change' and change['name'] == 'value':
             self.classify_button.disabled = True
 
-            # Models
             if change['new'] == 'ResNet50':
                 self.epoch_slider.min = 1
                 self.epoch_slider.max = 16
@@ -365,28 +327,34 @@ class Demo:
                 ngraph_bridge.set_backend(self.ngraph_backends[i])
 
     def init_gui(self):
-        self.fine_tune_slider = widgets.IntSlider(min=1,
-                                                  max=500,
-                                                  value=self.fine_tune_at,
-                                                  description='Fine Tune at Layer:')
-
         self.model_dropdown.observe(self.on_model_change)
         self.ngraph_dropdown.observe(self.on_ngraph_change)
         self.train_button.on_click(self.train_model)
         self.shuffle_button.on_click(self.init_model)
-        #self.classify_button.on_click(self.classify)
-        #self.fine_tune_button.on_click(self.fine_tune_model)
+        self.classify_button.on_click(self.classify)
+        self.fine_tune_button.on_click(self.train_model)
 
         return self.gui
 
-    def train_model(self, b):
-        self.train_button.disabled = True
-        self.epochs = self.epoch_slider.value
-        self.batch_size = self.batch_slider.value
+    def train_model(self, b=None, epochs=1, batch_size=32, model='ResNet50', fine_tune_at=0):
+        if not self.test:
+            self.train_button.disabled = True
+            self.epochs = self.epoch_slider.value
+            self.batch_size = self.batch_slider.value
+            model = self.model_dropdown.value
+            self.progress_text.value = ''
+        else:
+            self.epochs = epochs
+            self.batch_size = batch_size
+
         self.out.clear_output()
 
-        #print("epochs: " + str(self.epochs) + " batch_size: " + str(self.batch_size))
-        self.compile_model(self.model_dropdown.value)
+        if b == self.fine_tune_button:
+            fine_tune_at = self.fine_tune_slider.value
+        else:
+            fine_tune_at = 0
+
+        self.compile_model(model, fine=fine_tune_at)
         steps_per_epoch = self.train_generator.n // self.batch_size
         validation_steps = self.validation_generator.n // self.batch_size
 
@@ -405,6 +373,8 @@ class Demo:
 
         self.train_button.disabled = False
 
+        return history
+
     def compile_model(self, modelName, fine=0):
         if modelName == 'ResNet50':
             self.base_model = ResNet50(input_shape=self.IMAGE_SHAPE,
@@ -415,17 +385,20 @@ class Demo:
                                           include_top=False,
                                           weights='imagenet')
 
+        # GUI element update
+        self.fine_tune_slider.max = len(self.base_model.layers)
+
         with self.out_stats:
             print('Setting base model to ' + modelName)
 
         # Fine Tuning
-        if fine > 0:
+        if fine:
             self.base_model.trainable = True
             # Fine tune from this layer onwards
             self.fine_tune_at = fine
 
             # Freeze all the layers before the `fine_tune_at` layer
-            for layer in base_model.layers[:self.fine_tune_at]:
+            for layer in self.base_model.layers[:self.fine_tune_at]:
                 layer.trainable = False
 
             with self.out_stats:
@@ -446,7 +419,7 @@ class Demo:
                            metrics=self.LOSS_METRICS)
 
     def classify(self, b):
-        if b.description == 'Classify':
+        if b and b.description == 'Classify':
             out.clear_output()
 
         with self.out_stats:
