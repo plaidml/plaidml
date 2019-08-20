@@ -1188,6 +1188,9 @@ def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None)
 
 
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
+    if minval == maxval:
+        return constant(minval, dtype, shape)
+
     dtype = dtype or floatx()
     rng_state = _make_rng_state(seed)
     shape_inputs = []
