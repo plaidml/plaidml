@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <sstream>
-#include <stack>
 
 #include "tile/lang/builtins.h"
 #include "tile/lang/fpconv.h"
