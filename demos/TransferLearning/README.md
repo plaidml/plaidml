@@ -1,60 +1,24 @@
-{
- "cells": [
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
-    "# Transfer Learning Demo\n",
-    "\n",
-    "## Getting Started\n",
-    "Use of a virtual enviornment is highly recommended although not required. \n",
-    "```bash\n",
-    "virtualenv .venv\n",
-    "source .venv/bin/activate\n",
-    "```\n",
-    "\n",
-    "`pip install -r requirements.txt` will install the following packages necessary for this demo to run.\n",
-    "- ngraph_tensorflow_bridge\n",
-    "- tensorflow==1.14.0\n",
-    "- plaidml-keras\n",
-    "- pillow\n",
-    "- matplotlib\n",
-    "- jupyter\n",
-    "\n",
-    "## Other details\n",
-    "Instantiation of `TransferLearningDemo` with `verbose=1` will create a third output box where training and testing functions will output their loss and accuracy figures, along with how long the training took. \n",
-    "```python\n",
-    "d = TransferLearningDemo.Demo(verbose=1)\n",
-    "```"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {},
-   "outputs": [],
-   "source": []
-  }
- ],
- "metadata": {
-  "kernelspec": {
-   "display_name": "Python 3",
-   "language": "python",
-   "name": "python3"
-  },
-  "language_info": {
-   "codemirror_mode": {
-    "name": "ipython",
-    "version": 3
-   },
-   "file_extension": ".py",
-   "mimetype": "text/x-python",
-   "name": "python",
-   "nbconvert_exporter": "python",
-   "pygments_lexer": "ipython3",
-   "version": "3.7.0"
-  }
- },
- "nbformat": 4,
- "nbformat_minor": 2
-}
+# Transfer Learning Demo
+
+## Getting Started
+Use of a virtual enviornment is highly recommended although not required.
+```bash
+virtualenv .venv
+source .venv/bin/activate
+```
+
+`pip install -r requirements.txt` will install the following packages necessary for this demo to run.
+- ngraph_tensorflow_bridge
+- tensorflow==1.14.0
+- plaidml-keras
+- pillow
+- matplotlib
+- jupyter
+
+## Other details
+Menu Bar --> Cell --> Current Outputs --> Toggle Scrolling to stop Jupyter Notebook from creating scrollable boxes when the images appear.
+
+Instantiation of `TransferLearningDemo` with `verbose=1` will create a third output box where training and testing functions will output their loss and accuracy figures, along with how long the training took.
+```python
+d = TransferLearningDemo.Demo(verbose=1)
+```
