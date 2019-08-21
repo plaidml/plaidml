@@ -1827,6 +1827,6 @@ if __name__ == '__main__':
                 print("n: {}, test: {}".format(n, test))
                 suite.addTest(test)
         runner = unittest.TextTestRunner()
-        runner.run(suite)
+        exit(not runner.run(suite).wasSuccessful())
     else:
         unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
