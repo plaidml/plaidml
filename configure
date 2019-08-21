@@ -62,7 +62,7 @@ class Configure:
         # reset custom config settings
         open(BAZELRC, 'w').close()
 
-    def configure_conda(self):
+    def configure_conda(self, create_cenv=None):
         if is_windows():
             env_file = self.this_dir / 'environment-windows.yml'
         else:
@@ -81,8 +81,11 @@ class Configure:
             ]
             subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
         else:
-            answer = choice_prompt('Create a conda environment? path: {}'.format(self.cenv_dir),
-                                   ['y', 'n'], 'y')
+            if create_cenv:
+                answer = create_cenv
+            else:
+                answer = choice_prompt(
+                    'Create a conda environment? path: {}'.format(self.cenv_dir), ['y', 'n'], 'y')
             if answer == 'y':
                 print('Creating conda environment from: {}'.format(env_file))
                 cmd = [
@@ -102,10 +105,10 @@ class Configure:
         print('Using variant: {}'.format(variant))
         write_to_bazelrc('build --config={}'.format(variant))
 
-    def configure_cache(self):
+    def configure_cache(self, bazel_cache=None):
         print()
-        bazel_cache = input("Enter a bazel cache server URL (leave blank to disable): ")
         if bazel_cache:
+            print("Configuring bazel cache:", bazel_cache)
             write_to_bazelrc('build --remote_cache={}'.format(bazel_cache))
             if is_windows():
                 pass  # TODO
@@ -139,17 +142,23 @@ class Configure:
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--create_conda_env',
+        help='Create a conda environment for this repo, if one does not already exist?',
+        choices=['y', 'n'])
+    parser.add_argument('--bazel_cache',
+                        help='Enter a bazel cache server URL (omit argument to disable)')
     args = parser.parse_args()
 
     print("Configuring PlaidML build environment")
     print()
 
     cfg = Configure()
-    cfg.configure_conda()
+    cfg.configure_conda(args.create_conda_env)
     cfg.configure_precommit()
     cfg.configure_bazelisk()
     cfg.configure_variant()
-    cfg.configure_cache()
+    cfg.configure_cache(args.bazel_cache)
 
     print()
     print("Your build is configured.")
