@@ -62,7 +62,7 @@ class Configure:
         # reset custom config settings
         open(BAZELRC, 'w').close()
 
-    def configure_conda(self, create_cenv=None):
+    def configure_conda(self, skip_cenv=None):
         if is_windows():
             env_file = self.this_dir / 'environment-windows.yml'
         else:
@@ -81,12 +81,7 @@ class Configure:
             ]
             subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
         else:
-            if create_cenv:
-                answer = create_cenv
-            else:
-                answer = choice_prompt(
-                    'Create a conda environment? path: {}'.format(self.cenv_dir), ['y', 'n'], 'y')
-            if answer == 'y':
+            if not skip_cenv:
                 print('Creating conda environment from: {}'.format(env_file))
                 cmd = [
                     str(self.conda),
@@ -115,7 +110,9 @@ class Configure:
             else:
                 write_to_bazelrc('build --action_env={}'.format(UNIX_PATH))
 
-    def configure_precommit(self):
+    def configure_precommit(self, skip=False):
+        if skip:
+            return
         if is_windows():
             search_path = self.cenv_dir / 'Scripts'
         else:
@@ -129,7 +126,9 @@ class Configure:
             sys.exit(1)
         subprocess.run([pre_commit, 'install'], check=True)
 
-    def configure_bazelisk(self):
+    def configure_bazelisk(self, skip=False):
+        if skip:
+            return
         bazelisk = shutil.which('bazelisk')
         if not bazelisk:
             print('Please install bazelisk from:')
@@ -142,21 +141,26 @@ class Configure:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--create_conda_env',
-        help='Create a conda environment for this repo, if one does not already exist?',
-        choices=['y', 'n'])
     parser.add_argument('--bazel_cache',
                         help='Enter a bazel cache server URL (omit argument to disable)')
+    parser.add_argument('--skip_bazelisk',
+                        help='Skip the bazelisk configuration step?',
+                        action='store_true')
+    parser.add_argument('--skip_conda_env',
+                        help='Skip the conda environment creation step?',
+                        action='store_true')
+    parser.add_argument('--skip_precommit',
+                        help='Skip the precommit configuration step?',
+                        action='store_true')
     args = parser.parse_args()
 
     print("Configuring PlaidML build environment")
     print()
 
     cfg = Configure()
-    cfg.configure_conda(args.create_conda_env)
-    cfg.configure_precommit()
-    cfg.configure_bazelisk()
+    cfg.configure_conda(args.skip_conda_env)
+    cfg.configure_precommit(args.skip_precommit)
+    cfg.configure_bazelisk(args.skip_bazelisk)
     cfg.configure_variant()
     cfg.configure_cache(args.bazel_cache)
 
