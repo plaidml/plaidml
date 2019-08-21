@@ -143,6 +143,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--bazel_cache',
                         help='Enter a bazel cache server URL (omit argument to disable)')
+    parser.add_argument('--ci_mode',
+                        help='For CI machines, create conda env and skip bazelisk/precommit',
+                        action='store_true')
     parser.add_argument('--skip_bazelisk',
                         help='Skip the bazelisk configuration step?',
                         action='store_true')
@@ -157,10 +160,17 @@ def main():
     print("Configuring PlaidML build environment")
     print()
 
+    if args.ci_mode:
+        print("CI mode has been enabled. Overriding the following settings:")
+        print("    --skip_bazelisk  = True")
+        print("    --skip_conda_env = False")
+        print("    --skip_precommit = True")
+        print()
+
     cfg = Configure()
-    cfg.configure_conda(args.skip_conda_env)
-    cfg.configure_precommit(args.skip_precommit)
-    cfg.configure_bazelisk(args.skip_bazelisk)
+    cfg.configure_conda(False if args.ci_mode else args.skip_conda_env)
+    cfg.configure_precommit(True if args.ci_mode else args.skip_precommit)
+    cfg.configure_bazelisk(True if args.ci_mode else args.skip_bazelisk)
     cfg.configure_variant()
     cfg.configure_cache(args.bazel_cache)
 
