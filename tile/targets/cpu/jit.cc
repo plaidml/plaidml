@@ -222,6 +222,7 @@ Compiler::Compiler(llvm::LLVMContext* context, const Config& config)
 }
 
 ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
+  IVLOG(4, program);
   // Compile each block in this program into a function within an LLVM module.
   ProgramModule ret;
   ret.module = std::make_unique<llvm::Module>("stripe", context_);
@@ -301,7 +302,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
       std::vector<llvm::Value*> calloc_args{IndexConst(arenaSize_), IndexConst(1)};
       auto buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
       auto arena_gval = module_->getNamedGlobal(arena_name_);
-      auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), arenaSize_)->getPointerTo();
+      auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), 1)->getPointerTo();
       builder_.CreateStore(builder_.CreateBitCast(buffer, arenatype), arena_gval);
       allocs.push_back(buffer);
     }
@@ -374,7 +375,7 @@ uint64_t Compiler::MeasureArena(const stripe::Block& block) {
 
 void Compiler::GenerateArena(const stripe::Block& block) {
   arenaSize_ = MeasureArena(block);
-  auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), arenaSize_)->getPointerTo();
+  auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), 1)->getPointerTo();
   module_->getOrInsertGlobal(arena_name_, arenatype);
   auto gval = module_->getNamedGlobal(arena_name_);
   gval->setInitializer(llvm::Constant::getNullValue(arenatype));
@@ -669,7 +670,6 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     builder_.CreateBr(loops[i].test);
     builder_.SetInsertPoint(loops[i].test);
     llvm::Value* index = builder_.CreateLoad(variable);
-    assert(block.idxs[i].affine == stripe::Affine());
     llvm::Value* range = IndexConst(block.idxs[i].range);
     llvm::Value* limit = builder_.CreateAdd(init, range);
     llvm::Value* go = builder_.CreateICmpULT(index, limit);
@@ -920,8 +920,8 @@ void Compiler::Visit(const stripe::Block& block) {
       if (ref.has_tag("placed")) {
         auto arena = module_->getNamedGlobal(arena_name_);
         auto baseArenaAddress = builder_.CreateLoad(arena);
-        std::vector<llvm::Value*> idxList{llvm::ConstantInt::get(builder_.getInt64Ty(), ref.offset)};
-        buffer = builder_.CreateGEP(builder_.getInt8Ty()->getPointerTo(), baseArenaAddress, idxList);
+        std::vector<llvm::Value*> idxList{IndexConst(ref.offset)};
+        buffer = builder_.CreateGEP(baseArenaAddress, idxList);
       } else {
         // Allocate new storage for the buffer.
         size_t size = ref.interior_shape.byte_size();
@@ -1736,7 +1736,7 @@ void prng_step(uint32_t* in_state, uint32_t* out_state, uint32_t* buf, size_t co
 }
 
 void RunTimeLogEntry(char* str, char* extra, uint64_t address) {
-  IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ":" << std::hex << address);
+  IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ": 0x" << std::hex << address);
 }
 }  // namespace rt
 
