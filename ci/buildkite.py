@@ -44,7 +44,12 @@ def get_engine(pkey):
         return ':black_square_button::metal:'
     if 'plaid-ocl' in pkey:
         return ':black_square_button::cl:'
+    else:
+        return('')
 
+def get_shard_number(shard):
+    numbers = [':zero:',':one:',':two:',':three:',':four:',':five:',':six:',':seven:',':eight:',':nine:']
+    return (numbers[shard])
 
 def get_python(variant):
     if variant == 'windows_x86_64':
@@ -70,25 +75,60 @@ def cmd_pipeline(args, remainder):
             variant = pinfo['variant']
             if args.pipeline not in platform['pipelines']:
                 continue
+
             for wkey, workload in suite['workloads'].items():
                 popt = util.PlanOption(suite, workload, pkey)
                 skip = workload.get('skip_platforms', [])
                 if pkey in skip:
                     continue
+
+                shc = popt.get('shardcount')
+
+                if shc:
+                    for shard in popt.get('run_shards'):
+                        rsh = shard
+                        shard = 'shard'
+                        shard_emoji = get_shard_number(rsh)
+                        for batch_size in suite['params'][args.pipeline]['batch_sizes']:
+                            tests.append(
+                                dict(
+                                    suite=skey,
+                                    workload=wkey,
+                                    platform=pkey,
+                                    batch_size=batch_size,
+                                    variant=variant,
+                                    timeout=popt.get('timeout', 20),
+                                    retry=popt.get('retry'),
+                                    softfail=popt.get('softfail'),
+                                    python=get_python(variant),
+                                    shard=shard,
+                                    shardcount=shc,
+                                    rsh=rsh,
+                                    shard_emoji=shard_emoji,
+                                    emoji=get_emoji(variant),
+                                    engine=get_engine(pkey)))
+
+                else:
+                    shard = None
+
                 for batch_size in suite['params'][args.pipeline]['batch_sizes']:
-                    tests.append(
-                        dict(
-                            suite=skey,
-                            workload=wkey,
-                            platform=pkey,
-                            batch_size=batch_size,
-                            variant=variant,
-                            timeout=popt.get('timeout', 20),
-                            retry=popt.get('retry'),
-                            softfail=popt.get('softfail'),
-                            python=get_python(variant),
-                            emoji=get_emoji(variant),
-                            engine=get_engine(pkey)))
+                    if shc:
+                        continue
+
+                    else:
+                        tests.append(
+                            dict(
+                                suite=skey,
+                                workload=wkey,
+                                platform=pkey,
+                                batch_size=batch_size,
+                                variant=variant,
+                                timeout=popt.get('timeout', 20),
+                                retry=popt.get('retry'),
+                                softfail=popt.get('softfail'),
+                                python=get_python(variant),
+                                emoji=get_emoji(variant),
+                                engine=get_engine(pkey)))
 
     if args.count:
         print('variants: {}'.format(len(variants)))
@@ -99,14 +139,19 @@ def cmd_pipeline(args, remainder):
         yml = pystache.render(load_template('pipeline.yml'), ctx)
         print(yml)
 
-
 def cmd_build(args, remainder):
+
+    util.printf('--- :snake: pre-build steps... ')
+    
     common_args = []
     common_args += ['--config={}'.format(args.variant)]
     common_args += ['--define=version={}'.format(args.version)]
     common_args += ['--explain={}'.format(os.path.abspath('explain.log'))]
     common_args += ['--verbose_failures']
     common_args += ['--verbose_explanations']
+
+    util.printf('--- :bazel: Running Build ...')
+
     if platform.system() == 'Windows':
         util.check_call(['git', 'config', 'core.symlinks', 'true'])
         cenv = util.CondaEnv(pathlib.Path('.cenv'))
@@ -124,14 +169,15 @@ def cmd_build(args, remainder):
         'build',
         args.variant,
     )
+
+    util.printf('--- :buildkite: Uploading artifacts...')
     os.makedirs(archive_dir, exist_ok=True)
     shutil.copy(os.path.join('bazel-bin', 'pkg.tar.gz'), archive_dir)
 
 
 def cmd_test(args, remainder):
     import harness
-    harness.run(args)
-
+    harness.run(args, remainder)
 
 def cmd_report(args, remainder):
     archive_dir = os.path.join(args.root, args.pipeline, args.build_id)
@@ -142,7 +188,6 @@ def cmd_report(args, remainder):
     cmd += [archive_dir]
     cmd += remainder
     util.check_call(cmd)
-
 
 def make_cmd_build(parent):
     parser = parent.add_parser('build')
@@ -172,7 +217,7 @@ def make_cmd_pipeline(parent):
 
 
 def main():
-    pipeline = os.getenv('PIPELINE', 'pr')
+    pipeline = os.getenv('PIPELINE', 'plaidml')
     branch = os.getenv('BUILDKITE_BRANCH', 'undefined')
     build_id = os.getenv('BUILDKITE_BUILD_NUMBER', '0')
     with open('VERSION', 'r') as verf:
