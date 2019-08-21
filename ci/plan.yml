@@ -205,7 +205,8 @@ SUITES:
             softfail: true
           keras-plaid-mtl-uhd630:
             softfail: true
-
+        shardcount: 3
+        run_shards: [0,1,2]
       regression:
         args: [regression_test.py]
         precision: untested
