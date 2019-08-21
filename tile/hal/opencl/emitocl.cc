@@ -191,7 +191,7 @@ void Emit::Visit(const sem::CallExpr& n) {
   switch (n.function) {
     case sem::CallExpr::Function::CEIL:
     case sem::CallExpr::Function::FLOOR: {
-      assert(1 == node.vals.size());
+      assert(1 == n.vals.size());
       emit(n.name);
       emit("(");
       auto val_type = TypeOf(n.vals[0]);
