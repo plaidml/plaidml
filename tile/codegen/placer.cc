@@ -428,9 +428,8 @@ void PlaceRefinements(stripe::Block* outermost_block, const proto::MemoryPlaceme
 
 void MemoryPlacementPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, stripe::Block* block) {  //
-    PlaceRefinements(block, options_);
-  });
+  RunOnBlocks(state->entry(), reqs,
+              [&](const AliasMap& map, stripe::Block* block) { PlaceRefinements(block, options_); });
 }
 
 namespace {
