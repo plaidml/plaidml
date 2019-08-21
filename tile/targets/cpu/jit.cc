@@ -42,6 +42,7 @@ const char invoker_name_[] = "__invoke_";
 const char arena_name_[] = "__arena";
 const char profile_count_name_[] = "__profile_count_";
 const char profile_ticks_name_[] = "__profile_ticks_";
+const char profile_loop_body_name_[] = "__profile_loop_body_";
 }  // namespace
 
 struct ProgramModule {
@@ -186,6 +187,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Value* ReadCycleCounter();
   void ProfileBlockEnter(const stripe::Block& block);
   void ProfileBlockLeave(const stripe::Block& block);
+  void ProfileLoopEnter(const stripe::Block& block);
+  void ProfileLoopLeave(const stripe::Block& block);
   bool isXSMMSuppotedDataType(DataType dataType);
   const DataType GetBlockRefsDataType(const stripe::Block& block);
   llvm::Value* RunTimeLogEntry(void);
@@ -687,12 +690,16 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   builder_.CreateCondBr(go, block_body, block_done);
   builder_.SetInsertPoint(block_body);
 
+  ProfileLoopEnter(block);
+
   // process each statement in the block body, generating code to modify the
   // parameter buffer contents
   std::shared_ptr<stripe::Block> pBlock = std::make_shared<stripe::Block>(block);
   for (const auto& stmt : block.stmts) {
     stmt->Accept(this);
   }
+
+  ProfileLoopLeave(block);
 
   // rejoin instruction flow after the constraint check
   builder_.CreateBr(block_done);
@@ -1627,6 +1634,32 @@ void Compiler::ProfileBlockLeave(const stripe::Block& block) {
   builder_.CreateStore(profile_ticks, profile_ticks_gval);
 }
 
+void Compiler::ProfileLoopEnter(const stripe::Block& block) {
+  if (!config_.profile_loop_body) {
+    return;
+  }
+  // Count the time spent in the loop body, excluding increment/condition
+  // overhead
+  std::string profile_name = profile_loop_body_name_ + block.name;
+  module_->getOrInsertGlobal(profile_name, IndexType());
+  auto profile_gval = module_->getNamedGlobal(profile_name);
+  profile_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
+  llvm::Value* profile_ticks = builder_.CreateLoad(profile_gval);
+  profile_ticks = builder_.CreateSub(profile_ticks, ReadCycleCounter());
+  builder_.CreateStore(profile_ticks, profile_gval);
+}
+
+void Compiler::ProfileLoopLeave(const stripe::Block& block) {
+  if (!config_.profile_loop_body) {
+    return;
+  }
+  std::string profile_name = profile_loop_body_name_ + block.name;
+  auto profile_gval = module_->getNamedGlobal(profile_name);
+  llvm::Value* profile_ticks = builder_.CreateLoad(profile_gval);
+  profile_ticks = builder_.CreateAdd(profile_ticks, ReadCycleCounter());
+  builder_.CreateStore(profile_ticks, profile_gval);
+}
+
 Executable::Executable(const ProgramModule& module) : parameters_(module.parameters) {
   std::string errStr;
   std::unique_ptr<llvm::LegacyJITSymbolResolver> rez(new Runtime(module.externals));
@@ -1668,6 +1701,11 @@ void Executable::SetPerfAttrs(stripe::Block* block) {
   uint64_t ticks_addr = engine_->getGlobalValueAddress(ticks_name);
   if (ticks_addr) {
     block->set_attr("execution_ticks", *reinterpret_cast<int64_t*>(ticks_addr));
+  }
+  std::string loop_body_name = profile_loop_body_name_ + block->name;
+  uint64_t loop_ticks_addr = engine_->getGlobalValueAddress(loop_body_name);
+  if (loop_ticks_addr) {
+    block->set_attr("loop_body_ticks", *reinterpret_cast<int64_t*>(loop_ticks_addr));
   }
   // Recurse through nested blocks.
   for (const auto& stmt : block->stmts) {
