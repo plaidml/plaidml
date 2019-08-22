@@ -25,14 +25,32 @@ This error is caused by incorrect Tile syntax.
 
 ### Bazel Issues
 
+For any Bazel-specific issues you're encountering, we recommend that you first
+visit [Bazel's installation
+documentation](https://docs.bazel.build/versions/master/install.html) which has
+a comprehensive overview of Bazel on various platforms. Any issues commonly
+encountered by PlaidML users are documented below.
+
 `Encountered error while reading extension file 'workspace.bzl': no such package
 '@toolchain//'`
 
 On MacOS devices, `toolchain` errors often indicate that the user does not have
 Xcode properly installed. Even if you have Xcode Command Line Tools installed,
-you may not have a proper installation of Xcode itself. You can verify your
-Xcode installation by running `spctl --assess --verbose
-/Applications/Xcode.app`.
+you may not have a proper installation of Xcode itself.
+
+To check your installation of Xcode, first print the path of the active
+developer directory:
+
+`xcode-select -p`
+
+The resulting path should be `/Applications/Xcode.app/Contents/Developer`. If
+that is not the path you are seeing when you run `xcode-select -p`, please go to
+the App Store and download Xcode.
+
+After verifying that Xcode is properly installed, you will need to reset your
+Bazel instance before running Bazel again:
+
+`bazelisk clean --expunge`
 
 ### PlaidML Exceptions
 
