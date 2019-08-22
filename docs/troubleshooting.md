@@ -14,12 +14,16 @@ provide you with better support on your issue.
 
 ### Memory Errors
 
-`OSError: exception: access violation reading 0x0000000000000030`
+```
+OSError: exception: access violation reading 0x0000000000000030
+```
 
 This error might be caused by a memory allocation failure, and it fails
 silently. You can fix this error by decreasing your batch size and trying again.
 
-`plaidml.exceptions.ResourceExhausted: Out of memory` 
+```
+plaidml.exceptions.ResourceExhausted: Out of memory
+``` 
 
 This error is caused by incorrect Tile syntax.
 
@@ -31,8 +35,9 @@ documentation](https://docs.bazel.build/versions/master/install.html) which has
 a comprehensive overview of Bazel on various platforms. Any issues commonly
 encountered by PlaidML users are documented below.
 
-`Encountered error while reading extension file 'workspace.bzl': no such package
-'@toolchain//'`
+```
+Encountered error while reading extension file 'workspace.bzl': no such package '@toolchain//'
+```
 
 On MacOS devices, `toolchain` errors often indicate that the user does not have
 Xcode properly installed. Even if you have Xcode Command Line Tools installed,
@@ -41,7 +46,9 @@ you may not have a proper installation of Xcode itself.
 To check your installation of Xcode, first print the path of the active
 developer directory:
 
-`xcode-select -p`
+```
+xcode-select -p
+```
 
 The resulting path should be `/Applications/Xcode.app/Contents/Developer`. If
 that is not the path you are seeing when you run `xcode-select -p`, please go to
@@ -50,11 +57,15 @@ the App Store and download Xcode.
 After verifying that Xcode is properly installed, you will need to reset your
 Bazel instance before running Bazel again:
 
-`bazelisk clean --expunge`
+```
+bazelisk clean --expunge
+```
 
 ### PlaidML Exceptions
 
-`Applying function, tensor with mismatching dimensionality`
+```
+Applying function, tensor with mismatching dimensionality
+```
 
 This error may be caused by a known issue with the `BatchDot` operation, where 
 results are inconsistent across backends. The [Keras documentation for 
@@ -70,7 +81,9 @@ and it is running into this issue, you can enable experimental support for
 TensorFlow-like `BatchDot` behavior by setting the environment variable 
 `PLAIDML_BATCHDOT_TF_BEHAVIOR` to `True`.
 
-`ERROR:plaidml:syntax error, unexpected -, expecting "," or )`
+```
+ERROR:plaidml:syntax error, unexpected -, expecting "," or )
+```
 
 This error may be caused by special characters, such as `-`, that are used in
 variable names within your code. Please try removing and/or replacing special
