@@ -30,7 +30,8 @@ https://github.com/bazelbuild/bazelisk/releases
 
 ## Configure the build
 
-Use the `configure` script to configure your built. Note: the `configure` script requires Python 3.
+Use the `configure` script to configure your built. Note: the `configure` script
+requires Python 3.
 
 By default, running the `configure` script will:
 * Create and/or update your conda environment
