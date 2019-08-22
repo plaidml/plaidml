@@ -7,7 +7,7 @@
 #include "tile/codegen/compile_pass.h"
 #include "tile/codegen/driver.h"
 
-#include "pmlc/dialect/mir/padding_pass.h"
+#include "pmlc/dialect/stripe/padding_pass.h"
 
 namespace vertexai {
 namespace tile {
@@ -31,15 +31,15 @@ class MlirCompilePass : public CompilePass {
   Config config;
 };
 
-#define REGISTER(pass, config)                                                                 \
-  [[gnu::unused]] char reg_##pass = []() -> char {                                             \
-    CompilePassFactory<MlirCompilePass<pmlc::dialect::mir::pass, config>, config>::Register(); \
-    return 0;                                                                                  \
+#define REGISTER(pass, config)                                                                    \
+  [[gnu::unused]] char reg_##pass = []() -> char {                                                \
+    CompilePassFactory<MlirCompilePass<pmlc::dialect::stripe::pass, config>, config>::Register(); \
+    return 0;                                                                                     \
   }();
 
 namespace {
 
-REGISTER(PaddingPass, proto::MirPadPass);
+REGISTER(PaddingPass, proto::StripeMLIRPadPass);
 
 }
 

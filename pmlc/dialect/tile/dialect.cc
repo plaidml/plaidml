@@ -1,15 +1,15 @@
 // Copyright 2019, Intel Corporation
 
 #include "mlir/IR/Dialect.h"
-#include "pmlc/dialect/hir/ops.h"
+#include "pmlc/dialect/tile/ops.h"
 
 namespace pmlc {
 namespace dialect {
-namespace hir {
+namespace tile {
 
 class Dialect : public mlir::Dialect {
  public:
-  explicit Dialect(mlir::MLIRContext* ctx) : mlir::Dialect("pml_hir", ctx) {
+  explicit Dialect(mlir::MLIRContext* ctx) : mlir::Dialect("tile", ctx) {
     // addTypes<TensorType>();
     // addTypes<AffineType>();
     //   addOperations<
@@ -22,6 +22,6 @@ class Dialect : public mlir::Dialect {
 
 static mlir::DialectRegistration<Dialect> EdslOps;
 
-}  // namespace hir
+}  // namespace tile
 }  // namespace dialect
 }  // namespace pmlc

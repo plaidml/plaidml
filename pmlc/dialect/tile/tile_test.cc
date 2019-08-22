@@ -16,12 +16,12 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "base/util/logging.h"
-#include "pmlc/dialect/hir/ops.h"
+#include "pmlc/dialect/tile/ops.h"
 
-using namespace mlir;                // NOLINT
-using namespace pmlc::dialect::hir;  // NOLINT
+using namespace mlir;                 // NOLINT
+using namespace pmlc::dialect::tile;  // NOLINT
 
-#define DEBUG_TYPE "pml_hir"
+#define DEBUG_TYPE "tile"
 
 class Environment : public ::testing::Environment {
   void SetUp() override {  //
@@ -54,7 +54,7 @@ struct format_provider<Operation> {
 //   void runOnModule() override { IVLOG(1, "LoweringPass"); }
 // };
 
-TEST(HIR, Basic) {
+TEST(Tile, Basic) {
   Location loc = UnknownLoc::get(globalContext());
   auto module = ModuleOp::create(loc);
 

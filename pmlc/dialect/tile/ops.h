@@ -6,7 +6,7 @@
 
 namespace pmlc {
 namespace dialect {
-namespace hir {
+namespace tile {
 
 using mlir::ArrayRef;
 using mlir::Builder;
@@ -22,8 +22,8 @@ using mlir::Value;
 namespace OpTrait = mlir::OpTrait;
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/hir/ops.h.inc"
+#include "pmlc/dialect/tile/ops.h.inc"
 
-}  // namespace hir
+}  // namespace tile
 }  // namespace dialect
 }  // namespace pmlc

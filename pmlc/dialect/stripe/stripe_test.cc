@@ -10,18 +10,18 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/dialect/mir/ops.h"
-#include "pmlc/dialect/mir/padding_pass.h"
-#include "pmlc/dialect/mir/transcode.h"
-#include "pmlc/dialect/mir/types.h"
+#include "pmlc/dialect/stripe/ops.h"
+#include "pmlc/dialect/stripe/padding_pass.h"
+#include "pmlc/dialect/stripe/transcode.h"
+#include "pmlc/dialect/stripe/types.h"
 
 #include "tile/codegen/localize.h"
 #include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lib/lib.h"
 
-using namespace vertexai::tile;      // NOLINT
-using namespace pmlc::dialect::mir;  // NOLINT
+using namespace vertexai::tile;         // NOLINT
+using namespace pmlc::dialect::stripe;  // NOLINT
 
 lang::RunInfo example() {
   using plaidml::edsl::LogicalShape;
@@ -42,7 +42,7 @@ int main() {
   codegen::LocalizeBlockPass(codegen::AliasMap(codegen::AliasMap(), prog->entry.get()), prog->entry.get(), {"tmp"});
 
   printf("Converting to MLIR\n");
-  auto func = ToMir(&context, *prog);
+  auto func = ToStripeMLIR(&context, *prog);
 
   printf("Adding function to module\n");
   module.push_back(func);
@@ -53,7 +53,7 @@ int main() {
   printf("Doing some passes\n");
   mlir::PassManager pm;
   pm.addPass(mlir::createCSEPass());
-  vertexai::tile::codegen::proto::MirPadPass options;
+  vertexai::tile::codegen::proto::StripeMLIRPadPass options;
   pm.addPass(new PaddingPass(options));
   if (failed(pm.run(module))) {
     throw std::runtime_error("Invalid goo\n");

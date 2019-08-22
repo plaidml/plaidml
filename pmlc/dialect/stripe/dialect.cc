@@ -1,11 +1,11 @@
 // Copyright 2019, Intel Corporation
 
 #include "mlir/IR/Dialect.h"
-#include "pmlc/dialect/mir/ops.h"
+#include "pmlc/dialect/stripe/ops.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 class Dialect : public mlir::Dialect {
  public:
@@ -15,14 +15,14 @@ class Dialect : public mlir::Dialect {
   void printAttribute(mlir::Attribute attr, llvm::raw_ostream& os) const override;
 };
 
-static mlir::DialectRegistration<Dialect> MirOps;
+static mlir::DialectRegistration<Dialect> StripeOps;
 
-Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect("pml_mir", ctx) {
+Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect("stripe", ctx) {
   addTypes<AffineType, TensorType, PrngType>();
   addAttributes<TensorLayoutAttr>();
   addOperations<
 #define GET_OP_LIST
-#include "pmlc/dialect/mir/ops.cpp.inc"
+#include "pmlc/dialect/stripe/ops.cpp.inc"
       >();
 }
 
@@ -83,6 +83,6 @@ void Dialect::printAttribute(Attribute attr, llvm::raw_ostream& os) const {
   }
 }
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

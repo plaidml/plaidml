@@ -22,7 +22,7 @@ mlir_tblgen(
 )
 
 plaidml_cc_library(
-    name = "mir",
+    name = "stripe",
     srcs = [
         "analysis.cc",
         "dialect.cc",
@@ -52,7 +52,7 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "transcode",
     srcs = [
-        "to_mir.cc",
+        "to_stripe_mlir.cc",
         "to_stripe.cc",
     ],
     hdrs = [
@@ -60,7 +60,7 @@ plaidml_cc_library(
     ],
     tags = ["llvm"],
     deps = [
-        ":mir",
+        ":stripe",
         "//tile/stripe",
         "@mlir//:IR",
     ],
@@ -77,14 +77,14 @@ plaidml_cc_library(
     tags = ["llvm"],
     deps = [
         "//tile/codegen:proto_cc",
-	":mir",
+	":stripe",
     ],
 )
 
 plaidml_cc_test(
-    name = "mir_test",
-    srcs = ["mir_test.cc"],
-    tags = ["llvm", "mir_test"],
+    name = "stripe_test",
+    srcs = ["stripe_test.cc"],
+    tags = ["llvm", "stripe_mlir_test"],
     deps = [
         ":transcode",
         ":passes",

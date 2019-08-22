@@ -1,15 +1,16 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/mir/ops.h"
+#include "pmlc/dialect/tile/ops.h"
+
 #include "mlir/IR/OpImplementation.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace tile {
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/mir/ops.cpp.inc"
+#include "pmlc/dialect/tile/ops.cpp.inc"
 
-}  // namespace mir
+}  // namespace tile
 }  // namespace dialect
 }  // namespace pmlc

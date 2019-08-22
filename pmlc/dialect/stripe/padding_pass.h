@@ -8,15 +8,15 @@
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 struct PaddingPass : public mlir::FunctionPass<PaddingPass> {
-  explicit PaddingPass(const vertexai::tile::codegen::proto::MirPadPass& options) : options(options) {}
+  explicit PaddingPass(const vertexai::tile::codegen::proto::StripeMLIRPadPass& options) : options(options) {}
   void runOnFunction() override;
 
-  vertexai::tile::codegen::proto::MirPadPass options;
+  vertexai::tile::codegen::proto::StripeMLIRPadPass options;
 };
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

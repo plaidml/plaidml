@@ -24,7 +24,7 @@ mlir_tblgen(
 )
 
 plaidml_cc_library(
-    name = "hir",
+    name = "tile",
     srcs = [
         "dialect.cc",
         "ops.cc",
@@ -48,10 +48,10 @@ plaidml_cc_library(
 )
 
 plaidml_cc_test(
-    name = "hir_test",
-    srcs = ["hir_test.cc"],
+    name = "tile_test",
+    srcs = ["tile_test.cc"],
     deps = [
-        ":hir",
+        ":tile",
         "//tile/codegen",
         "//tile/lang",
         "//tile/lib",

@@ -2,9 +2,9 @@
 
 include "mlir/IR/OpBase.td"
 
-def HirDialect : Dialect {
-  let name = "pml.hir";
-  let cppNamespace = "pmlc::dialect::hir";
+def TileDialect : Dialect {
+  let name = "tile";
+  let cppNamespace = "pmlc::dialect::tile";
 }
 
 // def TensorType :
@@ -13,10 +13,10 @@ def HirDialect : Dialect {
 //         "Plaid AST Tensor Type"
 //     >;
 
-class HirOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<HirDialect, mnemonic, traits> {}
+class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    Op<TileDialect, mnemonic, traits> {}
 
-def ContractionOp : HirOp<"contraction"> {
+def ContractionOp : TileOp<"contraction"> {
     let summary = "Contraction operation";
 }
 
