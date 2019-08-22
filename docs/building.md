@@ -30,13 +30,13 @@ https://github.com/bazelbuild/bazelisk/releases
 
 ## Configure the build
 
-Use the `configure` script to configure your built. Note: the `configure` script
+Use the `configure` script to configure your build. Note: the `configure` script
 requires Python 3.
 
 By default, running the `configure` script will:
 * Create and/or update your conda environment
 * Configure pre-commit hooks for development purposes
-* Configure bazelisk based on the device you're using
+* Configure bazelisk based on your host OS
 
 ```
 ./configure
