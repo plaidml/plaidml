@@ -124,7 +124,8 @@ hal::proto::HardwareInfo Device::GetHardwareInfo() {
   settings->set_vec_size(1);
   settings->set_use_global(false);
   settings->set_mem_width(64);
-  settings->set_max_mem(32768);
+  settings->set_max_local_mem(32768);
+  settings->set_max_global_mem(4290772992);
   settings->set_max_regs(32);
   settings->set_goal_groups(1);
   settings->set_goal_flops_per_byte(1);

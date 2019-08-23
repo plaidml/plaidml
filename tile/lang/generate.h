@@ -43,7 +43,8 @@ struct HardwareSettings : public DirectSettings {
   // Vector size
   uint64_t vec_size;  // How wide to vectorize data (if possible)
   // Hard limits
-  uint64_t max_mem;   // Maximum local memory in bytes
+  uint64_t max_global_mem;  // Maximum global memory in bytes
+  uint64_t max_local_mem;   // Maximum local memory in bytes
   uint64_t max_regs;  // Maximum output register memory in bytes
   // Numbers that impact scoring
   uint64_t goal_groups;                           // How many workgroups till we hit full occupancy

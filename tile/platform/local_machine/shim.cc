@@ -10,18 +10,15 @@
 namespace vertexai {
 namespace tile {
 namespace local_machine {
-namespace {
 
 // Builds a memory allocation map for a particular program run.
-std::pair<std::vector<std::shared_ptr<MemChunk>>, std::list<Shim::AliasUpdate>> BuildChunkMap(
-    const context::Context& ctx, const Program* program,
-    const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
-    const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs) {
-  std::vector<std::shared_ptr<MemChunk>> chunk_infos;
-  std::list<Shim::AliasUpdate> updates;
-  chunk_infos.reserve(program->schedule().allocs.size());
-  for (const auto& alloc : program->schedule().allocs) {
-    std::shared_ptr<MemChunk> chunk;
+void Shim::BuildChunkMap(const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
+                         const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs) {
+  chunk_infos_.reserve(program_->schedule().allocs.size());
+  size_t user_size = 0;
+  size_t tmp_size = 0;
+  for (const auto& alloc : program_->schedule().allocs) {
+    std::shared_ptr<MemChunk> chunk = {nullptr};
     if (alloc.is_input()) {
       // This is a program input.  If the input has a chunk, we have to use it --
       // by definition, this is the input data to the program.  Note that the input
@@ -32,8 +29,8 @@ std::pair<std::vector<std::shared_ptr<MemChunk>>, std::list<Shim::AliasUpdate>> 
       if (iit == inputs.end()) {
         throw error::NotFound{"Missing program input: " + alloc.input};
       }
-      std::shared_ptr<Buffer> input_buffer = Buffer::Downcast(iit->second, program->devinfo());
-      input_buffer->EnsureChunk(ctx);
+      std::shared_ptr<Buffer> input_buffer = Buffer::Downcast(iit->second, program_->devinfo());
+      input_buffer->EnsureChunk(ctx_);
       chunk = input_buffer->chunk();
 
       if (alloc.is_output()) {
@@ -44,9 +41,10 @@ std::pair<std::vector<std::shared_ptr<MemChunk>>, std::list<Shim::AliasUpdate>> 
         if (oit == outputs.end()) {
           throw error::NotFound{"Missing program output: " + alloc.output};
         }
-        std::shared_ptr<Buffer> output_buffer = Buffer::Downcast(oit->second, program->devinfo());
-        updates.emplace_back(Shim::AliasUpdate{std::move(output_buffer), chunk});
+        std::shared_ptr<Buffer> output_buffer = Buffer::Downcast(oit->second, program_->devinfo());
+        updates_.emplace_back(Shim::AliasUpdate{std::move(output_buffer), chunk});
       }
+      user_size += alloc.byte_size;
     } else if (alloc.is_output()) {
       // This is a program output, but not a program input.  So we'll be creating a new chunk
       // for it here -- typically, the output buffer will not already have a chunk, but if it does,
@@ -55,30 +53,69 @@ std::pair<std::vector<std::shared_ptr<MemChunk>>, std::list<Shim::AliasUpdate>> 
       if (oit == outputs.end()) {
         throw error::NotFound{"Missing program output: " + alloc.output};
       }
-      std::shared_ptr<Buffer> output_buffer = Buffer::Downcast(oit->second, program->devinfo());
-      chunk = program->output_mem_strategy()->MakeChunk(ctx, output_buffer->size());
-      updates.emplace_back(Shim::AliasUpdate{std::move(output_buffer), chunk});
+      std::shared_ptr<Buffer> output_buffer = Buffer::Downcast(oit->second, program_->devinfo());
+      chunk = program_->output_mem_strategy()->MakeChunk(ctx_, output_buffer->size());
+      updates_.emplace_back(Shim::AliasUpdate{std::move(output_buffer), chunk});
+      user_size += alloc.byte_size;
     } else {
-      // This is neither a program input nor a program output; the alloc is purely internal
-      // to the program.  Make a temporary buffer for it.
-      chunk = program->tmp_mem_strategy()->MakeChunk(ctx, alloc.byte_size);
+      // We do not allocate memory for temp buffers now. We decide if they should be pre-allocated laster.
+      tmp_size += alloc.byte_size;
     }
-
-    chunk_infos.emplace_back(std::move(chunk));
+    chunk_infos_.emplace_back(std::move(chunk));
   }
-  return std::make_pair(std::move(chunk_infos), std::move(updates));
-}
 
-}  // namespace
+  pre_alloc_ = (user_size + tmp_size <= program_->devinfo()->settings.max_global_mem());
+  if (pre_alloc_) {
+    // We can pre-allocate the tmp buffers right now
+    for (auto& alloc : program_->schedule().allocs) {
+      if (alloc.is_tmp()) {
+        AllocateChunk(const_cast<schedule::Alloc*>(&alloc));
+      }
+    }
+  }
+}
 
 Shim::Shim(const context::Context& ctx, const Program* program,
            std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-           std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
-  std::tie(chunk_infos_, updates_) = BuildChunkMap(ctx, program, inputs, outputs);
+           std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) :
+           ctx_{ctx}, program_{program} {
+  // Count the uses of the allocs
+  alloc_uses_.clear();
+  for (const auto& step : program->schedule().steps) {
+    for (const auto& alloc : step.inputs) {
+      const auto& it = alloc_uses_.find(alloc->idx);
+      if (it == alloc_uses_.end()) {
+        alloc_uses_[alloc->idx] = 1;
+      }
+      else {
+        ++it->second;
+      }
+    }
+    for (const auto& oi : step.outputs) {
+      auto alloc = oi.allocp;
+      const auto& it = alloc_uses_.find(alloc->idx);
+      if (it == alloc_uses_.end()) {
+        alloc_uses_[alloc->idx] = 1;
+      }
+      else {
+        ++it->second;
+      }
+    }
+  }
+  BuildChunkMap(inputs, outputs);
 }
 
 std::shared_ptr<MemChunk> Shim::LookupAlloc(std::size_t /* sidx */, schedule::Alloc* alloc) const {
   return chunk_infos_[alloc->idx];
+}
+
+std::shared_ptr<MemChunk> Shim::AllocateChunk(schedule::Alloc* alloc) {
+  chunk_infos_[alloc->idx] = program_->tmp_mem_strategy()->MakeChunk(ctx_, alloc->byte_size, alloc_uses_.at(alloc->idx));
+  return chunk_infos_[alloc->idx];
+}
+
+void Shim::FreeChunk(size_t idx) {
+  chunk_infos_[idx] = nullptr;
 }
 
 void Shim::SetLaunchException(std::exception_ptr ep) const noexcept {

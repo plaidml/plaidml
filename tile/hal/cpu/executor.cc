@@ -52,7 +52,10 @@ hal::proto::HardwareInfo GetHardwareInfo() {
   // Maximum memory is another concept based on GPU local memory. It roughly means the size of the L1 cache: that is,
   // how much data can we efficiently read at one time?
 
-  settings->set_max_mem(32768);
+  settings->set_max_local_mem(32768);
+
+  // Global memory. Default is 1 GiB
+  settings->set_max_global_mem(1073741824);
 
   // Maximum number of registers refers to the vector unit registers. It controls the number of outputs which can be
   // generated at a time. This number is for NEON. 32-bit SSE had 8; AMD64 extended it to 16.

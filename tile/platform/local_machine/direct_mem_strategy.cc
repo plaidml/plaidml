@@ -37,6 +37,7 @@ class DirectMemChunk final : public MemChunk {
   boost::future<std::unique_ptr<View>> MapCurrent(const context::Context& ctx) final;
   std::unique_ptr<View> MapDiscard(const context::Context& ctx) final;
   std::uint64_t size() const final { return size_; }
+  std::uint64_t DecreaseUses() final { return --uses_; }
 
   // MemChunk implementation
   std::shared_ptr<MemDeps> deps() final { return deps_; }
@@ -44,6 +45,7 @@ class DirectMemChunk final : public MemChunk {
 
  private:
   std::uint64_t size_;
+  std::uint64_t uses_;
   std::shared_ptr<DevInfo> devinfo_;
   std::shared_ptr<MemDeps> deps_;
   std::shared_ptr<hal::Buffer> mem_;
@@ -99,7 +101,7 @@ DirectMemStrategy::DirectMemStrategy(const std::shared_ptr<DevInfo>& devinfo, ha
   }
 }
 
-std::shared_ptr<MemChunk> DirectMemStrategy::MakeChunk(const context::Context& ctx, std::uint64_t size) const {
+std::shared_ptr<MemChunk> DirectMemStrategy::MakeChunk(const context::Context& ctx, std::uint64_t size, std::uint64_t uses) const {
   return std::make_shared<DirectMemChunk>(ctx, devinfo_, size, source_);
 }
 

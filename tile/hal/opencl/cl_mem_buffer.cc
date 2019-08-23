@@ -15,6 +15,10 @@ namespace opencl {
 CLMemBuffer::CLMemBuffer(const std::shared_ptr<DeviceState>& device_state, std::uint64_t size, CLObj<cl_mem> mem)
     : Buffer{device_state->cl_ctx(), size}, device_state_{device_state}, mem_{std::move(mem)} {}
 
+CLMemBuffer::~CLMemBuffer() {
+  //ocl::ReleaseMemObject(mem_.get());
+}
+
 void CLMemBuffer::SetKernelArg(const CLObj<cl_kernel>& kernel, std::size_t index) {
   cl_mem m = mem_.get();
   Err err = ocl::SetKernelArg(kernel.get(),    // kernel

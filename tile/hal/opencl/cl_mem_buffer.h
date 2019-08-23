@@ -19,6 +19,8 @@ class CLMemBuffer final : public Buffer, public std::enable_shared_from_this<CLM
  public:
   CLMemBuffer(const std::shared_ptr<DeviceState>& device_state, std::uint64_t size, CLObj<cl_mem> mem);
 
+  ~CLMemBuffer();
+
   void SetKernelArg(const CLObj<cl_kernel>& kernel, std::size_t index) final;
 
   boost::future<void*> MapCurrent(const std::vector<std::shared_ptr<hal::Event>>& deps) final;

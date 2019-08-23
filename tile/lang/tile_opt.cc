@@ -212,7 +212,7 @@ double ComputeScore(const HardwareSettings& settings, const proto::PerfStats& pe
                << " sm=" << perf.shared_mem() << " or=" << perf.out_regs() << " mr=" << perf.mem_read()
                << " mw=" << perf.mem_write() << " op=" << perf.operations() << " rp=" << perf.rollups()
                << " tu=" << perf.threads_used());
-  if (perf.shared_mem() > settings.max_mem) {
+  if (perf.shared_mem() > settings.max_local_mem) {
     IVLOG(4, "  over memory");
     return -1;
   }

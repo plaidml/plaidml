@@ -19,6 +19,9 @@ class MemChunk : public Buffer {
 
   // Gets the chunk's underlying HAL buffer.
   virtual std::shared_ptr<hal::Buffer> hal_buffer() = 0;
+
+  // Decrease uses, return the uses after decrease
+  virtual std::uint64_t DecreaseUses() = 0;
 };
 
 }  // namespace local_machine

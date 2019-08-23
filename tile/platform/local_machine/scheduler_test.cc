@@ -61,7 +61,8 @@ tile::lang::HardwareSettings SchedulerTest::GetSettings() {
   settings.use_global = false;
   settings.mem_width = 128;
   settings.vec_size = 4;
-  settings.max_mem = 32768;
+  settings.max_local_mem = 32768;
+  settings.max_global_mem = 4294967296;
   settings.max_regs = 16384;
   settings.goal_groups = 16;
   settings.goal_flops_per_byte = 50;

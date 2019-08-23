@@ -43,7 +43,8 @@ HardwareSettings TestGPU() {
   settings.vec_size = 1;
   settings.use_global = false;
   settings.mem_width = 32;
-  settings.max_mem = 18 * 1024;
+  settings.max_local_mem = 18 * 1024;
+  settings.max_global_mem = 2145386496;
   settings.max_regs = 18 * 1024;
   settings.goal_groups = 20;
   settings.goal_flops_per_byte = 20;

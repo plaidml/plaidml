@@ -17,7 +17,8 @@ class MemStrategy {
   virtual ~MemStrategy() {}
 
   // Allocates a memory object for kernels to use.
-  virtual std::shared_ptr<MemChunk> MakeChunk(const context::Context& ctx, std::uint64_t size) const = 0;
+  virtual std::shared_ptr<MemChunk> MakeChunk(const context::Context& ctx,
+      std::uint64_t size, std::uint64_t uses = 1) const = 0;
 };
 
 }  // namespace local_machine

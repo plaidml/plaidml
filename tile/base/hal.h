@@ -112,6 +112,9 @@ class Buffer {
   // attaching a callback to the event returned by this call, or by attaching a callback to the returned event of a
   // subsequent operation whose dependencies include the event returned by this call.
   virtual std::shared_ptr<Event> Unmap(const context::Context& ctx) = 0;
+
+  // Buffer size
+  virtual std::uint64_t size() const = 0;
 };
 
 // A Tile arena is a fixed range of memory that can be used for placed

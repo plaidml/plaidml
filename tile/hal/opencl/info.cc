@@ -66,7 +66,10 @@ hal::proto::HardwareInfo GetHardwareInfo(const proto::DeviceInfo& info) {
 #endif
 
   // Maximum local memory
-  settings->set_max_mem(info.local_mem_size());
+  settings->set_max_local_mem(info.local_mem_size());
+
+  // Maximum global memory
+  settings->set_max_global_mem(info.global_mem_size());
 
   // Maximum register size
   settings->set_max_regs(16 * 1024);

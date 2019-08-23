@@ -46,10 +46,11 @@ message HardwareSettings {
   uint32 vec_size = 2;
   bool use_global = 3;
   uint64 mem_width = 4;
-  uint64 max_mem = 5;
-  uint64 max_regs = 6;
-  uint64 goal_groups = 7;
-  uint64 goal_flops_per_byte = 8;
+  uint64 max_local_mem = 5;
+  uint64 max_global_mem = 6;
+  uint64 max_regs = 7;
+  uint64 goal_groups = 8;
+  uint64 goal_flops_per_byte = 9;
   repeated uint64 dim_sizes = 10;
   bool is_synchronous = 11;
   bool disable_mad = 12;

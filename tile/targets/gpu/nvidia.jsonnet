@@ -186,6 +186,14 @@ local PARAMS = {
             },
 
             {
+              name: 'reduce_constraints',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IlpConstraintReductionPass',
+                reqs: ['all'],
+              },
+            },
+
+            {
               name: 'prune_idxs',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',

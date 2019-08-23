@@ -26,6 +26,9 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> RunSchedule(const conte
 
     auto add_chunk_param = [shim, &current_deps](std::size_t sidx, schedule::Alloc* alloc) {
       std::shared_ptr<MemChunk> chunk = shim->LookupAlloc(sidx, alloc);
+      if (chunk == nullptr || chunk.get() == nullptr) {
+        chunk = shim->AllocateChunk(alloc);
+      }
       chunk->deps()->GetReadDependencies(&current_deps);
       return chunk;
     };
@@ -71,6 +74,31 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> RunSchedule(const conte
       dep_set.erase(dep);
     }
     deps[step.idx] = std::move(event);
+
+    // If we pre-allocated all buffers, it means we have enough memory.
+    // So do not release the memory at once.
+    if (!shim->PreAlloc()) {
+      // Decrease the memory chunk uses
+      for (auto& input : step.inputs) {
+        if (input->is_tmp()) {
+          auto chunk = shim->LookupAlloc(step.idx, input);
+          if (chunk && chunk->DecreaseUses() == 0) {
+            // Free this chunk
+            shim->FreeChunk(input->idx);
+          }
+        }
+      }
+      for (auto& oi : step.outputs) {
+        auto output = oi.allocp;
+        if (output->is_tmp()) {
+          auto chunk = shim->LookupAlloc(step.idx, output);
+          if (chunk && chunk->DecreaseUses() == 0) {
+            // Free this chunk
+            shim->FreeChunk(output->idx);
+          }
+        }
+      }
+    }
   }
 
   boost::future<std::vector<std::shared_ptr<hal::Result>>> results;

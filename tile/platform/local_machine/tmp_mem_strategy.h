@@ -23,7 +23,8 @@ class TmpMemStrategy final : public MemStrategy {
  public:
   TmpMemStrategy(const std::shared_ptr<DevInfo>& devinfo, hal::Memory* source);
 
-  std::shared_ptr<MemChunk> MakeChunk(const context::Context& ctx, std::uint64_t size) const final;
+  std::shared_ptr<MemChunk> MakeChunk(const context::Context& ctx,
+      std::uint64_t size, std::uint64_t uses) const;
 
  private:
   std::shared_ptr<DevInfo> devinfo_;

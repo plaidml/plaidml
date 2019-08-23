@@ -34,8 +34,8 @@ void Validate(const proto::HardwareSettings& settings) {
     throw error::InvalidArgument("Memory width must be >= 8 and <= 4096 and a power of two: " +
                                  std::to_string(settings.mem_width()));
   }
-  if (settings.max_mem() < 1024) {
-    throw error::InvalidArgument("Max mem must be >= 1024: " + std::to_string(settings.max_mem()));
+  if (settings.max_local_mem() < 1024) {
+    throw error::InvalidArgument("Max local mem must be >= 1024: " + std::to_string(settings.max_local_mem()));
   }
   if (settings.goal_groups() < 1) {
     throw error::InvalidArgument("goal groups must be >= 1: " + std::to_string(settings.goal_groups()));
@@ -61,7 +61,8 @@ lang::HardwareSettings ToHardwareSettings(const proto::HardwareSettings& setting
   result.vec_size = settings.vec_size();
   result.use_global = settings.use_global();
   result.mem_width = settings.mem_width();
-  result.max_mem = settings.max_mem();
+  result.max_local_mem = settings.max_local_mem();
+  result.max_global_mem = settings.max_global_mem();
   result.max_regs = settings.max_regs();
   result.goal_groups = settings.goal_groups();
   result.goal_flops_per_byte = settings.goal_flops_per_byte();

@@ -42,6 +42,12 @@ class Shim {
   // Translate an input or output for a step.
   std::shared_ptr<MemChunk> LookupAlloc(std::size_t sidx, schedule::Alloc* alloc) const;
 
+  // Allocate a chunk
+  std::shared_ptr<MemChunk> AllocateChunk(schedule::Alloc* alloc);
+
+  // Free a chunk
+  void FreeChunk(size_t idx);
+
   // Handle execution errors.
   void SetLaunchException(std::exception_ptr ep) const noexcept;
 
@@ -49,9 +55,17 @@ class Shim {
   // Note that the shim should stay alive until execution is guaranteed to have completed.
   void OnLaunchSuccess() noexcept;
 
+  bool PreAlloc() { return pre_alloc_; }
+
  private:
+  void BuildChunkMap(const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
+    const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs);
   std::vector<std::shared_ptr<MemChunk>> chunk_infos_;
   std::list<AliasUpdate> updates_;
+  std::map<size_t, size_t> alloc_uses_;
+  const context::Context& ctx_;
+  const Program* program_;
+  bool pre_alloc_;
 };
 
 }  // namespace local_machine

@@ -32,7 +32,8 @@ def very_large_values_config():
           "value": "true"
         },
         "settings": {
-          "max_mem": 1000000,
+          "max_local_mem": 1000000,
+          "max_global_mem": 4 * 1024 * 1024 * 1024,
           "max_regs": 1000000,
           "mem_width": 1000000,
           "threads": 10000,
