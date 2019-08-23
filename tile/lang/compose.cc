@@ -985,7 +985,7 @@ void FunctionApplication::SetDone() {
       for (const auto& s : o.inputs) {
         try {
           inputs.push_back(bindings_.at(s));
-        } catch (std::out_of_range) {
+        } catch (const std::out_of_range&) {
           throw std::runtime_error(std::string("Missing input binding \"") + s + "\" in function op");
         }
       }
@@ -1002,7 +1002,7 @@ void FunctionApplication::SetDone() {
         try {
           inputs.push_back(bindings_.at(s));
           IVLOG(4, "  Added input " << s << " -> " << *bindings_.at(s));
-        } catch (std::out_of_range) {
+        } catch (const std::out_of_range&) {
           throw std::runtime_error(std::string("Missing input binding \"") + s + "\" in contraction op");
         }
       }
@@ -1010,7 +1010,7 @@ void FunctionApplication::SetDone() {
         try {
           dims.push_back(bindings_.at(s));
           IVLOG(4, "  Added output dim " << s << " -> " << *bindings_.at(s));
-        } catch (std::out_of_range) {
+        } catch (const std::out_of_range&) {
           throw std::runtime_error(std::string("Missing output binding \"") + s + "\"");
         }
       }
