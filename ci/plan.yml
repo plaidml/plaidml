@@ -92,6 +92,18 @@ PLATFORMS:
      variant: windows_x86_64
   keras-stripe-ocl-gfx804:
      variant: windows_x86_64
+  keras-plaid-ocl-gfx803:
+     variant: linux_x86_64
+  keras-stripe-ocl-gfx803:
+     variant: linux_x86_64
+  keras-plaid-ocl-vega56:
+     variant: macos_x86_64
+  keras-stripe-ocl-vega56:
+     variant: macos_x86_64
+  keras-plaid-mtl-vega56:
+     variant: macos_x86_64
+  keras-stripe-mtl-vega56:
+     variant: macos_x86_64 
 
 VARIANTS:
   linux_x86_64:
@@ -174,16 +186,14 @@ SUITES:
     platforms:
       keras-stripe-llvm-cpu:
         pipelines: [plaidml, nightly]
-      keras-stripe-ocl-neo:
-        pipelines: [plaidml, nightly]
       keras-plaid-mtl-uhd630:
+        pipelines: [nightly]
+      keras-stripe-mtl-uhd630:
         pipelines: [plaidml, nightly]
-
       keras-plaid-ocl-gfx804:
         pipelines: [nightly]
       keras-stripe-ocl-gfx804:
         pipelines: [plaidml, nightly]
-
       keras-plaid-ocl-gfx900:
         pipelines: [nightly]
       keras-stripe-ocl-gfx900:
@@ -205,9 +215,13 @@ SUITES:
       keras-stripe-ocl-neo:
         pipelines: [plaidml, nightly]
 
-      keras-plaid-mtl-uhd630:
-        pipelines: [nightly]
-      keras-stripe-mtl-uhd630:
+      keras-plaid-ocl-vega56:
+        pipelines: [plaidml, nightly]
+      keras-stripe-ocl-vega56:
+        pipelines: [plaidml, nightly]
+      keras-plaid-mtl-vega56:
+        pipelines: [plaidml, nightly]
+      keras-stripe-mtl-vega56:
         pipelines: [plaidml, nightly]
 
     params:
@@ -315,6 +329,14 @@ SUITES:
       keras-stripe-mtl-uhd630:
         pipelines: [plaidml, nightly]
 
+      keras-plaid-ocl-vega56:
+        pipelines: [plaidml, nightly]
+      keras-stripe-ocl-vega56:
+        pipelines: [plaidml, nightly]
+      keras-plaid-mtl-vega56:
+        pipelines: [plaidml, nightly]
+      keras-stripe-mtl-vega56:
+        pipelines: [plaidml, nightly]  
     params:
       ci:
         batch_sizes: [1]
