@@ -13,16 +13,12 @@
 namespace vertexai {
 namespace tile {
 namespace stripejit {
-// Lubo
-static std::shared_ptr<stripe::Block> program_ = nullptr;
-// Lubo end
 Program::Program(                  //
     const std::string& target,     //
     const lang::RunInfo& runinfo,  //
     ConstBufferManager* const_bufs)
     : executable_{new targets::cpu::Native} {
   auto stripe = GenerateStripe(runinfo);
-  program_ = stripe->entry;  // Lubo
   auto out_dir = boost::filesystem::path(env::Get("STRIPE_OUTPUT"));
   codegen::OptimizeOptions options = {
       !out_dir.empty(),    // dump_passes
@@ -63,8 +59,6 @@ boost::future<void> Program::Run(  //
     }
   }
   executable_->run(buffers);
-  executable_->set_perf_attrs(program_.get());  // Lubo
-  IVLOG(1, *program_.get());
   return boost::make_ready_future();
 }
 

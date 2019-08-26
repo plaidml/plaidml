@@ -222,6 +222,7 @@ Compiler::Compiler(llvm::LLVMContext* context, const Config& config)
 }
 
 ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
+  IVLOG(4, program);
   // Compile each block in this program into a function within an LLVM module.
   ProgramModule ret;
   ret.module = std::make_unique<llvm::Module>("stripe", context_);
