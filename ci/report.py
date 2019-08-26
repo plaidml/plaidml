@@ -39,14 +39,52 @@ def collect_results(root, pipeline):
     gpu_flops = plan['CONST']['gpu_flops']
     baseline_name = plan['CONST']['efficiency_baseline']
     for suite_name, suite in plan['SUITES'].items():
-        for workload_name, workload in suite['workloads'].items():
+        for wkey, workload in suite['workloads'].items():
             skip_platforms = workload.get('skip_platforms', [])
             for platform_name, platform in suite['platforms'].items():
                 if platform_name in skip_platforms or platform_name == baseline_name:
                     continue
                 if pipeline not in platform['pipelines']:
                     continue
+                popt = ci.util.PlanOption(suite, workload, platform_name)
+                shc = popt.get('shardcount')
+                if shc:
+                    for shard in popt.get('run_shards'):
+                        workload_name = str(wkey) + '-' + str(shard)
+                        for batch_size in suite['params'][pipeline]['batch_sizes']:
+                            info = ci.util.TestInfo(
+                                (suite_name, suite),
+                                (workload_name, workload),
+                                (platform_name, ci.util.Platform(platform_name, gpu_flops)),
+                                batch_size,
+                            )
+                            path = info.path(root) / 'report.json'
+                            print(path)
+                            if path.exists():
+                                with path.open() as fp:
+                                    data = json.load(fp)
+                            else:
+                                data = {
+                                    'compare': False,
+                                    'ratio': None,
+                                    'compile_duration': None,
+                                    'cur.execution_duration': None,
+                                    'ref.execution_duration': None,
+                                    'status': 'ERROR',
+                                    'failures': [],
+                                    'errors': [],
+                                    'reason': 'Result not found',
+                                    'build_url': DEFAULT_BUILD_URL,
+                                }
+                            data['info'] = info
+                            yield data
+                    else:
+                        shard = None
+
                 for batch_size in suite['params'][pipeline]['batch_sizes']:
+                    if shc:
+                        continue
+                    workload_name = wkey
                     info = ci.util.TestInfo(
                         (suite_name, suite),
                         (workload_name, workload),
@@ -353,6 +391,7 @@ def main():
         'errors': make_html_failures(results, 'ERROR'),
         'failures': make_html_failures(results, 'FAIL'),
         'report_url': 'artifact://report/report.html',
+        'wheel_url': 'artifact://all_wheels.tar.gz'
     }
     html = pystache.render(load_template('annotate.html'), context)
     write_file(report_dir / 'annotate.html', html)

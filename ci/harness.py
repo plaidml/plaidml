@@ -19,12 +19,22 @@ def buildkite_metadata(key, default=None):
     return os.getenv('BUILDKITE_AGENT_META_DATA_' + key, os.getenv(key, default))
 
 
-def run(args):
+def run(args, shargs):
+    if shargs:
+        print('running shard: ', shargs[3])
+        shard_num = shargs[3]
+
     root = pathlib.Path('.').resolve() / 'tmp'
     input = root / 'input'
     output_root = root / 'output'
-    output = output_root / args.suite / args.workload / args.platform / 'BATCH_SIZE={}'.format(
-        args.batch_size)
+
+    if shargs:
+        shard_result = str(args.workload) + '-' + shargs[3]
+        output = output_root / args.suite / shard_result / args.platform / 'BATCH_SIZE={}'.format(
+            args.batch_size)
+    else:
+        output = output_root / args.suite / args.workload / args.platform / 'BATCH_SIZE={}'.format(
+            args.batch_size)
 
     with open('ci/plan.yml') as fp:
         plan = yaml.safe_load(fp)
@@ -58,7 +68,7 @@ def run(args):
         version = args.version
 
     util.printf('--- Extracting {} -> {}'.format(pkg_path, input))
-    with tarfile.open(pkg_path, 'r') as tar:
+    with tarfile.open(str(pkg_path), 'r') as tar:
         tar.extractall(input)
 
     shutil.rmtree(output_root, ignore_errors=True)
@@ -100,6 +110,10 @@ def run(args):
     cmd_args = platform_cfg.get('prepend_args', []) + popt.get('prepend_args', [])
     cmd_args += platform_cfg.get('args', []) + popt.get('args', [])
     cmd_args += platform_cfg.get('append_args', []) + popt.get('append_args', [])
+
+    if shargs:
+        cmd_args += shargs
+
     ctx = dict(
         results=output,
         batch_size=args.batch_size,
@@ -123,12 +137,22 @@ def run(args):
 
     gpu_flops = plan['CONST']['gpu_flops']
     baseline_name = plan['CONST']['efficiency_baseline']
-    test_info = util.TestInfo(
-        (args.suite, suite),
-        (args.workload, workload),
-        (args.platform, util.Platform(args.platform, gpu_flops)),
-        args.batch_size,
-    )
+
+    if shargs:
+        test_info = util.TestInfo(
+            (args.suite, suite),
+            (shard_result, workload),
+            (args.platform, util.Platform(args.platform, gpu_flops)),
+            args.batch_size,
+        )
+    else:
+        test_info = util.TestInfo(
+            (args.suite, suite),
+            (args.workload, workload),
+            (args.platform, util.Platform(args.platform, gpu_flops)),
+            args.batch_size,
+        )
+
     golden_info = util.TestInfo(
         (args.suite, suite),
         (args.workload, workload),
@@ -151,8 +175,8 @@ def run(args):
         'ref.execution_duration': result.ref.execution_duration,
     }
 
-    with (output / 'report.json').open('w') as fp:
-        util.printf('Writing:', fp.name)
+    report_fn = 'report.json'
+    with (output / report_fn).open('w') as fp:
         json.dump(report, fp)
 
     src = output_root

@@ -30,7 +30,13 @@ https://github.com/bazelbuild/bazelisk/releases
 
 ## Configure the build
 
-Note: the `configure` script requires Python 3.
+Use the `configure` script to configure your build. Note: the `configure` script
+requires Python 3.
+
+By default, running the `configure` script will:
+* Create and/or update your conda environment
+* Configure pre-commit hooks for development purposes
+* Configure bazelisk based on your host OS
 
 ```
 ./configure
@@ -49,13 +55,14 @@ $ ./configure
 Configuring PlaidML build environment
 
 conda found at: /usr/local/miniconda3/bin/conda
-Create a conda environment? path: $HOME/src/plaidml/work1/plaidml/.cenv? (y,n)[y]:
-Creating conda environment from: $HOME/src/plaidml/work1/plaidml/environment.yml
+Creating conda environment from: $HOME/src/plaidml/environment.yml
 
-Searching for pre-commit in: $HOME/src/plaidml/work1/plaidml/.cenv/bin
+Searching for pre-commit in: $HOME/src/plaidml/.cenv/bin
 pre-commit installed at .git/hooks/pre-commit
 
 bazelisk version
+Bazelisk version: v0.0.8
+Starting local Bazel server and connecting to it...
 Build label: 0.28.1
 Build target: bazel-out/darwin-opt/bin/src/main/java/com/google/devtools/build/lib/bazel/BazelServer_deploy.jar
 Build time: Fri Jul 19 15:22:50 2019 (1563549770)
@@ -64,7 +71,6 @@ Build timestamp as int: 1563549770
 
 Using variant: macos_x86_64
 
-Enter a bazel cache server URL (leave blank to disable):
 
 Your build is configured.
 Use the following to run all unit tests:

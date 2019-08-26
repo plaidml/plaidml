@@ -7,6 +7,7 @@ src="docs/images/plaid-final.png" height="200"></a><br>
 [Installation Instructions](docs/install.md) |
 [Building PlaidML](docs/building.md) |
 [Contributing](docs/contributing.rst) |
+[Troubleshooting](docs/troubleshooting.md) |
 [Reporting Issues](#reporting-issues)
 
 </div>

@@ -6,6 +6,7 @@ plaidml._internal_set_vlog(0)
 
 import argparse
 import functools
+import logging
 import operator
 import os
 import sys
@@ -50,6 +51,9 @@ if __name__ == '__main__':
     args, remainder = parser.parse_known_args()
 
     plaidml._internal_set_vlog(args.verbose)
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
     if args.fp16:
         pkb.set_floatx('float16')
         DEFAULT_TOL = 1e-2
@@ -1822,9 +1826,9 @@ if __name__ == '__main__':
         print('Running shard {} of {}'.format(args.shard, args.shard_count))
         loader = unittest.TestLoader()
         suite = unittest.TestSuite()
-        for n, test in enumerate(loader.loadTestsFromTestCase(TestBackendOps)):
-            if n % args.shard_count == args.shard:
-                print("n: {}, test: {}".format(n, test))
+        for test_num, test in enumerate(loader.loadTestsFromTestCase(TestBackendOps)):
+            if test_num % args.shard_count == args.shard:
+                print("test_num: {}, test: {}".format(test_num, test))
                 suite.addTest(test)
         runner = unittest.TextTestRunner()
         exit(not runner.run(suite).wasSuccessful())

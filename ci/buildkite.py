@@ -7,6 +7,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 
 import util
 
@@ -44,6 +45,16 @@ def get_engine(pkey):
         return ':black_square_button::metal:'
     if 'plaid-ocl' in pkey:
         return ':black_square_button::cl:'
+    else:
+        return (':tensorflow:')
+
+
+def get_shard_number(shard):
+    numbers = [
+        ':zero:', ':one:', ':two:', ':three:', ':four:', ':five:', ':six:', ':seven:', ':eight:',
+        ':nine:'
+    ]
+    return (numbers[shard])
 
 
 def get_python(variant):
@@ -70,25 +81,60 @@ def cmd_pipeline(args, remainder):
             variant = pinfo['variant']
             if args.pipeline not in platform['pipelines']:
                 continue
+
             for wkey, workload in suite['workloads'].items():
                 popt = util.PlanOption(suite, workload, pkey)
                 skip = workload.get('skip_platforms', [])
                 if pkey in skip:
                     continue
+
+                shc = popt.get('shardcount')
+
+                if shc:
+                    for shard in popt.get('run_shards'):
+                        rsh = shard
+                        shard = 'shard'
+                        shard_emoji = get_shard_number(rsh)
+                        for batch_size in suite['params'][args.pipeline]['batch_sizes']:
+                            tests.append(
+                                dict(
+                                    suite=skey,
+                                    workload=wkey,
+                                    platform=pkey,
+                                    batch_size=batch_size,
+                                    variant=variant,
+                                    timeout=popt.get('timeout', 20),
+                                    retry=popt.get('retry'),
+                                    softfail=popt.get('softfail'),
+                                    python=get_python(variant),
+                                    shard=shard,
+                                    shardcount=shc,
+                                    rsh=rsh,
+                                    shard_emoji=shard_emoji,
+                                    emoji=get_emoji(variant),
+                                    engine=get_engine(pkey)))
+
+                else:
+                    shard = None
+
                 for batch_size in suite['params'][args.pipeline]['batch_sizes']:
-                    tests.append(
-                        dict(
-                            suite=skey,
-                            workload=wkey,
-                            platform=pkey,
-                            batch_size=batch_size,
-                            variant=variant,
-                            timeout=popt.get('timeout', 20),
-                            retry=popt.get('retry'),
-                            softfail=popt.get('softfail'),
-                            python=get_python(variant),
-                            emoji=get_emoji(variant),
-                            engine=get_engine(pkey)))
+                    if shc:
+                        continue
+
+                    else:
+                        tests.append(
+                            dict(
+                                suite=skey,
+                                workload=wkey,
+                                platform=pkey,
+                                batch_size=batch_size,
+                                variant=variant,
+                                timeout=popt.get('timeout', 20),
+                                retry=popt.get('retry'),
+                                softfail=popt.get('softfail'),
+                                python=get_python(variant),
+                                emoji=get_emoji(variant),
+                                engine=get_engine(pkey)))
 
     if args.count:
         print('variants: {}'.format(len(variants)))
@@ -100,13 +146,47 @@ def cmd_pipeline(args, remainder):
         print(yml)
 
 
+def bazel_bin_dir():
+    out = util.check_output(['bazelisk', 'info', 'bazel-bin'], stderr=subprocess.DEVNULL)
+    return out.decode().strip('\n')
+
+
+def wheel_path(arg):
+    return pathlib.Path(bazel_bin_dir()) / arg / 'wheel.pkg' / 'dist'
+
+
+def wheel_clean(arg):
+    ws = list(wheel_path(arg).glob('*.whl'))
+    for f in ws:
+        if f.is_file():
+            print('deleting: ' + str(f.resolve()))
+            try:
+                os.remove(f)
+            except PermissionError:
+                import stat
+                os.chmod(f, stat.S_IWRITE)
+                os.remove(f)
+
+
 def cmd_build(args, remainder):
+
+    util.printf('--- :snake: pre-build steps... ')
+    util.printf('bazel shutdown...')
+    util.check_output(['bazelisk', 'shutdown'])
+    util.printf('delete any old whl files...')
+    wheel_clean('plaidml')
+    wheel_clean('plaidbench')
+    wheel_clean('plaidml/keras')
+
     common_args = []
     common_args += ['--config={}'.format(args.variant)]
     common_args += ['--define=version={}'.format(args.version)]
     common_args += ['--explain={}'.format(os.path.abspath('explain.log'))]
     common_args += ['--verbose_failures']
     common_args += ['--verbose_explanations']
+
+    util.printf('--- :bazel: Running Build ...')
+
     if platform.system() == 'Windows':
         util.check_call(['git', 'config', 'core.symlinks', 'true'])
         cenv = util.CondaEnv(pathlib.Path('.cenv'))
@@ -116,7 +196,7 @@ def cmd_build(args, remainder):
     else:
         env = None
 
-    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
+    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env, stderr=subprocess.DEVNULL)
     archive_dir = os.path.join(
         args.root,
         args.pipeline,
@@ -124,16 +204,57 @@ def cmd_build(args, remainder):
         'build',
         args.variant,
     )
+
+    util.printf('--- :buildkite: Uploading artifacts...')
+    pw = wheel_path('plaidml').resolve()
+    pbw = wheel_path('plaidbench').resolve()
+    pkw = wheel_path('plaidml/keras').resolve()
+    util.check_call(['buildkite-agent', 'artifact', 'upload', '*.whl'], cwd=pw)
+    util.check_call(['buildkite-agent', 'artifact', 'upload', '*.whl'], cwd=pbw)
+    util.check_call(['buildkite-agent', 'artifact', 'upload', '*.whl'], cwd=pkw)
     os.makedirs(archive_dir, exist_ok=True)
     shutil.copy(os.path.join('bazel-bin', 'pkg.tar.gz'), archive_dir)
+    util.printf('bazel shutdown...')
+    util.check_output(['bazelisk', 'shutdown'])
 
 
 def cmd_test(args, remainder):
     import harness
-    harness.run(args)
+    harness.run(args, remainder)
+
+
+def make_tarfile(output_filename, source_dir):
+    with tarfile.open(output_filename, "w:gz") as tar:
+        tar.add(source_dir, arcname=os.path.basename(source_dir))
+
+
+def cmd_pack(arg):
+    pathlib.Path(arg).mkdir(parents=True, exist_ok=True)
+    dir_list = ['windows_x86_64', 'macos_x86_64', 'linux_x86_64', 'common']
+    whl_type = ['win_amd64', 'macosx', 'manylinux', 'none-any']
+
+    os.chdir(arg)
+    print('downloading wheels...')
+    util.check_output(['buildkite-agent', 'artifact', 'download', '*.whl', '.'], cwd='.')
+    whl_files = list(pathlib.Path('.').glob('*.whl'))
+
+    [pathlib.Path(d).mkdir(parents=True, exist_ok=True) for d in dir_list]
+
+    for whl, dest in zip(whl_type, dir_list):
+        for f in whl_files:
+            if whl in str(f):
+                shutil.move(str(f), dest)
+
+    print('packing all_wheels...')
+    make_tarfile('all_wheels.tar.gz', '.')
+    util.check_call(['buildkite-agent', 'artifact', 'upload', 'all_wheels.tar.gz'])
+    os.chdir('..')
 
 
 def cmd_report(args, remainder):
+    cmd_pack('tmp')
+    #shutil.rmtree('tmp')
+
     archive_dir = os.path.join(args.root, args.pipeline, args.build_id)
     cmd = ['bazelisk', 'run', '//ci:report']
     cmd += ['--']
@@ -141,7 +262,7 @@ def cmd_report(args, remainder):
     cmd += ['--annotate']
     cmd += [archive_dir]
     cmd += remainder
-    util.check_call(cmd)
+    util.check_call(cmd, stderr=subprocess.DEVNULL)
 
 
 def make_cmd_build(parent):
@@ -172,7 +293,7 @@ def make_cmd_pipeline(parent):
 
 
 def main():
-    pipeline = os.getenv('PIPELINE', 'pr')
+    pipeline = os.getenv('PIPELINE', 'plaidml')
     branch = os.getenv('BUILDKITE_BRANCH', 'undefined')
     build_id = os.getenv('BUILDKITE_BUILD_NUMBER', '0')
     with open('VERSION', 'r') as verf:
