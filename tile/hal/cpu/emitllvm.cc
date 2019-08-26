@@ -870,7 +870,7 @@ Emit::value Emit::Process(const sem::Node& n) {
   std::swap(result_, nv);
   try {
     n.Accept(*this);
-  } catch (Error err) {
+  } catch (const Error& err) {
     VLOG(1) << "cpu::Emit::Process failed on this node:\n" << sem::Print(n).str();
     throw;
   }
