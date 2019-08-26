@@ -6,6 +6,7 @@ plaidml._internal_set_vlog(0)
 
 import argparse
 import functools
+import logging
 import operator
 import os
 import sys
@@ -50,6 +51,9 @@ if __name__ == '__main__':
     args, remainder = parser.parse_known_args()
 
     plaidml._internal_set_vlog(args.verbose)
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
     if args.fp16:
         pkb.set_floatx('float16')
         DEFAULT_TOL = 1e-2

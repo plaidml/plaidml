@@ -21,6 +21,8 @@ from __future__ import print_function, division
 
 import atexit
 import functools
+import inspect
+import logging
 import math
 import numpy as np
 import os
@@ -45,6 +47,28 @@ from keras.backend.common import floatx
 from keras.backend.common import image_data_format
 from keras.backend.common import set_floatx as keras_set_floatx
 from keras.backend.common import set_image_data_format
+
+logger = logging.getLogger(__name__)
+
+
+def _log_call(func):
+    '''A decorator that logs the call of the wrapped function'''
+
+    def wrapper(*args, **kwargs):
+        # Construct a string logging the call if logging is turned on
+        if logger.isEnabledFor(logging.DEBUG):
+            sig = inspect.signature(func)
+            arg_str_list = list()
+            for i, arg in enumerate(args):
+                arg_str_list.append('{}: {}'.format(list(sig.parameters)[i][0], arg))
+            logger.debug(kwargs)  # TODO
+            for k, v in kwargs.items():
+                arg_str_list.append('{}: {}'.format(k, v))
+            logger.debug('{}({})'.format(func.__name__, ', '.join(arg_str_list)))
+        # Call the requested function regardless
+        return func(*args, **kwargs)
+
+    return wrapper
 
 
 def _normalize_data_format_unavailable(*args, **kwargs):
@@ -193,6 +217,7 @@ def _make_rng_state(seed=None):
     return rng_state
 
 
+@_log_call
 def abs(x):
     return builtins.abs(x)
 
@@ -202,6 +227,7 @@ all = op.all
 any = op.any
 
 
+@_log_call
 def arange(start, stop=None, step=1, dtype='int32'):
     if isinstance(dtype, plaidml.DType):
         dtype = ptile.convert_pml_dtype_to_np(dtype)
@@ -211,10 +237,12 @@ def arange(start, stop=None, step=1, dtype='int32'):
 argmax = op.argmax
 
 
+@_log_call
 def argmin(x, axis=-1):
     return argmax(-x, axis=axis)
 
 
+@_log_call
 def backend():
     return 'plaidml'
 
@@ -345,6 +373,7 @@ class BatchDot(ptile.Operation):
                                            name=name)
 
 
+@_log_call
 def batch_dot(x, y, axes=None, name=None):
     ret = BatchDot.function(x, y, axes=axes, name=name)
     if ret.shape.ndims == 1:
@@ -374,15 +403,18 @@ class BatchFlatten(ptile.Operation):
 batch_flatten = BatchFlatten.function
 
 
+@_log_call
 def batch_set_value(tuples):
     for pair in tuples:
         set_value(pair[0], pair[1])
 
 
+@_log_call
 def batch_get_value(xs):
     return [get_value(x) for x in xs]
 
 
+@_log_call
 def batch_normalization(x, mean, var, beta, gamma, axis=-1, epsilon=1e-3):
     # gamma == scale
     # beta == offset
@@ -399,6 +431,7 @@ def batch_normalization(x, mean, var, beta, gamma, axis=-1, epsilon=1e-3):
         return ((x - mean) / denom)
 
 
+@_log_call
 def bias_add(x, bias, data_format=None):
     if data_format is None:
         data_format = image_data_format()
@@ -421,10 +454,12 @@ def bias_add(x, bias, data_format=None):
     return x
 
 
+@_log_call
 def binary_crossentropy(target, output, from_logits=False):
     return op.binary_crossentropy(target, output, epsilon(), from_logits)
 
 
+@_log_call
 def cast(x, dtype):
     # Not clear what datatypes Keras supports.
     # Each backend appears to implement support for its own subset of some assumed
@@ -486,6 +521,7 @@ categorical_crossentropy = CategoricalCrossentropy.function
 ceil = op.ceiling
 
 
+@_log_call
 def clear_session():
     global _in_train_phase, _ctx, _dev, PLAIDML_EVENTLOG_FILENAME
     _in_train_phase = None
@@ -500,6 +536,7 @@ clip = op.clip
 concatenate = op.concatenate
 
 
+@_log_call
 def constant(value, dtype=None, shape=None, name=None):
     # Enforce sensible defaults if given None
     dtype = dtype or floatx()
@@ -517,6 +554,7 @@ def constant(value, dtype=None, shape=None, name=None):
 cos = op.cos
 
 
+@_log_call
 def conv(x,
          kernel,
          strides=None,
@@ -555,6 +593,7 @@ def conv(x,
     )
 
 
+@_log_call
 def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate):
     try:
         padding = _AUTO_PAD[padding]
@@ -582,6 +621,7 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilat
     )
 
 
+@_log_call
 def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rate=1):
     if padding == 'causal':
         left_pad = dilation_rate * (kernel.shape.dims[0] - 1)
@@ -590,12 +630,14 @@ def conv1d(x, kernel, strides=1, padding='valid', data_format=None, dilation_rat
     return conv(x, kernel, (strides,), padding, data_format, (dilation_rate,))
 
 
+@_log_call
 def conv2d(x, kernel, strides=(1, 1), padding='valid', dilation_rate=(1, 1), data_format=None):
     if data_format is None:
         data_format = image_data_format()
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
+@_log_call
 def conv2d_transpose(x,
                      kernel,
                      output_shape,
@@ -606,6 +648,7 @@ def conv2d_transpose(x,
     return conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate)
 
 
+@_log_call
 def conv3d(x,
            kernel,
            strides=(1, 1, 1),
@@ -615,6 +658,7 @@ def conv3d(x,
     return conv(x, kernel, strides, padding, data_format, dilation_rate)
 
 
+@_log_call
 def conv3d_transpose(x,
                      kernel,
                      output_shape,
@@ -625,6 +669,7 @@ def conv3d_transpose(x,
     return conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate)
 
 
+@_log_call
 def count_params(x):
     result = 1
     for dim in x.shape.dims:
@@ -632,14 +677,17 @@ def count_params(x):
     return result
 
 
+@_log_call
 def ctc_batch_cost(y_true, y_pred, input_length, label_length):
     _report_unimplemented('ctc_batch_cost')
 
 
+@_log_call
 def ctc_decode(y_pred, input_length, greedy=True, beam_width=100, top_paths=1):
     _report_unimplemented('ctc_decode')
 
 
+@_log_call
 def ctc_label_dense_to_sparse(labels, label_lengths):
     _report_unimplemented('ctc_label_dense_to_sparse')
 
@@ -649,6 +697,7 @@ cumprod = op.cumulative_prod
 cumsum = op.cumulative_sum
 
 
+@_log_call
 def depthwise_conv2d(x,
                      kernel,
                      strides=(1, 1),
@@ -663,6 +712,7 @@ def depthwise_conv2d(x,
 dot = op.dot
 
 
+@_log_call
 def dropout(x, level, noise_shape=None, seed=None):
     if noise_shape is not None and len(noise_shape) != x.shape.ndims:
         raise ValueError("Length of noise_shape doesn't match input ndims")
@@ -699,18 +749,22 @@ def dropout(x, level, noise_shape=None, seed=None):
     return o
 
 
+@_log_call
 def dtype(x):
     return ptile.convert_pml_dtype_to_np(x.shape.dtype)
 
 
+@_log_call
 def elu(x, alpha=1.0):
     return op.elu(x, alpha)
 
 
+@_log_call
 def eval(x):
     return get_value(x)
 
 
+@_log_call
 def equal(x, y):
     return op.equal(x, y)
 
@@ -718,6 +772,7 @@ def equal(x, y):
 exp = op.exp
 
 
+@_log_call
 def eye(size, dtype=None, name=None):
     if dtype is None:
         dtype = floatx()
@@ -757,14 +812,17 @@ flatten = op.flatten
 floor = op.floor
 
 
+@_log_call
 def foldl(fn, elems, initializer=None, name=None):
     _report_unimplemented('foldl')
 
 
+@_log_call
 def foldr(fn, elems, initializer=None, name=None):
     _report_unimplemented('foldr')
 
 
+@_log_call
 def function(inputs, outputs, updates=None, name=None):
     if updates == None:
         updates = []
@@ -776,6 +834,7 @@ def function(inputs, outputs, updates=None, name=None):
 gather = op.gather
 
 
+@_log_call
 def get_variable_shape(x):
     return x._keras_shape
 
@@ -783,11 +842,13 @@ def get_variable_shape(x):
 shape = op.shape_of
 
 
+@_log_call
 def get_uid(prefix=''):
     _UID_PREFIX_DICT[prefix] += 1
     return _UID_PREFIX_DICT[prefix]
 
 
+@_log_call
 def get_value(x):
     func = ptile.compose(_ctx, _device(), [], [('out', x)], name='get_value')
     invoker = plaidml.Invoker(_ctx, func)
@@ -805,14 +866,17 @@ def get_value(x):
 gradients = op.gradients
 
 
+@_log_call
 def greater(x, y):
     return x > y
 
 
+@_log_call
 def greater_equal(x, y):
     return x >= y
 
 
+@_log_call
 def hard_sigmoid(x):
     f = 'function (X) -> (R) { R = (X < -2.5 ? 0 : (X > 2.5 ? 1 : 0.2 * X + 0.5)); }'
     return ptile.Operation(f, [('X', x)], [('R', x.shape)], name='HardSigmoid').sole_output()
@@ -821,15 +885,18 @@ def hard_sigmoid(x):
 identity = op.identity
 
 
+@_log_call
 def in_test_phase(x, alt, training=None):
     # Note that this flips 'alt' and 'x'
     return in_train_phase(alt, x, training=training)
 
 
+@_log_call
 def in_top_k(predictions, targets, k):
     _report_unimplemented('in_top_k')
 
 
+@_log_call
 def in_train_phase(x, alt, training=None):
     if training is None:
         training = learning_phase()
@@ -857,10 +924,12 @@ def in_train_phase(x, alt, training=None):
         return o
 
 
+@_log_call
 def int_shape(x):
     return tuple(None if isinstance(dim, ptile.Value) else dim for dim in x.shape.dims)
 
 
+@_log_call
 def is_keras_tensor(x):
     if not is_tensor(x):
         raise ValueError('Unexpectedly found an instance of type `' + str(type(x)) + '`. '
@@ -868,25 +937,30 @@ def is_keras_tensor(x):
     return hasattr(x, '_keras_history')
 
 
+@_log_call
 def is_placeholder(x):
     if isinstance(x, ptile.Value) and x.var and isinstance(x.var, plaidml.Placeholder):
         return True
     return False
 
 
+@_log_call
 def is_sparse(x):
     return False
 
 
+@_log_call
 def is_tensor(x):
     return isinstance(x, ptile.Value)
 
 
+@_log_call
 def l2_normalize(x, axis):
     norm = sqrt(sum(square(x), axis=axis, keepdims=True))
     return x / norm
 
 
+@_log_call
 def learning_phase():
     # Initialize _in_train_phase if this is the first use
     global _in_train_phase
@@ -895,18 +969,22 @@ def learning_phase():
     return _in_train_phase
 
 
+@_log_call
 def less(x, y):
     return x < y
 
 
+@_log_call
 def less_equal(x, y):
     return x <= y
 
 
+@_log_call
 def local_conv1d(inputs, kernel, kernel_size, strides, data_format=None):
     _report_unimplemented('local_conv1d')
 
 
+@_log_call
 def local_conv2d(inputs, kernel, kernel_size, strides, output_shape, data_format=None):
     _report_unimplemented('local_conv2d')
 
@@ -914,18 +992,22 @@ def local_conv2d(inputs, kernel, kernel_size, strides, output_shape, data_format
 log = op.log
 
 
+@_log_call
 def logsumexp(x, axis=None, keepdims=False):
     return log(sum(exp(x), axis=axis, keepdims=keepdims))
 
 
+@_log_call
 def manual_variable_initialization(value):
     _report_unimplemented('manual_variable_initialization')
 
 
+@_log_call
 def map_fn(fn, elems, name=None, dtype=None):
     _report_unimplemented('map_fn')
 
 
+@_log_call
 def max(x, axis=None, keepdims=False):
     return op.max_reduce(x, axes=axis, keepdims=keepdims)
 
@@ -933,10 +1015,12 @@ def max(x, axis=None, keepdims=False):
 maximum = op.maximum
 
 
+@_log_call
 def mean(x, axis=None, keepdims=False):
     return op.mean(x, axes=axis, keepdims=keepdims, floatx=ptile.convert_np_dtype_to_pml(floatx()))
 
 
+@_log_call
 def min(x, axis=None, keepdims=False):
     return op.min_reduce(x, axes=axis, keepdims=keepdims)
 
@@ -944,6 +1028,7 @@ def min(x, axis=None, keepdims=False):
 minimum = op.minimum
 
 
+@_log_call
 def moving_average_update(x, value, momentum):
     return (x, x * momentum + value * (1. - momentum))
 
@@ -951,6 +1036,7 @@ def moving_average_update(x, value, momentum):
 _NAME_SCOPE_STACK = []
 
 
+@_log_call
 def _prepend_name_scope(name, default):
     global _NAME_SCOPE_STACK
     if name is None:
@@ -969,12 +1055,14 @@ def name_scope(name):
     _NAME_SCOPE_STACK.pop()
 
 
+@_log_call
 def cur_name():
     if len(_NAME_SCOPE_STACK):
         return _NAME_SCOPE_STACK[0]
     return ''
 
 
+@_log_call
 def ndim(x):
     return len(x._keras_shape)
 
@@ -982,6 +1070,7 @@ def ndim(x):
 not_equal = op.not_equal
 
 
+@_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     rank = x.shape.ndims
     if reduction_axes == None:
@@ -1046,11 +1135,13 @@ class OneHot(ptile.Operation):
 one_hot = OneHot.function
 
 
+@_log_call
 def ones(shape, dtype=None, name=None):
     dtype = dtype or floatx()
     return constant(1.0, shape=shape, dtype=dtype, name=_prepend_name_scope(name, 'ones'))
 
 
+@_log_call
 def ones_like(x, dtype=None, name=None):
     dtype = dtype or floatx()
     a_one = constant(1.0, shape=(1), dtype=dtype, name=_prepend_name_scope(name, 'a_one'))
@@ -1067,6 +1158,7 @@ def ones_like(x, dtype=None, name=None):
                 .sole_output()
 
 
+@_log_call
 def permute_dimensions(x, pattern):
     return ptile.Operation(
         """function (X[{src_ranges}]) -> (R) {{
@@ -1083,6 +1175,7 @@ def permute_dimensions(x, pattern):
         ]).sole_output()
 
 
+@_log_call
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     dtype = ptile.convert_np_dtype_to_pml(dtype or floatx())
     if shape is not None:
@@ -1095,6 +1188,7 @@ def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
         raise PlaidMLKerasException('Specify either a shape or ndim value for placeholder.')
 
 
+@_log_call
 def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mode='max'):
     if strides is None:
         strides = tuple(1 for _ in range(rank))
@@ -1121,6 +1215,7 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mod
                    name=cur_name())
 
 
+@_log_call
 def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool_mode='max'):
     return pool(x,
                 pool_size,
@@ -1130,6 +1225,7 @@ def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool
                 pool_mode=pool_mode)
 
 
+@_log_call
 def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, pool_mode='max'):
     return pool(x,
                 pool_size,
@@ -1139,16 +1235,19 @@ def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, p
                 pool_mode=pool_mode)
 
 
+@_log_call
 def pow(x, a):
     if not isinstance(x, ptile.Value):
         x = variable(x)
     return op.pow(x, a)
 
 
+@_log_call
 def print_tensor(x, message=''):
     _report_unimplemented('print_tensor')
 
 
+@_log_call
 def prod(value, axis=None, keepdims=False):
     return op.prod(value,
                    axes=axis,
@@ -1156,10 +1255,12 @@ def prod(value, axis=None, keepdims=False):
                    floatx=ptile.convert_np_dtype_to_pml(floatx()))
 
 
+@_log_call
 def random_binomial(shape, p=0.0, dtype=None, see=None):
     _report_unimplemented('random_binomial')
 
 
+@_log_call
 def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
     if dtype is None:
         dtype = floatx()
@@ -1176,6 +1277,7 @@ def random_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
     return z0
 
 
+@_log_call
 def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None):
     if dtype is None:
         dtype = floatx()
@@ -1187,6 +1289,7 @@ def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None)
     return variable(data, dtype=dtype, name=name)
 
 
+@_log_call
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
     if minval == maxval:
         return constant(minval, dtype, shape)
@@ -1226,6 +1329,7 @@ def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
     return o
 
 
+@_log_call
 def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
     if seed:
         np.random.seed(seed)
@@ -1236,6 +1340,7 @@ def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
 relu = op.relu
 
 
+@_log_call
 def repeat(x, n):
     assert x.shape.ndims == 2
     code = """
@@ -1248,6 +1353,7 @@ def repeat(x, n):
                            name='Repeat').sole_output()
 
 
+@_log_call
 def repeat_elements(x, rep, axis):
     if x.shape.dims[axis] is None:
         # Note: other backends just raise exception in this case
@@ -1280,6 +1386,7 @@ def repeat_elements(x, rep, axis):
                            .sole_output()
 
 
+@_log_call
 def reset_uids():
     global _UID_PREFIX_DICT
     _UID_PREFIX_DICT.clear()
@@ -1288,6 +1395,7 @@ def reset_uids():
 reshape = op.reshape
 
 
+@_log_call
 def resize_images(x, height_factor, width_factor, data_format, interpolation='nearest'):
     if not isinstance(height_factor, int) or not isinstance(width_factor, int):
         raise ValueError(
@@ -1352,6 +1460,7 @@ def resize_images(x, height_factor, width_factor, data_format, interpolation='ne
     return ret
 
 
+@_log_call
 def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
     if data_format == 'channels_first':
         ret = repeat_elements(x, depth_factor, axis=2)
@@ -1366,6 +1475,7 @@ def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
     return ret
 
 
+@_log_call
 def reverse(x, axes):
     if isinstance(axes, int):
         axes = [axes]
@@ -1390,10 +1500,12 @@ def reverse(x, axes):
     return ptile.Operation(f, [('I', x)], [('O', x.shape)], name='Reverse').sole_output()
 
 
+@_log_call
 def reverse_gradient(x, coeff=1.0):
     return ptile.binary_op(x, coeff, 'reverse_grad(L, R)', name='ReverseGradient')
 
 
+@_log_call
 def rnn(step_function,
         inputs,
         initial_states,
@@ -1446,10 +1558,12 @@ def rnn(step_function,
     return (output_val, output, states)
 
 
+@_log_call
 def round(x):
     return ptile.unary_op(x, 'round(I)', 'Round')
 
 
+@_log_call
 def separable_conv(x,
                    depthwise_kernel,
                    pointwise_kernel,
@@ -1484,6 +1598,7 @@ def separable_conv(x,
                 dilation_rate=ones)
 
 
+@_log_call
 def separable_conv2d(x,
                      depthwise_kernel,
                      pointwise_kernel,
@@ -1495,11 +1610,13 @@ def separable_conv2d(x,
                           dilation_rate)
 
 
+@_log_call
 def set_floatx(dtype):
     keras_set_floatx(dtype)
     plaidml.set_floatx(ptile.convert_np_dtype_to_pml(dtype))
 
 
+@_log_call
 def set_learning_phase(value):
     if value != 0 and value != 1:
         raise ValueError("May only set_learning_phase to 0 or 1")
@@ -1508,6 +1625,7 @@ def set_learning_phase(value):
     _in_train_phase = value
 
 
+@_log_call
 def set_value(x, value):
     if not isinstance(x.var, plaidml.Tensor):
         raise PlaidMLKerasException('Can only set values of tensors')
@@ -1531,6 +1649,7 @@ def set_value(x, value):
 sigmoid = op.sigmoid
 
 
+@_log_call
 def sign(x):
     return ptile.unary_op(x, "I == 0 ? 0 : (I > 0 ? 1 : -1)", name="Sign")
 
@@ -1538,18 +1657,22 @@ def sign(x):
 sin = op.sin
 
 
+@_log_call
 def softmax(x):
     return op.softmax(x, axis=x.shape.ndims - 1)
 
 
+@_log_call
 def softplus(x):
     return log(1. + exp(x))
 
 
+@_log_call
 def softsign(x):
     _report_unimplemented('softsign')
 
 
+@_log_call
 def sparse_categorical_crossentropy(target, output, from_logits=False):
     return categorical_crossentropy(
         reshape(one_hot(target, output.shape.dims[-1]), output.shape.dims), output, from_logits)
@@ -1615,18 +1738,22 @@ class SpatialPadding(ptile.Operation):
                                              [('O', ptile.Shape(x.shape.dtype, numeric_out_dims))])
 
 
+@_log_call
 def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
     return SpatialPadding.function(x, padding, data_format)
 
 
+@_log_call
 def spatial_3d_padding(x, padding=((1, 1), (1, 1), (1, 1)), data_format=None):
     return SpatialPadding.function(x, padding, data_format)
 
 
+@_log_call
 def square(x):
     return x * x
 
 
+@_log_call
 def squeeze(x, axis):
     if x.shape.dims[axis] != 1:
         raise ValueError('Can only squeeze length 1 axis')
@@ -1640,6 +1767,7 @@ def squeeze(x, axis):
 sqrt = op.sqrt
 
 
+@_log_call
 def stack(x, axis=0):
     tshape = x[0].shape
     for item in x:
@@ -1650,14 +1778,17 @@ def stack(x, axis=0):
     return concatenate([reshape(item, nshape) for item in x], axis=axis)
 
 
+@_log_call
 def std(x, axis=None, keepdims=False):
     return sqrt(var(x, axis=axis, keepdims=keepdims))
 
 
+@_log_call
 def stop_gradient(variables):
     _report_unimplemented('stop_gradient')
 
 
+@_log_call
 def sum(x, axis=None, keepdims=False):
     return op.summation(x,
                         axes=axis,
@@ -1678,6 +1809,7 @@ switch = Switch.function
 tanh = op.tanh
 
 
+@_log_call
 def temporal_padding(x, padding=(1, 1)):
     if x.shape.ndims != 3:
         raise ValueError('Can only perform temporal_padding on 3D tensor')
@@ -1685,6 +1817,7 @@ def temporal_padding(x, padding=(1, 1)):
     return SpatialPadding.function(x, padding=(padding,), data_format='channels_last')
 
 
+@_log_call
 def tile(x, n):
     if len(n) != x.shape.ndims:
         raise PlaidMLKerasException('Tile size dimensions doesn\'t match ndims')
@@ -1703,14 +1836,17 @@ def tile(x, n):
                            name='Tile').sole_output()
 
 
+@_log_call
 def to_dense(tensor):
     _report_unimplemented('to_dense')
 
 
+@_log_call
 def transpose(x):
     return permute_dimensions(x, range(x.shape.ndims - 1, -1, -1))
 
 
+@_log_call
 def truncated_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
     if dtype is None:
         dtype = floatx()
@@ -1719,18 +1855,22 @@ def truncated_normal(shape, mean=0.0, stddev=1.0, dtype=None, seed=None):
     return variable(stddev * scipy.stats.truncnorm.rvs(-2.0, 2.0, size=shape) + mean, dtype)
 
 
+@_log_call
 def update(x, new_x):
     return (x, new_x)
 
 
+@_log_call
 def update_add(x, increment):
     return (x, x + increment)
 
 
+@_log_call
 def update_sub(x, decrement):
     return (x, x - decrement)
 
 
+@_log_call
 def var(x, axis=None, keepdims=False):
     return op.variance(x,
                        axes=axis,
@@ -1738,6 +1878,7 @@ def var(x, axis=None, keepdims=False):
                        floatx=ptile.convert_np_dtype_to_pml(floatx()))
 
 
+@_log_call
 def variable(value, dtype=None, name=None, constraint=None):
     dtype = dtype or floatx()
     if constraint:
@@ -1774,10 +1915,12 @@ def variable(value, dtype=None, name=None, constraint=None):
                                 _prepend_name_scope(name, 'tensor_variable'))
 
 
+@_log_call
 def zeros(shape, dtype=floatx(), name=None):
     return constant(0.0, shape=shape, dtype=dtype, name=_prepend_name_scope(name, 'zeros'))
 
 
+@_log_call
 def zeros_like(x, dtype=floatx(), name=None):
     dtype = dtype or floatx()
     a_zero = constant(0.0, shape=(1), dtype=dtype, name=_prepend_name_scope(name, 'a_zero'))
@@ -1798,6 +1941,7 @@ def zeros_like(x, dtype=floatx(), name=None):
 # This allows us to transparently use Value as the tensor type exposed by
 # the Keras backend; it's a little squirrelly in this one place, but it
 # greatly simplifies the rest of this module.
+@_log_call
 def _get_keras_shape(x):
     try:
         return x.__keras_shape
@@ -1805,6 +1949,7 @@ def _get_keras_shape(x):
         return int_shape(x)
 
 
+@_log_call
 def _set_keras_shape(x, shape):
     x.__keras_shape = shape
 
