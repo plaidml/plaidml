@@ -1,6 +1,8 @@
 import warnings
 warnings.simplefilter('ignore')
 
+import argparse
+
 import ngraph_bridge
 ngraph_bridge.enable()
 
@@ -9,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import os
 import random
+from IPython.display import display
 
 import tensorflow as tf
 from tensorflow import keras
@@ -154,13 +157,13 @@ class Demo:
     tab.set_title(1, 'Fine Tuning')
     gui = widgets.VBox(children=[tab, progress_box, out_initial, out])
 
-    def __init__(self, verbose=0, test=0):
-        self.verbose = verbose
-        self.test = test
+    def __init__(self, gui=0, training=1):
+        self.gui = gui
 
-        if verbose:
+        if gui:
             self.gui = widgets.VBox(
                 children=[self.tab, self.progress_box, self.out_initial, self.out, self.out_stats])
+            display(self.init_gui())
 
         # Images
         self.test_class_indices = []
@@ -171,13 +174,13 @@ class Demo:
         self.predicted_class_indices_init = []
         self.wrong_guesses = []
 
-        if not test:
-            display(self.init_gui())
-
         self.train_button.disabled = False
         self.fine_tune_button.disabled = False
 
         self.init_model()
+
+        if training:
+            self.train_model(self.train_button)
 
     def init_images(self):
         zip_file = tf.keras.utils.get_file(
@@ -282,24 +285,25 @@ class Demo:
             if not guesses[randomIndex]:
                 self.wrong_guesses.append(randomIndex)
 
-        with self.out_initial:
-            f, ax = plt.subplots(3, 3, figsize=(15, 15))
+        if self.gui:
+            with self.out_initial:
+                f, ax = plt.subplots(3, 3, figsize=(15, 15))
 
-            for i in range(0, 9):
-                test_image = os.path.join(self.test_dir,
-                                          self.test_generator.filenames[self.wrong_guesses[i]])
-                imgRGB = mpimg.imread(test_image)
+                for i in range(0, 9):
+                    test_image = os.path.join(self.test_dir,
+                                              self.test_generator.filenames[self.wrong_guesses[i]])
+                    imgRGB = mpimg.imread(test_image)
 
-                predicted_class = "Dog" if self.predicted_class_indices_init[
-                    self.wrong_guesses[i]] else "Cat"
+                    predicted_class = "Dog" if self.predicted_class_indices_init[
+                        self.wrong_guesses[i]] else "Cat"
 
-                ax[i // 3, i % 3].imshow(imgRGB)
-                ax[i // 3, i % 3].axis('off')
-                ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='r')
+                    ax[i // 3, i % 3].imshow(imgRGB)
+                    ax[i // 3, i % 3].axis('off')
+                    ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='r')
 
-                if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
-                    ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
-            plt.show()
+                    if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
+                        ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
+                plt.show()
 
     def on_model_change(self, change):
         if change['type'] == 'change' and change['name'] == 'value':
@@ -337,7 +341,7 @@ class Demo:
         return self.gui
 
     def train_model(self, b=None, epochs=1, batch_size=32, model='ResNet50', fine_tune_at=0):
-        if not self.test:
+        if self.gui:
             self.train_button.disabled = True
             self.epochs = self.epoch_slider.value
             self.batch_size = self.batch_slider.value
@@ -365,7 +369,7 @@ class Demo:
                                                workers=8,
                                                validation_data=self.validation_generator,
                                                validation_steps=validation_steps,
-                                               verbose=self.verbose,
+                                               verbose=0,
                                                callbacks=[ProgressBar(self)])
         self.classify_button.disabled = False
         # Test model immediately after training
@@ -424,31 +428,42 @@ class Demo:
 
         with self.out_stats:
             probabilities = self.model.predict_generator(self.test_generator,
-                                                         verbose=self.verbose,
+                                                         verbose=0,
                                                          callbacks=[ProgressBar(self)])
 
         predicted_class_indices = np.argmax(probabilities, axis=1)
 
-        with self.out:
-            f, ax = plt.subplots(3, 3, figsize=(15, 15))
+        if self.gui:
+            with self.out:
+                f, ax = plt.subplots(3, 3, figsize=(15, 15))
 
-            for i in range(0, 9):
-                test_image = os.path.join(self.test_dir,
-                                          self.test_generator.filenames[self.wrong_guesses[i]])
-                imgRGB = mpimg.imread(test_image)
+                for i in range(0, 9):
+                    test_image = os.path.join(self.test_dir,
+                                              self.test_generator.filenames[self.wrong_guesses[i]])
+                    imgRGB = mpimg.imread(test_image)
 
-                predicted_class = "Dog" if predicted_class_indices[
-                    self.wrong_guesses[i]] else "Cat"
+                    predicted_class = "Dog" if predicted_class_indices[
+                        self.wrong_guesses[i]] else "Cat"
 
-                ax[i // 3, i % 3].imshow(imgRGB)
-                ax[i // 3, i % 3].axis('off')
-                ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='r')
+                    ax[i // 3, i % 3].imshow(imgRGB)
+                    ax[i // 3, i % 3].axis('off')
+                    ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='r')
 
-                if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
-                    ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
-            plt.show()
+                    if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
+                        ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
+                plt.show()
 
         with self.out_stats:
             wrong = ~(predicted_class_indices ^ self.test_class_indices) + 2
             print("Correct Matrix")
             print(wrong)
+
+        print("Total guessed:", wrong.shape[0])
+        print("Accuracy:", np.count_nonzero(wrong)/wrong.shape[0])
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog='TransferLearningDemo')
+    parser.add_argument('--gui', help='shows the GUI of the demo', action='store_true')
+    parser.add_argument('--training', help='performs the training phase of the demo', action='store_true')
+    args = parser.parse_args()
+    Demo(args.gui, args.training)

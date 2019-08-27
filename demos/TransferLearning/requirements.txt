@@ -4,3 +4,5 @@ plaidml-keras
 pillow
 matplotlib
 jupyter
+IPython
+argparse
