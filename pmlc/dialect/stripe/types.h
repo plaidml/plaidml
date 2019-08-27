@@ -6,13 +6,13 @@
 #include <tuple>
 #include <vector>
 
-#include "pmlc/dialect/mir/mlir.h"
 #include "pmlc/dialect/scalar/types.h"
+#include "pmlc/dialect/stripe/mlir.h"
 #include "tile/base/shape.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 namespace PlaidKind {
 enum Kinds {
@@ -71,6 +71,6 @@ class PrngType : public Type::TypeBase<PrngType, Type> {
   static PrngType get(MLIRContext* context) { return Base::get(context, PlaidKind::Prng); }
 };
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

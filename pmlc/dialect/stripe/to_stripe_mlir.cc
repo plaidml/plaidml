@@ -1,14 +1,14 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/mir/transcode.h"
+#include "pmlc/dialect/stripe/transcode.h"
 
 #include "base/util/lookup.h"
-#include "pmlc/dialect/mir/analysis.h"
 #include "pmlc/dialect/scalar/ops.h"
+#include "pmlc/dialect/stripe/analysis.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 namespace {
 
@@ -24,15 +24,15 @@ using vertexai::safe_at;
 using DataType = vertexai::tile::DataType;
 using TensorShape = vertexai::tile::TensorShape;
 
-static ScalarType ToMir(mlir::MLIRContext* ctx, vertexai::tile::DataType dtype) {  //
+static ScalarType ToStripeMLIR(mlir::MLIRContext* ctx, vertexai::tile::DataType dtype) {  //
   return ScalarType::get(ctx, dtype);
 }
 
-static Type ToMir(MLIRContext* ctx, const TensorShape& shape) {
+static Type ToStripeMLIR(MLIRContext* ctx, const TensorShape& shape) {
   if (shape.type == DataType::PRNG) {
     return PrngType::get(ctx);
   }
-  ScalarType dtype = ToMir(ctx, shape.type);
+  ScalarType dtype = ToStripeMLIR(ctx, shape.type);
   return TensorType::get(ctx, dtype, shape.dims.size());
 }
 
@@ -71,7 +71,7 @@ static DictionaryAttr TagsToDict(Builder* builder, const stripe::Taggable& tagga
 }
 
 static TensorLayoutAttr GetLayout(MLIRContext* ctx, const TensorShape& shape) {
-  ScalarType dtype = ToMir(ctx, shape.type);
+  ScalarType dtype = ToStripeMLIR(ctx, shape.type);
   std::vector<TensorDim> dims(shape.dims.size());
   for (size_t i = 0; i < shape.dims.size(); i++) {
     const auto& src = shape.dims[i];
@@ -82,7 +82,7 @@ static TensorLayoutAttr GetLayout(MLIRContext* ctx, const TensorShape& shape) {
   return TensorLayoutAttr::get(ctx, dtype, dims);
 }
 
-static Value* ToMir(OpBuilder* builder, const SymbolTable& syms, const stripe::Affine& affine) {
+static Value* ToStripeMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Affine& affine) {
   std::vector<Value*> add_inputs;
   for (const auto& kvp : affine.getMap()) {
     Value* term;
@@ -135,7 +135,7 @@ struct IntrinsicBuilder {
     for (const auto& in : intrinsic.inputs) {
       inputs.push_back(safe_at(locals->scalars, in));
     }
-    ScalarType intrinsic_type = ToMir(builder->getContext(), intrinsic.type);
+    ScalarType intrinsic_type = ToStripeMLIR(builder->getContext(), intrinsic.type);
     auto inst = builder->create<OpType>(builder->getUnknownLoc(), intrinsic_type, inputs);
     if (inst.getOperation()->getNumResults()) {
       locals->scalars.emplace(intrinsic.outputs[0], inst.getOperation()->getResult(0));
@@ -145,7 +145,7 @@ struct IntrinsicBuilder {
 
 }  // namespace
 
-static void ToMir(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
+static void ToStripeMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
   }
@@ -156,7 +156,7 @@ static void ToMir(OpBuilder* builder, SymbolTable* locals, const stripe::Intrins
   }
 }
 
-static void ToMir(OpBuilder* builder, const SymbolTable& outer, const stripe::Block& block) {
+static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const stripe::Block& block) {
   // Make room for local symbols
   SymbolTable locals;
 
@@ -185,7 +185,7 @@ static void ToMir(OpBuilder* builder, const SymbolTable& outer, const stripe::Bl
       if (idx.range != 1) {
         throw std::runtime_error("Invalid Stripe: range and affine both set on index");
       }
-      locals.idxs.emplace(idx.name, ToMir(builder, outer, idx.affine));
+      locals.idxs.emplace(idx.name, ToStripeMLIR(builder, outer, idx.affine));
     }
   }
 
@@ -193,7 +193,7 @@ static void ToMir(OpBuilder* builder, const SymbolTable& outer, const stripe::Bl
   for (const auto& ref : block.refs) {
     Value* from;
     if (ref.from == "") {
-      Type atype = ToMir(builder->getContext(), ref.interior_shape);
+      Type atype = ToStripeMLIR(builder->getContext(), ref.interior_shape);
       TensorLayoutAttr layout = GetLayout(builder->getContext(), ref.interior_shape);
       from = builder->create<AllocateOp>(builder->getUnknownLoc(), atype, layout);
     } else {
@@ -201,7 +201,7 @@ static void ToMir(OpBuilder* builder, const SymbolTable& outer, const stripe::Bl
     }
     std::vector<Value*> offsets;
     for (const auto& aff : ref.access) {
-      offsets.push_back(ToMir(builder, locals, aff));
+      offsets.push_back(ToStripeMLIR(builder, locals, aff));
     }
     DictionaryAttr attrs =
         TagsToDict(builder, ref, {{builder->getIdentifier("__name"), builder->getStringAttr(ref.into())}});
@@ -212,7 +212,7 @@ static void ToMir(OpBuilder* builder, const SymbolTable& outer, const stripe::Bl
   // Process the constraints
   for (const auto& con : block.constraints) {
     // Make the actual constraint value
-    auto aif = builder->create<ConstraintOp>(builder->getUnknownLoc(), ToMir(builder, locals, con));
+    auto aif = builder->create<ConstraintOp>(builder->getUnknownLoc(), ToStripeMLIR(builder, locals, con));
     // Make the block + attach to the region
     Block* if_body = new Block();
     aif.getOperation()->getRegion(0).push_back(if_body);
@@ -251,10 +251,10 @@ static void ToMir(OpBuilder* builder, const SymbolTable& outer, const stripe::Bl
         throw std::runtime_error("Special Unimplemented");
         break;
       case stripe::StmtKind::Intrinsic:
-        ToMir(builder, &locals, *stripe::Intrinsic::Downcast(stmt));
+        ToStripeMLIR(builder, &locals, *stripe::Intrinsic::Downcast(stmt));
         break;
       case stripe::StmtKind::Block:
-        ToMir(builder, locals, *stripe::Block::Downcast(stmt));
+        ToStripeMLIR(builder, locals, *stripe::Block::Downcast(stmt));
         break;
     }
   }
@@ -270,18 +270,18 @@ static void ToMir(OpBuilder* builder, const SymbolTable& outer, const stripe::Bl
   // TODO: Move across the index tags as well...
 }
 
-mlir::FuncOp ToMir(MLIRContext* ctx, const stripe::Program& prog) {
+mlir::FuncOp ToStripeMLIR(MLIRContext* ctx, const stripe::Program& prog) {
   auto func_type = mlir::FunctionType::get({}, {}, ctx);
   mlir::Location loc = mlir::UnknownLoc::get(ctx);
   mlir::FuncOp func = mlir::FuncOp::create(loc, "program", func_type, {});
   func.addEntryBlock();
   OpBuilder builder(func.getBody());
   SymbolTable initial;
-  ToMir(&builder, initial, *prog.entry);
+  ToStripeMLIR(&builder, initial, *prog.entry);
   builder.create<TerminateOp>(loc);
   return func;
 }
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

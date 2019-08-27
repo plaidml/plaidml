@@ -6,12 +6,12 @@
 #include <map>
 #include <vector>
 
-#include "pmlc/dialect/mir/mlir.h"
-#include "pmlc/dialect/mir/ops.h"
+#include "pmlc/dialect/stripe/mlir.h"
+#include "pmlc/dialect/stripe/ops.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 // A macro to add operator overloads for a class
 #define AFFINE_OP_OVERLOADS(X)                 \
@@ -112,6 +112,6 @@ std::vector<AffineRange> ComputeTensorRanges(Value* tensor, Value* base = nullpt
 std::vector<AffineRange> ComputeInteriorShape(Value* tensor);
 */
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

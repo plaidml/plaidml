@@ -22,7 +22,7 @@
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 // We load some things from the LLVM / MLIR namespace into our own namespace
 // and add some wrappers for various classes to make life easier.  In general,
@@ -60,7 +60,7 @@ using mlir::TypeAttr;
 using mlir::UnitAttr;
 using mlir::Value;
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
 

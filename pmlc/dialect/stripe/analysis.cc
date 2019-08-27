@@ -1,12 +1,14 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/mir/analysis.h"
+#include "pmlc/dialect/stripe/analysis.h"
+
+#include <utility>
 
 #include <boost/math/common_factor.hpp>
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 AffinePolynomial::AffinePolynomial() : constant(0) {}
 
@@ -151,6 +153,6 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
   return r;
 }
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

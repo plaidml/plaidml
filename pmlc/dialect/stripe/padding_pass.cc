@@ -1,15 +1,16 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/mir/padding_pass.h"
+#include "pmlc/dialect/stripe/padding_pass.h"
 
 #include <iostream>
+#include <vector>
 
-#include "pmlc/dialect/mir/analysis.h"
-#include "pmlc/dialect/mir/ops.h"
+#include "pmlc/dialect/stripe/analysis.h"
+#include "pmlc/dialect/stripe/ops.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 // Compute for a given tensor the range of each of it's dimensions
 std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
@@ -73,6 +74,6 @@ void PaddingPass::runOnFunction() {
   });
 }
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

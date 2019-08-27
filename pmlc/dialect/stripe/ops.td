@@ -2,9 +2,9 @@
 
 include "pmlc/dialect/scalar/predicates.td"
 
-def MirDialect : Dialect {
-  let name = "pml_mir";
-  let cppNamespace = "pmlc::dialect::mir";
+def StripeDialect : Dialect {
+  let name = "stripe";
+  let cppNamespace = "pmlc::dialect::stripe";
 }
 
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
@@ -25,22 +25,22 @@ def TensorLayoutAttr : Attr<CPred<"$_self.isa<TensorLayoutAttr>()">, "Tensor Lay
   let convertFromStorage = "$_self";
 }
 
-class MirOp<string mnemonic, list<OpTrait> traits = []> :
-    Op<MirDialect, mnemonic, traits>;
+class StripeOp<string mnemonic, list<OpTrait> traits = []> :
+    Op<StripeDialect, mnemonic, traits>;
 
-def AllocateOp : MirOp<"allocate"> {
+def AllocateOp : StripeOp<"allocate"> {
   let summary = "Allocate a new tensor and set it's intial shape / size";
   let arguments = (ins TensorLayoutAttr:$layout);
   let results = (outs TensorType:$res);
 }
 
-def RefineOp : MirOp<"refine", [NoSideEffect]> {
+def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let summary = "Modify the offset into a tensor in an affine way";
   let arguments = (ins TensorType:$in, Variadic<AffineType>:$offsets, DictionaryAttr:$attrs);
   let results = (outs TensorType:$result);
 }
 
-def LoadOp : MirOp<"load"> {
+def LoadOp : StripeOp<"load"> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorType:$from, DictionaryAttr:$attr);
   let results = (outs ScalarType:$into);
@@ -61,7 +61,7 @@ def LoadOp : MirOp<"load"> {
   */
 }
 
-def StoreOp : MirOp<"store"> {
+def StoreOp : StripeOp<"store"> {
   let summary = "Store to a tensor";
   let arguments = (ins TensorType:$into, ScalarType:$from, DictionaryAttr:$attr);
   let results = (outs);
@@ -79,7 +79,7 @@ def StoreOp : MirOp<"store"> {
   */
 }
 
-class AffineOp<string mnemonic> : MirOp<mnemonic, [NoSideEffect]> {
+class AffineOp<string mnemonic> : StripeOp<mnemonic, [NoSideEffect]> {
   let results = (outs AffineType:$result);
 }
 
@@ -110,7 +110,7 @@ def AffineMeta : AffineOp<"affine_meta"> {
   let arguments = (ins AffineType:$input, DictionaryAttr:$attrs);
 }
 
-def ParallelForOp : MirOp<"parallel_for"> {
+def ParallelForOp : StripeOp<"parallel_for"> {
   let summary = "Parallel for loop";
   // At some point, we should be able to dynamically control ranges
   // Variadic<IntegerType>:$dyn_ranges
@@ -121,7 +121,7 @@ def ParallelForOp : MirOp<"parallel_for"> {
   );
 }
 
-def ConstraintOp : MirOp<"constraint"> {
+def ConstraintOp : StripeOp<"constraint"> {
   let arguments = (ins AffineType:$input);
   let results = (outs);
   let regions = (region
@@ -130,7 +130,7 @@ def ConstraintOp : MirOp<"constraint"> {
   );
 }
 
-def TerminateOp : MirOp<"terminate", [Terminator]> {
+def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let summary = "A block terminator since MLIR requires one";
   let results = (outs);
   let arguments = (ins);

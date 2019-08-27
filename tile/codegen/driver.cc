@@ -2,12 +2,15 @@
 
 #include "tile/codegen/driver.h"
 
+#include <memory>
+#include <unordered_map>
+
 #include <boost/format.hpp>
 
 #include "base/config/config.h"
 #include "base/util/any_factory_map.h"
 #include "base/util/throw.h"
-#include "pmlc/dialect/mir/transcode.h"
+#include "pmlc/dialect/stripe/transcode.h"
 #include "tile/codegen/alias.h"
 #include "tile/codegen/compile_pass.h"
 #include "tile/codegen/emitc.h"
@@ -97,13 +100,13 @@ class ConfigsRegistry {
 void ConvertToStripe(CompilerState* state) {
   IVLOG(1, "Converting to Stripe");
   mlir::FuncOp op = mlir::cast<mlir::FuncOp>(state->module.front());
-  *state->prog = pmlc::dialect::mir::ToStripe(op);
+  *state->prog = pmlc::dialect::stripe::ToStripe(op);
   // TODO: Erase
 }
 
-void ConvertToMir(CompilerState* state) {
-  IVLOG(1, "Converting to MIR");
-  state->module.push_back(pmlc::dialect::mir::ToMir(&state->ctx, *state->prog));
+void ConvertToStripeMLIR(CompilerState* state) {
+  IVLOG(1, "Converting to Stripe MLIR");
+  state->module.push_back(pmlc::dialect::stripe::ToStripeMLIR(&state->ctx, *state->prog));
 }
 
 }  // namespace
@@ -124,7 +127,7 @@ void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions&
     if (!in_stripe && wants_stripe) {
       ConvertToStripe(state);
     } else if (in_stripe && !wants_stripe) {
-      ConvertToMir(state);
+      ConvertToStripeMLIR(state);
     }
     in_stripe = wants_stripe;
     compile_pass->Apply(state);

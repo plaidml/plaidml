@@ -3,12 +3,12 @@
 #pragma once
 
 #include "mlir/IR/OpDefinition.h"
-#include "pmlc/dialect/mir/attrs.h"
-#include "pmlc/dialect/mir/types.h"
+#include "pmlc/dialect/stripe/attrs.h"
+#include "pmlc/dialect/stripe/types.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 using mlir::ArrayRef;
 using mlir::Builder;
@@ -27,8 +27,8 @@ using scalar::ScalarType;
 namespace OpTrait = mlir::OpTrait;
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/mir/ops.h.inc"
+#include "pmlc/dialect/stripe/ops.h.inc"
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

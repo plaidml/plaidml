@@ -6,12 +6,12 @@
 #include <tuple>
 #include <vector>
 
-#include "pmlc/dialect/mir/mlir.h"
-#include "pmlc/dialect/mir/types.h"
+#include "pmlc/dialect/stripe/mlir.h"
+#include "pmlc/dialect/stripe/types.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 namespace PlaidAttrKind {
 enum Kinds {
@@ -67,6 +67,6 @@ class TensorLayoutAttr : public Attribute::AttrBase<TensorLayoutAttr, Attribute,
   const std::vector<TensorDim>& dims() { return getImpl()->dims; }
 };
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
