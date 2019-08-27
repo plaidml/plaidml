@@ -113,6 +113,34 @@ local PARAMS = {
             },
 
             {
+              name: 'prune_idxs',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
+                reqs: ['program'],
+              },
+            },
+
+            {
+              name: 'fuse_eltwise_cmp_lt_cond',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['eltwise_cmp_lt'],
+                b_reqs: ['eltwise_cond'],
+                fused_set: ['fuse_eltwise_cond'],
+              },
+            },
+
+            {
+              name: 'eltwise fuse',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['eltwise'],
+                b_reqs: ['eltwise'],
+                fused_set: ['fuse_eltwise'],
+              },
+            },
+
+            {
               name: 'tile_contract',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
@@ -128,6 +156,29 @@ local PARAMS = {
                 // Since all loads to/from global memory are across a wide bus, use that as the
                 // cache_width to optimize for contigous regions of DRAM for each inner block
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
+              },
+            },
+
+            {
+              name: 'localize_main',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocalizePass',
+                reqs: ['main'],
+              },
+            },
+            {
+              name: 'scalarize_main',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ScalarizePass',
+                reqs: ['main'],
+              },
+            },
+
+            {
+              name: 'dead_code_elimination',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.DeadCodeEliminationPass',
+                reqs: ['all'],
               },
             },
 
