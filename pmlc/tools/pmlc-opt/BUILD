@@ -8,7 +8,7 @@ plaidml_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//pmlc/dialect/hir",
-        "//pmlc/dialect/mir",
+        "//pmlc/dialect/stripe",
         "//pmlc/dialect/scalar",
         "@mlir//:EDSC",
         "@mlir//:OptMain",

@@ -64,7 +64,7 @@ message PadPass {
 }
 
 // Expand the size of buffers to reduce constraints required.
-message MirPadPass {
+message MLIR_PadPass {
   repeated string reqs = 1;
   // Modify the prime dimension greater than prime_threshold
   optional uint32 prime_threshold = 2 [default = 32];

@@ -1,14 +1,14 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/mir/transcode.h"
+#include "pmlc/dialect/stripe/transcode.h"
 
 #include "base/util/lookup.h"
-#include "pmlc/dialect/mir/analysis.h"
 #include "pmlc/dialect/scalar/ops.h"
+#include "pmlc/dialect/stripe/analysis.h"
 
 namespace pmlc {
 namespace dialect {
-namespace mir {
+namespace stripe {
 
 using vertexai::safe_at;
 using DataType = vertexai::tile::DataType;
@@ -347,6 +347,6 @@ stripe::Program ToStripe(mlir::FuncOp func) {
   return r;
 }
 
-}  // namespace mir
+}  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
