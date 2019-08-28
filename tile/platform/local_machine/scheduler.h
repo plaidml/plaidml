@@ -52,6 +52,9 @@ void AddLinearDeps(schedule::Schedule* schedule, std::size_t delta);
 void ValidateSchedule(const tile::proto::Program& program, const lang::KernelList& kl,
                       const schedule::Schedule& schedule);
 
+// Return the total size of all allocs
+std::size_t TotalAllocSize(const schedule::Schedule& schedule, std::size_t alignment = 1);
+
 // Writes information about a schedule to the debug log, and
 // optionally updates a CompilationInfo proto's tmp_sizes and
 // alloc_sizes fields based on the schedule.

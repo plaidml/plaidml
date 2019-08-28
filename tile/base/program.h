@@ -26,6 +26,11 @@ class Program {
   // once the returned future is resolved.
   virtual boost::future<void> Run(const context::Context& ctx, std::map<std::string, std::shared_ptr<Buffer>> inputs,
                                   std::map<std::string, std::shared_ptr<Buffer>> outputs) = 0;
+
+  // The maximum available memory
+  virtual std::size_t MaxAvailableMemory() = 0;
+  // Release resource used by the program
+  virtual void Release() = 0;
 };
 
 }  // namespace tile
