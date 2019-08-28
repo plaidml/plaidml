@@ -193,6 +193,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   const DataType GetBlockRefsDataType(const stripe::Block& block);
   llvm::Value* RunTimeLogEntry(void);
   void EmitRunTimeLogEntry(const char* str, const char* extra, llvm::Value* value);
+  void PrintOutputAssembly();
 
   // Gets the leading dimensions and the buffers for an XSMM call if available.
   // @returns true if the XSMM call is applicable, otherwise false.
@@ -244,14 +245,18 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   pmb.MergeFunctions = true;
   llvm::legacy::PassManager modopt;
   pmb.populateModulePassManager(modopt);
-  if (VLOG_IS_ON(4)) {
-    IVLOG(4, "\nBefore ============================================================\n");
+  if (config_.print_llvm_ir_simple) {
+    llvm::errs() << "LLVM IR, unoptimized: ================\n";
     module_->print(llvm::errs(), nullptr);
   }
   modopt.run(*module_);
-  if (VLOG_IS_ON(4)) {
-    IVLOG(4, "\nAfter ============================================================\n");
+  if (config_.print_llvm_ir_optimized) {
+    llvm::errs() << "LLVM IR, after optimization: ================\n";
     module_->print(llvm::errs(), nullptr);
+  }
+  if (config_.print_assembly) {
+    llvm::errs() << "Assembly code: ================\n";
+    PrintOutputAssembly();
   }
   // Wrap the finished module and the parameter names into a ProgramModule.
   for (auto& ref : program.refs) {
@@ -1658,6 +1663,29 @@ void Compiler::ProfileLoopLeave(const stripe::Block& block) {
   llvm::Value* profile_ticks = builder_.CreateLoad(profile_gval);
   profile_ticks = builder_.CreateAdd(profile_ticks, ReadCycleCounter());
   builder_.CreateStore(profile_ticks, profile_gval);
+}
+
+void Compiler::PrintOutputAssembly() {
+  // duplicate the output module, so we can create an execution engine, which
+  // will give us a target machine, which we can use to disassemble
+  std::unique_ptr<llvm::Module> clone(llvm::CloneModule(*module_));
+  std::string builderErrorStr;
+  auto ee =
+      llvm::EngineBuilder(std::move(clone)).setErrorStr(&builderErrorStr).setEngineKind(llvm::EngineKind::JIT).create();
+  if (ee) {
+    ee->finalizeObject();
+  } else {
+    throw Error("Failed to create ExecutionEngine: " + builderErrorStr);
+  }
+  std::string outputStr;
+  {
+    llvm::legacy::PassManager pm;
+    llvm::raw_string_ostream stream(outputStr);
+    llvm::buffer_ostream pstream(stream);
+    ee->getTargetMachine()->addPassesToEmitFile(pm, pstream, nullptr, llvm::TargetMachine::CGFT_AssemblyFile);
+    pm.run(*module_);
+  }
+  llvm::errs() << outputStr << "\n";
 }
 
 Executable::Executable(const ProgramModule& module) : parameters_(module.parameters) {
