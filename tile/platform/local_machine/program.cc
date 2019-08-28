@@ -170,6 +170,12 @@ lang::KernelList CompileProgram(const lang::RunInfo& runinfo,  //
 
 }  // namespace
 
+// Static members of Program
+bool Program::initialized_ = false;
+std::size_t Program::avail_mem_ = 0;
+std::condition_variable Program::cond_var_;
+std::mutex Program::mutex_;
+
 Program::Program(const context::Context& ctx, const tile::proto::Program& program,
                  const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<Scheduler>& scheduler,
                  const std::shared_ptr<MemStrategy>& output_mem_strategy,
@@ -282,10 +288,37 @@ Program::Program(const context::Context& ctx,                              //
   ValidateSchedule(program, kernel_list_, schedule_);
 }
 
+void Program::Release() {
+  // Restore the available memory
+  std::lock_guard<std::mutex> guard(mutex_);
+  avail_mem_ += alloc_mem_;
+  cond_var_.notify_one();
+}
+
 boost::future<void> Program::Run(const context::Context& ctx,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
   IVLOG(2, "Program::Run>");
+  if (!initialized_) {
+    // This is the first program instance.
+    // Initialize the sync variables.
+    std::lock_guard<std::mutex> guard(mutex_);
+    avail_mem_ = MaxAvailableMemory();
+    initialized_ = true;
+  }
+
+  alloc_mem_ = TotalAllocSize(schedule_);
+  {
+    std::unique_lock<std::mutex> guard(mutex_);
+    // Wait for enough memory
+    if (alloc_mem_ > MaxAvailableMemory()) {
+      throw std::runtime_error("No enough memory for the current schedule.");
+    }
+    cond_var_.wait(guard, [&]{ return alloc_mem_ <= avail_mem_; });
+    // Reduce the available memory
+    avail_mem_ -= alloc_mem_;
+  }
+
   IVLOG(2, "  Inputs:");
   for (const auto& kvp : inputs) {
     IVLOG(2, "    " << kvp.first << ": " << kvp.second);
@@ -302,6 +335,12 @@ boost::future<void> Program::Run(const context::Context& ctx,
     inputs[kvp.first] = kvp.second;
   }
   return RunRequest::Run(ctx, this, std::move(inputs), std::move(rewrite_outputs));
+}
+
+std::size_t Program::MaxAvailableMemory() {
+  auto memory = (devinfo_->dev->executor() && devinfo_->dev->executor()->device_memory() ?
+     devinfo_->dev->executor()->device_memory() : devinfo_->devset->host_memory());
+  return memory->size_goal() * kGoalMemPercentage;
 }
 
 }  // namespace local_machine

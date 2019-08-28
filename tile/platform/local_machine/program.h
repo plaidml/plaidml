@@ -8,6 +8,8 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <mutex>
+#include <condition_variable>
 
 #include "tile/base/buffer.h"
 #include "tile/base/program.h"
@@ -21,6 +23,11 @@
 namespace vertexai {
 namespace tile {
 namespace local_machine {
+
+// The percentage of the device's memory that programs will try to use.
+// This value seems to work pretty well on most devices.
+// TODO: Either autotune this, or move it to the per-device configuration.
+constexpr float kGoalMemPercentage = .85;
 
 class Program final : public tile::Program {
  public:
@@ -42,6 +49,12 @@ class Program final : public tile::Program {
   boost::future<void> Run(const context::Context& ctx, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
                           std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) final;
 
+  // The maximum available memory
+  std::size_t MaxAvailableMemory() final;
+
+  // Release resource used by the program
+  void Release() final;
+
   const std::shared_ptr<DevInfo>& devinfo() const { return devinfo_; }
   const std::shared_ptr<MemStrategy>& output_mem_strategy() const { return output_mem_strategy_; }
   const std::shared_ptr<MemStrategy>& tmp_mem_strategy() const { return tmp_mem_strategy_; }
@@ -57,6 +70,12 @@ class Program final : public tile::Program {
   schedule::Schedule schedule_;
   std::map<std::string, std::shared_ptr<tile::Buffer>> const_bufs_;
   std::unique_ptr<hal::Executable> executable_;
+  std::size_t alloc_mem_;
+
+  static bool initialized_;
+  static std::size_t avail_mem_;
+  static std::condition_variable cond_var_;
+  static std::mutex mutex_;
 };
 
 }  // namespace local_machine

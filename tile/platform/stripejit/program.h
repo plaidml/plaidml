@@ -35,6 +35,12 @@ class Program final : public tile::Program {
       std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
       std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) final;
 
+  // The maximum available memory
+  std::size_t MaxAvailableMemory() final;
+
+  // Release resource used by the program
+  void Release() final;
+
  private:
   std::unique_ptr<tile::targets::cpu::Native> executable_;
 };

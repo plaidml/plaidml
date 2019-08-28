@@ -382,6 +382,14 @@ void ValidateSchedule(const tile::proto::Program& program, const lang::KernelLis
   }
 }
 
+std::size_t TotalAllocSize(const schedule::Schedule& schedule) {
+  std::size_t total_size = 0;
+  for (const auto& alloc : schedule.allocs) {
+    total_size += alloc.byte_size;
+  }
+  return total_size;
+}
+
 void SummarizeSchedule(hal::proto::CompilationInfo* cinfo, const tile::proto::Program& program,
                        const lang::KernelList& kl, const schedule::Schedule& schedule) {
   IVLOG(1, "Summary for " << program.id() << ":");
