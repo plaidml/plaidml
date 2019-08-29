@@ -169,8 +169,6 @@ def wheel_clean(arg):
 def cmd_build(args, remainder):
 
     util.printf('--- :snake: pre-build steps... ')
-    util.printf('bazel shutdown...')
-    util.check_output(['bazelisk', 'shutdown'])
     util.printf('delete any old whl files...')
     wheel_clean('plaidml')
     wheel_clean('plaidbench')
