@@ -18,5 +18,8 @@ sphinx(
     out = "html",
     conf = "conf.py",
     sphinx = ":sphinx",
-    tags = ["docs"],
+    tags = [
+        "docs",
+        "manual",
+    ],
 )
