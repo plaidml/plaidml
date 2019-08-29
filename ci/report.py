@@ -38,78 +38,29 @@ def collect_results(root, pipeline):
         plan = yaml.safe_load(file_)
     gpu_flops = plan['CONST']['gpu_flops']
     baseline_name = plan['CONST']['efficiency_baseline']
-    for suite_name, suite in plan['SUITES'].items():
-        for wkey, workload in suite['workloads'].items():
-            skip_platforms = workload.get('skip_platforms', [])
-            for platform_name, platform in suite['platforms'].items():
-                if platform_name in skip_platforms or platform_name == baseline_name:
-                    continue
-                if pipeline not in platform['pipelines']:
-                    continue
-                popt = ci.util.PlanOption(suite, workload, platform_name)
-                shc = popt.get('shardcount')
-                if shc:
-                    for shard in popt.get('run_shards'):
-                        workload_name = str(wkey) + '-' + str(shard)
-                        for batch_size in suite['params'][pipeline]['batch_sizes']:
-                            info = ci.util.TestInfo(
-                                (suite_name, suite),
-                                (workload_name, workload),
-                                (platform_name, ci.util.Platform(platform_name, gpu_flops)),
-                                batch_size,
-                            )
-                            path = info.path(root) / 'report.json'
-                            print(path)
-                            if path.exists():
-                                with path.open() as fp:
-                                    data = json.load(fp)
-                            else:
-                                data = {
-                                    'compare': False,
-                                    'ratio': None,
-                                    'compile_duration': None,
-                                    'cur.execution_duration': None,
-                                    'ref.execution_duration': None,
-                                    'status': 'ERROR',
-                                    'failures': [],
-                                    'errors': [],
-                                    'reason': 'Result not found',
-                                    'build_url': DEFAULT_BUILD_URL,
-                                }
-                            data['info'] = info
-                            yield data
-                    else:
-                        shard = None
-
-                for batch_size in suite['params'][pipeline]['batch_sizes']:
-                    if shc:
-                        continue
-                    workload_name = wkey
-                    info = ci.util.TestInfo(
-                        (suite_name, suite),
-                        (workload_name, workload),
-                        (platform_name, ci.util.Platform(platform_name, gpu_flops)),
-                        batch_size,
-                    )
-                    path = info.path(root) / 'report.json'
-                    if path.exists():
-                        with path.open() as fp:
-                            data = json.load(fp)
-                    else:
-                        data = {
-                            'compare': False,
-                            'ratio': None,
-                            'compile_duration': None,
-                            'cur.execution_duration': None,
-                            'ref.execution_duration': None,
-                            'status': 'ERROR',
-                            'failures': [],
-                            'errors': [],
-                            'reason': 'Result not found',
-                            'build_url': DEFAULT_BUILD_URL,
-                        }
-                    data['info'] = info
-                    yield data
+    for info in ci.util.iterate_tests(plan, pipeline):
+        if info.platform_name == baseline_name:
+            continue
+        path = info.path(root) / 'report.json'
+        print(path)
+        if path.exists():
+            with path.open() as fp:
+                data = json.load(fp)
+        else:
+            data = {
+                'compare': False,
+                'ratio': None,
+                'compile_duration': None,
+                'cur.execution_duration': None,
+                'ref.execution_duration': None,
+                'status': 'ERROR',
+                'failures': [],
+                'errors': [],
+                'reason': 'Result not found',
+                'build_url': DEFAULT_BUILD_URL,
+            }
+        data['info'] = info
+        yield data
 
 
 CSS_MAP = {
@@ -209,7 +160,7 @@ def make_html_results(results):
             status=x['status'],
             gpu=info.platform.gpu,
             engine=info.platform.engine,
-            workload=info.workload_name,
+            workload=info.instance_name,
             batch_size=info.batch_size,
             cur_com=render_float(x['compile_duration']),
             cur_run=render_float(x['cur.execution_duration']),
