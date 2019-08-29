@@ -128,34 +128,39 @@ def wheel_path(arg):
     return pathlib.Path(bazel_bin_dir()) / arg / 'wheel.pkg' / 'dist'
 
 
-def wheel_clean(arg):
-    ws = list(wheel_path(arg).glob('*.whl'))
-    for f in ws:
-        if f.is_file():
-            util.printf('deleting: ' + str(f.resolve()))
-            try:
-                os.remove(f)
-            except PermissionError:
-                import stat
-                os.chmod(f, stat.S_IWRITE)
-                os.remove(f)
+def wheel_clean(dirs):
+    for wheel_dir in dirs:
+        for f in wheel_dir.glob('*.whl'):
+            if f.is_file():
+                util.printf('deleting: ' + str(f.resolve()))
+                try:
+                    os.remove(f)
+                except PermissionError:
+                    import stat
+                    os.chmod(f, stat.S_IWRITE)
+                    os.remove(f)
 
 
 def buildkite_upload(pattern, **kwargs):
     util.check_call(['buildkite-agent', 'artifact', 'upload', pattern], **kwargs)
 
 
+def buildkite_download(pattern, destination, **kwargs):
+    util.check_call(['buildkite-agent', 'artifact', 'download', pattern, destination], **kwargs)
+
+
 def cmd_build(args, remainder):
     util.printf('--- :snake: pre-build steps... ')
-    util.printf('bazel shutdown...')
-    util.check_call(['bazelisk', 'shutdown'])
     util.printf('delete any old whl files...')
-    wheel_clean('plaidml')
-    wheel_clean('plaidbench')
-    wheel_clean('plaidml/keras')
+    wheel_dirs = [
+        wheel_path('plaidml').resolve(),
+        wheel_path('plaidml/keras').resolve(),
+        wheel_path('plaidbench').resolve(),
+    ]
+    wheel_clean(wheel_dirs)
 
-    explain_log = os.path.abspath('explain.log')
-    profile_json = os.path.abspath('profile.json.gz')
+    explain_log = 'explain.log'
+    profile_json = 'profile.json.gz'
 
     common_args = []
     common_args += ['--config={}'.format(args.variant)]
@@ -182,9 +187,8 @@ def cmd_build(args, remainder):
     util.printf('--- :buildkite: Uploading artifacts...')
     buildkite_upload(explain_log)
     buildkite_upload(profile_json)
-    buildkite_upload('*.whl', cwd=wheel_path('plaidml').resolve())
-    buildkite_upload('*.whl', cwd=wheel_path('plaidml/keras').resolve())
-    buildkite_upload('*.whl', cwd=wheel_path('plaidbench').resolve())
+    for wheel_dir in wheel_dirs:
+        buildkite_upload('*.whl', cwd=wheel_dir)
 
     archive_dir = os.path.join(
         args.root,
@@ -195,8 +199,6 @@ def cmd_build(args, remainder):
     )
     os.makedirs(archive_dir, exist_ok=True)
     shutil.copy(os.path.join('bazel-bin', 'pkg.tar.gz'), archive_dir)
-    util.printf('bazel shutdown...')
-    util.check_call(['bazelisk', 'shutdown'])
 
 
 def cmd_test(args, remainder):
@@ -204,31 +206,22 @@ def cmd_test(args, remainder):
     harness.run(args, remainder)
 
 
-def make_tarfile(output_filename, source_dir):
-    with tarfile.open(output_filename, "w:gz") as tar:
-        tar.add(source_dir, arcname=source_dir.name)
-
-
 def make_all_wheels(workdir):
+    util.printf('clearing workdir: {}'.format(workdir))
+    shutil.rmtree(workdir, ignore_errors=True)
     workdir.mkdir(parents=True, exist_ok=True)
-    dir_list = ['windows_x86_64', 'macos_x86_64', 'linux_x86_64', 'common']
-    whl_type = ['win_amd64', 'macosx', 'manylinux', 'none-any']
 
     util.printf('downloading wheels...')
-    cmd = ['buildkite-agent', 'artifact', 'download', '*.whl', str(workdir)]
-    util.check_call(cmd, cwd=workdir)
-    whl_files = list(workdir.glob('*.whl'))
+    buildkite_download('*.whl', str(workdir), cwd=workdir)
 
-    [pathlib.Path(d).mkdir(parents=True, exist_ok=True) for d in dir_list]
-
-    for whl, dest in zip(whl_type, dir_list):
-        for f in whl_files:
-            if whl in str(f):
-                shutil.move(str(f), dest)
-
-    util.printf('packing all_wheels...')
     tarball = 'all_wheels.tar.gz'
-    make_tarfile(tarball, workdir)
+    util.printf('creating {}'.format(tarball))
+    with tarfile.open(tarball, "w:gz") as tar:
+        for whl in workdir.glob('*.whl'):
+            util.printf('adding {}'.format(whl))
+            tar.add(whl, arcname=whl.name)
+
+    util.printf('uploading {}'.format(tarball))
     buildkite_upload(tarball)
 
 
