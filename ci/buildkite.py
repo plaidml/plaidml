@@ -211,8 +211,6 @@ def cmd_build(args, remainder):
     util.check_call(['buildkite-agent', 'artifact', 'upload', 'explain.log'])
     os.makedirs(archive_dir, exist_ok=True)
     shutil.copy(os.path.join('bazel-bin', 'pkg.tar.gz'), archive_dir)
-    util.printf('bazel shutdown...')
-    util.check_output(['bazelisk', 'shutdown'])
 
 
 def cmd_test(args, remainder):
