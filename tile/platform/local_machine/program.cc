@@ -23,7 +23,14 @@
 namespace vertexai {
 namespace tile {
 namespace local_machine {
+
 namespace {
+
+// For Program synchonization
+std::size_t avail_mem = 0;
+std::once_flag first_run;
+std::condition_variable cond_var;
+std::mutex mutex;
 
 static PerfCounter pre_scan_time("pre_scan_time");
 static PerfCounter post_scan_time("post_scan_time");
@@ -188,6 +195,8 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
     // TODO: Implement a mechanism for providing a pre-compiled program.
     throw error::Unavailable{"The requested device is unavailable for running Tile programs"};
   }
+  memory_ = (devinfo_->dev->executor() && devinfo_->dev->executor()->device_memory() ?
+     devinfo_->dev->executor()->device_memory() : devinfo_->devset->host_memory());
 
   context::Activity activity{ctx, "tile::local_machine::Compile"};
 
@@ -242,6 +251,8 @@ Program::Program(const context::Context& ctx,                              //
     // TODO: Implement a mechanism for providing a pre-compiled program.
     throw error::Unavailable{"The requested device is unavailable for running Tile programs"};
   }
+  memory_ = (devinfo_->dev->executor() && devinfo_->dev->executor()->device_memory() ?
+     devinfo_->dev->executor()->device_memory() : devinfo_->devset->host_memory());
 
   context::Activity activity{ctx, "tile::local_machine::Compile"};
 
@@ -282,10 +293,40 @@ Program::Program(const context::Context& ctx,                              //
   ValidateSchedule(program, kernel_list_, schedule_);
 }
 
+void Program::Release() {
+  // Restore the available memory
+  // TODO: could switch to RAll pattern later
+  std::lock_guard<std::mutex> guard(mutex);
+  // Make sure that releases are not more than runs
+  if (num_runs_ > 0) {
+    avail_mem += alloc_mem_;
+    --num_runs_;
+    cond_var.notify_one();
+  }
+}
+
 boost::future<void> Program::Run(const context::Context& ctx,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
                                  std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
   IVLOG(2, "Program::Run>");
+
+  // This is the first program instance. Initialize the available memory and sync variables.
+  std::call_once(first_run, [&](){ avail_mem = MaxAvailableMemory(); });
+
+  alloc_mem_ = TotalAllocSize(schedule_, memory_->ArenaBufferAlignment());
+  if (alloc_mem_ <= MaxAvailableMemory()) {
+    std::unique_lock<std::mutex> guard(mutex);
+    // TODO: could be asynchronous later
+    // Wait for enough memory
+    cond_var.wait(guard, [&]{ return alloc_mem_ <= avail_mem; });
+    // Reduce the available memory
+    avail_mem -= alloc_mem_;
+    ++num_runs_;
+  }
+  else {
+    throw std::runtime_error("No enough memory for the current schedule.");
+  }
+
   IVLOG(2, "  Inputs:");
   for (const auto& kvp : inputs) {
     IVLOG(2, "    " << kvp.first << ": " << kvp.second);
@@ -302,6 +343,10 @@ boost::future<void> Program::Run(const context::Context& ctx,
     inputs[kvp.first] = kvp.second;
   }
   return RunRequest::Run(ctx, this, std::move(inputs), std::move(rewrite_outputs));
+}
+
+std::size_t Program::MaxAvailableMemory() {
+  return memory_->size_goal() * kGoalMemPercentage;
 }
 
 }  // namespace local_machine

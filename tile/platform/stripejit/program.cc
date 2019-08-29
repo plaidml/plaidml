@@ -62,6 +62,13 @@ boost::future<void> Program::Run(  //
   return boost::make_ready_future();
 }
 
+void Program::Release() {
+}
+
+std::size_t Program::MaxAvailableMemory() {
+  throw std::runtime_error("Program::MaxAvailableMemory is unimplemented for stripejit.");
+}
+
 }  // namespace stripejit
 }  // namespace tile
 }  // namespace vertexai
