@@ -97,22 +97,21 @@ def cmd_pipeline(args, remainder):
                         shard_emoji = get_shard_number(rsh)
                         for batch_size in suite['params'][args.pipeline]['batch_sizes']:
                             tests.append(
-                                dict(
-                                    suite=skey,
-                                    workload=wkey,
-                                    platform=pkey,
-                                    batch_size=batch_size,
-                                    variant=variant,
-                                    timeout=popt.get('timeout', 20),
-                                    retry=popt.get('retry'),
-                                    softfail=popt.get('softfail'),
-                                    python=get_python(variant),
-                                    shard=shard,
-                                    shardcount=shc,
-                                    rsh=rsh,
-                                    shard_emoji=shard_emoji,
-                                    emoji=get_emoji(variant),
-                                    engine=get_engine(pkey)))
+                                dict(suite=skey,
+                                     workload=wkey,
+                                     platform=pkey,
+                                     batch_size=batch_size,
+                                     variant=variant,
+                                     timeout=popt.get('timeout', 20),
+                                     retry=popt.get('retry'),
+                                     softfail=popt.get('softfail'),
+                                     python=get_python(variant),
+                                     shard=shard,
+                                     shardcount=shc,
+                                     rsh=rsh,
+                                     shard_emoji=shard_emoji,
+                                     emoji=get_emoji(variant),
+                                     engine=get_engine(pkey)))
 
                 else:
                     shard = None
@@ -123,18 +122,17 @@ def cmd_pipeline(args, remainder):
 
                     else:
                         tests.append(
-                            dict(
-                                suite=skey,
-                                workload=wkey,
-                                platform=pkey,
-                                batch_size=batch_size,
-                                variant=variant,
-                                timeout=popt.get('timeout', 20),
-                                retry=popt.get('retry'),
-                                softfail=popt.get('softfail'),
-                                python=get_python(variant),
-                                emoji=get_emoji(variant),
-                                engine=get_engine(pkey)))
+                            dict(suite=skey,
+                                 workload=wkey,
+                                 platform=pkey,
+                                 batch_size=batch_size,
+                                 variant=variant,
+                                 timeout=popt.get('timeout', 20),
+                                 retry=popt.get('retry'),
+                                 softfail=popt.get('softfail'),
+                                 python=get_python(variant),
+                                 emoji=get_emoji(variant),
+                                 engine=get_engine(pkey)))
 
     if args.count:
         print('variants: {}'.format(len(variants)))
@@ -196,7 +194,7 @@ def cmd_build(args, remainder):
     else:
         env = None
 
-    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env, stderr=subprocess.DEVNULL)
+    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
     archive_dir = os.path.join(
         args.root,
         args.pipeline,
