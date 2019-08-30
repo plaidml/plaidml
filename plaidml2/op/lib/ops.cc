@@ -2098,19 +2098,26 @@ Value softmax(const Value& value) {
   if (args.size() != 2) {
     throw std::runtime_error("softmax expects 2 arguments");
   }
-  auto X = args[0].as_tensor();
-  if (X.shape().ndims() == 2) {
-    TensorDim I, J;
-    TensorIndex i, j;
-    X.bind_dims(I, J);
-    auto M = TensorOutput(I, 1);
-    M(i, 0) >= X(i, j);
-    auto E = exp(X - M);
-    auto N = TensorOutput(I, 1);
-    N(i, 0) += E(i, j);
-    return Value{E / N};
-  }
-  throw std::runtime_error("softmax only works on 2 dimensions at this time.");
+  auto I = args[0].as_tensor();
+  auto axis = args[1].as_int();
+
+  auto ndims = I.shape().ndims();
+  axis = normalize_axis(axis, ndims, "softmax");
+
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  I.bind_dims(I_dims);
+  // R_dims & R_idxs are the dims/idxs reduced along the specified axis; used in the inner contractions
+  std::vector<TensorDim> R_dims = I_dims;
+  std::vector<TensorIndex> R_idxs = I_idxs;
+  R_dims[axis] = TensorDim{1};
+  R_idxs[axis] = TensorIndex{0};
+  auto M = TensorOutput(R_dims);
+  M(R_idxs) >= I(I_idxs);
+  auto E = exp(I - M);
+  auto N = TensorOutput(R_dims);
+  N(R_idxs) += E(I_idxs);
+  return Value{E / N};
 }
 
 Value spatial_padding(const Value& value) {
