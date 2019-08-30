@@ -1109,22 +1109,8 @@ class TestBackendOps(unittest.TestCase):
 
         I = x.tensor
         K = k.tensor
-        N = edsl.TensorDim()
-        L0 = edsl.TensorDim()
-        L1 = edsl.TensorDim()
-        CI = edsl.TensorDim()
-        LK0 = edsl.TensorDim()
-        LK1 = edsl.TensorDim()
-        C0 = edsl.TensorDim()
-        C1 = edsl.TensorDim()
-        n = edsl.TensorIndex()
-        x0 = edsl.TensorIndex()
-        x1 = edsl.TensorIndex()
-        co = edsl.TensorIndex()
-        ci = edsl.TensorIndex()
-        k0 = edsl.TensorIndex()
-        k1 = edsl.TensorIndex()
-
+        N, L0, L1, CI, LK0, LK1, C0, C1 = edsl.TensorDims(8)
+        n, x0, x1, c0, c1, co, ci, k0, k1 = edsl.TensorIndexes(9)
         O = edsl.TensorOutput(1, 5, 5, 1)
         O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
                                (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
