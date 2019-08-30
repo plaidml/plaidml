@@ -490,20 +490,47 @@ class TestBackendOps(unittest.TestCase):
     def testEye(self, b, *args):
         return b.eye(*args)
 
-    @unittest.skip('TODO: convert to EDSL')
     def testTileIdentity(self):
         I = pkb.variable(m(3)).tensor
+<<<<<<< HEAD
         # opId = pkb._KerasNode('tile_identity', name='opId', tensor=I)
         pkb.eval(I)
         return 0
 
     @unittest.skip('TODO: convert to EDSL - two outputs not currently supported')
+=======
+        N = edsl.TensorDim()
+        I.bind_dims(N)
+        O = edsl.TensorOutput(N)
+        i = edsl.TensorIndex()
+        O[i] = I[i]
+        opId = pkb._KerasNode('tile_identity', name='opId', tensor=O)
+        pkb.eval(opId)
+        return 0
+
+    #@unittest.skip('TODO: convert to EDSL')
+>>>>>>> EDSL convert backend_tests
     def testTwoOutputs(self):
-        x = pkb.variable(m(3))
-        op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
-                            [('O1', x.shape), ('O2', x.shape)])
-        output = op.outputs['O1'].eval()
-        output = op.outputs['O2'].eval()
+        #x = pkb.variable(m(3))
+        #op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
+        #                    [('O1', x.shape), ('O2', x.shape)])
+        #output = op.outputs['O1'].eval()
+        #output = op.outputs['O2'].eval()
+
+        x = pkb.variable(m(3)).tensor
+        N = edsl.TensorDim()
+        x.bind_dims(N)
+        O1 = edsl.TensorOutput(N)
+        O2 = edsl.TensorOutput(N)
+        i = edsl.TensorIndex()
+        O1[i] = x[i]
+        O2[i] = x[i]
+        #opO1O2=pkb._KerasNode('two_outputs',name='opO1O2',tensor=(O1,O2))
+        #pkb.eval(opO1O2)
+        opO1 = pkb._KerasNode('two_outputs', name='opO1', tensor=(O1))
+        opO2 = pkb._KerasNode('two_outputs', name='opO2', tensor=(O1))
+        pkb.eval(opO1)
+        pkb.eval(opO2)
         return 0
 
     @opTest([[m(3, 3), m(3, 3)]])
@@ -1085,11 +1112,34 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @opTest([[m(1, 3, 3, 1), m(1, 3, 3, 1) - 2]], skip_tensorflow=True, skip_theano=True)
+<<<<<<< HEAD
+=======
+    #@unittest.skip('TODO: convert to EDSL')
+>>>>>>> EDSL convert backend_tests
     def testDefractLong(self, b, x, k):
 
         I = x.tensor
         K = k.tensor
+<<<<<<< HEAD
         n, x0, x1, c0, c1, co, ci, k0, k1 = edsl.TensorIndexes(9)
+=======
+        N = edsl.TensorDim()
+        L0 = edsl.TensorDim()
+        L1 = edsl.TensorDim()
+        CI = edsl.TensorDim()
+        LK0 = edsl.TensorDim()
+        LK1 = edsl.TensorDim()
+        C0 = edsl.TensorDim()
+        C1 = edsl.TensorDim()
+        n = edsl.TensorIndex()
+        x0 = edsl.TensorIndex()
+        x1 = edsl.TensorIndex()
+        co = edsl.TensorIndex()
+        ci = edsl.TensorIndex()
+        k0 = edsl.TensorIndex()
+        k1 = edsl.TensorIndex()
+
+>>>>>>> EDSL convert backend_tests
         O = edsl.TensorOutput(1, 5, 5, 1)
         O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
                                (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
@@ -1135,6 +1185,7 @@ class TestBackendOps(unittest.TestCase):
         to help link tile code back to its origin while debugging, we must
         reformat those names as valid tile identifiers. If we are doing that,
         this test will pass, otherwise we'll get a syntax error.'''
+<<<<<<< HEAD
 
         I = x.tensor
         K = k.tensor
@@ -1152,6 +1203,23 @@ class TestBackendOps(unittest.TestCase):
                                  name='this-is-not an identifier',
                                  tensor=O)
 
+=======
+        A = pkb.variable(m(5, 1)).tensor
+        B = pkb.variable(m(1, 5)).tensor
+        L = edsl.TensorDim()
+        M = edsl.TensorDim()
+        N = edsl.TensorDim()
+        i = edsl.TensorIndex()
+        j = edsl.TensorIndex()
+        k = edsl.TensorIndex()
+        A.bind_dims(L, M)
+        B.bind_dims(M, N)
+        O = edsl.TensorOutput(L, N)
+        O[i, j] = A[i, k] * B[k, j]
+        opFunky = pkb._KerasNode('this-is-not an identifier',
+                                 name='this-is-not an identifier',
+                                 tensor=O)
+>>>>>>> EDSL convert backend_tests
         return [opFunky]
 
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
@@ -1638,12 +1706,24 @@ class TestBackendOps(unittest.TestCase):
     @unittest.skipIf(
         os.environ.get("USE_STRIPE", "0") == "1",
         "Stripe does not correctly validate assignment ops")
+<<<<<<< HEAD
     #@unittest.skip('TODO: convert to EDSL')
     def testAssignmentExceptions(self):
         A = pkb.variable(m(5, 1)).tensor
         B = pkb.variable(m(1, 5)).tensor
         L, M, N = edsl.TensorDims(3)
         i, j, k = edsl.TensorIndexes(3)
+=======
+    def testAssignmentExceptions(self):
+        A = pkb.variable(m(5, 1)).tensor
+        B = pkb.variable(m(1, 5)).tensor
+        L = edsl.TensorDim()
+        M = edsl.TensorDim()
+        N = edsl.TensorDim()
+        i = edsl.TensorIndex()
+        j = edsl.TensorIndex()
+        k = edsl.TensorIndex()
+>>>>>>> EDSL convert backend_tests
         A.bind_dims(L, M)
         B.bind_dims(M, N)
         O = edsl.TensorOutput(L, N)
