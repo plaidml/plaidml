@@ -2,7 +2,7 @@
 
 package(default_visibility = ["//visibility:private"])
 
-load("//bzl:conda.bzl", "conda_binary", "conda_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_binary",
@@ -217,17 +217,15 @@ genrule(
     visibility = ["//visibility:public"],
 )
 
-conda_binary(
+py_binary(
     name = "enumerate",
     srcs = ["enumerate.py"],
-    env = "@com_intel_plaidml_conda//:env",
     deps = [":py"],
 )
 
-conda_binary(
+py_binary(
     name = "setup",
     srcs = ["plaidml_setup.py"],
-    env = "@com_intel_plaidml_conda//:env",
     main = "plaidml_setup.py",
     deps = [":py"],
 )
@@ -255,17 +253,15 @@ plaidml_py_library(
     visibility = ["//visibility:public"],
 )
 
-conda_test(
+py_test(
     name = "settings_test",
     srcs = ["settings_test.py"],
-    env = "@com_intel_plaidml_conda//:env",
     deps = [":py"],
 )
 
-conda_test(
+py_test(
     name = "py_plaidml_test",
     srcs = ["plaidml_test.py"],
-    env = "@com_intel_plaidml_conda//:env",
     main = "plaidml_test.py",
     deps = [
         ":py",
@@ -273,10 +269,9 @@ conda_test(
     ],
 )
 
-conda_test(
+py_test(
     name = "py_tile_test",
     srcs = ["tile_test.py"],
-    env = "@com_intel_plaidml_conda//:env",
     main = "tile_test.py",
     deps = [
         ":py",

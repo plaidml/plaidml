@@ -14,3 +14,15 @@ http_archive(
 load("//bzl:workspace.bzl", "plaidml_workspace")
 
 plaidml_workspace()
+
+load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
+
+rules_pkg_dependencies()
+
+load("@rules_python//python:repositories.bzl", "py_repositories")
+
+py_repositories()
+
+register_toolchains(
+    "//:py_toolchain",
+)

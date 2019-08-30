@@ -62,6 +62,7 @@ class CondaEnv(object):
         }
         if platform.system() != 'Windows':
             env['JAVA_HOME'] = str(self.path)
+            env['CONDA_EXE'] = str(self.path / 'Scripts' / 'conda.exe')
         else:
             env['JAVA_HOME'] = str(self.path / 'Library')
         return env
