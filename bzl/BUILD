@@ -1,4 +1,4 @@
-load("//bzl:conda.bzl", "conda_binary")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -16,8 +16,7 @@ config_setting(
     define_values = {"with_callgrind": "true"},
 )
 
-conda_binary(
+py_binary(
     name = "sphinx",
     srcs = [":sphinx.py"],
-    env = "@com_intel_plaidml_conda_sphinx//:env",
 )

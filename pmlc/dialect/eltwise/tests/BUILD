@@ -1,8 +1,8 @@
 # Copyright 2019 Intel Corporation.
 
-load("//bzl:conda.bzl", "conda_test")
+load("@rules_python//python:defs.bzl", "py_test")
 
-conda_test(
+py_test(
     name = "tests",
     srcs = ["lit.py"],
     data = glob([
@@ -16,7 +16,6 @@ conda_test(
         "@llvm//:count",
         "@llvm//:not",
     ],
-    env = "@com_intel_plaidml_conda//:env",
     main = "lit.py",
     tags = ["manual"],
 )

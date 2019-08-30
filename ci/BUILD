@@ -1,8 +1,8 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@com_intel_plaidml//bzl:conda.bzl", "conda_binary")
+load("@rules_python//python:defs.bzl", "py_binary")
 
-conda_binary(
+py_binary(
     name = "report",
     srcs = [
         "report.py",
@@ -13,7 +13,6 @@ conda_binary(
         "plan.yml",
         "templates/*",
     ]),
-    env = "@com_intel_plaidml_conda_analysis//:env",
     tags = ["manual"],
     deps = ["//tools/analysis"],
 )

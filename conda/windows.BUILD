@@ -11,3 +11,8 @@ filegroup(
     name = "flex",
     srcs = ["env/Library/usr/bin/flex.exe"],
 )
+
+filegroup(
+    name = "python",
+    srcs = ["env/python.exe"],
+)

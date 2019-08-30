@@ -50,5 +50,4 @@ plaidml_py_library(
     deps = [
         "//plaidml2:py",
     ],
-    tags = ["conda"],
 )
