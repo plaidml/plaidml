@@ -480,36 +480,21 @@ class TestBackendOps(unittest.TestCase):
     def testTileIdentity(self):
         I = pkb.variable(m(3)).tensor
         N = edsl.TensorDim()
-        I.bind_dims(N)
-        O = edsl.TensorOutput(N)
+        #I.bind_dims(N)
+        #I = edsl.TensorOutput(N) #not sure if this is needed ?code segfaults with this line in
         i = edsl.TensorIndex()
-        O[i] = I[i]
-        opId = pkb._KerasNode('tile_identity', name='opId', tensor=O)
+        I[i] = I[i]
+        opId = pkb._KerasNode('tile_identity', name='opId', tensor=I)
         pkb.eval(opId)
         return 0
 
-    #@unittest.skip('TODO: convert to EDSL')
+    @unittest.skip('TODO: convert to EDSL - two outputs not currently supported')
     def testTwoOutputs(self):
-        #x = pkb.variable(m(3))
-        #op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
-        #                    [('O1', x.shape), ('O2', x.shape)])
-        #output = op.outputs['O1'].eval()
-        #output = op.outputs['O2'].eval()
-
-        x = pkb.variable(m(3)).tensor
-        N = edsl.TensorDim()
-        x.bind_dims(N)
-        O1 = edsl.TensorOutput(N)
-        O2 = edsl.TensorOutput(N)
-        i = edsl.TensorIndex()
-        O1[i] = x[i]
-        O2[i] = x[i]
-        #opO1O2=pkb._KerasNode('two_outputs',name='opO1O2',tensor=(O1,O2))
-        #pkb.eval(opO1O2)
-        opO1 = pkb._KerasNode('two_outputs', name='opO1', tensor=(O1))
-        opO2 = pkb._KerasNode('two_outputs', name='opO2', tensor=(O1))
-        pkb.eval(opO1)
-        pkb.eval(opO2)
+        x = pkb.variable(m(3))
+        op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
+                            [('O1', x.shape), ('O2', x.shape)])
+        output = op.outputs['O1'].eval()
+        output = op.outputs['O2'].eval()
         return 0
 
     @opTest([[m(3, 3), m(3, 3)]])
@@ -1090,12 +1075,10 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @opTest([[m(1, 3, 3, 1), m(1, 3, 3, 1) - 2]], skip_tensorflow=True, skip_theano=True)
-    #@unittest.skip('TODO: convert to EDSL')
     def testDefractLong(self, b, x, k):
 
         I = x.tensor
         K = k.tensor
-        N, L0, L1, CI, LK0, LK1, C0, C1 = edsl.TensorDims(8)
         n, x0, x1, c0, c1, co, ci, k0, k1 = edsl.TensorIndexes(9)
         O = edsl.TensorOutput(1, 5, 5, 1)
         O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
