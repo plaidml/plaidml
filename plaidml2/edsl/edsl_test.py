@@ -439,7 +439,6 @@ class TestEdsl(unittest.TestCase):
         O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
                                (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
         program = Program('defract_long', [O])
-        print(program)
         self.assertMultiLineEqual(
             str(program), '''function (
   I[I_0, I_1, I_2, I_3],
@@ -495,9 +494,7 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
 
-    @unittest.skip(
-        'TODO: convert to EDSL - fails with Error: Unsupported agg_op/combo_op also exception needs to be thrown'
-    )
+    @unittest.skip('TODO: convert to EDSL -  exception needs to be thrown')
     def testAssignmentExceptions(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [5, 1]), name='A')
         B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 5]), name='B')
@@ -508,7 +505,16 @@ class TestEdsl(unittest.TestCase):
         O = TensorOutput(L, N)
         O[i, j] = A[i, k] * B[k, j]
         program = Program('assignment_non_exception', [O])
-        print(program)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  A[A_0, A_1],
+  B[B_0, B_1]
+) -> (
+  _X0
+) {
+  _X0[x0, x2 : 5, 5] = =(A[x0, x1] * B[x1, x2]);
+}
+''')
         with self.assertRaises(RuntimeError) as cm:
             O = TensorOutput(L, N)
             O[i, j] = B[i, j] * A[j, k]

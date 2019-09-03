@@ -490,22 +490,6 @@ class TestBackendOps(unittest.TestCase):
     def testEye(self, b, *args):
         return b.eye(*args)
 
-    @unittest.skip('TODO: convert to EDSL')
-    def testTileIdentity(self):
-        I = pkb.variable(m(3)).tensor
-        # opId = pkb._KerasNode('tile_identity', name='opId', tensor=I)
-        pkb.eval(I)
-        return 0
-
-    @unittest.skip('TODO: convert to EDSL - two outputs not currently supported')
-    def testTwoOutputs(self):
-        x = pkb.variable(m(3))
-        op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
-                            [('O1', x.shape), ('O2', x.shape)])
-        output = op.outputs['O1'].eval()
-        output = op.outputs['O2'].eval()
-        return 0
-
     @opTest([[m(3, 3), m(3, 3)]])
     def testAddElements(self, b, x, y):
         return [x + y]
@@ -1084,76 +1068,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d_transpose(x, k, os, strides=st, padding=pd, data_format=df, dilation_rate=dr)
         ]
 
-    @opTest([[m(1, 3, 3, 1), m(1, 3, 3, 1) - 2]], skip_tensorflow=True, skip_theano=True)
-    def testDefractLong(self, b, x, k):
-
-        I = x.tensor
-        K = k.tensor
-        n, x0, x1, c0, c1, co, ci, k0, k1 = edsl.TensorIndexes(9)
-        O = edsl.TensorOutput(1, 5, 5, 1)
-        O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
-                               (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
-        opDefractLong = pkb._KerasNode('defract_long', name='opDefractLong', tensor=O)
-        return [opDefractLong]
-
-    @opTest([[m(3), m(3) + 1]], skip_tensorflow=True, skip_theano=True)
-    def testDefract(self, b, x, k):
-        I = x.tensor
-        K = k.tensor
-        N = edsl.TensorDim()
-        M = edsl.TensorDim()
-        i = edsl.TensorIndex()
-        j = edsl.TensorIndex()
-        I.bind_dims(N)
-        K.bind_dims(M)
-        O = edsl.TensorOutput(5)
-
-        O[i] += (I[(i - j + 1) // 2] * K[j])
-
-        opDefract = pkb._KerasNode('defract_test', name='opDefract', tensor=O)
-        return [opDefract]
-
-    @opTest([[m(3)]], skip_tensorflow=True, skip_theano=True)
-    def testDefractShort(self, b, x):
-
-        I = x.tensor
-        N = edsl.TensorDim()
-        i = edsl.TensorIndex()
-        j = edsl.TensorIndex()
-        I.bind_dims(N)
-        O = edsl.TensorOutput(6)
-        O[i] += (I[(i - 1) // 2])
-        opDefractShort = pkb._KerasNode('defract_short_test', name='opDefractShort', tensor=O)
-        return [opDefractShort]
-
-    @opTest([[m(3), m(3) + 1]], skip_tensorflow=True, skip_theano=True, do_grads=False)
-    #TODO: do_grads=False helps test pass but need a fix
-    def testFunkyLayerNames(self, b, x, k):
-        '''Exercises fix for plaidml bug #241
-
-        Now that we emit keras layer names as 'pid' attribute values, in order
-        to help link tile code back to its origin while debugging, we must
-        reformat those names as valid tile identifiers. If we are doing that,
-        this test will pass, otherwise we'll get a syntax error.'''
-
-        I = x.tensor
-        K = k.tensor
-        N = edsl.TensorDim()
-        M = edsl.TensorDim()
-        i = edsl.TensorIndex()
-        j = edsl.TensorIndex()
-        I.bind_dims(N)
-        K.bind_dims(M)
-        O = edsl.TensorOutput(5)
-
-        O[i] += (I[(i - j + 1) // 2] * K[j])
-
-        opFunky = pkb._KerasNode('this-is-not an identifier',
-                                 name='this-is-not an identifier',
-                                 tensor=O)
-
-        return [opFunky]
-
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
             1e-04,
             skip_theano=True)
@@ -1634,28 +1548,6 @@ class TestBackendOps(unittest.TestCase):
             pkb.conv(A, B, strides=(2, 3))
         with self.assertRaises(pml2_ffi_Error):
             pkb.conv(A, B, dilation_rate=(1, 1))
-
-    @unittest.skipIf(
-        os.environ.get("USE_STRIPE", "0") == "1",
-        "Stripe does not correctly validate assignment ops")
-    #@unittest.skip('TODO: convert to EDSL')
-    def testAssignmentExceptions(self):
-        A = pkb.variable(m(5, 1)).tensor
-        B = pkb.variable(m(1, 5)).tensor
-        L, M, N = edsl.TensorDims(3)
-        i, j, k = edsl.TensorIndexes(3)
-        A.bind_dims(L, M)
-        B.bind_dims(M, N)
-        O = edsl.TensorOutput(L, N)
-        O[i, j] = A[i, k] * B[k, j]
-        OutputAB = pkb._KerasNode('assignment_non_exception', name='opAB', tensor=O)
-        npt.assert_allclose(pkb.eval(OutputAB), np.dot(m(5, 1), m(1, 5)))
-        with self.assertRaises(RuntimeError) as cm:
-            O = edsl.TensorOutput(L, N)
-            O[i, j] = B[i, j] * A[j, k]
-            OutputBA = pkb._KerasNode('assignment_exception', name='opBA', tensor=O)
-            OutputBA.eval()
-        self.assertTrue("Multiple assignment" in str(cm.exception))
 
     @compareForwardExact()
     def testCastToInt(self, b):
