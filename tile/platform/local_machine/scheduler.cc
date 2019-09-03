@@ -382,6 +382,18 @@ void ValidateSchedule(const tile::proto::Program& program, const lang::KernelLis
   }
 }
 
+inline std::size_t AlignUp(std::size_t byte_size, std::size_t alignment) {
+  return ((byte_size + alignment - 1) / alignment) * alignment;
+}
+
+std::size_t TotalAllocSize(const schedule::Schedule& schedule, std::size_t alignment) {
+  std::size_t total_size = 0;
+  for (const auto& alloc : schedule.allocs) {
+    total_size += AlignUp(alloc.byte_size, alignment);
+  }
+  return total_size;
+}
+
 void SummarizeSchedule(hal::proto::CompilationInfo* cinfo, const tile::proto::Program& program,
                        const lang::KernelList& kl, const schedule::Schedule& schedule) {
   IVLOG(1, "Summary for " << program.id() << ":");

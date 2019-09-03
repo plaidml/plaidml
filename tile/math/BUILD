@@ -10,10 +10,10 @@ plaidml_cc_test(
         "math_test.cc",
         "test.cc",
     ],
+    tags = ["windows_fail"],
     deps = [
         ":math",
     ],
-    tags = ["catch"],
 )
 
 plaidml_cc_library(

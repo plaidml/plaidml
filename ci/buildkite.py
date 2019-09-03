@@ -49,12 +49,20 @@ def get_engine(pkey):
         return (':tensorflow:')
 
 
-def get_shard_number(shard):
+def get_shard_emoji(shard):
     numbers = [
-        ':zero:', ':one:', ':two:', ':three:', ':four:', ':five:', ':six:', ':seven:', ':eight:',
-        ':nine:'
+        ':zero:',
+        ':one:',
+        ':two:',
+        ':three:',
+        ':four:',
+        ':five:',
+        ':six:',
+        ':seven:',
+        ':eight:',
+        ':nine:',
     ]
-    return (numbers[shard])
+    return numbers[shard]
 
 
 def get_python(variant):
@@ -72,78 +80,43 @@ def cmd_pipeline(args, remainder):
 
     variants = []
     for variant in plan['VARIANTS'].keys():
-        variants.append(dict(name=variant, python=get_python(variant), emoji=get_emoji(variant)))
+        variants.append(dict(
+            name=variant,
+            python=get_python(variant),
+            emoji=get_emoji(variant),
+        ))
 
     tests = []
-    for skey, suite in plan['SUITES'].items():
-        for pkey, platform in suite['platforms'].items():
-            pinfo = plan['PLATFORMS'][pkey]
-            variant = pinfo['variant']
-            if args.pipeline not in platform['pipelines']:
-                continue
-
-            for wkey, workload in suite['workloads'].items():
-                popt = util.PlanOption(suite, workload, pkey)
-                skip = workload.get('skip_platforms', [])
-                if pkey in skip:
-                    continue
-
-                shc = popt.get('shardcount')
-
-                if shc:
-                    for shard in popt.get('run_shards'):
-                        rsh = shard
-                        shard = 'shard'
-                        shard_emoji = get_shard_number(rsh)
-                        for batch_size in suite['params'][args.pipeline]['batch_sizes']:
-                            tests.append(
-                                dict(
-                                    suite=skey,
-                                    workload=wkey,
-                                    platform=pkey,
-                                    batch_size=batch_size,
-                                    variant=variant,
-                                    timeout=popt.get('timeout', 20),
-                                    retry=popt.get('retry'),
-                                    softfail=popt.get('softfail'),
-                                    python=get_python(variant),
-                                    shard=shard,
-                                    shardcount=shc,
-                                    rsh=rsh,
-                                    shard_emoji=shard_emoji,
-                                    emoji=get_emoji(variant),
-                                    engine=get_engine(pkey)))
-
-                else:
-                    shard = None
-
-                for batch_size in suite['params'][args.pipeline]['batch_sizes']:
-                    if shc:
-                        continue
-
-                    else:
-                        tests.append(
-                            dict(
-                                suite=skey,
-                                workload=wkey,
-                                platform=pkey,
-                                batch_size=batch_size,
-                                variant=variant,
-                                timeout=popt.get('timeout', 20),
-                                retry=popt.get('retry'),
-                                softfail=popt.get('softfail'),
-                                python=get_python(variant),
-                                emoji=get_emoji(variant),
-                                engine=get_engine(pkey)))
+    for test in util.iterate_tests(plan, args.pipeline):
+        if test.shards > 1:
+            shard = dict(id=test.shard_id, count=test.shards)
+            shard_emoji = get_shard_emoji(test.shard_id)
+        else:
+            shard = None
+            shard_emoji = ''
+        tests.append(
+            dict(suite=test.suite_name,
+                 workload=test.workload_name,
+                 platform=test.platform_name,
+                 batch_size=test.batch_size,
+                 variant=test.variant,
+                 timeout=test.timeout,
+                 retry=test.retry,
+                 soft_fail=test.soft_fail,
+                 python=get_python(test.variant),
+                 shard=shard,
+                 shard_emoji=shard_emoji,
+                 emoji=get_emoji(test.variant),
+                 engine=get_engine(test.platform_name)))
 
     if args.count:
-        print('variants: {}'.format(len(variants)))
-        print('tests   : {}'.format(len(tests)))
-        print('total   : {}'.format(len(variants) + len(tests)))
+        util.printf('variants: {}'.format(len(variants)))
+        util.printf('tests   : {}'.format(len(tests)))
+        util.printf('total   : {}'.format(len(variants) + len(tests)))
     else:
         ctx = dict(variants=variants, tests=tests)
         yml = pystache.render(load_template('pipeline.yml'), ctx)
-        print(yml)
+        util.printf(yml)
 
 
 def bazel_bin_dir():
@@ -155,38 +128,52 @@ def wheel_path(arg):
     return pathlib.Path(bazel_bin_dir()) / arg / 'wheel.pkg' / 'dist'
 
 
-def wheel_clean(arg):
-    ws = list(wheel_path(arg).glob('*.whl'))
-    for f in ws:
-        if f.is_file():
-            print('deleting: ' + str(f.resolve()))
-            try:
-                os.remove(f)
-            except PermissionError:
-                import stat
-                os.chmod(f, stat.S_IWRITE)
-                os.remove(f)
+def wheel_clean(dirs):
+    for wheel_dir in dirs:
+        for f in wheel_dir.glob('*.whl'):
+            if f.is_file():
+                util.printf('deleting: ' + str(f.resolve()))
+                try:
+                    os.remove(f)
+                except PermissionError:
+                    import stat
+                    os.chmod(f, stat.S_IWRITE)
+                    os.remove(f)
+
+
+def buildkite_upload(pattern, **kwargs):
+    util.check_call(['buildkite-agent', 'artifact', 'upload', pattern], **kwargs)
+
+
+def buildkite_download(pattern, destination, **kwargs):
+    util.check_call(['buildkite-agent', 'artifact', 'download', pattern, destination], **kwargs)
 
 
 def cmd_build(args, remainder):
-
     util.printf('--- :snake: pre-build steps... ')
-    util.printf('bazel shutdown...')
-    util.check_output(['bazelisk', 'shutdown'])
     util.printf('delete any old whl files...')
-    wheel_clean('plaidml')
-    wheel_clean('plaidbench')
-    wheel_clean('plaidml/keras')
+    wheel_dirs = [
+        wheel_path('plaidml').resolve(),
+        wheel_path('plaidml/keras').resolve(),
+        wheel_path('plaidbench').resolve(),
+    ]
+    wheel_clean(wheel_dirs)
+
+    explain_log = 'explain.log'
+    profile_json = 'profile.json.gz'
 
     common_args = []
     common_args += ['--config={}'.format(args.variant)]
     common_args += ['--define=version={}'.format(args.version)]
-    common_args += ['--explain={}'.format(os.path.abspath('explain.log'))]
+    common_args += ['--experimental_generate_json_trace_profile']
+    common_args += ['--experimental_json_trace_compression']
+    common_args += ['--experimental_profile_cpu_usage']
+    common_args += ['--explain={}'.format(explain_log)]
+    common_args += ['--profile={}'.format(profile_json)]
     common_args += ['--verbose_failures']
     common_args += ['--verbose_explanations']
 
-    util.printf('--- :bazel: Running Build ...')
-
+    util.printf('--- :bazel: Running Build...')
     if platform.system() == 'Windows':
         util.check_call(['git', 'config', 'core.symlinks', 'true'])
         cenv = util.CondaEnv(pathlib.Path('.cenv'))
@@ -195,8 +182,14 @@ def cmd_build(args, remainder):
         env.update(cenv.env())
     else:
         env = None
+    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
 
-    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env, stderr=subprocess.DEVNULL)
+    util.printf('--- :buildkite: Uploading artifacts...')
+    buildkite_upload(explain_log)
+    buildkite_upload(profile_json)
+    for wheel_dir in wheel_dirs:
+        buildkite_upload('*.whl', cwd=wheel_dir)
+
     archive_dir = os.path.join(
         args.root,
         args.pipeline,
@@ -204,18 +197,8 @@ def cmd_build(args, remainder):
         'build',
         args.variant,
     )
-
-    util.printf('--- :buildkite: Uploading artifacts...')
-    pw = wheel_path('plaidml').resolve()
-    pbw = wheel_path('plaidbench').resolve()
-    pkw = wheel_path('plaidml/keras').resolve()
-    util.check_call(['buildkite-agent', 'artifact', 'upload', '*.whl'], cwd=pw)
-    util.check_call(['buildkite-agent', 'artifact', 'upload', '*.whl'], cwd=pbw)
-    util.check_call(['buildkite-agent', 'artifact', 'upload', '*.whl'], cwd=pkw)
     os.makedirs(archive_dir, exist_ok=True)
     shutil.copy(os.path.join('bazel-bin', 'pkg.tar.gz'), archive_dir)
-    util.printf('bazel shutdown...')
-    util.check_output(['bazelisk', 'shutdown'])
 
 
 def cmd_test(args, remainder):
@@ -223,38 +206,28 @@ def cmd_test(args, remainder):
     harness.run(args, remainder)
 
 
-def make_tarfile(output_filename, source_dir):
-    with tarfile.open(output_filename, "w:gz") as tar:
-        tar.add(source_dir, arcname=os.path.basename(source_dir))
+def make_all_wheels(workdir):
+    util.printf('clearing workdir: {}'.format(workdir))
+    shutil.rmtree(workdir, ignore_errors=True)
+    workdir.mkdir(parents=True, exist_ok=True)
 
+    util.printf('downloading wheels...')
+    buildkite_download('*.whl', str(workdir), cwd=workdir)
 
-def cmd_pack(arg):
-    pathlib.Path(arg).mkdir(parents=True, exist_ok=True)
-    dir_list = ['windows_x86_64', 'macos_x86_64', 'linux_x86_64', 'common']
-    whl_type = ['win_amd64', 'macosx', 'manylinux', 'none-any']
+    tarball = 'all_wheels.tar.gz'
+    util.printf('creating {}'.format(tarball))
+    with tarfile.open(tarball, "w:gz") as tar:
+        for whl in workdir.glob('*.whl'):
+            util.printf('adding {}'.format(whl))
+            tar.add(whl, arcname=whl.name)
 
-    os.chdir(arg)
-    print('downloading wheels...')
-    util.check_output(['buildkite-agent', 'artifact', 'download', '*.whl', '.'], cwd='.')
-    whl_files = list(pathlib.Path('.').glob('*.whl'))
-
-    [pathlib.Path(d).mkdir(parents=True, exist_ok=True) for d in dir_list]
-
-    for whl, dest in zip(whl_type, dir_list):
-        for f in whl_files:
-            if whl in str(f):
-                shutil.move(str(f), dest)
-
-    print('packing all_wheels...')
-    make_tarfile('all_wheels.tar.gz', '.')
-    util.check_call(['buildkite-agent', 'artifact', 'upload', 'all_wheels.tar.gz'])
-    os.chdir('..')
+    util.printf('uploading {}'.format(tarball))
+    buildkite_upload(tarball)
 
 
 def cmd_report(args, remainder):
-    cmd_pack('tmp')
-    #shutil.rmtree('tmp')
-
+    workdir = pathlib.Path('tmp').resolve()
+    make_all_wheels(workdir)
     archive_dir = os.path.join(args.root, args.pipeline, args.build_id)
     cmd = ['bazelisk', 'run', '//ci:report']
     cmd += ['--']
@@ -278,6 +251,8 @@ def make_cmd_test(parent):
     parser.add_argument('workload')
     parser.add_argument('batch_size')
     parser.add_argument('--local', action='store_true')
+    parser.add_argument('--shard', type=int)
+    parser.add_argument('--shard-count', type=int, default=0)
     parser.set_defaults(func=cmd_test)
 
 

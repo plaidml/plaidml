@@ -3,7 +3,8 @@
 #include "pmlc/dialect/stripe/transcode.h"
 
 #include "base/util/lookup.h"
-#include "pmlc/dialect/scalar/ops.h"
+#include "pmlc/dialect/eltwise/ops.h"
+#include "pmlc/dialect/eltwise/util.h"
 #include "pmlc/dialect/stripe/analysis.h"
 
 namespace pmlc {
@@ -119,7 +120,7 @@ struct IntrinsicBuilder {
       : builder(builder),  //
         locals(locals),
         intrinsic(intrinsic),
-        name("pml_scalar." + intrinsic.name),
+        name("eltwise." + intrinsic.name),
         done(false) {}
 
   template <class OpType>
@@ -150,7 +151,7 @@ static void ToStripeMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::
     throw std::runtime_error("No tags allowed on intrinsics");
   }
   IntrinsicBuilder intrinsic_builder(builder, locals, intrinsic);
-  scalar::ForAllOps(intrinsic_builder);
+  eltwise::ForAllOps(intrinsic_builder);
   if (!intrinsic_builder.done) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
@@ -230,9 +231,9 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
         Value* from = safe_at(locals.refs, load->from);
         auto tt = from->getType().cast<TensorType>();
         DictionaryAttr attrs = TagsToDict(builder, *load);
-
-        auto inst = builder->create<LoadOp>(builder->getUnknownLoc(), tt.base(), from, attrs);
-        locals.scalars.emplace(load->into, inst);
+        auto intoType = eltwise::GetTensorType(tt.base());
+        auto op = builder->create<LoadOp>(builder->getUnknownLoc(), intoType, from, attrs);
+        locals.scalars.emplace(load->into, op);
       } break;
       case stripe::StmtKind::Store: {
         const auto& store = stripe::Store::Downcast(stmt);

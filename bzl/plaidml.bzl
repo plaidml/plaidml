@@ -1,6 +1,7 @@
 # Tile Bazel configurations
 
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
+load("@rules_python//python:defs.bzl", "py_library")
 
 PY_SRCS_VER = "PY2AND3"
 
@@ -48,7 +49,7 @@ def plaidml_cc_test(copts = [], deps = (), linkopts = [], **kwargs):
     )
 
 def plaidml_py_library(**kwargs):
-    native.py_library(srcs_version = PY_SRCS_VER, **kwargs)
+    py_library(srcs_version = PY_SRCS_VER, **kwargs)
 
 def plaidml_proto_library(name, **kwargs):
     plaidml_cc_proto_library(name = name, **kwargs)

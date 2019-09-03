@@ -24,8 +24,6 @@ build --action_env=http_proxy
 build --action_env=https_proxy
 
 build --define=version=0.0.0.dev0
-build --build_tag_filters=-msvc
-test --test_tag_filters=-msvc
 test --test_timeout_filters=-eternal
 test --test_output=streamed
 test --test_env=HOME
@@ -48,10 +46,12 @@ build:macos_x86_64 --apple_platform_type=macos
 build:macos_x86_64 --build_tag_filters=-large,-linux,-msvc
 test:macos_x86_64 --test_tag_filters=-large,-linux,-msvc
 
-build:windows_x86_64 --build_tag_filters=-conda,-darwin,-deb,-docs,-graphviz,-linux,-metal,-pytorch,-shell
+build:windows_x86_64 --build_tag_filters=-darwin,-docs,-linux,-metal,-pytorch
+build:windows_x86_64 --action_env=CONDA_EXE
 build:windows_x86_64 --action_env=NUMBER_OF_PROCESSORS
 build:windows_x86_64 --action_env=PLAIDML_SETTINGS
-test:windows_x86_64 --test_tag_filters=-catch,-conda,-darwin,-deb,-docs,-graphviz,-linux,-metal,-stripe_test,-pytorch,-shell,-windows_path_fail
+test:windows_x86_64 --test_tag_filters=-darwin,-docs,-linux,-metal,-pytorch,-windows_fail
+test:windows_x86_64 --test_env=CONDA_EXE
 test:windows_x86_64 --test_env=NUMBER_OF_PROCESSORS
 test:windows_x86_64 --test_env=PLAIDML_SETTINGS
 test:windows_x86_64 --test_env=USERPROFILE
@@ -60,3 +60,28 @@ build:callgrind -c dbg
 build:callgrind --cxxopt=-O3
 build:callgrind --define=with_callgrind=true
 run:callgrind --run_under='valgrind --quiet --tool=callgrind'
+
+run:lldb --run_under='lldb --'
+run:gdb --run_under='gdbserver :2345'
+
+# Basic ASAN/UBSAN that works for gcc
+build:asan -c dbg
+build:asan --copt -fsanitize=address,undefined
+build:asan --copt -fno-sanitize=vptr
+build:asan --linkopt -fsanitize=address,undefined
+build:asan --linkopt -fno-sanitize=vptr
+build:asan --linkopt -ldl
+build:asan --copt -Wno-macro-redefined
+build:asan --copt -D_FORTIFY_SOURCE=0
+build:asan --copt -DADDRESS_SANITIZER=1
+build:asan --copt -D__SANITIZE_ADDRESS__
+build:asan --define tcmalloc=disabled
+build:asan --define signal_trace=disabled
+run:asan --test_env=ASAN_ENABLE=1
+run:asan --test_env=ASAN_OPTIONS
+run:asan --test_env=ASAN_SYMBOLIZER_PATH
+run:asan --test_env=DYLD_INSERT_LIBRARIES
+test:asan --test_env=ASAN_ENABLE=1
+test:asan --test_env=ASAN_OPTIONS
+test:asan --test_env=ASAN_SYMBOLIZER_PATH
+test:asan --test_env=DYLD_INSERT_LIBRARIES

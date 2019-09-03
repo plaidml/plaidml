@@ -83,6 +83,12 @@ def plaidml_workspace():
         build_file = Label("//bzl:opencl_headers.BUILD"),
     )
 
+    http_file(
+        name = "plantuml_jar",
+        urls = ["https://storage.googleapis.com/vertexai-depot/plantuml.jar"],
+        sha256 = "26d60e43c14106a3d220e33c2b2e073b2bce40b433ad3e5fa13c747f58e67ab6",
+    )
+
     http_archive(
         name = "pybind11",
         url = "https://github.com/pybind/pybind11/archive/v2.2.4.tar.gz",
@@ -92,62 +98,39 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "rules_pkg",
+        sha256 = "e46b4f5aa71d1037c7c8142e2fedb503127af4bbd9dbde4a742d119749f68a3f",
+        strip_prefix = "rules_pkg-cb54c427343aa48c32e3c09ddcc8f6316cdbd5a6/pkg",
+        url = "https://github.com/bazelbuild/rules_pkg/archive/cb54c427343aa48c32e3c09ddcc8f6316cdbd5a6.tar.gz",
+    )
+
+    http_archive(
+        name = "rules_python",
+        sha256 = "b5bab4c47e863e0fbb77df4a40c45ca85f98f5a2826939181585644c9f31b97b",
+        strip_prefix = "rules_python-9d68f24659e8ce8b736590ba1e4418af06ec2552",
+        url = "https://github.com/bazelbuild/rules_python/archive/9d68f24659e8ce8b736590ba1e4418af06ec2552.tar.gz",
+    )
+
+    http_archive(
         name = "zlib",
         url = "https://storage.googleapis.com/external_build_repo/zlib-1.2.8.tar.gz",
         sha256 = "36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d",
         build_file = Label("//bzl:zlib.BUILD"),
     )
 
-    http_file(
-        name = "plantuml_jar",
-        urls = ["https://storage.googleapis.com/vertexai-depot/plantuml.jar"],
-        sha256 = "26d60e43c14106a3d220e33c2b2e073b2bce40b433ad3e5fa13c747f58e67ab6",
-    )
-
     configure_protobuf()
     configure_cuda(name = "cuda")
 
     conda_repo(
-        name = "com_intel_plaidml_conda",
-        env = Label("//conda:plaidml.yml"),
+        name = "com_intel_plaidml_conda_unix",
+        env = Label("//conda:unix.yml"),
+        build_file = Label("//conda:unix.BUILD"),
     )
 
     conda_repo(
-        name = "com_intel_plaidml_conda_analysis",
-        env = "@com_intel_plaidml//conda:analysis.yml",
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_buildkite",
-        env = "@com_intel_plaidml//conda:buildkite.yml",
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_ml_gpu",
-        env = "@com_intel_plaidml//conda:ml_gpu.yml",
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_pytorch",
-        env = Label("//conda:pytorch.yml"),
-        build_file = Label("//conda:pytorch.BUILD"),
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_sphinx",
-        env = Label("//conda:sphinx.yml"),
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_tools_unix",
-        env = Label("//conda:tools-unix.yml"),
-        build_file = Label("//conda:tools-unix.BUILD"),
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_tools_windows",
-        env = Label("//conda:tools-windows.yml"),
-        build_file = Label("//conda:tools-windows.BUILD"),
+        name = "com_intel_plaidml_conda_windows",
+        env = Label("//conda:windows.yml"),
+        build_file = Label("//conda:windows.BUILD"),
     )
 
     xsmm_repo(
@@ -168,9 +151,9 @@ def plaidml_workspace():
 
     dev_http_archive(
         name = "mlir",
-        url = "https://github.com/plaidml/mlir/archive/4fcc9e1d9f8797a26512de1c640e46d24e07831c.zip",
-        sha256 = "73cc16075b4190e739ada30e1338765590cfeb84588d057345de597ad3e36e48",
-        strip_prefix = "mlir-4fcc9e1d9f8797a26512de1c640e46d24e07831c",
+        url = "https://github.com/plaidml/mlir/archive/68490b2de514d5c897335bce2948cd73230a2719.zip",
+        sha256 = "d659ed13f15ea05e65247ded6939a377271ab97015ad3a7814a09401006a5cf2",
+        strip_prefix = "mlir-68490b2de514d5c897335bce2948cd73230a2719",
         build_file = Label("//vendor/mlir:mlir.BUILD"),
     )
 

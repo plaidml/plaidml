@@ -23,7 +23,9 @@ class AnalysisTest(unittest.TestCase):
             # due to bash's limit of 128 chars for the shebang line
             # see: https://github.com/pypa/pip/issues/1773
             # see: https://www.in-ulm.de/~mascheck/various/shebang/#length
-            cmd = ['python', os.path.join(conda_env, 'bin', 'jupyter-nbconvert')]
+            python = os.path.join(conda_env, 'bin', 'python')
+            nbconvert = os.path.join(conda_env, 'bin', 'jupyter-nbconvert')
+            cmd = [python, nbconvert]
         cmd += ['--execute', '--ExecutePreprocessor.timeout=60', notebook]
         subprocess.check_call(cmd, env=env)
 

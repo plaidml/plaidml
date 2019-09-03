@@ -56,8 +56,9 @@ def max_pool_2d(I):
 
 
 def flatten(X):
-    dims = X.shape.dims
-    product = functools.reduce(lambda x, y: x * y, dims[1:-1])
+    X_dims = TensorDims(X.shape.ndims)
+    X.bind_dims(*X_dims)
+    product = functools.reduce(lambda x, y: x * y, X_dims[1:-1])
     return reshape(X, (1, product))
 
 
@@ -166,7 +167,7 @@ class TestEdsl(unittest.TestCase):
         K4 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [128, 100]))
         B4 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [100]))
         D2 = softmax(dot(D1, K4) + B4)
-        program = Program('mnist_mlp', [D2])
+        program = Program('mnist_cnn', [D2])
         self.assertMultiLineEqual(
             str(program), '''function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3],

@@ -28,7 +28,8 @@ struct FloatConst;
 struct IntConst;
 struct ParamExpr;
 struct StringExpr;
-struct TensorSpecExpr;
+struct IndexMapExpr;
+struct SizeMapExpr;
 struct TupleExpr;
 
 struct PolyExpr;
@@ -163,20 +164,22 @@ struct DimExprExpr : Expr {
   std::string str() const;
 };
 
-struct TensorSpecExpr : Expr {
+struct IndexMapExpr : Expr {
   ExprPtr ref;
-  std::vector<PolyExprPtr> index_spec;
-  std::vector<DimExprPtr> output_dims;
+  std::vector<PolyExprPtr> idxs;
 
-  // input ctor
-  TensorSpecExpr(          //
+  IndexMapExpr(            //
       const ExprPtr& ref,  //
-      const std::vector<PolyExprPtr>& index_spec);
+      const std::vector<PolyExprPtr>& idxs);
 
-  // output ctor
-  TensorSpecExpr(                                  //
-      const std::vector<PolyExprPtr>& index_spec,  //
-      const std::vector<DimExprPtr>& output_dims);
+  void Accept(AstVisitor<void>* visitor) {}
+  std::string str() const;
+};
+
+struct SizeMapExpr : Expr {
+  std::vector<DimExprPtr> dims;
+
+  explicit SizeMapExpr(const std::vector<DimExprPtr>& dims);
 
   void Accept(AstVisitor<void>* visitor) {}
   std::string str() const;
@@ -194,8 +197,9 @@ struct ConstraintExpr : Expr {
 struct ContractionExpr : Expr {
   AggregationOp agg_op;
   CombinationOp combo_op;
-  std::shared_ptr<TensorSpecExpr> output;
-  std::vector<std::shared_ptr<TensorSpecExpr>> inputs;
+  std::shared_ptr<IndexMapExpr> sink_idxs;
+  std::shared_ptr<SizeMapExpr> sink_dims;
+  std::vector<std::shared_ptr<IndexMapExpr>> srcs;
   std::vector<std::shared_ptr<ConstraintExpr>> constraints;
   bool no_defract = false;
   ExprPtr use_default;

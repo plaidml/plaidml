@@ -27,11 +27,6 @@ def m(*args, **kwargs):
 
 class TestTileTutorial(unittest.TestCase):
 
-    def setUp(self):
-        plaidml.settings.config = None
-        plaidml.settings.setup = True
-        plaidml.settings.experimental = True
-
     def testSumOverAxis(self):
         I = K.variable(np.array([[1., 2., 3.], [4., 5., 6.]]))
         code = """function (I[M, N]) -> (O) {

@@ -1,6 +1,8 @@
 # Copyright 2019 Intel Corporation.
 
-load("//vendor/mlir:mlir.bzl", "mlir_tblgen")
+package(default_visibility = ["//visibility:public"])
+
+load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_library",
@@ -12,6 +14,7 @@ mlir_tblgen(
     src = "ops.td",
     out = "ops.h.inc",
     action = "-gen-op-decls",
+    also = ["predicates.td"],
     incs = ["@mlir//:include"],
 )
 
@@ -20,37 +23,34 @@ mlir_tblgen(
     src = "ops.td",
     out = "ops.cpp.inc",
     action = "-gen-op-defs",
+    also = ["predicates.td"],
     incs = ["@mlir//:include"],
 )
 
 plaidml_cc_library(
-    name = "scalar",
+    name = "eltwise",
     srcs = [
         "dialect.cc",
         "ops.cc",
-        ":gen-op-defs",
+        "ops.cpp.inc",
+        "util.cc",
     ],
     hdrs = [
+        "dialect.h",
         "ops.h",
+        "ops.h.inc",
         "types.h",
-        ":gen-op-decls",
+        "util.h",
     ],
+    copts = COPTS,
     visibility = ["//visibility:public"],
     deps = [
+        ":gen-op-decls",
+        ":gen-op-defs",
         "//tile/base",
         "@llvm//:support",
         "@mlir//:IR",
         "@mlir//:StandardOps",
     ],
     alwayslink = 1,
-)
-
-plaidml_cc_test(
-    name = "scalar_test",
-    srcs = ["scalar_test.cc"],
-    deps = [
-        ":scalar",
-        "@mlir//:EDSC",
-        "@mlir//:Transforms",
-    ],
 )

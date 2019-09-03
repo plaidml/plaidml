@@ -10,19 +10,21 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
+using eltwise::ScalarType;
 using mlir::ArrayRef;
 using mlir::Builder;
+using mlir::IndexType;
 using mlir::LogicalResult;
 using mlir::NamedAttribute;
 using mlir::Op;
 using mlir::Operation;
 using mlir::OperationState;
 using mlir::OpFoldResult;
+using mlir::RankedTensorType;
 using mlir::ShapedType;
 using mlir::StringRef;
 using mlir::Type;
 using mlir::Value;
-using scalar::ScalarType;
 
 namespace OpTrait = mlir::OpTrait;
 

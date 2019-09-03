@@ -20,7 +20,7 @@ def _conda_repo_impl(repository_ctx):
         "-p",
         prefix_path,
     ]
-    result = repository_ctx.execute(args, quiet = False, timeout = 1200)
+    result = repository_ctx.execute(args, quiet = False, timeout = 1800)
     if result.return_code:
         fail("conda_repo failed: %s (%s)" % (result.stdout, result.stderr))
 

@@ -1,4 +1,4 @@
-// Copyright 2018, Intel Corporation
+// Copyright 2019, Intel Corporation
 
 #pragma once
 
@@ -6,7 +6,7 @@
 #include <tuple>
 #include <vector>
 
-#include "pmlc/dialect/scalar/types.h"
+#include "pmlc/dialect/eltwise/types.h"
 #include "pmlc/dialect/stripe/mlir.h"
 #include "tile/base/shape.h"
 
@@ -35,9 +35,9 @@ class AffineType : public Type::TypeBase<AffineType, Type> {
 };
 
 struct TensorTypeStorage : public mlir::TypeStorage {
-  TensorTypeStorage(scalar::ScalarType base, size_t ndim) : base(base), ndim(ndim) {}
+  TensorTypeStorage(eltwise::ScalarType base, size_t ndim) : base(base), ndim(ndim) {}
 
-  using KeyTy = std::tuple<scalar::ScalarType, size_t>;
+  using KeyTy = std::tuple<eltwise::ScalarType, size_t>;
   bool operator==(const KeyTy& key) const { return base == std::get<0>(key) && ndim == std::get<1>(key); }
   static llvm::hash_code hashKey(const KeyTy& key) { return hash_value(key); }
 
@@ -45,7 +45,7 @@ struct TensorTypeStorage : public mlir::TypeStorage {
     return new (allocator.allocate<TensorTypeStorage>()) TensorTypeStorage(std::get<0>(key), std::get<1>(key));
   }
 
-  scalar::ScalarType base;
+  eltwise::ScalarType base;
   size_t ndim;
 };
 
@@ -55,11 +55,11 @@ class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
 
   static bool kindof(unsigned kind) { return kind == PlaidKind::Tensor; }
 
-  static TensorType get(MLIRContext* context, scalar::ScalarType base, size_t ndim) {
+  static TensorType get(MLIRContext* context, eltwise::ScalarType base, size_t ndim) {
     return Base::get(context, PlaidKind::Tensor, base, ndim);
   }
 
-  scalar::ScalarType base() { return getImpl()->base; }
+  eltwise::ScalarType base() { return getImpl()->base; }
   size_t ndim() { return getImpl()->ndim; }
 };
 

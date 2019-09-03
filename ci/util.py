@@ -5,9 +5,6 @@ import shutil
 import subprocess
 import sys
 
-if platform.system() == 'Windows':
-    import win32api
-
 verbose = False  # pylint: disable=invalid-name
 
 
@@ -65,6 +62,7 @@ class CondaEnv(object):
         }
         if platform.system() != 'Windows':
             env['JAVA_HOME'] = str(self.path)
+            env['CONDA_EXE'] = str(self.path / 'Scripts' / 'conda.exe')
         else:
             env['JAVA_HOME'] = str(self.path / 'Library')
         return env
@@ -154,11 +152,21 @@ class Platform(object):
 
 class TestInfo(object):
 
-    def __init__(self, suite, workload, platform, batch_size):
+    def __init__(self, suite, workload, platform, batch_size, variant, popt, shards=1, shard_id=0):
         self.suite_name, self.suite = suite
         self.workload_name, self.workload = workload
         self.platform_name, self.platform = platform
         self.batch_size = batch_size
+        self.variant = variant
+        self.timeout = popt.get('timeout', 20)
+        self.retry = popt.get('retry')
+        self.soft_fail = popt.get('soft_fail')
+        self.shards = shards
+        self.shard_id = shard_id
+        if self.shards > 1:
+            self.instance_name = '{}-{}'.format(self.workload_name, self.shard_id)
+        else:
+            self.instance_name = self.workload_name
 
     def __repr__(self):
         return '{}/{}/{}/bs{}'.format(self.suite_name, self.workload_name, self.platform_name,
@@ -174,3 +182,31 @@ class TestInfo(object):
     def path(self, root):
         batch_size = 'BATCH_SIZE={}'.format(self.batch_size)
         return root / self.suite_name / self.workload_name / self.platform_name / batch_size
+
+
+def iterate_tests(plan, pipeline):
+    gpu_flops = plan['CONST']['gpu_flops']
+    for skey, suite in plan['SUITES'].items():
+        for pkey, platform in suite['platforms'].items():
+            pinfo = plan['PLATFORMS'][pkey]
+            variant = pinfo['variant']
+            if pipeline not in platform['pipelines']:
+                continue
+            for wkey, workload in suite['workloads'].items():
+                popt = PlanOption(suite, workload, pkey)
+                skip = workload.get('skip_platforms', [])
+                if pkey in skip:
+                    continue
+                shards = popt.get('shards', 1)
+                for shard_id in range(shards):
+                    for batch_size in suite['params'][pipeline]['batch_sizes']:
+                        yield TestInfo(
+                            suite=(skey, suite),
+                            workload=(wkey, workload),
+                            platform=(pkey, Platform(pkey, gpu_flops)),
+                            batch_size=batch_size,
+                            variant=variant,
+                            popt=popt,
+                            shard_id=shard_id,
+                            shards=shards,
+                        )

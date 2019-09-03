@@ -1,6 +1,6 @@
 # Copyright 2019, Intel Corporation.
 
-load("//bzl:conda.bzl", "conda_test")
+load("@rules_python//python:defs.bzl", "py_test")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_binary",
@@ -21,7 +21,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml2:api",
-        "@com_intel_plaidml_conda_pytorch//:pytorch",
+        "@com_intel_plaidml_conda_unix//:pytorch",
     ],
     alwayslink = 1,
 )
@@ -37,7 +37,7 @@ plaidml_py_library(
     name = "py",
     srcs = ["__init__.py"],
     data = [":plaidml_pytorch.so"],
-    tags = ["conda", "pytorch"],
+    tags = ["pytorch"],
     visibility = ["//visibility:public"],
     deps = ["//plaidml2:py"],
 )
@@ -49,10 +49,9 @@ plaidml_py_library(
     deps = [":py"],
 )
 
-conda_test(
+py_test(
     name = "ops_test",
     srcs = ["ops_test.py"],
-    env = "@com_intel_plaidml_conda_pytorch//:env",
     tags = [
         "manual",
         "pytorch",
@@ -60,10 +59,9 @@ conda_test(
     deps = [":test_utils"],
 )
 
-conda_test(
+py_test(
     name = "models_test",
     srcs = ["models_test.py"],
-    env = "@com_intel_plaidml_conda_pytorch//:env",
     tags = [
         "manual",
         "pytorch",

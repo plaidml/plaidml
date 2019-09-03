@@ -3,13 +3,14 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
-load("//vendor/mlir:mlir.bzl", "mlir_tblgen")
+load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
 
 mlir_tblgen(
     name = "gen-op-decls",
     src = "ops.td",
     out = "ops.h.inc",
     action = "-gen-op-decls",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
     incs = ["@mlir//:include"],
 )
 
@@ -18,6 +19,7 @@ mlir_tblgen(
     src = "ops.td",
     out = "ops.cpp.inc",
     action = "-gen-op-defs",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
     incs = ["@mlir//:include"],
 )
 
@@ -27,19 +29,22 @@ plaidml_cc_library(
         "analysis.cc",
         "dialect.cc",
         "ops.cc",
-        ":gen-op-defs",
+        "ops.cpp.inc",
     ],
     hdrs = [
         "analysis.h",
         "attrs.h",
         "mlir.h",
         "ops.h",
+        "ops.h.inc",
         "types.h",
-        ":gen-op-decls",
     ],
+    copts = COPTS,
     tags = ["llvm"],
     deps = [
-        "//pmlc/dialect/scalar",
+        ":gen-op-decls",
+        ":gen-op-defs",
+        "//pmlc/dialect/eltwise",
         "//tile/base",
         "@boost",
         "@llvm//:support",
@@ -52,12 +57,13 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "transcode",
     srcs = [
-        "to_stripe_mlir.cc",
         "to_stripe.cc",
+        "to_stripe_mlir.cc",
     ],
     hdrs = [
         "transcode.h",
     ],
+    copts = COPTS,
     tags = ["llvm"],
     deps = [
         ":stripe",
@@ -74,20 +80,25 @@ plaidml_cc_library(
     hdrs = [
         "padding_pass.h",
     ],
+    copts = COPTS,
     tags = ["llvm"],
     deps = [
+        ":stripe",
         "//tile/codegen:proto_cc",
-	":stripe",
     ],
 )
 
 plaidml_cc_test(
     name = "stripe_test",
     srcs = ["stripe_test.cc"],
-    tags = ["llvm", "stripe_test"],
+    copts = COPTS,
+    tags = [
+        "llvm",
+        "windows_fail",
+    ],
     deps = [
-        ":transcode",
         ":passes",
+        ":transcode",
         "//tile/codegen",
         "//tile/lang",
         "//tile/lib",

@@ -2,6 +2,9 @@
 
 #include "tile/lang/ast/traversal.h"
 
+#include <memory>
+#include <unordered_map>
+
 #include "base/util/stream_container.h"
 #include "tile/lang/ast/fold.h"
 
@@ -48,7 +51,7 @@ class AstTraversal : public AstVisitor<void> {
     // push inputs from right-to-left so they eventually get processed in left-to-right order
     IVLOG(6, "Visiting ContractionExpr: " << &expr);
     IVLOG(6, "  with agg_op " << to_string(expr.agg_op) << ", combo_op " << to_string(expr.combo_op));
-    for (auto it = expr.inputs.rbegin(); it != expr.inputs.rend(); ++it) {
+    for (auto it = expr.srcs.rbegin(); it != expr.srcs.rend(); ++it) {
       Push((*it)->ref);
     }
     if (expr.use_default) {
@@ -121,8 +124,8 @@ class AstPassRunner : AstVisitor<void> {
     IVLOG(4, "AstPassRunner::Visit(ContractionExpr)> " << &expr);
     auto new_expr = std::make_shared<ContractionExpr>();
     *new_expr = expr;
-    for (size_t i = 0; i < expr.inputs.size(); i++) {
-      new_expr->inputs[i]->ref = Translate(expr.inputs[i]->ref);
+    for (size_t i = 0; i < expr.srcs.size(); i++) {
+      new_expr->srcs[i]->ref = Translate(expr.srcs[i]->ref);
     }
     if (expr.use_default) {
       new_expr->use_default = Translate(expr.use_default);

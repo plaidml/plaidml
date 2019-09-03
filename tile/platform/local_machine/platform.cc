@@ -31,11 +31,6 @@ namespace tile {
 namespace local_machine {
 namespace {
 
-// The percentage of the device's memory that programs will try to use.
-// This value seems to work pretty well on most devices.
-// TODO: Either autotune this, or move it to the per-device configuration.
-constexpr float kGoalMemPercentage = .85;
-
 void GetMemStrategy(const std::shared_ptr<DevInfo>& devinfo, Platform::PlatformDev* pd) {
   if (devinfo->dev->executor() && devinfo->dev->executor()->shared_memory()) {
     IVLOG(2, "Using shared memory for data transfer");

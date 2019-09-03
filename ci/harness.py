@@ -19,26 +19,17 @@ def buildkite_metadata(key, default=None):
     return os.getenv('BUILDKITE_AGENT_META_DATA_' + key, os.getenv(key, default))
 
 
-def run(args, shargs):
-    if shargs:
-        print('running shard: ', shargs[3])
-        shard_num = shargs[3]
-
-    root = pathlib.Path('.').resolve() / 'tmp'
-    input = root / 'input'
-    output_root = root / 'output'
-
-    if shargs:
-        shard_result = str(args.workload) + '-' + shargs[3]
-        output = output_root / args.suite / shard_result / args.platform / 'BATCH_SIZE={}'.format(
-            args.batch_size)
-    else:
-        output = output_root / args.suite / args.workload / args.platform / 'BATCH_SIZE={}'.format(
-            args.batch_size)
+def run(args, remainder):
+    util.verbose = True
+    util.printf('args:', args)
+    if args.shard_count:
+        util.printf('running shard:', args.shard)
 
     with open('ci/plan.yml') as fp:
         plan = yaml.safe_load(fp)
 
+    gpu_flops = plan['CONST']['gpu_flops']
+    baseline_name = plan['CONST']['efficiency_baseline']
     platform = plan['PLATFORMS'][args.platform]
     variant_name = platform['variant']
     variant = plan['VARIANTS'][variant_name]
@@ -55,6 +46,21 @@ def run(args, shargs):
         sys.exit('Invalid workload. Available workloads: {}'.format(list(suite['workloads'])))
 
     popt = util.PlanOption(suite, workload, args.platform)
+    test_info = util.TestInfo(
+        suite=(args.suite, suite),
+        workload=(args.workload, workload),
+        platform=(args.platform, util.Platform(args.platform, gpu_flops)),
+        batch_size=args.batch_size,
+        variant=variant,
+        popt=popt,
+        shard_id=args.shard,
+        shards=args.shard_count,
+    )
+
+    root = pathlib.Path('tmp').resolve()
+    input = root / 'input'
+    output_root = root / 'output'
+    output = test_info.path(output_root)
 
     shutil.rmtree(input, ignore_errors=True)
     archive_dir = pathlib.Path(args.root) / args.pipeline / args.build_id
@@ -111,8 +117,9 @@ def run(args, shargs):
     cmd_args += platform_cfg.get('args', []) + popt.get('args', [])
     cmd_args += platform_cfg.get('append_args', []) + popt.get('append_args', [])
 
-    if shargs:
-        cmd_args += shargs
+    if args.shard_count:
+        cmd_args += ['--shard', str(args.shard)]
+        cmd_args += ['--shard-count', str(args.shard_count)]
 
     ctx = dict(
         results=output,
@@ -135,29 +142,13 @@ def run(args, shargs):
     else:
         build_url = DEFAULT_BUILD_URL
 
-    gpu_flops = plan['CONST']['gpu_flops']
-    baseline_name = plan['CONST']['efficiency_baseline']
-
-    if shargs:
-        test_info = util.TestInfo(
-            (args.suite, suite),
-            (shard_result, workload),
-            (args.platform, util.Platform(args.platform, gpu_flops)),
-            args.batch_size,
-        )
-    else:
-        test_info = util.TestInfo(
-            (args.suite, suite),
-            (args.workload, workload),
-            (args.platform, util.Platform(args.platform, gpu_flops)),
-            args.batch_size,
-        )
-
     golden_info = util.TestInfo(
-        (args.suite, suite),
-        (args.workload, workload),
-        (baseline_name, util.Platform(baseline_name, gpu_flops)),
-        args.batch_size,
+        suite=(args.suite, suite),
+        workload=(args.workload, workload),
+        platform=(baseline_name, util.Platform(baseline_name, gpu_flops)),
+        batch_size=args.batch_size,
+        variant=variant,
+        popt=popt,
     )
 
     result = analysis.Result(output_root, test_info, golden_info)
@@ -175,8 +166,7 @@ def run(args, shargs):
         'ref.execution_duration': result.ref.execution_duration,
     }
 
-    report_fn = 'report.json'
-    with (output / report_fn).open('w') as fp:
+    with (output / 'report.json').open('w') as fp:
         json.dump(report, fp)
 
     src = output_root

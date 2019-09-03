@@ -2,6 +2,7 @@
 
 #include "tile/hal/opencl/emitocl.h"
 
+#include <algorithm>
 #include <limits>
 #include <map>
 #include <utility>
