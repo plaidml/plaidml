@@ -6,7 +6,7 @@ from collections import namedtuple
 
 import numpy as np
 from plaidml2.core._version import PLAIDML_VERSION
-from plaidml2.ffi import ForeignObject, ffi, ffi_call, lib
+from plaidml2.ffi import Error, ForeignObject, ffi, ffi_call, lib
 
 
 def __init():
