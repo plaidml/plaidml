@@ -616,16 +616,6 @@ plaidml_expr* plaidml_expr_contraction(  //
       expr->srcs.emplace_back(idxs);
       src_values.emplace_back(raw_src_idxs[i]->value);
     }
-    ConstraintCollector cc;
-    for (const auto& idx : expr->sink_idxs->idxs) {
-      idx->Accept(&cc);
-    }
-    for (const auto& src : expr->srcs) {
-      for (const auto& idx : src->idxs) {
-        idx->Accept(&cc);
-      }
-    }
-    expr->constraints = cc.constraints;
     expr->ComputeShape(layout);
     // TODO: deal with all agg_op/combo_op
     switch (agg_op) {
@@ -766,6 +756,26 @@ plaidml_expr* plaidml_expr_contraction(  //
   });
 }
 
+void plaidml_expr_contraction_add_constraint(  //
+    plaidml_error* err,                        //
+    plaidml_expr* expr,                        //
+    plaidml_poly_expr* lhs,                    //
+    plaidml_dim_expr* rhs) {
+  // TODO
+  ffi_wrap_void(err, [&] {
+    IVLOG(1, "plaidml_expr_contraction_add_constraint");
+    if (!expr) {
+      throw std::runtime_error("add_constraint can only be specified on a contraction.");
+    }
+    auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
+    if (!cion) {
+      throw std::runtime_error("add_constraint can only be specified on a contraction.");
+    }
+    auto constraint = std::make_shared<ConstraintExpr>(lhs->expr, rhs->expr);
+    cion->constraints.emplace_back(constraint);
+  });
+}
+
 void plaidml_expr_contraction_set_no_defract(  //
     plaidml_error* err,                        //
     plaidml_expr* expr,                        //
@@ -773,6 +783,9 @@ void plaidml_expr_contraction_set_no_defract(  //
   // TODO
   ffi_wrap_void(err, [&] {
     IVLOG(1, "plaidml_expr_contraction_set_no_defract");
+    if (!expr) {
+      throw std::runtime_error("no_defract can only be specified on a contraction.");
+    }
     auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
     if (!cion) {
       throw std::runtime_error("no_defract can only be specified on a contraction.");
@@ -788,6 +801,9 @@ void plaidml_expr_contraction_set_use_default(  //
   // TODO
   ffi_wrap_void(err, [&] {
     IVLOG(1, "plaidml_expr_contraction_set_use_default");
+    if (!expr) {
+      throw std::runtime_error("use_default can only be specified on a contraction.");
+    }
     auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
     if (!cion) {
       throw std::runtime_error("use_default can only be specified on a contraction.");
@@ -922,19 +938,6 @@ plaidml_poly_expr* plaidml_poly_expr_op(  //
     }
     auto value = MakeAffineOp(op, values);
     return new plaidml_poly_expr{MakeOp(static_cast<IntOp>(op), vec_args), value};
-  });
-}
-
-void plaidml_poly_expr_add_constraint(  //
-    plaidml_error* err,                 //
-    plaidml_poly_expr* lhs,             //
-    plaidml_dim_expr* rhs) {
-  // TODO
-  ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_poly_expr_add_constraint");
-    auto constraint = std::make_shared<ConstraintExpr>(lhs->expr, rhs->expr);
-    ConstraintApplier applier(constraint);
-    lhs->expr->Accept(&applier);
   });
 }
 
