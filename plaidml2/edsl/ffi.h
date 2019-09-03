@@ -107,11 +107,6 @@ PLAIDML_EDSL_API plaidml_poly_expr* plaidml_poly_expr_op(  //
     size_t nargs,                                          //
     plaidml_poly_expr** args);
 
-PLAIDML_EDSL_API void plaidml_poly_expr_add_constraint(  //
-    plaidml_error* err,                                  //
-    plaidml_poly_expr* lhs,                              //
-    plaidml_dim_expr* rhs);
-
 PLAIDML_EDSL_API void plaidml_dim_expr_free(  //
     plaidml_error* err,                       //
     plaidml_dim_expr* expr);
@@ -276,6 +271,12 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_contraction(  //
     plaidml_expr** src_idxs,                              //
     const char* name,                                     //
     const char* layout);
+
+PLAIDML_EDSL_API void plaidml_expr_contraction_add_constraint(  //
+    plaidml_error* err,                                         //
+    plaidml_expr* expr,                                         //
+    plaidml_poly_expr* lhs,                                     //
+    plaidml_dim_expr* rhs);
 
 PLAIDML_EDSL_API void plaidml_expr_contraction_set_no_defract(  //
     plaidml_error* err,                                         //

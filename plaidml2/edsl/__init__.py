@@ -62,10 +62,7 @@ class LogicalShape(ForeignObject):
             ptr=ffi_call(lib.plaidml_logical_shape_into_tensor_shape, self.as_ptr()))
 
 
-class Constraint(object):
-
-    def __bool__(self):
-        return True
+Constraint = namedtuple('Constraint', ['lhs', 'rhs'])
 
 
 def wrap_dim(x):
@@ -144,9 +141,7 @@ class TensorIndex(ForeignObject):
         super(TensorIndex, self).__init__(expr)
 
     def __lt__(self, rhs):
-        rhs = wrap_dim(rhs)
-        ffi_call(lib.plaidml_poly_expr_add_constraint, self.as_ptr(), rhs.as_ptr())
-        return Constraint()
+        return Constraint(self, wrap_dim(rhs))
 
     def __neg__(self):
         return TensorIndex(poly_op(lib.PLAIDML_INT_OP_NEG, self))
@@ -476,6 +471,18 @@ class Tensor(ForeignObject):
             raise TypeError('use_default can only be specified on a contraction.')
         ffi_call(lib.plaidml_expr_contraction_set_use_default, self.as_ptr(), rhs.as_ptr())
         return self
+
+    def add_constraint(self, constraint):
+        ffi_call(
+            lib.plaidml_expr_contraction_add_constraint,
+            self.as_ptr(),
+            constraint.lhs.as_ptr(),
+            constraint.rhs.as_ptr(),
+        )
+
+    def add_constraints(self, constraints):
+        for constraint in constraints:
+            self.add_constraint(constraint)
 
     # Return the tensor's shape
     @property

@@ -19,7 +19,7 @@ bool operator==(const Program& lhs, const std::string& rhs) {  //
 namespace {
 
 class Environment : public ::testing::Environment {
-  void SetUp() override {  //
+  void SetUp() override {
     plaidml::init();
     plaidml::edsl::init();
   }
@@ -141,9 +141,8 @@ Tensor MaxPooling2(const Tensor& I) {
   TensorIndex n, x0, x1, i, j, c;
   I.bind_dims(N, X0, X1, C);
   auto R = TensorOutput(N, (X0 + 1) / 2, (X1 + 1) / 2, C);
-  if (i < 2 && j < 2) {
-    R(n, x0, x1, c) >= I(n, 2 * x0 + i, 2 * x1 + j, c);
-  }
+  R(n, x0, x1, c) >= I(n, 2 * x0 + i, 2 * x1 + j, c);
+  R.add_constraints({i < 2, j < 2});
   return R;
 }
 
@@ -304,10 +303,9 @@ TEST(CppEdsl, RepeatElements) {
   TensorIndex n0, n1, n2, k;
   I.bind_dims(N0, N1, N2);
   auto O = TensorOutput(N0, 3 * N1, N2);
-  if (k < 3) {
-    O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
-    O.no_defract();
-  }
+  O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
+  O.add_constraint(k < 3);
+  O.no_defract();
   Program program("repeat_elts", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -492,9 +490,8 @@ TEST(CppEdsl, CumSum) {
   TensorIndex i, k;
   I.bind_dims(N);
   auto O = TensorOutput(N);
-  if (i - k < N) {
-    O(i) += I(k);
-  }
+  O(i) += I(k);
+  O.add_constraint(i - k < N);
   Program program("csum", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (

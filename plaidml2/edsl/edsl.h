@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <functional>
-#include <iterator>
 #include <memory>
 #include <ostream>
 #include <sstream>
@@ -86,35 +85,6 @@ class Program {
   std::vector<Tensor> outputs_;
 };
 
-class TensorIndexIterator {
- public:
-  TensorIndexIterator() = default;
-  explicit TensorIndexIterator(TensorIndex* index) : index_(index) {}
-
-  TensorIndexIterator& operator++() {
-    index_ = nullptr;
-    return *this;
-  }
-
-  bool operator!=(const TensorIndexIterator& other) { return index_ != other.index_; }
-  TensorIndex& operator*() { return *index_; }
-
- private:
-  TensorIndex* index_ = nullptr;
-};
-
-class Constraint {
-  friend class TensorFriend;
-  friend class TensorIndex;
-
- public:
-  Constraint operator&&(const Constraint& rhs) const { return Constraint(); }
-  operator bool() const { return true; }
-
- private:
-  Constraint() = default;
-};
-
 class TensorDim {
   friend class LogicalShape;
   friend class Tensor;
@@ -147,12 +117,16 @@ class TensorDim {
     return ffi::call<int64_t>(plaidml_dim_expr_get_int, impl_->ptr.get());
   }
 
+  plaidml_dim_expr* as_ptr() const { return impl_->ptr.get(); }
+
  private:
   explicit TensorDim(const std::shared_ptr<Impl>& impl) : impl_(impl) {}
 
  private:
   std::shared_ptr<Impl> impl_;
 };
+
+struct Constraint;
 
 class TensorIndex {
   friend class Tensor;
@@ -175,31 +149,28 @@ class TensorIndex {
     impl_->ptr = details::make_plaidml_poly_expr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, name.c_str()));
   }
 
-  TensorIndexIterator begin() { return TensorIndexIterator(this); }
-  TensorIndexIterator end() { return TensorIndexIterator{}; }
-
   TensorIndex operator-() const;
 
-  Constraint operator<(int64_t rhs) const {
-    TensorDim rhs_dim(rhs);
-    ffi::call_void(plaidml_poly_expr_add_constraint, impl_->ptr.get(), rhs_dim.impl_->ptr.get());
-    return Constraint();
-  }
+  Constraint operator<(int64_t rhs) const;
 
-  Constraint operator<(const TensorDim& rhs) const {
-    ffi::call_void(plaidml_poly_expr_add_constraint, impl_->ptr.get(), rhs.impl_->ptr.get());
-    return Constraint();
-  }
+  Constraint operator<(const TensorDim& rhs) const;
 
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_poly_expr_repr, impl_->ptr.get()));
   }
+
+  plaidml_poly_expr* as_ptr() const { return impl_->ptr.get(); }
 
  private:
   explicit TensorIndex(const std::shared_ptr<Impl>& impl) : impl_(impl) {}
 
  private:
   std::shared_ptr<Impl> impl_;
+};
+
+struct Constraint {
+  TensorIndex lhs;
+  TensorDim rhs;
 };
 
 class IndexedTensor {
@@ -484,6 +455,16 @@ class Tensor {
     return *this;
   }
 
+  void add_constraint(const Constraint& constraint) {
+    ffi::call_void(plaidml_expr_contraction_add_constraint, as_ptr(), constraint.lhs.as_ptr(), constraint.rhs.as_ptr());
+  }
+
+  void add_constraints(const std::vector<Constraint>& constraints) {
+    for (const auto& constraint : constraints) {
+      add_constraint(constraint);
+    }
+  }
+
   // Return the tensor's shape
   LogicalShape shape() const {
     auto ptr = details::make_plaidml_logical_shape(ffi::call<plaidml_logical_shape*>(plaidml_expr_get_shape, as_ptr()));
@@ -754,6 +735,10 @@ inline Program::Program(                 //
 inline TensorDim TensorDim::operator-() const { return TensorFriend::DimOp(PLAIDML_INT_OP_NEG, {*this}); }
 
 inline TensorIndex TensorIndex::operator-() const { return TensorFriend::PolyOp(PLAIDML_INT_OP_NEG, {*this}); }
+
+inline Constraint TensorIndex::operator<(int64_t rhs) const { return Constraint{*this, TensorDim(rhs)}; }
+
+inline Constraint TensorIndex::operator<(const TensorDim& rhs) const { return Constraint{*this, rhs}; }
 
 #define PLAIDML_EDSL_DEFINE_TENSOR_IDXDIM_BINARY_OPS(_op_, _int_op_, _fn_)           \
   inline TensorIndex operator _op_(const TensorIndex& lhs, const TensorIndex& rhs) { \
