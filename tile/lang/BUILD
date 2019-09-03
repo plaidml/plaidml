@@ -125,10 +125,10 @@ plaidml_cc_test(
         "simulate.h",
         "test.cc",
     ],
+    tags = ["windows_fail"],
     deps = [
         ":lang",
     ],
-    tags = ["catch"],
 )
 
 plaidml_bison(
@@ -137,12 +137,12 @@ plaidml_bison(
     env = select({
         "//toolchain:windows_x86_64": {},
         "//conditions:default": {
-            "PATH": "external/com_intel_plaidml_conda_tools_unix/env/bin",
+            "PATH": "external/com_intel_plaidml_conda_unix/env/bin",
         },
     }),
     tool = select({
-        "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_tools_windows//:bison",
-        "//conditions:default": "@com_intel_plaidml_conda_tools_unix//:bison",
+        "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_windows//:bison",
+        "//conditions:default": "@com_intel_plaidml_conda_unix//:bison",
     }),
 )
 
@@ -154,8 +154,8 @@ plaidml_flex(
         "//conditions:default": [],
     }),
     tool = select({
-        "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_tools_windows//:flex",
-        "//conditions:default": "@com_intel_plaidml_conda_tools_unix//:flex",
+        "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_windows//:flex",
+        "//conditions:default": "@com_intel_plaidml_conda_unix//:flex",
     }),
 )
 

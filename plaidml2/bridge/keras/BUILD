@@ -2,7 +2,7 @@
 
 licenses(["by_exception_only"])
 
-load("//bzl:conda.bzl", "conda_test")
+load("@rules_python//python:defs.bzl", "py_test")
 load("//bzl:plaidml.bzl", "plaidml_py_library", "plaidml_py_wheel")
 
 package(default_visibility = ["//visibility:public"])
@@ -18,16 +18,14 @@ plaidml_py_library(
         "//plaidml2/exec:py",
         "//plaidml2/op:py",
     ],
-    tags = ["conda"],
 )
 
-conda_test(
+py_test(
     name = "backend_test",
     timeout = "long",
     srcs = [
         "backend_test.py",
     ],
-    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -38,12 +36,11 @@ conda_test(
     ],
 )
 
-conda_test(
+py_test(
     name = "mnist_mlp_test",
     srcs = [
         "mnist_mlp_test.py",
     ],
-    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -53,12 +50,11 @@ conda_test(
     ],
 )
 
-conda_test(
+py_test(
     name = "regression_test",
     srcs = [
         "regression_test.py",
     ],
-    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -68,12 +64,11 @@ conda_test(
     ],
 )
 
-# conda_test(
+# py_test(
 #     name = "tf_test",
 #     srcs = [
 #         "tf_test.py",
 #     ],
-#     env = "@com_intel_plaidml_conda//:env",
 #     tags = [
 #         "keras",
 #         "tensorflow",
@@ -83,12 +78,11 @@ conda_test(
 #     ],
 # )
 
-# conda_test(
+# py_test(
 #     name = "tile_sandbox",
 #     srcs = [
 #         "tile_sandbox.py",
 #     ],
-#     env = "@com_intel_plaidml_conda//:env",
 #     tags = [
 #         "keras",
 #         "manual",
@@ -98,10 +92,9 @@ conda_test(
 #     ],
 # )
 
-conda_test(
+py_test(
     name = "trivial_model_test",
     srcs = ["trivial_model_test.py"],
-    env = "@com_intel_plaidml_conda//:env",
     tags = [
         "keras",
         "manual",
@@ -111,12 +104,11 @@ conda_test(
     ],
 )
 
-# conda_test(
+# py_test(
 #     name = "tutorial_test",
 #     srcs = [
 #         "tutorial_test.py",
 #     ],
-#     env = "@com_intel_plaidml_conda//:env",
 #     tags = [
 #         "keras",
 #     ],

@@ -94,7 +94,7 @@ plaidml_cc_test(
     copts = COPTS,
     tags = [
         "llvm",
-        "stripe_test",
+        "windows_fail",
     ],
     deps = [
         ":passes",
