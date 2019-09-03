@@ -762,6 +762,7 @@ class TestBackendOps(unittest.TestCase):
     def testSoftmax(self, b, x):
         return [
             -b.log(b.softmax(x)),
+            -b.log(b.softmax(x, axis=-1)),
             -b.log(b.softmax(x, axis=1)),
         ]
 

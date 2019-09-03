@@ -1496,33 +1496,14 @@ def sin(x):
 
 
 @_log_call
-def softmax(x):
-    y = plaidml_op.softmax(x.tensor, axis=x.tensor.shape.ndims - 1)
-    return _KerasNode('softmax', tensor=y)
-
-
-@_log_call
 def softmax(x, axis=None, name=None):
+    I = x.tensor
     if name is None:
         name = 'softmax'
-    I = x.tensor
-    ndims = I.shape.ndims
-    I_dims = edsl.TensorDims(ndims)
-    I.bind_dims(*I_dims)
     if axis is None:
-        axis = ndims - 1
-    axis = _normalize_axis(axis=axis, ndims=ndims, name=name + ' (softmax)')
-    if ndims == 2 and axis == 1:
-        return _KerasNode('softmax', name=name, tensor=plaidml_op.softmax(I, axis=1))
-
-    if axis == 0:
-        group = 1
-    else:
-        group = functools.reduce(lambda x, y: x * y, I_dims[:axis])
-    values = functools.reduce(lambda x, y: x * y, I_dims[axis:])
-    flat_x = reshape(x, (group, values))
-    result = _KerasNode('softmax', name=name, tensor=plaidml_op.softmax(flat_x.tensor, axis=1))
-    return reshape(result, I_dims)
+        axis = I.shape.ndims - 1
+    y = plaidml_op.softmax(I, axis=axis)
+    return _KerasNode('softmax', name=name, tensor=y)
 
 
 @_log_call
