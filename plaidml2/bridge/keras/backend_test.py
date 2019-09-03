@@ -490,6 +490,7 @@ class TestBackendOps(unittest.TestCase):
     def testEye(self, b, *args):
         return b.eye(*args)
 
+<<<<<<< HEAD
     @unittest.skip('TODO: convert to EDSL')
     def testTileIdentity(self):
         I = pkb.variable(m(3)).tensor
@@ -539,6 +540,8 @@ class TestBackendOps(unittest.TestCase):
         pkb.eval(opO2)
         return 0
 
+=======
+>>>>>>> EDSL move tests to edsl_test.py
     @opTest([[m(3, 3), m(3, 3)]])
     def testAddElements(self, b, x, y):
         return [x + y]
@@ -1117,6 +1120,7 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d_transpose(x, k, os, strides=st, padding=pd, data_format=df, dilation_rate=dr)
         ]
 
+<<<<<<< HEAD
     @opTest([[m(1, 3, 3, 1), m(1, 3, 3, 1) - 2]], skip_tensorflow=True, skip_theano=True)
 <<<<<<< HEAD
 =======
@@ -1245,6 +1249,8 @@ class TestBackendOps(unittest.TestCase):
 >>>>>>> EDSL convert backend tests
         return [opFunky]
 
+=======
+>>>>>>> EDSL move tests to edsl_test.py
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
             1e-04,
             skip_theano=True)
@@ -1726,6 +1732,7 @@ class TestBackendOps(unittest.TestCase):
         with self.assertRaises(pml2_ffi_Error):
             pkb.conv(A, B, dilation_rate=(1, 1))
 
+<<<<<<< HEAD
     @unittest.skipIf(
         os.environ.get("USE_STRIPE", "0") == "1",
         "Stripe does not correctly validate assignment ops")
@@ -1769,6 +1776,8 @@ class TestBackendOps(unittest.TestCase):
             OutputBA.eval()
         self.assertTrue("Multiple assignment" in str(cm.exception))
 
+=======
+>>>>>>> EDSL move tests to edsl_test.py
     @compareForwardExact()
     def testCastToInt(self, b):
         A = b.variable(m(3, 2, 4))
