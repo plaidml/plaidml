@@ -195,32 +195,105 @@ class TernaryConOp<string mnemonic> : ContractionOp<mnemonic> {
     AffineIndexMap:$sink);
 }
 
+// Assign
 def ConAssignOp : UnaryConOp<"=(x)"> {
   let summary = "=(x) contraction";
+}
+
+def ConAssignAddOp : BinaryConOp<"=(x+y)"> {
+  let summary = "=(x + y) contraction";
+}
+
+def ConAssignCondOp : TernaryConOp<"=(x==y?z)"> {
+  let summary = "=(x == y ? z) contraction";
 }
 
 def ConAssignEqOp : BinaryConOp<"=(x==y)"> {
   let summary = "=(x == y) contraction";
 }
 
+def ConAssignMulOp : BinaryConOp<"=(x*y)"> {
+  let summary = "=(x * y) contraction";
+}
+
+// Max
 def ConMaxOp : UnaryConOp<">(x)"> {
   let summary = ">(x) contraction";
+}
+
+def ConMaxAddOp : BinaryConOp<">(x+y)"> {
+  let summary = ">(x + y) contraction";
 }
 
 def ConMaxCondOp : TernaryConOp<">(x==y?z)"> {
   let summary = ">(x == y ? z) contraction";
 }
 
+def ConMaxEqOp : BinaryConOp<">(x==y)"> {
+  let summary = ">(x == y) contraction";
+}
+
+def ConMaxMulOp : BinaryConOp<">(x*y)"> {
+  let summary = ">(x * y) contraction";
+}
+
+// Min
 def ConMinOp : UnaryConOp<"<(x)"> {
   let summary = "<(x) contraction";
 }
 
+def ConMinAddOp : BinaryConOp<"<(x+y)"> {
+  let summary = "<(x + y) contraction";
+}
+
+def ConMinCondOp : TernaryConOp<"<(x==y?z)"> {
+  let summary = "<(x == y ? z) contraction";
+}
+
+def ConMinEqOp : BinaryConOp<"<(x==y)"> {
+  let summary = "<(x == y) contraction";
+}
+
+def ConMinMulOp : BinaryConOp<"<(x*y)"> {
+  let summary = "<(x * y) contraction";
+}
+
+// Prod
 def ConProdOp : UnaryConOp<"*(x)"> {
   let summary = "*(x) contraction";
 }
 
+def ConProdAddOp : BinaryConOp<"*(x+y)"> {
+  let summary = "*(x + y) contraction";
+}
+
+def ConProdCondOp : TernaryConOp<"*(x==y?z)"> {
+  let summary = "*(x == y ? z) contraction";
+}
+
+def ConProdEqOp : BinaryConOp<"*(x==y)"> {
+  let summary = "*(x == y) contraction";
+}
+
+def ConProdMulOp : BinaryConOp<"*(x*y)"> {
+  let summary = "*(x * y) contraction";
+}
+
+// Sum
 def ConSumOp : UnaryConOp<"+(x)"> {
   let summary = "+(x) contraction";
+}
+
+def ConSumAddOp : BinaryConOp<"+(x+y)"> {
+  let summary = "+(x + y) contraction";
+}
+
+def ConSumCondOp : TernaryConOp<"+(x==y?z)"> {
+  let summary = "+(x == y ? z) contraction";
+}
+
+def ConSumEqOp : BinaryConOp<"+(x==y)"> {
+  let summary = "+(x == y) contraction";
 }
 
 def ConSumMulOp : BinaryConOp<"+(x*y)"> {
