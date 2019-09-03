@@ -386,6 +386,144 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
 
+    def testDefract(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='K')
+        N = TensorDim()
+        M = TensorDim()
+        i = TensorIndex()
+        j = TensorIndex()
+        I.bind_dims(N)
+        K.bind_dims(M)
+        O = TensorOutput(5)
+
+        O[i] += (I[(i - j + 1) // 2] * K[j])
+        program = Program('defract_test', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0],
+  K[K_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
+}
+''')
+
+    def testDefractShort(self):
+
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        N = TensorDim()
+        i = TensorIndex()
+        j = TensorIndex()
+        I.bind_dims(N)
+        O = TensorOutput(6)
+        O[i] += (I[(i - 1) // 2])
+        program = Program('defract_short_test', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 6] = +(I[-1/2 + 1/2*x0]);
+}
+''')
+
+    def testDefractLong(self):
+
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 3, 3, 1]), name='I')
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 3, 3, 1]), name='K')
+        n, x0, x1, c0, c1, co, ci, k0, k1 = TensorIndexes(9)
+        O = TensorOutput(1, 5, 5, 1)
+        O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
+                               (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
+        program = Program('defract_long', [O])
+        print(program)
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0, I_1, I_2, I_3],
+  K[K_0, K_1, K_2, K_3]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, x3, x6 : 1, 5, 5, 1] = +(I[x0, -1/2 + 1/2*x1 + 1/2*x2, -1/2 + 1/2*x3 + 1/2*x4, x5] * K[2 - x2, 2 - x4, x6, x5]);
+}
+''')
+
+    def testFunkyLayerNames(self):
+        '''Exercises fix for plaidml bug #241
+
+        Now that we emit keras layer names as 'pid' attribute values, in order
+        to help link tile code back to its origin while debugging, we must
+        reformat those names as valid tile identifiers. If we are doing that,
+        this test will pass, otherwise we'll get a syntax error.'''
+
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='K')
+        N = TensorDim()
+        M = TensorDim()
+        i = TensorIndex()
+        j = TensorIndex()
+        I.bind_dims(N)
+        K.bind_dims(M)
+        O = TensorOutput(5)
+
+        O[i] += (I[(i - j + 1) // 2] * K[j])
+
+        program = Program('this-is-not an identifier', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0],
+  K[K_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
+}
+''')
+
+    def testTileIdentity(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        program = Program('tile_identity', [I])
+        self.assertMultiLineEqual(str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0 = ident(I);
+}
+''')
+
+    @unittest.skip(
+        'TODO: convert to EDSL - fails with Error: Unsupported agg_op/combo_op also exception needs to be thrown'
+    )
+    def testAssignmentExceptions(self):
+        A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [5, 1]), name='A')
+        B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 5]), name='B')
+        L, M, N = TensorDims(3)
+        i, j, k = TensorIndexes(3)
+        A.bind_dims(L, M)
+        B.bind_dims(M, N)
+        O = TensorOutput(L, N)
+        O[i, j] = A[i, k] * B[k, j]
+        program = Program('assignment_non_exception', [O])
+        print(program)
+        with self.assertRaises(RuntimeError) as cm:
+            O = TensorOutput(L, N)
+            O[i, j] = B[i, j] * A[j, k]
+            program = Program('assignment_exception', [O])
+        self.assertTrue("Multiple assignment" in str(cm.exception))
+
+    @unittest.skip('TODO: convert to EDSL - two outputs not currently supported')
+    def testTwoOutputs(self):
+        x = pkb.variable(m(3))
+        op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
+                            [('O1', x.shape), ('O2', x.shape)])
+        output = op.outputs['O1'].eval()
+        output = op.outputs['O2'].eval()
+        return 0
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

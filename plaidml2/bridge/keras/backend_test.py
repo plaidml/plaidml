@@ -490,15 +490,11 @@ class TestBackendOps(unittest.TestCase):
     def testEye(self, b, *args):
         return b.eye(*args)
 
+    @unittest.skip('TODO: convert to EDSL')
     def testTileIdentity(self):
         I = pkb.variable(m(3)).tensor
-        N = edsl.TensorDim()
-        #I.bind_dims(N)
-        #I = edsl.TensorOutput(N) #not sure if this is needed ?code segfaults with this line in
-        i = edsl.TensorIndex()
-        I[i] = I[i]
-        opId = pkb._KerasNode('tile_identity', name='opId', tensor=I)
-        pkb.eval(opId)
+        # opId = pkb._KerasNode('tile_identity', name='opId', tensor=I)
+        pkb.eval(I)
         return 0
 
     @unittest.skip('TODO: convert to EDSL - two outputs not currently supported')
@@ -1139,21 +1135,23 @@ class TestBackendOps(unittest.TestCase):
         to help link tile code back to its origin while debugging, we must
         reformat those names as valid tile identifiers. If we are doing that,
         this test will pass, otherwise we'll get a syntax error.'''
-        A = pkb.variable(m(5, 1)).tensor
-        B = pkb.variable(m(1, 5)).tensor
-        L = edsl.TensorDim()
-        M = edsl.TensorDim()
+
+        I = x.tensor
+        K = k.tensor
         N = edsl.TensorDim()
+        M = edsl.TensorDim()
         i = edsl.TensorIndex()
         j = edsl.TensorIndex()
-        k = edsl.TensorIndex()
-        A.bind_dims(L, M)
-        B.bind_dims(M, N)
-        O = edsl.TensorOutput(L, N)
-        O[i, j] = A[i, k] * B[k, j]
+        I.bind_dims(N)
+        K.bind_dims(M)
+        O = edsl.TensorOutput(5)
+
+        O[i] += (I[(i - j + 1) // 2] * K[j])
+
         opFunky = pkb._KerasNode('this-is-not an identifier',
                                  name='this-is-not an identifier',
                                  tensor=O)
+
         return [opFunky]
 
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
@@ -1640,15 +1638,12 @@ class TestBackendOps(unittest.TestCase):
     @unittest.skipIf(
         os.environ.get("USE_STRIPE", "0") == "1",
         "Stripe does not correctly validate assignment ops")
+    #@unittest.skip('TODO: convert to EDSL')
     def testAssignmentExceptions(self):
         A = pkb.variable(m(5, 1)).tensor
         B = pkb.variable(m(1, 5)).tensor
-        L = edsl.TensorDim()
-        M = edsl.TensorDim()
-        N = edsl.TensorDim()
-        i = edsl.TensorIndex()
-        j = edsl.TensorIndex()
-        k = edsl.TensorIndex()
+        L, M, N = edsl.TensorDims(3)
+        i, j, k = edsl.TensorIndexes(3)
         A.bind_dims(L, M)
         B.bind_dims(M, N)
         O = edsl.TensorOutput(L, N)
