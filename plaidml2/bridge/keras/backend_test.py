@@ -428,6 +428,19 @@ class TestBackendOps(unittest.TestCase):
     def testDot(self, b, x, y):
         return [b.dot(x, y)]
 
+    @unittest.skip(
+        "In TF calling set_value and then evaluating doesn't seem to produce the new value. "
+        "If we want to test this, we will need a more complex test.")
+    @compareMultiple([[3, 4, 2], [7]])
+    @compareForwardExact()
+    def testSetValue(self, b, *args):  # TODO: Not yet correct
+        np_old_x = m(*args)
+        np_new_x = n(*args)
+        print("old: {}, new: {}".format(np_old_x, np_new_x))
+        x = b.variable(m(*args))
+        b.set_value(x, n(*args))
+        return x
+
     # TODO(T1046): Once Keras is updated beyond 2.0.8, re-enable TF on batch_dot tests
     @opTest(
         [
@@ -749,6 +762,7 @@ class TestBackendOps(unittest.TestCase):
     def testSoftmax(self, b, x):
         return [
             -b.log(b.softmax(x)),
+            -b.log(b.softmax(x, axis=-1)),
             -b.log(b.softmax(x, axis=1)),
         ]
 

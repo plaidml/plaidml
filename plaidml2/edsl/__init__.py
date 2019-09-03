@@ -1,11 +1,13 @@
 # Copyright 2019 Intel Corporation.
 
-from collections import namedtuple
 import logging
+from collections import namedtuple
 
+import numpy as np
 import six
 
 from plaidml2 import DType
+from plaidml2.core import TensorShape
 from plaidml2.ffi import ForeignObject, ffi, ffi_call, lib
 
 logger = logging.getLogger(__name__)
@@ -54,6 +56,10 @@ class LogicalShape(ForeignObject):
     #         TensorDim(expr=ffi_call(lib.plaidml_logical_shape_get_dim_expr, self.as_ptr(), i))
     #         for i in range(self.ndims)
     #     ]
+
+    def into_TensorShape(self):
+        return TensorShape(
+            ptr=ffi_call(lib.plaidml_logical_shape_into_tensor_shape, self.as_ptr()))
 
 
 class Constraint(object):
@@ -308,6 +314,11 @@ class Tensor(ForeignObject):
             raise ValueError('One of dims=, shape=, or expr= must be specified.')
         super(Tensor, self).__init__(expr)
 
+    def set_param_value(self, buffer):
+        # Changes the value of a parameter tensor (i.e. one explicitly set to a buffer value)
+        # Illegal on other tensors
+        ffi_call(lib.plaidml_expr_param_reset, self.__ffi_obj__, buffer.as_ptr())
+
     def __hash__(self):
         return hash((self.as_ptr(), self._dims, self._is_contraction))
 
@@ -487,6 +498,11 @@ class Value(ForeignObject):
 
     def __init__(self, value):
         # logger.debug('Value({})'.format(value))
+        if isinstance(value, np.ndarray):
+            if value.ndim == 0:
+                value = value.item()
+            else:
+                value = value.tolist()
         if value is None:
             ffi_obj = ffi_call(lib.plaidml_expr_none)
         elif isinstance(value, (six.integer_types, bool)):
@@ -504,7 +520,7 @@ class Value(ForeignObject):
         elif isinstance(value, ffi.CData) and ffi.typeof(value) is ffi.typeof('plaidml_expr*'):
             ffi_obj = value
         else:
-            raise TypeError('Unsupported type for value={}'.format(value))
+            raise TypeError('Unsupported type {} for value={}'.format(type(value), value))
         super(Value, self).__init__(ffi_obj)
 
     def as_tensor(self):
@@ -551,14 +567,17 @@ def call(fn, *args):
     def wrap(x):
         if isinstance(x, six.integer_types):
             return Tensor(expr=ffi_call(lib.plaidml_expr_int, x))
+        if np.issubdtype(type(x), np.integer):
+            return Tensor(expr=ffi_call(lib.plaidml_expr_int, x.item()))
         if isinstance(x, float):
             return Tensor(expr=ffi_call(lib.plaidml_expr_float, x))
         if isinstance(x, TensorDim):
             return Tensor(expr=ffi_call(lib.plaidml_expr_dim, x.as_ptr()))
         if isinstance(x, Tensor):
             return x
-        raise TypeError('Unexpected type for call argument: {}. fn: {}, args: {}'.format(
-            type(x), fn, args))
+        raise TypeError(
+            'Unexpected type for call argument: {}. fn: {}, args: {}, bad arg: {}'.format(
+                type(x), fn, args, x))
 
     args = [wrap(x) for x in args]
     raw_args = [x.as_ptr() for x in args]

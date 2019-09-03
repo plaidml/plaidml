@@ -41,6 +41,7 @@ py_binary(
     deps = [
         ":py",
         "//plaidml/keras",
+        "//plaidml2/bridge/keras",
     ],
 )
 

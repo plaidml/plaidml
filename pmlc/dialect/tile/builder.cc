@@ -489,45 +489,42 @@ mlir::Value* TileBuilder::MakeAffineSizeMapOp(llvm::ArrayRef<mlir::Value*> sizes
   return impl->builder.create<AffineSizeMapOp>(impl->builder.getUnknownLoc(), sizes).result();
 }
 
-mlir::Value* TileBuilder::MakeConAssignOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-  IVLOG(5, "TileBuilder::MakeConAssignOp>");
-  return impl->MakeUnaryContraction<ConAssignOp>(srcs, sink, sizes);
-}
+#define DEFINE_CONTRACTION_OPS(_agg_op_)                                                                    \
+  mlir::Value* TileBuilder::MakeCon##_agg_op_##Op(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,     \
+                                                  mlir::Value* sizes) {                                     \
+    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##Op>");                                                        \
+    return impl->MakeUnaryContraction<Con##_agg_op_##Op>(srcs, sink, sizes);                                \
+  }                                                                                                         \
+                                                                                                            \
+  mlir::Value* TileBuilder::MakeCon##_agg_op_##AddOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,  \
+                                                     mlir::Value* sizes) {                                  \
+    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##AddOp>");                                                     \
+    return impl->MakeBinaryContraction<Con##_agg_op_##AddOp>(srcs, sink, sizes);                            \
+  }                                                                                                         \
+                                                                                                            \
+  mlir::Value* TileBuilder::MakeCon##_agg_op_##CondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, \
+                                                      mlir::Value* sizes) {                                 \
+    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##CondOp>");                                                    \
+    return impl->MakeTernaryContraction<Con##_agg_op_##CondOp>(srcs, sink, sizes);                          \
+  }                                                                                                         \
+                                                                                                            \
+  mlir::Value* TileBuilder::MakeCon##_agg_op_##EqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,   \
+                                                    mlir::Value* sizes) {                                   \
+    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##EqOp>");                                                      \
+    return impl->MakeBinaryContraction<Con##_agg_op_##EqOp>(srcs, sink, sizes);                             \
+  }                                                                                                         \
+                                                                                                            \
+  mlir::Value* TileBuilder::MakeCon##_agg_op_##MulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,  \
+                                                     mlir::Value* sizes) {                                  \
+    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##MulOp>");                                                     \
+    return impl->MakeBinaryContraction<Con##_agg_op_##MulOp>(srcs, sink, sizes);                            \
+  }
 
-mlir::Value* TileBuilder::MakeConAssignEqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-  IVLOG(5, "TileBuilder::MakeConAssignEqOp>");
-  return impl->MakeBinaryContraction<ConAssignEqOp>(srcs, sink, sizes);
-}
-
-mlir::Value* TileBuilder::MakeConMaxOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-  IVLOG(5, "TileBuilder::MakeConMaxOp>");
-  return impl->MakeUnaryContraction<ConMaxOp>(srcs, sink, sizes);
-}
-
-mlir::Value* TileBuilder::MakeConMaxCondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-  IVLOG(5, "TileBuilder::MakeConMaxCondOp>");
-  return impl->MakeTernaryContraction<ConMaxCondOp>(srcs, sink, sizes);
-}
-
-mlir::Value* TileBuilder::MakeConMinOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-  IVLOG(5, "TileBuilder::MakeConMinOp>");
-  return impl->MakeUnaryContraction<ConMinOp>(srcs, sink, sizes);
-}
-
-mlir::Value* TileBuilder::MakeConProdOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-  IVLOG(5, "TileBuilder::MakeConProdOp>");
-  return impl->MakeUnaryContraction<ConProdOp>(srcs, sink, sizes);
-}
-
-mlir::Value* TileBuilder::MakeConSumOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-  IVLOG(5, "TileBuilder::MakeConSumOp>");
-  return impl->MakeUnaryContraction<ConSumOp>(srcs, sink, sizes);
-}
-
-mlir::Value* TileBuilder::MakeConSumMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-  IVLOG(5, "TileBuilder::MakeConSumMulOp>");
-  return impl->MakeBinaryContraction<ConSumMulOp>(srcs, sink, sizes);
-}
+DEFINE_CONTRACTION_OPS(Assign);
+DEFINE_CONTRACTION_OPS(Max);
+DEFINE_CONTRACTION_OPS(Min);
+DEFINE_CONTRACTION_OPS(Prod);
+DEFINE_CONTRACTION_OPS(Sum);
 
 mlir::Operation* TileBuilder::MakeFuncOp(llvm::StringRef name, llvm::ArrayRef<mlir::Value*> outputs) {
   IVLOG(5, "TileBuilder::MakeFuncOp> " << name.str());

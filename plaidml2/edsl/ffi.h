@@ -51,6 +51,10 @@ PLAIDML_EDSL_API void plaidml_logical_shape_free(  //
     plaidml_error* err,                            //
     plaidml_logical_shape* shape);
 
+PLAIDML_EDSL_API plaidml_shape* plaidml_logical_shape_into_tensor_shape(  //
+    plaidml_error* err,                                                   //
+    plaidml_logical_shape* shape);                                        //
+
 PLAIDML_EDSL_API plaidml_string* plaidml_logical_shape_repr(  //
     plaidml_error* err,                                       //
     plaidml_logical_shape* shape);
@@ -179,6 +183,11 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_placeholder(  //
     plaidml_logical_shape* shape,                         //
     plaidml_buffer* buffer,                               //
     const char* name);
+
+PLAIDML_EDSL_API void plaidml_expr_param_reset(  //
+    plaidml_error* err,                          //
+    plaidml_expr* shape,                         //
+    plaidml_buffer* buffer);
 
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_none(  //
     plaidml_error* err                             //
