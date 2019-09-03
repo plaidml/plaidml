@@ -227,6 +227,10 @@ plaidml_logical_shape* plaidml_expr_get_shape(  //
   // TODO
   return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {  //
     IVLOG(1, "plaidml_expr_get_shape");
+    if (!expr) {
+      throw std::runtime_error(
+          "Cannot compute shape of null expr. Perhaps you requested the shape of an unassigned tensor?");
+    }
     return new plaidml_logical_shape{expr->expr->shape};
   });
 }

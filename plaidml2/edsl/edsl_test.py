@@ -275,6 +275,12 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
 
+    def test_invalid_shape_error(self):
+        O = TensorOutput(TensorDims(3))
+        with self.assertRaises(plaidml.Error) as err:
+            shape = O.shape
+        self.assertTrue('Cannot compute shape' in str(err.exception))
+
     def test_unique_names(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='A')
         B = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='B')
