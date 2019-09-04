@@ -75,12 +75,20 @@ inline edsl::Tensor mean(const edsl::Tensor& I, const edsl::Value& axes = edsl::
   return details::op("mean", args).as_tensor();
 }
 
+inline edsl::Tensor reshape(const edsl::Tensor& I, const edsl::Value& dims) {
+  auto args = edsl::make_tuple(I, dims);
+  return details::op("reshape", args).as_tensor();
+}
+
 inline edsl::Tensor square(const edsl::Tensor& x) {  //
   return details::op("square", edsl::Value(x)).as_tensor();
 }
 
-inline edsl::Tensor spatial_padding(const edsl::Tensor& x, const std::vector<int>& lo_pads,
-                                    const std::vector<int>& hi_pads, const std::string& data_layout) {  //
+inline edsl::Tensor spatial_padding(  //
+    const edsl::Tensor& x,            //
+    const std::vector<int>& lo_pads,  //
+    const std::vector<int>& hi_pads,  //
+    const std::string& data_layout) {
   auto args = edsl::make_tuple(x, edsl::make_tuple(lo_pads), edsl::make_tuple(hi_pads), data_layout);
   return details::op("spatial_padding", edsl::Value(args)).as_tensor();
 }

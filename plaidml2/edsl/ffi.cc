@@ -335,11 +335,25 @@ plaidml_expr* plaidml_expr_clone(  //
     plaidml_expr* expr) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(1, "plaidml_expr_clone> " << expr->expr->str());
-    // auto value = GlobalContext::get()->Clone(expr->value);
-    // return new plaidml_expr{expr->expr, value};
+    // TODO: deal with clone of expr->value
     return new plaidml_expr{expr->expr, expr->value};
   });
 }
+
+plaidml_dim_expr* plaidml_expr_get_dim(  //
+    plaidml_error* err,                  //
+    plaidml_expr* expr) {
+  return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
+    IVLOG(1, "plaidml_expr_get_dim> " << expr->expr->str());
+    auto dim_expr = std::dynamic_pointer_cast<DimExprExpr>(expr->expr);
+    if (!dim_expr) {
+      throw std::runtime_error("plaidml_expr_get_dim can only be used on a DimExprExpr");
+    }
+    // TODO: deal with clone of expr->value
+    return new plaidml_dim_expr{dim_expr->expr, expr->value};
+  });
+}
+
 plaidml_expr_kind plaidml_expr_get_kind(  //
     plaidml_error* err,                   //
     plaidml_expr* expr) {
@@ -360,6 +374,9 @@ plaidml_expr_kind plaidml_expr_get_kind(  //
     }
     if (std::dynamic_pointer_cast<TupleExpr>(expr->expr)) {
       return PLAIDML_EXPR_TUPLE;
+    }
+    if (std::dynamic_pointer_cast<DimExprExpr>(expr->expr)) {
+      return PLAIDML_EXPR_DIM;
     }
     return PLAIDML_EXPR_TENSOR;
   });

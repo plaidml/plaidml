@@ -44,6 +44,7 @@ Value pool(const Value&);
 Value prod(const Value&);
 Value relu(const Value&);
 Value repeat(const Value&);
+Value reshape(const Value&);
 Value sigmoid(const Value&);
 Value slice(const Value&);
 Value softmax(const Value&);
@@ -1950,6 +1951,27 @@ Value repeat(const Value& value) {
   return Value{O};
 }
 
+Value reshape(const Value& value) {
+  IVLOG(1, "reshape");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(str(boost::format("PlaidML reshape op expects 2 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+  std::vector<TensorDim> dims;
+  for (auto dim : args[1].as_tuple()) {
+    if (dim.is_int()) {
+      dims.emplace_back(dim.as_int());
+    } else if (dim.is_dim()) {
+      dims.emplace_back(dim.as_dim());
+    } else if (dim.is_str()) {
+      // TODO: handle special cases
+      dims.emplace_back(0);
+    }
+  }
+  return Value{edsl::reshape(I, dims)};
+}
+
 Value sigmoid(const Value& value) {
   IVLOG(1, "sigmoid");
   auto args = value.as_tuple();
@@ -2602,6 +2624,7 @@ void RegisterOps() {
   registry->Register("prod", prod);
   registry->Register("relu", relu);
   registry->Register("repeat", repeat);
+  registry->Register("reshape", reshape);
   registry->Register("sigmoid", sigmoid);
   registry->Register("slice", slice);
   registry->Register("softmax", softmax);
