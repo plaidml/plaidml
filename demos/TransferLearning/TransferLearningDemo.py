@@ -157,9 +157,11 @@ class Demo:
     tab.set_title(1, 'Fine Tuning')
     gui = widgets.VBox(children=[tab, progress_box, out_initial, out])
 
-    def __init__(self, gui=1, training=0, model='ResNet50', verbose=1):
+    def __init__(self, gui=1, training=0, model='ResNet50', backend='INTERPRETER', verbose=1):
         self.gui = gui
         self.verbose = verbose
+        self.backend = backend
+        ngraph_bridge.set_backend(self.backend)
 
         if gui:
             self.gui = widgets.VBox(
@@ -468,9 +470,14 @@ if __name__ == "__main__":
     parser.add_argument('--gui', help='shows the GUI of the demo', action='store_true')
     parser.add_argument('--training', help='performs the training phase of the demo', action='store_true')
     parser.add_argument('--network_type', help='selects the network used for training/classification [ResNet50]/MobileNet V2')
+    parser.add_argument('--backend', -default="PLAIDML",
+                        help='selects the backend used for training/classification (run ngraph_bridge.lis_backends() for full list)')
     parser.add_argument('--quiet', help='disables most logging', action='store_false')
     args = parser.parse_args()
     nw = 'ResNet50'
     if args.network_type == 'ResNet50' or args.network_type == 'MobileNet V2':
         nw = args.network_type
-    Demo(args.gui, args.training, nw, args.quiet)
+    be = "PLAIDML"
+    if args.backend != "" and args.backend in ngraph_bridge.list_backends():
+        be = args.backend
+    Demo(args.gui, args.training, nw, be, args.quiet)
