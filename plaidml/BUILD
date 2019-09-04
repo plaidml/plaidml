@@ -387,7 +387,7 @@ plaidml_cc_binary(
     name = "libplaidml_pub.so",
     linkopts = [
         # Prefer internal library definitions.
-        "-Wl,-Bsymbolic-functions",
+        "-Wl,-Bsymbolic-functions,-T",
 
         # Use an explicit linker script.
         "-Wl,$(location :plaidml.lds)",
