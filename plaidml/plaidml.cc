@@ -1661,7 +1661,6 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
     result.then(boost::launch::async, [rundown = std::move(rundown), program = std::move(program)](decltype(result) fut) {
       try {
         fut.get();
-        program->Release();
       } catch (const std::exception& ex) {
         // TODO: We need a better way to notify users if the asynchronous results
         // of an invocation are valid, perhaps by allowing a callback to be specified.

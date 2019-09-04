@@ -162,6 +162,8 @@ namespace fifo_scheduler {
 // This should probably be related to the size of the device's L2 cache, given that the tile size
 // is already selected for L1 cache performance.
 constexpr std::uint64_t kMaxInputDeltatime = 100 * std::kilo::num;
+// The maximum waste bytes for reusing a free loc
+constexpr std::uint64_t kMaxLocWasteBytes = 2 * 1024 * 1024;
 
 // Used to define the heap ordering for the pending-step heap.
 bool PendingStepHeapLess(const PendingStep* lhs, const PendingStep* rhs) {
@@ -891,6 +893,10 @@ StepPlan::StepPlan(Build* b, PendingStep* ps) : ps_{ps} {
       Loc* loc = fit->second;
       if (is_io && loc->byte_size != mem_size) {
         // When assigning IO, we require identical sizes.
+        break;
+      }
+      if (loc->byte_size - mem_size > kMaxLocWasteBytes) {
+        // Reusing loc may waste too much
         break;
       }
       auto ulres = used_free_locs_.emplace(loc, LocManip{oi.add_dep, is_io, oi.allocp, 0});

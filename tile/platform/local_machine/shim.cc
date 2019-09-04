@@ -73,8 +73,17 @@ std::pair<std::vector<std::shared_ptr<MemChunk>>, std::list<Shim::AliasUpdate>> 
 
 Shim::Shim(const context::Context& ctx, const Program* program,
            std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-           std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
+           std::map<std::string, std::shared_ptr<tile::Buffer>> outputs):
+           program_{const_cast<Program*>(program)} {
   std::tie(chunk_infos_, updates_) = BuildChunkMap(ctx, program, inputs, outputs);
+}
+
+Shim::~Shim() {
+  // Release the resource manually first
+  // Then tell program that the resource is released
+  chunk_infos_.clear();
+  updates_.clear();
+  program_->Release();
 }
 
 std::shared_ptr<MemChunk> Shim::LookupAlloc(std::size_t /* sidx */, schedule::Alloc* alloc) const {
