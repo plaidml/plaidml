@@ -6,8 +6,7 @@ exports_files([
     "requirements.txt",
 ])
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
-load("//bzl:conda.bzl", "conda_binary")
+load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_py_library",
@@ -29,27 +28,20 @@ filegroup(
     srcs = ["plaidbench/cifar16.npy"],
 )
 
-pkg_tar(
-    name = "pkg",
-    srcs = glob(["**/*"]),
-    package_dir = "plaidbench",
-    strip_prefix = ".",
-)
-
 py_library(
     name = "plaidbench",
     srcs = ["plaidbench.py"],
     deps = [":py"],
 )
 
-conda_binary(
+py_binary(
     name = "bin",
     srcs = ["plaidbench.py"],
-    env = "@com_intel_plaidml_conda//:env",
     main = "plaidbench.py",
     deps = [
         ":py",
         "//plaidml/keras",
+        "//plaidml2/bridge/keras",
     ],
 )
 

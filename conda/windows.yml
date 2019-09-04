@@ -1,0 +1,24 @@
+channels:
+  - conda-forge
+dependencies:
+  - cffi
+  - jupyter
+  - m2-bison
+  - m2-flex
+  - m2-perl
+  - pip
+  - python=3.7.4
+  - scikit-image
+  - pip:
+    - bokeh
+    - click
+    - defaultlist
+    - graphviz
+    - humanize
+    - keras==2.2.5
+    - keras-applications==1.0.8
+    - networkx
+    - pandas
+    - pcpp
+    - tensorflow==1.14.0
+    - theano

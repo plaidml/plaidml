@@ -1,14 +1,13 @@
 # Copyright 2018 Intel Corporation.
 
-load("//bzl:conda.bzl", "conda_binary")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bzl:docs.bzl", "sphinx")
 
 package(default_visibility = ["//visibility:public"])
 
-conda_binary(
+py_binary(
     name = "sphinx",
     srcs = ["//bzl:sphinx.py"],
-    env = "@com_intel_plaidml_conda_sphinx//:env",
     deps = ["@com_intel_plaidml//plaidbench:py"],
 )
 
@@ -18,5 +17,8 @@ sphinx(
     out = "html",
     conf = "conf.py",
     sphinx = ":sphinx",
-    tags = ["docs"],
+    tags = [
+        "docs",
+        "manual",
+    ],
 )

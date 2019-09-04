@@ -1,3 +1,5 @@
+load("@rules_python//python:defs.bzl", "py_library")
+
 def _py_cffi_impl(ctx):
     args = ctx.actions.args()
     args.add_all(ctx.files.srcs, before_each = "--source")
@@ -10,6 +12,7 @@ def _py_cffi_impl(ctx):
         tools = [ctx.executable._tool],
         executable = ctx.executable._tool,
         mnemonic = "PyCffi",
+        use_default_shell_env = True,
     )
     return [DefaultInfo(files = depset([ctx.outputs.out]))]
 
@@ -25,7 +28,6 @@ py_cffi_rule = rule(
         "out": attr.output(),
         "_tool": attr.label(
             default = Label("//tools/py_cffi"),
-            allow_single_file = True,
             executable = True,
             cfg = "host",
         ),
@@ -34,19 +36,17 @@ py_cffi_rule = rule(
 )
 
 # It's named srcs_ordered because we want to prevent buildifier from automatically sorting this list.
-def py_cffi(name, module, srcs_ordered, tags = [], **kwargs):
+def py_cffi(name, module, srcs_ordered, **kwargs):
     out = name + ".py"
     py_cffi_rule(
         name = name + "_py_cffi",
         module = module,
         srcs = srcs_ordered,
         out = out,
-        tags = tags + ["conda"],
     )
 
-    native.py_library(
+    py_library(
         name = name,
         srcs = [out],
-        tags = tags + ["conda"],
         **kwargs
     )

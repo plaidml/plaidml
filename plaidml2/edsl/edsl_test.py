@@ -50,8 +50,8 @@ def max_pool_2d(I):
     n, x0, x1, i, j, c = TensorIndexes(6)
     I.bind_dims(N, X0, X1, C)
     R = TensorOutput(N, (X0 + 1) // 2, (X1 + 1) // 2, C)
-    if i < 2 and j < 2:
-        R[n, x0, x1, c] >= I[n, 2 * x0 + i, 2 * x1 + j, c]
+    R[n, x0, x1, c] >= I[n, 2 * x0 + i, 2 * x1 + j, c]
+    R.add_constraints([i < 2, j < 2])
     return R
 
 
@@ -262,8 +262,8 @@ class TestEdsl(unittest.TestCase):
         i, k = TensorIndexes(2)
         I.bind_dims(N)
         O = TensorOutput(N)
-        if i - k < N:
-            O[i] += I[k]
+        O[i] += I[k]
+        O.add_constraint(i - k < N)
         program = Program('cum_sum', [O])
         self.assertMultiLineEqual(
             str(program), '''function (
@@ -274,6 +274,12 @@ class TestEdsl(unittest.TestCase):
   _X0[x1 : 10] = +(I[x0]), -x0 + x1 < 10;
 }
 ''')
+
+    def test_invalid_shape_error(self):
+        O = TensorOutput(TensorDims(3))
+        with self.assertRaises(plaidml.Error) as err:
+            shape = O.shape
+        self.assertTrue('Cannot compute shape' in str(err.exception))
 
     def test_unique_names(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='A')
@@ -345,8 +351,8 @@ class TestEdsl(unittest.TestCase):
         n0, n1, n2, k = TensorIndexes(4)
         I.bind_dims(N0, N1, N2)
         O = TensorOutput(N0, 3 * N1, N2)
-        if k < 3:
-            O[n0, 3 * n1 + k, n2] = I[n0, n1, n2]
+        O[n0, 3 * n1 + k, n2] = I[n0, n1, n2]
+        O.add_constraint(k < 3)
         O.no_defract()
         program = Program('repeat_elts', [O])
         self.assertMultiLineEqual(
