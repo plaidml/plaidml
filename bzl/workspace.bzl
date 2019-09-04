@@ -220,6 +220,14 @@ def configure_protobuf():
 
 def configure_toolchain():
     http_archive(
+        name = "crosstool_ng_linux_x86_64_gcc_8.3",
+        build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
+        sha256 = "9d69a302cab7e6b0a7c0e4cf98c24bc24dccb75baabd0bac5c58982606e1165f",
+        strip_prefix = "x86_64-unknown-linux-gnu",
+        url = "https://github.com/plaidml/depot/raw/master/toolchain/gcc-8.3/x86_64-unknown-linux-gnu-20190910.tgz",
+    )
+
+    http_archive(
         name = "crosstool_ng_linux_x86_64_gcc_5.4.0",
         build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
         sha256 = "dfbf72d78bfe876b2864f51ac740a54e5fd12e2b4a86c10514fb7accaa9640e6",
