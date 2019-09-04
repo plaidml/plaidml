@@ -112,6 +112,24 @@ TEST(Op, Sum) {
 )"));
 }
 
+TEST(Op, Reshape) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  TensorDim I, J;
+  A.bind_dims(I, J);
+  Program program("reshape", {op::reshape(A, make_tuple(J, I))});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X2
+) {
+  _X0 = 20;
+  _X1 = 10;
+  _X2 = reshape(A, _X0, _X1);
+}
+)"));
+}
+
 }  // namespace
 }  // namespace op
 }  // namespace plaidml

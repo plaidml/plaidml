@@ -35,6 +35,7 @@ typedef enum {
   PLAIDML_EXPR_FLOAT,
   PLAIDML_EXPR_TENSOR,
   PLAIDML_EXPR_TUPLE,
+  PLAIDML_EXPR_DIM,
 } plaidml_expr_kind;
 
 PLAIDML_EDSL_API void plaidml_edsl_init(  //
@@ -167,6 +168,10 @@ PLAIDML_EDSL_API plaidml_string* plaidml_expr_repr(  //
 
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_clone(  //
     plaidml_error* err,                             //
+    plaidml_expr* expr);
+
+PLAIDML_EDSL_API plaidml_dim_expr* plaidml_expr_get_dim(  //
+    plaidml_error* err,                                   //
     plaidml_expr* expr);
 
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_dim(  //
