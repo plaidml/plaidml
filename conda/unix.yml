@@ -12,6 +12,7 @@ dependencies:
   - pip:
     - asq
     - bokeh
+    - click
     - defaultlist
     - graphviz
     - humanize
