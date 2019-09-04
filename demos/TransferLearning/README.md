@@ -37,6 +37,6 @@ optional arguments:
                         selects the network used for training/classification
                         [ResNet50]/MobileNet V2
   --backend BACKEND     selects the backend used for training/classification
-                        (run ngraph_bridge.lis_backends() for full list)
+                        (run ngraph_bridge.list_backends() for full list)
   --quiet               disables most logging
 ```
