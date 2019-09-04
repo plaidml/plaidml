@@ -304,7 +304,7 @@ class Demo:
 
                     if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
                         ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
-                plt.show()
+                display(plt)
 
     def on_model_change(self, change):
         if change['type'] == 'change' and change['name'] == 'value':
@@ -452,7 +452,7 @@ class Demo:
 
                     if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
                         ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
-                plt.show()
+                display(f)
 
         if self.verbose:
             with self.out_stats:
