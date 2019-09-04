@@ -26,7 +26,8 @@ jupyter notebook TransferLearningDemo.ipynb
 ## Running the demo through the command line
 ```
 usage: TransferLearningDemo [-h] [--gui] [--training]
-                            [--network_type NETWORK_TYPE] [--quiet]
+                            [--network_type NETWORK_TYPE] [--backend BACKEND]
+                            [--quiet]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -35,5 +36,7 @@ optional arguments:
   --network_type NETWORK_TYPE
                         selects the network used for training/classification
                         [ResNet50]/MobileNet V2
+  --backend BACKEND     selects the backend used for training/classification
+                        (run ngraph_bridge.lis_backends() for full list)
   --quiet               disables most logging
-````
+```
