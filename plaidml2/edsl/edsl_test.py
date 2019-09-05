@@ -7,6 +7,11 @@ import unittest
 
 import plaidml2 as plaidml
 from plaidml2.edsl import *
+import plaidml2.settings as plaidml_settings
+import plaidml2.exec as plaidml_exec
+
+device = plaidml_settings.get('PLAIDML_DEVICE')
+target = plaidml_settings.get('PLAIDML_TARGET')
 
 
 def dot(X, Y):
@@ -409,6 +414,8 @@ class TestEdsl(unittest.TestCase):
   _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
 }
 ''')
+        outputs = run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
+        self.assertEquals(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
     def testDefractShort(self):
 
@@ -429,11 +436,14 @@ class TestEdsl(unittest.TestCase):
   _X0[x0 : 6] = +(I[-1/2 + 1/2*x0]);
 }
 ''')
+        outputs = run(program, [(I, np.array([1, 2, 3]))])
+        self.assertEquals(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
 
     def testDefractLong(self):
 
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 3, 3, 1]), name='I')
-        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 3, 3, 1]), name='K')
+        shape = [1, 3, 3, 1]
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='I')
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='K')
         n, x0, x1, c0, c1, co, ci, k0, k1 = TensorIndexes(9)
         O = TensorOutput(1, 5, 5, 1)
         O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
@@ -449,6 +459,7 @@ class TestEdsl(unittest.TestCase):
   _X0[x0, x1, x3, x6 : 1, 5, 5, 1] = +(I[x0, -1/2 + 1/2*x1 + 1/2*x2, -1/2 + 1/2*x3 + 1/2*x4, x5] * K[2 - x2, 2 - x4, x6, x5]);
 }
 ''')
+        outputs = run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
 
     def testFunkyLayerNames(self):
         '''Exercises fix for plaidml bug #241
@@ -481,6 +492,8 @@ class TestEdsl(unittest.TestCase):
   _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
 }
 ''')
+        outputs = run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
+        self.assertEquals(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
     def testTileIdentity(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
@@ -493,8 +506,9 @@ class TestEdsl(unittest.TestCase):
   _X0 = ident(I);
 }
 ''')
+        outputs = run(program, [(I, np.array([(1, 2, 3)]))])
+        self.assertEquals(outputs[0].tolist(), [1, 2, 3])
 
-    @unittest.skip('TODO: convert to EDSL -  exception needs to be thrown')
     def testAssignmentExceptions(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [5, 1]), name='A')
         B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 5]), name='B')
@@ -515,20 +529,74 @@ class TestEdsl(unittest.TestCase):
   _X0[x0, x2 : 5, 5] = =(A[x0, x1] * B[x1, x2]);
 }
 ''')
-        with self.assertRaises(RuntimeError) as cm:
-            O = TensorOutput(L, N)
-            O[i, j] = B[i, j] * A[j, k]
-            program = Program('assignment_exception', [O])
-        self.assertTrue("Multiple assignment" in str(cm.exception))
+        outputs = run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
+                                (B, np.array([1, 2, 3, 4, 5]))])
+        self.assertEquals(outputs[0].tolist(),
+                          [[1., 2., 3., 4., 5.], [2., 4., 6., 8., 10.], [3., 6., 9., 12., 15.],
+                           [4., 8., 12., 16., 20.], [5., 10., 15., 20., 25.]])
 
-    @unittest.skip('TODO: convert to EDSL - two outputs not currently supported')
+        O = TensorOutput(L, N)
+        O[i, j] = B[j,] * A[j, k]
+        program = Program('assignment_exception', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  B[B_0, B_1],
+  A[A_0, A_1]
+) -> (
+  _X0
+) {
+  _X0[x2, x0 : 5, 5] = =(B[x0] * A[x0, x1]);
+}
+''')
+        with self.assertRaises(plaidml.Error) as cm:
+            outputs = run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
+                                    (B, np.array([1, 2, 3, 4, 5]))])
+        self.assertTrue("More indexes than dimensions for tensor" in str(cm.exception))
+
+    #@unittest.skip('TODO: convert to EDSL ')
     def testTwoOutputs(self):
-        x = pkb.variable(m(3))
-        op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
-                            [('O1', x.shape), ('O2', x.shape)])
-        output = op.outputs['O1'].eval()
-        output = op.outputs['O2'].eval()
-        return 0
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        program1 = Program('two_outputs', [I, I])
+        self.assertMultiLineEqual(
+            str(program1), '''function (
+  I[I_0]
+) -> (
+  _X1,
+  _X0
+) {
+  _X0 = ident(I);
+  _X1 = ident(I);
+}
+''')
+        outputs = run(program1, [(I, np.array([(1, 2, 3)]))])
+        self.assertEquals(outputs[0].tolist(), [1, 2, 3])
+        self.assertEquals(outputs[1].tolist(), [1, 2, 3])
+
+        N = TensorDim(3)
+        O1 = TensorOutput(N)
+        O2 = TensorOutput(N)
+        O1 = I
+        O2 = I
+        program2 = Program('two_outputs', [O1, O2])
+        self.assertMultiLineEqual(str(program1), str(program2))
+
+        outputs = run(program2, [(I, np.array([(1, 2, 3)]))])
+        self.assertEquals(outputs[0].tolist(), [1, 2, 3])
+        self.assertEquals(outputs[1].tolist(), [1, 2, 3])
+
+
+def run(program, inputs):
+
+    def make_buffer(tensor):
+        # convert LogicalShape into TensorShape
+        shape = plaidml.TensorShape(tensor.shape.dtype, tensor.shape.int_dims)
+        return plaidml.Buffer(device, shape)
+
+    ibindings = [(x, make_buffer(x)) for x, y in inputs]
+    obindings = [(x, make_buffer(x)) for x in program.outputs]
+
+    exe = plaidml_exec.Executable(program, device, target, ibindings, obindings)
+    return [x.as_ndarray() for x in exe([y for x, y in inputs])]
 
 
 if __name__ == '__main__':
