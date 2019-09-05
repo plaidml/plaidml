@@ -15,7 +15,7 @@ dependencies:
     - defaultlist
     - graphviz
     - humanize
-    - keras==2.2.5
+    - keras==2.2.4
     - keras-applications==1.0.8
     - networkx
     - pandas
