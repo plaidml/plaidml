@@ -536,7 +536,7 @@ class TestEdsl(unittest.TestCase):
                            [4., 8., 12., 16., 20.], [5., 10., 15., 20., 25.]])
 
         O = TensorOutput(L, N)
-        O[i, j] = B[j,] * A[j, k]
+        O[i, j] = B[i, k] * A[k, j]
         program = Program('assignment_exception', [O])
         self.assertMultiLineEqual(
             str(program), '''function (
@@ -545,15 +545,15 @@ class TestEdsl(unittest.TestCase):
 ) -> (
   _X0
 ) {
-  _X0[x2, x0 : 5, 5] = =(B[x0] * A[x0, x1]);
+  _X0[x0, x2 : 5, 5] = =(B[x0, x1] * A[x1, x2]);
 }
 ''')
-        with self.assertRaises(plaidml.Error) as cm:
-            outputs = run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
-                                    (B, np.array([1, 2, 3, 4, 5]))])
-        self.assertTrue("More indexes than dimensions for tensor" in str(cm.exception))
+        outputs = run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
+                                (B, np.array([1, 2, 3, 4, 5]))])
+        self.assertEquals(outputs[0].tolist(),
+                          [[25., 0., 0., 0., 0.], [0., 0., 0., 0., 0.], [0., 0., 0., 0., 0.],
+                           [0., 0., 0., 0., 0.], [0., 0., 0., 0., 0.]])
 
-    #@unittest.skip('TODO: convert to EDSL ')
     def testTwoOutputs(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         program1 = Program('two_outputs', [I, I])
