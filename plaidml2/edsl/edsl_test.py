@@ -603,4 +603,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', type=int, default=0)
     args, remainder = parser.parse_known_args()
-    unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
+    unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1, exit=False)
+    sys.exit(0)
