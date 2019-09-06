@@ -326,7 +326,7 @@ def backend():
 def batch_dot(x, y, axes=None, name=None):
     X = x.tensor
     Y = y.tensor
-    if isinstance(axes, int):
+    if isinstance(axes, six.integer_types):
         axes = (axes, axes)
     if axes is None:
         axes = (X.shape.ndims - 1, Y.shape.ndims - 2)
