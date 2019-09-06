@@ -194,6 +194,14 @@ local PARAMS = {
             },
 
             {
+              name: 'reduce_constraints',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IlpConstraintReductionPass',
+                reqs: ['all'],
+              },
+            },
+
+            {
               name: 'fuse_inner',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
