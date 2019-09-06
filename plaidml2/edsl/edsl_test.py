@@ -415,7 +415,7 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
         outputs = run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
-        self.assertEquals(outputs[0].tolist(), [2, 5, 4, 9, 6])
+        self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
     def testDefractShort(self):
 
@@ -437,7 +437,7 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
         outputs = run(program, [(I, np.array([1, 2, 3]))])
-        self.assertEquals(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
+        self.assertEqual(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
 
     def testDefractLong(self):
 
@@ -493,7 +493,7 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
         outputs = run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
-        self.assertEquals(outputs[0].tolist(), [2, 5, 4, 9, 6])
+        self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
     def testTileIdentity(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
@@ -507,7 +507,7 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
         outputs = run(program, [(I, np.array([(1, 2, 3)]))])
-        self.assertEquals(outputs[0].tolist(), [1, 2, 3])
+        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
 
     def testAssignmentExceptions(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [5, 1]), name='A')
@@ -531,9 +531,9 @@ class TestEdsl(unittest.TestCase):
 ''')
         outputs = run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
                                 (B, np.array([1, 2, 3, 4, 5]))])
-        self.assertEquals(outputs[0].tolist(),
-                          [[1., 2., 3., 4., 5.], [2., 4., 6., 8., 10.], [3., 6., 9., 12., 15.],
-                           [4., 8., 12., 16., 20.], [5., 10., 15., 20., 25.]])
+        self.assertEqual(outputs[0].tolist(),
+                         [[1., 2., 3., 4., 5.], [2., 4., 6., 8., 10.], [3., 6., 9., 12., 15.],
+                          [4., 8., 12., 16., 20.], [5., 10., 15., 20., 25.]])
 
         O = TensorOutput(L, N)
         O[i, j] = B[i, k] * A[k, j]
@@ -550,9 +550,9 @@ class TestEdsl(unittest.TestCase):
 ''')
         outputs = run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
                                 (B, np.array([1, 2, 3, 4, 5]))])
-        self.assertEquals(outputs[0].tolist(),
-                          [[25., 0., 0., 0., 0.], [0., 0., 0., 0., 0.], [0., 0., 0., 0., 0.],
-                           [0., 0., 0., 0., 0.], [0., 0., 0., 0., 0.]])
+        self.assertEqual(outputs[0].tolist(),
+                         [[25., 0., 0., 0., 0.], [0., 0., 0., 0., 0.], [0., 0., 0., 0., 0.],
+                          [0., 0., 0., 0., 0.], [0., 0., 0., 0., 0.]])
 
     def testTwoOutputs(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
@@ -569,8 +569,8 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
         outputs = run(program1, [(I, np.array([(1, 2, 3)]))])
-        self.assertEquals(outputs[0].tolist(), [1, 2, 3])
-        self.assertEquals(outputs[1].tolist(), [1, 2, 3])
+        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
+        self.assertEqual(outputs[1].tolist(), [1, 2, 3])
 
         N = TensorDim(3)
         O1 = TensorOutput(N)
@@ -581,8 +581,8 @@ class TestEdsl(unittest.TestCase):
         self.assertMultiLineEqual(str(program1), str(program2))
 
         outputs = run(program2, [(I, np.array([(1, 2, 3)]))])
-        self.assertEquals(outputs[0].tolist(), [1, 2, 3])
-        self.assertEquals(outputs[1].tolist(), [1, 2, 3])
+        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
+        self.assertEqual(outputs[1].tolist(), [1, 2, 3])
 
 
 def run(program, inputs):
