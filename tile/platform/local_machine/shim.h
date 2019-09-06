@@ -37,7 +37,7 @@ class Shim {
 
   // Destroys the Shim.  Note that this does not apply side-effects;
   // OnLaunchSuccess must be invoked in order to remap program output buffers.
-  ~Shim() {}
+  ~Shim();
 
   // Translate an input or output for a step.
   std::shared_ptr<MemChunk> LookupAlloc(std::size_t sidx, schedule::Alloc* alloc) const;
@@ -52,6 +52,7 @@ class Shim {
  private:
   std::vector<std::shared_ptr<MemChunk>> chunk_infos_;
   std::list<AliasUpdate> updates_;
+  Program* program_;
 };
 
 }  // namespace local_machine

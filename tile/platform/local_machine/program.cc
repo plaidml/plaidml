@@ -182,7 +182,7 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
                  const std::shared_ptr<MemStrategy>& output_mem_strategy,
                  const std::shared_ptr<MemStrategy>& tmp_mem_strategy, hal::Memory* tmp_memory,
                  const lang::TileOptimizer& optimizer, ConstBufferManager* const_bufs)
-    : devinfo_{devinfo}, output_mem_strategy_{output_mem_strategy}, tmp_mem_strategy_{tmp_mem_strategy} {
+    : devinfo_{devinfo}, output_mem_strategy_{output_mem_strategy}, tmp_mem_strategy_{tmp_mem_strategy}, num_runs_{0} {
   // TODO: Make this path asynchronous.
   // Asynchronous programming is a little tricky in this case, since if we compile asynchronously, the
   // compilation may not be complete when we're first asked to run a program, which means we'd need to save the run
@@ -246,7 +246,8 @@ Program::Program(const context::Context& ctx,                              //
                  ConstBufferManager* const_bufs)
     : devinfo_{devinfo},  //
       output_mem_strategy_{output_mem_strategy},
-      tmp_mem_strategy_{tmp_mem_strategy} {
+      tmp_mem_strategy_{tmp_mem_strategy},
+      num_runs_{0} {
   if (!devinfo->dev->compiler() || !devinfo->dev->executor()) {
     // TODO: Implement a mechanism for providing a pre-compiled program.
     throw error::Unavailable{"The requested device is unavailable for running Tile programs"};
@@ -324,7 +325,8 @@ boost::future<void> Program::Run(const context::Context& ctx,
     ++num_runs_;
   }
   else {
-    throw std::runtime_error("No enough memory for the current schedule.");
+    throw std::runtime_error(str(boost::format("No enough memory for the current schedule: required %1%, available %2%")
+      % alloc_mem_ % MaxAvailableMemory()));
   }
 
   IVLOG(2, "  Inputs:");
