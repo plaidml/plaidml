@@ -149,6 +149,8 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
       {"_libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
       {"RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},   // For debugging
       {"_RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
+      {"libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
+      {"_libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {

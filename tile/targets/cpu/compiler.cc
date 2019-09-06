@@ -210,7 +210,7 @@ void Compiler::GenerateArena(const stripe::Block& block) {
   gval->setInitializer(llvm::Constant::getNullValue(arenatype));
 }
 
-llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const DataType dataType,
+llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSMMDispatch xsmmDispatch,
                                            const XSMMCallData& xsmmCallData) {
   IVLOG(1, "XSMM Call.");
 
@@ -266,24 +266,39 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const Dat
   llvm::Value* alpha = nullptr;
   llvm::Value* beta = nullptr;
   llvm::Value* one = nullptr;
-  llvm::Type* alpha_beta_ptr_type = nullptr;
+  llvm::Type* alphaPtrType = nullptr;
+  llvm::Type* betaPtrType = nullptr;
+  llvm::Type* aPtrType = nullptr;
+  llvm::Type* bPtrType = nullptr;
+  llvm::Type* cPtrType = nullptr;
   std::string functionName("Invalid");
-  switch (dataType) {
-    case DataType::FLOAT32:
+  switch (xsmmDispatch) {
+    case XSMMDispatch::SMM:
       one = llvm::ConstantFP::get(builder_.getFloatTy(), 1.0);
       alpha = builder_.CreateAlloca(builder_.getFloatTy());
       beta = builder_.CreateAlloca(builder_.getFloatTy());
-      alpha_beta_ptr_type = llvm::Type::getFloatPtrTy(context_);
+      alphaPtrType = betaPtrType = aPtrType = bPtrType = cPtrType = llvm::Type::getFloatPtrTy(context_);
       functionName = "libxsmm_smmdispatch";
       break;
 
-    case DataType::FLOAT64:
+    case XSMMDispatch::DMM:
       one = llvm::ConstantFP::get(builder_.getDoubleTy(), 1.0L);
       alpha = builder_.CreateAlloca(builder_.getDoubleTy());
       beta = builder_.CreateAlloca(builder_.getDoubleTy());
-      alpha_beta_ptr_type = llvm::Type::getDoublePtrTy(context_);
+      alphaPtrType = betaPtrType = aPtrType = bPtrType = cPtrType = llvm::Type::getDoublePtrTy(context_);
       functionName = "libxsmm_dmmdispatch";
       break;
+
+    case XSMMDispatch::WIMM:
+      one = llvm::ConstantInt::get(builder_.getInt8Ty(), 1);
+      alpha = builder_.CreateAlloca(builder_.getInt8Ty());
+      beta = builder_.CreateAlloca(builder_.getInt8Ty());
+      alphaPtrType = betaPtrType = aPtrType = bPtrType = llvm::Type::getInt8PtrTy(context_);
+      cPtrType = llvm::Type::getInt32PtrTy(context_);
+      functionName = "libxsmm_wimmdispatch";
+      break;
+
+      // TODO: Handle the bfloat16 dispatch function when support for bfloat16 is added to Stripe.
 
     default:
       throw std::runtime_error("Unsupported DataType for XSMM.");
@@ -296,10 +311,10 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const Dat
   builder_.CreateStore(llvm::ConstantInt::get(i32t, xsmmCallData.lda_b_value), ldb);
   builder_.CreateStore(llvm::ConstantInt::get(i32t, xsmmCallData.lda_c_value), ldc);
   llvm::Value* nptr = llvm::ConstantPointerNull::get(llvm::Type::getInt32PtrTy(context_));
-  llvm::Value* dispatch = XSMMDispatchFunction(alpha_beta_ptr_type, functionName);
+  llvm::Value* dispatch = XSMMDispatchFunction(alphaPtrType, betaPtrType, aPtrType, bPtrType, cPtrType, functionName);
 
-  std::vector<llvm::Value*> args1 = {llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_n")->range),
-                                     llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_m")->range),
+  std::vector<llvm::Value*> args1 = {llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_m")->range),
+                                     llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_n")->range),
                                      llvm::ConstantInt::get(i32t, FindIndexByTag(block, "stencil_k")->range),
                                      lda,
                                      ldb,
@@ -325,9 +340,9 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const Dat
   IVLOG(1, block.ref_ins()[0]->into());
   IVLOG(1, block.ref_outs()[0]->into());
   std::vector<llvm::Type*> param_types{
-      alpha_beta_ptr_type,  // a
-      alpha_beta_ptr_type,  // b
-      alpha_beta_ptr_type,  // c
+      aPtrType,  // a
+      bPtrType,  // b
+      cPtrType,  // c
   };
   llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   std::vector<llvm::Value*> args2 = {buffers_[xsmmCallData.in1->into()].base, buffers_[xsmmCallData.in0->into()].base,
@@ -335,17 +350,6 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const Dat
   builder_.CreateCall(rftype, func, args2);
   builder_.CreateRetVoid();
   return function;
-}
-
-bool Compiler::isXSMMSuppotedDataType(DataType dataType) {
-  switch (dataType) {
-    case DataType::FLOAT32:
-    case DataType::FLOAT64:
-      return true;
-
-    default:
-      return false;
-  }
 }
 
 // Gets the leading dimensions and the buffers for an XSMM call if available.
@@ -377,13 +381,13 @@ bool Compiler::GetXSMMCallData(XSMMCallData* xsmmCallData, const stripe::Block& 
 
   for (const auto& ref : block.refs) {
     if (ref.has_tag("A")) {
-      xsmmCallData->lda_b_value = ref.FlatAccess()[m_name];
+      xsmmCallData->lda_b_value = ref.FlatAccess()[n_name];
       xsmmCallData->in0 = &ref;
     } else if (ref.has_tag("B")) {
       xsmmCallData->lda_a_value = ref.FlatAccess()[k_name];
       xsmmCallData->in1 = &ref;
     } else if (ref.has_tag("C")) {
-      xsmmCallData->lda_c_value = ref.FlatAccess()[m_name];
+      xsmmCallData->lda_c_value = ref.FlatAccess()[n_name];
       xsmmCallData->out0 = &ref;
     }
   }
@@ -399,33 +403,69 @@ bool Compiler::GetXSMMCallData(XSMMCallData* xsmmCallData, const stripe::Block& 
 // Make sure all the refinments of this block are of the same type.
 // If they are not, XSMM functions can't be called and we should
 // to slower GEMM calculation process.
-const DataType Compiler::GetBlockRefsDataType(const stripe::Block& block) {
-  DataType retDataType = DataType::INVALID;
+const XSMMDispatch Compiler::GetXSMMDispatch(const stripe::Block& block) {
+  DataType dataType = DataType::INVALID;
+  XSMMDispatch xsmmDispatch = XSMMDispatch::NONE;
+  // First Check to see if all parameters and output are float32 or float64.
   bool firstIteration = true;
   const auto allRefs = block.refs;
   for (auto it = allRefs.cbegin(); it != allRefs.cend(); ++it) {
     if (firstIteration) {
-      retDataType = it->interior_shape.type;
+      dataType = it->interior_shape.type;
       firstIteration = false;
+      if (dataType == DataType::FLOAT32) {
+        xsmmDispatch = XSMMDispatch::SMM;
+      } else if (dataType == DataType::FLOAT32) {
+        xsmmDispatch = XSMMDispatch::DMM;
+      } else {
+        break;
+      }
     } else {
-      if (retDataType != it->interior_shape.type) {
+      if (dataType != it->interior_shape.type) {
         // Refinments with tdifferent DataType detected.
         // Return INVALID, so the XSMM logic detects XSMM
         // should not be used.
-        return DataType::INVALID;
+        dataType = DataType::INVALID;
+        xsmmDispatch = XSMMDispatch::NONE;
+        break;
       }
     }
   }
 
-  return retDataType;
+  // Now check for the WIMM, BSMM, and BMMM XSMM dispatch functions.
+  if (xsmmDispatch == XSMMDispatch::NONE) {
+    DataType in0 = DataType::INVALID;
+    DataType in1 = DataType::INVALID;
+    DataType out = DataType::INVALID;
+    if (block.refs.size() == 3) {  // Only three refintments.
+      for (const auto& ref : block.refs) {
+        if (ref.has_tag("A")) {
+          in0 = ref.interior_shape.type;
+        } else if (ref.has_tag("B")) {
+          in1 = ref.interior_shape.type;
+        } else if (ref.has_tag("C")) {
+          out = ref.interior_shape.type;
+        }
+      }
+
+      // WIMM
+      if (in0 == DataType::INT8 && in1 == DataType::UINT8 && out == DataType::INT32) {
+        xsmmDispatch = XSMMDispatch::WIMM;
+      }
+
+      // TODO: Handle bfloat16 when support added to Stripe.
+    }
+  }
+
+  return xsmmDispatch;
 }
 
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   if (block.has_tag("xsmm")) {
-    const DataType dataType = GetBlockRefsDataType(block);
+    const XSMMDispatch xsmmDispatch = GetXSMMDispatch(block);
     XSMMCallData xsmmCallData;
-    if (GetXSMMCallData(&xsmmCallData, block) && isXSMMSuppotedDataType(dataType)) {
-      return CompileXSMMBlock(block, dataType, xsmmCallData);
+    if (xsmmDispatch != XSMMDispatch::NONE && GetXSMMCallData(&xsmmCallData, block)) {
+      return CompileXSMMBlock(block, xsmmDispatch, xsmmCallData);
     }
   }
 
@@ -1336,12 +1376,14 @@ llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   return llvm::FunctionType::get(return_type, param_types, false);
 }
 
-llvm::Value* Compiler::XSMMDispatchFunction(llvm::Type* alphaBetaPrtrType, const std::string& functionName) {
+llvm::Value* Compiler::XSMMDispatchFunction(llvm::Type* alphaPtrType, llvm::Type* betaPtrType, llvm::Type* aPtrType,
+                                            llvm::Type* bPtrType, llvm::Type* cPtrType,
+                                            const std::string& functionName) {
   llvm::Type* iptr = llvm::Type::getInt32PtrTy(context_);
   std::vector<llvm::Type*> param_types{
-      alphaBetaPrtrType,  // a
-      alphaBetaPrtrType,  // b
-      alphaBetaPrtrType,  // c
+      aPtrType,  // a
+      bPtrType,  // b
+      cPtrType,  // c
   };
   llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   std::vector<llvm::Type*> argtypes{
@@ -1351,8 +1393,8 @@ llvm::Value* Compiler::XSMMDispatchFunction(llvm::Type* alphaBetaPrtrType, const
       iptr,                   // lda
       iptr,                   // ldb
       iptr,                   // ldc
-      alphaBetaPrtrType,      // alpha
-      alphaBetaPrtrType,      // beta
+      alphaPtrType,           // alpha
+      betaPtrType,            // beta
       iptr,                   // flags
       iptr,                   // prefetch
   };
