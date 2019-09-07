@@ -81,6 +81,7 @@ plaidml_cc_library(
         "generate.h",
         "ops.h",
         "parser.h",
+        "runinfo.h",
         "sembuilder.h",
         "semprinter.h",
         "semtree.h",

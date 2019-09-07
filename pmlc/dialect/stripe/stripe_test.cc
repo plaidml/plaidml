@@ -17,8 +17,8 @@
 
 #include "tile/codegen/compile_pass.h"
 #include "tile/codegen/localize.h"
-#include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
+#include "tile/lang/runinfo.h"
 #include "tile/lib/lib.h"
 
 using namespace vertexai::tile;         // NOLINT

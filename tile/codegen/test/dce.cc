@@ -6,8 +6,8 @@
 #include "base/proto/proto.h"
 #include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/driver.h"
-#include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
+#include "tile/lang/runinfo.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {

@@ -4,8 +4,8 @@
 #include <google/protobuf/text_format.h>
 
 #include "tile/codegen/tile.h"
-#include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
+#include "tile/lang/runinfo.h"
 #include "tile/stripe/stripe.h"
 #include "tile/stripe/stripe.pb.h"
 #include "tile/targets/cpu/jit.h"

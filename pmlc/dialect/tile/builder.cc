@@ -16,7 +16,6 @@
 
 #include "mlir/Analysis/Verifier.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Module.h"
@@ -30,6 +29,7 @@
 #include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
+#include "pmlc/dialect/tile/internal.h"
 #include "pmlc/dialect/tile/ops.h"
 #include "tile/base/shape.h"
 
@@ -112,6 +112,10 @@ std::vector<mlir::Value*> getBackwardSlice(
 }  // namespace
 
 struct TileBuilder::Impl {
+  MLIRContext context;
+  ModuleOp module;
+  OpBuilder builder;
+
   Impl()
       : module(ModuleOp::create(UnknownLoc::get(&context))),  //
         builder(module.getBody()) {}
@@ -247,10 +251,6 @@ struct TileBuilder::Impl {
         });
     return domain->getResult(0);
   }
-
-  MLIRContext context;
-  ModuleOp module;
-  OpBuilder builder;
 };
 
 TileBuilder::TileBuilder() : impl(new Impl) {}
@@ -264,13 +264,6 @@ void TileBuilder::Destroy(mlir::Value* value) {
     if (op && op->use_empty()) {
       // op->erase();
     }
-  }
-}
-
-void TileBuilder::Destroy(mlir::Operation* op) {
-  IVLOG(5, "TileBuilder::Destroy> op");
-  if (op && op->use_empty()) {
-    op->erase();
   }
 }
 
@@ -342,33 +335,33 @@ struct EltwiseBuilder {
     auto factory = [](OpBuilder* builder, ScalarType type, llvm::ArrayRef<mlir::Value*> args) {
       return builder->create<OpType>(builder->getUnknownLoc(), type, args).getOperation();
     };
-    calls.emplace(name, factory);
+    primitives.emplace(name, factory);
     if (name == "eltwise.select") {
-      calls.emplace("eltwise.cond", factory);
+      primitives.emplace("eltwise.cond", factory);
     }
   }
 
-  using CallFactory = std::function<  //
-      mlir::Operation*(               //
-          OpBuilder* builder,         //
-          ScalarType type,            //
+  using PrimitiveFactory = std::function<  //
+      mlir::Operation*(                    //
+          OpBuilder* builder,              //
+          ScalarType type,                 //
           llvm::ArrayRef<mlir::Value*> args)>;
-  std::map<std::string, CallFactory> calls;
+  std::map<std::string, PrimitiveFactory> primitives;
 };
 
-mlir::Value* TileBuilder::MakeCall(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args) {
-  IVLOG(5, "TileBuilder::MakeCall> " << fn.str());
+mlir::Value* TileBuilder::MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args) {
+  IVLOG(5, "TileBuilder::MakePrimitiveOp> " << fn.str());
   for (auto arg : args) {
     IVLOG(6, "  arg: " << mlir::debugString(*arg));
   }
   std::stringstream ss;
   ss << eltwise::Dialect::getDialectNamespace() << "." << fn.str();
   auto builder = EltwiseBuilder::get();
-  auto it = builder->calls.find(ss.str());
-  if (it == builder->calls.end()) {
-    // TODO: handle unspecified call
+  auto it = builder->primitives.find(ss.str());
+  if (it == builder->primitives.end()) {
+    // TODO: handle unspecified primitive
     std::stringstream ss;
-    ss << "Unknown call: " << fn.str();
+    ss << "Unknown primitive: " << fn.str();
     throw std::runtime_error(ss.str());
   }
   auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);  // TODO
@@ -431,7 +424,14 @@ mlir::Value* TileBuilder::MakeDimOp(mlir::Value* tensor, unsigned dim) {
 mlir::Value* TileBuilder::MakePlaceholderOp(DataType dtype, llvm::ArrayRef<int64_t> dims) {
   IVLOG(5, "TileBuilder::MakePlaceholderOp> " << to_string(dtype));
   auto elt_type = impl->builder.getType<ScalarType>(dtype);
-  auto shape = RankedTensorType::get(dims, elt_type);
+  // Convert dims: PlaidML semantics use 0 for unknown size, MLIR uses -1.
+  llvm::SmallVector<int64_t, 4> mlir_dims(dims.begin(), dims.end());
+  for (unsigned i = 0; i < mlir_dims.size(); i++) {
+    if (mlir_dims[i] == 0) {
+      mlir_dims[i] = -1;
+    }
+  }
+  auto shape = RankedTensorType::get(mlir_dims, elt_type);
   return impl->builder.create<PlaceholderOp>(impl->builder.getUnknownLoc(), shape).result();
 }
 
@@ -444,7 +444,7 @@ mlir::Value* TileBuilder::MakeAffineIndexOp(llvm::StringRef name) {
   IVLOG(5, "TileBuilder::MakeAffineIndexOp> " << name.str());
   auto op = impl->builder.create<AffineIndexOp>(impl->builder.getUnknownLoc());
   if (!name.empty()) {
-    op.setAttr("name", impl->builder.getStringAttr(name));
+    // op.setAttr(SymbolTable::getSymbolAttrName(), impl->builder.getStringAttr(name));
   }
   return op.result();
 }
@@ -526,13 +526,16 @@ DEFINE_CONTRACTION_OPS(Min);
 DEFINE_CONTRACTION_OPS(Prod);
 DEFINE_CONTRACTION_OPS(Sum);
 
-mlir::Operation* TileBuilder::MakeFuncOp(llvm::StringRef name, llvm::ArrayRef<mlir::Value*> outputs) {
-  IVLOG(5, "TileBuilder::MakeFuncOp> " << name.str());
+std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
+    llvm::StringRef name,                               //
+    llvm::ArrayRef<mlir::Value*> outputs,               //
+    llvm::MutableArrayRef<mlir::Value*> new_outputs) {
+  IVLOG(5, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, mlir::debugString(impl->module));
   // Compute the result types
   std::vector<mlir::Type> resultTypes(outputs.size());
   llvm::SetVector<mlir::Value*> values;
-  for (size_t i = 0; i < outputs.size(); i++) {
+  for (unsigned i = 0; i < outputs.size(); i++) {
     if (!outputs[i]) {
       throw std::runtime_error("Invalid output");
     }
@@ -552,13 +555,15 @@ mlir::Operation* TileBuilder::MakeFuncOp(llvm::StringRef name, llvm::ArrayRef<ml
       inputTypes.push_back(value->getType());
     }
   }
-  // Construct a function to represent the entire program
+  // Construct a module
   auto loc = mlir::UnknownLoc::get(&impl->context);
-  auto func_type = mlir::FunctionType::get(inputTypes, resultTypes, &impl->context);
-  auto func_op = mlir::FuncOp::create(loc, name, func_type, {});
-  func_op.addEntryBlock();
-  OpBuilder builder(func_op.getBody());
-  mlir::BlockAndValueMapping mapper;
+  auto module = ModuleOp::create(loc);
+  auto program = std::make_shared<TileProgram>(module);
+  // Construct a function to represent the entire program
+  auto funcType = mlir::FunctionType::get(inputTypes, resultTypes, &impl->context);
+  auto funcOp = mlir::FuncOp::create(loc, name, funcType, {});
+  funcOp.addEntryBlock();
+  OpBuilder builder(funcOp.getBody());
   unsigned argcnt = 0;
   for (auto value : slice) {
     auto op = value->getDefiningOp();
@@ -566,23 +571,24 @@ mlir::Operation* TileBuilder::MakeFuncOp(llvm::StringRef name, llvm::ArrayRef<ml
     if (op && op->getBlock() == impl->module.getBody()) {
       if (auto var_op = llvm::dyn_cast<PlaceholderOp>(op)) {
         // Replace placeholders with block arguments
-        auto new_value = func_op.getArgument(argcnt++);
-        mapper.map(value, new_value);
+        auto new_value = funcOp.getArgument(argcnt++);
+        program->mapper.map(value, new_value);
       } else {
-        auto new_value = builder.clone(*op, mapper)->getResult(0);
-        mapper.map(value, new_value);
+        auto new_value = builder.clone(*op, program->mapper)->getResult(0);
+        program->mapper.map(value, new_value);
       }
     }
   }
   // Add a final ReturnOp
   std::vector<mlir::Value*> rets;
-  for (auto value : outputs) {
-    rets.push_back(mapper.lookup(value));
+  for (unsigned i = 0; i < outputs.size(); i++) {
+    auto new_value = program->mapper.lookup(outputs[i]);
+    new_outputs[i] = new_value;
+    rets.push_back(new_value);
   }
   builder.create<mlir::ReturnOp>(loc, rets);
-  // Create a new module to hold the function
-  auto module = ModuleOp::create(loc);
-  module.push_back(func_op);
+  // Attach the function to the module
+  module.push_back(funcOp);
   IVLOG(5, mlir::debugString(module));
   if (failed(mlir::verify(module))) {
     emitError(loc, "Module verification error");
@@ -596,7 +602,7 @@ mlir::Operation* TileBuilder::MakeFuncOp(llvm::StringRef name, llvm::ArrayRef<ml
     emitError(loc, "Optimization passes failure");
   }
   IVLOG(2, mlir::debugString(module));
-  return module.getOperation();
+  return program;
 }
 
 std::vector<mlir::Value*> TileBuilder::ComputeGradients(llvm::ArrayRef<mlir::Value*> wrt, mlir::Value* loss) {

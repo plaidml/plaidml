@@ -33,7 +33,6 @@ _CONV_DATA_FORMAT = ['channels_first', 'channels_last']
 _in_train_phase = None  # Will be initialized on first use
 
 _device = plaidml_settings.get('PLAIDML_DEVICE')
-_target = plaidml_settings.get('PLAIDML_TARGET')
 
 
 def _prepend_name_scope(name, default):
@@ -125,15 +124,7 @@ class _Function(object):
         outputs = [x.tensor for x in self._outputs]
         updates = [(x[0].tensor, x[1].tensor) for x in self._updates]
         program = edsl.Program(self._name, outputs, updates)
-
-        def make_buffer(tensor):
-            # convert LogicalShape into TensorShape
-            shape = tensor.shape.into_TensorShape()
-            return plaidml.Buffer(_device, shape)
-
-        input_bindings = [(x.tensor, make_buffer(x.tensor)) for x in self._inputs]
-        output_bindings = [(x, make_buffer(x)) for x in program.outputs]
-        return plaidml_exec.Executable(program, _device, _target, input_bindings, output_bindings)
+        return plaidml_exec.compile(program, [x.tensor for x in self._inputs])
 
 
 def _create_var(name, value):
