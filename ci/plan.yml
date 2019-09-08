@@ -176,9 +176,9 @@ SUITES:
       keras-stripe-ocl-gfx803:
         pipelines: [nightly]
       keras-plaid-ocl-gfx804:
-        pipelines: [ci]
+        pipelines: [plaidml, ci]
       keras-stripe-ocl-gfx804:
-        pipelines: [ci]
+        pipelines: [plaidml, ci]
 
     params:
       ci:
@@ -256,9 +256,9 @@ SUITES:
       keras-plaid-ocl-gfx803:
         pipelines: [plaidml]
       keras-plaid-ocl-gfx804:
-        pipelines: [ci]
+        pipelines: [plaidml, ci]
       keras-stripe-ocl-gfx804:
-        pipelines: [ci]
+        pipelines: [plaidml, ci]
 
     params:
       ci:
@@ -293,7 +293,7 @@ SUITES:
     workloads:
       imdb_lstm:
         precision: high
-        skip_platforms: [keras-stripe-ocl-neo, keras-stripe-mtl-uhd630]
+        skip_platforms: [keras-stripe-ocl-neo, keras-stripe-mtl-uhd630, keras-stripe-ocl-gfx804]
         perf_threshold: 0.7
       inception_v3:
         precision: high
