@@ -302,6 +302,10 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+          keras-plaid-ocl-gfx804:
+            prepend_args: [--examples, 256]
+          keras-stripe-ocl-gfx804:
+            prepend_args: [--examples, 256]
       mobilenet:
         precision: high
       mobilenet_v2:
@@ -323,6 +327,10 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+          keras-plaid-ocl-gfx804:
+            prepend_args: [--examples, 256]
+          keras-stripe-ocl-gfx804:
+            prepend_args: [--examples, 256]
         skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630, keras-plaid-ocl-gfx803]
       xception:
         precision: high
@@ -336,6 +344,10 @@ SUITES:
           keras-plaid-ocl-neo:
             prepend_args: [-n, 256]
           keras-stripe-ocl-neo:
+            prepend_args: [-n, 256]
+          keras-plaid-ocl-gfx804:
+            prepend_args: [-n, 256]
+          keras-stripe-ocl-gfx804:
             prepend_args: [-n, 256]
         skip_platforms: [keras-plaid-ocl-gv100gl]
 
