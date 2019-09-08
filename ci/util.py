@@ -88,7 +88,7 @@ class CondaEnv(object):
         return CondaEnv(path)
 
     def install(self, package):
-        check_call([str(self.python), '-m', 'pip', 'install', package])
+        check_call([str(self.python), '-m', 'pip', 'install', str(package)])
 
 
 class DictAction(argparse.Action):
