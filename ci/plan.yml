@@ -303,9 +303,9 @@ SUITES:
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-plaid-ocl-gfx804:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples, 128]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples, 128]
       mobilenet:
         precision: high
       mobilenet_v2:
@@ -321,20 +321,22 @@ SUITES:
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-plaid-ocl-gfx804:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples, 128]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples, 128]
       vgg19:
         precision: high
         platform_overrides:
+          keras-stripe-ocl-neo:
+            prepend_args: [--examples, 256]
           keras-plaid-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-plaid-ocl-gfx804:
-            prepend_args: [--examples, 128]
+            prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 128]
+            prepend_args: [--examples, 64]
         skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630, keras-plaid-ocl-gfx803]
       xception:
         precision: high
@@ -350,9 +352,9 @@ SUITES:
           keras-stripe-ocl-neo:
             prepend_args: [-n, 256]
           keras-plaid-ocl-gfx804:
-            prepend_args: [-n, 128]
+            prepend_args: [-n, 64]
           keras-stripe-ocl-gfx804:
-            prepend_args: [-n, 128]
+            prepend_args: [-n, 64]
         skip_platforms: [keras-plaid-ocl-gv100gl]
 
   comprehensive:
