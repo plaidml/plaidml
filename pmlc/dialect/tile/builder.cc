@@ -259,12 +259,13 @@ TileBuilder::~TileBuilder() = default;
 
 void TileBuilder::Destroy(mlir::Value* value) {
   IVLOG(5, "TileBuilder::Destroy> value");
-  if (value && value->use_empty()) {
-    auto op = value->getDefiningOp();
-    if (op && op->use_empty()) {
-      // op->erase();
-    }
-  }
+  // TODO: fix memory mgmt issues, once purely MLIR path is complete
+  // if (value && value->use_empty()) {
+  //   auto op = value->getDefiningOp();
+  //   if (op && op->use_empty()) {
+  //     op->erase();
+  //   }
+  // }
 }
 
 void TileBuilder::BindTensorDim(unsigned dim, mlir::Value* from, mlir::Value** into) {

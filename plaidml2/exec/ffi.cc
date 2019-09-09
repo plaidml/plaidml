@@ -106,7 +106,7 @@ plaidml_executable* plaidml_compile(  //
     // 1. lower tile -> stripe
     auto stripe = LowerIntoStripe(program->program.get());
     // 2. convert MLIR -> stripe
-    // ToStripe(func);
+    // stripe::ToStripe(func);
     // 3. runinfo?
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, program->eval.runinfo, &const_bufs);
     for (size_t i = 0; i < ninputs; i++) {
