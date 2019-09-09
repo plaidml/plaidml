@@ -44,6 +44,7 @@ Value pool(const Value&);
 Value prod(const Value&);
 Value relu(const Value&);
 Value repeat(const Value&);
+Value reshape(const Value&);
 Value sigmoid(const Value&);
 Value slice(const Value&);
 Value softmax(const Value&);
@@ -1172,6 +1173,8 @@ Value convolution(const Value& value) {
       throw std::runtime_error("Invalid input_layout");
   }
 
+  std::vector<Constraint> constraints;
+
   // Filter indexes
   TensorIndex f_co, f_ci;  // Filter index formulas for out/in channels; depend on group layout
   switch (group_layout) {
@@ -1183,16 +1186,12 @@ Value convolution(const Value& value) {
     case GroupLayout::IN_C:
       f_co = co;
       f_ci = (CI / G) * g + ci;
-      if (ci < CI / G) {
-        // Do nothing; this is just a constraint
-      }
+      constraints.push_back(ci < CI / G);
       break;
     case GroupLayout::IN_K:
       f_co = (CO / G) * g + co;
       f_ci = ci;
-      if (co < CO / G) {
-        // Do nothing; this is just a constraint
-      }
+      constraints.push_back(co < CO / G);
       break;
     default:
       throw std::runtime_error("Unrecognized group layout");
@@ -1257,12 +1256,15 @@ Value convolution(const Value& value) {
   switch (deriv_mode) {
     case ConvDerivMode::NONE:
       O(O_idxs) += I(I_idxs) * F(F_idxs);
+      O.add_constraints(constraints);
       return Value{O};
     case ConvDerivMode::DATA:
       I(I_idxs) += O(O_idxs) * F(F_idxs);
+      I.add_constraints(constraints);
       return Value{I};
     case ConvDerivMode::FILTER:
       F(F_idxs) += I(I_idxs) * O(O_idxs);
+      F.add_constraints(constraints);
       return Value{F};
     default:
       throw std::runtime_error("Unrecognized deriv_mode");
@@ -1288,9 +1290,8 @@ Value cumprod(const Value& value) {
   TensorIndex cumulator_idx;
   I_idxs[axis] = I_idxs[axis] - cumulator_idx;
   auto O = TensorOutput(dims);
-  if (cumulator_idx < dims[axis]) {
-    O(O_idxs) *= I(I_idxs);
-  }
+  O(O_idxs) *= I(I_idxs);
+  O.add_constraint(cumulator_idx < dims[axis]);
   return Value{O};
 }
 
@@ -1313,9 +1314,8 @@ Value cumsum(const Value& value) {
   TensorIndex cumulator_idx;
   I_idxs[axis] = I_idxs[axis] - cumulator_idx;
   auto O = TensorOutput(dims);
-  if (cumulator_idx < dims[axis]) {
-    O(O_idxs) += I(I_idxs);
-  }
+  O(O_idxs) += I(I_idxs);
+  O.add_constraint(cumulator_idx < dims[axis]);
   return Value{O};
 }
 
@@ -1574,12 +1574,10 @@ Value image_resize(const Value& value) {
         TensorIndex i{"i"};
         TensorIndex y{"y"};
         TensorIndex x{"x"};
-        if (j < HFactor) {
-          HK(y) += HCoeffVec(j + y - HFactor + 1);
-        }
-        if (i < WFactor) {
-          WK(x) += WCoeffVec(i + x - WFactor + 1);
-        }
+        HK(y) += HCoeffVec(j + y - HFactor + 1);
+        HK.add_constraint(j < HFactor);
+        WK(x) += WCoeffVec(i + x - WFactor + 1);
+        WK.add_constraint(i < WFactor);
       }
       auto K = TensorOutput(HK_dim, WK_dim);
       {
@@ -1820,6 +1818,7 @@ Value pool(const Value& value) {
   std::vector<TensorIndex> I_idxs = {n};
   std::vector<TensorDim> O_dims = {N};
   std::vector<TensorIndex> O_idxs = {n};
+  std::vector<Constraint> constraints;
   if (input_layout == TensorLayout::NCX) {
     I_dims.push_back(C);
   }
@@ -1847,10 +1846,7 @@ Value pool(const Value& value) {
     local_index = strides[i] * x[i] + k[i] - pad_before[i];
     O_dims.emplace_back(local_output_size);
     I_idxs.emplace_back(local_index);
-    // Add constraints: the format is weird but this does actually apply the constraints
-    if (k[i] < pool_size[i]) {
-      // nolint(whitespace/empty_if_body)
-    }
+    constraints.push_back(k[i] < pool_size[i]);
   }
   if (input_layout == TensorLayout::NXC) {
     I_idxs.push_back(c);
@@ -1860,15 +1856,19 @@ Value pool(const Value& value) {
   auto O = TensorOutput(O_dims);
   if (pool_mode == PoolMode::MAX) {
     O(O_idxs) >= I(I_idxs);
+    O.add_constraints(constraints);
     return Value{O};
   } else if (pool_mode == PoolMode::MIN) {
     O(O_idxs) <= I(I_idxs);
+    O.add_constraints(constraints);
     return Value{O};
   } else if (pool_mode == PoolMode::SUM) {
     O(O_idxs) += I(I_idxs);
+    O.add_constraints(constraints);
     return Value{O};
   } else if (pool_mode == PoolMode::AVG) {
     O(O_idxs) += I(I_idxs);
+    O.add_constraints(constraints);
     if (include_padding_in_avg) {
       int64_t total_pool_size = 1;
       for (const auto& sz : pool_size) {
@@ -1885,6 +1885,7 @@ Value pool(const Value& value) {
       // O_dims)
       Ones(O_idxs) = One(std::vector<TensorIndex>());
       Count(O_idxs) += Ones(I_idxs);
+      Count.add_constraints(constraints);
       return Value{O / Count};
     }
   } else {
@@ -1945,10 +1946,30 @@ Value repeat(const Value& value) {
   TensorIndex inner;
   O_idxs[axis] = repeats * I_idxs[axis] + inner;
   auto O = TensorOutput(O_dims);
-  if (inner < repeats) {
-    O(O_idxs) = I(I_idxs);
-  }
+  O(O_idxs) = I(I_idxs);
+  O.add_constraint(inner < repeats);
   return Value{O};
+}
+
+Value reshape(const Value& value) {
+  IVLOG(1, "reshape");
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(str(boost::format("PlaidML reshape op expects 2 arguments (received %1%)") % args.size()));
+  }
+  auto I = args[0].as_tensor();
+  std::vector<TensorDim> dims;
+  for (auto dim : args[1].as_tuple()) {
+    if (dim.is_int()) {
+      dims.emplace_back(dim.as_int());
+    } else if (dim.is_dim()) {
+      dims.emplace_back(dim.as_dim());
+    } else if (dim.is_str()) {
+      // TODO: handle special cases
+      dims.emplace_back(0);
+    }
+  }
+  return Value{edsl::reshape(I, dims)};
 }
 
 Value sigmoid(const Value& value) {
@@ -2098,19 +2119,26 @@ Value softmax(const Value& value) {
   if (args.size() != 2) {
     throw std::runtime_error("softmax expects 2 arguments");
   }
-  auto X = args[0].as_tensor();
-  if (X.shape().ndims() == 2) {
-    TensorDim I, J;
-    TensorIndex i, j;
-    X.bind_dims(I, J);
-    auto M = TensorOutput(I, 1);
-    M(i, 0) >= X(i, j);
-    auto E = exp(X - M);
-    auto N = TensorOutput(I, 1);
-    N(i, 0) += E(i, j);
-    return Value{E / N};
-  }
-  throw std::runtime_error("softmax only works on 2 dimensions at this time.");
+  auto I = args[0].as_tensor();
+  auto axis = args[1].as_int();
+
+  auto ndims = I.shape().ndims();
+  axis = normalize_axis(axis, ndims, "softmax");
+
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs(ndims);
+  I.bind_dims(I_dims);
+  // R_dims & R_idxs are the dims/idxs reduced along the specified axis; used in the inner contractions
+  std::vector<TensorDim> R_dims = I_dims;
+  std::vector<TensorIndex> R_idxs = I_idxs;
+  R_dims[axis] = TensorDim{1};
+  R_idxs[axis] = TensorIndex{0};
+  auto M = TensorOutput(R_dims);
+  M(R_idxs) >= I(I_idxs);
+  auto E = exp(I - M);
+  auto N = TensorOutput(R_dims);
+  N(R_idxs) += E(I_idxs);
+  return Value{E / N};
 }
 
 Value spatial_padding(const Value& value) {
@@ -2596,6 +2624,7 @@ void RegisterOps() {
   registry->Register("prod", prod);
   registry->Register("relu", relu);
   registry->Register("repeat", repeat);
+  registry->Register("reshape", reshape);
   registry->Register("sigmoid", sigmoid);
   registry->Register("slice", slice);
   registry->Register("softmax", softmax);

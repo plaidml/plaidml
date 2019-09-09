@@ -22,6 +22,15 @@ namespace tile {
 namespace targets {
 namespace cpu {
 
+enum class XSMMDispatch : int {
+  NONE = 0,  // No XSMM dispatch function to call.
+  SMM = 1,   // singe float
+  DMM = 2,   // double float
+  WIMM = 3,  // int8, uint8 ---> int
+  BSMM = 4,  // TODO: Need Stripe support for bfloat16.
+  BMMM = 5,  // TODO: Need Stripe support for bfloat16.
+};
+
 class Compiler : private stripe::ConstStmtVisitor {
  public:
   Compiler(llvm::LLVMContext* context, const Config& config);
@@ -46,7 +55,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void GenerateInvoker(const stripe::Block& program, llvm::Function* main);
   uint64_t MeasureArena(const stripe::Block& block);
   void GenerateArena(const stripe::Block& block);
-  llvm::Function* CompileXSMMBlock(const stripe::Block& block, const DataType dataType,
+  llvm::Function* CompileXSMMBlock(const stripe::Block& block, const XSMMDispatch xsmmDispatch,
                                    const XSMMCallData& xsmmCallData);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
@@ -123,7 +132,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
-  llvm::Value* XSMMDispatchFunction(llvm::Type* alphaBetaPrtrType, const std::string& funcionName);
+  llvm::Value* XSMMDispatchFunction(llvm::Type* alphaPtrType, llvm::Type* betaPtrType, llvm::Type* aPtrType,
+                                    llvm::Type* bPtrType, llvm::Type* cPtrType, const std::string& funcionName);
   llvm::Value* MallocFunction();
   llvm::Value* CallocFunction();
   llvm::Value* FreeFunction();
@@ -133,8 +143,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void ProfileBlockLeave(const stripe::Block& block);
   void ProfileLoopEnter(const stripe::Block& block);
   void ProfileLoopLeave(const stripe::Block& block);
-  bool isXSMMSuppotedDataType(DataType dataType);
-  const DataType GetBlockRefsDataType(const stripe::Block& block);
+  const XSMMDispatch GetXSMMDispatch(const stripe::Block& block);
   llvm::Value* RunTimeLogEntry(void);
   void EmitRunTimeLogEntry(const char* str, const char* extra, llvm::Value* value);
   void PrintOutputAssembly();

@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import argparse
+import os
 
 import plaidbench.cli
 
@@ -55,6 +56,9 @@ def make_parser():
     parser = argparse.ArgumentParser()
     plaidargs = parser.add_mutually_exclusive_group()
     plaidargs.add_argument('--plaid', action='store_true', help="Use PlaidML as the backend.")
+    plaidargs.add_argument('--plaid-edsl',
+                           action='store_true',
+                           help="EXPERIMENTAL: Use PlaidML2 (EDSL) as the backend")
     plaidargs.add_argument('--caffe2', action='store_true', help="Use Caffe2 as the backend.")
     plaidargs.add_argument('--tf', action='store_true', help="Use TensorFlow as the backend.")
     plaidargs.add_argument(
@@ -159,7 +163,9 @@ def main():
             argv.append('--cpu')
         if args.refresh_onnx_data:
             argv.append('--no-use-cached-data')
-        if args.plaid or (not args.no_plaid and not args.caffe2):
+        if args.plaid_edsl:
+            argv.append('--plaid-edsl')
+        elif args.plaid or (not args.no_plaid and not args.caffe2 and not args.tf):
             argv.append('--plaid')
         elif args.caffe2:
             argv.append('--caffe2')
@@ -180,7 +186,10 @@ def main():
             argv.append('--refresh-onnx-data is only meaningful with --onnx')
         if args.fix_learn_phase:
             argv.append('--fix-learn-phase')
-        if args.plaid or (not args.no_plaid and not args.caffe2):
+        if args.plaid_edsl:
+            argv.append('--plaid-edsl')
+            os.environ["KERAS_BACKEND"] = "plaidml2.bridge.keras.__init__"
+        elif args.plaid or (not args.no_plaid and not args.caffe2 and not args.tf):
             argv.append('--plaid')
         elif args.caffe2:
             raise ValueError('There is no Caffe2 backend for Keras')

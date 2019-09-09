@@ -358,10 +358,8 @@ static void PartialCacheInRegister(const AliasMap& parent_map,          //
         if (!ParseGlobalIndex(kvp.first, &depth, &idx_name)) {
           throw std::runtime_error("Incorrect global index " + kvp.first);
         }
-        if (depth == new_parent_map.depth() + 1) {
-          kvp.second = ToInteger(kvp.second * multiple.at(idx_name));
-        }
-        else if (depth == new_parent_map.depth() + 2) {
+        // Modify only the variables that are defined in the cache inner level
+        if (depth == new_inner_map.depth()) {
           kvp.second = ToInteger(kvp.second / multiple.at(idx_name));
         }
       }

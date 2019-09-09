@@ -84,6 +84,8 @@ struct LogicalShape {
   std::vector<DimExprPtr> dims_as_exprs() const;
 };
 
+TensorShape IntoTensorShape(const LogicalShape& shape);
+
 struct Expr : std::enable_shared_from_this<Expr> {
   std::string name;
   LogicalShape shape;
@@ -235,7 +237,6 @@ struct PolyDimExpr : PolyExpr {
 struct PolyIndex : PolyExpr {
   size_t idx_id;
   std::string name;
-  mutable std::vector<std::shared_ptr<ConstraintExpr>> constraints;
 
   explicit PolyIndex(size_t idx_id, const std::string& name = "") : idx_id(idx_id), name(name) {}
   Polynomial Accept(PolyVisitor* visitor) { return visitor->Visit(*this); }
@@ -314,67 +315,6 @@ struct DimRefExpr : DimExpr {
   DimRefExpr(const ExprPtr& ref, size_t dim) : ref(ref), dim(dim) {}
   int64_t Accept(DimVisitor* visitor) { return visitor->Visit(*this); }
   std::string str() const;
-};
-
-// This is necessary to allow for these kinds of expressions:
-//   if (i - j < 10) {}
-//
-// What we want is for both `i` and `j` to refer to the `i - j < 10` constraint.
-// Later, the ConstraintCollector will track each constraint that is associated
-// with the indexes that are in turn associated with a contraction.
-class ConstraintApplier : public PolyVisitor {
- public:
-  explicit ConstraintApplier(const std::shared_ptr<ConstraintExpr>& constraint) : constraint_(constraint) {}
-
- private:
-  Polynomial Visit(const PolyDimExpr& expr) { return Polynomial(); }
-
-  Polynomial Visit(const PolyIndex& expr) {
-    expr.constraints.emplace_back(constraint_);
-    return Polynomial();
-  }
-
-  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
-
-  Polynomial Visit(const PolyOpExpr& expr) {
-    for (auto operand : expr.operands) {
-      operand->Accept(this);
-    }
-    return Polynomial();
-  }
-
- private:
-  std::shared_ptr<ConstraintExpr> constraint_;
-};
-
-// Add each unique constraint on indexes associated with a contraction.
-// Duplicates may occur in cases like:
-//   if (i - j < 10) {}
-//
-// Both `i` and `j` will refer to the same `i - j < 10` constraint.
-struct ConstraintCollector : public PolyVisitor {
-  Polynomial Visit(const PolyDimExpr& expr) { return Polynomial(); }
-
-  Polynomial Visit(const PolyIndex& expr) {
-    for (const auto& constraint : expr.constraints) {
-      auto it = std::find(constraints.begin(), constraints.end(), constraint);
-      if (it == constraints.end()) {
-        constraints.emplace_back(constraint);
-      }
-    }
-    return Polynomial();
-  }
-
-  Polynomial Visit(const PolyLiteral& expr) { return Polynomial(); }
-
-  Polynomial Visit(const PolyOpExpr& expr) {
-    for (const auto& op : expr.operands) {
-      op->Accept(this);
-    }
-    return Polynomial();
-  }
-
-  std::vector<std::shared_ptr<ConstraintExpr>> constraints;
 };
 
 struct ProgramEvaluation {

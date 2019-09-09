@@ -260,9 +260,8 @@ edsl::Tensor avg_pool2d(const std::vector<edsl::Value>& args) {
   auto S0 = strides[0].as_int();
   auto S1 = strides[1].as_int();
   auto O = edsl::TensorOutput(N, C, (H + 2 * P0 - K0) / S0 + 1, (W + 2 * P1 - K1) / S1 + 1);
-  if (i < K0 && j < K1) {
-    O(n, c, h, w) += I(n, c, S0 * h + i, S1 * w + j);
-  }
+  O(n, c, h, w) += I(n, c, S0 * h + i, S1 * w + j);
+  O.add_constraints({i < K0, j < K1});
   return O / (K0 * K1);
 }
 
@@ -354,9 +353,8 @@ edsl::Tensor max_pool2d(const std::vector<edsl::Value>& args) {
   auto O = edsl::TensorOutput(N, C,                                       //
                               (H + 2 * P0 - D0 * (K0 - 1) - 1) / S0 + 1,  //
                               (W + 2 * P1 - D1 * (K1 - 1) - 1) / S1 + 1);
-  if (k0 < K0 && k1 < K1) {
-    O(n, c, h, w) >= I(n, c, S0 * h + k0 - P0, S1 * w + k1 - P1);
-  }
+  O(n, c, h, w) >= I(n, c, S0 * h + k0 - P0, S1 * w + k1 - P1);
+  O.add_constraints({k0 < K0, k1 < K1});
   return O;
 }
 

@@ -475,6 +475,19 @@ class TestBackendOps(unittest.TestCase):
     def testDot(self, b, x, y):
         return [b.dot(x, y)]
 
+    @unittest.skip(
+        "In TF calling set_value and then evaluating doesn't seem to produce the new value. "
+        "If we want to test this, we will need a more complex test.")
+    @compareMultiple([[3, 4, 2], [7]])
+    @compareForwardExact()
+    def testSetValue(self, b, *args):  # TODO: Not yet correct
+        np_old_x = m(*args)
+        np_new_x = n(*args)
+        print("old: {}, new: {}".format(np_old_x, np_new_x))
+        x = b.variable(m(*args))
+        b.set_value(x, n(*args))
+        return x
+
     @opTest([
         [m(1, 2), m(1, 3, 2), (1, 2)],
         [m(2, 5), m(2, 5), 1],
@@ -1716,6 +1729,15 @@ class TestBackendOps(unittest.TestCase):
             num_iterations=10,
             measure_eval_time=True)
     def resnetLayer3(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 8, 8, 16), m(3, 3, 16, 16)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer35(self, b, x, k):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]

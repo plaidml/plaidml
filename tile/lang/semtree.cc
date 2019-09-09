@@ -148,7 +148,8 @@ IfStmt::IfStmt(ExprPtr c, StmtPtr t, StmtPtr f) : cond(c), iftrue(t), iffalse(f)
 
 void IfStmt::Accept(Visitor& v) const { v.Visit(*this); }
 
-ForStmt::ForStmt(const std::string v, uint64_t n, uint64_t s, StmtPtr i) : var(v), num(n), step(s), inner(i) {
+ForStmt::ForStmt(const std::string v, uint64_t n, uint64_t s, StmtPtr i)
+    : var(sanitize_name(v)), num(n), step(s), inner(i) {
   if (!inner->isBlock()) {
     inner = std::make_shared<Block>(std::vector<StmtPtr>{i});
   }
@@ -171,7 +172,10 @@ void ReturnStmt::Accept(Visitor& v) const { v.Visit(*this); }
 void SpecialStmt::Accept(Visitor& v) const { v.Visit(*this); }
 
 Function::Function(const std::string n, const Type& r, const params_t& p, StmtPtr b)
-    : name(n), ret(r), params(p), body(b), subgroup_size(0) {
+    : name(sanitize_name(n)), ret(r), body(b), subgroup_size(0) {
+  for (const auto& param : p) {
+    params.push_back(std::pair<Type, std::string>{param.first, sanitize_name(param.second)});
+  }
   if (!body->isBlock()) {
     body = std::make_shared<Block>(std::vector<StmtPtr>{body});
   }

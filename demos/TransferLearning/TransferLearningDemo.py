@@ -157,8 +157,11 @@ class Demo:
     tab.set_title(1, 'Fine Tuning')
     gui = widgets.VBox(children=[tab, progress_box, out_initial, out])
 
-    def __init__(self, gui=0, training=1):
+    def __init__(self, gui=1, training=0, model='ResNet50', backend='INTERPRETER', verbose=1):
         self.gui = gui
+        self.verbose = verbose
+        self.backend = backend
+        ngraph_bridge.set_backend(self.backend)
 
         if gui:
             self.gui = widgets.VBox(
@@ -180,7 +183,7 @@ class Demo:
         self.init_model()
 
         if training:
-            self.train_model(self.train_button)
+            self.train_model(self.train_button, model=model)
 
     def init_images(self):
         zip_file = tf.keras.utils.get_file(
@@ -303,7 +306,7 @@ class Demo:
 
                     if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
                         ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
-                plt.show()
+                display(plt)
 
     def on_model_change(self, change):
         if change['type'] == 'change' and change['name'] == 'value':
@@ -451,19 +454,29 @@ class Demo:
 
                     if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
                         ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
-                plt.show()
+                display(f)
 
-        with self.out_stats:
-            wrong = ~(predicted_class_indices ^ self.test_class_indices) + 2
-            print("Correct Matrix")
-            print(wrong)
+        if self.verbose:
+            with self.out_stats:
+                wrong = ~(predicted_class_indices ^ self.test_class_indices) + 2
+                print("Correct Matrix")
+                print(wrong)
 
-        print("Total guessed:", wrong.shape[0])
-        print("Accuracy:", np.count_nonzero(wrong)/wrong.shape[0])
+            print("Total guessed:", wrong.shape[0])
+            print("Accuracy:", np.count_nonzero(wrong)/wrong.shape[0])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='TransferLearningDemo')
     parser.add_argument('--gui', help='shows the GUI of the demo', action='store_true')
     parser.add_argument('--training', help='performs the training phase of the demo', action='store_true')
+    parser.add_argument('--network_type', help='selects the network used for training/classification [ResNet50]/MobileNet V2')
+    parser.add_argument('--backend', help='selects the backend used for training/classification (run ngraph_bridge.list_backends() for full list)')
+    parser.add_argument('--quiet', help='disables most logging', action='store_false')
     args = parser.parse_args()
-    Demo(args.gui, args.training)
+    nw = 'ResNet50'
+    if args.network_type == 'ResNet50' or args.network_type == 'MobileNet V2':
+        nw = args.network_type
+    be = "PLAIDML"
+    if args.backend != "" and args.backend in ngraph_bridge.list_backends():
+        be = args.backend
+    Demo(args.gui, args.training, nw, be, args.quiet)
