@@ -145,7 +145,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void ProfileLoopLeave(const stripe::Block& block);
   const XSMMDispatch GetXSMMDispatch(const stripe::Block& block);
   llvm::Value* RunTimeLogEntry(void);
-  void EmitRunTimeLogEntry(const char* str, const char* extra, llvm::Value* value);
+  void EmitRunTimeLogEntry(const std::string& str, const std::string& extra, llvm::Value* value = nullptr);
   void PrintOutputAssembly();
 
   // Gets the leading dimensions and the buffers for an XSMM call if available.
