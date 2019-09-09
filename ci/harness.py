@@ -133,7 +133,8 @@ def run(args, remainder):
         except ValueError:
             pass
 
-    cmd = [popt.get('runner')] + cmd_args
+    runner = shutil.which(popt.get('runner'), path=env['PATH'])
+    cmd = [runner] + cmd_args
     retcode = util.call(cmd, cwd=cwd, env=env)
 
     build_url = os.getenv('BUILDKITE_BUILD_URL')
