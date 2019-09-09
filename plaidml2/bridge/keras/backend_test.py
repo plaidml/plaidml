@@ -439,18 +439,14 @@ class TestBackendOps(unittest.TestCase):
         x = b.variable(m(*args))
         b.set_value(x, n(*args))
         return x
-
-    # TODO(T1046): Once Keras is updated beyond 2.0.8, re-enable TF on batch_dot tests
-    @opTest(
-        [
-            [m(1, 2), m(1, 3, 2), (1, 2)],
-            #[m(2, 3, 4, 5), m(2, 3, 5, 1), None],
-            #[m(1, 2, 6, 2), m(1, 2, 2, 3), (3, 1)],
-            #[m(2, 3, 3, 2), m(2, 3, 4, 3), (1, 3)],
-            [m(2, 5), m(2, 5), 1],
-            #[m(2, 4, 5), m(2, 5, 1), None],
-        ],
-        skip_tensorflow=False)
+    
+    @opTest([
+        [m(1, 2), m(1, 3, 2), (1, 2)],
+        [m(2, 5), m(2, 5), 1],
+        [m(2, 4, 5), m(2, 5, 1), None],
+    ],
+            skip_tensorflow=not bool(os.getenv('PLAIDML_BATCHDOT_TF_BEHAVIOR')),
+            skip_theano=bool(os.getenv('PLAIDML_BATCHDOT_TF_BEHAVIOR')))
     def testBatchDot(self, b, x, y, ax):
         if ax is None:
             return [b.batch_dot(x, y)]
