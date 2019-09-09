@@ -223,7 +223,8 @@ def _plaidml_py_wheel_impl(ctx):
     ctx.actions.run(
         outputs = [wheel],
         inputs = wheel_inputs,
-        executable = "python",
+        tools = [ctx.executable.tool],
+        executable = ctx.executable.tool,
         arguments = bdist_wheel_args,
         mnemonic = "BuildWheel",
         use_default_shell_env = True,

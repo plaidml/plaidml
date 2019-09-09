@@ -6,6 +6,8 @@ tasks:
     shell_commands:
     - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     - bash ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+    environment:
+    - PATH: "$HOME/miniconda/bin:$PATH"
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:
@@ -17,6 +19,8 @@ tasks:
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh 
     - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
+    environment:
+    - PATH: "$HOME/miniconda/bin:$PATH"
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:
@@ -27,7 +31,7 @@ tasks:
     name: ":window:"
     batch_commands:
     - curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -OutFile .\miniconda.exe
-    - start /wait "" .\miniconda.exe /InstallationType=JustMe /S /D=%UserProfile%\Miniconda3
+    - .\miniconda.exe /InstallationType=JustMe /S /D=%UserProfile%\Miniconda3
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:
