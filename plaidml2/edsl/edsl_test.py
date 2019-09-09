@@ -459,11 +459,11 @@ class TestEdsl(unittest.TestCase):
   _X0[x0, x1, x3, x6 : 1, 5, 5, 1] = +(I[x0, -1/2 + 1/2*x1 + 1/2*x2, -1/2 + 1/2*x3 + 1/2*x4, x5] * K[2 - x2, 2 - x4, x6, x5]);
 }
 ''')
-        #outputs = run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
         #crashes when run on linux. Does not crash on mac.
         #if any one of the divide by twos is removed it no longer crashed
         #valgrnd was run and could not find anything, the test was written up in edsl_test.cc and run, the crash was reproduced exactly
         #issue created in tracking system (#)
+        #outputs = run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
 
     def testFunkyLayerNames(self):
         '''Exercises fix for plaidml bug #241
@@ -513,7 +513,7 @@ class TestEdsl(unittest.TestCase):
         outputs = run(program, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
 
-    @unittest.skip('TODO: convert to EDSL -  exception needs to be thrown')
+    @unittest.skip('TODO: exception needs to be thrown')
     def testAssignmentExceptions(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [5, 1]), name='A')
         B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 5]), name='B')
@@ -563,10 +563,6 @@ class TestEdsl(unittest.TestCase):
         outputs = run(program1, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
         self.assertEqual(outputs[1].tolist(), [1, 2, 3])
-
-        N = TensorDim(3)
-        O1 = TensorOutput(N)
-        O2 = TensorOutput(N)
         O1 = I
         O2 = I
         program2 = Program('two_outputs', [O1, O2])
