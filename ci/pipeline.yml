@@ -20,8 +20,7 @@ steps:
   - label: '{{emoji}}{{engine}}{{shard_emoji}}{{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}'
     command: |
       {{python}} -m pip install pyyaml --user
-      {{python}} ci/buildkite.py test \
-        {{platform}} {{suite}} {{workload}} {{batch_size}} {{#shard}}--shard-count {{count}} --shard {{id}}{{/shard}}
+      {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}} {{#shard}}--shard-count {{count}} --shard {{id}}{{/shard}}
 
   {{#soft_fail}}
     soft_fail: true

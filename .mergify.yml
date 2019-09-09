@@ -1,0 +1,10 @@
+pull_request_rules:
+  - name: automatic squash
+    conditions:
+      - "#approved-reviews-by>=1"
+      - "#changes-requested-reviews-by=0"
+      - status-success=buildkite/plaidml-plaidml/pr
+    actions:
+      merge:
+        method: squash
+        strict: smart

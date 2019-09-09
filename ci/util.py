@@ -62,17 +62,20 @@ class CondaEnv(object):
         }
         if platform.system() != 'Windows':
             env['JAVA_HOME'] = str(self.path)
-            env['CONDA_EXE'] = str(self.path / 'Scripts' / 'conda.exe')
         else:
+            env['CONDA_EXE'] = str(self.path / 'Scripts' / 'conda.exe')
             env['JAVA_HOME'] = str(self.path / 'Library')
         return env
 
     def create(self, spec):
         try:
             if not self.path.exists():
-                check_call(['conda', 'env', 'create', '-f', spec, '-p', str(self.path)])
+                check_call(['conda', 'env', 'create', '-f', str(spec), '-p', str(self.path)])
             else:
-                check_call(['conda', 'env', 'update', '--prune', '-f', spec, '-p', str(self.path)])
+                check_call(
+                    ['conda', 'env', 'update', '--prune', '-f',
+                     str(spec), '-p',
+                     str(self.path)])
         except:
             if self.path.exists():
                 shutil.rmtree(self.path)
@@ -85,7 +88,7 @@ class CondaEnv(object):
         return CondaEnv(path)
 
     def install(self, package):
-        check_call([self.python, '-m', 'pip', 'install', package])
+        check_call([str(self.python), '-m', 'pip', 'install', str(package)])
 
 
 class DictAction(argparse.Action):

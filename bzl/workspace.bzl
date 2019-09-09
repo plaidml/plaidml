@@ -1,6 +1,7 @@
 load("//bzl:conda_repo.bzl", "conda_repo")
 load("//bzl:xsmm_repo.bzl", "xsmm_repo")
 load("//vendor/cuda:configure.bzl", "configure_cuda")
+load("//vendor/cm:configure.bzl", "configure_cm")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//bzl:dev_repo.bzl", "dev_http_archive")
 
@@ -90,6 +91,22 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "cm_headers",
+        url = "https://github.com/intel/cm-compiler/releases/download/Release_20190717/Linux_C_for_Metal_Development_Package_20190717.zip",
+        sha256 = "4549496e3742ade2ff13e804654cb4ee7ddabb3b95dbc1fdeb9ca22141f317d5",
+        strip_prefix = "Linux_C_for_Metal_Development_Package_20190717",
+        build_file = Label("//bzl:cm_headers.BUILD"),
+    )
+
+    http_archive(
+        name = "libva",
+        url = "https://github.com/intel/libva/releases/download/2.5.0/libva-2.5.0.tar.bz2",
+        sha256 = "3aa89cd369a506ac4dbe5de7c0ef5da4f3d220bf986403f02fa1f6f702af6878",
+        strip_prefix = "libva-2.5.0",
+        build_file = Label("//bzl:libva.BUILD"),
+    )
+
+    http_archive(
         name = "pybind11",
         url = "https://github.com/pybind/pybind11/archive/v2.2.4.tar.gz",
         sha256 = "b69e83658513215b8d1443544d0549b7d231b9f201f6fc787a2b2218b408181e",
@@ -120,6 +137,7 @@ def plaidml_workspace():
 
     configure_protobuf()
     configure_cuda(name = "cuda")
+    configure_cm(name = "cm")
 
     conda_repo(
         name = "com_intel_plaidml_conda_unix",
