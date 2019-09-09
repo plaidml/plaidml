@@ -368,11 +368,26 @@ class TestBackendOps(unittest.TestCase):
         assert isinstance(pkb.learning_phase(), int)
         npt.assert_equal(pkb.learning_phase(), 0)
 
-    @opTest([
-        [m(4, 7, 3), n(4, 3), m(3, 3), n(3, 3), False],
-        [m(4, 7, 3), n(4, 3), m(3, 3), n(3, 3), True],
-    ])
-    @unittest.skipIf(os.environ.get("USE_STRIPE", "0") == "1", "Stripe does not work for RNNs")
+    @opTest(
+        [
+            # Don't use exactly 0 (inconsistent gradient behavior between frameworks at ReLU cusp)
+            [
+                m(4, 7, 3) + .000001,
+                n(4, 3) + .000001,
+                m(3, 3) + .000001,
+                n(3, 3) + .000001,
+                False,
+            ],
+            [
+                m(4, 7, 3) + .000001,
+                n(4, 3) + .000001,
+                m(3, 3) + .000001,
+                n(3, 3) + .000001,
+                True,
+            ],
+        ],
+        atol=1.e-4,  # RNNs have limited precision on some devices
+    )
     def testRNN(self, b, inp, init_state, ker, r_ker, go_back):
 
         def step_function(inputs, states):
