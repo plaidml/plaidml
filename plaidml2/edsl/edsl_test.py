@@ -460,6 +460,10 @@ class TestEdsl(unittest.TestCase):
 }
 ''')
         #outputs = run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
+        #crashes when run on linux. Does not crash on mac.
+        #if any one of the divide by twos is removed it no longer crashed
+        #valgrnd was run and could not find anything, the test was written up in edsl_test.cc and run, the crash was reproduced exactly
+        #issue created in tracking system (#)
 
     def testFunkyLayerNames(self):
         '''Exercises fix for plaidml bug #241
@@ -509,6 +513,7 @@ class TestEdsl(unittest.TestCase):
         outputs = run(program, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
 
+    @unittest.skip('TODO: convert to EDSL -  exception needs to be thrown')
     def testAssignmentExceptions(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [5, 1]), name='A')
         B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 5]), name='B')
@@ -537,22 +542,9 @@ class TestEdsl(unittest.TestCase):
 
         O = TensorOutput(L, N)
         O[i, j] = B[i, k] * A[k, j]
-        program = Program('assignment_exception', [O])
-        self.assertMultiLineEqual(
-            str(program), '''function (
-  B[B_0, B_1],
-  A[A_0, A_1]
-) -> (
-  _X0
-) {
-  _X0[x0, x2 : 5, 5] = =(B[x0, x1] * A[x1, x2]);
-}
-''')
-        outputs = run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
-                                (B, np.array([1, 2, 3, 4, 5]))])
-        self.assertEqual(outputs[0].tolist(),
-                         [[25., 0., 0., 0., 0.], [0., 0., 0., 0., 0.], [0., 0., 0., 0., 0.],
-                          [0., 0., 0., 0., 0.], [0., 0., 0., 0., 0.]])
+        with self.assertRaises(plaidml.Error) as cm:
+            program = Program('assignment_exception', [O])
+        self.assertTrue("illegal assignment aggregation" in str(cm.exception))
 
     def testTwoOutputs(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
@@ -604,6 +596,3 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--verbose', type=int, default=0)
     args, remainder = parser.parse_known_args()
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
-
-    #unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1, exit=False)
-    #sys.exit(0)
