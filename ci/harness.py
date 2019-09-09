@@ -106,8 +106,12 @@ def run(args, remainder):
         env['CUDA_VISIBLE_DEVICES'] = buildkite_metadata('CUDA_VISIBLE_DEVICES', '0')
     env['PLAIDML_DEVICE_IDS'] = buildkite_metadata('PLAIDML_DEVICE_IDS')
     env['PLAIDML_EXPERIMENTAL'] = buildkite_metadata('PLAIDML_EXPERIMENTAL', '0')
-    env['PLAIDML_DEVICE'] = buildkite_metadata('PLAIDML_DEVICE')
-    env['PLAIDML_TARGET'] = buildkite_metadata('PLAIDML_TARGET')
+    device = buildkite_metadata('PLAIDML_DEVICE')
+    target = buildkite_metadata('PLAIDML_TARGET')
+    if device != None:
+        env['PLAIDML_DEVICE'] = device
+    if target != None:
+        env['PLAIDML_TARGET'] = target
 
     util.printf('--- :bazel: Running test {suite}/{workload} on {platform}'.format(
         suite=args.suite,
