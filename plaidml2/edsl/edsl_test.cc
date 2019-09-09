@@ -6,6 +6,7 @@
 #include "base/util/logging.h"
 #include "plaidml2/edsl/autodiff.h"
 #include "plaidml2/edsl/edsl.h"
+#include "plaidml2/exec/exec.h"
 
 using ::testing::Eq;
 
@@ -59,6 +60,7 @@ TEST(CppEdsl, Dot) {
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
   Program program("dot", {Dot(A, B)});
   IVLOG(1, program);
+  exec::Executable::compile(program, {A, B})->run();
 }
 
 TEST(CppEdsl, DoubleDot) {
@@ -67,6 +69,7 @@ TEST(CppEdsl, DoubleDot) {
   auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
   IVLOG(1, program);
+  exec::Executable::compile(program, {A, B, C})->run();
 }
 
 TEST(CppEdsl, MnistMlp) {
@@ -117,6 +120,8 @@ TEST(CppEdsl, MnistMlp) {
   _X25 = div(_X23, _X24);
 }
 )"));
+  std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3};
+  exec::Executable::compile(program, inputs)->run();
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
@@ -130,10 +135,11 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 }
 
 TEST(CppEdsl, Convolution) {
-  auto input = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
-  auto kernel = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
-  Program program("convolution", {Convolution2(input, kernel)});
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
+  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
+  Program program("convolution", {Convolution2(I, K)});
   IVLOG(1, program);
+  exec::Executable::compile(program, {I, K})->run();
 }
 
 Tensor MaxPooling2(const Tensor& I) {
@@ -229,6 +235,9 @@ TEST(CppEdsl, MnistCnn) {
   _X37 = div(_X35, _X36);
 }
 )"));
+  // TODO: this currently crashes
+  // std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4};
+  // exec::Executable::compile(program, inputs)->run();
 }
 
 Tensor Normalize(const Tensor& X) {
@@ -295,6 +304,8 @@ TEST(CppEdsl, LarsMomentum4d) {
   _X24 = sub(_X6, _X23);
 }
 )"));
+  std::vector<Tensor> inputs{X, Grad, Veloc, LR};
+  exec::Executable::compile(program, inputs)->run();
 }
 
 TEST(CppEdsl, RepeatElements) {
@@ -316,6 +327,7 @@ TEST(CppEdsl, RepeatElements) {
   _X1[x0, 3*x1 + x3, x2 : 10, 30, 10] = =(_X0[x0, x1, x2]), x3 < 3 no_defract;
 }
 )"));
+  exec::Executable::compile(program, {I})->run();
 }
 
 TEST(CppEdsl, UseDefault) {
@@ -338,6 +350,7 @@ TEST(CppEdsl, UseDefault) {
   _X2[x0, 3, x1, x2 : 1, 7, 10, 10] = =(_X1[x0, x1, x2]) default _X0;
 }
 )"));
+  exec::Executable::compile(program, {P, I})->run();
 }
 
 Tensor ArgMax(const Tensor& I) {
@@ -376,6 +389,7 @@ TEST(CppEdsl, ArgMax) {
   _X8 = as_uint(_X6, _X7);
 }
 )"));
+  exec::Executable::compile(program, {I})->run();
 }
 
 Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor& B, const Tensor& G) {
@@ -438,6 +452,7 @@ TEST(CppEdsl, Winograd) {
   _X11[x0, x1 + 30*x3, 30*x4 + x6, x5 : 1, 222, 222, 32] = +(_X10[x0, x1, x2, x3, x4, x5] * _X0[x2, x6]) no_defract;
 }
 )"));
+  exec::Executable::compile(program, {I, K, A, B, G})->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
@@ -461,6 +476,7 @@ TEST(CppEdsl, UniqueNames) {
   _X2 = add(_X1, C0);
 }
 )"));
+  exec::Executable::compile(program, {A, B, C0, C1})->run();
 }
 
 TEST(CppEdsl, GlobalMin) {
@@ -482,6 +498,7 @@ TEST(CppEdsl, GlobalMin) {
   _X2 = neg(_X1);
 }
 )"));
+  exec::Executable::compile(program, {I})->run();
 }
 
 TEST(CppEdsl, CumSum) {
@@ -502,6 +519,7 @@ TEST(CppEdsl, CumSum) {
   _X0[x1 : 10] = +(I[x0]), -x0 + x1 < 10;
 }
 )"));
+  exec::Executable::compile(program, {I})->run();
 }
 
 Tensor ComplexConv2d(const Tensor& I,               //
@@ -556,6 +574,7 @@ TEST(CppEdsl, ComplexConv2d) {
   _X2[x0, x1, x3, x5, x7 : 1, 112, 112, 3, 32] = +(_X0[x0, -2 + 2*x1 + 3*x2, -2 + 2*x3 + 3*x4, x5, x6] * _X1[x2, x4, x5, x6, x7]);
 }
 )"));
+  exec::Executable::compile(program, {I, K})->run();
 }
 
 TEST(CppEdsl, Reciprocal) {
@@ -571,6 +590,7 @@ TEST(CppEdsl, Reciprocal) {
   _X1 = div(_X0, A);
 }
 )"));
+  exec::Executable::compile(program, {A})->run();
 }
 
 TEST(CppEdsl, GradientDot) {
@@ -593,6 +613,7 @@ TEST(CppEdsl, GradientDot) {
   _X3[x0, x2 : 100, 100] = +(_X1[x0, x1] * B[x2, x1]);
 }
 )"));
+  exec::Executable::compile(program, {A, B})->run();
 }
 
 Tensor Max2Da0(const Tensor& A) {
@@ -634,6 +655,7 @@ TEST(CppEdsl, GradientMultiDot) {
   _X9 = add(_X7, _X8);
 }
 )"));
+  exec::Executable::compile(program, {A, B})->run();
 }
 
 TEST(CppEdsl, GradientDotSqrt) {
@@ -662,6 +684,21 @@ TEST(CppEdsl, GradientDotSqrt) {
   _X8[x0, x2 : 100, 100] = +(_X6[x0, x1] * B[x2, x1]);
 }
 )"));
+  exec::Executable::compile(program, {A, B})->run();
+}
+
+TEST(CppEdsl, DefractLong) {
+  std::vector<int64_t> input_shape{1, 3, 3, 1};
+  std::vector<int64_t> output_shape{1, 5, 5, 1};
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, input_shape, "I");
+  auto K = Placeholder(PLAIDML_DATA_FLOAT32, input_shape, "K");
+  auto O = TensorOutput(output_shape);
+  TensorIndex n, x0, x1, k0, k1, co, ci;
+  O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
+  Program program("defract_long", {O});
+  IVLOG(1, program);
+  // TODO: this currently crashes
+  // exec::Executable::compile(program, {I, K})->run();
 }
 
 }  // namespace
