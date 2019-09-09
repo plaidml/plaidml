@@ -22,3 +22,8 @@ jsonnet_to_json(
     outs = ["intel_gen9.json"],
 )
 
+jsonnet_to_json(
+    name = "cm",
+    src = "cm.jsonnet",
+    outs = ["cm.json"],
+)
