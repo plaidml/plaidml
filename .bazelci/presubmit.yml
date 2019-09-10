@@ -4,10 +4,10 @@ tasks:
   ubuntu1604:
     name: ":linux:"
     shell_commands:
+    - echo "home is \$HOME"
+    - echo "path is \$PATH"
     - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     - bash ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
-    environment:
-      PATH: "$HOME/miniconda/bin:$PATH"
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:
@@ -17,10 +17,10 @@ tasks:
   macos:
     name: ":apple:"
     shell_commands:
+    - echo "home is \$HOME"
+    - echo "path is \$PATH"
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh 
     - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
-    environment:
-      PATH: "$HOME/miniconda/bin:$PATH"
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:
