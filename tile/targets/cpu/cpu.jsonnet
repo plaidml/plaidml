@@ -31,6 +31,9 @@ local PARAMS = {
               },
             },
 
+            // This pass seems to cause out of bounds accesses, but only on
+            // contractions that have implicit constraints.
+            //
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
@@ -107,8 +110,8 @@ local PARAMS = {
                     ],
                   },
                 ],
-                inputs_set: [{tags: ["A"]}, {tags: ["B"]}],
-                outputs_set: [{tags: ["C"]}],
+                inputs_set: [{ tags: ['A'] }, { tags: ['B'] }],
+                outputs_set: [{ tags: ['C'] }],
               },
             },
 
@@ -188,8 +191,8 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateBlocksRefinementsRecursivelyPass',
                 reqs: ['program'],
-                skip_tags: ["user"],
-                loc: { devs: [{ name: 'DRAM' }], },
+                skip_tags: ['user'],
+                loc: { devs: [{ name: 'DRAM' }] },
               },
             },
 
@@ -199,8 +202,8 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass',
                 reqs: ['program'],
-                skip_tags: ["user"],
-                locs: [{ devs: [{ name: 'DRAM'}] }],
+                skip_tags: ['user'],
+                locs: [{ devs: [{ name: 'DRAM' }] }],
                 alignment: 16,
               },
             },

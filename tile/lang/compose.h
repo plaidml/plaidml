@@ -13,6 +13,7 @@
 #include "tile/base/shape.h"
 #include "tile/lang/ops.h"
 #include "tile/lang/parser.h"
+#include "tile/lang/runinfo.h"
 #include "tile/lang/type.h"
 
 namespace vertexai {
@@ -36,13 +37,6 @@ class Value : public el::Loggable {
   virtual std::shared_ptr<Value> dim_value(size_t i) const = 0;
 
   virtual void log(el::base::type::ostream_t& os) const;  // NOLINT(runtime/references)
-};
-
-// This is an abstract base class for whatever underlying buffer concept the user of the system wished to use, however,
-// we presume pointer equality on buffers is equivalence on buffers
-class BufferBase {
- public:
-  virtual ~BufferBase() {}
 };
 
 // FConst values represent a floating point constant
@@ -231,20 +225,6 @@ class ValueVisitor {
     }
     throw std::runtime_error("Unknown type in Visit");
   }
-};
-
-struct RunInfo {
-  std::string program_name;
-  std::string code;
-  Program program;
-  ShapeMap input_shapes;
-  ShapeMap output_shapes;
-  std::map<std::string, std::shared_ptr<BufferBase>> input_buffers;
-  std::map<std::string, std::shared_ptr<BufferBase>> output_buffers;
-  std::map<std::string, std::shared_ptr<BufferBase>> qparams_buffers;
-  std::set<std::string> const_inputs;
-  bool from_edsl = false;
-  Bindings vars;
 };
 
 class FunctionApplication;

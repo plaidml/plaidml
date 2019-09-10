@@ -138,7 +138,17 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
   for (auto operand : operands.drop_front()) {
     auto type = operand->getType();
     if (!MergeTypes(&ret, type, override)) {
-      throw std::runtime_error("Incompatible types");
+      std::stringstream ss;
+      ss << "Incompatible types: (";
+      for (size_t i = 0; i < operands.size(); i++) {
+        if (i) {
+          ss << ", ";
+        }
+        auto type = operands[i]->getType();
+        ss << mlir::debugString(type);
+      }
+      ss << ")";
+      throw std::runtime_error(ss.str());
     }
   }
   return ret;

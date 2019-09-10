@@ -5,7 +5,7 @@
 
 #include <boost/optional.hpp>
 
-#include "tile/lang/compose.h"
+#include "tile/lang/runinfo.h"
 
 namespace vertexai {
 namespace tile {

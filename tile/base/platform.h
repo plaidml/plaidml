@@ -10,8 +10,8 @@
 #include "base/context/context.h"
 #include "tile/base/buffer.h"
 #include "tile/base/program.h"
-#include "tile/lang/compose.h"
 #include "tile/lang/generate.h"
+#include "tile/lang/runinfo.h"
 #include "tile/proto/tile.pb.h"
 
 namespace vertexai {

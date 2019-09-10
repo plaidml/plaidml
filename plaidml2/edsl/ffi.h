@@ -41,6 +41,10 @@ typedef enum {
 PLAIDML_EDSL_API void plaidml_edsl_init(  //
     plaidml_error* err);
 
+//
+// plaidml_logical_shape
+//
+
 PLAIDML_EDSL_API plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                                               //
     plaidml_datatype dtype,                                           //
@@ -82,6 +86,10 @@ PLAIDML_EDSL_API plaidml_dim_expr* plaidml_logical_shape_get_dim_expr(  //
     plaidml_logical_shape* shape,                                       //
     size_t dim);
 
+//
+// plaidml_poly_expr
+//
+
 PLAIDML_EDSL_API void plaidml_poly_expr_free(  //
     plaidml_error* err,                        //
     plaidml_poly_expr* expr);
@@ -107,6 +115,10 @@ PLAIDML_EDSL_API plaidml_poly_expr* plaidml_poly_expr_op(  //
     plaidml_int_op op,                                     //
     size_t nargs,                                          //
     plaidml_poly_expr** args);
+
+//
+// plaidml_dim_expr
+//
 
 PLAIDML_EDSL_API void plaidml_dim_expr_free(  //
     plaidml_error* err,                       //
@@ -138,6 +150,10 @@ PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_op(  //
     plaidml_int_op op,                                   //
     size_t nargs,                                        //
     plaidml_dim_expr** args);
+
+//
+// plaidml_expr
+//
 
 PLAIDML_EDSL_API void plaidml_expr_free(  //
     plaidml_error* err,                   //
@@ -293,6 +309,10 @@ PLAIDML_EDSL_API void plaidml_expr_contraction_set_use_default(  //
     plaidml_expr* expr,                                          //
     plaidml_expr* use_default);
 
+//
+// plaidml_deriv
+//
+
 PLAIDML_EDSL_API void plaidml_expr_gradient(  //
     plaidml_error* err,                       //
     size_t nwrts,                             //
@@ -313,6 +333,10 @@ PLAIDML_EDSL_API void plaidml_deriv_register(  //
     const char* name,                          //
     plaidml_deriv fn,                          //
     void* user_ctx);
+
+//
+// plaidml_program
+//
 
 PLAIDML_EDSL_API void plaidml_program_free(  //
     plaidml_error* err,                      //
