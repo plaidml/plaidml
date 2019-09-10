@@ -31,6 +31,9 @@ local PARAMS = {
               },
             },
 
+            // This pass seems to cause out of bounds accesses, but only on
+            // contractions that have implicit constraints.
+            //
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
