@@ -10,8 +10,12 @@ gencfg(
         "//tile/targets/gpu:cm.json",
         "//tile/targets/gpu:nvidia.json",
         "//tile/targets/gpu:intel_gen9.json",
-        "//tile/targets/cpu:cpu.json",
-    ],
+    ] + select({
+        "//toolchain:windows_x86_64": [],
+        "//conditions:default": [
+            "//tile/targets/cpu:cpu.json",
+        ],
+    }),
     identifier = "vertexai::tile::targets::kConfigs",
 )
 
@@ -26,6 +30,7 @@ plaidml_cc_library(
     ],
     deps = [
         "//tile/codegen",
+        "//tile/targets/cpu",
     ],
     alwayslink = 1,
 )
