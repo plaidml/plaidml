@@ -17,13 +17,9 @@ plaidml_cc_library(
         "//tile/lang",
         "//tile/lib",
         "//tile/util",
+        "//tile/targets/cpu",
         "@boost//:program_options",
-    ] + select({
-        "//toolchain:windows_x86_64": [],
-        "//conditions:default": [
-            "//tile/targets/cpu",
-        ],
-    }),
+    ],
 )
 
 plaidml_cc_binary(

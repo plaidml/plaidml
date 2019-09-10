@@ -24,10 +24,8 @@ plaidml_cc_library(
         "//tile/stripe",
         "//pmlc/dialect/stripe:transcode",
         "//pmlc/dialect/stripe:passes",
+        "//tile/targets/cpu"
         "@boost//:filesystem",
-    ] + select({
-        "//toolchain:windows_x86_64": [],
-        "//conditions:default": ["//tile/targets/cpu"],
-    }),
+    ],
     alwayslink = 1,
 )
