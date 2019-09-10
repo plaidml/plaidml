@@ -25,6 +25,7 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//plaidml2/core",
+        "//pmlc/dialect/stripe:transcode",
     ],
 )
 

@@ -8,6 +8,7 @@
 
 #include <boost/format.hpp>
 
+#include "tile/lang/compose.h"
 #include "tile/lang/parser.h"
 #include "tile/proto/tile.pb.h"
 

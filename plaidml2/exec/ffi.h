@@ -54,7 +54,7 @@ PLAIDML_EXEC_API void plaidml_target_list(  //
 PLAIDML_EXEC_API plaidml_executable* plaidml_compile(  //
     plaidml_error* err,                                //
     plaidml_program* program,                          //
-    const char* device_id,                             //
+    const char* device,                                //
     const char* target,                                //
     size_t ninputs,                                    //
     plaidml_binding** inputs,                          //
