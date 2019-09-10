@@ -40,6 +40,7 @@ class StripeBuilder {
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
   void visit(ParallelForOp op);
   void visit(ConstraintOp op, int count);
+  void visit(ExecutorOp op, int count);
   void visit(LoadOp op);
   void visit(StoreOp op);
   void walk_interior(Block* inner);
@@ -300,6 +301,22 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
   }
 }
 
+void StripeBuilder::visit(ExecutorOp op, int count) {
+  Block* body = &op.body().front();
+  blocks_.emplace(body, BlockInfo(nullptr));
+  walk_interior(body);
+  // Find the stripe block to attach the execution location to
+  Block* block = body;
+  while (blocks_.at(block).stripe == nullptr) {
+    block = block->getParentOp()->getBlock();
+  }
+  stripe::Block* sblock = blocks_.at(block).stripe;
+  if (sblock->location.devs.size() != 0) {
+    throw std::runtime_error("Multiple executors not supported right now");
+  }
+  sblock->location = build_location(sblock, op.devicePath());
+}
+
 void StripeBuilder::visit(LoadOp op) {
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &ref_name);
@@ -332,6 +349,8 @@ void StripeBuilder::walk_interior(Block* block) {
       old_cur->stmts.push_back(cur_);
       cur_ = old_cur;
     } else if (auto op = mlir::dyn_cast<ConstraintOp>(op_base)) {
+      visit(op, count);
+    } else if (auto op = mlir::dyn_cast<ExecutorOp>(op_base)) {
       visit(op, count);
     } else if (auto op = mlir::dyn_cast<LoadOp>(op_base)) {
       visit(op);

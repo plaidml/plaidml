@@ -142,6 +142,14 @@ def ConstraintOp : StripeOp<"constraint"> {
   );
 }
 
+def ExecutorOp : StripeOp<"executor"> {
+  let arguments = (ins DevicePathType:$devicePath);
+  let results = (outs);
+  let regions = (region
+    AnyRegion:$body
+  );
+}
+
 def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let summary = "A block terminator since MLIR requires one";
   let results = (outs);
