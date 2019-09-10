@@ -24,7 +24,7 @@ plaidml_cc_library(
         "//tile/stripe",
         "//pmlc/dialect/stripe:transcode",
         "//pmlc/dialect/stripe:passes",
-        "//tile/targets/cpu"
+        "//tile/targets/cpu",
         "@boost//:filesystem",
     ],
     alwayslink = 1,
