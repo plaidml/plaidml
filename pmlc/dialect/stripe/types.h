@@ -18,10 +18,14 @@ namespace PlaidKind {
 enum Kinds {
   // An affine is a affine polynomial of indexes over integers
   Affine = Type::Kind::FIRST_PRIVATE_EXPERIMENTAL_1_TYPE,
-  // A tensor reference
-  Tensor,
+  // A hardware device identifier
+  DeviceID,
+  // A hardware device path
+  DevicePath,
   // A PRNG state
   Prng,
+  // A tensor reference
+  Tensor,
 };
 }  // namespace PlaidKind
 
@@ -69,6 +73,24 @@ class PrngType : public Type::TypeBase<PrngType, Type> {
   using Base::Base;
   static bool kindof(unsigned kind) { return kind == PlaidKind::Prng; }
   static PrngType get(MLIRContext* context) { return Base::get(context, PlaidKind::Prng); }
+};
+
+// A relative identifier for a hardware component capable of storing tensor data or executing a block of
+// instructions.
+class DeviceIDType : public Type::TypeBase<DeviceIDType, Type> {
+ public:
+  using Base::Base;
+  static bool kindof(unsigned kind) { return kind == PlaidKind::DeviceID; }
+  static DeviceIDType get(MLIRContext* context) { return Base::get(context, PlaidKind::DeviceID); }
+};
+
+// An absolute path to a hardware component capable of storing tensor data or executing a block of
+// instructions.
+class DevicePathType : public Type::TypeBase<DevicePathType, Type> {
+ public:
+  using Base::Base;
+  static bool kindof(unsigned kind) { return kind == PlaidKind::DevicePath; }
+  static DevicePathType get(MLIRContext* context) { return Base::get(context, PlaidKind::DevicePath); }
 };
 
 }  // namespace stripe

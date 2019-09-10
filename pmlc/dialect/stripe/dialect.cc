@@ -18,7 +18,7 @@ class Dialect : public mlir::Dialect {
 static mlir::DialectRegistration<Dialect> StripeOps;
 
 Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect("stripe", ctx) {
-  addTypes<AffineType, TensorType, PrngType>();
+  addTypes<AffineType, DeviceIDType, DevicePathType, PrngType, TensorType>();
   addAttributes<TensorLayoutAttr>();
   addOperations<
 #define GET_OP_LIST
@@ -39,12 +39,20 @@ static void print(TensorType t, llvm::raw_ostream& os) {
 
 static void print(PrngType t, llvm::raw_ostream& os) { os << "prng"; }
 
+static void print(DeviceIDType t, llvm::raw_ostream& os) { os << "device_id"; }
+
+static void print(DevicePathType t, llvm::raw_ostream& os) { os << "device_path"; }
+
 void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
   if (auto t = type.dyn_cast<AffineType>()) {
     print(t, os);
-  } else if (auto t = type.dyn_cast<TensorType>()) {
+  } else if (auto t = type.dyn_cast<DeviceIDType>()) {
+    print(t, os);
+  } else if (auto t = type.dyn_cast<DevicePathType>()) {
     print(t, os);
   } else if (auto t = type.dyn_cast<PrngType>()) {
+    print(t, os);
+  } else if (auto t = type.dyn_cast<TensorType>()) {
     print(t, os);
   } else {
     llvm_unreachable("unhandled Plaid type");
