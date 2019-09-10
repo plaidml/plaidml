@@ -47,16 +47,27 @@ int main() {
   auto prog = lang::GenerateStripe(example());
   codegen::LocalizeBlockPass(codegen::AliasMap(codegen::AliasMap(), prog->entry.get()), prog->entry.get(), {"tmp"});
 
+  codegen::CompilerState cstate{prog};
+
   printf("Adding a memory location\n");
   codegen::proto::LocateMemoryPass lmp;
   auto lmp_dev = lmp.mutable_loc()->add_devs();
-  lmp_dev->set_name("OMemDev");
+  lmp_dev->set_name("OuterMem");
   lmp_dev->add_units()->set_offset(0);
   lmp_dev = lmp.mutable_loc()->add_devs();
-  lmp_dev->set_name("IMemDev");
+  lmp_dev->set_name("InnerMem");
   lmp_dev->add_units()->set_offset(1);
-  codegen::CompilerState cstate{prog};
   codegen::LocateMemoryPass{lmp}.Apply(&cstate);
+
+  printf("Adding an executor location\n");
+  codegen::proto::LocateBlockPass lbp;
+  auto lbp_dev = lbp.mutable_loc()->add_devs();
+  lbp_dev->set_name("OuterExecutor");
+  lbp_dev->add_units()->set_offset(0);
+  lbp_dev = lbp.mutable_loc()->add_devs();
+  lbp_dev->set_name("InnerExecutor");
+  lbp_dev->add_units()->set_offset(1);
+  codegen::LocateBlockPass{lbp}.Apply(&cstate);
 
   printf("Original version:\n");
   std::cout << *prog->entry;

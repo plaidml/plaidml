@@ -209,7 +209,11 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
     }
   }
 
-  // Process the refinements
+  // Process the refinements.
+  //
+  // N.B. We always process the refinements as direct children of the loop, because refinement scanning in the
+  // MLIR->Stripe conversion will skip over the fake blocks induced by execution location and constraint
+  // operations.
   for (const auto& ref : block.refs) {
     Value* from;
     Value* device_path = ToStripeMLIR(builder, locals, ref.location);
@@ -230,6 +234,17 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
         builder->create<RefineOp>(builder->getUnknownLoc(), from->getType(), from, offsets, attrs, device_path)
             .result();
     locals.refs.emplace(ref.into(), nref);
+  }
+
+  // Process the execution location
+  if (block.location.devs.size()) {
+    auto executor_op =
+        builder->create<ExecutorOp>(builder->getUnknownLoc(), ToStripeMLIR(builder, locals, block.location));
+    Block* execution_body = new Block();
+    executor_op.getOperation()->getRegion(0).push_back(execution_body);
+    builder->setInsertionPointToStart(execution_body);
+    builder->create<TerminateOp>(builder->getUnknownLoc());
+    builder->setInsertionPointToStart(execution_body);
   }
 
   // Process the constraints
