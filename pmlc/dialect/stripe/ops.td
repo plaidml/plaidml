@@ -8,8 +8,10 @@ def StripeDialect : Dialect {
 }
 
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
-def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Reference Type">;
+def DeviceIDType : Type<CPred<"$_self.isa<DeviceIDType>()">, "Plaid DeviceIDType">;
+def DevicePathType : Type<CPred<"$_self.isa<DevicePathType>()">, "Plaid DevicePathType">;
 def PrngType : Type<CPred<"$_self.isa<PrngType>()">, "Plaid PrngType">;
+def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Reference Type">;
 
 // def DictionaryAttr : Attr<CPred<"$_self.isa<mlir::DictionaryAttr>()">, "Dictionary Attribute"> {
 //   let storageType = "DictionaryAttr";
@@ -30,13 +32,13 @@ class StripeOp<string mnemonic, list<OpTrait> traits = []> :
 
 def AllocateOp : StripeOp<"allocate"> {
   let summary = "Allocate a new tensor and set it's intial shape / size";
-  let arguments = (ins TensorLayoutAttr:$layout);
+  let arguments = (ins TensorLayoutAttr:$layout, DevicePathType:$devicePath);
   let results = (outs TensorType:$res);
 }
 
 def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let summary = "Modify the offset into a tensor in an affine way";
-  let arguments = (ins TensorType:$in, Variadic<AffineType>:$offsets, DictionaryAttr:$attrs);
+  let arguments = (ins TensorType:$in, Variadic<AffineType>:$offsets, DictionaryAttr:$attrs, DevicePathType:$devicePath);
   let results = (outs TensorType:$result);
 }
 
@@ -108,6 +110,16 @@ def AffineAddOp : AffineOp<"affine_add"> {
 def AffineMeta : AffineOp<"affine_meta"> {
   let summary = "Attach metadata to an affine";
   let arguments = (ins AffineType:$input, DictionaryAttr:$attrs);
+}
+
+def DeviceIDOp : StripeOp<"devid", [NoSideEffect]> {
+  let arguments = (ins StrAttr:$name, Variadic<AffineType>:$unit);
+  let results = (outs DeviceIDType:$result);
+}
+
+def DevicePathOp : StripeOp<"devpath", [NoSideEffect]> {
+  let arguments = (ins Variadic<DeviceIDType>:$dev_ids);
+  let results = (outs DevicePathType:$result);
 }
 
 def ParallelForOp : StripeOp<"parallel_for"> {

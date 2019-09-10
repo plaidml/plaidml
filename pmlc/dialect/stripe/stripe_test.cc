@@ -47,6 +47,20 @@ int main() {
   auto prog = lang::GenerateStripe(example());
   codegen::LocalizeBlockPass(codegen::AliasMap(codegen::AliasMap(), prog->entry.get()), prog->entry.get(), {"tmp"});
 
+  printf("Adding a memory location\n");
+  codegen::proto::LocateMemoryPass lmp;
+  auto lmp_dev = lmp.mutable_loc()->add_devs();
+  lmp_dev->set_name("OMemDev");
+  lmp_dev->add_units()->set_offset(0);
+  lmp_dev = lmp.mutable_loc()->add_devs();
+  lmp_dev->set_name("IMemDev");
+  lmp_dev->add_units()->set_offset(1);
+  codegen::CompilerState cstate{prog};
+  codegen::LocateMemoryPass{lmp}.Apply(&cstate);
+
+  printf("Original version:\n");
+  std::cout << *prog->entry;
+
   printf("Converting to MLIR\n");
   auto func = ToStripeMLIR(&context, *prog);
 
@@ -59,12 +73,14 @@ int main() {
   printf("Doing some passes\n");
   mlir::PassManager pm;
   pm.addPass(mlir::createCSEPass());
-  vertexai::tile::codegen::proto::MLIR_PadPass options;
+  codegen::proto::MLIR_PadPass options;
   pm.addPass(CreatePass<PaddingPass>(options));
   if (failed(pm.run(module))) {
     module.dump();
     throw std::runtime_error("Invalid goo\n");
   }
+
+  printf("Did some passes\n");
 
   module.verify();
 
