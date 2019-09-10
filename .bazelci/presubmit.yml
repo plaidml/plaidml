@@ -8,9 +8,7 @@ tasks:
     - bash ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
     environment:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/go1.12.6.linux-amd64/bin:/opt/swift-4.2.1-RELEASE-ubuntu16.04/usr/bin
-    build_targets:
-    - "//plaidml/keras:wheel"
-    build_flags:
+    test_flags:
     - "--config=linux_x86_64"
     test_targets:
     - "..."
@@ -21,9 +19,7 @@ tasks:
     - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
     environment:
       PATH: /Users/buildkite/miniconda/bin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
-    build_targets:
-    - "//plaidml/keras:wheel"
-    build_flags:
+    test_flags:
     - "--config=macos_x86_64"
     test_targets:
     - "..."
