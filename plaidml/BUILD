@@ -15,6 +15,7 @@ load(
     "plaidml_py_wheel",
 )
 load("@cuda//:build_defs.bzl", "if_cuda_is_configured")
+load("@cm//:build_defs.bzl", "if_cm_is_configured")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 
 # The PlaidML configuration protobuf definition.
@@ -76,6 +77,8 @@ PLAIDML_CPP_DEPS = [
     ],
 }) + if_cuda_is_configured([
     "//tile/hal/cuda",
+])+ if_cm_is_configured([
+    "//tile/hal/cm",
 ])
 
 # The PlaidML C++ library, as used by Bazel targets.

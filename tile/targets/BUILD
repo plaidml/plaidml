@@ -7,14 +7,11 @@ gencfg(
     name = "configs",
     srcs = [
         "//tile/targets/gpu:amd.json",
+        "//tile/targets/gpu:cm.json",
         "//tile/targets/gpu:nvidia.json",
         "//tile/targets/gpu:intel_gen9.json",
-    ] + select({
-        "//toolchain:windows_x86_64": [],
-        "//conditions:default": [
-            "//tile/targets/cpu:cpu.json",
-        ],
-    }),
+        "//tile/targets/cpu:cpu.json",
+    ],
     identifier = "vertexai::tile::targets::kConfigs",
 )
 
@@ -29,11 +26,7 @@ plaidml_cc_library(
     ],
     deps = [
         "//tile/codegen",
-    ] + select({
-        "//toolchain:windows_x86_64": [],
-        "//conditions:default": [
-            "//tile/targets/cpu",
-        ],
-    }),
+        "//tile/targets/cpu",
+    ],
     alwayslink = 1,
 )

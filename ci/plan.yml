@@ -21,6 +21,7 @@ CONST:
     vega:       12697.10
     gfx900:     11300.84
     gfx803:      3573.79
+    vega56:    4342.63
     # mali
     t628:          34.05
     # intel
@@ -88,6 +89,10 @@ PLATFORMS:
      variant: linux_x86_64
   keras-stripe-ocl-gfx803:
      variant: linux_x86_64
+  keras-plaid-ocl-gfx804:
+     variant: windows_x86_64
+  keras-stripe-ocl-gfx804:
+     variant: windows_x86_64
    
 
 VARIANTS:
@@ -148,36 +153,36 @@ SUITES:
     platforms:
       keras-plaid-ocl-cpu:
         pipelines: []
-
       keras-stripe-ocl-neo:
         pipelines: [plaidml, nightly]
-
       keras-plaid-mtl-uhd630:
         pipelines: [plaidml, nightly]
       keras-stripe-mtl-uhd630:
         pipelines: [plaidml, nightly]
-
       keras-plaid-ocl-gfx900:
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gfx900:
         pipelines: [plaidml, nightly]
-
       keras-plaid-ocl-gv100gl:
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gv100gl:
         pipelines: [nightly]
-
       keras-plaid-ocl-gp100gl:
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gp100gl:
         pipelines: [plaidml, nightly]
-
       keras-plaid-ocl-gfx803:
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gfx803:
         pipelines: [nightly]
+      keras-plaid-ocl-gfx804:
+        pipelines: [plaidml, ci]
+      keras-stripe-ocl-gfx804:
+        pipelines: [plaidml, ci]
 
     params:
+      ci:
+        batch_sizes: [0]
       plaidml:
         batch_sizes: [0]
       stripe:
@@ -250,7 +255,14 @@ SUITES:
         pipelines: [plaidml]
       keras-plaid-ocl-gfx803:
         pipelines: [plaidml]
+      keras-plaid-ocl-gfx804:
+        pipelines: [plaidml, ci]
+      keras-stripe-ocl-gfx804:
+        pipelines: [plaidml, ci]
+
     params:
+      ci:
+        batch_sizes: [1]
       plaidml:
         batch_sizes: [1]
       stripe:
@@ -281,7 +293,7 @@ SUITES:
     workloads:
       imdb_lstm:
         precision: high
-        skip_platforms: [keras-stripe-ocl-neo, keras-stripe-mtl-uhd630]
+        skip_platforms: [keras-stripe-ocl-neo, keras-stripe-mtl-uhd630, keras-stripe-ocl-gfx804]
         perf_threshold: 0.7
       inception_v3:
         precision: high
@@ -290,6 +302,10 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+          keras-plaid-ocl-gfx804:
+            prepend_args: [--examples, 128]
+          keras-stripe-ocl-gfx804:
+            prepend_args: [--examples, 128]
       mobilenet:
         precision: high
       mobilenet_v2:
@@ -304,13 +320,23 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+          keras-plaid-ocl-gfx804:
+            prepend_args: [--examples, 128]
+          keras-stripe-ocl-gfx804:
+            prepend_args: [--examples, 128]
       vgg19:
         precision: high
         platform_overrides:
+          keras-stripe-ocl-neo:
+            prepend_args: [--examples, 256]
           keras-plaid-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+          keras-plaid-ocl-gfx804:
+            prepend_args: [--examples, 64]
+          keras-stripe-ocl-gfx804:
+            prepend_args: [--examples, 64]
         skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630, keras-plaid-ocl-gfx803]
       xception:
         precision: high
@@ -325,6 +351,10 @@ SUITES:
             prepend_args: [-n, 256]
           keras-stripe-ocl-neo:
             prepend_args: [-n, 256]
+          keras-plaid-ocl-gfx804:
+            prepend_args: [-n, 64]
+          keras-stripe-ocl-gfx804:
+            prepend_args: [-n, 64]
         skip_platforms: [keras-plaid-ocl-gv100gl]
 
   comprehensive:

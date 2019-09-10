@@ -35,10 +35,12 @@ class StripeBuilder {
   TensorShape get_shape(TensorLayoutAttr layout);
   void add_attributes(stripe::Taggable& out, DictionaryAttr in);  // NOLINT
   void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out);
+  stripe::Location build_location(stripe::Block* block, Value* device_path);
   std::string get_idx(stripe::Block* block, mlir::BlockArgument* affine);
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
   void visit(ParallelForOp op);
   void visit(ConstraintOp op, int count);
+  void visit(ExecutorOp op, int count);
   void visit(LoadOp op);
   void visit(StoreOp op);
   void walk_interior(Block* inner);
@@ -180,8 +182,9 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         }
       }
     }
-    // If op matches the block, move the op up, also add attributes
+    // If op matches the block, move the op up, also add location and attributes
     while (op->getBlock() == block && mlir::isa<RefineOp>(op)) {
+      ref->location = build_location(blocks_.at(block).stripe, mlir::cast<RefineOp>(op).devicePath());
       add_attributes(*ref, mlir::cast<RefineOp>(op).attrs());
       op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
     }
@@ -194,6 +197,26 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
   }
   // Special handing for allocation block
   ref->dir = stripe::RefDir::None;
+  // Add location info to the allocation block
+  if (auto alloc_op = mlir::cast<AllocateOp>(op)) {
+    ref->location = build_location(blocks_.at(block).stripe, alloc_op.devicePath());
+  }
+}
+
+stripe::Location StripeBuilder::build_location(stripe::Block* block, Value* device_path) {
+  stripe::Location result;
+  if (auto dev_path_op = mlir::cast<DevicePathOp>(device_path->getDefiningOp())) {
+    for (const auto& dev_id : dev_path_op.dev_ids()) {
+      if (auto dev_id_op = mlir::cast<DeviceIDOp>(dev_id->getDefiningOp())) {
+        std::vector<stripe::Affine> units;
+        for (auto* unit : dev_id_op.unit()) {
+          units.emplace_back(build_affine(block, unit));
+        }
+        result.devs.emplace_back(stripe::Device{dev_id_op.name(), std::move(units)});
+      }
+    }
+  }
+  return result;
 }
 
 std::string StripeBuilder::get_idx(stripe::Block* block, mlir::BlockArgument* affine) {
@@ -278,6 +301,22 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
   }
 }
 
+void StripeBuilder::visit(ExecutorOp op, int count) {
+  Block* body = &op.body().front();
+  blocks_.emplace(body, BlockInfo(nullptr));
+  walk_interior(body);
+  // Find the stripe block to attach the execution location to
+  Block* block = body;
+  while (blocks_.at(block).stripe == nullptr) {
+    block = block->getParentOp()->getBlock();
+  }
+  stripe::Block* sblock = blocks_.at(block).stripe;
+  if (sblock->location.devs.size() != 0) {
+    throw std::runtime_error("Multiple executors not supported right now");
+  }
+  sblock->location = build_location(sblock, op.devicePath());
+}
+
 void StripeBuilder::visit(LoadOp op) {
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &ref_name);
@@ -310,6 +349,8 @@ void StripeBuilder::walk_interior(Block* block) {
       old_cur->stmts.push_back(cur_);
       cur_ = old_cur;
     } else if (auto op = mlir::dyn_cast<ConstraintOp>(op_base)) {
+      visit(op, count);
+    } else if (auto op = mlir::dyn_cast<ExecutorOp>(op_base)) {
       visit(op, count);
     } else if (auto op = mlir::dyn_cast<LoadOp>(op_base)) {
       visit(op);

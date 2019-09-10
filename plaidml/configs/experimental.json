@@ -104,6 +104,23 @@
           "use_global": true
         }
       },
+     {
+        "description": "Intel GPU config (CM)",
+        "sel": {
+          "name_regex": "CM.*"
+        },
+        "settings": {
+          "threads": 64,
+          "vec_size": 1,
+          "mem_width": 256,
+          "max_mem": 7300,
+          "max_regs": 4000,
+          "goal_groups": 1,
+          "goal_flops_per_byte": 50,
+          "disable_mad": true,
+          "stripe_config": "cm"
+        }
+      }, 
       {
         "description": "NVIDIA config",
         "sel": {

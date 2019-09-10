@@ -106,6 +106,12 @@ def run(args, remainder):
         env['CUDA_VISIBLE_DEVICES'] = buildkite_metadata('CUDA_VISIBLE_DEVICES', '0')
     env['PLAIDML_DEVICE_IDS'] = buildkite_metadata('PLAIDML_DEVICE_IDS')
     env['PLAIDML_EXPERIMENTAL'] = buildkite_metadata('PLAIDML_EXPERIMENTAL', '0')
+    device = buildkite_metadata('PLAIDML_DEVICE')
+    target = buildkite_metadata('PLAIDML_TARGET')
+    if device != None:
+        env['PLAIDML_DEVICE'] = device
+    if target != None:
+        env['PLAIDML_TARGET'] = target
 
     util.printf('--- :bazel: Running test {suite}/{workload} on {platform}'.format(
         suite=args.suite,
@@ -133,7 +139,8 @@ def run(args, remainder):
         except ValueError:
             pass
 
-    cmd = [popt.get('runner')] + cmd_args
+    runner = shutil.which(popt.get('runner'), path=env['PATH'])
+    cmd = [runner] + cmd_args
     retcode = util.call(cmd, cwd=cwd, env=env)
 
     build_url = os.getenv('BUILDKITE_BUILD_URL')
