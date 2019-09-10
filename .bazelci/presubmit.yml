@@ -9,7 +9,7 @@ tasks:
     - cat << EOF
     {
         "PLAIDML_DEVICE_IDS":[
-            "opencl_cpu.0"
+            "llvm_cpu.0"
         ],
         "PLAIDML_EXPERIMENTAL":true,
         "PLAIDML_TELEMETRY":false
@@ -29,7 +29,7 @@ tasks:
     - cat << EOF
     {
         "PLAIDML_DEVICE_IDS":[
-            "opencl_cpu.0"
+            "llvm_cpu.0"
         ],
         "PLAIDML_EXPERIMENTAL":true,
         "PLAIDML_TELEMETRY":false
