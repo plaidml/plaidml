@@ -13,7 +13,8 @@ tasks:
        ],
        "PLAIDML_EXPERIMENTAL":true,
        "PLAIDML_TELEMETRY":false
-    }
+      }
+      EOF > $HOME/.plaidml
     environment:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/go1.12.6.linux-amd64/bin:/opt/swift-4.2.1-RELEASE-ubuntu16.04/usr/bin
     test_flags:
@@ -33,7 +34,7 @@ tasks:
         "PLAIDML_EXPERIMENTAL":true,
         "PLAIDML_TELEMETRY":false
       }
-    EOF > $HOME/.plaidml
+      EOF > $HOME/.plaidml
     environment:
       PATH: /Users/buildkite/miniconda/bin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
     test_flags:
