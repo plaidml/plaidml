@@ -11,7 +11,6 @@ gencfg(
         "//tile/targets/gpu:nvidia.json",
         "//tile/targets/gpu:intel_gen9.json",
         "//tile/targets/cpu:cpu.json",
-
     ],
     identifier = "vertexai::tile::targets::kConfigs",
 )
