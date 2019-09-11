@@ -60,7 +60,7 @@ build:linux_x86_64_bazelci --cpu=linux_x86_64
 build:linux_x86_64_bazelci --crosstool_top=//toolchain:toolchain
 build:linux_x86_64_bazelci --host_crosstool_top=//toolchain:toolchain
 build:linux_x86_64_bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
-test:linux_x86_64_bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
+test:linux_x86_64_bazelci --test_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
 
 build:callgrind -c dbg
 build:callgrind --cxxopt=-O3
