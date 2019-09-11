@@ -29,3 +29,14 @@ tasks:
     - "--config=macos_x86_64"
     test_targets:
     - "..."
+  windows:
+    name: ":window:"
+    batch_commands:
+    - powershell -Command "curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -OutFile .\miniconda.exe"
+    - .\miniconda.exe /InstallationType=JustMe /S /D=%UserProfile%\Miniconda3
+    build_targets:
+    - "//plaidml/keras:wheel"
+    build_flags:
+    - "--config=windows_x86_64"
+    test_targets:
+    - "..."
