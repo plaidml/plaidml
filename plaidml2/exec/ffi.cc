@@ -104,7 +104,7 @@ plaidml_executable* plaidml_compile(  //
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
     auto exec = new plaidml_executable{};
     // 1. lower tile -> stripe
-    auto stripe = LowerIntoStripe(program->program.get());
+    // auto stripe = LowerIntoStripe(program->program.get());
     // 2. convert MLIR -> stripe
     // stripe::ToStripe(func);
     // 3. runinfo?
