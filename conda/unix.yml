@@ -24,6 +24,7 @@ dependencies:
     - pcpp
     - pystache
     - pyyaml
+    - requests
     - tensorflow==1.14.0; platform_system == 'Darwin'
     - tensorflow-gpu==1.14.0; platform_system != 'Darwin'
     - theano

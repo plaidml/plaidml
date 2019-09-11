@@ -16,3 +16,10 @@ py_binary(
     tags = ["manual"],
     deps = ["//tools/analysis"],
 )
+
+py_binary(
+    name = "timeline",
+    srcs = ["timeline.py"],
+    tags = ["manual"],
+    deps = ["//tools/analysis"],
+)
