@@ -381,6 +381,24 @@ void StripeBuilder::apply() {
   }
 }
 
+template <>
+void StripeBuilder::apply<eltwise::ScalarConstantOp>() {
+  if (auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(iop)) {
+    std::string out_name = std::string("$c") + std::to_string(next_scalar_++);
+    scalars_.emplace(op.result(), out_name);
+    std::shared_ptr<stripe::Constant> cnst;
+    auto val_attr = op.getValue();
+    if (auto attr = val_attr.dyn_cast<IntegerAttr>()) {
+      cnst = std::make_shared<stripe::Constant>(out_name, attr.getInt());
+    } else if (auto attr = val_attr.dyn_cast<FloatAttr>()) {
+      cnst = std::make_shared<stripe::Constant>(out_name, attr.getValueAsDouble());
+    } else {
+      throw std::runtime_error("Invalid attribute during conversion");
+    }
+    cur_->stmts.push_back(cnst);
+  }
+}
+
 stripe::Program ToStripe(mlir::FuncOp func) {
   stripe::Program r;
   StripeBuilder builder(func);
