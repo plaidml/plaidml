@@ -2,7 +2,7 @@
 bazel: 0.28.1
 tasks:
   ubuntu1604:
-    name: ":linux:"
+    name: "PlaidML Ubuntu 16.04"
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh 
     - sh ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
@@ -21,11 +21,11 @@ tasks:
       PLAIDML_EXPERIMENTAL: 1
       PLAIDML_TELEMETRY: 0
     test_flags:
-    - "--config=linux_x86_64"
+    - "--config=linux_x86_64 --config=bazelci"
     test_targets:
     - "..."
   macos:
-    name: ":apple:"
+    name: "PlaidML MacOS"
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh 
     - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
@@ -39,13 +39,12 @@ tasks:
     test_targets:
     - "..."
   windows:
-    name: ":window:"
+    name: "PlaidML Windows"
     batch_commands:
-    - choco install wget
     - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-    - .\Miniconda3-latest-Windows-x86_64.exe /InstallationType=JustMe /S /D=%UserProfile%\Miniconda3
-    - conda.exe env create -f environment-windows.yml -n plaidml
-    - conda.exe activate plaidml
+    - .\Miniconda3-latest-Windows-x86_64.exe /InstallationType=JustMe /D=%UserProfile%\Miniconda3
+    - conda env create -f environment-windows.yml -n plaidml
+    - conda activate plaidml
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:

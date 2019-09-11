@@ -85,6 +85,7 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "platform_test",
     srcs = ["platform_test.cc"],
+    tags = ["opencl"],
     deps = [
         ":opencl",
         "//tile/base:platform_test",
