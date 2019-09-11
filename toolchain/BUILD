@@ -50,9 +50,10 @@ cc_toolchain_suite(
     tags = ["linux"],
     # target_cpu | compiler
     toolchains = {
-        "linux_x86_64|gcc": ":cc-linux_x86_64-gcc_5.4.0",
+        "linux_x86_64|gcc_5.4.0": ":cc-linux_x86_64-gcc_5.4.0",
         "linux_x86_64|gcc_4.9.4": ":cc-linux_x86_64-gcc_4.9.4",
-        "linux_x86_64": ":cc-linux_x86_64-gcc_5.4.0",
+        "linux_x86_64|gcc": ":cc-linux_x86_64-gcc_8.3",
+        "linux_x86_64": ":cc-linux_x86_64-gcc_8.3",
     },
 )
 
@@ -89,6 +90,20 @@ cc_toolchain(
     toolchain_identifier = "gcc-linux_x86_64-gcc_4.9.4",
 )
 
+cc_toolchain(
+    name = "cc-linux_x86_64-gcc_8.3",
+    all_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3:all_files",
+    compiler_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3:compiler_files",
+    dwp_files = ":empty",
+    linker_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3:linker_files",
+    objcopy_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3:objcopy",
+    strip_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3:strip",
+    supports_param_files = 1,
+    tags = ["linux"],
+    toolchain_config = ":cc_linux_x86_64-gcc_8.3",
+    toolchain_identifier = "gcc-linux_x86_64",
+)
+
 gcc_toolchain_config(
     name = "cc_linux_x86_64-gcc_4.9.4",
     libc_version = "glibc_2.19",
@@ -103,4 +118,12 @@ gcc_toolchain_config(
     tags = ["linux"],
     target = "linux_x86_64",
     version = "5.4.0",
+)
+
+gcc_toolchain_config(
+    name = "cc_linux_x86_64-gcc_8.3",
+    libc_version = "glibc_2.17",
+    tags = ["linux"],
+    target = "linux_x86_64",
+    version = "8.3",
 )

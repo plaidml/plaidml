@@ -616,7 +616,7 @@ TEST_CASE("Basic Infeasible Constraints", "[infeasible]") {
   Program prog = p.Parse("function (I[N]) -> (O) {O[2*i] = +(I[4*i]), i - 100 < 50; }");
   Contraction c = prog.ops[0].c;
   REQUIRE_THROWS_AS(Compile(c, {SimpleShape(DataType::FLOAT32, {50}), SimpleShape(DataType::FLOAT32, {50})}),
-                    std::runtime_error);
+                    const std::runtime_error&);
 }
 
 TEST_CASE("Duplicate constraints", "[duplicate]") {
