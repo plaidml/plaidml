@@ -62,7 +62,9 @@ build:callgrind --define=with_callgrind=true
 run:callgrind --run_under='valgrind --quiet --tool=callgrind'
 
 run:lldb --run_under='lldb --'
+run:py_lldb --run_under='lldb python --'
 run:gdb --run_under='gdbserver :2345'
+run:valgrind --run_under='valgrind'
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan -c dbg

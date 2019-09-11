@@ -30,12 +30,15 @@ plaidml_cc_library(
     srcs = [
         "builder.cc",
         "dialect.cc",
+        "internal.h",
+        "lowering.cc",
         "ops.cc",
         "ops.cpp.inc",
     ],
     hdrs = [
         "builder.h",
         "dialect.h",
+        "lowering.h",
         "ops.h",
         "ops.h.inc",
         "types.h",

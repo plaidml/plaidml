@@ -28,7 +28,7 @@ struct plaidml_expr {
 
 struct plaidml_program {
   vertexai::tile::lang::ast::ProgramEvaluation eval;
-  mlir::Operation* op = nullptr;
+  std::shared_ptr<pmlc::dialect::tile::TileProgram> program;
 };
 
 struct plaidml_buffer {

@@ -187,7 +187,8 @@ class Demo:
 
     def init_images(self):
         zip_file = tf.keras.utils.get_file(
-            origin="https://storage.googleapis.com/mledu-datasets/cats_and_dogs_filtered.zip",
+            origin=
+            "https://github.com/plaidml/depot/raw/master/datasets/cats_and_dogs_filtered.zip",
             fname="cats_and_dogs_filtered.zip",
             extract=True)
         base_dir, _ = os.path.splitext(zip_file)
@@ -304,8 +305,10 @@ class Demo:
                     ax[i // 3, i % 3].axis('off')
                     ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='r')
 
-                    if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
-                        ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
+                    if predicted_class.lower() in self.test_generator.filenames[
+                            self.wrong_guesses[i]]:
+                        ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class),
+                                                    color='g')
                 display(plt)
 
     def on_model_change(self, change):
@@ -452,8 +455,10 @@ class Demo:
                     ax[i // 3, i % 3].axis('off')
                     ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='r')
 
-                    if predicted_class.lower() in self.test_generator.filenames[self.wrong_guesses[i]]:
-                        ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class), color='g')
+                    if predicted_class.lower() in self.test_generator.filenames[
+                            self.wrong_guesses[i]]:
+                        ax[i // 3, i % 3].set_title("Predicted:{}".format(predicted_class),
+                                                    color='g')
                 display(f)
 
         if self.verbose:
@@ -463,14 +468,23 @@ class Demo:
                 print(wrong)
 
             print("Total guessed:", wrong.shape[0])
-            print("Accuracy:", np.count_nonzero(wrong)/wrong.shape[0])
+            print("Accuracy:", np.count_nonzero(wrong) / wrong.shape[0])
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='TransferLearningDemo')
     parser.add_argument('--gui', help='shows the GUI of the demo', action='store_true')
-    parser.add_argument('--training', help='performs the training phase of the demo', action='store_true')
-    parser.add_argument('--network_type', help='selects the network used for training/classification [ResNet50]/MobileNet V2')
-    parser.add_argument('--backend', help='selects the backend used for training/classification (run ngraph_bridge.list_backends() for full list)')
+    parser.add_argument('--training',
+                        help='performs the training phase of the demo',
+                        action='store_true')
+    parser.add_argument(
+        '--network_type',
+        help='selects the network used for training/classification [ResNet50]/MobileNet V2')
+    parser.add_argument(
+        '--backend',
+        help=
+        'selects the backend used for training/classification (run ngraph_bridge.list_backends() for full list)'
+    )
     parser.add_argument('--quiet', help='disables most logging', action='store_false')
     args = parser.parse_args()
     nw = 'ResNet50'

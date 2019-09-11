@@ -171,7 +171,10 @@ def _impl(ctx):
                 flag_groups = [
                     flag_group(
                         flags = [
+                            "-static-libgcc",
+                            "-Wl,-Bstatic",
                             "-lstdc++",
+                            "-Wl,-Bdynamic",
                             "-Wl,-z,relro,-z,now",
                             "-no-canonical-prefixes",
                             "-pass-exit-codes",

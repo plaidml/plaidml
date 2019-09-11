@@ -7,7 +7,7 @@
 #include <string>
 
 #include "tile/base/program.h"
-#include "tile/lang/compose.h"
+#include "tile/lang/runinfo.h"
 #include "tile/proto/tile.pb.h"
 
 namespace vertexai {
