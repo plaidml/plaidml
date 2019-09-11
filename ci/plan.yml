@@ -303,9 +303,9 @@ SUITES:
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-plaid-ocl-gfx804:
-            prepend_args: [--examples, 128]
+            prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 128]
+            prepend_args: [--examples, 64]
       mobilenet:
         precision: high
       mobilenet_v2:
