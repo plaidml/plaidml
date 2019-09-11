@@ -7,6 +7,7 @@ plaidml_proto_library(
     srcs = [
         "opencl.proto",
     ],
+    tags = ["opencl"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/context:proto",
@@ -61,6 +62,7 @@ plaidml_cc_library(
         "zero_kernel.cc",
         "zero_kernel.h",
     ],
+    tags = ["opencl"],
     hdrs = [
         "emitocl.h",
         "info.h",
