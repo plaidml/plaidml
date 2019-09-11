@@ -414,7 +414,7 @@ class TestEdsl(unittest.TestCase):
   _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
 }
 ''')
-        outputs = run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
+        outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
     def testDefractShort(self):
@@ -436,7 +436,7 @@ class TestEdsl(unittest.TestCase):
   _X0[x0 : 6] = +(I[-1/2 + 1/2*x0]);
 }
 ''')
-        outputs = run(program, [(I, np.array([1, 2, 3]))])
+        outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
 
     def testDefractLong(self):
@@ -463,7 +463,7 @@ class TestEdsl(unittest.TestCase):
         #if any one of the divide by twos is removed it no longer crashed
         #valgrnd was run and could not find anything, the test was written up in edsl_test.cc and run, the crash was reproduced exactly
         #issue created in tracking system (#)
-        #outputs = run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
+        #outputs = plaidml_exec.run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
 
     def testFunkyLayerNames(self):
         '''Exercises fix for plaidml bug #241
@@ -496,7 +496,7 @@ class TestEdsl(unittest.TestCase):
   _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
 }
 ''')
-        outputs = run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
+        outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
     def testTileIdentity(self):
@@ -510,7 +510,7 @@ class TestEdsl(unittest.TestCase):
   _X0 = ident(I);
 }
 ''')
-        outputs = run(program, [(I, np.array([(1, 2, 3)]))])
+        outputs = plaidml_exec.run(program, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
 
     @unittest.skip('TODO: exception needs to be thrown')
@@ -534,8 +534,8 @@ class TestEdsl(unittest.TestCase):
   _X0[x0, x2 : 5, 5] = =(A[x0, x1] * B[x1, x2]);
 }
 ''')
-        outputs = run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
-                                (B, np.array([1, 2, 3, 4, 5]))])
+        outputs = plaidml_exec.run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
+                                             (B, np.array([1, 2, 3, 4, 5]))])
         self.assertEqual(outputs[0].tolist(),
                          [[1., 2., 3., 4., 5.], [2., 4., 6., 8., 10.], [3., 6., 9., 12., 15.],
                           [4., 8., 12., 16., 20.], [5., 10., 15., 20., 25.]])
@@ -560,7 +560,7 @@ class TestEdsl(unittest.TestCase):
   _X1 = ident(I);
 }
 ''')
-        outputs = run(program1, [(I, np.array([(1, 2, 3)]))])
+        outputs = plaidml_exec.run(program1, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
         self.assertEqual(outputs[1].tolist(), [1, 2, 3])
         O1 = I
@@ -568,23 +568,9 @@ class TestEdsl(unittest.TestCase):
         program2 = Program('two_outputs', [O1, O2])
         self.assertMultiLineEqual(str(program1), str(program2))
 
-        outputs = run(program2, [(I, np.array([(1, 2, 3)]))])
+        outputs = plaidml_exec.run(program2, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
         self.assertEqual(outputs[1].tolist(), [1, 2, 3])
-
-
-def run(program, inputs):
-
-    def make_buffer(tensor):
-        # convert LogicalShape into TensorShape
-        shape = plaidml.TensorShape(tensor.shape.dtype, tensor.shape.int_dims)
-        return plaidml.Buffer(device, shape)
-
-    ibindings = [(x, make_buffer(x)) for x, y in inputs]
-    obindings = [(x, make_buffer(x)) for x in program.outputs]
-
-    exe = plaidml_exec.Executable(program, device, target, ibindings, obindings)
-    return [x.as_ndarray() for x in exe([y for x, y in inputs])]
 
 
 if __name__ == '__main__':
