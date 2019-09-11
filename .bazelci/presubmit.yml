@@ -41,8 +41,11 @@ tasks:
   windows:
     name: ":window:"
     batch_commands:
+    - path
     - powershell -Command "curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -OutFile .\miniconda.exe"
     - .\miniconda.exe /InstallationType=JustMe /S /D=%UserProfile%\Miniconda3
+    - conda env create -f environment-windows.yml -n plaidml
+    - conda activate plaidml
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:
