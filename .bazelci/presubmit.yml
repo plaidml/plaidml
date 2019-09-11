@@ -21,7 +21,7 @@ tasks:
       PLAIDML_EXPERIMENTAL: 1
       PLAIDML_TELEMETRY: 0
     test_flags:
-    - "--config=linux_x86_64 --config=bazelci"
+    - "--config=linux_x86_64_bazelci"
     test_targets:
     - "..."
   macos:

@@ -56,8 +56,11 @@ test:windows_x86_64 --test_env=NUMBER_OF_PROCESSORS
 test:windows_x86_64 --test_env=PLAIDML_SETTINGS
 test:windows_x86_64 --test_env=USERPROFILE
 
-build:bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
-test:bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
+build:linux_x86_64_bazelci --cpu=linux_x86_64
+build:linux_x86_64_bazelci --crosstool_top=//toolchain:toolchain
+build:linux_x86_64_bazelci --host_crosstool_top=//toolchain:toolchain
+build:linux_x86_64_bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
+test:linux_x86_64_bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
 
 build:callgrind -c dbg
 build:callgrind --cxxopt=-O3
