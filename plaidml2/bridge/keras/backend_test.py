@@ -1222,6 +1222,24 @@ class TestBackendOps(unittest.TestCase):
     def testReshape(self, b, x, s):
         return [b.reshape(x, s)]
 
+    def testReshapeMatchDim(self):
+        a = pkb.variable(m(1, 1, 60))
+        output = pkb.reshape(a, (2, 0, 30))
+        self.assertEqual(str(output), "reshape_1|fp32(2, 1, 30)")
+        a = pkb.variable(m(1, 1, 60))
+        output = pkb.reshape(a, (2, 0, -1))
+        self.assertEqual(str(output), "reshape_2|fp32(2, 1, 30)")
+        a = pkb.variable(m(1, 1, 60))
+        output = pkb.reshape(a, (0, 0, 0))
+        self.assertEqual(str(output), "reshape_3|fp32(1, 1, 60)")
+        #throw runtime exceptions
+        a = pkb.variable(m(1, 1, 60))
+        with self.assertRaises(plaidml2.Error) as cm:
+            output = pkb.reshape(a, (-1, -1))
+        self.assertTrue("PlaidML reshape op - at most one dimension of size -1 may be provided" in
+                        str(cm.exception))
+        a = pkb.variable(m(1, 1, 60))
+
     @opTest([
         [m(3)],
         #[m()],  # TODO: Need to support empty shapes for placeholders

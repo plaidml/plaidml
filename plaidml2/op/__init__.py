@@ -158,6 +158,19 @@ def softmax(x, axis=None):
     return op('softmax', [x, axis]).as_tensor()
 
 
+def reshape(x, shape):
+    #fix shape: replace 0 with "match" and -1 with "fill"
+    for i, s in enumerate(shape):
+        if s == -1:
+            #replace it with fill
+            shape[i] = 'fill'
+            continue
+        if s == 0:
+            #replace it with match
+            shape[i] = 'match'
+    return op('reshape', [x, shape]).as_tensor()
+
+
 def prod(x, axis=None, keepdims=False):
     return op('prod', [x, axis, keepdims]).as_tensor()
 

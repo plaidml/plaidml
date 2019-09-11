@@ -1957,8 +1957,14 @@ Value reshape(const Value& value) {
   if (args.size() != 2) {
     throw std::runtime_error(str(boost::format("PlaidML reshape op expects 2 arguments (received %1%)") % args.size()));
   }
+
   auto I = args[0].as_tensor();
   std::vector<TensorDim> dims;
+  int64_t dim_counter = 0;
+  int64_t neg_idx = -1;
+  std::vector<TensorDim> I_dims(I.shape().ndims());
+  I.bind_dims(I_dims);
+
   for (auto dim : args[1].as_tuple()) {
     if (dim.is_int()) {
       dims.emplace_back(dim.as_int());
@@ -1966,8 +1972,34 @@ Value reshape(const Value& value) {
       dims.emplace_back(dim.as_dim());
     } else if (dim.is_str()) {
       // TODO: handle special cases
-      dims.emplace_back(0);
+      // TODO: figure out why there are quotation marks around fill and match
+      if (strcmp("\"match\"", dim.str().c_str()) == 0) {
+        dims.emplace_back(I_dims[dim_counter]);
+      } else if (strcmp("\"fill\"", dim.str().c_str()) == 0) {
+        if (neg_idx > -1) {
+          throw std::runtime_error(
+              str(boost::format("PlaidML reshape op - at most one dimension of size -1 may be provided")));
+        }
+        neg_idx = dim_counter;
+        dims.emplace_back(1);
+      }
+    } else if (dim.is_none()) {
+      dims.emplace_back(I_dims[dim_counter]);
     }
+    dim_counter++;
+  }
+
+  if (neg_idx > -1) {  // there was a -1 dimension which needs to be filled
+    int64_t num = 1;
+    for (int i = 0; i < I.shape().ndims(); i++) {
+      num *= I_dims[i].as_int();
+    }
+    int64_t den = 1;
+    for (int i = 0; i < dims.size(); i++) {
+      den *= dims[i].as_int();
+    }
+
+    dims[neg_idx] = TensorDim(num / den);
   }
   return Value{edsl::reshape(I, dims)};
 }

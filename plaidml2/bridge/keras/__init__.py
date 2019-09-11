@@ -1282,67 +1282,68 @@ def reshape(x, dims):
     for idx, dim in enumerate(dims):
         if isinstance(dim, edsl.TensorDim):
             continue
-        if dim == 0 or dim is None:
-            dims[idx] = I_dims[idx]  # TODO: Fix how we manage shape
-        elif dim == -1:
-            if neg_idx:
-                raise RuntimeError('At most one dimension of size -1 may be provided in Reshape')
-            neg_idx = idx
-            dims[idx] = 1  # Just to simplify the size computation later
-    if neg_idx is not None:
-        # Compute the value to use for the -1 dimension in the
-        # output shape, by making it what it needs to be in order
-        # to preserve the correct number of elements in the
-        # tensor.
-        #
-        # This code is a little tricky because symbolic values
-        # (e.g. the batch size in a typical neural network) may
-        # appear in both the original shape and the target shape.
-        # Naively multiplying the original shape's dimensions and
-        # dividing by the target shape's dimensions (excluding the
-        # -1 dimension) would produce a symbolic value.
-        #
-        # So:
-        #
-        # We scan the input dimensions, counting the number of
-        # instances of each symbolic size encountered and
-        # multiplying together the non-symbolic sizes into the
-        # numerator.
-        #
-        # We then scan the output dimensions.  Where there's a
-        # symbolic size, we check and see if we have a count for
-        # it, and decrement the count if we do.  Otherwise -- if
-        # we don't have a count for it, or if it's not symbolic --
-        # we multiply it into the denominator.
-        #
-        # We then take the remaining symbolic input dimensions,
-        # and multiply them into the numerator -- these are the
-        # dimensions that haven't been cancelled out.
-        #
-        # And then the size of the -1 dimension is just numerator
-        # / denominator; if there are any remaining uncancelled
-        # symbolic dimension sizes, the output will be symbolic,
-        # but otherwise we'll come out with a concrete dimension
-        # size.
+    #this code was moved to plaidml2/op/lib/ops.cc
+    #     if dim == 0 or dim is None:
+    #         dims[idx] = I_dims[idx]  # TODO: Fix how we manage shape
+    #     elif dim == -1:
+    #         if neg_idx:
+    #             raise RuntimeError('At most one dimension of size -1 may be provided in Reshape')
+    #         neg_idx = idx
+    #         dims[idx] = 1  # Just to simplify the size computation later
+    # if neg_idx is not None:
+    #     # Compute the value to use for the -1 dimension in the
+    #     # output shape, by making it what it needs to be in order
+    #     # to preserve the correct number of elements in the
+    #     # tensor.
+    #     #
+    #     # This code is a little tricky because symbolic values
+    #     # (e.g. the batch size in a typical neural network) may
+    #     # appear in both the original shape and the target shape.
+    #     # Naively multiplying the original shape's dimensions and
+    #     # dividing by the target shape's dimensions (excluding the
+    #     # -1 dimension) would produce a symbolic value.
+    #     #
+    #     # So:
+    #     #
+    #     # We scan the input dimensions, counting the number of
+    #     # instances of each symbolic size encountered and
+    #     # multiplying together the non-symbolic sizes into the
+    #     # numerator.
+    #     #
+    #     # We then scan the output dimensions.  Where there's a
+    #     # symbolic size, we check and see if we have a count for
+    #     # it, and decrement the count if we do.  Otherwise -- if
+    #     # we don't have a count for it, or if it's not symbolic --
+    #     # we multiply it into the denominator.
+    #     #
+    #     # We then take the remaining symbolic input dimensions,
+    #     # and multiply them into the numerator -- these are the
+    #     # dimensions that haven't been cancelled out.
+    #     #
+    #     # And then the size of the -1 dimension is just numerator
+    #     # / denominator; if there are any remaining uncancelled
+    #     # symbolic dimension sizes, the output will be symbolic,
+    #     # but otherwise we'll come out with a concrete dimension
+    #     # size.
 
-        num = 1
-        syms = defaultdict(int)
-        for idx, dim in enumerate(I.shape.int_dims):
-            if dim is None:
-                syms[I_dims[idx]] += 1
-            else:
-                num *= dim
-        den = 1
-        for dim in dims:
-            if isinstance(dim, edsl.TensorDim) and syms[dim] > 0:
-                syms[dim] -= 1
-            else:
-                den *= dim
-        for sym, count in syms.items():
-            for _ in range(count):
-                num *= sym
-        dims[neg_idx] = num // den
-    return _KerasNode('reshape', tensor=edsl.reshape(I, dims))
+    #     num = 1
+    #     syms = defaultdict(int)
+    #     for idx, dim in enumerate(I.shape.int_dims):
+    #         if dim is None:
+    #             syms[I_dims[idx]] += 1
+    #         else:
+    #             num *= dim
+    #     den = 1
+    #     for dim in dims:
+    #         if isinstance(dim, edsl.TensorDim) and syms[dim] > 0:
+    #             syms[dim] -= 1
+    #         else:
+    #             den *= dim
+    #     for sym, count in syms.items():
+    #         for _ in range(count):
+    #             num *= sym
+    #     dims[neg_idx] = num // den
+    return _KerasNode('reshape', tensor=plaidml_op.reshape(I, dims))
 
 
 @_log_call
