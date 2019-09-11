@@ -10,7 +10,7 @@ def plaidml_workspace():
 
     http_archive(
         name = "boost",
-        url = "https://storage.googleapis.com/vertexai-depot/boost_1_66_0.tar.gz",
+        url = "https://github.com/plaidml/depot/raw/master/boost_1_66_0.tar.gz",
         sha256 = "bd0df411efd9a585e5a2212275f8762079fed8842264954675a4fddc46cfcf60",
         strip_prefix = "boost_1_66_0",
         build_file = Label("//bzl:boost.BUILD"),
@@ -40,7 +40,7 @@ def plaidml_workspace():
 
     http_archive(
         name = "half",
-        url = "https://storage.googleapis.com/external_build_repo/half-1.11.0.zip",
+        url = "https://github.com/plaidml/depot/raw/master/half-1.11.0.zip",
         sha256 = "9e5ddb4b43abeafe190e780b5b606b081acb511e6edd4ef6fbe5de863a4affaf",
         strip_prefix = "half-1.11.0",
         build_file = Label("//bzl:half.BUILD"),
@@ -86,7 +86,7 @@ def plaidml_workspace():
 
     http_file(
         name = "plantuml_jar",
-        urls = ["https://storage.googleapis.com/vertexai-depot/plantuml.jar"],
+        urls = ["https://github.com/plaidml/depot/raw/master/plantuml.jar"],
         sha256 = "26d60e43c14106a3d220e33c2b2e073b2bce40b433ad3e5fa13c747f58e67ab6",
     )
 
@@ -130,7 +130,7 @@ def plaidml_workspace():
 
     http_archive(
         name = "zlib",
-        url = "https://storage.googleapis.com/external_build_repo/zlib-1.2.8.tar.gz",
+        url = "https://github.com/plaidml/depot/raw/master/zlib-1.2.8.tar.gz",
         sha256 = "36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d",
         build_file = Label("//bzl:zlib.BUILD"),
     )
@@ -232,7 +232,7 @@ def configure_toolchain():
         build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
         sha256 = "dfbf72d78bfe876b2864f51ac740a54e5fd12e2b4a86c10514fb7accaa9640e6",
         strip_prefix = "x86_64-unknown-linux-gnu",
-        url = "https://storage.googleapis.com/vertexai-depot/toolchain/gcc-5.4.0/x86_64-unknown-linux-gnu-20190419.tgz",
+        url = "https://github.com/plaidml/depot/raw/master/toolchain/gcc-5.4.0/x86_64-unknown-linux-gnu-20190419.tgz",
     )
 
     http_archive(
@@ -240,5 +240,5 @@ def configure_toolchain():
         build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
         sha256 = "28fc19c39683c3c1065058ea525eb9fbb20095249e69971215d9451184ab006f",
         strip_prefix = "x86_64-unknown-linux-gnu",
-        url = "https://storage.googleapis.com/vertexai-depot/toolchain/gcc-4.9.4/x86_64-unknown-linux-gnu-20190617.tgz",
+        url = "https://github.com/plaidml/depot/raw/master/toolchain/gcc-4.9.4/x86_64-unknown-linux-gnu-20190617.tgz",
     )
