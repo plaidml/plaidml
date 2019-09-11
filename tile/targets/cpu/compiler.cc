@@ -126,7 +126,8 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   std::vector<llvm::Value*> args;
   std::vector<llvm::Value*> allocs;
   {
-    if (arenaSize_ != 0) {
+    if (arenaSize_) {
+      IVLOG(1, "Arena size: " << arenaSize_);
       // allocate the arena on the heap. This way static initialization order is never an issue.
       std::vector<llvm::Value*> calloc_args{IndexConst(arenaSize_), IndexConst(1)};
       auto buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
@@ -179,10 +180,6 @@ uint64_t Compiler::MeasureArena(const stripe::Block& block) {
   // Look for refinements which have been placed into an arena.
   uint64_t extent = 0;
   for (const auto& ref : block.refs) {
-    // skip the special case of top-level parameters
-    if (ref.has_tag("user")) {
-      continue;
-    }
     // skip refinements which lack the "placed" attribute applied by the placer
     if (!ref.has_tag("placed")) {
       continue;
@@ -195,8 +192,8 @@ uint64_t Compiler::MeasureArena(const stripe::Block& block) {
   }
   // Scan any nested blocks for additional refinements.
   for (const auto& stmt : block.stmts) {
-    if (stmt->kind() == stripe::StmtKind::Block) {
-      extent = std::max(extent, MeasureArena(*stripe::Block::Downcast(stmt)));
+    if (auto inner = stripe::Block::Downcast(stmt)) {
+      extent = std::max(extent, MeasureArena(*inner));
     }
   }
   return extent;
@@ -516,6 +513,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     indexes_[idx.name].variable = variable;
   }
 
+  // EmitRunTimeLogEntry(block.name, "enter");
   ProfileBlockEnter(block);
 
   // generate the basic blocks for each nested loop's evaluation stages
@@ -819,10 +817,8 @@ void Compiler::Visit(const stripe::Block& block) {
   builder_.CreateCall(function, args, "");
   // Free the temporary buffers we allocated as parameter values.
   for (auto ptr : allocs) {
-    std::vector<llvm::Value*> free_args;
-    free_args.push_back(ptr);
-    auto free_func = FreeFunction();
-    builder_.CreateCall(free_func, free_args, "");
+    std::vector<llvm::Value*> free_args{ptr};
+    builder_.CreateCall(FreeFunction(), free_args, "");
   }
 }
 
@@ -1411,23 +1407,27 @@ llvm::Value* Compiler::MallocFunction(void) {
 }
 
 llvm::Value* Compiler::RunTimeLogEntry(void) {
-  std::vector<llvm::Type*> argtypes{builder_.getInt8Ty()->getPointerTo(), builder_.getInt8Ty()->getPointerTo(),
-                                    builder_.getInt64Ty()};
+  std::vector<llvm::Type*> argtypes{
+      builder_.getInt8Ty()->getPointerTo(),
+      builder_.getInt8Ty()->getPointerTo(),
+      builder_.getInt64Ty(),
+  };
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "RunTimeLogEntry";
   return module_->getOrInsertFunction(funcname, functype).getCallee();
 }
 
-void Compiler::EmitRunTimeLogEntry(const char* str, const char* extra, llvm::Value* value) {
-  llvm::Type* valueType = builder_.getInt64Ty();
-  auto arg1 = builder_.CreateGlobalStringPtr(str);
-  auto arg2 = builder_.CreateGlobalStringPtr(extra);
-  auto arg3 = builder_.CreatePtrToInt(value, builder_.getInt64Ty());
-  std::vector<llvm::Value*> log_args;
-  log_args.push_back(arg1);
-  log_args.push_back(arg2);
-  log_args.push_back(arg3);
+void Compiler::EmitRunTimeLogEntry(const std::string& str, const std::string& extra, llvm::Value* value) {
+  std::vector<llvm::Value*> log_args{
+      builder_.CreateGlobalStringPtr(str),
+      builder_.CreateGlobalStringPtr(extra),
+  };
+  if (value) {
+    log_args.push_back(builder_.CreatePtrToInt(value, builder_.getInt64Ty()));
+  } else {
+    log_args.push_back(builder_.getInt64(0));
+  }
   auto buffer = builder_.CreateCall(RunTimeLogEntry(), log_args, "");
 }
 

@@ -14,7 +14,7 @@
 #include "tile/base/buffer.h"
 #include "tile/base/program.h"
 #include "tile/base/schedule.h"
-#include "tile/lang/compose.h"
+#include "tile/lang/runinfo.h"
 #include "tile/platform/local_machine/devinfo.h"
 #include "tile/platform/local_machine/mem_strategy.h"
 #include "tile/platform/local_machine/scheduler.h"

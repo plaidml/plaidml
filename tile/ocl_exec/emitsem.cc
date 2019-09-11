@@ -1,6 +1,10 @@
 // Copyright 2018, Intel Corporation
 
 #include "tile/ocl_exec/emitsem.h"
+
+#include <algorithm>
+#include <utility>
+
 #include "tile/lang/gen_special.h"
 #include "tile/lang/gen_trivial.h"
 #include "tile/lang/gid.h"
@@ -347,7 +351,7 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   for (const auto& idx : block.idxs) {
     logical.push_back(idx.range);
   }
-  auto map = lang::gid::MakeMap(lid_limits_, logical, false);
+  auto map = lang::gid::MakeMap(lid_limits_, logical, false, false);
   std::vector<std::shared_ptr<sem::Expression>> gids;
   for (size_t i = 0; i < 3; i++) {
     gids.push_back(_Index(used_threads_ == 1 ? sem::IndexExpr::GLOBAL : sem::IndexExpr::GROUP, i));
@@ -390,7 +394,13 @@ void SemtreeEmitter::do_gids(const stripe::Block& block) {
   if (block.has_attr("subgroup_size")) {
     ki.kfunc->subgroup_size = static_cast<size_t>(block.get_attr_int("subgroup_size"));
   }
-  ki.gwork = {{map.gid_sizes[0] * used_threads_, map.gid_sizes[1], map.gid_sizes[2]}};
+  ki.gwork = {
+      {
+          map.gid_sizes[0] * used_threads_,
+          map.gid_sizes[1],
+          map.gid_sizes[2],
+      },
+  };
   if (used_threads_ == 1 && !local_var_) {
     ki.lwork = {{0, 0, 0}};
   } else {
@@ -473,8 +483,8 @@ void SemtreeEmitter::init_loop_local(const std::string& buf, DataType type,  //
                                      size_t size, const sem::ExprPtr& init) {
   auto while_loop = _Block({});
   while_loop->push_back(_Declare({sem::Type::INDEX}, "_init_", sem::ExprPtr(_Index(sem::IndexExpr::LOCAL, 0))));
-  while_loop->push_back(_While(_("_init_") < _Const(size),
-                        _Block({_(ref_buf(buf))[_("_init_")] = init, _("_init_") = _("_init_") + used_threads_})));
+  while_loop->push_back(_While(_("_init_") < _Const(size), _Block({_(ref_buf(buf))[_("_init_")] = init,
+                                                                   _("_init_") = _("_init_") + used_threads_})));
   cur_->push_front(while_loop);
 }
 
@@ -615,14 +625,13 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     return;
   }
   size_t this_block_threads = block.has_tag("gpu_thread") ? block.idxs_product() : 1;
-  if (thread_condition_ == nullptr && !block.has_tag("reg_cache") &&
-      max_threads(block) == 1 && outer_threads_ * this_block_threads < used_threads_) {
+  if (thread_condition_ == nullptr && !block.has_tag("reg_cache") && max_threads(block) == 1 &&
+      outer_threads_ * this_block_threads < used_threads_) {
     thread_condition_ = &block;
   }
   // For subgroup_inline, we unroll the block directly because
   // we implement subgroup functions in only the unroller
-  if ((block.has_tag("subgroup_inline") || 
-      (block.has_tag("inline") && block.idxs_product() <= MAX_UNROLL_SIZE)) &&
+  if ((block.has_tag("subgroup_inline") || (block.has_tag("inline") && block.idxs_product() <= MAX_UNROLL_SIZE)) &&
       block.constraints.size() == 0 && inner_blocks(block) == 0 && thread_condition_ == nullptr) {
     scopes_.emplace_back(*scope_, const_cast<stripe::Block*>(&block));
     scope_ = &scopes_.back();
@@ -698,8 +707,8 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
       size_t size = ref.interior_shape.elem_size();
       sem::Type ptype = {sem::Type::VALUE, ref.interior_shape.type, 1, size,
                          ((use_register || in_threads_) ? sem::Type::NORMAL : sem::Type::LOCAL)};
-      sem::ExprPtr init = AggInit(ref.interior_shape.type, ref.agg_op,
-                          HasConstraints(const_cast<stripe::Block*>(&block)));
+      sem::ExprPtr init =
+          AggInit(ref.interior_shape.type, ref.agg_op, HasConstraints(const_cast<stripe::Block*>(&block)));
       if (use_register || in_threads_) {
         // not local variable
         cur_->push_front(_Declare(ptype, ref_buf(ref.into()), init));

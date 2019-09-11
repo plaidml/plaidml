@@ -13,8 +13,8 @@
 #include "tile/codegen/compile_pass.h"
 
 // N.B. We need to confine all definitions to MLIR here.
-// The reason is that when we mix Windows system headers with MLIR,
-// compliation faliures. This is because MLIR currently uses the MSVC-specific
+// The reason is that when we mix Windows system headers with MLIR, we get
+// compilation faliures. This is because MLIR currently uses the MSVC-specific
 // reserved keyword 'interface' in some declarations.
 
 namespace vertexai {

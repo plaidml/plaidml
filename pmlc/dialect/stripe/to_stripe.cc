@@ -27,7 +27,7 @@ class StripeBuilder {
   explicit StripeBuilder(mlir::FuncOp func);
   std::shared_ptr<stripe::Block> getResult() { return cur_; }
 
-  // Public purly to avoid annoyance with ForAllOps
+  // Public purely to avoid annoyance with ForAllOps
   template <class ScalarOp>
   void apply();
 

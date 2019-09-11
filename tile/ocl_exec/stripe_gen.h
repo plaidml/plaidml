@@ -3,8 +3,8 @@
 #include <string>
 
 #include "tile/base/buffer.h"
-#include "tile/lang/compose.h"
 #include "tile/lang/generate.h"
+#include "tile/lang/runinfo.h"
 
 namespace vertexai {
 namespace tile {

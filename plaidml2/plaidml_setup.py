@@ -97,21 +97,7 @@ Please choose a default device:
     A[x, y] += B[x, z] * C[z, y]
 
     program = edsl.Program('plaidml_setup', [A])
-
-    def run(program, inputs):
-
-        def make_buffer(tensor):
-            # convert LogicalShape into TensorShape
-            shape = plaidml.TensorShape(tensor.shape.dtype, tensor.shape.int_dims)
-            return plaidml.Buffer(device, shape)
-
-        ibindings = [(x, make_buffer(x)) for x, y in inputs]
-        obindings = [(x, make_buffer(x)) for x in program.outputs]
-
-        exe = plaidml_exec.Executable(program, device, target, ibindings, obindings)
-        return [x.as_ndarray() for x in exe([y for x, y in inputs])]
-
-    run(program, [(B, np.random.rand(3, 3)), (C, np.random.rand(3, 3))])
+    plaidml_exec.run(program, [(B, np.random.rand(3, 3)), (C, np.random.rand(3, 3))])
     print("Whew. That worked.")
     print()
 
