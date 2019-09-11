@@ -6,6 +6,15 @@ tasks:
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh 
     - sh ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+    - mkdir neo
+    - cd neo
+    - wget https://github.com/intel/compute-runtime/releases/download/19.35.13977/intel-gmmlib_19.2.3_amd64.deb
+    - wget https://github.com/intel/compute-runtime/releases/download/19.35.13977/intel-igc-core_1.0.11-2500_amd64.deb
+    - wget https://github.com/intel/compute-runtime/releases/download/19.35.13977/intel-igc-opencl_1.0.11-2500_amd64.deb
+    - wget https://github.com/intel/compute-runtime/releases/download/19.35.13977/intel-opencl_19.35.13977_amd64.deb
+    - wget https://github.com/intel/compute-runtime/releases/download/19.35.13977/intel-ocloc_19.35.13977_amd64.deb
+    - dpkg -i *.deb
+    - cd ..
     environment:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/go1.12.6.linux-amd64/bin:/opt/swift-4.2.1-RELEASE-ubuntu16.04/usr/bin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
