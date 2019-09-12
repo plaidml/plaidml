@@ -7,7 +7,7 @@
 #include <boost/filesystem.hpp>
 
 #include "base/util/zipfile.h"
-#include "tile/lang/compose.h"
+#include "tile/lang/runinfo.h"
 #include "tile/proto/metadata.pb.h"
 
 namespace vertexai {

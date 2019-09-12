@@ -30,7 +30,7 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(  //
   runinfo.input_shapes = FromProto(program.inputs());
   runinfo.output_shapes = FromProto(program.outputs());
   runinfo.program_name = "stripe_program";
-  return std::make_unique<Program>("cpu", runinfo, const_bufs);
+  return std::make_unique<Program>("llvm_cpu", runinfo, const_bufs);
 }
 
 std::shared_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx,   //

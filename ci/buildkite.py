@@ -150,6 +150,15 @@ def buildkite_download(pattern, destination, **kwargs):
 
 
 def cmd_build(args, remainder):
+    import yaml
+    with open('ci/plan.yml') as file_:
+        plan = yaml.safe_load(file_)
+
+    env = os.environ.copy()
+    variant = plan['VARIANTS'][args.variant]
+    for key, value in variant['env'].items():
+        env[key] = str(value)
+
     util.printf('--- :snake: pre-build steps... ')
     util.printf('delete any old whl files...')
     wheel_dirs = [
@@ -178,10 +187,7 @@ def cmd_build(args, remainder):
         util.check_call(['git', 'config', 'core.symlinks', 'true'])
         cenv = util.CondaEnv(pathlib.Path('.cenv'))
         cenv.create('environment-windows.yml')
-        env = os.environ.copy()
         env.update(cenv.env())
-    else:
-        env = None
     util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
 
     util.printf('--- :buildkite: Uploading artifacts...')

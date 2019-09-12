@@ -26,6 +26,8 @@ struct Shape {
   llvm::ArrayRef<int64_t> dims;
 };
 
+struct TileProgram;
+
 class TileBuilder {
   struct Impl;
 
@@ -34,7 +36,6 @@ class TileBuilder {
   ~TileBuilder();
 
   void Destroy(mlir::Value* value);
-  void Destroy(mlir::Operation* op);
 
   void BindTensorDim(unsigned dim, mlir::Value* from, mlir::Value** into);
   Shape GetShape(mlir::Value* tensor);
@@ -46,7 +47,7 @@ class TileBuilder {
   mlir::Value* MakeTupleOp(llvm::ArrayRef<mlir::Value*> elts);
   mlir::Value* MakeScalarConstantOp(int64_t value);
   mlir::Value* MakeScalarConstantOp(double value);
-  mlir::Value* MakeCall(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args);
+  mlir::Value* MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args);
   mlir::Value* MakeDimOp(mlir::Value* tensor, unsigned dim);
   mlir::Value* MakePlaceholderOp(DataType dtype, llvm::ArrayRef<int64_t> dims);
   mlir::Value* MakeAffineConstantOp(int64_t value);
@@ -90,7 +91,10 @@ class TileBuilder {
   mlir::Value* MakeConSumEqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
   mlir::Value* MakeConSumMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
 
-  mlir::Operation* MakeFuncOp(llvm::StringRef name, llvm::ArrayRef<mlir::Value*> outputs);
+  std::shared_ptr<TileProgram> MakeProgram(  //
+      llvm::StringRef name,                  //
+      llvm::ArrayRef<mlir::Value*> outputs,  //
+      llvm::MutableArrayRef<mlir::Value*> new_outputs);
 
  private:
   std::unique_ptr<Impl> impl;

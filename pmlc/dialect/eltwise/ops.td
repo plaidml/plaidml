@@ -170,6 +170,7 @@ def ACosOp : UnaryFloatOp<"acos">;
 def AddOp : BinaryOp<"add", [Commutative]>;
 def AndOp : BinaryIntOp<"and", [Commutative]>;
 def ASinOp : UnaryFloatOp<"asin">;
+def AssignOp : UnaryOp<"assign">;
 def ATanOp : UnaryFloatOp<"atan">;
 def CeilOp : UnaryOp<"ceil">;
 def CmpEqOp : CompareOp<"cmp_eq", [Commutative]>;

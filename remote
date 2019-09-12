@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import pathlib
+import subprocess
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--host', default='lab-13')
+    args, remainder = parser.parse_known_args()
+
+    # 1. compute target directory based on CWD
+    cwd = pathlib.Path(os.getcwd())
+    home = pathlib.Path('~').expanduser()
+    tgt_dir = cwd.relative_to(home)
+    base_dir = tgt_dir.parent
+    if base_dir:
+        subprocess.check_call([
+            'ssh', '-q', args.host, 'mkdir -p {}'.format(base_dir.as_posix())
+        ])
+
+    # 2. upload CWD to remote using rsync
+    exclude_from = cwd / '.exclude'
+    spec = '{}:{}'.format(args.host, tgt_dir.as_posix())
+    subprocess.check_call([
+        'rsync',
+        '-av',
+        '-F',
+        '--delete',
+        '--exclude-from',
+        str(exclude_from),
+        '.',
+        spec,
+    ])
+
+    # 3. run remote command from remote CWD
+    # if '--' in remainder:
+    #     remainder.remove('--')
+    remote_cmd = ' '.join(remainder)
+    bash_cmd = "'cd {}; {}'".format(tgt_dir.as_posix(), remote_cmd)
+    subprocess.check_call(
+        ['ssh', '-q', '-t', args.host, "bash -l -c {}".format(bash_cmd)])
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

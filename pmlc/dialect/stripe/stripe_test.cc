@@ -17,8 +17,8 @@
 
 #include "tile/codegen/compile_pass.h"
 #include "tile/codegen/localize.h"
-#include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
+#include "tile/lang/runinfo.h"
 #include "tile/lib/lib.h"
 
 using namespace vertexai::tile;         // NOLINT
@@ -47,6 +47,31 @@ int main() {
   auto prog = lang::GenerateStripe(example());
   codegen::LocalizeBlockPass(codegen::AliasMap(codegen::AliasMap(), prog->entry.get()), prog->entry.get(), {"tmp"});
 
+  codegen::CompilerState cstate{prog};
+
+  printf("Adding a memory location\n");
+  codegen::proto::LocateMemoryPass lmp;
+  auto lmp_dev = lmp.mutable_loc()->add_devs();
+  lmp_dev->set_name("OuterMem");
+  lmp_dev->add_units()->set_offset(0);
+  lmp_dev = lmp.mutable_loc()->add_devs();
+  lmp_dev->set_name("InnerMem");
+  lmp_dev->add_units()->set_offset(1);
+  codegen::LocateMemoryPass{lmp}.Apply(&cstate);
+
+  printf("Adding an executor location\n");
+  codegen::proto::LocateBlockPass lbp;
+  auto lbp_dev = lbp.mutable_loc()->add_devs();
+  lbp_dev->set_name("OuterExecutor");
+  lbp_dev->add_units()->set_offset(0);
+  lbp_dev = lbp.mutable_loc()->add_devs();
+  lbp_dev->set_name("InnerExecutor");
+  lbp_dev->add_units()->set_offset(1);
+  codegen::LocateBlockPass{lbp}.Apply(&cstate);
+
+  printf("Original version:\n");
+  std::cout << *prog->entry;
+
   printf("Converting to MLIR\n");
   auto func = ToStripeMLIR(&context, *prog);
 
@@ -59,12 +84,14 @@ int main() {
   printf("Doing some passes\n");
   mlir::PassManager pm;
   pm.addPass(mlir::createCSEPass());
-  vertexai::tile::codegen::proto::MLIR_PadPass options;
+  codegen::proto::MLIR_PadPass options;
   pm.addPass(CreatePass<PaddingPass>(options));
   if (failed(pm.run(module))) {
     module.dump();
     throw std::runtime_error("Invalid goo\n");
   }
+
+  printf("Did some passes\n");
 
   module.verify();
 

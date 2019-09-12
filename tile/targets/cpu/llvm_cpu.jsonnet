@@ -1,5 +1,5 @@
 local PARAMS = {
-  cpu: {
+  llvm_cpu: {
     CACHE_WIDTH: 64,
     L1_CACHE_SIZE: 32,
   },
@@ -31,6 +31,9 @@ local PARAMS = {
               },
             },
 
+            // This pass seems to cause out of bounds accesses, but only on
+            // contractions that have implicit constraints.
+            //
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
@@ -54,15 +57,7 @@ local PARAMS = {
                     startup_cost: 32,
                     idxs: [
                       { name: 'm', size: 64, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
-                      { name: 'k', size: 64, outs: [0], ins: [1, -1] },
-                    ],
-                  },
-                  {
-                    startup_cost: 32,
-                    idxs: [
-                      { name: 'm', size: 64, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: 16, outs: [-1], ins: [-1, 0] },
+                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
                       { name: 'k', size: 64, outs: [0], ins: [1, -1] },
                     ],
                   },
@@ -70,7 +65,7 @@ local PARAMS = {
                     startup_cost: 32,
                     idxs: [
                       { name: 'm', size: 32, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
                       { name: 'k', size: 32, outs: [0], ins: [1, -1] },
                     ],
                   },
@@ -78,7 +73,7 @@ local PARAMS = {
                     startup_cost: 32,
                     idxs: [
                       { name: 'm', size: 16, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
                       { name: 'k', size: 16, outs: [0], ins: [1, -1] },
                     ],
                   },
@@ -86,7 +81,7 @@ local PARAMS = {
                     startup_cost: 32,
                     idxs: [
                       { name: 'm', size: 48, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
                       { name: 'k', size: 48, outs: [0], ins: [1, -1] },
                     ],
                   },
@@ -94,7 +89,7 @@ local PARAMS = {
                     startup_cost: 32,
                     idxs: [
                       { name: 'm', size: 80, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
                       { name: 'k', size: 80, outs: [0], ins: [1, -1] },
                     ],
                   },
@@ -102,13 +97,13 @@ local PARAMS = {
                     startup_cost: 32,
                     idxs: [
                       { name: 'm', size: 96, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: 8, outs: [-1], ins: [-1, 0] },
+                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
                       { name: 'k', size: 96, outs: [0], ins: [1, -1] },
                     ],
                   },
                 ],
-                inputs_set: [{tags: ["A"]}, {tags: ["B"]}],
-                outputs_set: [{tags: ["C"]}],
+                inputs_set: [{ tags: ['A'] }, { tags: ['B'] }],
+                outputs_set: [{ tags: ['C'] }],
               },
             },
 
@@ -188,8 +183,8 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateBlocksRefinementsRecursivelyPass',
                 reqs: ['program'],
-                skip_tags: ["user"],
-                loc: { devs: [{ name: 'DRAM' }], },
+                skip_tags: ['user'],
+                loc: { devs: [{ name: 'DRAM' }] },
               },
             },
 
@@ -199,8 +194,8 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass',
                 reqs: ['program'],
-                skip_tags: ["user"],
-                locs: [{ devs: [{ name: 'DRAM'}] }],
+                skip_tags: ['user'],
+                locs: [{ devs: [{ name: 'DRAM' }] }],
                 alignment: 16,
               },
             },

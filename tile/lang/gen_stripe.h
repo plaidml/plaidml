@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "tile/lang/compose.h"
+#include "tile/lang/runinfo.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {
