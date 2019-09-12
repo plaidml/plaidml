@@ -2010,7 +2010,13 @@ Value reshape(const Value& value) {
           throw std::runtime_error("Unrecognized AutoDimMode");
       }
     } else if (target_shape[i].is_none()) {
-      O_dims.emplace_back(I_dims[i]);
+      if (i < I_dims.size()) {
+        O_dims.emplace_back(I_dims[i]);
+      } else {
+        throw std::runtime_error(
+            str(boost::format("PlaidML reshape op - matching dimension requested at %1% from %2%-dimensional tensor") %
+                (i + 1) % I_dims.size()));
+      }
     }
   }
 
