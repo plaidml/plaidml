@@ -99,26 +99,27 @@ VARIANTS:
     arch: manylinux1_x86_64
     system: Linux
     env:
-      PLAIDML_DEVICE_IDS: opencl_cpu.0
+      PLAIDML_DEVICE_IDS: llvm_cpu.0
       PLAIDML_EXPERIMENTAL: 1
-      PLAIDML_DEVICE: opencl_cpu.0
-      PLAIDML_TARGET: opencl_cpu
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
   macos_x86_64:
     arch: macosx_10_10_x86_64
     system: Darwin
     env:
       PLAIDML_DEVICE_IDS: llvm_cpu.0
       PLAIDML_EXPERIMENTAL: 1
-      PLAIDML_DEVICE: opencl_cpu.0
-      PLAIDML_TARGET: opencl_cpu
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
   windows_x86_64:
     arch: win_amd64
     system: Windows
     env:
       PLAIDML_DEVICE_IDS: opencl_cpu.0
       PLAIDML_EXPERIMENTAL: 1
-      PLAIDML_DEVICE: opencl_cpu.0
-      PLAIDML_TARGET: opencl_cpu
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
+      PLAIDML_VERBOSE: 1
 
 SUITES:
   smoke:
