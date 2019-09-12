@@ -7,3 +7,4 @@ CALL %UserProfile%\miniconda3\Scripts\activate.bat
 setx PATH "%userprofile%\miniconda3\;%PATH%"
 setx PATH "%userprofile%\miniconda3\Scripts;%PATH%"
 echo %PATH%
+CALL %UserProfile%\miniconda3\Scripts\activate.bat %UserProfile%\miniconda3
