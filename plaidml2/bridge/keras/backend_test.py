@@ -1235,6 +1235,11 @@ class TestBackendOps(unittest.TestCase):
             output = pkb.reshape(a, (-1, -1))
         self.assertTrue("PlaidML reshape op - at most one dimension's size may be inferred" in str(
             cm.exception))
+        with self.assertRaises(plaidml2.Error) as cm:
+            output = pkb.reshape(a, (1, 1, 1, 0))
+        self.assertTrue(
+            "PlaidML reshape op - matching dimension requested at 4 from 3-dimensional tensor" in
+            str(cm.exception))
 
     @opTest([
         [m(1, 1, 60), (60,)],

@@ -1990,7 +1990,13 @@ Value reshape(const Value& value) {
       auto autodim_mode = autodim_mode_from_str(target_shape[i].as_str());
       switch (autodim_mode) {
         case (AutoDimMode::MATCH):
-          O_dims.emplace_back(I_dims[i]);
+          if (i < I_dims.size()) {
+            O_dims.emplace_back(I_dims[i]);
+          } else {
+            throw std::runtime_error(str(
+                boost::format("PlaidML reshape op - matching dimension requested at %1% from %2%-dimensional tensor") %
+                (i + 1) % I_dims.size()));
+          }
           break;
 
         case (AutoDimMode::FILL):
