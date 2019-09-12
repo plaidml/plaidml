@@ -3,6 +3,7 @@
 #include "plaidml2/core/ffi.h"
 
 #include <mutex>
+#include <vector>
 
 #include <boost/filesystem.hpp>
 
@@ -10,10 +11,7 @@
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
 #include "tile/platform/local_machine/platform.h"
-
-#ifndef _WIN32
 #include "tile/platform/stripejit/platform.h"
-#endif
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
@@ -35,20 +33,16 @@ Platform* GetLocalPlatform() {
   return &platform;
 }
 
-#ifndef _WIN32
 Platform* GetJitPlatform() {
   static vertexai::tile::stripejit::Platform platform;
   return &platform;
 }
-#endif
 
 Platform* GetPlatform() {
-#ifndef _WIN32
   auto target = vertexai::env::Get("PLAIDML_DEVICE");
   if (target == "llvm_cpu.0") {
     return GetJitPlatform();
   }
-#endif
   return GetLocalPlatform();
 }
 
