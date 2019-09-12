@@ -394,14 +394,8 @@ class TestEdsl(unittest.TestCase):
     def testDefract(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='K')
-        N = TensorDim()
-        M = TensorDim()
-        i = TensorIndex()
-        j = TensorIndex()
-        I.bind_dims(N)
-        K.bind_dims(M)
+        i, j = TensorIndexes(2)
         O = TensorOutput(5)
-
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('defract_test', [O])
         self.assertMultiLineEqual(
@@ -418,12 +412,8 @@ class TestEdsl(unittest.TestCase):
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
     def testDefractShort(self):
-
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
-        N = TensorDim()
-        i = TensorIndex()
-        j = TensorIndex()
-        I.bind_dims(N)
+        i, j = TensorIndexes(2)
         O = TensorOutput(6)
         O[i] += (I[(i - 1) // 2])
         program = Program('defract_short_test', [O])
@@ -440,7 +430,6 @@ class TestEdsl(unittest.TestCase):
         self.assertEqual(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
 
     def testDefractLong(self):
-
         shape = [1, 3, 3, 1]
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='I')
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='K')
@@ -459,11 +448,8 @@ class TestEdsl(unittest.TestCase):
   _X0[x0, x1, x3, x6 : 1, 5, 5, 1] = +(I[x0, -1/2 + 1/2*x1 + 1/2*x2, -1/2 + 1/2*x3 + 1/2*x4, x5] * K[2 - x2, 2 - x4, x6, x5]);
 }
 ''')
-        #crashes when run on linux. Does not crash on mac.
-        #if any one of the divide by twos is removed it no longer crashed
-        #valgrnd was run and could not find anything, the test was written up in edsl_test.cc and run, the crash was reproduced exactly
-        #issue created in tracking system (#)
-        #outputs = plaidml_exec.run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
+        # out of bounds access occurs when implicit constraints are combined with the padding pass
+        # outputs = plaidml_exec.run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
 
     def testFunkyLayerNames(self):
         '''Exercises fix for plaidml bug #241
@@ -475,16 +461,9 @@ class TestEdsl(unittest.TestCase):
 
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='K')
-        N = TensorDim()
-        M = TensorDim()
-        i = TensorIndex()
-        j = TensorIndex()
-        I.bind_dims(N)
-        K.bind_dims(M)
+        i, j = TensorIndexes(2)
         O = TensorOutput(5)
-
         O[i] += (I[(i - j + 1) // 2] * K[j])
-
         program = Program('this-is-not an identifier', [O])
         self.assertMultiLineEqual(
             str(program), '''function (
@@ -563,6 +542,7 @@ class TestEdsl(unittest.TestCase):
         outputs = plaidml_exec.run(program1, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
         self.assertEqual(outputs[1].tolist(), [1, 2, 3])
+
         O1 = I
         O2 = I
         program2 = Program('two_outputs', [O1, O2])
