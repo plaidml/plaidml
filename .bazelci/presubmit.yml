@@ -44,11 +44,4 @@ tasks:
     name: "PlaidML Windows"
     batch_commands:
     - .\.bazelci\bazelci_windows.bat
-    build_flags:
-    - "--config=windows_x86_64"
-    - "--workspace_status_command .\\.bazelci\\bazelci_conda.bat"
-    test_flags:
-    - "--config=windows_x86_64"
-    - "--workspace_status_command .\\.bazelci\\bazelci_conda.bat"
-    test_targets:
-    - "..."
+    - bazelisk test //...
