@@ -43,7 +43,7 @@ tasks:
   windows:
     name: "PlaidML Windows"
     batch_commands:
-    - cmd.exe .\.bazelci\bazelci_windows.bat 
+    - .\.bazelci\bazelci_windows.bat 
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:
