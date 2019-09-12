@@ -596,7 +596,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   }
   // Do some optimization passes
   mlir::PassManager pm;
-  pm.addPass(mlir::createCanonicalizerPass());
+  // TODO: Debug & re-enable the canonicalization pass
+  // pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
   if (failed(result)) {
