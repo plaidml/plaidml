@@ -372,13 +372,24 @@ bool Compiler::GetXSMMCallData(XSMMCallData* xsmmCallData, const stripe::Block& 
     }
   }
 
+  // Special case n-dimension is 1 and an earlier optimization removes the stencil for n (being 1).
+  bool useSpecialN = false;
+  if (found == 2 && n_name.empty()) {
+    useSpecialN = true;
+    found++;
+  }
+
   if (found != 3) {
     return false;
   }
 
   for (const auto& ref : block.refs) {
     if (ref.has_tag("A")) {
-      xsmmCallData->lda_b_value = ref.FlatAccess()[n_name];
+      if (useSpecialN) {
+        xsmmCallData->lda_b_value = 0;
+      } else {
+        xsmmCallData->lda_b_value = ref.FlatAccess()[n_name];
+      }
       xsmmCallData->in0 = &ref;
     } else if (ref.has_tag("B")) {
       xsmmCallData->lda_a_value = ref.FlatAccess()[k_name];
@@ -461,7 +472,8 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   if (block.has_tag("xsmm")) {
     const XSMMDispatch xsmmDispatch = GetXSMMDispatch(block);
     XSMMCallData xsmmCallData;
-    if (xsmmDispatch != XSMMDispatch::NONE && GetXSMMCallData(&xsmmCallData, block)) {
+    auto data = GetXSMMCallData(&xsmmCallData, block);
+    if (xsmmDispatch != XSMMDispatch::NONE && data) {
       return CompileXSMMBlock(block, xsmmDispatch, xsmmCallData);
     }
   }
