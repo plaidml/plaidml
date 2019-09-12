@@ -114,6 +114,10 @@ struct AggregationAxes {
   }
 };
 
+enum class AutoDimMode {
+  MATCH,  // 0
+  FILL    // -1
+};
 enum class AutogroupMode {
   UNGROUPED,  // Group size explicitly 1
   EXPLICIT,   // Group size explicitly specified, > 1
@@ -170,6 +174,15 @@ enum class TensorLayout { NXC, NCX, KCX, XCK, GKCX, XGCK };
 namespace {
 // TODO: I haven't decided whether to make these helper functions visible to the outside world
 
+AutoDimMode autodim_mode_from_str(const std::string& s) {
+  if (s == "fill") {
+    return AutoDimMode::FILL;
+  }
+  if (s == "match") {
+    return AutoDimMode::MATCH;
+  }
+  throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as an autodim mode") % s));
+}
 AutogroupMode autogroup_mode_from_str(const std::string& s) {
   if (s == "ungrouped") {
     return AutogroupMode::UNGROUPED;
@@ -1960,42 +1973,54 @@ Value reshape(const Value& value) {
 
   auto I = args[0].as_tensor();
   std::vector<TensorDim> dims;
-  int64_t dim_counter = 0;
+  // int64_t dim_counter = 0;
   int64_t neg_idx = -1;
   std::vector<TensorDim> I_dims(I.shape().ndims());
   I.bind_dims(I_dims);
 
-  for (auto dim : args[1].as_tuple()) {
-    if (dim.is_int()) {
-      dims.emplace_back(dim.as_int());
-    } else if (dim.is_dim()) {
-      dims.emplace_back(dim.as_dim());
-    } else if (dim.is_str()) {
+  Value* set_neg_idx = nullptr;
+
+  auto dim = args[1].as_tuple();
+  // std::cout<<"!!!!!!size"<<dim_t.size()<<std::endl;
+  for (size_t i = 0; i < dim.size(); i++) {
+    if (dim[i].is_int()) {
+      dims.emplace_back(dim[i].as_int());
+    } else if (dim[i].is_dim()) {
+      dims.emplace_back(dim[i].as_dim());
+    } else if (dim[i].is_str()) {
       // TODO: handle special cases
       // TODO: figure out why there are quotation marks around fill and match
-      if (strcmp("\"match\"", dim.str().c_str()) == 0) {
-        dims.emplace_back(I_dims[dim_counter]);
-      } else if (strcmp("\"fill\"", dim.str().c_str()) == 0) {
-        if (neg_idx > -1) {
-          throw std::runtime_error(
-              str(boost::format("PlaidML reshape op - at most one dimension of size -1 may be provided")));
-        }
-        neg_idx = dim_counter;
-        dims.emplace_back(1);
+      auto autodim_mode = autodim_mode_from_str(dim[i].as_str());
+      switch (autodim_mode) {
+        case (AutoDimMode::MATCH):
+          dims.emplace_back(I_dims[i]);
+          break;
+
+        case (AutoDimMode::FILL):
+          if (set_neg_idx) {
+            throw std::runtime_error(
+                str(boost::format("PlaidML reshape op - at most one dimension of size -1 may be provided")));
+          }
+          set_neg_idx = &dim[i];
+          neg_idx = i;
+          dims.emplace_back(1);
+          break;
+        default:
+          throw std::runtime_error("Unrecognized AutoDimMode");
       }
-    } else if (dim.is_none()) {
-      dims.emplace_back(I_dims[dim_counter]);
+    } else if (dim[i].is_none()) {
+      dims.emplace_back(I_dims[i]);
     }
-    dim_counter++;
   }
 
-  if (neg_idx > -1) {  // there was a -1 dimension which needs to be filled
+  if (set_neg_idx) {  // remove this -1 use a nullptr
+    // there was a -1 dimension which needs to be filled
     TensorDim num = TensorDim(1);
-    for (int i = 0; i < I.shape().ndims(); i++) {
+    for (size_t i = 0; i < I.shape().ndims(); i++) {
       num = I_dims[i] * num;
     }
     TensorDim den = TensorDim(1);
-    for (int i = 0; i < dims.size(); i++) {
+    for (size_t i = 0; i < dims.size(); i++) {
       den = dims[i] * den;
     }
 

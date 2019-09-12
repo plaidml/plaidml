@@ -1276,12 +1276,15 @@ def reshape(x, dims):
     # TODO: This needs to be more thoroughly tested with symbolic shapes
     dims = list(dims)
     I = x.tensor
-    I_dims = edsl.TensorDims(I.shape.ndims)
-    I.bind_dims(*I_dims)
-    neg_idx = None
-    for idx, dim in enumerate(dims):
-        if isinstance(dim, edsl.TensorDim):
+    #fix shape: replace 0 with "match" and -1 with "fill"
+    for i, s in enumerate(dims):
+        if s == -1:
+            #replace it with fill
+            dims[i] = 'fill'
             continue
+        if s == 0:
+            #replace it with match
+            dims[i] = 'match'
     return _KerasNode('reshape', tensor=plaidml_op.reshape(I, dims))
 
 
