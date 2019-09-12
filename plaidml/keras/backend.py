@@ -1073,26 +1073,44 @@ not_equal = op.not_equal
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     rank = x.shape.ndims
-    if reduction_axes == None:
-        axes = [rank - 1]
+    if rank == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
+        # NOTE: Tensorflow's code is explicitly checking for reduction axes in
+        # the case where there are 4 dims in x. If the reduction axes are passed
+        # in explicitly when a layer is created, the broadcasting behavior
+        # differs.
+        xdims = x.shape.dims
+        target_shape = [1 if i in reduction_axes else xdims[i] for i in range(4)]
+        m = mean(x, axis=reduction_axes, keepdims=True)
+        m = reshape(m, target_shape)
+        v = var(x, axis=reduction_axes, keepdims=True)
+        v = reshape(v, target_shape)
+        if beta is not None:
+            beta = reshape(beta, target_shape)
+        if gamma is not None:
+            gamma = reshape(gamma, target_shape)
     else:
-        axes = reduction_axes
+        if reduction_axes == None:
+            axes = [rank - 1]
+        else:
+            axes = reduction_axes
 
-    # Will need to squeeze axes in order, so make sure none are negative and sort
-    axes = [i + rank if i < 0 else i for i in axes]
-    for i in axes:
-        if i < 0:
-            raise ValueError(('Unexpected axis \'{}\' in normalize_batch_in training ' +
-                              '(tensor dim {})').format(i - rank, rank))
-        if i >= rank:
-            raise ValueError(('Unexpected axis \'{}\' in normalize_batch_in training ' +
-                              '(tensor dim {})').format(i, rank))
-    axes.sort()
+        # Will need to squeeze axes in order, so make sure none are negative and
+        # sort
+        axes = [i + rank if i < 0 else i for i in axes]
+        for i in axes:
+            if i < 0:
+                raise ValueError(('Unexpected axis \'{}\' in normalize_batch_in' +
+                                  ' training (tensor dim {})').format(i - rank, rank))
+            if i >= rank:
+                raise ValueError(('Unexpected axis \'{}\' in normalize_batch_in' +
+                                  ' training (tensor dim {})').format(i, rank))
+        axes.sort()
 
-    # Mean and var need to keepdims for computing normalized_tensor, but their
-    # returned values need to not keepdims. So keepdims for now, then squeeze.
-    m = mean(x, axis=axes, keepdims=True)
-    v = var(x, axis=axes, keepdims=True)
+        # Mean and var need to keepdims for computing normalized_tensor, but
+        # their returned values need to not keepdims. So keepdims for now, then
+        # squeeze.
+        m = mean(x, axis=axes, keepdims=True)
+        v = var(x, axis=axes, keepdims=True)
 
     # TODO: Tensorflow's code implies using anything other than the single
     # final axis as the sole element of axis requires broadcasting,
@@ -1105,11 +1123,8 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
                                             gamma=gamma,
                                             epsilon=epsilon)
 
-    # Tensorflow and Theano disagree on whether mean and var should be squeezed
-    # here. For now, going with Theano for simplicity.
-    #  for ax in reversed(axes):
-    #    m = squeeze(m, ax)
-    #    v = squeeze(v, ax)
+    m = squeeze(m)
+    v = squeeze(v)
 
     return normalized_tensor, m, v
 
@@ -1754,7 +1769,25 @@ def square(x):
 
 
 @_log_call
-def squeeze(x, axis):
+def squeeze(x, axis=None):
+    if axis is None:
+        # define axis
+        axis = []
+        for s in range(len(x.shape.dims)):
+            if x.shape.dims[s] == 1:
+                axis.append(s)
+    if isinstance(axis, list) and len(axis):
+        x_squeezed = x
+        for i in range(len(axis)):
+            ax = axis[i] - i
+            x_squeezed = squeeze_one(x_squeezed, ax)
+        return x_squeezed
+    else:
+        return squeeze_one(x, axis)
+
+
+@_log_call
+def squeeze_one(x, axis):
     if x.shape.dims[axis] != 1:
         raise ValueError('Can only squeeze length 1 axis')
     if axis == -1:

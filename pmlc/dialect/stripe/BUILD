@@ -23,6 +23,24 @@ mlir_tblgen(
     incs = ["@mlir//:include"],
 )
 
+mlir_tblgen(
+    name = "gen-op-enums-decls",
+    src = "ops.td",
+    out = "ops_enum.h.inc",
+    action = "-gen-enum-decls",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
+    incs = ["@mlir//:include"],
+)
+
+mlir_tblgen(
+    name = "gen-op-enums-defs",
+    src = "ops.td",
+    out = "ops_enum.cpp.inc",
+    action = "-gen-enum-defs",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
+    incs = ["@mlir//:include"],
+)
+
 plaidml_cc_library(
     name = "stripe",
     srcs = [
@@ -30,6 +48,7 @@ plaidml_cc_library(
         "dialect.cc",
         "ops.cc",
         "ops.cpp.inc",
+        "ops_enum.cpp.inc",
     ],
     hdrs = [
         "analysis.h",
@@ -37,6 +56,7 @@ plaidml_cc_library(
         "mlir.h",
         "ops.h",
         "ops.h.inc",
+        "ops_enum.h.inc",
         "types.h",
     ],
     copts = COPTS,

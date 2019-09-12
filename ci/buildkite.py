@@ -45,6 +45,10 @@ def get_engine(pkey):
         return ':black_square_button::metal:'
     if 'plaid-ocl' in pkey:
         return ':black_square_button::cl:'
+    if 'llvm-cpu' in pkey:
+        return ':crown:'
+    if 'opencl-cpu' in pkey:
+        return ':crown::cl:'
     else:
         return (':tensorflow:')
 

@@ -1,0 +1,1 @@
+{"compile_duration": 10.14144778251648, "duration_per_example": 0.14412164688110352, "tile_duration_per_example": 1e-09, "examples": 1, "batch_size": 1, "model": "mobilenet", "backend": "plaid", "correct": true, "max_error": 4.380625978228636e-05, "max_abs_error": 4.664063453674316e-06, "fail_ratio": 0.0}

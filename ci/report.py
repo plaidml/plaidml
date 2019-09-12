@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import csv
 import json
 import mimetypes
 import pathlib
@@ -12,10 +13,6 @@ import pystache
 import yaml
 
 import ci.util
-import matplotlib
-matplotlib.use('Agg')  # this must come before importing pyplot
-import matplotlib.pyplot as plt
-import numpy as np
 from asq.initiators import query
 from asq.record import new
 
@@ -79,7 +76,11 @@ def load_template(name):
 
 
 def ratio_plot(path, labels, values, title):
-    y_pos = np.arange(len(labels))[::-1]
+    import matplotlib
+    matplotlib.use('Agg')  # this must come before importing pyplot
+    import matplotlib.pyplot as plt
+
+    y_pos = range(len(labels))[::-1]
     fig, ax = plt.subplots()
     fig.set_size_inches(10, len(values) / 4)
 
@@ -105,19 +106,15 @@ def ratio_plot(path, labels, values, title):
 
 
 def generate_ratio_chart(results, report_dir):
-    values = query(results) \
+    data = query(results) \
         .where(lambda x: x['compare']) \
         .where(lambda x: x['ratio']) \
         .order_by(lambda x: x['info'].label()) \
-        .select(lambda x: x['ratio']) \
+        .select(lambda x: new(label=x['info'].label(), value=x['ratio'])) \
         .to_list()
-    labels = query(results) \
-        .where(lambda x: x['compare']) \
-        .where(lambda x: x['ratio']) \
-        .order_by(lambda x: x['info'].label()) \
-        .select(lambda x: x['info'].label()) \
-        .to_list()
-    if len(values):
+    labels = query(data).select(lambda x: x.label).to_list()
+    values = query(data).select(lambda x: x.value).to_list()
+    if len(labels):
         filename = report_dir / 'ratios.png'
         ratio_plot(filename, labels, values, 'Throughput compared to golden')
         return Image(filename)
@@ -125,21 +122,55 @@ def generate_ratio_chart(results, report_dir):
 
 
 def generate_efficiency_chart(results, report_dir):
-    values = query(results) \
+    data = query(results) \
         .where(lambda x: x['compare']) \
         .where(lambda x: x['efficiency']) \
         .order_by(lambda x: x['info'].label()) \
-        .select(lambda x: x['efficiency']) \
+        .select(lambda x: new(label=x['info'].label(), value=x['efficiency'])) \
         .to_list()
-    labels = query(results) \
-        .where(lambda x: x['compare']) \
-        .where(lambda x: x['efficiency']) \
-        .order_by(lambda x: x['info'].label()) \
-        .select(lambda x: x['info'].label()) \
-        .to_list()
+    labels = query(data).select(lambda x: x.label).to_list()
+    values = query(data).select(lambda x: x.value).to_list()
     if len(values):
         filename = report_dir / 'efficiency.png'
         ratio_plot(filename, labels, values, 'Efficiency relative to TF/GP100')
+        return Image(filename)
+    return None
+
+
+def generate_engines_chart(results, report_dir, filename, compare, caption):
+    printf(caption)
+
+    def get_by_engine(items, engine):
+        for item in items:
+            if engine in item.engine:
+                return item
+        raise KeyError
+
+    def compare_durations(group):
+        plaid = get_by_engine(group, 'plaid')
+        stripe = get_by_engine(group, 'stripe')
+        printf('{:25} {:25} {:25}'.format(group.key, plaid.dur, stripe.dur))
+        return new(label=group.key, value=plaid.dur / stripe.dur)
+
+    data = query(results) \
+        .where(lambda x: x['compare']) \
+        .where(lambda x: x[compare]) \
+        .select(lambda x: new( \
+            key=x['info'].label(inc_engine=False), \
+            label=x['info'].label(), \
+            engine=x['info'].platform.engine, \
+            dur=x[compare], \
+        )) \
+        .group_by(lambda x: x.key) \
+        .where(lambda x: len(x) > 1) \
+        .select(lambda x: compare_durations(x)) \
+        .order_by(lambda x: x.label) \
+        .to_list()
+    labels = query(data).select(lambda x: x.label).to_list()
+    values = query(data).select(lambda x: x.value).to_list()
+    if len(values):
+        filename = report_dir / filename
+        ratio_plot(filename, labels, values, caption)
         return Image(filename)
     return None
 
@@ -267,6 +298,30 @@ def make_junit_context(results):
     return dict(testcases=testcases)
 
 
+def make_csv_results(results):
+
+    def _make_one_result(x):
+        info = x['info']
+        return dict(
+            label=info.label(),
+            status=x['status'],
+            gpu=info.platform.gpu,
+            engine=info.platform.engine,
+            workload=info.instance_name,
+            batch_size=info.batch_size,
+            cur_com=x['compile_duration'],
+            cur_run=x['cur.execution_duration'],
+            ref_run=x['ref.execution_duration'],
+            ratio=x['ratio'],
+            reason=x['reason'],
+        )
+
+    return query(results) \
+        .select(_make_one_result) \
+        .order_by(lambda x: x['label']) \
+        .to_list()
+
+
 class Image(object):
 
     def __init__(self, path):
@@ -303,7 +358,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('root', type=pathlib.Path)
-    parser.add_argument('--pipeline', default='pr')
+    parser.add_argument('--pipeline', default='plaidml')
     parser.add_argument('--annotate', action='store_true')
     args = parser.parse_args()
 
@@ -313,8 +368,14 @@ def main():
 
     results = list(collect_results(test_dir, args.pipeline))
 
-    ratio_png = generate_ratio_chart(results, report_dir)
-    efficiency_png = generate_efficiency_chart(results, report_dir)
+    csv_path = report_dir / 'report.csv'
+    csv_results = make_csv_results(results)
+    field_names = list(csv_results[0].keys())
+    with csv_path.open('w') as csv_file:
+        printf('Writing:', csv_path)
+        writer = csv.DictWriter(csv_file, field_names)
+        writer.writeheader()
+        writer.writerows(csv_results)
 
     xml = pystache.render(load_template('junit.xml'), make_junit_context(results))
     write_file(report_dir / 'junit.xml', xml)
@@ -324,10 +385,35 @@ def main():
         'suites': make_html_suites(results),
         'summary': summary,
     }
+
+    engines_execution_png = generate_engines_chart(
+        results,
+        report_dir,
+        'engines_execution.png',
+        'cur.execution_duration',
+        'plaid vs stripe (execution)',
+    )
+    if engines_execution_png:
+        context['engines_execution_png'] = engines_execution_png.data_url()
+
+    engines_compile_png = generate_engines_chart(
+        results,
+        report_dir,
+        'engines_compile.png',
+        'compile_duration',
+        'plaid vs stripe (compilation)',
+    )
+    if engines_compile_png:
+        context['engines_compile_png'] = engines_compile_png.data_url()
+
+    ratio_png = generate_ratio_chart(results, report_dir)
     if ratio_png:
         context['ratio_png'] = ratio_png.data_url()
+
+    efficiency_png = generate_efficiency_chart(results, report_dir)
     if efficiency_png:
         context['efficiency_png'] = efficiency_png.data_url()
+
     html = pystache.render(load_template('report.html'), context)
     write_file(report_dir / 'report.html', html)
 

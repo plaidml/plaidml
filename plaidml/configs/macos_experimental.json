@@ -21,7 +21,7 @@
           "mem_width": 64,
           "use_global": false,
           "max_regs": 8192,
-          "stripe_config": "cpu"
+          "stripe_config": "llvm_cpu"
         }
       },
       {
@@ -118,7 +118,7 @@
           "mem_width": 64,
           "max_mem": 32768,
           "max_regs": 32768,
-          "stripe_config": "cpu"
+          "stripe_config": "opencl_cpu"
         }
       },
       {
