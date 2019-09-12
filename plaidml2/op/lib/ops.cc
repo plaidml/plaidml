@@ -118,6 +118,7 @@ enum class AutoDimMode {
   MATCH,  // 0
   FILL    // -1
 };
+
 enum class AutogroupMode {
   UNGROUPED,  // Group size explicitly 1
   EXPLICIT,   // Group size explicitly specified, > 1
@@ -183,6 +184,7 @@ AutoDimMode autodim_mode_from_str(const std::string& s) {
   }
   throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as an autodim mode") % s));
 }
+
 AutogroupMode autogroup_mode_from_str(const std::string& s) {
   if (s == "ungrouped") {
     return AutogroupMode::UNGROUPED;
@@ -1972,7 +1974,7 @@ Value reshape(const Value& value) {
   }
 
   auto I = args[0].as_tensor();
-  std::vector<TensorDim> dims;
+  std::vector<TensorDim> O_dims;
   std::vector<TensorDim> I_dims(I.shape().ndims());
   I.bind_dims(I_dims);
 
@@ -1981,43 +1983,43 @@ Value reshape(const Value& value) {
   auto target_shape = args[1].as_tuple();
   for (size_t i = 0; i < target_shape.size(); i++) {
     if (target_shape[i].is_int()) {
-      dims.emplace_back(target_shape[i].as_int());
+      O_dims.emplace_back(target_shape[i].as_int());
     } else if (target_shape[i].is_dim()) {
-      dims.emplace_back(target_shape[i].as_dim());
+      O_dims.emplace_back(target_shape[i].as_dim());
     } else if (target_shape[i].is_str()) {
       auto autodim_mode = autodim_mode_from_str(target_shape[i].as_str());
       switch (autodim_mode) {
         case (AutoDimMode::MATCH):
-          dims.emplace_back(I_dims[i]);
+          O_dims.emplace_back(I_dims[i]);
           break;
 
         case (AutoDimMode::FILL):
           if (fill_dim) {
             throw std::runtime_error("PlaidML reshape op - at most one dimension's size may be inferred");
           }
-          dims.emplace_back(1);
-          fill_dim = &dims[i];
+          O_dims.emplace_back(1);
+          fill_dim = &O_dims[i];
           break;
         default:
           throw std::runtime_error("Unrecognized AutoDimMode");
       }
     } else if (target_shape[i].is_none()) {
-      dims.emplace_back(I_dims[i]);
+      O_dims.emplace_back(I_dims[i]);
     }
   }
 
   if (fill_dim) {
     TensorDim num(1);
-    for (size_t i = 0; i < I.shape().ndims(); i++) {
+    for (size_t i = 0; i < I_dims.size(); i++) {
       num = I_dims[i] * num;
     }
     TensorDim den(1);
-    for (size_t i = 0; i < dims.size(); i++) {
-      den = dims[i] * den;
+    for (size_t i = 0; i < O_dims.size(); i++) {
+      den = O_dims[i] * den;
     }
     *fill_dim = TensorDim(num / den);
   }
-  return Value{edsl::reshape(I, dims)};
+  return Value{edsl::reshape(I, O_dims)};
 }
 
 Value sigmoid(const Value& value) {
