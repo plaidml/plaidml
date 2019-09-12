@@ -95,6 +95,7 @@ plaidml_executable* plaidml_compile(  //
     size_t noutputs,                  //
     plaidml_binding** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
+    IVLOG(1, "Compiling with device: " << device << ", target: " << target);
     auto configs = GetConfigs().configs();
     if (!configs.count(target)) {
       throw std::runtime_error(str(boost::format("Unknown target specified: %1%") % target));

@@ -76,9 +76,7 @@ class Executable {
 
   static std::shared_ptr<Executable> compile(const edsl::Program& program, const std::vector<edsl::Tensor>& inputs) {
     auto device = Settings::get("PLAIDML_DEVICE");
-    IVLOG(1, "Using device: " << device);
     auto target = Settings::get("PLAIDML_TARGET");
-    IVLOG(1, "Using target: " << target);
 
     std::vector<Binding> input_bindings;
     for (auto input : inputs) {

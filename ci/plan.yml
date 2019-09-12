@@ -119,6 +119,7 @@ VARIANTS:
       PLAIDML_EXPERIMENTAL: 1
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
+      PLAIDML_VERBOSE: 1
 
 SUITES:
   smoke:
