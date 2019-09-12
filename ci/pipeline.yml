@@ -7,7 +7,9 @@ steps:
 
 {{#variants}}
   - label: ':hammer_and_wrench: {{emoji}}'
-    command: '{{python}} ci/buildkite.py build {{name}}'
+    command: |
+          '{{python}} -m pip install pyyaml --user'
+          '{{python}} ci/buildkite.py build {{name}}'
     agents:
       PLATFORM: '{{name}}'
 {{/variants}}
