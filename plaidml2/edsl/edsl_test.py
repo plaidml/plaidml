@@ -7,11 +7,7 @@ import unittest
 
 import plaidml2 as plaidml
 from plaidml2.edsl import *
-import plaidml2.settings as plaidml_settings
 import plaidml2.exec as plaidml_exec
-
-device = plaidml_settings.get('PLAIDML_DEVICE')
-target = plaidml_settings.get('PLAIDML_TARGET')
 
 
 def dot(X, Y):
