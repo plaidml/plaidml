@@ -8,7 +8,7 @@
 #include <boost/program_options.hpp>
 
 #include "tile/codegen/codegen.pb.h"
-#include "tile/lang/compose.h"
+#include "tile/lang/runinfo.h"
 #include "tile/stripe/stripe.h"
 
 namespace vertexai {

@@ -146,6 +146,25 @@ struct IntrinsicBuilder {
 
 }  // namespace
 
+static Value* ToStripeMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Device& dev) {
+  std::vector<Value*> units;
+  units.reserve(dev.units.size());
+  for (const auto& unit : dev.units) {
+    units.emplace_back(ToStripeMLIR(builder, syms, unit));
+  }
+  return builder->create<DeviceIDOp>(builder->getUnknownLoc(), builder->getType<DeviceIDType>(),
+                                     builder->getStringAttr(dev.name), units);
+}
+
+static Value* ToStripeMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Location& loc) {
+  std::vector<Value*> dev_ids;
+  dev_ids.reserve(loc.devs.size());
+  for (const auto& dev : loc.devs) {
+    dev_ids.emplace_back(ToStripeMLIR(builder, syms, dev));
+  }
+  return builder->create<DevicePathOp>(builder->getUnknownLoc(), builder->getType<DevicePathType>(), dev_ids);
+}
+
 static void ToStripeMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
@@ -190,13 +209,18 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
     }
   }
 
-  // Process the refinements
+  // Process the refinements.
+  //
+  // N.B. We always process the refinements as direct children of the loop, because refinement scanning in the
+  // MLIR->Stripe conversion will skip over the fake blocks induced by execution location and constraint
+  // operations.
   for (const auto& ref : block.refs) {
     Value* from;
+    Value* device_path = ToStripeMLIR(builder, locals, ref.location);
     if (ref.from == "") {
       Type atype = ToStripeMLIR(builder->getContext(), ref.interior_shape);
       TensorLayoutAttr layout = GetLayout(builder->getContext(), ref.interior_shape);
-      from = builder->create<AllocateOp>(builder->getUnknownLoc(), atype, layout);
+      from = builder->create<AllocateOp>(builder->getUnknownLoc(), atype, layout, device_path);
     } else {
       from = safe_at(outer.refs, ref.from);
     }
@@ -206,8 +230,21 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
     }
     DictionaryAttr attrs =
         TagsToDict(builder, ref, {{builder->getIdentifier("__name"), builder->getStringAttr(ref.into())}});
-    Value* nref = builder->create<RefineOp>(builder->getUnknownLoc(), from->getType(), from, offsets, attrs).result();
+    Value* nref =
+        builder->create<RefineOp>(builder->getUnknownLoc(), from->getType(), from, offsets, attrs, device_path)
+            .result();
     locals.refs.emplace(ref.into(), nref);
+  }
+
+  // Process the execution location
+  if (block.location.devs.size()) {
+    auto executor_op =
+        builder->create<ExecutorOp>(builder->getUnknownLoc(), ToStripeMLIR(builder, locals, block.location));
+    Block* execution_body = new Block();
+    executor_op.getOperation()->getRegion(0).push_back(execution_body);
+    builder->setInsertionPointToStart(execution_body);
+    builder->create<TerminateOp>(builder->getUnknownLoc());
+    builder->setInsertionPointToStart(execution_body);
   }
 
   // Process the constraints
@@ -242,9 +279,23 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
         DictionaryAttr attrs = TagsToDict(builder, *store);
         builder->create<StoreOp>(builder->getUnknownLoc(), into, from, attrs);
       } break;
-      case stripe::StmtKind::Constant:
-        throw std::runtime_error("Constant Unimplemented");
-        break;
+      case stripe::StmtKind::Constant: {
+        const auto cnst = stripe::Constant::Downcast(stmt);
+        eltwise::ScalarConstantOp op;
+        switch (cnst->type) {
+          case stripe::ConstType::Integer:
+            op = builder->create<eltwise::ScalarConstantOp>(
+                builder->getUnknownLoc(), eltwise::ScalarType::get(builder->getContext(), DataType::INT64),
+                cnst->iconst);
+            break;
+          case stripe::ConstType::Float:
+            op = builder->create<eltwise::ScalarConstantOp>(
+                builder->getUnknownLoc(), eltwise::ScalarType::get(builder->getContext(), DataType::FLOAT64),
+                cnst->fconst);
+            break;
+        }
+        locals.scalars.emplace(cnst->name, op);
+      } break;
       case stripe::StmtKind::LoadIndex:
         throw std::runtime_error("LoadIndex Unimplemented");
         break;

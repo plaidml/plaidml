@@ -26,8 +26,8 @@ from keras.layers import Conv1D, MaxPooling1D, Embedding
 from keras.models import Model
 from example_correctness_test_utils import TrainingHistory, StopwatchManager
 
-GLOVE_URL = 'https://storage.googleapis.com/vertexai-datasets/datasets/glove.6B.zip'
-TEXT_DATA_URL = 'https://storage.googleapis.com/vertexai-datasets/datasets/news20.tar.gz'
+GLOVE_URL = 'https://github.com/plaidml/depot/raw/master/datasets/glove.6B.zip'
+TEXT_DATA_URL = 'https://github.com/plaidml/depot/raw/master/datasets/news20.tar.gz'
 
 BASE_DIR = os.path.expanduser('~/.keras/datasets')
 GLOVE_DIR = 'glove.6B'

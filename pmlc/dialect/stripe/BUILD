@@ -52,6 +52,7 @@ plaidml_cc_library(
         "@mlir//:StandardOps",
         "@mlir//:Transforms",
     ],
+    alwayslink = 1,
 )
 
 plaidml_cc_library(

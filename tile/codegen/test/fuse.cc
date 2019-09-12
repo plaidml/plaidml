@@ -11,8 +11,8 @@
 #include "tile/codegen/tidy.h"
 #include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
-#include "tile/lang/compose.h"
 #include "tile/lang/gen_stripe.h"
+#include "tile/lang/runinfo.h"
 #include "tile/stripe/stripe.h"
 
 using ::testing::ContainerEq;

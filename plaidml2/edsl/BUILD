@@ -62,6 +62,7 @@ plaidml_cc_test(
     deps = [
         ":api",
         ":edsl",
+        "//plaidml2/exec",
     ],
 )
 

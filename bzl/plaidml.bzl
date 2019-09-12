@@ -44,6 +44,7 @@ def plaidml_cc_test(copts = [], deps = (), linkopts = [], **kwargs):
     native.cc_test(
         copts = PLAIDML_COPTS + copts,
         deps = deps + [str(Label("//testing:gtest_main"))],
+        linkstatic = 1,
         linkopts = PLAIDML_LINKOPTS + linkopts,
         **kwargs
     )
@@ -95,7 +96,7 @@ def _plaidml_bison_impl(ctx):
     )
     return [DefaultInfo(files = depset(outputs))]
 
-plaidml_bison = rule(
+plaidml_bison_rule = rule(
     attrs = {
         "src": attr.label(
             mandatory = True,
@@ -117,6 +118,20 @@ plaidml_bison = rule(
     implementation = _plaidml_bison_impl,
 )
 
+def plaidml_bison(name, src):
+    plaidml_bison_rule(
+        name = name,
+        src = src,
+        env = select({
+            "//toolchain:windows_x86_64": {},
+            "//conditions:default": {"PATH": "external/com_intel_plaidml_conda_unix/env/bin"},
+        }),
+        tool = select({
+            "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_windows//:bison",
+            "//conditions:default": "@com_intel_plaidml_conda_unix//:bison",
+        }),
+    )
+
 def _plaidml_flex_impl(ctx):
     args = ctx.actions.args()
     args.add("-o", ctx.outputs.out)
@@ -135,7 +150,7 @@ def _plaidml_flex_impl(ctx):
     )
     return [DefaultInfo(files = depset(outputs))]
 
-plaidml_flex = rule(
+plaidml_flex_rule = rule(
     attrs = {
         "src": attr.label(
             mandatory = True,
@@ -156,6 +171,20 @@ plaidml_flex = rule(
     },
     implementation = _plaidml_flex_impl,
 )
+
+def plaidml_flex(name, src):
+    plaidml_flex_rule(
+        name = name,
+        src = src,
+        flags = select({
+            "//toolchain:windows_x86_64": ["--nounistd"],
+            "//conditions:default": [],
+        }),
+        tool = select({
+            "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_windows//:flex",
+            "//conditions:default": "@com_intel_plaidml_conda_unix//:flex",
+        }),
+    )
 
 def _plaidml_py_wheel_impl(ctx):
     tpl = ctx.file._setup_py_tpl
@@ -223,7 +252,8 @@ def _plaidml_py_wheel_impl(ctx):
     ctx.actions.run(
         outputs = [wheel],
         inputs = wheel_inputs,
-        executable = "python",
+        tools = [ctx.executable.tool],
+        executable = ctx.executable.tool,
         arguments = bdist_wheel_args,
         mnemonic = "BuildWheel",
         use_default_shell_env = True,
@@ -240,7 +270,7 @@ def _plaidml_py_wheel_impl(ctx):
     runfiles = ctx.runfiles(files = [wheel])
     return DefaultInfo(files = depset([wheel]), runfiles = runfiles)
 
-plaidml_py_wheel = rule(
+plaidml_py_wheel_rule = rule(
     attrs = {
         "srcs": attr.label_list(
             mandatory = True,
@@ -262,9 +292,47 @@ plaidml_py_wheel = rule(
             default = Label("//bzl:setup.tpl.py"),
             allow_single_file = True,
         ),
+        "tool": attr.label(
+            mandatory = True,
+            allow_single_file = True,
+            executable = True,
+            cfg = "host",
+        ),
     },
     implementation = _plaidml_py_wheel_impl,
 )
+
+def plaidml_py_wheel(
+        name,
+        config,
+        srcs,
+        package_name,
+        python,
+        data = [],
+        data_renames = {},
+        config_substitutions = {},
+        package_prefix = "",
+        abi = "none",
+        platform = "any",
+        **kwargs):
+    plaidml_py_wheel_rule(
+        name = name,
+        srcs = srcs,
+        data = data,
+        data_renames = data_renames,
+        config = config,
+        config_substitutions = config_substitutions,
+        package_name = package_name,
+        package_prefix = package_prefix,
+        python = python,
+        abi = abi,
+        platform = platform,
+        tool = select({
+            "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_windows//:python",
+            "//conditions:default": "@com_intel_plaidml_conda_unix//:python",
+        }),
+        **kwargs
+    )
 
 def _plaidml_version_impl(ctx):
     ctx.actions.expand_template(

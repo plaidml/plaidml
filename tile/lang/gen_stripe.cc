@@ -1,9 +1,14 @@
 #include "tile/lang/gen_stripe.h"
 
+#include <set>
+#include <utility>
+#include <vector>
+
 #include <boost/format.hpp>
 
 #include "tile/lang/bound.h"
 #include "tile/lang/defract.h"
+#include "tile/lang/parser.h"
 #include "tile/lang/reduce.h"
 
 namespace vertexai {

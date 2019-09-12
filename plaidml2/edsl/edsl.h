@@ -372,6 +372,14 @@ class Tensor {
     impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()));
   }
 
+  explicit Tensor(const std::vector<int64_t>& dims, const std::string& layout = "") : impl_(new Impl) {
+    for (auto dim : dims) {
+      impl_->dims.emplace_back(dim);
+    }
+    impl_->has_dims = true;
+    impl_->layout = layout;
+  }
+
   explicit Tensor(const std::vector<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
@@ -531,6 +539,10 @@ Tensor TensorOutput(Ts... dims) {
 }
 
 inline Tensor TensorOutput(const std::vector<TensorDim>& dims, const std::string& layout = "") {  //
+  return Tensor(dims, layout);
+}
+
+inline Tensor TensorOutput(const std::vector<int64_t>& dims, const std::string& layout = "") {  //
   return Tensor(dims, layout);
 }
 

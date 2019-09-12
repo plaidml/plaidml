@@ -81,6 +81,7 @@ plaidml_cc_library(
         "generate.h",
         "ops.h",
         "parser.h",
+        "runinfo.h",
         "sembuilder.h",
         "semprinter.h",
         "semtree.h",
@@ -134,29 +135,11 @@ plaidml_cc_test(
 plaidml_bison(
     name = "parser",
     src = "tile.y",
-    env = select({
-        "//toolchain:windows_x86_64": {},
-        "//conditions:default": {
-            "PATH": "external/com_intel_plaidml_conda_unix/env/bin",
-        },
-    }),
-    tool = select({
-        "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_windows//:bison",
-        "//conditions:default": "@com_intel_plaidml_conda_unix//:bison",
-    }),
 )
 
 plaidml_flex(
     name = "parser_lex",
     src = "tile.lex",
-    flags = select({
-        "//toolchain:windows_x86_64": ["--nounistd"],
-        "//conditions:default": [],
-    }),
-    tool = select({
-        "//toolchain:windows_x86_64": "@com_intel_plaidml_conda_windows//:flex",
-        "//conditions:default": "@com_intel_plaidml_conda_unix//:flex",
-    }),
 )
 
 plaidml_cc_test(

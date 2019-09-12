@@ -74,6 +74,27 @@ class Executable {
     ffi::call_void(plaidml_executable_run, ptr_.get());
   }
 
+  static std::shared_ptr<Executable> compile(const edsl::Program& program, const std::vector<edsl::Tensor>& inputs) {
+    auto device = Settings::get("PLAIDML_DEVICE");
+    auto target = Settings::get("PLAIDML_TARGET");
+
+    std::vector<Binding> input_bindings;
+    for (auto input : inputs) {
+      auto shape = input.shape();
+      TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+      input_bindings.emplace_back(Binding{input, Buffer{device, tensor_shape}});
+    }
+
+    std::vector<Binding> output_bindings;
+    for (auto output : program.outputs()) {
+      auto shape = output.shape();
+      TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+      output_bindings.emplace_back(Binding{output, Buffer{device, tensor_shape}});
+    }
+
+    return std::make_shared<Executable>(program, device, target, input_bindings, output_bindings);
+  }
+
  private:
   std::shared_ptr<plaidml_executable> ptr_;
 };
