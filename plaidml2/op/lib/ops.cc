@@ -1990,13 +1990,13 @@ Value reshape(const Value& value) {
   }
 
   if (neg_idx > -1) {  // there was a -1 dimension which needs to be filled
-    int64_t num = 1;
+    TensorDim num = TensorDim(1);
     for (int i = 0; i < I.shape().ndims(); i++) {
-      num *= I_dims[i].as_int();
+      num = I_dims[i] * num;
     }
-    int64_t den = 1;
+    TensorDim den = TensorDim(1);
     for (int i = 0; i < dims.size(); i++) {
-      den *= dims[i].as_int();
+      den = dims[i] * den;
     }
 
     dims[neg_idx] = TensorDim(num / den);

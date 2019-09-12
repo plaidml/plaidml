@@ -1235,7 +1235,18 @@ class TestBackendOps(unittest.TestCase):
             output = pkb.reshape(a, (-1, -1))
         self.assertTrue("PlaidML reshape op - at most one dimension of size -1 may be provided" in
                         str(cm.exception))
-        a = pkb.variable(m(1, 1, 60))
+
+    @unittest.skip("TODO: fix symbolic test")
+    @opTest([
+        [m(1, 1, 60), (60,)],
+        [m(4, 3, 70, 2), (14, 10, 6, 2)],
+        [m(7, 3, 2, 4), (-1,)],
+        [m(4, 4), (-1,)],
+    ],
+            input_shapes=[((1, 1, None)), ((4, 3, 70, 2)), ((7, 3, 2, 4)), ((4, 4))],
+            verbose=False)
+    def testReshapeSymbolic(self, b, x, s):
+        return [b.reshape(x, s)]
 
     @opTest([
         [m(3)],
