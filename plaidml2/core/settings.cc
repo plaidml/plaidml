@@ -17,13 +17,13 @@ namespace core {
 namespace {
 
 fs::path home_path() {
-  auto home = vertexai::env::Get("HOME");
-  if (home.size()) {
-    return home;
-  }
   auto user_profile = vertexai::env::Get("USERPROFILE");
   if (user_profile.size()) {
     return user_profile;
+  }
+  auto home = vertexai::env::Get("HOME");
+  if (home.size()) {
+    return home;
   }
   auto home_drive = vertexai::env::Get("HOMEDRIVE");
   auto home_path = vertexai::env::Get("HOMEPATH");
