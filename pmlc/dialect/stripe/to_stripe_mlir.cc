@@ -279,9 +279,23 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
         DictionaryAttr attrs = TagsToDict(builder, *store);
         builder->create<StoreOp>(builder->getUnknownLoc(), into, from, attrs);
       } break;
-      case stripe::StmtKind::Constant:
-        throw std::runtime_error("Constant Unimplemented");
-        break;
+      case stripe::StmtKind::Constant: {
+        const auto cnst = stripe::Constant::Downcast(stmt);
+        eltwise::ScalarConstantOp op;
+        switch (cnst->type) {
+          case stripe::ConstType::Integer:
+            op = builder->create<eltwise::ScalarConstantOp>(
+                builder->getUnknownLoc(), eltwise::ScalarType::get(builder->getContext(), DataType::INT64),
+                cnst->iconst);
+            break;
+          case stripe::ConstType::Float:
+            op = builder->create<eltwise::ScalarConstantOp>(
+                builder->getUnknownLoc(), eltwise::ScalarType::get(builder->getContext(), DataType::FLOAT64),
+                cnst->fconst);
+            break;
+        }
+        locals.scalars.emplace(cnst->name, op);
+      } break;
       case stripe::StmtKind::LoadIndex:
         throw std::runtime_error("LoadIndex Unimplemented");
         break;
