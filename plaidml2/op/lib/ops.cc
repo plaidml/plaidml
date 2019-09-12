@@ -1973,24 +1973,20 @@ Value reshape(const Value& value) {
 
   auto I = args[0].as_tensor();
   std::vector<TensorDim> dims;
-  // int64_t dim_counter = 0;
   int64_t neg_idx = -1;
   std::vector<TensorDim> I_dims(I.shape().ndims());
   I.bind_dims(I_dims);
 
   Value* set_neg_idx = nullptr;
 
-  auto dim = args[1].as_tuple();
-  // std::cout<<"!!!!!!size"<<dim_t.size()<<std::endl;
-  for (size_t i = 0; i < dim.size(); i++) {
-    if (dim[i].is_int()) {
-      dims.emplace_back(dim[i].as_int());
-    } else if (dim[i].is_dim()) {
-      dims.emplace_back(dim[i].as_dim());
-    } else if (dim[i].is_str()) {
-      // TODO: handle special cases
-      // TODO: figure out why there are quotation marks around fill and match
-      auto autodim_mode = autodim_mode_from_str(dim[i].as_str());
+  auto target_shape = args[1].as_tuple();
+  for (size_t i = 0; i < target_shape.size(); i++) {
+    if (target_shape[i].is_int()) {
+      dims.emplace_back(target_shape[i].as_int());
+    } else if (target_shape[i].is_dim()) {
+      dims.emplace_back(target_shape[i].as_dim());
+    } else if (target_shape[i].is_str()) {
+      auto autodim_mode = autodim_mode_from_str(target_shape[i].as_str());
       switch (autodim_mode) {
         case (AutoDimMode::MATCH):
           dims.emplace_back(I_dims[i]);
@@ -1999,21 +1995,21 @@ Value reshape(const Value& value) {
         case (AutoDimMode::FILL):
           if (set_neg_idx) {
             throw std::runtime_error(
-                str(boost::format("PlaidML reshape op - at most one dimension of size -1 may be provided")));
+                str(boost::format("PlaidML reshape op - at most one dimension's size may be inferred")));
           }
-          set_neg_idx = &dim[i];
+          set_neg_idx = &target_shape[i];
           neg_idx = i;
           dims.emplace_back(1);
           break;
         default:
           throw std::runtime_error("Unrecognized AutoDimMode");
       }
-    } else if (dim[i].is_none()) {
+    } else if (target_shape[i].is_none()) {
       dims.emplace_back(I_dims[i]);
     }
   }
 
-  if (set_neg_idx) {  // remove this -1 use a nullptr
+  if (set_neg_idx) {
     // there was a -1 dimension which needs to be filled
     TensorDim num = TensorDim(1);
     for (size_t i = 0; i < I.shape().ndims(); i++) {
