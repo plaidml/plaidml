@@ -4,7 +4,3 @@ start /wait "" Miniconda3-latest-Windows-x86_64.exe /InstallationType=JustMe /Ad
 CALL %UserProfile%\miniconda3\Scripts\activate.bat
 %UserProfile%\miniconda3\Scripts\conda.exe init cmd.exe
 %UserProfile%\miniconda3\Scripts\conda.exe env update --file environment-windows.yml
-setx PATH "%userprofile%\miniconda3\;%PATH%"
-setx PATH "%userprofile%\miniconda3\Scripts;%PATH%"
-echo %PATH%
-CALL %UserProfile%\miniconda3\Scripts\activate.bat %UserProfile%\miniconda3

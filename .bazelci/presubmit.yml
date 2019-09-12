@@ -44,9 +44,8 @@ tasks:
     name: "PlaidML Windows"
     batch_commands:
     - .\.bazelci\bazelci_windows.bat 
-    build_targets:
-    - "//plaidml/keras:wheel"
-    build_flags:
+    test_flags:
     - "--config=windows_x86_64"
+    - "--workspace_status_command .\.bazelci\bazelci_conda.bat"
     test_targets:
     - "..."
