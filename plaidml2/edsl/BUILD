@@ -70,6 +70,8 @@ py_test(
     name = "py_test",
     srcs = ["edsl_test.py"],
     main = "edsl_test.py",
-    deps = [":py",
-            "//plaidml2/exec:py"],
+    deps = [
+        ":py",
+        "//plaidml2/exec:py",
+    ],
 )
