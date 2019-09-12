@@ -41,10 +41,10 @@ tasks:
   windows:
     name: "PlaidML Windows"
     batch_commands:
+    - cd %UserProfile%
     - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe
-    - .\Miniconda3-latest-Windows-x86_64.exe /InstallationType=JustMe /D=%UserProfile%\Miniconda3
-    - conda env create -f environment-windows.yml -n plaidml
-    - conda activate plaidml
+    - start /wait "" Miniconda3-latest-Windows-x86_64.exe /InstallationType=JustMe /AddToPath=1 /RegisterPython=0 /NoRegistry=0 /S /D=%UserProfile%\miniconda3
+    - %UserProfile%\miniconda3\Scripts\activate.bat
     build_targets:
     - "//plaidml/keras:wheel"
     build_flags:
