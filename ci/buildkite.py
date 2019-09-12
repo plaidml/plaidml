@@ -157,7 +157,7 @@ def cmd_build(args, remainder):
     env = os.environ.copy()
     variant = plan['VARIANTS'][args.variant]
     for key, value in variant['env'].items():
-        env[key] = value
+        env[key] = str(value)
 
     util.printf('--- :snake: pre-build steps... ')
     util.printf('delete any old whl files...')
