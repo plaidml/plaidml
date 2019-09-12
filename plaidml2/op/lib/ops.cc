@@ -1993,18 +1993,18 @@ Value reshape(const Value& value) {
           if (i < I_dims.size()) {
             O_dims.emplace_back(I_dims[i]);
           } else {
-            throw std::runtime_error(str(
-                boost::format("PlaidML reshape op - matching dimension requested at %1% from %2%-dimensional tensor") %
-                (i + 1) % I_dims.size()));
+            throw std::runtime_error(
+                str(boost::format("matching dimension requested at %1% from %2%-dimensional tensor") % (i + 1) %
+                    I_dims.size()));
           }
           break;
 
         case (AutoDimMode::FILL):
           if (fill_dim) {
-            throw std::runtime_error("PlaidML reshape op - at most one dimension's size may be inferred");
+            throw std::runtime_error("at most one dimension's size may be inferred");
           }
           O_dims.emplace_back(1);
-          fill_dim = &O_dims[i];
+          fill_dim = &O_dims.back();
           break;
         default:
           throw std::runtime_error("Unrecognized AutoDimMode");
@@ -2013,9 +2013,8 @@ Value reshape(const Value& value) {
       if (i < I_dims.size()) {
         O_dims.emplace_back(I_dims[i]);
       } else {
-        throw std::runtime_error(
-            str(boost::format("PlaidML reshape op - matching dimension requested at %1% from %2%-dimensional tensor") %
-                (i + 1) % I_dims.size()));
+        throw std::runtime_error(str(boost::format("matching dimension requested at %1% from %2%-dimensional tensor") %
+                                     (i + 1) % I_dims.size()));
       }
     }
   }
