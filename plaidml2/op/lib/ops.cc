@@ -1973,11 +1973,10 @@ Value reshape(const Value& value) {
 
   auto I = args[0].as_tensor();
   std::vector<TensorDim> dims;
-  int64_t neg_idx = -1;
   std::vector<TensorDim> I_dims(I.shape().ndims());
   I.bind_dims(I_dims);
 
-  Value* set_neg_idx = nullptr;
+  TensorDim* set_fill_dim = nullptr;
 
   auto target_shape = args[1].as_tuple();
   for (size_t i = 0; i < target_shape.size(); i++) {
@@ -1993,13 +1992,11 @@ Value reshape(const Value& value) {
           break;
 
         case (AutoDimMode::FILL):
-          if (set_neg_idx) {
-            throw std::runtime_error(
-                str(boost::format("PlaidML reshape op - at most one dimension's size may be inferred")));
+          if (set_fill_dim) {
+            throw std::runtime_error("PlaidML reshape op - at most one dimension's size may be inferred");
           }
-          set_neg_idx = &target_shape[i];
-          neg_idx = i;
           dims.emplace_back(1);
+          set_fill_dim = &dims[i];
           break;
         default:
           throw std::runtime_error("Unrecognized AutoDimMode");
@@ -2009,9 +2006,9 @@ Value reshape(const Value& value) {
     }
   }
 
-  if (set_neg_idx) {
+  if (set_fill_dim) {
     // there was a -1 dimension which needs to be filled
-    TensorDim num = TensorDim(1);
+    TensorDim num(1);
     for (size_t i = 0; i < I.shape().ndims(); i++) {
       num = I_dims[i] * num;
     }
@@ -2019,8 +2016,7 @@ Value reshape(const Value& value) {
     for (size_t i = 0; i < dims.size(); i++) {
       den = dims[i] * den;
     }
-
-    dims[neg_idx] = TensorDim(num / den);
+    *set_fill_dim = TensorDim(num / den);
   }
   return Value{edsl::reshape(I, dims)};
 }

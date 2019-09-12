@@ -1242,7 +1242,8 @@ class TestBackendOps(unittest.TestCase):
         [m(7, 3, 2, 4), (-1,)],
         [m(4, 4), (-1,)],
     ],
-            input_shapes=[((1, 1, 60),), ((4, 3, 70, 2),), ((7, 3, 2, 4),), ((4, 4),)],
+            input_shapes=[((1, 1, None),), ((4, None, 70, 2),), ((None, 3, 2, 4),),
+                          ((None, None),)],
             verbose=False)
     def testReshapeSymbolic(self, b, x, s):
         return [b.reshape(x, s)]
