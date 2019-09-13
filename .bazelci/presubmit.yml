@@ -19,7 +19,6 @@ tasks:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/go1.12.6.linux-amd64/bin:/opt/swift-4.2.1-RELEASE-ubuntu16.04/usr/bin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
       PLAIDML_EXPERIMENTAL: 1
-      PLAIDML_TELEMETRY: 0
     test_flags:
     - "--config=linux_x86_64"
     - "--config=bazelci"
@@ -27,7 +26,6 @@ tasks:
     - "..."
   macos:
     name: "PlaidML MacOS"
-    xcode_version: "10.3"
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh 
     - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
@@ -35,7 +33,6 @@ tasks:
       PATH: /Users/buildkite/miniconda/bin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
       PLAIDML_EXPERIMENTAL: 1
-      PLAIDML_TELEMETRY: 0
     test_flags:
     - "--config=macos_x86_64"
     test_targets:
