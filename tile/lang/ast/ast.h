@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "tile/base/buffer.h"
-#include "tile/lang/compose.h"
+#include "tile/lang/runinfo.h"
 #include "tile/lang/type.h"
 #include "tile/math/polynomial.h"
 

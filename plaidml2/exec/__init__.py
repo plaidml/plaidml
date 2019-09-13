@@ -1,8 +1,10 @@
 # Copyright 2019 Intel Corporation.
 
-from plaidml2.ffi import ForeignObject, decode_str, ffi, ffi_call, lib
-
 import numpy as np
+
+import plaidml2 as plaidml
+import plaidml2.settings as plaidml_settings
+from plaidml2.ffi import ForeignObject, decode_str, ffi, ffi_call, lib
 
 
 def __init():
@@ -29,19 +31,31 @@ def list_targets():
 class Executable(ForeignObject):
     __ffi_del__ = lib.plaidml_executable_free
 
-    def __init__(self, program, device_id, target, input_bindings, output_bindings):
-        self._inputs = [x[1] for x in input_bindings]
-        self._outputs = [x[1] for x in output_bindings]
+    def __init__(self, program, inputs, device=None, target=None):
+        if device is None:
+            device = plaidml_settings.get('PLAIDML_DEVICE')
+        if target is None:
+            target = plaidml_settings.get('PLAIDML_TARGET')
+
+        def make_buffer(tensor):
+            # convert LogicalShape into TensorShape
+            return plaidml.Buffer(device, tensor.shape.into_TensorShape())
+
+        self._input_bindings = [(x, make_buffer(x)) for x in inputs]
+        self._output_bindings = [(x, make_buffer(x)) for x in program.outputs]
+
+        self._inputs = [x[1] for x in self._input_bindings]
+        self._outputs = [x[1] for x in self._output_bindings]
 
         def wrap(x, y):
             return ffi.new('plaidml_binding*', [x.as_ptr(), y.as_ptr()])
 
-        inputs = [wrap(x, y) for x, y in input_bindings]
-        outputs = [wrap(x, y) for x, y in output_bindings]
+        inputs = [wrap(x, y) for x, y in self._input_bindings]
+        outputs = [wrap(x, y) for x, y in self._output_bindings]
         ffi_obj = ffi_call(
             lib.plaidml_compile,
             program.as_ptr(),
-            device_id.encode(),
+            device.encode(),
             target.encode(),
             len(inputs),
             inputs,
@@ -57,3 +71,8 @@ class Executable(ForeignObject):
             buffer.copy_from_ndarray(ndarray)
         ffi_call(lib.plaidml_executable_run, self.as_ptr())
         return self._outputs
+
+
+def run(program, inputs, device=None, target=None):
+    exe = compile(program, [x for x, y in inputs], device=device, target=target)
+    return [x.as_ndarray() for x in exe([y for x, y in inputs])]

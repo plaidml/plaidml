@@ -27,12 +27,18 @@ build --define=version=0.0.0.dev0
 test --test_timeout_filters=-eternal
 test --test_output=streamed
 test --test_env=HOME
-test --test_env=PLAIDML_EXPERIMENTAL
+test --test_env=PLAIDML_DEVICE
 test --test_env=PLAIDML_DEVICE_IDS
+test --test_env=PLAIDML_EXPERIMENTAL
+test --test_env=PLAIDML_TARGET
+test --test_env=PLAIDML_SETTINGS
 test --test_sharding_strategy=disabled
 run --test_env=HOME
-run --test_env=PLAIDML_EXPERIMENTAL
+run --test_env=PLAIDML_DEVICE
 run --test_env=PLAIDML_DEVICE_IDS
+run --test_env=PLAIDML_EXPERIMENTAL
+run --test_env=PLAIDML_TARGET
+run --test_env=PLAIDML_SETTINGS
 run --test_sharding_strategy=disabled
 
 build:linux_x86_64 --cpu=linux_x86_64
@@ -53,7 +59,6 @@ build:windows_x86_64 --action_env=PLAIDML_SETTINGS
 test:windows_x86_64 --test_tag_filters=-darwin,-docs,-linux,-metal,-pytorch,-windows_fail
 test:windows_x86_64 --test_env=CONDA_EXE
 test:windows_x86_64 --test_env=NUMBER_OF_PROCESSORS
-test:windows_x86_64 --test_env=PLAIDML_SETTINGS
 test:windows_x86_64 --test_env=USERPROFILE
 
 build:bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
@@ -65,7 +70,9 @@ build:callgrind --define=with_callgrind=true
 run:callgrind --run_under='valgrind --quiet --tool=callgrind'
 
 run:lldb --run_under='lldb --'
+run:py_lldb --run_under='lldb python --'
 run:gdb --run_under='gdbserver :2345'
+run:valgrind --run_under='valgrind'
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan -c dbg

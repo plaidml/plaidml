@@ -2,16 +2,24 @@
 
 #include "plaidml2/exec/ffi.h"
 
+#include <algorithm>
+#include <map>
+#include <memory>
 #include <mutex>
+#include <string>
 
 #include <boost/format.hpp>
 
 #include "plaidml2/core/internal.h"
+#include "pmlc/dialect/stripe/transcode.h"
+#include "pmlc/dialect/tile/lowering.h"
 #include "tile/targets/targets.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
+using pmlc::dialect::stripe::ToStripe;
+using pmlc::dialect::tile::LowerIntoStripe;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
 using vertexai::tile::Buffer;
@@ -80,22 +88,28 @@ void plaidml_device_list(  //
 plaidml_executable* plaidml_compile(  //
     plaidml_error* err,               //
     plaidml_program* program,         //
-    const char* device_id,            //
+    const char* device,               //
     const char* target,               //
     size_t ninputs,                   //
     plaidml_binding** inputs,         //
     size_t noutputs,                  //
     plaidml_binding** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
+    IVLOG(1, "Compiling with device: " << device << ", target: " << target);
     auto configs = GetConfigs().configs();
     if (!configs.count(target)) {
       throw std::runtime_error(str(boost::format("Unknown target specified: %1%") % target));
     }
     Context ctx;
     ConstBufferManager const_bufs;
-    const_bufs.allocator = std::make_shared<PlatformAllocator>(device_id);
+    const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
     auto exec = new plaidml_executable{};
-    exec->program = GetPlatform()->MakeProgram(ctx, device_id, target, program->eval.runinfo, &const_bufs);
+    // 1. lower tile -> stripe
+    // auto stripe = LowerIntoStripe(program->program.get());
+    // 2. convert MLIR -> stripe
+    // stripe::ToStripe(func);
+    // 3. runinfo?
+    exec->program = GetPlatform()->MakeProgram(ctx, device, target, program->eval.runinfo, &const_bufs);
     for (size_t i = 0; i < ninputs; i++) {
       auto param_expr = std::dynamic_pointer_cast<ParamExpr>(inputs[i]->expr->expr);
       if (!param_expr) {

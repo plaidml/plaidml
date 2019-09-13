@@ -126,6 +126,7 @@ void prng_step(uint32_t* in_state, uint32_t* out_state, uint32_t* buf, size_t co
 void RunTimeLogEntry(char* str, char* extra, uint64_t address) {
   IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ": 0x" << std::hex << address);
 }
+
 }  // namespace rt
 
 template <typename T>
@@ -139,18 +140,18 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
   static std::map<std::string, llvm::JITEvaluatedSymbol> symbols{
       {"__gnu_h2f_ieee", symInfo(rt::h2f)},
       {"__gnu_f2h_ieee", symInfo(rt::f2h)},
-      {"___truncsfhf2", symInfo(rt::f2h)},
       {"___extendhfsf2", symInfo(rt::h2f)},
-      {"prng_step", symInfo(rt::prng_step)},
-      {"_prng_step", symInfo(rt::prng_step)},
-      {"libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
-      {"_libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
-      {"libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
+      {"___truncsfhf2", symInfo(rt::f2h)},
       {"_libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
-      {"RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},   // For debugging
-      {"_RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
-      {"libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
+      {"_libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
       {"_libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
+      {"_prng_step", symInfo(rt::prng_step)},
+      {"_RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
+      {"libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
+      {"libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
+      {"libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
+      {"prng_step", symInfo(rt::prng_step)},
+      {"RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {

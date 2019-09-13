@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "plaidml2/edsl/edsl.h"
-#include "tile/lang/compose.h"
+#include "tile/lang/runinfo.h"
 
 namespace vertexai {
 namespace tile {

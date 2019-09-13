@@ -166,4 +166,14 @@ class Buffer {
   TensorShape shape_;
 };
 
+struct Settings {
+  static std::string get(const std::string& key) {
+    return ffi::str(ffi::call<plaidml_string*>(plaidml_settings_get, key.c_str()));
+  }
+
+  static void set(const std::string& key, const std::string& value) {
+    ffi::call_void(plaidml_settings_set, key.c_str(), value.c_str());
+  }
+};
+
 }  // namespace plaidml

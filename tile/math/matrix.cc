@@ -307,19 +307,13 @@ struct HermiteCompute {
   }
 
   std::string toString() {
-    size_t maxlen = 0;
+    std::stringstream ss;
     for (size_t i = 0; i < rows_; i++) {
       for (size_t j = 0; j < columns_; j++) {
-        maxlen = std::max(maxlen, lhs_(i, j).str().size());
+        ss << lhs_(i, j).str() << " ";
       }
     }
-    std::string r;
-    for (size_t i = 0; i < rows_; i++) {
-      for (size_t j = 0; j < columns_; j++) {
-        r += str(boost::format("%*s ") % static_cast<int>(maxlen) % lhs_(i, j).str());
-      }
-    }
-    return r;
+    return ss.str();
   }
 
  public:

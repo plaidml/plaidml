@@ -27,7 +27,7 @@ class StripeBuilder {
   explicit StripeBuilder(mlir::FuncOp func);
   std::shared_ptr<stripe::Block> getResult() { return cur_; }
 
-  // Public purly to avoid annoyance with ForAllOps
+  // Public purely to avoid annoyance with ForAllOps
   template <class ScalarOp>
   void apply();
 
@@ -378,6 +378,24 @@ void StripeBuilder::apply() {
       intr->inputs.push_back(scalars_.at(op.getOperation()->getOperand(i)));
     }
     cur_->stmts.push_back(intr);
+  }
+}
+
+template <>
+void StripeBuilder::apply<eltwise::ScalarConstantOp>() {
+  if (auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(iop)) {
+    std::string out_name = std::string("$c") + std::to_string(next_scalar_++);
+    scalars_.emplace(op.result(), out_name);
+    std::shared_ptr<stripe::Constant> cnst;
+    auto val_attr = op.getValue();
+    if (auto attr = val_attr.dyn_cast<IntegerAttr>()) {
+      cnst = std::make_shared<stripe::Constant>(out_name, attr.getInt());
+    } else if (auto attr = val_attr.dyn_cast<FloatAttr>()) {
+      cnst = std::make_shared<stripe::Constant>(out_name, attr.getValueAsDouble());
+    } else {
+      throw std::runtime_error("Invalid attribute during conversion");
+    }
+    cur_->stmts.push_back(cnst);
   }
 }
 

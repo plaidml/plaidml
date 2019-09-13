@@ -7,9 +7,15 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library")
 load("@com_intel_plaidml//vendor/llvm:llvm.bzl", "llvm_copts")
 
 jsonnet_to_json(
-    name = "cpu_jsonnet",
-    src = "cpu.jsonnet",
-    outs = ["cpu.json"],
+    name = "llvm_cpu_jsonnet",
+    src = "llvm_cpu.jsonnet",
+    outs = ["llvm_cpu.json"],
+)
+
+jsonnet_to_json(
+    name = "opencl_cpu_jsonnet",
+    src = "opencl_cpu.jsonnet",
+    outs = ["opencl_cpu.json"],
 )
 
 plaidml_cc_library(
