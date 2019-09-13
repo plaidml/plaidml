@@ -7,5 +7,6 @@ CALL %UserProfile%\miniconda3\Scripts\activate.bat
 set PLAIDML_DEVICE_IDS=llvm_cpu.0
 set PLAIDML_TARGET=llvm_cpu
 set PLAIDML_EXPERIMENTAL=1
+pip.exe install --upgrade setuptools
 wget https://releases.bazel.build/0.28.1/release/bazel-0.28.1-windows-x86_64.exe
 bazel-0.28.1-windows-x86_64.exe test //... --config=windows_x86_64
