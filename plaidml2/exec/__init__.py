@@ -74,5 +74,5 @@ class Executable(ForeignObject):
 
 
 def run(program, inputs, device=None, target=None):
-    exe = compile(program, [x for x, y in inputs], device=device, target=target)
+    exe = Executable(program, [x for x, y in inputs], device=device, target=target)
     return [x.as_ndarray() for x in exe([y for x, y in inputs])]

@@ -229,10 +229,17 @@ struct PrngOp : PrimitiveOp {
     std::vector<std::shared_ptr<DimExpr>> dims;
     for (size_t i = 1; i < args.size(); i++) {
       auto int_expr = std::dynamic_pointer_cast<IntConst>(args[i]);
-      if (!int_expr) {
-        throw std::runtime_error("'prng' requires additional arguments to be integers.");
+      if (int_expr) {
+        dims.push_back(std::make_shared<DimIntExpr>(int_expr->value));
+      } else {
+        auto dim_expr_expr = std::dynamic_pointer_cast<DimExprExpr>(args[i]);
+        if (dim_expr_expr) {
+          dims.push_back(dim_expr_expr->expr);
+        } else {
+          throw std::runtime_error(
+              "'prng' requires additional arguments to be tensor dimensions (integer or symbolic).");
+        }
       }
-      dims.push_back(std::make_shared<DimIntExpr>(int_expr->value));
     }
     return LogicalShape(DataType::FLOAT32, dims);
   }
