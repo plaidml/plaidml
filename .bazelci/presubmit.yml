@@ -30,7 +30,3 @@ tasks:
     - "--config=macos_x86_64"
     test_targets:
     - "..."
-  windows:
-    name: "PlaidML Windows"
-    batch_commands:
-    - .\.bazelci\bazelci_windows.bat
