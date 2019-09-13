@@ -96,6 +96,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Copy(const stripe::Special&);
   void Reshape(const stripe::Special&);
   void PrngStep(const stripe::Special&);
+  void AsFloat(const stripe::Intrinsic&);
 
   struct Scalar {
     llvm::Value* value = nullptr;
