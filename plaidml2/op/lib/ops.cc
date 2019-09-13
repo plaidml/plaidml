@@ -114,6 +114,11 @@ struct AggregationAxes {
   }
 };
 
+enum class AutoDimMode {
+  MATCH,  // 0
+  FILL    // -1
+};
+
 enum class AutogroupMode {
   UNGROUPED,  // Group size explicitly 1
   EXPLICIT,   // Group size explicitly specified, > 1
@@ -169,6 +174,16 @@ enum class TensorLayout { NXC, NCX, KCX, XCK, GKCX, XGCK };
 
 namespace {
 // TODO: I haven't decided whether to make these helper functions visible to the outside world
+
+AutoDimMode autodim_mode_from_str(const std::string& s) {
+  if (s == "fill") {
+    return AutoDimMode::FILL;
+  }
+  if (s == "match") {
+    return AutoDimMode::MATCH;
+  }
+  throw std::runtime_error(str(boost::format("Unable to parse string '%1%' as an autodim mode") % s));
+}
 
 AutogroupMode autogroup_mode_from_str(const std::string& s) {
   if (s == "ungrouped") {
@@ -706,12 +721,13 @@ Value concatenate(const Value& value) {
     results.emplace_back(TensorOutput(dims));
     O_idxs[axis] = axis_idx + axis_dim_subtotals[i];
     results[i](O_idxs) = tensors[i](I_idxs);
-    if (i > 0) {
-      results[i].use_default(results[i - 1]);
-    }
+  }
+  auto final_result = results[0];
+  for (size_t i = 1; i < tensors.size(); ++i) {
+    final_result = final_result + results[i];
   }
 
-  return Value{results[tensors.size() - 1]};
+  return Value{final_result};
 }
 
 Value convolution(const Value& value) {
@@ -1957,19 +1973,65 @@ Value reshape(const Value& value) {
   if (args.size() != 2) {
     throw std::runtime_error(str(boost::format("PlaidML reshape op expects 2 arguments (received %1%)") % args.size()));
   }
+
   auto I = args[0].as_tensor();
-  std::vector<TensorDim> dims;
-  for (auto dim : args[1].as_tuple()) {
-    if (dim.is_int()) {
-      dims.emplace_back(dim.as_int());
-    } else if (dim.is_dim()) {
-      dims.emplace_back(dim.as_dim());
-    } else if (dim.is_str()) {
-      // TODO: handle special cases
-      dims.emplace_back(0);
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorDim> I_dims(I.shape().ndims());
+  I.bind_dims(I_dims);
+
+  TensorDim* fill_dim = nullptr;
+
+  auto target_shape = args[1].as_tuple();
+  for (size_t i = 0; i < target_shape.size(); i++) {
+    if (target_shape[i].is_int()) {
+      O_dims.emplace_back(target_shape[i].as_int());
+    } else if (target_shape[i].is_dim()) {
+      O_dims.emplace_back(target_shape[i].as_dim());
+    } else if (target_shape[i].is_str()) {
+      auto autodim_mode = autodim_mode_from_str(target_shape[i].as_str());
+      switch (autodim_mode) {
+        case (AutoDimMode::MATCH):
+          if (i < I_dims.size()) {
+            O_dims.emplace_back(I_dims[i]);
+          } else {
+            throw std::runtime_error(
+                str(boost::format("matching dimension requested at %1% from %2%-dimensional tensor") % (i + 1) %
+                    I_dims.size()));
+          }
+          break;
+
+        case (AutoDimMode::FILL):
+          if (fill_dim) {
+            throw std::runtime_error("at most one dimension's size may be inferred");
+          }
+          O_dims.emplace_back(1);
+          fill_dim = &O_dims.back();
+          break;
+        default:
+          throw std::runtime_error("Unrecognized AutoDimMode");
+      }
+    } else if (target_shape[i].is_none()) {
+      if (i < I_dims.size()) {
+        O_dims.emplace_back(I_dims[i]);
+      } else {
+        throw std::runtime_error(str(boost::format("matching dimension requested at %1% from %2%-dimensional tensor") %
+                                     (i + 1) % I_dims.size()));
+      }
     }
   }
-  return Value{edsl::reshape(I, dims)};
+
+  if (fill_dim) {
+    TensorDim num(1);
+    for (size_t i = 0; i < I_dims.size(); i++) {
+      num = I_dims[i] * num;
+    }
+    TensorDim den(1);
+    for (size_t i = 0; i < O_dims.size(); i++) {
+      den = O_dims[i] * den;
+    }
+    *fill_dim = TensorDim(num / den);
+  }
+  return Value{edsl::reshape(I, O_dims)};
 }
 
 Value sigmoid(const Value& value) {

@@ -2,35 +2,33 @@
 bazel: 0.28.1
 tasks:
   ubuntu1604:
-    name: ":linux:"
+    name: "PlaidML Ubuntu 16.04"
     shell_commands:
-    - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-    - bash ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
-    build_targets:
-    - "//plaidml/keras:wheel"
-    build_flags:
+    - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh 
+    - sh ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+    environment:
+      PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/go1.12.6.linux-amd64/bin:/opt/swift-4.2.1-RELEASE-ubuntu16.04/usr/bin
+      PLAIDML_DEVICE_IDS: llvm_cpu.0
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
+      PLAIDML_EXPERIMENTAL: 1
+    test_flags:
     - "--config=linux_x86_64"
+    - "--config=bazelci"
     test_targets:
     - "..."
   macos:
-    name: ":apple:"
+    name: "PlaidML MacOS"
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh 
     - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
-    build_targets:
-    - "//plaidml/keras:wheel"
-    build_flags:
+    environment:
+      PATH: /Users/buildkite/miniconda/bin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+      PLAIDML_DEVICE_IDS: llvm_cpu.0
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
+      PLAIDML_EXPERIMENTAL: 1
+    test_flags:
     - "--config=macos_x86_64"
-    test_targets:
-    - "..."
-  windows:
-    name: ":window:"
-    batch_commands:
-    - curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -OutFile .\miniconda.exe
-    - start /wait "" .\miniconda.exe /InstallationType=JustMe /S /D=%UserProfile%\Miniconda3
-    build_targets:
-    - "//plaidml/keras:wheel"
-    build_flags:
-    - "--config=windows_x86_64"
     test_targets:
     - "..."
