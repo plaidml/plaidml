@@ -1161,6 +1161,35 @@ class TestBackendOps(unittest.TestCase):
     def testReshape(self, b, x, s):
         return [b.reshape(x, s)]
 
+    def testReshapeMatchDim(self):
+        a = pkb.variable(m(1, 1, 60))
+        output = pkb.reshape(a, (2, 0, 30))
+        self.assertEqual(str(output), "reshape_1|fp32(2, 1, 30)")
+        output = pkb.reshape(a, (2, 0, -1))
+        self.assertEqual(str(output), "reshape_2|fp32(2, 1, 30)")
+        output = pkb.reshape(a, (0, 0, 0))
+        self.assertEqual(str(output), "reshape_3|fp32(1, 1, 60)")
+        #throw runtime exceptions
+        with self.assertRaises(plaidml2.Error) as cm:
+            output = pkb.reshape(a, (-1, -1))
+        self.assertTrue("at most one dimension's size may be inferred" in str(cm.exception))
+        with self.assertRaises(plaidml2.Error) as cm:
+            output = pkb.reshape(a, (1, 1, 1, 0))
+        self.assertTrue(
+            "matching dimension requested at 4 from 3-dimensional tensor" in str(cm.exception))
+
+    @opTest([
+        [m(1, 1, 60), (60,)],
+        [m(4, 3, 70, 2), (14, 10, 6, 2)],
+        [m(7, 3, 2, 4), (-1,)],
+        [m(4, 4), (-1,)],
+    ],
+            input_shapes=[((1, 1, None),), ((4, None, 70, 2),), ((None, 3, 2, 4),),
+                          ((None, None),)],
+            verbose=False)
+    def testReshapeSymbolic(self, b, x, s):
+        return [b.reshape(x, s)]
+
     @opTest([
         [m(3)],
         #[m()],  # TODO: Need to support empty shapes for placeholders

@@ -158,6 +158,10 @@ def softmax(x, axis=None):
     return op('softmax', [x, axis]).as_tensor()
 
 
+def reshape(x, shape):
+    return op('reshape', [x, shape]).as_tensor()
+
+
 def prod(x, axis=None, keepdims=False):
     return op('prod', [x, axis, keepdims]).as_tensor()
 
