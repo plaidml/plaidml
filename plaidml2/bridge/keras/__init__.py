@@ -722,7 +722,8 @@ def dropout(x, level, noise_shape=None, seed=None):
     if noise_shape is not None and len(noise_shape) != I.shape.ndims:
         raise ValueError('noise_shape ndims doesn\'t match input ndims')
     if noise_shape is None:
-        shape = I.shape.dims
+        shape = edsl.TensorDims(I.shape.ndims)
+        I.bind_dims(*shape)
     else:
         shape = noise_shape
     rng_state = _make_rng_state(seed)
