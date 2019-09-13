@@ -44,4 +44,3 @@ tasks:
     name: "PlaidML Windows"
     batch_commands:
     - .\.bazelci\bazelci_windows.bat
-    - bazelisk test //...
