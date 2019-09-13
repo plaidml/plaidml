@@ -8,4 +8,4 @@ set PLAIDML_DEVICE_IDS=llvm_cpu.0
 set PLAIDML_TARGET=llvm_cpu
 set PLAIDML_EXPERIMENTAL=1
 wget https://releases.bazel.build/0.28.1/release/bazel-0.28.1-windows-x86_64.exe
-bazel-0.28.1-windows-x86_64.exe build //plaidml:wheel --config=windows_x86_64
+bazel-0.28.1-windows-x86_64.exe build //plaidml:wheel --verbose_failures --config=windows_x86_64
