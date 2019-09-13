@@ -46,6 +46,7 @@ plaidml_cc_library(
         "//tile/lang",
         "//tile/lang/ast",
         "//tile/platform/local_machine",
+        "//tile/platform/stripejit",
         "//tile/targets",
         "@boost//:filesystem",
     ] + select({

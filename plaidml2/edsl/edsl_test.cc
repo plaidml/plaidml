@@ -60,8 +60,7 @@ TEST(CppEdsl, Dot) {
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
   Program program("dot", {Dot(A, B)});
   IVLOG(1, program);
-  // TODO: fix with PLAIDML_TARGET works properly
-  // exec::Executable::compile(program, {A, B})->run();
+  exec::Executable::compile(program, {A, B})->run();
 }
 
 TEST(CppEdsl, DoubleDot) {
@@ -121,9 +120,8 @@ TEST(CppEdsl, MnistMlp) {
   _X25 = div(_X23, _X24);
 }
 )"));
-  // TODO: fix with PLAIDML_TARGET works properly
-  // std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3};
-  // exec::Executable::compile(program, inputs)->run();
+  std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3};
+  exec::Executable::compile(program, inputs)->run();
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
@@ -617,8 +615,7 @@ TEST(CppEdsl, GradientDot) {
   _X3[x0, x2 : 100, 100] = +(_X1[x0, x1] * B[x2, x1]);
 }
 )"));
-  // TODO: fix with PLAIDML_TARGET works properly
-  // exec::Executable::compile(program, {A, B})->run();
+  exec::Executable::compile(program, {A, B})->run();
 }
 
 Tensor Max2Da0(const Tensor& A) {
