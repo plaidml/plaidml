@@ -61,6 +61,9 @@ test:windows_x86_64 --test_env=CONDA_EXE
 test:windows_x86_64 --test_env=NUMBER_OF_PROCESSORS
 test:windows_x86_64 --test_env=USERPROFILE
 
+build:bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
+test:bazelci --test_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
+
 build:callgrind -c dbg
 build:callgrind --cxxopt=-O3
 build:callgrind --define=with_callgrind=true
