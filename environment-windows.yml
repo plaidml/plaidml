@@ -12,3 +12,4 @@ dependencies:
     - cpplint==1.4.4
     - yapf==0.27.0
     - win32event
+    - certifi
