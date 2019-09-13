@@ -40,13 +40,6 @@ int main(int argc, char* argv[]) {
     // Adjust environment variables to activate conda environment
     vertexai::env::Set("CONDA_DEFAULT_ENV", conda_env);
 
-#ifdef __APPLE__
-    // ASAN support
-    vertexai::env::Set("DYLD_INSERT_LIBRARIES",
-                       "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/"
-                       "10.0.1/lib/darwin/libclang_rt.asan_osx_dynamic.dylib");
-#endif
-
 #ifdef DEBUG
     // Useful debugging code
     std::cout << "argc: " << argc << std::endl;

@@ -29,3 +29,11 @@ We also want users to be able to either manually specify the number of groups or
  * `DEPTHWISE` for a limited autogrouping where the number of groups is equal to the number of input channels: this is to allow for depthwise convolutions with autogrouping while using the `IN_C` layout, a feature most notably useful for Keras.
 
 The function `normalize_grouping_strategy` is used to ensure that the `GroupLayout`, the filter `TensorLayout`, and the user provided number of groups are mutually consistent; see comments in that function for details.
+
+## Reshape as both a library op and an EDSL builtin
+
+Reshape is available in two places: both in the op library at `op/lib/ops.cc:reshape` and in the EDSL at `edsl/edsl.h:reshape`. These have slightly different functionality:
+ * The op library reshape includes auto-sizing features, where dimensions can be set to "whatever the corresponding dimension of the input is" or to "whatever size is necessary to make the flattened size of the reshaped tensor match the flattened size of the original tensor"
+ * The EDSL reshape will reshape to a fully specified size. That is, each dimension is either an integer or a symbolic `TensorDim`; neither of the auto-sizing features described above is available.
+
+The broader functionality of the op library reshape would be a bit messy to implement at the EDSL level. At the same time, having a more limited EDSL reshape gives us a reshape operation that can be easily translated to Stripe.
