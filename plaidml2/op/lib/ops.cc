@@ -721,12 +721,13 @@ Value concatenate(const Value& value) {
     results.emplace_back(TensorOutput(dims));
     O_idxs[axis] = axis_idx + axis_dim_subtotals[i];
     results[i](O_idxs) = tensors[i](I_idxs);
-    if (i > 0) {
-      results[i].use_default(results[i - 1]);
-    }
+  }
+  auto final_result = results[0];
+  for (size_t i = 1; i < tensors.size(); ++i) {
+    final_result = final_result + results[i];
   }
 
-  return Value{results[tensors.size() - 1]};
+  return Value{final_result};
 }
 
 Value convolution(const Value& value) {

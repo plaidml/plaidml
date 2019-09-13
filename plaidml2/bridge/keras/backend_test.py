@@ -23,6 +23,7 @@ from keras.backend import floatx
 from keras.backend import tensorflow_backend as tf
 from keras.backend import theano_backend as th
 from plaidml2.bridge import keras as pkb
+from plaidml2 import edsl as edsl
 
 theano.config.optimizer = "None"
 logger = logging.getLogger(__name__)
@@ -497,23 +498,6 @@ class TestBackendOps(unittest.TestCase):
     @compareForwardExact()
     def testEye(self, b, *args):
         return b.eye(*args)
-
-    @unittest.skip('TODO: convert to EDSL')
-    def testTileIdentity(self):
-        x = pkb.variable(m(3))
-        op = tile.Operation('function (I[N]) -> (O) { O = I; }', [('I', x)],
-                            [('O', tile.Shape(x.shape.dtype, (3,)))])
-        output = op.sole_output().eval()
-        return 0
-
-    @unittest.skip('TODO: convert to EDSL')
-    def testTwoOutputs(self):
-        x = pkb.variable(m(3))
-        op = tile.Operation('function (I[N]) -> (O1, O2) { O1 = I; O2 = I; }', [('I', x)],
-                            [('O1', x.shape), ('O2', x.shape)])
-        output = op.outputs['O1'].eval()
-        output = op.outputs['O2'].eval()
-        return 0
 
     @opTest([[m(3, 3), m(3, 3)]])
     def testAddElements(self, b, x, y):
@@ -1093,51 +1077,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d_transpose(x, k, os, strides=st, padding=pd, data_format=df, dilation_rate=dr)
         ]
 
-    @opTest([[m(1, 3, 3, 1), m(1, 3, 3, 1) - 2]], skip_tensorflow=True, skip_theano=True)
-    @unittest.skip('TODO: convert to EDSL')
-    def testDefractLong(self, b, x, k):
-        f = ('function (I[N, L0, L1, CI], K[LK0, LK1, CO, CI]) -> (O) {\n' +
-             '  O[n, x0, x1, co: 1, 5, 5, 1] = +(I[n, (x0 + k0 - 1)/2, (x1 + k1 - 1)/2, ci]' +
-             ' * K[2 - k0, 2 - k1, co, ci]);\n}')
-        return [
-            tile.Operation(f, [('I', x), ('K', k)], [('O', tile.Shape(x.shape.dtype,
-                                                                      (1, 5, 5, 1)))],
-                           name='DefractTest').sole_output()
-        ]
-
-    @opTest([[m(3), m(3) + 1]], skip_tensorflow=True, skip_theano=True)
-    @unittest.skip('TODO: convert to EDSL')
-    def testDefract(self, b, x, k):
-        f = 'function(I[N], K[M]) -> (O) {\n  O[x: 5] = +(I[(x - k + 1)/2] * K[k]);\n}'
-        return [
-            tile.Operation(f, [('I', x), ('K', k)], [('O', tile.Shape(x.shape.dtype, (5,)))],
-                           name='DefractTest').sole_output()
-        ]
-
-    @opTest([[m(3)]], skip_tensorflow=True, skip_theano=True)
-    @unittest.skip('TODO: convert to EDSL')
-    def testDefractShort(self, b, x):
-        f = 'function(I[N]) -> (O) {\n  O[x: 6] = +(I[(x - 1)/2]);\n}'
-        return [
-            tile.Operation(f, [('I', x)], [('O', tile.Shape(x.shape.dtype, (6,)))],
-                           name='DefractTest').sole_output()
-        ]
-
-    @opTest([[m(3), m(3) + 1]], skip_tensorflow=True, skip_theano=True)
-    @unittest.skip('TODO: convert to EDSL')
-    def testFunkyLayerNames(self, b, x, k):
-        '''Exercises fix for plaidml bug #241
-
-        Now that we emit keras layer names as 'pid' attribute values, in order
-        to help link tile code back to its origin while debugging, we must
-        reformat those names as valid tile identifiers. If we are doing that,
-        this test will pass, otherwise we'll get a syntax error.'''
-        f = 'function(I[N], K[M]) -> (O) {\n  O[x: 5] = +(I[(x - k + 1)/2] * K[k]);\n}'
-        return [
-            tile.Operation(f, [('I', x), ('K', k)], [('O', tile.Shape(x.shape.dtype, (5,)))],
-                           name='this-is-not an identifier').sole_output()
-        ]
-
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
             1e-04,
             skip_theano=True)
@@ -1647,32 +1586,6 @@ class TestBackendOps(unittest.TestCase):
             pkb.conv(A, B, strides=(2, 3))
         with self.assertRaises(pml2_ffi_Error):
             pkb.conv(A, B, dilation_rate=(1, 1))
-
-    @unittest.skipIf(
-        os.environ.get("USE_STRIPE", "0") == "1",
-        "Stripe does not correctly validate assignment ops")
-    @unittest.skip('TODO: convert to EDSL')
-    def testAssignmentExceptions(self):
-        A = pkb.variable(m(5, 1))
-        B = pkb.variable(m(1, 5))
-        f = """function (A[L, M], B[M, N]) -> (O) {
-                   O[i, k: L, N] = =(A[i, j] * B[j, k]);
-               }"""
-        # A * B has each entry a "sum" of exactly one product, and so assignment
-        # is valid and should be the same as + aggregation.
-        O = tile.Operation(f, [('A', A), ('B', B)],
-                           [('O', tile.Shape(A.shape.dtype,
-                                             (A.shape.dims[0], B.shape.dims[1])))]) \
-                .sole_output().eval()
-        npt.assert_allclose(O, np.dot(m(5, 1), m(1, 5)))
-        # B * A sums multiple products into one output entry, and so assignment
-        # is not valid and should raise a multiple assignment error.
-        with self.assertRaises(plaidml.exceptions.Unknown) as cm:
-            tile.Operation(f, [('A', B), ('B', A)],
-                           [('O', tile.Shape(A.shape.dtype,
-                                             (A.shape.dims[0], B.shape.dims[1])))]) \
-                .sole_output().eval()
-        self.assertTrue("Multiple assignment" in str(cm.exception))
 
     @compareForwardExact()
     def testCastToInt(self, b):

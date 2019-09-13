@@ -7,6 +7,7 @@ import unittest
 
 import plaidml2 as plaidml
 from plaidml2.edsl import *
+import plaidml2.exec as plaidml_exec
 
 
 def dot(X, Y):
@@ -385,6 +386,167 @@ class TestEdsl(unittest.TestCase):
   _X2[x0, 3, x1, x2 : 1, 7, 10, 10] = =(_X1[x0, x1, x2]) default _X0;
 }
 ''')
+
+    def testDefract(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='K')
+        i, j = TensorIndexes(2)
+        O = TensorOutput(5)
+        O[i] += (I[(i - j + 1) // 2] * K[j])
+        program = Program('defract_test', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0],
+  K[K_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
+}
+''')
+        outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
+        self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
+
+    def testDefractShort(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        i, j = TensorIndexes(2)
+        O = TensorOutput(6)
+        O[i] += (I[(i - 1) // 2])
+        program = Program('defract_short_test', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 6] = +(I[-1/2 + 1/2*x0]);
+}
+''')
+        outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3]))])
+        self.assertEqual(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
+
+    def testDefractLong(self):
+        shape = [1, 3, 3, 1]
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='I')
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='K')
+        n, x0, x1, c0, c1, co, ci, k0, k1 = TensorIndexes(9)
+        O = TensorOutput(1, 5, 5, 1)
+        O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
+                               (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
+        program = Program('defract_long', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0, I_1, I_2, I_3],
+  K[K_0, K_1, K_2, K_3]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, x3, x6 : 1, 5, 5, 1] = +(I[x0, -1/2 + 1/2*x1 + 1/2*x2, -1/2 + 1/2*x3 + 1/2*x4, x5] * K[2 - x2, 2 - x4, x6, x5]);
+}
+''')
+        # out of bounds access occurs when implicit constraints are combined with the padding pass
+        # outputs = plaidml_exec.run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
+
+    def testFunkyLayerNames(self):
+        '''Exercises fix for plaidml bug #241
+
+        Now that we emit keras layer names as 'pid' attribute values, in order
+        to help link tile code back to its origin while debugging, we must
+        reformat those names as valid tile identifiers. If we are doing that,
+        this test will pass, otherwise we'll get a syntax error.'''
+
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='K')
+        i, j = TensorIndexes(2)
+        O = TensorOutput(5)
+        O[i] += (I[(i - j + 1) // 2] * K[j])
+        program = Program('this-is-not an identifier', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  I[I_0],
+  K[K_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
+}
+''')
+        outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
+        self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
+
+    def testTileIdentity(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        program = Program('tile_identity', [I])
+        self.assertMultiLineEqual(str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0 = ident(I);
+}
+''')
+        outputs = plaidml_exec.run(program, [(I, np.array([(1, 2, 3)]))])
+        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
+
+    @unittest.skip('TODO: exception needs to be thrown')
+    def testAssignmentExceptions(self):
+        A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [5, 1]), name='A')
+        B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 5]), name='B')
+        L, M, N = TensorDims(3)
+        i, j, k = TensorIndexes(3)
+        A.bind_dims(L, M)
+        B.bind_dims(M, N)
+        O = TensorOutput(L, N)
+        O[i, j] = A[i, k] * B[k, j]
+        program = Program('assignment_non_exception', [O])
+        self.assertMultiLineEqual(
+            str(program), '''function (
+  A[A_0, A_1],
+  B[B_0, B_1]
+) -> (
+  _X0
+) {
+  _X0[x0, x2 : 5, 5] = =(A[x0, x1] * B[x1, x2]);
+}
+''')
+        outputs = plaidml_exec.run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
+                                             (B, np.array([1, 2, 3, 4, 5]))])
+        self.assertEqual(outputs[0].tolist(),
+                         [[1., 2., 3., 4., 5.], [2., 4., 6., 8., 10.], [3., 6., 9., 12., 15.],
+                          [4., 8., 12., 16., 20.], [5., 10., 15., 20., 25.]])
+
+        O = TensorOutput(L, N)
+        O[i, j] = B[i, k] * A[k, j]
+        with self.assertRaises(plaidml.Error) as cm:
+            program = Program('assignment_exception', [O])
+        self.assertTrue("illegal assignment aggregation" in str(cm.exception))
+
+    def testTwoOutputs(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
+        program1 = Program('two_outputs', [I, I])
+        self.assertMultiLineEqual(
+            str(program1), '''function (
+  I[I_0]
+) -> (
+  _X1,
+  _X0
+) {
+  _X0 = ident(I);
+  _X1 = ident(I);
+}
+''')
+        outputs = plaidml_exec.run(program1, [(I, np.array([(1, 2, 3)]))])
+        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
+        self.assertEqual(outputs[1].tolist(), [1, 2, 3])
+
+        O1 = I
+        O2 = I
+        program2 = Program('two_outputs', [O1, O2])
+        self.assertMultiLineEqual(str(program1), str(program2))
+
+        outputs = plaidml_exec.run(program2, [(I, np.array([(1, 2, 3)]))])
+        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
+        self.assertEqual(outputs[1].tolist(), [1, 2, 3])
 
 
 if __name__ == '__main__':
