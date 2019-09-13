@@ -13,12 +13,13 @@
 #include "plaidml2/core/internal.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/lowering.h"
+#include "tile/lang/gen_stripe.h"
 #include "tile/targets/targets.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
-using pmlc::dialect::stripe::ToStripe;
+using pmlc::dialect::stripe::FromMLIR;
 using pmlc::dialect::tile::LowerIntoStripe;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
@@ -105,11 +106,14 @@ plaidml_executable* plaidml_compile(  //
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
     auto exec = new plaidml_executable{};
     // 1. lower tile -> stripe
-    // auto stripe = LowerIntoStripe(program->program.get());
+    mlir::MLIRContext mlir_ctx;
+    // auto stripe = LowerIntoStripe(&mlir_ctx, program->program.get());
     // 2. convert MLIR -> stripe
-    // stripe::ToStripe(func);
-    // 3. runinfo?
-    exec->program = GetPlatform()->MakeProgram(ctx, device, target, program->eval.runinfo, &const_bufs);
+    // auto mlir = FromMLIR(stripe);
+    auto stripe = vertexai::tile::lang::GenerateStripe(program->eval.runinfo);
+    stripe->input_shapes = program->eval.runinfo.input_shapes;
+    stripe->output_shapes = program->eval.runinfo.output_shapes;
+    exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
     for (size_t i = 0; i < ninputs; i++) {
       auto param_expr = std::dynamic_pointer_cast<ParamExpr>(inputs[i]->expr->expr);
       if (!param_expr) {

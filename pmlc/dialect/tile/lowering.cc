@@ -2,11 +2,18 @@
 
 #include "pmlc/dialect/tile/lowering.h"
 
+#include "mlir/Pass/Pass.h"
+
 #include "pmlc/dialect/tile/internal.h"
 
 namespace pmlc {
 namespace dialect {
 namespace tile {
+
+struct LoweringPass : public mlir::ModulePass<LoweringPass> {
+  void runOnModule() override {  //
+  }
+};
 
 struct StripeProgram {
   mlir::OwningModuleRef module;
@@ -15,9 +22,9 @@ struct StripeProgram {
   explicit StripeProgram(mlir::ModuleOp module) : module(module) {}
 };
 
-std::shared_ptr<StripeProgram> LowerIntoStripe(TileProgram* program) {
-  auto module = llvm::cast<mlir::ModuleOp>(program->module->getOperation()->clone());
-  return std::make_shared<StripeProgram>(module);
+mlir::OwningModuleRef LowerIntoStripe(mlir::MLIRContext* context, TileProgram* program) {
+  mlir::OwningModuleRef module(llvm::cast<mlir::ModuleOp>(program->module->getOperation()->clone()));
+  return module;
 }
 
 }  // namespace tile

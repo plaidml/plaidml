@@ -17,14 +17,11 @@ namespace codegen {
 
 using namespace lang;  // NOLINT
 
-KernelList GenerateProgram(const RunInfo& runinfo,       //
-                           const std::string& cfg_name,  //
-                           const std::string& out_dir,   //
-                           ConstBufferManager* const_bufs) {
-  IVLOG(2, runinfo.input_shapes);
-  IVLOG(2, runinfo.output_shapes);
-  IVLOG(2, to_string(runinfo.program));
-  auto stripe = GenerateStripe(runinfo);
+lang::KernelList GenerateProgram(                    //
+    const std::shared_ptr<stripe::Program>& stripe,  //
+    const std::string& cfg_name,                     //
+    const std::string& out_dir,                      //
+    ConstBufferManager* const_bufs) {
   codegen::OptimizeOptions options;
   options.dump_passes = !out_dir.empty();
   options.dump_passes_proto = !out_dir.empty();
@@ -41,17 +38,19 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
   codegen::SemtreeEmitter emit(codegen::AliasMap{}, 256);
   emit.Visit(*stripe->entry);
   // lang::Simplify(emit.kernels_.kernels);
-  for (const auto ki : emit.kernels_.kernels) {
-    sem::Print p(*ki.kfunc);
-    IVLOG(2, p.str());
-    IVLOG(2, "gids = " << ki.gwork);
-    IVLOG(2, "lids = " << ki.lwork);
+  if (VLOG_IS_ON(2)) {
+    for (const auto ki : emit.kernels_.kernels) {
+      sem::Print p(*ki.kfunc);
+      IVLOG(2, p.str());
+      IVLOG(2, "gids = " << ki.gwork);
+      IVLOG(2, "lids = " << ki.lwork);
+    }
   }
-  IVLOG(3, "RETURNING THOSE KERNELS");
+  auto main = stripe->entry->SubBlock(0);
   AliasMap init_map;
   AliasMap prog_map(init_map, stripe->entry.get());
-  AliasMap main_map(prog_map, stripe->entry->SubBlock(0).get());
-  for (const auto& ref : stripe->entry->SubBlock(0)->refs) {
+  AliasMap main_map(prog_map, main.get());
+  for (const auto& ref : main->refs) {
     if (ref.dir != stripe::RefDir::None) {
       emit.kernels_.types[ref.from] = ref.interior_shape;
     } else {
@@ -69,6 +68,18 @@ KernelList GenerateProgram(const RunInfo& runinfo,       //
     }
   }
   return emit.kernels_;
+}
+
+KernelList GenerateProgram(       //
+    const RunInfo& runinfo,       //
+    const std::string& cfg_name,  //
+    const std::string& out_dir,   //
+    ConstBufferManager* const_bufs) {
+  IVLOG(2, runinfo.input_shapes);
+  IVLOG(2, runinfo.output_shapes);
+  IVLOG(2, to_string(runinfo.program));
+  auto stripe = GenerateStripe(runinfo);
+  return GenerateProgram(stripe, cfg_name, out_dir, const_bufs);
 }
 
 }  // End namespace codegen

@@ -4,10 +4,12 @@
 
 #include <algorithm>
 #include <forward_list>
+#include <limits>
 #include <numeric>
 #include <set>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "base/util/env.h"
 #include "base/util/error.h"
@@ -80,8 +82,11 @@ int64_t TryKernel(const context::Context& ctx, const lang::KernelInfo& ki,
   return std::numeric_limits<int64_t>::max();
 }
 
-lang::KernelList CompileProgram(const tile::proto::Program& program, const DevInfo& devinfo,
-                                const lang::TileOptimizer& optimizer, ConstBufferManager* const_bufs) {
+lang::KernelList CompileProgram(           //
+    const tile::proto::Program& program,   //
+    const DevInfo& devinfo,                //
+    const lang::TileOptimizer& optimizer,  //
+    ConstBufferManager* const_bufs) {
   IVLOG(2, "Compiling: " << program.code());
   size_t tile_trials = 1;
   size_t trial_runs = 1;
@@ -168,21 +173,22 @@ lang::KernelList CompileProgram(const tile::proto::Program& program, const DevIn
   return kernel_list;
 }
 
-lang::KernelList CompileProgram(const lang::RunInfo& runinfo,  //
-                                const std::string& target_id,  //
-                                ConstBufferManager* const_bufs) {
-  auto out_path = env::Get("STRIPE_OUTPUT");
-  return codegen::GenerateProgram(runinfo, target_id, out_path, const_bufs);
-}
-
 }  // namespace
 
-Program::Program(const context::Context& ctx, const tile::proto::Program& program,
-                 const std::shared_ptr<DevInfo>& devinfo, const std::shared_ptr<Scheduler>& scheduler,
-                 const std::shared_ptr<MemStrategy>& output_mem_strategy,
-                 const std::shared_ptr<MemStrategy>& tmp_mem_strategy, hal::Memory* tmp_memory,
-                 const lang::TileOptimizer& optimizer, ConstBufferManager* const_bufs)
-    : devinfo_{devinfo}, output_mem_strategy_{output_mem_strategy}, tmp_mem_strategy_{tmp_mem_strategy}, num_runs_{0} {
+Program::Program(                                             //
+    const context::Context& ctx,                              //
+    const tile::proto::Program& program,                      //
+    const std::shared_ptr<DevInfo>& devinfo,                  //
+    const std::shared_ptr<Scheduler>& scheduler,              //
+    const std::shared_ptr<MemStrategy>& output_mem_strategy,  //
+    const std::shared_ptr<MemStrategy>& tmp_mem_strategy,     //
+    hal::Memory* tmp_memory,                                  //
+    const lang::TileOptimizer& optimizer,                     //
+    ConstBufferManager* const_bufs)
+    : devinfo_{devinfo},  //
+      output_mem_strategy_{output_mem_strategy},
+      tmp_mem_strategy_{tmp_mem_strategy},
+      num_runs_{0} {
   // TODO: Make this path asynchronous.
   // Asynchronous programming is a little tricky in this case, since if we compile asynchronously, the
   // compilation may not be complete when we're first asked to run a program, which means we'd need to save the run
@@ -191,78 +197,48 @@ Program::Program(const context::Context& ctx, const tile::proto::Program& progra
   // straightforward dataflow-ish way to describe the resulting system, but it's more complicated than just
   // compiling everything synchronously, so we just do everything synchronously for now.
 
-  if (!devinfo->dev->compiler() || !devinfo->dev->executor()) {
-    // TODO: Implement a mechanism for providing a pre-compiled program.
-    throw error::Unavailable{"The requested device is unavailable for running Tile programs"};
-  }
-  memory_ = (devinfo_->dev->executor() && devinfo_->dev->executor()->device_memory() ?
-     devinfo_->dev->executor()->device_memory() : devinfo_->devset->host_memory());
-
-  context::Activity activity{ctx, "tile::local_machine::Compile"};
-
   kernel_list_ = CompileProgram(program, *devinfo_.get(), optimizer, const_bufs);
   const_bufs_ = const_bufs->buffers;
 
-  tile::proto::Program new_program = program;  // Modify logical program inputs for const_bufs
-  for (const auto& kvp : const_bufs_) {
-    if (!program.inputs().count(kvp.first)) {
-      auto shape = kernel_list_.types.at(kvp.first);
-      vertexai::tile::proto::ProgramInput input;
-      (*input.mutable_shape()) = IntoProto(shape);
-      (*new_program.mutable_inputs())[kvp.first] = input;
-    }
-  }
-  auto lib = devinfo_->dev->compiler()->Build(activity.ctx(), kernel_list_.kernels, devinfo_->settings).get();
-  executable_ = devinfo_->dev->executor()->Prepare(lib.get()).get();
-  schedule_ = scheduler->BuildSchedule(new_program, kernel_list_);
-
-  if (activity.ctx().is_logging_events()) {
-    hal::proto::CompilationInfo cinfo;
-    for (auto kernel : kernel_list_.kernels) {
-      (*cinfo.mutable_kernels())[kernel.kname] = kernel.info;
-    }
-    SummarizeSchedule(&cinfo, new_program, kernel_list_, schedule_);
-    *(cinfo.mutable_program()) = new_program;
-    activity.AddMetadata(cinfo);
-    schedule::proto::Schedule sched_pb;
-    schedule::ScheduleToProto(&sched_pb, schedule_);
-    for (auto kernel : kernel_list_.kernels) {
-      sched_pb.add_knames(kernel.kname);
-    }
-    activity.AddMetadata(sched_pb);
-  }
-
-  ValidateSchedule(new_program, kernel_list_, schedule_);
+  Initialize(ctx, program, scheduler);
 }
 
-Program::Program(const context::Context& ctx,                              //
-                 const lang::RunInfo& runinfo,                             //
-                 const std::string& target_id,                             //
-                 const std::shared_ptr<DevInfo>& devinfo,                  //
-                 const std::shared_ptr<Scheduler>& scheduler,              //
-                 const std::shared_ptr<MemStrategy>& output_mem_strategy,  //
-                 const std::shared_ptr<MemStrategy>& tmp_mem_strategy,     //
-                 hal::Memory* tmp_memory,                                  //
-                 ConstBufferManager* const_bufs)
+Program::Program(                                             //
+    const context::Context& ctx,                              //
+    const std::shared_ptr<stripe::Program>& stripe,           //
+    const std::string& target,                                //
+    const std::shared_ptr<DevInfo>& devinfo,                  //
+    const std::shared_ptr<Scheduler>& scheduler,              //
+    const std::shared_ptr<MemStrategy>& output_mem_strategy,  //
+    const std::shared_ptr<MemStrategy>& tmp_mem_strategy,     //
+    hal::Memory* tmp_memory,                                  //
+    ConstBufferManager* const_bufs)
     : devinfo_{devinfo},  //
       output_mem_strategy_{output_mem_strategy},
       tmp_mem_strategy_{tmp_mem_strategy},
       num_runs_{0} {
-  if (!devinfo->dev->compiler() || !devinfo->dev->executor()) {
-    // TODO: Implement a mechanism for providing a pre-compiled program.
-    throw error::Unavailable{"The requested device is unavailable for running Tile programs"};
-  }
-  memory_ = (devinfo_->dev->executor() && devinfo_->dev->executor()->device_memory() ?
-     devinfo_->dev->executor()->device_memory() : devinfo_->devset->host_memory());
-
-  context::Activity activity{ctx, "tile::local_machine::Compile"};
-
-  kernel_list_ = CompileProgram(runinfo, target_id, const_bufs);
+  auto out_path = env::Get("STRIPE_OUTPUT");
+  kernel_list_ = codegen::GenerateProgram(stripe, target, out_path, const_bufs);
   const_bufs_ = const_bufs->buffers;
 
   tile::proto::Program program;
-  *program.mutable_inputs() = IntoProtoInput(runinfo.input_shapes);
-  *program.mutable_outputs() = IntoProtoOutput(runinfo.output_shapes);
+  *program.mutable_inputs() = IntoProtoInput(stripe->input_shapes);
+  *program.mutable_outputs() = IntoProtoOutput(stripe->output_shapes);
+  Initialize(ctx, program, scheduler);
+}
+
+void Program::Initialize(          //
+    const context::Context& ctx,   //
+    tile::proto::Program program,  //
+    const std::shared_ptr<Scheduler>& scheduler) {
+  if (!devinfo_->dev->compiler() || !devinfo_->dev->executor()) {
+    // TODO: Implement a mechanism for providing a pre-compiled program.
+    throw error::Unavailable{"The requested device is unavailable for running Tile programs"};
+  }
+  memory_ = (devinfo_->dev->executor() && devinfo_->dev->executor()->device_memory()
+                 ? devinfo_->dev->executor()->device_memory()
+                 : devinfo_->devset->host_memory());
+
   for (const auto& kvp : const_bufs_) {
     if (!program.inputs().count(kvp.first)) {
       auto shape = kernel_list_.types.at(kvp.first);
@@ -271,6 +247,8 @@ Program::Program(const context::Context& ctx,                              //
       (*program.mutable_inputs())[kvp.first] = input;
     }
   }
+
+  context::Activity activity{ctx, "tile::local_machine::Compile"};
   auto lib = devinfo_->dev->compiler()->Build(activity.ctx(), kernel_list_.kernels, devinfo_->settings).get();
   executable_ = devinfo_->dev->executor()->Prepare(lib.get()).get();
   schedule_ = scheduler->BuildSchedule(program, kernel_list_);
@@ -312,21 +290,21 @@ boost::future<void> Program::Run(const context::Context& ctx,
   IVLOG(2, "Program::Run>");
 
   // This is the first program instance. Initialize the available memory and sync variables.
-  std::call_once(first_run, [&](){ avail_mem = MaxAvailableMemory(); });
+  std::call_once(first_run, [&]() { avail_mem = MaxAvailableMemory(); });
 
   alloc_mem_ = TotalAllocSize(schedule_, memory_->ArenaBufferAlignment());
   if (alloc_mem_ <= MaxAvailableMemory()) {
     std::unique_lock<std::mutex> guard(mutex);
     // TODO: could be asynchronous later
     // Wait for enough memory
-    cond_var.wait(guard, [&]{ return alloc_mem_ <= avail_mem; });
+    cond_var.wait(guard, [&] { return alloc_mem_ <= avail_mem; });
     // Reduce the available memory
     avail_mem -= alloc_mem_;
     ++num_runs_;
-  }
-  else {
-    throw std::runtime_error(str(boost::format("No enough memory for the current schedule: required %1%, available %2%")
-      % alloc_mem_ % MaxAvailableMemory()));
+  } else {
+    throw std::runtime_error(
+        str(boost::format("No enough memory for the current schedule: required %1%, available %2%") % alloc_mem_ %
+            MaxAvailableMemory()));
   }
 
   IVLOG(2, "  Inputs:");
@@ -347,9 +325,7 @@ boost::future<void> Program::Run(const context::Context& ctx,
   return RunRequest::Run(ctx, this, std::move(inputs), std::move(rewrite_outputs));
 }
 
-std::size_t Program::MaxAvailableMemory() {
-  return memory_->size_goal() * kGoalMemPercentage;
-}
+std::size_t Program::MaxAvailableMemory() { return memory_->size_goal() * kGoalMemPercentage; }
 
 }  // namespace local_machine
 }  // namespace tile

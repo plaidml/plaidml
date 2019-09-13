@@ -477,6 +477,8 @@ struct Buffer {
 struct Program {
   std::map<std::string, Buffer> buffers;
   std::shared_ptr<Block> entry;
+  ShapeMap input_shapes;
+  ShapeMap output_shapes;
 };
 
 std::string to_string(RefDir dir);

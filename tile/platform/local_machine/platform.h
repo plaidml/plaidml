@@ -38,20 +38,27 @@ class Platform : public tile::Platform {
 
   Platform(const context::Context& ctx, const proto::Platform& config);
 
-  std::shared_ptr<tile::Buffer> MakeBuffer(const context::Context& ctx, const std::string& device_id,
-                                           std::uint64_t size) final;
+  std::shared_ptr<tile::Buffer> MakeBuffer(  //
+      const context::Context& ctx,           //
+      const std::string& device,             //
+      std::uint64_t size) final;
 
-  std::unique_ptr<tile::Program> MakeProgram(const context::Context& ctx, const tile::proto::Program& program,
-                                             ConstBufferManager* const_bufs) final;
+  std::unique_ptr<tile::Program> MakeProgram(  //
+      const context::Context& ctx,             //
+      const tile::proto::Program& program,     //
+      ConstBufferManager* const_bufs) final;
 
-  std::shared_ptr<tile::Program> MakeProgram(const context::Context& ctx,   //
-                                             const std::string& device_id,  //
-                                             const std::string& target_id,  //
-                                             const lang::RunInfo& runinfo,  //
-                                             ConstBufferManager* const_bufs);
+  std::shared_ptr<tile::Program> MakeProgram(           //
+      const context::Context& ctx,                      //
+      const std::string& device,                        //
+      const std::string& target,                        //
+      const std::shared_ptr<stripe::Program>& program,  //
+      ConstBufferManager* const_bufs) final;
 
-  void ListDevices(const context::Context& ctx, const tile::proto::ListDevicesRequest& request,
-                   tile::proto::ListDevicesResponse* response) final;
+  void ListDevices(                                    //
+      const context::Context& ctx,                     //
+      const tile::proto::ListDevicesRequest& request,  //
+      tile::proto::ListDevicesResponse* response) final;
 
   void RegisterCostModel(const lang::TileCostFunction& cost_fn) final;
 

@@ -25,7 +25,7 @@ struct MLIRState {
   // Always valid
   mlir::MLIRContext ctx;
   // Holds a single function or no function depending on if state is in MLIR
-  mlir::ModuleOp module;
+  mlir::OwningModuleRef module;
 
   MLIRState() : module(mlir::ModuleOp::create(mlir::UnknownLoc::get(&ctx))) {}
 };
@@ -35,16 +35,14 @@ CompilerState::CompilerState(std::shared_ptr<stripe::Program> prog)
 
 CompilerState::~CompilerState() = default;
 
-void ConvertToStripe(CompilerState* state) {
-  IVLOG(1, "Converting to Stripe");
-  mlir::FuncOp op = mlir::cast<mlir::FuncOp>(state->mlir->module.front());
-  *state->prog = pmlc::dialect::stripe::ToStripe(op);
-  // TODO: Erase
+void ConvertFromMLIR(CompilerState* state) {
+  IVLOG(1, "Converting from Stripe MLIR");
+  *state->prog = pmlc::dialect::stripe::FromMLIR(*state->mlir->module);
 }
 
-void ConvertToStripeMLIR(CompilerState* state) {
+void ConvertIntoMLIR(CompilerState* state) {
   IVLOG(1, "Converting to Stripe MLIR");
-  state->mlir->module.push_back(pmlc::dialect::stripe::ToStripeMLIR(&state->mlir->ctx, *state->prog));
+  state->mlir->module = pmlc::dialect::stripe::IntoMLIR(&state->mlir->ctx, *state->prog);
 }
 
 template <typename Pass, typename Config>
@@ -61,7 +59,7 @@ class MlirCompilePass : public CompilePass {
     mlir::PassManager pm;
     pm.addPass(mlir::createCSEPass());
     pm.addPass(CreatePass<Pass>(config));
-    if (failed(pm.run(root->mlir->module))) {
+    if (failed(pm.run(*root->mlir->module))) {
       throw std::runtime_error("Failed to run pass\n");
     }
   }

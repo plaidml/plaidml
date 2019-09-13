@@ -11,8 +11,8 @@ namespace stripe {
 
 namespace stripe = vertexai::tile::stripe;
 
-mlir::FuncOp ToStripeMLIR(MLIRContext* ctx, const stripe::Program& prog);
-stripe::Program ToStripe(mlir::FuncOp func);
+mlir::OwningModuleRef IntoMLIR(MLIRContext* ctx, const stripe::Program& prog);
+stripe::Program FromMLIR(mlir::ModuleOp module);
 
 }  // namespace stripe
 }  // namespace dialect

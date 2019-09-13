@@ -2,11 +2,13 @@
 
 #include "pmlc/dialect/stripe/padding_pass.h"
 
-#include <iostream>
+#include <sstream>
 #include <vector>
 
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/ops.h"
+
+#include "base/util/logging.h"
 
 namespace pmlc {
 namespace dialect {
@@ -53,24 +55,29 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
 }
 
 void PaddingPass::runOnFunction() {
+  IVLOG(1, "PaddingPass::runOnFunction>");
   mlir::FuncOp f = getFunction();
   // Get the unbounded access ranges for each function input
-  std::cout << "Args\n";
   for (const auto& arg : f.getArguments()) {
     std::vector<AffineRange> final = ComputeUnboundedRanges(arg);
-    for (const auto& range : final) {
-      std::cout << range.min << ":" << range.max << " ";
+    if (VLOG_IS_ON(2)) {
+      std::stringstream ss;
+      for (const auto& range : final) {
+        ss << range.min << ":" << range.max << " ";
+      }
+      IVLOG(2, "  Args: " << ss.str());
     }
-    std::cout << "\n";
   }
-  std::cout << "Temps\n";
   // Get the unbounded access range of each allocation
   f.walk<AllocateOp>([](AllocateOp op) {
     std::vector<AffineRange> final = ComputeUnboundedRanges(op.res());
-    for (const auto& range : final) {
-      std::cout << range.min << ":" << range.max << " ";
+    if (VLOG_IS_ON(2)) {
+      std::stringstream ss;
+      for (const auto& range : final) {
+        ss << range.min << ":" << range.max << " ";
+      }
+      IVLOG(2, "  Tmps: " << ss.str());
     }
-    std::cout << "\n";
   });
 }
 

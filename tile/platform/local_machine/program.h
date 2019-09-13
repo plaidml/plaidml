@@ -19,6 +19,7 @@
 #include "tile/platform/local_machine/mem_strategy.h"
 #include "tile/platform/local_machine/scheduler.h"
 #include "tile/proto/tile.pb.h"
+#include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
@@ -37,7 +38,7 @@ class Program final : public tile::Program {
           const lang::TileOptimizer& optimizer, ConstBufferManager* const_bufs);
 
   Program(const context::Context& ctx,                              //
-          const lang::RunInfo& runinfo,                             //
+          const std::shared_ptr<stripe::Program>& stripe,           //
           const std::string& target_id,                             //
           const std::shared_ptr<DevInfo>& devinfo,                  //
           const std::shared_ptr<Scheduler>& scheduler,              //
@@ -46,8 +47,10 @@ class Program final : public tile::Program {
           hal::Memory* tmp_memory,                                  //
           ConstBufferManager* const_bufs);
 
-  boost::future<void> Run(const context::Context& ctx, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-                          std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) final;
+  boost::future<void> Run(          //
+      const context::Context& ctx,  //
+      std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
+      std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) final;
 
   // The maximum available memory
   std::size_t MaxAvailableMemory() final;
@@ -61,6 +64,12 @@ class Program final : public tile::Program {
   const schedule::Schedule& schedule() const { return schedule_; }
   const lang::KernelList& kernel_list() const { return kernel_list_; }
   const std::unique_ptr<hal::Executable>& executable() const { return executable_; }
+
+ private:
+  void Initialize(                   //
+      const context::Context& ctx,   //
+      tile::proto::Program program,  //
+      const std::shared_ptr<Scheduler>& scheduler);
 
  private:
   std::shared_ptr<DevInfo> devinfo_;

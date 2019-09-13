@@ -59,7 +59,6 @@ TEST(CppEdsl, Dot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
   Program program("dot", {Dot(A, B)});
-  IVLOG(1, program);
   // TODO: fix with PLAIDML_TARGET works properly
   // exec::Executable::compile(program, {A, B})->run();
 }
@@ -69,7 +68,6 @@ TEST(CppEdsl, DoubleDot) {
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
   auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
-  IVLOG(1, program);
   exec::Executable::compile(program, {A, B, C})->run();
 }
 
@@ -88,7 +86,6 @@ TEST(CppEdsl, MnistMlp) {
   auto bias3 = Placeholder(PLAIDML_DATA_FLOAT32, {10});
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   Program program("mnist_mlp", {dense3});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1],
   _X1[_X1_0, _X1_1],
@@ -140,7 +137,6 @@ TEST(CppEdsl, Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
-  IVLOG(1, program);
   // This currently crashes when combined with the padding pass
   // exec::Executable::compile(program, {I, K})->run();
 }
@@ -193,7 +189,6 @@ TEST(CppEdsl, MnistCnn) {
   auto bias4 = Placeholder(PLAIDML_DATA_FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   Program program("mnist_cnn", {dense2});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3],
   _X1[_X1_0, _X1_1, _X1_2, _X1_3],
@@ -274,7 +269,6 @@ TEST(CppEdsl, LarsMomentum4d) {
   auto LR = Placeholder(LR_shape);
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
   Program program("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X1[_X1_0, _X1_1, _X1_2, _X1_3],
   _X3[],
@@ -321,7 +315,6 @@ TEST(CppEdsl, RepeatElements) {
   O.add_constraint(k < 3);
   O.no_defract();
   Program program("repeat_elts", {O});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2]
 ) -> (
@@ -343,7 +336,6 @@ TEST(CppEdsl, UseDefault) {
   O(b, 3, i1, i2) = I(b, i1, i2);
   O.use_default(P);
   Program program("use_default", {O});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3],
   _X1[_X1_0, _X1_1, _X1_2]
@@ -375,7 +367,6 @@ TEST(CppEdsl, ArgMax) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 10, 10});
   auto X = ArgMax(I);
   Program program("arg_max", {X});
-  IVLOG(1, program);
   EXPECT_THAT(X.shape(), Eq(LogicalShape(PLAIDML_DATA_UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2],
@@ -437,7 +428,6 @@ TEST(CppEdsl, Winograd) {
   auto G = Placeholder(PLAIDML_DATA_FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1],
   _X1[_X1_0, _X1_1],
@@ -466,7 +456,6 @@ TEST(CppEdsl, UniqueNames) {
   auto C0 = Placeholder(shape, "C");
   auto C1 = Placeholder(shape, "C");
   Program program("unique_names", {A + B + C0 + C1});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[],
   B[],
@@ -491,7 +480,6 @@ TEST(CppEdsl, GlobalMin) {
   O_Neg() >= Neg(i, j, k);
   auto O = -O_Neg;
   Program program("global_min", {O});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0, I_1, I_2]
 ) -> (
@@ -514,7 +502,6 @@ TEST(CppEdsl, CumSum) {
   O(i) += I(k);
   O.add_constraint(i - k < N);
   Program program("csum", {O});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0]
 ) -> (
@@ -568,7 +555,6 @@ TEST(CppEdsl, ComplexConv2d) {
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
   Program program("complex_conv_2d", {O});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3, _X0_4],
   _X1[_X1_0, _X1_1, _X1_2, _X1_3, _X1_4]
@@ -584,7 +570,6 @@ TEST(CppEdsl, ComplexConv2d) {
 TEST(CppEdsl, Reciprocal) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
   Program program("reciprocal", {1 / A});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0]
 ) -> (
@@ -603,7 +588,6 @@ TEST(CppEdsl, GradientDot) {
   auto O = Dot(A, B);
   auto grads = Gradient({A, B}, O);
   Program program("gradient_dot", {grads});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
   B[B_0, B_1]
@@ -639,7 +623,6 @@ TEST(CppEdsl, GradientMultiDot) {
   auto O = Max2Da0(D);
   auto grads = Gradient({A, B}, O);
   Program program("gradient_dot", {grads});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
   B[B_0, B_1]
@@ -670,7 +653,6 @@ TEST(CppEdsl, GradientDotSqrt) {
   auto O = sqrt(C);
   auto grads = Gradient({A, B}, O);
   Program program("gradient_dot", {grads});
-  IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
   A[A_0, A_1],
   B[B_0, B_1]
@@ -701,7 +683,6 @@ TEST(CppEdsl, DefractLong) {
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   Program program("defract_long", {O});
-  IVLOG(1, program);
   // TODO: this currently crashes
   // exec::Executable::compile(program, {I, K})->run();
 }
