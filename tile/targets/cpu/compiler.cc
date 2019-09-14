@@ -765,6 +765,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"pow", &Compiler::Pow},
       {"tanh", &Compiler::Tanh},
       {"cos", &Compiler::Cos},
+      {"as_float", &Compiler::AsFloat},  // Lubo
   };
   auto externiter = config_.externals.find(intrinsic.name);
   if (externiter != config_.externals.end()) {
@@ -1185,6 +1186,14 @@ void Compiler::BitLeft(const stripe::Intrinsic& stmt) {
   Scalar rhs = Cast(scalars_[stmt.inputs[1]], stmt.type);
   llvm::Value* ret = builder_.CreateShl(lhs.value, rhs.value);
   OutputType(ret, stmt);
+}
+
+void Compiler::AsFloat(const stripe::Intrinsic& stmt) {
+  assert(1 == stmt.inputs.size());
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], DataType::FLOAT32);
+  assert(1 == stmt.outputs.size());
+  scalars_[stmt.outputs[0]] = ret;
+  ret.value->setName(stmt.outputs[0]);
 }
 
 void Compiler::BitRight(const stripe::Intrinsic& stmt) {
