@@ -368,6 +368,67 @@ SUITES:
           keras-stripe-ocl-gfx804:
             prepend_args: [-n, 64]
         skip_platforms: [keras-plaid-ocl-gv100gl]
+  train:
+    platforms:
+      keras-tf-cuda-gp100gl:
+        pipelines: [nightly]
+      keras-plaid-ocl-gp100gl:
+        pipelines: [nightly, train]
+      keras-stripe-ocl-gp100gl:
+        pipelines: [nightly, train]
+      keras-plaid-ocl-gfx900:
+        pipelines: [nightly, train]
+      keras-stripe-ocl-gfx900:
+        pipelines: [nightly, train]
+      keras-plaid-ocl-neo:
+        pipelines: [nightly, train]
+      keras-stripe-ocl-neo:
+        pipelines: [nightly, train]          
+      keras-plaid-ocl-gfx804:
+        pipelines: [nightly, train]          
+      keras-stripe-ocl-gfx804:
+        pipelines: [nightly, train]          
+      keras-plaid-mtl-uhd630:
+        pipelines: [nightly, train]          
+      keras-stripe-mtl-uhd630:
+        pipelines: [nightly, train]          
+
+    params:
+      nightly:
+        batch_sizes: [1, 32]
+      train:
+        batch_sizes: [16, 32]
+    wheels:
+      # NOTE: this list must be in least to most dependent order.
+      - plaidml-{version}-py2.py3-none-{arch}.whl
+      - plaidml_keras-{version}-py2.py3-none-any.whl
+      - plaidbench-{version}-py2.py3-none-any.whl
+
+    timeout: 5
+    conda_env: conda/ml_gpu.yml
+    cwd: plaidbench
+    runner: python
+    examples: 256
+    workloads:
+      inception_v3_train:
+        # Expecting a memory error -- the versions that are too big will skip;
+        # passing versions will pass; and non-memory errors will still error
+        expected: "CL_MEM_OBJECT_ALLOCATION_FAILURE"
+        precision: low
+        args: [plaidbench.py, inception_v3, --train, --print-stacktraces]
+      resnet50_train:
+        precision: low
+        args: [plaidbench.py, resnet50, --train, --print-stacktraces]
+      vgg19_train:
+        precision: low
+        args: [plaidbench.py, vgg19, --train, --print-stacktraces]
+      xception_train:
+        precision: low
+        args: [plaidbench.py, xception, --train, --print-stacktraces]
+        skip_platforms: keras-plaid-ocl-gp100gl
+      mobilenet_train:
+        precision: low
+        args: [plaidbench.py, mobilenet, --train, --print-stacktraces]
 
   comprehensive:
     platforms:
