@@ -92,6 +92,9 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Pow(const stripe::Intrinsic&);
   void Tanh(const stripe::Intrinsic&);
   void Cos(const stripe::Intrinsic&);
+  void Floor(const stripe::Intrinsic&);
+  void Ceil(const stripe::Intrinsic&);
+  void Round(const stripe::Intrinsic&);
   void Zero(const stripe::Special&);
   void Copy(const stripe::Special&);
   void Reshape(const stripe::Special&);

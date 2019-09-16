@@ -768,6 +768,10 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"as_float", &Compiler::AsFloat},
       {"as_int", &Compiler::AsInt},
       {"as_uint", &Compiler::AsUInt},
+      {"floor", &Compiler::Floor},
+      {"ceil", &Compiler::Ceil},
+      {"round", &Compiler::Round},
+      {"as_float", &Compiler::AsFloat},  // Lubo
   };
   auto externiter = config_.externals.find(intrinsic.name);
   if (externiter != config_.externals.end()) {
@@ -1292,6 +1296,12 @@ void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "pow
 void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanhf", "tanh"); }
 
 void Compiler::Cos(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "cosf", "cos"); }
+
+void Compiler::Floor(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "floorf", "floor"); }
+
+void Compiler::Ceil(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "ceilf", "ceil"); }
+
+void Compiler::Round(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "roundf", "round"); }
 
 void Compiler::Zero(const stripe::Special& zero) {
   assert(0 == zero.inputs.size());
