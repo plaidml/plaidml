@@ -170,7 +170,8 @@ class _KerasNode(object):
 
     def __getitem__(self, key):
         logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
-        if isinstance(key, slice) or isinstance(key, int) or isinstance(key, type(Ellipsis)):
+        if isinstance(key, slice) or isinstance(key, six.integer_types) or isinstance(
+                key, type(Ellipsis)):
             key = (key,)
         if not isinstance(key, tuple):
             raise ValueError('Cannot index PlaidML tensors using type {}'.format(type(key)))
