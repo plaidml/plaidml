@@ -372,7 +372,7 @@ SUITES:
     platforms:
       keras-tf-cuda-gp100gl:
         pipelines: [nightly, ci]
-        append_args: [--tensorflow]
+        append_args: [--tf]
       keras-plaid-ocl-gp100gl:
         pipelines: [nightly, train]
       keras-stripe-ocl-gp100gl:
