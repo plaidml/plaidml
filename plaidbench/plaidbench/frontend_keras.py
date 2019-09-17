@@ -68,17 +68,23 @@ def setup_imdb(train, epoch_size):
 
 class Model(core.Model):
 
-    def __init__(self, frontend, params):
+    def __init__(self, frontend, params, fold_bn_for_backend=False):
         learn_phase = params.learn_phase  # e.g. 0 for infer with fixed learning phase (but should come from param)
         if learn_phase is not None:
             from keras.backend import set_learning_phase
             set_learning_phase(learn_phase)
         self.frontend = frontend
         self.params = params
+        self.fold_bn_for_backend = fold_bn_for_backend
 
-    def fold_batch_norm(self, model):
+    def fold_batch_norm(self, model, backend):
         import json
-        import plaidml.keras.backend as K
+        if backend == 'plaid_edsl':
+            import plaidml2.bridge.keras as K
+        elif backend == 'plaid':
+            import plaidml.keras.backend as K
+        else:
+            import keras.backend as K
         from keras.models import model_from_json
 
         def make_mults(weights):
@@ -88,7 +94,7 @@ class Model(core.Model):
             mean = None
             var = None
             for w in weights:
-                name = w.name.split('/')[1]
+                name = w.name.split('/')[-1]
                 if name == 'beta':
                     beta = K.get_value(w)
                 elif name == 'gamma':
@@ -198,9 +204,9 @@ class Model(core.Model):
             eval(code, mod)
         self.x = mod['scale_dataset'](self.x)
         self.model = mod['build_model'](**build_model_kwargs)
-        if not self.frontend.train and os.getenv('USE_STRIPE', '0') == '1':
+        if self.fold_bn_for_backend:
             click.echo('Model loaded, folding in batch_norm')
-            self.model = self.fold_batch_norm(self.model)
+            self.model = self.fold_batch_norm(self.model, backend=self.fold_bn_for_backend)
 
     def compile(self):
         if self.params.network_name[:3] == 'vgg':
@@ -343,7 +349,11 @@ class Frontend(core.Frontend):
     def model(self, params):
         if self.train:
             return TrainingModel(self, params)
-        return InferenceModel(self, params)
+        if os.getenv('USE_STRIPE', '0') == '1' or self.backend == 'plaid_edsl':
+            fold_bn_for_backend = self.backend
+        else:
+            fold_bn_for_backend = False
+        return InferenceModel(self, params, fold_bn_for_backend=fold_bn_for_backend)
 
     @property
     def name(self):
