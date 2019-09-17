@@ -404,7 +404,6 @@ SUITES:
       # NOTE: this list must be in least to most dependent order.
       - plaidml-{version}-py2.py3-none-{arch}.whl
       - plaidml_keras-{version}-py2.py3-none-any.whl
-      - plaidbench-{version}-py2.py3-none-any.whl
 
     timeout: 5
     conda_env: conda/ml_gpu.yml
