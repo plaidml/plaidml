@@ -769,7 +769,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"floor", &Compiler::Floor},
       {"ceil", &Compiler::Ceil},
       {"round", &Compiler::Round},
-      {"as_float", &Compiler::AsFloat},  // Lubo
+      {"as_float", &Compiler::AsFloat},
   };
   auto externiter = config_.externals.find(intrinsic.name);
   if (externiter != config_.externals.end()) {
@@ -1137,7 +1137,10 @@ void Compiler::Unequal(const stripe::Intrinsic& neq) {
 void Compiler::Conditional(const stripe::Intrinsic& cond) {
   // Three inputs: C, T, F; C is boolean, T and F are operation type
   assert(3 == cond.inputs.size());
-  Scalar c = CheckBool(scalars_[cond.inputs[0]]);
+  // There are cases where keras calls a conditional with fp32 and fp64 type
+  // for first parameter. Cast it to boolean, so the LLVM type system checks
+  // are satisfied.
+  Scalar c = Cast(scalars_[cond.inputs[0]], DataType::BOOLEAN);
   Scalar t = Cast(scalars_[cond.inputs[1]], cond.type);
   Scalar f = Cast(scalars_[cond.inputs[2]], cond.type);
   // Single output will be one of T or F
