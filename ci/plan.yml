@@ -188,9 +188,9 @@ SUITES:
       keras-stripe-ocl-gfx803:
         pipelines: [nightly]
       keras-plaid-ocl-gfx804:
-        pipelines: [plaidml, ci]
+        pipelines: [plaidml]
       keras-stripe-ocl-gfx804:
-        pipelines: [plaidml, ci]
+        pipelines: [plaidml]
 
     params:
       ci:
@@ -268,9 +268,9 @@ SUITES:
       keras-plaid-ocl-gfx803:
         pipelines: [plaidml]
       keras-plaid-ocl-gfx804:
-        pipelines: [plaidml, ci]
+        pipelines: [plaidml]
       keras-stripe-ocl-gfx804:
-        pipelines: [plaidml, ci]
+        pipelines: [plaidml]
 
     params:
       ci:
@@ -371,7 +371,7 @@ SUITES:
   train:
     platforms:
       keras-tf-cuda-gp100gl:
-        pipelines: [nightly]
+        pipelines: [nightly, ci]
       keras-plaid-ocl-gp100gl:
         pipelines: [nightly, train]
       keras-stripe-ocl-gp100gl:
@@ -394,6 +394,8 @@ SUITES:
         pipelines: [nightly, train]          
 
     params:
+      ci:
+        batch_sizes: [1, 32]
       nightly:
         batch_sizes: [1, 32]
       train:
