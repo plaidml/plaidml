@@ -765,6 +765,12 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"pow", &Compiler::Pow},
       {"tanh", &Compiler::Tanh},
       {"cos", &Compiler::Cos},
+      {"as_float", &Compiler::AsFloat},
+      {"as_int", &Compiler::AsInt},
+      {"as_uint", &Compiler::AsUInt},
+      {"floor", &Compiler::Floor},
+      {"ceil", &Compiler::Ceil},
+      {"round", &Compiler::Round},
       {"as_float", &Compiler::AsFloat},  // Lubo
   };
   auto externiter = config_.externals.find(intrinsic.name);
@@ -1189,8 +1195,76 @@ void Compiler::BitLeft(const stripe::Intrinsic& stmt) {
 }
 
 void Compiler::AsFloat(const stripe::Intrinsic& stmt) {
-  assert(1 == stmt.inputs.size());
-  Scalar ret = Cast(scalars_[stmt.inputs[0]], DataType::FLOAT32);
+  assert(2 == stmt.inputs.size());
+  Scalar inStmt2 = scalars_[stmt.inputs[1]];
+  int bits = llvm::cast<llvm::ConstantInt>(*inStmt2.value).getValue().getLimitedValue();
+  DataType type = DataType::INVALID;
+  switch (bits) {
+    case 32:
+      type = DataType::FLOAT32;
+      break;
+    case 64:
+      type = DataType::FLOAT64;
+    default:
+      // TODO: Add bfloat16 when added to Stripe.
+      throw std::runtime_error("Invalid bit count for as_float for CPU jit.");
+  }
+
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
+  assert(1 == stmt.outputs.size());
+  scalars_[stmt.outputs[0]] = ret;
+  ret.value->setName(stmt.outputs[0]);
+}
+
+void Compiler::AsInt(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  Scalar inStmt2 = scalars_[stmt.inputs[1]];
+  int bits = llvm::cast<llvm::ConstantInt>(*inStmt2.value).getValue().getLimitedValue();
+  DataType type = DataType::INVALID;
+  switch (bits) {
+    case 8:
+      type = DataType::INT8;
+      break;
+    case 16:
+      type = DataType::INT16;
+      break;
+    case 32:
+      type = DataType::INT32;
+      break;
+    case 64:
+      type = DataType::INT64;
+    default:
+      throw std::runtime_error("Invalid bit count for as_int for CPU jit.");
+  }
+
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
+  assert(1 == stmt.outputs.size());
+  scalars_[stmt.outputs[0]] = ret;
+  ret.value->setName(stmt.outputs[0]);
+}
+
+void Compiler::AsUInt(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  Scalar inStmt2 = scalars_[stmt.inputs[1]];
+  int bits = llvm::cast<llvm::ConstantInt>(*inStmt2.value).getValue().getLimitedValue();
+  DataType type = DataType::INVALID;
+  switch (bits) {
+    case 8:
+      type = DataType::UINT8;
+      break;
+    case 16:
+      type = DataType::UINT16;
+      break;
+    case 32:
+      type = DataType::UINT32;
+      break;
+    case 64:
+      type = DataType::UINT64;
+    default:
+      throw std::runtime_error("Invalid bit count for as_uint for CPU jit.");
+  }
+
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
   assert(1 == stmt.outputs.size());
   scalars_[stmt.outputs[0]] = ret;
   ret.value->setName(stmt.outputs[0]);
@@ -1222,6 +1296,12 @@ void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "pow
 void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanhf", "tanh"); }
 
 void Compiler::Cos(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "cosf", "cos"); }
+
+void Compiler::Floor(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "floorf", "floor"); }
+
+void Compiler::Ceil(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "ceilf", "ceil"); }
+
+void Compiler::Round(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "roundf", "round"); }
 
 void Compiler::Zero(const stripe::Special& zero) {
   assert(0 == zero.inputs.size());
