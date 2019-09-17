@@ -405,14 +405,14 @@ class StripeGenerator {
         kernel->name += ",";
       }
       kernel->name += input;
+      if (loaded.count(input)) {
+        continue;
+      }
+      loaded.emplace(input);
       auto shape = AdjustShape(binding.shape);
       switch (binding.tag) {
         case Binding::TENSOR: {
           // Be careful to handle broadcasts
-          if (loaded.count(input)) {
-            continue;
-          }
-          loaded.emplace(input);
           std::vector<Affine> access;
           int start = (out_shape.dims.size() >= shape.dims.size()) ? 0 : (shape.dims.size() - out_shape.dims.size());
           int idx_offset = out_shape.dims.size() - shape.dims.size();  // can be negative
