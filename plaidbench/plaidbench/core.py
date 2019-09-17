@@ -283,7 +283,7 @@ def _inner_run(reports,
         timef = ProgramTimeFilter()
         og = logging.getLogger(plaidml.__name__)
 
-        if kernel_timing and params.backend_name == 'plaid':
+        if kernel_timing and 'plaid' in params.backend_name:
             device = plaidml.devices(plaidml.Context())[0]
             if 'metal' not in str(device):
                 plaidml._lib()._internal_set_vlog(1)
