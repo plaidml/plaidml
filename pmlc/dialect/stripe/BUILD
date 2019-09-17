@@ -58,8 +58,8 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "transcode",
     srcs = [
-        "to_stripe.cc",
-        "to_stripe_mlir.cc",
+        "from_mlir.cc",
+        "into_mlir.cc",
     ],
     hdrs = [
         "transcode.h",
@@ -100,6 +100,7 @@ plaidml_cc_test(
     deps = [
         ":passes",
         ":transcode",
+        "//testing:matchers",
         "//tile/codegen",
         "//tile/lang",
         "//tile/lib",

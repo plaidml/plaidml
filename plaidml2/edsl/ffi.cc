@@ -213,7 +213,7 @@ void plaidml_expr_free(  //
     plaidml_error* err,  //
     plaidml_expr* expr) {
   ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_expr_free> " << expr->expr->str());
+    IVLOG(3, "plaidml_expr_free> " << expr->expr->str());
     if (expr->value) {
       GlobalContext::get()->Destroy(expr->value);
     }
@@ -226,7 +226,7 @@ plaidml_logical_shape* plaidml_expr_get_shape(  //
     plaidml_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_expr_get_shape");
+    IVLOG(3, "plaidml_expr_get_shape");
     if (!expr) {
       throw std::runtime_error(
           "Cannot compute shape of null expr. Perhaps you requested the shape of an unassigned tensor?");
@@ -241,7 +241,7 @@ void plaidml_expr_bind_shape(  //
     plaidml_logical_shape* shape) {
   // TODO(MLIR)
   return ffi_wrap_void(err, [&] {  //
-    IVLOG(1, "plaidml_expr_bind_shape");
+    IVLOG(3, "plaidml_expr_bind_shape");
     auto param_expr = std::dynamic_pointer_cast<ParamExpr>(expr->expr);
     if (!param_expr) {
       throw std::runtime_error("Shape binding is only supported on ParamExprs");
@@ -256,7 +256,7 @@ void plaidml_expr_bind_dims(  //
     size_t ndims,             //
     plaidml_dim_expr** dims) {
   return ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_expr_bind_dims> " << expr->expr->str());
+    IVLOG(3, "plaidml_expr_bind_dims> " << expr->expr->str());
     std::vector<DimExprPtr> vec_dims(ndims);
     for (size_t i = 0; i < ndims; i++) {
       vec_dims[i] = dims[i]->expr;
@@ -264,8 +264,8 @@ void plaidml_expr_bind_dims(  //
     expr->expr->shape.bind_dims(&vec_dims);
     for (size_t i = 0; i < ndims; i++) {
       dims[i]->expr = vec_dims[i];
-      IVLOG(1, "bind_dims> i: " << i << ", from: " << expr->value << ", into: " << dims[i]->value);
-      IVLOG(1, "bind_dims> i: " << i << ", from: " << expr->expr->str());
+      IVLOG(3, "bind_dims> i: " << i << ", from: " << expr->value << ", into: " << dims[i]->value);
+      IVLOG(3, "bind_dims> i: " << i << ", from: " << expr->expr->str());
       GlobalContext::get()->BindTensorDim(i, expr->value, &dims[i]->value);
     }
   });
@@ -276,7 +276,7 @@ plaidml_string* plaidml_expr_repr(  //
     plaidml_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_expr_repr");
+    IVLOG(3, "plaidml_expr_repr");
     return new plaidml_string{expr->expr->str()};
   });
 }
@@ -285,7 +285,7 @@ plaidml_expr* plaidml_expr_dim(  //
     plaidml_error* err,          //
     plaidml_dim_expr* expr) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_dim");
+    IVLOG(3, "plaidml_expr_dim");
     return new plaidml_expr{std::make_shared<DimExprExpr>(expr->expr), expr->value};
   });
 }
@@ -296,7 +296,7 @@ plaidml_expr* plaidml_expr_placeholder(  //
     plaidml_buffer* buffer,              //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_placeholder");
+    IVLOG(3, "plaidml_expr_placeholder");
     auto expr = std::make_shared<ParamExpr>(name);
     if (buffer) {
       expr->buffer = buffer->buffer;
@@ -334,7 +334,7 @@ plaidml_expr* plaidml_expr_clone(  //
     plaidml_error* err,            //
     plaidml_expr* expr) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_clone> " << expr->expr->str());
+    IVLOG(3, "plaidml_expr_clone> " << expr->expr->str());
     // TODO(MLIR): deal with clone of expr->value
     return new plaidml_expr{expr->expr, expr->value};
   });
@@ -344,7 +344,7 @@ plaidml_dim_expr* plaidml_expr_get_dim(  //
     plaidml_error* err,                  //
     plaidml_expr* expr) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_get_dim> " << expr->expr->str());
+    IVLOG(3, "plaidml_expr_get_dim> " << expr->expr->str());
     auto dim_expr = std::dynamic_pointer_cast<DimExprExpr>(expr->expr);
     if (!dim_expr) {
       throw std::runtime_error("plaidml_expr_get_dim can only be used on a DimExprExpr");
@@ -359,7 +359,7 @@ plaidml_expr_kind plaidml_expr_get_kind(  //
     plaidml_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<plaidml_expr_kind>(err, PLAIDML_EXPR_NONE, [&] {
-    IVLOG(1, "plaidml_expr_get_kind");
+    IVLOG(3, "plaidml_expr_get_kind");
     if (std::dynamic_pointer_cast<NoneExpr>(expr->expr)) {
       return PLAIDML_EXPR_NONE;
     }
@@ -386,7 +386,7 @@ plaidml_expr* plaidml_expr_none(  //
     plaidml_error* err            //
 ) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_expr_none");
+    IVLOG(3, "plaidml_expr_none");
     auto value = GlobalContext::get()->MakeNoneOp();
     return new plaidml_expr{std::make_shared<NoneExpr>(), value};
   });
@@ -397,7 +397,7 @@ plaidml_expr* plaidml_expr_tuple(  //
     size_t nargs,                  //
     plaidml_expr** args) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_tuple");
+    IVLOG(3, "plaidml_expr_tuple");
     std::vector<ExprPtr> exprs(nargs);
     std::vector<mlir::Value*> tuple(nargs);
     for (size_t i = 0; i < nargs; i++) {
@@ -414,7 +414,7 @@ size_t plaidml_expr_tuple_get_count(  //
     plaidml_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<size_t>(err, 0, [&] {
-    IVLOG(1, "plaidml_expr_tuple_get_count");
+    IVLOG(3, "plaidml_expr_tuple_get_count");
     auto tuple_expr = std::dynamic_pointer_cast<TupleExpr>(expr->expr);
     if (!tuple_expr) {
       throw std::runtime_error("Expression is not a tuple");
@@ -429,7 +429,7 @@ void plaidml_expr_tuple_get_exprs(  //
     size_t nexprs,                  //
     plaidml_expr** exprs) {
   return ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_expr_tuple_get_exprs> nexprs: " << nexprs);
+    IVLOG(3, "plaidml_expr_tuple_get_exprs> nexprs: " << nexprs);
     auto tuple_expr = std::dynamic_pointer_cast<TupleExpr>(expr->expr);
     if (!tuple_expr) {
       throw std::runtime_error("Expression is not a tuple");
@@ -445,7 +445,7 @@ plaidml_expr* plaidml_expr_str(  //
     plaidml_error* err,          //
     const char* value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_str> " << value);
+    IVLOG(3, "plaidml_expr_str> " << value);
     auto str_val = GlobalContext::get()->MakeStringOp(value);
     return new plaidml_expr{std::make_shared<StringExpr>(value), str_val};
   });
@@ -456,7 +456,7 @@ plaidml_string* plaidml_expr_str_get_value(  //
     plaidml_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_str_get_value");
+    IVLOG(3, "plaidml_expr_str_get_value");
     if (!expr) {
       throw std::runtime_error("plaidml_expr_str_get_value can only be used on an StringExpr");
     }
@@ -472,7 +472,7 @@ plaidml_expr* plaidml_expr_int(  //
     plaidml_error* err,          //
     int64_t value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_int> " << value);
+    IVLOG(3, "plaidml_expr_int> " << value);
     auto const_val = GlobalContext::get()->MakeScalarConstantOp(value);
     return new plaidml_expr{std::make_shared<IntConst>(value), const_val};
   });
@@ -483,7 +483,7 @@ int64_t plaidml_expr_int_get_value(  //
     plaidml_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<int64_t>(err, 0, [&] {
-    IVLOG(1, "plaidml_expr_int_get_value");
+    IVLOG(3, "plaidml_expr_int_get_value");
     if (!expr) {
       throw std::runtime_error("plaidml_expr_int_get_value can only be used on an IntConst");
     }
@@ -499,7 +499,7 @@ plaidml_expr* plaidml_expr_float(  //
     plaidml_error* err,            //
     double value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_float");
+    IVLOG(3, "plaidml_expr_float");
     auto const_val = GlobalContext::get()->MakeScalarConstantOp(value);
     return new plaidml_expr{std::make_shared<FloatConst>(value), const_val};
   });
@@ -510,7 +510,7 @@ double plaidml_expr_float_get_value(  //
     plaidml_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<double>(err, 0, [&] {
-    IVLOG(1, "plaidml_expr_float_get_value");
+    IVLOG(3, "plaidml_expr_float_get_value");
     auto float_expr = std::dynamic_pointer_cast<FloatConst>(expr->expr);
     if (!float_expr) {
       throw std::runtime_error("plaidml_expr_float_get_value can only be used on an FloatConst");
@@ -525,7 +525,7 @@ plaidml_expr* plaidml_expr_call(  //
     size_t nargs,                 //
     plaidml_expr** args) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_call");
+    IVLOG(3, "plaidml_expr_call");
     std::vector<ExprPtr> exprs(nargs);
     std::vector<mlir::Value*> values(nargs);
     // FIXME: has_exprs and has_values is a HACK to allow gradient callbacks
@@ -565,7 +565,7 @@ plaidml_expr* plaidml_expr_index_map(  //
     size_t ndims,                      //
     plaidml_poly_expr** raw_idxs) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_index_map");
+    IVLOG(3, "plaidml_expr_index_map");
     std::vector<std::shared_ptr<PolyExpr>> idx_exprs(ndims);
     std::vector<mlir::Value*> idx_values(ndims);
     for (size_t i = 0; i < ndims; i++) {
@@ -587,7 +587,7 @@ plaidml_expr* plaidml_expr_size_map(  //
     size_t ndims,                     //
     plaidml_dim_expr** raw_dims) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_size_map");
+    IVLOG(3, "plaidml_expr_size_map");
     std::vector<DimExprPtr> dim_exprs;
     std::vector<mlir::Value*> dim_values;
     for (size_t i = 0; i < ndims; i++) {
@@ -611,7 +611,7 @@ plaidml_expr* plaidml_expr_contraction(  //
     const char* name,                    //
     const char* layout) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_contraction");
+    IVLOG(3, "plaidml_expr_contraction");
     auto expr = std::make_shared<ContractionExpr>();
     expr->name = name;
     expr->agg_op = into_agg_op(agg_op);
@@ -779,7 +779,7 @@ void plaidml_expr_contraction_add_constraint(  //
     plaidml_dim_expr* rhs) {
   // TODO(MLIR)
   ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_expr_contraction_add_constraint");
+    IVLOG(3, "plaidml_expr_contraction_add_constraint");
     if (!expr) {
       throw std::runtime_error("add_constraint can only be specified on a contraction.");
     }
@@ -798,7 +798,7 @@ void plaidml_expr_contraction_set_no_defract(  //
     bool no_defract) {
   // TODO(MLIR)
   ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_expr_contraction_set_no_defract");
+    IVLOG(3, "plaidml_expr_contraction_set_no_defract");
     if (!expr) {
       throw std::runtime_error("no_defract can only be specified on a contraction.");
     }
@@ -816,7 +816,7 @@ void plaidml_expr_contraction_set_use_default(  //
     plaidml_expr* use_default) {
   // TODO(MLIR)
   ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_expr_contraction_set_use_default");
+    IVLOG(3, "plaidml_expr_contraction_set_use_default");
     if (!expr) {
       throw std::runtime_error("use_default can only be specified on a contraction.");
     }
@@ -840,7 +840,7 @@ void plaidml_expr_gradient(  //
   // corresponding order as they were received in `wrt`.
   // TODO(MLIR)
   ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_expr_gradient");
+    IVLOG(3, "plaidml_expr_gradient");
     std::vector<ExprPtr> wrt_exprs(nwrts);
     std::vector<mlir::Value*> wrt_values(nwrts);
     for (size_t i = 0; i < nwrts; i++) {
@@ -891,7 +891,7 @@ void plaidml_deriv_register(  //
 
 void plaidml_poly_expr_free(plaidml_error* err, plaidml_poly_expr* expr) {
   ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_poly_expr_free> " << expr->expr->str());
+    IVLOG(3, "plaidml_poly_expr_free> " << expr->expr->str());
     if (expr->value) {
       GlobalContext::get()->Destroy(expr->value);
     }
@@ -904,7 +904,7 @@ plaidml_string* plaidml_poly_expr_repr(  //
     plaidml_poly_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_poly_expr_repr");
+    IVLOG(3, "plaidml_poly_expr_repr");
     return new plaidml_string{expr->expr->str()};
   });
 }
@@ -913,7 +913,7 @@ PLAIDML_EDSL_API plaidml_poly_expr* plaidml_poly_expr_dim(  //
     plaidml_error* err,                                     //
     plaidml_dim_expr* expr) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_poly_expr_dim");
+    IVLOG(3, "plaidml_poly_expr_dim");
     return new plaidml_poly_expr{std::make_shared<PolyDimExpr>(expr->expr), expr->value};
   });
 }
@@ -922,7 +922,7 @@ plaidml_poly_expr* plaidml_poly_expr_index(  //
     plaidml_error* err,                      //
     const char* name) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_poly_expr_index");
+    IVLOG(3, "plaidml_poly_expr_index");
     auto value = GlobalContext::get()->MakeAffineIndexOp(name);
     return new plaidml_poly_expr{std::make_shared<PolyIndex>(next_idx_id++, std::string{name}), value};
   });
@@ -932,7 +932,7 @@ plaidml_poly_expr* plaidml_poly_expr_literal(  //
     plaidml_error* err,                        //
     int64_t value) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_poly_expr_literal> " << value);
+    IVLOG(3, "plaidml_poly_expr_literal> " << value);
     auto mlir_value = GlobalContext::get()->MakeAffineConstantOp(value);
     return new plaidml_poly_expr{std::make_shared<PolyLiteral>(value), mlir_value};
   });
@@ -944,13 +944,13 @@ plaidml_poly_expr* plaidml_poly_expr_op(  //
     size_t nargs,                         //
     plaidml_poly_expr** args) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_poly_expr_op> " << op);
+    IVLOG(3, "plaidml_poly_expr_op> " << op);
     std::vector<std::shared_ptr<PolyExpr>> vec_args(nargs);
     std::vector<mlir::Value*> values(nargs);
     for (size_t i = 0; i < nargs; i++) {
       vec_args[i] = args[i]->expr;
       values[i] = args[i]->value;
-      IVLOG(1, "  arg: " << values[i] << ": " << vec_args[i]->str());
+      IVLOG(3, "  arg: " << values[i] << ": " << vec_args[i]->str());
     }
     auto value = MakeAffineOp(op, values);
     return new plaidml_poly_expr{MakeOp(static_cast<IntOp>(op), vec_args), value};
@@ -961,7 +961,7 @@ void plaidml_dim_expr_free(  //
     plaidml_error* err,      //
     plaidml_dim_expr* expr) {
   ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_dim_expr_free> " << expr->expr->str());
+    IVLOG(3, "plaidml_dim_expr_free> " << expr->expr->str());
     if (expr->value) {
       GlobalContext::get()->Destroy(expr->value);
     }
@@ -974,7 +974,7 @@ plaidml_string* plaidml_dim_expr_repr(  //
     plaidml_dim_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_dim_expr_repr");
+    IVLOG(3, "plaidml_dim_expr_repr");
     return new plaidml_string{expr->expr->str()};
   });
 }
@@ -983,7 +983,7 @@ plaidml_dim_expr* plaidml_dim_expr_none(  //
     plaidml_error* err                    //
 ) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_dim_expr_none");
+    IVLOG(3, "plaidml_dim_expr_none");
     auto value = GlobalContext::get()->MakeNoneOp();
     return new plaidml_dim_expr{std::make_shared<DimNoneExpr>(), value};
   });
@@ -994,7 +994,7 @@ plaidml_dim_expr* plaidml_dim_expr_none(  //
 //     plaidml_expr* ref,                   //
 //     size_t dim) {
 //   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
-//     IVLOG(1, "plaidml_dim_expr_ref");
+//     IVLOG(3, "plaidml_dim_expr_ref");
 //     auto value = GlobalContext::get()->MakeDimOp(ref->value, dim);
 //     return new plaidml_dim_expr{std::make_shared<DimRefExpr>(ref->expr, dim), value};
 //   });
@@ -1004,7 +1004,7 @@ plaidml_dim_expr* plaidml_dim_expr_int(  //
     plaidml_error* err,                  //
     int64_t value) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_dim_expr_int> " << value);
+    IVLOG(3, "plaidml_dim_expr_int> " << value);
     auto mlir_value = GlobalContext::get()->MakeAffineConstantOp(value);
     return new plaidml_dim_expr{std::make_shared<DimIntExpr>(value), mlir_value};
   });
@@ -1015,7 +1015,7 @@ int64_t plaidml_dim_expr_get_int(  //
     plaidml_dim_expr* expr) {
   // TODO(MLIR)
   return ffi_wrap<int64_t>(err, 0, [&] {
-    IVLOG(1, "plaidml_dim_expr_get_int");
+    IVLOG(3, "plaidml_dim_expr_get_int");
     if (!expr) {
       throw std::runtime_error("plaidml_dim_expr_get_int can only be used on an integer value");
     }
@@ -1033,13 +1033,13 @@ plaidml_dim_expr* plaidml_dim_expr_op(  //
     size_t nargs,                       //
     plaidml_dim_expr** args) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_dim_expr_op> " << op);
+    IVLOG(3, "plaidml_dim_expr_op> " << op);
     std::vector<DimExprPtr> vec_args(nargs);
     std::vector<mlir::Value*> values(nargs);
     for (size_t i = 0; i < nargs; i++) {
       vec_args[i] = args[i]->expr;
       values[i] = args[i]->value;
-      IVLOG(1, "  arg: " << values[i] << ": " << vec_args[i]->str());
+      IVLOG(3, "  arg: " << values[i] << ": " << vec_args[i]->str());
     }
     auto value = MakeAffineOp(op, values);
     return new plaidml_dim_expr{MakeOp(static_cast<IntOp>(op), vec_args), value};
@@ -1050,7 +1050,7 @@ void plaidml_program_free(  //
     plaidml_error* err,     //
     plaidml_program* program) {
   ffi_wrap_void(err, [&] {
-    IVLOG(1, "plaidml_program_free");
+    IVLOG(3, "plaidml_program_free");
     delete program;
   });
 }
@@ -1065,7 +1065,7 @@ plaidml_program* plaidml_program_evaluate(  //
     plaidml_expr** src_updates,             //
     plaidml_expr** dst_updates) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_program_evaluate");
+    IVLOG(3, "plaidml_program_evaluate");
     ProgramMutations mutations;
     std::vector<ExprPtr> outputs(noutputs);
     std::vector<mlir::Value*> values(noutputs);
@@ -1105,7 +1105,7 @@ plaidml_string* plaidml_program_repr(  //
     plaidml_program* program) {
   // TODO(MLIR)
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_program_repr");
+    IVLOG(3, "plaidml_program_repr");
     return new plaidml_string{to_string(program->eval.runinfo.program)};
   });
 }
@@ -1115,7 +1115,7 @@ const void* plaidml_program_runinfo(  //
     plaidml_program* program) {
   // TODO(MLIR)
   return ffi_wrap<const void*>(err, nullptr, [&] {  //
-    IVLOG(1, "plaidml_program_runinfo");
+    IVLOG(3, "plaidml_program_runinfo");
     return &program->eval.runinfo;
   });
 }

@@ -399,11 +399,12 @@ void StripeBuilder::apply<eltwise::ScalarConstantOp>() {
   }
 }
 
-stripe::Program ToStripe(mlir::FuncOp func) {
-  stripe::Program r;
+stripe::Program FromMLIR(mlir::ModuleOp module) {
+  auto func = llvm::dyn_cast<mlir::FuncOp>(module.getBody()->front());
   StripeBuilder builder(func);
-  r.entry = builder.getResult();
-  return r;
+  stripe::Program ret;
+  ret.entry = builder.getResult();
+  return ret;
 }
 
 }  // namespace stripe

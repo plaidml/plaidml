@@ -322,7 +322,8 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
   // TODO: Move across the index tags as well...
 }
 
-mlir::FuncOp ToStripeMLIR(MLIRContext* ctx, const stripe::Program& prog) {
+mlir::OwningModuleRef IntoMLIR(MLIRContext* ctx, const stripe::Program& prog) {
+  mlir::ModuleOp module(mlir::ModuleOp::create(mlir::UnknownLoc::get(ctx)));
   auto func_type = mlir::FunctionType::get({}, {}, ctx);
   mlir::Location loc = mlir::UnknownLoc::get(ctx);
   mlir::FuncOp func = mlir::FuncOp::create(loc, "program", func_type, {});
@@ -331,7 +332,8 @@ mlir::FuncOp ToStripeMLIR(MLIRContext* ctx, const stripe::Program& prog) {
   SymbolTable initial;
   ToStripeMLIR(&builder, initial, *prog.entry);
   builder.create<TerminateOp>(loc);
-  return func;
+  module.push_back(func);
+  return module;
 }
 
 }  // namespace stripe

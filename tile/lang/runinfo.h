@@ -12,8 +12,9 @@ namespace vertexai {
 namespace tile {
 namespace lang {
 
-// This is an abstract base class for whatever underlying buffer concept the user of the system wished to use, however,
-// we presume pointer equality on buffers is equivalence on buffers
+// This is an abstract base class for whatever underlying buffer concept the
+// user of the system wished to use, however, we presume pointer equality on
+// buffers is equivalence on buffers
 class BufferBase {
  public:
   virtual ~BufferBase() {}

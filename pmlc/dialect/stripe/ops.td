@@ -13,14 +13,6 @@ def DevicePathType : Type<CPred<"$_self.isa<DevicePathType>()">, "Plaid DevicePa
 def PrngType : Type<CPred<"$_self.isa<PrngType>()">, "Plaid PrngType">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Reference Type">;
 
-// def DictionaryAttr : Attr<CPred<"$_self.isa<mlir::DictionaryAttr>()">, "Dictionary Attribute"> {
-//   let storageType = "DictionaryAttr";
-//   let returnType = "DictionaryAttr";
-//   let convertFromStorage = "$_self";
-//   let defaultValue = "{}";
-//   let constBuilderCall = "$_builder.getDictionaryAttr($0)";
-// }
-
 def TensorLayoutAttr : Attr<CPred<"$_self.isa<TensorLayoutAttr>()">, "Tensor Layout Attribute"> {
   let storageType = "TensorLayoutAttr";
   let returnType = "TensorLayoutAttr";

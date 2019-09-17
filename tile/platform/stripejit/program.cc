@@ -13,12 +13,35 @@
 namespace vertexai {
 namespace tile {
 namespace stripejit {
+
 Program::Program(                  //
     const std::string& target,     //
     const lang::RunInfo& runinfo,  //
     ConstBufferManager* const_bufs)
     : executable_{new targets::cpu::Native} {
   auto stripe = GenerateStripe(runinfo);
+  auto out_dir = boost::filesystem::path(env::Get("STRIPE_OUTPUT"));
+  codegen::OptimizeOptions options = {
+      !out_dir.empty(),    // dump_passes
+      false,               // dump_passes_proto
+      false,               // dump_code
+      out_dir / "passes",  // dbg_dir
+  };
+  const auto& cfgs = targets::GetConfigs();
+  const auto& cfg = cfgs.configs().at(target);
+  const auto& stage = cfg.stages().at("default");
+  codegen::CompilerState state(stripe);
+  state.const_bufs = const_bufs;
+  codegen::Optimize(&state, stage.passes(), options);
+  targets::cpu::Config config;
+  executable_->compile(*stripe->entry, config);
+}
+
+Program::Program(                                    //
+    const std::string& target,                       //
+    const std::shared_ptr<stripe::Program>& stripe,  //
+    ConstBufferManager* const_bufs)
+    : executable_{new targets::cpu::Native} {
   auto out_dir = boost::filesystem::path(env::Get("STRIPE_OUTPUT"));
   codegen::OptimizeOptions options = {
       !out_dir.empty(),    // dump_passes
@@ -62,8 +85,7 @@ boost::future<void> Program::Run(  //
   return boost::make_ready_future();
 }
 
-void Program::Release() {
-}
+void Program::Release() {}
 
 std::size_t Program::MaxAvailableMemory() {
   throw std::runtime_error("Program::MaxAvailableMemory is unimplemented for stripejit.");
