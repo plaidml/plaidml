@@ -300,9 +300,12 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
 
   // Do the caching
   for (const auto& name : to_cache) {
-    Location loc = block->ref_by_into(name)->location;
-    ApplySimpleCache(self, RefDir::In, block, name, loc, Location(), {"kernel", "eltwise", "eltwise_padding"},
-               {"kernel", "eltwise", "eltwise_padding"});
+    auto ref_it = block->ref_by_into(name);
+    Location loc = ref_it->location;
+      ApplySimpleCache(self, IsWriteDir(ref_it->dir) ? RefDir::Out : RefDir::In,
+                       block, name, loc, Location(),
+                       {"kernel", "eltwise", "eltwise_padding"},
+                       {"kernel", "eltwise", "eltwise_padding"});
   }
 
   RefSize pad_sizes;
@@ -328,7 +331,9 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
       // Bump all the interior pointers!
       for (auto stmt : block->stmts) {
         auto inner = stripe::Block::Downcast(stmt);
-        if (!inner) continue;
+        if (!inner) {
+          continue;
+        }
         for (auto& refi : inner->refs) {
           if (refi.from == ref.into()) {
             refi.mut().access[i] += -exts[i].load.min;

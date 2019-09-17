@@ -516,6 +516,8 @@ class Value(ForeignObject):
             ffi_obj = ffi_call(lib.plaidml_expr_int, value)
         elif isinstance(value, float):
             ffi_obj = ffi_call(lib.plaidml_expr_float, value)
+        elif isinstance(value, TensorDim):
+            ffi_obj = ffi_call(lib.plaidml_expr_dim, value.as_ptr())
         elif isinstance(value, Tensor):
             ffi_obj = ffi_call(lib.plaidml_expr_clone, value.as_ptr())
         elif isinstance(value, (list, tuple)):

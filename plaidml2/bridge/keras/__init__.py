@@ -170,7 +170,12 @@ class _KerasNode(object):
 
     def __getitem__(self, key):
         logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
-        if isinstance(key, slice) or isinstance(key, int) or isinstance(key, type(Ellipsis)):
+        # Any _RawTensorDims are to be forwarded
+        raw_tensor_dims = getattr(self, '_RawTensorDims', None)
+        if raw_tensor_dims is not None:
+            raw_tensor_dims = raw_tensor_dims[key]
+        if isinstance(key, slice) or isinstance(key, six.integer_types) or isinstance(
+                key, type(Ellipsis)):
             key = (key,)
         if not isinstance(key, tuple):
             raise ValueError('Cannot index PlaidML tensors using type {}'.format(type(key)))
@@ -195,7 +200,10 @@ class _KerasNode(object):
                 list(key[ellipsis_idx + 1:]))
         else:
             key = tuple(list(key) + [slice(None, None, None)] * extension_length)
-        return _KerasNode('slice', tensor=plaidml_op.slice_of(I, key))
+        ret = _KerasNode('slice', tensor=plaidml_op.slice_of(I, key))
+        if raw_tensor_dims is not None:
+            ret._RawTensorDims = raw_tensor_dims
+        return ret
 
     def __neg__(self):
         return _KerasNode('neg', tensor=-self.tensor)
@@ -1269,6 +1277,13 @@ def reshape(x, dims):
     dims = list(dims)
     I = x.tensor
     for i, s in enumerate(dims):
+        if isinstance(s, _KerasNode):
+            # If using dims from a call to `shape`, they are saved directly in the _RawTensorDims attribute
+            raw_dim = getattr(s, '_RawTensorDims', None)
+            if isinstance(raw_dim, edsl.TensorDim):
+                dims[i] = raw_dim
+            else:
+                raise RuntimeError('Cannot parse dimension from {} for reshape'.format(s))
         if s == -1:
             dims[i] = 'fill'
             continue
@@ -1445,7 +1460,11 @@ def set_value(x, value):
 
 @_log_call
 def shape(x):
-    return _KerasNode('shape', tensor=edsl.shape(x.tensor))
+    ret = _KerasNode('shape', tensor=edsl.shape(x.tensor))
+    # Save the TensorDims directly on the _KerasNode, where they can be extracted if needed
+    ret._RawTensorDims = edsl.TensorDims(x.tensor.shape.ndims)
+    x.tensor.bind_dims(*ret._RawTensorDims)
+    return ret
 
 
 @_log_call
