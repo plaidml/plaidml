@@ -29,12 +29,17 @@ void DoThreadInnerPass(const AliasMap& scope, Block* block, const proto::ThreadI
       // so here is not definitely wrong.
       return;
     }
-    // If there is "eltwise" tag, the refinements must have aligned accesses
-    // though the accesses may not exactly same
+    // If there is "eltwise" tag, the refinements must have simliar accesses
+    // Different orders are allowed
+    // TODO: consider the performance if the access orders are different
     if (!block->has_tag("eltwise")) {
       const auto refs = block->ref_outs(true);
+      std::set<Affine> acc_set;
+      acc_set.insert(refs[0]->access.begin(), refs[0]->access.end());
       for (size_t i = 1; i < refs.size(); ++i) {
-        if (refs[0]->access != refs[i]->access) {
+        std::set<Affine> next_acc_set;
+        next_acc_set.insert(refs[i]->access.begin(), refs[i]->access.end());
+        if (acc_set != next_acc_set) {
           throw std::runtime_error("Thread inner pass only works with a single output");
         }
       }

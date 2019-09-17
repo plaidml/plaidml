@@ -706,10 +706,8 @@ void Compiler::Visit(const stripe::Special& special) {
   // tile/lang/gen_special.cc. The spec lists "zero", "copy", and "reshape",
   // while gen_special.cc uses "gather", "scatter", "shape", and "prng_step".
   static std::map<std::string, std::function<void(Compiler*, const stripe::Special&)>> handlers{
-      {"zero", &Compiler::Zero},
-      {"copy", &Compiler::Copy},
-      {"reshape", &Compiler::Reshape},
-      {"prng_step", &Compiler::PrngStep},
+      {"zero", &Compiler::Zero},          {"copy", &Compiler::Copy},   {"reshape", &Compiler::Reshape},
+      {"prng_step", &Compiler::PrngStep}, {"shape", &Compiler::Shape},
   };
   auto it = handlers.find(special.name);
   if (it == handlers.end()) {
@@ -1341,6 +1339,26 @@ void Compiler::PrngStep(const stripe::Special& prng_step) {
   llvm::Value* count = IndexConst(dest_bytes / sizeof(uint32_t));
   std::vector<llvm::Value*> args{in_state.base, out_state.base, dest_arg, count};
   builder_.CreateCall(PrngStepFunction(), args, "");
+}
+
+void Compiler::Shape(const stripe::Special& shape) {
+  // Input is a tensor. Output is a 1-dimensional array with number of elements
+  // equal to the input tensor's number of dimensions. Write the size of each
+  // input dimension to the corresponding element of the output tensor.
+  assert(1 == shape.inputs.size());
+  Buffer data = buffers_[shape.inputs[0]];
+  size_t data_ndims = data.refinement->interior_shape.dims.size();
+  assert(1 == shape.outputs.size());
+  Buffer out = buffers_[shape.outputs[0]];
+  assert(1 == out.refinement->interior_shape.dims.size());
+  assert(data_ndims == out.refinement->interior_shape.elem_size());
+  uint64_t elem_bits = bit_width(out.refinement->interior_shape.type);
+  for (size_t i = 0; i < data_ndims; ++i) {
+    uint64_t dim_size = data.refinement->interior_shape.dims[i].size;
+    llvm::Value* val = builder_.getIntN(elem_bits, dim_size);
+    llvm::Value* dest = builder_.CreateGEP(out.base, {IndexConst(i)});
+    builder_.CreateStore(val, dest);
+  }
 }
 
 Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {
