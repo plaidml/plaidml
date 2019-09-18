@@ -346,6 +346,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
   func.addEntryBlock();
   OpBuilder builder(func.getBody());
 
+  auto prefix = llvm::formatv("{0}.", Dialect::getDialectNamespace());
   SymbolTable initial;
   size_t argcnt = 0;
   for (const auto& ref : block.refs) {
@@ -356,12 +357,10 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg, device_path);
     initial.refs.emplace(ref.into(), tensorRefOp);
     // Only 'dialect attrs' are allowed on function arguments
-    auto attrName = llvm::formatv("{0}.name", Dialect::getDialectNamespace());
-    func.setArgAttr(argIndex, attrName.str(), builder.getStringAttr(ref.into()));
+    func.setArgAttr(argIndex, prefix.str() + "name", builder.getStringAttr(ref.into()));
   }
 
   std::vector<NamedAttribute> attrs;
-  auto prefix = llvm::formatv("{0}.", Dialect::getDialectNamespace());
   AttrBuilder visitor(&builder, &attrs, prefix.str());
   block.visit_tags(&visitor);
   func.setDialectAttrs(attrs);
