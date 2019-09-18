@@ -79,12 +79,7 @@ class Model(core.Model):
 
     def fold_batch_norm(self, model, backend):
         import json
-        if backend == 'plaid_edsl':
-            import plaidml2.bridge.keras as K
-        elif backend == 'plaid':
-            import plaidml.keras.backend as K
-        else:
-            import keras.backend as K
+        import keras.backend as K
         from keras.models import model_from_json
 
         def make_mults(weights):

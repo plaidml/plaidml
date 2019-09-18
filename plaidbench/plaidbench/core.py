@@ -247,6 +247,10 @@ def _inner_run(reports,
         params.examples, params.network_name, params.batch_size, params.backend_name),
                 fg='magenta')
 
+    # Disable kernel timing with PlaidML EDSL
+    if params.backend_name == 'plaid_edsl':
+        kernel_timing = False
+
     benchmark_results = {}
     model_output = None
 
