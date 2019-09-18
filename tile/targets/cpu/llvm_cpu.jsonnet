@@ -136,6 +136,37 @@ local PARAMS = {
             },
 
             {
+              name: 'eltwise_div and eltwise fuse',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['eltwise_div'],
+                b_reqs: ['eltwise'],
+                fused_set: ['fuse_eltwise_div_eltwise'],
+              },
+            },
+
+            {
+              name: 'eltwise and eltwise_div fuse',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['eltwise'],
+                b_reqs: ['eltwise_div'],
+                fused_set: ['fuse_eltwise_div_eltwise'],
+              },
+            },
+
+            {
+              name: 'agg_op_max and eltwise fuse',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
+                a_reqs: ['agg_op_max'],
+                b_reqs: ['eltwise'],
+                fused_set: ['fuse_agg_op_max_eltwise'],
+                exclude: ['mac'],
+              },
+            },
+
+            {
               name: 'tile_contract',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',

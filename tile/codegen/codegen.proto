@@ -71,7 +71,8 @@ message MLIR_PadPass {
 }
 
 // Reorder blocks
-message ReorderBlocksPass {}
+message ReorderBlocksPass {
+}
 
 // The scalarize pass looks for refinements which (usually due to
 // localization) now hold only a single element, and replaces
@@ -336,6 +337,7 @@ message StencilPass {
   // The size is cosidered being a match for the strict requirement if
   // the block.shape[dim] % tile[dim] == 0 for all dimensions.
   optional bool is_strict_dims = 7 [default = false];
+  optional bool copy_tags = 8 [default = false];
 }
 
 message Stencil {
@@ -662,7 +664,8 @@ message TempVarPass {
 }
 
 // Propagate constant tensors.
-message ConstantPropagatePass {}
+message ConstantPropagatePass {
+}
 
 // Remove constant tensor and replace the corresponding loads with constants
 message ConstTensorPass {

@@ -368,7 +368,8 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
 
   BlockIntoMLIR(&builder, initial, *block.SubBlock(0));
   builder.create<TerminateOp>(loc);
-  return func;
+  module.push_back(func);
+  return module;
 }
 
 mlir::OwningModuleRef IntoMLIR(MLIRContext* ctx, const stripe::Program& prog) {

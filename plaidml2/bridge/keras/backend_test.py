@@ -603,6 +603,12 @@ class TestBackendOps(unittest.TestCase):
     def testProdOfShape(self, b):
         return b.prod(b.shape(b.variable(m(2, 3, 4))))
 
+    @compareForwardClose()
+    def testReshapeShape(self, b):
+        x = b.variable(m(5, 2, 3))
+        y = b.variable(m(5, 6))
+        return b.reshape(x, b.shape(y))
+
     # TODO(T1026): Switch to opTest once PROD AggregationOp supports derivatives
     @compareForwardExact()
     def testProdKeepdims(self, b):
@@ -1164,11 +1170,14 @@ class TestBackendOps(unittest.TestCase):
     def testReshapeMatchDim(self):
         a = pkb.variable(m(1, 1, 60))
         output = pkb.reshape(a, (2, 0, 30))
-        self.assertEqual(str(output), "reshape_1|fp32(2, 1, 30)")
+        self.assertEqual(str(output)[:len('reshape_')], 'reshape_')
+        self.assertEqual(str(output)[-len('|fp32(2, 1, 30)'):], '|fp32(2, 1, 30)')
         output = pkb.reshape(a, (2, 0, -1))
-        self.assertEqual(str(output), "reshape_2|fp32(2, 1, 30)")
+        self.assertEqual(str(output)[:len('reshape_')], 'reshape_')
+        self.assertEqual(str(output)[-len('|fp32(2, 1, 30)'):], '|fp32(2, 1, 30)')
         output = pkb.reshape(a, (0, 0, 0))
-        self.assertEqual(str(output), "reshape_3|fp32(1, 1, 60)")
+        self.assertEqual(str(output)[:len('reshape_')], 'reshape_')
+        self.assertEqual(str(output)[-len('|fp32(1, 1, 60)'):], '|fp32(1, 1, 60)')
         #throw runtime exceptions
         with self.assertRaises(plaidml2.Error) as cm:
             output = pkb.reshape(a, (-1, -1))
