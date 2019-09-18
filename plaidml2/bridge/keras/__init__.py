@@ -1062,14 +1062,29 @@ def not_equal(lhs, rhs):
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     I = x.tensor
     ndims = I.shape.ndims
-    if reduction_axes == None:
-        raw_axes = [ndims - 1]
+    if ndims == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
+        target_shape = [1 if i in reduction_axes else i for i in range(4)]
+        if reduction_axes == [0, 1, 2]:
+            axes = 3
+        else:
+            axes = 1
+        m = mean(I, axis=axes, keepdims=True)
+        m = squeeze(m, axes)
+        m = reshape(m, target_shape)
+        v = var(I, axis=axes, keepdims=True)
+        v = squeeze(v, axes)
+        v = reshape(v, target_shape)
+        beta = reshape(beta, target_shape)
+        gamma = reshape(gamma, target_shape)
     else:
-        raw_axes = reduction_axes
-    axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
+        if reduction_axes == None:
+            raw_axes = [ndims - 1]
+        else:
+            raw_axes = reduction_axes
+        axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
 
-    m = mean(x, axis=axes, keepdims=True)
-    v = var(x, axis=axes, keepdims=True)
+        m = mean(x, axis=axes, keepdims=True)
+        v = var(x, axis=axes, keepdims=True)
 
     normalized_tensor = batch_normalization(x=x,
                                             mean=m,
@@ -1077,9 +1092,6 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
                                             beta=beta,
                                             gamma=gamma,
                                             epsilon=epsilon)
-
-    # Tensorflow and Theano disagree on whether mean and var should be squeezed
-    # here. For now, going with Theano for simplicity (i.e. don't squeeze).
 
     return normalized_tensor, m, v
 
