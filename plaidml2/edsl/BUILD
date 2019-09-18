@@ -1,6 +1,7 @@
 # Copyright 2019 Intel Corporation.
 
 load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_library",
@@ -11,6 +12,16 @@ load(
 exports_files([
     "ffi.h",
 ])
+
+pkg_tar(
+    name = "include_pkg",
+    package_dir = "include/plaidml2/edsl",
+    srcs = [
+        "edsl.h",
+        "ffi.h",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 plaidml_cc_library(
     name = "edsl",
