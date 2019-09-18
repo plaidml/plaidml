@@ -68,7 +68,6 @@ def StoreOp : StripeOp<"store"> {
     Eltwise_AnyTensor:$from,
     DictionaryAttr:$attr
   );
-  // let results = (outs);
   /*
   let parser = [{
     mlir::SmallVector<OpAsmParser::OperandType, 2> ops;
@@ -133,26 +132,21 @@ def ParallelForOp : StripeOp<"parallel_for"> {
     DictionaryAttr:$attrs
     // TypedArrayAttrBase<DictionaryAttr, "per index tags">:$idx_attrs
   ); 
-  // let results = (outs);
   let regions = (region SizedRegion<1>:$inner);
 }
 
 def ConstraintOp : StripeOp<"constraint"> {
   let arguments = (ins AffineType:$input);
-  // let results = (outs);
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
 }
 
 def ExecutorOp : StripeOp<"executor"> {
   let arguments = (ins DevicePathType:$devicePath);
-  // let results = (outs);
   let regions = (region AnyRegion:$body);
 }
 
 def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let summary = "A block terminator since MLIR requires one";
-  // let results = (outs);
-  // let arguments = (ins);
   let parser = [{ return mlir::success(); }];
   let printer = [{ *p << this->getOperation()->getName(); }];
 }

@@ -36,7 +36,7 @@ static void print(TensorType type, llvm::raw_ostream& os) {
   os << "tensor ";
   os << type.getElementType() << "(";
   auto shape = type.getShape();
-  for (size_t i = 0; i < type.getRank(); i++) {
+  for (int64_t i = 0; i < type.getRank(); i++) {
     const auto& dim = shape[i];
     if (i) {
       os << ", ";
