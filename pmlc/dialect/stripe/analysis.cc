@@ -4,8 +4,6 @@
 
 #include <utility>
 
-#include <utility>
-
 #include <boost/math/common_factor.hpp>
 
 namespace pmlc {
@@ -139,20 +137,28 @@ bool FlatTensorAccess::operator==(const FlatTensorAccess& rhs) const {
 }
 
 FlatTensorAccess ComputeAccess(Value* tensor) {
-  FlatTensorAccess r;
-  auto bop = tensor->getDefiningOp();
-  if (auto op = mlir::dyn_cast<AllocateOp>(bop)) {
-    r.base = op;
-    r.access.resize(op.layout().dims().size());
-  } else if (auto op = mlir::dyn_cast<RefineOp>(bop)) {
-    r = ComputeAccess(op.in());
-    for (size_t i = 0; i < r.access.size(); i++) {
-      r.access[i] += AffinePolynomial(*(op.offsets().begin() + i));
+  FlatTensorAccess ret;
+  if (auto bop = tensor->getDefiningOp()) {
+    if (auto op = mlir::dyn_cast<AllocateOp>(bop)) {
+      ret.base = op.result();
+      auto tensorType = op.result()->getType().cast<TensorType>();
+      ret.access.resize(tensorType.getRank());
+    } else if (auto op = mlir::dyn_cast<RefineOp>(bop)) {
+      ret = ComputeAccess(op.in());
+      for (size_t i = 0; i < ret.access.size(); i++) {
+        ret.access[i] += AffinePolynomial(*(op.offsets().begin() + i));
+      }
+    } else if (auto op = mlir::dyn_cast<TensorRefOp>(bop)) {
+      return ComputeAccess(op.in());
+    } else {
+      throw std::runtime_error("Invalid tensor value in ComputeAccess");
     }
   } else {
-    throw std::runtime_error("Invalid tensor value in ComputeAccess");
+    ret.base = tensor;
+    auto tensorType = tensor->getType().cast<TensorType>();
+    ret.access.resize(tensorType.getRank());
   }
-  return r;
+  return ret;
 }
 
 }  // namespace stripe

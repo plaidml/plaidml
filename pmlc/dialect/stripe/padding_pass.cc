@@ -34,9 +34,11 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
         inner[i] += AffineRange(*(ref.offsets().begin() + i));
       }
     } else if (auto op = mlir::dyn_cast<LoadOp>(use.getOwner())) {
-      inner.resize(op.from()->getType().cast<TensorType>().ndim());
+      inner.resize(op.from()->getType().cast<TensorRefType>().getRank());
     } else if (auto op = mlir::dyn_cast<StoreOp>(use.getOwner())) {
-      inner.resize(op.into()->getType().cast<TensorType>().ndim());
+      inner.resize(op.into()->getType().cast<TensorRefType>().getRank());
+    } else if (auto op = mlir::dyn_cast<TensorRefOp>(use.getOwner())) {
+      return ComputeUnboundedRanges(op.result());
     } else {
       throw std::runtime_error("Invalid type");
     }
@@ -70,7 +72,7 @@ void PaddingPass::runOnFunction() {
   }
   // Get the unbounded access range of each allocation
   f.walk<AllocateOp>([](AllocateOp op) {
-    std::vector<AffineRange> final = ComputeUnboundedRanges(op.res());
+    std::vector<AffineRange> final = ComputeUnboundedRanges(op.result());
     if (VLOG_IS_ON(2)) {
       std::stringstream ss;
       for (const auto& range : final) {

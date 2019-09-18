@@ -26,6 +26,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "base/util/env.h"
 #include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
@@ -138,7 +139,7 @@ struct TileBuilder::Impl {
       mlir::Value* sizes,                 //
       CreateOpFunc fn) {
     IVLOG(5, "TileBuilder::Impl::MakeContraction>");
-    IVLOG(5, mlir::debugString(module));
+    IVLOG(5, module);
     // Compute the sink shape of the contraction
     llvm::SmallVector<mlir::Type, 3> types;
     for (auto src : srcs) {
@@ -590,20 +591,22 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   builder.create<mlir::ReturnOp>(loc, rets);
   // Attach the function to the module
   module.push_back(funcOp);
-  IVLOG(5, mlir::debugString(module));
+  IVLOG(5, module);
   if (failed(mlir::verify(module))) {
     emitError(loc, "Module verification error");
   }
   // Do some optimization passes
   mlir::PassManager pm;
-  // TODO: Debug & re-enable the canonicalization pass
-  // pm.addPass(mlir::createCanonicalizerPass());
+  if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
+    // TODO: Debug & re-enable the canonicalization pass
+    pm.addPass(mlir::createCanonicalizerPass());
+  }
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
   if (failed(result)) {
     emitError(loc, "Optimization passes failure");
   }
-  IVLOG(2, mlir::debugString(module));
+  IVLOG(2, module);
   return program;
 }
 

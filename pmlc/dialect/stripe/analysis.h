@@ -92,7 +92,7 @@ inline AffineRange operator|(const AffineRange& a, const AffineRange& b) {
 }
 
 struct FlatTensorAccess {
-  AllocateOp base;
+  Value* base;
   std::vector<AffinePolynomial> access;
 
   // Comparisons

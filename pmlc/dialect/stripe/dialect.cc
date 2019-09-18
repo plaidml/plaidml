@@ -1,25 +1,25 @@
 // Copyright 2019, Intel Corporation
 
+#include "pmlc/dialect/stripe/dialect.h"
+
 #include "mlir/IR/Dialect.h"
+
 #include "pmlc/dialect/stripe/ops.h"
 
 namespace pmlc {
 namespace dialect {
 namespace stripe {
 
-class Dialect : public mlir::Dialect {
- public:
-  explicit Dialect(mlir::MLIRContext* ctx);
-  mlir::Type parseType(llvm::StringRef tyData, mlir::Location loc) const override;
-  void printType(mlir::Type type, llvm::raw_ostream& os) const override;
-  void printAttribute(mlir::Attribute attr, llvm::raw_ostream& os) const override;
-};
-
 static mlir::DialectRegistration<Dialect> StripeOps;
 
-Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect("stripe", ctx) {
-  addTypes<AffineType, DeviceIDType, DevicePathType, PrngType, TensorType>();
-  addAttributes<TensorLayoutAttr>();
+Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), ctx) {
+  addTypes<            //
+      AffineType,      //
+      DeviceIDType,    //
+      DevicePathType,  //
+      PrngType,        //
+      TensorType,      //
+      TensorRefType>();
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/stripe/ops.cpp.inc"
@@ -30,64 +30,54 @@ mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const 
   throw std::runtime_error("Unimplemented");
 }
 
-static void print(AffineType t, llvm::raw_ostream& os) { os << "affine"; }
+static void print(AffineType type, llvm::raw_ostream& os) { os << "affine"; }
 
-static void print(TensorType t, llvm::raw_ostream& os) {
+static void print(TensorType type, llvm::raw_ostream& os) {
   os << "tensor ";
-  os << t.base() << ":" << std::to_string(t.ndim());
-}
-
-static void print(PrngType t, llvm::raw_ostream& os) { os << "prng"; }
-
-static void print(DeviceIDType t, llvm::raw_ostream& os) { os << "device_id"; }
-
-static void print(DevicePathType t, llvm::raw_ostream& os) { os << "device_path"; }
-
-void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
-  if (auto t = type.dyn_cast<AffineType>()) {
-    print(t, os);
-  } else if (auto t = type.dyn_cast<DeviceIDType>()) {
-    print(t, os);
-  } else if (auto t = type.dyn_cast<DevicePathType>()) {
-    print(t, os);
-  } else if (auto t = type.dyn_cast<PrngType>()) {
-    print(t, os);
-  } else if (auto t = type.dyn_cast<TensorType>()) {
-    print(t, os);
-  } else {
-    llvm_unreachable("unhandled Plaid type");
-  }
-}
-
-static void print(TensorLayoutAttr a, llvm::raw_ostream& os) {
-  os << "tensor ";
-  os << a.base() << "(";
-  bool first = true;
-  for (const auto& dim : a.dims()) {
-    if (!first) {
+  os << type.getElementType() << "(";
+  auto shape = type.getShape();
+  for (size_t i = 0; i < type.getRank(); i++) {
+    const auto& dim = shape[i];
+    if (i) {
       os << ", ";
     }
-    first = false;
-    if (dim.unit != "") {
-      os << dim.unit << ":";
-    }
-    if (dim.size == 0) {
+    if (!dim.size) {
       os << "?";
     } else {
       os << std::to_string(dim.size);
     }
-    if (dim.stride != 0) {
-      os << ":" << std::to_string(dim.stride);
+    if (dim.stride) {
+      os << ": " << std::to_string(dim.stride);
     }
   }
   os << ")";
 }
 
-void Dialect::printAttribute(Attribute attr, llvm::raw_ostream& os) const {
-  if (auto a = attr.dyn_cast<TensorLayoutAttr>()) {
-    print(a, os);
+static void print(TensorRefType type, llvm::raw_ostream& os) {
+  os << "tensor_ref " << type.getElementType() << ":" << std::to_string(type.getRank());
+}
+
+static void print(PrngType type, llvm::raw_ostream& os) { os << "prng"; }
+
+static void print(DeviceIDType type, llvm::raw_ostream& os) { os << "device_id"; }
+
+static void print(DevicePathType type, llvm::raw_ostream& os) { os << "device_path"; }
+
+void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
+  if (auto affineType = type.dyn_cast<AffineType>()) {
+    print(affineType, os);
+  } else if (auto deviceIDType = type.dyn_cast<DeviceIDType>()) {
+    print(deviceIDType, os);
+  } else if (auto devicePathType = type.dyn_cast<DevicePathType>()) {
+    print(devicePathType, os);
+  } else if (auto prngType = type.dyn_cast<PrngType>()) {
+    print(prngType, os);
+  } else if (auto tensorType = type.dyn_cast<TensorType>()) {
+    print(tensorType, os);
+  } else if (auto tensorRefType = type.dyn_cast<TensorRefType>()) {
+    print(tensorRefType, os);
   } else {
-    llvm_unreachable("unhandled Plaid Attribute");
+    llvm_unreachable("unhandled Plaid type");
   }
 }
 

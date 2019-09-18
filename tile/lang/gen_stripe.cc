@@ -46,6 +46,8 @@ class StripeGenerator {
 
   std::shared_ptr<stripe::Program> Run() {
     auto program = std::make_shared<stripe::Program>();
+    program->input_shapes = runinfo_.input_shapes;
+    program->output_shapes = runinfo_.output_shapes;
     auto entry = program->entry = std::make_shared<stripe::Block>();
     entry->set_tag("program");
     entry->name = runinfo_.program_name;
