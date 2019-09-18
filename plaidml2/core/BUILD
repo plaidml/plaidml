@@ -1,5 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_library",
@@ -12,6 +13,16 @@ load(
 exports_files([
     "ffi.h",
 ])
+
+pkg_tar(
+    name = "include_pkg",
+    package_dir = "include/plaidml2/core",
+    srcs = [
+        "core.h",
+        "ffi.h",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 plaidml_cc_version(
     name = "cc_version",
