@@ -33,7 +33,7 @@ plaidml_cc_library(
     ],
     hdrs = [
         "analysis.h",
-        "attrs.h",
+        "dialect.h",
         "mlir.h",
         "ops.h",
         "ops.h.inc",

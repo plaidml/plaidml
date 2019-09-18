@@ -78,6 +78,7 @@ TEST(Stripe, Transcode) {
 
   IVLOG(1, "Adding an executor location");
   codegen::proto::LocateBlockPass lbp;
+  lbp.add_reqs("main");
   auto lbp_dev = lbp.mutable_loc()->add_devs();
   lbp_dev->set_name("OuterExecutor");
   lbp_dev->add_units()->set_offset(0);
@@ -93,7 +94,10 @@ TEST(Stripe, Transcode) {
   auto module = IntoMLIR(&context, *prog);
 
   IVLOG(1, "Verifying module");
-  module->verify();
+  if (failed(module->verify())) {
+    module->dump();
+    throw std::runtime_error("IntoMLIR verification failure");
+  }
 
   IVLOG(1, "Doing some passes");
   mlir::PassManager pm(true);
@@ -102,7 +106,7 @@ TEST(Stripe, Transcode) {
   pm.addPass(CreatePass<PaddingPass>(options));
   if (failed(pm.run(*module))) {
     module->dump();
-    throw std::runtime_error("Invalid goo");
+    throw std::runtime_error("MLIR passes failure");
   }
 
   IVLOG(2, "Dumping module");
@@ -113,10 +117,10 @@ TEST(Stripe, Transcode) {
   auto prog2 = FromMLIR(*module);
 
   IVLOG(2, "New version:");
-  IVLOG(2, *prog2.entry);
+  IVLOG(2, *prog2->entry);
 
   auto expected = R"(0: #program #total_macs=14797504512 
-block<OuterExecutor[0]/InnerExecutor[1]> []:1 ( // foo
+block []:1 ( // foo
     #user none new@0x00000000 B<OuterMem[0]/InnerMem[1]>[0] fp32:I(128):(1):512 B
     #user none new@0x00000000 I<OuterMem[0]/InnerMem[1]>[0, 0, 0, 0] fp32:I(16, 112, 112, 64):(802816, 7168, 64, 1):50176 KiB
     #user none new@0x00000000 K<OuterMem[0]/InnerMem[1]>[0, 0, 0, 0] fp32:I(3, 3, 64, 128):(24576, 8192, 128, 1):288 KiB
@@ -124,7 +128,7 @@ block<OuterExecutor[0]/InnerExecutor[1]> []:1 ( // foo
     #user none new@0x00000000 _X2<OuterMem[0]/InnerMem[1]>[0, 0, 0, 0] fp32:I(16, 112, 112, 128):(1605632, 14336, 128, 1):100352 KiB
 ) {
   0: #main 
-  block []:1 ( // main
+  block<OuterExecutor[0]/InnerExecutor[1]> []:1 ( // main
       in B<OuterMem[0]/InnerMem[1]>[0] fp32:I(128):(1):512 B, E(128):512 B
       in I<OuterMem[0]/InnerMem[1]>[0, 0, 0, 0] fp32:I(16, 112, 112, 64):(802816, 7168, 64, 1):50176 KiB, E(16, 112, 112, 64):50176 KiB
       in K<OuterMem[0]/InnerMem[1]>[0, 0, 0, 0] fp32:I(3, 3, 64, 128):(24576, 8192, 128, 1):288 KiB, E(3, 3, 64, 128):288 KiB
@@ -188,5 +192,5 @@ block<OuterExecutor[0]/InnerExecutor[1]> []:1 ( // foo
 }
 )";
 
-  EXPECT_THAT(to_string(*prog2.entry), LinesEq(expected));
+  EXPECT_THAT(to_string(*prog2->entry), LinesEq(expected));
 }

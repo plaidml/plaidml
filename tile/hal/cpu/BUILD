@@ -1,6 +1,7 @@
 # Copyright 2017-2018 Intel Corporation.
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("@com_intel_plaidml//vendor/llvm:llvm.bzl", "llvm_copts")
 
 plaidml_cc_library(
     name = "cpu",
@@ -35,10 +36,7 @@ plaidml_cc_library(
         "runtime.cc",
         "runtime.h",
     ],
-    copts = [
-        "-D__STDC_LIMIT_MACROS",
-        "-D__STDC_CONSTANT_MACROS",
-    ],
+    copts = llvm_copts,
     tags = ["llvm"],
     visibility = ["//visibility:public"],
     deps = [
@@ -61,10 +59,7 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "llvm_test",
     srcs = ["llvm_test.cc"],
-    copts = [
-        "-D__STDC_LIMIT_MACROS",
-        "-D__STDC_CONSTANT_MACROS",
-    ],
+    copts = llvm_copts,
     tags = ["llvm"],
     deps = [
         ":cpu",

@@ -4,8 +4,15 @@
 
 #include "pmlc/dialect/eltwise/types.h"
 
+#include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
+
+namespace mlir {
+
+std::ostream& operator<<(std::ostream& os, ModuleOp op);
+
+}  // namespace mlir
 
 namespace pmlc {
 namespace dialect {

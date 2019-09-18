@@ -50,6 +50,7 @@ plaidml_cc_library(
         ":gen-op-defs",
         "//base/util",
         "//pmlc/dialect/eltwise",
+        "//pmlc/dialect/stripe",
         "//tile/base",
         "//tile/lang",
         "@boost",

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "pmlc/dialect/stripe/mlir.h"
 #include "tile/stripe/stripe.h"
 
@@ -12,7 +14,7 @@ namespace stripe {
 namespace stripe = vertexai::tile::stripe;
 
 mlir::OwningModuleRef IntoMLIR(MLIRContext* ctx, const stripe::Program& prog);
-stripe::Program FromMLIR(mlir::ModuleOp module);
+std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module);
 
 }  // namespace stripe
 }  // namespace dialect

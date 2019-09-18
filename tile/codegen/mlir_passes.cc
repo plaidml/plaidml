@@ -37,7 +37,7 @@ CompilerState::~CompilerState() = default;
 
 void ConvertFromMLIR(CompilerState* state) {
   IVLOG(1, "Converting from Stripe MLIR");
-  *state->prog = pmlc::dialect::stripe::FromMLIR(*state->mlir->module);
+  state->prog = pmlc::dialect::stripe::FromMLIR(*state->mlir->module);
 }
 
 void ConvertIntoMLIR(CompilerState* state) {
