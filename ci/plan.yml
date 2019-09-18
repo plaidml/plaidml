@@ -90,9 +90,10 @@ PLATFORMS:
   keras-stripe-ocl-gfx803:
      variant: linux_x86_64
   keras-plaid-ocl-gfx804:
-     variant: windows_x86_64
+    variant: windows_x86_64
   keras-stripe-ocl-gfx804:
-     variant: windows_x86_64
+    variant: windows_x86_64
+   
 
 VARIANTS:
   linux_x86_64:
