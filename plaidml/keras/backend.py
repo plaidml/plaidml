@@ -1073,26 +1073,48 @@ not_equal = op.not_equal
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     rank = x.shape.ndims
-    if reduction_axes == None:
-        axes = [rank - 1]
+    if rank == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
+        # NOTE: Tensorflow's code is explicitly checking for reduction axes in
+        # the case where there are 4 dims in x. If the reduction axes are passed
+        # in explicitly when a layer is created, the broadcasting behavior
+        # differs.
+        target_shape = [1 if i in reduction_axes else i for i in range(4)]
+        if reduction_axes == [0, 1, 2]:
+            axes = 3
+        else:
+            axes = 1
+        m = mean(x, axis=axes, keepdims=True)
+        m = squeeze(m, axes)
+        m = reshape(m, target_shape)
+        v = var(x, axis=axes, keepdims=True)
+        v = squeeze(v, axes)
+        v = reshape(v, target_shape)
+        beta = reshape(beta, target_shape)
+        gamma = reshape(gamma, target_shape)
     else:
-        axes = reduction_axes
+        if reduction_axes == None:
+            axes = [rank - 1]
+        else:
+            axes = reduction_axes
 
-    # Will need to squeeze axes in order, so make sure none are negative and sort
-    axes = [i + rank if i < 0 else i for i in axes]
-    for i in axes:
-        if i < 0:
-            raise ValueError(('Unexpected axis \'{}\' in normalize_batch_in training ' +
-                              '(tensor dim {})').format(i - rank, rank))
-        if i >= rank:
-            raise ValueError(('Unexpected axis \'{}\' in normalize_batch_in training ' +
-                              '(tensor dim {})').format(i, rank))
-    axes.sort()
 
-    # Mean and var need to keepdims for computing normalized_tensor, but their
-    # returned values need to not keepdims. So keepdims for now, then squeeze.
-    m = mean(x, axis=axes, keepdims=True)
-    v = var(x, axis=axes, keepdims=True)
+# Will need to squeeze axes in order, so make sure none are negative and
+# sort
+        axes = [i + rank if i < 0 else i for i in axes]
+        for i in axes:
+            if i < 0:
+                raise ValueError(('Unexpected axis \'{}\' in normalize_batch_in' +
+                                  ' training (tensor dim {})').format(i - rank, rank))
+            if i >= rank:
+                raise ValueError(('Unexpected axis \'{}\' in normalize_batch_in' +
+                                  ' training (tensor dim {})').format(i, rank))
+        axes.sort()
+
+        # Mean and var need to keepdims for computing normalized_tensor, but
+        # their returned values need to not keepdims. So keepdims for now, then
+        # squeeze.
+        m = mean(x, axis=axes, keepdims=True)
+        v = var(x, axis=axes, keepdims=True)
 
     # TODO: Tensorflow's code implies using anything other than the single
     # final axis as the sole element of axis requires broadcasting,
@@ -1104,12 +1126,6 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
                                             beta=beta,
                                             gamma=gamma,
                                             epsilon=epsilon)
-
-    # Tensorflow and Theano disagree on whether mean and var should be squeezed
-    # here. For now, going with Theano for simplicity.
-    #  for ax in reversed(axes):
-    #    m = squeeze(m, ax)
-    #    v = squeeze(v, ax)
 
     return normalized_tensor, m, v
 
