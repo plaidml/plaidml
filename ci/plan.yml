@@ -410,7 +410,7 @@ SUITES:
     timeout: 5
     conda_env: conda/ml_gpu.yml
     cwd: plaidbench
-    runner: plaidbench
+    runner: python
     examples: 256
     workloads:
       inception_v3_train:
@@ -418,20 +418,20 @@ SUITES:
         # passing versions will pass; and non-memory errors will still error
         expected: "CL_MEM_OBJECT_ALLOCATION_FAILURE"
         precision: low
-        args: [inception_v3, --train, --print-stacktraces]
+        args: [plaidbench.py, inception_v3, --train, --print-stacktraces]
       resnet50_train:
         precision: low
-        args: [resnet50, --train, --print-stacktraces]
+        args: [plaidbench.py, resnet50, --train, --print-stacktraces]
       vgg19_train:
         precision: low
-        args: [vgg19, --train, --print-stacktraces]
+        args: [plaidbench.py, vgg19, --train, --print-stacktraces]
       xception_train:
         precision: low
-        args: [xception, --train, --print-stacktraces]
+        args: [plaidbench.py, xception, --train, --print-stacktraces]
         skip_platforms: keras-plaid-ocl-gp100gl
       mobilenet_train:
         precision: low
-        args: [mobilenet, --train, --print-stacktraces]
+        args: [plaidbench.py, mobilenet, --train, --print-stacktraces]
 
   comprehensive:
     platforms:
