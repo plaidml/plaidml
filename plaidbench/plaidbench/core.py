@@ -27,7 +27,6 @@ from collections import namedtuple
 import click
 
 import numpy as np
-import plaidml
 
 
 class GoldenOutputNotAvailableError(Exception):
@@ -281,9 +280,10 @@ def _inner_run(reports,
         # Plaid currently doesn't make it easy to get at metrics,
         # So we steal them from the logs
         timef = ProgramTimeFilter()
-        og = logging.getLogger(plaidml.__name__)
 
-        if kernel_timing and 'plaid' in params.backend_name:
+        if kernel_timing and 'plaid' == params.backend_name:
+            import plaidml
+            og = logging.getLogger(plaidml.__name__)
             device = plaidml.devices(plaidml.Context())[0]
             if 'metal' not in str(device):
                 plaidml._lib()._internal_set_vlog(1)
@@ -295,7 +295,8 @@ def _inner_run(reports,
         _, overrides = model.run()
         stop_watch.stop()
 
-        og.removeFilter(timef)
+        if kernel_timing and 'plaid' == params.backend_name:
+            og.removeFilter(timef)
         # Record stopwatch times
         execution_duration = overrides.get('time', stop_watch.elapsed())
         tile_exec_per_example = 1e-9 + timef.tot_time_ns / 10.0**9 / params.examples
