@@ -2,6 +2,9 @@
 
 #include "tile/codegen/stencil.h"
 
+#include <map>
+#include <utility>
+
 #include "base/util/logging.h"
 #include "base/util/lookup.h"
 #include "base/util/stream_container.h"
@@ -207,6 +210,7 @@ struct StencilPassOptions {
   std::vector<Tags> set_inputs;
   std::vector<Tags> set_outputs;
   bool is_strict_dims;
+  bool copy_tags;
 };
 
 void ApplyIndexTags(Block* block, const StencilMatch& match) {
@@ -263,6 +267,9 @@ void StencilPassRecurse(Block* block, const StencilPassOptions& options) {
     block->add_tags(options.set_outer);
     auto inner = block->SubBlock(0);
     ApplyIndexTags(inner.get(), *match);
+    if (options.copy_tags) {
+      inner->set_attrs(*block);
+    }
     inner->add_tags(options.set_inner);
   }
 }
@@ -285,6 +292,7 @@ void StencilPass::Apply(CompilerState* state) const {
   }
 
   sopts.is_strict_dims = options_.is_strict_dims();
+  sopts.copy_tags = options_.copy_tags();
 
   StencilPassRecurse(state->entry(), sopts);
 }
