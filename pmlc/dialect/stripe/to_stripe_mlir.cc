@@ -274,10 +274,24 @@ static void ToStripeMLIR(OpBuilder* builder, const SymbolTable& outer, const str
       } break;
       case stripe::StmtKind::Store: {
         const auto& store = stripe::Store::Downcast(stmt);
+        std::string agg_str = block.ref_by_into(store->into)->agg_op;
+        IVLOG(1, "STORE: agg_op = '" << agg_str << "'");
         Value* into = safe_at(locals.refs, store->into);
         Value* from = safe_at(locals.scalars, store->from);
         DictionaryAttr attrs = TagsToDict(builder, *store);
-        builder->create<StoreOp>(builder->getUnknownLoc(), into, from, attrs);
+        if (agg_str == "" || agg_str == "assign") {
+          // Simple case, just an assignment
+          builder->create<StoreOp>(builder->getUnknownLoc(), into, from, attrs);
+        } else {
+          // Aggregation case
+          llvm::Optional<AggTypeEnum> agg_type = symbolizeAggTypeEnum(agg_str);
+          if (!agg_type) {
+            throw std::runtime_error("Unknown agg-op:" + agg_str);
+          }
+          int64_t agg_int = static_cast<int>(agg_type.getValue());
+          IntegerAttr agg_attr = builder->getI64IntegerAttr(agg_int);
+          builder->create<AggregateOp>(builder->getUnknownLoc(), into, from, agg_attr, attrs);
+        }
       } break;
       case stripe::StmtKind::Constant: {
         const auto cnst = stripe::Constant::Downcast(stmt);

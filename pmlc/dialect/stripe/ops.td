@@ -81,6 +81,23 @@ def StoreOp : StripeOp<"store"> {
   */
 }
 
+def AggTypeEnum : I64EnumAttr<
+    "AggTypeEnum",
+    "Operation to aggregate with",
+    [
+      I64EnumAttrCase<"add", 1>,
+      I64EnumAttrCase<"mul", 2>,
+      I64EnumAttrCase<"min", 3>,
+      I64EnumAttrCase<"max", 4>,
+    ]> {
+}
+
+def AggregateOp : StripeOp<"aggregate"> {
+  let summary = "A accumulating store with a commutative, associative accumulation";
+  let arguments = (ins TensorType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$type, DictionaryAttr:$attr);
+  let results = (outs);
+}
+
 class AffineOp<string mnemonic> : StripeOp<mnemonic, [NoSideEffect]> {
   let results = (outs AffineType:$result);
 }
@@ -157,3 +174,4 @@ def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let parser = [{ return mlir::success(); }];
   let printer = [{ *p << this->getOperation()->getName(); }];
 }
+
