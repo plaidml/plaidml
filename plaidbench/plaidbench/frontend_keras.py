@@ -18,7 +18,6 @@ import tempfile
 
 import click
 import numpy as np
-import plaidml
 from plaidbench import core
 
 
