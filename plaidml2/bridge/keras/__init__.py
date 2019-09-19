@@ -1063,16 +1063,10 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     I = x.tensor
     ndims = I.shape.ndims
     if ndims == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
-        target_shape = [1 if i in reduction_axes else I.shape[i] for i in range(4)]
-        if reduction_axes == [0, 1, 2]:
-            axes = 3
-        else:
-            axes = 1
-        m = mean(I, axis=axes, keepdims=True)
-        m = squeeze(m, axes)
+        target_shape = [1 if i in reduction_axes else x._keras_shape[i] for i in range(4)]
+        m = mean(x, axis=reduction_axes, keepdims=True)
         m = reshape(m, target_shape)
-        v = var(I, axis=axes, keepdims=True)
-        v = squeeze(v, axes)
+        v = var(x, axis=reduction_axes, keepdims=True)
         v = reshape(v, target_shape)
         beta = reshape(beta, target_shape)
         gamma = reshape(gamma, target_shape)
@@ -1092,6 +1086,10 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
                                             beta=beta,
                                             gamma=gamma,
                                             epsilon=epsilon)
+
+    # squeeze the mean and variance in all cases, that's what TF does
+    m = squeeze(m)
+    v = squeeze(v)
 
     return normalized_tensor, m, v
 
@@ -1559,8 +1557,21 @@ def square(x):
 
 
 @_log_call
-def squeeze(x, axis):
-    return _KerasNode('squeeze', tensor=plaidml_op.squeeze(x.tensor, axis))
+def squeeze(x, axis=None):
+    if axis is None:
+        # define axis
+        axis = []
+        for s in range(len(x._keras_shape)):
+            if x._keras_shape[s] == 1:
+                axis.append(s)
+    if type(axis) is list:
+        x_squeezed = x
+        for i in range(len(axis)):
+            ax = axis[i] - i
+            x_squeezed = _KerasNode('squeeze', tensor=plaidml_op.squeeze(x_squeezed.tensor, ax))
+        return x_squeezed
+    else:
+        return _KerasNode('squeeze', tensor=plaidml_op.squeeze(x.tensor, axis))
 
 
 @_log_call
