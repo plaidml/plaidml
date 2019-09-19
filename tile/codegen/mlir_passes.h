@@ -8,8 +8,8 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ConvertToStripe(CompilerState* state);
-void ConvertToStripeMLIR(CompilerState* state);
+void ConvertFromMLIR(CompilerState* state);
+void ConvertIntoMLIR(CompilerState* state);
 
 }  // namespace codegen
 }  // namespace tile

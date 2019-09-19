@@ -113,9 +113,9 @@ void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions&
     }
     bool wants_stripe = compile_pass->is_stripe();
     if (!in_stripe && wants_stripe) {
-      ConvertToStripe(state);
+      ConvertFromMLIR(state);
     } else if (in_stripe && !wants_stripe) {
-      ConvertToStripeMLIR(state);
+      ConvertIntoMLIR(state);
     }
     in_stripe = wants_stripe;
     compile_pass->Apply(state);
@@ -128,7 +128,7 @@ void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions&
     ValidateBlock(state->entry());
   }
   if (!in_stripe) {
-    ConvertToStripe(state);
+    ConvertFromMLIR(state);
   }
   // Remove constants that are no longer used
   if (state->const_bufs == nullptr) {

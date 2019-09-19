@@ -27,7 +27,6 @@ from collections import namedtuple
 import click
 
 import numpy as np
-import plaidml
 
 
 class GoldenOutputNotAvailableError(Exception):
@@ -247,14 +246,6 @@ def _inner_run(reports,
         params.examples, params.network_name, params.batch_size, params.backend_name),
                 fg='magenta')
 
-    if params.backend_name == 'plaid_edsl':
-        # Don't do kernel timing with PlaidML EDSL
-        kernel_timing = False
-    else:
-        device = plaidml.devices(plaidml.Context())[0]
-        if 'metal' in str(device):
-            kernel_timing = False
-
     benchmark_results = {}
     model_output = None
 
@@ -289,19 +280,23 @@ def _inner_run(reports,
         # Plaid currently doesn't make it easy to get at metrics,
         # So we steal them from the logs
         timef = ProgramTimeFilter()
-        og = logging.getLogger(plaidml.__name__)
-        if kernel_timing:
-            plaidml._lib()._internal_set_vlog(1)
-            if og.level is logging.NOTSET:
-                plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.WARNING)
-            og.setLevel(logging.DEBUG)
-        og.addFilter(timef)
+
+        if kernel_timing and 'plaid' == params.backend_name:
+            import plaidml
+            og = logging.getLogger(plaidml.__name__)
+            device = plaidml.devices(plaidml.Context())[0]
+            if 'metal' not in str(device):
+                plaidml._lib()._internal_set_vlog(1)
+                if og.level is logging.NOTSET:
+                    plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.WARNING)
+                og.setLevel(logging.DEBUG)
 
         stop_watch.start()
         _, overrides = model.run()
         stop_watch.stop()
 
-        og.removeFilter(timef)
+        if kernel_timing and 'plaid' == params.backend_name:
+            og.removeFilter(timef)
         # Record stopwatch times
         execution_duration = overrides.get('time', stop_watch.elapsed())
         tile_exec_per_example = 1e-9 + timef.tot_time_ns / 10.0**9 / params.examples

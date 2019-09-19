@@ -78,8 +78,8 @@ MATCHER_P(LinesEq, str, "") {
   for (size_t i = 0; i < std::min(lines_a.size(), lines_b.size()); i++) {
     if (lines_a[i] != lines_b[i]) {
       *result_listener << "\nMismatch on line " << i << ":\n"
-                       << "expected: " << lines_a[i] << "\n"
-                       << "actual  : " << lines_b[i];
+                       << "expected: \"" << lines_a[i] << "\"\n"
+                       << "actual  : \"" << lines_b[i] << "\"";
     }
   }
 

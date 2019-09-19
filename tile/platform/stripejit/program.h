@@ -9,6 +9,7 @@
 #include "tile/base/program.h"
 #include "tile/lang/runinfo.h"
 #include "tile/proto/tile.pb.h"
+#include "tile/stripe/stripe.h"
 
 namespace vertexai {
 namespace tile {
@@ -28,6 +29,12 @@ class Program final : public tile::Program {
       const std::string& target,     //
       const lang::RunInfo& runinfo,  //
       ConstBufferManager* const_bufs);
+
+  Program(                                             //
+      const std::string& target,                       //
+      const std::shared_ptr<stripe::Program>& stripe,  //
+      ConstBufferManager* const_bufs);
+
   ~Program();
 
   boost::future<void> Run(          //

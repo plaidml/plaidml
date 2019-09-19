@@ -15,7 +15,7 @@ namespace stripejit {
 
 std::shared_ptr<tile::Buffer> Platform::MakeBuffer(  //
     const context::Context& ctx,                     //
-    const std::string& device_id,                    //
+    const std::string& device,                       //
     std::uint64_t size) {
   return std::make_shared<SimpleBuffer>(size);
 }
@@ -33,12 +33,13 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(  //
   return std::make_unique<Program>("llvm_cpu", runinfo, const_bufs);
 }
 
-std::shared_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx,   //
-                                                     const std::string& device_id,  //
-                                                     const std::string& target_id,  //
-                                                     const lang::RunInfo& runinfo,  //
-                                                     ConstBufferManager* const_bufs) {
-  return std::make_unique<Program>(target_id, runinfo, const_bufs);
+std::shared_ptr<tile::Program> Platform::MakeProgram(  //
+    const context::Context& ctx,                       //
+    const std::string& device,                         //
+    const std::string& target,                         //
+    const std::shared_ptr<stripe::Program>& program,   //
+    ConstBufferManager* const_bufs) {
+  return std::make_unique<Program>(target, program, const_bufs);
 }
 
 void Platform::ListDevices(                          //

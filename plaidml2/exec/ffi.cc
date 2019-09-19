@@ -10,15 +10,17 @@
 
 #include <boost/format.hpp>
 
+#include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/lowering.h"
+#include "tile/lang/gen_stripe.h"
 #include "tile/targets/targets.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
-using pmlc::dialect::stripe::ToStripe;
+using pmlc::dialect::stripe::FromMLIR;
 using pmlc::dialect::tile::LowerIntoStripe;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
@@ -100,16 +102,21 @@ plaidml_executable* plaidml_compile(  //
     if (!configs.count(target)) {
       throw std::runtime_error(str(boost::format("Unknown target specified: %1%") % target));
     }
-    Context ctx;
     ConstBufferManager const_bufs;
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
     auto exec = new plaidml_executable{};
-    // 1. lower tile -> stripe
-    // auto stripe = LowerIntoStripe(program->program.get());
-    // 2. convert MLIR -> stripe
-    // stripe::ToStripe(func);
-    // 3. runinfo?
-    exec->program = GetPlatform()->MakeProgram(ctx, device, target, program->eval.runinfo, &const_bufs);
+    std::shared_ptr<vertexai::tile::stripe::Program> stripe;
+    if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
+      mlir::MLIRContext mlir_ctx;
+      // 1. lower tile dialect -> stripe dialect
+      auto module = LowerIntoStripe(&mlir_ctx, program->program.get());
+      // 2. convert MLIR -> stripe
+      stripe = FromMLIR(*module);
+    } else {
+      stripe = vertexai::tile::lang::GenerateStripe(program->eval.runinfo);
+    }
+    Context ctx;
+    exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
     for (size_t i = 0; i < ninputs; i++) {
       auto param_expr = std::dynamic_pointer_cast<ParamExpr>(inputs[i]->expr->expr);
       if (!param_expr) {

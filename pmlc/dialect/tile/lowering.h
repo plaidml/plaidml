@@ -4,6 +4,8 @@
 
 #include <memory>
 
+#include "mlir/IR/Module.h"
+
 namespace pmlc {
 namespace dialect {
 namespace tile {
@@ -11,7 +13,9 @@ namespace tile {
 struct TileProgram;
 struct StripeProgram;
 
-std::shared_ptr<StripeProgram> LowerIntoStripe(TileProgram* program);
+mlir::OwningModuleRef LowerIntoStripe(  //
+    mlir::MLIRContext* context,         //
+    TileProgram* program);
 
 }  // namespace tile
 }  // namespace dialect

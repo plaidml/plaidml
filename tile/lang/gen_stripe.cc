@@ -46,6 +46,8 @@ class StripeGenerator {
 
   std::shared_ptr<stripe::Program> Run() {
     auto program = std::make_shared<stripe::Program>();
+    program->input_shapes = runinfo_.input_shapes;
+    program->output_shapes = runinfo_.output_shapes;
     auto entry = program->entry = std::make_shared<stripe::Block>();
     entry->set_tag("program");
     entry->name = runinfo_.program_name;
@@ -405,14 +407,14 @@ class StripeGenerator {
         kernel->name += ",";
       }
       kernel->name += input;
+      if (loaded.count(input)) {
+        continue;
+      }
+      loaded.emplace(input);
       auto shape = AdjustShape(binding.shape);
       switch (binding.tag) {
         case Binding::TENSOR: {
           // Be careful to handle broadcasts
-          if (loaded.count(input)) {
-            continue;
-          }
-          loaded.emplace(input);
           std::vector<Affine> access;
           int start = (out_shape.dims.size() >= shape.dims.size()) ? 0 : (shape.dims.size() - out_shape.dims.size());
           int idx_offset = out_shape.dims.size() - shape.dims.size();  // can be negative

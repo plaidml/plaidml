@@ -16,6 +16,15 @@
 
 #include "base/util/logging.h"
 
+namespace mlir {
+
+std::ostream& operator<<(std::ostream& os, mlir::ModuleOp op) {
+  os << mlir::debugString(op);
+  return os;
+}
+
+}  // namespace mlir
+
 namespace pmlc {
 namespace dialect {
 namespace eltwise {

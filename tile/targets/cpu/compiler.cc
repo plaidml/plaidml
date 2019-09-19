@@ -706,10 +706,8 @@ void Compiler::Visit(const stripe::Special& special) {
   // tile/lang/gen_special.cc. The spec lists "zero", "copy", and "reshape",
   // while gen_special.cc uses "gather", "scatter", "shape", and "prng_step".
   static std::map<std::string, std::function<void(Compiler*, const stripe::Special&)>> handlers{
-      {"zero", &Compiler::Zero},
-      {"copy", &Compiler::Copy},
-      {"reshape", &Compiler::Reshape},
-      {"prng_step", &Compiler::PrngStep},
+      {"zero", &Compiler::Zero},          {"copy", &Compiler::Copy},   {"reshape", &Compiler::Reshape},
+      {"prng_step", &Compiler::PrngStep}, {"shape", &Compiler::Shape},
   };
   auto it = handlers.find(special.name);
   if (it == handlers.end()) {
@@ -765,7 +763,13 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"pow", &Compiler::Pow},
       {"tanh", &Compiler::Tanh},
       {"cos", &Compiler::Cos},
-      {"as_float", &Compiler::AsFloat},  // Lubo
+      {"as_float", &Compiler::AsFloat},
+      {"as_int", &Compiler::AsInt},
+      {"as_uint", &Compiler::AsUInt},
+      {"floor", &Compiler::Floor},
+      {"ceil", &Compiler::Ceil},
+      {"round", &Compiler::Round},
+      {"as_float", &Compiler::AsFloat},
   };
   auto externiter = config_.externals.find(intrinsic.name);
   if (externiter != config_.externals.end()) {
@@ -1133,7 +1137,10 @@ void Compiler::Unequal(const stripe::Intrinsic& neq) {
 void Compiler::Conditional(const stripe::Intrinsic& cond) {
   // Three inputs: C, T, F; C is boolean, T and F are operation type
   assert(3 == cond.inputs.size());
-  Scalar c = CheckBool(scalars_[cond.inputs[0]]);
+  // There are cases where keras calls a conditional with fp32 and fp64 type
+  // for first parameter. Cast it to boolean, so the LLVM type system checks
+  // are satisfied.
+  Scalar c = Cast(scalars_[cond.inputs[0]], DataType::BOOLEAN);
   Scalar t = Cast(scalars_[cond.inputs[1]], cond.type);
   Scalar f = Cast(scalars_[cond.inputs[2]], cond.type);
   // Single output will be one of T or F
@@ -1189,8 +1196,76 @@ void Compiler::BitLeft(const stripe::Intrinsic& stmt) {
 }
 
 void Compiler::AsFloat(const stripe::Intrinsic& stmt) {
-  assert(1 == stmt.inputs.size());
-  Scalar ret = Cast(scalars_[stmt.inputs[0]], DataType::FLOAT32);
+  assert(2 == stmt.inputs.size());
+  Scalar inStmt2 = scalars_[stmt.inputs[1]];
+  int bits = llvm::cast<llvm::ConstantInt>(*inStmt2.value).getValue().getLimitedValue();
+  DataType type = DataType::INVALID;
+  switch (bits) {
+    case 32:
+      type = DataType::FLOAT32;
+      break;
+    case 64:
+      type = DataType::FLOAT64;
+    default:
+      // TODO: Add bfloat16 when added to Stripe.
+      throw std::runtime_error("Invalid bit count for as_float for CPU jit.");
+  }
+
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
+  assert(1 == stmt.outputs.size());
+  scalars_[stmt.outputs[0]] = ret;
+  ret.value->setName(stmt.outputs[0]);
+}
+
+void Compiler::AsInt(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  Scalar inStmt2 = scalars_[stmt.inputs[1]];
+  int bits = llvm::cast<llvm::ConstantInt>(*inStmt2.value).getValue().getLimitedValue();
+  DataType type = DataType::INVALID;
+  switch (bits) {
+    case 8:
+      type = DataType::INT8;
+      break;
+    case 16:
+      type = DataType::INT16;
+      break;
+    case 32:
+      type = DataType::INT32;
+      break;
+    case 64:
+      type = DataType::INT64;
+    default:
+      throw std::runtime_error("Invalid bit count for as_int for CPU jit.");
+  }
+
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
+  assert(1 == stmt.outputs.size());
+  scalars_[stmt.outputs[0]] = ret;
+  ret.value->setName(stmt.outputs[0]);
+}
+
+void Compiler::AsUInt(const stripe::Intrinsic& stmt) {
+  assert(2 == stmt.inputs.size());
+  Scalar inStmt2 = scalars_[stmt.inputs[1]];
+  int bits = llvm::cast<llvm::ConstantInt>(*inStmt2.value).getValue().getLimitedValue();
+  DataType type = DataType::INVALID;
+  switch (bits) {
+    case 8:
+      type = DataType::UINT8;
+      break;
+    case 16:
+      type = DataType::UINT16;
+      break;
+    case 32:
+      type = DataType::UINT32;
+      break;
+    case 64:
+      type = DataType::UINT64;
+    default:
+      throw std::runtime_error("Invalid bit count for as_uint for CPU jit.");
+  }
+
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
   assert(1 == stmt.outputs.size());
   scalars_[stmt.outputs[0]] = ret;
   ret.value->setName(stmt.outputs[0]);
@@ -1222,6 +1297,12 @@ void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "pow
 void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanhf", "tanh"); }
 
 void Compiler::Cos(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "cosf", "cos"); }
+
+void Compiler::Floor(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "floorf", "floor"); }
+
+void Compiler::Ceil(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "ceilf", "ceil"); }
+
+void Compiler::Round(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "roundf", "round"); }
 
 void Compiler::Zero(const stripe::Special& zero) {
   assert(0 == zero.inputs.size());
@@ -1261,6 +1342,26 @@ void Compiler::PrngStep(const stripe::Special& prng_step) {
   llvm::Value* count = IndexConst(dest_bytes / sizeof(uint32_t));
   std::vector<llvm::Value*> args{in_state.base, out_state.base, dest_arg, count};
   builder_.CreateCall(PrngStepFunction(), args, "");
+}
+
+void Compiler::Shape(const stripe::Special& shape) {
+  // Input is a tensor. Output is a 1-dimensional array with number of elements
+  // equal to the input tensor's number of dimensions. Write the size of each
+  // input dimension to the corresponding element of the output tensor.
+  assert(1 == shape.inputs.size());
+  Buffer data = buffers_[shape.inputs[0]];
+  size_t data_ndims = data.refinement->interior_shape.dims.size();
+  assert(1 == shape.outputs.size());
+  Buffer out = buffers_[shape.outputs[0]];
+  assert(1 == out.refinement->interior_shape.dims.size());
+  assert(data_ndims == out.refinement->interior_shape.elem_size());
+  uint64_t elem_bits = bit_width(out.refinement->interior_shape.type);
+  for (size_t i = 0; i < data_ndims; ++i) {
+    uint64_t dim_size = data.refinement->interior_shape.dims[i].size;
+    llvm::Value* val = builder_.getIntN(elem_bits, dim_size);
+    llvm::Value* dest = builder_.CreateGEP(out.base, {IndexConst(i)});
+    builder_.CreateStore(val, dest);
+  }
 }
 
 Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {

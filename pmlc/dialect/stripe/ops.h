@@ -3,7 +3,6 @@
 #pragma once
 
 #include "mlir/IR/OpDefinition.h"
-#include "pmlc/dialect/stripe/attrs.h"
 #include "pmlc/dialect/stripe/types.h"
 
 namespace pmlc {
