@@ -1063,7 +1063,7 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     I = x.tensor
     ndims = I.shape.ndims
     if ndims == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
-        target_shape = [1 if i in reduction_axes else i for i in range(4)]
+        target_shape = [1 if i in reduction_axes else I.shape[i] for i in range(4)]
         if reduction_axes == [0, 1, 2]:
             axes = 3
         else:

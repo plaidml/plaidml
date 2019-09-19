@@ -1078,7 +1078,7 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
         # the case where there are 4 dims in x. If the reduction axes are passed
         # in explicitly when a layer is created, the broadcasting behavior
         # differs.
-        target_shape = [1 if i in reduction_axes else i for i in range(4)]
+        target_shape = [1 if i in reduction_axes else x.shape[i] for i in range(4)]
         if reduction_axes == [0, 1, 2]:
             axes = 3
         else:
