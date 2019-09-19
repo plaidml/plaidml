@@ -34,7 +34,7 @@ class StripeBuilder {
  private:
   TensorShape get_shape(TensorLayoutAttr layout);
   void add_attributes(stripe::Taggable& out, DictionaryAttr in);  // NOLINT
-  void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out);
+  void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out, std::string agg = "");
   stripe::Location build_location(stripe::Block* block, Value* device_path);
   std::string get_idx(stripe::Block* block, mlir::BlockArgument* affine);
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
@@ -43,6 +43,7 @@ class StripeBuilder {
   void visit(ExecutorOp op, int count);
   void visit(LoadOp op);
   void visit(StoreOp op);
+  void visit(AggregateOp op);
   void walk_interior(Block* inner);
 
   std::shared_ptr<stripe::Block> cur_;
@@ -52,6 +53,7 @@ class StripeBuilder {
   std::map<std::pair<stripe::Block*, mlir::BlockArgument*>, std::string> idxs_;
   std::map<mlir::Value*, std::string> scalars_;
   Operation* iop;
+  bool found_inst_;
 };
 
 }  // End namespace
@@ -94,7 +96,8 @@ void StripeBuilder::add_attributes(stripe::Taggable& out, DictionaryAttr in) {
   }
 }
 
-void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out) {
+void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out,
+                                    std::string agg_name) {
   // Compute all the info about the tensor
   auto ti = ComputeAccess(tensor);
   // Translate allocation shape
@@ -155,7 +158,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         shape.dims[i].size = range.max - range.min + 1;
         shape.dims[i].size = std::min(shape.dims[i].size, base_shape.dims[i].size);
       }
-      sblock->refs.emplace(dir, "", rname, access, shape);
+      sblock->refs.emplace(dir, "", rname, access, shape, agg_name);
     }
     // Connect up previously added block
     if (ref) {
@@ -332,6 +335,15 @@ void StripeBuilder::visit(StoreOp op) {
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
 }
 
+void StripeBuilder::visit(AggregateOp op) {
+  std::string ref_name;
+  AggTypeEnum agg_enum = static_cast<AggTypeEnum>(op.agg_type().getLimitedValue());
+  std::string agg_name = stringifyAggTypeEnum(agg_enum);
+  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name, agg_name);
+  std::string from = scalars_.at(op.from());
+  cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
+}
+
 void StripeBuilder::walk_interior(Block* block) {
   // Count inner ops
   int count = 0;
@@ -356,10 +368,19 @@ void StripeBuilder::walk_interior(Block* block) {
       visit(op);
     } else if (auto op = mlir::dyn_cast<StoreOp>(op_base)) {
       visit(op);
+    } else if (auto op = mlir::dyn_cast<AggregateOp>(op_base)) {
+      visit(op);
     } else {
+      found_inst_ = false;
       // Try all the intrinsic ops
       iop = &op_base;
       eltwise::ForAllOps(*this);
+      /*
+      if (!found_inst_) {
+        std::cout << "Unable to convert instruction: " << iop << "\n";
+        throw std::runtime_error("Unable to find an instruction");
+      }
+      */
     }
   }
 }
@@ -378,6 +399,7 @@ void StripeBuilder::apply() {
       intr->inputs.push_back(scalars_.at(op.getOperation()->getOperand(i)));
     }
     cur_->stmts.push_back(intr);
+    found_inst_ = true;
   }
 }
 

@@ -35,6 +35,8 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
       inner.resize(op.from()->getType().cast<TensorType>().ndim());
     } else if (auto op = mlir::dyn_cast<StoreOp>(use.getOwner())) {
       inner.resize(op.into()->getType().cast<TensorType>().ndim());
+    } else if (auto op = mlir::dyn_cast<AggregateOp>(use.getOwner())) {
+      inner.resize(op.into()->getType().cast<TensorType>().ndim());
     } else {
       throw std::runtime_error("Invalid type");
     }

@@ -94,7 +94,7 @@ def AggTypeEnum : I64EnumAttr<
 
 def AggregateOp : StripeOp<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
-  let arguments = (ins TensorType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$type, DictionaryAttr:$attr);
+  let arguments = (ins TensorType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$agg_type, DictionaryAttr:$attr);
   let results = (outs);
 }
 

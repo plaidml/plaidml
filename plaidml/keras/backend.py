@@ -55,6 +55,7 @@ def _log_call(func):
     '''A decorator that logs the call of the wrapped function'''
 
     def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
         # Construct a string logging the call if logging is turned on
         if logger.isEnabledFor(logging.DEBUG):
             sig = inspect.signature(func)
