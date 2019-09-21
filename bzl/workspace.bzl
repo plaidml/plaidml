@@ -2,11 +2,13 @@ load("//bzl:conda_repo.bzl", "conda_repo")
 load("//bzl:xsmm_repo.bzl", "xsmm_repo")
 load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("//vendor/cm:configure.bzl", "configure_cm")
+load("//vendor/ngraph:configure.bzl", "configure_ngraph")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//bzl:dev_repo.bzl", "dev_http_archive")
 
 def plaidml_workspace():
     configure_toolchain()
+    configure_ngraph()
 
     http_archive(
         name = "boost",
