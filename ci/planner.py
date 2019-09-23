@@ -35,8 +35,6 @@ class Planner(BoxLayout):
             # for platform in plan['PLATFORMS'].keys():
             #     self.add_widget(Button(text=platform))
 
-        self.add_widget(self.label)
-
         variants = []
         for variant in plan['VARIANTS'].keys():
             self.variant = Button(text=variant)
@@ -57,6 +55,4 @@ class PlannerApp(App):
 
 
 if __name__ == '__main__':
-    layout = BoxLayout(padding=10)
-    label = Label(text="PlaidML")
     PlannerApp().run()
