@@ -18,14 +18,13 @@ summary reference section at the end.
 
 This tutorial covers how to use the C++ Tile EDSL, not how Tile code is
 constructed and manipulated by PlaidML. It does not cover the workings of
-PlaidML utilities such as the Tile compiler.
+PlaidML utilities such as the "pmlc compiler".
 
-Tile and PlaidML are still in early development and the C++ Tile EDSL is
-actively changing to add new functionality. It is certain there will be
-substantive additions to the C++ Tile EDSL; it is likely that some minor changes
-will affect operations described in this tutorial; it is not impossible that
-there will be major changes to the C++ Tile EDSL affecting the contents of this
-tutorial.
+Tile and PlaidML are still being developed and the APIs discussed here are subject
+to change. It is certain there will be substantive additions to the C++ Tile EDSL;
+it is likely that some minor changes will affect operations described in this
+tutorial; it is not impossible that there will be major changes to the C++ Tile
+EDSL affecting the contents of this tutorial.
 
 ## How to Write Tile Code
 
@@ -396,7 +395,7 @@ A set of indices are _valid_ if and only if:
    resulting indices are non-negative integers less than the appropriate
    dimension.
 1. All the constraints are satisfied.
-   Constraints always take the form `if ([index expression] < [constant expression])`
+   Constraints always take the form `[index expression] < [constant expression]`
    (where `[index expression]` is a linear polynomial in the index
    variables and `[constant expression]` is a linear polynomial in the input
    dimensions), and they always implicitly include `0 <= [index expression]`.
