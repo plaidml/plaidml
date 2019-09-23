@@ -37,10 +37,10 @@ _device = plaidml_settings.get('PLAIDML_DEVICE')
 
 def _prepend_name_scope(name, default):
     if name:
-        r = '_'.join(_NAME_SCOPE_STACK + [name])
+        r = '/'.join(_NAME_SCOPE_STACK + [name])
     else:
-        r = '_'.join(_NAME_SCOPE_STACK + [default])
-        r += '_' + str(get_uid(r))
+        r = '/'.join(_NAME_SCOPE_STACK + [default])
+        r += '/' + str(get_uid(r))
     return r
 
 

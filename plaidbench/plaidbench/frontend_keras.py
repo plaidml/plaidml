@@ -18,7 +18,6 @@ import tempfile
 
 import click
 import numpy as np
-import plaidml
 from plaidbench import core
 
 
@@ -68,17 +67,18 @@ def setup_imdb(train, epoch_size):
 
 class Model(core.Model):
 
-    def __init__(self, frontend, params):
+    def __init__(self, frontend, params, enable_bn_folding=False):
         learn_phase = params.learn_phase  # e.g. 0 for infer with fixed learning phase (but should come from param)
         if learn_phase is not None:
             from keras.backend import set_learning_phase
             set_learning_phase(learn_phase)
         self.frontend = frontend
         self.params = params
+        self.enable_bn_folding = enable_bn_folding
 
     def fold_batch_norm(self, model):
         import json
-        import plaidml.keras.backend as K
+        import keras.backend as K
         from keras.models import model_from_json
 
         def make_mults(weights):
@@ -88,7 +88,7 @@ class Model(core.Model):
             mean = None
             var = None
             for w in weights:
-                name = w.name.split('/')[1]
+                name = w.name.split('/')[-1]
                 if name == 'beta':
                     beta = K.get_value(w)
                 elif name == 'gamma':
@@ -198,7 +198,7 @@ class Model(core.Model):
             eval(code, mod)
         self.x = mod['scale_dataset'](self.x)
         self.model = mod['build_model'](**build_model_kwargs)
-        if not self.frontend.train and os.getenv('USE_STRIPE', '0') == '1':
+        if self.enable_bn_folding:
             click.echo('Model loaded, folding in batch_norm')
             self.model = self.fold_batch_norm(self.model)
 
@@ -343,7 +343,8 @@ class Frontend(core.Frontend):
     def model(self, params):
         if self.train:
             return TrainingModel(self, params)
-        return InferenceModel(self, params)
+        enable_bn_folding = os.getenv('USE_STRIPE', '0') == '1' or self.backend == 'plaid_edsl'
+        return InferenceModel(self, params, enable_bn_folding=enable_bn_folding)
 
     @property
     def name(self):
