@@ -1072,16 +1072,16 @@ not_equal = op.not_equal
 
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
-    rank = x.shape.ndims
+    try:
+        rank = x.shape.ndims
+    except AttributeError:
+        raise PlaidMLKerasException('x is not a valid tensor')
     if rank == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
         # NOTE: Tensorflow's code is explicitly checking for reduction axes in
         # the case where there are 4 dims in x. If the reduction axes are passed
         # in explicitly when a layer is created, the broadcasting behavior
         # differs.
-        try:
-            xdims = x.shape.dims
-        except AttributeError:
-            xdims = x.shape
+        xdims = x.shape.dims
         target_shape = [1 if i in reduction_axes else xdims[i] for i in range(4)]
         m = mean(x, axis=reduction_axes, keepdims=True)
         m = reshape(m, target_shape)
