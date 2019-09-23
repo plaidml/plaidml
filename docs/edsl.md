@@ -270,9 +270,8 @@ float I[N], O[N / 2];
 for (int i = 0; i < N/2; ++i) {
     float curr_max = FLT_MIN;
     for (int j = 0; j < 2; ++j) {
-        if (I[2 * i + j] > curr_max) {
-            curr_max = I[2 * i + j];
-        }
+      curr_max = I[2 * i + j];
+      O.add_constraints({I[2 * i + j] > curr_max})
     }
     O[i] = curr_max;
 }
@@ -312,9 +311,8 @@ Tensor max_pool_1d(const Tensor& I) {
   TensorIndex i, j;
   I.bind_dims(N);
   auto O = TensorOutput(N / 2);
-  if (j < 2) {
-    O(i) >= I(2 * i + j);
-  }
+  O(i) >= I(2 * i + j);
+  O.add_constraints({j<2});
   return O;
 }
 ```
@@ -382,8 +380,8 @@ or invalid set of index variables. For example, in the code:
 ```c++
 I.bind_dims(N);
 auto O = TensorOutput((N + 1) / 2);
-if (j < 2) {
-  O(i) >= I(2 * i + j);
+O(i) >= I(2 * i + j);
+O.add_constraints({j<2});
 }
 ```
 
@@ -451,9 +449,8 @@ Tensor csum(const Tensor& I) {
   TensorIndex i, k;
   I.bind_dims(N);
   auto O = TensorOutput(N);
-  if (i - k < N) {
-    O(i) += I(k);
-  }
+  O(i) += I(k);
+  O.add_constraints ({i - k < N})
   return O;
 }
 ```
