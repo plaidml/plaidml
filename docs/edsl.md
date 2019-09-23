@@ -18,13 +18,10 @@ summary reference section at the end.
 
 This tutorial covers how to use the C++ Tile EDSL, not how Tile code is
 constructed and manipulated by PlaidML. It does not cover the workings of
-PlaidML utilities such as the "pmlc compiler".
+PlaidML utilities such as the pmlc compiler.
 
 Tile and PlaidML are still being developed and the APIs discussed here are subject
-to change. It is certain there will be substantive additions to the C++ Tile EDSL;
-it is likely that some minor changes will affect operations described in this
-tutorial; it is not impossible that there will be major changes to the C++ Tile
-EDSL affecting the contents of this tutorial.
+to change.
 
 ## How to Write Tile Code
 
