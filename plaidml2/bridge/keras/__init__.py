@@ -1060,10 +1060,9 @@ def not_equal(lhs, rhs):
 
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
-    I = x.tensor
-    ndims = I.shape.ndims
+    ndims = ndims(x)
     if ndims == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
-        target_shape = [1 if i in reduction_axes else x._keras_shape[i] for i in range(4)]
+        target_shape = [1 if i in reduction_axes else int_shape(x) for i in range(4)]
         m = mean(x, axis=reduction_axes, keepdims=True)
         m = reshape(m, target_shape)
         v = var(x, axis=reduction_axes, keepdims=True)
@@ -1561,8 +1560,8 @@ def squeeze(x, axis=None):
     if axis is None:
         # define axis
         axis = []
-        for s in range(len(x._keras_shape)):
-            if x._keras_shape[s] == 1:
+        for s in range(len(int_shape(x))):
+            if int_shape(x)[s] == 1:
                 axis.append(s)
     if type(axis) is list:
         x_squeezed = x
