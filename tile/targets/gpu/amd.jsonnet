@@ -31,6 +31,7 @@ local PARAMS = {
           // Define the stripe passes
           passes: [
             // First, we place all the initial buffer in global memory (DRAM)
+            /*
             {
               name: 'loc_program',
               pass: {
@@ -39,7 +40,7 @@ local PARAMS = {
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
-
+            
             {
               name: 'loc_main',
               pass: {
@@ -48,7 +49,7 @@ local PARAMS = {
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
-
+            */
             // Change tags before optimizations
             {
               name: 'kernel_tag',
@@ -105,6 +106,7 @@ local PARAMS = {
             },
             */
 
+            
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',

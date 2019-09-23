@@ -37,6 +37,7 @@ local PARAMS = {
             },
 
             // we place all the initial buffer in global memory (DRAM)
+            /*
             {
               name: 'loc_program',
               pass: {
@@ -54,6 +55,7 @@ local PARAMS = {
                 loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
               },
             },
+            */
 
             {
               name: 'const_tensor',
@@ -101,12 +103,14 @@ local PARAMS = {
             },
 
             // Reorder Blocks
+            /*
             {
               name: 'reorder_blocks',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
               },
             },
+            */
 
             // Pad tensors to remove inner conditionals
             {
