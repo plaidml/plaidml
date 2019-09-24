@@ -1220,7 +1220,9 @@ void Compiler::AsFloat(const stripe::Intrinsic& stmt) {
       break;
     default:
       // TODO: Add bfloat16 when added to Stripe.
-      throw std::runtime_error("Invalid bit count for as_float for CPU jit.");
+      std::ostringstream oss;
+      oss << "Invalid bit count for as_float for CPU jit - " << bits;
+      throw std::runtime_error(oss.str());
   }
 
   Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
@@ -1248,7 +1250,9 @@ void Compiler::AsInt(const stripe::Intrinsic& stmt) {
       type = DataType::INT64;
       break;
     default:
-      throw std::runtime_error("Invalid bit count for as_int for CPU jit.");
+      std::ostringstream oss;
+      oss << "Invalid bit count for as_int for CPU jit - " << bits;
+      throw std::runtime_error(oss.str());
   }
 
   Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
@@ -1276,7 +1280,9 @@ void Compiler::AsUInt(const stripe::Intrinsic& stmt) {
       type = DataType::UINT64;
       break;
     default:
-      throw std::runtime_error("Invalid bit count for as_uint for CPU jit.");
+      std::ostringstream oss;
+      oss << "Invalid bit count for as_uint for CPU jit - " << bits;
+      throw std::runtime_error(oss.str());
   }
 
   Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
