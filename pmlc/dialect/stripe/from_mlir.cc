@@ -42,8 +42,10 @@ class StripeBuilder {
   void visit(ConstraintOp op, int count);
   void visit(ExecutorOp op, int count);
   void visit(LoadOp op);
+  void visit(LoadIndexOp op);
   void visit(StoreOp op);
   void visit(AggregateOp op);
+  void visit(ReshapeOp op);
   void walk_interior(Block* inner);
 
   std::shared_ptr<stripe::Block> cur_;
@@ -360,6 +362,13 @@ void StripeBuilder::visit(LoadOp op) {
   cur_->stmts.push_back(std::make_shared<stripe::Load>(ref_name, into));
 }
 
+void StripeBuilder::visit(LoadIndexOp op) {
+  stripe::Affine from = build_affine(cur_.get(), op.from());
+  std::string into = std::string("$s") + std::to_string(next_scalar_++);
+  scalars_.emplace(op.into(), into);
+  cur_->stmts.push_back(std::make_shared<stripe::LoadIndex>(from, into));
+}
+
 void StripeBuilder::visit(StoreOp op) {
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name);
@@ -374,6 +383,18 @@ void StripeBuilder::visit(AggregateOp op) {
   add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name, agg_name);
   std::string from = scalars_.at(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
+}
+
+void StripeBuilder::visit(ReshapeOp op) {
+  std::string from_name;
+  std::string into_name;
+  add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &from_name);
+  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &into_name);
+  auto r = std::make_shared<stripe::Special>();
+  r->name = "reshape";
+  r->inputs.push_back(from_name);
+  r->outputs.push_back(into_name);
+  cur_->stmts.push_back(r);
 }
 
 void StripeBuilder::walk_interior(Block* block) {
@@ -398,9 +419,13 @@ void StripeBuilder::walk_interior(Block* block) {
       visit(op, count);
     } else if (auto op = mlir::dyn_cast<LoadOp>(op_base)) {
       visit(op);
+    } else if (auto op = mlir::dyn_cast<LoadIndexOp>(op_base)) {
+      visit(op);
     } else if (auto op = mlir::dyn_cast<StoreOp>(op_base)) {
       visit(op);
     } else if (auto op = mlir::dyn_cast<AggregateOp>(op_base)) {
+      visit(op);
+    } else if (auto op = mlir::dyn_cast<ReshapeOp>(op_base)) {
       visit(op);
     } else {
       found_inst_ = false;
@@ -426,6 +451,9 @@ void StripeBuilder::apply() {
     std::string dialect = op.getOperation()->getName().getDialect().str();
     std::string full_name = op.getOperation()->getName().getStringRef().str();
     intr->name = full_name.substr(dialect.size() + 1, full_name.size() - dialect.size() - 1);
+    if (intr->name == "select") {
+      intr->name = "cond";
+    }
     intr->outputs.push_back(out_name);
     for (size_t i = 0; i < ScalarOp::operands(); i++) {
       intr->inputs.push_back(scalars_.at(op.getOperation()->getOperand(i)));

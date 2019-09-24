@@ -60,6 +60,7 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
 
 void PaddingPass::runOnFunction() {
   IVLOG(1, "PaddingPass::runOnFunction>");
+  /*
   mlir::FuncOp f = getFunction();
   // Get the unbounded access ranges for each function input
   for (const auto& arg : f.getArguments()) {
@@ -83,6 +84,7 @@ void PaddingPass::runOnFunction() {
       IVLOG(2, "  Tmps: " << ss.str());
     }
   });
+  */
 }
 
 }  // namespace stripe

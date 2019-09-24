@@ -119,11 +119,55 @@ static Value* AffineIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const 
 
 namespace {
 
+template <typename OpType>
+struct IntrinsicBuildImpl {
+  static Value* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic, const llvm::ArrayRef<Value*>& inputs) {
+    if (OpType::operands() != inputs.size()) {
+      std::cerr << intrinsic;
+      throw std::runtime_error("Mismatched intrinsic size");
+    }
+    ScalarType intrinsic_type = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
+    auto inst = builder->create<OpType>(builder->getUnknownLoc(), intrinsic_type, inputs);
+    return inst;
+  }
+};
+
+IntegerAttr ExtractIntegerConstant(Value* val) {
+  auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(val->getDefiningOp());
+  if (!op) {
+    throw std::runtime_error("Invalid constant");
+  }
+  auto attr = op.getValue().dyn_cast<IntegerAttr>();
+  if (!attr) {
+    throw std::runtime_error("Constant is not an integer");
+  }
+  return attr;
+}
+
+template <typename CastOpType>
+struct CastIntrinsicBuildImpl {
+  static Value* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic, const llvm::ArrayRef<Value*>& inputs) {
+    if (inputs.size() != 2) {
+      throw std::runtime_error("as_float needs to params");
+    }
+    auto bit_width = ExtractIntegerConstant(inputs[1]);
+    auto inst = builder->create<CastOpType>(builder->getUnknownLoc(), inputs[0], bit_width);
+    return inst;
+  }
+};
+
+template <>
+struct IntrinsicBuildImpl<eltwise::AsFloatOp> : CastIntrinsicBuildImpl<eltwise::AsFloatOp> {};
+template <>
+struct IntrinsicBuildImpl<eltwise::AsIntOp> : CastIntrinsicBuildImpl<eltwise::AsIntOp> {};
+template <>
+struct IntrinsicBuildImpl<eltwise::AsUIntOp> : CastIntrinsicBuildImpl<eltwise::AsUIntOp> {};
+
 struct IntrinsicBuilder {
   OpBuilder* builder;
   SymbolTable* locals;
   const stripe::Intrinsic& intrinsic;
-  const std::string name;
+  std::string name;
   bool done;
 
   IntrinsicBuilder(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic)
@@ -131,26 +175,24 @@ struct IntrinsicBuilder {
         locals(locals),
         intrinsic(intrinsic),
         name("eltwise." + intrinsic.name),
-        done(false) {}
+        done(false) {
+    if (name == "eltwise.cond") {
+      name = "eltwise.select";
+    }
+  }
 
   template <class OpType>
   void apply() {
     if (name != OpType::getOperationName()) {
       return;
     }
-    if (OpType::operands() != intrinsic.inputs.size()) {
-      throw std::runtime_error("Mismatched intrinsic size");
-    }
-    done = true;
     llvm::SmallVector<Value*, 8> inputs;
     for (const auto& in : intrinsic.inputs) {
       inputs.push_back(safe_at(locals->scalars, in));
     }
-    ScalarType intrinsic_type = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
-    auto inst = builder->create<OpType>(builder->getUnknownLoc(), intrinsic_type, inputs);
-    if (inst.getOperation()->getNumResults()) {
-      locals->scalars.emplace(intrinsic.outputs[0], inst.getOperation()->getResult(0));
-    }
+    Value* r = IntrinsicBuildImpl<OpType>::apply(builder, intrinsic, inputs);
+    locals->scalars.emplace(intrinsic.outputs[0], r);
+    done = true;
   }
 };
 
@@ -183,6 +225,19 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
   eltwise::ForAllOps(intrinsic_builder);
   if (!intrinsic_builder.done) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
+  }
+}
+
+static void SpecialIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Special& special) {
+  if (special.name == "reshape") {
+    if (special.inputs.size() != 1 || special.outputs.size() != 1) {
+      throw std::runtime_error("Invalid reshape");
+    }
+    Value* in_ref = safe_at(locals->refs, special.inputs[0]);
+    Value* out_ref = safe_at(locals->refs, special.outputs[0]);
+    builder->create<ReshapeOp>(builder->getUnknownLoc(), in_ref, out_ref);
+  } else {
+    throw std::runtime_error("Unknown special: " + special.name);
   }
 }
 
@@ -281,6 +336,14 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         auto op = builder->create<LoadOp>(unknownLoc, intoType, from, attrs);
         locals.scalars.emplace(load->into, op);
       } break;
+      case stripe::StmtKind::LoadIndex: {
+        const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
+        Value* from = AffineIntoMLIR(builder, locals, load_idx->from);
+        Type idx_base = eltwise::ScalarType::get(builder->getContext(), DataType::INT32);
+        Type idx_type = eltwise::GetTensorType(idx_base);
+        auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
+        locals.scalars.emplace(load_idx->into, op);
+      } break;
       case stripe::StmtKind::Store: {
         const auto& store = stripe::Store::Downcast(stmt);
         std::string agg_str = block.ref_by_into(store->into)->agg_op;
@@ -317,11 +380,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         }
         locals.scalars.emplace(cnst->name, op);
       } break;
-      case stripe::StmtKind::LoadIndex:
-        throw std::runtime_error("LoadIndex Unimplemented");
-        break;
       case stripe::StmtKind::Special:
-        throw std::runtime_error("Special Unimplemented");
+        SpecialIntoMLIR(builder, &locals, *stripe::Special::Downcast(stmt));
         break;
       case stripe::StmtKind::Intrinsic:
         IntrinsicIntoMLIR(builder, &locals, *stripe::Intrinsic::Downcast(stmt));

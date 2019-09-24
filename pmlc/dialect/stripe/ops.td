@@ -61,6 +61,12 @@ def LoadOp : StripeOp<"load"> {
   */
 }
 
+def LoadIndexOp : StripeOp<"load_index"> {
+  let summary = "Convert an affine expression into a scalar value";
+  let arguments = (ins AffineType:$from);
+  let results = (outs Eltwise_AnyTensor:$into);
+}
+
 def StoreOp : StripeOp<"store"> {
   let summary = "Store into a tensor";
   let arguments = (ins
@@ -155,6 +161,14 @@ def ParallelForOp : StripeOp<"parallel_for"> {
 def ConstraintOp : StripeOp<"constraint"> {
   let arguments = (ins AffineType:$input);
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
+}
+
+def ReshapeOp : StripeOp<"reshape"> {
+  let arguments = (ins
+    TensorRefType:$from,
+    TensorRefType:$into
+  );
+  let results = (outs);
 }
 
 def ExecutorOp : StripeOp<"executor"> {
