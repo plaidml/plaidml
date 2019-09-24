@@ -769,7 +769,18 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"floor", &Compiler::Floor},
       {"ceil", &Compiler::Ceil},
       {"round", &Compiler::Round},
-      {"as_float", &Compiler::AsFloat},
+      // Numeric operations from stdlib mentioned in tile/lang/builtins.cc
+      {"abs", &Compiler::Abs},
+      {"acos", &Compiler::Acos},
+      {"asin", &Compiler::Asin},
+      {"atan", &Compiler::Atan},
+      {"acosh", &Compiler::Acosh},
+      {"asinh", &Compiler::Asinh},
+      {"atanh", &Compiler::Atanh},
+      {"cosh", &Compiler::Cosh},
+      {"sin", &Compiler::Sin},
+      {"sinh", &Compiler::Sinh},
+      {"tan", &Compiler::Tan},
   };
   auto externiter = config_.externals.find(intrinsic.name);
   if (externiter != config_.externals.end()) {
@@ -1206,9 +1217,12 @@ void Compiler::AsFloat(const stripe::Intrinsic& stmt) {
       break;
     case 64:
       type = DataType::FLOAT64;
+      break;
     default:
       // TODO: Add bfloat16 when added to Stripe.
-      throw std::runtime_error("Invalid bit count for as_float for CPU jit.");
+      std::ostringstream oss;
+      oss << "Invalid bit count for as_float for CPU jit - " << bits;
+      throw std::runtime_error(oss.str());
   }
 
   Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
@@ -1234,8 +1248,11 @@ void Compiler::AsInt(const stripe::Intrinsic& stmt) {
       break;
     case 64:
       type = DataType::INT64;
+      break;
     default:
-      throw std::runtime_error("Invalid bit count for as_int for CPU jit.");
+      std::ostringstream oss;
+      oss << "Invalid bit count for as_int for CPU jit - " << bits;
+      throw std::runtime_error(oss.str());
   }
 
   Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
@@ -1261,8 +1278,11 @@ void Compiler::AsUInt(const stripe::Intrinsic& stmt) {
       break;
     case 64:
       type = DataType::UINT64;
+      break;
     default:
-      throw std::runtime_error("Invalid bit count for as_uint for CPU jit.");
+      std::ostringstream oss;
+      oss << "Invalid bit count for as_uint for CPU jit - " << bits;
+      throw std::runtime_error(oss.str());
   }
 
   Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
@@ -1303,6 +1323,28 @@ void Compiler::Floor(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "f
 void Compiler::Ceil(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "ceilf", "ceil"); }
 
 void Compiler::Round(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "roundf", "round"); }
+
+void Compiler::Abs(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "absf", "abs"); }
+
+void Compiler::Acos(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "acosf", "acos"); }
+
+void Compiler::Asin(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "asinf", "asin"); }
+
+void Compiler::Atan(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "atanf", "atan"); }
+
+void Compiler::Acosh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "acoshf", "acosh"); }
+
+void Compiler::Asinh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "asinhf", "asinh"); }
+
+void Compiler::Atanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "atanhf", "atanh"); }
+
+void Compiler::Cosh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "coshf", "cosh"); }
+
+void Compiler::Sin(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "sinf", "sin"); }
+
+void Compiler::Sinh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "sinhf", "sinh"); }
+
+void Compiler::Tan(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanf", "tan"); }
 
 void Compiler::Zero(const stripe::Special& zero) {
   assert(0 == zero.inputs.size());

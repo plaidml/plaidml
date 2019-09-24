@@ -95,6 +95,17 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Floor(const stripe::Intrinsic&);
   void Ceil(const stripe::Intrinsic&);
   void Round(const stripe::Intrinsic&);
+  void Abs(const stripe::Intrinsic&);
+  void Acos(const stripe::Intrinsic&);
+  void Asin(const stripe::Intrinsic&);
+  void Atan(const stripe::Intrinsic&);
+  void Acosh(const stripe::Intrinsic&);
+  void Asinh(const stripe::Intrinsic&);
+  void Atanh(const stripe::Intrinsic&);
+  void Cosh(const stripe::Intrinsic&);
+  void Sin(const stripe::Intrinsic&);
+  void Sinh(const stripe::Intrinsic&);
+  void Tan(const stripe::Intrinsic&);
   void Zero(const stripe::Special&);
   void Copy(const stripe::Special&);
   void Reshape(const stripe::Special&);
