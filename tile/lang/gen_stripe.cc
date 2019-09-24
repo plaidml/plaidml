@@ -427,6 +427,7 @@ class StripeGenerator {
           int start = (out_shape.dims.size() >= shape.dims.size()) ? 0 : (shape.dims.size() - out_shape.dims.size());
           int idx_offset = out_shape.dims.size() - shape.dims.size();  // can be negative
           for (int i = 0; i < shape.dims.size(); i++) {
+            // TODO: Confirm whether i < start case ever exists
             if (i < start) {
               access.emplace_back(Affine{});
             } else {
@@ -434,6 +435,7 @@ class StripeGenerator {
               if (dim.size > 1) {
                 access.emplace_back(Affine{kernel->idxs[i + idx_offset].name});
               } else {
+                // TODO: confirm that this should be empty Affine rather than affine{0}
                 access.emplace_back(Affine{});
               }
             }
