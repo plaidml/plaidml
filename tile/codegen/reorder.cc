@@ -15,30 +15,39 @@ namespace codegen {
 using namespace stripe;  // NOLINT
 using namespace math;    // NOLINT
 
+struct StmtList;
 typedef std::shared_ptr<Statement> StmtPtr;
+typedef std::shared_ptr<StmtList> StmtListPtr;
 
 struct StmtList {
-  std::vector<StmtPtr> stmts;                          // Statements in order
-  std::map<std::string, std::vector<size_t>> inputs;   // input refinements
-  std::map<std::string, std::vector<size_t>> outputs;  // output refinements;
-  std::set<StmtPtr> direct_deps;                       // The stmts that this list directly depends on
-  std::set<StmtPtr> transitive_deps;                   // The stmts that this list transitively depends on
-  bool in_eltwise;                                     // Whether the first stmt is element-wise
-  bool out_eltwise;                                    // Whether the last stmt is element-wise
-  bool skip;                                           // Skip the removed stmts
+  std::vector<StmtPtr> stmts;                                     // Statements in order
+  std::unordered_map<std::string, std::vector<size_t>> inputs;    // input refinements
+  std::unordered_map<std::string, std::vector<size_t>> outputs;   // output refinements;
+  std::unordered_set<StmtListPtr> deps;                           // The stmts that this list directly depends on
+  std::unordered_set<StmtListPtr> rdeps;                          // The reverse of deps
+  bool in_eltwise;                                                // Whether the first stmt is element-wise
+  bool out_eltwise;                                               // Whether the last stmt is element-wise
+  bool skip;                                                      // Skip the removed stmts
+  bool defer;                                                     // Whether defer processing the StmtList
 };
 
-// Determine if any of deps depends on any of stmts
-static bool Depends(const std::vector<StmtPtr>& stmts, const std::set<StmtPtr>& deps) {
-  for (const auto& stmt : stmts) {
-    if (deps.find(stmt) != deps.end()) {
-      return true;
-    }
-  }
-  return false;
+// Whether sl1 directly depends on sl0
+bool Depends(StmtListPtr sl0, StmtListPtr sl1) {
+  return sl1->deps.find(sl0) != sl1->deps.end();
 }
 
-static std::vector<size_t> MakeRefShape(Block* block, const Refinement& ref) {
+// Return true if sl1 does not have any dependency or depends on only sl0
+bool DependsOnly(StmtListPtr sl0, StmtListPtr sl1) {
+  if (sl1->deps.empty()) {
+    return true;
+  }
+  if (sl1->deps.size() > 1) {
+    return false;
+  }
+  return sl1->deps.find(sl0) != sl1->deps.end();
+}
+
+std::vector<size_t> MakeRefShape(Block* block, const Refinement& ref) {
   std::vector<size_t> shape;
   for (const auto& acc : ref.access) {
     const auto& acc_map = acc.getMap();
@@ -61,7 +70,7 @@ static std::vector<size_t> MakeRefShape(Block* block, const Refinement& ref) {
   return shape;
 }
 
-static bool MayFuse(std::shared_ptr<StmtList> s0, std::shared_ptr<StmtList> s1) {
+bool MayFuse(StmtListPtr s0, StmtListPtr s1) {
   if (!s1->in_eltwise) {
     return false;
   }
@@ -106,15 +115,13 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
   ComputeDepsForBlock(main_block.get(), alias_map);
 
   // The stmts in done list
-  std::set<StmtPtr> done_stmts;
-  // Initial stmt list with direct dependencies
-  std::vector<std::shared_ptr<StmtList>> direct_list;
-  // stmt list with transitive dependencies
-  std::vector<std::shared_ptr<StmtList>> transitive_list;
-  // stmt list after merging
-  std::vector<std::shared_ptr<StmtList>> ready_list;
+  std::unordered_set<StmtPtr> done_stmts;
+  // The processing stmt list
+  std::vector<std::shared_ptr<StmtList>> processing;
   // final stmt list
   StatementList done;
+  // Map the statement to the statement list
+  std::unordered_map<StmtPtr, StmtListPtr> stmt2list;
 
   // Initialize the statement lists
   for (const auto& stmt : main_block->stmts) {
@@ -126,12 +133,9 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
     auto block = Block::Downcast(stmt);
     auto sl = std::make_shared<StmtList>();
     sl->stmts.push_back(stmt);
-    for (const auto& dep_stmt_it : stmt->deps) {
-      if (done_stmts.find(*dep_stmt_it) == done_stmts.end()) {
-        sl->direct_deps.insert(*dep_stmt_it);
-      }
-    }
+    stmt2list.emplace(stmt, sl);
     sl->skip = false;
+    sl->defer = false;
     sl->in_eltwise = false;
     sl->out_eltwise = false;
     if (block) {
@@ -156,107 +160,152 @@ void ReorderBlocksPass::Apply(CompilerState* state) const {
         }
       }
     }
-    direct_list.push_back(sl);
+    processing.push_back(sl);
   }
 
-  // Make transitive dependencies for stmt_list
-  while (!direct_list.empty()) {
-    auto it = direct_list.begin();
-    // Find a stmt list without dependency
-    while (it != direct_list.end() && !(*it)->direct_deps.empty()) {
-      ++it;
-    }
-    if (it == direct_list.end()) {
-      throw std::runtime_error("Statement lists with direct dependencies depend on each other.");
-    }
-    auto& sl0 = *it;
-    // Pass its transitive dependencies to its successors
-    for (auto& sl1 : direct_list) {
-      if (sl0 != sl1 && Depends(sl0->stmts, sl1->direct_deps)) {
-        sl1->transitive_deps.insert(sl0->stmts.begin(), sl0->stmts.end());
-        sl1->transitive_deps.insert(sl0->transitive_deps.begin(), sl0->transitive_deps.end());
-        for (const auto& stmt : sl0->stmts) {
-          if (sl1->direct_deps.find(stmt) != sl1->direct_deps.end()) {
-            sl1->direct_deps.erase(stmt);
-          }
-        }
+  // Set the direct dependencies
+  for (auto& sl0 : processing) {
+    // Now there is only one statement in sl
+    auto& stmt = sl0->stmts[0];
+    for (const auto& dep_stmt_it : stmt->deps) {
+      if (done_stmts.find(*dep_stmt_it) == done_stmts.end()) {
+        // If the dep stmt is not in the done set, it is a real dependency
+        auto sl1 = stmt2list[*dep_stmt_it];
+        sl0->deps.insert(sl1);
+        sl1->rdeps.insert(sl0);
       }
     }
-    transitive_list.push_back(*it);
-    direct_list.erase(it);
   }
-  // direct_deps are no longer valid after this point
 
-  // Topological sort for transitive_list on transitive_deps field
-  while (!transitive_list.empty()) {
-    auto it = transitive_list.begin();
-    // Find a valid (skip is false) StmtList without transitive dependencies
-    while (it != transitive_list.end() && !(*it)->transitive_deps.empty() && !(*it)->skip) {
+  // Topological sort for processing on deps field
+  while (!processing.empty()) {
+    auto it = processing.begin();
+    auto first_defer = processing.end();
+    // Find a valid (skip is false) StmtList without dependencies
+    while (it != processing.end()) {
+      if ((*it)->skip) {
+        // Break the loop and erase the skip StmtList
+        break;
+      }
+      if ((*it)->deps.empty()) {
+        if (!(*it)->defer) {
+          // If it is not deferred, process it at once
+          break;
+        }
+        // Otherwise, save the first deferred StmtList
+        if (first_defer == processing.end()) {
+          first_defer = it;
+        }
+      }
       ++it;
     }
-    if (it == transitive_list.end()) {
-      throw std::runtime_error("Statement lists with transitive dependencies depend on each other.");
+    if (it == processing.end()) {
+      if (first_defer == processing.end()) {
+        // If there is not any StmtList without dependency
+        throw std::runtime_error("Statement lists with dependencies depend on each other.");
+      }
+      // There is only the deferred StmtList without dependency.
+      // We have to process it then.
+      it = first_defer;
     }
     auto sl0 = *it;
-    transitive_list.erase(it);
+    processing.erase(it);
     if (sl0->skip) {
       continue;
     }
+
+    // First StmtList that may be fused into sl0
+    auto first_may_fuse = processing.end();
+    // First dependency of sl0
+    auto first_dep = processing.end();
     // Find the StmtLists that may be fused after sl0
-    for (auto sl1_it = transitive_list.begin(); sl1_it != transitive_list.end(); ++sl1_it) {
+    for (auto sl1_it = processing.begin(); sl1_it != processing.end(); ++sl1_it) {
       auto& sl1 = *sl1_it;
       if (sl1->skip) {
         continue;
       }
       if (MayFuse(sl0, sl1)) {
-        // Make sure there is no any block depends on sl0, which sl1 depends on.
-        bool can_merge = true;
-        for (auto sl2_it = transitive_list.begin(); sl2_it != transitive_list.end(); ++sl2_it) {
-          auto& sl2 = *sl2_it;
-          if ((!sl2->skip) && Depends(sl0->stmts, sl2->transitive_deps)
-              && Depends(sl2->stmts, sl1->transitive_deps)) {
-            can_merge = false;
-            break;
-          }
-        }
-        if (can_merge) {
+        if (DependsOnly(sl0, sl1)) {
           sl1->skip = true;
           // merge stmts
           sl0->stmts.insert(sl0->stmts.end(), sl1->stmts.begin(), sl1->stmts.end());
-          // merge deps
-          for (auto& s : sl0->stmts) {
-            if (sl1->transitive_deps.find(s) != sl1->transitive_deps.end()) {
-              sl1->transitive_deps.erase(s);
-            }
+          // merge dependencies
+          if (Depends(sl0, sl1)) {
+            sl0->rdeps.erase(sl1);
           }
-          sl0->transitive_deps.insert(sl1->transitive_deps.begin(), sl1->transitive_deps.end());
+          for (auto& sl2 : sl1->rdeps) {
+            sl2->deps.erase(sl1);
+            sl2->deps.insert(sl0);
+            sl0->rdeps.insert(sl2);
+          }
           // merge inputs and outputs
-          for (auto& out_it : sl0->outputs) {
-            if (sl1->inputs.find(out_it.first) != sl1->inputs.end()) {
-              sl1->inputs.erase(out_it.first);
-            }
-          }
           sl0->inputs.insert(sl1->inputs.begin(), sl1->inputs.end());
           sl0->outputs.insert(sl1->outputs.begin(), sl1->outputs.end());
           sl0->out_eltwise = sl1->out_eltwise;
+          sl0->defer = false;
         }
-      }
-    }
-    if (sl0->transitive_deps.empty()) {
-      // Remove deps in the remaining stmt lists
-      for (auto& sl1 : transitive_list) {
-        if (sl0 != sl1) {
-          for (const auto& stmt : sl0->stmts) {
-            if (sl1->transitive_deps.find(stmt) != sl1->transitive_deps.end()) {
-              sl1->transitive_deps.erase(stmt);
-            }
+        else {
+          // If we can't fuse sl1 immediately, save "it could be fused" for later use
+          if (first_may_fuse == processing.end()) {
+            first_may_fuse = sl1_it;
           }
         }
       }
-      done.insert(done.end(), sl0->stmts.begin(), sl0->stmts.end());
+      else {
+        if (first_dep == processing.end() && Depends(sl0, *sl1_it)) {
+          first_dep = sl1_it;
+        }
+      }
     }
-    else {
-      transitive_list.insert(transitive_list.begin(), sl0);
+
+    // Whether sl0 can be done
+    bool sl0_done = true;
+    if (first_may_fuse != processing.end()) {
+      // sl1 depends on something that has not been done.
+      // We put sl0 before sl1 as close as possible now
+      if (first_dep == processing.end() || first_may_fuse <= first_dep) {
+        // Nothing depends on sl0 so far, fuse sl0 and sl1
+        auto sl1 = *first_may_fuse;
+        // merge statements
+        sl0->stmts.insert(sl0->stmts.end(), sl1->stmts.begin(), sl1->stmts.end());
+        // merge dependencies and reverse dependencies
+        for (auto& sl2 : sl1->deps) {
+          sl2->rdeps.erase(sl1);
+          if (sl2 != sl0) {
+            sl2->rdeps.insert(sl0);
+            sl0->deps.insert(sl2);
+          }
+        }
+        for (auto& sl2 : sl1->rdeps) {
+          sl2->deps.erase(sl1);
+          sl2->deps.insert(sl0);
+          sl0->rdeps.insert(sl2);
+        }
+        // merge inputs and outputs
+        sl0->inputs.insert(sl1->inputs.begin(), sl1->inputs.end());
+        sl0->outputs.insert(sl1->outputs.begin(), sl1->outputs.end());
+        sl0->out_eltwise = sl1->out_eltwise;
+        // Reuse the slot in processing
+        *first_may_fuse = sl0;
+        // Keep it to see if it can fuse more in the future
+        sl0_done = false;
+      }
+      else {
+        if (!sl0->deps.empty() || !sl0->defer) {
+          // We have to stop here and insert sl0 before the first dependency of sl0
+          sl0->defer = true;
+          sl0_done = false;
+          processing.insert(first_dep, sl0);
+        }
+        // else: If sl0 is already deferred, make it done
+      }
+    }
+    if (sl0_done && sl0->deps.empty()) {
+      // Remove deps in the remaining stmt lists
+      for (auto& sl1 : sl0->rdeps) {
+        sl1->deps.erase(sl0);
+      } 
+      done.insert(done.end(), sl0->stmts.begin(), sl0->stmts.end());
     }
   }
   // Replace the stmts in the main block
