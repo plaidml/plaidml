@@ -264,12 +264,13 @@ implement in straight C++:
 ```c++
 float I[N], O[N / 2];
 for (int i = 0; i < N/2; ++i) {
-    float curr_max = FLT_MIN;
-    for (int j = 0; j < 2; ++j) {
+  float curr_max = FLT_MIN;
+  for (int j = 0; j < 2; ++j) {
+    if (I[2 * i + j] > curr_max) {
       curr_max = I[2 * i + j];
-      O.add_constraints({I[2 * i + j] > curr_max})
     }
-    O[i] = curr_max;
+  }
+  O[i] = curr_max;
 }
 ```
 
@@ -446,7 +447,7 @@ Tensor csum(const Tensor& I) {
   I.bind_dims(N);
   auto O = TensorOutput(N);
   O(i) += I(k);
-  O.add_constraints ({i - k < N})
+  O.add_constraints({i - k < N});
   return O;
 }
 ```
