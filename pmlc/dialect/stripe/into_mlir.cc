@@ -121,7 +121,8 @@ namespace {
 
 template <typename OpType>
 struct IntrinsicBuildImpl {
-  static Value* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic, const llvm::ArrayRef<Value*>& inputs) {
+  static Operation* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic,
+                          const llvm::ArrayRef<Value*>& inputs) {
     if (OpType::operands() != inputs.size()) {
       std::cerr << intrinsic;
       throw std::runtime_error("Mismatched intrinsic size");
@@ -146,7 +147,8 @@ IntegerAttr ExtractIntegerConstant(Value* val) {
 
 template <typename CastOpType>
 struct CastIntrinsicBuildImpl {
-  static Value* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic, const llvm::ArrayRef<Value*>& inputs) {
+  static Operation* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic,
+                          const llvm::ArrayRef<Value*>& inputs) {
     if (inputs.size() != 2) {
       throw std::runtime_error("as_float needs to params");
     }
@@ -190,8 +192,9 @@ struct IntrinsicBuilder {
     for (const auto& in : intrinsic.inputs) {
       inputs.push_back(safe_at(locals->scalars, in));
     }
-    Value* r = IntrinsicBuildImpl<OpType>::apply(builder, intrinsic, inputs);
-    locals->scalars.emplace(intrinsic.outputs[0], r);
+    Operation* r = IntrinsicBuildImpl<OpType>::apply(builder, intrinsic, inputs);
+    locals->scalars.emplace(intrinsic.outputs[0], r->getResult(0));
+    r->setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
     done = true;
   }
 };
@@ -334,6 +337,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         auto intoType = eltwise::GetTensorType(elementType);
         auto attrs = TagsToDict(builder, *load);
         auto op = builder->create<LoadOp>(unknownLoc, intoType, from, attrs);
+        op.setAttr("scalar_name", builder->getStringAttr(load->into));
         locals.scalars.emplace(load->into, op);
       } break;
       case stripe::StmtKind::LoadIndex: {
@@ -372,10 +376,12 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
           case stripe::ConstType::Integer:
             op = builder->create<eltwise::ScalarConstantOp>(
                 unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::INT64), cnst->iconst);
+            op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
           case stripe::ConstType::Float:
             op = builder->create<eltwise::ScalarConstantOp>(
                 unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::FLOAT64), cnst->fconst);
+            op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
         }
         locals.scalars.emplace(cnst->name, op);

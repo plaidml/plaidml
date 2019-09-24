@@ -32,6 +32,7 @@ class StripeBuilder {
   void apply();
 
  private:
+  std::string scalar_name(Operation* op);
   TensorShape get_shape(TensorType type);
   void add_attributes(stripe::Taggable& out, ArrayRef<NamedAttribute> in);  // NOLINT
   void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out, std::string agg = "");
@@ -193,6 +194,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         shape.dims[i].size = std::min(shape.dims[i].size, base_shape.dims[i].size);
       }
       sblock->refs.emplace(dir, "", rname, access, shape, agg_name);
+      agg_name = "";
     }
     // Connect up previously added block
     if (ref) {
@@ -332,7 +334,7 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
       block = block->getParentOp()->getBlock();
     }
     stripe::Block* sblock = blocks_.at(block).stripe;
-    sblock->constraints.push_back(build_affine(sblock, op.input()));
+    sblock->constraints.insert(sblock->constraints.begin(), build_affine(sblock, op.input()));
   } else {
     throw std::runtime_error("Complex contraints not supported right now");
   }
@@ -357,7 +359,7 @@ void StripeBuilder::visit(ExecutorOp op, int count) {
 void StripeBuilder::visit(LoadOp op) {
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &ref_name);
-  std::string into = std::string("$s") + std::to_string(next_scalar_++);
+  std::string into = scalar_name(op.getOperation());
   scalars_.emplace(op.into(), into);
   cur_->stmts.push_back(std::make_shared<stripe::Load>(ref_name, into));
 }
@@ -442,10 +444,22 @@ void StripeBuilder::walk_interior(Block* block) {
   }
 }
 
+std::string StripeBuilder::scalar_name(Operation* op) {
+  std::string out_name = std::string("$_") + std::to_string(next_scalar_++);
+  auto attr = op->getAttr("scalar_name");
+  if (attr) {
+    auto name_attr = attr.template dyn_cast<StringAttr>();
+    if (name_attr) {
+      out_name = name_attr.getValue();
+    }
+  }
+  return out_name;
+}
+
 template <class ScalarOp>
 void StripeBuilder::apply() {
   if (auto op = mlir::dyn_cast<ScalarOp>(iop)) {
-    std::string out_name = std::string("$s") + std::to_string(next_scalar_++);
+    std::string out_name = scalar_name(op.getOperation());
     scalars_.emplace(op.result(), out_name);
     auto intr = std::make_shared<stripe::Intrinsic>();
     std::string dialect = op.getOperation()->getName().getDialect().str();
@@ -466,7 +480,7 @@ void StripeBuilder::apply() {
 template <>
 void StripeBuilder::apply<eltwise::ScalarConstantOp>() {
   if (auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(iop)) {
-    std::string out_name = std::string("$c") + std::to_string(next_scalar_++);
+    std::string out_name = scalar_name(op.getOperation());
     scalars_.emplace(op.result(), out_name);
     std::shared_ptr<stripe::Constant> cnst;
     auto val_attr = op.getValue();
