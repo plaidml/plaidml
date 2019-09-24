@@ -13,3 +13,7 @@ namespace stripe {
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
+
+#include "llvm/ADT/StringSwitch.h"
+
+#include "pmlc/dialect/stripe/ops_enum.cpp.inc"

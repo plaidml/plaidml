@@ -109,7 +109,7 @@ TEST(GenStripeTest, ContractPlusElementwise) {
           {
             key:"_X3"
             value: {
-              from:"_X3" dir:Out access [{}, {}] loc {} agg_op:"assign"
+              from:"_X3" dir:Out access [{}, {}] loc {}
               interior_shape {type: FLOAT32 dims [{size:10 stride:10}, {size:10 stride:1}]}
             }
           }

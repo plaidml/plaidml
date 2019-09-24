@@ -22,6 +22,11 @@ struct BlockInfo {
   std::map<FlatTensorAccess, std::string> refs;
 };
 
+struct ScalarInfo {
+  std::set<std::string> names;
+  size_t next = 0;
+};
+
 class StripeBuilder {
  public:
   explicit StripeBuilder(mlir::FuncOp func);
@@ -32,9 +37,10 @@ class StripeBuilder {
   void apply();
 
  private:
+  std::string scalar_name(Operation* op);
   TensorShape get_shape(TensorType type);
   void add_attributes(stripe::Taggable& out, ArrayRef<NamedAttribute> in);  // NOLINT
-  void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out);
+  void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out, std::string agg = "");
   stripe::Location build_location(stripe::Block* block, Value* device_path);
   std::string get_idx(stripe::Block* block, mlir::BlockArgument* affine);
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
@@ -42,15 +48,19 @@ class StripeBuilder {
   void visit(ConstraintOp op, int count);
   void visit(ExecutorOp op, int count);
   void visit(LoadOp op);
+  void visit(LoadIndexOp op);
   void visit(StoreOp op);
+  void visit(AggregateOp op);
+  void visit(ReshapeOp op);
   void walk_interior(Block* inner);
 
   std::shared_ptr<stripe::Block> cur_;
-  size_t next_scalar_ = 0;
+  std::map<stripe::Block*, ScalarInfo> scalar_names_;
   std::map<mlir::Block*, BlockInfo> blocks_;
   std::map<std::pair<stripe::Block*, mlir::BlockArgument*>, std::string> idxs_;
   std::map<mlir::Value*, std::string> scalars_;
   Operation* iop;
+  bool found_inst_;
 };
 
 }  // End namespace
@@ -93,6 +103,7 @@ TensorShape StripeBuilder::get_shape(TensorType type) {
   for (const auto& dim : type.getShape()) {
     ret.dims.emplace_back(dim.stride, dim.size);
   }
+  ret.is_const = type.is_const();
   return ret;
 }
 
@@ -126,7 +137,8 @@ void StripeBuilder::add_attributes(stripe::Taggable& out, ArrayRef<NamedAttribut
   }
 }
 
-void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out) {
+void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out,
+                                    std::string agg_name) {
   // Compute all the info about the tensor
   auto ti = ComputeAccess(tensor);
   // Translate allocation shape
@@ -187,7 +199,9 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         shape.dims[i].size = range.max - range.min + 1;
         shape.dims[i].size = std::min(shape.dims[i].size, base_shape.dims[i].size);
       }
-      sblock->refs.emplace(dir, "", rname, access, shape);
+      sblock->refs.emplace(dir, "", rname, access, shape, agg_name);
+      // TODO: Only do this when we are 1-to-1
+      agg_name = "";
     }
     // Connect up previously added block
     if (ref) {
@@ -327,7 +341,7 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
       block = block->getParentOp()->getBlock();
     }
     stripe::Block* sblock = blocks_.at(block).stripe;
-    sblock->constraints.push_back(build_affine(sblock, op.input()));
+    sblock->constraints.insert(sblock->constraints.begin(), build_affine(sblock, op.input()));
   } else {
     throw std::runtime_error("Complex contraints not supported right now");
   }
@@ -352,9 +366,16 @@ void StripeBuilder::visit(ExecutorOp op, int count) {
 void StripeBuilder::visit(LoadOp op) {
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &ref_name);
-  std::string into = std::string("$s") + std::to_string(next_scalar_++);
+  std::string into = scalar_name(op.getOperation());
   scalars_.emplace(op.into(), into);
   cur_->stmts.push_back(std::make_shared<stripe::Load>(ref_name, into));
+}
+
+void StripeBuilder::visit(LoadIndexOp op) {
+  stripe::Affine from = build_affine(cur_.get(), op.from());
+  std::string into = scalar_name(op.getOperation());
+  scalars_.emplace(op.into(), into);
+  cur_->stmts.push_back(std::make_shared<stripe::LoadIndex>(from, into));
 }
 
 void StripeBuilder::visit(StoreOp op) {
@@ -362,6 +383,27 @@ void StripeBuilder::visit(StoreOp op) {
   add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name);
   std::string from = scalars_.at(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
+}
+
+void StripeBuilder::visit(AggregateOp op) {
+  std::string ref_name;
+  AggTypeEnum agg_enum = static_cast<AggTypeEnum>(op.agg_type().getLimitedValue());
+  std::string agg_name = stringifyAggTypeEnum(agg_enum);
+  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name, agg_name);
+  std::string from = scalars_.at(op.from());
+  cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
+}
+
+void StripeBuilder::visit(ReshapeOp op) {
+  std::string from_name;
+  std::string into_name;
+  add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &from_name);
+  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &into_name);
+  auto r = std::make_shared<stripe::Special>();
+  r->name = "reshape";
+  r->inputs.push_back(from_name);
+  r->outputs.push_back(into_name);
+  cur_->stmts.push_back(r);
 }
 
 void StripeBuilder::walk_interior(Block* block) {
@@ -386,37 +428,67 @@ void StripeBuilder::walk_interior(Block* block) {
       visit(op, count);
     } else if (auto op = mlir::dyn_cast<LoadOp>(op_base)) {
       visit(op);
+    } else if (auto op = mlir::dyn_cast<LoadIndexOp>(op_base)) {
+      visit(op);
     } else if (auto op = mlir::dyn_cast<StoreOp>(op_base)) {
       visit(op);
+    } else if (auto op = mlir::dyn_cast<AggregateOp>(op_base)) {
+      visit(op);
+    } else if (auto op = mlir::dyn_cast<ReshapeOp>(op_base)) {
+      visit(op);
     } else {
+      found_inst_ = false;
       // Try all the intrinsic ops
       iop = &op_base;
       eltwise::ForAllOps(*this);
+      // TODO: consider checking found_inst_.  However, since many instructions
+      // (like affine computation) are *correct* to ignore, to do this we would
+      // need some sort of whitelist of things to ignore... punting for now.
     }
   }
+}
+
+std::string StripeBuilder::scalar_name(Operation* op) {
+  std::string out_name;
+  auto attr = op->getAttr("scalar_name");
+  if (attr) {
+    auto name_attr = attr.template dyn_cast<StringAttr>();
+    if (name_attr) {
+      out_name = name_attr.getValue();
+    }
+  }
+  auto& si = scalar_names_[cur_.get()];
+  while (out_name == "" || si.names.count(out_name)) {
+    out_name = "$s" + std::to_string(si.next++);
+  }
+  return out_name;
 }
 
 template <class ScalarOp>
 void StripeBuilder::apply() {
   if (auto op = mlir::dyn_cast<ScalarOp>(iop)) {
-    std::string out_name = std::string("$s") + std::to_string(next_scalar_++);
+    std::string out_name = scalar_name(op.getOperation());
     scalars_.emplace(op.result(), out_name);
     auto intr = std::make_shared<stripe::Intrinsic>();
     std::string dialect = op.getOperation()->getName().getDialect().str();
     std::string full_name = op.getOperation()->getName().getStringRef().str();
     intr->name = full_name.substr(dialect.size() + 1, full_name.size() - dialect.size() - 1);
+    if (intr->name == "select") {
+      intr->name = "cond";
+    }
     intr->outputs.push_back(out_name);
     for (size_t i = 0; i < ScalarOp::operands(); i++) {
       intr->inputs.push_back(scalars_.at(op.getOperation()->getOperand(i)));
     }
     cur_->stmts.push_back(intr);
+    found_inst_ = true;
   }
 }
 
 template <>
 void StripeBuilder::apply<eltwise::ScalarConstantOp>() {
   if (auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(iop)) {
-    std::string out_name = std::string("$c") + std::to_string(next_scalar_++);
+    std::string out_name = scalar_name(op.getOperation());
     scalars_.emplace(op.result(), out_name);
     std::shared_ptr<stripe::Constant> cnst;
     auto val_attr = op.getValue();

@@ -56,18 +56,23 @@ inline llvm::hash_code hash_value(const TensorDim& td) {  //
 }
 
 struct TensorTypeStorage : public mlir::TypeStorage {
-  TensorTypeStorage(Type elementType, llvm::ArrayRef<TensorDim> shape) : elementType(elementType), shape(shape) {}
+  TensorTypeStorage(Type elementType, llvm::ArrayRef<TensorDim> shape, bool is_const)
+      : elementType(elementType), shape(shape), is_const(is_const) {}
 
-  using KeyTy = std::tuple<Type, std::vector<TensorDim>>;
-  bool operator==(const KeyTy& key) const { return elementType == std::get<0>(key) && shape == std::get<1>(key); }
+  using KeyTy = std::tuple<Type, std::vector<TensorDim>, bool>;
+  bool operator==(const KeyTy& key) const {
+    return elementType == std::get<0>(key) && shape == std::get<1>(key) && is_const == std::get<2>(key);
+  }
   static llvm::hash_code hashKey(const KeyTy& key) { return hash_value(key); }
 
   static TensorTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {  // NOLINT
-    return new (allocator.allocate<TensorTypeStorage>()) TensorTypeStorage(std::get<0>(key), std::get<1>(key));
+    return new (allocator.allocate<TensorTypeStorage>())
+        TensorTypeStorage(std::get<0>(key), std::get<1>(key), std::get<2>(key));
   }
 
   Type elementType;
   std::vector<TensorDim> shape;
+  bool is_const;
 };
 
 struct TensorTypeBase {
@@ -84,8 +89,8 @@ class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
 
   static bool kindof(unsigned kind) { return kind == Types::Tensor; }
 
-  static TensorType get(Type elementType, llvm::ArrayRef<TensorDim> shape) {
-    return Base::get(elementType.getContext(), Types::Tensor, elementType, shape);
+  static TensorType get(Type elementType, llvm::ArrayRef<TensorDim> shape, bool is_const) {
+    return Base::get(elementType.getContext(), Types::Tensor, elementType, shape, is_const);
   }
 
   /// Return the element type.
@@ -96,21 +101,29 @@ class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
 
   /// Return the shape.
   llvm::ArrayRef<TensorDim> getShape() const { return getImpl()->shape; }
+
+  /// Check if things are const
+  bool is_const() const { return getImpl()->is_const; }
 };
 
 struct TensorRefTypeStorage : public mlir::TypeStorage {
-  TensorRefTypeStorage(Type elementType, size_t rank) : elementType(elementType), rank(rank) {}
+  TensorRefTypeStorage(Type elementType, size_t rank, bool is_const)
+      : elementType(elementType), rank(rank), is_const(is_const) {}
 
-  using KeyTy = std::tuple<Type, size_t>;
-  bool operator==(const KeyTy& key) const { return elementType == std::get<0>(key) && rank == std::get<1>(key); }
+  using KeyTy = std::tuple<Type, size_t, bool>;
+  bool operator==(const KeyTy& key) const {
+    return elementType == std::get<0>(key) && rank == std::get<1>(key) && is_const == std::get<2>(key);
+  }
   static llvm::hash_code hashKey(const KeyTy& key) { return hash_value(key); }
 
   static TensorRefTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {  // NOLINT
-    return new (allocator.allocate<TensorRefTypeStorage>()) TensorRefTypeStorage(std::get<0>(key), std::get<1>(key));
+    return new (allocator.allocate<TensorRefTypeStorage>())
+        TensorRefTypeStorage(std::get<0>(key), std::get<1>(key), std::get<2>(key));
   }
 
   Type elementType;
   size_t rank;
+  bool is_const;
 };
 
 class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeStorage> {
@@ -119,8 +132,8 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
 
   static bool kindof(unsigned kind) { return kind == Types::TensorRef; }
 
-  static TensorRefType get(Type elementType, size_t rank) {
-    return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank);
+  static TensorRefType get(Type elementType, size_t rank, bool is_const) {
+    return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const);
   }
 
   /// Return the element type.
@@ -128,6 +141,9 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
 
   /// Return the rank.
   int64_t getRank() const { return getImpl()->rank; }
+
+  /// Check if things are const
+  bool is_const() const { return getImpl()->is_const; }
 };
 
 // A PRNG state.

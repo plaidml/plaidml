@@ -70,7 +70,7 @@ block []:1 ( // simple_fuse
   block []:1 ( // main
       in A[0, 0] fp32:I(128, 20):(20, 1):10 KiB, E(128, 20):10 KiB
       in B[0] fp32:I(20):(1):80 B, E(20):80 B
-      out C[0, 0]:assign fp32:I(128, 20):(20, 1):10 KiB, E(128, 20):10 KiB
+      out C[0, 0] fp32:I(128, 20):(20, 1):10 KiB, E(128, 20):10 KiB
       #tmp inout T[0, 0] fp32:I(128, 20):(20, 1):10 KiB, E(128, 20):10 KiB
       #tmp inout X[0, 0] bool:I(128, 20):(20, 1):2.5 KiB, E(128, 20):2.5 KiB
   ) {
