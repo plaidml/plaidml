@@ -150,12 +150,12 @@ class StripeGenerator {
         });
       } else {
         main->refs.emplace(Refinement{
-            RefDir::Out,        // dir
-            item.first,         // from
-            item.first,         // into
-            access,             // access
-            shape,              // interior_shape
-            Intrinsic::ASSIGN,  // agg_op
+            RefDir::Out,  // dir
+            item.first,   // from
+            item.first,   // into
+            access,       // access
+            shape,        // interior_shape
+            "",           // agg_op
         });
       }
     }

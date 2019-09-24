@@ -22,6 +22,11 @@ struct BlockInfo {
   std::map<FlatTensorAccess, std::string> refs;
 };
 
+struct ScalarInfo {
+  std::set<std::string> names;
+  size_t next = 0;
+};
+
 class StripeBuilder {
  public:
   explicit StripeBuilder(mlir::FuncOp func);
@@ -50,7 +55,7 @@ class StripeBuilder {
   void walk_interior(Block* inner);
 
   std::shared_ptr<stripe::Block> cur_;
-  size_t next_scalar_ = 0;
+  std::map<stripe::Block*, ScalarInfo> scalar_names_;
   std::map<mlir::Block*, BlockInfo> blocks_;
   std::map<std::pair<stripe::Block*, mlir::BlockArgument*>, std::string> idxs_;
   std::map<mlir::Value*, std::string> scalars_;
@@ -98,6 +103,7 @@ TensorShape StripeBuilder::get_shape(TensorType type) {
   for (const auto& dim : type.getShape()) {
     ret.dims.emplace_back(dim.stride, dim.size);
   }
+  ret.is_const = type.is_const();
   return ret;
 }
 
@@ -194,6 +200,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         shape.dims[i].size = std::min(shape.dims[i].size, base_shape.dims[i].size);
       }
       sblock->refs.emplace(dir, "", rname, access, shape, agg_name);
+      // TODO: Only do this when we are 1-to-1
       agg_name = "";
     }
     // Connect up previously added block
@@ -366,7 +373,7 @@ void StripeBuilder::visit(LoadOp op) {
 
 void StripeBuilder::visit(LoadIndexOp op) {
   stripe::Affine from = build_affine(cur_.get(), op.from());
-  std::string into = std::string("$s") + std::to_string(next_scalar_++);
+  std::string into = scalar_name(op.getOperation());
   scalars_.emplace(op.into(), into);
   cur_->stmts.push_back(std::make_shared<stripe::LoadIndex>(from, into));
 }
@@ -434,24 +441,25 @@ void StripeBuilder::walk_interior(Block* block) {
       // Try all the intrinsic ops
       iop = &op_base;
       eltwise::ForAllOps(*this);
-      /*
-      if (!found_inst_) {
-        std::cout << "Unable to convert instruction: " << iop << "\n";
-        throw std::runtime_error("Unable to find an instruction");
-      }
-      */
+      // TODO: consider checking found_inst_.  However, since many instructions
+      // (like affine computation) are *correct* to ignore, to do this we would
+      // need some sort of whitelist of things to ignore... punting for now.
     }
   }
 }
 
 std::string StripeBuilder::scalar_name(Operation* op) {
-  std::string out_name = std::string("$_") + std::to_string(next_scalar_++);
+  std::string out_name;
   auto attr = op->getAttr("scalar_name");
   if (attr) {
     auto name_attr = attr.template dyn_cast<StringAttr>();
     if (name_attr) {
       out_name = name_attr.getValue();
     }
+  }
+  auto& si = scalar_names_[cur_.get()];
+  while (out_name == "" || si.names.count(out_name)) {
+    out_name = "$s" + std::to_string(si.next++);
   }
   return out_name;
 }

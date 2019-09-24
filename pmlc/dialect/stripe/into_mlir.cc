@@ -41,7 +41,7 @@ static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
   for (const auto& dim : shape.dims) {
     dims.emplace_back(TensorDim{static_cast<int64_t>(dim.size), dim.stride});
   }
-  return TensorType::get(dtype, dims);
+  return TensorType::get(dtype, dims, shape.is_const);
 }
 
 static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
@@ -49,7 +49,7 @@ static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
     return PrngType::get(ctx);
   }
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
-  return TensorRefType::get(dtype, shape.dims.size());
+  return TensorRefType::get(dtype, shape.dims.size(), shape.is_const);
 }
 
 struct AttrBuilder : stripe::TagVisitor {
@@ -346,12 +346,12 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         Type idx_base = eltwise::ScalarType::get(builder->getContext(), DataType::INT32);
         Type idx_type = eltwise::GetTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
+        op.setAttr("scalar_name", builder->getStringAttr(load_idx->into));
         locals.scalars.emplace(load_idx->into, op);
       } break;
       case stripe::StmtKind::Store: {
         const auto& store = stripe::Store::Downcast(stmt);
         std::string agg_str = block.ref_by_into(store->into)->agg_op;
-        IVLOG(1, "STORE: agg_op = '" << agg_str << "'");
         Value* into = safe_at(locals.refs, store->into);
         Value* from = safe_at(locals.scalars, store->from);
         auto attrs = TagsToDict(builder, *store);
