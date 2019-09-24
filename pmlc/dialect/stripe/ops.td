@@ -61,6 +61,12 @@ def LoadOp : StripeOp<"load"> {
   */
 }
 
+def LoadIndexOp : StripeOp<"load_index"> {
+  let summary = "Convert an affine expression into a scalar value";
+  let arguments = (ins AffineType:$from);
+  let results = (outs Eltwise_AnyTensor:$into);
+}
+
 def StoreOp : StripeOp<"store"> {
   let summary = "Store into a tensor";
   let arguments = (ins
@@ -80,6 +86,23 @@ def StoreOp : StripeOp<"store"> {
     *p << op->getName() << ' ' << *op->getOperand(0) << ", " << *op->getOperand(1);
   }];
   */
+}
+
+def AggTypeEnum : I64EnumAttr<
+    "AggTypeEnum",
+    "Operation to aggregate with",
+    [
+      I64EnumAttrCase<"add", 1>,
+      I64EnumAttrCase<"mul", 2>,
+      I64EnumAttrCase<"min", 3>,
+      I64EnumAttrCase<"max", 4>,
+    ]> {
+}
+
+def AggregateOp : StripeOp<"aggregate"> {
+  let summary = "A accumulating store with a commutative, associative accumulation";
+  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$agg_type, DictionaryAttr:$attr);
+  let results = (outs);
 }
 
 class AffineOp<string mnemonic> : StripeOp<mnemonic, [NoSideEffect]> {
@@ -140,6 +163,14 @@ def ConstraintOp : StripeOp<"constraint"> {
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
 }
 
+def ReshapeOp : StripeOp<"reshape"> {
+  let arguments = (ins
+    TensorRefType:$from,
+    TensorRefType:$into
+  );
+  let results = (outs);
+}
+
 def ExecutorOp : StripeOp<"executor"> {
   let arguments = (ins DevicePathType:$devicePath);
   let regions = (region AnyRegion:$body);
@@ -150,3 +181,4 @@ def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let parser = [{ return mlir::success(); }];
   let printer = [{ *p << this->getOperation()->getName(); }];
 }
+
