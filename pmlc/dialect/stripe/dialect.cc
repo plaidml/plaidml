@@ -33,7 +33,7 @@ mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const 
 static void print(AffineType type, llvm::raw_ostream& os) { os << "affine"; }
 
 static void print(TensorType type, llvm::raw_ostream& os) {
-  os << "tensor ";
+  os << "tensor: ";
   os << type.getElementType() << "(";
   auto shape = type.getShape();
   for (int64_t i = 0; i < type.getRank(); i++) {

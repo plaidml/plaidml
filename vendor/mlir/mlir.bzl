@@ -5,9 +5,14 @@ TBLGEN_ACTIONS = [
     "-gen-op-decls",
     "-gen-op-defs",
     "-gen-op-doc",
+    "-gen-op-interface-decls",
+    "-gen-op-interface-defs",
     "-gen-reference-implementations",
     "-gen-rewriters",
 ]
+
+# mlir_tablegen(LinalgLibraryOpInterfaces.h.inc -gen-op-interface-decls)
+# mlir_tablegen(LinalgLibraryOpInterfaces.cpp.inc -gen-op-interface-defs)
 
 COPTS = select({
     "@com_intel_plaidml//toolchain:windows_x86_64": [

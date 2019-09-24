@@ -10,7 +10,9 @@
 
 namespace mlir {
 
-std::ostream& operator<<(std::ostream& os, ModuleOp op);
+std::ostream& operator<<(std::ostream& os, ModuleOp rhs);
+std::ostream& operator<<(std::ostream& os, Type rhs);
+std::ostream& operator<<(std::ostream& os, const Value& rhs);
 
 }  // namespace mlir
 

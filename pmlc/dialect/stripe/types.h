@@ -75,14 +75,6 @@ struct TensorTypeStorage : public mlir::TypeStorage {
   bool is_const;
 };
 
-struct TensorTypeBase {
-  /// Return the element type.
-  virtual Type getElementType() const = 0;
-
-  /// Return the rank.
-  virtual int64_t getRank() const = 0;
-};
-
 class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
  public:
   using Base::Base;

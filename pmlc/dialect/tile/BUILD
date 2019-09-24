@@ -25,20 +25,42 @@ mlir_tblgen(
     incs = ["@mlir//:include"],
 )
 
+mlir_tblgen(
+    name = "gen-op-interface-decls",
+    src = "ops.td",
+    out = "opinterfaces.h.inc",
+    action = "-gen-op-interface-decls",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
+    incs = ["@mlir//:include"],
+)
+
+mlir_tblgen(
+    name = "gen-op-interface-defs",
+    src = "ops.td",
+    out = "opinterfaces.cpp.inc",
+    action = "-gen-op-interface-defs",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
+    incs = ["@mlir//:include"],
+)
+
 plaidml_cc_library(
     name = "tile",
     srcs = [
         "builder.cc",
+        "contraction.cc",
         "dialect.cc",
         "internal.h",
         "lowering.cc",
+        "opinterfaces.cpp.inc",
         "ops.cc",
         "ops.cpp.inc",
     ],
     hdrs = [
         "builder.h",
+        "contraction.h",
         "dialect.h",
         "lowering.h",
+        "opinterfaces.h.inc",
         "ops.h",
         "ops.h.inc",
         "types.h",
@@ -48,6 +70,8 @@ plaidml_cc_library(
     deps = [
         ":gen-op-decls",
         ":gen-op-defs",
+        ":gen-op-interface-decls",
+        ":gen-op-interface-defs",
         "//base/util",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/stripe",

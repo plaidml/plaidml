@@ -264,9 +264,9 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       // Handle the normal index case by adding a param to the body and the
       // range to the list to be used in the eventual attributes
       auto arg = body->addArgument(AffineType::get(builder->getContext()));
-      auto attrs = TagsToDict(builder, idx, {{builder->getIdentifier("__name"), builder->getStringAttr(idx.name)}});
-      auto idx_info = builder->create<AffineMeta>(unknownLoc, builder->getType<AffineType>(), arg, attrs);
-      locals.idxs.emplace(idx.name, idx_info);
+      // auto attrs = TagsToDict(builder, idx, {{builder->getIdentifier("__name"), builder->getStringAttr(idx.name)}});
+      // auto idx_info = builder->create<AffineMeta>(unknownLoc, builder->getType<AffineType>(), arg, attrs);
+      locals.idxs.emplace(idx.name, arg);
       ranges.push_back(static_cast<int64_t>(idx.range));
     } else {
       // Handle the 'passthru' case by computing the appropriate affine and
@@ -285,12 +285,11 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // operations.
   for (const auto& ref : block.refs) {
     Value* from;
-    Value* device_path = LocationIntoMLIR(builder, locals, ref.location);
     if (ref.from.empty()) {
       Type tensorType = ShapeIntoTensorType(builder->getContext(), ref.interior_shape);
-      from = builder->create<AllocateOp>(unknownLoc, tensorType, device_path);
+      from = builder->create<AllocateOp>(unknownLoc, tensorType);
       Type tensorRefType = ShapeIntoTensorRefType(builder->getContext(), ref.interior_shape);
-      from = builder->create<TensorRefOp>(unknownLoc, tensorRefType, from, device_path);
+      from = builder->create<TensorRefOp>(unknownLoc, tensorRefType, from);
     } else {
       from = safe_at(outer.refs, ref.from);
     }
@@ -299,7 +298,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       offsets.push_back(AffineIntoMLIR(builder, locals, aff));
     }
     auto attrs = TagsToDict(builder, ref, {{builder->getIdentifier("__name"), builder->getStringAttr(ref.into())}});
-    Value* nref = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets, attrs, device_path).result();
+    Value* nref = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets, attrs).result();
     locals.refs.emplace(ref.into(), nref);
   }
 
@@ -406,6 +405,16 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
                   {builder->getIdentifier("__comments"), builder->getStringAttr(block.comments)}}));
   loop_op.getOperation()->getRegion(0).push_back(body);
 
+  // Attach index tags
+  for (size_t i = 0; i < block.idxs.size(); i++) {
+    auto idx = block.idxs.at(i);
+    if (idx.affine == stripe::Affine()) {
+      auto name = llvm::formatv("arg{0}", i);
+      auto attrs = TagsToDict(builder, idx, {{builder->getIdentifier("__name"), builder->getStringAttr(idx.name)}});
+      loop_op.setAttr(name.str(), attrs);
+    }
+  }
+
   // TODO: Move across the index tags as well...
 }
 
@@ -433,8 +442,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     auto argIndex = argcnt++;
     auto arg = func.getArgument(argIndex);
     Type tensorRefType = ShapeIntoTensorRefType(ctx, ref.interior_shape);
-    Value* device_path = LocationIntoMLIR(&builder, initial, ref.location);
-    auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg, device_path);
+    auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg);
     initial.refs.emplace(ref.into(), tensorRefOp);
     // Only 'dialect attrs' are allowed on function arguments
     func.setArgAttr(argIndex, prefix.str() + "name", builder.getStringAttr(ref.into()));

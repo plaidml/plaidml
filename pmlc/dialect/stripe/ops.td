@@ -19,13 +19,12 @@ class StripeOp<string mnemonic, list<OpTrait> traits = []> :
 
 def AllocateOp : StripeOp<"alloc"> {
   let summary = "Allocate a new tensor and set it's intial shape / size";
-  let arguments = (ins DevicePathType:$devicePath);
   let results = (outs TensorType:$result);
 }
 
 def TensorRefOp : StripeOp<"ref", [NoSideEffect]> {
   let summary = "Create a default tensor_ref from a tensor";
-  let arguments = (ins TensorType:$in, DevicePathType:$devicePath);
+  let arguments = (ins TensorType:$in);
   let results = (outs TensorRefType:$result);
 }
 
@@ -34,8 +33,7 @@ def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let arguments = (ins
     TensorRefType:$in,
     Variadic<AffineType>:$offsets,
-    DictionaryAttr:$attrs,
-    DevicePathType:$devicePath
+    DictionaryAttr:$attrs
   );
   let results = (outs TensorRefType:$result);
 }
@@ -131,10 +129,10 @@ def AffineAddOp : AffineOp<"affine_add"> {
   let arguments = (ins Variadic<AffineType>:$inputs);
 }
 
-def AffineMeta : AffineOp<"affine_meta"> {
-  let summary = "Attach metadata to an affine";
-  let arguments = (ins AffineType:$input, DictionaryAttr:$attrs);
-}
+// def AffineMeta : AffineOp<"affine_meta"> {
+//   let summary = "Attach metadata to an affine";
+//   let arguments = (ins AffineType:$input, DictionaryAttr:$attrs);
+// }
 
 def DeviceIDOp : StripeOp<"devid", [NoSideEffect]> {
   let arguments = (ins StrAttr:$name, Variadic<AffineType>:$unit);
