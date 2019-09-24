@@ -1217,6 +1217,7 @@ void Compiler::AsFloat(const stripe::Intrinsic& stmt) {
       break;
     case 64:
       type = DataType::FLOAT64;
+      break;
     default:
       // TODO: Add bfloat16 when added to Stripe.
       std::ostringstream oss;
@@ -1247,6 +1248,7 @@ void Compiler::AsInt(const stripe::Intrinsic& stmt) {
       break;
     case 64:
       type = DataType::INT64;
+      break;
     default:
       std::ostringstream oss;
       oss << "Invalid bit count for as_int for CPU jit - " << bits;
@@ -1276,6 +1278,7 @@ void Compiler::AsUInt(const stripe::Intrinsic& stmt) {
       break;
     case 64:
       type = DataType::UINT64;
+      break;
     default:
       std::ostringstream oss;
       oss << "Invalid bit count for as_uint for CPU jit - " << bits;
