@@ -39,9 +39,9 @@ static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
   llvm::SmallVector<TensorDim, 4> dims;
   for (const auto& dim : shape.dims) {
-    dims.emplace_back(TensorDim{static_cast<int64_t>(dim.size), dim.stride});
+    dims.emplace_back(TensorDim{static_cast<int64_t>(dim.size), dim.stride, mlir::Identifier::get("address", ctx)});
   }
-  return TensorType::get(dtype, dims, shape.is_const);
+  return TensorType::get(dtype, dims, OffsetsMap{}, shape.is_const);
 }
 
 static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
@@ -201,25 +201,6 @@ struct IntrinsicBuilder {
 
 }  // namespace
 
-static Value* DeviceIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Device& dev) {
-  std::vector<Value*> units;
-  units.reserve(dev.units.size());
-  for (const auto& unit : dev.units) {
-    units.emplace_back(AffineIntoMLIR(builder, syms, unit));
-  }
-  return builder->create<DeviceIDOp>(builder->getUnknownLoc(), builder->getType<DeviceIDType>(),
-                                     builder->getStringAttr(dev.name), units);
-}
-
-static Value* LocationIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Location& loc) {
-  std::vector<Value*> dev_ids;
-  dev_ids.reserve(loc.devs.size());
-  for (const auto& dev : loc.devs) {
-    dev_ids.emplace_back(DeviceIntoMLIR(builder, syms, dev));
-  }
-  return builder->create<DevicePathOp>(builder->getUnknownLoc(), builder->getType<DevicePathType>(), dev_ids);
-}
-
 static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
@@ -285,12 +266,11 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // operations.
   for (const auto& ref : block.refs) {
     Value* from;
-    Value* device_path = LocationIntoMLIR(builder, locals, ref.location);
     if (ref.from.empty()) {
       Type tensorType = ShapeIntoTensorType(builder->getContext(), ref.interior_shape);
-      from = builder->create<AllocateOp>(unknownLoc, tensorType, device_path);
+      from = builder->create<AllocateOp>(unknownLoc, tensorType);
       Type tensorRefType = ShapeIntoTensorRefType(builder->getContext(), ref.interior_shape);
-      from = builder->create<TensorRefOp>(unknownLoc, tensorRefType, from, device_path);
+      from = builder->create<TensorRefOp>(unknownLoc, tensorRefType, from);
     } else {
       from = safe_at(outer.refs, ref.from);
     }
@@ -299,18 +279,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       offsets.push_back(AffineIntoMLIR(builder, locals, aff));
     }
     auto attrs = TagsToDict(builder, ref, {{builder->getIdentifier("__name"), builder->getStringAttr(ref.into())}});
-    Value* nref = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets, attrs, device_path).result();
+    Value* nref = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets, attrs).result();
     locals.refs.emplace(ref.into(), nref);
-  }
-
-  // Process the execution location
-  if (block.location.devs.size()) {
-    auto executor_op = builder->create<ExecutorOp>(unknownLoc, LocationIntoMLIR(builder, locals, block.location));
-    Block* execution_body = new Block();
-    executor_op.getOperation()->getRegion(0).push_back(execution_body);
-    builder->setInsertionPointToStart(execution_body);
-    builder->create<TerminateOp>(unknownLoc);
-    builder->setInsertionPointToStart(execution_body);
   }
 
   // Process the constraints
@@ -404,7 +374,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       TagsToDict(builder, block,
                  {{builder->getIdentifier("__name"), builder->getStringAttr(block.name)},
                   {builder->getIdentifier("__comments"), builder->getStringAttr(block.comments)}}));
-  loop_op.getOperation()->getRegion(0).push_back(body);
+  loop_op.inner().push_back(body);
 
   // TODO: Move across the index tags as well...
 }
@@ -433,8 +403,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     auto argIndex = argcnt++;
     auto arg = func.getArgument(argIndex);
     Type tensorRefType = ShapeIntoTensorRefType(ctx, ref.interior_shape);
-    Value* device_path = LocationIntoMLIR(&builder, initial, ref.location);
-    auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg, device_path);
+    auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg);
     initial.refs.emplace(ref.into(), tensorRefOp);
     // Only 'dialect attrs' are allowed on function arguments
     func.setArgAttr(argIndex, prefix.str() + "name", builder.getStringAttr(ref.into()));

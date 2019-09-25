@@ -8,8 +8,7 @@ def StripeDialect : Dialect {
 }
 
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
-def DeviceIDType : Type<CPred<"$_self.isa<DeviceIDType>()">, "Plaid DeviceIDType">;
-def DevicePathType : Type<CPred<"$_self.isa<DevicePathType>()">, "Plaid DevicePathType">;
+def ExecutorType : Type<CPred<"$_self.isa<ExecutorType>()">, "Plaid Executor Type">;
 def PrngType : Type<CPred<"$_self.isa<PrngType>()">, "Plaid PrngType">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Type">;
 def TensorRefType : Type<CPred<"$_self.isa<TensorRefType>()">, "Plaid Tensor Reference Type">;
@@ -18,14 +17,13 @@ class StripeOp<string mnemonic, list<OpTrait> traits = []> :
     Op<StripeDialect, mnemonic, traits>;
 
 def AllocateOp : StripeOp<"alloc"> {
-  let summary = "Allocate a new tensor and set it's intial shape / size";
-  let arguments = (ins DevicePathType:$devicePath);
+  let summary = "Allocate a new tensor and set its intial shape / size";
   let results = (outs TensorType:$result);
 }
 
 def TensorRefOp : StripeOp<"ref", [NoSideEffect]> {
   let summary = "Create a default tensor_ref from a tensor";
-  let arguments = (ins TensorType:$in, DevicePathType:$devicePath);
+  let arguments = (ins TensorType:$in);
   let results = (outs TensorRefType:$result);
 }
 
@@ -34,8 +32,7 @@ def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let arguments = (ins
     TensorRefType:$in,
     Variadic<AffineType>:$offsets,
-    DictionaryAttr:$attrs,
-    DevicePathType:$devicePath
+    DictionaryAttr:$attrs
   );
   let results = (outs TensorRefType:$result);
 }
@@ -136,16 +133,6 @@ def AffineMeta : AffineOp<"affine_meta"> {
   let arguments = (ins AffineType:$input, DictionaryAttr:$attrs);
 }
 
-def DeviceIDOp : StripeOp<"devid", [NoSideEffect]> {
-  let arguments = (ins StrAttr:$name, Variadic<AffineType>:$unit);
-  let results = (outs DeviceIDType:$result);
-}
-
-def DevicePathOp : StripeOp<"devpath", [NoSideEffect]> {
-  let arguments = (ins Variadic<DeviceIDType>:$dev_ids);
-  let results = (outs DevicePathType:$result);
-}
-
 def ParallelForOp : StripeOp<"parallel_for"> {
   let summary = "Parallel for loop";
   // At some point, we should be able to dynamically control ranges
@@ -169,11 +156,6 @@ def ReshapeOp : StripeOp<"reshape"> {
     TensorRefType:$into
   );
   let results = (outs);
-}
-
-def ExecutorOp : StripeOp<"executor"> {
-  let arguments = (ins DevicePathType:$devicePath);
-  let regions = (region AnyRegion:$body);
 }
 
 def TerminateOp : StripeOp<"terminate", [Terminator]> {
