@@ -4,6 +4,7 @@
 
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/JITEventListener.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
@@ -19,6 +20,7 @@
 
 #include <half.hpp>
 
+#include "base/util/env.h"
 #include "base/util/lookup.h"
 #include "tile/stripe/stripe.h"
 #include "tile/targets/cpu/link_names.h"
@@ -60,6 +62,9 @@ Executable::Executable(const ProgramModule& module) : parameters_(module.paramet
                 .setSymbolResolver(std::move(rez))
                 .create();
   if (ee) {
+    if (env::Get("VTUNE_PROFILE") == "1") {
+      ee->RegisterJITEventListener(llvm::JITEventListener::createIntelJITEventListener());
+    }
     ee->finalizeObject();
     engine_.reset(ee);
   } else {
