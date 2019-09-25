@@ -33,3 +33,7 @@ namespace OpTrait = mlir::OpTrait;
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
+
+#include "llvm/ADT/DenseMapInfo.h"
+using llvm::DenseMapInfo;
+#include "pmlc/dialect/stripe/ops_enum.h.inc"

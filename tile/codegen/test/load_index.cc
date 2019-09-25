@@ -358,7 +358,7 @@ TEST(LoadIndexTest, SimpleIndex) {
       0: #main 
       block []:1 ( // main
           in A[0, 0, 0, 0] fp32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB, E(4, 4, 4, 4):1 KiB
-          out B[0, 0, 0, 0]:assign i32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB, E(4, 4, 4, 4):1 KiB
+          out B[0, 0, 0, 0] i32:I(4, 4, 4, 4):(64, 16, 4, 1):1 KiB, E(4, 4, 4, 4):1 KiB
       ) {
         0: #eltwise #eltwise_index #kernel 
         block [i1:4, i2:4, i3:4, i4:4]:256 ( // kernel_0(A)
@@ -419,7 +419,7 @@ TEST(LoadIndexTest, AffineIndex) {
       0: #main 
       block []:1 ( // main
           in A[0, 0, 0, 0] fp32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB, E(8, 8, 256, 8):512 KiB
-          out B[0, 0, 0, 0]:assign i32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB, E(8, 8, 256, 8):512 KiB
+          out B[0, 0, 0, 0] i32:I(8, 8, 256, 8):(16384, 2048, 8, 1):512 KiB, E(8, 8, 256, 8):512 KiB
       ) {
         0: #eltwise #eltwise_index #kernel 
         block [i1:8, i2:8, i3:256, i4:8]:131072 ( // kernel_0(A)
@@ -486,9 +486,9 @@ TEST(LoadIndexTest, MultiLoadIndex) {
       0: #main 
       block []:1 ( // main
           in A[0, 0, 0, 0] fp32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
-          out B[0, 0, 0, 0]:assign i32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
-          out C[0, 0, 0, 0]:assign i32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
-          out D[0, 0, 0, 0]:assign i32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
+          out B[0, 0, 0, 0] i32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
+          out C[0, 0, 0, 0] i32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
+          out D[0, 0, 0, 0] i32:I(4, 4, 256, 8):(8192, 2048, 8, 1):128 KiB, E(4, 4, 256, 8):128 KiB
       ) {
         0: #eltwise #eltwise_index #kernel 
         block [i1:4, i2:4, i3:256, i4:8]:32768 ( // kernel_0(A)
@@ -572,8 +572,8 @@ TEST(LoadIndexTest, FuseIndex) {
       0: #main 
       block []:1 ( // main
           in A[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB, E(4, 4, 4, 8):2 KiB
-          out B[0, 0, 0, 0]:assign i32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB, E(4, 4, 4, 8):2 KiB
-          out C[0, 0, 0, 0]:assign fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB, E(4, 4, 4, 8):2 KiB
+          out B[0, 0, 0, 0] i32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB, E(4, 4, 4, 8):2 KiB
+          out C[0, 0, 0, 0] fp32:I(4, 4, 4, 8):(128, 32, 8, 1):2 KiB, E(4, 4, 4, 8):2 KiB
       ) {
         0: #eltwise #eltwise_index #kernel 
         block [i1:4, i2:4, i3:4, i4:8]:512 ( // kernel_0(A)

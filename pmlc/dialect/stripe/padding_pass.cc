@@ -37,6 +37,8 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
       inner.resize(op.from()->getType().cast<TensorRefType>().getRank());
     } else if (auto op = mlir::dyn_cast<StoreOp>(use.getOwner())) {
       inner.resize(op.into()->getType().cast<TensorRefType>().getRank());
+    } else if (auto op = mlir::dyn_cast<AggregateOp>(use.getOwner())) {
+      inner.resize(op.into()->getType().cast<TensorRefType>().getRank());
     } else if (auto op = mlir::dyn_cast<TensorRefOp>(use.getOwner())) {
       return ComputeUnboundedRanges(op.result());
     } else {
@@ -58,6 +60,7 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
 
 void PaddingPass::runOnFunction() {
   IVLOG(1, "PaddingPass::runOnFunction>");
+  /*
   mlir::FuncOp f = getFunction();
   // Get the unbounded access ranges for each function input
   for (const auto& arg : f.getArguments()) {
@@ -81,6 +84,7 @@ void PaddingPass::runOnFunction() {
       IVLOG(2, "  Tmps: " << ss.str());
     }
   });
+  */
 }
 
 }  // namespace stripe

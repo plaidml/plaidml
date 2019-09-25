@@ -94,6 +94,17 @@ local PARAMS = {
               }
             },
 
+            // No-op MLIR pass
+            /*
+            {
+              name: 'mlir_pad',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_PadPass',
+                reqs: ['main'],
+              },
+            },
+            */
+
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
