@@ -126,8 +126,6 @@ SUITES:
     platforms:
       keras-stripe-llvm-cpu:
         pipelines: [plaidml]
-      keras-plaid-mtl-uhd630:
-        pipelines: []
       keras-plaid-ocl-gp100gl:
         pipelines: [plaidml]
       keras-stripe-ocl-gp100gl:
@@ -162,7 +160,7 @@ SUITES:
   base:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [plaidml, nightly, ci]
+        pipelines: [plaidml, nightly]
       keras-stripe-ocl-neo:
         pipelines: [plaidml, nightly]
       keras-plaid-mtl-uhd630:
@@ -246,7 +244,7 @@ SUITES:
   infer:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [plaidml, nightly, ci]
+        pipelines: [plaidml, nightly]
       keras-tf-cuda-gp100gl:
         pipelines: [nightly]
         append_args: [--tensorflow]
