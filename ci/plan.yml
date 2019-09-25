@@ -177,10 +177,11 @@ SUITES:
       keras-stripe-ocl-gp100gl:
         pipelines: [plaidml, nightly]
 
+      # backend tests timeout on stripe, use plaid for now
       keras-plaid-ocl-gv100gl:
-        pipelines: [nightly]
-      keras-stripe-ocl-gv100gl:
         pipelines: [plaidml, nightly]
+      keras-stripe-ocl-gv100gl:
+        pipelines: [nightly]
 
       keras-plaid-ocl-neo:
         pipelines: [nightly]
@@ -214,9 +215,11 @@ SUITES:
         conda_env: conda/plaidml.yml
         precision: untested
         platform_overrides:
-          keras-stripe-mtl-uhd630:
+          keras-stripe-ocl-gfx803:
             soft_fail: true
           keras-plaid-mtl-uhd630:
+            soft_fail: true
+          keras-stripe-mtl-uhd630:
             soft_fail: true
         shards: 3
       regression:
@@ -240,11 +243,6 @@ SUITES:
         pipelines: [nightly]
         append_args: [--tensorflow]
 
-      keras-plaid-ocl-gfx900:
-        pipelines: [nightly]
-      keras-stripe-ocl-gfx900:
-        pipelines: [plaidml, nightly]
-
       keras-plaid-ocl-gfx803:
         pipelines: [nightly]
       keras-stripe-ocl-gfx803:
@@ -255,18 +253,23 @@ SUITES:
       keras-stripe-ocl-gfx804:
         pipelines: [plaidml, nightly]
 
+      keras-plaid-ocl-gfx900:
+        pipelines: [nightly]
+      keras-stripe-ocl-gfx900:
+        pipelines: [plaidml, nightly]
+
       keras-plaid-ocl-gv100gl:
         pipelines: [nightly]
       keras-stripe-ocl-gv100gl:
         pipelines: [plaidml, nightly]
 
       keras-plaid-ocl-gp100gl: # (linux, nvidia)
-        pipelines: [plaidml, nightly]
+        pipelines: [nightly]
       keras-stripe-ocl-gp100gl:
         pipelines: [plaidml, nightly]
 
       keras-plaid-ocl-neo: # (linux, intel)
-        pipelines: [plaidml, nightly]
+        pipelines: [nightly]
       keras-stripe-ocl-neo:
         pipelines: [plaidml, nightly]
 
@@ -302,7 +305,14 @@ SUITES:
     workloads:
       imdb_lstm:
         precision: high
-        skip_platforms: [keras-stripe-ocl-neo, keras-stripe-mtl-uhd630, keras-stripe-ocl-gfx804]
+        skip_platforms: 
+          - keras-stripe-ocl-gfx803
+          - keras-stripe-ocl-gfx804
+          - keras-stripe-ocl-gfx900
+          - keras-stripe-ocl-gp100gl
+          - keras-stripe-ocl-gv100gl
+          - keras-stripe-ocl-neo
+          - keras-stripe-mtl-uhd630
         perf_threshold: 0.7
       inception_v3:
         precision: high
