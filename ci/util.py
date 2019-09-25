@@ -175,11 +175,12 @@ class TestInfo(object):
         return '{}/{}/{}/bs{}'.format(self.suite_name, self.workload_name, self.platform_name,
                                       self.batch_size)
 
-    def label(self):
+    def label(self, inc_engine=True):
         label_parts = [self.platform.gpu, self.workload_name]
         if self.batch_size:
             label_parts += [str(self.batch_size)]
-        label_parts += [self.platform.engine]
+        if inc_engine:
+            label_parts += [self.platform.engine]
         return '-'.join(label_parts)
 
     def path(self, root):
