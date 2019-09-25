@@ -69,7 +69,7 @@ local PARAMS = {
             },
 
             // Reorder Blocks
-              {
+            {
               name: 'reorder_blocks',
               pass : {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
