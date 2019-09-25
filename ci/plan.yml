@@ -247,7 +247,7 @@ SUITES:
 
       keras-plaid-ocl-gfx803:
         pipelines: [nightly]
-      keras-plaid-stripe-gfx803:
+      keras-stripe-ocl-gfx803:
         pipelines: [plaidml, nightly]
 
       keras-plaid-ocl-gfx804: # (windows, amd)
