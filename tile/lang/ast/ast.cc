@@ -740,7 +740,7 @@ GradOverrideExpr::GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, co
       ins(ins),  //
       out(out) {}
 
-GradOverrideExpr::std::string str() const {
+std::string GradOverrideExpr::str() const {
   // TODO: would be best to upgrade this somehow...
   std::stringstream ss;
   ss << "grad_override";

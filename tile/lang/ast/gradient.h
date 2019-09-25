@@ -14,12 +14,6 @@ namespace tile {
 namespace lang {
 namespace ast {
 
-struct ExprDerivEntry {
-  ExprDeriv fn;
-  void* user_fn;
-  void* user_ctx;
-};
-
 class DerivRegistry {
  public:
   static DerivRegistry* Instance() {

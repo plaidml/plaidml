@@ -573,6 +573,7 @@ inline Tensor Placeholder(             //
 inline Tensor OverrideGrads(TensorDeriv fn, const std::vector<Tensor>& ins, const Tensor& out) {
   // TODO: Seems like it might (?) be possible to share the thunking code between this and
   // `autodiff.h`'s `RegisterTensorDeriv`. Investigate
+
   auto thunk = [](void* user_ctx,          //
                   plaidml_expr* Y_expr,    //
                   plaidml_expr* dY_expr,   //
@@ -599,8 +600,8 @@ inline Tensor OverrideGrads(TensorDeriv fn, const std::vector<Tensor>& ins, cons
   for (size_t i = 0; i < ins.size(); i++) {
     in_ptrs[i] = ins[i].as_ptr();
   }
-  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_grad_override, thunk, reinterpret_cast<void*>(fn), nins, in_ptrs,
-                                      out.as_ptr());
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_grad_override, thunk, reinterpret_cast<void*>(fn), nins,
+                                      in_ptrs.data(), out.as_ptr());
   return Tensor(ptr);
 }
 

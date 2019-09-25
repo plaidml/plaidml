@@ -2202,15 +2202,26 @@ Value softmax(const Value& value) {
   auto N = TensorOutput(R_dims);
   N(R_idxs) += E(I_idxs);
   auto O = E / N;
-  TensorDeriv deriv = [](const Tensor &Y, const Tensor &DY, const std::vector<Tensor>&X) {  //
+  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
     // TODO: will need to reconstruct the various dimensions?
+    // TODO: For now, just contract along the last axis, sort out later how to do the right thing
+    auto I = X[0];
+    auto ndims = I.shape().ndims();
+    std::vector<TensorDim> I_dims(ndims);
+    std::vector<TensorIndex> I_idxs(ndims);
+    I.bind_dims(I_dims);
+    std::vector<TensorDim> R_dims = I_dims;
+    std::vector<TensorIndex> R_idxs = I_idxs;
+    R_dims.back() = TensorDim{1};    // TODO
+    R_idxs.back() = TensorIndex{0};  // TODO
+
     auto YdY = Y * DY;
     auto T = TensorOutput(R_dims);
     T(R_idxs) += YdY(I_idxs);
     auto TB = TensorOutput(I_dims);
     TB(I_idxs) += T(R_idxs);
     return std::vector<Tensor>{YdY - TB * Y};
-  });
+  };
   OverrideGrads(deriv, std::vector<Tensor>{I}, O);
   return Value{O};
 }

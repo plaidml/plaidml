@@ -55,11 +55,16 @@ class ComputeUses : public AstVisitor<void> {
     }
   }
 
+  void Visit(const GradOverrideExpr& expr) final {
+    for (size_t i = 0; i < expr.ins.size(); i++) {
+      Push(expr, expr.ins[i], i);
+    }
+  }
+
   void Visit(const DimExprExpr& expr) final {}
   void Visit(const FloatConst& expr) final {}
   void Visit(const IntConst& expr) final {}
   void Visit(const ParamExpr& expr) final {}
-  void Visit(const GradOverrideExpr& expr) final {}
 
  private:
   void Push(const Expr& user, const ExprPtr& used, size_t idx) {
@@ -202,7 +207,7 @@ class Gradient {
 
   ExprPtr DeriveOverride(const ExprPtr& dout, const std::shared_ptr<GradOverrideExpr>& op, size_t idx) {
     // TODO: Ideally we'd cache this call somehow so when the only difference is `idx` we don't recompute
-    return op->fn->fn(op->out, dout, op->ins, op->fn->user_fun, op->fn->user_ctx)[idx];
+    return op->fn->fn(op->out, dout, op->ins, op->fn->user_fn, op->fn->user_ctx)[idx];
   }
 
   ExprPtr DeriveExtreme(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {

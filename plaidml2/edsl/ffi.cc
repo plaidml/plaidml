@@ -597,11 +597,11 @@ plaidml_expr* plaidml_expr_call(  //
 // TODO: Verify name and implementation
 plaidml_expr* plaidml_expr_grad_override(  //
     plaidml_error* err,                    //
-    plaidml_deriv* fn,                     //
+    plaidml_deriv fn,                      //
+    void* user_ctx,                        //
     size_t nins,                           //
     plaidml_expr** ins,                    //
-    plaidml_expr* out,                     //
-    void* user_ctx) {
+    plaidml_expr* out) {
   auto thunk = [](const ExprPtr& Y,                //
                   const ExprPtr& dY,               //
                   const std::vector<ExprPtr>& Xs,  //
@@ -624,9 +624,12 @@ plaidml_expr* plaidml_expr_grad_override(  //
     }
     return ret;
   };
-  ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(5, "plaidml_grad_override");
-    auto deriv_entry = std::make_shared<ExprDerivEntry>(thunk, reinterpret_cast<void*>(fn), user_ctx);
+    auto deriv_entry = std::make_shared<ExprDerivEntry>();
+    deriv_entry->fn = thunk;
+    deriv_entry->user_fn = reinterpret_cast<void*>(fn);
+    deriv_entry->user_ctx = user_ctx;
     std::vector<ExprPtr> in_exprs(nins);
     ExprPtr out_expr;
     for (size_t i = 0; i < nins; i++) {
