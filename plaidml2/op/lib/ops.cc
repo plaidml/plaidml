@@ -2181,8 +2181,9 @@ Value softmax(const Value& value) {
   if (args.size() != 2) {
     throw std::runtime_error("softmax expects 2 arguments");
   }
-  auto I = args[0].as_tensor();
+  auto I_original = args[0].as_tensor();
   auto axis = args[1].as_int();
+  auto I = I_original;  // Make a copy TODO: Sufficient?
 
   auto ndims = I.shape().ndims();
   axis = normalize_axis(axis, ndims, "softmax");
@@ -2200,7 +2201,18 @@ Value softmax(const Value& value) {
   auto E = exp(I - M);
   auto N = TensorOutput(R_dims);
   N(R_idxs) += E(I_idxs);
-  return Value{E / N};
+  auto O = E / N;
+  TensorDeriv deriv = [](const Tensor &Y, const Tensor &DY, const std::vector<Tensor>&X) {  //
+    // TODO: will need to reconstruct the various dimensions?
+    auto YdY = Y * DY;
+    auto T = TensorOutput(R_dims);
+    T(R_idxs) += YdY(I_idxs);
+    auto TB = TensorOutput(I_dims);
+    TB(I_idxs) += T(R_idxs);
+    return std::vector<Tensor>{YdY - TB * Y};
+  });
+  OverrideGrads(deriv, std::vector<Tensor>{I}, O);
+  return Value{O};
 }
 
 Value spatial_padding(const Value& value) {

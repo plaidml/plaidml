@@ -559,6 +559,99 @@ plaidml_expr* plaidml_expr_call(  //
   });
 }
 
+// // TODO: Verify name and implementation
+// // TODO: This is the ExprDerivEntry-returning variation
+// plaidml_expr_deriv_entry* plaidml_expr_grad_override(  //
+//     plaidml_error* err,      //
+//     plaidml_deriv fn,        //
+//     void* user_ctx) {
+//   auto thunk = [](const ExprPtr& Y,                //
+//                   const ExprPtr& dY,               //
+//                   const std::vector<ExprPtr>& Xs,  //
+//                   void* user_fn,                   //
+//                   void* user_ctx) {
+//     IVLOG(6, "plaidml_grad_override> thunk");
+//     plaidml_deriv fn = reinterpret_cast<plaidml_deriv>(user_fn);
+//     std::vector<plaidml_expr*> X_exprs(Xs.size());
+//     std::vector<plaidml_expr*> dX_exprs(Xs.size());
+//     auto Y_expr = new plaidml_expr{Y};
+//     auto dY_expr = new plaidml_expr{dY};
+//     for (size_t i = 0; i < X_exprs.size(); i++) {
+//       X_exprs[i] = new plaidml_expr{Xs[i]};
+//     }
+//     fn(user_ctx, Y_expr, dY_expr, X_exprs.size(), X_exprs.data(), dX_exprs.data());
+//     std::vector<ExprPtr> ret(Xs.size());
+//     for (size_t i = 0; i < ret.size(); i++) {
+//       ret[i] = dX_exprs[i]->expr;
+//       delete dX_exprs[i];
+//     }
+//     return ret;
+//   };
+//   ffi_wrap<plaidml_expr_deriv_entry*>(err, nullptr, [&] {
+//     IVLOG(5, "plaidml_grad_override");
+//     return new plaidml_expr_deriv_entry{std::make_shared<ExprDerivEntry>(thunk, reinterpret_cast<void*>(fn),
+//     user_ctx)};
+//   });
+// }
+
+// TODO: Verify name and implementation
+plaidml_expr* plaidml_expr_grad_override(  //
+    plaidml_error* err,                    //
+    plaidml_deriv* fn,                     //
+    size_t nins,                           //
+    plaidml_expr** ins,                    //
+    plaidml_expr* out,                     //
+    void* user_ctx) {
+  auto thunk = [](const ExprPtr& Y,                //
+                  const ExprPtr& dY,               //
+                  const std::vector<ExprPtr>& Xs,  //
+                  void* user_fn,                   //
+                  void* user_ctx) {
+    IVLOG(6, "plaidml_grad_override> thunk");
+    plaidml_deriv fn = reinterpret_cast<plaidml_deriv>(user_fn);
+    std::vector<plaidml_expr*> X_exprs(Xs.size());
+    std::vector<plaidml_expr*> dX_exprs(Xs.size());
+    auto Y_expr = new plaidml_expr{Y};
+    auto dY_expr = new plaidml_expr{dY};
+    for (size_t i = 0; i < X_exprs.size(); i++) {
+      X_exprs[i] = new plaidml_expr{Xs[i]};
+    }
+    fn(user_ctx, Y_expr, dY_expr, X_exprs.size(), X_exprs.data(), dX_exprs.data());
+    std::vector<ExprPtr> ret(Xs.size());
+    for (size_t i = 0; i < ret.size(); i++) {
+      ret[i] = dX_exprs[i]->expr;
+      delete dX_exprs[i];
+    }
+    return ret;
+  };
+  ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(5, "plaidml_grad_override");
+    auto deriv_entry = std::make_shared<ExprDerivEntry>(thunk, reinterpret_cast<void*>(fn), user_ctx);
+    std::vector<ExprPtr> in_exprs(nins);
+    ExprPtr out_expr;
+    for (size_t i = 0; i < nins; i++) {
+      if (!ins[i]) {
+        throw std::runtime_error("Undefined input tensor in gradient override");
+      }
+      if (ins[i]->expr) {
+        in_exprs[i] = ins[i]->expr;
+      } else {
+        throw std::runtime_error("TODO: Probably we need to support values for MLIR?");
+      }
+    }
+    if (!out) {
+      throw std::runtime_error("Undefined output tensor in gradient override");
+    }
+    if (out->expr) {
+      out_expr = out->expr;
+    } else {
+      throw std::runtime_error("TODO: Probably we need to support values for MLIR? (on output)");
+    }
+    ExprPtr expr = std::make_shared<GradOverrideExpr>(deriv_entry, in_exprs, out_expr);
+    return new plaidml_expr{expr, nullptr};
+  });
+}
+
 plaidml_expr* plaidml_expr_index_map(  //
     plaidml_error* err,                //
     plaidml_expr* ref,                 //

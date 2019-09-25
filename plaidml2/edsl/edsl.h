@@ -24,6 +24,11 @@ class TensorDim;
 class TensorIndex;
 class Value;
 
+using TensorDeriv = std::vector<Tensor> (*)(  //
+    const Tensor& Y,                          //
+    const Tensor& dY,                         //
+    const std::vector<Tensor>& Xs);
+
 namespace details {
 
 template <typename T>
@@ -564,6 +569,62 @@ inline Tensor Placeholder(             //
   LogicalShape shape(dtype, dims);
   return Placeholder(shape, name);
 }
+
+inline Tensor OverrideGrads(TensorDeriv fn, const std::vector<Tensor>& ins, const Tensor& out) {
+  // TODO: Seems like it might (?) be possible to share the thunking code between this and
+  // `autodiff.h`'s `RegisterTensorDeriv`. Investigate
+  auto thunk = [](void* user_ctx,          //
+                  plaidml_expr* Y_expr,    //
+                  plaidml_expr* dY_expr,   //
+                  size_t nXs,              //
+                  plaidml_expr** X_exprs,  //
+                  plaidml_expr** dX_exprs) {
+    auto fn = reinterpret_cast<TensorDeriv>(user_ctx);
+    Tensor Y(Y_expr);
+    Tensor dY(dY_expr);
+    std::vector<Tensor> Xs(nXs);
+    for (size_t i = 0; i < Xs.size(); i++) {
+      Xs[i] = Tensor(X_exprs[i]);
+    }
+    auto dXs = fn(Y, dY, Xs);
+    for (size_t i = 0; i < Xs.size(); i++) {
+      dX_exprs[i] = ffi::call<plaidml_expr*>(plaidml_expr_clone, dXs[i].as_ptr());
+    }
+  };
+  // TODO: It would be really nice for not accidentally overriding too much if we copied the ins and out Tensor here.
+  // However, I think that we semantically can't do that without having this be "add on to grads" rather than "override
+  // grads" Still, verify that reasoning
+  auto nins = ins.size();
+  std::vector<plaidml_expr*> in_ptrs(nins);
+  for (size_t i = 0; i < ins.size(); i++) {
+    in_ptrs[i] = ins[i].as_ptr();
+  }
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_grad_override, thunk, reinterpret_cast<void*>(fn), nins, in_ptrs,
+                                      out.as_ptr());
+  return Tensor(ptr);
+}
+
+// GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins, const ExprPtr& out);
+
+// TensorDeriv fn) {
+//   auto thunk = [](void* user_ctx,          //
+//                   plaidml_expr* Y_expr,    //
+//                   plaidml_expr* dY_expr,   //
+//                   size_t nXs,              //
+//                   plaidml_expr** X_exprs,  //
+//                   plaidml_expr** dX_exprs) {
+//     auto fn = reinterpret_cast<TensorDeriv>(user_ctx);
+//     Tensor Y(Y_expr);
+//     Tensor dY(dY_expr);
+//     std::vector<Tensor> Xs(nXs);
+//     for (size_t i = 0; i < Xs.size(); i++) {
+//       Xs[i] = Tensor(X_exprs[i]);
+//     }
+//     auto dXs = fn(Y, dY, Xs);
+//     for (size_t i = 0; i < Xs.size(); i++) {
+//       dX_exprs[i] = ffi::call<plaidml_expr*>(plaidml_expr_clone, dXs[i].as_ptr());
+//     }
+//   };
 
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
 

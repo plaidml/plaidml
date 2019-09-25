@@ -10,11 +10,6 @@
 namespace plaidml {
 namespace edsl {
 
-using TensorDeriv = std::vector<Tensor> (*)(  //
-    const Tensor& Y,                          //
-    const Tensor& dY,                         //
-    const std::vector<Tensor>& Xs);
-
 // Given a forward pass tensor operation that takes inputs `wrt` and produces output `loss`,
 // compute the gradients for each Tensor in `wrt`.
 inline std::vector<Tensor> Gradient(const std::vector<Tensor>& wrt, const Tensor& loss) {

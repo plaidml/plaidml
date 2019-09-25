@@ -63,6 +63,7 @@ class AstTraversal : public AstVisitor<void> {
   void Visit(const FloatConst& expr) final {}
   void Visit(const IntConst& expr) final {}
   void Visit(const ParamExpr& expr) final {}
+  void Visit(const GradOverrideExpr& expr) final {}
 
  private:
   void Push(const ExprPtr& expr) {
@@ -151,6 +152,12 @@ class AstPassRunner : AstVisitor<void> {
 
   void Visit(const ParamExpr& expr) final {
     IVLOG(4, "AstPassRunner::Visit(ParamExpr)> " << &expr);
+    GenericVisit(expr, expr);
+  }
+
+  // TODO
+  void Visit(const GradOverrideExpr& expr) final {
+    IVLOG(4, "AstPassRunner::Visit(GradOverrideExpr)> " << &expr);
     GenericVisit(expr, expr);
   }
 

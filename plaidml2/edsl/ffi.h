@@ -265,6 +265,14 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_size_map(  //
     size_t ndims,                                      //
     plaidml_dim_expr** sizes);
 
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_grad_override(  //
+    plaidml_error* err,                                     //
+    plaidml_deriv* fn,                                      //
+    size_t nins,                                            //
+    plaidml_expr** ins,                                     //
+    plaidml_expr* out,                                      //
+    void* user_ctx);
+
 typedef enum {
   PLAIDML_AGG_OP_NONE,
   PLAIDML_AGG_OP_SUM,

@@ -31,6 +31,7 @@ struct StringExpr;
 struct IndexMapExpr;
 struct SizeMapExpr;
 struct TupleExpr;
+struct GradOverrideExpr;
 
 struct PolyExpr;
 struct PolyDimExpr;
@@ -48,6 +49,24 @@ using ExprPtr = std::shared_ptr<Expr>;
 using DimExprPtr = std::shared_ptr<DimExpr>;
 using PolyExprPtr = std::shared_ptr<PolyExpr>;
 
+// ExprDeriv is a function that builds the gradient ("dX") from the following inputs:
+//  1. Y: The Expr for the node
+//  2. dY: The Expr for the already-computed gradient of the node's output
+//  3. Xs: The Exprs for the node's inputs
+using ExprDeriv = std::function<std::vector<ExprPtr>(  //
+    const ExprPtr& Y,                                  //
+    const ExprPtr& dY,                                 //
+    const std::vector<ExprPtr>& Xs,                    //
+    void* user_fn,                                     //
+    void* user_ctx)>;
+
+// An ExprDerivEntry bundles the ExprDeriv with the FFI-processed user function & context needed to call it from Exprs
+struct ExprDerivEntry {
+  ExprDeriv fn;
+  void* user_fn;
+  void* user_ctx;
+};
+
 template <typename T>
 struct AstVisitor {
   virtual ~AstVisitor() = default;
@@ -57,6 +76,7 @@ struct AstVisitor {
   virtual T Visit(const FloatConst& expr) = 0;
   virtual T Visit(const IntConst& expr) = 0;
   virtual T Visit(const ParamExpr& expr) = 0;
+  virtual T Visit(const GradOverrideExpr& expr) = 0;
 };
 
 struct LogicalDim {
@@ -143,6 +163,18 @@ struct TupleExpr : Expr {
 
   explicit TupleExpr(const std::vector<ExprPtr>& exprs);
   void Accept(AstVisitor<void>* visitor) {}
+  std::string str() const;
+};
+
+struct GradOverrideExpr : Expr {
+  std::shared_ptr<ExprDerivEntry> fn;
+  std::vector<ExprPtr> ins;  // These will have their derivatives overridden
+  ExprPtr out;               // This will passthrough as the forward pass output; used as Y in calls to fn
+
+  GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins, const ExprPtr& out);
+  // TODO: Eventually add this convenience lookup function:
+  // GradOverrideExpr(const std::string& fn_name, const std::vector<ExprPtr>& ins, const ExprPtr& out);
+  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }  // TODO: Actually implement Visit
   std::string str() const;
 };
 

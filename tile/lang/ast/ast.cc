@@ -213,6 +213,11 @@ class ShapeEvaluator : public AstVisitor<void> {
     bindings_by_expr_->emplace(&expr, Binding{value});
   }
 
+  void Visit(const GradOverrideExpr& expr) final {
+    // Forward-pass GradOverrideExprs are no-ops, so do nothing
+    // TODO: Or should I be copying the output?
+  }
+
  private:
   std::unordered_map<const Expr*, Binding>* bindings_by_expr_;
 };
@@ -388,6 +393,11 @@ class ProgramEvaluator : public AstVisitor<void> {
     };
     eval_.runinfo.program.ops.emplace_back(op);
     eval_.names_by_expr.emplace(&expr, name);
+  }
+
+  void Visit(const GradOverrideExpr& expr) final {
+    // Forward-pass GradOverrideExprs are no-ops, so do nothing
+    // TODO: Or should I be copying the output?
   }
 
   void Visit(const CallExpr& expr) final {
@@ -720,6 +730,20 @@ std::string ParamExpr::str() const {
   }
   std::stringstream ss;
   ss << "ParamExpr{" << shape << "}";
+  return ss.str();
+}
+
+// TODO
+GradOverrideExpr::GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins,
+                                   const ExprPtr& out)
+    : fn(fn),    //
+      ins(ins),  //
+      out(out) {}
+
+GradOverrideExpr::std::string str() const {
+  // TODO: would be best to upgrade this somehow...
+  std::stringstream ss;
+  ss << "grad_override";
   return ss.str();
 }
 
