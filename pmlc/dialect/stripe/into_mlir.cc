@@ -201,25 +201,6 @@ struct IntrinsicBuilder {
 
 }  // namespace
 
-static Value* DeviceIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Device& dev) {
-  std::vector<Value*> units;
-  units.reserve(dev.units.size());
-  for (const auto& unit : dev.units) {
-    units.emplace_back(AffineIntoMLIR(builder, syms, unit));
-  }
-  return builder->create<DeviceIDOp>(builder->getUnknownLoc(), builder->getType<DeviceIDType>(),
-                                     builder->getStringAttr(dev.name), units);
-}
-
-static Value* LocationIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Location& loc) {
-  std::vector<Value*> dev_ids;
-  dev_ids.reserve(loc.devs.size());
-  for (const auto& dev : loc.devs) {
-    dev_ids.emplace_back(DeviceIntoMLIR(builder, syms, dev));
-  }
-  return builder->create<DevicePathOp>(builder->getUnknownLoc(), builder->getType<DevicePathType>(), dev_ids);
-}
-
 static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
@@ -259,15 +240,18 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
 
   // Process the indexes
   std::vector<int64_t> ranges;
-  for (const auto& idx : block.idxs) {
+  std::map<std::string, DictionaryAttr> argAttrs;
+  for (size_t i = 0; i < block.idxs.size(); i++) {
+    auto idx = block.idxs.at(i);
     if (idx.affine == stripe::Affine()) {
       // Handle the normal index case by adding a param to the body and the
       // range to the list to be used in the eventual attributes
       auto arg = body->addArgument(AffineType::get(builder->getContext()));
-      // auto attrs = TagsToDict(builder, idx, {{builder->getIdentifier("__name"), builder->getStringAttr(idx.name)}});
-      // auto idx_info = builder->create<AffineMeta>(unknownLoc, builder->getType<AffineType>(), arg, attrs);
       locals.idxs.emplace(idx.name, arg);
       ranges.push_back(static_cast<int64_t>(idx.range));
+      auto name = llvm::formatv("arg{0}", i);
+      auto attrs = TagsToDict(builder, idx, {{builder->getIdentifier("__name"), builder->getStringAttr(idx.name)}});
+      argAttrs.emplace(name, attrs);
     } else {
       // Handle the 'passthru' case by computing the appropriate affine and
       // adding into the symbol table
@@ -297,19 +281,10 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
     for (const auto& aff : ref.access) {
       offsets.push_back(AffineIntoMLIR(builder, locals, aff));
     }
-    auto attrs = TagsToDict(builder, ref, {{builder->getIdentifier("__name"), builder->getStringAttr(ref.into())}});
-    Value* nref = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets, attrs).result();
-    locals.refs.emplace(ref.into(), nref);
-  }
-
-  // Process the execution location
-  if (block.location.devs.size()) {
-    auto executor_op = builder->create<ExecutorOp>(unknownLoc, LocationIntoMLIR(builder, locals, block.location));
-    Block* execution_body = new Block();
-    executor_op.getOperation()->getRegion(0).push_back(execution_body);
-    builder->setInsertionPointToStart(execution_body);
-    builder->create<TerminateOp>(unknownLoc);
-    builder->setInsertionPointToStart(execution_body);
+    auto refOp = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets);
+    refOp.setAttr("name", builder->getStringAttr(ref.into()));
+    refOp.setAttr("stripe_attrs", TagsToDict(builder, ref));
+    locals.refs.emplace(ref.into(), refOp.result());
   }
 
   // Process the constraints
@@ -334,8 +309,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         auto tensorRefType = from->getType().cast<TensorRefType>();
         auto elementType = tensorRefType.getElementType();
         auto intoType = eltwise::GetTensorType(elementType);
-        auto attrs = TagsToDict(builder, *load);
-        auto op = builder->create<LoadOp>(unknownLoc, intoType, from, attrs);
+        auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
+        op.setAttr("stripe_attrs", TagsToDict(builder, *load));
         op.setAttr("scalar_name", builder->getStringAttr(load->into));
         locals.scalars.emplace(load->into, op);
       } break;
@@ -356,7 +331,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         auto attrs = TagsToDict(builder, *store);
         if (agg_str == "" || agg_str == "assign") {
           // Simple case, just an assignment
-          builder->create<StoreOp>(unknownLoc, into, from, attrs);
+          auto op = builder->create<StoreOp>(unknownLoc, into, from);
+          op.setAttr("stripe_attrs", attrs);
         } else {
           // Aggregation case
           llvm::Optional<AggTypeEnum> agg_type = symbolizeAggTypeEnum(agg_str);
@@ -365,7 +341,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
           }
           int64_t agg_int = static_cast<int>(agg_type.getValue());
           IntegerAttr agg_attr = builder->getI64IntegerAttr(agg_int);
-          builder->create<AggregateOp>(unknownLoc, into, from, agg_attr, attrs);
+          auto op = builder->create<AggregateOp>(unknownLoc, into, from, agg_attr);
+          op.setAttr("stripe_attrs", attrs);
         }
       } break;
       case stripe::StmtKind::Constant: {
@@ -396,26 +373,17 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         break;
     }
   }
+
   // Build the loop itself
   builder->restoreInsertionPoint(orig_insert);
-  auto loop_op = builder->create<ParallelForOp>(
-      unknownLoc, builder->getI64ArrayAttr(ranges),
-      TagsToDict(builder, block,
-                 {{builder->getIdentifier("__name"), builder->getStringAttr(block.name)},
-                  {builder->getIdentifier("__comments"), builder->getStringAttr(block.comments)}}));
-  loop_op.getOperation()->getRegion(0).push_back(body);
-
-  // Attach index tags
-  for (size_t i = 0; i < block.idxs.size(); i++) {
-    auto idx = block.idxs.at(i);
-    if (idx.affine == stripe::Affine()) {
-      auto name = llvm::formatv("arg{0}", i);
-      auto attrs = TagsToDict(builder, idx, {{builder->getIdentifier("__name"), builder->getStringAttr(idx.name)}});
-      loop_op.setAttr(name.str(), attrs);
-    }
+  auto loop_op = builder->create<ParallelForOp>(unknownLoc, builder->getI64ArrayAttr(ranges));
+  loop_op.setAttr("name", builder->getStringAttr(block.name));
+  loop_op.setAttr("comments", builder->getStringAttr(block.comments));
+  loop_op.setAttr("stripe_attrs", TagsToDict(builder, block));
+  for (const auto& kvp : argAttrs) {
+    loop_op.setAttr(kvp.first, kvp.second);
   }
-
-  // TODO: Move across the index tags as well...
+  loop_op.getOperation()->getRegion(0).push_back(body);
 }
 
 static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block) {

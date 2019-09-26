@@ -66,26 +66,26 @@ TEST(Stripe, Transcode) {
 
   codegen::CompilerState cstate{prog};
 
-  IVLOG(1, "Adding a memory location");
-  codegen::proto::LocateMemoryPass lmp;
-  auto lmp_dev = lmp.mutable_loc()->add_devs();
-  lmp_dev->set_name("OuterMem");
-  lmp_dev->add_units()->set_offset(0);
-  lmp_dev = lmp.mutable_loc()->add_devs();
-  lmp_dev->set_name("InnerMem");
-  lmp_dev->add_units()->set_offset(1);
-  codegen::LocateMemoryPass{lmp}.Apply(&cstate);
+  // IVLOG(1, "Adding a memory location");
+  // codegen::proto::LocateMemoryPass lmp;
+  // auto lmp_dev = lmp.mutable_loc()->add_devs();
+  // lmp_dev->set_name("OuterMem");
+  // lmp_dev->add_units()->set_offset(0);
+  // lmp_dev = lmp.mutable_loc()->add_devs();
+  // lmp_dev->set_name("InnerMem");
+  // lmp_dev->add_units()->set_offset(1);
+  // codegen::LocateMemoryPass{lmp}.Apply(&cstate);
 
-  IVLOG(1, "Adding an executor location");
-  codegen::proto::LocateBlockPass lbp;
-  lbp.add_reqs("main");
-  auto lbp_dev = lbp.mutable_loc()->add_devs();
-  lbp_dev->set_name("OuterExecutor");
-  lbp_dev->add_units()->set_offset(0);
-  lbp_dev = lbp.mutable_loc()->add_devs();
-  lbp_dev->set_name("InnerExecutor");
-  lbp_dev->add_units()->set_offset(1);
-  codegen::LocateBlockPass{lbp}.Apply(&cstate);
+  // IVLOG(1, "Adding an executor location");
+  // codegen::proto::LocateBlockPass lbp;
+  // lbp.add_reqs("main");
+  // auto lbp_dev = lbp.mutable_loc()->add_devs();
+  // lbp_dev->set_name("OuterExecutor");
+  // lbp_dev->add_units()->set_offset(0);
+  // lbp_dev = lbp.mutable_loc()->add_devs();
+  // lbp_dev->set_name("InnerExecutor");
+  // lbp_dev->add_units()->set_offset(1);
+  // codegen::LocateBlockPass{lbp}.Apply(&cstate);
 
   IVLOG(2, "Original version:");
   IVLOG(2, *prog->entry);

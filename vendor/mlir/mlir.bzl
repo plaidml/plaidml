@@ -11,9 +11,6 @@ TBLGEN_ACTIONS = [
     "-gen-rewriters",
 ]
 
-# mlir_tablegen(LinalgLibraryOpInterfaces.h.inc -gen-op-interface-decls)
-# mlir_tablegen(LinalgLibraryOpInterfaces.cpp.inc -gen-op-interface-defs)
-
 COPTS = select({
     "@com_intel_plaidml//toolchain:windows_x86_64": [
         "/wd4624",

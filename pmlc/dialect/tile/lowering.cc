@@ -59,7 +59,8 @@ struct TypeConverter : public mlir::TypeConverter {
         newShape[i].size = shape[i];
         stride *= shape[i];
       }
-      return stripe::TensorType::get(rankedType.getElementType(), newShape);
+      // TODO: deal with is_const
+      return stripe::TensorType::get(rankedType.getElementType(), newShape, false);
     }
     if (auto tensorType = type.dyn_cast<stripe::TensorType>()) {
       IVLOG(1, "  TensorType");
@@ -190,11 +191,9 @@ struct AffineDomainOpConversion : public LoweringBase {
       newValue = allocOp.result();
     }
 
-    std::vector<NamedAttribute> attrs;
     auto forOp = rewriter.create<stripe::ParallelForOp>(  //
         op->getLoc(),                                     //
-        rewriter.getI64ArrayAttr(ranges),                 //
-        rewriter.getDictionaryAttr(attrs));
+        rewriter.getI64ArrayAttr(ranges));
     auto body = rewriter.createBlock(&forOp.inner());
 
     unsigned argcnt = 0;
