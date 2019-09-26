@@ -711,7 +711,7 @@ void Compiler::Visit(const stripe::Special& special) {
       {"reshape", &Compiler::Reshape},     //
       {"prng_step", &Compiler::PrngStep},  //
       {"shape", &Compiler::Shape},         //
-      {"init", &Compiler::Init},           //
+      {"agg_init", &Compiler::AggInit},    //
   };
   auto it = handlers.find(special.name);
   if (it == handlers.end()) {
@@ -1410,12 +1410,13 @@ void Compiler::Shape(const stripe::Special& shape) {
   }
 }
 
-void Compiler::Init(const stripe::Special& init) {
+void Compiler::AggInit(const stripe::Special& agg_init) {
   // One output: a tensor to initialize.
   // The initialization value depends on the refinement's agg_op.
   // Iterate over each dimension and write to each element.
-  assert(1 == init.outputs.size());
-  Buffer dest = buffers_[init.outputs[0]];
+  assert(0 == agg_init.inputs.size());
+  assert(1 == agg_init.outputs.size());
+  Buffer dest = buffers_[agg_init.outputs[0]];
   auto& dest_shape = dest.refinement->interior_shape;
   size_t dest_ndims = dest_shape.dims.size();
 
