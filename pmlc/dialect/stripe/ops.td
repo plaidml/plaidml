@@ -8,6 +8,7 @@ def StripeDialect : Dialect {
 }
 
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
+def ExecutorType : Type<CPred<"$_self.isa<ExecutorType>()">, "Plaid Executor Type">;
 def PrngType : Type<CPred<"$_self.isa<PrngType>()">, "Plaid PrngType">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Type">;
 def TensorRefType : Type<CPred<"$_self.isa<TensorRefType>()">, "Plaid Tensor Reference Type">;
@@ -16,7 +17,7 @@ class StripeOp<string mnemonic, list<OpTrait> traits = []> :
     Op<StripeDialect, mnemonic, traits>;
 
 def AllocateOp : StripeOp<"alloc"> {
-  let summary = "Allocate a new tensor and set it's intial shape / size";
+  let summary = "Allocate a new tensor and set its intial shape / size";
   let results = (outs TensorType:$result);
 }
 

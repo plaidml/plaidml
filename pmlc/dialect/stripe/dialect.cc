@@ -13,10 +13,11 @@ namespace stripe {
 static mlir::DialectRegistration<Dialect> StripeOps;
 
 Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), ctx) {
-  addTypes<        //
-      AffineType,  //
-      PrngType,    //
-      TensorType,  //
+  addTypes<          //
+      AffineType,    //
+      ExecutorType,  //
+      PrngType,      //
+      TensorType,    //
       TensorRefType>();
   addOperations<
 #define GET_OP_LIST
@@ -29,6 +30,8 @@ mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const 
 }
 
 static void print(AffineType type, llvm::raw_ostream& os) { os << "affine"; }
+
+static void print(ExecutorType type, llvm::raw_ostream& os) { os << "executor"; }
 
 static void print(TensorType type, llvm::raw_ostream& os) {
   os << "tensor ";
@@ -60,6 +63,8 @@ static void print(PrngType type, llvm::raw_ostream& os) { os << "prng"; }
 void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
   if (auto affineType = type.dyn_cast<AffineType>()) {
     print(affineType, os);
+  } else if (auto executorType = type.dyn_cast<ExecutorType>()) {
+    print(executorType, os);
   } else if (auto prngType = type.dyn_cast<PrngType>()) {
     print(prngType, os);
   } else if (auto tensorType = type.dyn_cast<TensorType>()) {

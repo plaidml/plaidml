@@ -59,8 +59,9 @@ struct TypeConverter : public mlir::TypeConverter {
         newShape[i].size = shape[i];
         stride *= shape[i];
       }
+      // TODO: deal with offsets
       // TODO: deal with is_const
-      return stripe::TensorType::get(rankedType.getElementType(), newShape, false);
+      return stripe::TensorType::get(rankedType.getElementType(), newShape, stripe::OffsetsMap{}, false);
     }
     if (auto tensorType = type.dyn_cast<stripe::TensorType>()) {
       IVLOG(1, "  TensorType");

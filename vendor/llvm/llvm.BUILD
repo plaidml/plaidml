@@ -1677,11 +1677,15 @@ cc_library(
         "lib/ExecutionEngine/*.cpp",
         "lib/ExecutionEngine/*.inc",
         "lib/ExecutionEngine/*.h",
+        "lib/ExecutionEngine/IntelJITEvents/*.cpp",
+        "lib/ExecutionEngine/IntelJITEvents/*.c",
+        "lib/ExecutionEngine/IntelJITEvents/*.h",
     ]),
     hdrs = glob([
         "include/llvm/ExecutionEngine/*.h",
         "include/llvm/ExecutionEngine/*.def",
         "include/llvm/ExecutionEngine/*.inc",
+        "include/llvm/ExecutionEngine/IntelJITEvents/*.h",
     ]),
     copts = llvm_copts,
     deps = [

@@ -39,9 +39,9 @@ static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
   llvm::SmallVector<TensorDim, 4> dims;
   for (const auto& dim : shape.dims) {
-    dims.emplace_back(TensorDim{static_cast<int64_t>(dim.size), dim.stride});
+    dims.emplace_back(TensorDim{static_cast<int64_t>(dim.size), dim.stride, mlir::Identifier::get("address", ctx)});
   }
-  return TensorType::get(dtype, dims, shape.is_const);
+  return TensorType::get(dtype, dims, OffsetsMap{}, shape.is_const);
 }
 
 static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
