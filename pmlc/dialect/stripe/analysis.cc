@@ -31,8 +31,6 @@ AffinePolynomial::AffinePolynomial(Value* x) : constant(0) {
     for (Value* v : op.inputs()) {
       *this += AffinePolynomial(v);
     }
-  } else if (auto op = mlir::dyn_cast<AffineMeta>(dop)) {
-    *this = AffinePolynomial(op.input());
   } else {
     throw std::runtime_error("Invalid affine in ComputeAffineRange");
   }

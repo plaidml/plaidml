@@ -3,7 +3,6 @@
 #pragma once
 
 #include <algorithm>
-#include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -58,7 +57,7 @@ struct TensorDim {
   int64_t stride;
 
   // The hardware class identified by this dimension.
-  mlir::Identifier cls;
+  llvm::StringRef cls;
 
   bool operator==(const TensorDim& rhs) const {  //
     return std::tie(size, stride, cls) == std::tie(rhs.size, rhs.stride, rhs.cls);
@@ -76,7 +75,9 @@ struct TensorTypeStorage : public mlir::TypeStorage {
       : elementType(elementType), shape(shape), offsets(offsets), is_const(is_const) {}
 
   using KeyTy = std::tuple<Type, std::vector<TensorDim>, OffsetsMap, bool>;
+
   bool operator==(const KeyTy& key) const { return std::tie(elementType, shape, offsets, is_const) == key; }
+
   static llvm::hash_code hashKey(const KeyTy& key) {
     std::vector<std::pair<const void*, int64_t>> offset_vec;
     const OffsetsMap& offsets = std::get<2>(key);
@@ -124,7 +125,11 @@ class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
 
   static bool kindof(unsigned kind) { return kind == Types::Tensor; }
 
-  static TensorType get(Type elementType, llvm::ArrayRef<TensorDim> shape, OffsetsMap offsets, bool is_const) {
+  static TensorType get(                //
+      Type elementType,                 //
+      llvm::ArrayRef<TensorDim> shape,  //
+      const OffsetsMap& offsets,        //
+      bool is_const) {
     return Base::get(elementType.getContext(), Types::Tensor, elementType, shape, offsets, is_const);
   }
 
