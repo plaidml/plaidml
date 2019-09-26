@@ -5,6 +5,8 @@ TBLGEN_ACTIONS = [
     "-gen-op-decls",
     "-gen-op-defs",
     "-gen-op-doc",
+    "-gen-op-interface-decls",
+    "-gen-op-interface-defs",
     "-gen-reference-implementations",
     "-gen-rewriters",
 ]

@@ -29,17 +29,13 @@ def TensorRefOp : StripeOp<"ref", [NoSideEffect]> {
 
 def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let summary = "Modify the offset into a tensor in an affine way";
-  let arguments = (ins
-    TensorRefType:$in,
-    Variadic<AffineType>:$offsets,
-    DictionaryAttr:$attrs
-  );
+  let arguments = (ins TensorRefType:$in, Variadic<AffineType>:$offsets);
   let results = (outs TensorRefType:$result);
 }
 
 def LoadOp : StripeOp<"load"> {
   let summary = "Load from a tensor";
-  let arguments = (ins TensorRefType:$from, DictionaryAttr:$attr);
+  let arguments = (ins TensorRefType:$from);
   let results = (outs Eltwise_AnyTensor:$into);
   /*
   let parser = [{
@@ -66,11 +62,7 @@ def LoadIndexOp : StripeOp<"load_index"> {
 
 def StoreOp : StripeOp<"store"> {
   let summary = "Store into a tensor";
-  let arguments = (ins
-    TensorRefType:$into,
-    Eltwise_AnyTensor:$from,
-    DictionaryAttr:$attr
-  );
+  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from);
   /*
   let parser = [{
     mlir::SmallVector<OpAsmParser::OperandType, 2> ops;
@@ -98,7 +90,7 @@ def AggTypeEnum : I64EnumAttr<
 
 def AggregateOp : StripeOp<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
-  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$agg_type, DictionaryAttr:$attr);
+  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$agg_type);
   let results = (outs);
 }
 
@@ -128,20 +120,11 @@ def AffineAddOp : AffineOp<"affine_add"> {
   let arguments = (ins Variadic<AffineType>:$inputs);
 }
 
-def AffineMeta : AffineOp<"affine_meta"> {
-  let summary = "Attach metadata to an affine";
-  let arguments = (ins AffineType:$input, DictionaryAttr:$attrs);
-}
-
 def ParallelForOp : StripeOp<"parallel_for"> {
   let summary = "Parallel for loop";
   // At some point, we should be able to dynamically control ranges
   // Variadic<IntegerType>:$dyn_ranges
-  let arguments = (ins
-    I64ArrayAttr:$ranges,
-    DictionaryAttr:$attrs
-    // TypedArrayAttrBase<DictionaryAttr, "per index tags">:$idx_attrs
-  ); 
+  let arguments = (ins I64ArrayAttr:$ranges);
   let regions = (region SizedRegion<1>:$inner);
 }
 

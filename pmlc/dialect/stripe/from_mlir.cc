@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/stripe/transcode.h"
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "base/util/lookup.h"
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/analysis.h"
@@ -39,7 +41,7 @@ class StripeBuilder {
  private:
   std::string scalar_name(Operation* op);
   TensorShape get_shape(TensorType type);
-  void add_attributes(stripe::Taggable& out, ArrayRef<NamedAttribute> in);  // NOLINT
+  void add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> in);
   void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out, std::string agg = "");
   std::string get_idx(stripe::Block* block, mlir::BlockArgument* affine);
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
@@ -68,7 +70,7 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
   cur_ = std::make_shared<stripe::Block>();
   cur_->name = func.getName();
   std::vector<NamedAttribute> attrs(func.getDialectAttrs().begin(), func.getDialectAttrs().end());
-  add_attributes(*cur_, attrs);
+  add_attributes(cur_.get(), attrs);
   Block& oblock = func.front();
   BlockInfo blockInfo(cur_.get());
   for (size_t i = 0; i < func.getNumArguments(); i++) {
@@ -100,31 +102,29 @@ TensorShape StripeBuilder::get_shape(TensorType type) {
   return ret;
 }
 
-void StripeBuilder::add_attributes(stripe::Taggable& out, ArrayRef<NamedAttribute> attrs) {
+void StripeBuilder::add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> attrs) {
   for (auto kvp : attrs) {
-    std::string name;
-    if (kvp.first.strref().count('.')) {
-      name = kvp.first.strref().split('.').second;
-    } else {
-      name = kvp.first.str();
+    llvm::StringRef name = kvp.first.strref();
+    if (name.count('.')) {
+      name = name.split('.').second;
     }
-    if (name == "__name" || name == "__comments") {
+    if (name == "__name") {
       continue;
     }
     if (kvp.second.dyn_cast<UnitAttr>()) {
-      out.set_attr(name);
+      out->set_attr(name);
     } else if (auto attr = kvp.second.dyn_cast<BoolAttr>()) {
-      out.set_attr(name, attr.getValue());
+      out->set_attr(name, attr.getValue());
     } else if (auto attr = kvp.second.dyn_cast<IntegerAttr>()) {
-      out.set_attr(name, attr.getInt());
+      out->set_attr(name, attr.getInt());
     } else if (auto attr = kvp.second.dyn_cast<FloatAttr>()) {
-      out.set_attr(name, attr.getValueAsDouble());
+      out->set_attr(name, attr.getValueAsDouble());
     } else if (auto attr = kvp.second.dyn_cast<IntegerAttr>()) {
-      out.set_attr(name, attr.getInt());
+      out->set_attr(name, attr.getInt());
     } else if (auto attr = kvp.second.dyn_cast<StringAttr>()) {
-      out.set_attr(name, attr.getValue().str());
+      out->set_attr(name, attr.getValue().str());
     } else {
-      IVLOG(1, "Attr: " << name);
+      IVLOG(1, "Attr: " << name.str());
       throw std::runtime_error("Invalid attribute during conversion");
     }
   }
@@ -160,20 +160,18 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
     }
     stripe::Block* sblock = blocks_.at(block).stripe;
     // Begin by seeing if we've already made a ref for this block
-    std::string& rname = (blocks_.at(block).refs[ti]);
+    std::string& ref_name = blocks_.at(block).refs[ti];
     // If not, add the refinement
-    if (rname == "") {
+    if (ref_name == "") {
       if (auto rop = mlir::dyn_cast<RefineOp>(op)) {
-        if (auto attr = rop.attrs().get("__name")) {
-          if (auto sattr = attr.dyn_cast<StringAttr>()) {
-            rname = sattr.getValue().str();
-          }
+        if (auto str_attr = rop.getAttrOfType<StringAttr>("name")) {
+          ref_name = str_attr.getValue().str();
         }
       }
-      if (rname == "") {
-        rname = "ref";
+      if (ref_name == "") {
+        ref_name = "ref";
       }
-      rname = sblock->unique_ref_name(rname);
+      ref_name = sblock->unique_ref_name(ref_name);
       std::vector<stripe::Affine> access;
       for (size_t i = 0; i < ti.access.size(); i++) {
         stripe::Affine aff;
@@ -192,18 +190,18 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         shape.dims[i].size = range.max - range.min + 1;
         shape.dims[i].size = std::min(shape.dims[i].size, base_shape.dims[i].size);
       }
-      sblock->refs.emplace(dir, "", rname, access, shape, agg_name);
+      sblock->refs.emplace(dir, "", ref_name, access, shape, agg_name);
       // TODO: Only do this when we are 1-to-1
       agg_name = "";
     }
     // Connect up previously added block
     if (ref) {
-      ref->from = rname;
+      ref->from = ref_name;
     } else {
-      *name_out = rname;
+      *name_out = ref_name;
     }
     // Get pointer to new/etc reference
-    ref = &blocks_.at(block).stripe->ref_by_into(rname)->mut();
+    ref = &blocks_.at(block).stripe->ref_by_into(ref_name)->mut();
     // Add in directionality
     if (ref->dir != stripe::RefDir::InOut && ref->dir != dir) {
       ref->dir = stripe::RefDir::InOut;
@@ -221,9 +219,11 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         }
       }
     }
-    // If op matches the block, move the op up, also add location and attributes
+    // If op matches the block, move the op up, also attributes
     while (op->getBlock() == block && mlir::isa<RefineOp>(op)) {
-      add_attributes(*ref, mlir::cast<RefineOp>(op).attrs().getValue());
+      if (auto attrs = op->getAttrOfType<DictionaryAttr>("stripe_attrs")) {
+        add_attributes(ref, attrs.getValue());
+      }
       op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
     }
     // Must have hit the allocation, stop
@@ -261,43 +261,36 @@ void StripeBuilder::visit(ParallelForOp op) {
   // Construct the block and put it in the table
   cur_ = std::make_shared<stripe::Block>();
   Block& oblock = op.inner().front();
-  // Move across the easy metadata
-  if (auto attr = op.attrs().get("__name")) {
-    if (auto sattr = attr.dyn_cast<StringAttr>()) {
-      cur_->name = sattr.getValue().str();
-    }
+  // Move across the easy attrs
+  if (auto attr = op.getAttrOfType<StringAttr>("name")) {
+    cur_->name = attr.getValue().str();
   }
-  if (auto attr = op.attrs().get("__comments")) {
-    if (auto sattr = attr.dyn_cast<StringAttr>()) {
-      cur_->comments = sattr.getValue().str();
-    }
+  if (auto attr = op.getAttrOfType<StringAttr>("comments")) {
+    cur_->comments = attr.getValue().str();
   }
   // Add the 'true' indexes
   for (size_t i = 0; i < op.ranges().size(); i++) {
     int64_t range = op.ranges().getValue()[i].cast<IntegerAttr>().getInt();
-    mlir::BlockArgument* ovpos = oblock.getArgument(i);
-    Value* vpos = ovpos;
-    std::string iname = "idx";
-    if (vpos->hasOneUse()) {
-      auto op = vpos->use_begin()->getOwner();
-      if (auto meta = mlir::dyn_cast<AffineMeta>(op)) {
-        vpos = meta.result();
-        if (auto attr = meta.attrs().get("__name")) {
-          if (auto sattr = attr.dyn_cast<StringAttr>()) {
-            iname = sattr.getValue().str();
-          }
+    std::string idx_name = "idx";
+    auto argName = llvm::formatv("arg{0}", i);
+    if (auto attrs = op.getAttrOfType<DictionaryAttr>(argName.str())) {
+      for (auto kvp : attrs.getValue()) {
+        if (kvp.first.strref() == "__name") {
+          idx_name = kvp.second.cast<StringAttr>().getValue().str();
         }
       }
     }
-    iname = cur_->unique_idx_name(iname);
-    idxs_.emplace(std::make_pair(cur_.get(), ovpos), iname);
-    cur_->idxs.emplace_back(iname, range);
-    if (auto meta = mlir::dyn_cast<AffineMeta>(vpos->getDefiningOp())) {
-      add_attributes(cur_->idxs.back(), meta.attrs().getValue());
+    idx_name = cur_->unique_idx_name(idx_name);
+    idxs_.emplace(std::make_pair(cur_.get(), oblock.getArgument(i)), idx_name);
+    cur_->idxs.emplace_back(idx_name, range);
+    if (auto attrs = op.getAttrOfType<DictionaryAttr>(argName.str())) {
+      add_attributes(&cur_->idxs.back(), attrs.getValue());
     }
   }
   // Add the attributes
-  add_attributes(*cur_, op.attrs().getValue());
+  if (auto attrs = op.getAttrOfType<DictionaryAttr>("stripe_attrs")) {
+    add_attributes(cur_.get(), attrs.getValue());
+  }
   blocks_.emplace(&oblock, BlockInfo(cur_.get()));
   walk_interior(&oblock);
 }
