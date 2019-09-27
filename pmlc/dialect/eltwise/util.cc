@@ -18,8 +18,18 @@
 
 namespace mlir {
 
-std::ostream& operator<<(std::ostream& os, mlir::ModuleOp op) {
-  os << mlir::debugString(op);
+std::ostream& operator<<(std::ostream& os, ModuleOp rhs) {
+  os << mlir::debugString(rhs);
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const Value& rhs) {
+  os << mlir::debugString(*const_cast<Value*>(&rhs));
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, Type rhs) {
+  os << mlir::debugString(rhs);
   return os;
 }
 

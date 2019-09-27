@@ -39,9 +39,9 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
 
 void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
   if (auto t = type.dyn_cast<AffineIndexMapType>()) {
-    os << "idx_map";
+    os << "imap";
   } else if (auto t = type.dyn_cast<AffineSizeMapType>()) {
-    os << "size_map";
+    os << "smap";
   }
 }
 

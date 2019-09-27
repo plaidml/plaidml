@@ -19,6 +19,7 @@ local PARAMS = {
           // Define the stripe passes
           passes: [
             // we place all the initial buffer in global memory (DRAM)
+            
             {
               name: 'loc_program',
               pass: {
@@ -66,13 +67,14 @@ local PARAMS = {
             },
 
             // Reorder Blocks
+            
             {
               name: 'reorder_blocks',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
               },
             },
-
+            
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',

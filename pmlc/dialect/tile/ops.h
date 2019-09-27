@@ -27,6 +27,7 @@ using mlir::Op;
 using mlir::Operation;
 using mlir::OperationState;
 using mlir::OpFoldResult;
+using mlir::OpInterface;
 using mlir::OwningRewritePatternList;
 using mlir::RankedTensorType;
 using mlir::Region;
@@ -39,6 +40,8 @@ using mlir::TypeAttr;
 using mlir::Value;
 
 namespace OpTrait = mlir::OpTrait;
+
+#include "pmlc/dialect/tile/opinterfaces.h.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ops.h.inc"
