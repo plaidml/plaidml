@@ -1060,8 +1060,8 @@ def not_equal(lhs, rhs):
 
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
-    x_shape = int_shape(x)
-    ndims = len(x_shape)
+    x_shape = shape(x)
+    ndims = x.tensor.shape.ndims
     if ndims == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
         target_shape = [1 if i in reduction_axes else x_shape[i] for i in range(4)]
         m = mean(x, axis=reduction_axes, keepdims=True)
@@ -1076,7 +1076,6 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
         else:
             raw_axes = reduction_axes
         axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
-
         m = mean(x, axis=axes, keepdims=True)
         v = var(x, axis=axes, keepdims=True)
 

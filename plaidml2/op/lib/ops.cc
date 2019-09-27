@@ -2484,7 +2484,8 @@ Value squeeze(const Value& value) {
     raw_axes.push_back(args[1].as_int());
   } else if (args[1].is_none()) {
     for (uint64_t i = 0; i < ndims; ++i) {
-      if (I_dims[i].as_int() == 1) {
+      // this doesn't work for symbolic dimensions that are later binded to 1
+      if (I_dims[i].as_ptr() && I_dims[i].as_int() == 1) {
         raw_axes.push_back(i);
       }
     }
