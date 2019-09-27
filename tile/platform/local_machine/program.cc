@@ -101,13 +101,13 @@ lang::KernelList CompileProgram(           //
   auto inputs = FromProto(program.inputs());
   auto outputs = FromProto(program.outputs());
 
-  auto use_stripe = env::Get("USE_STRIPE") == "1";
+  auto use_stripe = env::Get("PLAIDML_USE_STRIPE") == "1";
   if (use_stripe) {
     auto stripe_cfg = devinfo.settings.stripe_config();
     if (stripe_cfg.empty()) {
-      throw std::runtime_error("Selected device must have a stripe_config when USE_STRIPE is enabled");
+      throw std::runtime_error("Selected device must have a stripe_config when PLAIDML_USE_STRIPE is enabled");
     }
-    auto out_path = env::Get("STRIPE_OUTPUT");
+    auto out_path = env::Get("PLAIDML_STRIPE_OUTPUT");
     lang::RunInfo runinfo;
     runinfo.program = parsed;
     runinfo.input_shapes = inputs;
@@ -217,7 +217,7 @@ Program::Program(                                             //
       output_mem_strategy_{output_mem_strategy},
       tmp_mem_strategy_{tmp_mem_strategy},
       num_runs_{0} {
-  auto out_path = env::Get("STRIPE_OUTPUT");
+  auto out_path = env::Get("PLAIDML_STRIPE_OUTPUT");
   kernel_list_ = codegen::GenerateProgram(stripe, target, out_path, const_bufs);
   const_bufs_ = const_bufs->buffers;
 

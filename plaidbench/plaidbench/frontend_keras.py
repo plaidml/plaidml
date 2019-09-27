@@ -343,7 +343,8 @@ class Frontend(core.Frontend):
     def model(self, params):
         if self.train:
             return TrainingModel(self, params)
-        enable_bn_folding = os.getenv('USE_STRIPE', '0') == '1' or self.backend == 'plaid_edsl'
+        use_stripe = os.getenv('PLAIDML_USE_STRIPE', '0') == '1'
+        enable_bn_folding = use_stripe or self.backend == 'plaid_edsl'
         return InferenceModel(self, params, enable_bn_folding=enable_bn_folding)
 
     @property

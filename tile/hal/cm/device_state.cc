@@ -57,8 +57,8 @@ void DeviceState::ConfigEnv() {
   shell_env_->libva_driver_name_ = env::Get("LIBVA_DRIVER_NAME");
   env::Set("LIBVA_DRIVER_NAME", "iHD");
 
-  shell_env_->use_stripe_ = env::Get("USE_STRIPE");
-  env::Set("USE_STRIPE", "1");
+  shell_env_->use_stripe_ = env::Get("PLAIDML_USE_STRIPE");
+  env::Set("PLAIDML_USE_STRIPE", "1");
 
   shell_env_->plaidml_prohibit_winograd_ = env::Get("PLAIDML_PROHIBIT_WINOGRAD");
   env::Set("PLAIDML_PROHIBIT_WINOGRAD", "1");
@@ -82,7 +82,7 @@ void DeviceState::ConfigEnv() {
 
 void DeviceState::RecoverEnv() {
   env::Set("LIBVA_DRIVER_NAME", shell_env_->libva_driver_name_);
-  env::Set("USE_STRIPE", shell_env_->use_stripe_);
+  env::Set("PLAIDML_USE_STRIPE", shell_env_->use_stripe_);
   env::Set("PLAIDML_PROHIBIT_WINOGRAD", shell_env_->plaidml_prohibit_winograd_);
 }
 

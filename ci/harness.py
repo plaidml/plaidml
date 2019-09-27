@@ -101,7 +101,7 @@ def run(args, remainder):
         conda_env.install(whl_path)
 
     if 'stripe' in args.platform:
-        env['USE_STRIPE'] = '1'
+        env['PLAIDML_USE_STRIPE'] = '1'
     if 'cuda' in args.platform:
         env['CUDA_DEVICE_ORDER'] = buildkite_metadata('CUDA_CUDA_DEVICE_ORDER', 'PCI_BUS_ID')
         env['CUDA_VISIBLE_DEVICES'] = buildkite_metadata('CUDA_VISIBLE_DEVICES', '0')
