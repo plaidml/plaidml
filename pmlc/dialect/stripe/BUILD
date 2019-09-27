@@ -67,6 +67,7 @@ plaidml_cc_library(
         "ops.cc",
         "ops.cpp.inc",
         "ops_enum.cpp.inc",
+        "opinterfaces.cpp.inc",
     ],
     hdrs = [
         "analysis.h",
@@ -75,6 +76,7 @@ plaidml_cc_library(
         "ops.h",
         "ops.h.inc",
         "ops_enum.h.inc",
+        "opinterfaces.h.inc",
         "types.h",
     ],
     copts = COPTS,

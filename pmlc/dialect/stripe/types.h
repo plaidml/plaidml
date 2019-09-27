@@ -187,14 +187,6 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
   bool is_const() const { return getImpl()->is_const; }
 };
 
-// A PRNG state.
-class PrngType : public Type::TypeBase<PrngType, Type> {
- public:
-  using Base::Base;
-  static bool kindof(unsigned kind) { return kind == Types::Prng; }
-  static PrngType get(MLIRContext* context) { return Base::get(context, Types::Prng); }
-};
-
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

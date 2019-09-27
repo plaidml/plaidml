@@ -42,7 +42,8 @@ class StripeBuilder {
   std::string scalar_name(Operation* op);
   TensorShape get_shape(TensorType type);
   void add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> in);
-  void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out, std::string agg = "");
+  void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out, std::string agg = "",
+                       bool is_spec = false);
   std::string get_idx(stripe::Block* block, mlir::BlockArgument* affine);
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
   void visit(ParallelForOp op);
@@ -51,8 +52,7 @@ class StripeBuilder {
   void visit(LoadIndexOp op);
   void visit(StoreOp op);
   void visit(AggregateOp op);
-  void visit(ReshapeOp op);
-  void visit(PrngStepOp op);
+  void visit(SpecialOp op);
   void walk_interior(Block* inner);
 
   std::shared_ptr<stripe::Block> cur_;
@@ -132,7 +132,7 @@ void StripeBuilder::add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribut
 }
 
 void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out,
-                                    std::string agg_name) {
+                                    std::string agg_name, bool is_spec) {
   // Compute all the info about the tensor
   auto ti = ComputeAccess(tensor);
   size_t ndims = ti.access.size();
@@ -188,8 +188,10 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
       TensorShape shape = base_shape;
       for (size_t i = 0; i < ndims; i++) {
         auto range = AffineRange(inner[i]);
-        shape.dims[i].size = range.max - range.min + 1;
-        shape.dims[i].size = std::min(shape.dims[i].size, base_shape.dims[i].size);
+        if (!is_spec) {
+          shape.dims[i].size = range.max - range.min + 1;
+          shape.dims[i].size = std::min(shape.dims[i].size, base_shape.dims[i].size);
+        }
         access[i] += constants[i];
         constants[i] = 0;
       }
@@ -240,10 +242,6 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
   ref->dir = stripe::RefDir::None;
   // Get full allocation shape
   ref->interior_shape = base_shape;
-  // Add location info to the allocation block
-  if (auto alloc_op = mlir::dyn_cast<AllocateOp>(op)) {
-    ref->location = build_location(blocks_.at(block).stripe, alloc_op.devicePath());
-  }
 }
 
 std::string StripeBuilder::get_idx(stripe::Block* block, mlir::BlockArgument* affine) {
@@ -352,33 +350,25 @@ void StripeBuilder::visit(AggregateOp op) {
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
 }
 
-void StripeBuilder::visit(ReshapeOp op) {
-  std::string from;
-  std::string into;
-  add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &from);
-  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &into);
+void StripeBuilder::visit(SpecialOp op) {
   auto r = std::make_shared<stripe::Special>();
-  r->name = "reshape";
-  r->inputs.push_back(from);
-  r->outputs.push_back(into);
+  size_t operand = 0;
+  for (size_t i = 0; i < op.getNumOutputs(); i++) {
+    std::string out_name;
+    Operation* opr = op.getOperation();
+    add_refinements(opr->getBlock(), opr->getOperand(operand++), stripe::RefDir::Out, &out_name, "", true);
+    r->outputs.push_back(out_name);
+  }
+  for (size_t i = 0; i < op.getNumInputs(); i++) {
+    std::string in_name;
+    Operation* opr = op.getOperation();
+    add_refinements(opr->getBlock(), opr->getOperand(operand++), stripe::RefDir::In, &in_name, "", true);
+    r->inputs.push_back(in_name);
+  }
+  std::string dialect = op.getOperation()->getName().getDialect().str();
+  std::string full_name = op.getOperation()->getName().getStringRef().str();
+  r->name = full_name.substr(dialect.size() + 1, full_name.size() - dialect.size() - 1);
   cur_->stmts.push_back(r);
-}
-
-void StripeBuilder::visit(PrngStepOp op) {
-  std::cout << "Z000!\n";
-  std::string state_in;
-  std::string state_out;
-  std::string buffer;
-  add_refinements(op.getOperation()->getBlock(), op.state_in(), stripe::RefDir::In, &state_in);
-  add_refinements(op.getOperation()->getBlock(), op.state_out(), stripe::RefDir::Out, &state_out);
-  add_refinements(op.getOperation()->getBlock(), op.buffer(), stripe::RefDir::Out, &buffer);
-  auto r = std::make_shared<stripe::Special>();
-  r->name = "prng_step";
-  r->inputs.push_back(state_in);
-  r->outputs.push_back(state_out);
-  r->outputs.push_back(buffer);
-  cur_->stmts.push_back(r);
-  std::cout << "Z0000!\n";
 }
 
 void StripeBuilder::walk_interior(Block* block) {
@@ -407,9 +397,7 @@ void StripeBuilder::walk_interior(Block* block) {
       visit(op);
     } else if (auto op = mlir::dyn_cast<AggregateOp>(op_base)) {
       visit(op);
-    } else if (auto op = mlir::dyn_cast<ReshapeOp>(op_base)) {
-      visit(op);
-    } else if (auto op = mlir::dyn_cast<PrngStepOp>(op_base)) {
+    } else if (auto op = mlir::dyn_cast<SpecialOp>(op_base)) {
       visit(op);
     } else {
       found_inst_ = false;

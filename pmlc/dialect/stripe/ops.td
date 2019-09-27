@@ -142,10 +142,9 @@ def SpecialOpInterface : OpInterface<"SpecialOp"> {
 class SpecialOp<string mnemonic, int num_out, int num_in> :
     StripeOp<mnemonic, [SpecialOpInterface]> {
   let results = (outs);
-  let extraClassDeclaration = [{
-    size_t getNumOutpus() { return $num_out; }
-    size_t getNumInputs() { return $num_in; }
-  }];
+  let extraClassDeclaration = 
+    "  size_t getNumOutputs() { return " # num_out # "; }\n" #
+    "  size_t getNumInputs() { return " # num_in # "; }\n";
 }
 
 def ReshapeOp : SpecialOp<"reshape", 1, 1> {
@@ -162,16 +161,29 @@ def ShapeOp : SpecialOp<"shape", 1, 1> {
   );
 }
 
-def PrngStepOp : StripeOp<"prng_step"> {
+def GatherOp : SpecialOp<"gather", 1, 2> {
+  let arguments = (ins
+    TensorRefType:$out,
+    TensorRefType:$idxs,
+    TensorRefType:$table
+  );
+}
+
+def ScatterOp : SpecialOp<"scatter", 1, 3> {
+  let arguments = (ins
+    TensorRefType:$out,
+    TensorRefType:$expr,
+    TensorRefType:$idxs,
+    TensorRefType:$val
+  );
+}
+
+def PrngStepOp : SpecialOp<"prng_step", 2, 1> {
   let arguments = (ins
     TensorRefType:$state_out, 
     TensorRefType:$buffer_out,
     TensorRefType:$state_in
   );
-  let extraClassDeclaration = [{
-    size_t getNumOutpus() { return 1; }
-    size_t getNumInputs() { return 1; }
-  }];
 }
 
 def TerminateOp : StripeOp<"terminate", [Terminator]> {

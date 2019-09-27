@@ -206,27 +206,38 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
   }
 }
 
-static void SpecialIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Special& special) {
-  auto get_base = [&](const std::string name) {
-    Value* ref = safe_at(locals->refs, name);
-    return ref;
-  };
+template <typename T>
+static void SpecialConvertImpl(OpBuilder* builder, SymbolTable* locals, const stripe::Special& special) {
+  std::vector<Type> no_types;
+  std::vector<Value*> vals;
+  std::vector<NamedAttribute> no_attrs;
+  for (size_t i = 0; i < special.outputs.size(); i++) {
+    vals.push_back(safe_at(locals->refs, special.outputs[i]));
+  }
+  for (size_t i = 0; i < special.inputs.size(); i++) {
+    vals.push_back(safe_at(locals->refs, special.inputs[i]));
+  }
   auto unk = builder->getUnknownLoc();
+  auto op = builder->create<T>(unk, no_types, vals, no_attrs);
+  if (special.outputs.size() != op.getNumOutputs()) {
+    throw std::runtime_error(std::string("Special '") + special.name + "' has invalid number of inputs");
+  }
+  if (special.inputs.size() != op.getNumInputs()) {
+    throw std::runtime_error(std::string("Special '") + special.name + "' has invalid number of inputs");
+  }
+}
+
+static void SpecialIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Special& special) {
   if (special.name == "reshape") {
-    if (special.inputs.size() != 1 || special.outputs.size() != 1) {
-      throw std::runtime_error("Invalid reshape");
-    }
-    Value* from = get_base(special.inputs[0]);
-    Value* into = get_base(special.outputs[0]);
-    builder->create<ReshapeOp>(unk, from, into);
+    SpecialConvertImpl<ReshapeOp>(builder, locals, special);
   } else if (special.name == "prng_step") {
-    if (special.inputs.size() != 1 || special.outputs.size() != 2) {
-      throw std::runtime_error("Invalid prng");
-    }
-    Value* state_in = get_base(special.inputs[0]);
-    Value* state_out = get_base(special.outputs[0]);
-    Value* buffer = get_base(special.outputs[1]);
-    builder->create<PrngStepOp>(unk, state_in, state_out, buffer);
+    SpecialConvertImpl<PrngStepOp>(builder, locals, special);
+  } else if (special.name == "gather") {
+    SpecialConvertImpl<GatherOp>(builder, locals, special);
+  } else if (special.name == "scatter") {
+    SpecialConvertImpl<ScatterOp>(builder, locals, special);
+  } else if (special.name == "shape") {
+    SpecialConvertImpl<ShapeOp>(builder, locals, special);
   } else {
     throw std::runtime_error("Unknown special: " + special.name);
   }

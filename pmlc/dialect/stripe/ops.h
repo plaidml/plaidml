@@ -19,6 +19,7 @@ using mlir::Op;
 using mlir::Operation;
 using mlir::OperationState;
 using mlir::OpFoldResult;
+using mlir::OpInterface;
 using mlir::RankedTensorType;
 using mlir::ShapedType;
 using mlir::StringRef;
