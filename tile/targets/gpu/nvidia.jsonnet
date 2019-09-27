@@ -65,7 +65,8 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
               }
             },
-            
+           
+            /* 
             // No-op MLIR pass to induce transcoding
             {
               name: 'mlir_pad',
@@ -74,6 +75,7 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
+            */
 
             // Pad tensors to remove inner conditionals
             {
