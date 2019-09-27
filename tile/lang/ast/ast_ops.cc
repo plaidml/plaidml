@@ -133,7 +133,7 @@ struct BoolCastOp : PrimitiveOp {
       throw std::runtime_error("'as_bool' requires 1 arguments.");
     }
     LogicalShape ret = args[0]->shape;
-    ret.dtype = DataType:: : BOOLEAN;
+    ret.dtype = DataType::BOOLEAN;
     return ret;
   }
 };
