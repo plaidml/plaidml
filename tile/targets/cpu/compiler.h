@@ -114,6 +114,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void AsFloat(const stripe::Intrinsic&);
   void AsInt(const stripe::Intrinsic&);
   void AsUInt(const stripe::Intrinsic&);
+  void AsBool(const stripe::Intrinsic&);
 
   struct Scalar {
     llvm::Value* value = nullptr;

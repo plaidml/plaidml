@@ -66,6 +66,15 @@ local PARAMS = {
               }
             },
             
+            // No-op MLIR pass to induce transcoding
+            {
+              name: 'mlir_pad',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_PadPass',
+                reqs: ['main'],
+              },
+            },
+
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',

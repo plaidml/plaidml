@@ -127,6 +127,17 @@ struct UintCastOp : PrimitiveOp {
   }
 };
 
+struct BoolCastOp : PrimitiveOp {
+  LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
+    if (args.size() != 1) {
+      throw std::runtime_error("'as_bool' requires 1 arguments.");
+    }
+    LogicalShape ret = args[0]->shape;
+    ret.dtype = DataType:: : BOOLEAN;
+    return ret;
+  }
+};
+
 struct IndexOp : PrimitiveOp {
   LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     if (args.size() != 2) {
@@ -250,6 +261,7 @@ struct PrngOp : PrimitiveOp {
   registry->Register("as_float", std::make_unique<FloatCastOp>());
   registry->Register("as_int", std::make_unique<IntCastOp>());
   registry->Register("as_uint", std::make_unique<UintCastOp>());
+  registry->Register("as_bool", std::make_unique<BoolCastOp>());
   registry->Register("cmp_eq", std::make_unique<BooleanOp>());
   registry->Register("cmp_ge", std::make_unique<BooleanOp>());
   registry->Register("cmp_gt", std::make_unique<BooleanOp>());
