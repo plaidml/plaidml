@@ -101,7 +101,8 @@ lang::KernelList CompileProgram(           //
   auto inputs = FromProto(program.inputs());
   auto outputs = FromProto(program.outputs());
 
-  auto use_stripe = env::Get("PLAIDML_USE_STRIPE") == "1";
+  auto use_stripe_default = devinfo.settings.use_stripe() ? "1" : "0";
+  auto use_stripe = env::Get("PLAIDML_USE_STRIPE", use_stripe_default) == "1";
   if (use_stripe) {
     auto stripe_cfg = devinfo.settings.stripe_config();
     if (stripe_cfg.empty()) {
