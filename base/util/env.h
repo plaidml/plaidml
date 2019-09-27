@@ -14,10 +14,10 @@ namespace env {
 
 // Reads the requested environment variable.  If the variable is not set, an empty
 // string is returned.
-std::string Get(std::string key);
+std::string Get(const std::string& key, const std::string& default_value = "");
 
 // Writes the requested environment variable.
-void Set(std::string key, std::string value);
+void Set(const std::string& key, const std::string& value);
 
 }  // namespace env
 }  // namespace vertexai

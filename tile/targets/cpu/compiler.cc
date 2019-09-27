@@ -706,8 +706,12 @@ void Compiler::Visit(const stripe::Special& special) {
   // tile/lang/gen_special.cc. The spec lists "zero", "copy", and "reshape",
   // while gen_special.cc uses "gather", "scatter", "shape", and "prng_step".
   static std::map<std::string, std::function<void(Compiler*, const stripe::Special&)>> handlers{
-      {"zero", &Compiler::Zero},          {"copy", &Compiler::Copy},   {"reshape", &Compiler::Reshape},
-      {"prng_step", &Compiler::PrngStep}, {"shape", &Compiler::Shape},
+      {"zero", &Compiler::Zero},           //
+      {"copy", &Compiler::Copy},           //
+      {"reshape", &Compiler::Reshape},     //
+      {"prng_step", &Compiler::PrngStep},  //
+      {"shape", &Compiler::Shape},         //
+      {"agg_init", &Compiler::AggInit},    //
   };
   auto it = handlers.find(special.name);
   if (it == handlers.end()) {
@@ -1412,6 +1416,120 @@ void Compiler::Shape(const stripe::Special& shape) {
     llvm::Value* val = builder_.getIntN(elem_bits, dim_size);
     llvm::Value* dest = builder_.CreateGEP(out.base, {IndexConst(i)});
     builder_.CreateStore(val, dest);
+  }
+}
+
+void Compiler::AggInit(const stripe::Special& agg_init) {
+  // One output: a tensor to initialize.
+  // The initialization value depends on the refinement's agg_op.
+  // Iterate over each dimension and write to each element.
+  assert(0 == agg_init.inputs.size());
+  assert(1 == agg_init.outputs.size());
+  Buffer dest = buffers_[agg_init.outputs[0]];
+  auto& dest_shape = dest.refinement->interior_shape;
+  size_t dest_ndims = dest_shape.dims.size();
+
+  // Generate the limit value for each dimension.
+  std::vector<llvm::Value*> limits(dest_ndims);
+  for (size_t i = 0; i < dest_ndims; ++i) {
+    limits[i] = IndexConst(dest_shape.dims[i].size);
+  }
+
+  // Allocate an index variable for each loop.
+  std::vector<llvm::Value*> idx_vars(dest_ndims);
+  for (size_t i = 0; i < dest_ndims; ++i) {
+    std::string name = "idx_" + std::to_string(i);
+    idx_vars[i] = builder_.CreateAlloca(IndexType(), nullptr, name);
+  }
+
+  // Generate the initialization & limit test for each loop.
+  std::vector<Loop> loops(dest_ndims);
+  llvm::Function* parent = builder_.GetInsertBlock()->getParent();
+  for (size_t i = 0; i < dest_ndims; ++i) {
+    std::string name = std::to_string(i);
+    loops[i].init = llvm::BasicBlock::Create(context_, "init_" + name, parent);
+    loops[i].test = llvm::BasicBlock::Create(context_, "test_" + name, parent);
+    loops[i].body = llvm::BasicBlock::Create(context_, "body_" + name, parent);
+    loops[i].done = llvm::BasicBlock::Create(context_, "done_" + name, parent);
+    builder_.CreateBr(loops[i].init);
+    builder_.SetInsertPoint(loops[i].init);
+    builder_.CreateStore(IndexConst(0), idx_vars[i]);
+    builder_.CreateBr(loops[i].test);
+    builder_.SetInsertPoint(loops[i].test);
+    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
+    llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
+    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
+    builder_.SetInsertPoint(loops[i].body);
+  }
+
+  // Select the initialization value for this refinement's agg_op.
+  std::string agg_op = dest.refinement->agg_op;
+  size_t bits = bit_width(dest_shape.type);
+  llvm::Type* eltype = CType(dest_shape.type);
+  llvm::Value* init_val = nullptr;
+  if (agg_op == "" || agg_op == "assign" || agg_op == "add") {
+    // ZERO
+    if (is_float(dest_shape.type)) {
+      init_val = llvm::ConstantFP::get(eltype, 0.0);
+    } else if (is_int(dest_shape.type) || is_uint(dest_shape.type)) {
+      auto apval = llvm::APInt::getNullValue(bits);
+      init_val = llvm::ConstantInt::get(eltype, apval);
+    }
+  } else if (agg_op == "max") {
+    // MIN
+    if (is_float(dest_shape.type)) {
+      init_val = llvm::ConstantFP::getInfinity(eltype, /*Negative*/ true);
+    } else if (is_int(dest_shape.type)) {
+      auto apval = llvm::APInt::getSignedMinValue(bits);
+      init_val = llvm::ConstantInt::get(eltype, apval);
+    } else if (is_uint(dest_shape.type)) {
+      auto apval = llvm::APInt::getMinValue(bits);
+      init_val = llvm::ConstantInt::get(eltype, apval);
+    }
+  } else if (agg_op == "min") {
+    // MAX
+    if (is_float(dest_shape.type)) {
+      init_val = llvm::ConstantFP::getInfinity(eltype, /*Negative*/ false);
+    } else if (is_int(dest_shape.type)) {
+      auto apval = llvm::APInt::getSignedMaxValue(bits);
+      init_val = llvm::ConstantInt::get(eltype, apval);
+    } else if (is_uint(dest_shape.type)) {
+      auto apval = llvm::APInt::getMaxValue(bits);
+      init_val = llvm::ConstantInt::get(eltype, apval);
+    }
+  } else if (agg_op == "mul") {
+    // ONE
+    if (is_float(dest_shape.type)) {
+      init_val = llvm::ConstantFP::get(eltype, 1.0);
+    } else if (is_int(dest_shape.type) || is_uint(dest_shape.type)) {
+      auto apval = llvm::APInt(bits, 1);
+      init_val = llvm::ConstantInt::get(eltype, apval);
+    }
+  } else {
+    throw Error("Unimplemented agg_op: " + to_string(agg_op));
+  }
+  if (!init_val) {
+    throw Error("Undefined agg_op init for " + to_string(dest_shape.type));
+  }
+
+  // Compute the element offset for these indexes.
+  llvm::Value* dest_idx = IndexConst(0);
+  for (size_t i = 0; i < dest_ndims; ++i) {
+    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
+    llvm::Value* stride = IndexConst(dest_shape.dims[i].stride);
+    idx_val = builder_.CreateMul(idx_val, stride);
+    dest_idx = builder_.CreateAdd(dest_idx, idx_val);
+  }
+  llvm::Value* dest_element = builder_.CreateGEP(dest.base, dest_idx);
+  builder_.CreateStore(init_val, dest_element);
+
+  // Terminate the loop by incrementing the index and repeating.
+  for (size_t i = dest_ndims; i-- > 0;) {
+    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
+    idx_val = builder_.CreateAdd(idx_val, IndexConst(1));
+    builder_.CreateStore(idx_val, idx_vars[i]);
+    builder_.CreateBr(loops[i].test);
+    builder_.SetInsertPoint(loops[i].done);
   }
 }
 
