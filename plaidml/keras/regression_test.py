@@ -22,7 +22,7 @@ from keras.models import Model, Sequential
 class RegressionTests(unittest.TestCase):
     """PlaidML Keras regression tests"""
 
-    @unittest.skipIf(os.environ.get("USE_STRIPE", "0") == "1", "Stripe fails this test")
+    @unittest.skipIf(os.environ.get("PLAIDML_USE_STRIPE", "0") == "1", "Stripe fails this test")
     def testBatchNormalizationWithFlatten(self):
         # This regression test is thanks to Hans Pinckaers (HansPinckaers on
         # GitHub), who reported https://github.com/plaidml/plaidml/issues/57,
@@ -102,8 +102,8 @@ class RegressionTests(unittest.TestCase):
         loss = pkb.mean(pkb.square(inp - x1)) + pkb.mean(pkb.square(inp - x2))
         train_func = pkb.function([inp], [loss],
                                   keras.optimizers.Adam().get_updates(
-                                      loss, encoder.trainable_weights + decoder1.trainable_weights
-                                      + decoder2.trainable_weights))
+                                      loss, encoder.trainable_weights +
+                                      decoder1.trainable_weights + decoder2.trainable_weights))
         view_func1 = pkb.function([inp], [x1])
         view_func2 = pkb.function([inp], [x2])
 
