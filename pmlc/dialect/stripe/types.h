@@ -22,8 +22,6 @@ enum Kinds {
   DeviceID,
   // A hardware device path
   DevicePath,
-  // A PRNG state
-  Prng,
   // A fully-sized tensor with a memory layout
   Tensor,
   // A tensor reference

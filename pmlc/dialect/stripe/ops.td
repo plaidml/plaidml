@@ -10,7 +10,6 @@ def StripeDialect : Dialect {
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
 def DeviceIDType : Type<CPred<"$_self.isa<DeviceIDType>()">, "Plaid DeviceIDType">;
 def DevicePathType : Type<CPred<"$_self.isa<DevicePathType>()">, "Plaid DevicePathType">;
-def PrngType : Type<CPred<"$_self.isa<PrngType>()">, "Plaid PrngType">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Type">;
 def TensorRefType : Type<CPred<"$_self.isa<TensorRefType>()">, "Plaid Tensor Reference Type">;
 
@@ -163,12 +162,46 @@ def ConstraintOp : StripeOp<"constraint"> {
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
 }
 
-def ReshapeOp : StripeOp<"reshape"> {
-  let arguments = (ins
-    TensorRefType:$from,
-    TensorRefType:$into
-  );
+def SpecialOpInterface : OpInterface<"SpecialOp"> {
+  let methods = [
+    InterfaceMethod<"size_t", "getNumInputs">,
+    InterfaceMethod<"size_t", "getNumOutputs">,
+  ];
+}
+
+class SpecialOp<string mnemonic, int num_out, int num_in> :
+    StripeOp<mnemonic, [SpecialOpInterface]> {
   let results = (outs);
+  let extraClassDeclaration = [{
+    size_t getNumOutpus() { return $num_out; }
+    size_t getNumInputs() { return $num_in; }
+  }];
+}
+
+def ReshapeOp : SpecialOp<"reshape", 1, 1> {
+  let arguments = (ins
+    TensorRefType:$into,
+    TensorRefType:$from
+  );
+}
+
+def ShapeOp : SpecialOp<"shape", 1, 1> {
+  let arguments = (ins
+    TensorRefType:$shape,
+    TensorRefType:$tensor
+  );
+}
+
+def PrngStepOp : StripeOp<"prng_step"> {
+  let arguments = (ins
+    TensorRefType:$state_out, 
+    TensorRefType:$buffer_out,
+    TensorRefType:$state_in
+  );
+  let extraClassDeclaration = [{
+    size_t getNumOutpus() { return 1; }
+    size_t getNumInputs() { return 1; }
+  }];
 }
 
 def ExecutorOp : StripeOp<"executor"> {

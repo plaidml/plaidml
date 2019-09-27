@@ -52,6 +52,7 @@ class StripeBuilder {
   void visit(StoreOp op);
   void visit(AggregateOp op);
   void visit(ReshapeOp op);
+  void visit(PrngStepOp op);
   void walk_interior(Block* inner);
 
   std::shared_ptr<stripe::Block> cur_;
@@ -141,13 +142,15 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
                                     std::string agg_name) {
   // Compute all the info about the tensor
   auto ti = ComputeAccess(tensor);
+  size_t ndims = ti.access.size();
   // Translate allocation shape
-  TensorShape base_shape = get_shape(ti.base->getType().cast<TensorType>());
+  TensorShape base_shape = get_shape(ti.base_type);
   // Make a vector of 'inner' polynomials
-  std::vector<AffinePolynomial> inner(base_shape.dims.size());
-  // Move constants to inner
-  for (size_t i = 0; i < inner.size(); i++) {
-    std::swap(ti.access[i].constant, inner[i].constant);
+  std::vector<AffinePolynomial> inner(ndims);
+  std::vector<size_t> constants(ndims);
+  for (size_t i = 0; i < ndims; i++) {
+    constants[i] = ti.access[i].constant;
+    ti.access[i].constant = 0;
   }
   // Get the source instruction
   auto op = tensor->getDefiningOp();
@@ -182,7 +185,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
       }
       rname = sblock->unique_ref_name(rname);
       std::vector<stripe::Affine> access;
-      for (size_t i = 0; i < ti.access.size(); i++) {
+      for (size_t i = 0; i < ndims; i++) {
         stripe::Affine aff;
         for (const auto& kvp : ti.access[i].terms) {
           if (kvp.first->getOwner() == block) {
@@ -192,12 +195,12 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         access.push_back(aff);
       }
       TensorShape shape = base_shape;
-      for (size_t i = 0; i < shape.dims.size(); i++) {
+      for (size_t i = 0; i < ndims; i++) {
         auto range = AffineRange(inner[i]);
-        access[i] += range.min;
-        inner[i].constant -= range.min;
         shape.dims[i].size = range.max - range.min + 1;
         shape.dims[i].size = std::min(shape.dims[i].size, base_shape.dims[i].size);
+        access[i] += constants[i];
+        constants[i] = 0;
       }
       sblock->refs.emplace(dir, "", rname, access, shape, agg_name);
       // TODO: Only do this when we are 1-to-1
@@ -216,7 +219,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
       ref->dir = stripe::RefDir::InOut;
     }
     // Remove indexes from ti for this block + add to inner polynomial
-    for (size_t i = 0; i < ti.access.size(); i++) {
+    for (size_t i = 0; i < ndims; i++) {
       auto& ap = ti.access[i];
       auto& ip = inner[i];
       for (auto it = ap.terms.begin(); it != ap.terms.end(); /* nothing */) {
@@ -243,6 +246,8 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
   }
   // Special handing for allocation block
   ref->dir = stripe::RefDir::None;
+  // Get full allocation shape
+  ref->interior_shape = base_shape;
   // Add location info to the allocation block
   if (auto alloc_op = mlir::dyn_cast<AllocateOp>(op)) {
     ref->location = build_location(blocks_.at(block).stripe, alloc_op.devicePath());
@@ -395,15 +400,32 @@ void StripeBuilder::visit(AggregateOp op) {
 }
 
 void StripeBuilder::visit(ReshapeOp op) {
-  std::string from_name;
-  std::string into_name;
-  add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &from_name);
-  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &into_name);
+  std::string from;
+  std::string into;
+  add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &from);
+  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &into);
   auto r = std::make_shared<stripe::Special>();
   r->name = "reshape";
-  r->inputs.push_back(from_name);
-  r->outputs.push_back(into_name);
+  r->inputs.push_back(from);
+  r->outputs.push_back(into);
   cur_->stmts.push_back(r);
+}
+
+void StripeBuilder::visit(PrngStepOp op) {
+  std::cout << "Z000!\n";
+  std::string state_in;
+  std::string state_out;
+  std::string buffer;
+  add_refinements(op.getOperation()->getBlock(), op.state_in(), stripe::RefDir::In, &state_in);
+  add_refinements(op.getOperation()->getBlock(), op.state_out(), stripe::RefDir::Out, &state_out);
+  add_refinements(op.getOperation()->getBlock(), op.buffer(), stripe::RefDir::Out, &buffer);
+  auto r = std::make_shared<stripe::Special>();
+  r->name = "prng_step";
+  r->inputs.push_back(state_in);
+  r->outputs.push_back(state_out);
+  r->outputs.push_back(buffer);
+  cur_->stmts.push_back(r);
+  std::cout << "Z0000!\n";
 }
 
 void StripeBuilder::walk_interior(Block* block) {
@@ -435,6 +457,8 @@ void StripeBuilder::walk_interior(Block* block) {
     } else if (auto op = mlir::dyn_cast<AggregateOp>(op_base)) {
       visit(op);
     } else if (auto op = mlir::dyn_cast<ReshapeOp>(op_base)) {
+      visit(op);
+    } else if (auto op = mlir::dyn_cast<PrngStepOp>(op_base)) {
       visit(op);
     } else {
       found_inst_ = false;

@@ -27,6 +27,8 @@ using mlir::Value;
 
 namespace OpTrait = mlir::OpTrait;
 
+#include "pmlc/dialect/stripe/opinterfaces.h.inc"
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stripe/ops.h.inc"
 

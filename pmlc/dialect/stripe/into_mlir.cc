@@ -33,9 +33,6 @@ static ScalarType DataTypeIntoMLIR(mlir::MLIRContext* ctx, DataType dtype) {  //
 }
 
 static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
-  if (shape.type == DataType::PRNG) {
-    return PrngType::get(ctx);
-  }
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
   llvm::SmallVector<TensorDim, 4> dims;
   for (const auto& dim : shape.dims) {
@@ -45,9 +42,6 @@ static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
 }
 
 static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
-  if (shape.type == DataType::PRNG) {
-    return PrngType::get(ctx);
-  }
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
   return TensorRefType::get(dtype, shape.dims.size(), shape.is_const);
 }
@@ -232,13 +226,26 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
 }
 
 static void SpecialIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Special& special) {
+  auto get_base = [&](const std::string name) {
+    Value* ref = safe_at(locals->refs, name);
+    return ref;
+  };
+  auto unk = builder->getUnknownLoc();
   if (special.name == "reshape") {
     if (special.inputs.size() != 1 || special.outputs.size() != 1) {
       throw std::runtime_error("Invalid reshape");
     }
-    Value* in_ref = safe_at(locals->refs, special.inputs[0]);
-    Value* out_ref = safe_at(locals->refs, special.outputs[0]);
-    builder->create<ReshapeOp>(builder->getUnknownLoc(), in_ref, out_ref);
+    Value* from = get_base(special.inputs[0]);
+    Value* into = get_base(special.outputs[0]);
+    builder->create<ReshapeOp>(unk, from, into);
+  } else if (special.name == "prng_step") {
+    if (special.inputs.size() != 1 || special.outputs.size() != 2) {
+      throw std::runtime_error("Invalid prng");
+    }
+    Value* state_in = get_base(special.inputs[0]);
+    Value* state_out = get_base(special.outputs[0]);
+    Value* buffer = get_base(special.outputs[1]);
+    builder->create<PrngStepOp>(unk, state_in, state_out, buffer);
   } else {
     throw std::runtime_error("Unknown special: " + special.name);
   }
