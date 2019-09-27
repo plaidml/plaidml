@@ -20,7 +20,7 @@ Program::Program(                  //
     ConstBufferManager* const_bufs)
     : executable_{new targets::cpu::Native} {
   auto stripe = GenerateStripe(runinfo);
-  auto out_dir = boost::filesystem::path(env::Get("STRIPE_OUTPUT"));
+  auto out_dir = boost::filesystem::path(env::Get("PLAIDML_STRIPE_OUTPUT"));
   codegen::OptimizeOptions options = {
       !out_dir.empty(),    // dump_passes
       false,               // dump_passes_proto
@@ -42,7 +42,7 @@ Program::Program(                                    //
     const std::shared_ptr<stripe::Program>& stripe,  //
     ConstBufferManager* const_bufs)
     : executable_{new targets::cpu::Native} {
-  auto out_dir = boost::filesystem::path(env::Get("STRIPE_OUTPUT"));
+  auto out_dir = boost::filesystem::path(env::Get("PLAIDML_STRIPE_OUTPUT"));
   codegen::OptimizeOptions options = {
       !out_dir.empty(),    // dump_passes
       false,               // dump_passes_proto
