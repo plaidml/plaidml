@@ -2222,8 +2222,8 @@ Value softmax(const Value& value) {
     TB(I_idxs) += T(R_idxs);
     return std::vector<Tensor>{YdY - TB * Y};
   };
-  OverrideGrads(deriv, std::vector<Tensor>{I}, O);
-  return Value{O};
+  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
+  return Value{Overridden};
 }
 
 Value spatial_padding(const Value& value) {

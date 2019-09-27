@@ -56,6 +56,7 @@ class ComputeUses : public AstVisitor<void> {
   }
 
   void Visit(const GradOverrideExpr& expr) final {
+    throw std::runtime_error("Well, at least we got here");
     for (size_t i = 0; i < expr.ins.size(); i++) {
       Push(expr, expr.ins[i], i);
     }
@@ -100,6 +101,7 @@ class Gradient {
       auto dout = GetDerivative(use.expr);
       if (auto grad_override_expr = std::dynamic_pointer_cast<GradOverrideExpr>(use.expr)) {
         // A gradient override replaces all the derivatives, so set total and exit the loop
+        throw std::runtime_error("Yes, we did get here!");
         total = DeriveOverride(dout, grad_override_expr, use.idx);
         break;
       }

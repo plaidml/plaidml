@@ -396,8 +396,19 @@ class ProgramEvaluator : public AstVisitor<void> {
   }
 
   void Visit(const GradOverrideExpr& expr) final {
-    // Forward-pass GradOverrideExprs are no-ops, so do nothing
-    // TODO: Or should I be copying the output?
+    // Forward-pass GradOverrideExprs are no-ops; create an ident fcn
+    // TODO: is this right?
+    auto name = NewTmp(expr);
+    auto out_name = safe_at(&eval_.names_by_expr, expr.out.get());
+    Op op{
+        Op::FUNCTION,  // tag
+        name,          // output
+        {out_name},    // inputs
+        {},            // Contraction
+        {"ident"},     // Function
+    };
+    eval_.runinfo.program.ops.emplace_back(op);
+    eval_.names_by_expr.emplace(&expr, name);
   }
 
   void Visit(const CallExpr& expr) final {
@@ -738,7 +749,7 @@ GradOverrideExpr::GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, co
                                    const ExprPtr& out)
     : fn(fn),    //
       ins(ins),  //
-      out(out) {}
+      out(out) { IVLOG(5, "GradOverrideExpr ctor"); }//{}
 
 std::string GradOverrideExpr::str() const {
   // TODO: would be best to upgrade this somehow...
