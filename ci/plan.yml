@@ -238,6 +238,34 @@ SUITES:
           keras-plaid-mtl-uhd630:
             soft_fail: true
 
+  base2:
+    # TODO: Merge this suite back into base
+    platforms:
+      keras-stripe-ocl-gp100gl:
+        pipelines: [plaidml, nightly]
+
+    params:
+      ci:
+        batch_sizes: [0]
+      plaidml:
+        batch_sizes: [0]
+      nightly:
+        batch_sizes: [0]
+    wheels:
+      # NOTE: this list must be in least to most dependent order.
+      - plaidml-{version}-py2.py3-none-{arch}.whl
+      - plaidml_keras-{version}-py2.py3-none-any.whl
+    timeout: 30
+    conda_env: conda/plaidml.yml
+    compare: no
+    cwd: plaidml2/bridge/keras
+    runner: python
+    workloads:
+      backend:
+        args: [backend_test.py]
+        precision: untested
+        shards: 3
+
   infer:
     platforms:
       keras-tf-cuda-gp100gl:
