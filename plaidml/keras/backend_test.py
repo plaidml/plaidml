@@ -388,7 +388,8 @@ class TestBackendOps(unittest.TestCase):
         ],
         atol=1.e-4,  # RNNs have limited precision on some devices
     )
-    @unittest.skipIf(os.environ.get("USE_STRIPE", "0") == "1", "Stripe does not work for RNNs")
+    @unittest.skipIf(
+        os.environ.get("PLAIDML_USE_STRIPE", "0") == "1", "Stripe does not work for RNNs")
     def testRNN(self, b, inp, init_state, ker, r_ker, go_back):
 
         def step_function(inputs, states):
@@ -1639,7 +1640,7 @@ class TestBackendOps(unittest.TestCase):
             pkb.conv(A, B, dilation_rate=(1, 1))
 
     @unittest.skipIf(
-        os.environ.get("USE_STRIPE", "0") == "1",
+        os.environ.get("PLAIDML_USE_STRIPE", "0") == "1",
         "Stripe does not correctly validate assignment ops")
     def testAssignmentExceptions(self):
         A = pkb.variable(m(5, 1))

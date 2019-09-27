@@ -19,7 +19,7 @@ from keras.models import Model, Sequential
 class RegressionTests(unittest.TestCase):
     """PlaidML Keras regression tests"""
 
-    @unittest.skipIf(os.environ.get("USE_STRIPE", "0") == "1", "Stripe fails this test")
+    @unittest.skipIf(os.environ.get("PLAIDML_USE_STRIPE", "0") == "1", "Stripe fails this test")
     def testBatchNormalizationWithFlatten(self):
         # This regression test is thanks to Hans Pinckaers (HansPinckaers on
         # GitHub), who reported https://github.com/plaidml/plaidml/issues/57,
