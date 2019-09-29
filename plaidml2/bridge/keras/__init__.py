@@ -932,7 +932,9 @@ def is_keras_tensor(x):
 
 @_log_call
 def is_placeholder(x):
-    _report_unimplemented('is_placeholder')
+    if not is_tensor(x):
+        return False
+    return x.opname == 'placeholder'
 
 
 @_log_call
