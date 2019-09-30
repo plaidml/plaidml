@@ -1061,23 +1061,14 @@ def not_equal(lhs, rhs):
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     x_shape = shape(x)
-    ndims = x.tensor.shape.ndims
-    if ndims == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
-        target_shape = [1 if i in reduction_axes else x_shape[i] for i in range(4)]
-        m = mean(x, axis=reduction_axes, keepdims=True)
-        m = reshape(m, target_shape)
-        v = var(x, axis=reduction_axes, keepdims=True)
-        v = reshape(v, target_shape)
-        beta = reshape(beta, target_shape)
-        gamma = reshape(gamma, target_shape)
+    ndims = ndim(x)
+    if reduction_axes == None:
+        raw_axes = [ndim - 1]
     else:
-        if reduction_axes == None:
-            raw_axes = [ndims - 1]
-        else:
-            raw_axes = reduction_axes
-        axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
-        m = mean(x, axis=axes, keepdims=True)
-        v = var(x, axis=axes, keepdims=True)
+        raw_axes = reduction_axes
+    axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
+    m = mean(x, axis=axes, keepdims=True)
+    v = var(x, axis=axes, keepdims=True)
 
     normalized_tensor = batch_normalization(x=x,
                                             mean=m,
@@ -1557,6 +1548,13 @@ def square(x):
 
 @_log_call
 def squeeze(x, axis=None):
+    if axis is None:
+        # Auto-squeeze the size 1 dims. Note that this never squeezes symbolic dims
+        axis = []
+        x_shape = int_shape(x)
+        for s in range(len(x_shape)):
+            if x_shape[s] == 1:
+                axis.append(s)
     return _KerasNode('squeeze', tensor=plaidml_op.squeeze(x.tensor, axis))
 
 

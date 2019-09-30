@@ -2482,13 +2482,6 @@ Value squeeze(const Value& value) {
   std::vector<int64_t> raw_axes;
   if (args[1].is_int()) {
     raw_axes.push_back(args[1].as_int());
-  } else if (args[1].is_none()) {
-    for (uint64_t i = 0; i < ndims; ++i) {
-      // this doesn't work for symbolic dimensions that are later binded to 1
-      if (I_dims[i].is_int() && I_dims[i].as_int() == 1) {
-        raw_axes.push_back(i);
-      }
-    }
   } else {
     raw_axes = args[1].as_int_tuple();
   }
@@ -2504,6 +2497,7 @@ Value squeeze(const Value& value) {
       O_idxs.push_back(I_idxs[i]);
     }
   }
+  // TODO: Probably politer to call reshape rather than use a contraction here
   auto O = TensorOutput(O_dims);
   O(O_idxs) = I(I_idxs);
   return Value{O};

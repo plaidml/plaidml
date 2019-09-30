@@ -102,8 +102,6 @@ class TensorDim {
     return ffi::str(ffi::call<plaidml_string*>(plaidml_dim_expr_repr, ptr_.get()));
   }
 
-  bool is_int() const { return ffi::call<plaidml_expr_kind>(plaidml_expr_get_kind, ptr_.get()) == PLAIDML_EXPR_INT; }
-
   int64_t as_int() const {
     if (!ptr_) {
       throw std::runtime_error("as_int() only available on TensorDim with an integer value");
