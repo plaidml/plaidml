@@ -91,7 +91,6 @@ local PARAMS = {
               },
             },
            
-            /* 
             // No-op MLIR pass to induce transcoding
             {
               name: 'mlir_pad',
@@ -100,7 +99,6 @@ local PARAMS = {
                 reqs: ['main'],
               },
             },
-            */
 
             // Pad tensors to remove inner conditionals
             {
