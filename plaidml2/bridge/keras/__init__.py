@@ -1063,7 +1063,7 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     x_shape = shape(x)
     ndims = ndim(x)
     if reduction_axes == None:
-        raw_axes = [ndim - 1]
+        raw_axes = [ndims - 1]
     else:
         raw_axes = reduction_axes
     axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
