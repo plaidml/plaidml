@@ -21,7 +21,7 @@ namespace vertexai {
 namespace tile {
 namespace stripe {
 
-using Affine = math::Polynomial<int64_t>;
+using Affine = math::Affine;
 
 enum class StmtKind {
   Load,

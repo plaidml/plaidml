@@ -73,13 +73,15 @@ class Polynomial : boost::additive<Polynomial<T>>,
 extern template class Polynomial<Rational>;
 extern template class Polynomial<int64_t>;
 
+using Affine = math::Polynomial<int64_t>;
+
 // Friendly utility to play nice with std::to_string
 inline std::string to_string(const Polynomial<Rational>& p) { return p.toString(); }
 inline std::string to_string(const Polynomial<int64_t>& p) { return p.toString(); }
 
 // Simple Constraint object, mean poly <= rhs
 struct SimpleConstraint {
-  SimpleConstraint(const Polynomial<Rational>& _poly, int64_t _rhs);
+  SimpleConstraint(const Polynomial<Rational>& poly, int64_t rhs);
 
   Polynomial<Rational> poly;  // Polynomial<Rational> constraints apply to
   int64_t rhs;                // poly <= rhs
@@ -88,7 +90,7 @@ struct SimpleConstraint {
 // Range Constraint object, means 0 <= poly < upper, and value of poly is an integer
 struct RangeConstraint {
   RangeConstraint() = default;
-  RangeConstraint(const Polynomial<Rational>& _poly, int64_t _range);
+  RangeConstraint(const Polynomial<Rational>& poly, int64_t range);
   bool IsParallel(const RangeConstraint& c);
 
   Polynomial<Rational> poly;  // Polynomial<Rational> constraints apply to
