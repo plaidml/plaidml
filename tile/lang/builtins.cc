@@ -74,6 +74,7 @@ std::map<std::string, std::shared_ptr<BoundFunction>> DerivDefines = {
     {"as_float", ddef({"0", "0"})},
     {"as_int", ddef({"0", "0"})},
     {"as_uint", ddef({"0", "0"})},
+    {"as_bool", ddef({"0"})},
     {"bit_and", ddef({"0", "0"})},
     {"bit_or", ddef({"0", "0"})},
     {"bit_xor", ddef({"0", "0"})},

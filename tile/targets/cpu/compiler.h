@@ -112,9 +112,12 @@ class Compiler : private stripe::ConstStmtVisitor {
   void PrngStep(const stripe::Special&);
   void Shape(const stripe::Special&);
   void AggInit(const stripe::Special&);
+  void Scatter(const stripe::Special&);
+  void Gather(const stripe::Special&);
   void AsFloat(const stripe::Intrinsic&);
   void AsInt(const stripe::Intrinsic&);
   void AsUInt(const stripe::Intrinsic&);
+  void AsBool(const stripe::Intrinsic&);
 
   struct Scalar {
     llvm::Value* value = nullptr;

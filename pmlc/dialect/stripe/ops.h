@@ -19,6 +19,7 @@ using mlir::Op;
 using mlir::Operation;
 using mlir::OperationState;
 using mlir::OpFoldResult;
+using mlir::OpInterface;
 using mlir::RankedTensorType;
 using mlir::ShapedType;
 using mlir::StringRef;
@@ -26,6 +27,8 @@ using mlir::Type;
 using mlir::Value;
 
 namespace OpTrait = mlir::OpTrait;
+
+#include "pmlc/dialect/stripe/opinterfaces.h.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stripe/ops.h.inc"

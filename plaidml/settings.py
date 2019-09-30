@@ -41,7 +41,6 @@ SESSION = 'PLAIDML_SESSION'
 SETTINGS = 'PLAIDML_SETTINGS'
 TELEMETRY = 'PLAIDML_TELEMETRY'
 ENABLE_WINOGRAD = 'PLAIDML_ENABLE_WINOGRAD'
-USE_STRIPE = 'USE_STRIPE'
 DEFAULT_CONFIG = 'PLAIDML_DEFAULT_CONFIG'
 EXPERIMENTAL_CONFIG = 'PLAIDML_EXPERIMENTAL_CONFIG'
 
@@ -192,7 +191,6 @@ class _Settings(object):
     @property
     def enable_winograd(self):
         return os.environ.get(ENABLE_WINOGRAD, '0') is not '0'
-        #or os.environ.get( USE_STRIPE, '0') is not '0'
 
     @enable_winograd.setter
     def enable_winograd(self, val):

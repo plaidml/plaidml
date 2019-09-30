@@ -76,7 +76,7 @@ local PARAMS = {
               }
             },
 
-            // No-op MLIR pass
+            // No-op MLIR pass to induce transcoding
             /*
             {
               name: 'mlir_pad',
@@ -86,7 +86,6 @@ local PARAMS = {
               },
             },
             */
-
             
             // Pad tensors to remove inner conditionals
             {
