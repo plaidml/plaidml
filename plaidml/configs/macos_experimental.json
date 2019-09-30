@@ -61,18 +61,18 @@
           "stripe_config": "amd_opencl"
         }
       },
-      { 
+      {
         "description": "AMD Metal config",
-        "sel": { 
-          "and": { 
+        "sel": {
+          "and": {
             "sel": [
-              { 
+              {
                 "or": {
                   "sel": [
-                    { 
+                    {
                       "name_regex": ".*AMD.*"
                     },
-                    { 
+                    {
                       "name_regex": ".*Advanced Micro Devices.*"
                     }
                   ]
@@ -81,7 +81,7 @@
               {
                 "name_regex": ".*Metal.*"
               },
-              { 
+              {
                 "platform_regex": ".*"
               }
             ]
@@ -97,9 +97,9 @@
           "goal_flops_per_byte": 50,
           "stripe_config": "amd_metal"
         }
-      },      
+      },
       {
-        "description": "Intel CPU config",
+        "description": "Intel OpenCL CPU config",
         "sel": {
           "and": {
             "sel": [

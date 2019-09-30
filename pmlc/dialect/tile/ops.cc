@@ -127,9 +127,13 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
 
 }  // namespace
 
-void AffineDomainOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+void AffineDomainOp::getCanonicalizationPatterns(  //
+    OwningRewritePatternList& results,             //
+    MLIRContext* context) {
   results.insert<AffineDomainFolder>(context);
 }
+
+#include "pmlc/dialect/tile/opinterfaces.cpp.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ops.cpp.inc"

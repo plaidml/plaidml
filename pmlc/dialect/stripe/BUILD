@@ -41,6 +41,24 @@ mlir_tblgen(
     incs = ["@mlir//:include"],
 )
 
+mlir_tblgen(
+    name = "gen-op-interface-decls",
+    src = "ops.td",
+    out = "opinterfaces.h.inc",
+    action = "-gen-op-interface-decls",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
+    incs = ["@mlir//:include"],
+)
+
+mlir_tblgen(
+    name = "gen-op-interface-defs",
+    src = "ops.td",
+    out = "opinterfaces.cpp.inc",
+    action = "-gen-op-interface-defs",
+    also = ["//pmlc/dialect/eltwise:predicates.td"],
+    incs = ["@mlir//:include"],
+)
+
 plaidml_cc_library(
     name = "stripe",
     srcs = [
@@ -49,6 +67,7 @@ plaidml_cc_library(
         "ops.cc",
         "ops.cpp.inc",
         "ops_enum.cpp.inc",
+        "opinterfaces.cpp.inc",
     ],
     hdrs = [
         "analysis.h",
@@ -57,6 +76,7 @@ plaidml_cc_library(
         "ops.h",
         "ops.h.inc",
         "ops_enum.h.inc",
+        "opinterfaces.h.inc",
         "types.h",
     ],
     copts = COPTS,

@@ -36,25 +36,7 @@ local PARAMS = {
               },
             },
 
-            // we place all the initial buffer in global memory (DRAM)
-            {
-              name: 'loc_program',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
-                reqs: ['program'],
-                loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
-              },
-            },
-
-            {
-              name: 'loc_main',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
-                reqs: ['main'],
-                loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
-              },
-            },
-
+            // precomputing constant tensors
             {
               name: 'const_tensor',
               pass: {
@@ -101,12 +83,24 @@ local PARAMS = {
             },
 
             // Reorder Blocks
+            
             {
               name: 'reorder_blocks',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
               },
             },
+           
+            /* 
+            // No-op MLIR pass to induce transcoding
+            {
+              name: 'mlir_pad',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_PadPass',
+                reqs: ['main'],
+              },
+            },
+            */
 
             // Pad tensors to remove inner conditionals
             {

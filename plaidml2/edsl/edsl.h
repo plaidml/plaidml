@@ -582,6 +582,8 @@ inline Tensor as_int(const Tensor& x, size_t bit_size) { return Call("as_int", x
 
 inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint", x, static_cast<int64_t>(bit_size)); }
 
+inline Tensor as_bool(const Tensor& x) { return Call("as_bool", x); }
+
 inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 
 inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }

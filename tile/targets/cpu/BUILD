@@ -29,6 +29,7 @@ plaidml_cc_library(
     deps = [
         "//tile/stripe",
         "@half",
+        "@llvm//:execution_engine",
         "@llvm//:ipo",
         "@llvm//:mcjit",
         "@llvm//:x86_asm_parser",

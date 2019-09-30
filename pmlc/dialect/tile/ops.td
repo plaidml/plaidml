@@ -130,13 +130,13 @@ def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
 
 def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine source index map";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Index>:$idxs);
+  let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Index>:$dims);
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, Value* tensor, ArrayRef<Value*> idxs", [{
+    "Builder* builder, OperationState* result, Value* tensor, ArrayRef<Value*> dims", [{
       result->addOperands(tensor);
-      result->addOperands(idxs);
+      result->addOperands(dims);
       result->addTypes(builder->getType<AffineIndexMapType>());
     }]
   >];
@@ -144,12 +144,12 @@ def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]
 
 def AffineSinkIndexMapOp : TileOp<"sink_idx_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine sink index map";
-  let arguments = (ins Variadic<Index>:$idxs);
+  let arguments = (ins Variadic<Index>:$dims);
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ArrayRef<Value*> idxs", [{
-      result->addOperands(idxs);
+    "Builder* builder, OperationState* result, ArrayRef<Value*> dims", [{
+      result->addOperands(dims);
       result->addTypes(builder->getType<AffineIndexMapType>());
     }]
   >];
@@ -168,14 +168,32 @@ def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
   >];
 }
 
-class ContractionOp<string mnemonic> :
-    TileOp<mnemonic, [Terminator, HasParent<"AffineDomainOp">]>;
+def ContractionOpInterface : OpInterface<"ContractionOp"> {
+  let methods = [
+    InterfaceMethod<"std::vector<Value*>", "getSourceIndexMaps">,
+    InterfaceMethod<"Value*", "getSinkIndexMap">,
+    InterfaceMethod<"Value*", "getSizeMap">,
+  ];
+}
+
+class ContractionOp<string mnemonic, list<OpTrait> traits = []> :
+    TileOp<mnemonic, !listconcat(traits, [
+      Terminator,
+      HasParent<"AffineDomainOp">,
+      ContractionOpInterface
+    ])>;
 
 class UnaryConOp<string mnemonic> : ContractionOp<mnemonic> {
   let arguments = (ins
     AffineSizeMap:$size,
     AffineIndexMap:$src,
     AffineIndexMap:$sink);
+
+  let extraClassDeclaration = [{
+    Value* getSizeMap() { return size(); }
+    std::vector<Value*> getSourceIndexMaps() { return {src()}; }
+    Value* getSinkIndexMap() { return sink(); }
+  }];
 }
 
 class BinaryConOp<string mnemonic> : ContractionOp<mnemonic> {
@@ -184,6 +202,12 @@ class BinaryConOp<string mnemonic> : ContractionOp<mnemonic> {
     AffineIndexMap:$src1,
     AffineIndexMap:$src2,
     AffineIndexMap:$sink);
+
+  let extraClassDeclaration = [{
+    Value* getSizeMap() { return size(); }
+    std::vector<Value*> getSourceIndexMaps() { return {src1(), src2()}; }
+    Value* getSinkIndexMap() { return sink(); }
+  }];
 }
 
 class TernaryConOp<string mnemonic> : ContractionOp<mnemonic> {
@@ -193,6 +217,12 @@ class TernaryConOp<string mnemonic> : ContractionOp<mnemonic> {
     AffineIndexMap:$src2,
     AffineIndexMap:$src3,
     AffineIndexMap:$sink);
+
+  let extraClassDeclaration = [{
+    Value* getSizeMap() { return size(); }
+    std::vector<Value*> getSourceIndexMaps() { return {src1(), src2(), src3()}; }
+    Value* getSinkIndexMap() { return sink(); }
+  }];
 }
 
 // Assign

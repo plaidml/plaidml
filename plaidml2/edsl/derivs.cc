@@ -40,6 +40,9 @@ void RegisterDerivs() {
   RegisterTensorDeriv("as_uint", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
   });
+  RegisterTensorDeriv("as_bool", [](DERIV_ARGS) {  //
+    return Tensors{zero()};
+  });
   RegisterTensorDeriv("bit_and", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
   });

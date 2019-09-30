@@ -31,8 +31,6 @@ AffinePolynomial::AffinePolynomial(Value* x) : constant(0) {
     for (Value* v : op.inputs()) {
       *this += AffinePolynomial(v);
     }
-  } else if (auto op = mlir::dyn_cast<AffineMeta>(dop)) {
-    *this = AffinePolynomial(op.input());
   } else {
     throw std::runtime_error("Invalid affine in ComputeAffineRange");
   }
@@ -141,8 +139,8 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
   if (auto bop = tensor->getDefiningOp()) {
     if (auto op = mlir::dyn_cast<AllocateOp>(bop)) {
       ret.base = op.result();
-      auto tensorType = op.result()->getType().cast<TensorType>();
-      ret.access.resize(tensorType.getRank());
+      ret.base_type = op.result()->getType().cast<TensorType>();
+      ret.access.resize(ret.base_type.getRank());
     } else if (auto op = mlir::dyn_cast<RefineOp>(bop)) {
       ret = ComputeAccess(op.in());
       for (size_t i = 0; i < ret.access.size(); i++) {
@@ -155,8 +153,8 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
     }
   } else {
     ret.base = tensor;
-    auto tensorType = tensor->getType().cast<TensorType>();
-    ret.access.resize(tensorType.getRank());
+    ret.base_type = tensor->getType().cast<TensorType>();
+    ret.access.resize(ret.base_type.getRank());
   }
   return ret;
 }

@@ -104,6 +104,12 @@ def run(args, remainder):
         env['USE_STRIPE'] = '1'
         if 'llvm' in args.platform:
             env['STRIPE_JIT'] = '1'
+
+        env['PLAIDML_USE_STRIPE'] = '1'
+        if 'llvm' in args.platform:
+            env['STRIPE_JIT'] = '1'
+    else:
+        env['PLAIDML_USE_STRIPE'] = '0'
     if 'cuda' in args.platform:
         env['CUDA_DEVICE_ORDER'] = buildkite_metadata('CUDA_CUDA_DEVICE_ORDER', 'PCI_BUS_ID')
         env['CUDA_VISIBLE_DEVICES'] = buildkite_metadata('CUDA_VISIBLE_DEVICES', '0')

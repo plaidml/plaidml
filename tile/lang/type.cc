@@ -595,14 +595,23 @@ void TypeCheck(Program* prog, Bindings* vars) {
       }
 
       if (op.f.fn.substr(0, 3) == "as_") {
-        Binding val = vars->at(op.inputs[0]);
-        Binding bitbind = vars->at(op.inputs[1]);
-        // Bits must be bound to an integer constant
-        if (bitbind.tag != Binding::ICONST) {
-          throw std::runtime_error("Cast width must be an integer constant");
+        if (op.inputs.size() < 1) {
+          throw std::runtime_error("as_* requires at something to convert");
         }
-        int64_t bits = bitbind.iconst;
+        Binding val = vars->at(op.inputs[0]);
         const std::string typefamily = op.f.fn.substr(3);
+        int64_t bits = 0;
+        if (typefamily != "bool") {
+          if (op.inputs.size() < 2) {
+            throw std::runtime_error(op.f.fn + " requires at a bit width");
+          }
+          Binding bitbind = vars->at(op.inputs[1]);
+          // Bits must be bound to an integer constant
+          if (bitbind.tag != Binding::ICONST) {
+            throw std::runtime_error("Cast width must be an integer constant");
+          }
+          bits = bitbind.iconst;
+        }
         if ("float" == typefamily) {
           switch (bits) {
             case 16:
@@ -651,6 +660,8 @@ void TypeCheck(Program* prog, Bindings* vars) {
             default:
               throw std::runtime_error("UInt width must be 8, 16, 32, or 64");
           }
+        } else if ("bool" == typefamily) {
+          out_type = DataType::BOOLEAN;
         }
         // compute out_type from the function name and possibly inputs[1]
         std::vector<size_t> out_shape;

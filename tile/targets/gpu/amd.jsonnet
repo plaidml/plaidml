@@ -30,25 +30,7 @@ local PARAMS = {
         default: {
           // Define the stripe passes
           passes: [
-            // First, we place all the initial buffer in global memory (DRAM)
-            {
-              name: 'loc_program',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
-                reqs: ['program'],
-                loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
-              },
-            },
-
-            {
-              name: 'loc_main',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.LocateMemoryPass',
-                reqs: ['main'],
-                loc: { devs: [{ name: 'GLOBAL', units: [{ offset: 0 }] }] },
-              },
-            },
-
+        
             // Change tags before optimizations
             {
               name: 'kernel_tag',
@@ -94,7 +76,7 @@ local PARAMS = {
               }
             },
 
-            // No-op MLIR pass
+            // No-op MLIR pass to induce transcoding
             /*
             {
               name: 'mlir_pad',
@@ -104,7 +86,7 @@ local PARAMS = {
               },
             },
             */
-
+            
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
