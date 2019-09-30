@@ -5,7 +5,6 @@ from kivy.app import App
 from kivy.uix.label import Label
 from kivy.uix.button import Button
 from functools import partial
-
 from kivy.uix.boxlayout import BoxLayout
 import yaml
 import util
@@ -35,11 +34,13 @@ class Planner(BoxLayout):
             # for platform in plan['PLATFORMS'].keys():
             #     self.add_widget(Button(text=platform))
 
-        variants = []
-        for variant in plan['VARIANTS'].keys():
-            self.variant = Button(text=variant)
-            self.variant.bind(on_press=callback)
-            self.add_widget(self.variant)
+        def populate_variants():
+            variants = []
+            for variant in plan['VARIANTS'].keys():
+                self.variant = Button(text=variant)
+                self.variant.bind(on_press=callback)
+                self.add_widget(self.variant)
+
         # platforms = []
         # for platform in plan['PLATFORMS'].keys():
         #     self.add_widget(Button(text=platform))
