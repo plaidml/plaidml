@@ -38,16 +38,16 @@ CompilerState::~CompilerState() = default;
 void ConvertFromMLIR(CompilerState* state) {
   IVLOG(1, "Converting from Stripe MLIR");
   *state->prog = *pmlc::dialect::stripe::FromMLIR(*state->mlir->module);
-  std::cout << "New\n";
-  std::cout << *state->prog->entry;
+  // std::cout << "New\n";
+  // std::cout << *state->prog->entry;
 }
 
 void ConvertIntoMLIR(CompilerState* state) {
   IVLOG(1, "Converting to Stripe MLIR");
-  std::cout << "Original\n";
-  std::cout << *state->prog->entry;
+  // std::cout << "Original\n";
+  // std::cout << *state->prog->entry;
   state->mlir->module = pmlc::dialect::stripe::IntoMLIR(&state->mlir->ctx, *state->prog);
-  state->mlir->module->dump();
+  // state->mlir->module->dump();
 }
 
 template <typename Pass, typename Config>

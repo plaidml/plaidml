@@ -7,6 +7,8 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
+#include "pmlc/dialect/stripe/opinterfaces.cpp.inc"
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stripe/ops.cpp.inc"
 
