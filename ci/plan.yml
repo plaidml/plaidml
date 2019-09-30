@@ -372,27 +372,27 @@ SUITES:
   train:
     platforms:
       keras-tf-cuda-gp100gl:
-        pipelines: [nightly]
+        pipelines: []
       keras-plaid-ocl-gp100gl:
-        pipelines: [nightly, train]
+        pipelines: [train]
       keras-stripe-ocl-gp100gl:
-        pipelines: [nightly, train]
+        pipelines: [train]
       keras-plaid-ocl-gfx900:
-        pipelines: [nightly, train]
+        pipelines: [train]
       keras-stripe-ocl-gfx900:
-        pipelines: [nightly, train]
+        pipelines: [train]
       keras-plaid-ocl-neo:
-        pipelines: [nightly, train]
+        pipelines: [train]
       keras-stripe-ocl-neo:
-        pipelines: [nightly, train]          
+        pipelines: [train]          
       keras-plaid-ocl-gfx804:
-        pipelines: [nightly, train]          
+        pipelines: [train]          
       keras-stripe-ocl-gfx804:
-        pipelines: [nightly, train]          
+        pipelines: [train]          
       keras-plaid-mtl-uhd630:
-        pipelines: [nightly, train]          
+        pipelines: [train]          
       keras-stripe-mtl-uhd630:
-        pipelines: [nightly, train]          
+        pipelines: [train]          
 
     params:
       nightly:
