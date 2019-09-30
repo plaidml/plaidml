@@ -71,8 +71,7 @@ message MLIR_PadPass {
 }
 
 // Reorder blocks
-message ReorderBlocksPass {
-}
+message ReorderBlocksPass {}
 
 // The scalarize pass looks for refinements which (usually due to
 // localization) now hold only a single element, and replaces
@@ -310,6 +309,13 @@ message LocateBlocksRefinementsRecursivelyPass {
   repeated string reqs = 1;
   required stripe.proto.Location loc = 2;
   repeated string skip_tags = 3;
+}
+
+// Initiaslizes the output of an agg_XXXXX block to the appropriate
+// value for the respective operations (valid values for XXXXX
+// are sum, mul, min, max and <emoty string>)
+message AggregationBlockOutputInitializationPass {
+  repeated string reqs = 1;
 }
 
 // The stencil pass attempts to rewrite blocks to contain an inner block that
@@ -664,8 +670,7 @@ message TempVarPass {
 }
 
 // Propagate constant tensors.
-message ConstantPropagatePass {
-}
+message ConstantPropagatePass {}
 
 // Remove constant tensor and replace the corresponding loads with constants
 message ConstTensorPass {
