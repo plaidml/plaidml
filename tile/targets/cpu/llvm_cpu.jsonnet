@@ -230,6 +230,17 @@ local PARAMS = {
                 alignment: 16,
               },
             },
+            // Init aggregation outputs
+            // Keet this towards the end since other passes are generating intermediate blocks and the initialization 
+            // on aggregation transition could break in such cases.
+            // TODO: Enable this when we handle the initialization of the bool type and the right agg_init_* functions are defined in the runtime.
+            // {
+            //   name: 'init_aggregation_outputs',
+            //   pass: {
+            //     '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AggregationBlockOutputInitializationPass',
+            //     reqs: ['program'],
+            //   },
+            // },
           ],
         },
       },
