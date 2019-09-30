@@ -3,6 +3,7 @@
 #include "pmlc/dialect/stripe/dialect.h"
 
 #include "mlir/IR/Dialect.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/dialect/stripe/ops.h"
 
@@ -22,6 +23,11 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
 #define GET_OP_LIST
 #include "pmlc/dialect/stripe/ops.cpp.inc"
       >();
+}
+
+mlir::Identifier Dialect::getDialectAttrName(mlir::MLIRContext* ctx, llvm::StringRef name) {
+  auto dialectName = llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name);
+  return mlir::Identifier::get(dialectName.str(), ctx);
 }
 
 mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const {

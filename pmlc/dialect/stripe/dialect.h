@@ -13,6 +13,8 @@ class Dialect : public mlir::Dialect {
   explicit Dialect(mlir::MLIRContext* ctx);
 
   static llvm::StringRef getDialectNamespace() { return "stripe"; }
+  static mlir::Identifier getDialectAttrName(mlir::MLIRContext* ctx, llvm::StringRef name);
+  static llvm::StringRef getStripeAttrsName() { return "stripe_attrs"; }
 
   mlir::Type parseType(llvm::StringRef tyData, mlir::Location loc) const override;
   void printType(mlir::Type type, llvm::raw_ostream& os) const override;

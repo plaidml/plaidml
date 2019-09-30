@@ -94,6 +94,8 @@ struct Contraction {
   std::tuple<IndexBounds, SimpleConstraints> ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes);
 };
 
+math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds);
+
 }  // namespace tile
 }  // namespace dialect
 }  // namespace pmlc

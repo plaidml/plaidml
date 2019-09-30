@@ -7,6 +7,7 @@
 #include "base/util/lookup.h"
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/analysis.h"
+#include "pmlc/dialect/stripe/dialect.h"
 
 namespace pmlc {
 namespace dialect {
@@ -70,14 +71,15 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
   // Construct the block and put it in the table
   cur_ = std::make_shared<stripe::Block>();
   cur_->name = func.getName();
-  std::vector<NamedAttribute> attrs(func.getDialectAttrs().begin(), func.getDialectAttrs().end());
-  add_attributes(cur_.get(), attrs);
+  auto attrs = func.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+  add_attributes(cur_.get(), attrs.getValue());
   Block& oblock = func.front();
   BlockInfo blockInfo(cur_.get());
   for (size_t i = 0; i < func.getNumArguments(); i++) {
     // add refinement for each arg
     auto arg = func.getArgument(i);
-    auto name = func.getArgAttr(i, "stripe.name").cast<StringAttr>().getValue();
+    auto attrName = Dialect::getDialectAttrName(func.getContext(), "name");
+    auto name = func.getArgAttr(i, attrName).cast<StringAttr>().getValue();
     // Compute all the info about the tensor
     auto ti = ComputeAccess(arg);
     // Translate allocation shape
@@ -226,7 +228,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
     }
     // If op matches the block, move the op up, also attributes
     while (op->getBlock() == block && mlir::isa<RefineOp>(op)) {
-      if (auto attrs = op->getAttrOfType<DictionaryAttr>("stripe_attrs")) {
+      if (auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName())) {
         add_attributes(ref, attrs.getValue());
       }
       op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
@@ -295,7 +297,7 @@ void StripeBuilder::visit(ParallelForOp op) {
     }
   }
   // Add the attributes
-  if (auto attrs = op.getAttrOfType<DictionaryAttr>("stripe_attrs")) {
+  if (auto attrs = op.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName())) {
     add_attributes(cur_.get(), attrs.getValue());
   }
   blocks_.emplace(&oblock, BlockInfo(cur_.get()));
