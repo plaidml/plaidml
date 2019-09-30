@@ -11,21 +11,21 @@
 namespace vertexai {
 namespace env {
 
-std::string Get(std::string key) {
+std::string Get(const std::string& key, const std::string& default_value) {
 #ifdef _MSC_VER
   char var[1024];
   auto rv = GetEnvironmentVariableA(key.c_str(), var, sizeof(var));
   if (!rv || sizeof(var) <= rv) {
-    return "";
+    return default_value;
   }
   return std::string(var);
 #else
   char const* val = std::getenv(key.c_str());
-  return val == nullptr ? "" : val;
+  return val == nullptr ? default_value : val;
 #endif
 }
 
-void Set(std::string key, std::string value) {
+void Set(const std::string& key, const std::string& value) {
 #ifdef _MSC_VER
   SetEnvironmentVariableA(key.c_str(), value.c_str());
 #else

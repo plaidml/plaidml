@@ -27,9 +27,11 @@ void AggregationBlockOutputInitialization(const stripe::Block* const block,
   // Now, add any new locals
   for (const auto& ref : block->refs) {
     if (ref.dir == stripe::RefDir::None && dup_ref.find(ref.into()) == dup_ref.end() && !ref.has_tag("user")) {
-      const_cast<AggregationBlockOutputInitializationState&>(aggregationPass->state)
-          .blocksWithInits.emplace_back(
-              AggregationBlockOutputInitializationNode(const_cast<stripe::Block*>(block), &ref));
+      std::string aggOp = ref.agg_op;
+      if (!aggOp.empty()) {
+        const_cast<AggregationBlockOutputInitializationPass*>(aggregationPass)
+            ->AddRefinementToInit(const_cast<stripe::Block*>(block), &ref, nullptr, aggOp);
+      }
     }
   }
 
@@ -58,9 +60,8 @@ void AggregationBlockOutputInitialization(const stripe::Block* const block,
   }
 
   if (prevRefIter->agg_op == "" || prevRefIter->agg_op == "assign") {
-    const_cast<AggregationBlockOutputInitializationState&>(aggregationPass->state)
-        .blocksWithInits.emplace_back(
-            AggregationBlockOutputInitializationNode(const_cast<stripe::Block*>(block), dest));
+    const_cast<AggregationBlockOutputInitializationPass*>(aggregationPass)
+        ->AddRefinementToInit(const_cast<stripe::Block*>(prevBlock), dest, block, aggOp);
   } else {
     if (prevRefIter->agg_op != aggOp) {
       // TODO: Create a temp buffer here.
@@ -77,18 +78,69 @@ void AggregationBlockOutputInitializationPass::Apply(CompilerState* state) const
   for (const auto& toInit : this->state.blocksWithInits) {
     assert(toInit.blockToAddTo != nullptr);
     assert(toInit.refToInitialize != nullptr);
+    assert(toInit.initType == AggregationInitType::ADD || toInit.initType == AggregationInitType::MULL ||
+           toInit.initType == AggregationInitType::MIN || toInit.initType == AggregationInitType::MAX);
     auto aggInit = std::make_shared<Special>();
-    aggInit->name = "agg_init";
+    std::string aggInitName = "";
+    switch (toInit.initType) {
+      case AggregationInitType::ADD:
+        aggInitName = "agg_init_add";
+        break;
+      case AggregationInitType::MUL:
+        aggInitName = "agg_init_mul";
+        break;
+      case AggregationInitType::MIN:
+        aggInitName = "agg_init_min";
+        break;
+      case AggregationInitType::MAX:
+        aggInitName = "agg_init_max";
+        break;
+      default:
+        throw std::runtime_error("Invalid Aggregation Initialization Type value.");
+    }
+    aggInit->name = aggInitName;
     aggInit->outputs.emplace_back(toInit.refToInitialize->into());
-    toInit.blockToAddTo->stmts.emplace_front(aggInit);
+    if (toInit.statementToAddBefore == nullptr) {
+      toInit.blockToAddTo->stmts.emplace_front(aggInit);
+    } else {
+      // Insert the element before the toInit.statementToAddBefore element.
+      auto it = toInit.blockToAddTo->stmts.begin();
+      auto end = toInit.blockToAddTo->stmts.end();
+      for (; it != end; ++it) {
+        if (it->get() == toInit.statementToAddBefore) {
+          break;
+        }
+      }
+
+      if (it == end) {
+        throw std::runtime_error("The toInit.statementToAddBefore must be in the list.");
+      }
+
+      toInit.blockToAddTo->stmts.insert(it, aggInit);
+    }
   }
 
   const_cast<AggregationBlockOutputInitializationState&>(this->state).Clear();
 }
 
-void AggregationBlockOutputInitializationPass::AddRefinementToInit(stripe::Block* block,
-                                                                   const stripe::Refinement* ref) {
-  state.blocksWithInits.push_back(AggregationBlockOutputInitializationNode((block), ref));
+void AggregationBlockOutputInitializationPass::AddRefinementToInit(stripe::Block* toBlock,
+                                                                   const stripe::Refinement* ref,
+                                                                   const stripe::Statement* beforeStatement,
+                                                                   const std::string initTypeStr) {
+  AggregationInitType initType = AggregationInitType::NONE;
+  if (initTypeStr == "add") {
+    initType = AggregationInitType::ADD;
+  } else if (initTypeStr == "mul") {
+    initType = AggregationInitType::MUL;
+  } else if (initTypeStr == "min") {
+    initType = AggregationInitType::MIN;
+  } else if (initTypeStr == "max") {
+    initType = AggregationInitType::MAX;
+  } else {
+    throw std::runtime_error("Valid initTypeStr must be specified for AggregationInitType.");
+  }
+
+  state.blocksWithInits.emplace_back(AggregationBlockOutputInitializationNode(toBlock, ref, beforeStatement, initType));
 }
 
 namespace {

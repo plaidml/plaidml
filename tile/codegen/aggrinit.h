@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "tile/codegen/codegen.pb.h"
@@ -19,14 +20,25 @@ void RunOnBlocksRecurse(stripe::Block* block, const stripe::Tags& reqs,
 void AggregationBlockOutputInitialization(const stripe::Block* const block,
                                           const AggregationBlockOutputInitializationPass* aggregationPass);
 
+enum AggregationInitType : uint8_t { NONE = 0, ADD = 1, MUL = 2, MIN = 3, MAX = 4 };
+
 class AggregationBlockOutputInitializationNode final {
  public:
   explicit AggregationBlockOutputInitializationNode(stripe::Block* blockToAddToIn,
-                                                    const stripe::Refinement* refToInitializeIn)
-      : blockToAddTo(blockToAddToIn), refToInitialize(refToInitializeIn) {}
+                                                    const stripe::Refinement* refToInitializeIn,
+                                                    const stripe::Statement* statementToAddBeforeIn,
+                                                    const AggregationInitType initTypeIn)
+      : blockToAddTo(blockToAddToIn),
+        refToInitialize(refToInitializeIn),
+        statementToAddBefore(statementToAddBeforeIn),
+        initType(initTypeIn) {}
 
   stripe::Block* blockToAddTo;
   const stripe::Refinement* refToInitialize;
+  // This is the statement before which the initialization call is added.
+  // A value of nullptr means that the new initialization call is added as first statement of the block.
+  const stripe::Statement* statementToAddBefore;
+  const AggregationInitType initType;
 
   AggregationBlockOutputInitializationNode() = delete;
 };
@@ -48,7 +60,8 @@ class AggregationBlockOutputInitializationPass final : public CompilePass {
   explicit AggregationBlockOutputInitializationPass(const proto::AggregationBlockOutputInitializationPass& options)
       : options_{options} {}
   void Apply(CompilerState* state) const final;
-  void AddRefinementToInit(stripe::Block* block, const stripe::Refinement* ref);
+  void AddRefinementToInit(stripe::Block* toBlock, const stripe::Refinement* ref,
+                           const stripe::Statement* beforeStatement, const std::string initType);
 
   AggregationBlockOutputInitializationState state;
 

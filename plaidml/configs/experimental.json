@@ -23,7 +23,7 @@
           "max_regs": 8192,
           "max_mem": 8192,
           "goal_flops_per_byte": 20,
-          "stripe_config": "cpu"
+          "stripe_config": "llvm_cpu"
         }
       },
       {
@@ -85,7 +85,8 @@
           "goal_groups": 1,
           "goal_flops_per_byte": 50,
           "disable_mad": true,
-          "stripe_config": "intel_gen9_opencl"
+          "stripe_config": "intel_gen9_opencl",
+          "use_stripe": true
         }
       },
       {
@@ -104,7 +105,7 @@
           "use_global": true
         }
       },
-     {
+      {
         "description": "Intel GPU config (CM)",
         "sel": {
           "name_regex": "CM.*"
@@ -120,7 +121,7 @@
           "disable_mad": true,
           "stripe_config": "cm"
         }
-      }, 
+      },
       {
         "description": "NVIDIA config",
         "sel": {
@@ -138,7 +139,7 @@
         }
       },
       {
-        "description": "Intel CPU config",
+        "description": "Intel OpenCL CPU config",
         "sel": {
           "and": {
             "sel": [
@@ -157,7 +158,7 @@
           "mem_width": 64,
           "max_mem": 32768,
           "max_regs": 32768,
-          "stripe_config": "cpu"
+          "stripe_config": "opencl_cpu"
         }
       },
       {
