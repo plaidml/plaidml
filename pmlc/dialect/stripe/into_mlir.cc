@@ -17,9 +17,9 @@ namespace stripe {
 namespace {
 
 struct SymbolTable {
-  std::map<std::string, mlir::Value*> refs;
-  std::map<std::string, mlir::Value*> idxs;
-  std::map<std::string, mlir::Value*> scalars;
+  SymbolValueMap refs;
+  SymbolValueMap idxs;
+  SymbolValueMap scalars;
 };
 
 }  // End namespace
@@ -53,31 +53,29 @@ static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
 }
 
 struct AttrBuilder : stripe::TagVisitor {
-  AttrBuilder(Builder* builder, std::vector<NamedAttribute>* out, std::string prefix = "")
-      : builder(builder), out(out), prefix(prefix) {}
+  AttrBuilder(Builder* builder, std::vector<NamedAttribute>* out) : builder(builder), out(out) {}
 
   Builder* builder;
   std::vector<NamedAttribute>* out;
-  std::string prefix;
 
   void Visit(const std::string& name) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getUnitAttr());
+    out->emplace_back(builder->getIdentifier(name), builder->getUnitAttr());
   }
 
   void Visit(const std::string& name, bool value) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getBoolAttr(value));
+    out->emplace_back(builder->getIdentifier(name), builder->getBoolAttr(value));
   }
 
   void Visit(const std::string& name, int64_t value) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getI64IntegerAttr(value));
+    out->emplace_back(builder->getIdentifier(name), builder->getI64IntegerAttr(value));
   }
 
   void Visit(const std::string& name, double value) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getF64FloatAttr(value));
+    out->emplace_back(builder->getIdentifier(name), builder->getF64FloatAttr(value));
   }
 
   void Visit(const std::string& name, const std::string& value) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getStringAttr(value));
+    out->emplace_back(builder->getIdentifier(name), builder->getStringAttr(value));
   }
 
   void Visit(const std::string& name, const google::protobuf::Any& value) override {
@@ -93,7 +91,7 @@ static DictionaryAttr TagsToDict(Builder* builder, const stripe::Taggable& tagga
   return builder->getDictionaryAttr(vec);
 }
 
-static Value* AffineIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Affine& affine) {
+Value* AffineIntoMLIR(OpBuilder* builder, const SymbolValueMap& idxs, const stripe::Affine& affine) {
   auto unknownLoc = builder->getUnknownLoc();
   std::vector<Value*> add_inputs;
   for (const auto& kvp : affine.getMap()) {
@@ -102,7 +100,7 @@ static Value* AffineIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const 
       term = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
                                             builder->getI64IntegerAttr(kvp.second));
     } else {
-      Value* orig = safe_at(syms.idxs, kvp.first);
+      Value* orig = safe_at(idxs, kvp.first);
       term = builder->create<AffineMulOp>(unknownLoc, builder->getType<AffineType>(), orig,
                                           builder->getI64IntegerAttr(kvp.second));
     }
@@ -258,7 +256,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       if (idx.range != 1) {
         throw std::runtime_error("Invalid Stripe: range and affine both set on index");
       }
-      locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, outer, idx.affine));
+      locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, outer.idxs, idx.affine));
     }
   }
 
@@ -279,18 +277,18 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
     }
     std::vector<Value*> offsets;
     for (const auto& aff : ref.access) {
-      offsets.push_back(AffineIntoMLIR(builder, locals, aff));
+      offsets.push_back(AffineIntoMLIR(builder, locals.idxs, aff));
     }
     auto refOp = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets);
     refOp.setAttr("name", builder->getStringAttr(ref.into()));
-    refOp.setAttr("stripe_attrs", TagsToDict(builder, ref));
+    refOp.setAttr(Dialect::getStripeAttrsName(), TagsToDict(builder, ref));
     locals.refs.emplace(ref.into(), refOp.result());
   }
 
   // Process the constraints
   for (const auto& con : block.constraints) {
     // Make the actual constraint value
-    auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, locals, con));
+    auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, locals.idxs, con));
     // Make the block + attach to the region
     Block* if_body = new Block();
     aif.getOperation()->getRegion(0).push_back(if_body);
@@ -310,13 +308,13 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         auto elementType = tensorRefType.getElementType();
         auto intoType = eltwise::GetTensorType(elementType);
         auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
-        op.setAttr("stripe_attrs", TagsToDict(builder, *load));
+        op.setAttr(Dialect::getStripeAttrsName(), TagsToDict(builder, *load));
         op.setAttr("scalar_name", builder->getStringAttr(load->into));
         locals.scalars.emplace(load->into, op);
       } break;
       case stripe::StmtKind::LoadIndex: {
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
-        Value* from = AffineIntoMLIR(builder, locals, load_idx->from);
+        Value* from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
         Type idx_base = eltwise::ScalarType::get(builder->getContext(), DataType::INT32);
         Type idx_type = eltwise::GetTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
@@ -332,7 +330,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         if (agg_str == "" || agg_str == "assign") {
           // Simple case, just an assignment
           auto op = builder->create<StoreOp>(unknownLoc, into, from);
-          op.setAttr("stripe_attrs", attrs);
+          op.setAttr(Dialect::getStripeAttrsName(), attrs);
         } else {
           // Aggregation case
           llvm::Optional<AggTypeEnum> agg_type = symbolizeAggTypeEnum(agg_str);
@@ -342,7 +340,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
           int64_t agg_int = static_cast<int>(agg_type.getValue());
           IntegerAttr agg_attr = builder->getI64IntegerAttr(agg_int);
           auto op = builder->create<AggregateOp>(unknownLoc, into, from, agg_attr);
-          op.setAttr("stripe_attrs", attrs);
+          op.setAttr(Dialect::getStripeAttrsName(), attrs);
         }
       } break;
       case stripe::StmtKind::Constant: {
@@ -379,7 +377,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   auto loop_op = builder->create<ParallelForOp>(unknownLoc, builder->getI64ArrayAttr(ranges));
   loop_op.setAttr("name", builder->getStringAttr(block.name));
   loop_op.setAttr("comments", builder->getStringAttr(block.comments));
-  loop_op.setAttr("stripe_attrs", TagsToDict(builder, block));
+  loop_op.setAttr(Dialect::getStripeAttrsName(), TagsToDict(builder, block));
   for (const auto& kvp : argAttrs) {
     loop_op.setAttr(kvp.first, kvp.second);
   }
@@ -403,7 +401,6 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
   func.addEntryBlock();
   OpBuilder builder(func.getBody());
 
-  auto prefix = llvm::formatv("{0}.", Dialect::getDialectNamespace());
   SymbolTable initial;
   size_t argcnt = 0;
   for (const auto& ref : block.refs) {
@@ -413,13 +410,11 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg);
     initial.refs.emplace(ref.into(), tensorRefOp);
     // Only 'dialect attrs' are allowed on function arguments
-    func.setArgAttr(argIndex, prefix.str() + "name", builder.getStringAttr(ref.into()));
+    auto attrName = Dialect::getDialectAttrName(builder.getContext(), "name");
+    func.setArgAttr(argIndex, attrName, builder.getStringAttr(ref.into()));
   }
 
-  std::vector<NamedAttribute> attrs;
-  AttrBuilder visitor(&builder, &attrs, prefix.str());
-  block.visit_tags(&visitor);
-  func.setDialectAttrs(attrs);
+  func.setAttr(Dialect::getStripeAttrsName(), TagsToDict(&builder, block));
 
   BlockIntoMLIR(&builder, initial, *block.SubBlock(0));
   builder.create<TerminateOp>(loc);
