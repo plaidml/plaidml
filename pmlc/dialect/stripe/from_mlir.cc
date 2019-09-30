@@ -3,6 +3,7 @@
 #include "pmlc/dialect/stripe/transcode.h"
 
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
 
 #include "base/util/lookup.h"
 #include "pmlc/dialect/eltwise/ops.h"
@@ -299,6 +300,53 @@ void StripeBuilder::visit(ParallelForOp op) {
   // Add the attributes
   if (auto attrs = op.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName())) {
     add_attributes(cur_.get(), attrs.getValue());
+  }
+  // Add the location (if any) by checking the inputs to the block's closing return op.
+  if (auto ret = mlir::dyn_cast<ReturnOp>(oblock.back())) {
+    if (ret.getNumOperands() == 1) {  // Return ops may have zero or one argument/s.
+      auto val = ret.getOperand(0);
+      if (auto valType = val->getType().dyn_cast<TensorRefType>()) {
+        auto offsets = std::vector<stripe::Affine>(valType.getRank());
+        auto op = val->getDefiningOp();
+        // Walk back refinements until we get to the TensorType.
+        while (auto refOp = mlir::dyn_cast<RefineOp>(op)) {
+          auto offIt = offsets.begin();
+          for (auto offset : refOp.offsets()) {
+            if (offIt == offsets.end()) {
+              break;  // Should never happen; this is just to be careful.
+            }
+            *offIt++ += build_affine(cur_.get(), offset);
+          }
+          op = refOp.in()->getDefiningOp();
+        }
+        if (auto trefOp = mlir::dyn_cast<TensorRefOp>(op)) {
+          if (auto tType = trefOp.in()->getType().dyn_cast<TensorType>()) {
+            auto matches = llvm::SmallVector<StringRef, 4>();
+            auto offIt = offsets.begin();
+            for (const auto& dim : tType.getShape()) {
+              static llvm::Regex re{R"(([[:alpha:]]+)_([[:digit:]]+)_([[:digit:]]+))"};
+              cur_->location.devs.push_back(stripe::Device{dim.cls.str()});
+              if (re.match(dim.cls, &matches) && offIt != offsets.end()) {
+                const auto& dev_name = matches[1];
+                std::size_t dev_idx, unit_idx;
+                matches[2].getAsInteger(10, dev_idx);
+                matches[3].getAsInteger(10, unit_idx);
+                if (cur_->location.devs.size() <= dev_idx) {
+                  cur_->location.devs.resize(dev_idx + 1);
+                }
+                auto& dev = cur_->location.devs.at(dev_idx);
+                dev.name = dev_name;
+                if (dev.units.size() <= unit_idx) {
+                  dev.units.resize(unit_idx + 1);
+                }
+                dev.units.at(unit_idx) = *offIt;
+              }
+              ++offIt;
+            }
+          }
+        }
+      }
+    }
   }
   blocks_.emplace(&oblock, BlockInfo(cur_.get()));
   walk_interior(&oblock);

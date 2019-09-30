@@ -55,7 +55,7 @@ struct TensorDim {
   int64_t stride;
 
   // The hardware class identified by this dimension.
-  llvm::StringRef cls;
+  mlir::Identifier cls;
 
   bool operator==(const TensorDim& rhs) const {  //
     return std::tie(size, stride, cls) == std::tie(rhs.size, rhs.stride, rhs.cls);

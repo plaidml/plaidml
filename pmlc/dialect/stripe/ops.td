@@ -8,7 +8,6 @@ def StripeDialect : Dialect {
 }
 
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
-def ExecutorType : Type<CPred<"$_self.isa<ExecutorType>()">, "Plaid Executor Type">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Type">;
 def TensorRefType : Type<CPred<"$_self.isa<TensorRefType>()">, "Plaid Tensor Reference Type">;
 
@@ -158,3 +157,11 @@ def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let printer = [{ *p << getOperationName(); }];
 }
 
+def ReturnOp : StripeOp<"return", [Terminator, HasParent<"ParallelForOp">]> {
+  let summary = "Indicates where a ParallelForOp should execute";
+
+  // 'from' represents the executor value being returned.  We're using a
+  // Variadic here in lieu of Optional; a Stripe Return op may only have zero
+  // or one argument/s.
+  let arguments = (ins Variadic<TensorRefType>:$from);
+}

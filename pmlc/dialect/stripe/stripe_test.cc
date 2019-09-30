@@ -78,6 +78,7 @@ TEST(Stripe, Transcode) {
   lmp_dev->set_name("InnerMem");
   lmp_dev->add_units()->set_offset(1);
   codegen::LocateMemoryPass{lmp}.Apply(&cstate);
+#endif
 
   IVLOG(1, "Adding an executor location");
   codegen::proto::LocateBlockPass lbp;
@@ -89,13 +90,13 @@ TEST(Stripe, Transcode) {
   lbp_dev->set_name("InnerExecutor");
   lbp_dev->add_units()->set_offset(1);
   codegen::LocateBlockPass{lbp}.Apply(&cstate);
-#endif
 
   IVLOG(2, "Original version:");
   IVLOG(2, *prog->entry);
 
   IVLOG(1, "Converting to MLIR");
   auto module = IntoMLIR(&context, *prog);
+  module->dump();
 
   IVLOG(1, "Verifying module");
   if (failed(module->verify())) {

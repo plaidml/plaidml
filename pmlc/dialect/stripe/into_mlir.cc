@@ -249,11 +249,9 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // Make room for local symbols
   SymbolTable locals;
 
-  // Make the actual inner block + terminate it
+  // Make the actual inner block
   auto orig_insert = builder->saveInsertionPoint();
   Block* body = new Block();
-  builder->setInsertionPointToStart(body);
-  builder->create<TerminateOp>(unknownLoc);
   builder->setInsertionPointToStart(body);
 
   // Process the indexes
@@ -278,6 +276,31 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       }
       locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, outer.idxs, idx.affine));
     }
+  }
+
+  // Process the block's execution location.
+  std::vector<mlir::Value*> executor;
+  if (!block.location.empty()) {
+    std::vector<TensorDim> dims;
+    std::vector<Value*> offsets;
+    for (std::size_t dev_idx = 0; dev_idx < block.location.devs.size(); ++dev_idx) {
+      const auto& dev = block.location.devs.at(dev_idx);
+      for (std::size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
+        const auto& unit = dev.units.at(unit_idx);
+        auto cls = (boost::format("%s_%zu_%zu") % dev.name % dev_idx % unit_idx).str();
+        // N.B. Locations in Stripe Classic logically reference an abstract executor space, in which size and
+        // stride are not well-specified, so we leave them undefined after translation to MLIR, and ignore
+        // them on translation back to Stripe Classic.
+        dims.emplace_back(TensorDim{0, 0, builder->getIdentifier(cls)});
+        offsets.emplace_back(AffineIntoMLIR(builder, outer.idxs, unit));
+      }
+    }
+    auto allocOp = builder->create<AllocateOp>(
+        unknownLoc, TensorType::get(builder->getType<ExecutorType>(), dims, OffsetsMap{}, true));
+    auto refOp = builder->create<TensorRefOp>(
+        unknownLoc, TensorRefType::get(builder->getType<ExecutorType>(), dims.size(), true), allocOp.result());
+    auto refineOp = builder->create<RefineOp>(unknownLoc, refOp.getType(), refOp.result(), offsets);
+    executor.emplace_back(refineOp.result());
   }
 
   // Process the refinements.
@@ -391,6 +414,11 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         break;
     }
   }
+
+  // Terminate the block.
+  builder->setInsertionPointToEnd(body);
+
+  builder->create<ReturnOp>(unknownLoc, executor);
 
   // Build the loop itself
   builder->restoreInsertionPoint(orig_insert);
