@@ -1,5 +1,7 @@
 // Copyright 2018, Intel Corporation
 
+#include <memory>
+#include <set>
 #include <vector>
 
 #include "tile/codegen/aggrinit.h"
@@ -78,7 +80,7 @@ void AggregationBlockOutputInitializationPass::Apply(CompilerState* state) const
   for (const auto& toInit : this->state.blocksWithInits) {
     assert(toInit.blockToAddTo != nullptr);
     assert(toInit.refToInitialize != nullptr);
-    assert(toInit.initType == AggregationInitType::ADD || toInit.initType == AggregationInitType::MULL ||
+    assert(toInit.initType == AggregationInitType::ADD || toInit.initType == AggregationInitType::MUL ||
            toInit.initType == AggregationInitType::MIN || toInit.initType == AggregationInitType::MAX);
     auto aggInit = std::make_shared<Special>();
     std::string aggInitName = "";
