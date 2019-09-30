@@ -2473,9 +2473,7 @@ Value squeeze(const Value& value) {
   auto I = args[0].as_tensor();
   auto ndims = I.shape().ndims();
   std::vector<TensorDim> I_dims(ndims);
-  std::vector<TensorIndex> I_idxs;
   std::vector<TensorDim> O_dims;
-  std::vector<TensorIndex> O_idxs;
   I.bind_dims(I_dims);
 
   // argument 1: axes to squeeze upon
@@ -2491,16 +2489,16 @@ Value squeeze(const Value& value) {
   }
 
   for (size_t i = 0; i < ndims; ++i) {
-    I_idxs.emplace_back(str(boost::format("n%1%") % i));
     if (!axes.count(i)) {
       O_dims.push_back(I_dims[i]);
-      O_idxs.push_back(I_idxs[i]);
     }
   }
-  // TODO: Probably politer to call reshape rather than use a contraction here
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-  return Value{O};
+  std::vector<Value> O_dims_values;
+  for (const auto dim : O_dims) {
+    O_dims_values.push_back(Value{dim});
+  }
+  std::vector<Value> reshape_args = {Value{I}, Value{O_dims_values}};
+  return reshape(Value{reshape_args});
 }
 
 Value sum(const Value& value) {
