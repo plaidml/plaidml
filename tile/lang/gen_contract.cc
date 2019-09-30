@@ -2,6 +2,10 @@
 
 #include <assert.h>
 
+#include <algorithm>
+#include <map>
+#include <memory>
+
 #include <boost/algorithm/string/replace.hpp>
 
 #include "base/util/logging.h"
@@ -560,7 +564,8 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
       opexpr = std::make_shared<sem::UnaryExpr>("~", inexprs[0]);
     } else if (post_op.f.fn == "ident" || post_op.f.fn == "reshape") {
       opexpr = inexprs[0];
-    } else if (post_op.f.fn == "as_float" || post_op.f.fn == "as_int" || post_op.f.fn == "as_uint") {
+    } else if (post_op.f.fn == "as_float" || post_op.f.fn == "as_int" || post_op.f.fn == "as_uint" ||
+               post_op.f.fn == "as_bool") {
       sem::Type declatype{sem::Type::VALUE, vars.at(post_op.output).shape.type, op.agg_vec};
       opexpr = _Cast(declatype, inexprs[0]);
     } else if (post_op.f.fn == "index") {

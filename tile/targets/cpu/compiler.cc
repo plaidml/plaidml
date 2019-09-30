@@ -772,6 +772,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"as_float", &Compiler::AsFloat},
       {"as_int", &Compiler::AsInt},
       {"as_uint", &Compiler::AsUInt},
+      {"as_bool", &Compiler::AsBool},
       {"floor", &Compiler::Floor},
       {"ceil", &Compiler::Ceil},
       {"round", &Compiler::Round},
@@ -1292,6 +1293,14 @@ void Compiler::AsUInt(const stripe::Intrinsic& stmt) {
   }
 
   Scalar ret = Cast(scalars_[stmt.inputs[0]], type);
+  assert(1 == stmt.outputs.size());
+  scalars_[stmt.outputs[0]] = ret;
+  ret.value->setName(stmt.outputs[0]);
+}
+
+void Compiler::AsBool(const stripe::Intrinsic& stmt) {
+  assert(1 == stmt.inputs.size());
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], DataType::BOOLEAN);
   assert(1 == stmt.outputs.size());
   scalars_[stmt.outputs[0]] = ret;
   ret.value->setName(stmt.outputs[0]);

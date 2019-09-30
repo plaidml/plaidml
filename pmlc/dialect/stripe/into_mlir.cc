@@ -33,9 +33,6 @@ static ScalarType DataTypeIntoMLIR(mlir::MLIRContext* ctx, DataType dtype) {  //
 }
 
 static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
-  if (shape.type == DataType::PRNG) {
-    return PrngType::get(ctx);
-  }
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
   llvm::SmallVector<TensorDim, 4> dims;
   for (const auto& dim : shape.dims) {
@@ -45,9 +42,6 @@ static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
 }
 
 static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
-  if (shape.type == DataType::PRNG) {
-    return PrngType::get(ctx);
-  }
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
   return TensorRefType::get(dtype, shape.dims.size(), shape.is_const);
 }
@@ -212,14 +206,38 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
   }
 }
 
+template <typename T>
+static void SpecialConvertImpl(OpBuilder* builder, SymbolTable* locals, const stripe::Special& special) {
+  std::vector<Type> no_types;
+  std::vector<Value*> vals;
+  std::vector<NamedAttribute> no_attrs;
+  for (size_t i = 0; i < special.outputs.size(); i++) {
+    vals.push_back(safe_at(locals->refs, special.outputs[i]));
+  }
+  for (size_t i = 0; i < special.inputs.size(); i++) {
+    vals.push_back(safe_at(locals->refs, special.inputs[i]));
+  }
+  auto unk = builder->getUnknownLoc();
+  auto op = builder->create<T>(unk, no_types, vals, no_attrs);
+  if (special.outputs.size() != op.getNumOutputs()) {
+    throw std::runtime_error(std::string("Special '") + special.name + "' has invalid number of inputs");
+  }
+  if (special.inputs.size() != op.getNumInputs()) {
+    throw std::runtime_error(std::string("Special '") + special.name + "' has invalid number of inputs");
+  }
+}
+
 static void SpecialIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Special& special) {
   if (special.name == "reshape") {
-    if (special.inputs.size() != 1 || special.outputs.size() != 1) {
-      throw std::runtime_error("Invalid reshape");
-    }
-    Value* in_ref = safe_at(locals->refs, special.inputs[0]);
-    Value* out_ref = safe_at(locals->refs, special.outputs[0]);
-    builder->create<ReshapeOp>(builder->getUnknownLoc(), in_ref, out_ref);
+    SpecialConvertImpl<ReshapeOp>(builder, locals, special);
+  } else if (special.name == "prng_step") {
+    SpecialConvertImpl<PrngStepOp>(builder, locals, special);
+  } else if (special.name == "gather") {
+    SpecialConvertImpl<GatherOp>(builder, locals, special);
+  } else if (special.name == "scatter") {
+    SpecialConvertImpl<ScatterOp>(builder, locals, special);
+  } else if (special.name == "shape") {
+    SpecialConvertImpl<ShapeOp>(builder, locals, special);
   } else {
     throw std::runtime_error("Unknown special: " + special.name);
   }
