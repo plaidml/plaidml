@@ -14,6 +14,9 @@ class Dialect : public mlir::Dialect {
 
   static llvm::StringRef getDialectNamespace() { return "stripe"; }
 
+  mlir::Type parseTensor(llvm::StringRef tyData, mlir::Location loc) const;
+  mlir::Type parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const;
+
   mlir::Type parseType(llvm::StringRef tyData, mlir::Location loc) const override;
   void printType(mlir::Type type, llvm::raw_ostream& os) const override;
 };

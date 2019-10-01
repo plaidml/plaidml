@@ -36,21 +36,6 @@ def LoadOp : StripeOp<"load"> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorRefType:$from);
   let results = (outs Eltwise_AnyTensor:$into);
-  /*
-  let parser = [{
-    mlir::SmallVector<OpAsmParser::OperandType, 1> ops;
-    Type type;
-    return mlir::failure(parser->parseOperandList(ops, 1) ||
-                 parser->parseColonType(type) ||
-                 parser->resolveOperands(ops, type, result->operands) ||
-                 parser->addTypeToList(type, result->types));
-  }];
-  let printer = [{
-    auto op = this->getOperation();
-    *p << op->getName() << ' ' << *op->getOperand(0);
-    *p << " : " << op->getResult(0)->getType();
-  }];
-  */
 }
 
 def LoadIndexOp : StripeOp<"load_index"> {
@@ -62,18 +47,6 @@ def LoadIndexOp : StripeOp<"load_index"> {
 def StoreOp : StripeOp<"store"> {
   let summary = "Store into a tensor";
   let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from);
-  /*
-  let parser = [{
-    mlir::SmallVector<OpAsmParser::OperandType, 2> ops;
-    Type type;
-    return mlir::failure(parser->parseOperandList(ops, 2) ||
-                 parser->resolveOperands(ops, type, result->operands));
-  }];
-  let printer = [{
-    auto op = this->getOperation();
-    *p << op->getName() << ' ' << *op->getOperand(0) << ", " << *op->getOperand(1);
-  }];
-  */
 }
 
 def AggTypeEnum : I64EnumAttr<
@@ -100,13 +73,6 @@ class AffineOp<string mnemonic> : StripeOp<mnemonic, [NoSideEffect]> {
 def AffineConstOp : AffineOp<"affine_const"> {
   let summary = "A constant affine value";
   let arguments = (ins I64Attr:$value);
-  /*
-  let printer = [{
-    auto op = this->getOperation();
-    *p << op->getName() << ' ';
-    *p << op->getAttrOfType<IntegerAttr>("value").getInt();
-  }];
-  */
 }
 
 def AffineMulOp : AffineOp<"affine_mul"> {
@@ -189,6 +155,6 @@ def PrngStepOp : SpecialOp<"prng_step", 2, 1> {
 def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let summary = "A block terminator since MLIR requires one";
   let parser = [{ return mlir::success(); }];
-  let printer = [{ *p << this->getOperation()->getName(); }];
+  let printer = [{ *p << getOperationName(); }];
 }
 

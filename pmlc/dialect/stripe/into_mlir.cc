@@ -96,9 +96,11 @@ static Value* AffineIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const 
       term = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
                                             builder->getI64IntegerAttr(kvp.second));
     } else {
-      Value* orig = safe_at(syms.idxs, kvp.first);
-      term = builder->create<AffineMulOp>(unknownLoc, builder->getType<AffineType>(), orig,
-                                          builder->getI64IntegerAttr(kvp.second));
+      term = safe_at(syms.idxs, kvp.first);
+      if (kvp.second != 1) {
+        term = builder->createOrFold<AffineMulOp>(unknownLoc, builder->getType<AffineType>(), term,
+                                                  builder->getI64IntegerAttr(kvp.second));
+      }
     }
     add_inputs.push_back(term);
   }
@@ -108,7 +110,7 @@ static Value* AffineIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const 
   if (add_inputs.size() == 1) {
     return add_inputs[0];
   }
-  return builder->create<AffineAddOp>(unknownLoc, builder->getType<AffineType>(), add_inputs);
+  return builder->createOrFold<AffineAddOp>(unknownLoc, builder->getType<AffineType>(), add_inputs);
 }
 
 namespace {

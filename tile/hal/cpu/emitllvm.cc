@@ -974,8 +974,13 @@ llvm::Value* Emit::ToBool(llvm::Value* val) {
   if (val->getType() == booltype_) {
     return val;
   }
-  llvm::Value* zero = llvm::ConstantInt::get(val->getType(), 0);
-  return builder_.CreateICmpNE(val, zero);
+  if (llvm::isa<llvm::IntegerType>(val->getType())) {
+    llvm::Value* zero = llvm::ConstantInt::get(val->getType(), 0);
+    return builder_.CreateICmpNE(val, zero);
+  } else {
+    llvm::Value* zero = llvm::ConstantFP::get(val->getType(), 0.0);
+    return builder_.CreateFCmpUNE(val, zero);
+  }
 }
 
 void Emit::Enter() { blocks_.emplace_front(); }

@@ -110,6 +110,7 @@ plaidml_cc_library(
         ":stripe",
         "//tile/stripe",
         "@mlir//:IR",
+	"@mlir//:Parser",
     ],
 )
 
