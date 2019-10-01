@@ -91,6 +91,7 @@ plaidml_cc_library(
         "@mlir//:IR",
         "@mlir//:StandardOps",
         "@mlir//:Transforms",
+	"@mlir//:Parser",
     ],
     alwayslink = 1,
 )
@@ -110,7 +111,6 @@ plaidml_cc_library(
         ":stripe",
         "//tile/stripe",
         "@mlir//:IR",
-	"@mlir//:Parser",
     ],
 )
 
