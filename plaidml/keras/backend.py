@@ -1940,7 +1940,7 @@ def variable(value, dtype=None, name=None, constraint=None):
         # Fallthrough
     # Default to treating the value as an ndarray.
     tensor = plaidml.Tensor(
-        _device(), plaidml.Shape(_ctx, ptile.convert_np_dtype_to_pml(dtype), *value.shape))
+        _device(), plaidml.Shape(_ctx, ptile.convert_np_dtype_to_pml(dtype), None, *value.shape))
     with tensor.mmap_discard(_ctx) as view:
         view.copy_from_ndarray(value)
         view.writeback()

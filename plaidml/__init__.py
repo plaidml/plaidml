@@ -1329,7 +1329,7 @@ class _Shape(object):
 
 class Shape(_Shape):
 
-    def __init__(self, ctx, dtype, *args, layout=None):
+    def __init__(self, ctx, dtype, layout=None, *args):
         super(Shape, self).__init__(ctx, _lib().plaidml_alloc_shape(ctx, dtype))
         stride = 1
         for arg in args:
