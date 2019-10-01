@@ -1060,8 +1060,8 @@ def not_equal(lhs, rhs):
 
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
-    x_shape = shape(x)
-    ndims = ndim(x)
+    I = x.tensor
+    ndims = I.shape.ndims
     if reduction_axes == None:
         raw_axes = [ndims - 1]
     else:
@@ -1069,6 +1069,14 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
     m = mean(x, axis=axes, keepdims=True)
     v = var(x, axis=axes, keepdims=True)
+
+    # We reshape beta & gamma to the target shape; this discards shape information on beta & gamma but matches the behavior with the TF backend
+    dims = edsl.TensorDims(ndims)
+    I.bind_dims(*dims)
+    for ax in axes:
+        dims[ax] = 1
+    beta = reshape(beta, dims)
+    gamma = reshape(gamma, dims)
 
     normalized_tensor = batch_normalization(x=x,
                                             mean=m,
