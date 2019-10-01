@@ -529,14 +529,10 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   ProfileBlockEnter(block);
 
   // generate the basic blocks for each nested loop's evaluation stages
-  std::vector<Loop> loops;
-  for (auto& idx : block.idxs) {
-    std::string name = idx.name;
-    auto init = llvm::BasicBlock::Create(context_, "init_" + name, function);
-    auto test = llvm::BasicBlock::Create(context_, "test_" + name, function);
-    auto body = llvm::BasicBlock::Create(context_, "body_" + name, function);
-    auto done = llvm::BasicBlock::Create(context_, "done_" + name, function);
-    loops.push_back({init, test, body, done});
+  std::vector<Loop> loops(block.idxs.size());
+  for (size_t i = 0; i < block.idxs.size(); ++i) {
+    std::string name = block.idxs[i].name;
+    CreateLoop(&loops[i], name, function);
   }
 
   // initialize each loop index and generate the termination check
@@ -588,8 +584,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   for (size_t i = block.idxs.size(); i-- > 0;) {
     llvm::Value* variable = indexes_[block.idxs[i].name].variable;
     llvm::Value* index = builder_.CreateLoad(variable);
-    llvm::Value* increment = IndexConst(1);
-    index = builder_.CreateAdd(index, increment);
+    index = builder_.CreateAdd(index, IndexConst(1));
     builder_.CreateStore(index, variable);
     builder_.CreateBr(loops[i].test);
     builder_.SetInsertPoint(loops[i].done);
@@ -1476,10 +1471,7 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
   llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
-    loops[i].init = llvm::BasicBlock::Create(context_, "init_" + name, parent);
-    loops[i].test = llvm::BasicBlock::Create(context_, "test_" + name, parent);
-    loops[i].body = llvm::BasicBlock::Create(context_, "body_" + name, parent);
-    loops[i].done = llvm::BasicBlock::Create(context_, "done_" + name, parent);
+    CreateLoop(&loops[i], name, parent);
     builder_.CreateBr(loops[i].init);
     builder_.SetInsertPoint(loops[i].init);
     builder_.CreateStore(IndexConst(0), idx_vars[i]);
@@ -1595,10 +1587,7 @@ void Compiler::Scatter(const stripe::Special& scatter) {
   llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < data_ndims; ++i) {
     std::string name = std::to_string(i);
-    loops[i].init = llvm::BasicBlock::Create(context_, "init_" + name, parent);
-    loops[i].test = llvm::BasicBlock::Create(context_, "test_" + name, parent);
-    loops[i].body = llvm::BasicBlock::Create(context_, "body_" + name, parent);
-    loops[i].done = llvm::BasicBlock::Create(context_, "done_" + name, parent);
+    CreateLoop(&loops[i], name, parent);
     builder_.CreateBr(loops[i].init);
     builder_.SetInsertPoint(loops[i].init);
     builder_.CreateStore(IndexConst(0), idx_vars[i]);
@@ -1718,10 +1707,7 @@ void Compiler::Gather(const stripe::Special& gather) {
   llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
-    loops[i].init = llvm::BasicBlock::Create(context_, "init_" + name, parent);
-    loops[i].test = llvm::BasicBlock::Create(context_, "test_" + name, parent);
-    loops[i].body = llvm::BasicBlock::Create(context_, "body_" + name, parent);
-    loops[i].done = llvm::BasicBlock::Create(context_, "done_" + name, parent);
+    CreateLoop(&loops[i], name, parent);
     builder_.CreateBr(loops[i].init);
     builder_.SetInsertPoint(loops[i].init);
     builder_.CreateStore(IndexConst(0), idx_vars[i]);
@@ -1785,6 +1771,13 @@ void Compiler::Gather(const stripe::Special& gather) {
     builder_.CreateBr(loops[i].test);
     builder_.SetInsertPoint(loops[i].done);
   }
+}
+
+void Compiler::CreateLoop(Loop* loop, std::string name, llvm::Function* func) {
+  loop->init = llvm::BasicBlock::Create(context_, "init_" + name, func);
+  loop->test = llvm::BasicBlock::Create(context_, "test_" + name, func);
+  loop->body = llvm::BasicBlock::Create(context_, "body_" + name, func);
+  loop->done = llvm::BasicBlock::Create(context_, "done_" + name, func);
 }
 
 Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {

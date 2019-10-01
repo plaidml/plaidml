@@ -146,6 +146,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   };
 
  private:
+  void CreateLoop(Loop* loop, std::string name, llvm::Function* func);
   Scalar Cast(Scalar, DataType);
   Scalar CheckBool(Scalar);
   llvm::Type* CType(DataType);
