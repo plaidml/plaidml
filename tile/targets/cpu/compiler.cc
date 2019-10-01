@@ -129,8 +129,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
     if (arenaSize_) {
       IVLOG(1, "Arena size: " << arenaSize_);
       // allocate the arena on the heap. This way static initialization order is never an issue.
-      std::vector<llvm::Value*> calloc_args{IndexConst(arenaSize_), IndexConst(1)};
-      auto buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
+      auto buffer = Malloc(arenaSize_);
       auto arena_gval = module_->getNamedGlobal(arena_name_);
       auto arenatype = llvm::ArrayType::get(builder_.getInt8Ty(), 1)->getPointerTo();
       builder_.CreateStore(builder_.CreateBitCast(buffer, arenatype), arena_gval);
@@ -148,9 +147,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
         args.push_back(builder_.CreateBitCast(elval, eltype));
       } else if (ref.has_tag("tmp")) {
         // Allocate a temporary buffer for this refinement
-        size_t size = ref.interior_shape.byte_size();
-        std::vector<llvm::Value*> calloc_args{IndexConst(size), IndexConst(1)};
-        auto buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
+        auto buffer = Malloc(ref.interior_shape.byte_size());
         allocs.push_back(buffer);
         llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
         args.push_back(builder_.CreateBitCast(buffer, buftype));
@@ -170,8 +167,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   builder_.CreateCall(main, args, "");
   // Free any temporary buffers we may have allocated.
   for (auto ptr : allocs) {
-    std::vector<llvm::Value*> free_args{ptr};
-    builder_.CreateCall(FreeFunction(), free_args, "");
+    Free(ptr);
   }
   builder_.CreateRetVoid();
 }
@@ -829,9 +825,7 @@ void Compiler::Visit(const stripe::Block& block) {
         buffer = builder_.CreateGEP(baseArenaAddress, idxList);
       } else {
         // Allocate new storage for the buffer.
-        size_t size = ref.interior_shape.byte_size();
-        std::vector<llvm::Value*> calloc_args{IndexConst(size), IndexConst(1)};
-        buffer = builder_.CreateCall(CallocFunction(), calloc_args, "");
+        buffer = Malloc(ref.interior_shape.byte_size());
         allocs.push_back(buffer);
       }
       llvm::Type* buftype = CType(ref.interior_shape.type)->getPointerTo();
@@ -855,8 +849,7 @@ void Compiler::Visit(const stripe::Block& block) {
   builder_.CreateCall(function, args, "");
   // Free the temporary buffers we allocated as parameter values.
   for (auto ptr : allocs) {
-    std::vector<llvm::Value*> free_args{ptr};
-    builder_.CreateCall(FreeFunction(), free_args, "");
+    Free(ptr);
   }
 }
 
@@ -1943,12 +1936,14 @@ llvm::Value* Compiler::XSMMDispatchFunction(llvm::Type* alphaPtrType, llvm::Type
   return module_->getOrInsertFunction(functionName.c_str(), functype).getCallee();
 }
 
-llvm::Value* Compiler::MallocFunction(void) {
+llvm::Value* Compiler::Malloc(size_t size) {
   std::vector<llvm::Type*> argtypes{IndexType()};
   llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "malloc";
-  return module_->getOrInsertFunction(funcname, functype).getCallee();
+  auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
+  auto buffer = builder_.CreateCall(func, {IndexConst(size)}, "");
+  return buffer;
 }
 
 llvm::Value* Compiler::RunTimeLogEntry(void) {
@@ -1976,21 +1971,14 @@ void Compiler::EmitRunTimeLogEntry(const std::string& str, const std::string& ex
   auto buffer = builder_.CreateCall(RunTimeLogEntry(), log_args, "");
 }
 
-llvm::Value* Compiler::CallocFunction(void) {
-  std::vector<llvm::Type*> argtypes{IndexType(), IndexType()};
-  llvm::Type* rettype = builder_.getInt8PtrTy();
-  auto functype = llvm::FunctionType::get(rettype, argtypes, false);
-  const char* funcname = "calloc";
-  return module_->getOrInsertFunction(funcname, functype).getCallee();
-}
-
-llvm::Value* Compiler::FreeFunction(void) {
+void Compiler::Free(llvm::Value* buffer) {
   llvm::Type* ptrtype = builder_.getInt8PtrTy();
   std::vector<llvm::Type*> argtypes{ptrtype};
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "free";
-  return module_->getOrInsertFunction(funcname, functype).getCallee();
+  auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
+  builder_.CreateCall(func, {buffer}, "");
 }
 
 llvm::Value* Compiler::PrngStepFunction(void) {
