@@ -177,6 +177,10 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
     return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const);
   }
 
+  static TensorRefType get(TensorType type) {
+    return Base::get(type.getContext(), Types::TensorRef, type.getElementType(), type.getRank(), type.is_const());
+  }
+
   /// Return the element type.
   Type getElementType() const { return getImpl()->elementType; }
 

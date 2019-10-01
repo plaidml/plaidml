@@ -75,6 +75,7 @@ plaidml_cc_library(
         "//base/util",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/stripe",
+        "//pmlc/dialect/stripe:transcode",
         "//tile/base",
         "//tile/lang",
         "@boost",

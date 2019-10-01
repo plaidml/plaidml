@@ -4,6 +4,7 @@
 
 #include "mlir/IR/Dialect.h"
 #include "mlir/Parser.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/dialect/stripe/ops.h"
 
@@ -69,6 +70,11 @@ mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) c
     return Type();
   }
   return TensorRefType::get(t, ndims, is_const);
+}
+
+mlir::Identifier Dialect::getDialectAttrName(mlir::MLIRContext* ctx, llvm::StringRef name) {
+  auto dialectName = llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name);
+  return mlir::Identifier::get(dialectName.str(), ctx);
 }
 
 mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const {
