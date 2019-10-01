@@ -94,7 +94,7 @@ Value* AffineIntoMLIR(OpBuilder* builder, const SymbolValueMap& idxs, const stri
       term = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
                                             builder->getI64IntegerAttr(kvp.second));
     } else {
-      term = safe_at(syms.idxs, kvp.first);
+      term = safe_at(idxs, kvp.first);
       if (kvp.second != 1) {
         term = builder->createOrFold<AffineMulOp>(unknownLoc, builder->getType<AffineType>(), term,
                                                   builder->getI64IntegerAttr(kvp.second));
