@@ -159,9 +159,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::FunctionType* BlockType(const stripe::Block&);
   llvm::Value* XSMMDispatchFunction(llvm::Type* alphaPtrType, llvm::Type* betaPtrType, llvm::Type* aPtrType,
                                     llvm::Type* bPtrType, llvm::Type* cPtrType, const std::string& funcionName);
-  llvm::Value* MallocFunction();
-  llvm::Value* CallocFunction();
-  llvm::Value* FreeFunction();
+  llvm::Value* Malloc(size_t size);
+  void Free(llvm::Value* buffer);
   llvm::Value* PrngStepFunction();
   llvm::Value* ReadCycleCounter();
   void ProfileBlockEnter(const stripe::Block& block);
