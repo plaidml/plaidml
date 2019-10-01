@@ -3,6 +3,7 @@
 #include "pmlc/dialect/stripe/dialect.h"
 
 #include "mlir/IR/Dialect.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/dialect/stripe/ops.h"
 
@@ -16,13 +17,17 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addTypes<          //
       AffineType,    //
       ExecutorType,  //
-      PrngType,      //
       TensorType,    //
       TensorRefType>();
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/stripe/ops.cpp.inc"
       >();
+}
+
+mlir::Identifier Dialect::getDialectAttrName(mlir::MLIRContext* ctx, llvm::StringRef name) {
+  auto dialectName = llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name);
+  return mlir::Identifier::get(dialectName.str(), ctx);
 }
 
 mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const {
@@ -58,15 +63,11 @@ static void print(TensorRefType type, llvm::raw_ostream& os) {
   os << "tensor_ref " << type.getElementType() << ":" << std::to_string(type.getRank());
 }
 
-static void print(PrngType type, llvm::raw_ostream& os) { os << "prng"; }
-
 void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
   if (auto affineType = type.dyn_cast<AffineType>()) {
     print(affineType, os);
   } else if (auto executorType = type.dyn_cast<ExecutorType>()) {
     print(executorType, os);
-  } else if (auto prngType = type.dyn_cast<PrngType>()) {
-    print(prngType, os);
   } else if (auto tensorType = type.dyn_cast<TensorType>()) {
     print(tensorType, os);
   } else if (auto tensorRefType = type.dyn_cast<TensorRefType>()) {

@@ -165,6 +165,32 @@ def AsUIntOp : CastOp<"as_uint"> {
   let results = (outs Eltwise_UnsignedTensor:$result);
 }
 
+def AsBoolOp : EltwiseOp<"as_bool", [NoSideEffect]> {
+  let summary = "cast into boolean operation";
+  let arguments = (ins Eltwise_AnyTensor:$in, TypeAttr:$type);
+  let results = (outs Eltwise_BoolTensor:$result);
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
+      result->addOperands(operands);
+      result->addAttribute("type", TypeAttr::get(getResultType(operands)));
+      result->addTypes(getResultType(operands));
+    }]
+  >, OpBuilder<
+    "Builder* builder, OperationState* result, ScalarType type, Value* val", [{
+      build(builder, result, type, std::vector<Value*>({val}));
+    }]
+  >];
+
+  let extraClassDeclaration = [{
+    static constexpr int operands() { return 1; }
+    static Type getResultType(ArrayRef<Value*> operands) {
+      auto tensorType = GetTensorType(operands[0]->getType());
+      auto elementType = ScalarType::get(operands[0]->getContext(), DataType::BOOLEAN);
+      return RankedTensorType::get(tensorType.getShape(), elementType);
+    }
+  }];
+}
+
 def AbsOp : UnaryOp<"abs">;
 def ACosOp : UnaryFloatOp<"acos">;
 def AddOp : BinaryOp<"add", [Commutative]>;

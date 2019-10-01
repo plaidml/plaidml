@@ -486,6 +486,14 @@ class StripeGenerator {
       auto input_type = GetShape(input).type;
       output_type = CommonSupertype(input_type, output_type);
     }
+
+    // Clean up the semantics of cond to be more strict at the Stripe level
+    if (op.f.fn == "cond" && GetShape(op.inputs[0]).type != tile::DataType::BOOLEAN) {
+      std::string oname = ScalarName(op.inputs[0] + "_cast");
+      AddIntrinsic(kernel.get(), "as_bool", tile::DataType::BOOLEAN, {scalar_inputs[0]}, {oname});
+      scalar_inputs[0] = oname;
+    }
+
     AddIntrinsic(  //
         kernel.get(), op.f.fn, output_type, scalar_inputs, {ScalarName(op.output)});
 

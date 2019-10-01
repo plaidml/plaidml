@@ -21,8 +21,6 @@ enum Kinds {
   Affine = Type::Kind::FIRST_PRIVATE_EXPERIMENTAL_1_TYPE,
   // An executor (entity that can evaluate computations)
   Executor,
-  // A PRNG state
-  Prng,
   // A fully-sized tensor with a memory layout
   Tensor,
   // A tensor reference
@@ -179,6 +177,10 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
     return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const);
   }
 
+  static TensorRefType get(TensorType type) {
+    return Base::get(type.getContext(), Types::TensorRef, type.getElementType(), type.getRank(), type.is_const());
+  }
+
   /// Return the element type.
   Type getElementType() const { return getImpl()->elementType; }
 
@@ -187,14 +189,6 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
 
   /// Check if things are const
   bool is_const() const { return getImpl()->is_const; }
-};
-
-// A PRNG state.
-class PrngType : public Type::TypeBase<PrngType, Type> {
- public:
-  using Base::Base;
-  static bool kindof(unsigned kind) { return kind == Types::Prng; }
-  static PrngType get(MLIRContext* context) { return Base::get(context, Types::Prng); }
 };
 
 }  // namespace stripe

@@ -631,6 +631,24 @@ std::tuple<IndexBounds, SimpleConstraints> Contraction::ComputeBounds(llvm::Arra
   return constraints.ComputeBounds();
 }
 
+math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds) {
+  math::Affine result;
+  for (const auto& term : poly.getMap()) {
+    if (denominator(term.second) != 1) {
+      throw std::runtime_error("Non-integer polynomial in Integerize");
+    }
+    auto int_value = static_cast<int64_t>(numerator(term.second));
+    if (term.first.empty()) {
+      result += int_value;
+    } else {
+      const auto& bound = bounds.at(term.first);
+      result += int_value * bound.min;
+      result += math::Affine(term.first, int_value);
+    }
+  }
+  return result;
+}
+
 }  // namespace tile
 }  // namespace dialect
 }  // namespace pmlc

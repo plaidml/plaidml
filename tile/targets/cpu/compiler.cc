@@ -706,14 +706,17 @@ void Compiler::Visit(const stripe::Special& special) {
   // tile/lang/gen_special.cc. The spec lists "zero", "copy", and "reshape",
   // while gen_special.cc uses "gather", "scatter", "shape", and "prng_step".
   static std::map<std::string, std::function<void(Compiler*, const stripe::Special&)>> handlers{
-      {"zero", &Compiler::Zero},           //
-      {"copy", &Compiler::Copy},           //
-      {"reshape", &Compiler::Reshape},     //
-      {"prng_step", &Compiler::PrngStep},  //
-      {"shape", &Compiler::Shape},         //
-      {"agg_init", &Compiler::AggInit},    //
-      {"scatter", &Compiler::Scatter},     //
-      {"gather", &Compiler::Gather},       //
+      {"zero", &Compiler::Zero},                //
+      {"copy", &Compiler::Copy},                //
+      {"reshape", &Compiler::Reshape},          //
+      {"prng_step", &Compiler::PrngStep},       //
+      {"shape", &Compiler::Shape},              //
+      {"agg_init_add", &Compiler::AggInitAdd},  //
+      {"agg_init_mul", &Compiler::AggInitMul},  //
+      {"agg_init_min", &Compiler::AggInitMin},  //
+      {"agg_init_max", &Compiler::AggInitMax},  //
+      {"scatter", &Compiler::Scatter},          //
+      {"gather", &Compiler::Gather},            //
   };
   auto it = handlers.find(special.name);
   if (it == handlers.end()) {
@@ -772,6 +775,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"as_float", &Compiler::AsFloat},
       {"as_int", &Compiler::AsInt},
       {"as_uint", &Compiler::AsUInt},
+      {"as_bool", &Compiler::AsBool},
       {"floor", &Compiler::Floor},
       {"ceil", &Compiler::Ceil},
       {"round", &Compiler::Round},
@@ -1297,6 +1301,14 @@ void Compiler::AsUInt(const stripe::Intrinsic& stmt) {
   ret.value->setName(stmt.outputs[0]);
 }
 
+void Compiler::AsBool(const stripe::Intrinsic& stmt) {
+  assert(1 == stmt.inputs.size());
+  Scalar ret = Cast(scalars_[stmt.inputs[0]], DataType::BOOLEAN);
+  assert(1 == stmt.outputs.size());
+  scalars_[stmt.outputs[0]] = ret;
+  ret.value->setName(stmt.outputs[0]);
+}
+
 void Compiler::BitRight(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
   Scalar lhs = Cast(scalars_[stmt.inputs[0]], stmt.type);
@@ -1412,13 +1424,37 @@ void Compiler::Shape(const stripe::Special& shape) {
   }
 }
 
-void Compiler::AggInit(const stripe::Special& agg_init) {
+void Compiler::AggInitAdd(const stripe::Special& agg_init) {
   // One output: a tensor to initialize.
-  // The initialization value depends on the refinement's agg_op.
-  // Iterate over each dimension and write to each element.
   assert(0 == agg_init.inputs.size());
   assert(1 == agg_init.outputs.size());
-  Buffer dest = buffers_[agg_init.outputs[0]];
+  AggInit(buffers_[agg_init.outputs[0]], "add");
+}
+
+void Compiler::AggInitMul(const stripe::Special& agg_init) {
+  // One output: a tensor to initialize.
+  assert(0 == agg_init.inputs.size());
+  assert(1 == agg_init.outputs.size());
+  AggInit(buffers_[agg_init.outputs[0]], "mul");
+}
+
+void Compiler::AggInitMin(const stripe::Special& agg_init) {
+  // One output: a tensor to initialize.
+  assert(0 == agg_init.inputs.size());
+  assert(1 == agg_init.outputs.size());
+  AggInit(buffers_[agg_init.outputs[0]], "min");
+}
+
+void Compiler::AggInitMax(const stripe::Special& agg_init) {
+  // One output: a tensor to initialize.
+  assert(0 == agg_init.inputs.size());
+  assert(1 == agg_init.outputs.size());
+  AggInit(buffers_[agg_init.outputs[0]], "max");
+}
+
+void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
+  // The initialization value depends on the refinement's agg_op.
+  // Iterate over each dimension and write to each element.
   auto& dest_shape = dest.refinement->interior_shape;
   size_t dest_ndims = dest_shape.dims.size();
 
@@ -1456,7 +1492,6 @@ void Compiler::AggInit(const stripe::Special& agg_init) {
   }
 
   // Select the initialization value for this refinement's agg_op.
-  std::string agg_op = dest.refinement->agg_op;
   size_t bits = bit_width(dest_shape.type);
   llvm::Type* eltype = CType(dest_shape.type);
   llvm::Value* init_val = nullptr;
