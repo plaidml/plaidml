@@ -1684,7 +1684,7 @@ def softplus(x):
 
 @_log_call
 def softsign(x):
-    _report_unimplemented('softsign')
+    return x/(1 + abs(x))
 
 
 @_log_call
