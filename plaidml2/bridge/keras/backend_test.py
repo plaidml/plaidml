@@ -1253,6 +1253,14 @@ class TestBackendOps(unittest.TestCase):
         a = b.constant(5, shape=(10,))
         return a
 
+    def testIsPlaceholder(self):
+        x = pkb.placeholder((4, 3))
+        self.assertTrue(pkb.is_placeholder(x))
+        y = pkb.variable(m(2, 2))
+        self.assertFalse(pkb.is_placeholder(y))
+        z = pkb.exp(x)
+        self.assertFalse(pkb.is_placeholder(z))
+
     # Note: we skip tensorflow since init_global must be called in the middle of this function
     # for correct semantics, and Theano is sufficient.
     @compareForwardExact(skip_tensorflow=True)
