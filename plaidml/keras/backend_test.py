@@ -825,6 +825,10 @@ class TestBackendOps(unittest.TestCase):
     def testSoftplus(self, b, x):
         return [b.softplus(x)]
 
+    @opTest([[m(1, 3, 4)], [m(7, 19) - 10.]])
+    def testSoftsign(self, b, x):
+        return [b.softsign(x)]
+
     # TODO: Enable gradients again after we fix the Stripe bug
     @opTest([[m(10, 10)]], do_grads=False)
     def testSign(self, b, x):
