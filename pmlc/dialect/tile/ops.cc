@@ -73,6 +73,14 @@ OpFoldResult AffineNegOp::fold(ArrayRef<Attribute> operands) {
   return constFoldUnaryOp(operands, [](double x) { return -x; });
 }
 
+OpFoldResult AffineMaxOp::fold(ArrayRef<Attribute> operands) {
+  return constFoldBinaryOp(operands, [](double a, double b) { return fmax(a, b); });
+}
+
+OpFoldResult AffineMinOp::fold(ArrayRef<Attribute> operands) {
+  return constFoldBinaryOp(operands, [](double a, double b) { return fmin(a, b); });
+}
+
 OpFoldResult AffineSubOp::fold(ArrayRef<Attribute> operands) {
   // sub(x, x) -> 0
   if (lhs() == rhs()) {

@@ -769,6 +769,14 @@ PLAIDML_EDSL_DEFINE_TENSOR_IDXDIM_BINARY_OPS(-, PLAIDML_INT_OP_SUB, "sub");
 PLAIDML_EDSL_DEFINE_TENSOR_IDXDIM_BINARY_OPS(*, PLAIDML_INT_OP_MUL, "mul");
 PLAIDML_EDSL_DEFINE_TENSOR_IDXDIM_BINARY_OPS(/, PLAIDML_INT_OP_DIV, "div");
 
+#define PLAIDML_EDSL_DEFINE_TENSOR_DIM_BINARY_FN(_fn_, _int_op_)                                                  \
+  inline TensorDim _fn_(const TensorDim& lhs, const TensorDim& rhs) { return TensorDim{_int_op_, {lhs, rhs}}; }   \
+  inline TensorDim _fn_(int64_t lhs, const TensorDim& rhs) { return TensorDim{_int_op_, {TensorDim{lhs}, rhs}}; } \
+  inline TensorDim _fn_(const TensorDim& lhs, int64_t rhs) { return TensorDim{_int_op_, {lhs, TensorDim{rhs}}}; }
+
+PLAIDML_EDSL_DEFINE_TENSOR_DIM_BINARY_FN(max, PLAIDML_INT_OP_MAX);
+PLAIDML_EDSL_DEFINE_TENSOR_DIM_BINARY_FN(min, PLAIDML_INT_OP_MIN);
+
 inline Tensor Tensor::operator-() const { return Call("neg", {*this}); }
 inline Tensor Tensor::operator~() const { return Call("bit_not", {*this}); }
 

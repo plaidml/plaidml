@@ -501,9 +501,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
   if (autopad_mode == AutopadMode::SAME_LOWER || autopad_mode == AutopadMode::SAME_UPPER) {
     TensorDim output_size((I_eff + stride - 1 + ceil_term) / stride);
     int64_t lower_term = (autopad_mode == AutopadMode::SAME_LOWER) ? 1 : 0;
-    // TensorDim pad_before((max(0, (output_size - 1) * stride + F_eff - I_eff) + upper_term) / 2);
-    // TODO: Switch to above once max(TensorDim, TensorDim) is working
-    TensorDim pad_before(((output_size - 1) * stride + F_eff - I_eff + lower_term) / 2);
+    TensorDim pad_before((max(0, (output_size - 1) * stride + F_eff - I_eff) + lower_term) / 2);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
   }
   throw std::runtime_error(str(boost::format("Unexpected autopadding mode: %1%") % to_string(autopad_mode)));
