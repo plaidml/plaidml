@@ -525,6 +525,14 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     indexes_[idx.name].variable = variable;
   }
 
+  // compute the limit value for each loop
+  std::vector<llvm::Value*> limits(block.idxs.size());
+  for (size_t i = 0; i < block.idxs.size(); ++i) {
+    llvm::Value* init = indexes_[block.idxs[i].name].init;
+    llvm::Value* range = IndexConst(block.idxs[i].range);
+    limits[i] = builder_.CreateAdd(init, range);
+  }
+
   // EmitRunTimeLogEntry(block.name, "enter");
   ProfileBlockEnter(block);
 
@@ -537,12 +545,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     llvm::Value* variable = indexes_[name].variable;
     llvm::Value* init = indexes_[name].init;
     InitLoop(&loops[i], variable, init);
-    builder_.SetInsertPoint(loops[i].test);
-    llvm::Value* index = builder_.CreateLoad(variable);
-    llvm::Value* range = IndexConst(block.idxs[i].range);
-    llvm::Value* limit = builder_.CreateAdd(init, range);
-    llvm::Value* go = builder_.CreateICmpULT(index, limit);
-    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
+    TestLoop(&loops[i], variable, limits[i]);
     builder_.SetInsertPoint(loops[i].body);
   }
 
@@ -1463,10 +1466,7 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
     InitLoop(&loops[i], idx_vars[i], IndexConst(0));
-    builder_.SetInsertPoint(loops[i].test);
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
-    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
+    TestLoop(&loops[i], idx_vars[i], limits[i]);
     builder_.SetInsertPoint(loops[i].body);
   }
 
@@ -1572,10 +1572,7 @@ void Compiler::Scatter(const stripe::Special& scatter) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
     InitLoop(&loops[i], idx_vars[i], IndexConst(0));
-    builder_.SetInsertPoint(loops[i].test);
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
-    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
+    TestLoop(&loops[i], idx_vars[i], limits[i]);
     builder_.SetInsertPoint(loops[i].body);
   }
 
@@ -1685,10 +1682,7 @@ void Compiler::Gather(const stripe::Special& gather) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
     InitLoop(&loops[i], idx_vars[i], IndexConst(0));
-    builder_.SetInsertPoint(loops[i].test);
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
-    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
+    TestLoop(&loops[i], idx_vars[i], limits[i]);
     builder_.SetInsertPoint(loops[i].body);
   }
 
@@ -1754,6 +1748,13 @@ void Compiler::InitLoop(Loop* loop, llvm::Value* variable, llvm::Value* init) {
   builder_.SetInsertPoint(loop->init);
   builder_.CreateStore(init, variable);
   builder_.CreateBr(loop->test);
+}
+
+void Compiler::TestLoop(Loop* loop, llvm::Value* variable, llvm::Value* limit) {
+  builder_.SetInsertPoint(loop->test);
+  llvm::Value* idx_val = builder_.CreateLoad(variable);
+  llvm::Value* go = builder_.CreateICmpULT(idx_val, limit);
+  builder_.CreateCondBr(go, loop->body, loop->done);
 }
 
 void Compiler::LeaveLoop(Loop* loop, llvm::Value* variable) {
