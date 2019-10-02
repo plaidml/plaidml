@@ -541,7 +541,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   std::vector<Loop> loops(block.idxs.size());
   for (size_t i = 0; i < block.idxs.size(); ++i) {
     std::string name = block.idxs[i].name;
-    CreateLoop(&loops[i], name, function);
+    CreateLoop(&loops[i], name);
     llvm::Value* variable = indexes_[name].variable;
     llvm::Value* init = indexes_[name].init;
     EnterLoop(&loops[i], variable, init, limits[i]);
@@ -1459,10 +1459,9 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
 
   // Generate the initialization & limit test for each loop.
   std::vector<Loop> loops(dest_ndims);
-  llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
-    CreateLoop(&loops[i], name, parent);
+    CreateLoop(&loops[i], name);
     EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
@@ -1563,10 +1562,9 @@ void Compiler::Scatter(const stripe::Special& scatter) {
 
   // Generate the initialization & limit test for each loop
   std::vector<Loop> loops(data_ndims);
-  llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < data_ndims; ++i) {
     std::string name = std::to_string(i);
-    CreateLoop(&loops[i], name, parent);
+    CreateLoop(&loops[i], name);
     EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
@@ -1671,10 +1669,9 @@ void Compiler::Gather(const stripe::Special& gather) {
 
   // Generate the initialization & limit test for each loop
   std::vector<Loop> loops(dest_ndims);
-  llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
-    CreateLoop(&loops[i], name, parent);
+    CreateLoop(&loops[i], name);
     EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
@@ -1728,7 +1725,8 @@ void Compiler::Gather(const stripe::Special& gather) {
   }
 }
 
-void Compiler::CreateLoop(Loop* loop, std::string name, llvm::Function* func) {
+void Compiler::CreateLoop(Loop* loop, std::string name) {
+  llvm::Function* func = builder_.GetInsertBlock()->getParent();
   loop->init = llvm::BasicBlock::Create(context_, "init_" + name, func);
   loop->test = llvm::BasicBlock::Create(context_, "test_" + name, func);
   loop->body = llvm::BasicBlock::Create(context_, "body_" + name, func);

@@ -146,7 +146,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   };
 
  private:
-  void CreateLoop(Loop* loop, std::string name, llvm::Function* func);
+  void CreateLoop(Loop* loop, std::string name);
   void InitLoop(Loop* loop, llvm::Value* variable, llvm::Value* initializer);
   void TestLoop(Loop* loop, llvm::Value* variable, llvm::Value* limit);
   void EnterLoop(Loop* loop, llvm::Value* variable, llvm::Value* init, llvm::Value* limit);
