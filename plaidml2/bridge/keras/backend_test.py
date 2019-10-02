@@ -1334,10 +1334,11 @@ class TestBackendOps(unittest.TestCase):
 
     @compareForwardClose()
     def testNormalizeBatchInTrainingWeirdMultiAxis(self, b):
+        # These shapes are pretty much nonsense, but TF figures it out (via reshape) so we should too
         return b.normalize_batch_in_training(
             b.variable(n(2, 3, 5, 7)),
-            b.constant(11, shape=(1, 3, 1, 1)),
-            b.constant(0, shape=(1, 3, 1, 1)),
+            b.constant(11, shape=(3, 1, 1, 1, 1, 1, 1, 1)),
+            b.constant(0, shape=(3, 1)),
             [0, 2, 3],
         )[2]
 
