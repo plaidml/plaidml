@@ -544,9 +544,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     CreateLoop(&loops[i], name, function);
     llvm::Value* variable = indexes_[name].variable;
     llvm::Value* init = indexes_[name].init;
-    InitLoop(&loops[i], variable, init);
-    TestLoop(&loops[i], variable, limits[i]);
-    builder_.SetInsertPoint(loops[i].body);
+    EnterLoop(&loops[i], variable, init, limits[i]);
   }
 
   // check the constraints against the current index values and decide whether
@@ -1465,9 +1463,7 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    InitLoop(&loops[i], idx_vars[i], IndexConst(0));
-    TestLoop(&loops[i], idx_vars[i], limits[i]);
-    builder_.SetInsertPoint(loops[i].body);
+    EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
   // Select the initialization value for this refinement's agg_op.
@@ -1571,9 +1567,7 @@ void Compiler::Scatter(const stripe::Special& scatter) {
   for (size_t i = 0; i < data_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    InitLoop(&loops[i], idx_vars[i], IndexConst(0));
-    TestLoop(&loops[i], idx_vars[i], limits[i]);
-    builder_.SetInsertPoint(loops[i].body);
+    EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
   // Body of the loop nest
@@ -1681,9 +1675,7 @@ void Compiler::Gather(const stripe::Special& gather) {
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    InitLoop(&loops[i], idx_vars[i], IndexConst(0));
-    TestLoop(&loops[i], idx_vars[i], limits[i]);
-    builder_.SetInsertPoint(loops[i].body);
+    EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
   // Body of the loop nest: look up an index value from "indexes" using the
@@ -1755,6 +1747,12 @@ void Compiler::TestLoop(Loop* loop, llvm::Value* variable, llvm::Value* limit) {
   llvm::Value* idx_val = builder_.CreateLoad(variable);
   llvm::Value* go = builder_.CreateICmpULT(idx_val, limit);
   builder_.CreateCondBr(go, loop->body, loop->done);
+}
+
+void Compiler::EnterLoop(Loop* loop, llvm::Value* variable, llvm::Value* init, llvm::Value* limit) {
+  InitLoop(loop, variable, init);
+  TestLoop(loop, variable, limit);
+  builder_.SetInsertPoint(loop->body);
 }
 
 void Compiler::LeaveLoop(Loop* loop, llvm::Value* variable) {
