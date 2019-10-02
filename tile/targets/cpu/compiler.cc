@@ -1389,8 +1389,8 @@ void Compiler::PrngStep(const stripe::Special& prng_step) {
   Buffer out_state = buffers_[prng_step.outputs[0]];
   assert(out_state.refinement->interior_shape == in_state.refinement->interior_shape);
   Buffer dest = buffers_[prng_step.outputs[1]];
-  llvm::Type* int32ptrType = builder_.getInt32Ty()->getPointerTo();
-  llvm::Value* dest_arg = builder_.CreateBitCast(dest.base, int32ptrType);
+  llvm::Type* floatPtrType = builder_.getFloatTy()->getPointerTo();
+  llvm::Value* dest_arg = builder_.CreateBitCast(dest.base, floatPtrType);
   size_t dest_bytes = dest.refinement->interior_shape.byte_size();
   llvm::Value* count = IndexConst(dest_bytes / sizeof(uint32_t));
   std::vector<llvm::Value*> args{in_state.base, out_state.base, dest_arg, count};
@@ -1950,7 +1950,7 @@ llvm::Value* Compiler::RunTimeLogEntry(void) {
   std::vector<llvm::Type*> argtypes{
       builder_.getInt8Ty()->getPointerTo(),
       builder_.getInt8Ty()->getPointerTo(),
-      builder_.getInt64Ty(),
+      builder_.getFloatTy(),
   };
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
@@ -1964,9 +1964,9 @@ void Compiler::EmitRunTimeLogEntry(const std::string& str, const std::string& ex
       builder_.CreateGlobalStringPtr(extra),
   };
   if (value) {
-    log_args.push_back(builder_.CreatePtrToInt(value, builder_.getInt64Ty()));
+    log_args.push_back(value);
   } else {
-    log_args.push_back(builder_.getInt64(0));
+    log_args.push_back(llvm::ConstantFP::get(builder_.getFloatTy(), 0.0));
   }
   auto buffer = builder_.CreateCall(RunTimeLogEntry(), log_args, "");
 }
@@ -1982,8 +1982,9 @@ void Compiler::Free(llvm::Value* buffer) {
 }
 
 llvm::Value* Compiler::PrngStepFunction(void) {
+  llvm::Type* floatPtrType = builder_.getFloatTy()->getPointerTo();
   llvm::Type* int32ptrType = builder_.getInt32Ty()->getPointerTo();
-  std::vector<llvm::Type*> argtypes{int32ptrType, int32ptrType, int32ptrType, IndexType()};
+  std::vector<llvm::Type*> argtypes{int32ptrType, int32ptrType, floatPtrType, IndexType()};
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
   const char* funcname = "prng_step";

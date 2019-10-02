@@ -113,14 +113,14 @@ namespace rt {
 // that we won't be able to resolve from system libraries.
 float h2f(half_float::half n) { return n; }
 half_float::half f2h(float n) { return half_float::half_cast<half_float::half>(n); }
-void prng_step(uint32_t* in_state, uint32_t* out_state, uint32_t* buf, size_t count) {
+void prng_step(uint32_t* in_state, uint32_t* out_state, float* buf, size_t count) {
   // A reimplementation of the PRNG from tile/lang/gen_special.cc.
   // x_n = (s1_n ^ s2_n ^ s3_n)
   // s1_{n+1} = (((s1_n & 4294967294) <<12) ^ (((s1_n <<13) ^ s1_n) >>19))
   // s2_{n+1} = (((s2_n & 4294967288) << 4) ^ (((s2_n << 2) ^ s2_n) >>25))
   // s3_{n+1} = (((s3_n & 4294967280) <<17) ^ (((s3_n << 3) ^ s3_n) >>11))
   for (size_t i = 0; i < count; ++i) {
-    buf[i] = in_state[0] ^ in_state[1] ^ in_state[2];
+    buf[i] = (in_state[0] ^ in_state[1] ^ in_state[2]) / 4294967296.0;
     out_state[0] = (((in_state[0] & 4294967294) << 12) ^ (((in_state[0] << 13) ^ in_state[0]) >> 19));
     out_state[1] = (((in_state[1] & 4294967288) << 4) ^ (((in_state[1] << 2) ^ in_state[1]) >> 25));
     out_state[2] = (((in_state[2] & 4294967280) << 17) ^ (((in_state[2] << 3) ^ in_state[2]) >> 11));
@@ -128,8 +128,8 @@ void prng_step(uint32_t* in_state, uint32_t* out_state, uint32_t* buf, size_t co
   }
 }
 
-void RunTimeLogEntry(char* str, char* extra, uint64_t address) {
-  IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ": 0x" << std::hex << address);
+void RunTimeLogEntry(char* str, char* extra, float address) {
+  IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ":" /* 0x" << std::hex */ << address);
 }
 
 }  // namespace rt
