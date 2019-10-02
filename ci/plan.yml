@@ -54,11 +54,11 @@ PLATFORMS:
   keras-plaid-mtl-hd630:
     variant: macos_x86_64
   keras-plaid-mtl-uhd630:
-    variant: macos_x86_64  
+    variant: macos_x86_64
   keras-stripe-mtl-uhd630:
     variant: macos_x86_64
   keras-plaid-mtl-iris655:
-    variant: macos_x86_64  
+    variant: macos_x86_64
   keras-plaid-ocl-neo:
     variant: linux_x86_64
   keras-plaid-ocl-gtx1050:
@@ -104,6 +104,7 @@ VARIANTS:
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
   macos_x86_64:
+    bazel_config: macos_x86_64_ci
     arch: macosx_10_10_x86_64
     system: Darwin
     env:
@@ -115,7 +116,7 @@ VARIANTS:
     arch: win_amd64
     system: Windows
     env:
-      PLAIDML_DEVICE_IDS: opencl_cpu.0
+      PLAIDML_DEVICE_IDS: llvm_cpu.0
       PLAIDML_EXPERIMENTAL: 1
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu

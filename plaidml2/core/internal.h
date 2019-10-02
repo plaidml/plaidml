@@ -44,7 +44,13 @@ struct plaidml_view {
 namespace plaidml {
 namespace core {
 
-vertexai::tile::Platform* GetPlatform();
+struct PlatformHolder {
+  PlatformHolder();
+  std::unique_ptr<vertexai::tile::Platform> platform;
+  vertexai::tile::Platform* operator->() { return platform.get(); }
+};
+
+PlatformHolder& GetPlatform();
 
 template <typename T, typename F>
 T ffi_wrap(plaidml_error* err, T val, F fn) {

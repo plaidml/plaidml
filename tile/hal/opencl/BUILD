@@ -62,24 +62,24 @@ plaidml_cc_library(
         "zero_kernel.cc",
         "zero_kernel.h",
     ],
-    tags = ["opencl"],
     hdrs = [
         "emitocl.h",
         "info.h",
     ],
+    tags = ["opencl"],
     visibility = ["//visibility:public"],
     deps = [
         ":proto_cc",
         "//base/shim/opencl",
         "//base/util",
-        "@boost//:filesystem",
-        "@boost//:regex",
         "//tile/base",
         "//tile/base:hal",
         "//tile/hal/util:selector",
         "//tile/lang",
         "//tile/proto:proto_cc",
         "//tile/proto:support",
+        "@boost//:filesystem",
+        "@boost//:regex",
     ],
     alwayslink = 1,
 )
@@ -87,7 +87,10 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "platform_test",
     srcs = ["platform_test.cc"],
-    tags = ["opencl"],
+    tags = [
+        "not_ci",
+        "opencl",
+    ],
     deps = [
         ":opencl",
         "//tile/base:platform_test",
