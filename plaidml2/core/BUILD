@@ -52,7 +52,6 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//pmlc/dialect/tile",
-        "//tile/hal/cpu",
         "//tile/hal/opencl",
         "//tile/lang",
         "//tile/lang/ast",
