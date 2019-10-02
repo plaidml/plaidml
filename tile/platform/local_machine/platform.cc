@@ -17,19 +17,24 @@
 #include "base/util/type_url.h"
 #include "tile/hal/util/selector.h"
 #include "tile/hal/util/settings.h"
+#include "tile/lang/parser.h"
 #include "tile/platform/local_machine/block_placer.h"
 #include "tile/platform/local_machine/buffer.h"
+#include "tile/platform/local_machine/cpu_program.h"
 #include "tile/platform/local_machine/direct_mem_strategy.h"
 #include "tile/platform/local_machine/fifo_scheduler.h"
 #include "tile/platform/local_machine/loose_scheduler.h"
 #include "tile/platform/local_machine/program.h"
 #include "tile/platform/local_machine/tdep_scheduler.h"
 #include "tile/platform/local_machine/tmp_mem_strategy.h"
+#include "tile/proto/support.h"
 
 namespace vertexai {
 namespace tile {
 namespace local_machine {
 namespace {
+
+const char* kCpuDevice = "llvm_cpu.0";
 
 void GetMemStrategy(const std::shared_ptr<DevInfo>& devinfo, Platform::PlatformDev* pd) {
   if (devinfo->dev->executor() && devinfo->dev->executor()->shared_memory()) {
@@ -208,17 +213,38 @@ void Platform::RegisterCostModel(const lang::TileCostFunction& cost_fn) { tile_o
 
 std::shared_ptr<tile::Buffer> Platform::MakeBuffer(const context::Context& ctx, const std::string& device_id,
                                                    std::uint64_t size) {
+  if (device_id == kCpuDevice) {
+    return std::make_shared<SimpleBuffer>(size);
+  }
   auto& platform_dev = LookupDevice(device_id);
   return std::make_shared<Buffer>(platform_dev.devinfo, platform_dev.mem_strategy, size);
 }
 
-std::unique_ptr<tile::Program> Platform::MakeProgram(const context::Context& ctx, const tile::proto::Program& program,
-                                                     ConstBufferManager* const_bufs) {
-  auto& platform_dev = LookupDevice(program.dev_id());
-  return std::make_unique<Program>(ctx, program, platform_dev.devinfo, platform_dev.scheduler,
-                                   platform_dev.mem_strategy,
-                                   std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source),
-                                   platform_dev.tmp_mem_source, tile_optimizer_, const_bufs);
+std::unique_ptr<tile::Program> Platform::MakeProgram(  //
+    const context::Context& ctx,                       //
+    const tile::proto::Program& program,               //
+    ConstBufferManager* const_bufs) {
+  if (program.dev_id() == kCpuDevice) {
+    lang::Parser parser;
+    lang::RunInfo runinfo;
+    runinfo.program = parser.Parse(program.code());
+    runinfo.input_shapes = FromProto(program.inputs());
+    runinfo.output_shapes = FromProto(program.outputs());
+    runinfo.program_name = "stripe_program";
+    return std::make_unique<CpuProgram>("llvm_cpu", runinfo, const_bufs);
+  }
+  const auto& platform_dev = LookupDevice(program.dev_id());
+  auto tmp_strategy = std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source);
+  return std::make_unique<Program>(  //
+      ctx,                           //
+      program,                       //
+      platform_dev.devinfo,          //
+      platform_dev.scheduler,        //
+      platform_dev.mem_strategy,     //
+      tmp_strategy,                  //
+      platform_dev.tmp_mem_source,   //
+      tile_optimizer_,               //
+      const_bufs);
 }
 
 std::shared_ptr<tile::Program> Platform::MakeProgram(  //
@@ -227,15 +253,20 @@ std::shared_ptr<tile::Program> Platform::MakeProgram(  //
     const std::string& target,                         //
     const std::shared_ptr<stripe::Program>& program,   //
     ConstBufferManager* const_bufs) {
-  auto& platform_dev = LookupDevice(device);
+  if (device == kCpuDevice) {
+    return std::make_unique<CpuProgram>(target, program, const_bufs);
+  }
+  const auto& platform_dev = LookupDevice(device);
+  auto tmp_strategy = std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source);
   return std::make_shared<Program>(  //
       ctx,                           //
       program,                       //
       target,                        //
       platform_dev.devinfo,          //
       platform_dev.scheduler,        //
-      platform_dev.mem_strategy, std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source),
-      platform_dev.tmp_mem_source,  //
+      platform_dev.mem_strategy,     //
+      tmp_strategy,                  //
+      platform_dev.tmp_mem_source,   //
       const_bufs);
 }
 
@@ -253,18 +284,23 @@ void _fill_device(const Platform::PlatformDev& pdev, tile::proto::Device* dev) {
   dev->set_config(buf);
 }
 
-void Platform::ListDevices(const context::Context& ctx, const tile::proto::ListDevicesRequest& request,
-                           tile::proto::ListDevicesResponse* response) {
+void Platform::ListDevices(                          //
+    const context::Context& ctx,                     //
+    const tile::proto::ListDevicesRequest& request,  //
+    tile::proto::ListDevicesResponse* response) {
   for (const auto& dev : devs_) {
     _fill_device(dev.second, response->add_devices());
   }
   for (const auto& dev : unmatched_devs_) {
     _fill_device(dev.second, response->add_unmatched_devices());
   }
+  tile::proto::Device* dev = response->add_devices();
+  dev->set_dev_id(kCpuDevice);
+  dev->set_description("CPU (via LLVM)");
 }
 
 std::vector<std::string> Platform::ListDevices() {
-  std::vector<std::string> device_ids;
+  std::vector<std::string> device_ids{kCpuDevice};
   for (const auto& kvp : devs_) {
     device_ids.push_back(kvp.first);
   }

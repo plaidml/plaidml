@@ -11,9 +11,40 @@ def unittest_config():
 
 
 def config():
-    filename = os.getenv('PLAIDML_CONFIG_FILE', '../com_intel_plaidml/plaidml/experimental.json')
-    with open(filename) as file_:
-        return file_.read()
+    return '''
+{
+    "platform": {
+        "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+        "hardware_configs": [
+            {
+                "description": "CPU (via LLVM) settings",
+                "sel": {
+                    "and": {
+                        "sel": [
+                            {
+                                "name_regex": "LLVM CPU"
+                            },
+                            {
+                                "vendor_regex": "LLVM"
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "vec_size": 32,
+                    "mem_width": 4096,
+                    "use_global": true,
+                    "max_regs": 8192,
+                    "max_mem": 8192,
+                    "goal_flops_per_byte": 20,
+                    "stripe_config": "llvm_cpu",
+                    "use_stripe": true
+                }
+            }
+        ]
+    }
+}
+'''
 
 
 def very_large_values_config():

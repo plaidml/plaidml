@@ -11,7 +11,6 @@
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
 #include "tile/platform/local_machine/platform.h"
-#include "tile/platform/stripejit/platform.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
@@ -28,22 +27,9 @@ extern const char* PLAIDML_VERSION;
 namespace plaidml {
 namespace core {
 
-Platform* GetLocalPlatform() {
+Platform* GetPlatform() {
   static vertexai::tile::local_machine::Platform platform;
   return &platform;
-}
-
-Platform* GetJitPlatform() {
-  static vertexai::tile::stripejit::Platform platform;
-  return &platform;
-}
-
-Platform* GetPlatform() {
-  auto target = vertexai::env::Get("PLAIDML_DEVICE");
-  if (target == "llvm_cpu.0") {
-    return GetJitPlatform();
-  }
-  return GetLocalPlatform();
 }
 
 }  // namespace core

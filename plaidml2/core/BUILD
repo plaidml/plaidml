@@ -16,11 +16,11 @@ exports_files([
 
 pkg_tar(
     name = "include_pkg",
-    package_dir = "include/plaidml2/core",
     srcs = [
         "core.h",
         "ffi.h",
     ],
+    package_dir = "include/plaidml2/core",
     visibility = ["//visibility:public"],
 )
 
@@ -57,7 +57,6 @@ plaidml_cc_library(
         "//tile/lang",
         "//tile/lang/ast",
         "//tile/platform/local_machine",
-        "//tile/platform/stripejit",
         "//tile/targets",
         "@boost//:filesystem",
     ] + select({

@@ -16,9 +16,7 @@ std::unique_ptr<tile::Platform> PlatformFactory::MakeTypedInstance(const context
 }
 
 [[gnu::unused]] char reg = []() -> char {
-  if (!(env::Get("STRIPE_JIT") == "1")) {
-    AnyFactoryMap<tile::Platform>::Instance()->Register(std::make_unique<PlatformFactory>());
-  }
+  AnyFactoryMap<tile::Platform>::Instance()->Register(std::make_unique<PlatformFactory>());
   return 0;
 }();
 
