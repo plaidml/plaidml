@@ -21,7 +21,7 @@ dependencies:
     - matplotlib
     - networkx
     - pandas
-    - pcpp
+    - pcpp==1.20.1
     - pystache
     - pyyaml
     - requests

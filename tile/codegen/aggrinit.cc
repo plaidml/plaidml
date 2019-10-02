@@ -26,7 +26,7 @@ void AggregationBlockOutputInitialization(const stripe::Block* const block,
   // do not emit duplicated local declarations.
   std::set<std::string> dup_ref;
 
-  // Now, add any new locals
+  // Now, add any new locals that have agg_op.
   for (const auto& ref : block->refs) {
     if (ref.dir == stripe::RefDir::None && dup_ref.find(ref.into()) == dup_ref.end() && !ref.has_tag("user")) {
       std::string aggOp = ref.agg_op;
@@ -63,7 +63,7 @@ void AggregationBlockOutputInitialization(const stripe::Block* const block,
 
   if (prevRefIter->agg_op == "" || prevRefIter->agg_op == "assign") {
     const_cast<AggregationBlockOutputInitializationPass*>(aggregationPass)
-        ->AddRefinementToInit(const_cast<stripe::Block*>(prevBlock), dest, block, aggOp);
+        ->AddRefinementToInit(const_cast<stripe::Block*>(prevBlock), &(*prevRefIter), block, aggOp);
   } else {
     if (prevRefIter->agg_op != aggOp) {
       // TODO: Create a temp buffer here.
