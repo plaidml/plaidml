@@ -7,6 +7,7 @@ import operator
 import os
 import sys
 import unittest
+import warnings
 from collections import OrderedDict
 
 # Make sure we win the race with TF to load libstdc++...
@@ -15,8 +16,11 @@ from plaidml2.ffi import Error as pml2_ffi_Error
 
 import numpy as np
 import numpy.testing as npt
+warnings.simplefilter(action='ignore', category=FutureWarning)
 # Tensorflow needs some code called directly
 import tensorflow
+# Removes (almost) all tensorflow deprecation warnings
+tensorflow.compat.v1.logging.set_verbosity(tensorflow.compat.v1.logging.ERROR)
 # Theano breaks on convolution if given a default optimizer
 import theano
 from keras.backend import floatx

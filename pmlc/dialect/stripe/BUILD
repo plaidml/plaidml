@@ -91,6 +91,7 @@ plaidml_cc_library(
         "@mlir//:IR",
         "@mlir//:StandardOps",
         "@mlir//:Transforms",
+	"@mlir//:Parser",
     ],
     alwayslink = 1,
 )
