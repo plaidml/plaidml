@@ -529,18 +529,14 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   ProfileBlockEnter(block);
 
   // generate the basic blocks for each nested loop's evaluation stages
+  // initialize each loop index and generate the termination check
   std::vector<Loop> loops(block.idxs.size());
   for (size_t i = 0; i < block.idxs.size(); ++i) {
     std::string name = block.idxs[i].name;
     CreateLoop(&loops[i], name, function);
-  }
-
-  // initialize each loop index and generate the termination check
-  for (size_t i = 0; i < block.idxs.size(); ++i) {
-    builder_.CreateBr(loops[i].init);
     builder_.SetInsertPoint(loops[i].init);
-    llvm::Value* variable = indexes_[block.idxs[i].name].variable;
-    llvm::Value* init = indexes_[block.idxs[i].name].init;
+    llvm::Value* variable = indexes_[name].variable;
+    llvm::Value* init = indexes_[name].init;
     builder_.CreateStore(init, variable);
     builder_.CreateBr(loops[i].test);
     builder_.SetInsertPoint(loops[i].test);
@@ -1472,7 +1468,6 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    builder_.CreateBr(loops[i].init);
     builder_.SetInsertPoint(loops[i].init);
     builder_.CreateStore(IndexConst(0), idx_vars[i]);
     builder_.CreateBr(loops[i].test);
@@ -1588,7 +1583,6 @@ void Compiler::Scatter(const stripe::Special& scatter) {
   for (size_t i = 0; i < data_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    builder_.CreateBr(loops[i].init);
     builder_.SetInsertPoint(loops[i].init);
     builder_.CreateStore(IndexConst(0), idx_vars[i]);
     builder_.CreateBr(loops[i].test);
@@ -1708,7 +1702,6 @@ void Compiler::Gather(const stripe::Special& gather) {
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    builder_.CreateBr(loops[i].init);
     builder_.SetInsertPoint(loops[i].init);
     builder_.CreateStore(IndexConst(0), idx_vars[i]);
     builder_.CreateBr(loops[i].test);
@@ -1778,6 +1771,7 @@ void Compiler::CreateLoop(Loop* loop, std::string name, llvm::Function* func) {
   loop->test = llvm::BasicBlock::Create(context_, "test_" + name, func);
   loop->body = llvm::BasicBlock::Create(context_, "body_" + name, func);
   loop->done = llvm::BasicBlock::Create(context_, "done_" + name, func);
+  builder_.CreateBr(loop->init);
 }
 
 Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {
