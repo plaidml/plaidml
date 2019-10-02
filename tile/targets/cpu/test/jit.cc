@@ -771,7 +771,10 @@ TEST(Jit, JitExpSub3Nested) {
         }
       ]
 
-      stmts { block {
+      stmts { special { name:"zero" outputs:"X_T1" } }
+      stmts { special { name:"agg_init_add" outputs:"X_T4" } }
+      stmts { 
+        block {
         idxs { name: "i1" range: 3 }
         refs [
           {
@@ -943,6 +946,10 @@ TEST(Jit, JitExpSub4Nested) {
           }
         }
       ]
+
+      stmts { special { name:"zero" outputs:"X_T1" } }
+      stmts { special { name:"agg_init_add" outputs:"X_T4" } }
+      stmts { special { name:"zero" outputs:"X_T6" } }
 
       stmts { block {
         idxs { name: "i1" range: 3 }
