@@ -55,29 +55,15 @@ PLAIDML_CPP_DEPS = [
     "@boost//:filesystem",
     "@half",
     "@minizip",
+    "//tile/hal/opencl",
 ] + select({
-    "//toolchain:linux_arm_32v7": [
-        "//tile/hal/opencl",
-    ],
-    "//toolchain:linux_arm_64v8": [
-        "//tile/hal/opencl",
-    ],
     "//toolchain:macos_x86_64": [
-        "//tile/hal/cpu",
         "//tile/hal/metal",
-        "//tile/hal/opencl",
     ],
-    "//toolchain:windows_x86_64": [
-        "//tile/hal/cpu",
-        "//tile/hal/opencl",
-    ],
-    "//conditions:default": [
-        "//tile/hal/cpu",
-        "//tile/hal/opencl",
-    ],
+    "//conditions:default": [],
 }) + if_cuda_is_configured([
     "//tile/hal/cuda",
-])+ if_cm_is_configured([
+]) + if_cm_is_configured([
     "//tile/hal/cm",
 ])
 
@@ -94,7 +80,6 @@ plaidml_cc_library(
 
 plaidml_cc_binary(
     name = "libplaidml.so",
-    linkshared = 1,
     linkopts = [
         # Prefer internal library definitions.
         "-Wl,-Bsymbolic-functions",
@@ -102,6 +87,7 @@ plaidml_cc_binary(
         # Use an explicit linker script.
         "-Wl,$(location :plaidml.lds)",
     ],
+    linkshared = 1,
     tags = ["linux"],
     deps = [
         ":api",
