@@ -541,9 +541,9 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   std::vector<Loop> loops(block.idxs.size());
   for (size_t i = 0; i < block.idxs.size(); ++i) {
     std::string name = block.idxs[i].name;
-    CreateLoop(&loops[i], name);
     llvm::Value* variable = indexes_[name].variable;
     llvm::Value* init = indexes_[name].init;
+    CreateLoop(&loops[i], name);
     EnterLoop(&loops[i], variable, init, limits[i]);
   }
 
@@ -1734,22 +1734,14 @@ void Compiler::CreateLoop(Loop* loop, std::string name) {
   builder_.CreateBr(loop->init);
 }
 
-void Compiler::InitLoop(Loop* loop, llvm::Value* variable, llvm::Value* init) {
+void Compiler::EnterLoop(Loop* loop, llvm::Value* variable, llvm::Value* init, llvm::Value* limit) {
   builder_.SetInsertPoint(loop->init);
   builder_.CreateStore(init, variable);
   builder_.CreateBr(loop->test);
-}
-
-void Compiler::TestLoop(Loop* loop, llvm::Value* variable, llvm::Value* limit) {
   builder_.SetInsertPoint(loop->test);
   llvm::Value* idx_val = builder_.CreateLoad(variable);
   llvm::Value* go = builder_.CreateICmpULT(idx_val, limit);
   builder_.CreateCondBr(go, loop->body, loop->done);
-}
-
-void Compiler::EnterLoop(Loop* loop, llvm::Value* variable, llvm::Value* init, llvm::Value* limit) {
-  InitLoop(loop, variable, init);
-  TestLoop(loop, variable, limit);
   builder_.SetInsertPoint(loop->body);
 }
 
