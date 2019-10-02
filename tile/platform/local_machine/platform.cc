@@ -312,6 +312,7 @@ const Platform::PlatformDev& Platform::LookupDevice(const std::string& id) {
     if (!devs_.size()) {
       throw error::NotFound{"No Tile compute devices available"};
     }
+    IVLOG(1, "Using first device found: " << devs_.begin()->first);
     return devs_.begin()->second;
   }
   auto it = devs_.find(id);
