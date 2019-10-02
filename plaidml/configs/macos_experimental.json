@@ -3,28 +3,6 @@
     "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
     "hardware_configs": [
       {
-        "description": "CPU (via LLVM) settings",
-        "sel": {
-          "and": {
-            "sel": [
-              {
-                "name_regex": "LLVM CPU"
-              },
-              {
-                "vendor_regex": "LLVM"
-              }
-            ]
-          }
-        },
-        "settings": {
-          "vec_size": 16,
-          "mem_width": 64,
-          "use_global": false,
-          "max_regs": 8192,
-          "stripe_config": "llvm_cpu"
-        }
-      },
-      {
         "description": "AMD OpenCL config",
         "sel": {
           "and": {

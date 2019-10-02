@@ -11,7 +11,6 @@
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
 #include "tile/platform/local_machine/platform.h"
-#include "tile/platform/stripejit/platform.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
@@ -19,31 +18,20 @@ using plaidml::core::GetPlatform;
 using plaidml::core::Settings;
 using vertexai::context::Context;
 using vertexai::tile::DataType;
-using vertexai::tile::Platform;
 using vertexai::tile::TensorDimension;
 using vertexai::tile::TensorShape;
+using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
 
 namespace plaidml {
 namespace core {
 
-Platform* GetLocalPlatform() {
-  static vertexai::tile::local_machine::Platform platform;
-  return &platform;
-}
+PlatformHolder::PlatformHolder() : platform(new LocalPlatform) {}
 
-Platform* GetJitPlatform() {
-  static vertexai::tile::stripejit::Platform platform;
-  return &platform;
-}
-
-Platform* GetPlatform() {
-  auto target = vertexai::env::Get("PLAIDML_DEVICE");
-  if (target == "llvm_cpu.0") {
-    return GetJitPlatform();
-  }
-  return GetLocalPlatform();
+PlatformHolder& GetPlatform() {
+  static PlatformHolder holder;
+  return holder;
 }
 
 }  // namespace core
@@ -65,7 +53,15 @@ void plaidml_init(plaidml_error* err) {
       }
       IVLOG(1, "plaidml_init");
       Settings::Instance()->load();
+      GetPlatform();
     });
+  });
+}
+
+void plaidml_shutdown(plaidml_error* err) {
+  ffi_wrap_void(err, [&] {
+    IVLOG(1, "plaidml_shutdown");
+    GetPlatform().platform.reset(nullptr);
   });
 }
 

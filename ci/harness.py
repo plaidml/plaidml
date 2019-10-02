@@ -102,8 +102,6 @@ def run(args, remainder):
 
     if 'stripe' in args.platform:
         env['PLAIDML_USE_STRIPE'] = '1'
-        if 'llvm' in args.platform:
-            env['STRIPE_JIT'] = '1'
     else:
         env['PLAIDML_USE_STRIPE'] = '0'
     if 'cuda' in args.platform:

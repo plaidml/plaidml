@@ -16,6 +16,8 @@ plaidml_cc_library(
     srcs = [
         "buffer.cc",
         "buffer.h",
+        "cpu_program.cc",
+        "cpu_program.h",
         "devinfo.h",
         "direct_mem_strategy.cc",
         "direct_mem_strategy.h",
@@ -37,12 +39,7 @@ plaidml_cc_library(
         "shim.h",
         "tmp_mem_strategy.cc",
         "tmp_mem_strategy.h",
-    ] + select({
-        "//toolchain:windows_x86_64": [],
-        "//conditions:default": [
-            "factory_jit.cc",
-        ],
-    }),
+    ],
     hdrs = [
         "local_machine.h",
     ],
@@ -60,12 +57,8 @@ plaidml_cc_library(
         "//tile/ocl_exec",
         "//tile/proto:hal_cc",
         "//tile/proto:support",
-    ] + select({
-        "//toolchain:windows_x86_64": [],
-        "//conditions:default": [
-            "//tile/platform/stripejit",
-        ],
-    }),
+        "//tile/targets/cpu",
+    ],
     alwayslink = 1,
 )
 

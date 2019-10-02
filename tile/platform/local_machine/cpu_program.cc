@@ -1,6 +1,6 @@
 // Copyright 2017-2018 Intel Corporation.
 
-#include "tile/platform/stripejit/program.h"
+#include "tile/platform/local_machine/cpu_program.h"
 
 #include <memory>
 
@@ -12,9 +12,9 @@
 
 namespace vertexai {
 namespace tile {
-namespace stripejit {
+namespace local_machine {
 
-Program::Program(                  //
+CpuProgram::CpuProgram(            //
     const std::string& target,     //
     const lang::RunInfo& runinfo,  //
     ConstBufferManager* const_bufs)
@@ -37,7 +37,7 @@ Program::Program(                  //
   executable_->compile(*stripe->entry, config);
 }
 
-Program::Program(                                    //
+CpuProgram::CpuProgram(                              //
     const std::string& target,                       //
     const std::shared_ptr<stripe::Program>& stripe,  //
     ConstBufferManager* const_bufs)
@@ -59,10 +59,10 @@ Program::Program(                                    //
   executable_->compile(*stripe->entry, config);
 }
 
-Program::~Program() {}
+CpuProgram::~CpuProgram() {}
 
-boost::future<void> Program::Run(  //
-    const context::Context& ctx,   //
+boost::future<void> CpuProgram::Run(  //
+    const context::Context& ctx,      //
     std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
     std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
   std::map<std::string, void*> buffers;
@@ -85,12 +85,12 @@ boost::future<void> Program::Run(  //
   return boost::make_ready_future();
 }
 
-void Program::Release() {}
+void CpuProgram::Release() {}
 
-std::size_t Program::MaxAvailableMemory() {
-  throw std::runtime_error("Program::MaxAvailableMemory is unimplemented for stripejit.");
+std::size_t CpuProgram::MaxAvailableMemory() {
+  throw std::runtime_error("CpuProgram::MaxAvailableMemory is unimplemented");
 }
 
-}  // namespace stripejit
+}  // namespace local_machine
 }  // namespace tile
 }  // namespace vertexai
