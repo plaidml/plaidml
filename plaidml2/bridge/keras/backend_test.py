@@ -17,6 +17,8 @@ import numpy as np
 import numpy.testing as npt
 # Tensorflow needs some code called directly
 import tensorflow
+# Removes (almost) all tensorflow deprecation warnings
+tensorflow.compat.v1.logging.set_verbosity(tensorflow.compat.v1.logging.ERROR)
 # Theano breaks on convolution if given a default optimizer
 import theano
 from keras.backend import floatx
