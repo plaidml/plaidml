@@ -273,7 +273,6 @@ def opTest(in_data,
                     results.append((fr, gr))
                 else:
                     results.append((fr,))
-        tf_session.close()
         return results
 
     def apply(test_func):
