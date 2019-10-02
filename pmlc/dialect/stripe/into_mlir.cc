@@ -32,18 +32,29 @@ static ScalarType DataTypeIntoMLIR(mlir::MLIRContext* ctx, DataType dtype) {  //
   return ScalarType::get(ctx, dtype);
 }
 
-static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
+static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape, const stripe::Location& loc) {
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
   llvm::SmallVector<TensorDim, 4> dims;
+  for (std::size_t dev_idx = 0; dev_idx < loc.devs.size(); ++dev_idx) {
+    const auto& dev = loc.devs.at(dev_idx);
+    for (std::size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
+      dims.emplace_back(TensorDim{
+          0, 0, mlir::Identifier::get((boost::format("%s_%zu_%zu") % dev.name % dev_idx % unit_idx).str(), ctx)});
+    }
+  }
   for (const auto& dim : shape.dims) {
     dims.emplace_back(TensorDim{static_cast<int64_t>(dim.size), dim.stride, mlir::Identifier::get("address", ctx)});
   }
   return TensorType::get(dtype, dims, OffsetsMap{}, shape.is_const);
 }
 
-static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
+static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape, const stripe::Location& loc) {
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
-  return TensorRefType::get(dtype, shape.dims.size(), shape.is_const);
+  auto rank = shape.dims.size();
+  for (const auto& dev : loc.devs) {
+    rank += dev.units.size();
+  }
+  return TensorRefType::get(dtype, rank, shape.is_const);
 }
 
 struct AttrBuilder : stripe::TagVisitor {
@@ -109,6 +120,25 @@ Value* AffineIntoMLIR(OpBuilder* builder, const SymbolValueMap& idxs, const stri
     return add_inputs[0];
   }
   return builder->createOrFold<AffineAddOp>(unknownLoc, builder->getType<AffineType>(), add_inputs);
+}
+
+static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const SymbolValueMap& idxs,
+                                                     const stripe::Location& loc, bool* any_non_zero_offsets) {
+  std::vector<Value*> offsets;
+  if (any_non_zero_offsets) {
+    *any_non_zero_offsets = false;
+  }
+  for (std::size_t dev_idx = 0; dev_idx < loc.devs.size(); ++dev_idx) {
+    const auto& dev = loc.devs.at(dev_idx);
+    for (std::size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
+      const auto& unit = dev.units.at(unit_idx);
+      offsets.emplace_back(AffineIntoMLIR(builder, idxs, unit));
+      if (any_non_zero_offsets && (!unit.isConstant() || unit.constant() != 0)) {
+        *any_non_zero_offsets = true;
+      }
+    }
+  }
+  return offsets;
 }
 
 namespace {
@@ -282,25 +312,28 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   std::vector<mlir::Value*> executor;
   if (!block.location.empty()) {
     std::vector<TensorDim> dims;
-    std::vector<Value*> offsets;
     for (std::size_t dev_idx = 0; dev_idx < block.location.devs.size(); ++dev_idx) {
       const auto& dev = block.location.devs.at(dev_idx);
       for (std::size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
-        const auto& unit = dev.units.at(unit_idx);
         auto cls = (boost::format("%s_%zu_%zu") % dev.name % dev_idx % unit_idx).str();
         // N.B. Locations in Stripe Classic logically reference an abstract executor space, in which size and
         // stride are not well-specified, so we leave them undefined after translation to MLIR, and ignore
         // them on translation back to Stripe Classic.
         dims.emplace_back(TensorDim{0, 0, builder->getIdentifier(cls)});
-        offsets.emplace_back(AffineIntoMLIR(builder, outer.idxs, unit));
       }
     }
     auto allocOp = builder->create<AllocateOp>(
         unknownLoc, TensorType::get(builder->getType<ExecutorType>(), dims, OffsetsMap{}, true));
     auto refOp = builder->create<TensorRefOp>(
         unknownLoc, TensorRefType::get(builder->getType<ExecutorType>(), dims.size(), true), allocOp.result());
-    auto refineOp = builder->create<RefineOp>(unknownLoc, refOp.getType(), refOp.result(), offsets);
-    executor.emplace_back(refineOp.result());
+    bool any_non_zero_offsets = false;
+    auto offsets = LocationIntoTensorOffsets(builder, outer.idxs, block.location, &any_non_zero_offsets);
+    if (any_non_zero_offsets) {
+      auto refineOp = builder->create<RefineOp>(unknownLoc, refOp.getType(), refOp.result(), offsets);
+      executor.emplace_back(refineOp.result());
+    } else {
+      executor.emplace_back(refOp.result());
+    }
   }
 
   // Process the refinements.
@@ -310,15 +343,28 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // operations.
   for (const auto& ref : block.refs) {
     Value* from;
+    std::vector<Value*> offsets;
+    Value* zero = nullptr;
     if (ref.from.empty()) {
-      Type tensorType = ShapeIntoTensorType(builder->getContext(), ref.interior_shape);
+      Type tensorType = ShapeIntoTensorType(builder->getContext(), ref.interior_shape, ref.location);
       from = builder->create<AllocateOp>(unknownLoc, tensorType);
-      Type tensorRefType = ShapeIntoTensorRefType(builder->getContext(), ref.interior_shape);
+      Type tensorRefType = ShapeIntoTensorRefType(builder->getContext(), ref.interior_shape, ref.location);
       from = builder->create<TensorRefOp>(unknownLoc, tensorRefType, from);
+      offsets = LocationIntoTensorOffsets(builder, locals.idxs, ref.location, nullptr);
     } else {
       from = safe_at(outer.refs, ref.from);
+      if (auto trefTy = from->getType().dyn_cast<TensorRefType>()) {
+        // The outer tensor being refined may have hardware class indicies not reflected in the refinement;
+        // these need to be added to the offsets in order for the RefineOp to work correctly.
+        if (ref.access.size() < trefTy.getRank()) {
+          if (!zero) {
+            zero = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
+                                                  builder->getI64IntegerAttr(0));
+          }
+          offsets.resize(trefTy.getRank() - ref.access.size(), zero);
+        }
+      }
     }
-    std::vector<Value*> offsets;
     for (const auto& aff : ref.access) {
       offsets.push_back(AffineIntoMLIR(builder, locals.idxs, aff));
     }
@@ -439,7 +485,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     if (ref.from.size()) {
       throw std::runtime_error("Invalid program-level refinement");
     }
-    auto refType = ShapeIntoTensorType(ctx, ref.interior_shape);
+    auto refType = ShapeIntoTensorType(ctx, ref.interior_shape, ref.location);
     inputTypes.emplace_back(refType);
   }
 
@@ -454,9 +500,20 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
   for (const auto& ref : block.refs) {
     auto argIndex = argcnt++;
     auto arg = func.getArgument(argIndex);
-    Type tensorRefType = ShapeIntoTensorRefType(ctx, ref.interior_shape);
+    Type tensorRefType = ShapeIntoTensorRefType(ctx, ref.interior_shape, ref.location);
     auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg);
-    initial.refs.emplace(ref.into(), tensorRefOp);
+    bool any_non_zero_offsets = false;
+    // N.B. initial.idxs is empty here, but that's reasonable in this case; these incoming parameter
+    // refinement locations shouldn't be dependent on any external indicies.
+    auto offsets = LocationIntoTensorOffsets(&builder, initial.idxs, ref.location, &any_non_zero_offsets);
+    if (any_non_zero_offsets) {
+      auto zero = builder.create<AffineConstOp>(loc, builder.getType<AffineType>(), builder.getI64IntegerAttr(0));
+      offsets.resize(offsets.size() + ref.interior_shape.dims.size(), zero);
+      auto refOp = builder.create<RefineOp>(loc, tensorRefOp.getType(), tensorRefOp, offsets);
+      initial.refs.emplace(ref.into(), refOp);
+    } else {
+      initial.refs.emplace(ref.into(), tensorRefOp);
+    }
     // Only 'dialect attrs' are allowed on function arguments
     auto attrName = Dialect::getDialectAttrName(builder.getContext(), "name");
     func.setArgAttr(argIndex, attrName, builder.getStringAttr(ref.into()));

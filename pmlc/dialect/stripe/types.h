@@ -135,7 +135,7 @@ class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
   Type getElementType() const { return getImpl()->elementType; }
 
   /// Return the rank.
-  int64_t getRank() const { return getImpl()->shape.size(); }
+  uint64_t getRank() const { return getImpl()->shape.size(); }
 
   /// Return the shape.
   llvm::ArrayRef<TensorDim> getShape() const { return getImpl()->shape; }
@@ -185,7 +185,7 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
   Type getElementType() const { return getImpl()->elementType; }
 
   /// Return the rank.
-  int64_t getRank() const { return getImpl()->rank; }
+  uint64_t getRank() const { return getImpl()->rank; }
 
   /// Check if things are const
   bool is_const() const { return getImpl()->is_const; }

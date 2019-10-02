@@ -66,9 +66,6 @@ TEST(Stripe, Transcode) {
 
   codegen::CompilerState cstate{prog};
 
-#if 0
-  // TODO: Re-enable once locations are supported again.
-
   IVLOG(1, "Adding a memory location");
   codegen::proto::LocateMemoryPass lmp;
   auto lmp_dev = lmp.mutable_loc()->add_devs();
@@ -78,7 +75,6 @@ TEST(Stripe, Transcode) {
   lmp_dev->set_name("InnerMem");
   lmp_dev->add_units()->set_offset(1);
   codegen::LocateMemoryPass{lmp}.Apply(&cstate);
-#endif
 
   IVLOG(1, "Adding an executor location");
   codegen::proto::LocateBlockPass lbp;

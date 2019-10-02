@@ -66,6 +66,61 @@ class StripeBuilder {
   bool found_inst_;
 };
 
+struct StripeDevice {
+  std::string name;
+  std::vector<AffinePolynomial> units;
+};
+
+struct StripeLocation {
+  std::vector<StripeDevice> devs;
+};
+
+std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor) {
+  auto ret = ComputeAccess(tensor);
+  auto loc = StripeLocation{};
+
+  // At this point: ret.access contains the refinement accessors for every tensor dimension (including
+  // non-address dimensions), and ret.base_type is a TensorType which gets us the underyling dimension
+  // information.  For conversion to Stripe, we want to separate out the address dimensions (whose accessors
+  // are preserved in the flat tensor access) from the non-address dimensions (which become part of the
+  // location).
+
+  std::vector<AffinePolynomial> access;
+
+  auto combIt = ret.access.begin();
+  auto matches = llvm::SmallVector<StringRef, 4>();
+  for (const auto& dim : ret.base_type.getShape()) {
+    if (combIt == ret.access.end()) {
+      break;  // Should never happen; this is just to be careful.
+    }
+    if (dim.cls == "address") {
+      access.emplace_back(*combIt);
+    } else {
+      static llvm::Regex re{R"(([[:alpha:]]+)_([[:digit:]]+)_([[:digit:]]+))"};
+      if (re.match(dim.cls, &matches)) {
+        const auto& dev_name = matches[1];
+        std::size_t dev_idx, unit_idx;
+        matches[2].getAsInteger(10, dev_idx);
+        matches[3].getAsInteger(10, unit_idx);
+
+        if (loc.devs.size() <= dev_idx) {
+          loc.devs.resize(dev_idx + 1);
+        }
+        auto& dev = loc.devs.at(dev_idx);
+        dev.name = dev_name;
+        if (dev.units.size() <= unit_idx) {
+          dev.units.resize(unit_idx + 1);
+        }
+        dev.units.at(unit_idx) = *combIt;
+      }
+    }
+    ++combIt;
+  }
+
+  ret.access.swap(access);
+  return std::make_pair(ret, loc);
+}
+
 }  // End namespace
 
 StripeBuilder::StripeBuilder(mlir::FuncOp func) {
@@ -82,7 +137,7 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
     auto attrName = Dialect::getDialectAttrName(func.getContext(), "name");
     auto name = func.getArgAttr(i, attrName).cast<StringAttr>().getValue();
     // Compute all the info about the tensor
-    auto ti = ComputeAccess(arg);
+    auto ti = ComputeAccessAndLoc(arg).first;
     // Translate allocation shape
     TensorShape shape = get_shape(ti.base->getType().cast<TensorType>());
     std::vector<stripe::Affine> access(ti.access.size());
@@ -100,7 +155,9 @@ TensorShape StripeBuilder::get_shape(TensorType type) {
   auto elementType = type.getElementType().cast<eltwise::ScalarType>();
   ret.type = elementType.type();
   for (const auto& dim : type.getShape()) {
-    ret.dims.emplace_back(dim.stride, dim.size);
+    if (dim.cls == "address") {
+      ret.dims.emplace_back(dim.stride, dim.size);
+    }
   }
   ret.is_const = type.is_const();
   return ret;
@@ -137,7 +194,9 @@ void StripeBuilder::add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribut
 void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out,
                                     std::string agg_name, bool is_spec) {
   // Compute all the info about the tensor
-  auto ti = ComputeAccess(tensor);
+  auto ti = FlatTensorAccess{};
+  auto sloc = StripeLocation{};
+  std::tie(ti, sloc) = ComputeAccessAndLoc(tensor);
   size_t ndims = ti.access.size();
   // Translate allocation shape
   TensorShape base_shape = get_shape(ti.base_type);
@@ -210,6 +269,20 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
     }
     // Get pointer to new/etc reference
     ref = &blocks_.at(block).stripe->ref_by_into(ref_name)->mut();
+    // Set the location
+    for (const auto& dev : sloc.devs) {
+      ref->location.devs.emplace_back(stripe::Device{dev.name});
+      auto& sdev = ref->location.devs.back();
+      for (const auto& unit : dev.units) {
+        auto aff = stripe::Affine{unit.constant};
+        for (const auto& kvp : unit.terms) {
+          if (kvp.first->getOwner() == block) {
+            aff += stripe::Affine(get_idx(sblock, kvp.first), kvp.second);
+          }
+        }
+        sdev.units.emplace_back(std::move(aff));
+      }
+    }
     // Add in directionality
     if (ref->dir != stripe::RefDir::InOut && ref->dir != dir) {
       ref->dir = stripe::RefDir::InOut;
@@ -325,7 +398,6 @@ void StripeBuilder::visit(ParallelForOp op) {
             auto offIt = offsets.begin();
             for (const auto& dim : tType.getShape()) {
               static llvm::Regex re{R"(([[:alpha:]]+)_([[:digit:]]+)_([[:digit:]]+))"};
-              cur_->location.devs.push_back(stripe::Device{dim.cls.str()});
               if (re.match(dim.cls, &matches) && offIt != offsets.end()) {
                 const auto& dev_name = matches[1];
                 std::size_t dev_idx, unit_idx;
