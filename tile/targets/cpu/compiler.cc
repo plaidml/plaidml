@@ -577,11 +577,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   // increment each index, from innermost to outermost, then jump back to test
   for (size_t i = block.idxs.size(); i-- > 0;) {
     llvm::Value* variable = indexes_[block.idxs[i].name].variable;
-    llvm::Value* index = builder_.CreateLoad(variable);
-    index = builder_.CreateAdd(index, IndexConst(1));
-    builder_.CreateStore(index, variable);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].done);
+    LeaveLoop(&loops[i], variable);
   }
 
   ProfileBlockLeave(block);
@@ -1536,11 +1532,7 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
 
   // Terminate the loop by incrementing the index and repeating.
   for (size_t i = dest_ndims; i-- > 0;) {
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    idx_val = builder_.CreateAdd(idx_val, IndexConst(1));
-    builder_.CreateStore(idx_val, idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].done);
+    LeaveLoop(&loops[i], idx_vars[i]);
   }
 }
 
@@ -1644,11 +1636,7 @@ void Compiler::Scatter(const stripe::Special& scatter) {
 
   // Terminate the loop by incrementing the index and repeating.
   for (size_t i = data_ndims; i-- > 0;) {
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    idx_val = builder_.CreateAdd(idx_val, IndexConst(1));
-    builder_.CreateStore(idx_val, idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].done);
+    LeaveLoop(&loops[i], idx_vars[i]);
   }
 }
 
@@ -1750,11 +1738,7 @@ void Compiler::Gather(const stripe::Special& gather) {
 
   // Terminate the loop by incrementing the index and repeating.
   for (size_t i = dest_ndims; i-- > 0;) {
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    idx_val = builder_.CreateAdd(idx_val, IndexConst(1));
-    builder_.CreateStore(idx_val, idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].done);
+    LeaveLoop(&loops[i], idx_vars[i]);
   }
 }
 
@@ -1770,6 +1754,14 @@ void Compiler::InitLoop(Loop* loop, llvm::Value* variable, llvm::Value* init) {
   builder_.SetInsertPoint(loop->init);
   builder_.CreateStore(init, variable);
   builder_.CreateBr(loop->test);
+}
+
+void Compiler::LeaveLoop(Loop* loop, llvm::Value* variable) {
+  llvm::Value* index = builder_.CreateLoad(variable);
+  index = builder_.CreateAdd(index, IndexConst(1));
+  builder_.CreateStore(index, variable);
+  builder_.CreateBr(loop->test);
+  builder_.SetInsertPoint(loop->done);
 }
 
 Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {
