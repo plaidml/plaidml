@@ -534,11 +534,9 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   for (size_t i = 0; i < block.idxs.size(); ++i) {
     std::string name = block.idxs[i].name;
     CreateLoop(&loops[i], name, function);
-    builder_.SetInsertPoint(loops[i].init);
     llvm::Value* variable = indexes_[name].variable;
     llvm::Value* init = indexes_[name].init;
-    builder_.CreateStore(init, variable);
-    builder_.CreateBr(loops[i].test);
+    InitLoop(&loops[i], variable, init);
     builder_.SetInsertPoint(loops[i].test);
     llvm::Value* index = builder_.CreateLoad(variable);
     llvm::Value* range = IndexConst(block.idxs[i].range);
@@ -1468,9 +1466,7 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    builder_.SetInsertPoint(loops[i].init);
-    builder_.CreateStore(IndexConst(0), idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
+    InitLoop(&loops[i], idx_vars[i], IndexConst(0));
     builder_.SetInsertPoint(loops[i].test);
     llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
     llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
@@ -1583,9 +1579,7 @@ void Compiler::Scatter(const stripe::Special& scatter) {
   for (size_t i = 0; i < data_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    builder_.SetInsertPoint(loops[i].init);
-    builder_.CreateStore(IndexConst(0), idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
+    InitLoop(&loops[i], idx_vars[i], IndexConst(0));
     builder_.SetInsertPoint(loops[i].test);
     llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
     llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
@@ -1702,9 +1696,7 @@ void Compiler::Gather(const stripe::Special& gather) {
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
     CreateLoop(&loops[i], name, parent);
-    builder_.SetInsertPoint(loops[i].init);
-    builder_.CreateStore(IndexConst(0), idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
+    InitLoop(&loops[i], idx_vars[i], IndexConst(0));
     builder_.SetInsertPoint(loops[i].test);
     llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
     llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
@@ -1772,6 +1764,12 @@ void Compiler::CreateLoop(Loop* loop, std::string name, llvm::Function* func) {
   loop->body = llvm::BasicBlock::Create(context_, "body_" + name, func);
   loop->done = llvm::BasicBlock::Create(context_, "done_" + name, func);
   builder_.CreateBr(loop->init);
+}
+
+void Compiler::InitLoop(Loop* loop, llvm::Value* variable, llvm::Value* init) {
+  builder_.SetInsertPoint(loop->init);
+  builder_.CreateStore(init, variable);
+  builder_.CreateBr(loop->test);
 }
 
 Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {
