@@ -113,12 +113,21 @@ TEST(Stripe, Transcode) {
     throw std::runtime_error("MLIR passes failure");
   }
 
-  IVLOG(2, "Dumping module");
-  auto moduleOp = *module;
-  IVLOG(2, mlir::debugString(moduleOp));
+  IVLOG(1, "Writing out module");
+  std::string module_str;
+  llvm::raw_string_ostream str_stream(module_str);
+  module->print(str_stream);
+  str_stream.flush();
+  IVLOG(2, module_str);
+
+  IVLOG(1, "Parsing it back in");
+  auto new_module = parseSourceString(module_str, &context);
+  if (!new_module) {
+    throw std::runtime_error("Unable to parse");
+  }
 
   IVLOG(1, "Converting the other way");
-  auto prog2 = FromMLIR(*module);
+  auto prog2 = FromMLIR(new_module);
 
   IVLOG(2, "New version:");
   IVLOG(2, *prog2->entry);
