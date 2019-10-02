@@ -525,35 +525,26 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     indexes_[idx.name].variable = variable;
   }
 
+  // compute the limit value for each loop
+  std::vector<llvm::Value*> limits(block.idxs.size());
+  for (size_t i = 0; i < block.idxs.size(); ++i) {
+    llvm::Value* init = indexes_[block.idxs[i].name].init;
+    llvm::Value* range = IndexConst(block.idxs[i].range);
+    limits[i] = builder_.CreateAdd(init, range);
+  }
+
   // EmitRunTimeLogEntry(block.name, "enter");
   ProfileBlockEnter(block);
 
   // generate the basic blocks for each nested loop's evaluation stages
-  std::vector<Loop> loops;
-  for (auto& idx : block.idxs) {
-    std::string name = idx.name;
-    auto init = llvm::BasicBlock::Create(context_, "init_" + name, function);
-    auto test = llvm::BasicBlock::Create(context_, "test_" + name, function);
-    auto body = llvm::BasicBlock::Create(context_, "body_" + name, function);
-    auto done = llvm::BasicBlock::Create(context_, "done_" + name, function);
-    loops.push_back({init, test, body, done});
-  }
-
   // initialize each loop index and generate the termination check
+  std::vector<Loop> loops(block.idxs.size());
   for (size_t i = 0; i < block.idxs.size(); ++i) {
-    builder_.CreateBr(loops[i].init);
-    builder_.SetInsertPoint(loops[i].init);
-    llvm::Value* variable = indexes_[block.idxs[i].name].variable;
-    llvm::Value* init = indexes_[block.idxs[i].name].init;
-    builder_.CreateStore(init, variable);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].test);
-    llvm::Value* index = builder_.CreateLoad(variable);
-    llvm::Value* range = IndexConst(block.idxs[i].range);
-    llvm::Value* limit = builder_.CreateAdd(init, range);
-    llvm::Value* go = builder_.CreateICmpULT(index, limit);
-    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
-    builder_.SetInsertPoint(loops[i].body);
+    std::string name = block.idxs[i].name;
+    llvm::Value* variable = indexes_[name].variable;
+    llvm::Value* init = indexes_[name].init;
+    CreateLoop(&loops[i], name);
+    EnterLoop(&loops[i], variable, init, limits[i]);
   }
 
   // check the constraints against the current index values and decide whether
@@ -587,12 +578,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   // increment each index, from innermost to outermost, then jump back to test
   for (size_t i = block.idxs.size(); i-- > 0;) {
     llvm::Value* variable = indexes_[block.idxs[i].name].variable;
-    llvm::Value* index = builder_.CreateLoad(variable);
-    llvm::Value* increment = IndexConst(1);
-    index = builder_.CreateAdd(index, increment);
-    builder_.CreateStore(index, variable);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].done);
+    LeaveLoop(&loops[i], variable);
   }
 
   ProfileBlockLeave(block);
@@ -1473,22 +1459,10 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
 
   // Generate the initialization & limit test for each loop.
   std::vector<Loop> loops(dest_ndims);
-  llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
-    loops[i].init = llvm::BasicBlock::Create(context_, "init_" + name, parent);
-    loops[i].test = llvm::BasicBlock::Create(context_, "test_" + name, parent);
-    loops[i].body = llvm::BasicBlock::Create(context_, "body_" + name, parent);
-    loops[i].done = llvm::BasicBlock::Create(context_, "done_" + name, parent);
-    builder_.CreateBr(loops[i].init);
-    builder_.SetInsertPoint(loops[i].init);
-    builder_.CreateStore(IndexConst(0), idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].test);
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
-    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
-    builder_.SetInsertPoint(loops[i].body);
+    CreateLoop(&loops[i], name);
+    EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
   // Select the initialization value for this refinement's agg_op.
@@ -1553,11 +1527,7 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
 
   // Terminate the loop by incrementing the index and repeating.
   for (size_t i = dest_ndims; i-- > 0;) {
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    idx_val = builder_.CreateAdd(idx_val, IndexConst(1));
-    builder_.CreateStore(idx_val, idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].done);
+    LeaveLoop(&loops[i], idx_vars[i]);
   }
 }
 
@@ -1592,22 +1562,10 @@ void Compiler::Scatter(const stripe::Special& scatter) {
 
   // Generate the initialization & limit test for each loop
   std::vector<Loop> loops(data_ndims);
-  llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < data_ndims; ++i) {
     std::string name = std::to_string(i);
-    loops[i].init = llvm::BasicBlock::Create(context_, "init_" + name, parent);
-    loops[i].test = llvm::BasicBlock::Create(context_, "test_" + name, parent);
-    loops[i].body = llvm::BasicBlock::Create(context_, "body_" + name, parent);
-    loops[i].done = llvm::BasicBlock::Create(context_, "done_" + name, parent);
-    builder_.CreateBr(loops[i].init);
-    builder_.SetInsertPoint(loops[i].init);
-    builder_.CreateStore(IndexConst(0), idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].test);
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
-    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
-    builder_.SetInsertPoint(loops[i].body);
+    CreateLoop(&loops[i], name);
+    EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
   // Body of the loop nest
@@ -1667,11 +1625,7 @@ void Compiler::Scatter(const stripe::Special& scatter) {
 
   // Terminate the loop by incrementing the index and repeating.
   for (size_t i = data_ndims; i-- > 0;) {
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    idx_val = builder_.CreateAdd(idx_val, IndexConst(1));
-    builder_.CreateStore(idx_val, idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].done);
+    LeaveLoop(&loops[i], idx_vars[i]);
   }
 }
 
@@ -1715,22 +1669,10 @@ void Compiler::Gather(const stripe::Special& gather) {
 
   // Generate the initialization & limit test for each loop
   std::vector<Loop> loops(dest_ndims);
-  llvm::Function* parent = builder_.GetInsertBlock()->getParent();
   for (size_t i = 0; i < dest_ndims; ++i) {
     std::string name = std::to_string(i);
-    loops[i].init = llvm::BasicBlock::Create(context_, "init_" + name, parent);
-    loops[i].test = llvm::BasicBlock::Create(context_, "test_" + name, parent);
-    loops[i].body = llvm::BasicBlock::Create(context_, "body_" + name, parent);
-    loops[i].done = llvm::BasicBlock::Create(context_, "done_" + name, parent);
-    builder_.CreateBr(loops[i].init);
-    builder_.SetInsertPoint(loops[i].init);
-    builder_.CreateStore(IndexConst(0), idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].test);
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    llvm::Value* go = builder_.CreateICmpULT(idx_val, limits[i]);
-    builder_.CreateCondBr(go, loops[i].body, loops[i].done);
-    builder_.SetInsertPoint(loops[i].body);
+    CreateLoop(&loops[i], name);
+    EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
   // Body of the loop nest: look up an index value from "indexes" using the
@@ -1779,12 +1721,36 @@ void Compiler::Gather(const stripe::Special& gather) {
 
   // Terminate the loop by incrementing the index and repeating.
   for (size_t i = dest_ndims; i-- > 0;) {
-    llvm::Value* idx_val = builder_.CreateLoad(idx_vars[i]);
-    idx_val = builder_.CreateAdd(idx_val, IndexConst(1));
-    builder_.CreateStore(idx_val, idx_vars[i]);
-    builder_.CreateBr(loops[i].test);
-    builder_.SetInsertPoint(loops[i].done);
+    LeaveLoop(&loops[i], idx_vars[i]);
   }
+}
+
+void Compiler::CreateLoop(Loop* loop, std::string name) {
+  llvm::Function* func = builder_.GetInsertBlock()->getParent();
+  loop->init = llvm::BasicBlock::Create(context_, "init_" + name, func);
+  loop->test = llvm::BasicBlock::Create(context_, "test_" + name, func);
+  loop->body = llvm::BasicBlock::Create(context_, "body_" + name, func);
+  loop->done = llvm::BasicBlock::Create(context_, "done_" + name, func);
+  builder_.CreateBr(loop->init);
+}
+
+void Compiler::EnterLoop(Loop* loop, llvm::Value* variable, llvm::Value* init, llvm::Value* limit) {
+  builder_.SetInsertPoint(loop->init);
+  builder_.CreateStore(init, variable);
+  builder_.CreateBr(loop->test);
+  builder_.SetInsertPoint(loop->test);
+  llvm::Value* idx_val = builder_.CreateLoad(variable);
+  llvm::Value* go = builder_.CreateICmpULT(idx_val, limit);
+  builder_.CreateCondBr(go, loop->body, loop->done);
+  builder_.SetInsertPoint(loop->body);
+}
+
+void Compiler::LeaveLoop(Loop* loop, llvm::Value* variable) {
+  llvm::Value* index = builder_.CreateLoad(variable);
+  index = builder_.CreateAdd(index, IndexConst(1));
+  builder_.CreateStore(index, variable);
+  builder_.CreateBr(loop->test);
+  builder_.SetInsertPoint(loop->done);
 }
 
 Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {
