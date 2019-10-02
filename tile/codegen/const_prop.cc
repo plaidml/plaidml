@@ -1,13 +1,16 @@
 // Copyright 2019, Intel Corp.
 
+#include <memory>
+#include <set>
+#include <utility>
+#include <vector>
+
 #include "tile/codegen/const_prop.h"
 
 #include "base/util/any_factory_map.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/localize.h"
-#ifndef _WIN64
 #include "tile/targets/cpu/jit.h"
-#endif
 
 namespace vertexai {
 namespace tile {
@@ -113,11 +116,7 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
   for (const auto& name : out_const) {
     IVLOG(2, "Jitting constant propagation for" << name);
   }
-#ifdef _WIN64
-  throw std::runtime_error("LLVM doeesn't build on windows right now");
-#else
   targets::cpu::JitExecute(*cprog, buffers);
-#endif
 
   // Unmap the views
   views.clear();
