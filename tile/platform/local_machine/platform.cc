@@ -288,15 +288,15 @@ void Platform::ListDevices(                          //
     const context::Context& ctx,                     //
     const tile::proto::ListDevicesRequest& request,  //
     tile::proto::ListDevicesResponse* response) {
+  tile::proto::Device* dev = response->add_devices();
+  dev->set_dev_id(kCpuDevice);
+  dev->set_description("CPU (via LLVM)");
   for (const auto& dev : devs_) {
     _fill_device(dev.second, response->add_devices());
   }
   for (const auto& dev : unmatched_devs_) {
     _fill_device(dev.second, response->add_unmatched_devices());
   }
-  tile::proto::Device* dev = response->add_devices();
-  dev->set_dev_id(kCpuDevice);
-  dev->set_description("CPU (via LLVM)");
 }
 
 std::vector<std::string> Platform::ListDevices() {
