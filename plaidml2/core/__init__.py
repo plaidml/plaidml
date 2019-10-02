@@ -1,5 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
+import atexit
 import contextlib
 import enum
 from collections import namedtuple
@@ -19,6 +20,11 @@ def __init():
 
 
 __version__ = ffi.init_once(__init, 'plaidml_init')
+
+
+@atexit.register
+def __shutdown():
+    ffi_call(lib.plaidml_shutdown)
 
 
 class DType(enum.IntEnum):

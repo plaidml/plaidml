@@ -83,6 +83,9 @@ typedef struct {
 PLAIDML_CORE_API void plaidml_init(  //
     plaidml_error* err);
 
+PLAIDML_CORE_API void plaidml_shutdown(  //
+    plaidml_error* err);
+
 PLAIDML_CORE_API const char* plaidml_version(  //
     plaidml_error* err);
 

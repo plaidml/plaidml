@@ -32,7 +32,10 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "platform_test",
     srcs = ["platform_test.cc"],
-    tags = ["metal"],
+    tags = [
+        "metal",
+        "not_ci",
+    ],
     deps = [
         ":metal",
         "//tile/base:platform_test",

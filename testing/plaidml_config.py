@@ -11,9 +11,14 @@ def unittest_config():
 
 
 def config():
-    filename = os.getenv('PLAIDML_CONFIG_FILE', '../com_intel_plaidml/plaidml/experimental.json')
-    with open(filename) as file_:
-        return file_.read()
+    return '''
+{
+    "platform": {
+        "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+        "hardware_configs": []
+    }
+}
+'''
 
 
 def very_large_values_config():
