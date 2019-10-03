@@ -1407,31 +1407,89 @@ void Compiler::AggInitAdd(const stripe::Special& agg_init) {
   // One output: a tensor to initialize.
   assert(0 == agg_init.inputs.size());
   assert(1 == agg_init.outputs.size());
-  AggInit(buffers_[agg_init.outputs[0]], "add");
+  Buffer dest = buffers_[agg_init.outputs[0]];
+  auto& dest_shape = dest.refinement->interior_shape;
+  size_t bits = bit_width(dest_shape.type);
+  llvm::Type* eltype = CType(dest_shape.type);
+  llvm::Value* init_val = nullptr;
+  if (is_float(dest_shape.type)) {
+    init_val = llvm::ConstantFP::get(eltype, 0.0);
+  } else if (is_int(dest_shape.type) || is_uint(dest_shape.type)) {
+    auto apval = llvm::APInt::getNullValue(bits);
+    init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (DataType::BOOLEAN == dest_shape.type) {
+    init_val = builder_.getFalse();
+  }
+  AggInit(dest, init_val);
 }
 
 void Compiler::AggInitMul(const stripe::Special& agg_init) {
   // One output: a tensor to initialize.
   assert(0 == agg_init.inputs.size());
   assert(1 == agg_init.outputs.size());
-  AggInit(buffers_[agg_init.outputs[0]], "mul");
+  Buffer dest = buffers_[agg_init.outputs[0]];
+  auto& dest_shape = dest.refinement->interior_shape;
+  size_t bits = bit_width(dest_shape.type);
+  llvm::Type* eltype = CType(dest_shape.type);
+  llvm::Value* init_val = nullptr;
+  if (is_float(dest_shape.type)) {
+    init_val = llvm::ConstantFP::get(eltype, 1.0);
+  } else if (is_int(dest_shape.type) || is_uint(dest_shape.type)) {
+    auto apval = llvm::APInt(bits, 1);
+    init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (DataType::BOOLEAN == dest_shape.type) {
+    init_val = builder_.getTrue();
+  }
+  AggInit(dest, init_val);
 }
 
 void Compiler::AggInitMin(const stripe::Special& agg_init) {
   // One output: a tensor to initialize.
   assert(0 == agg_init.inputs.size());
   assert(1 == agg_init.outputs.size());
-  AggInit(buffers_[agg_init.outputs[0]], "min");
+  Buffer dest = buffers_[agg_init.outputs[0]];
+  auto& dest_shape = dest.refinement->interior_shape;
+  size_t bits = bit_width(dest_shape.type);
+  llvm::Type* eltype = CType(dest_shape.type);
+  llvm::Value* init_val = nullptr;
+  if (is_float(dest_shape.type)) {
+    init_val = llvm::ConstantFP::getInfinity(eltype, /*Negative*/ false);
+  } else if (is_int(dest_shape.type)) {
+    auto apval = llvm::APInt::getSignedMaxValue(bits);
+    init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (is_uint(dest_shape.type)) {
+    auto apval = llvm::APInt::getMaxValue(bits);
+    init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (DataType::BOOLEAN == dest_shape.type) {
+    init_val = builder_.getTrue();
+  }
+  AggInit(dest, init_val);
 }
 
 void Compiler::AggInitMax(const stripe::Special& agg_init) {
   // One output: a tensor to initialize.
   assert(0 == agg_init.inputs.size());
   assert(1 == agg_init.outputs.size());
-  AggInit(buffers_[agg_init.outputs[0]], "max");
+  Buffer dest = buffers_[agg_init.outputs[0]];
+  auto& dest_shape = dest.refinement->interior_shape;
+  size_t bits = bit_width(dest_shape.type);
+  llvm::Type* eltype = CType(dest_shape.type);
+  llvm::Value* init_val = nullptr;
+  if (is_float(dest_shape.type)) {
+    init_val = llvm::ConstantFP::getInfinity(eltype, /*Negative*/ true);
+  } else if (is_int(dest_shape.type)) {
+    auto apval = llvm::APInt::getSignedMinValue(bits);
+    init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (is_uint(dest_shape.type)) {
+    auto apval = llvm::APInt::getMinValue(bits);
+    init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (DataType::BOOLEAN == dest_shape.type) {
+    init_val = builder_.getFalse();
+  }
+  AggInit(dest, init_val);
 }
 
-void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
+void Compiler::AggInit(const Buffer& dest, llvm::Value* init_val) {
   // The initialization value depends on the refinement's agg_op.
   // Iterate over each dimension and write to each element.
   auto& dest_shape = dest.refinement->interior_shape;
@@ -1458,51 +1516,6 @@ void Compiler::AggInit(const Buffer& dest, std::string agg_op) {
     EnterLoop(&loops[i], idx_vars[i], IndexConst(0), limits[i]);
   }
 
-  // Select the initialization value for this refinement's agg_op.
-  size_t bits = bit_width(dest_shape.type);
-  llvm::Type* eltype = CType(dest_shape.type);
-  llvm::Value* init_val = nullptr;
-  if (agg_op == "" || agg_op == "assign" || agg_op == "add") {
-    // ZERO
-    if (is_float(dest_shape.type)) {
-      init_val = llvm::ConstantFP::get(eltype, 0.0);
-    } else if (is_int(dest_shape.type) || is_uint(dest_shape.type)) {
-      auto apval = llvm::APInt::getNullValue(bits);
-      init_val = llvm::ConstantInt::get(eltype, apval);
-    }
-  } else if (agg_op == "max") {
-    // MIN
-    if (is_float(dest_shape.type)) {
-      init_val = llvm::ConstantFP::getInfinity(eltype, /*Negative*/ true);
-    } else if (is_int(dest_shape.type)) {
-      auto apval = llvm::APInt::getSignedMinValue(bits);
-      init_val = llvm::ConstantInt::get(eltype, apval);
-    } else if (is_uint(dest_shape.type)) {
-      auto apval = llvm::APInt::getMinValue(bits);
-      init_val = llvm::ConstantInt::get(eltype, apval);
-    }
-  } else if (agg_op == "min") {
-    // MAX
-    if (is_float(dest_shape.type)) {
-      init_val = llvm::ConstantFP::getInfinity(eltype, /*Negative*/ false);
-    } else if (is_int(dest_shape.type)) {
-      auto apval = llvm::APInt::getSignedMaxValue(bits);
-      init_val = llvm::ConstantInt::get(eltype, apval);
-    } else if (is_uint(dest_shape.type)) {
-      auto apval = llvm::APInt::getMaxValue(bits);
-      init_val = llvm::ConstantInt::get(eltype, apval);
-    }
-  } else if (agg_op == "mul") {
-    // ONE
-    if (is_float(dest_shape.type)) {
-      init_val = llvm::ConstantFP::get(eltype, 1.0);
-    } else if (is_int(dest_shape.type) || is_uint(dest_shape.type)) {
-      auto apval = llvm::APInt(bits, 1);
-      init_val = llvm::ConstantInt::get(eltype, apval);
-    }
-  } else {
-    throw Error("Unimplemented agg_op: " + to_string(agg_op));
-  }
   if (!init_val) {
     throw Error("Undefined agg_op init for " + to_string(dest_shape.type));
   }

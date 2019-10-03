@@ -8,7 +8,6 @@ def StripeDialect : Dialect {
 }
 
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
-def ExecutorType : Type<CPred<"$_self.isa<ExecutorType>()">, "Plaid Executor Type">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Type">;
 def TensorRefType : Type<CPred<"$_self.isa<TensorRefType>()">, "Plaid Tensor Reference Type">;
 
@@ -158,3 +157,9 @@ def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let printer = [{ *p << getOperationName(); }];
 }
 
+def ExecuteOnOp : StripeOp<"execute_on", [Terminator, HasParent<"ParallelForOp">]> {
+  let summary = "Indicates where a ParallelForOp should execute";
+
+  // 'from' represents the executor value being returned.
+  let arguments = (ins TensorRefType:$from);
+}

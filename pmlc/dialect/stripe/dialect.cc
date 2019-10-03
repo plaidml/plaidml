@@ -2,9 +2,12 @@
 
 #include "pmlc/dialect/stripe/dialect.h"
 
+#include <utility>
+
 #include "mlir/IR/Dialect.h"
 #include "mlir/Parser.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
 
 #include "pmlc/dialect/stripe/ops.h"
 
@@ -27,6 +30,7 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
 }
 
 mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
+  static llvm::Regex re{R"(([[:alnum:]_]+)\[([[:digit:]]+):([[:digit:]]+)\])"};
   bool is_const = tyData.consume_back("const");
   StringRef typeSpec, sizeSpec;
   std::tie(typeSpec, sizeSpec) = tyData.trim().rsplit('(');
@@ -39,18 +43,19 @@ mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) cons
     emitError(loc, "invalid tensor type, no ()'s on size spec");
     return Type();
   }
-  llvm::SmallVector<StringRef, 8> dims;
-  llvm::SmallVector<TensorDim, 8> odims;
+  auto dims = llvm::SmallVector<StringRef, 8>();
+  auto odims = llvm::SmallVector<TensorDim, 8>();
+  auto matches = llvm::SmallVector<StringRef, 4>();
   sizeSpec.split(dims, ",");
   for (auto dim : dims) {
-    TensorDim odim;
-    StringRef strSize, strStride;
-    std::tie(strSize, strStride) = dim.split(':');
-    if (strSize.trim().consumeInteger(0, odim.size) || strStride.trim().consumeInteger(0, odim.stride)) {
+    if (!re.match(dim, &matches)) {
       emitError(loc, "invalid tensor dimension '") << dim << "'";
       return Type();
     }
-    odims.push_back(odim);
+    auto odim = TensorDim{0, 0, mlir::Identifier::get(matches[1], getContext())};
+    matches[2].getAsInteger(10, odim.size);
+    matches[3].getAsInteger(10, odim.stride);
+    odims.emplace_back(std::move(odim));
   }
   return TensorType::get(t, odims, OffsetsMap(), is_const);
 }
@@ -104,7 +109,7 @@ static void print(TensorType type, llvm::raw_ostream& os) {
     if (i) {
       os << ", ";
     }
-    os << std::to_string(dim.size) << ":" << std::to_string(dim.stride);
+    os << dim.cls << '[' << dim.size << ":" << dim.stride << ']';
   }
   os << ")";
   if (type.is_const()) {

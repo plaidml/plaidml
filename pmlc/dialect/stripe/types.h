@@ -15,6 +15,8 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
+constexpr char kAddressClassIdentifier[] = "address";
+
 namespace Types {
 enum Kinds {
   // An affine is a affine polynomial of indexes over integers
@@ -55,7 +57,7 @@ struct TensorDim {
   int64_t stride;
 
   // The hardware class identified by this dimension.
-  llvm::StringRef cls;
+  mlir::Identifier cls;
 
   bool operator==(const TensorDim& rhs) const {  //
     return std::tie(size, stride, cls) == std::tie(rhs.size, rhs.stride, rhs.cls);
@@ -115,8 +117,9 @@ struct TensorTypeStorage : public mlir::TypeStorage {
 // specified for that hardware class in the offsets table (or zero if the hardware class isn't present in the
 // offsets table).
 //
-// By convention, the hardware class identifier for linear address space is "address"; this is also the
-// identifier that should be used prior to hardware assignment.
+// By convention, the hardware class identifier for linear address space is "address" (and can be accessed
+// symbolically as kAddressClassIdentifier); this is also the identifier that should be used prior to hardware
+// assignment.
 class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
  public:
   using Base::Base;
@@ -148,10 +151,10 @@ class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
 };
 
 struct TensorRefTypeStorage : public mlir::TypeStorage {
-  TensorRefTypeStorage(Type elementType, size_t rank, bool is_const)
+  TensorRefTypeStorage(Type elementType, std::int64_t rank, bool is_const)
       : elementType(elementType), rank(rank), is_const(is_const) {}
 
-  using KeyTy = std::tuple<Type, size_t, bool>;
+  using KeyTy = std::tuple<Type, std::int64_t, bool>;
   bool operator==(const KeyTy& key) const {
     return elementType == std::get<0>(key) && rank == std::get<1>(key) && is_const == std::get<2>(key);
   }
@@ -163,7 +166,7 @@ struct TensorRefTypeStorage : public mlir::TypeStorage {
   }
 
   Type elementType;
-  size_t rank;
+  std::int64_t rank;
   bool is_const;
 };
 
@@ -173,7 +176,7 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
 
   static bool kindof(unsigned kind) { return kind == Types::TensorRef; }
 
-  static TensorRefType get(Type elementType, size_t rank, bool is_const) {
+  static TensorRefType get(Type elementType, std::int64_t rank, bool is_const) {
     return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const);
   }
 
@@ -185,7 +188,7 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
   Type getElementType() const { return getImpl()->elementType; }
 
   /// Return the rank.
-  int64_t getRank() const { return getImpl()->rank; }
+  std::int64_t getRank() const { return getImpl()->rank; }
 
   /// Check if things are const
   bool is_const() const { return getImpl()->is_const; }
