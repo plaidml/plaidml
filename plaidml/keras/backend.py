@@ -1141,7 +1141,7 @@ class OneHot(ptile.Operation):
             }}""".format(idim=', '.join(['I{}'.format(k) for k in range(indices.shape.ndims)]),
                          iidx=', '.join(['i{}'.format(k) for k in range(indices.shape.ndims)]))
 
-        outshape = ptile.Shape(plaidml.DType.BOOLEAN,
+        outshape = ptile.Shape(ptile.convert_np_dtype_to_pml(floatx()),
                                tuple(list(indices.shape.dims) + [num_classes]))
 
         super(OneHot, self).__init__(f, [('Idx', indices), ('Count', count)], [('O', outshape)])
