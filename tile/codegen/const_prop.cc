@@ -21,7 +21,7 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
   auto prog = state->entry();
   auto main = prog->SubBlock(0).get();
 
-  // Now, make the a main/prog block for the constant generation program
+  // Now, make the main/prog block for the constant generation program
   auto cmain = std::make_shared<stripe::Block>();
   auto cprog = std::make_shared<stripe::Block>();
   cprog->stmts.push_back(cmain);
@@ -94,6 +94,11 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
       size_t buf_size = cprog->ref_by_into(name)->interior_shape.byte_size();
       state->const_bufs->buffers.emplace(name, state->const_bufs->allocator->allocate(buf_size));
     }
+  }
+
+  if (all_const.empty()) {
+    // If there isn't any constant propagation work to be done, just bail
+    return;
   }
 
   // Now, we 'map' all the inputs + outputs

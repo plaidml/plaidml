@@ -26,7 +26,9 @@ lang::KernelList GenerateProgram(                    //
   options.dump_passes = !out_dir.empty();
   options.dump_passes_proto = !out_dir.empty();
   options.dbg_dir = out_dir + "/passes";
-  IVLOG(2, "Write passes to: " << options.dbg_dir);
+  if (options.dump_passes) {
+    IVLOG(2, "Write passes to: " << options.dbg_dir);
+  }
   IVLOG(2, *stripe->entry);
   const auto& cfgs = targets::GetConfigs();
   const auto& cfg = cfgs.configs().at(cfg_name);

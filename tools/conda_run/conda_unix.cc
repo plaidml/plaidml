@@ -40,6 +40,11 @@ int main(int argc, char* argv[]) {
     // Adjust environment variables to activate conda environment
     vertexai::env::Set("CONDA_DEFAULT_ENV", conda_env);
 
+    auto dyld_insert_libs = vertexai::env::Get("_DYLD_INSERT_LIBRARIES");
+    if (dyld_insert_libs.size()) {
+      vertexai::env::Set("DYLD_INSERT_LIBRARIES", dyld_insert_libs);
+    }
+
 #ifdef DEBUG
     // Useful debugging code
     std::cout << "argc: " << argc << std::endl;

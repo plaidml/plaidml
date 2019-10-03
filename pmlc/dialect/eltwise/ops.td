@@ -43,7 +43,7 @@ def ScalarConstantOp : EltwiseOp<"sconst", [NoSideEffect]>, HasFolder {
 }
 
 class UnaryOp<string mnemonic, list<OpTrait> traits = []> :
-    EltwiseOp<mnemonic, !listconcat(traits, [NoSideEffect])>,
+    EltwiseOp<mnemonic, traits>,
     HasCanonicalizer {
   let arguments = (ins Eltwise_AnyTensor:$in, TypeAttr:$type);
   let results = (outs Eltwise_AnyTensor:$result);
@@ -69,7 +69,7 @@ class UnaryOp<string mnemonic, list<OpTrait> traits = []> :
 }
 
 class BinaryOp<string mnemonic, list<OpTrait> traits = []> :
-    EltwiseOp<mnemonic, !listconcat(traits, [NoSideEffect])>,
+    EltwiseOp<mnemonic, traits>,
     HasCanonicalizer { 
   let arguments = (ins Eltwise_AnyTensor:$lhs, Eltwise_AnyTensor:$rhs, TypeAttr:$type);
   let results = (outs Eltwise_AnyTensor:$result);
@@ -95,7 +95,7 @@ class BinaryOp<string mnemonic, list<OpTrait> traits = []> :
 }
 
 class CompareOp<string mnemonic, list<OpTrait> traits = []> :
-    EltwiseOp<mnemonic, !listconcat(traits, [NoSideEffect])>,
+    EltwiseOp<mnemonic, traits>,
     HasCanonicalizer {
   let arguments = (ins Eltwise_AnyTensor:$lhs, Eltwise_AnyTensor:$rhs, TypeAttr:$type);
   let results = (outs Eltwise_BoolTensor:$result);
@@ -191,47 +191,47 @@ def AsBoolOp : EltwiseOp<"as_bool", [NoSideEffect]> {
   }];
 }
 
-def AbsOp : UnaryOp<"abs">;
-def ACosOp : UnaryFloatOp<"acos">;
-def AddOp : BinaryOp<"add", [Commutative]>;
-def AndOp : BinaryIntOp<"and", [Commutative]>;
-def ASinOp : UnaryFloatOp<"asin">;
-def AssignOp : UnaryOp<"assign">;
-def ATanOp : UnaryFloatOp<"atan">;
-def CeilOp : UnaryOp<"ceil">;
-def CmpEqOp : CompareOp<"cmp_eq", [Commutative]>;
-def CmpGeOp : CompareOp<"cmp_ge">;
-def CmpGtOp : CompareOp<"cmp_gt">;
-def CmpLeOp : CompareOp<"cmp_le">;
-def CmpLtOp : CompareOp<"cmp_lt">;
-def CmpNeOp : CompareOp<"cmp_ne", [Commutative]>;
-def CosHOp : UnaryFloatOp<"cosh">;
-def CosOp : UnaryFloatOp<"cos">;
-def DivOp : BinaryOp<"div">;
-def ExpOp : UnaryFloatOp<"exp">;
-def FloorOp : UnaryOp<"floor">;
+def AbsOp : UnaryOp<"abs", [NoSideEffect]>;
+def ACosOp : UnaryFloatOp<"acos", [NoSideEffect]>;
+def AddOp : BinaryOp<"add", [Commutative, NoSideEffect]>;
+def AndOp : BinaryIntOp<"and", [Commutative, NoSideEffect]>;
+def ASinOp : UnaryFloatOp<"asin", [NoSideEffect]>;
+def AssignOp : UnaryOp<"assign", [NoSideEffect]>;
+def ATanOp : UnaryFloatOp<"atan", [NoSideEffect]>;
+def CeilOp : UnaryOp<"ceil", [NoSideEffect]>;
+def CmpEqOp : CompareOp<"cmp_eq", [Commutative, NoSideEffect]>;
+def CmpGeOp : CompareOp<"cmp_ge", [NoSideEffect]>;
+def CmpGtOp : CompareOp<"cmp_gt", [NoSideEffect]>;
+def CmpLeOp : CompareOp<"cmp_le", [NoSideEffect]>;
+def CmpLtOp : CompareOp<"cmp_lt", [NoSideEffect]>;
+def CmpNeOp : CompareOp<"cmp_ne", [Commutative, NoSideEffect]>;
+def CosHOp : UnaryFloatOp<"cosh", [NoSideEffect]>;
+def CosOp : UnaryFloatOp<"cos", [NoSideEffect]>;
+def DivOp : BinaryOp<"div", [NoSideEffect]>;
+def ExpOp : UnaryFloatOp<"exp", [NoSideEffect]>;
+def FloorOp : UnaryOp<"floor", [NoSideEffect]>;
 def IdentOp : UnaryOp<"ident">;
-def LogOp : UnaryFloatOp<"log">;
-def MaxOp : BinaryOp<"max", [Commutative]>;
-def MinOp : BinaryOp<"min", [Commutative]>;
-def ModOp : BinaryOp<"mod">;
-def MulOp : BinaryOp<"mul", [Commutative]>, HasFolder;
-def NegOp : UnaryOp<"neg">;
-def NotOp : UnaryIntOp<"not">;
-def OrOp : BinaryIntOp<"or", [Commutative]>;
-def PowOp : BinaryOp<"pow">;
-def ReluOp : UnaryOp<"relu">;
-def RoundOp : UnaryOp<"round">;
-def ShlOp : BinaryIntOp<"shl">;
-def ShrOp : BinaryIntOp<"shr">;
-def SignOp : UnaryOp<"sign">;
-def SinHOp : UnaryFloatOp<"sinh">;
-def SinOp : UnaryFloatOp<"sin">;
-def SqrtOp : UnaryFloatOp<"sqrt">;
-def SubOp : BinaryOp<"sub">;
-def TanHOp : UnaryFloatOp<"tanh">;
-def TanOp : UnaryFloatOp<"tan">;
-def XorOp : BinaryIntOp<"xor", [Commutative]>;
+def LogOp : UnaryFloatOp<"log", [NoSideEffect]>;
+def MaxOp : BinaryOp<"max", [Commutative, NoSideEffect]>;
+def MinOp : BinaryOp<"min", [Commutative, NoSideEffect]>;
+def ModOp : BinaryOp<"mod", [NoSideEffect]>;
+def MulOp : BinaryOp<"mul", [Commutative, NoSideEffect]>, HasFolder;
+def NegOp : UnaryOp<"neg", [NoSideEffect]>;
+def NotOp : UnaryIntOp<"not", [NoSideEffect]>;
+def OrOp : BinaryIntOp<"or", [Commutative, NoSideEffect]>;
+def PowOp : BinaryOp<"pow", [NoSideEffect]>;
+def ReluOp : UnaryOp<"relu", [NoSideEffect]>;
+def RoundOp : UnaryOp<"round", [NoSideEffect]>;
+def ShlOp : BinaryIntOp<"shl", [NoSideEffect]>;
+def ShrOp : BinaryIntOp<"shr", [NoSideEffect]>;
+def SignOp : UnaryOp<"sign", [NoSideEffect]>;
+def SinHOp : UnaryFloatOp<"sinh", [NoSideEffect]>;
+def SinOp : UnaryFloatOp<"sin", [NoSideEffect]>;
+def SqrtOp : UnaryFloatOp<"sqrt", [NoSideEffect]>;
+def SubOp : BinaryOp<"sub", [NoSideEffect]>;
+def TanHOp : UnaryFloatOp<"tanh", [NoSideEffect]>;
+def TanOp : UnaryFloatOp<"tan", [NoSideEffect]>;
+def XorOp : BinaryIntOp<"xor", [Commutative, NoSideEffect]>;
 
 def GatherOp : EltwiseOp<"gather", [NoSideEffect]>, HasCanonicalizer {
   let summary = "special gather operation";

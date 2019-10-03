@@ -684,6 +684,15 @@ TEST(CppEdsl, DefractLong) {
   // exec::Executable::compile(program, {I, K})->run();
 }
 
+TEST(CppEdsl, DupOut) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
+  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
+  auto R = Dot(Dot(A, B), C);
+  Program program("dup_out", {R, R, R});
+  exec::Executable::compile(program, {A, B, C})->run();
+}
+
 }  // namespace
 }  // namespace edsl
 }  // namespace plaidml

@@ -21,8 +21,8 @@
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/contraction.h"
-#include "pmlc/dialect/tile/internal.h"
 #include "pmlc/dialect/tile/ops.h"
+#include "pmlc/dialect/tile/program.h"
 
 using mlir::Block;
 using mlir::ConversionPattern;
@@ -177,7 +177,8 @@ struct AffineDomainOpConversion : public LoweringBase {
 
     auto outputTensor = ConvertOutputTensor(op->getParentOfType<FuncOp>(), domainOp.result());
     if (!outputTensor) {
-      outputTensor = rewriter.create<stripe::AllocateOp>(op->getLoc(), outputTensorType).result();
+      auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), outputTensorType);
+      outputTensor = allocOp.result();
       Type tensorRefType = stripe::TensorRefType::get(outputTensorType);
       auto refOp = rewriter.create<stripe::TensorRefOp>(op->getLoc(), tensorRefType, outputTensor);
       outputTensor = refOp.result();
@@ -192,6 +193,11 @@ struct AffineDomainOpConversion : public LoweringBase {
     auto forOp = rewriter.create<stripe::ParallelForOp>(  //
         op->getLoc(),                                     //
         rewriter.getI64ArrayAttr(ranges));
+    std::vector<NamedAttribute> attrs{
+        {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
+        {rewriter.getIdentifier("kernel"), rewriter.getUnitAttr()},
+    };
+    forOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
     auto body = rewriter.createBlock(&forOp.inner());
 
     unsigned argcnt = 0;
@@ -244,7 +250,7 @@ struct AffineDomainOpConversion : public LoweringBase {
     // Combination Operation
     // TODO
     auto scalarType = outputTensorType.getElementType().cast<eltwise::ScalarType>();
-    auto comboOp = rewriter.create<eltwise::AddOp>(op->getLoc(), scalarType, locals[1], locals[2]);
+    auto comboOp = rewriter.create<eltwise::MulOp>(op->getLoc(), scalarType, locals[1], locals[2]);
 
     // STORE/Aggregate
     // TODO
@@ -307,8 +313,8 @@ struct FuncOpConversion : public LoweringBase {
     newFuncOp.setAttr("outputs", rewriter.getI32IntegerAttr(type.getNumResults()));
 
     for (unsigned i = 0; i < type.getNumInputs() + type.getNumResults(); i++) {
-      auto name = llvm::formatv("X{0}", i);
-      auto attrName = stripe::Dialect::getDialectAttrName(rewriter.getContext(), "name");
+      auto name = llvm::formatv("_X{0}", i);
+      auto attrName = stripe::Dialect::getDialectAttrName("name");
       newFuncOp.setArgAttr(i, attrName, rewriter.getStringAttr(name.str()));
     }
 
@@ -356,6 +362,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
           {builder.getIdentifier("main"), builder.getUnitAttr()},
       };
       forOp.setAttr(stripe::Dialect::getStripeAttrsName(), builder.getDictionaryAttr(attrs));
+      forOp.setAttr("name", builder.getStringAttr("main"));
       auto block = builder.createBlock(&forOp.inner());
       block->getOperations().splice(block->getOperations().end(), body->getOperations(), it, body->end());
 

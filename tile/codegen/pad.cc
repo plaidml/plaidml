@@ -2,6 +2,11 @@
 
 #include "tile/codegen/pad.h"
 
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <vector>
+
 #include "base/util/any_factory_map.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/localize.h"
@@ -223,8 +228,6 @@ void PrimeDimension(Block* block, const proto::PadPass& options) {
 }
 
 void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
-  AliasMap self(map, block);
-
   // Generate a map extents for possible padding candidates
   Extents extents;
   // Look for buffers that are used for multiply accumulates
@@ -233,7 +236,7 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
     if (QualifiedBlock(inner.get())) {
       // Add any inputs as possible candidates
       for (auto ref : inner->ref_ins()) {
-        std::string bname = self.at(ref->from).base_name;
+        std::string bname = map.at(ref->from).base_name;
         if (extents.count(bname)) {
           continue;
         }
@@ -241,14 +244,14 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
           extents[bname].emplace_back(a.constant());
         }
       }
-      ComputeExtents(inner.get(), self, &extents);
+      ComputeExtents(inner.get(), map, &extents);
     }
   }
   // Now decide which ones we will be padding, and which need caching
   std::set<std::string> to_pad;
   std::set<std::string> to_cache;
   for (auto& ref : block->refs) {
-    std::string bname = self.at(ref.into()).base_name;
+    std::string bname = map.at(ref.into()).base_name;
     auto it = extents.find(bname);
     if (it == extents.end()) {
       continue;
@@ -278,7 +281,7 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
         // accumulate are identity, the removing the constraint is safe
         for (auto ref : inner->ref_ins()) {
           for (size_t i = 0; i < ref->access.size(); i++) {
-            const auto& ai = self.at(ref->from);
+            const auto& ai = map.at(ref->from);
             // Check if constraint is a lower bound match
             if (ref->access[i] - con == Affine()) {
               is_safe = true;
@@ -302,10 +305,8 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   for (const auto& name : to_cache) {
     auto ref_it = block->ref_by_into(name);
     Location loc = ref_it->location;
-      ApplySimpleCache(self, IsWriteDir(ref_it->dir) ? RefDir::Out : RefDir::In,
-                       block, name, loc, Location(),
-                       {"kernel", "eltwise", "eltwise_padding"},
-                       {"kernel", "eltwise", "eltwise_padding"});
+    ApplySimpleCache(map, IsWriteDir(ref_it->dir) ? RefDir::Out : RefDir::In, block, name, loc, Location(),
+                     {"kernel", "eltwise", "eltwise_padding"}, {"kernel", "eltwise", "eltwise_padding"});
   }
 
   RefSize pad_sizes;
@@ -318,7 +319,7 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
     }
     std::vector<uint64_t> pad_size;
     old_refs.emplace(ref.into(), ref);
-    std::string bname = self.at(ref.into()).base_name;
+    std::string bname = map.at(ref.into()).base_name;
     const auto& exts = extents.at(bname);
     int64_t stride = 1;
     for (int i = exts.size() - 1; i >= 0; i--) {

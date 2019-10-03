@@ -1724,6 +1724,27 @@ class TestBackendOps(unittest.TestCase):
     def bigMatMul(self, b, A, B):
         return [b.dot(A, B)]
 
+    def testDupOutputs(self):
+
+        def model(b):
+            A = b.variable(m(10, 20), name='A')
+            B = b.variable(m(20, 30), name='B')
+            C = b.dot(A, B)
+            fn = b.function([], [C, C, C])
+            return fn([])
+
+        tf_session = tensorflow.Session()
+        tf.set_session(tf_session)
+        tensorflow_result = model(tf)
+        plaidml_result = model(pkb)
+
+        for result in zip(plaidml_result, tensorflow_result):
+            npt.assert_allclose(result[0],
+                                result[1],
+                                rtol=DEFAULT_TOL,
+                                atol=DEFAULT_ATOL,
+                                err_msg='x=plaidml, y=tensorflow')
+
 
 if __name__ == '__main__':
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

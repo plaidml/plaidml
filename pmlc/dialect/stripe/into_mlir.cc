@@ -430,7 +430,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg);
     initial.refs.emplace(ref.into(), tensorRefOp);
     // Only 'dialect attrs' are allowed on function arguments
-    auto attrName = Dialect::getDialectAttrName(builder.getContext(), "name");
+    auto attrName = Dialect::getDialectAttrName("name");
     func.setArgAttr(argIndex, attrName, builder.getStringAttr(ref.into()));
   }
 

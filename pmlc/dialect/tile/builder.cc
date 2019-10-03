@@ -30,8 +30,8 @@
 #include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
-#include "pmlc/dialect/tile/internal.h"
 #include "pmlc/dialect/tile/ops.h"
+#include "pmlc/dialect/tile/program.h"
 #include "tile/base/shape.h"
 
 namespace pmlc {
@@ -193,10 +193,10 @@ struct TileBuilder::Impl {
     OpBuilder domain_builder(body);
     for (auto value : slice) {
       auto op = value->getDefiningOp();
-      if (belong.count(value) ||                         //
-          llvm::dyn_cast<AffineSourceIndexMapOp>(op) ||  //
-          llvm::dyn_cast<AffineSinkIndexMapOp>(op) ||    //
-          llvm::dyn_cast<AffineSizeMapOp>(op)) {
+      if (belong.count(value) ||                    //
+          llvm::isa<AffineSourceIndexMapOp>(op) ||  //
+          llvm::isa<AffineSinkIndexMapOp>(op) ||    //
+          llvm::isa<AffineSizeMapOp>(op)) {
         auto new_value = domain_builder.clone(*op, mapper)->getResult(0);
         mapper.map(value, new_value);
       }
@@ -542,7 +542,11 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
       throw std::runtime_error("Invalid output");
     }
     resultTypes[i] = outputs[i]->getType();
-    values.insert(outputs[i]);
+    if (values.count(outputs[i])) {
+      values.insert(MakePrimitiveOp("ident", {outputs[i]}));
+    } else {
+      values.insert(outputs[i]);
+    }
   }
   auto slice = getBackwardSlice(values, true);
   // Compute the input types
@@ -583,8 +587,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   }
   // Add a final ReturnOp
   std::vector<mlir::Value*> rets;
-  for (unsigned i = 0; i < outputs.size(); i++) {
-    auto new_value = program->mapper.lookup(outputs[i]);
+  for (unsigned i = 0; i < values.size(); i++) {
+    auto new_value = program->mapper.lookup(values[i]);
     new_outputs[i] = new_value;
     rets.push_back(new_value);
   }

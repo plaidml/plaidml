@@ -72,9 +72,8 @@ mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) c
   return TensorRefType::get(t, ndims, is_const);
 }
 
-mlir::Identifier Dialect::getDialectAttrName(mlir::MLIRContext* ctx, llvm::StringRef name) {
-  auto dialectName = llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name);
-  return mlir::Identifier::get(dialectName.str(), ctx);
+std::string Dialect::getDialectAttrName(llvm::StringRef name) {
+  return llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name).str();
 }
 
 mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const {
