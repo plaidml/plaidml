@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/stripe/dialect.h"
 
+#include <utility>
+
 #include "mlir/IR/Dialect.h"
 #include "mlir/Parser.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -103,7 +105,7 @@ static void print(TensorType type, llvm::raw_ostream& os) {
   os << "tensor ";
   os << type.getElementType() << "(";
   auto shape = type.getShape();
-  for (uint64_t i = 0; i < type.getRank(); i++) {
+  for (int64_t i = 0; i < type.getRank(); i++) {
     const auto& dim = shape[i];
     if (i) {
       os << ", ";

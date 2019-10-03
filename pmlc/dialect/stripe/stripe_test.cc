@@ -92,7 +92,6 @@ TEST(Stripe, Transcode) {
 
   IVLOG(1, "Converting to MLIR");
   auto module = IntoMLIR(&context, *prog);
-  module->dump();
 
   IVLOG(1, "Verifying module");
   if (failed(module->verify())) {

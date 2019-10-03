@@ -157,11 +157,9 @@ def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let printer = [{ *p << getOperationName(); }];
 }
 
-def ReturnOp : StripeOp<"return", [Terminator, HasParent<"ParallelForOp">]> {
+def ExecuteOnOp : StripeOp<"execute_on", [Terminator, HasParent<"ParallelForOp">]> {
   let summary = "Indicates where a ParallelForOp should execute";
 
-  // 'from' represents the executor value being returned.  We're using a
-  // Variadic here in lieu of Optional; a Stripe Return op may only have zero
-  // or one argument/s.
-  let arguments = (ins Variadic<TensorRefType>:$from);
+  // 'from' represents the executor value being returned.
+  let arguments = (ins TensorRefType:$from);
 }
