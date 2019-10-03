@@ -166,14 +166,18 @@ struct TupleExpr : Expr {
   std::string str() const;
 };
 
+ExprPtr MakeGradOverride(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins,
+                         const ExprPtr& out);
+
+// TODO: Eventually add this convenience lookup function:
+// ExprPtr MakeGradOverride(const std::string& fn_name, const std::vector<ExprPtr>& ins, const ExprPtr& out);
+
 struct GradOverrideExpr : Expr {
   std::shared_ptr<ExprDerivEntry> fn;
   std::vector<ExprPtr> ins;  // These will have their derivatives overridden
   ExprPtr out;               // This will passthrough as the forward pass output; used as Y in calls to fn
 
   GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins, const ExprPtr& out);
-  // TODO: Eventually add this convenience lookup function:
-  // GradOverrideExpr(const std::string& fn_name, const std::vector<ExprPtr>& ins, const ExprPtr& out);
   void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
   void ComputeShape();

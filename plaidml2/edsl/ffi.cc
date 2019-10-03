@@ -663,7 +663,7 @@ plaidml_expr* plaidml_expr_grad_override(  //
       // TODO: Probably this can be streamlined
       out_value = out->value;
     }
-    ExprPtr expr = std::make_shared<GradOverrideExpr>(deriv_entry, in_exprs, out_expr);
+    ExprPtr expr = MakeGradOverride(deriv_entry, in_exprs, out_expr);
     // TODO: I think it's correct that we're ignoring `values`?
     mlir::Value* value = GlobalContext::get()->MakePrimitiveOp("ident", out_value);
     // TODO: Probably need to hook up the MLIR `value` instead of passing nullptr?
