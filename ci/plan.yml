@@ -319,11 +319,13 @@ SUITES:
         precision: high
         platform_overrides:
           keras-plaid-ocl-gfx803:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 64]
+          keras-stripe-ocl-neo:
+            prepend_args: [--examples, 512]
           keras-plaid-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
@@ -371,6 +373,8 @@ SUITES:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 64]
+          keras-stripe-ocl-gv100gl:
+            prepend_args: [--examples, 512]
           keras-plaid-ocl-neo:
             prepend_args: [--examples, 256]
           keras-stripe-ocl-neo:

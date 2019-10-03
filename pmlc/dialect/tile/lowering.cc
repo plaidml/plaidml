@@ -42,8 +42,6 @@ namespace dialect {
 namespace tile {
 
 struct TypeConverter : public mlir::TypeConverter {
-  explicit TypeConverter(MLIRContext* context) : context(context) {}
-
   using mlir::TypeConverter::convertType;
 
   Type convertType(Type type) override {
@@ -55,7 +53,7 @@ struct TypeConverter : public mlir::TypeConverter {
     if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
       IVLOG(4, "  RankedTensorType");
       auto shape = rankedType.getShape();
-      auto cls = mlir::Identifier::get("address", context);
+      auto cls = mlir::Identifier::get(stripe::kAddressClassIdentifier, type.getContext());
       llvm::SmallVector<stripe::TensorDim, 4> newShape(shape.size(), stripe::TensorDim{0, 0, cls});
       // TODO: instead of using natural strides, use the I/O map supplied by the user
       int64_t stride = 1;
@@ -73,12 +71,10 @@ struct TypeConverter : public mlir::TypeConverter {
     }
     return {};
   }
-
-  MLIRContext* context;
 };
 
 struct LoweringContext {
-  explicit LoweringContext(MLIRContext* context) : context(context), typeConverter(context) {}
+  explicit LoweringContext(MLIRContext* context) : context(context) {}
 
   MLIRContext* context;
   TypeConverter typeConverter;

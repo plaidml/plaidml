@@ -15,7 +15,7 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
-constexpr char kAddressClassIdentifier[] = "address";
+constexpr char kAddressClassIdentifier[] = "addr";
 
 namespace Types {
 enum Kinds {
