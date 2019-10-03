@@ -476,11 +476,11 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
   ret->entry = builder.getResult();
   for (const auto& ref : ret->entry->SubBlock(0)->refs) {
     if (IsReadDir(ref.dir)) {
-      IVLOG(1, "input_shape: " << ref.from << " = " << ref.interior_shape);
+      IVLOG(2, "input_shape: " << ref.from << " = " << ref.interior_shape);
       ret->input_shapes.emplace(ref.from, ref.interior_shape);
     }
     if (IsWriteDir(ref.dir)) {
-      IVLOG(1, "output_shape: " << ref.from << " = " << ref.interior_shape);
+      IVLOG(2, "output_shape: " << ref.from << " = " << ref.interior_shape);
       ret->output_shapes.emplace(ref.from, ref.interior_shape);
     }
   }

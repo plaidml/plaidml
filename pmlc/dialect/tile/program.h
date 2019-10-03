@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include <map>
+#include <unordered_map>
 
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Module.h"
@@ -16,7 +16,7 @@ namespace tile {
 struct TileProgram {
   mlir::OwningModuleRef module;
   mlir::BlockAndValueMapping mapper;
-  std::map<mlir::Value*, vertexai::tile::BufferPtr> ioMap;
+  std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr> ioMap;
 
   explicit TileProgram(mlir::ModuleOp module) : module(module) {}
 };

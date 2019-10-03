@@ -210,6 +210,7 @@ def CosOp : UnaryFloatOp<"cos", [NoSideEffect]>;
 def DivOp : BinaryOp<"div", [NoSideEffect]>;
 def ExpOp : UnaryFloatOp<"exp", [NoSideEffect]>;
 def FloorOp : UnaryOp<"floor", [NoSideEffect]>;
+// Prevent CSE from dropping 'ident' by avoiding the NoSideEffect trait
 def IdentOp : UnaryOp<"ident">;
 def LogOp : UnaryFloatOp<"log", [NoSideEffect]>;
 def MaxOp : BinaryOp<"max", [Commutative, NoSideEffect]>;

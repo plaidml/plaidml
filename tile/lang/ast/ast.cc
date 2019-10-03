@@ -2,7 +2,7 @@
 
 #include "tile/lang/ast/ast.h"
 
-#include <set>
+#include <unordered_set>
 
 #include <boost/format.hpp>
 
@@ -525,7 +525,7 @@ class ProgramEvaluator : public AstVisitor<void> {
   }
 
  private:
-  std::set<std::string> names_;
+  std::unordered_set<std::string> names_;
   std::unordered_map<const Expr*, Binding> bindings_by_expr_;
   ProgramEvaluation eval_;
 };
@@ -601,7 +601,7 @@ class ExprOptimizer : public AstPass {
 };
 
 ProgramEvaluation Evaluate(const std::string& name, ProgramMutations mutations) {
-  std::set<Expr*> dups;
+  std::unordered_set<Expr*> dups;
   for (size_t i = 0; i < mutations.outputs.size(); i++) {
     auto output = mutations.outputs[i];
     auto ptr = output.get();
