@@ -1417,6 +1417,8 @@ void Compiler::AggInitAdd(const stripe::Special& agg_init) {
   } else if (is_int(dest_shape.type) || is_uint(dest_shape.type)) {
     auto apval = llvm::APInt::getNullValue(bits);
     init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (DataType::BOOLEAN == dest_shape.type) {
+    init_val = builder_.getFalse();
   }
   AggInit(dest, init_val);
 }
@@ -1435,6 +1437,8 @@ void Compiler::AggInitMul(const stripe::Special& agg_init) {
   } else if (is_int(dest_shape.type) || is_uint(dest_shape.type)) {
     auto apval = llvm::APInt(bits, 1);
     init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (DataType::BOOLEAN == dest_shape.type) {
+    init_val = builder_.getTrue();
   }
   AggInit(dest, init_val);
 }
@@ -1456,6 +1460,8 @@ void Compiler::AggInitMin(const stripe::Special& agg_init) {
   } else if (is_uint(dest_shape.type)) {
     auto apval = llvm::APInt::getMaxValue(bits);
     init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (DataType::BOOLEAN == dest_shape.type) {
+    init_val = builder_.getTrue();
   }
   AggInit(dest, init_val);
 }
@@ -1477,6 +1483,8 @@ void Compiler::AggInitMax(const stripe::Special& agg_init) {
   } else if (is_uint(dest_shape.type)) {
     auto apval = llvm::APInt::getMinValue(bits);
     init_val = llvm::ConstantInt::get(eltype, apval);
+  } else if (DataType::BOOLEAN == dest_shape.type) {
+    init_val = builder_.getFalse();
   }
   AggInit(dest, init_val);
 }
