@@ -59,11 +59,20 @@ class AstTraversal : public AstVisitor<void> {
     }
   }
 
+  void Visit(const GradOverrideExpr& expr) final {
+    // push inputs from right-to-left so they eventually get processed in left-to-right order
+    // similarly, push `out` before pushing inputs
+    IVLOG(6, "Visiting GradOverrideExpr (in AstTraversal): " << &expr);
+    Push(expr.out);
+    for (auto it = expr.ins.rbegin(); it != expr.ins.rend(); ++it) {
+      Push(*it);
+    }
+  }
+
   void Visit(const DimExprExpr& expr) final {}
   void Visit(const FloatConst& expr) final {}
   void Visit(const IntConst& expr) final {}
   void Visit(const ParamExpr& expr) final {}
-  void Visit(const GradOverrideExpr& expr) final {}
 
  private:
   void Push(const ExprPtr& expr) {

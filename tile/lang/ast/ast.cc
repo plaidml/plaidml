@@ -214,8 +214,10 @@ class ShapeEvaluator : public AstVisitor<void> {
   }
 
   void Visit(const GradOverrideExpr& expr) final {
-    // Forward-pass GradOverrideExprs are no-ops, so do nothing
+    // Forward-pass GradOverrideExprs are no-ops, so do nothing?
     // TODO: Or should I be copying the output?
+    // TODO: Here I'm trying just copying the above...
+    bindings_by_expr_->emplace(&expr, Binding{IntoTensorShape(expr.shape)});
   }
 
  private:
@@ -398,6 +400,7 @@ class ProgramEvaluator : public AstVisitor<void> {
   void Visit(const GradOverrideExpr& expr) final {
     // Forward-pass GradOverrideExprs are no-ops; create an ident fcn
     // TODO: is this right?
+    IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
     auto name = NewTmp(expr);
     auto out_name = safe_at(&eval_.names_by_expr, expr.out.get());
     Op op{
@@ -755,6 +758,12 @@ std::string GradOverrideExpr::str() const {
   // TODO: would be best to upgrade this somehow...
   std::stringstream ss;
   ss << "grad_override";
+  // TODO: Decide whether to keep this more extensive output
+  // ss << "{" << fn << "(";
+  // for (const auto& in : ins) {
+  //   ss << in << ", ";
+  // }
+  // ss << ") -> " << out << "}";
   return ss.str();
 }
 

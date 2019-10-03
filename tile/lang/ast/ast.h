@@ -174,7 +174,7 @@ struct GradOverrideExpr : Expr {
   GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins, const ExprPtr& out);
   // TODO: Eventually add this convenience lookup function:
   // GradOverrideExpr(const std::string& fn_name, const std::vector<ExprPtr>& ins, const ExprPtr& out);
-  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }  // TODO: Actually implement Visit
+  void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
 };
 

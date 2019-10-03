@@ -611,6 +611,7 @@ plaidml_expr* plaidml_expr_grad_override(  //
     plaidml_deriv fn = reinterpret_cast<plaidml_deriv>(user_fn);
     std::vector<plaidml_expr*> X_exprs(Xs.size());
     std::vector<plaidml_expr*> dX_exprs(Xs.size());
+    // TODO: Construct the plaidml_exprs here w/ MLIR values too?
     auto Y_expr = new plaidml_expr{Y};
     auto dY_expr = new plaidml_expr{dY};
     for (size_t i = 0; i < X_exprs.size(); i++) {
@@ -631,7 +632,9 @@ plaidml_expr* plaidml_expr_grad_override(  //
     deriv_entry->user_fn = reinterpret_cast<void*>(fn);
     deriv_entry->user_ctx = user_ctx;
     std::vector<ExprPtr> in_exprs(nins);
+    std::vector<mlir::Value*> in_values(nins);
     ExprPtr out_expr;
+    mlir::Value* out_value;
     for (size_t i = 0; i < nins; i++) {
       if (!ins[i]) {
         throw std::runtime_error("Undefined input tensor in gradient override");
@@ -640,6 +643,12 @@ plaidml_expr* plaidml_expr_grad_override(  //
         in_exprs[i] = ins[i]->expr;
       } else {
         throw std::runtime_error("TODO: Probably we need to support values for MLIR?");
+      }
+      // TODO: Do we actually need to do this?
+      if (ins[i]->value) {
+        in_values[i] = ins[i]->value;
+      } else {
+        throw std::runtime_error("TODO: Something lacks a value and it's not supported...");
       }
     }
     if (!out) {
@@ -650,8 +659,15 @@ plaidml_expr* plaidml_expr_grad_override(  //
     } else {
       throw std::runtime_error("TODO: Probably we need to support values for MLIR? (on output)");
     }
+    if (out->value) {
+      // TODO: Probably this can be streamlined
+      out_value = out->value;
+    }
     ExprPtr expr = std::make_shared<GradOverrideExpr>(deriv_entry, in_exprs, out_expr);
-    return new plaidml_expr{expr, nullptr};
+    // TODO: I think it's correct that we're ignoring `values`?
+    mlir::Value* value = GlobalContext::get()->MakePrimitiveOp("ident", out_value);
+    // TODO: Probably need to hook up the MLIR `value` instead of passing nullptr?
+    return new plaidml_expr{expr, value};
   });
 }
 
@@ -966,6 +982,7 @@ void plaidml_deriv_register(  //
     plaidml_deriv fn = reinterpret_cast<plaidml_deriv>(user_fn);
     std::vector<plaidml_expr*> X_exprs(Xs.size());
     std::vector<plaidml_expr*> dX_exprs(Xs.size());
+    // TODO: Initialize the exprs here w/ MLIR values too?
     auto Y_expr = new plaidml_expr{Y};
     auto dY_expr = new plaidml_expr{dY};
     for (size_t i = 0; i < X_exprs.size(); i++) {
