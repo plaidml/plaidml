@@ -767,6 +767,12 @@ std::string GradOverrideExpr::str() const {
   return ss.str();
 }
 
+void GradOverrideExpr::ComputeShape() {
+  IVLOG(5, "GradOverrideExpr::ComputeShape> fn: " << fn);
+  IVLOG(5, "  " << out->shape.str());
+  shape = out->shape;
+}
+
 CallExpr::CallExpr(const std::string& fn, const std::vector<ExprPtr>& args)
     : fn(fn),  //
       args(args) {}

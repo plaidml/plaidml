@@ -176,6 +176,7 @@ struct GradOverrideExpr : Expr {
   // GradOverrideExpr(const std::string& fn_name, const std::vector<ExprPtr>& ins, const ExprPtr& out);
   void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
+  void ComputeShape();
 };
 
 ExprPtr MakeCall(const std::string& fn, const std::vector<ExprPtr>& args);

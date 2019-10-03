@@ -167,7 +167,13 @@ class AstPassRunner : AstVisitor<void> {
   // TODO
   void Visit(const GradOverrideExpr& expr) final {
     IVLOG(4, "AstPassRunner::Visit(GradOverrideExpr)> " << &expr);
-    GenericVisit(expr, expr);
+    auto new_expr = std::make_shared<GradOverrideExpr>(expr.fn, expr.ins, expr.out);
+    for (size_t i = 0; i < expr.ins.size(); i++) {
+      new_expr->ins[i] = Translate(expr.ins[i]);
+    }
+    new_expr->out = Translate(expr.out);
+    new_expr->ComputeShape();
+    GenericVisit(expr, *new_expr);
   }
 
  private:
