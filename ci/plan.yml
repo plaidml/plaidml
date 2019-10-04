@@ -254,11 +254,11 @@ SUITES:
     timeout: 30
     conda_env: conda/plaidml.yml
     compare: no
-    cwd: plaidml2/bridge/keras
+    cwd: plaidml2
     runner: python
     workloads:
       backend:
-        args: [backend_test.py]
+        args: [bridge/keras/backend_test.py]
         precision: untested
         shards: 3
 
