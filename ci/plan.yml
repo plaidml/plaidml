@@ -239,7 +239,7 @@ SUITES:
             soft_fail: true
 
   base2:
-    # TODO: Merge this suite back into base
+    # TODO: Merge this suite back into base once the directory structure coalesces
     platforms:
       keras-stripe-ocl-gp100gl:
         pipelines: [plaidml, nightly]
@@ -251,10 +251,6 @@ SUITES:
         batch_sizes: [0]
       nightly:
         batch_sizes: [0]
-    wheels:
-      # NOTE: this list must be in least to most dependent order.
-      - plaidml-{version}-py2.py3-none-{arch}.whl
-      - plaidml_keras-{version}-py2.py3-none-any.whl
     timeout: 30
     conda_env: conda/plaidml.yml
     compare: no
