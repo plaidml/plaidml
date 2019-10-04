@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mlir/IR/Dialect.h"
 
 namespace pmlc {
@@ -13,7 +15,7 @@ class Dialect : public mlir::Dialect {
   explicit Dialect(mlir::MLIRContext* ctx);
 
   static llvm::StringRef getDialectNamespace() { return "stripe"; }
-  static mlir::Identifier getDialectAttrName(mlir::MLIRContext* ctx, llvm::StringRef name);
+  static std::string getDialectAttrName(llvm::StringRef name);
   static llvm::StringRef getStripeAttrsName() { return "stripe_attrs"; }
 
   mlir::Type parseTensor(llvm::StringRef tyData, mlir::Location loc) const;

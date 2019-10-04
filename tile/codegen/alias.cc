@@ -2,6 +2,10 @@
 
 #include "tile/codegen/alias.h"
 
+#include <algorithm>
+#include <set>
+#include <utility>
+
 #include <boost/format.hpp>
 
 #include "base/util/stream_container.h"
@@ -308,8 +312,7 @@ void AliasMap::AddConstraintForIndex(stripe::Block* block,         //
         block->constraints.push_back(idx_passthru ? (Affine(top_index) - Affine(global_idx_name))
                                                   : (Affine(top_index) - Affine(global_idx_name) - Affine(idx_name)));
       }
-    }
-    else {
+    } else {
       Affine exp = translate(alias_info.access[idx]);
       if (underflow) {
         block->constraints.push_back(exp);
@@ -369,8 +372,7 @@ void AliasMap::AddPassthruIdx(Block* outer, Affine exp) {
       if (it.second == depth - 1) {
         std::string new_idx = MakePassthruIdx(this_block, it.first);
         to_build_next.push_back(std::make_pair(new_idx, depth));
-      }
-      else {
+      } else {
         to_build_next.push_back(std::make_pair(it.first, it.second));
       }
     }
@@ -390,8 +392,7 @@ void AliasMap::AddConstraintsForRef(const Refinement& ref) {
   AliasMap this_map(parent_map, this_block_);
   const auto& new_ai = at(ref.into());
   for (size_t i = 0; i < ref.interior_shape.dims.size(); ++i) {
-    this_map.AddConstraintForIndex(this_block_, new_ai, i,
-       "", ref.interior_shape.dims[i].size <= 1);
+    this_map.AddConstraintForIndex(this_block_, new_ai, i, "", ref.interior_shape.dims[i].size <= 1);
   }
 }
 
@@ -409,8 +410,7 @@ void AliasMap::AddConstraintsForBlock() {
   for (const auto& ref : this_block_->refs) {
     const auto& new_ai = at(ref.into());
     for (size_t i = 0; i < ref.interior_shape.dims.size(); ++i) {
-      this_map.AddConstraintForIndex(this_block_, new_ai, i,
-         "", ref.interior_shape.dims[i].size <= 1);
+      this_map.AddConstraintForIndex(this_block_, new_ai, i, "", ref.interior_shape.dims[i].size <= 1);
     }
   }
 }

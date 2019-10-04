@@ -134,7 +134,7 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
   for (size_t i = 0; i < func.getNumArguments(); i++) {
     // add refinement for each arg
     auto arg = func.getArgument(i);
-    auto attrName = Dialect::getDialectAttrName(func.getContext(), "name");
+    auto attrName = Dialect::getDialectAttrName("name");
     auto name = func.getArgAttr(i, attrName).cast<StringAttr>().getValue();
     // Compute all the info about the tensor
     auto ti = ComputeAccessAndLoc(arg).first;
@@ -592,6 +592,16 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
   StripeBuilder builder(func);
   auto ret = std::make_shared<stripe::Program>();
   ret->entry = builder.getResult();
+  for (const auto& ref : ret->entry->SubBlock(0)->refs) {
+    if (IsReadDir(ref.dir)) {
+      IVLOG(2, "input_shape: " << ref.from << " = " << ref.interior_shape);
+      ret->input_shapes.emplace(ref.from, ref.interior_shape);
+    }
+    if (IsWriteDir(ref.dir)) {
+      IVLOG(2, "output_shape: " << ref.from << " = " << ref.interior_shape);
+      ret->output_shapes.emplace(ref.from, ref.interior_shape);
+    }
+  }
   return ret;
 }
 

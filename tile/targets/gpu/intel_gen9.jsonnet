@@ -83,15 +83,15 @@ local PARAMS = {
             },
 
             // Reorder Blocks
-            
+
             {
               name: 'reorder_blocks',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ReorderBlocksPass',
               },
             },
-           
-            /* 
+
+            /*
             // No-op MLIR pass to induce transcoding
             {
               name: 'mlir_pad',

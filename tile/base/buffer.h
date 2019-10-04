@@ -57,6 +57,9 @@ class View {
   size_t size_ = 0;
 };
 
+class Buffer;
+using BufferPtr = std::shared_ptr<Buffer>;
+
 // Buffer represents a buffer residing on some Platform.
 class Buffer {
  public:
@@ -73,19 +76,19 @@ class Buffer {
   // existing contents.
   virtual std::unique_ptr<View> MapDiscard(const context::Context& ctx) = 0;
 
-  virtual std::shared_ptr<Buffer> Clone() { throw std::runtime_error("Not implemented"); }
+  virtual BufferPtr Clone() { throw std::runtime_error("Not implemented"); }
 };
 
 class Allocator {
  public:
   virtual ~Allocator() {}
-  virtual std::shared_ptr<Buffer> allocate(size_t size) = 0;
+  virtual BufferPtr allocate(size_t size) = 0;
 };
 
 // A mechanism used to modify / optimize constant buffers during compilation
 struct ConstBufferManager {
   std::shared_ptr<Allocator> allocator;
-  std::map<std::string, std::shared_ptr<Buffer>> buffers;
+  std::map<std::string, BufferPtr> buffers;
 };
 
 // A simple buffer backed by a std::vector
@@ -112,7 +115,7 @@ class SimpleBuffer : public Buffer, public std::enable_shared_from_this<SimpleBu
     return std::make_unique<SimpleView>(data_.data(), data_.size());
   }
 
-  std::shared_ptr<Buffer> Clone() final { return std::make_shared<SimpleBuffer>(data_); }
+  BufferPtr Clone() final { return std::make_shared<SimpleBuffer>(data_); }
 
  private:
   std::vector<char> data_;
