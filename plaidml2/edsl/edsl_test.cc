@@ -70,6 +70,14 @@ TEST(CppEdsl, DoubleDot) {
   exec::Executable::compile(program, {A, B, C})->run();
 }
 
+TEST(CppEdsl, EltwiseAdd) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto C = A + B;
+  Program program("eltwise_add", {C});
+  exec::Executable::compile(program, {A, B})->run();
+}
+
 TEST(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
   auto input = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});

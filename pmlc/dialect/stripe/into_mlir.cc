@@ -5,6 +5,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "base/util/lookup.h"
+#include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/eltwise/util.h"
 #include "pmlc/dialect/stripe/analysis.h"
@@ -146,99 +147,27 @@ static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const S
   return offsets;
 }
 
-namespace {
-
-template <typename OpType>
-struct IntrinsicBuildImpl {
-  static Operation* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic,
-                          const llvm::ArrayRef<Value*>& inputs) {
-    if (OpType::operands() != inputs.size()) {
-      std::cerr << intrinsic;
-      throw std::runtime_error("Mismatched intrinsic size");
-    }
-    ScalarType intrinsic_type = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
-    auto inst = builder->create<OpType>(builder->getUnknownLoc(), intrinsic_type, inputs);
-    return inst;
-  }
-};
-
-IntegerAttr ExtractIntegerConstant(Value* val) {
-  auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(val->getDefiningOp());
-  if (!op) {
-    throw std::runtime_error("Invalid constant");
-  }
-  auto attr = op.getValue().dyn_cast<IntegerAttr>();
-  if (!attr) {
-    throw std::runtime_error("Constant is not an integer");
-  }
-  return attr;
-}
-
-template <typename CastOpType>
-struct CastIntrinsicBuildImpl {
-  static Operation* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic,
-                          const llvm::ArrayRef<Value*>& inputs) {
-    if (inputs.size() != 2) {
-      throw std::runtime_error("as_float needs to params");
-    }
-    auto bit_width = ExtractIntegerConstant(inputs[1]);
-    auto inst = builder->create<CastOpType>(builder->getUnknownLoc(), inputs[0], bit_width);
-    return inst;
-  }
-};
-
-template <>
-struct IntrinsicBuildImpl<eltwise::AsFloatOp> : CastIntrinsicBuildImpl<eltwise::AsFloatOp> {};
-template <>
-struct IntrinsicBuildImpl<eltwise::AsIntOp> : CastIntrinsicBuildImpl<eltwise::AsIntOp> {};
-template <>
-struct IntrinsicBuildImpl<eltwise::AsUIntOp> : CastIntrinsicBuildImpl<eltwise::AsUIntOp> {};
-
-struct IntrinsicBuilder {
-  OpBuilder* builder;
-  SymbolTable* locals;
-  const stripe::Intrinsic& intrinsic;
-  std::string name;
-  bool done;
-
-  IntrinsicBuilder(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic)
-      : builder(builder),  //
-        locals(locals),
-        intrinsic(intrinsic),
-        name("eltwise." + intrinsic.name),
-        done(false) {
-    if (name == "eltwise.cond") {
-      name = "eltwise.select";
-    }
-  }
-
-  template <class OpType>
-  void apply() {
-    if (name != OpType::getOperationName()) {
-      return;
-    }
-    llvm::SmallVector<Value*, 8> inputs;
-    for (const auto& in : intrinsic.inputs) {
-      inputs.push_back(safe_at(locals->scalars, in));
-    }
-    Operation* r = IntrinsicBuildImpl<OpType>::apply(builder, intrinsic, inputs);
-    locals->scalars.emplace(intrinsic.outputs[0], r->getResult(0));
-    r->setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
-    done = true;
-  }
-};
-
-}  // namespace
-
 static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
   }
-  IntrinsicBuilder intrinsic_builder(builder, locals, intrinsic);
-  eltwise::ForAllOps(intrinsic_builder);
-  if (!intrinsic_builder.done) {
+  auto opName = eltwise::Dialect::getCanonicalOpName(intrinsic.name);
+  auto abstractOp = mlir::AbstractOperation::lookup(opName, builder->getContext());
+  if (!abstractOp) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
+  auto eltwiseBuilder = abstractOp->getInterface<eltwise::EltwiseBuilder>();
+  if (!eltwiseBuilder) {
+    throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
+  }
+  llvm::SmallVector<Value*, 8> operands;
+  for (const auto& in : intrinsic.inputs) {
+    operands.push_back(safe_at(locals->scalars, in));
+  }
+  ScalarType scalarType = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
+  auto op = eltwiseBuilder->create(builder, builder->getUnknownLoc(), scalarType, operands);
+  locals->scalars.emplace(intrinsic.outputs[0], op->getResult(0));
+  op->setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
 }
 
 template <typename T>
@@ -375,7 +304,10 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
     }
     auto refOp = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets);
     refOp.setAttr("name", builder->getStringAttr(ref.into()));
-    refOp.setAttr(Dialect::getStripeAttrsName(), TagsToDict(builder, ref));
+    auto attrs = TagsToDict(builder, ref);
+    if (attrs.size()) {
+      refOp.setAttr(Dialect::getStripeAttrsName(), attrs);
+    }
     locals.refs.emplace(ref.into(), refOp.result());
   }
 
@@ -402,7 +334,10 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         auto elementType = tensorRefType.getElementType();
         auto intoType = eltwise::GetTensorType(elementType);
         auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
-        op.setAttr(Dialect::getStripeAttrsName(), TagsToDict(builder, *load));
+        auto attrs = TagsToDict(builder, *load);
+        if (attrs.size()) {
+          op.setAttr(Dialect::getStripeAttrsName(), attrs);
+        }
         op.setAttr("scalar_name", builder->getStringAttr(load->into));
         locals.scalars.emplace(load->into, op);
       } break;
@@ -424,7 +359,9 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         if (agg_str == "" || agg_str == "assign") {
           // Simple case, just an assignment
           auto op = builder->create<StoreOp>(unknownLoc, into, from);
-          op.setAttr(Dialect::getStripeAttrsName(), attrs);
+          if (attrs.size()) {
+            op.setAttr(Dialect::getStripeAttrsName(), attrs);
+          }
         } else {
           // Aggregation case
           llvm::Optional<AggTypeEnum> agg_type = symbolizeAggTypeEnum(agg_str);
@@ -434,7 +371,9 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
           int64_t agg_int = static_cast<int>(agg_type.getValue());
           IntegerAttr agg_attr = builder->getI64IntegerAttr(agg_int);
           auto op = builder->create<AggregateOp>(unknownLoc, into, from, agg_attr);
-          op.setAttr(Dialect::getStripeAttrsName(), attrs);
+          if (attrs.size()) {
+            op.setAttr(Dialect::getStripeAttrsName(), attrs);
+          }
         }
       } break;
       case stripe::StmtKind::Constant: {
@@ -480,7 +419,10 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   auto loop_op = builder->create<ParallelForOp>(unknownLoc, builder->getI64ArrayAttr(ranges));
   loop_op.setAttr("name", builder->getStringAttr(block.name));
   loop_op.setAttr("comments", builder->getStringAttr(block.comments));
-  loop_op.setAttr(Dialect::getStripeAttrsName(), TagsToDict(builder, block));
+  auto attrs = TagsToDict(builder, block);
+  if (attrs.size()) {
+    loop_op.setAttr(Dialect::getStripeAttrsName(), attrs);
+  }
   for (const auto& kvp : argAttrs) {
     loop_op.setAttr(kvp.first, kvp.second);
   }
@@ -528,7 +470,10 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     func.setArgAttr(argIndex, attrName, builder.getStringAttr(ref.into()));
   }
 
-  func.setAttr(Dialect::getStripeAttrsName(), TagsToDict(&builder, block));
+  auto attrs = TagsToDict(&builder, block);
+  if (attrs.size()) {
+    func.setAttr(Dialect::getStripeAttrsName(), attrs);
+  }
 
   BlockIntoMLIR(&builder, initial, *block.SubBlock(0));
   builder.create<TerminateOp>(loc);

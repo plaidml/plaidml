@@ -274,6 +274,19 @@ struct AffineDomainOpConversion : public LoweringBase {
   }
 };
 
+struct EltwiseOpConversion : public LoweringBase {
+  explicit EltwiseOpConversion(LoweringContext* lowering, StringRef opName)  //
+      : LoweringBase(opName, lowering) {}
+
+  PatternMatchResult matchAndRewrite(   //
+      Operation* op,                    //
+      llvm::ArrayRef<Value*> operands,  //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "EltwiseOpConversion::matchAndRewrite> " << *op);
+    return matchFailure();
+  }
+};
+
 struct FuncOpConversion : public LoweringBase {
   explicit FuncOpConversion(LoweringContext* lowering)  //
       : LoweringBase(FuncOp::getOperationName(), lowering) {}
@@ -331,6 +344,13 @@ struct FuncOpConversion : public LoweringBase {
   }
 };
 
+struct OpCollector {
+  template <class OpType>
+  void apply() {}
+
+  std::vector<llvm::StringRef> ops;
+};
+
 struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   void runOnModule() override {
     LoweringContext lowering{&getContext()};
@@ -350,6 +370,11 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         AffineDomainOpConversion,    //
         FuncOpConversion,            //
         ReturnOpConversion>(&lowering);
+    OpCollector collector;
+    // eltwise::ForAllOps(&collector);
+    // for (auto opName : collector.ops) {
+    //   patterns.insert<EltwiseOpConversion>(&lowering, opName);
+    // }
     if (failed(applyPartialConversion(getModule(), target, patterns, &lowering.typeConverter))) {
       emitError(mlir::UnknownLoc::get(&getContext()), "Error lowering tile -> stripe\n");
       signalPassFailure();

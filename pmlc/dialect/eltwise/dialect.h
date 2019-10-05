@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mlir/IR/Dialect.h"
 
 namespace pmlc {
@@ -13,6 +15,7 @@ class Dialect : public mlir::Dialect {
   explicit Dialect(mlir::MLIRContext* ctx);
 
   static llvm::StringRef getDialectNamespace() { return "eltwise"; }
+  static std::string getCanonicalOpName(llvm::StringRef name);
 
   mlir::Type parseType(llvm::StringRef spec, mlir::Location loc) const override;
   void printType(mlir::Type type, llvm::raw_ostream& os) const override;

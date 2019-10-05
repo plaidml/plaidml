@@ -31,39 +31,6 @@ mlir::OpFoldResult ScalarConstantOp::fold(ArrayRef<Attribute> operands) {
   return getValue();
 }
 
-namespace {
-
-IntegerAttr getIntAttr(Value* value) {
-  auto op = value->getDefiningOp();
-  IntegerAttr attr;
-  if (!mlir::m_Constant(&attr).match(op)) {
-    throw std::runtime_error("CastOp requires 2nd operand to be a constant integer");
-  }
-  return attr;
-}
-
-template <typename OpType>
-struct CastOp {
-  static void build(Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands) {
-    if (operands.size() != 2) {
-      throw std::runtime_error("Expected 2 operands");
-    }
-    auto tensor = operands[0];
-    auto bitwidth = getIntAttr(operands[1]);
-    result->addOperands(operands[0]);
-    result->addAttribute("bitwidth", bitwidth);
-    result->addTypes(OpType::getResultType(tensor, bitwidth));
-  }
-
-  static void build(Builder* builder, OperationState* result, Value* tensor, IntegerAttr bitwidth) {
-    result->addOperands(tensor);
-    result->addAttribute("bitwidth", bitwidth);
-    result->addTypes(OpType::getResultType(tensor, bitwidth));
-  }
-};
-
-}  // namespace
-
 //
 // ---- CastOp ----
 //
@@ -76,32 +43,32 @@ struct CastCanonicalizer : public OpRewritePattern<OpType> {
     IVLOG(5, "CastCanonicalizer::matchAndRewrite> " << mlir::debugString(castOp));
     auto op = castOp.getOperation();
     auto tensor = castOp.tensor();
-    auto bitwidth = op->getAttr("bitwidth").template cast<IntegerAttr>();
-    auto resultType = OpType::getResultType(tensor, bitwidth);
+    auto tensorType = GetTensorType(tensor->getType());
+    auto resultTensorType = GetTensorType(castOp.result()->getType());
+    auto elementType = resultTensorType.getElementType();
+    auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
     if (resultType == castOp.result()->getType()) {
       return Pattern::matchFailure();
     }
-    auto newOp = rewriter.create<OpType>(op->getLoc(), tensor, bitwidth);
+    auto newOp = rewriter.create<OpType>(op->getLoc(), resultType, tensor);
     rewriter.replaceOp(op, {newOp});
     UpdateFuncOpType(newOp.getOperation());
     return Pattern::matchSuccess();
   }
 };
 
-void AsFloatOp::build(Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands) {
-  CastOp<AsFloatOp>::build(builder, result, type, operands);
-}
-
-void AsFloatOp::build(Builder* builder, OperationState* result, Value* tensor, IntegerAttr bitwidth) {
-  CastOp<AsFloatOp>::build(builder, result, tensor, bitwidth);
-}
-
 void AsFloatOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
   results.insert<CastCanonicalizer<AsFloatOp>>(context);
 }
 
-Type AsFloatOp::getResultType(Value* tensor, IntegerAttr bitwidth) {
+Type AsFloatOp::getResultType(ArrayRef<Value*> operands) {
   IVLOG(5, "AsFloatOp::getResultType>")
+  auto tensor = operands[0];
+  auto bitwidthOp = operands[1]->getDefiningOp();
+  IntegerAttr bitwidth;
+  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
+    throw std::runtime_error("CastOp requires 2nd operand to be a constant integer");
+  }
   auto tensorType = GetTensorType(tensor->getType());
   ScalarType elementType;
   switch (bitwidth.getInt()) {
@@ -122,16 +89,14 @@ void AsIntOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLI
   results.insert<CastCanonicalizer<AsIntOp>>(context);
 }
 
-void AsIntOp::build(Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands) {
-  CastOp<AsIntOp>::build(builder, result, type, operands);
-}
-
-void AsIntOp::build(Builder* builder, OperationState* result, Value* tensor, IntegerAttr bitwidth) {
-  CastOp<AsIntOp>::build(builder, result, tensor, bitwidth);
-}
-
-Type AsIntOp::getResultType(Value* tensor, IntegerAttr bitwidth) {
+Type AsIntOp::getResultType(ArrayRef<Value*> operands) {
   IVLOG(5, "AsIntOp::getResultType>")
+  auto tensor = operands[0];
+  auto bitwidthOp = operands[1]->getDefiningOp();
+  IntegerAttr bitwidth;
+  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
+    throw std::runtime_error("CastOp requires 2nd operand to be a constant integer");
+  }
   auto tensorType = GetTensorType(tensor->getType());
   ScalarType elementType;
   switch (bitwidth.getInt()) {
@@ -151,20 +116,18 @@ Type AsIntOp::getResultType(Value* tensor, IntegerAttr bitwidth) {
   return RankedTensorType::get(tensorType.getShape(), elementType);
 }
 
-void AsUIntOp::build(Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands) {
-  CastOp<AsUIntOp>::build(builder, result, type, operands);
-}
-
-void AsUIntOp::build(Builder* builder, OperationState* result, Value* tensor, IntegerAttr bitwidth) {
-  CastOp<AsUIntOp>::build(builder, result, tensor, bitwidth);
-}
-
 void AsUIntOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
   results.insert<CastCanonicalizer<AsUIntOp>>(context);
 }
 
-Type AsUIntOp::getResultType(Value* tensor, IntegerAttr bitwidth) {
+Type AsUIntOp::getResultType(ArrayRef<Value*> operands) {
   IVLOG(5, "AsUIntOp::getResultType>")
+  auto tensor = operands[0];
+  auto bitwidthOp = operands[1]->getDefiningOp();
+  IntegerAttr bitwidth;
+  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
+    throw std::runtime_error("CastOp requires 2nd operand to be a constant integer");
+  }
   auto tensorType = GetTensorType(tensor->getType());
   ScalarType elementType;
   switch (bitwidth.getInt()) {
@@ -495,6 +458,8 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
 }
+
+#include "pmlc/dialect/eltwise/opinterfaces.cpp.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ops.cpp.inc"
