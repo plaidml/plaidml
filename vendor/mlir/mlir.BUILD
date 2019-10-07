@@ -234,24 +234,25 @@ mlir_tblgen(
 
 cc_library(
     name = "StandardOps",
-    srcs = glob([
-        "lib/Dialect/StandardOps/**/*.h",
-        "lib/Dialect/StandardOps/**/*.cpp",
-    ]),
+    srcs = [
+        "lib/Dialect/StandardOps/Ops.cpp",
+    ],
     hdrs = [
-        "include/mlir/Dialect/StandardOps/Ops.cpp.inc",
-        "include/mlir/Dialect/StandardOps/Ops.h.inc",
+        "include/mlir/Analysis/CallInterfaces.h",
+        "include/mlir/Dialect/StandardOps/Ops.h",
+        "include/mlir/Transforms/InliningUtils.h",
     ],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
-        ":gen-call-interfaces-decls",
+        ":IR",
+        ":Support",
         ":gen-standard-op-decls",
         ":gen-standard-op-defs",
-        "@llvm//:core",
+        ":gen-call-interfaces-decls",
+        ":gen-call-interfaces-defs",
         "@llvm//:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -604,20 +605,83 @@ cc_library(
     ],
 )
 
+mlir_tblgen(
+    name = "gen-test-ops-decls",
+    src = "test/lib/TestDialect/TestOps.td",
+    out = "test/lib/TestDialect/TestOps.h.inc",
+    action = "-gen-op-decls",
+    incs = ["include"],
+)
+
+mlir_tblgen(
+    name = "gen-test-ops-defs",
+    src = "test/lib/TestDialect/TestOps.td",
+    out = "test/lib/TestDialect/TestOps.cpp.inc",
+    action = "-gen-op-defs",
+    incs = ["include"],
+)
+
+mlir_tblgen(
+    name = "gen-test-ops-rewriters",
+    src = "test/lib/TestDialect/TestOps.td",
+    out = "test/lib/TestDialect/TestPatterns.inc",
+    action = "-gen-rewriters",
+    incs = ["include"],
+)
+
+cc_library(
+    name = "TestDialect",
+    srcs = [
+        "test/lib/TestDialect/TestDialect.cpp",
+        "test/lib/TestDialect/TestPatterns.cpp",
+    ],
+    hdrs = [
+        "test/lib/TestDialect/TestDialect.h",
+    ],
+    includes = ["lib/TestDialect"],
+    deps = [
+        ":Analysis",
+        ":Dialect",
+        ":IR",
+        ":Pass",
+        ":TransformUtils",
+        ":Transforms",
+        ":gen-test-ops-decls",
+        ":gen-test-ops-defs",
+        ":gen-test-ops-rewriters",
+    ],
+    alwayslink = 1,
+)
+
 cc_library(
     name = "TestTransforms",
-    srcs = glob([
-        "test/lib/Transforms/**/*.cpp",
-    ]),
+    srcs = [
+        "test/lib/Transforms/TestCallGraph.cpp",
+        "test/lib/Transforms/TestConstantFold.cpp",
+        "test/lib/Transforms/TestInlining.cpp",
+        "test/lib/Transforms/TestLoopFusion.cpp",
+        "test/lib/Transforms/TestLoopMapping.cpp",
+        "test/lib/Transforms/TestLoopParametricTiling.cpp",
+        "test/lib/Transforms/TestMemRefStrideCalculation.cpp",
+        "test/lib/Transforms/TestOpaqueLoc.cpp",
+        "test/lib/Transforms/TestVectorizationUtils.cpp",
+    ],
     copts = PLATFORM_COPTS,
-    visibility = ["//visibility:public"],
+    includes = ["test/lib/TestDialect"],
     deps = [
         ":AffineOps",
         ":Analysis",
+        ":EDSC",
+        ":IR",
         ":LoopOps",
         ":Pass",
+        ":StandardOps",
+        ":Support",
         ":TransformUtils",
+        ":Transforms",
         ":VectorOps",
+        ":TestDialect",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )

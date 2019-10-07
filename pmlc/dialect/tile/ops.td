@@ -171,12 +171,12 @@ def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
 
 def ContractionOpInterface : OpInterface<"ContractionOp"> {
   let methods = [
-    InterfaceMethod<"std::vector<Value*>", "getSourceIndexMaps">,
-    InterfaceMethod<"Value*", "getSinkIndexMap">,
-    InterfaceMethod<"Value*", "getSizeMap">,
-    InterfaceMethod<"unsigned", "getNumOperands">,
-    InterfaceMethod<"AggregationKind", "getAggregationKind">,
-    InterfaceMethod<"CombinationKind", "getCombinationKind">,
+    InterfaceMethod<"TODO", "std::vector<Value*>", "getSourceIndexMaps">,
+    InterfaceMethod<"TODO", "Value*", "getSinkIndexMap">,
+    InterfaceMethod<"TODO", "Value*", "getSizeMap">,
+    InterfaceMethod<"TODO", "unsigned", "getNumOperands">,
+    InterfaceMethod<"TODO", "AggregationKind", "getAggregationKind">,
+    InterfaceMethod<"TODO", "CombinationKind", "getCombinationKind">,
   ];
 }
 
