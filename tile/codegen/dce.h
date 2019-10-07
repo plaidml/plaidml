@@ -29,9 +29,11 @@ void RunOnBlocksRecurseBackward(const AliasMap& map, stripe::Block* block, const
     }
     // Remove all statements tagged "removed"
     if (block->stmts.size() > 0) {
-      block->stmts.erase(
-          std::remove_if(block->stmts.begin(), block->stmts.end(),  //
-                         [](const std::shared_ptr<stripe::Statement>& stmt) { return stmt.get()->has_tag("removed"); }),
+      block->erase_stmts(            //
+          std::remove_if(            //
+              block->stmts.begin(),  //
+              block->stmts.end(),    //
+              [](const auto& stmt) { return stmt.get()->has_tag("removed"); }),
           block->stmts.end());
     }
   }

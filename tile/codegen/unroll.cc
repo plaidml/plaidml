@@ -2,6 +2,14 @@
 
 #include "tile/codegen/unroll.h"
 
+#include <list>
+#include <map>
+#include <string>
+#include <tuple>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "base/util/logging.h"
 #include "base/util/throw.h"
 #include "tile/codegen/alias.h"
@@ -289,11 +297,7 @@ void UnrollBlock(Block* outer,                     //
         }
       }
     }
-    outer->stmts.erase(it_stmt);
-    // Dependencies become invalid after a stmt is removed
-    for (auto& stmt : outer->stmts) {
-      stmt->deps.clear();
-    }
+    outer->erase_stmt(it_stmt);
   } else {
     AliasMap alias_map{outer_alias_map, block};
     PreIterate(block, [&](const StatementIt& it) {

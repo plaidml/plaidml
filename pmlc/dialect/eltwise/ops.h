@@ -2,6 +2,10 @@
 
 #pragma once
 
+#include <vector>
+
+#include "llvm/ADT/SmallVector.h"
+
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
@@ -9,10 +13,14 @@
 #include "pmlc/dialect/eltwise/types.h"
 #include "pmlc/dialect/eltwise/util.h"
 
+#include "pmlc/dialect/eltwise/ops_enums.h.inc"
+
 namespace pmlc {
 namespace dialect {
 namespace eltwise {
 
+using llvm::SmallVector;
+using mlir::AbstractOperation;
 using mlir::APInt;
 using mlir::ArrayRef;
 using mlir::Attribute;
@@ -44,10 +52,26 @@ using mlir::VectorType;
 
 namespace OpTrait = mlir::OpTrait;
 
-#include "pmlc/dialect/eltwise/opinterfaces.h.inc"
+#include "pmlc/dialect/eltwise/ops_interfaces.h.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ops.h.inc"
+
+template <typename Filter>
+std::vector<AbstractOperation*> getAllOpsWith(MLIRContext* context, Filter filter) {
+  std::vector<AbstractOperation*> ops;
+  for (auto* op : context->getRegisteredOperations()) {
+    if (filter(op)) {
+      ops.emplace_back(op);
+    }
+  }
+  return ops;
+}
+
+template <typename Interface>
+std::vector<AbstractOperation*> getAllOpsWithInterface(MLIRContext* context) {
+  return getAllOpsWith(context, [](AbstractOperation* op) { return op->getInterface<Interface>(); });
+}
 
 }  // namespace eltwise
 }  // namespace dialect

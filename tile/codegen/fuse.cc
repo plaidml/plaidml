@@ -2,6 +2,11 @@
 
 #include "tile/codegen/fuse.h"
 
+#include <algorithm>
+#include <set>
+#include <utility>
+#include <vector>
+
 #include <boost/format.hpp>
 
 #include "base/util/stream_container.h"
@@ -41,7 +46,7 @@ void AddInnerTags(Block* block, const Tags& tags) {
   for (auto stmt : block->stmts) {
     auto sub = Block::Downcast(stmt);
     if (sub) {
-       sub->add_tags(tags);
+      sub->add_tags(tags);
     }
   }
 }
@@ -141,8 +146,7 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
           if (b_range > a_range) {
             plan.tile_b[i] = b_range / a_range;
             plan.b_interleave = true;
-          }
-          else {
+          } else {
             IVLOG(3, "ComputeFusionPlan: b_range is less than a_range");
             return boost::none;
           }
@@ -245,7 +249,7 @@ void FlattenTrivial(stripe::Block* outer) {
     }
     auto it_old = it;
     ++it;
-    outer->stmts.erase(it_old);
+    outer->erase_stmt(it_old);
   }
 
   IVLOG(4, "FlattenTrivial after:\n" << *outer);
@@ -503,8 +507,7 @@ bool FuseBlocks(const AliasMap& scope, Block* block_a, Block* block_b) {
   return true;
 }
 
-void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strategy,
-                 bool no_inner, bool no_constraints) {
+void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strategy, bool no_inner, bool no_constraints) {
   // Start with the first statement, and keep tying to fuse until you can't anymore, then move to the next
   auto it = block->stmts.begin();
   while (it != block->stmts.end()) {
@@ -570,7 +573,7 @@ void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strateg
       auto refactor1 = FusionRefactor(*block1, plan->remap_a, plan->tile_a, plan->a_interleave);
       auto inner1 = refactor1->SubBlock(0, true);
       auto refactor2 = FusionRefactor(*block2, plan->remap_b, plan->tile_b, plan->b_interleave,
-                       (refactor1->idxs_product() > 1) || (inner1 == nullptr)); 
+                                      (refactor1->idxs_product() > 1) || (inner1 == nullptr));
       if (no_inner) {
         // Check if there is any inner block in refactor1 and refactor2
         if (!NoInnerBlock(refactor1.get()) || !NoInnerBlock(refactor2.get())) {
@@ -628,7 +631,7 @@ void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strateg
       IVLOG(3, "Fused block:\n" << *refactor1);
       // If it worked, update
       *it = refactor1;
-      block->stmts.erase(it_next);
+      block->erase_stmt(it_next);
       strategy->OnFused(scope, refactor1.get(), *block1, *block2);
     }
     it++;

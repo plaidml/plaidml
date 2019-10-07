@@ -253,6 +253,10 @@ bool ConstantValueMatcher::match(mlir::Operation* op) {
   return false;
 }
 
+llvm::StringRef getOpName(const mlir::OperationName& name) {
+  return name.getStringRef().drop_front(name.getDialect().size() + 1);
+}
+
 }  // namespace eltwise
 }  // namespace dialect
 }  // namespace pmlc

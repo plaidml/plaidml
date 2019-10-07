@@ -37,11 +37,16 @@ class StripeBuilder {
   std::shared_ptr<stripe::Block> getResult() { return cur_; }
 
  private:
-  std::string scalar_name(Operation* op);
+  std::string scalar_name(Operation* op, std::string out_name = "");
   TensorShape get_shape(TensorType type);
   void add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> in);
-  void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out, std::string agg = "",
-                       bool is_spec = false);
+  void add_refinements(       //
+      Block* block,           //
+      Value* tensor,          //
+      stripe::RefDir dir,     //
+      std::string* name_out,  //
+      std::string agg = "",   //
+      bool is_spec = false);
   std::string get_idx(stripe::Block* block, mlir::BlockArgument* affine);
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
 
@@ -233,7 +238,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         }
       }
       if (ref_name == "") {
-        ref_name = "ref";
+        ref_name = "X";
       }
       ref_name = sblock->unique_ref_name(ref_name);
       std::vector<stripe::Affine> access;
@@ -340,6 +345,7 @@ stripe::Affine StripeBuilder::build_affine(stripe::Block* block, Value* base) {
 }
 
 void StripeBuilder::visit(ParallelForOp op) {
+  IVLOG(3, "StripeBuilder::visit(ParallelForOp)");
   // Construct the block and put it in the table
   cur_ = std::make_shared<stripe::Block>();
   Block& oblock = op.inner().front();
@@ -422,6 +428,7 @@ void StripeBuilder::visit(ParallelForOp op) {
 }
 
 void StripeBuilder::visit(ConstraintOp op, int count) {
+  IVLOG(3, "StripeBuilder::visit(ConstraintOp)");
   if (count == 1 && op.lt_case().empty()) {
     Block* inner = &op.ge_case().front();
     blocks_.emplace(inner, BlockInfo(nullptr));
@@ -439,14 +446,16 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
 }
 
 void StripeBuilder::visit(LoadOp op) {
+  IVLOG(3, "StripeBuilder::visit(LoadOp)");
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &ref_name);
-  std::string into = scalar_name(op.getOperation());
+  std::string into = scalar_name(op.getOperation(), ref_name);
   scalars_.emplace(op.into(), into);
   cur_->stmts.push_back(std::make_shared<stripe::Load>(ref_name, into));
 }
 
 void StripeBuilder::visit(LoadIndexOp op) {
+  IVLOG(3, "StripeBuilder::visit(LoadIndexOp)");
   stripe::Affine from = build_affine(cur_.get(), op.from());
   std::string into = scalar_name(op.getOperation());
   scalars_.emplace(op.into(), into);
@@ -454,6 +463,7 @@ void StripeBuilder::visit(LoadIndexOp op) {
 }
 
 void StripeBuilder::visit(StoreOp op) {
+  IVLOG(3, "StripeBuilder::visit(StoreOp)");
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name);
   std::string from = scalars_.at(op.from());
@@ -461,15 +471,16 @@ void StripeBuilder::visit(StoreOp op) {
 }
 
 void StripeBuilder::visit(AggregateOp op) {
+  IVLOG(3, "StripeBuilder::visit(AggregateOp)");
   std::string ref_name;
-  AggTypeEnum agg_enum = static_cast<AggTypeEnum>(op.agg_type().getLimitedValue());
-  std::string agg_name = stringifyAggTypeEnum(agg_enum);
+  std::string agg_name = eltwise::stringifyAggregationKind(op.agg());
   add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name, agg_name);
   std::string from = scalars_.at(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
 }
 
 void StripeBuilder::visit(SpecialOp op) {
+  IVLOG(3, "StripeBuilder::visit(SpecialOp)");
   auto r = std::make_shared<stripe::Special>();
   size_t operand = 0;
   for (size_t i = 0; i < op.getNumOutputs(); i++) {
@@ -493,7 +504,14 @@ void StripeBuilder::visit(SpecialOp op) {
 void StripeBuilder::visit(eltwise::EltwiseBuilder builder) {
   auto op = builder.getOperation();
   IVLOG(3, "StripeBuilder::visit> " << *op);
-  std::string out_name = scalar_name(op);
+  for (auto operand : op->getOperands()) {
+    if (auto defOp = operand->getDefiningOp()) {
+      if (auto constOp = llvm::dyn_cast<eltwise::ScalarConstantOp>(defOp)) {
+        visit(constOp);
+      }
+    }
+  }
+  auto out_name = scalar_name(op);
   scalars_.emplace(op->getResult(0), out_name);
   auto intr = std::make_shared<stripe::Intrinsic>();
   auto dialect = op->getName().getDialect();
@@ -553,6 +571,7 @@ void StripeBuilder::visit(eltwise::ScalarConstantOp op) {
 }
 
 void StripeBuilder::walk_interior(Block* block) {
+  IVLOG(1, "walk_interior");
   // Count inner ops
   int count = 0;
   for (auto& op : *block) {
@@ -581,7 +600,8 @@ void StripeBuilder::walk_interior(Block* block) {
     } else if (auto op = mlir::dyn_cast<SpecialOp>(op_base)) {
       visit(op);
     } else if (auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(op_base)) {
-      visit(op);
+      // These are handled by other handlers so that scalars get created in the
+      // same scope as the user.
     } else if (auto op = mlir::dyn_cast<eltwise::CastOp>(op_base)) {
       visit(op);
     } else if (auto op = mlir::dyn_cast<eltwise::EltwiseBuilder>(op_base)) {
@@ -591,11 +611,15 @@ void StripeBuilder::walk_interior(Block* block) {
   }
 }
 
-std::string StripeBuilder::scalar_name(Operation* op) {
-  std::string out_name = "$s";
+std::string StripeBuilder::scalar_name(Operation* op, std::string out_name) {
+  if (out_name.empty()) {
+    out_name = "$s";
+  } else {
+    out_name = "$" + out_name;
+  }
   auto attr = op->getAttr("scalar_name");
   if (attr) {
-    auto name_attr = attr.template dyn_cast<StringAttr>();
+    auto name_attr = attr.dyn_cast<StringAttr>();
     if (name_attr) {
       out_name = name_attr.getValue();
     }
@@ -614,7 +638,8 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
   StripeBuilder builder(func);
   auto ret = std::make_shared<stripe::Program>();
   ret->entry = builder.getResult();
-  for (const auto& ref : ret->entry->SubBlock(0)->refs) {
+  auto main = ret->entry->SubBlock(0);
+  for (const auto& ref : main->refs) {
     if (IsReadDir(ref.dir)) {
       IVLOG(2, "input_shape: " << ref.from << " = " << ref.interior_shape);
       ret->input_shapes.emplace(ref.from, ref.interior_shape);

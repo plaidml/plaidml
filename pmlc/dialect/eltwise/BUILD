@@ -9,12 +9,17 @@ load(
     "plaidml_cc_test",
 )
 
+MLIR_TBLGEN_ALSO = [
+    "enums.td",
+    "predicates.td",
+]
+
 mlir_tblgen(
     name = "gen-op-decls",
     src = "ops.td",
     out = "ops.h.inc",
     action = "-gen-op-decls",
-    also = ["predicates.td"],
+    also = MLIR_TBLGEN_ALSO,
     incs = ["@mlir//:include"],
 )
 
@@ -23,25 +28,43 @@ mlir_tblgen(
     src = "ops.td",
     out = "ops.cpp.inc",
     action = "-gen-op-defs",
-    also = ["predicates.td"],
+    also = MLIR_TBLGEN_ALSO,
+    incs = ["@mlir//:include"],
+)
+
+mlir_tblgen(
+    name = "gen-op-enums-decls",
+    src = "ops.td",
+    out = "ops_enums.h.inc",
+    action = "-gen-enum-decls",
+    also = MLIR_TBLGEN_ALSO,
+    incs = ["@mlir//:include"],
+)
+
+mlir_tblgen(
+    name = "gen-op-enums-defs",
+    src = "ops.td",
+    out = "ops_enums.cpp.inc",
+    action = "-gen-enum-defs",
+    also = MLIR_TBLGEN_ALSO,
     incs = ["@mlir//:include"],
 )
 
 mlir_tblgen(
     name = "gen-op-interface-decls",
     src = "ops.td",
-    out = "opinterfaces.h.inc",
+    out = "ops_interfaces.h.inc",
     action = "-gen-op-interface-decls",
-    also = ["predicates.td"],
+    also = MLIR_TBLGEN_ALSO,
     incs = ["@mlir//:include"],
 )
 
 mlir_tblgen(
     name = "gen-op-interface-defs",
     src = "ops.td",
-    out = "opinterfaces.cpp.inc",
+    out = "ops_interfaces.cpp.inc",
     action = "-gen-op-interface-defs",
-    also = ["predicates.td"],
+    also = MLIR_TBLGEN_ALSO,
     incs = ["@mlir//:include"],
 )
 
@@ -49,16 +72,18 @@ plaidml_cc_library(
     name = "eltwise",
     srcs = [
         "dialect.cc",
-        "opinterfaces.cpp.inc",
         "ops.cc",
         "ops.cpp.inc",
+        "ops_enums.cpp.inc",
+        "ops_interfaces.cpp.inc",
         "util.cc",
     ],
     hdrs = [
         "dialect.h",
-        "opinterfaces.h.inc",
         "ops.h",
         "ops.h.inc",
+        "ops_enums.h.inc",
+        "ops_interfaces.h.inc",
         "types.h",
         "util.h",
     ],

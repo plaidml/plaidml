@@ -1,5 +1,6 @@
 // Copyright 2019, Intel Corporation
 
+include "pmlc/dialect/eltwise/enums.td"
 include "pmlc/dialect/eltwise/predicates.td"
 
 def EltwiseDialect : Dialect {
@@ -31,15 +32,21 @@ class EltwiseBuilderImpl {
   }];
 }
 
+def EltwiseOpInterface : OpInterface<"EltwiseOp">;
 
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<EltwiseDialect, mnemonic, traits>;
-  
-class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<EltwiseDialect, mnemonic, !listconcat(traits, [EltwiseBuilderInterface])>,
+    Op<EltwiseDialect, mnemonic, !listconcat(traits, [EltwiseOpInterface, EltwiseBuilderInterface])>,
     EltwiseBuilderImpl;
 
-def ScalarConstantOp : EltwiseOp<"sconst">, HasFolder {
+def SpecialOpInterface : OpInterface<"SpecialOp">;
+  
+class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    Op<EltwiseDialect, mnemonic, !listconcat(traits, [SpecialOpInterface, EltwiseBuilderInterface])>,
+    EltwiseBuilderImpl;
+
+def ScalarConstantOp :
+    Op<EltwiseDialect, "sconst", [NoSideEffect]>,
+    HasFolder {
   let summary = "constant";
   let arguments = (ins AnyAttr:$value);
   let results = (outs Eltwise_AnyTensor:$result);
@@ -71,8 +78,7 @@ def ScalarConstantOp : EltwiseOp<"sconst">, HasFolder {
 }
 
 class UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EltwiseOp<mnemonic, !listconcat(traits, [EltwiseBuilderInterface])>,
-    EltwiseBuilderImpl,
+    EltwiseOp<mnemonic, traits>,
     HasCanonicalizer {
   let arguments = (ins Eltwise_AnyTensor:$in, TypeAttr:$type);
   let results = (outs Eltwise_AnyTensor:$result);
@@ -97,8 +103,7 @@ class UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 }
 
 class BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EltwiseOp<mnemonic, !listconcat(traits, [EltwiseBuilderInterface])>,
-    EltwiseBuilderImpl,
+    EltwiseOp<mnemonic, traits>,
     HasCanonicalizer { 
   let arguments = (ins Eltwise_AnyTensor:$lhs, Eltwise_AnyTensor:$rhs, TypeAttr:$type);
   let results = (outs Eltwise_AnyTensor:$result);
@@ -123,8 +128,7 @@ class BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 }
 
 class CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EltwiseOp<mnemonic, !listconcat(traits, [EltwiseBuilderInterface])>,
-    EltwiseBuilderImpl,
+    EltwiseOp<mnemonic, traits>,
     HasCanonicalizer {
   let arguments = (ins Eltwise_AnyTensor:$lhs, Eltwise_AnyTensor:$rhs, TypeAttr:$type);
   let results = (outs Eltwise_BoolTensor:$result);
@@ -166,7 +170,7 @@ class BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 def CastOpInterface : OpInterface<"CastOp">;
 
 class CastOp<string mnemonic> :
-    EltwiseOp<mnemonic, [CastOpInterface, EltwiseBuilderInterface, NoSideEffect]>,
+    EltwiseOp<mnemonic, [CastOpInterface, NoSideEffect]>,
     HasCanonicalizer {
   let arguments = (ins Eltwise_AnyTensor:$tensor);
 
@@ -180,7 +184,7 @@ class CastOp<string mnemonic> :
     static Operation* create(OpBuilder* builder, Location loc, ScalarType type, ArrayRef<Value*> operands) {
       OperationState state(loc, getOperationName());
       if (operands.size() != 2) {
-        throw std::runtime_error("Expected 2 operands");
+        throw std::runtime_error("CastOp requires 2 operands");
       }
       auto tensor = operands[0];
       state.addOperands(tensor);
@@ -223,10 +227,10 @@ def AsBoolOp : EltwiseOp<"as_bool"> {
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value*> operands) {
       auto tensorType = GetTensorType(operands[0]->getType());
-      auto elementType = ScalarType::get(operands[0]->getContext(), DataType::BOOLEAN);
+      auto elementType = ScalarType::get(tensorType.getContext(), DataType::BOOLEAN);
       return RankedTensorType::get(tensorType.getShape(), elementType);
     }
-  }];
+  }] # EltwiseBuilderImpl_create;
 }
 
 def AbsOp : UnaryOp<"abs">;
@@ -358,7 +362,7 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
 //   }];
 // }
 
-def SelectOp : SpecialOp<"select">, HasCanonicalizer {
+def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let summary = "conditional selection";
   let arguments = (ins
     Eltwise_BoolTensor:$cond,

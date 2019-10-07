@@ -102,25 +102,54 @@ static DictionaryAttr TagsToDict(Builder* builder, const stripe::Taggable& tagga
   return builder->getDictionaryAttr(vec);
 }
 
-Value* AffineIntoMLIR(OpBuilder* builder, const SymbolValueMap& idxs, const stripe::Affine& affine) {
+Value* AffineIntoMLIR(           //
+    OpBuilder* builder,          //
+    Operation* constBeforeOp,    //
+    const SymbolValueMap& idxs,  //
+    const stripe::Affine& affine) {
   auto unknownLoc = builder->getUnknownLoc();
   std::vector<Value*> add_inputs;
   for (const auto& kvp : affine.getMap()) {
     Value* term;
     if (kvp.first.empty()) {
-      term = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
-                                            builder->getI64IntegerAttr(kvp.second));
+      OpBuilder::InsertPoint oldInsertPoint;
+      if (constBeforeOp) {
+        oldInsertPoint = builder->saveInsertionPoint();
+        builder->setInsertionPoint(constBeforeOp);
+      }
+      term = builder->create<AffineConstOp>(  //
+          unknownLoc,                         //
+          builder->getType<AffineType>(),     //
+          builder->getI64IntegerAttr(kvp.second));
+      if (constBeforeOp) {
+        builder->restoreInsertionPoint(oldInsertPoint);
+      }
     } else {
       term = safe_at(idxs, kvp.first);
       if (kvp.second != 1) {
-        term = builder->createOrFold<AffineMulOp>(unknownLoc, builder->getType<AffineType>(), term,
-                                                  builder->getI64IntegerAttr(kvp.second));
+        term = builder->createOrFold<AffineMulOp>(  //
+            unknownLoc,                             //
+            builder->getType<AffineType>(),         //
+            term,                                   //
+            builder->getI64IntegerAttr(kvp.second));
       }
     }
     add_inputs.push_back(term);
   }
   if (add_inputs.size() == 0) {
-    return builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(), builder->getI64IntegerAttr(0));
+    OpBuilder::InsertPoint oldInsertPoint;
+    if (constBeforeOp) {
+      oldInsertPoint = builder->saveInsertionPoint();
+      builder->setInsertionPoint(constBeforeOp);
+    }
+    auto ret = builder->create<AffineConstOp>(  //
+        unknownLoc,                             //
+        builder->getType<AffineType>(),         //
+        builder->getI64IntegerAttr(0));
+    if (constBeforeOp) {
+      builder->restoreInsertionPoint(oldInsertPoint);
+    }
+    return ret;
   }
   if (add_inputs.size() == 1) {
     return add_inputs[0];
@@ -138,7 +167,7 @@ static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const S
     const auto& dev = loc.devs.at(dev_idx);
     for (std::size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
       const auto& unit = dev.units.at(unit_idx);
-      offsets.emplace_back(AffineIntoMLIR(builder, idxs, unit));
+      offsets.emplace_back(AffineIntoMLIR(builder, nullptr, idxs, unit));
       if (any_non_zero_offsets && (!unit.isConstant() || unit.constant() != 0)) {
         *any_non_zero_offsets = true;
       }
@@ -238,7 +267,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       if (idx.range != 1) {
         throw std::runtime_error("Invalid Stripe: range and affine both set on index");
       }
-      locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, outer.idxs, idx.affine));
+      locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, nullptr, outer.idxs, idx.affine));
     }
   }
 
@@ -300,7 +329,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       }
     }
     for (const auto& aff : ref.access) {
-      offsets.push_back(AffineIntoMLIR(builder, locals.idxs, aff));
+      offsets.push_back(AffineIntoMLIR(builder, nullptr, locals.idxs, aff));
     }
     auto refOp = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets);
     refOp.setAttr("name", builder->getStringAttr(ref.into()));
@@ -314,7 +343,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // Process the constraints
   for (const auto& con : block.constraints) {
     // Make the actual constraint value
-    auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, locals.idxs, con));
+    auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, nullptr, locals.idxs, con));
     // Make the block + attach to the region
     Block* if_body = new Block();
     aif.getOperation()->getRegion(0).push_back(if_body);
@@ -343,7 +372,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       } break;
       case stripe::StmtKind::LoadIndex: {
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
-        Value* from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
+        Value* from = AffineIntoMLIR(builder, nullptr, locals.idxs, load_idx->from);
         Type idx_base = eltwise::ScalarType::get(builder->getContext(), DataType::INT32);
         Type idx_type = eltwise::GetTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
@@ -364,11 +393,11 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
           }
         } else {
           // Aggregation case
-          llvm::Optional<AggTypeEnum> agg_type = symbolizeAggTypeEnum(agg_str);
-          if (!agg_type) {
+          auto aggKind = eltwise::symbolizeAggregationKind(agg_str);
+          if (!aggKind) {
             throw std::runtime_error("Unknown agg-op:" + agg_str);
           }
-          int64_t agg_int = static_cast<int>(agg_type.getValue());
+          auto agg_int = static_cast<int>(aggKind.getValue());
           IntegerAttr agg_attr = builder->getI64IntegerAttr(agg_int);
           auto op = builder->create<AggregateOp>(unknownLoc, into, from, agg_attr);
           if (attrs.size()) {

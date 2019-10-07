@@ -30,6 +30,7 @@ mlir::Type ComputeResultType(llvm::ArrayRef<mlir::Value*> operands, DataType ove
 void UpdateFuncOpType(mlir::Operation* op);
 
 mlir::RankedTensorType GetTensorType(mlir::Type type);
+llvm::StringRef getOpName(const mlir::OperationName& name);
 
 using UnaryCalculate = std::function<double(double)>;
 mlir::Attribute constFoldUnaryOp(llvm::ArrayRef<mlir::Attribute> operands, UnaryCalculate calculate);
