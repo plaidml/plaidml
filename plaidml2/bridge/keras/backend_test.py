@@ -7,6 +7,7 @@ import operator
 import os
 import sys
 import unittest
+import warnings
 from collections import OrderedDict
 
 # Make sure we win the race with TF to load libstdc++...
@@ -15,8 +16,11 @@ from plaidml2.ffi import Error as pml2_ffi_Error
 
 import numpy as np
 import numpy.testing as npt
+warnings.simplefilter(action='ignore', category=FutureWarning)
 # Tensorflow needs some code called directly
 import tensorflow
+# Removes (almost) all tensorflow deprecation warnings
+tensorflow.compat.v1.logging.set_verbosity(tensorflow.compat.v1.logging.ERROR)
 # Theano breaks on convolution if given a default optimizer
 import theano
 from keras.backend import floatx
@@ -241,7 +245,6 @@ def opTest(in_data,
                     results.append((fr, gr))
                 else:
                     results.append((fr,))
-        tf_session.close()
         return results
 
     def apply(test_func):
@@ -1253,6 +1256,14 @@ class TestBackendOps(unittest.TestCase):
         a = b.constant(5, shape=(10,))
         return a
 
+    def testIsPlaceholder(self):
+        x = pkb.placeholder((4, 3))
+        self.assertTrue(pkb.is_placeholder(x))
+        y = pkb.variable(m(2, 2))
+        self.assertFalse(pkb.is_placeholder(y))
+        z = pkb.exp(x)
+        self.assertFalse(pkb.is_placeholder(z))
+
     # Note: we skip tensorflow since init_global must be called in the middle of this function
     # for correct semantics, and Theano is sufficient.
     @compareForwardExact(skip_tensorflow=True)
@@ -1330,10 +1341,11 @@ class TestBackendOps(unittest.TestCase):
 
     @compareForwardClose()
     def testNormalizeBatchInTrainingWeirdMultiAxis(self, b):
+        # These shapes are pretty much nonsense, but TF figures it out (via reshape) so we should too
         return b.normalize_batch_in_training(
             b.variable(n(2, 3, 5, 7)),
-            b.constant(11, shape=(1, 3, 1, 1)),
-            b.constant(0, shape=(1, 3, 1, 1)),
+            b.constant(11, shape=(3, 1, 1, 1, 1, 1, 1, 1)),
+            b.constant(0, shape=(3, 1)),
             [0, 2, 3],
         )[2]
 
@@ -1710,6 +1722,27 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(1024, 1024), m(1024, 1024)]], do_grads=False)
     def bigMatMul(self, b, A, B):
         return [b.dot(A, B)]
+
+    def testDupOutputs(self):
+
+        def model(b):
+            A = b.variable(m(10, 20), name='A')
+            B = b.variable(m(20, 30), name='B')
+            C = b.dot(A, B)
+            fn = b.function([], [C, C, C])
+            return fn([])
+
+        tf_session = tensorflow.Session()
+        tf.set_session(tf_session)
+        tensorflow_result = model(tf)
+        plaidml_result = model(pkb)
+
+        for result in zip(plaidml_result, tensorflow_result):
+            npt.assert_allclose(result[0],
+                                result[1],
+                                rtol=DEFAULT_TOL,
+                                atol=DEFAULT_ATOL,
+                                err_msg='x=plaidml, y=tensorflow')
 
 
 if __name__ == '__main__':

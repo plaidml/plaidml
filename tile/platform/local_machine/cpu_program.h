@@ -21,21 +21,21 @@ class Native;
 }  // namespace cpu
 }  // namespace targets
 
-namespace stripejit {
+namespace local_machine {
 
-class Program final : public tile::Program {
+class CpuProgram final : public tile::Program {
  public:
-  Program(                           //
+  CpuProgram(                        //
       const std::string& target,     //
       const lang::RunInfo& runinfo,  //
       ConstBufferManager* const_bufs);
 
-  Program(                                             //
+  CpuProgram(                                          //
       const std::string& target,                       //
       const std::shared_ptr<stripe::Program>& stripe,  //
       ConstBufferManager* const_bufs);
 
-  ~Program();
+  ~CpuProgram();
 
   boost::future<void> Run(          //
       const context::Context& ctx,  //
@@ -52,6 +52,6 @@ class Program final : public tile::Program {
   std::unique_ptr<tile::targets::cpu::Native> executable_;
 };
 
-}  // namespace stripejit
+}  // namespace local_machine
 }  // namespace tile
 }  // namespace vertexai

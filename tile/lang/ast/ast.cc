@@ -2,7 +2,7 @@
 
 #include "tile/lang/ast/ast.h"
 
-#include <set>
+#include <unordered_set>
 
 #include <boost/format.hpp>
 
@@ -525,7 +525,7 @@ class ProgramEvaluator : public AstVisitor<void> {
   }
 
  private:
-  std::set<std::string> names_;
+  std::unordered_set<std::string> names_;
   std::unordered_map<const Expr*, Binding> bindings_by_expr_;
   ProgramEvaluation eval_;
 };
@@ -601,11 +601,14 @@ class ExprOptimizer : public AstPass {
 };
 
 ProgramEvaluation Evaluate(const std::string& name, ProgramMutations mutations) {
+  std::unordered_set<Expr*> dups;
   for (size_t i = 0; i < mutations.outputs.size(); i++) {
-    auto param_expr = std::dynamic_pointer_cast<ParamExpr>(mutations.outputs[i]);
-    if (param_expr) {
-      mutations.outputs[i] = MakeCall("ident", {mutations.outputs[i]});
+    auto output = mutations.outputs[i];
+    auto ptr = output.get();
+    if (std::dynamic_pointer_cast<ParamExpr>(output) || dups.count(ptr)) {
+      mutations.outputs[i] = MakeCall("ident", {output});
     }
+    dups.insert(ptr);
   }
   ExprOptimizer optimizer;
   return ProgramEvaluator(name).Evaluate(RunAstPass(mutations, &optimizer));
@@ -642,8 +645,7 @@ void LogicalShape::bind_dims(std::vector<DimExprPtr>* into) {
         boost::str(boost::format("bind_dims() mismatch. Tensor shape: %1%, dims: %2%") % dims.size() % into->size()));
   }
   for (size_t i = 0; i < dims.size(); i++) {
-    auto none_expr = std::dynamic_pointer_cast<DimNoneExpr>(into->at(i));
-    if (none_expr) {
+    if (auto none_expr = std::dynamic_pointer_cast<DimNoneExpr>(into->at(i))) {
       (*into)[i] = dims[i].expr;
     } else {
       auto lhs_int = std::dynamic_pointer_cast<DimIntExpr>(into->at(i));
@@ -700,8 +702,7 @@ void ParamExpr::ComputeShape(const std::shared_ptr<ParamExpr>& ref, const Logica
   shape.dims.clear();
   for (size_t i = 0; i < in_shape.dims.size(); i++) {
     const auto& dim = in_shape.dims[i];
-    auto int_expr = std::dynamic_pointer_cast<DimIntExpr>(dim.expr);
-    if (int_expr) {
+    if (auto int_expr = std::dynamic_pointer_cast<DimIntExpr>(dim.expr)) {
       if (int_expr->value) {
         shape.dims.push_back(dim);
       } else {

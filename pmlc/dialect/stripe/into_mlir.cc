@@ -5,6 +5,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "base/util/lookup.h"
+#include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/eltwise/util.h"
 #include "pmlc/dialect/stripe/analysis.h"
@@ -17,9 +18,9 @@ namespace stripe {
 namespace {
 
 struct SymbolTable {
-  std::map<std::string, mlir::Value*> refs;
-  std::map<std::string, mlir::Value*> idxs;
-  std::map<std::string, mlir::Value*> scalars;
+  SymbolValueMap refs;
+  SymbolValueMap idxs;
+  SymbolValueMap scalars;
 };
 
 }  // End namespace
@@ -32,46 +33,60 @@ static ScalarType DataTypeIntoMLIR(mlir::MLIRContext* ctx, DataType dtype) {  //
   return ScalarType::get(ctx, dtype);
 }
 
-static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape) {
+static mlir::Identifier GetDevClass(MLIRContext* ctx, const stripe::Device& dev, std::size_t dev_idx,
+                                    std::size_t unit_idx) {
+  return mlir::Identifier::get(llvm::formatv("{0}_{1}_{2}", dev.name, dev_idx, unit_idx).str(), ctx);
+}
+
+static Type ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape, const stripe::Location& loc) {
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
   llvm::SmallVector<TensorDim, 4> dims;
+  for (std::size_t dev_idx = 0; dev_idx < loc.devs.size(); ++dev_idx) {
+    const auto& dev = loc.devs.at(dev_idx);
+    for (std::size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
+      dims.emplace_back(TensorDim{0, 0, GetDevClass(ctx, dev, dev_idx, unit_idx)});
+    }
+  }
   for (const auto& dim : shape.dims) {
-    dims.emplace_back(TensorDim{static_cast<int64_t>(dim.size), dim.stride, mlir::Identifier::get("address", ctx)});
+    dims.emplace_back(
+        TensorDim{static_cast<int64_t>(dim.size), dim.stride, mlir::Identifier::get(kAddressClassIdentifier, ctx)});
   }
   return TensorType::get(dtype, dims, OffsetsMap{}, shape.is_const);
 }
 
-static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape) {
+static Type ShapeIntoTensorRefType(MLIRContext* ctx, const TensorShape& shape, const stripe::Location& loc) {
   ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
-  return TensorRefType::get(dtype, shape.dims.size(), shape.is_const);
+  auto rank = shape.dims.size();
+  for (const auto& dev : loc.devs) {
+    rank += dev.units.size();
+  }
+  return TensorRefType::get(dtype, rank, shape.is_const);
 }
 
 struct AttrBuilder : stripe::TagVisitor {
-  AttrBuilder(Builder* builder, std::vector<NamedAttribute>* out, std::string prefix = "")
-      : builder(builder), out(out), prefix(prefix) {}
+  AttrBuilder(Builder* builder, std::vector<NamedAttribute>* out) : builder(builder), out(out) {}
 
   Builder* builder;
   std::vector<NamedAttribute>* out;
-  std::string prefix;
 
   void Visit(const std::string& name) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getUnitAttr());
+    out->emplace_back(builder->getIdentifier(name), builder->getUnitAttr());
   }
 
   void Visit(const std::string& name, bool value) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getBoolAttr(value));
+    out->emplace_back(builder->getIdentifier(name), builder->getBoolAttr(value));
   }
 
   void Visit(const std::string& name, int64_t value) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getI64IntegerAttr(value));
+    out->emplace_back(builder->getIdentifier(name), builder->getI64IntegerAttr(value));
   }
 
   void Visit(const std::string& name, double value) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getF64FloatAttr(value));
+    out->emplace_back(builder->getIdentifier(name), builder->getF64FloatAttr(value));
   }
 
   void Visit(const std::string& name, const std::string& value) override {
-    out->emplace_back(builder->getIdentifier(prefix + name), builder->getStringAttr(value));
+    out->emplace_back(builder->getIdentifier(name), builder->getStringAttr(value));
   }
 
   void Visit(const std::string& name, const google::protobuf::Any& value) override {
@@ -87,123 +102,101 @@ static DictionaryAttr TagsToDict(Builder* builder, const stripe::Taggable& tagga
   return builder->getDictionaryAttr(vec);
 }
 
-static Value* AffineIntoMLIR(OpBuilder* builder, const SymbolTable& syms, const stripe::Affine& affine) {
+Value* AffineIntoMLIR(           //
+    OpBuilder* builder,          //
+    Operation* constBeforeOp,    //
+    const SymbolValueMap& idxs,  //
+    const stripe::Affine& affine) {
   auto unknownLoc = builder->getUnknownLoc();
   std::vector<Value*> add_inputs;
   for (const auto& kvp : affine.getMap()) {
     Value* term;
     if (kvp.first.empty()) {
-      term = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
-                                            builder->getI64IntegerAttr(kvp.second));
+      OpBuilder::InsertPoint oldInsertPoint;
+      if (constBeforeOp) {
+        oldInsertPoint = builder->saveInsertionPoint();
+        builder->setInsertionPoint(constBeforeOp);
+      }
+      term = builder->create<AffineConstOp>(  //
+          unknownLoc,                         //
+          builder->getType<AffineType>(),     //
+          builder->getI64IntegerAttr(kvp.second));
+      if (constBeforeOp) {
+        builder->restoreInsertionPoint(oldInsertPoint);
+      }
     } else {
-      Value* orig = safe_at(syms.idxs, kvp.first);
-      term = builder->create<AffineMulOp>(unknownLoc, builder->getType<AffineType>(), orig,
-                                          builder->getI64IntegerAttr(kvp.second));
+      term = safe_at(idxs, kvp.first);
+      if (kvp.second != 1) {
+        term = builder->createOrFold<AffineMulOp>(  //
+            unknownLoc,                             //
+            builder->getType<AffineType>(),         //
+            term,                                   //
+            builder->getI64IntegerAttr(kvp.second));
+      }
     }
     add_inputs.push_back(term);
   }
   if (add_inputs.size() == 0) {
-    return builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(), builder->getI64IntegerAttr(0));
+    OpBuilder::InsertPoint oldInsertPoint;
+    if (constBeforeOp) {
+      oldInsertPoint = builder->saveInsertionPoint();
+      builder->setInsertionPoint(constBeforeOp);
+    }
+    auto ret = builder->create<AffineConstOp>(  //
+        unknownLoc,                             //
+        builder->getType<AffineType>(),         //
+        builder->getI64IntegerAttr(0));
+    if (constBeforeOp) {
+      builder->restoreInsertionPoint(oldInsertPoint);
+    }
+    return ret;
   }
   if (add_inputs.size() == 1) {
     return add_inputs[0];
   }
-  return builder->create<AffineAddOp>(unknownLoc, builder->getType<AffineType>(), add_inputs);
+  return builder->createOrFold<AffineAddOp>(unknownLoc, builder->getType<AffineType>(), add_inputs);
 }
 
-namespace {
-
-template <typename OpType>
-struct IntrinsicBuildImpl {
-  static Operation* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic,
-                          const llvm::ArrayRef<Value*>& inputs) {
-    if (OpType::operands() != inputs.size()) {
-      std::cerr << intrinsic;
-      throw std::runtime_error("Mismatched intrinsic size");
+static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const SymbolValueMap& idxs,
+                                                     const stripe::Location& loc, bool* any_non_zero_offsets) {
+  std::vector<Value*> offsets;
+  if (any_non_zero_offsets) {
+    *any_non_zero_offsets = false;
+  }
+  for (std::size_t dev_idx = 0; dev_idx < loc.devs.size(); ++dev_idx) {
+    const auto& dev = loc.devs.at(dev_idx);
+    for (std::size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
+      const auto& unit = dev.units.at(unit_idx);
+      offsets.emplace_back(AffineIntoMLIR(builder, nullptr, idxs, unit));
+      if (any_non_zero_offsets && (!unit.isConstant() || unit.constant() != 0)) {
+        *any_non_zero_offsets = true;
+      }
     }
-    ScalarType intrinsic_type = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
-    auto inst = builder->create<OpType>(builder->getUnknownLoc(), intrinsic_type, inputs);
-    return inst;
   }
-};
-
-IntegerAttr ExtractIntegerConstant(Value* val) {
-  auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(val->getDefiningOp());
-  if (!op) {
-    throw std::runtime_error("Invalid constant");
-  }
-  auto attr = op.getValue().dyn_cast<IntegerAttr>();
-  if (!attr) {
-    throw std::runtime_error("Constant is not an integer");
-  }
-  return attr;
+  return offsets;
 }
-
-template <typename CastOpType>
-struct CastIntrinsicBuildImpl {
-  static Operation* apply(OpBuilder* builder, const stripe::Intrinsic& intrinsic,
-                          const llvm::ArrayRef<Value*>& inputs) {
-    if (inputs.size() != 2) {
-      throw std::runtime_error("as_float needs to params");
-    }
-    auto bit_width = ExtractIntegerConstant(inputs[1]);
-    auto inst = builder->create<CastOpType>(builder->getUnknownLoc(), inputs[0], bit_width);
-    return inst;
-  }
-};
-
-template <>
-struct IntrinsicBuildImpl<eltwise::AsFloatOp> : CastIntrinsicBuildImpl<eltwise::AsFloatOp> {};
-template <>
-struct IntrinsicBuildImpl<eltwise::AsIntOp> : CastIntrinsicBuildImpl<eltwise::AsIntOp> {};
-template <>
-struct IntrinsicBuildImpl<eltwise::AsUIntOp> : CastIntrinsicBuildImpl<eltwise::AsUIntOp> {};
-
-struct IntrinsicBuilder {
-  OpBuilder* builder;
-  SymbolTable* locals;
-  const stripe::Intrinsic& intrinsic;
-  std::string name;
-  bool done;
-
-  IntrinsicBuilder(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic)
-      : builder(builder),  //
-        locals(locals),
-        intrinsic(intrinsic),
-        name("eltwise." + intrinsic.name),
-        done(false) {
-    if (name == "eltwise.cond") {
-      name = "eltwise.select";
-    }
-  }
-
-  template <class OpType>
-  void apply() {
-    if (name != OpType::getOperationName()) {
-      return;
-    }
-    llvm::SmallVector<Value*, 8> inputs;
-    for (const auto& in : intrinsic.inputs) {
-      inputs.push_back(safe_at(locals->scalars, in));
-    }
-    Operation* r = IntrinsicBuildImpl<OpType>::apply(builder, intrinsic, inputs);
-    locals->scalars.emplace(intrinsic.outputs[0], r->getResult(0));
-    r->setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
-    done = true;
-  }
-};
-
-}  // namespace
 
 static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
   }
-  IntrinsicBuilder intrinsic_builder(builder, locals, intrinsic);
-  eltwise::ForAllOps(intrinsic_builder);
-  if (!intrinsic_builder.done) {
+  auto opName = eltwise::Dialect::getCanonicalOpName(intrinsic.name);
+  auto abstractOp = mlir::AbstractOperation::lookup(opName, builder->getContext());
+  if (!abstractOp) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
+  auto eltwiseBuilder = abstractOp->getInterface<eltwise::EltwiseBuilder>();
+  if (!eltwiseBuilder) {
+    throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
+  }
+  llvm::SmallVector<Value*, 8> operands;
+  for (const auto& in : intrinsic.inputs) {
+    operands.push_back(safe_at(locals->scalars, in));
+  }
+  ScalarType scalarType = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
+  auto op = eltwiseBuilder->create(builder, builder->getUnknownLoc(), scalarType, operands);
+  locals->scalars.emplace(intrinsic.outputs[0], op->getResult(0));
+  op->setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
 }
 
 template <typename T>
@@ -249,11 +242,9 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // Make room for local symbols
   SymbolTable locals;
 
-  // Make the actual inner block + terminate it
+  // Make the actual inner block
   auto orig_insert = builder->saveInsertionPoint();
   Block* body = new Block();
-  builder->setInsertionPointToStart(body);
-  builder->create<TerminateOp>(unknownLoc);
   builder->setInsertionPointToStart(body);
 
   // Process the indexes
@@ -276,7 +267,35 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       if (idx.range != 1) {
         throw std::runtime_error("Invalid Stripe: range and affine both set on index");
       }
-      locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, outer, idx.affine));
+      locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, nullptr, outer.idxs, idx.affine));
+    }
+  }
+
+  // Process the block's execution location.
+  mlir::Value* executor = nullptr;
+  if (!block.location.empty()) {
+    std::vector<TensorDim> dims;
+    for (std::size_t dev_idx = 0; dev_idx < block.location.devs.size(); ++dev_idx) {
+      const auto& dev = block.location.devs.at(dev_idx);
+      for (std::size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
+        auto cls = llvm::formatv("{0}_{1}_{2}", dev.name, dev_idx, unit_idx).str();
+        // N.B. Locations in Stripe Classic logically reference an abstract executor space, in which size and
+        // stride are not well-specified, so we leave them undefined after translation to MLIR, and ignore
+        // them on translation back to Stripe Classic.
+        dims.emplace_back(TensorDim{0, 0, GetDevClass(builder->getContext(), dev, dev_idx, unit_idx)});
+      }
+    }
+    auto allocOp = builder->create<AllocateOp>(
+        unknownLoc, TensorType::get(builder->getType<ExecutorType>(), dims, OffsetsMap{}, true));
+    auto refOp = builder->create<TensorRefOp>(
+        unknownLoc, TensorRefType::get(builder->getType<ExecutorType>(), dims.size(), true), allocOp.result());
+    bool any_non_zero_offsets = false;
+    auto offsets = LocationIntoTensorOffsets(builder, outer.idxs, block.location, &any_non_zero_offsets);
+    if (any_non_zero_offsets) {
+      auto refineOp = builder->create<RefineOp>(unknownLoc, refOp.getType(), refOp.result(), offsets);
+      executor = refineOp.result();
+    } else {
+      executor = refOp.result();
     }
   }
 
@@ -287,28 +306,44 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // operations.
   for (const auto& ref : block.refs) {
     Value* from;
+    std::vector<Value*> offsets;
+    Value* zero = nullptr;
     if (ref.from.empty()) {
-      Type tensorType = ShapeIntoTensorType(builder->getContext(), ref.interior_shape);
+      Type tensorType = ShapeIntoTensorType(builder->getContext(), ref.interior_shape, ref.location);
       from = builder->create<AllocateOp>(unknownLoc, tensorType);
-      Type tensorRefType = ShapeIntoTensorRefType(builder->getContext(), ref.interior_shape);
+      Type tensorRefType = ShapeIntoTensorRefType(builder->getContext(), ref.interior_shape, ref.location);
       from = builder->create<TensorRefOp>(unknownLoc, tensorRefType, from);
+      offsets = LocationIntoTensorOffsets(builder, locals.idxs, ref.location, nullptr);
     } else {
       from = safe_at(outer.refs, ref.from);
+      if (auto trefTy = from->getType().dyn_cast<TensorRefType>()) {
+        // The outer tensor being refined may have hardware class indicies not reflected in the refinement;
+        // these need to be added to the offsets in order for the RefineOp to work correctly.
+        if (static_cast<std::int64_t>(ref.access.size()) < trefTy.getRank()) {
+          if (!zero) {
+            zero = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
+                                                  builder->getI64IntegerAttr(0));
+          }
+          offsets.resize(trefTy.getRank() - ref.access.size(), zero);
+        }
+      }
     }
-    std::vector<Value*> offsets;
     for (const auto& aff : ref.access) {
-      offsets.push_back(AffineIntoMLIR(builder, locals, aff));
+      offsets.push_back(AffineIntoMLIR(builder, nullptr, locals.idxs, aff));
     }
     auto refOp = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets);
     refOp.setAttr("name", builder->getStringAttr(ref.into()));
-    refOp.setAttr("stripe_attrs", TagsToDict(builder, ref));
+    auto attrs = TagsToDict(builder, ref);
+    if (attrs.size()) {
+      refOp.setAttr(Dialect::getStripeAttrsName(), attrs);
+    }
     locals.refs.emplace(ref.into(), refOp.result());
   }
 
   // Process the constraints
   for (const auto& con : block.constraints) {
     // Make the actual constraint value
-    auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, locals, con));
+    auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, nullptr, locals.idxs, con));
     // Make the block + attach to the region
     Block* if_body = new Block();
     aif.getOperation()->getRegion(0).push_back(if_body);
@@ -328,13 +363,16 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         auto elementType = tensorRefType.getElementType();
         auto intoType = eltwise::GetTensorType(elementType);
         auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
-        op.setAttr("stripe_attrs", TagsToDict(builder, *load));
+        auto attrs = TagsToDict(builder, *load);
+        if (attrs.size()) {
+          op.setAttr(Dialect::getStripeAttrsName(), attrs);
+        }
         op.setAttr("scalar_name", builder->getStringAttr(load->into));
         locals.scalars.emplace(load->into, op);
       } break;
       case stripe::StmtKind::LoadIndex: {
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
-        Value* from = AffineIntoMLIR(builder, locals, load_idx->from);
+        Value* from = AffineIntoMLIR(builder, nullptr, locals.idxs, load_idx->from);
         Type idx_base = eltwise::ScalarType::get(builder->getContext(), DataType::INT32);
         Type idx_type = eltwise::GetTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
@@ -350,17 +388,21 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         if (agg_str == "" || agg_str == "assign") {
           // Simple case, just an assignment
           auto op = builder->create<StoreOp>(unknownLoc, into, from);
-          op.setAttr("stripe_attrs", attrs);
+          if (attrs.size()) {
+            op.setAttr(Dialect::getStripeAttrsName(), attrs);
+          }
         } else {
           // Aggregation case
-          llvm::Optional<AggTypeEnum> agg_type = symbolizeAggTypeEnum(agg_str);
-          if (!agg_type) {
+          auto aggKind = eltwise::symbolizeAggregationKind(agg_str);
+          if (!aggKind) {
             throw std::runtime_error("Unknown agg-op:" + agg_str);
           }
-          int64_t agg_int = static_cast<int>(agg_type.getValue());
+          auto agg_int = static_cast<int>(aggKind.getValue());
           IntegerAttr agg_attr = builder->getI64IntegerAttr(agg_int);
           auto op = builder->create<AggregateOp>(unknownLoc, into, from, agg_attr);
-          op.setAttr("stripe_attrs", attrs);
+          if (attrs.size()) {
+            op.setAttr(Dialect::getStripeAttrsName(), attrs);
+          }
         }
       } break;
       case stripe::StmtKind::Constant: {
@@ -392,12 +434,24 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
     }
   }
 
+  // Terminate the block.
+  builder->setInsertionPointToEnd(body);
+
+  if (executor) {
+    builder->create<ExecuteOnOp>(unknownLoc, executor);
+  } else {
+    builder->create<TerminateOp>(unknownLoc);
+  }
+
   // Build the loop itself
   builder->restoreInsertionPoint(orig_insert);
   auto loop_op = builder->create<ParallelForOp>(unknownLoc, builder->getI64ArrayAttr(ranges));
   loop_op.setAttr("name", builder->getStringAttr(block.name));
   loop_op.setAttr("comments", builder->getStringAttr(block.comments));
-  loop_op.setAttr("stripe_attrs", TagsToDict(builder, block));
+  auto attrs = TagsToDict(builder, block);
+  if (attrs.size()) {
+    loop_op.setAttr(Dialect::getStripeAttrsName(), attrs);
+  }
   for (const auto& kvp : argAttrs) {
     loop_op.setAttr(kvp.first, kvp.second);
   }
@@ -411,7 +465,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     if (ref.from.size()) {
       throw std::runtime_error("Invalid program-level refinement");
     }
-    auto refType = ShapeIntoTensorType(ctx, ref.interior_shape);
+    auto refType = ShapeIntoTensorType(ctx, ref.interior_shape, ref.location);
     inputTypes.emplace_back(refType);
   }
 
@@ -421,23 +475,34 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
   func.addEntryBlock();
   OpBuilder builder(func.getBody());
 
-  auto prefix = llvm::formatv("{0}.", Dialect::getDialectNamespace());
   SymbolTable initial;
   size_t argcnt = 0;
   for (const auto& ref : block.refs) {
     auto argIndex = argcnt++;
     auto arg = func.getArgument(argIndex);
-    Type tensorRefType = ShapeIntoTensorRefType(ctx, ref.interior_shape);
+    Type tensorRefType = ShapeIntoTensorRefType(ctx, ref.interior_shape, ref.location);
     auto tensorRefOp = builder.create<TensorRefOp>(loc, tensorRefType, arg);
-    initial.refs.emplace(ref.into(), tensorRefOp);
+    bool any_non_zero_offsets = false;
+    // N.B. initial.idxs is empty here, but that's reasonable in this case; these incoming parameter
+    // refinement locations shouldn't be dependent on any external indicies.
+    auto offsets = LocationIntoTensorOffsets(&builder, initial.idxs, ref.location, &any_non_zero_offsets);
+    if (any_non_zero_offsets) {
+      auto zero = builder.create<AffineConstOp>(loc, builder.getType<AffineType>(), builder.getI64IntegerAttr(0));
+      offsets.resize(offsets.size() + ref.interior_shape.dims.size(), zero);
+      auto refOp = builder.create<RefineOp>(loc, tensorRefOp.getType(), tensorRefOp, offsets);
+      initial.refs.emplace(ref.into(), refOp);
+    } else {
+      initial.refs.emplace(ref.into(), tensorRefOp);
+    }
     // Only 'dialect attrs' are allowed on function arguments
-    func.setArgAttr(argIndex, prefix.str() + "name", builder.getStringAttr(ref.into()));
+    auto attrName = Dialect::getDialectAttrName("name");
+    func.setArgAttr(argIndex, attrName, builder.getStringAttr(ref.into()));
   }
 
-  std::vector<NamedAttribute> attrs;
-  AttrBuilder visitor(&builder, &attrs, prefix.str());
-  block.visit_tags(&visitor);
-  func.setDialectAttrs(attrs);
+  auto attrs = TagsToDict(&builder, block);
+  if (attrs.size()) {
+    func.setAttr(Dialect::getStripeAttrsName(), attrs);
+  }
 
   BlockIntoMLIR(&builder, initial, *block.SubBlock(0));
   builder.create<TerminateOp>(loc);

@@ -50,6 +50,13 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addInterfaces<OpAsmInterface>();
 }
 
+std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
+  if (name == "cond") {
+    name = "select";
+  }
+  return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
+}
+
 mlir::Type Dialect::parseType(llvm::StringRef spec, mlir::Location loc) const {  //
   return ScalarType::get(getContext(), DataTypeFromString(spec));
 }

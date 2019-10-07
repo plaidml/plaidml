@@ -7,6 +7,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "base/util/logging.h"
+#include "pmlc/dialect/eltwise/util.h"
 #include "tile/bilp/ilp_solver.h"
 #include "tile/math/basis.h"
 
@@ -96,7 +97,7 @@ static RangeConstraint IntersectParallelConstraintPair(  //
 void Constraints::AddTensor(const IndexAccess& access, stripe::TensorType tensorType) {
   auto shape = tensorType.getShape();
   if (access.size() != shape.size()) {
-    throw std::runtime_error(str(boost::format("Indexes != dimensions: %1% != %2%") % access.size() % shape.size()));
+    throw std::runtime_error(llvm::formatv("Indexes != dimensions: {0} != {1}", access.size(), shape.size()).str());
   }
   for (size_t i = 0; i < access.size(); i++) {
     constraints.emplace_back(access[i], shape[i].size);
@@ -210,15 +211,46 @@ std::tuple<IndexBounds, SimpleConstraints> Constraints::ComputeBounds() {
 }
 
 static IndexPoly MakePoly(mlir::Value* value, std::map<std::string, mlir::Value*>* map) {
+  IVLOG(3, "MakePoly: " << *value);
   if (auto blockArg = llvm::dyn_cast<mlir::BlockArgument>(value)) {
     auto name = llvm::formatv("x{0}", blockArg->getArgNumber());
     map->emplace(name.str(), value);
     return IndexPoly{name.str()};
   }
-  // TODO
-  // if (auto op = value->getDefiningOp()) {
-  // }
-  throw std::runtime_error("Invalid");
+  auto defOp = value->getDefiningOp();
+  if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
+    return IndexPoly{op.value().getSExtValue()};
+  }
+  if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
+    return MakePoly(op.lhs(), map) + MakePoly(op.rhs(), map);
+  }
+  if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
+    auto lhs = MakePoly(op.lhs(), map);
+    auto rhs = MakePoly(op.rhs(), map);
+    if (!rhs.isConstant()) {
+      throw std::runtime_error(
+          llvm::formatv("Divisor of polynomials must be a constant: {0} / {1}", lhs.toString(), rhs.toString()).str());
+    }
+    return lhs / rhs.constant();
+  }
+  if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
+    auto lhs = MakePoly(op.lhs(), map);
+    auto rhs = MakePoly(op.rhs(), map);
+    if (lhs.isConstant()) {
+      return rhs * lhs.constant();
+    }
+    if (rhs.isConstant()) {
+      return lhs * rhs.constant();
+    }
+    throw std::runtime_error(llvm::formatv("Non-linear polynomial: {0} * {1}", lhs.toString(), rhs.toString()).str());
+  }
+  if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
+    return -MakePoly(op.input(), map);
+  }
+  if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
+    return MakePoly(op.lhs(), map) - MakePoly(op.rhs(), map);
+  }
+  throw std::runtime_error("Invalid affine op");
 }
 
 Contraction::Contraction(ContractionOp op) {
@@ -252,7 +284,7 @@ Constraints Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> sh
   // Sanity check the shapes
   if (shapes.size() != accesses.size()) {
     throw std::runtime_error(
-        str(boost::format("Shape mismatch during constraint gathering: %1% vs %2%") % shapes.size() % accesses.size()));
+        llvm::formatv("Shape mismatch during constraint gathering: {0} vs {1}", shapes.size(), accesses.size()).str());
   }
   for (size_t i = 0; i < accesses.size(); i++) {
     ret.AddTensor(accesses[i], shapes[i]);
@@ -353,7 +385,7 @@ static IndexPoly ConvertPoly(                       //
 
 void Contraction::ReduceOutputPolynomials(const Constraints& order) {
   // First, we find all of our index variables
-  std::set<std::string> indexVars = getIndexVars();
+  auto indexVars = getIndexVars();
 
   // Now we construct a set of 'rewrite' variables for each linearly independent
   // output IndexPoly
@@ -422,24 +454,6 @@ void Contraction::ReduceOutputPolynomials(const Constraints& order) {
   for (auto& constraint : constraints) {
     constraint = RangeConstraint(ConvertVariables(constraint.poly, vec_idx, inverses), constraint.range);
   }
-
-  // Make new version of the op by first copying the original
-  // Contraction new_op(op.specs.size() - 1);
-  // new_op.comb_op = op.comb_op;
-  // new_op.agg_op = op.agg_op;
-  // for (size_t i = 0; i < op.specs.size(); i++) {
-  //   for (size_t j = 0; j < op.specs[i].spec.size(); j++) {
-  //     new_op.specs[i].spec.push_back(ConvertVariables(op.specs[i].spec[j], vec_idx, inverses));
-  //     new_op.specs[i].id = op.specs[i].id;
-  //   }
-  // }
-
-  // for (size_t i = 0; i < op.constraints.size(); i++) {
-  //   const RangeConstraint& oc = op.constraints[i].bound;
-  //   new_op.constraints.push_back(
-  //       SymbolicConstraint(RangeConstraint(ConvertVariables(oc.poly, vec_idx, inverses), oc.range)));
-  // }
-  // return new_op;
 }
 
 void Contraction::Defractionalize(const Constraints& order) {
@@ -575,33 +589,6 @@ void Contraction::Defractionalize(const Constraints& order) {
   for (const auto& constraint : new_cons) {
     constraints.push_back(constraint);
   }
-
-  // Make new version of the op by first copying the original
-  // Contraction new_op(op.specs.size() - 1);
-  // new_op.comb_op = op.comb_op;
-  // new_op.agg_op = op.agg_op;
-  // for (size_t i = 0; i < op.specs.size(); i++) {
-  //   for (size_t j = 0; j < op.specs[i].spec.size(); j++) {
-  //     new_op.specs[i].spec.push_back(ConvertPoly(op.specs[i].spec[j], replacements, transform_constant));
-  //     new_op.specs[i].id = op.specs[i].id;
-  //   }
-  // }
-
-  // for (size_t i = 0; i < op.constraints.size(); i++) {
-  //   const RangeConstraint& oc = op.constraints[i].bound;
-  //   new_op.constraints.push_back(
-  //       SymbolicConstraint(RangeConstraint(ConvertPoly(oc.poly, replacements, transform_constant), oc.range)));
-  // }
-  // if (transform_constant) {
-  //   // Add constraint for the constant term if it's being transformed
-  //   new_op.constraints.push_back(SymbolicConstraint(
-  //       RangeConstraint(ConvertPoly(IndexPoly(1), replacements, transform_constant) - 1, 1)));
-  // }
-
-  // for (const RangeConstraint& c : new_cons) {
-  //   new_op.constraints.push_back(SymbolicConstraint(c));
-  // }
-  // return new_op;
 }
 
 bool Contraction::NeedReduce() const {
@@ -629,6 +616,24 @@ std::tuple<IndexBounds, SimpleConstraints> Contraction::ComputeBounds(llvm::Arra
   // New parallel constraints might have been introduced by defract; re-merge them
   constraints.MergeParallelConstraints();
   return constraints.ComputeBounds();
+}
+
+math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds) {
+  math::Affine result;
+  for (const auto& term : poly.getMap()) {
+    if (denominator(term.second) != 1) {
+      throw std::runtime_error("Non-integer polynomial in Integerize");
+    }
+    auto int_value = static_cast<int64_t>(numerator(term.second));
+    if (term.first.empty()) {
+      result += int_value;
+    } else {
+      const auto& bound = bounds.at(term.first);
+      result += int_value * bound.min;
+      result += math::Affine(term.first, int_value);
+    }
+  }
+  return result;
 }
 
 }  // namespace tile

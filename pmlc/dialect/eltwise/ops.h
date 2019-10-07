@@ -2,16 +2,25 @@
 
 #pragma once
 
+#include <vector>
+
+#include "llvm/ADT/SmallVector.h"
+
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 
 #include "pmlc/dialect/eltwise/types.h"
 #include "pmlc/dialect/eltwise/util.h"
 
+#include "pmlc/dialect/eltwise/ops_enums.h.inc"
+
 namespace pmlc {
 namespace dialect {
 namespace eltwise {
 
+using llvm::SmallVector;
+using mlir::AbstractOperation;
 using mlir::APInt;
 using mlir::ArrayRef;
 using mlir::Attribute;
@@ -21,13 +30,16 @@ using mlir::FloatType;
 using mlir::IndexType;
 using mlir::IntegerAttr;
 using mlir::IntegerType;
+using mlir::Location;
 using mlir::LogicalResult;
 using mlir::MLIRContext;
 using mlir::NamedAttribute;
 using mlir::Op;
+using mlir::OpBuilder;
 using mlir::Operation;
 using mlir::OperationState;
 using mlir::OpFoldResult;
+using mlir::OpInterface;
 using mlir::OwningRewritePatternList;
 using mlir::RankedTensorType;
 using mlir::ShapedType;
@@ -40,38 +52,25 @@ using mlir::VectorType;
 
 namespace OpTrait = mlir::OpTrait;
 
+#include "pmlc/dialect/eltwise/ops_interfaces.h.inc"
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ops.h.inc"
 
-namespace impl {
-
-template <typename... Args>
-struct ForAllOpsImpl;
-
-template <typename First, typename... Args>
-struct ForAllOpsImpl<First, Args...> {
-  template <typename Operator>
-  static void run(Operator& op) {  // NOLINT
-    op.template apply<First>();
-    ForAllOpsImpl<Args...>::run(op);
+template <typename Filter>
+std::vector<AbstractOperation*> getAllOpsWith(MLIRContext* context, Filter filter) {
+  std::vector<AbstractOperation*> ops;
+  for (auto* op : context->getRegisteredOperations()) {
+    if (filter(op)) {
+      ops.emplace_back(op);
+    }
   }
-};
+  return ops;
+}
 
-template <>
-struct ForAllOpsImpl<> {
-  template <typename Operator>
-  static void run(Operator& op) {}  // NOLINT
-};
-
-}  // namespace impl
-
-template <typename Operator>
-void ForAllOps(Operator& op) {  // NOLINT
-  impl::ForAllOpsImpl<
-#define GET_OP_LIST
-#include "pmlc/dialect/eltwise/ops.cpp.inc"
-#undef GET_OP_LIST
-      >::run(op);
+template <typename Interface>
+std::vector<AbstractOperation*> getAllOpsWithInterface(MLIRContext* context) {
+  return getAllOpsWith(context, [](AbstractOperation* op) { return op->getInterface<Interface>(); });
 }
 
 }  // namespace eltwise

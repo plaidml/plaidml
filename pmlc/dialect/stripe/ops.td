@@ -1,5 +1,6 @@
 // Copyright 2019, Intel Corporation
 
+include "pmlc/dialect/eltwise/enums.td"
 include "pmlc/dialect/eltwise/predicates.td"
 
 def StripeDialect : Dialect {
@@ -8,7 +9,6 @@ def StripeDialect : Dialect {
 }
 
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
-def ExecutorType : Type<CPred<"$_self.isa<ExecutorType>()">, "Plaid Executor Type">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Type">;
 def TensorRefType : Type<CPred<"$_self.isa<TensorRefType>()">, "Plaid Tensor Reference Type">;
 
@@ -36,21 +36,6 @@ def LoadOp : StripeOp<"load"> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorRefType:$from);
   let results = (outs Eltwise_AnyTensor:$into);
-  /*
-  let parser = [{
-    mlir::SmallVector<OpAsmParser::OperandType, 1> ops;
-    Type type;
-    return mlir::failure(parser->parseOperandList(ops, 1) ||
-                 parser->parseColonType(type) ||
-                 parser->resolveOperands(ops, type, result->operands) ||
-                 parser->addTypeToList(type, result->types));
-  }];
-  let printer = [{
-    auto op = this->getOperation();
-    *p << op->getName() << ' ' << *op->getOperand(0);
-    *p << " : " << op->getResult(0)->getType();
-  }];
-  */
 }
 
 def LoadIndexOp : StripeOp<"load_index"> {
@@ -62,34 +47,11 @@ def LoadIndexOp : StripeOp<"load_index"> {
 def StoreOp : StripeOp<"store"> {
   let summary = "Store into a tensor";
   let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from);
-  /*
-  let parser = [{
-    mlir::SmallVector<OpAsmParser::OperandType, 2> ops;
-    Type type;
-    return mlir::failure(parser->parseOperandList(ops, 2) ||
-                 parser->resolveOperands(ops, type, result->operands));
-  }];
-  let printer = [{
-    auto op = this->getOperation();
-    *p << op->getName() << ' ' << *op->getOperand(0) << ", " << *op->getOperand(1);
-  }];
-  */
-}
-
-def AggTypeEnum : I64EnumAttr<
-    "AggTypeEnum",
-    "Operation to aggregate with",
-    [
-      I64EnumAttrCase<"add", 1>,
-      I64EnumAttrCase<"mul", 2>,
-      I64EnumAttrCase<"min", 3>,
-      I64EnumAttrCase<"max", 4>,
-    ]> {
 }
 
 def AggregateOp : StripeOp<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
-  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$agg_type);
+  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggregationKind:$agg);
   let results = (outs);
 }
 
@@ -100,13 +62,6 @@ class AffineOp<string mnemonic> : StripeOp<mnemonic, [NoSideEffect]> {
 def AffineConstOp : AffineOp<"affine_const"> {
   let summary = "A constant affine value";
   let arguments = (ins I64Attr:$value);
-  /*
-  let printer = [{
-    auto op = this->getOperation();
-    *p << op->getName() << ' ';
-    *p << op->getAttrOfType<IntegerAttr>("value").getInt();
-  }];
-  */
 }
 
 def AffineMulOp : AffineOp<"affine_mul"> {
@@ -142,9 +97,10 @@ def SpecialOpInterface : OpInterface<"SpecialOp"> {
 class SpecialOp<string mnemonic, int num_out, int num_in> :
     StripeOp<mnemonic, [SpecialOpInterface]> {
   let results = (outs);
-  let extraClassDeclaration = 
-    "  size_t getNumOutputs() { return " # num_out # "; }\n" #
-    "  size_t getNumInputs() { return " # num_in # "; }\n";
+  let extraClassDeclaration = [{
+    size_t getNumOutputs() { return }] # num_out # [{;}
+    size_t getNumInputs() { return }] # num_in # [{;}
+  }];
 }
 
 def ReshapeOp : SpecialOp<"reshape", 1, 1> {
@@ -189,6 +145,12 @@ def PrngStepOp : SpecialOp<"prng_step", 2, 1> {
 def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let summary = "A block terminator since MLIR requires one";
   let parser = [{ return mlir::success(); }];
-  let printer = [{ *p << this->getOperation()->getName(); }];
+  let printer = [{ *p << getOperationName(); }];
 }
 
+def ExecuteOnOp : StripeOp<"execute_on", [Terminator, HasParent<"ParallelForOp">]> {
+  let summary = "Indicates where a ParallelForOp should execute";
+
+  // 'from' represents the executor value being returned.
+  let arguments = (ins TensorRefType:$from);
+}

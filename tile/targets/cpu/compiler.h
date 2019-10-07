@@ -111,7 +111,10 @@ class Compiler : private stripe::ConstStmtVisitor {
   void Reshape(const stripe::Special&);
   void PrngStep(const stripe::Special&);
   void Shape(const stripe::Special&);
-  void AggInit(const stripe::Special&);
+  void AggInitAdd(const stripe::Special&);
+  void AggInitMul(const stripe::Special&);
+  void AggInitMin(const stripe::Special&);
+  void AggInitMax(const stripe::Special&);
   void Scatter(const stripe::Special&);
   void Gather(const stripe::Special&);
   void AsFloat(const stripe::Intrinsic&);
@@ -143,6 +146,9 @@ class Compiler : private stripe::ConstStmtVisitor {
   };
 
  private:
+  void CreateLoop(Loop* loop, std::string name);
+  void EnterLoop(Loop* loop, llvm::Value* variable, llvm::Value* init, llvm::Value* limit);
+  void LeaveLoop(Loop* loop, llvm::Value* variable);
   Scalar Cast(Scalar, DataType);
   Scalar CheckBool(Scalar);
   llvm::Type* CType(DataType);
@@ -156,9 +162,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::FunctionType* BlockType(const stripe::Block&);
   llvm::Value* XSMMDispatchFunction(llvm::Type* alphaPtrType, llvm::Type* betaPtrType, llvm::Type* aPtrType,
                                     llvm::Type* bPtrType, llvm::Type* cPtrType, const std::string& funcionName);
-  llvm::Value* MallocFunction();
-  llvm::Value* CallocFunction();
-  llvm::Value* FreeFunction();
+  llvm::Value* Malloc(size_t size);
+  void Free(llvm::Value* buffer);
   llvm::Value* PrngStepFunction();
   llvm::Value* ReadCycleCounter();
   void ProfileBlockEnter(const stripe::Block& block);
@@ -169,6 +174,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Value* RunTimeLogEntry(void);
   void EmitRunTimeLogEntry(const std::string& str, const std::string& extra, llvm::Value* value = nullptr);
   void PrintOutputAssembly();
+  void AggInit(const Buffer& dest, llvm::Value* init_val);
 
   // Gets the leading dimensions and the buffers for an XSMM call if available.
   // @returns true if the XSMM call is applicable, otherwise false.

@@ -1,13 +1,16 @@
 // Copyright 2019, Intel Corp.
 
+#include <memory>
+#include <set>
+#include <utility>
+#include <vector>
+
 #include "tile/codegen/const_prop.h"
 
 #include "base/util/any_factory_map.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/localize.h"
-#ifndef _WIN64
 #include "tile/targets/cpu/jit.h"
-#endif
 
 namespace vertexai {
 namespace tile {
@@ -18,7 +21,7 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
   auto prog = state->entry();
   auto main = prog->SubBlock(0).get();
 
-  // Now, make the a main/prog block for the constant generation program
+  // Now, make the main/prog block for the constant generation program
   auto cmain = std::make_shared<stripe::Block>();
   auto cprog = std::make_shared<stripe::Block>();
   cprog->stmts.push_back(cmain);
@@ -63,7 +66,7 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
     cmain->stmts.push_back(inner);
     auto old_it = stmt_it;
     stmt_it++;
-    main->stmts.erase(old_it);
+    main->erase_stmt(old_it);
 
     // Add all block outputs as new constant outputs
     for (const auto& in : inner->ref_outs()) {
@@ -93,6 +96,11 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
     }
   }
 
+  if (all_const.empty()) {
+    // If there isn't any constant propagation work to be done, just bail
+    return;
+  }
+
   // Now, we 'map' all the inputs + outputs
   std::vector<std::unique_ptr<tile::View>> views;
   std::map<std::string, void*> buffers;
@@ -113,11 +121,7 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
   for (const auto& name : out_const) {
     IVLOG(2, "Jitting constant propagation for" << name);
   }
-#ifdef _WIN64
-  throw std::runtime_error("LLVM doeesn't build on windows right now");
-#else
   targets::cpu::JitExecute(*cprog, buffers);
-#endif
 
   // Unmap the views
   views.clear();

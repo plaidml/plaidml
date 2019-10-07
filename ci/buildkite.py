@@ -174,9 +174,10 @@ def cmd_build(args, remainder):
 
     explain_log = 'explain.log'
     profile_json = 'profile.json.gz'
+    bazel_config = variant.get('bazel_config', args.variant)
 
     common_args = []
-    common_args += ['--config={}'.format(args.variant)]
+    common_args += ['--config={}'.format(bazel_config)]
     common_args += ['--define=version={}'.format(args.version)]
     common_args += ['--experimental_generate_json_trace_profile']
     common_args += ['--experimental_json_trace_compression']

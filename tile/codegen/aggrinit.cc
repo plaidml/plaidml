@@ -1,5 +1,7 @@
 // Copyright 2018, Intel Corporation
 
+#include <memory>
+#include <set>
 #include <vector>
 
 #include "tile/codegen/aggrinit.h"
@@ -24,7 +26,7 @@ void AggregationBlockOutputInitialization(const stripe::Block* const block,
   // do not emit duplicated local declarations.
   std::set<std::string> dup_ref;
 
-  // Now, add any new locals
+  // Now, add any new locals that have agg_op.
   for (const auto& ref : block->refs) {
     if (ref.dir == stripe::RefDir::None && dup_ref.find(ref.into()) == dup_ref.end() && !ref.has_tag("user")) {
       std::string aggOp = ref.agg_op;
@@ -61,7 +63,7 @@ void AggregationBlockOutputInitialization(const stripe::Block* const block,
 
   if (prevRefIter->agg_op == "" || prevRefIter->agg_op == "assign") {
     const_cast<AggregationBlockOutputInitializationPass*>(aggregationPass)
-        ->AddRefinementToInit(const_cast<stripe::Block*>(prevBlock), dest, block, aggOp);
+        ->AddRefinementToInit(const_cast<stripe::Block*>(prevBlock), &(*prevRefIter), block, aggOp);
   } else {
     if (prevRefIter->agg_op != aggOp) {
       // TODO: Create a temp buffer here.
@@ -78,7 +80,7 @@ void AggregationBlockOutputInitializationPass::Apply(CompilerState* state) const
   for (const auto& toInit : this->state.blocksWithInits) {
     assert(toInit.blockToAddTo != nullptr);
     assert(toInit.refToInitialize != nullptr);
-    assert(toInit.initType == AggregationInitType::ADD || toInit.initType == AggregationInitType::MULL ||
+    assert(toInit.initType == AggregationInitType::ADD || toInit.initType == AggregationInitType::MUL ||
            toInit.initType == AggregationInitType::MIN || toInit.initType == AggregationInitType::MAX);
     auto aggInit = std::make_shared<Special>();
     std::string aggInitName = "";

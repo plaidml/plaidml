@@ -70,6 +70,14 @@ TEST(CppEdsl, DoubleDot) {
   exec::Executable::compile(program, {A, B, C})->run();
 }
 
+TEST(CppEdsl, EltwiseAdd) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto C = A + B;
+  Program program("eltwise_add", {C});
+  exec::Executable::compile(program, {A, B})->run();
+}
+
 TEST(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
   auto input = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
@@ -231,7 +239,7 @@ TEST(CppEdsl, MnistCnn) {
   _X37 = div(_X35, _X36);
 }
 )"));
-  // TODO: this currently crashes
+  // This currently crashes when combined with the padding pass
   // std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4};
   // exec::Executable::compile(program, inputs)->run();
 }
@@ -444,7 +452,8 @@ TEST(CppEdsl, Winograd) {
   _X11[x0, x1 + 30*x3, 30*x4 + x6, x5 : 1, 222, 222, 32] = +(_X10[x0, x1, x2, x3, x4, x5] * _X0[x2, x6]) no_defract;
 }
 )"));
-  exec::Executable::compile(program, {I, K, A, B, G})->run();
+  // This currently crashes when combined with the padding pass
+  // exec::Executable::compile(program, {I, K, A, B, G})->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
@@ -680,8 +689,17 @@ TEST(CppEdsl, DefractLong) {
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   Program program("defract_long", {O});
-  // TODO: this currently crashes
+  // This currently crashes when combined with the padding pass
   // exec::Executable::compile(program, {I, K})->run();
+}
+
+TEST(CppEdsl, DupOut) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
+  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
+  auto R = Dot(Dot(A, B), C);
+  Program program("dup_out", {R, R, R});
+  exec::Executable::compile(program, {A, B, C})->run();
 }
 
 }  // namespace

@@ -30,8 +30,8 @@
 #include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
-#include "pmlc/dialect/tile/internal.h"
 #include "pmlc/dialect/tile/ops.h"
+#include "pmlc/dialect/tile/program.h"
 #include "tile/base/shape.h"
 
 namespace pmlc {
@@ -193,10 +193,10 @@ struct TileBuilder::Impl {
     OpBuilder domain_builder(body);
     for (auto value : slice) {
       auto op = value->getDefiningOp();
-      if (belong.count(value) ||                         //
-          llvm::dyn_cast<AffineSourceIndexMapOp>(op) ||  //
-          llvm::dyn_cast<AffineSinkIndexMapOp>(op) ||    //
-          llvm::dyn_cast<AffineSizeMapOp>(op)) {
+      if (belong.count(value) ||                    //
+          llvm::isa<AffineSourceIndexMapOp>(op) ||  //
+          llvm::isa<AffineSinkIndexMapOp>(op) ||    //
+          llvm::isa<AffineSizeMapOp>(op)) {
         auto new_value = domain_builder.clone(*op, mapper)->getResult(0);
         mapper.map(value, new_value);
       }
@@ -320,54 +320,23 @@ Shape TileBuilder::GetShape(mlir::Value* tensor) {
   return Shape{elementType.type(), type.getShape()};
 }
 
-struct EltwiseBuilder {
-  static EltwiseBuilder* get() {
-    static EltwiseBuilder builder;
-    static std::once_flag is_initialized;
-    std::call_once(is_initialized, []() {  //
-      eltwise::ForAllOps(builder);
-    });
-    return &builder;
-  }
-
-  template <class OpType>
-  void apply() {
-    auto name = OpType::getOperationName();
-    IVLOG(6, "EltwiseBuilder::apply> " << name.str());
-    auto factory = [](OpBuilder* builder, ScalarType type, llvm::ArrayRef<mlir::Value*> args) {
-      return builder->create<OpType>(builder->getUnknownLoc(), type, args).getOperation();
-    };
-    primitives.emplace(name, factory);
-    if (name == "eltwise.select") {
-      primitives.emplace("eltwise.cond", factory);
-    }
-  }
-
-  using PrimitiveFactory = std::function<  //
-      mlir::Operation*(                    //
-          OpBuilder* builder,              //
-          ScalarType type,                 //
-          llvm::ArrayRef<mlir::Value*> args)>;
-  std::map<std::string, PrimitiveFactory> primitives;
-};
-
 mlir::Value* TileBuilder::MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args) {
   IVLOG(5, "TileBuilder::MakePrimitiveOp> " << fn.str());
   for (auto arg : args) {
     IVLOG(6, "  arg: " << mlir::debugString(*arg));
   }
-  std::stringstream ss;
-  ss << eltwise::Dialect::getDialectNamespace() << "." << fn.str();
-  auto builder = EltwiseBuilder::get();
-  auto it = builder->primitives.find(ss.str());
-  if (it == builder->primitives.end()) {
-    // TODO: handle unspecified primitive
-    std::stringstream ss;
-    ss << "Unknown primitive: " << fn.str();
-    throw std::runtime_error(ss.str());
+  auto opName = eltwise::Dialect::getCanonicalOpName(fn);
+  auto abstractOp = mlir::AbstractOperation::lookup(opName, &impl->context);
+  if (!abstractOp) {
+    throw std::runtime_error("Unknown op: " + opName);
+  }
+  auto eltwiseBuilder = abstractOp->getInterface<eltwise::EltwiseBuilder>();
+  if (!eltwiseBuilder) {
+    throw std::runtime_error("Unknown intrinsic: " + opName);
   }
   auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);  // TODO
-  return it->second(&impl->builder, type, args)->getResult(0);
+  auto op = eltwiseBuilder->create(&impl->builder, impl->builder.getUnknownLoc(), type, args);
+  return op->getResult(0);
 }
 
 mlir::Value* TileBuilder::Clone(mlir::Value* value) {
@@ -542,7 +511,11 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
       throw std::runtime_error("Invalid output");
     }
     resultTypes[i] = outputs[i]->getType();
-    values.insert(outputs[i]);
+    if (values.count(outputs[i])) {
+      values.insert(MakePrimitiveOp("ident", {outputs[i]}));
+    } else {
+      values.insert(outputs[i]);
+    }
   }
   auto slice = getBackwardSlice(values, true);
   // Compute the input types
@@ -583,8 +556,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   }
   // Add a final ReturnOp
   std::vector<mlir::Value*> rets;
-  for (unsigned i = 0; i < outputs.size(); i++) {
-    auto new_value = program->mapper.lookup(outputs[i]);
+  for (unsigned i = 0; i < values.size(); i++) {
+    auto new_value = program->mapper.lookup(values[i]);
     new_outputs[i] = new_value;
     rets.push_back(new_value);
   }

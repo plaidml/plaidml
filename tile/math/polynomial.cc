@@ -260,9 +260,9 @@ std::string Polynomial<T>::toString() const {
 template class Polynomial<Rational>;
 template class Polynomial<int64_t>;
 
-SimpleConstraint::SimpleConstraint(const Polynomial<Rational>& _poly, int64_t _rhs) : poly(_poly), rhs(_rhs) {}
+SimpleConstraint::SimpleConstraint(const Polynomial<Rational>& poly, int64_t rhs) : poly(poly), rhs(rhs) {}
 
-RangeConstraint::RangeConstraint(const Polynomial<Rational>& _poly, int64_t _range) : poly(_poly), range(_range) {}
+RangeConstraint::RangeConstraint(const Polynomial<Rational>& poly, int64_t range) : poly(poly), range(range) {}
 
 bool RangeConstraint::IsParallel(const RangeConstraint& c) {
   if (this->poly.tryDivide(c.poly, true) != 0) return true;

@@ -2469,28 +2469,36 @@ Value squeeze(const Value& value) {
     throw std::runtime_error("Squeeze expects 2 arguments");
   }
 
-  // Read arguments
+  // argument 0: tensor to be squeezed
   auto I = args[0].as_tensor();
-  auto raw_axis = args[1].as_int();
-
-  // Validate arguments
   auto ndims = I.shape().ndims();
-  auto axis = normalize_axis(raw_axis, ndims, "squeeze");
   std::vector<TensorDim> I_dims(ndims);
-  std::vector<TensorIndex> I_idxs;
   std::vector<TensorDim> O_dims;
-  std::vector<TensorIndex> O_idxs;
   I.bind_dims(I_dims);
+
+  // argument 1: axes to squeeze upon
+  std::vector<int64_t> raw_axes;
+  if (args[1].is_int()) {
+    raw_axes.push_back(args[1].as_int());
+  } else {
+    raw_axes = args[1].as_int_tuple();
+  }
+  std::set<size_t> axes;
+  for (auto& raw_axis : raw_axes) {
+    axes.insert(normalize_axis(raw_axis, ndims, "squeeze"));
+  }
+
   for (size_t i = 0; i < ndims; ++i) {
-    I_idxs.emplace_back(str(boost::format("n%1%") % i));
-    if (i != axis) {
+    if (!axes.count(i)) {
       O_dims.push_back(I_dims[i]);
-      O_idxs.push_back(I_idxs[i]);
     }
   }
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-  return Value{O};
+  std::vector<Value> O_dims_values;
+  for (const auto dim : O_dims) {
+    O_dims_values.push_back(Value{dim});
+  }
+  std::vector<Value> reshape_args = {Value{I}, Value{O_dims_values}};
+  return reshape(Value{reshape_args});
 }
 
 Value sum(const Value& value) {

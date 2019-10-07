@@ -932,7 +932,9 @@ def is_keras_tensor(x):
 
 @_log_call
 def is_placeholder(x):
-    _report_unimplemented('is_placeholder')
+    if not is_tensor(x):
+        return False
+    return x.opname == 'placeholder'
 
 
 @_log_call
@@ -1060,25 +1062,23 @@ def not_equal(lhs, rhs):
 
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
-    x_shape = shape(x)
-    ndims = len(x_shape)
-    if ndims == 4 and reduction_axes in [[0, 1, 2], [0, 2, 3]]:
-        target_shape = [1 if i in reduction_axes else x_shape[i] for i in range(4)]
-        m = mean(x, axis=reduction_axes, keepdims=True)
-        m = reshape(m, target_shape)
-        v = var(x, axis=reduction_axes, keepdims=True)
-        v = reshape(v, target_shape)
-        beta = reshape(beta, target_shape)
-        gamma = reshape(gamma, target_shape)
+    I = x.tensor
+    ndims = I.shape.ndims
+    if reduction_axes == None:
+        raw_axes = [ndims - 1]
     else:
-        if reduction_axes == None:
-            raw_axes = [ndims - 1]
-        else:
-            raw_axes = reduction_axes
-        axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
+        raw_axes = reduction_axes
+    axes = [_normalize_axis(x, ndims, 'normalize_batch_in_training') for x in raw_axes]
+    m = mean(x, axis=axes, keepdims=True)
+    v = var(x, axis=axes, keepdims=True)
 
-        m = mean(x, axis=axes, keepdims=True)
-        v = var(x, axis=axes, keepdims=True)
+    # We reshape beta & gamma to the target shape; this discards shape information on beta & gamma but matches the behavior with the TF backend
+    dims = edsl.TensorDims(ndims)
+    I.bind_dims(*dims)
+    for ax in axes:
+        dims[ax] = 1
+    beta = reshape(beta, dims)
+    gamma = reshape(gamma, dims)
 
     normalized_tensor = batch_normalization(x=x,
                                             mean=m,
@@ -1559,20 +1559,13 @@ def square(x):
 @_log_call
 def squeeze(x, axis=None):
     if axis is None:
-        # define axis
+        # Auto-squeeze the size 1 dims. Note that this never squeezes symbolic dims
         axis = []
         x_shape = int_shape(x)
         for s in range(len(x_shape)):
             if x_shape[s] == 1:
                 axis.append(s)
-    if type(axis) is list:
-        x_squeezed = x
-        for i in range(len(axis)):
-            ax = axis[i] - i
-            x_squeezed = _KerasNode('squeeze', tensor=plaidml_op.squeeze(x_squeezed.tensor, ax))
-        return x_squeezed
-    else:
-        return _KerasNode('squeeze', tensor=plaidml_op.squeeze(x.tensor, axis))
+    return _KerasNode('squeeze', tensor=plaidml_op.squeeze(x.tensor, axis))
 
 
 @_log_call

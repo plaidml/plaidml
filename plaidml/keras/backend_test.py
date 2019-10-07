@@ -273,7 +273,6 @@ def opTest(in_data,
                     results.append((fr, gr))
                 else:
                     results.append((fr,))
-        tf_session.close()
         return results
 
     def apply(test_func):
@@ -824,6 +823,10 @@ class TestBackendOps(unittest.TestCase):
     @opTest([[m(2, 6)], [m(2, 9, 9) - 3.1]])
     def testSoftplus(self, b, x):
         return [b.softplus(x)]
+
+    @opTest([[m(1, 3, 4)], [m(7, 19) - 10.]])
+    def testSoftsign(self, b, x):
+        return [b.softsign(x)]
 
     # TODO: Enable gradients again after we fix the Stripe bug
     @opTest([[m(10, 10)]], do_grads=False)
@@ -1871,6 +1874,27 @@ class TestBackendOps(unittest.TestCase):
     )
     def bigMatMulInt32(self, b, A, B):
         return [b.dot(A, B)]
+
+    def testDupOutputs(self):
+
+        def model(b):
+            A = b.variable(m(10, 20), name='A')
+            B = b.variable(m(20, 30), name='B')
+            C = b.dot(A, B)
+            fn = b.function([], [C, C, C])
+            return fn([])
+
+        tf_session = tensorflow.Session()
+        tf.set_session(tf_session)
+        tensorflow_result = model(tf)
+        plaidml_result = model(pkb)
+
+        for result in zip(plaidml_result, tensorflow_result):
+            npt.assert_allclose(result[0],
+                                result[1],
+                                rtol=DEFAULT_TOL,
+                                atol=DEFAULT_ATOL,
+                                err_msg='x=plaidml, y=tensorflow')
 
 
 if __name__ == '__main__':
