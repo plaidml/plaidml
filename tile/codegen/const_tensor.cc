@@ -1,7 +1,12 @@
 // Copyright 2018, Intel Corporation
 
-#include <map>
 #include "tile/codegen/const_tensor.h"
+
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+
 #include "base/util/any_factory_map.h"
 #include "tile/codegen/tile.h"
 #include "tile/stripe/stripe.h"
@@ -12,7 +17,7 @@ namespace codegen {
 
 using namespace stripe;  // NOLINT
 
-bool FullyCoveredOut(Block *block, Block *parent) {
+bool FullyCoveredOut(Block* block, Block* parent) {
   if (block->constraints.size() > 0) {
     return false;
   }
@@ -29,8 +34,7 @@ bool FullyCoveredOut(Block *block, Block *parent) {
         if (ref_it->interior_shape.dims[dim].size != 1) {
           return false;
         }
-      }
-      else if (acc_map.size() == 1) {
+      } else if (acc_map.size() == 1) {
         if (acc_map.begin()->first == "" || acc_map.begin()->second != 1) {
           return false;
         }
@@ -38,8 +42,7 @@ bool FullyCoveredOut(Block *block, Block *parent) {
         if (ref_it->interior_shape.dims[dim].size != idx->range) {
           return false;
         }
-      }
-      else {
+      } else {
         return false;
       }
     }
@@ -62,8 +65,7 @@ bool AnalyzeConstTensor(Block* block, Block* parent, std::string* tensor, Consta
           auto constant = Constant::Downcast(stmt);
           scalars.insert(constant->name);
           *value = *(constant.get());
-        }
-        else {
+        } else {
           return false;
         }
         break;
@@ -73,8 +75,7 @@ bool AnalyzeConstTensor(Block* block, Block* parent, std::string* tensor, Consta
         if (stage == 1 && intrinsic->name == "assign" && scalars.find(intrinsic->inputs[0]) != scalars.end()) {
           ++stage;
           scalars.insert(intrinsic->outputs[0]);
-        }
-        else {
+        } else {
           return false;
         }
         break;
@@ -84,8 +85,7 @@ bool AnalyzeConstTensor(Block* block, Block* parent, std::string* tensor, Consta
         if ((stage == 1 || stage == 2) && scalars.find(store->from) != scalars.end()) {
           *tensor = store->into;
           ++stage;
-        }
-        else {
+        } else {
           return false;
         }
         break;
@@ -106,7 +106,7 @@ void ConstTensor(const AliasMap& alias_map, Block* block, const proto::ConstTens
       ++stmt_it;
       continue;
     }
-    // Check if there is any load that is actually constant  
+    // Check if there is any load that is actually constant
     std::map<std::string, std::string> ref_map;
     for (const auto ref : inner->refs) {
       ref_map.emplace(ref.into(), ref.from);
@@ -121,14 +121,13 @@ void ConstTensor(const AliasMap& alias_map, Block* block, const proto::ConstTens
         if (it != tensor_value.end()) {
           to_remove.insert(ref_name);
           const auto& value = it->second;
-          std::shared_ptr<Constant> new_stmt =
-            (value.type == ConstType::Integer) ? 
-            std::make_shared<Constant>(load->into, value.iconst) :
-            std::make_shared<Constant>(load->into, value.fconst);
+          std::shared_ptr<Constant> new_stmt = (value.type == ConstType::Integer)
+                                                   ? std::make_shared<Constant>(load->into, value.iconst)
+                                                   : std::make_shared<Constant>(load->into, value.fconst);
           inner->stmts.insert(inner_stmt_it, new_stmt);
           auto old_it = inner_stmt_it;
           ++inner_stmt_it;
-          inner->stmts.erase(old_it);
+          inner->erase_stmt(old_it);
           continue;
         }
       }
@@ -146,7 +145,7 @@ void ConstTensor(const AliasMap& alias_map, Block* block, const proto::ConstTens
       tensor_value.emplace(tensor, value);
       auto old_it = stmt_it;
       ++stmt_it;
-      block->stmts.erase(old_it);
+      block->erase_stmt(old_it);
       continue;
     }
     ++stmt_it;
@@ -155,11 +154,12 @@ void ConstTensor(const AliasMap& alias_map, Block* block, const proto::ConstTens
 
 void ConstTensorPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocks(state->entry(), reqs,
-              [this](const AliasMap& alias_map, stripe::Block* block) {  //
-                ConstTensor(alias_map, block, options_);
-              },
-              false);
+  RunOnBlocks(
+      state->entry(), reqs,
+      [this](const AliasMap& alias_map, stripe::Block* block) {  //
+        ConstTensor(alias_map, block, options_);
+      },
+      false);
 }
 
 namespace {

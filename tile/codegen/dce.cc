@@ -1,8 +1,12 @@
 // Copyright 2018, Intel Corporation
 
-#include <set>
-
 #include "tile/codegen/dce.h"
+
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+
 #include "tile/codegen/deps.h"
 #include "tile/stripe/stripe.h"
 
@@ -206,9 +210,12 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
   }
 
   // Remove all marked "removed" statements
-  block->stmts.erase(std::remove_if(block->stmts.begin(), block->stmts.end(),                                    //
-                                    [](std::shared_ptr<Statement>& stmt) { return stmt->has_tag("removed"); }),  //
-                     block->stmts.end());
+  block->erase_stmts(            //
+      std::remove_if(            //
+          block->stmts.begin(),  //
+          block->stmts.end(),    //
+          [](const auto& stmt) { return stmt->has_tag("removed"); }),
+      block->stmts.end());
 
   // Clean up refinements
   // Do not use AliasMap here, which may not be correct after code elimination
@@ -224,25 +231,27 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
 
 void DeadCodeEliminationPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocksBackward(state->entry(), reqs,
-                      [](const AliasMap& alias_map, stripe::Block* block) {  //
-                        DeadCodeElimination(alias_map, block);
-                      },
-                      true);
+  RunOnBlocksBackward(
+      state->entry(), reqs,
+      [](const AliasMap& alias_map, stripe::Block* block) {  //
+        DeadCodeElimination(alias_map, block);
+      },
+      true);
 
-  RunOnBlocks(state->entry(), reqs,
-              [&](const AliasMap& map, stripe::Block* block) {  //
-                if (options_.fix_deps()) {
-                  // Rebuild deps
-                  ComputeDepsForBlock(block, map);
-                } else {
-                  // Clean up deps after use
-                  for (auto& stmt : block->stmts) {
-                    stmt.get()->deps.clear();
-                  }
-                }
-              },
-              true);
+  RunOnBlocks(
+      state->entry(), reqs,
+      [&](const AliasMap& map, stripe::Block* block) {  //
+        if (options_.fix_deps()) {
+          // Rebuild deps
+          ComputeDepsForBlock(block, map);
+        } else {
+          // Clean up deps after use
+          for (auto& stmt : block->stmts) {
+            stmt.get()->deps.clear();
+          }
+        }
+      },
+      true);
 }
 
 namespace {

@@ -1,5 +1,6 @@
 // Copyright 2019, Intel Corporation
 
+include "pmlc/dialect/eltwise/enums.td"
 include "pmlc/dialect/eltwise/predicates.td"
 
 def TileDialect : Dialect {
@@ -173,6 +174,9 @@ def ContractionOpInterface : OpInterface<"ContractionOp"> {
     InterfaceMethod<"std::vector<Value*>", "getSourceIndexMaps">,
     InterfaceMethod<"Value*", "getSinkIndexMap">,
     InterfaceMethod<"Value*", "getSizeMap">,
+    InterfaceMethod<"unsigned", "getNumOperands">,
+    InterfaceMethod<"AggregationKind", "getAggregationKind">,
+    InterfaceMethod<"CombinationKind", "getCombinationKind">,
   ];
 }
 
@@ -183,7 +187,7 @@ class ContractionOp<string mnemonic, list<OpTrait> traits = []> :
       ContractionOpInterface
     ])>;
 
-class UnaryConOp<string mnemonic> : ContractionOp<mnemonic> {
+class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
   let arguments = (ins
     AffineSizeMap:$size,
     AffineIndexMap:$src,
@@ -193,10 +197,13 @@ class UnaryConOp<string mnemonic> : ContractionOp<mnemonic> {
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src()}; }
     Value* getSinkIndexMap() { return sink(); }
+    unsigned getNumOperands() { return 1; }
+    AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
+    CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
   }];
 }
 
-class BinaryConOp<string mnemonic> : ContractionOp<mnemonic> {
+class BinaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
   let arguments = (ins
     AffineSizeMap:$size,
     AffineIndexMap:$src1,
@@ -207,10 +214,13 @@ class BinaryConOp<string mnemonic> : ContractionOp<mnemonic> {
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src1(), src2()}; }
     Value* getSinkIndexMap() { return sink(); }
+    unsigned getNumOperands() { return 2; }
+    AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
+    CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
   }];
 }
 
-class TernaryConOp<string mnemonic> : ContractionOp<mnemonic> {
+class TernaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
   let arguments = (ins
     AffineSizeMap:$size,
     AffineIndexMap:$src1,
@@ -222,110 +232,113 @@ class TernaryConOp<string mnemonic> : ContractionOp<mnemonic> {
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src1(), src2(), src3()}; }
     Value* getSinkIndexMap() { return sink(); }
+    unsigned getNumOperands() { return 3; }
+    AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
+    CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
   }];
 }
 
 // Assign
-def ConAssignOp : UnaryConOp<"=(x)"> {
+def ConAssignOp : UnaryConOp<"=(x)", "assign", "none"> {
   let summary = "=(x) contraction";
 }
 
-def ConAssignAddOp : BinaryConOp<"=(x+y)"> {
+def ConAssignAddOp : BinaryConOp<"=(x+y)", "assign", "add"> {
   let summary = "=(x + y) contraction";
 }
 
-def ConAssignCondOp : TernaryConOp<"=(x==y?z)"> {
+def ConAssignCondOp : TernaryConOp<"=(x==y?z)", "assign", "cond"> {
   let summary = "=(x == y ? z) contraction";
 }
 
-def ConAssignEqOp : BinaryConOp<"=(x==y)"> {
+def ConAssignEqOp : BinaryConOp<"=(x==y)", "assign", "eq"> {
   let summary = "=(x == y) contraction";
 }
 
-def ConAssignMulOp : BinaryConOp<"=(x*y)"> {
+def ConAssignMulOp : BinaryConOp<"=(x*y)", "assign", "mul"> {
   let summary = "=(x * y) contraction";
 }
 
 // Max
-def ConMaxOp : UnaryConOp<">(x)"> {
+def ConMaxOp : UnaryConOp<">(x)", "max", "none"> {
   let summary = ">(x) contraction";
 }
 
-def ConMaxAddOp : BinaryConOp<">(x+y)"> {
+def ConMaxAddOp : BinaryConOp<">(x+y)", "max", "add"> {
   let summary = ">(x + y) contraction";
 }
 
-def ConMaxCondOp : TernaryConOp<">(x==y?z)"> {
+def ConMaxCondOp : TernaryConOp<">(x==y?z)", "max", "cond"> {
   let summary = ">(x == y ? z) contraction";
 }
 
-def ConMaxEqOp : BinaryConOp<">(x==y)"> {
+def ConMaxEqOp : BinaryConOp<">(x==y)", "max", "eq"> {
   let summary = ">(x == y) contraction";
 }
 
-def ConMaxMulOp : BinaryConOp<">(x*y)"> {
+def ConMaxMulOp : BinaryConOp<">(x*y)", "max", "mul"> {
   let summary = ">(x * y) contraction";
 }
 
 // Min
-def ConMinOp : UnaryConOp<"<(x)"> {
+def ConMinOp : UnaryConOp<"<(x)", "min", "none"> {
   let summary = "<(x) contraction";
 }
 
-def ConMinAddOp : BinaryConOp<"<(x+y)"> {
+def ConMinAddOp : BinaryConOp<"<(x+y)", "min", "add"> {
   let summary = "<(x + y) contraction";
 }
 
-def ConMinCondOp : TernaryConOp<"<(x==y?z)"> {
+def ConMinCondOp : TernaryConOp<"<(x==y?z)", "min", "cond"> {
   let summary = "<(x == y ? z) contraction";
 }
 
-def ConMinEqOp : BinaryConOp<"<(x==y)"> {
+def ConMinEqOp : BinaryConOp<"<(x==y)", "min", "eq"> {
   let summary = "<(x == y) contraction";
 }
 
-def ConMinMulOp : BinaryConOp<"<(x*y)"> {
+def ConMinMulOp : BinaryConOp<"<(x*y)", "min", "mul"> {
   let summary = "<(x * y) contraction";
 }
 
 // Prod
-def ConProdOp : UnaryConOp<"*(x)"> {
+def ConProdOp : UnaryConOp<"*(x)", "mul", "none"> {
   let summary = "*(x) contraction";
 }
 
-def ConProdAddOp : BinaryConOp<"*(x+y)"> {
+def ConProdAddOp : BinaryConOp<"*(x+y)", "mul", "add"> {
   let summary = "*(x + y) contraction";
 }
 
-def ConProdCondOp : TernaryConOp<"*(x==y?z)"> {
+def ConProdCondOp : TernaryConOp<"*(x==y?z)", "mul", "cond"> {
   let summary = "*(x == y ? z) contraction";
 }
 
-def ConProdEqOp : BinaryConOp<"*(x==y)"> {
+def ConProdEqOp : BinaryConOp<"*(x==y)", "mul", "eq"> {
   let summary = "*(x == y) contraction";
 }
 
-def ConProdMulOp : BinaryConOp<"*(x*y)"> {
+def ConProdMulOp : BinaryConOp<"*(x*y)", "mul", "mul"> {
   let summary = "*(x * y) contraction";
 }
 
 // Sum
-def ConSumOp : UnaryConOp<"+(x)"> {
+def ConSumOp : UnaryConOp<"+(x)", "add", "none"> {
   let summary = "+(x) contraction";
 }
 
-def ConSumAddOp : BinaryConOp<"+(x+y)"> {
+def ConSumAddOp : BinaryConOp<"+(x+y)", "add", "add"> {
   let summary = "+(x + y) contraction";
 }
 
-def ConSumCondOp : TernaryConOp<"+(x==y?z)"> {
+def ConSumCondOp : TernaryConOp<"+(x==y?z)", "add", "cond"> {
   let summary = "+(x == y ? z) contraction";
 }
 
-def ConSumEqOp : BinaryConOp<"+(x==y)"> {
+def ConSumEqOp : BinaryConOp<"+(x==y)", "add", "eq"> {
   let summary = "+(x == y) contraction";
 }
 
-def ConSumMulOp : BinaryConOp<"+(x*y)"> {
+def ConSumMulOp : BinaryConOp<"+(x*y)", "add", "mul"> {
   let summary = "+(x * y) contraction";
 }

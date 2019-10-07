@@ -66,7 +66,7 @@ void ConstantPropagatePass::Apply(CompilerState* state) const {
     cmain->stmts.push_back(inner);
     auto old_it = stmt_it;
     stmt_it++;
-    main->stmts.erase(old_it);
+    main->erase_stmt(old_it);
 
     // Add all block outputs as new constant outputs
     for (const auto& in : inner->ref_outs()) {

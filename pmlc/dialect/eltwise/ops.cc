@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "llvm/ADT/StringSwitch.h"
+
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -31,39 +33,6 @@ mlir::OpFoldResult ScalarConstantOp::fold(ArrayRef<Attribute> operands) {
   return getValue();
 }
 
-namespace {
-
-IntegerAttr getIntAttr(Value* value) {
-  auto op = value->getDefiningOp();
-  IntegerAttr attr;
-  if (!mlir::m_Constant(&attr).match(op)) {
-    throw std::runtime_error("CastOp requires 2nd operand to be a constant integer");
-  }
-  return attr;
-}
-
-template <typename OpType>
-struct CastOp {
-  static void build(Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands) {
-    if (operands.size() != 2) {
-      throw std::runtime_error("Expected 2 operands");
-    }
-    auto tensor = operands[0];
-    auto bitwidth = getIntAttr(operands[1]);
-    result->addOperands(operands[0]);
-    result->addAttribute("bitwidth", bitwidth);
-    result->addTypes(OpType::getResultType(tensor, bitwidth));
-  }
-
-  static void build(Builder* builder, OperationState* result, Value* tensor, IntegerAttr bitwidth) {
-    result->addOperands(tensor);
-    result->addAttribute("bitwidth", bitwidth);
-    result->addTypes(OpType::getResultType(tensor, bitwidth));
-  }
-};
-
-}  // namespace
-
 //
 // ---- CastOp ----
 //
@@ -76,32 +45,35 @@ struct CastCanonicalizer : public OpRewritePattern<OpType> {
     IVLOG(5, "CastCanonicalizer::matchAndRewrite> " << mlir::debugString(castOp));
     auto op = castOp.getOperation();
     auto tensor = castOp.tensor();
-    auto bitwidth = op->getAttr("bitwidth").template cast<IntegerAttr>();
-    auto resultType = OpType::getResultType(tensor, bitwidth);
+    auto tensorType = GetTensorType(tensor->getType());
+    auto resultTensorType = GetTensorType(castOp.result()->getType());
+    auto elementType = resultTensorType.getElementType();
+    auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
     if (resultType == castOp.result()->getType()) {
       return Pattern::matchFailure();
     }
-    auto newOp = rewriter.create<OpType>(op->getLoc(), tensor, bitwidth);
+    auto newOp = rewriter.create<OpType>(op->getLoc(), resultType, tensor);
     rewriter.replaceOp(op, {newOp});
     UpdateFuncOpType(newOp.getOperation());
     return Pattern::matchSuccess();
   }
 };
 
-void AsFloatOp::build(Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands) {
-  CastOp<AsFloatOp>::build(builder, result, type, operands);
-}
-
-void AsFloatOp::build(Builder* builder, OperationState* result, Value* tensor, IntegerAttr bitwidth) {
-  CastOp<AsFloatOp>::build(builder, result, tensor, bitwidth);
-}
-
 void AsFloatOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
   results.insert<CastCanonicalizer<AsFloatOp>>(context);
 }
 
-Type AsFloatOp::getResultType(Value* tensor, IntegerAttr bitwidth) {
+Type AsFloatOp::getResultType(ArrayRef<Value*> operands) {
   IVLOG(5, "AsFloatOp::getResultType>")
+  if (operands.size() != 2) {
+    throw std::runtime_error("AsFloatOp requires 2 operands");
+  }
+  auto tensor = operands[0];
+  auto bitwidthOp = operands[1]->getDefiningOp();
+  IntegerAttr bitwidth;
+  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
+    throw std::runtime_error("AsFloatOp requires 2nd operand to be a constant integer");
+  }
   auto tensorType = GetTensorType(tensor->getType());
   ScalarType elementType;
   switch (bitwidth.getInt()) {
@@ -122,16 +94,17 @@ void AsIntOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLI
   results.insert<CastCanonicalizer<AsIntOp>>(context);
 }
 
-void AsIntOp::build(Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands) {
-  CastOp<AsIntOp>::build(builder, result, type, operands);
-}
-
-void AsIntOp::build(Builder* builder, OperationState* result, Value* tensor, IntegerAttr bitwidth) {
-  CastOp<AsIntOp>::build(builder, result, tensor, bitwidth);
-}
-
-Type AsIntOp::getResultType(Value* tensor, IntegerAttr bitwidth) {
+Type AsIntOp::getResultType(ArrayRef<Value*> operands) {
   IVLOG(5, "AsIntOp::getResultType>")
+  if (operands.size() != 2) {
+    throw std::runtime_error("AsIntOp requires 2 operands");
+  }
+  auto tensor = operands[0];
+  auto bitwidthOp = operands[1]->getDefiningOp();
+  IntegerAttr bitwidth;
+  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
+    throw std::runtime_error("AsIntOp requires 2nd operand to be a constant integer");
+  }
   auto tensorType = GetTensorType(tensor->getType());
   ScalarType elementType;
   switch (bitwidth.getInt()) {
@@ -151,20 +124,21 @@ Type AsIntOp::getResultType(Value* tensor, IntegerAttr bitwidth) {
   return RankedTensorType::get(tensorType.getShape(), elementType);
 }
 
-void AsUIntOp::build(Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands) {
-  CastOp<AsUIntOp>::build(builder, result, type, operands);
-}
-
-void AsUIntOp::build(Builder* builder, OperationState* result, Value* tensor, IntegerAttr bitwidth) {
-  CastOp<AsUIntOp>::build(builder, result, tensor, bitwidth);
-}
-
 void AsUIntOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
   results.insert<CastCanonicalizer<AsUIntOp>>(context);
 }
 
-Type AsUIntOp::getResultType(Value* tensor, IntegerAttr bitwidth) {
+Type AsUIntOp::getResultType(ArrayRef<Value*> operands) {
   IVLOG(5, "AsUIntOp::getResultType>")
+  if (operands.size() != 2) {
+    throw std::runtime_error("AsUIntOp requires 2 operands");
+  }
+  auto tensor = operands[0];
+  auto bitwidthOp = operands[1]->getDefiningOp();
+  IntegerAttr bitwidth;
+  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
+    throw std::runtime_error("AsUIntOp requires 2nd operand to be a constant integer");
+  }
   auto tensorType = GetTensorType(tensor->getType());
   ScalarType elementType;
   switch (bitwidth.getInt()) {
@@ -194,7 +168,7 @@ struct GatherCanonicalizer : public OpRewritePattern<GatherOp> {
   PatternMatchResult matchAndRewrite(GatherOp gatherOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "IndexCanonicalizer::matchAndRewrite> " << mlir::debugString(gatherOp));
     auto op = gatherOp.getOperation();
-    llvm::SmallVector<Value*, 2> operands(op->getOperands());
+    SmallVector<Value*, 2> operands(op->getOperands());
     auto resultType = GatherOp::getResultType(operands);
     if (resultType == gatherOp.result()->getType()) {
       return Pattern::matchFailure();
@@ -213,7 +187,6 @@ void GatherOp::getCanonicalizationPatterns(OwningRewritePatternList& results, ML
 Type GatherOp::getResultType(ArrayRef<Value*> operands) {
   IVLOG(5, "GatherOp::getResultType>")
   if (operands.size() != 2) {
-    IVLOG(1, "operands.size() != 2");
     throw std::runtime_error("GatherOp requires 2 operands");
   }
   auto tensor = operands[0];
@@ -235,7 +208,7 @@ Type GatherOp::getResultType(ArrayRef<Value*> operands) {
   // for (size_t i = 1; i < data->shape.dims.size(); i++) {
   //   dims.push_back(data->shape.dims[i].expr);
   // }
-  llvm::SmallVector<int64_t, 4> shape;
+  SmallVector<int64_t, 4> shape;
   auto tensorShape = tensorType.getShape();
   auto indexShape = indexType.getShape();
   for (size_t i = 0; i < indexShape.size(); i++) {
@@ -259,7 +232,7 @@ struct IndexCanonicalizer : public OpRewritePattern<IndexOp> {
   PatternMatchResult matchAndRewrite(IndexOp indexOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "IndexCanonicalizer::matchAndRewrite> " << mlir::debugString(indexOp));
     auto op = indexOp.getOperation();
-    llvm::SmallVector<Value*, 2> operands(op->getOperands());
+    SmallVector<Value*, 2> operands(op->getOperands());
     auto resultType = IndexOp::getResultType(operands);
     if (resultType == indexOp.result()->getType()) {
       return Pattern::matchFailure();
@@ -303,12 +276,12 @@ struct PrngCanonicalizer : public OpRewritePattern<PrngOp> {
   PatternMatchResult matchAndRewrite(PrngOp prngOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "PrngCanonicalizer::matchAndRewrite> " << mlir::debugString(prngOp));
     auto op = prngOp.getOperation();
-    llvm::SmallVector<Value*, 5> operands(op->getOperands());
+    SmallVector<Value*, 5> operands(op->getOperands());
     auto resultType = PrngOp::getResultType(operands);
     if (resultType == prngOp.result()->getType()) {
       return Pattern::matchFailure();
     }
-    llvm::SmallVector<Value*, 4> dims(prngOp.dims());
+    SmallVector<Value*, 4> dims(prngOp.dims());
     auto newOp = rewriter.create<PrngOp>(op->getLoc(), resultType, prngOp.state(), dims);
     rewriter.replaceOp(op, {newOp});
     UpdateFuncOpType(newOp.getOperation());
@@ -343,12 +316,12 @@ struct ReshapeCanonicalizer : public OpRewritePattern<ReshapeOp> {
   PatternMatchResult matchAndRewrite(ReshapeOp reshapeOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "ReshapeCanonicalizer::matchAndRewrite> " << mlir::debugString(reshapeOp));
     auto op = reshapeOp.getOperation();
-    llvm::SmallVector<Value*, 5> operands(op->getOperands());
+    SmallVector<Value*, 5> operands(op->getOperands());
     auto resultType = ReshapeOp::getResultType(operands);
     if (resultType == reshapeOp.result()->getType()) {
       return Pattern::matchFailure();
     }
-    llvm::SmallVector<Value*, 4> dims(reshapeOp.dims());
+    SmallVector<Value*, 4> dims(reshapeOp.dims());
     auto newOp = rewriter.create<ReshapeOp>(op->getLoc(), resultType, reshapeOp.tensor(), dims);
     rewriter.replaceOp(op, {newOp});
     UpdateFuncOpType(newOp.getOperation());
@@ -383,7 +356,7 @@ struct ShapeCanonicalizer : public OpRewritePattern<ShapeOp> {
   PatternMatchResult matchAndRewrite(ShapeOp shapeOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "ShapeCanonicalizer::matchAndRewrite> " << mlir::debugString(shapeOp));
     auto op = shapeOp.getOperation();
-    llvm::SmallVector<Value*, 1> operands(op->getOperands());
+    SmallVector<Value*, 1> operands(op->getOperands());
     auto resultType = ShapeOp::getResultType(operands);
     if (resultType == shapeOp.result()->getType()) {
       return Pattern::matchFailure();
@@ -421,7 +394,7 @@ struct EltwiseCanonicalizer : public OpRewritePattern<OpType> {
   PatternMatchResult matchAndRewrite(OpType eltwiseOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "EltwiseCanonicalizer::matchAndRewrite> " << mlir::debugString(eltwiseOp));
     auto op = eltwiseOp.getOperation();
-    llvm::SmallVector<Value*, 2> operands(op->getOperands());
+    SmallVector<Value*, 2> operands(op->getOperands());
     auto resultType = OpType::getResultType(operands);
     if (resultType == eltwiseOp.result()->getType()) {
       return Pattern::matchFailure();
@@ -496,9 +469,13 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
   return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
 }
 
+#include "pmlc/dialect/eltwise/ops_interfaces.cpp.inc"
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ops.cpp.inc"
 
 }  // namespace eltwise
 }  // namespace dialect
 }  // namespace pmlc
+
+#include "pmlc/dialect/eltwise/ops_enums.cpp.inc"

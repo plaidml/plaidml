@@ -20,7 +20,11 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module);
 
 using SymbolValueMap = std::map<std::string, mlir::Value*>;
 
-mlir::Value* AffineIntoMLIR(mlir::OpBuilder* builder, const SymbolValueMap& idxs, const stripe::Affine& affine);
+mlir::Value* AffineIntoMLIR(         //
+    mlir::OpBuilder* builder,        //
+    mlir::Operation* constBeforeOp,  //
+    const SymbolValueMap& idxs,      //
+    const stripe::Affine& affine);
 
 }  // namespace stripe
 }  // namespace dialect
