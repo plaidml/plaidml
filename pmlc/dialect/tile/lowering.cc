@@ -362,7 +362,6 @@ struct EltwiseOpConversion : public LoweringBase {
         {rewriter.getIdentifier("eltwise"), rewriter.getUnitAttr()},
         {rewriter.getIdentifier("kernel"), rewriter.getUnitAttr()},
         {rewriter.getIdentifier(eltwiseOpTag.str()), rewriter.getUnitAttr()},
-        // {rewriter.getIdentifier(op->getName().getStringRef()), rewriter.getUnitAttr()},
     };
     forOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
     auto body = rewriter.createBlock(&forOp.inner());
