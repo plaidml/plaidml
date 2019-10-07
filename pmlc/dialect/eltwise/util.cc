@@ -10,7 +10,6 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/Operation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/DebugStringHelper.h"
 
@@ -25,6 +24,11 @@ std::ostream& operator<<(std::ostream& os, ModuleOp rhs) {
 
 std::ostream& operator<<(std::ostream& os, const Value& rhs) {
   os << mlir::debugString(*const_cast<Value*>(&rhs));
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const Operation& rhs) {
+  os << mlir::debugString(*const_cast<Operation*>(&rhs));
   return os;
 }
 
@@ -174,8 +178,7 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
 }
 
 void UpdateFuncOpType(Operation* op) {
-  auto funcOp = llvm::dyn_cast<FuncOp>(op->getParentOp());
-  if (funcOp) {
+  if (auto funcOp = llvm::dyn_cast<FuncOp>(op->getParentOp())) {
     auto retOp = &funcOp.getOperation()->getRegion(0).front().back();
     auto funcType = funcOp.getType();
     if (funcType.getNumResults() == retOp->getNumOperands()) {
@@ -248,6 +251,10 @@ bool ConstantValueMatcher::match(mlir::Operation* op) {
     }
   }
   return false;
+}
+
+llvm::StringRef getOpName(const mlir::OperationName& name) {
+  return name.getStringRef().drop_front(name.getDialect().size() + 1);
 }
 
 }  // namespace eltwise

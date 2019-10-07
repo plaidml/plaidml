@@ -320,54 +320,23 @@ Shape TileBuilder::GetShape(mlir::Value* tensor) {
   return Shape{elementType.type(), type.getShape()};
 }
 
-struct EltwiseBuilder {
-  static EltwiseBuilder* get() {
-    static EltwiseBuilder builder;
-    static std::once_flag is_initialized;
-    std::call_once(is_initialized, []() {  //
-      eltwise::ForAllOps(builder);
-    });
-    return &builder;
-  }
-
-  template <class OpType>
-  void apply() {
-    auto name = OpType::getOperationName();
-    IVLOG(6, "EltwiseBuilder::apply> " << name.str());
-    auto factory = [](OpBuilder* builder, ScalarType type, llvm::ArrayRef<mlir::Value*> args) {
-      return builder->create<OpType>(builder->getUnknownLoc(), type, args).getOperation();
-    };
-    primitives.emplace(name, factory);
-    if (name == "eltwise.select") {
-      primitives.emplace("eltwise.cond", factory);
-    }
-  }
-
-  using PrimitiveFactory = std::function<  //
-      mlir::Operation*(                    //
-          OpBuilder* builder,              //
-          ScalarType type,                 //
-          llvm::ArrayRef<mlir::Value*> args)>;
-  std::map<std::string, PrimitiveFactory> primitives;
-};
-
 mlir::Value* TileBuilder::MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args) {
   IVLOG(5, "TileBuilder::MakePrimitiveOp> " << fn.str());
   for (auto arg : args) {
     IVLOG(6, "  arg: " << mlir::debugString(*arg));
   }
-  std::stringstream ss;
-  ss << eltwise::Dialect::getDialectNamespace() << "." << fn.str();
-  auto builder = EltwiseBuilder::get();
-  auto it = builder->primitives.find(ss.str());
-  if (it == builder->primitives.end()) {
-    // TODO: handle unspecified primitive
-    std::stringstream ss;
-    ss << "Unknown primitive: " << fn.str();
-    throw std::runtime_error(ss.str());
+  auto opName = eltwise::Dialect::getCanonicalOpName(fn);
+  auto abstractOp = mlir::AbstractOperation::lookup(opName, &impl->context);
+  if (!abstractOp) {
+    throw std::runtime_error("Unknown op: " + opName);
+  }
+  auto eltwiseBuilder = abstractOp->getInterface<eltwise::EltwiseBuilder>();
+  if (!eltwiseBuilder) {
+    throw std::runtime_error("Unknown intrinsic: " + opName);
   }
   auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);  // TODO
-  return it->second(&impl->builder, type, args)->getResult(0);
+  auto op = eltwiseBuilder->create(&impl->builder, impl->builder.getUnknownLoc(), type, args);
+  return op->getResult(0);
 }
 
 mlir::Value* TileBuilder::Clone(mlir::Value* value) {

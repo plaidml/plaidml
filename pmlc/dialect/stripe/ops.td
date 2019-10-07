@@ -1,5 +1,6 @@
 // Copyright 2019, Intel Corporation
 
+include "pmlc/dialect/eltwise/enums.td"
 include "pmlc/dialect/eltwise/predicates.td"
 
 def StripeDialect : Dialect {
@@ -76,20 +77,9 @@ def StoreOp : StripeOp<"store"> {
   }];
 }
 
-def AggTypeEnum : I64EnumAttr<
-    "AggTypeEnum",
-    "Operation to aggregate with",
-    [
-      I64EnumAttrCase<"add", 1>,
-      I64EnumAttrCase<"mul", 2>,
-      I64EnumAttrCase<"min", 3>,
-      I64EnumAttrCase<"max", 4>,
-    ]> {
-}
-
 def AggregateOp : StripeOp<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
-  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$agg_type);
+  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggregationKind:$agg);
   let results = (outs);
   let printer = [{ PrintSimple(getOperation(), p, {}, into()->getType()); }];
   let parser = [{
@@ -145,9 +135,10 @@ def SpecialOpInterface : OpInterface<"SpecialOp"> {
 class SpecialOp<string mnemonic, int num_out, int num_in> :
     StripeOp<mnemonic, [SpecialOpInterface]> {
   let results = (outs);
-  let extraClassDeclaration = 
-    "  size_t getNumOutputs() { return " # num_out # "; }\n" #
-    "  size_t getNumInputs() { return " # num_in # "; }\n";
+  let extraClassDeclaration = [{
+    size_t getNumOutputs() { return }] # num_out # [{;}
+    size_t getNumInputs() { return }] # num_in # [{;}
+  }];
 }
 
 def ReshapeOp : SpecialOp<"reshape", 1, 1> {

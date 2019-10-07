@@ -133,7 +133,7 @@ void AffineDomainOp::getCanonicalizationPatterns(  //
   results.insert<AffineDomainFolder>(context);
 }
 
-#include "pmlc/dialect/tile/opinterfaces.cpp.inc"
+#include "pmlc/dialect/tile/ops_interfaces.cpp.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ops.cpp.inc"

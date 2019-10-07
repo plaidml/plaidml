@@ -36,18 +36,20 @@ class StripeBuilder {
   explicit StripeBuilder(mlir::FuncOp func);
   std::shared_ptr<stripe::Block> getResult() { return cur_; }
 
-  // Public purely to avoid annoyance with ForAllOps
-  template <class ScalarOp>
-  void apply();
-
  private:
-  std::string scalar_name(Operation* op);
+  std::string scalar_name(Operation* op, std::string out_name = "");
   TensorShape get_shape(TensorType type);
   void add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> in);
-  void add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out, std::string agg = "",
-                       bool is_spec = false);
+  void add_refinements(       //
+      Block* block,           //
+      Value* tensor,          //
+      stripe::RefDir dir,     //
+      std::string* name_out,  //
+      std::string agg = "",   //
+      bool is_spec = false);
   std::string get_idx(stripe::Block* block, mlir::BlockArgument* affine);
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
+
   void visit(ParallelForOp op);
   void visit(ConstraintOp op, int count);
   void visit(LoadOp op);
@@ -55,6 +57,10 @@ class StripeBuilder {
   void visit(StoreOp op);
   void visit(AggregateOp op);
   void visit(SpecialOp op);
+  void visit(eltwise::CastOp op);
+  void visit(eltwise::EltwiseBuilder op);
+  void visit(eltwise::ScalarConstantOp op);
+
   void walk_interior(Block* inner);
 
   std::shared_ptr<stripe::Block> cur_;
@@ -62,8 +68,6 @@ class StripeBuilder {
   std::map<mlir::Block*, BlockInfo> blocks_;
   std::map<std::pair<stripe::Block*, mlir::BlockArgument*>, std::string> idxs_;
   std::map<mlir::Value*, std::string> scalars_;
-  Operation* iop;
-  bool found_inst_;
 };
 
 struct StripeDevice {
@@ -234,7 +238,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
         }
       }
       if (ref_name == "") {
-        ref_name = "ref";
+        ref_name = "X";
       }
       ref_name = sblock->unique_ref_name(ref_name);
       std::vector<stripe::Affine> access;
@@ -341,6 +345,7 @@ stripe::Affine StripeBuilder::build_affine(stripe::Block* block, Value* base) {
 }
 
 void StripeBuilder::visit(ParallelForOp op) {
+  IVLOG(3, "StripeBuilder::visit(ParallelForOp)");
   // Construct the block and put it in the table
   cur_ = std::make_shared<stripe::Block>();
   Block& oblock = op.inner().front();
@@ -423,6 +428,7 @@ void StripeBuilder::visit(ParallelForOp op) {
 }
 
 void StripeBuilder::visit(ConstraintOp op, int count) {
+  IVLOG(3, "StripeBuilder::visit(ConstraintOp)");
   if (count == 1 && op.lt_case().empty()) {
     Block* inner = &op.ge_case().front();
     blocks_.emplace(inner, BlockInfo(nullptr));
@@ -440,14 +446,16 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
 }
 
 void StripeBuilder::visit(LoadOp op) {
+  IVLOG(3, "StripeBuilder::visit(LoadOp)");
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &ref_name);
-  std::string into = scalar_name(op.getOperation());
+  std::string into = scalar_name(op.getOperation(), ref_name);
   scalars_.emplace(op.into(), into);
   cur_->stmts.push_back(std::make_shared<stripe::Load>(ref_name, into));
 }
 
 void StripeBuilder::visit(LoadIndexOp op) {
+  IVLOG(3, "StripeBuilder::visit(LoadIndexOp)");
   stripe::Affine from = build_affine(cur_.get(), op.from());
   std::string into = scalar_name(op.getOperation());
   scalars_.emplace(op.into(), into);
@@ -455,6 +463,7 @@ void StripeBuilder::visit(LoadIndexOp op) {
 }
 
 void StripeBuilder::visit(StoreOp op) {
+  IVLOG(3, "StripeBuilder::visit(StoreOp)");
   std::string ref_name;
   add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name);
   std::string from = scalars_.at(op.from());
@@ -462,15 +471,16 @@ void StripeBuilder::visit(StoreOp op) {
 }
 
 void StripeBuilder::visit(AggregateOp op) {
+  IVLOG(3, "StripeBuilder::visit(AggregateOp)");
   std::string ref_name;
-  AggTypeEnum agg_enum = static_cast<AggTypeEnum>(op.agg_type().getLimitedValue());
-  std::string agg_name = stringifyAggTypeEnum(agg_enum);
+  std::string agg_name = eltwise::stringifyAggregationKind(op.agg());
   add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name, agg_name);
   std::string from = scalars_.at(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
 }
 
 void StripeBuilder::visit(SpecialOp op) {
+  IVLOG(3, "StripeBuilder::visit(SpecialOp)");
   auto r = std::make_shared<stripe::Special>();
   size_t operand = 0;
   for (size_t i = 0; i < op.getNumOutputs(); i++) {
@@ -491,7 +501,77 @@ void StripeBuilder::visit(SpecialOp op) {
   cur_->stmts.push_back(r);
 }
 
+void StripeBuilder::visit(eltwise::EltwiseBuilder builder) {
+  auto op = builder.getOperation();
+  IVLOG(3, "StripeBuilder::visit> " << *op);
+  for (auto operand : op->getOperands()) {
+    if (auto defOp = operand->getDefiningOp()) {
+      if (auto constOp = llvm::dyn_cast<eltwise::ScalarConstantOp>(defOp)) {
+        visit(constOp);
+      }
+    }
+  }
+  auto out_name = scalar_name(op);
+  scalars_.emplace(op->getResult(0), out_name);
+  auto intr = std::make_shared<stripe::Intrinsic>();
+  auto dialect = op->getName().getDialect();
+  auto full_name = op->getName().getStringRef();
+  intr->name = full_name.drop_front(dialect.size() + 1);
+  if (intr->name == "select") {
+    intr->name = "cond";
+  }
+  intr->outputs.push_back(out_name);
+  for (auto operand : op->getOperands()) {
+    intr->inputs.push_back(scalars_.at(operand));
+  }
+  cur_->stmts.push_back(intr);
+}
+
+void StripeBuilder::visit(eltwise::CastOp castOp) {
+  auto op = castOp.getOperation();
+  IVLOG(3, "StripeBuilder::visit> " << *op);
+
+  // handle the bitwidth
+  auto result = op->getResult(0);
+  auto tensorType = eltwise::GetTensorType(result->getType());
+  auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
+  auto bitwidth = bit_width(scalarType.type());
+  auto bitwidth_name = scalar_name(op);
+  auto constant = std::make_shared<stripe::Constant>(bitwidth_name, static_cast<int64_t>(bitwidth));
+  cur_->stmts.push_back(constant);
+
+  // handle the cast operation itself
+  auto out_name = scalar_name(op);
+  scalars_.emplace(result, out_name);
+  auto intr = std::make_shared<stripe::Intrinsic>();
+  auto dialect = op->getName().getDialect();
+  auto full_name = op->getName().getStringRef();
+  intr->name = full_name.drop_front(dialect.size() + 1);
+  intr->outputs.push_back(out_name);
+  for (auto operand : op->getOperands()) {
+    intr->inputs.push_back(scalars_.at(operand));
+  }
+  intr->inputs.push_back(bitwidth_name);
+  cur_->stmts.push_back(intr);
+}
+
+void StripeBuilder::visit(eltwise::ScalarConstantOp op) {
+  auto out_name = scalar_name(op.getOperation());
+  scalars_.emplace(op.result(), out_name);
+  std::shared_ptr<stripe::Constant> cnst;
+  auto val_attr = op.getValue();
+  if (auto attr = val_attr.dyn_cast<IntegerAttr>()) {
+    cnst = std::make_shared<stripe::Constant>(out_name, attr.getInt());
+  } else if (auto attr = val_attr.dyn_cast<FloatAttr>()) {
+    cnst = std::make_shared<stripe::Constant>(out_name, attr.getValueAsDouble());
+  } else {
+    throw std::runtime_error("Invalid attribute during conversion");
+  }
+  cur_->stmts.push_back(cnst);
+}
+
 void StripeBuilder::walk_interior(Block* block) {
+  IVLOG(1, "walk_interior");
   // Count inner ops
   int count = 0;
   for (auto& op : *block) {
@@ -519,71 +599,37 @@ void StripeBuilder::walk_interior(Block* block) {
       visit(op);
     } else if (auto op = mlir::dyn_cast<SpecialOp>(op_base)) {
       visit(op);
-    } else {
-      found_inst_ = false;
-      // Try all the intrinsic ops
-      iop = &op_base;
-      eltwise::ForAllOps(*this);
-      // TODO: consider checking found_inst_.  However, since many instructions
-      // (like affine computation) are *correct* to ignore, to do this we would
-      // need some sort of whitelist of things to ignore... punting for now.
+    } else if (auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(op_base)) {
+      // These are handled by other handlers so that scalars get created in the
+      // same scope as the user.
+    } else if (auto op = mlir::dyn_cast<eltwise::CastOp>(op_base)) {
+      visit(op);
+    } else if (auto op = mlir::dyn_cast<eltwise::EltwiseBuilder>(op_base)) {
+      // The EltwiseBuilder check should come after more specific checks
+      visit(op);
     }
   }
 }
 
-std::string StripeBuilder::scalar_name(Operation* op) {
-  std::string out_name;
+std::string StripeBuilder::scalar_name(Operation* op, std::string out_name) {
+  if (out_name.empty()) {
+    out_name = "$s";
+  } else {
+    out_name = "$" + out_name;
+  }
   auto attr = op->getAttr("scalar_name");
   if (attr) {
-    auto name_attr = attr.template dyn_cast<StringAttr>();
+    auto name_attr = attr.dyn_cast<StringAttr>();
     if (name_attr) {
       out_name = name_attr.getValue();
     }
   }
   auto& si = scalar_names_[cur_.get()];
-  while (out_name == "" || si.names.count(out_name)) {
-    out_name = "$s" + std::to_string(si.next++);
+  while (si.names.count(out_name)) {
+    out_name = out_name + "_" + std::to_string(si.next++);
   }
+  si.names.insert(out_name);
   return out_name;
-}
-
-template <class ScalarOp>
-void StripeBuilder::apply() {
-  if (auto op = mlir::dyn_cast<ScalarOp>(iop)) {
-    std::string out_name = scalar_name(op.getOperation());
-    scalars_.emplace(op.result(), out_name);
-    auto intr = std::make_shared<stripe::Intrinsic>();
-    std::string dialect = op.getOperation()->getName().getDialect().str();
-    std::string full_name = op.getOperation()->getName().getStringRef().str();
-    intr->name = full_name.substr(dialect.size() + 1, full_name.size() - dialect.size() - 1);
-    if (intr->name == "select") {
-      intr->name = "cond";
-    }
-    intr->outputs.push_back(out_name);
-    for (size_t i = 0; i < ScalarOp::operands(); i++) {
-      intr->inputs.push_back(scalars_.at(op.getOperation()->getOperand(i)));
-    }
-    cur_->stmts.push_back(intr);
-    found_inst_ = true;
-  }
-}
-
-template <>
-void StripeBuilder::apply<eltwise::ScalarConstantOp>() {
-  if (auto op = mlir::dyn_cast<eltwise::ScalarConstantOp>(iop)) {
-    std::string out_name = scalar_name(op.getOperation());
-    scalars_.emplace(op.result(), out_name);
-    std::shared_ptr<stripe::Constant> cnst;
-    auto val_attr = op.getValue();
-    if (auto attr = val_attr.dyn_cast<IntegerAttr>()) {
-      cnst = std::make_shared<stripe::Constant>(out_name, attr.getInt());
-    } else if (auto attr = val_attr.dyn_cast<FloatAttr>()) {
-      cnst = std::make_shared<stripe::Constant>(out_name, attr.getValueAsDouble());
-    } else {
-      throw std::runtime_error("Invalid attribute during conversion");
-    }
-    cur_->stmts.push_back(cnst);
-  }
 }
 
 std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
@@ -592,7 +638,8 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
   StripeBuilder builder(func);
   auto ret = std::make_shared<stripe::Program>();
   ret->entry = builder.getResult();
-  for (const auto& ref : ret->entry->SubBlock(0)->refs) {
+  auto main = ret->entry->SubBlock(0);
+  for (const auto& ref : main->refs) {
     if (IsReadDir(ref.dir)) {
       IVLOG(2, "input_shape: " << ref.from << " = " << ref.interior_shape);
       ret->input_shapes.emplace(ref.from, ref.interior_shape);
