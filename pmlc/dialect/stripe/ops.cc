@@ -9,8 +9,7 @@ namespace stripe {
 
 #include "pmlc/dialect/stripe/opinterfaces.cpp.inc"
 
-/*
-void PrintSimple(Operation* op, OpAsmPrinter* p, ArrayRef<StringRef> fixed, Type otype) {
+void PrintSimple(Operation* op, OpAsmPrinter* p, ArrayRef<StringRef> fixed, Type otype = Type()) {
   *p << op->getName() << " ";
   bool first = true;
   for (size_t i = 0; i < op->getNumOperands(); i++) {
@@ -28,41 +27,41 @@ void PrintSimple(Operation* op, OpAsmPrinter* p, ArrayRef<StringRef> fixed, Type
     *p << op->getAttrOfType<IntegerAttr>(name).getValue();
   }
   if (otype) {
-    *p << " : ";
-    p->printType(otype);
+    *p << " : " << otype;
   }
-  p->printOptionalAttrDict(op->getAttrs(), fixed);
+  llvm::SmallVector<StringRef, 4> ignore(fixed.begin(), fixed.end());
+  // ignore.push_back("name");
+  // ignore.push_back("scalar_name");
+  p->printOptionalAttrDict(op->getAttrs(), ignore);
 }
 
-Type ParseSimple(OpAsmParser* p, OperationState *res, ArrayRef<StringRef> fixed, bool with_type) {
+template <typename T, size_t N>
+bool ParseSimple(OpAsmParser* p, OperationState* res, std::array<OpAsmParser::OperandType, N>* ops,
+                 ArrayRef<StringRef> fixed, T* out_type) {
   bool first = true;
-  Type out_type;
-  ParseResult r;
-  for (size_t i = 0; i < op->getNumOperands(); i++) {
+  bool r = false;
+  for (size_t i = 0; i < N; i++) {
     if (!first) {
       r = r || p->parseComma();
     }
     first = false;
-    OperandType op;
-    r = r || p->parseOperand(op);
-    r = r || p->resolveOperand(op, Type(), res->operands);
+    r = r || p->parseOperand((*ops)[i]);
   }
   for (StringRef name : fixed) {
     if (!first) {
       r = r || p->parseComma();
+      Attribute dont_care;
+      r = r || p->parseAttribute(dont_care, name, res->attributes);
     }
     first = false;
-    r->attributes.
-    *p << op->getAttrOfType<IntegerAttr>(name).getValue();
   }
-  if (with_type) {
+  if (out_type) {
     r = r || p->parseColon();
-    r = r || p->parseType(out_type);
+    r = r || p->parseType(*out_type);
   }
   r = r || p->parseOptionalAttributeDict(res->attributes);
   return r;
 }
-*/
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stripe/ops.cpp.inc"

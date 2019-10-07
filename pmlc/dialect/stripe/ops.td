@@ -23,18 +23,36 @@ def TensorRefOp : StripeOp<"ref", [NoSideEffect]> {
   let summary = "Create a default tensor_ref from a tensor";
   let arguments = (ins TensorType:$in);
   let results = (outs TensorRefType:$result);
+  //let extraClassDeclaration = [{
+  //  typedef 
+  //}];
+  // typedef 
 }
 
 def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let summary = "Modify the offset into a tensor in an affine way";
   let arguments = (ins TensorRefType:$in, Variadic<AffineType>:$offsets);
   let results = (outs TensorRefType:$result);
+  
+  // Serialization format: %xp = refine %x[%i, %j] : $type
 }
 
 def LoadOp : StripeOp<"load"> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorRefType:$from);
   let results = (outs Eltwise_AnyTensor:$into);
+  let printer = [{ PrintSimple(getOperation(), p, {}, from()->getType()); }];
+  let parser = [{
+    TensorRefType refType;
+    std::array<OpAsmParser::OperandType, 1> operands;
+    bool r = ParseSimple(parser, result, &operands, {}, &refType);
+    Type eltType = RankedTensorType::get({}, refType.getElementType());
+    r = r || parser->resolveOperand(operands[0], refType, result->operands);
+    r = r || parser->addTypeToList(eltType, result->types);
+    return mlir::failure(r); 
+  }];
+  
+  // Serialization format: %s = load %t : $type
 }
 
 def LoadIndexOp : StripeOp<"load_index"> {
@@ -46,6 +64,16 @@ def LoadIndexOp : StripeOp<"load_index"> {
 def StoreOp : StripeOp<"store"> {
   let summary = "Store into a tensor";
   let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from);
+  let printer = [{ PrintSimple(getOperation(), p, {}, into()->getType()); }];
+  let parser = [{
+    TensorRefType refType;
+    std::array<OpAsmParser::OperandType, 2> operands;
+    bool r = ParseSimple(parser, result, &operands, {}, &refType);
+    Type eltType = RankedTensorType::get({}, refType.getElementType());
+    r = r || parser->resolveOperand(operands[0], refType, result->operands);
+    r = r || parser->resolveOperand(operands[1], eltType, result->operands);
+    return mlir::failure(r); 
+  }];
 }
 
 def AggTypeEnum : I64EnumAttr<
@@ -63,6 +91,16 @@ def AggregateOp : StripeOp<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
   let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggTypeEnum:$agg_type);
   let results = (outs);
+  let printer = [{ PrintSimple(getOperation(), p, {}, into()->getType()); }];
+  let parser = [{
+    TensorRefType refType;
+    std::array<OpAsmParser::OperandType, 2> operands;
+    bool r = ParseSimple(parser, result, &operands, {}, &refType);
+    Type eltType = RankedTensorType::get({}, refType.getElementType());
+    r = r || parser->resolveOperand(operands[0], refType, result->operands);
+    r = r || parser->resolveOperand(operands[1], eltType, result->operands);
+    return mlir::failure(r); 
+  }];
 }
 
 class AffineOp<string mnemonic> : StripeOp<mnemonic, [NoSideEffect]> {
