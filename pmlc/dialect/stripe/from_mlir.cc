@@ -288,7 +288,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
       }
     }
     // Add in directionality
-    if (ref->dir != stripe::RefDir::InOut && ref->dir != dir) {
+    if (ref->dir == stripe::RefDir::In && dir == stripe::RefDir::Out) {
       ref->dir = stripe::RefDir::InOut;
     }
     // Remove indexes from ti for this block + add to inner polynomial
@@ -571,7 +571,6 @@ void StripeBuilder::visit(eltwise::ScalarConstantOp op) {
 }
 
 void StripeBuilder::walk_interior(Block* block) {
-  IVLOG(1, "walk_interior");
   // Count inner ops
   int count = 0;
   for (auto& op : *block) {
