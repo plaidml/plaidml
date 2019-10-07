@@ -468,6 +468,8 @@ struct Block : Statement {
   std::vector<size_t> sorted_idx_ranges();
 
   std::shared_ptr<Block> SubBlock(size_t pos, bool reverse = false) const;
+  void erase_stmt(const StatementIt& it);
+  void erase_stmts(const StatementIt& begin, const StatementIt& end);
 };
 
 struct Buffer {

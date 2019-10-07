@@ -5,6 +5,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 
+#include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/eltwise/types.h"
 #include "pmlc/dialect/tile/types.h"
 
@@ -12,6 +13,8 @@ namespace pmlc {
 namespace dialect {
 namespace tile {
 
+using eltwise::AggregationKind;
+using eltwise::CombinationKind;
 using eltwise::ScalarType;
 using llvm::APInt;
 using mlir::ArrayRef;
@@ -41,7 +44,7 @@ using mlir::Value;
 
 namespace OpTrait = mlir::OpTrait;
 
-#include "pmlc/dialect/tile/opinterfaces.h.inc"
+#include "pmlc/dialect/tile/ops_interfaces.h.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ops.h.inc"

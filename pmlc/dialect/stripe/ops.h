@@ -3,12 +3,15 @@
 #pragma once
 
 #include "mlir/IR/OpDefinition.h"
+
+#include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/types.h"
 
 namespace pmlc {
 namespace dialect {
 namespace stripe {
 
+using eltwise::AggregationKind;
 using eltwise::ScalarType;
 using mlir::ArrayRef;
 using mlir::Builder;
@@ -28,7 +31,7 @@ using mlir::Value;
 
 namespace OpTrait = mlir::OpTrait;
 
-#include "pmlc/dialect/stripe/opinterfaces.h.inc"
+#include "pmlc/dialect/stripe/ops_interfaces.h.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stripe/ops.h.inc"
@@ -36,7 +39,3 @@ namespace OpTrait = mlir::OpTrait;
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
-
-#include "llvm/ADT/DenseMapInfo.h"
-using llvm::DenseMapInfo;
-#include "pmlc/dialect/stripe/ops_enum.h.inc"

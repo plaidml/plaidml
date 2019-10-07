@@ -3,6 +3,9 @@
 #include "tile/codegen/scalarize.h"
 
 #include <algorithm>
+#include <map>
+#include <set>
+#include <string>
 
 #include "tile/codegen/alias.h"
 #include "tile/stripe/stripe.h"
@@ -92,7 +95,7 @@ void Scalarize(Block* block, bool recursive) {
     } else {
       auto to_erase = it;
       ++it;
-      block->stmts.erase(to_erase);
+      block->erase_stmt(to_erase);
     }
   }
   // If recursion was requested, do that

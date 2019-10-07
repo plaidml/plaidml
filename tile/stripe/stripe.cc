@@ -2,8 +2,10 @@
 
 #include "tile/stripe/stripe.h"
 
+#include <algorithm>
 #include <regex>
 #include <sstream>
+#include <utility>
 
 #include <boost/format.hpp>
 
@@ -711,6 +713,22 @@ std::vector<Refinement*> Block::ref_inouts() {
   return results;
 }
 
+void Block::erase_stmt(const StatementIt& it) {
+  stmts.erase(it);
+  // Dependencies become invalid after a stmt is removed
+  for (auto& stmt : stmts) {
+    stmt->deps.clear();
+  }
+}
+
+void Block::erase_stmts(const StatementIt& begin, const StatementIt& end) {
+  stmts.erase(begin, end);
+  // Dependencies become invalid after a stmt is removed
+  for (auto& stmt : stmts) {
+    stmt->deps.clear();
+  }
+}
+
 std::ostream& operator<<(std::ostream& os, const Index& idx) {
   auto impl = Accessor::impl(idx);
   if (impl->attrs.size()) {
@@ -1037,7 +1055,7 @@ std::string Block::unique_ref_name(const std::string& into) const {
   }
   size_t i = 0;
   for (;;) {
-    auto name = str(boost::format("%s_%zu") % into % i++);
+    auto name = str(boost::format("%s_%02zu") % into % i++);
     if (ref_by_into(name, false) == refs.end()) {
       return name;
     }

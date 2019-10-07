@@ -5,6 +5,7 @@
 #include "pmlc/dialect/eltwise/types.h"
 
 #include "mlir/IR/Module.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
 
@@ -13,6 +14,7 @@ namespace mlir {
 std::ostream& operator<<(std::ostream& os, ModuleOp rhs);
 std::ostream& operator<<(std::ostream& os, Type rhs);
 std::ostream& operator<<(std::ostream& os, const Value& rhs);
+std::ostream& operator<<(std::ostream& os, const Operation& rhs);
 
 }  // namespace mlir
 
@@ -28,6 +30,7 @@ mlir::Type ComputeResultType(llvm::ArrayRef<mlir::Value*> operands, DataType ove
 void UpdateFuncOpType(mlir::Operation* op);
 
 mlir::RankedTensorType GetTensorType(mlir::Type type);
+llvm::StringRef getOpName(const mlir::OperationName& name);
 
 using UnaryCalculate = std::function<double(double)>;
 mlir::Attribute constFoldUnaryOp(llvm::ArrayRef<mlir::Attribute> operands, UnaryCalculate calculate);

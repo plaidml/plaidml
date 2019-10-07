@@ -1,13 +1,13 @@
 // Copyright 2019, Intel Corporation
-
 #include "pmlc/dialect/stripe/ops.h"
+
 #include "mlir/IR/OpImplementation.h"
 
 namespace pmlc {
 namespace dialect {
 namespace stripe {
 
-#include "pmlc/dialect/stripe/opinterfaces.cpp.inc"
+#include "pmlc/dialect/stripe/ops_interfaces.cpp.inc"
 
 /*
 void PrintSimple(Operation* op, OpAsmPrinter* p, ArrayRef<StringRef> fixed, Type otype) {
@@ -70,7 +70,3 @@ Type ParseSimple(OpAsmParser* p, OperationState *res, ArrayRef<StringRef> fixed,
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
-
-#include "llvm/ADT/StringSwitch.h"
-
-#include "pmlc/dialect/stripe/ops_enum.cpp.inc"

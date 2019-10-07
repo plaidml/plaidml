@@ -1,7 +1,9 @@
 #ifndef __PML_ELTWISE_PREDICATES__
 #define __PML_ELTWISE_PREDICATES__
 
+#ifndef OP_BASE
 include "mlir/IR/OpBase.td"
+#endif
 
 class HasCanonicalizer {
   bit hasCanonicalizer = 1;
@@ -59,4 +61,4 @@ def Eltwise_Integer :
     ]>,
     "eltwise-integer">;
 
-#endif // __PML_SCALAR_PREDICATES__
+#endif // __PML_ELTWISE_PREDICATES__
