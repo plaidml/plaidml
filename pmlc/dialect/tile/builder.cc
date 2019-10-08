@@ -503,7 +503,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     emitError(loc, "Module verification error");
   }
   // Do some optimization passes
-  mlir::PassManager pm;
+  mlir::PassManager pm(&impl->context);
   if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
     // TODO: Debug & re-enable the canonicalization pass
     pm.addPass(mlir::createCanonicalizerPass());

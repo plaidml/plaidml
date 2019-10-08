@@ -52,7 +52,7 @@ lang::RunInfo example() {
 }
 
 template <typename Pass, typename Config>
-std::unique_ptr<mlir::FunctionPassBase> CreatePass(Config config) {
+std::unique_ptr<mlir::Pass> CreatePass(Config config) {
   return std::make_unique<Pass>(config);
 }
 
@@ -100,7 +100,7 @@ TEST(Stripe, Transcode) {
   }
 
   IVLOG(1, "Doing some passes");
-  mlir::PassManager pm(true);
+  mlir::PassManager pm(&context, true);
   pm.addPass(mlir::createCSEPass());
   codegen::proto::MLIR_PadPass options;
   pm.addPass(CreatePass<PaddingPass>(options));
@@ -121,7 +121,7 @@ TEST(Stripe, Transcode) {
   }
 
   IVLOG(1, "Converting the other way");
-  auto prog2 = FromMLIR(new_module);
+  auto prog2 = FromMLIR(*new_module);
 
   IVLOG(2, "New version:");
   IVLOG(2, *prog2->entry);
