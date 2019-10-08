@@ -1671,14 +1671,30 @@ cc_library(
 )
 
 cc_library(
-    name = "execution_engine",
+    name = "execution_engine_c",
     srcs = glob([
         "lib/ExecutionEngine/*.c",
+        "lib/ExecutionEngine/*.h",
+        "lib/ExecutionEngine/*.inc",
+        "lib/ExecutionEngine/IntelJITEvents/*.c",
+    ]),
+    hdrs = glob([
+        "include/llvm/ExecutionEngine/*.inc",
+        "include/llvm/ExecutionEngine/IntelJITEvents/*.h",
+    ]),
+    copts = llvm_copts,
+    deps = [
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "execution_engine",
+    srcs = glob([
         "lib/ExecutionEngine/*.cpp",
         "lib/ExecutionEngine/*.inc",
         "lib/ExecutionEngine/*.h",
         "lib/ExecutionEngine/IntelJITEvents/*.cpp",
-        "lib/ExecutionEngine/IntelJITEvents/*.c",
         "lib/ExecutionEngine/IntelJITEvents/*.h",
     ]),
     hdrs = glob([
@@ -1691,6 +1707,7 @@ cc_library(
     deps = [
         ":config",
         ":core",
+        ":execution_engine_c",
         ":mc",
         ":object",
         ":runtime_dyld",
