@@ -30,10 +30,7 @@ def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let summary = "Modify the offset into a tensor in an affine way";
   let arguments = (ins TensorRefType:$in, Variadic<AffineType>:$offsets);
   let results = (outs TensorRefType:$result);
-  let printer = [{ 
-    PrintSimple(getOperation(), &p, 1, {}, in()->getType(), true);
-    p << " // This is a test comment";
-  }];
+  let printer = [{ PrintSimple(getOperation(), &p, 1, {}, in()->getType(), true); }];
   let parser = [{
     TensorRefType refType;
     auto aff_type = AffineType::get(parser.getBuilder().getContext());
