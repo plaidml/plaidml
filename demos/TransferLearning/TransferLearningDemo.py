@@ -231,6 +231,22 @@ class Demo:
         return probabilities
 
 
+def positive_int(v):
+    value = int(v)
+    if value < 0:
+        msg = '%r is not a positive value' % value
+        raise argparse.ArgumentTypeError(msg)
+    return value
+
+
+def positive_nonzero_int(v):
+    value = int(v)
+    if value <= 0:
+        msg = '%r is not a positive non-zero value' % value
+        raise argparse.ArgumentTypeError(msg)
+    return value
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='TransferLearningDemo')
     parser.add_argument('--training',
@@ -248,15 +264,19 @@ if __name__ == "__main__":
         help='selects the backend used for training/classification [CPU]/PLAIDML/TF]',
         default='PLAIDML')
     parser.add_argument('--quiet', help='disables most logging', action='store_false')
-    parser.add_argument('--epochs', help='number of epochs to train', type=int, default=5)
+    parser.add_argument('--epochs',
+                        help='number of epochs to train',
+                        type=positive_nonzero_int,
+                        default=5)
     parser.add_argument('--batch_size',
                         help='specify batch size for training',
-                        type=int,
+                        type=positive_nonzero_int,
                         default=16)
-    parser.add_argument('--workers',
-                        help='specify number of workers for threading',
-                        type=int,
-                        default=1)
+    parser.add_argument(
+        '--workers',
+        help='specify number of workers for threading; zero specifies main thread only',
+        type=positive_int,
+        default=1)
     parser.add_argument('--warmup', help='warmup run for training', action='store_true')
     args = parser.parse_args()
 
