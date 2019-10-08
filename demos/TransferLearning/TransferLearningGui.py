@@ -1,6 +1,5 @@
 import os
 import random
-import subprocess
 
 import ipywidgets as widgets
 import matplotlib.image as mpimg

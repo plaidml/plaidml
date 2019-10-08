@@ -1,24 +1,15 @@
 import argparse
-import importlib
 import os
-import random
-import sys
 import warnings
 
-import ipywidgets as widgets
-import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from IPython.display import clear_output, display
 from keras.applications.resnet50 import preprocess_input
 from keras.preprocessing.image import ImageDataGenerator
 from tensorflow import keras
 from tensorflow.keras.applications import MobileNetV2, ResNet50
 from tensorflow.keras.models import Sequential
 from tensorflow.python.keras import optimizers
-
-import ngraph_bridge
 
 warnings.simplefilter('ignore')
 
@@ -41,15 +32,6 @@ class Demo:
 
     IMAGE_SIZE = 224
     IMAGE_SHAPE = (IMAGE_SIZE, IMAGE_SIZE, 3)
-
-    ngraph_bridge = None
-
-    batch_size = 16
-    epochs = 2
-    fine_tune_at = 100
-
-    base_model = None
-    model = None
 
     def __init__(self,
                  training=0,
@@ -161,6 +143,8 @@ class Demo:
             # Use default
             if os.getenv('OMP_NUM_THREADS') is not None:
                 del os.environ['OMP_NUM_THREADS']
+
+        import ngraph_bridge
 
         if backend == 'DISABLED' or backend == 'TF':
             ngraph_bridge.disable()
