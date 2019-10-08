@@ -540,7 +540,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
       signalPassFailure();
     }
 
-    getModule().walk<FuncOp>([](FuncOp funcOp) {
+    getModule().walk([](FuncOp funcOp) {
       // wrap with a parallel_for to represent the 'main' block
       auto& region = funcOp.getBody();
       OpBuilder builder(region);
@@ -574,7 +574,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
 OwningModuleRef LowerIntoStripe(MLIRContext* context, TileProgram* program) {
   IVLOG(1, "LowerIntoStripe");
   OwningModuleRef module(llvm::cast<ModuleOp>(program->module->getOperation()->clone()));
-  mlir::PassManager pm;
+  mlir::PassManager pm(context, true);
   IVLOG(1, "before:" << *module);
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
