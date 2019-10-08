@@ -116,3 +116,6 @@ ENV/
 
 /tmp
 /.cenv
+
+# Source code tagging tools
+tags
