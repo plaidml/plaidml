@@ -17,12 +17,6 @@ class StripeOp<string mnemonic, list<OpTrait> traits = []> :
 
 def AllocateOp : StripeOp<"alloc"> {
   let summary = "Allocate a new tensor and set its intial shape / size";
-  let results = (outs TensorType:$result);
-}
-
-def TensorRefOp : StripeOp<"ref", [NoSideEffect]> {
-  let summary = "Create a default tensor_ref from a tensor";
-  let arguments = (ins TensorType:$in);
   let results = (outs TensorRefType:$result);
 }
 
