@@ -135,6 +135,9 @@ class TrainingDemoGui():
 
     def on_train_clicked(self, b=None):
         self.train_button.disabled = True
+        self.initial.clear_output()
+        self.updated.clear_output()
+
         # New instance of model
         with self.log:
             self.demo = TransferLearningDemo.Demo(epochs=self.epoch_slider.value,
