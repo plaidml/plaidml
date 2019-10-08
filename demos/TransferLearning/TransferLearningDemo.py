@@ -1,30 +1,26 @@
-import warnings
-warnings.simplefilter('ignore')
-import ngraph_bridge
-
 import argparse
-import sys
 import importlib
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 import os
 import random
-from IPython.display import display
+import sys
+import warnings
 
+import ipywidgets as widgets
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
+from IPython.display import clear_output, display
+from keras.applications.resnet50 import preprocess_input
+from keras.preprocessing.image import ImageDataGenerator
 from tensorflow import keras
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications import MobileNetV2, ResNet50
 from tensorflow.keras.models import Sequential
 from tensorflow.python.keras import optimizers
 
-from keras.applications.resnet50 import preprocess_input
-from keras.preprocessing.image import ImageDataGenerator
+import ngraph_bridge
 
-import ipywidgets as widgets
-
-from IPython.display import clear_output
+warnings.simplefilter('ignore')
 
 
 class Demo:
@@ -61,7 +57,7 @@ class Demo:
                  predict=0,
                  epochs=5,
                  batch_size=16,
-                 model='ResNet50',
+                 model_name='ResNet50',
                  backend='CPU',
                  workers=1,
                  verbose=1,
@@ -78,25 +74,14 @@ class Demo:
         self.test_class_indices = []
         self.init_images()
 
-        self.setup_ngraph_bridge(backend=backend,
-                                 epochs=epochs,
-                                 batch_size=batch_size,
-                                 verbose=verbose)
+        self.setup_ngraph_bridge(backend=backend)
 
-        self.compile_model(model)
+        self.compile_model(model_name)
 
         if training:
             if warmup:
-                self.train(model=model,
-                           backend=backend,
-                           epochs=1,
-                           batch_size=self.batch_size,
-                           callbacks=callbacks)
-            h = self.train(model=model,
-                           backend=backend,
-                           epochs=self.epochs,
-                           batch_size=self.batch_size,
-                           callbacks=callbacks)
+                self.train(epochs=1, callbacks=callbacks)
+            h = self.train(epochs=self.epochs, callbacks=callbacks)
         if predict:
             p = self.predict(callbacks)
 
@@ -166,7 +151,7 @@ class Demo:
             else:
                 print("Error, unclassifiable image " + file)
 
-    def setup_ngraph_bridge(self, backend, epochs=None, batch_size=None, verbose=1):
+    def setup_ngraph_bridge(self, backend):
         # Enviornment variables
         os.environ['PLAIDML_USE_STRIPE'] = '1'
 
@@ -177,9 +162,6 @@ class Demo:
             if os.getenv('OMP_NUM_THREADS') is not None:
                 del os.environ['OMP_NUM_THREADS']
 
-        self.set_ngraph_bridge(backend)
-
-    def set_ngraph_bridge(self, backend):
         if backend == 'DISABLED' or backend == 'TF':
             ngraph_bridge.disable()
         elif backend == 'CPU':
@@ -191,8 +173,8 @@ class Demo:
         else:
             print("ERROR: Unsupported backend " + backend + " selected.")
 
-    def compile_model(self, modelName, fine=0):
-        if modelName == 'ResNet50':
+    def compile_model(self, model_name, fine=0):
+        if model_name == 'ResNet50':
             self.base_model = ResNet50(pooling=self.RESNET50_POOLING_AVERAGE,
                                        include_top=False,
                                        weights='imagenet')
@@ -200,7 +182,7 @@ class Demo:
                 self.base_model,
                 keras.layers.Dense(self.NUM_CLASSES, activation=self.DENSE_LAYER_ACTIVATION)
             ])
-        elif modelName == 'MobileNet v2':
+        elif model_name == 'MobileNet v2':
             self.base_model = MobileNetV2(input_shape=self.IMAGE_SHAPE,
                                           include_top=False,
                                           weights='imagenet')
@@ -227,14 +209,9 @@ class Demo:
                            loss=self.OBJECTIVE_FUNCTION,
                            metrics=self.LOSS_METRICS)
 
-    def train(self, model='Resnet50', backend='PLAIDML', epochs=5, batch_size=16, callbacks=None):
+    def train(self, epochs, callbacks=None):
         steps_per_epoch = self.train_generator.n // self.batch_size
         validation_steps = self.validation_generator.n // self.batch_size
-
-        if not self.model:
-            self.model = self.compile_model(model)
-
-        self.set_ngraph_bridge(backend)
 
         history = self.model.fit_generator(self.train_generator,
                                            steps_per_epoch=steps_per_epoch,
@@ -247,14 +224,11 @@ class Demo:
         return history
 
     def predict(self, callbacks=None):
-        if self.model:
-            probabilities = self.model.predict_generator(self.test_generator,
-                                                         verbose=self.verbose,
-                                                         workers=self.workers,
-                                                         callbacks=callbacks)
-            predicted_class_indices = np.argmax(probabilities, axis=1)
-
-            return probabilities
+        probabilities = self.model.predict_generator(self.test_generator,
+                                                     verbose=self.verbose,
+                                                     workers=self.workers,
+                                                     callbacks=callbacks)
+        return probabilities
 
 
 if __name__ == "__main__":
@@ -267,39 +241,31 @@ if __name__ == "__main__":
                         action='store_true')
     parser.add_argument(
         '--network_type',
-        help='selects the network used for training/classification [ResNet50]/MobileNet V2')
+        help='selects the network used for training/classification [ResNet50]/MobileNet V2',
+        default='ResNet50')
     parser.add_argument(
-        '--backend', help='selects the backend used for training/classification [CPU]/PLAIDML/TF]')
+        '--backend',
+        help='selects the backend used for training/classification [CPU]/PLAIDML/TF]',
+        default='PLAIDML')
     parser.add_argument('--quiet', help='disables most logging', action='store_false')
-    parser.add_argument('--epochs', help='number of epochs to train')
-    parser.add_argument('--batch_size', help='specify batch size for training')
-    parser.add_argument('--workers', help='specify number of workers for threading')
+    parser.add_argument('--epochs', help='number of epochs to train', type=int, default=5)
+    parser.add_argument('--batch_size',
+                        help='specify batch size for training',
+                        type=int,
+                        default=16)
+    parser.add_argument('--workers',
+                        help='specify number of workers for threading',
+                        type=int,
+                        default=1)
     parser.add_argument('--warmup', help='warmup run for training', action='store_true')
     args = parser.parse_args()
-    nw = 'ResNet50'
-    if args.network_type == 'ResNet50' or args.network_type == 'MobileNet V2':
-        nw = args.network_type
-    be = "CPU"
-    if args.backend == 'CPU' or args.backend == 'TF' or args.backend == 'PLAIDML':
-        be = args.backend
-    if args.epochs:
-        epochs = int(args.epochs)
-    else:
-        epochs = 5
-    if args.batch_size:
-        batch_size = int(args.batch_size)
-    else:
-        batch_size = 16
-    if args.workers:
-        workers = int(args.workers)
-    else:
-        workers = 1
+
     Demo(training=args.training,
          warmup=args.warmup,
          predict=args.predict,
-         epochs=epochs,
-         batch_size=batch_size,
-         model=nw,
-         backend=be,
-         workers=workers,
+         epochs=args.epochs,
+         batch_size=args.batch_size,
+         model_name=args.network_type,
+         backend=args.backend,
+         workers=args.workers,
          verbose=args.quiet)

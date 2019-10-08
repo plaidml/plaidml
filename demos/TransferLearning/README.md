@@ -17,9 +17,9 @@ source .venv/bin/activate
 
 For PlaidML devices, run `plaidml-setup` before starting this demo to select the Plaidml backend device.
 
-Once the interface is presented, setup the model and network along with epoch and batch size values then hit the Train button to start. The demo will initialize test images and then start with a prediction with the model selected using pretrained `imagenet` weights. The demo will then automaticall proceed into the training phase followed by another predition phase based on the trained model.
+Once the interface is presented, setup the model and network along with epoch and batch size values then hit the Train button to start. The demo will initialize test images and then start with a prediction with the model selected using pretrained `imagenet` weights. The demo will then automatically proceed into the training phase followed by another predition phase based on the trained model.
 
-The demo will present 9 randomly selected test images where the initial prediction incorrectly guessed and then the same 9 image predictions after the model has been trained.
+Initially, the demo will select 9 random images from the test set and perform inference on them using the pre-trained model. These initial guesses are often incorrect. After training, the demo will perform inference on the same 9 images using the fully trained model. This is shown to prove that the training phase results in improved prediction accuracy.
 
 ## Running the demo through the Jupyter Notebook
 
@@ -31,7 +31,7 @@ jupyter notebook TransferLearningDemo.ipynb
 
 ## Running the demo through the command line
 ```
-usage: TransferLearningDemo [-h] [--gui] [--training] 
+usage: TransferLearningDemo [-h] [--training] 
                             [--network_type NETWORK_TYPE] [--backend BACKEND]
                             [--warmup] [--workers] [--quiet]
 
