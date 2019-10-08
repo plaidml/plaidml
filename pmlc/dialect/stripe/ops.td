@@ -22,9 +22,9 @@ def AllocateOp : StripeOp<"alloc"> {
   let results = (outs TensorRefType:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, TensorType type", [{
-      result->addAttribute("layout", builder->getTypeAttr(type));
-      result->addTypes(TensorRefType::get(type));
+    "Builder* builder, OperationState& result, TensorType type", [{
+      result.addAttribute("layout", builder->getTypeAttr(type));
+      result.addTypes(TensorRefType::get(type));
     }]
   >];
 }

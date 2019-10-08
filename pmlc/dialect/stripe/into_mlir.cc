@@ -275,8 +275,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         dims.emplace_back(TensorDim{0, 0, GetDevClass(builder->getContext(), dev, dev_idx, unit_idx)});
       }
     }
-    auto allocOp = builder->create<AllocateOp>(
-        unknownLoc, TensorType::get(builder->getType<ExecutorType>(), dims, OffsetsMap{}, true));
+    auto tensorType = TensorType::get(builder->getType<ExecutorType>(), dims, OffsetsMap{}, true);
+    auto allocOp = builder->create<AllocateOp>(unknownLoc, tensorType);
     bool any_non_zero_offsets = false;
     auto offsets = LocationIntoTensorOffsets(builder, outer.idxs, block.location, &any_non_zero_offsets);
     if (any_non_zero_offsets) {
