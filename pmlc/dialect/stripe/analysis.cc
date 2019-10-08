@@ -6,6 +6,8 @@
 
 #include <boost/math/common_factor.hpp>
 
+#include "pmlc/dialect/stripe/dialect.h"
+
 namespace pmlc {
 namespace dialect {
 namespace stripe {
@@ -14,22 +16,22 @@ AffinePolynomial::AffinePolynomial() : constant(0) {}
 
 AffinePolynomial::AffinePolynomial(int64_t x) : constant(x) {}
 
-AffinePolynomial::AffinePolynomial(Value* x) : constant(0) {
-  if (auto ba = mlir::dyn_cast<mlir::BlockArgument>(x)) {
+AffinePolynomial::AffinePolynomial(Value* value) : constant(0) {
+  if (auto arg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
     // This is a basic index: done
-    terms.emplace(ba, 1);
+    terms.emplace(arg, 1);
     return;
   }
-  auto dop = x->getDefiningOp();
-  if (auto op = mlir::dyn_cast<AffineConstOp>(dop)) {
+  auto defOp = value->getDefiningOp();
+  if (auto op = mlir::dyn_cast<AffineConstOp>(defOp)) {
     // This is a constant
     constant = op.value().getSExtValue();
-  } else if (auto op = mlir::dyn_cast<AffineMulOp>(dop)) {
+  } else if (auto op = mlir::dyn_cast<AffineMulOp>(defOp)) {
     *this = AffinePolynomial(op.input());
     *this *= op.scale().getSExtValue();
-  } else if (auto op = mlir::dyn_cast<AffineAddOp>(dop)) {
-    for (Value* v : op.inputs()) {
-      *this += AffinePolynomial(v);
+  } else if (auto op = mlir::dyn_cast<AffineAddOp>(defOp)) {
+    for (auto operand : op.inputs()) {
+      *this += AffinePolynomial(operand);
     }
   } else {
     throw std::runtime_error("Invalid affine in ComputeAffineRange");
@@ -139,22 +141,29 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
   if (auto bop = tensor->getDefiningOp()) {
     if (auto op = mlir::dyn_cast<AllocateOp>(bop)) {
       ret.base = op.result();
-      ret.base_type = op.result()->getType().cast<TensorType>();
+      ret.base_type = op.layout();
       ret.access.resize(ret.base_type.getRank());
     } else if (auto op = mlir::dyn_cast<RefineOp>(bop)) {
       ret = ComputeAccess(op.in());
       for (size_t i = 0; i < ret.access.size(); i++) {
-        ret.access[i] += AffinePolynomial(*(op.offsets().begin() + i));
+        ret.access[i] += AffinePolynomial(op.getOffset(i));
       }
-    } else if (auto op = mlir::dyn_cast<TensorRefOp>(bop)) {
-      return ComputeAccess(op.in());
     } else {
       throw std::runtime_error("Invalid tensor value in ComputeAccess");
     }
-  } else {
+  } else if (auto arg = mlir::dyn_cast<mlir::BlockArgument>(tensor)) {
+    auto parentOp = arg->getOwner()->getParentOp();
+    auto funcOp = mlir::dyn_cast<mlir::FuncOp>(parentOp);
+    if (!funcOp) {
+      throw std::runtime_error("Invalid tensor value: block argument not contained by FuncOp");
+    }
+    auto attrName = stripe::Dialect::getDialectAttrName("layout");
+    auto attr = funcOp.getArgAttrOfType<mlir::TypeAttr>(arg->getArgNumber(), attrName);
     ret.base = tensor;
-    ret.base_type = tensor->getType().cast<TensorType>();
+    ret.base_type = attr.getValue().cast<TensorType>();
     ret.access.resize(ret.base_type.getRank());
+  } else {
+    throw std::runtime_error("Invalid tensor value");
   }
   return ret;
 }

@@ -92,6 +92,7 @@ plaidml_cc_library(
     deps = [
         ":gen-op-decls",
         ":gen-op-defs",
+        "//pmlc/util",
         "//tile/base",
         "@llvm//:support",
         "@mlir//:IR",

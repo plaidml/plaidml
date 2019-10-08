@@ -5,10 +5,13 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Regex.h"
 
+#include "mlir/Support/DebugStringHelper.h"
+
 #include "base/util/lookup.h"
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
+#include "pmlc/util/util.h"
 
 namespace pmlc {
 namespace dialect {
@@ -31,6 +34,15 @@ struct ScalarInfo {
   size_t next = 0;
 };
 
+struct StripeDevice {
+  std::string name;
+  std::vector<AffinePolynomial> units;
+};
+
+struct StripeLocation {
+  std::vector<StripeDevice> devs;
+};
+
 class StripeBuilder {
  public:
   explicit StripeBuilder(mlir::FuncOp func);
@@ -40,15 +52,15 @@ class StripeBuilder {
   std::string scalar_name(Operation* op, std::string out_name = "");
   TensorShape get_shape(TensorType type);
   void add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> in);
-  void add_refinements(       //
-      Block* block,           //
-      Value* tensor,          //
-      stripe::RefDir dir,     //
-      std::string* name_out,  //
-      std::string agg = "",   //
+  std::string add_refinements(  //
+      Block* block,             //
+      Value* tensor,            //
+      stripe::RefDir dir,       //
+      std::string agg = "",     //
       bool is_spec = false);
   std::string get_idx(stripe::Block* block, mlir::BlockArgument* affine);
   stripe::Affine build_affine(stripe::Block* block, Value* affine);
+  stripe::Location build_location(const StripeLocation& loc, Block* block, stripe::Block* sblock);
 
   void visit(ParallelForOp op);
   void visit(ConstraintOp op, int count);
@@ -70,43 +82,31 @@ class StripeBuilder {
   std::map<mlir::Value*, std::string> scalars_;
 };
 
-struct StripeDevice {
-  std::string name;
-  std::vector<AffinePolynomial> units;
-};
-
-struct StripeLocation {
-  std::vector<StripeDevice> devs;
-};
-
 std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor) {
   auto ret = ComputeAccess(tensor);
   auto loc = StripeLocation{};
 
-  // At this point: ret.access contains the refinement accessors for every tensor dimension (including
-  // non-address dimensions), and ret.base_type is a TensorType which gets us the underyling dimension
-  // information.  For conversion to Stripe, we want to separate out the address dimensions (whose accessors
-  // are preserved in the flat tensor access) from the non-address dimensions (which become part of the
-  // location).
+  // At this point: ret.access contains the refinement accessors for every
+  // tensor dimension (including non-address dimensions), and ret.base_type is a
+  // TensorType which gets us the underyling dimension information.  For
+  // conversion to Stripe, we want to separate out the address dimensions (whose
+  // accessors are preserved in the flat tensor access) from the non-address
+  // dimensions (which become part of the location).
 
   std::vector<AffinePolynomial> access;
 
-  auto combIt = ret.access.begin();
   auto matches = llvm::SmallVector<StringRef, 4>();
-  for (const auto& dim : ret.base_type.getShape()) {
-    if (combIt == ret.access.end()) {
-      break;  // Should never happen; this is just to be careful.
-    }
+  for (unsigned i = 0; i < ret.base_type.getRank(); i++) {
+    const auto& dim = ret.base_type.getShape()[i];
     if (dim.cls == kAddressClassIdentifier) {
-      access.emplace_back(*combIt);
+      access.emplace_back(ret.access[i]);
     } else {
       static llvm::Regex re{R"(([[:alpha:]]+)_([[:digit:]]+)_([[:digit:]]+))"};
       if (re.match(dim.cls, &matches)) {
         const auto& dev_name = matches[1];
-        std::size_t dev_idx, unit_idx;
+        size_t dev_idx, unit_idx;
         matches[2].getAsInteger(10, dev_idx);
         matches[3].getAsInteger(10, unit_idx);
-
         if (loc.devs.size() <= dev_idx) {
           loc.devs.resize(dev_idx + 1);
         }
@@ -115,10 +115,9 @@ std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor) {
         if (dev.units.size() <= unit_idx) {
           dev.units.resize(unit_idx + 1);
         }
-        dev.units.at(unit_idx) = *combIt;
+        dev.units.at(unit_idx) = ret.access[i];
       }
     }
-    ++combIt;
   }
 
   ret.access.swap(access);
@@ -139,11 +138,11 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
     // add refinement for each arg
     auto arg = func.getArgument(i);
     auto attrName = Dialect::getDialectAttrName("name");
-    auto name = func.getArgAttr(i, attrName).cast<StringAttr>().getValue();
+    auto name = func.getArgAttrOfType<StringAttr>(i, attrName).getValue();
     // Compute all the info about the tensor
     auto ti = ComputeAccessAndLoc(arg).first;
     // Translate allocation shape
-    TensorShape shape = get_shape(ti.base->getType().cast<TensorType>());
+    TensorShape shape = get_shape(ti.base_type);
     std::vector<stripe::Affine> access(ti.access.size());
     stripe::Refinement ref{stripe::RefDir::None, "", name.str(), access, shape};
     ref.set_attr("user");
@@ -195,21 +194,26 @@ void StripeBuilder::add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribut
   }
 }
 
-void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir dir, std::string* name_out,
-                                    std::string agg_name, bool is_spec) {
+std::string StripeBuilder::add_refinements(  //
+    Block* block,                            //
+    Value* tensor,                           //
+    stripe::RefDir dir,                      //
+    std::string agg_name,                    //
+    bool is_spec) {
+  std::string name_out;
   // Compute all the info about the tensor
-  auto ti = FlatTensorAccess{};
-  auto sloc = StripeLocation{};
-  std::tie(ti, sloc) = ComputeAccessAndLoc(tensor);
-  size_t ndims = ti.access.size();
+  auto tensorInfo = FlatTensorAccess{};
+  auto stripeLoc = StripeLocation{};
+  std::tie(tensorInfo, stripeLoc) = ComputeAccessAndLoc(tensor);
+  size_t ndims = tensorInfo.access.size();
   // Translate allocation shape
-  TensorShape base_shape = get_shape(ti.base_type);
+  TensorShape base_shape = get_shape(tensorInfo.base_type);
   // Make a vector of 'inner' polynomials
   std::vector<AffinePolynomial> inner(ndims);
   std::vector<size_t> constants(ndims);
   for (size_t i = 0; i < ndims; i++) {
-    constants[i] = ti.access[i].constant;
-    ti.access[i].constant = 0;
+    constants[i] = tensorInfo.access[i].constant;
+    tensorInfo.access[i].constant = 0;
   }
   // Get the source instruction
   auto op = tensor->getDefiningOp();
@@ -218,10 +222,10 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
   // Stop when we've hit the 'allocating block'
   stripe::Refinement* ref = nullptr;
   while (true) {
-    if (blocks_.at(block).stripe == NULL) {
+    if (!blocks_.at(block).stripe) {
       // This is a 'fake' block introduced by merged constraints
       // First, make sure to move op up if needed, and then go to next block
-      while (op->getBlock() == block && mlir::isa<RefineOp>(op)) {
+      while (op && op->getBlock() == block && mlir::isa<RefineOp>(op)) {
         op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
       }
       block = block->getParentOp()->getBlock();
@@ -229,7 +233,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
     }
     stripe::Block* sblock = blocks_.at(block).stripe;
     // Begin by seeing if we've already made a ref for this block
-    std::string& ref_name = blocks_.at(block).refs[ti];
+    std::string& ref_name = blocks_.at(block).refs[tensorInfo];
     // If not, add the refinement
     if (ref_name == "") {
       if (auto rop = mlir::dyn_cast<RefineOp>(op)) {
@@ -244,7 +248,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
       std::vector<stripe::Affine> access;
       for (size_t i = 0; i < ndims; i++) {
         stripe::Affine aff;
-        for (const auto& kvp : ti.access[i].terms) {
+        for (const auto& kvp : tensorInfo.access[i].terms) {
           if (kvp.first->getOwner() == block) {
             aff += stripe::Affine(get_idx(sblock, kvp.first), kvp.second);
           }
@@ -269,31 +273,19 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
     if (ref) {
       ref->from = ref_name;
     } else {
-      *name_out = ref_name;
+      name_out = ref_name;
     }
     // Get pointer to new/etc reference
     ref = &blocks_.at(block).stripe->ref_by_into(ref_name)->mut();
     // Set the location
-    for (const auto& dev : sloc.devs) {
-      ref->location.devs.emplace_back(stripe::Device{dev.name});
-      auto& sdev = ref->location.devs.back();
-      for (const auto& unit : dev.units) {
-        auto aff = stripe::Affine{unit.constant};
-        for (const auto& kvp : unit.terms) {
-          if (kvp.first->getOwner() == block) {
-            aff += stripe::Affine(get_idx(sblock, kvp.first), kvp.second);
-          }
-        }
-        sdev.units.emplace_back(std::move(aff));
-      }
-    }
+    ref->location = build_location(stripeLoc, block, sblock);
     // Add in directionality
     if (ref->dir == stripe::RefDir::In && dir == stripe::RefDir::Out) {
       ref->dir = stripe::RefDir::InOut;
     }
     // Remove indexes from ti for this block + add to inner polynomial
     for (size_t i = 0; i < ndims; i++) {
-      auto& ap = ti.access[i];
+      auto& ap = tensorInfo.access[i];
       auto& ip = inner[i];
       for (auto it = ap.terms.begin(); it != ap.terms.end(); /* nothing */) {
         if (it->first->getOwner() == block) {
@@ -305,14 +297,14 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
       }
     }
     // If op matches the block, move the op up, also attributes
-    while (op->getBlock() == block && mlir::isa<RefineOp>(op)) {
+    while (op && op->getBlock() == block && mlir::isa<RefineOp>(op)) {
       if (auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName())) {
         add_attributes(ref, attrs.getValue());
       }
       op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
     }
     // Must have hit the allocation, stop
-    if (op->getBlock() == block) {
+    if (!op || op->getBlock() == block) {
       break;
     }
     // Move one block up
@@ -322,6 +314,7 @@ void StripeBuilder::add_refinements(Block* block, Value* tensor, stripe::RefDir 
   ref->dir = stripe::RefDir::None;
   // Get full allocation shape
   ref->interior_shape = base_shape;
+  return name_out;
 }
 
 std::string StripeBuilder::get_idx(stripe::Block* block, mlir::BlockArgument* affine) {
@@ -334,14 +327,32 @@ std::string StripeBuilder::get_idx(stripe::Block* block, mlir::BlockArgument* af
 }
 
 stripe::Affine StripeBuilder::build_affine(stripe::Block* block, Value* base) {
-  stripe::Affine r;
+  stripe::Affine ret;
   AffinePolynomial poly(base);
-  r += poly.constant;
+  ret += poly.constant;
   for (auto& kvp : poly.terms) {
     std::string name = get_idx(block, kvp.first);
-    r += stripe::Affine(name, kvp.second);
+    ret += stripe::Affine(name, kvp.second);
   }
-  return r;
+  return ret;
+}
+
+stripe::Location StripeBuilder::build_location(const StripeLocation& loc, Block* block, stripe::Block* sblock) {
+  stripe::Location ret;
+  for (const auto& dev : loc.devs) {
+    auto sdev = stripe::Device{dev.name};
+    for (const auto& unit : dev.units) {
+      auto aff = stripe::Affine{unit.constant};
+      for (const auto& kvp : unit.terms) {
+        if (kvp.first->getOwner() == block) {
+          aff += stripe::Affine(get_idx(sblock, kvp.first), kvp.second);
+        }
+      }
+      sdev.units.emplace_back(std::move(aff));
+    }
+    ret.devs.emplace_back(sdev);
+  }
+  return ret;
 }
 
 void StripeBuilder::visit(ParallelForOp op) {
@@ -381,47 +392,10 @@ void StripeBuilder::visit(ParallelForOp op) {
   }
   // Add the location (if any) by checking the inputs to the block's terminator.
   if (auto ret = mlir::dyn_cast<ExecuteOnOp>(oblock.back())) {
-    auto val = ret.from();
-    if (auto valType = val->getType().dyn_cast<TensorRefType>()) {
-      auto offsets = std::vector<stripe::Affine>(valType.getRank());
-      auto op = val->getDefiningOp();
-      // Walk back refinements until we get to the TensorType.
-      while (auto refOp = mlir::dyn_cast<RefineOp>(op)) {
-        auto offIt = offsets.begin();
-        for (auto offset : refOp.offsets()) {
-          if (offIt == offsets.end()) {
-            break;  // Should never happen; this is just to be careful.
-          }
-          *offIt++ += build_affine(cur_.get(), offset);
-        }
-        op = refOp.in()->getDefiningOp();
-      }
-      if (auto trefOp = mlir::dyn_cast<TensorRefOp>(op)) {
-        if (auto tType = trefOp.in()->getType().dyn_cast<TensorType>()) {
-          auto matches = llvm::SmallVector<StringRef, 4>();
-          auto offIt = offsets.begin();
-          for (const auto& dim : tType.getShape()) {
-            static llvm::Regex re{R"(([[:alpha:]]+)_([[:digit:]]+)_([[:digit:]]+))"};
-            if (re.match(dim.cls, &matches) && offIt != offsets.end()) {
-              const auto& dev_name = matches[1];
-              std::size_t dev_idx, unit_idx;
-              matches[2].getAsInteger(10, dev_idx);
-              matches[3].getAsInteger(10, unit_idx);
-              if (cur_->location.devs.size() <= dev_idx) {
-                cur_->location.devs.resize(dev_idx + 1);
-              }
-              auto& dev = cur_->location.devs.at(dev_idx);
-              dev.name = dev_name;
-              if (dev.units.size() <= unit_idx) {
-                dev.units.resize(unit_idx + 1);
-              }
-              dev.units.at(unit_idx) = *offIt;
-            }
-            ++offIt;
-          }
-        }
-      }
-    }
+    auto tensorInfo = FlatTensorAccess{};
+    auto stripeLoc = StripeLocation{};
+    std::tie(tensorInfo, stripeLoc) = ComputeAccessAndLoc(ret.from());
+    cur_->location = build_location(stripeLoc, &oblock, cur_.get());
   }
   blocks_.emplace(&oblock, BlockInfo(cur_.get()));
   walk_interior(&oblock);
@@ -447,63 +421,55 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
 
 void StripeBuilder::visit(LoadOp op) {
   IVLOG(3, "StripeBuilder::visit(LoadOp)");
-  std::string ref_name;
-  add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In, &ref_name);
-  std::string into = scalar_name(op.getOperation(), ref_name);
+  auto ref_name = add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In);
+  auto into = scalar_name(op.getOperation(), ref_name);
   scalars_.emplace(op.into(), into);
   cur_->stmts.push_back(std::make_shared<stripe::Load>(ref_name, into));
 }
 
 void StripeBuilder::visit(LoadIndexOp op) {
   IVLOG(3, "StripeBuilder::visit(LoadIndexOp)");
-  stripe::Affine from = build_affine(cur_.get(), op.from());
-  std::string into = scalar_name(op.getOperation());
+  auto from = build_affine(cur_.get(), op.from());
+  auto into = scalar_name(op.getOperation());
   scalars_.emplace(op.into(), into);
   cur_->stmts.push_back(std::make_shared<stripe::LoadIndex>(from, into));
 }
 
 void StripeBuilder::visit(StoreOp op) {
   IVLOG(3, "StripeBuilder::visit(StoreOp)");
-  std::string ref_name;
-  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name);
-  std::string from = scalars_.at(op.from());
+  auto ref_name = add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out);
+  auto from = scalars_.at(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
 }
 
 void StripeBuilder::visit(AggregateOp op) {
   IVLOG(3, "StripeBuilder::visit(AggregateOp)");
-  std::string ref_name;
-  std::string agg_name = eltwise::stringifyAggregationKind(op.agg());
-  add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, &ref_name, agg_name);
-  std::string from = scalars_.at(op.from());
+  auto agg_name = eltwise::stringifyAggregationKind(op.agg());
+  auto ref_name = add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, agg_name);
+  auto from = scalars_.at(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
 }
 
-void StripeBuilder::visit(SpecialOp op) {
+void StripeBuilder::visit(SpecialOp specialOp) {
   IVLOG(3, "StripeBuilder::visit(SpecialOp)");
-  auto r = std::make_shared<stripe::Special>();
+  auto stmt = std::make_shared<stripe::Special>();
+  auto op = specialOp.getOperation();
   size_t operand = 0;
-  for (size_t i = 0; i < op.getNumOutputs(); i++) {
-    std::string out_name;
-    Operation* opr = op.getOperation();
-    add_refinements(opr->getBlock(), opr->getOperand(operand++), stripe::RefDir::Out, &out_name, "", true);
-    r->outputs.push_back(out_name);
+  for (size_t i = 0; i < specialOp.getNumOutputs(); i++) {
+    auto out_name = add_refinements(op->getBlock(), op->getOperand(operand++), stripe::RefDir::Out, "", true);
+    stmt->outputs.emplace_back(out_name);
   }
-  for (size_t i = 0; i < op.getNumInputs(); i++) {
-    std::string in_name;
-    Operation* opr = op.getOperation();
-    add_refinements(opr->getBlock(), opr->getOperand(operand++), stripe::RefDir::In, &in_name, "", true);
-    r->inputs.push_back(in_name);
+  for (size_t i = 0; i < specialOp.getNumInputs(); i++) {
+    auto in_name = add_refinements(op->getBlock(), op->getOperand(operand++), stripe::RefDir::In, "", true);
+    stmt->inputs.emplace_back(in_name);
   }
-  std::string dialect = op.getOperation()->getName().getDialect().str();
-  std::string full_name = op.getOperation()->getName().getStringRef().str();
-  r->name = full_name.substr(dialect.size() + 1, full_name.size() - dialect.size() - 1);
-  cur_->stmts.push_back(r);
+  stmt->name = util::getOpName(op->getName());
+  cur_->stmts.push_back(stmt);
 }
 
 void StripeBuilder::visit(eltwise::EltwiseBuilder builder) {
   auto op = builder.getOperation();
-  IVLOG(3, "StripeBuilder::visit> " << *op);
+  IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
   for (auto operand : op->getOperands()) {
     if (auto defOp = operand->getDefiningOp()) {
       if (auto constOp = llvm::dyn_cast<eltwise::ScalarConstantOp>(defOp)) {
@@ -514,9 +480,7 @@ void StripeBuilder::visit(eltwise::EltwiseBuilder builder) {
   auto out_name = scalar_name(op);
   scalars_.emplace(op->getResult(0), out_name);
   auto intr = std::make_shared<stripe::Intrinsic>();
-  auto dialect = op->getName().getDialect();
-  auto full_name = op->getName().getStringRef();
-  intr->name = full_name.drop_front(dialect.size() + 1);
+  intr->name = util::getOpName(op->getName());
   if (intr->name == "select") {
     intr->name = "cond";
   }
@@ -529,7 +493,7 @@ void StripeBuilder::visit(eltwise::EltwiseBuilder builder) {
 
 void StripeBuilder::visit(eltwise::CastOp castOp) {
   auto op = castOp.getOperation();
-  IVLOG(3, "StripeBuilder::visit> " << *op);
+  IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
 
   // handle the bitwidth
   auto result = op->getResult(0);
@@ -544,9 +508,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
   auto out_name = scalar_name(op);
   scalars_.emplace(result, out_name);
   auto intr = std::make_shared<stripe::Intrinsic>();
-  auto dialect = op->getName().getDialect();
-  auto full_name = op->getName().getStringRef();
-  intr->name = full_name.drop_front(dialect.size() + 1);
+  intr->name = util::getOpName(op->getName());
   intr->outputs.push_back(out_name);
   for (auto operand : op->getOperands()) {
     intr->inputs.push_back(scalars_.at(operand));

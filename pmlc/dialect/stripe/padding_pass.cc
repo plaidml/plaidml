@@ -39,8 +39,6 @@ std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
       inner.resize(op.into()->getType().cast<TensorRefType>().getRank());
     } else if (auto op = mlir::dyn_cast<AggregateOp>(use.getOwner())) {
       inner.resize(op.into()->getType().cast<TensorRefType>().getRank());
-    } else if (auto op = mlir::dyn_cast<TensorRefOp>(use.getOwner())) {
-      return ComputeUnboundedRanges(op.result());
     } else {
       throw std::runtime_error("Invalid type");
     }

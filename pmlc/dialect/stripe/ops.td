@@ -11,19 +11,35 @@ def StripeDialect : Dialect {
 def AffineType : Type<CPred<"$_self.isa<AffineType>()">, "Plaid Affine Type">;
 def TensorType : Type<CPred<"$_self.isa<TensorType>()">, "Plaid Tensor Type">;
 def TensorRefType : Type<CPred<"$_self.isa<TensorRefType>()">, "Plaid Tensor Reference Type">;
+def TensorTypeAttr : TypeAttrBase<"TensorType", "tensor type attribute">;
 
 class StripeOp<string mnemonic, list<OpTrait> traits = []> :
     Op<StripeDialect, mnemonic, traits>;
 
 def AllocateOp : StripeOp<"alloc"> {
   let summary = "Allocate a new tensor and set its intial shape / size";
+  let arguments = (ins TensorTypeAttr:$layout);
   let results = (outs TensorRefType:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState* result, TensorType type", [{
+      result->addAttribute("layout", builder->getTypeAttr(type));
+      result->addTypes(TensorRefType::get(type));
+    }]
+  >];
 }
 
 def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let summary = "Modify the offset into a tensor in an affine way";
   let arguments = (ins TensorRefType:$in, Variadic<AffineType>:$offsets);
   let results = (outs TensorRefType:$result);
+
+  let extraClassDeclaration = [{
+    Value* getOffset(unsigned i) {
+      // skip the $in operand
+      return getOperand(i + 1);
+    }
+  }];
 }
 
 def LoadOp : StripeOp<"load"> {
