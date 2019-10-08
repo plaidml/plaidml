@@ -44,30 +44,26 @@ void AggregationBlockOutputInitialization(const stripe::Block* const block,
   }
 
   std::vector<const Refinement*> outRefs = block->ref_outs(true);
-  // We should handle only when there is one output (aggregation operation).
-  if (outRefs.size() != 1) {
-    return;
-  }
+  for (const Refinement* dest : outRefs) {
+    std::string aggOp = dest->agg_op;
+    if (aggOp != "add" && aggOp != "mul" && aggOp != "max" && aggOp != "min") {
+      continue;
+    }
 
-  const Refinement* dest = outRefs[0];
-  std::string aggOp = dest->agg_op;
-  if (aggOp != "add" && aggOp != "mul" && aggOp != "max" && aggOp != "min") {
-    return;
-  }
+    auto prevRefIter = prevBlock->ref_by_into(dest->from);
+    if (prevRefIter == prevBlock->refs.end()) {
+      throw std::runtime_error(
+          "AggregationBlockOutputInitializationPass: Didn't find referenced Refinement from outer block.");
+    }
 
-  auto prevRefIter = prevBlock->ref_by_into(dest->from);
-  if (prevRefIter == prevBlock->refs.end()) {
-    throw std::runtime_error(
-        "AggregationBlockOutputInitializationPass: Didn't find referenced Refinement from outer block.");
-  }
-
-  if (prevRefIter->agg_op == "" || prevRefIter->agg_op == "assign") {
-    const_cast<AggregationBlockOutputInitializationPass*>(aggregationPass)
-        ->AddRefinementToInit(const_cast<stripe::Block*>(prevBlock), &(*prevRefIter), block, aggOp);
-  } else {
-    if (prevRefIter->agg_op != aggOp) {
-      // TODO: Create a temp buffer here.
-      throw std::runtime_error("Nested agg ops of different type is not supported at the moment");
+    if (prevRefIter->agg_op == "" || prevRefIter->agg_op == "assign") {
+      const_cast<AggregationBlockOutputInitializationPass*>(aggregationPass)
+          ->AddRefinementToInit(const_cast<stripe::Block*>(prevBlock), &(*prevRefIter), block, aggOp);
+    } else {
+      if (prevRefIter->agg_op != aggOp) {
+        // TODO: Create a temp buffer here.
+        throw std::runtime_error("Nested agg ops of different type is not supported at the moment");
+      }
     }
   }
 }
