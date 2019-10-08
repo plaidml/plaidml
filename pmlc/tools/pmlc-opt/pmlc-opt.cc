@@ -40,8 +40,6 @@ static cl::opt<bool> verifyPasses(                                //
     cl::desc("Run the verifier after each transformation pass"),  //
     cl::init(true));
 
-static std::vector<const PassRegistryEntry*>* passList;
-
 int main(int argc, char** argv) {
   PrettyStackTraceProgram x(argc, argv);
   InitLLVM y(argc, argv);
@@ -50,8 +48,7 @@ int main(int argc, char** argv) {
   registerPassManagerCLOptions();
 
   // Parse pass names in main to ensure static initialization completed.
-  llvm::cl::list<const PassRegistryEntry*, bool, PassNameParser> passList("", llvm::cl::desc("Compiler passes to run"));
-  ::passList = &passList;
+  mlir::PassPipelineCLParser passPipeline("", "pmlc modular optimizer driver");
   cl::ParseCommandLineOptions(argc, argv, "pmlc modular optimizer driver\n");
 
   // Set up the input file.
@@ -68,5 +65,6 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
-  return failed(MlirOptMain(output->os(), std::move(file), passList, splitInputFile, verifyDiagnostics, verifyPasses));
+  return failed(
+      MlirOptMain(output->os(), std::move(file), passPipeline, splitInputFile, verifyDiagnostics, verifyPasses));
 }

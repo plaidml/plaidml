@@ -10,8 +10,8 @@ def EltwiseDialect : Dialect {
 
 def EltwiseBuilderInterface : OpInterface<"EltwiseBuilder"> {
   let methods = [
-    StaticInterfaceMethod<"Type", "getResultType", (ins "ArrayRef<Value*>":$operands)>,
-    StaticInterfaceMethod<"Operation*", "create", (ins
+    StaticInterfaceMethod<"TODO", "Type", "getResultType", (ins "ArrayRef<Value*>":$operands)>,
+    StaticInterfaceMethod<"TODO", "Operation*", "create", (ins
       "OpBuilder*":$builder,
       "Location":$loc,
       "ScalarType":$type,
@@ -52,22 +52,22 @@ def ScalarConstantOp :
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, double value", [{
-      result->addAttribute("value", builder->getF32FloatAttr(value));
-      result->addTypes(builder->getTensorType({}, type));
+    "Builder* builder, OperationState& result, ScalarType type, double value", [{
+      result.addAttribute("value", builder->getF32FloatAttr(value));
+      result.addTypes(builder->getTensorType({}, type));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, int64_t value", [{
-      result->addAttribute("value", builder->getI64IntegerAttr(value));
-      result->addTypes(builder->getTensorType({}, type));
+    "Builder* builder, OperationState& result, ScalarType type, int64_t value", [{
+      result.addAttribute("value", builder->getI64IntegerAttr(value));
+      result.addTypes(builder->getTensorType({}, type));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, Attribute value", [{
-      result->addAttribute("value", value);
-      result->addTypes(builder->getTensorType({}, type));
+    "Builder* builder, OperationState& result, ScalarType type, Attribute value", [{
+      result.addAttribute("value", value);
+      result.addTypes(builder->getTensorType({}, type));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
       llvm_unreachable("unhandled transcoding");
     }]
   >];
@@ -84,13 +84,13 @@ class UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addAttribute("type", TypeAttr::get(type));
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addAttribute("type", TypeAttr::get(type));
+      result.addTypes(getResultType(operands));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, Value* operand", [{
+    "Builder* builder, OperationState& result, ScalarType type, Value* operand", [{
       build(builder, result, type, llvm::SmallVector<Value*, 1>({operand}));
     }]
   >];
@@ -109,13 +109,13 @@ class BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addAttribute("type", TypeAttr::get(type));
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addAttribute("type", TypeAttr::get(type));
+      result.addTypes(getResultType(operands));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, Value* lhs, Value* rhs", [{
+    "Builder* builder, OperationState& result, ScalarType type, Value* lhs, Value* rhs", [{
       build(builder, result, type, {lhs, rhs});
     }]
   >];
@@ -134,13 +134,13 @@ class CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs Eltwise_BoolTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addAttribute("type", TypeAttr::get(type));
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addAttribute("type", TypeAttr::get(type));
+      result.addTypes(getResultType(operands));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, Value* lhs, Value* rhs", [{
+    "Builder* builder, OperationState& result, ScalarType type, Value* lhs, Value* rhs", [{
       build(builder, result, type, {lhs, rhs});
     }]
   >];
@@ -175,7 +175,9 @@ class CastOp<string mnemonic> :
   let arguments = (ins Eltwise_AnyTensor:$tensor);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands"
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands"
+  >, OpBuilder<
+    "Builder* builder, OperationState& result, Value* tensor, IntegerAttr bitwidth"
   >];
 
   let extraClassDeclaration = [{
@@ -214,12 +216,12 @@ def AsBoolOp : EltwiseOp<"as_bool"> {
   let arguments = (ins Eltwise_AnyTensor:$in);
   let results = (outs Eltwise_BoolTensor:$result);
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, Value* val", [{
+    "Builder* builder, OperationState& result, ScalarType type, Value* val", [{
       build(builder, result, type, std::vector<Value*>({val}));
     }]
   >];
@@ -282,9 +284,9 @@ def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
     }]
   >];
 
@@ -299,9 +301,9 @@ def IndexOp : SpecialOp<"index">, HasCanonicalizer {
   let results = (outs Eltwise_IntegerTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
     }]
   >];
 
@@ -316,9 +318,9 @@ def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
     }]
   >];
 
@@ -333,9 +335,9 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
     }]
   >];
 
@@ -351,9 +353,9 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
 //   let results = (outs Eltwise_AnyTensor:$result);
 
 //   let builders = [OpBuilder<
-//     "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-//       result->addOperands(operands);
-//       result->addTypes(getResultType(operands));
+//     "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+//       result.addOperands(operands);
+//       result.addTypes(getResultType(operands));
 //     }]
 //   >];
 
@@ -372,10 +374,10 @@ def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addAttribute("type", TypeAttr::get(type));
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addAttribute("type", TypeAttr::get(type));
+      result.addTypes(getResultType(operands));
     }]
   >];
 
@@ -392,9 +394,9 @@ def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let results = (outs Eltwise_IntegerTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ScalarType type, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addTypes(getResultType(operands));
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
     }]
   >];
 

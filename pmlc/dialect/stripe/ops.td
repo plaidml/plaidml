@@ -89,8 +89,8 @@ def ConstraintOp : StripeOp<"constraint"> {
 
 def SpecialOpInterface : OpInterface<"SpecialOp"> {
   let methods = [
-    InterfaceMethod<"size_t", "getNumInputs">,
-    InterfaceMethod<"size_t", "getNumOutputs">,
+    InterfaceMethod<"TODO", "size_t", "getNumInputs">,
+    InterfaceMethod<"TODO", "size_t", "getNumOutputs">,
   ];
 }
 
@@ -145,7 +145,7 @@ def PrngStepOp : SpecialOp<"prng_step", 2, 1> {
 def TerminateOp : StripeOp<"terminate", [Terminator]> {
   let summary = "A block terminator since MLIR requires one";
   let parser = [{ return mlir::success(); }];
-  let printer = [{ *p << getOperationName(); }];
+  let printer = [{ p << getOperationName(); }];
 }
 
 def ExecuteOnOp : StripeOp<"execute_on", [Terminator, HasParent<"ParallelForOp">]> {
