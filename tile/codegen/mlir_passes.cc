@@ -50,7 +50,7 @@ void ConvertIntoMLIR(CompilerState* state) {
 }
 
 template <typename Pass, typename Config>
-std::unique_ptr<mlir::FunctionPassBase> CreatePass(Config config) {
+std::unique_ptr<mlir::Pass> CreatePass(Config config) {
   return std::make_unique<Pass>(config);
 }
 
@@ -60,7 +60,7 @@ class MlirCompilePass : public CompilePass {
   bool is_stripe() const override { return false; }
   explicit MlirCompilePass(const Config& cfg) : config(cfg) {}
   void Apply(CompilerState* root) const override {
-    mlir::PassManager pm;
+    mlir::PassManager pm(&root->mlir->ctx, true);
     pm.addPass(mlir::createCSEPass());
     pm.addPass(CreatePass<Pass>(config));
     if (failed(pm.run(*root->mlir->module))) {

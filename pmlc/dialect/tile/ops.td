@@ -20,8 +20,8 @@ def PlaceholderOp : TileOp<"var"> {
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, RankedTensorType type", [{
-      result->addTypes(type);
+    "Builder* builder, OperationState& result, RankedTensorType type", [{
+      result.addTypes(type);
     }]
   >];
 }
@@ -46,11 +46,11 @@ def DimOp : TileOp<"dim">, HasFolder {
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, Value* tensor, int64_t value", [{
+    "Builder* builder, OperationState& result, Value* tensor, int64_t value", [{
       auto type = builder->getIndexType();
-      result->addOperands(tensor);
-      result->addAttribute("dim", builder->getIntegerAttr(type, value));
-      result->addTypes(type);
+      result.addOperands(tensor);
+      result.addAttribute("dim", builder->getIntegerAttr(type, value));
+      result.addTypes(type);
     }]
   >];
 }
@@ -61,9 +61,9 @@ def AffineConstantOp : TileOp<"const_dim">, HasFolder {
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, int64_t value", [{
-      result->addAttribute("value", builder->getI64IntegerAttr(value));
-      result->addTypes(builder->getIndexType());
+    "Builder* builder, OperationState& result, int64_t value", [{
+      result.addAttribute("value", builder->getI64IntegerAttr(value));
+      result.addTypes(builder->getIndexType());
     }]
   >];
 
@@ -77,8 +77,8 @@ def AffineIndexOp : TileOp<"idx"> {
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result", [{
-      result->addTypes(builder->getIndexType());
+    "Builder* builder, OperationState& result", [{
+      result.addTypes(builder->getIndexType());
     }]
   >];
 }
@@ -87,9 +87,9 @@ class AffineOp<string mnemonic> : TileOp<mnemonic, [NoSideEffect]>, HasFolder {
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ArrayRef<Value*> operands", [{
-      result->addOperands(operands);
-      result->addTypes(builder->getIndexType());
+    "Builder* builder, OperationState& result, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(builder->getIndexType());
     }]
   >];
 }
@@ -135,10 +135,10 @@ def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, Value* tensor, ArrayRef<Value*> dims", [{
-      result->addOperands(tensor);
-      result->addOperands(dims);
-      result->addTypes(builder->getType<AffineIndexMapType>());
+    "Builder* builder, OperationState& result, Value* tensor, ArrayRef<Value*> dims", [{
+      result.addOperands(tensor);
+      result.addOperands(dims);
+      result.addTypes(builder->getType<AffineIndexMapType>());
     }]
   >];
 }
@@ -149,9 +149,9 @@ def AffineSinkIndexMapOp : TileOp<"sink_idx_map", [HasParent<"AffineDomainOp">]>
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ArrayRef<Value*> dims", [{
-      result->addOperands(dims);
-      result->addTypes(builder->getType<AffineIndexMapType>());
+    "Builder* builder, OperationState& result, ArrayRef<Value*> dims", [{
+      result.addOperands(dims);
+      result.addTypes(builder->getType<AffineIndexMapType>());
     }]
   >];
 }
@@ -162,21 +162,21 @@ def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
   let results = (outs AffineSizeMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState* result, ArrayRef<Value*> sizes", [{
-      result->addOperands(sizes);
-      result->addTypes(builder->getType<AffineSizeMapType>());
+    "Builder* builder, OperationState& result, ArrayRef<Value*> sizes", [{
+      result.addOperands(sizes);
+      result.addTypes(builder->getType<AffineSizeMapType>());
     }]
   >];
 }
 
 def ContractionOpInterface : OpInterface<"ContractionOp"> {
   let methods = [
-    InterfaceMethod<"std::vector<Value*>", "getSourceIndexMaps">,
-    InterfaceMethod<"Value*", "getSinkIndexMap">,
-    InterfaceMethod<"Value*", "getSizeMap">,
-    InterfaceMethod<"unsigned", "getNumOperands">,
-    InterfaceMethod<"AggregationKind", "getAggregationKind">,
-    InterfaceMethod<"CombinationKind", "getCombinationKind">,
+    InterfaceMethod<"TODO", "std::vector<Value*>", "getSourceIndexMaps">,
+    InterfaceMethod<"TODO", "Value*", "getSinkIndexMap">,
+    InterfaceMethod<"TODO", "Value*", "getSizeMap">,
+    InterfaceMethod<"TODO", "unsigned", "getNumOperands">,
+    InterfaceMethod<"TODO", "AggregationKind", "getAggregationKind">,
+    InterfaceMethod<"TODO", "CombinationKind", "getCombinationKind">,
   ];
 }
 
