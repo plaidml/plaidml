@@ -15,30 +15,6 @@
 
 #include "base/util/logging.h"
 
-namespace mlir {
-
-std::ostream& operator<<(std::ostream& os, ModuleOp rhs) {
-  os << mlir::debugString(rhs);
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const Value& rhs) {
-  os << mlir::debugString(*const_cast<Value*>(&rhs));
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const Operation& rhs) {
-  os << mlir::debugString(*const_cast<Operation*>(&rhs));
-  return os;
-}
-
-std::ostream& operator<<(std::ostream& os, Type rhs) {
-  os << mlir::debugString(rhs);
-  return os;
-}
-
-}  // namespace mlir
-
 namespace pmlc {
 namespace dialect {
 namespace eltwise {
@@ -251,10 +227,6 @@ bool ConstantValueMatcher::match(mlir::Operation* op) {
     }
   }
   return false;
-}
-
-llvm::StringRef getOpName(const mlir::OperationName& name) {
-  return name.getStringRef().drop_front(name.getDialect().size() + 1);
 }
 
 }  // namespace eltwise
