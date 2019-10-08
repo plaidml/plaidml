@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Regex.h"
@@ -14,6 +15,24 @@
 namespace pmlc {
 namespace dialect {
 namespace stripe {
+
+struct OpAsmInterface : public mlir::OpAsmDialectInterface {
+  using mlir::OpAsmDialectInterface::OpAsmDialectInterface;
+
+  /// Get a special name to use when printing the given operation. The desired
+  /// name should be streamed into 'os'.
+  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {
+    if (auto str_attr = op->getAttrOfType<StringAttr>("name")) {
+      os << str_attr.getValue().str();
+    } else if (auto str_attr = op->getAttrOfType<StringAttr>("scalar_name")) {
+      std::string s = str_attr.getValue().str();
+      os << "s_" << s.substr(1);
+    } else if (auto const_op = llvm::dyn_cast<AffineConstOp>(op)) {
+      auto value = const_op.value().getSExtValue();
+      os << 'c' << value;
+    }
+  }
+};
 
 static mlir::DialectRegistration<Dialect> StripeOps;
 
@@ -27,6 +46,7 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
 #define GET_OP_LIST
 #include "pmlc/dialect/stripe/ops.cpp.inc"
       >();
+  addInterfaces<OpAsmInterface>();
 }
 
 mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
