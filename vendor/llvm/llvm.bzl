@@ -328,7 +328,7 @@ llvm_linkopts = select({
     "//conditions:default": [
         "-ldl",
         "-lm",
-        "-pthread",
+        "-lpthread",
     ],
 })
 
@@ -402,6 +402,15 @@ llvm_copts = select({
     ],
     "//conditions:default": [
         "-w",
+    ],
+})
+
+llvm_cxxopts = llvm_copts + select({
+    "@com_intel_plaidml//toolchain:windows_x86_64": [
+        "/std:c++14",
+    ],
+    "//conditions:default": [
+        "-std=c++14",
     ],
 })
 

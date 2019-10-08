@@ -60,7 +60,7 @@ mlir_tblgen(
     name = "gen-call-interfaces-decls",
     src = "include/mlir/Analysis/CallInterfaces.td",
     out = "include/mlir/Analysis/CallInterfaces.h.inc",
-    action = "-gen-op-decls",
+    action = "-gen-op-interface-decls",
     incs = ["include"],
 )
 
@@ -68,7 +68,7 @@ mlir_tblgen(
     name = "gen-call-interfaces-defs",
     src = "include/mlir/Analysis/CallInterfaces.td",
     out = "include/mlir/Analysis/CallInterfaces.cpp.inc",
-    action = "-gen-op-defs",
+    action = "-gen-op-interface-defs",
     incs = ["include"],
 )
 
@@ -76,7 +76,7 @@ mlir_tblgen(
     name = "gen-infer-type-op-interface-decls",
     src = "include/mlir/Analysis/InferTypeOpInterface.td",
     out = "include/mlir/Analysis/InferTypeOpInterface.h.inc",
-    action = "-gen-op-decls",
+    action = "-gen-op-interface-decls",
     incs = ["include"],
 )
 
@@ -84,7 +84,7 @@ mlir_tblgen(
     name = "gen-infer-type-op-interface-defs",
     src = "include/mlir/Analysis/InferTypeOpInterface.td",
     out = "include/mlir/Analysis/InferTypeOpInterface.cpp.inc",
-    action = "-gen-op-defs",
+    action = "-gen-op-interface-defs",
     incs = ["include"],
 )
 
@@ -245,6 +245,7 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
+        ":gen-call-interfaces-decls",
         ":gen-standard-op-decls",
         ":gen-standard-op-defs",
         "@llvm//:core",
@@ -326,6 +327,7 @@ cc_library(
         ":gen-llvm-enum-defs",
         ":gen-llvm-op-decls",
         ":gen-llvm-op-defs",
+        ":Analysis",
         "@llvm//:asm_parser",
         "@llvm//:core",
         "@llvm//:support",
@@ -430,9 +432,9 @@ cc_library(
     includes = ["include"],
     deps = [
         ":Support",
-        "@llvm//:support",
         ":gen-call-interfaces-decls",
         ":gen-call-interfaces-defs",
+        "@llvm//:support",
     ],
 )
 
@@ -459,57 +461,22 @@ cc_library(
 
 cc_library(
     name = "Analysis",
-
-    srcs = [
-        "lib/Analysis/AffineAnalysis.cpp",
-        "lib/Analysis/AffineStructures.cpp",
-        "lib/Analysis/CallGraph.cpp",
-        "lib/Analysis/Dominance.cpp",
-        "lib/Analysis/InferTypeOpInterface.cpp",
-        "lib/Analysis/LoopAnalysis.cpp",
-        "lib/Analysis/MemRefBoundCheck.cpp",
-        "lib/Analysis/NestedMatcher.cpp",
-        "lib/Analysis/OpStats.cpp",
-        "lib/Analysis/SliceAnalysis.cpp",
-        "lib/Analysis/TestMemRefDependenceCheck.cpp",
-        "lib/Analysis/TestParallelismDetection.cpp",
-        "lib/Analysis/Utils.cpp",
-        "lib/Analysis/VectorAnalysis.cpp",
-        "lib/Analysis/Verifier.cpp",
-    ],
-    hdrs = [
-        "include/mlir/Analysis/AffineAnalysis.h",
-        "include/mlir/Analysis/AffineStructures.h",
-        "include/mlir/Analysis/CallGraph.h",
-        "include/mlir/Analysis/CallInterfaces.h",
-        "include/mlir/Analysis/Dominance.h",
-        "include/mlir/Analysis/InferTypeOpInterface.h",
-        "include/mlir/Analysis/LoopAnalysis.h",
-        "include/mlir/Analysis/NestedMatcher.h",
-        "include/mlir/Analysis/Passes.h",
-        "include/mlir/Analysis/SliceAnalysis.h",
-        "include/mlir/Analysis/Utils.h",
-        "include/mlir/Analysis/VectorAnalysis.h",
-        "include/mlir/Analysis/Verifier.h",
-    ],
+    srcs = glob([
+        "lib/Analysis/*.cpp",
+        "lib/Analysis/*.h",
+    ]),
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
         ":AffineOps",
-        ":IR",
         ":LoopOps",
-        ":Pass",
-        ":StandardOps",
-        ":Support",
         ":VectorOps",
         ":gen-call-interfaces-decls",
         ":gen-call-interfaces-defs",
         ":gen-infer-type-op-interface-decls",
         ":gen-infer-type-op-interface-defs",
         "@llvm//:support",
-
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -548,29 +515,14 @@ cc_library(
 
 cc_library(
     name = "Pass",
-    srcs = [
-        "lib/Pass/IRPrinting.cpp",
-        "lib/Pass/Pass.cpp",
-        "lib/Pass/PassDetail.h",
-        "lib/Pass/PassManagerOptions.cpp",
-        "lib/Pass/PassRegistry.cpp",
-        "lib/Pass/PassTiming.cpp",
-    ],
-    hdrs = [
-        "include/mlir/Analysis/Verifier.h",
-        "include/mlir/Pass/AnalysisManager.h",
-        "include/mlir/Pass/Pass.h",
-        "include/mlir/Pass/PassInstrumentation.h",
-        "include/mlir/Pass/PassManager.h",
-        "include/mlir/Pass/PassRegistry.h",
-    ],
+    srcs = glob([
+        "lib/Pass/*.cpp",
+        "lib/Pass/*.h",
+    ]),
     copts = PLATFORM_COPTS,
     includes = ["include"],
-    linkopts = [
-        "-lm",
-        "-lpthread",
-    ],
     deps = [
+        ":Analysis",
         ":IR",
         ":Support",
         "@llvm//:support",
