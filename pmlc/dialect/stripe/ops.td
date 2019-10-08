@@ -30,12 +30,35 @@ def RefineOp : StripeOp<"refine", [NoSideEffect]> {
   let summary = "Modify the offset into a tensor in an affine way";
   let arguments = (ins TensorRefType:$in, Variadic<AffineType>:$offsets);
   let results = (outs TensorRefType:$result);
+  let printer = [{ PrintSimple(getOperation(), &p, 1, {}, in()->getType(), true); }];
+  let parser = [{
+    TensorRefType refType;
+    auto aff_type = AffineType::get(parser.getBuilder().getContext());
+    llvm::SmallVector<OpAsmParser::OperandType, 8> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 1, {}, &refType, true);
+    r = r || parser.resolveOperand(operands[0], refType, result.operands);
+    for (size_t i = 1; i < operands.size(); i++) {
+      r = r || parser.resolveOperand(operands[i], aff_type, result.operands);
+    }
+    r = r || parser.addTypeToList(refType, result.types);
+    return mlir::failure(r); 
+  }];
 }
 
 def LoadOp : StripeOp<"load"> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorRefType:$from);
   let results = (outs Eltwise_AnyTensor:$into);
+  let printer = [{ PrintSimple(getOperation(), &p, 1, {}, from()->getType(), false); }];
+  let parser = [{
+    TensorRefType refType;
+    llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 1, {}, &refType, false);
+    Type eltType = RankedTensorType::get({}, refType.getElementType());
+    r = r || parser.resolveOperand(operands[0], refType, result.operands);
+    r = r || parser.addTypeToList(eltType, result.types);
+    return mlir::failure(r); 
+  }];
 }
 
 def LoadIndexOp : StripeOp<"load_index"> {
@@ -47,12 +70,32 @@ def LoadIndexOp : StripeOp<"load_index"> {
 def StoreOp : StripeOp<"store"> {
   let summary = "Store into a tensor";
   let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from);
+  let printer = [{ PrintSimple(getOperation(), &p, 2, {}, into()->getType(), false); }];
+  let parser = [{
+    TensorRefType refType;
+    llvm::SmallVector<OpAsmParser::OperandType, 2> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 2, {}, &refType, false);
+    Type eltType = RankedTensorType::get({}, refType.getElementType());
+    r = r || parser.resolveOperand(operands[0], refType, result.operands);
+    r = r || parser.resolveOperand(operands[1], eltType, result.operands);
+    return mlir::failure(r); 
+  }];
 }
 
 def AggregateOp : StripeOp<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
   let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggregationKind:$agg);
   let results = (outs);
+  let printer = [{ PrintSimple(getOperation(), &p, 2, {}, into()->getType(), false); }];
+  let parser = [{
+    TensorRefType refType;
+    llvm::SmallVector<OpAsmParser::OperandType, 2> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 2, {}, &refType, false);
+    Type eltType = RankedTensorType::get({}, refType.getElementType());
+    r = r || parser.resolveOperand(operands[0], refType, result.operands);
+    r = r || parser.resolveOperand(operands[1], eltType, result.operands);
+    return mlir::failure(r); 
+  }];
 }
 
 class AffineOp<string mnemonic> : StripeOp<mnemonic, [NoSideEffect]> {
@@ -62,16 +105,42 @@ class AffineOp<string mnemonic> : StripeOp<mnemonic, [NoSideEffect]> {
 def AffineConstOp : AffineOp<"affine_const"> {
   let summary = "A constant affine value";
   let arguments = (ins I64Attr:$value);
+  let printer = [{ PrintSimple(getOperation(), &p, 0, {"value"}, Type(), false); }];
+  let parser = [{
+    auto aff_type = AffineType::get(parser.getBuilder().getContext());
+    llvm::SmallVector<OpAsmParser::OperandType, 0> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 0, {"value"}, static_cast<Type*>(nullptr), false);
+    r = r || parser.addTypeToList(aff_type, result.types);
+    return mlir::failure(r); 
+  }];
 }
 
 def AffineMulOp : AffineOp<"affine_mul"> {
   let summary = "Multiply an affine by a constant value";
   let arguments = (ins AffineType:$input, I64Attr:$scale);
+  let printer = [{ PrintSimple(getOperation(), &p, 1, {"scale"}, Type(), false); }];
+  let parser = [{
+    auto aff_type = AffineType::get(parser.getBuilder().getContext());
+    llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 1, {"scale"}, static_cast<Type*>(nullptr), false);
+    r = r || parser.resolveOperand(operands[0], aff_type, result.operands);
+    r = r || parser.addTypeToList(aff_type, result.types);
+    return mlir::failure(r); 
+  }];
 }
 
 def AffineAddOp : AffineOp<"affine_add"> {
   let summary = "Add multiple affines together";
-  let arguments = (ins Variadic<AffineType>:$inputs);
+  let arguments = (ins Variadic<AffineType>:$inputs); 
+  let printer = [{ PrintSimple(getOperation(), &p, 0, {}, Type(), true); }];
+  let parser = [{
+    auto aff_type = AffineType::get(parser.getBuilder().getContext());
+    llvm::SmallVector<OpAsmParser::OperandType, 4> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 0, {}, static_cast<Type*>(nullptr), true);
+    r = r || parser.resolveOperands(operands, aff_type, result.operands);
+    r = r || parser.addTypeToList(aff_type, result.types);
+    return mlir::failure(r); 
+  }];
 }
 
 def ParallelForOp : StripeOp<"parallel_for"> {
