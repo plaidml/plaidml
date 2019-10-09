@@ -110,10 +110,8 @@ TEST(Stripe, Transcode) {
   }
 
   IVLOG(1, "Writing out module");
-  std::string module_str;
-  llvm::raw_string_ostream str_stream(module_str);
-  module->print(str_stream);
-  str_stream.flush();
+  auto moduleOp = *module;
+  auto module_str = mlir::debugString(moduleOp);
   IVLOG(2, module_str);
 
   IVLOG(1, "Parsing it back in");

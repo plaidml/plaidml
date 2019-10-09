@@ -54,6 +54,7 @@ plaidml_cc_library(
         "ops.cc",
         "ops.cpp.inc",
         "ops_interfaces.cpp.inc",
+        "types.cc",
     ],
     hdrs = [
         "analysis.h",
@@ -94,6 +95,7 @@ plaidml_cc_library(
     tags = ["llvm"],
     deps = [
         ":stripe",
+        "//pmlc/util",
         "//tile/stripe",
         "@mlir//:IR",
     ],

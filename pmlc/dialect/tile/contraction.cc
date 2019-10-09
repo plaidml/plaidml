@@ -6,8 +6,10 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/Support/DebugStringHelper.h"
+
 #include "base/util/logging.h"
-#include "pmlc/dialect/eltwise/util.h"
+#include "pmlc/util/util.h"
 #include "tile/bilp/ilp_solver.h"
 #include "tile/math/basis.h"
 
@@ -211,7 +213,7 @@ std::tuple<IndexBounds, SimpleConstraints> Constraints::ComputeBounds() {
 }
 
 static IndexPoly MakePoly(mlir::Value* value, std::map<std::string, mlir::Value*>* map) {
-  IVLOG(3, "MakePoly: " << *value);
+  IVLOG(3, "MakePoly: " << mlir::debugString(*value));
   if (auto blockArg = llvm::dyn_cast<mlir::BlockArgument>(value)) {
     auto name = llvm::formatv("x{0}", blockArg->getArgNumber());
     map->emplace(name.str(), value);
