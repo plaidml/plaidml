@@ -14,4 +14,5 @@ plaidml_cc_library(
     deps = [
         "//pmlc/dialect/stripe",
     ],
+    alwayslink=1,
 )
