@@ -101,10 +101,6 @@ def run(args, remainder):
         conda_env.install(whl_path)
 
     if 'stripe' in args.platform:
-        env['USE_STRIPE'] = '1'
-        if 'llvm' in args.platform:
-            env['STRIPE_JIT'] = '1'
-
         env['PLAIDML_USE_STRIPE'] = '1'
     else:
         env['PLAIDML_USE_STRIPE'] = '0'
