@@ -2190,6 +2190,7 @@ Value softmax(const Value& value) {
 
   std::vector<TensorDim> I_dims(ndims);
   std::vector<TensorIndex> I_idxs(ndims);
+  IVLOG(2, "Calling bind_dims in softmax");
   I.bind_dims(I_dims);
   // R_dims & R_idxs are the dims/idxs reduced along the specified axis; used in the inner contractions
   std::vector<TensorDim> R_dims = I_dims;
@@ -2207,8 +2208,13 @@ Value softmax(const Value& value) {
     // TODO: For now, just contract along the last axis, sort out later how to do the right thing
     auto I = X[0];
     auto ndims = I.shape().ndims();
+    auto I_shape = I.shape();  // TODO: Temporary as part of debug code
+    IVLOG(2, "I is " << I);
+    IVLOG(2, "I.shape() is " << I_shape);
     std::vector<TensorDim> I_dims(ndims);
     std::vector<TensorIndex> I_idxs(ndims);
+    IVLOG(2, "Calling bind_dims in softmax deriv");
+    IVLOG(2, "I.shape() is " << I.shape());
     I.bind_dims(I_dims);
     std::vector<TensorDim> R_dims = I_dims;
     std::vector<TensorIndex> R_idxs = I_idxs;
@@ -2223,6 +2229,10 @@ Value softmax(const Value& value) {
     return std::vector<Tensor>{YdY - TB * Y};
   };
   auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
+  IVLOG(2, "Just built an OverrideGrads");
+  IVLOG(2, "  shape: " << Overridden.shape());
+  IVLOG(2, "The input I we handed over is " << I << ". This has shape " << I.shape());
+  // IVLOG(2, "it has MLIR value " << I.as_ptr()->value); // TODO: Can't get at this here ... maybe elsewhere?
   return Value{Overridden};
 }
 

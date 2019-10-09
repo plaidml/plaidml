@@ -336,6 +336,8 @@ plaidml_expr* plaidml_expr_clone(  //
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_clone> " << expr->expr->str());
     // TODO(MLIR): deal with clone of expr->value
+    IVLOG(3, "value is " << expr->value);
+    // throw std::runtime_error("Test if expr clone is called");
     return new plaidml_expr{expr->expr, expr->value};
   });
 }
@@ -350,6 +352,7 @@ plaidml_dim_expr* plaidml_expr_get_dim(  //
       throw std::runtime_error("plaidml_expr_get_dim can only be used on a DimExprExpr");
     }
     // TODO(MLIR): deal with clone of expr->value
+    // throw std::runtime_error("Test if get dim is called");
     return new plaidml_dim_expr{dim_expr->expr, expr->value};
   });
 }
@@ -662,11 +665,13 @@ plaidml_expr* plaidml_expr_grad_override(  //
     if (out->value) {
       // TODO: Probably this can be streamlined
       out_value = out->value;
+    } else {
+      throw std::runtime_error("No out_value!");  // TODO
     }
     ExprPtr expr = MakeGradOverride(deriv_entry, in_exprs, out_expr);
-    // TODO: I think it's correct that we're ignoring `values`?
+    // TODO: Is this handling of the `value` correct?
     mlir::Value* value = GlobalContext::get()->MakePrimitiveOp("ident", out_value);
-    // TODO: Probably need to hook up the MLIR `value` instead of passing nullptr?
+    IVLOG(2, "The expr from plaidml_expr_grad_override has shape " << expr->shape.str());
     return new plaidml_expr{expr, value};
   });
 }
