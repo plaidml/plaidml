@@ -20,7 +20,7 @@ struct ConvertStripeToAffine : public mlir::FunctionPass<ConvertStripeToAffine> 
 
 void ConvertStripeToAffine::runOnFunction() {
   mlir::OwningRewritePatternList patterns;
-  pmlc::populateStripeToAffineConversionPatterns(patterns, &getContext());
+  pmlc::conversion::stripe_to_affine::populateStripeToAffineConversionPatterns(patterns, &getContext());
   mlir::ConversionTarget target(getContext());
   target.addLegalDialect<mlir::AffineOpsDialect, mlir::StandardOpsDialect>();
 
@@ -28,7 +28,8 @@ void ConvertStripeToAffine::runOnFunction() {
 }
 }  // namespace
 
-void pmlc::populateStripeToAffineConversionPatterns(mlir::OwningRewritePatternList& patterns, mlir::MLIRContext* ctx) {
+void pmlc::conversion::stripe_to_affine::populateStripeToAffineConversionPatterns(
+    mlir::OwningRewritePatternList& patterns, mlir::MLIRContext* ctx) {
   // patterns.insert<ForLowering, IfLowering, TerminatorLowering>(ctx);
 }
 
