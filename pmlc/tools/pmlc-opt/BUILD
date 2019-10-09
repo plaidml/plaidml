@@ -10,6 +10,14 @@ plaidml_cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//pmlc/conversion/stripe_to_affine",
+        "//pmlc/dialect/eltwise",
+        "//pmlc/dialect/stripe",
+        "//pmlc/dialect/tile",	
+        "@mlir//:EDSC",	
+        "@mlir//:OptMain",	
+        "@mlir//:Parser",	
+        "@mlir//:TestTransforms",	
+        "@mlir//:Transforms",
         "@mlir//:MlirOptLib",
     ],
 )
