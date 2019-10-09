@@ -72,6 +72,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
+#include <random>
 
 // #included from: catch_compiler_capabilities.h
 #define TWOBLUECUBES_CATCH_COMPILER_CAPABILITIES_HPP_INCLUDED
@@ -5719,9 +5720,6 @@ namespace Catch {
         struct LexSort {
             bool operator() (TestCase i,TestCase j) const { return (i<j);}
         };
-        struct RandomNumberGenerator {
-            int operator()( int n ) const { return std::rand() % n; }
-        };
 
     public:
         TestRegistry() : m_unnamedCount( 0 ) {}
@@ -5784,8 +5782,9 @@ namespace Catch {
                     break;
                 case RunTests::InRandomOrder:
                 {
-                    RandomNumberGenerator rng;
-                    std::random_shuffle( matchingTestCases.begin(), matchingTestCases.end(), rng );
+                    std::random_device rd;
+                    std::mt19937 g(rd());
+                    std::shuffle( matchingTestCases.begin(), matchingTestCases.end(), g );
                 }
                     break;
                 case RunTests::InDeclarationOrder:

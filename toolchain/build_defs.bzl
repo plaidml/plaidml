@@ -118,7 +118,7 @@ def _impl(ctx):
             ),
             flag_set(
                 actions = cpp_actions,
-                flag_groups = [flag_group(flags = ["-std=c++1y"])],
+                flag_groups = [flag_group(flags = ["-std=c++17"])],
             ),
         ],
     )
