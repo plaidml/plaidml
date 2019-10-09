@@ -175,6 +175,7 @@ def _impl(ctx):
                             "-Wl,-Bstatic",
                             "-lstdc++",
                             "-Wl,-Bdynamic",
+                            "-lrt",
                             "-Wl,-z,relro,-z,now",
                             "-no-canonical-prefixes",
                             "-pass-exit-codes",
