@@ -5,9 +5,7 @@
 #include <map>
 #include <queue>
 #include <set>
-#include <stack>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -32,6 +30,7 @@
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/tile/ops.h"
 #include "pmlc/dialect/tile/program.h"
+#include "pmlc/util/slice.h"
 #include "tile/base/shape.h"
 
 namespace pmlc {
@@ -46,71 +45,6 @@ using mlir::MLIRContext;
 using mlir::ModuleOp;
 using mlir::OpBuilder;
 using mlir::UnknownLoc;
-
-namespace {
-
-using TransitiveFilter = std::function<bool(Value*)>;
-
-class BackwardSliceImpl {
- public:
-  std::vector<mlir::Value*> slice;
-
-  BackwardSliceImpl(llvm::SetVector<mlir::Value*> values, bool enter_regions, TransitiveFilter filter) {
-    for (auto it = values.rbegin(); it != values.rend(); it++) {
-      Push(*it, [](Value*) { return true; });
-    }
-    std::unordered_set<const mlir::Value*> seen;
-    while (stack.size()) {
-      auto entry = stack.top();
-      stack.pop();
-      auto value = entry.first;
-      if (entry.second) {
-        slice.emplace_back(value);
-      } else if (!seen.count(value)) {
-        seen.insert(value);
-        stack.push(std::make_pair(value, true));
-        auto op = value->getDefiningOp();
-        if (op) {
-          Push(op, enter_regions, filter);
-        }
-      }
-    }
-  }
-
- private:
-  void Push(mlir::Value* value, TransitiveFilter filter) {
-    if (filter(value)) {
-      stack.push(std::make_pair(value, false));
-    }
-  }
-
-  void Push(mlir::Operation* op, bool enter_regions, TransitiveFilter filter) {
-    for (auto operand : op->getOperands()) {
-      Push(operand, filter);
-    }
-    if (enter_regions) {
-      for (auto& region : op->getRegions()) {
-        for (auto& block : region) {
-          for (auto it = block.rbegin(); it != block.rend(); it++) {
-            Push(&*it, enter_regions, filter);
-          }
-        }
-      }
-    }
-  }
-
-  std::stack<std::pair<mlir::Value*, bool>> stack;
-};
-
-std::vector<mlir::Value*> getBackwardSlice(
-    llvm::SetVector<mlir::Value*> values,  //
-    bool enter_regions = false,            //
-    TransitiveFilter filter = [](Value*) { return true; }) {
-  BackwardSliceImpl impl(values, enter_regions, filter);
-  return impl.slice;
-}
-
-}  // namespace
 
 struct TileBuilder::Impl {
   MLIRContext context;
@@ -139,7 +73,7 @@ struct TileBuilder::Impl {
       mlir::Value* sizes,                 //
       CreateOpFunc fn) {
     IVLOG(5, "TileBuilder::Impl::MakeContraction>");
-    IVLOG(5, module);
+    IVLOG(5, mlir::debugString(module));
     // Compute the sink shape of the contraction
     llvm::SmallVector<mlir::Type, 3> types;
     for (auto src : srcs) {
@@ -161,7 +95,7 @@ struct TileBuilder::Impl {
     values.insert(srcs.begin(), srcs.end());
     values.insert(sink);
     values.insert(sizes);
-    auto slice = getBackwardSlice(values, false, [](Value* value) {  //
+    auto slice = util::getBackwardSlice(values, false, [](Value* value) {  //
       return value->getType().isa<IndexType>();
     });
     // Find and replace each AffineIndexOp with a BlockArgument of the domain op
@@ -517,7 +451,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
       values.insert(outputs[i]);
     }
   }
-  auto slice = getBackwardSlice(values, true);
+  auto slice = util::getBackwardSlice(values, true);
   // Compute the input types
   std::vector<mlir::Type> inputTypes;
   for (auto value : slice) {
@@ -569,7 +503,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     emitError(loc, "Module verification error");
   }
   // Do some optimization passes
-  mlir::PassManager pm;
+  mlir::PassManager pm(&impl->context);
   if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
     // TODO: Debug & re-enable the canonicalization pass
     pm.addPass(mlir::createCanonicalizerPass());

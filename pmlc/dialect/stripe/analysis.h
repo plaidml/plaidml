@@ -14,26 +14,22 @@ namespace dialect {
 namespace stripe {
 
 // A macro to add operator overloads for a class
-#define AFFINE_OP_OVERLOADS(X)                 \
-  inline X operator*(const X& in, int64_t x) { \
-    X r = in;                                  \
-    r *= x;                                    \
-    return r;                                  \
-  }                                            \
-  inline X operator*(int64_t x, const X& in) { \
-    X r = in;                                  \
-    r *= x;                                    \
-    return r;                                  \
-  }                                            \
-  inline X operator+(const X& a, const X& b) { \
-    X r = a;                                   \
-    r += b;                                    \
-    return r;                                  \
-  }                                            \
-  inline X operator-(const X& a, const X& b) { \
-    X r = a;                                   \
-    r += (-1 * b);                             \
-    return r;                                  \
+#define AFFINE_OP_OVERLOADS(X)              \
+  inline X operator*(X lhs, int64_t rhs) {  \
+    lhs *= rhs;                             \
+    return lhs;                             \
+  }                                         \
+  inline X operator*(int64_t lhs, X rhs) {  \
+    rhs *= lhs;                             \
+    return rhs;                             \
+  }                                         \
+  inline X operator+(X lhs, const X& rhs) { \
+    lhs += rhs;                             \
+    return lhs;                             \
+  }                                         \
+  inline X operator-(X lhs, const X& rhs) { \
+    lhs += (-1 * rhs);                      \
+    return lhs;                             \
   }
 
 // A macro to secondary comparisons for a class
