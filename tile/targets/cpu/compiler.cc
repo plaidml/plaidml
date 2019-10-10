@@ -1309,7 +1309,7 @@ void Compiler::Exp(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "exp
 
 void Compiler::Log(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "logf", "log"); }
 
-void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "powf", "pow"); }
+void Compiler::Pow(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "powf", "pow", 2); }
 
 void Compiler::Tanh(const stripe::Intrinsic& stmt) { CallIntrinsicFunc(stmt, "tanhf", "tanh"); }
 
@@ -1846,16 +1846,47 @@ void Compiler::OutputBool(llvm::Value* ret, const stripe::Intrinsic& intrinsic) 
   ret->setName(intrinsic.outputs[0]);
 }
 
-void Compiler::CallIntrinsicFunc(const stripe::Intrinsic& stmt, const char* name_f32, const char* name_f64) {
-  assert(1 == stmt.inputs.size());
-  Scalar op = Cast(scalars_[stmt.inputs[0]], stmt.type);
-  std::vector<llvm::Value*> argvals{op.value};
+void Compiler::CallIntrinsicFunc(const stripe::Intrinsic& stmt, const char* name_f32, const char* name_f64,
+                                 const size_t numParamsIn) {
+  size_t numParams = stmt.inputs.size();
+  switch (numParamsIn) {
+    case 1:
+      if (numParams != 1) {
+        throw std::runtime_error("CallIntrinsicFunction expects 1 parameter");
+      }
+      break;
+    case 2:
+      if (numParams != 2) {
+        throw std::runtime_error("CallIntrinsicFunction expects 2 parameters");
+      }
+      break;
+    default:
+      throw std::runtime_error("CallIntrinsicFunction expects 1 or 2 parameters");
+  }
+
+  Scalar op1 = Cast(scalars_[stmt.inputs[0]], stmt.type);
+  Scalar op2;
+
+  if (numParamsIn == 2) {
+    op2 = Cast(scalars_[stmt.inputs[1]], stmt.type);
+  }
+
+  std::vector<llvm::Value*> argvals;
+  argvals.emplace_back(op1.value);
+  if (numParamsIn == 2) {
+    argvals.emplace_back(op2.value);
+  }
+
   // C intrinsics come in either f32 or f64 flavors. We'll use f32 for single
   // and half-precision float inputs, f64 for ints and doubles
   bool use_f32 = (stmt.type == DataType::FLOAT16 || stmt.type == DataType::FLOAT32);
   const char* name = use_f32 ? name_f32 : name_f64;
   llvm::Type* ctype = use_f32 ? builder_.getFloatTy() : builder_.getDoubleTy();
-  std::vector<llvm::Type*> argtypes{ctype};
+  std::vector<llvm::Type*> argtypes;
+  argtypes.emplace_back(ctype);
+  if (numParamsIn == 2) {
+    argtypes.emplace_back(ctype);
+  }
   auto functype = llvm::FunctionType::get(ctype, argtypes, false);
   auto func = module_->getOrInsertFunction(name, functype).getCallee();
   llvm::Value* ret = builder_.CreateCall(func, argvals, "");
