@@ -175,6 +175,7 @@ def _impl(ctx):
                             "-Wl,-Bstatic",
                             "-lstdc++",
                             "-Wl,-Bdynamic",
+                            "-lrt",
                             "-Wl,-z,relro,-z,now",
                             "-no-canonical-prefixes",
                             "-pass-exit-codes",
@@ -230,12 +231,9 @@ def _impl(ctx):
     )
 
     cxx_builtin_include_directories = [
-        "external/crosstool_ng_" + ctx.attr.target + "_gcc_" + ctx.attr.version + "/x86_64-unknown-linux-gnu/include/c++/" + ctx.attr.version,
-        "external/crosstool_ng_" + ctx.attr.target + "_gcc_" + ctx.attr.version + "/x86_64-unknown-linux-gnu/include/c++/" + ctx.attr.version + "/x86_64-unknown-linux-gnu",
-        "external/crosstool_ng_" + ctx.attr.target + "_gcc_" + ctx.attr.version + "/x86_64-unknown-linux-gnu/include/c++/" + ctx.attr.version + "/backward",
-        "external/crosstool_ng_" + ctx.attr.target + "_gcc_" + ctx.attr.version + "/lib/gcc/x86_64-unknown-linux-gnu/" + ctx.attr.version + "/include",
-        "external/crosstool_ng_" + ctx.attr.target + "_gcc_" + ctx.attr.version + "/lib/gcc/x86_64-unknown-linux-gnu/" + ctx.attr.version + "/include-fixed",
-        "external/crosstool_ng_" + ctx.attr.target + "_gcc_" + ctx.attr.version + "/x86_64-unknown-linux-gnu/sysroot/usr/include",
+        "%sysroot%/usr/include",
+        "%package(@crosstool_ng_linux_x86_64_gcc_" + ctx.attr.version + "//lib/gcc/x86_64-unknown-linux-gnu/" + ctx.attr.version + ")%",
+        "%package(@crosstool_ng_linux_x86_64_gcc_" + ctx.attr.version + "//x86_64-unknown-linux-gnu/include/c++/" + ctx.attr.version + ")%",
     ]
 
     features = [
@@ -264,6 +262,7 @@ def _impl(ctx):
         tool_paths = tool_paths,
         features = features,
         cxx_builtin_include_directories = cxx_builtin_include_directories,
+        builtin_sysroot = "external/crosstool_ng_" + ctx.attr.target + "_gcc_" + ctx.attr.version + "/x86_64-unknown-linux-gnu/sysroot",
     )
 
 gcc_toolchain_config = rule(

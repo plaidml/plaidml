@@ -228,6 +228,14 @@ def configure_toolchain():
     )
 
     http_archive(
+        name = "crosstool_ng_linux_x86_64_gcc_8.3.0",
+        build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
+        sha256 = "091f5732882a499c6b9fb5fcb895176d0c96e958236e16b61d1a9cafec4271ad",
+        strip_prefix = "x86_64-unknown-linux-gnu",
+        url = "https://github.com/plaidml/depot/raw/master/toolchain/gcc-8.3/x86_64-unknown-linux-gnu-20191010.tgz",
+    )
+
+    http_archive(
         name = "crosstool_ng_linux_x86_64_gcc_5.4.0",
         build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
         sha256 = "dfbf72d78bfe876b2864f51ac740a54e5fd12e2b4a86c10514fb7accaa9640e6",
