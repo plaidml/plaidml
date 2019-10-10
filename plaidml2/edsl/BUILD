@@ -37,6 +37,7 @@ plaidml_cc_library(
     ],
     defines = ["PLAIDML_EDSL_DLL"],
     visibility = ["//visibility:public"],
+    alwayslink = 1,
     deps = [
         "//base/util",
         "//plaidml2/core",

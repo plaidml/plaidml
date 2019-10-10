@@ -1,6 +1,6 @@
 #!/bin/bash --norc
 
-ROOT="external/crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1"
+ROOT="external/crosstool_ng_linux_x86_64_gcc_8.3.0"
 PREFIX="x86_64-unknown-linux-gnu"
 TOOL=$(basename $0)
 

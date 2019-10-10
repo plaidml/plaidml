@@ -228,7 +228,7 @@ def configure_toolchain():
     )
 
     http_archive(
-        name = "crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1",
+        name = "crosstool_ng_linux_x86_64_gcc_8.3.0",
         build_file = Label("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
         sha256 = "091f5732882a499c6b9fb5fcb895176d0c96e958236e16b61d1a9cafec4271ad",
         strip_prefix = "x86_64-unknown-linux-gnu",
