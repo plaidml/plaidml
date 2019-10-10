@@ -342,9 +342,15 @@ class mapping {
     }
     switch (behavior_) {
       case mapping_destructor_behavior::writeback_if_normal:
+#ifdef __cpp_lib_uncaught_exceptions
+        if (std::uncaught_exceptions()) {
+          break;
+        }
+#else
         if (std::uncaught_exception()) {
           break;
         }
+#endif
       // fallthrough
       case mapping_destructor_behavior::writeback_always:
         plaidml_writeback_mapping(ctx_->get_ctx(), map_.get());

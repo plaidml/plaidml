@@ -4,8 +4,7 @@
 #include <string>
 #include <utility>
 
-namespace vertexai {
-namespace error {
+namespace vertexai::error {
 
 class Cancelled;
 class Unknown;
@@ -156,5 +155,4 @@ class DataLoss : public Error {
   void Accept(ErrorVisitor* visitor) const noexcept final;
 };
 
-}  // namespace error
-}  // namespace vertexai
+}  // namespace vertexai::error
