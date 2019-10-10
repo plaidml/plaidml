@@ -497,7 +497,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
 
   // handle the bitwidth
   auto result = op->getResult(0);
-  auto tensorType = eltwise::GetTensorType(result->getType());
+  auto tensorType = eltwise::getRankedTensorType(result->getType());
   auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
   auto bitwidth = bit_width(scalarType.type());
   auto bitwidth_name = scalar_name(op);

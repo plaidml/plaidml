@@ -342,3 +342,122 @@ def ConSumEqOp : BinaryConOp<"+(x==y)", "add", "eq"> {
 def ConSumMulOp : BinaryConOp<"+(x*y)", "add", "mul"> {
   let summary = "+(x * y) contraction";
 }
+
+def SpecialOpInterface : OpInterface<"SpecialOp">;
+  
+class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    Op<TileDialect, mnemonic, !listconcat(traits, [SpecialOpInterface])> {
+
+  let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, ScalarType type, ArrayRef<Value*> operands) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(operands);
+      state.addAttribute("type", TypeAttr::get(type));
+      state.addTypes(getResultType(operands));
+      return builder->createOperation(state);
+    }
+  }];
+}
+
+def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
+  let summary = "special gather operation";
+  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims);
+  let results = (outs Eltwise_AnyTensor:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
+    }]
+  >];
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ArrayRef<Value*> operands);
+  }];
+}
+
+def IndexOp : SpecialOp<"index">, HasCanonicalizer {
+  let summary = "tensor index lookup operation";
+  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_Integer:$dim);
+  let results = (outs Eltwise_IntegerTensor:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
+    }]
+  >];
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ArrayRef<Value*> operands);
+  }];
+}
+
+def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
+  let summary = "pseudorandom number generator";
+  let arguments = (ins Eltwise_AnyTensor:$state, Variadic<Eltwise_Integer>:$dims);
+  let results = (outs Eltwise_AnyTensor:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
+    }]
+  >];
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ArrayRef<Value*> operands);
+  }];
+}
+
+def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
+  let summary = "tensor reshape operation";
+  let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Eltwise_Integer>:$dims);
+  let results = (outs Eltwise_AnyTensor:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
+    }]
+  >];
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ArrayRef<Value*> operands);
+  }];
+}
+
+// TODO
+// def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
+//   let summary = "special scatter operation";
+//   let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims, Eltwise_AnyTensor:$other);
+//   let results = (outs Eltwise_AnyTensor:$result);
+
+//   let builders = [OpBuilder<
+//     "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+//       result.addOperands(operands);
+//       result.addTypes(getResultType(operands));
+//     }]
+//   >];
+
+//   let extraClassDeclaration = [{
+//     static Type getResultType(ArrayRef<Value*> operands);
+//   }];
+// }
+
+def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
+  let summary = "tensor shape operation";
+  let arguments = (ins Eltwise_AnyTensor:$tensor);
+  let results = (outs Eltwise_IntegerTensor:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
+    }]
+  >];
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ArrayRef<Value*> operands);
+  }];
+}

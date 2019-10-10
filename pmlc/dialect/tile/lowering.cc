@@ -309,7 +309,7 @@ struct AffineDomainOpConversion : public LoweringBase {
         // LOAD
         auto tensorRefType = srcType.cast<stripe::TensorRefType>();
         auto elementType = tensorRefType.getElementType();
-        auto intoType = eltwise::GetTensorType(elementType);
+        auto intoType = eltwise::getRankedTensorType(elementType);
         auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
         inputs.emplace_back(loadOp.into());
       } else {
@@ -430,7 +430,7 @@ struct EltwiseOpConversion : public LoweringBase {
       };
       refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
       auto elementType = tensorRefType.getElementType();
-      auto intoType = eltwise::GetTensorType(elementType);
+      auto intoType = eltwise::getRankedTensorType(elementType);
       // LOAD
       auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
       inputs.emplace_back(loadOp.into());

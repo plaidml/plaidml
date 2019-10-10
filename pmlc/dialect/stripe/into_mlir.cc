@@ -347,7 +347,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         Value* from = safe_at(locals.refs, load->from);
         auto tensorRefType = from->getType().cast<TensorRefType>();
         auto elementType = tensorRefType.getElementType();
-        auto intoType = eltwise::GetTensorType(elementType);
+        auto intoType = eltwise::getRankedTensorType(elementType);
         auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
         auto attrs = TagsToDict(builder, *load);
         if (attrs.size()) {
@@ -360,7 +360,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
         Value* from = AffineIntoMLIR(builder, nullptr, locals.idxs, load_idx->from);
         Type idx_base = eltwise::ScalarType::get(builder->getContext(), DataType::INT32);
-        Type idx_type = eltwise::GetTensorType(idx_base);
+        Type idx_type = eltwise::getRankedTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
         op.setAttr("scalar_name", builder->getStringAttr(load_idx->into));
         locals.scalars.emplace(load_idx->into, op);
