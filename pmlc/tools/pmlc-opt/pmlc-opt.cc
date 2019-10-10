@@ -46,9 +46,9 @@ int main(int argc, char** argv) {
 
   // Register any pass manager command line options.
   registerPassManagerCLOptions();
+  mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
 
   // Parse pass names in main to ensure static initialization completed.
-  mlir::PassPipelineCLParser passPipeline("", "pmlc modular optimizer driver");
   cl::ParseCommandLineOptions(argc, argv, "pmlc modular optimizer driver\n");
 
   // Set up the input file.
