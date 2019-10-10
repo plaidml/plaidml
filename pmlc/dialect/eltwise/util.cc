@@ -37,8 +37,8 @@ namespace {
 
 bool MergeTypes(Type* into, Type from, DataType dtype) {
   IVLOG(6, "MergeTypes> " << mlir::debugString(*into) << ", " << mlir::debugString(from));
-  auto intoShapedType = GetTensorType(*into);
-  auto fromShapedType = GetTensorType(from);
+  auto intoShapedType = getRankedTensorType(*into);
+  auto fromShapedType = getRankedTensorType(from);
 
   // To compute the result broadcasted shape, we compare operand shapes
   // element-wise: starting with the trailing dimensions, and working the
@@ -107,7 +107,7 @@ bool MergeTypes(Type* into, Type from, DataType dtype) {
 
 }  // namespace
 
-mlir::RankedTensorType GetTensorType(mlir::Type type) {
+mlir::RankedTensorType getRankedTensorType(mlir::Type type) {
   if (auto rankedType = type.dyn_cast<mlir::RankedTensorType>()) {
     return rankedType;
   }
@@ -151,20 +151,6 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
     }
   }
   return ret;
-}
-
-void UpdateFuncOpType(Operation* op) {
-  if (auto funcOp = llvm::dyn_cast<FuncOp>(op->getParentOp())) {
-    auto retOp = &funcOp.getOperation()->getRegion(0).front().back();
-    auto funcType = funcOp.getType();
-    if (funcType.getNumResults() == retOp->getNumOperands()) {
-      SmallVector<Type, 4> retTypes(retOp->getOperandTypes());
-      auto newType = FunctionType::get(funcType.getInputs(), retTypes, funcOp.getContext());
-      if (funcType != newType) {
-        funcOp.setType(newType);
-      }
-    }
-  }
 }
 
 SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value*> operands) {

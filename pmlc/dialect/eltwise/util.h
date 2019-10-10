@@ -17,10 +17,7 @@ llvm::SmallVector<int64_t, 4> ComputeShape(llvm::ArrayRef<mlir::Value*> operands
 
 mlir::Type ComputeResultType(llvm::ArrayRef<mlir::Value*> operands, DataType override = DataType::INVALID);
 
-// Adjust the result types on the containing FuncOp if this op relates to an output
-void UpdateFuncOpType(mlir::Operation* op);
-
-mlir::RankedTensorType GetTensorType(mlir::Type type);
+mlir::RankedTensorType getRankedTensorType(mlir::Type type);
 
 using UnaryCalculate = std::function<double(double)>;
 mlir::Attribute constFoldUnaryOp(llvm::ArrayRef<mlir::Attribute> operands, UnaryCalculate calculate);
