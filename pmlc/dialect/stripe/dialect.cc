@@ -44,7 +44,7 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
       TensorRefType>();
   addOperations<
 #define GET_OP_LIST
-#include "pmlc/dialect/stripe/ops.cpp.inc"
+#include "pmlc/dialect/stripe/ops.cc.inc"
       >();
   addInterfaces<OpAsmInterface>();
 }

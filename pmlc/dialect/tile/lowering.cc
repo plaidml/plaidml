@@ -243,9 +243,9 @@ struct AffineDomainOpConversion : public LoweringBase {
     }
 
     auto aggKind = contractionOp.getAggregationKind();
-    auto aggOpTag = llvm::formatv("agg_op_{0}", eltwise::stringifyAggregationKind(aggKind));
+    auto aggOpTag = llvm::formatv("agg_op_{0}", util::stringifyAggregationKind(aggKind));
     auto comboKind = contractionOp.getCombinationKind();
-    auto comboOpTag = llvm::formatv("combo_op_{0}", eltwise::stringifyCombinationKind(comboKind));
+    auto comboOpTag = llvm::formatv("combo_op_{0}", util::stringifyCombinationKind(comboKind));
     auto forOp = rewriter.create<stripe::ParallelForOp>(  //
         op->getLoc(),                                     //
         rewriter.getI64ArrayAttr(ranges));
@@ -309,7 +309,7 @@ struct AffineDomainOpConversion : public LoweringBase {
         // LOAD
         auto tensorRefType = srcType.cast<stripe::TensorRefType>();
         auto elementType = tensorRefType.getElementType();
-        auto intoType = eltwise::GetTensorType(elementType);
+        auto intoType = eltwise::getRankedTensorType(elementType);
         auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
         inputs.emplace_back(loadOp.into());
       } else {
@@ -348,7 +348,7 @@ struct EltwiseOpConversion : public LoweringBase {
       Operation* op,                      //
       llvm::ArrayRef<Value*> operands,    //
       ConversionPatternRewriter& rewriter) const override {
-    IVLOG(2, "EltwiseOpConversion::matchAndRewrite> " << op);
+    IVLOG(2, "EltwiseOpConversion::matchAndRewrite> " << mlir::debugString(*op));
 
     auto resultType = op->getResult(0)->getType();
     auto resultTensorType = convertIntoTensorType(resultType);
@@ -430,7 +430,7 @@ struct EltwiseOpConversion : public LoweringBase {
       };
       refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
       auto elementType = tensorRefType.getElementType();
-      auto intoType = eltwise::GetTensorType(elementType);
+      auto intoType = eltwise::getRankedTensorType(elementType);
       // LOAD
       auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
       inputs.emplace_back(loadOp.into());
@@ -439,9 +439,9 @@ struct EltwiseOpConversion : public LoweringBase {
     // INTRINSIC
     auto scalarType = resultTensorType.getElementType().cast<eltwise::ScalarType>();
     auto abstractOp = op->getAbstractOperation();
-    auto builder = abstractOp->getInterface<eltwise::EltwiseBuilder>();
+    auto builder = abstractOp->getInterface<util::GenericBuilder>();
     if (!builder) {
-      op->emitError("EltwiseBuilder expected for intrisnic");
+      op->emitError("GenericBuilder expected for intrisnic");
       return matchFailure();
     }
     auto intrinsicOp = builder->create(&rewriter, op->getLoc(), scalarType, inputs);

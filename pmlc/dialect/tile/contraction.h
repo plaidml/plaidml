@@ -47,31 +47,11 @@ struct Constraints {
   std::set<std::string> VariablesUsed();
 };
 
-// enum class AggregationOp {
-//   None,
-//   Sum,
-//   Max,
-//   Min,
-//   Prod,
-//   Assign,
-// };
-
-// enum class CombinationOp {
-//   None,
-//   Mul,
-//   Add,
-//   Eq,
-//   Cond,
-// };
-
 struct Contraction {
   explicit Contraction(ContractionOp op);
 
   std::map<std::string, mlir::Value*> argMap;
   std::vector<IndexAccess> accesses;
-  // std::vector<int64_t> size_map;
-  // CombinationOp combo_op;
-  // AggregationOp agg_op;
   std::vector<math::RangeConstraint> constraints;
   // bool no_defract = false;
   // std::string use_default;

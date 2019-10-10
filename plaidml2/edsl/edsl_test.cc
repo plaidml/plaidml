@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "base/util/env.h"
 #include "base/util/logging.h"
 #include "plaidml2/edsl/autodiff.h"
 #include "plaidml2/edsl/edsl.h"
@@ -240,8 +241,10 @@ TEST(CppEdsl, MnistCnn) {
 }
 )"));
   // This currently crashes when combined with the padding pass
-  // std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4};
-  // exec::Executable::compile(program, inputs)->run();
+  if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
+    std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4};
+    exec::Executable::compile(program, inputs)->run();
+  }
 }
 
 Tensor Normalize(const Tensor& X) {
