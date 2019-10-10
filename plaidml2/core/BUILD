@@ -49,6 +49,7 @@ plaidml_cc_library(
     ],
     defines = ["PLAIDML_CORE_DLL"],
     visibility = ["//visibility:public"],
+    alwayslink = 1,
     deps = [
         "//base/util",
         "//pmlc/dialect/tile",

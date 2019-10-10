@@ -53,8 +53,8 @@ cc_toolchain_suite(
         "linux_x86_64|gcc_5.4.0": ":cc-linux_x86_64-gcc_5.4.0",
         "linux_x86_64|gcc_4.9.4": ":cc-linux_x86_64-gcc_4.9.4",
         "linux_x86_64|gcc_8.3": ":cc-linux_x86_64-gcc_8.3",
-        "linux_x86_64|gcc": ":cc-linux_x86_64-gcc_8.3-glibc_2.12.1",
-        "linux_x86_64": ":cc-linux_x86_64-gcc_8.3-glibc_2.12.1",
+        "linux_x86_64|gcc": ":cc-linux_x86_64-gcc_8.3.0",
+        "linux_x86_64": ":cc-linux_x86_64-gcc_8.3.0",
     },
 )
 
@@ -106,16 +106,16 @@ cc_toolchain(
 )
 
 cc_toolchain(
-    name = "cc-linux_x86_64-gcc_8.3-glibc_2.12.1",
-    all_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3-glibc_2.12.1:all_files",
-    compiler_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3-glibc_2.12.1:compiler_files",
+    name = "cc-linux_x86_64-gcc_8.3.0",
+    all_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3.0:all_files",
+    compiler_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3.0:compiler_files",
     dwp_files = ":empty",
-    linker_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3-glibc_2.12.1:linker_files",
-    objcopy_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3-glibc_2.12.1:objcopy",
-    strip_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3-glibc_2.12.1:strip",
+    linker_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3.0:linker_files",
+    objcopy_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3.0:objcopy",
+    strip_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3.0:strip",
     supports_param_files = 1,
     tags = ["linux"],
-    toolchain_config = ":cc_linux_x86_64-gcc_8.3-glibc_2.12.1",
+    toolchain_config = ":cc_linux_x86_64-gcc_8.3.0",
     toolchain_identifier = "gcc-linux_x86_64",
 )
 
@@ -144,9 +144,9 @@ gcc_toolchain_config(
 )
 
 gcc_toolchain_config(
-    name = "cc_linux_x86_64-gcc_8.3-glibc_2.12.1",
+    name = "cc_linux_x86_64-gcc_8.3.0",
     libc_version = "glibc_2.12.1",
     tags = ["linux"],
     target = "linux_x86_64",
-    version = "8.3-glibc_2.12.1",
+    version = "8.3.0",
 )
