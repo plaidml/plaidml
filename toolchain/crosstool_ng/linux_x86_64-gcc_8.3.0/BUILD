@@ -16,7 +16,7 @@ filegroup(
         ":ar",
         ":gcc",
         ":ld",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:all_files",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:all_files",
     ],
     tags = ["linux"],
 )
@@ -25,7 +25,7 @@ filegroup(
     name = "ar",
     srcs = [
         "wrappers/ar",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:ar",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:ar",
     ],
     tags = ["linux"],
 )
@@ -34,7 +34,7 @@ filegroup(
     name = "as",
     srcs = [
         "wrappers/as",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:as",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:as",
     ],
     tags = ["linux"],
 )
@@ -43,7 +43,7 @@ filegroup(
     name = "gcc",
     srcs = [
         "wrappers/gcc",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:gcc",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:gcc",
     ],
     tags = ["linux"],
 )
@@ -52,7 +52,7 @@ filegroup(
     name = "ld",
     srcs = [
         "wrappers/ld",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:ld",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:ld",
     ],
     tags = ["linux"],
 )
@@ -61,7 +61,7 @@ filegroup(
     name = "nm",
     srcs = [
         "wrappers/nm",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:nm",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:nm",
     ],
     tags = ["linux"],
 )
@@ -70,7 +70,7 @@ filegroup(
     name = "objcopy",
     srcs = [
         "wrappers/objcopy",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:objcopy",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:objcopy",
     ],
     tags = ["linux"],
 )
@@ -79,7 +79,7 @@ filegroup(
     name = "objdump",
     srcs = [
         "wrappers/objdump",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:objdump",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:objdump",
     ],
     tags = ["linux"],
 )
@@ -88,7 +88,7 @@ filegroup(
     name = "strip",
     srcs = [
         "wrappers/strip",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:strip",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:strip",
     ],
     tags = ["linux"],
 )
@@ -104,7 +104,7 @@ filegroup(
         ":objcopy",
         ":objdump",
         ":strip",
-        "@crosstool_ng_linux_x86_64_gcc_8.3_glibc_2.12.1//:all_files",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:all_files",
     ],
     tags = ["linux"],
 )

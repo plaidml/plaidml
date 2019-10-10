@@ -21,6 +21,7 @@ plaidml_cc_library(
         "ffi.h",
     ],
     defines = ["PLAIDML_EXEC_DLL"],
+    alwayslink = 1,
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
