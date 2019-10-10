@@ -615,10 +615,15 @@ plaidml_expr* plaidml_expr_grad_override(  //
     std::vector<plaidml_expr*> X_exprs(Xs.size());
     std::vector<plaidml_expr*> dX_exprs(Xs.size());
     // TODO: Construct the plaidml_exprs here w/ MLIR values too?
+    // TODO: Experimenting: next 2 lines are old version
+    // TODO: Delete the wacky Value initialization
     auto Y_expr = new plaidml_expr{Y};
     auto dY_expr = new plaidml_expr{dY};
+    // auto Y_expr = new plaidml_expr{Y, reinterpret_cast<mlir::Value *>(0x1)};
+    // auto dY_expr = new plaidml_expr{dY, reinterpret_cast<mlir::Value *>(0x1)};
     for (size_t i = 0; i < X_exprs.size(); i++) {
-      X_exprs[i] = new plaidml_expr{Xs[i]};
+      // TODO: Delete the wacky Value initialization
+      X_exprs[i] = new plaidml_expr{Xs[i], reinterpret_cast<mlir::Value*>(0x1)};
     }
     fn(user_ctx, Y_expr, dY_expr, X_exprs.size(), X_exprs.data(), dX_exprs.data());
     std::vector<ExprPtr> ret(Xs.size());
