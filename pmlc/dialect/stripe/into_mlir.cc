@@ -175,8 +175,8 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
   if (!abstractOp) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
-  auto eltwiseBuilder = abstractOp->getInterface<eltwise::EltwiseBuilder>();
-  if (!eltwiseBuilder) {
+  auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
+  if (!genericBuilder) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
   llvm::SmallVector<Value*, 8> operands;
@@ -184,7 +184,7 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
     operands.push_back(safe_at(locals->scalars, in));
   }
   ScalarType scalarType = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
-  auto op = eltwiseBuilder->create(builder, builder->getUnknownLoc(), scalarType, operands);
+  auto op = genericBuilder->create(builder, builder->getUnknownLoc(), scalarType, operands);
   locals->scalars.emplace(intrinsic.outputs[0], op->getResult(0));
   op->setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
 }
@@ -379,7 +379,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
           }
         } else {
           // Aggregation case
-          auto aggKind = eltwise::symbolizeAggregationKind(agg_str);
+          auto aggKind = util::symbolizeAggregationKind(agg_str);
           if (!aggKind) {
             throw std::runtime_error("Unknown agg-op:" + agg_str);
           }

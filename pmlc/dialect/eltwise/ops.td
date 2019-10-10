@@ -1,6 +1,7 @@
 // Copyright 2019, Intel Corporation
 
-include "pmlc/dialect/eltwise/enums.td"
+include "pmlc/util/interfaces.td"
+include "pmlc/dialect/eltwise/interfaces.td"
 include "pmlc/dialect/eltwise/predicates.td"
 
 def EltwiseDialect : Dialect {
@@ -8,21 +9,9 @@ def EltwiseDialect : Dialect {
   let cppNamespace = "pmlc::dialect::eltwise";
 }
 
-def EltwiseBuilderInterface : OpInterface<"EltwiseBuilder"> {
-  let methods = [
-    StaticInterfaceMethod<"TODO", "Type", "getResultType", (ins "ArrayRef<Value*>":$operands)>,
-    StaticInterfaceMethod<"TODO", "Operation*", "create", (ins
-      "OpBuilder*":$builder,
-      "Location":$loc,
-      "ScalarType":$type,
-      "ArrayRef<Value*>":$operands
-    )>,
-  ];
-}
-
 class EltwiseBuilderImpl {
   code EltwiseBuilderImpl_create = [{
-    static Operation* create(OpBuilder* builder, Location loc, ScalarType type, ArrayRef<Value*> operands) {
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
       OperationState state(loc, getOperationName());
       state.addOperands(operands);
       state.addAttribute("type", TypeAttr::get(type));
@@ -32,10 +21,8 @@ class EltwiseBuilderImpl {
   }];
 }
 
-def EltwiseOpInterface : OpInterface<"EltwiseOp">;
-
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<EltwiseDialect, mnemonic, !listconcat(traits, [EltwiseOpInterface, EltwiseBuilderInterface])>,
+    Op<EltwiseDialect, mnemonic, !listconcat(traits, [EltwiseOpInterface, GenericBuilderInterface])>,
     EltwiseBuilderImpl;
 
 def ScalarConstantOp :
@@ -161,7 +148,6 @@ class BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins Eltwise_IntegerTensor:$lhs, Eltwise_IntegerTensor:$rhs, TypeAttr:$type)>,
     Results<(outs Eltwise_IntegerTensor:$result)>;
 
-def CastOpInterface : OpInterface<"CastOp">;
 
 class CastOp<string mnemonic> :
     EltwiseOp<mnemonic, [CastOpInterface, NoSideEffect]>,
@@ -177,7 +163,7 @@ class CastOp<string mnemonic> :
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value*> operands);
 
-    static Operation* create(OpBuilder* builder, Location loc, ScalarType type, ArrayRef<Value*> operands) {
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
       OperationState state(loc, getOperationName());
       if (operands.size() != 2) {
         throw std::runtime_error("CastOp requires 2 operands");

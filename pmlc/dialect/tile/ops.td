@@ -1,7 +1,10 @@
 // Copyright 2019, Intel Corporation
 
-include "pmlc/dialect/eltwise/enums.td"
+include "pmlc/util/enums.td"
+include "pmlc/util/interfaces.td"
+include "pmlc/dialect/eltwise/interfaces.td"
 include "pmlc/dialect/eltwise/predicates.td"
+include "pmlc/dialect/tile/interfaces.td"
 
 def TileDialect : Dialect {
   let name = "tile";
@@ -169,17 +172,6 @@ def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
   >];
 }
 
-def ContractionOpInterface : OpInterface<"ContractionOp"> {
-  let methods = [
-    InterfaceMethod<"TODO", "std::vector<Value*>", "getSourceIndexMaps">,
-    InterfaceMethod<"TODO", "Value*", "getSinkIndexMap">,
-    InterfaceMethod<"TODO", "Value*", "getSizeMap">,
-    InterfaceMethod<"TODO", "unsigned", "getNumOperands">,
-    InterfaceMethod<"TODO", "AggregationKind", "getAggregationKind">,
-    InterfaceMethod<"TODO", "CombinationKind", "getCombinationKind">,
-  ];
-}
-
 class ContractionOp<string mnemonic, list<OpTrait> traits = []> :
     TileOp<mnemonic, !listconcat(traits, [
       Terminator,
@@ -343,13 +335,13 @@ def ConSumMulOp : BinaryConOp<"+(x*y)", "add", "mul"> {
   let summary = "+(x * y) contraction";
 }
 
-def SpecialOpInterface : OpInterface<"SpecialOp">;
-  
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<TileDialect, mnemonic, !listconcat(traits, [SpecialOpInterface])> {
+    Op<TileDialect, mnemonic, !listconcat(traits, [SpecialOpInterface, GenericBuilderInterface])> {
 
   let extraClassDeclaration = [{
-    static Operation* create(OpBuilder* builder, Location loc, ScalarType type, ArrayRef<Value*> operands) {
+    static Type getResultType(ArrayRef<Value*> operands);
+
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
       OperationState state(loc, getOperationName());
       state.addOperands(operands);
       state.addAttribute("type", TypeAttr::get(type));
@@ -370,10 +362,6 @@ def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
       result.addTypes(getResultType(operands));
     }]
   >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }];
 }
 
 def IndexOp : SpecialOp<"index">, HasCanonicalizer {
@@ -387,10 +375,6 @@ def IndexOp : SpecialOp<"index">, HasCanonicalizer {
       result.addTypes(getResultType(operands));
     }]
   >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }];
 }
 
 def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
@@ -404,10 +388,6 @@ def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
       result.addTypes(getResultType(operands));
     }]
   >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }];
 }
 
 def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
@@ -421,10 +401,6 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
       result.addTypes(getResultType(operands));
     }]
   >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }];
 }
 
 // TODO
@@ -439,10 +415,6 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
 //       result.addTypes(getResultType(operands));
 //     }]
 //   >];
-
-//   let extraClassDeclaration = [{
-//     static Type getResultType(ArrayRef<Value*> operands);
-//   }];
 // }
 
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
@@ -456,8 +428,4 @@ def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
       result.addTypes(getResultType(operands));
     }]
   >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }];
 }

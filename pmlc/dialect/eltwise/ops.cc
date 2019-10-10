@@ -245,13 +245,11 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
   return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
 }
 
-#include "pmlc/dialect/eltwise/ops_interfaces.cpp.inc"
+#include "pmlc/dialect/eltwise/interfaces.cc.inc"
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/eltwise/ops.cpp.inc"
+#include "pmlc/dialect/eltwise/ops.cc.inc"
 
 }  // namespace eltwise
 }  // namespace dialect
 }  // namespace pmlc
-
-#include "pmlc/dialect/eltwise/ops_enums.cpp.inc"

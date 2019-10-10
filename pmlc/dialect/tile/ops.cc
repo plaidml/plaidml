@@ -361,10 +361,10 @@ Type ShapeOp::getResultType(ArrayRef<Value*> operands) {
   return RankedTensorType::get({tensorType.getRank()}, elementType);
 }
 
-#include "pmlc/dialect/tile/ops_interfaces.cpp.inc"
+#include "pmlc/dialect/tile/interfaces.cc.inc"
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/tile/ops.cpp.inc"
+#include "pmlc/dialect/tile/ops.cc.inc"
 
 }  // namespace tile
 }  // namespace dialect
