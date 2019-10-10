@@ -43,6 +43,7 @@ class DType(enum.IntEnum):
     FLOAT16 = 0x31
     FLOAT32 = 0x32
     FLOAT64 = 0x33
+    BFLOAT16 = 0x38
     PRNG = 0x40
 
     def into_numpy(self):
@@ -83,6 +84,7 @@ NUMPY_DTYPE_TO_PLAIDML = {
     'uint16': DType.UINT16,
     'uint32': DType.UINT32,
     'uint64': DType.UINT64,
+    'bfloat16': DType.BFLOAT16,
 }
 
 PLAIDML_DTYPE_TO_NUMPY = {v: k for k, v in NUMPY_DTYPE_TO_PLAIDML.items()}
@@ -113,6 +115,7 @@ DTYPE_INFOS = {
     DType.FLOAT16: DTypeInfo(base='float', width=2),
     DType.FLOAT32: DTypeInfo(base='float', width=4),
     DType.FLOAT64: DTypeInfo(base='float', width=8),
+    DType.BFLOAT16: DTypeInfo(base='float', width=2),
 }
 
 

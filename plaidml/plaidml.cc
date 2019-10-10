@@ -23,7 +23,9 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include <boost/filesystem.hpp>
 
@@ -593,6 +595,8 @@ tile::DataType MakeTileDataType(plaidml_datatype datatype) {
       return tile::DataType::FLOAT32;
     case PLAIDML_DATA_FLOAT64:
       return tile::DataType::FLOAT64;
+    case PLAIDML_DATA_BFLOAT16:
+      return tile::DataType::BFLOAT16;
     case PLAIDML_DATA_PRNG:
       return tile::DataType::PRNG;
     default:
@@ -716,6 +720,8 @@ extern "C" plaidml_datatype plaidml_get_shape_type(plaidml_shape* shape) {
       return PLAIDML_DATA_FLOAT32;
     case tile::DataType::FLOAT64:
       return PLAIDML_DATA_FLOAT64;
+    case tile::DataType::BFLOAT16:
+      return PLAIDML_DATA_BFLOAT16;
     case tile::DataType::PRNG:
       return PLAIDML_DATA_PRNG;
     default:
@@ -1658,15 +1664,16 @@ extern "C" plaidml_invocation* plaidml_schedule_invocation(vai_ctx* ctx, plaidml
 
     // Run the program
     auto result = program->Run(activity.ctx(), in_buffers, out_buffers);
-    result.then(boost::launch::async, [rundown = std::move(rundown), program = std::move(program)](decltype(result) fut) {
-      try {
-        fut.get();
-      } catch (const std::exception& ex) {
-        // TODO: We need a better way to notify users if the asynchronous results
-        // of an invocation are valid, perhaps by allowing a callback to be specified.
-        LOG(ERROR) << ex.what();
-      }
-    });
+    result.then(boost::launch::async,
+                [rundown = std::move(rundown), program = std::move(program)](decltype(result) fut) {
+                  try {
+                    fut.get();
+                  } catch (const std::exception& ex) {
+                    // TODO: We need a better way to notify users if the asynchronous results
+                    // of an invocation are valid, perhaps by allowing a callback to be specified.
+                    LOG(ERROR) << ex.what();
+                  }
+                });
 
     return invocation.release();
   } catch (...) {
