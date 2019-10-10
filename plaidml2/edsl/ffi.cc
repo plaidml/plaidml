@@ -675,9 +675,10 @@ plaidml_expr* plaidml_expr_grad_override(  //
     }
     ExprPtr expr = MakeGradOverride(deriv_entry, in_exprs, out_expr);
     // TODO: Is this handling of the `value` correct?
-    mlir::Value* value = GlobalContext::get()->MakePrimitiveOp("ident", out_value);
+    // mlir::Value* value = GlobalContext::get()->MakePrimitiveOp("ident", out_value);
     IVLOG(2, "The expr from plaidml_expr_grad_override has shape " << expr->shape.str());
-    return new plaidml_expr{expr, value};
+    return new plaidml_expr{expr, nullptr};
+    // return new plaidml_expr{expr, value};
   });
 }
 
@@ -1189,6 +1190,7 @@ plaidml_program* plaidml_program_evaluate(  //
     plaidml_expr** dst_updates) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_program_evaluate");
+    bool has_every_value = true;
     ProgramMutations mutations;
     std::vector<ExprPtr> outputs(noutputs);
     std::vector<mlir::Value*> values(noutputs);
@@ -1198,6 +1200,10 @@ plaidml_program* plaidml_program_evaluate(  //
       }
       mutations.outputs.emplace_back(raw_outputs[i]->expr);
       values[i] = raw_outputs[i]->value;
+      if (!values[i]) {
+        IVLOG(5, "Found a missing value! (index " << i << ")");
+        has_every_value = false;
+      }
     }
     std::vector<ProgramUpdate> updates(nupdates);
     for (size_t i = 0; i < nupdates; i++) {
@@ -1210,16 +1216,28 @@ plaidml_program* plaidml_program_evaluate(  //
       mutations.updates.emplace_back(ProgramUpdate{src_updates[i]->expr, dst_updates[i]->expr});
     }
     // TODO(MLIR): updates
-    std::vector<mlir::Value*> new_values(noutputs);
-    auto program = GlobalContext::get()->MakeProgram(name, values, new_values);
-    auto ret = new plaidml_program{Evaluate(name, mutations), program};
-    if (noutputs != ret->eval.outputs.size()) {
-      throw std::runtime_error("Internal error: noutputs != ret->eval.outputs.size()");
+    if (has_every_value) {
+      std::vector<mlir::Value*> new_values(noutputs);
+      auto program = GlobalContext::get()->MakeProgram(name, values, new_values);
+      auto ret = new plaidml_program{Evaluate(name, mutations), program};
+      if (noutputs != ret->eval.outputs.size()) {
+        throw std::runtime_error("Internal error: noutputs != ret->eval.outputs.size()");
+      }
+      for (size_t i = 0; i < noutputs; i++) {
+        new_outputs[i] = new plaidml_expr{ret->eval.outputs[i], new_values[i]};
+      }
+      return ret;
+    } else {
+      std::vector<mlir::Value*> new_values(noutputs);
+      auto ret = new plaidml_program{Evaluate(name, mutations)};
+      if (noutputs != ret->eval.outputs.size()) {
+        throw std::runtime_error("Internal error: noutputs != ret->eval.outputs.size()");
+      }
+      for (size_t i = 0; i < noutputs; i++) {
+        new_outputs[i] = new plaidml_expr{ret->eval.outputs[i]};
+      }
+      return ret;
     }
-    for (size_t i = 0; i < noutputs; i++) {
-      new_outputs[i] = new plaidml_expr{ret->eval.outputs[i], new_values[i]};
-    }
-    return ret;
   });
 }
 
