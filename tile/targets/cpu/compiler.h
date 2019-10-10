@@ -156,7 +156,8 @@ class Compiler : private stripe::ConstStmtVisitor {
   llvm::Value* Eval(const stripe::Affine& access);
   void OutputType(llvm::Value* ret, const stripe::Intrinsic&);
   void OutputBool(llvm::Value* ret, const stripe::Intrinsic&);
-  void CallIntrinsicFunc(const stripe::Intrinsic&, const char* name_f32, const char* name_f64);
+  void CallIntrinsicFunc(const stripe::Intrinsic&, const char* name_f32, const char* name_f64,
+                         const size_t numParams = 1);
   llvm::Type* IndexType();
   llvm::Value* IndexConst(ssize_t val);
   llvm::FunctionType* BlockType(const stripe::Block&);
