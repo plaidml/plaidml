@@ -23,8 +23,8 @@
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
-using pmlc::dialect::stripe::Dialect;
 using pmlc::dialect::stripe::FromMLIR;
+using pmlc::dialect::stripe::StripeOpsDialect;
 using pmlc::dialect::tile::LowerIntoStripe;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
@@ -139,7 +139,7 @@ plaidml_executable* plaidml_compile(  //
           throw std::runtime_error("Input expected BlockArgument");
         }
         auto argNumber = arg->getArgNumber();
-        auto attrName = Dialect::getDialectAttrName("name");
+        auto attrName = StripeOpsDialect::getDialectAttrName("name");
         auto attr = stripeFuncOp.getArgAttrOfType<mlir::StringAttr>(argNumber, attrName);
         if (!attr) {
           throw std::runtime_error("Missing expected argument attribute");
@@ -158,7 +158,7 @@ plaidml_executable* plaidml_compile(  //
       for (size_t i = 0; i < noutputs; i++) {
         IVLOG(1, "Output[" << i << "]: ");
         auto argNumber = numInputs + i;
-        auto attrName = Dialect::getDialectAttrName("name");
+        auto attrName = StripeOpsDialect::getDialectAttrName("name");
         auto attr = stripeFuncOp.getArgAttrOfType<mlir::StringAttr>(argNumber, attrName);
         if (!attr) {
           throw std::runtime_error("Missing expected argument attribute");

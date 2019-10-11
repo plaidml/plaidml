@@ -321,7 +321,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
     refOp.setAttr("name", builder->getStringAttr(ref.into()));
     auto attrs = TagsToDict(builder, ref);
     if (attrs.size()) {
-      refOp.setAttr(Dialect::getStripeAttrsName(), attrs);
+      refOp.setAttr(StripeOpsDialect::getStripeAttrsName(), attrs);
     }
     locals.refs.emplace(ref.into(), refOp.result());
   }
@@ -351,7 +351,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
         auto attrs = TagsToDict(builder, *load);
         if (attrs.size()) {
-          op.setAttr(Dialect::getStripeAttrsName(), attrs);
+          op.setAttr(StripeOpsDialect::getStripeAttrsName(), attrs);
         }
         op.setAttr("scalar_name", builder->getStringAttr(load->into));
         locals.scalars.emplace(load->into, op);
@@ -375,7 +375,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
           // Simple case, just an assignment
           auto op = builder->create<StoreOp>(unknownLoc, into, from);
           if (attrs.size()) {
-            op.setAttr(Dialect::getStripeAttrsName(), attrs);
+            op.setAttr(StripeOpsDialect::getStripeAttrsName(), attrs);
           }
         } else {
           // Aggregation case
@@ -387,7 +387,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
           IntegerAttr agg_attr = builder->getI64IntegerAttr(agg_int);
           auto op = builder->create<AggregateOp>(unknownLoc, into, from, agg_attr);
           if (attrs.size()) {
-            op.setAttr(Dialect::getStripeAttrsName(), attrs);
+            op.setAttr(StripeOpsDialect::getStripeAttrsName(), attrs);
           }
         }
       } break;
@@ -436,7 +436,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   loop_op.setAttr("comments", builder->getStringAttr(block.comments));
   auto attrs = TagsToDict(builder, block);
   if (attrs.size()) {
-    loop_op.setAttr(Dialect::getStripeAttrsName(), attrs);
+    loop_op.setAttr(StripeOpsDialect::getStripeAttrsName(), attrs);
   }
   for (const auto& kvp : argAttrs) {
     loop_op.setAttr(kvp.first, kvp.second);
@@ -481,15 +481,15 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
       initial.refs.emplace(ref.into(), arg);
     }
     // Only 'dialect attrs' are allowed on function arguments
-    auto attrName = Dialect::getDialectAttrName("name");
+    auto attrName = StripeOpsDialect::getDialectAttrName("name");
     func.setArgAttr(argIndex, attrName, builder.getStringAttr(ref.into()));
-    auto attrLayout = Dialect::getDialectAttrName("layout");
+    auto attrLayout = StripeOpsDialect::getDialectAttrName("layout");
     func.setArgAttr(argIndex, attrLayout, builder.getTypeAttr(tensorTypes[argIndex]));
   }
 
   auto attrs = TagsToDict(&builder, block);
   if (attrs.size()) {
-    func.setAttr(Dialect::getStripeAttrsName(), attrs);
+    func.setAttr(StripeOpsDialect::getStripeAttrsName(), attrs);
   }
 
   BlockIntoMLIR(&builder, initial, *block.SubBlock(0));

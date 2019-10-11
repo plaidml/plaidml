@@ -10,9 +10,9 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
-class Dialect : public mlir::Dialect {
+class StripeOpsDialect : public mlir::Dialect {
  public:
-  explicit Dialect(mlir::MLIRContext* ctx);
+  explicit StripeOpsDialect(mlir::MLIRContext* ctx);
 
   static llvm::StringRef getDialectNamespace() { return "stripe"; }
   static std::string getDialectAttrName(llvm::StringRef name);

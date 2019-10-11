@@ -34,9 +34,9 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   }
 };
 
-static mlir::DialectRegistration<Dialect> StripeOps;
+static mlir::DialectRegistration<StripeOpsDialect> StripeOps;
 
-Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), ctx) {
+StripeOpsDialect::StripeOpsDialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), ctx) {
   addTypes<          //
       AffineType,    //
       ExecutorType,  //
@@ -49,7 +49,7 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addInterfaces<OpAsmInterface>();
 }
 
-mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
+mlir::Type StripeOpsDialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
   static llvm::Regex re{R"(([[:alnum:]_]+)\[([[:digit:]]+):([[:digit:]]+)\])"};
   bool is_const = tyData.consume_back("const");
   StringRef typeSpec, sizeSpec;
@@ -80,7 +80,7 @@ mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) cons
   return TensorType::get(t, odims, OffsetsMap(), is_const);
 }
 
-mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const {
+mlir::Type StripeOpsDialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const {
   bool is_const = tyData.consume_back("const");
   StringRef typeSpec, ndimSpec;
   std::tie(typeSpec, ndimSpec) = tyData.rsplit(':');
@@ -97,11 +97,11 @@ mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) c
   return TensorRefType::get(t, ndims, is_const);
 }
 
-std::string Dialect::getDialectAttrName(llvm::StringRef name) {
-  return llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name).str();
+std::string StripeOpsDialect::getDialectAttrName(llvm::StringRef name) {
+  return llvm::formatv("{0}.{1}", StripeOpsDialect::getDialectNamespace(), name).str();
 }
 
-mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const {
+mlir::Type StripeOpsDialect::parseType(llvm::StringRef tyData, mlir::Location loc) const {
   if (tyData == "affine") {
     return AffineType::get(getContext());
   } else if (tyData == "executor") {
@@ -144,7 +144,7 @@ static void print(TensorRefType type, llvm::raw_ostream& os) {
   }
 }
 
-void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
+void StripeOpsDialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
   if (auto affineType = type.dyn_cast<AffineType>()) {
     print(affineType, os);
   } else if (auto executorType = type.dyn_cast<ExecutorType>()) {

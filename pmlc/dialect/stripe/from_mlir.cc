@@ -130,14 +130,14 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
   // Construct the block and put it in the table
   cur_ = std::make_shared<stripe::Block>();
   cur_->name = func.getName();
-  auto attrs = func.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+  auto attrs = func.getAttrOfType<DictionaryAttr>(StripeOpsDialect::getStripeAttrsName());
   add_attributes(cur_.get(), attrs.getValue());
   Block& oblock = func.front();
   BlockInfo blockInfo(cur_.get());
   for (size_t i = 0; i < func.getNumArguments(); i++) {
     // add refinement for each arg
     auto arg = func.getArgument(i);
-    auto attrName = Dialect::getDialectAttrName("name");
+    auto attrName = StripeOpsDialect::getDialectAttrName("name");
     auto name = func.getArgAttrOfType<StringAttr>(i, attrName).getValue();
     // Compute all the info about the tensor
     auto ti = ComputeAccessAndLoc(arg).first;
@@ -298,7 +298,7 @@ std::string StripeBuilder::add_refinements(  //
     }
     // If op matches the block, move the op up, also attributes
     while (op && op->getBlock() == block && mlir::isa<RefineOp>(op)) {
-      if (auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName())) {
+      if (auto attrs = op->getAttrOfType<DictionaryAttr>(StripeOpsDialect::getStripeAttrsName())) {
         add_attributes(ref, attrs.getValue());
       }
       op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
@@ -387,7 +387,7 @@ void StripeBuilder::visit(ParallelForOp op) {
     }
   }
   // Add the attributes
-  if (auto attrs = op.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName())) {
+  if (auto attrs = op.getAttrOfType<DictionaryAttr>(StripeOpsDialect::getStripeAttrsName())) {
     add_attributes(cur_.get(), attrs.getValue());
   }
   // Add the location (if any) by checking the inputs to the block's terminator.

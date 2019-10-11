@@ -157,7 +157,7 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
     if (!funcOp) {
       throw std::runtime_error("Invalid tensor value: block argument not contained by FuncOp");
     }
-    auto attrName = stripe::Dialect::getDialectAttrName("layout");
+    auto attrName = StripeOpsDialect::getDialectAttrName("layout");
     auto attr = funcOp.getArgAttrOfType<mlir::TypeAttr>(arg->getArgNumber(), attrName);
     ret.base = tensor;
     ret.base_type = attr.getValue().cast<TensorType>();

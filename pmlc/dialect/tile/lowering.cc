@@ -43,6 +43,7 @@ using mlir::PatternMatchResult;
 using mlir::ReturnOp;
 using mlir::UnknownLoc;
 using mlir::Value;
+using pmlc::dialect::stripe::StripeOpsDialect;
 
 namespace pmlc {
 namespace dialect {
@@ -255,7 +256,7 @@ struct AffineDomainOpConversion : public LoweringBase {
         {rewriter.getIdentifier(aggOpTag.str()), rewriter.getUnitAttr()},
         {rewriter.getIdentifier(comboOpTag.str()), rewriter.getUnitAttr()},
     };
-    forOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
+    forOp.setAttr(StripeOpsDialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
     auto body = rewriter.createBlock(&forOp.inner());
 
     unsigned argcnt = 0;
@@ -305,7 +306,7 @@ struct AffineDomainOpConversion : public LoweringBase {
         auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
             {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
         };
-        refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
+        refineOp.setAttr(StripeOpsDialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
         // LOAD
         auto tensorRefType = srcType.cast<stripe::TensorRefType>();
         auto elementType = tensorRefType.getElementType();
@@ -374,7 +375,7 @@ struct EltwiseOpConversion : public LoweringBase {
         {rewriter.getIdentifier("kernel"), rewriter.getUnitAttr()},
         {rewriter.getIdentifier(eltwiseOpTag.str()), rewriter.getUnitAttr()},
     };
-    forOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
+    forOp.setAttr(StripeOpsDialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
     auto body = rewriter.createBlock(&forOp.inner());
 
     stripe::SymbolValueMap idxs;
@@ -428,7 +429,7 @@ struct EltwiseOpConversion : public LoweringBase {
       auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
           {rewriter.getIdentifier(eltwiseOpTag.str()), rewriter.getUnitAttr()},
       };
-      refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
+      refineOp.setAttr(StripeOpsDialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
       auto elementType = tensorRefType.getElementType();
       auto intoType = eltwise::getRankedTensorType(elementType);
       // LOAD
@@ -495,15 +496,15 @@ struct FuncOpConversion : public LoweringBase {
     auto attrs = llvm::SmallVector<NamedAttribute, 1>{
         {rewriter.getIdentifier("program"), rewriter.getUnitAttr()},
     };
-    newFuncOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
+    newFuncOp.setAttr(StripeOpsDialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
     newFuncOp.setAttr("inputs", rewriter.getI32IntegerAttr(type.getNumInputs()));
     newFuncOp.setAttr("outputs", rewriter.getI32IntegerAttr(type.getNumResults()));
 
     for (unsigned i = 0; i < tensorTypes.size(); i++) {
       auto name = llvm::formatv("_X{0}", i);
-      auto attrName = stripe::Dialect::getDialectAttrName("name");
+      auto attrName = StripeOpsDialect::getDialectAttrName("name");
       newFuncOp.setArgAttr(i, attrName, rewriter.getStringAttr(name.str()));
-      auto attrLayout = stripe::Dialect::getDialectAttrName("layout");
+      auto attrLayout = StripeOpsDialect::getDialectAttrName("layout");
       newFuncOp.setArgAttr(i, attrLayout, rewriter.getTypeAttr(tensorTypes[i]));
     }
 
@@ -521,7 +522,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   void runOnModule() override {
     LoweringContext lowering{&getContext()};
     ConversionTarget target(getContext());
-    target.addLegalDialect<stripe::Dialect>();
+    target.addLegalDialect<StripeOpsDialect>();
     std::function<bool(Operation*)> isDynamicallyLegal = [](Operation* op) {
       IVLOG(3, "isDynamicallyLegal: " << op->getName().getStringRef().str());
       return llvm::isa<eltwise::EltwiseOp>(op) && op->getParentOfType<stripe::ParallelForOp>();
@@ -561,7 +562,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
       auto attrs = llvm::SmallVector<NamedAttribute, 1>{
           {builder.getIdentifier("main"), builder.getUnitAttr()},
       };
-      forOp.setAttr(stripe::Dialect::getStripeAttrsName(), builder.getDictionaryAttr(attrs));
+      forOp.setAttr(StripeOpsDialect::getStripeAttrsName(), builder.getDictionaryAttr(attrs));
       forOp.setAttr("name", builder.getStringAttr("main"));
       auto block = builder.createBlock(&forOp.inner());
       block->getOperations().splice(block->getOperations().end(), body->getOperations(), it, body->end());
