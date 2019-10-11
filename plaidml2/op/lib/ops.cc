@@ -2188,9 +2188,26 @@ Value softmax(const Value& value) {
   auto ndims = I.shape().ndims();
   axis = normalize_axis(axis, ndims, "softmax");
 
+  // Ensure the axis is the last dimension, to make the derivative code happy
+  bool transposed = false;
+  std::vector<Value> pattern(ndims);  // Will be reused at the end to return to original order
+  if (axis != ndims - 1) {
+    transposed = true;
+    for (size_t i = 0; i < ndims; ++i) {
+      if (i == axis) {
+        pattern[i] = Value{ndims - 1};
+      } else if (i == ndims - 1) {
+        pattern[i] = Value{axis};
+      } else {
+        pattern[i] = Value{i};
+      }
+    }
+    I = transpose(Value{std::vector<Value>{args[0], Value{pattern}}}).as_tensor();
+    axis = ndims - 1;  // we've moved the softmax axis to be the last axis
+  }
+
   std::vector<TensorDim> I_dims(ndims);
   std::vector<TensorIndex> I_idxs(ndims);
-  IVLOG(2, "Calling bind_dims in softmax");
   I.bind_dims(I_dims);
   // R_dims & R_idxs are the dims/idxs reduced along the specified axis; used in the inner contractions
   std::vector<TensorDim> R_dims = I_dims;
@@ -2204,22 +2221,15 @@ Value softmax(const Value& value) {
   N(R_idxs) += E(I_idxs);
   auto O = E / N;
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-    // TODO: will need to reconstruct the various dimensions?
-    // TODO: For now, just contract along the last axis, sort out later how to do the right thing
     auto I = X[0];
     auto ndims = I.shape().ndims();
-    auto I_shape = I.shape();  // TODO: Temporary as part of debug code
-    IVLOG(2, "I is " << I);
-    IVLOG(2, "I.shape() is " << I_shape);
     std::vector<TensorDim> I_dims(ndims);
     std::vector<TensorIndex> I_idxs(ndims);
-    IVLOG(2, "Calling bind_dims in softmax deriv");
-    IVLOG(2, "I.shape() is " << I.shape());
     I.bind_dims(I_dims);
     std::vector<TensorDim> R_dims = I_dims;
     std::vector<TensorIndex> R_idxs = I_idxs;
-    R_dims.back() = TensorDim{1};    // TODO
-    R_idxs.back() = TensorIndex{0};  // TODO
+    R_dims.back() = TensorDim{1};    // Softmax along last axis
+    R_idxs.back() = TensorIndex{0};  // Softmax along last axis
 
     auto YdY = Y * DY;
     auto T = TensorOutput(R_dims);
@@ -2229,11 +2239,14 @@ Value softmax(const Value& value) {
     return std::vector<Tensor>{YdY - TB * Y};
   };
   auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
-  IVLOG(2, "Just built an OverrideGrads");
-  IVLOG(2, "  shape: " << Overridden.shape());
-  IVLOG(2, "The input I we handed over is " << I << ". This has shape " << I.shape());
-  // IVLOG(2, "it has MLIR value " << I.as_ptr()->value); // TODO: Can't get at this here ... maybe elsewhere?
-  return Value{Overridden};
+  // If we reordered, return to original order
+  Tensor ret;
+  if (transposed) {
+    ret = transpose(Value{std::vector<Value>{Value{Overridden}, Value{pattern}}}).as_tensor();
+  } else {
+    ret = Overridden;
+  }
+  return Value{ret};
 }
 
 Value spatial_padding(const Value& value) {

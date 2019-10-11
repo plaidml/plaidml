@@ -745,7 +745,6 @@ std::string ParamExpr::str() const {
   return ss.str();
 }
 
-// TODO
 GradOverrideExpr::GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins,
                                    const ExprPtr& out)
     : fn(fn),    //
@@ -753,10 +752,9 @@ GradOverrideExpr::GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, co
       out(out) {}
 
 std::string GradOverrideExpr::str() const {
-  // TODO: would be best to upgrade this somehow...
   std::stringstream ss;
   ss << "grad_override";
-  // TODO: Decide whether to keep this more extensive output
+  // TODO: I found the more verbose version of this output confusing, so it's commented out
   // ss << "{" << fn << "(";
   // for (const auto& in : ins) {
   //   ss << in << ", ";

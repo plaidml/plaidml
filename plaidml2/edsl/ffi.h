@@ -154,7 +154,6 @@ PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_op(  //
 //
 // plaidml_deriv
 //
-// TODO: Decide where this should live
 
 PLAIDML_EDSL_API void plaidml_expr_gradient(  //
     plaidml_error* err,                       //

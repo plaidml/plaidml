@@ -666,7 +666,7 @@ plaidml_expr* plaidml_expr_grad_override(  //
       if (ins[i]->expr) {
         in_exprs[i] = ins[i]->expr;
       } else {
-        throw std::runtime_error("TODO: Currently exprs are required (plaidml_expr_grad_override)");
+        throw std::runtime_error("Currently exprs are required in plaidml_grad_override");  // TODO: MLIR
       }
     }
     if (!out) {
@@ -675,7 +675,7 @@ plaidml_expr* plaidml_expr_grad_override(  //
     if (out->expr) {
       out_expr = out->expr;
     } else {
-      throw std::runtime_error("TODO: Currently out expr is required (plaidml_expr_grad_override)");
+      throw std::runtime_error("Currently out expr is required in plaidml_expr_grad_override");  // TODO: MLIR
     }
     if (out->value && use_mlir) {
       out_value = out->value;
@@ -684,7 +684,7 @@ plaidml_expr* plaidml_expr_grad_override(  //
     }
     ExprPtr expr = MakeGradOverride(deriv_entry, in_exprs, out_expr);
     mlir::Value* value = use_mlir ? GlobalContext::get()->MakePrimitiveOp("ident", out_value) : nullptr;
-    IVLOG(2, "The expr from plaidml_expr_grad_override has shape " << expr->shape.str());
+    IVLOG(6, "The expr from plaidml_expr_grad_override has shape " << expr->shape.str());
     return new plaidml_expr{expr, value};
   });
 }
@@ -1043,7 +1043,6 @@ void plaidml_deriv_register(  //
     plaidml_deriv fn = reinterpret_cast<plaidml_deriv>(user_fn);
     std::vector<plaidml_expr*> X_exprs(Xs.size());
     std::vector<plaidml_expr*> dX_exprs(Xs.size());
-    // TODO: Initialize the exprs here w/ MLIR values too?
     auto Y_expr = new plaidml_expr{Y};
     auto dY_expr = new plaidml_expr{dY};
     for (size_t i = 0; i < X_exprs.size(); i++) {

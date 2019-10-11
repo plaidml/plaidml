@@ -169,7 +169,7 @@ struct TupleExpr : Expr {
 ExprPtr MakeGradOverride(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins,
                          const ExprPtr& out);
 
-// TODO: Eventually add this convenience lookup function:
+// TODO: Consider adding this lookup function to grab a gradient from the deriv registry:
 // ExprPtr MakeGradOverride(const std::string& fn_name, const std::vector<ExprPtr>& ins, const ExprPtr& out);
 
 struct GradOverrideExpr : Expr {
