@@ -352,8 +352,6 @@ plaidml_expr* plaidml_expr_clone(  //
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_clone> " << expr->expr->str());
     // TODO(MLIR): deal with clone of expr->value
-    IVLOG(3, "value is " << expr->value);
-    // throw std::runtime_error("Test if expr clone is called");
     return new plaidml_expr{expr->expr, expr->value};
   });
 }
@@ -368,7 +366,6 @@ plaidml_dim_expr* plaidml_expr_get_dim(  //
       throw std::runtime_error("plaidml_expr_get_dim can only be used on a DimExprExpr");
     }
     // TODO(MLIR): deal with clone of expr->value
-    // throw std::runtime_error("Test if get dim is called");
     return new plaidml_dim_expr{dim_expr->expr, expr->value};
   });
 }
@@ -621,42 +618,6 @@ plaidml_expr* plaidml_expr_call(  //
   });
 }
 
-// // TODO: Verify name and implementation
-// // TODO: This is the ExprDerivEntry-returning variation
-// plaidml_expr_deriv_entry* plaidml_expr_grad_override(  //
-//     plaidml_error* err,      //
-//     plaidml_deriv fn,        //
-//     void* user_ctx) {
-//   auto thunk = [](const ExprPtr& Y,                //
-//                   const ExprPtr& dY,               //
-//                   const std::vector<ExprPtr>& Xs,  //
-//                   void* user_fn,                   //
-//                   void* user_ctx) {
-//     IVLOG(6, "plaidml_grad_override> thunk");
-//     plaidml_deriv fn = reinterpret_cast<plaidml_deriv>(user_fn);
-//     std::vector<plaidml_expr*> X_exprs(Xs.size());
-//     std::vector<plaidml_expr*> dX_exprs(Xs.size());
-//     auto Y_expr = new plaidml_expr{Y};
-//     auto dY_expr = new plaidml_expr{dY};
-//     for (size_t i = 0; i < X_exprs.size(); i++) {
-//       X_exprs[i] = new plaidml_expr{Xs[i]};
-//     }
-//     fn(user_ctx, Y_expr, dY_expr, X_exprs.size(), X_exprs.data(), dX_exprs.data());
-//     std::vector<ExprPtr> ret(Xs.size());
-//     for (size_t i = 0; i < ret.size(); i++) {
-//       ret[i] = dX_exprs[i]->expr;
-//       delete dX_exprs[i];
-//     }
-//     return ret;
-//   };
-//   ffi_wrap<plaidml_expr_deriv_entry*>(err, nullptr, [&] {
-//     IVLOG(5, "plaidml_grad_override");
-//     return new plaidml_expr_deriv_entry{std::make_shared<ExprDerivEntry>(thunk, reinterpret_cast<void*>(fn),
-//     user_ctx)};
-//   });
-// }
-
-// TODO: Verify name and implementation
 plaidml_expr* plaidml_expr_grad_override(  //
     plaidml_error* err,                    //
     plaidml_deriv fn,                      //
@@ -674,15 +635,10 @@ plaidml_expr* plaidml_expr_grad_override(  //
     std::vector<plaidml_expr*> X_exprs(Xs.size());
     std::vector<plaidml_expr*> dX_exprs(Xs.size());
     // TODO: Construct the plaidml_exprs here w/ MLIR values too?
-    // TODO: Experimenting: next 2 lines are old version
-    // TODO: Delete the wacky Value initialization
     auto Y_expr = new plaidml_expr{Y};
     auto dY_expr = new plaidml_expr{dY};
-    // auto Y_expr = new plaidml_expr{Y, reinterpret_cast<mlir::Value *>(0x1)};
-    // auto dY_expr = new plaidml_expr{dY, reinterpret_cast<mlir::Value *>(0x1)};
     for (size_t i = 0; i < X_exprs.size(); i++) {
-      // TODO: Delete the wacky Value initialization
-      X_exprs[i] = new plaidml_expr{Xs[i], reinterpret_cast<mlir::Value*>(0x1)};
+      X_exprs[i] = new plaidml_expr{Xs[i]};
     }
     fn(user_ctx, Y_expr, dY_expr, X_exprs.size(), X_exprs.data(), dX_exprs.data());
     std::vector<ExprPtr> ret(Xs.size());
@@ -710,7 +666,7 @@ plaidml_expr* plaidml_expr_grad_override(  //
       if (ins[i]->expr) {
         in_exprs[i] = ins[i]->expr;
       } else {
-        throw std::runtime_error("TODO: Probably we need to support values for MLIR?");
+        throw std::runtime_error("TODO: Currently exprs are required (plaidml_expr_grad_override)");
       }
     }
     if (!out) {
@@ -719,7 +675,7 @@ plaidml_expr* plaidml_expr_grad_override(  //
     if (out->expr) {
       out_expr = out->expr;
     } else {
-      throw std::runtime_error("TODO: Probably we need to support values for MLIR? (on output)");
+      throw std::runtime_error("TODO: Currently out expr is required (plaidml_expr_grad_override)");
     }
     if (out->value && use_mlir) {
       out_value = out->value;
@@ -727,7 +683,6 @@ plaidml_expr* plaidml_expr_grad_override(  //
       out_value = nullptr;
     }
     ExprPtr expr = MakeGradOverride(deriv_entry, in_exprs, out_expr);
-    // TODO: Is this handling of the `value` correct?
     mlir::Value* value = use_mlir ? GlobalContext::get()->MakePrimitiveOp("ident", out_value) : nullptr;
     IVLOG(2, "The expr from plaidml_expr_grad_override has shape " << expr->shape.str());
     return new plaidml_expr{expr, value};

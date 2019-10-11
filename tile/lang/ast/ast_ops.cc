@@ -9,14 +9,6 @@ namespace tile {
 namespace lang {
 namespace ast {
 
-// // TODO: WIP
-// struct PassthroughOp : PrimitiveOp {
-//   LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
-//     IVLOG(1, "PassthroughOp");
-//     return args[0]->shape;
-//   }
-// };
-
 struct ReshapeOp : PrimitiveOp {
   LogicalShape ComputeShape(const std::vector<ExprPtr>& args) const final {
     IVLOG(1, "ReshapeOp");
@@ -279,7 +271,6 @@ struct PrngOp : PrimitiveOp {
   // registry->Register("element", std::make_unique<ElementOp>());
   registry->Register("gather", std::make_unique<GatherOp>());
   registry->Register("index", std::make_unique<IndexOp>());
-  // registry->Register("override_grads", std::make_unique<PassthroughOp>());
   registry->Register("prng", std::make_unique<PrngOp>());
   registry->Register("reshape", std::make_unique<ReshapeOp>());
   registry->Register("scatter", std::make_unique<ScatterOp>());

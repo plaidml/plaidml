@@ -26,10 +26,6 @@ struct plaidml_expr {
   mlir::Value* value = nullptr;
 };
 
-// struct plaidml_expr_deriv_entry {
-//   vertexai::tile::lang::ast::ExprDerivEntry entry;
-// };
-
 struct plaidml_program {
   vertexai::tile::lang::ast::ProgramEvaluation eval;
   std::shared_ptr<pmlc::dialect::tile::TileProgram> program;

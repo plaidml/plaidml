@@ -605,28 +605,6 @@ inline Tensor OverrideGrads(TensorDeriv fn, const std::vector<Tensor>& ins, cons
   return Tensor(ptr);
 }
 
-// GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins, const ExprPtr& out);
-
-// TensorDeriv fn) {
-//   auto thunk = [](void* user_ctx,          //
-//                   plaidml_expr* Y_expr,    //
-//                   plaidml_expr* dY_expr,   //
-//                   size_t nXs,              //
-//                   plaidml_expr** X_exprs,  //
-//                   plaidml_expr** dX_exprs) {
-//     auto fn = reinterpret_cast<TensorDeriv>(user_ctx);
-//     Tensor Y(Y_expr);
-//     Tensor dY(dY_expr);
-//     std::vector<Tensor> Xs(nXs);
-//     for (size_t i = 0; i < Xs.size(); i++) {
-//       Xs[i] = Tensor(X_exprs[i]);
-//     }
-//     auto dXs = fn(Y, dY, Xs);
-//     for (size_t i = 0; i < Xs.size(); i++) {
-//       dX_exprs[i] = ffi::call<plaidml_expr*>(plaidml_expr_clone, dXs[i].as_ptr());
-//     }
-//   };
-
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
 
 template <typename... Ts>

@@ -221,9 +221,6 @@ void TileBuilder::BindTensorDim(unsigned dim, mlir::Value* from, mlir::Value** i
   if (!from) {
     throw std::runtime_error("BindTensorDim: from == nullptr");
   }
-  if (from == reinterpret_cast<mlir::Value*>(0x1)) {  // TODO: Special testing code REMOVE IT
-    throw std::runtime_error("FOUND THE SPECIAL 0x1!!");
-  }
   IVLOG(5, "TileBuilder::BindTensorDim> from: " << mlir::debugString(*from));
   if (!into) {
     throw std::runtime_error("BindTensorDim: into == nullptr");

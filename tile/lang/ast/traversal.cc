@@ -164,7 +164,6 @@ class AstPassRunner : AstVisitor<void> {
     GenericVisit(expr, expr);
   }
 
-  // TODO
   void Visit(const GradOverrideExpr& expr) final {
     IVLOG(4, "AstPassRunner::Visit(GradOverrideExpr)> " << &expr);
     auto new_expr = std::make_shared<GradOverrideExpr>(expr.fn, expr.ins, expr.out);
