@@ -12,7 +12,7 @@ class OpPassBase;
 using FunctionPassBase = OpPassBase<FuncOp>;
 class OwningRewritePatternList;
 
-/// Creates a pass to convert Stripe dialect to affine dialect.
+/// Creates a pass to convert Stripe dialect to Affine dialect.
 std::unique_ptr<FunctionPassBase> createConvertStripeToAffinePass();
 }  // namespace mlir
 
@@ -20,7 +20,7 @@ namespace pmlc {
 namespace conversion {
 namespace stripe_to_affine {
 
-/// Collect a set of patterns to convert Stripe dialect ops into affine dialect ops.
+/// Collect a set of patterns to convert Stripe dialect ops into Affine dialect ops.
 void populateStripeToAffineConversionPatterns(mlir::OwningRewritePatternList& patterns,  // NOLINT
                                               mlir::MLIRContext* ctx);
 

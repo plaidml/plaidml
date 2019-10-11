@@ -23,9 +23,8 @@ void ConvertStripeToAffine::runOnFunction() {
   mlir::OwningRewritePatternList patterns;
   pmlc::conversion::stripe_to_affine::populateStripeToAffineConversionPatterns(patterns, &getContext());
 
-  // Add affine/std dialect legal ops to conversion target.
+  // Add Affine/Std dialect legal ops to conversion target.
   mlir::ConversionTarget target(getContext());
-  target.addLegalDialect<mlir::AffineOpsDialect, mlir::StandardOpsDialect>();
   target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
   target.addLegalDialect<mlir::AffineOpsDialect, mlir::StandardOpsDialect>();
   target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
@@ -103,4 +102,4 @@ std::unique_ptr<mlir::FunctionPassBase> mlir::createConvertStripeToAffinePass() 
   return std::make_unique<ConvertStripeToAffine>();
 }
 
-static mlir::PassRegistration<ConvertStripeToAffine> pass(PASS_NAME, "Convert Stripe dialect to affine dialect");
+static mlir::PassRegistration<ConvertStripeToAffine> pass(PASS_NAME, "Convert Stripe dialect to Affine dialect");
