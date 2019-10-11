@@ -549,6 +549,7 @@ KernelInfo GenContract(const string& kname, const DirectSettings& settings, cons
         case DataType::FLOAT16:
         case DataType::FLOAT32:
         case DataType::FLOAT64:
+        case DataType::BFLOAT16:
           inexprs[0] = (inexprs[0] != 0.0);
           break;
         case DataType::BOOLEAN:

@@ -38,6 +38,7 @@ enum class DataType : int {
   FLOAT16 = 0x31,
   FLOAT32 = 0x32,
   FLOAT64 = 0x33,
+  BFLOAT16 = 0x38,
   PRNG = 0x40,
 };
 
@@ -71,6 +72,7 @@ inline bool is_float(const DataType& dt) {
     case DataType::FLOAT16:
     case DataType::FLOAT32:
     case DataType::FLOAT64:
+    case DataType::BFLOAT16:
       return true;
     default:
       return false;
@@ -103,6 +105,8 @@ inline size_t bit_width(const DataType& dt) {
       return 32;
     case DataType::FLOAT64:
       return 64;
+    case DataType::BFLOAT16:
+      return 16;
     case DataType::INT128:
       return 128;
     default:
@@ -140,6 +144,8 @@ inline std::string to_string(const DataType& dt) {
       return "fp32";
     case DataType::FLOAT64:
       return "fp64";
+    case DataType::BFLOAT16:
+      return "bf16";
     case DataType::PRNG:
       return "prng";
     default:
@@ -149,21 +155,22 @@ inline std::string to_string(const DataType& dt) {
 
 inline DataType DataTypeFromString(const std::string& str) {
   static std::map<std::string, DataType> tbl = {
-      {"void", DataType::INVALID},  //
-      {"bool", DataType::BOOLEAN},  //
-      {"i8", DataType::INT8},       //
-      {"i16", DataType::INT16},     //
-      {"i32", DataType::INT32},     //
-      {"i64", DataType::INT64},     //
-      {"i128", DataType::INT128},   //
-      {"u8", DataType::UINT8},      //
-      {"u16", DataType::UINT16},    //
-      {"u32", DataType::UINT32},    //
-      {"u64", DataType::UINT64},    //
-      {"fp16", DataType::FLOAT16},  //
-      {"fp32", DataType::FLOAT32},  //
-      {"fp64", DataType::FLOAT64},  //
-      {"prng", DataType::PRNG},     //
+      {"void", DataType::INVALID},   //
+      {"bool", DataType::BOOLEAN},   //
+      {"i8", DataType::INT8},        //
+      {"i16", DataType::INT16},      //
+      {"i32", DataType::INT32},      //
+      {"i64", DataType::INT64},      //
+      {"i128", DataType::INT128},    //
+      {"u8", DataType::UINT8},       //
+      {"u16", DataType::UINT16},     //
+      {"u32", DataType::UINT32},     //
+      {"u64", DataType::UINT64},     //
+      {"fp16", DataType::FLOAT16},   //
+      {"fp32", DataType::FLOAT32},   //
+      {"fp64", DataType::FLOAT64},   //
+      {"bf16", DataType::BFLOAT16},  //
+      {"prng", DataType::PRNG},      //
   };
   auto it = tbl.find(str);
   if (it == tbl.end()) {
@@ -354,6 +361,8 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::FLOAT32;
     case proto::TensorShape_DataType_FLOAT64:
       return DataType::FLOAT64;
+    case proto::TensorShape_DataType_BFLOAT16:
+      return DataType::BFLOAT16;
     case proto::TensorShape_DataType_PRNG:
       return DataType::PRNG;
     default:
@@ -389,6 +398,8 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_FLOAT32;
     case DataType::FLOAT64:
       return proto::TensorShape_DataType_FLOAT64;
+    case DataType::BFLOAT16:
+      return proto::TensorShape_DataType_BFLOAT16;
     case DataType::PRNG:
       return proto::TensorShape_DataType_PRNG;
     default:
