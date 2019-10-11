@@ -107,6 +107,9 @@ void RegisterDerivs() {
   RegisterTensorDeriv("log", [](DERIV_ARGS) {  //
     return Tensors{DY / X[0]};
   });
+  RegisterTensorDeriv("ident", [](DERIV_ARGS) {  //
+    return Tensors{DY};
+  });
   RegisterTensorDeriv("index", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
   });

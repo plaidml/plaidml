@@ -775,6 +775,14 @@ class TestBackendOps(unittest.TestCase):
             -b.log(b.softmax(x, axis=1)),
         ]
 
+    @opTest([[m(1, 3, 2)]])
+    def testBranchWithSoftmax(self, b, x):
+        return [
+            b.softmax(x) + b.mean(x),
+            b.log(b.softmax(x)) + b.log(b.mean(x)),
+            b.softmax(x, axis=1) * b.mean(x, axis=1, keepdims=True),
+        ]
+
     @opTest([[m(1, 3, 4)], [m(7, 19) - 10.]])
     def testSoftsign(self, b, x):
         return [b.softsign(x)]

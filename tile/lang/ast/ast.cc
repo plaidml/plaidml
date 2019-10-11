@@ -397,7 +397,6 @@ class ProgramEvaluator : public AstVisitor<void> {
 
   void Visit(const GradOverrideExpr& expr) final {
     // Forward-pass GradOverrideExprs are no-ops; create an ident fcn
-    // TODO: probably can even elide the ident?
     IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
     auto name = NewTmp(expr);
     auto out_name = safe_at(&eval_.names_by_expr, expr.out.get());

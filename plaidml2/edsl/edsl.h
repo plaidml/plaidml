@@ -570,16 +570,13 @@ inline Tensor Placeholder(             //
   return Placeholder(shape, name);
 }
 
-inline Tensor OverrideGrads(TensorDeriv fn, const std::vector<Tensor>& ins, const Tensor& out) {
-  // TODO: Seems like it might (?) be possible to share the thunking code between this and
-  // `autodiff.h`'s `RegisterTensorDeriv`. Investigate
-
-  auto thunk = [](void* user_ctx,          //
-                  plaidml_expr* Y_expr,    //
-                  plaidml_expr* dY_expr,   //
-                  size_t nXs,              //
-                  plaidml_expr** X_exprs,  //
-                  plaidml_expr** dX_exprs) {
+inline plaidml_deriv ThunkTensorDeriv(TensorDeriv fn) {
+  return [](void* user_ctx,          //
+            plaidml_expr* Y_expr,    //
+            plaidml_expr* dY_expr,   //
+            size_t nXs,              //
+            plaidml_expr** X_exprs,  //
+            plaidml_expr** dX_exprs) {
     auto fn = reinterpret_cast<TensorDeriv>(user_ctx);
     Tensor Y(Y_expr);
     Tensor dY(dY_expr);
@@ -592,9 +589,10 @@ inline Tensor OverrideGrads(TensorDeriv fn, const std::vector<Tensor>& ins, cons
       dX_exprs[i] = ffi::call<plaidml_expr*>(plaidml_expr_clone, dXs[i].as_ptr());
     }
   };
-  // TODO: It would be really nice for not accidentally overriding too much if we copied the ins and out Tensor here.
-  // However, I think that we semantically can't do that without having this be "add on to grads" rather than "override
-  // grads" Still, verify that reasoning
+}
+
+inline Tensor OverrideGrads(TensorDeriv fn, const std::vector<Tensor>& ins, const Tensor& out) {
+  auto thunk = ThunkTensorDeriv(fn);
   auto nins = ins.size();
   std::vector<plaidml_expr*> in_ptrs(nins);
   for (size_t i = 0; i < ins.size(); i++) {
@@ -631,6 +629,8 @@ inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
 inline Tensor exp(const Tensor& x) { return Call("exp", x); }
 
 inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x, y); }
+
+inline Tensor ident(const Tensor& x) { return Call("ident", x); }
 
 inline Tensor index(const Tensor& x, size_t axis) { return Call("index", x, static_cast<int64_t>(axis)); }
 

@@ -2183,7 +2183,7 @@ Value softmax(const Value& value) {
   }
   auto I_original = args[0].as_tensor();
   auto axis = args[1].as_int();
-  auto I = I_original;  // Make a copy TODO: Sufficient?
+  auto I = ident(I_original);
 
   auto ndims = I.shape().ndims();
   axis = normalize_axis(axis, ndims, "softmax");
