@@ -22,7 +22,9 @@ class DerivRegistry {
   }
 
   void Register(const std::string& name, const ExprDeriv& fn, void* user_fn, void* user_ctx) {  //
-    // TODO: Handle the exception of name already existing
+    if (registry_.count(name)) {
+      throw std::runtime_error("Attempted to register deriv '" + name + "', which was already in the DerivRegistry");
+    }
     registry_[name] = ExprDerivEntry{fn, user_fn, user_ctx};
   }
 
