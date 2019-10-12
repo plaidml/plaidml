@@ -45,7 +45,7 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addTypes<ScalarType>();
   addOperations<
 #define GET_OP_LIST
-#include "pmlc/dialect/eltwise/ops.cpp.inc"
+#include "pmlc/dialect/eltwise/ops.cc.inc"
       >();
   addInterfaces<OpAsmInterface>();
 }

@@ -7,7 +7,7 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
-#include "pmlc/dialect/stripe/ops_interfaces.cpp.inc"
+#include "pmlc/dialect/stripe/ops_interfaces.cc.inc"
 
 void PrintSimple(Operation* op, OpAsmPrinter* p, size_t count, ArrayRef<StringRef> fixed, Type otype, bool vararg) {
   // Print the op name
@@ -80,7 +80,7 @@ bool ParseSimple(OpAsmParser* p, OperationState* res, llvm::SmallVectorImpl<OpAs
 }
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/stripe/ops.cpp.inc"
+#include "pmlc/dialect/stripe/ops.cc.inc"
 
 }  // namespace stripe
 }  // namespace dialect

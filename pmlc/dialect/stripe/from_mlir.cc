@@ -70,7 +70,7 @@ class StripeBuilder {
   void visit(AggregateOp op);
   void visit(SpecialOp op);
   void visit(eltwise::CastOp op);
-  void visit(eltwise::EltwiseBuilder op);
+  void visit(util::GenericBuilder op);
   void visit(eltwise::ScalarConstantOp op);
 
   void walk_interior(Block* inner);
@@ -444,7 +444,7 @@ void StripeBuilder::visit(StoreOp op) {
 
 void StripeBuilder::visit(AggregateOp op) {
   IVLOG(3, "StripeBuilder::visit(AggregateOp)");
-  auto agg_name = eltwise::stringifyAggregationKind(op.agg());
+  auto agg_name = util::stringifyAggregationKind(op.agg());
   auto ref_name = add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, agg_name);
   auto from = scalars_.at(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
@@ -467,7 +467,7 @@ void StripeBuilder::visit(SpecialOp specialOp) {
   cur_->stmts.push_back(stmt);
 }
 
-void StripeBuilder::visit(eltwise::EltwiseBuilder builder) {
+void StripeBuilder::visit(util::GenericBuilder builder) {
   auto op = builder.getOperation();
   IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
   for (auto operand : op->getOperands()) {
@@ -497,7 +497,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
 
   // handle the bitwidth
   auto result = op->getResult(0);
-  auto tensorType = eltwise::GetTensorType(result->getType());
+  auto tensorType = eltwise::getRankedTensorType(result->getType());
   auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
   auto bitwidth = bit_width(scalarType.type());
   auto bitwidth_name = scalar_name(op);
@@ -565,7 +565,7 @@ void StripeBuilder::walk_interior(Block* block) {
       // same scope as the user.
     } else if (auto op = mlir::dyn_cast<eltwise::CastOp>(op_base)) {
       visit(op);
-    } else if (auto op = mlir::dyn_cast<eltwise::EltwiseBuilder>(op_base)) {
+    } else if (auto op = mlir::dyn_cast<util::GenericBuilder>(op_base)) {
       // The EltwiseBuilder check should come after more specific checks
       visit(op);
     }

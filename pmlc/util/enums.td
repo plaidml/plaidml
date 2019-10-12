@@ -1,5 +1,5 @@
-#ifndef __PML_ELTWISE_ENUMS__
-#define __PML_ELTWISE_ENUMS__
+#ifndef __PML_UTIL_ENUMS__
+#define __PML_UTIL_ENUMS__
 
 #ifndef OP_BASE
 include "mlir/IR/OpBase.td"
@@ -15,7 +15,7 @@ def AggregationKind : I64EnumAttr<
       I64EnumAttrCase<"min", 3>,
       I64EnumAttrCase<"mul", 4>,
     ]> {
-  let cppNamespace = "pmlc::dialect::eltwise";
+  let cppNamespace = "pmlc::util";
   let returnType = "AggregationKind";
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
@@ -30,9 +30,9 @@ def CombinationKind : I64EnumAttr<
       I64EnumAttrCase<"eq", 3>,
       I64EnumAttrCase<"mul", 4>,
     ]> {
-  let cppNamespace = "pmlc::dialect::eltwise";
+  let cppNamespace = "pmlc::util";
   let returnType = "CombinationKind";
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
-#endif // __PML_ELTWISE_ENUMS__
+#endif // __PML_UTIL_ENUMS__
