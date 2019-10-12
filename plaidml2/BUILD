@@ -36,6 +36,7 @@ jsonnet_to_json(
 plaidml_cc_shlib(
     name = "shlib",
     linkopts = select({
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "@com_intel_plaidml//toolchain:macos_x86_64": [
             "-Wl,-exported_symbols_list",
             "$(location :plaidml.ld)",
@@ -54,6 +55,7 @@ plaidml_cc_shlib(
     deps = [
         ":plaidml",
     ] + select({
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "@com_intel_plaidml//toolchain:macos_x86_64": [
             ":plaidml.ld",
         ],
