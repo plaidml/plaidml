@@ -20,7 +20,6 @@ def _py_setup_impl(ctx):
     args.add(ctx.attr.action)
     if ctx.attr.universal:
         args.add("--universal")
-
     if ctx.attr.platform != "any":
         args.add("--plat-name", ctx.attr.platform)
 

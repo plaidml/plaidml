@@ -7,7 +7,7 @@ from setuptools import setup
 from tools.py_setup import bazel_stage
 
 REQUIRED_PACKAGES = [
-    'plaidml',
+    'plaidml2',
     'keras == 2.2.4',
     'six',
 ]
