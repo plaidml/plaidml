@@ -1,6 +1,7 @@
 # Copyright 2019 Intel Corporation.
 
 load("//tools/py_cffi:build_defs.bzl", "py_cffi")
+load("//tools/py_setup:build_defs.bzl", "py_setup")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bzl:plaidml.bzl",
@@ -22,7 +23,7 @@ plaidml_cc_library(
 
 plaidml_cc_dylib(
     name = "dylib",
-    dylib_name = "plaidml",
+    dylib_name = "plaidml2",
     visibility = ["//visibility:public"],
     deps = [
         ":plaidml",
@@ -77,4 +78,32 @@ py_binary(
         "//plaidml2/exec:py",
         "//plaidml2/op:py",
     ],
+)
+
+py_binary(
+    name = "py_setup",
+    srcs = ["setup.py"],
+    data = [
+        ":api",
+        "//plaidml2/core:sdk",
+        "//plaidml2/edsl:sdk",
+        "//plaidml2/exec:sdk",
+        "//plaidml2/op:sdk",
+    ],
+    main = "setup.py",
+    deps = [
+        ":py",
+        "//plaidml2/core:py",
+        "//plaidml2/edsl:py",
+        "//plaidml2/exec:py",
+        "//plaidml2/op:py",
+        "//tools/py_setup",
+    ],
+)
+
+py_setup(
+    name = "wheel",
+    package_name = "plaidml2",
+    tool = ":py_setup",
+    universal = True,
 )

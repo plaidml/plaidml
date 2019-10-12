@@ -7,35 +7,40 @@ load(
     "plaidml_py_library",
 )
 
+SDK_HDRS = [
+    "exec.h",
+    "ffi.h",
+]
+
 exports_files([
     "ffi.h",
 ])
+
+filegroup(
+    name = "sdk",
+    srcs = SDK_HDRS,
+    visibility = ["//visibility:public"],
+)
 
 plaidml_cc_library(
     name = "exec",
     srcs = [
         "ffi.cc",
     ],
-    hdrs = [
-        "exec.h",
-        "ffi.h",
-    ],
+    hdrs = SDK_HDRS,
     defines = ["PLAIDML_EXEC_DLL"],
-    alwayslink = 1,
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
         "//plaidml2/core",
         "//pmlc/dialect/stripe:transcode",
     ],
+    alwayslink = 1,
 )
 
 plaidml_cc_library(
     name = "api",
-    hdrs = [
-        "exec.h",
-        "ffi.h",
-    ],
+    hdrs = SDK_HDRS,
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml2/core:api",

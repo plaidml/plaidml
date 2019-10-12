@@ -262,15 +262,6 @@ def _plaidml_py_wheel_impl(ctx):
         mnemonic = "BuildWheel",
         use_default_shell_env = True,
     )
-
-    # output = ctx.actions.declare_file(wheel.basename, sibling = ctx.bin_dir)
-    # ctx.actions.run_shell(
-    #     outputs = [output],
-    #     inputs = [wheel],
-    #     command = "cp $1 $2",
-    #     arguments = [wheel.path, output.path],
-    #     mnemonic = "CopyWheel",
-    # )
     runfiles = ctx.runfiles(files = [wheel])
     return DefaultInfo(files = depset([wheel]), runfiles = runfiles)
 
