@@ -1,20 +1,24 @@
 # Copyright 2019 Intel Corporation.
 
 import os
+import pathlib
 import shutil
 import sys
+import zipfile
 
 
 def bazel_stage():
-    src = os.getenv('BZL_SRC')
-    tgt = os.path.join(os.getenv('BZL_TGT'), 'tmp')
-    shutil.rmtree(tgt)
+    src_root = pathlib.Path(os.getenv('BZL_SRC'))
+    tgt_root = pathlib.Path(os.getenv('BZL_TGT'))
+    tgt_path = tgt_root / 'tmp'
+    shutil.rmtree(tgt_path)
     if sys.platform == 'win32':
-        src = src + '.zip'
-        # unzip
+        stage = tgt_root / 'stage'
+        with zipfile.ZipFile(src_root.with_suffix('.zip')) as zf:
+            zf.extractall(stage)
+        src_path = stage / 'runfiles' / os.getenv('BZL_WORKSPACE')
+        src_path.rename(tgt_path)
     else:
-        src = os.path.join(src + '.runfiles', os.getenv('BZL_WORKSPACE'))
-        print('src: {}'.format(src))
-        print('tgt: {}'.format(tgt))
-        shutil.copytree(src, tgt)
-    os.chdir(tgt)
+        src_path = src_root.with_suffix('.runfiles') / os.getenv('BZL_WORKSPACE')
+        shutil.copytree(src_path, tgt_path)
+    os.chdir(tgt_path)
