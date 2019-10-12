@@ -14,10 +14,12 @@ REQUIRED_PACKAGES = [
 
 
 def main():
-    bazel_stage()
+    if os.getenv('BZL_SRC'):
+        bazel_stage()
+
     setup(
         name='plaidml2_keras',
-        version=os.getenv('BZL_VERSION'),
+        version=os.getenv('BZL_VERSION', '0.0.0'),
         author='Intel Corporation',
         author_email='plaidml-dev@googlegroups.com',
         classifiers=[

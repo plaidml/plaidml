@@ -19,7 +19,8 @@ REQUIRED_PACKAGES = [
 
 
 def main():
-    bazel_stage()
+    if os.getenv('BZL_SRC'):
+        bazel_stage()
 
     if sys.platform == 'win32':
         binary_name = 'plaidml2.dll'
@@ -30,7 +31,7 @@ def main():
 
     setup(
         name='plaidml2',
-        version=os.getenv('BZL_VERSION'),
+        version=os.getenv('BZL_VERSION', '0.0.0'),
         author='Intel Corporation',
         author_email='plaidml-dev@googlegroups.com',
         classifiers=[

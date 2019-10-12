@@ -104,6 +104,12 @@ py_binary(
 py_setup(
     name = "wheel",
     package_name = "plaidml2",
+    platform = select({
+        "//toolchain:macos_x86_64": "macosx_10_10_x86_64",
+        "//toolchain:windows_x86_64": "win_amd64",
+        "//conditions:default": "manylinux1_x86_64",
+    }),
     tool = ":py_setup",
     universal = True,
+    visibility = ["//visibility:public"],
 )

@@ -35,6 +35,7 @@ py_setup(
     package_name = "plaidml2_keras",
     tool = ":setup",
     universal = True,
+    visibility = ["//visibility:public"],
 )
 
 py_test(

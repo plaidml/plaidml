@@ -13,6 +13,8 @@ pkg_tar(
         "//plaidbench:wheel",
         "//plaidml:wheel",
         "//plaidml/keras:wheel",
+        "//plaidml2:wheel",
+        "//plaidml2/bridge/keras:wheel",
     ],
     extension = "tar.gz",
 )

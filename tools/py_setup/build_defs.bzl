@@ -21,6 +21,9 @@ def _py_setup_impl(ctx):
     if ctx.attr.universal:
         args.add("--universal")
 
+    if ctx.attr.platform != "any":
+        args.add("--plat-name", ctx.attr.platform)
+
     ctx.actions.run(
         mnemonic = "PySetup",
         executable = ctx.executable.tool,

@@ -243,7 +243,6 @@ SUITES:
     platforms:
       keras-stripe-ocl-gp100gl:
         pipelines: [plaidml, nightly]
-
     params:
       ci:
         batch_sizes: [0]
@@ -251,14 +250,18 @@ SUITES:
         batch_sizes: [0]
       nightly:
         batch_sizes: [0]
+    wheels:
+      # NOTE: this list must be in least to most dependent order.
+      - plaidml2-{version}-py2.py3-none-{arch}.whl
+      - plaidml2_keras-{version}-py2.py3-none-any.whl
     timeout: 30
     conda_env: conda/plaidml.yml
     compare: no
-    cwd: .
+    cwd: plaidml2/bridge/keras
     runner: python
     workloads:
       backend:
-        args: [plaidml2/bridge/keras/backend_test.py]
+        args: [backend_test.py]
         precision: untested
         shards: 3
 
