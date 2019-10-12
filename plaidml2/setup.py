@@ -12,6 +12,7 @@ CONSOLE_SCRIPTS = [
 ]
 
 REQUIRED_PACKAGES = [
+    'cffi',
     'enum34 >= 1.1.6',
     'numpy',
     'six',
@@ -71,6 +72,7 @@ def main():
                 'plaidml2/op/ffi.h',
             ]),
             ('lib', [os.path.join('plaidml2', binary_name)]),
+            ('share/plaidml2', ['plaidml2/plaidml2-config.cmake']),
         ],
         description='PlaidML machine learning accelerator',
         entry_points={
