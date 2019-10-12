@@ -213,7 +213,7 @@ SUITES:
     workloads:
       backend:
         args: [backend_test.py]
-        conda_env: conda/plaidml.yml
+        conda_env: conda/keras_backend_test.yml
         precision: untested
         platform_overrides:
           keras-stripe-ocl-gfx803:
@@ -255,7 +255,7 @@ SUITES:
       - plaidml2-{version}-py2.py3-none-{arch}.whl
       - plaidml2_keras-{version}-py2.py3-none-any.whl
     timeout: 30
-    conda_env: conda/plaidml.yml
+    conda_env: conda/keras_backend_test.yml
     compare: no
     cwd: plaidml2/bridge/keras
     runner: python
