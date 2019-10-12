@@ -1,6 +1,6 @@
 // Copyright 2019, Intel Corporation
 
-include "pmlc/dialect/eltwise/enums.td"
+include "pmlc/util/enums.td"
 include "pmlc/dialect/eltwise/predicates.td"
 
 def StripeDialect : Dialect {
