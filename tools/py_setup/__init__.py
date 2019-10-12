@@ -16,9 +16,9 @@ def bazel_stage():
         stage = tgt_root / 'stage'
         with zipfile.ZipFile(src_root.with_suffix('.zip')) as zf:
             zf.extractall(stage)
-        src_path = stage / 'runfiles' / os.getenv('BZL_WORKSPACE')
+        src_path = stage / 'runfiles'
         src_path.rename(tgt_path)
     else:
-        src_path = src_root.with_suffix('.runfiles') / os.getenv('BZL_WORKSPACE')
+        src_path = src_root.with_suffix('.runfiles')
         shutil.copytree(src_path, tgt_path)
     os.chdir(tgt_path)

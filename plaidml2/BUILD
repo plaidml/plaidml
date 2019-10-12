@@ -6,8 +6,8 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 load(
     "//bzl:plaidml.bzl",
-    "plaidml_cc_dylib",
     "plaidml_cc_library",
+    "plaidml_cc_shlib",
     "plaidml_py_library",
     "plaidml_py_wheel",
 )
@@ -33,9 +33,8 @@ jsonnet_to_json(
     extra_args = ["-S"],
 )
 
-plaidml_cc_dylib(
-    name = "dylib",
-    dylib_name = "plaidml2",
+plaidml_cc_shlib(
+    name = "shlib",
     linkopts = select({
         "@com_intel_plaidml//toolchain:macos_x86_64": [
             "-Wl,-exported_symbols_list",
@@ -49,14 +48,12 @@ plaidml_cc_dylib(
             "$(location :plaidml.lds)",
         ],
     }),
+    shlib_name = "plaidml2",
     visibility = ["//visibility:public"],
     win_def_file = ":plaidml.def",
     deps = [
         ":plaidml",
     ] + select({
-        "@com_intel_plaidml//toolchain:windows_x86_64": [
-            ":plaidml.def",
-        ],
         "@com_intel_plaidml//toolchain:macos_x86_64": [
             ":plaidml.ld",
         ],
@@ -68,7 +65,7 @@ plaidml_cc_dylib(
 
 plaidml_cc_library(
     name = "api",
-    srcs = [":dylib"],
+    srcs = [":shlib"],
     linkstatic = 1,
     visibility = ["//visibility:public"],
     deps = [
@@ -85,7 +82,7 @@ plaidml_py_library(
         "__init__.py",
         "ffi.py",
     ],
-    data = [":dylib"],
+    data = [":shlib"],
     visibility = ["//visibility:public"],
     deps = [
         ":_ffi",
@@ -122,10 +119,21 @@ py_binary(
     data = [
         "plaidml2-config.cmake",
         ":api",
+        "//:LICENSE",
         "//plaidml2/core:sdk",
         "//plaidml2/edsl:sdk",
         "//plaidml2/exec:sdk",
         "//plaidml2/op:sdk",
+        "@boost//:LICENSE_1_0.txt",
+        "@com_google_protobuf//:LICENSE",
+        "@easylogging//:LICENCE.txt",
+        "@gmock//:googlemock/LICENSE",
+        "@half//:LICENSE.txt",
+        "@jsoncpp//:LICENSE",
+        "@llvm//:LICENSE.TXT",
+        "@minizip//:LICENSE",
+        "@mlir//:LICENSE.TXT",
+        "@xsmm//:documentation/LICENSE.md",
     ],
     main = "setup.py",
     deps = [

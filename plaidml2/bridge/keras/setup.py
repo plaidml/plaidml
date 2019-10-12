@@ -7,8 +7,10 @@ from setuptools import setup
 from tools.py_setup import bazel_stage
 
 REQUIRED_PACKAGES = [
-    'plaidml2',
     'keras == 2.2.4',
+    'numpy',
+    'plaidml2',
+    'scipy',
     'six',
 ]
 
@@ -46,6 +48,7 @@ def main():
         keywords='plaidml ml machine learning tensor compiler keras',
         license='https://www.apache.org/licenses/LICENSE-2.0',
         long_description='PlaidML-Keras implements a Keras backend using PlaidML.',
+        package_dir={'': 'com_intel_plaidml'},
         packages=[
             'plaidml2.bridge.keras',
         ],
