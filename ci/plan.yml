@@ -37,6 +37,8 @@ PLATFORMS:
     variant: linux_x86_64
   keras-tf-cuda-gtx1070:
     variant: linux_x86_64
+  keras-tf-dnnl-cpu:
+    variant: linux_x86_64
   keras-plaid-ocl-gtx1070:
     variant: linux_x86_64
   keras-plaid-ocl-r9nano:
@@ -270,6 +272,9 @@ SUITES:
       keras-tf-cuda-gp100gl:
         pipelines: [nightly]
         append_args: [--tensorflow]
+      keras-tf-dnnl-cpu:
+        pipelines: [nightly]
+        append_args: [--tensorflow]
 
       keras-plaid-ocl-gfx803:
         pipelines: [nightly]
@@ -345,6 +350,8 @@ SUITES:
       inception_v3:
         precision: high
         platform_overrides:
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
           keras-plaid-ocl-gfx803:
             prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
