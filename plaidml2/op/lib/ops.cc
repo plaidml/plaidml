@@ -2181,11 +2181,30 @@ Value softmax(const Value& value) {
   if (args.size() != 2) {
     throw std::runtime_error("softmax expects 2 arguments");
   }
-  auto I = args[0].as_tensor();
-  auto axis = args[1].as_int();
+  auto I_original = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+  auto I = ident(I_original);
 
   auto ndims = I.shape().ndims();
-  axis = normalize_axis(axis, ndims, "softmax");
+  auto axis = normalize_axis(raw_axis, ndims, "softmax");
+
+  // Ensure the axis is the last dimension, to make the derivative code happy
+  bool transposed = false;
+  std::vector<Value> pattern(ndims);  // Will be reused at the end to return to original order
+  if (axis != ndims - 1) {
+    transposed = true;
+    for (size_t i = 0; i < ndims; ++i) {
+      if (i == axis) {
+        pattern[i] = Value{ndims - 1};
+      } else if (i == ndims - 1) {
+        pattern[i] = Value{axis};
+      } else {
+        pattern[i] = Value{i};
+      }
+    }
+    I = transpose(Value{std::vector<Value>{args[0], Value{pattern}}}).as_tensor();
+    axis = ndims - 1;  // we've moved the softmax axis to be the last axis
+  }
 
   std::vector<TensorDim> I_dims(ndims);
   std::vector<TensorIndex> I_idxs(ndims);
@@ -2200,7 +2219,34 @@ Value softmax(const Value& value) {
   auto E = exp(I - M);
   auto N = TensorOutput(R_dims);
   N(R_idxs) += E(I_idxs);
-  return Value{E / N};
+  auto O = E / N;
+  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
+    auto I = X[0];
+    auto ndims = I.shape().ndims();
+    std::vector<TensorDim> I_dims(ndims);
+    std::vector<TensorIndex> I_idxs(ndims);
+    I.bind_dims(I_dims);
+    std::vector<TensorDim> R_dims = I_dims;
+    std::vector<TensorIndex> R_idxs = I_idxs;
+    R_dims.back() = TensorDim{1};    // Softmax along last axis
+    R_idxs.back() = TensorIndex{0};  // Softmax along last axis
+
+    auto YdY = Y * DY;
+    auto T = TensorOutput(R_dims);
+    T(R_idxs) += YdY(I_idxs);
+    auto TB = TensorOutput(I_dims);
+    TB(I_idxs) += T(R_idxs);
+    return std::vector<Tensor>{YdY - TB * Y};
+  };
+  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
+  // If we reordered, return to original order
+  Tensor ret;
+  if (transposed) {
+    ret = transpose(Value{std::vector<Value>{Value{Overridden}, Value{pattern}}}).as_tensor();
+  } else {
+    ret = Overridden;
+  }
+  return Value{ret};
 }
 
 Value spatial_padding(const Value& value) {

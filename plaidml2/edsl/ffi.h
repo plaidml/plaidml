@@ -152,6 +152,31 @@ PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_op(  //
     plaidml_dim_expr** args);
 
 //
+// plaidml_deriv
+//
+
+PLAIDML_EDSL_API void plaidml_expr_gradient(  //
+    plaidml_error* err,                       //
+    size_t nwrts,                             //
+    plaidml_expr** wrts,                      //
+    plaidml_expr* loss,                       //
+    plaidml_expr** derivs);
+
+typedef void (*plaidml_deriv)(  //
+    void* user_ctx,             //
+    plaidml_expr* Y,            //
+    plaidml_expr* dY,           //
+    size_t nXs,                 //
+    plaidml_expr** Xs,          //
+    plaidml_expr** dXs);
+
+PLAIDML_EDSL_API void plaidml_deriv_register(  //
+    plaidml_error* err,                        //
+    const char* name,                          //
+    plaidml_deriv fn,                          //
+    void* user_ctx);
+
+//
 // plaidml_expr
 //
 
@@ -265,6 +290,14 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_size_map(  //
     size_t ndims,                                      //
     plaidml_dim_expr** sizes);
 
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_grad_override(  //
+    plaidml_error* err,                                     //
+    plaidml_deriv fn,                                       //
+    void* user_ctx,                                         //
+    size_t nins,                                            //
+    plaidml_expr** ins,                                     //
+    plaidml_expr* out);
+
 typedef enum {
   PLAIDML_AGG_OP_NONE,
   PLAIDML_AGG_OP_SUM,
@@ -308,31 +341,6 @@ PLAIDML_EDSL_API void plaidml_expr_contraction_set_use_default(  //
     plaidml_error* err,                                          //
     plaidml_expr* expr,                                          //
     plaidml_expr* use_default);
-
-//
-// plaidml_deriv
-//
-
-PLAIDML_EDSL_API void plaidml_expr_gradient(  //
-    plaidml_error* err,                       //
-    size_t nwrts,                             //
-    plaidml_expr** wrts,                      //
-    plaidml_expr* loss,                       //
-    plaidml_expr** derivs);
-
-typedef void (*plaidml_deriv)(  //
-    void* user_ctx,             //
-    plaidml_expr* Y,            //
-    plaidml_expr* dY,           //
-    size_t nXs,                 //
-    plaidml_expr** Xs,          //
-    plaidml_expr** dXs);
-
-PLAIDML_EDSL_API void plaidml_deriv_register(  //
-    plaidml_error* err,                        //
-    const char* name,                          //
-    plaidml_deriv fn,                          //
-    void* user_ctx);
 
 //
 // plaidml_program
