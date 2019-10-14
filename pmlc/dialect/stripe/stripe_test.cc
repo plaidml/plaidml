@@ -56,7 +56,12 @@ std::unique_ptr<mlir::Pass> CreatePass(Config config) {
   return std::make_unique<Pass>(config);
 }
 
-TEST(Stripe, Transcode) {
+// Stripe Classic <-> Stripe MLIR transcoding tests are parameterized by whether they should add location info
+// or not, since there've been some subtle transcoding issues when location-adding top-level refinements are
+// or aren't in place.
+class TranscodeTest : public ::testing::TestWithParam<bool> {};
+
+TEST_P(TranscodeTest, Classic_MLIR_Classic) {
   IVLOG(1, "Making context + module");
   mlir::MLIRContext context;
 
@@ -64,28 +69,30 @@ TEST(Stripe, Transcode) {
   auto prog = lang::GenerateStripe(example());
   codegen::LocalizeBlockPass(codegen::AliasMap(codegen::AliasMap(), prog->entry.get()), prog->entry.get(), {"tmp"});
 
-  codegen::CompilerState cstate{prog};
+  if (GetParam()) {
+    codegen::CompilerState cstate{prog};
 
-  IVLOG(1, "Adding a memory location");
-  codegen::proto::LocateMemoryPass lmp;
-  auto lmp_dev = lmp.mutable_loc()->add_devs();
-  lmp_dev->set_name("OuterMem");
-  lmp_dev->add_units()->set_offset(0);
-  lmp_dev = lmp.mutable_loc()->add_devs();
-  lmp_dev->set_name("InnerMem");
-  lmp_dev->add_units()->set_offset(1);
-  codegen::LocateMemoryPass{lmp}.Apply(&cstate);
+    IVLOG(1, "Adding a memory location");
+    codegen::proto::LocateMemoryPass lmp;
+    auto lmp_dev = lmp.mutable_loc()->add_devs();
+    lmp_dev->set_name("OuterMem");
+    lmp_dev->add_units()->set_offset(0);
+    lmp_dev = lmp.mutable_loc()->add_devs();
+    lmp_dev->set_name("InnerMem");
+    lmp_dev->add_units()->set_offset(1);
+    codegen::LocateMemoryPass{lmp}.Apply(&cstate);
 
-  IVLOG(1, "Adding an executor location");
-  codegen::proto::LocateBlockPass lbp;
-  lbp.add_reqs("main");
-  auto lbp_dev = lbp.mutable_loc()->add_devs();
-  lbp_dev->set_name("OuterExecutor");
-  lbp_dev->add_units()->set_offset(0);
-  lbp_dev = lbp.mutable_loc()->add_devs();
-  lbp_dev->set_name("InnerExecutor");
-  lbp_dev->add_units()->set_offset(1);
-  codegen::LocateBlockPass{lbp}.Apply(&cstate);
+    IVLOG(1, "Adding an executor location");
+    codegen::proto::LocateBlockPass lbp;
+    lbp.add_reqs("main");
+    auto lbp_dev = lbp.mutable_loc()->add_devs();
+    lbp_dev->set_name("OuterExecutor");
+    lbp_dev->add_units()->set_offset(0);
+    lbp_dev = lbp.mutable_loc()->add_devs();
+    lbp_dev->set_name("InnerExecutor");
+    lbp_dev->add_units()->set_offset(1);
+    codegen::LocateBlockPass{lbp}.Apply(&cstate);
+  }
 
   IVLOG(2, "Original version:");
   IVLOG(2, *prog->entry);
@@ -129,3 +136,5 @@ TEST(Stripe, Transcode) {
   // require textually perfect round trip
   EXPECT_THAT(to_string(*prog2->entry), LinesEq(to_string(*prog->entry)));
 }
+
+INSTANTIATE_TEST_CASE_P(NonTrivialLocs, TranscodeTest, ::testing::Values(false, true));
