@@ -7,8 +7,11 @@ load("//vendor/mlir:mlir.bzl", "COPTS")
 
 plaidml_cc_library(
     name = "stripe_to_affine",
-    srcs = ["convert_stripe_to_affine.cc"],
-    hdrs = ["convert_stripe_to_affine.h"],
+    srcs = [
+        "convert_stripe_to_affine.cc",
+        "convert_stripe_to_affine.h",
+        "supported_ops.inc"
+    ],
     copts = COPTS,
     tags = ["llvm"],
     deps = [
