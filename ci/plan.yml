@@ -350,6 +350,8 @@ SUITES:
       inception_v3:
         precision: high
         platform_overrides:
+          keras-stripe-llvm-cpu:
+            prepend_args: [--examples, 64]
           keras-plaid-ocl-gfx803:
             prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
@@ -372,6 +374,8 @@ SUITES:
       resnet50:
         precision: high
         platform_overrides:
+          keras-stripe-llvm-cpu:
+            prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 128]
           keras-stripe-ocl-gfx804:
@@ -382,7 +386,9 @@ SUITES:
             prepend_args: [--examples, 256]
       vgg19:
         precision: high
-        platform_overrides:
+        platform_overrides:          
+          keras-stripe-llvm-cpu:
+            prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx803:
             prepend_args: [--examples, 256]
           keras-plaid-ocl-gfx804:
@@ -399,6 +405,8 @@ SUITES:
       xception:
         precision: high
         platform_overrides:
+          keras-stripe-llvm-cpu:
+            prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx803:
             prepend_args: [--examples, 64]
           keras-plaid-ocl-gfx804:
