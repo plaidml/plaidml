@@ -3,7 +3,7 @@ channels:
 dependencies:
   - pip
   - python=3.6
-  - tensorflow
+  - tensorflow-gpu
 #  - pip:
 #      - intel-tensorflow==1.8.0; platform_system == 'Darwin'
 #      - tensorflow-gpu==1.8.0; platform_system != 'Darwin'

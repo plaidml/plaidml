@@ -7,7 +7,7 @@ dependencies:
   - pip
   - python=3.6
   - scipy=1.2.1
-  - tensorflow
+  - tensorflow-gpu
   - pip:
       - click
       - keras==2.2.4
