@@ -273,7 +273,7 @@ SUITES:
         pipelines: [nightly]
         append_args: [--tensorflow]
       keras-tf-dnnl-cpu:
-        pipelines: [nightly]
+        pipelines: [ci, nightly]
         append_args: [--tensorflow]
 
       keras-plaid-ocl-gfx803:
