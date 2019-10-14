@@ -90,6 +90,7 @@ NUMPY_DTYPE_TO_PLAIDML = {
     'uint16': plaidml.DType.UINT16,
     'uint32': plaidml.DType.UINT32,
     'uint64': plaidml.DType.UINT64,
+    'bfloat16': plaidml.DType.BFLOAT16,
 }
 
 PLAIDML_DTYPE_TO_NUMPY = dict([[v, k] for k, v in NUMPY_DTYPE_TO_PLAIDML.items()])
@@ -1204,6 +1205,7 @@ DTYPE_INFOS = {
     plaidml.DType.FLOAT16: DTypeInfo(base='float', width=2),
     plaidml.DType.FLOAT32: DTypeInfo(base='float', width=4),
     plaidml.DType.FLOAT64: DTypeInfo(base='float', width=8),
+    plaidml.DType.BFLOAT16: DTypeInfo(base='float', width=2),
 }
 
 INFO_DTYPES = dict([[v, k] for k, v in DTYPE_INFOS.items()])

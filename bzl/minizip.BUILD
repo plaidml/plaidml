@@ -2,6 +2,8 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])  # BSD/MIT-like license
 
+exports_files(["LICENSE"])
+
 cc_library(
     name = "minizip",
     srcs = [

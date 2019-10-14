@@ -3,7 +3,8 @@
 licenses(["by_exception_only"])
 
 load("@rules_python//python:defs.bzl", "py_test")
-load("//bzl:plaidml.bzl", "plaidml_py_library", "plaidml_py_wheel")
+load("//tools/py_setup:build_defs.bzl", "py_setup")
+load("//bzl:plaidml.bzl", "plaidml_py_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -18,6 +19,23 @@ plaidml_py_library(
         "//plaidml2/exec:py",
         "//plaidml2/op:py",
     ],
+)
+
+py_binary(
+    name = "setup",
+    srcs = ["setup.py"],
+    deps = [
+        ":keras",
+        "//tools/py_setup",
+    ],
+)
+
+py_setup(
+    name = "wheel",
+    package_name = "plaidml2_keras",
+    tool = ":setup",
+    universal = True,
+    visibility = ["//visibility:public"],
 )
 
 py_test(
@@ -115,16 +133,4 @@ py_test(
 #     deps = [
 #         ":keras",
 #     ],
-# )
-
-# plaidml_py_wheel(
-#     name = "wheel",
-#     package_name = "plaidml_keras",
-#     srcs = [
-#         "__init__.py",
-#         "backend.py",
-#     ],
-#     config = ":not_setup.cfg",
-#     package_prefix = "plaidml/keras",
-#     python = "py2.py3",
 # )

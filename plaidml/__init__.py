@@ -815,6 +815,7 @@ class DType(enum.IntEnum):
     FLOAT16 = 0x31
     FLOAT32 = 0x32
     FLOAT64 = 0x33
+    BFLOAT16 = 0x38
     PRNG = 0x40
 
 
@@ -830,7 +831,8 @@ _CTYPES = {
     DType.UINT64: ctypes.c_uint64,
     DType.FLOAT16: ctypes.c_uint16,  # TODO: Implement half-width float wrapper
     DType.FLOAT32: ctypes.c_float,
-    DType.FLOAT64: ctypes.c_double
+    DType.FLOAT64: ctypes.c_double,
+    DType.BFLOAT16: ctypes.c_uint16
 }
 
 _NP_TYPES = {
@@ -842,6 +844,7 @@ _NP_TYPES = {
     DType.INT64: 'int64',
     DType.UINT32: 'uint32',
     DType.UINT64: 'uint64',
+    DType.BFLOAT16: 'bfloat16'  # NB Requires numpy bf16 support, as added by Tensorflow
 }
 
 
@@ -1188,18 +1191,33 @@ class _View(object):
             varray[0] = value
             value = varray.view(dtype='uint16')[0]
 
+        # Special handling since bfloat16 is a placed into a uint16 on the C side
+        # (since C has no half type), and yet we want the move the actual bits
+        # across (not cast float -> int)
+        if self._dtype == DType.BFLOAT16:
+            # Do a reinterpet cast... Is there a better way to do this?
+            varray = np.array([0], dtype='bfloat16')
+            varray[0] = value
+            value = varray.view(dtype='uint16')[0]
+
         self._base[idx] = value
 
     def as_ndarray(self):
         ar = np.ctypeslib.as_array(self, shape=tuple(dim.size for dim in self._shape.dimensions))
         if self._dtype == DType.FLOAT16:
             ar = ar.view(dtype='float16')
+        elif self._dtype == DType.BFLOAT16:
+            ar = ar.view(dtype='bfloat16')
         return ar
 
     def copy_from_ndarray(self, src):
         if self._dtype == DType.FLOAT16:
             if src.dtype != 'float16':
                 src = src.astype('float16')
+            src = src.view(dtype='uint16')
+        elif self._dtype == DType.BFLOAT16:
+            if src.dtype != 'bfloat16':
+                src = src.astype('bfloat16')
             src = src.view(dtype='uint16')
         dst = np.ctypeslib.as_array(self._base, shape=src.shape)
         np.copyto(dst, src)
@@ -1208,6 +1226,8 @@ class _View(object):
         src = np.ctypeslib.as_array(self._base, shape=dst.shape)
         if self._dtype == DType.FLOAT16:
             src = src.view(dtype='float16')
+        elif self._dtype == DType.BFLOAT16:
+            src = src.view(dtype='bfloat16')
         np.copyto(dst, src)
 
     def __len__(self):

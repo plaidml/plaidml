@@ -75,6 +75,7 @@ class StripeBuilder {
 
   void walk_interior(Block* inner);
 
+  mlir::Block* func_block_ = nullptr;
   std::shared_ptr<stripe::Block> cur_;
   std::map<stripe::Block*, ScalarInfo> scalar_names_;
   std::map<mlir::Block*, BlockInfo> blocks_;
@@ -132,7 +133,7 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
   cur_->name = func.getName();
   auto attrs = func.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
   add_attributes(cur_.get(), attrs.getValue());
-  Block& oblock = func.front();
+  func_block_ = &func.front();
   BlockInfo blockInfo(cur_.get());
   for (size_t i = 0; i < func.getNumArguments(); i++) {
     // add refinement for each arg
@@ -149,8 +150,8 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
     cur_->refs.emplace(ref);
     blockInfo.refs[ti] = name.str();
   }
-  blocks_.emplace(&oblock, blockInfo);
-  walk_interior(&oblock);
+  blocks_.emplace(func_block_, blockInfo);
+  walk_interior(func_block_);
 }
 
 TensorShape StripeBuilder::get_shape(TensorType type) {
@@ -297,18 +298,32 @@ std::string StripeBuilder::add_refinements(  //
       }
     }
     // If op matches the block, move the op up, also attributes
+    mlir::Value* opInput = nullptr;
     while (op && op->getBlock() == block && mlir::isa<RefineOp>(op)) {
       if (auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName())) {
         add_attributes(ref, attrs.getValue());
       }
-      op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
+      opInput = mlir::cast<RefineOp>(op).in();
+      if (mlir::isa<mlir::BlockArgument>(opInput)) {
+        // Since the input is a block argument, we're done.
+        break;
+      } else {
+        op = opInput->getDefiningOp();
+      }
     }
-    // Must have hit the allocation, stop
-    if (!op || op->getBlock() == block) {
+    // Must have reached an alloc or a block argument.  If it's an alloc, we're done; we're also done if we're
+    // already looking at the function block.
+    if (!op || mlir::isa<AllocateOp>(op) || block == func_block_) {
       break;
     }
-    // Move one block up
-    block = block->getParentOp()->getBlock();
+    if (opInput && mlir::isa<mlir::BlockArgument>(opInput)) {
+      // This was a block argument; advance to the function block.
+      block = func_block_;
+      op = nullptr;
+    } else {
+      // Move one block up.
+      block = block->getParentOp()->getBlock();
+    }
   }
   // Special handing for allocation block
   ref->dir = stripe::RefDir::None;

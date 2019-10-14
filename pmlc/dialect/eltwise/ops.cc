@@ -78,6 +78,7 @@ Type AsFloatOp::getResultType(ArrayRef<Value*> operands) {
   auto tensorType = getRankedTensorType(tensor->getType());
   ScalarType elementType;
   switch (bitwidth.getInt()) {
+    // TODO: How should this handle bfloat16?
     case 16:
       elementType = ScalarType::get(tensor->getContext(), DataType::FLOAT16);
       break;
