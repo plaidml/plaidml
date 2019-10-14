@@ -137,6 +137,13 @@ DimExprPtr MakeOp(IntOp op, const std::vector<DimExprPtr>& args) {  //
   return MakeOp<DimIntExpr, DimOpExpr>(op, args);
 }
 
+ExprPtr MakeGradOverride(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins,
+                         const ExprPtr& out) {  //
+  auto expr = std::make_shared<GradOverrideExpr>(fn, ins, out);
+  expr->ComputeShape();
+  return expr;
+}
+
 ExprPtr MakeCall(const std::string& fn, const std::vector<ExprPtr>& args) {
   if (fn == "neg") {
     auto int_expr = std::dynamic_pointer_cast<IntConst>(args[0]);

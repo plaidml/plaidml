@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,8 @@ namespace ast {
 PolyExprPtr MakeOp(IntOp op, const std::vector<PolyExprPtr>& args);
 DimExprPtr MakeOp(IntOp op, const std::vector<DimExprPtr>& args);
 ExprPtr MakeCall(const std::string& fn, const std::vector<ExprPtr>& args);
+ExprPtr MakeGradOverride(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins,
+                         const ExprPtr& out);
 
 }  // namespace ast
 }  // namespace lang
