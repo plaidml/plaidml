@@ -224,8 +224,6 @@ SUITES:
             soft_fail: true
           keras-plaid-mtl-uhd630:
             soft_fail: true
-          keras-stripe-llvm-cpu:
-            soft_fail: true
         shards: 3
       regression:
         args: [regression_test.py]
