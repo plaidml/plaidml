@@ -7,12 +7,18 @@ package(default_visibility = ["//visibility:public"])
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_python//python:defs.bzl", "py_runtime_pair")
 
+exports_files([
+    "LICENSE",
+])
+
 pkg_tar(
     name = "pkg",
     srcs = [
         "//plaidbench:wheel",
         "//plaidml:wheel",
         "//plaidml/keras:wheel",
+        "//plaidml2:wheel",
+        "//plaidml2/bridge/keras:wheel",
     ],
     extension = "tar.gz",
 )

@@ -28,6 +28,7 @@
 #include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
+#include "pmlc/dialect/tile/dialect.h"
 #include "pmlc/dialect/tile/ops.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/slice.h"
@@ -63,6 +64,19 @@ struct TileBuilder::Impl {
       ret = CommonSupertype(ret, dtype);
     }
     return builder.getType<ScalarType>(ret);
+  }
+
+  const mlir::AbstractOperation* lookupOperation(StringRef op) {
+    auto opName = eltwise::Dialect::getCanonicalOpName(op);
+    auto abstractOp = mlir::AbstractOperation::lookup(opName, &context);
+    if (!abstractOp) {
+      opName = tile::Dialect::getCanonicalOpName(op);
+      abstractOp = mlir::AbstractOperation::lookup(opName, &context);
+      if (!abstractOp) {
+        throw std::runtime_error("Unknown op: " + op.str());
+      }
+    }
+    return abstractOp;
   }
 
   using CreateOpFunc = std::function<void(OpBuilder, BlockAndValueMapping*)>;
@@ -259,17 +273,13 @@ mlir::Value* TileBuilder::MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mli
   for (auto arg : args) {
     IVLOG(6, "  arg: " << mlir::debugString(*arg));
   }
-  auto opName = eltwise::Dialect::getCanonicalOpName(fn);
-  auto abstractOp = mlir::AbstractOperation::lookup(opName, &impl->context);
-  if (!abstractOp) {
-    throw std::runtime_error("Unknown op: " + opName);
-  }
-  auto eltwiseBuilder = abstractOp->getInterface<eltwise::EltwiseBuilder>();
-  if (!eltwiseBuilder) {
-    throw std::runtime_error("Unknown intrinsic: " + opName);
+  auto abstractOp = impl->lookupOperation(fn);
+  auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
+  if (!genericBuilder) {
+    throw std::runtime_error("Unknown intrinsic: " + fn.str());
   }
   auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);  // TODO
-  auto op = eltwiseBuilder->create(&impl->builder, impl->builder.getUnknownLoc(), type, args);
+  auto op = genericBuilder->create(&impl->builder, impl->builder.getUnknownLoc(), type, args);
   return op->getResult(0);
 }
 

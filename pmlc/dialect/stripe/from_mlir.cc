@@ -70,11 +70,12 @@ class StripeBuilder {
   void visit(AggregateOp op);
   void visit(SpecialOp op);
   void visit(eltwise::CastOp op);
-  void visit(eltwise::EltwiseBuilder op);
+  void visit(util::GenericBuilder op);
   void visit(eltwise::ScalarConstantOp op);
 
   void walk_interior(Block* inner);
 
+  mlir::Block* func_block_ = nullptr;
   std::shared_ptr<stripe::Block> cur_;
   std::map<stripe::Block*, ScalarInfo> scalar_names_;
   std::map<mlir::Block*, BlockInfo> blocks_;
@@ -132,7 +133,7 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
   cur_->name = func.getName();
   auto attrs = func.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
   add_attributes(cur_.get(), attrs.getValue());
-  Block& oblock = func.front();
+  func_block_ = &func.front();
   BlockInfo blockInfo(cur_.get());
   for (size_t i = 0; i < func.getNumArguments(); i++) {
     // add refinement for each arg
@@ -149,8 +150,8 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
     cur_->refs.emplace(ref);
     blockInfo.refs[ti] = name.str();
   }
-  blocks_.emplace(&oblock, blockInfo);
-  walk_interior(&oblock);
+  blocks_.emplace(func_block_, blockInfo);
+  walk_interior(func_block_);
 }
 
 TensorShape StripeBuilder::get_shape(TensorType type) {
@@ -297,18 +298,32 @@ std::string StripeBuilder::add_refinements(  //
       }
     }
     // If op matches the block, move the op up, also attributes
+    mlir::Value* opInput = nullptr;
     while (op && op->getBlock() == block && mlir::isa<RefineOp>(op)) {
       if (auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName())) {
         add_attributes(ref, attrs.getValue());
       }
-      op = mlir::cast<RefineOp>(op).in()->getDefiningOp();
+      opInput = mlir::cast<RefineOp>(op).in();
+      if (mlir::isa<mlir::BlockArgument>(opInput)) {
+        // Since the input is a block argument, we're done.
+        break;
+      } else {
+        op = opInput->getDefiningOp();
+      }
     }
-    // Must have hit the allocation, stop
-    if (!op || op->getBlock() == block) {
+    // Must have reached an alloc or a block argument.  If it's an alloc, we're done; we're also done if we're
+    // already looking at the function block.
+    if (!op || mlir::isa<AllocateOp>(op) || block == func_block_) {
       break;
     }
-    // Move one block up
-    block = block->getParentOp()->getBlock();
+    if (opInput && mlir::isa<mlir::BlockArgument>(opInput)) {
+      // This was a block argument; advance to the function block.
+      block = func_block_;
+      op = nullptr;
+    } else {
+      // Move one block up.
+      block = block->getParentOp()->getBlock();
+    }
   }
   // Special handing for allocation block
   ref->dir = stripe::RefDir::None;
@@ -444,7 +459,7 @@ void StripeBuilder::visit(StoreOp op) {
 
 void StripeBuilder::visit(AggregateOp op) {
   IVLOG(3, "StripeBuilder::visit(AggregateOp)");
-  auto agg_name = eltwise::stringifyAggregationKind(op.agg());
+  auto agg_name = util::stringifyAggregationKind(op.agg());
   auto ref_name = add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, agg_name);
   auto from = scalars_.at(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
@@ -467,7 +482,7 @@ void StripeBuilder::visit(SpecialOp specialOp) {
   cur_->stmts.push_back(stmt);
 }
 
-void StripeBuilder::visit(eltwise::EltwiseBuilder builder) {
+void StripeBuilder::visit(util::GenericBuilder builder) {
   auto op = builder.getOperation();
   IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
   for (auto operand : op->getOperands()) {
@@ -497,7 +512,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
 
   // handle the bitwidth
   auto result = op->getResult(0);
-  auto tensorType = eltwise::GetTensorType(result->getType());
+  auto tensorType = eltwise::getRankedTensorType(result->getType());
   auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
   auto bitwidth = bit_width(scalarType.type());
   auto bitwidth_name = scalar_name(op);
@@ -565,7 +580,7 @@ void StripeBuilder::walk_interior(Block* block) {
       // same scope as the user.
     } else if (auto op = mlir::dyn_cast<eltwise::CastOp>(op_base)) {
       visit(op);
-    } else if (auto op = mlir::dyn_cast<eltwise::EltwiseBuilder>(op_base)) {
+    } else if (auto op = mlir::dyn_cast<util::GenericBuilder>(op_base)) {
       // The EltwiseBuilder check should come after more specific checks
       visit(op);
     }

@@ -2,6 +2,8 @@ package(default_visibility = ["@//visibility:public"])
 
 load("@com_intel_plaidml//vendor/mlir:mlir.bzl", "mlir_tblgen")
 
+exports_files(["LICENSE.TXT"])
+
 PLATFORM_COPTS = select({
     "@com_intel_plaidml//toolchain:macos_x86_64": [
         "-std=c++14",
@@ -664,4 +666,25 @@ cc_library(
         "@llvm//:support",
     ],
     alwayslink = 1,
+)
+
+cc_library(
+    name = "MlirOptLib",
+    srcs = glob([
+        "lib/Support/MlirOptMain.cpp",
+    ]),
+    hdrs = [
+        "include/mlir/Support/MlirOptMain.h",
+    ],
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":Analysis",
+        ":IR",
+        ":Parser",
+        ":Pass",
+        ":Support",
+        ":Transforms",
+        "@llvm//:support",
+    ],
 )

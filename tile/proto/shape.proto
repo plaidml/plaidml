@@ -20,6 +20,7 @@ message TensorShape {
     FLOAT16 = 49;
     FLOAT32 = 50;
     FLOAT64 = 51;
+    BFLOAT16 = 56;
     PRNG = 64;
   }
 

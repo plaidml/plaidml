@@ -1,5 +1,5 @@
 ---
-bazel: 0.28.1
+bazel: 1.0.0
 tasks:
   ubuntu1604:
     name: "PlaidML Ubuntu 16.04"

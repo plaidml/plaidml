@@ -12,8 +12,7 @@
 
 #include "pmlc/dialect/eltwise/types.h"
 #include "pmlc/dialect/eltwise/util.h"
-
-#include "pmlc/dialect/eltwise/ops_enums.h.inc"
+#include "pmlc/util/interfaces.h"
 
 namespace pmlc {
 namespace dialect {
@@ -49,10 +48,11 @@ using mlir::Type;
 using mlir::TypeAttr;
 using mlir::Value;
 using mlir::VectorType;
+using util::GenericBuilder;
 
 namespace OpTrait = mlir::OpTrait;
 
-#include "pmlc/dialect/eltwise/ops_interfaces.h.inc"
+#include "pmlc/dialect/eltwise/interfaces.h.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ops.h.inc"

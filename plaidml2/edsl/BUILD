@@ -9,17 +9,26 @@ load(
     "plaidml_py_library",
 )
 
+SDK_HDRS = [
+    "autodiff.h",
+    "edsl.h",
+    "ffi.h",
+]
+
 exports_files([
     "ffi.h",
 ])
 
 pkg_tar(
     name = "include_pkg",
+    srcs = SDK_HDRS,
     package_dir = "include/plaidml2/edsl",
-    srcs = [
-        "edsl.h",
-        "ffi.h",
-    ],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "sdk",
+    srcs = SDK_HDRS,
     visibility = ["//visibility:public"],
 )
 
@@ -30,11 +39,7 @@ plaidml_cc_library(
         "derivs.h",
         "ffi.cc",
     ],
-    hdrs = [
-        "autodiff.h",
-        "edsl.h",
-        "ffi.h",
-    ],
+    hdrs = SDK_HDRS,
     defines = ["PLAIDML_EDSL_DLL"],
     visibility = ["//visibility:public"],
     deps = [
@@ -43,6 +48,7 @@ plaidml_cc_library(
         "//pmlc/dialect/tile",
         "//tile/lang/ast",
     ],
+    alwayslink = 1,
 )
 
 plaidml_py_library(
@@ -58,11 +64,7 @@ plaidml_py_library(
 
 plaidml_cc_library(
     name = "api",
-    hdrs = [
-        "autodiff.h",
-        "edsl.h",
-        "ffi.h",
-    ],
+    hdrs = SDK_HDRS,
     visibility = ["//visibility:public"],
     deps = ["//plaidml2/core:api"],
 )

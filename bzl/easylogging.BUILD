@@ -2,6 +2,8 @@ includes = ["."]
 
 package(default_visibility = ["@//visibility:public"])
 
+exports_files(["LICENCE.txt"])
+
 cc_library(
     name = "easylogging",
     srcs = ["easylogging++.cc"],

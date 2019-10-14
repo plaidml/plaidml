@@ -9,17 +9,25 @@ load(
     "plaidml_py_library",
 )
 
+SDK_HDRS = [
+    "ffi.h",
+    "op.h",
+]
+
 exports_files([
     "ffi.h",
 ])
 
 pkg_tar(
     name = "include_pkg",
-    srcs = [
-        "ffi.h",
-        "op.h",
-    ],
+    srcs = SDK_HDRS,
     package_dir = "include/plaidml2/op",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "sdk",
+    srcs = SDK_HDRS,
     visibility = ["//visibility:public"],
 )
 
@@ -40,14 +48,12 @@ plaidml_cc_library(
         "//plaidml2/op/lib",
         "@boost",
     ],
+    alwayslink = 1,
 )
 
 plaidml_cc_library(
     name = "api",
-    hdrs = [
-        "ffi.h",
-        "op.h",
-    ],
+    hdrs = SDK_HDRS,
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml2/core:api",

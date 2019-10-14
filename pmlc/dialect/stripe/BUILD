@@ -6,7 +6,7 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
 
 MLIR_TBLGEN_ALSO = [
-    "//pmlc/dialect/eltwise:enums.td",
+    "//pmlc/util:enums.td",
     "//pmlc/dialect/eltwise:predicates.td",
 ]
 
@@ -22,7 +22,7 @@ mlir_tblgen(
 mlir_tblgen(
     name = "gen-op-defs",
     src = "ops.td",
-    out = "ops.cpp.inc",
+    out = "ops.cc.inc",
     action = "-gen-op-defs",
     also = MLIR_TBLGEN_ALSO,
     incs = ["@mlir//:include"],
@@ -40,7 +40,7 @@ mlir_tblgen(
 mlir_tblgen(
     name = "gen-op-interface-defs",
     src = "ops.td",
-    out = "ops_interfaces.cpp.inc",
+    out = "ops_interfaces.cc.inc",
     action = "-gen-op-interface-defs",
     also = MLIR_TBLGEN_ALSO,
     incs = ["@mlir//:include"],
@@ -52,8 +52,8 @@ plaidml_cc_library(
         "analysis.cc",
         "dialect.cc",
         "ops.cc",
-        "ops.cpp.inc",
-        "ops_interfaces.cpp.inc",
+        "ops.cc.inc",
+        "ops_interfaces.cc.inc",
         "types.cc",
     ],
     hdrs = [

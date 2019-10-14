@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/tile/dialect.h"
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 
@@ -32,9 +34,13 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addTypes<AffineIndexMapType, AffineSizeMapType, StringType>();
   addOperations<
 #define GET_OP_LIST
-#include "pmlc/dialect/tile/ops.cpp.inc"
+#include "pmlc/dialect/tile/ops.cc.inc"
       >();
   addInterfaces<OpAsmInterface>();
+}
+
+std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
+  return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
 void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {

@@ -1,6 +1,7 @@
 // Copyright 2019, Intel Corporation
 
-include "pmlc/dialect/eltwise/enums.td"
+include "pmlc/util/interfaces.td"
+include "pmlc/dialect/eltwise/interfaces.td"
 include "pmlc/dialect/eltwise/predicates.td"
 
 def EltwiseDialect : Dialect {
@@ -8,21 +9,9 @@ def EltwiseDialect : Dialect {
   let cppNamespace = "pmlc::dialect::eltwise";
 }
 
-def EltwiseBuilderInterface : OpInterface<"EltwiseBuilder"> {
-  let methods = [
-    StaticInterfaceMethod<"TODO", "Type", "getResultType", (ins "ArrayRef<Value*>":$operands)>,
-    StaticInterfaceMethod<"TODO", "Operation*", "create", (ins
-      "OpBuilder*":$builder,
-      "Location":$loc,
-      "ScalarType":$type,
-      "ArrayRef<Value*>":$operands
-    )>,
-  ];
-}
-
 class EltwiseBuilderImpl {
   code EltwiseBuilderImpl_create = [{
-    static Operation* create(OpBuilder* builder, Location loc, ScalarType type, ArrayRef<Value*> operands) {
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
       OperationState state(loc, getOperationName());
       state.addOperands(operands);
       state.addAttribute("type", TypeAttr::get(type));
@@ -32,16 +21,8 @@ class EltwiseBuilderImpl {
   }];
 }
 
-def EltwiseOpInterface : OpInterface<"EltwiseOp">;
-
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<EltwiseDialect, mnemonic, !listconcat(traits, [EltwiseOpInterface, EltwiseBuilderInterface])>,
-    EltwiseBuilderImpl;
-
-def SpecialOpInterface : OpInterface<"SpecialOp">;
-  
-class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<EltwiseDialect, mnemonic, !listconcat(traits, [SpecialOpInterface, EltwiseBuilderInterface])>,
+    Op<EltwiseDialect, mnemonic, !listconcat(traits, [EltwiseOpInterface, GenericBuilderInterface])>,
     EltwiseBuilderImpl;
 
 def ScalarConstantOp :
@@ -167,7 +148,6 @@ class BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins Eltwise_IntegerTensor:$lhs, Eltwise_IntegerTensor:$rhs, TypeAttr:$type)>,
     Results<(outs Eltwise_IntegerTensor:$result)>;
 
-def CastOpInterface : OpInterface<"CastOp">;
 
 class CastOp<string mnemonic> :
     EltwiseOp<mnemonic, [CastOpInterface, NoSideEffect]>,
@@ -183,7 +163,7 @@ class CastOp<string mnemonic> :
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value*> operands);
 
-    static Operation* create(OpBuilder* builder, Location loc, ScalarType type, ArrayRef<Value*> operands) {
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
       OperationState state(loc, getOperationName());
       if (operands.size() != 2) {
         throw std::runtime_error("CastOp requires 2 operands");
@@ -228,7 +208,7 @@ def AsBoolOp : EltwiseOp<"as_bool"> {
 
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value*> operands) {
-      auto tensorType = GetTensorType(operands[0]->getType());
+      auto tensorType = getRankedTensorType(operands[0]->getType());
       auto elementType = ScalarType::get(tensorType.getContext(), DataType::BOOLEAN);
       return RankedTensorType::get(tensorType.getShape(), elementType);
     }
@@ -278,92 +258,6 @@ def TanHOp : UnaryFloatOp<"tanh">;
 def TanOp : UnaryFloatOp<"tan">;
 def XorOp : BinaryIntOp<"xor", [Commutative, NoSideEffect]>;
 
-def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
-  let summary = "special gather operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }] # EltwiseBuilderImpl_create;
-}
-
-def IndexOp : SpecialOp<"index">, HasCanonicalizer {
-  let summary = "tensor index lookup operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_Integer:$dim);
-  let results = (outs Eltwise_IntegerTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }] # EltwiseBuilderImpl_create;
-}
-
-def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
-  let summary = "pseudorandom number generator";
-  let arguments = (ins Eltwise_AnyTensor:$state, Variadic<Eltwise_Integer>:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }] # EltwiseBuilderImpl_create;
-}
-
-def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
-  let summary = "tensor reshape operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Eltwise_Integer>:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }] # EltwiseBuilderImpl_create;
-}
-
-// TODO
-// def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
-//   let summary = "special scatter operation";
-//   let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims, Eltwise_AnyTensor:$other);
-//   let results = (outs Eltwise_AnyTensor:$result);
-
-//   let builders = [OpBuilder<
-//     "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-//       result.addOperands(operands);
-//       result.addTypes(getResultType(operands));
-//     }]
-//   >];
-
-//   let extraClassDeclaration = [{
-//     static Type getResultType(ArrayRef<Value*> operands);
-//   }];
-// }
-
 def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let summary = "conditional selection";
   let arguments = (ins
@@ -388,19 +282,3 @@ def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   }] # EltwiseBuilderImpl_create;
 }
 
-def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
-  let summary = "tensor shape operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor);
-  let results = (outs Eltwise_IntegerTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-  }] # EltwiseBuilderImpl_create;
-}
