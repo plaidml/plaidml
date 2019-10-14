@@ -2182,11 +2182,11 @@ Value softmax(const Value& value) {
     throw std::runtime_error("softmax expects 2 arguments");
   }
   auto I_original = args[0].as_tensor();
-  auto axis = args[1].as_int();
+  auto raw_axis = args[1].as_int();
   auto I = ident(I_original);
 
   auto ndims = I.shape().ndims();
-  axis = normalize_axis(axis, ndims, "softmax");
+  auto axis = normalize_axis(raw_axis, ndims, "softmax");
 
   // Ensure the axis is the last dimension, to make the derivative code happy
   bool transposed = false;
