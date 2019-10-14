@@ -1340,8 +1340,13 @@ class TestBackendOps(unittest.TestCase):
     def testNormalizeBatchInTrainingSimple(self, b, x, mov_avg, mov_var):
         return [(b.normalize_batch_in_training(x, mov_avg, mov_var, [2]))[0]]
 
-    @opTest([[n(2, 3), np.array([3., 4., .7]),
-              np.array([1.44, .99, .98])]],
+    @opTest([
+        [n(2, 3), np.array([3., 4., .7]),
+         np.array([1.44, .99, .98])],
+        [n(3, 2), None, None],
+        [n(1, 3), None, np.array([2., 3., .55])],
+        [n(1, 2), np.array([-2., 0.]), None],
+    ],
             skip_theano=True,
             skip_tensorflow=True)
     def testNormalizeBatchInTraining(self, b, x, beta, gamma):
