@@ -4,7 +4,7 @@ exports_files([
     "analysis.yml",
     "buildkite.yml",
     "ml_gpu.yml",
-    "plaidml.yml",
+    "keras_backend_test.yml",
     "pytorch.yml",
     "sphinx.yml",
     "tensorflow.yml",

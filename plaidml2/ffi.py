@@ -16,11 +16,11 @@ _TLS = threading.local()
 _TLS.err = ffi.new('plaidml_error*')
 
 if platform.system() == 'Windows':
-    lib_name = 'plaidml.dll'
+    lib_name = 'plaidml2.dll'
 elif platform.system() == 'Darwin':
-    lib_name = 'libplaidml.dylib'
+    lib_name = 'libplaidml2.dylib'
 else:
-    lib_name = 'libplaidml.so'
+    lib_name = 'libplaidml2.so'
 
 lib_path = os.getenv('PLAIDML_LIB_PATH')
 if not lib_path:

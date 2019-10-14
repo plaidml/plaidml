@@ -119,28 +119,6 @@ def cmd_pipeline(args, remainder):
         util.printf(yml)
 
 
-def bazel_bin_dir():
-    out = util.check_output(['bazelisk', 'info', 'bazel-bin'], stderr=subprocess.DEVNULL)
-    return out.decode().strip('\n')
-
-
-def wheel_path(arg):
-    return pathlib.Path(bazel_bin_dir()) / arg / 'wheel.pkg' / 'dist'
-
-
-def wheel_clean(dirs):
-    for wheel_dir in dirs:
-        for f in wheel_dir.glob('*.whl'):
-            if f.is_file():
-                util.printf('deleting: ' + str(f.resolve()))
-                try:
-                    os.remove(f)
-                except PermissionError:
-                    import stat
-                    os.chmod(f, stat.S_IWRITE)
-                    os.remove(f)
-
-
 def buildkite_upload(pattern, **kwargs):
     util.check_call(['buildkite-agent', 'artifact', 'upload', pattern], **kwargs)
 
@@ -158,15 +136,6 @@ def cmd_build(args, remainder):
     variant = plan['VARIANTS'][args.variant]
     for key, value in variant['env'].items():
         env[key] = str(value)
-
-    util.printf('--- :snake: pre-build steps... ')
-    util.printf('delete any old whl files...')
-    wheel_dirs = [
-        wheel_path('plaidml').resolve(),
-        wheel_path('plaidml/keras').resolve(),
-        wheel_path('plaidbench').resolve(),
-    ]
-    wheel_clean(wheel_dirs)
 
     explain_log = 'explain.log'
     profile_json = 'profile.json.gz'
@@ -194,8 +163,16 @@ def cmd_build(args, remainder):
     util.printf('--- :buildkite: Uploading artifacts...')
     buildkite_upload(explain_log)
     buildkite_upload(profile_json)
-    for wheel_dir in wheel_dirs:
-        buildkite_upload('*.whl', cwd=wheel_dir)
+
+    shutil.rmtree('tmp', ignore_errors=True)
+    tarball = os.path.join('bazel-bin', 'pkg.tar.gz')
+    with tarfile.open(tarball, "r") as tar:
+        wheels = []
+        for item in tar.getmembers():
+            if item.name.endswith('.whl'):
+                wheels.append(item)
+        tar.extractall('tmp', members=wheels)
+    buildkite_upload('*.whl', cwd='tmp')
 
     archive_dir = os.path.join(
         args.root,
@@ -205,7 +182,7 @@ def cmd_build(args, remainder):
         args.variant,
     )
     os.makedirs(archive_dir, exist_ok=True)
-    shutil.copy(os.path.join('bazel-bin', 'pkg.tar.gz'), archive_dir)
+    shutil.copy(tarball, archive_dir)
 
 
 def cmd_test(args, remainder):

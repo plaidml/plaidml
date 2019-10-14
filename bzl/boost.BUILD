@@ -9,6 +9,8 @@ package(default_visibility = ["@//visibility:public"])
 
 licenses(["notice"])  # Boost software license
 
+exports_files(["LICENSE_1_0.txt"])
+
 cc_library(
     name = "boost",
     hdrs = glob([
