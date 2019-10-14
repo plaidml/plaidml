@@ -1,5 +1,7 @@
 package(default_visibility = ["@//visibility:public"])
 
+exports_files(["googlemock/LICENSE"])
+
 cc_library(
     name = "gtest",
     srcs = [

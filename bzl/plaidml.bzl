@@ -262,15 +262,6 @@ def _plaidml_py_wheel_impl(ctx):
         mnemonic = "BuildWheel",
         use_default_shell_env = True,
     )
-
-    # output = ctx.actions.declare_file(wheel.basename, sibling = ctx.bin_dir)
-    # ctx.actions.run_shell(
-    #     outputs = [output],
-    #     inputs = [wheel],
-    #     command = "cp $1 $2",
-    #     arguments = [wheel.path, output.path],
-    #     mnemonic = "CopyWheel",
-    # )
     runfiles = ctx.runfiles(files = [wheel])
     return DefaultInfo(files = depset([wheel]), runfiles = runfiles)
 
@@ -394,23 +385,23 @@ def plaidml_macos_dylib(name, lib, src, tags, internal_libname = ""):
         """,
     )
 
-def _dylib_name_patterns(name):
+def _shlib_name_patterns(name):
     return {
         "@com_intel_plaidml//toolchain:windows_x86_64": ["{}.dll".format(name)],
         "@com_intel_plaidml//toolchain:macos_x86_64": ["lib{}.dylib".format(name)],
         "//conditions:default": ["lib{}.so".format(name)],
     }
 
-def plaidml_cc_dylib(
+def plaidml_cc_shlib(
         name,
-        dylib_name = None,
+        shlib_name = None,
         copts = [],
         linkopts = [],
         visibility = None,
         **kwargs):
-    if dylib_name == None:
-        dylib_name = name
-    names = _dylib_name_patterns(dylib_name)
+    if shlib_name == None:
+        shlib_name = name
+    names = _shlib_name_patterns(shlib_name)
     for key, name_list in names.items():
         for name_os in name_list:
             native.cc_binary(
