@@ -1,9 +1,9 @@
 load("//bzl:conda_repo.bzl", "conda_repo")
 load("//bzl:xsmm_repo.bzl", "xsmm_repo")
+load("//vendor/bazel:http.bzl", "dev_http_archive")
 load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("//vendor/cm:configure.bzl", "configure_cm")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
-load("//bzl:dev_repo.bzl", "dev_http_archive")
 
 def plaidml_workspace():
     configure_toolchain()
