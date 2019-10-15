@@ -350,8 +350,6 @@ SUITES:
       inception_v3:
         precision: high
         platform_overrides:
-          keras-stripe-llvm-cpu:
-            prepend_args: [--examples, 64]
           keras-plaid-ocl-gfx803:
             prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
@@ -364,6 +362,7 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+        skip_platforms: [keras-stripe-llvm-cpu]
       mobilenet:
         precision: high
       mobilenet_v2:
@@ -401,12 +400,14 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
-        skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630, keras-plaid-ocl-gfx803]
+        skip_platforms: 
+          - keras-plaid-mtl-uhd630 
+          - keras-stripe-mtl-uhd630
+          - keras-plaid-ocl-gfx803
+          - keras-stripe-llvm-cpu
       xception:
         precision: high
         platform_overrides:
-          keras-stripe-llvm-cpu:
-            prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx803:
             prepend_args: [--examples, 64]
           keras-plaid-ocl-gfx804:
@@ -426,7 +427,7 @@ SUITES:
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 64]
             soft_fail: true
-        skip_platforms: [keras-plaid-ocl-gv100gl]
+        skip_platforms: [keras-plaid-ocl-gv100gl, keras-stripe-llvm-cpu]
 
   train:
     platforms:
