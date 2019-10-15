@@ -173,6 +173,8 @@ def plaidml_workspace():
         sha256 = "69bcd0a9e6bc1891874e9e9653a145e51f5465a6145ec3d6244f2d9293c16a91",
         strip_prefix = "mlir-85a65512321acb64b39cae93cdcb2a72d825208c",
         build_file = Label("//vendor/mlir:mlir.BUILD"),
+        patches = [Label("//vendor/mlir:mlir.patch")],
+        patch_args = ["-p1"],
     )
 
 def configure_protobuf():
