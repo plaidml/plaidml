@@ -24,6 +24,11 @@ class TensorDim;
 class TensorIndex;
 class Value;
 
+using TensorDeriv = std::vector<Tensor> (*)(  //
+    const Tensor& Y,                          //
+    const Tensor& dY,                         //
+    const std::vector<Tensor>& Xs);
+
 namespace details {
 
 template <typename T>
@@ -565,6 +570,39 @@ inline Tensor Placeholder(             //
   return Placeholder(shape, name);
 }
 
+inline plaidml_deriv ThunkTensorDeriv(TensorDeriv fn) {
+  return [](void* user_ctx,          //
+            plaidml_expr* Y_expr,    //
+            plaidml_expr* dY_expr,   //
+            size_t nXs,              //
+            plaidml_expr** X_exprs,  //
+            plaidml_expr** dX_exprs) {
+    auto fn = reinterpret_cast<TensorDeriv>(user_ctx);
+    Tensor Y(Y_expr);
+    Tensor dY(dY_expr);
+    std::vector<Tensor> Xs(nXs);
+    for (size_t i = 0; i < Xs.size(); i++) {
+      Xs[i] = Tensor(X_exprs[i]);
+    }
+    auto dXs = fn(Y, dY, Xs);
+    for (size_t i = 0; i < Xs.size(); i++) {
+      dX_exprs[i] = ffi::call<plaidml_expr*>(plaidml_expr_clone, dXs[i].as_ptr());
+    }
+  };
+}
+
+inline Tensor OverrideGrads(TensorDeriv fn, const std::vector<Tensor>& ins, const Tensor& out) {
+  auto thunk = ThunkTensorDeriv(fn);
+  auto nins = ins.size();
+  std::vector<plaidml_expr*> in_ptrs(nins);
+  for (size_t i = 0; i < ins.size(); i++) {
+    in_ptrs[i] = ins[i].as_ptr();
+  }
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_grad_override, thunk, reinterpret_cast<void*>(fn), nins,
+                                      in_ptrs.data(), out.as_ptr());
+  return Tensor(ptr);
+}
+
 Tensor Call(const std::string& fn, const std::vector<Tensor>& args);
 
 template <typename... Ts>
@@ -591,6 +629,8 @@ inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
 inline Tensor exp(const Tensor& x) { return Call("exp", x); }
 
 inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x, y); }
+
+inline Tensor ident(const Tensor& x) { return Call("ident", x); }
 
 inline Tensor index(const Tensor& x, size_t axis) { return Call("index", x, static_cast<int64_t>(axis)); }
 

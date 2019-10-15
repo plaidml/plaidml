@@ -1,5 +1,8 @@
 licenses(["notice"])  # MIT
+
 package(default_visibility = ["@//visibility:public"])
+
+exports_files(["LICENSE"])
 
 JSON_HEADERS = [
     "include/json/assertions.h",
