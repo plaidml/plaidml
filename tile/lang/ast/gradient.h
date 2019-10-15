@@ -14,23 +14,6 @@ namespace tile {
 namespace lang {
 namespace ast {
 
-// ExprDeriv is a function that builds the gradient ("dX") from the following inputs:
-//  1. Y: The Expr for the node
-//  2. dY: The Expr for the already-computed gradient of the node's output
-//  3. Xs: The Exprs for the node's inputs
-using ExprDeriv = std::function<std::vector<ExprPtr>(  //
-    const ExprPtr& Y,                                  //
-    const ExprPtr& dY,                                 //
-    const std::vector<ExprPtr>& Xs,                    //
-    void* user_fn,                                     //
-    void* user_ctx)>;
-
-struct ExprDerivEntry {
-  ExprDeriv fn;
-  void* user_fn;
-  void* user_ctx;
-};
-
 class DerivRegistry {
  public:
   static DerivRegistry* Instance() {
@@ -39,6 +22,9 @@ class DerivRegistry {
   }
 
   void Register(const std::string& name, const ExprDeriv& fn, void* user_fn, void* user_ctx) {  //
+    if (registry_.count(name)) {
+      throw std::runtime_error("Attempted to register deriv '" + name + "', which was already in the DerivRegistry");
+    }
     registry_[name] = ExprDerivEntry{fn, user_fn, user_ctx};
   }
 
