@@ -55,6 +55,12 @@ class ComputeUses : public AstVisitor<void> {
     }
   }
 
+  void Visit(const GradOverrideExpr& expr) final {
+    for (size_t i = 0; i < expr.ins.size(); i++) {
+      Push(expr, expr.ins[i], i);
+    }
+  }
+
   void Visit(const DimExprExpr& expr) final {}
   void Visit(const FloatConst& expr) final {}
   void Visit(const IntConst& expr) final {}
@@ -92,6 +98,11 @@ class Gradient {
     for (const auto& use : uses_.uses(expr.get())) {
       ExprPtr dop;
       auto dout = GetDerivative(use.expr);
+      if (auto grad_override_expr = std::dynamic_pointer_cast<GradOverrideExpr>(use.expr)) {
+        // A gradient override replaces all the derivatives, so set total and exit the loop
+        total = DeriveOverride(dout, grad_override_expr, use.idx);
+        break;
+      }
       if (auto call_expr = std::dynamic_pointer_cast<CallExpr>(use.expr)) {
         dop = DeriveCall(dout, call_expr, use.idx);
       } else if (auto cion_expr = std::dynamic_pointer_cast<ContractionExpr>(use.expr)) {
@@ -192,6 +203,11 @@ class Gradient {
     dop->sink_dims = std::make_shared<SizeMapExpr>(input->ref->shape.dims_as_exprs());
     dop->ComputeShape(input->ref->shape.layout);
     return dop;
+  }
+
+  ExprPtr DeriveOverride(const ExprPtr& dout, const std::shared_ptr<GradOverrideExpr>& op, size_t idx) {
+    // TODO: Ideally we'd cache this call somehow so when the only difference is `idx` we don't recompute
+    return op->fn->fn(op->out, dout, op->ins, op->fn->user_fn, op->fn->user_ctx)[idx];
   }
 
   ExprPtr DeriveExtreme(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {

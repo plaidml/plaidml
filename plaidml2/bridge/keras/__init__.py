@@ -1077,8 +1077,10 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     I.bind_dims(*dims)
     for ax in axes:
         dims[ax] = 1
-    beta = reshape(beta, dims)
-    gamma = reshape(gamma, dims)
+    if beta is not None:
+        beta = reshape(beta, dims)
+    if gamma is not None:
+        gamma = reshape(gamma, dims)
 
     normalized_tensor = batch_normalization(x=x,
                                             mean=m,

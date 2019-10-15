@@ -324,7 +324,12 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
     int64_t stride = 1;
     for (int i = exts.size() - 1; i >= 0; i--) {
       ref.mut().interior_shape.dims[i].stride = stride;
-      pad_size.push_back(-exts[i].load.min);
+      // When padding the new buffer should be biger and there should not be negative offsets.
+      int64_t padSize = -exts[i].load.min;
+      if (padSize < 0) {
+        padSize = 0;
+      }
+      pad_size.push_back(padSize);
       uint64_t new_size = exts[i].load.max + 1 - exts[i].load.min;
       new_size = std::max(new_size, ref.interior_shape.dims[i].size);
       ref.mut().interior_shape.dims[i].size = new_size;
@@ -337,11 +342,10 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
         }
         for (auto& refi : inner->refs) {
           if (refi.from == ref.into()) {
-            refi.mut().access[i] += -exts[i].load.min;
+            refi.mut().access[i] += padSize;
           }
         }
       }
-      // ref.mut().access[i] += -exts[i].load.min;
     }
     std::reverse(pad_size.begin(), pad_size.end());
     pad_sizes.emplace(ref.into(), pad_size);
