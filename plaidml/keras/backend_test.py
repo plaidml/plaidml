@@ -837,14 +837,18 @@ class TestBackendOps(unittest.TestCase):
     def testSigmoid(self, b, x):
         return [b.sigmoid(x)]
 
-    @opTest([[m(2, 2)]], skip_theano=True)
-    def testBinaryCrossentropy(self, b, x):
+    @opTest([
+        [np.array([[0, 1], [1, 0]]), m(2, 2)],
+        [np.array([[0.3, 0.7], [0.1, 0.9]]), m(2, 2)],
+        [np.array([[0, 0.7], [1, .3]]), m(2, 2)],
+    ],
+            skip_theano=True,
+            atol=1e-7)
+    def testBinaryCrossentropy(self, b, x, y):
         return [
-            b.binary_crossentropy(b.variable(np.array([[0, 1], [1, 0]])), x, from_logits=True),
-            b.binary_crossentropy(b.variable(np.array([[0.3, 0.7], [0.1, 0.9]])),
-                                  x,
-                                  from_logits=False),
-            b.binary_crossentropy(b.variable(np.array([[0, 0.7], [1, .3]])), b.sigmoid(x))
+            b.binary_crossentropy(x, y, from_logits=True),
+            b.binary_crossentropy(x, y, from_logits=False),
+            b.binary_crossentropy(x, b.sigmoid(y))
         ]
 
     @opTest([[np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]]), (m(3, 3) + 3) / 15.0],
@@ -994,11 +998,10 @@ class TestBackendOps(unittest.TestCase):
         [[100, 100], 5, 2],
         [[50, 50], 5, 2, 'float16'],
     ])
-    @unittest.skip(
-        "We use a float16 as an accumulator for the matrix elements. "
-        "The sum grows to a point that adding more elements doesn't change "
-        "the sum, because the number being added is less than the "
-        "precision of the float16.")
+    @unittest.skip("We use a float16 as an accumulator for the matrix elements. "
+                   "The sum grows to a point that adding more elements doesn't change "
+                   "the sum, because the number being added is less than the "
+                   "precision of the float16.")
     @compareForwardClose(epsilon=0.2)
     def testRandomeNormalVariableMean(self, b, *args):
         return b.mean(b.random_normal_variable(*args))
