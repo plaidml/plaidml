@@ -11,7 +11,10 @@ namespace stripe {
 
 void PrintSimple(Operation* op, OpAsmPrinter* p, size_t count, ArrayRef<StringRef> fixed, Type otype, bool vararg) {
   // Print the op name
-  *p << op->getName() << " ";
+  *p << op->getName();
+  if (count > 0) {
+    *p << " ";
+  }
   // Pring the normal (fixed) operands
   p->printOperands(op->operand_begin(), op->operand_begin() + count);
   // Print the fixed attributes (which are always integers in our case)
@@ -19,6 +22,8 @@ void PrintSimple(Operation* op, OpAsmPrinter* p, size_t count, ArrayRef<StringRe
   for (StringRef name : fixed) {
     if (!first) {
       *p << ", ";
+    } else {
+      *p << " ";
     }
     first = false;
     *p << op->getAttrOfType<IntegerAttr>(name).getValue();

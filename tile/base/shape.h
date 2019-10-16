@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <map>
 #include <ostream>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -41,6 +42,27 @@ enum class DataType : int {
   BFLOAT16 = 0x38,
   PRNG = 0x40,
 };
+
+inline const std::set<DataType>& GetDataTypeSet() {
+  static std::set<DataType> all_types = {
+      DataType::BOOLEAN,   //
+      DataType::INT8,      //
+      DataType::INT16,     //
+      DataType::INT32,     //
+      DataType::INT64,     //
+      DataType::INT128,    //
+      DataType::UINT8,     //
+      DataType::UINT16,    //
+      DataType::UINT32,    //
+      DataType::UINT64,    //
+      DataType::FLOAT16,   //
+      DataType::FLOAT32,   //
+      DataType::FLOAT64,   //
+      DataType::BFLOAT16,  //
+      DataType::PRNG,      //
+  };
+  return all_types;
+}
 
 inline bool is_int(const DataType& dt) {
   switch (dt) {
