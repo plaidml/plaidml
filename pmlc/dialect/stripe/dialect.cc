@@ -21,7 +21,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
   /// Get a special name to use when printing the given operation. The desired
   /// name should be streamed into 'os'.
-  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {
+  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {  // NOLINT
     if (auto str_attr = op->getAttrOfType<StringAttr>("name")) {
       os << str_attr.getValue().str();
     } else if (auto str_attr = op->getAttrOfType<StringAttr>("scalar_name")) {
@@ -30,6 +30,29 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     } else if (auto const_op = llvm::dyn_cast<AffineConstOp>(op)) {
       auto value = const_op.value().getSExtValue();
       os << 'c' << value;
+    }
+  }
+  void getBlockArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {  // NOLINT
+    Operation* op = arg->getOwner()->getParentOp();
+    if (auto vec = op->getAttrOfType<ArrayAttr>("idx_names")) {
+      if (vec.size() > arg->getArgNumber()) {
+        if (auto str_attr = vec.getValue()[arg->getArgNumber()].dyn_cast<StringAttr>()) {
+          os << str_attr.getValue().str();
+        }
+      }
+    }
+  }
+  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {  // NOLINT
+    MLIRContext* ctx = getDialect()->getContext();
+    Type t = AffineType::get(ctx);
+    aliases.push_back(std::make_pair(t, StringRef("aff")));
+    for (const auto dt : vertexai::tile::GetDataTypeSet()) {
+      for (size_t r = 0; r < 9; r++) {
+        std::string base = to_string(dt) + "_" + std::to_string(r);
+        auto st = ScalarType::get(ctx, dt);
+        aliases.emplace_back(TensorRefType::get(st, r, false), mlir::Identifier::get(base, ctx));
+        aliases.emplace_back(TensorRefType::get(st, r, true), mlir::Identifier::get(base + "_c", ctx));
+      }
     }
   }
 };
