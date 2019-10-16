@@ -346,6 +346,7 @@ SUITES:
           - keras-stripe-ocl-gv100gl
           - keras-stripe-ocl-neo
           - keras-stripe-mtl-uhd630
+          - keras-tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
         precision: high
@@ -366,11 +367,16 @@ SUITES:
             prepend_args: [--examples, 256]
       mobilenet:
         precision: high
+        platform_overrides:
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
       mobilenet_v2:
         precision: high
         platform_overrides:
           keras-plaid-mtl-uhd630:
             soft_fail: true
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
       resnet50:
         precision: high
         platform_overrides:
@@ -382,6 +388,8 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
       vgg19:
         precision: high
         platform_overrides:
@@ -397,6 +405,8 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
         skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630, keras-plaid-ocl-gfx803]
       xception:
         precision: high
@@ -420,6 +430,8 @@ SUITES:
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 64]
             soft_fail: true
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
         skip_platforms: [keras-plaid-ocl-gv100gl]
 
   train:
@@ -478,19 +490,24 @@ SUITES:
         expected: "CL_MEM_OBJECT_ALLOCATION_FAILURE"
         precision: low
         args: [plaidbench.py, inception_v3, --train, --print-stacktraces]
+        skip_platforms: [keras-tf-dnnl-cpu]
       resnet50_train:
         precision: low
         args: [plaidbench.py, resnet50, --train, --print-stacktraces]
+        skip_platforms: [keras-tf-dnnl-cpu]
       vgg19_train:
         precision: low
         args: [plaidbench.py, vgg19, --train, --print-stacktraces]
+        skip_platforms: [keras-tf-dnnl-cpu]
       xception_train:
         precision: low
         args: [plaidbench.py, xception, --train, --print-stacktraces]
-        skip_platforms: keras-plaid-ocl-gp100gl
+        skip_platforms: [keras-plaid-ocl-gp100gl, keras-tf-dnnl-cpu]
       mobilenet_train:
         precision: low
         args: [plaidbench.py, mobilenet, --train, --print-stacktraces]
+        skip_platforms: [keras-tf-dnnl-cpu]
+
 
   comprehensive:
     platforms:
