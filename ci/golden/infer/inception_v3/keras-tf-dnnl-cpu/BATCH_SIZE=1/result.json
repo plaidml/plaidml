@@ -1,0 +1,1 @@
+{"compile_duration": 5.0239996910095215, "duration_per_example": 0.1345680421218276, "tile_duration_per_example": 1e-09, "examples": 1024, "batch_size": 1, "model": "inception_v3", "backend": "tensorflow", "correct": true, "max_error": 1.0336864761484321e-05, "max_abs_error": 1.087784767150879e-06, "fail_ratio": 0.0}
