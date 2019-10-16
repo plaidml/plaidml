@@ -213,6 +213,11 @@ class ShapeEvaluator : public AstVisitor<void> {
     bindings_by_expr_->emplace(&expr, Binding{value});
   }
 
+  void Visit(const GradOverrideExpr& expr) final {
+    // Forward-pass GradOverrideExprs are no-ops, so do almost nothing (just setup the shape)
+    bindings_by_expr_->emplace(&expr, Binding{IntoTensorShape(expr.shape)});
+  }
+
  private:
   std::unordered_map<const Expr*, Binding>* bindings_by_expr_;
 };
@@ -385,6 +390,22 @@ class ProgramEvaluator : public AstVisitor<void> {
         {std::to_string(value)},  // inputs
         {},                       // Contraction
         {"iconst"},               // Function
+    };
+    eval_.runinfo.program.ops.emplace_back(op);
+    eval_.names_by_expr.emplace(&expr, name);
+  }
+
+  void Visit(const GradOverrideExpr& expr) final {
+    // Forward-pass GradOverrideExprs are no-ops; create an ident fcn
+    IVLOG(4, "ProgramEvaluator::Visit> " << to_string(&expr));
+    auto name = NewTmp(expr);
+    auto out_name = safe_at(&eval_.names_by_expr, expr.out.get());
+    Op op{
+        Op::FUNCTION,  // tag
+        name,          // output
+        {out_name},    // inputs
+        {},            // Contraction
+        {"ident"},     // Function
     };
     eval_.runinfo.program.ops.emplace_back(op);
     eval_.names_by_expr.emplace(&expr, name);
@@ -721,6 +742,30 @@ std::string ParamExpr::str() const {
   std::stringstream ss;
   ss << "ParamExpr{" << shape << "}";
   return ss.str();
+}
+
+GradOverrideExpr::GradOverrideExpr(const std::shared_ptr<ExprDerivEntry>& fn, const std::vector<ExprPtr>& ins,
+                                   const ExprPtr& out)
+    : fn(fn),    //
+      ins(ins),  //
+      out(out) {}
+
+std::string GradOverrideExpr::str() const {
+  std::stringstream ss;
+  ss << "grad_override";
+  // TODO: I found the more verbose version of this output confusing, so it's commented out
+  // ss << "{" << fn << "(";
+  // for (const auto& in : ins) {
+  //   ss << in << ", ";
+  // }
+  // ss << ") -> " << out << "}";
+  return ss.str();
+}
+
+void GradOverrideExpr::ComputeShape() {
+  IVLOG(5, "GradOverrideExpr::ComputeShape> fn: " << fn);
+  IVLOG(5, "  " << out->shape.str());
+  shape = out->shape;
 }
 
 CallExpr::CallExpr(const std::string& fn, const std::vector<ExprPtr>& args)
