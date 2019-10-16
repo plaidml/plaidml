@@ -272,8 +272,9 @@ SUITES:
       keras-tf-cuda-gp100gl:
         pipelines: [nightly]
         append_args: [--tensorflow]
+
       keras-tf-dnnl-cpu:
-        pipelines: [ci, nightly]
+        pipelines: [ci]
         append_args: [--tensorflow]
 
       keras-plaid-ocl-gfx803:
@@ -437,7 +438,7 @@ SUITES:
   train:
     platforms:
       keras-tf-cuda-gp100gl:
-        pipelines: [ci]
+        pipelines: [train]
         append_args: [--tf]
 
       keras-plaid-ocl-gfx804:
