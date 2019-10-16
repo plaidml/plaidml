@@ -491,23 +491,19 @@ SUITES:
         expected: "CL_MEM_OBJECT_ALLOCATION_FAILURE"
         precision: low
         args: [plaidbench.py, inception_v3, --train, --print-stacktraces]
-        skip_platforms: [keras-tf-dnnl-cpu]
       resnet50_train:
         precision: low
         args: [plaidbench.py, resnet50, --train, --print-stacktraces]
-        skip_platforms: [keras-tf-dnnl-cpu]
       vgg19_train:
         precision: low
         args: [plaidbench.py, vgg19, --train, --print-stacktraces]
-        skip_platforms: [keras-tf-dnnl-cpu]
       xception_train:
         precision: low
         args: [plaidbench.py, xception, --train, --print-stacktraces]
-        skip_platforms: [keras-plaid-ocl-gp100gl, keras-tf-dnnl-cpu]
+        skip_platforms: [keras-plaid-ocl-gp100gl]
       mobilenet_train:
         precision: low
         args: [plaidbench.py, mobilenet, --train, --print-stacktraces]
-        skip_platforms: [keras-tf-dnnl-cpu]
 
 
   comprehensive:
