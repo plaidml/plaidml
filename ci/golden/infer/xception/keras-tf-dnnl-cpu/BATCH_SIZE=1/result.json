@@ -1,0 +1,1 @@
+{"compile_duration": 2.6833903789520264, "duration_per_example": 0.20039213821291924, "tile_duration_per_example": 1e-09, "examples": 1024, "batch_size": 1, "model": "xception", "backend": "tensorflow", "correct": true, "max_error": 1.0657152415660676e-05, "max_abs_error": 1.4901161193847656e-06, "fail_ratio": 0.0}
