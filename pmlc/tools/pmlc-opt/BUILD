@@ -9,6 +9,7 @@ plaidml_cc_binary(
     copts = COPTS,
     visibility = ["//visibility:public"],
     deps = [
+        "//pmlc/conversion/affine_to_stripe",
         "//pmlc/conversion/stripe_to_affine",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/stripe",

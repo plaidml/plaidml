@@ -55,6 +55,7 @@ plaidml_cc_library(
         "ops.cc.inc",
         "ops_interfaces.cc.inc",
         "types.cc",
+        "util.cc",
     ],
     hdrs = [
         "analysis.h",
@@ -64,6 +65,7 @@ plaidml_cc_library(
         "ops.h.inc",
         "ops_interfaces.h.inc",
         "types.h",
+        "util.h",
     ],
     copts = COPTS,
     tags = ["llvm"],
