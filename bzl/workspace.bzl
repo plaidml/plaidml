@@ -1,9 +1,9 @@
 load("//bzl:conda_repo.bzl", "conda_repo")
 load("//bzl:xsmm_repo.bzl", "xsmm_repo")
+load("//vendor/bazel:http.bzl", "dev_http_archive")
 load("//vendor/cuda:configure.bzl", "configure_cuda")
 load("//vendor/cm:configure.bzl", "configure_cm")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
-load("//bzl:dev_repo.bzl", "dev_http_archive")
 
 def plaidml_workspace():
     configure_toolchain()
@@ -173,6 +173,8 @@ def plaidml_workspace():
         sha256 = "69bcd0a9e6bc1891874e9e9653a145e51f5465a6145ec3d6244f2d9293c16a91",
         strip_prefix = "mlir-85a65512321acb64b39cae93cdcb2a72d825208c",
         build_file = Label("//vendor/mlir:mlir.BUILD"),
+        patches = [Label("//vendor/mlir:mlir.patch")],
+        patch_args = ["-p1"],
     )
 
 def configure_protobuf():

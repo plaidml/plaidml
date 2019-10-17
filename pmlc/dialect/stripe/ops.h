@@ -33,6 +33,7 @@ using mlir::ParseResult;
 using mlir::RankedTensorType;
 using mlir::Region;
 using mlir::ShapedType;
+using mlir::StringAttr;
 using mlir::StringRef;
 using mlir::Type;
 using mlir::TypeAttr;

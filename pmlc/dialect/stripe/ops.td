@@ -27,6 +27,20 @@ def AllocateOp : StripeOp<"alloc"> {
       result.addTypes(TensorRefType::get(type));
     }]
   >];
+  let printer = [{ PrintSimple(getOperation(), &p, 0, {}, Type(), false); }];
+  let parser = [{
+    llvm::SmallVector<OpAsmParser::OperandType, 0> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 0, {}, static_cast<Type*>(nullptr), false);
+    for (auto& kvp : result.attributes) {
+      if (kvp.first.str() != "layout") continue;
+      TypeAttr ta = kvp.second.dyn_cast<TypeAttr>();
+      if (!ta) continue;
+      auto layout = ta.getValue().dyn_cast<TensorType>();
+      if (!layout) continue;
+      result.addTypes(TensorRefType::get(layout.getElementType(), layout.getRank(), layout.is_const()));
+    }
+    return mlir::failure(r); 
+  }];
 }
 
 def RefineOp : StripeOp<"refine", [NoSideEffect]> {
@@ -160,11 +174,88 @@ def ParallelForOp : StripeOp<"parallel_for"> {
   // Variadic<IntegerType>:$dyn_ranges
   let arguments = (ins I64ArrayAttr:$ranges);
   let regions = (region SizedRegion<1>:$inner);
+  let printer = [{
+    p << getOperation()->getName() << " (";
+    llvm::SmallVector<StringRef, 8> skip;
+    skip.push_back("ranges");
+    skip.push_back("idx_names");
+    auto names = getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", getContext())); 
+    for(size_t i = 0; i < ranges().size(); i++) {
+      auto idx_name = StringAttr::get("", getContext());
+      if (names && names.size() > i) {
+        if (auto str_attr = names.getValue()[i].template dyn_cast<StringAttr>()) {
+          idx_name = str_attr;
+        }
+      }
+      p << idx_name << ":" << ranges().getValue()[i].cast<IntegerAttr>().getInt();
+      if (i + 1 != ranges().size()) {
+        p << ", ";
+      }
+    }
+    p << ")";
+    p.printNewline(1);
+    p.printOptionalAttrDict(getOperation()->getAttrs(), skip);
+    p.printRegion(inner());
+  }];
+  let parser = [{
+    bool r = false;
+    r = r || parser.parseLParen();
+    //size_t i = 0;
+    MLIRContext* ctx = parser.getBuilder().getContext();
+    std::vector<std::string> idx_name;
+    std::vector<int64_t> idx_range;
+    llvm::SmallVector<mlir::Attribute, 8> ranges;
+    llvm::SmallVector<mlir::Attribute, 8> idx_names;
+    while (!r) {
+      if (!parser.parseOptionalRParen()) {
+        break;
+      }
+      parser.parseOptionalComma();
+      StringAttr idx_name;
+      IntegerAttr idx_range;
+      llvm::SmallVector<NamedAttribute, 2> ignore;
+      r = r || parser.parseAttribute(idx_name, mlir::NoneType::get(ctx), "name", ignore);
+      r = r || parser.parseColon();
+      r = r || parser.parseAttribute(idx_range, Type(), "range", ignore);
+      if (!r) {
+        idx_names.push_back(idx_name);
+        ranges.push_back(idx_range);
+      }  
+    }
+    r = r || parser.parseOptionalAttributeDict(result.attributes);
+    auto ranges_attr = ArrayAttr::get(ranges, ctx);
+    auto idx_names_attr = ArrayAttr::get(idx_names, ctx);
+    result.attributes.emplace_back(mlir::Identifier::get("ranges", ctx), ranges_attr);
+    result.attributes.emplace_back(mlir::Identifier::get("idx_names", ctx), idx_names_attr);
+    result.regions.emplace_back(new Region(nullptr));
+    r = r || parser.parseRegion(*result.regions.back(), {}, {}, false);
+    return mlir::failure(r);
+  }];
 }
 
 def ConstraintOp : StripeOp<"constraint"> {
   let arguments = (ins AffineType:$input);
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
+  let printer = [{
+    p << getOperation()->getName() << " ";
+    p.printOperand(input());
+    p.printRegion(ge_case());
+    if (!lt_case().empty()) {
+      p.printRegion(lt_case());
+    }
+  }];
+  let parser = [{
+    auto aff_type = AffineType::get(parser.getBuilder().getContext());
+    OpAsmParser::OperandType op;
+    bool r = false;
+    r = r || parser.parseOperand(op);
+    r = r || parser.resolveOperand(op, aff_type, result.operands);
+    result.regions.emplace_back(new Region(nullptr));
+    r = r || parser.parseRegion(*result.regions.back(), {}, {});
+    result.regions.emplace_back(new Region(nullptr));
+    r = r || parser.parseOptionalRegion(*result.regions.back(), {}, {});
+    return mlir::failure(r);
+  }];
 }
 
 def SpecialOpInterface : OpInterface<"SpecialOp"> {
@@ -233,4 +324,12 @@ def ExecuteOnOp : StripeOp<"execute_on", [Terminator, HasParent<"ParallelForOp">
 
   // 'from' represents the executor value being returned.
   let arguments = (ins TensorRefType:$from);
+  let printer = [{ PrintSimple(getOperation(), &p, 1, {}, from()->getType(), false); }];
+  let parser = [{
+    TensorRefType refType;
+    llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
+    bool r = ParseSimple(&parser, &result, &operands, 1, {}, &refType, false);
+    r = r || parser.resolveOperand(operands[0], refType, result.operands);
+    return mlir::failure(r); 
+  }];
 }
