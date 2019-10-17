@@ -126,6 +126,14 @@ def AffineSubOp : AffineBinaryOp<"affine_sub"> {
   let summary = "Affine subtraction operation";
 }
 
+def AffineMaxOp : AffineBinaryOp<"affine_max"> {
+  let summary = "Affine max operation";
+}
+
+def AffineMinOp : AffineBinaryOp<"affine_min"> {
+  let summary = "Affine min operation";
+}
+
 def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
   let summary = "affine domain";
   let results = (outs Eltwise_AnyTensor:$result);
