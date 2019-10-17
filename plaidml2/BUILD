@@ -136,6 +136,7 @@ py_binary(
         "@minizip//:LICENSE",
         "@mlir//:LICENSE.TXT",
         "@xsmm//:documentation/LICENSE.md",
+        "@tbb//:doc/copyright_brand_disclaimer_doxygen.txt",
     ],
     main = "setup.py",
     deps = [
