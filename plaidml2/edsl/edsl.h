@@ -674,8 +674,6 @@ inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& 
 
 inline Tensor shape(const Tensor& x) { return Call("shape", x); }
 
-inline Tensor sigmoid(const Tensor& x) { return Call("sigmoid", x); }
-
 inline Tensor sin(const Tensor& x) { return Call("sin", x); }
 
 inline Tensor sinh(const Tensor& x) { return Call("sinh", x); }
