@@ -142,6 +142,10 @@ def minimum(x, y):
     return op('minimum', [x, y]).as_tensor()
 
 
+def scale_gradient(x, scale=-1.0):
+    return op('scale_gradient', [x, scale]).as_tensor()
+
+
 def relu(x, alpha=None, max_value=None, threshold=0.):
     return op('relu', [x, alpha, max_value, threshold]).as_tensor()
 
