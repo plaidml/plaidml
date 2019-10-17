@@ -1,0 +1,1 @@
+{"compile_duration": 0.40518927574157715, "duration_per_example": 0.0656121124047786, "tile_duration_per_example": 1e-09, "examples": 1024, "batch_size": 1, "model": "vgg19", "backend": "tensorflow", "correct": true, "max_error": 1.8098486407325254e-06, "max_abs_error": 1.043081283569336e-07, "fail_ratio": 0.0}

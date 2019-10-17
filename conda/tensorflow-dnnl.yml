@@ -1,0 +1,7 @@
+channels:
+  - anaconda
+  - conda-forge
+dependencies:
+  - pip
+  - python=3.7
+  - anaconda::tensorflow=1.14.0
