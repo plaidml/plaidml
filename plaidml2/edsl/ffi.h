@@ -26,6 +26,8 @@ typedef enum {
   PLAIDML_INT_OP_SUB,
   PLAIDML_INT_OP_MUL,
   PLAIDML_INT_OP_DIV,
+  PLAIDML_INT_OP_MAX,
+  PLAIDML_INT_OP_MIN,
 } plaidml_int_op;
 
 typedef enum {

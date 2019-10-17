@@ -57,6 +57,8 @@ class TileBuilder {
   mlir::Value* MakeAffineMulOp(llvm::ArrayRef<mlir::Value*> args);
   mlir::Value* MakeAffineDivOp(llvm::ArrayRef<mlir::Value*> args);
   mlir::Value* MakeAffineNegOp(llvm::ArrayRef<mlir::Value*> args);
+  mlir::Value* MakeAffineMaxOp(llvm::ArrayRef<mlir::Value*> args);
+  mlir::Value* MakeAffineMinOp(llvm::ArrayRef<mlir::Value*> args);
   mlir::Value* MakeAffineSourceIndexMapOp(mlir::Value* tensor, llvm::ArrayRef<mlir::Value*> idxs);
   mlir::Value* MakeAffineSinkIndexMapOp(llvm::ArrayRef<mlir::Value*> idxs);
   mlir::Value* MakeAffineSizeMapOp(llvm::ArrayRef<mlir::Value*> sizes);
