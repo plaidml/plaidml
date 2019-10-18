@@ -90,6 +90,70 @@ std::shared_ptr<ExprType> fold_div(        //
   return nullptr;
 }
 
+template <typename NumType1, typename NumType2, typename ExprType>
+std::shared_ptr<ExprType> fold_max(        //
+    const std::shared_ptr<ExprType>& lhs,  //
+    const std::shared_ptr<ExprType>& rhs) {
+  auto lhs_num = std::dynamic_pointer_cast<NumType1>(lhs);
+  auto rhs_num = std::dynamic_pointer_cast<NumType2>(rhs);
+  if (lhs_num && rhs_num) {
+    return make_number(lhs, std::max(lhs_num, rhs_num));
+  }
+  return nullptr;
+}
+
+// Max does not apply to PolyExpr so specialize
+template <>
+std::shared_ptr<PolyExpr> fold_max<PolyLiteral, PolyLiteral, PolyExpr>(  //
+    const std::shared_ptr<PolyExpr>& lhs,                                //
+    const std::shared_ptr<PolyExpr>& rhs) {
+  throw std::runtime_error("Max function not defined for PolyExpr");
+}
+
+template <>
+std::shared_ptr<DimExpr> fold_max<DimIntExpr, DimIntExpr, DimExpr>(  //
+    const std::shared_ptr<DimExpr>& lhs,                             //
+    const std::shared_ptr<DimExpr>& rhs) {
+  auto lhs_iexpr = std::dynamic_pointer_cast<DimIntExpr>(lhs);
+  auto rhs_iexpr = std::dynamic_pointer_cast<DimIntExpr>(rhs);
+  if (lhs_iexpr && rhs_iexpr) {
+    return make_number(lhs, std::max(lhs_iexpr->value, rhs_iexpr->value));
+  }
+  return nullptr;
+}
+
+template <typename NumType1, typename NumType2, typename ExprType>
+std::shared_ptr<ExprType> fold_min(        //
+    const std::shared_ptr<ExprType>& lhs,  //
+    const std::shared_ptr<ExprType>& rhs) {
+  auto lhs_num = std::dynamic_pointer_cast<NumType1>(lhs);
+  auto rhs_num = std::dynamic_pointer_cast<NumType2>(rhs);
+  if (lhs_num && rhs_num) {
+    return make_number(lhs, std::min(lhs_num, rhs_num));
+  }
+  return nullptr;
+}
+
+// Min does not apply to PolyExpr so specialize
+template <>
+std::shared_ptr<PolyExpr> fold_min<PolyLiteral, PolyLiteral, PolyExpr>(  //
+    const std::shared_ptr<PolyExpr>& lhs,                                //
+    const std::shared_ptr<PolyExpr>& rhs) {
+  throw std::runtime_error("Min function not defined for PolyExpr");
+}
+
+template <>
+std::shared_ptr<DimExpr> fold_min<DimIntExpr, DimIntExpr, DimExpr>(  //
+    const std::shared_ptr<DimExpr>& lhs,                             //
+    const std::shared_ptr<DimExpr>& rhs) {
+  auto lhs_iexpr = std::dynamic_pointer_cast<DimIntExpr>(lhs);
+  auto rhs_iexpr = std::dynamic_pointer_cast<DimIntExpr>(rhs);
+  if (lhs_iexpr && rhs_iexpr) {
+    return make_number(lhs, std::min(lhs_iexpr->value, rhs_iexpr->value));
+  }
+  return nullptr;
+}
+
 template <typename IntType, typename OpType, typename ExprType>
 std::shared_ptr<ExprType> MakeOp(IntOp op, const std::vector<std::shared_ptr<ExprType>>& args) {
   switch (op) {
@@ -119,6 +183,18 @@ std::shared_ptr<ExprType> MakeOp(IntOp op, const std::vector<std::shared_ptr<Exp
     } break;
     case IntOp::Div: {
       auto ret = fold_div<IntType, IntType>(args[0], args[1]);
+      if (ret) {
+        return ret;
+      }
+    } break;
+    case IntOp::Max: {
+      auto ret = fold_max<IntType, IntType>(args[0], args[1]);
+      if (ret) {
+        return ret;
+      }
+    } break;
+    case IntOp::Min: {
+      auto ret = fold_min<IntType, IntType>(args[0], args[1]);
       if (ret) {
         return ret;
       }

@@ -20,6 +20,7 @@
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/stripe/transcode.h"
+#include "pmlc/dialect/stripe/util.h"
 #include "pmlc/dialect/tile/contraction.h"
 #include "pmlc/dialect/tile/ops.h"
 #include "pmlc/dialect/tile/program.h"
@@ -548,22 +549,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     }
 
     getModule().walk([](FuncOp funcOp) {
-      // wrap with a parallel_for to represent the 'main' block
-      auto& region = funcOp.getBody();
-      OpBuilder builder(region);
-      auto body = region.begin();
-      auto it = body->begin();
-      auto forOp = builder.create<stripe::ParallelForOp>(funcOp.getLoc(), builder.getI64ArrayAttr({}));
-      auto attrs = llvm::SmallVector<NamedAttribute, 1>{
-          {builder.getIdentifier("main"), builder.getUnitAttr()},
-      };
-      forOp.setAttr(stripe::Dialect::getStripeAttrsName(), builder.getDictionaryAttr(attrs));
-      forOp.setAttr("name", builder.getStringAttr("main"));
-      auto block = builder.createBlock(&forOp.inner());
-      block->getOperations().splice(block->getOperations().end(), body->getOperations(), it, body->end());
-
-      builder.setInsertionPointToEnd(&region.front());
-      builder.create<stripe::TerminateOp>(funcOp.getLoc());
+      // Wraps function body with a ParallelForOp to represent Stripe's 'main' block.
+      stripe::createMainParallelFor(funcOp);
     });
   }
 

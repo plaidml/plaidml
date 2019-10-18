@@ -1335,7 +1335,7 @@ def reverse(x, axes):
 
 @_log_call
 def reverse_gradient(x, coeff=1.0):
-    _report_unimplemented('reverse_gradient')
+    return _KerasNode('reverse_gradient', tensor=plaidml_op.scale_gradient(x.tensor, -coeff))
 
 
 @_log_call

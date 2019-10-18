@@ -326,6 +326,18 @@ class TestBackendOps(unittest.TestCase):
         assert isinstance(pkb.learning_phase(), int)
         npt.assert_equal(pkb.learning_phase(), 0)
 
+    def testReverseGradient(self):
+        x = m(2, 2, 3) + 3.
+        pl = pkb.placeholder(shape=x.shape)
+        y = pkb.reverse_gradient(pl)
+        z = pkb.sqrt(y) + pl
+        df = pkb.gradients(pkb.mean(z), [pl])
+        gfn = pkb.function([pl], df, updates=[])
+        gr = gfn([x])
+        npt.assert_allclose(gr[0], (1. / x.size) * (-1. / (2 * np.sqrt(x)) + 1.),
+                            rtol=DEFAULT_TOL,
+                            atol=DEFAULT_ATOL)
+
     @opTest([
         # Don't use exactly 0 (inconsistent gradient behavior between frameworks at ReLU cusp)
         [
@@ -800,14 +812,18 @@ class TestBackendOps(unittest.TestCase):
     def testSigmoid(self, b, x):
         return [b.sigmoid(x)]
 
-    @opTest([[m(2, 2)]], skip_theano=True)
-    def testBinaryCrossentropy(self, b, x):
+    @opTest([
+        [np.array([[0, 1], [1, 0]]), m(2, 2)],
+        [np.array([[0.3, 0.7], [0.1, 0.9]]), m(2, 2)],
+        [np.array([[0, 0.7], [1, .3]]), m(2, 2)],
+    ],
+            skip_theano=True,
+            atol=1e-7)
+    def testBinaryCrossentropy(self, b, x, y):
         return [
-            b.binary_crossentropy(b.variable(np.array([[0, 1], [1, 0]])), x, from_logits=True),
-            b.binary_crossentropy(b.variable(np.array([[0.3, 0.7], [0.1, 0.9]])),
-                                  x,
-                                  from_logits=False),
-            b.binary_crossentropy(b.variable(np.array([[0, 0.7], [1, .3]])), b.sigmoid(x))
+            b.binary_crossentropy(x, y, from_logits=True),
+            b.binary_crossentropy(x, y, from_logits=False),
+            b.binary_crossentropy(x, b.sigmoid(y))
         ]
 
     @opTest([[np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]]), (m(3, 3) + 3) / 15.0],
@@ -1102,7 +1118,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d_transpose(x, k, os, strides=st, padding=pd, data_format=df, dilation_rate=dr)
         ]
 
-    @unittest.skip("Broken until TensorDim min/max supported")
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
             1e-04,
             skip_theano=True)
@@ -1112,7 +1127,6 @@ class TestBackendOps(unittest.TestCase):
         If we're not concerned with Keras 2.0.8 we probably don't need to retain this.'''
         return [b.conv2d(im, km, padding='same', strides=(2, 3), data_format=df)]
 
-    @unittest.skip("Broken until TensorDim min/max supported")
     @opTest([
         _conv_inp(IN=3, IC=1, OC=3, IS=[4, 7, 5], KS=[3, 3, 3]),
         _conv_inp(IN=3, IC=4, OC=2, IS=[3, 6, 3], KS=[2, 1, 2], data_format='channels_last'),

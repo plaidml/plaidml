@@ -146,9 +146,6 @@ void RegisterDerivs() {
   RegisterTensorDeriv("shape", [](DERIV_ARGS) {  //
     return Tensors{zero()};
   });
-  RegisterTensorDeriv("sigmoid", [](DERIV_ARGS) {  //
-    return Tensors{Y * (1.0 - Y) * DY};
-  });
   RegisterTensorDeriv("sin", [](DERIV_ARGS) {  //
     return Tensors{cos(X[0]) * DY};
   });

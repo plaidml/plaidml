@@ -84,6 +84,10 @@ mlir::Value* MakeAffineOp(plaidml_int_op op, const std::vector<mlir::Value*> ope
       return builder->MakeAffineNegOp(operands);
     case PLAIDML_INT_OP_SUB:
       return builder->MakeAffineSubOp(operands);
+    case PLAIDML_INT_OP_MAX:
+      return builder->MakeAffineMaxOp(operands);
+    case PLAIDML_INT_OP_MIN:
+      return builder->MakeAffineMinOp(operands);
   }
   throw std::runtime_error("Unknown affine op");
 }

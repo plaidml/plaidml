@@ -692,8 +692,7 @@ TEST(CppEdsl, DefractLong) {
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   Program program("defract_long", {O});
-  // This currently crashes when combined with the padding pass
-  // exec::Executable::compile(program, {I, K})->run();
+  exec::Executable::compile(program, {I, K})->run();
 }
 
 TEST(CppEdsl, DupOut) {

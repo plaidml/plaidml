@@ -157,6 +157,10 @@ class DimExprEvaluator : public DimVisitor {
         return lhs * rhs;
       case IntOp::Div:
         return lhs / rhs;
+      case IntOp::Max:
+        return std::max(lhs, rhs);
+      case IntOp::Min:
+        return std::min(lhs, rhs);
       default:
         throw std::runtime_error("Unknown DimOp");
     }
@@ -274,6 +278,9 @@ class PolyEvaluator : public PolyVisitor {
               str(boost::format("Divisor of polynomials must be a constant: %1% / %2%") % lhs % rhs));
         }
         return lhs / rhs.constant();
+      case IntOp::Max:
+      case IntOp::Min:
+        throw std::runtime_error("Min/Max unsupported for polynomials");
       default:
         throw std::runtime_error("Unknown PolyOp");
         break;
@@ -911,6 +918,10 @@ std::string to_string(IntOp op) {
       return "*";
     case IntOp::Div:
       return "/";
+    case IntOp::Max:
+      return "max";
+    case IntOp::Min:
+      return "min";
     default:
       throw std::runtime_error("Invalid op");
   }
@@ -927,6 +938,10 @@ std::string PolyOpExpr::str() const {
     case IntOp::Mul:
     case IntOp::Div:
       ss << "(" << operands[0]->str() << " " << to_string(op) << " " << operands[1]->str() << ")";
+      break;
+    case IntOp::Max:
+    case IntOp::Min:
+      throw std::runtime_error("During printing, encountered unexpected Max/Min polynomial op");
       break;
   }
   return ss.str();
@@ -949,6 +964,10 @@ std::string DimOpExpr::str() const {
     case IntOp::Mul:
     case IntOp::Div:
       ss << "(" << operands[0]->str() << " " << to_string(op) << " " << operands[1]->str() << ")";
+      break;
+    case IntOp::Max:
+    case IntOp::Min:
+      ss << to_string(op) << "(" << operands[0]->str() << ", " << operands[1]->str() << ")";
       break;
   }
   return ss.str();
