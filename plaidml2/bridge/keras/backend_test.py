@@ -191,14 +191,10 @@ def compareMultiple(arguments):
     return decorator
 
 
-# TODO(MLIR): Remove this once MLIR supports gradients
-SHOULD_DO_GRADS = os.getenv('PLAIDML_MLIR') != '1'
-
-
 def opTest(in_data,
            tol=DEFAULT_TOL,
            atol=DEFAULT_ATOL,
-           do_grads=SHOULD_DO_GRADS,
+           do_grads=True,
            skip_theano=True,
            skip_tensorflow=False,
            verbose=False,
