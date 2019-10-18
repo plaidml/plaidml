@@ -389,6 +389,16 @@ mlir::Value* TileBuilder::MakeAffineNegOp(llvm::ArrayRef<mlir::Value*> args) {
   return impl->builder.create<AffineNegOp>(impl->builder.getUnknownLoc(), args).result();
 }
 
+mlir::Value* TileBuilder::MakeAffineMaxOp(llvm::ArrayRef<mlir::Value*> args) {
+  IVLOG(5, "TileBuilder::MakeAffineMaxOp>");
+  return impl->builder.create<AffineMaxOp>(impl->builder.getUnknownLoc(), args).result();
+}
+
+mlir::Value* TileBuilder::MakeAffineMinOp(llvm::ArrayRef<mlir::Value*> args) {
+  IVLOG(5, "TileBuilder::MakeAffineMinOp>");
+  return impl->builder.create<AffineMinOp>(impl->builder.getUnknownLoc(), args).result();
+}
+
 mlir::Value* TileBuilder::MakeAffineSourceIndexMapOp(mlir::Value* tensor, llvm::ArrayRef<mlir::Value*> idxs) {
   IVLOG(5, "TileBuilder::MakeAffineSourceIndexMapOp>");
   return impl->builder.create<AffineSourceIndexMapOp>(impl->builder.getUnknownLoc(), tensor, idxs).result();

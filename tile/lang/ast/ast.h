@@ -294,6 +294,8 @@ enum class IntOp {
   Sub,
   Mul,
   Div,
+  Max,
+  Min,
 };
 
 PolyExprPtr MakeOp(IntOp op, const std::vector<PolyExprPtr>& operands);

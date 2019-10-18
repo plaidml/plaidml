@@ -444,8 +444,27 @@ class TestEdsl(unittest.TestCase):
   _X0[x0, x1, x3, x6 : 1, 5, 5, 1] = +(I[x0, -1/2 + 1/2*x1 + 1/2*x2, -1/2 + 1/2*x3 + 1/2*x4, x5] * K[2 - x2, 2 - x4, x6, x5]);
 }
 ''')
-        # out of bounds access occurs when implicit constraints are combined with the padding pass
-        # outputs = plaidml_exec.run(program, [(I, np.random.rand(1, 3, 3, 1)), (K, np.random.rand(1, 3, 3, 1))])
+        outputs = plaidml_exec.run(program, [
+            (I, np.array([[
+                [[1], [3], [-1]],
+                [[0], [2], [4]],
+                [[1], [-1], [-2]],
+            ]])),
+            (K, np.array([[
+                [[2], [3], [4]],
+                [[6], [-3], [-1]],
+                [[-1], [-2], [1]],
+            ]])),
+        ])
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array([[
+                [[0], [0], [0], [0], [0]],
+                [[0], [4], [12], [6], [24]],
+                [[0], [0], [0], [0], [0]],
+                [[6], [-3], [-6], [-3], [-12]],
+                [[0], [0], [0], [0], [0]],
+            ]]))
 
     def testFunkyLayerNames(self):
         '''Exercises fix for plaidml bug #241

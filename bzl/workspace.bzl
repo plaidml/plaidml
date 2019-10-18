@@ -160,6 +160,14 @@ def plaidml_workspace():
     )
 
     dev_http_archive(
+        name = "tbb",
+        url = "https://github.com/intel/tbb/archive/tbb_2019.zip",
+        sha256 = "078c969b1bbd6b2afb01f65cf9d513bb80636363b206f1e2ae221b614d7ae197",
+        strip_prefix = "tbb-tbb_2019",
+        build_file = Label("//bzl:tbb.BUILD"),
+    )
+
+    dev_http_archive(
         name = "llvm",
         url = "https://github.com/llvm-mirror/llvm/archive/6d4c970c3440a7d3418b3222b663438bc343c0db.zip",
         sha256 = "b74de0e5e0fe1f430ee974425acf7ab1ab49bc41ea1f02b57a668893c5abf92d",

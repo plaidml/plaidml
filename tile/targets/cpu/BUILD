@@ -35,5 +35,6 @@ plaidml_cc_library(
         "@llvm//:x86_asm_parser",
         "@llvm//:x86_code_gen",
         "@xsmm",
+        "@tbb",
     ],
 )
