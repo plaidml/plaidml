@@ -88,6 +88,10 @@ mlir::Value* MakeAffineOp(plaidml_int_op op, const std::vector<mlir::Value*> ope
   throw std::runtime_error("Unknown affine op");
 }
 
+static bool use_mlir() {  //
+  return vertexai::env::Get("PLAIDML_MLIR") == "1";
+}
+
 }  // namespace
 
 extern "C" {
@@ -258,7 +262,6 @@ void plaidml_expr_bind_dims(  //
     plaidml_dim_expr** dims) {
   return ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_expr_bind_dims> " << expr->expr->str());
-    bool use_mlir = vertexai::env::Get("PLAIDML_MLIR", "0") == "1";
     std::vector<DimExprPtr> vec_dims(ndims);
     for (size_t i = 0; i < ndims; i++) {
       vec_dims[i] = dims[i]->expr;
@@ -266,7 +269,7 @@ void plaidml_expr_bind_dims(  //
     expr->expr->shape.bind_dims(&vec_dims);
     for (size_t i = 0; i < ndims; i++) {
       dims[i]->expr = vec_dims[i];
-      if (use_mlir) {
+      if (use_mlir()) {
         IVLOG(3, "bind_dims> i: " << i << ", from: " << expr->value << ", into: " << dims[i]->value);
         IVLOG(3, "bind_dims> i: " << i << ", from: " << expr->expr->str());
         GlobalContext::get()->BindTensorDim(i, expr->value, &dims[i]->value);
@@ -290,7 +293,7 @@ plaidml_expr* plaidml_expr_dim(  //
     plaidml_dim_expr* expr) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_dim");
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       return new plaidml_expr{std::make_shared<DimExprExpr>(expr->expr), expr->value};
     } else {
       return new plaidml_expr{std::make_shared<DimExprExpr>(expr->expr)};
@@ -319,7 +322,7 @@ plaidml_expr* plaidml_expr_placeholder(  //
         dims[i] = -1;
       }
     }
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto value = GlobalContext::get()->MakePlaceholderOp(shape->shape.dtype, dims);
       return new plaidml_expr{expr, value};
     } else {
@@ -399,7 +402,7 @@ plaidml_expr* plaidml_expr_none(  //
 ) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {  //
     IVLOG(3, "plaidml_expr_none");
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto value = GlobalContext::get()->MakeNoneOp();
       return new plaidml_expr{std::make_shared<NoneExpr>(), value};
     } else {
@@ -420,7 +423,7 @@ plaidml_expr* plaidml_expr_tuple(  //
       exprs[i] = args[i]->expr;
       tuple[i] = args[i]->value;
     }
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto value = GlobalContext::get()->MakeTupleOp(tuple);
       return new plaidml_expr{std::make_shared<TupleExpr>(exprs), value};
     } else {
@@ -454,7 +457,7 @@ void plaidml_expr_tuple_get_exprs(  //
     if (!tuple_expr) {
       throw std::runtime_error("Expression is not a tuple");
     }
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto elts = GlobalContext::get()->GetTupleElements(expr->value);
       for (size_t i = 0; i < std::min(nexprs, tuple_expr->exprs.size()); i++) {
         exprs[i] = new plaidml_expr{tuple_expr->exprs[i], elts[i]};
@@ -472,7 +475,7 @@ plaidml_expr* plaidml_expr_str(  //
     const char* value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_str> " << value);
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto str_val = GlobalContext::get()->MakeStringOp(value);
       return new plaidml_expr{std::make_shared<StringExpr>(value), str_val};
     } else {
@@ -503,7 +506,7 @@ plaidml_expr* plaidml_expr_int(  //
     int64_t value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_int> " << value);
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto const_val = GlobalContext::get()->MakeScalarConstantOp(value);
       return new plaidml_expr{std::make_shared<IntConst>(value), const_val};
     } else {
@@ -534,7 +537,7 @@ plaidml_expr* plaidml_expr_float(  //
     double value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_float");
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto const_val = GlobalContext::get()->MakeScalarConstantOp(value);
       return new plaidml_expr{std::make_shared<FloatConst>(value), const_val};
     } else {
@@ -569,10 +572,7 @@ plaidml_expr* plaidml_expr_call(  //
     // FIXME: has_exprs and has_values is a HACK to allow gradient callbacks
     // to work while the MLIR backend is under construction.
     bool has_exprs = true;
-    bool has_values = true;
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") != "1") {
-      has_values = false;
-    }
+    bool has_values = use_mlir();
     for (size_t i = 0; i < nargs; i++) {
       if (!args[i]) {
         throw std::runtime_error(str(boost::format("Undefined tensor in call to %1%()") % fn));
@@ -639,7 +639,6 @@ plaidml_expr* plaidml_expr_grad_override(  //
     std::vector<ExprPtr> in_exprs(nins);
     ExprPtr out_expr;
     mlir::Value* out_value;
-    bool use_mlir = vertexai::env::Get("PLAIDML_MLIR", "0") == "1";
     for (size_t i = 0; i < nins; i++) {
       if (!ins[i]) {
         throw std::runtime_error("Undefined input tensor in gradient override");
@@ -658,13 +657,13 @@ plaidml_expr* plaidml_expr_grad_override(  //
     } else {
       throw std::runtime_error("Currently out expr is required in plaidml_expr_grad_override");  // TODO: MLIR
     }
-    if (out->value && use_mlir) {
+    if (out->value && use_mlir()) {
       out_value = out->value;
     } else {
       out_value = nullptr;
     }
     ExprPtr expr = MakeGradOverride(deriv_entry, in_exprs, out_expr);
-    mlir::Value* value = use_mlir ? GlobalContext::get()->MakePrimitiveOp("ident", out_value) : nullptr;
+    mlir::Value* value = use_mlir() ? GlobalContext::get()->MakePrimitiveOp("ident", out_value) : nullptr;
     IVLOG(6, "The expr from plaidml_expr_grad_override has shape " << expr->shape.str());
     return new plaidml_expr{expr, value};
   });
@@ -679,23 +678,22 @@ plaidml_expr* plaidml_expr_index_map(  //
     IVLOG(3, "plaidml_expr_index_map");
     std::vector<std::shared_ptr<PolyExpr>> idx_exprs(ndims);
     std::vector<mlir::Value*> idx_values(ndims);
-    bool use_mlir = vertexai::env::Get("PLAIDML_MLIR", "0") == "1";
     for (size_t i = 0; i < ndims; i++) {
       idx_exprs[i] = raw_idxs[i]->expr;
-      if (use_mlir) {
+      if (use_mlir()) {
         idx_values[i] = raw_idxs[i]->value;
       }
     }
     auto builder = GlobalContext::get();
     if (ref) {
-      if (use_mlir) {
+      if (use_mlir()) {
         auto value = builder->MakeAffineSourceIndexMapOp(ref->value, idx_values);
         return new plaidml_expr{std::make_shared<IndexMapExpr>(ref->expr, idx_exprs), value};
       } else {
         return new plaidml_expr{std::make_shared<IndexMapExpr>(ref->expr, idx_exprs)};
       }
     }
-    if (use_mlir) {
+    if (use_mlir()) {
       auto value = builder->MakeAffineSinkIndexMapOp(idx_values);
       return new plaidml_expr{std::make_shared<IndexMapExpr>(nullptr, idx_exprs), value};
     } else {
@@ -712,15 +710,14 @@ plaidml_expr* plaidml_expr_size_map(  //
     IVLOG(3, "plaidml_expr_size_map");
     std::vector<DimExprPtr> dim_exprs;
     std::vector<mlir::Value*> dim_values;
-    bool use_mlir = vertexai::env::Get("PLAIDML_MLIR", "0") == "1";
     for (size_t i = 0; i < ndims; i++) {
       dim_exprs.emplace_back(raw_dims[i]->expr);
-      if (use_mlir) {
+      if (use_mlir()) {
         dim_values.emplace_back(raw_dims[i]->value);
       }
     }
     auto builder = GlobalContext::get();
-    auto value = use_mlir ? builder->MakeAffineSizeMapOp(dim_values) : nullptr;
+    auto value = use_mlir() ? builder->MakeAffineSizeMapOp(dim_values) : nullptr;
     return new plaidml_expr{std::make_shared<SizeMapExpr>(dim_exprs), value};
   });
 }
@@ -737,7 +734,6 @@ plaidml_expr* plaidml_expr_contraction(  //
     const char* layout) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_contraction");
-    bool use_mlir = vertexai::env::Get("PLAIDML_MLIR", "0") == "1";
     auto expr = std::make_shared<ContractionExpr>();
     expr->name = name;
     expr->agg_op = into_agg_op(agg_op);
@@ -757,12 +753,12 @@ plaidml_expr* plaidml_expr_contraction(  //
         throw std::runtime_error("oops: src_idxs");
       }
       expr->srcs.emplace_back(idxs);
-      if (use_mlir) {
+      if (use_mlir()) {
         src_values.emplace_back(raw_src_idxs[i]->value);
       }
     }
     expr->ComputeShape(layout);
-    if (use_mlir) {
+    if (use_mlir()) {
       switch (agg_op) {
         case PLAIDML_AGG_OP_SUM:
           switch (combo_op) {
@@ -991,7 +987,7 @@ void plaidml_expr_gradient(  //
       wrt_values[i] = wrts[i]->value;
     }
     auto deriv_exprs = ComputeGradients(wrt_exprs, loss->expr);
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto deriv_values = GlobalContext::get()->ComputeGradients(wrt_values, loss->value);
       for (size_t i = 0; i < nwrts; i++) {
         derivs[i] = new plaidml_expr{deriv_exprs[i], deriv_values[i]};
@@ -1063,7 +1059,7 @@ PLAIDML_EDSL_API plaidml_poly_expr* plaidml_poly_expr_dim(  //
     plaidml_dim_expr* expr) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {  //
     IVLOG(3, "plaidml_poly_expr_dim");
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       return new plaidml_poly_expr{std::make_shared<PolyDimExpr>(expr->expr), expr->value};
     } else {
       return new plaidml_poly_expr{std::make_shared<PolyDimExpr>(expr->expr)};
@@ -1076,7 +1072,7 @@ plaidml_poly_expr* plaidml_poly_expr_index(  //
     const char* name) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_poly_expr_index");
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto value = GlobalContext::get()->MakeAffineIndexOp(name);
       return new plaidml_poly_expr{std::make_shared<PolyIndex>(next_idx_id++, std::string{name}), value};
     } else {
@@ -1090,7 +1086,7 @@ plaidml_poly_expr* plaidml_poly_expr_literal(  //
     int64_t value) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_poly_expr_literal> " << value);
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto mlir_value = GlobalContext::get()->MakeAffineConstantOp(value);
       return new plaidml_poly_expr{std::make_shared<PolyLiteral>(value), mlir_value};
     } else {
@@ -1113,7 +1109,7 @@ plaidml_poly_expr* plaidml_poly_expr_op(  //
       values[i] = args[i]->value;
       IVLOG(3, "  arg: " << values[i] << ": " << vec_args[i]->str());
     }
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto value = MakeAffineOp(op, values);
       return new plaidml_poly_expr{MakeOp(static_cast<IntOp>(op), vec_args), value};
     } else {
@@ -1149,7 +1145,7 @@ plaidml_dim_expr* plaidml_dim_expr_none(  //
 ) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {  //
     IVLOG(3, "plaidml_dim_expr_none");
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto value = GlobalContext::get()->MakeNoneOp();
       return new plaidml_dim_expr{std::make_shared<DimNoneExpr>(), value};
     } else {
@@ -1174,7 +1170,7 @@ plaidml_dim_expr* plaidml_dim_expr_int(  //
     int64_t value) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_dim_expr_int> " << value);
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto mlir_value = GlobalContext::get()->MakeAffineConstantOp(value);
       return new plaidml_dim_expr{std::make_shared<DimIntExpr>(value), mlir_value};
     } else {
@@ -1214,7 +1210,7 @@ plaidml_dim_expr* plaidml_dim_expr_op(  //
       values[i] = args[i]->value;
       IVLOG(3, "  arg: " << values[i] << ": " << vec_args[i]->str());
     }
-    if (vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (use_mlir()) {
       auto value = MakeAffineOp(op, values);
       return new plaidml_dim_expr{MakeOp(static_cast<IntOp>(op), vec_args), value};
     } else {
@@ -1269,7 +1265,7 @@ plaidml_program* plaidml_program_evaluate(  //
       mutations.updates.emplace_back(ProgramUpdate{src_updates[i]->expr, dst_updates[i]->expr});
     }
     // TODO(MLIR): updates
-    if (has_every_value && vertexai::env::Get("PLAIDML_MLIR", "0") == "1") {
+    if (has_every_value && use_mlir()) {
       std::vector<mlir::Value*> new_values(noutputs);
       auto program = GlobalContext::get()->MakeProgram(name, values, new_values);
       auto ret = new plaidml_program{Evaluate(name, mutations), program};
