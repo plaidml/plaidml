@@ -41,6 +41,7 @@ namespace conversion {
 namespace stripe_to_affine {
 
 using mlir::ArrayAttr;
+using mlir::isa;
 using mlir::OpRewritePattern;
 using mlir::PatternMatchResult;
 using mlir::PatternRewriter;
@@ -74,7 +75,7 @@ PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp forOp, 
     // one.
     auto& parentBlockOps = forOp.getOperation()->getBlock()->getOperations();
     auto& forBodyOps = forBodyRegion.front().getOperations();
-    assert(parentBlockOps.back().isa<TerminateOp>() && "Expected terminator");
+    assert(isa<TerminateOp>(parentBlockOps.back()) && "Expected terminator");
     parentBlockOps.splice(mlir::Block::iterator(forOp), forBodyOps, forBodyOps.begin(), std::prev(forBodyOps.end()));
   } else {
     llvm_unreachable("ParallelForOp not supported yet");

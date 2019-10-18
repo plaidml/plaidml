@@ -383,22 +383,23 @@ void StripeBuilder::visit(ParallelForOp op) {
     cur_->comments = attr.getValue().str();
   }
   // Add the 'true' indexes
+  auto idx_names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  auto idx_attrs = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_attrs", op.getContext()));
   for (size_t i = 0; i < op.ranges().size(); i++) {
     int64_t range = op.ranges().getValue()[i].cast<IntegerAttr>().getInt();
     std::string idx_name = "idx";
-    auto argName = llvm::formatv("arg{0}", i);
-    if (auto attrs = op.getAttrOfType<DictionaryAttr>(argName.str())) {
-      for (auto kvp : attrs.getValue()) {
-        if (kvp.first.strref() == "__name") {
-          idx_name = kvp.second.cast<StringAttr>().getValue().str();
-        }
+    if (idx_names && idx_names.size() > i) {
+      if (auto str_attr = idx_names.getValue()[i].template dyn_cast<StringAttr>()) {
+        idx_name = str_attr.getValue().str();
       }
     }
     idx_name = cur_->unique_idx_name(idx_name);
     idxs_.emplace(std::make_pair(cur_.get(), oblock.getArgument(i)), idx_name);
     cur_->idxs.emplace_back(idx_name, range);
-    if (auto attrs = op.getAttrOfType<DictionaryAttr>(argName.str())) {
-      add_attributes(&cur_->idxs.back(), attrs.getValue());
+    if (idx_attrs && idx_attrs.size() > i) {
+      if (auto attrs = idx_attrs.getValue()[i].template dyn_cast<DictionaryAttr>()) {
+        add_attributes(&cur_->idxs.back(), attrs.getValue());
+      }
     }
   }
   // Add the attributes

@@ -239,7 +239,9 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
 
   // Process the indexes
   std::vector<int64_t> ranges;
-  std::map<std::string, DictionaryAttr> argAttrs;
+  llvm::SmallVector<Attribute, 8> idx_attrs;
+  llvm::SmallVector<Attribute, 8> idx_names;
+  bool any_attrs = false;
   for (size_t i = 0; i < block.idxs.size(); i++) {
     auto idx = block.idxs.at(i);
     if (idx.affine == stripe::Affine()) {
@@ -248,9 +250,12 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       auto arg = body->addArgument(AffineType::get(builder->getContext()));
       locals.idxs.emplace(idx.name, arg);
       ranges.push_back(static_cast<int64_t>(idx.range));
-      auto name = llvm::formatv("arg{0}", i);
-      auto attrs = TagsToDict(builder, idx, {{builder->getIdentifier("__name"), builder->getStringAttr(idx.name)}});
-      argAttrs.emplace(name, attrs);
+      auto attrs = TagsToDict(builder, idx);
+      if (attrs.size() != 0) {
+        any_attrs = true;
+      }
+      idx_names.emplace_back(builder->getStringAttr(idx.name));
+      idx_attrs.emplace_back(attrs);
     } else {
       // Handle the 'passthru' case by computing the appropriate affine and
       // adding into the symbol table
@@ -438,8 +443,9 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   if (attrs.size()) {
     loop_op.setAttr(Dialect::getStripeAttrsName(), attrs);
   }
-  for (const auto& kvp : argAttrs) {
-    loop_op.setAttr(kvp.first, kvp.second);
+  loop_op.setAttr("idx_names", ArrayAttr::get(idx_names, builder->getContext()));
+  if (any_attrs) {
+    loop_op.setAttr("idx_attrs", ArrayAttr::get(idx_attrs, builder->getContext()));
   }
   loop_op.getOperation()->getRegion(0).push_back(body);
 }

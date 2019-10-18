@@ -22,6 +22,7 @@ class AstPass : public AstVisitor<ExprPtr> {
   ExprPtr Visit(const FloatConst& expr) override { return GenericVisit(expr); }
   ExprPtr Visit(const IntConst& expr) override { return GenericVisit(expr); }
   ExprPtr Visit(const ParamExpr& expr) override { return GenericVisit(expr); }
+  ExprPtr Visit(const GradOverrideExpr& expr) override { return GenericVisit(expr); }
 
  protected:
   template <typename T>

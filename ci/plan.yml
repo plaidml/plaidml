@@ -37,6 +37,8 @@ PLATFORMS:
     variant: linux_x86_64
   keras-tf-cuda-gtx1070:
     variant: linux_x86_64
+  keras-tf-dnnl-cpu:
+    variant: linux_x86_64
   keras-plaid-ocl-gtx1070:
     variant: linux_x86_64
   keras-plaid-ocl-r9nano:
@@ -67,7 +69,7 @@ PLATFORMS:
     variant: linux_x86_64
   keras-plaid-ogl-gk20a:
     variant: linux_arm_32v7
-  keras-plaid-ocl-cpu:
+  keras-stripe-llvm-cpu:
     variant: linux_x86_64
   keras-plaid-ocl-gv100gl:
     variant: linux_x86_64
@@ -125,6 +127,8 @@ VARIANTS:
 SUITES:
   smoke:
     platforms:
+      keras-stripe-llvm-cpu:
+        pipelines: [plaidml]
       keras-plaid-ocl-gp100gl:
         pipelines: [plaidml]
       keras-stripe-ocl-gp100gl:
@@ -158,9 +162,11 @@ SUITES:
 
   base:
     platforms:
-      keras-plaid-ocl-gfx803:
-        pipelines: [nightly]
-      keras-stripe-ocl-gfx803:
+      keras-stripe-llvm-cpu:
+        pipelines: [plaidml, nightly]
+      keras-stripe-ocl-neo:
+        pipelines: [plaidml, nightly]
+      keras-plaid-mtl-uhd630:
         pipelines: [plaidml, nightly]
 
       keras-plaid-ocl-gfx804:
@@ -220,8 +226,6 @@ SUITES:
             soft_fail: true
           keras-plaid-mtl-uhd630:
             soft_fail: true
-          keras-stripe-mtl-uhd630:
-            soft_fail: true
         shards: 3
       regression:
         args: [regression_test.py]
@@ -267,8 +271,14 @@ SUITES:
 
   infer:
     platforms:
+      keras-stripe-llvm-cpu:
+        pipelines: [plaidml, nightly]
       keras-tf-cuda-gp100gl:
         pipelines: [nightly]
+        append_args: [--tensorflow]
+
+      keras-tf-dnnl-cpu:
+        pipelines: [ci]
         append_args: [--tensorflow]
 
       keras-plaid-ocl-gfx803:
@@ -334,6 +344,7 @@ SUITES:
       imdb_lstm:
         precision: high
         skip_platforms: 
+          - keras-stripe-llvm-cpu
           - keras-stripe-ocl-gfx803
           - keras-stripe-ocl-gfx804
           - keras-stripe-ocl-gfx900
@@ -341,10 +352,13 @@ SUITES:
           - keras-stripe-ocl-gv100gl
           - keras-stripe-ocl-neo
           - keras-stripe-mtl-uhd630
+          - keras-tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
         precision: high
         platform_overrides:
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
           keras-plaid-ocl-gfx803:
             prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
@@ -357,16 +371,24 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+        skip_platforms: [keras-stripe-llvm-cpu]
       mobilenet:
         precision: high
+        platform_overrides:
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
       mobilenet_v2:
         precision: high
         platform_overrides:
           keras-plaid-mtl-uhd630:
             soft_fail: true
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
       resnet50:
         precision: high
         platform_overrides:
+          keras-stripe-llvm-cpu:
+            prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 128]
           keras-stripe-ocl-gfx804:
@@ -375,9 +397,13 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
       vgg19:
         precision: high
-        platform_overrides:
+        platform_overrides:          
+          keras-stripe-llvm-cpu:
+            prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx803:
             prepend_args: [--examples, 256]
           keras-plaid-ocl-gfx804:
@@ -390,7 +416,14 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
-        skip_platforms: [keras-plaid-mtl-uhd630, keras-stripe-mtl-uhd630, keras-plaid-ocl-gfx803]
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
+        skip_platforms: 
+          - keras-plaid-mtl-uhd630 
+          - keras-stripe-mtl-uhd630
+          - keras-plaid-ocl-gfx803
+          - keras-stripe-llvm-cpu
+
       xception:
         precision: high
         platform_overrides:
@@ -413,12 +446,14 @@ SUITES:
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 64]
             soft_fail: true
-        skip_platforms: [keras-plaid-ocl-gv100gl]
+          keras-tf-dnnl-cpu:
+            conda_env: conda/tensorflow-dnnl.yml
+        skip_platforms: [keras-plaid-ocl-gv100gl, keras-stripe-llvm-cpu]
 
   train:
     platforms:
       keras-tf-cuda-gp100gl:
-        pipelines: [ci]
+        pipelines: [train]
         append_args: [--tf]
 
       keras-plaid-ocl-gfx804:
@@ -470,23 +505,26 @@ SUITES:
         # passing versions will pass; and non-memory errors will still error
         expected: "CL_MEM_OBJECT_ALLOCATION_FAILURE"
         precision: low
-        args: [plaidbench.py, inception_v3, --train, --print-stacktraces]
+        args: [plaidbench.py, inception_v3, --train, --print-stacktraces, --batch-size, '{batch_size}']
       resnet50_train:
         precision: low
-        args: [plaidbench.py, resnet50, --train, --print-stacktraces]
+        args: [plaidbench.py, resnet50, --train, --print-stacktraces, --batch-size, '{batch_size}']
       vgg19_train:
         precision: low
-        args: [plaidbench.py, vgg19, --train, --print-stacktraces]
+        args: [plaidbench.py, vgg19, --train, --print-stacktraces, --batch-size, '{batch_size}']
       xception_train:
         precision: low
-        args: [plaidbench.py, xception, --train, --print-stacktraces]
+        args: [plaidbench.py, xception, --train, --print-stacktraces, --batch-size, '{batch_size}']
         skip_platforms: keras-plaid-ocl-gp100gl
       mobilenet_train:
         precision: low
-        args: [plaidbench.py, mobilenet, --train, --print-stacktraces]
+        args: [plaidbench.py, mobilenet, --train, --print-stacktraces, --batch-size, '{batch_size}']
+
 
   comprehensive:
     platforms:
+      keras-stripe-llvm-cpu:
+        pipelines: [nightly]
       keras-tf-cuda-gp100gl:
         pipelines: [nightly]
         append_args: [--tensorflow]
