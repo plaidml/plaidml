@@ -11,7 +11,8 @@
 #endif
 
 AFFINE_OP(AffineForOp)
-AFFINE_LAST_OP(AffineTerminatorOp)
+AFFINE_OP(AffineTerminatorOp)
+AFFINE_LAST_OP(ConstantIndexOp)
 
 #undef AFFINE_OP
 #undef AFFINE_LAST_OP

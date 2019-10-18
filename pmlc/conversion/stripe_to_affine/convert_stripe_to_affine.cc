@@ -46,6 +46,7 @@ using mlir::OpRewritePattern;
 using mlir::PatternMatchResult;
 using mlir::PatternRewriter;
 using mlir::SmallVector;
+using pmlc::dialect::stripe::AffineConstOp;
 using pmlc::dialect::stripe::ParallelForOp;
 using pmlc::dialect::stripe::TerminateOp;
 
@@ -57,6 +58,11 @@ using pmlc::dialect::stripe::TerminateOp;
     PatternMatchResult matchAndRewrite(OP Op, PatternRewriter& rewriter) const override; \
   };
 #include "supported_ops.inc"
+
+PatternMatchResult AffineConstOpConverter::matchAndRewrite(AffineConstOp constOp, PatternRewriter& rewriter) const {
+  rewriter.replaceOpWithNewOp<mlir::ConstantIndexOp>(constOp, constOp.value().getSExtValue());
+  return matchSuccess();
+}
 
 PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp forOp, PatternRewriter& rewriter) const {
   auto forRanges = forOp.ranges().getValue();
