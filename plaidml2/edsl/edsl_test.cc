@@ -34,10 +34,10 @@ class Environment : public ::testing::Environment {
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
-  TensorIndex i("i"), j("j"), k("k");
+  TensorIndex i, j, k;
   X.bind_dims(I, K);
   Y.bind_dims(K, J);
-  auto R = NamedTensorOutput("R", I, J);
+  auto R = TensorOutput(I, J);
   R(i, j) += X(i, k) * Y(k, j);
   return R;
 }
@@ -57,16 +57,16 @@ Tensor Softmax(const Tensor& X) {
 }
 
 TEST(CppEdsl, Dot) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784}, "A");
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512}, "B");
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
   Program program("dot", {Dot(A, B)});
   exec::Executable::compile(program, {A, B})->run();
 }
 
 TEST(CppEdsl, DoubleDot) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30}, "B");
-  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40}, "C");
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
+  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
   exec::Executable::compile(program, {A, B, C})->run();
 }

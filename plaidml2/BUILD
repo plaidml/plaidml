@@ -135,8 +135,8 @@ py_binary(
         "@llvm//:LICENSE.TXT",
         "@minizip//:LICENSE",
         "@mlir//:LICENSE.TXT",
-        "@xsmm//:documentation/LICENSE.md",
-        "@tbb//:doc/copyright_brand_disclaimer_doxygen.txt",
+        "@tbb//:LICENSE",
+        "@xsmm//:LICENSE.md",
     ],
     main = "setup.py",
     deps = [
