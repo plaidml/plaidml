@@ -667,24 +667,3 @@ cc_library(
     ],
     alwayslink = 1,
 )
-
-cc_library(
-    name = "MlirOptLib",
-    srcs = glob([
-        "lib/Support/MlirOptMain.cpp",
-    ]),
-    hdrs = [
-        "include/mlir/Support/MlirOptMain.h",
-    ],
-    copts = PLATFORM_COPTS,
-    includes = ["include"],
-    deps = [
-        ":Analysis",
-        ":IR",
-        ":Parser",
-        ":Pass",
-        ":Support",
-        ":Transforms",
-        "@llvm//:support",
-    ],
-)

@@ -13,12 +13,17 @@ plaidml_cc_binary(
         "//pmlc/conversion/stripe_to_affine",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/stripe",
-        "//pmlc/dialect/tile",	
-        "@mlir//:EDSC",	
-        "@mlir//:OptMain",	
-        "@mlir//:Parser",	
-        "@mlir//:TestTransforms",	
+        "//pmlc/dialect/tile",
+        "@mlir//:EDSC",
+        "@mlir//:OptMain",
+        "@mlir//:Parser",
+        "@mlir//:TestTransforms",
         "@mlir//:Transforms",
-        "@mlir//:MlirOptLib",
     ],
+)
+
+filegroup(
+    name = "litfiles",
+    srcs = glob(["runlit*py"]),
+    visibility = ["//visibility:public"],
 )
