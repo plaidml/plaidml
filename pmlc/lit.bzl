@@ -95,7 +95,7 @@ def glob_lit_tests(
             name = curr_test,
             data = data + per_test_extra_data.pop(curr_test, []),
             size = size_override.pop(curr_test, default_size),
-            tags = default_tags + tags_override.pop(curr_test, []),
+            tags = ["windows_fail"] + default_tags + tags_override.pop(curr_test, []),
             features = features,
         )
 
