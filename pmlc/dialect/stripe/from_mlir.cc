@@ -346,8 +346,6 @@ std::string StripeBuilder::add_refinements(  //
         }
         mblock = mblock->getParentOp()->getBlock();
       }
-      // ensure the 'main' refinement has the full allocation shape
-      builder.ref->interior_shape = builder.baseShape;
       if (!seen.count(mblock)) {
         builder.addRefinement(mblock);
         seen.insert(mblock);
