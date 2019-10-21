@@ -5,6 +5,7 @@
 #include <memory>
 
 namespace mlir {
+
 class FuncOp;
 class MLIRContext;
 template <typename T>
@@ -14,6 +15,7 @@ class OwningRewritePatternList;
 
 /// Creates a pass to convert Affine dialect to Stripe dialect.
 std::unique_ptr<FunctionPassBase> createConvertAffineToStripePass();
+
 }  // namespace mlir
 
 namespace pmlc {
