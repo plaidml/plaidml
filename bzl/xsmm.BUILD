@@ -1,8 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])  # BSD/MIT-like license
-
-exports_files(["documentation/LICENSE.md"])
+exports_files(["LICENSE.md"])
 
 cc_library(
     name = "xsmm",

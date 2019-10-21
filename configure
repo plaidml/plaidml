@@ -9,12 +9,6 @@ import sys
 
 BAZELRC = '.bazelrc.configure'
 
-DEFAULT_VARIANTS = {
-    'Darwin': 'macos_x86_64',
-    'Linux': 'linux_x86_64',
-    'Windows': 'windows_x86_64',
-}
-
 UNIX_PATH = 'PATH=/usr/local/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 
 
@@ -94,12 +88,6 @@ class Configure:
                 ]
                 subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
 
-    def configure_variant(self):
-        variant = DEFAULT_VARIANTS.get(platform.system())
-        print()
-        print('Using variant: {}'.format(variant))
-        write_to_bazelrc('build --config={}'.format(variant))
-
     def configure_cache(self, bazel_cache=None):
         print()
         if bazel_cache:
@@ -171,7 +159,6 @@ def main():
     cfg.configure_conda(False if args.ci_mode else args.skip_conda_env)
     cfg.configure_precommit(True if args.ci_mode else args.skip_precommit)
     cfg.configure_bazelisk(True if args.ci_mode else args.skip_bazelisk)
-    cfg.configure_variant()
     cfg.configure_cache(args.bazel_cache)
 
     print()

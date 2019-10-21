@@ -35,11 +35,14 @@ void ConvertAffineToStripe::runOnFunction() {
   });
 
   auto funcOp = getFunction();
-  if (failed(mlir::applyFullConversion(funcOp, target, patterns))) signalPassFailure();
+  if (failed(mlir::applyFullConversion(funcOp, target, patterns))) {
+    signalPassFailure();
+  }
 
   // Wrap function body with a ParallelForOp to represent Stripe's 'main' block.
   pmlc::dialect::stripe::createMainParallelFor(funcOp);
 }
+
 }  // namespace
 
 namespace pmlc {
@@ -91,6 +94,7 @@ void populateAffineToStripeConversionPatterns(mlir::OwningRewritePatternList& pa
 #include "supported_ops.inc"  // NOLINT
       >(ctx);
 }
+
 }  // namespace affine_to_stripe
 }  // namespace conversion
 }  // namespace pmlc

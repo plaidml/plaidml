@@ -31,9 +31,15 @@ local PARAMS = {
               },
             },
 
-            // This pass seems to cause out of bounds accesses, but only on
-            // contractions that have implicit constraints.
-            //
+            // No-op MLIR pass to test transcoding
+            {
+               name: 'mlir_nop',
+               pass: {
+                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_NopPass',
+               },
+            },
+
+
             // Pad tensors to remove inner conditionals
             {
               name: 'pad',
