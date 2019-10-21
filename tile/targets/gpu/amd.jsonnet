@@ -8,7 +8,8 @@ local PARAMS = {
     REG_MEM_LAT: 1,
     LOCAL_MEM_LAT: 30,
     GLOBAL_MEM_LAT: 100,
-    ALIGN_SIZE_B: 64
+    ALIGN_SIZE_B: 64,
+    MAX_REFS: 1024,
   },
   amd_metal: {
     LOCAL_MEM_KIB: 64,
@@ -19,7 +20,8 @@ local PARAMS = {
     REG_MEM_LAT: 1,
     LOCAL_MEM_LAT: 30,
     GLOBAL_MEM_LAT: 100,
-    ALIGN_SIZE_B: 128
+    ALIGN_SIZE_B: 128,
+    MAX_REFS: 31,
   },
 };
 
@@ -141,6 +143,7 @@ local PARAMS = {
                 b_reqs: ['eltwise'],
                 inner_remove_set: ['kernel'],
                 output_match: true,
+                max_refs: PARAMS[cfg].MAX_REFS,
               }
             },
 
@@ -152,6 +155,7 @@ local PARAMS = {
                 b_reqs: ['eltwise'],
                 inner_remove_set: ['kernel'],
                 b_inner_set: ['eltwise_middle'],
+                max_refs: PARAMS[cfg].MAX_REFS,
               }
             },
 
@@ -213,6 +217,7 @@ local PARAMS = {
                 fused_set: ['cache', 'eltwise'],
                 exclude: ['contract_middle'],
                 no_inner: true,
+                max_refs: PARAMS[cfg].MAX_REFS,
               }
             },
 
