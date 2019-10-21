@@ -1,8 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])  # BSD/MIT-like license
-
-exports_files(["documentation/LICENSE.md"])
+exports_files(["LICENSE"])
 
 cc_library(
     name = "tbb",
@@ -17,11 +15,4 @@ cc_library(
         "include/tbb/**/**",
     ]),
     includes = ["include"],
-)
-
-genrule(
-    name = "license",
-    srcs = ["doc/copyright_brand_disclaimer_doxygen.txt"],
-    outs = ["tbb-LICENSE"],
-    cmd = "cp $(SRCS) $@",
 )

@@ -36,20 +36,6 @@ void createMainParallelFor(mlir::FuncOp funcOp) {
   auto block = builder.createBlock(&forOp.inner());
   block->getOperations().splice(block->getOperations().end(), body->getOperations(), it, body->end());
 
-  // Inject RefineOp between each block argument and first usage
-  builder.setInsertionPointToStart(&region.front());
-  auto constOp = builder.create<AffineConstOp>(  //
-      funcOp.getLoc(),                           //
-      builder.getType<AffineType>(),             //
-      builder.getI64IntegerAttr(0));
-  auto zero = constOp.result();
-  for (auto arg : funcOp.getArguments()) {
-    auto tensorRefType = arg->getType().cast<TensorRefType>();
-    llvm::SmallVector<Value*, 4> offsets(tensorRefType.getRank(), zero);
-    auto refineOp = builder.create<RefineOp>(funcOp.getLoc(), tensorRefType, arg, offsets);
-    arg->replaceAllUsesWith(refineOp);
-    refineOp.setOperand(0, arg);
-  }
   builder.setInsertionPointToEnd(&region.front());
   builder.create<TerminateOp>(funcOp.getLoc());
 }

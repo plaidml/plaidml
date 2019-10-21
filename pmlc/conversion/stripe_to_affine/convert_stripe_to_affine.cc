@@ -32,8 +32,11 @@ void ConvertStripeToAffine::runOnFunction() {
     return true;  // typeConverter.isSignatureLegal(op.getType());
   });
 
-  if (failed(mlir::applyFullConversion(getFunction(), target, patterns))) signalPassFailure();
+  if (failed(mlir::applyFullConversion(getFunction(), target, patterns))) {
+    signalPassFailure();
+  }
 }
+
 }  // namespace
 
 namespace pmlc {
@@ -101,6 +104,7 @@ void populateStripeToAffineConversionPatterns(mlir::OwningRewritePatternList& pa
 #include "supported_ops.inc"  // NOLINT
       >(ctx);
 }
+
 }  // namespace stripe_to_affine
 }  // namespace conversion
 }  // namespace pmlc

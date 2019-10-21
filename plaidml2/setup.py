@@ -85,6 +85,8 @@ def main():
             ('share/plaidml2/minizip', ['minizip/LICENSE']),
             ('share/plaidml2/mlir', ['mlir/LICENSE.TXT']),
             ('share/plaidml2/protobuf', ['com_google_protobuf/LICENSE']),
+            ('share/plaidml2/tbb', ['tbb/LICENSE']),
+            ('share/plaidml2/xsmm', ['xsmm/LICENSE.md']),
         ],
         description='PlaidML machine learning accelerator',
         entry_points={
