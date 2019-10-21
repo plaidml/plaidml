@@ -41,6 +41,7 @@ tool_names = [
     'mlir-opt',
     'mlir-translate',
     'pmlc-opt',
+    'pmlc-translate',
 ]
 tools = [ToolSubst(s, unresolved='ignore') for s in tool_names]
 llvm_config.add_tool_substitutions(tools, tool_dirs)

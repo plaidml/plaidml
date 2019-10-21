@@ -4,7 +4,7 @@
 """
 
 # Default values used by the test runner.
-_default_test_file_exts = ["mlir", ".pbtxt", ".td"]
+_default_test_file_exts = ["mlir", "pbtxt", "td"]
 _default_size = "small"
 _default_tags = []
 
@@ -44,6 +44,7 @@ def _run_lit_test(name, data, size, tags, features):
         ] + features,
         data = data + [
             "//pmlc:pmlc-opt",
+            "//pmlc:pmlc-translate",
             "//pmlc:litfiles",
             "@llvm//:FileCheck",
             "@llvm//:count",

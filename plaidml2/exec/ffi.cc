@@ -110,9 +110,8 @@ plaidml_executable* plaidml_compile(  //
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
     std::unique_ptr<plaidml_executable> exec{new plaidml_executable};
     if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
-      mlir::MLIRContext mlir_ctx;
       // 1. lower tile dialect -> stripe dialect
-      auto module = LowerIntoStripe(&mlir_ctx, program->program.get());
+      auto module = LowerIntoStripe(*program->program->module);
       // 2. convert MLIR -> stripe
       auto stripe = FromMLIR(*module);
       Context ctx;

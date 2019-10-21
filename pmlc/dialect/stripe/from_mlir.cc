@@ -6,6 +6,7 @@
 #include "llvm/Support/Regex.h"
 
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Translation.h"
 
 #include "base/util/lookup.h"
 #include "pmlc/dialect/eltwise/ops.h"
@@ -676,6 +677,16 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
   // IVLOG(1, *ret->entry);
   return ret;
 }
+
+static mlir::LogicalResult FromMlirTranslateFunction(mlir::ModuleOp module, llvm::raw_ostream& output) {
+  auto program = FromMLIR(module);
+  std::stringstream ss;
+  ss << *program->entry;
+  output << ss.str();
+  return mlir::success();
+}
+
+static mlir::TranslateFromMLIRRegistration FromMlirTranslate("mlir-to-stripe", FromMlirTranslateFunction);
 
 }  // namespace stripe
 }  // namespace dialect

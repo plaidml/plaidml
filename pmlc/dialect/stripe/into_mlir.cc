@@ -1,8 +1,11 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/stripe/transcode.h"
+#include <google/protobuf/text_format.h>
 
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/MemoryBuffer.h"
+
+#include "mlir/Translation.h"
 
 #include "base/util/lookup.h"
 #include "pmlc/dialect/eltwise/dialect.h"
@@ -10,6 +13,8 @@
 #include "pmlc/dialect/eltwise/util.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
+#include "pmlc/dialect/stripe/transcode.h"
+#include "tile/stripe/stripe.pb.h"
 
 namespace pmlc {
 namespace dialect {
@@ -509,6 +514,19 @@ mlir::OwningModuleRef IntoMLIR(MLIRContext* ctx, const stripe::Program& prog) {
   module.push_back(func);
   return module;
 }
+
+static mlir::OwningModuleRef IntoMlirTranslateFunction(  //
+    std::unique_ptr<llvm::MemoryBuffer> input,           //
+    MLIRContext* context) {
+  vertexai::tile::stripe::proto::Program proto;
+  if (!google::protobuf::TextFormat::ParseFromString(input->getBuffer().str(), &proto)) {
+    llvm::report_fatal_error("Could not parse stripe prototxt");
+    return nullptr;
+  }
+  return IntoMLIR(context, *stripe::FromProto(proto));
+}
+
+static mlir::TranslateToMLIRRegistration IntoMlirTranslate("stripe-to-mlir", IntoMlirTranslateFunction);
 
 }  // namespace stripe
 }  // namespace dialect
