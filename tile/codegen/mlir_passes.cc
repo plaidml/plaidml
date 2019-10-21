@@ -9,6 +9,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/dialect/eltwise/util.h"
+#include "pmlc/dialect/stripe/nop_pass.h"
 #include "pmlc/dialect/stripe/padding_pass.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "tile/codegen/compile_pass.h"
@@ -78,6 +79,7 @@ inline void RegisterPass() {
 }
 
 [[gnu::unused]] char register_passes = []() -> char {
+  RegisterPass<pmlc::dialect::stripe::NopPass, proto::MLIR_NopPass>();
   RegisterPass<pmlc::dialect::stripe::PaddingPass, proto::MLIR_PadPass>();
   return 0;
 }();
