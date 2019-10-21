@@ -14,6 +14,7 @@ build --announce_rc
 build --nolegacy_external_runfiles
 build --distinct_host_configuration=false
 build:ro --remote_upload_local_results=false
+build --enable_platform_specific_config
 
 build --action_env=LC_ALL # This is to allow plaidbench to work on *nix under python3
 build --action_env=LANG # This is to allow plaidbench to work on *nix under python3
@@ -47,11 +48,20 @@ build:linux_x86_64 --crosstool_top=//toolchain:toolchain
 build:linux_x86_64 --host_crosstool_top=//toolchain:toolchain
 build:linux_x86_64 --build_tag_filters=-darwin,-metal,-msvc,-pytorch
 test:linux_x86_64 --test_tag_filters=-darwin,-metal,-msvc,-pytorch
+build:linux --cpu=linux_x86_64
+build:linux --crosstool_top=//toolchain:toolchain
+build:linux --host_crosstool_top=//toolchain:toolchain
+build:linux --build_tag_filters=-darwin,-metal,-msvc,-pytorch
+test:linux --test_tag_filters=-darwin,-metal,-msvc,-pytorch
 
 build:macos_x86_64 --cpu=darwin_x86_64
 build:macos_x86_64 --apple_platform_type=macos
 build:macos_x86_64 --build_tag_filters=-large,-linux,-msvc
 test:macos_x86_64 --test_tag_filters=-large,-linux,-msvc
+build:macos --cpu=darwin_x86_64
+build:macos --apple_platform_type=macos
+build:macos --build_tag_filters=-large,-linux,-msvc
+test:macos --test_tag_filters=-large,-linux,-msvc
 
 build:macos_x86_64_ci --cpu=darwin_x86_64
 build:macos_x86_64_ci --apple_platform_type=macos
@@ -66,6 +76,14 @@ test:windows_x86_64 --test_tag_filters=-darwin,-docs,-linux,-metal,-pytorch,-win
 test:windows_x86_64 --test_env=CONDA_EXE
 test:windows_x86_64 --test_env=NUMBER_OF_PROCESSORS
 test:windows_x86_64 --test_env=USERPROFILE
+build:windows --build_tag_filters=-darwin,-docs,-linux,-metal,-pytorch
+build:windows --action_env=CONDA_EXE
+build:windows --action_env=NUMBER_OF_PROCESSORS
+build:windows --action_env=PLAIDML_SETTINGS
+test:windows --test_tag_filters=-darwin,-docs,-linux,-metal,-pytorch,-windows_fail
+test:windows --test_env=CONDA_EXE
+test:windows --test_env=NUMBER_OF_PROCESSORS
+test:windows --test_env=USERPROFILE
 
 build:bazelci --build_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
 test:bazelci --test_tag_filters=-darwin,-metal,-msvc,-opencl,-pytorch
