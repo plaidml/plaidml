@@ -87,7 +87,7 @@ bazelisk build //plaidml:wheel
 ## Install the PlaidML Python wheel
 
 ```
-pip install -U bazel-bin/plaidml/*.whl
+pip install -U bazel-bin/plaidml/wheel.pkg/dist/*.whl
 plaidml-setup
 ```
 
@@ -182,7 +182,7 @@ bazelisk build //plaidml/keras:wheel
 ## Install the PlaidML-Keras Python wheel
 
 ```
-  pip install -U bazel-bin/plaidml/keras/*.whl
+  pip install -U bazel-bin/plaidml/keras/wheel.pkg/dist/*.whl
 ```
 
 # Testing PlaidML
