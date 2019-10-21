@@ -80,6 +80,11 @@ inline edsl::Tensor reshape(const edsl::Tensor& I, const edsl::Value& dims) {
   return details::op("reshape", args).as_tensor();
 }
 
+inline edsl::Tensor sigmoid(const edsl::Tensor& I) {
+  auto args = edsl::make_tuple(I);
+  return details::op("sigmoid", args).as_tensor();
+}
+
 inline edsl::Tensor square(const edsl::Tensor& x) {  //
   return details::op("square", edsl::Value(x)).as_tensor();
 }

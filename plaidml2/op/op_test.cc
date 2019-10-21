@@ -84,6 +84,27 @@ TEST(Op, Mean) {
 )"));
 }
 
+TEST(Op, Sigmoid) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
+  Program program("sigmoid", {op::sigmoid(A)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0]
+) -> (
+  _X7
+) {
+  _X0 = ident(A);
+  _X1 = 1.000000;
+  _X2 = 1.000000;
+  _X3 = neg(_X0);
+  _X4 = exp(_X3);
+  _X5 = add(_X2, _X4);
+  _X6 = div(_X1, _X5);
+  _X7 = ident(_X6);
+}
+)"));
+}
+
 TEST(Op, Square) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
   Program program("square", {op::square(A)});
