@@ -11,6 +11,9 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
+#include "base/util/env.h"
+#include "base/util/logging.h"
+
 using namespace llvm;  // NOLINT
 using namespace mlir;  // NOLINT
 
@@ -41,6 +44,14 @@ static cl::opt<bool> verifyPasses(                                //
     cl::init(true));
 
 int main(int argc, char** argv) {
+  auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
+  if (level_str.size()) {
+    auto level = std::atoi(level_str.c_str());
+    if (level) {
+      el::Loggers::setVerboseLevel(level);
+    }
+  }
+
   PrettyStackTraceProgram x(argc, argv);
   InitLLVM y(argc, argv);
 
