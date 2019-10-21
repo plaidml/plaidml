@@ -93,7 +93,7 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
     }
 
     std::vector<Orderer<const Index*>> idxs;
-    if (block->idxs.size() > 6) {
+    if (block->idxs.size() > 8) {
       // Skip attempting to stencil when permutation space is too large
       // TODO: There are much better algorithms to use for stenciling
       continue;
