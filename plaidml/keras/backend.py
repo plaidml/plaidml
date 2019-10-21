@@ -526,6 +526,8 @@ def clear_session():
     global _in_train_phase, _ctx, _dev, PLAIDML_EVENTLOG_FILENAME
     _in_train_phase = None
     _ctx = plaidml.Context()
+    if _dev:
+        _dev.close()
     _dev = None
     if PLAIDML_EVENTLOG_FILENAME:
         _ctx.set_eventlog_filename(PLAIDML_EVENTLOG_FILENAME)
@@ -1684,7 +1686,7 @@ def softplus(x):
 
 @_log_call
 def softsign(x):
-    return x/(1 + abs(x))
+    return x / (1 + abs(x))
 
 
 @_log_call
