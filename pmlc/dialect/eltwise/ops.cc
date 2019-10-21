@@ -234,6 +234,14 @@ DEFINE_CANONICALIZER(TanOp);
 DEFINE_CANONICALIZER(XorOp);
 DEFINE_CANONICALIZER(SelectOp);
 
+OpFoldResult AddOp::fold(ArrayRef<Attribute> operands) {
+  /// add(x, 0) -> x
+  if (matchPattern(rhs(), m_Zero())) {
+    return lhs();
+  }
+  return constFoldBinaryOp(operands, [](double a, double b) { return a + b; });
+}
+
 OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
   // mul(x, 0) -> 0
   if (matchPattern(rhs(), m_Zero())) {
