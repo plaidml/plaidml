@@ -132,6 +132,9 @@ void RunTimeLogEntry(char* str, char* extra, float address) {
   IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ":" /* 0x" << std::hex */ << address);
 }
 
+typedef void (*libxsmm_function)(const void* a, const void* b, void* c);
+void XSMMRTCaller(libxsmm_function func, const void* aPtr, const void* bPtr, void* cPtr) { func(aPtr, bPtr, cPtr); }
+
 }  // namespace rt
 
 template <typename T>
@@ -152,11 +155,13 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
       {"_libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
       {"_prng_step", symInfo(rt::prng_step)},
       {"_RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
+      {"_XSMMRTCaller", symInfo(rt::XSMMRTCaller)},
       {"libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
       {"libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
       {"libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
       {"prng_step", symInfo(rt::prng_step)},
       {"RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
+      {"XSMMRTCaller", symInfo(rt::XSMMRTCaller)},
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {
