@@ -23,25 +23,25 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   /// name should be streamed into 'os'.
   void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {  // NOLINT
     if (auto str_attr = op->getAttrOfType<StringAttr>("name")) {
-      os << str_attr.getValue().str();
+      os << str_attr.getValue();
     } else if (auto str_attr = op->getAttrOfType<StringAttr>("scalar_name")) {
-      std::string s = str_attr.getValue().str();
-      os << "s_" << s.substr(1);
+      os << "s_" << str_attr.getValue().drop_front();
     } else if (auto const_op = llvm::dyn_cast<AffineConstOp>(op)) {
-      auto value = const_op.value().getSExtValue();
-      os << 'c' << value;
+      os << 'c' << const_op.value().getSExtValue();
     }
   }
+
   void getBlockArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {  // NOLINT
     Operation* op = arg->getOwner()->getParentOp();
     if (auto vec = op->getAttrOfType<ArrayAttr>("idx_names")) {
       if (vec.size() > arg->getArgNumber()) {
         if (auto str_attr = vec.getValue()[arg->getArgNumber()].dyn_cast<StringAttr>()) {
-          os << str_attr.getValue().str();
+          os << str_attr.getValue();
         }
       }
     }
   }
+
   void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {  // NOLINT
     MLIRContext* ctx = getDialect()->getContext();
     Type t = AffineType::get(ctx);
