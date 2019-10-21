@@ -111,15 +111,40 @@ def AggregateOp : StripeOp<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
   let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggregationKind:$agg);
   let results = (outs);
-  let printer = [{ PrintSimple(getOperation(), &p, 2, {}, into()->getType(), false); }];
+  let printer = [{
+    p << getOperation()->getName() << " \"";
+    p << util::stringifyAggregationKind(agg());
+    p << "\" ";
+    p.printOperand(into());
+    p << " ";
+    p.printOperand(from());
+    p << " : " << into()->getType();
+    llvm::SmallVector<StringRef, 1> skip;
+    skip.push_back("agg");
+    p.printOptionalAttrDict(getOperation()->getAttrs(), skip);
+  }];
   let parser = [{
+    bool r = false;
+    StringAttr agg_op_val;
+    llvm::SmallVector<NamedAttribute, 1> ignore;
+    MLIRContext* ctx = parser.getBuilder().getContext();
+    r = r || parser.parseAttribute(agg_op_val, mlir::NoneType::get(ctx), "agg", ignore);
+    auto agg_op = util::symbolizeAggregationKind(agg_op_val.getValue());
+    if (!agg_op) {
+      return mlir::failure();
+    }
+    auto agg_op_attr = parser.getBuilder().getI64IntegerAttr(static_cast<int64_t>(agg_op.getValue()));
+    result.attributes.emplace_back(mlir::Identifier::get("agg", ctx), agg_op_attr);
+    OpAsmParser::OperandType into;
+    OpAsmParser::OperandType from;
+    r = r || parser.parseOperand(into);
+    r = r || parser.parseOperand(from);
     TensorRefType refType;
-    llvm::SmallVector<OpAsmParser::OperandType, 2> operands;
-    bool r = ParseSimple(&parser, &result, &operands, 2, {}, &refType, false);
+    r = r || parser.parseColonType(refType);
     Type eltType = RankedTensorType::get({}, refType.getElementType());
-    r = r || parser.resolveOperand(operands[0], refType, result.operands);
-    r = r || parser.resolveOperand(operands[1], eltType, result.operands);
-    return mlir::failure(r); 
+    r = r || parser.resolveOperand(into, refType, result.operands);
+    r = r || parser.resolveOperand(from, eltType, result.operands);
+    return mlir::failure(r);
   }];
 }
 
