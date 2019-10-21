@@ -42,6 +42,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
       }
     }
   }
+
   void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {  // NOLINT
     for (const auto dt : vertexai::tile::GetDataTypeSet()) {
       // Intern the string

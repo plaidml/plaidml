@@ -217,7 +217,7 @@ def AsBoolOp : EltwiseOp<"as_bool"> {
 
 def AbsOp : UnaryOp<"abs">;
 def ACosOp : UnaryFloatOp<"acos">;
-def AddOp : BinaryOp<"add", [Commutative, NoSideEffect]>;
+def AddOp : BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
 def AndOp : BinaryIntOp<"and", [Commutative, NoSideEffect]>;
 def ASinOp : UnaryFloatOp<"asin">;
 def AssignOp : UnaryOp<"assign">;
