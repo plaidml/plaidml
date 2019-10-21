@@ -45,6 +45,12 @@ class Orderer {
 };
 
 template <typename V>
+std::ostream& operator<<(std::ostream& os, const Orderer<V>& v) {
+  os << *v << ":" << v.ord();
+  return os;
+}
+
+template <typename V>
 void swap(Orderer<V>& v1, Orderer<V>& v2) {
   std::size_t v1o = v1.ord();
   v1.set_ord(v2.ord());
@@ -87,6 +93,11 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
     }
 
     std::vector<Orderer<const Index*>> idxs;
+    if (block->idxs.size() > 8) {
+      // Skip attempting to stencil when permutation space is too large
+      // TODO: There are much better algorithms to use for stenciling
+      continue;
+    }
     ord = 0;
     for (auto& idx : block->idxs) {
       idxs.emplace_back(ord++, &idx);
@@ -157,6 +168,7 @@ boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>&
     do {      // Iterate through idxs permutations
       do {    // Iterate through ref_ins permutations
         do {  // Iterate through ref_outs permutations
+          // IVLOG(5, "Evaluating, ref_outs = " << ref_outs << ", ref_ins = " << ref_ins << ", idxs = " << idxs);
           bool is_legal = true;
 
           // Loop over spec rules and block idxs.
