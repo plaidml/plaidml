@@ -80,6 +80,9 @@ class StripeBuilder {
   stripe::Affine build_affine(stripe::Block* sblock, Value* affine);
   stripe::Location build_location(const StripeLocation& loc, Block* mblock, stripe::Block* sblock);
 
+  // Helper to get scalar (possibly inlining constant if needed)
+  std::string get_scalar(mlir::Value*);
+
   void visit(ParallelForOp op);
   void visit(ConstraintOp op, int count);
   void visit(LoadOp op);
@@ -414,6 +417,17 @@ stripe::Location StripeBuilder::build_location(const StripeLocation& loc, Block*
   return ret;
 }
 
+std::string StripeBuilder::get_scalar(Value* val) {
+  if (auto defOp = val->getDefiningOp()) {
+    if (auto constOp = llvm::dyn_cast<eltwise::ScalarConstantOp>(defOp)) {
+      if (!scalars_.count(val)) {
+        visit(constOp);
+      }
+    }
+  }
+  return scalars_.at(val);
+}
+
 void StripeBuilder::visit(ParallelForOp op) {
   IVLOG(3, "StripeBuilder::visit(ParallelForOp)");
   // Construct the block and put it in the table
@@ -498,7 +512,7 @@ void StripeBuilder::visit(LoadIndexOp op) {
 void StripeBuilder::visit(StoreOp op) {
   IVLOG(3, "StripeBuilder::visit(StoreOp)");
   auto ref_name = add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out);
-  auto from = scalars_.at(op.from());
+  auto from = get_scalar(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
 }
 
@@ -506,7 +520,7 @@ void StripeBuilder::visit(AggregateOp op) {
   IVLOG(3, "StripeBuilder::visit(AggregateOp)");
   auto agg_name = util::stringifyAggregationKind(op.agg());
   auto ref_name = add_refinements(op.getOperation()->getBlock(), op.into(), stripe::RefDir::Out, agg_name);
-  auto from = scalars_.at(op.from());
+  auto from = get_scalar(op.from());
   cur_->stmts.push_back(std::make_shared<stripe::Store>(from, ref_name));
 }
 
@@ -530,13 +544,6 @@ void StripeBuilder::visit(SpecialOp specialOp) {
 void StripeBuilder::visit(util::GenericBuilder builder) {
   auto op = builder.getOperation();
   IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
-  for (auto operand : op->getOperands()) {
-    if (auto defOp = operand->getDefiningOp()) {
-      if (auto constOp = llvm::dyn_cast<eltwise::ScalarConstantOp>(defOp)) {
-        visit(constOp);
-      }
-    }
-  }
   auto out_name = scalar_name(op);
   scalars_.emplace(op->getResult(0), out_name);
   auto intr = std::make_shared<stripe::Intrinsic>();
@@ -546,7 +553,7 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
   }
   intr->outputs.push_back(out_name);
   for (auto operand : op->getOperands()) {
-    intr->inputs.push_back(scalars_.at(operand));
+    intr->inputs.push_back(get_scalar(operand));
   }
   cur_->stmts.push_back(intr);
 }
@@ -571,7 +578,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
   intr->name = util::getOpName(op->getName());
   intr->outputs.push_back(out_name);
   for (auto operand : op->getOperands()) {
-    intr->inputs.push_back(scalars_.at(operand));
+    intr->inputs.push_back(get_scalar(operand));
   }
   intr->inputs.push_back(bitwidth_name);
   cur_->stmts.push_back(intr);
