@@ -35,11 +35,14 @@ void ConvertAffineToStripe::runOnFunction() {
   });
 
   auto funcOp = getFunction();
-  if (failed(mlir::applyFullConversion(funcOp, target, patterns))) signalPassFailure();
+  if (failed(mlir::applyFullConversion(funcOp, target, patterns))) {
+    signalPassFailure();
+  }
 
   // Wrap function body with a ParallelForOp to represent Stripe's 'main' block.
   pmlc::dialect::stripe::createMainParallelFor(funcOp);
 }
+
 }  // namespace
 
 namespace pmlc {
@@ -48,9 +51,11 @@ namespace affine_to_stripe {
 
 using mlir::AffineForOp;
 using mlir::AffineTerminatorOp;
+using mlir::ConstantIndexOp;
 using mlir::OpRewritePattern;
 using mlir::PatternMatchResult;
 using mlir::PatternRewriter;
+using pmlc::dialect::stripe::AffineConstOp;
 using pmlc::dialect::stripe::TerminateOp;
 
 // Declaration of Affine ops converters for supported ops.
@@ -61,6 +66,13 @@ using pmlc::dialect::stripe::TerminateOp;
     PatternMatchResult matchAndRewrite(OP Op, PatternRewriter& rewriter) const override; \
   };
 #include "supported_ops.inc"
+
+PatternMatchResult ConstantIndexOpConverter::matchAndRewrite(ConstantIndexOp constOp, PatternRewriter& rewriter) const {
+  // AffineConstOp currently has a fixed 64-bit integer type.
+  rewriter.replaceOpWithNewOp<AffineConstOp>(constOp, rewriter.getIntegerType(64),
+                                             constOp.value().cast<mlir::IntegerAttr>());
+  return matchSuccess();
+}
 
 PatternMatchResult AffineForOpConverter::matchAndRewrite(AffineForOp forOp, PatternRewriter& rewriter) const {
   llvm_unreachable("ParallelForOp not supported yet");
@@ -82,6 +94,7 @@ void populateAffineToStripeConversionPatterns(mlir::OwningRewritePatternList& pa
 #include "supported_ops.inc"  // NOLINT
       >(ctx);
 }
+
 }  // namespace affine_to_stripe
 }  // namespace conversion
 }  // namespace pmlc

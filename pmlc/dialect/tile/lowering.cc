@@ -27,6 +27,7 @@
 #include "pmlc/util/util.h"
 
 using mlir::AbstractOperation;
+using mlir::ArrayAttr;
 using mlir::Block;
 using mlir::ConversionPattern;
 using mlir::ConversionPatternRewriter;
@@ -259,17 +260,14 @@ struct AffineDomainOpConversion : public LoweringBase {
     forOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
     auto body = rewriter.createBlock(&forOp.inner());
 
-    unsigned argcnt = 0;
     stripe::SymbolValueMap idxs;
+    llvm::SmallVector<Attribute, 8> idxNames;
     for (const auto& kvp : bounds) {
       auto arg = body->addArgument(stripe::AffineType::get(rewriter.getContext()));
-      auto argAttrs = llvm::SmallVector<NamedAttribute, 1>{
-          {rewriter.getIdentifier("__name"), rewriter.getStringAttr(kvp.first)},
-      };
-      auto name = llvm::formatv("arg{0}", argcnt++);
-      forOp.setAttr(name.str(), rewriter.getDictionaryAttr(argAttrs));
+      idxNames.emplace_back(rewriter.getStringAttr(kvp.first));
       idxs.emplace(kvp.first, arg);
     }
+    forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
 
     // add constraints
     // TODO
@@ -379,17 +377,15 @@ struct EltwiseOpConversion : public LoweringBase {
     auto body = rewriter.createBlock(&forOp.inner());
 
     stripe::SymbolValueMap idxs;
+    llvm::SmallVector<Attribute, 8> idxNames;
     const auto& dims = resultTensorType.getShape();
     for (unsigned i = 0; i < dims.size(); i++) {
       auto arg = body->addArgument(stripe::AffineType::get(rewriter.getContext()));
       auto idxName = llvm::formatv("i{0}", i);
-      auto argAttrs = llvm::SmallVector<NamedAttribute, 1>{
-          {rewriter.getIdentifier("__name"), rewriter.getStringAttr(idxName.str())},
-      };
-      auto argName = llvm::formatv("arg{0}", i);
-      forOp.setAttr(argName.str(), rewriter.getDictionaryAttr(argAttrs));
+      idxNames.emplace_back(rewriter.getStringAttr(idxName.str()));
       idxs.emplace(idxName, arg);
     }
+    forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
 
     // output refinement
     Value* output;
@@ -576,7 +572,7 @@ OwningModuleRef LowerIntoStripe(MLIRContext* context, TileProgram* program) {
     IVLOG(1, "LowerIntoStripe failed: " << mlir::debugString(*module->getOperation()));
     throw std::runtime_error("Lowering to stripe dialect failure");
   }
-  IVLOG(1, "after:\n" << mlir::debugString(*module->getOperation()));
+  // IVLOG(1, "after:\n" << mlir::debugString(*module->getOperation()));
   return module;
 }
 

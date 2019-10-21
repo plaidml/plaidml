@@ -9,10 +9,10 @@
 // -----
 
 func @main_parallel_for()
-attributes  {stripe_attrs = {program = unit, total_macs = 27 : i64}} {
-  "stripe.parallel_for"() ( {
+attributes {stripe_attrs = {program = unit, total_macs = 27 : i64}} {
+  stripe.parallel_for () {comments = "", name = "main", stripe_attrs = {main = unit}} {
     stripe.terminate
-  }) {comments = "", name = "main", ranges = [], stripe_attrs = {main = unit}} : () -> ()
+  }
   stripe.terminate
 }
 // AFFINE-LABEL: func @main_parallel_for()
@@ -26,3 +26,21 @@ attributes  {stripe_attrs = {program = unit, total_macs = 27 : i64}} {
 // STRIPE-NEXT: stripe.terminate
 // STRIPE-NOT: stripe.terminate
 // STRIPE-NOT: ^bb
+
+// -----
+
+func @affine_const()
+attributes {stripe_attrs = {program = unit, total_macs = 27 : i64}} {
+  stripe.parallel_for () {comments = "", name = "main", stripe_attrs = {main = unit}} {
+    %c0 = stripe.affine_const 0
+    stripe.terminate
+  }
+  stripe.terminate
+}
+// AFFINE-LABEL: func @affine_const()
+// AFFINE-NEXT: attributes
+// AFFINE-NEXT: constant 0 : index
+
+// STRIPE-LABEL: func @affine_const()
+// STRIPE-NEXT: attributes
+// STRIPE-NEXT: stripe.affine_const 0
