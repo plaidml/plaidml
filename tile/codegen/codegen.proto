@@ -275,6 +275,8 @@ message FusionPass {
   repeated string a_inner_set = 11;
   // New tags for the second inner block
   repeated string b_inner_set = 12;
+  // Limit of number of refinements
+  optional uint32 max_refs = 13 [default = 1024];
 }
 
 // A localize pass detects allocations (refinements with dir = None)

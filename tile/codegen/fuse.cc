@@ -533,6 +533,10 @@ void FusionInner(const AliasMap& scope, Block* block, TagFusionStrategy* strateg
       if (!block2) {
         break;
       }
+      if (block1->refs.size() + block2->refs.size() - 1 > strategy->Options().max_refs()) {
+        // Too many refinements in a block for the particular platform
+        break;
+      }
       // Get the list of outputs for this block
       std::set<std::string> outs_for_fuse;
       // Do not use block1->ref_outs() because we need also InOut refs
