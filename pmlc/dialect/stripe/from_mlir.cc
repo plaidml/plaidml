@@ -6,6 +6,7 @@
 #include "llvm/Support/Regex.h"
 
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Translation.h"
 
 #include "base/util/lookup.h"
 #include "pmlc/dialect/eltwise/ops.h"
@@ -337,7 +338,7 @@ std::string StripeBuilder::add_refinements(  //
     std::string agg_name,                    //
     bool is_special) {
   RefinementBuilder builder(this, value, dir, agg_name, is_special);
-  std::unordered_set<Block*> seen{mblock};
+  std::unordered_set<Block*> seen;
   while (true) {
     // move up the def-chain
     if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
@@ -364,14 +365,16 @@ std::string StripeBuilder::add_refinements(  //
         }
         mblock = mblock->getParentOp()->getBlock();
       }
+      auto nameAttr = op->getAttrOfType<StringAttr>("name");
+      auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+      if (!seen.count(mblock)) {
+        builder.addRefinement(mblock, nameAttr, attrs);
+        seen.insert(mblock);
+      }
       if (auto allocOp = mlir::dyn_cast<AllocateOp>(op)) {
         builder.adjustRoot();
         break;
       } else if (auto refineOp = mlir::dyn_cast<RefineOp>(op)) {
-        auto nameAttr = refineOp.getAttrOfType<StringAttr>("name");
-        auto attrs = refineOp.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
-        builder.addRefinement(mblock, nameAttr, attrs);
-        seen.insert(mblock);
         value = refineOp.in();
       }
     }
@@ -683,6 +686,16 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
   // IVLOG(1, *ret->entry);
   return ret;
 }
+
+static mlir::LogicalResult FromMlirTranslateFunction(mlir::ModuleOp module, llvm::raw_ostream& output) {
+  auto program = FromMLIR(module);
+  std::stringstream ss;
+  ss << *program->entry;
+  output << ss.str();
+  return mlir::success();
+}
+
+static mlir::TranslateFromMLIRRegistration FromMlirTranslate("mlir-to-stripe", FromMlirTranslateFunction);
 
 }  // namespace stripe
 }  // namespace dialect

@@ -21,9 +21,8 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   /// Get a special name to use when printing the given operation. The desired
   /// name should be streamed into 'os'.
   void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {
-    if (auto const_op = llvm::dyn_cast<AffineConstantOp>(op)) {
-      auto value = const_op.value().getSExtValue();
-      os << 'c' << value;
+    if (auto constOp = llvm::dyn_cast<AffineConstantOp>(op)) {
+      os << 'c' << constOp.value().getSExtValue();
     }
   }
 };
@@ -49,6 +48,17 @@ void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
   } else if (auto t = type.dyn_cast<AffineSizeMapType>()) {
     os << "smap";
   }
+}
+
+mlir::Type Dialect::parseType(llvm::StringRef spec, mlir::Location loc) const {
+  if (spec == "imap") {
+    return AffineIndexMapType::get(getContext());
+  }
+  if (spec == "smap") {
+    return AffineSizeMapType::get(getContext());
+  }
+  emitError(loc, llvm::formatv("unknown tile type: '{0}'", spec));
+  return Type();
 }
 
 mlir::Operation* Dialect::materializeConstant(  //

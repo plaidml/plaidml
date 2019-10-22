@@ -2,6 +2,7 @@
 
 #include "pmlc/dialect/tile/lowering.h"
 
+#include <memory>
 #include <vector>
 
 #include "llvm/Support/FormatVariadic.h"
@@ -12,6 +13,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Translation.h"
 
 #include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/dialect.h"
@@ -557,10 +559,10 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   static std::unique_ptr<mlir::Pass> Create() { return std::make_unique<LoweringPass>(); }
 };
 
-OwningModuleRef LowerIntoStripe(MLIRContext* context, TileProgram* program) {
+OwningModuleRef LowerIntoStripe(ModuleOp workspace) {
   IVLOG(1, "LowerIntoStripe");
-  OwningModuleRef module(llvm::cast<ModuleOp>(program->module->getOperation()->clone()));
-  mlir::PassManager pm(context, true);
+  OwningModuleRef module(llvm::cast<ModuleOp>(workspace.getOperation()->clone()));
+  mlir::PassManager pm(workspace.getContext(), true);
   IVLOG(1, "before:\n" << mlir::debugString(*module->getOperation()));
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
@@ -575,6 +577,21 @@ OwningModuleRef LowerIntoStripe(MLIRContext* context, TileProgram* program) {
   // IVLOG(1, "after:\n" << mlir::debugString(*module->getOperation()));
   return module;
 }
+
+static mlir::LogicalResult IntoStripeTranslateFunction(mlir::ModuleOp input, llvm::raw_ostream& output) {
+  auto module = LowerIntoStripe(input);
+  auto stripe = stripe::FromMLIR(*module);
+  std::stringstream ss;
+  ss << *stripe->entry;
+  output << ss.str();
+  return mlir::success();
+}
+
+static mlir::PassRegistration<LoweringPass> legalize_pass(  //
+    "tile-legalize-to-stripe",                              //
+    "Legalize from Tile dialect to Stripe dialect");
+
+static mlir::TranslateFromMLIRRegistration IntoStripeTranslate("tile-to-stripe", IntoStripeTranslateFunction);
 
 }  // namespace tile
 }  // namespace dialect

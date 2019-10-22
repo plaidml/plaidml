@@ -22,6 +22,22 @@ plaidml_cc_binary(
     ],
 )
 
+plaidml_cc_binary(
+    name = "pmlc-translate",
+    srcs = ["pmlc-translate.cc"],
+    copts = COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pmlc/dialect/stripe:transcode",
+        "//pmlc/dialect/tile",
+        "@llvm//:support",
+        "@mlir//:IR",
+        "@mlir//:Support",
+        "@mlir//:TranslateClParser",
+        "@mlir//:Translation",
+    ],
+)
+
 filegroup(
     name = "litfiles",
     srcs = glob(["runlit*py"]),

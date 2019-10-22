@@ -17,6 +17,7 @@ class Dialect : public mlir::Dialect {
   static llvm::StringRef getDialectNamespace() { return "tile"; }
   static std::string getCanonicalOpName(llvm::StringRef name);
 
+  mlir::Type parseType(llvm::StringRef spec, mlir::Location loc) const override;
   void printType(mlir::Type type, llvm::raw_ostream& os) const override;
 
   mlir::Operation* materializeConstant(  //

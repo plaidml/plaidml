@@ -7,7 +7,8 @@
 #include <sstream>
 #include <utility>
 
-#include <boost/format.hpp>
+#include "boost/format.hpp"
+#include "google/protobuf/text_format.h"
 
 #include "base/util/stream_container.h"
 #include "base/util/throw.h"
@@ -1173,6 +1174,10 @@ void Codec::Register(const std::string& name, const Codec::Factory& factory) {  
 
 std::unique_ptr<Codec> Codec::Resolve(const TensorShape& shape) {  //
   return CodecRegistry::Instance()->Resolve(shape);
+}
+
+bool FromProtoText(const std::string& pbtxt, proto::Program* into) {
+  return google::protobuf::TextFormat::ParseFromString(pbtxt, into);
 }
 
 }  // namespace stripe

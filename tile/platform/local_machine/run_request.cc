@@ -3,8 +3,10 @@
 #include "tile/platform/local_machine/run_request.h"
 
 #include <unordered_set>
+#include <utility>
 
 #include "base/util/error.h"
+#include "tile/platform/local_machine/shim.h"
 
 namespace vertexai {
 namespace tile {
