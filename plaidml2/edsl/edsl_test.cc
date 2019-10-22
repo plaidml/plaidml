@@ -79,6 +79,12 @@ TEST(CppEdsl, EltwiseAdd) {
   exec::Executable::compile(program, {A, B})->run();
 }
 
+TEST(CppEdsl, Relu) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  Program program("relu", {Relu(A)});
+  exec::Executable::compile(program, {A})->run();
+}
+
 TEST(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
   auto input = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
