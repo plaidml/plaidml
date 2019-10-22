@@ -12,7 +12,6 @@
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/transcode.h"
-#include "tile/stripe/stripe.pb.h"
 
 namespace pmlc {
 namespace dialect {
