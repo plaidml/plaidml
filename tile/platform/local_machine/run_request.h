@@ -11,7 +11,6 @@
 #include "tile/base/buffer.h"
 #include "tile/base/hal.h"
 #include "tile/platform/local_machine/program.h"
-#include "tile/platform/local_machine/shim.h"
 
 namespace vertexai {
 namespace tile {

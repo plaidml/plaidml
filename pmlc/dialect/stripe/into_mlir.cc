@@ -1,5 +1,7 @@
 // Copyright 2019, Intel Corporation
 
+#include "pmlc/dialect/stripe/transcode.h"
+
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -11,7 +13,6 @@
 #include "pmlc/dialect/eltwise/util.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
-#include "pmlc/dialect/stripe/transcode.h"
 
 namespace pmlc {
 namespace dialect {
