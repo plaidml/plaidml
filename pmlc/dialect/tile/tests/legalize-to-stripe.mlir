@@ -146,3 +146,51 @@ func @double_dot(
 // CHECK-NEXT:   }
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
+
+// -----
+
+!fp32 = type tensor<!eltwise.fp32>
+!t_10x20xfp32 = type tensor<10x20x!eltwise.fp32>
+!t_10x20xbool = type tensor<10x20x!eltwise.bool>
+
+func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
+  %0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> !fp32
+  %1 = "eltwise.cmp_lt"(%arg0, %0) {type = !eltwise.fp32} : (!t_10x20xfp32, !fp32) -> !t_10x20xbool
+  %2 = "eltwise.select"(%1, %0, %arg0) {type = !eltwise.fp32} : (!t_10x20xbool, !fp32, !t_10x20xfp32) -> !t_10x20xfp32
+  return %2 : !t_10x20xfp32
+}
+
+// CHECK-LABEL: func @relu
+// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
+// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X1"})
+// CHECK-NEXT: attributes  {inputs = 1 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
+// CHECK-NEXT:   stripe.parallel_for ()
+// CHECK-NEXT:      {name = "main", stripe_attrs = {main = unit}} {
+// CHECK-NEXT:     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
+// CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.bool(addr[10:20], addr[20:1])">}
+// CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20)
+// CHECK-NEXT:        {stripe_attrs = {eltwise = unit, eltwise_cmp_lt = unit, kernel = unit}} {
+// CHECK-NEXT:     ^bb0(%i0: !aff, %i1: !aff):
+// CHECK-NEXT:       %1 = stripe.refine %0 (%i0, %i1) : !bool_2
+// CHECK-NEXT:       %2 = stripe.refine %arg0 (%i0, %i1) : !fp32_2 {stripe_attrs = {eltwise_cmp_lt = unit}}
+// CHECK-NEXT:       %3 = stripe.load %2 : !fp32_2
+// CHECK-NEXT:       %4 = "eltwise.cmp_lt"(%3, %cst) {type = !eltwise.bool} : (!fp32, !fp32) -> !bool
+// CHECK-NEXT:       stripe.store %1, %4 : !bool_2
+// CHECK-NEXT:       stripe.terminate
+// CHECK-NEXT:     }
+// CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20)
+// CHECK-NEXT:        {stripe_attrs = {eltwise = unit, eltwise_select = unit, kernel = unit}} {
+// CHECK-NEXT:     ^bb0(%i0: !aff, %i1: !aff):
+// CHECK-NEXT:       %1 = stripe.refine %arg1 (%i0, %i1) : !fp32_2
+// CHECK-NEXT:       %2 = stripe.refine %0 (%i0, %i1) : !bool_2 {stripe_attrs = {eltwise_select = unit}}
+// CHECK-NEXT:       %3 = stripe.load %2 : !bool_2
+// CHECK-NEXT:       %4 = stripe.refine %arg0 (%i0, %i1) : !fp32_2 {stripe_attrs = {eltwise_select = unit}}
+// CHECK-NEXT:       %5 = stripe.load %4 : !fp32_2
+// CHECK-NEXT:       %6 = "eltwise.select"(%3, %cst, %5) {type = !eltwise.fp32} : (!bool, !fp32, !fp32) -> !fp32
+// CHECK-NEXT:       stripe.store %1, %6 : !fp32_2
+// CHECK-NEXT:       stripe.terminate
+// CHECK-NEXT:     }
+// CHECK-NEXT:     stripe.terminate
+// CHECK-NEXT:   }
+// CHECK-NEXT:   stripe.terminate
+// CHECK-NEXT: }
