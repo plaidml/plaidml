@@ -1,4 +1,4 @@
-# RUN: pmlc-translate --stripe-to-mlir %s | FileCheck %s
+# RUN: pmlc-translate --stripe-to-mlir %s | pmlc-opt -cse | FileCheck %s
 
 entry {
   block {
@@ -302,51 +302,53 @@ entry {
 }
 
 # CHECK-LABEL: func @double_dot
-# CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
-# CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[20:30], addr[30:1])">, stripe.name = "_X1"}
-# CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[30:40], addr[40:1])">, stripe.name = "_X3"}
-# CHECK-SAME: %arg3: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:40], addr[40:1])">, stripe.name = "_X4"}
+# CHECK-SAME: %[[arg0:.*]]: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
+# CHECK-SAME: %[[arg1:.*]]: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[20:30], addr[30:1])">, stripe.name = "_X1"}
+# CHECK-SAME: %[[arg2:.*]]: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[30:40], addr[40:1])">, stripe.name = "_X3"}
+# CHECK-SAME: %[[arg3:.*]]: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:40], addr[40:1])">, stripe.name = "_X4"}
 # CHECK-NEXT: attributes  {stripe_attrs = {program = unit, total_macs = 18000 : i64}} {
 # CHECK-NEXT:   stripe.parallel_for ()
-# CHECK-NEXT:       {comments = "", name = "main", stripe_attrs = {main = unit}} {
-# CHECK-NEXT:     %c0 = stripe.affine_const 0
-# CHECK-NEXT:     %c0_0 = stripe.affine_const 0
-# CHECK-NEXT:     %_X0 = stripe.refine %arg0 (%c0, %c0_0) : !fp32_2 {name = "_X0"}
-# CHECK-NEXT:     %c0_1 = stripe.affine_const 0
-# CHECK-NEXT:     %c0_2 = stripe.affine_const 0
-# CHECK-NEXT:     %_X1 = stripe.refine %arg1 (%c0_1, %c0_2) : !fp32_2 {name = "_X1"}
+# CHECK-NEXT:       name = "main"
+# CHECK-SAME:       main = unit
+# CHECK-NEXT:     %[[c0:.*]] = stripe.affine_const 0
+# CHECK-NEXT:     %[[_X0:.*]] = stripe.refine %[[arg0]] (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X0"}
+# CHECK-NEXT:     %[[_X1:.*]] = stripe.refine %[[arg1]] (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X1"}
 # CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.fp32(addr[10:30], addr[30:1])">}
-# CHECK-NEXT:     %c0_3 = stripe.affine_const 0
-# CHECK-NEXT:     %c0_4 = stripe.affine_const 0
-# CHECK-NEXT:     %_X2 = stripe.refine %0 (%c0_3, %c0_4) : !fp32_2 {name = "_X2"}
-# CHECK-NEXT:     %c0_5 = stripe.affine_const 0
-# CHECK-NEXT:     %c0_6 = stripe.affine_const 0
-# CHECK-NEXT:     %_X3 = stripe.refine %arg2 (%c0_5, %c0_6) : !fp32_2 {name = "_X3"}
-# CHECK-NEXT:     %c0_7 = stripe.affine_const 0
-# CHECK-NEXT:     %c0_8 = stripe.affine_const 0
-# CHECK-NEXT:     %_X4 = stripe.refine %arg3 (%c0_7, %c0_8) : !fp32_2 {name = "_X4"}
+# CHECK-NEXT:     %[[_X2:.*]] = stripe.refine %0 (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X2"}
+# CHECK-NEXT:     %[[_X3:.*]] = stripe.refine %[[arg2]] (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X3"}
+# CHECK-NEXT:     %[[_X4:.*]] = stripe.refine %[[arg3]] (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X4"}
 # CHECK-NEXT:     stripe.parallel_for ("x0":10, "x1":20, "x2":30)
-# CHECK-NEXT:         {comments = "_X2[x0, x2 : 10, 30] = +(_X0[x0, x1] * _X1[x1, x2])", name = "kernel_0(_X0,_X1)", stripe_attrs = {agg_op_add = unit, comb_op_mul = unit, contraction = unit, kernel = unit}} {
-# CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):	// no predecessors
-# CHECK-NEXT:       %_X0_9 = stripe.refine %_X0 (%x0, %x1) : !fp32_2 {name = "_X0", stripe_attrs = {contraction = unit}}
-# CHECK-NEXT:       %_X1_10 = stripe.refine %_X1 (%x1, %x2) : !fp32_2 {name = "_X1", stripe_attrs = {contraction = unit}}
-# CHECK-NEXT:       %_X2_11 = stripe.refine %_X2 (%x0, %x2) : !fp32_2 {name = "_X2"}
-# CHECK-NEXT:       %s__X0 = stripe.load %_X0_9 : !fp32_2 {scalar_name = "$_X0"}
-# CHECK-NEXT:       %s__X1 = stripe.load %_X1_10 : !fp32_2 {scalar_name = "$_X1"}
-# CHECK-NEXT:       %s__X2 = "eltwise.mul"(%s__X0, %s__X1) {scalar_name = "$_X2", type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
-# CHECK-NEXT:       stripe.aggregate %_X2_11, %s__X2 : !fp32_2 {agg = 1 : i64}
+# CHECK-NEXT:         comments = "_X2[x0, x2 : 10, 30] = +(_X0[x0, x1] * _X1[x1, x2])"
+# CHECK-SAME:         name = "kernel_0(_X0,_X1)"
+# CHECK-SAME:         agg_op_add = unit
+# CHECK-SAME:         comb_op_mul = unit
+# CHECK-SAME:         contraction = unit
+# CHECK-SAME:         kernel = unit
+# CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
+# CHECK-NEXT:       %[[_X0_0:.*]] = stripe.refine %[[_X0]] (%x0, %x1) : !fp32_2 {name = "_X0", stripe_attrs = {contraction = unit}}
+# CHECK-NEXT:       %[[_X1_0:.*]] = stripe.refine %[[_X1]] (%x1, %x2) : !fp32_2 {name = "_X1", stripe_attrs = {contraction = unit}}
+# CHECK-NEXT:       %[[_X2_0:.*]] = stripe.refine %[[_X2]] (%x0, %x2) : !fp32_2 {name = "_X2"}
+# CHECK-NEXT:       %[[s_X0:.*]] = stripe.load %[[_X0_0]] : !fp32_2 {scalar_name = "$_X0"}
+# CHECK-NEXT:       %[[s_X1:.*]] = stripe.load %[[_X1_0]] : !fp32_2 {scalar_name = "$_X1"}
+# CHECK-NEXT:       %[[s_X2:.*]] = "eltwise.mul"(%[[s_X0]], %[[s_X1]]) {scalar_name = "$_X2", type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+# CHECK-NEXT:       stripe.aggregate "add" %[[_X2_0]] %[[s_X2]] : !fp32_2
 # CHECK-NEXT:       stripe.terminate
 # CHECK-NEXT:     }
 # CHECK-NEXT:     stripe.parallel_for ("x0":10, "x1":30, "x2":40)
-# CHECK-NEXT:         {comments = "_X4[x0, x2 : 10, 40] = +(_X2[x0, x1] * _X3[x1, x2])", name = "kernel_1(_X2,_X3)", stripe_attrs = {agg_op_add = unit, comb_op_mul = unit, contraction = unit, kernel = unit}} {
-# CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):	// no predecessors
-# CHECK-NEXT:       %_X2_9 = stripe.refine %_X2 (%x0, %x1) : !fp32_2 {name = "_X2", stripe_attrs = {contraction = unit}}
-# CHECK-NEXT:       %_X3_10 = stripe.refine %_X3 (%x1, %x2) : !fp32_2 {name = "_X3", stripe_attrs = {contraction = unit}}
-# CHECK-NEXT:       %_X4_11 = stripe.refine %_X4 (%x0, %x2) : !fp32_2 {name = "_X4"}
-# CHECK-NEXT:       %s__X2 = stripe.load %_X2_9 : !fp32_2 {scalar_name = "$_X2"}
-# CHECK-NEXT:       %s__X3 = stripe.load %_X3_10 : !fp32_2 {scalar_name = "$_X3"}
-# CHECK-NEXT:       %s__X4 = "eltwise.mul"(%s__X2, %s__X3) {scalar_name = "$_X4", type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
-# CHECK-NEXT:       stripe.aggregate %_X4_11, %s__X4 : !fp32_2 {agg = 1 : i64}
+# CHECK-NEXT:         comments = "_X4[x0, x2 : 10, 40] = +(_X2[x0, x1] * _X3[x1, x2])"
+# CHECK-SAME:         name = "kernel_1(_X2,_X3)"
+# CHECK-SAME:         agg_op_add = unit
+# CHECK-SAME:         comb_op_mul = unit
+# CHECK-SAME:         contraction = unit
+# CHECK-SAME:         kernel = unit
+# CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
+# CHECK-NEXT:       %[[_X2_1:.*]] = stripe.refine %[[_X2]] (%x0, %x1) : !fp32_2 {name = "_X2", stripe_attrs = {contraction = unit}}
+# CHECK-NEXT:       %[[_X3_1:.*]] = stripe.refine %[[_X3]] (%x1, %x2) : !fp32_2 {name = "_X3", stripe_attrs = {contraction = unit}}
+# CHECK-NEXT:       %[[_X4_1:.*]] = stripe.refine %[[_X4]] (%x0, %x2) : !fp32_2 {name = "_X4"}
+# CHECK-NEXT:       %[[s_X2:.*]] = stripe.load %[[_X2_1]] : !fp32_2 {scalar_name = "$_X2"}
+# CHECK-NEXT:       %[[s_X3:.*]] = stripe.load %[[_X3_1]] : !fp32_2 {scalar_name = "$_X3"}
+# CHECK-NEXT:       %[[s_X4:.*]] = "eltwise.mul"(%[[s_X2]], %[[s_X3]]) {scalar_name = "$_X4", type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+# CHECK-NEXT:       stripe.aggregate "add" %[[_X4_1]] %[[s_X4]] : !fp32_2
 # CHECK-NEXT:       stripe.terminate
 # CHECK-NEXT:     }
 # CHECK-NEXT:     stripe.terminate
