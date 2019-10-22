@@ -342,6 +342,9 @@ TEST(CppEdsl, RepeatElements) {
 }
 
 TEST(CppEdsl, UseDefault) {
+  if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
+    FAIL() << "[MLIR] NYI: use_default";
+  }
   auto P = Placeholder(PLAIDML_DATA_FLOAT32, {1, 7, 10, 10});
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 10, 10});
   TensorDim B, N1, N2;

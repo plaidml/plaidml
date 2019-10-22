@@ -3,6 +3,7 @@
 #include "tile/platform/local_machine/shim.h"
 
 #include <unordered_set>
+#include <utility>
 
 #include "base/util/error.h"
 #include "tile/platform/local_machine/buffer.h"
@@ -71,11 +72,13 @@ std::pair<std::vector<std::shared_ptr<MemChunk>>, std::list<Shim::AliasUpdate>> 
 
 }  // namespace
 
-Shim::Shim(const context::Context& ctx, const Program* program,
-           std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-           std::map<std::string, std::shared_ptr<tile::Buffer>> outputs):
-           program_{const_cast<Program*>(program)} {
-  std::tie(chunk_infos_, updates_) = BuildChunkMap(ctx, program, inputs, outputs);
+Shim::Shim(                                   //
+    const context::Context& ctx,              //
+    const std::shared_ptr<Program>& program,  //
+    std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
+    std::map<std::string, std::shared_ptr<tile::Buffer>> outputs)
+    : program_{program} {
+  std::tie(chunk_infos_, updates_) = BuildChunkMap(ctx, program.get(), inputs, outputs);
 }
 
 Shim::~Shim() {

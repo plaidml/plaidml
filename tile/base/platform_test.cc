@@ -25,7 +25,7 @@ void PlatformTest::SetUp() {
   platform_ = param.factory();
 }
 
-std::unique_ptr<Program> PlatformTest::MakeProgram(tile::proto::TileScanningParameters* params,  //
+std::shared_ptr<Program> PlatformTest::MakeProgram(tile::proto::TileScanningParameters* params,  //
                                                    const char* code,                             //
                                                    const TensorShape& shape) {
   proto::Program pb_program;

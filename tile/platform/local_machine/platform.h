@@ -43,7 +43,7 @@ class Platform : public tile::Platform {
       const std::string& device,             //
       std::uint64_t size) final;
 
-  std::unique_ptr<tile::Program> MakeProgram(  //
+  std::shared_ptr<tile::Program> MakeProgram(  //
       const context::Context& ctx,             //
       const tile::proto::Program& program,     //
       ConstBufferManager* const_bufs) final;
