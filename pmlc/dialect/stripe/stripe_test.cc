@@ -148,6 +148,14 @@ TEST_P(TranscodeTest, Conv2d) {
   RunTest(ri, GetParam());
 }
 
+TEST_P(TranscodeTest, MaxPool2d) {
+  using plaidml::edsl::LogicalShape;
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {1, 64, 64, 3});
+  using vertexai::tile::lib::LoadMaxPool2d;
+  auto ri = LoadMaxPool2d("maxpool", A, {2, 2});
+  RunTest(ri, GetParam());
+}
+
 static lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
   Program program(name, vars, {});
   return *static_cast<const lang::RunInfo*>(program.runinfo());
