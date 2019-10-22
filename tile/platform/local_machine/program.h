@@ -30,7 +30,7 @@ namespace local_machine {
 // TODO: Either autotune this, or move it to the per-device configuration.
 constexpr float kGoalMemPercentage = .85;
 
-class Program final : public tile::Program {
+class Program final : public tile::Program, public std::enable_shared_from_this<Program> {
  public:
   Program(const context::Context& ctx, const tile::proto::Program& program, const std::shared_ptr<DevInfo>& devinfo,
           const std::shared_ptr<Scheduler>& scheduler, const std::shared_ptr<MemStrategy>& output_mem_strategy,

@@ -32,8 +32,11 @@ class Shim {
 
   // Construct the Shim.  This should be done at the start of queueing
   // the program's steps.
-  Shim(const context::Context& ctx, const Program* program, std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-       std::map<std::string, std::shared_ptr<tile::Buffer>> outputs);
+  Shim(                                         //
+      const context::Context& ctx,              //
+      const std::shared_ptr<Program>& program,  //
+      std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
+      std::map<std::string, std::shared_ptr<tile::Buffer>> outputs);
 
   // Destroys the Shim.  Note that this does not apply side-effects;
   // OnLaunchSuccess must be invoked in order to remap program output buffers.
@@ -52,7 +55,7 @@ class Shim {
  private:
   std::vector<std::shared_ptr<MemChunk>> chunk_infos_;
   std::list<AliasUpdate> updates_;
-  Program* program_;
+  std::shared_ptr<Program> program_;
 };
 
 }  // namespace local_machine
