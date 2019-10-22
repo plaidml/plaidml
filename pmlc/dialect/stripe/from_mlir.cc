@@ -335,7 +335,7 @@ std::string StripeBuilder::add_refinements(  //
     std::string agg_name,                    //
     bool is_special) {
   RefinementBuilder builder(this, value, dir, agg_name, is_special);
-  std::unordered_set<Block*> seen{mblock};
+  std::unordered_set<Block*> seen;
   while (true) {
     // move up the def-chain
     if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
@@ -362,14 +362,16 @@ std::string StripeBuilder::add_refinements(  //
         }
         mblock = mblock->getParentOp()->getBlock();
       }
+      auto nameAttr = op->getAttrOfType<StringAttr>("name");
+      auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+      if (!seen.count(mblock)) {
+        builder.addRefinement(mblock, nameAttr, attrs);
+        seen.insert(mblock);
+      }
       if (auto allocOp = mlir::dyn_cast<AllocateOp>(op)) {
         builder.adjustRoot();
         break;
       } else if (auto refineOp = mlir::dyn_cast<RefineOp>(op)) {
-        auto nameAttr = refineOp.getAttrOfType<StringAttr>("name");
-        auto attrs = refineOp.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
-        builder.addRefinement(mblock, nameAttr, attrs);
-        seen.insert(mblock);
         value = refineOp.in();
       }
     }

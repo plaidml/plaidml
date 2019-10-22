@@ -1,7 +1,5 @@
 // Copyright 2019, Intel Corporation
 
-#include <google/protobuf/text_format.h>
-
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -519,7 +517,7 @@ static mlir::OwningModuleRef IntoMlirTranslateFunction(  //
     std::unique_ptr<llvm::MemoryBuffer> input,           //
     MLIRContext* context) {
   vertexai::tile::stripe::proto::Program proto;
-  if (!google::protobuf::TextFormat::ParseFromString(input->getBuffer().str(), &proto)) {
+  if (!stripe::FromProtoText(input->getBuffer().str(), &proto)) {
     llvm::report_fatal_error("Could not parse stripe prototxt");
     return nullptr;
   }

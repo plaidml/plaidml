@@ -54,11 +54,6 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // MLIRContext context;
-  // if (failed((*requested_translation)(std::move(input), output->os(), &context))) {
-  //   return 1;
-  // }
-
   auto processBuffer = [&](std::unique_ptr<MemoryBuffer> ownedBuffer, raw_ostream& os) {
     MLIRContext context;
     return (*requested_translation)(std::move(ownedBuffer), os, &context);
