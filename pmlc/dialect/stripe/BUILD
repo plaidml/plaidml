@@ -111,6 +111,7 @@ plaidml_cc_library(
         "padding_pass.cc",
     ],
     hdrs = [
+        "nop_pass.h",
         "padding_pass.h",
     ],
     copts = COPTS,

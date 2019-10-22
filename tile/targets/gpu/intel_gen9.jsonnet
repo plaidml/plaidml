@@ -8,6 +8,7 @@ local PARAMS = {
     MEM_BOUNDED_THRESHOLD: 14,
     CACHE_SIZE: 3 * 768 * 1024,
     INNER_STMTS_LIMIT: 1250,
+    MAX_REFS: 1024,
   },
   intel_gen9_metal: {
     CACHE_WIDTH: 64,
@@ -18,6 +19,7 @@ local PARAMS = {
     MEM_BOUNDED_THRESHOLD: 14,
     CACHE_SIZE: 3 * 768 * 1024,
     INNER_STMTS_LIMIT: 1200,
+    MAX_REFS: 31,
   },
 };
 
@@ -186,6 +188,7 @@ local PARAMS = {
                 a_reqs: ['subgroup_outer'],
                 b_reqs: ['eltwise'],
                 no_constraints: true,
+                max_refs: PARAMS[cfg].MAX_REFS, 
               },
             },
 
@@ -195,6 +198,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FusionPass',
                 a_reqs: ['subgroup_thread'],
                 b_reqs: ['eltwise'],
+                max_refs: PARAMS[cfg].MAX_REFS,
               },
             },
 
@@ -205,6 +209,7 @@ local PARAMS = {
                 a_reqs: ['subgroup_write'],
                 b_reqs: ['eltwise'],
                 no_inner: true,
+                max_refs: PARAMS[cfg].MAX_REFS,
               },
             },
 
@@ -233,6 +238,7 @@ local PARAMS = {
                 a_reqs: ['eltwise'],
                 b_reqs: ['eltwise'],
                 output_match: true,
+                max_refs: PARAMS[cfg].MAX_REFS,
               },
             },
 

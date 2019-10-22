@@ -317,7 +317,7 @@ class StripeGenerator {
     }
     if (scalar_inputs.size() > 1) {
       if (cion.comb_op == CombinationOp::COND) {
-        kernel.get()->stmts.push_back(std::make_shared<Constant>("$ZERO", INT64_C(0)));
+        kernel.get()->stmts.push_back(std::make_shared<Constant>("$ZERO", 0.0));
         AddIntrinsic(kernel.get(), Intrinsic::EQ, input_based_type, {scalar_inputs[0], scalar_inputs[1]}, {"$IS_EQ"});
         AddIntrinsic(kernel.get(), Intrinsic::COND, output_type, {"$IS_EQ", scalar_inputs[2], "$ZERO"},
                      {ScalarName(op.output)});

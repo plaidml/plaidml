@@ -63,6 +63,10 @@ message PadPass {
   optional uint32 prime_threshold = 2 [default = 32];
 }
 
+// A No-op pass to test MLIR transcoding
+message MLIR_NopPass {
+}
+
 // Expand the size of buffers to reduce constraints required.
 message MLIR_PadPass {
   repeated string reqs = 1;
@@ -71,7 +75,8 @@ message MLIR_PadPass {
 }
 
 // Reorder blocks
-message ReorderBlocksPass {}
+message ReorderBlocksPass {
+}
 
 // The scalarize pass looks for refinements which (usually due to
 // localization) now hold only a single element, and replaces
@@ -270,6 +275,8 @@ message FusionPass {
   repeated string a_inner_set = 11;
   // New tags for the second inner block
   repeated string b_inner_set = 12;
+  // Limit of number of refinements
+  optional uint32 max_refs = 13 [default = 1024];
 }
 
 // A localize pass detects allocations (refinements with dir = None)
@@ -670,7 +677,8 @@ message TempVarPass {
 }
 
 // Propagate constant tensors.
-message ConstantPropagatePass {}
+message ConstantPropagatePass {
+}
 
 // Remove constant tensor and replace the corresponding loads with constants
 message ConstTensorPass {
