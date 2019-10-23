@@ -493,6 +493,22 @@ lang::RunInfo LoadSoftmax(const std::string& name,      //
   return Evaluate(name, {E / N});
 }
 
+Tensor BatchNormalization(const Tensor& I, const Tensor& M, const Tensor& V, 
+                          const Tensor& G, const Tensor& B, const Tensor& E) {
+  return ((I - M) * G / sqrt(V + E)) + B;
+}
+
+lang::RunInfo LoadBatchNormalization(const std::string& name,      //
+                                     const LogicalShape& input) {  //
+  auto I = Placeholder(input);
+  auto M = Placeholder(input);
+  auto V = Placeholder(input);
+  auto G = Placeholder(input);
+  auto B = Placeholder(input);
+  auto E = Placeholder(PLAIDML_DATA_FLOAT32, {});
+  return Evaluate(name, {BatchNormalization(I, M, V, G, B, E)});
+}
+
 }  // namespace lib
 }  // namespace tile
 }  // namespace vertexai
