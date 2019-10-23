@@ -50,12 +50,14 @@ struct Constraints {
 struct Contraction {
   explicit Contraction(ContractionOp op);
 
-  std::map<std::string, mlir::Value*> argMap;
+  std::tuple<IndexBounds, SimpleConstraints> ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes);
+
   std::vector<IndexAccess> accesses;
   std::vector<math::RangeConstraint> constraints;
   // bool no_defract = false;
   // std::string use_default;
 
+ private:
   std::set<std::string> getIndexVars() const;
 
   // Gathers boths explicit and implied constraints, and removes dups.
@@ -70,8 +72,6 @@ struct Contraction {
 
   // Remove any fractional polynomial multipliers (IE, any non-integers).
   void Defractionalize(const Constraints& order);
-
-  std::tuple<IndexBounds, SimpleConstraints> ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes);
 };
 
 math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds);

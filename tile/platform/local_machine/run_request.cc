@@ -3,8 +3,10 @@
 #include "tile/platform/local_machine/run_request.h"
 
 #include <unordered_set>
+#include <utility>
 
 #include "base/util/error.h"
+#include "tile/platform/local_machine/shim.h"
 
 namespace vertexai {
 namespace tile {
@@ -12,8 +14,8 @@ namespace local_machine {
 namespace {
 
 // Runs the schedule for a particular program.
-boost::future<std::vector<std::shared_ptr<hal::Result>>> RunSchedule(const context::Context& ctx, RunRequest* req,
-                                                                     Shim* shim) {
+boost::future<std::vector<std::shared_ptr<hal::Result>>> RunSchedule(  //
+    const context::Context& ctx, RunRequest* req, Shim* shim) {
   std::vector<std::shared_ptr<hal::Event>> deps;
   deps.resize(req->program()->schedule().steps.size());
   std::unordered_set<std::shared_ptr<hal::Event>> dep_set;
@@ -107,9 +109,11 @@ boost::future<std::vector<std::shared_ptr<hal::Result>>> RunSchedule(const conte
 
 }  // namespace
 
-boost::future<void> RunRequest::Run(const context::Context& ctx, const Program* program,
-                                    std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-                                    std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
+boost::future<void> RunRequest::Run(          //
+    const context::Context& ctx,              //
+    const std::shared_ptr<Program>& program,  //
+    std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
+    std::map<std::string, std::shared_ptr<tile::Buffer>> outputs) {
   LogRequest(program, inputs, outputs);
 
   RunRequest req{program};
@@ -138,11 +142,15 @@ boost::future<void> RunRequest::Run(const context::Context& ctx, const Program* 
   // Keep the shim and activity referenced until the program is complete.
   // N.B. It's important to keep the shim referenced because it's the thing that's actually holding
   // onto all of our chunk references; if those go away, unfortunate things happen.
-  return complete.then([shim = std::move(shim), running = std::move(running)](decltype(complete) fut) { fut.get(); });
+  return complete.then([shim = std::move(shim), running = std::move(running)](decltype(complete) fut) {  //
+    fut.get();
+  });
 }
 
-void RunRequest::LogRequest(const Program* program, const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
-                            const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs) {
+void RunRequest::LogRequest(                  //
+    const std::shared_ptr<Program>& program,  //
+    const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
+    const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs) {
   VLOG(1) << "Running program " << program;
   if (VLOG_IS_ON(2)) {
     for (const auto& it : inputs) {
@@ -170,8 +178,9 @@ void RunRequest::LogRequest(const Program* program, const std::map<std::string, 
   }
 }
 
-boost::future<void> RunRequest::LogResults(const context::Context& ctx,
-                                           boost::future<std::vector<std::shared_ptr<hal::Result>>> results) {
+boost::future<void> RunRequest::LogResults(  //
+    const context::Context& ctx,             //
+    boost::future<std::vector<std::shared_ptr<hal::Result>>> results) {
   context::Context ctx_copy{ctx};
   return results.then([ctx = std::move(ctx_copy)](decltype(results) future) {
     auto results = future.get();

@@ -323,7 +323,7 @@ boost::future<void> Program::Run(const context::Context& ctx,
   for (const auto& kvp : const_bufs_) {
     inputs[kvp.first] = kvp.second;
   }
-  return RunRequest::Run(ctx, this, std::move(inputs), std::move(rewrite_outputs));
+  return RunRequest::Run(ctx, shared_from_this(), std::move(inputs), std::move(rewrite_outputs));
 }
 
 std::size_t Program::MaxAvailableMemory() { return memory_->size_goal() * kGoalMemPercentage; }

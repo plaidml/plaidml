@@ -6,6 +6,7 @@
 #include "llvm/Support/Regex.h"
 
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Translation.h"
 
 #include "base/util/lookup.h"
 #include "pmlc/dialect/eltwise/ops.h"
@@ -65,6 +66,7 @@ class StripeBuilder {
 
  public:
   explicit StripeBuilder(mlir::FuncOp func);
+  explicit StripeBuilder(const StripeBuilder& rhs);
   std::shared_ptr<stripe::Block> getResult() { return cur_; }
 
  private:
@@ -98,9 +100,10 @@ class StripeBuilder {
 
   std::shared_ptr<stripe::Block> cur_;
   std::map<stripe::Block*, ScalarInfo> scalar_names_;
-  std::map<mlir::Block*, BlockInfo> blocks_;
   std::map<std::pair<stripe::Block*, mlir::BlockArgument*>, std::string> idxs_;
   std::map<mlir::Value*, std::string> scalars_;
+  // shared state among all StripeBuilders
+  std::shared_ptr<std::map<mlir::Block*, BlockInfo>> blocks_;
 };
 
 std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor) {
@@ -145,7 +148,14 @@ std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor) {
   return std::make_pair(ret, loc);
 }
 
-StripeBuilder::StripeBuilder(mlir::FuncOp func) {
+StripeBuilder::StripeBuilder(const StripeBuilder& rhs)
+    : cur_(rhs.cur_),  //
+      scalar_names_(rhs.scalar_names_),
+      idxs_(rhs.idxs_),
+      scalars_(rhs.scalars_),
+      blocks_(rhs.blocks_) {}
+
+StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::map<mlir::Block*, BlockInfo>>()) {
   // Construct the block and put it in the table
   cur_ = std::make_shared<stripe::Block>();
   cur_->name = func.getName();
@@ -172,7 +182,7 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) {
     cur_->refs.emplace(ref);
     blockInfo.refs[tensorInfo] = name.str();
   }
-  blocks_.emplace(mblock, blockInfo);
+  blocks_->emplace(mblock, blockInfo);
   walk_interior(mblock);
 }
 
@@ -248,8 +258,8 @@ struct RefinementBuilder {
   // Add a refinement into a stripe block
   void addRefinement(Block* mblock, StringAttr nameAttr = StringAttr{}, DictionaryAttr attrs = DictionaryAttr{}) {
     auto ndims = tensorInfo.access.size();
-    auto it = stripeBuilder->blocks_.find(mblock);
-    if (it == stripeBuilder->blocks_.end()) {
+    auto it = stripeBuilder->blocks_->find(mblock);
+    if (it == stripeBuilder->blocks_->end()) {
       throw std::runtime_error("Missing stripe block");
     }
     auto& blockInfo = it->second;
@@ -337,7 +347,7 @@ std::string StripeBuilder::add_refinements(  //
     std::string agg_name,                    //
     bool is_special) {
   RefinementBuilder builder(this, value, dir, agg_name, is_special);
-  std::unordered_set<Block*> seen{mblock};
+  std::unordered_set<Block*> seen;
   while (true) {
     // move up the def-chain
     if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
@@ -364,14 +374,16 @@ std::string StripeBuilder::add_refinements(  //
         }
         mblock = mblock->getParentOp()->getBlock();
       }
+      auto nameAttr = op->getAttrOfType<StringAttr>("name");
+      auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+      if (!seen.count(mblock)) {
+        builder.addRefinement(mblock, nameAttr, attrs);
+        seen.insert(mblock);
+      }
       if (auto allocOp = mlir::dyn_cast<AllocateOp>(op)) {
         builder.adjustRoot();
         break;
       } else if (auto refineOp = mlir::dyn_cast<RefineOp>(op)) {
-        auto nameAttr = refineOp.getAttrOfType<StringAttr>("name");
-        auto attrs = refineOp.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
-        builder.addRefinement(mblock, nameAttr, attrs);
-        seen.insert(mblock);
         value = refineOp.in();
       }
     }
@@ -471,7 +483,7 @@ void StripeBuilder::visit(ParallelForOp op) {
     std::tie(tensorInfo, stripeLoc) = ComputeAccessAndLoc(ret.from());
     cur_->location = build_location(stripeLoc, &oblock, cur_.get());
   }
-  blocks_.emplace(&oblock, BlockInfo(cur_.get()));
+  blocks_->emplace(&oblock, BlockInfo(cur_.get()));
   walk_interior(&oblock);
 }
 
@@ -479,14 +491,14 @@ void StripeBuilder::visit(ConstraintOp op, int count) {
   IVLOG(3, "StripeBuilder::visit(ConstraintOp)");
   if (count == 1 && op.lt_case().empty()) {
     Block* inner = &op.ge_case().front();
-    blocks_.emplace(inner, BlockInfo(nullptr));
+    blocks_->emplace(inner, BlockInfo(nullptr));
     walk_interior(inner);
     // Find the stripe block to attach the contraint to
     Block* block = inner;
-    while (blocks_.at(block).stripe == nullptr) {
+    while (blocks_->at(block).stripe == nullptr) {
       block = block->getParentOp()->getBlock();
     }
-    stripe::Block* sblock = blocks_.at(block).stripe;
+    stripe::Block* sblock = blocks_->at(block).stripe;
     sblock->constraints.insert(sblock->constraints.begin(), build_affine(sblock, op.input()));
   } else {
     throw std::runtime_error("Complex contraints not supported right now");
@@ -611,10 +623,9 @@ void StripeBuilder::walk_interior(Block* block) {
   // Go over all the inner ops
   for (auto& op_base : *block) {
     if (auto op = mlir::dyn_cast<ParallelForOp>(op_base)) {
-      auto old_cur = cur_;
-      visit(op);
-      old_cur->stmts.push_back(cur_);
-      cur_ = old_cur;
+      StripeBuilder builder(*this);
+      builder.visit(op);
+      cur_->stmts.push_back(builder.cur_);
     } else if (auto op = mlir::dyn_cast<ConstraintOp>(op_base)) {
       visit(op, count);
     } else if (auto op = mlir::dyn_cast<LoadOp>(op_base)) {
@@ -683,6 +694,16 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
   // IVLOG(1, *ret->entry);
   return ret;
 }
+
+static mlir::LogicalResult FromMlirTranslateFunction(mlir::ModuleOp module, llvm::raw_ostream& output) {
+  auto program = FromMLIR(module);
+  std::stringstream ss;
+  ss << *program->entry;
+  output << ss.str();
+  return mlir::success();
+}
+
+static mlir::TranslateFromMLIRRegistration FromMlirTranslate("mlir-to-stripe", FromMlirTranslateFunction);
 
 }  // namespace stripe
 }  // namespace dialect

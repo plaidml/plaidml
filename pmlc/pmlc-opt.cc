@@ -1,15 +1,16 @@
 // Copyright 2019 Intel Corporation.
 
-#include "mlir/Analysis/Passes.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/FileUtilities.h"
-#include "mlir/Support/MlirOptMain.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+
+#include "mlir/Analysis/Passes.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
+#include "mlir/Support/MlirOptMain.h"
 
 #include "base/util/env.h"
 #include "base/util/logging.h"
@@ -57,7 +58,7 @@ int main(int argc, char** argv) {
 
   // Register any pass manager command line options.
   registerPassManagerCLOptions();
-  mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
+  PassPipelineCLParser passPipeline("", "Compiler passes to run");
 
   // Parse pass names in main to ensure static initialization completed.
   cl::ParseCommandLineOptions(argc, argv, "pmlc modular optimizer driver\n");
@@ -66,16 +67,21 @@ int main(int argc, char** argv) {
   std::string errorMessage;
   auto file = openInputFile(inputFilename, &errorMessage);
   if (!file) {
-    llvm::errs() << errorMessage << "\n";
+    errs() << errorMessage << "\n";
     return 1;
   }
 
   auto output = openOutputFile(outputFilename, &errorMessage);
   if (!output) {
-    llvm::errs() << errorMessage << "\n";
+    errs() << errorMessage << "\n";
     exit(1);
   }
 
-  return failed(
-      MlirOptMain(output->os(), std::move(file), passPipeline, splitInputFile, verifyDiagnostics, verifyPasses));
+  return failed(MlirOptMain(  //
+      output->os(),           //
+      std::move(file),        //
+      passPipeline,           //
+      splitInputFile,         //
+      verifyDiagnostics,      //
+      verifyPasses));
 }
