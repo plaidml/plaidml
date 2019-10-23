@@ -196,3 +196,26 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
+
+// -----
+
+func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32> {
+  %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> index
+  %c20 = "eltwise.sconst"() {value = 20 : i64} : () -> index
+  %1 = "tile.reshape"(%arg0, %c5, %c5, %c20) : (tensor<10x20x!eltwise.fp32>, index, index, index) -> tensor<5x5x20x!eltwise.fp32>
+  return %1 : tensor<5x5x20x!eltwise.fp32>
+}
+
+// CHECK:      0: #program
+// CHECK-NEXT: block []:1 ( // reshape
+// CHECK-NEXT:     #user none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
+// CHECK-NEXT:     #user none new@0x00000000 _X1[0, 0, 0] fp32:I(5, 5, 20):(100, 20, 1):1.95312 KiB
+// CHECK-NEXT: ) {
+// CHECK-NEXT:   0: #main
+// CHECK-NEXT:   block []:1 ( // main
+// CHECK-DAG:        in [[IN:.*]] = _X0[0, 0] fp32:I(10, 20):(20, 1):800 B, E(10, 20):800 B
+// CHECK-DAG:        out [[OUT:.*]] = _X1[0, 0, 0] fp32:I(5, 5, 20):(100, 20, 1):1.95312 KiB, E(5, 5, 20):1.95312 KiB
+// CHECK-NEXT:   ) {
+// CHECK-NEXT:     0: [[OUT]] = reshape([[IN]])
+// CHECK-NEXT:   }
+// CHECK-NEXT: }
