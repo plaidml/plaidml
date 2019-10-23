@@ -588,11 +588,11 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         AffineDomainOpConversion,    //
         FuncOpConversion,            //
         ReturnOpConversion>(&lowering);
-    auto eltwiseOps = eltwise::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
+    auto eltwiseOps = util::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
     for (auto op : eltwiseOps) {
       patterns.insert<EltwiseOpConversion>(&lowering, op->name);
     }
-    auto specialOps = eltwise::getAllOpsWithInterface<tile::SpecialOp>(&getContext());
+    auto specialOps = util::getAllOpsWithInterface<tile::SpecialOp>(&getContext());
     for (auto op : specialOps) {
       patterns.insert<SpecialOpConversion>(&lowering, op->name);
     }
