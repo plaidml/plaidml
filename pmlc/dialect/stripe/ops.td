@@ -68,6 +68,7 @@ def RefineOp : StripeOp<"refine", [NoSideEffect]> {
       return getOperand(i + 1);
     }
   }];
+  let hasCanonicalizer = 1;
 }
 
 def LoadOp : StripeOp<"load"> {
@@ -177,6 +178,11 @@ def AffineMulOp : AffineOp<"affine_mul"> {
     r = r || parser.addTypeToList(aff_type, result.types);
     return mlir::failure(r); 
   }];
+
+  // N.B. Since the multiplication factor is an attribute of the operation,
+  //      a simple folder is inadequate -- multiplication when scale() != 1
+  //      requires the creation of a new AffineConstOp.
+  let hasCanonicalizer = 1;
 }
 
 def AffineAddOp : AffineOp<"affine_add"> {
@@ -191,6 +197,11 @@ def AffineAddOp : AffineOp<"affine_add"> {
     r = r || parser.addTypeToList(aff_type, result.types);
     return mlir::failure(r); 
   }];
+
+  // N.B. Addition folding may involve combining multiple AffineConstOp
+  //      operation inputs into a single unified AffineConstOp -- which requires
+  //      operation creation, so a simple folder is inadequate.
+  let hasCanonicalizer = 1;
 }
 
 def ParallelForOp : StripeOp<"parallel_for"> {
