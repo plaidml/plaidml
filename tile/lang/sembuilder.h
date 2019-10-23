@@ -127,8 +127,16 @@ inline std::shared_ptr<CondExpr> _Cond(ExprPtr cond, ExprPtr tcase, ExprPtr fcas
   return std::make_shared<CondExpr>(cond, tcase, fcase);
 }
 
+inline std::shared_ptr<CondExpr> _Cond(ExprPtr cond, ExprPtr tcase, ExprPtr fcase, Type type) {
+  return std::make_shared<CondExpr>(cond, tcase, fcase, type);
+}
+
 inline std::shared_ptr<SelectExpr> _Select(ExprPtr cond, ExprPtr tcase, ExprPtr fcase) {
   return std::make_shared<SelectExpr>(cond, tcase, fcase);
+}
+
+inline std::shared_ptr<SelectExpr> _Select(ExprPtr cond, ExprPtr tcase, ExprPtr fcase, Type type) {
+  return std::make_shared<SelectExpr>(cond, tcase, fcase, type);
 }
 
 inline std::shared_ptr<ClampExpr> _Clamp(ExprPtr val, ExprPtr min, ExprPtr max) {
