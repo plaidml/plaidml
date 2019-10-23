@@ -212,7 +212,7 @@ TEST_P(TranscodeTest, LayerNorm4dAx2) {
 
 TEST_P(TranscodeTest, BatchNormalization) {
   using plaidml::edsl::LogicalShape;
-  LogicalShape A(PLAIDML_DATA_FLOAT32, {1, 64, 64, 32});
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 64, 64, 32});
   using vertexai::tile::lib::LoadBatchNormalization;
   auto ri = LoadBatchNormalization("batch_norm", A);
   RunTest(ri, 1);

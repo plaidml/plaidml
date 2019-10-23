@@ -500,11 +500,14 @@ Tensor BatchNormalization(const Tensor& I, const Tensor& M, const Tensor& V,
 
 lang::RunInfo LoadBatchNormalization(const std::string& name,      //
                                      const LogicalShape& input) {  //
-  auto I = Placeholder(input);
-  auto M = Placeholder(input);
-  auto V = Placeholder(input);
-  auto G = Placeholder(input);
-  auto B = Placeholder(input);
+  auto b1dims = input.int_dims();
+  b1dims[0] = 1;
+  auto b1 = LogicalShape(PLAIDML_DATA_FLOAT32, b1dims);
+  auto I = Placeholder(b1);
+  auto M = Placeholder(b1);
+  auto V = Placeholder(b1);
+  auto G = Placeholder(b1);
+  auto B = Placeholder(b1);
   auto E = Placeholder(PLAIDML_DATA_FLOAT32, {});
   return Evaluate(name, {BatchNormalization(I, M, V, G, B, E)});
 }
