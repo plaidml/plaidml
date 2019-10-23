@@ -127,8 +127,16 @@ inline std::shared_ptr<CondExpr> _Cond(ExprPtr cond, ExprPtr tcase, ExprPtr fcas
   return std::make_shared<CondExpr>(cond, tcase, fcase);
 }
 
+inline std::shared_ptr<CondExpr> _Cond(ExprPtr cond, ExprPtr tcase, ExprPtr fcase, Type type) {
+  return std::make_shared<CondExpr>(cond, tcase, fcase, type);
+}
+
 inline std::shared_ptr<SelectExpr> _Select(ExprPtr cond, ExprPtr tcase, ExprPtr fcase) {
   return std::make_shared<SelectExpr>(cond, tcase, fcase);
+}
+
+inline std::shared_ptr<SelectExpr> _Select(ExprPtr cond, ExprPtr tcase, ExprPtr fcase, Type type) {
+  return std::make_shared<SelectExpr>(cond, tcase, fcase, type);
 }
 
 inline std::shared_ptr<ClampExpr> _Clamp(ExprPtr val, ExprPtr min, ExprPtr max) {
@@ -143,16 +151,16 @@ inline std::shared_ptr<BinaryExpr> _LogicalOr(ExprPtr lhs, ExprPtr rhs) {
   return std::make_shared<BinaryExpr>("||", lhs, rhs);
 }
 
-inline ExprPtr _MaybeSelect(ExprPtr cond, ExprPtr tcase, ExprPtr fcase) {
+inline ExprPtr _MaybeSelect(ExprPtr cond, ExprPtr tcase, ExprPtr fcase, Type type) {
   if (cond) {
-    return _Select(cond, tcase, fcase);
+    return _Select(cond, tcase, fcase, type);
   }
   return tcase;
 }
 
-inline ExprPtr _MaybeCond(ExprPtr cond, ExprPtr tcase, ExprPtr fcase) {
+inline ExprPtr _MaybeCond(ExprPtr cond, ExprPtr tcase, ExprPtr fcase, Type type) {
   if (cond) {
-    return _Cond(cond, tcase, fcase);
+    return _Cond(cond, tcase, fcase, type);
   }
   return tcase;
 }
