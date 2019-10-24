@@ -212,11 +212,10 @@ std::tuple<IndexBounds, SimpleConstraints> Constraints::ComputeBounds() {
   return std::tie(out, remaining);
 }
 
-static IndexPoly MakePoly(mlir::Value* value, std::map<std::string, mlir::Value*>* map) {
+static IndexPoly MakePoly(mlir::Value* value) {
   IVLOG(3, "MakePoly: " << mlir::debugString(*value));
   if (auto blockArg = llvm::dyn_cast<mlir::BlockArgument>(value)) {
     auto name = llvm::formatv("x{0}", blockArg->getArgNumber());
-    map->emplace(name.str(), value);
     return IndexPoly{name.str()};
   }
   auto defOp = value->getDefiningOp();
@@ -224,11 +223,11 @@ static IndexPoly MakePoly(mlir::Value* value, std::map<std::string, mlir::Value*
     return IndexPoly{op.value().getSExtValue()};
   }
   if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
-    return MakePoly(op.lhs(), map) + MakePoly(op.rhs(), map);
+    return MakePoly(op.lhs()) + MakePoly(op.rhs());
   }
   if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
-    auto lhs = MakePoly(op.lhs(), map);
-    auto rhs = MakePoly(op.rhs(), map);
+    auto lhs = MakePoly(op.lhs());
+    auto rhs = MakePoly(op.rhs());
     if (!rhs.isConstant()) {
       throw std::runtime_error(
           llvm::formatv("Divisor of polynomials must be a constant: {0} / {1}", lhs.toString(), rhs.toString()).str());
@@ -236,8 +235,8 @@ static IndexPoly MakePoly(mlir::Value* value, std::map<std::string, mlir::Value*
     return lhs / rhs.constant();
   }
   if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
-    auto lhs = MakePoly(op.lhs(), map);
-    auto rhs = MakePoly(op.rhs(), map);
+    auto lhs = MakePoly(op.lhs());
+    auto rhs = MakePoly(op.rhs());
     if (lhs.isConstant()) {
       return rhs * lhs.constant();
     }
@@ -247,10 +246,10 @@ static IndexPoly MakePoly(mlir::Value* value, std::map<std::string, mlir::Value*
     throw std::runtime_error(llvm::formatv("Non-linear polynomial: {0} * {1}", lhs.toString(), rhs.toString()).str());
   }
   if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
-    return -MakePoly(op.input(), map);
+    return -MakePoly(op.input());
   }
   if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
-    return MakePoly(op.lhs(), map) - MakePoly(op.rhs(), map);
+    return MakePoly(op.lhs()) - MakePoly(op.rhs());
   }
   throw std::runtime_error("Invalid affine op");
 }
@@ -261,7 +260,7 @@ Contraction::Contraction(ContractionOp op) {
     auto sinkOp = llvm::cast<AffineSinkIndexMapOp>(sink->getDefiningOp());
     IndexAccess dims;
     for (auto dim : sinkOp.dims()) {
-      dims.emplace_back(MakePoly(dim, &argMap));
+      dims.emplace_back(MakePoly(dim));
     }
     accesses.emplace_back(dims);
   }
@@ -270,7 +269,7 @@ Contraction::Contraction(ContractionOp op) {
     auto srcOp = llvm::cast<AffineSourceIndexMapOp>(src->getDefiningOp());
     IndexAccess dims;
     for (auto dim : srcOp.dims()) {
-      dims.emplace_back(MakePoly(dim, &argMap));
+      dims.emplace_back(MakePoly(dim));
     }
     accesses.emplace_back(dims);
   }
@@ -319,36 +318,36 @@ std::set<std::string> Contraction::getIndexVars() const {
   }
   // Valdiate that no variables appear only in the constraints
   // Pre-add the 'constant' variable (which is always valid)
-  // vars.insert("");
-  // for (const auto& cons : constraints) {
-  //   for (const auto& kvp : cons.bound.poly.getMap()) {
-  //     // If if there is a variable used in a constraint and that variable doesn't
-  //     // appear in the list of variables from the tensors, then it's a variable
-  //     // that appears only in the constraints, and we need to throw.
-  //     if (vars.find(kvp.first) == vars.end()) {
-  //       std::ostringstream ErrorStr;
-  //       ErrorStr << "Contraction::getIndexAndOutputVars: Variable '" << kvp.first
-  //                << "' appears only in constraints of contraction:\n"
-  //                << " Tensors:";
-  //       for (const auto& tensor : specs) {
-  //         ErrorStr << " {";
-  //         for (const auto& poly : tensor.spec) {
-  //           ErrorStr << poly.toString() << ", ";
-  //         }
-  //         ErrorStr.seekp(-2, ErrorStr.cur);
-  //         ErrorStr << "},";
-  //       }
-  //       ErrorStr.seekp(-1, ErrorStr.cur);
-  //       ErrorStr << "\nConstraints:";
-  //       for (const auto& cons_error : constraints) {
-  //         ErrorStr << " { Poly: " << cons_error.bound.poly.toString();
-  //         ErrorStr << ", Range: " << std::to_string(cons_error.bound.range);
-  //         ErrorStr << ", Var: " << cons_error.range << " }";
-  //       }
-  //       throw std::runtime_error(ErrorStr.str());
-  //     }
-  //   }
-  // }
+  vars.insert("");
+  for (const auto& constraint : constraints) {
+    for (const auto& kvp : constraint.poly.getMap()) {
+      // If there is a variable used in a constraint and that variable doesn't
+      // appear in the list of variables from the tensors, then it's a variable
+      // that appears only in the constraints, and we need to throw.
+      if (vars.find(kvp.first) == vars.end()) {
+        std::ostringstream ss;
+        ss << "Contraction::getIndexAndOutputVars: Variable '" << kvp.first
+           << "' appears only in constraints of contraction:\n"
+           << " Tensors:";
+        for (const auto& access : accesses) {
+          ss << " {";
+          for (const auto& poly : access) {
+            ss << poly.toString() << ", ";
+          }
+          ss.seekp(-2, ss.cur);
+          ss << "},";
+        }
+        ss.seekp(-1, ss.cur);
+        ss << "\nConstraints:";
+        for (const auto& cons_error : constraints) {
+          ss << " { Poly: " << cons_error.poly.toString();
+          ss << ", Range: " << std::to_string(cons_error.range);
+          ss << ", Var: " << cons_error.range << " }";
+        }
+        throw std::runtime_error(ss.str());
+      }
+    }
+  }
   // Erase constant
   vars.erase("");
   return vars;

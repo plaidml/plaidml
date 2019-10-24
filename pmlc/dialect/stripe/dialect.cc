@@ -72,6 +72,10 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addInterfaces<OpAsmInterface>();
 }
 
+std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
+  return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
+}
+
 mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
   static llvm::Regex re{R"(([[:alnum:]_]+)\[([[:digit:]]+):([[:digit:]]+)\])"};
   bool is_const = tyData.consume_back("const");

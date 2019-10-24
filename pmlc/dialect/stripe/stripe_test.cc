@@ -48,9 +48,10 @@ std::unique_ptr<mlir::Pass> CreatePass(Config config) {
   return std::make_unique<Pass>(config);
 }
 
-// Stripe Classic <-> Stripe MLIR transcoding tests are parameterized by whether they should add location info
-// or not, since there've been some subtle transcoding issues when location-adding top-level refinements are
-// or aren't in place.
+// Stripe Classic <-> Stripe MLIR transcoding tests are parameterized by whether
+// they should add location info or not, since there've been some subtle
+// transcoding issues when location-adding top-level refinements are or aren't
+// in place.
 class TranscodeTest : public ::testing::TestWithParam<bool> {};
 
 static void RunTest(const lang::RunInfo& ri, bool addLocations) {

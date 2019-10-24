@@ -263,6 +263,10 @@ cc_library(
     copts = PLATFORM_COPTS,
     includes = ["include"],
     deps = [
+        ":IR",
+        ":Parser",
+        ":StandardOps",
+        ":Support",
         "@llvm//:support",
     ],
 )
@@ -666,4 +670,34 @@ cc_library(
         "@llvm//:support",
     ],
     alwayslink = 1,
+)
+
+cc_library(
+    name = "TranslateClParser",
+    srcs = ["lib/Support/TranslateClParser.cpp"],
+    hdrs = ["include/mlir/Support/TranslateClParser.h"],
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    deps = [
+        ":Analysis",
+        ":IR",
+        ":Parser",
+        ":Support",
+        ":Translation",
+        "@llvm//:support",
+    ],
+)
+
+cc_library(
+    name = "MlirTranslateMain",
+    srcs = ["tools/mlir-translate/mlir-translate.cpp"],
+    copts = PLATFORM_COPTS,
+    deps = [
+        ":IR",
+        ":Parser",
+        ":Support",
+        ":TranslateClParser",
+        ":Translation",
+        "@llvm//:support",
+    ],
 )

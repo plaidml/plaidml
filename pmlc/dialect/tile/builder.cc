@@ -520,18 +520,15 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   module.push_back(funcOp);
   IVLOG(5, module);
   if (failed(mlir::verify(module))) {
-    emitError(loc, "Module verification error");
+    throw std::runtime_error("Module verification error");
   }
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
-  if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
-    // TODO: Debug & re-enable the canonicalization pass
-    pm.addPass(mlir::createCanonicalizerPass());
-  }
+  pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
   if (failed(result)) {
-    emitError(loc, "Optimization passes failure");
+    throw std::runtime_error("Optimization passes failure");
   }
   IVLOG(2, module);
   return program;

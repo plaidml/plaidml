@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "llvm/ADT/SmallVector.h"
 
 #include "mlir/IR/Builders.h"
@@ -56,22 +54,6 @@ namespace OpTrait = mlir::OpTrait;
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ops.h.inc"
-
-template <typename Filter>
-std::vector<AbstractOperation*> getAllOpsWith(MLIRContext* context, Filter filter) {
-  std::vector<AbstractOperation*> ops;
-  for (auto* op : context->getRegisteredOperations()) {
-    if (filter(op)) {
-      ops.emplace_back(op);
-    }
-  }
-  return ops;
-}
-
-template <typename Interface>
-std::vector<AbstractOperation*> getAllOpsWithInterface(MLIRContext* context) {
-  return getAllOpsWith(context, [](AbstractOperation* op) { return op->getInterface<Interface>(); });
-}
 
 }  // namespace eltwise
 }  // namespace dialect

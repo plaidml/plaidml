@@ -220,7 +220,7 @@ std::shared_ptr<tile::Buffer> Platform::MakeBuffer(const context::Context& ctx, 
   return std::make_shared<Buffer>(platform_dev.devinfo, platform_dev.mem_strategy, size);
 }
 
-std::unique_ptr<tile::Program> Platform::MakeProgram(  //
+std::shared_ptr<tile::Program> Platform::MakeProgram(  //
     const context::Context& ctx,                       //
     const tile::proto::Program& program,               //
     ConstBufferManager* const_bufs) {
@@ -231,11 +231,11 @@ std::unique_ptr<tile::Program> Platform::MakeProgram(  //
     runinfo.input_shapes = FromProto(program.inputs());
     runinfo.output_shapes = FromProto(program.outputs());
     runinfo.program_name = "stripe_program";
-    return std::make_unique<CpuProgram>("llvm_cpu", runinfo, const_bufs);
+    return std::make_shared<CpuProgram>("llvm_cpu", runinfo, const_bufs);
   }
   const auto& platform_dev = LookupDevice(program.dev_id());
   auto tmp_strategy = std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source);
-  return std::make_unique<Program>(  //
+  return std::make_shared<Program>(  //
       ctx,                           //
       program,                       //
       platform_dev.devinfo,          //
@@ -254,7 +254,7 @@ std::shared_ptr<tile::Program> Platform::MakeProgram(  //
     const std::shared_ptr<stripe::Program>& program,   //
     ConstBufferManager* const_bufs) {
   if (device == kCpuDevice) {
-    return std::make_unique<CpuProgram>(target, program, const_bufs);
+    return std::make_shared<CpuProgram>(target, program, const_bufs);
   }
   const auto& platform_dev = LookupDevice(device);
   auto tmp_strategy = std::make_shared<TmpMemStrategy>(platform_dev.devinfo, platform_dev.tmp_mem_source);

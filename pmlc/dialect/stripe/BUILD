@@ -100,7 +100,9 @@ plaidml_cc_library(
         "//pmlc/util",
         "//tile/stripe",
         "@mlir//:IR",
+        "@mlir//:Translation",
     ],
+    alwayslink = 1,
 )
 
 plaidml_cc_library(

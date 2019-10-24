@@ -57,7 +57,7 @@ class PlatformTest : public ::testing::TestWithParam<FactoryParam> {
  protected:
   void SetUp() final;
 
-  std::unique_ptr<Program> MakeProgram(proto::TileScanningParameters* params,  //
+  std::shared_ptr<Program> MakeProgram(proto::TileScanningParameters* params,  //
                                        const char* code,                       //
                                        const TensorShape& shape);
   std::shared_ptr<Buffer> MakeInput(const TensorShape& shape,  //

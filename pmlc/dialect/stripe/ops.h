@@ -29,6 +29,7 @@ using mlir::Operation;
 using mlir::OperationState;
 using mlir::OpFoldResult;
 using mlir::OpInterface;
+using mlir::OwningRewritePatternList;
 using mlir::ParseResult;
 using mlir::RankedTensorType;
 using mlir::Region;

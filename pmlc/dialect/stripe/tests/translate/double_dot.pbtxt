@@ -1,0 +1,357 @@
+# RUN: pmlc-translate --stripe-to-mlir %s | pmlc-opt -cse | FileCheck %s
+
+entry {
+  block {
+    name: "double_dot"
+    refs {
+      key: "_X0"
+      value {
+        access {}
+        access {}
+        interior_shape {
+          type: FLOAT32
+          dims { size: 10 stride: 20 }
+          dims { size: 20 stride: 1 }
+        }
+        loc {}
+        attrs { key: "user" value {} }
+      }
+    }
+    refs {
+      key: "_X1"
+      value {
+        access {}
+        access {}
+        interior_shape {
+          type: FLOAT32
+          dims { size: 20 stride: 30 }
+          dims { size: 30 stride: 1 }
+        }
+        loc {}
+        attrs { key: "user" value {} }
+      }
+    }
+    refs {
+      key: "_X3"
+      value {
+        access {}
+        access {}
+        interior_shape {
+          type: FLOAT32
+          dims { size: 30 stride: 40 }
+          dims { size: 40 stride: 1 }
+        }
+        loc {}
+        attrs { key: "user" value {} }
+      }
+    }
+    refs {
+      key: "_X4"
+      value {
+        access {}
+        access {}
+        interior_shape {
+          type: FLOAT32
+          dims { size: 10 stride: 40 }
+          dims { size: 40 stride: 1 }
+        }
+        loc {}
+        attrs { key: "user" value {} }
+      }
+    }
+    stmts {
+      block {
+        name: "main"
+        refs {
+          key: "_X0"
+          value {
+            dir: In
+            from: "_X0"
+            access {}
+            access {}
+            interior_shape {
+              type: FLOAT32
+              dims { size: 10 stride: 20 }
+              dims { size: 20 stride: 1 }
+            }
+            loc {}
+          }
+        }
+        refs {
+          key: "_X1"
+          value {
+            dir: In
+            from: "_X1"
+            access {
+            }
+            access {
+            }
+            interior_shape {
+              type: FLOAT32
+              dims { size: 20 stride: 30 }
+              dims { size: 30 stride: 1 }
+            }
+            loc {}
+          }
+        }
+        refs {
+          key: "_X2"
+          value {
+            access {}
+            access {}
+            interior_shape {
+              type: FLOAT32
+              dims { size: 10 stride: 30 }
+              dims { size: 30 stride: 1 }
+            }
+            loc {}
+          }
+        }
+        refs {
+          key: "_X3"
+          value {
+            dir: In
+            from: "_X3"
+            access {}
+            access {}
+            interior_shape {
+              type: FLOAT32
+              dims { size: 30 stride: 40 }
+              dims { size: 40 stride: 1 }
+            }
+            loc {}
+          }
+        }
+        refs {
+          key: "_X4"
+          value {
+            dir: Out
+            from: "_X4"
+            access {}
+            access {}
+            interior_shape {
+              type: FLOAT32
+              dims { size: 10 stride: 40 }
+              dims { size: 40 stride: 1 }
+            }
+            loc {}
+          }
+        }
+        stmts {
+          block {
+            name: "kernel_0(_X0,_X1)"
+            comments: "_X2[x0, x2 : 10, 30] = +(_X0[x0, x1] * _X1[x1, x2])"
+            idxs { name: "x0" range: 10 affine {} }
+            idxs { name: "x1" range: 20 affine {} }
+            idxs { name: "x2" range: 30 affine {} }
+            refs {
+              key: "_X0"
+              value {
+                dir: In
+                from: "_X0"
+                access { terms { key: "x0" value: 1 } }
+                access { terms { key: "x1" value: 1 } }
+                interior_shape {
+                  type: FLOAT32
+                  dims { size: 1 stride: 20 }
+                  dims { size: 1 stride: 1 }
+                }
+                loc {}
+                attrs { key: "contraction" value {} }
+              }
+            }
+            refs {
+              key: "_X1"
+              value {
+                dir: In
+                from: "_X1"
+                access { terms { key: "x1" value: 1 } }
+                access { terms { key: "x2" value: 1 } }
+                interior_shape {
+                  type: FLOAT32
+                  dims { size: 1 stride: 30 }
+                  dims { size: 1 stride: 1 }
+                }
+                loc {}
+                attrs { key: "contraction" value {} }
+              }
+            }
+            refs {
+              key: "_X2"
+              value {
+                dir: Out
+                from: "_X2"
+                access { terms { key: "x0" value: 1 } }
+                access { terms { key: "x2" value: 1 } }
+                interior_shape {
+                  type: FLOAT32
+                  dims { size: 1 stride: 30 }
+                  dims { size: 1 stride: 1 }
+                }
+                agg_op: "add"
+                loc {}
+              }
+            }
+            stmts {
+              load { from: "_X0" into: "$_X0" }
+            }
+            stmts {
+              load { from: "_X1" into: "$_X1" }
+            }
+            stmts {
+              intrinsic {
+                name: "mul"
+                inputs: "$_X0"
+                inputs: "$_X1"
+                outputs: "$_X2"
+                type: FLOAT32
+              }
+            }
+            stmts {
+              store { from: "$_X2" into: "_X2" }
+            }
+            loc {}
+          }
+          attrs { key: "agg_op_add" value {} }
+          attrs { key: "comb_op_mul" value {} }
+          attrs { key: "contraction" value {} }
+          attrs { key: "kernel" value {} }
+        }
+        stmts {
+          block {
+            name: "kernel_1(_X2,_X3)"
+            comments: "_X4[x0, x2 : 10, 40] = +(_X2[x0, x1] * _X3[x1, x2])"
+            idxs { name: "x0" range: 10 affine {} }
+            idxs { name: "x1" range: 30 affine {} }
+            idxs { name: "x2" range: 40 affine {} }
+            refs {
+              key: "_X2"
+              value {
+                dir: In
+                from: "_X2"
+                access { terms { key: "x0" value: 1 } }
+                access { terms { key: "x1" value: 1 } }
+                interior_shape {
+                  type: FLOAT32
+                  dims { size: 1 stride: 30 }
+                  dims { size: 1 stride: 1 }
+                }
+                loc {}
+                attrs { key: "contraction" value {} }
+              }
+            }
+            refs {
+              key: "_X3"
+              value {
+                dir: In
+                from: "_X3"
+                access { terms { key: "x1" value: 1 } }
+                access { terms { key: "x2" value: 1 } }
+                interior_shape {
+                  type: FLOAT32
+                  dims { size: 1 stride: 40 }
+                  dims { size: 1 stride: 1 }
+                }
+                loc {}
+                attrs { key: "contraction" value {} }
+              }
+            }
+            refs {
+              key: "_X4"
+              value {
+                dir: Out
+                from: "_X4"
+                access { terms { key: "x0" value: 1 } }
+                access { terms { key: "x2" value: 1 } }
+                interior_shape {
+                  type: FLOAT32
+                  dims { size: 1 stride: 40 }
+                  dims { size: 1 stride: 1 }
+                }
+                agg_op: "add"
+                loc {}
+              }
+            }
+            stmts { load { from: "_X2" into: "$_X2" } }
+            stmts { load { from: "_X3" into: "$_X3" } }
+            stmts {
+              intrinsic {
+                name: "mul"
+                inputs: "$_X2"
+                inputs: "$_X3"
+                outputs: "$_X4"
+                type: FLOAT32
+              }
+            }
+            stmts { store { from: "$_X4" into: "_X4" } }
+            loc {}
+          }
+          attrs { key: "agg_op_add" value {} }
+          attrs { key: "comb_op_mul" value {} }
+          attrs { key: "contraction" value {} }
+          attrs { key: "kernel" value {} }
+        }
+        loc {}
+      }
+      attrs { key: "main" value {} }
+    }
+    loc {}
+  }
+  attrs { key: "program" value {} }
+  attrs { key: "total_macs" value { ival: 18000 } }
+}
+
+# CHECK-LABEL: func @double_dot
+# CHECK-SAME: %[[arg0:.*]]: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
+# CHECK-SAME: %[[arg1:.*]]: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[20:30], addr[30:1])">, stripe.name = "_X1"}
+# CHECK-SAME: %[[arg2:.*]]: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[30:40], addr[40:1])">, stripe.name = "_X3"}
+# CHECK-SAME: %[[arg3:.*]]: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:40], addr[40:1])">, stripe.name = "_X4"}
+# CHECK-NEXT: attributes  {stripe_attrs = {program = unit, total_macs = 18000 : i64}} {
+# CHECK-NEXT:   stripe.parallel_for ()
+# CHECK-NEXT:       name = "main"
+# CHECK-SAME:       main = unit
+# CHECK-NEXT:     %[[c0:.*]] = stripe.affine_const 0
+# CHECK-NEXT:     %[[X0:.*]] = stripe.refine %[[arg0]] (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X0"}
+# CHECK-NEXT:     %[[X1:.*]] = stripe.refine %[[arg1]] (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X1"}
+# CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.fp32(addr[10:30], addr[30:1])">}
+# CHECK-NEXT:     %[[X2:.*]] = stripe.refine %0 (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X2"}
+# CHECK-NEXT:     %[[X3:.*]] = stripe.refine %[[arg2]] (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X3"}
+# CHECK-NEXT:     %[[X4:.*]] = stripe.refine %[[arg3]] (%[[c0]], %[[c0]]) : !fp32_2 {name = "_X4"}
+# CHECK-NEXT:     stripe.parallel_for ("x0":10, "x1":20, "x2":30)
+# CHECK-NEXT:         comments = "_X2[x0, x2 : 10, 30] = +(_X0[x0, x1] * _X1[x1, x2])"
+# CHECK-SAME:         name = "kernel_0(_X0,_X1)"
+# CHECK-SAME:         agg_op_add = unit
+# CHECK-SAME:         comb_op_mul = unit
+# CHECK-SAME:         contraction = unit
+# CHECK-SAME:         kernel = unit
+# CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
+# CHECK-NEXT:       %[[X0_0:.*]] = stripe.refine %[[X0]] (%x0, %x1) : !fp32_2 {name = "_X0", stripe_attrs = {contraction = unit}}
+# CHECK-NEXT:       %[[X1_0:.*]] = stripe.refine %[[X1]] (%x1, %x2) : !fp32_2 {name = "_X1", stripe_attrs = {contraction = unit}}
+# CHECK-NEXT:       %[[X2_0:.*]] = stripe.refine %[[X2]] (%x0, %x2) : !fp32_2 {name = "_X2"}
+# CHECK-NEXT:       %[[s_X0:.*]] = stripe.load %[[X0_0]] : !fp32_2 {scalar_name = "$_X0"}
+# CHECK-NEXT:       %[[s_X1:.*]] = stripe.load %[[X1_0]] : !fp32_2 {scalar_name = "$_X1"}
+# CHECK-NEXT:       %[[s_X2:.*]] = "eltwise.mul"(%[[s_X0]], %[[s_X1]]) {scalar_name = "$_X2", type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+# CHECK-NEXT:       stripe.aggregate "add" %[[X2_0]] %[[s_X2]] : !fp32_2
+# CHECK-NEXT:       stripe.terminate
+# CHECK-NEXT:     }
+# CHECK-NEXT:     stripe.parallel_for ("x0":10, "x1":30, "x2":40)
+# CHECK-NEXT:         comments = "_X4[x0, x2 : 10, 40] = +(_X2[x0, x1] * _X3[x1, x2])"
+# CHECK-SAME:         name = "kernel_1(_X2,_X3)"
+# CHECK-SAME:         agg_op_add = unit
+# CHECK-SAME:         comb_op_mul = unit
+# CHECK-SAME:         contraction = unit
+# CHECK-SAME:         kernel = unit
+# CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
+# CHECK-NEXT:       %[[X2_1:.*]] = stripe.refine %[[X2]] (%x0, %x1) : !fp32_2 {name = "_X2", stripe_attrs = {contraction = unit}}
+# CHECK-NEXT:       %[[X3_1:.*]] = stripe.refine %[[X3]] (%x1, %x2) : !fp32_2 {name = "_X3", stripe_attrs = {contraction = unit}}
+# CHECK-NEXT:       %[[X4_1:.*]] = stripe.refine %[[X4]] (%x0, %x2) : !fp32_2 {name = "_X4"}
+# CHECK-NEXT:       %[[s_X2:.*]] = stripe.load %[[X2_1]] : !fp32_2 {scalar_name = "$_X2"}
+# CHECK-NEXT:       %[[s_X3:.*]] = stripe.load %[[X3_1]] : !fp32_2 {scalar_name = "$_X3"}
+# CHECK-NEXT:       %[[s_X4:.*]] = "eltwise.mul"(%[[s_X2]], %[[s_X3]]) {scalar_name = "$_X4", type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+# CHECK-NEXT:       stripe.aggregate "add" %[[X4_1]] %[[s_X4]] : !fp32_2
+# CHECK-NEXT:       stripe.terminate
+# CHECK-NEXT:     }
+# CHECK-NEXT:     stripe.terminate
+# CHECK-NEXT:   }
+# CHECK-NEXT:   stripe.terminate
+# CHECK-NEXT: }

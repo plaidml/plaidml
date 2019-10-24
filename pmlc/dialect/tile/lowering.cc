@@ -2,6 +2,7 @@
 
 #include "pmlc/dialect/tile/lowering.h"
 
+#include <memory>
 #include <vector>
 
 #include "llvm/Support/FormatVariadic.h"
@@ -12,6 +13,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Translation.h"
 
 #include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/dialect.h"
@@ -163,7 +165,8 @@ struct ReturnOpConversion : public LoweringBase {
   }
 };
 
-static Value* ConvertOutputTensor(FuncOp funcOp, Value* tensor) {
+static Value* ConvertOutputTensor(Operation* op, Value* tensor) {
+  auto funcOp = op->getParentOfType<FuncOp>();
   auto attr = funcOp.getAttrOfType<IntegerAttr>("inputs");
   if (!attr) {
     throw std::runtime_error("Missing inputs attr");
@@ -238,7 +241,7 @@ struct AffineDomainOpConversion : public LoweringBase {
       ranges.emplace_back(range);
     }
 
-    auto outputTensor = ConvertOutputTensor(op->getParentOfType<FuncOp>(), domainOp.result());
+    auto outputTensor = ConvertOutputTensor(op, domainOp.result());
     if (!outputTensor) {
       auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
       outputTensor = allocOp.result();
@@ -353,7 +356,7 @@ struct EltwiseOpConversion : public LoweringBase {
     auto resultTensorType = convertIntoTensorType(resultType);
     IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
 
-    auto outputTensor = ConvertOutputTensor(op->getParentOfType<FuncOp>(), op->getResult(0));
+    auto outputTensor = ConvertOutputTensor(op, op->getResult(0));
     if (!outputTensor) {
       auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
       outputTensor = allocOp.result();
@@ -514,6 +517,52 @@ struct FuncOpConversion : public LoweringBase {
   }
 };
 
+struct SpecialOpConversion : public LoweringBase {
+  explicit SpecialOpConversion(LoweringContext* lowering, StringRef opName)  //
+      : LoweringBase(opName, lowering) {}
+
+  PatternMatchResult tryMatchAndRewrite(  //
+      Operation* op,                      //
+      ArrayRef<Value*> operands,          //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "SpecialOpConversion::matchAndRewrite>");
+
+    auto opName = stripe::Dialect::getCanonicalOpName(util::getOpName(op->getName()));
+    auto abstractOp = AbstractOperation::lookup(opName, op->getContext());
+    if (!abstractOp) {
+      op->emitError("AbstractOperation::lookup failed for: " + opName);
+      return matchFailure();
+    }
+    auto specialOp = abstractOp->getInterface<stripe::SpecialOp>();
+    if (!specialOp) {
+      op->emitError("SpecialOp interface expected");
+      return matchFailure();
+    }
+
+    std::vector<Value*> inputs;
+    for (unsigned i = 0; i < specialOp->getNumInputs(); i++) {
+      inputs.emplace_back(operands[i]);
+    }
+
+    std::vector<Value*> outputs;
+    for (unsigned i = 0; i < specialOp->getNumOutputs(); i++) {
+      auto result = op->getResult(i);
+      auto resultType = result->getType();
+      auto resultTensorType = convertIntoTensorType(resultType);
+      auto output = ConvertOutputTensor(op, result);
+      if (!output) {
+        auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
+        output = allocOp.result();
+      }
+      outputs.emplace_back(output);
+    }
+
+    specialOp->create(&rewriter, op->getLoc(), inputs, outputs);
+    rewriter.replaceOp(op, outputs);
+    return matchSuccess();
+  }
+};
+
 struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   void runOnModule() override {
     LoweringContext lowering{&getContext()};
@@ -539,9 +588,13 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         AffineDomainOpConversion,    //
         FuncOpConversion,            //
         ReturnOpConversion>(&lowering);
-    auto eltwiseOps = eltwise::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
+    auto eltwiseOps = util::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
     for (auto op : eltwiseOps) {
       patterns.insert<EltwiseOpConversion>(&lowering, op->name);
+    }
+    auto specialOps = util::getAllOpsWithInterface<tile::SpecialOp>(&getContext());
+    for (auto op : specialOps) {
+      patterns.insert<SpecialOpConversion>(&lowering, op->name);
     }
     if (failed(applyPartialConversion(getModule(), target, patterns, &lowering.typeConverter))) {
       emitError(UnknownLoc::get(&getContext()), "Error lowering tile -> stripe\n");
@@ -557,10 +610,10 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   static std::unique_ptr<mlir::Pass> Create() { return std::make_unique<LoweringPass>(); }
 };
 
-OwningModuleRef LowerIntoStripe(MLIRContext* context, TileProgram* program) {
+OwningModuleRef LowerIntoStripe(ModuleOp workspace) {
   IVLOG(1, "LowerIntoStripe");
-  OwningModuleRef module(llvm::cast<ModuleOp>(program->module->getOperation()->clone()));
-  mlir::PassManager pm(context, true);
+  OwningModuleRef module(llvm::cast<ModuleOp>(workspace.getOperation()->clone()));
+  mlir::PassManager pm(workspace.getContext(), true);
   IVLOG(1, "before:\n" << mlir::debugString(*module->getOperation()));
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
@@ -575,6 +628,21 @@ OwningModuleRef LowerIntoStripe(MLIRContext* context, TileProgram* program) {
   // IVLOG(1, "after:\n" << mlir::debugString(*module->getOperation()));
   return module;
 }
+
+static mlir::LogicalResult IntoStripeTranslateFunction(mlir::ModuleOp input, llvm::raw_ostream& output) {
+  auto module = LowerIntoStripe(input);
+  auto stripe = stripe::FromMLIR(*module);
+  std::stringstream ss;
+  ss << *stripe->entry;
+  output << ss.str();
+  return mlir::success();
+}
+
+static mlir::PassRegistration<LoweringPass> legalize_pass(  //
+    "tile-legalize-to-stripe",                              //
+    "Legalize from Tile dialect to Stripe dialect");
+
+static mlir::TranslateFromMLIRRegistration IntoStripeTranslate("tile-to-stripe", IntoStripeTranslateFunction);
 
 }  // namespace tile
 }  // namespace dialect

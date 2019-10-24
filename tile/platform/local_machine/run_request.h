@@ -11,7 +11,6 @@
 #include "tile/base/buffer.h"
 #include "tile/base/hal.h"
 #include "tile/platform/local_machine/program.h"
-#include "tile/platform/local_machine/shim.h"
 
 namespace vertexai {
 namespace tile {
@@ -20,13 +19,15 @@ namespace local_machine {
 // Represents the state of a Program::Run request.
 class RunRequest {
  public:
-  static boost::future<void> Run(const context::Context& ctx, const Program* program,
-                                 std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
-                                 std::map<std::string, std::shared_ptr<tile::Buffer>> outputs);
+  static boost::future<void> Run(               //
+      const context::Context& ctx,              //
+      const std::shared_ptr<Program>& program,  //
+      std::map<std::string, std::shared_ptr<tile::Buffer>> inputs,
+      std::map<std::string, std::shared_ptr<tile::Buffer>> outputs);
 
   void AddProgramDoneDep(const std::shared_ptr<hal::Event>& event);
 
-  const Program* program() const { return program_; }
+  const Program* program() const { return program_.get(); }
 
  private:
   struct KernelLogInfo {
@@ -36,15 +37,18 @@ class RunRequest {
     std::size_t tot_flops;
   };
 
-  explicit RunRequest(const Program* program) : program_{program} {}
+  explicit RunRequest(const std::shared_ptr<Program>& program) : program_{program} {}
 
-  static void LogRequest(const Program* program, const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
-                         const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs);
+  static void LogRequest(                       //
+      const std::shared_ptr<Program>& program,  //
+      const std::map<std::string, std::shared_ptr<tile::Buffer>>& inputs,
+      const std::map<std::string, std::shared_ptr<tile::Buffer>>& outputs);
 
-  boost::future<void> LogResults(const context::Context& ctx,
-                                 boost::future<std::vector<std::shared_ptr<hal::Result>>> results);
+  boost::future<void> LogResults(   //
+      const context::Context& ctx,  //
+      boost::future<std::vector<std::shared_ptr<hal::Result>>> results);
 
-  const Program* program_;
+  const std::shared_ptr<Program> program_;
 };
 
 }  // namespace local_machine

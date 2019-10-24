@@ -559,6 +559,7 @@ std::ostream& operator<<(std::ostream& os, const Refinement& ref);
 std::ostream& operator<<(std::ostream& os, const PrintRefinement& ref);
 std::ostream& operator<<(std::ostream& os, const Block& block);
 
+bool FromProtoText(const std::string& pbtxt, proto::Program* into);
 std::shared_ptr<Program> FromProto(const proto::Program& program);
 std::shared_ptr<Block> FromProto(const proto::Block& block);
 Affine FromProto(const proto::Affine& affine);
