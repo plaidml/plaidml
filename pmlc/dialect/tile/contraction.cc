@@ -6,6 +6,7 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "base/util/logging.h"
@@ -254,7 +255,7 @@ static IndexPoly MakePoly(mlir::Value* value) {
   throw std::runtime_error("Invalid affine op");
 }
 
-Contraction::Contraction(ContractionOp op) {
+Contraction::Contraction(ContractionOp op, llvm::ArrayRef<ConstraintOp> constraintOps) {
   {
     auto sink = op.getSinkIndexMap();
     auto sinkOp = llvm::cast<AffineSinkIndexMapOp>(sink->getDefiningOp());
@@ -273,15 +274,25 @@ Contraction::Contraction(ContractionOp op) {
     }
     accesses.emplace_back(dims);
   }
+
+  for (auto constraintOp : constraintOps) {
+    auto poly = MakePoly(constraintOp.lhs());
+    auto rhsOp = constraintOp.rhs()->getDefiningOp();
+    mlir::IntegerAttr attr;
+    if (!mlir::m_Constant(&attr).match(rhsOp)) {
+      throw std::runtime_error("Constraint range must resolve to a constant integer");
+    }
+    auto range = attr.getInt();
+    IVLOG(5, "constraint: " << poly << " < " << range);
+    constraints.emplace_back(poly, range);
+  }
 }
 
 Constraints Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes) const {
   // Make the output collection
   Constraints ret;
   // Add all the simple constraints
-  for (const auto& constraint : constraints) {
-    ret.constraints.push_back(constraint);
-  }
+  ret.constraints = constraints;
   // Sanity check the shapes
   if (shapes.size() != accesses.size()) {
     throw std::runtime_error(
@@ -297,14 +308,12 @@ Constraints Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> sh
 }
 
 void Contraction::ConstrainIndexVarsToInts() {
-  std::vector<math::RangeConstraint> newConstraints;
   const int32_t kBoundWidth = 1000000000;
   for (const auto& var : getIndexVars()) {
     if (!var.empty()) {  // Constant components not used
-      newConstraints.emplace_back(RangeConstraint(IndexPoly(var) + kBoundWidth / 2, kBoundWidth));
+      constraints.emplace_back(RangeConstraint(IndexPoly(var) + kBoundWidth / 2, kBoundWidth));
     }
   }
-  constraints = newConstraints;
 }
 
 std::set<std::string> Contraction::getIndexVars() const {
@@ -604,14 +613,17 @@ bool Contraction::NeedReduce() const {
 std::tuple<IndexBounds, SimpleConstraints> Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes) {
   ConstrainIndexVarsToInts();
   auto constraints = GatherConstraints(shapes);
+  IVLOG(3, "Constraints:" << to_string(constraints.constraints));
   // Reduce if needed
   if (NeedReduce()) {
     ReduceOutputPolynomials(constraints);
     constraints = GatherConstraints(shapes);
   }
   constraints.MergeParallelConstraints();
+  IVLOG(3, "Merged Parallel Constraints:" << to_string(constraints.constraints));
   // Defract if needed (defract does early return if not required)
   Defractionalize(constraints);
+  // IVLOG(3, "Defracted:\n" << to_string(defracted));
   // Gather the constraints from index bounds
   constraints = GatherConstraints(shapes);
   // New parallel constraints might have been introduced by defract; re-merge them

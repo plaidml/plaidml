@@ -180,10 +180,15 @@ def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
   >];
 }
 
+def ConstraintOp : TileOp<"constraint", [Terminator]> {
+  let summary = "constraint operation";
+  let arguments = (ins Index:$lhs, Index:$rhs);
+  let regions = (region SizedRegion<1>:$body);
+}
+
 class ContractionOp<string mnemonic, list<OpTrait> traits = []> :
     TileOp<mnemonic, !listconcat(traits, [
       Terminator,
-      HasParent<"AffineDomainOp">,
       ContractionOpInterface
     ])>;
 
@@ -411,19 +416,18 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
   >];
 }
 
-// TODO
-// def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
-//   let summary = "special scatter operation";
-//   let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims, Eltwise_AnyTensor:$other);
-//   let results = (outs Eltwise_AnyTensor:$result);
+def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
+  let summary = "special scatter operation";
+  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims, Eltwise_AnyTensor:$other);
+  let results = (outs Eltwise_AnyTensor:$result);
 
-//   let builders = [OpBuilder<
-//     "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-//       result.addOperands(operands);
-//       result.addTypes(getResultType(operands));
-//     }]
-//   >];
-// }
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+      result.addOperands(operands);
+      result.addTypes(getResultType(operands));
+    }]
+  >];
+}
 
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";

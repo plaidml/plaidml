@@ -47,10 +47,15 @@ using mlir::ModuleOp;
 using mlir::OpBuilder;
 using mlir::UnknownLoc;
 
+struct DomainInfo {
+  BlockAndValueMapping mapping;
+};
+
 struct TileBuilder::Impl {
   MLIRContext context;
   ModuleOp module;
   OpBuilder builder;
+  std::map<AffineDomainOp, DomainInfo> domains;
 
   Impl()
       : module(ModuleOp::create(UnknownLoc::get(&context))),  //
@@ -103,6 +108,7 @@ struct TileBuilder::Impl {
     auto shape = eltwise::ComputeShape(size_map_sizes);
     auto tensorType = builder.getTensorType(shape, elementType);
     auto domain = builder.create<AffineDomainOp>(builder.getUnknownLoc(), tensorType);
+    auto& info = domains[domain];
     auto body = new Block();
     domain.body().push_back(body);
     llvm::SetVector<mlir::Value*> values;
@@ -113,13 +119,12 @@ struct TileBuilder::Impl {
       return value->getType().isa<IndexType>();
     });
     // Find and replace each AffineIndexOp with a BlockArgument of the domain op
-    BlockAndValueMapping mapper;
     std::queue<mlir::Value*> worklist;
     for (auto value : slice) {
       auto op = value->getDefiningOp();
       if (auto idx_op = llvm::dyn_cast<AffineIndexOp>(op)) {
         auto arg = body->addArgument(idx_op.getType());
-        mapper.map(value, arg);
+        info.mapping.map(value, arg);
         worklist.push(value);
       }
     }
@@ -145,11 +150,11 @@ struct TileBuilder::Impl {
           llvm::isa<AffineSourceIndexMapOp>(op) ||  //
           llvm::isa<AffineSinkIndexMapOp>(op) ||    //
           llvm::isa<AffineSizeMapOp>(op)) {
-        auto new_value = domain_builder.clone(*op, mapper)->getResult(0);
-        mapper.map(value, new_value);
+        auto new_value = domain_builder.clone(*op, info.mapping)->getResult(0);
+        info.mapping.map(value, new_value);
       }
     }
-    fn(domain_builder, &mapper);
+    fn(domain_builder, &info.mapping);
     IVLOG(5, mlir::debugString(domain));
     return domain.getOperation();
   }
@@ -159,10 +164,10 @@ struct TileBuilder::Impl {
     if (srcs.size() != 1) {
       throw std::runtime_error("Unary contraction op requires 1 operand");
     }
-    auto domain = MakeContraction({srcs[0]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapper) {
-      auto new_src = mapper->lookup(srcs[0]);
-      auto new_sink = mapper->lookup(sink);
-      auto new_sizes = mapper->lookup(sizes);
+    auto domain = MakeContraction({srcs[0]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapping) {
+      auto new_src = mapping->lookup(srcs[0]);
+      auto new_sink = mapping->lookup(sink);
+      auto new_sizes = mapping->lookup(sizes);
       domain_builder.create<ConOp>(builder.getUnknownLoc(), new_sizes, new_src, new_sink);
     });
     return domain->getResult(0);
@@ -174,11 +179,11 @@ struct TileBuilder::Impl {
       throw std::runtime_error("Binary contraction op requires 2 operands");
     }
     auto domain =
-        MakeContraction({srcs[0], srcs[1]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapper) {
-          auto new_src1 = mapper->lookup(srcs[0]);
-          auto new_src2 = mapper->lookup(srcs[1]);
-          auto new_sink = mapper->lookup(sink);
-          auto new_sizes = mapper->lookup(sizes);
+        MakeContraction({srcs[0], srcs[1]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapping) {
+          auto new_src1 = mapping->lookup(srcs[0]);
+          auto new_src2 = mapping->lookup(srcs[1]);
+          auto new_sink = mapping->lookup(sink);
+          auto new_sizes = mapping->lookup(sizes);
           domain_builder.create<ConOp>(builder.getUnknownLoc(), new_sizes, new_src1, new_src2, new_sink);
         });
     return domain->getResult(0);
@@ -190,12 +195,12 @@ struct TileBuilder::Impl {
       throw std::runtime_error("Ternary contraction op requires 3 operands");
     }
     auto domain = MakeContraction(
-        {srcs[0], srcs[1], srcs[2]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapper) {
-          auto new_src1 = mapper->lookup(srcs[0]);
-          auto new_src2 = mapper->lookup(srcs[1]);
-          auto new_src3 = mapper->lookup(srcs[2]);
-          auto new_sink = mapper->lookup(sink);
-          auto new_sizes = mapper->lookup(sizes);
+        {srcs[0], srcs[1], srcs[2]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapping) {
+          auto new_src1 = mapping->lookup(srcs[0]);
+          auto new_src2 = mapping->lookup(srcs[1]);
+          auto new_src3 = mapping->lookup(srcs[2]);
+          auto new_sink = mapping->lookup(sink);
+          auto new_sizes = mapping->lookup(sizes);
           domain_builder.create<ConOp>(builder.getUnknownLoc(), new_sizes, new_src1, new_src2, new_src3, new_sink);
         });
     return domain->getResult(0);
@@ -414,6 +419,50 @@ mlir::Value* TileBuilder::MakeAffineSizeMapOp(llvm::ArrayRef<mlir::Value*> sizes
   return impl->builder.create<AffineSizeMapOp>(impl->builder.getUnknownLoc(), sizes).result();
 }
 
+void TileBuilder::AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value* rhs) {
+  IVLOG(2, "TileBuilder::AddConstraint>");
+  auto op = cion->getDefiningOp();
+  if (!op) {
+    throw std::runtime_error("add_constraint can only be specified on a contraction.");
+  }
+  auto domainOp = llvm::dyn_cast<AffineDomainOp>(op);
+  if (!domainOp) {
+    throw std::runtime_error("add_constraint can only be specified on a contraction.");
+  }
+
+  auto& region = domainOp.body();
+  auto src = &region.front();
+  OpBuilder builder(src->getTerminator());
+
+  // Get a backward slice to trace the transitive defs of the lhs and rhs.
+  auto& info = impl->domains[domainOp];
+  llvm::SetVector<mlir::Value*> values;
+  values.insert(lhs);
+  values.insert(rhs);
+  auto slice = util::getBackwardSlice(values, false, [](Value* value) {  //
+    return value->getType().isa<IndexType>();
+  });
+
+  // Previously, some values will have already been cloned into the AffineDomainOp
+  // However, there might be other ops that this constraint introduced that needs
+  // to be cloned into the AffineDomainOp.
+  for (auto value : slice) {
+    if (!info.mapping.contains(value)) {
+      IVLOG(5, "clone: " << mlir::debugString(*value));
+      auto op = value->getDefiningOp();
+      auto newValue = builder.clone(*op, info.mapping)->getResult(0);
+      info.mapping.map(value, newValue);
+    }
+  }
+
+  // Create the ConstraintOp as a parent of the existing terminator.
+  auto constraintOp = builder.create<ConstraintOp>(op->getLoc(), info.mapping.lookup(lhs), info.mapping.lookup(rhs));
+  auto it = std::prev(src->end(), 1);
+  auto block = builder.createBlock(&constraintOp.body());
+  auto& dst = block->getOperations();
+  dst.splice(dst.end(), src->getOperations(), it, src->end());
+}
+
 #define DEFINE_CONTRACTION_OPS(_agg_op_)                                                                    \
   mlir::Value* TileBuilder::MakeCon##_agg_op_##Op(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,     \
                                                   mlir::Value* sizes) {                                     \
@@ -518,7 +567,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   builder.create<mlir::ReturnOp>(loc, rets);
   // Attach the function to the module
   module.push_back(funcOp);
-  IVLOG(5, module);
+  IVLOG(5, mlir::debugString(module));
   if (failed(mlir::verify(module))) {
     throw std::runtime_error("Module verification error");
   }
@@ -530,7 +579,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   if (failed(result)) {
     throw std::runtime_error("Optimization passes failure");
   }
-  IVLOG(2, module);
+  IVLOG(2, mlir::debugString(module));
   return program;
 }
 

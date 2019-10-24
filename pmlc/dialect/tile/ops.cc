@@ -112,7 +112,10 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
 
   PatternMatchResult matchAndRewrite(AffineDomainOp op, PatternRewriter& rewriter) const override {
     IVLOG(5, "AffineDomainFolder::matchAndRewrite>");
-    auto terminator = &op.body().front().back();
+    auto terminator = op.body().front().getTerminator();
+    while (auto constraintOp = llvm::dyn_cast<ConstraintOp>(terminator)) {
+      terminator = constraintOp.body().front().getTerminator();
+    }
     auto size_map_op = llvm::dyn_cast<AffineSizeMapOp>(terminator->getOperand(0)->getDefiningOp());
     if (!size_map_op) {
       return matchFailure();
@@ -187,13 +190,6 @@ Type GatherOp::getResultType(ArrayRef<Value*> operands) {
   if (!indexElementType || indexElementType.type() != eltwise::DataType::INT32) {
     throw std::runtime_error("'gather' requires the data type for the second argument to be INT32.");
   }
-  // std::vector<std::shared_ptr<DimExpr>> dims;
-  // for (size_t i = 0; i < index->shape.dims.size(); i++) {
-  //   dims.push_back(index->shape.dims[i].expr);
-  // }
-  // for (size_t i = 1; i < data->shape.dims.size(); i++) {
-  //   dims.push_back(data->shape.dims[i].expr);
-  // }
   SmallVector<int64_t, 4> shape;
   auto tensorShape = tensorType.getShape();
   auto indexShape = indexType.getShape();
@@ -330,6 +326,64 @@ Type ReshapeOp::getResultType(ArrayRef<Value*> operands) {
   auto elementType = tensorType.getElementType();
   auto shape = eltwise::ComputeShape(dims);
   return RankedTensorType::get(shape, elementType);
+}
+
+//
+// --- ScatterOp ---
+//
+
+struct ScatterCanonicalizer : public OpRewritePattern<ScatterOp> {
+  using OpRewritePattern<ScatterOp>::OpRewritePattern;
+
+  PatternMatchResult matchAndRewrite(ScatterOp scatterOp, PatternRewriter& rewriter) const override {
+    IVLOG(5, "IndexCanonicalizer::matchAndRewrite> " << mlir::debugString(scatterOp));
+    auto op = scatterOp.getOperation();
+    SmallVector<Value*, 3> operands(op->getOperands());
+    auto resultType = ScatterOp::getResultType(operands);
+    if (resultType == scatterOp.result()->getType()) {
+      return Pattern::matchFailure();
+    }
+    auto newOp =
+        rewriter.create<ScatterOp>(op->getLoc(), resultType, scatterOp.tensor(), scatterOp.dims(), scatterOp.other());
+    rewriter.replaceOp(op, {newOp});
+    util::UpdateFuncOpType(newOp.getOperation());
+    return Pattern::matchSuccess();
+  }
+};
+
+void ScatterOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<ScatterCanonicalizer>(context);
+}
+
+Type ScatterOp::getResultType(ArrayRef<Value*> operands) {
+  IVLOG(5, "ScatterOp::getResultType>")
+  if (operands.size() != 3) {
+    throw std::runtime_error("ScatterOp requires 3 operands");
+  }
+  auto tensor = operands[0];
+  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
+  auto tensorElementType = tensorType.getElementType();
+  const auto& tensorShape = tensorType.getShape();
+  if (!tensorType.getRank()) {
+    throw std::runtime_error("'scatter' requires first operand to have at least one dimension.");
+  }
+  auto index = operands[1];
+  auto indexType = eltwise::getRankedTensorType(index->getType());
+  auto indexElementType = indexType.getElementType().dyn_cast<ScalarType>();
+  if (!indexElementType || indexElementType.type() != eltwise::DataType::INT32) {
+    // TODO: Handle other integer types?  Floor floats?
+    throw std::runtime_error("'scatter' requires the data type for the second argument to be INT32.");
+  }
+  auto other = operands[2];
+  auto otherType = eltwise::getRankedTensorType(other->getType());
+  const auto& otherShape = otherType.getShape();
+  SmallVector<int64_t, 4> shape{otherShape[0]};
+  for (unsigned i = indexType.getRank(); i < tensorType.getRank(); i++) {
+    shape.emplace_back(tensorShape[i]);
+  }
+  auto resultType = RankedTensorType::get(shape, tensorElementType);
+  IVLOG(6, "  resultType: " << mlir::debugString(resultType));
+  return resultType;
 }
 
 //
