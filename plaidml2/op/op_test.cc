@@ -98,36 +98,6 @@ TEST(Op, Prod) {
 )"));
 }
 
-TEST(Op, Relu) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
-  auto r = op::relu(  //
-      I,              // tensor to run relu on
-      A,              // alpha
-      M,              // max value
-      0.05);          // threshold
-  Program program("relu", {r});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  I[I_0, I_1],
-  A[A_0, A_1],
-  M[M_0, M_1]
-) -> (
-  _X7
-) {
-  _X0 = 0.050000;
-  _X1 = cmp_lt(I, _X0);
-  _X2 = 0.050000;
-  _X3 = sub(I, _X2);
-  _X4 = mul(A, _X3);
-  _X5 = cond(_X1, _X4, I);
-  _X6 = cmp_lt(_X5, M);
-  _X7 = cond(_X6, _X5, M);
-}
-)"));
-}
-
 TEST(Op, Repeat) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
   auto t = op::repeat(  //

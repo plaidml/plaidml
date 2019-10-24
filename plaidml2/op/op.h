@@ -80,13 +80,6 @@ inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::
   return details::op("prod", args).as_tensor();
 }
 
-inline edsl::Tensor relu(const edsl::Tensor& I, const edsl::Tensor& alpha = edsl::Placeholder(PLAIDML_DATA_FLOAT32, {}),
-                         const edsl::Tensor& max_value = edsl::Placeholder(PLAIDML_DATA_FLOAT32, {}),
-                         float threshold = 0.0) {
-  auto args = edsl::make_tuple(I, alpha, max_value, threshold);
-  return details::op("relu", args).as_tensor();
-}
-
 inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int raw_axis) {
   auto args = edsl::make_tuple(I, repeats, raw_axis);
   return details::op("repeat", args).as_tensor();
