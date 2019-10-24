@@ -52,7 +52,7 @@ struct SimplifyAddConstants final : public mlir::OpRewritePattern<AffineAddOp> {
     std::int64_t constSum = 0;
 
     for (auto* operand : op.inputs()) {
-      auto val = mlir::dyn_cast<AffineConstOp>(operand->getDefiningOp());
+      auto val = mlir::dyn_cast_or_null<AffineConstOp>(operand->getDefiningOp());
       if (val) {
         ++constCount;
         constSum += val.value().getSExtValue();
@@ -66,7 +66,7 @@ struct SimplifyAddConstants final : public mlir::OpRewritePattern<AffineAddOp> {
     std::vector<mlir::Value*> operands;
     operands.reserve(op.getNumOperands() - constCount + (constSum ? 1 : 0));
     for (auto* operand : op.inputs()) {
-      auto val = mlir::dyn_cast<AffineConstOp>(operand->getDefiningOp());
+      auto val = mlir::dyn_cast_or_null<AffineConstOp>(operand->getDefiningOp());
       if (!val) {
         operands.emplace_back(operand);
       }
@@ -100,7 +100,7 @@ struct SimplifyMulConstValue final : public mlir::OpRewritePattern<AffineMulOp> 
   explicit SimplifyMulConstValue(mlir::MLIRContext* context) : OpRewritePattern<AffineMulOp>(context) {}
 
   mlir::PatternMatchResult match(AffineMulOp op) const final {
-    auto val = mlir::dyn_cast<AffineConstOp>(op.input()->getDefiningOp());
+    auto val = mlir::dyn_cast_or_null<AffineConstOp>(op.input()->getDefiningOp());
     if (!val) {
       return matchFailure();
     }
@@ -108,7 +108,7 @@ struct SimplifyMulConstValue final : public mlir::OpRewritePattern<AffineMulOp> 
   }
 
   void rewrite(AffineMulOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    auto val = mlir::dyn_cast<AffineConstOp>(op.input()->getDefiningOp());
+    auto val = mlir::cast<AffineConstOp>(op.input()->getDefiningOp());
     auto constValue = val.value().getSExtValue();
     if (constValue == 0) {
       rewriter.replaceOp(op, op.input());  // A handy source of a zero

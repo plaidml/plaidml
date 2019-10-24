@@ -30,6 +30,14 @@ inline edsl::Value op(const std::string& name, const edsl::Value& args) {
 
 }  // namespace details
 
+//  return absolute value of tensor
+
+inline edsl::Tensor abs(const edsl::Tensor& I_or_O  //
+) {
+  auto args = edsl::make_tuple(I_or_O);
+  return details::op("abs", args).as_tensor();
+}
+
 inline edsl::Tensor convolution(             //
     const edsl::Tensor& I_or_O,              //
     const edsl::Tensor& F_or_O,              //
