@@ -184,3 +184,24 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-NEXT:   } {name = "main", stripe_attrs = {main = unit}}
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
+
+// -----
+
+func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32> {
+  %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> index
+  %c20 = "eltwise.sconst"() {value = 20 : i64} : () -> index
+  %1 = "tile.reshape"(%arg0, %c5, %c5, %c20) : (tensor<10x20x!eltwise.fp32>, index, index, index) -> tensor<5x5x20x!eltwise.fp32>
+  return %1 : tensor<5x5x20x!eltwise.fp32>
+}
+
+// CHECK: func @reshape
+// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
+// CHECK-SAME: %arg1: !fp32_3 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[5:100], addr[5:20], addr[20:1])">, stripe.name = "_X1"}
+// CHECK-NEXT: attributes  {inputs = 1 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
+// CHECK-NEXT:   stripe.parallel_for ()
+// CHECK-NEXT:      {name = "main", stripe_attrs = {main = unit}} {
+// CHECK:          "stripe.reshape"(%arg1, %arg0) : (!fp32_3, !fp32_2) -> ()
+// CHECK-NEXT:     stripe.terminate
+// CHECK-NEXT:   }
+// CHECK-NEXT:   stripe.terminate
+// CHECK-NEXT: }

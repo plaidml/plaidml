@@ -165,7 +165,8 @@ struct ReturnOpConversion : public LoweringBase {
   }
 };
 
-static Value* ConvertOutputTensor(FuncOp funcOp, Value* tensor) {
+static Value* ConvertOutputTensor(Operation* op, Value* tensor) {
+  auto funcOp = op->getParentOfType<FuncOp>();
   auto attr = funcOp.getAttrOfType<IntegerAttr>("inputs");
   if (!attr) {
     throw std::runtime_error("Missing inputs attr");
@@ -240,7 +241,7 @@ struct AffineDomainOpConversion : public LoweringBase {
       ranges.emplace_back(range);
     }
 
-    auto outputTensor = ConvertOutputTensor(op->getParentOfType<FuncOp>(), domainOp.result());
+    auto outputTensor = ConvertOutputTensor(op, domainOp.result());
     if (!outputTensor) {
       auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
       outputTensor = allocOp.result();
@@ -355,7 +356,7 @@ struct EltwiseOpConversion : public LoweringBase {
     auto resultTensorType = convertIntoTensorType(resultType);
     IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
 
-    auto outputTensor = ConvertOutputTensor(op->getParentOfType<FuncOp>(), op->getResult(0));
+    auto outputTensor = ConvertOutputTensor(op, op->getResult(0));
     if (!outputTensor) {
       auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
       outputTensor = allocOp.result();
@@ -516,6 +517,52 @@ struct FuncOpConversion : public LoweringBase {
   }
 };
 
+struct SpecialOpConversion : public LoweringBase {
+  explicit SpecialOpConversion(LoweringContext* lowering, StringRef opName)  //
+      : LoweringBase(opName, lowering) {}
+
+  PatternMatchResult tryMatchAndRewrite(  //
+      Operation* op,                      //
+      ArrayRef<Value*> operands,          //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "SpecialOpConversion::matchAndRewrite>");
+
+    auto opName = stripe::Dialect::getCanonicalOpName(util::getOpName(op->getName()));
+    auto abstractOp = AbstractOperation::lookup(opName, op->getContext());
+    if (!abstractOp) {
+      op->emitError("AbstractOperation::lookup failed for: " + opName);
+      return matchFailure();
+    }
+    auto specialOp = abstractOp->getInterface<stripe::SpecialOp>();
+    if (!specialOp) {
+      op->emitError("SpecialOp interface expected");
+      return matchFailure();
+    }
+
+    std::vector<Value*> inputs;
+    for (unsigned i = 0; i < specialOp->getNumInputs(); i++) {
+      inputs.emplace_back(operands[i]);
+    }
+
+    std::vector<Value*> outputs;
+    for (unsigned i = 0; i < specialOp->getNumOutputs(); i++) {
+      auto result = op->getResult(i);
+      auto resultType = result->getType();
+      auto resultTensorType = convertIntoTensorType(resultType);
+      auto output = ConvertOutputTensor(op, result);
+      if (!output) {
+        auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
+        output = allocOp.result();
+      }
+      outputs.emplace_back(output);
+    }
+
+    specialOp->create(&rewriter, op->getLoc(), inputs, outputs);
+    rewriter.replaceOp(op, outputs);
+    return matchSuccess();
+  }
+};
+
 struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   void runOnModule() override {
     LoweringContext lowering{&getContext()};
@@ -541,9 +588,13 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         AffineDomainOpConversion,    //
         FuncOpConversion,            //
         ReturnOpConversion>(&lowering);
-    auto eltwiseOps = eltwise::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
+    auto eltwiseOps = util::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
     for (auto op : eltwiseOps) {
       patterns.insert<EltwiseOpConversion>(&lowering, op->name);
+    }
+    auto specialOps = util::getAllOpsWithInterface<tile::SpecialOp>(&getContext());
+    for (auto op : specialOps) {
+      patterns.insert<SpecialOpConversion>(&lowering, op->name);
     }
     if (failed(applyPartialConversion(getModule(), target, patterns, &lowering.typeConverter))) {
       emitError(UnknownLoc::get(&getContext()), "Error lowering tile -> stripe\n");

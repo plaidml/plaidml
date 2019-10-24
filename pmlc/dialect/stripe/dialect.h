@@ -17,6 +17,7 @@ class Dialect : public mlir::Dialect {
   static llvm::StringRef getDialectNamespace() { return "stripe"; }
   static std::string getDialectAttrName(llvm::StringRef name);
   static llvm::StringRef getStripeAttrsName() { return "stripe_attrs"; }
+  static std::string getCanonicalOpName(llvm::StringRef name);
 
   mlir::Type parseTensor(llvm::StringRef tyData, mlir::Location loc) const;
   mlir::Type parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const;

@@ -337,8 +337,19 @@ def ConstraintOp : StripeOp<"constraint", [ImplicitTerminator]> {
 
 def SpecialOpInterface : OpInterface<"SpecialOp"> {
   let methods = [
-    InterfaceMethod<"TODO", "size_t", "getNumInputs">,
-    InterfaceMethod<"TODO", "size_t", "getNumOutputs">,
+    StaticInterfaceMethod<"TODO", "size_t", "getNumInputs">,
+    StaticInterfaceMethod<"TODO", "size_t", "getNumOutputs">,
+    StaticInterfaceMethod<"TODO", "Operation*", "create", (ins
+      "OpBuilder*":$builder,
+      "Location":$loc,
+      "ArrayRef<Value*>":$inputs,
+      "ArrayRef<Value*>":$outputs
+    ), [{
+      OperationState state(loc, ConcreteOp::getOperationName());
+      state.addOperands(outputs);
+      state.addOperands(inputs);
+      return builder->createOperation(state);
+    }]>,
   ];
 }
 
@@ -346,8 +357,8 @@ class SpecialOp<string mnemonic, int num_out, int num_in> :
     StripeOp<mnemonic, [SpecialOpInterface]> {
   let results = (outs);
   let extraClassDeclaration = [{
-    size_t getNumOutputs() { return }] # num_out # [{;}
-    size_t getNumInputs() { return }] # num_in # [{;}
+    static size_t getNumOutputs() { return }] # num_out # [{;}
+    static size_t getNumInputs() { return }] # num_in # [{;}
   }];
 }
 

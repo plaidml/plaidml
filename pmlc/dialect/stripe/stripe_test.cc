@@ -157,6 +157,68 @@ TEST_P(TranscodeTest, MaxPool2d) {
   RunTest(ri, GetParam());
 }
 
+TEST_P(TranscodeTest, Softmax) {
+  using plaidml::edsl::LogicalShape;
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {64, 64});
+  using vertexai::tile::lib::LoadSoftmax;
+  auto ri = LoadSoftmax("softmax", A);
+  RunTest(ri, GetParam());
+}
+
+TEST_P(TranscodeTest, EltwiseAdd) {
+  using plaidml::edsl::LogicalShape;
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 16});
+  LogicalShape B(PLAIDML_DATA_FLOAT32, {16, 16});
+  using vertexai::tile::lib::LoadEltwiseAdd;
+  auto ri = LoadEltwiseAdd("eltwise_add", A, B);
+  RunTest(ri, GetParam());
+}
+
+TEST_P(TranscodeTest, EltwiseMul) {
+  using plaidml::edsl::LogicalShape;
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 16});
+  LogicalShape B(PLAIDML_DATA_FLOAT32, {16, 16});
+  using vertexai::tile::lib::LoadEltwiseMul;
+  auto ri = LoadEltwiseMul("eltwise_mul", A, B);
+  RunTest(ri, GetParam());
+}
+
+TEST_P(TranscodeTest, EltwiseDiv) {
+  using plaidml::edsl::LogicalShape;
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 16});
+  LogicalShape B(PLAIDML_DATA_FLOAT32, {16, 16});
+  using vertexai::tile::lib::LoadEltwiseDiv;
+  auto ri = LoadEltwiseDiv("eltwise_div", A, B);
+  RunTest(ri, GetParam());
+}
+
+TEST_P(TranscodeTest, MatMul) {
+  using plaidml::edsl::LogicalShape;
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 16});
+  LogicalShape B(PLAIDML_DATA_FLOAT32, {16, 16});
+  using vertexai::tile::lib::LoadMatMul;
+  auto ri = LoadMatMul("matmul", A, B);
+  RunTest(ri, GetParam());
+}
+
+// These two tests fail with invalid tensor dimensions if the location parameter for RunTest is set to 0.
+
+TEST_P(TranscodeTest, LayerNorm4dAx2) {
+  using plaidml::edsl::LogicalShape;
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {1, 64, 64, 32});
+  using vertexai::tile::lib::LoadLayerNorm4dAx2;
+  auto ri = LoadLayerNorm4dAx2("layer_norm", A);
+  RunTest(ri, 1);
+}
+
+TEST_P(TranscodeTest, BatchNormalization) {
+  using plaidml::edsl::LogicalShape;
+  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 64, 64, 32});
+  using vertexai::tile::lib::LoadBatchNormalization;
+  auto ri = LoadBatchNormalization("batch_norm", A);
+  RunTest(ri, 1);
+}
+
 static lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
   Program program(name, vars, {});
   return *static_cast<const lang::RunInfo*>(program.runinfo());
