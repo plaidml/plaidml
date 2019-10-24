@@ -125,7 +125,7 @@ std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor) {
     if (dim.cls == kAddressClassIdentifier) {
       access.emplace_back(ret.access[i]);
     } else {
-      static llvm::Regex re{R"(([[:alpha:]]+)_([[:digit:]]+)_([[:digit:]]+))"};
+      static llvm::Regex re{R"(([[:alpha:]_]+)_([[:digit:]]+)_([[:digit:]]+))"};
       if (re.match(dim.cls, &matches)) {
         const auto& dev_name = matches[1];
         size_t dev_idx, unit_idx;
