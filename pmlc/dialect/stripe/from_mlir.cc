@@ -119,27 +119,30 @@ std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor) {
 
   std::vector<AffinePolynomial> access;
 
-  auto matches = llvm::SmallVector<StringRef, 4>();
+  auto matches = llvm::SmallVector<StringRef, 5>();
   for (unsigned i = 0; i < ret.base_type.getRank(); i++) {
     const auto& dim = ret.base_type.getShape()[i];
     if (dim.cls == kAddressClassIdentifier) {
       access.emplace_back(ret.access[i]);
     } else {
-      static llvm::Regex re{R"(([[:alpha:]_]+)_([[:digit:]]+)_([[:digit:]]+))"};
+      static llvm::Regex re{R"(([[:alpha:]_]+)_([[:digit:]]+)(_([[:digit:]]+))?)"};
       if (re.match(dim.cls, &matches)) {
         const auto& dev_name = matches[1];
-        size_t dev_idx, unit_idx;
+        size_t dev_idx;
         matches[2].getAsInteger(10, dev_idx);
-        matches[3].getAsInteger(10, unit_idx);
         if (loc.devs.size() <= dev_idx) {
           loc.devs.resize(dev_idx + 1);
         }
         auto& dev = loc.devs.at(dev_idx);
         dev.name = dev_name;
-        if (dev.units.size() <= unit_idx) {
-          dev.units.resize(unit_idx + 1);
+        if (matches[3].size()) {
+          size_t unit_idx;
+          matches[4].getAsInteger(10, unit_idx);
+          if (dev.units.size() <= unit_idx) {
+            dev.units.resize(unit_idx + 1);
+          }
+          dev.units.at(unit_idx) = ret.access[i];
         }
-        dev.units.at(unit_idx) = ret.access[i];
       }
     }
   }
