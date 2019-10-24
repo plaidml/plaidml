@@ -213,7 +213,14 @@ struct AffineDomainOpConversion : public LoweringBase {
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "AffineDomainOpConversion::matchAndRewrite>");
     auto domainOp = llvm::cast<AffineDomainOp>(op);
+
+    std::vector<ConstraintOp> constraintOps;
     auto terminator = domainOp.body().front().getTerminator();
+    while (auto constraintOp = llvm::dyn_cast<ConstraintOp>(terminator)) {
+      terminator = constraintOp.body().front().getTerminator();
+      constraintOps.emplace_back(constraintOp);
+    }
+
     auto contractionOp = llvm::dyn_cast<ContractionOp>(terminator);
     if (!contractionOp) {
       return matchFailure();
@@ -229,7 +236,7 @@ struct AffineDomainOpConversion : public LoweringBase {
       auto srcTensorType = convertIntoTensorType(srcType);
       shapes.push_back(srcTensorType);
     }
-    Contraction contraction{contractionOp};
+    Contraction contraction{contractionOp, constraintOps};
     IndexBounds bounds;
     SimpleConstraints constraints;
     std::tie(bounds, constraints) = contraction.ComputeBounds(shapes);
@@ -272,15 +279,6 @@ struct AffineDomainOpConversion : public LoweringBase {
     }
     forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
 
-    // add constraints
-    // TODO
-    // for (const auto& constraint : constraints) {
-    //   auto lhs = Integerize(constraint.poly, bounds);  // lhs <= rhs;
-    //   lhs -= constraint.rhs;                           // lhs <= 0;
-    //   lhs = -lhs;                                      // lhs >= 0
-    //   kernel->constraints.emplace_back(lhs);
-    // }
-
     llvm::SmallVector<Value*, 4> tensors{outputTensor};
     for (auto src : contractionOp.getSourceIndexMaps()) {
       auto srcOp = llvm::cast<AffineSourceIndexMapOp>(src->getDefiningOp());
@@ -289,7 +287,7 @@ struct AffineDomainOpConversion : public LoweringBase {
 
     // add refinements
     Value* output = nullptr;
-    llvm::SmallVector<Value*, 4> inputs;
+    llvm::SmallVector<Value*, 4> refs;
     for (unsigned i = 0; i < contraction.accesses.size(); i++) {
       const auto& access = contraction.accesses[i];
       llvm::SmallVector<Value*, 4> offsets;
@@ -308,15 +306,38 @@ struct AffineDomainOpConversion : public LoweringBase {
             {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
         };
         refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
-        // LOAD
-        auto tensorRefType = srcType.cast<stripe::TensorRefType>();
-        auto elementType = tensorRefType.getElementType();
-        auto intoType = eltwise::getRankedTensorType(elementType);
-        auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
-        inputs.emplace_back(loadOp.into());
+        refs.emplace_back(refineOp.result());
       } else {
         output = refineOp.result();
       }
+    }
+
+    // add constraints
+    for (const auto& constraint : constraints) {
+      auto lhs = Integerize(constraint.poly, bounds);  // lhs <= rhs;
+      lhs -= constraint.rhs;                           // lhs <= 0;
+      lhs = -lhs;                                      // lhs >= 0
+      IVLOG(3, "constraint: " << lhs << " >= 0");
+      auto affine = stripe::AffineIntoMLIR(&rewriter, forOp.getOperation(), idxs, lhs);
+      auto constraintOp = rewriter.create<stripe::ConstraintOp>(op->getLoc(), affine);
+      rewriter.create<stripe::TerminateOp>(op->getLoc());
+      auto body = rewriter.createBlock(&constraintOp.ge_case());
+      rewriter.setInsertionPointToStart(body);
+    }
+
+    // LOADs
+    llvm::SmallVector<Value*, 4> inputs;
+    for (unsigned i = 0; i < refs.size(); i++) {
+      auto srcType = tensors[i]->getType();
+      if (!srcType.isa<stripe::TensorRefType>()) {
+        auto srcTensorType = convertIntoTensorType(srcType);
+        srcType = stripe::TensorRefType::get(srcTensorType);
+      }
+      auto tensorRefType = srcType.cast<stripe::TensorRefType>();
+      auto elementType = tensorRefType.getElementType();
+      auto intoType = eltwise::getRankedTensorType(elementType);
+      auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refs[i]);
+      inputs.emplace_back(loadOp.into());
     }
 
     // Combination Operation
@@ -570,7 +591,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     target.addLegalDialect<stripe::Dialect>();
     std::function<bool(Operation*)> isDynamicallyLegal = [](Operation* op) {
       IVLOG(3, "isDynamicallyLegal: " << op->getName().getStringRef().str());
-      return llvm::isa<eltwise::EltwiseOp>(op) && op->getParentOfType<stripe::ParallelForOp>();
+      return llvm::isa<eltwise::EltwiseOp>(op) &&
+             (op->getParentOfType<stripe::ParallelForOp>() || op->getParentOfType<stripe::ConstraintOp>());
     };
     target.addLegalOp<eltwise::ScalarConstantOp>();
     target.addDynamicallyLegalDialect<eltwise::Dialect>(isDynamicallyLegal);
@@ -619,13 +641,13 @@ OwningModuleRef LowerIntoStripe(ModuleOp workspace) {
   pm.addPass(mlir::createCSEPass());
   pm.addPass(LoweringPass::Create());
   pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(mlir::createCSEPass());
+  // pm.addPass(mlir::createCSEPass());
   auto result = pm.run(*module);
   if (failed(result)) {
     IVLOG(1, "LowerIntoStripe failed: " << mlir::debugString(*module->getOperation()));
     throw std::runtime_error("Lowering to stripe dialect failure");
   }
-  // IVLOG(1, "after:\n" << mlir::debugString(*module->getOperation()));
+  IVLOG(1, "after:\n" << mlir::debugString(*module->getOperation()));
   return module;
 }
 

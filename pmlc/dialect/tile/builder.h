@@ -42,9 +42,11 @@ class TileBuilder {
   std::vector<mlir::Value*> GetTupleElements(mlir::Value* value);
   std::vector<mlir::Value*> ComputeGradients(llvm::ArrayRef<mlir::Value*> wrt, mlir::Value* loss);
   mlir::Value* Clone(mlir::Value* value);
+
   mlir::Value* MakeNoneOp();
   mlir::Value* MakeStringOp(llvm::StringRef value);
   mlir::Value* MakeTupleOp(llvm::ArrayRef<mlir::Value*> elts);
+
   mlir::Value* MakeScalarConstantOp(int64_t value);
   mlir::Value* MakeScalarConstantOp(double value);
   mlir::Value* MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args);
@@ -92,6 +94,8 @@ class TileBuilder {
   mlir::Value* MakeConSumCondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
   mlir::Value* MakeConSumEqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
   mlir::Value* MakeConSumMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
+
+  void AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value* rhs);
 
   std::shared_ptr<TileProgram> MakeProgram(  //
       llvm::StringRef name,                  //
