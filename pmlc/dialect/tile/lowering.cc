@@ -591,8 +591,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     target.addLegalDialect<stripe::Dialect>();
     std::function<bool(Operation*)> isDynamicallyLegal = [](Operation* op) {
       IVLOG(3, "isDynamicallyLegal: " << op->getName().getStringRef().str());
-      return llvm::isa<eltwise::EltwiseOp>(op) &&
-             (op->getParentOfType<stripe::ParallelForOp>() || op->getParentOfType<stripe::ConstraintOp>());
+      return llvm::isa<eltwise::EltwiseOp>(op) && op->getParentOfType<stripe::ParallelForOp>();
     };
     target.addLegalOp<eltwise::ScalarConstantOp>();
     target.addDynamicallyLegalDialect<eltwise::Dialect>(isDynamicallyLegal);
@@ -641,7 +640,7 @@ OwningModuleRef LowerIntoStripe(ModuleOp workspace) {
   pm.addPass(mlir::createCSEPass());
   pm.addPass(LoweringPass::Create());
   pm.addPass(mlir::createCanonicalizerPass());
-  // pm.addPass(mlir::createCSEPass());
+  pm.addPass(mlir::createCSEPass());
   auto result = pm.run(*module);
   if (failed(result)) {
     IVLOG(1, "LowerIntoStripe failed: " << mlir::debugString(*module->getOperation()));
