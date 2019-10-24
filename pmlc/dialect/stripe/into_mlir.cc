@@ -313,7 +313,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       if (auto trefTy = from->getType().dyn_cast<TensorRefType>()) {
         // The outer tensor being refined may have hardware class indicies not reflected in the refinement;
         // these need to be added to the offsets in order for the RefineOp to work correctly.
-        if (static_cast<std::int64_t>(ref.access.size()) < trefTy.getRank()) {
+        if (static_cast<int64_t>(ref.access.size()) < trefTy.getRank()) {
           if (!zero) {
             zero = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
                                                   builder->getI64IntegerAttr(0));
