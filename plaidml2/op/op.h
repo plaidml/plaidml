@@ -75,6 +75,26 @@ inline edsl::Tensor mean(const edsl::Tensor& I, const edsl::Value& axes = edsl::
   return details::op("mean", args).as_tensor();
 }
 
+inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
+  auto args = edsl::make_tuple(I, axes, keepdims);
+  return details::op("prod", args).as_tensor();
+}
+
+inline edsl::Tensor relu(
+    const edsl::Tensor& I, 
+    const edsl::Tensor& alpha, 
+    const edsl::Tensor& max_value, 
+    const float& threshold
+) {
+  auto args = edsl::make_tuple(I, alpha, max_value, threshold);
+  return details::op("relu", args).as_tensor();
+}
+
+inline edsl::Tensor repeat(const edsl::Tensor& I, const int& repeats, const int& raw_axis) {
+  auto args = edsl::make_tuple(I, repeats, raw_axis);
+  return details::op("repeat", args).as_tensor();
+}
+
 inline edsl::Tensor reshape(const edsl::Tensor& I, const edsl::Value& dims) {
   auto args = edsl::make_tuple(I, dims);
   return details::op("reshape", args).as_tensor();
@@ -83,6 +103,16 @@ inline edsl::Tensor reshape(const edsl::Tensor& I, const edsl::Value& dims) {
 inline edsl::Tensor sigmoid(const edsl::Tensor& I) {
   auto args = edsl::make_tuple(I);
   return details::op("sigmoid", args).as_tensor();
+}
+
+inline edsl::Tensor slice(const edsl::Tensor& I, const std::vector<int>& slices) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(slices));
+  return details::op("slice", args).as_tensor();
+}
+
+inline edsl::Tensor softmax(const edsl::Tensor& I, const int& raw_axis) {
+  auto args = edsl::make_tuple(I, raw_axis);
+  return details::op("softmax", args).as_tensor();
 }
 
 inline edsl::Tensor square(const edsl::Tensor& x) {  //

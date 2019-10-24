@@ -84,6 +84,20 @@ TEST(Op, Mean) {
 )"));
 }
 
+TEST(Op, Prod) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  Program program("prod", {op::prod(A)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X0
+) {
+  _X0[] = *(A[x0, x1]);
+}
+)"));
+}
+
 TEST(Op, Sigmoid) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
   Program program("sigmoid", {op::sigmoid(A)});
@@ -101,6 +115,64 @@ TEST(Op, Sigmoid) {
   _X5 = add(_X2, _X4);
   _X6 = div(_X1, _X5);
   _X7 = ident(_X6);
+}
+)"));
+}
+
+TEST(Op, Slice) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto t = op::slice( //
+      A,                        // tensor to perform spatial padding on
+      {2, 10}                   // slices
+  );
+  Program program("slice", {t});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X0
+) {
+  _X0[] = =(A[2, 10]);
+}
+)"));
+}
+
+TEST(Op, Softmax) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  Program program("softmax", {op::softmax(A, 1)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X6
+) {
+  _X0 = ident(A);
+  _X1[x0, 0 : 10, 1] = >(_X0[x0, x1]);
+  _X2 = sub(_X0, _X1);
+  _X3 = exp(_X2);
+  _X4[x0, 0 : 10, 1] = +(_X3[x0, x1]);
+  _X5 = div(_X3, _X4);
+  _X6 = ident(_X5);
+}
+)"));
+}
+
+TEST(Op, SpatialPadding) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {64, 4, 32, 32}, "A");
+  auto t = op::spatial_padding( //
+      A,                        // tensor to perform spatial padding on
+      {1, 3},                   // low pads
+      {3, 3},                   // high pads
+      "nchw"                    // data layout
+  );
+  Program program("spatial_padding", {t});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1, A_2, A_3]
+) -> (
+  _X0
+) {
+  _X0[n, c, 1 + x0, 3 + x1 : 64, 4, 36, 38] = =(A[n, c, x0, x1]);
 }
 )"));
 }
@@ -149,6 +221,56 @@ TEST(Op, Squeeze) {
   _X0 = 32;
   _X1 = 4;
   _X2 = reshape(A, _X0, _X1);
+}
+)"));
+}
+
+TEST(Op, Relu) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
+  auto r = op::relu( //
+      I,             // tensor to run relu on
+      A,             // alpha
+      M,             // max value
+      0.05           // threshold
+  );
+  Program program("relu", {r});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1],
+  A[A_0, A_1],
+  M[M_0, M_1]
+) -> (
+  _X7
+) {
+  _X0 = 0.050000;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = 0.050000;
+  _X3 = sub(I, _X2);
+  _X4 = mul(A, _X3);
+  _X5 = cond(_X1, _X4, I);
+  _X6 = cmp_lt(_X5, M);
+  _X7 = cond(_X6, _X5, M);
+}
+)"));
+}
+
+TEST(Op, Repeat) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
+  auto t = op::repeat( //
+      A,              // tensor to repeat
+      3,              // number of repeats
+      2               // axis to repeat
+  );
+  Program program("repeat", {t});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1, A_2, A_3]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, 3*x2 + x4, x3 : 32, 1, 12, 1] = =(A[x0, x1, x2, x3]), x4 < 3;
 }
 )"));
 }
