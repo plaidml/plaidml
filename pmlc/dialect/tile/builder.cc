@@ -434,6 +434,7 @@ void TileBuilder::AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value
   auto src = &region.front();
   OpBuilder builder(src->getTerminator());
 
+  // Get a backward slice to trace the transitive defs of the lhs and rhs.
   auto& info = impl->domains[domainOp];
   llvm::SetVector<mlir::Value*> values;
   values.insert(lhs);
@@ -441,66 +442,25 @@ void TileBuilder::AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value
   auto slice = util::getBackwardSlice(values, false, [](Value* value) {  //
     return value->getType().isa<IndexType>();
   });
-  // Find and replace each AffineIndexOp with a BlockArgument of the domain op
-  // std::queue<mlir::Value*> worklist;
+
+  // Previously, some values will have already been cloned into the AffineDomainOp
+  // However, there might be other ops that this constraint introduced that needs
+  // to be cloned into the AffineDomainOp.
   for (auto value : slice) {
-    // if (auto idx_op = llvm::dyn_cast<AffineIndexOp>(op)) {
-    //   auto arg = body->addArgument(idx_op.getType());
-    //   info.mapping.map(value, arg);
-    //   worklist.push(value);
-    // }
-    // auto newValue = info.mapping.lookupOrNull(value);
     if (!info.mapping.contains(value)) {
-      IVLOG(1, "move: " << mlir::debugString(*value));
+      IVLOG(5, "clone: " << mlir::debugString(*value));
       auto op = value->getDefiningOp();
       auto newValue = builder.clone(*op, info.mapping)->getResult(0);
       info.mapping.map(value, newValue);
     }
   }
-  // Move across only the values/ops that depend on AffineIndexOps
-  // First determine the transitive users of AffineIndexOps
-  // std::set<Value*> belong;
-  // while (worklist.size()) {
-  //   auto value = worklist.front();
-  //   worklist.pop();
-  //   for (auto user : value->getUsers()) {
-  //     auto user_value = user->getResult(0);
-  //     if (!belong.count(user_value)) {
-  //       belong.insert(user_value);
-  //       worklist.push(user_value);
-  //     }
-  //   }
-  // }
-  // Now move across ops but do so in topologically sorted order
-  // OpBuilder domain_builder(body);
-  // for (auto value : slice) {
-  //   auto op = value->getDefiningOp();
-  //   if (belong.count(value) ||                    //
-  //       llvm::isa<AffineSourceIndexMapOp>(op) ||  //
-  //       llvm::isa<AffineSinkIndexMapOp>(op) ||    //
-  //       llvm::isa<AffineSizeMapOp>(op)) {
-  //     auto new_value = domain_builder.clone(*op, info.mapping)->getResult(0);
-  //     info.mapping.map(value, new_value);
-  //   }
-  // }
 
-  // for (auto value : slice) {
-  //   IVLOG(1, "slice: " << mlir::debugString(*value));
-  // }
-
+  // Create the ConstraintOp as a parent of the existing terminator.
   auto constraintOp = builder.create<ConstraintOp>(op->getLoc(), info.mapping.lookup(lhs), info.mapping.lookup(rhs));
   auto it = std::prev(src->end(), 1);
-  // auto itEnd = std::prev(src->end(), 1);
   auto block = builder.createBlock(&constraintOp.body());
   auto& dst = block->getOperations();
-  for (auto xx = it; xx != src->end(); xx++) {
-    IVLOG(1, "xx: " << mlir::debugString(*xx));
-  }
   dst.splice(dst.end(), src->getOperations(), it, src->end());
-  IVLOG(1, "after: " << mlir::debugString(*op));
-  // block.splice(block->getOperations().end(), body->getOperations(), it, body->end());
-  // block->getOperations().splice(where, l2, first, last);
-  // return impl->builder.create<AffineSizeMapOp>(impl->builder.getUnknownLoc(), sizes).result();
 }
 
 #define DEFINE_CONTRACTION_OPS(_agg_op_)                                                                    \
