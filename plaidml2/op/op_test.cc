@@ -33,6 +33,26 @@ class Environment : public ::testing::Environment {
   return 0;
 }();
 
+TEST(Op, abs) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto abs = op::abs(I);
+  IVLOG(1, "Abs done");
+  Program program("abs", {abs});
+  IVLOG(1, program);
+
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X3
+) {
+  _X0 = 0.000000;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = neg(I);
+  _X3 = cond(_X1, _X2, I);
+}
+)"));
+}
+
 TEST(Op, Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
