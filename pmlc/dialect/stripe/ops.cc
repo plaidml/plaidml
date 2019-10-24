@@ -248,6 +248,17 @@ bool ParseSimple(OpAsmParser* p, OperationState* res, llvm::SmallVectorImpl<OpAs
   return r;
 }
 
+void ParallelForOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {
+  result.addAttribute("ranges", builder->getI64ArrayAttr(ranges));
+  auto region = result.addRegion();
+  Block* body = new Block();
+  for (size_t i = 0; i < ranges.size(); i++) {
+    body->addArgument(AffineType::get(builder->getContext()));
+  }
+  region->push_back(body);
+  ensureTerminator(*region, *builder, result.location);
+}
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stripe/ops.cc.inc"
 

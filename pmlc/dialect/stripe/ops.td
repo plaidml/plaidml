@@ -16,6 +16,15 @@ def TensorTypeAttr : TypeAttrBase<"TensorType", "tensor type attribute">;
 class StripeOp<string mnemonic, list<OpTrait> traits = []> :
     Op<StripeDialect, mnemonic, traits>;
 
+def TerminateOp : StripeOp<"terminate", [Terminator]> {
+  let summary = "A block terminator since MLIR requires one";
+  let parser = [{ return mlir::success(); }];
+  let printer = [{ p << getOperationName(); }];
+}
+
+def ImplicitTerminator
+    : SingleBlockImplicitTerminator<"TerminateOp">;
+
 def AllocateOp : StripeOp<"alloc"> {
   let summary = "Allocate a new tensor and set its intial shape / size";
   let arguments = (ins TensorTypeAttr:$layout);
@@ -169,6 +178,13 @@ def AffineConstOp : AffineOp<"affine_const"> {
 def AffineMulOp : AffineOp<"affine_mul"> {
   let summary = "Multiply an affine by a constant value";
   let arguments = (ins AffineType:$input, I64Attr:$scale);
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, Value* input, int64_t scale", [{
+      result.addOperands(input);
+      result.addAttribute("scale", builder->getI64IntegerAttr(scale));
+      result.addTypes(AffineType::get(builder->getContext()));
+    }]
+  >];
   let printer = [{ PrintSimple(getOperation(), &p, 1, {"scale"}, Type(), false); }];
   let parser = [{
     auto aff_type = AffineType::get(parser.getBuilder().getContext());
@@ -188,6 +204,14 @@ def AffineMulOp : AffineOp<"affine_mul"> {
 def AffineAddOp : AffineOp<"affine_add"> {
   let summary = "Add multiple affines together";
   let arguments = (ins Variadic<AffineType>:$inputs); 
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, Value* a, Value* b", [{
+      result.addOperands(a);
+      result.addOperands(b);
+      result.addTypes(AffineType::get(builder->getContext()));
+    }]
+  >];
   let printer = [{ PrintSimple(getOperation(), &p, 0, {}, Type(), true); }];
   let parser = [{
     auto aff_type = AffineType::get(parser.getBuilder().getContext());
@@ -204,12 +228,15 @@ def AffineAddOp : AffineOp<"affine_add"> {
   let hasCanonicalizer = 1;
 }
 
-def ParallelForOp : StripeOp<"parallel_for"> {
+def ParallelForOp : StripeOp<"parallel_for", [ImplicitTerminator]> {
   let summary = "Parallel for loop";
   // At some point, we should be able to dynamically control ranges
   // Variadic<IntegerType>:$dyn_ranges
   let arguments = (ins I64ArrayAttr:$ranges);
   let regions = (region SizedRegion<1>:$inner);
+  let builders = [
+    OpBuilder<"Builder *builder, OperationState &result, ArrayRef<int64_t> ranges">
+  ];
   let printer = [{
     p << getOperation()->getName() << " (";
     llvm::SmallVector<StringRef, 8> skip;
@@ -229,9 +256,8 @@ def ParallelForOp : StripeOp<"parallel_for"> {
       }
     }
     p << ")";
-    p.printNewline(1);
-    p.printOptionalAttrDict(getOperation()->getAttrs(), skip);
     p.printRegion(inner());
+    p.printOptionalAttrDict(getOperation()->getAttrs(), skip);
   }];
   let parser = [{
     bool r = false;
@@ -258,18 +284,33 @@ def ParallelForOp : StripeOp<"parallel_for"> {
         ranges.push_back(idx_range);
       }  
     }
-    r = r || parser.parseOptionalAttributeDict(result.attributes);
     auto ranges_attr = ArrayAttr::get(ranges, ctx);
     auto idx_names_attr = ArrayAttr::get(idx_names, ctx);
     result.attributes.emplace_back(mlir::Identifier::get("ranges", ctx), ranges_attr);
     result.attributes.emplace_back(mlir::Identifier::get("idx_names", ctx), idx_names_attr);
     result.regions.emplace_back(new Region(nullptr));
     r = r || parser.parseRegion(*result.regions.back(), {}, {}, false);
+    r = r || parser.parseOptionalAttributeDict(result.attributes);
     return mlir::failure(r);
+  }];
+  let extraClassDeclaration = [{
+    int64_t getRange(unsigned i) {
+      return ranges().getValue()[i].cast<IntegerAttr>().getInt();
+    }
+    /*
+    void setRanges(unsigned i, ArrayRef<int64_t> ranges) {
+      Builder b(getContext());
+      setAttribute("ranges", b.getI64ArrayAttr(ranges)
+    }
+    */
+    Block *getBody() { return &inner().front(); }
+    OpBuilder getBodyBuilder() {
+      return OpBuilder(getBody(), std::prev(getBody()->end()));
+    }
   }];
 }
 
-def ConstraintOp : StripeOp<"constraint"> {
+def ConstraintOp : StripeOp<"constraint", [ImplicitTerminator]> {
   let arguments = (ins AffineType:$input);
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
   let printer = [{
@@ -349,11 +390,6 @@ def PrngStepOp : SpecialOp<"prng_step", 2, 1> {
   );
 }
 
-def TerminateOp : StripeOp<"terminate", [Terminator]> {
-  let summary = "A block terminator since MLIR requires one";
-  let parser = [{ return mlir::success(); }];
-  let printer = [{ p << getOperationName(); }];
-}
 
 def ExecuteOnOp : StripeOp<"execute_on", [Terminator, HasParent<"ParallelForOp">]> {
   let summary = "Indicates where a ParallelForOp should execute";
