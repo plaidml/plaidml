@@ -106,9 +106,24 @@ inline edsl::Tensor spatial_padding(  //
   return details::op("spatial_padding", edsl::Value(args)).as_tensor();
 }
 
+inline edsl::Tensor squeeze(const edsl::Tensor& I, const std::vector<int>& raw_axes) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(raw_axes));
+  return details::op("squeeze", args).as_tensor();
+}
+
 inline edsl::Tensor sum(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
   auto args = edsl::make_tuple(I, axes, keepdims);
   return details::op("sum", args).as_tensor();
+}
+
+inline edsl::Tensor tile(const edsl::Tensor& I, const std::vector<int>& tiling_factors) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(tiling_factors));
+  return details::op("tile", args).as_tensor();
+}
+
+inline edsl::Tensor transpose(const edsl::Tensor& I, const edsl::Value& axes = edsl::None()) {
+  auto args = edsl::make_tuple(I, axes);
+  return details::op("transpose", args).as_tensor();
 }
 
 inline edsl::Tensor variance(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
