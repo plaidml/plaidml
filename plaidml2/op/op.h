@@ -80,12 +80,8 @@ inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::
   return details::op("prod", args).as_tensor();
 }
 
-inline edsl::Tensor relu(
-    const edsl::Tensor& I, 
-    const edsl::Tensor& alpha, 
-    const edsl::Tensor& max_value, 
-    const float& threshold
-) {
+inline edsl::Tensor relu(const edsl::Tensor& I, const edsl::Tensor& alpha, const edsl::Tensor& max_value,
+                         const float& threshold) {
   auto args = edsl::make_tuple(I, alpha, max_value, threshold);
   return details::op("relu", args).as_tensor();
 }

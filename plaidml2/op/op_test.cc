@@ -102,12 +102,11 @@ TEST(Op, Relu) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
-  auto r = op::relu( //
-      I,             // tensor to run relu on
-      A,             // alpha
-      M,             // max value
-      0.05           // threshold
-  );
+  auto r = op::relu(  //
+      I,              // tensor to run relu on
+      A,              // alpha
+      M,              // max value
+      0.05);          // threshold
   Program program("relu", {r});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -131,11 +130,10 @@ TEST(Op, Relu) {
 
 TEST(Op, Repeat) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
-  auto t = op::repeat( //
-      A,              // tensor to repeat
-      3,              // number of repeats
-      2               // axis to repeat
-  );
+  auto t = op::repeat(  //
+      A,                // tensor to repeat
+      3,                // number of repeats
+      2);               // axis to repeat
   Program program("repeat", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -189,10 +187,9 @@ TEST(Op, Sigmoid) {
 
 TEST(Op, Slice) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  auto t = op::slice( //
-      A,                        // tensor to perform spatial padding on
-      {2, 10}                   // slices
-  );
+  auto t = op::slice(  //
+      A,               // tensor to perform spatial padding on
+      {2, 10});        // slices
   Program program("slice", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -227,12 +224,11 @@ TEST(Op, Softmax) {
 
 TEST(Op, SpatialPadding) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {64, 4, 32, 32}, "A");
-  auto t = op::spatial_padding( //
-      A,                        // tensor to perform spatial padding on
-      {1, 3},                   // low pads
-      {3, 3},                   // high pads
-      "nchw"                    // data layout
-  );
+  auto t = op::spatial_padding(  //
+      A,                         // tensor to perform spatial padding on
+      {1, 3},                    // low pads
+      {3, 3},                    // high pads
+      "nchw");                   // data layout
   Program program("spatial_padding", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -275,10 +271,9 @@ TEST(Op, Sum) {
 
 TEST(Op, Squeeze) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
-  auto t = op::squeeze( //
-      A,             // tensor to squeeze
-      {1, 3}         // axes to squeeze
-  );
+  auto t = op::squeeze(  //
+      A,                 // tensor to squeeze
+      {1, 3});           // axes to squeeze
   Program program("squeeze", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -295,10 +290,9 @@ TEST(Op, Squeeze) {
 
 TEST(Op, Tile) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  auto t = op::tile( //
-      A,             // tensor to tile
-      {5, 4}         // tiling factors
-  );
+  auto t = op::tile(  //
+      A,              // tensor to tile
+      {5, 4});        // tiling factors
   Program program("tile", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
