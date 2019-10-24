@@ -25,8 +25,8 @@ namespace stripe {
 void createMainParallelFor(mlir::FuncOp funcOp) {
   auto& region = funcOp.getBody();
   OpBuilder builder(region);
-  auto body = region.begin();
-  auto it = body->begin();
+  auto src = &region.front();
+  auto it = src->begin();
   auto forOp = builder.create<ParallelForOp>(funcOp.getLoc(), builder.getI64ArrayAttr({}));
   auto attrs = llvm::SmallVector<NamedAttribute, 1>{
       {builder.getIdentifier("main"), builder.getUnitAttr()},
@@ -34,9 +34,10 @@ void createMainParallelFor(mlir::FuncOp funcOp) {
   forOp.setAttr(dialect::stripe::Dialect::getStripeAttrsName(), builder.getDictionaryAttr(attrs));
   forOp.setAttr("name", builder.getStringAttr("main"));
   auto block = builder.createBlock(&forOp.inner());
-  block->getOperations().splice(block->getOperations().end(), body->getOperations(), it, body->end());
+  auto& dst = block->getOperations();
+  dst.splice(dst.end(), src->getOperations(), it, src->end());
 
-  builder.setInsertionPointToEnd(&region.front());
+  builder.setInsertionPointToEnd(src);
   builder.create<TerminateOp>(funcOp.getLoc());
 }
 

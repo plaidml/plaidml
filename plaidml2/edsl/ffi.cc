@@ -926,6 +926,9 @@ void plaidml_expr_contraction_add_constraint(  //
     if (!expr) {
       throw std::runtime_error("add_constraint can only be specified on a contraction.");
     }
+    if (use_mlir()) {
+      GlobalContext::get()->AddConstraint(expr->value, lhs->value, rhs->value);
+    }
     auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
     if (!cion) {
       throw std::runtime_error("add_constraint can only be specified on a contraction.");

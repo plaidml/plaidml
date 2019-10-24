@@ -48,7 +48,7 @@ struct Constraints {
 };
 
 struct Contraction {
-  explicit Contraction(ContractionOp op);
+  explicit Contraction(ContractionOp op, llvm::ArrayRef<ConstraintOp> constraintOps);
 
   std::tuple<IndexBounds, SimpleConstraints> ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes);
 
