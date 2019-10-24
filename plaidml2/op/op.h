@@ -81,12 +81,12 @@ inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::
 }
 
 inline edsl::Tensor relu(const edsl::Tensor& I, const edsl::Tensor& alpha, const edsl::Tensor& max_value,
-                         const float& threshold) {
+                         float threshold) {
   auto args = edsl::make_tuple(I, alpha, max_value, threshold);
   return details::op("relu", args).as_tensor();
 }
 
-inline edsl::Tensor repeat(const edsl::Tensor& I, const int& repeats, const int& raw_axis) {
+inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int raw_axis) {
   auto args = edsl::make_tuple(I, repeats, raw_axis);
   return details::op("repeat", args).as_tensor();
 }
@@ -106,7 +106,7 @@ inline edsl::Tensor slice(const edsl::Tensor& I, const std::vector<int>& slices)
   return details::op("slice", args).as_tensor();
 }
 
-inline edsl::Tensor softmax(const edsl::Tensor& I, const int& raw_axis) {
+inline edsl::Tensor softmax(const edsl::Tensor& I, int raw_axis) {
   auto args = edsl::make_tuple(I, raw_axis);
   return details::op("softmax", args).as_tensor();
 }
