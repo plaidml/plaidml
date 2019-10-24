@@ -133,6 +133,26 @@ TEST(Op, Sum) {
 )"));
 }
 
+TEST(Op, Squeeze) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
+  auto t = op::squeeze( //
+      A,             // tensor to squeeze
+      {1, 3}         // axes to squeeze
+  );
+  Program program("squeeze", {t});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1, A_2, A_3]
+) -> (
+  _X2
+) {
+  _X0 = 32;
+  _X1 = 4;
+  _X2 = reshape(A, _X0, _X1);
+}
+)"));
+}
+
 TEST(Op, Reshape) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   TensorDim I, J;
@@ -147,6 +167,38 @@ TEST(Op, Reshape) {
   _X0 = 20;
   _X1 = 10;
   _X2 = reshape(A, _X0, _X1);
+}
+)"));
+}
+
+TEST(Op, Tile) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto t = op::tile( //
+      A,             // tensor to tile
+      {5, 4}         // tiling factors
+  );
+  Program program("tile", {t});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X0
+) {
+  _X0[x0 + 10*x2, x1 + 20*x3 : 50, 80] = =(A[x0, x1]) no_defract;
+}
+)"));
+}
+
+TEST(Op, Transpose) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  Program program("transpose", {op::transpose(A)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X0
+) {
+  _X0[x1, x0 : 20, 10] = =(A[x0, x1]);
 }
 )"));
 }
