@@ -26,9 +26,6 @@ def TerminateOp : StripeOpWithPP<"terminate", [Terminator]> {
   let summary = "A block terminator since MLIR requires one";
 }
 
-def ImplicitTerminator
-    : SingleBlockImplicitTerminator<"TerminateOp">;
-
 def AllocateOp : StripeOpWithPP<"alloc"> {
   let summary = "Allocate a new tensor and set its intial shape / size";
   let arguments = (ins TensorTypeAttr:$layout);
@@ -115,7 +112,7 @@ def AffineAddOp : AffineOp<"affine_add"> {
   let hasCanonicalizer = 1;
 }
 
-def ParallelForOp : StripeOpWithPP<"parallel_for", [ImplicitTerminator]> {
+def ParallelForOp : StripeOpWithPP<"parallel_for"> {
   let summary = "Parallel for loop";
   // At some point, we should be able to dynamically control ranges
   // Variadic<IntegerType>:$dyn_ranges
@@ -135,7 +132,7 @@ def ParallelForOp : StripeOpWithPP<"parallel_for", [ImplicitTerminator]> {
   }];
 }
 
-def ConstraintOp : StripeOpWithPP<"constraint", [ImplicitTerminator]> {
+def ConstraintOp : StripeOpWithPP<"constraint"> {
   let arguments = (ins AffineType:$input);
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
 }

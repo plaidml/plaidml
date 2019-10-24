@@ -198,11 +198,10 @@ func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32
 // CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
 // CHECK-SAME: %arg1: !fp32_3 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[5:100], addr[5:20], addr[20:1])">, stripe.name = "_X1"}
 // CHECK-NEXT: attributes  {inputs = 1 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
-// CHECK-NEXT:   stripe.parallel_for ()
-// CHECK-NEXT:      {name = "main", stripe_attrs = {main = unit}} {
+// CHECK-NEXT:   stripe.parallel_for () {
 // CHECK:          "stripe.reshape"(%arg1, %arg0) : (!fp32_3, !fp32_2) -> ()
 // CHECK-NEXT:     stripe.terminate
-// CHECK-NEXT:   }
+// CHECK-NEXT:   } {name = "main", stripe_attrs = {main = unit}}
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
 

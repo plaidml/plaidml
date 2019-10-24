@@ -465,7 +465,9 @@ void ParallelForOp::build(Builder* builder, OperationState& result, ArrayRef<int
     body->addArgument(AffineType::get(builder->getContext()));
   }
   region->push_back(body);
-  ensureTerminator(*region, *builder, result.location);
+  OperationState state(result.location, TerminateOp::getOperationName());
+  TerminateOp::build(builder, state);
+  body->push_back(Operation::create(state));
 }
 
 static void printConstraintOp(OpAsmPrinter& p, ConstraintOp op) {  // NOLINT
