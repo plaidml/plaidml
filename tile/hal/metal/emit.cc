@@ -155,11 +155,11 @@ class Emitter : public sem::Visitor {
   }
 
   void Visit(const sem::CondExpr& node) {  //
-    Select(node.cond, node.tcase, node.fcase);
+    Select(node.type, node.cond, node.tcase, node.fcase);
   }
 
   void Visit(const sem::SelectExpr& node) {  //
-    Select(node.cond, node.tcase, node.fcase);
+    Select(node.type, node.cond, node.tcase, node.fcase);
   }
 
   void Visit(const sem::Block& node) {
@@ -403,16 +403,17 @@ class Emitter : public sem::Visitor {
   }
 
  private:
-  void Select(const sem::ExprPtr& cond, const sem::ExprPtr& tcase, const sem::ExprPtr& fcase) {
+  void Select(const sem::Type& result_type, const sem::ExprPtr& cond, const sem::ExprPtr& tcase, const sem::ExprPtr& fcase) {
     auto tcase_type = TypeOf(tcase);
     auto fcase_type = TypeOf(fcase);
     auto cond_type = TypeOf(cond);
     auto tgt_type = lang::Promote({tcase_type, fcase_type});
     tgt_type.vec_width = std::max(tgt_type.vec_width, cond_type.vec_width);
+    const_cast<sem::Type&>(result_type).vec_width = tgt_type.vec_width;
     emit("select(");
-    EmitWithTypeConversion(fcase_type, tgt_type, fcase, true);
+    EmitWithTypeConversion(fcase_type, result_type, fcase, true);
     emit(", ");
-    EmitWithTypeConversion(tcase_type, tgt_type, tcase, true);
+    EmitWithTypeConversion(tcase_type, result_type, tcase, true);
     emit(", ");
     EmitWithWidthConversion(cond_type, tgt_type, cond, true);
     emit(")");

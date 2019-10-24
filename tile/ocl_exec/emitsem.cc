@@ -90,7 +90,7 @@ sem::ExprPtr SemtreeEmitter::default_intrinsic_emitter(const stripe::Intrinsic& 
              in.name == "as_bool") {
     opexpr = in_val(0);
   } else if (in.name == "cond") {
-    opexpr = _Cond(in_val(0, false), in_val(1), in_val(2));
+    opexpr = _Cond(in_val(0, false), in_val(1), in_val(2), {sem::Type::VALUE, in.type, 1, 0});
   } else if (in.name == "neg") {
     opexpr = -in_val(0);
   } else if (in.name == "bit_not") {

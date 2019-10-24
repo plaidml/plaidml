@@ -143,7 +143,9 @@ struct CondExpr : public Expression {
   ExprPtr cond;
   ExprPtr tcase;
   ExprPtr fcase;
-  CondExpr(ExprPtr c, ExprPtr t, ExprPtr f) : cond(c), tcase(t), fcase(f) {}
+  Type type;
+  CondExpr(ExprPtr c, ExprPtr t, ExprPtr f) : cond(c), tcase(t), fcase(f), type({Type::VALUE, DataType::FLOAT32, 1, 0}) {}
+  CondExpr(ExprPtr c, ExprPtr t, ExprPtr f, Type ty) : cond(c), tcase(t), fcase(f), type(ty) {}
   void Accept(Visitor&) const final;
 };
 
@@ -152,7 +154,9 @@ struct SelectExpr : public Expression {
   ExprPtr cond;
   ExprPtr tcase;
   ExprPtr fcase;
-  SelectExpr(ExprPtr c, ExprPtr t, ExprPtr f) : cond(c), tcase(t), fcase(f) {}
+  Type type;
+  SelectExpr(ExprPtr c, ExprPtr t, ExprPtr f) : cond(c), tcase(t), fcase(f), type({Type::VALUE, DataType::FLOAT32, 1, 0}) {}
+  SelectExpr(ExprPtr c, ExprPtr t, ExprPtr f, Type ty) : cond(c), tcase(t), fcase(f), type(ty) {}
   void Accept(Visitor&) const final;
 };
 
