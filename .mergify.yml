@@ -3,7 +3,6 @@ pull_request_rules:
     conditions:
       - "#approved-reviews-by>=1"
       - "#changes-requested-reviews-by=0"
-      - "#review-requested=0"
       - status-success=buildkite/plaidml-plaidml/pr
       - base=master
     actions:

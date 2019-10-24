@@ -130,6 +130,9 @@ lang::RunInfo LoadPow(const std::string& name,  //
 lang::RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
                                  const LogicalShape& input);
 
+lang::RunInfo LoadBatchNormalization(const std::string& name,  //
+                                      const LogicalShape& input);
+
 lang::RunInfo LoadPolygonBoxTransform(const std::string& name,  //
                                       const LogicalShape& input);
 
