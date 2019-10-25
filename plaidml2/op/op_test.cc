@@ -127,6 +127,115 @@ TEST(Op, Argmax) {
 )"));
 }
 
+TEST(Op, BinaryCrossentropy) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto O = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "O");
+  float epsilon = 0;
+  auto binary_crossentropy = op::binary_crossentropy(I, O, epsilon);
+  IVLOG(1, "binary_crossentropy done");
+  Program program("binary_crossentropy", {binary_crossentropy});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3],
+  O[O_0, O_1, O_2, O_3]
+) -> (
+  _X17
+) {
+  _X0 = ident(I);
+  _X1 = 0.000000;
+  _X2 = cmp_gt(O, _X1);
+  _X3 = cond(_X2, O, _X1);
+  _X4 = 1.000000;
+  _X5 = cmp_lt(_X3, _X4);
+  _X6 = cond(_X5, _X3, _X4);
+  _X7 = neg(_X0);
+  _X8 = log(_X6);
+  _X9 = mul(_X7, _X8);
+  _X10 = 1;
+  _X11 = sub(_X10, _X0);
+  _X12 = 1;
+  _X13 = sub(_X12, _X6);
+  _X14 = log(_X13);
+  _X15 = mul(_X11, _X14);
+  _X16 = sub(_X9, _X15);
+  _X17 = ident(_X16);
+}
+)"));
+}
+
+TEST(Op, Clip) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto raw_min = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "raw_min");
+  auto raw_max = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "raw_max");
+  auto clip = op::clip(I, raw_min, raw_max);
+  IVLOG(1, "clip done");
+  Program program("clip", {clip});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3],
+  raw_min[raw_min_0, raw_min_1, raw_min_2, raw_min_3],
+  raw_max[raw_max_0, raw_max_1, raw_max_2, raw_max_3]
+) -> (
+  _X3
+) {
+  _X0 = cmp_gt(I, raw_min);
+  _X1 = cond(_X0, I, raw_min);
+  _X2 = cmp_lt(_X1, raw_max);
+  _X3 = cond(_X2, _X1, raw_max);
+}
+)"));
+}
+
+TEST(Op, CumProd) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto cumprod = op::cumprod(I, 2);
+  IVLOG(1, "cumprod done");
+  Program program("cumprod", {cumprod});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, x2, x4 : 7, 7, 3, 64] = *(I[x0, x1, x2 - x3, x4]), x3 < 3;
+}
+)"));
+}
+
+TEST(Op, CumSum) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto cumsum = op::cumsum(I, 2);
+  IVLOG(1, "cumsum done");
+  Program program("cumsum", {cumsum});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, x2, x4 : 7, 7, 3, 64] = +(I[x0, x1, x2 - x3, x4]), x3 < 3;
+}
+)"));
+}
+
+TEST(Op, Dot) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
+  auto dot = op::dot(I, K);
+  IVLOG(1, "dot done");
+  Program program("dot", {dot});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3],
+  K[K_0, K_1, K_2, K_3]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, x2, x4, x5, x6 : 7, 7, 3, 7, 7, 64] = +(I[x0, x1, x2, x3] * K[x4, x5, x3, x6]);
+}
+)"));
+}
+
 TEST(Op, Max) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto max = op::max(I);  // NOLINT(build/include_what_you_use)
