@@ -36,19 +36,36 @@ static ScalarType DataTypeIntoMLIR(mlir::MLIRContext* ctx, DataType dtype) {  //
   return ScalarType::get(ctx, dtype);
 }
 
+static mlir::Identifier GetDevClass(MLIRContext* ctx, const stripe::Device& dev, size_t dev_idx) {
+  return mlir::Identifier::get(llvm::formatv("{0}_{1}", dev.name, dev_idx).str(), ctx);
+}
+
 static mlir::Identifier GetDevClass(MLIRContext* ctx, const stripe::Device& dev, size_t dev_idx, size_t unit_idx) {
   return mlir::Identifier::get(llvm::formatv("{0}_{1}_{2}", dev.name, dev_idx, unit_idx).str(), ctx);
 }
 
-static TensorType ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape, const stripe::Location& loc) {
-  ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
-  llvm::SmallVector<TensorDim, 8> dims;
+template <typename OutputIterator>
+static void LocationIntoTensorDims(MLIRContext* ctx, const stripe::Location& loc, OutputIterator out) {
+  // N.B. Locations in Stripe Classic logically reference an abstract executor space, in which size and
+  // stride are not well-specified, so we leave them undefined after translation to MLIR, and ignore
+  // them on translation back to Stripe Classic.
+
   for (size_t dev_idx = 0; dev_idx < loc.devs.size(); ++dev_idx) {
     const auto& dev = loc.devs.at(dev_idx);
-    for (size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
-      dims.emplace_back(TensorDim{0, 0, GetDevClass(ctx, dev, dev_idx, unit_idx)});
+    if (!dev.units.size()) {
+      *out++ = TensorDim{0, 0, GetDevClass(ctx, dev, dev_idx)};
+    } else {
+      for (size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
+        *out++ = TensorDim{0, 0, GetDevClass(ctx, dev, dev_idx, unit_idx)};
+      }
     }
   }
+}
+
+static TensorType ShapeIntoTensorType(MLIRContext* ctx, const TensorShape& shape, const stripe::Location& loc) {
+  ScalarType dtype = DataTypeIntoMLIR(ctx, shape.type);
+  auto dims = llvm::SmallVector<TensorDim, 8>{};
+  LocationIntoTensorDims(ctx, loc, std::back_inserter(dims));
   for (const auto& dim : shape.dims) {
     dims.emplace_back(
         TensorDim{static_cast<int64_t>(dim.size), dim.stride, mlir::Identifier::get(kAddressClassIdentifier, ctx)});
@@ -158,11 +175,15 @@ static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const S
   }
   for (size_t dev_idx = 0; dev_idx < loc.devs.size(); ++dev_idx) {
     const auto& dev = loc.devs.at(dev_idx);
-    for (size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
-      const auto& unit = dev.units.at(unit_idx);
-      offsets.emplace_back(AffineIntoMLIR(builder, nullptr, idxs, unit));
-      if (any_non_zero_offsets && (!unit.isConstant() || unit.constant() != 0)) {
-        *any_non_zero_offsets = true;
+    if (!dev.units.size()) {
+      offsets.emplace_back(AffineIntoMLIR(builder, nullptr, idxs, 0));
+    } else {
+      for (size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
+        const auto& unit = dev.units.at(unit_idx);
+        offsets.emplace_back(AffineIntoMLIR(builder, nullptr, idxs, unit));
+        if (any_non_zero_offsets && (!unit.isConstant() || unit.constant() != 0)) {
+          *any_non_zero_offsets = true;
+        }
       }
     }
   }
@@ -272,17 +293,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // Process the block's execution location.
   mlir::Value* executor = nullptr;
   if (!block.location.empty()) {
-    std::vector<TensorDim> dims;
-    for (size_t dev_idx = 0; dev_idx < block.location.devs.size(); ++dev_idx) {
-      const auto& dev = block.location.devs.at(dev_idx);
-      for (size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
-        auto cls = llvm::formatv("{0}_{1}_{2}", dev.name, dev_idx, unit_idx).str();
-        // N.B. Locations in Stripe Classic logically reference an abstract executor space, in which size and
-        // stride are not well-specified, so we leave them undefined after translation to MLIR, and ignore
-        // them on translation back to Stripe Classic.
-        dims.emplace_back(TensorDim{0, 0, GetDevClass(builder->getContext(), dev, dev_idx, unit_idx)});
-      }
-    }
+    auto dims = llvm::SmallVector<TensorDim, 8>{};
+    LocationIntoTensorDims(builder->getContext(), block.location, std::back_inserter(dims));
     auto tensorType = TensorType::get(builder->getType<ExecutorType>(), dims, OffsetsMap{}, true);
     auto allocOp = builder->create<AllocateOp>(unknownLoc, tensorType);
     bool any_non_zero_offsets = false;
