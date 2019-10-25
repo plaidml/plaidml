@@ -127,6 +127,22 @@ TEST(Op, argmax) {
 )"));
 }
 
+TEST(Op, max) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto max = op::max(I);  // NOLINT(build/include_what_you_use)
+  IVLOG(1, "max done");
+  Program program("max", {max});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X0
+) {
+  _X0[] = >(I[x0, x1, x2, x3]);
+}
+)"));
+}
+
 TEST(Op, Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
