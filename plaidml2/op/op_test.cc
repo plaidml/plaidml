@@ -231,7 +231,7 @@ TEST(Op, Squeeze) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
   auto t = op::squeeze(  //
       A,                 // tensor to squeeze
-      {1, 3} /* axes to squeeze*/);
+      {1, 3});           // axes to squeeze
   Program program("squeeze", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -268,7 +268,7 @@ TEST(Op, Tile) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   auto t = op::tile(  //
       A,              // tensor to tile
-      {5, 4} /* tiling factors*/);
+      {5, 4});        // tiling factors
   Program program("tile", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
