@@ -50,12 +50,12 @@ inline edsl::Tensor argmax(const edsl::Tensor& I, const edsl::Value& axes = edsl
   return details::op("argmax", args).as_tensor();
 }
 
-inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tensor& O, const float epsilon) {
+inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tensor& O, float epsilon) {
   auto args = edsl::make_tuple(I, O, epsilon);
   return details::op("binary_crossentropy", args).as_tensor();
 }
 
-inline edsl::Tensor clip(const edsl::Tensor& I, const edsl::Tensor raw_min, const edsl::Tensor raw_max) {
+inline edsl::Tensor clip(const edsl::Tensor& I, const edsl::Tensor& raw_min, const edsl::Tensor& raw_max) {
   auto args = edsl::make_tuple(I, raw_min, raw_max);
   return details::op("clip", args).as_tensor();
 }
