@@ -88,6 +88,62 @@ TEST(Op, Convolution) {
 )"));
 }
 
+TEST(Op, HardSigmoid) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  Program program("hard_sigmoid", {op::hard_sigmoid(A, 0.05)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X11
+) {
+  _X0 = -10.000000;
+  _X1 = cmp_lt(A, _X0);
+  _X2 = 0.000000;
+  _X3 = 10.000000;
+  _X4 = cmp_gt(A, _X3);
+  _X5 = 1.000000;
+  _X6 = 0.050000;
+  _X7 = mul(_X6, A);
+  _X8 = 0.500000;
+  _X9 = add(_X7, _X8);
+  _X10 = cond(_X4, _X5, _X9);
+  _X11 = cond(_X1, _X2, _X10);
+}
+)"));
+}
+
+TEST(Op, Max) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  Program program("max", {op::max(A)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X0
+) {
+  _X0[] = >(A[x0, x1]);
+}
+)"));
+}
+
+TEST(Op, Maximum) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "B");
+  Program program("maximum", {op::maximum(A, B)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1],
+  B[B_0, B_1]
+) -> (
+  _X1
+) {
+  _X0 = cmp_lt(A, B);
+  _X1 = cond(_X0, B, A);
+}
+)"));
+}
+
 TEST(Op, Mean) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   Program program("mean", {op::mean(A)});
@@ -100,6 +156,37 @@ TEST(Op, Mean) {
   _X0[] = +(A[x0, x1]);
   _X1 = 200;
   _X2 = div(_X0, _X1);
+}
+)"));
+}
+
+TEST(Op, Min) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  Program program("min", {op::min(A)});  // NOLINT
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X0
+) {
+  _X0[] = <(A[x0, x1]);
+}
+)"));
+}
+
+TEST(Op, Minimum) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "B");
+  Program program("minimum", {op::minimum(A, B)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1],
+  B[B_0, B_1]
+) -> (
+  _X1
+) {
+  _X0 = cmp_lt(A, B);
+  _X1 = cond(_X0, A, B);
 }
 )"));
 }
