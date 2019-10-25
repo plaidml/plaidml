@@ -69,7 +69,6 @@ static void RunTest(const lang::RunInfo& ri, bool addLocations) {
     codegen::proto::LocateMemoryPass lmp;
     auto lmp_dev = lmp.mutable_loc()->add_devs();
     lmp_dev->set_name("OuterMem");
-    lmp_dev->add_units()->set_offset(0);
     lmp_dev = lmp.mutable_loc()->add_devs();
     lmp_dev->set_name("InnerMem");
     lmp_dev->add_units()->set_offset(1);
