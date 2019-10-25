@@ -53,6 +53,80 @@ TEST(Op, abs) {
 )"));
 }
 
+TEST(Op, all) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto all = op::all(I);
+  IVLOG(1, "all done");
+  Program program("all", {all});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X7
+) {
+  _X0 = 0;
+  _X1 = cmp_eq(I, _X0);
+  _X2 = 0;
+  _X3 = 1;
+  _X4 = cond(_X1, _X2, _X3);
+  _X5[] = *(_X4[x0, x1, x2, x3]);
+  _X6 = 8;
+  _X7 = as_uint(_X5, _X6);
+}
+)"));
+}
+
+TEST(Op, any) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto any = op::any(I);
+  IVLOG(1, "any done");
+  Program program("any", {any});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X12
+) {
+  _X0 = 0;
+  _X1 = cmp_eq(I, _X0);
+  _X2 = 0;
+  _X3 = 1;
+  _X4 = cond(_X1, _X2, _X3);
+  _X5[] = +(_X4[x0, x1, x2, x3]);
+  _X6 = 0;
+  _X7 = cmp_eq(_X5, _X6);
+  _X8 = 0;
+  _X9 = 1;
+  _X10 = cond(_X7, _X8, _X9);
+  _X11 = 8;
+  _X12 = as_uint(_X10, _X11);
+}
+)"));
+}
+
+TEST(Op, argmax) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto argmax = op::argmax(I);
+  IVLOG(1, "argmax done");
+  Program program("argmax", {argmax});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X7
+) {
+  _X0[] = >(I[x0, x1, x2, x3]);
+  _X1 = 1;
+  _X2[x0, x1, x2, x3 : 1, 224, 224, 3] = =(_X1[]);
+  _X3 = 0;
+  _X4 = index(_X2, _X3);
+  _X5[] = >(I[x0, x1, x2, x3] == _X0[] ? _X4[x0, x1, x2, x3]);
+  _X6 = 32;
+  _X7 = as_uint(_X5, _X6);
+}
+)"));
+}
+
 TEST(Op, Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
@@ -155,10 +229,9 @@ TEST(Op, Sum) {
 
 TEST(Op, Squeeze) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
-  auto t = op::squeeze( //
-      A,             // tensor to squeeze
-      {1, 3}         // axes to squeeze
-  );
+  auto t = op::squeeze(  //
+      A,                 // tensor to squeeze
+      {1, 3} /* axes to squeeze*/);
   Program program("squeeze", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (
@@ -193,10 +266,9 @@ TEST(Op, Reshape) {
 
 TEST(Op, Tile) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  auto t = op::tile( //
-      A,             // tensor to tile
-      {5, 4}         // tiling factors
-  );
+  auto t = op::tile(  //
+      A,              // tensor to tile
+      {5, 4} /* tiling factors*/);
   Program program("tile", {t});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"(function (

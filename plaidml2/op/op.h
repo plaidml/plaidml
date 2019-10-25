@@ -37,6 +37,18 @@ inline edsl::Tensor abs(const edsl::Tensor& I_or_O  //
   auto args = edsl::make_tuple(I_or_O);
   return details::op("abs", args).as_tensor();
 }
+inline edsl::Tensor all(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
+  auto args = edsl::make_tuple(I, axes, keepdims);
+  return details::op("all", args).as_tensor();
+}
+inline edsl::Tensor any(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
+  auto args = edsl::make_tuple(I, axes, keepdims);
+  return details::op("any", args).as_tensor();
+}
+inline edsl::Tensor argmax(const edsl::Tensor& I, const edsl::Value& axes = edsl::None()) {
+  auto args = edsl::make_tuple(I, axes);
+  return details::op("argmax", args).as_tensor();
+}
 
 inline edsl::Tensor convolution(             //
     const edsl::Tensor& I_or_O,              //
