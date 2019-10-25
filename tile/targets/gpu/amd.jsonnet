@@ -2,13 +2,13 @@ local PARAMS = {
   amd_opencl: {
     LOCAL_MEM_KIB: 32,
     NUM_THREADS: 256,
-    CACHE_WIDTH: 64, 
+    CACHE_WIDTH: 128,
     NUM_UNITS: 64,
     REGS_MEM_B: 128,
     REG_MEM_LAT: 1,
     LOCAL_MEM_LAT: 30,
     GLOBAL_MEM_LAT: 100,
-    ALIGN_SIZE_B: 64,
+    ALIGN_SIZE_B: 128,
     MAX_REFS: 1024,
   },
   amd_metal: {
@@ -109,7 +109,7 @@ local PARAMS = {
                 fail_inner_set: ['no_threads'],
                 clear_outer: true,
                 acc_idxs: true,
-                only_po2: true,
+                only_even: true,
                 odd_size: true,
                 min_out_count: PARAMS[cfg].NUM_UNITS,
                 max_total_size: PARAMS[cfg].LOCAL_MEM_KIB * 1024,
@@ -130,7 +130,7 @@ local PARAMS = {
                 output_cost: 0.0,
                 min_out_count: PARAMS[cfg].NUM_UNITS,
                 split_factor: -100.0,
-                only_po2: true,
+                only_even: true,
               }
             },
 
@@ -250,7 +250,7 @@ local PARAMS = {
                 outer_set: ['eltwise_outer', 'kernel'],
                 inner_set: ['eltwise_middle'],
                 clear_outer: true,
-                only_po2: true,
+                only_even: true,
                 min_count: PARAMS[cfg].NUM_UNITS,
                 max_sizes_product: PARAMS[cfg].NUM_THREADS,
                 min_size: PARAMS[cfg].NUM_THREADS,
