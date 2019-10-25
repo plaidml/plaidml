@@ -137,7 +137,7 @@ sem::StmtPtr LoopInfo::generate(uint64_t threads, uint64_t div, bool skip_edge, 
         if (!inner_cond.get() && acc_cond.get()) {
           inner_cond = acc_cond;
         }
-        auto select = _MaybeSelect(acc_cond, idx_init, _Const(0));
+        auto select = _MaybeSelect(acc_cond, idx_init, _Const(0), {sem::Type::VALUE, DataType::INT32, 1, 0});
         block->append(_Declare({sem::Type::INDEX}, idx_name, select));
         block->append(cur);
         next->append(block);
