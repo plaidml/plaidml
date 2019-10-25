@@ -16,10 +16,8 @@ func @eltwise_add(
 // CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X1"}
 // CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X2"}
 // CHECK-NEXT: attributes  {inputs = 2 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
-// CHECK-NEXT:   stripe.parallel_for ()
-// CHECK-NEXT:       {name = "main", stripe_attrs = {main = unit}} {
-// CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20)
-// CHECK-NEXT:         {stripe_attrs = {eltwise = unit, eltwise_add = unit, kernel = unit}} {
+// CHECK-NEXT:   stripe.parallel_for () {
+// CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20) {
 // CHECK-NEXT:     ^bb0(%i0: !aff, %i1: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %arg2 (%i0, %i1) : !fp32_2
 // CHECK-DAG:        %[[IN1:.*]] = stripe.refine %arg0 (%i0, %i1) : !fp32_2 {stripe_attrs = {eltwise_add = unit}}
@@ -29,9 +27,9 @@ func @eltwise_add(
 // CHECK-DAG:        %[[ADD:.*]] = "eltwise.add"(%[[LOAD2]], %[[LOAD1]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.store %[[OUT]], %[[ADD]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
-// CHECK-NEXT:     }
+// CHECK-NEXT:     } {stripe_attrs = {eltwise = unit, eltwise_add = unit, kernel = unit}}
 // CHECK-NEXT:     stripe.terminate
-// CHECK-NEXT:   }
+// CHECK-NEXT:   } {name = "main", stripe_attrs = {main = unit}}
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
 
@@ -56,12 +54,10 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 // CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[784:512], addr[512:1])">, stripe.name = "_X1"}
 // CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[1:512], addr[512:1])">, stripe.name = "_X2"}
 // CHECK-NEXT: attributes  {inputs = 2 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
-// CHECK-NEXT:   stripe.parallel_for ()
-// CHECK-NEXT:      {name = "main", stripe_attrs = {main = unit}} {
+// CHECK-NEXT:   stripe.parallel_for () {
 // CHECK-NEXT:     %c512 = stripe.affine_const 512
 // CHECK-NEXT:     %c1 = stripe.affine_const 1
-// CHECK-NEXT:     stripe.parallel_for ("x0":784, "x1":1, "x2":512)
-// CHECK-NEXT:        {stripe_attrs = {agg_op_add = unit, combo_op_mul = unit, contraction = unit, kernel = unit}} {
+// CHECK-NEXT:     stripe.parallel_for ("x0":784, "x1":1, "x2":512) {
 // CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %arg2 (%x1, %x2) : !fp32_2
 // CHECK-DAG:        %[[IN1:.*]] = stripe.refine %arg0 (%x1, %x0) : !fp32_2 {stripe_attrs = {contraction = unit}}
@@ -71,9 +67,9 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 // CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.aggregate "add" %[[OUT]] %[[MUL]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
-// CHECK-NEXT:     }
+// CHECK-NEXT:     } {stripe_attrs = {agg_op_add = unit, combo_op_mul = unit, contraction = unit, kernel = unit}}
 // CHECK-NEXT:     stripe.terminate
-// CHECK-NEXT:   }
+// CHECK-NEXT:   } {name = "main", stripe_attrs = {main = unit}}
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
 
@@ -112,14 +108,12 @@ func @double_dot(
 // CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[30:40], addr[40:1])">, stripe.name = "_X2"}
 // CHECK-SAME: %arg3: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:40], addr[40:1])">, stripe.name = "_X3"}
 // CHECK-NEXT: attributes  {inputs = 3 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
-// CHECK-NEXT:   stripe.parallel_for ()
-// CHECK-NEXT:      {name = "main", stripe_attrs = {main = unit}} {
+// CHECK-NEXT:   stripe.parallel_for () {
 // CHECK-NEXT:     %c30 = stripe.affine_const 30
 // CHECK-NEXT:     %c10 = stripe.affine_const 10
 // CHECK-NEXT:     %c40 = stripe.affine_const 40
 // CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.fp32(addr[10:30], addr[30:1])">}
-// CHECK-NEXT:     stripe.parallel_for ("x0":20, "x1":10, "x2":30)
-// CHECK-NEXT:        {stripe_attrs = {agg_op_add = unit, combo_op_mul = unit, contraction = unit, kernel = unit}} {
+// CHECK-NEXT:     stripe.parallel_for ("x0":20, "x1":10, "x2":30) {
 // CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %0 (%x1, %x2) : !fp32_2
 // CHECK-DAG:        %[[IN1:.*]] = stripe.refine %arg0 (%x1, %x0) : !fp32_2 {stripe_attrs = {contraction = unit}}
@@ -129,9 +123,8 @@ func @double_dot(
 // CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.aggregate "add" %[[OUT]] %[[MUL]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
-// CHECK-NEXT:     }
-// CHECK-NEXT:     stripe.parallel_for ("x0":30, "x1":10, "x2":40)
-// CHECK-NEXT:        {stripe_attrs = {agg_op_add = unit, combo_op_mul = unit, contraction = unit, kernel = unit}} {
+// CHECK-NEXT:     } {stripe_attrs = {agg_op_add = unit, combo_op_mul = unit, contraction = unit, kernel = unit}}
+// CHECK-NEXT:     stripe.parallel_for ("x0":30, "x1":10, "x2":40) {
 // CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %arg3 (%x1, %x2) : !fp32_2
 // CHECK-DAG:        %[[IN1:.*]] = stripe.refine %0 (%x1, %x0) : !fp32_2 {stripe_attrs = {contraction = unit}}
@@ -141,9 +134,9 @@ func @double_dot(
 // CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.aggregate "add" %[[OUT]] %[[MUL]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
-// CHECK-NEXT:     }
+// CHECK-NEXT:     } {stripe_attrs = {agg_op_add = unit, combo_op_mul = unit, contraction = unit, kernel = unit}}
 // CHECK-NEXT:     stripe.terminate
-// CHECK-NEXT:   }
+// CHECK-NEXT:   } {name = "main", stripe_attrs = {main = unit}}
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
 
@@ -165,11 +158,9 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X1"})
 // CHECK-NEXT: attributes  {inputs = 1 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
 // CHECK-NEXT:   stripe.parallel_for ()
-// CHECK-NEXT:      {name = "main", stripe_attrs = {main = unit}} {
 // CHECK-NEXT:     %[[CST:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
 // CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.bool(addr[10:20], addr[20:1])">}
-// CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20)
-// CHECK-NEXT:        {stripe_attrs = {eltwise = unit, eltwise_cmp_lt = unit, kernel = unit}} {
+// CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20) {
 // CHECK-NEXT:     ^bb0(%i0: !aff, %i1: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %0 (%i0, %i1) : !bool_2
 // CHECK-DAG:        %[[IN:.*]] = stripe.refine %arg0 (%i0, %i1) : !fp32_2 {stripe_attrs = {eltwise_cmp_lt = unit}}
@@ -177,9 +168,8 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-DAG:        %[[CMP:.*]] = "eltwise.cmp_lt"(%[[LOAD]], %[[CST]]) {type = !eltwise.bool} : (!fp32, !fp32) -> !bool
 // CHECK-DAG:        stripe.store %[[OUT]], %[[CMP]] : !bool_2
 // CHECK-NEXT:       stripe.terminate
-// CHECK-NEXT:     }
-// CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20)
-// CHECK-NEXT:        {stripe_attrs = {eltwise = unit, eltwise_select = unit, kernel = unit}} {
+// CHECK-NEXT:     } {stripe_attrs = {eltwise = unit, eltwise_cmp_lt = unit, kernel = unit}}
+// CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20) {
 // CHECK-NEXT:     ^bb0(%i0: !aff, %i1: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %arg1 (%i0, %i1) : !fp32_2
 // CHECK-DAG:        %[[IN1:.*]] = stripe.refine %0 (%i0, %i1) : !bool_2 {stripe_attrs = {eltwise_select = unit}}
@@ -189,9 +179,9 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-DAG:        %[[SELECT:.*]] = "eltwise.select"(%[[LOAD1]], %[[CST]], %[[LOAD2]]) {type = !eltwise.fp32} : (!bool, !fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.store %[[OUT]], %[[SELECT]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
-// CHECK-NEXT:     }
+// CHECK-NEXT:     } {stripe_attrs = {eltwise = unit, eltwise_select = unit, kernel = unit}}
 // CHECK-NEXT:     stripe.terminate
-// CHECK-NEXT:   }
+// CHECK-NEXT:   } {name = "main", stripe_attrs = {main = unit}}
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
 
@@ -208,11 +198,10 @@ func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32
 // CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
 // CHECK-SAME: %arg1: !fp32_3 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[5:100], addr[5:20], addr[20:1])">, stripe.name = "_X1"}
 // CHECK-NEXT: attributes  {inputs = 1 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
-// CHECK-NEXT:   stripe.parallel_for ()
-// CHECK-NEXT:      {name = "main", stripe_attrs = {main = unit}} {
+// CHECK-NEXT:   stripe.parallel_for () {
 // CHECK:          "stripe.reshape"(%arg1, %arg0) : (!fp32_3, !fp32_2) -> ()
 // CHECK-NEXT:     stripe.terminate
-// CHECK-NEXT:   }
+// CHECK-NEXT:   } {name = "main", stripe_attrs = {main = unit}}
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
 

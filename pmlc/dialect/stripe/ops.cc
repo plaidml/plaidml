@@ -1,6 +1,7 @@
 // Copyright 2019, Intel Corporation
 #include "pmlc/dialect/stripe/ops.h"
 
+#include <string>
 #include <vector>
 
 #include "mlir/IR/OpImplementation.h"
@@ -246,6 +247,261 @@ bool ParseSimple(OpAsmParser* p, OperationState* res, llvm::SmallVectorImpl<OpAs
   // Parse any additional attributes
   r = r || p->parseOptionalAttributeDict(res->attributes);
   return r;
+}
+
+static void printTerminateOp(OpAsmPrinter& p, TerminateOp op) {  // NOLINT
+  p << op.getOperationName();
+}
+
+static ParseResult parseTerminateOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  return mlir::success();
+}
+
+static void printAllocateOp(OpAsmPrinter& p, AllocateOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 0, {}, Type(), false);
+}
+
+static ParseResult parseAllocateOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  llvm::SmallVector<OpAsmParser::OperandType, 0> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 0, {}, static_cast<Type*>(nullptr), false);
+  for (auto& kvp : result.attributes) {
+    if (kvp.first.str() != "layout") continue;
+    TypeAttr ta = kvp.second.dyn_cast<TypeAttr>();
+    if (!ta) continue;
+    auto layout = ta.getValue().dyn_cast<TensorType>();
+    if (!layout) continue;
+    result.addTypes(TensorRefType::get(layout.getElementType(), layout.getRank(), layout.is_const()));
+  }
+  return mlir::failure(r);
+}
+
+void AllocateOp::build(Builder* builder, OperationState& result, TensorType type) {  // NOLINT
+  result.addAttribute("layout", builder->getTypeAttr(type));
+  result.addTypes(TensorRefType::get(type));
+}
+
+static void printRefineOp(OpAsmPrinter& p, RefineOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 1, {}, op.in()->getType(), true);
+}
+
+static ParseResult parseRefineOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  TensorRefType refType;
+  auto aff_type = AffineType::get(parser.getBuilder().getContext());
+  llvm::SmallVector<OpAsmParser::OperandType, 8> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 1, {}, &refType, true);
+  r = r || parser.resolveOperand(operands[0], refType, result.operands);
+  for (size_t i = 1; i < operands.size(); i++) {
+    r = r || parser.resolveOperand(operands[i], aff_type, result.operands);
+  }
+  r = r || parser.addTypeToList(refType, result.types);
+  return mlir::failure(r);
+}
+
+static void printLoadOp(OpAsmPrinter& p, LoadOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 1, {}, op.from()->getType(), false);
+}
+
+static ParseResult parseLoadOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  TensorRefType refType;
+  llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 1, {}, &refType, false);
+  Type eltType = RankedTensorType::get({}, refType.getElementType());
+  r = r || parser.resolveOperand(operands[0], refType, result.operands);
+  r = r || parser.addTypeToList(eltType, result.types);
+  return mlir::failure(r);
+}
+
+static void printStoreOp(OpAsmPrinter& p, StoreOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 2, {}, op.into()->getType(), false);
+}
+
+static ParseResult parseStoreOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  TensorRefType refType;
+  llvm::SmallVector<OpAsmParser::OperandType, 2> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 2, {}, &refType, false);
+  Type eltType = RankedTensorType::get({}, refType.getElementType());
+  r = r || parser.resolveOperand(operands[0], refType, result.operands);
+  r = r || parser.resolveOperand(operands[1], eltType, result.operands);
+  return mlir::failure(r);
+}
+
+static void printAggregateOp(OpAsmPrinter& p, AggregateOp op) {  // NOLINT
+  p << op.getOperation()->getName() << " \"";
+  p << util::stringifyAggregationKind(op.agg());
+  p << "\" ";
+  p.printOperand(op.into());
+  p << " ";
+  p.printOperand(op.from());
+  p << " : " << op.into()->getType();
+  llvm::SmallVector<StringRef, 1> skip;
+  skip.push_back("agg");
+  p.printOptionalAttrDict(op.getOperation()->getAttrs(), skip);
+}
+
+static ParseResult parseAggregateOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  bool r = false;
+  StringAttr agg_op_val;
+  llvm::SmallVector<NamedAttribute, 1> ignore;
+  MLIRContext* ctx = parser.getBuilder().getContext();
+  r = r || parser.parseAttribute(agg_op_val, mlir::NoneType::get(ctx), "agg", ignore);
+  auto agg_op = util::symbolizeAggregationKind(agg_op_val.getValue());
+  if (!agg_op) {
+    return mlir::failure();
+  }
+  auto agg_op_attr = parser.getBuilder().getI64IntegerAttr(static_cast<int64_t>(agg_op.getValue()));
+  result.attributes.emplace_back(mlir::Identifier::get("agg", ctx), agg_op_attr);
+  OpAsmParser::OperandType into;
+  OpAsmParser::OperandType from;
+  r = r || parser.parseOperand(into);
+  r = r || parser.parseOperand(from);
+  TensorRefType refType;
+  r = r || parser.parseColonType(refType);
+  Type eltType = RankedTensorType::get({}, refType.getElementType());
+  r = r || parser.resolveOperand(into, refType, result.operands);
+  r = r || parser.resolveOperand(from, eltType, result.operands);
+  return mlir::failure(r);
+}
+
+static void printAffineConstOp(OpAsmPrinter& p, AffineConstOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 0, {"value"}, Type(), false);
+}
+
+static ParseResult parseAffineConstOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  auto aff_type = AffineType::get(parser.getBuilder().getContext());
+  llvm::SmallVector<OpAsmParser::OperandType, 0> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 0, {"value"}, static_cast<Type*>(nullptr), false);
+  r = r || parser.addTypeToList(aff_type, result.types);
+  return mlir::failure(r);
+}
+
+static void printAffineMulOp(OpAsmPrinter& p, AffineMulOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 1, {"scale"}, Type(), false);
+}
+
+static ParseResult parseAffineMulOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  auto aff_type = AffineType::get(parser.getBuilder().getContext());
+  llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 1, {"scale"}, static_cast<Type*>(nullptr), false);
+  r = r || parser.resolveOperand(operands[0], aff_type, result.operands);
+  r = r || parser.addTypeToList(aff_type, result.types);
+  return mlir::failure(r);
+}
+
+static void printAffineAddOp(OpAsmPrinter& p, AffineAddOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 0, {}, Type(), true);
+}
+
+static ParseResult parseAffineAddOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  auto aff_type = AffineType::get(parser.getBuilder().getContext());
+  llvm::SmallVector<OpAsmParser::OperandType, 4> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 0, {}, static_cast<Type*>(nullptr), true);
+  r = r || parser.resolveOperands(operands, aff_type, result.operands);
+  r = r || parser.addTypeToList(aff_type, result.types);
+  return mlir::failure(r);
+}
+
+static void printParallelForOp(OpAsmPrinter& p, ParallelForOp op) {  // NOLINT
+  p << op.getOperation()->getName() << " (";
+  llvm::SmallVector<StringRef, 8> skip;
+  skip.push_back("ranges");
+  skip.push_back("idx_names");
+  auto names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  for (size_t i = 0; i < op.ranges().size(); i++) {
+    auto idx_name = StringAttr::get("", op.getContext());
+    if (names && names.size() > i) {
+      if (auto str_attr = names.getValue()[i].template dyn_cast<StringAttr>()) {
+        idx_name = str_attr;
+      }
+    }
+    p << idx_name << ":" << op.ranges().getValue()[i].cast<IntegerAttr>().getInt();
+    if (i + 1 != op.ranges().size()) {
+      p << ", ";
+    }
+  }
+  p << ")";
+  p.printRegion(op.inner());
+  p.printOptionalAttrDict(op.getOperation()->getAttrs(), skip);
+}
+
+static ParseResult parseParallelForOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  bool r = false;
+  r = r || parser.parseLParen();
+  MLIRContext* ctx = parser.getBuilder().getContext();
+  std::vector<std::string> idx_name;
+  std::vector<int64_t> idx_range;
+  llvm::SmallVector<mlir::Attribute, 8> ranges;
+  llvm::SmallVector<mlir::Attribute, 8> idx_names;
+  while (!r) {
+    if (!parser.parseOptionalRParen()) {
+      break;
+    }
+    parser.parseOptionalComma();
+    StringAttr idx_name;
+    IntegerAttr idx_range;
+    llvm::SmallVector<NamedAttribute, 2> ignore;
+    r = r || parser.parseAttribute(idx_name, mlir::NoneType::get(ctx), "name", ignore);
+    r = r || parser.parseColon();
+    r = r || parser.parseAttribute(idx_range, Type(), "range", ignore);
+    if (!r) {
+      idx_names.push_back(idx_name);
+      ranges.push_back(idx_range);
+    }
+  }
+  auto ranges_attr = ArrayAttr::get(ranges, ctx);
+  auto idx_names_attr = ArrayAttr::get(idx_names, ctx);
+  result.attributes.emplace_back(mlir::Identifier::get("ranges", ctx), ranges_attr);
+  result.attributes.emplace_back(mlir::Identifier::get("idx_names", ctx), idx_names_attr);
+  result.regions.emplace_back(new Region(nullptr));
+  r = r || parser.parseRegion(*result.regions.back(), {}, {}, false);
+  r = r || parser.parseOptionalAttributeDict(result.attributes);
+  return mlir::failure(r);
+}
+
+void ParallelForOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {  // NOLINT
+  result.addAttribute("ranges", builder->getI64ArrayAttr(ranges));
+  auto region = result.addRegion();
+  Block* body = new Block();
+  for (size_t i = 0; i < ranges.size(); i++) {
+    body->addArgument(AffineType::get(builder->getContext()));
+  }
+  region->push_back(body);
+  OperationState state(result.location, TerminateOp::getOperationName());
+  TerminateOp::build(builder, state);
+  body->push_back(Operation::create(state));
+}
+
+static void printConstraintOp(OpAsmPrinter& p, ConstraintOp op) {  // NOLINT
+  p << op.getOperation()->getName() << " ";
+  p.printOperand(op.input());
+  p.printRegion(op.ge_case());
+  if (!op.lt_case().empty()) {
+    p.printRegion(op.lt_case());
+  }
+}
+
+static ParseResult parseConstraintOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  auto aff_type = AffineType::get(parser.getBuilder().getContext());
+  OpAsmParser::OperandType op;
+  bool r = false;
+  r = r || parser.parseOperand(op);
+  r = r || parser.resolveOperand(op, aff_type, result.operands);
+  result.regions.emplace_back(new Region(nullptr));
+  r = r || parser.parseRegion(*result.regions.back(), {}, {});
+  result.regions.emplace_back(new Region(nullptr));
+  r = r || parser.parseOptionalRegion(*result.regions.back(), {}, {});
+  return mlir::failure(r);
+}
+
+static void printExecuteOnOp(OpAsmPrinter& p, ExecuteOnOp& op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 1, {}, op.from()->getType(), false);
+}
+
+static ParseResult parseExecuteOnOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  TensorRefType refType;
+  llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 1, {}, &refType, false);
+  r = r || parser.resolveOperand(operands[0], refType, result.operands);
+  return mlir::failure(r);
 }
 
 #define GET_OP_CLASSES
