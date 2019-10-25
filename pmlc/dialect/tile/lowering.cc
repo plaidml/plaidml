@@ -19,6 +19,7 @@
 #include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/eltwise/util.h"
+#include "pmlc/dialect/stripe/affine_poly.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/stripe/transcode.h"
@@ -141,11 +142,7 @@ struct AffineConstantOpConversion : public LoweringBase {
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "AffineConstantOpConversion::matchAndRewrite>");
     auto constOp = llvm::cast<AffineConstantOp>(op);
-    auto newOp = rewriter.create<stripe::AffineConstOp>(  //
-        op->getLoc(),                                     //
-        rewriter.getType<stripe::AffineType>(),           //
-        rewriter.getI64IntegerAttr(constOp.value().getSExtValue()));
-    rewriter.replaceOp(op, {newOp});
+    rewriter.replaceOpWithNewOp<stripe::AffinePolyOp>(op, stripe::AffinePolynomial(constOp.value().getSExtValue()));
     return matchSuccess();
   }
 };

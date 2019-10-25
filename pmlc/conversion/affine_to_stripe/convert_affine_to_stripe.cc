@@ -1,6 +1,7 @@
 // Copyright 2019 Intel Corporation
 
 #include "pmlc/conversion/affine_to_stripe/convert_affine_to_stripe.h"
+#include "pmlc/dialect/stripe/affine_poly.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/stripe/util.h"
@@ -55,7 +56,8 @@ using mlir::ConstantIndexOp;
 using mlir::OpRewritePattern;
 using mlir::PatternMatchResult;
 using mlir::PatternRewriter;
-using pmlc::dialect::stripe::AffineConstOp;
+using pmlc::dialect::stripe::AffinePolynomial;
+using pmlc::dialect::stripe::AffinePolyOp;
 using pmlc::dialect::stripe::TerminateOp;
 
 // Declaration of Affine ops converters for supported ops.
@@ -68,9 +70,9 @@ using pmlc::dialect::stripe::TerminateOp;
 #include "supported_ops.inc"
 
 PatternMatchResult ConstantIndexOpConverter::matchAndRewrite(ConstantIndexOp constOp, PatternRewriter& rewriter) const {
-  // AffineConstOp currently has a fixed 64-bit integer type.
-  rewriter.replaceOpWithNewOp<AffineConstOp>(constOp, rewriter.getIntegerType(64),
-                                             constOp.value().cast<mlir::IntegerAttr>());
+  int64_t val = constOp.value().cast<mlir::IntegerAttr>().getInt();
+  // AffinePolyOp currently has a fixed 64-bit integer type.
+  rewriter.replaceOpWithNewOp<AffinePolyOp>(constOp, AffinePolynomial(val));
   return matchSuccess();
 }
 

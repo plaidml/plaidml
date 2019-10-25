@@ -26,8 +26,10 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
       os << str_attr.getValue();
     } else if (auto str_attr = op->getAttrOfType<StringAttr>("scalar_name")) {
       os << "s_" << str_attr.getValue().drop_front();
-    } else if (auto const_op = llvm::dyn_cast<AffineConstOp>(op)) {
-      os << 'c' << const_op.value().getSExtValue();
+    } else if (auto poly_op = llvm::dyn_cast<AffinePolyOp>(op)) {
+      if (poly_op.coeffs().size() == 0) {
+        os << 'c' << poly_op.offset().getSExtValue();
+      }
     }
   }
 

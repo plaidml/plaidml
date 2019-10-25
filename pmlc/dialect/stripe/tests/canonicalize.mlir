@@ -50,8 +50,8 @@ func @no_simplify_useful_refines(%arg0: !fp32_2) -> !fp32_2 {
 
   // CHECK:   stripe.refine
 
-  %c0 = stripe.affine_const 0
-  %c1 = stripe.affine_const 1
+  %c0 = stripe.affine_poly () [], 0
+  %c1 = stripe.affine_poly () [], 1
   %T = stripe.refine %arg0 (%c0, %c1) : !fp32_2
   %0 = stripe.load %T : !fp32_2
   stripe.store %T, %0 : !fp32_2
@@ -61,11 +61,11 @@ func @no_simplify_useful_refines(%arg0: !fp32_2) -> !fp32_2 {
 // CHECK-LABEL: @no_simplify_stripe_attr_refines
 func @no_simplify_stripe_attr_refines(%arg0: !fp32_2) -> !fp32_2 {
 
-  // This test validates that useful stripe.refine ops are not removed.
+  // This test validates that stripe.refine ops with attributes are not removed.
 
   // CHECK:   stripe.refine
 
-  %c0 = stripe.affine_const 0
+  %c0 = stripe.affine_poly () [], 0
   %T = stripe.refine %arg0 (%c0, %c0) : !fp32_2 { stripe_attrs = {} }
   %0 = stripe.load %T : !fp32_2
   stripe.store %T, %0 : !fp32_2

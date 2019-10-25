@@ -24,17 +24,7 @@ AffinePolynomial::AffinePolynomial(Value* value) : constant(0) {
     return;
   }
   auto defOp = value->getDefiningOp();
-  if (auto op = mlir::dyn_cast<AffineConstOp>(defOp)) {
-    // This is a constant
-    constant = op.value().getSExtValue();
-  } else if (auto op = mlir::dyn_cast<AffineMulOp>(defOp)) {
-    *this = AffinePolynomial(op.input());
-    *this *= op.scale().getSExtValue();
-  } else if (auto op = mlir::dyn_cast<AffineAddOp>(defOp)) {
-    for (auto operand : op.inputs()) {
-      *this += AffinePolynomial(operand);
-    }
-  } else if (auto op = mlir::dyn_cast<AffinePolyOp>(defOp)) {
+  if (auto op = mlir::dyn_cast<AffinePolyOp>(defOp)) {
     constant = op.offset().getSExtValue();
     for (size_t i = 0; i < op.coeffs().size(); i++) {
       *this += AffinePolynomial(op.getOperand(i)) * op.getCoeff(i);
