@@ -33,7 +33,7 @@ class Environment : public ::testing::Environment {
   return 0;
 }();
 
-TEST(Op, abs) {
+TEST(Op, Abs) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto abs = op::abs(I);
   IVLOG(1, "Abs done");
@@ -53,7 +53,7 @@ TEST(Op, abs) {
 )"));
 }
 
-TEST(Op, all) {
+TEST(Op, All) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto all = op::all(I);
   IVLOG(1, "all done");
@@ -76,7 +76,7 @@ TEST(Op, all) {
 )"));
 }
 
-TEST(Op, any) {
+TEST(Op, Any) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto any = op::any(I);
   IVLOG(1, "any done");
@@ -104,7 +104,7 @@ TEST(Op, any) {
 )"));
 }
 
-TEST(Op, argmax) {
+TEST(Op, Argmax) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto argmax = op::argmax(I);
   IVLOG(1, "argmax done");
@@ -127,7 +127,7 @@ TEST(Op, argmax) {
 )"));
 }
 
-TEST(Op, max) {
+TEST(Op, Max) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto max = op::max(I);  // NOLINT(build/include_what_you_use)
   IVLOG(1, "max done");
