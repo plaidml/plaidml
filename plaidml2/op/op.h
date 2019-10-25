@@ -83,11 +83,6 @@ inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, float slope) {
   return details::op("hard_sigmoid", args).as_tensor();
 }
 
-inline edsl::Tensor max(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
-  auto args = edsl::make_tuple(I, axes, keepdims);
-  return details::op("max", args).as_tensor();
-}
-
 inline edsl::Tensor maximum(const edsl::Tensor& X, const edsl::Tensor& Y) {
   auto args = edsl::make_tuple(X, Y);
   return details::op("maximum", args).as_tensor();

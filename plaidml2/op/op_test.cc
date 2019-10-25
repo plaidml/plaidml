@@ -113,20 +113,6 @@ TEST(Op, HardSigmoid) {
 )"));
 }
 
-TEST(Op, Max) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  Program program("max", {op::max(A)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  A[A_0, A_1]
-) -> (
-  _X0
-) {
-  _X0[] = >(A[x0, x1]);
-}
-)"));
-}
-
 TEST(Op, Maximum) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "B");
