@@ -97,57 +97,26 @@ static DictionaryAttr TagsToDict(Builder* builder, const stripe::Taggable& tagga
 
 Value* AffineIntoMLIR(           //
     OpBuilder* builder,          //
-    Operation* constBeforeOp,    //
     const SymbolValueMap& idxs,  //
     const stripe::Affine& affine) {
   auto unknownLoc = builder->getUnknownLoc();
-  std::vector<Value*> add_inputs;
+  llvm::SmallVector<Value*, 8> vars;
+  llvm::SmallVector<int64_t, 8> coeffs;
+  int64_t offset = 0;
   for (const auto& kvp : affine.getMap()) {
-    Value* term;
     if (kvp.first.empty()) {
-      OpBuilder::InsertPoint oldInsertPoint;
-      if (constBeforeOp) {
-        oldInsertPoint = builder->saveInsertionPoint();
-        builder->setInsertionPoint(constBeforeOp);
-      }
-      term = builder->create<AffineConstOp>(  //
-          unknownLoc,                         //
-          builder->getType<AffineType>(),     //
-          builder->getI64IntegerAttr(kvp.second));
-      if (constBeforeOp) {
-        builder->restoreInsertionPoint(oldInsertPoint);
-      }
+      offset = kvp.second;
     } else {
-      term = safe_at(idxs, kvp.first);
-      if (kvp.second != 1) {
-        term = builder->createOrFold<AffineMulOp>(  //
-            unknownLoc,                             //
-            builder->getType<AffineType>(),         //
-            term,                                   //
-            builder->getI64IntegerAttr(kvp.second));
-      }
+      vars.push_back(safe_at(idxs, kvp.first));
+      coeffs.push_back(kvp.second);
     }
-    add_inputs.push_back(term);
   }
-  if (add_inputs.size() == 0) {
-    OpBuilder::InsertPoint oldInsertPoint;
-    if (constBeforeOp) {
-      oldInsertPoint = builder->saveInsertionPoint();
-      builder->setInsertionPoint(constBeforeOp);
-    }
-    auto ret = builder->create<AffineConstOp>(  //
-        unknownLoc,                             //
-        builder->getType<AffineType>(),         //
-        builder->getI64IntegerAttr(0));
-    if (constBeforeOp) {
-      builder->restoreInsertionPoint(oldInsertPoint);
-    }
-    return ret;
-  }
-  if (add_inputs.size() == 1) {
-    return add_inputs[0];
-  }
-  return builder->createOrFold<AffineAddOp>(unknownLoc, builder->getType<AffineType>(), add_inputs);
+  return builder->create<AffinePolyOp>(  //
+      unknownLoc,                        //
+      builder->getType<AffineType>(),    //
+      vars,                              //
+      builder->getI64ArrayAttr(coeffs),  //
+      builder->getI64IntegerAttr(offset));
 }
 
 static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const SymbolValueMap& idxs,
@@ -160,7 +129,7 @@ static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const S
     const auto& dev = loc.devs.at(dev_idx);
     for (size_t unit_idx = 0; unit_idx < dev.units.size(); ++unit_idx) {
       const auto& unit = dev.units.at(unit_idx);
-      offsets.emplace_back(AffineIntoMLIR(builder, nullptr, idxs, unit));
+      offsets.emplace_back(AffineIntoMLIR(builder, idxs, unit));
       if (any_non_zero_offsets && (!unit.isConstant() || unit.constant() != 0)) {
         *any_non_zero_offsets = true;
       }
@@ -265,7 +234,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       if (idx.range != 1) {
         throw std::runtime_error("Invalid Stripe: range and affine both set on index");
       }
-      locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, nullptr, outer.idxs, idx.affine));
+      locals.idxs.emplace(idx.name, AffineIntoMLIR(builder, outer.idxs, idx.affine));
     }
   }
 
@@ -315,15 +284,14 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         // these need to be added to the offsets in order for the RefineOp to work correctly.
         if (static_cast<int64_t>(ref.access.size()) < trefTy.getRank()) {
           if (!zero) {
-            zero = builder->create<AffineConstOp>(unknownLoc, builder->getType<AffineType>(),
-                                                  builder->getI64IntegerAttr(0));
+            zero = builder->create<AffinePolyOp>(unknownLoc, AffinePolynomial());
           }
           offsets.resize(trefTy.getRank() - ref.access.size(), zero);
         }
       }
     }
     for (const auto& aff : ref.access) {
-      offsets.push_back(AffineIntoMLIR(builder, nullptr, locals.idxs, aff));
+      offsets.push_back(AffineIntoMLIR(builder, locals.idxs, aff));
     }
     auto refOp = builder->create<RefineOp>(unknownLoc, from->getType(), from, offsets);
     refOp.setAttr("name", builder->getStringAttr(ref.into()));
@@ -337,7 +305,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // Process the constraints
   for (const auto& con : block.constraints) {
     // Make the actual constraint value
-    auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, nullptr, locals.idxs, con));
+    auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, locals.idxs, con));
     // Make the block + attach to the region
     Block* if_body = new Block();
     aif.getOperation()->getRegion(0).push_back(if_body);
@@ -366,7 +334,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       } break;
       case stripe::StmtKind::LoadIndex: {
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
-        Value* from = AffineIntoMLIR(builder, nullptr, locals.idxs, load_idx->from);
+        Value* from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
         Type idx_base = eltwise::ScalarType::get(builder->getContext(), DataType::INT32);
         Type idx_type = eltwise::getRankedTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
@@ -482,7 +450,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     // refinement locations shouldn't be dependent on any external indicies.
     auto offsets = LocationIntoTensorOffsets(&builder, initial.idxs, ref.location, &any_non_zero_offsets);
     if (any_non_zero_offsets) {
-      auto zero = builder.create<AffineConstOp>(loc, builder.getType<AffineType>(), builder.getI64IntegerAttr(0));
+      auto zero = builder.create<AffinePolyOp>(loc, AffinePolynomial());
       offsets.resize(offsets.size() + ref.interior_shape.dims.size(), zero);
       auto refOp = builder.create<RefineOp>(loc, arg->getType(), arg, offsets);
       initial.refs.emplace(ref.into(), refOp);

@@ -293,7 +293,7 @@ struct AffineDomainOpConversion : public LoweringBase {
       llvm::SmallVector<Value*, 4> offsets;
       for (const auto& poly : access) {
         auto affine = Integerize(poly, bounds);
-        offsets.emplace_back(stripe::AffineIntoMLIR(&rewriter, forOp.getOperation(), idxs, affine));
+        offsets.emplace_back(stripe::AffineIntoMLIR(&rewriter, idxs, affine));
       }
       auto srcType = tensors[i]->getType();
       if (!srcType.isa<stripe::TensorRefType>()) {
@@ -318,7 +318,7 @@ struct AffineDomainOpConversion : public LoweringBase {
       lhs -= constraint.rhs;                           // lhs <= 0;
       lhs = -lhs;                                      // lhs >= 0
       IVLOG(3, "constraint: " << lhs << " >= 0");
-      auto affine = stripe::AffineIntoMLIR(&rewriter, forOp.getOperation(), idxs, lhs);
+      auto affine = stripe::AffineIntoMLIR(&rewriter, idxs, lhs);
       auto constraintOp = rewriter.create<stripe::ConstraintOp>(op->getLoc(), affine);
       rewriter.create<stripe::TerminateOp>(op->getLoc());
       auto body = rewriter.createBlock(&constraintOp.ge_case());

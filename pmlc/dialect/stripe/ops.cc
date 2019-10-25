@@ -8,24 +8,36 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/stripe/dialect.h"
+
 namespace pmlc::dialect::stripe {
 
 #include "pmlc/dialect/stripe/ops_interfaces.cc.inc"
 
 namespace {
 
-struct SimplifyAddNothing final : public mlir::OpRewritePattern<AffineAddOp> {
-  explicit SimplifyAddNothing(mlir::MLIRContext* context) : OpRewritePattern<AffineAddOp>(context) {}
+struct SimplifyPoly final : public mlir::OpRewritePattern<AffinePolyOp> {
+  explicit SimplifyPoly(mlir::MLIRContext* context) : OpRewritePattern<AffinePolyOp>(context) {}
 
-  mlir::PatternMatchResult match(AffineAddOp op) const final {
-    if (!op.getNumOperands()) {
+  mlir::PatternMatchResult match(AffinePolyOp op) const final {
+    for (size_t i = 0; i < op.getNumOperands(); i++) {
+      if (op.getOperand(i)->getKind() != Value::Kind::BlockArgument) {
+        return matchSuccess();
+      }
+    }
+    if (op.offset() == 0 && op.coeffs().size() == 1 && op.getCoeff(0) == 1) {
       return matchSuccess();
     }
     return matchFailure();
   }
 
-  void rewrite(AffineAddOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    rewriter.replaceOpWithNewOp<AffineConstOp>(op, rewriter.getType<AffineType>(), rewriter.getI64IntegerAttr(0));
+  void rewrite(AffinePolyOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
+    AffinePolynomial a(op.result());
+    if (a.constant == 0 && a.terms.size() == 1 && a.terms.begin()->second == 1) {
+      rewriter.replaceOp(op, a.terms.begin()->first);
+    } else {
+      rewriter.replaceOpWithNewOp<AffinePolyOp>(op, a);
+    }
   }
 };
 
@@ -143,10 +155,12 @@ struct SimplifyNopRefines final : public mlir::OpRewritePattern<RefineOp> {
 
   mlir::PatternMatchResult match(RefineOp op) const final {
     for (auto* offset : op.offsets()) {
-      auto val = mlir::dyn_cast_or_null<AffineConstOp>(offset->getDefiningOp());
-      if (!val || !!val.value()) {
+      if (AffinePolynomial(offset) != AffinePolynomial()) {
         return matchFailure();
       }
+    }
+    if (op.getAttr(Dialect::getStripeAttrsName())) {
+      return matchFailure();
     }
     return matchSuccess();
   }
@@ -158,8 +172,11 @@ struct SimplifyNopRefines final : public mlir::OpRewritePattern<RefineOp> {
 
 }  // namespace
 
+void AffinePolyOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<SimplifyPoly>(context);
+}
+
 void AffineAddOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
-  results.insert<SimplifyAddNothing>(context);
   results.insert<SimplifyAddSingle>(context);
   results.insert<SimplifyAddConstants>(context);
 }
@@ -182,6 +199,15 @@ void PrintSimple(Operation* op, OpAsmPrinter* p, size_t count, ArrayRef<StringRe
   }
   // Pring the normal (fixed) operands
   p->printOperands(op->operand_begin(), op->operand_begin() + count);
+  // If we can have varargs, print them wrapped in ()'s
+  if (vararg) {
+    if (count == 0) {
+      *p << " ";
+    }
+    *p << "(";
+    p->printOperands(op->operand_begin() + count, op->operand_end());
+    *p << ")";
+  }
   // Print the fixed attributes (which are always integers in our case)
   bool first = (count == 0);
   for (StringRef name : fixed) {
@@ -191,16 +217,23 @@ void PrintSimple(Operation* op, OpAsmPrinter* p, size_t count, ArrayRef<StringRe
       *p << " ";
     }
     first = false;
-    *p << op->getAttrOfType<IntegerAttr>(name).getValue();
-  }
-  // If we can have varargs, print them wrapped in ()'s
-  if (vararg) {
-    if (count > 0) {
-      *p << " ";
+    if (auto at = op->getAttrOfType<IntegerAttr>(name)) {
+      *p << at.getValue();
+    } else if (auto at = op->getAttrOfType<ArrayAttr>(name)) {
+      *p << "[";
+      for (size_t i = 0; i < at.getValue().size(); i++) {
+        if (auto val = at.getValue()[i].dyn_cast<IntegerAttr>()) {
+          if (i != 0) *p << ", ";
+          *p << val.getValue();
+        } else {
+          throw std::runtime_error("Invalid attribute, array isn't integers");
+        }
+      }
+      *p << "]";
+    } else {
+      op->getAttr(name).dump();
+      throw std::runtime_error("Invalid attribute: " + std::string(name));
     }
-    *p << "(";
-    p->printOperands(op->operand_begin() + count, op->operand_end());
-    *p << ")";
   }
   // Print a type (if needed)
   if (otype) {
@@ -226,6 +259,10 @@ bool ParseSimple(OpAsmParser* p, OperationState* res, llvm::SmallVectorImpl<OpAs
     r = r || p->parseOperand(op);
     ops->push_back(op);
   }
+  // If we can have varargs, parse them wrapped in ()'s
+  if (vararg) {
+    r = r || p->parseOperandList(*ops, -1, OpAsmParser::Delimiter::Paren);
+  }
   // Parse the fixed attributes
   for (StringRef name : fixed) {
     if (!first) {
@@ -234,10 +271,6 @@ bool ParseSimple(OpAsmParser* p, OperationState* res, llvm::SmallVectorImpl<OpAs
     Attribute dont_care;
     r = r || p->parseAttribute(dont_care, name, res->attributes);
     first = false;
-  }
-  // If we can have varargs, parse them wrapped in ()'s
-  if (vararg) {
-    r = r || p->parseOperandList(*ops, -1, OpAsmParser::Delimiter::Paren);
   }
   // Parse a type if needed
   if (out_type) {
@@ -360,6 +393,30 @@ static ParseResult parseAggregateOp(OpAsmParser& parser, OperationState& result)
   r = r || parser.resolveOperand(into, refType, result.operands);
   r = r || parser.resolveOperand(from, eltType, result.operands);
   return mlir::failure(r);
+}
+
+static void printAffinePolyOp(OpAsmPrinter& p, AffinePolyOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 0, {"coeffs", "offset"}, Type(), true);
+}
+
+static ParseResult parseAffinePolyOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+  auto aff_type = AffineType::get(parser.getBuilder().getContext());
+  llvm::SmallVector<OpAsmParser::OperandType, 0> operands;
+  bool r = ParseSimple(&parser, &result, &operands, 0, {"coeffs", "offset"}, static_cast<Type*>(nullptr), true);
+  r = r || parser.resolveOperands(operands, aff_type, result.operands);
+  r = r || parser.addTypeToList(aff_type, result.types);
+  return mlir::failure(r);
+}
+
+void AffinePolyOp::build(Builder* builder, OperationState& result, const AffinePolynomial& poly) {  // NOLINT
+  llvm::SmallVector<int64_t, 8> coeffs;
+  for (const auto& kvp : poly.terms) {
+    result.addOperands(kvp.first);
+    coeffs.push_back(kvp.second);
+  }
+  result.addAttribute("coeffs", builder->getI64ArrayAttr(coeffs));
+  result.addAttribute("offset", builder->getI64IntegerAttr(poly.constant));
+  result.addTypes(builder->getType<AffineType>());
 }
 
 static void printAffineConstOp(OpAsmPrinter& p, AffineConstOp op) {  // NOLINT

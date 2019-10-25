@@ -1,5 +1,6 @@
 // RUN: pmlc-opt %s -canonicalize | FileCheck %s
 
+!aff = type !stripe.affine
 !fp32_2 = type !stripe<"tensor_ref !eltwise.fp32:2">
 
 // CHECK-LABEL: @simplify_affines
@@ -11,21 +12,34 @@ func @simplify_affines(%arg0: !fp32_2) -> !fp32_2 {
 
   // CHECK-NOT:    stripe.refine
 
-  %c5 = stripe.affine_const 5
-  %m0 = stripe.affine_mul %c5, 0
+  // Compute 5 * 2 - 8 - 2 in parts, make sure it becomes zero
+  %z = stripe.affine_poly () [], 0
+  %c5 = stripe.affine_poly () [], 5
+  %c10 = stripe.affine_poly () [], 8 
+  %t0 = stripe.affine_poly (%c5) [2], 0
+  %t1 = stripe.affine_poly (%t0, %c10) [1, -1], -2
 
-  %m5 = stripe.affine_mul %c5, 1
-  %s5 = stripe.affine_add (%m5)
-
-  %cNeg1 = stripe.affine_const -1
-  %mNeg5 = stripe.affine_mul %cNeg1, 5
-
-  %empty = stripe.affine_add ()
-  %z = stripe.affine_add (%s5, %mNeg5, %empty)
-
-  %T = stripe.refine %arg0 (%m0, %z) : !fp32_2
+  %T = stripe.refine %arg0 (%t1, %z) : !fp32_2
   %0 = stripe.load %T : !fp32_2
   stripe.store %T, %0 : !fp32_2
+  stripe.terminate
+}
+
+// CHECK-LABEL: @simplify_raw_ref
+func @simplify_raw_ref(%arg0: !fp32_2) -> !fp32_2 {
+
+  // This test makes sure the simple affines that return raw block ops are removed
+
+  // CHECK-NOT:    stripe.affine_poly
+
+  stripe.parallel_for ("i":100) {
+  ^bb0(%i: !aff):
+    %p = stripe.affine_poly (%i) [1], 0
+    %T = stripe.refine %arg0 (%p, %p) : !fp32_2
+    %0 = stripe.load %T : !fp32_2
+    stripe.store %T, %0 : !fp32_2
+    stripe.terminate
+  }
   stripe.terminate
 }
 
@@ -43,3 +57,18 @@ func @no_simplify_useful_refines(%arg0: !fp32_2) -> !fp32_2 {
   stripe.store %T, %0 : !fp32_2
   stripe.terminate
 }
+
+// CHECK-LABEL: @no_simplify_stripe_attr_refines
+func @no_simplify_stripe_attr_refines(%arg0: !fp32_2) -> !fp32_2 {
+
+  // This test validates that useful stripe.refine ops are not removed.
+
+  // CHECK:   stripe.refine
+
+  %c0 = stripe.affine_const 0
+  %T = stripe.refine %arg0 (%c0, %c0) : !fp32_2 { stripe_attrs = {} }
+  %0 = stripe.load %T : !fp32_2
+  stripe.store %T, %0 : !fp32_2
+  stripe.terminate
+}
+

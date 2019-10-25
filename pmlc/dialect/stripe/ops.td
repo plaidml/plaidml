@@ -71,9 +71,21 @@ def AggregateOp : StripeOpWithPP<"aggregate"> {
   let results = (outs);
 }
 
-class AffineOp<string mnemonic> : StripeOpWithPP<mnemonic, [NoSideEffect]> {
+def AffinePolyOp : StripeOpWithPP<"affine_poly", [NoSideEffect]> {
+  let arguments = (ins Variadic<AffineType>:$inputs, I64ArrayAttr:$coeffs, I64Attr:$offset); 
   let results = (outs AffineType:$result);
+  let builders = [OpBuilder<"Builder* builder, OperationState& result, const AffinePolynomial& poly">];
+  let extraClassDeclaration = [{
+    int64_t getCoeff(unsigned i) {
+      return coeffs().getValue()[i].cast<IntegerAttr>().getInt();
+    }
+  }];
+  let hasCanonicalizer = 1;
 }
+
+class AffineOp<string mnemonic> : StripeOpWithPP<mnemonic, [NoSideEffect]> {
+   let results = (outs AffineType:$result);
+ }
 
 def AffineConstOp : AffineOp<"affine_const"> {
   let summary = "A constant affine value";
@@ -98,7 +110,7 @@ def AffineMulOp : AffineOp<"affine_mul"> {
 
 def AffineAddOp : AffineOp<"affine_add"> {
   let summary = "Add multiple affines together";
-  let arguments = (ins Variadic<AffineType>:$inputs); 
+  let arguments = (ins Variadic<AffineType>:$inputs);
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Value* a, Value* b", [{
       result.addOperands(a);
