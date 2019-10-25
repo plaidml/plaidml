@@ -33,7 +33,7 @@ class Environment : public ::testing::Environment {
   return 0;
 }();
 
-TEST(Op, abs) {
+TEST(Op, Abs) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto abs = op::abs(I);
   IVLOG(1, "Abs done");
@@ -49,6 +49,96 @@ TEST(Op, abs) {
   _X1 = cmp_lt(I, _X0);
   _X2 = neg(I);
   _X3 = cond(_X1, _X2, I);
+}
+)"));
+}
+
+TEST(Op, All) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto all = op::all(I);
+  IVLOG(1, "all done");
+  Program program("all", {all});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X7
+) {
+  _X0 = 0;
+  _X1 = cmp_eq(I, _X0);
+  _X2 = 0;
+  _X3 = 1;
+  _X4 = cond(_X1, _X2, _X3);
+  _X5[] = *(_X4[x0, x1, x2, x3]);
+  _X6 = 8;
+  _X7 = as_uint(_X5, _X6);
+}
+)"));
+}
+
+TEST(Op, Any) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto any = op::any(I);
+  IVLOG(1, "any done");
+  Program program("any", {any});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X12
+) {
+  _X0 = 0;
+  _X1 = cmp_eq(I, _X0);
+  _X2 = 0;
+  _X3 = 1;
+  _X4 = cond(_X1, _X2, _X3);
+  _X5[] = +(_X4[x0, x1, x2, x3]);
+  _X6 = 0;
+  _X7 = cmp_eq(_X5, _X6);
+  _X8 = 0;
+  _X9 = 1;
+  _X10 = cond(_X7, _X8, _X9);
+  _X11 = 8;
+  _X12 = as_uint(_X10, _X11);
+}
+)"));
+}
+
+TEST(Op, Argmax) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto argmax = op::argmax(I);
+  IVLOG(1, "argmax done");
+  Program program("argmax", {argmax});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X7
+) {
+  _X0[] = >(I[x0, x1, x2, x3]);
+  _X1 = 1;
+  _X2[x0, x1, x2, x3 : 1, 224, 224, 3] = =(_X1[]);
+  _X3 = 0;
+  _X4 = index(_X2, _X3);
+  _X5[] = >(I[x0, x1, x2, x3] == _X0[] ? _X4[x0, x1, x2, x3]);
+  _X6 = 32;
+  _X7 = as_uint(_X5, _X6);
+}
+)"));
+}
+
+TEST(Op, Max) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto max = op::max(I);  // NOLINT(build/include_what_you_use)
+  IVLOG(1, "max done");
+  Program program("max", {max});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X0
+) {
+  _X0[] = >(I[x0, x1, x2, x3]);
 }
 )"));
 }
