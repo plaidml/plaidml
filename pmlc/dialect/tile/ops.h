@@ -10,9 +10,7 @@
 #include "pmlc/dialect/tile/types.h"
 #include "pmlc/util/enums.h"
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 using eltwise::ScalarType;
 using llvm::APInt;
@@ -53,6 +51,4 @@ namespace OpTrait = mlir::OpTrait;
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ops.h.inc"
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile

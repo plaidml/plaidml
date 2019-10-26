@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-legalize-to-stripe -split-input-file %s | FileCheck %s --dump-input-on-failure
+// RUN: pmlc-opt -tile-legalize-to-stripe -cse -split-input-file %s | FileCheck %s --dump-input-on-failure
 
 func @eltwise_add(
   %arg0: tensor<10x20x!eltwise.fp32>, 
@@ -55,8 +55,6 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 // CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[1:512], addr[512:1])">, stripe.name = "_X2"}
 // CHECK-NEXT: attributes  {inputs = 2 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
 // CHECK-NEXT:   stripe.parallel_for () {
-// CHECK-NEXT:     %c512 = stripe.affine_const 512
-// CHECK-NEXT:     %c1 = stripe.affine_const 1
 // CHECK-NEXT:     stripe.parallel_for ("x0":784, "x1":1, "x2":512) {
 // CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %arg2 (%x1, %x2) : !fp32_2
@@ -109,9 +107,6 @@ func @double_dot(
 // CHECK-SAME: %arg3: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:40], addr[40:1])">, stripe.name = "_X3"}
 // CHECK-NEXT: attributes  {inputs = 3 : i32, outputs = 1 : i32, stripe_attrs = {program = unit}} {
 // CHECK-NEXT:   stripe.parallel_for () {
-// CHECK-NEXT:     %c30 = stripe.affine_const 30
-// CHECK-NEXT:     %c10 = stripe.affine_const 10
-// CHECK-NEXT:     %c40 = stripe.affine_const 40
 // CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.fp32(addr[10:30], addr[30:1])">}
 // CHECK-NEXT:     stripe.parallel_for ("x0":20, "x1":10, "x2":30) {
 // CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
@@ -233,3 +228,30 @@ func @csum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
 // CHECK-NEXT: stripe.terminate
+
+// -----
+
+func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
+  %c3 = "tile.const_dim"() {value = 3 : i64} : () -> index
+  %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
+  %c7 = "tile.const_dim"() {value = 7 : i64} : () -> index
+  %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+  %4 = "tile.domain"() ( {
+  ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
+    %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
+    %6 = "tile.sink_idx_map"(%arg4, %c3, %arg3, %arg2) : (index, index, index, index) -> !tile.imap
+    %7 = "tile.size_map"(%c1, %c7, %c10, %c10) : (index, index, index, index) -> !tile.smap
+    "tile.=(x)"(%7, %5, %6, %arg1) : (!tile.smap, !tile.imap, !tile.imap, tensor<1x7x10x10x!eltwise.fp32>) -> ()
+  }) : () -> tensor<1x7x10x10x!eltwise.fp32>
+  return %4 : tensor<1x7x10x10x!eltwise.fp32>
+}
+
+// CHECK-LABEL: func @use_default
+// CHECK: stripe.parallel_for ("i0":1, "i1":7, "i2":10, "i3":10)
+// CHECK: stripe.load
+// CHECK: stripe.store
+// CHECK: copy = unit
+// CHECK: stripe.parallel_for ("x0":10, "x1":10, "x2":1)
+// CHECK: stripe.load
+// CHECK: stripe.store
+// CHECK: contraction = unit

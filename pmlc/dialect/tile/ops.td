@@ -196,7 +196,18 @@ class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnem
   let arguments = (ins
     AffineSizeMap:$size,
     AffineIndexMap:$src,
-    AffineIndexMap:$sink);
+    AffineIndexMap:$sink,
+    Variadic<RankedTensorOf<[AnyScalar]>>:$init
+  );
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, Value* size, Value* src, Value* sink", [{
+      result.addOperands(size);
+      result.addOperands(src);
+      result.addOperands(sink);
+      result.setOperandListToResizable();
+    }]
+  >];
 
   let extraClassDeclaration = [{
     Value* getSizeMap() { return size(); }
@@ -205,6 +216,12 @@ class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnem
     unsigned getNumOperands() { return 1; }
     AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
     CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
+    Value* getInitializer() {
+      if (getOperation()->getNumOperands() < 4) {
+        return nullptr;
+      }
+      return getOperand(3);
+    }
   }];
 }
 
@@ -213,7 +230,19 @@ class BinaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mne
     AffineSizeMap:$size,
     AffineIndexMap:$src1,
     AffineIndexMap:$src2,
-    AffineIndexMap:$sink);
+    AffineIndexMap:$sink,
+    Variadic<RankedTensorOf<[AnyScalar]>>:$init
+  );
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, Value* size, Value* src1, Value* src2, Value* sink", [{
+      result.addOperands(size);
+      result.addOperands(src1);
+      result.addOperands(src2);
+      result.addOperands(sink);
+      result.setOperandListToResizable();
+    }]
+  >];
 
   let extraClassDeclaration = [{
     Value* getSizeMap() { return size(); }
@@ -222,6 +251,12 @@ class BinaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mne
     unsigned getNumOperands() { return 2; }
     AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
     CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
+    Value* getInitializer() {
+      if (getOperation()->getNumOperands() < 5) {
+        return nullptr;
+      }
+      return getOperand(4);
+    }
   }];
 }
 
@@ -231,7 +266,20 @@ class TernaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mn
     AffineIndexMap:$src1,
     AffineIndexMap:$src2,
     AffineIndexMap:$src3,
-    AffineIndexMap:$sink);
+    AffineIndexMap:$sink,
+    Variadic<RankedTensorOf<[AnyScalar]>>:$init
+  );
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, Value* size, Value* src1, Value* src2, Value* src3, Value* sink", [{
+      result.addOperands(size);
+      result.addOperands(src1);
+      result.addOperands(src2);
+      result.addOperands(src3);
+      result.addOperands(sink);
+      result.setOperandListToResizable();
+    }]
+  >];
 
   let extraClassDeclaration = [{
     Value* getSizeMap() { return size(); }
@@ -240,6 +288,12 @@ class TernaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mn
     unsigned getNumOperands() { return 3; }
     AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
     CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
+    Value* getInitializer() {
+      if (getOperation()->getNumOperands() < 6) {
+        return nullptr;
+      }
+      return getOperand(5);
+    }
   }];
 }
 

@@ -920,7 +920,6 @@ void plaidml_expr_contraction_add_constraint(  //
     plaidml_expr* expr,                        //
     plaidml_poly_expr* lhs,                    //
     plaidml_dim_expr* rhs) {
-  // TODO(MLIR)
   ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_expr_contraction_add_constraint");
     if (!expr) {
@@ -960,11 +959,13 @@ void plaidml_expr_contraction_set_use_default(  //
     plaidml_error* err,                         //
     plaidml_expr* expr,                         //
     plaidml_expr* use_default) {
-  // TODO(MLIR)
   ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_expr_contraction_set_use_default");
     if (!expr) {
       throw std::runtime_error("use_default can only be specified on a contraction.");
+    }
+    if (use_mlir()) {
+      GlobalContext::get()->SetUseDefault(expr->value, use_default->value);
     }
     auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
     if (!cion) {
