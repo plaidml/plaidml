@@ -97,9 +97,30 @@ inline edsl::Tensor convolution(             //
   return details::op("convolution", args).as_tensor();
 }
 
+inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, float slope) {
+  auto args = edsl::make_tuple(I, slope);
+  return details::op("hard_sigmoid", args).as_tensor();
+}
+
+inline edsl::Tensor maximum(const edsl::Tensor& X, const edsl::Tensor& Y) {
+  auto args = edsl::make_tuple(X, Y);
+  return details::op("maximum", args).as_tensor();
+}
+
 inline edsl::Tensor mean(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
   auto args = edsl::make_tuple(I, axes, keepdims);
   return details::op("mean", args).as_tensor();
+}
+
+inline edsl::Tensor min(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(),  // NOLINT
+                        bool keepdims = false) {
+  auto args = edsl::make_tuple(I, axes, keepdims);
+  return details::op("min", args).as_tensor();
+}
+
+inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
+  auto args = edsl::make_tuple(X, Y);
+  return details::op("minimum", args).as_tensor();
 }
 
 inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
