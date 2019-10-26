@@ -2,20 +2,14 @@
 
 #include "pmlc/dialect/stripe/util.h"
 
+#include "mlir/IR/Builders.h"
+
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
 
-#include "mlir/IR/Builders.h"
-#include "mlir/TableGen/Argument.h"
-
 using mlir::NamedAttribute;
 using mlir::OpBuilder;
-using mlir::Value;
-using pmlc::dialect::stripe::AffineConstOp;
-using pmlc::dialect::stripe::AffineType;
 using pmlc::dialect::stripe::ParallelForOp;
-using pmlc::dialect::stripe::RefineOp;
-using pmlc::dialect::stripe::TensorRefType;
 using pmlc::dialect::stripe::TerminateOp;
 
 namespace pmlc {

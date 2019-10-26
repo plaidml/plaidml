@@ -20,7 +20,7 @@
 #include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/eltwise/util.h"
-#include "pmlc/dialect/stripe/analysis.h"
+#include "pmlc/dialect/stripe/affine_poly.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/stripe/transcode.h"
@@ -194,11 +194,7 @@ struct AffineConstantOpConversion : public LoweringBase {
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "AffineConstantOpConversion::matchAndRewrite>");
     auto constOp = llvm::cast<AffineConstantOp>(op);
-    auto newOp = rewriter.create<stripe::AffineConstOp>(  //
-        op->getLoc(),                                     //
-        rewriter.getType<stripe::AffineType>(),           //
-        rewriter.getI64IntegerAttr(constOp.value().getSExtValue()));
-    rewriter.replaceOp(op, {newOp});
+    rewriter.replaceOpWithNewOp<stripe::AffinePolyOp>(op, stripe::AffinePolynomial(constOp.value().getSExtValue()));
     return matchSuccess();
   }
 };
@@ -352,7 +348,7 @@ struct AffineDomainOpConversion : public LoweringBase {
       llvm::SmallVector<Value*, 4> offsets;
       for (const auto& poly : access) {
         auto affine = Integerize(poly, bounds);
-        offsets.emplace_back(stripe::AffineIntoMLIR(&rewriter, forOp.getOperation(), idxs, affine));
+        offsets.emplace_back(stripe::AffineIntoMLIR(&rewriter, idxs, affine));
       }
       auto srcType = tensors[i]->getType();
       if (!srcType.isa<stripe::TensorRefType>()) {
@@ -378,7 +374,7 @@ struct AffineDomainOpConversion : public LoweringBase {
       lhs -= constraint.rhs;                           // lhs <= 0;
       lhs = -lhs;                                      // lhs >= 0
       IVLOG(3, "constraint: " << lhs << " >= 0");
-      auto affine = stripe::AffineIntoMLIR(&rewriter, forOp.getOperation(), idxs, lhs);
+      auto affine = stripe::AffineIntoMLIR(&rewriter, idxs, lhs);
       auto constraintOp = rewriter.create<stripe::ConstraintOp>(op->getLoc(), affine);
       rewriter.create<stripe::TerminateOp>(op->getLoc());
       auto body = rewriter.createBlock(&constraintOp.ge_case());

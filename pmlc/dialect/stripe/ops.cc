@@ -8,133 +8,36 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/stripe/dialect.h"
+
 namespace pmlc::dialect::stripe {
 
 #include "pmlc/dialect/stripe/ops_interfaces.cc.inc"
 
 namespace {
 
-struct SimplifyAddNothing final : public mlir::OpRewritePattern<AffineAddOp> {
-  explicit SimplifyAddNothing(mlir::MLIRContext* context) : OpRewritePattern<AffineAddOp>(context) {}
+struct SimplifyPoly final : public mlir::OpRewritePattern<AffinePolyOp> {
+  explicit SimplifyPoly(mlir::MLIRContext* context) : OpRewritePattern<AffinePolyOp>(context) {}
 
-  mlir::PatternMatchResult match(AffineAddOp op) const final {
-    if (!op.getNumOperands()) {
-      return matchSuccess();
-    }
-    return matchFailure();
-  }
-
-  void rewrite(AffineAddOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    rewriter.replaceOpWithNewOp<AffineConstOp>(op, rewriter.getType<AffineType>(), rewriter.getI64IntegerAttr(0));
-  }
-};
-
-struct SimplifyAddSingle final : public mlir::OpRewritePattern<AffineAddOp> {
-  explicit SimplifyAddSingle(mlir::MLIRContext* context) : OpRewritePattern<AffineAddOp>(context) {}
-
-  mlir::PatternMatchResult match(AffineAddOp op) const final {
-    if (op.getNumOperands() == 1) {
-      return matchSuccess();
-    }
-    return matchFailure();
-  }
-
-  void rewrite(AffineAddOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    rewriter.replaceOp(op, op.getOperand(0));
-  }
-};
-
-struct SimplifyAddConstants final : public mlir::OpRewritePattern<AffineAddOp> {
-  explicit SimplifyAddConstants(mlir::MLIRContext* context) : OpRewritePattern<AffineAddOp>(context) {}
-
-  mlir::PatternMatchResult matchAndRewrite(AffineAddOp op,
-                                           mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    std::size_t constCount = 0;
-    std::int64_t constSum = 0;
-
-    for (auto* operand : op.inputs()) {
-      auto val = mlir::dyn_cast_or_null<AffineConstOp>(operand->getDefiningOp());
-      if (val) {
-        ++constCount;
-        constSum += val.value().getSExtValue();
+  mlir::PatternMatchResult match(AffinePolyOp op) const final {
+    for (size_t i = 0; i < op.getNumOperands(); i++) {
+      if (op.getOperand(i)->getKind() != Value::Kind::BlockArgument) {
+        return matchSuccess();
       }
     }
-
-    if (constCount < 2) {
-      return matchFailure();
-    }
-
-    std::vector<mlir::Value*> operands;
-    operands.reserve(op.getNumOperands() - constCount + (constSum ? 1 : 0));
-    for (auto* operand : op.inputs()) {
-      auto val = mlir::dyn_cast_or_null<AffineConstOp>(operand->getDefiningOp());
-      if (!val) {
-        operands.emplace_back(operand);
-      }
-    }
-    if (constSum) {
-      operands.emplace_back(rewriter.create<AffineConstOp>(op.getLoc(), rewriter.getType<AffineType>(),
-                                                           rewriter.getI64IntegerAttr(constSum)));
-    }
-    rewriter.replaceOpWithNewOp<AffineAddOp>(op, rewriter.getType<AffineType>(), operands);
-
-    return matchSuccess();
-  }
-};
-
-struct SimplifyMulConstOne final : public mlir::OpRewritePattern<AffineMulOp> {
-  explicit SimplifyMulConstOne(mlir::MLIRContext* context) : OpRewritePattern<AffineMulOp>(context) {}
-
-  mlir::PatternMatchResult match(AffineMulOp op) const final {
-    if (op.scale().getSExtValue() == 1) {
+    if (op.offset() == 0 && op.coeffs().size() == 1 && op.getCoeff(0) == 1) {
       return matchSuccess();
     }
     return matchFailure();
   }
 
-  void rewrite(AffineMulOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    rewriter.replaceOp(op, op.input());
-  }
-};
-
-struct SimplifyMulConstValue final : public mlir::OpRewritePattern<AffineMulOp> {
-  explicit SimplifyMulConstValue(mlir::MLIRContext* context) : OpRewritePattern<AffineMulOp>(context) {}
-
-  mlir::PatternMatchResult match(AffineMulOp op) const final {
-    auto val = mlir::dyn_cast_or_null<AffineConstOp>(op.input()->getDefiningOp());
-    if (!val) {
-      return matchFailure();
-    }
-    return matchSuccess();
-  }
-
-  void rewrite(AffineMulOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    auto val = mlir::cast<AffineConstOp>(op.input()->getDefiningOp());
-    auto constValue = val.value().getSExtValue();
-    if (constValue == 0) {
-      rewriter.replaceOp(op, op.input());  // A handy source of a zero
+  void rewrite(AffinePolyOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
+    AffinePolynomial a(op.result());
+    if (a.constant == 0 && a.terms.size() == 1 && a.terms.begin()->second == 1) {
+      rewriter.replaceOp(op, a.terms.begin()->first);
     } else {
-      auto maybeDead = llvm::SmallVector<mlir::Value*, 1>{op.input()};
-      rewriter.replaceOpWithNewOp<AffineConstOp>(maybeDead, op, rewriter.getType<AffineType>(),
-                                                 rewriter.getI64IntegerAttr((op.scale() * constValue).getSExtValue()));
+      rewriter.replaceOpWithNewOp<AffinePolyOp>(op, a);
     }
-  }
-};
-
-struct SimplifyMulConstZero final : public mlir::OpRewritePattern<AffineMulOp> {
-  explicit SimplifyMulConstZero(mlir::MLIRContext* context) : OpRewritePattern<AffineMulOp>(context) {}
-
-  mlir::PatternMatchResult match(AffineMulOp op) const final {
-    if (!op.scale()) {
-      return matchSuccess();
-    }
-    return matchFailure();
-  }
-
-  void rewrite(AffineMulOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    auto maybeDead = llvm::SmallVector<mlir::Value*, 1>{op.input()};
-    rewriter.replaceOpWithNewOp<AffineConstOp>(maybeDead, op, rewriter.getType<AffineType>(),
-                                               rewriter.getI64IntegerAttr(0));
   }
 };
 
@@ -143,10 +46,12 @@ struct SimplifyNopRefines final : public mlir::OpRewritePattern<RefineOp> {
 
   mlir::PatternMatchResult match(RefineOp op) const final {
     for (auto* offset : op.offsets()) {
-      auto val = mlir::dyn_cast_or_null<AffineConstOp>(offset->getDefiningOp());
-      if (!val || !!val.value()) {
+      if (AffinePolynomial(offset) != AffinePolynomial()) {
         return matchFailure();
       }
+    }
+    if (op.getAttr(Dialect::getStripeAttrsName())) {
+      return matchFailure();
     }
     return matchSuccess();
   }
@@ -158,16 +63,8 @@ struct SimplifyNopRefines final : public mlir::OpRewritePattern<RefineOp> {
 
 }  // namespace
 
-void AffineAddOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
-  results.insert<SimplifyAddNothing>(context);
-  results.insert<SimplifyAddSingle>(context);
-  results.insert<SimplifyAddConstants>(context);
-}
-
-void AffineMulOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
-  results.insert<SimplifyMulConstOne>(context);
-  results.insert<SimplifyMulConstValue>(context);
-  results.insert<SimplifyMulConstZero>(context);
+void AffinePolyOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<SimplifyPoly>(context);
 }
 
 void RefineOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
@@ -182,6 +79,15 @@ void PrintSimple(Operation* op, OpAsmPrinter* p, size_t count, ArrayRef<StringRe
   }
   // Pring the normal (fixed) operands
   p->printOperands(op->operand_begin(), op->operand_begin() + count);
+  // If we can have varargs, print them wrapped in ()'s
+  if (vararg) {
+    if (count == 0) {
+      *p << " ";
+    }
+    *p << "(";
+    p->printOperands(op->operand_begin() + count, op->operand_end());
+    *p << ")";
+  }
   // Print the fixed attributes (which are always integers in our case)
   bool first = (count == 0);
   for (StringRef name : fixed) {
@@ -191,16 +97,23 @@ void PrintSimple(Operation* op, OpAsmPrinter* p, size_t count, ArrayRef<StringRe
       *p << " ";
     }
     first = false;
-    *p << op->getAttrOfType<IntegerAttr>(name).getValue();
-  }
-  // If we can have varargs, print them wrapped in ()'s
-  if (vararg) {
-    if (count > 0) {
-      *p << " ";
+    if (auto at = op->getAttrOfType<IntegerAttr>(name)) {
+      *p << at.getValue();
+    } else if (auto at = op->getAttrOfType<ArrayAttr>(name)) {
+      *p << "[";
+      for (size_t i = 0; i < at.getValue().size(); i++) {
+        if (auto val = at.getValue()[i].dyn_cast<IntegerAttr>()) {
+          if (i != 0) *p << ", ";
+          *p << val.getValue();
+        } else {
+          throw std::runtime_error("Invalid attribute, array isn't integers");
+        }
+      }
+      *p << "]";
+    } else {
+      op->getAttr(name).dump();
+      throw std::runtime_error("Invalid attribute: " + std::string(name));
     }
-    *p << "(";
-    p->printOperands(op->operand_begin() + count, op->operand_end());
-    *p << ")";
   }
   // Print a type (if needed)
   if (otype) {
@@ -226,6 +139,10 @@ bool ParseSimple(OpAsmParser* p, OperationState* res, llvm::SmallVectorImpl<OpAs
     r = r || p->parseOperand(op);
     ops->push_back(op);
   }
+  // If we can have varargs, parse them wrapped in ()'s
+  if (vararg) {
+    r = r || p->parseOperandList(*ops, -1, OpAsmParser::Delimiter::Paren);
+  }
   // Parse the fixed attributes
   for (StringRef name : fixed) {
     if (!first) {
@@ -234,10 +151,6 @@ bool ParseSimple(OpAsmParser* p, OperationState* res, llvm::SmallVectorImpl<OpAs
     Attribute dont_care;
     r = r || p->parseAttribute(dont_care, name, res->attributes);
     first = false;
-  }
-  // If we can have varargs, parse them wrapped in ()'s
-  if (vararg) {
-    r = r || p->parseOperandList(*ops, -1, OpAsmParser::Delimiter::Paren);
   }
   // Parse a type if needed
   if (out_type) {
@@ -362,42 +275,28 @@ static ParseResult parseAggregateOp(OpAsmParser& parser, OperationState& result)
   return mlir::failure(r);
 }
 
-static void printAffineConstOp(OpAsmPrinter& p, AffineConstOp op) {  // NOLINT
-  PrintSimple(op.getOperation(), &p, 0, {"value"}, Type(), false);
+static void printAffinePolyOp(OpAsmPrinter& p, AffinePolyOp op) {  // NOLINT
+  PrintSimple(op.getOperation(), &p, 0, {"coeffs", "offset"}, Type(), true);
 }
 
-static ParseResult parseAffineConstOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
+static ParseResult parseAffinePolyOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
   auto aff_type = AffineType::get(parser.getBuilder().getContext());
   llvm::SmallVector<OpAsmParser::OperandType, 0> operands;
-  bool r = ParseSimple(&parser, &result, &operands, 0, {"value"}, static_cast<Type*>(nullptr), false);
-  r = r || parser.addTypeToList(aff_type, result.types);
-  return mlir::failure(r);
-}
-
-static void printAffineMulOp(OpAsmPrinter& p, AffineMulOp op) {  // NOLINT
-  PrintSimple(op.getOperation(), &p, 1, {"scale"}, Type(), false);
-}
-
-static ParseResult parseAffineMulOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
-  auto aff_type = AffineType::get(parser.getBuilder().getContext());
-  llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
-  bool r = ParseSimple(&parser, &result, &operands, 1, {"scale"}, static_cast<Type*>(nullptr), false);
-  r = r || parser.resolveOperand(operands[0], aff_type, result.operands);
-  r = r || parser.addTypeToList(aff_type, result.types);
-  return mlir::failure(r);
-}
-
-static void printAffineAddOp(OpAsmPrinter& p, AffineAddOp op) {  // NOLINT
-  PrintSimple(op.getOperation(), &p, 0, {}, Type(), true);
-}
-
-static ParseResult parseAffineAddOp(OpAsmParser& parser, OperationState& result) {  // NOLINT
-  auto aff_type = AffineType::get(parser.getBuilder().getContext());
-  llvm::SmallVector<OpAsmParser::OperandType, 4> operands;
-  bool r = ParseSimple(&parser, &result, &operands, 0, {}, static_cast<Type*>(nullptr), true);
+  bool r = ParseSimple(&parser, &result, &operands, 0, {"coeffs", "offset"}, static_cast<Type*>(nullptr), true);
   r = r || parser.resolveOperands(operands, aff_type, result.operands);
   r = r || parser.addTypeToList(aff_type, result.types);
   return mlir::failure(r);
+}
+
+void AffinePolyOp::build(Builder* builder, OperationState& result, const AffinePolynomial& poly) {  // NOLINT
+  llvm::SmallVector<int64_t, 8> coeffs;
+  for (const auto& kvp : poly.terms) {
+    result.addOperands(kvp.first);
+    coeffs.push_back(kvp.second);
+  }
+  result.addAttribute("coeffs", builder->getI64ArrayAttr(coeffs));
+  result.addAttribute("offset", builder->getI64IntegerAttr(poly.constant));
+  result.addTypes(builder->getType<AffineType>());
 }
 
 static void printParallelForOp(OpAsmPrinter& p, ParallelForOp op) {  // NOLINT

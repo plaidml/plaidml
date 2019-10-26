@@ -49,8 +49,9 @@ mlir_tblgen(
 plaidml_cc_library(
     name = "stripe",
     srcs = [
+        "affine_poly.cc",
         "analysis.cc",
-	"demo_vectorize.cc",
+        "demo_vectorize.cc",
         "dialect.cc",
         "ops.cc",
         "ops.cc.inc",
@@ -60,6 +61,7 @@ plaidml_cc_library(
         "util.cc",
     ],
     hdrs = [
+        "affine_poly.h",
         "analysis.h",
         "dialect.h",
         "mlir.h",

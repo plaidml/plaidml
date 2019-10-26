@@ -71,44 +71,15 @@ def AggregateOp : StripeOpWithPP<"aggregate"> {
   let results = (outs);
 }
 
-class AffineOp<string mnemonic> : StripeOpWithPP<mnemonic, [NoSideEffect]> {
+def AffinePolyOp : StripeOpWithPP<"affine_poly", [NoSideEffect]> {
+  let arguments = (ins Variadic<AffineType>:$inputs, I64ArrayAttr:$coeffs, I64Attr:$offset); 
   let results = (outs AffineType:$result);
-}
-
-def AffineConstOp : AffineOp<"affine_const"> {
-  let summary = "A constant affine value";
-  let arguments = (ins I64Attr:$value);
-}
-
-def AffineMulOp : AffineOp<"affine_mul"> {
-  let summary = "Multiply an affine by a constant value";
-  let arguments = (ins AffineType:$input, I64Attr:$scale);
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* input, int64_t scale", [{
-      result.addOperands(input);
-      result.addAttribute("scale", builder->getI64IntegerAttr(scale));
-      result.addTypes(AffineType::get(builder->getContext()));
-    }]
-  >];
-  // N.B. Since the multiplication factor is an attribute of the operation,
-  //      a simple folder is inadequate -- multiplication when scale() != 1
-  //      requires the creation of a new AffineConstOp.
-  let hasCanonicalizer = 1;
-}
-
-def AffineAddOp : AffineOp<"affine_add"> {
-  let summary = "Add multiple affines together";
-  let arguments = (ins Variadic<AffineType>:$inputs); 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* a, Value* b", [{
-      result.addOperands(a);
-      result.addOperands(b);
-      result.addTypes(AffineType::get(builder->getContext()));
-    }]
-  >];
-  // N.B. Addition folding may involve combining multiple AffineConstOp
-  //      operation inputs into a single unified AffineConstOp -- which requires
-  //      operation creation, so a simple folder is inadequate.
+  let builders = [OpBuilder<"Builder* builder, OperationState& result, const AffinePolynomial& poly">];
+  let extraClassDeclaration = [{
+    int64_t getCoeff(unsigned i) {
+      return coeffs().getValue()[i].cast<IntegerAttr>().getInt();
+    }
+  }];
   let hasCanonicalizer = 1;
 }
 
