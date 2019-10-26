@@ -55,6 +55,11 @@ inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tenso
   return details::op("binary_crossentropy", args).as_tensor();
 }
 
+inline edsl::Tensor concatenate(const std::vector<edsl::Tensor>& tensors, int axis) {
+  auto args = edsl::make_tuple(edsl::make_tuple(tensors), axis);
+  return details::op("concatenate", args).as_tensor();
+}
+
 inline edsl::Tensor clip(const edsl::Tensor& I, const edsl::Tensor& min, const edsl::Tensor& max) {
   auto args = edsl::make_tuple(I, min, max);
   return details::op("clip", args).as_tensor();
