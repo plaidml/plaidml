@@ -16,7 +16,7 @@ using Operation = std::function<edsl::Value(const edsl::Value& value)>;
 class OperationRegistry {
  public:
   static OperationRegistry* Instance() {
-    static OperationRegistry registry;
+    static OperationRegistry registry = BuildDefault();
     return &registry;
   }
 
@@ -33,10 +33,16 @@ class OperationRegistry {
   }
 
  private:
+  static void AddDefaultOps(OperationRegistry* registry);
+
+  static OperationRegistry BuildDefault() {
+    OperationRegistry registry;
+    AddDefaultOps(&registry);
+    return registry;
+  }
+
   std::unordered_map<std::string, Operation> registry_;
 };
-
-void RegisterOps();
 
 }  // namespace lib
 }  // namespace op

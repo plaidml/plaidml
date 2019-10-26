@@ -2752,8 +2752,7 @@ Value variance(const Value& value) {
   return Value{SumSqDiff / denom};
 }
 
-void RegisterOps() {
-  auto registry = OperationRegistry::Instance();
+void OperationRegistry::AddDefaultOps(OperationRegistry* registry) {
   registry->Register("abs", abs);
   registry->Register("all", all);
   registry->Register("any", any);

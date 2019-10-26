@@ -20,6 +20,13 @@
 extern "C" {
 #endif  // __cplusplus
 
+// Ensures that the PlaidML operation library globals have been initialized.
+//
+// Using this API is optional: if it is not called before the first use of the operation library, the
+// operation library will be automatically initialized at that time.  This API is provided for callers that
+// wish to control initialization order (typically ensuring that all components are loaded prior to performing
+// other expensive computations), or that need to observe initialization failures separately from execution
+// failures.
 PLAIDML_OP_API void plaidml_op_init(  //
     plaidml_error* err);
 

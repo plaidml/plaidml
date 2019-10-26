@@ -18,13 +18,7 @@ extern "C" {
 
 void plaidml_op_init(  //
     plaidml_error* err) {
-  static std::once_flag is_initialized;
-  ffi_wrap_void(err, [&] {
-    std::call_once(is_initialized, []() {
-      IVLOG(1, "plaidml_op_init");
-      lib::RegisterOps();
-    });
-  });
+  ffi_wrap_void(err, [&] { lib::OperationRegistry::Instance(); });
 }
 
 plaidml_expr* plaidml_op_make(  //
