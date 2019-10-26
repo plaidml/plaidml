@@ -55,31 +55,37 @@ const OffsetsMap& TensorType::getOffsets() const { return getImpl()->offsets; }
 bool TensorType::is_const() const { return getImpl()->is_const; }
 
 struct TensorRefTypeStorage : public mlir::TypeStorage {
-  TensorRefTypeStorage(Type elementType, int64_t rank, bool is_const)
-      : elementType(elementType), rank(rank), is_const(is_const) {}
+  TensorRefTypeStorage(Type elementType, int64_t rank, bool is_const, const ArrayRef<TensorDim> inShape)
+      : elementType(elementType), rank(rank), is_const(is_const) {
+    std::copy(inShape.begin(), inShape.end(), std::back_inserter(shape));
+  }
 
-  using KeyTy = std::tuple<Type, int64_t, bool>;
+  using KeyTy = std::tuple<Type, int64_t, bool, const ArrayRef<TensorDim>>;
   bool operator==(const KeyTy& key) const {
-    return elementType == std::get<0>(key) && rank == std::get<1>(key) && is_const == std::get<2>(key);
+    return elementType == std::get<0>(key) && rank == std::get<1>(key) && is_const == std::get<2>(key) &&
+           std::equal(shape.begin(), shape.end(), std::get<3>(key).begin());
   }
   static llvm::hash_code hashKey(const KeyTy& key) { return hash_value(key); }
 
   static TensorRefTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {  // NOLINT
     return new (allocator.allocate<TensorRefTypeStorage>())
-        TensorRefTypeStorage(std::get<0>(key), std::get<1>(key), std::get<2>(key));
+        TensorRefTypeStorage(std::get<0>(key), std::get<1>(key), std::get<2>(key), std::get<3>(key));
   }
 
   Type elementType;
   int64_t rank;
   bool is_const;
+  llvm::SmallVector<TensorDim, 4> shape;
 };
 
 TensorRefType TensorRefType::get(Type elementType, int64_t rank, bool is_const) {
-  return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const);
+  return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const,
+                   /*shape=*/llvm::SmallVector<TensorDim, 0>());
 }
 
 TensorRefType TensorRefType::get(TensorType type) {
-  return Base::get(type.getContext(), Types::TensorRef, type.getElementType(), type.getRank(), type.is_const());
+  return Base::get(type.getContext(), Types::TensorRef, type.getElementType(), type.getRank(), type.is_const(),
+                   type.getShape());
 }
 
 Type TensorRefType::getElementType() const { return getImpl()->elementType; }
@@ -87,6 +93,8 @@ Type TensorRefType::getElementType() const { return getImpl()->elementType; }
 int64_t TensorRefType::getRank() const { return getImpl()->rank; }
 
 bool TensorRefType::is_const() const { return getImpl()->is_const; }
+
+const ArrayRef<TensorDim> TensorRefType::getShape() const { return getImpl()->shape; }
 
 }  // namespace stripe
 }  // namespace dialect

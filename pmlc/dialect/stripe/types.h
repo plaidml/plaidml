@@ -143,6 +143,9 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
 
   /// Check if things are const
   bool is_const() const;
+
+  /// Return the pre-computed TensorType shape for this TensorRefType.
+  const ArrayRef<TensorDim> getShape() const;
 };
 
 }  // namespace stripe

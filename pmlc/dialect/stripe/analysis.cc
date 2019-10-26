@@ -96,6 +96,7 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
     }
     auto attrName = stripe::Dialect::getDialectAttrName("layout");
     auto attr = funcOp.getArgAttrOfType<mlir::TypeAttr>(arg->getArgNumber(), attrName);
+    assert(attr && "Expected 'layout' attribute in TensorRefType function argument");
     ret.base = tensor;
     ret.base_type = attr.getValue().cast<TensorType>();
     ret.access.resize(ret.base_type.getRank());
