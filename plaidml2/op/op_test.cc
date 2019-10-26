@@ -311,6 +311,26 @@ TEST(Op, Max) {
 )"));
 }
 
+TEST(Op, Concatenate) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "A");
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "B");
+  auto concatenate = op::concatenate({A, B}, 2);
+  IVLOG(1, "concvatenate done");
+  Program program("concatenate", {concatenate});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1, A_2, A_3],
+  B[B_0, B_1, B_2, B_3]
+) -> (
+  _X2
+) {
+  _X0[n0, n1, a, n3 : 7, 7, 6, 64] = =(A[n0, n1, a, n3]);
+  _X1[n0, n1, 3 + a, n3 : 7, 7, 6, 64] = =(B[n0, n1, a, n3]);
+  _X2 = add(_X0, _X1);
+}
+)"));
+}
+
 TEST(Op, Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
